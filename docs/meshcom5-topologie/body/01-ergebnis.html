@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshCom 5: Topologie als einzige Quelle</title>
+<style>
+@@CSS@@
+</style>
+</head>
+<body>
+<main>
+<h1>MeshCom 5: die Topologie als einzige Quelle für Nachbarschaft, MHeard, Pfad und NCNT</h1>
+<ul class="meta">
+<li>Stand: 2026-09-25, Fassung 2 mit Flottenzählung vom 25.09.</li>
+<li>Autor: DK5EN, mit Claude</li>
+<li>Codebasis: MeshCom-Firmware Fork, Zweig feature-neighbour-matrix bei 0140b225; der Code der Nachbarschaftsmatrix ist seit d9fc5c5a unverändert</li>
+<li>Ersetzt: Nachbarschaftsmatrix als Kantenpool, Nachbarzahl NCNT Befund und Konzept, Nachbarzähler aus HEY als Zeitreihe, Zwei-Hop-Nachbarschaft in mcmap, MeshCom 5 Topologie Fassung 1 und deren Fable-Verdict; alle vom 24.09., archiviert unter docs/archive/meshcom5-topologie/</li>
+<li>Belege: docs/archive/meshcom5-topologie/evidence/ mit Finder- und Prüfberichten, Replay-Skripten und Messausgaben; Anhang H nennt je Zahl das Skript</li>
+<li>Quelle Code: src/nbr_matrix.{h,cpp}, src/mheard_functions.cpp, src/lora_functions.cpp, src/via_functions.cpp, src/loop_functions.cpp, src/web_functions/web_functions.cpp, src/esp32/udp_frame_esp32.cpp, src/nrf52/udp_frame_nrf52.cpp; upstream/dev bei 472304e8 und die Tags v4.35a bis v4.35t</li>
+<li>Quelle Feld: Mitschnitt DK5EN-98 auf rpizero ~/meshlog/dk5en-98/2026-09-21.log bis 2026-09-24.log, Ende 24.09. 09:28; Web-Seiten von DK5EN-98 am 24.09. 08:55 und 25.09. 16:02</li>
+<li>Quelle Flotte: mcmap-Produktionsschnappschuss 24.09. mit 823 Knoten, INTERLINK-Log 23.09. mit 125.944 eindeutigen HEY-Rahmen, mcmap fleet_firmware 25.09. mit 1.491 meldenden Knoten</li>
+<li>Quelle RAM: Symbolgrößen per nm aus den firmware.elf vom 24.09. auf d9fc5c5a; Strukturgrößen mit xtensa-esp32-elf-gcc und arm-none-eabi-gcc übersetzt</li>
+<li>Quelle App: ~/WebDev/Meshcom-MobileApp, Ursprung rainerfritz/Meshcom-MobileApp</li>
+<li>Rufzeichen: Beobachtungen von DK5EN-98; fremde Rufzeichen erscheinen nur als Beobachtung, nie als Sender</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>Ein Knoten speichert heute dreimal, wen er gehört hat: in MHeard, in der Pfadtabelle und in der Nachbarschaftsmatrix, zusammen @@OLD_C@@ Byte auf klassischem ESP32 und @@OLD_S@@ Byte auf S3. Die Matrix, der einzige Speicher mit Entscheidungen, hat nur 13 oder 21 Zeilen, während Super-Nodes bis 113 Stationen im 2-Hop-Umkreis sehen. Zwei Befunde kommen dazu. Die Rollen sind falsch, sobald die Matrix älter als einige Stunden ist: ein einziger Treffer in 12 Stunden macht eine Station gedeckt, und DB0ED-99 erscheint als redundant, obwohl es DB0FHR-12 allein trägt. Und das Netz befolgt den Via nicht einheitlich: Firmware vor dem 09.06.2026 liest das erste Via-Rufzeichen als Ziel, und nur 37 % der Flotte laufen sicher auf einem Stand, der den Via richtig liest.</p>
+<p>Daraus folgt:</p>
+<ol>
+<li><b>Stufe 1, Kern:</b> Kantenpool mit getrennten Feldern, 64 Zeilen und 64-Bit-Masken auf klassischem ESP32, 128 und 128 Bit auf S3 und nRF52; Deckung nach Verkehrsanteil statt nach einem Treffer; jede Änderung am Kern unter einer Scheduler-Klammer auf nRF52.</li>
+<li><b>Stufe 2, Schatten:</b> Direkt-Erweiterung, Horizont und die Abfrageschicht nbr_views rechnen MHeard, Pfad und NCNT neben den alten Tabellen und vergleichen minütlich, auch auf einem RAK4631.</li>
+<li><b>Stufe 3, Umschaltung:</b> MHeard und Pfadtabelle entfallen; App, Web, Konsole und T-Deck lesen nur noch die Topologie; NCNT zählt Zwei-Wege-Nachbarn; T-Deck sichert die Topologie auf SD.</li>
+<li><b>Stufe 4, Auto-Via für Positionen, zurückgestellt:</b> nur für eigene Positionen und nur dort, wo kein direkter Nachbar den Via falsch liest; Super-Node zuerst, ein Zubringer, wenn er meine Aussendung oft verpasst. Nach der Flottenzählung erfüllt heute nur etwa jeder zwanzigste Knoten die Bedingung.</li>
+</ol>
+<p>Der Speicher sinkt in jeder Familie, obwohl die Zeilenzahl drei- bis sechsmal steigt: netto @@NET_C@@ Byte klassisch, @@NET_X@@ Byte auf E22_XML, @@NET_S@@ Byte auf S3, @@NET_N@@ Byte auf nRF52. Die mcmap-Seite bekommt parallel eine Zählerreihe, benannte 2-Hop-Mengen und Rollen, ohne Änderung an Firmware oder Hub.</p>
+<p class="reco">Empfehlung: Stufe 1 bis 3 als ein Umbau bauen, Abnahme über 24 Stunden Schatten auf DK5EN-98, DK5EN-1 und DK5EN-90; Stufe 4 zurückstellen, bis der Anteil von 4.35p und älter in fleet_firmware unter 20 % fällt.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>So viel Speicher wie möglich sparen, MHeard und Pfadtabelle entfallen</td><td>Beide Tabellen und die dichte Matrix entfallen; die Topologie braucht in jeder Familie weniger als die drei zusammen</td><td>3</td><td>4.10</td></tr>
+<tr><td>2</td><td>Topologie als einzige Quelle der Wahrheit, alles an einem Ort</td><td>Jede Beobachtung wird einmal geschrieben, jeder Leser fragt über nbr_views; dieses Papier ersetzt fünf Papiere und das Verdict</td><td>1 bis 3</td><td>3</td></tr>
+<tr><td>3</td><td>MHeard und Pfad ableiten</td><td>MHeard sind die Zeilen mit frischer Kante zu mir; Pfade sind alle Wege über die Kanten, ferne Absender über Horizont-Einträge</td><td>2, 3</td><td>4.6, 4.7</td></tr>
+<tr><td>4</td><td>NCNT aus der Topologie, symmetrische Nachbarn</td><td>Nachbarn der letzten Stunde, die mich nachweislich hören oder mit geglättet mindestens -16 dB ankommen, ohne Veto aus ihrem HN-Bericht</td><td>3</td><td>4.8</td></tr>
+<tr><td>5</td><td>64 Bit mindestens, Bergknoten mit Hop 2 über 100</td><td>64 Bit und 64 Zeilen klassisch, 128 Bit und 128 Zeilen auf S3 und nRF52</td><td>1</td><td>4.2</td></tr>
+<tr><td>6</td><td>App aus der Topologie, angereichert, speichereffizient</td><td>MH-JSON mit 13 alten und 7 neuen Feldern; Detailwerte bitgepackt in @@EXT_B@@ Byte je direktem Nachbarn</td><td>2, 3</td><td>4.6, 4.9</td></tr>
+<tr><td>7</td><td>Auto-Via über den Super-Node</td><td>Nur eigene Positionen, nur ohne Via-unfähige Nachbarn, Super-Node zuerst, Zubringer bei schwacher Strecke; Ausfall über Lebenszeichen statt Echo; zurückgestellt, weil 63 % der Flotte den Via nicht sicher richtig lesen</td><td>4</td><td>4.11</td></tr>
+<tr><td>8</td><td>T-Deck sichert auf SD</td><td>Schnappschuss /topo.dat alle 10 Minuten, beim Laden auf die neue Bootzeit umgerechnet</td><td>3</td><td>4.12</td></tr>
+<tr><td>9</td><td>Kein Schalter für Upstream-Parität</td><td>Die Topologie ist der Kern von MeshCom 5; MHeard-Code wird entfernt, nicht abgeschaltet</td><td>3</td><td>3</td></tr>
+<tr><td>10</td><td>Was ein Kantenpool ist, mit Grafiken</td><td>Pool fester Größe für belegte Zellen, zwei Masken je Zeile, Verdrängung nach Alter</td><td>1</td><td>4.1</td></tr>
+<tr><td>11</td><td>Was zu Fall A und Fall B führt</td><td>Allein-Menge nicht leer heißt Fall A; unverändert, nur die Deckung rechnet nach Anteil</td><td>1</td><td>4.4</td></tr>
+<tr><td>12</td><td>Super-Node und Redundant richtig entscheiden; DB0ED-99 falsch dargestellt</td><td>Ursache ist die Ein-Treffer-Deckung; Deckung ab 10 % des Verkehrs des stärksten Hörers</td><td>1</td><td>4.3</td></tr>
+<tr><td>13</td><td>RAM aller 32 Umgebungen</td><td>Tabelle je Umgebung aus dem Build vom 24.09.</td><td>-</td><td>4.10</td></tr>
+<tr><td>14</td><td>NCNT-Befunde B1 bis B6</td><td>B1, B2, B4, B5 entfallen durch den Umbau; B3 und B6 bleiben bewusst, B6 als fünfter Leser genannt</td><td>3</td><td>4.8</td></tr>
+<tr><td>15</td><td>mcmap: Spitzen, 2-Hop, Rollen</td><td>Zählerreihe, benannte Nachbarschaft, Rollen; nur mcmap, 7 Tage</td><td>M1 bis M3</td><td>4.13</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>RAM netto klassisch / S3 / nRF52</th><th>Auf der Luft</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td>MHeard, Pfadtabelle, dichte Matrix 13 oder 21 Zeilen, Ein-Treffer-Deckung, NCNT aus MHeard, Auto-Via auskommentiert</td><td>-</td><td>0 / 0 / 0</td><td>R&lt;n&gt; und /N einseitig, Deckel 30 oder 80</td><td>-</td></tr>
+<tr><td>1 Kern</td><td>Kantenpool, getrennte Felder, NbrMask, Rufzeichenwort, Anteilsdeckung, Scheduler-Klammer, Minuten-Sweep</td><td>5, 10, 11, 12</td><td>vorübergehend mehr, alte Tabellen laufen weiter</td><td>Relays: mehr Fall A, wo heute ein Zufallstreffer deckt</td><td>Replay-Werkzeug, neue Host-Tests</td></tr>
+<tr><td>2 Schatten</td><td>Direkt-Erweiterung, Horizont, nbr_views, [TOPO]-Vergleich</td><td>3, 6 als Rechnung</td><td>vorübergehend mehr</td><td>unverändert</td><td>Stufe 1</td></tr>
+<tr><td>3 Umschaltung</td><td>alte Tabellen entfernt, alle Leser auf nbr_views, NCNT symmetrisch, topo.dat</td><td>1, 2, 3, 4, 6, 8, 9, 14</td><td>@@NET_C@@ / @@NET_S@@ / @@NET_N@@ B</td><td>NCNT zählt Zwei-Wege-Nachbarn, Deckel 63 oder 127</td><td>24 h Schatten ohne ungeklärte Abweichung, drei Familien</td></tr>
+<tr><td>4 Auto-Via</td><td>Via-Menge für eigene Positionen, Erkennung Via-unfähiger Nachbarn, Zubringer, Lebenszeichen, Echo-Log</td><td>7</td><td>in Stufe 3 enthalten</td><td>Positionen nennen Super-Node und Zubringer; nicht genannte Nachbarn wiederholen sie nicht</td><td>Anteil 4.35p und älter unter 20 %, Standort ohne Via-unfähigen Nachbarn</td></tr>
+<tr><td>M1 bis M3</td><td>mcmap: Zählerreihe, benannte Nachbarschaft, Rollen</td><td>15</td><td>-</td><td>unverändert</td><td>Schema-Migration, 7 Tage Daten</td></tr>
+</table>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+<li><a href="#s1">Ergebnis</a></li>
+<li><a href="#s2">Ausgangslage</a></li>
+<li><a href="#s3">Zielbild</a></li>
+<li><a href="#s4">Bausteine</a>: 4.1 Kantenpool, 4.2 Zeilen und Masken, 4.3 Deckung und Rollen, 4.4 Fall A und B, 4.5 Nebenläufigkeit, 4.6 MHeard, 4.7 Pfad und Horizont, 4.8 NCNT, 4.9 App, 4.10 RAM, 4.11 Auto-Via, 4.12 T-Deck, 4.13 mcmap</li>
+<li><a href="#s5">Fehlerszenarien</a></li>
+<li><a href="#s6">Rollout</a></li>
+<li><a href="#s7">Offene Punkte</a></li>
+<li><a href="#anh">Anhang</a>: A Messungen, B Schnappschuss, C Baudaten, D Flottenmessung, E Umbaustellen, F Befundregister, G Widerlegte Annahmen, H Belege und Archiv</li>
+</ol>

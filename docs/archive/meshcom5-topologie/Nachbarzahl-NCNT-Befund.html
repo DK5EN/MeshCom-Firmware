@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nachbarzahl NCNT: Befund und Konzept</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .dash .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+
+</style>
+</head>
+<body>
+<main>
+<h1>Nachbarzahl NCNT und Pfadtabelle: Befund und Konzept</h1>
+<ul class="meta">
+  <li>Stand: 2026-09-24</li>
+  <li>Autor: Claude für DK5EN</li>
+  <li>Quelle Firmware: MeshCom-Firmware-DEV-Main, Zweig <code>feature-neighbour-matrix</code> bei <code>d9fc5c5a</code>; alle hier beschriebenen Stellen sind wortgleich auch in <code>upstream/dev</code> vorhanden, geprüft per <code>git grep</code></li>
+  <li>Quelle Messung: <code>~/Downloads/dk5en-98/2026-09-20.log</code>, Mitschnitt DK5EN-98, 2026-09-20 11:17 bis 23:56 MESZ</li>
+  <li>Verwandtes Papier: <code>~/Desktop/Nachbarzaehler-Zeitreihe.html</code> behandelt dieselbe Zahl auf der mcmap-Seite; dieses Papier behandelt nur die Firmware</li>
+  <li>Rufzeichen im Text sind reale Stationen aus dem Mitschnitt, nur als Messbeispiel zitiert</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>Die Nachbarzahl eines Knotens ist eine einzige Messung: <code>getMheardCount()</code> zählt die Stationen, die er in der letzten Stunde direkt gehört hat. Er verschickt sie auf zwei Wegen, als <code>R&lt;n&gt;;</code> im HEY und als <code>/N&lt;n&gt;</code> im Positionsbeacon. Der Empfänger legt den Wert aber in zwei getrennten Kopien ab, die drei verschiedene Schreiber unterschiedlich pflegen. Web-Seite und App zeigen deshalb zeitweise verschiedene Werte für denselben Knoten, und ein über Relais gehörter HEY überschreibt Datum und Typ des Direkt-Eintrags.</p>
+<p>Daraus folgt:</p>
+<ol>
+  <li><b>Stufe 1, eine Kopie:</b> alle Schreiber und alle Anzeigen benutzen denselben Speicher, dazu zwei kleine Randkorrekturen. Nur Firmware, nichts auf der Luft ändert sich.</li>
+  <li><b>Stufe 2, Herkunft und Alter:</b> der gespeicherte Wert trägt Quelle und Empfangszeit. Ein HEY über Relais setzt nur noch die Nachbarzahl und lässt den Direkt-Eintrag sonst unberührt.</li>
+  <li><b>Stufe 3, Null auf der Luft:</b> <code>/N0</code> senden, dekodieren und übernehmen. Das ist eine Formatänderung auf der Luft für einen Nutzen von höchstens 15 Minuten Aktualität.</li>
+</ol>
+<p class="reco">Empfehlung: Stufe 1 bauen und als kleinen Upstream-PR anbieten. Stufe 2 erst nach Rücksprache mit Kurt, weil sie eine bewusst gebaute Upstream-Logik ändert. Stufe 3 nicht bauen. Den toten Beacon-Auslöser bei Zähleränderung nicht reparieren.</p>
+</div>
+
+<h3>Antworten auf die Ausgangsfragen</h3>
+<table>
+<tr><th>Nr</th><th>Frage</th><th>Antwort</th><th>Abschnitt</th></tr>
+<tr><td>F1</td><td>Welche Rahmen landen in der Pfadtabelle der Web-Seite „Path Information“?</td><td>Nur HEY-Rahmen <code>@</code>, nur über LoRa, nur mit mindestens einem Relais im Pfad, nie das eigene Rufzeichen, nur mit gültiger Uhr. Pro Absender eine Zeile, der kürzeste Pfad der letzten 12 Stunden gewinnt.</td><td>2.2</td></tr>
+<tr><td>F2</td><td>Fließt die Pfadtabelle in die Nachbarzahl ein?</td><td>Nein. Die Nachbarzahl zählt MHeard-Einträge, und MHeard ist nach dem letzten Sender <code>msg_source_last</code> geschlüsselt, also nur direkt gehörte Stationen.</td><td>2.1</td></tr>
+<tr><td>F3</td><td>Welche Rahmentypen zählen als Nachbar?</td><td>Position <code>!</code>, Text <code>:</code> samt Text-ACK, HEY <code>@</code>, Duplikate eingeschlossen. Nicht: Binär-ACK 0x41, HN-Bericht, Rahmen von unkonfigurierten Rufzeichen.</td><td>2.1</td></tr>
+<tr><td>F4</td><td>Können sich die Werte widersprechen?</td><td>Ja, an sechs Stellen, siehe Befundliste. Der Absender misst nur einmal; die Widersprüche entstehen erst beim Empfänger.</td><td>1, 4</td></tr>
+</table>
+
+<h3>Befundliste</h3>
+<table>
+<tr><th>Nr</th><th>Befund</th><th>Folge</th><th>Schwere</th><th>Stufe</th></tr>
+<tr><td>B1</td><td>Zwei Kopien der NCNT: Kopie A <code>mheardRecords[].mr_ncount</code> liest nur die Web-Seite, Kopie B <code>mheardNCount[]</code> lesen <code>--mheard</code>, App/BLE-JSON und T-Deck. Ein Positionsbeacon über Relais schreibt nur Kopie B.</td><td>Web und App zeigen verschiedene NCNT, bis der Knoten wieder direkt gehört wird.</td><td>mittel</td><td>1</td></tr>
+<tr><td>B2</td><td>Die „REP action“ in <code>updateHeyPath()</code> überschreibt bei einem HEY über Relais den Direkt-Eintrag des Absenders mit Datum, Uhrzeit, Typ, Hop-Zahl und Mesh des Relais-Rahmens, behält aber RSSI, SNR, Hardware, Modulation und Distanz der alten Direktmessung.</td><td>Die Web-Karte zeigt „gehört 07:50“ mit RSSI von 06:10. Sortierung und Stundenzähler laufen dagegen nach <code>mheardMillis[]</code>, das nicht erneuert wird.</td><td>mittel</td><td>2</td></tr>
+<tr><td>B3</td><td>Eine Nachbarzahl 0 kommt nur über HEY an: der Sender lässt <code>/N0</code> weg, der Dekoder verlangt eine Ziffer 1 bis 9, der Empfänger übernimmt nur Werte größer 0.</td><td>Veralteter Wert größer 0 bis zum nächsten HEY, im Standard höchstens 15 Minuten.</td><td>niedrig</td><td>3</td></tr>
+<tr><td>B4</td><td>Beim ersten direkt gehörten Positionsbeacon eines neuen Nachbarn geht <code>/N</code> verloren, weil der Eintrag erst danach angelegt wird.</td><td>NCNT 0 bis zum nächsten HEY oder Beacon dieses Nachbarn.</td><td>niedrig</td><td>1</td></tr>
+<tr><td>B5</td><td>Bei voller Pfadtabelle übernimmt der wiederverwendete Platz die Hop-Zahl des Vorgängers; ein neuer Absender mit längerem Pfad wird abgewiesen, der alte Eintrag bleibt.</td><td>Neue ferne Stationen fehlen in „Path Information“, solange die Tabelle voll ist.</td><td>niedrig</td><td>1</td></tr>
+<tr><td>B6</td><td>Der Auslöser „Nachbarzahl geändert, Beacon senden“ in <code>esp32_main.cpp</code> und <code>nrf52_main.cpp</code> kann nicht feuern, weil <code>posinfo_timer_min</code> in jeder Schleife ohne fälligen Beacon auf jetzt gesetzt wird.</td><td>Toter Code. Repariert würde er wegen seiner Sperre von 60 s bis zu 60 Beacons pro Stunde erzeugen.</td><td>Hinweis</td><td>keine</td></tr>
+</table>
+<p>Kein Befund, aber wichtig für die Lesart: NCNT existiert nur für Stationen, die man selbst direkt hört. Die Zahl eines Knotens, der nur über Relais ankommt, wird dekodiert und verworfen. Außerdem trägt ein HEY mehrere Zahlen, das <code>R&lt;n&gt;</code> des Absenders und je Relais eine Gruppe <code>NCT,RSSI,SNR</code>; MHeard liest nur die erste, die Nachbarschaftsmatrix und mcmap lesen andere Teile.</p>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Behebt</th><th>Bleibt offen</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td>zwei Kopien, drei Schreiber, REP-Überschreibung</td><td>nichts</td><td>B1 bis B6</td><td>keine</td></tr>
+<tr><td>1 eine Kopie</td><td>Web-Seite liest Kopie B wie alle anderen, <code>/N</code> beim ersten Beacon nachgetragen, Pfadtabellen-Platz beim Wiederverwenden zurückgesetzt</td><td>B1, B4, B5</td><td>B2, B3</td><td>nur Firmware, Host-Test, kein Luftformat</td></tr>
+<tr><td>2 Herkunft und Alter</td><td>NCNT mit Quelle <code>R</code> oder <code>N</code> und Empfangszeit, Anzeige des Alters; REP schreibt nur noch NCNT</td><td>B2, Lesbarkeit von B3</td><td>B3 selbst</td><td>Stufe 1, Zustimmung Kurt</td></tr>
+<tr><td>3 Null auf der Luft</td><td><code>/N0</code> senden, dekodieren, übernehmen</td><td>B3</td><td>Altknoten ignorieren <code>/N0</code> weiter</td><td>Upstream-Absprache, alle drei Stellen gleichzeitig</td></tr>
+</table>
+
+<ol class="toc">
+  <li><a href="#s1">Ergebnis</a></li>
+  <li><a href="#s2">Ausgangslage</a></li>
+  <li><a href="#s3">Zielbild</a></li>
+  <li><a href="#s4">Bausteine</a></li>
+  <li><a href="#s5">Fehlerszenarien</a></li>
+  <li><a href="#s6">Rollout</a></li>
+  <li><a href="#s7">Offene Punkte</a></li>
+</ol>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Ein Knoten misst seine Nachbarzahl einmal und sendet sie zweimal. Wer sie empfängt, verteilt sie über drei Schreibfunktionen auf zwei Kopien, und jede Anzeige liest nur eine davon.</p>
+
+<h3>2.1 Die Nachbarzahl beim Absender</h3>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Messung</td><td>Zahl der MHeard-Einträge, die in der letzten Stunde gehört wurden, gemessen nach <code>millis()</code></td><td><code>mheard_functions.cpp:103</code>, <code>:691</code></td></tr>
+<tr><td>Schlüssel eines MHeard-Eintrags</td><td><code>msg_source_last</code>, der letzte Sender des Rahmens; bei einem weitergeleiteten Rahmen ist das das Relais, also immer eine direkt gehörte Station</td><td><code>lora_functions.cpp:1076</code></td></tr>
+<tr><td>Zählende Rahmen</td><td><code>!</code>, <code>:</code>, <code>@</code>; Duplikate zählen mit, <code>updateMheard()</code> fragt <code>rx_dup</code> nicht ab. Das eigene Echo zählt nicht.</td><td><code>lora_functions.cpp:1056</code>, <code>:1195</code></td></tr>
+<tr><td>Nicht zählende Rahmen</td><td>Binär-ACK 0x41, von <code>handleACK()</code> vorher verbraucht; HN-Bericht, verlässt OnRxDone früh; unkonfigurierte Rufzeichen, RX-01</td><td><code>lora_functions.cpp:648</code>, <code>:773</code>, <code>:958</code></td></tr>
+<tr><td>Uhr-Schranke</td><td>Ohne Datum ab 2025 legt <code>updateMheard()</code> nichts an; ein Knoten ohne Uhr meldet 0 bis auf Einträge aus der Persistenz</td><td><code>mheard_functions.cpp:303</code></td></tr>
+<tr><td>Obergrenze</td><td>Tabellengröße <code>MAX_MHEARD</code>: 30 klassischer ESP32, 50 XML/SBUFFER-Builds, 80 ESP32-S3 und RAK4631, 10 Entwicklervariante</td><td><code>configuration_global.h:301-333</code></td></tr>
+<tr><td>Versand im HEY</td><td><code>R&lt;n&gt;;</code> immer, auch 0, alle 15 Minuten im Standard</td><td><code>loop_functions.cpp:5095</code>, <code>configuration_global.h:272</code></td></tr>
+<tr><td>Versand im Beacon</td><td><code>/N&lt;n&gt;</code> nur wenn n größer 0, auf 99 gekappt, alle 30 Minuten im Standard</td><td><code>loop_functions.cpp:4545-4551</code>, <code>configuration_global.h:271</code></td></tr>
+<tr><td>Relais-Anhang im HEY</td><td>jedes Relais und jedes Gateway hängt <code>NCT,RSSI,SNR;</code> mit seiner eigenen Zahl an</td><td><code>aprs_functions.cpp:1145</code>, <code>lora_functions.cpp:1736</code>, <code>:1863</code></td></tr>
+</table>
+
+<h3>2.2 Die Pfadtabelle</h3>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Eingang</td><td>nur <code>payload_type == '@'</code> aus dem LoRa-Empfang</td><td><code>lora_functions.cpp:1202</code></td></tr>
+<tr><td>Filter</td><td>Datum ab 2025, nicht das eigene Rufzeichen, Pfad muss ein Komma enthalten, also mindestens ein Relais</td><td><code>mheard_functions.cpp:482-488</code>, <code>:637</code></td></tr>
+<tr><td>Anzeige</td><td>Pfad ab dem ersten Relais, der Absender selbst steht als Überschrift; Zahl = Hop-Zahl, „G“ = Ziel <code>HG</code>, also von einem Gateway</td><td><code>mheard_functions.cpp:625-662</code>, <code>web_functions.cpp:1559</code></td></tr>
+<tr><td>Ersetzungsregel</td><td>ein neuer HEY ersetzt die Zeile nur bei gleicher oder kleinerer Hop-Zahl; nach 12 Stunden verfällt die Zeile</td><td><code>mheard_functions.cpp:584</code>, <code>:622</code></td></tr>
+<tr><td>Größe</td><td><code>MAX_MHPATH</code>: 40 klassischer ESP32, 50 XML/SBUFFER, 100 ESP32-S3 und RAK4631, 10 Entwicklervariante</td><td><code>configuration_global.h:302-334</code></td></tr>
+</table>
+<p>Die alten Zeitstempel in „Path Information“, etwa DB0HOB-12 um 05:49 bei laufendem HEY-Verkehr, sind deshalb kein Fehler: die Zeile zeigt den besten Pfad der letzten 12 Stunden und dessen Zeit, nicht den letzten.</p>
+
+<h3>2.3 Die Nachbarzahl beim Empfänger</h3>
+<table>
+<tr><th>Schreiber</th><th>Auslöser</th><th>Kopie A <code>mr_ncount</code></th><th>Kopie B <code>mheardNCount[]</code></th><th>Quelle</th></tr>
+<tr><td><code>updateMheard()</code></td><td>jeder zählende Rahmen</td><td>übernimmt Kopie B, wenn der Rahmen selbst 0 trägt</td><td>gleich A</td><td><code>mheard_functions.cpp:404-416</code></td></tr>
+<tr><td>Positionszweig, direkt</td><td><code>!</code> mit <code>/N</code>, Absender = letzter Sender</td><td>über den folgenden <code>updateMheard()</code></td><td>ja, aber nur wenn der Eintrag schon existiert</td><td><code>lora_functions.cpp:1155-1158</code></td></tr>
+<tr><td>Positionszweig, über Relais</td><td><code>!</code> mit <code>/N</code>, Absender ungleich letzter Sender</td><td><b>nein</b></td><td>ja, wenn der Absender selbst in MHeard steht</td><td><code>lora_functions.cpp:1177-1186</code></td></tr>
+<tr><td><code>updateHeyPath()</code></td><td><code>@</code> mit <code>R&lt;n&gt;</code>, Absender in MHeard</td><td>ja, samt Datum, Typ, Hop-Zahl, Mesh</td><td>ja</td><td><code>mheard_functions.cpp:537-551</code></td></tr>
+</table>
+<table>
+<tr><th>Anzeige</th><th>liest</th><th>Quelle</th></tr>
+<tr><td>Web-Seite MHeard</td><td>Kopie A</td><td><code>web_functions.cpp:1511</code></td></tr>
+<tr><td>App und BLE-JSON</td><td>Kopie B</td><td><code>mheard_functions.cpp:919-920</code></td></tr>
+<tr><td>Konsole <code>--mheard</code></td><td>Kopie B</td><td><code>mheard_functions.cpp:992</code></td></tr>
+<tr><td>T-Deck</td><td>Kopie B</td><td><code>mheard_functions.cpp:1184</code></td></tr>
+<tr><td>automatische VIA-Wahl</td><td>Kopie B, seit 2026-07-22 auskommentiert</td><td><code>via_functions.cpp:165-190</code></td></tr>
+</table>
+
+<figure><div class="fig">
+<svg viewBox="0 0 960 420" role="img" aria-label="Datenfluss der Nachbarzahl beim Empfaenger">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a37"/></marker>
+  <marker id="arx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c62828"/></marker></defs>
+  <text x="20" y="24" class="t11 b">Rahmen</text><text x="250" y="24" class="t11 b">Schreiber</text><text x="560" y="24" class="t11 b">Speicher</text><text x="800" y="24" class="t11 b">Anzeige</text>
+  <!-- column A -->
+  <rect x="20" y="40" width="180" height="66" class="node hamf ham"/>
+  <text x="30" y="60" class="b">! : @ Rahmen</text><text x="30" y="76" class="t11">auch Duplikate</text><text x="30" y="92" class="t11">Schluessel: letzter Sender</text>
+  <rect x="20" y="150" width="180" height="66" class="node hamf ham"/>
+  <text x="30" y="170" class="b">! Positionsbeacon</text><text x="30" y="186" class="mono">/N&lt;n&gt;, nur n &gt; 0</text><text x="30" y="202" class="t11">direkt oder ueber Relais</text>
+  <rect x="20" y="260" width="180" height="66" class="node hamf ham"/>
+  <text x="30" y="280" class="b">@ HEY</text><text x="30" y="296" class="mono">R&lt;n&gt;; + Pfad</text><text x="30" y="312" class="t11">direkt oder ueber Relais</text>
+  <rect x="20" y="360" width="180" height="40" class="node bad"/>
+  <text x="30" y="378" class="t11">0x41 ACK, @ an HN,</text><text x="30" y="392" class="t11">unkonfiguriert</text>
+  <!-- column B -->
+  <rect x="250" y="40" width="200" height="66" class="node"/>
+  <text x="262" y="66" class="mono b">updateMheard()</text><text x="262" y="84" class="t11">legt Eintrag an, 1-h-Zaehler</text>
+  <rect x="250" y="150" width="200" height="66" class="node"/>
+  <text x="262" y="176" class="b">Positionszweig</text><text x="262" y="194" class="mono">lora_functions:1155/1177</text>
+  <rect x="250" y="260" width="200" height="66" class="node"/>
+  <text x="262" y="286" class="mono b">updateHeyPath()</text><text x="262" y="304" class="t11">R&lt;n&gt; und Pfadtabelle</text>
+  <!-- column C -->
+  <rect x="560" y="40" width="190" height="66" class="node prx"/>
+  <text x="572" y="62" class="b">Kopie A</text><text x="572" y="78" class="mono">mheardRecords[]</text><text x="572" y="94" class="mono">.mr_ncount, Datum, RSSI</text>
+  <rect x="560" y="150" width="190" height="66" class="node prx"/>
+  <text x="572" y="172" class="b">Kopie B</text><text x="572" y="188" class="mono">mheardNCount[]</text><text x="572" y="204" class="t11">nur die Zahl</text>
+  <rect x="560" y="260" width="190" height="66" class="node srv"/>
+  <text x="572" y="282" class="b">Pfadtabelle</text><text x="572" y="298" class="mono">mheardPath*[]</text><text x="572" y="314" class="t11">nur HEY ueber Relais</text>
+  <!-- column D -->
+  <rect x="800" y="40" width="150" height="66" class="node wwwf www"/>
+  <text x="812" y="66" class="b">Web MHeard</text><text x="812" y="84" class="t11">NCNT, Datum, RSSI</text>
+  <rect x="800" y="150" width="150" height="66" class="node wwwf www"/>
+  <text x="812" y="170" class="b">App/BLE-JSON</text><text x="812" y="186" class="mono">--mheard</text><text x="812" y="202" class="t11">T-Deck</text>
+  <rect x="800" y="260" width="150" height="66" class="node wwwf www"/>
+  <text x="812" y="286" class="b">Web Path</text><text x="812" y="304" class="b">Information</text>
+  <!-- A to B -->
+  <path d="M200 73 L248 73" class="ln" marker-end="url(#ar)"/>
+  <path d="M200 183 L248 183" class="ln" marker-end="url(#ar)"/>
+  <path d="M200 293 L248 293" class="ln" marker-end="url(#ar)"/>
+  <path d="M200 380 L240 380" class="lnx"/><text x="244" y="384" class="t11">kein Eintrag</text>
+  <!-- B to C -->
+  <path d="M450 62 L558 62" class="ln" marker-end="url(#ar)"/>
+  <path d="M450 92 L500 92 L500 165 L558 165" class="ln" marker-end="url(#ar)"/>
+  <text x="505" y="130" class="t11">gleich A</text>
+  <path d="M450 190 L558 190" class="ln" marker-end="url(#ar)"/>
+  <path d="M450 272 L530 272 L530 205 L558 205" class="ln" marker-end="url(#ar)"/>
+  <path d="M450 300 L558 300" class="ln" marker-end="url(#ar)"/>
+  <path d="M450 316 L545 316 L545 342 L954 342 L954 32 L680 32 L680 38" class="lnx" marker-end="url(#arx)"/>
+  <text x="560" y="358" class="t11" fill="#c62828">REP: Datum, Typ, Hop-Zahl, NCNT in Kopie A (B2)</text>
+  <text x="462" y="210" class="t11" fill="#c62828">B1</text>
+  <!-- C to D -->
+  <path d="M750 60 L798 60" class="ln" marker-end="url(#ar)"/>
+  <path d="M750 183 L798 183" class="ln" marker-end="url(#ar)"/>
+  <path d="M750 293 L798 293" class="ln" marker-end="url(#ar)"/>
+</svg></div>
+<figcaption>Abb. 1: Ist-Zustand beim Empfänger. Der Positionszweig schreibt nur Kopie B, die Web-Seite liest nur Kopie A; das ist B1. Der rote Pfad ist die REP-Überschreibung durch einen HEY über Relais, B2.</figcaption></figure>
+
+<h3>2.4 Messung zum toten Beacon-Auslöser</h3>
+<p>Der Mitschnitt vom 20.09. bestätigt B6: kein Knoten beaconet häufiger, wenn sich seine Nachbarzahl ändert. Gezählt sind erste Kopien je <code>msg_id</code> bei DK5EN-98 über 12,6 Stunden; bei 30 Minuten Intervall wären rund 25 zu erwarten.</p>
+<table>
+<tr><th>Station</th><th class="num">Positionsrahmen</th><th class="num">verschiedene /N-Werte</th><th>Spanne /N</th></tr>
+<tr><td>DB0FHR-12</td><td class="num">17</td><td class="num">10</td><td>1 bis 12</td></tr>
+<tr><td>DL2JA-2</td><td class="num">19</td><td class="num">9</td><td>9 bis 19</td></tr>
+<tr><td>DK5EN-98, eigene</td><td class="num">20</td><td class="num">5</td><td>2 bis 6</td></tr>
+<tr><td>DB0ED-99</td><td class="num">18</td><td class="num">3</td><td>8 bis 10</td></tr>
+</table>
+<p>Ein funktionierender Auslöser hätte bei DB0FHR-12 mindestens neun Zusatzbeacons erzeugt. Die Zahlen sind Untergrenzen, weil DK5EN-98 nicht jeden Rahmen hört.</p>
+
+<h2 id="s3">3. Zielbild</h2>
+<p>Im Endzustand von Stufe 2 gibt es für die Nachbarzahl eines Nachbarn einen Speicher mit Wert, Quelle und Empfangszeit. Alle Schreiber gehen über eine Funktion, alle Anzeigen lesen denselben Speicher, und der Direkt-Eintrag in MHeard wird nur noch von direkt gehörten Rahmen beschrieben.</p>
+<figure><div class="fig">
+<svg viewBox="0 0 960 200" role="img" aria-label="Zielbild eine Kopie">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2a37"/></marker></defs>
+  <rect x="20" y="30" width="200" height="50" class="node hamf ham"/><text x="32" y="52" class="b">@ HEY mit R&lt;n&gt;</text><text x="32" y="70" class="t11">direkt oder ueber Relais</text>
+  <rect x="20" y="110" width="200" height="50" class="node hamf ham"/><text x="32" y="132" class="b">! Beacon mit /N&lt;n&gt;</text><text x="32" y="150" class="t11">direkt oder ueber Relais</text>
+  <rect x="300" y="60" width="220" height="66" class="node"/><text x="312" y="84" class="mono b">mheardNoteNcount()</text><text x="312" y="102" class="t11">Rufzeichen, Wert, Quelle</text><text x="312" y="118" class="t11">legt bei Bedarf an</text>
+  <rect x="580" y="60" width="180" height="66" class="node prx"/><text x="592" y="82" class="b">ein Speicher je Slot</text><text x="592" y="100" class="mono">ncount, src, rx_ms</text><text x="592" y="116" class="t11">verfaellt mit dem Slot</text>
+  <rect x="810" y="30" width="130" height="40" class="node wwwf www"/><text x="822" y="55" class="b">Web MHeard</text>
+  <rect x="810" y="80" width="130" height="40" class="node wwwf www"/><text x="822" y="105" class="b">App/BLE-JSON</text>
+  <rect x="810" y="130" width="130" height="40" class="node wwwf www"/><text x="822" y="155" class="b">--mheard, T-Deck</text>
+  <path d="M220 55 L260 55 L260 85 L298 85" class="ln" marker-end="url(#ar2)"/>
+  <path d="M220 135 L260 135 L260 105 L298 105" class="ln" marker-end="url(#ar2)"/>
+  <path d="M520 93 L578 93" class="ln" marker-end="url(#ar2)"/>
+  <path d="M760 80 L785 80 L785 50 L808 50" class="ln" marker-end="url(#ar2)"/>
+  <path d="M760 93 L785 93 L785 100 L808 100" class="ln" marker-end="url(#ar2)"/>
+  <path d="M760 106 L775 106 L775 150 L808 150" class="ln" marker-end="url(#ar2)"/>
+  <text x="300" y="160" class="t11">updateMheard() und REP setzen die Zahl nicht mehr</text>
+</svg></div>
+<figcaption>Abb. 2: Zielbild Stufe 2. Ein Schreiber, ein Speicher mit Quelle und Alter, alle Anzeigen lesen denselben Wert.</figcaption></figure>
+<table>
+<tr><th>Komponente</th><th>Rolle</th><th>ab Stufe</th></tr>
+<tr><td>Kopie B <code>mheardNCount[]</code></td><td>einziger Speicher der Zahl, Kopie A wird nur noch mitgeschrieben, damit das Persistenzformat gleich bleibt</td><td>1</td></tr>
+<tr><td><code>mheardNoteNcount()</code></td><td>einziger Schreiber; Rufzeichen suchen, bei Bedarf Eintrag nachtragen, Wert, Quelle und Zeit setzen</td><td>2</td></tr>
+<tr><td>Web-Karte</td><td>zeigt NCNT mit Alter, etwa „12 (R, 4 min)“</td><td>2</td></tr>
+</table>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Eine Kopie für alle Anzeigen, B1</h3>
+<p class="reco">Entscheidung: die Web-Seite liest <code>mheardNCount[iset]</code> statt <code>mr_ncount</code>, wie Konsole, App und T-Deck.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Web liest Kopie B</td><td>eine Zeile in <code>web_functions.cpp:1511</code></td><td><span class="tag ok">gewählt</span> kleinste Änderung, alle Anzeigen danach gleich</td></tr>
+<tr><td>Positionszweig über Relais schreibt auch Kopie A</td><td>Record lesen, Feld setzen, zurückschreiben</td><td><span class="tag warn">verworfen</span> zwei Kopien bleiben, der nächste Schreiber reißt sie wieder auseinander</td></tr>
+<tr><td>Kopie A entfernen</td><td>Feld aus <code>MheardRecord</code> streichen</td><td><span class="tag bad">verworfen</span> ändert das Persistenzformat der MHeard-Datei</td></tr>
+</table>
+<p>Kopie B wird ohnehin bei jedem <code>updateMheard()</code> auf den Stand von A gezogen und umgekehrt; nach der Umstellung gibt es nur noch den Fall, dass B neuer ist als A, und den sieht dann niemand mehr.</p>
+
+<h3>4.2 REP-Überschreibung durch HEY über Relais, B2</h3>
+<p class="reco">Entscheidung: <code>updateHeyPath()</code> setzt bei einem HEY über Relais nur noch die Nachbarzahl; Datum, Uhrzeit, Typ, Hop-Zahl und Mesh des Direkt-Eintrags bleiben unverändert. Umsetzung erst nach Zustimmung von Kurt.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>REP nur für direkt gehörte HEY</td><td>REP-Block unter <code>is_equ(mh_sourcecallsign, mh_callsign)</code> stellen, NCNT immer setzen</td><td><span class="tag ok">gewählt</span> der Eintrag beschreibt wieder genau eine Direktmessung</td></tr>
+<tr><td>REP beibehalten, <code>mheardMillis[]</code> mit erneuern</td><td>Zeitstempel synchron halten</td><td><span class="tag bad">verworfen</span> der Stundenzähler würde dann auch Knoten zählen, die man nur über Relais hört, und die Nachbarzahl verfälschen</td></tr>
+<tr><td>heute lassen</td><td>keine</td><td><span class="tag warn">Stufe 0</span> gemischte Karte bleibt</td></tr>
+</table>
+<p>Warum Zustimmung nötig ist: der Code-Kommentar an der Stelle sagt ausdrücklich, dass die gemischte Herkunft Feld für Feld so erhalten bleibt, und die Logik stammt aus Upstream. Möglicherweise will Kurt, dass die Karte zeigt, wann ein Knoten zuletzt irgendwie gehört wurde; dann gehört die Relais-Zeit in ein eigenes Feld statt in das Datum der Direktmessung.</p>
+
+<h3>4.3 Null-Wert, B3</h3>
+<p class="reco">Entscheidung: nicht ändern; in Stufe 2 macht die Altersanzeige einen veralteten Wert erkennbar.</p>
+<p>Prämisse: HEY sendet <code>R0;</code> alle 15 Minuten, also korrigiert sich ein falscher Wert größer 0 spätestens nach einem HEY-Intervall, sofern der HEY ankommt. Die Luftänderung müsste an drei Stellen gleichzeitig kommen, beim Sender <code>loop_functions.cpp:4546</code>, im Dekoder <code>aprs_functions.cpp:857</code> und beim Empfänger <code>lora_functions.cpp:1155</code> und <code>:1177</code>. Altknoten würden <code>/N0</code> weiter ignorieren. Aufwand und Absprache stehen in keinem Verhältnis zu 15 Minuten.</p>
+
+<h3>4.4 Erster Beacon eines neuen Nachbarn, B4</h3>
+<p class="reco">Entscheidung: <code>/N</code> nach <code>updateMheard()</code> übernehmen statt davor, oder den Wert über <code>mheardLine.mh_ncount</code> an <code>updateMheard()</code> übergeben.</p>
+<p>Die zweite Variante ist kleiner: <code>updateMheard()</code> übernimmt <code>mh_ncount</code> schon heute, wenn er nicht 0 ist, und legt den Eintrag dabei selbst an. Der direkte Positionszweig setzt dann <code>mheardLine.mh_ncount = aprspos.ncnt</code> statt <code>mheardNCount[ipos]</code>.</p>
+
+<h3>4.5 Wiederverwendeter Platz in der Pfadtabelle, B5</h3>
+<p class="reco">Entscheidung: beim Überschreiben über <code>mheardPathWrite</code> die Hop-Zahl auf <code>0x7F</code> setzen, wie beim freien Platz.</p>
+<p>Der Fall tritt nur ein, wenn alle Plätze jünger als 12 Stunden sind. Bei 10 Plätzen in der Entwicklervariante und 40 auf dem klassischen ESP32 ist das in einem belebten Gebiet erreichbar.</p>
+
+<h3>4.6 Toter Beacon-Auslöser, B6</h3>
+<p class="reco">Entscheidung: nicht reparieren. Entfernen gehört in die DRY-Kampagne, nicht in diesen PR.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>so lassen</td><td>keine</td><td><span class="tag ok">gewählt</span> kein Verhalten ändert sich</td></tr>
+<tr><td>reparieren</td><td>eigener Zeitstempel für die Sperre</td><td><span class="tag bad">verworfen</span> bei einem gleitenden Stundenfenster ändert sich die Zahl in belebten Gebieten laufend; bis zu 60 Beacons pro Stunde bei 60 s Sperre, statt 2 bei 30 Minuten Intervall</td></tr>
+<tr><td>entfernen</td><td>Block in <code>esp32_main.cpp</code> und <code>nrf52_main.cpp</code> streichen</td><td><span class="tag info">später</span> reiner Aufräumschritt</td></tr>
+</table>
+<p>Nebenbei: ein Auslöser über <code>posinfo_shot</code> sendet mit <code>posinfo_prev_lat/lon</code>, die nach jedem Beacon auf 0 stehen; <code>sendPosition()</code> verwirft 0/0. Ohne GPS-Track würde also auch ein reparierter Auslöser nichts senden.</p>
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<figure><div class="fig">
+<svg viewBox="0 0 960 230" role="img" aria-label="Zeitachse Abweichung Web und App">
+  <line x1="60" y1="70" x2="930" y2="70" class="ln"/>
+  <circle cx="110" cy="70" r="5" fill="#1f2a37"/><circle cx="290" cy="70" r="5" fill="#c62828"/><circle cx="470" cy="70" r="5" fill="#c62828"/><circle cx="650" cy="70" r="5" fill="#c62828"/><circle cx="830" cy="70" r="5" fill="#1f2a37"/>
+  <text x="110" y="40" text-anchor="middle" class="b">t0</text><text x="290" y="40" text-anchor="middle" class="b">t1</text><text x="470" y="40" text-anchor="middle" class="b">t2</text><text x="650" y="40" text-anchor="middle" class="b">t3</text><text x="830" y="40" text-anchor="middle" class="b">t4</text>
+  <text x="110" y="98" text-anchor="middle" class="t11">HEY direkt</text><text x="110" y="112" text-anchor="middle" class="mono">R12</text>
+  <text x="290" y="98" text-anchor="middle" class="t11">Beacon ueber Relais</text><text x="290" y="112" text-anchor="middle" class="mono">/N15</text>
+  <text x="470" y="98" text-anchor="middle" class="t11">HEY ueber Relais</text><text x="470" y="112" text-anchor="middle" class="mono">R9</text>
+  <text x="650" y="98" text-anchor="middle" class="t11">Zahl faellt auf 0,</text><text x="650" y="112" text-anchor="middle" class="t11">Beacon ohne /N</text>
+  <text x="830" y="98" text-anchor="middle" class="t11">naechster HEY</text><text x="830" y="112" text-anchor="middle" class="mono">R0</text>
+  <rect x="45" y="135" width="130" height="66" class="node"/><text x="55" y="155" class="t11">Web: 12</text><text x="55" y="171" class="t11">App: 12</text><text x="55" y="187" class="t11">einig</text>
+  <rect x="225" y="135" width="130" height="66" class="node bad"/><text x="235" y="155" class="t11">Web: 12</text><text x="235" y="171" class="t11">App: 15</text><text x="235" y="187" class="t11">B1</text>
+  <rect x="405" y="135" width="130" height="66" class="node bad"/><text x="415" y="155" class="t11">Web: 9, Datum neu</text><text x="415" y="171" class="t11">App: 9, RSSI von t0</text><text x="415" y="187" class="t11">B2</text>
+  <rect x="585" y="135" width="130" height="66" class="node prx"/><text x="595" y="155" class="t11">Web: 9</text><text x="595" y="171" class="t11">App: 9</text><text x="595" y="187" class="t11">veraltet, B3</text>
+  <rect x="765" y="135" width="130" height="66" class="node"/><text x="775" y="155" class="t11">Web: 0</text><text x="775" y="171" class="t11">App: 0</text><text x="775" y="187" class="t11">einig</text>
+</svg></div>
+<figcaption>Abb. 3: Ein Nachbar X aus Sicht eines Empfängers. Zwischen t1 und t4 zeigen Web und App verschiedene oder veraltete Werte, obwohl X nur eine Zahl gemessen hat. Die Zeitpunkte sind konstruiert, jeder Übergang folgt aus dem zitierten Code.</figcaption></figure>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion heute</th><th>Lücke</th><th>behoben ab Stufe</th></tr>
+<tr><td>Beacon über Relais mit neuer Zahl</td><td>Web und App vergleichen</td><td>Web bleibt alt bis zum nächsten Direktrahmen</td><td>B1</td><td>1</td></tr>
+<tr><td>HEY über Relais von einem Direktnachbarn</td><td>Web-Datum neuer als RSSI plausibel</td><td>Karte mischt zwei Empfänge</td><td>B2</td><td>2</td></tr>
+<tr><td>Zahl eines Nachbarn fällt auf 0</td><td>keine</td><td>Wert bleibt bis zum nächsten HEY</td><td>B3</td><td>sichtbar ab 2, behoben erst 3</td></tr>
+<tr><td>Neuer Nachbar sendet zuerst einen Beacon</td><td>NCNT 0 trotz <code>/N</code></td><td>Wert kommt mit dem nächsten Rahmen</td><td>B4</td><td>1</td></tr>
+<tr><td>Pfadtabelle voll, neue ferne Station</td><td>Station fehlt in „Path Information“</td><td>alter Eintrag bleibt bis 12 h</td><td>B5</td><td>1</td></tr>
+<tr><td>Knoten ohne Uhr</td><td>MHeard leer, sendet <code>R0</code></td><td>kein Eintrag, keine Zahl</td><td>außerhalb dieses Papiers</td><td>keine</td></tr>
+</table>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>1</td><td>Host-Test, der B1, B4 und B5 an den heutigen Funktionen reproduziert</td><td>Test rot am unveränderten Stand</td></tr>
+<tr><td>2</td><td>1</td><td>Korrekturen 4.1, 4.4, 4.5 in fork-main</td><td>Test grün, alle Envs bauen, <code>--mheard</code> und Web-Seite zeigen auf DK5EN-98 dieselbe NCNT über 24 h</td></tr>
+<tr><td>3</td><td>1</td><td>Upstream-PR mit deutscher Beschreibung</td><td>von Kurt gemergt</td></tr>
+<tr><td>4</td><td>2</td><td>Rückfrage an Kurt zur REP-Absicht, 4.2</td><td>schriftliche Antwort</td></tr>
+<tr><td>5</td><td>2</td><td><code>mheardNoteNcount()</code>, Quelle und Alter, REP nur für Direkt-HEY</td><td>Web-Karte zeigt Alter, Datum springt bei Relais-HEY nicht mehr</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Absicht der REP-Überschreibung</td><td>entscheidet, ob Stufe 2 eine Korrektur oder eine Verhaltensänderung ist</td><td>Kurt fragen</td></tr>
+<tr><td>Ob HEY über Relais in der Praxis oft einen Direkt-Eintrag trifft</td><td>bestimmt die Dringlichkeit von B2</td><td>Mitschnitt DK5EN-98 auswerten: HEY mit Absender ungleich letztem Sender, dessen Absender in MHeard steht</td></tr>
+<tr><td>DB0ISM-1 mit 56 Positionsrahmen in 8 Stunden am 21.09.</td><td>zeigt eine Beacon-Häufung, die nicht von der Nachbarzahl kommt, nur 2 verschiedene <code>/N</code>-Werte</td><td>eigene Untersuchung, außerhalb dieses Papiers</td></tr>
+<tr><td>Uhrzeit auf reinen Funkknoten</td><td>ohne Uhr zählen sie 0 Nachbarn und melden <code>R0</code>, was mcmap und die Matrix verfälscht</td><td>prüfen, ob ein Knoten ohne NTP und GPS seine Uhr aus empfangenen Rahmen setzt</td></tr>
+</table>
+</main>
+</body>
+</html>

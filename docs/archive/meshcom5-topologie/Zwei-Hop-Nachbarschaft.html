@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zwei-Hop-Nachbarschaft</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .dash .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+
+</style>
+</head>
+<body>
+<main>
+<h1>Zwei-Hop-Nachbarschaft in mcmap</h1>
+<ul class="meta">
+  <li>Stand: 2026-09-24, mcmap <code>development</code> auf <code>ff76f2b</code></li>
+  <li>Autor: Claude für DK5EN</li>
+  <li>Umfang: nur mcmap, keine Änderung an Firmware oder Hub (Entscheidung des Auftraggebers)</li>
+  <li>Quelle Draht: <code>interlink.log.2026-09-23.gz</code> von oe-link, 24 h, 125 944 eindeutige HEY-Rahmen</li>
+  <li>Quelle Datenbank: Produktions-Schnappschuss vom 2026-09-24 09:22 MESZ (<code>link_signal_1h</code> über 7 Tage, <code>nodes</code>)</li>
+  <li>Quelle Code: <code>proxy/src/db/unifiedDatabase.ts</code>, <code>proxy/src/db/unifiedStore.ts</code>, <code>proxy/src/interlink/ingest.ts</code>, <code>proxy/src/wss/parsers.ts</code></li>
+  <li>Vorgänger: Konzept "Nachbarzähler aus HEY als Zeitreihe" (v1) und dessen Fable-Verdict; beide Befundlisten sind hier eingearbeitet, v1 ist damit überholt</li>
+  <li>Rufzeichen sind reale Stationen aus dem Messzeitraum, nur als Messbeispiel zitiert</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+  <p>mcmap kennt heute pro Station nur eine selbst gemeldete Nachbarzahl ohne Verlauf und einen Kantengraph, der nur Pfade zu einem Gateway sieht: im Median ein Drittel der Nachbarn, die die Station selbst meldet. Eine 1-Hop-Spitze über einen Zeitraum, eine 2-Hop-Menge und die Frage "wer muss für wen weiterleiten" beantwortet heute keine Ansicht und keine Route.</p>
+  <p>Daraus folgt:</p>
+  <ol>
+    <li><b>Stufe 1, Zählerreihe:</b> Selbst- und Relaiszähler aus jedem HEY als Stundenreihe mit Firmware-Kennzeichen; beantwortet die 1-Hop-Spitze je Station, verlässlich nur für Firmware 4.35s und neuer.</li>
+    <li><b>Stufe 2, benannte Nachbarschaft:</b> je Station die benannte 1-Hop- und 2-Hop-Menge aus dem vorhandenen Kantengraph, dazu eine Obergrenze aus den Zählern; 2-Hop wird damit ein Intervall statt einer Zahl.</li>
+    <li><b>Stufe 3, Rollen:</b> exklusive Blätter je Station aus den vorhandenen Erstempfänger-Daten plus einem neuen Merkmal "direkt am Gateway gehört"; daraus die Einordnung Supernode, kritisches Relais, beides oder keines.</li>
+  </ol>
+  <p>Die Grenze steht schon fest: mcmap sieht nur, wer ein Gateway erreicht. Ob ein Knoten für Mesh-internen Verkehr weiterleiten muss, bleibt ohne Firmware unbeobachtbar. Gemessen ist auch, dass exklusive Blätter selten sind: 99 an einem Tag, verteilt auf 84 Stationen, höchstens 3 je Station.</p>
+  <p class="reco">Empfehlung: alle drei Stufen in dieser Reihenfolge bauen, 7 Tage Aufbewahrung wie die vorhandenen Linktabellen, Stufe 3 erst abnehmen, wenn <code>gateway_direct_1d</code> eine volle Woche gesammelt hat.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>Maximale 1-Hop-Nachbarzahl und über welchen Zeitraum</td><td>Stundenspitze aus dem Selbstbericht, Fenster 24 h und 7 Tage; nur Firmware 4.35s/t gilt als sicheres 1-h-Fenster, Kappung markiert</td><td>1</td><td>4.1</td></tr>
+<tr><td>2</td><td>Maximale 2-Hop-Nachbarzahl</td><td>Intervall: benannte Menge aus dem Graph als Untergrenze, Summe der Nachbarzähler als Obergrenze</td><td>2</td><td>4.2</td></tr>
+<tr><td>3</td><td>Wer ist Supernode für eine Region</td><td>Region = die benannte 2-Hop-Menge; Supernode = 2-Hop-Menge im obersten Zehntel des Netzes im selben Fenster</td><td>3</td><td>4.3</td></tr>
+<tr><td>4</td><td>Wer muss weiterleiten, weil er exklusive Blätter bedient</td><td>Exklusives Blatt = Station mit genau einem Erstempfänger, nie direkt an einem Gateway, selbst nie Relais; bezogen auf Gateway-Erreichbarkeit</td><td>3</td><td>4.3</td></tr>
+<tr><td>5</td><td>Nur mcmap</td><td>Keine Firmware- und keine Hub-Änderung; die Firmware-Alternative steht als Ausblick im Firmware-Backlog</td><td>alle</td><td>8</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>Lücke</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td>NBCNT als Einzelwert (seit <code>ff76f2b</code> ohne fremde Zähler), Kantengraph 7 Tage, Erstempfänger je Tag in <code>link_origins_1d</code></td><td>nichts davon als Nachbarschaft abfragbar</td><td>kein Verlauf, keine 2-Hop-Menge, keine Rollen</td><td>keine</td></tr>
+<tr><td>1 Zählerreihe</td><td>Tabelle <code>neighbor_count_1h</code>, Route, MCP-Tool</td><td>1</td><td>2-Hop, Rollen</td><td>Migration, Deploy</td></tr>
+<tr><td>2 Benannte Nachbarschaft</td><td>Route <code>neighborhood</code>, MCP-Tool, Profilabschnitt</td><td>1, 2</td><td>Rollen</td><td>Stufe 1</td></tr>
+<tr><td>3 Rollen</td><td>Tabelle <code>gateway_direct_1d</code>, Route <code>neighborhood/roles</code>, MCP-Tool, Rollentabelle</td><td>1 bis 4</td><td>Mesh-interner Verkehr unsichtbar</td><td>Stufe 2, 7 Tage Daten</td></tr>
+</table>
+
+<ul class="toc">
+  <li><a href="#s1">1. Ergebnis</a></li>
+  <li><a href="#s2">2. Ausgangslage</a></li>
+  <li><a href="#s3">3. Zielbild</a></li>
+  <li><a href="#s4">4. Bausteine</a></li>
+  <li><a href="#s5">5. Fehlerszenarien</a></li>
+  <li><a href="#s6">6. Rollout</a></li>
+  <li><a href="#s7">7. Offene Punkte</a></li>
+  <li><a href="#s8">8. Ausblick außerhalb des Umfangs</a></li>
+</ul>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Drei vorhandene Tabellen tragen schon den größten Teil der Antwort; es fehlen der Zählerverlauf und ein einziges Merkmal.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Nachbarzähler, Bedeutung</td><td>verschiedene direkt gehörte Rufzeichen; 1 h nach <code>millis()</code> ab 4.35p.08.31 und in 4.35s/t, 12 h nach Uhrzeit in frühen 4.35p-Builds; alle 4.35p melden nur "4.35p"</td><td>Firmware <code>mheard_functions.cpp:691</code>, Tag <code>v4.35p_20260321</code> Zeile 512</td></tr>
+<tr><td>Kappung</td><td>30 klassischer ESP32, 50 XML-Build, 80 ESP32-S3/RAK; frühe 4.35p auf S3/RAK 120</td><td><code>configuration_global.h</code> je Tag</td></tr>
+<tr><td>Selbstzähler in mcmap</td><td>letzter Wert in <code>nodes.nct</code>; seit <code>ff76f2b</code> nicht mehr aus fremden Zählern alter Firmware</td><td><code>interlink/ingest.ts</code>, <code>resolveHeyNctOwner</code></td></tr>
+<tr><td>Relaiszähler</td><td>erstes Feld jeder Gruppe <code>n,rssi,snr;</code>, heute im Parser verworfen</td><td><code>wss/parsers.ts</code> <code>parseWssRssi</code></td></tr>
+<tr><td>Kantengraph</td><td><code>link_signal_1h</code>: gerichtete Paare je Stunde, nur aus Pfaden, die ein Gateway erreicht haben, 7 Tage</td><td><code>unifiedDatabase.ts:1273</code></td></tr>
+<tr><td>Erstempfänger</td><td><code>link_origins_1d</code>: Segment und Absender je Tag; die Zeilen mit <code>from_call = origin_call</code> sind die Erstempfänger, 7 Tage</td><td><code>unifiedDatabase.ts:1432</code>, <code>LINK_ORIGINS_1D_TTL_DAYS</code></td></tr>
+<tr><td>Relaislast</td><td><code>relay_counts_1h</code>: weitergeleitete Rahmen je Relais und Stunde, 7 Tage</td><td><code>unifiedDatabase.ts:1370</code></td></tr>
+<tr><td>Direkt am Gateway gehört</td><td>ein HEY mit einelementigem Pfad und nicht leerer RSSI-Kette; das Gateway hat auf dem Draht kein Rufzeichen; <b>nirgends gespeichert</b></td><td><code>interlink/ingest.ts</code> <code>applyHey</code></td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 290" role="img" aria-label="Ist-Zustand">
+  <rect x="20" y="110" width="170" height="60" class="node prx"/>
+  <text x="105" y="134" text-anchor="middle" class="b">HEY-Rahmen</text>
+  <text x="105" y="152" text-anchor="middle" class="mono">path, rssi, nct</text>
+
+  <rect x="300" y="20" width="220" height="44" class="node srv"/>
+  <text x="410" y="40" text-anchor="middle" class="b">nodes.nct</text>
+  <text x="410" y="56" text-anchor="middle" class="t11">letzter Selbstwert</text>
+  <rect x="300" y="76" width="220" height="44" class="node srv"/>
+  <text x="410" y="96" text-anchor="middle" class="b">link_signal_1h</text>
+  <text x="410" y="112" text-anchor="middle" class="t11">Kantengraph, 7 Tage</text>
+  <rect x="300" y="132" width="220" height="44" class="node srv"/>
+  <text x="410" y="152" text-anchor="middle" class="b">link_origins_1d</text>
+  <text x="410" y="168" text-anchor="middle" class="t11">Erstempfaenger je Tag, 7 Tage</text>
+  <rect x="300" y="188" width="220" height="44" class="node srv"/>
+  <text x="410" y="208" text-anchor="middle" class="b">relay_counts_1h</text>
+  <text x="410" y="224" text-anchor="middle" class="t11">Relaislast, 7 Tage</text>
+
+  <path d="M190 140 L250 140" class="ln"/>
+  <path d="M250 42 L250 250" class="ln"/>
+  <path d="M250 42 L300 42" class="ln"/>
+  <path d="M250 98 L300 98" class="ln"/>
+  <path d="M250 154 L300 154" class="ln"/>
+  <path d="M250 210 L300 210" class="ln"/>
+
+  <rect x="640" y="60" width="300" height="44" class="node bad"/>
+  <text x="790" y="80" text-anchor="middle" class="b">Relaiszaehler</text>
+  <text x="790" y="96" text-anchor="middle" class="t11">verworfen, ca. 59 800 am Tag</text>
+  <rect x="640" y="170" width="300" height="44" class="node bad"/>
+  <text x="790" y="190" text-anchor="middle" class="b">direkt am Gateway gehoert</text>
+  <text x="790" y="206" text-anchor="middle" class="t11">nicht gespeichert, 1 110 Absender am Tag</text>
+  <path d="M250 250 L600 250 L600 82 L640 82" class="lnx"/>
+  <path d="M600 192 L640 192" class="lnx"/>
+  <text x="610" y="270" class="t11">heute ohne Ablage</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Vier Tabellen nehmen HEY-Inhalte schon auf; die Relaiszähler und das Merkmal "direkt am Gateway gehört" gehen verloren.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+<p>24 h Draht vom 2026-09-23, Duplikate mit gleicher <code>msg_id</code>, Zeit, Pfad und RSSI-Kette entfernt; Graphwerte aus 7 Tagen <code>link_signal_1h</code>.</p>
+<table>
+<tr><th>Größe</th><th class="num">Wert</th><th>Bemerkung</th></tr>
+<tr><td>Absender mit HEY</td><td class="num">1 313</td><td>799 davon mit mehrgliedrigem Pfad</td></tr>
+<tr><td>Absender mindestens einmal direkt an einem Gateway</td><td class="num">1 110</td><td>einelementiger Pfad, mit RSSI oder als Gateway-Selbstbericht</td></tr>
+<tr><td>Erstempfänger je Absender</td><td class="num">p50 2, max 30</td><td>verschiedene <code>path[1]</code> am Tag</td></tr>
+<tr><td>Absender mit genau einem Erstempfänger</td><td class="num">354</td><td>231 davon auch direkt an einem Gateway, 79 selbst Relais</td></tr>
+<tr><td>Exklusive Blätter</td><td class="num">99</td><td>bei 84 Stationen, höchstens 3 je Station</td></tr>
+<tr><td>Benannte 2-Hop-Menge, 24 h</td><td class="num">p50 13, p90 48, max 113</td><td>ungerichteter Graph</td></tr>
+<tr><td>Benannte 2-Hop-Menge, 7 Tage</td><td class="num">p50 20, p90 80, max 326</td><td>max HB4LO-7, nicht geprüft</td></tr>
+<tr><td>Graph-Abdeckung</td><td class="num">p10 0,14, p50 0,36, p90 0,80</td><td>gehörte Stationen im Graph durch Selbstzähler, gleiche Stunde, nur 4.35s/t; in 2 008 von 3 674 Stationsstunden sieht der Graph gar keinen Nachbarn</td></tr>
+<tr><td>Relaiszähler</td><td class="num">59 849 am Tag</td><td>zuordenbar, davon ca. 31 400 verschiedene Messungen; 441 Relais</td></tr>
+<tr><td>Zeilen <code>neighbor_count_1h</code></td><td class="num">ca. 21 700 am Tag</td><td>7 Tage ca. 152 000 Zeilen</td></tr>
+</table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p>Zwei neue Tabellen füllen die Lücken aus Abb. 1; drei Routen lesen sie zusammen mit den vorhandenen Tabellen; je Route ein MCP-Tool und eine Ansicht.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 360" role="img" aria-label="Zielbild">
+  <rect x="20" y="150" width="150" height="50" class="node prx"/>
+  <text x="95" y="172" text-anchor="middle" class="b">applyHey</text>
+  <text x="95" y="188" text-anchor="middle" class="t11">INTERLINK</text>
+
+  <rect x="230" y="20" width="200" height="44" class="node srv"/>
+  <text x="330" y="40" text-anchor="middle" class="b">neighbor_count_1h</text>
+  <text x="330" y="56" text-anchor="middle" class="t11">neu, Stufe 1</text>
+  <rect x="230" y="80" width="200" height="44" class="node srv"/>
+  <text x="330" y="100" text-anchor="middle" class="b">link_signal_1h</text>
+  <text x="330" y="116" text-anchor="middle" class="t11">vorhanden</text>
+  <rect x="230" y="140" width="200" height="44" class="node srv"/>
+  <text x="330" y="160" text-anchor="middle" class="b">link_origins_1d</text>
+  <text x="330" y="176" text-anchor="middle" class="t11">vorhanden</text>
+  <rect x="230" y="200" width="200" height="44" class="node srv"/>
+  <text x="330" y="220" text-anchor="middle" class="b">relay_counts_1h</text>
+  <text x="330" y="236" text-anchor="middle" class="t11">vorhanden</text>
+  <rect x="230" y="260" width="200" height="44" class="node srv"/>
+  <text x="330" y="280" text-anchor="middle" class="b">gateway_direct_1d</text>
+  <text x="330" y="296" text-anchor="middle" class="t11">neu, Stufe 3</text>
+  <path d="M170 175 L200 175" class="ln"/>
+  <path d="M200 42 L200 282" class="ln"/>
+  <path d="M200 42 L230 42" class="ln"/><path d="M200 102 L230 102" class="ln"/><path d="M200 162 L230 162" class="ln"/><path d="M200 222 L230 222" class="ln"/><path d="M200 282 L230 282" class="ln"/>
+
+  <rect x="520" y="20" width="200" height="50" class="node"/>
+  <text x="620" y="41" text-anchor="middle" class="b">neighbor-count/series</text>
+  <text x="620" y="57" text-anchor="middle" class="t11">Stufe 1, mit MCP-Tool</text>
+  <rect x="520" y="120" width="200" height="50" class="node"/>
+  <text x="620" y="141" text-anchor="middle" class="b">neighborhood</text>
+  <text x="620" y="157" text-anchor="middle" class="t11">Stufe 2, mit MCP-Tool</text>
+  <rect x="520" y="230" width="200" height="50" class="node"/>
+  <text x="620" y="251" text-anchor="middle" class="b">neighborhood/roles</text>
+  <text x="620" y="267" text-anchor="middle" class="t11">Stufe 3, mit MCP-Tool</text>
+  <path d="M430 42 L520 45" class="ln"/>
+  <path d="M430 42 L520 135" class="ln"/>
+  <path d="M430 42 L520 240" class="ln"/>
+  <path d="M430 102 L520 150" class="ln"/>
+  <path d="M430 102 L520 248" class="ln"/>
+  <path d="M430 162 L520 256" class="ln"/>
+  <path d="M430 222 L520 264" class="ln"/>
+  <path d="M430 282 L520 272" class="ln"/>
+
+  <rect x="780" y="110" width="160" height="50" class="node wwwf www"/>
+  <text x="860" y="131" text-anchor="middle" class="b">Knotenprofil</text>
+  <text x="860" y="147" text-anchor="middle" class="t11">Stufe 1 und 2</text>
+  <rect x="780" y="230" width="160" height="50" class="node wwwf www"/>
+  <text x="860" y="251" text-anchor="middle" class="b">Rollentabelle</text>
+  <text x="860" y="267" text-anchor="middle" class="t11">Stufe 3</text>
+  <path d="M720 45 L780 128" class="lnd"/>
+  <path d="M720 145 L780 142" class="lnd"/>
+  <path d="M720 255 L780 255" class="lnd"/>
+  <text x="520" y="330" class="t11">Durchgezogen: Daten; gestrichelt: Ansicht der Route</text>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild. Die Rollen-Route liest fünf Tabellen, die beiden anderen eine und zwei; die Routen tragen die ganze Logik, MCP-Tools und Ansichten nur die Anzeige.</figcaption>
+</figure>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Zählerreihe</h3>
+<p class="reco">Entscheidung: Tabelle <code>neighbor_count_1h(call, bucket_ts, role, firmware, cnt_min, cnt_max, cnt_last, n)</code>, 7 Tage, geschrieben hinter <code>frameDedup</code> an der INTERLINK-Einspeisung.</p>
+<ul>
+  <li>Selbstwert nur, wenn <code>resolveHeyNctOwner</code> ihn dem Absender zuordnet; Relaiswert aus Gruppe i für Pfadelement i+1, die letzte Gruppe eines gleich langen Pfads gehört dem unbenannten Gateway und entfällt. Die Zuordnung stimmt in 98 % der Fälle mit dem Selbstwert desselben Rufzeichens überein.</li>
+  <li><code>firmware</code> ist der beim Schreiben gespeicherte Stand der Station. Die Route liefert je Wert <code>windowCertain</code>: wahr nur für 4.35s und neuer, weil kein 4.35p-String das Zählfenster verrät.</li>
+  <li>Obergrenze der Prüfung 120 statt 99, weil frühe 4.35p auf S3/RAK bis 120 zählen.</li>
+  <li><code>capReached</code> in der Route: Maximum mindestens 90 % der Kappung für Hardware und Firmware, nicht Gleichheit, weil alte Firmware in fester Slotfolge verdrängt und knapp unter der Kappung stehen bleibt.</li>
+  <li>7 Tage: dieselbe Aufbewahrung wie <code>link_signal_1h</code> und <code>link_origins_1d</code>, sonst lassen sich die Tabellen in Stufe 2 und 3 nicht über dasselbe Fenster verbinden.</li>
+  <li>Parser trimmt Leerzeichen in Gruppen, am Messtag 225 Gruppen wie <code>7, 0,6</code>.</li>
+</ul>
+
+<h3>4.2 Benannte Nachbarschaft und 2-Hop-Intervall</h3>
+<p class="reco">Entscheidung: <code>GET /api/v2/neighborhood?call=&amp;window=24h|7d</code> liefert benannte 1-Hop- und 2-Hop-Mengen, das 2-Hop-Intervall und die Graph-Abdeckung.</p>
+<ul>
+  <li>1-Hop benannt: <code>heard</code> (Kanten zu <code>call</code>) und <code>heardBy</code> (Kanten von <code>call</code>) aus <code>link_signal_1h</code>, je mit Stichproben und letztem Zeitpunkt.</li>
+  <li>2-Hop benannt: Vereinigung der Nachbarn aller 1-Hop-Nachbarn ohne <code>call</code> selbst; die Untergrenze, weil der Graph nur Gateway-Pfade sieht.</li>
+  <li>2-Hop-Obergrenze: Summe der Spitzenzähler aller benannten 1-Hop-Nachbarn aus Stufe 1; jede gemeinsame Station zählt mehrfach, deshalb nur Schranke.</li>
+  <li>Abdeckung: benannte gehörte Stationen durch eigenen Spitzenzähler; Median heute 0,36. Die Ansicht zeigt sie neben jeder Zahl, damit eine dünne Graphsicht nicht als kleine Nachbarschaft gelesen wird.</li>
+  <li>Knotenprofil: neuer Abschnitt "Neighborhood" mit Zählerkurve (Aufbau wie <code>links/LinkSignalChart.vue</code>), Spitze, Intervall und Listen; die Einzelzahl NBCNT im Kopf bleibt.</li>
+</ul>
+
+<h3>4.3 Rollen</h3>
+<p class="reco">Entscheidung: neue Tabelle <code>gateway_direct_1d(origin_call, day_ts)</code> und <code>GET /api/v2/neighborhood/roles?window=7d</code> mit exklusiven Blättern und Einordnung je Station.</p>
+<p>Prämisse für das neue Merkmal: ohne es wären 354 Stationen Blattkandidaten, mit ihm 99; 231 der 354 erreichen an demselben Tag auch direkt ein Gateway und brauchen kein Relais.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 270" role="img" aria-label="Exklusives Blatt">
+  <rect x="20" y="20" width="220" height="48" class="node srv"/>
+  <text x="130" y="40" text-anchor="middle" class="b">Blatt L1</text>
+  <text x="130" y="57" text-anchor="middle" class="t11">nur X als Erstempfaenger: exklusiv</text>
+  <rect x="20" y="110" width="220" height="48" class="node"/>
+  <text x="130" y="130" text-anchor="middle" class="b">Station L2</text>
+  <text x="130" y="147" text-anchor="middle" class="t11">X und Y: nicht exklusiv</text>
+  <rect x="20" y="200" width="220" height="48" class="node"/>
+  <text x="130" y="220" text-anchor="middle" class="b">Station L3</text>
+  <text x="130" y="237" text-anchor="middle" class="t11">auch direkt am Gateway: nicht exklusiv</text>
+  <rect x="340" y="70" width="150" height="40" class="node prx"/>
+  <text x="415" y="95" text-anchor="middle" class="b">Relais X</text>
+  <rect x="340" y="150" width="150" height="40" class="node prx"/>
+  <text x="415" y="175" text-anchor="middle" class="b">Relais Y</text>
+  <rect x="680" y="110" width="160" height="40" class="node wwwf www"/>
+  <text x="760" y="135" text-anchor="middle" class="b">Gateway</text>
+  <path d="M240 44 L340 85" class="lnh"/>
+  <path d="M240 128 L340 95" class="lnh"/>
+  <path d="M240 140 L340 170" class="lnh"/>
+  <path d="M490 90 L680 120" class="lnh"/>
+  <path d="M490 170 L680 132" class="lnh"/>
+  <path d="M240 224 L640 224 L640 142 L680 142" class="lnh"/>
+</svg>
+</div>
+<figcaption>Abb. 3: Exklusives Blatt. Nur L1 hängt allein an X; L2 hat zwei Erstempfänger, L3 erreicht ein Gateway auch direkt. X ist damit kritisches Relais für genau eine Station.</figcaption>
+</figure>
+<table>
+<tr><th>Rolle</th><th>Regel</th><th>Grund</th></tr>
+<tr><td>Kritisches Relais</td><td>mindestens ein exklusives Blatt, das an mindestens 2 Tagen des Fensters so gesehen wurde</td><td>ein einzelner Tag ist bei median 29 Meldungen je Relais und Tag zu dünn; Annahme, im Rollout geprüft</td></tr>
+<tr><td>Supernode</td><td>benannte 2-Hop-Menge im obersten Zehntel des Netzes im selben Fenster, heute 7 Tage ab 80</td><td>relativer Schwellwert, weil die absolute Größe mit Gateway-Dichte und Netzgröße wandert</td></tr>
+<tr><td>beides</td><td>beide Regeln</td><td>die eigentlich wichtigen Stationen</td></tr>
+<tr><td>keine</td><td>keine Regel</td><td>Regelfall</td></tr>
+</table>
+<ul>
+  <li>Exklusives Blatt, vollständig: genau ein Erstempfänger aus <code>link_origins_1d</code>, keine Zeile in <code>gateway_direct_1d</code>, nie Mittelglied eines Pfads (<code>relay_counts_1h</code>), kein Gateway-Eintrag.</li>
+  <li>Die Route liefert die Blätter namentlich, damit jede Einordnung nachprüfbar ist.</li>
+  <li>Rollentabelle als eigene Tabelle in der Connections-Ansicht, sortierbar nach Rolle, Blattzahl und 2-Hop-Menge.</li>
+</ul>
+
+<h3>4.4 Schnittstellen</h3>
+<p class="reco">Entscheidung: drei anonyme Routen im Stil <code>?call=</code>, je ein MCP-Tool als 1:1-Übersetzung.</p>
+<table>
+<tr><th>Route</th><th>MCP-Tool</th><th>Stufe</th></tr>
+<tr><td><code>GET /api/v2/neighbor-count/series?call=&amp;window=</code></td><td><code>neighbor_count_series</code></td><td>1</td></tr>
+<tr><td><code>GET /api/v2/neighborhood?call=&amp;window=</code></td><td><code>neighborhood</code></td><td>2</td></tr>
+<tr><td><code>GET /api/v2/neighborhood/roles?window=</code></td><td><code>neighborhood_roles</code></td><td>3</td></tr>
+</table>
+<p>Anonym, weil das Frontend keine Authentifizierung hat und dieselben Daten schon heute als NBCNT und Kanten öffentlich sind.</p>
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>4.35p-Station mit 12-h-Zähler</td><td><code>windowCertain</code> falsch</td><td>nicht in Spitzen- und Supernode-Aussagen, nur angezeigt</td><td>knapp die Hälfte der Flotte ohne sichere 1-Hop-Spitze</td><td>1</td></tr>
+<tr><td>Kappung</td><td><code>capReached</code></td><td>Wert als "mindestens" anzeigen</td><td>wahre Spitze der dichtesten Stationen unbekannt</td><td>1</td></tr>
+<tr><td>Zuordnung der Relaisgruppen verrutscht</td><td>Übereinstimmung Relaiswert gegen Selbstwert je Stunde, heute ca. 98 %</td><td>Abfall unter 90 % als Warnung im app.log</td><td>bis zur Warnung falsche Relaiswerte</td><td>1</td></tr>
+<tr><td>Blatt wirkt exklusiv, weil es selten sendet</td><td>Tage im Fenster</td><td>Regel "mindestens 2 Tage"</td><td>seltene Sender bleiben unsicher</td><td>3</td></tr>
+<tr><td>Mobile Station verfälscht Spitze oder Blattstatus</td><td>wechselnde Erstempfänger</td><td>keine Sonderregel; in der Liste namentlich prüfbar</td><td>bleibt</td><td>2</td></tr>
+<tr><td>Selbstbericht ist unbeglaubigt</td><td>Abdeckung ungewöhnlich klein bei großem Zähler</td><td>Abdeckung neben jeder Zahl</td><td>ein falscher Zähler bläht nur die Obergrenze</td><td>2</td></tr>
+<tr><td>Zusätzliche Schreiblast auf dem Ein-Kern-Host</td><td>Stall-Zeilen im app.log vor und nach dem Deploy</td><td>Upserts pro Takt bündeln wie bei <code>link_signal</code></td><td>keine</td><td>1</td></tr>
+</table>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>1</td><td>Parser, Tabelle, Route, MCP-Tool</td><td>Replay eines Tages ergibt ca. 59 800 Relaiswerte bei 441 Relais; Zuordnungs-Übereinstimmung über 95 %</td></tr>
+<tr><td>2</td><td>1</td><td>Deploy</td><td>nach 24 h ca. 21 700 Zeilen, keine neuen Stall-Zeilen</td></tr>
+<tr><td>3</td><td>2</td><td>Route, MCP-Tool, Profilabschnitt</td><td>für IZ5IOM-13 (4.35t) Intervall und Abdeckung plausibel gegen den Selbstwert; Sichtprüfung Dark und Light</td></tr>
+<tr><td>4</td><td>3</td><td><code>gateway_direct_1d</code> ausrollen, 7 Tage sammeln</td><td>Tabelle füllt sich mit ca. 1 100 Absendern je Tag</td></tr>
+<tr><td>5</td><td>3</td><td>Rollen-Route, MCP-Tool, Rollentabelle</td><td>Stichprobe von 10 kritischen Relais aus den rohen Pfaden nachvollzogen; Prüfung der 2-Tage-Annahme</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>7 oder 30 Tage Aufbewahrung</td><td>30 Tage fangen seltene Spitzen, verlangen aber dieselbe Verlängerung für drei vorhandene Tabellen</td><td>Entscheidung des Auftraggebers nach Schritt 2</td></tr>
+<tr><td>Schwellwert Supernode</td><td>oberstes Zehntel ist eine Setzung</td><td>nach Schritt 5 gegen die bekannten Digipeater (DB0-, OE-X-Rufzeichen) prüfen</td></tr>
+<tr><td>HB4LO-7 mit 326 Stationen in 2 Hops</td><td>ein Ausreißer verschiebt das oberste Zehntel kaum, verzerrt aber die Obergrenze seiner Nachbarn</td><td>vor Schritt 5 rohe Pfade prüfen</td></tr>
+</table>
+
+<h2 id="s8">8. Ausblick außerhalb des Umfangs</h2>
+<p>Mesh-interne Weiterleitung und echte benannte Blatt-Nachbarschaften liefert nur die Firmware. Die DEV-Firmware sendet seit <code>ec636e3f</code> (2026-09-23) einen HN-Bericht mit bis zu 8 gehörten Rufzeichen, standardmäßig nur von Knoten ohne Mesh und ohne Gateway, also genau von den Blättern; er bleibt heute auf LoRa. Ein Gateway, das empfangene HN-Berichte hochlädt, würde mcmap diese Listen liefern. Das steht als eigener Punkt im Firmware-Backlog und ist nicht Teil dieses Konzepts.</p>
+</main>
+</body>
+</html>

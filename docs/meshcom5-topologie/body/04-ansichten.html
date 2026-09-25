@@ -1,0 +1,150 @@
+
+<h3>4.6 MHeard aus der Topologie</h3>
+<p class="reco">Entscheidung: Ein MHeard-Eintrag ist eine Zeile mit frischer Kante (x, ich), also "ich habe x gehört"; ihre Detailwerte liegen in einem @@EXT_B@@-Byte-Slot der Direkt-Erweiterung, ihre Uhrzeit ist die Minute dieser Kante.</p>
+<p>Der ME-Schritt in nbrNoteFrame() trägt heute schon für jeden gültigen Rahmen den letzten Hop ein und ist damit der Schlüssel von MHeard. Zwei Abweichungen sind zu beheben. Ein Rahmen mit ungültigem Token irgendwo im Pfad oder mit Schleife wird heute ganz verworfen, bevor der ME-Schritt läuft; im Mitschnitt waren das 0 DROP TOK und 2 DROP LOOP in 32,5 h. Stufe 2 löst den ME-Schritt von der Pfadprüfung, als eigener Arbeitspunkt, weil MHeard solche Rahmen heute zählt. Und HN-Berichte laufen heute durch den ME-Schritt, erscheinen aber nicht in MHeard. Ein HN-Bericht ist ein direkter Funkempfang mit max_hop 0; die abgeleitete MHeard-Liste führt ihn künftig, und der Schatten-Vergleich weist das als erklärte Abweichung aus.</p>
+<p>Prämisse für 48 und 64 Slots: Die Flotte hört höchstens 41 direkte Nachbarn in 24 Stunden und 59 in sieben Tagen; ein 12-Stunden-Fenster liegt darunter.</p>
+<table>
+<tr><th>MH-Feld</th><th>Quelle in der Topologie</th><th>Bits</th><th>Kodierung</th></tr>
+<tr><td>CALL</td><td>nbrCall[x]</td><td>64</td><td>6 Bit je Zeichen</td></tr>
+<tr><td>DATE, TIME</td><td>jetzt minus Alter der Kante (x, ich), Sekunde aus dem Slot</td><td>6</td><td>Sekunde 0 bis 59; nicht die Zeilenminute, die auch eine bloße Pfadnennung verjüngt</td></tr>
+<tr><td>PLT</td><td>Slot</td><td>2</td><td>0 Text, 1 Position, 2 HEY, 3 anderes</td></tr>
+<tr><td>HW</td><td>Kern hw, im ME-Schritt aus msg_last_hw</td><td>8</td><td>wie heute</td></tr>
+<tr><td>MOD</td><td>Slot</td><td>8</td><td>wie heute, beide Halbbytes</td></tr>
+<tr><td>RSSI</td><td>Slot</td><td>8</td><td>dBm + 160, also -160 bis +95</td></tr>
+<tr><td>SNR</td><td>Kante (x, ich)</td><td>8</td><td>gleitender Mittelwert über 8 Rahmen statt letzter Wert</td></tr>
+<tr><td>DIST</td><td>gerechnet aus Slot-Position und eigener Position, auf 0,1 km gerundet</td><td>43</td><td>Breite 21 Bit, Länge 22 Bit in 0,0001 Grad; alle Bits gesetzt heißt unbekannt</td></tr>
+<tr><td>ALT, nur Web</td><td>Slot</td><td>16</td><td>Meter + 1000; 0xFFFF unbekannt</td></tr>
+<tr><td>PL, MESH</td><td>Slot</td><td>4 + 1</td><td>Pfadlänge und Mesh-Bit des letzten Rahmens</td></tr>
+<tr><td>NCNT</td><td>Kern ncnt</td><td>8</td><td>zuletzt gemeldete Nachbarzahl dieser Station</td></tr>
+<tr><td>kein MH-Feld</td><td>Slot f, s, FW, W, Y</td><td>4 + 4 + 5 + 1 + 1</td><td>erste und zweite Hand für 4.11, Firmware-Buchstabe aus selbst gesendeten Rahmen, Via-unfähig, SYM-Zustand für 4.8</td></tr>
+</table>
+<p>Prämisse für 0,0001 Grad: eine APRS-Position hat 0,01 Bogenminuten Auflösung, rund 18,5 m; 0,0001 Grad sind rund 11 m und damit verlustfrei gegenüber der Quelle. Die 0,01 Grad des Zeilenkerns reichen für Reichweite und Nachbarkarte, für DIST in 0,1 km nicht. Der Firmware-Buchstabe kommt nur aus Rahmen, die der Nachbar selbst gesendet hat: das FW-Feld eines Rahmens nennt den Stand des Absenders, nicht den des letzten Hops.</p>
+<p>Regeln:</p>
+<ul>
+<li>Ein Slot wird im ME-Schritt vergeben und im Sweep frei, sobald die Kante (x, ich) das Fenster verlässt. Sind alle belegt, weicht der Slot des am längsten nicht gehörten direkten Nachbarn, Logzeile [NBR]|EVICT-X; die Zeile bleibt.</li>
+<li>Ohne gültige Uhr arbeitet die Topologie weiter, Web und Konsole zeigen das Alter in Minuten, und an die App geht wie heute kein MH-Rahmen; heute sorgt dafür die Datumsschranke in updateMheard() an Zeile 303.</li>
+<li>Eine gemeldete Nachbarzahl aus R&lt;n&gt;, /N oder einer Relais-Gruppe schreibt ncnt der Zeile ihres Absenders, direkt oder indirekt. Damit entfallen die Befunde B1, B2, B4 und B5 des NCNT-Papiers ohne eigene Korrektur, siehe 4.8.</li>
+</ul>
+
+<h3>4.7 Pfad und Horizont</h3>
+<p class="reco">Entscheidung: Die Pfadansicht zeigt je Absender alle Wege, die die Kanten hergeben, mit dem Alter der ältesten Kante je Weg; Absender ab 3 Hops ohne eigene Zeile bekommen einen Horizont-Eintrag mit der Maske der Fensterzeilen, über die sie hereinkommen.</p>
+<p>Ein Weg für eine 2-Hop-Zeile X ist X, dann ein direkter Nachbar B aus heardBy(X) geschnitten mit Direkt, dann ich. Ein Weg für einen fernen Absender S ist S, die Hop-Zahl bis zur Eintrittszeile A, dann B aus heardBy(A) geschnitten mit Direkt, dann ich. Die Namen zwischen S und A kennt die Topologie absichtlich nicht; das 2-Hop-Fenster bleibt die Grenze der Zeilen.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 350" role="img" aria-label="Pfad aus der Topologie">
+  <rect x="250" y="30" width="690" height="200" class="zone"/>
+  <text x="264" y="50" class="t11">2-Hop-Fenster: Zeilen und Kanten der Topologie</text>
+  <rect x="30" y="112" width="150" height="50" class="node hamf ham"/>
+  <text x="105" y="133" text-anchor="middle" class="b">DL8HW-12</text>
+  <text x="105" y="150" text-anchor="middle" class="t11">ferner Absender</text>
+  <rect x="300" y="112" width="150" height="50" class="node"/>
+  <text x="375" y="133" text-anchor="middle" class="b">DB0HOB-12</text>
+  <text x="375" y="150" text-anchor="middle" class="t11">2-Hop-Zeile, Eintritt</text>
+  <rect x="540" y="62" width="150" height="50" class="node srv"/>
+  <text x="615" y="83" text-anchor="middle" class="b">DB0ED-99</text>
+  <text x="615" y="100" text-anchor="middle" class="t11">direkt</text>
+  <rect x="540" y="162" width="150" height="50" class="node srv"/>
+  <text x="615" y="183" text-anchor="middle" class="b">DL2JA-2</text>
+  <text x="615" y="200" text-anchor="middle" class="t11">direkt</text>
+  <rect x="780" y="112" width="140" height="50" class="node"/>
+  <text x="850" y="133" text-anchor="middle" class="b">DK5EN-98</text>
+  <text x="850" y="150" text-anchor="middle" class="t11">ich</text>
+  <path d="M180 137 L300 137" class="lnd"/>
+  <text x="105" y="182" text-anchor="middle" class="t11">Horizont-Eintrag:</text>
+  <text x="105" y="196" text-anchor="middle" class="t11">4 Hops, G, Eintritt DB0HOB-12</text>
+  <path d="M450 128 L540 90" class="ln"/>
+  <path d="M450 146 L540 184" class="ln"/>
+  <path d="M690 90 L780 128" class="ln"/>
+  <path d="M690 184 L780 146" class="ln"/>
+  <text x="488" y="98" text-anchor="middle" class="t11">358</text>
+  <text x="488" y="182" text-anchor="middle" class="t11">53</text>
+  <text x="742" y="98" text-anchor="middle" class="t11">750</text>
+  <text x="742" y="182" text-anchor="middle" class="t11">610</text>
+  <rect x="30" y="256" width="440" height="72" class="node prx"/>
+  <text x="46" y="276" class="b">Heute, Path Information</text>
+  <text x="46" y="296" class="mono">DL8HW-12 (08:20:50)  4G/DL2RN-13,DB0HOB-12,DB0ED-99</text>
+  <text x="46" y="314" class="t11">ein Pfad, der kuerzeste der letzten 12 h</text>
+  <rect x="490" y="256" width="440" height="72" class="node srv"/>
+  <text x="506" y="276" class="b">Aus der Topologie</text>
+  <text x="506" y="296" class="mono">DL8HW-12  4 Hops G  Eintritt DB0HOB-12</text>
+  <text x="506" y="314" class="mono">Wege: DB0HOB-12&gt;DB0ED-99, DB0HOB-12&gt;DL2JA-2</text>
+</svg>
+</div>
+<figcaption>Abb. 11: Ein ferner Absender aus der Topologie. Die Pfadtabelle kennt einen Weg und den Namen DL2RN-13; die Topologie kennt die Hop-Zahl, die Eintrittszeile und beide Wege ab dort. Die Zahlen an den Kanten sind Trefferzahlen aus dem Schnappschuss vom 24.09. 07:25, nicht Signalwerte.</figcaption>
+</figure>
+
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Pfadtext wie heute</td><td>71 B je Absender, kürzester Pfad</td><td><span class="tag bad">verworfen</span> ein Weg, bis 12 h alt, doppelte Speicherung der Rufzeichen</td></tr>
+<tr><td>nur die Topologie</td><td>Pfade bis 2 Hops</td><td><span class="tag bad">verworfen</span> 22 von 29 Absendern der Pfadtabelle von DK5EN-98 lägen außerhalb</td></tr>
+<tr><td>Horizont mit einem Eintrittsindex</td><td>13 B je Absender</td><td><span class="tag warn">Teilmenge</span> verliert die Mehrwege vor dem Fenster</td></tr>
+<tr><td>Horizont mit Eintrittsmaske</td><td>20 oder 28 B je Absender, 48 oder 112 Einträge</td><td><span class="tag ok">gewählt</span> alle Eintrittszeilen, Hop-Minimum mit Verfall, G-Bit</td></tr>
+<tr><td>Fenster aufheben</td><td>jede Pfadstation bekommt eine Zeile</td><td><span class="tag bad">verworfen</span> kehrt die HELLO-Matrix-Entscheidung um, vervielfacht den Zeilenbedarf</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Ein Horizont-Eintrag entsteht oder wird aufgefrischt nur aus Position und HEY mit mindestens drei Pfad-Token, nur wenn der Absender keine frische Zeile hat und nur wenn das Eintrittstoken nicht das eigene Rufzeichen ist. Prämisse: bei DK5EN-98 hätten ohne diese Bedingungen je 12 h 68 bis 73 Absender einen Eintrag bekommen, davon 26 bis 28 direkte oder 2-Hop-Stationen, die dann doppelt erschienen; 987 von 3.832 auslösenden Rahmen, 26 %, waren Echos eigener Relays, deren Weg durch mich zurückliefe.</li>
+<li>Bekommt der Absender später eine Zeile, wird sein Horizont-Eintrag frei.</li>
+<li>Kein Text: vom Server eingespeister Text trägt Pfadpaare, die nie auf Funk gehört wurden. Für eingespeiste Position und HEY gilt dasselbe Restrisiko wie heute im 2-Hop-Fenster; im Mitschnitt kam in 749 Server-Rahmen keine einzige Position und kein HEY.</li>
+<li>Die Hop-Zahl steht einmal je Absender, nicht je Weg: das Minimum der laufenden und der vorigen 6-h-Epoche. Prämisse: 28 von 49 fernen Absendern kamen über verschiedene Eintrittszeilen mit verschiedenen Hop-Zahlen, etwa DL2RN-13 mit 3 über DB0HOB-12 und 4 über DB0ED-99; eine Zahl je Weg kostete 3 Bit je Zeile und Eintrag. Die zwei Epochen lassen das Minimum nach spätestens 12 h wieder steigen.</li>
+<li>Verdrängt wird der am längsten nicht gesehene Eintrag, Logzeile [NBR]|EVICT-H. Wird eine Zeile verdrängt, löscht der Durchlauf ihr Bit in allen Eintrittsmasken; ein Eintrag mit leerer Maske wird frei.</li>
+<li>Prämisse für 48 und 112 Einträge: DK5EN-98 sah je 12 h 42 bis 45 ferne Absender ohne eigene Zeile. 48 Einträge decken das auf klassischem ESP32 knapp, 112 auf S3 und nRF52 das 2,5-fache für Bergknoten. Der Horizont ist reine Anzeige, eine Verdrängung kostet nur einen Eintrag der Pfadansicht; jeder weitere kostet 20 oder 28 Byte.</li>
+</ul>
+
+<h3>4.8 NCNT</h3>
+<p class="reco">Entscheidung: NCNT zählt die Nachbarn, die ich in der letzten Stunde gehört habe und die mich nachweislich hören oder mit geglättet mindestens -16 dB ankommen, ohne die, deren vollständiger HN-Bericht mich nicht nennt.</p>
+<pre>D60   = Zeilen mit Kante (x, ich), juenger als 60 min      // beim Lesen aus der Kantenminute
+HM    = heardBy[ich]                                      // x hat mich gehoert, Fenster 12 h
+SYM   = { x in D60 : SNR-Mittel(x, ich) &gt;= -16 dB, aus erst unter -18 dB }
+VETO  = { x : vollstaendiger HN-Bericht von x juenger als 45 min nennt mich nicht }
+NCNT  = popcount(D60 &amp; (HM | SYM) &amp; ~VETO)</pre>
+<p>Die Prämissen:</p>
+<ul>
+<li>D60 bleibt eine Stunde wie heute, damit NCNT eine Momentaufnahme bleibt und ein abgeschalteter Nachbar nach einer Stunde herausfällt.</li>
+<li>HM gilt 12 Stunden, weil ein Beweis nur ankommt, wenn der Nachbar eine meiner Positionen oder HEYs weiterleitet oder mich in seinem HN-Bericht nennt; ein Nachbar ohne Mesh liefert ihn nie.</li>
+<li>SYM fängt genau diese Nachbarn auf; ohne SYM fiele NCNT mit Stufe 4 zusammen, weil Auto-Via redundanten Altknoten das Weiterleiten meiner Positionen abnimmt.</li>
+<li>Glättung und Hysterese, weil der SNR je Rahmen stark streut: p10 bis p90 liegen bei DK5EN-1 2 dB, bei DB0ED-99 und DL2JA-1 5 dB, bei DL2JA-2 7 dB und bei DL2UD-1 8 dB auseinander. Ein Mittel über 8 Rahmen drückt die Streuung auf rund ein Drittel, 2 dB Hysterese fangen den Rest. Ungeglättet würde ein Nachbar ohne Beweis genau an der Schwelle 0,7 bis 3,4 Trickle-Rücksetzungen je Stunde auslösen, jede mit 2 bis 3 zusätzlichen HEYs; der Replay des Mitschnitts ergab 0.</li>
+<li>Das Veto übernimmt die Regel, die nbrHearsSym() für die Relay-Entscheidung schon anwendet; ein Bericht listet nur Nachbarn der letzten 60 min mit mindestens -16 dB und höchstens 8 Einträge, ein gekürzter Bericht mit '+' vetoet nicht. Im Mitschnitt kam kein fremder Bericht an.</li>
+</ul>
+<p>Beispiel DK5EN-98 am 24.09. um 08:55: MHeard hat 5 Einträge, getMheardCount() meldet 5. Vier Nachbarn hören mich nachweislich, DL2JA-2 mit -13 dB, DK5EN-1 mit 6 dB, DL2UD-1 mit -13 dB und DB0ED-99 mit -6 dB; DL2JA-1 leitet nie weiter, kommt aber mit -8 dB an und zählt über SYM. NCNT bleibt 5. Ein Nachbar, der nur mit -18 dB ankommt und nie weiterleitet, zählt künftig nicht mehr.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>einseitig wie heute</td><td>D60</td><td><span class="tag warn">Teilmenge</span> läuft im Schatten als Vergleichswert mit</td></tr>
+<tr><td>symmetrisch, nur gemessen</td><td>D60 &amp; HM</td><td><span class="tag bad">verworfen</span> bricht mit Stufe 4 und bei Nachbarn ohne Mesh ein</td></tr>
+<tr><td>symmetrisch mit Annahme, geglättet, mit Veto</td><td>oben</td><td><span class="tag ok">gewählt</span> Zwei-Wege-Nachbarn, stabil gegen Auto-Via und SNR-Streuung</td></tr>
+<tr><td>12-Stunden-Fenster</td><td>alle Kanten des Fensters</td><td><span class="tag bad">verworfen</span> Werte steigen sprunghaft, kein Vergleich mehr mit älterer Firmware</td></tr>
+</table>
+<p>Leser des Werts: R&lt;n&gt; im HEY, /N im Positionsbeacon, beim Sender wie heute auf 99 gekappt, die Trickle-Rücksetzung, R&lt;heard&gt; im HN-Bericht und der tote Beacon-Auslöser B6, der tot bleibt. Der Deckel steigt von 30 oder 80 auf 63 oder 127. Ein Knoten ohne Uhr zählt künftig richtig, weil die Topologie mit Minuten seit dem Start rechnet. Die Altersanzeige für NCNT, die das NCNT-Papier als Stufe 2 vorsah, entfällt: der Zeilenkern ist mit 12 Byte voll, eine Minute je Zeile kostete 256 Byte auf S3.</p>
+<table>
+<tr><th>Befund aus dem NCNT-Papier</th><th>Inhalt</th><th>Nach dem Umbau</th></tr>
+<tr><td>B1</td><td>zwei Kopien, Web und App zeigen verschiedene Werte</td><td>entfällt, eine Kopie im Zeilenkern</td></tr>
+<tr><td>B2</td><td>HEY über Relais überschreibt Datum und Typ des Direkt-Eintrags</td><td>entfällt, Relais-HEY schreibt nur ncnt</td></tr>
+<tr><td>B3</td><td>NCNT 0 kommt nur über HEY an</td><td>bleibt, bewusst, höchstens 15 min veraltet</td></tr>
+<tr><td>B4</td><td>/N beim ersten Beacon eines neuen Nachbarn verloren</td><td>entfällt, ncnt braucht keinen bestehenden Eintrag</td></tr>
+<tr><td>B5</td><td>wiederverwendeter Pfadplatz behält alte Hop-Zahl</td><td>entfällt mit der Pfadtabelle</td></tr>
+<tr><td>B6</td><td>Beacon-Auslöser bei geänderter Zahl ist toter Code</td><td>bleibt tot, Entfernung gehört in die Aufräumarbeit</td></tr>
+</table>
+<p>NCNT eines MeshCom-5-Knotens bedeutet etwas anderes als das eines 4.35-Knotens. Die MH-Liste der App mischt beide Bedeutungen je Nachbar, mcmap ebenso; mcmap braucht eine Kennung, die beide trennt, das ist ein offener Punkt.</p>
+
+<h3>4.9 Telefon-App</h3>
+<p class="reco">Entscheidung: Der MH-Rahmen behält TYP, alle 13 Felder und ihre Bedeutung und bekommt 7 neue Felder am Ende; nur direkte Nachbarn gehen als MH an die App; DIST wird auf 0,1 km gerundet, und beide Sendestellen bauen den Rahmen mit bleJsonFrameFailSoft().</p>
+<table>
+<tr><th>Neues Feld</th><th>Bedeutung</th><th>Quelle</th></tr>
+<tr><td>AGE</td><td>Minuten seit dem letzten Direktempfang, ohne Uhr gültig</td><td>Kante (x, ich)</td></tr>
+<tr><td>HM</td><td>SNR, mit dem der Nachbar mich zuletzt gehört hat; fehlt, wenn unbekannt</td><td>Kante (ich, x)</td></tr>
+<tr><td>ROLE</td><td>S Super-Node, N nötig, R redundant</td><td>#X nach 4.3</td></tr>
+<tr><td>EX</td><td>exklusiver Beitrag #X</td><td>Masken und Anteilsregel</td></tr>
+<tr><td>NB</td><td>wie viele Stationen der Nachbar hört, #N</td><td>popcount hears(x)</td></tr>
+<tr><td>GW</td><td>1, wenn der Nachbar ein Gateway ist</td><td>NBR_FLAG_GW</td></tr>
+<tr><td>VIA</td><td>1, wenn er gerade in meiner Via-Menge steht</td><td>Via-Maske, ab Stufe 4</td></tr>
+</table>
+<p>Prämissen für die Länge, gemessen mit ArduinoJson 7.4.3 der Firmware: der heutige Rahmen braucht im schlimmsten Fall 167 Byte live, weil DIST dort als ungerundeter double mit 11 Zeichen erscheint, und 162 Byte in der Liste. Mit gerundetem DIST braucht der neue Rahmen 225 Byte, mit allen Kodierungen am Maximum 232 Byte, mit AGE 65535 und DIST in Exponentform 237 Byte. Breite, Länge und Höhe zusätzlich ergäben 268 Byte und passen nicht; die App erhält Positionen ohnehin aus den Positionsrahmen. Die Grenzen je Weg: Liste 245 Byte, live 252 Byte auf ESP32 und 247 Byte auf nRF52. bleJsonFrameFailSoft() streicht bei Überlänge die hintersten Felder, also die neuen; heute schneidet der Kommando-Ring stattdessen Bytes ab und die App verwirft den ganzen Rahmen.</p>
+<p>Alle Grenzen setzen voraus, dass das Telefon die größte MTU aushandelt. Ein Telefon mit MTU 185 verlöre jeden Rahmen über 182 Byte, also den erweiterten, nicht den heutigen. Darum rechnet die Firmware payload_max aus der ausgehandelten MTU, höchstens 244 Zeichen, und FailSoft fällt auf die 13 alten Felder zurück; welche MTU iOS und Android wirklich aushandeln, ist vor Stufe 3 zu messen.</p>
+<p>Regeln:</p>
+<ul>
+<li>Die alte App liest nur ihr Interface und ignoriert die neuen Felder; die Fork-App zeigt sie, ein PR an rainerfritz/Meshcom-MobileApp folgt nach dem Feldlauf.</li>
+<li>2-Hop-Zeilen gehen nicht als MH an die App: eine alte App würde sie als direkt gehört listen. Die Nachbarschaft über 2 Hops zeigt die Web-Seite.</li>
+<li>Live-Rahmen höchstens einmal je Nachbar und Minute, ausgelöst von einer neuen Minute der Kante (x, ich), nicht der Zeile. Prämisse: DK5EN-98 empfängt rund 4 Rahmen je Minute von 5 Nachbarn, heute geht jeder als BLE-Rahmen an die App; die App nimmt "zuletzt gehört" aus DATE und TIME und zeigt je Rufzeichen nur den letzten Stand.</li>
+<li>Die Liste beim Verbinden läuft wie heute in Portionen über den Kommando-Ring, neueste zuerst, 12 Stunden; der Arbeitsspeicher je Eintrag ist eine Sicht von 48 Byte statt einer struct mheardLine mit 584 Byte.</li>
+</ul>

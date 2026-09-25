@@ -1,0 +1,122 @@
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Befund: Drei Speicher halten dieselbe Beobachtung in drei Formaten, jeder mit eigener Verdrängung, eigenem Fenster und eigenen Lesern. Die Matrix trägt als einzige Entscheidungen, sie ist außer auf E22_XML der kleinste der drei, und ihre Deckungsregel kippt mit der Laufzeit.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>MHeard-Schlüssel</td><td>msg_source_last, der letzte Sender; nur direkt gehörte Stationen, jeder Rahmentyp außer Binär-ACK und HN-Bericht, das eigene Echo nicht</td><td>src/lora_functions.cpp:1078, :1197</td></tr>
+<tr><td>MHeard-Eintrag</td><td>55 B: acht Felder mit 54 B, also Datensatz 20, Rufzeichen 10, lat, lon, alt, Epoche, millis und NCNT je 4, dazu mheard_send_idx 1 B; 6 B Verwaltung für mheard_send_cursor, mheard_send_n und mheardWrite</td><td>nm, src/mheard_functions.cpp 53 bis 120, :802</td></tr>
+<tr><td>MHeard-Größe</td><td>30 klassisch, 50 E22_XML, 80 S3 und nRF52; Verdrängung des ältesten, Verfall nach 12 h; ohne Datum ab 2025 kein Eintrag</td><td>src/configuration_global.h 301 bis 334, src/mheard_functions.cpp:303</td></tr>
+<tr><td>App</td><td>MH-JSON mit 13 Feldern live bei jedem Rahmen eines Nachbarn und als Liste beim Verbinden, 12 h, neueste zuerst; beide Stellen nutzen bleJsonFrame() ohne Kürzungsschutz</td><td>src/mheard_functions.cpp:439, :926</td></tr>
+<tr><td>BLE-Grenzen</td><td>Liste über den Kommando-Ring 245 B, darüber werden Bytes abgeschnitten und die App verwirft den Rahmen; live 252 B auf ESP32 wegen uint8-Länge und MTU minus 3, 247 B auf nRF52; alle Werte setzen voraus, dass das Telefon die größte MTU aushandelt</td><td>src/loop_functions.cpp:674, :716, src/phone_commands.cpp:69, src/nrf52/nrf52_ble.cpp:97, MessageHandler.ts:795</td></tr>
+<tr><td>DIST</td><td>live als ungerundeter double, ArduinoJson schreibt 11 Zeichen; in der Liste auf 0,1 km gerundet</td><td>src/lora_functions.cpp:1166, src/mheard_record.h 60 bis 72</td></tr>
+<tr><td>Web MHeard</td><td>Fenster 3 h, neueste zuerst</td><td>src/web_functions/web_functions.cpp:1499</td></tr>
+<tr><td>NCNT-Leser</td><td>getMheardCount(), Einträge der letzten Stunde: R&lt;n&gt; im HEY, /N im Positionsbeacon, Trickle-Rücksetzung, HN-Bericht, dazu der tote Beacon-Auslöser B6</td><td>src/mheard_functions.cpp:691, src/loop_functions.cpp:4545, :5095, :5152, src/esp32/esp32_main.cpp:3480, src/nrf52/nrf52_main.cpp:2018</td></tr>
+<tr><td>NCNT beim Empfänger</td><td>zwei Kopien, drei Schreiber, REP-Überschreibung durch HEY über Relais; Befunde B1 bis B6</td><td>Anhang F, archiviertes NCNT-Papier</td></tr>
+<tr><td>Pfadtabelle</td><td>nur HEY mit mindestens einem Relais; je Absender der kürzeste Pfad der letzten 12 h als Text; 71 B je Eintrag, 40 klassisch, 50 E22_XML, 100 S3 und nRF52; Leser Web, --path, T-Deck, SD</td><td>src/mheard_functions.cpp 575 bis 661</td></tr>
+<tr><td>nRF52-Arbeitskopien</td><td>drei statische struct mheardLine zu 584 B; auf ESP32 dieselben 584 B je Aufruf auf dem Stack</td><td>nm wiscore_rak4631</td></tr>
+<tr><td>Matrix</td><td>2-Hop-Fenster; Text speist nur den ME-Schritt; Masken uint32_t, nbrBit() liefert ab Index 32 still 0; Sweep nur aus dem Empfangspfad und nur alle 1024 min</td><td>src/nbr_matrix.h 229 bis 245, src/nbr_matrix.cpp 506 bis 510, :276, :1107</td></tr>
+<tr><td>Deckungsregel</td><td>eine Station gilt als von einem Nachbarn gedeckt, sobald dessen Zelle im 12-h-Fenster einen Treffer hat; das gilt für #X, die Rollen und die Deckung in der Relay-Entscheidung</td><td>src/nbr_matrix.cpp nbrRowMeshNeedCount(), nbrCoverMask()</td></tr>
+<tr><td>Tasks</td><td>ESP32: Empfang, Web und BLE im selben Loop-Task. nRF52: LORA-Task und Loop-Task mit Priorität 1 berühren beide die Matrix und wechseln bei jedem Aufwachen eines höher priorisierten Tasks, nicht nur an Yield-Punkten</td><td>freertos/Source/tasks.c 150 bis 165, FreeRTOSConfig.h Zeitscheibe aus</td></tr>
+<tr><td>Via beim Empfänger</td><td>nennt der Zielpfad Rufzeichen, wiederholt nur ein genannter Knoten; einziger Aufrufer von checkMesh()</td><td>src/lora_functions.cpp:1777, src/via_functions.cpp</td></tr>
+<tr><td>Via beim Relais</td><td>jedes Relais setzt den Zielpfad auf das Ziel zurück und wendet seinen eigenen Via an</td><td>src/lora_functions.cpp 1825 bis 1827</td></tr>
+<tr><td>checkVia-Aufrufer</td><td>eigene Rahmen, Relais, Gateway-Einspeisung vom Server und Test-Einspeisung</td><td>src/loop_functions.cpp 750, 3446, 3715, 4839, 5025; src/esp32/udp_frame_esp32.cpp:252, :349; src/nrf52/udp_frame_nrf52.cpp:197, :353; src/test_inject.cpp:182</td></tr>
+<tr><td>Via je Firmware-Stand</td><td>vor 2c96f11b vom 09.06.2026, also 4.35a bis 4.35o und 4.35p bis v4.35p.06.08: erstes Via-Rufzeichen gilt als Ziel, der erstgenannte Knoten wiederholt nie, alle anderen immer, der Via bleibt stehen, Texte mit Via werden nicht angezeigt. v4.35p.06.10: nur Genannte wiederholen, Via bleibt stehen. Ab a8dc23a2 vom 13.06.: Pfad wird zurückgesetzt. Der Buchstabe p reicht vom 22.03. bis 02.09. und trennt diese Stände nicht</td><td>git show der Tags, Anhang F V1</td></tr>
+<tr><td>Via über den Server</td><td>alle Einspeisestellen rufen checkVia() ohne den Pfad zurückzusetzen; ein Via läuft damit über den Server in andere Regionen; der Server lieferte in 18 Tagen nur Text</td><td>Einspeisestellen oben, RX-UDP im Mitschnitt</td></tr>
+<tr><td>Auto-Via</td><td>Wahl des frischen MHeard-Nachbarn mit größtem NCNT; seit 22.07.2026 auskommentiert, upstream identisch</td><td>src/via_functions.cpp 150 bis 190</td></tr>
+<tr><td>T-Deck</td><td>mheard.dat und mhpath.dat, je höchstens alle 30 s, nur mit node_persist_to_sd; neuester Zeitstempel stellt nach dem Neustart die Uhr</td><td>src/mheard_functions.cpp 230 bis 298, src/time_functions.cpp:131</td></tr>
+<tr><td>App-Parser</td><td>castet das JSON auf ein Interface und ignoriert unbekannte Felder; nimmt "zuletzt gehört" aus DATE und TIME, nicht aus der Ankunftszeit</td><td>MessageHandler.ts 1188 bis 1260, MheardStaticStore.ts</td></tr>
+<tr><td>DK5EN-98 live, 25.09. 16:02</td><td>seit 24.09. 23:17 per OTA auf dem Build vom 24.09. 23:15, der gegenüber 8487ea2a nur Ping und Pong ändert; 21 von 21 Zeilen; DB0ED-99 redundant mit #X 0; neu der mobile DL2JA-11</td><td>Web-Seiten info und neighbours, docs/pong-ble-campaign.md</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 470" role="img" aria-label="Ist-Zustand">
+  <rect x="20" y="196" width="190" height="82" class="node"/>
+  <text x="115" y="222" text-anchor="middle" class="b">OnRxDone</text>
+  <text x="115" y="240" text-anchor="middle" class="t11">lora_functions.cpp</text>
+  <text x="115" y="256" text-anchor="middle" class="t11">jeder LoRa-Empfang</text>
+
+  <rect x="290" y="64" width="250" height="148" class="node prx"/>
+  <text x="415" y="100" text-anchor="middle" class="b">MHeard</text>
+  <text x="415" y="120" text-anchor="middle" class="t11">Schluessel: letzter Hop, nur direkt</text>
+  <text x="415" y="136" text-anchor="middle" class="t11">55 B je Eintrag, 30 / 50 / 80</text>
+  <text x="415" y="152" text-anchor="middle" class="t11">NCNT in zwei Kopien</text>
+  <text x="415" y="168" text-anchor="middle" class="t11">ohne Uhr kein Eintrag</text>
+
+  <rect x="290" y="258" width="250" height="82" class="node prx"/>
+  <text x="415" y="278" text-anchor="middle" class="b">Pfadtabelle</text>
+  <text x="415" y="294" text-anchor="middle" class="t11">71 B je Eintrag, 40 / 50 / 100</text>
+  <text x="415" y="310" text-anchor="middle" class="t11">je Absender kuerzester Pfad, 12 h</text>
+  <text x="415" y="326" text-anchor="middle" class="t11">nur HEY mit Relais</text>
+
+  <rect x="290" y="356" width="250" height="82" class="node"/>
+  <text x="415" y="376" text-anchor="middle" class="b">Nachbarschaftsmatrix</text>
+  <text x="415" y="392" text-anchor="middle" class="t11">13 / 21 Zeilen, dichte Zellen</text>
+  <text x="415" y="408" text-anchor="middle" class="t11">Masken uint32, 2-Hop-Fenster</text>
+  <text x="415" y="424" text-anchor="middle" class="t11">Deckung: ein Treffer in 12 h</text>
+
+  <path d="M210 237 L290 138" class="ln"/>
+  <path d="M210 237 L290 299" class="ln"/>
+  <path d="M210 237 L290 397" class="ln"/>
+
+  <rect x="650" y="24" width="290" height="28" class="node"/>
+  <text x="795" y="42" text-anchor="middle">App: MH-JSON live und als Liste</text>
+  <rect x="650" y="66" width="290" height="28" class="node"/>
+  <text x="795" y="84" text-anchor="middle">Web MHeard, 3 h</text>
+  <rect x="650" y="108" width="290" height="28" class="node"/>
+  <text x="795" y="126" text-anchor="middle">Konsole --mheard, T-Deck-Anzeigen</text>
+  <rect x="650" y="150" width="290" height="28" class="node"/>
+  <text x="795" y="168" text-anchor="middle">T-Deck SD mheard.dat, Uhr</text>
+  <rect x="650" y="192" width="290" height="28" class="node"/>
+  <text x="795" y="210" text-anchor="middle">NCNT auf der Luft: R&lt;n&gt;, /N, Trickle</text>
+  <rect x="650" y="234" width="290" height="28" class="node bad"/>
+  <text x="795" y="252" text-anchor="middle">Auto-Via, seit 22.07. auskommentiert</text>
+  <rect x="650" y="276" width="290" height="28" class="node"/>
+  <text x="795" y="294" text-anchor="middle">Web Path Information</text>
+  <rect x="650" y="318" width="290" height="28" class="node"/>
+  <text x="795" y="336" text-anchor="middle">--path, T-Deck-Seite, SD mhpath.dat</text>
+  <rect x="650" y="360" width="290" height="28" class="node"/>
+  <text x="795" y="378" text-anchor="middle">Web Nachbarn, Rollen</text>
+  <rect x="650" y="402" width="290" height="28" class="node"/>
+  <text x="795" y="420" text-anchor="middle">Relay-Entscheidung Fall A / B</text>
+
+  <path d="M540 72 L650 38" class="ln"/>
+  <path d="M540 80 L650 80" class="ln"/>
+  <path d="M540 122 L650 122" class="ln"/>
+  <path d="M540 164 L650 164" class="ln"/>
+  <path d="M540 204 L650 206" class="ln"/>
+  <path d="M540 204 L650 248" class="lnx" stroke-dasharray="5 4"/>
+  <path d="M540 290 L650 290" class="ln"/>
+  <path d="M540 332 L650 332" class="ln"/>
+  <path d="M540 374 L650 374" class="ln"/>
+  <path d="M540 416 L650 416" class="ln"/>
+
+  <text x="20" y="458" class="t11">Dieselbe Beobachtung liegt dreimal im RAM: 5.829 B klassisch, 14.663 B auf S3, 16.415 B auf nRF52 mit den drei statischen Arbeitskopien.</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Jeder Empfang schreibt in drei Speicher, die orange markierten nur für Anzeige, NCNT und die tote Via-Wahl. Nur die Matrix trägt eine Entscheidung, und ihre Deckungsregel lässt einen einzigen Treffer genügen.</figcaption>
+</figure>
+
+<figure>
+<div class="fig">
+@@FIG:kp-ist-matrix@@
+</div>
+<figcaption>Abb. 2: Die dichte Matrix heute, Schnappschuss DK5EN-98 vom 24.09. 07:25. 84 % des Speichers sind Zellen, 84 % der Zellen sind leer, und die Zeilen sind trotzdem voll. Die Sendeentscheidung liest nur Spalte 0, Zeile 0 und die Spalten der direkten Nachbarn.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+<p>Die Flottenzahlen stammen aus dem mcmap-Schnappschuss vom 24.09. und sind Untergrenzen, weil der Linkgraph des Servers nur gatewaynahe Hops sieht. Die Zahlen von DK5EN-98 kommen aus dem Mitschnitt vom 21. bis 24.09., Anhang A beschreibt die Rechnung.</p>
+<table>
+<tr><th>Größe</th><th>heute</th><th>Ziel</th><th>Bemerkung</th></tr>
+<tr><td>RAM der drei Speicher</td><td class="num">@@OLD_C@@ / @@OLD_X@@ / @@OLD_S@@ / @@OLD_N@@ B</td><td class="num">@@NEW_C@@ / @@NEW_X@@ / @@NEW_S@@ / @@NEW_N@@ B</td><td>klassisch / E22_XML / S3 / nRF52; Ziel ohne Ringseitenfelder, siehe 4.10</td></tr>
+<tr><td>Zeilen der Topologie</td><td class="num">13 / 21 / 21 / 21</td><td class="num">64 / 64 / 128 / 128</td><td>2-Hop in 24 h: p90 48, p99 84, Maximum 113; Bergknoten laut Betreiber über 100</td></tr>
+<tr><td>Direkte Nachbarn mit Details</td><td class="num">30 / 50 / 80 / 80</td><td class="num">48 / 48 / 64 / 64</td><td>1-Hop-Maximum der Flotte 41 in 24 h, 59 in 7 Tagen</td></tr>
+<tr><td>Absender ab 3 Hops</td><td class="num">in 40 / 50 / 100 Pfadplätzen, geteilt mit näheren Absendern</td><td class="num">48 / 48 / 112 / 112 eigene Einträge</td><td>DK5EN-98: 42 bis 45 ferne Absender je 12 h</td></tr>
+<tr><td>NCNT-Deckel</td><td class="num">30 / 50 / 80 / 80</td><td class="num">63 / 63 / 127 / 127</td><td>fünf von 262 TLORA V2.1.6 melden heute genau 30</td></tr>
+<tr><td>Bytes je direktem Nachbarn</td><td class="num">55 MHeard + Matrixzeile</td><td class="num">36 + @@EXT_B@@ klassisch, 52 + @@EXT_B@@ S3</td><td>Zeile mit Masken plus Direkt-Erweiterung</td></tr>
+<tr><td>Bytes je fernem Absender</td><td class="num">71</td><td class="num">20 klassisch, 28 S3</td><td>Horizont-Eintrag</td></tr>
+<tr><td>MH-Rahmen an die App, schlimmster Fall</td><td class="num">167 B live, 162 B Liste</td><td class="num">225 B</td><td>mit DIST auf 0,1 km gerundet; Grenze 245 B; Kodierungsmaximum 237 B</td></tr>
+<tr><td>Flotte nach Via-Verhalten, 25.09., 1.491 Knoten</td><td class="num">557 fähig, 681 unbekannt, 253 unfähig</td><td class="num">-</td><td>4.35s und t 37 %; 4.35p 46 %; 4.35a bis o 17 %</td></tr>
+<tr><td>Echo meiner Positionen durch einen genannten Nachbarn</td><td class="num">37 bis 43 %</td><td class="num">-</td><td>binnen 300 s; ein beliebiges Echo 80 bis 86 %</td></tr>
+<tr><td>SNR-Streuung je Rahmen, p10 bis p90</td><td class="num">2 bis 8 dB</td><td class="num">-</td><td>DK5EN-1 2, DB0ED-99 5, DL2JA-1 5, DL2JA-2 7, DL2UD-1 8 dB</td></tr>
+</table>

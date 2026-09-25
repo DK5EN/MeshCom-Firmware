@@ -1,0 +1,56 @@
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>Streutreffer eines Super-Node deckt eine Station</td><td>#X eines Nachbarn fällt mit der Laufzeit</td><td>Deckung erst ab 10 % des Verkehrs des stärksten Hörers</td><td>Schwelle nur an einem Standort geprüft</td><td>1</td></tr>
+<tr><td>Task-Wechsel auf nRF52 mitten in einer Änderung</td><td>Konsistenzprüfung im Schatten: jedes Maskenbit hat eine Kante und umgekehrt</td><td>Scheduler-Klammer um jede Änderung und jeden Mehrwort-Leser</td><td>keine</td><td>1</td></tr>
+<tr><td>Ruhiger Kanal, der Sweep läuft nicht</td><td>-</td><td>zeitabhängige Werte werden beim Lesen gerechnet, Sweep im Loop-Task</td><td>keine</td><td>1</td></tr>
+<tr><td>Pool voll am Super-Node</td><td>[NBR]|EVICT-E</td><td>älteste Kante ohne Bezug zu Zeile 0 weicht</td><td>Rang gekappt, Entscheidung vollständig</td><td>1</td></tr>
+<tr><td>Zeilen voll am Bergknoten</td><td>[NBR]|EVICT</td><td>direkte Zeilen geschützt, 2-Hop-Zeilen weichen</td><td>#X gekappt, MHeard vollständig</td><td>1</td></tr>
+<tr><td>Rufzeichen außerhalb der Zeichenregel</td><td>DROP TOK im Schatten</td><td>keine Zeile</td><td>die Station fehlt in MHeard; der Dekoder lässt etwa OE12ABC-12 mit 10 Zeichen durch</td><td>1</td></tr>
+<tr><td>16-Bit-Minute läuft nach 45 Tagen über</td><td>Geist-Sweep</td><td>Kanten mit großem Alter frei, Uhrzeiten als jetzt minus Alter</td><td>keine</td><td>1</td></tr>
+<tr><td>Vom Server eingespeiste Position oder HEY</td><td>Paar aus letztem Server-Token und Gateway</td><td>keine, Restrisiko wie heute</td><td>eine erfundene Kante; 0 Fälle in 749 Server-Rahmen</td><td>1</td></tr>
+<tr><td>Mehr direkte Nachbarn als Slots</td><td>[NBR]|EVICT-X</td><td>ältester Slot weicht, Zeile bleibt</td><td>Detailwerte fehlen bis zum nächsten Rahmen</td><td>2</td></tr>
+<tr><td>Horizont voll</td><td>[NBR]|EVICT-H</td><td>ältester Eintrag weicht</td><td>ferner Absender fehlt in der Pfadansicht</td><td>2</td></tr>
+<tr><td>Knoten ohne Uhr</td><td>Bootepoche fehlt</td><td>Topologie und NCNT arbeiten, Anzeige in Minuten</td><td>kein MH an die App, wie heute</td><td>3</td></tr>
+<tr><td>Asymmetrische Strecke, Gegenstation mit Endstufe</td><td>SYM-Zeile im Log</td><td>zählt über SYM mit, außer ihr HN-Bericht vetoet</td><td>NCNT zu hoch; keine Entscheidung hängt daran</td><td>3</td></tr>
+<tr><td>Telefon handelt kleine MTU aus</td><td>MTU im Log</td><td>payload_max aus der MTU, FailSoft fällt auf 13 Felder zurück</td><td>die neuen Felder fehlen dort</td><td>3</td></tr>
+<tr><td>topo.dat passt nicht</td><td>Kopf weicht ab</td><td>Datei löschen, neu aufbauen</td><td>bis zu 15 min ohne Nachbarschaft</td><td>3</td></tr>
+<tr><td>NCNT alter und neuer Bedeutung gemischt</td><td>Firmware-Kennung je Station</td><td>mcmap trennt nach Kennung</td><td>solange die Kennung fehlt, gemischt</td><td>3, M1</td></tr>
+<tr><td>Via-unfähiger oder unbekannter Nachbar mit Mesh</td><td>Verhalten, Firmware-Buchstabe</td><td>kein Auto-Via an diesem Standort</td><td>kein Gewinn, solange solche Knoten im Netz sind</td><td>4</td></tr>
+<tr><td>Super-Node verpasst meine Aussendung</td><td>Anteil zweite Hand über 10 %</td><td>Zubringer in die Via-Menge</td><td>über den Zubringer endet die Position am Super-Node, max_hop 2</td><td>4</td></tr>
+<tr><td>Via-Knoten ohne Lebenszeichen</td><td>nicht in D60 oder 30 min nicht als letzter Hop gehört</td><td>60 min Flut, danach neu</td><td>eigene Positionen bis zu 30 min nur bei direkten Nachbarn und Zubringer</td><td>4</td></tr>
+<tr><td>Knoten mit Präfix des Via-Rufzeichens, Stand v4.35p.06.10</td><td>zusätzliche Wiederholung im Log</td><td>keine</td><td>Vergleich per Teilstring; DK5EN-9 wiederholt, wenn DK5EN-98 genannt ist</td><td>4</td></tr>
+<tr><td>Gateway-Nachbar mit überhöhtem #X durch Serverzufuhr</td><td>#X gegen Reichweite</td><td>keine</td><td>nur Reihenfolge der Auswahl; die Deckungsprüfung verhindert Abschneiden</td><td>4</td></tr>
+</table>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>1</td><td>Replay-Werkzeug: ein Host-Test, der die [LOG]-Zeilen eines Mitschnitts in nbrNoteFrame() einspeist</td><td>am dichten Build reproduziert es die [NBR]-Zeilen des Mitschnitts vom 24.09. byte-gleich</td></tr>
+<tr><td>2</td><td>1</td><td>Kern: Kantenpool, getrennte Felder, NbrMask, Rufzeichenwort, Anteilsdeckung, Zählerhalbierung, Klammer, Sweep im Loop; test_txring auf NbrMask umgestellt; neue Host-Tests für Rufzeichen-Kodierung, 128-Bit-Masken, Bitpacken, Anteilsregel am Schnappschuss, Verdrängung</td><td>Replay mit 21 Zeilen und den unteren 32 Bit der Masken byte-gleich zum dichten Build für SNAP, ROW, EDGE, ME, NEED, CANCEL, REFUSE; mit 64 und 128 Zeilen jede Relay-Entscheidung gleich, außer nach einer Verdrängung im dichten Build oder wo die Anteilsregel anders deckt, beides einzeln gelistet; im Anteilstest bekommt DB0ED-99 DB0FHR-12 als exklusiv; alle Host-Suiten grün, alle 32 Umgebungen bauen</td></tr>
+<tr><td>3</td><td>2</td><td>nbr_views, Direkt-Erweiterung, Horizont, ME-Schritt von der Pfadprüfung gelöst, Vergleichslog [TOPO]|DIFF je Minute gegen MHeard, getMheardCount() und Pfadtabelle, Log [NBR]|ECHO</td><td>Host-Test native_nbr_views: MH-JSON aus derselben Rahmenfolge feldgleich zu updateMheard(), ausgenommen die 7 neuen Felder, die REP-Mischung B2, DIST beidseitig auf 0,1 km gerundet, DATE und TIME auf die Minute</td></tr>
+<tr><td>4</td><td>2</td><td>24 h Schatten auf DK5EN-98 und DK5EN-1, beide S3, und auf dem RAK DK5EN-90</td><td>MHeard-Menge in mindestens 99 % der Minuten gleich; jede Abweichung erklärt durch Kapazität, Minutenrundung an der Fenstergrenze, DROP TOK oder LOOP, HN-Empfang oder B2; jeder Absender der Pfadtabelle als Zeile oder Horizont-Eintrag, nie beides; auf dem RAK 0 Verstöße der Konsistenzprüfung</td></tr>
+<tr><td>5</td><td>3</td><td>Umschaltung: MHeard-Speicher, updateMheard(), updateHeyPath(), mheard_record.h entfernt; Leser auf nbr_views; NCNT symmetrisch; topo.dat; payload_max aus der MTU</td><td>nm-Symbolsummen je Familie gleich der Tabelle in 4.10, gemessen mit einem neuen Skript über die Symbole statt über die Gesamtzeile; String-Scan nur auf t_deck und t_deck_plus: mheard.dat und mhpath.dat stehen nur noch im einmaligen Löschen; App-Liste auf iOS und Android sichtbar, ausgehandelte MTU im Log; DK5EN-14 behält die Topologie über einen Neustart</td></tr>
+<tr><td>6</td><td>3</td><td>24 h Feld mit DK5EN-98, DK5EN-1 und DK5EN-90</td><td>kein Neustart; freier Heap mindestens wie vorher minus 1 kB; je Minute geloggt NCNT und D60, dabei gilt stets NCNT gleich D60 minus Nachbarn ohne HM und unter SYM minus Veto, aus dem Log nachgerechnet ohne Abweichung</td></tr>
+<tr><td>7</td><td>4</td><td>erst wenn fleet_firmware 4.35p und älter unter 20 % zeigt, am 25.09. 63 %: Auto-Via mit --via on an einem geeigneten Standort; Kurt vorher informieren, weil Auto-Via upstream seit 22.07. absichtlich aus ist</td><td>[NBR]|VIA meldet den Standort geeignet; nicht genannte Nachbarn wiederholen eigene Positionen nicht mehr; eigene Positionen erreichen die Gateways laut mcmap mindestens so oft wie in den 24 h davor auf denselben Knoten; Echo-Quote aus [NBR]|ECHO berichtet, kein Schaltkriterium; keine Sperre ohne belegten Verlust eines Lebenszeichens</td></tr>
+<tr><td>8</td><td>4</td><td>Voreinstellung von --via für MeshCom 5 entscheiden</td><td>Feldbericht aus Schritt 7</td></tr>
+<tr><td>M1</td><td>M1</td><td>mcmap: Parser, neighbor_count_1h, Route, MCP-Tool, Deploy</td><td>Replay eines Tages ergibt rund 59.800 Relaiswerte bei 441 Relais, Übereinstimmung mit dem Selbstwert über 95 %; nach 24 h rund 21.700 Zeilen, keine neuen Stall-Zeilen</td></tr>
+<tr><td>M2</td><td>M2</td><td>mcmap: Route neighborhood, MCP-Tool, Profilabschnitt</td><td>für IZ5IOM-13 Intervall und Abdeckung plausibel gegen den Selbstwert; Sichtprüfung hell und dunkel</td></tr>
+<tr><td>M3</td><td>M3</td><td>mcmap: gateway_direct_1d 7 Tage sammeln, Rollen-Route, Rollentabelle</td><td>rund 1.100 Absender je Tag; 10 kritische Relais aus den rohen Pfaden nachvollzogen</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Wann Stufe 4 sinnvoll wird</td><td>am 25.09. laufen 17 % sicher unfähig und 46 % auf 4.35p mit unbekanntem Via-Verhalten; bei DK5EN-98 schließt DL2UD-1 sie aus</td><td>fleet_firmware monatlich abfragen, Wiedervorlage unter 20 %</td></tr>
+<tr><td>Kennung von MeshCom 5 auf der Luft</td><td>mcmap muss die neue NCNT-Bedeutung trennen. shortVERSION() liest die Stellen 3 und 4 von SOURCE_VERSION als Zahl; "5.00" ergäbe 0, und jeder Empfänger schaltete damit die Fuß-Meter-Umrechnung in lora_functions.cpp:1145 und loop_functions.cpp:3120 ab und die Dekodierweiche in aprs_functions.cpp:531 um</td><td>Betreiberentscheidung zur Versionskennung</td></tr>
+<tr><td>Warum Auto-Via am 22.07. abgeschaltet wurde</td><td>stand ein Feldproblem der alten NCNT-Regel dahinter, adressiert 4.11 es; stand etwas anderes dahinter, nicht</td><td>Kurt fragen</td></tr>
+<tr><td>Ausgehandelte BLE-MTU der Telefone</td><td>unter 248 Byte fallen die neuen Felder weg</td><td>Messung mit iOS und Android vor Stufe 3</td></tr>
+<tr><td>Anteilsschwelle 10 % an anderen Standorten</td><td>geprüft nur bei DK5EN-98</td><td>Replay der Mitschnitte weiterer Knoten, Rollenwechsel zählen</td></tr>
+<tr><td>Horizont 48 auf klassischem ESP32</td><td>deckt DK5EN-98 knapp; Bergknoten unbekannt</td><td>EVICT-H im Feld zählen</td></tr>
+<tr><td>Kantenzahl am Super-Node</td><td>256 und 512 Kanten sind aus 4 je Zeile abgeleitet</td><td>EVICT-E am Bergknoten zählen</td></tr>
+<tr><td>HM-Beweise und Veto am Super-Node</td><td>ein HN-Bericht nennt höchstens 8 Stationen</td><td>Schatten am Bergknoten, HM-, SYM- und Veto-Anteil zählen</td></tr>
+<tr><td>mcmap: 7 oder 30 Tage, Supernode-Schwelle, Ausreißer HB4LO-7</td><td>30 Tage fangen seltene Spitzen, verlangen aber dieselbe Verlängerung für drei vorhandene Tabellen</td><td>nach M1 und M3 entscheiden</td></tr>
+<tr><td>millis() auf nRF52 läuft nach 48,5 Tagen über</td><td>jede uint32-Differenz liegt danach rund 28 h daneben, heute auch in MHeard; nicht Teil dieses Umbaus</td><td>eigener Befund im Backlog</td></tr>
+</table>

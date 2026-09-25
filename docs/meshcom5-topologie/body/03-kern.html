@@ -1,0 +1,260 @@
+
+<h2 id="s3">3. Zielbild</h2>
+<p class="reco">Entscheidung: Die Topologie ist der einzige Speicher für "wer hat wen gehört". Sie hält Zeilen, Masken, Kanten, die Direkt-Erweiterung und den Horizont; jeder Leser fragt über nbr_views, niemand kopiert, und jede Änderung läuft unter einer Klammer.</p>
+<p>Die Topologie ersetzt MHeard, statt es zu ergänzen: MHeard-Speicher, updateMheard(), updateHeyPath(), struct mheardLine und mheard_record.h werden entfernt. Hilfsfunktionen, die auch andere nutzen, etwa getHardwareLong() und getPayloadType(), ziehen in nbr_views um. Ein Kompatibilitätsschalter für Upstream entfällt, weil die Topologie der Kern von MeshCom 5 ist.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 470" role="img" aria-label="Zielbild">
+  <rect x="20" y="205" width="150" height="66" class="node"/>
+  <text x="95" y="228" text-anchor="middle" class="b">OnRxDone</text>
+  <text x="95" y="244" text-anchor="middle" class="t11">ME, Kanten, POS,</text>
+  <text x="95" y="258" text-anchor="middle" class="t11">Horizont, NCNT</text>
+  <path d="M170 238 L195 238" class="ln"/>
+
+  <rect x="195" y="20" width="300" height="424" class="zone"/>
+  <text x="209" y="42" class="b">Topologie, einzige Quelle</text>
+  <rect x="210" y="56" width="270" height="50" class="node srv"/>
+  <text x="345" y="76" text-anchor="middle" class="b">Rufzeichen nbrCall[R]</text>
+  <text x="345" y="93" text-anchor="middle" class="t11">64-Bit-Wort, 6 Bit je Zeichen</text>
+  <rect x="210" y="118" width="270" height="50" class="node srv"/>
+  <text x="345" y="138" text-anchor="middle" class="b">Zeilenkern, 12 B</text>
+  <text x="345" y="155" text-anchor="middle" class="t11">Position, Minute, Flags, hw, NCNT</text>
+  <rect x="210" y="180" width="270" height="50" class="node srv"/>
+  <text x="345" y="200" text-anchor="middle" class="b">Masken hears / heardBy</text>
+  <text x="345" y="217" text-anchor="middle" class="t11">64 Bit klassisch, 128 Bit S3 und nRF52</text>
+  <rect x="210" y="242" width="270" height="50" class="node srv"/>
+  <text x="345" y="262" text-anchor="middle" class="b">Kantenpool, 6 B je Kante</text>
+  <text x="345" y="279" text-anchor="middle" class="t11">Zaehler halbiert alle 90 min, SNR, Minute</text>
+  <rect x="210" y="304" width="270" height="50" class="node prx"/>
+  <text x="345" y="324" text-anchor="middle" class="b">Direkt-Erweiterung, 13 B</text>
+  <text x="345" y="341" text-anchor="middle" class="t11">bitgepackt: RSSI, Mod, Position, FW</text>
+  <rect x="210" y="366" width="270" height="50" class="node hamf ham"/>
+  <text x="345" y="386" text-anchor="middle" class="b">Horizont, 20 / 28 B</text>
+  <text x="345" y="403" text-anchor="middle" class="t11">Absender ab 3 Hops, Eintrittsmaske</text>
+  <path d="M495 232 L530 232" class="ln" stroke-width="3"/>
+
+  <rect x="530" y="20" width="150" height="424" class="node prx"/>
+  <text x="605" y="46" text-anchor="middle" class="b">nbr_views</text>
+  <text x="605" y="62" text-anchor="middle" class="t11">Abfrageschicht,</text>
+  <text x="605" y="76" text-anchor="middle" class="t11">Arduino-frei</text>
+  <text x="605" y="120" text-anchor="middle" class="mono">nbrMhFill()</text>
+  <text x="605" y="150" text-anchor="middle" class="mono">nbrMhJson()</text>
+  <text x="605" y="180" text-anchor="middle" class="mono">nbrNcnt()</text>
+  <text x="605" y="210" text-anchor="middle" class="mono">nbrRoutes()</text>
+  <text x="605" y="240" text-anchor="middle" class="mono">nbrViaSet()</text>
+  <text x="605" y="270" text-anchor="middle" class="mono">nbrExclusive()</text>
+  <text x="605" y="300" text-anchor="middle" class="mono">nbrSave()</text>
+  <text x="605" y="330" text-anchor="middle" class="mono">nbrLoad()</text>
+  <text x="605" y="380" text-anchor="middle" class="t11">Schreiber und Mehrwort-</text>
+  <text x="605" y="394" text-anchor="middle" class="t11">Leser unter Klammer</text>
+
+  <rect x="715" y="24" width="225" height="30" class="node"/>
+  <text x="827" y="43" text-anchor="middle">App: MH + 7 Felder</text>
+  <rect x="715" y="66" width="225" height="30" class="node"/>
+  <text x="827" y="85" text-anchor="middle">Web MHeard</text>
+  <rect x="715" y="108" width="225" height="30" class="node"/>
+  <text x="827" y="127" text-anchor="middle">Konsole, T-Deck, T-Deck Pro</text>
+  <rect x="715" y="150" width="225" height="30" class="node"/>
+  <text x="827" y="169" text-anchor="middle">T-Deck SD topo.dat, Uhr</text>
+  <rect x="715" y="192" width="225" height="30" class="node"/>
+  <text x="827" y="211" text-anchor="middle">NCNT Zwei-Wege auf der Luft</text>
+  <rect x="715" y="234" width="225" height="30" class="node srv"/>
+  <text x="827" y="253" text-anchor="middle">Auto-Via fuer Positionen</text>
+  <rect x="715" y="276" width="225" height="30" class="node"/>
+  <text x="827" y="295" text-anchor="middle">Web Pfad: alle Wege</text>
+  <rect x="715" y="318" width="225" height="30" class="node"/>
+  <text x="827" y="337" text-anchor="middle">--path</text>
+  <rect x="715" y="360" width="225" height="30" class="node"/>
+  <text x="827" y="379" text-anchor="middle">Web Nachbarn, Rollen</text>
+  <rect x="715" y="402" width="225" height="30" class="node"/>
+  <text x="827" y="421" text-anchor="middle">Relay-Entscheidung Fall A / B</text>
+  <path d="M680 39 L715 39" class="ln"/><path d="M680 81 L715 81" class="ln"/><path d="M680 123 L715 123" class="ln"/>
+  <path d="M680 165 L715 165" class="ln"/><path d="M680 207 L715 207" class="ln"/><path d="M680 249 L715 249" class="ln"/>
+  <path d="M680 291 L715 291" class="ln"/><path d="M680 333 L715 333" class="ln"/><path d="M680 375 L715 375" class="ln"/>
+  <path d="M680 417 L715 417" class="ln"/>
+</svg>
+</div>
+<figcaption>Abb. 3: Zielbild nach Stufe 4. Ein Speicher, eine Abfrageschicht, zehn Leser. Die Relay-Entscheidung rechnet auf den Masken, alle Anzeigen und die App gehen über nbr_views.</figcaption>
+</figure>
+
+<table>
+<tr><th>Komponente</th><th>Ort</th><th>Rolle</th></tr>
+<tr><td>nbrCall[R], uint64_t</td><td>src/nbr_matrix.h</td><td>Rufzeichen je Zeile, 6 Bit je Zeichen; Suche ist ein Wortvergleich je Zeile</td></tr>
+<tr><td>NbrRow[R], 12 B</td><td>src/nbr_matrix.h</td><td>lat16, lon16 in 0,01 Grad, last_min, rpt_min, flags, hw, ncnt, ext</td></tr>
+<tr><td>nbrHears[R], nbrHeardBy[R], NbrMask</td><td>src/nbr_matrix.h</td><td>Mengen als Feld aus 64-Bit-Wörtern, 1 Wort klassisch, 2 Wörter auf S3 und nRF52</td></tr>
+<tr><td>NbrEdge[E], 6 B</td><td>src/nbr_matrix.h</td><td>x, y, cnt, snr, last_min; 256 oder 512 Kanten; cnt halbiert alle 90 min</td></tr>
+<tr><td>nbrExt[X][13]</td><td>src/nbr_matrix.h</td><td>Direkt-Erweiterung, 48 oder 64 Slots, bitgepackt</td></tr>
+<tr><td>hzCall[H], hzEntry[H], hzMeta[H][4]</td><td>src/nbr_matrix.h</td><td>Horizont, 48 oder 112 Einträge; hzMeta ausdrücklich uint8_t[4], keine Struktur</td></tr>
+<tr><td>Kopf und Echo-Tabelle</td><td>src/nbr_matrix.h</td><td>boot_min, last_sweep, Bootepoche, Maske D60, Via-Maske, Via-Zustand; die letzten vier eigenen Rahmen mit Masken erste und zweite Hand</td></tr>
+<tr><td>nbr_views.{h,cpp}</td><td>src/</td><td>MH-Sicht, MH-JSON, NCNT, Wege, Via-Menge, Sicherung; Arduino-frei wie nbr_matrix</td></tr>
+<tr><td>Leser</td><td>web_functions.cpp, command_functions.cpp, t-deck/, t-deck-pro/, via_functions.cpp, loop_functions.cpp, esp32_main.cpp, nrf52_main.cpp</td><td>rufen nur noch nbr_views; kein extern auf Topologie-Felder außerhalb von nbr_matrix.cpp und nbr_views.cpp</td></tr>
+<tr><td>entfällt</td><td>src/mheard_functions.cpp, src/mheard_record.h, struct mheardLine</td><td>Speicher, Schreiber, Persistenz, Zerlegung, drei 584-B-Arbeitskopien</td></tr>
+</table>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Kantenpool und Speicherlayout</h3>
+<p class="reco">Entscheidung: Ein Pool fester Größe mit 6-Byte-Kanten ersetzt die N mal N Zellen; Rufzeichen, Zeilenkern und Masken liegen in getrennten Feldern; die Detailwerte direkter Nachbarn liegen bitgepackt ohne Füllbytes.</p>
+<p>Eine Zelle der heutigen Matrix ist eine Beobachtung "Y hat X gehört" mit Zählern, dem zuletzt gesehenen SNR und einer Minute. Von 420 möglichen Beobachtungen hatte DK5EN-98 nach elf Stunden 67. Ein Kantenpool speichert nur diese 67: jeder Eintrag trägt die beiden Zeilenindizes x und y dazu. Wer eine Zelle sucht, durchläuft die Liste; wer wissen will, welche Zeilen sich hören, liest die Masken der Zeilen, die jede Kante beim Anlegen setzt. Prämisse für die Größe: 67 Kanten auf 21 Zeilen sind 3,2 je Zeile, ein Super-Node bekommt über HN-Berichte bis zu 8 Kanten je berichtendem Nachbarn dazu, darum 4 je Zeile.</p>
+
+<figure>
+<div class="fig">
+@@FIG:kp-kantenpool@@
+</div>
+<figcaption>Abb. 4: Was ein Kantenpool ist. Nur Zellen mit einem Treffer werden zu Einträgen; jeder Eintrag setzt ein Bit in der Hörer-Maske des Gehörten und in der Hört-Maske des Hörers. Die Rechnung läuft auf den Masken, der Pool liefert Zähler und SNR.</figcaption>
+</figure>
+
+<p>Prämisse für die getrennten Felder: Eine Struktur mit einem uint64_t-Feld wird auf Xtensa und ARM auf 8 Byte ausgerichtet. Eine Zeile mit call[10], sechs kleinen Feldern und zwei 64-Bit-Masken ist deshalb @@AOS_ROW@@ Byte groß, nicht 36; beide Compiler liefern sizeof 40. In getrennten Feldern kostet die Zeile genau die Summe ihrer Teile. Prämisse für das Rufzeichen: Die Matrix nimmt schon heute nur Token aus 3 bis 9 Zeichen aus A bis Z, 0 bis 9 und Bindestrich an, das passt in 6 Bit je Zeichen und 54 Bit je Rufzeichen.</p>
+
+<figure>
+<div class="fig">
+@@GEN:layout@@
+</div>
+<figcaption>Abb. 5: Speicherlayout. Jede Zeile besteht aus Rufzeichenwort, 12 Byte Kern und zwei Masken in getrennten Feldern; direkte Nachbarn bekommen einen @@EXT_B@@-Byte-Slot mit @@EXT_BITS@@ Bit, ferne Absender einen Horizont-Eintrag. f und s zählen, wie oft der Nachbar meine Rahmen aus erster und zweiter Hand bekam, FW ist der Firmware-Buchstabe, W markiert einen Via-unfähigen Stand, Y hält den Zustand der SYM-Hysterese.</figcaption>
+</figure>
+
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Dichte Matrix, wie heute</td><td>cells[N][N] zu 6 B</td><td><span class="tag bad">verworfen</span> quadratisch: 64 Zeilen kosten 26 kB</td></tr>
+<tr><td>Rechteckig: alle Zeilen, nur direkte Spalten</td><td>cells[N][M] mit eigener Spaltenverdrängung</td><td><span class="tag bad">verworfen</span> am Super-Node ist M 20 bis 40, dazu ein zweiter Allokator</td></tr>
+<tr><td>Kantenpool plus zwei Masken je Zeile</td><td>edges[E] zu 6 B, hears und heardBy</td><td><span class="tag ok">gewählt</span> linear in Zeilen und Kanten</td></tr>
+<tr><td>Zeilenstruktur mit Masken</td><td>struct mit call[10] und zwei uint64_t</td><td><span class="tag bad">verworfen</span> 40 B statt 36 B durch Ausrichtung, gemessen</td></tr>
+<tr><td>gepackte Struktur</td><td>__attribute__((packed))</td><td><span class="tag bad">verworfen</span> Einzelbyte-Zugriffe bei jeder Maskenoperation</td></tr>
+<tr><td>getrennte Felder</td><td>nbrCall[], NbrRow[], nbrHears[], nbrHeardBy[]</td><td><span class="tag ok">gewählt</span> keine Füllung, Masken zusammenhängend für OR und popcount</td></tr>
+<tr><td>Rufzeichen 6 Bit je Zeichen in uint64_t</td><td>Abb. 5</td><td><span class="tag ok">gewählt</span> ein Wortvergleich, Dekodierung per Tabelle; Basis 37 in 47 Bit verworfen, weil sie dividiert und kein ausgerichtetes Wort ergibt</td></tr>
+<tr><td>Detailwerte als Bitstrom variabler Länge</td><td>Präsenzbits, Felder variabler Breite</td><td><span class="tag bad">verworfen</span> jeder Zugriff scannt, jede Längenänderung verschiebt den Rest</td></tr>
+<tr><td>Detailwerte bitgepackt mit fester Breite</td><td>@@EXT_BITS@@ Bit je Slot, Zugriff über Bitversatz</td><td><span class="tag ok">gewählt</span> kein Füllbyte, Zugriff in konstanter Zeit</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Eine Kante entsteht beim ersten Treffer und setzt zwei Bits: Bit x in hears[y], Bit y in heardBy[x]. Die Diagonale bleibt leer.</li>
+<li>Der Sweep läuft einmal je Minute über den Pool; eine Kante älter als 12 h wird frei, ihre zwei Bits werden gelöscht. Ist der Pool voll, weicht die älteste Kante, die weder Spalte 0 noch Zeile 0 berührt, erst danach die älteste überhaupt.</li>
+<li>Wird eine Zeile verdrängt, werden ihre Kanten frei und ihr Bit in allen Masken und Eintrittsmasken gelöscht, ein Durchlauf.</li>
+<li>cnt einer Kante wird alle 90 Minuten halbiert. Prämisse: DK5EN-98 hörte DB0ED-99 750-mal in 12 h, also rund 94-mal je 90 min; halbiert pendelt der Zähler um 188 und sättigt nicht bei 255. Der Zähler misst damit den aktuellen Verkehr, das braucht die Deckung in 4.3.</li>
+<li>Der SNR der Kante (x, ich) ist ein gleitender Mittelwert über 8 Rahmen, alle anderen Kanten behalten den zuletzt gemeldeten Wert. Prämisse in 4.8.</li>
+<li>Kodierung des Rufzeichens: 0 Ende, 1 bis 10 die Ziffern, 11 bis 36 die Buchstaben, 37 der Bindestrich; Zeichen 1 in den Bits 0 bis 5. Die Bitfelder der Erweiterung liest und schreibt ein Paar nbrBitsGet() und nbrBitsPut(); keine C-Bitfelder, damit das Layout auf Host und Ziel gleich ist.</li>
+<li>Die Suche nach einer Kante ist ein linearer Scan über höchstens 512 Einträge; bei fünf Rahmen je Sekunde am Super-Node sind das unter 50.000 Vergleiche je Sekunde.</li>
+</ul>
+
+<h3>4.2 Zeilen, Masken und die Rechnung darauf</h3>
+<p class="reco">Entscheidung: 64 Zeilen mit 64-Bit-Masken auf klassischem ESP32 einschließlich E22_XML, 128 Zeilen mit 128-Bit-Masken auf S3 und nRF52; jede Menge der Entscheidung ist eine Maske, die Rechnung besteht aus OR, AND NOT und popcount.</p>
+<p>Prämisse: Die Flotte zeigt im 2-Hop-Umkreis in 24 Stunden p90 48, p99 84 und maximal 113 Stationen, an Bergknoten laut Betreiber über 100. 64 Zeilen decken p90, 128 Zeilen auch das Maximum. Auf S3 und nRF52 bezahlen die frei werdenden 11,5 kB aus MHeard und Pfadtabelle die 128 Zeilen; auf klassischem ESP32 reichen die frei werdenden 4,5 kB für 64 Zeilen.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>64 Zeilen überall</td><td>ein Maskenwort</td><td><span class="tag warn">Teilmenge</span> klassisch gewählt; auf S3 und nRF52 kappt es die Bergknoten</td></tr>
+<tr><td>128 Zeilen auf S3 und nRF52, 64 klassisch</td><td>NBR_MASK_WORDS 2 oder 1</td><td><span class="tag ok">gewählt</span> netto weniger RAM als heute in jeder Familie</td></tr>
+<tr><td>128 Zeilen überall</td><td>auch klassisch 2 Maskenwörter, S3-Größen</td><td><span class="tag bad">verworfen</span> klassisch @@ALL128@@ kB mehr als heute; Laufzeit-Heap mit WLAN und BLE dort nicht gemessen</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+@@FIG:kp-speicher-zeilen@@
+</div>
+<figcaption>Abb. 6: Speicher je Zeilenzahl. Die dichte Matrix überschreitet bei 41 Zeilen, dem 1-Hop-Maximum der Flotte in 24 h, 12 kB; der Kantenpool bleibt bei 64 Zeilen unter 4 kB. Die rechteckige Variante hilft am Super-Node mit 20 und mehr Hörern nicht.</figcaption>
+</figure>
+
+<pre>struct NbrMask { uint64_t w[NBR_MASK_WORDS]; };        // 1 klassisch, 2 auf S3 und nRF52
+static_assert(NBR_MAX_ROWS &lt;= 64 * NBR_MASK_WORDS, "Zeilenindex passt nicht in die Maske");
+
+Direkt     = hears[ich]                                // Kante (x, ich): ich habe x gehoert
+HoertMich  = heardBy[ich]                              // Kante (ich, x): x hat mich gehoert
+D          = (Direkt | HoertMich) &amp; ~GW &amp; ~ich                   // Abhaengige
+Pfad       = OR bit(p) fuer p im Pfad
+HatF       = Pfad | OR heardBy(p) fuer p im Pfad
+need       = D &amp; ~HatF
+Versorger  = Direkt &amp; HatF &amp; ~angenommen
+gedeckt    = OR deckt(M) fuer M in Versorger        // deckt(M): Stationen, die M mit Anteil hoert, 4.3
+alone      = need &amp; ~gedeckt                         // Fall A, wenn != 0
+#X(N)      = popcount(deckt(N) &amp; ~Direkt &amp; ~OR deckt(M) fuer M in Direkt, M != N)</pre>
+<p>Kosten je Relay-Entscheidung: heute bis zu rund 600 Zellzugriffe mit Frischetest bei 21 Zeilen, auf Masken Pfadlänge plus zweimal N Wortoperationen, bei 128 Zeilen unter 300. Die static_assert-Zeile ersetzt die heutige stille Kappung, bei der nbrBit() ab Index 32 die Maske 0 liefert. ringNeed[] und ringAlone[] werden NbrMask und kosten @@RINGS_C@@ Byte klassisch und @@RINGS_S@@ Byte auf S3 und nRF52 statt 160 Byte; test_txring schreibt sie heute als uint32_t und wird mit umgestellt.</p>
+
+<h3>4.3 Deckung und Rollen</h3>
+<p class="reco">Entscheidung: Ein Nachbar M deckt eine Station x nur, wenn sein Kantenzähler für x mindestens 10 % des Zählers des stärksten direkten Hörers von x erreicht. Die Regel gilt für #X, die Rollen, die Deckung in der Relay-Entscheidung und die Via-Wahl.</p>
+<p>Das ist die Ursache dafür, dass DB0ED-99 im Live-Bild redundant erscheint. DB0ED-99 trägt DB0FHR-12 praktisch allein: in den letzten 9,5 h des Mitschnitts meldete es 347 Kanten-Treffer für DB0FHR-12, DL2JA-2 genau einen. Die heutige Regel zählt jede Zelle mit mindestens einem Treffer im 12-h-Fenster als Deckung. Der Super-Node DL2JA-2 mit 19 Hörern sammelt über Stunden für fast jede Station einen Streutreffer, und nach sechs bis neun Stunden Laufzeit hat DB0ED-99 keine exklusive Station mehr. Der Code ist seit Stufe 1 unverändert, auch der OTA vom 24.09. 23:15 änderte nur Ping und Pong. Früher sah es richtig aus, weil DK5EN-98 zwischen dem 21. und 23.09. fünfmal neu geflasht wurde und die Matrix nie alt wurde; seit dem 24.09. 23:17 läuft sie ohne Neustart.</p>
+
+<figure>
+<div class="fig">
+@@FIG:kp-rollen-dk5en98@@
+</div>
+<figcaption>Abb. 7: Die Nachbarschaft von DK5EN-98 am 24.09. 07:25 nach der heutigen Ein-Treffer-Regel. Der Rang hängt am exklusiven Beitrag, nicht an der Nachbarzahl; DB0FHR-12 steht hier unter "doppelt gehört", weil DL2JA-2 es einmal gehört hat, nach der Anteilsregel gehört es DB0ED-99 allein.</figcaption>
+</figure>
+
+<figure>
+<div class="fig">
+@@GEN:coverage@@
+</div>
+<figcaption>Abb. 8: Exklusiver Beitrag #X von DB0ED-99 über @@N_SNAPS@@ Schnappschüsse vom 21. bis 24.09., nachgerechnet aus den [NBR]-Zeilen. Mit der heutigen Regel fällt #X nach jedem Neustart binnen Stunden auf 0, in @@R12_DB0ED_ZERO@@ Schnappschüssen; mit der Anteilsregel bleibt DB0ED-99 bis auf @@SHARE_DB0ED_ZERO@@ Schnappschüsse nötig.</figcaption>
+</figure>
+
+<table>
+<tr><th>Regel für "M deckt x"</th><th>DB0ED-99 nötig</th><th>Rollenwechsel</th><th>Bewertung</th></tr>
+<tr><td>ein Treffer in 12 h, heute</td><td class="num">189 von 243</td><td class="num">13</td><td><span class="tag bad">verworfen</span> Streutreffer des Super-Node löschen echte Exklusivität</td></tr>
+<tr><td>ein Treffer in den letzten 60 min</td><td class="num">220 von 243</td><td class="num">12</td><td><span class="tag bad">verworfen</span> flattert, einmal fiel DL2JA-2 auf #X 0, weil er 60 min nicht zu hören war</td></tr>
+<tr><td>Anteil mindestens 10 % des stärksten direkten Hörers</td><td class="num">234 von 243</td><td class="num">2</td><td><span class="tag ok">gewählt</span> stabil, DL2JA-2 unverändert 238 von 243</td></tr>
+</table>
+<p>Prämisse für 10 %: die zwei Fälle, die heute kippen, liegen weit darunter, DB0FHR-12 bei DL2JA-2 mit 1 zu 347 und im Live-Bild 3 zu 274; die echten Doppelhörer liegen weit darüber, DB0HOB-12 mit 87 zu 344 und DD7MH-55 mit 59 zu 45. Der Schnitt ist nicht beliebig: mit 5 % ist DB0ED-99 in 224 von 243 Schnappschüssen nötig und wechselt 12-mal die Rolle, mit 10 % 234-mal und 2 Wechsel, mit 20 % immer und ohne Wechsel. 20 % läge aber nah an DB0HOB-12, das DL2JA-2 mit 25 % des Verkehrs von DB0ED-99 hört und das damit knapp doppelt gehört bleibt; 10 % hält Abstand nach beiden Seiten. Geprüft ist das nur an diesem einen Standort.</p>
+<p>Regeln:</p>
+<ul>
+<li>#X(N) zählt die Stationen, die N mit Anteil hört und die weder ich direkt noch ein anderer direkter Nachbar mit Anteil hört. Super-Node ist der direkte Nachbar mit dem größten #X, wenn #X mindestens 2 und mindestens doppelt so groß wie das zweitgrößte ist; nötig heißt #X mindestens 1, redundant #X gleich 0. Eigene Blätter E_self sind direkt gehörte Stationen, die kein anderer direkter Nachbar mit Anteil hört.</li>
+<li>Die rohe Nachbarzahl #N taugt nicht als Rang: DB0ED-99 hört zehn Stationen, aber fast alle hört auch DL2JA-2.</li>
+<li>Die Anteilsregel verschiebt die Relay-Entscheidung in die sichere Richtung: eine Station, die heute ein Streutreffer deckt, zählt künftig als allein und führt zu Fall A statt zu einem Abbruch.</li>
+<li>Die Web-Seite zeigt neben #X die Zähler, damit eine knappe Entscheidung sichtbar ist.</li>
+</ul>
+
+<h3>4.4 Fall A und Fall B</h3>
+<p class="reco">Entscheidung: unverändert gegenüber Stufe 2 der Nachbarschaftsmatrix; der Umbau ändert nur die Rechnung auf Masken und die Deckung nach Anteil, nicht die Regel.</p>
+<p>Ein Relay-Kandidat bekommt beim Einreihen zwei Masken: need, die direkten Nachbarn und Rückhörer, die den Rahmen noch nicht haben können, und alone, die davon, die ihn von niemandem sonst bekommen können. Ist alone nicht leer, ist es Fall A. Ist alone leer, ist es Fall B. Hat die Matrix kein Wissen, weil der Pfad ungültig ist oder keine abhängige Zeile existiert, läuft das Relay wie heute.</p>
+
+<figure>
+<div class="fig">
+@@FIG:kp-fall-ab@@
+</div>
+<figcaption>Abb. 9: Wie ein Relay in Fall A oder Fall B kommt. Entschieden wird je Rahmen beim Einreihen aus den Masken; der Fall bestimmt Basis, Slots, Re-Arm-Verhalten und ob ein Abbruch zulässig ist.</figcaption>
+</figure>
+
+<table>
+<tr><th>Fall</th><th>Basis und Slots</th><th>Re-Arm bei fremdem Empfang</th><th>Abbruch</th><th>Zweck</th></tr>
+<tr><td>A</td><td>3500 ms plus Slots 0 bis 2, vor Relay 4500, POS und HEY 5500, hinter ACK und DM 3000</td><td>bis 8 s Wartezeit voll; danach 150 ms Schutzabstand plus Jitter, dann CAD</td><td>nie; eine fremde Kopie erzeugt eine REFUSE-Zeile</td><td>der Knoten, an dem Blätter hängen, kommt zuerst</td></tr>
+<tr><td>B, POS und HEY</td><td>Prio-Basis plus Slots 7 bis 9; einmalige Sperre 20 s ab Einreihen</td><td>innerhalb der Sperre max(Rest, Basis); ab 60 s Kurzsuche wie A</td><td>sobald gehörte Kopien need auf 0 bringen</td><td>die Flut der Nachbarn abwarten, dann nur senden, wenn noch jemand fehlt</td></tr>
+<tr><td>B, Text</td><td>heutige Basis und Slots</td><td>wie heute</td><td>wie B</td><td>Menschen warten auf Text</td></tr>
+<tr><td>kein Wissen</td><td>Prio-Basis wie heute</td><td>wie heute</td><td>nie</td><td>nichts auf Verdacht unterdrücken</td></tr>
+</table>
+<p>Prämissen der Zahlen: 3500 ms liegt zwischen ACK und dem heutigen Relay, damit ein Fall-A-Relay jede Wiederholung der Alt-Firmware schlägt. 20 s Sperre fangen die Hälfte der fremden Kopien am Standort DK5EN-98, deren Median bei 19 bis 26 s liegt; 82 % der Abbrüche fielen im Feld in die ersten 60 s, daher der 60-s-Deckel. 8 s entsprechen etwa zwei vollen Backoffs.</p>
+
+<figure>
+<div class="fig">
+@@FIG:kp-zeitachse@@
+</div>
+<figcaption>Abb. 10: Zeitachse eines Rahmens an drei Nachbarn mit Matrix und einem ohne, als Animation mit 12,5 s je Durchlauf. Der Super-Node sendet als erster, die redundanten Knoten hören seine Kopie und brechen ab; die Alt-Firmware startet ihren Backoff bei jedem Empfang neu und sendet als letzte, im Feld nach 19 s im Median.</figcaption>
+</figure>
+
+<table>
+<tr><th>Was, gemessen an DK5EN-98</th><th>vor Stufe 2, 11,9 h</th><th>erster Tag --nbrrelay on, 23.09., 9 h</th><th>nach Welle 5 und 6, 24.09., 11 h</th></tr>
+<tr><td>Eigene Relays je Stunde</td><td>76</td><td>22</td><td>48</td></tr>
+<tr><td>Verzögerung der Kopie des Super-Node DL2JA-2</td><td>109 s Median, p90 206 s</td><td>unverändert, Alt-Firmware</td><td>unverändert, Alt-Firmware</td></tr>
+<tr><td>Fall-B-Wartezeit</td><td>-</td><td>Median 137 s, max 16 min</td><td>POS p90 42 s, max 65 s; HEY p90 42 s, max 72 s</td></tr>
+<tr><td>Verworfene Relays, RING_DROP</td><td>0</td><td>149 Relays und 10 HN-Meldungen</td><td>0</td></tr>
+<tr><td>Abbrüche</td><td>0</td><td>62 % der Fall-B-Entscheidungen</td><td>208 von 661 Fall B, 31 %; 81 Fall A; 0 REFUSE-Fehler</td></tr>
+</table>
+<p>Zwei Folgen: Fall A hängt an der Symmetrie-Annahme, ohne --nbrsym stand DL2JA-1, das nie wiederholt, dauerhaft in der Allein-Maske und zwang 96 % aller Relays in Fall A. Und der Abbruch wirkt nur bei Knoten mit neuer Firmware; der Super-Node DL2JA-2 sendet weiter nach 109 s, weil seine Alt-Firmware bei jedem Empfang neu wartet.</p>
+
+<h3>4.5 Nebenläufigkeit und Sweep</h3>
+<p class="reco">Entscheidung: Jede Änderung an der Topologie und jeder Leser, der mehr als ein Wort liest, läuft auf nRF52 unter vTaskSuspendAll() und xTaskResumeAll(); geloggt wird erst nach der Klammer. Der Minuten-Sweep läuft im Loop-Task unter derselben Klammer, und alles, was von der Zeit abhängt, wird beim Lesen aus den Kantenminuten gerechnet.</p>
+<p>Prämisse: Auf nRF52 berühren LORA-Task und Loop-Task die Matrix schon heute, der eine schreibt beim Empfang, der andere liest für Web, Konsole und Bericht und nullt bei --nbrreset. Beide haben Priorität 1. FreeRTOS wählt bei jedem Wechsel den nächsten Task gleicher Priorität reihum, sobald ein höher priorisierter Task wie usbd, der BLE-Task oder der Timer-Task aufwacht und wieder blockiert; ein Wechsel kann also an jeder Stelle einer Änderung fallen, nicht nur an einem Yield. Auf ESP32 laufen Empfang, Web und BLE im selben Loop-Task, dort kompiliert die Klammer zu nichts.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>keine Sperre, wie heute</td><td>Annahme: Wechsel nur an Yield-Punkten</td><td><span class="tag bad">verworfen</span> widerlegt durch den Scheduler-Code; auch docs/architecture/09-concurrency-map.md irrt hier</td></tr>
+<tr><td>Mutex</td><td>xSemaphoreTake um jede Änderung</td><td><span class="tag bad">verworfen</span> der Web-Render hielte ihn lange, der Empfang müsste warten oder würde Rahmen verlieren</td></tr>
+<tr><td>ein Schreiber mit Auftragsliste</td><td>nur der LORA-Task schreibt, der Loop reicht Aufträge ein</td><td><span class="tag warn">Teilmenge</span> sauber, aber der LORA-Task wacht nur bei Empfang auf und der Sweep bliebe liegen</td></tr>
+<tr><td>Scheduler-Klammer</td><td>vTaskSuspendAll() um kurze Abschnitte, Vorbild N-16 in lora_functions.cpp 2278 bis 2284</td><td><span class="tag ok">gewählt</span> kurze Abschnitte, kein Warten, auf ESP32 leer</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Der Sweep läuft einmal je Minute aus dem Loop-Task: Kanten, Slots und Horizont-Einträge freigeben, Zähler alle 90 min halbieren, Via-Menge neu rechnen. Er ist Aufräumarbeit, keine Voraussetzung für richtige Zahlen.</li>
+<li>D60, NCNT, Alter und Uhrzeiten werden beim Lesen aus den Kantenminuten gerechnet. Ein ausgefallener Sweep kann sie nicht einfrieren; heute friert der Sweep auf einem ruhigen Kanal ein, weil er nur beim Empfang läuft.</li>
+<li>Die Web-Seite kopiert je Zeile unter der Klammer und rendert außerhalb. Die Kreuztabelle der Nachbarn erscheint nur bis 64 Zeilen, darüber seitenweise; bei 128 Zeilen wären es 16.384 Zellen und mindestens 147 kB HTML, und auf nRF52 bleibt der Funk während des ganzen Renderns ohne neues Scharfschalten.</li>
+<li>Puffer in Zeilengröße liegen statisch, nicht auf dem Stack; --neighbours erreichte bei 128 Zeilen sonst 3,6 bis 3,9 KB des 4-KB-Loop-Stacks auf nRF52.</li>
+<li>Uhrzeiten werden als jetzt minus Alter gerechnet, nicht als Bootepoche plus Minute; die 16-Bit-Minute läuft nach 45 Tagen über.</li>
+<li>Der Shadow-Betrieb in Stufe 2 läuft auch auf dem RAK DK5EN-90, weil nur nRF52 diese Wechsel kennt.</li>
+</ul>

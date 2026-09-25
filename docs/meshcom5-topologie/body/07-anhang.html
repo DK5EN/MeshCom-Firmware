@@ -1,0 +1,138 @@
+
+<h2 id="anh">Anhang</h2>
+<p>Die Anhänge halten fest, worauf das Papier rechnet, in zitierfähiger Form. Jede Messung nennt ihr Skript; die Skripte liegen unter docs/archive/meshcom5-topologie/evidence/, die Rohmitschnitte auf rpizero.</p>
+
+<h3>Anhang A: Messungen</h3>
+<p><b>A.1 Deckungsregeln im Replay.</b> Aus den [NBR]-Zeilen vom 21. bis 24.09., 243 Schnappschüsse, Textkanten entfernt wie seit 8487ea2a. Skript rca/xrules.py.</p>
+<table>
+<tr><th>Regel</th><th class="num">DB0ED-99 nötig</th><th class="num">Wechsel</th><th class="num">DL2JA-2 nötig</th><th class="num">Wechsel</th></tr>
+<tr><td>ein Treffer in 12 h, heute</td><td class="num">189 / 243</td><td class="num">13</td><td class="num">238 / 243</td><td class="num">2</td></tr>
+<tr><td>ein Treffer in 60 min</td><td class="num">220 / 243</td><td class="num">12</td><td class="num">230 / 243</td><td class="num">6</td></tr>
+<tr><td>Anteil mindestens 5 %</td><td class="num">224 / 243</td><td class="num">12</td><td class="num">238 / 243</td><td class="num">2</td></tr>
+<tr><td>Anteil mindestens 10 %, gewählt</td><td class="num">234 / 243</td><td class="num">2</td><td class="num">238 / 243</td><td class="num">2</td></tr>
+<tr><td>Anteil mindestens 20 %</td><td class="num">243 / 243</td><td class="num">0</td><td class="num">238 / 243</td><td class="num">2</td></tr>
+</table>
+<p>Kanten-Treffer vom 24.09. 00:00 bis 09:28, gehört von DB0ED-99 gegen DL2JA-2: DB0FHR-12 347 zu 1, DB0HOB-12 368 zu 62, DD7MH-55 87 zu 89, DB0ISM-1 49 zu 29, DC2MAC-1 16 zu 19, DL3NCU-1 32 zu 12. Live am 25.09. 08:08: DB0FHR-12 274 zu 3, DB0HOB-12 344 zu 87.</p>
+<p><b>A.2 Echo eigener Positionen.</b> 65 eigene Positionen vom 23.09. 00:12 bis 24.09. 08:46; Fenster ab meiner Aussendung. Skripte v1b/echo.py und v1b/b3.py.</p>
+<table>
+<tr><th>Merkmal</th><th class="num">ohne Fenster</th><th class="num">binnen 300 s</th><th class="num">zwei Fehlschläge in Folge, von 64</th><th class="num">längste Fehlschlagfolge</th></tr>
+<tr><td>irgendein Echo</td><td class="num">56 / 65, 86 %</td><td class="num">52 / 65, 80 %</td><td class="num">2</td><td class="num">2</td></tr>
+<tr><td>ein Knoten aus {DL2JA-2, DL2UD-1} im Pfad</td><td class="num">34 / 65, 52 %</td><td class="num">28 / 65, 43 %</td><td class="num">22</td><td class="num">9</td></tr>
+<tr><td>hinter mir nur genannte Knoten</td><td class="num">28 / 65, 43 %</td><td class="num">24 / 65, 37 %</td><td class="num">27</td><td class="num">12</td></tr>
+<tr><td>dasselbe für {DL2JA-2, DB0ED-99}</td><td class="num">29 / 65, 45 %</td><td class="num">24 / 65, 37 %</td><td class="num">28</td><td class="num">16</td></tr>
+</table>
+<p>DL2JA-2 wiederholte im Median 122 s nach meiner Aussendung, 24 % seiner Kopien kamen später als 300 s; gemessen ab der ersten gehörten Kopie sind es 109 s Median und 206 s p90. Kein Nachbar erschien je für dieselbe msg_id in erster und zweiter Hand.</p>
+<p><b>A.3 Horizont.</b> DK5EN-98, drei 12-h-Fenster, Skripte fable/v3_hz.py und v3_hz12.py: ohne die Regeln aus 4.7 hätten 68 bis 73 Absender einen Eintrag bekommen, davon 26 bis 28 direkte oder 2-Hop-Stationen; ferne Absender ohne Zeile 42 bis 45. 987 von 3.832 auslösenden Rahmen waren Echos eigener Relays. 28 von 49 fernen Absendern kamen über verschiedene Eintrittszeilen mit verschiedenen Hop-Zahlen. Die Pfadtabelle hielt am 24.09. 08:55 29 Einträge, davon 22 mit mindestens 3 Hops; am 25.09. waren es 62 %.</p>
+<p><b>A.4 SNR je Rahmen.</b> ME-Zeilen vom 23. und 24.09.: DB0ED-99 3.343 Rahmen, p10 -6, p50 -4, p90 -1 dB; DL2JA-2 2.247, -12, -7, -5; DK5EN-1 1.438, 5, 6, 7; DL2UD-1 1.099, -8, -5, 0; DL2JA-1 221, -11, -8, -6. Trickle-Replay über 31,6 h, Skript v2_trickle.py: 0 Rücksetzungen durch SYM; ein unbewiesener Nachbar genau an der Schwelle ergäbe 0,7 bis 3,4 je Stunde.</p>
+<p><b>A.5 MH-Rahmen.</b> Gemessen mit ArduinoJson 7.4.3 der Firmware, Werkzeug fable/v4/mhlen.cpp, Byte einschließlich Kennbyte 0x44.</p>
+<table>
+<tr><th>Fall</th><th class="num">13 Felder</th><th class="num">20 Felder</th></tr>
+<tr><td>Werte wie im Generator, DIST 1234.5</td><td class="num">162</td><td class="num">225</td></tr>
+<tr><td>live heute, DIST als ungerundeter double</td><td class="num">167</td><td class="num">230</td></tr>
+<tr><td>alle Kodierungen am Maximum</td><td class="num">-</td><td class="num">232</td></tr>
+<tr><td>dazu AGE 65535 und DIST in Exponentform</td><td class="num">-</td><td class="num">237</td></tr>
+<tr><td>mit Breite, Länge und Höhe</td><td class="num">-</td><td class="num">268</td></tr>
+</table>
+<p><b>A.6 Flotte nach Firmware.</b> mcmap fleet_firmware am 25.09.: 1.520 Knoten, 1.491 melden. 4.35t 470, 4.35s 87, 4.35p 681, 4.35o 27, 4.35n 6, 4.35m 1, 4.35k 63, 4.35j 3, 4.35i 24, 4.35h 37, 4.35f 48, 4.35e 7, 4.35d 24, 4.35c 9, 4.35a 3, 4.35 1. Das Versionsfeld hat fünf Zeichen, DL2UD-1 steht dort als 4.35p.</p>
+<p><b>A.7 Firmware der Nachbarn.</b> FW-Feld aus Rahmen, die der Nachbar selbst gesendet hat, 23. und 24.09.: DL2JA-2 463 Rahmen 4.35t, DB0ED-99 276 4.35t, DK5EN-1 216 4.35t, DL2UD-1 171 4.35p. DL2UD-1 wiederholte DB2GS-1,DK5EN-98&gt;F1ZKT-12,* ungenannt mit H04 zu H03 und ist damit ein Stand vor dem 09.06. Zwei Hops weiter laufen DL2JA-3 mit 4.35d und DG3MNF-4 mit 4.35k.</p>
+
+@@FILE:kantenpool-anhang-bcd.html@@
+
+<h3>Anhang E: Umbaustellen im Code</h3>
+<table>
+<tr><th>Datei</th><th>Heute</th><th>Umbau</th><th>Stufe</th></tr>
+<tr><td>src/nbr_matrix.h, .cpp</td><td>NbrRow 24 B, cells[N][N], uint32-Masken, Sweep alle 1024 min aus dem Empfang, Ein-Treffer-Deckung</td><td>getrennte Felder, NbrEdge-Pool, NbrMask mit static_assert, Rufzeichenwort, Anteilsdeckung, Zählerhalbierung, SNR-Mittel der Kante (x, ich), Klammer, Minuten-Sweep, Direkt-Erweiterung, Horizont, Echo-Tabelle, Via-Menge</td><td>1, 2, 4</td></tr>
+<tr><td>src/nbr_views.h, .cpp, neu</td><td>-</td><td>MH-Sicht, MH-JSON, NCNT, Wege, Via-Menge, Sicherung; getHardwareLong() und getPayloadType() ziehen her</td><td>2</td></tr>
+<tr><td>src/lora_functions.cpp</td><td>MHeard-Block 1056 bis 1210, ME nur bei gültigem Pfad, Cover-Scan mit uint32</td><td>ME-Schritt von der Pfadprüfung gelöst; Horizont- und Echo-Einspeisung; NbrMask; MHeard-Block entfällt in Stufe 3</td><td>2, 3</td></tr>
+<tr><td>src/mheard_functions.cpp, src/mheard_record.h</td><td>MHeard, Pfadtabelle, Persistenz</td><td>entfallen</td><td>3</td></tr>
+<tr><td>src/txring_functions.{h,cpp}</td><td>ringNeed, ringAlone uint32_t</td><td>NbrMask</td><td>1</td></tr>
+<tr><td>src/web_functions/web_functions.cpp</td><td>sub_page_mheard, sub_page_path, sub_page_neighbours mit Kreuztabelle</td><td>über nbr_views; Kreuztabelle nur bis 64 Zeilen, darüber seitenweise; Kopie je Zeile unter der Klammer</td><td>2, 3</td></tr>
+<tr><td>src/command_functions.cpp</td><td>--mheard, --path, --neighbours, --nbrreset</td><td>über nbr_views; Puffer statisch</td><td>3</td></tr>
+<tr><td>src/loop_functions.cpp, src/esp32/esp32_main.cpp, src/nrf52/nrf52_main.cpp</td><td>getMheardCount() für R&lt;n&gt;, /N, Trickle, HN; sendMheard()</td><td>nbrNcnt(); MH aus nbr_views; Sweep-Aufruf je Minute; Zielpfad vor dem Hochladen zurücksetzen</td><td>3</td></tr>
+<tr><td>src/via_functions.cpp</td><td>Auto-Via auskommentiert</td><td>Via-Menge nur für eigene Positionen, Eignungsprüfung</td><td>4</td></tr>
+<tr><td>src/esp32/udp_frame_esp32.cpp, src/nrf52/udp_frame_nrf52.cpp</td><td>checkVia() ohne Pfad-Reset</td><td>Zielpfad auf das Ziel zurücksetzen vor checkVia()</td><td>3</td></tr>
+<tr><td>src/t-deck/, src/t-deck-pro/, src/time_functions.cpp</td><td>MHeard- und Pfadseiten, mheard.dat, mhpath.dat, Uhr aus MHeard</td><td>über nbr_views; topo.dat; Uhr aus der Schnappschuss-Epoche; alte Dateien einmal löschen</td><td>3</td></tr>
+<tr><td>src/ble_json_frame.h, Aufrufer</td><td>bleJsonFrame() ohne Kürzungsschutz</td><td>bleJsonFrameFailSoft() mit payload_max aus der MTU</td><td>3</td></tr>
+<tr><td>test/</td><td>test_nbr_matrix, test_nbr_report, test_txring, test_mheard_record</td><td>Replay-Test, native_nbr_views, Tests für Kodierung, Masken, Bitpacken, Anteilsregel, Verdrängung, Persistenz; test_txring umgestellt; test_mheard_record entfällt</td><td>1 bis 3</td></tr>
+<tr><td>tools/</td><td>nbrsnap.py, nbrlog.py, nbrrelay.py, nbrhopcheck.py, resource_watch.py</td><td>neues Skript für nm-Symbolsummen; nbrsnap um die Anteilsregel erweitern</td><td>1, 3</td></tr>
+<tr><td>docs/nbr-logformat.md</td><td>[NBR]-Zeilen bis HN</td><td>neu EVICT-E, EVICT-X, EVICT-H, ECHO, VIA, [TOPO]|DIFF; Masken in NEED, CANCEL, REFUSE mit 2 oder 4 Wörtern, weil nRF52 kein %llX kennt</td><td>1 bis 4</td></tr>
+</table>
+
+<h3>Anhang F: Befundregister</h3>
+<p>Ein Befund je Zeile mit Quelle und dem Ort, an dem dieses Papier ihn aufnimmt. K steht für das Kantenpool-Papier, B für das NCNT-Papier, V für die Fable-Prüfung vom 24.09., R für die Ursachenanalyse vom 25.09.</p>
+<table class="small">
+<tr><th>Nr</th><th>Befund</th><th>Quelle</th><th>Abschnitt</th></tr>
+<tr><td>K1</td><td>84 % des Matrixspeichers sind Zellen, 84 % der Zellen leer; 67 von 420 belegt</td><td>[NBR]|SNAP 24.09. 07:02</td><td>2</td></tr>
+<tr><td>K2</td><td>Zeilen sind der Engpass: 21 von 21, 46 Rufzeichen in 12 h, 56 Verdrängungen in 11,9 h</td><td>docs/nbr-wichtigkeit-konzept.md 2.3</td><td>4.2</td></tr>
+<tr><td>K4</td><td>Die Sendeentscheidung liest nur Spalte 0, Zeile 0 und die Spalten der Versorger</td><td>src/nbr_matrix.cpp 1225 bis 1300</td><td>4.2</td></tr>
+<tr><td>K5</td><td>Spalten indirekter Zeilen füllen nur HN-Berichte, Pfadpaare landen in der Spalte des letzten Hops</td><td>src/nbr_matrix.cpp 655, 928 bis 943</td><td>4.1</td></tr>
+<tr><td>K8</td><td>Flotte: Nachbarzähler Median 3, p90 11, p99 30, max 37 in 1 h; 2-Hop in 24 h p90 48, p99 84, max 113</td><td>Anhang D</td><td>4.2</td></tr>
+<tr><td>K10</td><td>Ein 1-h-Fenster erklärt Blätter fälschlich exklusiv; 12 bis 24 h nötig</td><td>Anhang D</td><td>4.3</td></tr>
+<tr><td>K16</td><td>Fall A heißt alone ungleich 0, Fall B alone gleich 0, Zahlen der Sperren und Slots</td><td>src/configuration_global.h 471 bis 477</td><td>4.4</td></tr>
+<tr><td>K17 bis K20</td><td>Feldzahlen der Stufe 2: Sperre je Re-Arm kostete 149 Relays; als Frist 0 Verluste; DL2JA-2 109 s; ohne --nbrsym 96 % Fall A</td><td>docs/nbr-stage2-campaign.md</td><td>4.4</td></tr>
+<tr><td>K21, K22</td><td>Rolle nach #X; #N taugt nicht; Kappung ändert die Zahl, nicht die Ordnung</td><td>web_functions.cpp 1670 bis 1700</td><td>4.3</td></tr>
+<tr><td>K24</td><td>Stufe 1 mit 64 Zeilen zu 36 B: in dieser Form 40 B, getrennte Felder nötig</td><td>V und Übersetzung</td><td>4.1</td></tr>
+<tr><td>B1 bis B6</td><td>NCNT-Kopien, REP-Überschreibung, fehlende /N0, erster Beacon, Pfadplatz, toter Auslöser</td><td>archiviertes NCNT-Papier</td><td>4.8</td></tr>
+<tr><td>V1</td><td>Firmware vor dem 09.06. liest das erste Via-Rufzeichen als Ziel; DL2UD-1 ist so ein Stand</td><td>Tags, Mitschnitt</td><td>4.11</td></tr>
+<tr><td>V2</td><td>Echo-Kontrolle mit 86 % statt 37 bis 43 % Basis</td><td>A.2</td><td>4.11</td></tr>
+<tr><td>V3</td><td>Zubringer im Beispiel mit umgekehrter Kante gewählt; richtig ist DB0ED-99</td><td>Anhang B</td><td>4.11</td></tr>
+<tr><td>V4</td><td>Deckung der Via-Wahl in falscher Richtung</td><td>Anhang B</td><td>4.11</td></tr>
+<tr><td>V5</td><td>Via läuft über den Server in andere Regionen</td><td>udp_frame_*.cpp</td><td>4.11</td></tr>
+<tr><td>V6</td><td>nRF52 wechselt Tasks bei jedem Aufwachen höherer Priorität</td><td>tasks.c</td><td>4.5</td></tr>
+<tr><td>V7</td><td>Task des Minuten-Sweeps nicht festgelegt</td><td>src/nbr_matrix.cpp 506 bis 510</td><td>4.5</td></tr>
+<tr><td>V8</td><td>MH-Uhrzeit und Live-Auslöser an der Zeilenminute statt an der Kante (x, ich)</td><td>src/nbr_matrix.cpp 666, 681, 716</td><td>4.6, 4.9</td></tr>
+<tr><td>V9</td><td>Horizont doppelt zu Zeilen, Echos eigener Relays, Größe zu klein</td><td>A.3</td><td>4.7</td></tr>
+<tr><td>V10</td><td>eine Hop-Zahl je Horizont-Eintrag für alle Eintrittszeilen, Minimum steigt nie</td><td>A.3</td><td>4.7</td></tr>
+<tr><td>V11</td><td>Abnahmekriterien, die nicht bestehen oder nicht scheitern können</td><td>Rollout Fassung 1</td><td>6</td></tr>
+<tr><td>V12</td><td>MH-Längen 5 B zu niedrig, MTU ungeprüft, FailSoft an keiner Sendestelle</td><td>A.5</td><td>4.9</td></tr>
+<tr><td>V13</td><td>ME-Schritt verwirft bei DROP TOK und LOOP; HN-Empfang träfe MHeard</td><td>src/nbr_matrix.cpp 519 bis 535</td><td>4.6</td></tr>
+<tr><td>V14</td><td>Web-Kreuztabelle und Stack auf nRF52 bei 128 Zeilen</td><td>web_functions.cpp 1613 bis 1937</td><td>4.5</td></tr>
+<tr><td>V15</td><td>NCNT ohne Veto, ohne Hysterese, ohne Alter; B6 fünfter Leser</td><td>src/nbr_matrix.cpp 1184 bis 1219</td><td>4.8</td></tr>
+<tr><td>V16</td><td>Einzelzahlen: 6,2 kB, Feldliste 55 B, Zitate, hzMeta-Typ, 109 s gegen 122 s, max_hop 2 beim Zubringer, v5-Zubringer, Erkennungsdauer</td><td>Prüfberichte</td><td>verteilt</td></tr>
+<tr><td>R1</td><td>DB0ED-99 erscheint redundant, weil ein Treffer in 12 h deckt; sichtbar erst nach Stunden Laufzeit, früher verdeckt durch häufige Flashs</td><td>A.1, Live-Seite 25.09.</td><td>4.3</td></tr>
+<tr><td>R2</td><td>Die Spalte Reach nennt die größte Entfernung zwischen der Station der Zeile und einem mit ihr verbundenen Partner, nicht die Entfernung zu mir; die Werte stimmen</td><td>nbrReach(), Positionen im Mitschnitt</td><td>-</td></tr>
+<tr><td>R3</td><td>Der OTA vom 24.09. 23:15 änderte nur Ping und Pong, keine Zeile der Nachbarschaftsmatrix</td><td>git diff 8487ea2a df0ea8c1</td><td>4.3</td></tr>
+<tr><td>R4</td><td>Flotte am 25.09.: 37 % via-fähig, 46 % 4.35p unbekannt, 17 % unfähig; ein Knoten mit 3 Nachbarn hat nur zu rund 5 % ausschließlich fähige Nachbarn</td><td>A.6</td><td>4.11</td></tr>
+</table>
+
+<h3>Anhang G: Widerlegte Annahmen</h3>
+<table class="small">
+<tr><th>Annahme</th><th>Stand</th><th>Beleg</th></tr>
+<tr><td>Eine Zeile mit zwei uint64-Masken kostet 36 B</td><td>falsch, 40 B; getrennte Felder kosten 36 B</td><td>Übersetzung mit xtensa und arm</td></tr>
+<tr><td>Die Pfadtabelle bleibt hinter einem Schalter für Upstream</td><td>überholt, MeshCom 5 entfernt sie</td><td>Betreiberentscheidung 24.09.</td></tr>
+<tr><td>4.35-Knoten befolgen den Via</td><td>nur ab dem 13.06.2026</td><td>Tags, DL2UD-1</td></tr>
+<tr><td>Zubringer bei DK5EN-98 ist DL2UD-1</td><td>falsch, die Regel wählt DB0ED-99</td><td>Anhang B, Mitschnitt</td></tr>
+<tr><td>Die Echo-Quote eines genannten Knotens liegt bei 86 %</td><td>falsch, 37 bis 43 %</td><td>A.2</td></tr>
+<tr><td>128 Zeilen überall kosten 6,2 kB mehr</td><td>falsch gerechnet; mit S3-Größen 8,5 kB</td><td>Generator</td></tr>
+<tr><td>"Nur zweite Hand" beweist nicht, dass DL2JA-2 die direkte Kopie verpasst hat</td><td>widerlegt: 4.35t vermerkt die msg_id vor der Relay-Entscheidung, Duplikate erreichen den Relay-Zweig nie, Relays werden nicht abgebrochen</td><td>lora_functions.cpp 897, 962, 1429, 596 in 4.35t</td></tr>
+<tr><td>Die Messung der ersten und zweiten Hand ist falsch</td><td>widerlegt, von zwei Skripten exakt reproduziert</td><td>A.2</td></tr>
+<tr><td>Die OLSR-Analogie bricht an der Duplikatregel</td><td>widerlegt, RFC 3626 3.4.1 entscheidet auf einer Schnittstelle ebenfalls nach der ersten Kopie</td><td>RFC 3626</td></tr>
+<tr><td>Ohne Uhr geht heute ein MH-Rahmen an die App</td><td>widerlegt, updateMheard() kehrt vorher zurück</td><td>src/mheard_functions.cpp:303</td></tr>
+<tr><td>Ein 20-Zeichen-Rufzeichen sprengt den neuen MH-Rahmen</td><td>widerlegt, das neue CALL kommt aus dem 6-Bit-Wort mit höchstens 9 Zeichen</td><td>4.1</td></tr>
+<tr><td>SNR -128 und PL 255 treiben den Rahmen auf 235 bis 245 B</td><td>widerlegt, RadioLib liefert -32 bis 31,75 dB, PL hat 4 Bit, Maximum 237 B</td><td>A.5</td></tr>
+<tr><td>Der Live-Weg hat 10 B mehr Luft als die Liste</td><td>widerlegt, 252 B auf ESP32 und 247 B auf nRF52</td><td>phone_commands.cpp, nrf52_ble.cpp</td></tr>
+<tr><td>Der MHeard-Eintrag hat 54 B</td><td>widerlegt, 55 B mit mheard_send_idx</td><td>nm</td></tr>
+<tr><td>Die Topologie führt die Wiederverwendung von Zeilenindizes ein</td><td>widerlegt als neu, besteht heute schon in ringNeed und im BLE-Cursor</td><td>txring_functions.cpp, mheard_functions.cpp 873 bis 883</td></tr>
+<tr><td>Der millis-Überlauf macht Stufe 3 auf allen Plattformen schlechter</td><td>nur auf ESP32; nRF52 läuft nach 48,5 Tagen über und MHeard ist dort heute schon betroffen</td><td>delay.c, rtos.h</td></tr>
+<tr><td>resource_watch scheitert am Rauschen der Builds</td><td>widerlegt, es misst die Gesamtzeile, der echte Störfaktor sind andere Statics</td><td>tools/resource_watch.py</td></tr>
+<tr><td>Die Spalte Reach zeigt die Entfernung zu einem falschen Rufzeichen</td><td>widerlegt, Lesart geklärt, R2</td><td>nbrReach()</td></tr>
+<tr><td>Der OTA vom 24.09. hat die Nachbarschaftsmatrix verändert</td><td>widerlegt, R3</td><td>git diff</td></tr>
+</table>
+
+<h3>Anhang H: Belege und Archiv</h3>
+<p>Dieses Papier liegt in docs/meshcom5-topologie/: meshcom5-topologie.html, der Generator build.py, die Textteile body/, die übernommenen Abbildungen figures/ und die Eingangsdaten data/ mit ram-20260924.json und coverage-rules-series.json. Neu erzeugen: python3 docs/meshcom5-topologie/build.py.</p>
+<table class="small">
+<tr><th>Ort unter docs/archive/meshcom5-topologie/</th><th>Inhalt</th></tr>
+<tr><td>Nachbarschaftsmatrix-Kantenpool.html, .build.py, .ram-20260924.json</td><td>Kantenpool-Papier vom 24.09. mit Generator</td></tr>
+<tr><td>Nachbarzahl-NCNT-Befund.html</td><td>NCNT-Befunde B1 bis B6</td></tr>
+<tr><td>Nachbarzaehler-Zeitreihe.html, Zwei-Hop-Nachbarschaft.html</td><td>mcmap-Konzepte, Fassung 1 und 2</td></tr>
+<tr><td>MeshCom5-Topologie-als-Quelle-v1.html, .build.py, .body.html</td><td>Fassung 1 dieses Papiers</td></tr>
+<tr><td>MeshCom5-Topologie-als-Quelle-v1-verdict.md</td><td>Fable-Verdict zu Fassung 1</td></tr>
+<tr><td>evidence/finder-*.md, evidence/verify-*.md</td><td>neun Finder- und sechs Prüfberichte</td></tr>
+<tr><td>evidence/rca/</td><td>xrules.py für A.1 mit Ausgaben für 5, 10 und 20 %, Neighbours-Seiten vom 24. und 25.09., Flottenzählung fleet-firmware-20260925.json für A.6</td></tr>
+<tr><td>evidence/v1b/, evidence/v2_*.py, evidence/fable/</td><td>Skripte für A.2 bis A.5: Echo, Trickle, Horizont, MH-Länge, Strukturgrößen</td></tr>
+<tr><td>rpizero ~/meshlog/dk5en-98/2026-09-21.log bis 2026-09-24.log</td><td>Rohmitschnitte, nicht im Repo</td></tr>
+</table>
+</main>
+</body>
+</html>

@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshCom 5: Topologie als einzige Quelle</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .dash .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+
+</style>
+</head>
+<body>
+<main>
+<h1>MeshCom 5: die Topologie ersetzt MHeard und Pfadtabelle</h1>
+<ul class="meta">
+<li>Stand: 2026-09-24</li>
+<li>Autor: DK5EN, mit Claude</li>
+<li>Codebasis: MeshCom-Firmware Fork, Zweig feature-neighbour-matrix bei d9fc5c5a</li>
+<li>Baut auf: ~/Desktop/Nachbarschaftsmatrix-Kantenpool.html, ~/Desktop/Nachbarzahl-NCNT-Befund.html, ~/Desktop/Nachbarzaehler-Zeitreihe.html</li>
+<li>Quelle MHeard: src/mheard_functions.cpp updateMheard() 299 bis 476, getMheardCount() 691, sendMheard() 844 bis 933; src/lora_functions.cpp 1056 bis 1210</li>
+<li>Quelle Pfadtabelle: src/mheard_functions.cpp updateHeyPath() 478 bis 668, showPath() 999, showPathTDECK() 1194; src/web_functions/web_functions.cpp sub_page_path() 1543</li>
+<li>Quelle Via: src/via_functions.cpp checkMesh() und checkVia(); Aufrufer src/lora_functions.cpp:1827 und src/loop_functions.cpp 750, 3446, 3715, 4839, 5025; upstream/dev bei 472304e8</li>
+<li>Quelle App: ~/WebDev/Meshcom-MobileApp, Ursprung rainerfritz/Meshcom-MobileApp; src/hooks/MessageHandler.ts 1188 bis 1260, src/utils/AppInterfaces.ts 377 bis 393</li>
+<li>Quelle RAM: Symbolgrößen per nm aus den firmware.elf der Builds vom 2026-09-24 auf d9fc5c5a, Umgebungen heltec_wifi_lora_32_V2, E22_XML-DevKitC, heltec_wifi_lora_32_V3, wiscore_rak4631; Strukturgrößen mit xtensa-esp32-elf-gcc und arm-none-eabi-gcc übersetzt</li>
+<li>Quelle live: Web-Seiten path, mheard und neighbours von DK5EN-98, abgerufen 2026-09-24 08:55</li>
+<li>Rufzeichen: Beobachtungen von DK5EN-98; fremde Rufzeichen erscheinen nur als Beobachtung, nie als Sender</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>Ein Knoten speichert dieselbe Beobachtung, wen er gehört hat, heute dreimal: in MHeard mit 55 Byte je direktem Nachbarn, in der Pfadtabelle mit 71 Byte je Absender und in der Nachbarschaftsmatrix. Zusammen belegen sie 5.829 Byte auf klassischem ESP32 und 14.663 Byte auf S3, auf nRF52 mit drei statischen Arbeitskopien 16.415 Byte. Trotzdem hat die Matrix nur 13 oder 21 Zeilen, während Super-Nodes in 24 Stunden bis 113 Stationen im 2-Hop-Umkreis sehen. NCNT hängt an MHeard und wird auf klassischem ESP32 bei 30 gekappt, und die Pfadseite zeigt je Absender einen einzigen kürzesten Pfad, der bis zu 12 Stunden alt sein kann.</p>
+<p>Daraus folgt:</p>
+<ol>
+<li><b>Stufe 1, Kern:</b> Kantenpool mit getrennten Feldern für Rufzeichen, Zeilenkern und Masken; 64 Zeilen mit 64-Bit-Masken auf klassischem ESP32, 128 Zeilen mit 128-Bit-Masken auf S3 und nRF52; jedes Rufzeichen ist ein 64-Bit-Wort.</li>
+<li><b>Stufe 2, Ableitung im Schatten:</b> Direkt-Erweiterung mit 12 Byte bitgepackt je direktem Nachbarn und Horizont-Einträge für Absender ab 3 Hops; MHeard, Pfad und NCNT werden neben den alten Tabellen aus der Topologie gerechnet und minütlich verglichen.</li>
+<li><b>Stufe 3, Umschaltung:</b> MHeard und Pfadtabelle entfallen; App, Web, Konsole und T-Deck lesen nur noch die Topologie; NCNT zählt symmetrische Nachbarn; T-Deck sichert die Topologie auf SD.</li>
+<li><b>Stufe 4, Auto-Via:</b> jeder Knoten nennt im Zielpfad seinen Super-Node; hört dieser ihn nachweislich schlecht, kommt ein Zubringer dazu, den der Super-Node gut hört; weitere Nachbarn nur, wenn sonst eine Station abgeschnitten wäre; bleibt das Echo aus, flutet der Knoten wieder.</li>
+</ol>
+<p>Der Speicher sinkt dabei in jeder Familie, obwohl die Kapazität steigt: netto -377 Byte klassisch, -4.011 Byte auf E22_XML, -899 Byte auf S3 und -2.651 Byte auf nRF52, bei drei- bis sechsmal so vielen Zeilen: 64 statt 13 oder 21, auf S3 und nRF52 128 statt 21.</p>
+<p class="reco">Empfehlung: Stufe 1 bis 3 als ein Umbau nach der Auswertung von Feldlauf 2 bauen, Abnahme über 24 Stunden Schattenbetrieb auf DK5EN-98 und DK5EN-1; Stufe 4 danach getrennt, weil sie das Verhalten von Altknoten im gemeinsamen Netz ändert.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>So viel Speicher wie möglich sparen, indem die zwei alten Tabellen entfallen</td><td>MHeard, Pfadtabelle und die dichte Matrix entfallen; die Topologie braucht in jeder Familie weniger als die drei zusammen, bei drei- bis sechsfacher Zeilenzahl</td><td>3</td><td>4.1, 4.7</td></tr>
+<tr><td>2</td><td>Topologie als einzige Quelle der Wahrheit</td><td>Jede Beobachtung wird genau einmal geschrieben; jeder Leser geht über eine Abfrageschicht nbr_views, kein Leser hält eine eigene Kopie</td><td>1 bis 3</td><td>3</td></tr>
+<tr><td>3</td><td>MHeard und Pfad aus der Topologie ableiten</td><td>MHeard sind die Zeilen mit frischer Kante zu mir plus Direkt-Erweiterung; Pfade sind alle Wege über die Kanten, ferne Absender über Horizont-Einträge mit Eintrittsmaske</td><td>2, 3</td><td>4.3, 4.4</td></tr>
+<tr><td>4</td><td>NCNT aus der Topologie</td><td>NCNT zählt Nachbarn, die ich in der letzten Stunde gehört habe und die mich nachweislich hören oder mit mindestens -16 dB ankommen</td><td>3</td><td>4.5</td></tr>
+<tr><td>5</td><td>64 Bit statt 32 Bit, Bergknoten mit Hop 2 über 100</td><td>64-Bit-Masken und 64 Zeilen klassisch, 128-Bit-Masken und 128 Zeilen auf S3 und nRF52; eine Maske ist ein Feld aus 64-Bit-Wörtern</td><td>1</td><td>4.2</td></tr>
+<tr><td>6</td><td>App aus der Matrix bedienen, angereichert, speichereffizient als Bitstrom</td><td>MH-JSON behält seine 13 Felder und bekommt 7 neue; die Werte liegen bitgepackt in 12 Byte je direktem Nachbarn, Rufzeichen als 64-Bit-Wort statt 10 Zeichen</td><td>2, 3</td><td>4.3, 4.6</td></tr>
+<tr><td>7</td><td>Via-Lookup bedienen, Auto-Via über den Super-Node</td><td>Via-Menge nach dem MPR-Verfahren aus OLSR mit Super-Node vorn; verpasst er meine Aussendungen nachweislich oft, kommt ein Zubringer dazu; Echo-Kontrolle mit Rückfall auf Flut</td><td>4</td><td>4.8</td></tr>
+<tr><td>8</td><td>T-Deck: Topologie auf SD sichern</td><td>Schnappschuss /topo.dat alle 10 Minuten, beim Laden auf die neue Bootzeit umgerechnet</td><td>3</td><td>4.9</td></tr>
+<tr><td>9</td><td>Kein Schalter für Upstream-Parität</td><td>Die Topologie ist der neue Kern von MeshCom 5; MHeard-Code wird entfernt, nicht abgeschaltet</td><td>3</td><td>3</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>RAM netto klassisch / S3 / nRF52</th><th>Auf der Luft</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td>MHeard, Pfadtabelle, dichte Matrix 13 oder 21 Zeilen, NCNT aus MHeard, Auto-Via auskommentiert</td><td>nichts davon</td><td>0 / 0 / 0</td><td>R&lt;n&gt; und /N zählen einseitig, Deckel 30 oder 80</td><td>-</td></tr>
+<tr><td>1 Kern</td><td>Kantenpool, Felder statt Strukturen, 64 oder 128 Zeilen, Rufzeichen als Wort</td><td>5</td><td>vorübergehend mehr, alte Tabellen laufen weiter</td><td>unverändert</td><td>Auswertung Feldlauf 2, Replay-Parität der [NBR]-Zeilen</td></tr>
+<tr><td>2 Schatten</td><td>Direkt-Erweiterung, Horizont, nbr_views, Vergleichslog [TOPO]|DIFF</td><td>3, 6 als Rechnung</td><td>vorübergehend mehr</td><td>unverändert</td><td>Stufe 1</td></tr>
+<tr><td>3 Umschaltung</td><td>alte Tabellen und struct mheardLine entfernt, alle Leser auf nbr_views, NCNT symmetrisch, topo.dat</td><td>1, 2, 3, 4, 6, 8, 9</td><td>-377 / -899 / -2.651 B</td><td>NCNT zählt symmetrisch, Deckel 63 oder 127</td><td>24 h Schatten ohne ungeklärte Abweichung</td></tr>
+<tr><td>4 Auto-Via</td><td>Via-Menge je Minute, Zubringer für schwache Strecken, Echo-Kontrolle, 60 Minuten Flut nach zwei Fehlschlägen</td><td>7</td><td>Via-Zustand und Echo-Tabelle, in Stufe 3 schon enthalten</td><td>Zielpfad nennt Super-Node und Zubringer; nicht genannte Nachbarn wiederholen eigene Rahmen nicht mehr</td><td>24 h Stufe 3 im Feld, Kurt informiert</td></tr>
+</table>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+<li><a href="#s1">Ergebnis</a></li>
+<li><a href="#s2">Ausgangslage</a></li>
+<li><a href="#s3">Zielbild</a></li>
+<li><a href="#s4">Bausteine</a>: 4.1 Speicherlayout, 4.2 Zeilen und Masken, 4.3 MHeard, 4.4 Pfad und Horizont, 4.5 NCNT, 4.6 App, 4.7 RAM, 4.8 Auto-Via, 4.9 T-Deck</li>
+<li><a href="#s5">Fehlerszenarien</a></li>
+<li><a href="#s6">Rollout</a></li>
+<li><a href="#s7">Offene Punkte</a></li>
+</ol>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Befund: Drei Speicher halten dieselbe Beobachtung in drei Formaten, jeder mit eigener Verdrängung, eigenem Fenster und eigenen Lesern. Die Matrix ist der einzige der drei Speicher, auf dem Entscheidungen laufen, und außer auf E22_XML der kleinste.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>MHeard-Schlüssel</td><td>msg_source_last, also der letzte Sender; nur direkt gehörte Stationen, jeder Rahmentyp außer Binär-ACK und HN-Bericht, das eigene Echo nicht</td><td>src/lora_functions.cpp:1076, :1197</td></tr>
+<tr><td>MHeard-Eintrag</td><td>55 B: Datensatz 20, Rufzeichen 10, lat, lon, alt, Epoche, millis, NCNT je 4; dazu 6 B Verwaltung</td><td>nm, src/mheard_functions.cpp 53 bis 120</td></tr>
+<tr><td>MHeard-Größe</td><td>30 klassisch, 50 E22_XML, 80 S3 und nRF52; Verdrängung des ältesten, Verfall nach 12 h</td><td>src/configuration_global.h 301 bis 334</td></tr>
+<tr><td>Uhr-Schranke</td><td>ohne Datum ab 2025 kein Eintrag, damit NCNT 0 auf Knoten ohne Uhr</td><td>src/mheard_functions.cpp:303</td></tr>
+<tr><td>App</td><td>MH-JSON mit 13 Feldern, live bei jedem Rahmen eines Nachbarn und als Liste beim Verbinden, 12 h, neueste zuerst</td><td>src/mheard_functions.cpp 413 bis 436, 844 bis 933</td></tr>
+<tr><td>Web MHeard</td><td>Fenster 3 h, neueste zuerst</td><td>src/web_functions/web_functions.cpp:1499</td></tr>
+<tr><td>NCNT</td><td>getMheardCount(): MHeard-Einträge der letzten Stunde; R&lt;n&gt; im HEY, /N im Positionsbeacon, Trickle-Rücksetzung bei Änderung, HN-Bericht</td><td>src/mheard_functions.cpp:691, src/loop_functions.cpp:4545, :5095, src/esp32/esp32_main.cpp:3481</td></tr>
+<tr><td>NCNT beim Empfänger</td><td>zwei Kopien, drei Schreiber, REP-Überschreibung durch HEY über Relais, Befunde B1 bis B6</td><td>~/Desktop/Nachbarzahl-NCNT-Befund.html</td></tr>
+<tr><td>Pfadtabelle</td><td>nur HEY mit mindestens einem Relais; je Absender der kürzeste Pfad der letzten 12 h als Text; 71 B je Eintrag, 40 klassisch, 50 E22_XML, 100 S3 und nRF52</td><td>src/mheard_functions.cpp 575 bis 661</td></tr>
+<tr><td>Pfad-Leser</td><td>Web-Seite Path Information, --path, T-Deck-Seite, SD-Sicherung; keine Entscheidung, kein BLE</td><td>src/web_functions/web_functions.cpp:1550, src/command_functions.cpp:4877</td></tr>
+<tr><td>nRF52-Arbeitskopien</td><td>drei statische struct mheardLine zu 584 B in sendMheard(), showMHeard(), sub_page_mheard(); auf ESP32 dieselben 584 B je Aufruf auf dem Stack</td><td>nm wiscore_rak4631</td></tr>
+<tr><td>Matrix</td><td>2-Hop-Fenster: Zeilen nur für die letzten zwei Pfad-Token; Text speist nur den ME-Schritt; Masken uint32_t, nbrBit() liefert ab Index 32 still 0</td><td>src/nbr_matrix.h 229 bis 245, src/nbr_matrix.cpp:1109</td></tr>
+<tr><td>Via beim Empfänger</td><td>Nennt der Zielpfad Rufzeichen, wiederholt nur ein genannter Knoten; upstream prüft per Teilstring und wiederholt als Genannter auch mit Mesh aus</td><td>src/via_functions.cpp checkMesh(), upstream/dev derselben Datei</td></tr>
+<tr><td>Via beim Relais</td><td>Jedes Relais setzt den Zielpfad auf das Ziel zurück und wendet seinen eigenen Via an; der Via ist also ein Nächster-Hop-Feld</td><td>src/lora_functions.cpp 1825 bis 1827</td></tr>
+<tr><td>Auto-Via</td><td>Wahl des frischen MHeard-Nachbarn mit größtem NCNT; seit 22.07.2026 auskommentiert, upstream identisch</td><td>src/via_functions.cpp 150 bis 190</td></tr>
+<tr><td>T-Deck</td><td>mheard.dat und mhpath.dat, höchstens alle 30 s, nur mit node_persist_to_sd; neuester Zeitstempel stellt nach dem Neustart die Uhr</td><td>src/mheard_functions.cpp 230 bis 298, src/time_functions.cpp:131</td></tr>
+<tr><td>App-Parser</td><td>castet das JSON auf ein Interface, unbekannte Felder bleiben ungenutzt; verwirft XX0XXX-00 und das eigene Rufzeichen</td><td>MessageHandler.ts 1188 bis 1260</td></tr>
+<tr><td>BLE-Rahmen</td><td>ein Kommando-Rahmen ist höchstens 245 B lang: Kennbyte 0x44 plus JSON</td><td>src/loop_functions.cpp:716, src/ble_json_frame.h:21</td></tr>
+<tr><td>Live DK5EN-98, 08:55</td><td>MHeard 5 Einträge; Pfadtabelle 29 Einträge seit 06:29, davon 7 mit 2, 14 mit 3, 7 mit 4 und 1 mit 5 Hops; Matrix 21 von 21 Zeilen, DL2JA-2 Super-Node mit #X 8</td><td>Web-Seiten von DK5EN-98</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 470" role="img" aria-label="Ist-Zustand">
+  <rect x="20" y="196" width="190" height="82" class="node"/>
+  <text x="115" y="222" text-anchor="middle" class="b">OnRxDone</text>
+  <text x="115" y="240" text-anchor="middle" class="t11">lora_functions.cpp</text>
+  <text x="115" y="256" text-anchor="middle" class="t11">jeder LoRa-Empfang</text>
+
+  <rect x="290" y="64" width="250" height="148" class="node prx"/>
+  <text x="415" y="100" text-anchor="middle" class="b">MHeard</text>
+  <text x="415" y="120" text-anchor="middle" class="t11">Schluessel: letzter Hop, nur direkt</text>
+  <text x="415" y="136" text-anchor="middle" class="t11">55 B je Eintrag, 30 / 50 / 80</text>
+  <text x="415" y="152" text-anchor="middle" class="t11">NCNT in zwei Kopien</text>
+  <text x="415" y="168" text-anchor="middle" class="t11">ohne Uhr kein Eintrag</text>
+
+  <rect x="290" y="258" width="250" height="82" class="node prx"/>
+  <text x="415" y="278" text-anchor="middle" class="b">Pfadtabelle</text>
+  <text x="415" y="294" text-anchor="middle" class="t11">71 B je Eintrag, 40 / 50 / 100</text>
+  <text x="415" y="310" text-anchor="middle" class="t11">je Absender kuerzester Pfad, 12 h</text>
+  <text x="415" y="326" text-anchor="middle" class="t11">nur HEY mit Relais</text>
+
+  <rect x="290" y="356" width="250" height="82" class="node"/>
+  <text x="415" y="376" text-anchor="middle" class="b">Nachbarschaftsmatrix</text>
+  <text x="415" y="392" text-anchor="middle" class="t11">13 / 21 Zeilen, dichte Zellen</text>
+  <text x="415" y="408" text-anchor="middle" class="t11">Masken uint32, 2-Hop-Fenster</text>
+  <text x="415" y="424" text-anchor="middle" class="t11">Fenster 12 h</text>
+
+  <path d="M210 237 L290 138" class="ln"/>
+  <path d="M210 237 L290 299" class="ln"/>
+  <path d="M210 237 L290 397" class="ln"/>
+
+  <rect x="650" y="24" width="290" height="28" class="node"/>
+  <text x="795" y="42" text-anchor="middle">App: MH-JSON live und als Liste</text>
+  <rect x="650" y="66" width="290" height="28" class="node"/>
+  <text x="795" y="84" text-anchor="middle">Web MHeard, 3 h</text>
+  <rect x="650" y="108" width="290" height="28" class="node"/>
+  <text x="795" y="126" text-anchor="middle">Konsole --mheard, T-Deck-Anzeigen</text>
+  <rect x="650" y="150" width="290" height="28" class="node"/>
+  <text x="795" y="168" text-anchor="middle">T-Deck SD mheard.dat, Uhr</text>
+  <rect x="650" y="192" width="290" height="28" class="node"/>
+  <text x="795" y="210" text-anchor="middle">NCNT auf der Luft: R&lt;n&gt;, /N, Trickle</text>
+  <rect x="650" y="234" width="290" height="28" class="node bad"/>
+  <text x="795" y="252" text-anchor="middle">Auto-Via, seit 22.07. auskommentiert</text>
+  <rect x="650" y="276" width="290" height="28" class="node"/>
+  <text x="795" y="294" text-anchor="middle">Web Path Information</text>
+  <rect x="650" y="318" width="290" height="28" class="node"/>
+  <text x="795" y="336" text-anchor="middle">--path, T-Deck-Seite, SD mhpath.dat</text>
+  <rect x="650" y="360" width="290" height="28" class="node"/>
+  <text x="795" y="378" text-anchor="middle">Web Nachbarn</text>
+  <rect x="650" y="402" width="290" height="28" class="node"/>
+  <text x="795" y="420" text-anchor="middle">Relay-Entscheidung Fall A / B</text>
+
+  <path d="M540 72 L650 38" class="ln"/>
+  <path d="M540 80 L650 80" class="ln"/>
+  <path d="M540 122 L650 122" class="ln"/>
+  <path d="M540 164 L650 164" class="ln"/>
+  <path d="M540 204 L650 206" class="ln"/>
+  <path d="M540 204 L650 248" class="lnx" stroke-dasharray="5 4"/>
+  <path d="M540 290 L650 290" class="ln"/>
+  <path d="M540 332 L650 332" class="ln"/>
+  <path d="M540 374 L650 374" class="ln"/>
+  <path d="M540 416 L650 416" class="ln"/>
+
+  <text x="20" y="458" class="t11">Dieselbe Beobachtung liegt dreimal im RAM: 5.829 B klassisch, 14.663 B auf S3, 16.415 B auf nRF52 mit den drei statischen Arbeitskopien.</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Jeder Empfang schreibt in drei Speicher, die orange markierten nur für Anzeige, NCNT und die tote Via-Wahl. Nur die Matrix trägt eine Entscheidung, und sie ist außer auf E22_XML der kleinste der drei Speicher.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+<p>Die Flottenzahlen stammen aus dem mcmap-Schnappschuss vom 24.09. mit 823 Knoten und sind Untergrenzen, weil der Linkgraph des Servers nur gatewaynahe Hops sieht. Die Zahl der fernen Absender ist eine Momentaufnahme der Pfadtabelle von DK5EN-98 mit Einträgen von 06:29 bis 08:55.</p>
+<table>
+<tr><th>Größe</th><th>heute</th><th>Ziel</th><th>Bemerkung</th></tr>
+<tr><td>RAM der drei Speicher</td><td class="num">5.829 / 9.463 / 14.663 / 16.415 B</td><td class="num">5.292 / 5.292 / 13.284 / 13.284 B</td><td>klassisch / E22_XML / S3 / nRF52, gemessen per nm; Ziel ohne Ringseitenfelder, siehe 4.7</td></tr>
+<tr><td>Zeilen der Topologie</td><td class="num">13 / 21 / 21 / 21</td><td class="num">64 / 64 / 128 / 128</td><td>2-Hop in 24 h: p90 48, p99 84, Maximum 113; Betreiber: Bergknoten über 100</td></tr>
+<tr><td>Direkte Nachbarn mit Details</td><td class="num">30 / 50 / 80 / 80</td><td class="num">48 / 48 / 64 / 64</td><td>1-Hop-Maximum der Flotte 41 in 24 h, 59 in 7 Tagen</td></tr>
+<tr><td>Absender ab 3 Hops</td><td class="num">in 40 / 50 / 100 Pfadplätzen, geteilt mit 2-Hop-Absendern</td><td class="num">40 / 40 / 96 / 96 eigene Einträge</td><td>DK5EN-98: 22 von 29 Pfadeinträgen sind ferne Absender</td></tr>
+<tr><td>NCNT-Deckel</td><td class="num">30 / 50 / 80 / 80</td><td class="num">63 / 63 / 127 / 127</td><td>fünf von 262 TLORA V2.1.6 melden heute genau 30</td></tr>
+<tr><td>Bytes je direktem Nachbarn</td><td class="num">55 MHeard + Matrixzeile</td><td class="num">36 + 12 klassisch, 52 + 12 S3</td><td>Zeile mit Masken plus Direkt-Erweiterung</td></tr>
+<tr><td>Bytes je fernem Absender</td><td class="num">71</td><td class="num">19 klassisch, 27 S3</td><td>Horizont-Eintrag</td></tr>
+<tr><td>MH-Rahmen an die App, schlimmster Fall</td><td class="num">162 B</td><td class="num">225 B</td><td>Grenze 245 B; mit Position wären es 268 B</td></tr>
+</table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p class="reco">Entscheidung: Die Topologie ist der einzige Speicher für "wer hat wen gehört". Sie hält Zeilen, Masken, Kanten, die Direkt-Erweiterung und den Horizont; jeder Leser fragt über nbr_views, niemand kopiert.</p>
+<p>Die Topologie ist kein Anbau an MHeard, sondern ersetzt es: MHeard-Speicher, updateMheard(), updateHeyPath(), struct mheardLine und mheard_record.h werden entfernt. Hilfsfunktionen, die auch andere nutzen, etwa getHardwareLong() und getPayloadType(), ziehen in nbr_views um. Ein Kompatibilitätsschalter für Upstream entfällt, weil die Topologie der Kern von MeshCom 5 ist.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 470" role="img" aria-label="Zielbild">
+  <rect x="20" y="205" width="150" height="66" class="node"/>
+  <text x="95" y="228" text-anchor="middle" class="b">OnRxDone</text>
+  <text x="95" y="244" text-anchor="middle" class="t11">ME, Kanten, POS,</text>
+  <text x="95" y="258" text-anchor="middle" class="t11">Horizont, NCNT</text>
+  <path d="M170 238 L195 238" class="ln"/>
+
+  <rect x="195" y="20" width="300" height="424" class="zone"/>
+  <text x="209" y="42" class="b">Topologie, einzige Quelle</text>
+  <rect x="210" y="56" width="270" height="50" class="node srv"/>
+  <text x="345" y="76" text-anchor="middle" class="b">Rufzeichen nbrCall[R]</text>
+  <text x="345" y="93" text-anchor="middle" class="t11">64-Bit-Wort, 6 Bit je Zeichen</text>
+  <rect x="210" y="118" width="270" height="50" class="node srv"/>
+  <text x="345" y="138" text-anchor="middle" class="b">Zeilenkern, 12 B</text>
+  <text x="345" y="155" text-anchor="middle" class="t11">Position, Minute, Flags, hw, NCNT</text>
+  <rect x="210" y="180" width="270" height="50" class="node srv"/>
+  <text x="345" y="200" text-anchor="middle" class="b">Masken hears / heardBy</text>
+  <text x="345" y="217" text-anchor="middle" class="t11">64 Bit klassisch, 128 Bit S3 und nRF52</text>
+  <rect x="210" y="242" width="270" height="50" class="node srv"/>
+  <text x="345" y="262" text-anchor="middle" class="b">Kantenpool, 6 B je Kante</text>
+  <text x="345" y="279" text-anchor="middle" class="t11">wer wen gehoert hat, SNR, Minute</text>
+  <rect x="210" y="304" width="270" height="50" class="node prx"/>
+  <text x="345" y="324" text-anchor="middle" class="b">Direkt-Erweiterung, 12 B</text>
+  <text x="345" y="341" text-anchor="middle" class="t11">bitgepackt: RSSI, Mod, Position, Hoehe</text>
+  <rect x="210" y="366" width="270" height="50" class="node hamf ham"/>
+  <text x="345" y="386" text-anchor="middle" class="b">Horizont, 19 / 27 B</text>
+  <text x="345" y="403" text-anchor="middle" class="t11">Absender ab 3 Hops, Eintrittsmaske</text>
+  <path d="M495 232 L530 232" class="ln" stroke-width="3"/>
+
+  <rect x="530" y="20" width="150" height="424" class="node prx"/>
+  <text x="605" y="46" text-anchor="middle" class="b">nbr_views</text>
+  <text x="605" y="62" text-anchor="middle" class="t11">Abfrageschicht,</text>
+  <text x="605" y="76" text-anchor="middle" class="t11">Arduino-frei</text>
+  <text x="605" y="120" text-anchor="middle" class="mono">nbrMhFill()</text>
+  <text x="605" y="150" text-anchor="middle" class="mono">nbrMhJson()</text>
+  <text x="605" y="180" text-anchor="middle" class="mono">nbrNcnt()</text>
+  <text x="605" y="210" text-anchor="middle" class="mono">nbrRoutes()</text>
+  <text x="605" y="240" text-anchor="middle" class="mono">nbrViaSet()</text>
+  <text x="605" y="270" text-anchor="middle" class="mono">nbrExclusive()</text>
+  <text x="605" y="300" text-anchor="middle" class="mono">nbrSave()</text>
+  <text x="605" y="330" text-anchor="middle" class="mono">nbrLoad()</text>
+  <text x="605" y="380" text-anchor="middle" class="t11">Host-Test</text>
+  <text x="605" y="394" text-anchor="middle" class="t11">native_nbr_views</text>
+
+  <rect x="715" y="24" width="225" height="30" class="node"/>
+  <text x="827" y="43" text-anchor="middle">App: MH + 7 Felder</text>
+  <rect x="715" y="66" width="225" height="30" class="node"/>
+  <text x="827" y="85" text-anchor="middle">Web MHeard</text>
+  <rect x="715" y="108" width="225" height="30" class="node"/>
+  <text x="827" y="127" text-anchor="middle">Konsole, T-Deck, T-Deck Pro</text>
+  <rect x="715" y="150" width="225" height="30" class="node"/>
+  <text x="827" y="169" text-anchor="middle">T-Deck SD topo.dat, Uhr</text>
+  <rect x="715" y="192" width="225" height="30" class="node"/>
+  <text x="827" y="211" text-anchor="middle">NCNT symmetrisch auf der Luft</text>
+  <rect x="715" y="234" width="225" height="30" class="node srv"/>
+  <text x="827" y="253" text-anchor="middle">Auto-Via ueber den Super-Node</text>
+  <rect x="715" y="276" width="225" height="30" class="node"/>
+  <text x="827" y="295" text-anchor="middle">Web Pfad: alle Wege</text>
+  <rect x="715" y="318" width="225" height="30" class="node"/>
+  <text x="827" y="337" text-anchor="middle">--path</text>
+  <rect x="715" y="360" width="225" height="30" class="node"/>
+  <text x="827" y="379" text-anchor="middle">Web Nachbarn</text>
+  <rect x="715" y="402" width="225" height="30" class="node"/>
+  <text x="827" y="421" text-anchor="middle">Relay-Entscheidung Fall A / B</text>
+  <path d="M680 39 L715 39" class="ln"/><path d="M680 81 L715 81" class="ln"/><path d="M680 123 L715 123" class="ln"/>
+  <path d="M680 165 L715 165" class="ln"/><path d="M680 207 L715 207" class="ln"/><path d="M680 249 L715 249" class="ln"/>
+  <path d="M680 291 L715 291" class="ln"/><path d="M680 333 L715 333" class="ln"/><path d="M680 375 L715 375" class="ln"/>
+  <path d="M680 417 L715 417" class="ln"/>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild nach Stufe 4. Ein Speicher, eine Abfrageschicht, zehn Leser. Die Relay-Entscheidung rechnet wie im Kantenpool-Papier auf den Masken, alle Anzeigen und die App gehen über nbr_views.</figcaption>
+</figure>
+
+<table>
+<tr><th>Komponente</th><th>Ort</th><th>Rolle</th></tr>
+<tr><td>nbrCall[R], uint64_t</td><td>src/nbr_matrix.h</td><td>Rufzeichen je Zeile, 6 Bit je Zeichen; Suche ist ein Wortvergleich je Zeile</td></tr>
+<tr><td>NbrRow[R], 12 B</td><td>src/nbr_matrix.h</td><td>lat16, lon16 in 0,01 Grad, last_min, rpt_min, flags, hw, ncnt, ext</td></tr>
+<tr><td>nbrHears[R], nbrHeardBy[R], NbrMask</td><td>src/nbr_matrix.h</td><td>Mengen als Feld aus 64-Bit-Wörtern, 1 Wort klassisch, 2 Wörter auf S3 und nRF52</td></tr>
+<tr><td>NbrEdge[E], 6 B</td><td>src/nbr_matrix.h</td><td>x, y, cnt, snr, last_min wie im Kantenpool-Papier; 256 oder 512 Kanten</td></tr>
+<tr><td>nbrExt[X][12]</td><td>src/nbr_matrix.h</td><td>Direkt-Erweiterung, 48 oder 64 Slots, bitgepackt</td></tr>
+<tr><td>hzCall[H], hzEntry[H], hzMeta[H]</td><td>src/nbr_matrix.h</td><td>Horizont, 40 oder 96 Einträge</td></tr>
+<tr><td>Kopf und Echo-Tabelle</td><td>src/nbr_matrix.h</td><td>boot_min, last_sweep, Bootepoche, Maske D60, Via-Maske, Via-Zustand; die letzten vier eigenen Rahmen mit Masken erste und zweite Hand</td></tr>
+<tr><td>nbr_views.{h,cpp}</td><td>src/</td><td>MH-Sicht, MH-JSON, NCNT, Wege, Via-Menge, Sicherung; Arduino-frei wie nbr_matrix</td></tr>
+<tr><td>Leser</td><td>web_functions.cpp, command_functions.cpp, t-deck/, t-deck-pro/, via_functions.cpp, loop_functions.cpp, esp32_main.cpp, nrf52_main.cpp</td><td>rufen nur noch nbr_views; kein extern auf Topologie-Felder außerhalb von nbr_matrix.cpp und nbr_views.cpp</td></tr>
+<tr><td>entfällt</td><td>src/mheard_functions.cpp, src/mheard_record.h, struct mheardLine</td><td>Speicher, Schreiber, Persistenz, Zerlegung, drei 584-B-Arbeitskopien</td></tr>
+</table>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Speicherlayout</h3>
+<p class="reco">Entscheidung: Getrennte Felder statt einer Zeilenstruktur, Rufzeichen als ein 64-Bit-Wort, die Detailwerte direkter Nachbarn bitgepackt ohne Füllbytes.</p>
+<p>Prämisse für die Trennung: Eine Struktur mit einem uint64_t-Feld wird auf Xtensa und ARM auf 8 Byte ausgerichtet. Die Zeile aus dem Kantenpool-Papier mit call[10], sechs kleinen Feldern und zwei 64-Bit-Masken ist deshalb nicht 36, sondern 40 Byte groß; beide Compiler liefern sizeof 40. Liegen Rufzeichen, Kern und Masken in eigenen Feldern, entfällt die Füllung, und die Zeile kostet genau die Summe ihrer Teile.</p>
+<p>Prämisse für das Rufzeichen: Die Matrix nimmt heute schon nur Token aus 3 bis 9 Zeichen aus A bis Z, 0 bis 9 und Bindestrich an; alles andere verwirft sie als DROP TOK. Diese 37 Zeichen passen in 6 Bit, neun Zeichen in 54 Bit, und der Code 0 markiert das Ende. Ein Rufzeichen ist damit ein uint64_t; zwei Rufzeichen vergleicht ein einziger Wortvergleich statt strncmp über 10 Byte.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 466" role="img" aria-label="Speicherlayout">
+<text x="40" y="30" class="b">Rufzeichen: ein 64-Bit-Wort, 6 Bit je Zeichen, Code 0 beendet</text>
+<rect x="40" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="70.0" y="57.0" text-anchor="middle" class="mono">D</text>
+<text x="70" y="80" text-anchor="middle" class="t11">14</text>
+<rect x="100" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="130.0" y="57.0" text-anchor="middle" class="mono">K</text>
+<text x="130" y="80" text-anchor="middle" class="t11">21</text>
+<rect x="160" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="190.0" y="57.0" text-anchor="middle" class="mono">5</text>
+<text x="190" y="80" text-anchor="middle" class="t11">6</text>
+<rect x="220" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="250.0" y="57.0" text-anchor="middle" class="mono">E</text>
+<text x="250" y="80" text-anchor="middle" class="t11">15</text>
+<rect x="280" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="310.0" y="57.0" text-anchor="middle" class="mono">N</text>
+<text x="310" y="80" text-anchor="middle" class="t11">24</text>
+<rect x="340" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="370.0" y="57.0" text-anchor="middle" class="mono">-</text>
+<text x="370" y="80" text-anchor="middle" class="t11">37</text>
+<rect x="400" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="430.0" y="57.0" text-anchor="middle" class="mono">9</text>
+<text x="430" y="80" text-anchor="middle" class="t11">10</text>
+<rect x="460" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="490.0" y="57.0" text-anchor="middle" class="mono">8</text>
+<text x="490" y="80" text-anchor="middle" class="t11">9</text>
+<rect x="520" y="40" width="60" height="26" class="node srv" style="rx:2"/>
+<text x="550.0" y="57.0" text-anchor="middle" class="mono">Ende</text>
+<text x="550" y="80" text-anchor="middle" class="t11">0</text>
+<rect x="580" y="40" width="100" height="26" class="node" style="rx:2"/>
+<text x="630.0" y="57.0" text-anchor="middle" class="mono">10 Bit frei</text>
+<text x="690" y="58" class="t11">Vergleich zweier Rufzeichen = ein Wortvergleich</text>
+<text x="40" y="110" class="b">Zeilenkern: 12 Byte, fuer jede Zeile</text>
+<rect x="40" y="120" width="120" height="26" class="node" style="rx:2"/>
+<text x="100.0" y="137.0" text-anchor="middle" class="mono">lat16</text>
+<rect x="160" y="120" width="120" height="26" class="node" style="rx:2"/>
+<text x="220.0" y="137.0" text-anchor="middle" class="mono">lon16</text>
+<rect x="280" y="120" width="120" height="26" class="node" style="rx:2"/>
+<text x="340.0" y="137.0" text-anchor="middle" class="mono">last_min</text>
+<rect x="400" y="120" width="120" height="26" class="node" style="rx:2"/>
+<text x="460.0" y="137.0" text-anchor="middle" class="mono">rpt_min</text>
+<rect x="520" y="120" width="60" height="26" class="node" style="rx:2"/>
+<text x="550.0" y="137.0" text-anchor="middle" class="mono">flags</text>
+<rect x="580" y="120" width="60" height="26" class="node" style="rx:2"/>
+<text x="610.0" y="137.0" text-anchor="middle" class="mono">hw</text>
+<rect x="640" y="120" width="60" height="26" class="node" style="rx:2"/>
+<text x="670.0" y="137.0" text-anchor="middle" class="mono">ncnt</text>
+<rect x="700" y="120" width="60" height="26" class="node" style="rx:2"/>
+<text x="730.0" y="137.0" text-anchor="middle" class="mono">ext</text>
+<text x="40" y="162" class="t11">ext: Nummer des Slots der Direkt-Erweiterung, 0xFF = keiner; ncnt: zuletzt gemeldete Nachbarzahl der Station</text>
+<text x="40" y="196" class="b">Masken je Zeile: eigene Felder, 64 Bit klassisch, 128 Bit S3 und nRF52</text>
+<rect x="40" y="206" width="260" height="26" class="node srv" style="rx:2"/>
+<text x="170.0" y="223.0" text-anchor="middle" class="mono">hears[R]: wen X hoert</text>
+<rect x="300" y="206" width="260" height="26" class="node srv" style="rx:2"/>
+<text x="430.0" y="223.0" text-anchor="middle" class="mono">heardBy[R]: wer X hoert</text>
+<text x="570" y="224" class="t11">getrennt vom Kern, sonst 4 Byte Fuellung je Zeile</text>
+<text x="40" y="266" class="b">Kante: 6 Byte, "y hat x gehoert"</text>
+<rect x="40" y="276" width="60" height="26" class="node" style="rx:2"/>
+<text x="70.0" y="293.0" text-anchor="middle" class="mono">x</text>
+<rect x="100" y="276" width="60" height="26" class="node" style="rx:2"/>
+<text x="130.0" y="293.0" text-anchor="middle" class="mono">y</text>
+<rect x="160" y="276" width="60" height="26" class="node" style="rx:2"/>
+<text x="190.0" y="293.0" text-anchor="middle" class="mono">cnt</text>
+<rect x="220" y="276" width="60" height="26" class="node" style="rx:2"/>
+<text x="250.0" y="293.0" text-anchor="middle" class="mono">snr</text>
+<rect x="280" y="276" width="120" height="26" class="node" style="rx:2"/>
+<text x="340.0" y="293.0" text-anchor="middle" class="mono">last_min</text>
+<text x="410" y="294" class="t11">256 Kanten klassisch, 512 auf S3 und nRF52</text>
+<text x="40" y="336" class="b">Direkt-Erweiterung: 96 Bit = 12 Byte, nur fuer direkt gehoerte Zeilen</text>
+<rect x="40" y="358" width="54" height="26" class="node prx" style="rx:1"/>
+<text x="67.0" y="375" text-anchor="middle" class="mono">6</text>
+<text x="67.0" y="353" text-anchor="middle" class="t11">sec</text>
+<rect x="94" y="358" width="18" height="26" class="node prx" style="rx:1"/>
+<text x="103.0" y="375" text-anchor="middle" class="mono">2</text>
+<text x="103.0" y="353" text-anchor="middle" class="t11">PLT</text>
+<rect x="112" y="358" width="72" height="26" class="node prx" style="rx:1"/>
+<text x="148.0" y="375" text-anchor="middle" class="mono">8</text>
+<text x="148.0" y="353" text-anchor="middle" class="t11">MOD</text>
+<rect x="184" y="358" width="72" height="26" class="node prx" style="rx:1"/>
+<text x="220.0" y="375" text-anchor="middle" class="mono">8</text>
+<text x="220.0" y="353" text-anchor="middle" class="t11">RSSI</text>
+<rect x="256" y="358" width="189" height="26" class="node prx" style="rx:1"/>
+<text x="350.5" y="375" text-anchor="middle" class="mono">21</text>
+<text x="350.5" y="353" text-anchor="middle" class="t11">LAT</text>
+<rect x="445" y="358" width="198" height="26" class="node prx" style="rx:1"/>
+<text x="544.0" y="375" text-anchor="middle" class="mono">22</text>
+<text x="544.0" y="353" text-anchor="middle" class="t11">LON</text>
+<rect x="643" y="358" width="144" height="26" class="node prx" style="rx:1"/>
+<text x="715.0" y="375" text-anchor="middle" class="mono">16</text>
+<text x="715.0" y="353" text-anchor="middle" class="t11">ALT</text>
+<rect x="787" y="358" width="36" height="26" class="node prx" style="rx:1"/>
+<text x="805.0" y="375" text-anchor="middle" class="mono">4</text>
+<text x="805.0" y="353" text-anchor="middle" class="t11">PL</text>
+<rect x="823" y="358" width="9" height="26" class="node prx" style="rx:1"/>
+<text x="827.5" y="375" text-anchor="middle" class="mono">1</text>
+<text x="827.5" y="353" text-anchor="middle" class="t11">M</text>
+<rect x="832" y="358" width="36" height="26" class="node prx" style="rx:1"/>
+<text x="850.0" y="375" text-anchor="middle" class="mono">4</text>
+<text x="850.0" y="353" text-anchor="middle" class="t11">f</text>
+<rect x="868" y="358" width="36" height="26" class="node prx" style="rx:1"/>
+<text x="886.0" y="375" text-anchor="middle" class="mono">4</text>
+<text x="886.0" y="353" text-anchor="middle" class="t11">s</text>
+<text x="40" y="416" class="b">Horizont-Eintrag: 19 Byte klassisch, 27 Byte auf S3 und nRF52</text>
+<rect x="40" y="426" width="240" height="26" class="node hamf ham" style="rx:2"/>
+<text x="160.0" y="443.0" text-anchor="middle" class="mono">Rufzeichen 8 B</text>
+<rect x="280" y="426" width="240" height="26" class="node hamf ham" style="rx:2"/>
+<text x="400.0" y="443.0" text-anchor="middle" class="mono">Eintrittsmaske 8 / 16 B</text>
+<rect x="520" y="426" width="90" height="26" class="node hamf ham" style="rx:2"/>
+<text x="565.0" y="443.0" text-anchor="middle" class="mono">Meta 3 B</text>
+<text x="620" y="444" class="t11">Meta: letzte Minute, kleinste Hop-Zahl, G-Bit</text>
+</svg>
+</div>
+<figcaption>Abb. 3: Speicherlayout. Jede Zeile besteht aus Rufzeichenwort, 12 Byte Kern und zwei Masken in getrennten Feldern; direkte Nachbarn bekommen zusätzlich einen 12-Byte-Slot, ferne Absender einen Horizont-Eintrag. Kein Feld trägt ein Nullbyte als Füllung; f und s zählen für Auto-Via, wie oft der Nachbar meine Rahmen aus erster und aus zweiter Hand bekam.</figcaption>
+</figure>
+
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Zeilenstruktur mit Masken</td><td>struct mit call[10] und zwei uint64_t</td><td><span class="tag bad">verworfen</span> 40 B statt 36 B durch Ausrichtung, gemessen</td></tr>
+<tr><td>gepackte Struktur</td><td>__attribute__((packed))</td><td><span class="tag bad">verworfen</span> der Compiler erzeugt für jeden Maskenzugriff Einzelbyte-Zugriffe</td></tr>
+<tr><td>getrennte Felder</td><td>nbrCall[], NbrRow[], nbrHears[], nbrHeardBy[]</td><td><span class="tag ok">gewählt</span> keine Füllung, Masken zusammenhängend für OR und popcount</td></tr>
+<tr><td>Rufzeichen als char[10]</td><td>wie heute</td><td><span class="tag bad">verworfen</span> 2 B mehr je Zeile, Vergleich über 10 Byte</td></tr>
+<tr><td>Rufzeichen Basis 37 in 47 Bit</td><td>Zahl aus neun Stellen</td><td><span class="tag bad">verworfen</span> spart 2 B, braucht aber Division beim Dekodieren und kein ausgerichtetes Wort</td></tr>
+<tr><td>Rufzeichen 6 Bit je Zeichen in uint64_t</td><td>Abb. 3</td><td><span class="tag ok">gewählt</span> ein Wortvergleich, Dekodierung per Tabelle</td></tr>
+<tr><td>Detailwerte als Bitstrom variabler Länge</td><td>Präsenzbits, Felder variabler Breite</td><td><span class="tag bad">verworfen</span> jeder Zugriff scannt, jede Längenänderung verschiebt den Rest</td></tr>
+<tr><td>Detailwerte bitgepackt mit fester Breite</td><td>96 Bit je Slot, Zugriff über Bitversatz</td><td><span class="tag ok">gewählt</span> kein Füllbyte, Zugriff in konstanter Zeit</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Kodierung: 0 Ende, 1 bis 10 die Ziffern 0 bis 9, 11 bis 36 die Buchstaben A bis Z, 37 der Bindestrich; Zeichen 1 steht in den Bits 0 bis 5.</li>
+<li>Die Bitfelder der Erweiterung liest und schreibt ein Paar Hilfsfunktionen nbrBitsGet() und nbrBitsPut() mit Versatz und Breite; keine C-Bitfelder, damit das Layout auf Host und Zielsystem gleich ist.</li>
+<li>Die Zeichenregel gilt für jedes gespeicherte Rufzeichen; ein Rufzeichen außerhalb der Regel bekommt keine Zeile, wie heute in der Matrix.</li>
+</ul>
+
+<h3>4.2 Zeilen und Masken je Familie</h3>
+<p class="reco">Entscheidung: 64 Zeilen mit 64-Bit-Masken auf klassischem ESP32 einschließlich E22_XML, 128 Zeilen mit 128-Bit-Masken auf S3 und nRF52.</p>
+<p>Prämisse: Die Flotte zeigt im 2-Hop-Umkreis in 24 Stunden p90 48, p99 84 und maximal 113 Stationen, an Bergknoten laut Betreiber über 100. 64 Zeilen decken p90, 128 Zeilen auch das Maximum. Auf S3 und nRF52 bezahlen die frei werdenden 11,5 kB aus MHeard und Pfadtabelle die Stufe 2 des Kantenpool-Papiers sofort, statt sie an einen weiteren Feldnachweis zu binden. Auf klassischem ESP32 reichen die frei werdenden 4,5 kB für 64 Zeilen, nicht für 128.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>64 Zeilen überall</td><td>Kantenpool-Papier Stufe 1</td><td><span class="tag warn">Teilmenge</span> klassisch gewählt; auf S3 und nRF52 kappt es die 2-Hop-Nachbarschaft der Bergknoten</td></tr>
+<tr><td>128 Zeilen auf S3 und nRF52, 64 klassisch</td><td>NBR_MASK_WORDS 2 oder 1</td><td><span class="tag ok">gewählt</span> netto weniger RAM als heute in jeder Familie</td></tr>
+<tr><td>128 Zeilen überall</td><td>auch klassisch 2 Maskenwörter</td><td><span class="tag bad">verworfen</span> mit den S3-Größen klassisch rund 6,2 kB mehr als heute, Laufzeit-Heap mit WLAN und BLE dort nicht gemessen</td></tr>
+</table>
+<p>Die Maske ist ein Feld aus Wörtern, damit dieselbe Rechnung auf beiden Familien läuft:</p>
+<pre>struct NbrMask { uint64_t w[NBR_MASK_WORDS]; };        // 1 klassisch, 2 auf S3 und nRF52
+static_assert(NBR_MAX_ROWS &lt;= 64 * NBR_MASK_WORDS, "Zeilenindex passt nicht in die Maske");
+inline int nbrPop(const NbrMask &amp;m) { int n = 0; for (auto w : m.w) n += __builtin_popcountll(w); return n; }</pre>
+<p>Die static_assert-Zeile ersetzt die heutige stille Kappung: nbrBit() liefert ab Index 32 die Maske 0 und lässt Zeilen still aus jedem Urteil fallen. Die Ringseitenfelder ringNeed[] und ringAlone[] werden NbrMask; das kostet 320 Byte klassisch und 640 Byte auf S3 und nRF52 statt 160 Byte.</p>
+
+<h3>4.3 MHeard aus der Topologie</h3>
+<p class="reco">Entscheidung: Ein MHeard-Eintrag ist eine Zeile mit frischer Kante zu mir, also "ich habe X gehört"; ihre Detailwerte liegen in einem 12-Byte-Slot der Direkt-Erweiterung.</p>
+<p>Der ME-Schritt in nbrNoteFrame() läuft heute schon bei jedem Rahmen für den letzten Hop und ist damit genau der Schlüssel von MHeard. Er bekommt die Werte, die updateMheard() heute speichert, und schreibt sie in den Slot. Prämisse für 48 und 64 Slots: Die Flotte hört höchstens 41 direkte Nachbarn in 24 Stunden und 59 in sieben Tagen; ein 12-Stunden-Fenster liegt darunter.</p>
+<table>
+<tr><th>MH-Feld</th><th>Quelle in der Topologie</th><th>Bits</th><th>Kodierung</th></tr>
+<tr><td>CALL</td><td>nbrCall[x]</td><td>64</td><td>6 Bit je Zeichen</td></tr>
+<tr><td>DATE, TIME</td><td>Bootepoche + last_min + Sekunde</td><td>6</td><td>Sekunde 0 bis 59 im Slot, Minute im Kern</td></tr>
+<tr><td>PLT</td><td>Slot</td><td>2</td><td>0 Text, 1 Position, 2 HEY, 3 anderes</td></tr>
+<tr><td>HW</td><td>Kern hw, im ME-Schritt aus msg_last_hw</td><td>8</td><td>wie heute</td></tr>
+<tr><td>MOD</td><td>Slot</td><td>8</td><td>wie heute, beide Halbbytes</td></tr>
+<tr><td>RSSI</td><td>Slot</td><td>8</td><td>dBm + 160, also -160 bis +95</td></tr>
+<tr><td>SNR</td><td>Kante (x, ich)</td><td>8</td><td>schon im Kantenpool</td></tr>
+<tr><td>DIST</td><td>gerechnet aus Slot-Position und eigener Position</td><td>43</td><td>Breite 21 Bit, Länge 22 Bit in 0,0001 Grad; alle Bits gesetzt heißt unbekannt</td></tr>
+<tr><td>ALT, nur Web</td><td>Slot</td><td>16</td><td>Meter + 1000; 0xFFFF unbekannt</td></tr>
+<tr><td>PL</td><td>Slot</td><td>4</td><td>Pfadlänge des letzten Rahmens</td></tr>
+<tr><td>MESH</td><td>Slot</td><td>1</td><td>Mesh-Bit des letzten Rahmens</td></tr>
+<tr><td>NCNT</td><td>Kern ncnt</td><td>8</td><td>zuletzt gemeldete Nachbarzahl dieser Station</td></tr>
+<tr><td>kein MH-Feld</td><td>Slot, f und s</td><td>8</td><td>je 4 Bit: eigene Rahmen aus erster und aus zweiter Hand, für Auto-Via in 4.8</td></tr>
+</table>
+<p>Prämisse für 0,0001 Grad: Eine APRS-Position hat 0,01 Bogenminuten Auflösung, rund 18,5 m; 0,0001 Grad sind rund 11 m und damit verlustfrei gegenüber der Quelle. Die 0,01 Grad des Zeilenkerns reichen für Reichweite und Nachbarkarte, für DIST in 0,1 km nicht.</p>
+<p>Regeln:</p>
+<ul>
+<li>Ein Slot wird im ME-Schritt vergeben, wenn die Zeile noch keinen hat, und im Minuten-Sweep frei, sobald die Kante (x, ich) das Fenster verlässt.</li>
+<li>Sind alle Slots belegt, weicht der Slot des am längsten nicht gehörten direkten Nachbarn; die Zeile bleibt, nur ihre Detailwerte fehlen bis zum nächsten Rahmen. Logzeile [NBR]|EVICT-X.</li>
+<li>Der ME-Schritt prüft nur das Token des letzten Hops. Ein Rahmen mit ungültigem Token weiter vorn oder mit Schleife verliert wie heute seine Kanten, zählt aber als Direktempfang, weil MHeard ihn heute auch zählt.</li>
+<li>Uhrzeit: nbr_views rechnet DATE und TIME aus der Bootepoche, die gesetzt wird, sobald die Uhr gültig ist. Ohne gültige Uhr arbeitet die Topologie weiter, Web und Konsole zeigen das Alter in Minuten, und an die App geht wie heute kein MH-Rahmen.</li>
+<li>Eine gemeldete Nachbarzahl R&lt;n&gt;, /N oder eine Relais-Gruppe NCT,RSSI,SNR schreibt ncnt der Zeile ihres Absenders, egal ob direkt oder indirekt. Damit entfallen die Befunde B1, B2, B4 und B5 des NCNT-Papiers ohne eigene Korrektur: es gibt nur noch eine Kopie, kein Relais-HEY überschreibt Direktwerte, ncnt braucht keinen bestehenden MHeard-Eintrag, und eine Pfadtabelle gibt es nicht mehr.</li>
+</ul>
+
+<h3>4.4 Pfad aus der Topologie und Horizont</h3>
+<p class="reco">Entscheidung: Die Pfadansicht zeigt je Absender alle Wege, die die Kanten hergeben, mit dem Alter der ältesten Kante je Weg. Absender ab 3 Hops bekommen einen Horizont-Eintrag mit der Maske der Fensterzeilen, über die sie hereinkommen.</p>
+<p>Ein Weg für eine 2-Hop-Zeile X ist X, dann ein direkter Nachbar B aus heardBy(X) geschnitten mit Direkt, dann ich. Ein Weg für einen fernen Absender S ist S, die Hop-Zahl bis zur Eintrittszeile A aus hzEntry(S), dann B aus heardBy(A) geschnitten mit Direkt, dann ich. Die Namen zwischen S und A kennt die Topologie absichtlich nicht; das 2-Hop-Fenster bleibt die Grenze der Zeilen.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 350" role="img" aria-label="Pfad aus der Topologie">
+  <rect x="250" y="30" width="690" height="200" class="zone"/>
+  <text x="264" y="50" class="t11">2-Hop-Fenster: Zeilen und Kanten der Topologie</text>
+
+  <rect x="30" y="112" width="150" height="50" class="node hamf ham"/>
+  <text x="105" y="133" text-anchor="middle" class="b">DL8HW-12</text>
+  <text x="105" y="150" text-anchor="middle" class="t11">ferner Absender</text>
+
+  <rect x="300" y="112" width="150" height="50" class="node"/>
+  <text x="375" y="133" text-anchor="middle" class="b">DB0HOB-12</text>
+  <text x="375" y="150" text-anchor="middle" class="t11">2-Hop-Zeile, Eintritt</text>
+
+  <rect x="540" y="62" width="150" height="50" class="node srv"/>
+  <text x="615" y="83" text-anchor="middle" class="b">DB0ED-99</text>
+  <text x="615" y="100" text-anchor="middle" class="t11">direkt</text>
+  <rect x="540" y="162" width="150" height="50" class="node srv"/>
+  <text x="615" y="183" text-anchor="middle" class="b">DL2JA-2</text>
+  <text x="615" y="200" text-anchor="middle" class="t11">direkt</text>
+
+  <rect x="780" y="112" width="140" height="50" class="node"/>
+  <text x="850" y="133" text-anchor="middle" class="b">DK5EN-98</text>
+  <text x="850" y="150" text-anchor="middle" class="t11">ich</text>
+
+  <path d="M180 137 L300 137" class="lnd"/>
+  <text x="105" y="182" text-anchor="middle" class="t11">Horizont-Eintrag:</text>
+  <text x="105" y="196" text-anchor="middle" class="t11">4 Hops, G, Eintritt DB0HOB-12</text>
+  <path d="M450 128 L540 90" class="ln"/>
+  <path d="M450 146 L540 184" class="ln"/>
+  <path d="M690 90 L780 128" class="ln"/>
+  <path d="M690 184 L780 146" class="ln"/>
+  <text x="488" y="98" text-anchor="middle" class="t11">358</text>
+  <text x="488" y="182" text-anchor="middle" class="t11">53</text>
+  <text x="742" y="98" text-anchor="middle" class="t11">750</text>
+  <text x="742" y="182" text-anchor="middle" class="t11">610</text>
+
+  <rect x="30" y="256" width="440" height="72" class="node prx"/>
+  <text x="46" y="276" class="b">Heute, Path Information</text>
+  <text x="46" y="296" class="mono">DL8HW-12 (08:20:50)  4G/DL2RN-13,DB0HOB-12,DB0ED-99</text>
+  <text x="46" y="314" class="t11">ein Pfad, der kuerzeste der letzten 12 h</text>
+  <rect x="490" y="256" width="440" height="72" class="node srv"/>
+  <text x="506" y="276" class="b">Aus der Topologie</text>
+  <text x="506" y="296" class="mono">DL8HW-12  4 Hops G  Eintritt DB0HOB-12</text>
+  <text x="506" y="314" class="mono">Wege: DB0HOB-12&gt;DB0ED-99, DB0HOB-12&gt;DL2JA-2</text>
+</svg>
+</div>
+<figcaption>Abb. 4: Ein ferner Absender aus der Topologie. Die Pfadtabelle kennt einen Weg und den Namen DL2RN-13; die Topologie kennt die Hop-Zahl, die Eintrittszeile und beide Wege ab dort, mit Treffern je Kante aus dem Schnappschuss vom 24.09. 07:25. Die Zahlen an den Kanten sind Trefferzahlen, nicht Signalwerte.</figcaption>
+</figure>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Pfadtext wie heute</td><td>71 B je Absender, kürzester Pfad</td><td><span class="tag bad">verworfen</span> ein Weg, bis 12 h alt, doppelte Speicherung der Rufzeichen</td></tr>
+<tr><td>nur die Topologie</td><td>Pfade bis 2 Hops</td><td><span class="tag bad">verworfen</span> 22 von 29 Absendern bei DK5EN-98 lägen außerhalb</td></tr>
+<tr><td>Horizont mit einem Eintrittsindex</td><td>12 B je Absender</td><td><span class="tag warn">Teilmenge</span> verliert die Mehrwege vor dem Fenster</td></tr>
+<tr><td>Horizont mit Eintrittsmaske</td><td>19 oder 27 B je Absender, 40 oder 96 Einträge</td><td><span class="tag ok">gewählt</span> alle Eintrittszeilen, kleinste Hop-Zahl, G-Bit</td></tr>
+<tr><td>Fenster aufheben</td><td>jede Pfadstation bekommt eine Zeile</td><td><span class="tag bad">verworfen</span> kehrt die HELLO-Matrix-Entscheidung um, vervielfacht den Zeilenbedarf</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Horizont-Einträge entstehen aus Position und HEY mit mindestens drei Pfad-Token, nicht aus Text, aus demselben Grund wie im Kantenpool-Papier: vom Server eingespeister Text trägt Pfadpaare, die nie auf Funk gehört wurden.</li>
+<li>Eintrittszeile ist das vorletzte Token; es liegt im Fenster und hat nach dem Commit des Rahmens immer eine Zeile.</li>
+<li>Die Hop-Zahl ist die kleinste im Fenster gesehene, last_min die letzte; das G-Bit setzt ein HEY an HG.</li>
+<li>Verdrängt wird der am längsten nicht gesehene Eintrag. Wird eine Zeile verdrängt, löscht der Durchlauf ihr Bit auch in allen Eintrittsmasken; ein Eintrag mit leerer Maske wird frei.</li>
+<li>Prämisse für 40 und 96 Einträge: bei DK5EN-98 sind 22 von 29 Pfadeinträgen, also 76 %, ferne Absender. Heute teilen sich 40 oder 100 Pfadplätze ferne und 2-Hop-Absender, bieten also rund 30 oder 76 Plätze für ferne; 40 und 96 reine Horizont-Plätze sind in beiden Familien mehr. Jeder weitere Platz kostet 19 oder 27 Byte.</li>
+</ul>
+
+<h3>4.5 NCNT aus der Topologie</h3>
+<p class="reco">Entscheidung: NCNT ist die Zahl der Nachbarn, die ich in der letzten Stunde gehört habe und die mich entweder nachweislich hören oder bei mir mit mindestens -16 dB ankommen.</p>
+<pre>D60  = Zeilen mit Kante (x, ich), last_min juenger als 60 min   // Kopf, vom Minuten-Sweep gepflegt
+HM   = rows[ich].heardBy                                        // x hat mich gehoert, Fenster 12 h
+SYM  = { x in D60 : snr(x, ich) &gt;= LORA_SNR_STABLE_MIN_DB }     // -16 dB, derselbe Wert wie --nbrsym
+NCNT = popcount(D60 &amp; (HM | SYM))</pre>
+<p>Die Prämissen der drei Fenster:</p>
+<ul>
+<li>D60 bleibt eine Stunde wie heute, damit NCNT eine Momentaufnahme der Nachbarschaft bleibt und ein abgeschalteter Nachbar nach einer Stunde herausfällt.</li>
+<li>HM gilt 12 Stunden, weil ein Beweis nur ankommt, wenn der Nachbar eine meiner Positionen oder HEYs weiterleitet oder mich in seinem HN-Bericht nennt; das geschieht höchstens alle 15 Minuten und bei einem Nachbarn ohne Mesh nie.</li>
+<li>SYM fängt genau diese Nachbarn auf. Ohne SYM fiele NCNT mit Stufe 4 zusammen, denn Auto-Via nimmt redundanten Altknoten das Weiterleiten meiner Rahmen und damit den Beweis.</li>
+</ul>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>einseitig wie heute</td><td>D60</td><td><span class="tag warn">Teilmenge</span> läuft im Schatten als Vergleichswert zu getMheardCount() mit</td></tr>
+<tr><td>symmetrisch, nur gemessen</td><td>D60 &amp; HM</td><td><span class="tag bad">verworfen</span> bricht mit Stufe 4 und bei Nachbarn ohne Mesh ein</td></tr>
+<tr><td>symmetrisch mit Annahme</td><td>D60 &amp; (HM | SYM)</td><td><span class="tag ok">gewählt</span> Zwei-Wege-Nachbarn, stabil gegen Auto-Via</td></tr>
+<tr><td>12-Stunden-Fenster</td><td>alle Kanten des Fensters</td><td><span class="tag bad">verworfen</span> Werte steigen sprunghaft, kein Vergleich mehr mit älterer Firmware</td></tr>
+</table>
+<p>Beispiel DK5EN-98 am 24.09. um 08:55: MHeard hat 5 Einträge, getMheardCount() meldet 5. Vier Nachbarn hören mich nachweislich, DL2JA-2 mit -13 dB, DK5EN-1 mit 6 dB, DL2UD-1 mit -12 dB, DB0ED-99 mit -6 dB; DL2JA-1 leitet nie weiter, kommt aber mit -8 dB an und zählt über SYM. NCNT bleibt 5. Ein Nachbar, der nur mit -18 dB ankommt und nie weiterleitet, zählt künftig nicht mehr.</p>
+<p>Folgen: Der Deckel steigt von 30 oder 80 auf 63 oder 127, /N bleibt beim Sender wie heute auf 99 gekappt. Die Trickle-Rücksetzung reagiert auf Änderungen des neuen Werts. NCNT eines MeshCom-5-Knotens bedeutet etwas anderes als das eines 4.35-Knotens; mcmap muss beide trennen können, das ist ein offener Punkt.</p>
+
+<h3>4.6 Telefon-App</h3>
+<p class="reco">Entscheidung: Der MH-Rahmen behält TYP, alle 13 Felder und ihre Bedeutung und bekommt 7 neue Felder am Ende; nur direkte Nachbarn gehen als MH an die App.</p>
+<table>
+<tr><th>Neues Feld</th><th>Bedeutung</th><th>Quelle</th></tr>
+<tr><td>AGE</td><td>Minuten seit dem letzten Empfang, ohne Uhr gültig</td><td>last_min</td></tr>
+<tr><td>HM</td><td>SNR, mit dem der Nachbar mich zuletzt gehört hat; fehlt, wenn unbekannt</td><td>Kante (ich, x)</td></tr>
+<tr><td>ROLE</td><td>S Super-Node, N nötig, R redundant</td><td>#X wie im Kantenpool-Papier 4.4</td></tr>
+<tr><td>EX</td><td>exklusiver Beitrag #X</td><td>popcount der Masken</td></tr>
+<tr><td>NB</td><td>wie viele Stationen der Nachbar hört, #N</td><td>popcount hears(x)</td></tr>
+<tr><td>GW</td><td>1, wenn der Nachbar ein Gateway ist</td><td>NBR_FLAG_GW</td></tr>
+<tr><td>VIA</td><td>1, wenn er gerade in meiner Via-Menge steht</td><td>Via-Maske, ab Stufe 4</td></tr>
+</table>
+<p>Prämisse für die Länge: Ein Kommando-Rahmen darf 245 Byte lang sein. Der heutige MH-Rahmen braucht im schlimmsten Fall 162 Byte, mit den 7 neuen Feldern 225 Byte. Breite, Länge und Höhe zusätzlich ergäben 268 Byte und passen nicht; die App erhält Positionen ohnehin aus den Positionsrahmen und DIST wie heute. Der Rahmen wird mit bleJsonFrameFailSoft() gebaut, das bei Überlänge zuerst die hintersten Felder streicht, also die neuen, nie die alten.</p>
+<p>Regeln:</p>
+<ul>
+<li>Die alte App liest nur ihr Interface und ignoriert die neuen Felder; die Fork-App zeigt sie, ein PR an rainerfritz/Meshcom-MobileApp folgt nach dem Feldlauf.</li>
+<li>2-Hop-Zeilen gehen nicht als MH an die App: eine alte App würde sie als direkt gehört listen. Die Nachbarschaft über 2 Hops zeigt die Web-Seite Nachbarn.</li>
+<li>Live-Rahmen höchstens einmal je Nachbar und Minute, nämlich wenn sich last_min der Zeile ändert. Prämisse: DK5EN-98 empfängt rund 4 Rahmen je Minute von 5 Nachbarn; heute geht jeder davon als BLE-Rahmen an die App, künftig höchstens einer je Nachbar und Minute. Die App zeigt ohnehin nur den letzten Stand je Rufzeichen.</li>
+<li>Die Liste beim Verbinden läuft wie heute in Portionen über den Kommando-Ring, neueste zuerst, 12 Stunden; der Arbeitsspeicher je Eintrag ist eine Sicht von 48 Byte statt einer struct mheardLine mit 584 Byte.</li>
+</ul>
+
+<h3>4.7 RAM je Familie</h3>
+<p class="reco">Entscheidung: Die Größen aus 4.2 bis 4.5 gelten je Familie wie in der Tabelle; jede Familie braucht netto weniger RAM als heute.</p>
+<p>Gemessen ist heute die Summe der Datensymbole aus nm: MHeard, Pfadtabelle, nbrMatrix, ringNeed und ringAlone, auf nRF52 zusätzlich die drei statischen struct mheardLine. Gerechnet ist das Ziel aus den Feldgrößen dieses Papiers.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 362" role="img" aria-label="RAM je Familie">
+<text x="20" y="54" class="b">klassisch</text>
+<text x="20" y="78" class="t11">heltec_wifi_lora_32_V2</text>
+<text x="162" y="54" text-anchor="end" class="t11">heute</text>
+<rect x="170.0" y="42" width="51.3" height="16" style="fill:#f6c9a0;stroke:#fff"/>
+<rect x="221.3" y="42" width="88.1" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="309.4" y="42" width="41.3" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="350.7" y="42" width="5.0" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="361.7" y="54" class="mono">5.989 B</text>
+<text x="162" y="78" text-anchor="end" class="t11">neu</text>
+<rect x="170.0" y="66" width="39.7" height="16" style="fill:#b9d7c4;stroke:#fff"/>
+<rect x="209.7" y="66" width="31.7" height="16" style="fill:#9cc9ab;stroke:#fff"/>
+<rect x="241.4" y="66" width="47.6" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="289.0" y="66" width="17.9" height="16" style="fill:#f6e3a0;stroke:#fff"/>
+<rect x="306.9" y="66" width="27.2" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="334.1" y="66" width="9.9" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="350.0" y="78" class="mono">5.612 B, netto -377 B, 64 statt 13 Zeilen</text>
+<text x="20" y="120" class="b">E22_XML</text>
+<text x="20" y="144" class="t11">E22_XML-DevKitC</text>
+<text x="162" y="120" text-anchor="end" class="t11">heute</text>
+<rect x="170.0" y="108" width="85.4" height="16" style="fill:#f6c9a0;stroke:#fff"/>
+<rect x="255.4" y="108" width="110.1" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="365.5" y="108" width="97.8" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="463.4" y="108" width="5.0" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="474.3" y="120" class="mono">9.623 B</text>
+<text x="162" y="144" text-anchor="end" class="t11">neu</text>
+<rect x="170.0" y="132" width="39.7" height="16" style="fill:#b9d7c4;stroke:#fff"/>
+<rect x="209.7" y="132" width="31.7" height="16" style="fill:#9cc9ab;stroke:#fff"/>
+<rect x="241.4" y="132" width="47.6" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="289.0" y="132" width="17.9" height="16" style="fill:#f6e3a0;stroke:#fff"/>
+<rect x="306.9" y="132" width="27.2" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="334.1" y="132" width="9.9" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="350.0" y="144" class="mono">5.612 B, netto -4.011 B, 64 statt 21 Zeilen</text>
+<text x="20" y="186" class="b">S3</text>
+<text x="20" y="210" class="t11">heltec_wifi_lora_32_V3</text>
+<text x="162" y="186" text-anchor="end" class="t11">heute</text>
+<rect x="170.0" y="174" width="136.6" height="16" style="fill:#f6c9a0;stroke:#fff"/>
+<rect x="306.6" y="174" width="220.1" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="526.7" y="174" width="97.8" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="624.6" y="174" width="5.0" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="635.5" y="186" class="mono">14.823 B</text>
+<text x="162" y="210" text-anchor="end" class="t11">neu</text>
+<rect x="170.0" y="198" width="79.4" height="16" style="fill:#b9d7c4;stroke:#fff"/>
+<rect x="249.4" y="198" width="127.0" height="16" style="fill:#9cc9ab;stroke:#fff"/>
+<rect x="376.3" y="198" width="95.2" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="471.6" y="198" width="23.8" height="16" style="fill:#f6e3a0;stroke:#fff"/>
+<rect x="495.4" y="198" width="86.4" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="581.8" y="198" width="19.8" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="607.6" y="210" class="mono">13.924 B, netto -899 B, 128 statt 21 Zeilen</text>
+<text x="20" y="252" class="b">nRF52</text>
+<text x="20" y="276" class="t11">wiscore_rak4631</text>
+<text x="162" y="252" text-anchor="end" class="t11">heute</text>
+<rect x="170.0" y="240" width="136.6" height="16" style="fill:#f6c9a0;stroke:#fff"/>
+<rect x="306.6" y="240" width="220.1" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="526.7" y="240" width="97.8" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="624.6" y="240" width="5.0" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<rect x="629.5" y="240" width="54.3" height="16" style="fill:#f3b4b4;stroke:#fff"/>
+<text x="689.8" y="252" class="mono">16.575 B</text>
+<text x="162" y="276" text-anchor="end" class="t11">neu</text>
+<rect x="170.0" y="264" width="79.4" height="16" style="fill:#b9d7c4;stroke:#fff"/>
+<rect x="249.4" y="264" width="127.0" height="16" style="fill:#9cc9ab;stroke:#fff"/>
+<rect x="376.3" y="264" width="95.2" height="16" style="fill:#c9dcf5;stroke:#fff"/>
+<rect x="471.6" y="264" width="23.8" height="16" style="fill:#f6e3a0;stroke:#fff"/>
+<rect x="495.4" y="264" width="86.4" height="16" style="fill:#e7c1e6;stroke:#fff"/>
+<rect x="581.8" y="264" width="19.8" height="16" style="fill:#dde3ea;stroke:#fff"/>
+<text x="607.6" y="276" class="mono">13.924 B, netto -2.651 B, 128 statt 21 Zeilen</text>
+<text x="20" y="322" class="t11 b">heute:</text>
+<rect x="70" y="312" width="14" height="12" style="fill:#f6c9a0"/>
+<text x="88" y="322" class="t11">MHeard</text>
+<rect x="143.2" y="312" width="14" height="12" style="fill:#e7c1e6"/>
+<text x="161.2" y="322" class="t11">Pfadtabelle</text>
+<rect x="247.39999999999998" y="312" width="14" height="12" style="fill:#c9dcf5"/>
+<text x="265.4" y="322" class="t11">Matrix</text>
+<rect x="320.59999999999997" y="312" width="14" height="12" style="fill:#dde3ea"/>
+<text x="338.59999999999997" y="322" class="t11">Ringe</text>
+<rect x="387.59999999999997" y="312" width="14" height="12" style="fill:#f3b4b4"/>
+<text x="405.59999999999997" y="322" class="t11">mheardLine-Statics</text>
+<text x="20" y="344" class="t11 b">neu:</text>
+<rect x="70" y="334" width="14" height="12" style="fill:#b9d7c4"/>
+<text x="88" y="344" class="t11">Rufzeichen + Kern</text>
+<rect x="211.4" y="334" width="14" height="12" style="fill:#9cc9ab"/>
+<text x="229.4" y="344" class="t11">Masken</text>
+<rect x="284.6" y="334" width="14" height="12" style="fill:#c9dcf5"/>
+<text x="302.6" y="344" class="t11">Kanten</text>
+<rect x="357.8" y="334" width="14" height="12" style="fill:#f6e3a0"/>
+<text x="375.8" y="344" class="t11">Direkt-Erweiterung</text>
+<rect x="505.40000000000003" y="334" width="14" height="12" style="fill:#e7c1e6"/>
+<text x="523.4000000000001" y="344" class="t11">Horizont</text>
+<rect x="591.0" y="334" width="14" height="12" style="fill:#dde3ea"/>
+<text x="609.0" y="344" class="t11">Ringe</text>
+</svg>
+</div>
+<figcaption>Abb. 5: RAM je Familie, heute gegen Ziel. Die Topologie hält drei- bis sechsmal so viele Zeilen und trotzdem weniger Byte als die drei alten Speicher zusammen.</figcaption>
+</figure>
+<table>
+<tr><th>Teil</th><th class="num">klassisch</th><th class="num">S3 und nRF52</th><th>Rechnung</th></tr>
+<tr><td>Rufzeichen</td><td class="num">512</td><td class="num">1.024</td><td>8 B je Zeile</td></tr>
+<tr><td>Zeilenkern</td><td class="num">768</td><td class="num">1.536</td><td>12 B je Zeile</td></tr>
+<tr><td>Masken</td><td class="num">1.024</td><td class="num">4.096</td><td>2 Masken zu 8 oder 16 B je Zeile</td></tr>
+<tr><td>Kanten</td><td class="num">1.536</td><td class="num">3.072</td><td>256 oder 512 zu 6 B</td></tr>
+<tr><td>Direkt-Erweiterung</td><td class="num">576</td><td class="num">768</td><td>48 oder 64 Slots zu 12 B</td></tr>
+<tr><td>Horizont</td><td class="num">760</td><td class="num">2.592</td><td>40 zu 19 B oder 96 zu 27 B</td></tr>
+<tr><td>Kopf</td><td class="num">28</td><td class="num">44</td><td>Minuten, Bootepoche, Maske D60, Via-Maske, Via-Zustand</td></tr>
+<tr><td>Echo-Tabelle</td><td class="num">88</td><td class="num">152</td><td>4 eigene Rahmen: msg_id, zwei Masken, Minute</td></tr>
+<tr><td>Ringseitenfelder</td><td class="num">320</td><td class="num">640</td><td>ringNeed und ringAlone, 20 Einträge je Maske</td></tr>
+<tr><td><b>Ziel gesamt</b></td><td class="num"><b>5.612</b></td><td class="num"><b>13.924</b></td><td></td></tr>
+<tr><td>heute gesamt</td><td class="num">5.989, E22_XML 9.623</td><td class="num">14.823, nRF52 16.575</td><td>nm, Builds vom 24.09.</td></tr>
+<tr><td><b>netto</b></td><td class="num"><b>-377, E22_XML -4.011</b></td><td class="num"><b>-899, nRF52 -2.651</b></td><td></td></tr>
+</table>
+<p>Dazu kommt Stack: auf ESP32 legt jeder MHeard-Leser eine struct mheardLine mit 584 Byte auf den Stack. Auf nRF52 liegen dieselben drei Kopien als statische Felder und sind in den 1.752 Byte oben enthalten; sie wurden dorthin verlegt, weil sendMheard() mit ihr 1.184 Byte des 4-KB-Loop-Stacks belegte, auf dem schon einmal null Reserve gemessen wurde. Die Sicht aus nbr_views ist 48 Byte groß.</p>
+
+<h3>4.8 Auto-Via über den Super-Node</h3>
+<p class="reco">Entscheidung: Bei --via on ohne festen node_via nennt jeder Knoten im Zielpfad seinen Super-Node. Bekommt der Super-Node meine Rahmen nachweislich oft erst aus zweiter Hand, kommt ein Zubringer dazu, den er gut hört. Weitere Nachbarn nur, wenn sonst eine Station im 2-Hop-Umkreis abgeschnitten wäre. Reichen dafür drei Nachbarn nicht, flutet der Knoten wie heute.</p>
+<p>Prämisse zum Mechanismus: Der Via ist schon heute ein Nächster-Hop-Feld. Ein Empfänger, dessen Zielpfad Rufzeichen nennt, wiederholt nur, wenn er selbst genannt ist, und das gilt für 4.35 wie für den Fork. Jedes Relais setzt den Zielpfad vor dem Senden auf das Ziel zurück und wendet seinen eigenen Via an. Wer so seine Relais auswählt, macht das, was OLSR als Multipoint Relay beschreibt, RFC 3626 Abschnitt 8.3.1, ohne ein neues Rahmenformat. Die Einschränkung gilt für den Hop nach mir: ein genannter Knoten mit 4.35 setzt beim Weiterleiten keinen Via und flutet ab dort, jeder MeshCom-5-Knoten auf dem Weg schränkt seinen eigenen nächsten Hop wieder ein. Der Gewinn wächst also mit dem Anteil der MeshCom-5-Knoten.</p>
+<p>Messung DK5EN-98, 2026-09-23 00:12 bis 2026-09-24 08:46: 65 eigene Positionsrahmen, für 56 kam mindestens ein Echo zurück, für 9 keines. "Erste Hand" heißt, der Nachbar steht im Echopfad direkt hinter mir und hat meine Aussendung selbst gehört; "nur zweite Hand" heißt, er steht weiter hinten und hat den Rahmen erst über einen anderen Nachbarn bekommen.</p>
+<table>
+<tr><th>Nachbar</th><th class="num">erste Hand</th><th class="num">nur zweite Hand</th><th class="num">Anteil zweite Hand</th><th class="num">hört mich mit</th><th>Rolle</th></tr>
+<tr><td>DK5EN-1</td><td class="num">44</td><td class="num">0</td><td class="num">0 %</td><td class="num">6 dB</td><td>redundant, Blatt</td></tr>
+<tr><td>DB0ED-99</td><td class="num">25</td><td class="num">1</td><td class="num">4 %</td><td class="num">-6 dB</td><td>redundant</td></tr>
+<tr><td>DL2UD-1</td><td class="num">18</td><td class="num">1</td><td class="num">5 %</td><td class="num">-12 dB</td><td>redundant</td></tr>
+<tr><td>DL2JA-2</td><td class="num">12</td><td class="num">13</td><td class="num">52 %</td><td class="num">-13 dB</td><td>Super-Node, #X 8</td></tr>
+</table>
+<p>Die absoluten Zahlen sind Untergrenzen, weil sich in der Flut bis zu vier Wiederholungen gegenseitig stören. Das Verhältnis ist es nicht: beim Super-Node kam jedes zweite gehörte Echo aus zweiter Hand, bei den drei anderen höchstens jedes zwanzigste. DL2JA-2 hat meine Aussendung also in mindestens 13 von 65 Fällen, einem Fünftel, selbst nicht gehört. Als einziger Via hätte er diese Rahmen jenseits der direkten Nachbarn verschluckt, denn die anderen hätten sie ihm nicht mehr zugetragen.</p>
+<pre>K       = D60 &amp; HM &amp; ~Sperre                  // gehoert in 60 min, hoeren mich laut Kanten der letzten 12 h
+N2      = OR hears(m) fuer m in D60, ohne D60 und ohne mich
+Pflicht = { m in K : m ist fuer ein x in N2 der einzige Hoerer in K }
+offen   = N2 &amp; ~OR hears(m) fuer m in Pflicht
+solange offen: nimm m in K mit groesstem popcount(hears(m) &amp; offen), Gleichstand: groesseres #N
+schwach(m) = f(m) + s(m) &lt; 4  oder  s(m) &gt; 10 % von f(m) + s(m)
+fuer jedes schwache m: Zubringer F in K, nicht schwach, m hoert F, meiste Treffer auf Kante (F, m)
+Via     = Pflicht + Auswahl + Zubringer, Super-Node vorn
+gueltig, wenn jedes x in N2 gedeckt ist, jedes schwache Mitglied einen Zubringer hat und |Via| &lt;= 3</pre>
+<p>Die Prämissen der Zahlen:</p>
+<ul>
+<li>f und s zählen je Nachbar, wie oft er einen meiner letzten 15 eigenen Positions- oder HEY-Rahmen aus erster und wie oft nur aus zweiter Hand wiederholt hat; je 4 Bit im Direkt-Slot. Die Echo-Tabelle hält die letzten vier eigenen Rahmen mit je einer Maske für erste und zweite Hand und faltet sie nach 300 Sekunden in die Zähler; sind 15 erreicht, werden beide halbiert.</li>
+<li>10 % trennt die Messung mit Abstand: die drei guten Hörer liegen bei 0 bis 5 %, der Super-Node bei 52 %. Unter 4 gezählten Echos gilt ein Nachbar als unbekannt und damit als schwach.</li>
+<li>HM über 12 Stunden statt 60 Minuten: DL2JA-2 lieferte für eigene Positionen in 32,5 Stunden nur 12 Beweise aus erster Hand, im Schnitt einen je 2,7 Stunden; ein 60-Minuten-Fenster hätte den Super-Node fast immer ausgeschlossen. Ob er gerade gehört wird, prüft D60.</li>
+<li>Höchstens drei Via-Knoten einschließlich Zubringer, weil jeder bis zu 10 Zeichen im Zielpfad kostet und ein Umfeld, das mehr Relais braucht, durch Flut kaum mehr verliert.</li>
+<li>Eine Station im 2-Hop-Umkreis, die kein Kandidat hört, macht die Menge ungültig: in der Flut hätte ein Nachbar ohne Beweis sie vielleicht erreicht, mit Via nicht.</li>
+</ul>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 380" role="img" aria-label="Auto-Via bei DK5EN-98">
+  <rect x="30" y="150" width="160" height="60" class="node"/>
+  <text x="110" y="174" text-anchor="middle" class="b">DK5EN-98</text>
+  <text x="110" y="192" text-anchor="middle" class="mono">DL2JA-2,DL2UD-1,*</text>
+
+  <rect x="290" y="30" width="230" height="44" class="node srv"/>
+  <text x="405" y="49" text-anchor="middle" class="b">DL2JA-2, Via</text>
+  <text x="405" y="65" text-anchor="middle" class="t11">Super-Node, schwach: 52 % zweite Hand</text>
+  <rect x="290" y="100" width="230" height="44" class="node srv"/>
+  <text x="405" y="119" text-anchor="middle" class="b">DL2UD-1, Zubringer</text>
+  <text x="405" y="135" text-anchor="middle" class="t11">5 % zweite Hand, DL2JA-2 hoert ihn</text>
+  <rect x="290" y="170" width="230" height="44" class="node"/>
+  <text x="405" y="189" text-anchor="middle" class="b">DB0ED-99</text>
+  <text x="405" y="205" text-anchor="middle" class="t11">nicht genannt</text>
+  <rect x="290" y="240" width="230" height="44" class="node"/>
+  <text x="405" y="259" text-anchor="middle" class="b">DK5EN-1</text>
+  <text x="405" y="275" text-anchor="middle" class="t11">nicht genannt, Blatt</text>
+  <rect x="290" y="310" width="230" height="44" class="node"/>
+  <text x="405" y="329" text-anchor="middle" class="b">DL2JA-1</text>
+  <text x="405" y="345" text-anchor="middle" class="t11">kein Beweis, kein Kandidat</text>
+
+  <path d="M190 170 L290 52" class="ln"/>
+  <path d="M190 176 L290 122" class="ln"/>
+  <path d="M190 182 L290 192" class="ln"/>
+  <path d="M190 188 L290 262" class="ln"/>
+  <path d="M190 194 L290 332" class="ln"/>
+  <path d="M520 118 L540 118 L540 60 L520 60" class="ln" stroke-dasharray="4 3"/>
+  <text x="546" y="92" class="t11">traegt zu</text>
+
+  <text x="530" y="196" class="t11">schweigt</text>
+  <text x="530" y="266" class="t11">schweigt</text>
+  <text x="530" y="336" class="t11">schweigt</text>
+
+  <rect x="620" y="30" width="320" height="324" class="zone"/>
+  <text x="634" y="52" class="b">2-Hop-Umkreis, 15 Stationen</text>
+  <text x="634" y="70" class="t11">alle 15 hoert DL2JA-2, 7 davon auch DB0ED-99</text>
+  <text x="634" y="100" class="mono">DB0HOB-12   DC2MAC-1    DB0FHR-12</text>
+  <text x="634" y="120" class="mono">DL2JA-3     DL3NCU-1    DD7MH-55</text>
+  <text x="634" y="140" class="mono">OE2XZR-12   DB0MMR-12   DB0ISM-1</text>
+  <text x="634" y="160" class="mono">DF2KX-12    DG7RJ-12    DG7RJ-8</text>
+  <text x="634" y="180" class="mono">OE7XWT-12   DO7GH       DG3MNF-4</text>
+  <path d="M520 44 L620 44" class="ln" stroke-width="2.4"/>
+  <text x="585" y="38" text-anchor="middle" class="t11">wiederholt</text>
+
+  <text x="634" y="226" class="t11">heute wiederholen vier Nachbarn jeden</text>
+  <text x="634" y="242" class="t11">eigenen Rahmen von DK5EN-98</text>
+  <text x="634" y="272" class="t11">mit Via zwei: DL2JA-2 bekommt ihn direkt</text>
+  <text x="634" y="288" class="t11">oder von DL2UD-1, jede Station bleibt gedeckt</text>
+</svg>
+</div>
+<figcaption>Abb. 6: Auto-Via bei DK5EN-98, Kanten aus dem Schnappschuss vom 24.09. 07:25, Hörverhalten aus dem Mitschnitt vom 23. und 24.09. DL2JA-2 ist Pflicht, weil acht Stationen nur ihn als Hörer haben, und deckt alle 15. Weil er meine Rahmen in jedem zweiten gehörten Fall aus zweiter Hand hatte, kommt DL2UD-1 als Zubringer dazu: er hört mich sicher, und DL2JA-2 hat ihn 159-mal gehört. DB0ED-99 und DK5EN-1 wiederholen eigene Rahmen von DK5EN-98 nicht mehr, auch mit Firmware 4.35.</figcaption>
+</figure>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Flut wie heute</td><td>kein Via</td><td><span class="tag warn">Stufe 0</span> und Rückfall jeder ungültigen Menge</td></tr>
+<tr><td>alte Regel: größtes NCNT</td><td>via_functions.cpp 165 bis 190</td><td><span class="tag bad">verworfen</span> NCNT überschätzt DB0ED-99 zehnfach; ein Via mit vielen Nachbarn, aber ohne exklusive, schneidet andere ab</td></tr>
+<tr><td>nur der Super-Node</td><td>Via = größtes #X</td><td><span class="tag bad">verworfen</span> bei DK5EN-98 hätte er mindestens jeden fünften eigenen Rahmen verschluckt; schneidet außerdem die exklusiven Stationen jedes zweiten nötigen Nachbarn ab</td></tr>
+<tr><td>Super-Node plus Deckung, ohne Hörqualität</td><td>MPR nach RFC 3626</td><td><span class="tag bad">verworfen</span> OLSR setzt symmetrische, verlässliche Strecken voraus; die Messung widerlegt das für den Super-Node</td></tr>
+<tr><td>Super-Node plus Deckung plus Zubringer</td><td>Auswahl oben</td><td><span class="tag ok">gewählt</span> Super-Node vorn, keine bekannte Station abgeschnitten, schwache Strecke abgesichert</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Die Via-Menge wird einmal je Minute im Sweep neu gerechnet und als Via-Maske gehalten; checkVia() liest sie für eigene Rahmen und für Relais gleichermaßen.</li>
+<li>HEY und HN behalten ihr Ziel HG, H oder HN ohne Via, weil Matrix und Server das Gateway-Merkmal am unveränderten Zielpfad HG erkennen. Binär-ACKs laufen nicht über checkVia(). Weil HEY immer flutet, liefern HEY-Echos f und s aller Nachbarn weiter, auch wenn Positionen und Text mit Via gehen; im Mitschnitt kamen dafür allerdings nur für 22 eigene HEY Echos zurück.</li>
+<li>Ein fester node_via hat Vorrang, --via off schaltet alles ab. Gateways rechnen die Menge wie jeder andere Knoten.</li>
+<li>Echo-Kontrolle: Nach jedem eigenen Text- oder Positionsrahmen mit Via gilt er als weitergetragen, wenn binnen 300 Sekunden eine Wiederholung durch einen genannten Knoten gehört wird, aus erster oder zweiter Hand. Fehlt sie zweimal hintereinander, flutet der Knoten 60 Minuten lang und rechnet danach neu.</li>
+<li>Prämissen der Echo-Kontrolle: In der Flut kam für 56 von 65 eigenen Positionen ein Echo zurück, 86 %. Annahme: mit Via ist die Quote nicht kleiner, weil sich weniger Wiederholungen stören. Zwei Fehlschläge hintereinander treffen einen gesunden Via dann in rund 2 % der Rahmenpaare. 300 Sekunden lassen dem Altknoten DL2JA-2, der im Median 109 Sekunden nach der ersten Kopie wiederholt, fast das Dreifache; 60 Minuten entsprechen vier HEY-Intervallen für neue f-, s- und HM-Werte.</li>
+</ul>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 310" role="img" aria-label="Zustandsautomat Auto-Via">
+  <text x="30" y="30" class="t11">Via-Menge je Minute neu: Kandidaten gehoert (60 min) und hoeren mich (12 h), Deckung aller 2-Hop-Stationen, Zubringer fuer schwache, hoechstens 3.</text>
+  <text x="30" y="48" class="t11">HEY und HN behalten ihr Ziel; ein fester node_via hat Vorrang; --via off fuehrt aus jedem Zustand nach AUS.</text>
+  <rect x="30" y="120" width="170" height="60" class="node"/>
+  <text x="115" y="144" text-anchor="middle" class="b">AUS</text>
+  <text x="115" y="162" text-anchor="middle" class="t11">--via off oder node_via</text>
+  <rect x="300" y="120" width="170" height="60" class="node"/>
+  <text x="385" y="144" text-anchor="middle" class="b">FLUT</text>
+  <text x="385" y="162" text-anchor="middle" class="t11">Zielpfad = Ziel</text>
+  <rect x="620" y="120" width="170" height="60" class="node srv"/>
+  <text x="705" y="144" text-anchor="middle" class="b">VIA</text>
+  <text x="705" y="162" text-anchor="middle" class="t11">Zielpfad = Via-Menge, Ziel</text>
+  <rect x="620" y="232" width="170" height="60" class="node prx"/>
+  <text x="705" y="256" text-anchor="middle" class="b">SPERRE</text>
+  <text x="705" y="274" text-anchor="middle" class="t11">60 min Flut</text>
+
+  <path d="M200 150 L300 150" class="ln"/>
+  <text x="250" y="128" text-anchor="middle" class="t11">--via on,</text>
+  <text x="250" y="141" text-anchor="middle" class="t11">node_via leer</text>
+  <path d="M470 140 L620 140" class="ln"/>
+  <text x="545" y="132" text-anchor="middle" class="t11">Menge gueltig</text>
+  <path d="M620 165 L470 165" class="ln"/>
+  <text x="545" y="180" text-anchor="middle" class="t11">Menge ungueltig</text>
+  <path d="M705 180 L705 232" class="lnx"/>
+  <text x="715" y="210" class="t11">2 Echos fehlen, je 300 s</text>
+  <path d="M620 262 L385 262 L385 180" class="ln"/>
+  <text x="500" y="254" text-anchor="middle" class="t11">nach 60 min</text>
+</svg>
+</div>
+<figcaption>Abb. 7: Zustandsautomat Auto-Via. Ohne gültige Menge flutet der Knoten wie heute. Fehlen zwei Echos hintereinander, flutet er eine Stunde lang und rechnet die Menge danach mit frischen Beweisen neu.</figcaption>
+</figure>
+
+<h3>4.9 T-Deck: Topologie auf SD</h3>
+<p class="reco">Entscheidung: T-Deck schreibt alle 10 Minuten einen Schnappschuss der Topologie nach /topo.dat und rechnet ihn beim Laden auf die neue Bootzeit um.</p>
+<ul>
+<li>Inhalt: Kopf mit Kennung, Formatnummer, Zeilen-, Kanten-, Slot- und Horizontzahl, Epoche und Bootminute beim Speichern, danach die Felder roh. Auf S3 sind das rund 13,3 kB.</li>
+<li>Laden: passt der Kopf nicht, wird die Datei gelöscht, wie heute bei mheard.dat. Sonst wird jede Minutenmarke umgerechnet: Alter beim Speichern plus vergangene Zeit laut Epochen; was älter als das Fenster ist, entfällt. Ohne gültige Uhr gilt die vergangene Zeit als 0, wie heute beim Laden von mheard.dat.</li>
+<li>Uhr: loadTimePersistence() nimmt die Epoche des Schnappschusses an die Stelle von getLatestMHeardTimestamp().</li>
+<li>Prämisse für 10 Minuten: ein HEY-Intervall dauert 15 Minuten, also verliert ein Neustart weniger als ein Intervall an Beobachtung. Heute schreibt T-Deck höchstens alle 30 Sekunden zwei Dateien; weniger Schreibzugriffe entlasten den SPI-Bus, den SD-Karte und Anzeige teilen.</li>
+<li>Gilt nur mit node_persist_to_sd, wie heute; T-Deck Pro zeigt, schreibt aber wie heute nicht.</li>
+</ul>
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>Mehr direkte Nachbarn als Slots</td><td>[NBR]|EVICT-X</td><td>ältester Slot weicht, Zeile bleibt</td><td>RSSI, Position und Höhe dieses Nachbarn fehlen bis zum nächsten Rahmen</td><td>2</td></tr>
+<tr><td>Horizont voll</td><td>[NBR]|EVICT-H</td><td>ältester Eintrag weicht</td><td>ferner Absender fehlt in der Pfadansicht, bis er wieder sendet</td><td>2</td></tr>
+<tr><td>Zeilen voll am Bergknoten</td><td>[NBR]|EVICT</td><td>direkte Zeilen geschützt, 2-Hop-Zeilen weichen</td><td>#X gekappt, Entscheidung und MHeard vollständig</td><td>1</td></tr>
+<tr><td>Rufzeichen außerhalb der Zeichenregel</td><td>DROP TOK im Schattenlog</td><td>keine Zeile</td><td>Station fehlt in MHeard, die heute dort stünde; Häufigkeit misst Stufe 2</td><td>1</td></tr>
+<tr><td>Knoten ohne Uhr</td><td>Bootepoche fehlt</td><td>Topologie und NCNT arbeiten, Anzeige in Minuten</td><td>kein MH an die App, wie heute</td><td>3</td></tr>
+<tr><td>Asymmetrische Strecke, etwa Gegenstation mit Endstufe</td><td>SYM-Zeile im Log</td><td>zählt über SYM mit</td><td>NCNT zu hoch; keine Entscheidung hängt daran, Auto-Via nutzt nur Beweise</td><td>3</td></tr>
+<tr><td>Super-Node hört mich schlecht</td><td>Anteil zweite Hand über 10 %</td><td>Zubringer in die Via-Menge</td><td>keine, solange ein sicherer Nachbar ihn erreicht; sonst Flut</td><td>4</td></tr>
+<tr><td>Via-Knoten fällt aus</td><td>Echo fehlt</td><td>nach zwei Fehlschlägen 60 min Flut, danach neu</td><td>bis zu zwei eigene Rahmen erreichen in bis zu 600 s nur die direkten Nachbarn und den Zubringer</td><td>4</td></tr>
+<tr><td>Zähler f und s veralten</td><td>nicht genannte Nachbarn wiederholen Positionen nicht mehr</td><td>HEY-Echos pflegen sie weiter, SPERRE-Phasen messen neu</td><td>schwächere Datenbasis, wenn wenige HEY-Echos zurückkommen</td><td>4</td></tr>
+<tr><td>Altknoten mit Präfix des Via-Rufzeichens</td><td>zusätzliche Wiederholung im Log</td><td>keine</td><td>4.35 vergleicht per Teilstring; DK5EN-9 wiederholt, wenn DK5EN-98 genannt ist</td><td>4</td></tr>
+<tr><td>Gateway-Nachbar mit überhöhtem #X durch Serverzufuhr</td><td>#X gegen Reichweite</td><td>keine</td><td>nur Reihenfolge der Auswahl; die Deckungsprüfung verhindert Abschneiden</td><td>4</td></tr>
+<tr><td>topo.dat passt nicht</td><td>Kopf weicht ab</td><td>Datei löschen, neu aufbauen</td><td>bis zu 15 min ohne Nachbarschaft</td><td>3</td></tr>
+</table>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>1</td><td>Topologie-Kern in nbr_matrix: getrennte Felder, NbrMask, Rufzeichenwort, Kantenpool, NBR_MAX_ROWS 64 und 128</td><td>native_nbr_matrix, native_nbr_report, test_txring grün; Replay des Mitschnitts vom 24.09.: SNAP, ROW, NEED, CANCEL, REFUSE byte-gleich zum dichten Build; alle 32 Umgebungen bauen</td></tr>
+<tr><td>2</td><td>2</td><td>Direkt-Erweiterung, Horizont, nbr_views; Schattenlog [TOPO]|DIFF je Minute gegen MHeard, getMheardCount() und Pfadtabelle</td><td>neuer Host-Test native_nbr_views: MH-JSON aus derselben Rahmenfolge feldgleich zu updateMheard() bis auf die neuen Felder und die REP-Mischung B2</td></tr>
+<tr><td>3</td><td>2</td><td>24 h Schatten auf DK5EN-98 und DK5EN-1</td><td>MHeard-Menge in mindestens 99 % der Minuten gleich; jede Abweichung durch DROP TOK, Verdrängung oder B2 erklärt; jeder Absender der Pfadtabelle als Zeile oder Horizont vorhanden</td></tr>
+<tr><td>4</td><td>3</td><td>Umschaltung: mheard_functions-Speicher, updateMheard(), updateHeyPath(), mheard_record.h entfernt; Leser auf nbr_views; NCNT symmetrisch; topo.dat</td><td>tools/resource_watch.py zeigt die Nettowerte aus 4.7 mit höchstens 64 B Abweichung; String-Scan: "mheard.dat" und "mhpath.dat" fehlen im Image; App auf dem Telefon zeigt die Liste; T-Deck DK5EN-14 behält die Topologie über einen Neustart</td></tr>
+<tr><td>5</td><td>3</td><td>24 h Feld mit DK5EN-98, DK5EN-1 und dem RAK DK5EN-90</td><td>kein Neustart, freier Heap mindestens wie vorher abzüglich 1 kB, NCNT gegen den Schattenwert plausibel</td></tr>
+<tr><td>6</td><td>4</td><td>Auto-Via auf DK5EN-98 und DK5EN-1 mit --via on; Kurt vorher informieren, weil Auto-Via upstream seit 22.07. absichtlich aus ist</td><td>Echo-Quote mit Via mindestens 86 % wie in der Flut; eigene Positionen erreichen die Gateways laut mcmap mindestens so oft wie in den 24 h davor; jede SPERRE einem echten Ausfall zuordenbar</td></tr>
+<tr><td>7</td><td>4</td><td>Voreinstellung von --via für MeshCom 5 entscheiden</td><td>Feldbericht aus Schritt 6</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Kennung von MeshCom 5 auf der Luft</td><td>mcmap muss die neue NCNT-Bedeutung von der alten trennen. shortVERSION() liest die Stellen 3 und 4 von SOURCE_VERSION als Zahl; "5.00" ergäbe 0, und jeder Empfänger schaltete damit die Fuß-Meter-Umrechnung ab, lora_functions.cpp:1145 und loop_functions.cpp:3120, und die Dekodierweiche in aprs_functions.cpp:531 um</td><td>Betreiberentscheidung zur Versionskennung, getrennt von diesem Papier</td></tr>
+<tr><td>Warum Auto-Via am 22.07. abgeschaltet wurde</td><td>stand ein Feldproblem der alten NCNT-Regel dahinter, adressiert die MPR-Auswahl es; stand etwas anderes dahinter, nicht</td><td>Kurt fragen</td></tr>
+<tr><td>Hörqualität im Betrieb mit Via</td><td>f und s stammen aus der Flut; ob die Echo-Quote mit Via wirklich nicht sinkt, ist eine Annahme</td><td>Schritt 6 des Rollouts, Echo-Quote vor und nach dem Einschalten vergleichen</td></tr>
+<tr><td>HM-Beweise am Super-Node</td><td>ein HN-Bericht nennt höchstens 8 Stationen; ob ein Bergknoten damit seine Nachbarn ausreichend als Hörer bestätigt, bestimmt, wie oft dort SYM statt HM zählt</td><td>Schattenlog am Bergknoten, HM- und SYM-Anteil zählen</td></tr>
+<tr><td>Anzeige der neuen Felder in der App</td><td>die alte App ignoriert sie</td><td>Fork-App zuerst, PR an rainerfritz/Meshcom-MobileApp nach dem Feldlauf</td></tr>
+<tr><td>Kantenzahl am Super-Node</td><td>256 und 512 Kanten sind aus 4 je Zeile abgeleitet</td><td>EVICT-E am Bergknoten zählen, wie im Kantenpool-Papier</td></tr>
+</table>
+</main>
+</body>
+</html>
