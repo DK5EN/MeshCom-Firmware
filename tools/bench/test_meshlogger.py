@@ -98,7 +98,11 @@ class FakeConsole(threading.Thread):
                 if cmd:
                     self.commands.append((nr, cmd))
                     if cmd == "--info":
-                        conn.sendall(b"...LORADEBUG off\n")
+                        # The real debug line of a firmware --info reply
+                        # (T-Beam, 2026-09-26): every flag the logger forces
+                        # on is reported, so each one gets restored at exit.
+                        conn.sendall(b"...DEBUG off ...LORADEBUG off ...NBRDEBUG on "
+                                     b"...TXCAPTURE off ...GPSDEBUG off/0 ...SOFTSERDEBUG off\n")
 
     def _serve(self, conn, nr):
         conn.sendall(b"MeshCom Console\nType --help for commands\n")

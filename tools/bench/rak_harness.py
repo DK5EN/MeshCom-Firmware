@@ -4,7 +4,7 @@ regression goal (BACKLOG TM-25/TM-26), sister of tdeck_harness.py / oled_harness
 
     python3 tools/bench/rak_harness.py --list
     python3 tools/bench/rak_harness.py --scenario all
-    python3 tools/bench/rak_harness.py --scenario boot,instr --port /dev/cu.usbmodem201301
+    python3 tools/bench/rak_harness.py --scenario boot,instr --port /dev/cu.usbmodem1101
 
 What is different on the RAK (memory rak4631-serial-testing-pitfalls):
   * opening the port does NOT reset the node; it needs dtr=True or it stays silent;
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extudp_peer as ep  # noqa: E402  (host end of the EXTUDP link, TM-43)
 from identity_guard import IdentityError, require  # noqa: E402
 
-DEFAULT_PORT = "/dev/cu.usbmodem201301"   # DK5EN-90
+DEFAULT_PORT = "/dev/cu.usbmodem1101"   # DK5EN-90
 BAUD = 115200
 CRASH = r"HardFault|assert|Backtrace|\[BOOT\] RESETREAS=0x0000000[28]"   # 0x2 watchdog, 0x8 lockup
 SEP = r"[; ]"

@@ -27,7 +27,7 @@ from identity_guard import IdentityError, read_info_serial, require
 
 NODE_IP = "192.168.68.68"
 EXT_PORT = 1799
-SERIAL_PORT = "/dev/cu.usbmodem2101"
+SERIAL_PORT = "/dev/cu.usbmodem1101"
 LOG = "./soak_log.txt"
 
 stop = threading.Event()
