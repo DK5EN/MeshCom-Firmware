@@ -165,3 +165,47 @@ Observations:
   outbox ladder (`--dmretry`) was not exercised.
 - Not covered yet: stage 4 on the sender side (DK5EN-1 on `feature-snf`), `--dmretry` ladder, the
   Mailbox web page, cooldown/storetime expiry, peer store nodes.
+
+### Run 2 -- Mailbox page demo and delivery (2026-09-26 20:09-20:19)
+
+T-Beam away as DK5EN-91 (20:09), DK5EN-1 sends `{517}` (20:10, gateway off 20:10-20:11 only):
+the entry shows HELD on the RAK's Mailbox page (`DK5EN-92 | DK5EN-1 | 517 | 34 B | HELD | 0.0 of
+9 sent`), `:sto517` reaches DK5EN-1. T-Beam back as DK5EN-92 at 20:11:53. Its own POS waited
+about four minutes in its queue behind live group-20 relays (prio 3); a DM it sent to DK5EN-90 at
+20:15:58 was not received by the RAK (busy channel). Presence at 20:17:01 (own POS heard
+directly), delivery `DK5EN-1,DK5EN-90>DK5EN-92 ... {517` H00 at 20:17:32, `:ack517` to DK5EN-1 at
+20:17:37 (confirmed in DK5EN-1's soak capture). RAK afterwards `used=0 deliv=2 ack=3 sto=3/0`.
+Logs: `docs/bench/snf-20260926/{rak,tbeam,dk1}-run2.txt`.
+
+Observation: under channel load a returning destination's own POS/beacon is starved by relay
+traffic, so time-to-delivery is load dependent, not just beacon-interval dependent.
+
+## Bench coverage after 2026-09-26
+
+Test IDs from `docs/dm-transport-impl-plan-20260913.md` (T-0.x, T-3.x), `docs/dm-stage1-plan-20260914.md`
+(T-1.x) and `docs/dm-stage4-plan-20260914.md` (T-4.x).
+
+| Covered (partly)                                                                                   | Evidence     |
+| -------------------------------------------------------------------------------------------------- | ------------ |
+| T-3.1 absent destination, one hop-0 delivery, ack reaches sender (absence by callsign, not airgap) | run 1 and 2  |
+| T-4.2 sender without stage 4 (DK5EN-1 on `0d4b914c`, not upstream 4.35t): `:sto` shown as one text | run 1 and 2  |
+| store/purge-by-ack in the healthy case, notice when the direct ack is missed                       | run 1 step 2 |
+
+| Open         | What                                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-0.2        | replayed DM: exactly one extra `:ackNNN`, no second display (dedup + re-ack limiter on air)                                                        |
+| T-0.3        | DM to an unreachable call gives one `0x03`; broadcast/ACK give-ups give none                                                                       |
+| T-0.4        | `--airgap` (instrumented build)                                                                                                                    |
+| T-0.5 / M0-1 | one hour on the live net, ring enqueue and parked-overwrite counters                                                                               |
+| T-1.1..T-1.9 | the whole `--dmretry` ladder: 9 attempts, stop on ack (T1/T2 regressions), echo gate, QRT, outbox full, `off` byte-identical, upstream destination |
+| T-3.2        | a relay never forwards a hop-0 delivery                                                                                                            |
+| T-3.3        | destination never acks: 9 sends, 1 h cooldown, storetime expiry                                                                                    |
+| T-3.4        | two store nodes (peer cancel; mutually airgapped)                                                                                                  |
+| T-3.5        | store node that is also a gateway, server-injected frame                                                                                           |
+| T-3.6        | store node reboot with pending entries                                                                                                             |
+| T-3.7        | destination on upstream 4.35t                                                                                                                      |
+| T-3.8        | string scan of the release image (no 0x41 path for stored DMs, airgap compiled out)                                                                |
+| T-3.9        | 25 DMs to an absent destination: caps hold                                                                                                         |
+| T-4.1        | sender on `feature-snf`: held mark in app/web, flips to delivered on ack                                                                           |
+| T-4.3..T-4.7 | re-flood while held, ladder gives up while held, two holders, `--storenotice all`, notice via server                                               |
+| web          | Mailbox page actions (Deliver, Purge), setup card persistence across reboot, `--dmretry` web select                                                |
