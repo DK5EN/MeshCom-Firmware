@@ -9,14 +9,14 @@ Source of truth for the feature itself: `fork-main:docs/dm-transport-impl-plan-2
 
 ## Status
 
-| Wave | Content                                                             | Status          | Commit |
-| ---- | ------------------------------------------------------------------- | --------------- | ------ |
-| 0    | branch, this doc, neo path lists (NBR gap)                          | done 2026-09-26 |        |
-| 1    | new modules + host tests, shared headers, `env:native`              | open            |        |
-| 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | open            |        |
-| 3    | stage 1 outbox + ladder (`--dmretry`)                               | open            |        |
-| 4    | stage 3 store node + stage 4 custody notice                         | open            |        |
-| 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |        |
+| Wave | Content                                                             | Status          | Commit   |
+| ---- | ------------------------------------------------------------------- | --------------- | -------- |
+| 0    | branch, this doc, neo path lists (NBR gap)                          | done 2026-09-26 | 4bb0dc45 |
+| 1    | new modules + host tests, shared headers, `env:native`              | done 2026-09-26 | see log  |
+| 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | open            |          |
+| 3    | stage 1 outbox + ladder (`--dmretry`)                               | open            |          |
+| 4    | stage 3 store node + stage 4 custody notice                         | open            |          |
+| 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |          |
 
 Per-wave gate: files exist; host suite (native envs only, never bare `pio test`);
 `test/golden/help_parity_lint.py`; 7 lead envs clean and sequential; string scan of the S3 and
@@ -53,3 +53,16 @@ Wave 0 found the whole NBR branch unregistered, not only `nbr_matrix.*`: 19 code
 19 test paths (K19) since `e4a2393f`. All added; README counts updated (744 / 281 / 463). Separately,
 `fork-neo-test` itself lacks `src/mask_secret.h` and `src/mheard_throttle.h` in its lists — not
 touched here.
+
+## Wave log
+
+**Wave 1 (2026-09-26).** 19 modules + 7 test suites from fork-main tip; 17 files byte-identical,
+only `dm_outbox_glue.cpp` and `msgstore_glue.cpp` adapted (`char[]` via `mc_text.h`, heard age via
+`nbrFind()`+`nbrMhGet()`, `NBR_WINDOW_MIN` 720 = `MSGSTORE_HEARD_WINDOW_MS`). Orchestrator:
+`ack_attribution.h` (0x03/0x04), `backpressure.h` (`BP_NACK_OUTBOX_FULL`), `ENABLE_MSGSTORE`,
+`env:native` lists, neo paths (+19 S&F code incl. the two modified headers, +7 tests). Gate: host
+44/44 envs, 1373 cases; 7 lead envs clean green; objects present on RAK (guard not eating them);
+the ELF drops them until wave 2 wires a caller. Advisor skipped: no caller, no behaviour change;
+the two glue adaptations go to the advisor of the wave that wires them. Baseline for later
+comparison (inert code): RAK flash 92.8 % (756592 B), RAM 79948 B; Heltec V3 RAM 101276 B.
+Pre-existing red, not ours: `test/golden/drift_matrix_lint.py` (DR-03, DR-16 lack asserting tests).

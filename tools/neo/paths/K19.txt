@@ -373,6 +373,10 @@ test/test_decodemheard/stubs/parser_link_stubs.h
 test/test_decodetinyxml/stubs/nrf52/WisBlock-API.h
 test/test_decodetinyxml/test_decodetinyxml.cpp
 test/test_dedup_replay/test_dedup_replay.cpp
+test/test_dm_dedup/test_main.cpp
+test/test_dm_outbox/test_main.cpp
+test/test_dm_stats/test_main.cpp
+test/test_dm_text_escape/test_dm_text_escape.cpp
 test/test_esp32_flash_lifecycle/stubs/Preferences.h
 test/test_esp32_flash_lifecycle/stubs/lora_setchip.h
 test/test_esp32_flash_lifecycle/test_esp32_flash_lifecycle.cpp
@@ -406,6 +410,7 @@ test/test_mheard_record/test_mheard_record.cpp
 test/test_mheard_render/test_mheard_render.cpp
 test/test_millis_rollover/test_main.cpp
 test/test_msgid_counter/test_msgid_counter.cpp
+test/test_msgstore/test_main.cpp
 test/test_nbr_matrix/test_nbr_matrix.cpp
 test/test_nbr_replay/fixtures/dk5en98-20260923-boot.txt
 test/test_nbr_replay/reference/nbr_matrix_dense.cpp
@@ -429,6 +434,7 @@ test/test_ntp_harvest/test_main.cpp
 test/test_pos_tag_nan/test_pos_tag_nan.cpp
 test/test_printfdeb_format/test_printfdeb_format.cpp
 test/test_radio_units/test_radio_units.cpp
+test/test_reack_limiter/test_main.cpp
 test/test_regex_call/test_regex_call.cpp
 test/test_serial_command_twin/stubs/Arduino.h
 test/test_serial_command_twin/stubs/debugconf.h
@@ -440,6 +446,7 @@ test/test_settings_members/test_settings_members.cpp
 test/test_settings_roundtrip/test_settings_roundtrip.cpp
 test/test_settings_sanitize/test_settings_sanitize.cpp
 test/test_settings_store/test_settings_store.cpp
+test/test_sto_notice/test_main.cpp
 test/test_topo_shadow/fixtures/dk5en98-20260924.txt
 test/test_topo_shadow/reference/mheard_functions.cpp
 test/test_topo_shadow/reference/mheard_functions.h

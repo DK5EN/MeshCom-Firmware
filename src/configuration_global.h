@@ -309,6 +309,10 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: E22_XML zaehlt zur klassischen Familie (64 Zeilen), docs/meshcom5-topologie 4.2
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
 // ESP32-S3 (320 KB SRAM) and nRF52840 (256 KB RAM) — full buffer sizes
+// Store node role (docs/dm-stage3-wave-plan-20260914.md): only boards with
+// the full buffer set host a mailbox. Classic ESP32 (~6.6 kB headroom) is
+// sender/receiver only; nothing of msgstore is compiled there.
+#define ENABLE_MSGSTORE 1
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 100                 // dedup ring for received msg_ids (was 60, wraparounds observed)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer (ram_opti)
