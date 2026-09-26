@@ -240,12 +240,15 @@ void test_rejects_leave_matrix_byte_identical(void)
     nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 50);
     memcpy(&before, &m, sizeof(m));
 
-    // ungueltiges Rufzeichen (2 Zeichen, unter der Mindestlaenge 3)
-    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "AB,OE1BBB-2", ':', NULL, false, -80, 5, 60));
+    // ungueltiges Rufzeichen (2 Zeichen, unter der Mindestlaenge 3). Seit
+    // Stufe 2 bekommt ein verworfener Frame noch den ME-Schritt, wenn sein
+    // LETZTES Token gueltig ist (test_dropped_frame_still_gets_me_step) --
+    // hier ist es das ungueltige, also bleibt alles unangetastet.
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "OE1BBB-2,AB", ':', NULL, false, -80, 5, 60));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
 
-    // Schleife: dasselbe Rufzeichen zweimal im Pfad
-    TEST_ASSERT_EQUAL_INT(-2, nbrNoteFrame(m, "OE1AAA-1,OE1AAA-1", ':', NULL, false, -80, 5, 60));
+    // Schleife mit mir als letztem Hop (eigenes Echo): kein ME-Schritt.
+    TEST_ASSERT_EQUAL_INT(-2, nbrNoteFrame(m, "DK5EN-93,OE1AAA-1,DK5EN-93", ':', NULL, false, -80, 5, 60));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
 
     // unbekannter Frame-Typ
@@ -471,10 +474,25 @@ void test_more_than_eight_hops_is_rejected_whole(void)
     memcpy(&before, &m, sizeof(m));
 
     TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m,
-        "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4,OE1EEE-5,OE1FFF-6,OE1GGG-7,OE1HHH-8,OE1III-9",
+        "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4,OE1EEE-5,OE1FFF-6,OE1GGG-7,OE1HHH-8,DK5EN-93",
         ':', NULL, false, -80, 5, 100));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // Stufe 2: mit einem fremden letzten Hop bleibt nur dessen ME-Schritt --
+    // eine Zeile fuer den letzten Hop und die Kante (letzter Hop, 0), sonst
+    // nichts (keine Pfadkante, keine Zeile fuer die anderen Token).
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m,
+        "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4,OE1EEE-5,OE1FFF-6,OE1GGG-7,OE1HHH-8,OE1III-9",
+        '!', NULL, false, -80, 5, 100));
+    int iii = nbrFind(m, "OE1III-9");
+    TEST_ASSERT_TRUE(iii > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iii, 0));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1HHH-8"));
+    TEST_ASSERT_EQUAL_INT(2, nbrRowsUsed(m));
+    TEST_ASSERT_EQUAL_INT(1, nbrEdgesUsed(m));
+    TEST_ASSERT_TRUE(masks_match_pool(m));
 }
+
 
 void test_reset_keeps_only_row_zero_call(void)
 {
@@ -834,6 +852,49 @@ static void test_log_capture(const char *line)
 static void test_log_reset(void)
 {
     g_log_buf[0] = '\0';
+}
+
+// Stufe 2 (Konzept 4.6): der ME-Schritt haengt nicht mehr an der
+// Pfadpruefung. Ein wegen TOK oder LOOP verworfener Frame traegt seinen
+// letzten Hop weiter ein, wenn dieses Token fuer sich gueltig und nicht ich
+// ist -- MHeard zaehlt solche Rahmen. Rueckgabe und DROP-Zeile bleiben.
+void test_dropped_frame_still_gets_me_step(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 50);
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    // TOK: "AB" ist ungueltig, der letzte Hop OE1BBB-2 nicht.
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "AB,OE1BBB-2", '@', NULL, true, -80, 5, 60));
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(ibbb > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ibbb, 0));
+    TEST_ASSERT_EQUAL_INT8(5, esnr(m, ibbb, 0));
+    TEST_ASSERT_EQUAL_UINT16(60, rview(m, ibbb).last_min);
+    TEST_ASSERT_EQUAL_UINT8(0, rflags(m, ibbb) & NBR_FLAG_GW); // kein '@'-Schritt ausser ME
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|DROP|60|TOK|AB,OE1BBB-2\n[NBR]|ME|60|OE1BBB-2|H|-80|1|5\n"));
+
+    // LOOP: OE1CCC-3 zweimal, letzter Hop OE1CCC-3 gueltig -> nur ME.
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-2, nbrNoteFrame(m, "OE1CCC-3,OE1DDD-4,OE1CCC-3", '!', NULL, false, -70, -3, 61));
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_TRUE(iccc > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iccc, 0));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1DDD-4"));
+    TEST_ASSERT_EQUAL_INT(2, nbrEdgesUsed(m));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|DROP|61|LOOP|OE1CCC-3,OE1DDD-4,OE1CCC-3\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ME|61|OE1CCC-3|P|-70|1|-3\n"));
+
+    // Ein ungueltiger letzter Hop und ein ungueltiger Typ bleiben folgenlos.
+    NbrMatrix before;
+    memcpy(&before, &m, sizeof(m));
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "OE1BBB-2,oe1xx", ':', NULL, false, -80, 5, 62));
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "", ':', NULL, false, -80, 5, 62));
+    TEST_ASSERT_EQUAL_INT(0, nbrNoteFrame(m, "AB,OE1BBB-2", 'X', NULL, false, -80, 5, 62));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+    TEST_ASSERT_TRUE(masks_match_pool(m));
+    nbrLog = NULL;
 }
 
 void test_log_emitter_field_sequence_matches_format_doc(void)
@@ -2258,6 +2319,7 @@ int main(int, char **)
     RUN_TEST(test_long_path_beyond_two_hop_window_is_accepted_not_rejected);
     RUN_TEST(test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again);
     RUN_TEST(test_more_than_eight_hops_is_rejected_whole);
+    RUN_TEST(test_dropped_frame_still_gets_me_step);
     RUN_TEST(test_reset_keeps_only_row_zero_call);
     RUN_TEST(test_note_pos_mesh_false_clears_previously_set_mesh_flag);
     RUN_TEST(test_hearers_returns_total_count_beyond_what_was_written);

@@ -2979,6 +2979,46 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_nbr_views": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=128",
+   "-D NBR_MAX_EDGES=512",
+   "-D NBR_EXT_SLOTS=64",
+   "-D NBR_HZ_ENTRIES=112",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_views"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_views64": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=64",
+   "-D NBR_MAX_EDGES=256",
+   "-D NBR_EXT_SLOTS=48",
+   "-D NBR_HZ_ENTRIES=48",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_views"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_nrf52_settings_paths": {
   "build_flags": [
    "-std=gnu++17",
@@ -3187,6 +3227,43 @@
   "test_build_src": "True",
   "test_filter": [
    "test_settings_store"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_topo_shadow": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=128",
+   "-D NBR_MAX_EDGES=512",
+   "-D NBR_EXT_SLOTS=64",
+   "-D NBR_HZ_ENTRIES=112",
+   "-I test/test_decodemheard/stubs",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<Regexp.cpp>",
+   "+<regex_functions.cpp>",
+   "+<aprs_functions.cpp>",
+   "+<charset_filter.cpp>",
+   "+<mheard_functions.cpp>",
+   "+<via_functions.cpp>",
+   "+<nbr_matrix.cpp>",
+   "+<nbr_views.cpp>"
+  ],
+  "lib_deps": [
+   "bblanchon/ArduinoJson@^7.4.3"
+  ],
+  "lib_ldf_mode": "chain+",
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_topo_shadow"
   ],
   "test_framework": "unity"
  },

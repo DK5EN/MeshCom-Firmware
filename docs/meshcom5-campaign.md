@@ -21,7 +21,7 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
 | 0    | sync      | Merge `fork-neo-test`, delete sset4 migration, baseline (native suites, golden, all firmware envs, nm symbols) -- done, 0f7749c2                                                                                                                                         | done   |
 | 1    | 1 prep    | W1a replay harness + 24.09 fixture (byte-identical `[NBR]` lines from the dense build); W1b `tools/nm_symsum.py`                                                                                                                                                         | done   |
 | 2    | 1 core    | Header contract by the orchestrator; W2a `nbr_matrix.*` (edge pool, NbrMask, callsign word, share rule, counter halving, clamp, minute sweep); W2b mask consumers (txring, lora cover scan, web/command neighbours, loop, both mains)                                    | done   |
-| 3    | 2 views   | W3a `nbr_views.*`, direct extension, horizon, echo table, ME step off the path check; W3b horizon/echo feed in `lora_functions.cpp` + replay shadow over 21.-24.09.                                                                                                      | open   |
+| 3    | 2 views   | W3a `nbr_views.*`, direct extension, horizon, echo table, ME step off the path check; W3b horizon/echo feed in `lora_functions.cpp` + replay shadow over 21.-24.09.                                                                                                      | done   |
 | 4    | 3 cutover | W4a removal + core readers; W4b web + command; W4c mains + loop + MH JSON (7 new fields, FailSoft); W4d T-Deck, T-Deck Pro, `topo.dat`                                                                                                                                   | open   |
 | 5    | 3 field   | Bench on the three USB nodes (T-Deck Plus DK5EN-14 reboot keeps topology, Heltec V3 DK5EN-1, T-Beam v1.2), then 24 h field run on DK5EN-98 and DK5EN-1. The RAK4631 DK5EN-90 nRF52 consistency test runs last, after everything else is finished (operator, 2026-09-25). | open   |
 | 6    | docs      | `nbr-logformat.md`, `docs/architecture/09/10/11`, changelog                                                                                                                                                                                                              | open   |
@@ -111,3 +111,36 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   test needs a firmware-side check.
 - Gate: all native suites and golden green; 34 of 35 firmware envs build with >= 4 kB DRAM
   headroom (esp32-external-radio as before).
+
+### Wave 3
+
+- Contract: new `src/nbr_views.h` (MH view, `nbrMhRows/Get/Count`, `nbrNcnt/Air`, routes and
+  horizon, name helpers, save/load with epoch rebasing); new feed API in `src/nbr_matrix.h`
+  (`NbrDirectInfo` + `nbrNoteDirect`, `nbrNoteNcnt`, `nbrNoteOwnTx`, `nbrSetClock`). Stage-4 via
+  fields are not stored yet.
+- Envs: `native_nbr_views` (128 rows) and `native_topo_shadow` (old MHeard next to the
+  topology, replay shadow over the DK5EN-98 capture 21.-24.09.).
+- Writers: W3a (Opus) `nbr_matrix.*`, new `nbr_views.cpp`, nbr tests; W3b `lora_functions.cpp`,
+  `loop_functions.cpp`, `time_functions.cpp`, `test/test_topo_shadow`.
+- Bench smoke after wave 2 (T-Beam v1.2 classic 64 rows, T-Deck Plus S3 128 rows, both flashed
+  with d8adf932 + the two advisor fixes): clean boot, free heap at the monitor point 148 kB /
+  149 kB, the T-Beam filled 3 rows within its first minute.
+- Result: direct slots (103 bit in 13 B), horizon, echo table, ME step off the path check,
+  `nbr_views` and the RX feed. Byte sizes match build.py except the stage-4 via fields, which
+  are not stored yet (13,864 B at 128 rows, 5,528 B at 64 rows).
+- Replay shadow (`native_topo_shadow`) over DK5EN-98 21.-24.09. (4,122 minutes, both sides fed
+  from the same `[LOG]` lines): MHeard set identical in 99.85 % of minutes (6 minutes window
+  edge), count identical, DIST identical to 0.1 km in all 19,435 comparisons; every field
+  difference is finding B2 (the old code lets a relayed HEY overwrite plt/mesh/ncnt of the
+  direct entry); every old path-table sender is a row, a horizon entry or excluded by rule
+  (DIRECT 16,840, own call as sender 3,514, own call elsewhere 7); never both row and horizon.
+  The concept's 24 h live shadow is replaced by this (operator decision 3).
+- Advisor (Fable): rework, all fixed: R1 a sender could appear as 2-hop row and horizon entry
+  (HN report and pre-window edges refreshed the edge but not the row minute; horizon rule now
+  equals "shown as a row", regression test fails before/passes after); R2 the matrix clock is set
+  in one place, `Clock::SetClock()`, which every clock source runs through; R3-R6 small. The NTP
+  hook in `ntp_async.cpp` was dropped (broke env `native`; the funnel covers NTP).
+- Open for wave 4 (advisor R7): `topo.dat` should store raw UTC epochs, so a `--utcoff` change
+  between save and load does not shift ages.
+- RAM (nm): classic 10,345 B of stores (topology 5,528), S3 26,011 (13,864), nRF52 27,763
+  (13,864) -- still transitional; MHeard and the path table go in wave 4.

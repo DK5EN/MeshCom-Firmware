@@ -5018,6 +5018,12 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         if(iWriteOwn >= MAX_RING)
             iWriteOwn=0;
 
+        // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '!'-
+        // Positionsrahmen -- fuer die Echo-Tabelle, nicht fuer Relays/Text/
+        // den HN-Bericht (die haben eigene Aufrufstellen bzw. gar keine).
+        nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                     (uint16_t)(millis() / 60000UL));
+
         // An APP als Anzeige retour senden
         if(isPhoneReady == 1)
         {
@@ -5091,6 +5097,11 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     if(iWriteOwn >= MAX_RING)
         iWriteOwn=0;
 
+    // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '!'-
+    // Positionsrahmen (vom Telefon ausgeloest), gleiche Aufrufstelle wie
+    // sendPosition()'s Mesh-Zweig oben.
+    nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                 (uint16_t)(millis() / 60000UL));
 }
 
 unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *src_override)
@@ -5208,6 +5219,13 @@ void sendHey()
 
     // store last message to compare later on
     insertOwnTx(aprsmsg.msg_id);
+
+    // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '@'-HEY-
+    // Rahmen -- fuer die Echo-Tabelle, nicht fuer sendNbrReport()'s HN-Bericht
+    // (eigene, ausgeschlossene Aufrufstelle: der HN-Bericht wird nie relayt
+    // und ist keine im 2-Hop-Fenster sichtbare Echo-Kette).
+    nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                 (uint16_t)(millis() / 60000UL));
 
     // GW-01: no gateway self-upload of the own '@' HEY. The bare copy
     // (rssi/snr 0, no signal report) always reached the server seconds before

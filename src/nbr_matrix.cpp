@@ -64,6 +64,25 @@
 static_assert(sizeof(NbrRow) == 12, "NbrRow muss 12 Byte ohne Fuellung bleiben (Konzept 4.1)");
 static_assert(sizeof(NbrEdge) == 6, "NbrEdge muss 6 Byte ohne Fuellung bleiben (Konzept 4.1)");
 static_assert(NBR_MAX_EDGES <= 65535, "Kantenindex muss in uint16_t passen");
+// Stufe 2, Groessen je Teil wie docs/meshcom5-topologie/build.py newsize():
+// Direkt-Slots 13 B, Horizont 8 + 8*W + 4 B je Eintrag, Echo 4 x (msg_id 4 +
+// zwei Masken + Minute 2) plus 4 Typbytes. Der Kopf traegt boot_min,
+// last_sweep, last_halve und die Bootepoche; Maske D60, Via-Maske und
+// Via-Zustand (Stufe 4) sind noch nicht angelegt.
+static_assert(sizeof(NbrMatrix::ext) == 13u * NBR_EXT_SLOTS, "Direkt-Slot: 13 Byte je Slot");
+static_assert(sizeof(NbrMatrix::hz_call) + sizeof(NbrMatrix::hz_entry) +
+                      sizeof(NbrMatrix::hz_meta) ==
+                  (8u + 8u * NBR_MASK_WORDS + 4u) * NBR_HZ_ENTRIES,
+              "Horizont: 8 + 8*W + 4 Byte je Eintrag");
+static_assert(sizeof(NbrMatrix::echo_id) + sizeof(NbrMatrix::echo_first) +
+                      sizeof(NbrMatrix::echo_second) + sizeof(NbrMatrix::echo_min) ==
+                  4u * (4u + 16u * NBR_MASK_WORDS + 2u),
+              "Echo-Tabelle: 4 x (msg_id, zwei Masken, Minute)");
+static_assert(sizeof(NbrMatrix) <=
+                  8u * NBR_MAX_ROWS + 12u * NBR_MAX_ROWS + 16u * NBR_MASK_WORDS * NBR_MAX_ROWS + 6u * NBR_MAX_EDGES +
+                      13u * NBR_EXT_SLOTS + (12u + 8u * NBR_MASK_WORDS) * NBR_HZ_ENTRIES + 10u +
+                      4u * (4u + 16u * NBR_MASK_WORDS + 2u) + 4u + 16u,
+              "NbrMatrix: Fuellung ueber 16 Byte (Feldreihenfolge pruefen)");
 
 // NULL = Instrumentierung aus (siehe nbr_matrix.h).
 NbrLogFn nbrLog = NULL;
@@ -306,12 +325,37 @@ static void nbrLogEvictEdge(uint16_t now_min, const char *from, const char *to)
     nbrLog(buf);
 }
 
+// EVICT-H / EVICT-X: ein Horizont-Eintrag bzw. ein Direkt-Slot wich (Stufe 2).
+static void nbrLogEvictKind(uint16_t now_min, const char *kind, const char *old_call, const char *new_call)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|%s|%u|%s|%s", kind, (unsigned)now_min, old_call, new_call);
+    nbrLog(buf);
+}
+
+// ECHO: ein eigener Rahmen verlaesst die Echo-Tabelle (Konzept 4.11); Masken
+// wie in NEED als NBR_MASK_HEX_LEN Hexstellen.
+static void nbrLogEcho(uint16_t now_min, uint32_t msg_id, const NbrMask &first, const NbrMask &second)
+{
+    if (!nbrLog)
+        return;
+    char f[NBR_MASK_HEX_LEN + 1], s[NBR_MASK_HEX_LEN + 1];
+    nbrIMaskHex(first, f, sizeof(f));
+    nbrIMaskHex(second, s, sizeof(s));
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|ECHO|%u|%08lX|%s|%s", (unsigned)now_min, (unsigned long)msg_id, f, s);
+    nbrLog(buf);
+}
+
 // --- Ereignisliste eines Schreibaufrufs ----------------------------------------
 //
 // nbrNoteFrame()/nbrNoteReport() sammeln unter der Klammer, was sie loggen
 // wollen, und geben es danach in derselben Reihenfolge aus. Ein Frame hat
 // hoechstens 8 Token: 2 Zeilenverdraengungen, 7 Pfadkanten + ME (je mit
-// hoechstens einer Kantenverdraengung), 1 DROP -- 20 Eintraege reichen.
+// hoechstens einer Kantenverdraengung) und 1 Horizont-Verdraengung = 19, oder
+// statt der Kanten 1 DROP -- 20 Eintraege reichen.
 // Liegt auf dem Stack des Aufrufers (LORA-Task, 16 KB auf nRF52).
 
 enum
@@ -320,7 +364,9 @@ enum
     NBR_EV_EVICTE,    // c1 = from, c2 = to der gewichenen Kante
     NBR_EV_EDGE,      // a/b = Token-Index from/to, cnt, snr
     NBR_EV_ME,        // a = Token-Index, cnt, snr
-    NBR_EV_DROPFULL
+    NBR_EV_DROPFULL,
+    NBR_EV_EVICTH,    // c1 = altes, c2 = neues Rufzeichen eines Horizont-Eintrags
+    NBR_EV_EVICTX     // nur nbrNoteDirect(): altes/neues Rufzeichen eines Direkt-Slots
 };
 
 struct NbrEv
@@ -522,6 +568,22 @@ static void nbrIRowClear(NbrMatrix &m, int idx)
     }
     m.hears[idx] = nbrMaskNone();
     m.heardBy[idx] = nbrMaskNone();
+    // Stufe 2: ihr Bit in jeder Eintrittsmaske und Echo-Maske; ein Horizont-
+    // Eintrag ohne Eintrittszeile wird frei (Konzept 4.7). Ihr Direkt-Slot
+    // wird mit NbrRow.ext = 0xFF (nbrIRowBlank) frei.
+    for (int h = 0; h < NBR_HZ_ENTRIES; h++)
+    {
+        if (!m.hz_call[h])
+            continue;
+        nbrMaskClear(m.hz_entry[h], idx);
+        if (nbrMaskEmpty(m.hz_entry[h]))
+            m.hz_call[h] = 0;
+    }
+    for (int k = 0; k < 4; k++)
+    {
+        nbrMaskClear(m.echo_first[k], idx);
+        nbrMaskClear(m.echo_second[k], idx);
+    }
     nbrIRowBlank(m, idx);
     m.call[idx] = 0;
     NBR_GEN_BUMP();
@@ -598,9 +660,14 @@ static void nbrICommitRow(NbrMatrix &m, int idx, uint64_t w, const char *call, u
     m.row[idx].last_min = now_min;
 }
 
+// Setzt alles zurueck. Die Bootepoche bleibt: sie beschreibt die Uhr des
+// Geraets, nicht die Topologie -- ein nbrSetClock() vor dem ersten (lazy)
+// nbrInit() oder vor --nbrreset ginge sonst verloren.
 static void nbrIInitAll(NbrMatrix &m, uint64_t own, uint16_t now_min)
 {
+    uint32_t epoch = m.boot_epoch;
     memset(&m, 0, sizeof(NbrMatrix));
+    m.boot_epoch = epoch;
     for (int i = 0; i < NBR_MAX_ROWS; i++)
         nbrIRowBlank(m, i);
     for (int e = 0; e < NBR_MAX_EDGES; e++)
@@ -613,6 +680,331 @@ static void nbrIInitAll(NbrMatrix &m, uint64_t own, uint16_t now_min)
     m.last_sweep = now_min;
     m.last_halve = now_min;
     NBR_GEN_BUMP();
+}
+
+// --- Stufe 2: Direkt-Slots (Konzept 4.6) -------------------------------------------
+
+static void nbrISlotInit(NbrMatrix &m, int s)
+{
+    uint8_t *x = m.ext[s];
+    memset(x, 0, NBR_EXT_BYTES);
+    nbrBitsPut(x, NBR_XO_SEC, NBR_XW_SEC, NBR_EXT_SEC_UNKNOWN);
+    nbrBitsPut(x, NBR_XO_PLT, NBR_XW_PLT, 3);
+    nbrBitsPut(x, NBR_XO_LAT, NBR_XW_LAT, NBR_EXT_LAT_UNKNOWN);
+    nbrBitsPut(x, NBR_XO_LON, NBR_XW_LON, NBR_EXT_LON_UNKNOWN);
+    nbrBitsPut(x, NBR_XO_ALT, NBR_XW_ALT, NBR_EXT_ALT_UNKNOWN);
+}
+
+// Slot der Zeile row oder -1 (ungueltiger Verweis zaehlt als keiner).
+static int nbrISlotOf(const NbrMatrix &m, int row)
+{
+    if (row <= 0 || row >= NBR_MAX_ROWS)
+        return -1;
+    uint8_t s = m.row[row].ext;
+    return (s < NBR_EXT_SLOTS) ? (int)s : -1;
+}
+
+// Vergibt row einen Slot: frei ist ein Slot ohne Zeile oder einer, dessen
+// Zeile keine frische Kante (x, 0) mehr hat (was der Sweep ohnehin freigaebe
+// -- so haengt die Wahl nicht davon ab, ob er gelaufen ist). Sonst weicht der
+// Slot des am laengsten nicht direkt gehoerten Nachbarn (Log EVICT-X ueber
+// *evx, kind = NBR_EV_EVICTX), seine Zeile bleibt. Gleichstand: kleinster
+// Slotindex.
+static int nbrISlotAlloc(NbrMatrix &m, int row, uint16_t now_min, NbrEv *evx)
+{
+    int16_t owner[NBR_EXT_SLOTS];
+    uint16_t age[NBR_EXT_SLOTS];
+    for (int s = 0; s < NBR_EXT_SLOTS; s++)
+    {
+        owner[s] = -1;
+        age[s] = 0;
+    }
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+    {
+        int s = nbrISlotOf(m, i);
+        if (s >= 0 && nbrIUsed(m, i))
+        {
+            if (owner[s] >= 0)
+                m.row[i].ext = 0xFF; // doppelter Verweis (nur nach fremdem Abbild denkbar)
+            else
+                owner[s] = (int16_t)i;
+        }
+    }
+    for (int s = 0; s < NBR_EXT_SLOTS; s++)
+    {
+        if (owner[s] < 0)
+            continue;
+        int e = nbrIEdgeFind(m, owner[s], 0);
+        age[s] = (e >= 0) ? (uint16_t)(now_min - m.edge[e].last_min) : 0xFFFF;
+        if (e < 0 || !nbrIFresh(m.edge[e].last_min, now_min))
+            age[s] = 0xFFFF;
+    }
+    int slot = -1;
+    for (int s = 0; s < NBR_EXT_SLOTS && slot < 0; s++)
+        if (owner[s] < 0 || age[s] == 0xFFFF)
+            slot = s;
+    if (slot < 0)
+    {
+        for (int s = 0; s < NBR_EXT_SLOTS; s++)
+            if (slot < 0 || age[s] > age[slot])
+                slot = s;
+        evx->kind = NBR_EV_EVICTX;
+        nbrIDecode(m.call[owner[slot]], evx->c1);
+        nbrIDecode(m.call[row], evx->c2);
+    }
+    if (owner[slot] >= 0)
+        m.row[owner[slot]].ext = 0xFF;
+    nbrISlotInit(m, slot);
+    m.row[row].ext = (uint8_t)slot;
+    return slot;
+}
+
+// SYM-Hysterese (Konzept 4.8) im Slot von x nachfuehren, sobald sich das
+// SNR-Mittel der Kante (x, 0) geaendert haben kann: an bei >= NBR_SYM_MIN_SNR,
+// aus erst unter NBR_SYM_MIN_SNR - 2; ohne Kante oder SNR aus.
+static void nbrISymUpdate(NbrMatrix &m, int x)
+{
+    int s = nbrISlotOf(m, x);
+    if (s < 0)
+        return;
+    int e = nbrIEdgeFind(m, x, 0);
+    int8_t snr = (e >= 0) ? m.edge[e].snr : (int8_t)NBR_SNR_UNKNOWN;
+    uint32_t on = nbrBitsGet(m.ext[s], NBR_XO_SYM, NBR_XW_SYM);
+    if (snr == NBR_SNR_UNKNOWN)
+        on = 0;
+    else if (!on && snr >= NBR_SYM_MIN_SNR)
+        on = 1;
+    else if (on && snr < NBR_SYM_MIN_SNR - 2)
+        on = 0;
+    nbrBitsPut(m.ext[s], NBR_XO_SYM, NBR_XW_SYM, on);
+}
+
+static uint32_t nbrIClampU(long v, long lo, long hi)
+{
+    return (uint32_t)((v < lo) ? lo : (v > hi) ? hi : v) - (uint32_t)lo;
+}
+
+// Grad in 0,0001 mit Versatz; NAN oder ausserhalb des Bereichs = unbekannt.
+static uint32_t nbrIDeg4(float v, float offset, float span, uint32_t unknown)
+{
+    if (v != v)
+        return unknown;
+    float s = (v + offset) * 10000.0f;
+    if (s < 0.0f || s > span * 10000.0f)
+        return unknown;
+    return (uint32_t)floorf(s + 0.5f);
+}
+
+// --- Stufe 2: Horizont (Konzept 4.7) ------------------------------------------------
+
+// "Absender hat eine frische Zeile" (Konzept 4.7) heisst: die Zeile steht in
+// der Sicht als direkte oder 2-Hop-Zeile -- frische Kante (r, 0) oder frische
+// Kante (r, B) zu einem B mit frischer Kante (B, 0). Die Zeilenminute allein
+// taugt nicht: Kanten (r, B) werden auch ohne sie aufgefrischt (Regel-3-Paare
+// vor dem Fenster), und nbrNotePos() verjuengt sie ohne jede Kante (Advisor
+// Welle 3, R1). Dieselbe Regel nimmt nbrRouteCount()/nbrRouteGet() als letzte
+// Sicherung gegen einen doppelten Eintrag.
+static bool nbrIRowShown(const NbrMatrix &m, int r, uint16_t now_min)
+{
+    if (r == 0)
+        return true;
+    if (r < 0 || !nbrIUsed(m, r))
+        return false;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (ed.x != r || !nbrIFresh(ed.last_min, now_min))
+            continue;
+        if (ed.y == 0 || nbrIEdgeFresh(m, ed.y, 0, now_min))
+            return true;
+    }
+    return false;
+}
+
+static int nbrIHzFind(const NbrMatrix &m, uint64_t w)
+{
+    if (!w)
+        return -1;
+    for (int h = 0; h < NBR_HZ_ENTRIES; h++)
+        if (m.hz_call[h] == w)
+            return h;
+    return -1;
+}
+
+// Ein Absender, der (wieder) eine Zeile hat, gibt seinen Eintrag frei.
+static void nbrIHzFreeWord(NbrMatrix &m, uint64_t w)
+{
+    int h = nbrIHzFind(m, w);
+    if (h >= 0)
+        m.hz_call[h] = 0;
+}
+
+static void nbrIHzSetLast(uint8_t *meta, uint16_t now_min)
+{
+    meta[2] = (uint8_t)(now_min & 0xFF);
+    meta[3] = (uint8_t)(now_min >> 8);
+}
+
+// Absender w (Token tok) kam ueber die Eintrittszeile entry mit hops Hops bis
+// dorthin. Freier oder verfallener Eintrag zuerst (stumm, sweep-unabhaengig),
+// sonst weicht der am laengsten nicht gesehene (EVICT-H, Gleichstand:
+// kleinster Index).
+static void nbrIHzTouch(NbrMatrix &m, uint64_t w, const char *tok, int entry, uint8_t hops, bool gw_known,
+                        bool gw, uint16_t now_min, NbrEvList *lg)
+{
+    if (hops > 15)
+        hops = 15;
+    int h = nbrIHzFind(m, w);
+    if (h >= 0 && !nbrIFresh(nbrPrivHzLast(m.hz_meta[h]), now_min))
+    {
+        m.hz_call[h] = 0; // verfallen: neu anfangen
+        h = -1;
+    }
+    if (h < 0)
+    {
+        for (int k = 0; k < NBR_HZ_ENTRIES && h < 0; k++)
+            if (!m.hz_call[k] || !nbrIFresh(nbrPrivHzLast(m.hz_meta[k]), now_min))
+                h = k;
+        if (h < 0)
+        {
+            uint16_t oldest = 0;
+            for (int k = 0; k < NBR_HZ_ENTRIES; k++)
+            {
+                uint16_t age = (uint16_t)(now_min - nbrPrivHzLast(m.hz_meta[k]));
+                if (h < 0 || age > oldest)
+                {
+                    h = k;
+                    oldest = age;
+                }
+            }
+            NbrEv *ev = nbrIEvAdd(lg, NBR_EV_EVICTH);
+            if (ev)
+            {
+                nbrIDecode(m.hz_call[h], ev->c1);
+                strncpy(ev->c2, tok, NBR_CALL_LEN - 1);
+                ev->c2[NBR_CALL_LEN - 1] = '\0';
+            }
+        }
+        m.hz_call[h] = w;
+        m.hz_entry[h] = nbrMaskNone();
+        m.hz_meta[h][0] = hops;
+        m.hz_meta[h][1] = 0;
+    }
+    else
+    {
+        uint8_t *meta = m.hz_meta[h];
+        uint8_t cur = meta[0] & 0x0F;
+        uint16_t e_now = now_min / NBR_HZ_EPOCH_MIN, e_last = nbrPrivHzLast(meta) / NBR_HZ_EPOCH_MIN;
+        if (e_last == e_now)
+            meta[0] = (uint8_t)((meta[0] & 0xF0) | ((cur && cur < hops) ? cur : hops));
+        else if ((uint16_t)(e_last + 1) == e_now)
+            meta[0] = (uint8_t)((cur << 4) | hops);
+        else
+            meta[0] = hops;
+    }
+    if (gw_known)
+        m.hz_meta[h][1] = gw ? 1 : 0;
+    nbrMaskSet(m.hz_entry[h], entry);
+    nbrIHzSetLast(m.hz_meta[h], now_min);
+}
+
+// --- Stufe 2: Echo-Tabelle (Konzept 4.11) ----------------------------------------
+
+// Ein Echo-Eintrag lebt so lange (300 s); danach wird er in die Zaehler f/s
+// der Direkt-Slots gefaltet.
+#define NBR_ECHO_FOLD_MIN 5
+
+struct NbrEchoOut
+{
+    uint32_t id;
+    NbrMask  first, second;
+};
+
+// Faltet Eintrag k in f/s der Direkt-Slots (4 Bit je Zaehler: steht f + s
+// bei 15, werden beide halbiert, bevor gezaehlt wird -- eine Naeherung an
+// "die letzten 15 Echos" ohne Verlauf), gibt ihn frei und merkt ihn fuers
+// Log.
+static void nbrIEchoFold(NbrMatrix &m, int k, NbrEchoOut *out)
+{
+    NbrMask only_second = nbrMaskAndNot(m.echo_second[k], m.echo_first[k]);
+    for (int pass = 0; pass < 2; pass++)
+    {
+        const NbrMask &set = pass == 0 ? m.echo_first[k] : only_second;
+        for (int x = nbrMaskNext(set, -1); x >= 0; x = nbrMaskNext(set, x))
+        {
+            int s = nbrISlotOf(m, x);
+            if (s < 0 || !nbrIUsed(m, x))
+                continue;
+            uint32_t f = nbrBitsGet(m.ext[s], NBR_XO_F, NBR_XW_F);
+            uint32_t sc = nbrBitsGet(m.ext[s], NBR_XO_S, NBR_XW_S);
+            if (f + sc >= 15)
+            {
+                f >>= 1;
+                sc >>= 1;
+            }
+            if (pass == 0)
+                f++;
+            else
+                sc++;
+            nbrBitsPut(m.ext[s], NBR_XO_F, NBR_XW_F, f);
+            nbrBitsPut(m.ext[s], NBR_XO_S, NBR_XW_S, sc);
+        }
+    }
+    if (out)
+    {
+        out->id = m.echo_id[k];
+        out->first = m.echo_first[k];
+        out->second = m.echo_second[k];
+    }
+    m.echo_type[k] = 0;
+    m.echo_id[k] = 0;
+    m.echo_first[k] = m.echo_second[k] = nbrMaskNone();
+    m.echo_min[k] = 0;
+}
+
+// Faltet jeden Eintrag, der NBR_ECHO_FOLD_MIN erreicht hat. Liefert die Zahl
+// der gefalteten Eintraege (hoechstens 4, in out).
+static int nbrIEchoExpire(NbrMatrix &m, uint16_t now_min, NbrEchoOut *out)
+{
+    int n = 0;
+    for (int k = 0; k < 4; k++)
+        if (m.echo_type[k] && (uint16_t)(now_min - m.echo_min[k]) >= NBR_ECHO_FOLD_MIN)
+            nbrIEchoFold(m, k, &out[n++]);
+    return n;
+}
+
+// Echo eines eigenen '!'/'@' ("<ich>,X[,Y...]"): X erste, Y zweite Hand im
+// juengsten lebenden Eintrag desselben Typs.
+static void nbrIEchoNote(NbrMatrix &m, const uint64_t *words, int ntok, char type, uint16_t now_min)
+{
+    if (ntok < 2 || words[0] != m.call[0])
+        return;
+    int best = -1;
+    uint16_t best_age = 0;
+    for (int k = 0; k < 4; k++)
+    {
+        if (m.echo_type[k] != (uint8_t)type)
+            continue;
+        uint16_t age = (uint16_t)(now_min - m.echo_min[k]);
+        if (age >= NBR_ECHO_FOLD_MIN)
+            continue;
+        if (best < 0 || age < best_age)
+        {
+            best = k;
+            best_age = age;
+        }
+    }
+    if (best < 0)
+        return;
+    int x = nbrIFindWord(m, words[1]);
+    if (x > 0)
+        nbrMaskSet(m.echo_first[best], x);
+    if (ntok >= 3)
+    {
+        int y = nbrIFindWord(m, words[2]);
+        if (y > 0)
+            nbrMaskSet(m.echo_second[best], y);
+    }
 }
 
 // --- Pfad- und Berichtsparser (unveraendert) --------------------------------------
@@ -743,40 +1135,50 @@ static void nbrIApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const
 
 // --- nbrNoteFrame(), innerer Teil (unter der Klammer) ------------------------------
 
+// ME-Schritt allein (Text, und seit Stufe 2 ein wegen TOK/LOOP verworfener
+// Frame): Zeile des letzten Hops finden oder anlegen, Kante (letzter Hop, 0)
+// mit snr_here. tok_idx ist der Token-Index fuer die ME-Logzeile. Liefert 1,
+// 0 fuer das eigene Echo, -3 wenn keine Zeile frei wurde (DROP FULL).
+static int nbrIMeStep(NbrMatrix &m, uint64_t w, const char *tok, uint8_t tok_idx, int8_t snr_here,
+                      uint16_t now_min, NbrEvList *lg)
+{
+    int last_idx = nbrIFindWord(m, w);
+    if (last_idx < 0)
+    {
+        last_idx = nbrIPlanRow(m, w, now_min, nbrMaskNone());
+        if (last_idx < 0)
+        {
+            nbrIEvAdd(lg, NBR_EV_DROPFULL);
+            return -3;
+        }
+        nbrICommitRow(m, last_idx, w, tok, now_min, lg);
+    }
+    if (w == m.call[0])
+        return 0; // eigenes Echo
+    nbrIHzFreeWord(m, w);
+
+    int e = nbrIEdgeHit(m, last_idx, 0, now_min, lg);
+    nbrISnrSample(m.edge[e], nbrClampSnr(snr_here));
+    nbrISymUpdate(m, last_idx);
+    m.row[last_idx].last_min = now_min;
+    m.row[0].last_min = now_min;
+    NbrEv *ev = nbrIEvAdd(lg, NBR_EV_ME);
+    if (ev)
+    {
+        ev->a = tok_idx;
+        ev->cnt = m.edge[e].cnt;
+        ev->snr = m.edge[e].snr;
+    }
+    return 1;
+}
+
 static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64_t *words, int ntok,
                          char type, const char *payload, bool dest_gw, int8_t snr_here, uint16_t now_min,
                          NbrEvList *lg)
 {
     // Text: nur der ME-Schritt (siehe nbr_matrix.h).
     if (type == ':')
-    {
-        int last_idx = nbrIFindWord(m, words[ntok - 1]);
-        if (last_idx < 0)
-        {
-            last_idx = nbrIPlanRow(m, words[ntok - 1], now_min, nbrMaskNone());
-            if (last_idx < 0)
-            {
-                nbrIEvAdd(lg, NBR_EV_DROPFULL);
-                return -3;
-            }
-            nbrICommitRow(m, last_idx, words[ntok - 1], tokens[ntok - 1], now_min, lg);
-        }
-        if (words[ntok - 1] == m.call[0])
-            return 0; // eigenes Echo
-
-        int e = nbrIEdgeHit(m, last_idx, 0, now_min, lg);
-        nbrISnrSample(m.edge[e], nbrClampSnr(snr_here));
-        m.row[last_idx].last_min = now_min;
-        m.row[0].last_min = now_min;
-        NbrEv *ev = nbrIEvAdd(lg, NBR_EV_ME);
-        if (ev)
-        {
-            ev->a = (uint8_t)(ntok - 1);
-            ev->cnt = m.edge[e].cnt;
-            ev->snr = m.edge[e].snr;
-        }
-        return 1;
-    }
+        return nbrIMeStep(m, words[ntok - 1], tokens[ntok - 1], (uint8_t)(ntok - 1), snr_here, now_min, lg);
 
     // 2-Hop-Fenster fuer '!'/'@'.
     int start = (ntok > 2) ? ntok - 2 : 0;
@@ -810,7 +1212,10 @@ static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64
         nbrMaskSet(prot, idx);
     }
     for (int i = start; i < ntok; i++)
+    {
         nbrICommitRow(m, row_idx[i], words[i], tokens[i], now_min, lg);
+        nbrIHzFreeWord(m, words[i]); // hat jetzt eine Zeile (Konzept 4.7)
+    }
 
     // Regel 3: Token vor dem Fenster nur lesend.
     for (int i = 0; i < start; i++)
@@ -850,6 +1255,7 @@ static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64
         if (e >= 0)
         {
             nbrISnrSample(m.edge[e], nbrClampSnr(snr_here));
+            nbrISymUpdate(m, last);
             m.row[last].last_min = now_min;
             m.row[0].last_min = now_min;
             NbrEv *ev = nbrIEvAdd(lg, NBR_EV_ME);
@@ -869,7 +1275,26 @@ static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64
         if (dest_gw && sender >= 0)
             m.row[sender].flags |= NBR_FLAG_GW;
         nbrIApplyHeyGroups(m, row_idx, ntok, payload);
+        // Eine Gruppe kann (nur mit NBR_SNR_AVG_N == 1) den SNR einer Kante
+        // (x, 0) setzen: die SYM-Hysterese folgt.
+        for (int i = 0; i < ntok; i++)
+            if (row_idx[i] > 0)
+                nbrISymUpdate(m, row_idx[i]);
     }
+
+    // Horizont (Konzept 4.7): ab 3 Token, Absender ohne frische Zeile
+    // (nbrIRowShown(), nach allen Kanten dieses Frames), Eintrittstoken
+    // (erstes Fenster-Token) nicht ich.
+    if (ntok >= 3 && words[start] != m.call[0] && words[0] != m.call[0])
+    {
+        bool fresh_row = nbrIRowShown(m, row_idx[0], now_min);
+        if (!fresh_row && row_idx[start] > 0)
+            nbrIHzTouch(m, words[0], tokens[0], row_idx[start], (uint8_t)start, type == '@', dest_gw, now_min,
+                        lg);
+    }
+
+    // Echo eines eigenen Rahmens (Konzept 4.11).
+    nbrIEchoNote(m, words, ntok, type, now_min);
     return hits;
 }
 
@@ -1065,9 +1490,8 @@ static bool nbrIHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, 
     int8_t snr = m.edge[e].snr;
     if (snr == NBR_SNR_UNKNOWN || snr < NBR_SYM_MIN_SNR)
         return false;
-    const NbrRow &rx = m.row[x];
     *snr_used = snr;
-    if ((rx.flags & NBR_FLAG_RPT) && (uint16_t)(now_min - rx.rpt_min) < NBR_REPORT_VALID_MIN)
+    if (nbrPrivRptValid(m.row[x], now_min))
     {
         *vetoed = true;
         return false;
@@ -1480,6 +1904,8 @@ void nbrReset(NbrMatrix &m, uint16_t now_min)
 
 void nbrSweep(NbrMatrix &m, uint16_t now_min)
 {
+    NbrEchoOut echo[4];
+    int n_echo = 0;
     NBR_LOCK();
     if (nbrIReady(m) && now_min != m.last_sweep)
     {
@@ -1501,9 +1927,21 @@ void nbrSweep(NbrMatrix &m, uint16_t now_min)
             m.last_halve = now_min;
         }
 #endif
+        // Stufe 2: ein Slot wird frei, sobald die Kante (x, 0) das Fenster
+        // verlassen hat; ein Horizont-Eintrag nach NBR_WINDOW_MIN ohne neuen
+        // Rahmen; ein Echo-Eintrag nach NBR_ECHO_FOLD_MIN (in f/s gefaltet).
+        for (int i = 1; i < NBR_MAX_ROWS; i++)
+            if (m.row[i].ext != 0xFF && (!nbrIUsed(m, i) || nbrISlotOf(m, i) < 0 || nbrIEdgeFind(m, i, 0) < 0))
+                m.row[i].ext = 0xFF;
+        for (int h = 0; h < NBR_HZ_ENTRIES; h++)
+            if (m.hz_call[h] && !nbrIFresh(nbrPrivHzLast(m.hz_meta[h]), now_min))
+                m.hz_call[h] = 0;
+        n_echo = nbrIEchoExpire(m, now_min, echo);
         m.last_sweep = now_min;
     }
     NBR_UNLOCK();
+    for (int k = 0; k < n_echo; k++)
+        nbrLogEcho(now_min, echo[k].id, echo[k].first, echo[k].second);
 }
 
 bool nbrRowGet(const NbrMatrix &m, int row, NbrRowView *out)
@@ -1636,47 +2074,11 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min)
     return (uint16_t)(now_min - last);
 }
 
-int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
-                 bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+// Ereignisliste eines Schreibaufrufs nach der Klammer ausgeben. tokens
+// loest die Token-Indizes von EDGE/ME auf.
+static void nbrIEvFlush(const NbrEvList &lg, char tokens[][NBR_CALL_LEN], char type, int16_t rssi_here,
+                        const char *path, uint16_t now_min)
 {
-    if (type != ':' && type != '!' && type != '@')
-    {
-        nbrLogDrop(now_min, "TYPE", path);
-        return 0;
-    }
-    char tokens[8][NBR_CALL_LEN];
-    int ntok = nbrTokenizePath(path, tokens, 8);
-    if (ntok < 0)
-    {
-        nbrLogDrop(now_min, "TOK", path);
-        return -1;
-    }
-    for (int i = 0; i < ntok; i++)
-        for (int j = i + 1; j < ntok; j++)
-            if (strncmp(tokens[i], tokens[j], NBR_CALL_LEN) == 0)
-            {
-                nbrLogDrop(now_min, "LOOP", path);
-                return -2;
-            }
-    uint64_t words[8];
-    for (int i = 0; i < ntok; i++)
-        words[i] = nbrIEncode(tokens[i]);
-
-    NBR_LOCK();
-    bool ready = nbrIReady(m);
-    NBR_UNLOCK();
-    if (!ready)
-        return 0; // vor nbrInit(): nichts einzutragen
-
-    if (type != ':' && ntok > 2)
-        nbrLogCut(now_min, ntok, 2, path);
-
-    NbrEvList lg;
-    lg.n = 0;
-    NBR_LOCK();
-    int rc = nbrINoteFrame(m, tokens, words, ntok, type, payload, dest_gw, snr_here, now_min, &lg);
-    NBR_UNLOCK();
-
     for (int i = 0; i < lg.n; i++)
     {
         const NbrEv &ev = lg.ev[i];
@@ -1697,10 +2099,87 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
         case NBR_EV_DROPFULL:
             nbrLogDrop(now_min, "FULL", path);
             break;
+        case NBR_EV_EVICTH:
+            nbrLogEvictKind(now_min, "EVICT-H", ev.c1, ev.c2);
+            break;
         default:
             break;
         }
     }
+}
+
+// Stufe 2 (Konzept 4.6): der ME-Schritt eines wegen TOK/LOOP verworfenen
+// Frames, wenn sein letztes Token fuer sich gueltig und nicht ich ist.
+// noinline, damit die eigene Ereignisliste (rund 0,5 kB) nicht dauerhaft im
+// Rahmen von nbrNoteFrame() liegt; waehrend dieses Aufrufs kommt sie zu dessen
+// Rahmen hinzu (zusammen rund 1,2 kB, im 16-kB-LORA-Task auf nRF52 unkritisch).
+__attribute__((noinline)) static void nbrIDroppedMe(NbrMatrix &m, const char *path, char type, int16_t rssi_here, int8_t snr_here,
+                          uint16_t now_min)
+{
+    if (!path)
+        return;
+    const char *last = strrchr(path, ',');
+    last = last ? last + 1 : path;
+    size_t len = strlen(last);
+    char tok[1][NBR_CALL_LEN];
+    if (!nbrValidToken(last, len))
+        return;
+    memcpy(tok[0], last, len);
+    tok[0][len] = '\0';
+    uint64_t w = nbrIEncode(tok[0]);
+
+    NbrEvList lg;
+    lg.n = 0;
+    NBR_LOCK();
+    if (nbrIReady(m) && w != m.call[0])
+        nbrIMeStep(m, w, tok[0], 0, snr_here, now_min, &lg);
+    NBR_UNLOCK();
+    nbrIEvFlush(lg, tok, type, rssi_here, path, now_min);
+}
+
+int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
+                 bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+{
+    if (type != ':' && type != '!' && type != '@')
+    {
+        nbrLogDrop(now_min, "TYPE", path);
+        return 0;
+    }
+    char tokens[8][NBR_CALL_LEN];
+    int ntok = nbrTokenizePath(path, tokens, 8);
+    if (ntok < 0)
+    {
+        nbrLogDrop(now_min, "TOK", path);
+        nbrIDroppedMe(m, path, type, rssi_here, snr_here, now_min);
+        return -1;
+    }
+    for (int i = 0; i < ntok; i++)
+        for (int j = i + 1; j < ntok; j++)
+            if (strncmp(tokens[i], tokens[j], NBR_CALL_LEN) == 0)
+            {
+                nbrLogDrop(now_min, "LOOP", path);
+                nbrIDroppedMe(m, path, type, rssi_here, snr_here, now_min);
+                return -2;
+            }
+    uint64_t words[8];
+    for (int i = 0; i < ntok; i++)
+        words[i] = nbrIEncode(tokens[i]);
+
+    NBR_LOCK();
+    bool ready = nbrIReady(m);
+    NBR_UNLOCK();
+    if (!ready)
+        return 0; // vor nbrInit(): nichts einzutragen
+
+    if (type != ':' && ntok > 2)
+        nbrLogCut(now_min, ntok, 2, path);
+
+    NbrEvList lg;
+    lg.n = 0;
+    NBR_LOCK();
+    int rc = nbrINoteFrame(m, tokens, words, ntok, type, payload, dest_gw, snr_here, now_min, &lg);
+    NBR_UNLOCK();
+    nbrIEvFlush(lg, tokens, type, rssi_here, path, now_min);
     return rc;
 }
 
@@ -1732,6 +2211,189 @@ void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
     snprintf(buf, sizeof(buf), "[NBR]|POS|%u|%s|%.5f|%.5f|%d|%u",
              (unsigned)now_min, call, (double)lat, (double)lon, mesh ? 1 : 0, (unsigned)hw);
     nbrLog(buf);
+}
+
+// --- Stufe 2: Direkt-Slot, NCNT, Echo, Uhr (Welle 3) ------------------------------------
+
+void nbrNoteDirect(NbrMatrix &m, const char *last_hop, const NbrDirectInfo &info, uint16_t now_min)
+{
+    uint64_t w = nbrIEncode(last_hop);
+    uint32_t lat = NBR_EXT_LAT_UNKNOWN, lon = NBR_EXT_LON_UNKNOWN, alt = NBR_EXT_ALT_UNKNOWN;
+    bool pos = info.own_frame && info.has_pos;
+    if (pos)
+    {
+        lat = nbrIDeg4(info.lat, 90.0f, 180.0f, NBR_EXT_LAT_UNKNOWN);
+        lon = nbrIDeg4(info.lon, 180.0f, 360.0f, NBR_EXT_LON_UNKNOWN);
+        if (info.alt_m != NBR_ALT_UNKNOWN)
+            alt = nbrIClampU(info.alt_m, -1000, 32767);
+    }
+    uint32_t plt = (info.plt == ':') ? 0 : (info.plt == '!') ? 1 : (info.plt == '@') ? 2 : 3;
+    uint32_t fw = (info.fw >= 'a' && info.fw <= 'z') ? (uint32_t)(info.fw - 'a' + 1) : 0;
+
+    NbrEv evx;
+    evx.kind = 0;
+    NBR_LOCK();
+    int x = (nbrIReady(m) && w != m.call[0]) ? nbrIFindWord(m, w) : -1;
+    if (x > 0)
+    {
+        int s = nbrISlotOf(m, x);
+        if (s < 0)
+            s = nbrISlotAlloc(m, x, now_min, &evx);
+        uint8_t *slot = m.ext[s];
+        nbrBitsPut(slot, NBR_XO_SEC, NBR_XW_SEC, info.sec < 60 ? info.sec : NBR_EXT_SEC_UNKNOWN);
+        nbrBitsPut(slot, NBR_XO_PLT, NBR_XW_PLT, plt);
+        nbrBitsPut(slot, NBR_XO_MOD, NBR_XW_MOD, info.mod);
+        nbrBitsPut(slot, NBR_XO_RSSI, NBR_XW_RSSI, nbrIClampU(info.rssi, -160, 95));
+        nbrBitsPut(slot, NBR_XO_PL, NBR_XW_PL, info.pl < 15 ? info.pl : 15);
+        nbrBitsPut(slot, NBR_XO_MESH, NBR_XW_MESH, info.mesh ? 1 : 0);
+        if (pos)
+        {
+            nbrBitsPut(slot, NBR_XO_LAT, NBR_XW_LAT, lat);
+            nbrBitsPut(slot, NBR_XO_LON, NBR_XW_LON, lon);
+            nbrBitsPut(slot, NBR_XO_ALT, NBR_XW_ALT, alt);
+        }
+        if (info.own_frame && fw)
+            nbrBitsPut(slot, NBR_XO_FW, NBR_XW_FW, fw);
+        m.row[x].hw = (uint8_t)(info.hw & 0x7F);
+        nbrISymUpdate(m, x);
+    }
+    NBR_UNLOCK();
+    if (evx.kind == NBR_EV_EVICTX)
+        nbrLogEvictKind(now_min, "EVICT-X", evx.c1, evx.c2);
+}
+
+void nbrNoteNcnt(NbrMatrix &m, const char *call, int ncnt, uint16_t now_min)
+{
+    (void)now_min;
+    if (ncnt < 0)
+        return;
+    uint64_t w = nbrIEncode(call);
+    NBR_LOCK();
+    int x = nbrIReady(m) ? nbrIFindWord(m, w) : -1;
+    if (x >= 0)
+        m.row[x].ncnt = (uint8_t)(ncnt > 255 ? 255 : ncnt);
+    NBR_UNLOCK();
+}
+
+void nbrNoteOwnTx(NbrMatrix &m, uint32_t msg_id, char type, uint16_t now_min)
+{
+    if (type != '!' && type != '@')
+        return;
+    NbrEchoOut out[5];
+    int n = 0;
+    NBR_LOCK();
+    if (nbrIReady(m))
+    {
+        n = nbrIEchoExpire(m, now_min, out);
+        int k = -1;
+        for (int i = 0; i < 4 && k < 0; i++)
+            if (m.echo_type[i] && m.echo_id[i] == msg_id)
+                k = i; // derselbe Rahmen noch einmal gesendet: Eintrag bleibt
+        if (k < 0)
+        {
+            for (int i = 0; i < 4 && k < 0; i++)
+                if (!m.echo_type[i])
+                    k = i;
+            if (k < 0)
+            {
+                uint16_t oldest = 0;
+                for (int i = 0; i < 4; i++)
+                {
+                    uint16_t age = (uint16_t)(now_min - m.echo_min[i]);
+                    if (k < 0 || age > oldest)
+                    {
+                        k = i;
+                        oldest = age;
+                    }
+                }
+                nbrIEchoFold(m, k, &out[n++]);
+            }
+            m.echo_type[k] = (uint8_t)type;
+            m.echo_id[k] = msg_id;
+            m.echo_min[k] = now_min;
+            m.echo_first[k] = m.echo_second[k] = nbrMaskNone();
+        }
+    }
+    NBR_UNLOCK();
+    for (int i = 0; i < n; i++)
+        nbrLogEcho(now_min, out[i].id, out[i].first, out[i].second);
+}
+
+void nbrSetClock(NbrMatrix &m, uint32_t now_epoch, uint16_t now_min)
+{
+    uint32_t off = (uint32_t)now_min * 60u;
+    uint32_t e = (now_epoch > off) ? now_epoch - off : 0;
+    NBR_LOCK();
+    m.boot_epoch = e;
+    NBR_UNLOCK();
+}
+
+uint32_t nbrBootEpoch(const NbrMatrix &m)
+{
+    NBR_LOCK();
+    uint32_t e = m.boot_epoch;
+    NBR_UNLOCK();
+    return e;
+}
+
+// --- Privat fuer nbr_views.cpp (siehe Ende von nbr_matrix.h) ------------------------------
+
+void nbrPrivLock(void)
+{
+    NBR_LOCK();
+}
+
+void nbrPrivUnlock(void)
+{
+    NBR_UNLOCK();
+}
+
+void nbrPrivRowsChanged(void)
+{
+    NBR_GEN_BUMP();
+}
+
+// #X aller Zeilen (Konzept 4.3), gleichwertig zu nbrIMeshNeedSet() je Zeile:
+// x zaehlt fuer den direkten Nachbarn N, wenn x nicht direkt und nicht ich
+// ist, N x mit Anteil hoert und kein anderer direkter Nachbar. Zwei
+// Durchlaeufe ueber den Pool statt einem je direkter Zeile.
+void nbrPrivXCounts(const NbrMatrix &m, uint16_t now_min, uint8_t *xcnt, NbrMask *direct)
+{
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+        xcnt[i] = 0xFF;
+    if (!nbrIReady(m))
+    {
+        if (direct)
+            *direct = nbrMaskNone();
+        return;
+    }
+    NbrCtx cbuf;
+    const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+    if (direct)
+        *direct = c.direct;
+    for (int x = nbrMaskNext(c.direct, -1); x >= 0; x = nbrMaskNext(c.direct, x))
+        xcnt[x] = 0;
+    NbrMask once = nbrMaskNone(), twice = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (!nbrIEdgeLive(ed) || ed.x == 0 || nbrMaskTest(c.direct, ed.x) || !nbrMaskTest(c.direct, ed.y) ||
+            !nbrICovers(m, c, ed))
+            continue;
+        if (nbrMaskTest(once, ed.x))
+            nbrMaskSet(twice, ed.x);
+        else
+            nbrMaskSet(once, ed.x);
+    }
+    NbrMask sole = nbrMaskAndNot(once, twice);
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (!nbrIEdgeLive(ed) || !nbrMaskTest(sole, ed.x) || !nbrMaskTest(c.direct, ed.y) || !nbrICovers(m, c, ed))
+            continue;
+        if (xcnt[ed.y] < 254)
+            xcnt[ed.y]++;
+    }
 }
 
 // --- HN-Nachbarschaftsbericht ----------------------------------------------------------
@@ -1932,7 +2594,13 @@ int nbrNoteReport(NbrMatrix &m, const char *sender, const char *payload, uint16_
             // Absender selbst nennt, zaehlt, schreibt aber keine Kante.
             int e = nbrIEdgeHit(m, target, s, now_min, &lg);
             if (e >= 0)
+            {
                 m.edge[e].snr = entries[i].snr;
+                // Ein angewendeter Eintrag ist eine Beobachtung ueber target
+                // (Advisor Welle 3, R1): seine Zeile gilt wieder als frisch.
+                if (target > 0)
+                    m.row[target].last_min = now_min;
+            }
             applied++;
         }
         ev_at[k] = lg.n;

@@ -68,8 +68,25 @@
 #ifndef NBR_SNR_AVG_N
 #define NBR_SNR_AVG_N 8
 #endif
+// Stufe 2 (Welle 3): Direkt-Slots und Horizont. Die Boards setzen die
+// Familienwerte in configuration_global.h (48/48 klassisch, 64/112 S3 und
+// nRF52); diese Host-Defaults gelten nur fuer Host-Umgebungen, die sie nicht
+// per -D setzen: so viele Slots wie Zeilen (hoechstens 64), und ein Horizont,
+// der im Kompat-Replay nie verdraengt.
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS ((NBR_MAX_ROWS) < 64 ? (NBR_MAX_ROWS) : 64)
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 112
+#endif
+// Deckel fuer NCNT auf der Luft (nbrNcntAir() in nbr_views.h).
+#ifndef NBR_NCNT_AIR_MAX
+#define NBR_NCNT_AIR_MAX 99
+#endif
 static_assert(NBR_MAX_EDGES >= NBR_MAX_ROWS, "Kantenpool kleiner als die Zeilenzahl");
 static_assert(NBR_SNR_AVG_N >= 1, "NBR_SNR_AVG_N ist mindestens 1 (= letzter Wert)");
+static_assert(NBR_EXT_SLOTS >= 1 && NBR_EXT_SLOTS <= 255, "Slotindex muss in NbrRow.ext passen (0xFF = keiner)");
+static_assert(NBR_HZ_ENTRIES >= 1, "Horizont braucht mindestens einen Eintrag");
 
 #ifndef LORA_SNR_STABLE_MIN_DB
 #error "LORA_SNR_STABLE_MIN_DB ist nicht definiert -- siehe configuration_default.h (Flottendefault, #ifndef-Wert -16)."
@@ -183,6 +200,24 @@ struct NbrEdge
 // dem Urteile und Relay-Entscheidung Mengen bilden. Nur nbr_matrix.cpp greift
 // auf diese Felder zu; alle anderen lesen ueber nbrRowGet()/nbrEdgeGet() und
 // die Maskenfunktionen unten (Scheduler-Klammer, siehe nbr_matrix.cpp).
+//
+// Stufe 2 (Welle 3, Konzept 4.1/4.6/4.7/4.11), nur nbr_matrix.cpp und
+// nbr_views.cpp greifen darauf zu. Reihenfolge so gewaehlt, dass zwischen den
+// Feldern hoechstens 2 Byte Fuellung entstehen (uint8-Felder vor den
+// 4- und 8-Byte-Feldern):
+//   ext[s][13]    Direkt-Slot s, 103 Bit (NBR_XO_*/NBR_XW_* unten), nur ueber
+//                 nbrBitsGet()/nbrBitsPut(); frei, wenn keine Zeile ihn per
+//                 NbrRow.ext nennt.
+//   hz_*[h]       Horizont-Eintrag h (Absender ab 3 Hops ohne Zeile): Rufzeichen
+//                 (0 = frei), Eintrittszeilen-Maske, hz_meta[h][4] =
+//                   [0] Hops Absender->Eintrittszeile: Bit 0-3 laufende 6-h-Epoche,
+//                       Bit 4-7 vorige (0 = keine Beobachtung in dieser Epoche);
+//                       die laufende Epoche ist die von last_min (Minute / 360)
+//                   [1] Bit 0: G (letzter HEY an "HG"), Rest 0
+//                   [2..3] last_min, little endian
+//   echo_*[4]     die letzten vier eigenen POS/HEY-Rahmen (nbrNoteOwnTx()):
+//                 msg_id, Masken erste/zweite Hand, Minute, Typ ('!'/'@', 0 = frei).
+//   boot_epoch    Wanduhr bei Minute 0 (nbrSetClock()), 0 = keine Uhr.
 struct NbrMatrix
 {
     uint64_t call[NBR_MAX_ROWS];
@@ -193,6 +228,16 @@ struct NbrMatrix
     uint16_t boot_min;
     uint16_t last_sweep;   // Minute des letzten nbrSweep()
     uint16_t last_halve;   // Minute der letzten Zaehlerhalbierung
+    uint16_t echo_min[4];
+    uint8_t  echo_type[4];
+    uint8_t  hz_meta[NBR_HZ_ENTRIES][4];
+    uint8_t  ext[NBR_EXT_SLOTS][13];
+    uint32_t boot_epoch;
+    uint32_t echo_id[4];
+    uint64_t hz_call[NBR_HZ_ENTRIES];
+    NbrMask  hz_entry[NBR_HZ_ENTRIES];
+    NbrMask  echo_first[4];
+    NbrMask  echo_second[4];
 };
 
 // CONTRACT (Welle 2): entschluesselte Zeile fuer Leser ausserhalb von
@@ -295,10 +340,26 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 //
 // Ablauf: der Pfad wird in bis zu 8 Rufzeichen zerlegt, jedes 3..9 Zeichen
 // aus [A-Z0-9-]; verletzt das ein Token oder gibt es mehr als 8, wird der
-// GANZE Frame verworfen (-1, Log: DROP TOK), die Matrix bleibt unangetastet.
-// Kommt ein Rufzeichen zweimal vor (Schleife), wird ebenso verworfen
-// (-2, Log: DROP LOOP). Diese beiden Pruefungen laufen ueber den GANZEN
-// Pfad, unabhaengig vom Fenster unten.
+// GANZE Frame verworfen (-1, Log: DROP TOK). Kommt ein Rufzeichen zweimal
+// vor (Schleife), wird ebenso verworfen (-2, Log: DROP LOOP). Diese beiden
+// Pruefungen laufen ueber den GANZEN Pfad, unabhaengig vom Fenster unten.
+// Seit Stufe 2 (Konzept 4.6, MHeard zaehlt solche Rahmen) bekommt ein so
+// verworfener Frame trotzdem den ME-Schritt unten, wenn sein LETZTES Token
+// fuer sich gueltig und nicht das eigene Rufzeichen ist (Zeile des letzten
+// Hops wie bei Text, Kante (letzter Hop, 0), Log: ME nach dem DROP); sonst
+// bleibt die Matrix unangetastet. Rueckgabe bleibt -1 bzw. -2.
+//
+// Stufe 2 ausserdem, nur fuer gueltige '!'/'@' (Konzept 4.7/4.11):
+// Horizont -- ab 3 Pfad-Token, wenn der Absender keine frische Zeile hat und
+// das Eintrittstoken (das erste Fenster-Token, Index ntok-2) nicht ich bin,
+// bekommt der Absender einen Horizont-Eintrag (Hops Absender->Eintritt =
+// ntok-2, Minimum ueber laufende und vorige 6-h-Epoche, G aus dest_gw bei
+// '@', Eintrittszeile in der Maske). Voll: der am laengsten nicht gesehene
+// weicht (Log: [NBR]|EVICT-H|<up>|<alt>|<neu>). Jedes Fenster-Token (und der
+// letzte Hop eines Textes) gibt seinen Horizont-Eintrag frei, sobald es eine
+// Zeile hat. Echo -- ist das erste Token mein Rufzeichen, traegt der Frame
+// X = Token 1 (erste Hand) und Y = Token 2 (zweite Hand) in den juengsten
+// lebenden Echo-Eintrag desselben Typs ein (nbrNoteOwnTx()).
 //
 // Text (':') faellt NICHT unter das 2-Hop-Fenster und die Pfadpaar-Kanten
 // unten: ein Gateway mit Mesh an setzt vom Server eingespeiste Frames mit
@@ -392,6 +453,54 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // rssi_here bleibt reines Logfeld (Log: ME, <rssi>).
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
                   bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min);
+
+// CONTRACT (Welle 3), Direkt-Slot (Konzept 4.6): Detailwerte des letzten
+// Direktempfangs von last_hop, bitgepackt (103 Bit in 13 Byte, NBR_EXT_SLOTS
+// Slots; nbrBitsGet()/nbrBitsPut(), keine C-Bitfelder). Aufruf aus OnRxDone
+// NACH nbrNoteFrame() fuer denselben Rahmen, fuer jeden dekodierten Rahmen
+// ':' '!' '@' (auch HN), nicht fuer das eigene Echo (last_hop == ich). Legt
+// keine Zeile an; ohne Zeile folgenlos. Slot wird beim ersten Mal vergeben;
+// sind alle belegt, weicht der Slot des am laengsten nicht direkt gehoerten
+// Nachbarn (Log: [NBR]|EVICT-X|<up>|<old>|<new>), die Zeile bleibt.
+// fw nur uebernehmen, wenn source == last_hop (der Rahmen nennt den Stand des
+// Absenders); lat/lon/alt ebenso nur aus eigenen Positionsrahmen.
+#define NBR_ALT_UNKNOWN INT32_MIN
+struct NbrDirectInfo
+{
+    char     plt;        // payload_type
+    uint8_t  hw;         // msg_last_hw & 0x7F
+    uint8_t  mod;        // wie mh_mod heute (msg_source_mod, 0xF0 wenn Absender != letzter Hop)
+    int16_t  rssi;
+    uint8_t  sec;        // Sekunde 0..59 (Wanduhr, sonst millis()/1000 % 60)
+    uint8_t  pl;         // msg_last_path_cnt
+    bool     mesh;       // msg_mesh
+    bool     own_frame;  // source == last_hop
+    char     fw;         // msg_source_fw_sub_version ('a'..'z'), 0 unbekannt; nur bei own_frame
+    bool     has_pos;    // lat/lon gueltig (nur bei own_frame und '!')
+    float    lat, lon;
+    int32_t  alt_m;      // NBR_ALT_UNKNOWN
+};
+void nbrNoteDirect(NbrMatrix &m, const char *last_hop, const NbrDirectInfo &info, uint16_t now_min);
+
+// CONTRACT (Welle 3): gemeldete Nachbarzahl einer Station (R<n> im HEY, /N im
+// Positionsbeacon, NCT einer Relais-Gruppe) in den Zeilenkern ihres Absenders,
+// direkt oder indirekt; ohne Zeile folgenlos. Ersetzt mh_ncount (Befunde B1,
+// B2, B4, B5 des NCNT-Papiers entfallen).
+void nbrNoteNcnt(NbrMatrix &m, const char *call, int ncnt, uint16_t now_min);
+
+// CONTRACT (Welle 3), Echo-Tabelle (Konzept 4.11, Daten fuer Stufe 4): die
+// letzten 4 eigenen POS/HEY-Rahmen mit msg_id. nbrNoteFrame() erkennt deren
+// Echo ("<ich>,X[,Y]") und fuehrt Masken erster (X) und zweiter Hand (Y) sowie
+// die Zaehler f/s im Direkt-Slot; Log [NBR]|ECHO|<up>|<msg_id>|<first>|<second>
+// beim Verdraengen eines Eintrags. Aufruf beim Senden eines eigenen '!'/'@'.
+void nbrNoteOwnTx(NbrMatrix &m, uint32_t msg_id, char type, uint16_t now_min);
+
+// CONTRACT (Welle 3): Wanduhr bekannt geworden oder gestellt: Bootepoche =
+// now_epoch - now_min*60 (0 = keine Uhr). Anzeigen rechnen Uhrzeiten als jetzt
+// minus Alter, nicht als Bootepoche plus Minute (16-Bit-Minute laeuft nach 45
+// Tagen um).
+void     nbrSetClock(NbrMatrix &m, uint32_t now_epoch, uint16_t now_min);
+uint32_t nbrBootEpoch(const NbrMatrix &m);
 
 // Traegt eine Position NUR in eine BEREITS BESTEHENDE Zeile ein (Konzept
 // 4.4). Legt anders als frueher KEINE Zeile mehr an: der Aufrufer in
@@ -686,3 +795,106 @@ void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min);
 #ifndef NATIVE_BUILD
 extern NbrMatrix nbrMatrix;
 #endif
+
+// ============================================================================
+// PRIVAT (kein CONTRACT): nur fuer nbr_matrix.cpp und nbr_views.cpp. Kein
+// anderer Leser ruft das hier -- alle anderen gehen ueber nbr_views.h.
+// ============================================================================
+
+// Direkt-Slot (Konzept 4.6, build.py EXT_BITS): Bitversatz und Breite je Feld,
+// Bit 0 = Bit 0 von Byte 0 (little endian ueber den ganzen Slot).
+#define NBR_EXT_BYTES 13
+#define NBR_XO_SEC   0
+#define NBR_XW_SEC   6    // 0..59, 63 = unbekannt
+#define NBR_XO_PLT   6
+#define NBR_XW_PLT   2    // 0 ':' 1 '!' 2 '@' 3 anderes
+#define NBR_XO_MOD   8
+#define NBR_XW_MOD   8
+#define NBR_XO_RSSI  16
+#define NBR_XW_RSSI  8    // dBm + 160
+#define NBR_XO_LAT   24
+#define NBR_XW_LAT   21   // (Grad + 90) * 10000, alle Bits = unbekannt
+#define NBR_XO_LON   45
+#define NBR_XW_LON   22   // (Grad + 180) * 10000, alle Bits = unbekannt
+#define NBR_XO_ALT   67
+#define NBR_XW_ALT   16   // Meter + 1000, 0xFFFF = unbekannt
+#define NBR_XO_PL    83
+#define NBR_XW_PL    4
+#define NBR_XO_MESH  87
+#define NBR_XW_MESH  1
+#define NBR_XO_F     88
+#define NBR_XW_F     4    // Echo erste Hand (4.11)
+#define NBR_XO_S     92
+#define NBR_XW_S     4    // Echo nur zweite Hand
+#define NBR_XO_FW    96
+#define NBR_XW_FW    5    // 'a'..'z' -> 1..26, 0 unbekannt
+#define NBR_XO_W     101
+#define NBR_XW_W     1    // Via-unfaehig, Stufe 4 (bis dahin 0)
+#define NBR_XO_SYM   102
+#define NBR_XW_SYM   1    // Zustand der SYM-Hysterese (4.8)
+#define NBR_EXT_BITS 103
+static_assert(NBR_XO_SYM + NBR_XW_SYM == NBR_EXT_BITS && NBR_EXT_BITS <= 8 * NBR_EXT_BYTES,
+              "Direkt-Slot: 103 Bit in 13 Byte");
+#define NBR_EXT_SEC_UNKNOWN 63u
+#define NBR_EXT_LAT_UNKNOWN 0x1FFFFFu
+#define NBR_EXT_LON_UNKNOWN 0x3FFFFFu
+#define NBR_EXT_ALT_UNKNOWN 0xFFFFu
+
+static inline uint32_t nbrBitsGet(const uint8_t *slot, unsigned off, unsigned width)
+{
+    uint32_t v = 0;
+    for (unsigned i = 0; i < width; i++)
+    {
+        unsigned b = off + i;
+        v |= (uint32_t)((slot[b >> 3] >> (b & 7u)) & 1u) << i;
+    }
+    return v;
+}
+
+static inline void nbrBitsPut(uint8_t *slot, unsigned off, unsigned width, uint32_t v)
+{
+    for (unsigned i = 0; i < width; i++)
+    {
+        unsigned b = off + i;
+        uint8_t bit = (uint8_t)(1u << (b & 7u));
+        if ((v >> i) & 1u)
+            slot[b >> 3] |= bit;
+        else
+            slot[b >> 3] &= (uint8_t)~bit;
+    }
+}
+
+// Veto-Regel der Symmetrie-Annahme (nbrHearsSym() in nbr_matrix.cpp), auch
+// fuer VETO in nbrNcnt(): letzter HN-Bericht vollstaendig und juenger als
+// NBR_REPORT_VALID_MIN.
+static inline bool nbrPrivRptValid(const NbrRow &r, uint16_t now_min)
+{
+    return (r.flags & NBR_FLAG_RPT) && (uint16_t)(now_min - r.rpt_min) < NBR_REPORT_VALID_MIN;
+}
+
+// Horizont-Meta (Layout siehe NbrMatrix).
+#define NBR_HZ_EPOCH_MIN 360
+static inline uint16_t nbrPrivHzLast(const uint8_t *meta)
+{
+    return (uint16_t)(meta[2] | ((uint16_t)meta[3] << 8));
+}
+// Hops Absender->Eintrittszeile: Minimum der laufenden und der vorigen 6-h-Epoche.
+static inline uint8_t nbrPrivHzHops(const uint8_t *meta, uint16_t now_min)
+{
+    uint8_t cur = meta[0] & 0x0F, prev = meta[0] >> 4;
+    uint16_t e_now = now_min / NBR_HZ_EPOCH_MIN, e_last = nbrPrivHzLast(meta) / NBR_HZ_EPOCH_MIN;
+    if (e_last == e_now && prev && prev < cur)
+        return prev;
+    return cur;
+}
+
+// Scheduler-Klammer von nbr_matrix.cpp (verschachtelbar, siehe dort).
+void nbrPrivLock(void);
+void nbrPrivUnlock(void);
+// Zeilenbelegung geaendert (nbrLoad()): Namen aufgeschobener SYM-Zeilen verwerfen.
+void nbrPrivRowsChanged(void);
+// #X jeder Zeile in einem Durchlauf, dieselbe Regel wie nbrRowMeshNeedCount()
+// (Anteilsregel inklusive): xcnt[row] = #X, 0xFF fuer "NA" (Zeile 0 und nicht
+// direkt gehoerte Zeilen), auf 254 gesaettigt. *direct (darf NULL sein) =
+// Direkt-Maske. Der Aufrufer haelt die Klammer.
+void nbrPrivXCounts(const NbrMatrix &m, uint16_t now_min, uint8_t *xcnt, NbrMask *direct);

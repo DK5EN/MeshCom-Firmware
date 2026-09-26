@@ -525,6 +525,83 @@ void nbrDebugApply(void)
         nbrsnap_timer = millis();
 }
 
+// W3b (docs/meshcom5-campaign.md Welle 3, docs/meshcom5-topologie/ 4.6):
+// gemeinsames NbrDirectInfo-Grundgeruest fuer beide nbrNoteDirect()-Aufrufstellen
+// unten (regulaerer ':'/'!'/'@'-Zweig und der HN-Zweig) -- Position/Hoehe
+// bleiben hier unbesetzt (NBR_ALT_UNKNOWN, has_pos=false); der '!'-Zweig
+// traegt sie danach selbst nach, aus der ohnehin schon fuer nbrNotePos()
+// dekodierten Position (nur bei own_frame, Konzept 4.6).
+static NbrDirectInfo nbrBuildDirectInfo(const struct aprsMessage &aprsmsg, int16_t rssi_here)
+{
+    NbrDirectInfo info;
+    memset(&info, 0, sizeof(info));
+
+    info.plt = aprsmsg.payload_type;
+    info.hw  = aprsmsg.msg_last_hw & 0x7F;
+
+    // Gleiche 0x80-Regel wie der bestehende MHeard-Block weiter unten
+    // (mheardLine.mh_mod): 0x80 gesetzt heisst "letzter Hop ist die
+    // sendende Station selbst" (aprs_functions.cpp:129/1122 setzen das Bit
+    // beim Senden), sonst kommt der Modulationswert von einem Absender, den
+    // dieser Rahmen nicht direkt bestaetigt.
+    info.mod = ((aprsmsg.msg_last_hw & 0x80) == 0x80) ? aprsmsg.msg_source_mod
+                                                        : (uint8_t)(aprsmsg.msg_source_mod | 0xF0);
+    info.rssi = rssi_here;
+
+    // Sekunde aus der Wanduhr, wenn sie steht (gleicher Jahres-Test wie
+    // updateMheard()/updateHeyPath() in mheard_functions.cpp: "< 2025" heisst
+    // "noch kein NTP/GPS/Telefon-Sync seit Boot"), sonst aus millis() (CONTRACT
+    // in nbr_matrix.h).
+    info.sec = (meshcom_settings.node_date_year >= 2025)
+                   ? (uint8_t)meshcom_settings.node_date_second
+                   : (uint8_t)((millis() / 1000UL) % 60);
+
+    info.pl   = aprsmsg.msg_last_path_cnt;
+    info.mesh = aprsmsg.msg_mesh;
+    info.own_frame = is_equ(aprsmsg.msg_source_call, aprsmsg.msg_source_last);
+    info.fw   = info.own_frame ? aprsmsg.msg_source_fw_sub_version : 0;
+
+    info.has_pos = false;
+    info.lat = NAN;
+    info.lon = NAN;
+    info.alt_m = NBR_ALT_UNKNOWN;
+
+    return info;
+}
+
+// W3b: liest das "R<n>"-Feld eines HEY-'@'-Payloads -- dieselbe Grammatik wie
+// updateHeyPath() (src/mheard_functions.cpp, fuer diese Welle nur lesende
+// Referenz, nicht im Dateiset dieser Welle) fuer mh_ncount, hier eigenstaendig
+// nachgebaut, weil diese Datei die Datei nicht aendern darf. "R<digits>;" oder
+// "R<digits>,<digits>,<digits>;" (0 oder 2 Kommas vor dem ersten ';') ist
+// gueltig, alles andere (altes Zwei-Komma-Format, fehlendes 'R', kein Feld)
+// liefert false, *out_n bleibt unangetastet. Ein fehlendes abschliessendes
+// ';' wird wie dort defensiv angehaengt.
+static bool nbrParseHeyReportedCount(const char *payload, long *out_n)
+{
+    char buf[MC_PAYLOAD_LEN];
+    if(!mcSet(buf, sizeof(buf), payload))
+        return false;
+    mcAppend(buf, sizeof(buf), ";");
+
+    int ipos = mcIndexOf(buf, ';');
+    if(ipos <= 0 || !mcStartsWith(buf, "R"))
+        return false;
+
+    int icomma = 0;
+    for(int i = 1; i < ipos; i++)
+    {
+        if(buf[i] == ',')
+            icomma++;
+    }
+
+    if(icomma != 0 && icomma != 2)
+        return false;
+
+    *out_n = mcSliceToLong(buf, 1, (size_t)ipos);
+    return true;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
@@ -795,6 +872,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                          aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
                          rssi, snr, now_min_hn);
 
+            // W3b: Direkt-Slot fuer den HN-Bericht selbst (Konzept 4.6) --
+            // HN traegt nie eine Position (payload_type ist immer '@'), also
+            // ohne has_pos. Wie beim regulaeren Zweig unten: kein eigenes Echo.
+            if(!is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
+            {
+                NbrDirectInfo hn_direct_info = nbrBuildDirectInfo(aprsmsg, rssi);
+                nbrNoteDirect(nbrMatrix, aprsmsg.msg_source_last, hn_direct_info, now_min_hn);
+            }
+
             nbrNoteReport(nbrMatrix, aprsmsg.msg_source_call, aprsmsg.msg_payload, now_min_hn);
 
 #if defined BOARD_RAK4630
@@ -1026,6 +1112,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                              aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
                              rssi, snr, now_min);
 
+                // W3b (docs/meshcom5-campaign.md Welle 3): Direkt-Slot-Grundgeruest
+                // fuer denselben Rahmen. Position/Hoehe kommen erst unten aus dem
+                // '!'-Zweig hinzu (nur own_frame); nbrNoteDirect() selbst steht
+                // ganz am Ende dieses Blocks, NACH dem eigenen Echo-Test.
+                NbrDirectInfo direct_info = nbrBuildDirectInfo(aprsmsg, rssi);
+
                 // Relayte POS-Frames (Konzept 4.4): MHeard traegt die Position
                 // nur bei Direktempfang ein (unten, msg_source_call ==
                 // msg_source_last), die Matrix braucht sie aber unabhaengig
@@ -1049,8 +1141,36 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                         nbrNotePos(nbrMatrix, aprsmsg.msg_source_call, nbr_lat, nbr_lon, aprsmsg.msg_mesh,
                                    aprsmsg.msg_source_hw, now_min);
+
+                        // W3b: Position/Hoehe im Direkt-Slot NUR aus eigenen
+                        // Positionsrahmen (Konzept 4.6), Hoehenumrechnung exakt
+                        // wie der MHeard-Block weiter unten (fw_version > 13 ->
+                        // Fuss->Meter).
+                        if(direct_info.own_frame)
+                        {
+                            direct_info.has_pos = true;
+                            direct_info.lat = nbr_lat;
+                            direct_info.lon = nbr_lon;
+
+                            int nbr_alt_m = aprspos.alt;
+                            if(aprsmsg.msg_source_fw_version > 13)
+                                nbr_alt_m = (int)((float)nbr_alt_m * 0.3048);
+                            direct_info.alt_m = nbr_alt_m;
+                        }
+
+                        // W3b: gemeldete Nachbarzahl aus einem '!'-Rahmen (aprspos.ncnt,
+                        // /N<k>) -- fuer JEDE Zeile mit einer gueltig dekodierten Position,
+                        // nicht nur bei own_frame; mirrors MHeard's mheardNCount-Zuweisung
+                        // an beiden Stellen (lora_functions.cpp, own_frame- und
+                        // relayter Zweig unten), die beide denselben Wert an dieselbe
+                        // Absender-Zeile schreiben.
+                        if(aprspos.ncnt > 0)
+                            nbrNoteNcnt(nbrMatrix, aprsmsg.msg_source_call, aprspos.ncnt, now_min);
                     }
                 }
+
+                if(!is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
+                    nbrNoteDirect(nbrMatrix, aprsmsg.msg_source_last, direct_info, now_min);
             }
 
             // LoRx RX to RAW-Buffer
@@ -1219,6 +1339,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     ///////////////////////////////////////////////
                     // Path
                     mcSet(mheardLine.mh_path_payload, sizeof(mheardLine.mh_path_payload), aprsmsg.msg_payload);
+
+                    // W3b: "R<n>" des HEY-Berichts -- MHeard traegt denselben Wert dem
+                    // ABSENDER zu (mh_ncount via updateHeyPath() unten,
+                    // mheard_functions.cpp, fuer diese Welle nur lesende Referenz),
+                    // hier fuer die Topologie gespiegelt, ohne diese Datei zu aendern.
+                    long nbr_hey_ncnt = 0;
+                    if(nbrParseHeyReportedCount(aprsmsg.msg_payload, &nbr_hey_ncnt))
+                    {
+                        uint16_t now_min_hey = (uint16_t)(millis() / 60000UL);
+                        nbrNoteNcnt(nbrMatrix, aprsmsg.msg_source_call, (int)nbr_hey_ncnt, now_min_hey);
+                    }
 
                     updateHeyPath(mheardLine);
                     //

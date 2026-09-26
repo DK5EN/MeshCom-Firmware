@@ -238,6 +238,9 @@
 //        ROW verdict/meshneed, E_self), with a category; OTHER must be 0;
 //        the DB0ED-99/DB0FHR-12 check from concept 4.3.
 //     D  NbrMask operations on the upper rows.
+//   wave 3: B, B' and the capture comparison first remove the ME_DECOUPLED
+//   category (see strip_me_decoupled()), count it, and assert that no
+//   stage-2 line type (EVICT-H/EVICT-X/ECHO) appears on the compat replay.
 
 #include <unity.h>
 #include <string.h>
@@ -1486,6 +1489,77 @@ static long count_lines(const ReplayResult &r, const char *type)
     return n;
 }
 
+// --- Wave 3: categories the dense reference cannot produce -----------------
+//
+// ME decoupling (concept 4.6, wave 3): a frame dropped for DROP TOK/LOOP now
+// still gets its ME step when its last token is valid and not my own call.
+// The dense code (and the capture, made by it) has only the DROP line for
+// such a frame; the edge pool adds the ME line plus, if the last hop had no
+// row yet, the EVICT/EVICT-E that making its row caused. Those lines -- and
+// only those, and only in a group whose reference side holds a DROP TOK or
+// DROP LOOP -- are the ME_DECOUPLED category, removed before comparing.
+// EVICT-H/EVICT-X/ECHO are stage-2 line types the dense code never emits;
+// the harness does not drive nbrNoteDirect()/nbrNoteOwnTx(), and the
+// horizon (NBR_HZ_ENTRIES) never fills on this fixture, so they are counted
+// and asserted to be 0, not normalised away.
+
+static bool is_drop_tok_or_loop(const std::string &line)
+{
+    std::vector<std::string> fld = split_pipe(line);
+    return fld.size() > 3 && fld[1] == "DROP" && (fld[3] == "TOK" || fld[3] == "LOOP");
+}
+
+// Removes from `lines` the ME/EVICT/EVICT-E lines that `ref` does not hold,
+// when `ref` has a DROP TOK/LOOP line. Returns how many were removed.
+static long strip_me_decoupled(const std::vector<std::string> &ref, std::vector<std::string> &lines)
+{
+    bool dropped = false;
+    for (size_t i = 0; i < ref.size() && !dropped; i++)
+        dropped = is_drop_tok_or_loop(ref[i]);
+    if (!dropped)
+        return 0;
+    std::multiset<std::string> have(ref.begin(), ref.end());
+    std::vector<std::string> kept;
+    long removed = 0;
+    for (size_t i = 0; i < lines.size(); i++)
+    {
+        std::string t = nbr_line_type(lines[i]);
+        std::multiset<std::string>::iterator it = have.find(lines[i]);
+        if (it != have.end())
+        {
+            have.erase(it);
+            kept.push_back(lines[i]);
+        }
+        else if (t == "ME" || t == "EVICT" || t == "EVICT-E")
+            removed++;
+        else
+            kept.push_back(lines[i]);
+    }
+    lines.swap(kept);
+    return removed;
+}
+
+// Copy of `run` with the ME_DECOUPLED lines removed relative to `ref` (same
+// fixture, one group per trigger in both). `against_expected`: compare with
+// the capture's own lines (g.expected) instead of another run's actual lines.
+__attribute__((unused)) static ReplayResult strip_run(const ReplayResult &ref, const ReplayResult &run, bool against_expected,
+                              long *removed)
+{
+    ReplayResult out = run;
+    *removed = 0;
+    for (size_t g = 0; g < out.groups.size() && g < ref.groups.size(); g++)
+    {
+        const std::vector<std::string> &r = against_expected ? run.groups[g].expected : ref.groups[g].actual;
+        *removed += strip_me_decoupled(r, out.groups[g].actual);
+    }
+    return out;
+}
+
+__attribute__((unused)) static long count_stage2_types(const ReplayResult &r)
+{
+    return count_lines(r, "EVICT-H") + count_lines(r, "EVICT-X") + count_lines(r, "ECHO");
+}
+
 // --- tests -------------------------------------------------------------
 
 void setUp(void) {}
@@ -1608,6 +1682,28 @@ void test_group_matches_is_order_insensitive_within_a_group(void)
     TEST_ASSERT_FALSE(group_matches(g, CompareMode::EXACT));
 }
 
+// Wave 3: the ME_DECOUPLED category removes exactly the ME/EVICT lines a
+// dropped frame gained, and nothing in a group without DROP TOK/LOOP.
+void test_strip_me_decoupled_only_touches_dropped_groups(void)
+{
+    std::vector<std::string> ref, got;
+    ref.push_back("[NBR]|DROP|7|LOOP|A-1,B-2,A-1");
+    got.push_back("[NBR]|DROP|7|LOOP|A-1,B-2,A-1");
+    got.push_back("[NBR]|EVICT|7|3|OLD-1|A-1");
+    got.push_back("[NBR]|ME|7|A-1|P|-90|1|5");
+    got.push_back("[NBR]|SYM|7|00000001|HASF|X|Y|3");
+    TEST_ASSERT_EQUAL_INT(2, (int)strip_me_decoupled(ref, got));
+    TEST_ASSERT_EQUAL_INT(2, (int)got.size());
+    TEST_ASSERT_EQUAL_STRING("[NBR]|SYM|7|00000001|HASF|X|Y|3", got[1].c_str()); // kept, so the diff still sees it
+
+    std::vector<std::string> ref2, got2;
+    ref2.push_back("[NBR]|EDGE|8|A-1|B-2|P|0|1|NA");
+    got2.push_back("[NBR]|EDGE|8|A-1|B-2|P|0|1|NA");
+    got2.push_back("[NBR]|ME|8|B-2|P|-90|1|5");
+    TEST_ASSERT_EQUAL_INT(0, (int)strip_me_decoupled(ref2, got2));
+    TEST_ASSERT_EQUAL_INT(2, (int)got2.size());
+}
+
 // Wave 2, D: the mask operations on the upper rows (64..127 on the 128-row
 // build, the top of the single word on the 64-row build), and the hex form
 // the log lines use.
@@ -1712,7 +1808,11 @@ static ReplayResult &edge_run(bool sweep)
 void test_replay_reproduces_dk5en98_20260923_boot(void)
 {
     TEST_ASSERT_TRUE_MESSAGE(path_exists(fixture_path()), ("fixture missing: " + fixture_path()).c_str());
-    ReplayResult &rr = edge_run(false);
+    long me_decoupled = 0;
+    ReplayResult rr = strip_run(edge_run(false), edge_run(false), true, &me_decoupled);
+    printf("[nbr_replay] capture: ME_DECOUPLED lines (TOK/LOOP frames with ME) = %ld, stage-2 types = %ld\n",
+           me_decoupled, count_stage2_types(rr));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)count_stage2_types(rr), "EVICT-H/EVICT-X/ECHO on the compat replay");
 
     GroupReport decision_rep = build_group_report(rr.groups, CompareMode::DECISION);
     print_hourly_table("DECISION (edge pool)", decision_rep);
@@ -1760,9 +1860,13 @@ void test_replay_reproduces_dk5en98_20260923_boot(void)
 void test_differential_dense_vs_edge_pool_compat(void)
 {
     ReplayResult &d = dense_run();
-    ReplayResult &e = edge_run(false);
+    long me_decoupled = 0;
+    ReplayResult e = strip_run(d, edge_run(false), false, &me_decoupled);
     TEST_ASSERT_TRUE(d.groups.size() > 1000);
     long bad = diff_runs("B dense vs edge", d, e, normalize_b);
+    printf("[nbr_replay] B: ME_DECOUPLED lines removed = %ld, stage-2 types = %ld\n", me_decoupled,
+           count_stage2_types(e));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)count_stage2_types(e), "EVICT-H/EVICT-X/ECHO on the compat replay");
     printf("[nbr_replay] B: EVICT dense=%ld edge=%ld, EVICT-E edge=%ld, SYM dense=%ld edge=%ld\n",
            count_lines(d, "EVICT"), count_lines(e, "EVICT"), count_lines(e, "EVICT-E"),
            count_lines(d, "SYM"), count_lines(e, "SYM"));
@@ -1774,9 +1878,12 @@ void test_differential_dense_vs_edge_pool_compat(void)
 // recorded under the clamp and printed after it).
 void test_differential_dense_vs_edge_pool_deferred_log(void)
 {
-    static ReplayResult r;
-    run_replay<EdgeDeferredA>(fixture_path(), r, ReplayOpts());
+    static ReplayResult raw;
+    run_replay<EdgeDeferredA>(fixture_path(), raw, ReplayOpts());
+    long me_decoupled = 0;
+    ReplayResult r = strip_run(dense_run(), raw, false, &me_decoupled);
     long bad = diff_runs("B' dense vs edge (deferred SYM)", dense_run(), r, normalize_b);
+    printf("[nbr_replay] B': ME_DECOUPLED lines removed = %ld\n", me_decoupled);
     long drops = 0;
     for (size_t g = 0; g < r.groups.size(); g++)
         for (size_t i = 0; i < r.groups[g].actual.size(); i++)
@@ -1999,6 +2106,7 @@ int main(int, char **)
     RUN_TEST(test_normalize_indexfree_strips_row_and_evict_idx_and_rewrites_need_masks);
     RUN_TEST(test_normalize_b_allows_only_cnt_and_mask_width);
     RUN_TEST(test_group_matches_is_order_insensitive_within_a_group);
+    RUN_TEST(test_strip_me_decoupled_only_touches_dropped_groups);
     RUN_TEST(test_mask_ops_on_upper_rows);
 #ifndef NBR_REPLAY_PRODUCTION
     RUN_TEST(test_replay_reproduces_dk5en98_20260923_boot);
