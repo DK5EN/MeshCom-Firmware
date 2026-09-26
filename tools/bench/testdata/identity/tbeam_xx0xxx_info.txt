@@ -1,0 +1,31 @@
+--MeshCom 4.35t (build: Sep 26 2026 / 00:09:35)
+...UPDATE: 2026-09-25 23:20:57
+...Call: <XX0XXX-00> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [{CET}]
+...BATT 5.22 V ...BATT 100 % ...MAXV 4.200 V
+...TIME 44529 ms
+...Flash-Version 20260724
+...NOMSGALL off ...MESH on ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+...PASSWD <>
+...DEBUG man ...DEBUG en
+...DEBUG off ...LORADEBUG off ...NBRDEBUG off ...TXCAPTURE off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
+...WXDEBUG off ...BLEDEBUG off
+...NBRRELAY off ...relays A 0 B 0 ...cancelled 0 ...possible 0 ...refused 0 ...NBRSYM on ...NBRREPORT auto
+...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+...EXTUDP off ...EXT IP none ...NOPMOTHER off
+...BTCODE 000000
+...APRSMC: APRSMC
+...ATXT: 
+...NAME: 
+...BLE : short
+...DISPLAY off
+...CTRY EU8
+...FREQ 433.1750 MHz TXPWR 20 dBm RXBOOST off
+...MAXHOP text 4 / pos 2
+
+...Webserver  on / Webpwd <> / Gateway off 
+...NETConsole off
+...KISS/TCP   off / TX off / RxMeta off / Auth off
+...WIFI-AP    on
+...SSID <XX0XXX-00> / PASSWORD <>
+...NETWORK Mode:WiFi
+...hasIpAddress: no

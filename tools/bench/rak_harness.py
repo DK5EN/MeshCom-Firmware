@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extudp_peer as ep  # noqa: E402  (host end of the EXTUDP link, TM-43)
+from identity_guard import IdentityError, require  # noqa: E402
 
 DEFAULT_PORT = "/dev/cu.usbmodem201301"   # DK5EN-90
 BAUD = 115200
@@ -940,6 +941,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--soak-seconds", type=float, default=600.0, help="extudp: soak tail (default 600)")
     p.add_argument("--soak-interval", type=float, default=3.0, help="extudp: seconds between soak datagrams")
     p.add_argument("--out", default="rak_summary.json")
+    p.add_argument("--node", default=None,
+                   help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    p.add_argument("--no-identity-guard", action="store_true",
+                   help="skip the identity guard -- only for setting up a node's identity")
     args = p.parse_args(argv)
     if args.list:
         for n in ORDER:
@@ -947,6 +952,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for n in EXTRA:
             print(f"  {n:8s} {HELP[n]}  [not in --scenario all]")
         return 0
+    if not args.node and not args.no_identity_guard:
+        print("refused: --node NAME is required (fleet.json node name) unless --no-identity-guard "
+              "is given for identity setup", file=sys.stderr)
+        return 2
     wanted = ORDER if args.scenario == "all" else [x.strip() for x in args.scenario.split(",") if x.strip()]
     skip = {x.strip() for x in args.skip.split(",") if x.strip()}
     bad = [x for x in wanted + sorted(skip) if x not in SCENARIOS]
@@ -962,6 +971,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # A node behind a USB-UART bridge reboots when the port is opened; give it
     # its boot before the first command instead of talking into a resetting node.
     s.pump(settle_for(args.port))
+    if args.node and not args.no_identity_guard:
+        idx = s.send("--info")
+        s.wait_for(r"--MeshCom|\.\.\.Call:", 8.0, since=idx)
+        s.pump(2.0)
+        info_text = "\n".join(s.lines_since(idx))
+        try:
+            require(info_text, args.node)
+        except IdentityError as e:
+            print(str(e), file=sys.stderr)
+            s.close()
+            return 1
     summary: Dict[str, Dict[str, Any]] = {}
     ok = True
     try:

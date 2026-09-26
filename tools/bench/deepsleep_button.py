@@ -32,6 +32,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from oled_harness import OledSession
 from tdeck_harness import TDeckSession
+from identity_guard import IdentityError, require
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PORT = "/dev/cu.usbserial-0001"  # Heltec V3 DK5EN-93
@@ -230,7 +231,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument(
         "--json", default=None, help="default: <runs-dir>/deepsleep_button_<ts>.json"
     )
+    p.add_argument(
+        "--node", default=None,
+        help="fleet.json node name for the identity guard (required unless --no-identity-guard)",
+    )
+    p.add_argument(
+        "--no-identity-guard", action="store_true",
+        help="skip the identity guard -- only for setting up a node's identity",
+    )
     args = p.parse_args(argv)
+    if not args.node and not args.no_identity_guard:
+        p.error(
+            "--node NAME is required (fleet.json node name) unless --no-identity-guard "
+            "is given for identity setup"
+        )
 
     runs_dir = Path(args.runs_dir)
     if not runs_dir.is_absolute():
@@ -252,6 +266,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             s.open()
         except Exception as e:
             raise HarnessError(f"could not open session: {e}") from e
+
+        if args.node and not args.no_identity_guard:
+            guard_idx = s.send("--info")
+            s.wait_for(r"\.\.\.Call:", 8.0, since=guard_idx)
+            info_text = "\n".join(l for _, _, l in s.records_since(guard_idx))
+            try:
+                require(info_text, args.node)
+            except IdentityError as e:
+                raise HarnessError(str(e)) from e
 
         info_idx = s.send("--info")
         m = s.wait_for(r"BUTTON \(0\) (on|off)", 5.0, since=info_idx)

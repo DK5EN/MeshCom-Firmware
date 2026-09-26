@@ -73,6 +73,7 @@ except ImportError:  # pragma: no cover - parse-only works without it
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import webflash  # noqa: E402
+from identity_guard import IdentityError, require  # noqa: E402
 
 BAUD = 115200
 WALL_FMT = "%Y-%m-%d %H:%M:%S"
@@ -412,6 +413,17 @@ def run(args: argparse.Namespace, opener: Callable[[str], Any] = real_opener,
                          f"{args.boot_wait_s:.0f}s -- continuing anyway")
     time.sleep(1.0)
 
+    if args.node and not args.no_identity_guard:
+        info_text = send_and_collect(sess, "--info", RE_INFO_WEBSERVER, args.snapshot_timeout_s)
+        try:
+            require(info_text, args.node)
+        except IdentityError as e:
+            result.update(verdict="FAIL", fails=[str(e)], warnings=[])
+            sess.close()
+            write_result(rundir, result)
+            print(render_summary(result))
+            return 1
+
     print("Reading pre-flash settings snapshot over serial ...")
     before, problems = capture_snapshot(sess, timeout=args.snapshot_timeout_s)
     for p in problems:
@@ -594,6 +606,10 @@ def build_parser() -> argparse.ArgumentParser:
                      help="--parse-only: print only, do not rewrite summary.json/.txt")
     ap.add_argument("--expect-hw", default=None,
                      help="--parse-only: expected hardware string (default: none, skip the check)")
+    ap.add_argument("--node", default=None,
+                     help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    ap.add_argument("--no-identity-guard", action="store_true",
+                     help="skip the identity guard -- only for setting up a node's identity")
     return ap
 
 
@@ -608,6 +624,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         missing.append("--host or --ip")
     if missing:
         print(f"error: missing required argument(s): {', '.join(missing)}")
+        return 2
+    if not args.node and not args.no_identity_guard:
+        print("error: --node NAME is required (fleet.json node name) unless "
+              "--no-identity-guard is given for identity setup")
         return 2
 
     return run(args)

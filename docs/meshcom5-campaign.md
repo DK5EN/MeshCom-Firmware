@@ -249,3 +249,35 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   updated: whether this branch goes to fork-neo at all is an open operator decision (neo carries
   dry-unification only); if it does, it needs its own chapter in `tools/neo/paths/` and
   `derive.sh`, and `src/mheard_record.h` leaves CORE.
+
+### Wave 5 re-verification with valid identities (2026-09-26)
+
+- Finding (operator): the T-Beam and the T-Deck Plus ran the earlier wave 5 bench as `XX0XXX-00`
+  without WiFi (T-Beam 20 dBm). They never transmitted, so the TX side, the NTP clock path and the
+  live web page were not tested on them; the earlier T-Deck `/topo.dat` result held only for a
+  hand-set clock and a placeholder callsign. The RAK (DK5EN-90) and the field nodes were fine.
+- Restored: T-Beam DK5EN-92 (WiFi 192.168.68.71), T-Deck Plus DK5EN-14 (was temporarily
+  DK5EN-89, 192.168.68.70), RAK DK5EN-90; all three at 2 dBm, UTC offset 2. T-Beam and T-Deck
+  flashed over WiFi with the 99ae5df6 tree (builds 09:31 / 09:28), the RAK runs bc0cd4de (same
+  code).
+- New guard: `tools/bench/identity_guard.py` + `tools/bench/fleet.json` refuse a node with a
+  placeholder or unregistered callsign, above 2 dBm, or (ESP32) without WiFi IP, web server or
+  set clock; self-test fixtures from real `--info` replies, negative control verified.
+- Results with real identities:
+  - TX side: T-Beam row 0 heard by DK5EN-1, DK5EN-98, DK5EN-14; T-Deck row 0 heard by DK5EN-98,
+    DK5EN-92, DK5EN-1 (HM edges from HEY signal groups).
+  - Echo table: `[NBR]|ECHO` for the T-Beam's own HEY (first hand 0x26, second hand 0x08).
+  - NCNT on air: T-Beam `R5`, T-Deck `R4` (its own HEY at 09:45:36, seen by DK5EN-1). The
+    receivers showed `ncnt=0` for DK5EN-14 until then: 0 means "not reported yet", not a count.
+  - NTP clock path: T-Beam clock source `[NTP]`, MH times match local time. The RAK has no time
+    source and runs about 6 min behind (pre-existing, no network on nRF52 here).
+  - Web info page live on both ESP32 nodes: all groups, board-specific rows, local time.
+  - `/topo.dat`: the file written as DK5EN-89 did not come back after the callsign change
+    (every row age 0 after boot); a file saved as DK5EN-14 came back 20 s after `--reboot`
+    (4 MH rows, 10 paths, ages 4-14 min).
+  - Consistency: 12 `[NBR]|CHECK` lines on T-Beam and T-Deck, 0 violations; `--nbrcheck` ok on
+    all three.
+- Field run: DK5EN-98 flashed over WiFi with the 99ae5df6 tree at 09:41 (operator go; settings
+  unchanged, KISS off, NBR debug/relay/report on, 22 dBm production). Its capture on rpizero
+  reconnected by itself; evaluate the new image with `--since 2026-09-26T09:42`. DK5EN-1 still
+  runs ccb3ec23.

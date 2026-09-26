@@ -49,6 +49,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "golden"))
+from identity_guard import IdentityError, require  # noqa: E402
 
 # Line prefixes the node emits without being asked. Kept explicit rather than
 # clever: every one of these was seen interleaving a command answer during the
@@ -663,6 +664,10 @@ def main(argv: Iterable[str] | None = None) -> int:
                     help="byte-exact --compare (no chatter tolerance); "
                          "for a capture taken with the radio quiet")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--node", default=None,
+                     help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    ap.add_argument("--no-identity-guard", action="store_true",
+                     help="skip the identity guard -- only for setting up a node's identity")
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     if args.self_test:
@@ -671,6 +676,9 @@ def main(argv: Iterable[str] | None = None) -> int:
         return compare(*args.compare, strict=args.strict)
     if not args.out:
         ap.error("--out is required for a capture")
+    if not args.node and not args.no_identity_guard:
+        ap.error("--node NAME is required (fleet.json node name) unless --no-identity-guard "
+                  "is given for identity setup")
 
     commands = read_script(args.script)
     if args.limit:
@@ -688,6 +696,18 @@ def main(argv: Iterable[str] | None = None) -> int:
         args.quiet = default_quiet
     if args.cap is None:
         args.cap = default_cap
+
+    if args.node and not args.no_identity_guard:
+        info_answers, _ = drive(transport, ["--info"], quiet=args.quiet, cap=args.cap,
+                                 settle_min=args.settle_min, settle_quiet=args.settle_quiet,
+                                 progress=0)
+        info_text = "\n".join(info_answers[0][1]) if info_answers else ""
+        try:
+            require(info_text, args.node)
+        except IdentityError as e:
+            print(str(e), file=sys.stderr)
+            transport.close()
+            return 1
 
     print(f"driving {len(commands)} commands over {name}", file=sys.stderr)
 

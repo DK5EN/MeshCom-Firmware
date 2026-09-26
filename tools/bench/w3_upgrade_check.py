@@ -91,6 +91,8 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.error import URLError
 
+from identity_guard import IdentityError, read_info_net, require
+
 # ---------------------------------------------------------------------------
 # Allow-list: fields that legitimately differ across the exact reboot this
 # tool exists to check, and are therefore not configuration drift.
@@ -464,6 +466,12 @@ def main(argv: Optional[list[str]] = None) -> int:
              "drifting output rather than as settings. Off by default -- on a "
              "node with a fixed configured position those three are real "
              "settings and a change in them is a real defect.")
+    ap.add_argument("--node", default=None,
+                    help="fleet.json node name for the identity guard; required when "
+                         "'new' is a live host (not a saved export file) unless "
+                         "--no-identity-guard is given")
+    ap.add_argument("--no-identity-guard", action="store_true",
+                    help="skip the identity guard -- only for setting up a node's identity")
     args = ap.parse_args(argv)
 
     if args.self_test:
@@ -471,6 +479,22 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if not args.baseline or not args.new:
         ap.error("baseline and new are required unless --self-test is given")
+
+    # A saved export file is a pure offline replay -- no live node is touched,
+    # so the identity guard does not apply. Only a bare IP/hostname fetch
+    # ("new export... to fetch from") reaches a live node's web server.
+    new_is_live = not Path(args.new).is_file()
+    if new_is_live:
+        if not args.node and not args.no_identity_guard:
+            ap.error("--node NAME is required (fleet.json node name) when 'new' is a "
+                      "live host unless --no-identity-guard is given for identity setup")
+        if args.node and not args.no_identity_guard:
+            info_text = read_info_net(args.new)
+            try:
+                require(info_text, args.node)
+            except IdentityError as e:
+                print(str(e), file=sys.stderr)
+                return 1
 
     baseline_doc = load_config(args.baseline)
     new_doc = load_config(args.new)

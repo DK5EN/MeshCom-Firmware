@@ -67,6 +67,9 @@ import time
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from identity_guard import add_guard_args, enforce  # noqa: E402
+
 NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 NUS_TX_CHAR = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"   # phone -> node (write)
 NUS_RX_CHAR = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"   # node -> phone (notify)
@@ -917,12 +920,18 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--compare", nargs=2, type=Path, metavar="BIN",
                     help="diff two ble-frames.bin captures (msg_id excluded)")
     ap.add_argument("--self-test", action="store_true")
+    add_guard_args(ap)
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     if args.self_test:
         return _self_test()
     if args.compare:
         return compare_captures(*args.compare)
+    # Operator rule 2026-09-26: no test on a node without a valid identity
+    # (tools/bench/identity_guard.py); checked over the text console, before BLE.
+    # --scan only lists devices and needs no node.
+    if not args.scan:
+        enforce(ap, args)
     if args.pin_file is not None:
         args.pin = int(args.pin_file.read_text().strip())
     if not args.scan and not (args.name or args.address):

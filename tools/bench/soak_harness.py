@@ -13,6 +13,7 @@ Three channels against the bench RAK4631 (DK5EN-90, 192.168.68.68):
 
 All events go to soak_log.txt with wall-clock timestamps. Ctrl-C / SIGTERM to stop.
 """
+import argparse
 import json
 import signal
 import socket
@@ -21,6 +22,8 @@ import threading
 import time
 
 import serial
+
+from identity_guard import IdentityError, read_info_serial, require
 
 NODE_IP = "192.168.68.68"
 EXT_PORT = 1799
@@ -166,14 +169,38 @@ def summary(*_):
     sys.exit(0)
 
 
-signal.signal(signal.SIGTERM, summary)
-signal.signal(signal.SIGINT, summary)
+def main() -> int:
+    ap = argparse.ArgumentParser(description="N-20 cable-flap soak harness")
+    ap.add_argument("--node", default=None,
+                     help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    ap.add_argument("--no-identity-guard", action="store_true",
+                     help="skip the identity guard -- only for setting up a node's identity")
+    args = ap.parse_args()
+    if not args.node and not args.no_identity_guard:
+        ap.error("--node NAME is required (fleet.json node name) unless --no-identity-guard "
+                  "is given for identity setup")
 
-log("RUN", "soak harness started -- pull the cable whenever you like")
-threads = [threading.Thread(target=listener, daemon=True),
-           threading.Thread(target=injector, daemon=True),
-           threading.Thread(target=serial_probe, daemon=True)]
-for t in threads:
-    t.start()
-while not stop.is_set():
-    time.sleep(1)
+    if args.node and not args.no_identity_guard:
+        try:
+            info_text = read_info_serial(SERIAL_PORT)
+            require(info_text, args.node)
+        except (IdentityError, OSError) as e:
+            print(str(e), file=sys.stderr)
+            return 1
+
+    signal.signal(signal.SIGTERM, summary)
+    signal.signal(signal.SIGINT, summary)
+
+    log("RUN", "soak harness started -- pull the cable whenever you like")
+    threads = [threading.Thread(target=listener, daemon=True),
+               threading.Thread(target=injector, daemon=True),
+               threading.Thread(target=serial_probe, daemon=True)]
+    for t in threads:
+        t.start()
+    while not stop.is_set():
+        time.sleep(1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

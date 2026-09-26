@@ -98,6 +98,7 @@ from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ble_golden as bg  # noqa: E402  (path insert must come first)
+from identity_guard import add_guard_args, enforce  # noqa: E402
 
 # --------------------------------------------------------------- frame layout
 
@@ -446,10 +447,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="seconds to scan for --name (default: 10)")
     ap.add_argument("--self-test", action="store_true",
                     help="run the frame-builder self-test and exit, no BLE")
+    add_guard_args(ap)
     args = ap.parse_args(argv)
 
     if args.self_test:
         return _self_test()
+
+    # Operator rule 2026-09-26: no test on a node without a valid identity
+    # (tools/bench/identity_guard.py); checked over the text console, before BLE.
+    enforce(ap, args)
 
     err = check_src_call(args.src_call)
     if err:
