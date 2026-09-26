@@ -20,7 +20,7 @@ Library use (harnesses call this before the first test step)::
 
 CLI::
 
-    identity_guard.py --node t-beam-92 --host 192.168.68.71   # 2323 net console
+    identity_guard.py --node t-beam-92 --host 192.168.68.73   # 2323 net console
     identity_guard.py --node rak-90 --port /dev/cu.usbmodem1101
     identity_guard.py --node t-beam-92 --info-file info.txt
     identity_guard.py --self-test
