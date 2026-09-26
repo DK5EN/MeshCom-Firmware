@@ -66,6 +66,7 @@ src/lora_functions.cpp
 src/lora_setchip.cpp
 src/lora_setchip.h
 src/main.cpp
+src/mask_secret.h
 src/mc_text.h
 src/meshcom_settings.h
 src/meshcom_settings_runtime.h

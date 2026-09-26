@@ -1798,6 +1798,11 @@ void commandAction(char *umsg_text, bool ble)
         // TRK-01: Warnhinweis bei jeder Bedienung ausgeben, auch wenn Track schon an war
         printfdeb(TRACK_WARNING_SERIAL "\n");
 
+        if(meshcom_settings.node_pingcall[0] != 0x00)
+        {
+            printfdeb("[PING]...warning: ping is now suppressed while TRACK mode is active\n");
+        }
+
         track_to_meshcom_timer=0;   // damit auch alle 5 minuten zu MeshCom gesendet wird wenn TRACK ON
 
         meshcom_settings.node_sset |= 0x0020;
@@ -2507,6 +2512,12 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         save_settings();
+
+        // resend SN/SN1 so the app shows the new web password (WSPWD in SN1)
+        if(ble)
+        {
+            sendNodeSetting();
+        }
 
         return;
     }
@@ -3393,6 +3404,11 @@ void commandAction(char *umsg_text, bool ble)
                 meshcom_settings.node_pingtime = PING_INTERVAL;
         }
 
+        if(bDisplayTrack && meshcom_settings.node_pingcall[0] != 0x00)
+        {
+            printfdeb("[PING]...warning: TRACK mode active, ping will not be sent (--track off to enable ping)\n");
+        }
+
         save_settings();
 
         return;
@@ -3422,6 +3438,11 @@ void commandAction(char *umsg_text, bool ble)
         bReturn = true;
 
         meshcom_settings.node_pingcount = meshcom_settings.node_pingmax;
+
+        if(bDisplayTrack)
+        {
+            printfdeb("[PING]...warning: TRACK mode active, ping will not be sent (--track off to enable ping)\n");
+        }
 
         save_settings();
     }
@@ -6564,8 +6585,8 @@ void sendNodeSetting()
     nsetdoc["TYP"] = "SN";
     nsetdoc["GW"] = bGATEWAY;
     nsetdoc["WS"] = bWEBSERVER;
-    //KBC/KFR
-    nsetdoc["WSPWD"] = meshcom_settings.node_webpwd;
+    // WSPWD and ASYM are sent in SN1 below: with them SN exceeded
+    // BLE_JSON_PAYLOAD_MAX and bleJsonFrameFailSoft() dropped trailing fields (GWS)
     nsetdoc["DISP"] =  bDisplayOff;
     nsetdoc["BTN"] = bButtonCheck;
     nsetdoc["MSH"] = bMESH;
@@ -6582,17 +6603,18 @@ void sendNodeSetting()
     nsetdoc["NOPMOTHER"] = (bool)(meshcom_settings.node_sset3 & 0x8000);
     nsetdoc["BLED"] = bUSER_BOARD_LED;
     nsetdoc["GWS"] = meshcom_settings.node_gwsrv;
-    nsetdoc["ASYM"] = bGPSAutosymbol;
 
     sendBleJsonRegister(nsetdoc); // JSN-01
 
     // second node settings json
-    // {"TYP":"SN1","VIA":true,"VIACALL":"OE1KFR-12"}
+    // {"TYP":"SN1","VIA":true,"VIACALL":"OE1KFR-12","WSPWD":"","ASYM":false}
     JsonDocument nsetdoc1;
 
     nsetdoc1["TYP"] = "SN1";
     nsetdoc1["VIA"] = bVIA;
     nsetdoc1["VIACALL"] = meshcom_settings.node_via;
+    nsetdoc1["WSPWD"] = meshcom_settings.node_webpwd;
+    nsetdoc1["ASYM"] = bGPSAutosymbol;
 
     sendBleJsonRegister(nsetdoc1); // JSN-01
 }

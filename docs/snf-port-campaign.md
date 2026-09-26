@@ -209,3 +209,23 @@ Test IDs from `docs/dm-transport-impl-plan-20260913.md` (T-0.x, T-3.x), `docs/dm
 | T-4.1        | sender on `feature-snf`: held mark in app/web, flips to delivered on ack                                                                           |
 | T-4.3..T-4.7 | re-flood while held, ladder gives up while held, two holders, `--storenotice all`, notice via server                                               |
 | web          | Mailbox page actions (Deliver, Purge), setup card persistence across reboot, `--dmretry` web select                                                |
+
+## Catch-up from fork-main (2026-09-26 evening)
+
+A line-by-line comparison of fork-main's code commits against the `feature-snf` tree found five
+items the neo line never got; everything else (P13, volt switch, batt maxv, RAM header, `c_json`
+in BSS, `--mesh off` on via paths, byte-FIFO rings, loop stack 12288, EXTUDP originator keys, DHCP
+hostname, P15, coordinate compare) is present in equivalent form. Safeboot differs from
+upstream/fork-main only in two comments (the upstream PR dropped fork-internal references).
+
+| Item                                                                                                                                                          | Source                           | Port                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| `WSPWD`/`ASYM` from SN to SN1 (SN overflowed the BLE limit), SN/SN1 resent after `--webpwd` over BLE                                                          | upstream `f73cbf9e`              | clean                                                                                  |
+| `--ping` fails loudly (TRACK suppression, ring refusal)                                                                                                       | fork-main `c570e62e`             | conflicts resolved to fork-main tip: P15 `addTxRingEntryOnce()` plus the refusal check |
+| `RADIO_TX` at all six transmit sites (TXM-02), nRF52 `CAD_FREE`/`TX_START` parity                                                                             | fork-main `47eb2011`, `ec070235` | clean; markers verified directly before each send call                                 |
+| EXTUDP boot line with an empty IP in the DNS branch                                                                                                           | fork-main `4879d6e5`             | clean                                                                                  |
+| Tools: `serial_session.py` (DTR by port, boot marker, LF), `webflash.py` OTA session support, `ota_abort.py` + test + 41 run records, `safeboot_page_test.js` | fork-main                        | copied; `test_ota_abort.py`, `test_ota_regression.py`, `webflash.py --self-test` pass  |
+
+`src/mask_secret.h` registered in the neo path lists (305 / 470 / 775). Gate: host 44/44 envs,
+1379 cases; 13 lints; 7 lead envs; the new markers are in the Heltec, RAK and T-Beam images; RAK
+flash 785504 of 815104 B. Not bench-tested: SN/SN1 over BLE to the app.

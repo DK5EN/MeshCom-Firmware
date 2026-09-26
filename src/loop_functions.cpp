@@ -3485,11 +3485,27 @@ static void finalizeAndSendAPRS(struct aprsMessage &aprsmsg, uint8_t *msg_buffer
     encodeAPRS(msg_buffer, aprsmsg);
 }
 
-void sendPing(char msg_call[10])
+PingResult sendPing(char msg_call[10])
 {
     // no ping within track mode
+    //
+    // Vorher kehrte die Funktion hier stumm zurueck: der Aufrufer hatte
+    // "[PING]...send Ping" schon ausgegeben und ein Ping-Budget verbraucht,
+    // obwohl nie ein Frame den TX-Ring erreichte -- der Operator sah eine
+    // Luege auf dem Display. static statt bLORADEBUG/bDisplayInfo, damit die
+    // Meldung unabhaengig vom Debug-Level einmal pro Unterdrueckungs-Episode
+    // erscheint statt bei jedem Ping-Intervall erneut.
+    static bool bPingTrackNoticeShown = false;
     if(bDisplayTrack)
-        return;
+    {
+        if(!bPingTrackNoticeShown)
+        {
+            printfdeb("[PING]...suppressed: TRACK mode active (--track off to ping)\n");
+            bPingTrackNoticeShown = true;
+        }
+        return PING_SUPPRESSED_TRACK;
+    }
+    bPingTrackNoticeShown = false;
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
@@ -3525,10 +3541,21 @@ void sendPing(char msg_call[10])
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
+    //
+    // Rueckgabewert war bisher verworfen: ein voller Ring hat den Ping
+    // ebenso stumm verschluckt wie der TRACK-Fall oben, nur dass Display und
+    // bPingSend so taten, als sei er unterwegs -- eine Intervall-Laenge
+    // spaeter kam dann ein irrefuehrendes "[PONG]...fail". Sofort raus, noch
+    // vor DisplayPong/bPingSend, damit kein Zaehler fuer einen nie
+    // eingereihten Frame scharf gestellt wird.
     // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
     // ...) -- ein Ping ist eine persoenliche DM und soll als solche
     // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
-    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg");
+    if(addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg") < 0)
+    {
+        printfdeb("[PING]...not queued: TX ring refused the frame\n");
+        return PING_RING_REFUSED;
+    }
 
     if(!bPingSend)
     {
@@ -3545,6 +3572,8 @@ void sendPing(char msg_call[10])
 
     meshcom_settings.node_pingduration = millis();
     bPingSend=true;
+
+    return PING_QUEUED;
 }
 
 void PongFail(String msg_call)
@@ -3559,8 +3588,20 @@ void PongFail(String msg_call)
 void SendPong(String msg_call, unsigned int msg_id)
 {
     // no ping within track mode
+    //
+    // Gleiches stummes Verhalten wie bei sendPing() -- Marker-only, Signatur
+    // bleibt void, static-Flag unabhaengig von der in sendPing().
+    static bool bPongTrackNoticeShown = false;
     if(bDisplayTrack)
+    {
+        if(!bPongTrackNoticeShown)
+        {
+            printfdeb("[PONG]...suppressed: TRACK mode active\n");
+            bPongTrackNoticeShown = true;
+        }
         return;
+    }
+    bPongTrackNoticeShown = false;
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
