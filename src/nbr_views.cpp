@@ -217,7 +217,7 @@ bool nbrMhGet(const NbrMatrix &m, int row, uint16_t now_min, NbrMhView *out)
         out->plt = 0;
         out->mod = 0;
         out->rssi = NBR_MH_RSSI_UNKNOWN;
-        out->lat = out->lon = NAN;
+        out->lat = out->lon = NBR_POS_NONE;
         out->alt = NBR_MH_ALT_UNKNOWN;
         out->pl = 0;
         out->mesh = 0;
@@ -233,8 +233,8 @@ bool nbrMhGet(const NbrMatrix &m, int row, uint16_t now_min, NbrMhView *out)
     uint32_t lat = nbrBitsGet(slot, NBR_XO_LAT, NBR_XW_LAT);
     uint32_t lon = nbrBitsGet(slot, NBR_XO_LON, NBR_XW_LON);
     bool pos = lat != NBR_EXT_LAT_UNKNOWN && lon != NBR_EXT_LON_UNKNOWN;
-    out->lat = pos ? (float)((double)lat / 10000.0 - 90.0) : NAN;
-    out->lon = pos ? (float)((double)lon / 10000.0 - 180.0) : NAN;
+    out->lat = pos ? (float)((double)lat / 10000.0 - 90.0) : NBR_POS_NONE;
+    out->lon = pos ? (float)((double)lon / 10000.0 - 180.0) : NBR_POS_NONE;
     uint32_t alt = nbrBitsGet(slot, NBR_XO_ALT, NBR_XW_ALT);
     out->alt = (alt == NBR_EXT_ALT_UNKNOWN) ? (int16_t)NBR_MH_ALT_UNKNOWN : (int16_t)((int32_t)alt - 1000);
     out->pl = (uint8_t)nbrBitsGet(slot, NBR_XO_PL, NBR_XW_PL);

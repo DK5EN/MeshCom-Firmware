@@ -530,8 +530,8 @@ static NbrDirectInfo build_direct_info(const LogFrame &lf)
     info.own_frame = is_equ(lf.source_call.c_str(), lf.source_last.c_str());
     info.fw = info.own_frame ? lf.fw_sub : 0;
     info.has_pos = false;
-    info.lat = NAN;
-    info.lon = NAN;
+    info.lat = NBR_POS_NONE;
+    info.lon = NBR_POS_NONE;
     info.alt_m = NBR_ALT_UNKNOWN;
     return info;
 }
@@ -1035,7 +1035,7 @@ static void compare_fields(Report &r, HourBucket &hb, uint32_t now_ms, uint16_t 
         // g_own_lat's comment) -- tracked separately, never folded into
         // field_mismatch/bad above, since it is a harness approximation, not
         // a byte-exact reproduction of either production formula.
-        if (g_own_pos_known && rec.mr_dist >= 0.0f && !isnan(v.lat) && !isnan(v.lon))
+        if (g_own_pos_known && rec.mr_dist >= 0.0f && nbrPosKnown(v.lat, v.lon))
         {
             float new_dist = round_dist_km(nbrDistKm((float)g_own_lat, (float)g_own_lon, v.lat, v.lon));
             r.dist_compared++;

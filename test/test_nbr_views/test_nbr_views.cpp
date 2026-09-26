@@ -91,7 +91,7 @@ static NbrDirectInfo info(char plt, int16_t rssi, uint8_t sec, bool own)
     d.own_frame = own;
     d.fw = 0;
     d.has_pos = false;
-    d.lat = d.lon = NAN;
+    d.lat = d.lon = NBR_POS_NONE;
     d.alt_m = NBR_ALT_UNKNOWN;
     return d;
 }
@@ -216,7 +216,7 @@ void test_direct_slot_encodings_at_min_max_unknown(void)
     TEST_ASSERT_EQUAL_INT8(0, v.plt);
     TEST_ASSERT_EQUAL_INT16(-160, v.rssi); // geklemmt
     TEST_ASSERT_EQUAL_UINT8(15, v.pl);     // geklemmt
-    TEST_ASSERT_TRUE(isnan(v.lat) && isnan(v.lon));
+    TEST_ASSERT_FALSE(nbrPosKnown(v.lat, v.lon));
     TEST_ASSERT_EQUAL_INT16(NBR_MH_ALT_UNKNOWN, v.alt);
     TEST_ASSERT_EQUAL_INT8(0, v.fw);
     TEST_ASSERT_EQUAL_UINT8(1, v.mesh);
@@ -407,7 +407,7 @@ void test_mh_view_fields_from_frame_sequence(void)
     TEST_ASSERT_EQUAL_UINT8(0, v.ex);
     TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, v.hm_snr);
     TEST_ASSERT_EQUAL_INT16(NBR_MH_RSSI_UNKNOWN, v.rssi);
-    TEST_ASSERT_TRUE(isnan(v.lat));
+    TEST_ASSERT_FALSE(nbrPosKnown(v.lat, v.lon));
     // B: keine Kante (B, ich) -> kein MHeard; Zeile 0 und ungueltige Indizes ebenso.
     TEST_ASSERT_FALSE(nbrMhGet(m, nbrFind(m, "DB0BBB-1"), 20, &v));
     TEST_ASSERT_FALSE(nbrMhGet(m, 0, 20, &v));
@@ -1298,6 +1298,37 @@ void test_size_table_per_part(void)
     TEST_ASSERT_TRUE(sizeof(NbrMatrix) - sum <= 8);
 }
 
+// RAK-Test 2026-09-26: der nRF52-Build laeuft mit -Ofast (-ffast-math), isnan()
+// fiel dort weg und --mheard zeigte "lat=N nan". Diese Umgebung (native_nbr_views64)
+// baut ebenfalls mit -ffast-math; unbekannte Positionen muessen trotzdem als
+// unbekannt erkennbar sein.
+void test_unknown_position_detected_under_fast_math(void)
+{
+    TEST_ASSERT_TRUE(nbrPosKnown(48.4f, 11.7f));
+    TEST_ASSERT_TRUE(nbrPosKnown(-90.0f, 180.0f));
+    TEST_ASSERT_FALSE(nbrPosKnown(NBR_POS_NONE, NBR_POS_NONE));
+    TEST_ASSERT_FALSE(nbrPosKnown(48.4f, NBR_POS_NONE));
+
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrame(m, "OE1AAA-1", '@', "", false, -70, 5, 100);
+    NbrDirectInfo info;
+    memset(&info, 0, sizeof(info));
+    info.plt = '@';
+    info.own_frame = true;
+    info.has_pos = false;
+    info.lat = NBR_POS_NONE;
+    info.lon = NBR_POS_NONE;
+    info.alt_m = NBR_ALT_UNKNOWN;
+    nbrNoteDirect(m, "OE1AAA-1", info, 100);
+    NbrMhView v;
+    TEST_ASSERT_TRUE(nbrMhGet(m, nbrFind(m, "OE1AAA-1"), 100, &v));
+    TEST_ASSERT_FALSE(nbrPosKnown(v.lat, v.lon));
+    NbrRowView r;
+    TEST_ASSERT_TRUE(nbrRowGet(m, nbrFind(m, "OE1AAA-1"), &r));
+    TEST_ASSERT_FALSE(nbrPosKnown(r.lat, r.lon));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1317,6 +1348,7 @@ int main(int, char **)
     RUN_TEST(test_horizon_hop_minimum_rises_after_12h);
     RUN_TEST(test_routes_two_hop_rows_then_horizon);
     RUN_TEST(test_route_sender_never_listed_as_row_and_horizon);
+    RUN_TEST(test_unknown_position_detected_under_fast_math);
     RUN_TEST(test_name_helpers_match_old_tables);
     RUN_TEST(test_echo_table_first_second_hand_and_fold);
     RUN_TEST(test_set_clock_and_boot_epoch_survive_init_and_reset);

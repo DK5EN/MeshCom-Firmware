@@ -3010,6 +3010,8 @@
  "env:native_nbr_views64": {
   "build_flags": [
    "-std=gnu++17",
+   "-O2",
+   "-ffast-math",
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
    "-D NBR_MAX_ROWS=64",

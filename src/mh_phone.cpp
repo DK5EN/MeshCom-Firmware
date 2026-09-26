@@ -169,7 +169,7 @@ uint16_t mhJsonBuild(const NbrMhView &v, uint32_t now_epoch, double own_lat, dou
     // unbekannt ist (own 0/0, fremd NAN).
     double dist_out = -1.0;
     bool own_known = !(own_lat == 0.0 && own_lon == 0.0);
-    bool nb_known  = !isnan(v.lat) && !isnan(v.lon);
+    bool nb_known  = nbrPosKnown(v.lat, v.lon);
     if (own_known && nb_known)
         dist_out = (double)mhRoundDist((double)nbrDistKm((float)own_lat, (float)own_lon, v.lat, v.lon));
     doc["DIST"] = dist_out;

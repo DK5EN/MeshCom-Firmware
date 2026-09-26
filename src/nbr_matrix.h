@@ -136,6 +136,17 @@ struct NbrRow
 // [-127,127] begrenzt).
 #define NBR_SNR_UNKNOWN (-128)
 
+// Unbekannte Position in Leser-Sichten (NbrRowView, NbrMhView, NbrDirectInfo):
+// ein endlicher Wert ausserhalb jedes Koordinatenbereichs, KEIN NAN. Der
+// nRF52-Build laeuft mit -Ofast (-ffast-math); dort faltet der Compiler isnan(),
+// v != v und sogar einen Bitmuster-Test auf NaN zu "false" (RAK-Test
+// 2026-09-26: --mheard zeigte "lat=N nan"). Leser pruefen mit nbrPosKnown().
+#define NBR_POS_NONE 999.0f
+static inline bool nbrPosKnown(float lat, float lon)
+{
+    return lat >= -90.0f && lat <= 90.0f && lon >= -180.0f && lon <= 180.0f;
+}
+
 // Schwelle fuer die Symmetrie-Annahme (--nbrsym, Abschnitt D unten) UND fuer
 // den HN-Nachbarschaftsbericht (nbrBuildReport() unten, Abschnitt E):
 // derselbe Betreiberwert, ein einziges Mal definiert. Der Wert selbst
@@ -241,7 +252,7 @@ struct NbrMatrix
 };
 
 // CONTRACT (Welle 2): entschluesselte Zeile fuer Leser ausserhalb von
-// nbr_matrix.cpp. Position als float wie frueher, NAN wenn unbekannt.
+// nbr_matrix.cpp. Position als float wie frueher, NBR_POS_NONE wenn unbekannt.
 struct NbrRowView
 {
     char     call[NBR_CALL_LEN];

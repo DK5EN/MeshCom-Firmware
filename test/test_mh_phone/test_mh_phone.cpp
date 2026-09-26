@@ -298,8 +298,8 @@ void test_dist_unknown_when_position_missing(void)
 
     // fremde Position unbekannt (NAN).
     NbrMhView v2 = v;
-    v2.lat = NAN;
-    v2.lon = NAN;
+    v2.lat = NBR_POS_NONE;
+    v2.lon = NBR_POS_NONE;
     uint8_t buf2[400] = {0};
     uint16_t n2 = mhJsonBuild(v2, now_epoch, 48.1, 16.2, buf2, sizeof(buf2));
     TEST_ASSERT_GREATER_THAN(0, n2);

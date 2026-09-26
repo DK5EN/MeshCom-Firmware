@@ -551,8 +551,8 @@ static NbrDirectInfo nbrBuildDirectInfo(const struct aprsMessage &aprsmsg, int16
     info.fw   = info.own_frame ? aprsmsg.msg_source_fw_sub_version : 0;
 
     info.has_pos = false;
-    info.lat = NAN;
-    info.lon = NAN;
+    info.lat = NBR_POS_NONE;
+    info.lon = NBR_POS_NONE;
     info.alt_m = NBR_ALT_UNKNOWN;
 
     return info;

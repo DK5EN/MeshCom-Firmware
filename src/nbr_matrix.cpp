@@ -220,7 +220,7 @@ static int nbrIMaskHex(const NbrMask &mask, char *out, size_t outlen)
 
 static int16_t nbrIDeg16(float v)
 {
-    if (v != v)
+    if (!(v >= -180.0f && v <= 180.0f))   // unbekannt/ausserhalb, auch NBR_POS_NONE; kein NaN-Test (-ffast-math)
         return (int16_t)NBR_POS_UNKNOWN; // NAN
     float s = v * 100.0f;
     s = (s >= 0.0f) ? floorf(s + 0.5f) : -floorf(-s + 0.5f);
@@ -787,7 +787,7 @@ static uint32_t nbrIClampU(long v, long lo, long hi)
 // Grad in 0,0001 mit Versatz; NAN oder ausserhalb des Bereichs = unbekannt.
 static uint32_t nbrIDeg4(float v, float offset, float span, uint32_t unknown)
 {
-    if (v != v)
+    if (!(v >= -180.0f && v <= 180.0f))   // unbekannt/ausserhalb, auch NBR_POS_NONE; kein NaN-Test (-ffast-math)
         return unknown;
     float s = (v + offset) * 10000.0f;
     if (s < 0.0f || s > span * 10000.0f)
@@ -1959,8 +1959,8 @@ bool nbrRowGet(const NbrMatrix &m, int row, NbrRowView *out)
         return false;
     nbrIDecode(w, out->call);
     bool pos = (r.lat16 != (int16_t)NBR_POS_UNKNOWN && r.lon16 != (int16_t)NBR_POS_UNKNOWN);
-    out->lat = pos ? r.lat16 / 100.0f : NAN;
-    out->lon = pos ? r.lon16 / 100.0f : NAN;
+    out->lat = pos ? r.lat16 / 100.0f : NBR_POS_NONE;
+    out->lon = pos ? r.lon16 / 100.0f : NBR_POS_NONE;
     out->last_min = r.last_min;
     out->rpt_min = r.rpt_min;
     out->flags = r.flags;

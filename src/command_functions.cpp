@@ -5081,13 +5081,13 @@ void commandAction(char *umsg_text, bool ble)
             // 0/0 = unbekannt (dieselbe Regel wie src/mh_phone.h).
             char distTxt[12];
             bool haveOwnPos = !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0);
-            if(!isnan(v.lat) && !isnan(v.lon) && haveOwnPos)
+            if(nbrPosKnown(v.lat, v.lon) && haveOwnPos)
                 snprintf(distTxt, sizeof(distTxt), "%.1f", gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0);
             else
                 snprintf(distTxt, sizeof(distTxt), "NA");
 
             char latTxt[12], lonTxt[12];
-            if(!isnan(v.lat) && !isnan(v.lon))
+            if(nbrPosKnown(v.lat, v.lon))
             {
                 double a = v.lat, o = v.lon;
                 snprintf(latTxt, sizeof(latTxt), "%c%06.3f", (a < 0) ? 'S' : 'N', fabs(a));

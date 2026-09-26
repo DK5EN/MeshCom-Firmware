@@ -1536,7 +1536,7 @@ void sub_page_mheard()
         // DIST weiterhin aus der eigenen Position gerechnet, 0/0 = unbekannt
         // (dieselbe Regel wie src/mh_phone.h fuer den App-Rahmen).
         double dist = -1.0;
-        if (!isnan(v.lat) && !isnan(v.lon) && !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0))
+        if (nbrPosKnown(v.lat, v.lon) && !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0))
             dist = gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0;
         if (dist >= 0.0)
             web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", dist);
@@ -1545,7 +1545,7 @@ void sub_page_mheard()
 
         web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2u</span></div>", (unsigned)v.ncnt);
 
-        if (!isnan(v.lat) && !isnan(v.lon))
+        if (nbrPosKnown(v.lat, v.lon))
         {
             dlat = v.lat;
             clat = 'N';

@@ -34,7 +34,7 @@ struct NbrMhView
     uint8_t  mod;         // wie heute mh_mod, beide Halbbytes
     int16_t  rssi;        // dBm, NBR_MH_RSSI_UNKNOWN wenn unbekannt
     int8_t   snr;         // Mittel der Kante (x, 0) (NBR_SNR_AVG_N), NBR_SNR_UNKNOWN
-    float    lat, lon;    // Grad, 0,0001-Aufloesung; NAN wenn unbekannt
+    float    lat, lon;    // Grad, 0,0001-Aufloesung; NBR_POS_NONE wenn unbekannt (nbrPosKnown())
     int16_t  alt;         // Meter, NBR_MH_ALT_UNKNOWN
     uint8_t  pl;          // Pfadlaenge des letzten Rahmens (msg_last_path_cnt), 0..15
     uint8_t  mesh;        // Mesh-Bit des letzten Rahmens
