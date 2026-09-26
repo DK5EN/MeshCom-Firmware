@@ -7,6 +7,79 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## neo-Release v4.35t.09.26-neo (2026-09-26)
+
+Dritter Nachzug von `upstream/dev` auf den neo-Zweig: Basis `6cc8b552`
+(icssw-org hat #1157 bis #1161 gemergt), als `43760732` in `fork-neo-test`
+gemergt. neo bleibt dabei, was es ist -- `upstream/dev` plus besserer Code,
+keine neue Protokollfunktion, kein neuer Betriebsmodus. Die Firmware meldet
+weiterhin `4.35t`, `FLASH_VERSION 20260912` und `FLASH_STRUCT_VERSION 20260724`
+exakt wie vorher; der Name "neo" lebt nur im Git-Tag, im Release und im
+Web-Flasher. Die Konfiguration der Knoten bleibt beim Update erhalten.
+
+Inhaltlich bringt der Merge vier Bloecke zurueck bzw. neu herein: #1157 ist
+die eigene RAM-Arbeit dieses Branches (Byte-FIFO-Ringe, MHeard-Drosselfix,
+Web-Header als String), ueber `fork-main` portiert und jetzt wieder upstream;
+#1158 (OE1KFR) verschiebt `WSPWD`/`ASYM` von `SN` nach `SN1`, damit das
+Knoten-JSON unter dem BLE-Limit bleibt (`f73cbf9e`, mit diesem Merge neu auf
+dem Branch); #1159 bis #1161 (OE1KBC) sind Kommentare fuer
+`4.35t`, die zwei MSB-Wiederholungsbits im `msg_id` vorbereiten, die Maske
+selbst bleibt auskommentiert -- keine Verhaltensaenderung. Aus der
+Konfliktaufloesung des Merges selbst: `sendPing()` meldet eine verweigerte
+TX-Ring-Eintragung jetzt laut (`[PING]...not queued`) statt sie
+stillschweigend zu verwerfen, der BLE-Kommandoring `RING_BYTES_PHONECOM`
+waechst auf 3072 B auf jeder Boardklasse, damit der komplette
+Konfigurations-Burst hineinpasst, ein neuer Diagnosemarker
+`[MC-DBG] RING_OVERFLOW buf=phone` meldet einen Ueberlauf dieses Rings, und
+der Byte-Ring-Iterator fuer die Web-Nachrichtenseite zieht seinen Snapshot
+jetzt unter `BF_LOCK`. Details, Einstufung (Restrukturierung/Fehlerbehebung)
+und Nachweislage stehen als Punkte 124-129 in
+[`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md).
+
+Dieses Release ersetzt `v4.35t.09.21-neo`: dessen Release-Objekt und Tag
+wurden geloescht, ein Freitext dazu wurde nie committet.
+
+**Gates:** 36 native Host-Umgebungen, 1070/1070 Testfaelle;
+`test/golden/selftest.sh` gruen; alle 32 Release-Umgebungen gebaut.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+**Nichts.** Kein Board hat dieses Firmware-Image -- den heutigen Merge-Stand
+`43760732` -- je geladen. Als Kontext die fruehere neo-Bank-Historie, die
+nicht dieses Image betrifft:
+
+- **Differenzlauf 2026-09-19** gegen `upstream/dev` auf DK5EN-1 (Heltec V3)
+  und DK5EN-92 (T-Beam): auf dem Draht kein Unterschied messbar, im Knoten
+  +11 296 B respektive +15 560 B freier Heap (Details in
+  [`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md), Abschnitt "Auf der Bank
+  gemessen"). Zwoelfstuendiger Dauerlauf im Anschluss auf drei Knoten ohne
+  Neustart, Absturz oder Ringueberlauf.
+- **W4-Bench auf DK5EN-1, 2026-09-25**: KISS/TCP, `IS1`, `SN1` und der
+  `--via`-Fix nach dem Upstream-Merge auf `e4a2393f` (siehe
+  `docs/neo-upstream-merge-20260925.md`).
+
+Beide Laeufe pruefen fruehere Zwischenstaende dieses Branches, nicht den
+heutigen Merge.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der heutige Merge `43760732` selbst, auf keinem Board.
+- Die um +1 kB je Boardklasse gewachsene `RING_BYTES_PHONECOM` -- ob der
+  komplette Konfigurations-Burst jetzt tatsaechlich ohne Abschneiden bei der
+  App ankommt, ist eine Annahme aus der Ringgroesse, keine Messung.
+- Der neue `[MC-DBG] RING_OVERFLOW buf=phone`-Marker -- kein Ueberlauf auf der
+  Bank provoziert.
+- Die verschobenen `WSPWD`/`ASYM`-Felder in `SN1` -- keine App-Sichtpruefung,
+  nur Host-Suite.
+- Die aufgeloeste `sendPing()`-Fehlermeldung -- kein Bank-Log mit einem
+  tatsaechlich verweigerten Ping.
+- Der Safeboot-Stand (K15, `a04d9c87`, inhaltsgleich mit dem offenen
+  upstream-PR #1162) auf diesem Image -- die Abbruch-Bank 6/6 lief am 25.09.
+  auf DK5EN-1 mit fork-main, nicht mit diesem Stand.
+- Alles, was in [`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md) unter den
+  Kapiteln K01-K18 ohnehin schon als "kein Hardware-Nachweis" oder
+  "kompilier-verifiziert" gefuehrt wird (E22_XML- und T-Beam-Headroom u. a.).
+
 ## Stability-Release v4.35t.09.12.2 (2026-09-12)
 
 Zehn Punkte des Forks gegenueber `v4.35t.09.10`, Changelog-Punkte 212-221:

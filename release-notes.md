@@ -3,156 +3,80 @@
 
 ## What this release is
 
-**Official MeshCom `4.35t` plus ten changes, in one build.** Upstream released `4.35t` on 10 September 2026, and it already contains this fork's items 104–210 (the ICSSW maintainers merged [PR #1135](https://github.com/icssw-org/MeshCom-Firmware/pull/1135) that day, after [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) and [#1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103) in August). What official `4.35t` does **not** have is changelog items 212–221: the APRS position parser repairs, a web GUI fix, three field fixes against `4.35t` that upstream merged into `dev` today ([PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140)) but has not shipped in a release with assets yet, and the upstream sync itself. This build also carries the fork-only pieces that were never offered upstream: the safeboot OTA recovery and fail-closed completion gate (items 153, 154, 186), `--port` in every esptool upload command (151) and the host-side test environments.
+**neo is `upstream/dev` plus better code. Nothing else.** This build is official `4.35t` plus everything the ICSSW team has merged into `dev` since (up to [`6cc8b552`](https://github.com/icssw-org/MeshCom-Firmware/commit/6cc8b552), PRs #1157–#1161) plus this fork's code-quality campaign: duplicated logic unified, dead files removed, and the handful of real bugs that duplication had let drift apart, fixed. It carries no new protocol feature and no new operating mode over `dev`.
 
-This release **replaces `v4.35t.09.10`**, whose release object has been deleted; that tag stays in the repository.
+**The promise: on the air, this firmware behaves like official `4.35t`. It only gets better under load** — more free heap, more flash headroom, the same frames. Where behaviour genuinely differs from upstream, it is because upstream's own duplication had let a bug through, and that is named below and in the linked changelog.
 
-**This build reports itself as `4.35t`, exactly like official `4.35t`.** The letter was this fork's marker in `v4.35t.09.10`; upstream moved to the same letter one day later (item 221), so it no longer tells the two apart. The flash stamp in `--info` does: `20260912` here, `20260909` in official `4.35t`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
+**How to tell this build apart:** not by the version letter and not by `FLASH_VERSION` — both report exactly what official `4.35t` reports (`4.35t`, `FLASH_VERSION 20260912`). The tell is the build date in `--info` / the `IS1` JSON, and the tag or filename this asset came from (`v4.35t.09.26-neo`) or the entry on the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/). `FLASH_STRUCT_VERSION` stands at `20260724`, unchanged — **your configuration survives this update.**
 
-**Why `.2` in the tag:** upstream tagged its own `dev` as `v4.35t.09.12` on the evening of 12 September (a release without assets at the time of writing). A fork tag of the same name would collide on every fetch, so this one carries `.2`. It is the only fork release of the day.
+This release replaces `v4.35t.09.21-neo`, whose release and tag were deleted; a body for it was never committed, so this note is the first one for the neo line.
 
-## What is new in this build
+## What is new since the last neo build
 
-The numbered items are in the [MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/CHANGELOG-stability.md).
+The previous neo build was cut on the evening of 21 September. Everything since then is below; detail, evidence and the restructuring/bug-fix classification are in [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md) (items 118–129 plus the chapter entries named here).
 
-**APRS position parser: the decoder finally reads what the encoder writes** (212–216). A drift analysis against the firmware's own wire format ([the analysis](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/aprs-parser-drift-20260911.md)) showed the encoder emits 17 `/X=` position keys and the decoder understood 14. The group list `/R=`, INA226 bus voltage `/U=` and current `/I=` are decoded now (212); the `/Y=` scan no longer inherits digits from the preceding `/V=` value (213); the eight NaN guards in the encoder test their own buffer instead of the pressure buffer, so `/H=nan`, `/T=nan` and five more can no longer leave the node (214); the full 17-key grammar is written down as a contract (215); and the `#name` suffix the encoder appends to the position comment is split off into its own field, with `--setname` refusing `#` so the split stays unambiguous (216). The same `#name` rule is implemented in MCProxy and the mobile app.
+**Safeboot: the complete recovery rework** (`a04d9c87`, chapter K15). The 21 September build carried only part of it. Now in: the OTA session as a state machine with a generation guard, a status page with network panel and WiFi scan, an access point after 25 s without a join, `/ota/info`, `/ota/state`, `/ota/scan`, and single-app-slot handling (`app_valid` instead of the old 180-second fallback loop). The same work is offered upstream as [PR #1162](https://github.com/icssw-org/MeshCom-Firmware/pull/1162), still open. The safeboot partition is written only by the web flasher or a serial flash, not by OTA.
 
-**Web GUI: the group stays in the destination field after a send** (217). Selecting a group tab writes the group number into the destination field, but the send-ok handler cleared it after every send, so the next message typed in a hurry went out as a broadcast to `*`. Reported by DJ8MEH. A numeric destination is left alone now; a DM call sign is still cleared.
+**Upstream catch-up of 25 September** (`def2dc7e`, items 118–123): KISS/TCP on port 8001 (#1151, DH1FR; off by default, here also on E22_XML-DevKitC), the via settings as a second node-settings JSON `SN1` (#1155), the build date as `IS1` (#1156), and this fork's own #1152 (T-Beam-1W battery shown as USB after a settings wipe, `551f9a0b`) and #1153 (the web GUI "Voltage" switch did nothing, `248662ff`). `--via on/off` no longer stores "ON"/"OFF" as the via call sign (`0923e037`, found on the bench).
 
-**Three field fixes against `4.35t`** (218–220), all in upstream `dev` since PR #1140:
+**Ping and pong over BLE** (`3b018f03`, `1a14bef5`, `b55fe5d7`): a pong addressed to the node's own call sign now also reaches the BLE client (P13); a `{ping}` typed in the app goes out once instead of being retransmitted up to three times at 40-second intervals (P14); own messages without retransmission keep their priority in the TX queue instead of being ranked like relayed traffic (P15).
 
-- **Long press switches the node off again** (218). Since the deep-sleep rework the user button is armed as wake source, but the long-press handler fires while the button is still held — the wake condition was already true and the node rebooted at once. The firmware now waits for the release (bounded 10 s, then 100 ms debounce) before arming, on every long-press-to-sleep board, ESP32 and nRF52, and only when `--button` is on. Serial `--deepsleep` with the button untouched is unaffected.
-- **T-Deck keyboard light stays dark while the keylock is engaged** (219). The display wake path tested the keylock flag instead of the keyboard-light setting and forced the keyboard to 150 whenever a message woke the locked panel.
-- **T-Beam Supreme boots again** (220). The `4.35t` OLED change gave u8g2 the I2C pins explicitly; u8g2 then reconfigures both pins as plain outputs, detaching them from the I2C controller that already owns them, and the display init hangs after `Auto detecting display:`. Two field nodes were stuck there. Constructors take no pins now and the bus runs at 100 kHz like the sensor path on the same bus.
+**Upstream catch-up to `6cc8b552` (PRs #1157–#1161, merge `43760732`, items 124–129).**
 
-**Upstream sync** (221). Three plain merges: Kurt's own move to `4.35t`, OE1KFR's "RAK LEDs off in Deepsleep" (the green and blue LEDs of a RAK4631 are driven LOW before System OFF, so a sleeping node no longer shows a lit LED), and upstream's merge of PR #1140. `fork-main` is content-identical to upstream `dev` at `1cb2d9e6` except for items 212–217, the fork-only pieces named above and `FLASH_VERSION`.
+- **#1157** is this branch's own RAM-reclaim work (byte-FIFO ring buffers, the MHeard-throttle fix, the web header held as `String`) coming back from `fork-main`, now merged into `dev` itself. Resolving the merge kept this branch's structure where it already carries the behaviour, and took four pieces from upstream's side of the same change:
+  - `sendPing()` now reports a refused TX-ring entry loudly (`[PING]...not queued: TX ring refused the frame`) instead of dropping it silently — a visibility fix, nothing changes on the air since the ping was never queued either way.
+  - The BLE command ring `RING_BYTES_PHONECOM` grows to 3072 B on every board class, so the whole configuration burst fits.
+  - A new diagnostic marker, `[MC-DBG] RING_OVERFLOW buf=phone`.
+  - The byte-ring iterator that feeds the web message page now takes its snapshot under the existing lock, instead of reading a ring that a writer could still be mutating.
+- **#1158** (OE1KFR, `f73cbf9e`): `WSPWD` and `ASYM` move from the `SN` node-settings JSON to `SN1`. `SN` was already about 250 characters without a web password, over the 244-byte BLE payload limit, and the app was silently losing `ASYM` always and `GWS`/`BLED` once a password got long enough. New on this branch with this merge.
+- **#1159–#1161** (OE1KBC): comments in `4.35t` preparing two MSB repeat-count bits in `msg_id`; the mask itself stays commented out upstream ("discussion ongoing"). No behaviour change.
 
-**Field confirmation for item 200.** The Wireless Paper / Vision Master E213 chip-select release on wake was a blind fix in `v4.35t.09.10`. OE3LCR tested it on both boards on 11 September: EXT1 wake, `RESET_REASON=8`, SX1262 init and SPI traffic fine afterwards. OE3LCR also notes that pre-fix `4.35p` woke with working RX on the same boards, so the call is most likely a guard rather than a repair; it stays.
-
-## Already in official `4.35t`
-
-For orientation only — everything below is in the official firmware since 10 September and is described in the changelog: input hardening and web security (107–118); back-pressure honesty (156–167, 179); WiFi, NTP, Ethernet and gateway path (119–128, 131, 176); ACK attribution toward the phone (192, 193); deep sleep made real (197–200); GPS and altitude (174, 204–206); web GUI and web API (134–136, 189, 190, 194–196); T-Deck (140–147, 175, 181–185, 199, 201); telemetry on the air (187, 207); build, test and tooling (150, 152, 164, 166, 169, 170, 191, 202, 208); text and operator warnings (209, 210); the previous upstream sync (211).
+Gate for the whole merge: 36 native host environments, 1070/1070 test cases; `test/golden/selftest.sh` green.
 
 ## What changes on the air
 
-Compared with official `4.35t`, two things:
+Today's merge changes nothing on the air: logging, RAM sizing and a BLE JSON field. Since the previous neo build, three things do:
 
-1. **A NaN can no longer leave the node in a position beacon** (item 214). Seven of the eight encoder guards were comparing the wrong buffer; a sensor returning NaN could put `/H=nan` and friends on the air. Frames with valid readings are byte-identical to before.
-2. **`--setname` drops `#` from the node name** (item 216). Nothing else about the frame changes; the name suffix was always there, the decoder now reads it.
+1. **An app-originated `{ping}` is sent once** (P14), not up to three times.
+2. **Own messages without retransmission (ping, pong, ACK) keep their priority** in the TX queue (P15), so on a busy node they no longer wait behind relayed traffic. Frame bytes are unchanged; send order can differ.
+3. **KISS/TCP** (#1151, upstream behaviour) can put a client's frames on the air — only when switched on with `--kiss on` and `--kiss tx on`; it is off by default.
 
-Everything else on the air — `XX0XXX` frames dropped (111), the 30-second shot-path floor (132), `/D=` for MCP23017 nodes (207), CP1252 pass-through (210), the ACK call signs toward the app (192, 193) — is official behaviour now.
-
-## Debug logs from a node in the field
-
-**What ships in a normal board build:**
-
-- **Markers**: compact `[TAG];key;value` lines — `[WIFI]`, `[ETH]`, `[GW]`, `[UDP]`, `[NTP]`, `[KBD]`, `[SAFEBOOT]` and more. High-rate candidates are rate-limited or bound to their own switch.
-- **Log switches**: `--setlog on` (the per-message line set), `--gpsdebug on` (fix/position/reject/convergence every 3 s), `--debug on` (verbose), `--loradebug on` (RX/TX, dedup, TX-ring), and — on a gateway — `--udplog on/off`, `--udpstat`, `--wifistat` (ESP32) and `--ethstat` (nRF52).
-- **Where to capture it**: the USB serial console, or the **network console on TCP port 2323** (ESP32 boards), which serves the same log over WiFi so the node can stay in place: `nc <node-ip> 2323`, or long-term with `tools/meshlogger.py` from this repository. Note for ESP32-S3 boards on native USB (T-Deck, T-Beam Supreme): output written before the port was opened is dropped after the first ~256 bytes, so a log that appears to start at boot may not — open the terminal first, then reboot.
-
-**What is not in a normal build** (item 202): the bench and measurement surface — `[INSTR-LOOP]` loop-gap markers, `--instr`, `--heap`, `--injectmsg`, `--injectraw`, `--loratx`, `--ntpsync`, `--flashpoke`, `--disptest`, `--spitrace` and the T-Deck UI hooks. If you need them, build a measurement firmware: `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e <env>`.
-
-If you capture a log of misbehavior in the field, open an issue with the log attached — the markers are designed to be evaluated.
-
-## Deep sleep: what is in, what is not, where we need your help
-
-Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdict is in [the linked document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/archive/issue-962-deepsleep-verdict.md): it is not misbehaving, it was switched off entirely for issue #1053 (`e0043a56`, 4.35p.07.11), on every board, and the manual `--deepsleep` command never really slept either.
-
-**What the firmware does** (items 197–200, 218, 221):
-
-- `--deepsleep` is a real sleep on **every ESP32 board**: radio to sleep, display off, PMU rails off on the T-Beam family, the shared rail cut on the T-Deck and T-Deck Plus, a button wake armed on the configured button pin. Wake is the user button or RESET.
-- `--deepsleep` on **RAK4631, Heltec T114 and T-Echo** is a real nRF52 System OFF (the T-Echo long-press too). Wake is the button, plugging in USB, or RESET. The RAK4631's LEDs are off while it sleeps (221).
-- **The long press works again** (218): hold the button until the display goes dark, release, and the node stays asleep; the next press wakes it. With `--button off` the long press is not available and the firmware does not touch the pin.
-- Boards wake up **with their rails and radio working**: the T-Deck, T-Deck Plus and T-Beam-1W left a gpio hold latched across the wake reset (199), and the same mechanism on Wireless Paper and Vision Master E213 is fixed and field-confirmed (200).
-
-**What the firmware deliberately does not do:**
-
-- **No automatic low-voltage shutdown.** Issue 962 Option B (a timer-wake loop with hysteresis, opt-in) is designed but not implemented. The old guard stays commented out as upstream left it.
-- **No light sleep.** Option C (light sleep with LoRa wake) is advised against in the verdict and was not attempted.
-- **No sleep-current figures.** We have no bench supply, no discharged packs and no inline current meter on the desk. The "tens of microamps" and "about 2 µA" numbers are datasheet and core figures, not measurements.
-
-**We rely on the community for these tests.** If you own one of the boards below, please put it to sleep with `--deepsleep` or the long press, wake it, and post the boot log's reset-reason line and whether LoRa, display and GPS came back — in the issue 962 thread or as an issue on this repository. Two hints from OE3LCR's test: RST is a power-on reset (`wake: 0`), not a deep-sleep wake, so only the PRG/user button proves anything; on boards with a CP2102 USB bridge, pulsing DTR after `--deepsleep` wakes the node without a hand on it.
-
-- **Vision Master E290**: the e-ink keeps drawing its last frame through sleep; we have no unit to verify a clear.
-- **T-Beam Supreme** (AXP2101 rail cut, compile-verified only), **T-Beam SX1262 / SX1268** (AXP192 rails), **T-Beam-1W** (radio LDO).
-- **Heltec T114 and T-Echo** (System OFF and the long-press release wait, compile-verified only; the RAK4631 is the only nRF52 board on our bench).
-- **E22-DevKitC, E22_XML-DevKitC, ttgo-lora32-v21**: the button wake pin has no external pull-up on these; the firmware keeps the internal one alive through sleep, which we could not test on those boards.
-- **Anyone with a meter**: sleep current on the battery lead, on any board.
-
-## Changelog and engineering rationale
-
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/CHANGELOG-stability.md)** — the numbered list; items 212–221 are new since `v4.35t.09.10`, items 104–210 are in official `4.35t`.
-- **[The three field fixes as offered upstream](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/pr-deepsleep-keylock-draft-20260912.md)** — items 218–220 with file references and the bench evidence (German), plus the [T-Beam Supreme hang report](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/bug-tbeam-supreme-435t-display-hang.md) and the [Heltec V3 long-press report](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/bugreport-heltec-v3-longpress-deepsleep.md).
-- **[APRS parser drift analysis and `/X=` contract](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/aprs-parser-drift-20260911.md)** — items 212–216; the grammar itself is §1.8 of [the wire-format document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/architecture/11-wire-format.md).
-- **[Engineering write-up of the back-pressure campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/archive/pr-draft-20260831.md)** — items 107–169, with per-change file references and measurements.
-- **[Issue 962 deep sleep verdict and plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/archive/issue-962-deepsleep-verdict.md)** and **[gpio-hold and HWCDC follow-ups](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/gpio-hold-and-hwcdc-followups.md)**.
-- **[ACK attribution plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/ack-implementierungsplan.md)** and **[the gateway heard-frame fix](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.12.2/docs/archive/ack-heard-foreign-msgids-fix.md)** — items 192 and 193 (German).
-- [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
+Everything else behaves as official `4.35t` plus upstream `dev`.
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 673 native test cases green across 12 host environments (17 new since `v4.35t.09.10`: the `/R= /U= /I=` decode, the `/Y=` reset, the per-buffer NaN guards and the `#name` split).
-- **No board has run the published image itself.** Three boards ran the same source at earlier commits of this cycle; the release image differs from those builds only in `FLASH_VERSION`.
-- **Heltec V3 (DK5EN-93, bench, flashed 12 September with this cycle's code)**: serial `--deepsleep` sleeps at once, no reboot within 15 s; long-press with `--button on`, two cycles — dark, staying dark after the release, wake on the next press with `RESET_REASON=8 DEEPSLEEP` (item 218).
-- **Heltec V3 gateway (DK5EN-98, bench, WiFi OTA 11 September)**: item 217 checked with the jsdom harness against the live node — group kept, DM call sign cleared; the check fails on the previous firmware.
-- **T-Deck Plus (DK5EN-14, bench, instrument build)**: harness scenario `keylock_kbl` — the old code writes 150 to the keyboard light on a message wake, the new code writes nothing; hand test on 12 September: keyboard light off, keylock on, a LoRa message wakes the display and the keyboard stays dark (item 219). The device runs an `INSTRUMENT_ENABLED=1` image, not the release image.
-- **Wireless Paper V1.2 and Vision Master E213 (OE3LCR-10 and -11, field)**: item 200 confirmed by OE3LCR on upstream `dev` after #1137 — the same code path, not this image.
-- **WisBlock RAK4631 (DK5EN-90)** and **T-Beam v1.2 (DK5EN-92)**: no bench time this cycle. The RAK's deep-sleep path changed (218, 221) and was not re-run; see the known gaps.
+- **Host suite**: 36 native environments, 1070/1070 test cases; `test/golden/selftest.sh` green.
+- **Build**: all 32 release environments build clean.
+- **No board has run this release image.** Nothing in today's merge (`43760732`) has been loaded onto hardware. What bench history exists belongs to earlier neo builds, not this one:
+  - A 2026-09-19 differential run against `upstream/dev` on DK5EN-1 (Heltec V3) and DK5EN-92 (T-Beam): no measurable difference on the air, +11,296 B and +15,560 B free heap respectively, and a clean 12-hour soak on three nodes afterward (see "Auf der Bank gemessen" in [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md)).
+  - A 2026-09-25 bench pass on DK5EN-1 covering KISS/TCP, `IS1`, `SN1` and the `--via` fix from that day's upstream catch-up (`docs/neo-upstream-merge-20260925.md`).
 
 ### Built and shipped, not on our bench
 
-These boards build cleanly from the same source and inherit every improvement, but had no bench time here:
+Every board in the 32 release environments builds from the same source and inherits the whole campaign, but none of them has bench time on this specific image — see "Known gaps" below.
 
-- T-Deck without Plus, t_deck_pro
-- E22-DevKitC, E22_1262-DevKitC, E22_1262_S3-DevKitC-1-N16R8, E22_1268_S3-DevKitC-1-N16R8, E22_XML-DevKitC
-- esp32-loraprs-e22, esp32-loraprs-ra01
-- heltec_wifi_lora_32_V2, heltec_wifi_lora_32_V4, heltec_wireless_stick, heltec_wireless_tracker, wireless-paper
-- vision-master-e213, vision-master-e290
-- ttgo-lora32-v21, ttgo_tbeam_supreme, ttgo_tbeam_SX1262, ttgo_tbeam_SX1268, T-Beam-1W
-- T3_S3_V13, t_connect_pro, T-ETH-ELITE_1262
-- heltec_t114, t_echo
+## Known gaps, stated plainly
 
-(The T5 e-paper variant is not included: it does not build from the current tree for a pre-existing include-path reason unrelated to these changes.)
-
-### Known gaps, stated plainly
-
-New with this release:
-
-- **The T-Beam Supreme fix (item 220) is compile-verified only.** No Supreme on our bench; the two field nodes that hung have not yet reported back with the fix build.
-- **The APRS decoder repairs (items 212–216) are proven by the native suite only.** No board has received a real position with `/R= /U= /I=` or a `#name` comment; nobody has eyeballed the result on serial or in the web GUI.
-- **The RAK4631 deep-sleep path changed without a re-run.** Item 218 adds the release wait (gated on `--button`), item 221 switches the LEDs off; the bench RAK sits in System OFF and needs its reset button before it can be re-tested. Heltec T114 and T-Echo inherit both changes compile-verified only.
-- **The letter `t` is shared with official `4.35t`.** Use the flash stamp in `--info` (`20260912`) to tell this build apart.
-
-Carried over, still open:
-
-- **A strict UTF-8 receiver may start rejecting frames it used to accept** (item 210, now official). A consumer on the EXTUDP sideband that decodes strictly will drop frames with CP1252 bytes instead of showing a mangled word. mc-chat handles it; other consumers have not been checked (CHR-03).
-- **Five bytes that are undefined even in CP1252** (`0x81`, `0x8D`, `0x8F`, `0x90`, `0x9D`) arrive at the far end as `U+FFFD` (item 210).
-- **The GPS/barometer fusion misses its own design gate.** Target 4 m standard deviation, bench 6.6 m; tau 2 h reaches 3.6 m in replay. The constant is deliberately left at 30 min.
-- **No moving-node altitude proof.** TRACK mode bypasses both filters, and a TRACK-mode capture with pressure has not been recorded.
-- **The MCP23017 transmit path is proven natively only** (item 207). No MCP23017 on the bench.
-- **The bench and injection commands are gone from a normal build** (item 202). The injection machinery itself is still compiled in and costs flash without being reachable.
-- **No low-voltage shutdown and no light sleep** (see the deep sleep section).
-- **Deep sleep on T-Beam Supreme, the T-Beam SX1262/SX1268 variants, T-Beam-1W, Heltec T114, T-Echo, Vision Master E290 and the E22 DevKitC boards is compile-verified only.** No sleep current was measured on any board.
-- **Vision Master E290 keeps its last e-ink frame through sleep.**
-- **The unread badge is a lower bound after a long absence** (item 195): 20 ring slots shared with positions and acks, and messages stamped near zero on a node without a valid clock count only within one browser session.
-- **The QRS forecast (item 194) has not been eyeballed against a real burst in the browser.**
-- **ACK attribution stage 4 (the wire appendix) is not in**; Gateway ACK stays anonymous.
-- **TD-15 (filed, not fixed):** after a reboot the T-Deck map shows only stations whose position beacon arrived since boot.
-- **MEM-04 (risk, not a defect):** `ttgo_tbeam`, `ttgo_tbeam_SX1262` and `ttgo_tbeam_SX1268` link with about 20 bytes of IRAM headroom, `E22_XML-DevKitC` with under 1 kB of DRAM.
-- **The safeboot fail-closed gate (item 186) has no bench arm on a 4 MB board yet** (TM-49).
-- **The echo guard's ring-flood case (item 179) is still owed** on the T-Deck bench.
-- **`--postime 0` no longer switches position beacons off** — clamped to the 300-second floor, from upstream's own `4.35s` fix (item 177); filed for an upstream PR rather than patched here.
-- **The `--setlog` line set has no hardware run yet.**
-- **The GPS two-hour comparison arms (A/B/C) have not been run.**
+- **No hardware has run today's merge.** Everything above the host suite and the clean build is unverified for this image.
+- **`RING_BYTES_PHONECOM` grew by roughly 1 kB RAM per board class and has not been measured on hardware.** Whether the larger BLE command ring actually stops a truncated configuration burst at the app is an inference from the ring size, not an observation.
+- **The safeboot rework is ahead of upstream.** This build carries it (K15); upstream has it only as the open [PR #1162](https://github.com/icssw-org/MeshCom-Firmware/pull/1162). Its abort bench (6/6) ran on DK5EN-1 on 25 September on fork-main, not on this image.
+- **E22_XML-DevKitC and the T-Beam family run with thin link-time headroom.** The campaign closed the worst of it (see chapter K18 in the changelog), but these environments are still the ones to watch after any further change.
+- Everything `docs/CHANGELOG-neo.md` already lists per chapter as "kein Hardware-Nachweis" or "kompilier-verifiziert" carries over unchanged — this merge did not add bench time anywhere in the tree.
 
 ## Installing
 
-Pick the asset for your board. ESP32 boards take the `.bin` over USB or, if the node is already reachable, over WiFi with `tools/webflash.py`. The three nRF52 boards (`wiscore_rak4631`, `heltec_t114`, `t_echo`) ship both a `.uf2` — double-tap reset, copy the file to the volume that appears — and a DFU `.zip` for `adafruit-nrfutil` over serial.
+**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, 30 boards, board detection built in. This is the easiest path for most boards.
 
-`FLASH_STRUCT_VERSION` is unchanged, so your settings survive. Coming from a build older than `v4.35p.08.22-stability`, check `--info` afterwards.
+Otherwise, pick the asset for your board below. ESP32 boards take the `.bin` over USB or, if the node is already reachable, over WiFi with `tools/webflash.py`. The three nRF52 boards (`wiscore_rak4631`, `heltec_t114`, `t_echo`) ship both a `.uf2` — double-tap reset, copy the file to the volume that appears — and a DFU `.zip` for `adafruit-nrfutil` over serial.
+
+`FLASH_STRUCT_VERSION` is unchanged, so your settings survive.
+
+## Changelog
+
+- **[MeshCom neo Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md)** — items 124–129 are new since the last documented catch-up (2026-09-25); the rest of the document is the full code-quality campaign this branch carries.
 
 ## Upstream
 
-Everything here is offered back to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) as individual pull requests. Items 1–210 are in official `4.35t`; items 218–220 are in upstream `dev` since 12 September; items 212–217 are queued for a PR once a board has seen them work. Please report bugs that also exist in the official firmware over there.
+This branch tracks `upstream/dev` and offers its own work back as individual pull requests once it is proven here; #1157–#1161 above are already upstream. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.

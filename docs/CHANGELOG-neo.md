@@ -70,10 +70,86 @@ Erstellt auf `upstream/dev`, Stand `4058b25b` (Merge von PR #1145). Die
 Instrumentierung, die Kapitel K17 beschreibt, ist dort bereits enthalten; dieser
 Branch aendert an ihr achtzehn Zeilen.
 
-Seitdem zweimal nachgezogen: auf `80b85a5a` (PRs #1147 bis #1150, 2026-09-20)
-und auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25). Was upstream
-dabei gebracht hat, verhaelt sich hier wie upstream; wo dieser Branch davon
-abweicht, steht es im folgenden Abschnitt.
+Seitdem dreimal nachgezogen: auf `80b85a5a` (PRs #1147 bis #1150, 2026-09-20),
+auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25) und auf
+`6cc8b552` (PRs #1157 bis #1161, 2026-09-26). Was upstream dabei gebracht hat,
+verhaelt sich hier wie upstream; wo dieser Branch davon abweicht, steht es in
+den beiden folgenden Abschnitten.
+
+## Nachgezogen aus upstream/dev (2026-09-26)
+
+Der Merge `43760732` (Basis-Merge `6cc8b552`, in der `dev`-Historie fuenf
+Merge-Commits fuer die PRs #1157 bis #1161) bringt vier Bloecke: #1157 ist die
+Portierung dieses Branches eigener RAM-Arbeit (Byte-FIFO-Ringe, MHeard-
+Drosselfix, Web-Header als String, `int16_t`-Zeilenkoordinaten) ueber
+`fork-main` zurueck nach upstream, zusammen mit eigenstaendigen `fork-main`-
+Fixen; die meisten Hunks sind dieselbe Aenderung zweimal. #1158 (OE1KFR) ist
+bereits seit dem 25. September als `f73cbf9e` auf diesem Branch und landet
+jetzt unveraendert auch upstream. #1159 bis #1161 (OE1KBC) sind
+Kommentaraenderungen fuer `4.35t`, die zwei MSB-Wiederholungsbits im `msg_id`
+vorbereiten; die Maske selbst bleibt auskommentiert ("discussion ongoing").
+Aufgeloest wurde ueberwiegend zugunsten der eigenen Struktur, mit vier
+gezielten Uebernahmen aus upstream. Nachweis fuer den ganzen Merge: 36
+Host-Umgebungen 1070/1070 Faelle, `test/golden/selftest.sh` gruen. Kein Board
+hat dieses Zusammenfuehrungsergebnis gesehen.
+
+**124. `sendPing()` meldet eine verweigerte TX-Ring-Eintragung jetzt laut statt
+sie zu verschlucken.** (`43760732`, PR #1157). Upstreams Aenderung gibt
+`sendPing()` einen `PingResult`-Rueckgabewert mit `PING_RING_REFUSED`, statt
+den Aufruf wortlos ins Leere laufen zu lassen, wenn der TX-Ring das Ping nicht
+annimmt; die Zeile geht als `[PING];...;not queued` auf die Konsole. Die
+eigentliche Ring-Eintragung bleibt der neo-Pfad `addTxRingEntryOnce()` (P15,
+`b55fe5d7`) -- nur die Fehlermeldung ist von upstream uebernommen.
+Fehlerbehebung: aus stillem Verlust wird ein sichtbarer Fehler. Kein
+Unterschied auf dem Draht, da hier nichts gesendet wird, das vorher gesendet
+wurde. Nachweis: Host-Suite; kein Hardware-Nachweis fuer die Logzeile selbst.
+
+**125. Der BLE-Kommandoring `RING_BYTES_PHONECOM` waechst auf 3072 B, auf
+jeder Boardklasse gleich.** (`43760732`, PR #1157). Ziel ist, dass der
+komplette Konfigurations-Burst (alle `SN`/`SN1`/`IS`/`IS1`-JSON-Antworten
+zusammen) in den Ring passt, ohne dass eine Boardklasse mit einer kleineren
+Ringgroesse Teile davon verwirft. Fehlerbehebung dem Zweck nach (verhindert
+abgeschnittene Konfigurationsantworten ueber BLE), kostet aber Speicher: rund
++1 kB RAM je Boardklasse, auf keinem Board nachgemessen (siehe bekannte
+Luecken). Nachweis: Host-Suite; kein Hardware-Nachweis.
+
+**126. Neuer Diagnosemarker `[MC-DBG] RING_OVERFLOW buf=phone`.** (`43760732`,
+PR #1157). Meldet einen Ueberlauf des Telefon-Kommandorings auf der Konsole,
+so wie es fuer andere Ringe bereits existiert. Reine Restrukturierung
+(Sichtbarkeit), kein Verhaltensunterschied auf dem Draht. Kein
+Hardware-Nachweis, da der Marker nur bei einem tatsaechlichen Ueberlauf
+feuert und ein solcher auf der Bank nicht provoziert wurde.
+
+**127. Der Byte-Ring-Iterator fuer die Web-Nachrichtenseite nimmt seinen
+Schnappschuss jetzt unter `BF_LOCK`.** (`43760732`, PR #1157). Vorher konnte
+die Web-Historie waehrend des Iterierens von einem gleichzeitigen Schreiber
+veraendert werden; der Snapshot wird jetzt unter dem bestehenden Lock
+gezogen. Fehlerbehebung (verhindert eine inkonsistente Anzeige), betrifft nur
+die Web-GUI, nichts auf dem Draht. Nachweis: Host-Suite; kein
+Hardware-Nachweis fuer die Web-Anzeige selbst.
+
+**128. `WSPWD` und `ASYM` stehen jetzt im zweiten Knoten-JSON `SN1` statt in
+`SN`.** (`f73cbf9e`, OE1KFR, upstream als #1158; mit dem Merge vom
+2026-09-26 neu auf diesem Branch). `SN` lag bei rund 250 Zeichen schon
+ohne gesetztes Web-Passwort ueber `BLE_JSON_PAYLOAD_MAX` (244);
+`bleJsonFrameFailSoft()` hat dann still Felder vom Ende her verworfen --
+`ASYM` immer, `GWS` (das die App fuer die Gateway-Server-Auswahl braucht) ab
+rund acht Passwortzeichen, `BLED` ab neunzehn. Mit `WSPWD` und `ASYM` in `SN1`
+bleibt `SN` bei rund 228 (worst case 235) Zeichen, deutlich unter dem Limit.
+Nach `--webpwd` per BLE sendet der Knoten jetzt `SN`/`SN1` erneut, damit die
+App das neue Web-Passwort zeigt. Fehlerbehebung, betrifft nur die
+BLE-Konfigurationsuebertragung zur App, nichts auf dem Draht. Nachweis:
+Host-Suite; kein dedizierter Test und kein Hardware-Nachweis fuer die
+App-Anzeige.
+
+**129. Kommentare fuer zwei MSB-Wiederholungsbits im `msg_id`, ohne
+Maskenaenderung.** (PRs #1159 bis #1161, OE1KBC, upstream `6cc8b552`). Die
+Kommentare in `4.35t` bereiten vor, dass ein kommendes Protokoll zwei
+hoechstwertige Bits der Nachrichten-ID fuer eine Wiederholungszaehlung
+reserviert; die dazugehoerige Maske ist im upstream-Quelltext selbst
+auskommentiert, laut Commit-Text "discussion ongoing". Reine
+Restrukturierung ohne jede Codewirkung -- kein Verhaltensunterschied, daher
+kein Nachweis noetig.
 
 ## Nachgezogen aus upstream/dev (2026-09-25)
 
