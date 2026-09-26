@@ -990,7 +990,7 @@ void commandAction(char *umsg_text, bool ble)
 
             printdeb("\n== LoRa / mesh ==\n--txpower 99            TX power dBm\n--txfreq 999.999        TX frequency MHz\n--txbw 999              bandwidth kHz\n--txsf 6-12             spreading factor\n--txcr 5-8              coding rate 4/x\n");
             // --maxhop: printfdeb needed here for the %i/%i substitution.
-            printfdeb("--maxhop %i-%i          text hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
+            printfdeb("--maxhop %d-%-13dtext hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
             printdeb("--mesh on/off           relay foreign frames\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
