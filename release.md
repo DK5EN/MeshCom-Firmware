@@ -1,11 +1,163 @@
 # Release Notes -- MeshCom Firmware v4.35t
 
-Firmware `4.35t`, `FLASH_VERSION 20260912`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35t`, `FLASH_VERSION 20260927`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
 
 ---
+
+## Release v4.35t.09.27-neo (Sonntag, 2026-09-27)
+
+Der Sonntagsstand vom 27. September: `v4.35t.09.26-neo` plus zwei neue
+Funktionen, gleichgewichtig -- die Nachbarschaftsmatrix (MeshCom-5-Topologie,
+Stufen 1 bis 3, Branch `feature-neighbour-matrix`) und Speichern und
+Weiterleiten fuer Direktnachrichten (DM-Stufen 0, 1, 2.1, 3 und 4 aus
+`fork-main`, portiert auf Branch `feature-snf`). Gebaut von `feature-snf`.
+Damit ist dieses Release nicht mehr "upstream/dev plus besserer Code": es
+bringt neues Verhalten, auch auf dem Funk. Wer den reinen neo-Stand will,
+nimmt `v4.35t.09.26-neo`; beide stehen im Web-Flasher.
+
+`FLASH_VERSION` geht auf 20260927 (Boot-Log und `DM`-Setlog-Zeile),
+`FLASH_STRUCT_VERSION` bleibt 20260724 -- die Einstellungen bleiben erhalten.
+Die neuen S&F-Einstellungen liegen in eigenem Speicher (ESP32 NVS-Keys, nRF52
+`/dm.cfg` und `/msgstore.cfg`). Das Build-Datum in `--info` ist der Abend des 26. September. Ausnahme beim Update: ein Knoten, der eine
+Nachbarschaftsmatrix-Testversion vor dem 25. September hatte (nur
+DK5EN-Testknoten), kommt mit KISS/TCP und KISS-TX an hoch und braucht sofort
+`--kiss tx off`, `--kiss meta off`, `--kiss off`.
+
+Nachbarschaftsmatrix: ein Topologiespeicher (Kantenpool, Direktnachbarn,
+Horizont) ersetzt MHeard-Tabelle, Pfadtabelle und die dichte Matrix; 64/256
+Nachbarn/Kanten auf klassischem ESP32, 128/512 auf S3 und nRF52, bei weniger
+statischem RAM als vorher. NCNT ist symmetrisch und auf dem Funk auf 99
+gekappt. Relay-Entscheidung je Frame mit `--nbrrelay off|count|on` (Standard
+off), HN-Nachbarschaftsmeldung mit `--nbrreport off|auto|on` (Standard auto:
+alle 15 min von Knoten ohne Mesh und ohne Gateway, `max_hop 0`). Details in
+[`docs/CHANGELOG-meshcom5.md`](docs/CHANGELOG-meshcom5.md).
+
+Speichern und Weiterleiten: doppelte DMs werden erneut quittiert (hoechstens
+einmal je 30 s), aber nicht doppelt angezeigt; eine gescheiterte DM meldet
+Status `0x03`; `{` im DM-Text geht als `(` hinaus; optionaler Ausgangskorb mit
+Wiederholleiter (`--dmretry off|3|9`, Standard off); Speicherknoten auf
+ESP32-S3 und RAK4631 (`--store off|own|list|heard`, Standard off) mit
+Mailbox-Seite und `:sto`-Gewahrsamsmeldung (Status `0x04` in der App). Details
+in [`docs/CHANGELOG-snf.md`](docs/CHANGELOG-snf.md).
+
+Nicht uebernommen aus upstream: `5efa2171` und die zwei Folgecommits
+(Wiederholbits im `msg_id`); upstream hat die Maske selbst auskommentiert,
+kein Verhaltensunterschied zu `v4.35t.09.26-neo`.
+
+**Gates:** 44 native Host-Umgebungen, 1379/1379 Testfaelle; `test/golden/selftest.sh` gruen (die Baseline
+`variant-ini-effective.json` nachgezogen: vier Schluessel, genau die
+S&F-Quellen und -Tests der Host-Umgebungen); alle 32 Release-Umgebungen
+gebaut, RAK4631-Flash 96,4 % (785 504 von 815 104 B).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Dieses exakte Image lief auf keinem Board. Die Bank-Laeufe unten liefen mit
+Vorstufen von `feature-snf` bzw. `feature-neighbour-matrix`; der Unterschied
+zum Release ist der Nachzug aus `fork-main` (Logzeilen, `SN1` nach
+`--webpwd`, Ping-Meldung) und der `FLASH_VERSION`-Stempel, nicht der Code der
+beiden Funktionen.
+
+- **S&F-Bank 2026-09-26, nur LoRa, 2 dBm, zwei Laeufe, beide PASS:** RAK4631
+  DK5EN-90 als Speicherknoten (`--store heard`), T-Beam DK5EN-92 als
+  Empfaenger, Heltec V3 DK5EN-1 als Sender (auf `0d4b914c`). DM an den
+  abwesenden T-Beam gehalten (Mailbox-Seite zeigt HELD), `:sto` beim Sender,
+  nach Rueckkehr Zustellung ueber einen Hop, Quittung beim Sender. Logs in
+  `docs/bench/snf-20260926/`.
+- **Nachbarschaftsmatrix:** T-Deck Plus (Topologie ueberlebt den Neustart,
+  Nachbarn nach 78 s wieder da), Heltec V3, T-Beam v1.2, RAK4631-Stresslauf
+  (2 Laeufe, 0 Konsistenzverletzungen, kein Reset, Heap stabil); Replay des
+  Feldmitschnitts 21.-24.09. gegen eine eingefrorene Kopie des alten Codes
+  (0 abweichende Entscheidungen in 2697 Frame-Gruppen).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Das Release-Image selbst, auf keinem Board.
+- Der groesste Teil des S&F-Testplans: `--dmretry`-Leiter, Sender auf dieser
+  Firmware mit "gehalten" in der App, zwei Speicherknoten, Speicherknoten mit
+  Gateway, Neustart mit offenen Eintraegen, Ablauf und Cooldown, Grenzen bei
+  25 DMs, Mailbox-Knoepfe Deliver/Purge. Liste mit Test-IDs in
+  `docs/snf-port-campaign.md`.
+- Die Auswertung des Nachbarschaftsmatrix-Feldlaufs auf DK5EN-1 und
+  DK5EN-98 (laeuft seit 26.09.).
+- `--nbrrelay on` ausserhalb der zwei DK5EN-Feldknoten.
+- Alle anderen Boards der 32 Release-Umgebungen: gebaut, nicht auf der Bank.
+- Alles, was fuer `v4.35t.09.26-neo` unten schon als ungeprueft steht.
+
+## neo-Release v4.35t.09.26-neo (2026-09-26)
+
+Dritter Nachzug von `upstream/dev` auf den neo-Zweig: Basis `6cc8b552`
+(icssw-org hat #1157 bis #1161 gemergt), als `43760732` in `fork-neo-test`
+gemergt. neo bleibt dabei, was es ist -- `upstream/dev` plus besserer Code,
+keine neue Protokollfunktion, kein neuer Betriebsmodus. Die Firmware meldet
+weiterhin `4.35t`, `FLASH_VERSION 20260912` und `FLASH_STRUCT_VERSION 20260724`
+exakt wie vorher; der Name "neo" lebt nur im Git-Tag, im Release und im
+Web-Flasher. Die Konfiguration der Knoten bleibt beim Update erhalten.
+
+Inhaltlich bringt der Merge vier Bloecke zurueck bzw. neu herein: #1157 ist
+die eigene RAM-Arbeit dieses Branches (Byte-FIFO-Ringe, MHeard-Drosselfix,
+Web-Header als String), ueber `fork-main` portiert und jetzt wieder upstream;
+#1158 (OE1KFR) verschiebt `WSPWD`/`ASYM` von `SN` nach `SN1`, damit das
+Knoten-JSON unter dem BLE-Limit bleibt (`f73cbf9e`, mit diesem Merge neu auf
+dem Branch); #1159 bis #1161 (OE1KBC) sind Kommentare fuer
+`4.35t`, die zwei MSB-Wiederholungsbits im `msg_id` vorbereiten, die Maske
+selbst bleibt auskommentiert -- keine Verhaltensaenderung. Aus der
+Konfliktaufloesung des Merges selbst: `sendPing()` meldet eine verweigerte
+TX-Ring-Eintragung jetzt laut (`[PING]...not queued`) statt sie
+stillschweigend zu verwerfen, der BLE-Kommandoring `RING_BYTES_PHONECOM`
+waechst auf 3072 B auf jeder Boardklasse, damit der komplette
+Konfigurations-Burst hineinpasst, ein neuer Diagnosemarker
+`[MC-DBG] RING_OVERFLOW buf=phone` meldet einen Ueberlauf dieses Rings, und
+der Byte-Ring-Iterator fuer die Web-Nachrichtenseite zieht seinen Snapshot
+jetzt unter `BF_LOCK`. Details, Einstufung (Restrukturierung/Fehlerbehebung)
+und Nachweislage stehen als Punkte 124-129 in
+[`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md).
+
+Dieses Release ersetzt `v4.35t.09.21-neo`: dessen Release-Objekt und Tag
+wurden geloescht, ein Freitext dazu wurde nie committet.
+
+**Gates:** 36 native Host-Umgebungen, 1070/1070 Testfaelle;
+`test/golden/selftest.sh` gruen; alle 32 Release-Umgebungen gebaut.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+**Nichts.** Kein Board hat dieses Firmware-Image -- den heutigen Merge-Stand
+`43760732` -- je geladen. Als Kontext die fruehere neo-Bank-Historie, die
+nicht dieses Image betrifft:
+
+- **Differenzlauf 2026-09-19** gegen `upstream/dev` auf DK5EN-1 (Heltec V3)
+  und DK5EN-92 (T-Beam): auf dem Draht kein Unterschied messbar, im Knoten
+  +11 296 B respektive +15 560 B freier Heap (Details in
+  [`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md), Abschnitt "Auf der Bank
+  gemessen"). Zwoelfstuendiger Dauerlauf im Anschluss auf drei Knoten ohne
+  Neustart, Absturz oder Ringueberlauf.
+- **W4-Bench auf DK5EN-1, 2026-09-25**: KISS/TCP, `IS1`, `SN1` und der
+  `--via`-Fix nach dem Upstream-Merge auf `e4a2393f` (siehe
+  `docs/neo-upstream-merge-20260925.md`).
+
+Beide Laeufe pruefen fruehere Zwischenstaende dieses Branches, nicht den
+heutigen Merge.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der heutige Merge `43760732` selbst, auf keinem Board.
+- Die um +1 kB je Boardklasse gewachsene `RING_BYTES_PHONECOM` -- ob der
+  komplette Konfigurations-Burst jetzt tatsaechlich ohne Abschneiden bei der
+  App ankommt, ist eine Annahme aus der Ringgroesse, keine Messung.
+- Der neue `[MC-DBG] RING_OVERFLOW buf=phone`-Marker -- kein Ueberlauf auf der
+  Bank provoziert.
+- Die verschobenen `WSPWD`/`ASYM`-Felder in `SN1` -- keine App-Sichtpruefung,
+  nur Host-Suite.
+- Die aufgeloeste `sendPing()`-Fehlermeldung -- kein Bank-Log mit einem
+  tatsaechlich verweigerten Ping.
+- Der Safeboot-Stand (K15, `a04d9c87`, inhaltsgleich mit dem offenen
+  upstream-PR #1162) auf diesem Image -- die Abbruch-Bank 6/6 lief am 25.09.
+  auf DK5EN-1 mit fork-main, nicht mit diesem Stand.
+- Alles, was in [`docs/CHANGELOG-neo.md`](docs/CHANGELOG-neo.md) unter den
+  Kapiteln K01-K18 ohnehin schon als "kein Hardware-Nachweis" oder
+  "kompilier-verifiziert" gefuehrt wird (E22_XML- und T-Beam-Headroom u. a.).
 
 ## Stability-Release v4.35t.09.12.2 (2026-09-12)
 

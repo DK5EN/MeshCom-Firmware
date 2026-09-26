@@ -4,8 +4,11 @@ Branch `feature-snf`, the DM transport stages from `fork-main` ported onto
 `feature-neighbour-matrix` (`0d4b914c`). Engineering record, decisions and gate results:
 `docs/snf-port-campaign.md`. Feature design and stage table: `docs/dm-transport-impl-plan-20260913.md`.
 
-Nothing here has been flashed or bench-tested yet, on this branch or on `fork-main`. The bench plan
-is `docs/dm-bench-session-plan-20260914.md`.
+Released as `v4.35t.09.27-neo` together with the neighbour matrix. Bench state: the store node's
+basic case (absent destination, held DM, `:sto` notice, one-hop delivery, ack back to the sender)
+passed twice on 2026-09-26 with a RAK4631 store node and a T-Beam receiver; the rest of the bench
+plan (`docs/dm-bench-session-plan-20260914.md`) is open, see the coverage table at the end of
+`docs/snf-port-campaign.md`.
 
 ## Upgrade note
 

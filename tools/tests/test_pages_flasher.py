@@ -295,6 +295,20 @@ def test_prune_keeps_newest_n(tmp_path):
         == ["v4", "v1", "v2"]
 
 
+def test_release_date_can_be_set(tmp_path):
+    pf.update_releases(tmp_path, "v1", [], keep=3, date="2026-09-27")
+    pf.update_releases(tmp_path, "v2", [], keep=3)
+    rel = {r["version"]: r["date"] for r in
+           json.loads((tmp_path / "releases.json").read_text())["releases"]}
+    assert rel["v1"] == "2026-09-27"
+    assert rel["v2"] == pf._dt.date.today().isoformat()
+
+
+def test_date_flag_rejects_a_malformed_date():
+    with pytest.raises(SystemExit):
+        pf.main(["stage", "--version", "v1", "--out", "x", "--date", "27.09.2026"])
+
+
 def test_republishing_a_version_does_not_duplicate_it(tmp_path):
     pf.update_releases(tmp_path, "v1", [], keep=3)
     info = pf.update_releases(tmp_path, "v1", [], keep=3)

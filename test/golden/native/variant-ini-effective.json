@@ -2297,7 +2297,14 @@
    "+<gps_filter.cpp>",
    "+<alt_fusion.cpp>",
    "+<radio_units.cpp>",
-   "+<msgid_counter.cpp>"
+   "+<msgid_counter.cpp>",
+   "+<dm_stats.cpp>",
+   "+<reack_limiter.cpp>",
+   "+<dm_dedup.cpp>",
+   "+<dm_outbox.cpp>",
+   "+<msgstore.cpp>",
+   "+<sto_notice.cpp>",
+   "+<dm_settings.cpp>"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2330,7 +2337,14 @@
    "test_alt_fusion",
    "test_kbd_repeat",
    "test_radio_units",
-   "test_msgid_counter"
+   "test_msgid_counter",
+   "test_dm_stats",
+   "test_reack_limiter",
+   "test_dm_dedup",
+   "test_dm_text_escape",
+   "test_dm_outbox",
+   "test_msgstore",
+   "test_sto_notice"
   ],
   "test_framework": "unity"
  },
@@ -2350,7 +2364,10 @@
    "+<regex_functions.cpp>",
    "+<aprs_functions.cpp>",
    "+<charset_filter.cpp>",
-   "+<txring_functions.cpp>"
+   "+<txring_functions.cpp>",
+   "+<dm_stats.cpp>",
+   "+<dm_dedup.cpp>",
+   "+<reack_limiter.cpp>"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3295,6 +3312,9 @@
    "+<setlog_lines.cpp>",
    "+<via_functions.cpp>",
    "+<txring_functions.cpp>",
+   "+<dm_stats.cpp>",
+   "+<dm_dedup.cpp>",
+   "+<reack_limiter.cpp>",
    "+<esp32/udp_frame_esp32.cpp>",
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],
