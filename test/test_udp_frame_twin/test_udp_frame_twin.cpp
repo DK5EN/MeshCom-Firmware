@@ -67,6 +67,7 @@
 #include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
 #include <dm_outbox_api.h>   // F2 hookup under test: dmOutboxOnAck() (faked below, see there)
+#include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -218,6 +219,62 @@ bool dmOutboxOnAck(const char *from, uint16_t nnn)
 {
     g_dm_outbox_ack_calls.push_back(DmOutboxAckCall{from ? from : "", nnn});
     return g_dm_outbox_ack_return;
+}
+
+// sto_notice.* (wave4 port map, Group B): sto_notice.cpp is not in this
+// env's build_src_filter (native_udp_frame_twin lists dm_stats/dm_dedup/
+// reack_limiter but not sto_notice -- test/test_sto_notice covers its own
+// parse/build/rate-limit logic), so the three symbols the ingress twins now
+// call are faked here. stoNoticeParse mirrors the real byte-9 tag anchor
+// (src/sto_notice.cpp: "%-9.9s:sto%03u %s", `{`/`:ack`/`:rej` reject) closely
+// enough to drive the wiring under test, not to re-prove sto_notice's own
+// parser. stoHolderNote/stoHolderClear are pure call recorders like
+// dmOutboxOnAck() above, not sinks (kept out of g_sink_log for the same
+// reason: they cannot perturb the U1 corpus dump or the twin-diff baseline).
+struct StoHolderNoteCall { uint32_t msg_id; std::string holder; uint16_t nnn; };
+static std::vector<StoHolderNoteCall> g_sto_holder_note_calls;
+static std::vector<uint32_t> g_sto_holder_clear_calls;
+static bool g_sto_holder_note_return = true;
+
+bool stoNoticeParse(const char *payload, uint16_t *nnn, char *dst)
+{
+    if (nnn) *nnn = 0;
+    if (dst) dst[0] = 0;
+    if (!payload) return false;
+
+    size_t len = strlen(payload);
+    if (len < 9 + strlen(STO_NOTICE_TAG))
+        return false;
+    if (strchr(payload, '{') != NULL)
+        return false;
+    if (strstr(payload, ":ack") != NULL || strstr(payload, ":rej") != NULL)
+        return false;
+
+    const char *tag = payload + 9;
+    if (strncmp(tag, STO_NOTICE_TAG, strlen(STO_NOTICE_TAG)) != 0)
+        return false;
+
+    const char *digits = tag + strlen(STO_NOTICE_TAG);
+    if (!(digits[0] >= '0' && digits[0] <= '9') ||
+        !(digits[1] >= '0' && digits[1] <= '9') ||
+        !(digits[2] >= '0' && digits[2] <= '9'))
+        return false;
+
+    if (nnn)
+        *nnn = (uint16_t)((digits[0] - '0') * 100 + (digits[1] - '0') * 10 + (digits[2] - '0'));
+    return true;
+}
+
+bool stoHolderNote(uint32_t msg_id, const char *holder, uint16_t nnn, uint32_t now_ms)
+{
+    (void)now_ms;
+    g_sto_holder_note_calls.push_back(StoHolderNoteCall{msg_id, holder ? holder : "", nnn});
+    return g_sto_holder_note_return;
+}
+
+void stoHolderClear(uint32_t msg_id)
+{
+    g_sto_holder_clear_calls.push_back(msg_id);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +570,9 @@ static void recorder_reset()
     g_insert_calls.clear();
     g_dm_outbox_ack_calls.clear();
     g_dm_outbox_ack_return = false;
+    g_sto_holder_note_calls.clear();
+    g_sto_holder_clear_calls.clear();
+    g_sto_holder_note_return = true;
 
     udp_is_busy = false;
     lora_tx_msg_len = 0;
@@ -1502,6 +1562,82 @@ static void test_regression_server_ack_stops_outbox_ladder_on_both(void)
         snprintf(msg, sizeof(msg), "%s ack_status must be 0x02 when the outbox (not own_msg_id[]) "
                                     "stopped the ladder", name);
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x02, g_ble[0][5], msg);
+
+        // Wave 4 advisor F3: the holder row is cleared on every accepted ack,
+        // also when own_msg_id[] no longer knows the DM (checkOwnTx() == -1
+        // here) and only the outbox stopped -- else a stale holder outlives
+        // the NNN wrap.
+        snprintf(msg, sizeof(msg), "%s did not clear the store holder on an outbox-only ack", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sto_holder_clear_calls.size(), msg);
+    }
+}
+
+// Wave 4 (docs/snf-port-campaign.md, port map Group B / 150b0a4a): a
+// server-ingress `:sto` custody notice for one of our own outgoing DMs must
+// be CONSUMED -- not displayed as a chat text, not relayed to the phone as
+// a plain message -- and must yield the HELD status (BLE ack frame, status
+// ACK_STATUS_HELD/0x04, holder attribution) instead. Red without the src
+// hook: stoNoticeParse()/stoHolderNote() are never called, own_msg_id[][4]
+// never reaches 0x04, and the notice is displayed like an ordinary DM text
+// (g_sendDisplayText_calls > 0, no HELD ack frame built).
+static void test_regression_sto_notice_consumed_yields_held_status_on_both(void)
+{
+    const uint16_t nnn = 42;
+    const char *holder = "DK5EN-93";
+    char payload[64];
+    snprintf(payload, sizeof(payload), "%-9.9s:sto%03u %s", holder, (unsigned)nnn, "DK5EN-14");
+
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    // Destination == own node_call ("DK5EN-1", set by recorder_reset()), NOT
+    // "*"; source is the store node that sent the notice.
+    uint16_t len = build_gate_datagram(tmpl, holder, "DK5EN-1", ':', payload, 0x9101);
+
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (nnn & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        // own_msg_id[0] models the slot for the DM this notice is about --
+        // checkOwnTx()/g_own_tx_known is index-aligned with own_msg_id[], see
+        // the comment at their declaration above.
+        g_own_tx_known.push_back(expected_msg_id);
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[144];
+        snprintf(msg, sizeof(msg), "%s did not call stoHolderNote() for the :sto notice", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sto_holder_note_calls.size(), msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() holder-callsign mismatch", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(holder, g_sto_holder_note_calls[0].holder.c_str(), msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() NNN mismatch", name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(nnn, g_sto_holder_note_calls[0].nnn, msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() msg_id mismatch", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_sto_holder_note_calls[0].msg_id, msg);
+
+        snprintf(msg, sizeof(msg), "%s did not mark own_msg_id[][4] HELD (0x04)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x04, own_msg_id[0][4], msg);
+
+        snprintf(msg, sizeof(msg), "%s did not build exactly one BLE frame (HELD ack, nothing else)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame indicator byte", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x41, g_ble[0][0], msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame status byte must be ACK_STATUS_HELD (0x04)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(ACK_STATUS_HELD, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame attribution length byte", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)strlen(holder), g_ble[0][6], msg);
+        for (size_t i = 0; i < strlen(holder); i++)
+        {
+            snprintf(msg, sizeof(msg), "%s HELD ack frame attribution byte mismatch", name);
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)holder[i], g_ble[0][7 + i], msg);
+        }
+
+        snprintf(msg, sizeof(msg), "%s displayed a :sto notice as a chat text (must be consumed, not shown)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, msg);
     }
 }
 
@@ -2167,6 +2303,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_conf_zero_address_guard_on_both);
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
     RUN_TEST(test_regression_server_ack_stops_outbox_ladder_on_both);
+    RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);
     RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);

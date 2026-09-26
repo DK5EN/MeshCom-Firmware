@@ -18,6 +18,10 @@
 #include "reack_limiter.h"  // stage 0.2: rate-limited re-ACK for duplicate DMs
 #include "dm_dedup.h"       // stage 2.1: second dedup layer, keyed on (source call, NNN)
 #include "instrument.h"     // stage 0.5: --airgap (bAirgap), INSTRUMENT_ENABLED
+#include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
+#endif
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -1279,6 +1283,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     bNewLine=true;
                 }
 
+#if defined(ENABLE_MSGSTORE)
+                // S3: presence hook -- a frame heard directly from its
+                // originator (no relay hop in the path) arms any HELD
+                // mailbox entry addressed to that call. F2
+                // (docs/review/fable-dm-stage3-verdict-20260914.md): no
+                // server-flag guard -- a gateway that relayed or emitted
+                // this frame already appended its own call to the path,
+                // which fails the comma test below on its own.
+                if(strchr(aprsmsg.msg_source_path, ',') == NULL)
+                    msgstorePresence(aprsmsg.msg_source_call);
+#endif
+
                 // last heard LoRa MeshCom-Packet
                 lastHeardTime = millis();
 
@@ -1299,7 +1315,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // foreign msg_ids that a gateway only forwarded from the server to LoRa
                 // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
                 // unconditional so the web rxlog heard/ACK ticks keep working as today.
-                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
+                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                 {
                     if(ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID))
                     {
@@ -1325,9 +1341,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                        mcIndexOfStr(aprsmsg.msg_payload, ":ack") <= 0)
                         dmstat_echo.fetch_add(1);
 
-                    // 0x02 (acked) and 0x03 (failed, 0.3) are final: a late
-                    // relay echo must not turn them back into "heard".
-                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03)
+                    // 0x02 (acked), 0x03 (failed, 0.3) and 0x04 (held, S4) are
+                    // final/latched: a late relay echo must not turn them
+                    // back into "heard" -- a store node holding this DM would
+                    // otherwise be downgraded by the very echo that proves
+                    // the mesh still relays it.
+                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03 && own_msg_id[icheck][4] != 0x04)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
             }
@@ -1483,7 +1502,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                     int iAckPos=mcIndexOfStr(aprsmsg.msg_payload, ":ack");
                                     int iEnqPos=mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1);
-                                    
+                                    uint16_t stoNnn=0;   // stage 4: :sto custody notice NNN
+
                                     if(iAckPos > 0 || mcIndexOfStr(aprsmsg.msg_payload, ":rej") > 0)
                                     {
                                         //
@@ -1529,6 +1549,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             if(iackcheck >= 0)
                                                 own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
+                                            // S4: the destination's own ack is the final word --
+                                            // forget any store node(s) that were holding this DM.
+                                            // Also when own_msg_id[] already rotated it out and only
+                                            // the outbox still knew the NNN (dmAckStopped).
+                                            stoHolderClear(msg_counter);
+
                                             // 0.3/0.4: peer ACK for an own DM, plus the RTT sample
                                             // for the send-to-ack histogram (M0-1). Also correct
                                             // when only the outbox (not own_msg_id[]) still knew
@@ -1546,6 +1572,44 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         }
 
                                         addBLEOutBuffer(print_buff, plen);
+                                    }
+                                    else
+                                    if(stoNoticeParse(aprsmsg.msg_payload, &stoNnn, NULL))
+                                    {
+                                        // S4: a store node told us (the original sender) it took
+                                        // this DM into custody -- mark it HELD unless it already
+                                        // reached a final state (0x02 ack, 0x03 failed); 0x00/0x01/
+                                        // 0x04 may still be upgraded/refreshed here.
+                                        msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
+
+                                        int iStoCheck = checkOwnTx(msg_counter);
+
+                                        // S1 (D3): informational only, never stops the ladder --
+                                        // independent of the rate-limited phone-frame branch below.
+                                        // F1: unconditional, same T2 reasoning as the :ack branch
+                                        // above -- the outbox is keyed on NNN, not on own_msg_id[].
+                                        dmOutboxOnHeld(stoNnn);
+
+                                        if(iStoCheck >= 0 &&
+                                           (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
+                                           stoHolderNote(msg_counter, aprsmsg.msg_source_call, stoNnn, millis()))
+                                        {
+                                            own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                                            uint16_t stoPlen = buildAckPhoneFrame(print_buff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call);
+                                            addBLEOutBuffer(print_buff, stoPlen);
+
+                                            if(bDisplayInfo)
+                                            {
+                                                printfdeb("\n");
+                                                printfdeb("%s", getTimeString().c_str());
+                                                printfdeb("[HELD] by %s nnn:%03u\n", aprsmsg.msg_source_call, (unsigned)stoNnn);
+                                                bNewLine=true;
+                                            }
+                                        }
+                                        // 0x02 (acked) and 0x03 (failed, 0.3) are final states and are
+                                        // never downgraded back to held; stoHolderNote()'s per-hour rate
+                                        // limit keeps a replayed notice from repeating the phone frame.
                                     }
                                     else
                                     if(iEnqPos > 0)
@@ -1626,6 +1690,74 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                             }
                             else
                             {
+#if defined(ENABLE_MSGSTORE)
+                                // Destination is not us: a store node may need to purge an
+                                // entry heard acked, hold a fresh DM for its store set, or
+                                // cancel a pending delivery it heard a peer store node do
+                                // first. All three run before the relay decision below, so
+                                // a stored/purged DM is still relayed normally.
+                                //
+                                // F2 (docs/review/fable-dm-stage3-verdict-20260914.md): no
+                                // server-flag guard here -- every frame in OnRxDone arrived
+                                // over RF, and the 0x80 bit only records that a
+                                // server-connected gateway touched the copy. Excluding those
+                                // frames would exclude every gateway-relayed or
+                                // app-originated DM, which is exactly the traffic a mailbox
+                                // exists for.
+                                //
+                                // F6: a peer store node's own hop-0 delivery must never be
+                                // re-stored here (that is what feeds msgstoreOnPeerDelivery()
+                                // below) -- the tell is the path shape a store node's own
+                                // delivery actually has: exactly two calls in msg_source_path
+                                // (glueDeliver() appends itself to the sender's own single-call
+                                // path), and the last one is not the frame's source.
+                                int iMboxTagPos = mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1);
+                                uint16_t mboxTagNnn = (iMboxTagPos > 0) ? (uint16_t)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iMboxTagPos + 1), strlen(aprsmsg.msg_payload)) : 0;
+                                const char *pMboxComma1 = strchr(aprsmsg.msg_source_path, ',');
+                                bool bMboxPathTwoCalls = (pMboxComma1 != NULL &&
+                                                          pMboxComma1 > aprsmsg.msg_source_path &&
+                                                          strchr(pMboxComma1 + 1, ',') == NULL);
+                                bool bMboxPeerDelivery = (rly_hop == 0 &&
+                                                          bMboxPathTwoCalls &&
+                                                          strcmp(pMboxComma1 + 1, aprsmsg.msg_source_call) != 0 &&
+                                                          iMboxTagPos > 0);
+
+                                int iMboxAckPos = mcIndexOfStr(aprsmsg.msg_payload, ":ack");
+
+                                if(iMboxAckPos > 0)
+                                {
+                                    // S3: purge hook -- :ackNNN heard for someone else's DM.
+                                    uint16_t mboxAckNnn = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iMboxAckPos + 4), strlen(aprsmsg.msg_payload));
+                                    msgstoreOnAck(aprsmsg.msg_source_call, destination_call, mboxAckNnn);
+                                }
+                                else
+                                if(strcmp(destination_call, "*") != 0 &&
+                                   CheckGroup(destination_call) == 0 &&
+                                   mcIndexOfStr(aprsmsg.msg_payload, ":rej") <= 0 &&
+                                   !mcStartsWith(aprsmsg.msg_payload, "{") &&   // {ping}/{pong}/{MCP}/{SET}/{CET}: control frames, never a DM
+                                   !bMboxPeerDelivery &&                        // F6: don't store a peer's own delivery frame
+                                   msgstoreEligible(destination_call))
+                                {
+                                    // S3: store hook -- a DM for our store set.
+                                    int iMboxEnqPos = mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1);
+                                    if(iMboxEnqPos > 0)
+                                    {
+                                        uint16_t mboxNnn = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iMboxEnqPos + 1), strlen(aprsmsg.msg_payload));
+                                        char mboxPayload[MC_PAYLOAD_LEN];
+                                        mcSet(mboxPayload, sizeof(mboxPayload), aprsmsg.msg_payload);
+                                        mcTruncate(mboxPayload, sizeof(mboxPayload), (size_t)iMboxEnqPos);
+
+                                        msgstoreStore(aprsmsg.msg_source_call, destination_call,
+                                                      mboxNnn, mboxPayload, strlen(mboxPayload));
+                                    }
+                                }
+
+                                // S3: peer-cancel hook -- a hop-0 delivery frame (rly_hop
+                                // computed above) whose path already holds one hop is
+                                // another store node's mailbox delivery, heard directly.
+                                if(bMboxPeerDelivery)
+                                    msgstoreOnPeerDelivery(aprsmsg.msg_source_call, mboxTagNnn);
+#endif
                                 //
                                 // next sequence to decode special broadcast messages
                                 //
@@ -2770,12 +2902,28 @@ bool updateRetransmissionStatus()
                                 dmstat_giveup.fetch_add(1);
 
                                 int idx = checkOwnTx(ring_msg_id);
-                                if(idx >= 0 && own_msg_id[idx][4] != 0x02)
-                                    own_msg_id[idx][4] = 0x03;
 
-                                uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
-                                uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call);
-                                addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                // S4: a store node is holding this DM (docs/dm-stage4-plan-
+                                // 20260914.md, decision 3) -- the ladder giving up on its own
+                                // ring slot is not a failure, the message stays "held" until
+                                // the destination's real :ack flips it. Skip the 0x03 frame
+                                // and the failed mark. dmstat_giveup already counted this
+                                // give-up above (F2, fable-dm-stage4-verdict-20260914.md):
+                                // dmstat_giveup_held additionally marks the held subset, it
+                                // does not replace the giveup count.
+                                if(idx >= 0 && own_msg_id[idx][4] == 0x04)
+                                {
+                                    dmstat_giveup_held.fetch_add(1);
+                                }
+                                else
+                                {
+                                    if(idx >= 0 && own_msg_id[idx][4] != 0x02)
+                                        own_msg_id[idx][4] = 0x03;
+
+                                    uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
+                                    uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call);
+                                    addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                }
 
                                 if(bLORADEBUG)
                                     printfdeb("[MC-DBG] RETRANSMIT_GIVEUP_DM msg_id=%08X dest=%s\n",

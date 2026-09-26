@@ -25,6 +25,10 @@
 #include "nbr_matrix.h"        // NBR-W2: Nachbarschaftsmatrix -- Datenquelle fuer die neue Neighbours-Seite
 #include "nbr_views.h"         // W4b: MHeard/Pfad-Seiten lesen nur noch ueber die Abfrageschicht
 #include <TinyGPSPlus.h>       // DIST auf der MHeard-Seite -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
+#include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
+#if defined(ENABLE_MSGSTORE)
+#include <msgstore_api.h> // stage 3 store node: /?page=mailbox, mboxpurge/mboxdeliver, the setup card
+#endif
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -706,6 +710,13 @@ String work_webpage(bool bget_password, int webid)
                             send_http_header(200, RESPONSE_TYPE_TEXT);
                             sub_page_messages();
                         }
+#if defined(ENABLE_MSGSTORE)
+                        else if (web_header.indexOf("/?page=mailbox") >= 0)
+                        { // user requested the mailbox (store node) page, stage 3
+                            send_http_header(200, RESPONSE_TYPE_TEXT);
+                            sub_page_mailbox();
+                        }
+#endif
                         else if (web_header.indexOf("/?page=rxlog") >= 0)
                         { // user requested the rx log page
                             send_http_header(200, RESPONSE_TYPE_TEXT);
@@ -871,6 +882,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("cpage=\"info\";csender=undefined;\nsetInterval(autorefresh,30000);");
     // This function will be called in intervalls - can be used to auto-refresh content depending on what page is loaded
     web_client.println("function autorefresh() {if(cpage=='messages')updateMessages();if(cpage=='wx')loadPage('wx',csender,false);if(cpage=='position')loadPage('position',csender,false);if(cpage=='mheard')loadPage('mheard',csender,false);if(cpage=='path')loadPage('path',csender,false);if(cpage=='rxlog')loadPage('rxlog',csender,false);};");
+#if defined(ENABLE_MSGSTORE)
+    web_client.println("function autorefreshMbox(){if(cpage=='mailbox')loadPage('mailbox',csender,false);}setInterval(autorefreshMbox,10000);");
+#endif
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
@@ -1168,9 +1182,27 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".mcbadge {font-size:x-small;font-weight:bold;margin-left:4px;}\n");
 
     // stage 1 (docs/dm-stage1-plan-20260914.md): the setup page's --dmretry interop warning.
-    // Shared class name with fork-main's stage 3 mailbox card, not ported yet -- this rule alone
-    // is self-contained (no dependency on the other .mbx-* rules there).
+    // Shared class name with the stage 3 mailbox card below.
     web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
+
+    // content definitions -> mailbox page (stage 3, docs/design/mailbox-page-mockup.html).
+    // Kept unconditional (not #if ENABLE_MSGSTORE) because this is a string literal inside
+    // one big <style> block: the rules never match anything on a board without the page.
+    web_client.println("#content_inner > table td.num {white-space:nowrap;font-variant-numeric:tabular-nums;}\n");
+    web_client.println(".mbx-actions button {padding:3px 7px;}\n");
+    web_client.println(".mbx-counters {display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px 10px;margin:7px;font-variant-numeric:tabular-nums;}\n");
+    web_client.println(".mbx-counters>div {display:flex;justify-content:space-between;gap:6px;border-bottom:1px dotted #c8c8c8;padding:2px 0;}\n");
+    web_client.println(".mbx-counters b {font-weight:bold;}\n");
+    web_client.println(".mbx-state {display:inline-block;border:solid 1px var(--mcgray);border-radius:5px;padding:0 6px;font-size:x-small;font-weight:bold;white-space:nowrap;}\n");
+    web_client.println(".mbx-held {background:var(--mclightblue);}\n");
+    web_client.println(".mbx-armed, .mbx-ladder {background:var(--mclightgreen);}\n");
+    web_client.println(".mbx-cooldown {background:#F6E7B8;}\n");
+    web_client.println(".mbx-stale {color:var(--mcred);}\n");
+    web_client.println(".mbx-actions {display:flex;gap:6px;white-space:nowrap;}\n");
+    web_client.println(".mbx-toolbar {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 10px 0;}\n");
+    web_client.println(".mbx-toolbar .spacer {flex:1;}\n");
+    web_client.println(".mbx-legend {font-size:x-small;margin:8px 0 0 0;color:#555;}\n");
+    web_client.println(".mbx-legend .mbx-state {margin-right:8px;}\n");
 
     web_client.println("</style>\n\n");
 
@@ -1195,6 +1227,12 @@ void deliver_scaffold(bool bget_password)
 
     web_client.println("<Button class=\"nav_button nbactive\" onclick=\"loadPage('info',this,true)\"><svg viewBox=\"-0.5 0 25 25\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M12 21.5C17.1086 21.5 21.25 17.3586 21.25 12.25C21.25 7.14137 17.1086 3 12 3C6.89137 3 2.75 7.14137 2.75 12.25C2.75 17.3586 6.89137 21.5 12 21.5Z\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <path d=\"M12.9309 8.15005C12.9256 8.39231 12.825 8.62272 12.6509 8.79123C12.4767 8.95974 12.2431 9.05271 12.0008 9.05002C11.8242 9.04413 11.6533 8.98641 11.5093 8.884C11.3652 8.7816 11.2546 8.63903 11.1911 8.47415C11.1275 8.30927 11.1139 8.12932 11.152 7.95675C11.19 7.78419 11.278 7.6267 11.405 7.50381C11.532 7.38093 11.6923 7.29814 11.866 7.26578C12.0397 7.23341 12.2192 7.25289 12.3819 7.32181C12.5446 7.39072 12.6834 7.506 12.781 7.65329C12.8787 7.80057 12.9308 7.97335 12.9309 8.15005ZM11.2909 16.5301V11.1501C11.2882 11.0556 11.3046 10.9615 11.3392 10.8736C11.3738 10.7857 11.4258 10.7057 11.4922 10.6385C11.5585 10.5712 11.6378 10.518 11.7252 10.4822C11.8126 10.4464 11.9064 10.4286 12.0008 10.43C12.094 10.4299 12.1863 10.4487 12.272 10.4853C12.3577 10.5218 12.4352 10.5753 12.4997 10.6426C12.5642 10.7099 12.6143 10.7895 12.6472 10.8767C12.6801 10.9639 12.6949 11.0569 12.6908 11.1501V16.5301C12.6908 16.622 12.6727 16.713 12.6376 16.7979C12.6024 16.8828 12.5508 16.96 12.4858 17.025C12.4208 17.09 12.3437 17.1415 12.2588 17.1767C12.1738 17.2119 12.0828 17.23 11.9909 17.23C11.899 17.23 11.8079 17.2119 11.723 17.1767C11.6381 17.1415 11.5609 17.09 11.4959 17.025C11.4309 16.96 11.3793 16.8828 11.3442 16.7979C11.309 16.713 11.2909 16.622 11.2909 16.5301Z\" fill=\"#ffffff\"></path> </g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('messages',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> </g></svg></Button>\n");
+#if defined(ENABLE_MSGSTORE)
+    // Stage 3 store node: envelope icon from docs/design/mailbox-page-mockup.html, placed
+    // right after Messages. Non-eligible boards never emit this button, so a stray click
+    // would 404 anyway, but there is no click to have.
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mailbox',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M3 8l9 6 9-6\" stroke=\"#ffffff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\" stroke=\"#ffffff\" stroke-width=\"1.6\"></rect> </g></svg></Button>\n");
+#endif
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('wx',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 512 512\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g > <style type=\"text/css\"> .st0{fill:#ffffff;} </style> <g> <path class=\"st0\" d=\"M115.958,269.922c16.999-10.12,36.842-15.916,58.04-15.916c2.556,0,5.127,0.078,7.682,0.234 c7.199-24.681,20.957-46.355,39.203-63.12c-3.49-39.437-36.562-70.32-76.879-70.32c-42.647,0-77.207,34.56-77.207,77.199 C66.798,230.766,87.194,258.719,115.958,269.922z\"></path> <rect x=\"135.652\" y=\"54.002\" class=\"st0\" width=\"16.696\" height=\"45.911\"></rect> <polygon class=\"st0\" points=\"102.184,108.88 79.232,69.116 64.772,77.467 87.724,117.232 \"></polygon> <polygon class=\"st0\" points=\"15.114,133.233 54.878,156.185 63.23,141.726 23.466,118.774 \"></polygon> <polygon class=\"st0\" points=\"45.919,189.654 0,189.654 0,206.35 45.919,206.342 \"></polygon> <polygon class=\"st0\" points=\"15.114,262.77 23.466,277.23 63.23,254.27 54.878,239.811 \"></polygon> <rect x=\"240.478\" y=\"114.523\" transform=\"matrix(0.4998 0.8661 -0.8661 0.4998 243.5358 -146.7501)\" class=\"st0\" width=\"16.694\" height=\"45.913\"></rect> <polygon class=\"st0\" points=\"223.228,77.467 208.776,69.116 185.817,108.88 200.269,117.232 \"></polygon> <path class=\"st0\" d=\"M431.997,298c-0.031,0-0.062,0.008-0.101,0.008c0.054-1.332,0.101-2.665,0.101-4.004 C431.997,229.932,380.064,178,316,178c-60.012,0-109.382,45.575-115.388,104.006c-8.414-2.602-17.342-4.005-26.614-4.005 C124.294,278.001,84,318.295,84,368c0,49.704,40.294,89.998,89.998,89.998h257.999c44.182,0,80.003-35.814,80.003-79.995 C512,333.814,476.178,298,431.997,298z\"></path> </g> </g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('position',this,true)\"><svg viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"#ffffff\" stroke=\"#ffffff\"><g stroke-width=\"0\"></g><g istroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"#ffffff\" d=\"M256 17.108c-75.73 0-137.122 61.392-137.122 137.122.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063c11.27-20.324 17.188-43.18 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108zm0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z\"></path></g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mheard',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 32 32\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <style type=\"text/css\"> .linesandangles_een{fill:#ffffff;} </style> <path class=\"linesandangles_een\" d=\"M25,13c0,3.348-2.208,7.455-4.286,9.618c-0.527,0.549-0.902,1.188-1.299,1.863 C18.447,26.131,17.35,28,14,28c-3.616,0-5.077-2.068-6.043-3.437c-0.238-0.337-0.464-0.657-0.664-0.856l1.414-1.414 C9.028,22.614,9.301,23,9.59,23.41C10.49,24.683,11.42,26,14,26c2.205,0,2.796-1.007,3.69-2.531 c0.417-0.711,0.891-1.517,1.581-2.236C21.064,19.366,23,15.687,23,13c0-3.86-3.14-7-7-7s-7,3.14-7,7H7c0-4.962,4.038-9,9-9 S25,8.038,25,13z M12,17h-1v2h1c1.206,0,3-0.799,3-3c0-1.639-0.994-2.5-2-2.833v-0.161C13.006,12.503,13.177,10,16,10 s2.994,2.503,3,3.005L20,13h1c0-1.729-1.045-5-5-5s-5,3.271-5,5l0.014,1.975L11.988,15C12.45,15.012,13,15.195,13,16 S12.45,16.988,12,17z\"></path> </g></svg></Button>\n");
@@ -2505,6 +2543,199 @@ void sub_page_messages()
     web_client.println(); // The HTTP response ends with another blank line
 }
 
+#if defined(ENABLE_MSGSTORE)
+/**
+ * ###########################################################################################################################
+ * Formats a millisecond duration as "Ns" / "N min" / "Nh NNmin" into a caller-supplied stack
+ * buffer -- stage 3 mailbox page helper, kept out of sub_page_mailbox() only so every one of
+ * its six call sites (age, hold left, jitter/next) stays a single line. No heap, no String
+ * concatenation, matching the rest of this file's per-row discipline.
+ */
+static void mbxFormatDuration(char *buf, size_t n, uint32_t ms)
+{
+    uint32_t secs = ms / 1000UL;
+    if (secs < 60UL)
+        snprintf(buf, n, "%lus", (unsigned long)secs);
+    else if (secs < 3600UL)
+        snprintf(buf, n, "%lu min", (unsigned long)(secs / 60UL));
+    else
+        snprintf(buf, n, "%lu h %02lu min", (unsigned long)(secs / 3600UL), (unsigned long)((secs % 3600UL) / 60UL));
+}
+
+/**
+ * ###########################################################################################################################
+ * delivers the mailbox (store node) page to be injected into the scaffold. Stage 3,
+ * docs/dm-stage3-wave-plan-20260914.md -- read-only list of what this node is holding for
+ * other stations plus operator actions (deliver now / purge); the stored message TEXT is
+ * never rendered, only its stripped length (plen). Owner-gated like every other page: the
+ * password check already ran in work_webpage() before this is ever called.
+ */
+void sub_page_mailbox()
+{
+    _create_meshcom_subheader("Mailbox");
+    web_client.println("<div id=\"content_inner\">");
+
+    char buf_next[24];
+    uint32_t next_in_ms = msgstoreNextActionInMs();
+    if (next_in_ms == 0) // msgstore_api.h: 0 == nothing due, not "due now"
+        snprintf(buf_next, sizeof(buf_next), "none due");
+    else
+        mbxFormatDuration(buf_next, sizeof(buf_next), next_in_ms);
+
+    enum MsgStoreMode mode = msgstoreMode();
+    int used = msgstoreUsed();
+
+    web_client.println("<div class=\"mbx-toolbar\">");
+    web_client.printf("<span class=\"mctab mctab-on\">store node: %s<span class=\"mcbadge\">%s</span></span>\n",
+                       msgstoreModeName(mode), mode == MSGSTORE_OFF ? "OFF" : "ON");
+    web_client.printf("<span class=\"mctab\">notice %s</span>\n", msgstoreNotice() ? "on" : "off");
+    web_client.printf("<span class=\"mctab\">slots %d / %u</span>\n", used, (unsigned)msgstoreSlots());
+    web_client.printf("<span class=\"mctab\">actions this hour %u / %u</span>\n", (unsigned)msgstoreActionsLastHour(), (unsigned)MSGSTORE_ACTIONS_PER_HOUR);
+    web_client.printf("<span class=\"mctab\">next action in %s</span>\n", buf_next);
+    web_client.println("<span class=\"spacer\"></span>");
+    web_client.println("<button type=\"button\" onclick=\"loadPage('mailbox',csender,false)\" title=\"Reload the list\">Refresh</button>\n");
+    web_client.printf("<button type=\"button\" title=\"Drop every stored message\" onclick=\"if(confirm('Purge all %d stored messages? The senders are not told.')){callfunction('mboxpurge','all');}\">Purge all</button>\n", used);
+    web_client.println("</div>");
+
+    // No wrapper div: the scaffold table rules match `#content_inner > table` only.
+    web_client.println("<table><thead><tr>");
+    web_client.println("<th>Destination</th><th>Last heard</th><th>Source</th><th>NNN</th><th>Size</th><th>Age</th><th>Hold left</th><th>State</th><th>Attempts</th><th>Notified</th><th>Actions</th>");
+    web_client.println("</tr></thead><tbody>");
+
+    uint32_t now_ms = millis();
+    uint32_t hold_total_ms = (uint32_t)msgstoreHoldHours() * 3600000UL;
+    int nslots = (int)msgstoreSlots();
+
+    for (int slot = 0; slot < nslots; slot++)
+    {
+        const struct MsgStoreEntry *e = msgstoreEntry(slot);
+        if (e == NULL)
+            continue;
+
+        char buf_heard[24], buf_age[24], buf_hold[24], buf_attempt[48];
+
+        // feature-snf port: fork-main reads mheardAgeMs(), which does not exist on this
+        // branch (mheard_functions.* removed by ccb3ec23) -- same replacement as
+        // msgstore_glue.cpp's glueHeardAgeMs(), the neighbour-matrix topology directly.
+        int32_t heard_ms;
+        {
+            uint16_t now_min = (uint16_t)(millis() / 60000UL);
+            int row = nbrFind(nbrMatrix, e->dst);
+            NbrMhView v;
+            heard_ms = nbrMhGet(nbrMatrix, row, now_min, &v) ? (int32_t)v.age_min * 60000L : -1;
+        }
+        bool stale = false;
+        if (heard_ms < 0)
+        {
+            snprintf(buf_heard, sizeof(buf_heard), "never");
+        }
+        else
+        {
+            mbxFormatDuration(buf_heard, sizeof(buf_heard), (uint32_t)heard_ms);
+            stale = ((uint32_t)heard_ms >= MSGSTORE_HEARD_WINDOW_MS);
+        }
+
+        uint32_t age_ms = now_ms - e->stored_ms; // monotonic, wraps the same way millis() does
+        mbxFormatDuration(buf_age, sizeof(buf_age), age_ms);
+
+        uint32_t held_ms = (age_ms >= hold_total_ms) ? hold_total_ms : age_ms;
+        mbxFormatDuration(buf_hold, sizeof(buf_hold), hold_total_ms - held_ms);
+
+        // advisor F3 (docs/review/fable-dm-stage3-verdict-20260914.md): millis-wrap
+        // safe "time left" -- plain > misreports across the 49.7-day wrap.
+        int32_t remain_signed = (int32_t)(e->next_ms - now_ms);
+        uint32_t remain_ms = (remain_signed > 0) ? (uint32_t)remain_signed : 0;
+        if (e->state == MSGSTORE_ARMED)
+        {
+            char buf_remain[16];
+            mbxFormatDuration(buf_remain, sizeof(buf_remain), remain_ms);
+            snprintf(buf_attempt, sizeof(buf_attempt), "%u.%u of %u &middot; jitter %s", e->cycles, e->attempt, MSGSTORE_LADDER_STEPS, buf_remain);
+        }
+        else if (e->state == MSGSTORE_LADDER || e->state == MSGSTORE_COOLDOWN)
+        {
+            char buf_remain[16];
+            mbxFormatDuration(buf_remain, sizeof(buf_remain), remain_ms);
+            snprintf(buf_attempt, sizeof(buf_attempt), "%u.%u of %u &middot; next %s", e->cycles, e->attempt, MSGSTORE_LADDER_STEPS, buf_remain);
+        }
+        else
+        {
+            snprintf(buf_attempt, sizeof(buf_attempt), "%u.%u of %u", e->cycles, e->attempt, MSGSTORE_LADDER_STEPS);
+        }
+
+        const char *state_class;
+        switch (e->state)
+        {
+        case MSGSTORE_HELD: state_class = "mbx-held"; break;
+        case MSGSTORE_ARMED: state_class = "mbx-armed"; break;
+        case MSGSTORE_LADDER: state_class = "mbx-ladder"; break;
+        case MSGSTORE_COOLDOWN: state_class = "mbx-cooldown"; break;
+        default: state_class = ""; break;
+        }
+
+        web_client.printf("<tr><td class=\"font-bold no-wrap\">%s</td>", e->dst);
+        if (stale)
+            web_client.printf("<td class=\"no-wrap mbx-stale\" title=\"Older than the store set window\">%s</td>", buf_heard);
+        else
+            web_client.printf("<td class=\"no-wrap\">%s</td>", buf_heard);
+        web_client.printf("<td class=\"no-wrap\">%s</td>", e->src);
+        web_client.printf("<td class=\"num\">%03u</td>", (unsigned)e->nnn);
+        web_client.printf("<td class=\"num\">%u B</td>", (unsigned)e->plen);
+        web_client.printf("<td class=\"no-wrap\">%s</td>", buf_age);
+        web_client.printf("<td class=\"no-wrap\">%s</td>", buf_hold);
+        web_client.printf("<td><span class=\"mbx-state %s\">%s</span></td>", state_class, msgstoreStateName(e->state));
+        web_client.printf("<td>%s</td>", buf_attempt);
+        web_client.printf("<td>%s</td>", (e->notice == 2) ? "sent" : (e->notice == 1) ? "pending" : "-");
+
+        web_client.println("<td class=\"mbx-actions\">");
+        if (e->state == MSGSTORE_ARMED || e->state == MSGSTORE_LADDER)
+        {
+            web_client.printf("<button type=\"button\" disabled title=\"%s\">Deliver</button>",
+                               (e->state == MSGSTORE_ARMED) ? "Delivery is already scheduled" : "A ladder is already running");
+        }
+        else
+        {
+            web_client.printf("<button type=\"button\" onclick=\"if(confirm('Start a delivery ladder now for %s to %s (NNN %03u)? Ignores the cooldown, still subject to the node caps.')){callfunction('mboxdeliver','%d');}\">Deliver</button>",
+                               e->src, e->dst, (unsigned)e->nnn, slot);
+        }
+        web_client.printf("<button type=\"button\" onclick=\"if(confirm('Purge the message for %s from %s (NNN %03u)?')){callfunction('mboxpurge','%d');}\">Purge</button>",
+                           e->dst, e->src, (unsigned)e->nnn, slot);
+        web_client.println("</td></tr>");
+    }
+
+    web_client.println("</tbody></table>");
+
+    web_client.println("<p class=\"mbx-legend\">");
+    web_client.println("<span class=\"mbx-state mbx-held\">HELD</span>waiting for the destination to be heard directly");
+    web_client.println("<span class=\"mbx-state mbx-armed\">ARMED</span>heard, random 5-60 s wait, cancelled if another store node delivers first");
+    web_client.println("<span class=\"mbx-state mbx-ladder\">LADDER</span>9 sends over 9 min at hop 0");
+    web_client.println("<span class=\"mbx-state mbx-cooldown\">COOLDOWN</span>ladder done without ack, 1 h before the next");
+    web_client.println("<br>Attempts read cycle.attempt. Last heard in red is older than the 12 h store-set window: the entry is kept until hold runs out, but delivery needs a fresh direct sighting. Message text is never shown here.");
+    web_client.println("</p>");
+
+    const struct MsgStoreCounters *cnt = msgstoreCounters();
+    web_client.println("<div class=\"cardlayout\">");
+    web_client.println("<span class=\"cardlabel\">Counters since boot</span>");
+    web_client.println("<div class=\"mbx-counters\">");
+    web_client.printf("<div><span>stored</span><b>%u</b></div>", (unsigned)cnt->stored);
+    web_client.printf("<div><span>refreshed</span><b>%u</b></div>", (unsigned)cnt->refreshed);
+    web_client.printf("<div><span>delivered</span><b>%u</b></div>", (unsigned)cnt->delivered);
+    web_client.printf("<div><span>purged by ack</span><b>%u</b></div>", (unsigned)cnt->purged_ack);
+    web_client.printf("<div><span>dropped storetime</span><b>%u</b></div>", (unsigned)cnt->dropped_storetime);
+    web_client.printf("<div><span>dropped by cap</span><b>%u</b></div>", (unsigned)cnt->dropped_cap);
+    web_client.printf("<div><span>dropped no slot</span><b>%u</b></div>", (unsigned)cnt->dropped_slots);
+    web_client.printf("<div><span>cancelled by peer</span><b>%u</b></div>", (unsigned)cnt->cancelled_peer);
+    web_client.printf("<div><span>blocked by caps</span><b>%u</b></div>", (unsigned)cnt->blocked_bp);
+    web_client.printf("<div><span>notices sent</span><b>%u</b></div>", (unsigned)cnt->notified);
+    web_client.printf("<div><span>notices blocked</span><b>%u</b></div>", (unsigned)cnt->notice_blocked);
+    web_client.println("</div>");
+    web_client.println("<p class=\"font-small\" style=\"margin:7px;\">Same numbers as the <code>MBOX</code> setlog line. Dropped by cap and dropped no slot are two counters on purpose: the first means the 20-per-hour ceiling ate a hold time, the second means the mailbox was full.</p>");
+    web_client.println("</div>");
+
+    web_client.println("</div>");
+    web_client.println(); // The HTTP response ends with another blank line
+}
+#endif // ENABLE_MSGSTORE
+
 /**
  * ###########################################################################################################################
  * delivers the setup-page to be injected into the scaffold
@@ -2781,6 +3012,38 @@ void sub_page_setup()
     web_client.println("<div class=\"mbx-warn\">Requires the receiving node to run this firmware or newer. Older nodes show every retry as a new message.</div>");
     web_client.println("</div>");
 
+#if defined(ENABLE_MSGSTORE)
+    // Store node card (stage 3, docs/dm-stage3-wave-plan-20260914.md / M7). The mode select is
+    // hand-built like --maxhop above rather than _create_setup_switch_element, because it has
+    // four states and switching away from "off" must confirm() first and revert the select on
+    // cancel -- a plain on/off switch can't carry that. storecall/storetime/storeslots are
+    // ordinary text settings and do fit _create_setup_textinput_element.
+    web_client.println("<div class=\"cardlayout\">");
+    web_client.println("<label class=\"cardlabel\">Store node</label>");
+    web_client.println("<div class=\"grid grid2\">");
+    {
+        static const char *s_storemode_val[4] = {"off", "own", "list", "heard"};
+        static const char *s_storemode_lbl[4] = {"off", "own callsign, all SSIDs", "callsign list", "every station heard directly (12 h)"};
+        const char *cur_mode = msgstoreModeName(msgstoreMode());
+
+        web_client.println("<label for=\"storemode\">Store messages for</label>");
+        web_client.printf("<select id=\"storemode\" name=\"storemode\" data-prev=\"%s\" onchange=\"var s=this;if(s.value!='off' && !confirm('This node must run 24/7 on continuous power. Stored messages live in RAM only; a reboot discards all of them without notice.')){s.value=s.getAttribute('data-prev');return;}s.setAttribute('data-prev',s.value);setvalue('store',s.value,true);\">\n", cur_mode);
+        for (int im = 0; im < 4; im++)
+        {
+            web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", s_storemode_val[im], (strcmp(s_storemode_val[im], cur_mode) == 0) ? "selected" : "", s_storemode_lbl[im]);
+        }
+        web_client.println("</select>");
+    }
+    _create_setup_textinput_element("storecall", "Callsign list (list mode, up to 16)", msgstoreListCsv(), "OE1KBC-4,DK5EN-14", "storecall", MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX, false, false);
+    _create_setup_textinput_element("storetime", "Hold time in hours (1 to 168)", String(msgstoreHoldHours()), "24", "storetime", 3, false, false);
+    _create_setup_textinput_element("storeslots", "Slots (1 to 50)", String(msgstoreSlots()), "50", "storeslots", 3, false, false);
+    _create_setup_switch_element("storenotice", "Notify sender", "tell the sender when a message is held", msgstoreNotice()); // stage 4: --storenotice on|off
+    web_client.println("</div>");
+    web_client.printf("<div class=\"mbx-warn\"><b>Before you switch this on.</b> This node must run 24/7 on continuous power. Stored messages live in RAM only; a reboot discards all of them without notice, and nobody is told. About %.1f kB of RAM is reserved for %u slots.</div>\n",
+                       (float)(msgstoreSlots() * sizeof(struct MsgStoreEntry)) / 1024.0f, (unsigned)msgstoreSlots());
+    web_client.println("</div>");
+#endif
+
     // Config Backup / Restore Section (CS-03)
     // The download is a plain navigation to /config.json -- the response
     // carries a Content-Disposition, so the browser saves it instead of
@@ -2860,18 +3123,25 @@ void sub_content_messages()
             if (icheck >= 0)
             {
                 if (own_msg_id[icheck][4] == 1)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                     ccheck = "&#x2713&nbsp;";
                 }
 
                 if (own_msg_id[icheck][4] == 2)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                     ccheck = "&#x2611;&nbsp;";
                 }
 
                 if (own_msg_id[icheck][4] == 3)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed (retransmit gave up)
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held (retransmit gave up on a user-originated DM)
                     ccheck = "<span title=\"delivery failed\">&#x2717;</span>&nbsp;";
+                }
+
+                if (own_msg_id[icheck][4] == 4)
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held (a store node holds this DM for an absent destination)
+                    String holder = stoHolder(aprsmsg.msg_id);
+                    String holdtitle = holder.length() > 0 ? ("held by " + htmlEscape(holder)) : "held by a store node";
+                    ccheck = "<span title=\"" + holdtitle + "\">&#x2709;</span>&nbsp;";
                 }
             }
 
@@ -3166,6 +3436,9 @@ void sub_page_info()
 
     web_client.printf("<tr><td>Messaging</td><td>");
     web_client.printf("No MSG All: %s<br>", (bNoMSGtoALL ? "on" : "off"));
+    #if defined(ENABLE_MSGSTORE)
+    web_client.printf("Notify sender: %s<br>", msgstoreNotice() ? "on" : "off"); // info_switch_lint: matches sub_page_setup()'s "storenotice" label
+    #endif
     web_client.printf("</td></tr>\n");
 
     // Neighbourhood: not on the setup page (no _create_setup_switch_element there --
@@ -3598,7 +3871,32 @@ void call_function(String web_header)
         functionData.functionParameter = "";
     }
 
-    webFunctionCall(&functionData); // try to execute that command
+#if defined(ENABLE_MSGSTORE)
+    // Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md). Handled here
+    // rather than in webFunctionCall() (web_nodefunctioncalls.cpp, out of this file's exclusive
+    // set) -- both keep the same WF_RETURNCODE_OKAY/FAIL convention call_function() already
+    // serialises below, so the mailbox page's callfunction() calls need no special handling.
+    if (functionData.functionName.equals("mboxpurge"))
+    {
+        if (functionData.functionParameter.equals("all"))
+        {
+            msgstorePurgeAll();
+            functionData.returnCode = WF_RETURNCODE_OKAY;
+        }
+        else
+        {
+            functionData.returnCode = msgstorePurge(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        }
+    }
+    else if (functionData.functionName.equals("mboxdeliver"))
+    {
+        functionData.returnCode = msgstoreDeliverNow(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+    }
+    else
+#endif
+    {
+        webFunctionCall(&functionData); // try to execute that command
+    }
 
     send_http_header(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON); // send header, either 200 if command was executed or 422 if not
 

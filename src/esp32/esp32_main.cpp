@@ -126,6 +126,10 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
 #include "dm_settings.h"
 #include "dm_outbox_api.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#include "msgstore_settings.h"
+#endif
 #include <regex_functions.h>
 #include <test_inject.h>
 #include <command_functions.h>
@@ -838,6 +842,13 @@ void esp32setup()
     // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
     dmSettingsLoad();
     dmOutboxGlueInit();
+
+#if defined(ENABLE_MSGSTORE)
+    // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
+    // --store/--storecall/--storetime/--storeslots/--storenotice settings.
+    msgstoreGlueInit();
+    msgstoreSettingsLoad();
+#endif
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das
@@ -3997,6 +4008,9 @@ void esp32loop()
     if((int32_t)(millis() - (retransmit_timer + (1000 * 2))) > 0)
     {
         updateRetransmissionStatus();
+#if defined(ENABLE_MSGSTORE)
+        msgstoreLoop();   // S3: all mailbox work runs here, in the loop task
+#endif
         dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
         retransmit_timer = millis();
     }

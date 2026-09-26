@@ -130,6 +130,10 @@ void sendHeartbeat();
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
 #include "dm_settings.h"
 #include "dm_outbox_api.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#include "msgstore_settings.h"
+#endif
 #include <regex_functions.h>
 #include "setlog_lines.h"
 #include "dedup_functions.h"
@@ -567,6 +571,13 @@ void nrf52setup()
     // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
     dmSettingsLoad();
     dmOutboxGlueInit();
+
+#if defined(ENABLE_MSGSTORE)
+    // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
+    // --store/--storecall/--storetime/--storeslots/--storenotice settings.
+    msgstoreGlueInit();
+    msgstoreSettingsLoad();
+#endif
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das

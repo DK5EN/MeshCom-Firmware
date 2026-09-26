@@ -36,6 +36,9 @@
 #include "dm_stats.h"
 #include "dm_outbox_api.h"   // S1: stage 1 outbox/retry ladder
 #include "dm_settings.h"     // S1: dmRetryMode()
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"    // S3: store node (last-hop mailbox)
+#endif
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
 #include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
@@ -3351,6 +3354,14 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
             dmOutboxFormatLine(dmbuf, sizeof(dmbuf));   // S1: OUTBOX line, same gate
             setlogPrint(dmbuf);
         }
+
+#if defined(ENABLE_MSGSTORE)
+        if(msgstoreMode() != MSGSTORE_OFF)
+        {
+            msgstoreFormatLine(dmbuf, sizeof(dmbuf));   // S3: MBOX line, same gate
+            setlogPrint(dmbuf);
+        }
+#endif
     }
 }
 

@@ -7,6 +7,9 @@ This file contains all web-based setup functions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <dm_settings.h> // stage 1: dmretry setparam mapping, every board
+#if defined(ENABLE_MSGSTORE)
+#include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
+#endif
 #include <string>
 
 
@@ -426,6 +429,52 @@ void webSetup_setParam(setupStruct *setupData){
         setupData->returnValue = dmRetryModeName(dmRetryMode());
         return;
     } else
+
+    #if defined(ENABLE_MSGSTORE)
+    // Stage 3 store node (docs/dm-stage3-wave-plan-20260914.md): five commands owned by sibling
+    // C (command_functions.cpp), reached from the mailbox setup card the same way every other
+    // setting here reaches its command -- through commandAction(), never a direct setter, so the
+    // web GUI and the serial console can never drift apart (same discipline as maxhop/dmretry).
+    if(setupData->paramName.equals("store")) {
+        snprintf(message_text, sizeof(message_text), "--store %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (strcmp(msgstoreModeName(msgstoreMode()), setupData->paramValue.c_str())==0)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = msgstoreModeName(msgstoreMode());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storecall")) {
+        snprintf(message_text, sizeof(message_text), "--storecall %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (strcmp(msgstoreListCsv(), setupData->paramValue.c_str())==0)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = msgstoreListCsv();
+        return;
+    } else
+
+    if(setupData->paramName.equals("storetime")) {
+        snprintf(message_text, sizeof(message_text), "--storetime %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = ((int)msgstoreHoldHours() == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = String(msgstoreHoldHours());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storeslots")) {
+        snprintf(message_text, sizeof(message_text), "--storeslots %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = ((int)msgstoreSlots() == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = String(msgstoreSlots());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storenotice")) {
+        snprintf(message_text, sizeof(message_text), "--storenotice %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (msgstoreNotice() == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = msgstoreNotice()?"on":"off";
+        return;
+    } else
+    #endif
 
     if(setupData->paramName.equals("sendpos")) {
         // WEB-04: this used to be a copy-paste of the nomsgall block above it
@@ -928,6 +977,33 @@ void webSetup_getParam(setupStruct *setupData){
         setupData->returnValue = dmRetryModeName(dmRetryMode());
         return;
     } else
+
+    #if defined(ENABLE_MSGSTORE)
+    if(setupData->paramName.equals("store")) {
+        setupData->returnValue = msgstoreModeName(msgstoreMode());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storecall")) {
+        setupData->returnValue = msgstoreListCsv();
+        return;
+    } else
+
+    if(setupData->paramName.equals("storetime")) {
+        setupData->returnValue = String(msgstoreHoldHours());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storeslots")) {
+        setupData->returnValue = String(msgstoreSlots());
+        return;
+    } else
+
+    if(setupData->paramName.equals("storenotice")) {
+        setupData->returnValue = msgstoreNotice()?"on":"off";
+        return;
+    } else
+    #endif
 
     if(setupData->paramName.equals("setssid")) {
         setupData->returnValue = String(meshcom_settings.node_ssid);    

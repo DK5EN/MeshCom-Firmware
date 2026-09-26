@@ -15,7 +15,7 @@ Source of truth for the feature itself: `fork-main:docs/dm-transport-impl-plan-2
 | 1    | new modules + host tests, shared headers, `env:native`              | done 2026-09-26 | see log  |
 | 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | done 2026-09-26 |          |
 | 3    | stage 1 outbox + ladder (`--dmretry`)                               | done 2026-09-26 |          |
-| 4    | stage 3 store node + stage 4 custody notice                         | open            |          |
+| 4    | stage 3 store node + stage 4 custody notice                         | done 2026-09-26 |          |
 | 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |          |
 
 Per-wave gate: files exist; host suite (native envs only, never bare `pio test`);
@@ -91,3 +91,20 @@ fork-main), `bUseOnce` for `--dmretry` DMs, `dmOutboxAdd()`. `--dmretry`, `--inf
 line. Gate: host 44/44 envs, 1378 cases; 13 lints; 7 lead envs; `esp32-external-radio` builds with
 a dummy overlay (`EXTERNAL_RADIO_HOST/PORT`, the env's own precondition) and links `dmOutboxLoop`.
 RAK flash 94.1 % (767048 of 815104 B) -- 48 kB left before stage 3/4.
+
+**Wave 4 (2026-09-26).** Stages 3 and 4 plus the deferred stage 1-4 links, five writers.
+`lora_functions.cpp`: presence hook where `updateMheard()` sat (same gate and callsign as
+fork-main), store/purge/peer-delivery hooks in the existing destination-not-us `else`, `:sto`
+parse -> 0x04 + `ACK_STATUS_HELD` + `dmOutboxOnHeld()`, echo guard `!= 0x04`, give-up vs held.
+Twins: `:sto` consumption with `bStoConsumed` gates (twin regression test). Commands `--store*`,
+`--mbox`, `--storenotice`, `--info STORE` (one unguarded `store` rung with the `#if` inside, forced
+by `command_ladder_lint`; help lines added, fork-main had none), MBOX setlog line, Mailbox page,
+setup card, messages-page held marker, `msgstoreGlueInit()`/`msgstoreSettingsLoad()` at boot,
+`msgstoreLoop()` on both main ticks. Advisor: four findings, all fixed -- F1 peer-delivery tell
+was the pre-stage-1 msg_id rule (now fork-main's path-shape rule), F2 `msgstoreLoop()` missing in
+the ESP32 `EXTERNAL_RADIO` tick, F3 `stoHolderClear()` now runs on every accepted ack incl.
+outbox-only (twin test asserts it, red on the old nesting), F4 Mailbox table no longer wrapped in
+a div (this branch's table CSS rule). A writer ran `git stash` on the two twin files against its
+brief; the stash matched the tree byte for byte and was dropped. Gate: host 44/44 envs, 1379
+cases; 13 lints; 7 lead envs; store node only in S3/RAK images, none in classic; RAK flash 96.3 %
+(784720 of 815104 B).

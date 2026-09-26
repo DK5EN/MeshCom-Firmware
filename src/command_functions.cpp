@@ -28,6 +28,10 @@
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
 #include "dm_settings.h"       // sender-side --dmretry, every board (stage 1)
+#include "msgstore_settings.h" // store node settings persistence (stage 3, owner C)
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"      // store node core -- link stub off ENABLE_MSGSTORE boards (owner A)
+#endif
 #include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #ifdef ESP32
 #include "net_console.h"
@@ -187,6 +191,91 @@ int commandCheck(char *msg, char *command)
 {
     return commandMatches(msg, command) ? 0 : -1;
 }
+
+#if defined(ENABLE_MSGSTORE)
+// --storecall entry validator: A-Z0-9, optional "-SSID" (1..99), <= 9 chars
+// before the SSID part (MSGSTORE_CALL_MAX - 1, msgstore_api.h). Mutates the
+// token in place to its uppercase form on success.
+static bool storeCallEntryValid(char *call)
+{
+    for(char *p = call; *p; p++)
+        *p = (char)toupper((unsigned char)*p);
+
+    size_t len = strlen(call);
+    if(len == 0 || len > MSGSTORE_CALL_MAX - 1)
+        return false;
+
+    char *dash = strchr(call, '-');
+    char *base_end = dash ? dash : call + len;
+
+    if(base_end == call)
+        return false;
+
+    for(char *p = call; p < base_end; p++)
+    {
+        if(!isalnum((unsigned char)*p))
+            return false;
+    }
+
+    if(dash != NULL)
+    {
+        char *ssid = dash + 1;
+        size_t ssid_len = strlen(ssid);
+        if(ssid_len == 0 || ssid_len > 2)
+            return false;
+
+        for(char *p = ssid; *p; p++)
+        {
+            if(!isdigit((unsigned char)*p))
+                return false;
+        }
+
+        int ssidVal = atoi(ssid);
+        if(ssidVal < 1 || ssidVal > 99)
+            return false;
+    }
+
+    return true;
+}
+
+// Prints the current mode/slots/time/notice line, bench-parseable (raw
+// Serial.printf, like --maxhop's [MAXHOP] line -- printfdeb() strips ';'
+// outside CSV mode).
+static void storePrintState(void)
+{
+    Serial.printf("[STORE];mode;%s;slots;%u;time;%u;notice;%s\n",
+        msgstoreModeName(msgstoreMode()), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+        msgstoreNotice() ? "on" : "off");
+}
+
+// Applies a new store mode, persists it, and -- when arming the store for
+// the first time (off -> anything else) -- prints the RAM/24-7 warning and
+// the current free heap first, verbatim per the stage 3 brief.
+static void storeApplyMode(enum MsgStoreMode newMode)
+{
+    enum MsgStoreMode prevMode = msgstoreMode();
+
+    msgstoreConfigure(newMode, msgstoreSlots(), msgstoreHoldHours());
+    msgstoreSettingsSave();
+
+    if(prevMode == MSGSTORE_OFF && newMode != MSGSTORE_OFF)
+    {
+        Serial.printf("[STORE];warning;this node must run 24/7 on continuous power; "
+                       "stored messages live in RAM only and a reboot discards all of "
+                       "them without notice\n");
+
+#if defined(ESP32)
+        Serial.printf("[STORE];heap;%u\n", (unsigned)ESP.getFreeHeap());
+#else
+        extern int dbgHeapTotal(void);   // src/instrument.cpp:19 precedent
+        extern int dbgHeapUsed(void);
+        Serial.printf("[STORE];heap;%u\n", (unsigned)(dbgHeapTotal() - dbgHeapUsed()));
+#endif
+    }
+
+    storePrintState();
+}
+#endif // ENABLE_MSGSTORE
 
 // ---------------------------------------------------------------------------
 // D2-06: the 70 table-driven on/off toggles. See src/command_toggles.h for the
@@ -1021,6 +1110,17 @@ void commandAction(char *umsg_text, bool ble)
             // --maxhop: printfdeb needed here for the %i/%i substitution.
             printfdeb("--maxhop %d-%-13dtext hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
             printfdeb("--dmretry off|3|9       Enhanced message transport protection (no value: show)\n");
+            // "--store" alone (no value: show) is the one rung that compiles
+            // on every board (command_ladder_lint.py does not know
+            // ENABLE_MSGSTORE is mutually exclusive with anything, so the
+            // handler is one unconditional rung with a guarded body -- see
+            // commandAction()); its own mention must stay unguarded too, or
+            // help_parity_lint.py's guard-parity check (D) fires on the
+            // boards where the modal --store lines below do not compile.
+            printdeb("--store                 mailbox status (no value: show)\n");
+            #if defined(ENABLE_MSGSTORE)
+            printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--mbox                  store-node mailbox contents\n");
+            #endif
             printdeb("--mesh on/off           relay foreign frames\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
@@ -4115,6 +4215,243 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // Store node (mailbox) settings, stage 3 (docs/dm-stage3-wave-plan-20260914.md)
+    // + stage 4 sender-visible custody notice (docs/dm-stage4-plan-20260914.md).
+    // T13: persisted through msgstore_settings.cpp's own keys/file, never
+    // through struct s_meshcom_settings. commandCheck is a prefix match for
+    // the trailing-space (argument) forms, so storecall/storetime/storeslots/
+    // storenotice must be tested before the bare "store"/"storenotice" below --
+    // "store" (5 chars) alone would otherwise not reach them, but "storenotice"
+    // (11 chars) as an exact token would shadow "storenotice " if reordered.
+#if defined(ENABLE_MSGSTORE)
+    if(commandCheck(msg_text+2, (char*)"storecall ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+12);
+
+        if(casecmp(_owner_c, (char*)"none") == 0)
+        {
+            msgstoreSetList("");
+            msgstoreSettingsSave();
+            Serial.printf("[STORE];list;\n");
+
+            return;
+        }
+
+        char normalized[MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX] = {0};
+        int count = 0;
+        bool bad = false;
+
+        char *tok = strtok(_owner_c, ",");
+        while(tok != NULL)
+        {
+            while(*tok == ' ')
+                tok++;
+
+            size_t tl = strlen(tok);
+            while(tl > 0 && tok[tl-1] == ' ')
+                tok[--tl] = 0;
+
+            count++;
+
+            if(count > MSGSTORE_LIST_MAX || !storeCallEntryValid(tok))
+            {
+                bad = true;
+                break;
+            }
+
+            if(normalized[0] != 0)
+                strncat(normalized, ",", sizeof(normalized) - strlen(normalized) - 1);
+            strncat(normalized, tok, sizeof(normalized) - strlen(normalized) - 1);
+
+            tok = strtok(NULL, ",");
+        }
+
+        if(bad || count == 0)
+        {
+            Serial.printf("[ERR];storecall;invalid entry or more than %d entries\n", MSGSTORE_LIST_MAX);
+
+            return;
+        }
+
+        msgstoreSetList(normalized);
+        msgstoreSettingsSave();
+        Serial.printf("[STORE];list;%s\n", msgstoreListCsv());
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storecall") == 0)
+    {
+        Serial.printf("[STORE];list;%s\n", msgstoreListCsv());
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storetime ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+12);
+        iVar = 0;
+        sscanf(_owner_c, "%d", &iVar);
+
+        if(iVar < 1 || iVar > MSGSTORE_HOLD_MAX_H)
+        {
+            Serial.printf("[ERR];storetime;%d not between 1 and %d\n", iVar, MSGSTORE_HOLD_MAX_H);
+
+            return;
+        }
+
+        msgstoreConfigure(msgstoreMode(), msgstoreSlots(), (uint16_t)iVar);
+        msgstoreSettingsSave();
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storetime") == 0)
+    {
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storeslots ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
+        iVar = 0;
+        sscanf(_owner_c, "%d", &iVar);
+
+        if(iVar < 1 || iVar > MSGSTORE_SLOTS_MAX)
+        {
+            Serial.printf("[ERR];storeslots;%d not between 1 and %d\n", iVar, MSGSTORE_SLOTS_MAX);
+
+            return;
+        }
+
+        // Allowed while entries are held: the core caps its use at the new
+        // value (docs/commands-store-node.md).
+        msgstoreConfigure(msgstoreMode(), (uint8_t)iVar, msgstoreHoldHours());
+        msgstoreSettingsSave();
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storeslots") == 0)
+    {
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store off") == 0)
+    {
+        storeApplyMode(MSGSTORE_OFF);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store own") == 0)
+    {
+        storeApplyMode(MSGSTORE_OWN);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store list") == 0)
+    {
+        storeApplyMode(MSGSTORE_LIST);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store heard") == 0)
+    {
+        storeApplyMode(MSGSTORE_HEARD);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storenotice ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            msgstoreSetNotice(true);
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            msgstoreSetNotice(false);
+        }
+        else
+        {
+            Serial.printf("[ERR];storenotice;must be on or off\n");
+
+            return;
+        }
+
+        msgstoreSettingsSave();
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storenotice") == 0)
+    {
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mbox") == 0)
+    {
+        // F3 (fable-dm-stage4-verdict-20260914.md): matches the STAT path's
+        // dmbuf[200] (loop_functions.cpp) -- msgstoreFormatLine() now carries
+        // 15 numbers behind 94 bytes of literals, and 128 clamps the trailing
+        // sto= field first on a store node that has been up for weeks.
+        char line[200];
+        msgstoreFormatLine(line, sizeof(line));
+        Serial.printf("%s\n", line);
+
+        int slots = msgstoreSlots();
+        for(int islot=0; islot<slots; islot++)
+        {
+            const struct MsgStoreEntry *e = msgstoreEntry(islot);
+            if(e == NULL)
+                continue;
+
+            unsigned long age_s = (unsigned long)((millis() - e->stored_ms) / 1000);
+
+            // Never the payload text -- slot, dst, src, nnn, state, cycles.attempt, age.
+            Serial.printf("[MBOX];%d;%s;%s;%u;%s;%u.%u;age;%lu\n",
+                islot, e->dst, e->src, (unsigned)e->nnn, msgstoreStateName(e->state),
+                (unsigned)e->cycles, (unsigned)e->attempt, age_s);
+        }
+
+        return;
+    }
+    else
+#endif // ENABLE_MSGSTORE
+    // Bare "store" is a single, unconditional rung on both build shapes --
+    // command_ladder_lint.py's exact-duplicate check only recognises
+    // NRF52_SERIES/ESP32 as mutually exclusive #if guards, not
+    // ENABLE_MSGSTORE, so two separate "store" rungs (one per #if/#else
+    // arm, as fork-main has it) would read as dead code. One rung, two
+    // bodies instead.
+    if(commandCheck(msg_text+2, (char*)"store") == 0)
+    {
+#if defined(ENABLE_MSGSTORE)
+        storePrintState();
+#else
+        // Ineligible board (T-Beam and other classic-ESP32 boards): the
+        // setters above do not exist here, so a web setparam must not fall
+        // into "unknown command" for the bare form either.
+        Serial.printf("[STORE];unavailable\n");
+#endif
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"txpower ") == 0)
     {
         bArgOk = cmdArgInt(msg_text+10, &iVar);
@@ -5847,6 +6184,14 @@ void commandAction(char *umsg_text, bool ble)
             // Sender-side DM retry ladder, "Enhanced message transport
             // protection" -- every board (docs/dm-stage1-plan-20260914.md).
             printfdeb("...DMRETRY mode=%s\n", dmRetryModeName(dmRetryMode()));
+
+#if defined(ENABLE_MSGSTORE)
+            // Store node (mailbox), stage 3 + stage 4 notice --
+            // docs/dm-stage3-wave-plan-20260914.md / dm-stage4-plan-20260914.md.
+            printfdeb("...STORE mode=%s used=%d/%u time=%uh notice=%s\n",
+                msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+                (msgstoreNotice()?"on":"off"));
+#endif
 
             for(int ig=0;ig<6;ig++)
             {

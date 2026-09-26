@@ -13,6 +13,7 @@
 #include "reack_limiter.h"
 #include "dm_stats.h"
 #include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
+#include "sto_notice.h"      // F1/stage 4: :sto custody notice on server ingress
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -312,6 +313,8 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 unsigned int iAckId = 0;
                 bool bDmDedupNew = true;   // 2.1 default
+                bool bStoConsumed = false; // stage 4: :sto notice consumed, don't display/forward
+                uint16_t stoNnn = 0;
 
                 int iAckPos=mcIndexOfStr(aprsmsg.msg_payload, ":ack");
                 int iRefPos=mcIndexOfStr(aprsmsg.msg_payload, ":rej");
@@ -344,6 +347,10 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                     {
                         if(iackcheck >= 0)
                             own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                        // stage 4: the destination's own ack is the final word --
+                        // forget any store node(s) that were holding this DM, also
+                        // when only the outbox still knew the NNN (dmAckStopped).
+                        stoHolderClear(msg_counter);
                         ack_status = 0x02;  // 02...ACK
                       }
 
@@ -372,6 +379,33 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                     bBLELoopOut=false;
                 }
+                else
+                if(strcmp(destination_call, meshcom_settings.node_call) == 0 &&
+                   stoNoticeParse(aprsmsg.msg_payload, &stoNnn, NULL))
+                {
+                    // stage 4: another node (a store node) tells us it is
+                    // holding one of our own outgoing DMs -- consume the
+                    // notice, mark the message HELD, do not display or
+                    // forward it as a chat text.
+                    msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
+
+                    int iStoCheck = checkOwnTx(msg_counter);
+                    if(iStoCheck >= 0 &&
+                       (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
+                       stoHolderNote(msg_counter, aprsmsg.msg_source_call, stoNnn, millis()))
+                    {
+                        own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                        uint8_t stoPrintBuff[30];
+                        uint16_t stoPlen = buildAckPhoneFrame(stoPrintBuff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call);
+                        addBLEOutBuffer(stoPrintBuff, stoPlen);
+
+                        if(bDisplayInfo)
+                            printfdeb("[HELD] by %s nnn:%03u\n", aprsmsg.msg_source_call, (unsigned)stoNnn);
+                    }
+
+                    bStoConsumed = true;
+                }
                 if(iEnqPos > 0)
                 {
                   iAckId = (unsigned int)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iEnqPos+1), strlen(aprsmsg.msg_payload));
@@ -388,7 +422,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                   }
                 }
 
-                if(iAckPos <= 0 && bDmDedupNew)
+                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed)
                 {
                   sendDisplayText(aprsmsg, 99, 0);
                 }
@@ -404,7 +438,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                if(bDmDedupNew) addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew && !bStoConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 
