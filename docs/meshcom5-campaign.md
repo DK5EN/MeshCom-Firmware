@@ -281,3 +281,17 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   unchanged, KISS off, NBR debug/relay/report on, 22 dBm production). Its capture on rpizero
   reconnected by itself; evaluate the new image with `--since 2026-09-26T09:42`. DK5EN-1 still
   runs ccb3ec23.
+
+### Fleet state and RAK Ethernet (2026-09-26, late morning)
+
+- Whole fleet on the 99ae5df6/124c7ba7 code: DK5EN-98 and DK5EN-1 over WiFi OTA (build
+  09:40:55; DK5EN-1 at about 10:03, its USB capture kept running, evaluate it with
+  `--since 2026-09-26T10:04`), T-Beam DK5EN-92, T-Deck Plus DK5EN-14, RAK DK5EN-90 (USB DFU,
+  build 10:39:19).
+- RAK Ethernet: link up but no DHCP on any image, and a static IP was not even ARP-reachable.
+  Clean flash and a fork-main 1b829721 A/B image changed nothing. Cause: the router port. On
+  another port the current image got 192.168.68.73 within 45 s, NTP and web server; identity
+  guard passes. Side observation on the fork-main image (not investigated): chip had the IP,
+  firmware still reported no IP.
+- `test_meshlogger` fixed (fake console now reports TXCAPTURE like real firmware); bench RAK
+  port is `/dev/cu.usbmodem1101` in `soak_harness.py` and `rak_harness.py`.
