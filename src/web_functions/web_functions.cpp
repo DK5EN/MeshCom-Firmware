@@ -2912,17 +2912,100 @@ void sub_page_info()
         web_client.printf("<tr><td>Battery</td><td>USB (no battery)</td></tr>\n");
     else
         web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV</td></tr>\n", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
+    // WEB-SW: grouped switch overview, one <tr> per group, labels matching
+    // sub_page_setup()'s _create_setup_switch_element() calls verbatim, same
+    // #if guards as there. test/golden/info_switch_lint.py checks every
+    // setup-page switch label appears somewhere on this page.
     web_client.printf("<tr><td>Settings</td><td>");
     web_client.printf("Gateway: %s<br>", (bGATEWAY ? "on" : "off"));
+    web_client.printf("Mesh: %s<br>", (bMESH ? "on" : "off"));
+    web_client.printf("Via: %s<br>", (bVIA ? "on" : "off"));
+    web_client.printf("Userbutton: %s<br>", (bButtonCheck ? "on" : "off"));
+    #if defined(ANALOG_PIN)
     if (!bAnalogCheck)
         web_client.printf("Analog: off<br>");
     else if (meshcom_settings.node_analog_pin <= 0 || meshcom_settings.node_analog_pin >= 99)
         web_client.printf("Analog: on (GPIO not set, measurement paused)<br>");
     else
         web_client.printf("Analog: on (GPIO %i)<br>", meshcom_settings.node_analog_pin);
-    web_client.printf("Mesh: %s<br>", (bMESH ? "on" : "off"));
-    web_client.printf("Routing: %s<br>", (bVIA ? "on" : "off"));
-    web_client.printf("Button: %s<br>", (bButtonCheck ? "on" : "off"));
+    #endif
+    web_client.printf("</td></tr>\n");
+
+    web_client.printf("<tr><td>Display</td><td>");
+    web_client.printf("Display: %s<br>", (!bDisplayOff ? "on" : "off"));
+    web_client.printf("Voltage: %s<br>", (bDisplayVolt ? "on" : "off"));
+    web_client.printf("</td></tr>\n");
+
+    web_client.printf("<tr><td>Network</td><td>");
+    #if defined(HAS_ETHERNET)
+    web_client.printf("Ethernet Mode: %s<br>", (meshcom_settings.node_netmode == 1 ? "on" : "off"));
+    #endif
+    web_client.printf("ext UDP: %s<br>", (bEXTUDP ? "on" : "off"));
+    #if !defined(BOARD_RAK4630) && !defined(DISABLE_NET_CONSOLE)
+    web_client.printf("net console: %s<br>", (bNETCONSOLE ? "on" : "off"));
+    #endif
+    #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+    web_client.printf("KISS/TCP: %s<br>", (bKISS ? "on" : "off"));
+    // security: flag transmit-enabled KISS clients with no HMAC auth gate
+    web_client.printf("KISS TX: %s%s<br>", (bKISSTX ? "on" : "off"), (bKISSTX && bKISS && !bKISSAUTH) ? " (!)" : "");
+    web_client.printf("KISS RxMeta: %s<br>", (bKISSMETA ? "on" : "off"));
+    web_client.printf("KISS Auth: %s<br>", (bKISSAUTH ? "on" : "off"));
+    #endif
+    web_client.printf("</td></tr>\n");
+
+    web_client.printf("<tr><td>Position</td><td>");
+    #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
+    web_client.printf("GPS: %s<br>", (bGPSON ? "on" : "off"));
+    #endif
+    web_client.printf("Track: %s<br>", (bDisplayTrack ? "on" : "off"));
+    web_client.printf("</td></tr>\n");
+
+    web_client.printf("<tr><td>Sensors</td><td>");
+    #ifdef OneWire_GPIO
+    web_client.printf("1-Wire: %s<br>", (bONEWIRE ? "on" : "off"));
+    #endif
+    #if defined(ENABLE_BMX280)
+    web_client.printf("BMP280: %s<br>", (bBMPON ? "on" : "off"));
+    web_client.printf("BME280: %s<br>", (bBMEON ? "on" : "off"));
+    web_client.printf("BME680: %s<br>", (bBME680ON ? "on" : "off"));
+    web_client.printf("MCU811: %s<br>", (bMCU811ON ? "on" : "off"));
+    #endif
+    #if defined (ENABLE_INA226)
+    web_client.printf("INA226: %s<br>", (bINA226ON ? "on" : "off"));
+    #endif
+    #if defined(ENABLE_AHT20)
+    web_client.printf("AHT20: %s<br>", (bAHT20ON ? "on" : "off"));
+    #endif
+    #if defined(ENABLE_SHT21)
+    web_client.printf("SHT21: %s<br>", (bSHT21ON ? "on" : "off"));
+    #endif
+    #if defined(ENABLE_SOFTSER)
+    web_client.printf("SoftSer: %s<br>", (bSOFTSERON ? "on" : "off"));
+    #endif
+    web_client.printf("</td></tr>\n");
+
+    web_client.printf("<tr><td>Messaging</td><td>");
+    web_client.printf("No MSG All: %s<br>", (bNoMSGtoALL ? "on" : "off"));
+    web_client.printf("</td></tr>\n");
+
+    // Neighbourhood: not on the setup page (no _create_setup_switch_element there --
+    // these are console-only --nbr* flags), so info_switch_lint.py does not require
+    // them, but they are the security/behaviour-relevant state for mesh relay decisions.
+    web_client.printf("<tr><td>Neighbourhood</td><td>");
+    web_client.printf("NBR debug: %s<br>", (bNBRDEBUG ? "on" : "off"));
+    web_client.printf("NBR relay: %s<br>", (bNBRCANCEL ? "on" : (bNBRRELAY ? "count" : "off")));
+    web_client.printf("NBR sym: %s<br>", (bNBRSYM ? "on" : "off"));
+    web_client.printf("NBR report: %s<br>", (bNBRRPTOFF ? "off" : (bNBRRPTON ? "on" : "auto")));
+    web_client.printf("</td></tr>\n");
+
+    #if defined(ESP32) && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO))
+    web_client.printf("<tr><td>Persistence</td><td>");
+    web_client.printf("SD: %s<br>", (meshcom_settings.node_persist_to_sd ? "on" : "off"));
+    web_client.printf("Flash: %s<br>", (meshcom_settings.node_persist_to_flash ? "on" : "off"));
+    web_client.printf("</td></tr>\n");
+    #endif
+
+    web_client.printf("<tr><td>Debug</td><td>");
     web_client.printf("Debug: %s<br>", (bDEBUG ? "on" : "off"));
     web_client.printf("Debug LoRa: %s<br>", (bLORADEBUG ? "on" : "off"));
     web_client.printf("Debug GPS: %s<br>", (iGPSDEBUG ? "on" : "off"));

@@ -57,6 +57,12 @@ python3 test/golden/toggle_table_lint.py
 # after the fix.
 python3 test/golden/producer_match_lint.py --self-test
 python3 test/golden/producer_match_lint.py
+# WEB-SW: sub_page_info() (the web info page) is supposed to print one
+# "Label: value" line per sub_page_setup() switch, so a node's state can be
+# read without opening the settings page -- nothing but this lint keeps the
+# two pages in step when a switch is added, renamed or dropped.
+python3 test/golden/info_switch_lint.py --self-test
+python3 test/golden/info_switch_lint.py
 # settings_layout_lint.py (the struct-twin diff between src/esp32/esp32_flash.h
 # and src/nrf52/WisBlock-API.h) was retired in the D1-04 W3 struct merge: with
 # ONE struct (src/meshcom_settings.h) there is no twin left to diff. Its
