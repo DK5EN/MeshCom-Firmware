@@ -210,3 +210,21 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   evaluate with `--since 2026-09-26T07:43`.
 - Open: RAK4631 DK5EN-90 consistency test after
   everything else (operator, 2026-09-25).
+
+### RAK4631 test (2026-09-26)
+
+- New firmware instrument (f699fa73): `nbrCheck()` compares masks and edge pool row by row under
+  the nRF52 clamp; `[NBR]|CHECK` once a minute with `--nbrdebug`, `--nbrcheck` on demand.
+- Stress on DK5EN-90: loop-task readers (`--neighbours`, `--mheard`, `--path`, `--nbrcheck`)
+  every 4 s while the LORA task writes received frames. Run 1: 27.5 min uptime, 350 reader
+  commands, 40 received frames / 126 EDGE/ME updates, 25 minute checks and 88 on-demand checks,
+  all 0 violations, no reset, free heap stable (111,940 -> 111,884 B). Run 2 on the fixed image:
+  12 min, 12 + 41 checks, 0 violations. Traffic at the desk is light; the field run on a busier
+  site remains the stronger test.
+- Found and fixed (bc0cd4de): nRF52 builds with -Ofast (-ffast-math); `isnan()` and every other
+  NaN test fold to false, so unknown positions printed as `nan`. Unknown positions are now the
+  finite `NBR_POS_NONE` with `nbrPosKnown()`; `native_nbr_views64` builds with `-O2 -ffast-math`
+  to pin it. Pre-existing and not changed: `isnan()` in bmx280.cpp (3), onewire_functions.cpp (2)
+  and `isfinite()` in config_json.cpp have the same weakness on nRF52.
+- Info page (efcce970): all 26 settings-page switches plus the NBR switches, `info_switch_lint.py`
+  in the golden selftest. Not yet seen live (field-run nodes untouched, RAK without Ethernet).
