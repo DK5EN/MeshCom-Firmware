@@ -5252,6 +5252,19 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // --nbrcheck: Konsistenz Masken <-> Kantenpool (nbrCheck(), nbr_matrix.h),
+    // unabhaengig von --nbrdebug. 0/0/0/0 heisst konsistent.
+    if(commandCheck(msg_text+2, (char*)"nbrcheck") == 0)
+    {
+        NbrCheck c;
+        nbrCheck(nbrMatrix, &c);
+        printfdeb("[NBR] check rows=%u edges=%u mask_extra=%u mask_missing=%u edge_bad=%u edge_dup=%u -> %s\n",
+                  (unsigned)c.rows, (unsigned)c.edges, (unsigned)c.mask_extra, (unsigned)c.mask_missing,
+                  (unsigned)c.edge_bad, (unsigned)c.edge_dup,
+                  (c.mask_extra || c.mask_missing || c.edge_bad || c.edge_dup) ? "INCONSISTENT" : "ok");
+        return;
+    }
+
     if(commandCheck(msg_text+2, (char*)"nbrreset") == 0)
     {
         uint16_t now_min = (uint16_t)(millis() / 60000UL);

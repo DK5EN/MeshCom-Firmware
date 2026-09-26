@@ -3557,6 +3557,11 @@ void esp32loop()
         {
             s_nbr_sweep_min = now_min_sweep;
             nbrSweep(nbrMatrix, now_min_sweep);
+            // Konsistenzpruefung Masken <-> Kantenpool (nbrLogCheck(), [NBR]|CHECK),
+            // einmal je Minute, nur bei --nbrdebug: auf nRF52 das Instrument fuer
+            // Task-Wechsel mitten in einer Aenderung (Konzept 5).
+            if(bNBRDEBUG)
+                nbrLogCheck(nbrMatrix, now_min_sweep);
         }
     }
 

@@ -2302,6 +2302,63 @@ static void test_echoed_hey_group_leaves_me_snr_mean_alone(void)
 #endif
 }
 
+// nbrCheck() (Firmware-Konsistenzpruefung, [NBR]|CHECK): ein gesunder Pool gibt
+// ueberall 0, jede einzeln eingebaute Stoerung wird genau in ihrer Klasse
+// gezaehlt -- sonst waere 0 auf dem RAK kein Beweis.
+static void test_nbr_check_counts_each_inconsistency_class(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
+    NbrCheck c;
+    nbrCheck(m, &c);
+    TEST_ASSERT_TRUE(c.edges >= 2);
+    TEST_ASSERT_EQUAL_UINT16(0, c.mask_extra);
+    TEST_ASSERT_EQUAL_UINT16(0, c.mask_missing);
+    TEST_ASSERT_EQUAL_UINT16(0, c.edge_bad);
+    TEST_ASSERT_EQUAL_UINT16(0, c.edge_dup);
+    TEST_ASSERT_TRUE(masks_match_pool(m));
+
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+
+    NbrMatrix x = m;                      // Bit ohne Kante
+    nbrMaskSet(x.hears[iaaa], ibbb);
+    nbrCheck(x, &c);
+    TEST_ASSERT_EQUAL_UINT16(1, c.mask_extra);
+    TEST_ASSERT_EQUAL_UINT16(0, c.mask_missing);
+
+    x = m;                                // Kante ohne Bit
+    nbrMaskClear(x.hears[ibbb], iaaa);
+    nbrCheck(x, &c);
+    TEST_ASSERT_EQUAL_UINT16(1, c.mask_missing);
+    TEST_ASSERT_EQUAL_UINT16(0, c.mask_extra);
+
+    x = m;                                // doppelte Kante (x, y)
+    int live = -1, freeslot = -1;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        if (x.edge[e].x != 0xFF && live < 0) live = e;
+        if (x.edge[e].x == 0xFF && freeslot < 0) freeslot = e;
+    }
+    TEST_ASSERT_TRUE(live >= 0 && freeslot >= 0);
+    x.edge[freeslot] = x.edge[live];
+    nbrCheck(x, &c);
+    TEST_ASSERT_EQUAL_UINT16(1, c.edge_dup);
+
+    x = m;                                // Kante auf der Diagonale
+    x.edge[freeslot] = x.edge[live];
+    x.edge[freeslot].y = x.edge[freeslot].x;
+    nbrCheck(x, &c);
+    TEST_ASSERT_EQUAL_UINT16(1, c.edge_bad);
+
+    NbrMatrix z;                          // nie initialisiert
+    memset(&z, 0, sizeof(z));
+    nbrCheck(z, &c);
+    TEST_ASSERT_EQUAL_UINT16(0, c.edges);
+    TEST_ASSERT_EQUAL_UINT16(0, c.rows);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2379,5 +2436,6 @@ int main(int, char **)
     RUN_TEST(test_me_snr_is_a_running_mean);
     RUN_TEST(test_decisions_do_not_depend_on_the_sweep);
     RUN_TEST(test_echoed_hey_group_leaves_me_snr_mean_alone);
+    RUN_TEST(test_nbr_check_counts_each_inconsistency_class);
     return UNITY_END();
 }

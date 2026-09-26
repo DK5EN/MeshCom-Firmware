@@ -2925,6 +2925,73 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
     return (int)a.pos;
 }
 
+// --- Konsistenzpruefung ------------------------------------------------------
+
+static void nbrICheck(const NbrMatrix &m, NbrCheck *out)
+{
+    memset(out, 0, sizeof(*out));
+    for (int y = 0; y < NBR_MAX_ROWS; y++)
+    {
+        NbrMask exp_hears = nbrMaskNone();
+        NbrMask exp_heard_by = nbrMaskNone();
+        NBR_LOCK();
+        if (!nbrIReady(m))
+        {
+            NBR_UNLOCK();
+            memset(out, 0, sizeof(*out));
+            return;
+        }
+        if (y == 0 || nbrIUsed(m, y))
+            out->rows++;
+        for (int e = 0; e < NBR_MAX_EDGES; e++)
+        {
+            const NbrEdge &ed = m.edge[e];
+            if (!nbrIEdgeLive(ed))
+                continue;
+            if (y == 0)
+            {
+                out->edges++;
+                bool x_ok = ed.x < NBR_MAX_ROWS && (ed.x == 0 || nbrIUsed(m, ed.x));
+                bool y_ok = ed.y < NBR_MAX_ROWS && (ed.y == 0 || nbrIUsed(m, ed.y));
+                if (ed.x == ed.y || !x_ok || !y_ok)
+                    out->edge_bad++;
+            }
+            if (ed.y == y && ed.x < NBR_MAX_ROWS)
+            {
+                if (nbrMaskTest(exp_hears, ed.x))
+                    out->edge_dup++;
+                nbrMaskSet(exp_hears, ed.x);
+            }
+            if (ed.x == y && ed.y < NBR_MAX_ROWS)
+                nbrMaskSet(exp_heard_by, ed.y);
+        }
+        out->mask_extra += (uint16_t)(nbrMaskCount(nbrMaskAndNot(m.hears[y], exp_hears)) +
+                                      nbrMaskCount(nbrMaskAndNot(m.heardBy[y], exp_heard_by)));
+        out->mask_missing += (uint16_t)(nbrMaskCount(nbrMaskAndNot(exp_hears, m.hears[y])) +
+                                        nbrMaskCount(nbrMaskAndNot(exp_heard_by, m.heardBy[y])));
+        NBR_UNLOCK();
+    }
+}
+
+void nbrCheck(const NbrMatrix &m, NbrCheck *out)
+{
+    if (out)
+        nbrICheck(m, out);
+}
+
+void nbrLogCheck(const NbrMatrix &m, uint16_t now_min)
+{
+    if (!nbrLog)
+        return;
+    NbrCheck c;
+    nbrICheck(m, &c);
+    char buf[96];
+    snprintf(buf, sizeof(buf), "[NBR]|CHECK|%u|%u|%u|%u|%u|%u|%u", (unsigned)now_min, (unsigned)c.rows,
+             (unsigned)c.edges, (unsigned)c.mask_extra, (unsigned)c.mask_missing, (unsigned)c.edge_bad,
+             (unsigned)c.edge_dup);
+    nbrLog(buf);
+}
+
 void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
 {
     if (!nbrLog)

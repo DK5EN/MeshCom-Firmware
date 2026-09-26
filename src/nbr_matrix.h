@@ -785,6 +785,30 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
 // nicht miteinander verglichen werden (docs/nbr-logformat.md).
 void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min);
 
+// Konsistenzpruefung (Konzept 5, Fehlerszenario "Task-Wechsel auf nRF52 mitten
+// in einer Aenderung"; Rollout Schritt 4/6: auf dem RAK 0 Verstoesse). Prueft je
+// Zeile unter der Scheduler-Klammer, dass hears[]/heardBy[] genau die lebenden
+// Kanten abbilden: mask_extra = Bit ohne Kante, mask_missing = Kante ohne Bit,
+// edge_bad = Kante auf der Diagonale oder zu einer unbelegten Zeile, edge_dup =
+// dieselbe Kante (x, y) zweimal im Pool. Die Klammer gilt je Zeile, nicht fuer
+// den ganzen Lauf (bei 128 Zeilen und 512 Kanten rund 130.000 Vergleiche), also
+// ist jede Zeile fuer sich konsistent gelesen. Vor nbrInit alles 0.
+struct NbrCheck
+{
+    uint16_t rows;
+    uint16_t edges;
+    uint16_t mask_extra;
+    uint16_t mask_missing;
+    uint16_t edge_bad;
+    uint16_t edge_dup;
+};
+void nbrCheck(const NbrMatrix &m, NbrCheck *out);
+
+// Fuehrt nbrCheck() aus und loggt [NBR]|CHECK|<up>|<rows>|<edges>|<extra>|
+// <missing>|<bad>|<dup> (nur mit nbrLog). Aus dem Loop-Task, einmal je Minute
+// bei --nbrdebug, und von --nbrcheck.
+void nbrLogCheck(const NbrMatrix &m, uint16_t now_min);
+
 // Eine gemeinsame Instanz fuers Geraet: geschrieben aus OnRxDone
 // (lora_functions.cpp, auf nRF52 im LORA-Task) und vom Minuten-Sweep und
 // --nbrreset (Loop-Task), gelesen von Web-Seite und --neighbours. CONTRACT
