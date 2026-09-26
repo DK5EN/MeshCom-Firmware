@@ -295,3 +295,13 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   firmware still reported no IP.
 - `test_meshlogger` fixed (fake console now reports TXCAPTURE like real firmware); bench RAK
   port is `/dev/cu.usbmodem1101` in `soak_harness.py` and `rak_harness.py`.
+
+### Field run moves to the release image (2026-09-26, evening)
+
+- DK5EN-1 (21:26) and DK5EN-98 (21:28) OTA-flashed with the `v4.35t.09.27-neo` release asset
+  (`feature-snf` `74f72a34`, build 21:07:15, `FLASH_VERSION 20260927`; operator go, soak
+  deliberately interrupted). Neighbour-matrix code unchanged against `0d4b914c`; the image adds
+  S&F with `--dmretry`, `--store` and the notice off. Boot line on DK5EN-1:
+  `FLASH layout 20260724 ok, build 20260927` (settings kept), gateway and NBR back; DK5EN-1's USB
+  capture kept running, the rpizero logger for DK5EN-98 reconnected at 21:28:50 and re-applied
+  its flags. Heap baseline and `--since` for both nodes: **2026-09-26T21:29**.
