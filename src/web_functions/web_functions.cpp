@@ -1484,6 +1484,16 @@ void sub_page_mheard()
 
     _create_meshcom_subheader("MHeard Information");
     web_client.println("<div id=\"content_inner\">");
+    // W4d: Legende fuer die zweite Kaertchenzeile (title= wirkt auf dem
+    // Telefon nicht, deshalb als Text).
+    web_client.print("<p style=\"font-size:0.85em;color:#555;max-width:900px;\">"
+                     "Stations I heard directly in the last 3 h, newest first. "
+                     "Last heard: minutes since I last received it directly. "
+                     "Hears me: its own reports say it hears me, at this SNR. "
+                     "It hears: stations it hears, as far as my table knows. "
+                     "Only it hears: of those, how many no other direct neighbour of mine hears -- its value as a relay for me. "
+                     "Relay role: Super node = by far the most exclusive stations; Needed = at least one exclusive station; Redundant = everything it hears is heard by others too. "
+                     "It reports: the neighbour count the station announces itself (NCNT).</p>");
 
     uint8_t *idx = (uint8_t *)malloc((size_t)NBR_MAX_ROWS);
     if (idx == NULL)
@@ -1503,7 +1513,7 @@ void sub_page_mheard()
         if (!nbrMhGet(nbrMatrix, idx[k], now_min, &v))
             continue;
 
-        web_client.printf("<div class=\"cardlayout\">\n");
+        web_client.printf("<div class=\"cardlayout\" style=\"max-width:900px;\">\n");
         web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(", v.call, v.call);
         if (bClockValid)
         {
@@ -1521,17 +1531,26 @@ void sub_page_mheard()
         }
         web_client.printf(")</span></label>");
         web_client.printf("<div class=\"flex-auto-wrap\">");
-        web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", nbrPayloadTypeName(v.plt));
+        {
+            const char *ptype = nbrPayloadTypeName(v.plt);
+            if (v.plt == ':')
+                ptype = "Text message";
+            else if (v.plt == '!')
+                ptype = "Position";
+            else if (v.plt == '@')
+                ptype = "Heartbeat (HEY)";
+            web_client.printf("<div><span class=\"font-bold\">Last frame:</span><br><span>%s</span></div>", ptype);
+        }
         web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", nbrHardwareName(v.hw));
-        web_client.printf("<div><span class=\"font-bold\">Mod:</span><br><span>%01X/%01X</span></div>", (v.mod >> 4), (v.mod & 0x0f));
+        web_client.printf("<div><span class=\"font-bold\">Country / mode:</span><br><span title=\"high nibble: country index, low nibble: LoRa modulation\">%01X / %01X</span></div>", (v.mod >> 4), (v.mod & 0x0f));
         if (v.rssi == NBR_MH_RSSI_UNKNOWN)
             web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span></span></div>");
         else
-            web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%4idBm</span></div>", (int)v.rssi);
+            web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%d dBm</span></div>", (int)v.rssi);
         if (v.snr == NBR_SNR_UNKNOWN)
-            web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span></span></div>");
+            web_client.printf("<div><span class=\"font-bold\">SNR (avg):</span><br><span>-</span></div>");
         else
-            web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span>%4idB</span></div>", (int)v.snr);
+            web_client.printf("<div><span class=\"font-bold\">SNR (avg):</span><br><span>%d dB</span></div>", (int)v.snr);
 
         // DIST weiterhin aus der eigenen Position gerechnet, 0/0 = unbekannt
         // (dieselbe Regel wie src/mh_phone.h fuer den App-Rahmen).
@@ -1539,11 +1558,11 @@ void sub_page_mheard()
         if (nbrPosKnown(v.lat, v.lon) && !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0))
             dist = gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0;
         if (dist >= 0.0)
-            web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", dist);
+            web_client.printf("<div><span class=\"font-bold\">Distance:</span><br><span>%.1lf km</span></div>", dist);
         else
-            web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span></span></div>");
+            web_client.printf("<div><span class=\"font-bold\">Distance:</span><br><span>-</span></div>");
 
-        web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2u</span></div>", (unsigned)v.ncnt);
+        // NCNT (Konzept 4.8) steht jetzt in der zweiten Zeile, bei den Nachbarschaftswerten.
 
         if (nbrPosKnown(v.lat, v.lon))
         {
@@ -1570,21 +1589,31 @@ void sub_page_mheard()
             web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span></span></div>");
         }
         if (v.alt != NBR_MH_ALT_UNKNOWN)
-            web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span>%4i</span></div>", (int)v.alt);
+            web_client.printf("<div><span class=\"font-bold\">Altitude:</span><br><span>%d m</span></div>", (int)v.alt);
         else
-            web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span></span></div>");
+            web_client.printf("<div><span class=\"font-bold\">Altitude:</span><br><span>-</span></div>");
 
-        // W4b, Konzept 4.9: die sechs neuen MH-Spalten -- billig angehaengt,
-        // die bestehenden Felder bleiben in ihrer alten Reihenfolge.
-        web_client.printf("<div><span class=\"font-bold\">AGE:</span><br><span>%u</span></div>", (unsigned)v.age_min);
+        // W4b, Konzept 4.9: die Nachbarschaftswerte -- W4d: eigene zweite
+        // Zeile im Kaertchen, ausgeschriebene Namen statt AGE/HM/#X/#N/R,
+        // Legende oben auf der Seite.
+        web_client.printf("</div><div class=\"flex-auto-wrap\" style=\"margin-top:8px;\">");
+        web_client.printf("<div><span class=\"font-bold\">Last heard:</span><br><span>%u min ago</span></div>", (unsigned)v.age_min);
         if (v.hm_snr == NBR_SNR_UNKNOWN)
-            web_client.printf("<div><span class=\"font-bold\">HM:</span><br><span></span></div>");
+            web_client.printf("<div><span class=\"font-bold\">Hears me:</span><br><span>not reported</span></div>");
         else
-            web_client.printf("<div><span class=\"font-bold\">HM:</span><br><span>%d</span></div>", (int)v.hm_snr);
-        web_client.printf("<div><span class=\"font-bold\">Role:</span><br><span>%c</span></div>", v.role ? v.role : '-');
-        web_client.printf("<div><span class=\"font-bold\">#X:</span><br><span>%u</span></div>", (unsigned)v.ex);
-        web_client.printf("<div><span class=\"font-bold\">#N:</span><br><span>%u</span></div>", (unsigned)v.nb);
-        web_client.printf("<div><span class=\"font-bold\">GW:</span><br><span>%s</span></div>", v.gw ? "Y" : "N");
+            web_client.printf("<div><span class=\"font-bold\">Hears me:</span><br><span>yes, %d dB</span></div>", (int)v.hm_snr);
+        const char *role = "-";
+        if (v.role == 'S')
+            role = "Super node";
+        else if (v.role == 'N')
+            role = "Needed";
+        else if (v.role == 'R')
+            role = "Redundant";
+        web_client.printf("<div><span class=\"font-bold\">Relay role:</span><br><span>%s</span></div>", role);
+        web_client.printf("<div><span class=\"font-bold\">Only it hears:</span><br><span>%u station%s</span></div>", (unsigned)v.ex, v.ex == 1 ? "" : "s");
+        web_client.printf("<div><span class=\"font-bold\">It hears:</span><br><span>%u station%s</span></div>", (unsigned)v.nb, v.nb == 1 ? "" : "s");
+        web_client.printf("<div><span class=\"font-bold\">It reports:</span><br><span>%u neighbour%s</span></div>", (unsigned)v.ncnt, v.ncnt == 1 ? "" : "s");
+        web_client.printf("<div><span class=\"font-bold\">Gateway:</span><br><span>%s</span></div>", v.gw ? "yes" : "no");
         web_client.printf("</div></div>");
     }
     free(idx);
