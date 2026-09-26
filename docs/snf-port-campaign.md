@@ -132,3 +132,36 @@ Same-base resources, 7 lead envs, clean builds of `0d4b914c` vs `fd2bc48f` (byte
 
 The ~10.5 kB of the S3/RAK RAM delta is the 50-slot mailbox table (`msgstore.cpp` BSS); classic
 ESP32 carries only the sender side (+2.2 kB). RAK4631 flash ends at 96.3 % (30384 B free).
+
+## Bench 2026-09-26 -- minimal store-node run, PASS
+
+Three nodes over LoRa only (gateway off on all three during the run), 2 dBm, on one desk. RAK4631
+DK5EN-90 = store node on `feature-snf` (build 19:15:55, `--store heard`); T-Beam DK5EN-92 = receiver
+on `feature-snf` (build 19:26:08, flashed over WiFi); Heltec DK5EN-1 = sender, left on
+`0d4b914c` because it is in the neighbour-matrix soak (gateway off 19:48-20:02, net console on for
+the run, both restored). Logs: `docs/bench/snf-20260926/{rak,tbeam,dk1}.txt` (wall-clock stamps; SSID/BSSID redacted).
+
+| Step | What                                       | Result                                                                                                                                                                                   |
+| ---- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | RAK -> T-Beam DM                           | PASS: `{409}` sent 19:50:05, `:ack409` direct 19:50:10, ring retransmit stopped                                                                                                          |
+| 2    | DK5EN-1 -> T-Beam DM                       | PASS: `{511}` acked directly 19:51:03; the RAK missed that direct ack, sent `:sto511` at 19:51:06, purged on the relayed ack 19:51:14                                                    |
+| 3    | RAK stored step 2's DM                     | PASS: `stored=1 ack=1 sto=1/0 used=0`                                                                                                                                                    |
+| 4    | T-Beam away (`--setcall DK5EN-91`, reboot) | done 19:52:10                                                                                                                                                                            |
+| 5    | DK5EN-1 -> DK5EN-92, nobody answers        | PASS: `{512}` on air 19:54:18, RAK `:sto512 DK5EN-92` 19:54:30, received by DK5EN-1 (shown as plain text -- old firmware)                                                                |
+| 6    | DM held on the RAK                         | PASS: `[MBOX];0;DK5EN-92;DK5EN-1;512;HELD`                                                                                                                                               |
+| 7    | T-Beam back as DK5EN-92, reboot            | done 19:57:10                                                                                                                                                                            |
+| 8    | Delivery via the RAK                       | PASS: own POS from DK5EN-92 heard 20:00:00 (presence), delivery `DK5EN-1,DK5EN-90>DK5EN-92 ... {512` H00, fresh id, 20:00:38; `:ack512` 20:00:42 reaches DK5EN-1; `deliv=1 ack=2 used=0` |
+
+Observations:
+
+- Presence counts only a frame the destination originates and the store node hears directly;
+  DK5EN-92 relaying other traffic for 2.5 min after its reboot did not arm the entry. The run
+  triggered its beacon with `--sendpos`; in the field a returning node arms the mailbox with its
+  first own beacon, so delivery latency follows the destination's beacon interval.
+- The `:sto` notice also goes out when the destination did ack but the store node missed that ack
+  (step 2). By design (notice on every new entry); a sender on `feature-snf` would see "held"
+  briefly and then "acked".
+- DK5EN-1 on the old image retried once and then stopped on hearing its own relayed copy; the
+  outbox ladder (`--dmretry`) was not exercised.
+- Not covered yet: stage 4 on the sender side (DK5EN-1 on `feature-snf`), `--dmretry` ladder, the
+  Mailbox web page, cooldown/storetime expiry, peer store nodes.

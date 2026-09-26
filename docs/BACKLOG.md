@@ -7343,24 +7343,24 @@ decisions: `docs/dm-transport-impl-plan-20260913.md`; bench handoff:
 `docs/dm-bench-session-plan-20260914.md` (written for fork-main -- the tick sites it names are
 `loopAction_retransmit()` in `loop_actions_*.cpp` here). IDs follow fork-main's DM list.
 
-| ID    | Item                                                                                                            | State on feature-snf                                            |
-| ----- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| DM-01 | Stage 0: DM/ring counters, `--airgap`, give-up 0x03, brace escape (0.1 millis() ack ids NOT ported, P1)         | code, advisor-approved (wave 2), bench T-0.x open               |
-| DM-02 | Stage 2.1: destination dedup on source+NNN, LoRa + both `udp_frame` twins                                       | code, advisor-approved (wave 2), bench open                     |
-| DM-03 | Stage 3: store node, Mailbox page, settings; heard test reads the topology                                      | code, advisor-approved after rework (wave 4), bench T-3.x open  |
-| DM-04 | Stage 4: custody notice `:stoNNN`, status 0x04 held                                                             | code, advisor-approved after rework (wave 4), bench T-4.x open  |
-| DM-05 | Stage 1: outbox + ladder behind `--dmretry off\|3\|9`, default off                                              | code, advisor-approved after rework (wave 3), bench T-1.x open  |
-| DM-06 | M0-1 ring-slot survival, one hour on the live net                                                               | measurement open, confirmation only                             |
-| DM-07 | Stage 2.2 bounded ACK repeats                                                                                   | deferred (P5)                                                   |
-| DM-08 | T11: dedup-ring rotation window under nine ids per DM                                                           | measure on the bench node                                       |
-| DM-09 | Server and mcmap fold on (source, NNN) or DM counts inflate once `--dmretry` is on                              | open, outside this repo                                         |
-| DM-10 | Clients: ack states 3/4 + holder, outbox-full nack (`docs/client-integration-store-forward.md`)                 | open, three repos                                               |
-| DM-11 | Stage 3 peer-delivery tell (path-shape rule)                                                                    | bench question, T-3.5                                           |
-| DM-12 | Node-settings JSON (`SN`) field for the store role                                                              | waiting for the app side                                        |
-| DM-13 | Upstream framing: stages 0 and 2.1 are PR-sized; 1/3/4 stay fork-only                                           | after the bench                                                 |
-| DM-14 | RAK4631 flash at 96.3 % (784888 of 815104 B) with every stage in                                                | watch; about 30 kB left for anything that follows               |
-| DM-15 | Heard-age lookup duplicated: `glueHeardAgeMs()` (`msgstore_glue.cpp`) and inline in `sub_page_mailbox()`        | nit, same contract; fold into one helper when either is touched |
-| DM-16 | Classic ESP32: `--storecall/--storetime/--storeslots/--storenotice` answer "unknown command", not "unavailable" | accepted deviation (exact-token matching)                       |
+| ID    | Item                                                                                                            | State on feature-snf                                                                                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| DM-01 | Stage 0: DM/ring counters, `--airgap`, give-up 0x03, brace escape (0.1 millis() ack ids NOT ported, P1)         | code, advisor-approved (wave 2), bench T-0.x open                                                                               |
+| DM-02 | Stage 2.1: destination dedup on source+NNN, LoRa + both `udp_frame` twins                                       | code, advisor-approved (wave 2), bench open                                                                                     |
+| DM-03 | Stage 3: store node, Mailbox page, settings; heard test reads the topology                                      | code, advisor-approved after rework (wave 4); minimal bench PASS 2026-09-26 (store, hold, deliver on presence), T-3.x rest open |
+| DM-04 | Stage 4: custody notice `:stoNNN`, status 0x04 held                                                             | code, advisor-approved after rework (wave 4); `:sto` emission bench PASS 2026-09-26, sender side (held 0x04) open               |
+| DM-05 | Stage 1: outbox + ladder behind `--dmretry off\|3\|9`, default off                                              | code, advisor-approved after rework (wave 3), bench T-1.x open                                                                  |
+| DM-06 | M0-1 ring-slot survival, one hour on the live net                                                               | measurement open, confirmation only                                                                                             |
+| DM-07 | Stage 2.2 bounded ACK repeats                                                                                   | deferred (P5)                                                                                                                   |
+| DM-08 | T11: dedup-ring rotation window under nine ids per DM                                                           | measure on the bench node                                                                                                       |
+| DM-09 | Server and mcmap fold on (source, NNN) or DM counts inflate once `--dmretry` is on                              | open, outside this repo                                                                                                         |
+| DM-10 | Clients: ack states 3/4 + holder, outbox-full nack (`docs/client-integration-store-forward.md`)                 | open, three repos                                                                                                               |
+| DM-11 | Stage 3 peer-delivery tell (path-shape rule)                                                                    | bench question, T-3.5                                                                                                           |
+| DM-12 | Node-settings JSON (`SN`) field for the store role                                                              | waiting for the app side                                                                                                        |
+| DM-13 | Upstream framing: stages 0 and 2.1 are PR-sized; 1/3/4 stay fork-only                                           | after the bench                                                                                                                 |
+| DM-14 | RAK4631 flash at 96.3 % (784888 of 815104 B) with every stage in                                                | watch; about 30 kB left for anything that follows                                                                               |
+| DM-15 | Heard-age lookup duplicated: `glueHeardAgeMs()` (`msgstore_glue.cpp`) and inline in `sub_page_mailbox()`        | nit, same contract; fold into one helper when either is touched                                                                 |
+| DM-16 | Classic ESP32: `--storecall/--storetime/--storeslots/--storenotice` answer "unknown command", not "unavailable" | accepted deviation (exact-token matching)                                                                                       |
 
 Pitfalls for whoever continues: the main radio tick is `loopAction_retransmit()` in both
 `loop_actions_*.cpp`, and `esp32_main.cpp`'s inline `EXTERNAL_RADIO` tick needs the same calls
