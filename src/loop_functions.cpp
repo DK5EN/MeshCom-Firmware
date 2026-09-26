@@ -3352,7 +3352,8 @@ PingResult sendPing(char msg_call[10])
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markieren
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     aprsmsg.msg_source_path = meshcom_settings.node_call;
@@ -4159,8 +4160,13 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
+
+    // MSG-ID für repeat Bits frei machen
+    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
+    //discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
     
     aprsmsg.msg_source_path = (src_override && src_override[0]) ? String(src_override) : String(meshcom_settings.node_call);
     aprsmsg.msg_destination_path = strDestinationCall;  //Later FW insert PATH from HEY! collecting
@@ -4409,6 +4415,7 @@ unsigned int sendInjectedPosition(const char *srcCall, const char *posData)
 
     aprsmsg.msg_len = 0;
 
+    // bei Positionen keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     aprsmsg.msg_source_path      = srcCall;
@@ -4975,7 +4982,8 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
 
         aprsmsg.msg_len = 0;
 
-        // MSG ID zusammen setzen    
+        // MSG ID zusammen setzen
+        // bei Postionen keine MSB für repeat markiereb 
         aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
         if(intervall != POSINFO_INTERVAL)
@@ -5064,7 +5072,8 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Postionen keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     aprsmsg.msg_source_path = meshcom_settings.node_call;
@@ -5131,6 +5140,10 @@ unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *s
     // rewrite per ACK: on nRF52 that rewrites the whole LittleFS settings file,
     // on ESP32 it is ~20 NVS put*() calls, both for a value nothing reads back.
     aprsmsg.msg_id = millis();
+
+    // MSG-ID für repeat Bits frei machen
+    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
+    // discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
 
     // own Call, or a foreign source when relaying a KISS client's APRS ack
     aprsmsg.msg_source_path = (src_override && src_override[0])
@@ -5207,7 +5220,8 @@ void sendHey()
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Hey keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     aprsmsg.msg_source_path = meshcom_settings.node_call;
@@ -5331,7 +5345,8 @@ void sendTelemetry(int ID)
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text mit msg_destination_call 100001 keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     aprsmsg.msg_source_path = meshcom_settings.node_call;
