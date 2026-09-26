@@ -1,5 +1,13 @@
 # RESUME — pick up here
 
+## 2026-09-26: branch `feature-snf` -- S&F ported, nothing flashed (start here for S&F)
+
+`feature-snf` = `feature-neighbour-matrix` `0d4b914c` plus the DM store-and-forward stages 0 (without
+0.1), 2.1, 1, 3 and 4 from `fork-main`, five waves, each advisor-reviewed. State, decisions P1-P5
+and gate figures: `docs/snf-port-campaign.md`; user-facing: `docs/CHANGELOG-snf.md`; open items:
+BACKLOG §3.8az (DM-01..DM-16). Next: the bench, `docs/dm-bench-session-plan-20260914.md`, after the
+neighbour-matrix soak. Not pushed.
+
 ## Where we are, 2026-09-17 night: the closing run is done (start here)
 
 Branch `dry-unification`, tree clean. Operator decisions of the evening: **no

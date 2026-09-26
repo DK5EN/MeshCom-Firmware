@@ -155,6 +155,7 @@ src/ui_common/scr_mgr.c
 src/ui_common/scr_mgr.h
 src/via_functions.cpp
 src/web_functions/web_functions.cpp
+src/web_functions/web_functions.h
 variants/E22-DevKitC/configuration.h
 variants/E22-DevKitC/lv_conf.h
 variants/E22-DevKitC/platformio.ini

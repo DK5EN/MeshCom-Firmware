@@ -592,15 +592,15 @@ extraction of the ~221 genuinely shared, radio-independent loop lines.
 
 ### 3.6 Deferred, with explicit triggers
 
-| Item                                                                                     | Revisit when                                                                              |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Arduino 3.x migration                                                                    | Wave 0 has delivered a RAM baseline and a CI gate                                         |
-| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                                          | the CI matrix is in place                                                                 |
-| Radio interface / HAL                                                                    | only after C-02's cheap extraction proves the seam                                        |
-| LVGL 8 → 9                                                                               | never, unless the T-Deck UI is rewritten anyway                                           |
-| ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned          | closed                                                                                    |
-| `FLASH_VERSION` migration (`N-12`) — re-verified 2026-08-18, still deferred (see doc 08) | **before** any change to the `meshcom_settings` layout                                    |
-| Hardware bench (2 × Heltec V3)                                                           | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
+| Item                                                                                                                                                                                                                                                                                     | Revisit when                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arduino 3.x migration                                                                                                                                                                                                                                                                    | Wave 0 has delivered a RAM baseline and a CI gate                                                                                                    |
+| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                                                                                                                                                                                                                                          | the CI matrix is in place                                                                                                                            |
+| Radio interface / HAL                                                                                                                                                                                                                                                                    | only after C-02's cheap extraction proves the seam                                                                                                   |
+| LVGL 8 → 9                                                                                                                                                                                                                                                                               | never, unless the T-Deck UI is rewritten anyway                                                                                                      |
+| ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned                                                                                                                                                                                                          | closed                                                                                                                                               |
+| `FLASH_VERSION` migration (`N-12`) — re-verified 2026-08-18, still deferred (see doc 08)                                                                                                                                                                                                 | **before** any change to the `meshcom_settings` layout                                                                                               |
+| Hardware bench (2 × Heltec V3)                                                                                                                                                                                                                                                           | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue                                                            |
 | HN upload by gateways — a gateway uploads received `HN` neighbor reports (`ec636e3f`) so mcmap gets named leaf neighborhoods instead of estimates; the hub must pass the `@`/`HN` frame through INTERLINK (outlook §8 of mcmap `docs/proposals/data-neighbor-2hop.md`, added 2026-09-24) | mcmap MC-319 is built and its gateway-bound graph (median coverage 0.36 of the self-reported count) proves too thin for the supernode/relay question |
 
 ### 3.6a Sizing — input for the G12 decision
@@ -7276,7 +7276,7 @@ DK5EN-14 instrument image, KEYLOCK off; DK5EN-90 in the serial-DFU bootloader
 | `H8`            | Heltec-93 | passed 17.09. afternoon (§3.8ar); RAK-90 side blocked by ETH-03, now fixed in code, bench PASS owed after the double-tap                                                                                                                                              |
 | `H11`           | T-Deck-14 | automated half **PASS** on the final instrument image: tabs 8/8 repainted, nav 34/34, input keys 7/7 (p95 166 ms) + trackball 40/40 after `--keylock off` (TD-18 precondition fired first, correctly). Four by-eye items owed to the operator, DR-28 order among them |
 | `D1-10` cadence | Heltec-93 | battery reads at 0.0, 28.5, 58.5, 88.5, 118.5 s: 30 s exact, first fire on pass 1 as before                                                                                                                                                                           |
-| `ETH-02`        | RAK-90    | **confirmed on hardware 2026-09-18 21:23** (cable out at boot, retry + `dhcp_acquired_late` at 77.7 s, web 200 seven seconds later, `hasIpAddress: yes`); ETH-02b too -- `test/golden/hw/G2/rak-90/eth02b-README.md`                                                                                                                                                                                         |
+| `ETH-02`        | RAK-90    | **confirmed on hardware 2026-09-18 21:23** (cable out at boot, retry + `dhcp_acquired_late` at 77.7 s, web 200 seven seconds later, `hasIpAddress: yes`); ETH-02b too -- `test/golden/hw/G2/rak-90/eth02b-README.md`                                                  |
 
 **`H6-01` (fixed 2026-09-18, see below): a malformed datagram on UDP 1990 took the WiFi
 radio down and the node rebooted.** New against G1. The corpus tail
@@ -7334,6 +7334,39 @@ INS-01 made it a field diagnostic. String-scan the ELF for `[SRVIP];err`.
 one line: RAK double-tap (then ETH-03 bench PASS, ETH-02, H8 on RAK); H11
 four by-eye checks; `H6-01`; `ENABLE_MCU811` typo decision; E3 dropped (no
 merging on this branch).
+
+### 3.8az S&F port to `feature-snf` — stages 0, 2.1, 1, 3, 4 in the tree, nothing flashed (2026-09-26)
+
+Branch `feature-snf` off `feature-neighbour-matrix` `0d4b914c`. Campaign record:
+`docs/snf-port-campaign.md`; user-facing summary: `docs/CHANGELOG-snf.md`; stage table and
+decisions: `docs/dm-transport-impl-plan-20260913.md`; bench handoff:
+`docs/dm-bench-session-plan-20260914.md` (written for fork-main -- the tick sites it names are
+`loopAction_retransmit()` in `loop_actions_*.cpp` here). IDs follow fork-main's DM list.
+
+| ID    | Item                                                                                                            | State on feature-snf                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| DM-01 | Stage 0: DM/ring counters, `--airgap`, give-up 0x03, brace escape (0.1 millis() ack ids NOT ported, P1)         | code, advisor-approved (wave 2), bench T-0.x open               |
+| DM-02 | Stage 2.1: destination dedup on source+NNN, LoRa + both `udp_frame` twins                                       | code, advisor-approved (wave 2), bench open                     |
+| DM-03 | Stage 3: store node, Mailbox page, settings; heard test reads the topology                                      | code, advisor-approved after rework (wave 4), bench T-3.x open  |
+| DM-04 | Stage 4: custody notice `:stoNNN`, status 0x04 held                                                             | code, advisor-approved after rework (wave 4), bench T-4.x open  |
+| DM-05 | Stage 1: outbox + ladder behind `--dmretry off\|3\|9`, default off                                              | code, advisor-approved after rework (wave 3), bench T-1.x open  |
+| DM-06 | M0-1 ring-slot survival, one hour on the live net                                                               | measurement open, confirmation only                             |
+| DM-07 | Stage 2.2 bounded ACK repeats                                                                                   | deferred (P5)                                                   |
+| DM-08 | T11: dedup-ring rotation window under nine ids per DM                                                           | measure on the bench node                                       |
+| DM-09 | Server and mcmap fold on (source, NNN) or DM counts inflate once `--dmretry` is on                              | open, outside this repo                                         |
+| DM-10 | Clients: ack states 3/4 + holder, outbox-full nack (`docs/client-integration-store-forward.md`)                 | open, three repos                                               |
+| DM-11 | Stage 3 peer-delivery tell (path-shape rule)                                                                    | bench question, T-3.5                                           |
+| DM-12 | Node-settings JSON (`SN`) field for the store role                                                              | waiting for the app side                                        |
+| DM-13 | Upstream framing: stages 0 and 2.1 are PR-sized; 1/3/4 stay fork-only                                           | after the bench                                                 |
+| DM-14 | RAK4631 flash at 96.3 % (784888 of 815104 B) with every stage in                                                | watch; about 30 kB left for anything that follows               |
+| DM-15 | Heard-age lookup duplicated: `glueHeardAgeMs()` (`msgstore_glue.cpp`) and inline in `sub_page_mailbox()`        | nit, same contract; fold into one helper when either is touched |
+| DM-16 | Classic ESP32: `--storecall/--storetime/--storeslots/--storenotice` answer "unknown command", not "unavailable" | accepted deviation (exact-token matching)                       |
+
+Pitfalls for whoever continues: the main radio tick is `loopAction_retransmit()` in both
+`loop_actions_*.cpp`, and `esp32_main.cpp`'s inline `EXTERNAL_RADIO` tick needs the same calls
+(`bRadio` makes them exclusive); `esp32-external-radio` only builds with an overlay
+(`EXTERNAL_RADIO_HOST/PORT`); an ack hook behind `checkOwnTx()` defeats the outbox (T2); a
+`#if ENABLE_MSGSTORE` above the configuration include compiles a file to nothing.
 
 ## 4. State of the repository
 

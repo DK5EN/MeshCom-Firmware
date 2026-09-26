@@ -16,7 +16,7 @@ Source of truth for the feature itself: `fork-main:docs/dm-transport-impl-plan-2
 | 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | done 2026-09-26 |          |
 | 3    | stage 1 outbox + ladder (`--dmretry`)                               | done 2026-09-26 |          |
 | 4    | stage 3 store node + stage 4 custody notice                         | done 2026-09-26 |          |
-| 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |          |
+| 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | done 2026-09-26 |          |
 
 Per-wave gate: files exist; host suite (native envs only, never bare `pio test`);
 `test/golden/help_parity_lint.py`; 7 lead envs clean and sequential; string scan of the S3 and
@@ -108,3 +108,27 @@ a div (this branch's table CSS rule). A writer ran `git stash` on the two twin f
 brief; the stash matched the tree byte for byte and was dropped. Gate: host 44/44 envs, 1379
 cases; 13 lints; 7 lead envs; store node only in S3/RAK images, none in classic; RAK flash 96.3 %
 (784720 of 815104 B).
+
+**Wave 5 (2026-09-26).** 18 S&F docs from fork-main (plans, stage verdicts, client guide,
+command references, bench plan, mockup) byte-identical except prettier on
+`review/fable-dm-stage4-verdict-20260914.md`; `docs/CHANGELOG-snf.md` new; BACKLOG §3.8az
+(DM-01..DM-16); RESUME entry; neo path lists complete against `e4a2393f`
+(`src/web_functions/web_functions.h` added, README counts 774 / 304 / 470). Docs-only wave, no
+advisor. Final gate: 33 of 33 board envs build on HEAD `fd2bc48f` (both safeboot envs skipped:
+S&F touches nothing under `src/safeboot/` and a build rewrites the tracked root images;
+`esp32-external-radio` with the dummy overlay).
+
+Same-base resources, 7 lead envs, clean builds of `0d4b914c` vs `fd2bc48f` (bytes):
+
+| Env                    | RAM base | RAM S&F | delta  | Flash base | Flash S&F | delta  |
+| ---------------------- | -------- | ------- | ------ | ---------- | --------- | ------ |
+| heltec_wifi_lora_32_V3 | 101260   | 113996  | +12736 | 1502177    | 1533029   | +30852 |
+| E22-DevKitC            | 95456    | 97624   | +2168  | 1614361    | 1627401   | +13040 |
+| ttgo_tbeam             | 95272    | 97440   | +2168  | 1634757    | 1647153   | +12396 |
+| ttgo_tbeam_supreme     | 101580   | 114324  | +12744 | 1538465    | 1569265   | +30800 |
+| t_deck                 | 121668   | 134404  | +12736 | 2231649    | 2263077   | +31428 |
+| t_deck_plus            | 121668   | 134404  | +12736 | 2231445    | 2262773   | +31328 |
+| wiscore_rak4631        | 79748    | 92820   | +13072 | 756064     | 784720    | +28656 |
+
+The ~10.5 kB of the S3/RAK RAM delta is the 50-slot mailbox table (`msgstore.cpp` BSS); classic
+ESP32 carries only the sender side (+2.2 kB). RAK4631 flash ends at 96.3 % (30384 B free).
