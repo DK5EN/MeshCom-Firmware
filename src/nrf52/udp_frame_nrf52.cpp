@@ -10,6 +10,9 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "dedup_functions.h"
+#include "dm_dedup.h"
+#include "reack_limiter.h"
+#include "dm_stats.h"
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -270,6 +273,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     bUDPtoLoraSend=false;
 
                 unsigned int iAckId = 0;
+                bool bDmDedupNew = true;   // 2.1 default
 
                 int iAckPos=mcIndexOfStr(aprsmsg.msg_payload, ":ack");
                 int iRefPos=mcIndexOfStr(aprsmsg.msg_payload, ":rej");
@@ -345,9 +349,19 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 {
                   iAckId = (unsigned int)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iEnqPos+1), strlen(aprsmsg.msg_payload));
                   mcTruncate(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), (size_t)(iEnqPos));
+
+                  // 2.1: second dedup layer, keyed on (source call, NNN),
+                  // same table the LoRa RX path writes to.
+                  if(strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(dmDedupCheck(aprsmsg.msg_source_call, (uint16_t)iAckId,
+                                      aprsmsg.msg_payload, strlen(aprsmsg.msg_payload),
+                                      millis()) == DM_DEDUP_DUP)
+                          bDmDedupNew = false;
+                  }
                 }
 
-                if(iAckPos <= 0)
+                if(iAckPos <= 0 && bDmDedupNew)
                 {
                   if(!bGATEWAY)
                     sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
@@ -364,15 +378,38 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew) addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 
-                // DM message for lokal Node 
+                // DM message for lokal Node
                 if(iAckId > 0)
                 {
                   strSource_call = source_call;
-                  SendAckMessage(strSource_call, iAckId);
+
+                  if(iEnqPos > 0 && strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(bDmDedupNew)
+                      {
+                          reackAllowed(aprsmsg.msg_source_call, (uint16_t)iAckId, millis());
+                          SendAckMessage(strSource_call, iAckId);
+                      }
+                      else
+                      {
+                          if(reackAllowed(aprsmsg.msg_source_call, (uint16_t)iAckId, millis()))
+                          {
+                              SendAckMessage(strSource_call, iAckId);
+                              dmstat_reack.fetch_add(1);
+                          }
+                          else
+                              dmstat_reack_limited.fetch_add(1);
+
+                          if(bDisplayInfo)
+                              printfdeb("[DMDUP] from %s nnn:%03u\n", aprsmsg.msg_source_call, (unsigned)iAckId);
+                      }
+                  }
+                  else
+                      SendAckMessage(strSource_call, iAckId);
                 }
             }
           }

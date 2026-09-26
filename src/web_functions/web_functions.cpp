@@ -2835,13 +2835,18 @@ void sub_content_messages()
             if (icheck >= 0)
             {
                 if (own_msg_id[icheck][4] == 1)
-                { // 00...not heard, 01...heard, 02...ACK
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed
                     ccheck = "&#x2713&nbsp;";
                 }
 
                 if (own_msg_id[icheck][4] == 2)
-                { // 00...not heard, 01...heard, 02...ACK
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed
                     ccheck = "&#x2611;&nbsp;";
+                }
+
+                if (own_msg_id[icheck][4] == 3)
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed (retransmit gave up)
+                    ccheck = "<span title=\"delivery failed\">&#x2717;</span>&nbsp;";
                 }
             }
 

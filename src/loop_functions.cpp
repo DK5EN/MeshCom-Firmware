@@ -33,8 +33,10 @@
 #include "msgid_counter.h"
 #include <counters_store.h>
 #include "setlog_lines.h"
+#include "dm_stats.h"
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
+#include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
 #include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
 
 bool gpsDetected = false;
@@ -3333,6 +3335,15 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     // fertigen Fensters fuer Leser, die nicht selbst drucken (Web-GUI).
     stat_last_window = *f;
     stat_last_window_ms = f->t_ms;
+
+    // 0.4: DM counters/RTT histogram as a second setlog line, same channel
+    // (setlogPrint -> printfdeb) and the same bDisplayLog gate as STAT.
+    if(bDisplayLog)
+    {
+        char dmbuf[200];
+        dmStatFormat(dmbuf, sizeof(dmbuf));
+        setlogPrint(dmbuf);
+    }
 }
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
@@ -4190,9 +4201,37 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // ACK add request only DM Calls
     if(bDM)
     {
+        // A '{' inside the user text breaks the receiver's NNN parse
+        // (indexOf("{", 1) finds the first brace, not the ack tag); escape it
+        // at the sender (plan risk list, advisor m4).
+        //
+        // P14/P15: ausser bei einem fuehrenden {ping}/{SET}-Tag -- das ist
+        // kein Fliesstext, sondern das Tag selbst (siehe dm_text_escape.h).
+        // Ein '{' NACH dem Tag bricht weiterhin den NNN-Parse und wird
+        // escaped.
+        size_t escFrom = dmTextEscapeFrom(strMsg.c_str());
+        for(size_t i = escFrom; i < (size_t)strMsg.length(); i++)
+        {
+            if(strMsg[i] == '{')
+                strMsg.setCharAt(i, '(');
+        }
+
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
         snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "%s{%s", strMsg.c_str(), cAckId);
+
+        // 0.4: DM outcome counters (docs/dm-transport-impl-plan-20260913.md).
+        // nnn is the same node_msgid value just written into cAckId, before
+        // the increment below.
+        //
+        // P14/P15: nicht fuer ein {ping} -- die Gegenstelle antwortet mit
+        // {pong}, nie mit einem ACK, also stuende es fuer immer als
+        // sent-nie-acked in der DM-Statistik.
+        if(!mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+        {
+            dmstat_sent.fetch_add(1);
+            dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
+        }
     }
 
     finalizeAndSendAPRS(aprsmsg, msg_buffer);

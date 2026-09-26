@@ -64,6 +64,8 @@
 
 #include <udp_functions.h>   // stub: bUDPLOG, resetMeshComUDP, handleUdpFrame_esp32
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
+#include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
+#include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -538,6 +540,12 @@ static void recorder_reset()
     iWrite = 0;
     iRead = 0;
 
+    // Stage 2.1 dedup table + stage 0.2 re-ACK rate limiter -- both process-
+    // global, shared by every test in this binary the moment the RX-decode
+    // hookup calls them.
+    dmDedupReset();
+    reackLimiterReset();
+
     Serial.clear();
     mc_test_set_millis(1000);
 }
@@ -668,6 +676,69 @@ static void test_agreement_extudp_forward_ahead_of_dedup_gate_on_both(void)
         snprintf(msg, sizeof(msg), "%s: EXTUDP forward must still see the duplicate -- it must "
                                     "stay ahead of is_new_packet()", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)g_extern.size(), msg);
+    }
+}
+
+// Stage 2.1 (dm_dedup.h) + stage 0.2 (reack_limiter.h), server ingress hookup
+// (docs/snf-port-campaign.md wave 2 / wave2-anchors.md Group B). A DM
+// addressed to this node, same (source call, NNN, stripped payload) but a
+// FRESH msg_id each time -- the shape a stage-1 retry-ladder resend takes
+// (not built yet): the stage-0 msg_id dedup ring alone (is_new_packet(),
+// already exercised by test_agreement_dedup_blocks_repeat_relay_on_both
+// above) cannot catch this, since the id differs on every attempt. The
+// first delivery must display, forward to the phone and ack; a repeat of
+// the same (call, NNN, payload) must NOT display or forward again, but --
+// once the 0.2 re-ACK limiter's 30 s window has passed -- must still be
+// acked (fork-main semantics: a lost :ackNNN is repaired without a second
+// copy of the message reaching the phone).
+static void test_regression_dm_dedup_reacks_without_redisplay_on_both(void)
+{
+    uint8_t tmpl1[BUF_CAP], tmpl2[BUF_CAP];
+    memset(tmpl1, 0, sizeof(tmpl1));
+    memset(tmpl2, 0, sizeof(tmpl2));
+    // "duptest{007": no leading '{' (iEnqPos scans from offset 1), "{007"
+    // is the transport-sequence tag stripped before the dedup key is built.
+    uint16_t len1 = build_gate_datagram(tmpl1, "DK5EN-2", "DK5EN-1", ':', "duptest{007", 0x8001);
+    uint16_t len2 = build_gate_datagram(tmpl2, "DK5EN-2", "DK5EN-1", ':', "duptest{007", 0x8002);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        bDisplayInfo = true;
+        mc_test_set_millis(1000);
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl1, len1);
+        if (side) handleUdpFrame_nrf52(buf, len1, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len1, IPAddress(1, 2, 3, 4));
+
+        char msg[160];
+        snprintf(msg, sizeof(msg), "%s: first delivery must display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: first delivery must forward to the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: first delivery must ack", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ack_ids.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: first ack has the wrong NNN", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(7, g_ack_ids[0], msg);
+
+        // Past the 0.2 re-ACK limiter's 30 s window, so the second ack below
+        // exercises the dedup-duplicate re-ack path, not the rate limiter.
+        mc_test_set_millis(1000 + 31000);
+
+        copy_into(buf, tmpl2, len2);   // same (call, NNN, payload), fresh msg_id
+        if (side) handleUdpFrame_nrf52(buf, len2, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len2, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: repeat (call,NNN,payload) must not display again", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: repeat must not forward to the phone again", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: repeat must still be acked (fork-main semantics)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)g_ack_ids.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: second ack has the wrong NNN", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(7, g_ack_ids[1], msg);
     }
 }
 
@@ -2012,6 +2083,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
+    RUN_TEST(test_regression_dm_dedup_reacks_without_redisplay_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);

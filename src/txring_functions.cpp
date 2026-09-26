@@ -18,6 +18,11 @@
 // setlog_lines.cpp (env:native_aprs baut diese TU, aber nicht setlog_lines.cpp).
 #include <setlog_lines.h>
 
+// M0-1 (0.4): ring enqueues per window and parked-slot overwrites, counted
+// in addTxRingEntryCore() below for every caller (addTxRingEntry() and
+// addTxRingEntryOnce() alike).
+#include <dm_stats.h>
+
 #if defined(NATIVE_BUILD)
 // Native Testbuild: loop_functions.cpp (die kanonische Definitionsstelle
 // dieser Globals, siehe loop_functions_extern.h) wird hier NICHT mitgebaut
@@ -656,6 +661,7 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
     uint8_t msgType, prio;
     uint32_t mid;
     bool droppedNew = false, droppedOld = false, ringOverflowAdvance = false;
+    bool parkedOverwrite = false;
     int dropSlot = -1;
     uint8_t dropPrio = 0, dropType = 0;
     uint32_t dropId = 0, newLostId = 0;
@@ -665,6 +671,13 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
 #endif
 
     w = iWrite;
+
+    // M0-1 instrumentation (0.4, docs/dm-transport-impl-plan-20260913.md):
+    // snapshot slot w's occupancy before the write below overwrites it.
+    parkedOverwrite = ringBuffer[w][0] != 0 &&
+                       ringBuffer[w][1] != RING_STATUS_READY &&
+                       ringBuffer[w][1] != RING_STATUS_DONE &&
+                       ringBuffer[w][1] != RING_STATUS_EXT_PENDING;
     r = iRead;
 
     if(clearSlotFirst)
@@ -831,6 +844,11 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
 #endif
 
     // ---- Ab hier ausserhalb des Locks ----
+
+    // M0-1 (0.4): ring enqueues per window and parked-slot overwrites.
+    ringstat_enqueue.fetch_add(1);
+    if(parkedOverwrite)
+        ringstat_parked_overwrite.fetch_add(1);
 
     // SL-05: Hochwasser des Ringfuellstands im 5-Minuten-Fenster. Bewusst
     // ausserhalb des Locks und ueber txRingDepth() (selbst lock-frei, siehe

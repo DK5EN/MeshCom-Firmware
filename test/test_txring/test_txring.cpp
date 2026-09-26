@@ -23,6 +23,7 @@
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
 #include <aprs_functions.h>
+#include <dm_stats.h>             // M0-1: ringstat_enqueue/ringstat_parked_overwrite
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp ------------
@@ -75,6 +76,9 @@ static void resetRing(void)
     // --nbrrelay aus, sonst wuerde ein liegen gebliebenes bNBRCANCEL=true aus
     // einem frueheren Test den naechsten unbemerkt mitfaerben.
     bNBRCANCEL = false;
+    // M0-1 (0.4): reset between tests, same as every other stat_* counter above.
+    ringstat_enqueue.store(0);
+    ringstat_parked_overwrite.store(0);
 }
 
 void setUp(void) { resetRing(); }
@@ -1454,6 +1458,66 @@ static void test_nbr_caseb_text_relay_kein_hold(void)
         "Text-Relay (NORMAL) muss vor der eigenen Position (LOW) gewinnen -- er ist nicht gehalten");
 }
 
+// --------------------------------------------------------------- M0-1 (0.4)
+//
+// ringstat_parked_overwrite (docs/dm-transport-impl-plan-20260913.md): landet
+// ein Enqueue auf einem Slot, der noch retransmit-pending ist (Laenge != 0,
+// Status weder READY(0x00) noch DONE(0xFF) noch EXT_PENDING(0x80) -- 0x05 hier
+// als typischer Wert innerhalb der 0x01..0x14-Alterungsfolge aus
+// updateRetransmissionStatus()), muss der Zaehler steigen; auf einem leeren
+// Slot nicht. ringstat_enqueue zaehlt beide Faelle (jeder erreichte Write).
+
+static void test_ringstat_parked_overwrite_bei_pending_slot(void)
+{
+    // Slot 0 traegt noch einen unbestaetigten Sendeversuch: Laenge gesetzt,
+    // Status 0x05 (pending, wie ihn updateRetransmissionStatus() nach ein
+    // paar Alterungs-Ticks hinterlaesst) -- weder READY noch DONE noch
+    // EXT_PENDING.
+    ringBuffer[0][0] = 10;
+    ringBuffer[0][1] = 0x05;
+
+    BuiltFrame f = buildPositionFrame(0xF001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_ovw");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
+static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
+{
+    // resetRing() (per setUp bereits gelaufen) liefert einen frischen, leeren
+    // Slot 0 -- kein Ueberschreiben eines Pending-Eintrags.
+    BuiltFrame f = buildPositionFrame(0xF002UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_empty");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
+// Die drei Ausschluesse des Kriteriums einzeln: ein Slot mit Laenge != 0,
+// dessen Status DONE, READY oder EXT_PENDING ist, wird NICHT als
+// ueberschriebener Pending-Eintrag gezaehlt. Ohne diese Faelle bestuende der
+// Test auch mit `len != 0` allein (Advisor-Befund F4, 2026-09-13).
+static void test_ringstat_parked_overwrite_ignoriert_done_ready_ext(void)
+{
+    const uint8_t statusse[3] = { RING_STATUS_DONE, RING_STATUS_READY, RING_STATUS_EXT_PENDING };
+    for(int i = 0; i < 3; i++)
+    {
+        resetRing();
+        ringBuffer[0][0] = 10;
+        ringBuffer[0][1] = statusse[i];
+
+        BuiltFrame f = buildPositionFrame(0xF010UL + (uint32_t)i);
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_excl");
+
+        TEST_ASSERT_EQUAL_INT(0, slot);
+        TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+        TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+    }
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -1498,5 +1562,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_nbr_caseb_kein_re_arm);
     RUN_TEST(test_nbr_ohne_bnbrcancel_unveraendert);
     RUN_TEST(test_nbr_caseb_text_relay_kein_hold);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_pending_slot);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null);
+    RUN_TEST(test_ringstat_parked_overwrite_ignoriert_done_ready_ext);
     return UNITY_END();
 }

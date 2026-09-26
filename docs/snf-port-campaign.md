@@ -13,7 +13,7 @@ Source of truth for the feature itself: `fork-main:docs/dm-transport-impl-plan-2
 | ---- | ------------------------------------------------------------------- | --------------- | -------- |
 | 0    | branch, this doc, neo path lists (NBR gap)                          | done 2026-09-26 | 4bb0dc45 |
 | 1    | new modules + host tests, shared headers, `env:native`              | done 2026-09-26 | see log  |
-| 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | open            |          |
+| 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | done 2026-09-26 |          |
 | 3    | stage 1 outbox + ladder (`--dmretry`)                               | open            |          |
 | 4    | stage 3 store node + stage 4 custody notice                         | open            |          |
 | 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |          |
@@ -66,3 +66,14 @@ the ELF drops them until wave 2 wires a caller. Advisor skipped: no caller, no b
 the two glue adaptations go to the advisor of the wave that wires them. Baseline for later
 comparison (inert code): RAK flash 92.8 % (756592 B), RAM 79948 B; Heltec V3 RAM 101276 B.
 Pre-existing red, not ours: `test/golden/drift_matrix_lint.py` (DR-03, DR-16 lack asserting tests).
+
+**Wave 2 (2026-09-26).** Stage 0 without 0.1 and stage 2.1, three writers. `lora_functions.cpp`:
+dmstat counters (incl. both gw_ack sites), `--airgap` RX drop/teardown and TX refusal
+(`INSTRUMENT_ENABLED` only), give-up -> 0x03 + `ACK_STATUS_FAILED`, duplicate-DM re-ACK `else`
+on the `setlogCountDedup()` branch, 2.1 dedup in the `iEnqPos` branch. `txring_functions.cpp`:
+M0-1 counters in `addTxRingEntryCore()`. Both `udp_frame_*` twins: 2.1 dedup + re-ACK gate,
+twin regression test (red without the gate). `loop_functions.cpp`: brace escape with `{ping}`/`{SET}`
+exemption, dmstat_sent, DM setlog line. `--airgap` command, web "failed" marker. Gate: host 44/44
+envs, 1377 cases; 13 lints; 7 lead envs; DM strings in Heltec/RAK/T-Beam images; instrumented RAK
+build carries the AIRGAP strings. Advisor: one finding (second `dmstat_gw_ack` site, gateway
+self-ack in OnRxDone) fixed, rest verified equal to fork-main tip. RAK flash 93.4 % (761256 B).

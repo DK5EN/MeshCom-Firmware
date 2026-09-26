@@ -44,14 +44,14 @@ void sendUDP()
         if(!neth.udp_is_busy)
         {
             // CONC-16 (nRF52-Leser): der Schreiber addUdpOutBuffer() laeuft
-            // ueber addNodeData() im Timer-Service-Task (OnRxDone, siehe
-            // C-01) und kann diesen Slot per Ring-voll-Eviction ueberholen,
-            // waehrend hier gesendet wird. Laenge und Payload deshalb als
-            // Snapshot unter kurzem Lock lesen und den Index-Advance unten
-            // gegen ein zwischenzeitliches Vorruecken sichern — gleiche
-            // Behandlung wie sendMeshComUDP() in udp_functions.cpp (ESP32).
-            // Snapshot bewusst groesser als der Quell-Slot und nullgefuellt
-            // (siehe dortige Begruendung).
+            // ueber addNodeData() im dedizierten 16 kB _lora_task (OnRxDone,
+            // siehe C-01, board.cpp:498) und kann diesen Slot per Ring-voll-
+            // Eviction ueberholen, waehrend hier gesendet wird. Laenge und
+            // Payload deshalb als Snapshot unter kurzem Lock lesen und den
+            // Index-Advance unten gegen ein zwischenzeitliches Vorruecken
+            // sichern — gleiche Behandlung wie sendMeshComUDP() in
+            // udp_functions.cpp (ESP32). Snapshot bewusst groesser als der
+            // Quell-Slot und nullgefuellt (siehe dortige Begruendung).
             static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64];
             memset(udpSnapshot, 0, sizeof(udpSnapshot));
             uint16_t myGen = bf_tail_gen(&udpOutRing);
