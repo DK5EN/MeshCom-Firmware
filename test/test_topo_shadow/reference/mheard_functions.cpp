@@ -1,3 +1,11 @@
+// Referenzkopie (MeshCom 5, Welle 4): src/mheard_functions.cpp aus 313e619a,
+// unveraendert bis auf die zwei Includes der Nachbarkopien, den Pfad zu
+// printfdeb_functions.h und diesen Waechter. Wird NUR von test/test_topo_shadow/test_topo_shadow.cpp
+// eingebunden (#include "reference/mheard_functions.cpp"); der Waechter
+// verhindert, dass PlatformIOs rekursiver Testquellen-Build die Datei
+// zusaetzlich als eigene Uebersetzungseinheit baut und die MHeard-Symbole
+// doppelt anlegt. Vorbild: test/test_nbr_replay/reference/nbr_matrix_dense.cpp.
+#ifdef MHEARD_REFERENCE_TU
 #include "mc_text.h"
 #include <aprs_functions.h>
 #include <loop_functions.h>
@@ -6,10 +14,14 @@
 #include <ArduinoJson.h>
 #include <ble_json_frame.h>
 #include <time_functions.h>
-#include <mheard_functions.h>
-#include <mheard_record.h>
+#include "mheard_functions.h"
+#include "mheard_record.h"
 
-#include "printfdeb_functions.h"
+// Referenzkopie: im Original fand der Quote-Include zuerst src/printfdeb_functions.h
+// (Verzeichnis der einbindenden Datei). Von hier aus gewaenne sonst der
+// Inline-Shim aus test/support und kollidierte mit den Link-Stubs des Tests;
+// der relative Pfad haelt die Aufloesung des Originals fest.
+#include "../../../src/printfdeb_functions.h"
 
 // NATIVE_BUILD (pio test -e native_parsers, PT-01): these headers pull in
 // SD/SPI and the T-Deck LVGL UI chain. The BOARD_T_DECK*/BOARD_T_DECK_PRO
@@ -1390,3 +1402,5 @@ unsigned long getLatestMHeardTimestamp()
     }
     return max_ts;
 }
+
+#endif // MHEARD_REFERENCE_TU

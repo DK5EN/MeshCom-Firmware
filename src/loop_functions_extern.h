@@ -9,7 +9,6 @@
  *  @date        2025-12-03
  */
 
-#include "mheard_record.h"   // MheardRecord, siehe mheardRecords[] unten
 #include <atomic>
 
 // WQ-01 (2026-09-05): queue panel on the rxlog web page -- pulls in
@@ -377,7 +376,7 @@ extern std::atomic<uint8_t>  stat_ring_max;    // Hochwasser von txRingDepth()
 // (definition in loop_functions.cpp next to getTimeString()).
 void setlogPrint(const char *body);
 // SL-05: fills the STAT fields from the interval counters (drains them), the
-// mheard/trickle/version globals and uptime; heap is platform-specific and passed in.
+// neighbour-count/trickle/version globals and uptime; heap is platform-specific and passed in.
 // stat_drop_count[] is read, not cleared -- the platform tick clears it.
 void setlogFillStat(struct setlogStatFields *f, uint32_t heap);
 
@@ -419,8 +418,6 @@ extern unsigned long previousWiFiMillis;
 
 // Timer variables for persitence to SD
 extern unsigned long lastsavePOSPersistence;
-extern unsigned long lastsaveMHEARDPersistence;
-extern unsigned long lastsavePATHPersistence;
 
 extern double posinfo_distance;
 extern double posinfo_direction;
@@ -458,18 +455,6 @@ extern unsigned long web_timer;          // Refreshtime WEbServer
 // batt
 extern float global_batt;
 extern int global_proz;
-
-// R2-01: war `unsigned char mheardBuffer[MAX_MHEARD][60]` -- Text je
-// Eintrag. Jetzt der Datensatz, 20 statt 60 Byte (src/mheard_record.h).
-extern MheardRecord mheardRecords[MAX_MHEARD];
-extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
-extern unsigned long mheardEpoch[MAX_MHEARD];  //Ringbuffer for MHeard EPoch Update Time
-extern int mheardNCount[MAX_MHEARD];
-
-extern char mheardPathCalls[MAX_MHPATH][10]; //Ringbuffer for MHeard Key = Call
-extern unsigned long mheardPathEpoch[MAX_MHPATH];  //Ringbuffer for MHeard EPoch Update Time
-extern unsigned char mheardPathBuffer1[MAX_MHPATH][52]; //Ringbuffer for MHeard Sourcepath
-extern uint8_t mheardPathLen[MAX_MHPATH];
 
 extern char cTimeSource[10];
 

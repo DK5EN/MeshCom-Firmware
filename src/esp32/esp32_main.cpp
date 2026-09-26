@@ -137,7 +137,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <extudp_functions.h>
 #include <kiss_functions.h>
 #include <web_functions/web_functions.h>
-#include <mheard_functions.h>
+#include <mh_phone.h>
+#include <topo_ui.h>
 #include <time_functions.h>
 #include <clock.h>
 #include <setlog_lines.h> // SL-04/SL-05: --setlog on line formatters (Welle 0)
@@ -798,9 +799,6 @@ void esp32setup()
     // init nach Reboot
     init_loop_function();
 
-    // Initialize mheard list
-    initMheard();
-
 	// Get LoRa parameter
 	init_flash();
 
@@ -985,6 +983,12 @@ void esp32setup()
     #if defined(BOARD_T_DECK_PRO)
         initTDeck_pro();
     #endif
+
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): /topo.dat laden. Erst hier,
+    // nach init_flash() (Rufzeichen, node_persist_to_sd) und nach initTDeck()/
+    // initTDeck_pro(), die die SD-Karte einhaengen; auf allen anderen Boards ein
+    // No-Op (src/topo_ui.h).
+    topoUiBoot();
 
     #if defined(BOARD_T5_EPAPER)
         idf_setup();
@@ -3177,7 +3181,7 @@ void esp32loop()
                 //sendMessage((char*)config_cmds[config_cmds_index], strlen(config_cmds[config_cmds_index]));
             }
 
-            startMheardToPhone(); // MHeard erst, wenn der Kommando-Ring leer ist (siehe unten)
+            mhPhoneListStart(); // MHeard-Liste erst, wenn der Kommando-Ring leer ist (siehe unten)
 
             config_to_phone_prepare_timer = millis();
 
@@ -3204,10 +3208,10 @@ void esp32loop()
                         ble_wait = millis();
                     }
                 }
-                else if (mheardToPhonePending())
+                else if (mhPhoneListPending())
                 {
                     // Kommando-Ring leer: naechste Portion der MHeard-Liste nachlegen
-                    sendMheard();
+                    mhPhoneListStep();
                 }
                 else if (!bf_empty(&phoneRing))
                 {
@@ -3389,8 +3393,9 @@ void esp32loop()
         gps_refresh_timer = millis();
     }
 
-    // check NCNT modified
-    int incnt = getMheardCount();
+    // check NCNT modified -- MeshCom 5 (Welle 4, Konzept 4.8): lokaler
+    // Vergleich, nicht die Sendefassung -- nbrNcnt(), nicht nbrNcntAir().
+    int incnt = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     if(ncnt_hold != incnt)
     {
         // minimal alle 60 sec
@@ -3487,8 +3492,9 @@ void esp32loop()
     {
         bHeyFirst = false;
 
-        // Check for topology change (neighbor count changed)
-        int current_neighbors = getMheardCount();
+        // Check for topology change (neighbor count changed) -- lokaler
+        // Vergleich (Konzept 4.8: die Trickle-Ruecksetzung ist kein Sender).
+        int current_neighbors = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
         {
             // Topology changed — reset to fastest interval

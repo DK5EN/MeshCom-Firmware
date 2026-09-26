@@ -140,7 +140,8 @@ void sendHeartbeat();
 #include <udp_functions.h>
 #include <web_functions/web_functions.h>
 #include <phone_commands.h>
-#include <mheard_functions.h>
+#include <mh_phone.h>
+#include <topo_ui.h>
 #include <clock.h>
 
 #include <bmx280.h>
@@ -523,8 +524,10 @@ void nrf52setup()
         memset(ringBufferLoraRX[i], 0, 4);
     }
 
-    // Initialize mheard list
-    initMheard();
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): Topologie ersetzt die
+    // alte MHeard-Init; topoUiBoot() ist ein No-Op ausser auf T-Deck/T-Deck
+    // Pro (SD-Sicherung dort passt in tdeck_main.cpp).
+    topoUiBoot();
 
 	// Initialize battery reading
 	init_batt();
@@ -1862,7 +1865,7 @@ void nrf52loop()
                 commandAction((char*)config_cmds[config_cmds_index], isPhoneReady, true);
             }
 
-            startMheardToPhone(); // MHeard erst, wenn der Kommando-Ring leer ist (siehe unten)
+            mhPhoneListStart(); // MHeard-Liste erst, wenn der Kommando-Ring leer ist (siehe unten)
 
             config_to_phone_prepare_timer=millis();
 
@@ -1882,10 +1885,10 @@ void nrf52loop()
                 {
                     sendComToPhone();
                 }
-                else if (mheardToPhonePending())
+                else if (mhPhoneListPending())
                 {
                     // Kommando-Ring leer: naechste Portion der MHeard-Liste nachlegen
-                    sendMheard();
+                    mhPhoneListStep();
                 }
                 else if (!bf_empty(&phoneRing))
                 {
@@ -1915,8 +1918,9 @@ void nrf52loop()
         }
     }
 
-    // check NCNT modified
-    int incnt = getMheardCount();
+    // check NCNT modified -- MeshCom 5 (Welle 4, Konzept 4.8): lokaler
+    // Vergleich, nicht die Sendefassung -- nbrNcnt(), nicht nbrNcntAir().
+    int incnt = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     if(ncnt_hold != incnt)
     {
         INSTR_SECTION("pos_timer");
@@ -2016,8 +2020,9 @@ void nrf52loop()
     {
         bHeyFirst = false;
 
-        // Check for topology change
-        int current_neighbors = getMheardCount();
+        // Check for topology change -- lokaler Vergleich (Konzept 4.8: die
+        // Trickle-Ruecksetzung ist kein Sender).
+        int current_neighbors = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
         {
             trickle_interval_ms = TRICKLE_IMIN_S * 1000UL;

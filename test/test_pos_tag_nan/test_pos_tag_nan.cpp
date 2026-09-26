@@ -17,8 +17,8 @@
 #include <parser_link_stubs.h>
 #include <pos_tag_nan.h>
 
-// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
-// (env:native_parsers linkt alle drei Parser in jedes Testprogramm der Env,
+// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/via_functions.cpp
+// (env:native_parsers linkt beide Parser in jedes Testprogramm der Env,
 // siehe test/test_decodemheard/stubs/parser_link_stubs.h; pos_tag_nan.h
 // selbst braucht keinen davon, aber build_src_filter ist env-weit, nicht
 // pro Test-Case)

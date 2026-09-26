@@ -239,6 +239,17 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
               Serial.printf("[GW];rx;type;%s;len;%d;ms;%lu\n", gwRxType, packetSize, (unsigned long)millis());
           }
 
+          // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+          // Zielpfad vor checkVia() auf das Ziel zuruecksetzen. Ein Via ist ein
+          // Naechster-Hop-Feld der Absender-Region; vom Server eingespeist
+          // nennt er Knoten, die hier niemand hoert, und kein Nachbar mit
+          // Firmware ab dem 13.06. wiederholte den Rahmen. Danach setzt
+          // checkVia() hoechstens den eigenen Via (node_via). Steht hier vor
+          // der Anzeige, damit sendDisplayPosition()/sendDisplayText(), die
+          // Telefon-Kopien und der TX-Ring denselben Pfad sehen -- gleiche
+          // Reihenfolge wie udp_frame_nrf52.cpp (test_udp_frame_twin).
+          mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), aprsmsg.msg_destination_call);
+
           if(msg_type_b == 0x21)
           {
             sendDisplayPosition(aprsmsg, 99, 0);

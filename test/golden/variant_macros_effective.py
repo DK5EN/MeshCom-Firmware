@@ -339,7 +339,7 @@ def self_test() -> int:
     report("macro-name set covers the variant headers AND the global buffers",
            200 < len(names) < 600
            and {"RF_FREQUENCY", "LORA_SF", "LORA_CR"} <= names
-           and {"MAX_LOG", "MAX_MHEARD", "MAX_RING"} <= names)
+           and {"MAX_LOG", "MAX_DEDUP_RING", "MAX_RING"} <= names)
 
     report("volatile macros are filtered",
            all(VOLATILE.match(n) for n in ("__DATE__", "__TIME__", "__FILE__"))

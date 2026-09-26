@@ -194,6 +194,16 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           memset(convBuffer, 0x00, UDP_TX_BUF_SIZE);
 
+          // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+          // Zielpfad vor checkVia() auf das Ziel zuruecksetzen. Ein Via ist ein
+          // Naechster-Hop-Feld der Absender-Region; vom Server eingespeist
+          // nennt er Knoten, die hier niemand hoert, und kein Nachbar mit
+          // Firmware ab dem 13.06. wiederholte den Rahmen. Danach setzt
+          // checkVia() hoechstens den eigenen Via (node_via). Die Anzeige,
+          // die Telefon-Kopien und die zweite checkVia()-Stelle weiter unten
+          // arbeiten auf demselben, hier schon zurueckgesetzten aprsmsg.
+          mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), aprsmsg.msg_destination_call);
+
           checkVia(aprsmsg);
 
           uint16_t size = encodeAPRS(convBuffer, aprsmsg);

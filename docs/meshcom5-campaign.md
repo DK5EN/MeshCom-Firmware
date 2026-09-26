@@ -22,7 +22,7 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
 | 1    | 1 prep    | W1a replay harness + 24.09 fixture (byte-identical `[NBR]` lines from the dense build); W1b `tools/nm_symsum.py`                                                                                                                                                         | done   |
 | 2    | 1 core    | Header contract by the orchestrator; W2a `nbr_matrix.*` (edge pool, NbrMask, callsign word, share rule, counter halving, clamp, minute sweep); W2b mask consumers (txring, lora cover scan, web/command neighbours, loop, both mains)                                    | done   |
 | 3    | 2 views   | W3a `nbr_views.*`, direct extension, horizon, echo table, ME step off the path check; W3b horizon/echo feed in `lora_functions.cpp` + replay shadow over 21.-24.09.                                                                                                      | done   |
-| 4    | 3 cutover | W4a removal + core readers; W4b web + command; W4c mains + loop + MH JSON (7 new fields, FailSoft); W4d T-Deck, T-Deck Pro, `topo.dat`                                                                                                                                   | open   |
+| 4    | 3 cutover | W4a removal + core readers; W4b web + command; W4c mains + loop + MH JSON (7 new fields, FailSoft); W4d T-Deck, T-Deck Pro, `topo.dat`                                                                                                                                   | done   |
 | 5    | 3 field   | Bench on the three USB nodes (T-Deck Plus DK5EN-14 reboot keeps topology, Heltec V3 DK5EN-1, T-Beam v1.2), then 24 h field run on DK5EN-98 and DK5EN-1. The RAK4631 DK5EN-90 nRF52 consistency test runs last, after everything else is finished (operator, 2026-09-25). | open   |
 | 6    | docs      | `nbr-logformat.md`, `docs/architecture/09/10/11`, changelog                                                                                                                                                                                                              | open   |
 
@@ -144,3 +144,49 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   between save and load does not shift ages.
 - RAM (nm): classic 10,345 B of stores (topology 5,528), S3 26,011 (13,864), nRF52 27,763
   (13,864) -- still transitional; MHeard and the path table go in wave 4.
+
+### Wave 4
+
+- Contracts: `src/mh_phone.h` (MH frame builder with 13 old + 7 new keys, live frame at most once
+  per neighbour and minute, connect-time list) and `src/topo_ui.h` (one board hook for display
+  refresh and `/topo.dat` every 10 min, one boot hook). Env `native_mh_phone`; the MHeard envs and
+  entries are gone from the ini; `native_topo_shadow` keeps running against a frozen copy of the
+  old MHeard under `test/test_topo_shadow/reference/`.
+- Writers: W4a (Opus) removal + lora/via/time/aprs + tests; W4b web + console; W4c `mh_phone.cpp`,
+  loop, both mains; W4d T-Deck, T-Deck Pro, `topo_ui.cpp` (raw UTC in `topo.dat`, advisor R7).
+- RAM after the cutover (nm stores incl. rings; before = wave 0 baseline):
+
+  | Family                | Before | After  | Net    | Concept 4.10 |
+  | --------------------- | ------ | ------ | ------ | ------------ |
+  | classic (E22, T-Beam) | 5,989  | 5,848  | -141   | -129         |
+  | E22_XML               | 9,599  | 5,848  | -3,751 | -3,763       |
+  | S3 (Heltec V3)        | 14,823 | 14,504 | -319   | -291         |
+  | nRF52 (RAK4631)       | 16,575 | 14,504 | -2,071 | -2,043       |
+
+  Rows 13/21 -> 64/128. The small extra saving is the stage-4 via fields, not stored yet.
+
+- Deliberate changes: `--mheard`/`--path` print one `key=value` line per row instead of the old
+  box table; the web path page is a real table; the app gets DATE/TIME in local time as before
+  (the builder adds `node_utcoff` back, `getUnixClock()` is raw UTC); `topo.dat` holds raw UTC.
+- The destination path is reset to the destination before `checkVia()` in both UDP handlers
+  (Anhang E, stage 3). Deferred: the same reset before the server upload (Anhang E, loop and
+  mains; `lora_functions.cpp` `addNodeData(RcvBuffer)` uploads the received via). It needs a
+  copy of the frame because the relay reuses it; decide with stage 4.
+- `docs/testplan/drift-matrix.csv` DR-28/DR-29 now point at `test_nbr_views` / `test_mh_phone`.
+- For fork-neo: `tools/neo/paths/*.txt` still list `src/mheard_functions.*` and do not list
+  `src/nbr_mask.h`, `src/nbr_views.*`, `src/mh_phone.*`, `src/topo_ui.*`; `derive.sh` would drop
+  them. Update the path lists before this branch is projected onto fork-neo.
+- Advisor (Fable): rework, all fixed: R1 no MH frame without a clock (the builder now checks the
+  current time itself before back-dating; an age > 0 could otherwise wrap to a plausible date);
+  R2 no `topo.dat` save without a clock, implausible saved epochs rejected, save interval stamped
+  before the SD work (no retry storm without a card); R3 `nbrInit()` before `nbrLoad()`, a foreign
+  or rejected image is deleted; R4 T-Deck tables refresh on tab switch; low items (stale LVGL rows,
+  signed utcoff casts, `via_buf` static, nothrow allocation, dead defines). Regression tests:
+  `test_mh_phone::test_no_frame_when_epoch_zero`, `test_udp_frame_twin` destination-path reset
+  (fails without the reset on both platforms).
+- Gate: all native suites and golden green, 34 of 35 firmware envs (esp32-external-radio as
+  before); string scan on t_deck/t_deck_plus: `mheard.dat`/`mhpath.dat` only in the one-time
+  delete. Linker RAM against the wave 0 baseline: E22 95,584 -> 95,456, Heltec V3 101,548 ->
+  101,260, RAK4631 81,408 -> 79,748.
+- Pre-existing, not changed: on ESP32 the display copy of a server position is taken before
+  `checkVia()`, on nRF52 after it (only visible with a node via set).

@@ -294,14 +294,12 @@ static inline bool flashLayoutCompatible(int stored)
 #define MC_I2C_NEEDS_BUS_RESET 0
 #endif
 
-// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle sieben Konstanten und seine NBR_FAMILY_*-Marke setzen --
+// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle sechs Konstanten und seine NBR_FAMILY_*-Marke setzen --
 // wer eine vergisst, bekommt keinen stillen Fehlwert, sondern einen Compile-Fehler,
 // weil die Konstanten Array-Groessen sind. ALT-33.
 #if defined(ENABLE_XML) || defined(ENABLE_SBUFFER)
 // ENABLE_XML und ENABLE_SBUFFER hatten bis 2026-08-18 zwei byte-identische Zweige
 // nebeneinander; zusammengelegt, damit sie nicht auseinanderlaufen koennen.
-#define MAX_MHEARD 50                      // max count of messages in mheard ringbuffer
-#define MAX_MHPATH 50                      // max count of messages in mhpath ringbuffer
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 60                  // dedup ring for received msg_ids (separate from TX ring)
 #define MAX_LOG 20                         // max count of messages in ringbuffer
@@ -311,8 +309,6 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: E22_XML zaehlt zur klassischen Familie (64 Zeilen), docs/meshcom5-topologie 4.2
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
 // ESP32-S3 (320 KB SRAM) and nRF52840 (256 KB RAM) — full buffer sizes
-#define MAX_MHEARD 80                      // max count of messages in mheard ringbuffer (was 20, 85-124 H00 nodes observed)
-#define MAX_MHPATH 100                     // max count of messages in mhpath ringbuffer (was 30, multiple paths per node)
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 100                 // dedup ring for received msg_ids (was 60, wraparounds observed)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer (ram_opti)
@@ -321,8 +317,6 @@ static inline bool flashLayoutCompatible(int stored)
 #define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang (war 20 x 256)
 #define NBR_FAMILY_LARGE                   // MeshCom-5-Topologie: 128 Zeilen, 128-Bit-Masken, docs/meshcom5-topologie 4.2
 #elif defined(ENABLE_TBEAM)                // very smal version only for developer tests
-#define MAX_MHEARD 10                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
-#define MAX_MHPATH 10                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
 #define MAX_RING 10                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 10                  // dedup ring for received msg_ids (was 60)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer
@@ -332,8 +326,6 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_FAMILY_DEV                     // MeshCom-5-Topologie: Entwickler-Variante, 32 Zeilen
 #else
 // ESP32 original (~160 KB DRAM) — reduced buffer sizes due to RAM constraints
-#define MAX_MHEARD 30                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
-#define MAX_MHPATH 40                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
 // MEM-01 (2026-08-30): 30/25 -> 20/20, same as every other board. MAX_RING
 // feeds five static rings (ringBuffer, both BLE*toPhoneBuff, retry/prio) --
 // at 30 the classic-ESP32 dram0_0_seg had 0.5 kB (T-Beam) / 1.7 kB (E22)

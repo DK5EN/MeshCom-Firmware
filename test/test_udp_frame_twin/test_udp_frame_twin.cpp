@@ -153,6 +153,10 @@ static std::vector<std::string> g_ack_dest;
 static int g_save_settings_calls = 0;
 static int g_sendDisplayText_calls = 0;
 static int g_sendDisplayPosition_calls = 0;
+// msg_destination_path as the display saw it (sendDisplayText()/
+// sendDisplayPosition(), in call order). Kept out of the ordered sink log on
+// purpose, so the U1 corpus dump does not change with it.
+static std::vector<std::string> g_display_dest_path;
 
 // queueKiss() -- declared by stubs/kiss_functions.h, which shadows the real
 // header (see there). Kept out of the ordered sink log on purpose: bKISS is
@@ -312,14 +316,16 @@ bool save_settings(void) { g_save_settings_calls++; record_sink("SAVESETTINGS", 
 
 void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-    (void)aprsmsg; (void)rssi; (void)snr;
+    (void)rssi; (void)snr;
+    g_display_dest_path.push_back(aprsmsg.msg_destination_path);
     g_sendDisplayText_calls++;
     record_sink("DISPLAYTEXT", "-");
 }
 
 void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-    (void)aprsmsg; (void)rssi; (void)snr;
+    (void)rssi; (void)snr;
+    g_display_dest_path.push_back(aprsmsg.msg_destination_path);
     g_sendDisplayPosition_calls++;
     record_sink("DISPLAYPOS", "-");
 }
@@ -478,6 +484,7 @@ static void recorder_reset()
     g_save_settings_calls = 0;
     g_sendDisplayText_calls = 0;
     g_sendDisplayPosition_calls = 0;
+    g_display_dest_path.clear();
     g_kiss.clear();
     g_extern.clear();
     g_extern_ack.clear();
@@ -1849,6 +1856,153 @@ static void test_extern_ack_json_is_valid_at_its_edges(void)
 }
 
 
+// ===========================================================================
+// MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+// a frame injected from the server leaves the gateway with its destination
+// path reset to the destination before checkVia() -- a via of the sender's
+// region must not reach local LoRa, where nobody named in it relays. Checked
+// on every copy the handler produces: the TX-ring entry (decoded back), the
+// phone copies (addBLEOutBuffer) and the display (sendDisplayText()/
+// sendDisplayPosition()). Both twins must also agree byte for byte.
+// ===========================================================================
+
+struct ViaResetOutcome
+{
+    std::vector<uint8_t> tx;          // TX-ring entry (frame bytes only)
+    std::string tx_path;              // its decoded msg_destination_path
+    std::vector<std::string> ble_paths;
+    std::vector<std::vector<uint8_t>> ble;
+    std::vector<std::string> display_paths;
+};
+
+static ViaResetOutcome run_via_reset_case(int side, char type, const char *dest_path,
+                                          bool via_on, const char *node_via, uint32_t msg_id)
+{
+    recorder_reset();
+    bVIA = via_on;
+    if (node_via)
+        snprintf(meshcom_settings.node_via, sizeof(meshcom_settings.node_via), "%s", node_via);
+
+    const char *payload = (type == '!') ? "4812.34N/01123.45E#via-reset" : "via-reset";
+    uint8_t buf[BUF_CAP];
+    memset(buf, 0, sizeof(buf));
+    uint16_t len = build_gate_datagram(buf, "DK5EN-92", dest_path, type, payload, msg_id);
+
+    if (side)
+        handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    else
+        handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+    ViaResetOutcome o;
+    int used = 0;
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        if (ringBuffer[i][0] == 0)
+            continue;
+        used++;
+        o.tx.assign(ringBuffer[i] + 2, ringBuffer[i] + 2 + ringBuffer[i][0]);
+    }
+    char msg[96];
+    snprintf(msg, sizeof(msg), "%s '%c' %s: exactly one TX-ring entry expected",
+             side ? "nrf52" : "esp32", type, dest_path);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, used, msg);
+
+    uint8_t dec[UDP_TX_BUF_SIZE + 5];
+    memset(dec, 0, sizeof(dec));
+    memcpy(dec, o.tx.data(), o.tx.size());
+    struct aprsMessage m;
+    initAPRS(m, type);
+    snprintf(msg, sizeof(msg), "%s '%c' %s: TX-ring entry does not decode",
+             side ? "nrf52" : "esp32", type, dest_path);
+    TEST_ASSERT_TRUE_MESSAGE(decodeAPRS(dec, (uint16_t)o.tx.size(), m) != 0, msg);
+    o.tx_path = m.msg_destination_path;
+
+    for (const auto &b : g_ble)
+    {
+        o.ble.push_back(b);
+        uint8_t bb[UDP_TX_BUF_SIZE + 5];
+        memset(bb, 0, sizeof(bb));
+        memcpy(bb, b.data(), std::min(b.size(), sizeof(bb)));
+        struct aprsMessage bm;
+        initAPRS(bm, type);
+        if (decodeAPRS(bb, (uint16_t)b.size(), bm) != 0)
+            o.ble_paths.push_back(bm.msg_destination_path);
+    }
+    o.display_paths = g_display_dest_path;
+    return o;
+}
+
+static void check_via_reset(char type, const char *dest_path, bool via_on,
+                            const char *node_via, const char *expect, uint32_t msg_id)
+{
+    ViaResetOutcome out[2];
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        out[side] = run_via_reset_case(side, type, dest_path, via_on, node_via, msg_id);
+        char msg[128];
+
+        snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: TX-ring destination path",
+                 name, type, dest_path, (int)via_on);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, out[side].tx_path.c_str(), msg);
+
+        snprintf(msg, sizeof(msg), "%s '%c' %s: phone copy missing", name, type, dest_path);
+        TEST_ASSERT_TRUE_MESSAGE(!out[side].ble_paths.empty(), msg);
+        for (const auto &p : out[side].ble_paths)
+        {
+            snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: phone copy destination path",
+                     name, type, dest_path, (int)via_on);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, p.c_str(), msg);
+        }
+
+        // The display sees the reset path: sendDisplayPosition() runs before
+        // checkVia() (bare destination), sendDisplayText() after the first
+        // checkVia() (with node_via, if set). Never the sender's via.
+        const char *comma = strrchr(dest_path, ',');
+        std::string bare = comma ? comma + 1 : dest_path;
+        snprintf(msg, sizeof(msg), "%s '%c' %s: display not called", name, type, dest_path);
+        TEST_ASSERT_TRUE_MESSAGE(!out[side].display_paths.empty(), msg);
+        for (const auto &p : out[side].display_paths)
+        {
+            snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: display destination path '%s'",
+                     name, type, dest_path, (int)via_on, p.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(p == bare || p == expect, msg);
+        }
+    }
+
+    char msg[96];
+    snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: TX-ring bytes differ between twins",
+             type, dest_path, (int)via_on);
+    TEST_ASSERT_TRUE_MESSAGE(out[0].tx == out[1].tx, msg);
+    snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: phone copies differ between twins",
+             type, dest_path, (int)via_on);
+    TEST_ASSERT_TRUE_MESSAGE(out[0].ble == out[1].ble, msg);
+    // Display paths agree only without an own node_via. With one, a known
+    // drift shows: the ESP32 handler calls sendDisplayPosition() before its
+    // checkVia(), the nRF52 handler after it, so the ESP32 display sees "9"
+    // and the nRF52 display "DK5EN-90,9". Both are free of the sender's via
+    // (checked per side above); the order itself is not this fix's subject.
+    if (!via_on)
+    {
+        snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: display paths differ between twins",
+                 type, dest_path, (int)via_on);
+        TEST_ASSERT_TRUE_MESSAGE(out[0].display_paths == out[1].display_paths, msg);
+    }
+}
+
+static void test_regression_server_via_is_reset_before_checkvia_on_both(void)
+{
+    // foreign via from another region -> only the destination remains
+    check_via_reset(':', "DB0XYZ-12,9", false, nullptr, "9", 0x5101);
+    check_via_reset('!', "DB0XYZ-12,9", false, nullptr, "9", 0x5102);
+    // own node_via still applies -- on the reset path, not appended to the foreign one
+    check_via_reset(':', "DB0XYZ-12,9", true, "DK5EN-90", "DK5EN-90,9", 0x5103);
+    check_via_reset('!', "DB0XYZ-12,9", true, "DK5EN-90", "DK5EN-90,9", 0x5104);
+    // a frame already at its destination stays there (no "9,9")
+    check_via_reset(':', "9", false, nullptr, "9", 0x5105);
+    check_via_reset('!', "9", false, nullptr, "9", 0x5106);
+}
+
 int main(int, char **argv)
 {
     g_argv0 = argv[0] ? argv[0] : "";
@@ -1882,6 +2036,8 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);
 
     RUN_TEST(test_drift_kiss_server_relay_tap_is_esp32_only);
+
+    RUN_TEST(test_regression_server_via_is_reset_before_checkvia_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

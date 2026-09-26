@@ -10,6 +10,9 @@
 #include "dedup_functions.h"
 #include "setlog_lines.h"
 #include "nbr_matrix.h"
+#include "nbr_views.h"   // nbrNcntAir(): R<n> der HEY-Gruppe (MeshCom 5 Welle 4)
+#include "mh_phone.h"    // mhPhoneLive(): MH-Live-Rahmen an die App
+#include "topo_ui.h"     // topoUiChanged(): T-Deck-Anzeigen und /topo.dat
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -75,7 +78,6 @@
 #include <loop_functions_extern.h>
 #include "aprs_functions.h"
 #include <batt_functions.h>
-#include <mheard_functions.h>
 #include <udp_functions.h>
 #include <extudp_functions.h>
 #include <kiss_functions.h>
@@ -113,19 +115,6 @@ void loraDeepSleep()
 
                                         // flag to indicate if we are after receiving
 extern unsigned long iReceiveTimeOutTime;
-
-extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
-extern float mheardLat[MAX_MHEARD];   // R3-12: war double
-extern float mheardLon[MAX_MHEARD];   // R3-12: war double
-extern int mheardAlt[MAX_MHEARD];
-
-#include "TinyGPSPlus.h"
-
-// TinyGPS
-// gps nur fuer Distanz-/Kursberechnung (distanceBetween) - auch ohne ENABLE_GPS sichtbar machen.
-#if defined(ENABLE_GPS) || defined(ENABLE_RAK_GPS) || defined(WP_DISP)
-extern TinyGPSPlus gps;
-#endif
 
 int sendlng = 0;
 uint8_t lora_tx_buffer[UDP_TX_BUF_SIZE+10];  // lora tx buffer
@@ -539,8 +528,8 @@ static NbrDirectInfo nbrBuildDirectInfo(const struct aprsMessage &aprsmsg, int16
     info.plt = aprsmsg.payload_type;
     info.hw  = aprsmsg.msg_last_hw & 0x7F;
 
-    // Gleiche 0x80-Regel wie der bestehende MHeard-Block weiter unten
-    // (mheardLine.mh_mod): 0x80 gesetzt heisst "letzter Hop ist die
+    // Gleiche 0x80-Regel wie frueher mh_mod im MHeard-Block (bis Welle 4):
+    // 0x80 gesetzt heisst "letzter Hop ist die
     // sendende Station selbst" (aprs_functions.cpp:129/1122 setzen das Bit
     // beim Senden), sonst kommt der Modulationswert von einem Absender, den
     // dieser Rahmen nicht direkt bestaetigt.
@@ -549,7 +538,7 @@ static NbrDirectInfo nbrBuildDirectInfo(const struct aprsMessage &aprsmsg, int16
     info.rssi = rssi_here;
 
     // Sekunde aus der Wanduhr, wenn sie steht (gleicher Jahres-Test wie
-    // updateMheard()/updateHeyPath() in mheard_functions.cpp: "< 2025" heisst
+    // frueher das MHeard (bis Welle 4): "< 2025" heisst
     // "noch kein NTP/GPS/Telefon-Sync seit Boot"), sonst aus millis() (CONTRACT
     // in nbr_matrix.h).
     info.sec = (meshcom_settings.node_date_year >= 2025)
@@ -569,10 +558,9 @@ static NbrDirectInfo nbrBuildDirectInfo(const struct aprsMessage &aprsmsg, int16
     return info;
 }
 
-// W3b: liest das "R<n>"-Feld eines HEY-'@'-Payloads -- dieselbe Grammatik wie
-// updateHeyPath() (src/mheard_functions.cpp, fuer diese Welle nur lesende
-// Referenz, nicht im Dateiset dieser Welle) fuer mh_ncount, hier eigenstaendig
-// nachgebaut, weil diese Datei die Datei nicht aendern darf. "R<digits>;" oder
+// W3b: liest das "R<n>"-Feld eines HEY-'@'-Payloads -- dieselbe Grammatik, mit
+// der das MHeard bis Welle 4 seinen NCNT las (Referenzkopie heute in
+// test/test_topo_shadow/reference/). "R<digits>;" oder
 // "R<digits>,<digits>,<digits>;" (0 oder 2 Kommas vor dem ersten ';') ist
 // gueltig, alles andere (altes Zwei-Komma-Format, fehlendes 'R', kein Feld)
 // liefert false, *out_n bleibt unangetastet. Ein fehlendes abschliessendes
@@ -600,6 +588,50 @@ static bool nbrParseHeyReportedCount(const char *payload, long *out_n)
 
     *out_n = mcSliceToLong(buf, 1, (size_t)ipos);
     return true;
+}
+
+// MeshCom 5 Welle 4 (Konzept 4.9): Live-MH-Rahmen an die App hoechstens einmal
+// je Nachbar und Minute, ausgeloest von einer neuen Minute der Kante (x, 0)
+// ("ich habe x gehoert"), nicht von jedem Rahmen. nbrMhEdgeBefore() liest die
+// Kantenminute des letzten Hops VOR nbrNoteFrame(), nbrMhLiveAfter() NACH
+// nbrNoteDirect(); beide suchen per Rufzeichen, damit eine zwischendurch
+// verdraengte und neu vergebene Zeile nicht verwechselt wird.
+struct NbrMhEdgeMark
+{
+    bool     known;      // Kante (x, 0) lebte schon vor diesem Rahmen
+    uint16_t last_min;
+};
+
+static NbrMhEdgeMark nbrMhEdgeBefore(const char *last_hop)
+{
+    NbrMhEdgeMark mark = {false, 0};
+    NbrEdgeView ev;
+    int row = nbrFind(nbrMatrix, last_hop);
+
+    if(row > 0 && nbrEdgeGet(nbrMatrix, row, 0, &ev))
+    {
+        mark.known = true;
+        mark.last_min = ev.last_min;
+    }
+
+    return mark;
+}
+
+static void nbrMhLiveAfter(const char *last_hop, const NbrMhEdgeMark &before, uint16_t now_min)
+{
+    if(isPhoneReady != 1)
+        return;
+
+    NbrEdgeView ev;
+    int row = nbrFind(nbrMatrix, last_hop);
+
+    if(row <= 0 || !nbrEdgeGet(nbrMatrix, row, 0, &ev))
+        return;
+
+    if(before.known && ev.last_min == before.last_min)
+        return;
+
+    mhPhoneLive(row, now_min);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -838,7 +870,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         // sendNbrReport() in loop_functions.cpp) ist KEIN normaler Frame -- er
         // darf weder in die Stufe-2-Deckungs-/Abbruchpruefung unten laufen noch
         // in den grossen if/else-Block ab msg_type_b_lora==0x00 (Dedup-Zaehlung,
-        // trickle_consistent_count, MHeard, Relay, Gateway-/Server-Upload,
+        // trickle_consistent_count, Relay, Gateway-/Server-Upload,
         // EXTUDP, Telefon/BLE, Display). Er fuettert ausschliesslich die eigene
         // Matrix (nbrNoteFrame fuer die Pfadkanten wie jeder andere Frame,
         // danach nbrNoteReport fuer den Berichtsinhalt) und verlaesst OnRxDone
@@ -868,6 +900,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             if(bGATEWAY)
                 nbrRowSetFlag(nbrMatrix, 0, NBR_FLAG_GW);
 
+            // Welle 4: Kantenminute des letzten Hops vor dem Rahmen (Live-MH).
+            NbrMhEdgeMark hn_edge_before = nbrMhEdgeBefore(aprsmsg.msg_source_last);
+
             nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
                          aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
                          rssi, snr, now_min_hn);
@@ -879,9 +914,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 NbrDirectInfo hn_direct_info = nbrBuildDirectInfo(aprsmsg, rssi);
                 nbrNoteDirect(nbrMatrix, aprsmsg.msg_source_last, hn_direct_info, now_min_hn);
+                nbrMhLiveAfter(aprsmsg.msg_source_last, hn_edge_before, now_min_hn);
             }
 
             nbrNoteReport(nbrMatrix, aprsmsg.msg_source_call, aprsmsg.msg_payload, now_min_hn);
+
+            topoUiChanged(now_min_hn);
 
 #if defined BOARD_RAK4630
             taskENTER_CRITICAL();
@@ -1060,7 +1098,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         {
             // RX-01 (BACKLOG 3.8k): a node still on the factory callsign is
             // not identifying itself, so nothing it sends is legal to
-            // relay -- drop it here, before mheard, display, phone/BLE out,
+            // relay -- drop it here, before the topology feed, display, phone/BLE out,
             // the gateway upload and the relay decision below.
             logRxDropUnconfigured(aprsmsg.msg_source_call);
 
@@ -1108,6 +1146,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // ist im neuen EDGE/ME/CUT/DROP-Format (docs/nbr-logformat.md,
                 // Vertrag der Nachbarschaftsmatrix) nicht mehr vorgesehen -- die
                 // Zeilen dort tragen die gleiche Information pro Hoerbeziehung.
+                //
+                // Welle 4: Kantenminute des letzten Hops vor dem Rahmen (Live-MH).
+                NbrMhEdgeMark edge_before = nbrMhEdgeBefore(aprsmsg.msg_source_last);
+
                 nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
                              aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
                              rssi, snr, now_min);
@@ -1118,9 +1160,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // ganz am Ende dieses Blocks, NACH dem eigenen Echo-Test.
                 NbrDirectInfo direct_info = nbrBuildDirectInfo(aprsmsg, rssi);
 
-                // Relayte POS-Frames (Konzept 4.4): MHeard traegt die Position
-                // nur bei Direktempfang ein (unten, msg_source_call ==
-                // msg_source_last), die Matrix braucht sie aber unabhaengig
+                // Relayte POS-Frames (Konzept 4.4): der Direkt-Slot traegt die
+                // Position nur bei Direktempfang (msg_source_call ==
+                // msg_source_last), die Zeile braucht sie aber unabhaengig
                 // vom letzten Hop, sonst bleiben die Nachbarn hinter einem
                 // Relais positionslos. msg_source_hw ist -- anders als
                 // msg_last_hw -- bereits der Absender-Wert ohne Last-Hop-Bit,
@@ -1144,7 +1186,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                         // W3b: Position/Hoehe im Direkt-Slot NUR aus eigenen
                         // Positionsrahmen (Konzept 4.6), Hoehenumrechnung exakt
-                        // wie der MHeard-Block weiter unten (fw_version > 13 ->
+                        // wie frueher im MHeard-Block (fw_version > 13 ->
                         // Fuss->Meter).
                         if(direct_info.own_frame)
                         {
@@ -1160,17 +1202,30 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                         // W3b: gemeldete Nachbarzahl aus einem '!'-Rahmen (aprspos.ncnt,
                         // /N<k>) -- fuer JEDE Zeile mit einer gueltig dekodierten Position,
-                        // nicht nur bei own_frame; mirrors MHeard's mheardNCount-Zuweisung
-                        // an beiden Stellen (lora_functions.cpp, own_frame- und
-                        // relayter Zweig unten), die beide denselben Wert an dieselbe
-                        // Absender-Zeile schreiben.
+                        // nicht nur bei own_frame (wie frueher das MHeard in seinem
+                        // own_frame- und seinem relayten Zweig).
                         if(aprspos.ncnt > 0)
                             nbrNoteNcnt(nbrMatrix, aprsmsg.msg_source_call, aprspos.ncnt, now_min);
                     }
                 }
 
                 if(!is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
+                {
+                    // W3b: "R<n>" des HEY-Berichts ist die gemeldete Nachbarzahl
+                    // des ABSENDERS (bis Welle 4 trug das MHeard sie als
+                    // mh_ncount). Vor nbrNoteDirect(), damit ein Live-MH-Rahmen
+                    // schon den neuen NCNT traegt.
+                    long nbr_hey_ncnt = 0;
+                    if(aprsmsg.payload_type == '@' && nbrParseHeyReportedCount(aprsmsg.msg_payload, &nbr_hey_ncnt))
+                        nbrNoteNcnt(nbrMatrix, aprsmsg.msg_source_call, (int)nbr_hey_ncnt, now_min);
+
                     nbrNoteDirect(nbrMatrix, aprsmsg.msg_source_last, direct_info, now_min);
+                    nbrMhLiveAfter(aprsmsg.msg_source_last, edge_before, now_min);
+                }
+
+                // Welle 4: ersetzt die T-Deck-/T-Deck-Pro-Haken aus
+                // updateMheard()/updateHeyPath() (Anzeige, /topo.dat).
+                topoUiChanged(now_min);
             }
 
             // LoRx RX to RAW-Buffer
@@ -1198,163 +1253,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     printfdeb("\n");
                     bNewLine=true;
                 }
-                //
-                ///////////////////////////////////////////////
-            
-                struct mheardLine mheardLine;
 
-                initMheardLine(mheardLine);
-
-                // R2-04 (zweite Haelfte): msg_source_last/msg_source_path/
-                // msg_source_call/msg_destination_path sind bereits char[]
-                // mit exakt denselben Breiten wie die mheardLine-Gegenstuecke
-                // (aprs_structures.h), mcSet() also nur eine Kopie, keine
-                // Kuerzung.
-                mcSet(mheardLine.mh_callsign, sizeof(mheardLine.mh_callsign), aprsmsg.msg_source_last);
-                mcSet(mheardLine.mh_sourcepath, sizeof(mheardLine.mh_sourcepath), aprsmsg.msg_source_path);
-                mcSet(mheardLine.mh_sourcecallsign, sizeof(mheardLine.mh_sourcecallsign), aprsmsg.msg_source_call);
-                mcSet(mheardLine.mh_destinationpath, sizeof(mheardLine.mh_destinationpath), aprsmsg.msg_destination_path);
-                mheardLine.mh_hw = aprsmsg.msg_last_hw & 0x7F;
-
-                if((aprsmsg.msg_last_hw & 0x80) == 0x80)    // Last-Sending
-                    mheardLine.mh_mod = aprsmsg.msg_source_mod;
-                else
-                    mheardLine.mh_mod = aprsmsg.msg_source_mod | 0xF0;  // set mod not from last
-
-                mheardLine.mh_rssi = rssi;
-                mheardLine.mh_snr = snr;
-                mcSet(mheardLine.mh_date, sizeof(mheardLine.mh_date), getDateString().c_str());
-                mcSet(mheardLine.mh_time, sizeof(mheardLine.mh_time), getTimeString().c_str());
-                mheardLine.mh_payload_type = aprsmsg.payload_type;
-                mheardLine.mh_dist = -1;
-                mheardLine.mh_path_len = aprsmsg.msg_last_path_cnt;
-                mheardLine.mh_mesh = aprsmsg.msg_mesh;
-                mheardLine.mh_ncount = 0;
-                mheardLine.mh_path_payload[0] = 0;
-
-                ///////////////////////////////////////////////
-                // MHeard
-                
-                // only on Position
-                if(aprsmsg.payload_type == '!')
-                {
-                    // check MHeard exists already
-                    int ipos=-1;
-                    double lat=0.0;
-                    double lon=0.0;
-                    int alt=0;
-
-                    for(int iset=0; iset<MAX_MHEARD; iset++)
-                    {
-                        if(mheardCalls[iset][0] != 0x00)
-                        {
-                            if(is_equ(mheardCalls[iset], mheardLine.mh_callsign))
-                            {
-                                ipos=iset;
-                                lat = mheardLat[ipos];
-                                lon = mheardLon[ipos];
-                                alt = mheardAlt[ipos];
-                                break;
-                            }
-                        }
-                    }
-
-                    if(msg_type_b_lora == MSG_TYPE_POSITION) // Position
-                    {
-                        struct aprsPosition aprspos;
-
-                        if(decodeAPRSPOS(aprsmsg.msg_payload, aprspos) == 0x01)
-                        {
-                            if(strcmp(aprsmsg.msg_source_call, aprsmsg.msg_source_last) == 0)
-                            {
-                                // Display Distance, Direction
-                                lat = conv_coord_to_dec(aprspos.lat);
-                                if(aprspos.lat_c == 'S')
-                                    lat = lat * -1.0;
-                                lon = conv_coord_to_dec(aprspos.lon);
-                                if(aprspos.lon_c == 'W')
-                                    lon = lon * -1.0;
-
-                                alt = aprspos.alt;
-                                
-                                if(aprsmsg.msg_source_fw_version > 13)
-                                    alt = (int)((float)alt * 0.3048);
-
-                                if(ipos >= 0)
-                                {
-                                    mheardLat[ipos]=lat;
-                                    mheardLon[ipos]=lon;
-                                    mheardAlt[ipos]=alt;
-
-                                    // ab version v4.35p.06.11 kommt das als /N99 mit der Position auch mit
-                                    if(aprspos.ncnt > 0)
-                                    {
-                                        // ab version v4.35p.06.11 kommt das als /N99 mit der Position auch mit
-                                        mheardNCount[ipos]=aprspos.ncnt;
-                                    }
-                                }
-
-                                #if not defined(BOARD_T5_EPAPER)
-                                if(lat != 0.0 && lon != 0.0 && meshcom_settings.node_lat != 0.0 && meshcom_settings.node_lon != 0.0)
-                                {
-                                    #if defined(ENABLE_GPS) || defined(ENABLE_RAK_GPS)
-                                    mheardLine.mh_dist = gps.distanceBetween(lat, lon, meshcom_settings.node_lat, meshcom_settings.node_lon)/1000.0;    // km;
-                                    //printfdeb("mheardLine.mh_dist:%.2lf lat:%.4lf, lon:%.4lf  lat:%.4lf, lon:%.4lf\n", mheardLine.mh_dist, lat, lon, meshcom_settings.node_lat, meshcom_settings.node_lon);
-                                    #else
-                                    mheardLine.mh_dist = 0;
-                                    #endif
-                                }
-                                #endif
-                            }
-                            else
-                            {
-                                // ab version v4.35p.06.11 kommt das als /N99 mit der Position auch mit
-                                if(aprspos.ncnt > 0)
-                                {
-                                    for(int iset=0; iset<MAX_MHEARD; iset++)
-                                    {
-                                        if(mheardCalls[iset][0] != 0x00)
-                                        {
-                                            if(is_equ(mheardCalls[iset], aprsmsg.msg_source_call))
-                                            {
-                                                // ab version v4.35p.06.11 kommt das als /N99 mit der Position auch mit
-                                                mheardNCount[iset]=aprspos.ncnt;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                updateMheard(mheardLine, isPhoneReady);
-                
                 // last heard LoRa MeshCom-Packet
                 lastHeardTime = millis();
-
-                if(aprsmsg.payload_type == '@')
-                {
-                    ///////////////////////////////////////////////
-                    // Path
-                    mcSet(mheardLine.mh_path_payload, sizeof(mheardLine.mh_path_payload), aprsmsg.msg_payload);
-
-                    // W3b: "R<n>" des HEY-Berichts -- MHeard traegt denselben Wert dem
-                    // ABSENDER zu (mh_ncount via updateHeyPath() unten,
-                    // mheard_functions.cpp, fuer diese Welle nur lesende Referenz),
-                    // hier fuer die Topologie gespiegelt, ohne diese Datei zu aendern.
-                    long nbr_hey_ncnt = 0;
-                    if(nbrParseHeyReportedCount(aprsmsg.msg_payload, &nbr_hey_ncnt))
-                    {
-                        uint16_t now_min_hey = (uint16_t)(millis() / 60000UL);
-                        nbrNoteNcnt(nbrMatrix, aprsmsg.msg_source_call, (int)nbr_hey_ncnt, now_min_hey);
-                    }
-
-                    updateHeyPath(mheardLine);
-                    //
-                    ///////////////////////////////////////////////
-                }
 
             }
 
@@ -1893,7 +1794,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // append own signal report (NCT,RSSI,SNR) before UDP out, so the
                                 // server gets the same report the mesh gets — the relay path below
                                 // skips its append (RcvBuffer is re-encoded there anyway)
-                                appendHeySignalReport(aprsmsg, rssi, snr, getMheardCount());
+                                appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
                                 bHeyReportAppended = true;
 
                                 memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
@@ -2020,7 +1921,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 }
 
                                 if(aprsmsg.payload_type == '@' && !bHeyReportAppended)
-                                    appendHeySignalReport(aprsmsg, rssi, snr, getMheardCount());
+                                    appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
                                 
                                 memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
 

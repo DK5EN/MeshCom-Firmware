@@ -143,14 +143,13 @@ static void test_shim_zufall_ist_deterministisch(void)
 // ------------------------------------------------------------ Board-Profil
 // Sichert, dass der native Build dieselben Ringgroessen sieht wie die Boards,
 // gegen die wir testen. Ohne explizites Profil faellt configuration_global.h
-// in den #else-Zweig (MAX_MHEARD 30 / MAX_DEDUP_RING 70) und die Tests wuerden
+// in den #else-Zweig (MAX_DEDUP_RING 70 statt 100) und die Tests wuerden
 // eine Konfiguration pruefen, die auf keiner Hardware existiert.
 
 static void test_board_profil_ist_gepinnt(void)
 {
-    TEST_ASSERT_EQUAL_INT_MESSAGE(80, MAX_MHEARD, "MAX_MHEARD (ESP32-S3/RAK-Profil)");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(100, MAX_MHPATH, "MAX_MHPATH");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(20, MAX_RING, "MAX_RING");
+    // MAX_MHEARD/MAX_MHPATH entfielen mit MHeard (MeshCom 5 Welle 4).
+    TEST_ASSERT_EQUAL_INT_MESSAGE(20, MAX_RING, "MAX_RING (ESP32-S3/RAK-Profil)");
     TEST_ASSERT_EQUAL_INT_MESSAGE(100, MAX_DEDUP_RING, "MAX_DEDUP_RING");
 }
 

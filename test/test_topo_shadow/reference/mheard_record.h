@@ -1,5 +1,8 @@
 #pragma once
 
+// Referenzkopie (MeshCom 5, Welle 4): src/mheard_record.h aus 313e619a,
+// unveraendert bis auf diesen Kopf; nur noch fuer test/test_topo_shadow.
+
 // R2-01: eine MHeard-Zeile als Datensatz statt als Text.
 //
 // Bis 2026-09-16 lag jeder Eintrag als pipe-getrennte ZEICHENKETTE in

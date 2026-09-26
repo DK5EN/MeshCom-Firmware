@@ -1,9 +1,55 @@
+// Referenzkopie (MeshCom 5, Welle 4): src/mheard_functions.h aus 313e619a,
+// dem letzten Stand vor dem Umstieg auf die Topologie. Seit Welle 4 gibt es
+// MHeard und die Pfadtabelle in der Firmware nicht mehr; die Kopie lebt nur
+// noch fuer test/test_topo_shadow, das die Topologie gegen genau dieses
+// Verhalten vergleicht. Unveraendert bis auf diesen Kopf und die Dinge,
+// die mit MHeard aus src/ verschwinden und hier deshalb selbst stehen:
+// struct mheardLine mit MC_DATE_LEN/MC_TIME_LEN (vorher aprs_structures.h) und
+// MAX_MHEARD/MAX_MHPATH (vorher configuration_global.h, Werte des
+// S3-/RAK-Profils, das test/support/configuration.h fuer native Builds
+// festlegt).
 #ifndef _MHEARD_FUNCTIONS_H_
 #define _MHEARD_FUNCTIONS_H_
 
 #include <Arduino.h>
 #include <configuration.h>
 #include <aprs_structures.h>
+
+#ifndef MAX_MHEARD
+#define MAX_MHEARD 80                      // max count of messages in mheard ringbuffer (S3-/RAK-Profil)
+#endif
+#ifndef MAX_MHPATH
+#define MAX_MHPATH 100                     // max count of messages in mhpath ringbuffer (S3-/RAK-Profil)
+#endif
+
+// mh_date/mh_time: fester "YYYY-MM-DD"/"HH:MM:SS"-Vertrag von
+// mheardFormatDate()/mheardFormatTime() (mheard_record.h).
+#ifndef MC_DATE_LEN
+#define MC_DATE_LEN     11     // "YYYY-MM-DD" + NUL
+#endif
+#ifndef MC_TIME_LEN
+#define MC_TIME_LEN     9      // "HH:MM:SS" + NUL
+#endif
+
+struct mheardLine
+{
+    char mh_callsign[MC_CALL_LEN_Z];
+    char mh_date[MC_DATE_LEN];
+    char mh_time[MC_TIME_LEN];
+    char mh_sourcecallsign[MC_CALL_LEN_Z];
+    char mh_sourcepath[MC_PATH_LEN];
+    char mh_destinationpath[MC_PATH_LEN];
+    char mh_path_payload[MC_PAYLOAD_LEN];
+    char mh_payload_type;
+    uint8_t mh_hw;
+    uint8_t mh_mod;
+    int16_t mh_rssi;
+    int8_t mh_snr;
+    double mh_dist;
+    uint8_t mh_path_len;
+    uint8_t mh_mesh;
+    uint8_t mh_ncount;
+};
 
 void initMheard();
 void initMheardLine(struct mheardLine &mheardLine);

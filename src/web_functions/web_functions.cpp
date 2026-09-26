@@ -8,7 +8,6 @@
 #include <configuration.h>
 #include <debugconf.h>
 #include "web_functions.h"
-#include <mheard_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <time.h>
@@ -23,6 +22,8 @@
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
 #include "track_warning.h"    // TRK-01: Warnhinweis-Text neben dem Track-Switch
 #include "nbr_matrix.h"        // NBR-W2: Nachbarschaftsmatrix -- Datenquelle fuer die neue Neighbours-Seite
+#include "nbr_views.h"         // W4b: MHeard/Pfad-Seiten lesen nur noch ueber die Abfrageschicht
+#include <TinyGPSPlus.h>       // DIST auf der MHeard-Seite -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -54,9 +55,9 @@ bool bweb_server_running = false;
 char web_ip[10][20] = {0};
 long web_ip_passwd_time[10] = {0};
 
-extern float mheardLat[MAX_MHEARD];   // R3-12: war double
-extern float mheardLon[MAX_MHEARD];   // R3-12: war double
-extern int mheardAlt[MAX_MHEARD];
+// gps_functions.cpp instanziiert das TinyGPSPlus-Objekt unbedingt (auch ohne
+// ENABLE_GPS); hier nur fuer distanceBetween() auf der MHeard-Seite genutzt.
+extern TinyGPSPlus gps;
 
 double dlat;
 double dlon;
@@ -1459,78 +1460,136 @@ void sub_page_position()
 /**
  * ###########################################################################################################################
  * delivers the mheard-page to be injected into the scaffold
+ *
+ * W4b (docs/meshcom5-campaign.md Welle 4, Konzept 4.6/4.9 in
+ * docs/meshcom5-topologie/body/04-ansichten.html): liest nur noch ueber
+ * src/nbr_views.h -- mheard_functions.* ist mit dieser Welle weg. Die
+ * Zeilenauswahl kommt aus nbrMhRows() (schon neueste zuerst, 3h-Fenster wie
+ * bisher), Detailwerte je Zeile aus nbrMhGet(). Ein Heap-Block fuer die
+ * Zeilenindizes statt eines Stack-Arrays, dieselbe Begruendung wie
+ * sub_page_neighbours() unten (Seite wird selten geoeffnet).
  */
 void sub_page_mheard()
 {
-    // N-22 (BACKLOG SS3.8m, Fix 9ce62aa0): der Loop-Task auf nRF52 hat 4 KB
-    // Stack -- LOOP_STACK_SZ = 256*4 Woerter, hart im Adafruit-Core, nicht per
-    // Build-Flag zu erhoehen. Seit R2-04 ist struct mheardLine 584 Byte statt
-    // ~112 (sieben String-Handles a 12 B wurden feste char[]), und dieser Pfad
-    // liegt damit 1904 B tief auf einem Stack, auf dem N-22 schon einmal
-    // uxTaskGetStackHighWaterMark(NULL) == 0 gemessen hat.
-    // Gemessen mit -fstack-usage auf wiscore_rak4631: nrf52loop 792 + loopWebserver 32 + web_client_html 120 + work_webpage 264 + sub_page_mheard 696.
-    // Nur auf dem Loop-Task aufgerufen (web_functions.cpp:685 ueber loopWebserver aus nrf52_main.cpp:2476), nicht reentrant --
-    // also nach BSS statt auf den Stack. ESP32 behaelt den Stack-Puffer:
-    // 8 KB Loop-Task, dort ist der Frame kein Thema.
-    // Bewusst DREI getrennte Statics statt eines gemeinsamen: ein gemeinsamer
-    // muesste ueber zwei Uebersetzungseinheiten hinweg extern sein und koppelte
-    // mheard_functions.cpp an web_functions.cpp ueber die Annahme, dass keine
-    // der drei Funktionen je auf einen anderen Task wandert.
-#if defined(NRF52_SERIES)
-    static mheardLine mheardLine;
-#else
-    mheardLine mheardLine;
-#endif
-    bool isShowing = false;
+    // Konzept 4.6: dieselbe Minuten-seit-Boot-Uhr wie der OnRxDone-Haken und
+    // die Neighbours-Seite (nbrFresh() etc.) -- alle Leser rechnen gegen
+    // dieselbe Uhr.
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+    // Konzept 4.6, Regel 2: ohne gueltige Uhr (Jahr < 2025, wie bisher
+    // isWallClockValid() in mheard_functions.cpp) bleibt die Topologie
+    // gueltig -- DATE/TIME zeigt dann nur das Alter in Minuten.
+    bool bClockValid = (meshcom_settings.node_date_year >= 2025);
+    unsigned long nowEpoch = bClockValid ? getUnixClock() : 0;
+
     _create_meshcom_subheader("MHeard Information");
     web_client.println("<div id=\"content_inner\">");
 
-    // DR-28 (BACKLOG OPT-D16): most-recent-first, via mheardSortedIndex() --
-    // the storage arrays themselves stay in physical slot order, see that
-    // function's comment in mheard_functions.cpp/.h.
-    uint8_t idx[MAX_MHEARD];
-    uint32_t now = (uint32_t)millis();
-    uint8_t n = mheardSortedIndex(idx, now);
-
-    for (uint8_t k = 0; k < n; k++)
+    uint8_t *idx = (uint8_t *)malloc((size_t)NBR_MAX_ROWS);
+    if (idx == NULL)
     {
-        uint8_t iset = idx[k];
+        web_client.println("<p>Not enough memory to render MHeard.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
 
-        if (mheardFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
-            isShowing = true;
-        mheardLineFromRecord(mheardRecords[iset], mheardLine);
+    int total = nbrMhRows(nbrMatrix, now_min, 180, idx, NBR_MAX_ROWS); // 3h Fenster wie bisher
+    int shown = (total < NBR_MAX_ROWS) ? total : NBR_MAX_ROWS;
+
+    for (int k = 0; k < shown; k++)
+    {
+        NbrMhView v;
+        if (!nbrMhGet(nbrMatrix, idx[k], now_min, &v))
+            continue;
+
         web_client.printf("<div class=\"cardlayout\">\n");
-        web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date, mheardLine.mh_time);
+        web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(", v.call, v.call);
+        if (bClockValid)
+        {
+            // Sekunde aus dem Slot statt der Zeilenminute (Konzept 4.6);
+            // dieselbe utcoff-Umrechnung wie frueher fuer die Pfadseite.
+            unsigned long base = nowEpoch - (nowEpoch % 60UL) - (unsigned long)v.age_min * 60UL;
+            if (v.sec < 60)
+                base += v.sec;
+            base += (unsigned long)(long)(meshcom_settings.node_utcoff * 3600.0);
+            web_client.print(convertUNIXtoString(base));
+        }
+        else
+        {
+            web_client.printf("%u min ago", (unsigned)v.age_min);
+        }
+        web_client.printf(")</span></label>");
         web_client.printf("<div class=\"flex-auto-wrap\">");
-        web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", getPayloadType(mheardLine.mh_payload_type));
-        web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", getHardwareLong(mheardLine.mh_hw).c_str());
-        web_client.printf("<div><span class=\"font-bold\">Mod:</span><br><span>%01X/%01X</span></div>", (mheardLine.mh_mod >> 4), (mheardLine.mh_mod & 0x0f));
-        web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%4idBm</span></div>", mheardLine.mh_rssi);
-        web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span>%4idB</span></div>", mheardLine.mh_snr);
-        web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", mheardLine.mh_dist);
-        web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2i</span></div>", mheardLine.mh_ncount);
+        web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", nbrPayloadTypeName(v.plt));
+        web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", nbrHardwareName(v.hw));
+        web_client.printf("<div><span class=\"font-bold\">Mod:</span><br><span>%01X/%01X</span></div>", (v.mod >> 4), (v.mod & 0x0f));
+        if (v.rssi == NBR_MH_RSSI_UNKNOWN)
+            web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span></span></div>");
+        else
+            web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%4idBm</span></div>", (int)v.rssi);
+        if (v.snr == NBR_SNR_UNKNOWN)
+            web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span></span></div>");
+        else
+            web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span>%4idB</span></div>", (int)v.snr);
 
-        dlat = mheardLat[iset];
-        clat = 'N';
-        if(dlat < 0)
-        {
-            dlat = dlat * (-1);
-            clat = 'S';
-        }
-        dlon = mheardLon[iset];
-        clon = 'E';
-        if(dlon < 0)
-        {
-            dlon = dlon * (-1);
-            clon = 'W';
-        }
+        // DIST weiterhin aus der eigenen Position gerechnet, 0/0 = unbekannt
+        // (dieselbe Regel wie src/mh_phone.h fuer den App-Rahmen).
+        double dist = -1.0;
+        if (!isnan(v.lat) && !isnan(v.lon) && !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0))
+            dist = gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0;
+        if (dist >= 0.0)
+            web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", dist);
+        else
+            web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span></span></div>");
 
-        web_client.printf("<div><span class=\"font-bold\">Lat:</span><br><span>%c%06.3lf</span></div>", clat, dlat);
-        web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span>%c%07.3lf</span></div>", clon, dlon);
-        web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span>%4i</span></div>", mheardAlt[iset]);
+        web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2u</span></div>", (unsigned)v.ncnt);
+
+        if (!isnan(v.lat) && !isnan(v.lon))
+        {
+            dlat = v.lat;
+            clat = 'N';
+            if (dlat < 0)
+            {
+                dlat = dlat * (-1);
+                clat = 'S';
+            }
+            dlon = v.lon;
+            clon = 'E';
+            if (dlon < 0)
+            {
+                dlon = dlon * (-1);
+                clon = 'W';
+            }
+            web_client.printf("<div><span class=\"font-bold\">Lat:</span><br><span>%c%06.3lf</span></div>", clat, dlat);
+            web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span>%c%07.3lf</span></div>", clon, dlon);
+        }
+        else
+        {
+            web_client.printf("<div><span class=\"font-bold\">Lat:</span><br><span></span></div>");
+            web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span></span></div>");
+        }
+        if (v.alt != NBR_MH_ALT_UNKNOWN)
+            web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span>%4i</span></div>", (int)v.alt);
+        else
+            web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span></span></div>");
+
+        // W4b, Konzept 4.9: die sechs neuen MH-Spalten -- billig angehaengt,
+        // die bestehenden Felder bleiben in ihrer alten Reihenfolge.
+        web_client.printf("<div><span class=\"font-bold\">AGE:</span><br><span>%u</span></div>", (unsigned)v.age_min);
+        if (v.hm_snr == NBR_SNR_UNKNOWN)
+            web_client.printf("<div><span class=\"font-bold\">HM:</span><br><span></span></div>");
+        else
+            web_client.printf("<div><span class=\"font-bold\">HM:</span><br><span>%d</span></div>", (int)v.hm_snr);
+        web_client.printf("<div><span class=\"font-bold\">Role:</span><br><span>%c</span></div>", v.role ? v.role : '-');
+        web_client.printf("<div><span class=\"font-bold\">#X:</span><br><span>%u</span></div>", (unsigned)v.ex);
+        web_client.printf("<div><span class=\"font-bold\">#N:</span><br><span>%u</span></div>", (unsigned)v.nb);
+        web_client.printf("<div><span class=\"font-bold\">GW:</span><br><span>%s</span></div>", v.gw ? "Y" : "N");
         web_client.printf("</div></div>");
     }
-    if (!isShowing)
+    free(idx);
+
+    if (shown == 0)
         web_client.println("<p>No Nodes heard so far.</p>"); // no nodes available? Tell the user
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line
@@ -1539,31 +1598,78 @@ void sub_page_mheard()
 /**
  * ###########################################################################################################################
  * delivers the path-page to be injected into the scaffold
+ *
+ * W4b (Konzept 4.7, Abb. 11): eine Zeile je Absender aus nbrRouteCount()/
+ * nbrRouteGet() -- eine 2-Hop-Zeile zeigt ihre direkten Nachbarn B, ein
+ * Horizont-Eintrag seine Eintrittszeilen A und, wo billig, die B's, ueber die
+ * jedes A hereinkommt (nbrHearersMask(A) & nbrDirectMask()). Kein
+ * Index-Array noetig -- nbrRouteGet() nimmt einen laufenden Index 0..count-1
+ * direkt entgegen.
  */
 void sub_page_path()
 {
-    bool isShowing = false;
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
     _create_meshcom_subheader("Path Information");
     web_client.println("<div id=\"content_inner\">");
-    for (int iset = 0; iset < MAX_MHPATH; iset++)
+
+    int total = nbrRouteCount(nbrMatrix, now_min);
+    if (total == 0)
     {
-        if (mheardPathCalls[iset][0] != 0x00)
+        web_client.println("<p>No Paths available so far.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
+
+    // Tabelle DIREKT unter #content_inner, keine Wrapper-div: das Tabellen-
+    // CSS des Scaffolds greift nur auf "#content_inner > table" (siehe
+    // sub_page_neighbours() unten, Bench 2026-09-20).
+    web_client.println("<table class=\"table\">");
+    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>Hops</td><td>G</td><td>Age (min)</td><td>Via</td></tr></thead>");
+
+    for (int i = 0; i < total; i++)
+    {
+        NbrRouteView r;
+        if (!nbrRouteGet(nbrMatrix, i, now_min, &r))
+            continue;
+
+        web_client.printf("<tr><td><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a></td>", r.call, r.call);
+        web_client.printf("<td>%u</td><td>%s</td><td>%u</td><td>", (unsigned)r.hops, r.gw ? "Y" : "N", (unsigned)r.age_min);
+
+        bool first = true;
+        for (int a = nbrMaskNext(r.entry, -1); a >= 0; a = nbrMaskNext(r.entry, a))
         {
-            if (mheardPathFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
-            { // 3h
-                isShowing = true;
-                unsigned long lt = mheardPathEpoch[iset] + (long)(meshcom_settings.node_utcoff * 3600.0);
-                web_client.printf("<div class=\"cardlayout\">\n");
-                web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s)</span></label>", mheardPathCalls[iset], mheardPathCalls[iset], convertUNIXtoString(lt).substring(5).c_str());
-                web_client.printf("<div class=\"flex-auto-wrap\">");
-                web_client.printf("<div><span class=\"font-bold\">Source Path: </span><span>%01u%s/%s</span></div>", (mheardPathLen[iset] & 0x7F), ((mheardPathLen[iset] & 0x80) ? "G" : " "), mheardPathBuffer1[iset]);
-                web_client.printf("</div></div>");
+            NbrRowView av;
+            const char *acall = nbrRowGet(nbrMatrix, a, &av) ? av.call : "?";
+
+            if (r.is_row)
+            { // 2-Hop-Zeile: entry IST schon die B-Menge (die direkten Nachbarn)
+                web_client.printf("%s%s", first ? "" : ", ", acall);
+                first = false;
+                continue;
+            }
+
+            // Horizont: entry sind die Eintrittszeilen A; wo billig, dazu die
+            // B's, ueber die jedes A hereinkommt.
+            NbrMask viaB = nbrMaskAnd(nbrHearersMask(nbrMatrix, a, now_min), nbrDirectMask(nbrMatrix, now_min));
+            if (nbrMaskEmpty(viaB))
+            {
+                web_client.printf("%s%s", first ? "" : ", ", acall);
+                first = false;
+                continue;
+            }
+            for (int b = nbrMaskNext(viaB, -1); b >= 0; b = nbrMaskNext(viaB, b))
+            {
+                NbrRowView bv;
+                const char *bcall = nbrRowGet(nbrMatrix, b, &bv) ? bv.call : "?";
+                web_client.printf("%s%s&gt;%s", first ? "" : ", ", acall, bcall);
+                first = false;
             }
         }
+        web_client.println("</td></tr>");
     }
-    if (!isShowing)
-        web_client.println("No Paths available so far.");
-    web_client.println("</div></div>");
+    web_client.println("</table></div>");
     web_client.println(); // The HTTP response ends with another blank line
 }
 
@@ -2797,7 +2903,7 @@ void sub_page_info()
     web_client.printf("<tr><td>Firmware</td><td>Meshcom %-4.4s%s<br>(build: %s / %s)<br>(flash-version %i)</td></tr>\n", SOURCE_VERSION, SOURCE_VERSION_WEB_SUB, __DATE__, __TIME__, meshcom_settings.node_fversion);
     web_client.printf("<tr><td>Start Date</td><td>%s</td></tr>\n", meshcom_settings.node_update);
     web_client.printf("<tr><td>Call</td><td>%s</td></tr>\n", meshcom_settings.node_call);
-    web_client.printf("<tr><td>Hardware</td><td>%s</td></tr>\n", getHardwareLong(BOARD_HARDWARE).c_str());
+    web_client.printf("<tr><td>Hardware</td><td>%s</td></tr>\n", nbrHardwareName(BOARD_HARDWARE));
     web_client.printf("<tr><td>UTC offset</td><td>%.1f [%s]</td></tr>\n", meshcom_settings.node_utcoff, cTimeSource);
     // BAT-01: global_batt==0.0 is the established "no reading" convention (grounded pin, or
     // the ADC-path no-battery detection in batt_functions.cpp) -- same check the on-device

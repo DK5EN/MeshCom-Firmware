@@ -3,9 +3,10 @@
 // shadow over the DK5EN-98 capture 21.-24.09.2026: every "[LOG]" RX frame in
 // the capture is fed, ONE FRAME AT A TIME, into BOTH
 //
-//   OLD  updateMheard()/updateHeyPath()/getMheardCount() (src/mheard_functions.cpp,
-//        read-only reference for this wave -- the file this test's job is to
-//        prove parity AGAINST, never to change)
+//   OLD  updateMheard()/updateHeyPath()/getMheardCount() (since wave 4 the
+//        frozen copy test/test_topo_shadow/reference/mheard_functions.cpp of
+//        src/mheard_functions.cpp at 313e619a -- the code this test's job is
+//        to prove parity AGAINST, never to change)
 //   NEW  nbrNoteFrame()/nbrNoteDirect()/nbrNoteNcnt()/nbrNotePos() (src/nbr_matrix.cpp)
 //        and the read layer nbrMhRows()/nbrMhGet()/nbrMhCount()/nbrNcnt()/
 //        nbrRouteGet() (src/nbr_views.cpp) -- both W3a's in-flight contract
@@ -96,8 +97,8 @@
 #include <Arduino.h>
 #include <aprs_structures.h>
 #include <mc_text.h>
-#include <mheard_functions.h>
-#include <mheard_record.h>
+#include "reference/mheard_functions.h"
+#include "reference/mheard_record.h"
 #include <nrf52/WisBlock-API.h>
 
 #include "nbr_matrix.h"
@@ -106,13 +107,13 @@
 // ============================================================================
 // Link stubs (own copy, NOT test/test_decodemheard/stubs/parser_link_stubs.h:
 // getUnixClock()/getTimeString() must be REPLAY-DRIVEN here, from the
-// capture's own logger timestamp -- see test_mheard_aging.cpp for the same
-// "own copy, not the shared header" pattern and why. Regxp.cpp/regex_functions.cpp/
-// aprs_functions.cpp/charset_filter.cpp/mheard_functions.cpp/via_functions.cpp
-// are the SAME five+one translation units native_parsers already links
-// successfully against this exact stub shape (platformio.ini env
-// native_topo_shadow mirrors native_parsers's build_src_filter, plus
-// nbr_matrix.cpp/nbr_views.cpp).
+// capture's own logger timestamp ("own copy, not the shared header", the
+// pattern the former test_mheard_aging.cpp used). Regexp.cpp/regex_functions.cpp/
+// aprs_functions.cpp/charset_filter.cpp/via_functions.cpp are the same
+// translation units native_parsers links against this exact stub shape
+// (platformio.ini env native_topo_shadow mirrors native_parsers's
+// build_src_filter, plus nbr_matrix.cpp/nbr_views.cpp); the MHeard copy
+// comes in through the #include of reference/mheard_functions.cpp below.
 // ============================================================================
 
 s_meshcom_settings meshcom_settings;
@@ -163,10 +164,19 @@ static String getDateStringReplay()
 static uint8_t phoneComStoreStub[2048];
 byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStoreStub);
 
-// ---- direct extern access to mheard_functions.cpp's own storage arrays
-// (same pattern as test/test_mheard_aging/test_mheard_aging.cpp: not exported
-// via mheard_functions.h on purpose, a test may still extern the real
-// symbols -- see that file's own header comment).
+// ---- OLD side: the frozen MHeard copy (MeshCom 5 wave 4 removed MHeard and
+// the path table from src/; native_topo_shadow no longer builds
+// src/mheard_functions.cpp). Compiled into THIS translation unit, same
+// pattern as test/test_nbr_replay's dense reference; the guard keeps pio's
+// recursive test build from compiling reference/mheard_functions.cpp a
+// second time on its own.
+#define MHEARD_REFERENCE_TU 1
+#include "reference/mheard_functions.cpp"
+#undef MHEARD_REFERENCE_TU
+
+// ---- direct extern access to the reference copy's own storage arrays (not
+// exported via mheard_functions.h on purpose; defined above in this same
+// translation unit, the declarations stay as the documented read set).
 extern MheardRecord mheardRecords[MAX_MHEARD];
 extern char mheardCalls[MAX_MHEARD][10];
 extern float mheardLat[MAX_MHEARD];

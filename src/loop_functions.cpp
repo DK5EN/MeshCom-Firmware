@@ -13,7 +13,7 @@
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
 #include "beacon_rate.h"
-#include "mheard_functions.h"
+#include "nbr_views.h"
 #include "command_functions.h"
 
 #include "clock.h"
@@ -238,8 +238,6 @@ unsigned long previousWiFiMillis = 0;
 
 // Timer variables for persitence to SD
 unsigned long lastsavePOSPersistence = 0;
-unsigned long lastsaveMHEARDPersistence = 0;
-unsigned long lastsavePATHPersistence = 0;
 
 char cTimeSource[10];
 
@@ -3318,7 +3316,10 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     f->drop[2]        = stat_drop_count[3];
     f->drop[3]        = stat_drop_count[4];
     f->drop[4]        = stat_drop_count[5];
-    f->mh             = (uint16_t)getMheardCount();
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): STAT-Zeile ist ein
+    // Monitor-Feld (Konsole 2323), kein Funk -- nbrNcnt(), nicht die auf
+    // NBR_NCNT_AIR_MAX gekappte Sendefassung.
+    f->mh             = (uint16_t)nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     f->heap           = heap;
     f->trk_interval_s = trickle_interval_ms / 1000UL;
     f->trk_consistent = trickle_consistent_count;
@@ -4642,12 +4643,18 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
                 return "";
         }
 
-        int incnt = getMheardCount();
+        // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): /N geht
+        // auf die Luft -- nbrNcntAir() kappt schon auf NBR_NCNT_AIR_MAX; der
+        // Deckel hier bleibt trotzdem stehen (belt-and-suspenders, benannt
+        // statt der alten 99 als Literal) -- ohne ihn kann GCC cncnt's feste
+        // Breite nicht aus dem Rueckgabewert einer Funktion herleiten
+        // (-Werror=format-truncation).
+        int incnt = nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(incnt > 0)
         {
-            if(incnt > 99)
-                incnt=99;
-                
+            if(incnt > NBR_NCNT_AIR_MAX)
+                incnt = NBR_NCNT_AIR_MAX;
+
             snprintf(cncnt, sizeof(cncnt), "/N%i", incnt);
         }
     }
@@ -5207,7 +5214,10 @@ void sendHey()
 
     mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), aprsmsg.msg_destination_path);
 
-    snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;", getMheardCount());
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<n> im HEY
+    // geht auf die Luft -- nbrNcntAir(), auf NBR_NCNT_AIR_MAX gekappt.
+    snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;",
+             nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
    
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -5271,7 +5281,9 @@ void sendNbrReport()
     uint16_t now_min = (uint16_t)(millis() / 60000UL);
 
     char nbr_payload[128];
-    int nbr_plen = nbrBuildReport(nbrMatrix, now_min, getMheardCount(), nbr_payload, sizeof(nbr_payload));
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<heard> im
+    // HN-Bericht geht auf die Luft -- nbrNcntAir(), auf NBR_NCNT_AIR_MAX gekappt.
+    int nbr_plen = nbrBuildReport(nbrMatrix, now_min, nbrNcntAir(nbrMatrix, now_min), nbr_payload, sizeof(nbr_payload));
 
     if(nbr_plen < 0)
     {

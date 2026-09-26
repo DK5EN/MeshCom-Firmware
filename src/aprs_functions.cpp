@@ -1140,16 +1140,17 @@ uint16_t encodeAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], struct aprsMessage &apr
 }
 
 // Append the per-hop HEY signal report "NCT,RSSI,SNR;" to a '@' payload.
-// NCT = mheard neighbour count, RSSI as positive number, SNR in dB.
+// NCT = neighbour count as sent on air (nbrNcntAir(), capped at two digits),
+// RSSI as positive number, SNR in dB.
 // Used by the mesh relay path and the gateway UDP upload (same wire format).
-void appendHeySignalReport(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr, int mheard_count)
+void appendHeySignalReport(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr, int ncnt_air)
 {
     // Die Kette waechst mit jedem Relais um bis zu HEY_REPORT_GROUP_MAX Zeichen.
     // Regulaer begrenzt MAX_HOP_LIMIT die Zahl der Gruppen, ein von der
     // Luftschnittstelle hereingereichtes '@'-Paket mit ueberlanger Nutzlast aber
     // nicht. Ohne Schranke waechst der re-encodierte Rahmen ueber
     // UDP_TX_BUF_SIZE, wo lora_functions.cpp ihn auf Byteebene kappt -- also
-    // mitten in einer Gruppe, was updateHeyPath() nicht mehr parsen kann. Die
+    // mitten in einer Gruppe, die ein Empfaenger nicht mehr parsen kann. Die
     // Kette hier zu beenden ist der verlustaermere Weg: was bereits drinsteht,
     // bleibt gueltig.
     if (strlen(aprsmsg.msg_payload) + HEY_REPORT_GROUP_MAX > HEY_PATH_PAYLOAD_MAX)
@@ -1162,7 +1163,7 @@ void appendHeySignalReport(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr
     // also gibt es hier keine Rundungsfrage.
     char cGroup[HEY_REPORT_GROUP_MAX + 2];
     snprintf(cGroup, sizeof(cGroup), "%d,%.0f,%d;",
-             mheard_count, (double)(rssi * -1.0), (int)snr);
+             ncnt_air, (double)(rssi * -1.0), (int)snr);
     mcAppend(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), cGroup);
 }
 

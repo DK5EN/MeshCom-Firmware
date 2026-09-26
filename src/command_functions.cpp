@@ -9,8 +9,9 @@
 #include "command_setters.h" // D2-07: numeric argument parse/range/store
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
-#include "mheard_functions.h"
 #include "nbr_matrix.h"
+#include "nbr_views.h"      // W4b: --mheard/--path lesen nur noch ueber die Abfrageschicht
+#include <TinyGPSPlus.h>    // DIST fuer --mheard -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
 #include "udp_functions.h"
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "extudp_functions.h"
@@ -23,6 +24,7 @@
 #include "lora_setchip.h"
 #include "spectral_scan.h"
 #include "rtc_functions.h"
+#include "time_functions.h" // W4b: convertUNIXtoString() fuer --mheard
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
 #include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
@@ -78,6 +80,10 @@ namespace Platform { void prepareToSleep(); void loraToSleep(); }
 #endif
 
 unsigned long rebootAuto = 0;
+
+// gps_functions.cpp instanziiert das TinyGPSPlus-Objekt unbedingt (auch ohne
+// ENABLE_GPS); --mheard nutzt nur distanceBetween(), kein GPS-Modul noetig.
+extern TinyGPSPlus gps;
 
 // OTA Libs for ESP32 Partition Switching
 #ifdef ESP32
@@ -5013,14 +5019,152 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"mheard") == 0 || commandCheck(msg_text+2, (char*)"mh") == 0)
     {
-        showMHeard();
+        // W4b (docs/meshcom5-campaign.md Welle 4, Konzept 4.6/4.9): showMHeard()
+        // ist mit mheard_functions.* weg -- Quelle ist nur noch die Topologie
+        // (src/nbr_views.h), 12h-Fenster, neueste zuerst, dieselben Felder wie
+        // die Web-MHeard-Seite (web_functions.cpp: sub_page_mheard()).
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        bool bClockValid = (meshcom_settings.node_date_year >= 2025);
+        unsigned long nowEpoch = bClockValid ? getUnixClock() : 0;
+
+        uint8_t *mh_idx = (uint8_t *)malloc((size_t)NBR_MAX_ROWS);
+        if(mh_idx == NULL)
+        {
+            printfdeb("[MH] not enough memory\n");
+            return;
+        }
+
+        int mh_total = nbrMhRows(nbrMatrix, now_min, 12 * 60, mh_idx, NBR_MAX_ROWS);
+        printfdeb("[MH] window=720min rows=%d\n", mh_total);
+
+        int mh_shown = (mh_total < NBR_MAX_ROWS) ? mh_total : NBR_MAX_ROWS;
+        for(int k = 0; k < mh_shown; k++)
+        {
+            NbrMhView v;
+            if(!nbrMhGet(nbrMatrix, mh_idx[k], now_min, &v))
+                continue;
+
+            char ts[24];
+            if(bClockValid)
+            {
+                // Sekunde aus dem Slot statt der Zeilenminute (Konzept 4.6).
+                unsigned long base = nowEpoch - (nowEpoch % 60UL) - (unsigned long)v.age_min * 60UL;
+                if(v.sec < 60)
+                    base += v.sec;
+                base += (unsigned long)(long)(meshcom_settings.node_utcoff * 3600.0);
+                snprintf(ts, sizeof(ts), "%s", convertUNIXtoString(base).c_str());
+            }
+            else
+            {
+                snprintf(ts, sizeof(ts), "age %umin", (unsigned)v.age_min);
+            }
+
+            char rssiTxt[8];
+            if(v.rssi == NBR_MH_RSSI_UNKNOWN)
+                snprintf(rssiTxt, sizeof(rssiTxt), "NA");
+            else
+                snprintf(rssiTxt, sizeof(rssiTxt), "%d", (int)v.rssi);
+
+            char snrTxt[8];
+            if(v.snr == NBR_SNR_UNKNOWN)
+                snprintf(snrTxt, sizeof(snrTxt), "NA");
+            else
+                snprintf(snrTxt, sizeof(snrTxt), "%d", (int)v.snr);
+
+            char hmTxt[8];
+            if(v.hm_snr == NBR_SNR_UNKNOWN)
+                snprintf(hmTxt, sizeof(hmTxt), "NA");
+            else
+                snprintf(hmTxt, sizeof(hmTxt), "%d", (int)v.hm_snr);
+
+            // DIST wie auf der Web-Seite aus der eigenen Position gerechnet,
+            // 0/0 = unbekannt (dieselbe Regel wie src/mh_phone.h).
+            char distTxt[12];
+            bool haveOwnPos = !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0);
+            if(!isnan(v.lat) && !isnan(v.lon) && haveOwnPos)
+                snprintf(distTxt, sizeof(distTxt), "%.1f", gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0);
+            else
+                snprintf(distTxt, sizeof(distTxt), "NA");
+
+            char latTxt[12], lonTxt[12];
+            if(!isnan(v.lat) && !isnan(v.lon))
+            {
+                double a = v.lat, o = v.lon;
+                snprintf(latTxt, sizeof(latTxt), "%c%06.3f", (a < 0) ? 'S' : 'N', fabs(a));
+                snprintf(lonTxt, sizeof(lonTxt), "%c%07.3f", (o < 0) ? 'W' : 'E', fabs(o));
+            }
+            else
+            {
+                snprintf(latTxt, sizeof(latTxt), "NA");
+                snprintf(lonTxt, sizeof(lonTxt), "NA");
+            }
+
+            char altTxt[8];
+            if(v.alt == NBR_MH_ALT_UNKNOWN)
+                snprintf(altTxt, sizeof(altTxt), "NA");
+            else
+                snprintf(altTxt, sizeof(altTxt), "%d", (int)v.alt);
+
+            printfdeb("[MH] call=%s %s typ=%s hw=%s mod=%01X/%01X rssi=%sdBm snr=%sdB dist=%skm ncnt=%u age=%umin hm=%sdB role=%c ex=%u nb=%u gw=%c lat=%s lon=%s alt=%sm\n",
+                       v.call, ts, nbrPayloadTypeName(v.plt), nbrHardwareName(v.hw),
+                       (v.mod >> 4), (v.mod & 0x0f), rssiTxt, snrTxt, distTxt, (unsigned)v.ncnt,
+                       (unsigned)v.age_min, hmTxt, v.role ? v.role : '-', (unsigned)v.ex, (unsigned)v.nb,
+                       v.gw ? 'Y' : 'N', latTxt, lonTxt, altTxt);
+        }
+        free(mh_idx);
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"path") == 0 || commandCheck(msg_text+2, (char*)"hey") == 0)
     {
-        showPath();
+        // W4b (Konzept 4.7, Abb. 11): eine Zeile je Absender aus
+        // nbrRouteCount()/nbrRouteGet() -- kein Index-Array noetig, der
+        // laufende Index geht direkt hinein. "via": bei einer 2-Hop-Zeile die
+        // direkten Nachbarn B (schon in entry), bei einem Horizont-Eintrag die
+        // Eintrittszeilen A, ergaenzt -- wo billig -- um die B's, ueber die
+        // jedes A hereinkommt (dieselbe Logik wie sub_page_path() in
+        // web_functions.cpp).
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        int path_total = nbrRouteCount(nbrMatrix, now_min);
+        printfdeb("[PATH] rows=%d\n", path_total);
+
+        for(int i = 0; i < path_total; i++)
+        {
+            NbrRouteView r;
+            if(!nbrRouteGet(nbrMatrix, i, now_min, &r))
+                continue;
+
+            char via_buf[200] = {0}; // Weg-Text dieser Zeile, kein Zeilen-Array; Stack ist fuer 200 B gut
+            int vpos = 0;
+            for(int a = nbrMaskNext(r.entry, -1); a >= 0 && vpos >= 0 && vpos < (int)sizeof(via_buf); a = nbrMaskNext(r.entry, a))
+            {
+                NbrRowView av;
+                const char *acall = nbrRowGet(nbrMatrix, a, &av) ? av.call : "?";
+
+                if(r.is_row)
+                { // 2-Hop-Zeile: entry IST schon die B-Menge (die direkten Nachbarn)
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s", (vpos > 0) ? "," : "", acall);
+                    continue;
+                }
+
+                NbrMask viaB = nbrMaskAnd(nbrHearersMask(nbrMatrix, a, now_min), nbrDirectMask(nbrMatrix, now_min));
+                if(nbrMaskEmpty(viaB))
+                {
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s", (vpos > 0) ? "," : "", acall);
+                    continue;
+                }
+                for(int b = nbrMaskNext(viaB, -1); b >= 0 && vpos >= 0 && vpos < (int)sizeof(via_buf); b = nbrMaskNext(viaB, b))
+                {
+                    NbrRowView bv;
+                    const char *bcall = nbrRowGet(nbrMatrix, b, &bv) ? bv.call : "?";
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s>%s", (vpos > 0) ? "," : "", acall, bcall);
+                }
+            }
+
+            printfdeb("[PATH] call=%s hops=%u g=%c age=%umin via=%s\n", r.call, (unsigned)r.hops, r.gw ? 'Y' : 'N', (unsigned)r.age_min, via_buf);
+        }
 
         return;
     }
@@ -5042,7 +5186,8 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         // N-22: eigener Static statt Stack -- der Loop-Task hat auf nRF52 nur
-        // 4 KB (siehe showMHeard()), das Kommando laeuft ausschliesslich dort.
+        // 4 KB, das Kommando laeuft ausschliesslich dort (Fix 9ce62aa0, frueher
+        // an showMHeard() aus mheard_functions.cpp festgemacht, das mit W4b weg ist).
         // 300 statt 200: Zeile 0 mit 20 Hoerern plus Reichweite und Alter
         // liegt ueber 200 Zeichen, snprintf kappte dann stumm (Advisor L1).
         // nbr_buf bleibt static (fest 300 B, skaliert nicht mit NBR_MAX_ROWS).
@@ -5587,7 +5732,7 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("");
             printfdeb("--MeshCom %-4.4s%-1.1s (build: %s / %s)\n...UPDATE: %s\n...Call: <%s> ...ID %08X ...NODE %i <%s> ...UTC-OFF %f [%s]\n...BATT %.2f V ...BATT %d %% ...MAXV %.3f V\n...TIME %li ms\n", 
                     SOURCE_VERSION, SOURCE_VERSION_SUB , __DATE__ , __TIME__ , meshcom_settings.node_update,
-                    meshcom_settings.node_call, _GW_ID, BOARD_HARDWARE, getHardwareLong(BOARD_HARDWARE).c_str(), meshcom_settings.node_utcoff, cTimeSource, global_batt/1000.0, global_proz, meshcom_settings.node_maxv, millis());
+                    meshcom_settings.node_call, _GW_ID, BOARD_HARDWARE, nbrHardwareName(BOARD_HARDWARE), meshcom_settings.node_utcoff, cTimeSource, global_batt/1000.0, global_proz, meshcom_settings.node_maxv, millis());
 
             printfdeb("...Flash-Version %i\n", meshcom_settings.node_fversion);
 
