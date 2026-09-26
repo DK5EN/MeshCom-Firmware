@@ -867,7 +867,7 @@ void deliver_scaffold(bool bget_password)
     // ECMA-Script/Javascript
     web_client.println("<script type=\"text/javascript\">\n");
     // these variables will hold the last loaded page name and sender in order to force a refresh
-    web_client.println("cpage=\"info\";csender=undefined;\nsetInterval(autorefresh,10000);");
+    web_client.println("cpage=\"info\";csender=undefined;\nsetInterval(autorefresh,30000);");
     // This function will be called in intervalls - can be used to auto-refresh content depending on what page is loaded
     web_client.println("function autorefresh() {if(cpage=='messages')updateMessages();if(cpage=='wx')loadPage('wx',csender,false);if(cpage=='position')loadPage('position',csender,false);if(cpage=='mheard')loadPage('mheard',csender,false);if(cpage=='path')loadPage('path',csender,false);if(cpage=='rxlog')loadPage('rxlog',csender,false);};");
     // this function is used for login and logout
@@ -973,7 +973,7 @@ void deliver_scaffold(bool bget_password)
     // and injected with innerHTML, which never runs a <script> tag it carries,
     // so the rendering logic has to live here in the scaffold instead and be
     // invoked from loadPage() after each fragment swap (that covers both the
-    // initial page load and the 10s autorefresh). The fragment itself only
+    // initial page load and the 30s autorefresh). The fragment itself only
     // emits an empty #mcq div carrying data-* attributes; all markup below is
     // built from those. JS strings use single quotes and HTML attribute
     // values are written unquoted (none of them ever contain a space) so
@@ -1595,84 +1595,6 @@ void sub_page_mheard()
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-/**
- * ###########################################################################################################################
- * delivers the path-page to be injected into the scaffold
- *
- * W4b (Konzept 4.7, Abb. 11): eine Zeile je Absender aus nbrRouteCount()/
- * nbrRouteGet() -- eine 2-Hop-Zeile zeigt ihre direkten Nachbarn B, ein
- * Horizont-Eintrag seine Eintrittszeilen A und, wo billig, die B's, ueber die
- * jedes A hereinkommt (nbrHearersMask(A) & nbrDirectMask()). Kein
- * Index-Array noetig -- nbrRouteGet() nimmt einen laufenden Index 0..count-1
- * direkt entgegen.
- */
-void sub_page_path()
-{
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
-
-    _create_meshcom_subheader("Path Information");
-    web_client.println("<div id=\"content_inner\">");
-
-    int total = nbrRouteCount(nbrMatrix, now_min);
-    if (total == 0)
-    {
-        web_client.println("<p>No Paths available so far.</p>");
-        web_client.println("</div>");
-        web_client.println(); // The HTTP response ends with another blank line
-        return;
-    }
-
-    // Tabelle DIREKT unter #content_inner, keine Wrapper-div: das Tabellen-
-    // CSS des Scaffolds greift nur auf "#content_inner > table" (siehe
-    // sub_page_neighbours() unten, Bench 2026-09-20).
-    web_client.println("<table class=\"table\">");
-    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>Hops</td><td>G</td><td>Age (min)</td><td>Via</td></tr></thead>");
-
-    for (int i = 0; i < total; i++)
-    {
-        NbrRouteView r;
-        if (!nbrRouteGet(nbrMatrix, i, now_min, &r))
-            continue;
-
-        web_client.printf("<tr><td><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a></td>", r.call, r.call);
-        web_client.printf("<td>%u</td><td>%s</td><td>%u</td><td>", (unsigned)r.hops, r.gw ? "Y" : "N", (unsigned)r.age_min);
-
-        bool first = true;
-        for (int a = nbrMaskNext(r.entry, -1); a >= 0; a = nbrMaskNext(r.entry, a))
-        {
-            NbrRowView av;
-            const char *acall = nbrRowGet(nbrMatrix, a, &av) ? av.call : "?";
-
-            if (r.is_row)
-            { // 2-Hop-Zeile: entry IST schon die B-Menge (die direkten Nachbarn)
-                web_client.printf("%s%s", first ? "" : ", ", acall);
-                first = false;
-                continue;
-            }
-
-            // Horizont: entry sind die Eintrittszeilen A; wo billig, dazu die
-            // B's, ueber die jedes A hereinkommt.
-            NbrMask viaB = nbrMaskAnd(nbrHearersMask(nbrMatrix, a, now_min), nbrDirectMask(nbrMatrix, now_min));
-            if (nbrMaskEmpty(viaB))
-            {
-                web_client.printf("%s%s", first ? "" : ", ", acall);
-                first = false;
-                continue;
-            }
-            for (int b = nbrMaskNext(viaB, -1); b >= 0; b = nbrMaskNext(viaB, b))
-            {
-                NbrRowView bv;
-                const char *bcall = nbrRowGet(nbrMatrix, b, &bv) ? bv.call : "?";
-                web_client.printf("%s%s&gt;%s", first ? "" : ", ", acall, bcall);
-                first = false;
-            }
-        }
-        web_client.println("</td></tr>");
-    }
-    web_client.println("</table></div>");
-    web_client.println(); // The HTTP response ends with another blank line
-}
-
 // W2c CONTRACT: jede Zeile ausserhalb von nbr_matrix.cpp liest nur ueber die
 // oeffentliche API (nbrRowGet()/nbrEdgeGet()/die Maskenfunktionen aus
 // nbr_matrix.h) -- die Zeilen- und Kantenfelder von NbrMatrix sind seit dem
@@ -1695,6 +1617,306 @@ static void nbrPrintCall(uint8_t row)
 
 /**
  * ###########################################################################################################################
+ * delivers the path-page to be injected into the scaffold
+ *
+ * W4c (docs/meshcom5-topologie/, Zusammenlegung der alten Zeilentabelle der
+ * Neighbours-Seite in diese Seite): EINE Tabelle, eine Zeile je bekannter
+ * Station, sortiert nach Hops aufsteigend, dann Alter aufsteigend -- Hops 0
+ * ist die eigene Zeile (immer gezeigt, solange die Topologie bereit ist),
+ * Hops 1 die frischen Direktnachbarn (nbrDirectMask()), Hops 2 und mehr jeder
+ * nbrRouteCount()/nbrRouteGet()-Eintrag (2-Hop-Zeile ODER Horizont). Die
+ * Spalten Hears me/Covered by (Hops 1) und GW/Mesh/Hears me/Reach (2-Hop-
+ * Zeile, ueber das neue NbrRouteView::row) sind aus der alten Zeilentabelle
+ * von sub_page_neighbours() uebernommen -- Via/Covered by bei Hops >= 2 ist
+ * die unveraenderte Via-Logik der alten Pfadseite (entry-Maske, Horizont
+ * A&gt;B-Form).
+ *
+ * Sortierung: ein einziger transienter Heap-Block (dieselbe Begruendung wie
+ * `scratch` in sub_page_neighbours() oben) haelt nur Art+Index je Zeile, nie
+ * eine Kopie von NbrRowView/NbrRouteView (W2c CONTRACT oben). nbrRouteGet()
+ * ist O(i) -- darum genau ein Aufruf je Weg-Eintrag im Sammeldurchlauf (fuer
+ * Hops/Alter) und genau einer im Renderdurchlauf, keiner davon in der
+ * Sortierschleife selbst (einfaches Einfuegesortieren).
+ */
+void sub_page_path()
+{
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+    _create_meshcom_subheader("Path Information");
+    web_client.println("<div id=\"content_inner\">");
+
+    NbrRowView r0;
+    if (!nbrRowGet(nbrMatrix, 0, &r0) || r0.call[0] == 0)
+    { // noch kein Frame ausgewertet -- Zeile 0 ist unbelegt (wie sub_page_neighbours())
+        web_client.println("<p>No frames received yet.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
+
+    NbrMask directMask = nbrDirectMask(nbrMatrix, now_min);
+    int route_total = nbrRouteCount(nbrMatrix, now_min);
+
+    // Datensatz fuer die Sortierung: nur Art (0 eigene Zeile, 1 direkt, 2 Weg)
+    // und Index (Matrixzeile bei 0/1, laufender Weg-Index bei 2), dazu die
+    // beiden Sortierschluessel. Obergrenze: jede Matrixzeile hoechstens
+    // einmal (eigene Zeile ODER direkt ODER 2-Hop-Zeile, nie mehrfach) plus
+    // der Horizont -- NBR_MAX_ROWS + NBR_HZ_ENTRIES + 1 deckt das mit Reserve.
+    struct PathRec
+    {
+        uint8_t  kind; // 0 eigene Zeile, 1 direkt, 2 Weg (2-Hop-Zeile oder Horizont)
+        uint8_t  hops;
+        uint16_t age;
+        uint16_t idx;
+    };
+    size_t maxrec = (size_t)NBR_MAX_ROWS + (size_t)NBR_HZ_ENTRIES + 1;
+    PathRec *rec = (PathRec *)malloc(maxrec * sizeof(PathRec));
+    if (rec == NULL)
+    {
+        web_client.println("<p>Not enough memory to render the path table.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
+    size_t nrec = 0;
+
+    rec[nrec].kind = 0;
+    rec[nrec].hops = 0;
+    rec[nrec].age = nbrRowAgeMin(nbrMatrix, 0, now_min);
+    rec[nrec].idx = 0;
+    nrec++;
+
+    for (int X = nbrMaskNext(directMask, -1); X >= 0 && nrec < maxrec; X = nbrMaskNext(directMask, X))
+    {
+        rec[nrec].kind = 1;
+        rec[nrec].hops = 1;
+        rec[nrec].age = nbrRowAgeMin(nbrMatrix, (uint8_t)X, now_min);
+        rec[nrec].idx = (uint16_t)X;
+        nrec++;
+    }
+
+    for (int i = 0; i < route_total && nrec < maxrec; i++)
+    {
+        NbrRouteView r;
+        if (!nbrRouteGet(nbrMatrix, i, now_min, &r))
+            continue;
+        rec[nrec].kind = 2;
+        rec[nrec].hops = r.hops;
+        rec[nrec].age = r.age_min;
+        rec[nrec].idx = (uint16_t)i;
+        nrec++;
+    }
+
+    // Einfuegesortieren nach Hops, dann Alter (beide aufsteigend) -- rec[0]
+    // (eigene Zeile, Hops 0) bleibt dabei an erster Stelle.
+    for (size_t a = 1; a < nrec; a++)
+    {
+        PathRec key = rec[a];
+        long b = (long)a - 1;
+        while (b >= 0 && (rec[b].hops > key.hops || (rec[b].hops == key.hops && rec[b].age > key.age)))
+        {
+            rec[b + 1] = rec[b];
+            b--;
+        }
+        rec[b + 1] = key;
+    }
+
+    // Tabelle DIREKT unter #content_inner, keine Wrapper-div: das Tabellen-
+    // CSS des Scaffolds greift nur auf "#content_inner > table" (siehe
+    // sub_page_neighbours() unten, Bench 2026-09-20).
+    web_client.println("<table class=\"table\">");
+    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>Hops</td><td>GW</td><td>Mesh</td>"
+                        "<td>Hears me</td><td>Via / Covered by</td><td>Reach</td><td>Age (min)</td></tr></thead>");
+
+    for (size_t k = 0; k < nrec; k++)
+    {
+        PathRec &pr = rec[k];
+
+        if (pr.kind == 0)
+        { // eigene Zeile: dieselben Spaltenregeln wie eine direkte Zeile, ohne Hears me/Via
+            web_client.printf("<tr><td><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a></td>", r0.call, r0.call);
+            web_client.print("<td>0</td>");
+            web_client.printf("<td>%s</td>", (r0.flags & NBR_FLAG_GW) ? "Y" : "N");
+            if (!(r0.flags & NBR_FLAG_POS))
+                web_client.print("<td>-</td>");
+            else
+                web_client.printf("<td>%s</td>", (r0.flags & NBR_FLAG_MESH) ? "Y" : "N");
+            web_client.print("<td>-</td>"); // Hears me: keine Kante nach mir selbst
+            web_client.print("<td>-</td>"); // Via / Covered by: nicht anwendbar auf die eigene Zeile
+
+            int partner = -1;
+            float reach = nbrReach(nbrMatrix, 0, now_min, &partner);
+            if (reach >= 0 && partner >= 0)
+            {
+                web_client.printf("<td>%.1f km @ ", (double)reach);
+                nbrPrintCall((uint8_t)partner);
+                web_client.print("</td>");
+            }
+            else
+                web_client.print("<td>-</td>");
+
+            web_client.printf("<td>%u</td></tr>\n", (unsigned)pr.age);
+            continue;
+        }
+
+        if (pr.kind == 1)
+        { // direkte Zeile
+            uint8_t X = (uint8_t)pr.idx;
+            NbrRowView v;
+            if (!nbrRowGet(nbrMatrix, X, &v))
+                continue; // Zeile ist zwischen Sammel- und Renderdurchlauf verschwunden (EVICT)
+
+            web_client.printf("<tr><td><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a></td>", v.call, v.call);
+            web_client.print("<td>1</td>");
+            web_client.printf("<td>%s</td>", (v.flags & NBR_FLAG_GW) ? "Y" : "N");
+            if (!(v.flags & NBR_FLAG_POS))
+                web_client.print("<td>-</td>");
+            else
+                web_client.printf("<td>%s</td>", (v.flags & NBR_FLAG_MESH) ? "Y" : "N");
+
+            NbrEdgeView hm;
+            if (nbrEdgeGet(nbrMatrix, 0, X, &hm) && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
+                web_client.printf("<td>%d</td>", (int)hm.snr);
+            else
+                web_client.print("<td>-</td>");
+
+            // Covered by (wie 6.2, Regel 3 der alten Zeilentabelle): direkte
+            // Nachbarn, die X ebenfalls frisch hoeren -- leer ist E_self,
+            // "nur ich erreiche diesen Knoten".
+            web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
+            {
+                NbrMask covered = nbrMaskAnd(nbrHearersMask(nbrMatrix, X, now_min), directMask);
+                bool first = true;
+                for (int m = nbrMaskNext(covered, -1); m >= 0; m = nbrMaskNext(covered, m))
+                {
+                    if (!first)
+                        web_client.print(", ");
+                    nbrPrintCall((uint8_t)m);
+                    first = false;
+                }
+                if (first)
+                    web_client.print("only me");
+            }
+            web_client.print("</td>");
+
+            int partner = -1;
+            float reach = nbrReach(nbrMatrix, X, now_min, &partner);
+            if (reach >= 0 && partner >= 0)
+            {
+                web_client.printf("<td>%.1f km @ ", (double)reach);
+                nbrPrintCall((uint8_t)partner);
+                web_client.print("</td>");
+            }
+            else
+                web_client.print("<td>-</td>");
+
+            web_client.printf("<td>%u</td></tr>\n", (unsigned)pr.age);
+            continue;
+        }
+
+        // pr.kind == 2: Weg-Eintrag (2-Hop-Zeile oder Horizont).
+        NbrRouteView r;
+        if (!nbrRouteGet(nbrMatrix, (int)pr.idx, now_min, &r) || r.hops != pr.hops)
+            continue; // Momentaufnahme hat sich zwischen den Durchlaeufen verschoben
+                      // (Index zeigt auf einen anderen Eintrag -- nicht falsch einsortieren)
+
+        bool hasRow = (r.row != 0xFF);
+        NbrRowView rv;
+        uint8_t rowFlags = hasRow && nbrRowGet(nbrMatrix, r.row, &rv) ? rv.flags : 0;
+
+        web_client.printf("<tr><td><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a></td>", r.call, r.call);
+        web_client.printf("<td>%u</td>", (unsigned)r.hops);
+        web_client.printf("<td>%s</td>", hasRow ? ((rowFlags & NBR_FLAG_GW) ? "Y" : "N") : (r.gw ? "Y" : "N"));
+
+        if (!hasRow || !(rowFlags & NBR_FLAG_POS))
+            web_client.print("<td>-</td>"); // Horizont hat keine Zeile, oder keine Positions-Info
+        else
+            web_client.printf("<td>%s</td>", (rowFlags & NBR_FLAG_MESH) ? "Y" : "N");
+
+        if (hasRow)
+        {
+            NbrEdgeView hm;
+            if (nbrEdgeGet(nbrMatrix, 0, r.row, &hm) && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
+                web_client.printf("<td>%d</td>", (int)hm.snr);
+            else
+                web_client.print("<td>-</td>");
+        }
+        else
+            web_client.print("<td>-</td>");
+
+        // Via / Covered by: unveraenderte Via-Logik der alten Pfadseite.
+        web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
+        {
+            bool first = true;
+            for (int a = nbrMaskNext(r.entry, -1); a >= 0; a = nbrMaskNext(r.entry, a))
+            {
+                NbrRowView av;
+                const char *acall = nbrRowGet(nbrMatrix, a, &av) ? av.call : "?";
+
+                if (r.is_row)
+                { // 2-Hop-Zeile: entry IST schon die B-Menge (die direkten Nachbarn)
+                    web_client.printf("%s%s", first ? "" : ", ", acall);
+                    first = false;
+                    continue;
+                }
+
+                // Horizont: entry sind die Eintrittszeilen A; wo billig, dazu
+                // die B's, ueber die jedes A hereinkommt.
+                NbrMask viaB = nbrMaskAnd(nbrHearersMask(nbrMatrix, a, now_min), directMask);
+                if (nbrMaskEmpty(viaB))
+                {
+                    web_client.printf("%s%s", first ? "" : ", ", acall);
+                    first = false;
+                    continue;
+                }
+                for (int b = nbrMaskNext(viaB, -1); b >= 0; b = nbrMaskNext(viaB, b))
+                {
+                    NbrRowView bv;
+                    const char *bcall = nbrRowGet(nbrMatrix, b, &bv) ? bv.call : "?";
+                    web_client.printf("%s%s&gt;%s", first ? "" : ", ", acall, bcall);
+                    first = false;
+                }
+            }
+        }
+        web_client.print("</td>");
+
+        if (hasRow)
+        {
+            int partner = -1;
+            float reach = nbrReach(nbrMatrix, r.row, now_min, &partner);
+            if (reach >= 0 && partner >= 0)
+            {
+                web_client.printf("<td>%.1f km @ ", (double)reach);
+                nbrPrintCall((uint8_t)partner);
+                web_client.print("</td>");
+            }
+            else
+                web_client.print("<td>-</td>");
+        }
+        else
+            web_client.print("<td>-</td>");
+
+        web_client.printf("<td>%u</td></tr>\n", (unsigned)r.age_min);
+    }
+    free(rec);
+    web_client.println("</table>");
+
+    // Legende, wie bei sub_page_neighbours() unten: title= wirkt auf dem
+    // Telefon nicht, deshalb stehen dieselben Erklaerungen hier als Text.
+    web_client.print("<p style=\"font-size:0.85em;color:#555;\">"
+                      "Hops: 0 = me, 1 = direct neighbour, 2+ = reached via other nodes."
+                      " | Hears me: SNR at which that neighbour last reported hearing me, '-' if unknown or not a direct/2-hop row."
+                      " | Via: the entry path this station was heard on (2-hop: the direct neighbour it is via; horizon: the entry row, and beyond it if cheap to show)."
+                      " Covered by (direct neighbours only): other direct neighbours that also hear this one -- 'only me' means I am its only link."
+                      " | Reach: the farthest station with a known position that is linked to this one (heard by it or hearing it).");
+    web_client.println("</p>");
+
+    web_client.println("</div>");
+    web_client.println(); // The HTTP response ends with another blank line
+}
+
+/**
+ * ###########################################################################################################################
  * delivers the neighbour-matrix page to be injected into the scaffold (NBR-W2, Konzept 4.5;
  * Stufe 2a, docs/nbr-wichtigkeit-konzept.md Abschnitt 6: Rollenspalten, Legende, Sortierung,
  * "Covered by" und der Block "My relay decision")
@@ -1703,8 +1925,8 @@ static void nbrPrintCall(uint8_t row)
  * docs/meshcom5-topologie/body/03-kern.html): NBR_MAX_ROWS kann jetzt 128
  * erreichen (S3/nRF52). Zwei Kostenpunkte, die die alte, dichte Matrix nicht
  * hatte, und die diese Fassung beide vermeidet:
- *  - RAM: acht zeilengrosse uint8_t-Felder teilen sich EINEN malloc()-Block
- *    (`scratch`, 8 * NBR_MAX_ROWS Byte, mit free() vor jedem Rueckkehrpunkt)
+ *  - RAM: vier zeilengrosse uint8_t-Felder teilen sich EINEN malloc()-Block
+ *    (`scratch`, 4 * NBR_MAX_ROWS Byte, mit free() vor jedem Rueckkehrpunkt)
  *    statt permanent im BSS zu liegen (Orchestrator-Review 2026-09-25, zweite
  *    Runde: 1580 B `static` fuer eine selten geoeffnete Seite war noch immer
  *    zu viel gegen eine geplante Kampagnen-Ersparnis von ~300 B). malloc()
@@ -1724,9 +1946,16 @@ static void nbrPrintCall(uint8_t row)
  *    gebraucht wird.
  * Die Kreuztabelle "wer hoert wen" zeigt bei mehr als 64 sichtbaren Zeilen
  * nur einen 64-Spalten-Ausschnitt, ueber &x=<Spalte> weitergeblaettert --
- * alle ANDEREN Spalten der Kopfzeilen (D/I, G, M, #N, #X, Role) und Tabelle 2
- * bleiben dabei fuer alle n Zeilen vollstaendig, nur das n*n-Gitter selbst
- * wird seitenweise gerendert.
+ * alle ANDEREN Spalten der Kopfzeile (D/I, G, M, #N, #X, Cov, Role) bleiben
+ * dabei fuer alle n Zeilen vollstaendig, nur das n*n-Gitter selbst wird
+ * seitenweise gerendert.
+ * W4c: die zweite Tabelle dieser Seite (Call/GW/Mesh/Hears me/Hearers/
+ * Covered by/Reach/Age, eine Zeile je sichtbarer Nachbarschaftszeile) ist mit
+ * der Path-Seite zusammengelegt -- dort steht jetzt jede Station in einer
+ * einzigen, nach Hops sortierten Tabelle. Was diese Seite noch je Zeile
+ * zeigt, ist auf die neue Cov-Spalte der Kreuztabelle geschrumpft (Covered by,
+ * nur als Zahl+title); Details (Hears me/Reach/Via) gibt es nur noch auf der
+ * Path-Seite.
  */
 void sub_page_neighbours()
 {
@@ -1747,15 +1976,18 @@ void sub_page_neighbours()
         return;
     }
 
-    // W2c CONTRACT: ein einziger transienter Heap-Block statt acht einzelner
+    // W2c CONTRACT: ein einziger transienter Heap-Block statt vier einzelner
     // static uint8_t[NBR_MAX_ROWS]-Arrays (Orchestrator-Review 2026-09-25,
-    // zweite Runde): die Seite wird selten geoeffnet, ~1 kB fuer die Dauer
+    // zweite Runde): die Seite wird selten geoeffnet, ~0.5 kB fuer die Dauer
     // EINES Renderaufrufs ist unproblematisch -- anders als der printf-Heap-
     // Churn je Logzeile (siehe printf-malloc-starves-nimble.md), der einmal
     // pro RX/TX zuschlaegt, nicht einmal pro Seitenaufruf. free() steht direkt
     // vor jedem Rueckkehrpunkt; die Funktion hat ab hier nur noch das
     // natuerliche Ende (kein weiteres return), das free() steht dort.
-    uint8_t *scratch = (uint8_t *)malloc(8 * (size_t)NBR_MAX_ROWS);
+    // W4c: order[]/directList[]/indirectList[]/hearers[] sind mit der
+    // Zeilentabelle weg (in die Path-Seite zusammengelegt) -- der Block ist
+    // von acht auf vier Zeilenfelder geschrumpft.
+    uint8_t *scratch = (uint8_t *)malloc(4 * (size_t)NBR_MAX_ROWS);
     if (scratch == NULL)
     {
         web_client.println("<p>Not enough memory to render the neighbour matrix.</p>");
@@ -1767,10 +1999,6 @@ void sub_page_neighbours()
     uint8_t *eself = scratch + 1 * NBR_MAX_ROWS;
     uint8_t *xCount = scratch + 2 * NBR_MAX_ROWS;
     uint8_t *nCount = scratch + 3 * NBR_MAX_ROWS;
-    uint8_t *order = scratch + 4 * NBR_MAX_ROWS;
-    uint8_t *directList = scratch + 5 * NBR_MAX_ROWS;
-    uint8_t *indirectList = scratch + 6 * NBR_MAX_ROWS;
-    uint8_t *hearers = scratch + 7 * NBR_MAX_ROWS;
 
     // Sichtbare Zeilen: Zeile 0 immer dabei, sonst USED (nbrRowGet() liefert
     // false fuer eine unbelegte Zeile != 0) und frisch (Konzept 4.5, Fenster
@@ -1935,6 +2163,7 @@ void sub_page_neighbours()
     web_client.print("<td title=\"Mesh: relays foreign frames, from its last position frame.\">M</td>");
     web_client.print("<td title=\"Neighbours: nodes this node hears, as far as this table can hold them.\">#N</td>");
     web_client.print("<td title=\"Exclusive: nodes that ONLY this neighbour hears. This is the value of a relay.\">#X</td>");
+    web_client.print("<td title=\"Covered by: other direct neighbours that also hear it. 0 = only I reach it. Details on the Path page.\">Cov</td>");
     web_client.print("<td title=\"Super: largest exclusive share. Needed: has exclusive nodes. Redundant: everything it hears is heard by others.\">Role</td>");
     for (uint8_t j = colStart; j < colEnd; j++)
     {
@@ -2042,6 +2271,34 @@ void sub_page_neighbours()
         else
             web_client.print("<td>-</td>");
 
+        // Cov (W4c, ersetzt die "Covered by"-Spalte der geloeschten
+        // Zeilentabelle): fuer eine direkte Zeile die anderen direkten
+        // Nachbarn, die X ebenfalls frisch hoeren -- hm ist oben schon
+        // geholt, also nur noch mit directMaskGlobal verunden, keine neue
+        // Maskenberechnung.
+        if (isDirect)
+        {
+            NbrMask covered = nbrMaskAnd(hm, directMaskGlobal);
+            int covCount = nbrMaskCount(covered);
+            web_client.print("<td title=\"Covered by: ");
+            if (covCount == 0)
+                web_client.print("nobody");
+            else
+            {
+                bool firstCov = true;
+                for (int m = nbrMaskNext(covered, -1); m >= 0; m = nbrMaskNext(covered, m))
+                {
+                    if (!firstCov)
+                        web_client.print(", ");
+                    nbrPrintCall((uint8_t)m);
+                    firstCov = false;
+                }
+            }
+            web_client.printf("\">%u</td>", (unsigned)covCount);
+        }
+        else
+            web_client.print("<td>-</td>");
+
         // Role
         if (X == 0 || !isDirect)
         {
@@ -2095,154 +2352,18 @@ void sub_page_neighbours()
     }
 
     // Legende (6.1, Kopf): title= wirkt auf dem Telefon nicht, deshalb
-    // stehen dieselben sechs Erklaerungen hier zusaetzlich als Text.
+    // stehen dieselben Erklaerungen hier zusaetzlich als Text (W4c: Cov dazu,
+    // die "Covered by"-Spalte der geloeschten Zeilentabelle).
     web_client.print("<p style=\"font-size:0.85em;color:#555;\">"
                       "D/I: Direct: heard by me over the air. Indirect: only via a neighbour."
                       " | G: Gateway: a HEY addressed to HG was seen from this node. 'no' means not observed."
                       " | M: Mesh: relays foreign frames, from its last position frame."
                       " | #N: Neighbours: nodes this node hears, as far as this table can hold them."
                       " | #X: Exclusive: nodes that ONLY this neighbour hears. This is the value of a relay."
+                      " | Cov: other direct neighbours that also hear it; 0 = only I reach it. Details on the Path page."
                       " | Role: Super: largest exclusive share. Needed: has exclusive nodes."
                       " Redundant: everything it hears is heard by others.");
     web_client.println("</p>");
-
-    // Sortierung fuer Tabelle 2 (6.2, Regel 2): Zeile 0 zuerst, dann direkte
-    // Nachbarn nach #X absteigend (Gleichstand nach Rufzeichen), dann
-    // Indirekte nach Alter aufsteigend -- der Super-Node steht damit oben.
-    // order[]/directList[]/indirectList[] speichern POSITIONEN in idx[],
-    // keine Zeilennummern (wie schon vor W2c).
-    uint8_t no_ = 0;
-    order[no_++] = 0; // idx[0] ist per Aufbau immer Zeile 0
-
-    uint8_t nDirectList = 0;
-    for (uint8_t i = 1; i < n; i++)
-        if (nbrMaskTest(directMaskGlobal, idx[i]))
-            directList[nDirectList++] = i;
-    for (uint8_t a = 1; a < nDirectList; a++)
-    {
-        uint8_t key = directList[a];
-        int b = (int)a - 1;
-        while (b >= 0)
-        {
-            uint8_t other = directList[b];
-            // Rufzeichen fuer den Gleichstand-Vergleich: je zwei nbrRowGet()-
-            // Aufrufe pro Vergleich, O(1) je Aufruf (row[] ist ein Array) --
-            // kein Grund, sie in einem Array vorzuhalten.
-            NbrRowView keyV, otherV;
-            nbrRowGet(nbrMatrix, idx[key], &keyV);
-            nbrRowGet(nbrMatrix, idx[other], &otherV);
-            bool keyFirst = (xCount[key] > xCount[other]) ||
-                             (xCount[key] == xCount[other] &&
-                              strncmp(keyV.call, otherV.call, NBR_CALL_LEN) < 0);
-            if (!keyFirst)
-                break;
-            directList[b + 1] = other;
-            b--;
-        }
-        directList[b + 1] = key;
-    }
-    for (uint8_t k = 0; k < nDirectList; k++)
-        order[no_++] = directList[k];
-
-    uint8_t nIndirectList = 0;
-    for (uint8_t i = 1; i < n; i++)
-        if (!nbrMaskTest(directMaskGlobal, idx[i]))
-            indirectList[nIndirectList++] = i;
-    for (uint8_t a = 1; a < nIndirectList; a++)
-    {
-        uint8_t key = indirectList[a];
-        int b = (int)a - 1;
-        while (b >= 0)
-        {
-            uint8_t other = indirectList[b];
-            if (nbrRowAgeMin(nbrMatrix, idx[key], now_min) >= nbrRowAgeMin(nbrMatrix, idx[other], now_min))
-                break;
-            indirectList[b + 1] = other;
-            b--;
-        }
-        indirectList[b + 1] = key;
-    }
-    for (uint8_t k = 0; k < nIndirectList; k++)
-        order[no_++] = indirectList[k];
-
-    // Zeilentabelle: eine Zeile je sichtbarer Nachbarschaftszeile, inkl. 0,
-    // in der Sortierung von oben. "Hearers" bricht um (6.2, Regel 1); die
-    // Tabelle waechst in die Hoehe, nicht in die Breite.
-    web_client.println("<table class=\"table mw-600\">");
-    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>GW</td><td>Mesh</td><td>Hears me</td><td>Hearers</td><td>Covered by</td><td>Reach</td><td>Age</td></tr></thead>");
-    for (uint8_t oi = 0; oi < n; oi++)
-    {
-        uint8_t i = order[oi];
-        uint8_t X = idx[i];
-        NbrRowView row;
-        nbrRowGet(nbrMatrix, X, &row);
-
-        web_client.printf("<tr><td>%s</td><td>%s</td><td>%s</td>", row.call,
-                           (row.flags & NBR_FLAG_GW) ? "yes" : "no",
-                           (row.flags & NBR_FLAG_MESH) ? "yes" : "no");
-
-        NbrEdgeView hm;
-        if (X != 0 && nbrEdgeGet(nbrMatrix, 0, X, &hm) && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
-            web_client.printf("<td>%d</td>", (int)hm.snr);
-        else
-            web_client.print("<td>-</td>");
-
-        uint8_t nh = nbrHearers(nbrMatrix, X, now_min, hearers, NBR_MAX_ROWS);
-        uint8_t nh_shown = (nh < NBR_MAX_ROWS) ? nh : (uint8_t)NBR_MAX_ROWS;
-        web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
-        if (nh_shown == 0)
-        {
-            web_client.print("-");
-        }
-        else
-        {
-            for (uint8_t h = 0; h < nh_shown; h++)
-            {
-                if (h)
-                    web_client.print(",");
-                nbrPrintCall(hearers[h]);
-            }
-        }
-        web_client.print("</td>");
-
-        // Covered by (6.2, Regel 3): direkte Nachbarn, die X ebenfalls
-        // frisch hoeren -- leer ist genau E_self, "nur ich erreiche diesen
-        // Knoten".
-        web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
-        if (nbrMaskTest(directMaskGlobal, X))
-        {
-            NbrMask covered = nbrMaskAnd(nbrHearersMask(nbrMatrix, X, now_min), directMaskGlobal);
-            bool first = true;
-            for (int m = nbrMaskNext(covered, -1); m >= 0; m = nbrMaskNext(covered, m))
-            {
-                if (!first)
-                    web_client.print(",");
-                nbrPrintCall((uint8_t)m);
-                first = false;
-            }
-            if (first)
-                web_client.print("-");
-        }
-        else
-        {
-            web_client.print("-");
-        }
-        web_client.print("</td>");
-
-        int partner = -1;
-        float reach = nbrReach(nbrMatrix, X, now_min, &partner);
-        if (reach >= 0 && partner >= 0)
-        {
-            web_client.printf("<td>%.1f km @ ", (double)reach);
-            nbrPrintCall((uint8_t)partner);
-            web_client.print("</td>");
-        }
-        else
-            web_client.print("<td>-</td>");
-
-        web_client.printf("<td>%u min</td></tr>\n", (unsigned)nbrRowAgeMin(nbrMatrix, X, now_min));
-    }
-    web_client.println("</table>");
 
     // 6.3: "My relay decision" -- drei Zeilen Text, keine Tabelle. Die
     // Zaehler kommen aus loop_functions.cpp (5.8 Punkt 3); solange

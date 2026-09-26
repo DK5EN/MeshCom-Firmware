@@ -90,6 +90,8 @@ struct NbrRouteView
     uint8_t  is_row;      // 1: 2-Hop-Zeile, 0: Horizont-Eintrag
     NbrMask  entry;       // Zeilen, ueber die er hereinkommt: bei is_row die direkten Nachbarn B,
                           // sonst die Eintrittszeilen A (deren B liefert nbrHearersMask(A) & Direkt)
+    uint8_t  row;         // Matrixzeile bei is_row, sonst 0xFF (Horizont hat keine Zeile;
+                          // W4c fuer die zusammengelegte Path-Seite in web_functions.cpp)
 };
 
 // Zahl der Weg-Eintraege (2-Hop-Zeilen plus lebende Horizont-Eintraege) und

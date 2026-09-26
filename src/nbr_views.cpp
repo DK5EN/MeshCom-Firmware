@@ -400,6 +400,7 @@ bool nbrRouteGet(const NbrMatrix &m, int idx, uint16_t now_min, NbrRouteView *ou
             out->age_min = best;
             out->is_row = 1;
             out->entry = entry;
+            out->row = (uint8_t)x;
             ok = true;
         }
         else
@@ -419,6 +420,7 @@ bool nbrRouteGet(const NbrMatrix &m, int idx, uint16_t now_min, NbrRouteView *ou
                 out->age_min = (uint16_t)(now_min - nbrPrivHzLast(m.hz_meta[h]));
                 out->is_row = 0;
                 out->entry = m.hz_entry[h];
+                out->row = 0xFF;
                 ok = true;
             }
         }

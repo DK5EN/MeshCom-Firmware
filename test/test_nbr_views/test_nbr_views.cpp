@@ -809,6 +809,35 @@ void test_routes_two_hop_rows_then_horizon(void)
     free(mp);
 }
 
+// W4c (docs/meshcom5-topologie/, zusammengelegte Path-Seite in
+// web_functions.cpp): row ist die Matrixzeile einer 2-Hop-Zeile (fuer die
+// Spalten GW/Mesh/Hears me/Age, die dort ueber nbrRowGet()/nbrEdgeGet()
+// kommen), 0xFF fuer einen Horizont-Eintrag (der hat keine Zeile).
+void test_route_row_field_two_hop_row_and_horizon(void)
+{
+    NbrMatrix *mp = mk();
+    NbrMatrix &m = *mp;
+    heard(m, "B2AAA", 50);
+    nbrNoteFrame(m, "X1AAA,B1AAA", '!', NULL, false, -90, 0, 90); // (X1,B1) 90
+    nbrNoteFrame(m, "X1AAA,B2AAA", '!', NULL, false, -90, 0, 95); // (X1,B2) 95
+    heard(m, "B1AAA", 100);
+    nbrNoteFrame(m, "X2AAA,B1AAA", '@', NULL, true, -90, 0, 100);  // X2 an "HG"; (B1,0) 100
+    nbrNoteFrame(m, "S1AAA,A1AAA,B2AAA", '@', NULL, true, -90, 0, 101); // (B2,0) 101
+
+    NbrRouteView v;
+    TEST_ASSERT_TRUE(route_find(m, "X1AAA", 110, &v) >= 0);
+    TEST_ASSERT_EQUAL_UINT8(1, v.is_row);
+    TEST_ASSERT_NOT_EQUAL(0xFF, v.row);
+    NbrRowView rv;
+    TEST_ASSERT_TRUE(nbrRowGet(m, v.row, &rv));
+    TEST_ASSERT_EQUAL_STRING(v.call, rv.call);
+
+    TEST_ASSERT_TRUE(route_find(m, "S1AAA", 110, &v) >= 0);
+    TEST_ASSERT_EQUAL_UINT8(0, v.is_row);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, v.row);
+    free(mp);
+}
+
 // Advisor Welle 3, R1 (scratchpad/advisor-w3/repro_twice.cpp): ein Absender,
 // dessen Zeilenminute verfallen ist, dessen Kante (X, B) aber frisch ist (HN-
 // Bericht von B), bekam zusaetzlich einen Horizont-Eintrag und stand in den
@@ -1347,6 +1376,7 @@ int main(int, char **)
     RUN_TEST(test_horizon_row_eviction_clears_entry_masks);
     RUN_TEST(test_horizon_hop_minimum_rises_after_12h);
     RUN_TEST(test_routes_two_hop_rows_then_horizon);
+    RUN_TEST(test_route_row_field_two_hop_row_and_horizon);
     RUN_TEST(test_route_sender_never_listed_as_row_and_horizon);
     RUN_TEST(test_unknown_position_detected_under_fast_math);
     RUN_TEST(test_name_helpers_match_old_tables);
