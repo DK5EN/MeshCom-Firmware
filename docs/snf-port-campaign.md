@@ -14,7 +14,7 @@ Source of truth for the feature itself: `fork-main:docs/dm-transport-impl-plan-2
 | 0    | branch, this doc, neo path lists (NBR gap)                          | done 2026-09-26 | 4bb0dc45 |
 | 1    | new modules + host tests, shared headers, `env:native`              | done 2026-09-26 | see log  |
 | 2    | stage 0 (without 0.1) + stage 2.1 hooks                             | done 2026-09-26 |          |
-| 3    | stage 1 outbox + ladder (`--dmretry`)                               | open            |          |
+| 3    | stage 1 outbox + ladder (`--dmretry`)                               | done 2026-09-26 |          |
 | 4    | stage 3 store node + stage 4 custody notice                         | open            |          |
 | 5    | docs over, CHANGELOG/BACKLOG, all-env build, RAM snapshot same-base | open            |          |
 
@@ -77,3 +77,17 @@ exemption, dmstat_sent, DM setlog line. `--airgap` command, web "failed" marker.
 envs, 1377 cases; 13 lints; 7 lead envs; DM strings in Heltec/RAK/T-Beam images; instrumented RAK
 build carries the AIRGAP strings. Advisor: one finding (second `dmstat_gw_ack` site, gateway
 self-ack in OnRxDone) fixed, rest verified equal to fork-main tip. RAK flash 93.4 % (761256 B).
+
+**Wave 3 (2026-09-26).** Stage 1 outbox + ladder behind `--dmretry off|3|9` (default off), four
+writers. Ack stops the ladder independent of `checkOwnTx()` (1595542c shape) in OnRxDone and both
+`udp_frame` twins (twin regression test red without it); F5 fresh-id ring slot stop; echo hook
+mode-independent. Ticks: `loopAction_retransmit()` in `loop_actions_esp32.cpp` /
+`loop_actions_nrf52.cpp` (loop task) plus the ESP32 inline `EXTERNAL_RADIO` tick; boot
+`dmSettingsLoad()` then `dmOutboxGlueInit()` after the cleanflash branch (advisor: the consistent
+order here, fork-main loads before `clear_flash()`). `sendMessage()`: outbox-full refusal with
+distinct NACK, `{ping}` exempt (advisor R1 fixed: `bPingMsg` hoisted from `strMsg` as on
+fork-main), `bUseOnce` for `--dmretry` DMs, `dmOutboxAdd()`. `--dmretry`, `--info`, `--help`
+(fork-main had no help line; help_parity_lint requires it), web select + info line, OUTBOX setlog
+line. Gate: host 44/44 envs, 1378 cases; 13 lints; 7 lead envs; `esp32-external-radio` builds with
+a dummy overlay (`EXTERNAL_RADIO_HOST/PORT`, the env's own precondition) and links `dmOutboxLoop`.
+RAK flash 94.1 % (767048 of 815104 B) -- 48 kB left before stage 3/4.

@@ -12,6 +12,7 @@
 #include "dm_dedup.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
+#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -332,10 +333,17 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                     uint8_t ack_status = 0x01;  // ACK
 
-                    int iackcheck = checkOwnTx(msg_counter);
-                    if(iackcheck >= 0)
+                    // F2 (fable-dm-stage1-verdict-20260914.md): a destination
+                    // that answers over the server must still stop the
+                    // outbox's ladder, independent of checkOwnTx() (Finding 1
+                    // reasoning applies here too).
+                    int  iackcheck    = checkOwnTx(msg_counter);
+                    bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call, (uint16_t)(iAckId & 0x3FF));
+
+                    if(iackcheck >= 0 || dmAckStopped)
                     {
-                        own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                        if(iackcheck >= 0)
+                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
                         ack_status = 0x02;  // 02...ACK
                       }
 

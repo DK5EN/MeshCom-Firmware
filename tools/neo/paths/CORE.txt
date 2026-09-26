@@ -53,6 +53,7 @@ src/extern_msg_json.h
 src/extudp_functions.cpp
 src/extudp_functions.h
 src/gateway_service.h
+src/instrument.h
 src/kiss_frame.cpp
 src/kiss_frame.h
 src/kiss_functions.cpp

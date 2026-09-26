@@ -124,6 +124,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
+#include "dm_settings.h"
+#include "dm_outbox_api.h"
 #include <regex_functions.h>
 #include <test_inject.h>
 #include <command_functions.h>
@@ -832,6 +834,10 @@ void esp32setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
+    dmSettingsLoad();
+    dmOutboxGlueInit();
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das
@@ -3991,6 +3997,7 @@ void esp32loop()
     if((int32_t)(millis() - (retransmit_timer + (1000 * 2))) > 0)
     {
         updateRetransmissionStatus();
+        dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
         retransmit_timer = millis();
     }
 

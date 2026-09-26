@@ -128,6 +128,8 @@ void sendHeartbeat();
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
+#include "dm_settings.h"
+#include "dm_outbox_api.h"
 #include <regex_functions.h>
 #include "setlog_lines.h"
 #include "dedup_functions.h"
@@ -561,6 +563,10 @@ void nrf52setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
+    dmSettingsLoad();
+    dmOutboxGlueInit();
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das

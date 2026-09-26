@@ -13,6 +13,7 @@
 #include "dm_dedup.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
+#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -295,10 +296,17 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                     uint8_t ack_status = 0x01;  // ACK
 
-                    int iackcheck = checkOwnTx(msg_counter);
-                    if(iackcheck >= 0)
+                    // F2 (fable-dm-stage1-verdict-20260914.md): a destination
+                    // that answers over the server must still stop the
+                    // outbox's ladder, independent of checkOwnTx() (Finding 1
+                    // reasoning applies here too).
+                    int  iackcheck    = checkOwnTx(msg_counter);
+                    bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call, (uint16_t)(iAckId & 0x3FF));
+
+                    if(iackcheck >= 0 || dmAckStopped)
                     {
-                        own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                        if(iackcheck >= 0)
+                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
                         // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                         // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,

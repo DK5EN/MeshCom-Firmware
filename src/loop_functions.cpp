@@ -34,6 +34,8 @@
 #include <counters_store.h>
 #include "setlog_lines.h"
 #include "dm_stats.h"
+#include "dm_outbox_api.h"   // S1: stage 1 outbox/retry ladder
+#include "dm_settings.h"     // S1: dmRetryMode()
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
 #include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
@@ -3343,6 +3345,12 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
         char dmbuf[200];
         dmStatFormat(dmbuf, sizeof(dmbuf));
         setlogPrint(dmbuf);
+
+        if(dmRetryMode() != DM_RETRY_OFF)
+        {
+            dmOutboxFormatLine(dmbuf, sizeof(dmbuf));   // S1: OUTBOX line, same gate
+            setlogPrint(dmbuf);
+        }
     }
 }
 
@@ -3876,6 +3884,37 @@ static void bpEmitNack(BpNack n, MsgOrigin origin, const char *dst, const char *
     bpDeliver(body, origin, dst);
 }
 
+// F8 (fable-dm-stage1-verdict-20260914.md): the stage 1 outbox-full refusal
+// (below, dmOutboxHasRoom()) must not reuse bpEmitNack(BP_NACK_QRT, ...) --
+// that carries two side effects the plan never asked for -- [BP];nack;QRT;
+// makes bench tooling (tools/loganalyse.sh, serial_monitor.py) count an
+// outbox refusal as channel back-pressure, and bpEmitNack() always latches
+// bp_episode_origin/bp_episode_dst, which can route a QRT episode's closing
+// QRV to a sender this refusal never opened one for. outboxEmitRefuse()
+// delivers the same per-message nack framing (BP_NACK_OUTBOX_FULL, its own
+// wire prefix) without either side effect: no [BP];nack; marker --
+// [OUTBOX];refuse;full (already printed at the call site) stays the only
+// marker for this refusal -- and no touch to the episode state, which
+// belongs to the TX-ring-depth episode machinery this refusal never went
+// through.
+static void outboxEmitRefuse(MsgOrigin origin, const char *dst, const char *msg_text)
+{
+    // 24, not bpEmitNack()'s 16: bpNackPrefix(BP_NACK_OUTBOX_FULL) is
+    // "OUTBOX FULL NOT SENT - ", 23 bytes plus NUL -- longer than either of
+    // the two prefixes 16 was sized for. bpNackCompose() is out_len-safe
+    // either way (never overflows), but a too-small headroom constant would
+    // needlessly clip a few bytes of the operator's own text off the
+    // BP_NACK_TEXT_MAX budget for no reason.
+#if defined(NRF52_SERIES)
+    static char body[24 + BP_NACK_TEXT_MAX + 4];
+#else
+    char body[24 + BP_NACK_TEXT_MAX + 4];
+#endif
+    bpNackCompose(body, sizeof(body), bpNackPrefix(BP_NACK_OUTBOX_FULL), msg_text);
+
+    bpDeliver(body, origin, dst);
+}
+
 /// Route a notice: to the sender that just spoke, else to the one the episode
 /// was opened for. Also remembers the transport and destination for the
 /// closing QRV (BP-06: bp_episode_dst mirrors bp_episode_origin exactly).
@@ -4173,6 +4212,28 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         return BP_SEND_REFUSED;
     }
 
+    // P15: ein {ping} wird nie wiederholt -- weder vom Ring noch von der
+    // Outbox-Leiter. Die Gegenstelle antwortet mit {pong}, nie mit ACK, also
+    // stoppte nichts die Wiederholung. Hier benannt (strMsg ist schon ohne
+    // {ZIEL}-Teil) und an jeder Stelle wiederverwendet, die ein {ping} anders
+    // behandelt: Outbox-voll-Absage, dmstat_sent, bUseOnce, dmOutboxAdd().
+    const bool bPingMsg = strMsg.startsWith("{ping}");
+
+    // S1 (docs/dm-stage1-plan-20260914.md section 3, decision 3): the stage 1
+    // outbox refuses a DM outright when it has no free slot, the same way
+    // the BP-01/BP-07 check above refuses one -- before any side effect
+    // (node_msgid++, save_settings(), insertOwnTx(), addLoraRxBuffer()) has
+    // happened, so a refused message does not consume a message id either.
+    // Mode off: dmOutboxHasRoom() is never consulted (short-circuit on
+    // dmRetryMode()), sendMessage() stays byte-identical to today (T-1.7).
+    if(bDM && !bPingMsg && dmRetryMode() != DM_RETRY_OFF && !dmOutboxHasRoom())
+    {
+        Serial.printf("[OUTBOX];refuse;full\n");
+        dmstat_outbox_full.fetch_add(1);
+        outboxEmitRefuse(bp_origin, bp_origin_dst, strMsg.c_str());
+        return BP_SEND_REFUSED;
+    }
+
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
     // encodeAPRS() beschreibt den Puffer bei jedem Aufruf vollstaendig.
 #if defined(NRF52_SERIES)
@@ -4227,7 +4288,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         // P14/P15: nicht fuer ein {ping} -- die Gegenstelle antwortet mit
         // {pong}, nie mit einem ACK, also stuende es fuer immer als
         // sent-nie-acked in der DM-Statistik.
-        if(!mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+        if(!bPingMsg)
         {
             dmstat_sent.fetch_add(1);
             dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
@@ -4274,8 +4335,10 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     {
         if(mcStartsWith(aprsmsg.msg_payload, "{CET}") || mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
-        else if(mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+        else if(bPingMsg)
             bUseOnce = true; // P14/P15: siehe oben
+        else if(bDM && dmRetryMode() != DM_RETRY_OFF)
+            bUseOnce = true; // S1: the outbox's own ladder replaces the ring's 3x40s retry
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
     }
@@ -4367,6 +4430,22 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         addLoraRxBuffer(aprsmsg.msg_id, true);
     else
         addLoraRxBuffer(aprsmsg.msg_id, false);
+
+    // S1: register this DM with the stage 1 outbox -- attempt 1 was just
+    // enqueued above (bUseOnce), dmOutboxAdd() only records it as sent and
+    // schedules attempt 2. nnn is recovered from the low 10 bits of
+    // aprsmsg.msg_id (meshcom_settings.node_msgid already advanced above),
+    // the same reconstruction lora_functions.cpp uses for an incoming
+    // :ackNNN. Never for a {ping} (bPingMsg) -- it is never retried and the
+    // outbox has nothing to manage for it. Mode off: never called,
+    // sendMessage() stays byte-identical to today (T-1.7); full was already
+    // refused earlier (C1/S1 above).
+    if(bDM && !bPingMsg && dmRetryMode() != DM_RETRY_OFF)
+    {
+        dmOutboxAdd((uint16_t)(aprsmsg.msg_id & 0x3FF), strDestinationCall.c_str(),
+                    strMsg.c_str(), strMsg.length(), aprsmsg.max_hop, aprsmsg.msg_id,
+                    dmRetryMode());
+    }
 
     // BP-01/BP-08: the ring accepted the frame above (w < 0 already returned
     // early), so this call always signals success -- the new depth after
