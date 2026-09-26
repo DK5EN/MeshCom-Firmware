@@ -203,5 +203,10 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
 - Finding: with the sset4 migration gone (wave 0), DK5EN-1 came up with KISS/TCP on, TX on, no
   auth (its old NBR bits 0x10/0x20). Fixed on the node with `--kiss tx off`, `--kiss off`,
   `--nbrdebug on`, `--nbrrelay count`. DK5EN-98 needs the same commands right after its flash.
-- Open: DK5EN-98 (remote, OTA) waits for the operator; RAK4631 DK5EN-90 consistency test after
+- DK5EN-98 flashed over WiFi OTA with ccb3ec23 on 2026-09-26 (operator go; 67 s, build 03:40:41).
+  It came up with KISS off but TX on / RxMeta on and NBRDEBUG/NBRRELAY off (old bits 0x20/0x40
+  = `--nbrrelay on`); restored with `--kiss tx off`, `--kiss meta off`, `--nbrdebug on`,
+  `--nbrrelay on`. Capture on rpizero since 07:43 (26 h): `~/meshlog/dk5en-98/2026-09-26.log`,
+  evaluate with `--since 2026-09-26T07:43`.
+- Open: RAK4631 DK5EN-90 consistency test after
   everything else (operator, 2026-09-25).
