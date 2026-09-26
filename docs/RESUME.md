@@ -1,6 +1,16 @@
 # RESUME — pick up here
 
-## 2026-09-26: branch `feature-snf` -- S&F ported, nothing flashed (start here for S&F)
+## 2026-09-26 evening: release `v4.35t.09.27-neo` published (dated Sunday 27 September)
+
+Tag `v4.35t.09.27-neo` on `feature-snf` `74f72a34`: neo (`v4.35t.09.26-neo` content) plus the
+neighbour matrix and DM store-and-forward. GitHub release with 39 assets, marked Latest;
+`v4.35t.09.26-neo` stays. Web flasher on gh-pages `8cc0e5a3` lists both (09.27 default, dated
+2026-09-27 via the new `pages_flasher.py --date`), `check` 30 boards / 0 mismatches; PR-history
+section and index cards in gh-pages `f938a7bb`. Gate: 44 native envs 1379/1379, golden selftest
+green, 32 release envs built, RAK4631 flash 96.4 %. `FLASH_VERSION 20260927`. This exact image has
+not run on a board; the S&F bench coverage table in `docs/snf-port-campaign.md` lists what is open.
+
+## 2026-09-26: branch `feature-snf` -- S&F ported (bench and release: see the entry above)
 
 `feature-snf` = `feature-neighbour-matrix` `0d4b914c` plus the DM store-and-forward stages 0 (without
 0.1), 2.1, 1, 3 and 4 from `fork-main`, five waves, each advisor-reviewed. State, decisions P1-P5
