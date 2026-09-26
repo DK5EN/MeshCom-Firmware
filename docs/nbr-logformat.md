@@ -79,14 +79,36 @@ Firmware-Wert gegenueber. `<verdict>` wird nur berichtet, nicht verglichen.
 Die dichte N x N-Matrix ist durch einen Kantenpool ersetzt (64 Zeilen klassisch, 128 auf S3 und
 nRF52). Was sich an den Zeilen aendert:
 
-| Zeile / Feld                                 | Aenderung                                                                                                                                         |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EDGE`/`ME` `<cnt>`                          | EIN Zaehler je Kante ueber alle Typen statt eines Zaehlers je Typ; mit `NBR_CNT_HALVE_MIN` alle 90 min als `(cnt+1)/2` halbiert.                  |
-| `ME` `<snr>`                                 | gleitendes Mittel ueber `NBR_SNR_AVG_N` (8) Rahmen fuer die Kante (x, ich), nicht mehr der letzte Wert.                                           |
-| `SNAP` `<cells>`                             | Zahl lebender Kanten im Pool (nach dem Minuten-Sweep fallen verfallene Kanten heraus).                                                            |
-| Masken in `NEED`/`CANCEL?`/`CANCEL`/`REFUSE` | 16 (klassisch) oder 32 (S3, nRF52) Hex-Stellen statt 8, hoechstwertige zuerst, als `%08lX`-Haelften (nRF52 kennt kein `%llX`). Bit i = Zeile i.   |
-| `[NBR]\|EVICT-E\|<up>\|<from>\|<to>`         | neu: der Kantenpool war voll, die aelteste Kante ohne Bezug zu Zeile 0 wich (erst danach die aelteste ueberhaupt). `<to>` hatte `<from>` gehoert. |
-| `[NBR]\|DROP\|<up>\|SYMBUF\|<n>`             | neu, nur nRF52: `<n>` SYM-Zeilen gingen verloren, weil der Puffer fuer Zeilen aus der Scheduler-Klammer voll war.                                 |
+| Zeile / Feld                                                            | Aenderung                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EDGE`/`ME` `<cnt>`                                                     | EIN Zaehler je Kante ueber alle Typen statt eines Zaehlers je Typ; mit `NBR_CNT_HALVE_MIN` alle 90 min als `(cnt+1)/2` halbiert.                                                                                      |
+| `ME` `<snr>`                                                            | gleitendes Mittel ueber `NBR_SNR_AVG_N` (8) Rahmen fuer die Kante (x, ich), nicht mehr der letzte Wert.                                                                                                               |
+| `SNAP` `<cells>`                                                        | Zahl lebender Kanten im Pool (nach dem Minuten-Sweep fallen verfallene Kanten heraus).                                                                                                                                |
+| Masken in `NEED`/`CANCEL?`/`CANCEL`/`REFUSE`                            | 16 (klassisch) oder 32 (S3, nRF52) Hex-Stellen statt 8, hoechstwertige zuerst, als `%08lX`-Haelften (nRF52 kennt kein `%llX`). Bit i = Zeile i.                                                                       |
+| `[NBR]\|EVICT-E\|<up>\|<from>\|<to>`                                    | neu: der Kantenpool war voll, die aelteste Kante ohne Bezug zu Zeile 0 wich (erst danach die aelteste ueberhaupt). `<to>` hatte `<from>` gehoert.                                                                     |
+| `[NBR]\|DROP\|<up>\|SYMBUF\|<n>`                                        | neu, nur nRF52: `<n>` SYM-Zeilen gingen verloren, weil der Puffer fuer Zeilen aus der Scheduler-Klammer voll war.                                                                                                     |
+| `[NBR]\|EVICT-H\|<up>\|<alt>\|<neu>`                                    | neu (Welle 3): die Horizont-Tabelle war voll, der am laengsten nicht gesehene Eintrag `<alt>` wich fuer `<neu>`.                                                                                                      |
+| `[NBR]\|EVICT-X\|<up>\|<alt>\|<neu>`                                    | neu (Welle 3): alle Direkt-Slots belegt, der Slot des am laengsten nicht direkt gehoerten Nachbarn `<alt>` ging an `<neu>`; die Zeile bleibt.                                                                         |
+| `[NBR]\|ECHO\|<up>\|<msg_id>\|<first>\|<second>`                        | neu (Welle 3): ein eigener POS/HEY-Rahmen verlaesst die Echo-Tabelle (letzte 4 eigene Rahmen, Konzept 4.11). `<msg_id>` 8 Hexstellen, `<first>`/`<second>` die Masken erster (X) und zweiter Hand (Y) wie bei `NEED`. |
+| `[NBR]\|CHECK\|<up>\|<rows>\|<edges>\|<extra>\|<missing>\|<bad>\|<dup>` | neu: Konsistenzpruefung Masken gegen Kantenpool (`nbrCheck()`), einmal je Minute nach dem Sweep aus dem Loop-Task, nur mit `--nbrdebug on`. Alles ausser `<rows>`/`<edges>` muss `0` sein, siehe unten.               |
+
+### `CHECK` und `--nbrcheck`
+
+`<rows>` belegte Zeilen, `<edges>` lebende Kanten im Pool. Die vier Fehlerzaehler:
+`<extra>` Maskenbit ohne Kante, `<missing>` Kante ohne Maskenbit, `<bad>` Kante auf der Diagonale
+oder zu einer unbelegten Zeile, `<dup>` dieselbe Kante zweimal im Pool. Geprueft wird Zeile fuer
+Zeile unter `NBR_LOCK` (auf nRF52 die Scheduler-Klammer), nicht der ganze Lauf am Stueck; jede
+Zeile ist also fuer sich konsistent gelesen. Jeder Wert ungleich `0` ist ein Fehler, keine
+Momentaufnahme eines laufenden Schreibvorgangs.
+
+`--nbrcheck` fuehrt dieselbe Pruefung auf Anfrage aus, unabhaengig von `--nbrdebug`, und gibt
+eine Klartextzeile statt der `CHECK`-Zeile aus:
+
+```
+[NBR] check rows=9 edges=31 mask_extra=0 mask_missing=0 edge_bad=0 edge_dup=0 -> ok
+```
+
+Bei einem Fehler endet sie auf `-> INCONSISTENT`.
 
 Deckung nach Anteil (`NBR_SHARE_PCT`, 10 %): eine Kante deckt nur, wenn ihr Zaehler mindestens 10 %
 des Zaehlers der staerksten Kante derselben Art erreicht. Fuer #X (`<meshneed>`, Web-Rollen) ist das
@@ -193,15 +215,18 @@ HEY-Rahmen (Typ `@`), Ziel `HN`, `max_hop 0`. Payload:
 R<heard>;N<k>[+];<CALL>,<snr>;<CALL>,<snr>;...;
 ```
 
-`<heard>` ist dieselbe Zahl wie im `R<n>` des regulaeren HEY: die Eintraege der MHeard-Tabelle des
-Senders der letzten Stunde, unabhaengig vom SNR (`getMheardCount()`). Sie ist NICHT die Zahl der
-Listeneintraege und kein Kappungssignal. `<k>` ist die Anzahl der GELISTETEN Eintraege: direkt
+`<heard>` ist dieselbe Zahl wie im `R<n>` des regulaeren HEY: seit MeshCom 5 (Welle 4) das
+symmetrische NCNT des Senders, `nbrNcntAir()` (`src/nbr_views.h`, Konzept 4.8): direkt gehoerte
+Nachbarn der letzten 60 min, die mich gehoert haben oder per SNR-Symmetrie gelten, ohne die per
+`HN`-Bericht widersprochenen, gekappt auf `NBR_NCNT_AIR_MAX` (99). Firmware vor Welle 4 sendet hier
+die einseitige MHeard-Zahl der letzten Stunde (`getMheardCount()`), die meist groesser ist. Sie ist
+NICHT die Zahl der Listeneintraege und kein Kappungssignal. `<k>` ist die Anzahl der GELISTETEN Eintraege: direkt
 gehoerte Stationen der letzten 60 min mit SNR >= `LORA_SNR_STABLE_MIN_DB`
 (`src/configuration_default.h`, an SF11/BW250/CR4/6 gebunden, aktuell -16 dB), absteigend nach SNR
 sortiert, hoechstens 8. Das `+` ist das EINZIGE Kappungssignal: es steht genau dann, wenn mehr als 8
 Stationen die Bedingung erfuellt haben. Ohne `+` ist die Liste vollstaendig: eine Station, die darin
 fehlt, ist der Beleg, dass der Sender sie nicht mit >= -16 dB hoert. `<heard>` - `<k>` darf nicht als
-"ungelistete Stationen" gelesen werden (MHeard zaehlt auch schwache und nicht mehr frische Stationen).
+"ungelistete Stationen" gelesen werden (NCNT zaehlt auch schwache Stationen unter -16 dB).
 
 Beispiel, vollstaendig (kein `+`, obwohl `<heard>` groesser ist):
 
@@ -291,6 +316,7 @@ Median-Laenge), und `VETO`-Zaehler je `(<x>, <m>)`.
 [NBR]|RPT|315|DL2JA-2|DK5EN-98|-9|self
 [NBR]|RPT|315|DL2JA-2|OE9ZZZ-9|-14|norow
 [NBR]|RPTSUM|315|DL2JA-2|3|3|1|1
+[NBR]|CHECK|316|9|31|0|0|0|0
 [NBR]|SYM|316|2B3C4D5E|VETO|DK5EN-95|DK5EN-93|-11
 [NBR]|DROP|317|RPT|OE1XXX-1
 ```

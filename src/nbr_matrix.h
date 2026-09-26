@@ -817,7 +817,7 @@ void nbrCheck(const NbrMatrix &m, NbrCheck *out);
 
 // Fuehrt nbrCheck() aus und loggt [NBR]|CHECK|<up>|<rows>|<edges>|<extra>|
 // <missing>|<bad>|<dup> (nur mit nbrLog). Aus dem Loop-Task, einmal je Minute
-// bei --nbrdebug, und von --nbrcheck.
+// bei --nbrdebug. --nbrcheck ruft nbrCheck() direkt und gibt Klartext aus.
 void nbrLogCheck(const NbrMatrix &m, uint16_t now_min);
 
 // Eine gemeinsame Instanz fuers Geraet: geschrieben aus OnRxDone

@@ -318,6 +318,13 @@ try to fix this with more atomics.
 
 ### F2-21 — nRF52: `OnRxDone` has two execution contexts, and they share the RX double buffer — **High**, new
 
+> **Status 2026-09-26 (narrowed).** Every nRF52 variant sets `RX_TIMEOUT_VALUE 0` (continuous
+> RX, `variants/*/configuration.h`), so `Radio.Rx()` never arms the RX-timeout timer and
+> `RadioOnRxTimeoutIrq` never runs. The measured live path is DIO1 ISR -> semaphore -> the `LORA`
+> task (16 KB stack; object-code measurement 2026-09-02, RX print chain ~2.1 kB). What remains of
+> the finding is the TX-timeout timer, which fires only when a transmission hangs. Treat
+> `OnRxDone` as `LORA`-task code with a 16 KB budget; the analysis below is kept as the record.
+
 `radio.cpp:1283-1312` (`RadioOnTxTimeoutIrq`, `RadioOnRxTimeoutIrq` → `RadioBgIrqProcess()`),
 registered as `SoftwareTimer` callbacks at `:598-599`; `SoftwareTimer::begin` → `xTimerCreate`
 (`cores/nRF5/utility/SoftwareTimer.cpp:39`); `lora_functions.cpp:310-323`, `:392`, `:1298`.
@@ -895,3 +902,114 @@ against `1ba101f4`, before the rebase onto `upstream/dev`; `git diff --stat 1ba1
    "ESP32-S3 + SX1262 ×2". Essentially every race in this document is nRF52-only. **The bench as
    configured cannot observe this class of defect at all**; it validates the MCU family with the
    least concurrency exposure. This should be stated explicitly there.
+
+---
+
+## 9. The neighbour matrix (`nbr_matrix.h` / `nbr_matrix.cpp`)
+
+Added since the `3fb2c917` baseline above, as part of the MeshCom 5 topology work (concept in
+`docs/meshcom5-topologie/`, campaign log in `docs/meshcom5-campaign.md`; stages 1–3 are in the
+tree). It replaces the old MHeard tables (`mheard_functions.*`, no longer in `src/`) as the single
+source for MHeard, path/2-hop and neighbour-matrix data, and is a separate concurrency domain with
+its own primitive — a scheduler clamp, not an atomic or a queue. Nothing below changes any verdict
+in §1–§8; it documents an independent subsystem added afterwards.
+
+### 9.1 The clamp: `NBR_LOCK()` / `NBR_UNLOCK()`
+
+`src/nbr_matrix.cpp:40-51`:
+
+```c
+#if (defined(NRF52_SERIES) || defined(ARDUINO_ARCH_NRF52)) && !defined(NATIVE_BUILD)
+#define NBR_LOCK()   vTaskSuspendAll()
+#define NBR_UNLOCK() ((void)xTaskResumeAll())
+#else
+#define NBR_LOCK()   ((void)0)
+#define NBR_UNLOCK() ((void)0)
+#endif
+```
+
+- **nRF52**: `vTaskSuspendAll()`/`xTaskResumeAll()` suspends the **scheduler**, not interrupts —
+  SysTick keeps ticking and the DIO1 ISR can still fire (it only gives `_lora_sem`, §1.2), but no
+  task switch can happen while it is held, and it is nestable (`:30-33`). This is deliberately a
+  different, weaker primitive than the `taskENTER_CRITICAL()` this document flags throughout
+  §3–§6 (rule C-4): it neither masks interrupts nor raises BASEPRI, so holding it cannot itself
+  cause the SoftDevice-timing hazard of F2-1/F2-3. The design comment (`:27-30`) gives the reason
+  in exactly the terms this document's own §1.2 correction established: **"the `LORA` task and the
+  loop task have the same priority and swap on every wake of a higher-priority task"** — not only
+  at a yield. That is §1.2's correction and F2-21's finding restated: the FreeRTOS timer-service
+  task (priority 2) can preempt whichever of `LORA`/loop is running mid-update. Because
+  `vTaskSuspendAll()` blocks _all_ task switches while held, it defends against both the
+  equal-priority swap and the priority-2 preemption in one primitive — a stronger property than
+  the per-field atomics, or the single mutex this document proposes for F2-4.
+- **ESP32 and the host build**: both macros are a no-op (`:48-51`), for the same reason §2 makes
+  every other ESP32 LoRa-path object single-context: `OnRxDone`, the web server and the net
+  console all run in `loopTask` (§1.1, §2). `NATIVE_BUILD` is excluded from the nRF52 branch at
+  `:40`, so the host test build takes the same no-op branch as ESP32 by default; a build can force
+  `NBR_DEFER_LOG=1` to additionally exercise the nRF52 log-buffering path on the host (`:58-59`),
+  which is how `test/test_nbr_views` covers it.
+- **Caveat inherited from F2-20**: if the neighbour matrix is ever built for T5-ePaper or
+  T-Deck-Pro, the "ESP32 is single-context" premise behind the no-op clamp is void there for the
+  same reason it is void for every other object in §5 — `OnRxDone` runs on an unpinned task at
+  priority 20–24 on those two boards.
+
+**Rule under the clamp** (`:38-39`, restated at the contract comment `nbr_matrix.h:823-829`): no
+`nbrLog`/`printf` (`Serial` can block on nRF52), no floating-point `printf` (newlib `dtoa`
+allocates), and no nested call into another public `nbr_matrix.h` function. Every public function
+is a thin shell — take the clamp, call one internal `static` function, release the clamp, **then**
+log (`nbr_matrix.cpp:7-13`, the file's own explicit contract) — which is why none of C-4's grep
+patterns (`String`, `malloc`, `Serial`, `delay`) needs to run against this file the way it does
+against the LoRa path.
+
+**Granularity**: the clamp is held per call, and for the two functions that walk the whole matrix,
+per row — never for a whole sweep or a whole consistency check. `nbrCheck()`
+(`nbr_matrix.cpp:2930-2974`, reached via `nbrLogCheck()` and directly via `--nbrcheck`) takes and
+releases `NBR_LOCK()` once per row inside its `for (y…)` loop (`:2937`, `:2972`); the header
+comment (`nbr_matrix.h:799-806`) states the reason explicitly — at `NBR_MAX_ROWS`=128 and 512
+edges the whole-matrix comparison is ~130,000 operations, so a single clamp over all of it would
+itself create the kind of window this document warns against elsewhere. `nbrLogSnapshot()` takes
+one clamp for its header line (`nbr_matrix.cpp:3002-3008`) and then one clamp per row
+(`:3015-3024`, comment: "je Zeile eine eigene kurze Klammer").
+
+**Deferred SYM log (nRF52 only, `NBR_DEFER_LOG`, `nbr_matrix.cpp:45-47`)**: `OnRxDone`'s
+relay-decision tracing (`SYM` lines) cannot log while the clamp is held, so `nbrISymAdd()`
+(`:1595-1614`) records each line as a 4-byte struct into a 96-entry static buffer (`:1565-1569`)
+instead; `nbrISymFlush()` (`:1620-1656`) formats and emits them after `NBR_UNLOCK()`, re-taking the
+clamp only briefly per line to re-read the callsigns (`:1633-1641`) and falling back to `"?<idx>"`
+if the row layout changed underneath it — tracked by a generation counter bumped on every row
+change (`s_nbr_gen`, `:99-109`). A full or contended buffer drops the line and reports the count as
+`[NBR]|DROP|<up>|SYMBUF|<n>` (`:1506`, `:1651`). On ESP32 and the host, where the clamp is a no-op,
+every line goes out immediately and this whole buffer is compiled out (`NBR_DEFER_LOG` defaults to
+0 outside the nRF52 branch, `:60-62`).
+
+### 9.2 Writers
+
+| Context                                                                                                                                                                                                                                                             | Function(s)                                                                                                          | Call site                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `OnRxDone` — ESP32: `loopTask`; nRF52: the `LORA` task (16 KB). F2-21's timer-service path needs an armed RX-timeout timer, and every nRF52 variant sets `RX_TIMEOUT_VALUE 0` (e.g. `variants/wiscore_rak4631/configuration.h:47`); see the status note under F2-21 | `nbrInit` (lazy init), `nbrNotePos`, `nbrNoteFrame`, `nbrNoteDirect`, `nbrNoteNcnt`, `nbrNoteReport`, `nbrRelayNeed` | `src/lora_functions.cpp:640` (`OnRxDone`); calls at `:895,898,906,916,920,1133,1140,1153,1184,1208,1220,1222,1905`       |
+| Own-TX beacon paths (position / HEY), loop task on both MCUs                                                                                                                                                                                                        | `nbrNoteOwnTx`                                                                                                       | `src/loop_functions.cpp:5031,5110,5237`                                                                                  |
+| Minute sweep, loop task (`esp32loop()` / `nrf52loop()`)                                                                                                                                                                                                             | `nbrSweep`, `nbrLogCheck` (only under `--nbrdebug`)                                                                  | `src/esp32/esp32_main.cpp:3559,3564`; `src/nrf52/nrf52_main.cpp:2081,2086`                                               |
+| `--nbrcheck` command, loop task                                                                                                                                                                                                                                     | `nbrCheck`                                                                                                           | `src/command_functions.cpp:5260`                                                                                         |
+| `--nbrreset` command, loop task                                                                                                                                                                                                                                     | `nbrReset`                                                                                                           | `src/command_functions.cpp:5272`                                                                                         |
+| Boot, before the first `OnRxDone` — T-Deck / T-Deck-Plus / T-Deck-Pro only                                                                                                                                                                                          | `nbrInit`, `nbrLoad`, `nbrSetClock` (from `/topo.dat`)                                                               | `src/topo_ui.cpp:239,241,248` (`topoUiBoot`), called from `src/esp32/esp32_main.cpp:991`, `src/nrf52/nrf52_main.cpp:530` |
+
+### 9.3 Readers
+
+| Reader                                                                     | What it reads                                                                                                                                               | Call site                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Query layer, thin wrapper over the same clamp, Arduino-free                | `nbrMhRows`/`nbrMhGet` (MHeard), `nbrRouteCount`/`nbrRouteGet` (2-hop / path)                                                                               | `src/nbr_views.cpp` (host-tested: `test/test_nbr_views`, env `native_nbr_views*`)                                                                                                                                             |
+| Web GUI, loop task (synchronous `WiFiServer`, §1.1)                        | `sub_page_mheard()`, `sub_page_path()`, `sub_page_neighbours()`                                                                                             | `src/web_functions/web_functions.cpp:1472,1609,1731`                                                                                                                                                                          |
+| Serial / BLE / net-console commands, loop task                             | `--mheard`/`--mh`, `--path`/`--hey`, `--neighbours`/`--nbr`, `--nbrcheck`                                                                                   | `src/command_functions.cpp:5020,5119,5172,5257`                                                                                                                                                                               |
+| Phone MH frames (BLE JSON), loop task                                      | `nbrMhRows`, `nbrMhGet`                                                                                                                                     | `src/mh_phone.cpp:213,262,273,303`                                                                                                                                                                                            |
+| T-Deck / T-Deck-Plus / T-Deck-Pro live tables, loop task, throttled to 1/s | `tdeck_refresh_mh_view()`, `tdeck_refresh_path_view()`, `TDeck_pro_mheard_disp()` via `topoUiChanged()`                                                     | `src/topo_ui.cpp:114-156`, called from `OnRxDone` at `src/lora_functions.cpp:922,1228`; the same call drives `/topo.dat` save every 10 min (`TOPO_SAVE_INTERVAL_MIN`, `src/topo_ui.cpp:48,63-110`) and the load at boot above |
+| TX-ring relay/CSMA decisions, loop-driven ring machinery                   | consumes `NbrMask` values (`ringNeed[]`/`ringAlone[]`) already computed by `nbrRelayNeed()` under `OnRxDone`; these sites do not themselves take `NBR_LOCK` | `src/txring_functions.cpp:299,323,724-725`                                                                                                                                                                                    |
+
+### 9.4 Verification
+
+- Host: `test/test_nbr_matrix` (env `native_nbr_matrix`), including
+  `test_nbr_check_counts_each_inconsistency_class`
+  (`test/test_nbr_matrix/test_nbr_matrix.cpp:2308`), which drives each of `nbrCheck()`'s four
+  inconsistency counters independently.
+- Hardware: RAK4631 stress, `docs/meshcom5-campaign.md` §"RAK4631 test (2026-09-26)" — loop-task
+  readers (`--neighbours`, `--mheard`, `--path`, `--nbrcheck`) fired every 4 s against the `LORA`
+  task writing received frames. Two runs: 0 violations (`nbrCheck()`'s four counters and no reset)
+  across 40 received frames / 126 edge updates and 113 consistency checks combined.

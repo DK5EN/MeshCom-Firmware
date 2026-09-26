@@ -167,6 +167,27 @@ class EvictRec:
 
 
 @dataclass
+class CheckRec:
+    """Eine Konsistenzpruefung Masken gegen Kantenpool (MeshCom 5,
+    ``[NBR]|CHECK|<up>|<rows>|<edges>|<extra>|<missing>|<bad>|<dup>``,
+    ``docs/nbr-logformat.md``). Jeder Fehlerzaehler ungleich 0 ist ein Fehler."""
+
+    host: datetime
+    up: int
+    rows: int
+    edges: int
+    extra: int
+    missing: int
+    bad: int
+    dup: int
+    session: int
+
+    @property
+    def violations(self) -> int:
+        return self.extra + self.missing + self.bad + self.dup
+
+
+@dataclass
 class EvictERec:
     """Eine einzelne verdraengte KANTE, nicht eine ganze Zeile (W2c, Kantenpool
     ``docs/meshcom5-campaign.md`` Welle 2, ``[NBR]|EVICT-E|<up>|<from>|<to>``).
@@ -331,6 +352,13 @@ class NbrState:
     #: W2c: einzelne Kanten-Verdraengungen ([NBR]|EVICT-E), getrennt von den
     #: ganzen Zeilen-Verdraengungen oben.
     evicts_e: list[EvictERec] = field(default_factory=list)
+    #: MeshCom 5 Welle 3: Horizont- und Direkt-Slot-Verdraengungen
+    #: ([NBR]|EVICT-H, [NBR]|EVICT-X) und ausgelaufene Echo-Eintraege
+    #: ([NBR]|ECHO), nur gezaehlt.
+    evict_kinds: Counter = field(default_factory=Counter)
+    echoes: int = 0
+    #: [NBR]|CHECK, Konsistenzpruefung Masken <-> Kantenpool.
+    checks: list[CheckRec] = field(default_factory=list)
     pos: list[PosRec] = field(default_factory=list)
     snaps: list[SnapBlock] = field(default_factory=list)
     open_snap: SnapBlock | None = None
@@ -439,6 +467,25 @@ def _h_evict_e(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     state.evicts_e.append(EvictERec(host, up, frm, to, state.session))
 
 
+def _h_evict_kind(kind: str):
+    def h(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+        (_old, _new) = f
+        state.evict_kinds[kind] += 1
+
+    return h
+
+
+def _h_echo(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    (msg_id, first, second) = f
+    int(msg_id, 16), int(first, 16), int(second, 16)
+    state.echoes += 1
+
+
+def _h_check(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    (rows, edges, extra, missing, bad, dup) = (int(v) for v in f)
+    state.checks.append(CheckRec(host, up, rows, edges, extra, missing, bad, dup, state.session))
+
+
 def _h_pos(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     (call, lat, lon, mesh, hw) = f
     state.pos.append(
@@ -498,6 +545,10 @@ HANDLERS = {
     "DROP": _h_drop,
     "EVICT": _h_evict,
     "EVICT-E": _h_evict_e,
+    "EVICT-H": _h_evict_kind("EVICT-H"),
+    "EVICT-X": _h_evict_kind("EVICT-X"),
+    "ECHO": _h_echo,
+    "CHECK": _h_check,
     "POS": _h_pos,
     "SNAP": _h_snap,
     "ROW": _h_row,
@@ -991,6 +1042,17 @@ def a6_tabellendruck(state: NbrState) -> dict[str, Any]:
         # eine einzelne Kante, keine ganze Zeile, und darf die Zeilen-Statistik
         # oben nicht verfaelschen.
         "evict_e_gesamt": len(state.evicts_e),
+        "evict_h_gesamt": state.evict_kinds["EVICT-H"],
+        "evict_x_gesamt": state.evict_kinds["EVICT-X"],
+        "echo_gesamt": state.echoes,
+        # MeshCom 5: Konsistenz Masken <-> Kantenpool. Jede Zeile mit einem
+        # Fehlerzaehler ungleich 0 ist ein Befund, keine Momentaufnahme.
+        "check_gesamt": len(state.checks),
+        "check_verstoesse": [
+            {"host": fmt_dt(c.host), "up": c.up, "extra": c.extra, "missing": c.missing, "bad": c.bad, "dup": c.dup}
+            for c in state.checks
+            if c.violations
+        ],
     }
 
 
@@ -1348,6 +1410,13 @@ def render_bluf(res: dict[str, Any]) -> list[str]:
         lines.append(f"- {druck['evict_gesamt']} EVICT-Ereignisse insgesamt -- Tabellendruck ist real.")
     if druck["evict_e_gesamt"]:
         lines.append(f"- {druck['evict_e_gesamt']} EVICT-E-Ereignis(se) (einzelne Kante verdraengt).")
+    if druck["check_verstoesse"]:
+        lines.append(
+            f"- **KONSISTENZFEHLER: {len(druck['check_verstoesse'])} von {druck['check_gesamt']} "
+            "CHECK-Zeilen melden Masken/Kantenpool-Verstoesse** (Abschnitt 6)."
+        )
+    elif druck["check_gesamt"]:
+        lines.append(f"- {druck['check_gesamt']} CHECK-Zeilen, 0 Konsistenzverstoesse.")
     if res["8_verworfene_frames"]["full_alarm"]:
         lines.append(
             f"- **{res['8_verworfene_frames']['full_anzahl']} DROP|FULL** -- Alarmsignal, "
@@ -1592,6 +1661,13 @@ def render_md(res: dict[str, Any]) -> str:
     out.append(f"- rows max: {dr['rows_max']}, rows median: {dr['rows_median']}")
     out.append(f"- EVICT gesamt: {dr['evict_gesamt']}")
     out.append(f"- EVICT-E (einzelne Kante) gesamt: {dr['evict_e_gesamt']}")
+    out.append(f"- EVICT-H (Horizont) gesamt: {dr['evict_h_gesamt']}, EVICT-X (Direkt-Slot) gesamt: {dr['evict_x_gesamt']}")
+    out.append(f"- ECHO (eigene Rahmen aus der Echo-Tabelle) gesamt: {dr['echo_gesamt']}")
+    out.append(f"- CHECK gesamt: {dr['check_gesamt']}, davon mit Verstoss: {len(dr['check_verstoesse'])}")
+    for v in dr["check_verstoesse"][:10]:
+        out.append(
+            f"  - {v['host']} up={v['up']}: extra={v['extra']} missing={v['missing']} bad={v['bad']} dup={v['dup']}"
+        )
     if dr["ueberlauf_erkannt"]:
         out.append(f"- **Tabellenueberlauf in {len(dr['ueberlauf_snapshots'])} Snapshot(s)** -- Urteil aus Abschnitt 4 dort nicht haltbar.")
     out.append("")
@@ -2145,6 +2221,20 @@ def run_self_test() -> int:
     # EVICT-E darf die Zeilen-EVICT-Zaehlung nicht mitzaehlen -- diese Fixture
     # hat keine einzige [NBR]|EVICT-Zeile (nur EVICT-E).
     _check("w2c evict_gesamt (Zeilen, unveraendert 0)", res_w2c["6_tabellendruck"]["evict_gesamt"], 0, failures)
+
+    # -- 5c) MeshCom 5 Welle 3/5: EVICT-H, EVICT-X, ECHO, CHECK werden geparst,
+    #    nicht als unknown_subtype verworfen; CHECK-Verstoesse landen in
+    #    Abschnitt 6 und im BLUF.
+    state_w5 = parse_files([TESTDATA_DIR / "nbr_sample_w5.log"])
+    res_w5 = analyze(state_w5)
+    _check("w5 verworfen_gruende", res_w5["1_rahmen"]["verworfen_gruende"], {"no_timestamp": 4, "malformed:CHECK": 1}, failures)
+    dr_w5 = res_w5["6_tabellendruck"]
+    _check("w5 evict_h_gesamt", dr_w5["evict_h_gesamt"], 1, failures)
+    _check("w5 evict_x_gesamt", dr_w5["evict_x_gesamt"], 2, failures)
+    _check("w5 echo_gesamt", dr_w5["echo_gesamt"], 1, failures)
+    _check("w5 check_gesamt", dr_w5["check_gesamt"], 3, failures)
+    _check("w5 check_verstoesse", [(v["up"], v["missing"]) for v in dr_w5["check_verstoesse"]], [(502, 1)], failures)
+    _check("w5 bluf nennt KONSISTENZFEHLER", any("KONSISTENZFEHLER" in l for l in render_bluf(res_w5)), True, failures)
 
     # -- 6) --fetch --dry-run darf das Netz nie anfassen --
     import unittest.mock as mock

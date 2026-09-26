@@ -268,25 +268,25 @@ fixed order (§1.8.3) into a single tail string. "Branch" is which half of
 the plain-sensor `else` branch (`:4336-4419`), or code outside both (`/R=`,
 `/Y=`, `/D=` — computed unconditionally on their own gates).
 
-| Key   | printf format                                                             | Unit / meaning                                                                | Emit condition                               | Branch       | Origin                                     |
-| ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------ |
-| `/A=` | `%06i` feet (`%05i` metres only if `bFuss=false`, no call site uses that) | altitude, `conv_fuss(alt)` when `bFuss` (always true today)                   | `alt > 0`                                    | both         | upstream (`mcp23017-digital-field.md` §3)  |
-| `/B=` | `%03d`                                                                    | battery percent, sent at 0 % too (empty ≠ "flat", it means "no battery")      | `battHardwarePresent()`                      | both         | upstream                                   |
-| `/P=` | `%.1f`                                                                    | station pressure (QFE), hPa                                                   | `press > 0`                                  | sensor only  | upstream                                   |
-| `/H=` | `%.1f`                                                                    | humidity, %                                                                   | `hum > 0`                                    | sensor only  | upstream                                   |
-| `/T=` | `%.1f`                                                                    | temperature, °C                                                               | `temp != 0`                                  | sensor only  | upstream                                   |
-| `/O=` | `%.1f`                                                                    | second/OneWire temperature, °C                                                | `temp2 != 0`                                 | sensor only  | upstream                                   |
-| `/F=` | `%i`                                                                      | **pressure altitude in metres — not a pressure** (`extern_tele_json.h:12-17`) | `qfe > 0`                                    | sensor only  | upstream                                   |
-| `/Q=` | `%.1f`                                                                    | QNH, hPa                                                                      | `qnh > 0 && !bMCU811ON && !bBME680ON`        | sensor only  | upstream                                   |
-| `/G=` | `%.1f`                                                                    | BME680 gas resistance                                                         | `gasres > 0 && bBME680ON`; also sets `/V=3`  | sensor only  | upstream                                   |
-| `/C=` | `%.0f`                                                                    | CO2, ppm                                                                      | `co2 > 0 && bMCU811ON`; also sets `/V=2`     | sensor only  | upstream                                   |
-| `/V=` | literal `2`, `3` or `5`                                                   | sensor-block version: `2`=MCU811/CO2, `3`=BME680/gas, `5`=INA226              | set by whichever of `/G=`/`/C=`/INA226 fired | both         | upstream (meaning undocumented elsewhere)  |
-| `/N`  | `"/N%i"` — **no `=`**                                                     | MHeard count, capped at 99                                                    | `getMheardCount() > 0`                       | sensor only  | upstream                                   |
-| `/R=` | `%i;` repeated, up to 6                                                   | configured group-call list                                                    | at least one non-zero `node_gcb[]` entry     | outside both | upstream                                   |
-| `/Y=` | literal `1`                                                               | telemetry-beacon flag                                                         | `bSsendTele`                                 | outside both | upstream                                   |
-| `/D=` | `%s`, 8 chars of `0`/`1`                                                  | MCP23017 port A input bits, GPA0 first                                        | `bMCP23017` (chip answered at boot)          | outside both | **fork-only**, commit `b179fdff`, item 207 |
-| `/U=` | `%.2f`                                                                    | INA226 bus voltage, V                                                         | inside the INA226 branch                     | INA226 only  | upstream                                   |
-| `/I=` | `%.1f`                                                                    | INA226 current, A                                                             | inside the INA226 branch                     | INA226 only  | upstream                                   |
+| Key   | printf format                                                             | Unit / meaning                                                                                                                                                               | Emit condition                                                       | Branch       | Origin                                           |
+| ----- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------ | ------------------------------------------------ |
+| `/A=` | `%06i` feet (`%05i` metres only if `bFuss=false`, no call site uses that) | altitude, `conv_fuss(alt)` when `bFuss` (always true today)                                                                                                                  | `alt > 0`                                                            | both         | upstream (`mcp23017-digital-field.md` §3)        |
+| `/B=` | `%03d`                                                                    | battery percent, sent at 0 % too (empty ≠ "flat", it means "no battery")                                                                                                     | `battHardwarePresent()`                                              | both         | upstream                                         |
+| `/P=` | `%.1f`                                                                    | station pressure (QFE), hPa                                                                                                                                                  | `press > 0`                                                          | sensor only  | upstream                                         |
+| `/H=` | `%.1f`                                                                    | humidity, %                                                                                                                                                                  | `hum > 0`                                                            | sensor only  | upstream                                         |
+| `/T=` | `%.1f`                                                                    | temperature, °C                                                                                                                                                              | `temp != 0`                                                          | sensor only  | upstream                                         |
+| `/O=` | `%.1f`                                                                    | second/OneWire temperature, °C                                                                                                                                               | `temp2 != 0`                                                         | sensor only  | upstream                                         |
+| `/F=` | `%i`                                                                      | **pressure altitude in metres — not a pressure** (`extern_tele_json.h:12-17`)                                                                                                | `qfe > 0`                                                            | sensor only  | upstream                                         |
+| `/Q=` | `%.1f`                                                                    | QNH, hPa                                                                                                                                                                     | `qnh > 0 && !bMCU811ON && !bBME680ON`                                | sensor only  | upstream                                         |
+| `/G=` | `%.1f`                                                                    | BME680 gas resistance                                                                                                                                                        | `gasres > 0 && bBME680ON`; also sets `/V=3`                          | sensor only  | upstream                                         |
+| `/C=` | `%.0f`                                                                    | CO2, ppm                                                                                                                                                                     | `co2 > 0 && bMCU811ON`; also sets `/V=2`                             | sensor only  | upstream                                         |
+| `/V=` | literal `2`, `3` or `5`                                                   | sensor-block version: `2`=MCU811/CO2, `3`=BME680/gas, `5`=INA226                                                                                                             | set by whichever of `/G=`/`/C=`/INA226 fired                         | both         | upstream (meaning undocumented elsewhere)        |
+| `/N`  | `"/N%i"` — **no `=`**                                                     | on-air neighbour count NCNT (concept 4.8 of `docs/meshcom5-topologie/`: neighbours heard within 60 min that are HM or SYM and not vetoed), capped at `NBR_NCNT_AIR_MAX` = 99 | `nbrNcntAir(nbrMatrix, now_min) > 0` (`src/loop_functions.cpp:4652`) | sensor only  | upstream key, fork-redefined content (MeshCom 5) |
+| `/R=` | `%i;` repeated, up to 6                                                   | configured group-call list                                                                                                                                                   | at least one non-zero `node_gcb[]` entry                             | outside both | upstream                                         |
+| `/Y=` | literal `1`                                                               | telemetry-beacon flag                                                                                                                                                        | `bSsendTele`                                                         | outside both | upstream                                         |
+| `/D=` | `%s`, 8 chars of `0`/`1`                                                  | MCP23017 port A input bits, GPA0 first                                                                                                                                       | `bMCP23017` (chip answered at boot)                                  | outside both | **fork-only**, commit `b179fdff`, item 207       |
+| `/U=` | `%.2f`                                                                    | INA226 bus voltage, V                                                                                                                                                        | inside the INA226 branch                                             | INA226 only  | upstream                                         |
+| `/I=` | `%.1f`                                                                    | INA226 current, A                                                                                                                                                            | inside the INA226 branch                                             | INA226 only  | upstream                                         |
 
 Origin follows the letter table in `docs/mcp23017-digital-field.md` §3
 ("letters in use in the beacon sensor tail at the time of the decision"),
@@ -637,58 +637,83 @@ hello (the node uses it to set its clock when it has no better source).
 ### 4.2 Post-hello config burst
 
 On hello the main loop runs a fixed command list with BLE output enabled
-(`config_cmds[]`, `src/nrf52/nrf52_main.cpp:268` /
-`src/esp32/esp32_main.cpp:297`):
+(`config_cmds[]`, `src/nrf52/nrf52_main.cpp:296` /
+`src/esp32/esp32_main.cpp:306`):
 
 ```
 --info --seset --wifiset --nodeset --wx --pos --aprsset --io --tel [--analogset (ESP32 only)]
 ```
 
-plus `sendMheard()` (one `MH` JSON per MHeard entry from the last 12 h).
-Each command emits one or two `0x44` JSON notifications (§4.3). After a 3 s
-settle and once both notification rings have drained, the node sends
-`{"TYP":"CONFFIN"}` exactly once (`nrf52_main.cpp:1707–1748`,
-`sendConfigFinish()`, `src/command_functions.cpp:5513`). The burst happens
+plus the MH list burst (`mhPhoneListStart()`, `mhPhoneListPending()`,
+`mhPhoneListStep()`, `src/mh_phone.cpp:250–318`): one `MH` JSON (schema
+below) per MHeard entry from the last 12 h (`NBR_WINDOW_MIN` = 720 min,
+`src/nbr_matrix.h:106`), newest first, queued through the same command ring
+as the command replies once that ring is empty. Each command emits one or
+two `0x44` JSON notifications (§4.3). After a 3 s settle and once the
+command ring, the MH list and the data ring have all drained, the node
+sends `{"TYP":"CONFFIN"}` exactly once (`src/nrf52/nrf52_main.cpp:1859–1902`,
+`sendConfigFinish()`, `src/command_functions.cpp:6249`). The burst happens
 once per genuine hello — a mock phone that reconnects without a new hello
-gets no re-send, and a mock node must reproduce the burst-then-CONFFIN order
-(MCProxy's cache hydration depends on it,
+gets no re-send, and a mock node must reproduce the burst→MH-list→CONFFIN
+order (MCProxy's cache hydration depends on it,
 `MCProxy/src/mcapp/ble_hydration_tests.py`).
 
 `0x44` JSON schemas (producers in `src/command_functions.cpp`; all objects
 carry `"TYP"` as discriminator):
 
-| TYP       | source command | fields                                                                                                                                                     |
-| --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `I`       | `--info`       | FWVER, CALL, ID (gateway id), HWID, MAXV, BLE ("long"/"short"), BATP, BATV, GCB0…GCB5 (groups), CTRY, BOOST, BPIN                                          |
-| `SE`+`S1` | `--seset`      | SE: BME, BMP, BMP3, BMP3F, AHT, AHTF, BMXF, 680, 680F, 811, 811F, SS, LPS33, OW, OWPIN, OWF, USERPIN · S1: INA226, SHUNT, IMAX, SAMP, SHT, SHTF, 226, 226F |
-| `SW`+`S2` | `--wifiset`    | SW: SSID, IP, GW, AP, DNS, SUB · S2: OWNIP, OWNGW, OWNMS, OWNDNS, OWNNTP, EUDP, EUDPIP, TXPOW                                                              |
-| `SN`      | `--nodeset`    | GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM                                                 |
-| `W`       | `--wx`         | TEMP, TOFFI, TOUT, TOFFO, HUM, PRES, QNH, ALT, GAS, CO2, VBUS, VSHUNT, VAMP, VPOW                                                                          |
-| `G`       | `--pos`        | LAT, LON (signed decimal degrees), ALT, SAT, SFIX, HDOP, RATE, NEXT, DIST, DIRn, DIRo, DATE                                                                |
-| `SA`      | `--aprsset`    | ATXT, SYMID, SYMCD, NAME                                                                                                                                   |
-| `IO`      | `--io`         | MCP23017, AxOUT, AxVAL, BxOUT, BxVAL (bit strings)                                                                                                         |
-| `TM`      | `--tel`        | PARM, UNIT, FORMAT, EQNS, VALES, PTIME                                                                                                                     |
-| `AN`      | `--analogset`  | ESP32 only: APN, AFC, AK, AFL, ACK, ADC, ADCRAW, ADCE1, ADCE2, ADCSL, ADCOF, ADCAT                                                                         |
-| `MH`      | (MHeard)       | CALL, DATE, TIME, PLT (payload type byte), HW, MOD, RSSI, SNR, DIST, PL, MESH, NCNT                                                                        |
-| `CONFFIN` | `--conffin`    | no further fields                                                                                                                                          |
+| TYP       | source command                                    | fields                                                                                                                                                                                                         |
+| --------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `I`       | `--info`                                          | FWVER, CALL, ID (gateway id), HWID, MAXV, BLE ("long"/"short"), BATP, BATV, GCB0…GCB5 (groups), CTRY, BOOST, BPIN                                                                                              |
+| `SE`+`S1` | `--seset`                                         | SE: BME, BMP, BMP3, BMP3F, AHT, AHTF, BMXF, 680, 680F, 811, 811F, SS, LPS33, OW, OWPIN, OWF, USERPIN · S1: INA226, SHUNT, IMAX, SAMP, SHT, SHTF, 226, 226F                                                     |
+| `SW`+`S2` | `--wifiset`                                       | SW: SSID, IP, GW, AP, DNS, SUB · S2: OWNIP, OWNGW, OWNMS, OWNDNS, OWNNTP, EUDP, EUDPIP, TXPOW                                                                                                                  |
+| `SN`      | `--nodeset`                                       | GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM                                                                                                     |
+| `W`       | `--wx`                                            | TEMP, TOFFI, TOUT, TOFFO, HUM, PRES, QNH, ALT, GAS, CO2, VBUS, VSHUNT, VAMP, VPOW                                                                                                                              |
+| `G`       | `--pos`                                           | LAT, LON (signed decimal degrees), ALT, SAT, SFIX, HDOP, RATE, NEXT, DIST, DIRn, DIRo, DATE                                                                                                                    |
+| `SA`      | `--aprsset`                                       | ATXT, SYMID, SYMCD, NAME                                                                                                                                                                                       |
+| `IO`      | `--io`                                            | MCP23017, AxOUT, AxVAL, BxOUT, BxVAL (bit strings)                                                                                                                                                             |
+| `TM`      | `--tel`                                           | PARM, UNIT, FORMAT, EQNS, VALES, PTIME                                                                                                                                                                         |
+| `AN`      | `--analogset`                                     | ESP32 only: APN, AFC, AK, AFL, ACK, ADC, ADCRAW, ADCE1, ADCE2, ADCSL, ADCOF, ADCAT                                                                                                                             |
+| `MH`      | `mhJsonBuild()` (neighbour matrix, not a command) | 13 old fields, old order — CALL, DATE, TIME, PLT (payload type byte), HW, MOD, RSSI, SNR, DIST, PL, MESH, NCNT — then 7 new (concept 4.9, appended, dropped first on overflow): AGE, HM, ROLE, EX, NB, GW, VIA |
+| `CONFFIN` | `--conffin`                                       | no further fields                                                                                                                                                                                              |
 
-`MH` records are also pushed live as each frame updates the MHeard table
-(`updateMheard()`, `src/mheard_functions.cpp:331`).
+**The `MH` frame (concept 4.9 of `docs/meshcom5-topologie/`).** Built by
+`mhJsonBuild()` (`src/mh_phone.cpp:73–199`) from the neighbour-matrix MH view
+(`NbrMhView`, `src/nbr_views.h:27–50`), with `bleJsonFrameFailSoft()` and a
+`BLE_JSON_PAYLOAD_MAX` of 244 bytes (`src/configuration_global.h:562`) — on
+overflow the 7 new trailing fields drop first, never the 13 old ones. There
+is no MHeard ring buffer any more; `mheard_functions.cpp` is gone.
+`DIST` is rounded to 0.1 km (`mhRoundDist()`, `src/mh_phone.cpp:42–49`), `-1`
+when either the node's own position or the neighbour's is unknown. `DATE`/
+`TIME` are local time — the node epoch is `getUnixClock()` (raw UTC) plus
+`node_utcoff*3600` (`mhNodeEpoch()`, `:65–70`) — and no `MH` frame is built
+at all without a valid clock (year < 2025 rejected at the entry, `:90–94`).
 
-**The `PLT` contract (DR-29).** `PLT` is the raw wire payload-type byte,
-`(uint8_t)` cast, not a decoded string — `sendMheard()` emits
-`mhdoc["PLT"] = (uint8_t)mheardLine.mh_payload_type` (`src/mheard_functions.cpp:742`),
-so a position frame (`'!'`, 0x21) serializes as `PLT:33`, never `"POS"`.
-This is deliberate, not an oversight: JSON/BLE — the machine-readable feed —
-carries the raw byte, while the human-facing serial display carries decoded
-text via `getPayloadType()` (`"TXT"`/`"POS"`/`"HEY"`), used by `showMHeard()`
-at `src/mheard_functions.cpp:787` calling into the decoder at `:836`. The
-two renderers are intentionally inconsistent with each other and **must
-stay that way**: do not "fix" `sendMheard()` to emit `"POS"` instead of a
-number — MCProxy and the app both read `PLT` as numeric
-(`ble_protocol.py` `_coerce_mh_payload_type()` fails closed on a non-numeric
-value; the app's `AppInterfaces.ts` declares `PLT: number`), so changing the
-JSON shape would break every existing client silently.
+Records reach the phone two ways:
+
+- **Live**: `mhPhoneLive()` (`src/mh_phone.cpp:207–222`), called from
+  `OnRxDone` (`src/lora_functions.cpp:634`) at most once per neighbour and
+  minute, over the same BLE output the old live path used
+  (`addBLEOutBuffer()`).
+- **List on connect**: the post-hello burst (§4.2 above) — newest first, a
+  12 h window, one snapshot per hello.
+
+**The `PLT` contract (DR-29).** `PLT` is still the raw wire payload-type
+byte, `(uint8_t)` cast, not a decoded string — `mhJsonBuild()` emits
+`doc["PLT"] = (uint8_t)v.plt` (`src/mh_phone.cpp:162`), so a position frame
+(`'!'`, 0x21) serializes as `PLT:33`, never `"POS"`. This is unchanged from
+before the MeshCom 5 rework and still deliberate: JSON/BLE — the
+machine-readable feed — carries the raw byte, while the human-facing serial
+`[MH]` line (`src/command_functions.cpp:5106–5109`) and the web/T-Deck views
+(`src/web_functions/web_functions.cpp:1524`,
+`src/t-deck/lv_obj_functions.cpp:4636`,
+`src/t-deck-pro/ui_deckpro.cpp:1349`) carry decoded text via
+`nbrPayloadTypeName()` (`"TXT"`/`"POS"`/`"HEY"`/`"???"`,
+`src/nbr_views.cpp:434`). The two renderers are intentionally inconsistent
+with each other and **must stay that way**: do not "fix" `mhJsonBuild()` to
+emit `"POS"` instead of a number — MCProxy and the app both read `PLT` as
+numeric (`ble_protocol.py` `_coerce_mh_payload_type()` fails closed on a
+non-numeric value; the app's `AppInterfaces.ts` declares `PLT: number`), so
+changing the JSON shape would break every existing client silently.
 
 ### 4.3 Node → phone notifications
 

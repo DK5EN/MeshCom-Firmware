@@ -24,7 +24,7 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
 | 3    | 2 views   | W3a `nbr_views.*`, direct extension, horizon, echo table, ME step off the path check; W3b horizon/echo feed in `lora_functions.cpp` + replay shadow over 21.-24.09.                                                                                                      | done   |
 | 4    | 3 cutover | W4a removal + core readers; W4b web + command; W4c mains + loop + MH JSON (7 new fields, FailSoft); W4d T-Deck, T-Deck Pro, `topo.dat`                                                                                                                                   | done   |
 | 5    | 3 field   | Bench on the three USB nodes (T-Deck Plus DK5EN-14 reboot keeps topology, Heltec V3 DK5EN-1, T-Beam v1.2), then 24 h field run on DK5EN-98 and DK5EN-1. The RAK4631 DK5EN-90 nRF52 consistency test runs last, after everything else is finished (operator, 2026-09-25). | open   |
-| 6    | docs      | `nbr-logformat.md`, `docs/architecture/09/10/11`, changelog                                                                                                                                                                                                              | open   |
+| 6    | docs      | `nbr-logformat.md`, `docs/architecture/01/06/09/10/11`, `CHANGELOG-meshcom5.md`, `nbrlog.py` handlers                                                                                                                                                                    | done   |
 
 ## Baseline and fixtures
 
@@ -228,3 +228,24 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   and `isfinite()` in config_json.cpp have the same weakness on nRF52.
 - Info page (efcce970): all 26 settings-page switches plus the NBR switches, `info_switch_lint.py`
   in the golden selftest. Not yet seen live (field-run nodes untouched, RAK without Ethernet).
+
+### Wave 6 (docs)
+
+- `docs/nbr-logformat.md`: `CHECK`, `ECHO`, `EVICT-H`, `EVICT-X` lines and `--nbrcheck`; HN
+  `<heard>` is the symmetric NCNT (`nbrNcntAir()`), capped at 99.
+- `tools/nbrlog.py` parsed none of the four new lines (all counted as `unknown_subtype`). It now
+  counts them in section 6 and names CHECK violations in the BLUF; self-test fixture
+  `tools/testdata/nbr/nbr_sample_w5.log` (7 checks fail with the old handler table, pass now).
+  Checked against the 25 CHECK lines of the RAK stress log: 25 lines, 0 violations.
+- `docs/architecture/`: 01 (overview, packet-path structs), 06 (test envs), 09 (new section 9,
+  neighbour matrix clamp, writers, readers; F2-21 narrowed: `RX_TIMEOUT_VALUE 0` on every nRF52
+  variant, `OnRxDone` runs in the LORA task), 10 (per-family constants and RAM, section 2.4 now
+  the matrix, removed-code findings carry a status line), 11 (`/N` NCNT, MH frame fields, MH list
+  in the post-hello burst). `11-wire-format.html` is a hand-made snapshot and is now stale.
+- `docs/CHANGELOG-meshcom5.md`: user-facing changelog for this branch, with the sset4 upgrade note.
+- Open, found during the wave: finding F3-8 and other doc 10 findings that assume `String` fields
+  in `aprsMessage` need re-deriving (the struct is `char[]` since the neo core commit); the
+  ring-size table in doc 10 section 1.2 has stale anchors. The fork-neo path lists are not
+  updated: whether this branch goes to fork-neo at all is an open operator decision (neo carries
+  dry-unification only); if it does, it needs its own chapter in `tools/neo/paths/` and
+  `derive.sh`, and `src/mheard_record.h` leaves CORE.
