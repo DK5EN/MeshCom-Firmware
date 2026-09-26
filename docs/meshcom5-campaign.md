@@ -190,3 +190,18 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   101,260, RAK4631 81,408 -> 79,748.
 - Pre-existing, not changed: on ESP32 the display copy of a server position is taken before
   `checkVia()`, on nRF52 after it (only visible with a node via set).
+
+### Wave 5 (running)
+
+- T-Deck Plus DK5EN-14 bench (ccb3ec23, `--persistsd on`): after 11 min 2 MHeard rows and 9
+  path entries (horizon senders up to 5 hops); `--reboot`; 78 s after boot `--mheard` shows both
+  rows and `--path` 8 entries (one had aged out), so `/topo.dat` was saved and loaded. Free heap
+  at the monitor point 156,852 B (149,504 B with the wave 2 image).
+- DK5EN-1 (Heltec V3, USB) flashed with ccb3ec23 at 04:05; field capture since 2026-09-26 04:08
+  in `~/meshlog/dk5en-1/2026-09-26-meshcom5.log`. Heap baseline on the previous build: STAT
+  `heap=146484`.
+- Finding: with the sset4 migration gone (wave 0), DK5EN-1 came up with KISS/TCP on, TX on, no
+  auth (its old NBR bits 0x10/0x20). Fixed on the node with `--kiss tx off`, `--kiss off`,
+  `--nbrdebug on`, `--nbrrelay count`. DK5EN-98 needs the same commands right after its flash.
+- Open: DK5EN-98 (remote, OTA) waits for the operator; RAK4631 DK5EN-90 consistency test after
+  everything else (operator, 2026-09-25).
