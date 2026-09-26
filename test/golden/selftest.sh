@@ -32,6 +32,8 @@ python3 test/golden/carve_extern_lint.py --self-test
 python3 test/golden/carve_extern_lint.py
 python3 test/golden/command_ladder_lint.py --self-test
 python3 test/golden/command_ladder_lint.py
+python3 test/golden/help_parity_lint.py --self-test
+python3 test/golden/help_parity_lint.py
 # W3 bench 2026-09-16: the persist-only schema rows are never exported, so the
 # upgrade check that diffs GET /config.json cannot see them -- 12 of the 17 had
 # no read-back at all. --persiststat is that read-back; this gate keeps it from

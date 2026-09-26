@@ -955,209 +955,175 @@ void commandAction(char *umsg_text, bool ble)
         }
 //        else
         {
-            printfdeb("MeshCom %-4.4s%-1.1s commands\n--setcall  set callsign (OE0XXX-1)\n--operatorname set first name/none\n--setctry 0-99 set RX/RX-LoRa-Parameter\n--reboot   Node reboot\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
+            // Every line below sits under the same preprocessor guard as its
+            // handler in commandAction() -- copied verbatim, not re-derived --
+            // so --help never advertises a command this image does not build
+            // (INS-01/INS-04/DOC-02). tools/help_parity_lint.py checks that.
+            printfdeb("MeshCom %-4.4s%-1.1s commands   (a/b = pick one, <x> = value)\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
+            delay(100);
+
+            printdeb("\n== Show ==\n--info                  node info\n--pos                   lat/lon/alt/time\n--weather               temp/hum/press (alias --wx)\n--lora                  LoRa settings\n--mheard                heard stations, 12 h (alias --mh)\n--path                  routes per sender (alias --hey)\n--neighbours            neighbour matrix (alias --nbr)\n--msgid                 message-id counter\n--io                    IO config\n--showI2C               scan I2C bus\n--seset                 show sensor settings\n--wifiset               show WiFi settings\n--nodeset               show node settings\n--analogset             show analog settings\n--tel                   show telemetry settings\n--aprsset               show APRS settings\n--regex <call>          test callsign against the validator\n");
+            #ifndef DISABLE_NET_CONSOLE
+            printdeb("--netconsole            net console status\n");
+            #endif
+            #if defined(ESP32)
+            printdeb("--wifistat              WiFi link/counters\n--udpstat               MeshCom UDP RX/TX counters\n");
+            #endif
             #if defined(NRF52_SERIES)
-            printfdeb("--dfu      reboot into UF2 bootloader (node appears as USB drive)\n");
+            printdeb("--ethstat               Ethernet link/counters\n--dumpsettings          dump raw settings store\n");
             #endif
             delay(100);
 
-            printlndeb("--setssid  WLAN SSID/none\n--setpwd   WLAN PASSWORD/none\n--setownip 255.255.255.255\n--setowngw 255.255.255.255\n--setownms mask:255.255.255.255\n--setowndns 255.255.255.255\n--setownntp 255.255.255.255\n--wifiap on/off WLAN AP\n--extudp  on/off\n--extudpip 255.255.255.255/none\n");
-            delay(100);
-
-            printlndeb("--sethamnet on/off\n--setinet   on/off\n");
-            delay(100);
-
-            printlndeb("--btcode 999999 BT-Code\n--button gpio 99 User-Button PIN\n--analog gpio 99 Analog PIN\n--analog factor 9.9 Analog factor\n--analog check on/off\n");
-            delay(100);
-            printfdeb("--pos      show lat/lon/alt/time info\n--weather  show temp/hum/press\n--sendpos  send pos info now\n--setlat   set latitude 44.12345\n--setlon   set logitude 016.12345\n--setalt   set altidude 9999m, with GPS: seeds the altitude filter, GPS keeps refining\n");
-            delay(100);
-            printlndeb("--symid  set prim/sec Sym-Table\n--symcd  set table column\n--aprscomment  set APRS Comment/none\n--showI2C\n");
-            delay(100);
-            printlndeb("--debug    on/off\n--bledebug on/off\n--loradebug on/off\n--txcapture on/off\n--nbrdebug on/off\n--gpsdebug  on/off\n--softserdebug  on/off\n--wxdebug   on/off\n--display   on/off\n--setinfo   on/off\n--volt on/off   show battery voltage\n--proz on/off    show battery proz.\n");
-            delay(100);
-#if defined(WP_DISP)
-            printlndeb("--rotate 0/90/180/270  E-Ink Display drehen (persistent, board-uebergreifend)\n");
-            delay(100);
-#endif
-            printfdeb("--setgrc 9;..9;  set groups\n--nomsgall on/off  '*'-msg on display\n");
-            delay(100);
-            printlndeb("--maxv    100%% battery voltage\n--track   on/off SmartBeaconing\n--gps on/off use GPS-CHIP\n--utcoff +/-99.9 set UTC-Offset\n--settime yyyy.mm.dd hh:mm:ss\n");
-            delay(100);
-            printlndeb("--gps reset Factory reset\n--txpower 99 LoRa TX-power dBm\n--txfreq  999.999 LoRa TX-freqency MHz\n--txbw    999 LoRa TX-bandwith kHz\n--lora    Show LoRa setting\n");
-            delay(100);
-            printfdeb("--maxhop  %i-%i hop limit for text messages (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
-            delay(100);
-            printlndeb("--bmp on  use BMP280-CHIP\n--bme on  use BME280-CHIP\n--680 on  use BME680-CHIP\n--811 on  use CMCU811-CHIP\n--bmx BME/BMP/680 off\n");
-            delay(100);
-            printlndeb("--onewire on/off  use DSxxxx\n--onewire gpio 99\n");
-            delay(100);
-            // HL-03/HL-04: bis 2026-08-30 nur ueber die T-Deck-GUI erreichbar.
-            // DOC-02: these five commands are gated BOARD_T_DECK/BOARD_T_DECK_PLUS
-            // in commandAction() (own field block ahead of INSTRUMENT_ENABLED,
-            // so they exist in every T-Deck image) -- this line used to
-            // advertise them on every board unconditionally.
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--mute on/off  Ton stumm\n--persistflash on/off  Positionen ins Flash\n--persistsd on/off  Positionen auf SD\n--immediatesave on/off  sofort speichern\n--persiststat  alle nur-NVS-Werte lesen\n");
-            delay(100);
+            printdeb("\n== Node ==\n--setcall <call>        callsign (OE0XXX-1)\n--setname <name>/none   operator first name (alias --operatorname)\n--setctry 0-99          country -> LoRa preset\n--setgrc 9;..9;         groups\n--utcoff +/-99.9        UTC offset h\n--settime yyyy.mm.dd hh:mm:ss  set clock\n");
+            #if defined(ENABLE_RTC)
+            printdeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
             #endif
-            
-            #ifdef BOARD_RAK4630
-                printfdeb("--lps33 on/off (RAK only)\n");
-                delay(100);
+            printdeb("--btcode 999999         BLE pairing code\n--bleshort              BLE advertising short, reboots\n--blelong               BLE advertising long, reboots\n--all                   display: all frames\n--msg                   display: messages only\n--save                  write settings to flash\n--reboot                reboot\n--deepsleep             enter deep sleep\n--cleanflash            wipe settings flash (recovery)\n");
+            #if defined(NRF52_SERIES)
+            printdeb("--dfu                   reboot into UF2 bootloader\n");
             #endif
-
-            printfdeb("--info      show info\n--msgid     show message-id counter\n--mheard    show MHeard\n--neighbours show neighbour matrix (alias --nbr)\n--nbrreset  reset neighbour matrix\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
-            delay(100);
             #ifdef ESP32
-                printlndeb("--netconsole on/off  (net console port 2323)\n");
-                printfdeb("--passwd xxxx/none   (net console password, none=clear)\n");
-                delay(100);
-                #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
-                    printlndeb("--kiss on/off | tx on/off | meta on/off | auth on/off  (KISS/TCP port 8001)\n");
-                    delay(100);
-                #endif
+            printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
+            printdeb("--conffin               send config-finished to app\n");
             delay(100);
-            printlndeb("--softser   on/off/send/app/baud/fixpegel/fixpegel2/fixtemp");
-            delay(100);
-            printlndeb("--softserread   on/off (show rx msg)");
-            delay(100);
-            // INS-04-Muster: die Hilfe darf ein Kommando nicht bewerben, das
-            // in DIESEM Image gar nicht existiert. Genau das war der T-Deck-
-            // Mute-Fehlbericht -- "Sound on" stand im Menue, --mute war
-            // wegkompiliert. Der String-Scan nach R3-11 fand hier dasselbe:
-            // E22_XML (MC_DIAG=0) trug "specstart" noch genau einmal im Image,
-            // und das war diese Zeile.
-            #if MC_DIAG
-            printlndeb("--spectrum  run spectral scan  --specstart MHz --specend MHz  --specstep MHz  --specsamples 500-2048");
-            delay(100);
-            #endif
-            //own-call-ssid:PARM.VOLT,AMPERE,BATT,,,track,-,-,-,-,-,-,-
-            printlndeb("--parm tm1,tm2,tm3,tm4,tm5 (measured value name ... not used leave blank)");
-            delay(100);
-            //own-call-ssid:%-9.9s:UNIT.V,A,V,,,Y/N,O/N,O/N,O/N,O/N,O/N,O/N,O/N
-            printlndeb("--unit tm1,tm2,tm3,tm4,tm5 (unit like V,A,mV, ... not used leave blank)");
-            delay(100);
-            //#%03i,%.1f,%.1f,0,0,0,%01i0000000
-            printlndeb("--format 1,1,1,1,1 (decimal places ... not used leave 0)");
-            delay(100);
-            //own-call-ssid:EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0
-            printlndeb("--eqns 0,1,0, 0,1,0, 0,1,0, 0,1,0, 0,1,0 (default is set)");
-            delay(100);
-            //internal value names
-            printlndeb("--values press,hum,temp,onewire,co2 (see project pages)");
-            delay(100);
-            //value timer
-            printlndeb("--ptime 99 messuring interval minutes");
 
+            printdeb("\n== LoRa / mesh ==\n--txpower 99            TX power dBm\n--txfreq 999.999        TX frequency MHz\n--txbw 999              bandwidth kHz\n--txsf 6-12             spreading factor\n--txcr 5-8              coding rate 4/x\n");
+            // --maxhop: printfdeb needed here for the %i/%i substitution.
+            printfdeb("--maxhop %i-%i          text hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
+            printdeb("--mesh on/off           relay foreign frames\n");
+            #ifndef BOARD_RAK4630
+            #if defined(RELAY_SWITCH)
+            printdeb("--relay on/off          board relay output (GPIO)\n");
+            #endif
+            #endif
+            printdeb("--shortpath on/off      short path\n--via on/off/<call>     via callsign\n");
             #if defined(SX126X_V3) || defined(SX1262_E290) || defined(SX1262X) || defined(SX126X) || \
                 defined(SX1262_V3) || defined(USING_SX1262) || defined(BOARD_RAK4630)
-                delay(100);
-                printlndeb("--setboostedgain    on/off  enable/disable boosted rx gain");
+            printdeb("--setboostedgain on/off boosted RX gain\n");
             #endif
+            printdeb("--sendpos               send position now\n--sendtrack             send track/APRS beacon now\n--sendhey               send HEY beacon now\n--sendtele              send telemetry now\n--posshot               one-shot position now\n--postime 99            position interval s\n");
             delay(100);
-            // INS-01: these live inside the INSTRUMENT_ENABLED block in
-            // commandAction() and do not exist in a normal board build, so
-            // --help must not advertise them there.
-            #if INSTRUMENT_ENABLED
-            printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
-            delay(100);
-            printlndeb("--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)");
-            printlndeb("--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)");
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            delay(100);
-            printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
-            delay(100);
-            printlndeb("--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up");
-            #endif
-            #endif
 
-            // DOC-02: everything above predates this pass and is kept as it
-            // was. Below closes the parity gap against the real command set
-            // in commandAction() -- grouped by topic, not by when it was
-            // added.
+            printdeb("\n== Neighbour matrix ==\n--nbrreset              clear matrix\n--nbrcheck              consistency check\n--nbrrelay off/count/on relay decision: off / log only / active\n--nbrsym on/off         assume symmetric links\n--nbrreport off/auto/on HN neighbour report\n");
             delay(100);
-            printlndeb("--txsf 6-12  LoRa spreading factor\n--txcr 5-8  LoRa coding rate 4/x\n--cleanflash  wipe settings flash (recovery)\n");
+
+            printdeb("\n== APRS ==\n--symid <c>             symbol table\n--symcd <c>             symbol code\n--aprscomment <t>/none  comment (alias --atxt)\n--aprsmc <call>         APRS destination call (default APRSMC)\n--track on/off          SmartBeaconing\n");
+            #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
+            printdeb("--gps on/off            GPS chip\n");
+            #ifndef BOARD_T_DECK_PRO
+            printdeb("--gps reset             GPS factory reset\n");
+            #endif
+            printdeb("--gps autosymbol/fixsymbol  symbol source\n");
+            #endif
+            printdeb("--setlat 44.12345       latitude\n--setlon 016.12345      longitude\n--setalt 999            altitude m (with GPS: seeds the filter)\n--setublox <cmd>        u-blox GPS passthrough\n--setl76k <cmd>         L76K GPS passthrough\n");
             delay(100);
-            printlndeb("--sendhey  send HEY beacon now\n--sendtele  send telemetry now\n--sendtrack  send track/APRS beacon now\n");
-            delay(100);
-            printlndeb("--pingcall <call>  set ping target\n--pingtime 99  ping interval (s)\n--pingmax 99/max  ping count limit\n--ping start/stop  start/stop pinging\n");
-            delay(100);
+
+            printdeb("\n== Network ==\n");
+            #ifndef BOARD_RAK4630
+            printdeb("--setssid <ssid>/none   WLAN SSID\n--setpwd <pwd>/none     WLAN password\n--wifiap on/off         WLAN access point\n");
+            #endif
+            printdeb("--wifitxpower 2-20      WiFi TX power dBm\n--setownip a.b.c.d      static IP\n--setowngw a.b.c.d      gateway\n--setownms a.b.c.d      netmask\n--setowndns a.b.c.d     DNS server\n--setownntp a.b.c.d     NTP server\n");
+            #ifndef BOARD_RAK4630
             #if defined(HAS_ETHERNET)
-            printlndeb("--netmode wifi/eth  select network interface\n");
-            delay(100);
+            printdeb("--netmode wifi/eth      network interface\n");
             #endif
-            #if defined(RELAY_SWITCH)
-            printlndeb("--relay on/off  mesh relay\n");
-            delay(100);
             #endif
-            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n--ackinfo on/off  show who ACKed, not saved to flash\n");
-            delay(100);
-            printlndeb("--debug csv/man/en/de  debug output format/language\n");
-            delay(100);
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--keylock on/off  keyboard lock (SYM+K); on = touch and keyboard ignored\n");
-            delay(100);
+            printdeb("--gateway on/off/pos/nopos  MeshCom gateway\n--gateway srv OE/DL/IT  gateway server, reboots\n--setudpcall <call>     UDP callsign\n--sethamnet on/off      HAMNET server\n--setinet on/off        internet server\n--extudp on/off         external UDP\n--extudpip a.b.c.d/none external UDP peer\n--nopmother on/off      no foreign DMs to EXTUDP peer\n--webserver on/off      web server\n--webpwd <pwd>/none     web password\n--webtimer 0            reset web session timer\n");
+            #ifndef DISABLE_NET_CONSOLE
+            printdeb("--netconsole on/off     console on TCP 2323\n");
             #endif
-            printlndeb("--setcont on/off\n--setlog on/off/<val>\n--setretx on/off\n--shortpath on/off\n");
-            delay(100);
-            printlndeb("--softser app0/baud/rxpin/txpin  softser wiring\n");
-            delay(100);
-            printlndeb("--aht20 on/off\n--sht21 on/off\n--390 on/off  use BMP390-CHIP\n--ina226 on/off\n--shunt 9.999  INA226 shunt ohms\n--imax 9.9  INA226 max current A\n--isamp 9  INA226 sample count\n");
-            delay(100);
-            printlndeb("--batt factor 9.9  battery ADC factor\n--tempoff in/out 9.9  temperature offset\n");
-            delay(100);
-            #if defined(ENABLE_RTC)
-            printlndeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
-            delay(100);
+            printdeb("--passwd <pwd>/none     net console password\n");
+            #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+            printdeb("--kiss on/off           KISS/TCP port 8001\n--kiss tx on/off        KISS may transmit\n--kiss meta on/off      KISS metadata frames\n--kiss auth on/off      KISS authentication\n");
             #endif
-            printlndeb("--setpress  latch QNH reference at current altitude\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
-            delay(100);
-            #ifdef BOARD_LED
-            printlndeb("--board led on/off  board LED\n");
-            delay(100);
-            #endif
-            printlndeb("--wifitxpower 2-20  WiFi TX power dBm\n--webtimer 0  reset web session timer\n--contrast 1-255  OLED contrast\n--button on/off  enable user-button check\n");
-            delay(100);
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--spiffs reset  format SPIFFS\n");
-            delay(100);
-            #endif
-            printlndeb("--io  show IO config\n--setio 99 in/out/pullup  MCP17 IO pin\n--setio clear\n--setout 99 on/off  MCP17 output\n");
-            delay(100);
-            printlndeb("--seset/--wifiset/--nodeset/--analogset/--tel/--aprsset  show that settings group\n--aprsmc <call>  set APRS MYCALL/none\n");
-            delay(100);
-            printlndeb("--posshot  one-shot position now\n--postime 99  position interval (s)\n--regex <call>  test callsign against the validator\n");
-            delay(100);
-            #if defined BOARD_T5_EPAPER
-            printlndeb("--t5 on/off  E-paper power\n");
-            delay(100);
-            #endif
-            #if INSTRUMENT_ENABLED
-            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n--ntpsync  request an immediate NTP refresh now\n");
-            #else
-            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n");
+            #if defined(ESP32) || defined(NRF52_SERIES)
+            printdeb("--udplog on/off         one [UDP] line per datagram\n");
             #endif
             delay(100);
-            #if defined(ESP32)
-            printlndeb("--wifistat  WiFi link/counters\n--udpstat  MeshCom UDP RX/TX counters\n--udplog on/off  one [UDP] line per datagram\n");
-            delay(100);
-            #endif
-            #if defined(NRF52_SERIES)
-            printlndeb("--ethstat  Ethernet link/counters\n--udplog on/off  one [UDP] line per datagram\n");
-            delay(100);
-            printlndeb("--dumpsettings  dump the raw keyed settings store file to console\n");
-            delay(100);
-            #endif
 
-            // DOC-02: the ~50-command bench/instrument surface (--heap,
-            // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
-            // --ntpsync, ... see src/instrument.h) is compiled out of a normal
-            // board build and only present in a measurement firmware built
-            // with -D INSTRUMENT_ENABLED=1. Announce it only where it exists,
-            // and do not enumerate the block command by command.
+            printdeb("\n== Sensors / battery ==\n");
+            #if defined(ENABLE_BMX280)
+            printdeb("--bmp on                use BMP280\n--bme on                use BME280\n--680 on                use BME680\n--811 on                use CCS811\n");
+            #endif
+            #if defined(ENABLE_BMP390)
+            printdeb("--390 on                use BMP390\n");
+            #endif
+            printdeb("--bmx off               BMx280/390/680 off\n--bmp off               BMx280/390 off\n--bme off               BMx280/390 off\n--680 off               BME680 off\n--390 off               BMP390 off\n--811 off               CCS811 off\n");
+            #if defined (ENABLE_BMX280)
+            printdeb("--setpress              latch QNH at current altitude\n");
+            #endif
+            #if defined(ENABLE_AHT20)
+            printdeb("--aht20 on/off          AHT20\n");
+            #endif
+            #if defined(ENABLE_SHT21)
+            printdeb("--sht21 on/off          SHT21\n");
+            #endif
+            #if defined(LPS33)
+            printdeb("--lps33 on/off          LPS33\n");
+            #endif
+            #ifdef OneWire_GPIO
+            printdeb("--onewire on/off        1-Wire DSxxxx\n--onewire gpio 99       1-Wire pin\n");
+            #endif
+            #if defined (ENABLE_INA226)
+            printdeb("--ina226 on/off         INA226\n--shunt 9.999           INA226 shunt ohms\n--imax 9.9              INA226 max current A\n--isamp 9               INA226 sample count\n");
+            #endif
+            #if defined(ANALOG_PIN)
+            printdeb("--analog gpio 99        analog pin\n--analog factor 9.9     analog factor\n--analog alpha 9.9      analog filter alpha\n--analog slope 9.999    analog slope 0-9.999\n--analog offset 999     analog offset mV\n--analog atten 0-3      ADC attenuation\n--analog filter on/off  analog filter\n--analog check on/off   analog check\n");
+            #endif
+            printdeb("--batt factor 9.9       battery ADC factor\n--maxv 9.99             100% battery voltage\n--volt on/off           show battery voltage\n--proz on/off           show battery percent\n--tempoff in/out 9.9    temperature offset\n--button on/off         user button check\n");
+            #ifndef BOARD_T_DECK_PRO
+            printdeb("--button gpio 99        user button pin\n");
+            #endif
+            printdeb("--setio a0-b7 in/out    MCP IO pin mode\n--setio clear           clear MCP IO config\n--setout a0-b7 on/off   MCP output\n");
+            delay(100);
+
+            printdeb("\n== Telemetry ==\n--parm tm1,..,tm5       value names (unused: blank)\n--unit tm1,..,tm5       units (unused: blank)\n--format 1,1,1,1,1      decimals (unused: 0)\n--eqns 0,1,0,...        equations, 15 values\n--values press,hum,temp,onewire,co2  value sources\n--ptime 99              interval min\n");
+            delay(100);
+
+            printdeb("\n== Display ==\n--display on/off        display\n--nomsgall on/off       hide '*' messages\n--contrast 1-255        OLED contrast\n");
+            #if defined(WP_DISP) or defined(BOARD_E290)
+            printdeb("--rotate 0/90/180/270   e-ink rotation\n");
+            #endif
+            #if defined BOARD_T5_EPAPER
+            printdeb("--t5 on/off             e-paper power\n");
+            #endif
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--mute on/off           sound off\n--persistflash on/off   positions to flash\n--persistsd on/off      positions to SD\n--immediatesave on/off  save at once\n");
+            #endif
+            printdeb("--persiststat           NVS-only values\n");
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--keylock on/off        SYM+K lock\n");
+            #endif
+            #ifdef BOARD_LED
+            printdeb("--board led on/off      board LED\n");
+            #endif
+            delay(100);
+
+            printdeb("\n== Debug ==\n--debug on/off          debug output\n--debug csv/man         output format\n--debug en/de           output language\n--bledebug on/off       BLE debug\n--loradebug on/off      LoRa debug\n--txcapture on/off      TX capture\n--nbrdebug on/off       neighbour debug\n--viadebug on/off       via debug\n--wxdebug on/off        weather debug\n--gpsdebug on/off       GPS debug (also 2/0)\n--ackinfo on/off        show who ACKed (not saved)\n--setinfo on/off        LoRa info lines on serial\n--setcont on/off        verbose serial output\n--setretx on/off        retransmit info on serial\n--setlog on/off/<call>  log one callsign\n");
+            #if defined(ENABLE_SOFTSER)
+            printdeb("--softser on/off        soft serial\n--softser send          soft serial send\n--softser app/app0      soft serial app\n--softser baud 9600     soft serial baud\n--softser rxpin 99      soft serial RX pin\n--softser txpin 99      soft serial TX pin\n--softser fixpegel 9.9  fixed level\n--softser fixpegel2 9.9 fixed level 2\n--softser fixtemp 9.9   fixed temperature\n--softserdebug on/off   soft serial debug\n--softserread on/off    show soft serial RX\n");
+            #endif
+            printdeb("--pingcall <call>       ping target\n--pingtime 99           ping interval s\n--pingmax 99/max        ping count limit\n--ping start/stop       start/stop pinging\n--spectrum              spectral scan\n");
+            #ifdef HEAP_TEST
+            printdeb("--spiffs reset          format SPIFFS\n");
+            #endif
+            #if MC_DIAG
+            printdeb("--specstart 999.9       scan start MHz\n--specend 999.9         scan end MHz\n--specstep 9.9          scan step MHz\n--specsamples 500-2048  scan samples\n");
+            #endif
+            delay(100);
+
+            // INS-01/INS-04: these bench/instrument commands live only inside
+            // the INSTRUMENT_ENABLED block in commandAction() and do not exist
+            // in a normal board build, so --help must not advertise them there.
             #if INSTRUMENT_ENABLED
-            printlndeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            printdeb("\n== Bench (instrument build) ==\n--injectmsg <grp|call> <text>  queue a text as if received via LoRa\n--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)\n--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)\n");
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
+            #endif
+            printdeb("--ntpsync  request an immediate NTP refresh now\n");
+            printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            delay(100);
             #endif
         }
 
