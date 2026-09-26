@@ -2,6 +2,8 @@
 #include <aprs_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include <byte_fifo.h>
+#include <mheard_throttle.h>
 #include <debugconf.h>
 #include <ArduinoJson.h>
 #include <ble_json_frame.h>
@@ -770,7 +772,7 @@ String getValue(String data, char separator, int index)
 // MHeard-Liste zum Telefon, wiederaufnehmbar.
 //
 // Bis 4.35t wurde die komplette Liste in einem Loop-Durchlauf direkt hinter
-// die Config-Frames in BLEComToPhoneBuff (MAX_RING Slots) geschrieben. Ab
+// die Config-Frames in den Kommando-Ring (damals MAX_RING Slots) geschrieben. Ab
 // MAX_RING - json_configs_cnt gehoerten Stationen (11 bzw. 12) ueberschrieb
 // die Liste die Config-Frames, bevor der Drain sie senden konnte; die App sah
 // CONFFIN ohne jemals das I-Frame bekommen zu haben (leere Node Settings,

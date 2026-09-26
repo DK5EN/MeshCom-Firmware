@@ -8,6 +8,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "byte_fifo.h"
 #include "ack_attribution.h"
 #include "txring_functions.h"
 #include "bp_notice_frame.h"
@@ -682,6 +683,13 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
         printfdeb("<%02X>BLEtoPhone RingBuff added len=%i unread=%u lost=%i\n", buffer[0], len, (unsigned)bf_unread(&phoneRing), lost);
         printBuffer(buffer, len);
     }
+
+    // Anders als beim alten Schlitzring (addRingPointer() liess "phone"
+    // bewusst aus, um das Log nicht mit der haeufigsten Ring-Sorte
+    // zuzuschuetten) liefert bf_push2() jetzt eine echte Verdraengungszahl --
+    // die melden wir, statt sie wie zuvor stillschweigend zu verwerfen.
+    if(bLORADEBUG && lost > 0)
+        printfdeb("[MC-DBG] RING_OVERFLOW buf=phone lost=%d\n", lost);
 }
 
 /** @brief Function adding config messages into outgoing BLE ringbuffer
@@ -3427,11 +3435,27 @@ static void finalizeAndSendAPRS(struct aprsMessage &aprsmsg, uint8_t *msg_buffer
     encodeAPRS(msg_buffer, aprsmsg);
 }
 
-void sendPing(char msg_call[10])
+PingResult sendPing(char msg_call[10])
 {
     // no ping within track mode
+    //
+    // Vorher kehrte die Funktion hier stumm zurueck: der Aufrufer hatte
+    // "[PING]...send Ping" schon ausgegeben und ein Ping-Budget verbraucht,
+    // obwohl nie ein Frame den TX-Ring erreichte -- der Operator sah eine
+    // Luege auf dem Display. static statt bLORADEBUG/bDisplayInfo, damit die
+    // Meldung unabhaengig vom Debug-Level einmal pro Unterdrueckungs-Episode
+    // erscheint statt bei jedem Ping-Intervall erneut.
+    static bool bPingTrackNoticeShown = false;
     if(bDisplayTrack)
-        return;
+    {
+        if(!bPingTrackNoticeShown)
+        {
+            printfdeb("[PING]...suppressed: TRACK mode active (--track off to ping)\n");
+            bPingTrackNoticeShown = true;
+        }
+        return PING_SUPPRESSED_TRACK;
+    }
+    bPingTrackNoticeShown = false;
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
@@ -3441,7 +3465,8 @@ void sendPing(char msg_call[10])
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markieren
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -3470,7 +3495,18 @@ void sendPing(char msg_call[10])
     // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
     // ...) -- ein Ping ist eine persoenliche DM und soll als solche
     // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
-    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg");
+    //
+    // Rueckgabewert war bisher verworfen: ein voller Ring hat den Ping
+    // ebenso stumm verschluckt wie der TRACK-Fall oben, nur dass Display und
+    // bPingSend so taten, als sei er unterwegs -- eine Intervall-Laenge
+    // spaeter kam dann ein irrefuehrendes "[PONG]...fail". Sofort raus, noch
+    // vor DisplayPong/bPingSend, damit kein Zaehler fuer einen nie
+    // eingereihten Frame scharf gestellt wird.
+    if(addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg") < 0)
+    {
+        printfdeb("[PING]...not queued: TX ring refused the frame\n");
+        return PING_RING_REFUSED;
+    }
 
     if(!bPingSend)
     {
@@ -3487,6 +3523,8 @@ void sendPing(char msg_call[10])
 
     meshcom_settings.node_pingduration = millis();
     bPingSend=true;
+
+    return PING_QUEUED;
 }
 
 void PongFail(String msg_call)
@@ -3501,8 +3539,20 @@ void PongFail(String msg_call)
 void SendPong(String msg_call, unsigned int msg_id)
 {
     // no ping within track mode
+    //
+    // Gleiches stummes Verhalten wie bei sendPing() -- Marker-only, Signatur
+    // bleibt void, static-Flag unabhaengig von der in sendPing().
+    static bool bPongTrackNoticeShown = false;
     if(bDisplayTrack)
+    {
+        if(!bPongTrackNoticeShown)
+        {
+            printfdeb("[PONG]...suppressed: TRACK mode active\n");
+            bPongTrackNoticeShown = true;
+        }
         return;
+    }
+    bPongTrackNoticeShown = false;
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
@@ -3723,7 +3773,7 @@ static void bpDeliver(const char *text, MsgOrigin origin, const char *dst)
 
         case ORIGIN_BLE:
         case ORIGIN_WEB:
-            // Both land in BLEtoPhoneBuff via bpNoticeToPhone(): the phone
+            // Both land in phoneRing via bpNoticeToPhone(): the phone
             // app drains it in sendToPhone(), the web GUI reads the same ring
             // for its message list (web_functions.cpp ~1293). Framed under
             // the node's own callsign (msg_id via bpNextMsgId(), E5;
@@ -4148,8 +4198,13 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
+
+    // MSG-ID für repeat Bits frei machen
+    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
+    //discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
     
     // src_override: a KISS client's own source call (handleInboundAx25()), else our own
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path),
@@ -4359,6 +4414,7 @@ unsigned int sendInjectedPosition(const char *srcCall, const char *posData)
 
     aprsmsg.msg_len = 0;
 
+    // bei Positionen keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), srcCall);
@@ -4943,7 +4999,8 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
 
         aprsmsg.msg_len = 0;
 
-        // MSG ID zusammen setzen    
+        // MSG ID zusammen setzen
+        // bei Postionen keine MSB für repeat markiereb 
         aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
         if(intervall != POSINFO_INTERVAL)
@@ -5023,7 +5080,8 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Postionen keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -5075,7 +5133,11 @@ unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *s
     aprsmsg.msg_len = 0;
 
     // MSG ID zusammen setzen
-    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
+    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
+
+    // MSG-ID für repeat Bits frei machen
+    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
+    // discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
 
     // own Call, or a foreign source when relaying a KISS client's APRS ack
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path),
@@ -5157,7 +5219,8 @@ void sendHey()
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Hey keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -5272,7 +5335,8 @@ void sendTelemetry(int ID)
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
+    // MSG ID zusammen setzen
+    // bei Text mit msg_destination_call 100001 keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);

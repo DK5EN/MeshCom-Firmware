@@ -161,6 +161,9 @@ void singleClick()
     #if defined(HAS_TFT) || defined(HAS_TFT_114)
       displayTFT(pageLastTextLong1[pagePointer], pageLastTextLong2[pagePointer]);
     #else
+      // Langtext-Seiten nur auf Boards mit HAS_LONG_PAGE_TEXT (siehe
+      // display_pages_cfg.h) -- auf OLED-Boards gibt es pageLastTextLong1/2
+      // nicht mehr, hier also nichts zu lesen.
       #if defined(HAS_LONG_PAGE_TEXT)
       strncpy(pageTextLong1, pageLastTextLong1[pagePointer], sizeof(pageTextLong1));
       if(bDisplayCont && strlen(pageTextLong1) > 0)

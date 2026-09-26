@@ -305,9 +305,9 @@ static inline bool flashLayoutCompatible(int stored)
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 60                  // dedup ring for received msg_ids (separate from TX ring)
 #define MAX_LOG 20                         // max count of messages in ringbuffer
-#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 1536           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
-#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256)
+#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
+#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
 // ESP32-S3 (320 KB SRAM) and nRF52840 (256 KB RAM) — full buffer sizes
 #define MAX_MHEARD 80                      // max count of messages in mheard ringbuffer (was 20, 85-124 H00 nodes observed)
@@ -315,18 +315,18 @@ static inline bool flashLayoutCompatible(int stored)
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 100                 // dedup ring for received msg_ids (was 60, wraparounds observed)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer (ram_opti)
-#define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
-#define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang (war 20 x 256)
+#define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
+#define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang
 #elif defined(ENABLE_TBEAM)                // very smal version only for developer tests
 #define MAX_MHEARD 10                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
 #define MAX_MHPATH 10                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
 #define MAX_RING 10                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 10                  // dedup ring for received msg_ids (was 60)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer
-#define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war 10 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 1024           // Byte-Ring BLE-Kommandos zum Telefon (war 10 x 246)
-#define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang (war 10 x 256)
+#define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
+#define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang
 #else
 // ESP32 original (~160 KB DRAM) — reduced buffer sizes due to RAM constraints
 #define MAX_MHEARD 30                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
@@ -345,9 +345,9 @@ static inline bool flashLayoutCompatible(int stored)
 // (src/byte_fifo.h). Ein Frame ist im Dauerlauf im Mittel 77 Byte lang, die
 // 260-Byte-Schlitze waren zu 70 % Reserve. 2048 Byte fassen rund 25 typische
 // Frames, also mehr als die 20 Schlitze vorher, bei 60 % weniger RAM.
-#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 = 5200)
-#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246 = 4920)
-#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256 = 5120)
+#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
+#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang
 #endif
 
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message

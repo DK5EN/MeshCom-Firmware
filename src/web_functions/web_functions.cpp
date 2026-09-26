@@ -11,6 +11,7 @@
 #include <mheard_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include <byte_fifo.h>
 #include <time.h>
 #include <lora_setchip.h>
 #include <rtc_functions.h>
@@ -534,15 +535,23 @@ static void sub_config_upload(long content_length)
  */
 String work_webpage(bool bget_password, int webid)
 {
-    // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
+    // RAM-Rueckgewinn (2026-09-21): der 1-kB-Sammelpuffer web_header_collect
     // lag als statisches Feld im DRAM und wurde am Ende ohnehin in den String
-    // kopiert. Jetzt sammelt der String selbst; reserve() holt die 1 kB EINMAL
-    // beim ersten Aufruf vom Heap und behaelt sie (der String ist global),
-    // also kein Wachsen und kein Freigeben je Anfrage -- dieselbe Obergrenze
-    // wie vorher (WEB_HEADER_MAX), nur dass sie nicht mehr im Linkerbild steht.
+    // kopiert. Jetzt sammelt der String selbst, mit einmaligem reserve() je
+    // Aufruf. Dieselbe Obergrenze wie vorher (WEB_HEADER_MAX: hoechstens
+    // 1023 Zeichen, exakt wie die alte Schranke sizeof(puffer)-1), nur dass
+    // sie nicht mehr im Linkerbild steht.
+    //
     // Das ist eine Verschiebung aus dem statischen Bild in den Heap, kein
     // Byte weniger zur Laufzeit; sie entlastet die Linkregion, die auf den
     // klassischen ESP32 knapp ist.
+    //
+    // Nicht behaupten, die 1 kB wuerden einmalig geholt und dann behalten:
+    // der /?nodepassword-Zweig weiter unten weist web_header das Ergebnis
+    // von substring() zu. Das ist eine Move-Zuweisung von einem Temporary,
+    // der globale String uebernimmt also dessen kleinen Puffer und gibt die
+    // 1 kB frei -- die naechste Anfrage holt sie erneut. Ein malloc/free je
+    // Login, mehr nicht; der Rest der Funktion arbeitet ohnehin mit Strings.
     static const uint16_t WEB_HEADER_MAX = 1023;
     web_header.reserve(WEB_HEADER_MAX + 1);
     web_header = "";
@@ -879,9 +888,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200 && this.responseText.indexOf(\"sendmessage ok\")>=0){var sc=document.getElementById(\"sendcall\");if(!/^[0-9]+$/.test(sc.value))sc.value=\"\"; document.getElementById(\"messagetext\").value=\"\"; updateCharsLeft();}};xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();}\n");
     // this functions is counting and displaying the amount of chars left that the user can use to write a message
     web_client.println("function updateCharsLeft() {let maxlength=149;if(document.getElementById(\"sendcall\").value.length>0) {maxlength-=(document.getElementById(\"sendcall\").value.length)+2;}let msglength=document.getElementById(\"messagetext\").value.length;if(msglength>maxlength){document.getElementById(\"messagetext\").value=document.getElementById(\"messagetext\").value.substring(0,maxlength);msglength=maxlength;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
-    // MC-msg-history: BLEtoPhoneBuff/MAX_RING is only 20 slots and is shared
-    // with positions and acks, so a handful of new messages can push an old
-    // message out of the node's own ring within minutes. The browser tab
+    // MC-msg-history: the phone ring (phoneRing, RING_BYTES_PHONE bytes) is
+    // shared with positions and acks, so a handful of new messages can push
+    // an old message out of the node's own ring within minutes. The browser tab
     // keeps every message it has seen for the life of the page in
     // mcHistory/mcSeen (capped at MC_HIST_MAX, oldest dropped first) so
     // switching Info -> Messages -> Info -> Messages does not lose messages
