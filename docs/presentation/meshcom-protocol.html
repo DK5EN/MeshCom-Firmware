@@ -2440,10 +2440,10 @@ Quittung: <b>{987</b> angehängt</pre>
 
 <section class="slide"><span class="num">21</span><div class="inner">
   <div class="eyebrow">Umgesetzt · Stand 28.09.2026</div>
-  <h2>Wiederholung ohne neue msg_id: zwei Bits, die alte Relais mitnehmen</h2>
+  <h2>Wiederholung mit gekippter msg_id: zwei Bits, die alte Relais mitnehmen</h2>
 
   <p class="lead">Vorschlag Schritt 1 von zuvor ist Code: eine persönliche Nachricht (PN), die kein Echo hört,
-  wird bis zu 4-mal im 40-Sekunden-Abstand erneut gesendet — mit zwei geänderten msg_id-Bits, damit auch eine
+  wird bis zu dreimal im 40-Sekunden-Abstand erneut gesendet — mit zwei geänderten msg_id-Bits, damit auch eine
   <b>alte</b> Firmware sie als neues Paket durchlässt, statt sie im eigenen Dedup zu verwerfen.</p>
 
   <div class="bytes" style="margin-top:1rem">
@@ -2484,7 +2484,7 @@ Quittung: <b>{987</b> angehängt</pre>
       erneut aus. Diese Server-Änderung ist noch nicht bestätigt (<code>docs/pn-retry-server.md</code>).
     </div>
     <div class="note ok">
-      <b>Serverseitig zuerst eingereicht.</b> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a>
+      <b>Upstream gemergt.</b> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a>
       wurde am 27.09.2026 von OE1KBC (Kurt) nach <code>dev</code> gemergt (Merge-Commit <code>36fa70bb</code>). Auf der
       Bank offen bleibt der Nachweis, dass eine Wiederholung einen alten Relais-Knoten tatsächlich passiert.
     </div>
