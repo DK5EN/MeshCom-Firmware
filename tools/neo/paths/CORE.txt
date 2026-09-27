@@ -233,3 +233,4 @@ variants/wiscore_rak4631/configuration.h
 variants/wiscore_rak4631/lv_conf.h
 src/lora_functions.h
 src/mheard_throttle.h
+src/net_console.cpp
