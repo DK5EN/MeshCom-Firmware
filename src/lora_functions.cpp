@@ -18,6 +18,7 @@
 #include "reack_limiter.h"  // stage 0.2: rate-limited re-ACK for duplicate DMs
 #include "dm_dedup.h"       // stage 2.1: second dedup layer, keyed on (source call, NNN)
 #include "instrument.h"     // stage 0.5: --airgap (bAirgap), INSTRUMENT_ENABLED
+#include "pn_retry.h"       // PN retry (XOR form): pnRetryCore/pnRetryId/pnFrameIsOwnPn etc.
 #include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -318,14 +319,27 @@ static bool extTxqAckInvalidateIfOwned(int slot)
  * Find and stop retransmission of a message by uint32_t msg_id.
  * Sets slot status to RING_STATUS_DONE and clears retryCount.
  * Returns slot index, or -1 if not found.
+ *
+ * PN-Wiederholung (XOR, pn_retry.h): Vergleich ueber pnRetryCore(), damit
+ * ein ACK auf die urspruengliche msg-id auch einen auf Retry-Variante
+ * umgeschriebenen Slot stoppt (nur eigene pending Slots im Scope).
+ *
+ * Non-static: auch vom Server-ACK-Pfad gerufen (udp_frame_esp32.cpp,
+ * udp_frame_nrf52.cpp), der auf nRF52 im Loop-Task laeuft, waehrend
+ * OnRxDone() im LORA-Task laeuft -- Scan und Status-Schreiben deshalb auf
+ * RAK4631 unter derselben Ring-Sperre wie anderswo in dieser Datei
+ * (queueDisplayText() etc.).
  */
-static int findAndStopRingSlot(uint32_t msgId)
+int findAndStopRingSlot(uint32_t msgId)
 {
+#if defined(BOARD_RAK4630)
+    taskENTER_CRITICAL();
+#endif
     for(int i = 0; i < MAX_RING; i++)
     {
         if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY)
         {
-            if(extractRingMsgId(i) == msgId)
+            if(pnRetryCore(extractRingMsgId(i)) == pnRetryCore(msgId))
             {
 #if defined(EXTERNAL_RADIO)
                 // ACK-before-result. If this slot is owned by an in-flight
@@ -341,10 +355,16 @@ static int findAndStopRingSlot(uint32_t msgId)
                 ringBuffer[i][1] = RING_STATUS_DONE;
                 ringBuffer[i][0] = 0;  // clear len so getNextTxSlot skips this slot
                 retryCount[i] = 0;
+#if defined(BOARD_RAK4630)
+                taskEXIT_CRITICAL();
+#endif
                 return i;
             }
         }
     }
+#if defined(BOARD_RAK4630)
+    taskEXIT_CRITICAL();
+#endif
     return -1;
 }
 
@@ -846,17 +866,50 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             extTxqAckInvalidateIfOwned(rxSlot);
 #endif
 
-            // Jetzt erst release
-            ringBuffer[rxSlot][1] = RING_STATUS_DONE;
-            retryCount[rxSlot] = 0;
-            ringBuffer[rxSlot][0] = 0;
+            // PN-Wiederholung (XOR, pn_retry.h): das eigene Echo einer PN ist
+            // kein Grund, die Wartezeit abzubrechen -- nur ein :ackNNN vom
+            // echten Ziel darf das (findAndStopRingSlot()). Wartezeit neu
+            // starten (wie doTX() es nach dem Senden tut) statt freizugeben.
+            // Nur fuer eine PN, die WIR ausgeloest haben: eine PN, die
+            // sendMessage() fuer einen KISS-Client sendet, bleibt beim
+            // bisherigen Verhalten (Freigabe beim ersten Echo).
+            //
+            // M1: Ausnahme -- das Ziel hat diese PN schon geackt (own_msg_id
+            // 0x02, ueber die Original-id). Dann nicht neu starten, sondern
+            // wie bisher freigeben, sonst bleibt der Slot bis zum naechsten
+            // Schwellwert (40 s) belegt.
+            bool pnEcho = dbg_type == MSG_TYPE_TEXT &&
+               pnFrameIsOwnPn(ringBuffer[rxSlot] + 2, dbg_lng, _GW_ID, meshcom_settings.node_call);
+            bool pnEchoAcked = false;
+            if(pnEcho)
+            {
+                uint32_t pnEchoOrigId = pnRetryId(pnFrameMsgId(ringBuffer[rxSlot] + 2), _GW_ID, 0);
+                int pnEchoIdx = checkOwnTx(pnEchoOrigId);
+                pnEchoAcked = (pnEchoIdx >= 0 && own_msg_id[pnEchoIdx][4] == 0x02);
+            }
 
-            if(bDisplayRetx)
-                printfdeb("\n[RETX] got lora rx for retid:%i no need status:%02X lng;%i msg-id:%c-%08X\n",
-                              rxSlot, dbg_status, dbg_lng, dbg_type, dbg_msg_id);
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] ACK_RECEIVED retid=%d msg_id=%08X\n",
-                              rxSlot, dbg_msg_id);
+            if(pnEcho && !pnEchoAcked)
+            {
+                ringBuffer[rxSlot][1] = RING_STATUS_SENT;
+
+                if(bDisplayRetx)
+                    printfdeb("\n[RETX] PN echo, wait restarted retid:%i status:%02X lng;%i msg-id:%c-%08X\n",
+                                  rxSlot, dbg_status, dbg_lng, dbg_type, dbg_msg_id);
+            }
+            else
+            {
+                // Jetzt erst release
+                ringBuffer[rxSlot][1] = RING_STATUS_DONE;
+                retryCount[rxSlot] = 0;
+                ringBuffer[rxSlot][0] = 0;
+
+                if(bDisplayRetx)
+                    printfdeb("\n[RETX] got lora rx for retid:%i no need status:%02X lng;%i msg-id:%c-%08X\n",
+                                  rxSlot, dbg_status, dbg_lng, dbg_type, dbg_msg_id);
+                if(bLORADEBUG)
+                    printfdeb("[MC-DBG] ACK_RECEIVED retid=%d msg_id=%08X\n",
+                                  rxSlot, dbg_msg_id);
+            }
         }
 
         struct aprsMessage aprsmsg;
@@ -877,6 +930,30 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         bool rx_is_new = is_new_packet(RcvBuffer+1);
         bool rx_dup = !rx_is_new;
         bool rx_own_echo = false;
+
+        // PN-Wiederholung (XOR, pn_retry.h): gleiche PN unter einer anderen
+        // Wiederholungsvariante schon gesehen? Reiner msg-id-Dedup (oben)
+        // sieht das nicht -- checkOwnRx() ist die stille Ringabfrage (kein
+        // zweites is_new_packet()).
+        bool rx_pn_shape = msg_type_b_lora == MSG_TYPE_TEXT &&
+           pnPayloadIsPn(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload)) &&
+           pnDestIsPersonal(aprsmsg.msg_destination_call, strlen(aprsmsg.msg_destination_call));
+        bool rx_pn_repeat = false;
+        if(rx_is_new && rx_pn_shape)
+        {
+            uint32_t pn_variants[3];
+            pnVariantIds(aprsmsg.msg_id, pn_variants);
+            for(int pv = 0; pv < 3 && !rx_pn_repeat; pv++)
+            {
+                uint8_t pn_variant_buf[4];
+                pnIdToLe(pn_variants[pv], pn_variant_buf);
+                if(checkOwnRx(pn_variant_buf) >= 0)
+                    rx_pn_repeat = true;
+            }
+
+            if(rx_pn_repeat && bDisplayInfo)
+                printfdeb("[RX] PNREPEAT msg-id:%08X\n", aprsmsg.msg_id);
+        }
 
         if(bDisplayLog)
         {
@@ -1303,23 +1380,46 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             //
             ///////////////////////////////////////////////
 
-            if(icheck >= 0) // own msg_id
+            // PN-Wiederholung (XOR, pn_retry.h): eine eigene Retry-Kopie
+            // traegt eine andere msg-id als checkOwnTx() (icheck) kennt --
+            // HEARD trotzdem unter der URSPRUENGLICHEN id buchen, im selben
+            // Block (kein zweiter Eintrag). Das Dedup-Verdikt bleibt
+            // unveraendert: rx_is_new ist fuer diese Kopie bereits false
+            // (eigene addLoraRxBuffer()-Registrierung beim Senden, siehe
+            // updateRetransmissionStatus()), der else-Zweig unten bliebe
+            // also so oder so zu.
+            int heardIcheck = icheck;
+            uint32_t heardMsgId = aprsmsg.msg_id;
+
+            if(heardIcheck < 0 && rx_pn_shape && pnIsOwnNodeId(aprsmsg.msg_id, _GW_ID))
+            {
+                uint32_t pnOrigId = pnRetryId(aprsmsg.msg_id, _GW_ID, 0);
+                int pnOrigCheck = checkOwnTx(pnOrigId);
+                if(pnOrigCheck >= 0)
+                {
+                    heardIcheck = pnOrigCheck;
+                    heardMsgId = pnOrigId;
+                    setlogCountDedup(rx_is_new);    // SL-01: Zaehler wie im else-Zweig
+                }
+            }
+
+            if(heardIcheck >= 0) // own msg_id (direkt oder PN-Retry-Echo)
             {
                 // S1 (fable-dm-stage1-verdict-20260914.md): own frame heard relayed.
                 // Mode-independent (F6) -- a no-op when the outbox has no matching
                 // entry, so this costs nothing when --dmretry is off.
                 if(msg_type_b_lora == MSG_TYPE_TEXT)
-                    dmOutboxOnEcho(aprsmsg.msg_id);
+                    dmOutboxOnEcho(heardMsgId);
 
                 // Status frame to the phone is origin-gated: own_msg_id[] also holds
                 // foreign msg_ids that a gateway only forwarded from the server to LoRa
                 // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
                 // unconditional so the web rxlog heard/ACK ticks keep working as today.
-                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
+                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[heardIcheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                 {
-                    if(ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID))
+                    if(ackMsgIdFromNode(heardMsgId, _GW_ID))
                     {
-                        uint16_t plen = buildAckPhoneFrame(print_buff, aprsmsg.msg_id, 0x00, aprsmsg.msg_source_last);
+                        uint16_t plen = buildAckPhoneFrame(print_buff, heardMsgId, 0x00, aprsmsg.msg_source_last);
 
                         addBLEOutBuffer(print_buff, plen);
 
@@ -1335,7 +1435,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // broadcast/group text heard back counts here too -- see
                     // the report for why that split is not cheaply knowable
                     // at this site.
-                    if(own_msg_id[icheck][4] == 0x00 &&
+                    if(own_msg_id[heardIcheck][4] == 0x00 &&
                        msg_type_b_lora == MSG_TYPE_TEXT &&
                        mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1) > 0 &&
                        mcIndexOfStr(aprsmsg.msg_payload, ":ack") <= 0)
@@ -1346,8 +1446,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // back into "heard" -- a store node holding this DM would
                     // otherwise be downgraded by the very echo that proves
                     // the mesh still relays it.
-                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03 && own_msg_id[icheck][4] != 0x04)
-                        own_msg_id[icheck][4]=0x01; // 0x01 HEARD
+                    if(own_msg_id[heardIcheck][4] != 0x02 && own_msg_id[heardIcheck][4] != 0x03 && own_msg_id[heardIcheck][4] != 0x04)
+                        own_msg_id[heardIcheck][4]=0x01; // 0x01 HEARD
                 }
             }
             else
@@ -1378,14 +1478,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 if(msg_type_b_lora == MSG_TYPE_TEXT || msg_type_b_lora == MSG_TYPE_POSITION || msg_type_b_lora == MSG_TYPE_HEY)
                 {
                     // Extern Server (deferred — avoid blocking UDP in radio callback)
-                    if(bEXTUDP)
+                    // PN retry: a repeat copy of a PN we already relayed/saw
+                    // must not re-upload to the extern server / KISS -- the
+                    // relay decision and addLoraRxBuffer() below still run.
+                    if(bEXTUDP && !rx_pn_repeat)
                         queueExtern((char*)"lora", RcvBuffer, size, rssi, snr);
 
                     // KISS/TCP interface (deferred — same reason). HEY frames are
                     // not representable as AX.25 (buildAx25 discards them) — don't
                     // let them evict text/position from the 2-slot queue.
                     #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
-                    if(bKISS && msg_type_b_lora != MSG_TYPE_HEY)
+                    if(bKISS && msg_type_b_lora != MSG_TYPE_HEY && !rx_pn_repeat)
                         queueKiss(RcvBuffer, size, rssi, snr);
                     #endif
 
@@ -1736,6 +1839,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                    mcIndexOfStr(aprsmsg.msg_payload, ":rej") <= 0 &&
                                    !mcStartsWith(aprsmsg.msg_payload, "{") &&   // {ping}/{pong}/{MCP}/{SET}/{CET}: control frames, never a DM
                                    !bMboxPeerDelivery &&                        // F6: don't store a peer's own delivery frame
+                                   !rx_pn_repeat &&                             // E2: a repeat XOR copy must not push stored_ms out again
                                    msgstoreEligible(destination_call))
                                 {
                                     // S3: store hook -- a DM for our store set.
@@ -2045,14 +2149,22 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                             // SL-06: Upload zum Server, unmittelbar vor
                             // addNodeData() und vor dem Hop-Dekrement des Relays.
-                            if(bDisplayLog)
+                            //
+                            // PN retry: a repeat copy of a PN we already
+                            // uploaded must not upload again -- the relay
+                            // decision below (rly_go/rly_reason) still runs
+                            // regardless, so the frame keeps propagating.
+                            if(!rx_pn_repeat)
                             {
-                                setlogFormatGwu(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
-                                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, (uint32_t)millis());
-                                setlogPrint(setlog_buf);
-                            }
+                                if(bDisplayLog)
+                                {
+                                    setlogFormatGwu(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
+                                                    aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, (uint32_t)millis());
+                                    setlogPrint(setlog_buf);
+                                }
 
-                            addNodeData(RcvBuffer, size, rssi, snr);
+                                addNodeData(RcvBuffer, size, rssi, snr);
+                            }
                         }
 
                         // resend only Packet to all and !owncall
@@ -2857,6 +2969,9 @@ bool doTX()
 
 // Maximum retransmit attempts per message
 #define MAX_RETRANSMIT 3
+// PN-Wiederholung (XOR, pn_retry.h): k = retryCount+1 muss 1..3 bleiben,
+// k=4 wuerde die Retry-Variante auf die urspruengliche id zurueckdrehen.
+static_assert(MAX_RETRANSMIT <= 3, "MAX_RETRANSMIT must stay <=3: pnRetryId's k=retryCount+1 wraps onto the original id at k=4");
 
 bool updateRetransmissionStatus()
 {
@@ -2889,6 +3004,32 @@ bool updateRetransmissionStatus()
 
             if(ringBuffer[ircheck][1] == threshold)
             {
+                // PN-Wiederholung (XOR, pn_retry.h), M1: das Ziel hat schon
+                // geackt (own_msg_id 0x02), dieser Slot ist aber trotzdem
+                // faellig -- z.B. weil :ackNNN eintraf, waehrend die letzte
+                // Kopie noch READY/CSMA wartete; findAndStopRingSlot()
+                // fasst READY-Slots absichtlich nicht an (ein READY-Slot
+                // kann gerade von doTX() uebernommen werden). Slot hier
+                // freigeben statt erneut
+                // zu senden oder aufzugeben (kein zusaetzlicher FAILED).
+                if(pnFrameIsOwnPn(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                {
+                    uint32_t pnSlotOrigId = pnRetryId(pnFrameMsgId(&ringBuffer[ircheck][2]), _GW_ID, 0);
+                    int pnAckedIdx = checkOwnTx(pnSlotOrigId);
+                    if(pnAckedIdx >= 0 && own_msg_id[pnAckedIdx][4] == 0x02)
+                    {
+                        ringBuffer[ircheck][1] = RING_STATUS_DONE;
+                        ringBuffer[ircheck][0] = 0;
+                        retryCount[ircheck] = 0;
+
+                        if(bDisplayRetx)
+                            printfdeb("\n[RETX] PN already acked, stop retid:%i msg-id:%08X\n",
+                                          ircheck, pnSlotOrigId);
+
+                        continue;
+                    }
+                }
+
                 // Check retry cap
                 if(retryCount[ircheck] >= MAX_RETRANSMIT)
                 {
@@ -2908,6 +3049,15 @@ bool updateRetransmissionStatus()
                     // runs on this slot's content just before transmit.
                     {
                         unsigned int ring_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
+
+                        // PN-Wiederholung (XOR, pn_retry.h), neu fuer den Fork:
+                        // nach mind. einem Retry traegt der Slot die XOR-
+                        // Variante der id, nicht mehr die Original-id -- vor
+                        // checkOwnTx() zurueckfalten, sonst findet weder die
+                        // 0x04-Held-Pruefung noch das 0x03-Telefonframe unten
+                        // den eigenen own_msg_id-Eintrag.
+                        if(pnFrameIsOwnPn(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                            ring_msg_id = pnRetryId(ring_msg_id, _GW_ID, 0);
 
                         struct aprsMessage giveupMsg;
                         uint16_t giveupType = decodeAPRS(&ringBuffer[ircheck][2], (uint16_t)size, giveupMsg);
@@ -2944,9 +3094,15 @@ bool updateRetransmissionStatus()
                                     if(idx >= 0 && own_msg_id[idx][4] != 0x02)
                                         own_msg_id[idx][4] = 0x03;
 
-                                    uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
-                                    uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call);
-                                    addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                    // M1: das Ziel hat schon geackt (0x02) --
+                                    // kein FAILED an die App, obwohl diese
+                                    // (spaete XOR-)Kopie gerade aufgibt.
+                                    if(idx < 0 || own_msg_id[idx][4] != 0x02)
+                                    {
+                                        uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
+                                        uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call);
+                                        addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                    }
                                 }
 
                                 if(bLORADEBUG)
@@ -2991,6 +3147,54 @@ bool updateRetransmissionStatus()
                     printfdeb("");
                 }
 
+                // PN-Wiederholung (XOR, pn_retry.h): eigene PN-Kopie bekommt
+                // eine neue msg-id statt der 1:1-Kopie, damit ein reiner
+                // msg-id-Dedup beim Relay sie nicht verwirft. Fremde PNs und
+                // Nicht-Text bleiben byte-identisch (LOCAL buffer, der Ring
+                // wird nie nachtraeglich gepatcht -- ein anderer Task koennte
+                // den Slot gerade senden).
+                bool pnRewritten = false;
+                uint32_t pnNewId = 0;
+                bool pnEligible;
+#if defined(NRF52_SERIES)
+                static uint8_t pnLocalFrame[UDP_TX_BUF_SIZE];
+#else
+                uint8_t pnLocalFrame[UDP_TX_BUF_SIZE];
+#endif
+
+                // Groesse+Typ unter Lock erneut lesen und dort kopieren -- ein
+                // Nebenlaeufer (TX/Retransmit) koennte den Slot zwischen dem
+                // `size`-Read oben und hier veraendert haben. Bail-out
+                // (pnEligible=false) faellt unten auf den unveraenderten
+                // 1:1-Pfad zurueck.
+#if defined(BOARD_RAK4630)
+                taskENTER_CRITICAL();
+#endif
+                {
+                    int pnLockedSize = ringBuffer[ircheck][0];
+                    pnEligible = (pnLockedSize == size) && (pnLockedSize > 0) &&
+                                 (size_t)pnLockedSize <= sizeof(pnLocalFrame) &&
+                                 ringBuffer[ircheck][2] == MSG_TYPE_TEXT;
+                    if(pnEligible)
+                        memcpy(pnLocalFrame, &ringBuffer[ircheck][2], (size_t)pnLockedSize);
+                }
+#if defined(BOARD_RAK4630)
+                taskEXIT_CRITICAL();
+#endif
+
+                // Nur eigene PN (eigenes Rufzeichen als Quelle): eine PN, die
+                // sendMessage() fuer einen KISS-Client sendet, bleibt 1:1.
+                if(pnEligible &&
+                   pnFrameIsOwnPn(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                {
+                    pnNewId = pnRetryId(pnFrameMsgId(pnLocalFrame), _GW_ID,
+                                        (uint8_t)(retryCount[ircheck] + 1));
+
+                    if(pnFrameSetMsgId(pnLocalFrame, (uint16_t)size, pnNewId))
+                        pnRewritten = true;
+                    // else: kein FCS-Feld gefunden -- 1:1-Pfad unten greift
+                }
+
                 // ready for doTX (text messages) or fire-and-forget, wie zuvor
                 uint8_t retransmitStatus = (ringBuffer[ircheck][2] == MSG_TYPE_TEXT)
                                             ? RING_STATUS_READY : RING_STATUS_DONE;
@@ -3001,13 +3205,30 @@ bool updateRetransmissionStatus()
                 // memcpy(dst==src) hier folgenlos (Quelle == Ziel-Byte fuer Byte).
                 // Original erst NACH dem Kopieren freigeben, damit die Payload beim
                 // Kopiervorgang garantiert noch gueltig ist.
-                int retxSlot = addTxRingEntry(&ringBuffer[ircheck][2], (uint16_t)size, retransmitStatus,
+                int retxSlot = addTxRingEntry(pnRewritten ? pnLocalFrame : &ringBuffer[ircheck][2],
+                                (uint16_t)size, retransmitStatus,
                                 "retransmit", retryCount[ircheck] + 1);
 
                 // SL-03: "retransmit" bildet auf 'o' ab -- die Kennung des
                 // Quellslots wird deshalb mitgenommen (wie bei der Prio-Verdraengung).
                 if(retxSlot >= 0)
+                {
                     ringSource[retxSlot] = ringSource[ircheck];
+
+                    if(pnRewritten)
+                    {
+                        // Eigene Retry-id registrieren wie sendMessage() (sonst
+                        // faelschlich als fremdes eigenes Echo erkannt).
+                        if(bGATEWAY && meshcom_settings.node_hasIPaddress)
+                            addLoraRxBuffer(pnNewId, true);
+                        else
+                            addLoraRxBuffer(pnNewId, false);
+
+                        if(bDisplayRetx)
+                            printfdeb("\n[RETX] PNRETRY k=%u msg-id:%08X\n",
+                                          (unsigned)(retryCount[ircheck] + 1), pnNewId);
+                    }
+                }
 
                 // Mark original as done and free slot (after copy, so len is correct in new slot)
                 ringBuffer[ircheck][1] = RING_STATUS_DONE;

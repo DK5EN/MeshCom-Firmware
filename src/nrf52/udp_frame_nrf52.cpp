@@ -309,7 +309,16 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     if(iackcheck >= 0 || dmAckStopped)
                     {
                         if(iackcheck >= 0)
+                        {
                             own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+
+                            // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
+                            // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
+                            int ackSlot = findAndStopRingSlot(msg_counter);
+                            if(ackSlot >= 0 && bDisplayRetx)
+                                printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
+                                          ackSlot, msg_counter);
+                        }
                         // stage 4: the destination's own ack is the final word --
                         // forget any store node(s) that were holding this DM, also
                         // when only the outbox still knew the NNN (dmAckStopped).
