@@ -1,5 +1,18 @@
 # RESUME — pick up here
 
+## 2026-09-27 evening: release `v4.35t.09.28-neo` published (dated Monday 28 September)
+
+Tag `v4.35t.09.28-neo` on `feature-snf`: PN retries in the XOR format (ring path only, `--dmretry` and
+the outbox removed). GitHub release with 39 assets, marked Latest; `v4.35t.09.27-neo` stays as a
+release but is **no longer in the web flasher** (operator decision: offer only the latest). gh-pages
+`b7e0958e` (flasher, `check` 30 boards / 0 mismatches) + `bb532ad1` (index card, protocol section,
+PR history now 46 merged -- #1162, #1168, #1169). Upstream PR #1168 was merged by OE1KBC at 17:17.
+Gate: selftest green, 45 native envs / 1384 cases, 32 release envs, RAK4631 flash 96.1 %.
+`FLASH_VERSION 20260928`. DK5EN-1 and DK5EN-98 run the code-identical build from `ce9bf157` in the
+24 h soak (`docs/soak-xor-20260927.md`, until 2026-09-28 17:39, interim PASS). Open: final soak
+verdict, multi-hop bench PN-01, server dedup PN-05. Do NOT use `tools/pages-sync.sh` for content
+updates -- its full mirror deletes `flash/`; copy the changed HTML files into a gh-pages worktree.
+
 ## 2026-09-27: PN XOR retry ported onto `feature-snf`, then the outbox removed
 
 Personal-message retries carry the XOR retry id (msg_id bits 10-11 XOR k, `src/pn_retry.h`,
