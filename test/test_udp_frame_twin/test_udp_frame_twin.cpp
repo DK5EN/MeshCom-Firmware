@@ -683,6 +683,42 @@ static void test_agreement_gate_text_message_decodes_and_relays_on_both(void)
     }
 }
 
+// A gateway hears our own PN retry copy k back from the server after it has
+// left the dedup ring. The copy's id has bits 10-11 XORed; own_msg_id[] only
+// knows the original. The own-TX check must fold the id back, or the node
+// relays its own copy once more (insertOwnTx + addTxRingEntry "udp_rx").
+static void test_regression_server_echo_of_own_pn_retry_copy_not_relayed_on_both(void)
+{
+    uint32_t orig = ((_GW_ID & 0x3FFFFFu) << 10) | 0x07u;   // as sendMessage() builds it
+    uint32_t copy = orig ^ (1u << 10);                       // retry copy k=1
+
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-1", "DK5EN-2", ':', "hallo{7", copy);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        g_own_tx_known.push_back(orig);                      // we sent the original
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        int depth0 = txRingDepth();
+
+        if (side)
+            handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else
+            handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: own retry copy was relayed to the TX ring", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+        snprintf(msg, sizeof(msg), "%s: own retry copy entered as foreign own-tx", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_insert_calls.size(), msg);
+    }
+}
+
 static void test_agreement_dedup_blocks_repeat_relay_on_both(void)
 {
     uint8_t tmpl[BUF_CAP];
@@ -2313,6 +2349,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
     RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);
     RUN_TEST(test_regression_zero_scan_oob_byte_flips_verdict_before_fix);
+    RUN_TEST(test_regression_server_echo_of_own_pn_retry_copy_not_relayed_on_both);
 
     // DR-01/DR-02/DR-04/DR-05/DR-06/DR-07/DR-08/DR-09/DR-18/DR-19 (all
     // 2026-09-12 decided, implemented this wave): former DRIFT cases,

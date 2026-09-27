@@ -17,6 +17,7 @@
 #include <time_functions.h>
 #include <lora_setchip.h>
 #include <lora_functions.h>
+#include "pn_retry.h"
 #include <extudp_functions.h>
 #include "printfdeb_functions.h"
 #include "via_functions.h"
@@ -466,7 +467,10 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           if(is_new_packet(udp_mid))
           {
-            int icheck = checkOwnTx(aprsmsg.msg_id);
+            // Eigene PN-Retry-Kopie (Bits 10-11 gekippt, pn_retry.h) vom Server zurueck:
+            // own_msg_id[] kennt nur die Original-id -- zurueckfalten, sonst sendet der
+            // Knoten seine eigene Kopie noch einmal, sobald sie aus dem Dedup-Ring ist.
+            int icheck = checkOwnTx(pnOwnTxLookupId(aprsmsg.msg_id, _GW_ID));
 
             if(bDisplayInfo)
               printfdeb("OWN-TX-CHECK-UDP msg_id:%08X check:%i\n", aprsmsg.msg_id, icheck);

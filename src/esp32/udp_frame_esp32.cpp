@@ -14,6 +14,7 @@
 #include "dm_stats.h"
 #include "sto_notice.h"      // F1/stage 4: :sto custody notice on server ingress
 #include <lora_functions.h>
+#include "pn_retry.h"
 #include <time_functions.h>
 #include <lora_setchip.h>
 #include <configuration.h>
@@ -477,7 +478,10 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           // Dedup ring (same check the LoRa RX path uses), read above
           if(bUdpMsgIsNew)
           {
-            int icheck = checkOwnTx(aprsmsg.msg_id);
+            // Eigene PN-Retry-Kopie (Bits 10-11 gekippt, pn_retry.h) vom Server zurueck:
+            // own_msg_id[] kennt nur die Original-id -- zurueckfalten, sonst sendet der
+            // Knoten seine eigene Kopie noch einmal, sobald sie aus dem Dedup-Ring ist.
+            int icheck = checkOwnTx(pnOwnTxLookupId(aprsmsg.msg_id, _GW_ID));
             if(icheck < 0)
             {
               if(bUDPtoLoraSend)
