@@ -191,24 +191,24 @@ Test IDs from `docs/dm-transport-impl-plan-20260913.md` (T-0.x, T-3.x), `docs/dm
 | T-4.2 sender without stage 4 (DK5EN-1 on `0d4b914c`, not upstream 4.35t): `:sto` shown as one text | run 1 and 2  |
 | store/purge-by-ack in the healthy case, notice when the direct ack is missed                       | run 1 step 2 |
 
-| Open         | What                                                                                                                                               |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T-0.2        | replayed DM: exactly one extra `:ackNNN`, no second display (dedup + re-ack limiter on air)                                                        |
-| T-0.3        | DM to an unreachable call gives one `0x03`; broadcast/ACK give-ups give none                                                                       |
-| T-0.4        | `--airgap` (instrumented build)                                                                                                                    |
-| T-0.5 / M0-1 | one hour on the live net, ring enqueue and parked-overwrite counters                                                                               |
-| T-1.1..T-1.9 | the whole `--dmretry` ladder: 9 attempts, stop on ack (T1/T2 regressions), echo gate, QRT, outbox full, `off` byte-identical, upstream destination |
-| T-3.2        | a relay never forwards a hop-0 delivery                                                                                                            |
-| T-3.3        | destination never acks: 9 sends, 1 h cooldown, storetime expiry                                                                                    |
-| T-3.4        | two store nodes (peer cancel; mutually airgapped)                                                                                                  |
-| T-3.5        | store node that is also a gateway, server-injected frame                                                                                           |
-| T-3.6        | store node reboot with pending entries                                                                                                             |
-| T-3.7        | destination on upstream 4.35t                                                                                                                      |
-| T-3.8        | string scan of the release image (no 0x41 path for stored DMs, airgap compiled out)                                                                |
-| T-3.9        | 25 DMs to an absent destination: caps hold                                                                                                         |
-| T-4.1        | sender on `feature-snf`: held mark in app/web, flips to delivered on ack                                                                           |
-| T-4.3..T-4.7 | re-flood while held, ladder gives up while held, two holders, `--storenotice all`, notice via server                                               |
-| web          | Mailbox page actions (Deliver, Purge), setup card persistence across reboot, `--dmretry` web select                                                |
+| Open         | What                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| T-0.2        | replayed DM: exactly one extra `:ackNNN`, no second display (dedup + re-ack limiter on air)                         |
+| T-0.3        | DM to an unreachable call gives one `0x03`; broadcast/ACK give-ups give none                                        |
+| T-0.4        | `--airgap` (instrumented build)                                                                                     |
+| T-0.5 / M0-1 | one hour on the live net, ring enqueue and parked-overwrite counters                                                |
+| T-1.1..T-1.9 | superseded 2026-09-27: outbox and `--dmretry` removed, DMs use the ring retry only (BACKLOG §3.8ba PN-01)           |
+| T-3.2        | a relay never forwards a hop-0 delivery                                                                             |
+| T-3.3        | destination never acks: 9 sends, 1 h cooldown, storetime expiry                                                     |
+| T-3.4        | two store nodes (peer cancel; mutually airgapped)                                                                   |
+| T-3.5        | store node that is also a gateway, server-injected frame                                                            |
+| T-3.6        | store node reboot with pending entries                                                                              |
+| T-3.7        | destination on upstream 4.35t                                                                                       |
+| T-3.8        | string scan of the release image (no 0x41 path for stored DMs, airgap compiled out)                                 |
+| T-3.9        | 25 DMs to an absent destination: caps hold                                                                          |
+| T-4.1        | sender on `feature-snf`: held mark in app/web, flips to delivered on ack                                            |
+| T-4.3..T-4.7 | re-flood while held, ladder gives up while held, two holders, `--storenotice all`, notice via server                |
+| web          | Mailbox page actions (Deliver, Purge), setup card persistence across reboot (`--dmretry` select removed 2026-09-27) |
 
 ## Catch-up from fork-main (2026-09-26 evening)
 

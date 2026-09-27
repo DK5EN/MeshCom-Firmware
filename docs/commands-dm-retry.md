@@ -1,36 +1,23 @@
-# DM retry ladder ("Enhanced message transport protection")
+# DM retries
 
-- `--dmretry off|3` — sender-side retry mode for user-to-user DMs
-  (destination is a callsign, payload carries `{NNN`); groups, broadcasts,
-  positions and ACKs are untouched. Bare `--dmretry` prints the current
-  state. Invalid values answer `[ERR];dmretry;<text> not one of off|3` and
-  change nothing.
+Every direct message (DM) on this branch is sent once and, if needed, retried automatically by the
+LoRa TX ring: up to 3 retries, 40 s after the previous send. An echo of the DM (heard back on air)
+restarts that 40 s wait; only the destination's own `:ackNNN` — over LoRa or over the server —
+stops it.
 
-| Mode  | Schedule                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------ |
-| `off` | ring retry (default): the original send plus up to three retries, 40 s apart                     |
-| `3`   | outbox ladder: four sends total at 0/40/80/120 s (attempt 1 = original, attempts 2-4 the ladder) |
+Each retry carries a different msg_id: bits 10-11 XOR the retry number (the XOR retry format,
+`src/pn_retry.h`). Relays that dedup on the full msg_id still forward it; the destination folds the
+XOR variants back onto the original and acks once.
 
-- Every retry — on the ring path (`off`) and on the outbox ladder (`3`) alike
-  — carries a fresh msg_id: attempt n (2..4) is `first_id ^ ((n-1) << 10)`
-  (the official XOR retry format, `src/pn_retry.h`), never the same id twice
-  and never a `millis()`-derived id. An echo of the DM does not stop the
-  ladder; only a `:ackNNN` for it does.
-- Switching from `off` to `3` prints once:
-  `[DMRETRY];warning;receiving nodes must run this firmware or newer; older
-nodes show every retry as a new message` — a fresh-id retry is a new message
-  to any node that doesn't fold attempts on `(source, NNN)`.
-- The sender's outbox holds one entry per in-flight DM (5 slots on
-  ESP32-S3/nRF52840, 3 on classic ESP32). A DM that would exceed it is
-  **refused** with a notice on the originating transport — nothing is
-  silently dropped, nothing is queued behind it.
-- `--info` adds `DMRETRY mode=<name>`.
+After the 4th send's wait has passed with no ack, the sending phone gets a "failed" status
+(`0x03`) — unless a store node has taken custody of the DM in the meantime, in which case it gets
+"held" (`0x04`) instead.
 
-## Storage (T13, outside `struct s_meshcom_settings`)
+There is no user-facing switch for this. Every DM behaves this way; an earlier build of this branch
+had an `--dmretry off|3` setting with a separate outbox path, removed 2026-09-27 (see
+`docs/CHANGELOG-snf.md`).
 
-- ESP32: NVS key `dm_retry` (u8: 0/3) in the `Credentials` namespace, own
-  `Preferences` handle. Absent or out-of-range value -> `off`; a stored `9`
-  from an older build is read back as `3`.
-- nRF52: own file `/dm.cfg` (`{magic 'DMC1', mode}`), memcmp-guarded write.
-  Absent file or bad magic/value -> `off`; a stored `9` from an older build
-  is read back as `3`. Saved only from `commandAction()` (loop task).
+**Compatibility**: older nodes forward the retries correctly but don't recognise them as copies of
+the same DM. A receiving node on older firmware may show the same DM up to 4 times, and an older
+store node may push its delivery back by up to ~2 minutes per copy it sees. Servers must dedup on
+the mask `0xFFFFF3FF` (`docs/pn-retry-server.md`) before this goes to the field.

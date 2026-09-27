@@ -135,3 +135,23 @@ Outbox-Leiter mit `--dmretry 3`), Übertrag nach `fork-main` / `fork-neo-test`, 
 - Zur Kenntnis: `dmstat_echo` zählt jetzt das erste Echo je DM statt eines je Versuch; die
   Web-rxlog-Häkchen fehlen auf den Zeilen der XOR-Kopien (nur Anzeige); ein nach dem ACK noch
   eingereihter Outbox-Versuch geht einmal raus (vorher schon so).
+
+## 7. Nachtrag: Outbox entfernt (2026-09-27)
+
+Nach der Umstellung auf das XOR-Format (Kapitel 4, Entscheidung E1) unterschieden sich Ring-Weg und
+Outbox-Leiter kaum noch: beide senden höchstens viermal mit derselben XOR-id-Bildung, beide stoppen
+nur noch am `:ackNNN`, beide laufen im 40-s-Takt. Der Betreiber hat entschieden, die Outbox und
+`--dmretry` (`off|3`) ersatzlos zu streichen: ein Weg ist einfacher als zwei fast gleiche.
+
+**Entfernt**: das `--dmretry`-Kommando (Web-Auswahl, `--info`-Zeile DMRETRY), die Outbox-Leiter
+selbst, die "OUTBOX FULL NOT SENT"-Ablehnung (der Textpräfix bleibt im Echo-Tor für ältere Knoten
+stehen) und die `obfull=`-Zeile im DM-Setlog. Ein gespeicherter `dm_retry`-Wert (ESP32 NVS, nRF52
+`/dm.cfg`) wird ignoriert. Jede PN läuft jetzt über den einen Ring-Weg: einmal gesendet, bis zu drei
+Wiederholungen im 40-s-Takt ab der jeweils letzten Aussendung (ein Echo setzt die Wartezeit zurück),
+mit XOR-id wie in Kapitel 3 beschrieben.
+
+**Kompatibilität**: Die frühere `--dmretry`-Warnung galt nur, solange der Schalter auf `3` stand;
+jetzt gilt sie für jede PN. Ältere Empfänger und Relais leiten die XOR-Kopien weiter, zeigen eine an
+sie adressierte PN aber bis zu viermal, und ein älterer Store-Knoten behandelt jede Kopie als neue
+Sendung und schiebt seine Zustellung um bis zu ~2 Minuten hinaus. Der Server muss vor dem
+Feldeinsatz mit der Maske `0xFFFFF3FF` deduplizieren (`docs/pn-retry-server.md`).

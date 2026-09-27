@@ -84,14 +84,15 @@ old nodes it is the only signal the operator gets.
 The same padded-callsign layout exists for `:ackNNN` and `:rejNNN` texts; new firmware consumes
 those as well.
 
-**Also new (stage 1, 2026-09-14): an "outbox full" nack.** When `--dmretry 3`/`9` is on and the
-sender's own retry-ladder queue has no free slot, a DM is refused before it is even sent; the
-client gets an ordinary text reply on the same transport the operator sent from (BLE/serial/web/
+**Historical (stage 1, 2026-09-14 through 2026-09-26): an "outbox full" nack.** When `--dmretry 3`/
+`9` was on and the sender's own retry-ladder queue had no free slot, a DM was refused before it was
+even sent, with an ordinary text reply on the same transport the operator sent from (BLE/serial/web/
 EXTUDP) -- `"OUTBOX FULL NOT SENT - <the message>"` -- the same shape as the existing
-`"QRT NOT SENT - "` / `"QTA NOT SENT - "` channel-congestion nacks, but with its own prefix, so a
-client that wants to render "outbox full" distinctly from generic channel congestion can match on
-it (`src/backpressure.h`, `BP_NACK_OUTBOX_FULL`); a client that does not care still shows it like
-any other refused message.
+`"QRT NOT SENT - "` / `"QTA NOT SENT - "` channel-congestion nacks. **This firmware no longer sends
+it**: the outbox and `--dmretry` were removed 2026-09-27 (`docs/CHANGELOG-snf.md`). A client may
+still see this text from an older node still running `--dmretry 3`/`9`; keep matching on the prefix
+for that case (`src/backpressure.h`, `BP_NACK_OUTBOX_FULL`, in that older code) and show it like any
+other refused message otherwise.
 
 ## 4. Per-client checklist
 

@@ -90,11 +90,13 @@ APRS2SOTA. Gruppen, `*` und alle anderen Meldungen verhalten sich wie bisher.
 Die Zeilenangaben oben (`src/lora_functions.cpp:NNN` u. ä.) beziehen sich auf `dk5en-xor`. Auf
 `feature-snf` gilt stattdessen:
 
-- **Zwei Sendewege**: `--dmretry off` (Standard) läuft über die Ring-Wiederholung mit XOR-ids wie
-  oben beschrieben. `--dmretry 3` läuft über die Outbox, ebenfalls mit XOR-ids: Aussendung 1 die
-  Original-id, Aussendung 2–4 `first_id ^ ((n-1) << 10)` im 40/80/120-s-Takt. Ein Echo stoppt die
-  Leiter nicht mehr, nur ein `:ackNNN`. Modus 9 entfällt, weil er sich nicht in drei Bitvarianten
-  ausdrücken lässt; ein gespeicherter Wert 9 (NVS `dm_retry`, nRF52 `/dm.cfg`) wird als 3 gelesen.
+- **Ein Sendeweg**: jede PN läuft über die Ring-Wiederholung mit XOR-ids wie oben beschrieben --
+  Aussendung 1 die Original-id, Aussendung 2–4 `first_id ^ ((n-1) << 10)` im 40-s-Takt ab der
+  jeweils letzten Aussendung. Ein Echo stoppt die Wiederholung nicht mehr, nur ein `:ackNNN`. Die
+  Outbox-Leiter und `--dmretry` (zuletzt `off|3`, Modus 9 schon vorher entfallen, weil er sich nicht
+  in drei Bitvarianten ausdrücken lässt) sind seit 2026-09-27 entfernt (Nachtrag in
+  `docs/pn-retry-snf-port-plan.md`); ein gespeicherter `dm_retry`-Wert (NVS, nRF52 `/dm.cfg`) wird
+  ignoriert.
 - **`dm_dedup`** fängt Wiederholungen einer an uns adressierten PN ab; es gibt kein eigenes
   Anzeige-Tor dafür.
 - **Store-Knoten** bekommt Wiederholungskopien nicht noch einmal (Entscheidung E2): `rx_pn_repeat`

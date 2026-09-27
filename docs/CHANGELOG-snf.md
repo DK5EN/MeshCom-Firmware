@@ -59,14 +59,21 @@ default: `--dmretry off`, `--store off`.
 1. **Personal-message retries use the XOR format** (`src/pn_retry.h`, `docs/pn-retry-xor-impl-plan.md`).
    Retry k (1..3) of a DM this node sent carries the original msg_id with bits 10-11 XOR k and a
    recomputed FCS, so relays with msg_id-only dedup forward it. The first send is byte-identical to
-   before. Applies to both send paths: the ring retry (`--dmretry off`, 40 s steps) and the outbox
-   ladder (`--dmretry 3`).
+   before. Applies to every DM, on the one ring-retry path (40 s steps).
 2. **An echo no longer ends the retry, only the destination's `:ackNNN` does** -- over LoRa or over
    the server; a server-side ack now also stops the waiting ring slot. A DM sent on behalf of a
    KISS client keeps the old behaviour (byte-identical retries, released on the first echo).
 3. **Repeat copies are recognised** by their three other bit variants: not uploaded to the server,
    EXTUDP or KISS again, not stored again by a store node; a DM addressed to this node is re-acked
    but not shown twice (`dm_dedup`).
-4. **`--dmretry` is now `off|3`.** Mode 3 sends at most four times (original plus retries at
-   40/80/120 s) with XOR ids; mode 9 is gone because nine attempts do not fit three bit variants. A
-   stored `9` is read back as `3`.
+4. **`--dmretry` removed.** Every DM now takes the single ring-retry path described in item 1: sent
+   once, retried up to three times at 40 s apart, XOR ids throughout. The outbox ladder, the
+   `--dmretry off|3` setting, the web setup select and the `--info` DMRETRY line are gone; the
+   `OUTBOX FULL NOT SENT` refusal no longer exists (the text prefix stays in the echo guard for
+   older nodes) and the `obfull=` counter is gone from the DM setlog line. A stored `dm_retry` value
+   (ESP32 NVS, nRF52 `/dm.cfg`) is ignored.
+5. **Compatibility now applies to every DM, not only `--dmretry 3`.** Older receivers and relays
+   still forward the XOR copies, but an older receiving node may show the same DM up to 4 times, and
+   an older store node treats each copy as a new send and pushes its delivery back by up to
+   ~2 minutes. Servers must dedup with the mask `0xFFFFF3FF` (`docs/pn-retry-server.md`) before this
+   goes to the field.
