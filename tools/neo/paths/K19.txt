@@ -431,6 +431,7 @@ test/test_nrf52_settings_paths/stubs/nrf52/stub_only_globals.h
 test/test_nrf52_settings_paths/test_nrf52_settings_paths.cpp
 test/test_ntp_async/test_main.cpp
 test/test_ntp_harvest/test_main.cpp
+test/test_pn_retry/test_main.cpp
 test/test_pos_tag_nan/test_pos_tag_nan.cpp
 test/test_printfdeb_format/test_printfdeb_format.cpp
 test/test_radio_units/test_radio_units.cpp
