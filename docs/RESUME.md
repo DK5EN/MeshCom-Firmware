@@ -10,8 +10,8 @@ PR history now 46 merged -- #1162, #1168, #1169). Upstream PR #1168 was merged b
 Gate: selftest green, 45 native envs / 1384 cases, 32 release envs, RAK4631 flash 96.1 %.
 `FLASH_VERSION 20260928`. DK5EN-1 and DK5EN-98 run the code-identical build from `ce9bf157` in the
 24 h soak (`docs/soak-xor-20260927.md`, until 2026-09-28 17:39, interim PASS). Open: final soak
-verdict, multi-hop bench PN-01, server dedup PN-05. Do NOT use `tools/pages-sync.sh` for content
-updates -- its full mirror deletes `flash/`; copy the changed HTML files into a gh-pages worktree.
+verdict, multi-hop bench PN-01, server dedup PN-05. `tools/pages-sync.sh` keeps `flash/` since the follow-up fix (KEEP list, `--self-test`); before
+that its full mirror would have deleted the flasher.
 
 ## 2026-09-27: PN XOR retry ported onto `feature-snf`, then the outbox removed
 
