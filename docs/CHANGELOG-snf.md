@@ -4,11 +4,13 @@ Branch `feature-snf`, the DM transport stages from `fork-main` ported onto
 `feature-neighbour-matrix` (`0d4b914c`). Engineering record, decisions and gate results:
 `docs/snf-port-campaign.md`. Feature design and stage table: `docs/dm-transport-impl-plan-20260913.md`.
 
-Released as `v4.35t.09.27-neo` together with the neighbour matrix. Bench state: the store node's
-basic case (absent destination, held DM, `:sto` notice, one-hop delivery, ack back to the sender)
-passed twice on 2026-09-26 with a RAK4631 store node and a T-Beam receiver; the rest of the bench
-plan (`docs/dm-bench-session-plan-20260914.md`) is open, see the coverage table at the end of
-`docs/snf-port-campaign.md`.
+Released as `v4.35t.09.27-neo` together with the neighbour matrix; the personal-message retry
+rework below shipped in `v4.35t.09.28-neo`. Bench state: the store node's basic case (absent
+destination, held DM, `:sto` notice, one-hop delivery, ack back to the sender) passed twice on
+2026-09-26 with a RAK4631 store node and a T-Beam receiver; a 24 h soak of the XOR retry format
+between DK5EN-1 and DK5EN-98 started 2026-09-27 17:39, interim PASS (`docs/soak-xor-20260927.md`).
+The rest of the bench plan (`docs/dm-bench-session-plan-20260914.md`) is open, see the coverage
+table at the end of `docs/snf-port-campaign.md`.
 
 ## Upgrade note
 
@@ -54,7 +56,7 @@ default: `--dmretry off`, `--store off`.
 - `--storecall`, `--storetime`, `--storeslots`, `--storenotice` on classic ESP32 answer "unknown
   command" instead of "unavailable" (exact command matching).
 
-## Since v4.35t.09.27-neo (not released yet)
+## Released as v4.35t.09.28-neo
 
 1. **Personal-message retries use the XOR format** (`src/pn_retry.h`, `docs/pn-retry-xor-impl-plan.md`).
    Retry k (1..3) of a DM this node sent carries the original msg_id with bits 10-11 XOR k and a

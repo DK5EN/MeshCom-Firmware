@@ -76,6 +76,19 @@ auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25) und auf
 verhaelt sich hier wie upstream; wo dieser Branch davon abweicht, steht es in
 den beiden folgenden Abschnitten.
 
+## v4.35t.09.28-neo: PN-Wiederholung im XOR-Format
+
+Das Release `v4.35t.09.28-neo` (Branch `feature-snf`) ist `v4.35t.09.27-neo` unveraendert plus
+einen neuen Wiederholungsmechanismus fuer persoenliche Nachrichten (PN, Direktnachrichten):
+Wiederholung k traegt die Original-msg_id mit XOR-verknuepften Bits 10-11, ein Echo beendet die
+Wiederholung nicht mehr, nur noch das Ziel-ACK, und `--dmretry` samt Ausgangskorb entfaellt zugunsten
+eines einzigen Ring-Wiederholungspfads. Eigenes Changelog, hier nicht nummeriert:
+
+- Personal-message retries: [`docs/CHANGELOG-snf.md`](CHANGELOG-snf.md)
+
+Wer den reinen neo-Stand will, nimmt `v4.35t.09.26-neo`; wer neo plus Nachbarschaftsmatrix und
+Speichern-und-Weiterleiten ohne die PN-Wiederholung will, nimmt `v4.35t.09.27-neo`.
+
 ## v4.35t.09.27-neo: zwei Funktionen obendrauf
 
 Das Release `v4.35t.09.27-neo` (Branch `feature-snf`) ist dieser neo-Stand
