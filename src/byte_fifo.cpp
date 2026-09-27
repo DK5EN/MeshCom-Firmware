@@ -9,6 +9,13 @@
 #include <task.h>
 #define BF_LOCK()   taskENTER_CRITICAL()
 #define BF_UNLOCK() taskEXIT_CRITICAL()
+#elif defined(BF_TEST_LOCK_HOOK)
+// Nur im Host-Test (env:native_byte_fifo): die Suite zaehlt mit, welche
+// Funktion die Sperre nimmt.
+void bf_test_lock(void);
+void bf_test_unlock(void);
+#define BF_LOCK()   bf_test_lock()
+#define BF_UNLOCK() bf_test_unlock()
 #else
 #define BF_LOCK()   ((void)0)
 #define BF_UNLOCK() ((void)0)
@@ -135,7 +142,7 @@ void bf_iter_begin(const byte_fifo_t *f, bf_iter_t *it)
     // und einem gen von NACH der Verdraengung. bf_iter_next() haelt das
     // fuer gueltig, liest ein beliebiges Byte als Laenge und liefert Muell,
     // bis left aufgebraucht ist (in-bounds, aber sichtbar auf der
-    // Web-Nachrichtenseite).
+    // Web-Nachrichtenseite). Aus #1157 (f1c5b14f) nachgezogen.
     BF_LOCK();
     it->pos = f->oldest;
     it->left = f->frames;
