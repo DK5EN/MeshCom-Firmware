@@ -10,6 +10,9 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "dedup_functions.h"
+#include "dm_dedup.h"
+#include "reack_limiter.h"
+#include "dm_stats.h"
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -22,6 +25,7 @@
 #include "setlog_lines.h"
 #include "udp_frame.h"
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
+#include "sto_notice.h"        // F1/stage 4: :sto custody notice on server ingress
 
 // C1/U1 carve of handleUdpFrame_nrf52() out of nrf_eth.cpp; see udp_frame.h
 // for why it moved and why the two platform copies are not merged. Moved
@@ -194,6 +198,16 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           memset(convBuffer, 0x00, UDP_TX_BUF_SIZE);
 
+          // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+          // Zielpfad vor checkVia() auf das Ziel zuruecksetzen. Ein Via ist ein
+          // Naechster-Hop-Feld der Absender-Region; vom Server eingespeist
+          // nennt er Knoten, die hier niemand hoert, und kein Nachbar mit
+          // Firmware ab dem 13.06. wiederholte den Rahmen. Danach setzt
+          // checkVia() hoechstens den eigenen Via (node_via). Die Anzeige,
+          // die Telefon-Kopien und die zweite checkVia()-Stelle weiter unten
+          // arbeiten auf demselben, hier schon zurueckgesetzten aprsmsg.
+          mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), aprsmsg.msg_destination_call);
+
           checkVia(aprsmsg);
 
           uint16_t size = encodeAPRS(convBuffer, aprsmsg);
@@ -260,6 +274,9 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     bUDPtoLoraSend=false;
 
                 unsigned int iAckId = 0;
+                bool bDmDedupNew = true;   // 2.1 default
+                bool bStoConsumed = false; // stage 4: :sto notice consumed, don't display/forward
+                uint16_t stoNnn = 0;
 
                 int iAckPos=mcIndexOfStr(aprsmsg.msg_payload, ":ack");
                 int iRefPos=mcIndexOfStr(aprsmsg.msg_payload, ":rej");
@@ -282,9 +299,21 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     uint8_t ack_status = 0x01;  // ACK
 
                     int iackcheck = checkOwnTx(msg_counter);
+
                     if(iackcheck >= 0)
                     {
                         own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+
+                        // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
+                        // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
+                        int ackSlot = findAndStopRingSlot(msg_counter);
+                        if(ackSlot >= 0 && bDisplayRetx)
+                            printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
+                                      ackSlot, msg_counter);
+
+                        // stage 4: the destination's own ack is the final word --
+                        // forget any store node(s) that were holding this DM.
+                        stoHolderClear(msg_counter);
                         // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                         // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,
@@ -330,14 +359,51 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                     bBLELoopOut=false;
                 }
+                else
+                if(strcmp(destination_call, meshcom_settings.node_call) == 0 &&
+                   stoNoticeParse(aprsmsg.msg_payload, &stoNnn, NULL))
+                {
+                    // stage 4: another node (a store node) tells us it is
+                    // holding one of our own outgoing DMs -- consume the
+                    // notice, mark the message HELD, do not display or
+                    // forward it as a chat text.
+                    msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
+
+                    int iStoCheck = checkOwnTx(msg_counter);
+                    if(iStoCheck >= 0 &&
+                       (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
+                       stoHolderNote(msg_counter, aprsmsg.msg_source_call, stoNnn, millis()))
+                    {
+                        own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                        uint8_t stoPrintBuff[30];
+                        uint16_t stoPlen = buildAckPhoneFrame(stoPrintBuff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call);
+                        addBLEOutBuffer(stoPrintBuff, stoPlen);
+
+                        if(bDisplayInfo)
+                            printfdeb("[HELD] by %s nnn:%03u\n", aprsmsg.msg_source_call, (unsigned)stoNnn);
+                    }
+
+                    bStoConsumed = true;
+                }
 
                 if(iEnqPos > 0)
                 {
                   iAckId = (unsigned int)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iEnqPos+1), strlen(aprsmsg.msg_payload));
                   mcTruncate(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), (size_t)(iEnqPos));
+
+                  // 2.1: second dedup layer, keyed on (source call, NNN),
+                  // same table the LoRa RX path writes to.
+                  if(strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(dmDedupCheck(aprsmsg.msg_source_call, (uint16_t)iAckId,
+                                      aprsmsg.msg_payload, strlen(aprsmsg.msg_payload),
+                                      millis()) == DM_DEDUP_DUP)
+                          bDmDedupNew = false;
+                  }
                 }
 
-                if(iAckPos <= 0)
+                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed)
                 {
                   if(!bGATEWAY)
                     sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
@@ -354,15 +420,38 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew && !bStoConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 
-                // DM message for lokal Node 
+                // DM message for lokal Node
                 if(iAckId > 0)
                 {
                   strSource_call = source_call;
-                  SendAckMessage(strSource_call, iAckId);
+
+                  if(iEnqPos > 0 && strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(bDmDedupNew)
+                      {
+                          reackAllowed(aprsmsg.msg_source_call, (uint16_t)iAckId, millis());
+                          SendAckMessage(strSource_call, iAckId);
+                      }
+                      else
+                      {
+                          if(reackAllowed(aprsmsg.msg_source_call, (uint16_t)iAckId, millis()))
+                          {
+                              SendAckMessage(strSource_call, iAckId);
+                              dmstat_reack.fetch_add(1);
+                          }
+                          else
+                              dmstat_reack_limited.fetch_add(1);
+
+                          if(bDisplayInfo)
+                              printfdeb("[DMDUP] from %s nnn:%03u\n", aprsmsg.msg_source_call, (unsigned)iAckId);
+                      }
+                  }
+                  else
+                      SendAckMessage(strSource_call, iAckId);
                 }
             }
           }

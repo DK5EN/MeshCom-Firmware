@@ -31,7 +31,7 @@ flowchart TD
     RX --> DEDUP{"is_new_packet()<br/>ringBufferLoraRX[MAX_DEDUP_RING]"}
     DEDUP -->|duplicate| DROP["drop"]
     DEDUP -->|new| DEC["decodeAPRS() / decodeAPRSPOS()<br/>aprs_functions.cpp"]
-    DEC --> MH["updateMheard() / updateHeyPath()<br/>mheard_functions.cpp"]
+    DEC --> MH["nbrNoteFrame() / nbrNoteDirect()<br/>nbr_matrix.cpp"]
     DEC --> ROUTE{"routing decision<br/>own? / hop budget / prio"}
 
     ROUTE --> DISP["sendDisplayText/Position<br/>loop_functions.cpp"]
@@ -65,7 +65,7 @@ reaches upward and sideways through globals.
 | MCU / scheduler      | `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`                                           | The real `loop()`. **Duplicated between the two MCU families.**             |
 | Radio                | `src/lora_functions.cpp`, `src/lora_setchip.cpp`                                                 | RX/TX state machine, CAD, CSMA, retransmission, per-region chip setup.      |
 | Wire format          | `src/aprs_functions.cpp`, `src/aprs_structures.h`                                                | APRS encode/decode. The interop contract with the live network.             |
-| Application services | `src/loop_functions.cpp`, `mheard_functions.cpp`, `via_functions.cpp`                            | Position, telemetry, messaging, neighbour table, display formatting.        |
+| Application services | `src/loop_functions.cpp`, `nbr_matrix.cpp`, `nbr_views.cpp`, `via_functions.cpp`                 | Position, telemetry, messaging, neighbour matrix, display formatting.       |
 | Config surface       | `src/command_functions.cpp`, `phone_commands.cpp`, `web_functions/`                              | 218 `--command` arms, BLE command channel, web setup forms.                 |
 | Transport (backhaul) | `src/udp_functions.cpp`, `extudp_functions.cpp`, `nrf52/nrf_eth.cpp`                             | WiFi/Ethernet uplink to the MeshCom server.                                 |
 | Sensors / IO         | `src/{aht20,bme680,bmp390,bmx280,sht21,mcu811,ina226,onewire,adc,io,rtc,gps,batt}_functions.cpp` | Mostly self-contained. The healthiest part of the tree.                     |
@@ -165,20 +165,20 @@ This is the single highest-leverage structural defect in the codebase: one inter
 would collapse ~3,200 lines of duplicated scheduling into one implementation and make the
 nRF52 path stop lagging the ESP32 path on every feature.
 
-### 4. `String` in the packet path
+### 4. `String` in the packet path — resolved for the core structs
 
 `docs/codequality-rules.md` states: _"String handling: fixed `char[]` arrays — NEVER
 Arduino `String` in hot paths."_
 
-`struct aprsMessage` — the central RX/TX packet struct — contains **7 `String` members**
-(`msg_source_path`, `msg_source_call`, `msg_source_last`, `msg_destination_path`,
-`msg_destination_call`, `msg_payload`, `msg_gateway_call`). `struct mheardLine` contains 7
-more, and there are `MAX_MHEARD` of them (up to 80 on some boards). Every received packet
-therefore heap-allocates and fragments.
-
-The project's own rules and the project's own core data structure contradict each other.
-This is worth recording as a known, accepted debt rather than pretending it is a bug — but
-it is the reason the DRAM-tight boards had to drop `MAX_MHEARD` to 10.
+The two structs this section used to cite no longer violate that rule. `struct aprsMessage` — the central RX/TX packet struct — held 7 `String`
+members; its text fields (`msg_source_path`, `msg_source_call`, `msg_source_last`,
+`msg_destination_path`, `msg_destination_call`, `msg_payload`, `msg_gateway_call`) are now fixed
+`char[]` arrays (`aprs_structures.h:70-76`, marked "R2-04" in the header comment; neo core
+commit `3b2fbb8c`). `struct mheardLine` — 7 more `String` members, `MAX_MHEARD` times over (up to
+80 on some boards) — was deleted in the MeshCom 5 cutover (`ccb3ec23`); the neighbour matrix that replaced it (`struct NbrMatrix`,
+`nbr_matrix.h:232-252`, [10 §2.4](10-buffer-inventory.md#24-neighbour-matrix--display)) has no
+`String` fields at all. Not re-audited here: whether any other struct on the packet path still
+carries a `String`.
 
 ### 5. Layering violations in both directions
 
@@ -186,8 +186,12 @@ it is the reason the DRAM-tight boards had to drop `MAX_MHEARD` to 10.
   `sendDisplay1306` 321, `sendDisplayPosition` 312) — application logic and presentation
   in one file.
 - Radio scheduling lives in `esp32loop()` — transport concerns inside the scheduler.
-- `mheard_functions.cpp` shares 19 cloned windows with `t-deck-pro/ui_deckpro.cpp` —
-  neighbour-table logic reimplemented inside a UI file.
+- Neighbour-table logic used to be cloned into `t-deck-pro/ui_deckpro.cpp` (19 cloned windows
+  against the now-deleted `mheard_functions.cpp`). Since the MeshCom 5 cutover (`ccb3ec23`) it is
+  centralised in `nbr_views.cpp` (name/hardware tables ported in, `nbr_views.cpp:432-452`), with
+  `topo_ui.cpp` as the one board-agnostic entry point for display refresh and `/topo.dat`
+  (`topo_ui.h:5-23`). Not re-measured: whether any clone remains between `nbr_views.cpp` and the
+  UI files.
 - `udp_functions.cpp` and `nrf52/nrf_eth.cpp` share 19 cloned windows — the same UDP
   protocol handling, forked per MCU.
 

@@ -1,5 +1,46 @@
 # RESUME — pick up here
 
+## 2026-09-27 evening: release `v4.35t.09.28-neo` published (dated Monday 28 September)
+
+Tag `v4.35t.09.28-neo` on `feature-snf`: PN retries in the XOR format (ring path only, `--dmretry` and
+the outbox removed). GitHub release with 39 assets, marked Latest; `v4.35t.09.27-neo` stays as a
+release but is **no longer in the web flasher** (operator decision: offer only the latest). gh-pages
+`b7e0958e` (flasher, `check` 30 boards / 0 mismatches) + `bb532ad1` (index card, protocol section,
+PR history now 46 merged -- #1162, #1168, #1169). Upstream PR #1168 was merged by OE1KBC at 17:17.
+Gate: selftest green, 45 native envs / 1384 cases, 32 release envs, RAK4631 flash 96.1 %.
+`FLASH_VERSION 20260928`. DK5EN-1 and DK5EN-98 run the code-identical build from `ce9bf157` in the
+24 h soak (`docs/soak-xor-20260927.md`, until 2026-09-28 17:39, interim PASS). Open: final soak
+verdict, multi-hop bench PN-01, server dedup PN-05. `tools/pages-sync.sh` keeps `flash/` since the follow-up fix (KEEP list, `--self-test`); before
+that its full mirror would have deleted the flasher.
+
+## 2026-09-27: PN XOR retry ported onto `feature-snf`, then the outbox removed
+
+Personal-message retries carry the XOR retry id (msg_id bits 10-11 XOR k, `src/pn_retry.h`,
+reference `dk5en-xor` `a605e9f5`) on the one remaining send path: the ring retry, up to 3 retries at
+40 s apart. The outbox ladder and `--dmretry` (`off|3`, mode 9 already gone) were removed the same
+day -- after the XOR switch the two paths were nearly identical, so one path stays. Server acks stop
+the ring slot; repeat copies are not re-uploaded or re-stored. Plan, decisions, advisor findings and
+the removal rationale: `docs/pn-retry-snf-port-plan.md` (§7); open items BACKLOG §3.8ba (PN-01..05).
+Host tests and full sweep green, advisor approved, nothing flashed.
+
+## 2026-09-26 evening: release `v4.35t.09.27-neo` published (dated Sunday 27 September)
+
+Tag `v4.35t.09.27-neo` on `feature-snf` `74f72a34`: neo (`v4.35t.09.26-neo` content) plus the
+neighbour matrix and DM store-and-forward. GitHub release with 39 assets, marked Latest;
+`v4.35t.09.26-neo` stays. Web flasher on gh-pages `8cc0e5a3` lists both (09.27 default, dated
+2026-09-27 via the new `pages_flasher.py --date`), `check` 30 boards / 0 mismatches; PR-history
+section and index cards in gh-pages `f938a7bb`. Gate: 44 native envs 1379/1379, golden selftest
+green, 32 release envs built, RAK4631 flash 96.4 %. `FLASH_VERSION 20260927`. This exact image has
+not run on a board; the S&F bench coverage table in `docs/snf-port-campaign.md` lists what is open.
+
+## 2026-09-26: branch `feature-snf` -- S&F ported (bench and release: see the entry above)
+
+`feature-snf` = `feature-neighbour-matrix` `0d4b914c` plus the DM store-and-forward stages 0 (without
+0.1), 2.1, 1, 3 and 4 from `fork-main`, five waves, each advisor-reviewed. State, decisions P1-P5
+and gate figures: `docs/snf-port-campaign.md`; user-facing: `docs/CHANGELOG-snf.md`; open items:
+BACKLOG §3.8az (DM-01..DM-16). Next: the bench, `docs/dm-bench-session-plan-20260914.md`, after the
+neighbour-matrix soak. Not pushed.
+
 ## Where we are, 2026-09-17 night: the closing run is done (start here)
 
 Branch `dry-unification`, tree clean. Operator decisions of the evening: **no

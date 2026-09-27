@@ -8,13 +8,12 @@
 #endif
 
 #include "loop_functions.h"
-#include "byte_fifo.h"
 #include "ack_attribution.h"
 #include "txring_functions.h"
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
 #include "beacon_rate.h"
-#include "mheard_functions.h"
+#include "nbr_views.h"
 #include "command_functions.h"
 
 #include "clock.h"
@@ -34,8 +33,14 @@
 #include "msgid_counter.h"
 #include <counters_store.h>
 #include "setlog_lines.h"
+#include "dm_stats.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"    // S3: store node (last-hop mailbox)
+#endif
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
+#include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
+#include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -107,6 +112,31 @@ bool bDEBUGCSV = false;
 bool bDEBUGEN = false;
 bool bDEBUGLNG = false;
 bool bLORADEBUG = false;
+bool bNBRDEBUG = false;   // --nbrdebug: [NBR]-Zeilen der Nachbarschaftsmatrix, getrennt von bLORADEBUG
+// --nbrrelay off|count|on (Stufe 2, docs/nbr-wichtigkeit-konzept.md Abschnitt 5): count rechnet
+// Bedarfs- und Allein-Maske je Relay und zaehlt, was abgebrochen werden koennte, ohne Wirkung;
+// on bricht Fall-B-Relays gegen gehoerte fremde Wiederholungen ab und staffelt den Backoff nach Fall.
+bool bNBRRELAY = false;   // count oder on: Masken rechnen, NEED/CANCEL?-Zeilen, Zaehler
+bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): default an, gespeichert invertiert
+// (node_sset4 0x2000 gesetzt heisst "aus") -- jeder bestehende Knoten startet damit
+// nach einem Firmware-Update ohne Migration mit sym an. Siehe nbr_matrix.h
+// NBR_SYM_MIN_SNR fuer die Schwelle. Bit seit 2026-09-25 auf 0x2000 (vorher
+// 0x0080, kollidierte mit upstream KISS/TCP), siehe settings_sanitize.h.
+bool bNBRSYM = true;
+// --nbrreport off|auto|on (Stufe 3, HN-Bericht): zwei Bits in node_sset4 --
+// 0x0100 "off" (nie senden), 0x0200 "on" (immer senden), keines von beiden
+// "auto" (Default fuer jeden bestehenden Knoten, keine Migration noetig):
+// Bericht nur, wenn weder bMESH noch bGATEWAY (siehe sendNbrReport()-Aufrufer
+// in esp32_main.cpp/nrf52_main.cpp). Modell wie --nbrrelay oben: EIN Bool je
+// Bit, jede Kommandozeile schreibt nur ihr eigenes.
+bool bNBRRPTOFF = false;   // 0x0100 gesetzt
+bool bNBRRPTON = false;    // 0x0200 gesetzt
+uint32_t stat_nbr_relay_a = 0;          // eingereihte Relays Fall A (Allein-Maske != 0)
+uint32_t stat_nbr_relay_b = 0;          // eingereihte Relays Fall B
+uint32_t stat_nbr_cancel = 0;           // abgebrochene Relays (nur on)
+uint32_t stat_nbr_cancel_possible = 0;  // Relays, deren Bedarf durch fremde Wiederholungen gedeckt war (count: je Slot einmal)
+uint32_t stat_nbr_refuse_alone = 0;     // gehoerte fremde Wiederholung, Abbruch wegen Allein-Maske verweigert (je Slot einmal)
 bool bBLEDEBUG = false;
 bool bWXDEBUG = false;
 bool bIODEBUG = false;
@@ -213,8 +243,6 @@ unsigned long previousWiFiMillis = 0;
 
 // Timer variables for persitence to SD
 unsigned long lastsavePOSPersistence = 0;
-unsigned long lastsaveMHEARDPersistence = 0;
-unsigned long lastsavePATHPersistence = 0;
 
 char cTimeSource[10];
 
@@ -593,6 +621,7 @@ static bool bHaveOwnHeyTx = false;
 static unsigned long iHeyShotSuppressed = 0;
 unsigned long heyinfo_timer = 0;        // we check periodically to send HEY
 int ncnt_hold = 0;
+unsigned long nbrsnap_timer = 0;        // --nbrdebug: 15-min-Takt fuer nbrLogSnapshot()
 
 // Priority Queue arrays
 uint8_t ringPriority[MAX_RING];                 // Prio 1-5 pro Slot
@@ -683,13 +712,6 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
         printfdeb("<%02X>BLEtoPhone RingBuff added len=%i unread=%u lost=%i\n", buffer[0], len, (unsigned)bf_unread(&phoneRing), lost);
         printBuffer(buffer, len);
     }
-
-    // Anders als beim alten Schlitzring (addRingPointer() liess "phone"
-    // bewusst aus, um das Log nicht mit der haeufigsten Ring-Sorte
-    // zuzuschuetten) liefert bf_push2() jetzt eine echte Verdraengungszahl --
-    // die melden wir, statt sie wie zuvor stillschweigend zu verwerfen.
-    if(bLORADEBUG && lost > 0)
-        printfdeb("[MC-DBG] RING_OVERFLOW buf=phone lost=%d\n", lost);
 }
 
 /** @brief Function adding config messages into outgoing BLE ringbuffer
@@ -3299,7 +3321,10 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     f->drop[2]        = stat_drop_count[3];
     f->drop[3]        = stat_drop_count[4];
     f->drop[4]        = stat_drop_count[5];
-    f->mh             = (uint16_t)getMheardCount();
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): STAT-Zeile ist ein
+    // Monitor-Feld (Konsole 2323), kein Funk -- nbrNcnt(), nicht die auf
+    // NBR_NCNT_AIR_MAX gekappte Sendefassung.
+    f->mh             = (uint16_t)nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     f->heap           = heap;
     f->trk_interval_s = trickle_interval_ms / 1000UL;
     f->trk_consistent = trickle_consistent_count;
@@ -3313,6 +3338,23 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     // fertigen Fensters fuer Leser, die nicht selbst drucken (Web-GUI).
     stat_last_window = *f;
     stat_last_window_ms = f->t_ms;
+
+    // 0.4: DM counters/RTT histogram as a second setlog line, same channel
+    // (setlogPrint -> printfdeb) and the same bDisplayLog gate as STAT.
+    if(bDisplayLog)
+    {
+        char dmbuf[200];
+        dmStatFormat(dmbuf, sizeof(dmbuf));
+        setlogPrint(dmbuf);
+
+#if defined(ENABLE_MSGSTORE)
+        if(msgstoreMode() != MSGSTORE_OFF)
+        {
+            msgstoreFormatLine(dmbuf, sizeof(dmbuf));   // S3: MBOX line, same gate
+            setlogPrint(dmbuf);
+        }
+#endif
+    }
 }
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
@@ -3465,8 +3507,7 @@ PingResult sendPing(char msg_call[10])
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen
-    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markieren
+    // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -3492,9 +3533,6 @@ PingResult sendPing(char msg_call[10])
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
-    // ...) -- ein Ping ist eine persoenliche DM und soll als solche
-    // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
     //
     // Rueckgabewert war bisher verworfen: ein voller Ring hat den Ping
     // ebenso stumm verschluckt wie der TRACK-Fall oben, nur dass Display und
@@ -3502,6 +3540,9 @@ PingResult sendPing(char msg_call[10])
     // spaeter kam dann ein irrefuehrendes "[PONG]...fail". Sofort raus, noch
     // vor DisplayPong/bPingSend, damit kein Zaehler fuer einen nie
     // eingereihten Frame scharf gestellt wird.
+    // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
+    // ...) -- ein Ping ist eine persoenliche DM und soll als solche
+    // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
     if(addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg") < 0)
     {
         printfdeb("[PING]...not queued: TX ring refused the frame\n");
@@ -3773,7 +3814,7 @@ static void bpDeliver(const char *text, MsgOrigin origin, const char *dst)
 
         case ORIGIN_BLE:
         case ORIGIN_WEB:
-            // Both land in phoneRing via bpNoticeToPhone(): the phone
+            // Both land in BLEtoPhoneBuff via bpNoticeToPhone(): the phone
             // app drains it in sendToPhone(), the web GUI reads the same ring
             // for its message list (web_functions.cpp ~1293). Framed under
             // the node's own callsign (msg_id via bpNextMsgId(), E5;
@@ -4184,6 +4225,12 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         return BP_SEND_REFUSED;
     }
 
+    // P15: ein {ping} wird nie wiederholt -- die Gegenstelle antwortet mit
+    // {pong}, nie mit ACK, also stoppte nichts die Wiederholung. Hier benannt
+    // (strMsg ist schon ohne {ZIEL}-Teil) und an jeder Stelle wiederverwendet,
+    // die ein {ping} anders behandelt: dmstat_sent, bUseOnce.
+    const bool bPingMsg = strMsg.startsWith("{ping}");
+
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
     // encodeAPRS() beschreibt den Puffer bei jedem Aufruf vollstaendig.
 #if defined(NRF52_SERIES)
@@ -4198,13 +4245,8 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen
-    // bei Text beginnend mit {ping} und {pong} keine MSB für repeat markiereb 
+    // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
-
-    // MSG-ID für repeat Bits frei machen
-    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
-    //discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
     
     // src_override: a KISS client's own source call (handleInboundAx25()), else our own
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path),
@@ -4217,9 +4259,37 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // ACK add request only DM Calls
     if(bDM)
     {
+        // A '{' inside the user text breaks the receiver's NNN parse
+        // (indexOf("{", 1) finds the first brace, not the ack tag); escape it
+        // at the sender (plan risk list, advisor m4).
+        //
+        // P14/P15: ausser bei einem fuehrenden {ping}/{SET}-Tag -- das ist
+        // kein Fliesstext, sondern das Tag selbst (siehe dm_text_escape.h).
+        // Ein '{' NACH dem Tag bricht weiterhin den NNN-Parse und wird
+        // escaped.
+        size_t escFrom = dmTextEscapeFrom(strMsg.c_str());
+        for(size_t i = escFrom; i < (size_t)strMsg.length(); i++)
+        {
+            if(strMsg[i] == '{')
+                strMsg.setCharAt(i, '(');
+        }
+
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
         snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "%s{%s", strMsg.c_str(), cAckId);
+
+        // 0.4: DM outcome counters (docs/dm-transport-impl-plan-20260913.md).
+        // nnn is the same node_msgid value just written into cAckId, before
+        // the increment below.
+        //
+        // P14/P15: nicht fuer ein {ping} -- die Gegenstelle antwortet mit
+        // {pong}, nie mit einem ACK, also stuende es fuer immer als
+        // sent-nie-acked in der DM-Statistik.
+        if(!bPingMsg)
+        {
+            dmstat_sent.fetch_add(1);
+            dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
+        }
     }
 
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
@@ -4262,7 +4332,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     {
         if(mcStartsWith(aprsmsg.msg_payload, "{CET}") || mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
-        else if(mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+        else if(bPingMsg)
             bUseOnce = true; // P14/P15: siehe oben
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
@@ -4414,7 +4484,6 @@ unsigned int sendInjectedPosition(const char *srcCall, const char *posData)
 
     aprsmsg.msg_len = 0;
 
-    // bei Positionen keine MSB für repeat markiereb 
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), srcCall);
@@ -4671,12 +4740,18 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
                 return "";
         }
 
-        int incnt = getMheardCount();
+        // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): /N geht
+        // auf die Luft -- nbrNcntAir() kappt schon auf NBR_NCNT_AIR_MAX; der
+        // Deckel hier bleibt trotzdem stehen (belt-and-suspenders, benannt
+        // statt der alten 99 als Literal) -- ohne ihn kann GCC cncnt's feste
+        // Breite nicht aus dem Rueckgabewert einer Funktion herleiten
+        // (-Werror=format-truncation).
+        int incnt = nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(incnt > 0)
         {
-            if(incnt > 99)
-                incnt=99;
-                
+            if(incnt > NBR_NCNT_AIR_MAX)
+                incnt = NBR_NCNT_AIR_MAX;
+
             snprintf(cncnt, sizeof(cncnt), "/N%i", incnt);
         }
     }
@@ -4999,8 +5074,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
 
         aprsmsg.msg_len = 0;
 
-        // MSG ID zusammen setzen
-        // bei Postionen keine MSB für repeat markiereb 
+        // MSG ID zusammen setzen    
         aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
         if(intervall != POSINFO_INTERVAL)
@@ -5048,6 +5122,12 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         if(iWriteOwn >= MAX_RING)
             iWriteOwn=0;
 
+        // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '!'-
+        // Positionsrahmen -- fuer die Echo-Tabelle, nicht fuer Relays/Text/
+        // den HN-Bericht (die haben eigene Aufrufstellen bzw. gar keine).
+        nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                     (uint16_t)(millis() / 60000UL));
+
         // An APP als Anzeige retour senden
         if(isPhoneReady == 1)
         {
@@ -5080,8 +5160,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen
-    // bei Postionen keine MSB für repeat markiereb 
+    // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -5122,6 +5201,11 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     if(iWriteOwn >= MAX_RING)
         iWriteOwn=0;
 
+    // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '!'-
+    // Positionsrahmen (vom Telefon ausgeloest), gleiche Aufrufstelle wie
+    // sendPosition()'s Mesh-Zweig oben.
+    nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                 (uint16_t)(millis() / 60000UL));
 }
 
 unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *src_override)
@@ -5133,11 +5217,7 @@ unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *s
     aprsmsg.msg_len = 0;
 
     // MSG ID zusammen setzen
-    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
-
-    // MSG-ID für repeat Bits frei machen
-    // NSB start with 00 .. repeater 1 = 01 .. repeater 2 = 10 .. repeater 3 = 11
-    // discussion ongoing aprsmsg.msg_id  = aprsmsg.msg_id & 0x3FFFFFFF;
+    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
     // own Call, or a foreign source when relaying a KISS client's APRS ack
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path),
@@ -5219,8 +5299,7 @@ void sendHey()
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen
-    // bei Hey keine MSB für repeat markiereb 
+    // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -5232,7 +5311,10 @@ void sendHey()
 
     mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), aprsmsg.msg_destination_path);
 
-    snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;", getMheardCount());
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<n> im HEY
+    // geht auf die Luft -- nbrNcntAir(), auf NBR_NCNT_AIR_MAX gekappt.
+    snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;",
+             nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
    
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -5244,6 +5326,13 @@ void sendHey()
 
     // store last message to compare later on
     insertOwnTx(aprsmsg.msg_id);
+
+    // W3b (docs/meshcom5-campaign.md Welle 3, Konzept 4.11): eigener '@'-HEY-
+    // Rahmen -- fuer die Echo-Tabelle, nicht fuer sendNbrReport()'s HN-Bericht
+    // (eigene, ausgeschlossene Aufrufstelle: der HN-Bericht wird nie relayt
+    // und ist keine im 2-Hop-Fenster sichtbare Echo-Kette).
+    nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
+                 (uint16_t)(millis() / 60000UL));
 
     // GW-01: no gateway self-upload of the own '@' HEY. The bare copy
     // (rssi/snr 0, no signal report) always reached the server seconds before
@@ -5263,6 +5352,117 @@ void sendHey()
             iWrite=0;
         */
     }
+}
+
+// HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport off|auto|on): periodischer
+// HEY-artiger Bericht "wen ich direkt mit welchem SNR hoere" (Nachbau von
+// sendHey() oben) an das eigene Ziel "HN", max_hop 0 explizit gesetzt --
+// dieser Bericht wird NIE weiterrelayt (siehe OnRxDone-Abfangpunkt in
+// lora_functions.cpp, der ihn ausschliesslich in die eigene Matrix fuettert
+// und aus jedem anderen Pfad heraushaelt). Der Aufrufer (Timer in
+// esp32_main.cpp/nrf52_main.cpp) entscheidet Takt und ob der --nbrreport-Modus
+// ueberhaupt senden soll; diese Funktion prueft den Modus nicht noch einmal.
+//
+// Wie sendHey() (GW-01) geht der Bericht NUR ueber addTxRingEntry() auf die
+// LoRa-TX-Seite: finalizeAndSendAPRS() ruft weder addNodeData() (Server-
+// Upload) noch sendExternNotice()/queueExtern() (EXTUDP) noch addBLE*Buffer()
+// (Telefon) auf, und diese Funktion selbst auch nicht -- der eigene HN-
+// Bericht bleibt reines LoRa.
+void sendNbrReport()
+{
+    // Wie sendHey(): im Ping-Testbetrieb (node_pingtime > 0) bleibt der
+    // Knoten auch fuer die HN-Meldung still (Advisor R4).
+    if(meshcom_settings.node_call[0] != 0x00 && meshcom_settings.node_pingtime > 0)
+        return;
+
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+    char nbr_payload[128];
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<heard> im
+    // HN-Bericht geht auf die Luft -- nbrNcntAir(), auf NBR_NCNT_AIR_MAX gekappt.
+    int nbr_plen = nbrBuildReport(nbrMatrix, now_min, nbrNcntAir(nbrMatrix, now_min), nbr_payload, sizeof(nbr_payload));
+
+    if(nbr_plen < 0)
+    {
+        // Kein Bericht baubar (leere Matrix o.ae.) -- nichts senden. Feldzahl
+        // wie eine normale RPTTX-Zeile (docs/nbr-logformat.md), nur mit
+        // leerem Payload-Feld, damit ein Auswerter, der immer vier Felder
+        // hinter "RPTTX" erwartet, nicht auf einer fehlenden Spalte stolpert.
+        if(bNBRDEBUG && nbrLog != NULL)
+        {
+            char nbr_line[32];
+            snprintf(nbr_line, sizeof(nbr_line), "[NBR]|RPTTX|%u|-1|", (unsigned)now_min);
+            nbrLog(nbr_line);
+        }
+        return;
+    }
+
+    uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
+
+    struct aprsMessage aprsmsg;
+
+    initAPRS(aprsmsg, '@');
+
+    aprsmsg.msg_len = 0;
+    aprsmsg.max_hop = 0;   // HN-Bericht wird nie weiterrelayt
+
+    // MSG ID zusammen setzen (gleiches Muster wie sendHey())
+    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
+
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "HN");
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "HN");
+
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), nbr_payload);
+
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
+
+    if(bNBRDEBUG && nbrLog != NULL)
+    {
+        char nbr_line[160];
+        snprintf(nbr_line, sizeof(nbr_line), "[NBR]|RPTTX|%u|%d|%s", (unsigned)now_min, nbr_plen, nbr_payload);
+        nbrLog(nbr_line);
+    }
+
+    // store last message to compare later on
+    insertOwnTx(aprsmsg.msg_id);
+
+    // to LoRa
+    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "nbr_report"); // 0xFF no retransmission
+}
+
+// Takt fuer sendNbrReport() (Stufe 3): laeuft UNABHAENGIG vom Trickle-
+// Intervall und wird NIE unterdrueckt -- der Zeitpunkt der naechsten Pruefung
+// ruckt immer weiter, auch bei --nbrreport off, damit ein spaeteres Umschalten
+// auf auto/on nicht sofort einen aufgestauten Bericht nachholt. Nur der
+// SEND-Entscheid haengt am Modus (siehe unten).
+static unsigned long nbrreport_timer = 0;
+static unsigned long nbrreport_due_ms = (unsigned long)NBR_REPORT_FIRST_S * 1000UL;
+
+void nbrReportTick()
+{
+    if((uint32_t)(millis() - nbrreport_timer) < nbrreport_due_ms)
+        return;
+
+    // off (bNBRRPTOFF) nie, on (bNBRRPTON) immer, sonst auto: nur wenn weder
+    // Mesh-Relay noch Gateway-Betrieb an sind -- ein Gateway hoert die
+    // eigentliche Information laengst aus dem Server, ein Mesh-Relay flutet
+    // ohnehin schon.
+    bool bSend;
+    if(bNBRRPTON)
+        bSend = true;
+    else if(bNBRRPTOFF)
+        bSend = false;
+    else
+        bSend = (!bMESH && !bGATEWAY);
+
+    if(bSend)
+        sendNbrReport();
+
+    nbrreport_due_ms = (unsigned long)NBR_REPORT_INTERVAL_S * 1000UL
+                        + (unsigned long)random(0, (long)(NBR_REPORT_JITTER_S * 1000L) + 1);
+    nbrreport_timer = millis();
 }
 
 // Sofort-Pfad fuer sendHey() (FL-02): --sendhey ruft diese Funktion statt
@@ -5335,8 +5535,7 @@ void sendTelemetry(int ID)
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen
-    // bei Text mit msg_destination_call 100001 keine MSB für repeat markiereb 
+    // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
     mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);

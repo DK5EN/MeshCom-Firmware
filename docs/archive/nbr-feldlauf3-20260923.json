@@ -1,0 +1,1561 @@
+{
+  "meta": {
+    "generated_by": "tools/nbrlog.py",
+    "format_vertrag": "docs/nbr-logformat.md"
+  },
+  "1_rahmen": {
+    "dateien": [
+      "/private/tmp/claude-501/-Users-martinwerner-WebDev-MeshCom-Firmware-DEV-Main/232134e1-d55b-4ed7-ab3b-e14c35f025a7/scratchpad/run3/w.log"
+    ],
+    "von": "2026-09-22 23:12:02.795",
+    "bis": "2026-09-23 07:38:02.556",
+    "zeilen_gesamt": 96742,
+    "nbr_zeilen": 7861,
+    "verworfen_gesamt": 88881,
+    "verworfen_gruende": {
+      "endsnap_without_snap": 3,
+      "foreign_line": 88093,
+      "garbled_prefix": 3,
+      "row_without_snap": 63,
+      "unknown_subtype:CANCEL?": 97,
+      "unknown_subtype:NEED": 616,
+      "unknown_subtype:REFUSE": 6
+    },
+    "gefiltert_durch_since": 0,
+    "anomalien": {},
+    "reboots": 0,
+    "reboot_ereignisse": [],
+    "luecken": [],
+    "anzahl_luecken": 0
+  },
+  "eigener_rufzeichen": "DK5EN-98",
+  "eigener_rufzeichen_bekannt": true,
+  "2_nachbarschaft": {
+    "anzahl_direkte_nachbarn": 5,
+    "je_nachbar": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "anzahl": 847,
+        "typverteilung": {
+          "H": 410,
+          "P": 342,
+          "T": 95
+        },
+        "rssi_median": -112,
+        "rssi_min": -115,
+        "rssi_max": -110,
+        "rssi_ohne_bericht": 0,
+        "snr_median": -1,
+        "snr_min": -9,
+        "snr_max": 0,
+        "snr_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-22 23:12:03.207",
+        "letzte_sichtung": "2026-09-23 07:37:50.580"
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "anzahl": 614,
+        "typverteilung": {
+          "P": 338,
+          "T": 106,
+          "H": 170
+        },
+        "rssi_median": -117.0,
+        "rssi_min": -119,
+        "rssi_max": -110,
+        "rssi_ohne_bericht": 0,
+        "snr_median": -5.0,
+        "snr_min": -13,
+        "snr_max": 1,
+        "snr_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-22 23:14:49.098",
+        "letzte_sichtung": "2026-09-23 07:37:11.466"
+      },
+      {
+        "rufzeichen": "DK5EN-1",
+        "anzahl": 387,
+        "typverteilung": {
+          "H": 253,
+          "T": 71,
+          "P": 63
+        },
+        "rssi_median": -65,
+        "rssi_min": -69,
+        "rssi_max": -63,
+        "rssi_ohne_bericht": 0,
+        "snr_median": 6,
+        "snr_min": 5,
+        "snr_max": 8,
+        "snr_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-22 23:13:14.277",
+        "letzte_sichtung": "2026-09-23 07:37:28.157"
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "anzahl": 217,
+        "typverteilung": {
+          "H": 98,
+          "T": 44,
+          "P": 75
+        },
+        "rssi_median": -119,
+        "rssi_min": -121,
+        "rssi_max": -114,
+        "rssi_ohne_bericht": 0,
+        "snr_median": -7,
+        "snr_min": -13,
+        "snr_max": -3,
+        "snr_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-22 23:12:29.242",
+        "letzte_sichtung": "2026-09-23 07:36:28.447"
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "anzahl": 55,
+        "typverteilung": {
+          "P": 15,
+          "H": 40
+        },
+        "rssi_median": -120,
+        "rssi_min": -121,
+        "rssi_max": -117,
+        "rssi_ohne_bericht": 0,
+        "snr_median": -8,
+        "snr_min": -15,
+        "snr_max": -5,
+        "snr_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-22 23:36:44.759",
+        "letzte_sichtung": "2026-09-23 07:38:02.478"
+      }
+    ]
+  },
+  "3_kreuzmatrix": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "anzahl_gehoert": 11,
+        "gehoert": [
+          "DB0FHR-12",
+          "DB0HOB-12",
+          "DB0ISM-1",
+          "DC2MAC-1",
+          "DD7MH-55",
+          "DK5EN-98",
+          "DL2JA-1",
+          "DL2JA-2",
+          "DL3NCU-1",
+          "DO7GH",
+          "OE7XWT-12"
+        ]
+      },
+      {
+        "rufzeichen": "DK5EN-1",
+        "anzahl_gehoert": 9,
+        "gehoert": [
+          "DK5EN-98",
+          "DL1HRU-7",
+          "DO2QG-1",
+          "DO2QG-99",
+          "F6JON-13",
+          "HB3XTK-12",
+          "IS0QLX-11",
+          "OE1XAR-33",
+          "OE6DJG-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "anzahl_gehoert": 0,
+        "gehoert": []
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "anzahl_gehoert": 36,
+        "gehoert": [
+          "DB0ED-99",
+          "DB0HOB-12",
+          "DB0ISM-1",
+          "DB0MMR-12",
+          "DC2MAC-1",
+          "DD7MH-55",
+          "DF2AP-99",
+          "DF2KX-12",
+          "DF8RD-1",
+          "DG3MNF-4",
+          "DG7RJ-12",
+          "DG7RJ-8",
+          "DJ9DQ-1",
+          "DK1JZ-12",
+          "DK3ACH-12",
+          "DK5EN-98",
+          "DK8JP-12",
+          "DL1HRU-7",
+          "DL2JA-1",
+          "DL2JA-3",
+          "DL2UD-1",
+          "DL3NCU-1",
+          "DL5RAS-2",
+          "DM2FK-86",
+          "DO2QG-1",
+          "DO2QG-99",
+          "DO5DMF-99",
+          "DO7GH",
+          "F6JON-13",
+          "HB3XTK-1",
+          "HB3XTK-12",
+          "IS0QLX-11",
+          "OE1KFR-1",
+          "OE1XAR-33",
+          "OE6DJG-2",
+          "OE7XWT-12"
+        ]
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "anzahl_gehoert": 3,
+        "gehoert": [
+          "DK5EN-98",
+          "DL2JA-1",
+          "DL2JA-2"
+        ]
+      }
+    ],
+    "umgekehrt": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DB0FHR-12",
+        "gehoert_von": [
+          "DB0ED-99"
+        ]
+      },
+      {
+        "rufzeichen": "DB0HOB-12",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DB0ISM-1",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DB0MMR-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DC2MAC-1",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DD7MH-55",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DF2AP-99",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DF2KX-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DF8RD-1",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DG3MNF-4",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DG7RJ-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DG7RJ-8",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DJ9DQ-1",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DK1JZ-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DK3ACH-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DK5EN-98",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DK5EN-1",
+          "DL2JA-2",
+          "DL2UD-1"
+        ]
+      },
+      {
+        "rufzeichen": "DK8JP-12",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL1HRU-7",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2",
+          "DL2UD-1"
+        ]
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2UD-1"
+        ]
+      },
+      {
+        "rufzeichen": "DL2JA-3",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL3NCU-1",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DL5RAS-2",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DM2FK-86",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DO2QG-1",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DO2QG-99",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DO5DMF-99",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "DO7GH",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "F6JON-13",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "HB3XTK-1",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "HB3XTK-12",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "IS0QLX-11",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "OE1KFR-1",
+        "gehoert_von": [
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "OE1XAR-33",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "OE6DJG-2",
+        "gehoert_von": [
+          "DK5EN-1",
+          "DL2JA-2"
+        ]
+      },
+      {
+        "rufzeichen": "OE7XWT-12",
+        "gehoert_von": [
+          "DB0ED-99",
+          "DL2JA-2"
+        ]
+      }
+    ]
+  },
+  "4_urteil": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "eigenes_urteil": "exklusiv",
+        "eigenes_meshneed": "MESH",
+        "h_n": [
+          "DB0FHR-12",
+          "DB0HOB-12",
+          "DB0ISM-1",
+          "DC2MAC-1",
+          "DD7MH-55",
+          "DL2JA-1",
+          "DL2JA-2",
+          "DL3NCU-1",
+          "DO7GH",
+          "OE7XWT-12"
+        ],
+        "exklusive_knoten": [
+          "DB0FHR-12"
+        ],
+        "firmware_meshneed": "MESH",
+        "firmware_verdict": "RED",
+        "firmware_snapshot_up": 495,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DK5EN-1",
+        "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [
+          "DL1HRU-7",
+          "DO2QG-1",
+          "DO2QG-99",
+          "F6JON-13",
+          "HB3XTK-12",
+          "IS0QLX-11",
+          "OE1XAR-33",
+          "OE6DJG-2"
+        ],
+        "exklusive_knoten": [],
+        "firmware_meshneed": "RED",
+        "firmware_verdict": "EXCL",
+        "firmware_snapshot_up": 495,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [],
+        "exklusive_knoten": [],
+        "firmware_meshneed": "RED",
+        "firmware_verdict": "RED",
+        "firmware_snapshot_up": 495,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "eigenes_urteil": "exklusiv",
+        "eigenes_meshneed": "MESH",
+        "h_n": [
+          "DB0ED-99",
+          "DB0HOB-12",
+          "DB0ISM-1",
+          "DB0MMR-12",
+          "DC2MAC-1",
+          "DD7MH-55",
+          "DF2AP-99",
+          "DF2KX-12",
+          "DF8RD-1",
+          "DG3MNF-4",
+          "DG7RJ-12",
+          "DG7RJ-8",
+          "DJ9DQ-1",
+          "DK1JZ-12",
+          "DK3ACH-12",
+          "DK8JP-12",
+          "DL1HRU-7",
+          "DL2JA-1",
+          "DL2JA-3",
+          "DL2UD-1",
+          "DL3NCU-1",
+          "DL5RAS-2",
+          "DM2FK-86",
+          "DO2QG-1",
+          "DO2QG-99",
+          "DO5DMF-99",
+          "DO7GH",
+          "F6JON-13",
+          "HB3XTK-1",
+          "HB3XTK-12",
+          "IS0QLX-11",
+          "OE1KFR-1",
+          "OE1XAR-33",
+          "OE6DJG-2",
+          "OE7XWT-12"
+        ],
+        "exklusive_knoten": [
+          "DB0MMR-12",
+          "DF2AP-99",
+          "DF2KX-12",
+          "DF8RD-1",
+          "DG3MNF-4",
+          "DG7RJ-12",
+          "DG7RJ-8",
+          "DJ9DQ-1",
+          "DK1JZ-12",
+          "DK3ACH-12",
+          "DK8JP-12",
+          "DL2JA-3",
+          "DL5RAS-2",
+          "DM2FK-86",
+          "DO5DMF-99",
+          "HB3XTK-1",
+          "OE1KFR-1"
+        ],
+        "firmware_meshneed": "MESH",
+        "firmware_verdict": "RED",
+        "firmware_snapshot_up": 495,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [
+          "DL2JA-1",
+          "DL2JA-2"
+        ],
+        "exklusive_knoten": [],
+        "firmware_meshneed": "RED",
+        "firmware_verdict": "RED",
+        "firmware_snapshot_up": 495,
+        "uebereinstimmung": true
+      }
+    ],
+    "abweichungen": [],
+    "nicht_vergleichbar": []
+  },
+  "4b_deckung": {
+    "universum_groesse": 33,
+    "deckungsmenge": [
+      "DB0ED-99",
+      "DL2JA-2"
+    ],
+    "deckungsmenge_groesse": 2,
+    "wechselseitig_redundante_gruppen": []
+  },
+  "5_stabilitaet": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "verlauf": [
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED"
+        ],
+        "anzahl_snapshots": 30,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "RED"
+      },
+      {
+        "rufzeichen": "DK5EN-1",
+        "verlauf": [
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL"
+        ],
+        "anzahl_snapshots": 30,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "EXCL"
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "verlauf": [
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED"
+        ],
+        "anzahl_snapshots": 29,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "RED"
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "verlauf": [
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED"
+        ],
+        "anzahl_snapshots": 30,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "RED"
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "verlauf": [
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "EXCL",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED",
+          "RED"
+        ],
+        "anzahl_snapshots": 30,
+        "stabil_ab_snapshot": 5,
+        "letztes_urteil": "RED"
+      }
+    ]
+  },
+  "6_tabellendruck": {
+    "reihen": [
+      {
+        "host": "2026-09-22 23:26:52.174",
+        "up": 15,
+        "rows": 17,
+        "maxrows": 21,
+        "voll": false
+      },
+      {
+        "host": "2026-09-22 23:41:52.178",
+        "up": 30,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-22 23:56:52.177",
+        "up": 45,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:11:52.170",
+        "up": 60,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:26:52.169",
+        "up": 75,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:41:52.179",
+        "up": 90,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:56:52.176",
+        "up": 105,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:11:52.173",
+        "up": 120,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:26:52.200",
+        "up": 135,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:41:52.183",
+        "up": 150,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:56:52.181",
+        "up": 165,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:11:52.181",
+        "up": 180,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:26:52.186",
+        "up": 195,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:41:52.164",
+        "up": 210,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:56:52.167",
+        "up": 225,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:26:52.289",
+        "up": 255,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:41:52.202",
+        "up": 270,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:56:52.198",
+        "up": 285,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:11:52.220",
+        "up": 300,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:41:52.189",
+        "up": 330,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:56:52.193",
+        "up": 345,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:11:52.198",
+        "up": 360,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:26:52.201",
+        "up": 375,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:41:52.202",
+        "up": 390,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:56:52.198",
+        "up": 405,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:11:52.199",
+        "up": 420,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:26:52.209",
+        "up": 435,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:41:52.212",
+        "up": 450,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:56:52.215",
+        "up": 465,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 07:26:52.219",
+        "up": 495,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      }
+    ],
+    "rows_max": 21,
+    "rows_median": 21.0,
+    "ueberlauf_snapshots": [
+      {
+        "host": "2026-09-22 23:41:52.178",
+        "up": 30,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-22 23:56:52.177",
+        "up": 45,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:11:52.170",
+        "up": 60,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:26:52.169",
+        "up": 75,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:41:52.179",
+        "up": 90,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 00:56:52.176",
+        "up": 105,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:11:52.173",
+        "up": 120,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:26:52.200",
+        "up": 135,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:41:52.183",
+        "up": 150,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 01:56:52.181",
+        "up": 165,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:11:52.181",
+        "up": 180,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:26:52.186",
+        "up": 195,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:41:52.164",
+        "up": 210,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 02:56:52.167",
+        "up": 225,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:26:52.289",
+        "up": 255,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:41:52.202",
+        "up": 270,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 03:56:52.198",
+        "up": 285,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:11:52.220",
+        "up": 300,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:41:52.189",
+        "up": 330,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 04:56:52.193",
+        "up": 345,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:11:52.198",
+        "up": 360,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:26:52.201",
+        "up": 375,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:41:52.202",
+        "up": 390,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 05:56:52.198",
+        "up": 405,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:11:52.199",
+        "up": 420,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:26:52.209",
+        "up": 435,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:41:52.212",
+        "up": 450,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 06:56:52.215",
+        "up": 465,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-23 07:26:52.219",
+        "up": 495,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      }
+    ],
+    "ueberlauf_erkannt": true,
+    "evict_pro_stunde": {
+      "2026-09-22 23": 2,
+      "2026-09-23 00": 9,
+      "2026-09-23 01": 12,
+      "2026-09-23 02": 9,
+      "2026-09-23 03": 3,
+      "2026-09-23 04": 17,
+      "2026-09-23 05": 4,
+      "2026-09-23 06": 17,
+      "2026-09-23 07": 2
+    },
+    "verdraengte_rufzeichen": {
+      "DG3MNF-4": 8,
+      "DC2MAC-1": 8,
+      "DL5RAS-2": 7,
+      "DG7RJ-12": 7,
+      "DL2JA-3": 5,
+      "OE7XWT-12": 5,
+      "DL3NCU-1": 5,
+      "DO2QG-1": 4,
+      "DF2KX-12": 4,
+      "DF8RD-1": 3,
+      "DG7RJ-8": 2,
+      "DO2QG-99": 2,
+      "DB0MMR-12": 2,
+      "DL1HRU-7": 2,
+      "DO7GH": 1,
+      "DJ9DQ-1": 1,
+      "DB0ISM-1": 1,
+      "DO5DMF-99": 1,
+      "DK3ACH-12": 1,
+      "DM2FK-86": 1,
+      "IS0QLX-11": 1,
+      "DK1JZ-12": 1,
+      "OE1KFR-1": 1,
+      "DK8JP-12": 1,
+      "HB3XTK-12": 1
+    },
+    "evict_gesamt": 75
+  },
+  "7_zwei_hop_schnitt": {
+    "frames_gekuerzt": 1333,
+    "token_verworfen_gesamt": 1995,
+    "verteilung_ntok": {
+      "3": 857,
+      "4": 294,
+      "5": 180,
+      "6": 1,
+      "8": 1
+    },
+    "verteilung_verworfene_token": {
+      "1": 857,
+      "2": 294,
+      "3": 180,
+      "4": 1,
+      "6": 1
+    }
+  },
+  "8_verworfene_frames": {
+    "pro_grund": {
+      "LOOP": 2
+    },
+    "pro_stunde_und_grund": {
+      "2026-09-23 04": {
+        "LOOP": 1
+      },
+      "2026-09-23 06": {
+        "LOOP": 1
+      }
+    },
+    "full_anzahl": 0,
+    "full_alarm": false
+  },
+  "9_positionen": {
+    "eigener_rufzeichen": "DK5EN-98",
+    "eigene_position_bekannt": true,
+    "knoten": [
+      {
+        "rufzeichen": "DB0ED-99",
+        "lat": 48.286,
+        "lon": 12.03367,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:15:41.821",
+        "entfernung_km": 25.709
+      },
+      {
+        "rufzeichen": "DB0FHR-12",
+        "lat": 47.86033,
+        "lon": 12.13183,
+        "mesh": true,
+        "hw": 9,
+        "letzte_sichtung": "2026-09-23 07:12:16.506",
+        "entfernung_km": 67.531
+      },
+      {
+        "rufzeichen": "DB0HOB-12",
+        "lat": 47.748,
+        "lon": 12.25,
+        "mesh": true,
+        "hw": 12,
+        "letzte_sichtung": "2026-09-23 07:20:26.800",
+        "entfernung_km": 82.643
+      },
+      {
+        "rufzeichen": "DB0ISM-1",
+        "lat": 48.22066,
+        "lon": 11.6665,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:21:46.985",
+        "entfernung_km": 21.474
+      },
+      {
+        "rufzeichen": "DB0MMR-12",
+        "lat": 48.13933,
+        "lon": 12.66867,
+        "mesh": true,
+        "hw": 39,
+        "letzte_sichtung": "2026-09-23 07:21:22.831",
+        "entfernung_km": 75.069
+      },
+      {
+        "rufzeichen": "DC2MAC-1",
+        "lat": 48.20716,
+        "lon": 12.05933,
+        "mesh": true,
+        "hw": 12,
+        "letzte_sichtung": "2026-09-23 07:28:41.600",
+        "entfernung_km": 32.599
+      },
+      {
+        "rufzeichen": "DD7MH-55",
+        "lat": 48.165,
+        "lon": 12.61667,
+        "mesh": true,
+        "hw": 39,
+        "letzte_sichtung": "2026-09-23 07:11:35.338",
+        "entfernung_km": 70.397
+      },
+      {
+        "rufzeichen": "DF2KX-12",
+        "lat": 48.46667,
+        "lon": 11.92283,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 05:25:22.541",
+        "entfernung_km": 15.124
+      },
+      {
+        "rufzeichen": "DF8RD-1",
+        "lat": 48.22417,
+        "lon": 11.683,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 04:03:37.912",
+        "entfernung_km": 20.823
+      },
+      {
+        "rufzeichen": "DG3MNF-4",
+        "lat": 48.5505,
+        "lon": 11.86833,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 06:36:40.421",
+        "entfernung_km": 18.546
+      },
+      {
+        "rufzeichen": "DG7RJ-12",
+        "lat": 48.302,
+        "lon": 11.6275,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 04:43:59.904",
+        "entfernung_km": 14.323
+      },
+      {
+        "rufzeichen": "DG7RJ-8",
+        "lat": 48.302,
+        "lon": 11.62767,
+        "mesh": true,
+        "hw": 44,
+        "letzte_sichtung": "2026-09-23 06:46:26.874",
+        "entfernung_km": 14.316
+      },
+      {
+        "rufzeichen": "DK5EN-1",
+        "lat": 48.41633,
+        "lon": 11.75533,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:20:32.654",
+        "entfernung_km": 1.59
+      },
+      {
+        "rufzeichen": "DK5EN-98",
+        "lat": 48.40783,
+        "lon": 11.738,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 06:49:29.351",
+        "entfernung_km": null
+      },
+      {
+        "rufzeichen": "DL2JA-1",
+        "lat": 48.4225,
+        "lon": 11.7865,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:14:00.447",
+        "entfernung_km": 3.934
+      },
+      {
+        "rufzeichen": "DL2JA-2",
+        "lat": 48.423,
+        "lon": 11.78667,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:14:32.388",
+        "entfernung_km": 3.968
+      },
+      {
+        "rufzeichen": "DL2JA-3",
+        "lat": 48.535,
+        "lon": 11.67233,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 05:29:36.262",
+        "entfernung_km": 14.946
+      },
+      {
+        "rufzeichen": "DL2UD-1",
+        "lat": 48.40883,
+        "lon": 11.76133,
+        "mesh": true,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-23 07:14:24.506",
+        "entfernung_km": 1.726
+      },
+      {
+        "rufzeichen": "DL3NCU-1",
+        "lat": 48.3015,
+        "lon": 11.91433,
+        "mesh": true,
+        "hw": 3,
+        "letzte_sichtung": "2026-09-23 07:37:50.584",
+        "entfernung_km": 17.594
+      },
+      {
+        "rufzeichen": "DL5RAS-2",
+        "lat": 48.07117,
+        "lon": 11.68767,
+        "mesh": true,
+        "hw": 12,
+        "letzte_sichtung": "2026-09-23 06:48:01.206",
+        "entfernung_km": 37.62
+      },
+      {
+        "rufzeichen": "DO7GH",
+        "lat": 47.97733,
+        "lon": 11.96,
+        "mesh": true,
+        "hw": 51,
+        "letzte_sichtung": "2026-09-23 07:13:11.596",
+        "entfernung_km": 50.619
+      },
+      {
+        "rufzeichen": "OE7XWT-12",
+        "lat": 47.57767,
+        "lon": 12.2095,
+        "mesh": true,
+        "hw": 42,
+        "letzte_sichtung": "2026-09-23 06:07:20.551",
+        "entfernung_km": 98.752
+      }
+    ]
+  },
+  "10_symmetrie": {
+    "anzahl_gesamt": 491,
+    "pro_rolle": {
+      "ALT": 34,
+      "COVER": 20,
+      "HASF": 437
+    },
+    "je_paar": [
+      {
+        "x": "DL2JA-1",
+        "m": "DB0ED-99",
+        "anzahl": 323,
+        "snr_median": -11
+      },
+      {
+        "x": "DL2JA-1",
+        "m": "DL2JA-2",
+        "anzahl": 97,
+        "snr_median": 7
+      },
+      {
+        "x": "DL2JA-1",
+        "m": "DL2UD-1",
+        "anzahl": 34,
+        "snr_median": -15.0
+      },
+      {
+        "x": "DL2JA-1",
+        "m": "DB0ISM-1",
+        "anzahl": 22,
+        "snr_median": 5.0
+      },
+      {
+        "x": "DL2JA-1",
+        "m": "OE7XWT-12",
+        "anzahl": 11,
+        "snr_median": -12
+      },
+      {
+        "x": "DL2JA-1",
+        "m": "DL3NCU-1",
+        "anzahl": 4,
+        "snr_median": -14.5
+      }
+    ]
+  }
+}

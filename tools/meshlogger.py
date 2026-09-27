@@ -77,7 +77,25 @@ BACKOFF_MAX = 60
 # positive on a genuinely mute node costs one harmless reconnect.
 STALL_TIMEOUT = 90.0
 
+#: Flags forced on for the run and restored at exit. NBR-01: the NBR duty-cycle
+#: test wants only ``--nbrdebug on`` (the two default flags flood the log at
+#: ~200 B/s and would swamp the [NBR] lines) -- ``--flags nbrdebug`` replaces
+#: this list, it does not add to it.
+DEFAULT_FLAGS = "txcapture,loradebug"
+
 stop_requested = False
+
+
+def parse_flag_state(info, flag):
+    """Looks for "...<FLAG> on/off" in a ``--info`` reply (LORADEBUG style).
+
+    Returns ``"on"``/``"off"``, or ``None`` when the node's ``--info`` does
+    not report this flag at all -- the caller must then leave the flag alone
+    at exit instead of guessing a value that could turn ON something that
+    was never touched.
+    """
+    m = re.search(rb"\.\.\." + flag.upper().encode() + rb" (on|off)", info)
+    return m.group(1).decode() if m else None
 
 
 def on_signal(signum, frame):
@@ -201,6 +219,11 @@ def main():
     ap.add_argument("--minfree", type=int, default=500, help="stop below N MB free")
     ap.add_argument("--no-debug-flags", action="store_true",
                     help="do not switch the node, only record what it emits")
+    ap.add_argument("--flags", default=DEFAULT_FLAGS,
+                    help="comma-separated node flags to force on for the run and "
+                         "restore at exit, replacing the default list entirely "
+                         "(default: %(default)s; e.g. --flags nbrdebug for the "
+                         "NBR duty-cycle test)")
     ap.add_argument("--stall-timeout", type=float, default=STALL_TIMEOUT,
                     help="seconds of read silence before the connection is "
                          "declared dead and re-opened (TM-50; default %.0f)"
@@ -219,8 +242,9 @@ def main():
     deadline = started + args.hours * 3600.0
     console = Console(args.host, args.port, args.password)
 
+    flag_names = [f.strip() for f in args.flags.split(",") if f.strip()]
     flags_set = False
-    prev_loradebug = "off"
+    prev_state = {}  # flag name -> "on"/"off"/None (None = unknown, leave alone at exit)
     reconnects = 0
     last_status = 0.0
     backoff = BACKOFF_MIN
@@ -250,23 +274,31 @@ def main():
                         break
                     info += chunk
                 rest += info
-                m = re.search(rb"\.\.\.LORADEBUG (on|off)", info)
-                prev_loradebug = m.group(1).decode() if m else "off"
+                for name in flag_names:
+                    prev_state[name] = parse_flag_state(info, name)
+                    if prev_state[name] is None:
+                        sink.write(
+                            "[LOGGER] flag %s: state not found in --info -- "
+                            "will be left untouched at exit" % name)
 
-                console.send("--txcapture on")
-                time.sleep(1.0)
-                console.send("--loradebug on")
+                for i, name in enumerate(flag_names):
+                    console.send("--%s on" % name)
+                    if i < len(flag_names) - 1:
+                        time.sleep(1.0)
                 flags_set = True
-                sink.write("[LOGGER] flags set (loradebug was: %s)" % prev_loradebug)
+                sink.write("[LOGGER] flags set (%s)" % ", ".join(
+                    "%s was %s" % (n, prev_state[n] if prev_state[n] is not None else "unknown")
+                    for n in flag_names))
             elif flags_set and not args.no_debug_flags:
                 # TM-50: the flags live in flash and survive a node reboot,
                 # but a reconnect can also follow paths where they do not
                 # (settings restored from backup, a fresh flash mid-run).
-                # Both commands are idempotent, so re-applying is free and
+                # Every command here is idempotent, so re-applying is free and
                 # keeps the recording verbose no matter why we reconnected.
-                console.send("--txcapture on")
-                time.sleep(1.0)
-                console.send("--loradebug on")
+                for i, name in enumerate(flag_names):
+                    console.send("--%s on" % name)
+                    if i < len(flag_names) - 1:
+                        time.sleep(1.0)
                 sink.write("[LOGGER] flags re-applied after reconnect")
 
             buf = rest
@@ -355,15 +387,26 @@ def main():
     # 2026-09-01 incident surfaced, and the flags stayed on); the second
     # attempt always starts from a fresh connection.
     if flags_set and not args.no_debug_flags:
+        restore = [(n, v) for n, v in prev_state.items() if v is not None]
+        left_alone = [n for n, v in prev_state.items() if v is None]
+        # txcapture defaulted to an unconditional "off" here before this flag
+        # list was generalised; a flag whose prior state was never found in
+        # --info is now left untouched instead, so a state we never actually
+        # observed is never guessed at shutdown.
         for attempt in (1, 2):
             try:
                 if console.sock is None:
                     console.connect()
-                console.send("--txcapture off")
+                for name, val in restore:
+                    console.send("--%s %s" % (name, val))
+                    time.sleep(1.0)
                 time.sleep(1.0)
-                console.send("--loradebug " + prev_loradebug)
-                time.sleep(2.0)
-                sink.write("[LOGGER] flags restored (loradebug %s)" % prev_loradebug)
+                if restore:
+                    sink.write("[LOGGER] flags restored (%s)" % ", ".join(
+                        "%s=%s" % (n, v) for n, v in restore))
+                if left_alone:
+                    sink.write("[LOGGER] flags left untouched (unknown prior state): %s"
+                               % ", ".join(left_alone))
                 break
             except (OSError, ConnectionError) as exc:
                 console.close()

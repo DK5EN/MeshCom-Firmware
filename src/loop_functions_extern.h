@@ -9,7 +9,6 @@
  *  @date        2025-12-03
  */
 
-#include "mheard_record.h"   // MheardRecord, siehe mheardRecords[] unten
 #include <atomic>
 
 // WQ-01 (2026-09-05): queue panel on the rxlog web page -- pulls in
@@ -46,6 +45,13 @@ extern bool bDEBUGCSV;
 extern bool bDEBUGEN;
 extern bool bDEBUGLNG;
 extern bool bLORADEBUG;
+extern bool bNBRDEBUG;
+extern bool bNBRRELAY;                  // --nbrrelay count|on (Stufe 2), siehe loop_functions.cpp
+extern bool bNBRCANCEL;                 // --nbrrelay on
+extern bool bNBRSYM;                    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme), default on
+extern bool bNBRRPTOFF;                 // --nbrreport off (Stufe 3, HN-Bericht), node_sset4 0x0100
+extern bool bNBRRPTON;                  // --nbrreport on  (Stufe 3, HN-Bericht), node_sset4 0x0200 -- weder/noch = auto
+extern uint32_t stat_nbr_relay_a, stat_nbr_relay_b, stat_nbr_cancel, stat_nbr_cancel_possible, stat_nbr_refuse_alone;
 extern bool bBLEDEBUG;
 extern bool bWXDEBUG;
 extern bool bIODEBUG;
@@ -212,16 +218,23 @@ extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
 extern uint32_t ringEnqueueTime[MAX_RING];     // millis() timestamp when enqueued
 
+// Welle 2 (edge pool, nbr_mask.h): wie in loop_functions.h nur vorwaerts
+// deklariert, nicht per Include gezogen -- gleiche Begruendung dort.
+struct NbrMask;
+
 // N-14: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
 // (ein Default darf pro Parameter nur einmal je Uebersetzungseinheit stehen);
 // diese Zeile deckt nur TUs ab, die ausschliesslich dieses Extern-Header ziehen.
+// Stufe-2-Parameter (kind/need/alone): siehe loop_functions.h.
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
-                    const char* source, int retryCountIn, bool clearSlotFirst);
+                    const char* source, int retryCountIn, bool clearSlotFirst,
+                    uint8_t kind, const NbrMask *need, const NbrMask *alone);
 
 // P15: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
 // (siehe Kommentar bei addTxRingEntry() oben) -- gleiche Begruendung.
 int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
-                        int retryCountIn, bool clearSlotFirst);
+                        int retryCountIn, bool clearSlotFirst,
+                        uint8_t kind, const NbrMask *need, const NbrMask *alone);
 
 // BP-01 (BACKLOG) / TM-37: back-pressure to the sender, in Q-codes.
 //
@@ -363,7 +376,7 @@ extern std::atomic<uint8_t>  stat_ring_max;    // Hochwasser von txRingDepth()
 // (definition in loop_functions.cpp next to getTimeString()).
 void setlogPrint(const char *body);
 // SL-05: fills the STAT fields from the interval counters (drains them), the
-// mheard/trickle/version globals and uptime; heap is platform-specific and passed in.
+// neighbour-count/trickle/version globals and uptime; heap is platform-specific and passed in.
 // stat_drop_count[] is read, not cleared -- the platform tick clears it.
 void setlogFillStat(struct setlogStatFields *f, uint32_t heap);
 
@@ -405,8 +418,6 @@ extern unsigned long previousWiFiMillis;
 
 // Timer variables for persitence to SD
 extern unsigned long lastsavePOSPersistence;
-extern unsigned long lastsaveMHEARDPersistence;
-extern unsigned long lastsavePATHPersistence;
 
 extern double posinfo_distance;
 extern double posinfo_direction;
@@ -431,6 +442,9 @@ extern unsigned long posinfo_timer;      // we check periodically to send GPS
 extern unsigned long posinfo_timer_min;
 extern unsigned long heyinfo_timer;      // we check periodically to send HEY
 extern int ncnt_hold;
+extern unsigned long nbrsnap_timer;      // --nbrdebug: 15-min-Takt fuer nbrLogSnapshot()
+
+void nbrDebugApply(void);                // nbrLog an bNBRDEBUG angleichen (lora_functions.cpp)
 
 extern unsigned long telemetry_timer;    // we check periodically to send TELEMETRY
 extern unsigned long temphum_timer;      // we check periodically get TEMP/HUM
@@ -441,18 +455,6 @@ extern unsigned long web_timer;          // Refreshtime WEbServer
 // batt
 extern float global_batt;
 extern int global_proz;
-
-// R2-01: war `unsigned char mheardBuffer[MAX_MHEARD][60]` -- Text je
-// Eintrag. Jetzt der Datensatz, 20 statt 60 Byte (src/mheard_record.h).
-extern MheardRecord mheardRecords[MAX_MHEARD];
-extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
-extern unsigned long mheardEpoch[MAX_MHEARD];  //Ringbuffer for MHeard EPoch Update Time
-extern int mheardNCount[MAX_MHEARD];
-
-extern char mheardPathCalls[MAX_MHPATH][10]; //Ringbuffer for MHeard Key = Call
-extern unsigned long mheardPathEpoch[MAX_MHPATH];  //Ringbuffer for MHeard EPoch Update Time
-extern unsigned char mheardPathBuffer1[MAX_MHPATH][52]; //Ringbuffer for MHeard Sourcepath
-extern uint8_t mheardPathLen[MAX_MHPATH];
 
 extern char cTimeSource[10];
 

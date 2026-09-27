@@ -1,7 +1,6 @@
 #include "ble_phone_frame.h"
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
-#include <byte_fifo.h>
 #include <phone_commands.h>
 #include <regex_functions.h>
 #include <debugconf.h>
@@ -147,10 +146,7 @@ void sendComToPhone()
 		uint8_t blelen = bf_peek(&phoneComRing, ringSnapshot, sizeof(ringSnapshot));
 		bf_pop(&phoneComRing);
 
-		// N-04 residual: see sendToPhone() above. Nothing queued: bf_pop() on
-		// an empty ring is a safe no-op anyway, but there is no frame to
-		// consume, so we don't call it here -- only the delivering path below
-		// does.
+		// N-04 residual: see sendToPhone() above.
 		if(blelen == 0)
 		{
 			ble_busy_flag = false;
@@ -174,7 +170,7 @@ void sendComToPhone()
 		// send to phone
 		// why do we need to add 2 bytes??
 		bLED_BLUE = true;
-
+		
 		#if defined(ESP8266) || defined(ESP32)
 			blelen=blelen + 2;
 			esp32_write_ble(ComToPhoneBuff, blelen);

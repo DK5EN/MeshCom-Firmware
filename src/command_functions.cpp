@@ -9,7 +9,9 @@
 #include "command_setters.h" // D2-07: numeric argument parse/range/store
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
-#include "mheard_functions.h"
+#include "nbr_matrix.h"
+#include "nbr_views.h"      // W4b: --mheard/--path lesen nur noch ueber die Abfrageschicht
+#include <TinyGPSPlus.h>    // DIST fuer --mheard -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
 #include "udp_functions.h"
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "extudp_functions.h"
@@ -22,8 +24,13 @@
 #include "lora_setchip.h"
 #include "spectral_scan.h"
 #include "rtc_functions.h"
+#include "time_functions.h" // W4b: convertUNIXtoString() fuer --mheard
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
+#include "msgstore_settings.h" // store node settings persistence (stage 3, owner C)
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"      // store node core -- link stub off ENABLE_MSGSTORE boards (owner A)
+#endif
 #include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #ifdef ESP32
 #include "net_console.h"
@@ -77,6 +84,10 @@ namespace Platform { void prepareToSleep(); void loraToSleep(); }
 #endif
 
 unsigned long rebootAuto = 0;
+
+// gps_functions.cpp instanziiert das TinyGPSPlus-Objekt unbedingt (auch ohne
+// ENABLE_GPS); --mheard nutzt nur distanceBetween(), kein GPS-Modul noetig.
+extern TinyGPSPlus gps;
 
 // OTA Libs for ESP32 Partition Switching
 #ifdef ESP32
@@ -180,6 +191,91 @@ int commandCheck(char *msg, char *command)
     return commandMatches(msg, command) ? 0 : -1;
 }
 
+#if defined(ENABLE_MSGSTORE)
+// --storecall entry validator: A-Z0-9, optional "-SSID" (1..99), <= 9 chars
+// before the SSID part (MSGSTORE_CALL_MAX - 1, msgstore_api.h). Mutates the
+// token in place to its uppercase form on success.
+static bool storeCallEntryValid(char *call)
+{
+    for(char *p = call; *p; p++)
+        *p = (char)toupper((unsigned char)*p);
+
+    size_t len = strlen(call);
+    if(len == 0 || len > MSGSTORE_CALL_MAX - 1)
+        return false;
+
+    char *dash = strchr(call, '-');
+    char *base_end = dash ? dash : call + len;
+
+    if(base_end == call)
+        return false;
+
+    for(char *p = call; p < base_end; p++)
+    {
+        if(!isalnum((unsigned char)*p))
+            return false;
+    }
+
+    if(dash != NULL)
+    {
+        char *ssid = dash + 1;
+        size_t ssid_len = strlen(ssid);
+        if(ssid_len == 0 || ssid_len > 2)
+            return false;
+
+        for(char *p = ssid; *p; p++)
+        {
+            if(!isdigit((unsigned char)*p))
+                return false;
+        }
+
+        int ssidVal = atoi(ssid);
+        if(ssidVal < 1 || ssidVal > 99)
+            return false;
+    }
+
+    return true;
+}
+
+// Prints the current mode/slots/time/notice line, bench-parseable (raw
+// Serial.printf, like --maxhop's [MAXHOP] line -- printfdeb() strips ';'
+// outside CSV mode).
+static void storePrintState(void)
+{
+    Serial.printf("[STORE];mode;%s;slots;%u;time;%u;notice;%s\n",
+        msgstoreModeName(msgstoreMode()), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+        msgstoreNotice() ? "on" : "off");
+}
+
+// Applies a new store mode, persists it, and -- when arming the store for
+// the first time (off -> anything else) -- prints the RAM/24-7 warning and
+// the current free heap first, verbatim per the stage 3 brief.
+static void storeApplyMode(enum MsgStoreMode newMode)
+{
+    enum MsgStoreMode prevMode = msgstoreMode();
+
+    msgstoreConfigure(newMode, msgstoreSlots(), msgstoreHoldHours());
+    msgstoreSettingsSave();
+
+    if(prevMode == MSGSTORE_OFF && newMode != MSGSTORE_OFF)
+    {
+        Serial.printf("[STORE];warning;this node must run 24/7 on continuous power; "
+                       "stored messages live in RAM only and a reboot discards all of "
+                       "them without notice\n");
+
+#if defined(ESP32)
+        Serial.printf("[STORE];heap;%u\n", (unsigned)ESP.getFreeHeap());
+#else
+        extern int dbgHeapTotal(void);   // src/instrument.cpp:19 precedent
+        extern int dbgHeapUsed(void);
+        Serial.printf("[STORE];heap;%u\n", (unsigned)(dbgHeapTotal() - dbgHeapUsed()));
+#endif
+    }
+
+    storePrintState();
+}
+#endif // ENABLE_MSGSTORE
+
 // ---------------------------------------------------------------------------
 // D2-06: the 70 table-driven on/off toggles. See src/command_toggles.h for the
 // column meanings and for why the mask is stored as an and/or pair.
@@ -246,6 +342,29 @@ static void tg_post_tft_off() { tdeck_dbg_tft(0); }
 #endif
 #endif
 
+// --nbrrelay off|count|on (Nachbarschaftsmatrix Stufe 2, docs/nbr-wichtigkeit-konzept.md
+// Abschnitt 5 und 5.8 Punkt 4): zwei Bits in node_sset4 -- 0x0800 "rechnen und zaehlen"
+// (bNBRRELAY), 0x1000 "Abbruch und Backoff nach Fall anwenden" (bNBRCANCEL). on setzt beide,
+// count nur das erste, off keines. Die Nachlaeufer halten die beiden Laufzeitflags konsistent,
+// weil eine Tabellenzeile nur EIN Flag schreibt.
+// Bits seit 2026-09-25 verschoben (docs/nbr-stage2-campaign.md "Bit layout since
+// 2026-09-25"): 0x0020/0x0040 kollidierten mit upstream KISS/TCP auf demselben
+// Feld. Die Boot-Migration der Altbits entfiel mit dem KISS-Merge (fork-neo-test
+// 5180eef4): Bestandsknoten setzen ihre NBR-Schalter einmal neu.
+static void tg_post_nbrrelay_off()   { bNBRCANCEL = false; }
+static void tg_post_nbrrelay_count() { bNBRCANCEL = false; }
+static void tg_post_nbrrelay_on()    { bNBRRELAY = true; }
+
+// --nbrreport off|auto|on (Nachbarschaftsmatrix Stufe 3, HN-Bericht): zwei Bits in
+// node_sset4 -- 0x0100 "off" (bNBRRPTOFF), 0x0200 "on" (bNBRRPTON), keines von
+// beiden "auto" (Default, kein bestehender Knoten braucht Migration). Jede Zeile
+// schreibt ihr eigenes Flag per row.flag/TG_FLAG_TRUE und raeumt das jeweils
+// andere per Nachlaeufer weg, damit hoechstens eines der beiden je gesetzt ist --
+// gleiches Muster wie bei --nbrrelay oben.
+static void tg_post_nbrreport_off()  { bNBRRPTON = false; }
+static void tg_post_nbrreport_auto() { bNBRRPTOFF = false; bNBRRPTON = false; }
+static void tg_post_nbrreport_on()   { bNBRRPTOFF = false; }
+
 static const ToggleRow COMMAND_TOGGLES[] =
 {
     { "--setinfo off",        &bDisplayInfo,         nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_ECHO_LN },
@@ -279,6 +398,23 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--debug off",          &bDEBUG,               &meshcom_settings.node_sset,     0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--txcapture on",       &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0008,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--txcapture off",      &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrdebug on",        &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0400,       nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrdebug off",       &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFBFF,   0x00000000,   nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay off",       &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFE7FF,   0x00000000,   tg_post_nbrrelay_off,          TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay count",     &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFEFFF,   0x0800,       tg_post_nbrrelay_count,        TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrrelay on",        &bNBRCANCEL,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x1800,       tg_post_nbrrelay_on,           TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): 0x2000 in node_sset4, invertiert
+    // gespeichert ("aus" setzt das Bit) -- jeder bestehende Knoten startet damit ohne
+    // Migration mit sym an, derselbe Trick wie bei --mesh (Zeilen oben). Keine
+    // Neuberechnung noetig: die Relay-Entscheidung liest bNBRSYM je Frame neu.
+    { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFDFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x2000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100/0x0200 in node_sset4,
+    // siehe tg_post_nbrreport_*() oben. Jede Zeile loescht zuerst BEIDE Bits
+    // (and_mask 0xFFFFFCFF), dann setzt or_mask hoechstens eines davon.
+    { "--nbrreport off",      &bNBRRPTOFF,           &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0100,       tg_post_nbrreport_off,         TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrreport auto",     nullptr,               &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x00000000,   tg_post_nbrreport_auto,        TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrreport on",       &bNBRRPTON,            &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0200,       tg_post_nbrreport_on,          TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     // Upstream d93c05a0/31ef8648: the phone gets SN + SN1, not a text echo the
@@ -908,209 +1044,186 @@ void commandAction(char *umsg_text, bool ble)
         }
 //        else
         {
-            printfdeb("MeshCom %-4.4s%-1.1s commands\n--setcall  set callsign (OE0XXX-1)\n--operatorname set first name/none\n--setctry 0-99 set RX/RX-LoRa-Parameter\n--reboot   Node reboot\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
+            // Every line below sits under the same preprocessor guard as its
+            // handler in commandAction() -- copied verbatim, not re-derived --
+            // so --help never advertises a command this image does not build
+            // (INS-01/INS-04/DOC-02). tools/help_parity_lint.py checks that.
+            printfdeb("MeshCom %-4.4s%-1.1s commands   (a/b = pick one, <x> = value)\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
+            delay(100);
+
+            printdeb("\n== Show ==\n--info                  node info\n--pos                   lat/lon/alt/time\n--weather               temp/hum/press (alias --wx)\n--lora                  LoRa settings\n--mheard                heard stations, 12 h (alias --mh)\n--path                  routes per sender (alias --hey)\n--neighbours            neighbour matrix (alias --nbr)\n--msgid                 message-id counter\n--io                    IO config\n--showI2C               scan I2C bus\n--seset                 show sensor settings\n--wifiset               show WiFi settings\n--nodeset               show node settings\n--analogset             show analog settings\n--tel                   show telemetry settings\n--aprsset               show APRS settings\n--regex <call>          test callsign against the validator\n");
+            #ifndef DISABLE_NET_CONSOLE
+            printdeb("--netconsole            net console status\n");
+            #endif
+            #if defined(ESP32)
+            printdeb("--wifistat              WiFi link/counters\n--udpstat               MeshCom UDP RX/TX counters\n");
+            #endif
             #if defined(NRF52_SERIES)
-            printfdeb("--dfu      reboot into UF2 bootloader (node appears as USB drive)\n");
+            printdeb("--ethstat               Ethernet link/counters\n--dumpsettings          dump raw settings store\n");
             #endif
             delay(100);
 
-            printlndeb("--setssid  WLAN SSID/none\n--setpwd   WLAN PASSWORD/none\n--setownip 255.255.255.255\n--setowngw 255.255.255.255\n--setownms mask:255.255.255.255\n--setowndns 255.255.255.255\n--setownntp 255.255.255.255\n--wifiap on/off WLAN AP\n--extudp  on/off\n--extudpip 255.255.255.255/none\n");
-            delay(100);
-
-            printlndeb("--sethamnet on/off\n--setinet   on/off\n");
-            delay(100);
-
-            printlndeb("--btcode 999999 BT-Code\n--button gpio 99 User-Button PIN\n--analog gpio 99 Analog PIN\n--analog factor 9.9 Analog factor\n--analog check on/off\n");
-            delay(100);
-            printfdeb("--pos      show lat/lon/alt/time info\n--weather  show temp/hum/press\n--sendpos  send pos info now\n--setlat   set latitude 44.12345\n--setlon   set logitude 016.12345\n--setalt   set altidude 9999m, with GPS: seeds the altitude filter, GPS keeps refining\n");
-            delay(100);
-            printlndeb("--symid  set prim/sec Sym-Table\n--symcd  set table column\n--aprscomment  set APRS Comment/none\n--showI2C\n");
-            delay(100);
-            printlndeb("--debug    on/off\n--bledebug on/off\n--loradebug on/off\n--txcapture on/off\n--gpsdebug  on/off\n--softserdebug  on/off\n--wxdebug   on/off\n--display   on/off\n--setinfo   on/off\n--volt on/off   show battery voltage\n--proz on/off    show battery proz.\n");
-            delay(100);
-#if defined(WP_DISP)
-            printlndeb("--rotate 0/90/180/270  E-Ink Display drehen (persistent, board-uebergreifend)\n");
-            delay(100);
-#endif
-            printfdeb("--setgrc 9;..9;  set groups\n--nomsgall on/off  '*'-msg on display\n");
-            delay(100);
-            printlndeb("--maxv    100%% battery voltage\n--track   on/off SmartBeaconing\n--gps on/off use GPS-CHIP\n--utcoff +/-99.9 set UTC-Offset\n--settime yyyy.mm.dd hh:mm:ss\n");
-            delay(100);
-            printlndeb("--gps reset Factory reset\n--txpower 99 LoRa TX-power dBm\n--txfreq  999.999 LoRa TX-freqency MHz\n--txbw    999 LoRa TX-bandwith kHz\n--lora    Show LoRa setting\n");
-            delay(100);
-            printfdeb("--maxhop  %i-%i hop limit for text messages (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
-            delay(100);
-            printlndeb("--bmp on  use BMP280-CHIP\n--bme on  use BME280-CHIP\n--680 on  use BME680-CHIP\n--811 on  use CMCU811-CHIP\n--bmx BME/BMP/680 off\n");
-            delay(100);
-            printlndeb("--onewire on/off  use DSxxxx\n--onewire gpio 99\n");
-            delay(100);
-            // HL-03/HL-04: bis 2026-08-30 nur ueber die T-Deck-GUI erreichbar.
-            // DOC-02: these five commands are gated BOARD_T_DECK/BOARD_T_DECK_PLUS
-            // in commandAction() (own field block ahead of INSTRUMENT_ENABLED,
-            // so they exist in every T-Deck image) -- this line used to
-            // advertise them on every board unconditionally.
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--mute on/off  Ton stumm\n--persistflash on/off  Positionen ins Flash\n--persistsd on/off  Positionen auf SD\n--immediatesave on/off  sofort speichern\n--persiststat  alle nur-NVS-Werte lesen\n");
-            delay(100);
+            printdeb("\n== Node ==\n--setcall <call>        callsign (OE0XXX-1)\n--setname <name>/none   operator first name (alias --operatorname)\n--setctry 0-99          country -> LoRa preset\n--setgrc 9;..9;         groups\n--utcoff +/-99.9        UTC offset h\n--settime yyyy.mm.dd hh:mm:ss  set clock\n");
+            #if defined(ENABLE_RTC)
+            printdeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
             #endif
-            
-            #ifdef BOARD_RAK4630
-                printfdeb("--lps33 on/off (RAK only)\n");
-                delay(100);
+            printdeb("--btcode 999999         BLE pairing code\n--bleshort              BLE advertising short, reboots\n--blelong               BLE advertising long, reboots\n--all                   display: all frames\n--msg                   display: messages only\n--save                  write settings to flash\n--reboot                reboot\n--deepsleep             enter deep sleep\n--cleanflash            wipe settings flash (recovery)\n");
+            #if defined(NRF52_SERIES)
+            printdeb("--dfu                   reboot into UF2 bootloader\n");
             #endif
-
-            printfdeb("--info      show info\n--msgid     show message-id counter\n--mheard    show MHeard\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
-            delay(100);
             #ifdef ESP32
-                printlndeb("--netconsole on/off  (net console port 2323)\n");
-                printfdeb("--passwd xxxx/none   (net console password, none=clear)\n");
-                delay(100);
-                #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
-                    printlndeb("--kiss on/off | tx on/off | meta on/off | auth on/off  (KISS/TCP port 8001)\n");
-                    delay(100);
-                #endif
+            printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
+            printdeb("--conffin               send config-finished to app\n");
             delay(100);
-            printlndeb("--softser   on/off/send/app/baud/fixpegel/fixpegel2/fixtemp");
-            delay(100);
-            printlndeb("--softserread   on/off (show rx msg)");
-            delay(100);
-            // INS-04-Muster: die Hilfe darf ein Kommando nicht bewerben, das
-            // in DIESEM Image gar nicht existiert. Genau das war der T-Deck-
-            // Mute-Fehlbericht -- "Sound on" stand im Menue, --mute war
-            // wegkompiliert. Der String-Scan nach R3-11 fand hier dasselbe:
-            // E22_XML (MC_DIAG=0) trug "specstart" noch genau einmal im Image,
-            // und das war diese Zeile.
-            #if MC_DIAG
-            printlndeb("--spectrum  run spectral scan  --specstart MHz --specend MHz  --specstep MHz  --specsamples 500-2048");
-            delay(100);
-            #endif
-            //own-call-ssid:PARM.VOLT,AMPERE,BATT,,,track,-,-,-,-,-,-,-
-            printlndeb("--parm tm1,tm2,tm3,tm4,tm5 (measured value name ... not used leave blank)");
-            delay(100);
-            //own-call-ssid:%-9.9s:UNIT.V,A,V,,,Y/N,O/N,O/N,O/N,O/N,O/N,O/N,O/N
-            printlndeb("--unit tm1,tm2,tm3,tm4,tm5 (unit like V,A,mV, ... not used leave blank)");
-            delay(100);
-            //#%03i,%.1f,%.1f,0,0,0,%01i0000000
-            printlndeb("--format 1,1,1,1,1 (decimal places ... not used leave 0)");
-            delay(100);
-            //own-call-ssid:EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0
-            printlndeb("--eqns 0,1,0, 0,1,0, 0,1,0, 0,1,0, 0,1,0 (default is set)");
-            delay(100);
-            //internal value names
-            printlndeb("--values press,hum,temp,onewire,co2 (see project pages)");
-            delay(100);
-            //value timer
-            printlndeb("--ptime 99 messuring interval minutes");
 
+            printdeb("\n== LoRa / mesh ==\n--txpower 99            TX power dBm\n--txfreq 999.999        TX frequency MHz\n--txbw 999              bandwidth kHz\n--txsf 6-12             spreading factor\n--txcr 5-8              coding rate 4/x\n");
+            // --maxhop: printfdeb needed here for the %i/%i substitution.
+            printfdeb("--maxhop %d-%-13dtext hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
+            // "--store" alone (no value: show) is the one rung that compiles
+            // on every board (command_ladder_lint.py does not know
+            // ENABLE_MSGSTORE is mutually exclusive with anything, so the
+            // handler is one unconditional rung with a guarded body -- see
+            // commandAction()); its own mention must stay unguarded too, or
+            // help_parity_lint.py's guard-parity check (D) fires on the
+            // boards where the modal --store lines below do not compile.
+            printdeb("--store                 mailbox status (no value: show)\n");
+            #if defined(ENABLE_MSGSTORE)
+            printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--mbox                  store-node mailbox contents\n");
+            #endif
+            printdeb("--mesh on/off           relay foreign frames\n");
+            #ifndef BOARD_RAK4630
+            #if defined(RELAY_SWITCH)
+            printdeb("--relay on/off          board relay output (GPIO)\n");
+            #endif
+            #endif
+            printdeb("--shortpath on/off      short path\n--via on/off/<call>     via callsign\n");
             #if defined(SX126X_V3) || defined(SX1262_E290) || defined(SX1262X) || defined(SX126X) || \
                 defined(SX1262_V3) || defined(USING_SX1262) || defined(BOARD_RAK4630)
-                delay(100);
-                printlndeb("--setboostedgain    on/off  enable/disable boosted rx gain");
+            printdeb("--setboostedgain on/off boosted RX gain\n");
             #endif
+            printdeb("--sendpos               send position now\n--sendtrack             send track/APRS beacon now\n--sendhey               send HEY beacon now\n--sendtele              send telemetry now\n--posshot               one-shot position now\n--postime 99            position interval s\n");
             delay(100);
-            // INS-01: these live inside the INSTRUMENT_ENABLED block in
-            // commandAction() and do not exist in a normal board build, so
-            // --help must not advertise them there.
-            #if INSTRUMENT_ENABLED
-            printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
-            delay(100);
-            printlndeb("--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)");
-            printlndeb("--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)");
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            delay(100);
-            printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
-            delay(100);
-            printlndeb("--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up");
-            #endif
-            #endif
 
-            // DOC-02: everything above predates this pass and is kept as it
-            // was. Below closes the parity gap against the real command set
-            // in commandAction() -- grouped by topic, not by when it was
-            // added.
+            printdeb("\n== Neighbour matrix ==\n--nbrreset              clear matrix\n--nbrcheck              consistency check\n--nbrrelay off/count/on relay decision: off / log only / active\n--nbrsym on/off         assume symmetric links\n--nbrreport off/auto/on HN neighbour report\n");
             delay(100);
-            printlndeb("--txsf 6-12  LoRa spreading factor\n--txcr 5-8  LoRa coding rate 4/x\n--cleanflash  wipe settings flash (recovery)\n");
+
+            printdeb("\n== APRS ==\n--symid <c>             symbol table\n--symcd <c>             symbol code\n--aprscomment <t>/none  comment (alias --atxt)\n--aprsmc <call>         APRS destination call (default APRSMC)\n--track on/off          SmartBeaconing\n");
+            #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
+            printdeb("--gps on/off            GPS chip\n");
+            #ifndef BOARD_T_DECK_PRO
+            printdeb("--gps reset             GPS factory reset\n");
+            #endif
+            printdeb("--gps autosymbol/fixsymbol  symbol source\n");
+            #endif
+            printdeb("--setlat 44.12345       latitude\n--setlon 016.12345      longitude\n--setalt 999            altitude m (with GPS: seeds the filter)\n--setublox <cmd>        u-blox GPS passthrough\n--setl76k <cmd>         L76K GPS passthrough\n");
             delay(100);
-            printlndeb("--sendhey  send HEY beacon now\n--sendtele  send telemetry now\n--sendtrack  send track/APRS beacon now\n");
-            delay(100);
-            printlndeb("--pingcall <call>  set ping target\n--pingtime 99  ping interval (s)\n--pingmax 99/max  ping count limit\n--ping start/stop  start/stop pinging\n");
-            delay(100);
+
+            printdeb("\n== Network ==\n");
+            #ifndef BOARD_RAK4630
+            printdeb("--setssid <ssid>/none   WLAN SSID\n--setpwd <pwd>/none     WLAN password\n--wifiap on/off         WLAN access point\n");
+            #endif
+            printdeb("--wifitxpower 2-20      WiFi TX power dBm\n--setownip a.b.c.d      static IP\n--setowngw a.b.c.d      gateway\n--setownms a.b.c.d      netmask\n--setowndns a.b.c.d     DNS server\n--setownntp a.b.c.d     NTP server\n");
+            #ifndef BOARD_RAK4630
             #if defined(HAS_ETHERNET)
-            printlndeb("--netmode wifi/eth  select network interface\n");
-            delay(100);
+            printdeb("--netmode wifi/eth      network interface\n");
             #endif
-            #if defined(RELAY_SWITCH)
-            printlndeb("--relay on/off  mesh relay\n");
-            delay(100);
             #endif
-            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n--ackinfo on/off  show who ACKed, not saved to flash\n");
-            delay(100);
-            printlndeb("--debug csv/man/en/de  debug output format/language\n");
-            delay(100);
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--keylock on/off  keyboard lock (SYM+K); on = touch and keyboard ignored\n");
-            delay(100);
+            printdeb("--gateway on/off/pos/nopos  MeshCom gateway\n--gateway srv OE/DL/IT  gateway server, reboots\n--setudpcall <call>     UDP callsign\n--sethamnet on/off      HAMNET server\n--setinet on/off        internet server\n--extudp on/off         external UDP\n--extudpip a.b.c.d/none external UDP peer\n--nopmother on/off      no foreign DMs to EXTUDP peer\n--webserver on/off      web server\n--webpwd <pwd>/none     web password\n--webtimer 0            reset web session timer\n");
+            #ifndef DISABLE_NET_CONSOLE
+            printdeb("--netconsole on/off     console on TCP 2323\n");
             #endif
-            printlndeb("--setcont on/off\n--setlog on/off/<val>\n--setretx on/off\n--shortpath on/off\n");
-            delay(100);
-            printlndeb("--softser app0/baud/rxpin/txpin  softser wiring\n");
-            delay(100);
-            printlndeb("--aht20 on/off\n--sht21 on/off\n--390 on/off  use BMP390-CHIP\n--ina226 on/off\n--shunt 9.999  INA226 shunt ohms\n--imax 9.9  INA226 max current A\n--isamp 9  INA226 sample count\n");
-            delay(100);
-            printlndeb("--batt factor 9.9  battery ADC factor\n--tempoff in/out 9.9  temperature offset\n");
-            delay(100);
-            #if defined(ENABLE_RTC)
-            printlndeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
-            delay(100);
+            printdeb("--passwd <pwd>/none     net console password\n");
+            #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+            printdeb("--kiss on/off           KISS/TCP port 8001\n--kiss tx on/off        KISS may transmit\n--kiss meta on/off      KISS metadata frames\n--kiss auth on/off      KISS authentication\n");
             #endif
-            printlndeb("--setpress  latch QNH reference at current altitude\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
-            delay(100);
-            #ifdef BOARD_LED
-            printlndeb("--board led on/off  board LED\n");
-            delay(100);
-            #endif
-            printlndeb("--wifitxpower 2-20  WiFi TX power dBm\n--webtimer 0  reset web session timer\n--contrast 1-255  OLED contrast\n--button on/off  enable user-button check\n");
-            delay(100);
-            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--spiffs reset  format SPIFFS\n");
-            delay(100);
-            #endif
-            printlndeb("--io  show IO config\n--setio 99 in/out/pullup  MCP17 IO pin\n--setio clear\n--setout 99 on/off  MCP17 output\n");
-            delay(100);
-            printlndeb("--seset/--wifiset/--nodeset/--analogset/--tel/--aprsset  show that settings group\n--aprsmc <call>  set APRS MYCALL/none\n");
-            delay(100);
-            printlndeb("--posshot  one-shot position now\n--postime 99  position interval (s)\n--regex <call>  test callsign against the validator\n");
-            delay(100);
-            #if defined BOARD_T5_EPAPER
-            printlndeb("--t5 on/off  E-paper power\n");
-            delay(100);
-            #endif
-            #if INSTRUMENT_ENABLED
-            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n--ntpsync  request an immediate NTP refresh now\n");
-            #else
-            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n");
+            #if defined(ESP32) || defined(NRF52_SERIES)
+            printdeb("--udplog on/off         one [UDP] line per datagram\n");
             #endif
             delay(100);
-            #if defined(ESP32)
-            printlndeb("--wifistat  WiFi link/counters\n--udpstat  MeshCom UDP RX/TX counters\n--udplog on/off  one [UDP] line per datagram\n");
-            delay(100);
-            #endif
-            #if defined(NRF52_SERIES)
-            printlndeb("--ethstat  Ethernet link/counters\n--udplog on/off  one [UDP] line per datagram\n");
-            delay(100);
-            printlndeb("--dumpsettings  dump the raw keyed settings store file to console\n");
-            delay(100);
-            #endif
 
-            // DOC-02: the ~50-command bench/instrument surface (--heap,
-            // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
-            // --ntpsync, ... see src/instrument.h) is compiled out of a normal
-            // board build and only present in a measurement firmware built
-            // with -D INSTRUMENT_ENABLED=1. Announce it only where it exists,
-            // and do not enumerate the block command by command.
+            printdeb("\n== Sensors / battery ==\n");
+            #if defined(ENABLE_BMX280)
+            printdeb("--bmp on                use BMP280\n--bme on                use BME280\n--680 on                use BME680\n--811 on                use CCS811\n");
+            #endif
+            #if defined(ENABLE_BMP390)
+            printdeb("--390 on                use BMP390\n");
+            #endif
+            printdeb("--bmx off               BMx280/390/680 off\n--bmp off               BMx280/390 off\n--bme off               BMx280/390 off\n--680 off               BME680 off\n--390 off               BMP390 off\n--811 off               CCS811 off\n");
+            #if defined (ENABLE_BMX280)
+            printdeb("--setpress              latch QNH at current altitude\n");
+            #endif
+            #if defined(ENABLE_AHT20)
+            printdeb("--aht20 on/off          AHT20\n");
+            #endif
+            #if defined(ENABLE_SHT21)
+            printdeb("--sht21 on/off          SHT21\n");
+            #endif
+            #if defined(LPS33)
+            printdeb("--lps33 on/off          LPS33\n");
+            #endif
+            #ifdef OneWire_GPIO
+            printdeb("--onewire on/off        1-Wire DSxxxx\n--onewire gpio 99       1-Wire pin\n");
+            #endif
+            #if defined (ENABLE_INA226)
+            printdeb("--ina226 on/off         INA226\n--shunt 9.999           INA226 shunt ohms\n--imax 9.9              INA226 max current A\n--isamp 9               INA226 sample count\n");
+            #endif
+            #if defined(ANALOG_PIN)
+            printdeb("--analog gpio 99        analog pin\n--analog factor 9.9     analog factor\n--analog alpha 9.9      analog filter alpha\n--analog slope 9.999    analog slope 0-9.999\n--analog offset 999     analog offset mV\n--analog atten 0-3      ADC attenuation\n--analog filter on/off  analog filter\n--analog check on/off   analog check\n");
+            #endif
+            printdeb("--batt factor 9.9       battery ADC factor\n--maxv 9.99             100% battery voltage\n--volt on/off           show battery voltage\n--proz on/off           show battery percent\n--tempoff in/out 9.9    temperature offset\n--button on/off         user button check\n");
+            #ifndef BOARD_T_DECK_PRO
+            printdeb("--button gpio 99        user button pin\n");
+            #endif
+            printdeb("--setio a0-b7 in/out    MCP IO pin mode\n--setio clear           clear MCP IO config\n--setout a0-b7 on/off   MCP output\n");
+            delay(100);
+
+            printdeb("\n== Telemetry ==\n--parm tm1,..,tm5       value names (unused: blank)\n--unit tm1,..,tm5       units (unused: blank)\n--format 1,1,1,1,1      decimals (unused: 0)\n--eqns 0,1,0,...        equations, 15 values\n--values press,hum,temp,onewire,co2  value sources\n--ptime 99              interval min\n");
+            delay(100);
+
+            printdeb("\n== Display ==\n--display on/off        display\n--nomsgall on/off       hide '*' messages\n--contrast 1-255        OLED contrast\n");
+            #if defined(WP_DISP) or defined(BOARD_E290)
+            printdeb("--rotate 0/90/180/270   e-ink rotation\n");
+            #endif
+            #if defined BOARD_T5_EPAPER
+            printdeb("--t5 on/off             e-paper power\n");
+            #endif
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--mute on/off           sound off\n--persistflash on/off   positions to flash\n--persistsd on/off      positions to SD\n--immediatesave on/off  save at once\n");
+            #endif
+            printdeb("--persiststat           NVS-only values\n");
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--keylock on/off        SYM+K lock\n");
+            #endif
+            #ifdef BOARD_LED
+            printdeb("--board led on/off      board LED\n");
+            #endif
+            delay(100);
+
+            printdeb("\n== Debug ==\n--debug on/off          debug output\n--debug csv/man         output format\n--debug en/de           output language\n--bledebug on/off       BLE debug\n--loradebug on/off      LoRa debug\n--txcapture on/off      TX capture\n--nbrdebug on/off       neighbour debug\n--viadebug on/off       via debug\n--wxdebug on/off        weather debug\n--gpsdebug on/off       GPS debug (also 2/0)\n--ackinfo on/off        show who ACKed (not saved)\n--setinfo on/off        LoRa info lines on serial\n--setcont on/off        verbose serial output\n--setretx on/off        retransmit info on serial\n--setlog on/off/<call>  log one callsign\n");
+            #if defined(ENABLE_SOFTSER)
+            printdeb("--softser on/off        soft serial\n--softser send          soft serial send\n--softser app/app0      soft serial app\n--softser baud 9600     soft serial baud\n--softser rxpin 99      soft serial RX pin\n--softser txpin 99      soft serial TX pin\n--softser fixpegel 9.9  fixed level\n--softser fixpegel2 9.9 fixed level 2\n--softser fixtemp 9.9   fixed temperature\n--softserdebug on/off   soft serial debug\n--softserread on/off    show soft serial RX\n");
+            #endif
+            printdeb("--pingcall <call>       ping target\n--pingtime 99           ping interval s\n--pingmax 99/max        ping count limit\n--ping start/stop       start/stop pinging\n--spectrum              spectral scan\n");
+            #ifdef HEAP_TEST
+            printdeb("--spiffs reset          format SPIFFS\n");
+            #endif
+            #if MC_DIAG
+            printdeb("--specstart 999.9       scan start MHz\n--specend 999.9         scan end MHz\n--specstep 9.9          scan step MHz\n--specsamples 500-2048  scan samples\n");
+            #endif
+            delay(100);
+
+            // INS-01/INS-04: these bench/instrument commands live only inside
+            // the INSTRUMENT_ENABLED block in commandAction() and do not exist
+            // in a normal board build, so --help must not advertise them there.
             #if INSTRUMENT_ENABLED
-            printlndeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            printdeb("\n== Bench (instrument build) ==\n--injectmsg <grp|call> <text>  queue a text as if received via LoRa\n--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)\n--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)\n");
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printdeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
+            #endif
+            printdeb("--ntpsync  request an immediate NTP refresh now\n");
+            printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            delay(100);
             #endif
         }
 
@@ -3251,7 +3364,6 @@ void commandAction(char *umsg_text, bool ble)
             }
         }
 
-        // Ziel ist node_pingcall, nicht node_call -- eigene sizeof verwenden, sonst bricht es sobald eines der beiden Arrays vergroessert wird
         snprintf(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_pingcall), "%s", sVar.c_str());
 
          if(meshcom_settings.node_pingcall[0] == 0x00)
@@ -4064,6 +4176,243 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // Store node (mailbox) settings, stage 3 (docs/dm-stage3-wave-plan-20260914.md)
+    // + stage 4 sender-visible custody notice (docs/dm-stage4-plan-20260914.md).
+    // T13: persisted through msgstore_settings.cpp's own keys/file, never
+    // through struct s_meshcom_settings. commandCheck is a prefix match for
+    // the trailing-space (argument) forms, so storecall/storetime/storeslots/
+    // storenotice must be tested before the bare "store"/"storenotice" below --
+    // "store" (5 chars) alone would otherwise not reach them, but "storenotice"
+    // (11 chars) as an exact token would shadow "storenotice " if reordered.
+#if defined(ENABLE_MSGSTORE)
+    if(commandCheck(msg_text+2, (char*)"storecall ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+12);
+
+        if(casecmp(_owner_c, (char*)"none") == 0)
+        {
+            msgstoreSetList("");
+            msgstoreSettingsSave();
+            Serial.printf("[STORE];list;\n");
+
+            return;
+        }
+
+        char normalized[MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX] = {0};
+        int count = 0;
+        bool bad = false;
+
+        char *tok = strtok(_owner_c, ",");
+        while(tok != NULL)
+        {
+            while(*tok == ' ')
+                tok++;
+
+            size_t tl = strlen(tok);
+            while(tl > 0 && tok[tl-1] == ' ')
+                tok[--tl] = 0;
+
+            count++;
+
+            if(count > MSGSTORE_LIST_MAX || !storeCallEntryValid(tok))
+            {
+                bad = true;
+                break;
+            }
+
+            if(normalized[0] != 0)
+                strncat(normalized, ",", sizeof(normalized) - strlen(normalized) - 1);
+            strncat(normalized, tok, sizeof(normalized) - strlen(normalized) - 1);
+
+            tok = strtok(NULL, ",");
+        }
+
+        if(bad || count == 0)
+        {
+            Serial.printf("[ERR];storecall;invalid entry or more than %d entries\n", MSGSTORE_LIST_MAX);
+
+            return;
+        }
+
+        msgstoreSetList(normalized);
+        msgstoreSettingsSave();
+        Serial.printf("[STORE];list;%s\n", msgstoreListCsv());
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storecall") == 0)
+    {
+        Serial.printf("[STORE];list;%s\n", msgstoreListCsv());
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storetime ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+12);
+        iVar = 0;
+        sscanf(_owner_c, "%d", &iVar);
+
+        if(iVar < 1 || iVar > MSGSTORE_HOLD_MAX_H)
+        {
+            Serial.printf("[ERR];storetime;%d not between 1 and %d\n", iVar, MSGSTORE_HOLD_MAX_H);
+
+            return;
+        }
+
+        msgstoreConfigure(msgstoreMode(), msgstoreSlots(), (uint16_t)iVar);
+        msgstoreSettingsSave();
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storetime") == 0)
+    {
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storeslots ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
+        iVar = 0;
+        sscanf(_owner_c, "%d", &iVar);
+
+        if(iVar < 1 || iVar > MSGSTORE_SLOTS_MAX)
+        {
+            Serial.printf("[ERR];storeslots;%d not between 1 and %d\n", iVar, MSGSTORE_SLOTS_MAX);
+
+            return;
+        }
+
+        // Allowed while entries are held: the core caps its use at the new
+        // value (docs/commands-store-node.md).
+        msgstoreConfigure(msgstoreMode(), (uint8_t)iVar, msgstoreHoldHours());
+        msgstoreSettingsSave();
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storeslots") == 0)
+    {
+        storePrintState();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store off") == 0)
+    {
+        storeApplyMode(MSGSTORE_OFF);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store own") == 0)
+    {
+        storeApplyMode(MSGSTORE_OWN);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store list") == 0)
+    {
+        storeApplyMode(MSGSTORE_LIST);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"store heard") == 0)
+    {
+        storeApplyMode(MSGSTORE_HEARD);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storenotice ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            msgstoreSetNotice(true);
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            msgstoreSetNotice(false);
+        }
+        else
+        {
+            Serial.printf("[ERR];storenotice;must be on or off\n");
+
+            return;
+        }
+
+        msgstoreSettingsSave();
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storenotice") == 0)
+    {
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mbox") == 0)
+    {
+        // F3 (fable-dm-stage4-verdict-20260914.md): matches the STAT path's
+        // dmbuf[200] (loop_functions.cpp) -- msgstoreFormatLine() now carries
+        // 15 numbers behind 94 bytes of literals, and 128 clamps the trailing
+        // sto= field first on a store node that has been up for weeks.
+        char line[200];
+        msgstoreFormatLine(line, sizeof(line));
+        Serial.printf("%s\n", line);
+
+        int slots = msgstoreSlots();
+        for(int islot=0; islot<slots; islot++)
+        {
+            const struct MsgStoreEntry *e = msgstoreEntry(islot);
+            if(e == NULL)
+                continue;
+
+            unsigned long age_s = (unsigned long)((millis() - e->stored_ms) / 1000);
+
+            // Never the payload text -- slot, dst, src, nnn, state, cycles.attempt, age.
+            Serial.printf("[MBOX];%d;%s;%s;%u;%s;%u.%u;age;%lu\n",
+                islot, e->dst, e->src, (unsigned)e->nnn, msgstoreStateName(e->state),
+                (unsigned)e->cycles, (unsigned)e->attempt, age_s);
+        }
+
+        return;
+    }
+    else
+#endif // ENABLE_MSGSTORE
+    // Bare "store" is a single, unconditional rung on both build shapes --
+    // command_ladder_lint.py's exact-duplicate check only recognises
+    // NRF52_SERIES/ESP32 as mutually exclusive #if guards, not
+    // ENABLE_MSGSTORE, so two separate "store" rungs (one per #if/#else
+    // arm, as fork-main has it) would read as dead code. One rung, two
+    // bodies instead.
+    if(commandCheck(msg_text+2, (char*)"store") == 0)
+    {
+#if defined(ENABLE_MSGSTORE)
+        storePrintState();
+#else
+        // Ineligible board (T-Beam and other classic-ESP32 boards): the
+        // setters above do not exist here, so a web setparam must not fall
+        // into "unknown command" for the bare form either.
+        Serial.printf("[STORE];unavailable\n");
+#endif
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"txpower ") == 0)
     {
         bArgOk = cmdArgInt(msg_text+10, &iVar);
@@ -4533,6 +4882,31 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // --airgap on|off: RAM-only bench instrument (plan 0.5). While set,
+    // OnRxDone() drops every frame at the radio boundary and doTX() refuses
+    // to transmit -- see src/instrument.h. Never persisted, so a reboot
+    // always clears it. Order matters: "airgap on"/"airgap off" must be
+    // tested before the bare "airgap" (commandCheck() is a prefix match).
+    if(commandCheck(msg_text+2, (char*)"airgap on") == 0)
+    {
+        bAirgap = true;
+        Serial.printf("[AIRGAP];on\n");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"airgap off") == 0)
+    {
+        bAirgap = false;
+        Serial.printf("[AIRGAP];off\n");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"airgap") == 0)
+    {
+        Serial.printf("[AIRGAP];%s\n", bAirgap ? "on" : "off");
+        return;
+    }
+    else
     // --- UI test hooks (T-Deck) and message injection -----------------------
     // --injectmsg <dst> <text>: enqueue a text message as if received via LoRa
     // --injectpos <call> <lat> <lon>   (decimal degrees, negative = S / W)
@@ -4994,14 +5368,259 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"mheard") == 0 || commandCheck(msg_text+2, (char*)"mh") == 0)
     {
-        showMHeard();
+        // W4b (docs/meshcom5-campaign.md Welle 4, Konzept 4.6/4.9): showMHeard()
+        // ist mit mheard_functions.* weg -- Quelle ist nur noch die Topologie
+        // (src/nbr_views.h), 12h-Fenster, neueste zuerst, dieselben Felder wie
+        // die Web-MHeard-Seite (web_functions.cpp: sub_page_mheard()).
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        bool bClockValid = (meshcom_settings.node_date_year >= 2025);
+        unsigned long nowEpoch = bClockValid ? getUnixClock() : 0;
+
+        uint8_t *mh_idx = (uint8_t *)malloc((size_t)NBR_MAX_ROWS);
+        if(mh_idx == NULL)
+        {
+            printfdeb("[MH] not enough memory\n");
+            return;
+        }
+
+        int mh_total = nbrMhRows(nbrMatrix, now_min, 12 * 60, mh_idx, NBR_MAX_ROWS);
+        printfdeb("[MH] window=720min rows=%d\n", mh_total);
+
+        int mh_shown = (mh_total < NBR_MAX_ROWS) ? mh_total : NBR_MAX_ROWS;
+        for(int k = 0; k < mh_shown; k++)
+        {
+            NbrMhView v;
+            if(!nbrMhGet(nbrMatrix, mh_idx[k], now_min, &v))
+                continue;
+
+            char ts[24];
+            if(bClockValid)
+            {
+                // Sekunde aus dem Slot statt der Zeilenminute (Konzept 4.6).
+                unsigned long base = nowEpoch - (nowEpoch % 60UL) - (unsigned long)v.age_min * 60UL;
+                if(v.sec < 60)
+                    base += v.sec;
+                base += (unsigned long)(long)(meshcom_settings.node_utcoff * 3600.0);
+                snprintf(ts, sizeof(ts), "%s", convertUNIXtoString(base).c_str());
+            }
+            else
+            {
+                snprintf(ts, sizeof(ts), "age %umin", (unsigned)v.age_min);
+            }
+
+            char rssiTxt[8];
+            if(v.rssi == NBR_MH_RSSI_UNKNOWN)
+                snprintf(rssiTxt, sizeof(rssiTxt), "NA");
+            else
+                snprintf(rssiTxt, sizeof(rssiTxt), "%d", (int)v.rssi);
+
+            char snrTxt[8];
+            if(v.snr == NBR_SNR_UNKNOWN)
+                snprintf(snrTxt, sizeof(snrTxt), "NA");
+            else
+                snprintf(snrTxt, sizeof(snrTxt), "%d", (int)v.snr);
+
+            char hmTxt[8];
+            if(v.hm_snr == NBR_SNR_UNKNOWN)
+                snprintf(hmTxt, sizeof(hmTxt), "NA");
+            else
+                snprintf(hmTxt, sizeof(hmTxt), "%d", (int)v.hm_snr);
+
+            // DIST wie auf der Web-Seite aus der eigenen Position gerechnet,
+            // 0/0 = unbekannt (dieselbe Regel wie src/mh_phone.h).
+            char distTxt[12];
+            bool haveOwnPos = !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0);
+            if(nbrPosKnown(v.lat, v.lon) && haveOwnPos)
+                snprintf(distTxt, sizeof(distTxt), "%.1f", gps.distanceBetween(v.lat, v.lon, meshcom_settings.node_lat, meshcom_settings.node_lon) / 1000.0);
+            else
+                snprintf(distTxt, sizeof(distTxt), "NA");
+
+            char latTxt[12], lonTxt[12];
+            if(nbrPosKnown(v.lat, v.lon))
+            {
+                double a = v.lat, o = v.lon;
+                snprintf(latTxt, sizeof(latTxt), "%c%06.3f", (a < 0) ? 'S' : 'N', fabs(a));
+                snprintf(lonTxt, sizeof(lonTxt), "%c%07.3f", (o < 0) ? 'W' : 'E', fabs(o));
+            }
+            else
+            {
+                snprintf(latTxt, sizeof(latTxt), "NA");
+                snprintf(lonTxt, sizeof(lonTxt), "NA");
+            }
+
+            char altTxt[8];
+            if(v.alt == NBR_MH_ALT_UNKNOWN)
+                snprintf(altTxt, sizeof(altTxt), "NA");
+            else
+                snprintf(altTxt, sizeof(altTxt), "%d", (int)v.alt);
+
+            printfdeb("[MH] call=%s %s typ=%s hw=%s mod=%01X/%01X rssi=%sdBm snr=%sdB dist=%skm ncnt=%u age=%umin hm=%sdB role=%c ex=%u nb=%u gw=%c lat=%s lon=%s alt=%sm\n",
+                       v.call, ts, nbrPayloadTypeName(v.plt), nbrHardwareName(v.hw),
+                       (v.mod >> 4), (v.mod & 0x0f), rssiTxt, snrTxt, distTxt, (unsigned)v.ncnt,
+                       (unsigned)v.age_min, hmTxt, v.role ? v.role : '-', (unsigned)v.ex, (unsigned)v.nb,
+                       v.gw ? 'Y' : 'N', latTxt, lonTxt, altTxt);
+        }
+        free(mh_idx);
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"path") == 0 || commandCheck(msg_text+2, (char*)"hey") == 0)
     {
-        showPath();
+        // W4b (Konzept 4.7, Abb. 11): eine Zeile je Absender aus
+        // nbrRouteCount()/nbrRouteGet() -- kein Index-Array noetig, der
+        // laufende Index geht direkt hinein. "via": bei einer 2-Hop-Zeile die
+        // direkten Nachbarn B (schon in entry), bei einem Horizont-Eintrag die
+        // Eintrittszeilen A, ergaenzt -- wo billig -- um die B's, ueber die
+        // jedes A hereinkommt (dieselbe Logik wie sub_page_path() in
+        // web_functions.cpp).
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        int path_total = nbrRouteCount(nbrMatrix, now_min);
+        printfdeb("[PATH] rows=%d\n", path_total);
+
+        for(int i = 0; i < path_total; i++)
+        {
+            NbrRouteView r;
+            if(!nbrRouteGet(nbrMatrix, i, now_min, &r))
+                continue;
+
+            char via_buf[200] = {0}; // Weg-Text dieser Zeile, kein Zeilen-Array; Stack ist fuer 200 B gut
+            int vpos = 0;
+            for(int a = nbrMaskNext(r.entry, -1); a >= 0 && vpos >= 0 && vpos < (int)sizeof(via_buf); a = nbrMaskNext(r.entry, a))
+            {
+                NbrRowView av;
+                const char *acall = nbrRowGet(nbrMatrix, a, &av) ? av.call : "?";
+
+                if(r.is_row)
+                { // 2-Hop-Zeile: entry IST schon die B-Menge (die direkten Nachbarn)
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s", (vpos > 0) ? "," : "", acall);
+                    continue;
+                }
+
+                NbrMask viaB = nbrMaskAnd(nbrHearersMask(nbrMatrix, a, now_min), nbrDirectMask(nbrMatrix, now_min));
+                if(nbrMaskEmpty(viaB))
+                {
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s", (vpos > 0) ? "," : "", acall);
+                    continue;
+                }
+                for(int b = nbrMaskNext(viaB, -1); b >= 0 && vpos >= 0 && vpos < (int)sizeof(via_buf); b = nbrMaskNext(viaB, b))
+                {
+                    NbrRowView bv;
+                    const char *bcall = nbrRowGet(nbrMatrix, b, &bv) ? bv.call : "?";
+                    vpos += snprintf(via_buf + vpos, sizeof(via_buf) - vpos, "%s%s>%s", (vpos > 0) ? "," : "", acall, bcall);
+                }
+            }
+
+            printfdeb("[PATH] call=%s hops=%u g=%c age=%umin via=%s\n", r.call, (unsigned)r.hops, r.gw ? 'Y' : 'N', (unsigned)r.age_min, via_buf);
+        }
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"neighbours") == 0 || commandCheck(msg_text+2, (char*)"nbr") == 0)
+    {
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        // Konzept 4.2/4.5: "leer" heisst wirklich noch nichts gehoert, nicht
+        // nur ausserhalb des 720-min-Fensters -- Zeile 0 traegt vor der
+        // ersten OnRxDone-Ausfuehrung (Lazy Init dort) noch kein Rufzeichen.
+        // W2c CONTRACT: Zeile 0 nur noch ueber nbrRowGet() lesen -- das rows-
+        // Feld der Matrix ist seit dem Kantenpool-Umbau nicht mehr oeffentlich.
+        NbrRowView r0v;
+        if(!nbrRowGet(nbrMatrix, 0, &r0v) || r0v.call[0] == 0x00)
+        {
+            printfdeb("[NBR] empty\n");
+            return;
+        }
+
+        // N-22: eigener Static statt Stack -- der Loop-Task hat auf nRF52 nur
+        // 4 KB, das Kommando laeuft ausschliesslich dort (Fix 9ce62aa0, frueher
+        // an showMHeard() aus mheard_functions.cpp festgemacht, das mit W4b weg ist).
+        // 300 statt 200: Zeile 0 mit 20 Hoerern plus Reichweite und Alter
+        // liegt ueber 200 Zeichen, snprintf kappte dann stumm (Advisor L1).
+        // nbr_buf bleibt static (fest 300 B, skaliert nicht mit NBR_MAX_ROWS).
+        // W2c (Orchestrator-Review 2026-09-25, zweite Runde): nbr_rows[]/
+        // ex_idx[] sind jetzt bis zu NBR_MAX_ROWS==128 (S3/nRF52) statt
+        // vormals <= 21 -- zusammen 256 B, die NICHT permanent im BSS liegen
+        // sollen (selten benutztes Kommando). Ein malloc()-Block statt zweier
+        // static-Arrays, free() vor jedem Rueckkehrpunkt danach.
+        static char nbr_buf[300];
+        uint8_t *nbr_scratch = (uint8_t *)malloc(2 * (size_t)NBR_MAX_ROWS);
+        if(nbr_scratch == NULL)
+        {
+            printfdeb("[NBR] not enough memory\n");
+            return;
+        }
+        uint8_t *nbr_rows = nbr_scratch + 0 * NBR_MAX_ROWS;
+        uint8_t *ex_idx = nbr_scratch + 1 * NBR_MAX_ROWS;
+
+        uint8_t nbr_n = 0;
+        nbr_rows[nbr_n++] = 0;
+
+        for(int i = 1; i < NBR_MAX_ROWS; i++)
+        {
+            NbrRowView v;
+            if(nbrRowGet(nbrMatrix, i, &v) && nbrFresh(v.last_min, now_min))
+                nbr_rows[nbr_n++] = (uint8_t)i;
+        }
+
+        int ex_n = nbrExclusive(nbrMatrix, now_min, ex_idx, NBR_MAX_ROWS);
+
+        if(ex_n == -1)
+        {
+            printfdeb("[NBR] window=%dmin rows=%d now=%d verdict=nothing-heard\n", NBR_WINDOW_MIN, nbr_n, now_min);
+        }
+        else if(ex_n > 0)
+        {
+            int vpos = snprintf(nbr_buf, sizeof(nbr_buf), "[NBR] window=%dmin rows=%d now=%d verdict=exclusive:",
+                                 NBR_WINDOW_MIN, nbr_n, now_min);
+
+            for(int i = 0; i < ex_n && i < NBR_MAX_ROWS && vpos > 0 && vpos < (int)sizeof(nbr_buf); i++)
+            {
+                NbrRowView ev;
+                const char *ecall = nbrRowGet(nbrMatrix, ex_idx[i], &ev) ? ev.call : "?";
+                vpos += snprintf(nbr_buf+vpos, sizeof(nbr_buf)-vpos, "%s%s", (i > 0) ? "," : "", ecall);
+            }
+
+            printfdeb("%s\n", nbr_buf);
+        }
+        else
+        {
+            printfdeb("[NBR] window=%dmin rows=%d now=%d verdict=redundant\n", NBR_WINDOW_MIN, nbr_n, now_min);
+        }
+
+        for(int k = 0; k < nbr_n; k++)
+        {
+            int flen = nbrFormatRow(nbrMatrix, nbr_rows[k], now_min, nbr_buf, sizeof(nbr_buf));
+            if(flen > 0)
+                printfdeb("[NBR] %s%s\n", nbr_buf, (flen >= (int)sizeof(nbr_buf)) ? " ..." : "");
+        }
+
+        free(nbr_scratch);
+        return;
+    }
+    else
+    // --nbrcheck: Konsistenz Masken <-> Kantenpool (nbrCheck(), nbr_matrix.h),
+    // unabhaengig von --nbrdebug. 0/0/0/0 heisst konsistent.
+    if(commandCheck(msg_text+2, (char*)"nbrcheck") == 0)
+    {
+        NbrCheck c;
+        nbrCheck(nbrMatrix, &c);
+        printfdeb("[NBR] check rows=%u edges=%u mask_extra=%u mask_missing=%u edge_bad=%u edge_dup=%u -> %s\n",
+                  (unsigned)c.rows, (unsigned)c.edges, (unsigned)c.mask_extra, (unsigned)c.mask_missing,
+                  (unsigned)c.edge_bad, (unsigned)c.edge_dup,
+                  (c.mask_extra || c.mask_missing || c.edge_bad || c.edge_dup) ? "INCONSISTENT" : "ok");
+        return;
+    }
+
+    if(commandCheck(msg_text+2, (char*)"nbrreset") == 0)
+    {
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        nbrReset(nbrMatrix, now_min);
+
+        printfdeb("[NBR] reset\n");
 
         return;
     }
@@ -5475,7 +6094,7 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("");
             printfdeb("--MeshCom %-4.4s%-1.1s (build: %s / %s)\n...UPDATE: %s\n...Call: <%s> ...ID %08X ...NODE %i <%s> ...UTC-OFF %f [%s]\n...BATT %.2f V ...BATT %d %% ...MAXV %.3f V\n...TIME %li ms\n", 
                     SOURCE_VERSION, SOURCE_VERSION_SUB , __DATE__ , __TIME__ , meshcom_settings.node_update,
-                    meshcom_settings.node_call, _GW_ID, BOARD_HARDWARE, getHardwareLong(BOARD_HARDWARE).c_str(), meshcom_settings.node_utcoff, cTimeSource, global_batt/1000.0, global_proz, meshcom_settings.node_maxv, millis());
+                    meshcom_settings.node_call, _GW_ID, BOARD_HARDWARE, nbrHardwareName(BOARD_HARDWARE), meshcom_settings.node_utcoff, cTimeSource, global_batt/1000.0, global_proz, meshcom_settings.node_maxv, millis());
 
             printfdeb("...Flash-Version %i\n", meshcom_settings.node_fversion);
 
@@ -5484,8 +6103,21 @@ void commandAction(char *umsg_text, bool ble)
 
             printfdeb("...DEBUG %s ...DEBUG %s\n", (bDEBUGCSV?"csv":"man"), (bDEBUGEN?"en":"de"));
 
-            printfdeb("...DEBUG %s ...LORADEBUG %s ...GPSDEBUG %s/%i ...SOFTSERDEBUG %s\n...WXDEBUG %s ...BLEDEBUG %s\n",
-                (bDEBUG?"on":"off"), (bLORADEBUG?"on":"off"), (iGPSDEBUG?"on":"off"), iGPSDEBUG, (bSOFTSERDEBUG?"on":"off"),(bWXDEBUG?"on":"off"), (bBLEDEBUG?"on":"off"));
+            // TXCAPTURE steht hier, seit tools/meshlogger.py den Vorzustand jedes
+            // Flags aus dieser Antwort liest und ein Flag, das er nicht findet,
+            // beim Beenden unangetastet laesst. Vorher schaltete er --txcapture
+            // blind aus; ohne diese Spalte bliebe es nach einem Lauf an.
+            printfdeb("...DEBUG %s ...LORADEBUG %s ...NBRDEBUG %s ...TXCAPTURE %s ...GPSDEBUG %s/%i ...SOFTSERDEBUG %s\n...WXDEBUG %s ...BLEDEBUG %s\n",
+                (bDEBUG?"on":"off"), (bLORADEBUG?"on":"off"), (bNBRDEBUG?"on":"off"), (bTXCAPTURE?"on":"off"), (iGPSDEBUG?"on":"off"), iGPSDEBUG, (bSOFTSERDEBUG?"on":"off"),(bWXDEBUG?"on":"off"), (bBLEDEBUG?"on":"off"));
+
+            // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): Modus und die
+            // fuenf Zaehler, damit ein Feldlauf ohne Web-Seite ablesbar bleibt.
+            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s ...NBRREPORT %s\n",
+                (bNBRCANCEL?"on":(bNBRRELAY?"count":"off")),
+                (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
+                (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone,
+                (bNBRSYM?"on":"off"),
+                (bNBRRPTOFF?"off":(bNBRRPTON?"on":"auto")));
             
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));
@@ -5509,6 +6141,14 @@ void commandAction(char *umsg_text, bool ble)
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,
             // max_hop_pos bleibt der Compile-Default.
             printfdeb("...MAXHOP text %i / pos %i\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
+
+#if defined(ENABLE_MSGSTORE)
+            // Store node (mailbox), stage 3 + stage 4 notice --
+            // docs/dm-stage3-wave-plan-20260914.md / dm-stage4-plan-20260914.md.
+            printfdeb("...STORE mode=%s used=%d/%u time=%uh notice=%s\n",
+                msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+                (msgstoreNotice()?"on":"off"));
+#endif
 
             for(int ig=0;ig<6;ig++)
             {

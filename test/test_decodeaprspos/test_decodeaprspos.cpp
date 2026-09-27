@@ -26,8 +26,8 @@
 #include <nrf52/WisBlock-API.h>
 #include <parser_link_stubs.h>
 
-// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
-// (env:native_parsers linkt alle drei Parser in jedes der drei Testprogramme,
+// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/via_functions.cpp
+// (env:native_parsers linkt beide Parser in jedes Testprogramm der Env,
 // siehe test/test_decodemheard/stubs/parser_link_stubs.h)
 s_meshcom_settings meshcom_settings;
 bool bDisplayInfo = false;

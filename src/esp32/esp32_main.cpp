@@ -124,9 +124,14 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#include "msgstore_settings.h"
+#endif
 #include <regex_functions.h>
 #include <test_inject.h>
 #include <command_functions.h>
+#include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <phone_commands.h>
 #include <aprs_functions.h>
 #include <batt_functions.h>
@@ -136,7 +141,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <extudp_functions.h>
 #include <kiss_functions.h>
 #include <web_functions/web_functions.h>
-#include <mheard_functions.h>
+#include <mh_phone.h>
+#include <topo_ui.h>
 #include <time_functions.h>
 #include <clock.h>
 #include <setlog_lines.h> // SL-04/SL-05: --setlog on line formatters (Welle 0)
@@ -797,9 +803,6 @@ void esp32setup()
     // init nach Reboot
     init_loop_function();
 
-    // Initialize mheard list
-    initMheard();
-
 	// Get LoRa parameter
 	init_flash();
 
@@ -833,6 +836,13 @@ void esp32setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+#if defined(ENABLE_MSGSTORE)
+    // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
+    // --store/--storecall/--storetime/--storeslots/--storenotice settings.
+    msgstoreGlueInit();
+    msgstoreSettingsLoad();
+#endif
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das
@@ -931,6 +941,16 @@ void esp32setup()
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
+    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0400;
+    nbrDebugApply();
+    // --nbrrelay off|count|on (Stufe 2): 0x0800 rechnen/zaehlen, 0x1000 anwenden.
+    bNBRRELAY  = (meshcom_settings.node_sset4 & 0x1800) != 0;
+    bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;
+    // --nbrsym on|off (Stufe 2): 0x2000 invertiert gespeichert, siehe command_functions.cpp.
+    bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;
+    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100 off, 0x0200 on, keines von beiden auto.
+    bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;
+    bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;
     #ifndef DISABLE_KISS_TCP
     bKISS = meshcom_settings.node_sset4 & 0x0010;
     bKISSTX = meshcom_settings.node_sset4 & 0x0020;
@@ -974,6 +994,12 @@ void esp32setup()
     #if defined(BOARD_T_DECK_PRO)
         initTDeck_pro();
     #endif
+
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): /topo.dat laden. Erst hier,
+    // nach init_flash() (Rufzeichen, node_persist_to_sd) und nach initTDeck()/
+    // initTDeck_pro(), die die SD-Karte einhaengen; auf allen anderen Boards ein
+    // No-Op (src/topo_ui.h).
+    topoUiBoot();
 
     #if defined(BOARD_T5_EPAPER)
         idf_setup();
@@ -3166,7 +3192,7 @@ void esp32loop()
                 //sendMessage((char*)config_cmds[config_cmds_index], strlen(config_cmds[config_cmds_index]));
             }
 
-            startMheardToPhone(); // MHeard erst, wenn der Kommando-Ring leer ist (siehe unten)
+            mhPhoneListStart(); // MHeard-Liste erst, wenn der Kommando-Ring leer ist (siehe unten)
 
             config_to_phone_prepare_timer = millis();
 
@@ -3193,10 +3219,10 @@ void esp32loop()
                         ble_wait = millis();
                     }
                 }
-                else if (mheardToPhonePending())
+                else if (mhPhoneListPending())
                 {
                     // Kommando-Ring leer: naechste Portion der MHeard-Liste nachlegen
-                    sendMheard();
+                    mhPhoneListStep();
                 }
                 else if (!bf_empty(&phoneRing))
                 {
@@ -3378,8 +3404,9 @@ void esp32loop()
         gps_refresh_timer = millis();
     }
 
-    // check NCNT modified
-    int incnt = getMheardCount();
+    // check NCNT modified -- MeshCom 5 (Welle 4, Konzept 4.8): lokaler
+    // Vergleich, nicht die Sendefassung -- nbrNcnt(), nicht nbrNcntAir().
+    int incnt = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     if(ncnt_hold != incnt)
     {
         // minimal alle 60 sec
@@ -3476,8 +3503,9 @@ void esp32loop()
     {
         bHeyFirst = false;
 
-        // Check for topology change (neighbor count changed)
-        int current_neighbors = getMheardCount();
+        // Check for topology change (neighbor count changed) -- lokaler
+        // Vergleich (Konzept 4.8: die Trickle-Ruecksetzung ist kein Sender).
+        int current_neighbors = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
         {
             // Topology changed — reset to fastest interval
@@ -3509,6 +3537,43 @@ void esp32loop()
         trickle_consistent_count = 0;
 
         heyinfo_timer = millis();
+    }
+
+    // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): eigener Takt,
+    // unabhaengig vom Trickle-Intervall oben und nie unterdrueckt -- siehe
+    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und Modus-Auswertung.
+    nbrReportTick();
+
+    // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer
+    // nbrLogSnapshot(). Nur im Loop, NICHT im Timer-Task -- laesst sich hier nicht
+    // verletzen, esp32loop() ist der Loop-Task. Laeuft nur, wenn das Flag gesetzt
+    // ist; nbrDebugApply() setzt nbrsnap_timer beim Einschalten zurueck, damit der
+    // erste Schnappschuss nicht erst 15 Minuten nach dem Einschalten kommt.
+    if(bNBRDEBUG && (uint32_t)(millis() - nbrsnap_timer) >= 900000UL)
+    {
+        nbrsnap_timer = millis();
+        nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
+    }
+
+    // Nachbarschaftsmatrix (Welle 2, edge pool): Minuten-Sweep (nbrSweep(),
+    // CONTRACT in nbr_matrix.h) -- IMMER, unabhaengig von --nbrdebug (das
+    // steuert nur den 15-Minuten-Schnappschuss oben). Loop-Task, nicht
+    // Timer-Task, wie nbrLogSnapshot() oben. nbrSweep() selbst ist ein No-Op
+    // bei einem zweiten Aufruf in derselben Minute; die Minuten-Waechter hier
+    // spart trotzdem den Funktionsaufruf bei jedem Loop-Durchlauf.
+    {
+        static uint16_t s_nbr_sweep_min = 0xFFFF;
+        uint16_t now_min_sweep = (uint16_t)(millis() / 60000UL);
+        if(now_min_sweep != s_nbr_sweep_min)
+        {
+            s_nbr_sweep_min = now_min_sweep;
+            nbrSweep(nbrMatrix, now_min_sweep);
+            // Konsistenzpruefung Masken <-> Kantenpool (nbrLogCheck(), [NBR]|CHECK),
+            // einmal je Minute, nur bei --nbrdebug: auf nRF52 das Instrument fuer
+            // Task-Wechsel mitten in einer Aenderung (Konzept 5).
+            if(bNBRDEBUG)
+                nbrLogCheck(nbrMatrix, now_min_sweep);
+        }
     }
 
     // TELEMETRY_INTERVAL in Minutes == 15 minutes default
@@ -3942,6 +4007,9 @@ void esp32loop()
     if((int32_t)(millis() - (retransmit_timer + (1000 * 2))) > 0)
     {
         updateRetransmissionStatus();
+#if defined(ENABLE_MSGSTORE)
+        msgstoreLoop();   // S3: all mailbox work runs here, in the loop task
+#endif
         retransmit_timer = millis();
     }
 

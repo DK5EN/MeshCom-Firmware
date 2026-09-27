@@ -2,8 +2,9 @@
 // BACKLOG SS3.8j): test_decodeaprspos, test_decodemheard, test_checkvia.
 //
 // build_src_filter dieser Env ist Env-weit, nicht pro Test-Case: jede der
-// drei Suiten linkt Regexp.cpp, regex_functions.cpp, aprs_functions.cpp,
-// mheard_functions.cpp UND via_functions.cpp in ein eigenes Programm (siehe
+// drei Suiten linkt Regexp.cpp, regex_functions.cpp, aprs_functions.cpp
+// UND via_functions.cpp in ein eigenes Programm (bis MeshCom 5 Welle 4 auch
+// mheard_functions.cpp, das es seither nicht mehr gibt; siehe
 // platformio.ini [env:native_parsers]). Der Linker verlangt darum fuer jedes
 // der drei Programme dieselbe vollstaendige Menge an Stub-Definitionen,
 // unabhaengig davon, welchen der drei Parser die jeweilige Suite eigentlich
@@ -16,13 +17,13 @@
 // genau einmal in ihre eigene main()-Uebersetzungseinheit ein (kein
 // Mehrfachinklusions-Risiko), und eine ungerufene "inline"-Funktion muss der
 // Compiler nicht in die Objektdatei emittieren -- der Linker braeuchte die
-// Definition trotzdem, weil mheard_functions.o/via_functions.o sie von
+// Definition trotzdem, weil aprs_functions.o/via_functions.o sie von
 // AUSSEN referenzieren. Gewoehnliche Funktionsdefinitionen mit externer
 // Bindung werden dagegen immer emittiert, wie bei den lokalen Stubs in
 // test_aprs_decode.cpp/test_hey_report.cpp (env:native_aprs).
 //
 // printfdeb_functions.h ist hier bewusst NICHT der Weg: "#include
-// "printfdeb_functions.h"" in mheard_functions.cpp/via_functions.cpp sucht
+// "printfdeb_functions.h"" in via_functions.cpp sucht
 // zuerst im Verzeichnis der inkludierenden Datei (src/) -- das echte
 // src/printfdeb_functions.h (nur Deklarationen, Implementierung haengt an
 // Serial/net_console) gewinnt daher gegen jeden per -I gereichten Shim,
@@ -65,12 +66,10 @@ bool bGATEWAY = false;
 bool bVIA = false;
 
 // ---- loop_functions.cpp (Kommando-Ring)
-// sendMheard() drosselt sich an phoneComRing, damit es keinen ungelesenen
-// Frame verdraengt. Der Ring selbst wird hier nie gefuellt -- diese Umgebung
-// baut loop_functions.cpp nicht mit --, aber comRingWouldEvictUnread() liest
-// ihn, also braucht der Linker ihn. Vor dem Byte-Ring standen hier die zwei
-// Schlitz-Zeiger, und sie fehlten: native_parsers linkte seit dem
-// MHeard-Umbau (PR #1147) gar nicht mehr, bis 2026-09-21.
+// Brauchte bis MeshCom 5 Welle 4 die MH-Liste ans Telefon (sie drosselte
+// sich an phoneComRing); seither liest ihn in dieser Umgebung niemand mehr.
+// Bleibt als harmlose Definition stehen, damit eine Suite, die kuenftig
+// wieder einen Ringleser linkt, nicht still ohne Ring baut.
 #include "byte_fifo.h"
 static uint8_t phoneComStoreStub[2048];
 byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStoreStub);

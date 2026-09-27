@@ -1,0 +1,112 @@
+# PN-Wiederholung Variante a) (XOR-Form) — Umsetzung
+
+Branch `dk5en-xor`, Basis `upstream/dev` @ `cf215b5d`. Konzept und Begründung:
+`docs/pn-zustellung-dedup.md`. Begleitende Änderungen außerhalb der Firmware:
+`docs/pn-retry-server.md`, `docs/pn-retry-app.md`, `docs/pn-retry-mcapp.md`.
+
+## Was die Firmware jetzt tut
+
+**Was als PN gilt**: eine Textmeldung, deren Text auf `{NNN` endet (`{` plus 1–5 Ziffern) und die an
+ein persönliches Ziel geht — nicht `*`, keine Gruppennummer (1–6 Ziffern), nicht WLNK-1 oder
+APRS2SOTA. Gruppen, `*` und alle anderen Meldungen verhalten sich wie bisher.
+
+**Absender**
+
+- Die Erstsendung ist unverändert.
+- Wiederholung k (1–3) einer eigenen PN bekommt in Bit 10–11 der msg_id die Original-Bits (Bit 0–1
+  von `_GW_ID`) XOR k — immer vom Original aus gerechnet, nie von der vorigen Kopie. Die restlichen
+  30 Bit, Text und `{NNN` bleiben gleich; die FCS wird neu berechnet.
+- Die Wiederholungskopie wird unter der Ring-Sperre aus dem Ring gelesen (nRF52) und in einem lokalen
+  Puffer umgeschrieben (auf nRF52 `static`, wegen des 4-KB-Loop-Tasks). Ihre msg_id kommt in den eigenen
+  Dedup-Ring, damit das eigene Echo nicht als fremde Meldung gilt.
+- Ein Echo der eigenen PN bricht die Wiederholung nicht mehr ab, sondern startet die 40-s-Wartezeit neu.
+- "Eigene PN" heißt: eigene Knotenkennung in der msg_id **und** eigenes Rufzeichen als Quelle
+  (`pnFrameIsOwnPn`). Eine PN, die `sendMessage()` für einen KISS-Client sendet, trägt zwar unsere
+  msg_id, aber das Rufzeichen des Clients; ihr `:ackNNN` geht an den Client und stoppt unseren Slot nie.
+  Sie bleibt deshalb beim alten Verhalten: byte-gleiche Wiederholung, Abbruch beim ersten Echo. Der
+  Client wiederholt selbst.
+- Ein `:ackNNN` stoppt die Wiederholung — über LoRa und jetzt auch über den Server-Pfad (ESP32 und
+  nRF52). `findAndStopRingSlot` vergleicht dafür den 30-Bit-Kern und ist exportiert.
+- "Gehört" (Status 0x00 ans Telefon) wird auch für das Echo einer Wiederholung gemeldet, immer mit der
+  Original-msg_id.
+- Höchstens 4 Aussendungen (`MAX_RETRANSMIT` 3, per `static_assert` auf ≤ 3 festgehalten, weil k = 4
+  wieder das Original ergäbe).
+
+**Empfänger**
+
+- Relais-Entscheidung wie bisher auf der vollen msg_id: alte und neue Firmware leiten Wiederholungen
+  weiter.
+- Steht eine der drei anderen Bitvarianten schon im Dedup-Ring (stille Abfrage `checkOwnRx`), ist die
+  Meldung die Wiederholung einer bekannten PN: sie wird weitergeleitet und quittiert, aber nicht noch
+  einmal angezeigt, ans Telefon gegeben, hochgeladen, an Extern-UDP oder KISS gegeben.
+- `checkOwnTx` ist unverändert; genau ein `is_new_packet()` je Frame wie bisher.
+
+## Code
+
+| Datei                       | Inhalt                                                                |
+| --------------------------- | --------------------------------------------------------------------- |
+| `src/pn_retry.h` (neu)      | Reine Hilfsfunktionen: Retry-msg_id, 30-Bit-Kern, PN-Erkennung, FCS   |
+| `src/lora_functions.cpp`    | Wiederholung, Echo-Neustart, Empfänger-Erkennung, "gehört", ACK-Stopp |
+| `src/lora_functions.h`      | Deklaration `findAndStopRingSlot`                                     |
+| `src/udp_functions.cpp`     | Server-`:ackNNN` stoppt die Wiederholung (ESP32)                      |
+| `src/nrf52/nrf_eth.cpp`     | Server-`:ackNNN` stoppt die Wiederholung (nRF52/Ethernet)             |
+| `test/test_pn_retry/` (neu) | 24 Host-Tests, darunter ein Golden-Frame mit von Hand gerechneter FCS |
+| `platformio.ini`            | Optionale Testumgebung `native_pnretry` (nicht in `default_envs`)     |
+
+## Prüfung
+
+- `pio test -e native_pnretry`: 24/24.
+- Voll-Compile aller 35 Umgebungen nach sauberem Löschen: 33 grün, identisch zum unveränderten
+  Basisstand; `t5_epaper` und `esp32-external-radio` sind schon an `cf215b5d` rot. Keine neuen Warnungen.
+  Die neuen Log-Marker (`PNRETRY`, `PNREPEAT`, `PN echo`, `server ACK for retid`) stehen in allen 31
+  Firmware-ELFs.
+- Code-Review mit gegnerischer Verifikation und unabhängigem Advisor vor dem Commit.
+- **Noch nicht auf Hardware getestet.** Offen: Kette A → R1 → R2 → B mit ausgefallenem letztem Sprung,
+  gemischt mit 4.35p-Knoten als Relais und Empfänger, ein Gateway mit Server-Anbindung.
+
+## Bekannte Grenzen
+
+- **Server zuerst**: Wiederholungen tragen neue msg_ids. Bis der Server auf den 30-Bit-Kern
+  dedupliziert und die Weiterleitung an Gateways regelt, zeigt er Wiederholungen mehrfach und reicht
+  sie womöglich an alle Gateways weiter (`docs/pn-retry-server.md`).
+- **Server-Pfad im Knoten**: Auf dem UDP/ETH-Pfad laufen Anzeige, BLE und ACK wie bisher vor dem
+  Dedup-Tor; die Empfänger-Erkennung greift nur auf dem LoRa-Pfad.
+- **Upload**: Ein Gateway, das das Original gehört hat, lädt die Wiederholung nicht erneut hoch. Ein nur
+  über den Server erreichbares Ziel bekommt eine Wiederholung nur über ein anderes Gateway.
+- **Fehlerkennung**: Eine echte neue PN eines anderen Knotens mit gleichen unteren 20 Knotenbits und
+  gleichem Zähler im Dedup-Fenster würde nicht angezeigt (aber weitergeleitet und quittiert). Grob 2e-5
+  pro PN; der heutige Dedup hat dieselbe Klasse auf 32 Bit mit härterer Folge.
+- **Airtime**: Jedes Echo derselben Kopie startet die Wartezeit neu (begrenzt durch die Zahl der
+  Relais); eine unquittierte PN kostet bis zu 4 Flutungen, jede angekommene Kopie eine Quittung.
+- **Spätes ACK**: Trifft ein `:ack` ein, während eine Wiederholungskopie noch auf den Versand wartet
+  (READY), wird es wie bisher übersprungen; die Kopie geht noch einmal raus.
+- **Gruppenerkennung**: `pnDestIsPersonal` behandelt jede 1–6-stellige Ziffernfolge als Gruppe;
+  `CheckGroup` kennt 1–99999 und 100001. Abweichung nur bei Zielen wie 000000 oder 999999, die kein
+  Rufzeichen sein können.
+- **Alte Empfänger** zeigen jede Wiederholung als eigene Nachricht (bis zu 4) und quittieren jede.
+
+## Fork feature-snf
+
+Die Zeilenangaben oben (`src/lora_functions.cpp:NNN` u. ä.) beziehen sich auf `dk5en-xor`. Auf
+`feature-snf` gilt stattdessen:
+
+- **Ein Sendeweg**: jede PN läuft über die Ring-Wiederholung mit XOR-ids wie oben beschrieben --
+  Aussendung 1 die Original-id, Aussendung 2–4 `first_id ^ ((n-1) << 10)` im 40-s-Takt ab der
+  jeweils letzten Aussendung. Ein Echo stoppt die Wiederholung nicht mehr, nur ein `:ackNNN`. Die
+  Outbox-Leiter und `--dmretry` (zuletzt `off|3`, Modus 9 schon vorher entfallen, weil er sich nicht
+  in drei Bitvarianten ausdrücken lässt) sind seit 2026-09-27 entfernt (Nachtrag in
+  `docs/pn-retry-snf-port-plan.md`); ein gespeicherter `dm_retry`-Wert (NVS, nRF52 `/dm.cfg`) wird
+  ignoriert.
+- **`dm_dedup`** fängt Wiederholungen einer an uns adressierten PN ab; es gibt kein eigenes
+  Anzeige-Tor dafür.
+- **Store-Knoten** bekommt Wiederholungskopien nicht noch einmal (Entscheidung E2): `rx_pn_repeat`
+  geht nicht in `msgstoreStore`.
+- **Aufgabe, Held-Markierung und 0x03-Telefonframe** laufen auf der Original-id; die
+  Wiederholungskopie wird davor darauf zurückgefaltet.
+- **Server-ACK stoppt den Ring-Slot**: `udp_frame_esp32.cpp` und `udp_frame_nrf52.cpp` rufen nach
+  erkanntem eigenem `:ackNNN` `findAndStopRingSlot`; auf nRF52 unter der Ring-Sperre, weil der
+  Aufruf jetzt auch aus dem Loop-Task kommt.
+- **Backpressure-Tiefe** (`txRingDepth`) zählt wartende PN-Slots weiter mit (Entscheidung E3,
+  hingenommen).
+- **Dedup-Ring mit 10 Einträgen** bei `ENABLE_TBEAM` begrenzt die Wiedererkennung von
+  Wiederholungen entsprechend; hingenommen.

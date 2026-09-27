@@ -31,6 +31,10 @@ extern uint32_t instrument_active_tab_bubble_count(void);
 extern int      map_point_count;
 #endif
 
+/* --airgap on|off (plan stage 0.5): RAM-only, never persisted -- see the
+ * extern declaration and doc comment in instrument.h. */
+bool bAirgap = false;
+
 static uint32_t s_flush_n    = 0;
 static uint64_t s_flush_us   = 0;
 static uint32_t s_flush_max  = 0;

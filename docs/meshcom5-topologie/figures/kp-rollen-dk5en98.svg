@@ -1,0 +1,62 @@
+<svg viewBox="0 0 960 470" role="img" aria-label="Nachbarschaftsgraph DK5EN-98"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="30" y="28" class="b">Schnappschuss DK5EN-98, 2026-09-24 07:25, Fenster 12 h</text>
+<rect x="30" y="230" width="150" height="50" class="node wwwf"/>
+<text x="105.0" y="244" text-anchor="middle" class="b">DK5EN-98</text>
+<text x="105.0" y="262" text-anchor="middle" class="t11">ich, Zeile 0</text>
+<rect x="260" y="70" width="190" height="50" class="node srv"/>
+<text x="355.0" y="84" text-anchor="middle" class="b">DL2JA-2</text>
+<text x="355.0" y="102" text-anchor="middle" class="t11">Super, #X 8, #N 19</text>
+<path d="M180 255 L220 255 L220 95 L260 95" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="150" width="190" height="50" class="node bad"/>
+<text x="355.0" y="164" text-anchor="middle" class="b">DK5EN-1</text>
+<text x="355.0" y="182" text-anchor="middle" class="t11">Blatt: nur ich hoere es</text>
+<path d="M180 255 L220 255 L220 175 L260 175" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="230" width="190" height="50" class="node"/>
+<text x="355.0" y="244" text-anchor="middle" class="b">DL2UD-1</text>
+<text x="355.0" y="262" text-anchor="middle" class="t11">Redundant, #X 0</text>
+<path d="M180 255 L220 255 L220 255 L260 255" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="310" width="190" height="50" class="node"/>
+<text x="355.0" y="324" text-anchor="middle" class="b">DB0ED-99</text>
+<text x="355.0" y="342" text-anchor="middle" class="t11">Redundant, #X 0, #N 10</text>
+<path d="M180 255 L220 255 L220 335 L260 335" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="390" width="190" height="50" class="node"/>
+<text x="355.0" y="404" text-anchor="middle" class="b">DL2JA-1</text>
+<text x="355.0" y="422" text-anchor="middle" class="t11">Redundant, relayt nie</text>
+<path d="M180 255 L220 255 L220 415 L260 415" class="ln" marker-end="url(#arr)"/>
+<rect x="560" y="50" width="180" height="174" class="zone"/>
+<text x="650" y="68" text-anchor="middle" class="b">8 exklusiv an DL2JA-2</text>
+<text x="650" y="88" text-anchor="middle" class="mono">DL2JA-3</text>
+<text x="650" y="106" text-anchor="middle" class="mono">OE2XZR-12</text>
+<text x="650" y="124" text-anchor="middle" class="mono">DB0MMR-12</text>
+<text x="650" y="142" text-anchor="middle" class="mono">DF2KX-12</text>
+<text x="650" y="160" text-anchor="middle" class="mono">DG7RJ-12</text>
+<text x="650" y="178" text-anchor="middle" class="mono">DG7RJ-8</text>
+<text x="650" y="196" text-anchor="middle" class="mono">DO7GH</text>
+<text x="650" y="214" text-anchor="middle" class="mono">DG3MNF-4</text>
+<rect x="560" y="254" width="180" height="156" class="zone"/>
+<text x="650" y="272" text-anchor="middle" class="b">7 doppelt gehoert</text>
+<text x="650" y="292" text-anchor="middle" class="mono">DB0HOB-12</text>
+<text x="650" y="310" text-anchor="middle" class="mono">DC2MAC-1</text>
+<text x="650" y="328" text-anchor="middle" class="mono">DB0FHR-12</text>
+<text x="650" y="346" text-anchor="middle" class="mono">DL3NCU-1</text>
+<text x="650" y="364" text-anchor="middle" class="mono">DD7MH-55</text>
+<text x="650" y="382" text-anchor="middle" class="mono">DB0ISM-1</text>
+<text x="650" y="400" text-anchor="middle" class="mono">OE7XWT-12</text>
+<path d="M450 92 L560 92" class="lnh" marker-end="url(#arr)"/>
+<text x="505" y="84" text-anchor="middle" class="t11">hoert</text>
+<path d="M450 100 L520 100 L520 294 L560 294" class="lnh" marker-end="url(#arr)"/>
+<path d="M450 332 L540 332 L540 314 L560 314" class="ln" marker-end="url(#arr)"/>
+<text x="505" y="324" text-anchor="middle" class="t11">hoert auch</text>
+<text x="770" y="60" class="b">Rollen aus meiner Sicht:</text>
+<text x="770" y="82" class="t11">#X(N) = Knoten, die N hoert und</text>
+<text x="770" y="98" class="t11">die weder ich noch ein anderer</text>
+<text x="770" y="114" class="t11">direkter Nachbar hoert.</text>
+<text x="770" y="146" class="t11">Super: groesstes #X, mindestens 2</text>
+<text x="770" y="162" class="t11">und mindestens doppelt so gross</text>
+<text x="770" y="178" class="t11">wie das zweitgroesste.</text>
+<text x="770" y="210" class="t11">Needed: #X &gt;= 1.</text>
+<text x="770" y="226" class="t11">Redundant: #X = 0.</text>
+<text x="770" y="258" class="t11">Blatt (rot): nur ich hoere es,</text>
+<text x="770" y="274" class="t11">darum 'Mesh needed' fuer mich.</text>
+<text x="770" y="306" class="t11">DB0ED-99 hoert 10, davon 7</text>
+<text x="770" y="322" class="t11">auch DL2JA-2 und 3 auch ich:</text>
+<text x="770" y="338" class="t11">#X 0, obwohl #N 10.</text></svg>

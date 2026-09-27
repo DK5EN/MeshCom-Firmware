@@ -76,6 +76,33 @@ auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25) und auf
 verhaelt sich hier wie upstream; wo dieser Branch davon abweicht, steht es in
 den beiden folgenden Abschnitten.
 
+## v4.35t.09.28-neo: PN-Wiederholung im XOR-Format
+
+Das Release `v4.35t.09.28-neo` (Branch `feature-snf`) ist `v4.35t.09.27-neo` unveraendert plus
+einen neuen Wiederholungsmechanismus fuer persoenliche Nachrichten (PN, Direktnachrichten):
+Wiederholung k traegt die Original-msg_id mit XOR-verknuepften Bits 10-11, ein Echo beendet die
+Wiederholung nicht mehr, nur noch das Ziel-ACK, und `--dmretry` samt Ausgangskorb entfaellt zugunsten
+eines einzigen Ring-Wiederholungspfads. Eigenes Changelog, hier nicht nummeriert:
+
+- Personal-message retries: [`docs/CHANGELOG-snf.md`](CHANGELOG-snf.md)
+
+Wer den reinen neo-Stand will, nimmt `v4.35t.09.26-neo`; wer neo plus Nachbarschaftsmatrix und
+Speichern-und-Weiterleiten ohne die PN-Wiederholung will, nimmt `v4.35t.09.27-neo`.
+
+## v4.35t.09.27-neo: zwei Funktionen obendrauf
+
+Das Release `v4.35t.09.27-neo` (Branch `feature-snf`) ist dieser neo-Stand
+plus zwei neue Funktionen und bricht damit bewusst das Versprechen "keine neue
+Protokollfunktion". Beide haben ein eigenes Changelog und sind hier nicht
+nummeriert:
+
+- Nachbarschaftsmatrix (MeshCom-5-Topologie, Stufen 1 bis 3):
+  [`docs/CHANGELOG-meshcom5.md`](CHANGELOG-meshcom5.md)
+- Speichern und Weiterleiten fuer Direktnachrichten:
+  [`docs/CHANGELOG-snf.md`](CHANGELOG-snf.md)
+
+Wer den reinen neo-Stand will, nimmt `v4.35t.09.26-neo`.
+
 ## Nachgezogen aus upstream/dev (2026-09-26)
 
 Der Merge `43760732` (Basis-Merge `6cc8b552`, in der `dev`-Historie fuenf

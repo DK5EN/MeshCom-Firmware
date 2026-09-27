@@ -3,7 +3,7 @@
 // R1-02 Schritt 1: die Rahmung einer Ringzelle fuer das Telefon, EINMAL.
 //
 // sendToPhone() und sendComToPhone() (src/phone_commands.cpp) trugen dieselbe
-// dreiarmige Fallunterscheidung zweimal aus -- 0x91 (MHeard), 0x44 (JSON),
+// dreiarmige Fallunterscheidung zweimal aus -- 0x91 (MH-Liste), 0x44 (JSON),
 // sonst Text mit vorangestelltem 0x40. Bis auf EINEN Unterschied Zeichen fuer
 // Zeichen gleich, und dieser Unterschied ist ein Defekt, kein Zweck:
 //
@@ -12,7 +12,8 @@
 //
 // Der Com-Text-Arm ist unerreichbar: BLEComToPhoneBuff hat genau zwei
 // Erzeuger -- sendBleJsonRegister() (command_functions.cpp:133-140) und der
-// MHeard-Versand (mheard_functions.cpp:758-764) -- und BEIDE setzen
+// MH-Versand (damals mheard_functions.cpp:758-764, seit MeshCom 5 Welle 4
+// src/mh_phone.cpp) -- und BEIDE setzen
 // buffer[0] = 0x44, nehmen also immer den JSON-Arm. Geschrieben wird der Ring
 // sonst nirgends (einzige Schreibstelle: addBLEComToOutBuffer(),
 // loop_functions.cpp). Der 0x91-Arm dort ist aus demselben Grund tot.
@@ -43,7 +44,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define BLE_PHONE_TYPE_MHEARD 0x91u   // MHeard-Liste: Typbyte wird verworfen
+#define BLE_PHONE_TYPE_MH     0x91u   // MH-Liste: Typbyte wird verworfen
 #define BLE_PHONE_TYPE_JSON   0x44u   // 'D' -- JSON, unveraendert durchgereicht
 #define BLE_PHONE_TAG_TEXT    0x40u   // Text/Position: Tag wird vorangestellt
 
@@ -67,7 +68,7 @@ static inline bool blePhoneFrame(const uint8_t *payload, uint8_t blelen,
     if (payload == 0 || out == 0 || blelen == 0)
         return false;
 
-    if (payload[0] == BLE_PHONE_TYPE_MHEARD)
+    if (payload[0] == BLE_PHONE_TYPE_MH)
     {
         uint8_t n = (uint8_t)(blelen - 1);
         if ((size_t)n > out_size)

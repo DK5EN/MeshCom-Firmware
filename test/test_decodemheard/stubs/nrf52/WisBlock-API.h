@@ -3,13 +3,14 @@
 //
 // Schattet test/support/nrf52/WisBlock-API.h: env:native_parsers listet
 // "-I test/test_decodemheard/stubs" vor "-I test/support" (platformio.ini),
-// darum gewinnt diese Datei fuer alle fuenf hier kompilierten
+// darum gewinnt diese Datei fuer alle hier kompilierten
 // Uebersetzungseinheiten (Regexp.cpp, regex_functions.cpp, aprs_functions.cpp,
-// mheard_functions.cpp, via_functions.cpp), nicht nur fuer mheard/via.
+// via_functions.cpp), nicht nur fuer via -- und fuer native_topo_shadow, das
+// die MHeard-Referenzkopie (test/test_topo_shadow/reference/) mitbaut.
 //
 // Ist deshalb ein Superset des test/support-Shims: alle Felder, die
 // aprs_functions.cpp bereits braucht (siehe dort), PLUS node_via/node_utcoff,
-// die via_functions.cpp bzw. mheard_functions.cpp lesen. Feldtypen, -groessen
+// die via_functions.cpp bzw. die MHeard-Referenzkopie lesen. Feldtypen, -groessen
 // und Default-Werte spiegeln das Original (src/nrf52/WisBlock-API.h).
 //
 // Absichtlich KEINE weiteren Felder: greift eine kuenftig getestete Funktion
@@ -36,9 +37,9 @@ typedef struct
     // via_functions.cpp: checkVia() routing target
     char node_via[40] = {0};
 
-    // mheard_functions.cpp: showPath() timezone offset (hours) for the
-    // printed timestamp -- unused by decodeMHeard() itself, but showPath()
-    // is compiled unconditionally (no board guard) so the field must exist.
+    // test/test_topo_shadow/reference/mheard_functions.cpp: showPath()
+    // timezone offset (hours) for the printed timestamp -- compiled
+    // unconditionally (no board guard) so the field must exist.
     float node_utcoff = 0;
 } s_meshcom_settings;
 

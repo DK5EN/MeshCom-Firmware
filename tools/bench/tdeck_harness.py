@@ -43,6 +43,7 @@ from tdeck_parse import (
     redraw_summary,
     refr_summary,
 )
+from identity_guard import IdentityError, require
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"
 DEFAULT_BAUD = 115200
@@ -2896,10 +2897,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="touch_inject: number of tap positions to use, 1-3 (default: 3)",
     )
     p.add_argument("--out", default="summary.json", help="output JSON summary path (default: summary.json)")
+    p.add_argument("--node", default=None,
+                   help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    p.add_argument("--no-identity-guard", action="store_true",
+                   help="skip the identity guard -- only for setting up a node's identity")
     args = p.parse_args(argv)
     if args.list:
         _list_scenarios()
         raise SystemExit(0)
+    if not args.node and not args.no_identity_guard:
+        p.error("--node NAME is required (fleet.json node name) unless --no-identity-guard "
+                "is given for identity setup")
     args.scenarios = _select_scenarios(args.scenario, args.skip)
     return args
 
@@ -2916,6 +2924,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except Exception as e:
         print(f"ERROR: could not open session on {args.port}: {e}", file=sys.stderr)
         return 2
+
+    if args.node and not args.no_identity_guard:
+        idx = session.send("--info")
+        session.wait_for(r"--MeshCom|\.\.\.Call:", 8.0, since=idx)
+        info_text = "\n".join(session.collect(2.0, since=idx))
+        try:
+            require(info_text, args.node)
+        except IdentityError as e:
+            print(str(e), file=sys.stderr)
+            session.close()
+            return 1
 
     order = args.scenarios
     summary: Dict[str, Dict[str, Any]] = {}

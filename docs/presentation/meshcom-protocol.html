@@ -2438,7 +2438,68 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide" id="s18"><span class="num">21</span><div class="inner">
+<section class="slide"><span class="num">21</span><div class="inner">
+  <div class="eyebrow">Umgesetzt · Stand 28.09.2026</div>
+  <h2>Wiederholung mit gekippter msg_id: zwei Bits, die alte Relais mitnehmen</h2>
+
+  <p class="lead">Vorschlag Schritt 1 von zuvor ist Code: eine persönliche Nachricht (PN), die kein Echo hört,
+  wird bis zu dreimal im 40-Sekunden-Abstand erneut gesendet — mit zwei geänderten msg_id-Bits, damit auch eine
+  <b>alte</b> Firmware sie als neues Paket durchlässt, statt sie im eigenen Dedup zu verwerfen.</p>
+
+  <div class="bytes" style="margin-top:1rem">
+    <div class="by v"><u>Bit 31–12 · 20 Bit</u><b>Knotenkennung (gw_id Bit 2–21)</b></div>
+    <div class="by hi"><u>Bit 11–10 · 2 Bit</u><b>Wiederholungs-Variante</b></div>
+    <div class="by v"><u>Bit 9–0 · 10 Bit</u><b>laufende Nummer, angezeigt als <code>{NNN</code></b></div>
+  </div>
+
+  <div class="grid g3" style="margin-top:1.05rem">
+    <div class="card"><h3>Woher die zwei Bits kommen</h3>
+      <ul class="plain">
+        <li>Wiederholung k (1–3): Bit 10–11 = Original-Bits <b>XOR k</b> — immer von der Erstsendung aus gerechnet, nie von der letzten Kopie, sonst läuft k=3 auf k=0 zurück</li>
+        <li>Erkennungsmaske <code>0xFFFFF3FF</code> löscht nur diese 2 Bit: Original und alle Kopien tragen denselben stabilen 30-Bit-Kern</li>
+        <li>Die FCS wird für jede Kopie neu berechnet, sonst verwirft jeder Empfänger den Frame</li>
+      </ul>
+    </div>
+    <div class="card good"><h3>Warum es auf 97&nbsp;% der Flotte gratis passt</h3>
+      <ul class="plain">
+        <li>ESP32 setzt Bit 0–7 der Knotenkennung aus dem letzten MAC-Byte; Espressif vergibt vier fortlaufende MAC-Adressen je Chip (STA/AP/BT/ETH)</li>
+        <li>Die Basis-MAC ist deshalb durch 4 teilbar — Bit 10–11 stehen bei der Erstsendung schon auf <b>00</b> (meshmap-Stichprobe 27.09.2026: 97&nbsp;% der Flotte)</li>
+        <li>Dort liest sich die Wiederholungsnummer k direkt aus dem Frame ab; die XOR-Form hält nRF52 korrekt, wo diese Bits effektiv zufällig sind</li>
+      </ul>
+    </div>
+    <div class="card cold"><h3>Wie sie endet — und was alte Firmware sieht</h3>
+      <ul class="plain">
+        <li>Nur ein gehörtes <code>:ackNNN</code> des Empfängers stoppt die Wiederholung, per LoRa oder über den Server</li>
+        <li>Ein bloßes Echo markiert nur "unterwegs" und <b>verlängert</b> den Takt bis zur nächsten Aussendung, bricht sie nicht mehr ab</li>
+        <li>Der Empfänger antwortet mit <code>:ackNNN</code> als eigener, frischer msg_id; der Absender baut die erwartete Original-msg_id aus der eigenen Knotenkennung und NNN nach und faltet die Quittung so auf die wartende Kopie zurück</li>
+        <li>Eine alte Firmware im Pfad sieht jede Kopie als eigene Nachricht — sie quittiert (und relayt) jede einzeln, der Empfänger kann dieselbe PN bis zu 4-mal sehen</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="note warn">
+      <b>Der Server muss zuerst umstellen.</b> Er speist Wiederholungen unverändert in jedes Gateway ein; ohne
+      eigenen Dedup-Schlüssel <code>msg_id &amp; 0xFFFFF3FF</code> strahlt sonst jede Region jede Wiederholung
+      erneut aus. Diese Server-Änderung ist noch nicht bestätigt (<code>docs/pn-retry-server.md</code>).
+    </div>
+    <div class="note ok">
+      <b>Upstream gemergt.</b> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a>
+      wurde am 27.09.2026 von OE1KBC (Kurt) nach <code>dev</code> gemergt (Merge-Commit <code>36fa70bb</code>). Auf der
+      Bank offen bleibt der Nachweis, dass eine Wiederholung einen alten Relais-Knoten tatsächlich passiert.
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:.85rem;font-size:.82rem">
+    <b>Weiterlesen:</b>
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-zustellung-dedup.md">Konzeptpapier — Zustellung und Dedup</a> ·
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-xor-impl-plan.md">Umsetzungsplan Firmware</a> ·
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-server.md">Änderungen am Server</a>
+    <span class="cite" style="margin-left:.6rem">Stand 28.09.2026, Release v4.35t.09.28-neo.</span>
+  </div>
+</div></section>
+
+<section class="slide" id="s18"><span class="num">22</span><div class="inner">
   <div class="eyebrow">Der Plan</div>
   <h2>Die Statistik gewinnen lassen — die Transportsicherung macht den Rest</h2>
 

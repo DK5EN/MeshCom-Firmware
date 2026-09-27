@@ -183,6 +183,9 @@ def make_args(port="/dev/fake", env="ttgo_tbeam", host=None, ip="192.168.1.90",
         port=port, env=env, host=host, ip=ip, bin=None, settings_check=settings_check,
         force=False, runs_dir="", boot_wait_s=0.5, snapshot_timeout_s=1.0,
         safeboot_poll_s=0.5, reboot_poll_s=0.5, post_ota_timeout_s=1.0,
+        # these tests drive run() against a fake serial port with no fleet.json
+        # entry, so they bypass the identity guard rather than exercise it.
+        node=None, no_identity_guard=True,
     )
     for k, v in overrides.items():
         setattr(ns, k, v)

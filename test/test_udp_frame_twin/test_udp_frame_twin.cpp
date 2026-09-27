@@ -64,6 +64,9 @@
 
 #include <udp_functions.h>   // stub: bUDPLOG, resetMeshComUDP, handleUdpFrame_esp32
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
+#include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
+#include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
+#include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -102,6 +105,7 @@ bool bGATEWAY = false;
 bool bDEBUG = false;
 bool bVIA = false;
 bool bKISS = false;          // KISS/TCP on (loop_functions.cpp on the board)
+bool bDisplayRetx = false;   // --setretx: the [RETX] log line on a server-ack ring stop
 int isPhoneReady = 1;
 unsigned int msg_counter = 0;
 unsigned int _GW_ID = 0x99999999;
@@ -153,6 +157,10 @@ static std::vector<std::string> g_ack_dest;
 static int g_save_settings_calls = 0;
 static int g_sendDisplayText_calls = 0;
 static int g_sendDisplayPosition_calls = 0;
+// msg_destination_path as the display saw it (sendDisplayText()/
+// sendDisplayPosition(), in call order). Kept out of the ordered sink log on
+// purpose, so the U1 corpus dump does not change with it.
+static std::vector<std::string> g_display_dest_path;
 
 // queueKiss() -- declared by stubs/kiss_functions.h, which shadows the real
 // header (see there). Kept out of the ordered sink log on purpose: bKISS is
@@ -195,6 +203,77 @@ static std::vector<ExternAckCall> g_extern_ack;
 // reads as "not ours" (icheck < 0) -- the common case in this corpus.
 static std::vector<uint32_t> g_own_tx_known;
 static std::vector<uint32_t> g_insert_calls;
+
+// findAndStopRingSlot() (src/lora_functions.h/.cpp): a server-ack for an id
+// checkOwnTx() knows also stops the waiting TX-ring slot (PN retry, see the
+// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp). lora_functions.cpp
+// is not in this env's build_src_filter, so faked here exactly like
+// checkOwnTx() above: a pure recorder, kept out of g_sink_log so it cannot
+// perturb the U1 corpus dump or the committed twin-diff baseline. Returns -1
+// (no ring slot found) like the real function on a cold/empty ring.
+static std::vector<uint32_t> g_ring_stop_calls;
+
+int findAndStopRingSlot(uint32_t msgId)
+{
+    g_ring_stop_calls.push_back(msgId);
+    return -1;
+}
+
+// sto_notice.* (wave4 port map, Group B): sto_notice.cpp is not in this
+// env's build_src_filter (native_udp_frame_twin lists dm_stats/dm_dedup/
+// reack_limiter but not sto_notice -- test/test_sto_notice covers its own
+// parse/build/rate-limit logic), so the three symbols the ingress twins now
+// call are faked here. stoNoticeParse mirrors the real byte-9 tag anchor
+// (src/sto_notice.cpp: "%-9.9s:sto%03u %s", `{`/`:ack`/`:rej` reject) closely
+// enough to drive the wiring under test, not to re-prove sto_notice's own
+// parser. stoHolderNote/stoHolderClear are pure call recorders like
+// checkOwnTx() above, not sinks (kept out of g_sink_log for the same
+// reason: they cannot perturb the U1 corpus dump or the twin-diff baseline).
+struct StoHolderNoteCall { uint32_t msg_id; std::string holder; uint16_t nnn; };
+static std::vector<StoHolderNoteCall> g_sto_holder_note_calls;
+static std::vector<uint32_t> g_sto_holder_clear_calls;
+static bool g_sto_holder_note_return = true;
+
+bool stoNoticeParse(const char *payload, uint16_t *nnn, char *dst)
+{
+    if (nnn) *nnn = 0;
+    if (dst) dst[0] = 0;
+    if (!payload) return false;
+
+    size_t len = strlen(payload);
+    if (len < 9 + strlen(STO_NOTICE_TAG))
+        return false;
+    if (strchr(payload, '{') != NULL)
+        return false;
+    if (strstr(payload, ":ack") != NULL || strstr(payload, ":rej") != NULL)
+        return false;
+
+    const char *tag = payload + 9;
+    if (strncmp(tag, STO_NOTICE_TAG, strlen(STO_NOTICE_TAG)) != 0)
+        return false;
+
+    const char *digits = tag + strlen(STO_NOTICE_TAG);
+    if (!(digits[0] >= '0' && digits[0] <= '9') ||
+        !(digits[1] >= '0' && digits[1] <= '9') ||
+        !(digits[2] >= '0' && digits[2] <= '9'))
+        return false;
+
+    if (nnn)
+        *nnn = (uint16_t)((digits[0] - '0') * 100 + (digits[1] - '0') * 10 + (digits[2] - '0'));
+    return true;
+}
+
+bool stoHolderNote(uint32_t msg_id, const char *holder, uint16_t nnn, uint32_t now_ms)
+{
+    (void)now_ms;
+    g_sto_holder_note_calls.push_back(StoHolderNoteCall{msg_id, holder ? holder : "", nnn});
+    return g_sto_holder_note_return;
+}
+
+void stoHolderClear(uint32_t msg_id)
+{
+    g_sto_holder_clear_calls.push_back(msg_id);
+}
 
 // ---------------------------------------------------------------------------
 // U1 ordered sink log (test plan 4.4, section 9.1). The vectors above record
@@ -312,14 +391,16 @@ bool save_settings(void) { g_save_settings_calls++; record_sink("SAVESETTINGS", 
 
 void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-    (void)aprsmsg; (void)rssi; (void)snr;
+    (void)rssi; (void)snr;
+    g_display_dest_path.push_back(aprsmsg.msg_destination_path);
     g_sendDisplayText_calls++;
     record_sink("DISPLAYTEXT", "-");
 }
 
 void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-    (void)aprsmsg; (void)rssi; (void)snr;
+    (void)rssi; (void)snr;
+    g_display_dest_path.push_back(aprsmsg.msg_destination_path);
     g_sendDisplayPosition_calls++;
     record_sink("DISPLAYPOS", "-");
 }
@@ -478,12 +559,17 @@ static void recorder_reset()
     g_save_settings_calls = 0;
     g_sendDisplayText_calls = 0;
     g_sendDisplayPosition_calls = 0;
+    g_display_dest_path.clear();
     g_kiss.clear();
     g_extern.clear();
     g_extern_ack.clear();
     g_sink_log.clear();
     g_own_tx_known.clear();
     g_insert_calls.clear();
+    g_ring_stop_calls.clear();
+    g_sto_holder_note_calls.clear();
+    g_sto_holder_clear_calls.clear();
+    g_sto_holder_note_return = true;
 
     udp_is_busy = false;
     lora_tx_msg_len = 0;
@@ -509,6 +595,7 @@ static void recorder_reset()
     bDEBUG = false;
     bVIA = false;
     bKISS = false;
+    bDisplayRetx = false;
     isPhoneReady = 1;
     msg_counter = 0;
     memset(own_msg_id, 0, sizeof(own_msg_id));
@@ -530,6 +617,12 @@ static void recorder_reset()
     memset(ringBuffer, 0, sizeof(ringBuffer));
     iWrite = 0;
     iRead = 0;
+
+    // Stage 2.1 dedup table + stage 0.2 re-ACK rate limiter -- both process-
+    // global, shared by every test in this binary the moment the RX-decode
+    // hookup calls them.
+    dmDedupReset();
+    reackLimiterReset();
 
     Serial.clear();
     mc_test_set_millis(1000);
@@ -661,6 +754,69 @@ static void test_agreement_extudp_forward_ahead_of_dedup_gate_on_both(void)
         snprintf(msg, sizeof(msg), "%s: EXTUDP forward must still see the duplicate -- it must "
                                     "stay ahead of is_new_packet()", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)g_extern.size(), msg);
+    }
+}
+
+// Stage 2.1 (dm_dedup.h) + stage 0.2 (reack_limiter.h), server ingress hookup
+// (docs/snf-port-campaign.md wave 2 / wave2-anchors.md Group B). A DM
+// addressed to this node, same (source call, NNN, stripped payload) but a
+// FRESH msg_id each time -- the shape a stage-1 retry-ladder resend takes
+// (not built yet): the stage-0 msg_id dedup ring alone (is_new_packet(),
+// already exercised by test_agreement_dedup_blocks_repeat_relay_on_both
+// above) cannot catch this, since the id differs on every attempt. The
+// first delivery must display, forward to the phone and ack; a repeat of
+// the same (call, NNN, payload) must NOT display or forward again, but --
+// once the 0.2 re-ACK limiter's 30 s window has passed -- must still be
+// acked (fork-main semantics: a lost :ackNNN is repaired without a second
+// copy of the message reaching the phone).
+static void test_regression_dm_dedup_reacks_without_redisplay_on_both(void)
+{
+    uint8_t tmpl1[BUF_CAP], tmpl2[BUF_CAP];
+    memset(tmpl1, 0, sizeof(tmpl1));
+    memset(tmpl2, 0, sizeof(tmpl2));
+    // "duptest{007": no leading '{' (iEnqPos scans from offset 1), "{007"
+    // is the transport-sequence tag stripped before the dedup key is built.
+    uint16_t len1 = build_gate_datagram(tmpl1, "DK5EN-2", "DK5EN-1", ':', "duptest{007", 0x8001);
+    uint16_t len2 = build_gate_datagram(tmpl2, "DK5EN-2", "DK5EN-1", ':', "duptest{007", 0x8002);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        bDisplayInfo = true;
+        mc_test_set_millis(1000);
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl1, len1);
+        if (side) handleUdpFrame_nrf52(buf, len1, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len1, IPAddress(1, 2, 3, 4));
+
+        char msg[160];
+        snprintf(msg, sizeof(msg), "%s: first delivery must display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: first delivery must forward to the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: first delivery must ack", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ack_ids.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: first ack has the wrong NNN", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(7, g_ack_ids[0], msg);
+
+        // Past the 0.2 re-ACK limiter's 30 s window, so the second ack below
+        // exercises the dedup-duplicate re-ack path, not the rate limiter.
+        mc_test_set_millis(1000 + 31000);
+
+        copy_into(buf, tmpl2, len2);   // same (call, NNN, payload), fresh msg_id
+        if (side) handleUdpFrame_nrf52(buf, len2, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len2, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: repeat (call,NNN,payload) must not display again", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: repeat must not forward to the phone again", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: repeat must still be acked (fork-main semantics)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)g_ack_ids.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: second ack has the wrong NNN", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(7, g_ack_ids[1], msg);
     }
 }
 
@@ -1364,6 +1520,151 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
     }
 }
 
+// PN retry (dk5en-xor, replaces the removed stage 1 DM outbox): a DM's ack
+// arriving over the SERVER/UDP ingress must stop the waiting TX-ring slot
+// too, exactly when checkOwnTx() recognizes the acked id as one of our own --
+// findAndStopRingSlot(msg_counter) and stoHolderClear(msg_counter) at the
+// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp. This replaces
+// test_regression_server_ack_stops_outbox_ladder_on_both (the stage 1 outbox
+// it exercised is gone); the own-DM branch of the server-ack path was
+// otherwise uncovered by any twin test.
+static void test_regression_server_ack_own_dm_stops_ring_on_both(void)
+{
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    // Destination == own node_call, NOT "*"; payload carries ":ack" at a
+    // position > 0, same shape as the DR-09 attribution test above.
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack7", 0x7207);
+
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (7 & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        // Case 1: checkOwnTx() knows this id -- own DM, the server ack must
+        // stop the waiting ring slot and clear any store holder.
+        recorder_reset();
+        g_own_tx_known.push_back(expected_msg_id);
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s did not build an ack phone frame for a known own-tx id", name);
+        TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, msg);
+        snprintf(msg, sizeof(msg), "%s ack_status must be 0x02 for a known own-tx id", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x02, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s did not mark own_msg_id[][4] ACK (0x02)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x02, own_msg_id[0][4], msg);
+
+        snprintf(msg, sizeof(msg), "%s did not stop exactly one ring slot for the acked id", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ring_stop_calls.size(), msg);
+        if (g_ring_stop_calls.size() >= 1)
+        {
+            snprintf(msg, sizeof(msg), "%s findAndStopRingSlot() got the wrong msg id", name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_ring_stop_calls[0], msg);
+        }
+
+        snprintf(msg, sizeof(msg), "%s did not clear the store holder for the acked id", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sto_holder_clear_calls.size(), msg);
+        if (g_sto_holder_clear_calls.size() >= 1)
+        {
+            snprintf(msg, sizeof(msg), "%s stoHolderClear() got the wrong msg id", name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_sto_holder_clear_calls[0], msg);
+        }
+
+        // Case 2: checkOwnTx() does not know this id -- a plain unattributed
+        // ack (same as the DR-09 test above), no ring stop, no holder clear.
+        recorder_reset();
+
+        uint8_t buf2[BUF_CAP];
+        copy_into(buf2, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf2, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf2, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s did not build an ack phone frame for an unknown own-tx id", name);
+        TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, msg);
+        snprintf(msg, sizeof(msg), "%s ack_status must stay 0x01 for an unknown own-tx id", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x01, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s stopped a ring slot for an id it never sent", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ring_stop_calls.size(), msg);
+        snprintf(msg, sizeof(msg), "%s cleared a store holder for an id it never sent", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sto_holder_clear_calls.size(), msg);
+    }
+}
+
+// Wave 4 (docs/snf-port-campaign.md, port map Group B / 150b0a4a): a
+// server-ingress `:sto` custody notice for one of our own outgoing DMs must
+// be CONSUMED -- not displayed as a chat text, not relayed to the phone as
+// a plain message -- and must yield the HELD status (BLE ack frame, status
+// ACK_STATUS_HELD/0x04, holder attribution) instead. Red without the src
+// hook: stoNoticeParse()/stoHolderNote() are never called, own_msg_id[][4]
+// never reaches 0x04, and the notice is displayed like an ordinary DM text
+// (g_sendDisplayText_calls > 0, no HELD ack frame built).
+static void test_regression_sto_notice_consumed_yields_held_status_on_both(void)
+{
+    const uint16_t nnn = 42;
+    const char *holder = "DK5EN-93";
+    char payload[64];
+    snprintf(payload, sizeof(payload), "%-9.9s:sto%03u %s", holder, (unsigned)nnn, "DK5EN-14");
+
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    // Destination == own node_call ("DK5EN-1", set by recorder_reset()), NOT
+    // "*"; source is the store node that sent the notice.
+    uint16_t len = build_gate_datagram(tmpl, holder, "DK5EN-1", ':', payload, 0x9101);
+
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (nnn & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        // own_msg_id[0] models the slot for the DM this notice is about --
+        // checkOwnTx()/g_own_tx_known is index-aligned with own_msg_id[], see
+        // the comment at their declaration above.
+        g_own_tx_known.push_back(expected_msg_id);
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[144];
+        snprintf(msg, sizeof(msg), "%s did not call stoHolderNote() for the :sto notice", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sto_holder_note_calls.size(), msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() holder-callsign mismatch", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(holder, g_sto_holder_note_calls[0].holder.c_str(), msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() NNN mismatch", name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(nnn, g_sto_holder_note_calls[0].nnn, msg);
+        snprintf(msg, sizeof(msg), "%s stoHolderNote() msg_id mismatch", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_sto_holder_note_calls[0].msg_id, msg);
+
+        snprintf(msg, sizeof(msg), "%s did not mark own_msg_id[][4] HELD (0x04)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x04, own_msg_id[0][4], msg);
+
+        snprintf(msg, sizeof(msg), "%s did not build exactly one BLE frame (HELD ack, nothing else)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame indicator byte", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x41, g_ble[0][0], msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame status byte must be ACK_STATUS_HELD (0x04)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(ACK_STATUS_HELD, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s HELD ack frame attribution length byte", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)strlen(holder), g_ble[0][6], msg);
+        for (size_t i = 0; i < strlen(holder); i++)
+        {
+            snprintf(msg, sizeof(msg), "%s HELD ack frame attribution byte mismatch", name);
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)holder[i], g_ble[0][7 + i], msg);
+        }
+
+        snprintf(msg, sizeof(msg), "%s displayed a :sto notice as a chat text (must be consumed, not shown)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, msg);
+    }
+}
+
 static void test_agreement_extudp_ack_json_mirrors_ble_ack_on_both(void)
 {
     // DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3, implemented
@@ -1849,6 +2150,153 @@ static void test_extern_ack_json_is_valid_at_its_edges(void)
 }
 
 
+// ===========================================================================
+// MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+// a frame injected from the server leaves the gateway with its destination
+// path reset to the destination before checkVia() -- a via of the sender's
+// region must not reach local LoRa, where nobody named in it relays. Checked
+// on every copy the handler produces: the TX-ring entry (decoded back), the
+// phone copies (addBLEOutBuffer) and the display (sendDisplayText()/
+// sendDisplayPosition()). Both twins must also agree byte for byte.
+// ===========================================================================
+
+struct ViaResetOutcome
+{
+    std::vector<uint8_t> tx;          // TX-ring entry (frame bytes only)
+    std::string tx_path;              // its decoded msg_destination_path
+    std::vector<std::string> ble_paths;
+    std::vector<std::vector<uint8_t>> ble;
+    std::vector<std::string> display_paths;
+};
+
+static ViaResetOutcome run_via_reset_case(int side, char type, const char *dest_path,
+                                          bool via_on, const char *node_via, uint32_t msg_id)
+{
+    recorder_reset();
+    bVIA = via_on;
+    if (node_via)
+        snprintf(meshcom_settings.node_via, sizeof(meshcom_settings.node_via), "%s", node_via);
+
+    const char *payload = (type == '!') ? "4812.34N/01123.45E#via-reset" : "via-reset";
+    uint8_t buf[BUF_CAP];
+    memset(buf, 0, sizeof(buf));
+    uint16_t len = build_gate_datagram(buf, "DK5EN-92", dest_path, type, payload, msg_id);
+
+    if (side)
+        handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    else
+        handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+    ViaResetOutcome o;
+    int used = 0;
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        if (ringBuffer[i][0] == 0)
+            continue;
+        used++;
+        o.tx.assign(ringBuffer[i] + 2, ringBuffer[i] + 2 + ringBuffer[i][0]);
+    }
+    char msg[96];
+    snprintf(msg, sizeof(msg), "%s '%c' %s: exactly one TX-ring entry expected",
+             side ? "nrf52" : "esp32", type, dest_path);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, used, msg);
+
+    uint8_t dec[UDP_TX_BUF_SIZE + 5];
+    memset(dec, 0, sizeof(dec));
+    memcpy(dec, o.tx.data(), o.tx.size());
+    struct aprsMessage m;
+    initAPRS(m, type);
+    snprintf(msg, sizeof(msg), "%s '%c' %s: TX-ring entry does not decode",
+             side ? "nrf52" : "esp32", type, dest_path);
+    TEST_ASSERT_TRUE_MESSAGE(decodeAPRS(dec, (uint16_t)o.tx.size(), m) != 0, msg);
+    o.tx_path = m.msg_destination_path;
+
+    for (const auto &b : g_ble)
+    {
+        o.ble.push_back(b);
+        uint8_t bb[UDP_TX_BUF_SIZE + 5];
+        memset(bb, 0, sizeof(bb));
+        memcpy(bb, b.data(), std::min(b.size(), sizeof(bb)));
+        struct aprsMessage bm;
+        initAPRS(bm, type);
+        if (decodeAPRS(bb, (uint16_t)b.size(), bm) != 0)
+            o.ble_paths.push_back(bm.msg_destination_path);
+    }
+    o.display_paths = g_display_dest_path;
+    return o;
+}
+
+static void check_via_reset(char type, const char *dest_path, bool via_on,
+                            const char *node_via, const char *expect, uint32_t msg_id)
+{
+    ViaResetOutcome out[2];
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        out[side] = run_via_reset_case(side, type, dest_path, via_on, node_via, msg_id);
+        char msg[128];
+
+        snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: TX-ring destination path",
+                 name, type, dest_path, (int)via_on);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, out[side].tx_path.c_str(), msg);
+
+        snprintf(msg, sizeof(msg), "%s '%c' %s: phone copy missing", name, type, dest_path);
+        TEST_ASSERT_TRUE_MESSAGE(!out[side].ble_paths.empty(), msg);
+        for (const auto &p : out[side].ble_paths)
+        {
+            snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: phone copy destination path",
+                     name, type, dest_path, (int)via_on);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, p.c_str(), msg);
+        }
+
+        // The display sees the reset path: sendDisplayPosition() runs before
+        // checkVia() (bare destination), sendDisplayText() after the first
+        // checkVia() (with node_via, if set). Never the sender's via.
+        const char *comma = strrchr(dest_path, ',');
+        std::string bare = comma ? comma + 1 : dest_path;
+        snprintf(msg, sizeof(msg), "%s '%c' %s: display not called", name, type, dest_path);
+        TEST_ASSERT_TRUE_MESSAGE(!out[side].display_paths.empty(), msg);
+        for (const auto &p : out[side].display_paths)
+        {
+            snprintf(msg, sizeof(msg), "%s '%c' %s bVIA=%d: display destination path '%s'",
+                     name, type, dest_path, (int)via_on, p.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(p == bare || p == expect, msg);
+        }
+    }
+
+    char msg[96];
+    snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: TX-ring bytes differ between twins",
+             type, dest_path, (int)via_on);
+    TEST_ASSERT_TRUE_MESSAGE(out[0].tx == out[1].tx, msg);
+    snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: phone copies differ between twins",
+             type, dest_path, (int)via_on);
+    TEST_ASSERT_TRUE_MESSAGE(out[0].ble == out[1].ble, msg);
+    // Display paths agree only without an own node_via. With one, a known
+    // drift shows: the ESP32 handler calls sendDisplayPosition() before its
+    // checkVia(), the nRF52 handler after it, so the ESP32 display sees "9"
+    // and the nRF52 display "DK5EN-90,9". Both are free of the sender's via
+    // (checked per side above); the order itself is not this fix's subject.
+    if (!via_on)
+    {
+        snprintf(msg, sizeof(msg), "'%c' %s bVIA=%d: display paths differ between twins",
+                 type, dest_path, (int)via_on);
+        TEST_ASSERT_TRUE_MESSAGE(out[0].display_paths == out[1].display_paths, msg);
+    }
+}
+
+static void test_regression_server_via_is_reset_before_checkvia_on_both(void)
+{
+    // foreign via from another region -> only the destination remains
+    check_via_reset(':', "DB0XYZ-12,9", false, nullptr, "9", 0x5101);
+    check_via_reset('!', "DB0XYZ-12,9", false, nullptr, "9", 0x5102);
+    // own node_via still applies -- on the reset path, not appended to the foreign one
+    check_via_reset(':', "DB0XYZ-12,9", true, "DK5EN-90", "DK5EN-90,9", 0x5103);
+    check_via_reset('!', "DB0XYZ-12,9", true, "DK5EN-90", "DK5EN-90,9", 0x5104);
+    // a frame already at its destination stays there (no "9,9")
+    check_via_reset(':', "9", false, nullptr, "9", 0x5105);
+    check_via_reset('!', "9", false, nullptr, "9", 0x5106);
+}
+
 int main(int, char **argv)
 {
     g_argv0 = argv[0] ? argv[0] : "";
@@ -1858,6 +2306,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
+    RUN_TEST(test_regression_dm_dedup_reacks_without_redisplay_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);
@@ -1877,11 +2326,15 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_decodeaprs_reject_suppresses_processing_on_both);
     RUN_TEST(test_agreement_conf_zero_address_guard_on_both);
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
+    RUN_TEST(test_regression_server_ack_own_dm_stops_ring_on_both);
+    RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);
     RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);
 
     RUN_TEST(test_drift_kiss_server_relay_tap_is_esp32_only);
+
+    RUN_TEST(test_regression_server_via_is_reset_before_checkvia_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

@@ -68,7 +68,7 @@ Four layers, in dependency order. Layer 1 is worth building even if nothing else
 ```mermaid
 flowchart TD
     L0["Layer 0 — CI gate<br/>build all 32 envs on PR"] --> L1
-    L1["Layer 1 — Native unit tests<br/>codec, CSMA math, mheard, via, compress"] --> L2
+    L1["Layer 1 — Native unit tests<br/>codec, CSMA math, neighbour matrix/topology, via, compress"] --> L2
     L2["Layer 2 — Golden vectors<br/>replay tools/meshcom_monitor/*.log frames"] --> L3
     L3["Layer 3 — Host-side integration<br/>fake radio, fake clock, run the scheduler"] --> L4
     L4["Layer 4 — Hardware-in-the-loop<br/>2 nodes, scripted serial, on-air assertions"]
@@ -122,13 +122,27 @@ runtime. Two options, use both:
 
 **First five test targets**, ranked by risk × testability:
 
-| #   | Target                                                        | Why first                                                                |
-| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | `decodeAPRS()` / `decodeAPRSPOS()` — `aprs_functions.cpp`     | The interop contract. Highest consequence, pure input→output.            |
-| 2   | `PositionToAPRS()` — `loop_functions.cpp:3266`                | The encode side. Round-trip with #1.                                     |
-| 3   | `csma_compute_timeout_prio()`, `getNextTxSlot()`              | Timing math; regressions here are invisible until the channel collapses. |
-| 4   | `updateMheard()` / `updateHeyPath()` — `mheard_functions.cpp` | Ring-buffer index arithmetic, `MAX_MHEARD` varies per board.             |
-| 5   | `commandCheck()` + a handful of `commandAction` arms          | Enables the Phase 2 dispatch-table refactor safely.                      |
+| #   | Target                                                                                                                           | Why first                                                                                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | `decodeAPRS()` / `decodeAPRSPOS()` — `aprs_functions.cpp`                                                                        | The interop contract. Highest consequence, pure input→output.                             |
+| 2   | `PositionToAPRS()` — `loop_functions.cpp:3266`                                                                                   | The encode side. Round-trip with #1.                                                      |
+| 3   | `csma_compute_timeout_prio()`, `getNextTxSlot()`                                                                                 | Timing math; regressions here are invisible until the channel collapses.                  |
+| 4   | Neighbour matrix / topology — `nbr_matrix.cpp`, `nbr_views.cpp`, `mh_phone.cpp` (superseded `mheard_functions.cpp`, now removed) | Mask/edge-pool arithmetic and the MH/NCNT/route queries built on it; **done**, see below. |
+| 5   | `commandCheck()` + a handful of `commandAction` arms                                                                             | Enables the Phase 2 dispatch-table refactor safely.                                       |
+
+Item 4 already landed as native `platformio.ini` environments: `native_nbr_matrix`
+(mask/edge-pool rules, `NBR_MAX_ROWS` 5), `native_nbr_views` /
+`native_nbr_views64` (the MH/NCNT/route query layer at S3/nRF52 and classic-ESP32
+row counts; `native_nbr_views64` builds with `-O2 -ffast-math` specifically to
+mirror the nRF52 `-Ofast` build, where the compiler folds away `isnan()`),
+`native_mh_phone` (the phone `MH` JSON, `mhJsonBuild()`), `native_nbr_report`
+(the HN neighbour-report cap), and the field-replay harness — `native_nbr_replay`
+plus its `64`/`128` row-count siblings — that reproduces a captured `[LOG]`
+session's `[NBR]` output byte-for-byte. `native_topo_shadow` runs the same
+replay through both the old mheard code (frozen under
+`test/test_topo_shadow/reference/`) and the new topology side by side as a
+shadow comparison. `MAX_MHEARD` no longer exists; its successor is
+`NBR_MAX_ROWS`, sized per board family.
 
 Then: `via_functions.cpp`, `regex_functions.cpp`, `test/compress_functions.cpp`,
 `conv_fuss`/`conv_meter`/`cround4`, `shortVERSION()`, `convertCallToShort()`.

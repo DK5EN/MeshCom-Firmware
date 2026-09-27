@@ -1,0 +1,60 @@
+{
+  "scenario": "doublestart",
+  "started": "2026-09-13 18:04:59",
+  "verdict": "PASS",
+  "assertions": [
+    {
+      "name": "safeboot web server up",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "first /ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "second /ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "serial ota;abort;reason;stale_session",
+      "passed": true,
+      "detail": "stale_session"
+    },
+    {
+      "name": "app_valid reported (first session)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "second upload HTTP 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "serial ota;verify;result;ok (second session)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "serial ota;end;result;success (second session)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "node back in the app within 120s",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "GET / answers",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "extra": {
+    "app_valid_first_session": true
+  }
+}

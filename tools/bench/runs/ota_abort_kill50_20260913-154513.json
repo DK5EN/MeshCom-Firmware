@@ -1,0 +1,58 @@
+{
+  "scenario": "kill50",
+  "started": "2026-09-13 15:45:14",
+  "verdict": "FAIL",
+  "assertions": [
+    {
+      "name": "safeboot web server up",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "upload ends without a 200 (client killed at ~50%)",
+      "passed": true,
+      "detail": "status=0 body=''"
+    },
+    {
+      "name": "serial ota;abort;reason;<r> within 40s, reason in ['client_disconnected', 'incomplete_upload', 'stalled']",
+      "passed": true,
+      "detail": "client_disconnected"
+    },
+    {
+      "name": "/ota/state aborted with expected reason",
+      "passed": true,
+      "detail": "state={'state': 'aborted', 'reason': 'client_disconnected', 'generation': 1, 'received': 728226, 'total': 0, 'image_valid': False, 'fallback_in_ms': 179849, 'uptime_ms': 14363}"
+    },
+    {
+      "name": "node stays in safeboot 10s after abort (/update still 200)",
+      "passed": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "serial fallback;reason;timeout (or legacy 'OTA Start Timeout')",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "[BOOT];ready after the fallback",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "no serial ota;verify;result;ok",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "no serial ota;end;result;success",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "extra": {}
+}

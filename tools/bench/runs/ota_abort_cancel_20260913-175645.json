@@ -1,0 +1,98 @@
+{
+  "scenario": "cancel",
+  "started": "2026-09-13 17:56:46",
+  "verdict": "PASS",
+  "assertions": [
+    {
+      "name": "safeboot web server up (part A)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/cancel 200 (no upload running)",
+      "passed": true,
+      "detail": "HTTP 200 OTA update canceled."
+    },
+    {
+      "name": "serial fallback;reason;cancel (or legacy 'Rebooting to app partition')",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "app boot within 60s",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "safeboot web server up (part B)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/start 200 (part B)",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "/ota/cancel 400 while an upload is in progress",
+      "passed": true,
+      "detail": "HTTP 400 OTA update in progress. Cannot cancel."
+    },
+    {
+      "name": "safeboot web server up (part C)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/start 200 (part C)",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "part C upload ends without a 200 (client killed at ~50%)",
+      "passed": true,
+      "detail": "status=0 body=''"
+    },
+    {
+      "name": "part C serial ota;abort;reason;<r>",
+      "passed": true,
+      "detail": "client_disconnected"
+    },
+    {
+      "name": "/ota/cancel 409 app_invalid (part C, after a kill)",
+      "passed": true,
+      "detail": "HTTP 409 app_invalid"
+    },
+    {
+      "name": "part C recovery /ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "part C recovery upload HTTP 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "part C recovery serial ota;verify;result;ok",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part C recovery serial ota;end;result;success",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part C app back after recovery ([BOOT];ready)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "GET / answers after part C recovery",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "extra": {}
+}

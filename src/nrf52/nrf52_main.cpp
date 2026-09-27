@@ -128,9 +128,14 @@ void sendHeartbeat();
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#include "msgstore_settings.h"
+#endif
 #include <regex_functions.h>
 #include "setlog_lines.h"
 #include "dedup_functions.h"
+#include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <command_functions.h>
 #include <aprs_functions.h>
 #include <batt_functions.h>
@@ -139,7 +144,8 @@ void sendHeartbeat();
 #include <udp_functions.h>
 #include <web_functions/web_functions.h>
 #include <phone_commands.h>
-#include <mheard_functions.h>
+#include <mh_phone.h>
+#include <topo_ui.h>
 #include <clock.h>
 
 #include <bmx280.h>
@@ -522,8 +528,10 @@ void nrf52setup()
         memset(ringBufferLoraRX[i], 0, 4);
     }
 
-    // Initialize mheard list
-    initMheard();
+    // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): Topologie ersetzt die
+    // alte MHeard-Init; topoUiBoot() ist ein No-Op ausser auf T-Deck/T-Deck
+    // Pro (SD-Sicherung dort passt in tdeck_main.cpp).
+    topoUiBoot();
 
 	// Initialize battery reading
 	init_batt();
@@ -557,6 +565,13 @@ void nrf52setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+#if defined(ENABLE_MSGSTORE)
+    // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
+    // --store/--storecall/--storetime/--storeslots/--storenotice settings.
+    msgstoreGlueInit();
+    msgstoreSettingsLoad();
+#endif
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das
@@ -634,6 +649,16 @@ void nrf52setup()
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
+    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0400;
+    nbrDebugApply();
+    // --nbrrelay off|count|on (Stufe 2): 0x0800 rechnen/zaehlen, 0x1000 anwenden.
+    bNBRRELAY  = (meshcom_settings.node_sset4 & 0x1800) != 0;
+    bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;
+    // --nbrsym on|off (Stufe 2): 0x2000 invertiert gespeichert, siehe command_functions.cpp.
+    bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;
+    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100 off, 0x0200 on, keines von beiden auto.
+    bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;
+    bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;
 
     bDisplayInfo = bLORADEBUG;
 
@@ -1865,7 +1890,7 @@ void nrf52loop()
                 commandAction((char*)config_cmds[config_cmds_index], isPhoneReady, true);
             }
 
-            startMheardToPhone(); // MHeard erst, wenn der Kommando-Ring leer ist (siehe unten)
+            mhPhoneListStart(); // MHeard-Liste erst, wenn der Kommando-Ring leer ist (siehe unten)
 
             config_to_phone_prepare_timer=millis();
 
@@ -1885,10 +1910,10 @@ void nrf52loop()
                 {
                     sendComToPhone();
                 }
-                else if (mheardToPhonePending())
+                else if (mhPhoneListPending())
                 {
                     // Kommando-Ring leer: naechste Portion der MHeard-Liste nachlegen
-                    sendMheard();
+                    mhPhoneListStep();
                 }
                 else if (!bf_empty(&phoneRing))
                 {
@@ -1918,8 +1943,9 @@ void nrf52loop()
         }
     }
 
-    // check NCNT modified
-    int incnt = getMheardCount();
+    // check NCNT modified -- MeshCom 5 (Welle 4, Konzept 4.8): lokaler
+    // Vergleich, nicht die Sendefassung -- nbrNcnt(), nicht nbrNcntAir().
+    int incnt = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
     if(ncnt_hold != incnt)
     {
         INSTR_SECTION("pos_timer");
@@ -2019,8 +2045,9 @@ void nrf52loop()
     {
         bHeyFirst = false;
 
-        // Check for topology change
-        int current_neighbors = getMheardCount();
+        // Check for topology change -- lokaler Vergleich (Konzept 4.8: die
+        // Trickle-Ruecksetzung ist kein Sender).
+        int current_neighbors = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
         if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
         {
             trickle_interval_ms = TRICKLE_IMIN_S * 1000UL;
@@ -2044,6 +2071,45 @@ void nrf52loop()
         trickle_consistent_count = 0;
 
         heyinfo_timer = millis();
+    }
+
+    // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): eigener Takt,
+    // unabhaengig vom Trickle-Intervall oben und nie unterdrueckt -- siehe
+    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und Modus-Auswertung.
+    nbrReportTick();
+
+    // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer
+    // nbrLogSnapshot(). Nur im Loop, NICHT im Timer-Task -- der hat auf nRF52 nur
+    // 1 kB Stack, nbrLogSnapshot() formatiert in einen 160-Byte-Puffer und laeuft
+    // ueber alle Zeilen. Laeuft nur, wenn das Flag gesetzt ist; nbrDebugApply()
+    // setzt nbrsnap_timer beim Einschalten zurueck, damit der erste Schnappschuss
+    // nicht erst 15 Minuten nach dem Einschalten kommt.
+    if(bNBRDEBUG && (uint32_t)(millis() - nbrsnap_timer) >= 900000UL)
+    {
+        nbrsnap_timer = millis();
+        nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
+    }
+
+    // Nachbarschaftsmatrix (Welle 2, edge pool): Minuten-Sweep (nbrSweep(),
+    // CONTRACT in nbr_matrix.h) -- IMMER, unabhaengig von --nbrdebug (das
+    // steuert nur den 15-Minuten-Schnappschuss oben). Loop-Task, NICHT
+    // Timer-Task (der hat auf nRF52 nur 1 kB Stack, gleiche Begruendung wie
+    // bei nbrLogSnapshot() oben). nbrSweep() selbst ist ein No-Op bei einem
+    // zweiten Aufruf in derselben Minute; die Minuten-Waechter hier spart
+    // trotzdem den Funktionsaufruf bei jedem Loop-Durchlauf.
+    {
+        static uint16_t s_nbr_sweep_min = 0xFFFF;
+        uint16_t now_min_sweep = (uint16_t)(millis() / 60000UL);
+        if(now_min_sweep != s_nbr_sweep_min)
+        {
+            s_nbr_sweep_min = now_min_sweep;
+            nbrSweep(nbrMatrix, now_min_sweep);
+            // Konsistenzpruefung Masken <-> Kantenpool (nbrLogCheck(), [NBR]|CHECK),
+            // einmal je Minute, nur bei --nbrdebug: auf nRF52 das Instrument fuer
+            // Task-Wechsel mitten in einer Aenderung (Konzept 5).
+            if(bNBRDEBUG)
+                nbrLogCheck(nbrMatrix, now_min_sweep);
+        }
     }
 
     // TELEMETRY_INTERVAL in Minutes == 15 minutes default

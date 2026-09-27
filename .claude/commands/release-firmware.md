@@ -200,7 +200,9 @@ uv run tools/pages_flasher.py publish --version <tag> --keep 3
 `publish` builds a detached `gh-pages` worktree from `origin/gh-pages`, writes
 `flash/<tag>/<env>/` for all 30 boards, regenerates `flash/releases.json` and
 `flash/detect.json` (hardware ID per board, for the "Board erkennen" button),
-prunes release folders beyond `--keep`, and commits. It refuses to run if any
+prunes release folders beyond `--keep`, and commits. `--date YYYY-MM-DD`
+sets the release date the flasher shows (default: today) -- use it when the
+release is dated ahead of the build day. It refuses to run if any
 artefact is missing — a partial board never ships. Add `--push` once the
 commit looks right; without it the commit stays local and only the local
 `gh-pages` branch is moved.

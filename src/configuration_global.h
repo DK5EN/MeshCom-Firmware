@@ -112,8 +112,10 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // beim Sprung 20260724 -> 20260821 passiert: dieser Commit hat esp32_flash.h
 // nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
 //
-// FLASH_VERSION 20260912 ist der Release-Stempel von v4.35t.09.12.2
-// (Release-Stempel davor war 20260910) --
+// FLASH_VERSION 20260928 ist der Release-Stempel von v4.35t.09.28-neo
+// (PN-Wiederholung mit XOR-msg_id, --dmretry entfernt; davor 20260927 fuer
+// v4.35t.09.27-neo, 20260912 fuer v4.35t.09.12.2 und die neo-Builds bis
+// v4.35t.09.26-neo) --
 // rein informativ, loest kein clear_flash() aus.
 //
 // FLASH_STRUCT_VERSION bleibt 20260724: letzte echte Layout-Aenderung war
@@ -121,7 +123,7 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // kamen hinzu. Alles seither (auch die neuen Features wie max_hop_text) nutzt
 // auf ESP32 eigene NVS-Keys bzw. freie Bits bestehender Felder und aendert
 // das Struct-Layout nicht.
-#define FLASH_VERSION 20260912
+#define FLASH_VERSION 20260928
 #define FLASH_STRUCT_VERSION 20260724
 
 // Bestandsschutz. Diese Staende tragen dasselbe Layout wie
@@ -294,43 +296,42 @@ static inline bool flashLayoutCompatible(int stored)
 #define MC_I2C_NEEDS_BUS_RESET 0
 #endif
 
-// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle acht Konstanten setzen --
+// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle sechs Konstanten und seine NBR_FAMILY_*-Marke setzen --
 // wer eine vergisst, bekommt keinen stillen Fehlwert, sondern einen Compile-Fehler,
 // weil die Konstanten Array-Groessen sind. ALT-33.
 #if defined(ENABLE_XML) || defined(ENABLE_SBUFFER)
 // ENABLE_XML und ENABLE_SBUFFER hatten bis 2026-08-18 zwei byte-identische Zweige
 // nebeneinander; zusammengelegt, damit sie nicht auseinanderlaufen koennen.
-#define MAX_MHEARD 50                      // max count of messages in mheard ringbuffer
-#define MAX_MHPATH 50                      // max count of messages in mhpath ringbuffer
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 60                  // dedup ring for received msg_ids (separate from TX ring)
 #define MAX_LOG 20                         // max count of messages in ringbuffer
-#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
-#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
-#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang
+#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
+#define RING_BYTES_PHONECOM 1536           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
+#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256)
+#define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: E22_XML zaehlt zur klassischen Familie (64 Zeilen), docs/meshcom5-topologie 4.2
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
 // ESP32-S3 (320 KB SRAM) and nRF52840 (256 KB RAM) — full buffer sizes
-#define MAX_MHEARD 80                      // max count of messages in mheard ringbuffer (was 20, 85-124 H00 nodes observed)
-#define MAX_MHPATH 100                     // max count of messages in mhpath ringbuffer (was 30, multiple paths per node)
+// Store node role (docs/dm-stage3-wave-plan-20260914.md): only boards with
+// the full buffer set host a mailbox. Classic ESP32 (~6.6 kB headroom) is
+// sender/receiver only; nothing of msgstore is compiled there.
+#define ENABLE_MSGSTORE 1
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 100                 // dedup ring for received msg_ids (was 60, wraparounds observed)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer (ram_opti)
-#define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
-#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
-#define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang
+#define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
+#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
+#define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang (war 20 x 256)
+#define NBR_FAMILY_LARGE                   // MeshCom-5-Topologie: 128 Zeilen, 128-Bit-Masken, docs/meshcom5-topologie 4.2
 #elif defined(ENABLE_TBEAM)                // very smal version only for developer tests
-#define MAX_MHEARD 10                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
-#define MAX_MHPATH 10                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
 #define MAX_RING 10                        // max count of messages in ringbuffer
 #define MAX_DEDUP_RING 10                  // dedup ring for received msg_ids (was 60)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer
-#define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
-#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
-#define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang
+#define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war 10 x 260 Schlitze)
+#define RING_BYTES_PHONECOM 1024           // Byte-Ring BLE-Kommandos zum Telefon (war 10 x 246)
+#define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang (war 10 x 256)
+#define NBR_FAMILY_DEV                     // MeshCom-5-Topologie: Entwickler-Variante, 32 Zeilen
 #else
 // ESP32 original (~160 KB DRAM) — reduced buffer sizes due to RAM constraints
-#define MAX_MHEARD 30                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
-#define MAX_MHPATH 40                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
 // MEM-01 (2026-08-30): 30/25 -> 20/20, same as every other board. MAX_RING
 // feeds five static rings (ringBuffer, both BLE*toPhoneBuff, retry/prio) --
 // at 30 the classic-ESP32 dram0_0_seg had 0.5 kB (T-Beam) / 1.7 kB (E22)
@@ -345,9 +346,10 @@ static inline bool flashLayoutCompatible(int stored)
 // (src/byte_fifo.h). Ein Frame ist im Dauerlauf im Mittel 77 Byte lang, die
 // 260-Byte-Schlitze waren zu 70 % Reserve. 2048 Byte fassen rund 25 typische
 // Frames, also mehr als die 20 Schlitze vorher, bei 60 % weniger RAM.
-#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war Schlitzfeld)
-#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
-#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang
+#define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 = 5200)
+#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246 = 4920)
+#define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256 = 5120)
+#define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: 64 Zeilen, 64-Bit-Masken, docs/meshcom5-topologie 4.2
 #endif
 
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message
@@ -452,6 +454,92 @@ static inline bool flashLayoutCompatible(int stored)
 #define TRICKLE_IMIN_S        30      // Schnellstes HEY-Intervall (30s nach Topologieaenderung)
 #define TRICKLE_IMAX_S        (15*60) // Langsamstes HEY-Intervall (15min, wie bisher)
 #define TRICKLE_K             2       // Redundanzschwelle: eigenen HEY unterdruecken wenn >=k konsistente gehoert
+
+// MeshCom-5-Topologie (docs/meshcom5-topologie/, docs/meshcom5-campaign.md): alle
+// Groessen je Familie an EINER Stelle, jede einzeln per -D ueberschreibbar. Wer im
+// Feld RAM zurueckholen muss, dreht hier; nbr_matrix.h prueft die Abhaengigkeiten
+// (Maskenbreite >= Zeilen, Zeilenindex passt in ein Byte) per static_assert.
+//   NBR_MAX_ROWS      Zeilen inkl. eigener Zeile 0            (8 B Rufzeichen + 12 B Kern + 2 Masken)
+//   NBR_MAX_EDGES     Kantenpool, 6 B je Kante                 (Konzept: 4 Kanten je Zeile)
+//   NBR_EXT_SLOTS     Direkt-Erweiterung, 13 B je Slot         (ab Stufe 2)
+//   NBR_HZ_ENTRIES    Horizont, 20 B (klassisch) / 28 B        (ab Stufe 2)
+//   NBR_SHARE_PCT     Deckung ab diesem Anteil am Zaehler des staerksten direkten Hoerers; 0 = Ein-Treffer-Regel (alt)
+//   NBR_CNT_HALVE_MIN Kantenzaehler alle n Minuten halbieren; 0 = nie
+//   NBR_SNR_AVG_N     gleitendes SNR-Mittel der Kante (x, ich) ueber n Rahmen; 1 = letzter Wert (alt)
+//   NBR_NCNT_AIR_MAX  Deckel fuer NCNT auf der Luft (R<n>, /N, HEY-Gruppe, HN), zweistellig
+#if defined(NBR_FAMILY_LARGE)
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 128
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 512
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 64
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 112
+#endif
+#elif defined(NBR_FAMILY_DEV)
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 32
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 128
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 16
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 16
+#endif
+#else   // NBR_FAMILY_CLASSIC
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 64
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 256
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 48
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 48
+#endif
+#endif
+#ifndef NBR_SHARE_PCT
+#define NBR_SHARE_PCT 10
+#endif
+#ifndef NBR_CNT_HALVE_MIN
+#define NBR_CNT_HALVE_MIN 90
+#endif
+#ifndef NBR_SNR_AVG_N
+#define NBR_SNR_AVG_N 8
+#endif
+#ifndef NBR_NCNT_AIR_MAX
+#define NBR_NCNT_AIR_MAX 99
+#endif
+
+// HN-Nachbarschaftsmeldung (HEY-Rahmen an "HN", max_hop 0, --nbrreport): fester
+// Takt im langsamsten Trickle-Intervall, NICHT dem Trickle unterworfen (kein
+// Schnellstart nach Topologieaenderung, keine Unterdrueckung) -- die Liste ist
+// je Knoten einmalig, nie redundant.
+#define NBR_REPORT_INTERVAL_S TRICKLE_IMAX_S   // 15 min
+#define NBR_REPORT_FIRST_S    (5*60)           // erste Meldung 5 min nach dem Start
+#define NBR_REPORT_JITTER_S   30               // 0..30 s Zufallsversatz je Meldung
+
+// Nachbarschaftsmatrix Stufe 2: Relay-Entscheidung je Frame (docs/nbr-wichtigkeit-konzept.md,
+// Abschnitt 5). Fall A = mindestens ein direkter Nachbar bekommt den Frame nur von mir:
+// vorn, gekappter Re-Arm, nie Abbruch. Fall B = alles, was ich erreiche, erreicht auch ein
+// anderer, der den Frame hat: Nachrang, Abbruch gegen eine gehoerte fremde Wiederholung.
+// Wirksam nur mit --nbrrelay on; --nbrrelay count rechnet und zaehlt ohne Wirkung.
+#define NBR_RELAY_CASE_A_BASE_MS     3500   // Fall A: Basis vor Relay/POS/HEY (4500/5500), hinter ACK/DM (3000)
+#define NBR_RELAY_CASE_A_SLOTS       3      // Fall A: Jitter-Slots 0..2
+#define NBR_RELAY_CASE_A_MAX_WAIT_MS 8000   // Fall A: ab so viel Wartezeit seit Einreihen nur noch Kurzsuche je Re-Arm
+#define NBR_RELAY_CASE_A_SHORT_MS    150    // Fall A: Kurzsuche = Schutzabstand nach Empfangsende, dann CAD
+#define NBR_RELAY_CASE_B_EXTRA_MS    20000  // Fall B (POS/HEY): Nachrang als EINMALIGE Sperre ab Einreihen (nicht je Re-Arm), laesst die Flut der Nachbarn vor mir laufen
+#define NBR_RELAY_CASE_B_MAX_WAIT_MS 60000  // Fall B: ab so viel Wartezeit seit Einreihen nur noch Kurzsuche wie Fall A (82 % der Abbrueche fallen in die ersten 60 s, Feldlauf 23.09.)
+#define NBR_RELAY_CASE_B_SLOT_START  7      // Fall B: Jitter-Slots 7..9
 
 // Priority statistics interval
 #define PRIO_STAT_INTERVAL_S  300   // 5 Minuten

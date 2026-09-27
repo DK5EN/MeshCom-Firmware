@@ -5,8 +5,9 @@
 // checkVia() (src/via_functions.cpp) ist deutlich schlanker als es aussieht:
 // von den drei Zweigen unter "if(strlen(node_via) == 0)" ist nur der
 // bGATEWAY-Zweig ueberhaupt vorhanden, und der ist komplett auskommentiert
-// ("22.07.2026 - zum Test entfernt"), ebenso der mheard-basierte
-// Nicht-Gateway-Zweig. Effektiv bleibt:
+// ("22.07.2026 - zum Test entfernt"), ebenso der Nicht-Gateway-Zweig (bis
+// MeshCom 5 Welle 4 auf MHeard, seither auf die Topologie umgeschrieben,
+// weiter auskommentiert). Effektiv bleibt:
 //
 //   bVIA==false                      -> msg_destination_path unveraendert
 //   bVIA==true, node_via leer        -> msg_destination_path unveraendert (toter Code)
@@ -28,8 +29,8 @@
 #include <parser_link_stubs.h>
 #include <via_functions.h>
 
-// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
-// (env:native_parsers linkt alle drei Parser in jedes der drei Testprogramme,
+// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/via_functions.cpp
+// (env:native_parsers linkt beide Parser in jedes Testprogramm der Env,
 // siehe test/test_decodemheard/stubs/parser_link_stubs.h)
 s_meshcom_settings meshcom_settings;
 bool bDisplayInfo = false;

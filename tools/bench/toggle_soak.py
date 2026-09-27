@@ -33,6 +33,8 @@ import time
 
 import serial  # pyserial
 
+from identity_guard import IdentityError, require
+
 RESET_RE = re.compile(r"RESET_REASON=|RESETREAS=|rst:0x|CLIENT SETUP|\[BOOT\] RESET")
 CRASH_RE = re.compile(
     r"Guru Meditation|abort\(\) was called|Backtrace:|Task watchdog|TWDT|"
@@ -132,9 +134,16 @@ def main() -> int:
     ap.add_argument("--dtr", default="auto", choices=["auto", "on", "off"])
     ap.add_argument("--wait-boot", action="store_true")
     ap.add_argument("--step", action="append", default=[])
+    ap.add_argument("--node", default=None,
+                    help="fleet.json node name for the identity guard (required unless --no-identity-guard)")
+    ap.add_argument("--no-identity-guard", action="store_true",
+                    help="skip the identity guard -- only for setting up a node's identity")
     a = ap.parse_args()
     if not a.step:
         ap.error("at least one --step")
+    if not a.node and not a.no_identity_guard:
+        ap.error("--node NAME is required (fleet.json node name) unless --no-identity-guard "
+                  "is given for identity setup")
     dtr = {"on": True, "off": False}.get(a.dtr, "usbmodem" in a.port)
 
     ses = Session(a.port, dtr, a.out)
@@ -143,6 +152,19 @@ def main() -> int:
         ok = ses.wait_for(BOOT_DONE_RE, 0, 60)
         ses.mark(f"### boot marker {'seen' if ok else 'MISSING'}")
         time.sleep(3)
+
+    if a.node and not a.no_identity_guard:
+        start = ses.cut()
+        ses.send("--info")
+        ses.wait_for(re.compile(r"--MeshCom|\.\.\.Call:"), start, 8.0)
+        time.sleep(2.0)
+        info_text = "\n".join(ses.since(start))
+        try:
+            require(info_text, a.node)
+        except IdentityError as e:
+            print(str(e), file=sys.stderr)
+            ses.stop.set()
+            return 1
 
     rows = []
     worst = 0

@@ -122,7 +122,7 @@ int8_t pendingRawSnr = 10;
 volatile bool bInjectRawReporting = false;
 
 // Consume the staged raw frame, if any, by running it through OnRxDone()
-// itself -- the exact same processing (decodeAPRS, dedup, mheard, relay
+// itself -- the exact same processing (decodeAPRS, dedup, topology, relay
 // decision, display queueing) a real off-air frame gets. Called only from
 // test_inject_service(), which runs at OnRxDone()'s own exit points (see
 // test_inject.h): by the time this recursive call happens, the outer

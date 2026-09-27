@@ -15,7 +15,6 @@
 #include "tdeck_helpers.h"
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include <esp32/esp32_flash.h>
-#include <mheard_functions.h>
 #include <time_functions.h>
 
 #include <Arduino.h>
@@ -260,8 +259,10 @@ void initTDeck()
 
     if(bSDDected)
     {
-        loadMHeardPersistence();
-        loadPathPersistence();
+        // MeshCom-5-Topologie Welle 4 (docs/meshcom5-topologie/ 4.12): das alte
+        // loadMHeardPersistence()/loadPathPersistence() (mheard_functions.cpp,
+        // entfallen) ist topoUiBoot() (src/topo_ui.cpp) gewichen -- die ruft
+        // W4c einmal fuer alle Boards nach dem jeweiligen SD-Init auf.
         loadTimePersistence();
     }
 

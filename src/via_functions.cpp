@@ -7,7 +7,6 @@
 
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
-#include "mheard_functions.h"
 
 #include "printfdeb_functions.h"
 
@@ -163,23 +162,26 @@ void checkVia(struct aprsMessage &aprsmsg)
             else
             {
                 /* 22.07.2026 - zum Test entfernt
-                char cMH[10];
+                // MeshCom 5 Welle 4: dieselbe Frage an die Topologie statt an
+                // das entfallene MHeard -- direkte Nachbarn mit Kante (x, 0)
+                // juenger als 60 min (nbrMhRows(), nbr_views.h, Minuten seit
+                // Boot, ohne Uhr gueltig), davon der mit dem groessten
+                // gemeldeten NCNT > 1. Die echte Via-Wahl kommt in Stufe 4 aus
+                // der Via-Menge (Konzept 4.11).
+                char cMH[NBR_CALL_LEN];
                 int inct=0;
-                // insert mheard-calls to routing informnation
-                for(int iset=0; iset<MAX_MHEARD; iset++)
+                uint16_t now_min = (uint16_t)(millis() / 60000UL);
+                uint8_t rows[NBR_MAX_ROWS];
+                int nrows = nbrMhRows(nbrMatrix, now_min, 60, rows, NBR_MAX_ROWS);
+                if(nrows > NBR_MAX_ROWS)
+                    nrows = NBR_MAX_ROWS;
+                for(int i=0; i<nrows; i++)
                 {
-                    if(mheardCalls[iset][0] != 0x00)
+                    NbrMhView v;
+                    if(nbrMhGet(nbrMatrix, rows[i], now_min, &v) && v.ncnt > 1 && v.ncnt > inct)
                     {
-                        if(mheardFreshMs(iset, 60UL*60UL*1000UL))   // mheard only last hour (NC-02: millis(), not wall clock)
-                        {
-                            if(mheardNCount[iset] > 1 && mheardNCount[iset] > inct)
-                            {
-                                memset(cMH, 0x00, sizeof(cMH));
-                                strncpy(cMH, mheardCalls[iset], sizeof(cMH));
-
-                                inct = mheardNCount[iset];
-                            }
-                        }
+                        mcSet(cMH, sizeof(cMH), v.call);
+                        inct = v.ncnt;
                     }
                 }
 

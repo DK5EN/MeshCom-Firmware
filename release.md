@@ -1,11 +1,174 @@
 # Release Notes -- MeshCom Firmware v4.35t
 
-Firmware `4.35t`, `FLASH_VERSION 20260912`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35t`, `FLASH_VERSION 20260928`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
 
 ---
+
+## Release v4.35t.09.28-neo (Sonntag, 2026-09-27, datiert auf 2026-09-28)
+
+Gebaut am Samstagabend/Sonntag 27. September, auf Betreiberwunsch auf den 28. September datiert --
+derselbe Vorgriff wie schon bei `v4.35t.09.27-neo`. Inhaltlich: `v4.35t.09.27-neo` unveraendert
+(Nachbarschaftsmatrix, Speichern und Weiterleiten fuer Direktnachrichten) plus ein neuer
+Wiederholungsmechanismus fuer persoenliche Nachrichten (PN, Direktnachrichten) mit XOR-msg_id, dazu
+die Entfernung von `--dmretry` und dem Ausgangskorb. Gebaut von `feature-snf`.
+
+`FLASH_VERSION` geht auf 20260928 (Boot-Log und `DM`-Setlog-Zeile), `FLASH_STRUCT_VERSION` bleibt
+20260724 -- die Einstellungen bleiben erhalten. Der neue Wiederholungsmechanismus braucht keinen
+eigenen Speicher.
+
+**PN-Wiederholung im XOR-Format.** Konzept: `docs/pn-zustellung-dedup.md`; Umsetzung:
+`docs/pn-retry-xor-impl-plan.md`; Server-Aenderung (noetig, bevor dieser Stand breit ausgerollt
+wird): `docs/pn-retry-server.md`. Wiederholung k (1 bis 3) einer selbst gesendeten PN traegt die
+Original-msg_id mit XOR-verknuepften Bits 10-11 und neu berechneter FCS; die Erstsendung bleibt
+bytegleich zu vorher. Alte Relais leiten die Kopie damit weiter, statt sie als Duplikat der
+Original-msg_id zu verwerfen -- genau das Problem, das dieses Format loest. Ein Echo der eigenen PN
+beendet die Wiederholung nicht mehr, nur noch das `:ackNNN` des Ziels, ueber LoRa oder ueber den
+Server; ein reiner Server-ACK stoppt jetzt auch den wartenden Ring-Platz. Eine PN im Auftrag eines
+KISS-Clients bleibt beim alten Verhalten (bytegleiche Wiederholung, Abbruch beim ersten Echo). Ein
+Wettlaufbefund zwischen einem eintreffenden ACK und einer noch in der Warteschlange stehenden
+Wiederholungskopie ist behoben (M1): vorher konnte die Kopie trotz ACK noch hinausgehen und ihr Echo
+die Wartezeit neu starten -- bis zu drei ueberzaehlige Kopien und am Ende ein faelschliches
+"failed" nach dem ACK.
+
+**`--dmretry` und der Ausgangskorb sind entfernt.** Mit dem XOR-Format waren Ausgangskorb-Leiter
+und Ring-Wiederholung fast identisch geworden, deshalb bleibt nur ein Pfad: jede PN wird einmal
+gesendet und bis zu dreimal im Abstand von 40 s wiederholt. Das Kommando `--dmretry off|3|9`, sein
+Web-Setup-Feld, die `--info`-Zeile und die Ablehnung `OUTBOX FULL NOT SENT` entfallen (Modus 9 liess
+sich mit drei Bitvarianten ohnehin nicht mehr abbilden). Details: `docs/CHANGELOG-snf.md`.
+
+**Vertraeglichkeit, offen ausgesprochen:** das gilt jetzt fuer jede PN, nicht mehr nur fuer
+`--dmretry 3`. Aeltere Empfaenger koennen dieselbe PN bis zu viermal zeigen (einmal je
+Bitvariante), weil sie ueber die volle msg_id entdoppeln. Aeltere Speicherknoten verzoegern die
+Zustellung um bis zu rund 2 Minuten, weil sie jede Kopie als neue Sendung werten und die Haltezeit
+jedes Mal neu ansetzen. Ein gespeicherter `dm_retry`-Wert (ESP32-NVS, nRF52 `/dm.cfg`) wird gelesen
+und ignoriert; ein Kommando dafuer gibt es nicht mehr. Die Ablehnung `OUTBOX FULL NOT SENT` gibt es
+auf dieser Firmware nicht mehr, ihr Textpraefix bleibt aber in der Echo-Wache stehen, damit das
+Wiederholungsformat aelterer Absender weiter erkannt wird. **Der zentrale MeshCom-Server muss vor
+einer breiten Verteilung auf `msg_id & 0xFFFFF3FF` entdoppeln** (`docs/pn-retry-server.md`); bis
+dahin kann eine Region mit mehreren Knoten auf diesem Stand die Wiederholungen einer PN ueber den
+Server als getrennte Nachrichten sehen.
+
+**Auch in diesem Schnitt:** die Soak-Werkzeuge `tools/bench/soak_dm.py` (Test-DMs zwischen zwei
+eigenen Knoten ueber deren Webserver, nie `*` oder eine Gruppe) und `tools/soakstatus.py`
+(Auswertung eines Mitschnittfensters: Neustarts, Heap-Drift, DM-Zaehler, Wiederholungsmarker,
+Quittungszeit je Test-DM, NBR-Konsistenz). Protokoll: `docs/soak-xor-20260927.md`. Dazu eine
+Luecke aus der Ausgangskorb-Entfernung geschlossen: `native_udp_frame_twin` verlor seine
+Attrappe fuer den neuen Server-ACK-Ring-Stopp und liess sich zeitweise nicht mehr linken; jetzt
+mit passender Attrappe und einem Test fuer den eigenen-DM-Server-ACK-Zweig.
+
+Nicht uebernommen aus upstream, unveraendert seit `v4.35t.09.27-neo`: `5efa2171` und die zwei
+Folgecommits (auskommentierte Wiederholbits im `msg_id`), kein Verhaltensunterschied. Die
+PN-XOR-Wiederholung selbst ist inzwischen upstream: [PR #1168](https://github.com/icssw-org/MeshCom-Firmware/pull/1168),
+gemergt in `dev` am 27. September.
+
+**Gates:** 45 native Host-Umgebungen, 1384 Testfaelle;
+`test/golden/selftest.sh` gruen; 32 Release-Umgebungen gebaut, RAK4631-Flash 96,1 %
+(783 580 von 815 104 B, vorher 96,4 %).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **PN-XOR-Bank, 27. September, DK5EN-1 und DK5EN-98 (beide Heltec V3), direkte LoRa-Strecke:**
+  beide Knoten laufen seit 17:25/17:32 auf genau diesem Firmware-Stand (Build `ce9bf157`; die
+  beiden Commits danach fuegen nur Soak-Werkzeuge und den `FLASH_VERSION`-Stempel hinzu, keine
+  Quelltextaenderung). Ein 24-Stunden-Dauerlauf laeuft seit 17:39; der Zwischenstand nach rund
+  20 Minuten war PASS auf jedem Kriterium: kein Neustart, Heap stabil, jede Test-DM quittiert
+  (eine in 4,6 s ueber den Server-Pfad, eine in 10,0 s ueber direktes LoRa, keine brauchte eine
+  Wiederholung), 0 NBR-Konsistenzverletzungen. Beide Knoten hoeren sich direkt und stark, dieser
+  Lauf belegt 24-Stunden-Stabilitaet und den Quittungspfad, nicht die Wiederholung bei
+  Mehrfach-Hop-Verlust. Der endgueltige 24-Stunden-Befund steht beim Schreiben dieses Textes noch
+  aus.
+- Alle anderen Boards der 32 Release-Umgebungen (inklusive RAK4631): gebaut, keine Bank-Zeit fuer
+  das XOR-Format in diesem Zyklus.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der endgueltige 24-Stunden-Befund des laufenden Dauerlaufs.
+- Wiederholung bei Mehrfach-Hop-Verlust (`BACKLOG` PN-01) -- DK5EN-1 und DK5EN-98 hoeren sich
+  direkt, es fehlt ein Knotenpaar mit echtem Mehrfach-Hop- oder Grenzsignalpfad.
+- Die maskierte Entdopplung auf dem zentralen Server -- noch nicht ausgeliefert.
+- Alles, was fuer `v4.35t.09.27-neo` unten schon als ungeprueft steht.
+
+## Release v4.35t.09.27-neo (Sonntag, 2026-09-27)
+
+Der Sonntagsstand vom 27. September: `v4.35t.09.26-neo` plus zwei neue
+Funktionen, gleichgewichtig -- die Nachbarschaftsmatrix (MeshCom-5-Topologie,
+Stufen 1 bis 3, Branch `feature-neighbour-matrix`) und Speichern und
+Weiterleiten fuer Direktnachrichten (DM-Stufen 0, 1, 2.1, 3 und 4 aus
+`fork-main`, portiert auf Branch `feature-snf`). Gebaut von `feature-snf`.
+Damit ist dieses Release nicht mehr "upstream/dev plus besserer Code": es
+bringt neues Verhalten, auch auf dem Funk. Wer den reinen neo-Stand will,
+nimmt `v4.35t.09.26-neo`; beide stehen im Web-Flasher.
+
+`FLASH_VERSION` geht auf 20260927 (Boot-Log und `DM`-Setlog-Zeile),
+`FLASH_STRUCT_VERSION` bleibt 20260724 -- die Einstellungen bleiben erhalten.
+Die neuen S&F-Einstellungen liegen in eigenem Speicher (ESP32 NVS-Keys, nRF52
+`/dm.cfg` und `/msgstore.cfg`). Das Build-Datum in `--info` ist der Abend des 26. September. Ausnahme beim Update: ein Knoten, der eine
+Nachbarschaftsmatrix-Testversion vor dem 25. September hatte (nur
+DK5EN-Testknoten), kommt mit KISS/TCP und KISS-TX an hoch und braucht sofort
+`--kiss tx off`, `--kiss meta off`, `--kiss off`.
+
+Nachbarschaftsmatrix: ein Topologiespeicher (Kantenpool, Direktnachbarn,
+Horizont) ersetzt MHeard-Tabelle, Pfadtabelle und die dichte Matrix; 64/256
+Nachbarn/Kanten auf klassischem ESP32, 128/512 auf S3 und nRF52, bei weniger
+statischem RAM als vorher. NCNT ist symmetrisch und auf dem Funk auf 99
+gekappt. Relay-Entscheidung je Frame mit `--nbrrelay off|count|on` (Standard
+off), HN-Nachbarschaftsmeldung mit `--nbrreport off|auto|on` (Standard auto:
+alle 15 min von Knoten ohne Mesh und ohne Gateway, `max_hop 0`). Details in
+[`docs/CHANGELOG-meshcom5.md`](docs/CHANGELOG-meshcom5.md).
+
+Speichern und Weiterleiten: doppelte DMs werden erneut quittiert (hoechstens
+einmal je 30 s), aber nicht doppelt angezeigt; eine gescheiterte DM meldet
+Status `0x03`; `{` im DM-Text geht als `(` hinaus; optionaler Ausgangskorb mit
+Wiederholleiter (`--dmretry off|3|9`, Standard off); Speicherknoten auf
+ESP32-S3 und RAK4631 (`--store off|own|list|heard`, Standard off) mit
+Mailbox-Seite und `:sto`-Gewahrsamsmeldung (Status `0x04` in der App). Details
+in [`docs/CHANGELOG-snf.md`](docs/CHANGELOG-snf.md).
+
+Nicht uebernommen aus upstream: `5efa2171` und die zwei Folgecommits
+(Wiederholbits im `msg_id`); upstream hat die Maske selbst auskommentiert,
+kein Verhaltensunterschied zu `v4.35t.09.26-neo`.
+
+**Gates:** 44 native Host-Umgebungen, 1379/1379 Testfaelle; `test/golden/selftest.sh` gruen (die Baseline
+`variant-ini-effective.json` nachgezogen: vier Schluessel, genau die
+S&F-Quellen und -Tests der Host-Umgebungen); alle 32 Release-Umgebungen
+gebaut, RAK4631-Flash 96,4 % (785 504 von 815 104 B).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Dieses exakte Image lief auf keinem Board. Die Bank-Laeufe unten liefen mit
+Vorstufen von `feature-snf` bzw. `feature-neighbour-matrix`; der Unterschied
+zum Release ist der Nachzug aus `fork-main` (Logzeilen, `SN1` nach
+`--webpwd`, Ping-Meldung) und der `FLASH_VERSION`-Stempel, nicht der Code der
+beiden Funktionen.
+
+- **S&F-Bank 2026-09-26, nur LoRa, 2 dBm, zwei Laeufe, beide PASS:** RAK4631
+  DK5EN-90 als Speicherknoten (`--store heard`), T-Beam DK5EN-92 als
+  Empfaenger, Heltec V3 DK5EN-1 als Sender (auf `0d4b914c`). DM an den
+  abwesenden T-Beam gehalten (Mailbox-Seite zeigt HELD), `:sto` beim Sender,
+  nach Rueckkehr Zustellung ueber einen Hop, Quittung beim Sender. Logs in
+  `docs/bench/snf-20260926/`.
+- **Nachbarschaftsmatrix:** T-Deck Plus (Topologie ueberlebt den Neustart,
+  Nachbarn nach 78 s wieder da), Heltec V3, T-Beam v1.2, RAK4631-Stresslauf
+  (2 Laeufe, 0 Konsistenzverletzungen, kein Reset, Heap stabil); Replay des
+  Feldmitschnitts 21.-24.09. gegen eine eingefrorene Kopie des alten Codes
+  (0 abweichende Entscheidungen in 2697 Frame-Gruppen).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Das Release-Image selbst, auf keinem Board.
+- Der groesste Teil des S&F-Testplans: `--dmretry`-Leiter, Sender auf dieser
+  Firmware mit "gehalten" in der App, zwei Speicherknoten, Speicherknoten mit
+  Gateway, Neustart mit offenen Eintraegen, Ablauf und Cooldown, Grenzen bei
+  25 DMs, Mailbox-Knoepfe Deliver/Purge. Liste mit Test-IDs in
+  `docs/snf-port-campaign.md`.
+- Die Auswertung des Nachbarschaftsmatrix-Feldlaufs auf DK5EN-1 und
+  DK5EN-98 (laeuft seit 26.09.).
+- `--nbrrelay on` ausserhalb der zwei DK5EN-Feldknoten.
+- Alle anderen Boards der 32 Release-Umgebungen: gebaut, nicht auf der Bank.
+- Alles, was fuer `v4.35t.09.26-neo` unten schon als ungeprueft steht.
 
 ## neo-Release v4.35t.09.26-neo (2026-09-26)
 

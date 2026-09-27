@@ -12,6 +12,9 @@
 #include "lora_functions.h"
 #include "txring_functions.h"
 #include "command_functions.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#endif
 #include <printfdeb_functions.h>
 
 #if defined(ENABLE_MCP23017)
@@ -46,6 +49,9 @@ bool loopEnabled_retransmit(void)
 void loopAction_retransmit(void)
 {
     updateRetransmissionStatus();
+#if defined(ENABLE_MSGSTORE)
+    msgstoreLoop();   // S3: the main radio tick (advisor F1), not the EXTERNAL_RADIO one
+#endif
     // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring entries
     // here, in the main-loop tick -- NOT in getNextTxSlot(), which also
     // runs on the nRF52 timer task itself (Advisor F1, the critical

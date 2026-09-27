@@ -1,0 +1,201 @@
+
+<h3>4.10 RAM je Familie und Umgebung</h3>
+<p class="reco">Entscheidung: Die Größen aus 4.1 bis 4.9 gelten je Familie wie in der Tabelle; jede Familie braucht netto weniger RAM als heute, bei drei- bis sechsmal so vielen Zeilen.</p>
+<p>Gemessen ist heute die Summe der Datensymbole aus nm für MHeard, Pfadtabelle, nbrMatrix, ringNeed und ringAlone, auf nRF52 zusätzlich die drei statischen struct mheardLine. Gerechnet ist das Ziel aus den Feldgrößen dieses Papiers. Für die übrigen Umgebungen einer Familie gelten dieselben Symbolgrößen, weil MAX_MHEARD, MAX_MHPATH und NBR_MAX_ROWS je Familie festliegen.</p>
+<figure>
+<div class="fig">
+@@GEN:ram@@
+</div>
+<figcaption>Abb. 12: RAM je Familie, heute gegen Ziel. Die Topologie hält drei- bis sechsmal so viele Zeilen und braucht trotzdem weniger Byte als die drei alten Speicher zusammen; auf klassischem ESP32 ist der Gewinn mit @@NET_C@@ Byte klein, weil der Direkt-Slot und der Horizont die frei werdenden Byte fast ganz verbrauchen.</figcaption>
+</figure>
+<table>
+<tr><th>Teil</th><th class="num">klassisch</th><th class="num">S3 und nRF52</th><th>Rechnung</th></tr>
+<tr><td>Rufzeichen</td><td class="num">@@CALLS_C@@</td><td class="num">@@CALLS_S@@</td><td>8 B je Zeile</td></tr>
+<tr><td>Zeilenkern</td><td class="num">@@CORE_C@@</td><td class="num">@@CORE_S@@</td><td>12 B je Zeile</td></tr>
+<tr><td>Masken</td><td class="num">@@MASKS_C@@</td><td class="num">@@MASKS_S@@</td><td>2 Masken zu 8 oder 16 B je Zeile</td></tr>
+<tr><td>Kanten</td><td class="num">@@EDGES_C@@</td><td class="num">@@EDGES_S@@</td><td>256 oder 512 zu 6 B</td></tr>
+<tr><td>Direkt-Erweiterung</td><td class="num">@@EXT_C@@</td><td class="num">@@EXT_S@@</td><td>48 oder 64 Slots zu @@EXT_B@@ B</td></tr>
+<tr><td>Horizont</td><td class="num">@@HZ_C@@</td><td class="num">@@HZ_S@@</td><td>48 zu 20 B oder 112 zu 28 B</td></tr>
+<tr><td>Kopf</td><td class="num">@@HDR_C@@</td><td class="num">@@HDR_S@@</td><td>Minuten, Bootepoche, Maske D60, Via-Maske, Via-Zustand</td></tr>
+<tr><td>Echo-Tabelle</td><td class="num">@@ECHO_C@@</td><td class="num">@@ECHO_S@@</td><td>4 eigene Rahmen: msg_id, zwei Masken, Minute</td></tr>
+<tr><td>Ringseitenfelder</td><td class="num">@@RINGS_C@@</td><td class="num">@@RINGS_S@@</td><td>ringNeed und ringAlone, 20 Einträge je Maske</td></tr>
+<tr><td><b>Ziel gesamt</b></td><td class="num"><b>@@NEWALL_C@@</b></td><td class="num"><b>@@NEWALL_S@@</b></td><td></td></tr>
+<tr><td>heute gesamt</td><td class="num">@@OLDALL_C@@, E22_XML @@OLDALL_X@@</td><td class="num">@@OLDALL_S@@, nRF52 @@OLDALL_N@@</td><td>nm, Builds vom 24.09.</td></tr>
+<tr><td><b>netto</b></td><td class="num"><b>@@NET_C@@, E22_XML @@NET_X@@</b></td><td class="num"><b>@@NET_S@@, nRF52 @@NET_N@@</b></td><td></td></tr>
+</table>
+<p>Dazu kommt Stack: auf ESP32 legt jeder MHeard-Leser eine struct mheardLine mit 584 Byte auf den Stack. Auf nRF52 liegen dieselben drei Kopien als statische Felder und sind in den 1.752 Byte oben enthalten; sie wurden dorthin verlegt, weil sendMheard() mit ihr 1.184 Byte des 4-KB-Loop-Stacks belegte, auf dem schon einmal null Reserve gemessen wurde. Die Sicht aus nbr_views ist 48 Byte groß.</p>
+<p>Je Umgebung, statisches Segment aus dem Build aller 32 Umgebungen vom 24.09.; auf ESP32 dram0_0_seg, auf nRF52 die RAM-Zeile. Die beiden Safeboot-Umgebungen haben keine Matrix.</p>
+@@GEN:envtable@@
+
+<h3>4.11 Auto-Via für eigene Positionen</h3>
+<p class="reco">Entscheidung: Stufe 4 wird zurückgestellt, bis der Anteil von 4.35p und älter in fleet_firmware unter 20 % fällt. Die Regel für danach: Auto-Via gilt nur für eigene Positionsrahmen und nur an einem Standort, an dem kein direkter Nachbar mit Mesh einen Via-unfähigen oder unbekannten Firmware-Stand hat. Erstes Via-Rufzeichen ist der Super-Node mit Firmware ab dem 13.06.2026; bekommt er meine Aussendungen oft erst aus zweiter Hand, kommt ein Zubringer dazu, den er gut hört; weitere Nachbarn nur, wenn sonst eine Station im 2-Hop-Umkreis abgeschnitten wäre; höchstens drei. Sonst flutet der Knoten wie heute.</p>
+<p>Prämisse zum Mechanismus: Der Via ist ein Nächster-Hop-Feld. Ein Empfänger, dessen Zielpfad Rufzeichen nennt, wiederholt nur, wenn er selbst genannt ist; jedes Relais setzt den Zielpfad zurück und wendet seinen eigenen Via an. Wer so seine Relais wählt, tut, was OLSR als Multipoint Relay beschreibt, RFC 3626 Abschnitt 8.3.1, ohne neues Rahmenformat; auch die Regel "die erste Kopie entscheidet" teilt MeshCom mit OLSR auf einem Knoten mit einer Funkschnittstelle, Abschnitt 3.4.1. Das gilt aber nur für Firmware ab dem 13.06.2026.</p>
+<table>
+<tr><th>Firmware-Stand</th><th>Tags</th><th>Wiederholt einen Rahmen mit Via</th><th>Via beim Weiterleiten</th><th>Anzeige von Text mit Via</th></tr>
+<tr><td>vor 2c96f11b, 09.06.</td><td>4.35a bis 4.35o, 4.35p bis v4.35p.06.08</td><td>der erstgenannte nie, er hält den Rahmen für eine DM an sich; alle anderen immer</td><td>bleibt stehen</td><td>nein, und die spätere saubere Kopie ist ein Duplikat</td></tr>
+<tr><td>2c96f11b bis a8dc23a2</td><td>nur v4.35p.06.10</td><td>nur wer genannt ist, Vergleich per Teilstring</td><td>bleibt stehen</td><td>ja</td></tr>
+<tr><td>ab a8dc23a2, 13.06.</td><td>v4.35p.06.13 bis 09.02, 4.35s, 4.35t, Fork</td><td>nur wer genannt ist</td><td>Pfad zurückgesetzt, eigener Via</td><td>ja</td></tr>
+</table>
+<p>Daraus folgen drei Grenzen. Nur Positionen, weil ein Knoten vor dem 09.06. Text mit Via nicht anzeigt, der Positionszweig das Ziel aber nicht liest, und weil der Via von Text über den Server in andere Regionen läuft; der Server lieferte in 18 Tagen nur Text. Nur ohne Via-unfähigen Nachbarn, weil ein solcher Knoten den Rahmen immer wiederholt und meinen Via dabei stehen lässt: ein Knoten zwei Hops weiter, der diese Kopie zuerst hört, ist nicht genannt, vermerkt die msg_id und wiederholt auch die spätere saubere Kopie nicht. Und das erste Via-Rufzeichen braucht einen Stand ab dem 13.06., weil ein älterer erstgenannter Knoten den Rahmen nie wiederholt. Der Buchstabe p reicht vom 22.03. bis 02.09. und trennt die Stände nicht; ein p-Knoten zählt als unbekannt, bis sein Verhalten ihn ausweist.</p>
+<p>Flottenzählung mit mcmap fleet_firmware am 25.09.: von 1.520 Knoten melden 1.491 ihren Stand. mcmap speichert nur die fünf Zeichen des Versionsfelds, etwa "4.35p", und kann 4.35p nicht nach Build-Datum trennen.</p>
+<table>
+<tr><th>Stand</th><th class="num">Knoten</th><th class="num">Anteil</th><th>Via-Verhalten</th></tr>
+<tr><td>4.35t, 4.35s</td><td class="num">557</td><td class="num">37 %</td><td>fähig</td></tr>
+<tr><td>4.35p</td><td class="num">681</td><td class="num">46 %</td><td>unbekannt: vor dem 09.06. unfähig, danach fähig</td></tr>
+<tr><td>4.35a bis 4.35o und 4.35</td><td class="num">253</td><td class="num">17 %</td><td>unfähig</td></tr>
+</table>
+<p>Daraus folgt die Zurückstellung. Ein Standort ist nur geeignet, wenn alle direkten Nachbarn mit Mesh sicher fähig sind. Bei unabhängiger Verteilung gilt das für einen Knoten mit dem Median von 3 direkten Nachbarn mit 0,37 hoch 3, also rund 5 %, mit 5 Nachbarn rund 0,7 %, mit dem p90 von 11 Nachbarn praktisch nie. Die Unabhängigkeit ist eine Annahme; Betreiber, die aktualisieren, sitzen oft beieinander, der wahre Anteil kann höher liegen, bleibt aber klein. Prämisse für die Schwelle 20 %: bei 80 % fähigen Knoten hat ein Knoten mit 3 Nachbarn in 0,8 hoch 3, also rund der Hälfte der Fälle, nur fähige Nachbarn. Ein p-Nachbar lässt sich nur als unfähig erkennen, wenn er einen Rahmen mit fremdem Via ungenannt wiederholt; als fähig ausweisen ließe er sich nur mit einer aktiven Probe, einer eigenen Position, die ihn an zweiter Stelle nennt. Diese Probe kostet bei einem unfähigen Knoten die Reichweite genau dieses Rahmens und wird nicht gebaut.</p>
+<p>Messung DK5EN-98, 2026-09-23 00:12 bis 2026-09-24 08:46, 65 eigene Positionen; für 56 kam ein Echo zurück, für 9 keines. "Erste Hand" heißt, der Nachbar steht im Echopfad direkt hinter mir; "nur zweite Hand" heißt, er hatte den Rahmen erst über einen anderen Nachbarn.</p>
+<table>
+<tr><th>Nachbar</th><th>Firmware</th><th class="num">erste Hand</th><th class="num">nur zweite Hand</th><th class="num">Anteil zweite Hand</th><th class="num">hört mich mit</th><th>Rolle</th></tr>
+<tr><td>DK5EN-1</td><td>4.35t</td><td class="num">44</td><td class="num">0</td><td class="num">0 %</td><td class="num">6 dB</td><td>redundant, Blatt</td></tr>
+<tr><td>DB0ED-99</td><td>4.35t</td><td class="num">25</td><td class="num">1</td><td class="num">4 %</td><td class="num">-6 dB</td><td>redundant nach heutiger Regel, nötig nach Anteil</td></tr>
+<tr><td>DL2UD-1</td><td>4.35p, Via-unfähig</td><td class="num">18</td><td class="num">1</td><td class="num">5 %</td><td class="num">-13 dB</td><td>redundant</td></tr>
+<tr><td>DL2JA-2</td><td>4.35t</td><td class="num">12</td><td class="num">13</td><td class="num">52 %</td><td class="num">-13 dB</td><td>Super-Node, #X 8</td></tr>
+</table>
+<p>DL2JA-2 hat meine Aussendung in mindestens 13 von 65 Fällen selbst nicht gehört. Der Code beweist das: 4.35t vermerkt die msg_id vor der Relay-Entscheidung, ein Duplikat erreicht den Relay-Zweig nie, und ein Relay wird nicht abgebrochen, wenn eine fremde Kopie eintrifft; ein Echo aus zweiter Hand heißt also, dass die erste Kopie, die DL2JA-2 dekodiert hat, schon weitergeleitet war. Als einziger Via hätte er diese Rahmen jenseits der direkten Nachbarn verschluckt. DL2UD-1 ist Via-unfähig: es wiederholte die Einspeisung DB2GS-1,DK5EN-98&gt;F1ZKT-12,* ungenannt und ließ den Via stehen.</p>
+<pre>geeignet  = kein x in Direkt mit Mesh und Stand "vor 13.06." oder "unbekannt"
+K         = D60 &amp; HM &amp; ~Sperre &amp; Stand ab 13.06.
+N2        = OR deckt(m) fuer m in D60, ohne D60 und ohne mich
+erreicht(m) = Stationen x mit Kante (m, x)            // x hat m gehoert, Lieferrichtung
+            | Stationen, die m mit Anteil hoert und SNR &gt;= -16 dB   // Symmetrie-Annahme, benannt
+Pflicht   = { m in K : m ist fuer ein x in N2 der einzige, der es erreicht }
+offen     = N2 &amp; ~OR erreicht(m) fuer m in Pflicht
+solange offen: nimm m in K mit groesstem popcount(erreicht(m) &amp; offen)
+schwach(m) = f(m) + s(m) &lt; 4  oder  s(m) &gt; 10 % von f(m) + s(m)
+Zubringer(m) = F in K, nicht schwach, Kante (F, m) mit den meisten Treffern   // m hoert F
+Via       = Super-Node zuerst, dann Pflicht, Auswahl, Zubringer
+gueltig, wenn geeignet, N2 erreicht, jedes schwache Mitglied einen Zubringer hat, |Via| &lt;= 3</pre>
+<p>Die Prämissen:</p>
+<ul>
+<li>Die Deckung zählt in Lieferrichtung. Die Topologie weiß aus Pfaden vor allem, wen ein Nachbar gehört hat; für den Via zählt, wer ihn hört. Wo kein Beweis in Lieferrichtung vorliegt, gilt die Symmetrie-Annahme mit derselben Schwelle wie SYM und ist so benannt. Im Schnappschuss vom 24.09. zeigen nur 4 der 15 Stationen im 2-Hop-Umkreis einen Beweis, dass sie einen Kandidaten hören.</li>
+<li>f und s zählen je Nachbar über die letzten 15 eigenen Positionen und HEYs, wie oft er sie aus erster und wie oft nur aus zweiter Hand wiederholt hat; die Echo-Tabelle hält die letzten vier eigenen Rahmen und faltet sie nach 300 s in die Zähler. 10 % trennt die Messung mit Abstand, die guten Hörer liegen bei 0 bis 5 %, der Super-Node bei 52 %. Weil HEY immer ohne Via läuft, liefern HEY-Echos f und s aller Nachbarn weiter.</li>
+<li>HM über 12 h: DL2JA-2 lieferte für eigene Positionen in 32,5 h nur 12 Beweise aus erster Hand, einen je 2,7 h; D60 prüft, ob er gerade gehört wird.</li>
+<li>Höchstens drei, weil jedes Rufzeichen bis zu 10 Zeichen im Zielpfad kostet und ein Umfeld, das mehr Relais braucht, durch Flut kaum mehr verliert.</li>
+<li>Positionen laufen mit max_hop 2. Ein Rahmen über den Zubringer erreicht den Super-Node mit H00 und endet dort; die Stationen drei Hops weiter bekommen ihn auf diesem Weg nicht. In der Flut gilt dieselbe Grenze, sobald der Super-Node die direkte Kopie verpasst.</li>
+</ul>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 400" role="img" aria-label="Auto-Via bei DK5EN-98">
+  <rect x="20" y="10" width="920" height="30" class="node bad"/>
+  <text x="480" y="30" text-anchor="middle" class="b">DK5EN-98 heute nicht freigegeben: DL2UD-1 ist Via-unfaehig und hat Mesh an</text>
+  <rect x="30" y="170" width="160" height="60" class="node"/>
+  <text x="110" y="194" text-anchor="middle" class="b">DK5EN-98</text>
+  <text x="110" y="212" text-anchor="middle" class="mono">DL2JA-2,DB0ED-99,*</text>
+  <rect x="290" y="55" width="230" height="44" class="node srv"/>
+  <text x="405" y="74" text-anchor="middle" class="b">DL2JA-2, Via, 4.35t</text>
+  <text x="405" y="90" text-anchor="middle" class="t11">Super-Node, schwach: 52 % zweite Hand</text>
+  <rect x="290" y="125" width="230" height="44" class="node srv"/>
+  <text x="405" y="144" text-anchor="middle" class="b">DB0ED-99, Zubringer, 4.35t</text>
+  <text x="405" y="160" text-anchor="middle" class="t11">4 % zweite Hand, DL2JA-2 hoert ihn 66-mal</text>
+  <rect x="290" y="195" width="230" height="44" class="node bad"/>
+  <text x="405" y="214" text-anchor="middle" class="b">DL2UD-1, 4.35p</text>
+  <text x="405" y="230" text-anchor="middle" class="t11">Via-unfaehig: wiederholt immer, Via bleibt</text>
+  <rect x="290" y="265" width="230" height="44" class="node"/>
+  <text x="405" y="284" text-anchor="middle" class="b">DK5EN-1, 4.35t</text>
+  <text x="405" y="300" text-anchor="middle" class="t11">nicht genannt, Blatt</text>
+  <rect x="290" y="335" width="230" height="44" class="node"/>
+  <text x="405" y="354" text-anchor="middle" class="b">DL2JA-1, 4.35t</text>
+  <text x="405" y="370" text-anchor="middle" class="t11">kein Beweis, kein Kandidat</text>
+  <path d="M190 190 L290 77" class="ln"/>
+  <path d="M190 196 L290 147" class="ln"/>
+  <path d="M190 202 L290 217" class="ln"/>
+  <path d="M190 208 L290 287" class="ln"/>
+  <path d="M190 214 L290 357" class="ln"/>
+  <path d="M520 147 L540 147 L540 77 L520 77" class="ln" stroke-dasharray="4 3"/>
+  <text x="546" y="117" class="t11">traegt zu</text>
+  <text x="530" y="221" class="t11">wiederholt</text>
+  <text x="530" y="291" class="t11">schweigt</text>
+  <text x="530" y="361" class="t11">schweigt</text>
+  <rect x="640" y="55" width="300" height="324" class="zone"/>
+  <text x="654" y="77" class="b">2-Hop-Umkreis, 15 Stationen</text>
+  <text x="654" y="95" class="t11">alle 15 hoert DL2JA-2, 7 davon auch DB0ED-99</text>
+  <text x="654" y="125" class="mono">DB0HOB-12   DC2MAC-1    DB0FHR-12</text>
+  <text x="654" y="145" class="mono">DL2JA-3     DL3NCU-1    DD7MH-55</text>
+  <text x="654" y="165" class="mono">OE2XZR-12   DB0MMR-12   DB0ISM-1</text>
+  <text x="654" y="185" class="mono">DF2KX-12    DG7RJ-12    DG7RJ-8</text>
+  <text x="654" y="205" class="mono">OE7XWT-12   DO7GH       DG3MNF-4</text>
+  <path d="M520 70 L640 70" class="ln" stroke-width="2.4"/>
+  <text x="580" y="64" text-anchor="middle" class="t11">wiederholt</text>
+  <text x="654" y="250" class="t11">die Kopie von DL2UD-1 traegt meinen Via</text>
+  <text x="654" y="266" class="t11">weiter; wer sie zuerst hoert, ist nicht</text>
+  <text x="654" y="282" class="t11">genannt und wiederholt gar nicht mehr</text>
+  <text x="654" y="316" class="t11">ohne DL2UD-1: zwei statt vier Kopien</text>
+  <text x="654" y="332" class="t11">jeder eigenen Position</text>
+</svg>
+</div>
+<figcaption>Abb. 13: Auto-Via bei DK5EN-98, Kanten aus dem Schnappschuss vom 24.09. 07:25, Hörverhalten aus dem Mitschnitt. Die Regel wählte DL2JA-2 zuerst, weil acht Stationen nur ihn als Hörer haben, und DB0ED-99 als Zubringer, weil DL2JA-2 ihn 66-mal und DL2UD-1 nur 15-mal gehört hat; im Mitschnitt kamen 7 der 13 Kopien aus zweiter Hand bei DL2JA-2 über DB0ED-99. Heute bleibt es bei der Flut, weil der Via-unfähige DL2UD-1 Mesh an hat.</figcaption>
+</figure>
+
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Flut wie heute</td><td>kein Via</td><td><span class="tag warn">Stufe 0</span> und Rückfall jeder ungültigen oder nicht freigegebenen Menge</td></tr>
+<tr><td>alte Regel: größtes NCNT</td><td>via_functions.cpp 165 bis 190</td><td><span class="tag bad">verworfen</span> NCNT überschätzt DB0ED-99 zehnfach; ein Via mit vielen Nachbarn ohne exklusive schneidet andere ab</td></tr>
+<tr><td>nur der Super-Node</td><td>Via = größtes #X</td><td><span class="tag bad">verworfen</span> hätte bei DK5EN-98 mindestens jeden fünften Rahmen verschluckt</td></tr>
+<tr><td>Auto-Via für alle Rahmen</td><td>Text, Positionen, Relais</td><td><span class="tag bad">verworfen</span> Knoten vor dem 09.06. zeigen Text mit Via nicht an; der Via läuft über den Server; ein v5-Zubringer, der selbst einen Via setzt, sperrt den Super-Node aus</td></tr>
+<tr><td>eigene Positionen, geprüfte Nachbarschaft, Zubringer</td><td>oben</td><td><span class="tag ok">gewählt</span> Super-Node vorn, keine bekannte Station abgeschnitten, Altknoten ausgeschlossen</td></tr>
+</table>
+<p>Regeln:</p>
+<ul>
+<li>Nur eigene Positionen tragen den Via. Relais fluten wie heute: ein Relais, das selbst einen Via setzt, könnte als Zubringer den Super-Node aus seiner Menge lassen, und der Super-Node verwürfe die spätere Kopie als Duplikat.</li>
+<li>Ein Nachbar gilt als Via-unfähig, sobald er einen Rahmen mit Via wiederholt, der ihn nicht nennt, oder einen fremden Via stehen lässt; das sieht der Empfang ohne neue Rahmen. Buchstaben a bis o gelten sofort als Via-unfähig, s und t als fähig, p als unbekannt.</li>
+<li>Ausfall wird über Lebenszeichen erkannt, nicht über Echos: Super-Node und Zubringer müssen in D60 stehen und in den letzten 30 min als letzter Hop irgendeines Rahmens gehört worden sein. Fällt einer heraus, flutet der Knoten 60 min lang und rechnet danach neu.</li>
+<li>Das Echo meiner Positionen wird nur geloggt, [NBR]|ECHO je eigener Position mit den Namen der Wiederholer und der Verzögerung. Als Schalter taugt es nicht: ein genannter Knoten wurde in der Flut nur in 37 bis 43 % der Fälle binnen 300 s gehört, zwei Fehlschläge in Folge kamen in 42 % der Paare vor, und DL2JA-2 wiederholte im Median 122 s nach meiner Aussendung, 24 % später als 300 s.</li>
+<li>HEY, HN, Text, DM und ACK bleiben ohne Via. Ein fester node_via hat Vorrang, --via off schaltet alles ab.</li>
+<li>MeshCom-5-Gateways setzen den Zielpfad vor dem Hochladen und vor dem Einspeisen auf das Ziel zurück, in udp_frame_esp32.cpp und udp_frame_nrf52.cpp; 4.35-Gateways reichen einen Via weiter durch.</li>
+</ul>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 310" role="img" aria-label="Zustandsautomat Auto-Via">
+  <text x="30" y="30" class="t11">Je Minute neu: geeignet = kein Via-unfaehiger oder unbekannter direkter Nachbar mit Mesh; Menge in Lieferrichtung vollstaendig, hoechstens 3.</text>
+  <text x="30" y="48" class="t11">Nur eigene Positionen; Relais, HEY, HN, Text, DM und ACK ohne Via; ein fester node_via hat Vorrang; --via off fuehrt nach AUS.</text>
+  <rect x="30" y="120" width="170" height="60" class="node"/>
+  <text x="115" y="144" text-anchor="middle" class="b">AUS</text>
+  <text x="115" y="162" text-anchor="middle" class="t11">--via off oder node_via</text>
+  <rect x="300" y="120" width="170" height="60" class="node"/>
+  <text x="385" y="144" text-anchor="middle" class="b">FLUT</text>
+  <text x="385" y="162" text-anchor="middle" class="t11">Zielpfad = Ziel</text>
+  <rect x="620" y="120" width="170" height="60" class="node srv"/>
+  <text x="705" y="144" text-anchor="middle" class="b">VIA</text>
+  <text x="705" y="162" text-anchor="middle" class="t11">eigene Positionen mit Via</text>
+  <rect x="620" y="232" width="170" height="60" class="node prx"/>
+  <text x="705" y="256" text-anchor="middle" class="b">SPERRE</text>
+  <text x="705" y="274" text-anchor="middle" class="t11">60 min Flut</text>
+  <path d="M200 150 L300 150" class="ln"/>
+  <text x="250" y="128" text-anchor="middle" class="t11">--via on,</text>
+  <text x="250" y="141" text-anchor="middle" class="t11">node_via leer</text>
+  <path d="M470 140 L620 140" class="ln"/>
+  <text x="545" y="132" text-anchor="middle" class="t11">geeignet, Menge gueltig</text>
+  <path d="M620 165 L470 165" class="ln"/>
+  <text x="545" y="180" text-anchor="middle" class="t11">nicht mehr gueltig</text>
+  <path d="M705 180 L705 232" class="lnx"/>
+  <text x="715" y="210" class="t11">Via-Knoten ohne Lebenszeichen, 30 min</text>
+  <path d="M620 262 L385 262 L385 180" class="ln"/>
+  <text x="500" y="254" text-anchor="middle" class="t11">nach 60 min</text>
+</svg>
+</div>
+<figcaption>Abb. 14: Zustandsautomat Auto-Via. Ohne geeignete Nachbarschaft oder gültige Menge flutet der Knoten wie heute. Verliert ein Via-Knoten sein Lebenszeichen, flutet der Knoten eine Stunde lang und rechnet danach neu.</figcaption>
+</figure>
+
+<h3>4.12 T-Deck: Topologie auf SD</h3>
+<p class="reco">Entscheidung: T-Deck schreibt alle 10 Minuten einen Schnappschuss der Topologie nach /topo.dat, rechnet ihn beim Laden auf die neue Bootzeit um und löscht beim ersten Start die alten Dateien mheard.dat und mhpath.dat.</p>
+<ul>
+<li>Inhalt: Kopf mit Kennung, Formatnummer, Zeilen-, Kanten-, Slot- und Horizontzahl, Epoche und Bootminute beim Speichern, danach die Felder roh; auf S3 rund @@FILE_S3@@ kB.</li>
+<li>Laden: passt der Kopf nicht, wird die Datei gelöscht, wie heute bei mheard.dat. Sonst wird jede Minutenmarke umgerechnet, Alter beim Speichern plus vergangene Zeit laut Epochen; was älter als das Fenster ist, entfällt. Ohne gültige Uhr gilt die vergangene Zeit als 0.</li>
+<li>Uhr: loadTimePersistence() nimmt die Epoche des Schnappschusses an die Stelle von getLatestMHeardTimestamp().</li>
+<li>Prämisse für 10 Minuten: ein HEY-Intervall dauert 15 Minuten, ein Neustart verliert weniger als ein Intervall. Heute schreibt T-Deck höchstens alle 30 s zwei Dateien; weniger Schreibzugriffe entlasten den SPI-Bus, den SD-Karte und Anzeige teilen.</li>
+<li>Gilt nur mit node_persist_to_sd; T-Deck Pro zeigt, schreibt aber wie heute nicht.</li>
+</ul>
+
+<h3>4.13 mcmap-Seite</h3>
+<p class="reco">Entscheidung: mcmap bekommt ohne Änderung an Firmware oder Hub eine Zählerreihe, benannte 1-Hop- und 2-Hop-Mengen und Rollen, 7 Tage aufbewahrt; die Relay-Entscheidung bleibt in der Firmware.</p>
+<p>mcmap kennt heute je Station nur die zuletzt gemeldete Nachbarzahl ohne Verlauf und einen Kantengraph, der nur Pfade zu einem Gateway sieht, im Median ein Drittel der Nachbarn, die die Station selbst meldet. Jeder HEY trägt die Nachbarzahl seines Absenders und je Relais eine Gruppe NCT,RSSI,SNR; die Relaiszähler wirft der Parser heute weg, an einem Tag rund 60.000 zuordenbare Werte von 441 Relais.</p>
+<table>
+<tr><th>Stufe</th><th>Inhalt</th><th>Entscheidung und Prämisse</th></tr>
+<tr><td>M1 Zählerreihe</td><td>Tabelle neighbor_count_1h(call, bucket_ts, role, firmware, cnt_min, cnt_max, cnt_last, n), Route und MCP-Tool neighbor_count_series</td><td>Relaiswert aus Gruppe i für Pfadelement i+1, die letzte Gruppe eines gleich langen Pfads gehört dem unbenannten Gateway und entfällt; die Zuordnung stimmt zu 98 % mit dem Selbstwert. windowCertain nur für 4.35s und neuer, weil kein 4.35p-String das Zählfenster verrät; Kappungsmarke ab 90 % der Tabellengröße</td></tr>
+<tr><td>M2 benannte Nachbarschaft</td><td>Route neighborhood mit 1-Hop- und 2-Hop-Mengen aus link_signal_1h, 2-Hop als Intervall zwischen benannter Menge und Summe der Nachbarzähler, Abdeckung daneben</td><td>Abdeckung heute Median 0,36; die Ansicht zeigt sie, damit eine dünne Graphsicht nicht als kleine Nachbarschaft gelesen wird</td></tr>
+<tr><td>M3 Rollen</td><td>Tabelle gateway_direct_1d, Route neighborhood/roles; exklusives Blatt, kritisches Relais, Supernode</td><td>exklusives Blatt: genau ein Erstempfänger, nie direkt an einem Gateway, selbst nie Relais; 99 an einem Tag bei 84 Stationen; Supernode im obersten Zehntel der 2-Hop-Menge</td></tr>
+</table>
+<p>Verbindung zur Firmware: der NCNT eines MeshCom-5-Knotens zählt Zwei-Wege-Nachbarn und ist nicht mehr bei 30 oder 80 gekappt; M1 muss ihn anhand einer Firmware-Kennung von 4.35 trennen. Ein Gateway, das empfangene HN-Berichte hochlädt, würde mcmap die benannten Nachbarlisten der Blätter liefern; das steht als eigener Punkt im Firmware-Backlog und ist zurückgestellt, Auslöser ist mcmap MC-319.</p>

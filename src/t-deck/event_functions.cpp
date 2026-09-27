@@ -21,6 +21,8 @@
 #include <command_functions.h>
 #include <esp32/esp32_flash.h>
 #include <lora_setchip.h>
+#include <SD.h>
+#include "nbr_matrix.h"   // nbrReset(), nbrMatrix -- btn_event_handler_clear_mheards()
 
 #include <Arduino.h>
 #include <AceButton.h>
@@ -485,11 +487,18 @@ void btn_event_handler_clear_messages(lv_event_t * e)
 }
 
 /**
- *  handler for clearing mheards
+ * handler for clearing MHeard/path/topology state (MeshCom-5-Topologie
+ * Welle 4, docs/meshcom5-topologie/ 4.12): resets the in-RAM topology the
+ * same way the console's "--nbrreset" does, and drops the SD backup so a
+ * reboot right after does not just reload what was just cleared.
  */
 void btn_event_handler_clear_mheards(lv_event_t * e)
 {
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    nbrReset(nbrMatrix, now_min);
 
+    if (SD.exists("/topo.dat"))
+        SD.remove("/topo.dat");
 }
 
 /**
@@ -951,8 +960,14 @@ void tabview_event_cb(lv_event_t * e)
                 tdeck_refresh_track_view();
                 break;
             case 5: // MHD
+                // R4 (Advisor): topoUiChanged() only rebuilds a table while
+                // its tab is already active, so without this the MHeard tab
+                // shows just the header row from a switch until the next
+                // received frame happens to land while it stays open.
+                tdeck_refresh_mh_view();
                 break;
             case 6: // PATH
+                tdeck_refresh_path_view();
                 break;
             case 7: // SET
                 tdeck_refresh_SET_view();
@@ -1000,15 +1015,15 @@ void position_ta_draw_event(lv_event_t * e)
 }
 
 /**
- * callback when mheard table is drawn
+ * callback when the MHeard table is drawn
  */
-void mheard_ta_draw_event(lv_event_t * e)
+void mh_ta_draw_event(lv_event_t * e)
 {
     table_center_first_row(e);
 }
 
 /**
- * callback when mheard table is drawn
+ * callback when the path table is drawn
  */
 void path_ta_draw_event(lv_event_t * e)
 {

@@ -437,7 +437,8 @@ def stage(version: str, out: Path, repo: Path = REPO, envs=None) -> list[dict]:
     return boards
 
 
-def update_releases(pages_root: Path, version: str, boards: list[dict], keep: int) -> dict:
+def update_releases(pages_root: Path, version: str, boards: list[dict], keep: int,
+                    date: str | None = None) -> dict:
     rj = pages_root / "releases.json"
     data = json.loads(rj.read_text()) if rj.is_file() else {"releases": []}
     data["releases"] = [r for r in data["releases"] if r["version"] != version]
@@ -445,7 +446,7 @@ def update_releases(pages_root: Path, version: str, boards: list[dict], keep: in
         0,
         {
             "version": version,
-            "date": _dt.date.today().isoformat(),
+            "date": date or _dt.date.today().isoformat(),
             "notes": f"https://github.com/DK5EN/MeshCom-Firmware/releases/tag/{version}",
             "boards": boards,
         },
@@ -483,7 +484,7 @@ def cmd_stage(args) -> int:
     boards = stage(args.version, out, REPO, args.envs)
     copy_page(out)
     write_detect(out)
-    info = update_releases(out, args.version, boards, args.keep)
+    info = update_releases(out, args.version, boards, args.keep, args.date)
     print(f"staged {len(boards)} boards into {out}/{args.version} ({du(out)})")
     print(f"releases kept: {', '.join(info['kept'])}")
     return 0
@@ -507,7 +508,7 @@ def cmd_publish(args) -> int:
             boards = stage(args.version, root, REPO, args.envs)
             copy_page(root)
             write_detect(root)
-            info = update_releases(root, args.version, boards, args.keep)
+            info = update_releases(root, args.version, boards, args.keep, args.date)
             for old in info["pruned"]:
                 if (root / old).is_dir():
                     shutil.rmtree(root / old)
@@ -601,6 +602,8 @@ def main(argv=None) -> int:
     common.add_argument("--version", required=True)
     common.add_argument("--keep", type=int, default=3)
     common.add_argument("--envs", nargs="*", default=None)
+    common.add_argument("--date", type=lambda v: _dt.date.fromisoformat(v).isoformat(),
+                        default=None, help="release date shown in the flasher (YYYY-MM-DD, default today)")
 
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)

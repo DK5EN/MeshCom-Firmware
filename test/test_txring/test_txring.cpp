@@ -23,6 +23,7 @@
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
 #include <aprs_functions.h>
+#include <dm_stats.h>             // M0-1: ringstat_enqueue/ringstat_parked_overwrite
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp ------------
@@ -65,9 +66,19 @@ static void resetRing(void)
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
     memset(ringSource, 0, sizeof(ringSource));
+    memset(ringNeed, 0, sizeof(ringNeed));
+    memset(ringAlone, 0, sizeof(ringAlone));
+    memset(ringKind, 0, sizeof(ringKind));
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
     mc_test_set_millis(0);
+    // Nachbarschaftsmatrix Stufe 2 (Feldlauf 23.09.): jeder Test startet mit
+    // --nbrrelay aus, sonst wuerde ein liegen gebliebenes bNBRCANCEL=true aus
+    // einem frueheren Test den naechsten unbemerkt mitfaerben.
+    bNBRCANCEL = false;
+    // M0-1 (0.4): reset between tests, same as every other stat_* counter above.
+    ringstat_enqueue.store(0);
+    ringstat_parked_overwrite.store(0);
 }
 
 void setUp(void) { resetRing(); }
@@ -238,16 +249,21 @@ static void test_prioritaets_klassifizierung(void)
 
 // -------------------------------------------- Test 2b: addTxRingEntryOnce()
 //
-// P15: SendAckMessage()/sendPing()/SendPong()/dm_outbox_glue.cpp wollten
-// alle dasselbe -- Status DONE speichern (keine Wiederholung), aber als
-// eigene DM/Gruppen-/Broadcast-Nachricht klassifizieren, nicht als Relay
-// (die TEXT-Falle: ein VORAB auf DONE gesetzter Status stuft
-// getMessagePriority() als "Relay" ein, siehe Test oben "Text-Relay").
-// SendAckMessage() reihte deshalb bisher mit temp-READY ein und schrieb den
-// Status NACH addTxRingEntry() per Hand nach -- ausserhalb des Locks, auf
-// nRF52 ein Fenster fuer eine Race mit doTX() im anderen Task. Diese Tests
-// pinnen addTxRingEntryOnce()s Ersatz dafuer: Klassifizierung UND
-// Status-Schreiben in einem Aufruf.
+// P15: SendAckMessage()/sendPing()/SendPong() und der
+// {ping}-Zweig von sendMessage() wollten alle dasselbe -- Status DONE speichern (keine
+// Wiederholung), aber als eigene DM/Gruppen-/Broadcast-Nachricht
+// klassifizieren, nicht als Relay (die TEXT-Falle: ein VORAB auf DONE
+// gesetzter Status stuft getMessagePriority() als "Relay" ein, siehe Test
+// oben "Text-Relay"). SendAckMessage() reihte deshalb bisher mit temp-READY
+// ein und schrieb den Status NACH addTxRingEntry() per Hand nach --
+// ausserhalb des Locks, auf nRF52 ein Fenster fuer eine Race mit doTX() im
+// anderen Task. Diese Tests pinnen addTxRingEntryOnce()s Ersatz dafuer:
+// Klassifizierung UND Status-Schreiben in einem Aufruf.
+//
+// bNBRCANCEL bleibt hier false (resetRing()) und kind/need/alone bleiben auf
+// ihren Defaults (RING_KIND_OTHER, 0, 0) -- keiner dieser Slots kann also in
+// die Nachbarschaftsmatrix-Stufe-2-Fall-B-Sperre (txringInCaseBHold())
+// geraten, die nur RING_KIND_RELAY-Slots mit ringAlone==0 haelt.
 
 static void test_add_tx_ring_entry_once_dm_wird_critical_und_done(void)
 {
@@ -300,13 +316,15 @@ static void test_add_tx_ring_entry_mit_done_klassifiziert_weiter_als_relay(void)
 }
 
 // getNextTxSlot() waehlt READY oder DONE aus, uebergeht aber jeden Status
-// dazwischen (SENT..Schwelle, "wartet auf Retransmit-Timer" -- siehe dessen
-// eigene Kommentare). Ein per addTxRingEntryOnce() eingereihter Slot landet
-// mit DONE im Ring: er wird also EINMAL zur Sendung ausgewaehlt (wie READY),
-// aber nie durch die Retransmit-Statusfolge erneut vorgemerkt -- das ist der
-// gesamte Mechanismus, der eine Wiederholung verhindert (doTX()/
+// dazwischen (SENT..Schwelle, "wartet auf Retransmit-Timer"). Ein per
+// addTxRingEntryOnce() eingereihter Slot landet mit DONE im Ring: er wird
+// also EINMAL zur Sendung ausgewaehlt (wie READY), aber nie durch die
+// Retransmit-Statusfolge erneut vorgemerkt -- das ist der gesamte
+// Mechanismus, der eine Wiederholung verhindert (doTX()/
 // updateRetransmissionStatus() selbst sitzen in lora_functions.cpp, nativ
-// hier nicht mitgebaut, siehe env:native_aprs build_src_filter).
+// hier nicht mitgebaut, siehe env:native_aprs build_src_filter). RING_KIND_OTHER
+// (Default) heisst auch: kein Fall-B-Hold, der Slot waere sonst nicht sofort
+// waehlbar.
 static void test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done(void)
 {
     BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo");
@@ -325,12 +343,14 @@ static void test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done(void)
 // jeder Ring-Eintrag und wurde beim Overflow VERWORFEN (droppedNew-Zweig,
 // "same or lower priority than everything in queue"). Ueber
 // addTxRingEntryOnce() klassifiziert dieselbe DM CRITICAL (Prio 1) und
-// verdraengt jetzt den aeltesten Relay-Eintrag, statt selbst zu verschwinden.
+// verdraengt jetzt den aeltesten Relay-Eintrag, statt selbst zu
+// verschwinden. Die Relay-Fuellung geht ueber addTxRingEntry(..., DONE, ...)
+// mit Default-kind (RING_KIND_OTHER) -- kein RING_KIND_RELAY, also auch kein
+// Fall-B-Hold, der die Eviction-Auswahl hier verzerren wuerde.
 static void test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden(void)
 {
     // Ring mit MAX_RING-1 Relay-Eintraegen (Text, Status DONE -> NORMAL,
-    // siehe getMessagePriority()) "voll" fuellen -- so wie OnRxDone das fuer
-    // echte weitergeleitete Pakete tut.
+    // siehe getMessagePriority()) "voll" fuellen.
     for (int i = 0; i < MAX_RING - 1; i++)
     {
         BuiltFrame f = buildTextFrame("DK5EN-91", "relay", (uint32_t)(0x4000 + i));
@@ -564,6 +584,143 @@ static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
     TEST_ASSERT_EQUAL_INT('r', (int)ringSource[5]);
     // unbeteiligte Slots unveraendert
     TEST_ASSERT_EQUAL_INT('o', (int)ringSource[1]);
+}
+
+// --------------------------- Nachbarschaftsmatrix Stufe 2: ringKind/ringNeed/ringAlone
+//
+// docs/nbr-wichtigkeit-konzept.md 5.1: drei neue Seitenfelder neben
+// ringSource[], gesetzt in addTxRingEntry(). Drei Eigenschaften werden hier
+// fixiert: (a) jeder Enqueue OHNE die neuen Argumente nullt sie, auch wenn
+// der Slot vorher eine fremde Maske trug (kein Leck zwischen Wiederverwendungen),
+// (b) mit Argumenten landen sie unveraendert im Slot, (c) der N-24-Umzug
+// nimmt sie mit wie ringSource[].
+//
+// Welle 2 (edge pool): ringNeed[]/ringAlone[] sind NbrMask (nbr_mask.h), und
+// addTxRingEntry() nimmt need/alone als const NbrMask* (nullptr = leere
+// Maske) statt als uint32_t. maskFromU32() baut zum Vergleich mit den alten
+// Bitmustern eine NbrMask, deren unterstes Wort exakt diese 32 Bit traegt --
+// bequem fuer die alten festen Testwerte, ohne dass die Tests wissen muessen,
+// wie viele Woerter NBR_MASK_WORDS auf diesem Env hat.
+static NbrMask maskFromU32(uint32_t bits)
+{
+    NbrMask m = nbrMaskNone();
+    m.w[0] = bits;
+    return m;
+}
+
+// (a) Default-Ueberschreiben: Slot 3 traegt eine simulierte Alt-Maske aus
+// einem fruehereren Relay (RING_KIND_COUNTED gesetzt); ein Enqueue OHNE
+// kind/need/alone in genau diesen Slot muss sie auf leer/RING_KIND_OTHER
+// zuruecksetzen.
+static void test_stufe2_default_ueberschreibt_alte_maske(void)
+{
+    ringKind[3]  = RING_KIND_RELAY | RING_KIND_COUNTED;
+    ringNeed[3]  = maskFromU32(0xAAAAAAAAUL);
+    ringAlone[3] = maskFromU32(0x55555555UL);
+
+    iWrite = 3;
+    iRead = 3;
+
+    BuiltFrame f = buildPositionFrame(0x9001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos"); // keine Stufe-2-Argumente
+    TEST_ASSERT_EQUAL_INT(3, slot);
+
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[slot]));
+}
+
+// (b) Mit Argumenten landen kind/need/alone unveraendert im Slot.
+static void test_stufe2_kind_need_alone_werden_gesetzt(void)
+{
+    NbrMask needMask  = maskFromU32(0x0000000FUL);
+    NbrMask aloneMask = maskFromU32(0x00000003UL);
+
+    BuiltFrame f = buildPositionFrame(0x9010UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "rx_relay", 0, true,
+                               RING_KIND_RELAY, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[slot]));
+}
+
+// (c) N-24-Umzug (siehe test_n24_indirekte_eviction_verwaist_keinen_slot
+// oben): derselbe Aufbau, aber Slot 0 traegt eine Stufe-2-Maske, die den
+// Umzug nach Slot 5 ueberleben muss.
+static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
+{
+    NbrMask needMask  = maskFromU32(0x000000AAUL);
+    NbrMask aloneMask = maskFromU32(0x00000002UL);
+
+    BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
+    int slot0 = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_DONE, "rx_relay", 0, true,
+                                RING_KIND_RELAY, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_INT(0, slot0);
+
+    for (int i = 1; i <= 4; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x5100 + i));
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill");
+    }
+
+    BuiltFrame hey = buildHeyFrame(0x6100UL);
+    int slot5 = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "orphanworst");
+    TEST_ASSERT_EQUAL_INT(5, slot5);
+
+    for (int i = 6; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x7100 + i));
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill2");
+    }
+    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    BuiltFrame trigger = buildPositionFrame(0x8100UL);
+    int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "orphantrigger");
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+
+    // Der CRITICAL-Relay-Eintrag ist von Slot 0 nach Slot 5 umgezogen --
+    // seine Stufe-2-Maske muss ihn begleitet haben.
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[5]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[5]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[5]));
+
+    // Slot 0 ist geleert.
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
+}
+
+// (d) Ein Zeilenindex >= 32 liegt jenseits des ersten Maskenworts (NBR_MASK_WORDS
+// >= 2 bei den 128 Zeilen, die dieses Env ueber CONFIG_IDF_TARGET_ESP32S3
+// -- siehe test/support/configuration.h -- bekommt): pinnt, dass ein Bit im
+// ZWEITEN Wort addTxRingEntry()/ringNeed[]/txringInCaseBHold() genauso
+// unveraendert durchlaeuft wie eines im ersten.
+static void test_stufe2_maskenbit_ueber_32_ueberlebt_case_b(void)
+{
+    TEST_ASSERT_TRUE_MESSAGE(NBR_MAX_ROWS > 40,
+        "Env liefert weniger als 41 Zeilen -- Bit 40 waere gar nicht darstellbar");
+
+    bNBRCANCEL = true;
+    mc_test_set_millis(1000);
+
+    NbrMask need40    = nbrMaskBit(40);
+    NbrMask aloneEmpty = nbrMaskNone();   // Fall B: alone leer
+
+    BuiltFrame pos = buildPositionFrame(0xB040UL); // LOW
+    int slot = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_DONE, "rx_relay",
+                               0, true, RING_KIND_RELAY, &need40, &aloneEmpty);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+
+    TEST_ASSERT_TRUE(nbrMaskTest(ringNeed[slot], 40));
+    TEST_ASSERT_FALSE(nbrMaskTest(ringNeed[slot], 39));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[slot]));
+
+    // Fall B (ringAlone leer) -> im Hold-Fenster gehalten, wie jeder andere
+    // Fall-B-Relay-Slot (txringInCaseBHold(), siehe txring_functions.h) --
+    // das Bit jenseits von Wort 0 darf die Fall-A/B-Unterscheidung nicht
+    // verfaelschen.
+    TEST_ASSERT_TRUE(txringInCaseBHold(slot, (uint32_t)millis()));
 }
 
 // ----------------------------------------------------- Test 5: Overflow-Drop
@@ -1108,6 +1265,259 @@ static void test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt(void)
 // [env:*_external_radio]). Ein #if-gated Test wuerde in diesem Env nie
 // laufen (toter Test) -- deshalb hier bewusst ausgelassen, siehe Wave-Report.
 
+// ----------------------------------- Nachbarschaftsmatrix Stufe 2, Fix vom
+// -------------------------------------------------- Feldlauf 23.09.2026
+//
+// Feldbefund (DK5EN-98, --nbrrelay on, 9h): der Fall-B-Nachrang
+// (NBR_RELAY_CASE_B_EXTRA_MS) wurde bei JEDEM CSMA-Re-Arm (jedes empfangene
+// Frame) neu auf die Basis addiert statt nur EINMAL ab dem Einreihen zu
+// gelten -- ein Fall-B-Relay an der Ringspitze wartete dadurch effektiv auf
+// eine durchgehende Funkstille (Median 137s, Maximum 16min), und
+// getNextTxSlot() kannte den Fall gar nicht: alles dahinter (auch Fall-A-
+// Relays, eigene Sendungen, HN-Meldungen) wartete mit. Ergebnis: 149
+// verworfene Relays + 10 eigene HN-Meldungen in 9h (RING_DROP_NEW/
+// RING_DROP_STALE), 0 im reinen --nbrrelay count.
+//
+// Die folgenden Tests fixieren den GEFIXTEN Zustand (einmalige Deadline ab
+// Einreihen, dreiphasiger Fall-B-Backoff, Fall-B-Hold blockiert
+// getNextTxSlot() nicht mehr) und dokumentieren je die genaue Assertion, die
+// gegen den ALTEN Code (bei jedem Aufruf erneut EXTRA addieren, kein
+// Hold-Wissen in getNextTxSlot()) rot faellt.
+
+// Test 1: ein Fall-B-Relay (ringAlone==0) vor einem Fall-A-Relay
+// (ringAlone!=0) derselben Prioritaet (beide POS, also LOW) -- waehrend der
+// Fall-B-Sperre gewinnt Fall A (obwohl B zuerst eingereiht wurde und bei
+// gleicher Prio sonst FIFO gilt), nach Ablauf der Sperre gewinnt wieder B
+// (FIFO, B war zuerst da). ALTER CODE (kein Hold-Wissen in getNextTxSlot()):
+// die erste Assertion (waehrend der Sperre) faellt rot -- getNextTxSlot()
+// haette B (FIFO-Erster) zurueckgegeben, nicht A.
+static void test_nbr_caseb_hold_weicht_fall_a_gleicher_prio(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(1000);
+
+    BuiltFrame posB = buildPositionFrame(0xB001UL); // LOW
+    int slotB = addTxRingEntry(posB.bytes, posB.len, RING_STATUS_DONE, "rx_relay",
+                                0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // Fall B
+    TEST_ASSERT_EQUAL_INT(0, slotB);
+
+    BuiltFrame posA = buildPositionFrame(0xA001UL); // LOW, gleiche Prio wie B
+    NbrMask aloneA = nbrMaskBit(0); // irgendein gesetztes Bit -- nur "nicht leer" zaehlt fuer Fall A
+    int slotA = addTxRingEntry(posA.bytes, posA.len, RING_STATUS_DONE, "rx_relay",
+                                0, true, RING_KIND_RELAY, /*need*/nullptr, /*alone*/&aloneA); // Fall A
+    TEST_ASSERT_EQUAL_INT(1, slotA);
+
+    // Innerhalb der Fall-B-Sperre (waited=0 < NBR_RELAY_CASE_B_EXTRA_MS):
+    // Fall A ist der einzige NICHT gehaltene Kandidat und gewinnt, trotz
+    // gleicher Prio und spaeterer Einreihung.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotA, getNextTxSlot(), "waehrend der Fall-B-Sperre muss Fall A gewinnen");
+
+    // Nach Ablauf der Sperre sind beide nicht mehr gehalten -> normales
+    // Prio+FIFO greift wieder, B (zuerst eingereiht) gewinnt.
+    mc_test_set_millis(1000UL + NBR_RELAY_CASE_B_EXTRA_MS + 1UL);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotB, getNextTxSlot(), "nach der Sperre muss B (FIFO-Erster) gewinnen");
+}
+
+// Test 2: ein gehaltener Fall-B-Relay (hier: Positions-Relay, Prio LOW=4,
+// also "bessere" Prio-Nummer als die HN-Meldung) darf eine spaeter
+// eingereihte, nominell schlechter priorisierte eigene HN-Meldung
+// (HEY-Frame, RING_KIND_OTHER, Prio BACKGROUND=5) NICHT blockieren -- genau
+// das Feldsymptom ("10 eigene HN-Meldungen in 9h verhungert"). ALTER CODE:
+// getNextTxSlot() kennt den Hold nicht und waehlt stur nach Prio -> haette
+// den ACK-Relay-Slot zurueckgegeben (Prio 1 < 5), diese Assertion faellt rot.
+static void test_nbr_caseb_hold_blockiert_hn_meldung_nicht(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(2000);
+
+    // Positions-Relay (LOW, bessere Prio als die HN-Meldung) in Fall B -- genau
+    // die Lage aus dem Feldlauf 23.09. (ACK-Relays bekommen nie RING_KIND_RELAY,
+    // nur Text/POS/HEY laufen durch nbrRelayNeed()).
+    BuiltFrame posRelay = buildPositionFrame(0xB002UL);
+    int slotHeld = addTxRingEntry(posRelay.bytes, posRelay.len, RING_STATUS_DONE, "rx_relay",
+                                   0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // Fall B -> gehalten
+    TEST_ASSERT_EQUAL_INT(0, slotHeld);
+
+    BuiltFrame heyOwn = buildHeyFrame(0xC002UL); // BACKGROUND -- eigene HN-Meldung, kind=OTHER (Default)
+    int slotHN = addTxRingEntry(heyOwn.bytes, heyOwn.len, RING_STATUS_READY, "nbr_report");
+    TEST_ASSERT_EQUAL_INT(1, slotHN);
+
+    TEST_ASSERT_TRUE(txringInCaseBHold(slotHeld, (uint32_t)millis()));
+    TEST_ASSERT_FALSE(txringInCaseBHold(slotHN, (uint32_t)millis()));
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotHN, getNextTxSlot(),
+        "gehaltener Fall-B-Relay darf die spaeter eingereihte HN-Meldung nicht blockieren");
+}
+
+// Test 3: dreiphasiger Fall-B-Backoff direkt gegen txringCaseBackoffSlot()
+// (LOW-Prio-Slot, CSMA_PRIO_BASE_4=5500, attempt=0 -- keine Versuchs-
+// Skalierung). Normale Fall-B-Basis (kein EXTRA): 5500 + (7..9)*35 =
+// [5745,5815] (NBR_RELAY_CASE_B_SLOT_START=7 + random(0,3)={0,1,2}).
+//
+// waited=5000 (< EXTRA=20000): Rest-Hold (20000-5000=15000) > normale Basis
+// (max. 5815) -> Ergebnis GENAU 15000, kein Zufallsanteil. ALTER CODE
+// (Basis+EXTRA+Slots bei jedem Aufruf, unabhaengig von waited) haette hier
+// ~25745..25815 geliefert -- die Obergrenze 16000 faellt dagegen rot.
+//
+// waited=25000 (>= EXTRA, < MAX_WAIT=60000): normale Basis OHNE EXTRA,
+// [5745,5815]. ALTER CODE haette weiterhin ~25745..25815 geliefert -- die
+// Obergrenze 5815 faellt dagegen rot.
+//
+// waited=65000 (>= MAX_WAIT=60000, neuer 60s-Deckel): Kurzsuche wie Fall A,
+// NBR_RELAY_CASE_A_SHORT_MS(150) + random(0,3)*35 = [150,220]. ALTER CODE
+// kannte MAX_WAIT gar nicht -- haette weiterhin ~25745..25815 geliefert, die
+// Obergrenze 220 faellt dagegen rot.
+static void test_nbr_caseb_backoff_dreiphasig(void)
+{
+    ringPriority[0] = MSG_PRIO_LOW;
+    ringAlone[0] = nbrMaskNone(); // Fall B
+
+    unsigned long b1 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/5000UL);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(15000UL, b1, "Rest-Hold bei waited=5s");
+
+    unsigned long b2 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/25000UL);
+    TEST_ASSERT_TRUE_MESSAGE(b2 >= 5745UL && b2 <= 5815UL, "normale Fall-B-Basis ohne EXTRA bei waited=25s");
+
+    unsigned long b3 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/65000UL);
+    TEST_ASSERT_TRUE_MESSAGE(b3 >= 150UL && b3 <= 220UL, "Kurzsuche wie Fall A ab dem 60s-Deckel");
+}
+
+// Test 4: Re-Arm-Invarianz -- zwei Aufrufe fuer DENSELBEN Slot, 50ms
+// auseinander (wie zwei kurz aufeinanderfolgende CSMA-Re-Arms durch zwei
+// empfangene Frames), duerfen die Sperre NICHT neu starten. Bei
+// waited=3000/3050 (beide < EXTRA=20000, Rest-Hold jeweils weit ueber der
+// normalen Basis) ist das Ergebnis exakt EXTRA-waited, ohne Zufallsanteil --
+// exakt pruefbar. ALTER CODE addierte EXTRA bei jedem Aufruf neu und war von
+// waited komplett unabhaengig: beide Aufrufe haetten denselben, viel
+// groesseren Wert (~25745..25815) geliefert -- diese beiden Assertions
+// fallen einzeln schon rot (siehe Test 3), hier zusaetzlich fixiert, dass
+// der zweite Aufruf die Sperre um genau das Delta (50ms) verkuerzt statt sie
+// zu verlaengern/neu zu starten.
+static void test_nbr_caseb_kein_re_arm(void)
+{
+    ringPriority[0] = MSG_PRIO_LOW;
+    ringAlone[0] = nbrMaskNone(); // Fall B
+
+    unsigned long first = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3000UL);
+    unsigned long second = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3050UL);
+
+    TEST_ASSERT_EQUAL_UINT32(17000UL, first);
+    TEST_ASSERT_EQUAL_UINT32(16950UL, second);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(50UL, first - second,
+        "die Sperre muss um genau das Zeitdelta zwischen den Re-Arms schrumpfen, nicht neu starten");
+}
+
+// Test 5: ohne bNBRCANCEL (--nbrrelay off/count) bleibt alles unveraendert
+// -- txringInCaseBHold() liefert immer false, egal wie kind/alone stehen,
+// und getNextTxSlot() waehlt reines Prio+FIFO wie vor diesem Fix. ALTER CODE
+// hatte diesen Codepfad ueberhaupt nicht -- dieser Test fixiert nur, dass
+// der NEUE Code ihn ebenfalls nicht aendert.
+static void test_nbr_ohne_bnbrcancel_unveraendert(void)
+{
+    // bNBRCANCEL bleibt false (Default aus resetRing()).
+    mc_test_set_millis(3000);
+
+    BuiltFrame posLow = buildPositionFrame(0xB005UL); // LOW, kind/alone wie ein Fall-B-Relay, aber bNBRCANCEL aus
+    int slotLow = addTxRingEntry(posLow.bytes, posLow.len, RING_STATUS_DONE, "rx_relay",
+                                  0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0);
+    TEST_ASSERT_EQUAL_INT(0, slotLow);
+
+    BuiltFrame heyBg = buildHeyFrame(0xC005UL); // BACKGROUND, schlechtere Prio
+    int slotBg = addTxRingEntry(heyBg.bytes, heyBg.len, RING_STATUS_READY, "nbr_report");
+    TEST_ASSERT_EQUAL_INT(1, slotBg);
+
+    TEST_ASSERT_FALSE(txringInCaseBHold(slotLow, (uint32_t)millis()));
+    // Reines Prio+FIFO: LOW (4) schlaegt BACKGROUND (5), wie vor diesem Fix.
+    TEST_ASSERT_EQUAL_INT(slotLow, getNextTxSlot());
+}
+
+// Test 6: eine Text-Relay-Nachricht bleibt vom Fall-B-Hold komplett
+// unberuehrt (Konzept 5.1: Menschen warten darauf), SELBST wenn ringAlone==0
+// und RING_KIND_RELAY gesetzt sind. Realistische Probe (Advisor 2026-09-23;
+// ACK-Frames bekommen in der Firmware nie RING_KIND_RELAY): Text-Relay
+// (NORMAL=3) vor einer eigenen, NICHT gehaltenen Position (RING_KIND_OTHER,
+// LOW=4). Richtig klassifiziert gewinnt der Text nach Prio; waere er
+// faelschlich gehalten, gewaenne die Position als einziger nicht gehaltener
+// Kandidat.
+static void test_nbr_caseb_text_relay_kein_hold(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(4000);
+
+    BuiltFrame textRelay = buildTextFrame("DK5EN-91", "Hallo", 0xE006UL, "DK5EN-90");
+    int slotText = addTxRingEntry(textRelay.bytes, textRelay.len, RING_STATUS_DONE, "rx_relay",
+                                   0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // alone=0, waere Fall B ohne den Text-Ausschluss
+    TEST_ASSERT_EQUAL_INT(0, slotText);
+
+    BuiltFrame ownPos = buildPositionFrame(0xD006UL);
+    int slotPos = addTxRingEntry(ownPos.bytes, ownPos.len, RING_STATUS_READY, "own_pos");
+    TEST_ASSERT_EQUAL_INT(1, slotPos);
+
+    TEST_ASSERT_FALSE_MESSAGE(txringInCaseBHold(slotText, (uint32_t)millis()), "Text-Relay darf nie gehalten sein");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotText, getNextTxSlot(),
+        "Text-Relay (NORMAL) muss vor der eigenen Position (LOW) gewinnen -- er ist nicht gehalten");
+}
+
+// --------------------------------------------------------------- M0-1 (0.4)
+//
+// ringstat_parked_overwrite (docs/dm-transport-impl-plan-20260913.md): landet
+// ein Enqueue auf einem Slot, der noch retransmit-pending ist (Laenge != 0,
+// Status weder READY(0x00) noch DONE(0xFF) noch EXT_PENDING(0x80) -- 0x05 hier
+// als typischer Wert innerhalb der 0x01..0x14-Alterungsfolge aus
+// updateRetransmissionStatus()), muss der Zaehler steigen; auf einem leeren
+// Slot nicht. ringstat_enqueue zaehlt beide Faelle (jeder erreichte Write).
+
+static void test_ringstat_parked_overwrite_bei_pending_slot(void)
+{
+    // Slot 0 traegt noch einen unbestaetigten Sendeversuch: Laenge gesetzt,
+    // Status 0x05 (pending, wie ihn updateRetransmissionStatus() nach ein
+    // paar Alterungs-Ticks hinterlaesst) -- weder READY noch DONE noch
+    // EXT_PENDING.
+    ringBuffer[0][0] = 10;
+    ringBuffer[0][1] = 0x05;
+
+    BuiltFrame f = buildPositionFrame(0xF001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_ovw");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
+static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
+{
+    // resetRing() (per setUp bereits gelaufen) liefert einen frischen, leeren
+    // Slot 0 -- kein Ueberschreiben eines Pending-Eintrags.
+    BuiltFrame f = buildPositionFrame(0xF002UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_empty");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
+// Die drei Ausschluesse des Kriteriums einzeln: ein Slot mit Laenge != 0,
+// dessen Status DONE, READY oder EXT_PENDING ist, wird NICHT als
+// ueberschriebener Pending-Eintrag gezaehlt. Ohne diese Faelle bestuende der
+// Test auch mit `len != 0` allein (Advisor-Befund F4, 2026-09-13).
+static void test_ringstat_parked_overwrite_ignoriert_done_ready_ext(void)
+{
+    const uint8_t statusse[3] = { RING_STATUS_DONE, RING_STATUS_READY, RING_STATUS_EXT_PENDING };
+    for(int i = 0; i < 3; i++)
+    {
+        resetRing();
+        ringBuffer[0][0] = 10;
+        ringBuffer[0][1] = statusse[i];
+
+        BuiltFrame f = buildPositionFrame(0xF010UL + (uint32_t)i);
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_excl");
+
+        TEST_ASSERT_EQUAL_INT(0, slot);
+        TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+        TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+    }
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -1124,6 +1534,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_overflow_mit_eviction);
     RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
     RUN_TEST(test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert);
+    RUN_TEST(test_stufe2_default_ueberschreibt_alte_maske);
+    RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
+    RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
+    RUN_TEST(test_stufe2_maskenbit_ueber_32_ueberlebt_case_b);
     RUN_TEST(test_len_null_wird_abgewiesen);
     RUN_TEST(test_len_ueber_max_wird_abgewiesen);
     RUN_TEST(test_len_exakt_max_wird_enqueued);
@@ -1142,5 +1556,14 @@ int main(int argc, char **argv)
     RUN_TEST(test_wq01_leerer_ring_liefert_nur_nullen);
     RUN_TEST(test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein);
     RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
+    RUN_TEST(test_nbr_caseb_hold_weicht_fall_a_gleicher_prio);
+    RUN_TEST(test_nbr_caseb_hold_blockiert_hn_meldung_nicht);
+    RUN_TEST(test_nbr_caseb_backoff_dreiphasig);
+    RUN_TEST(test_nbr_caseb_kein_re_arm);
+    RUN_TEST(test_nbr_ohne_bnbrcancel_unveraendert);
+    RUN_TEST(test_nbr_caseb_text_relay_kein_hold);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_pending_slot);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null);
+    RUN_TEST(test_ringstat_parked_overwrite_ignoriert_done_ready_ext);
     return UNITY_END();
 }

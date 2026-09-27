@@ -1,0 +1,111 @@
+{
+  "scenario": "kill50",
+  "started": "2026-09-13 17:34:31",
+  "verdict": "FAIL",
+  "assertions": [
+    {
+      "name": "safeboot web server up",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "upload ends without a 200 (client killed at ~50%)",
+      "passed": true,
+      "detail": "status=0 body=''"
+    },
+    {
+      "name": "serial ota;abort;reason;<r> within 40s, reason in ['client_disconnected', 'incomplete_upload', 'stalled']",
+      "passed": false,
+      "detail": "not seen"
+    },
+    {
+      "name": "/ota/state aborted with expected reason",
+      "passed": true,
+      "detail": "state={'state': 'aborted', 'reason': 'client_disconnected', 'generation': 1, 'received': 1091586, 'total': 0, 'image_valid': False, 'app_valid': False, 'fallback_in_ms': -1, 'uptime_ms': 53163}"
+    },
+    {
+      "name": "app_valid reported",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "serial app;image;invalid after the abort",
+      "passed": false,
+      "detail": "not seen"
+    },
+    {
+      "name": "fallback_in_ms == -1 (app invalid, no fallback possible)",
+      "passed": true,
+      "detail": "fallback_in_ms=-1"
+    },
+    {
+      "name": "node stays in safeboot 60s with app invalid (/update still 200)",
+      "passed": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "no OTA UDATE started boot banner in that window (no reboot loop)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "no serial fallback;reason;timeout while app invalid (no reboot loop)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "/ota/cancel 409 app_invalid",
+      "passed": true,
+      "detail": "HTTP 409 app_invalid"
+    },
+    {
+      "name": "no serial ota;verify;result;ok",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "no serial ota;end;result;success",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "recovery /ota/start 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "recovery upload HTTP 200",
+      "passed": true,
+      "detail": "HTTP 200 OK"
+    },
+    {
+      "name": "recovery serial ota;verify;result;ok",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "recovery serial ota;end;result;success",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "app back after recovery upload ([BOOT];ready)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "GET / answers after recovery",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "extra": {
+    "app_valid": false,
+    "bytes_before_kill": 1091586
+  }
+}

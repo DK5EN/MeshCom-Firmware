@@ -3,80 +3,82 @@
 
 ## What this release is
 
-**neo is `upstream/dev` plus better code. Nothing else.** This build is official `4.35t` plus everything the ICSSW team has merged into `dev` since (up to [`6cc8b552`](https://github.com/icssw-org/MeshCom-Firmware/commit/6cc8b552), PRs #1157–#1161) plus this fork's code-quality campaign: duplicated logic unified, dead files removed, and the handful of real bugs that duplication had let drift apart, fixed. It carries no new protocol feature and no new operating mode over `dev`.
+**The Sunday 27 September 2026 build, dated 28 September: neo plus the neighbour matrix and store-and-forward from `v4.35t.09.27-neo`, plus personal-message (DM) retries in the new XOR format.** It is `v4.35t.09.28-neo` — everything in `v4.35t.09.27-neo` unchanged, with the direct-message retry mechanism replaced end to end.
 
-**The promise: on the air, this firmware behaves like official `4.35t`. It only gets better under load** — more free heap, more flash headroom, the same frames. Where behaviour genuinely differs from upstream, it is because upstream's own duplication had let a bug through, and that is named below and in the linked changelog.
+**How to tell this build apart:** `FLASH_VERSION 20260928` in the boot log (`[INIT]...FLASH layout 20260724 ok, build 20260928`) and in the `DM` setlog line. The version field on the air stays `4.35t` — a fixed five characters. `FLASH_STRUCT_VERSION` stands at `20260724`, unchanged — **your configuration survives this update.** The new retry format needs no settings storage of its own.
 
-**How to tell this build apart:** not by the version letter and not by `FLASH_VERSION` — both report exactly what official `4.35t` reports (`4.35t`, `FLASH_VERSION 20260912`). The tell is the build date in `--info` / the `IS1` JSON, and the tag or filename this asset came from (`v4.35t.09.26-neo`) or the entry on the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/). `FLASH_STRUCT_VERSION` stands at `20260724`, unchanged — **your configuration survives this update.**
+## Personal-message (DM) retries: the XOR format
 
-This release replaces `v4.35t.09.21-neo`, whose release and tag were deleted; a body for it was never committed, so this note is the first one for the neo line.
+Full design: [`docs/pn-retry-xor-impl-plan.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-xor-impl-plan.md), concept paper [`docs/pn-zustellung-dedup.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-zustellung-dedup.md). Upstream: [PR #1168](https://github.com/icssw-org/MeshCom-Firmware/pull/1168) (merged into `dev` 2026-09-27).
 
-## What is new since the last neo build
+- **Retry k (1..3) of a DM this node sent carries the original `msg_id` with bits 10–11 XOR k and a recomputed FCS.** The first send is byte-identical to before. Old relays, which dedup on the full 32-bit `msg_id`, forward the retry as a new frame instead of dropping it as a duplicate of the original — the problem this format is built to fix.
+- **An echo of the DM no longer ends the retry ladder.** Only the destination's `:ackNNN` does, over LoRa or over the server; a server-side ack now also stops the waiting ring slot. A DM sent on behalf of a KISS client keeps the old behaviour: byte-identical retries, released on the first echo.
+- **Repeat copies are recognised by their bit pattern** and are not uploaded to the server, EXTUDP or KISS again, and not stored again by a store node. A DM addressed to this node that arrives again is re-acknowledged but not shown twice.
+- **`--dmretry` and the DM outbox are removed.** With the XOR format, the outbox ladder and the ring retry had become nearly identical, so only one path is left: every DM is sent once and retried up to 3 times, 40 s apart. The `--dmretry off|3|9` setting, its web setup select, the `--info` line and the `OUTBOX FULL NOT SENT` refusal are gone (mode 9 was already unusable with three retry-id bit variants). A DM held by a store node still uses the app's "held" status; a DM the ring gives up on shows "failed" unless a store node holds it.
+- **A race between an incoming ack and a retry copy still in the send queue is fixed (M1).** Before this fix, an ack that arrived while a retry copy was queued but not yet sent could miss that copy, letting it go out anyway and its echo restart the wait — up to three redundant copies and a spurious "failed" after an ack.
 
-The previous neo build was cut on the evening of 21 September. Everything since then is below; detail, evidence and the restructuring/bug-fix classification are in [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md) (items 118–129 plus the chapter entries named here).
+## Compatibility, stated plainly
 
-**Safeboot: the complete recovery rework** (`a04d9c87`, chapter K15). The 21 September build carried only part of it. Now in: the OTA session as a state machine with a generation guard, a status page with network panel and WiFi scan, an access point after 25 s without a join, `/ota/info`, `/ota/state`, `/ota/scan`, and single-app-slot handling (`app_valid` instead of the old 180-second fallback loop). The same work is offered upstream as [PR #1162](https://github.com/icssw-org/MeshCom-Firmware/pull/1162), still open. The safeboot partition is written only by the web flasher or a serial flash, not by OTA.
+This retry format now applies to **every** DM, not only ones that previously opted into `--dmretry 3`:
 
-**Upstream catch-up of 25 September** (`def2dc7e`, items 118–123): KISS/TCP on port 8001 (#1151, DH1FR; off by default, here also on E22_XML-DevKitC), the via settings as a second node-settings JSON `SN1` (#1155), the build date as `IS1` (#1156), and this fork's own #1152 (T-Beam-1W battery shown as USB after a settings wipe, `551f9a0b`) and #1153 (the web GUI "Voltage" switch did nothing, `248662ff`). `--via on/off` no longer stores "ON"/"OFF" as the via call sign (`0923e037`, found on the bench).
+- **Older receivers may show the same DM up to 4 times** (once per retry-id bit variant) — they dedup on the full `msg_id`, which the XOR bits deliberately change.
+- **Older store nodes delay delivery by up to roughly 2 minutes** — they treat every retry copy as a new send and reset the hold timer each time.
+- **A stored `dm_retry` setting (ESP32 NVS, nRF52 `/dm.cfg`) is read and ignored.** There is no `--dmretry` command left to set it.
+- **The `OUTBOX FULL NOT SENT` refusal no longer exists** on this firmware, though its text prefix stays in the echo guard so an older sender's retry format is still recognised.
+- **The central MeshCom server must dedup on `msg_id & 0xFFFFF3FF`**, not the full 32-bit id, before this firmware is widely deployed — see [`docs/pn-retry-server.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-server.md). Until it does, a region with many nodes on this firmware may see each PN's retries surfaced by the server as separate messages.
 
-**Ping and pong over BLE** (`3b018f03`, `1a14bef5`, `b55fe5d7`): a pong addressed to the node's own call sign now also reaches the BLE client (P13); a `{ping}` typed in the app goes out once instead of being retransmitted up to three times at 40-second intervals (P14); own messages without retransmission keep their priority in the TX queue instead of being ranked like relayed traffic (P15).
+## Also in this delta
 
-**Upstream catch-up to `6cc8b552` (PRs #1157–#1161, merge `43760732`, items 124–129).**
+- **Soak tooling.** `tools/bench/soak_dm.py` sends test DMs between two of our own nodes over their web servers (never `*` or a group); `tools/soakstatus.py` evaluates a capture window for reboots, heap drift, DM counters, retry markers, per-DM ack time and neighbour-matrix consistency. Protocol: [`docs/soak-xor-20260927.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/soak-xor-20260927.md).
+- **A host-suite gap from the outbox removal is closed.** `native_udp_frame_twin` had lost its fake for the new server-ack ring stop and stopped linking partway through this delta; it now carries that fake and a test for the own-DM server-ack branch.
 
-- **#1157** is this branch's own RAM-reclaim work (byte-FIFO ring buffers, the MHeard-throttle fix, the web header held as `String`) coming back from `fork-main`, now merged into `dev` itself. Resolving the merge kept this branch's structure where it already carries the behaviour, and took four pieces from upstream's side of the same change:
-  - `sendPing()` now reports a refused TX-ring entry loudly (`[PING]...not queued: TX ring refused the frame`) instead of dropping it silently — a visibility fix, nothing changes on the air since the ping was never queued either way.
-  - The BLE command ring `RING_BYTES_PHONECOM` grows to 3072 B on every board class, so the whole configuration burst fits.
-  - A new diagnostic marker, `[MC-DBG] RING_OVERFLOW buf=phone`.
-  - The byte-ring iterator that feeds the web message page now takes its snapshot under the existing lock, instead of reading a ring that a writer could still be mutating.
-- **#1158** (OE1KFR, `f73cbf9e`): `WSPWD` and `ASYM` move from the `SN` node-settings JSON to `SN1`. `SN` was already about 250 characters without a web password, over the 244-byte BLE payload limit, and the app was silently losing `ASYM` always and `GWS`/`BLED` once a password got long enough. New on this branch with this merge.
-- **#1159–#1161** (OE1KBC): comments in `4.35t` preparing two MSB repeat-count bits in `msg_id`; the mask itself stays commented out upstream ("discussion ongoing"). No behaviour change.
+## Relation to `v4.35t.09.27-neo`
 
-Gate for the whole merge: 36 native host environments, 1070/1070 test cases; `test/golden/selftest.sh` green.
+Everything in `v4.35t.09.27-neo` is in this build unchanged: the neighbour matrix (MeshCom 5 topology, stages 1–3), store-and-forward for direct messages (stages 0, 1, 2.1, 3, 4), and everything it in turn carried from `v4.35t.09.26-neo`. Only the DM retry mechanism itself changes, as described above.
 
 ## What changes on the air
 
-Today's merge changes nothing on the air: logging, RAM sizing and a BLE JSON field. Since the previous neo build, three things do:
+With default settings, compared with `v4.35t.09.27-neo`:
 
-1. **An app-originated `{ping}` is sent once** (P14), not up to three times.
-2. **Own messages without retransmission (ping, pong, ACK) keep their priority** in the TX queue (P15), so on a busy node they no longer wait behind relayed traffic. Frame bytes are unchanged; send order can differ.
-3. **KISS/TCP** (#1151, upstream behaviour) can put a client's frames on the air — only when switched on with `--kiss on` and `--kiss tx on`; it is off by default.
-
-Everything else behaves as official `4.35t` plus upstream `dev`.
+1. **A DM retry no longer has the same `msg_id` as the original send** — bits 10–11 carry the retry count XORed in, so mesh relays and dedup-by-`msg_id` receivers see it as a new frame.
+2. **A DM retry no longer stops on an echo of the DM**, only on the destination's ack.
+3. Everything already listed as changing on the air in `v4.35t.09.27-neo` (the `HN` neighbourhood report, symmetric `NCNT`, duplicate-DM re-acknowledgement, `{` in DM text going out as `(`) is unchanged here.
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **Host suite**: 36 native environments, 1070/1070 test cases; `test/golden/selftest.sh` green.
-- **Build**: all 32 release environments build clean.
-- **No board has run this release image.** Nothing in today's merge (`43760732`) has been loaded onto hardware. What bench history exists belongs to earlier neo builds, not this one:
-  - A 2026-09-19 differential run against `upstream/dev` on DK5EN-1 (Heltec V3) and DK5EN-92 (T-Beam): no measurable difference on the air, +11,296 B and +15,560 B free heap respectively, and a clean 12-hour soak on three nodes afterward (see "Auf der Bank gemessen" in [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md)).
-  - A 2026-09-25 bench pass on DK5EN-1 covering KISS/TCP, `IS1`, `SN1` and the `--via` fix from that day's upstream catch-up (`docs/neo-upstream-merge-20260925.md`).
+- **Host suite:** 45 native environments, 1,384 test cases; `test/golden/selftest.sh` green.
+- **Build:** 32 release environments build clean. RAK4631 flash usage 96.1 % (783,580 of 815,104 bytes), down from 96.4 % in the previous release: the outbox removal deletes more code than the retry-id header adds.
+- **PN-XOR retry bench, 27 September, DK5EN-1 and DK5EN-98 (both Heltec V3), direct LoRa link:** both nodes have run this exact firmware since 17:25/17:32 (build `ce9bf157`; the two commits since then only add soak tooling and the `FLASH_VERSION` stamp, no source change). A 24 h soak has been running since 17:39; the interim result at ~20 minutes in was PASS on every acceptance criterion (no reboot, heap stable, every test DM acked — one in 4.6 s via the server path, one in 10.0 s via direct LoRa, neither needed a retry, zero neighbour-matrix consistency violations). Both nodes hear each other directly at a strong link, so this soak proves 24 h stability and the ack path, not multi-hop loss recovery. The final 24 h verdict is not in yet.
+- **RAK4631 and every other board in the 32 release environments** build from the same source but had no bench time on the XOR retry format this cycle.
 
 ### Built and shipped, not on our bench
 
-Every board in the 32 release environments builds from the same source and inherits the whole campaign, but none of them has bench time on this specific image — see "Known gaps" below.
+Every board other than DK5EN-1 and DK5EN-98 above.
 
 ## Known gaps, stated plainly
 
-- **No hardware has run today's merge.** Everything above the host suite and the clean build is unverified for this image.
-- **`RING_BYTES_PHONECOM` grew by roughly 1 kB RAM per board class and has not been measured on hardware.** Whether the larger BLE command ring actually stops a truncated configuration burst at the app is an inference from the ring size, not an observation.
-- **The safeboot rework is ahead of upstream.** This build carries it (K15); upstream has it only as the open [PR #1162](https://github.com/icssw-org/MeshCom-Firmware/pull/1162). Its abort bench (6/6) ran on DK5EN-1 on 25 September on fork-main, not on this image.
-- **E22_XML-DevKitC and the T-Beam family run with thin link-time headroom.** The campaign closed the worst of it (see chapter K18 in the changelog), but these environments are still the ones to watch after any further change.
-- Everything `docs/CHANGELOG-neo.md` already lists per chapter as "kein Hardware-Nachweis" or "kompilier-verifiziert" carries over unchanged — this merge did not add bench time anywhere in the tree.
+- **The final 24 h soak verdict is not in at the time of writing.** The interim report is PASS; re-run `tools/soakstatus.py` after the window closes for the final BLUF.
+- **Multi-hop loss recovery is not bench-proven (`BACKLOG` PN-01).** DK5EN-1 and DK5EN-98 hear each other directly, so the retry ladder has not been exercised against a lost last hop or a marginal link. That needs a node pair with a real multi-hop or fringe-signal path.
+- **The central server's masked dedup is not shipped.** Until it is, a network with several nodes on this firmware may show a PN's retries as separate messages on server-fed paths (APRS-IS, mcmap, other gateways' server feeds).
+- **Everything `v4.35t.09.27-neo` and `v4.35t.09.26-neo` already listed as unproven carries over unchanged** — see their sections in [`release.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/release.md), and [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-neo.md) for the neo campaign's own gaps.
 
 ## Installing
 
-**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, 30 boards, board detection built in. This is the easiest path for most boards.
+**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, 30 boards, board detection built in. From this release on, only `v4.35t.09.28-neo` is offered there; older releases are removed from the flasher (their GitHub release objects stay).
 
 Otherwise, pick the asset for your board below. ESP32 boards take the `.bin` over USB or, if the node is already reachable, over WiFi with `tools/webflash.py`. The three nRF52 boards (`wiscore_rak4631`, `heltec_t114`, `t_echo`) ship both a `.uf2` — double-tap reset, copy the file to the volume that appears — and a DFU `.zip` for `adafruit-nrfutil` over serial.
 
 `FLASH_STRUCT_VERSION` is unchanged, so your settings survive.
 
-## Changelog
+## Changelogs
 
-- **[MeshCom neo Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.26-neo/docs/CHANGELOG-neo.md)** — items 124–129 are new since the last documented catch-up (2026-09-25); the rest of the document is the full code-quality campaign this branch carries.
+- [Personal-message retries — `docs/CHANGELOG-snf.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-snf.md)
+- [Neighbour matrix — `docs/CHANGELOG-meshcom5.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-meshcom5.md)
+- [Store-and-forward — `docs/CHANGELOG-snf.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-snf.md)
+- [neo code-quality campaign — `docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-neo.md)
 
 ## Upstream
 
-This branch tracks `upstream/dev` and offers its own work back as individual pull requests once it is proven here; #1157–#1161 above are already upstream. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.
+The XOR retry format is [PR #1168](https://github.com/icssw-org/MeshCom-Firmware/pull/1168), merged into upstream `dev` on 2026-09-27. The neighbour matrix and store-and-forward have not been offered upstream yet. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.
