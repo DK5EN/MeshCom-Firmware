@@ -1,5 +1,14 @@
 # RESUME — pick up here
 
+## 2026-09-27: PN XOR retry ported onto `feature-snf`
+
+Personal-message retries on both send paths now carry the XOR retry id (msg_id bits 10-11 XOR k,
+`src/pn_retry.h`, reference `dk5en-xor` `a605e9f5`). The outbox (`--dmretry 3`) follows the same
+format with 4 sends at 0/40/80/120 s; `--dmretry 9` is gone (stored 9 reads as 3). Server acks stop
+the ring slot; repeat copies are not re-uploaded or re-stored. Plan, decisions and advisor findings:
+`docs/pn-retry-snf-port-plan.md`; open items BACKLOG §3.8ba (PN-01..05). Host tests and full sweep
+green, advisor approved, nothing flashed.
+
 ## 2026-09-26 evening: release `v4.35t.09.27-neo` published (dated Sunday 27 September)
 
 Tag `v4.35t.09.27-neo` on `feature-snf` `74f72a34`: neo (`v4.35t.09.26-neo` content) plus the

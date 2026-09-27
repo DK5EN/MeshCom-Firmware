@@ -1,15 +1,15 @@
 # PN-Wiederholung (XOR, Bit 10-11) nach feature-snf portieren -- Analyse und Plan
 
-Status: **Entscheidungen getroffen 2026-09-27, Plan wartet auf Freigabe.** Quelle: `dk5en-xor` @ `a605e9f5`
+Status: **erledigt 2026-09-27** -- Bench (BACKLOG §3.8ba PN-01) offen. Quelle: `dk5en-xor` @ `a605e9f5`
 (icssw-org). Ziel: `feature-snf` @ `983b0d7b`.
 
 ## Wellenstatus
 
-| Welle | Inhalt                                                | Status |
-| ----- | ----------------------------------------------------- | ------ |
-| W0    | Header, Host-Tests, native-Env, neo-Pfadlisten        | offen  |
-| W1    | lora_functions-Port, Outbox auf XOR, Server-ACK, Doku | offen  |
-| W2    | Gate, Advisor, Commit, Kampagnen-Doku, Push           | offen  |
+| Welle | Inhalt                                                | Status                                                                                                             |
+| ----- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| W0    | Header, Host-Tests, native-Env, neo-Pfadlisten        | erledigt (`cb15229e`)                                                                                              |
+| W1    | lora_functions-Port, Outbox auf XOR, Server-ACK, Doku | erledigt, M1 behoben                                                                                               |
+| W2    | Gate, Advisor, Commit, Kampagnen-Doku, Push           | erledigt: Host-Tests 32/476/137/2, Sweep 34/35 (esp32-external-radio: Overlay fehlt, vorbestehend), Strings im ELF |
 
 ## 1. Ausgangslage
 
@@ -121,3 +121,17 @@ Schnittstelle A/C: A ruft `dmOutboxOnEcho` mit der umgebuchten Original-id (`hea
 
 Nicht Teil dieses Plans: Bench-Test auf Hardware (A -> R1 -> R2 -> B mit verlorenem letzten Hop,
 Outbox-Leiter mit `--dmretry 3`), Übertrag nach `fork-main` / `fork-neo-test`, Server-Änderung.
+
+## 6. Advisor-Befunde W1
+
+- **M1 (behoben in W1)**: Kommt das `:ackNNN`, während eine Wiederholungskopie noch READY in der
+  Warteschlange steht, überspringt `findAndStopRingSlot` sie (Absicht: doTX-Wettlauf). Die Kopie
+  geht raus, ihr Echo startete die Wartezeit neu -- bis zu drei überflüssige Kopien und am Ende
+  ein 0x03 nach 0x02. Jetzt: vor jeder fälligen Wiederholung, beim Echo und bei der Aufgabe wird
+  geprüft, ob die Original-id schon 0x02 hat; dann wird der Slot freigegeben bzw. kein 0x03
+  gemeldet. Die Lücke besteht genauso im Referenz-Branch `dk5en-xor`.
+- **L1/L2 (behoben in W1)**: `docs/commands-dm-retry.md` und `docs/CHANGELOG-snf.md` auf
+  `off|3` und XOR-ids nachgezogen.
+- Zur Kenntnis: `dmstat_echo` zählt jetzt das erste Echo je DM statt eines je Versuch; die
+  Web-rxlog-Häkchen fehlen auf den Zeilen der XOR-Kopien (nur Anzeige); ein nach dem ACK noch
+  eingereihter Outbox-Versuch geht einmal raus (vorher schon so).

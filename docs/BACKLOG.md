@@ -7368,6 +7368,26 @@ Pitfalls for whoever continues: the main radio tick is `loopAction_retransmit()`
 (`EXTERNAL_RADIO_HOST/PORT`); an ack hook behind `checkOwnTx()` defeats the outbox (T2); a
 `#if ENABLE_MSGSTORE` above the configuration include compiles a file to nothing.
 
+### 3.8ba PN XOR retry ported to `feature-snf`, outbox on the XOR format, mode 9 gone (2026-09-27)
+
+Plan, decisions E1-E3 and advisor findings: `docs/pn-retry-snf-port-plan.md`. Reference: icssw-org
+`dk5en-xor` `a605e9f5`. Both send paths now use the XOR retry ids (msg_id bits 10-11 XOR k); the
+outbox (`--dmretry 3`) sends at 0/40/80/120 s, `--dmretry 9` removed. Host tests and the full sweep
+green, nothing flashed.
+
+Open:
+
+- **PN-01** bench: A -> R1 -> R2 -> B with the last hop lost, once per send path (`--dmretry off`
+  and `3`); prove the XOR copy passes an old relay and the ack stops the ladder.
+- **PN-02** `M1` also exists on `dk5en-xor` (ack while the copy is READY -> extra copies, FAILED
+  after ACK); port the fix there before any upstream PR.
+- **PN-03** web rxlog ticks are missing on the lines of XOR-copy echoes (display only; fold with
+  `pnRetryId(id, _GW_ID, 0)` at `web_functions.cpp` rxlog if wanted).
+- **PN-04** `dmstat_echo` now counts the first echo per DM, not one per attempt -- note in the
+  counter docs if anyone reads it.
+- **PN-05** server side (`docs/pn-retry-server.md`) must ship its masked dedup before this firmware
+  goes to the field.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
