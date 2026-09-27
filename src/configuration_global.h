@@ -112,9 +112,10 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // beim Sprung 20260724 -> 20260821 passiert: dieser Commit hat esp32_flash.h
 // nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
 //
-// FLASH_VERSION 20260927 ist der Release-Stempel von v4.35t.09.27-neo
-// (Speicher-und-Weiterleiten plus Nachbarschaftsmatrix; davor 20260912,
-// v4.35t.09.12.2 und die neo-Builds bis v4.35t.09.26-neo) --
+// FLASH_VERSION 20260928 ist der Release-Stempel von v4.35t.09.28-neo
+// (PN-Wiederholung mit XOR-msg_id, --dmretry entfernt; davor 20260927 fuer
+// v4.35t.09.27-neo, 20260912 fuer v4.35t.09.12.2 und die neo-Builds bis
+// v4.35t.09.26-neo) --
 // rein informativ, loest kein clear_flash() aus.
 //
 // FLASH_STRUCT_VERSION bleibt 20260724: letzte echte Layout-Aenderung war
@@ -122,7 +123,7 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // kamen hinzu. Alles seither (auch die neuen Features wie max_hop_text) nutzt
 // auf ESP32 eigene NVS-Keys bzw. freie Bits bestehender Felder und aendert
 // das Struct-Layout nicht.
-#define FLASH_VERSION 20260927
+#define FLASH_VERSION 20260928
 #define FLASH_STRUCT_VERSION 20260724
 
 // Bestandsschutz. Diese Staende tragen dasselbe Layout wie
