@@ -42,6 +42,21 @@ tools/neo/derive.sh                       # rebuild fork-neo, run the two cheap 
 tools/neo/gate.sh /tmp/neo-gate.log       # the expensive one, ~20 min
 ```
 
+**Pin the base.** Since 2026-09-27 `fork-neo` (= `icssw-org/dk5en-neo`) stays on
+upstream `6cc8b552` until the operator decides on the next upstream sync. The
+default `BASE=upstream/dev` would pull every newer upstream commit into the
+derivation, so pass the base explicitly to both scripts:
+
+```sh
+tools/neo/derive.sh fork-neo-test fork-neo 6cc8b552
+tools/neo/gate.sh /tmp/neo-gate.log fork-neo fork-neo-test 6cc8b552
+```
+
+Every path that differs between the base and `fork-neo-test` over `src lib
+variants config platformio.ini` must be in a list, and no list may name a path
+that exists on neither side -- `git checkout` refuses such a pathspec and
+`derive.sh` aborts half-built.
+
 `derive.sh` closes with two checks that cost nothing: `strip(fork-neo-test)`
 must equal `fork-neo` over `src lib variants config platformio.ini`, and the two
 safeboot images must be identical. `gate.sh` adds the per-commit builds and the

@@ -20,10 +20,10 @@ path.
   unless you add `--cleanup-tag`. Ask the user which of the two they want
   gone before deleting anything.
 - Releases go on the current working branch's HEAD. Do not merge or switch
-  branches for a release. The working branch is `fork-main` (renamed from
-  `v4.35p_prio` on 2026-09-03; the old name survives only as
-  `archive/v4.35p_prio-20260903`). Older docs and RESUME entries that say
-  `v4.35p_prio` mean `fork-main`.
+  branches for a release. The working branch is `fork-neo-test` (primary since
+  2026-09-27; `fork-main`, `feature-snf` and `feature-neighbour-matrix` were
+  merged in and retired as `archive/<name>-20260927`). Older docs that say
+  `fork-main` or `v4.35p_prio` describe the retired pre-neo line.
 
 ## Versioning
 
