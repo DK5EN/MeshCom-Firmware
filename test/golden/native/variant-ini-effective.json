@@ -2301,10 +2301,8 @@
    "+<dm_stats.cpp>",
    "+<reack_limiter.cpp>",
    "+<dm_dedup.cpp>",
-   "+<dm_outbox.cpp>",
    "+<msgstore.cpp>",
-   "+<sto_notice.cpp>",
-   "+<dm_settings.cpp>"
+   "+<sto_notice.cpp>"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2342,7 +2340,6 @@
    "test_reack_limiter",
    "test_dm_dedup",
    "test_dm_text_escape",
-   "test_dm_outbox",
    "test_msgstore",
    "test_sto_notice"
   ],
@@ -3109,6 +3106,22 @@
    "test_decodeaprspos",
    "test_checkvia",
    "test_pos_tag_nan"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_pnretry": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_pn_retry"
   ],
   "test_framework": "unity"
  },

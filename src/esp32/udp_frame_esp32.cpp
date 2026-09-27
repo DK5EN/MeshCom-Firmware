@@ -12,7 +12,6 @@
 #include "dm_dedup.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
-#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include "sto_notice.h"      // F1/stage 4: :sto custody notice on server ingress
 #include <lora_functions.h>
 #include <time_functions.h>
@@ -336,29 +335,21 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                     uint8_t ack_status = 0x01;  // ACK
 
-                    // F2 (fable-dm-stage1-verdict-20260914.md): a destination
-                    // that answers over the server must still stop the
-                    // outbox's ladder, independent of checkOwnTx() (Finding 1
-                    // reasoning applies here too).
-                    int  iackcheck    = checkOwnTx(msg_counter);
-                    bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call, (uint16_t)(iAckId & 0x3FF));
+                    int iackcheck = checkOwnTx(msg_counter);
 
-                    if(iackcheck >= 0 || dmAckStopped)
-                    {
-                        if(iackcheck >= 0)
-                        {
-                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                    if(iackcheck >= 0)
+                      {
+                        own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
-                            // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
-                            // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
-                            int ackSlot = findAndStopRingSlot(msg_counter);
-                            if(ackSlot >= 0 && bDisplayRetx)
-                                printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
-                                          ackSlot, msg_counter);
-                        }
+                        // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
+                        // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
+                        int ackSlot = findAndStopRingSlot(msg_counter);
+                        if(ackSlot >= 0 && bDisplayRetx)
+                            printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
+                                      ackSlot, msg_counter);
+
                         // stage 4: the destination's own ack is the final word --
-                        // forget any store node(s) that were holding this DM, also
-                        // when only the outbox still knew the NNN (dmAckStopped).
+                        // forget any store node(s) that were holding this DM.
                         stoHolderClear(msg_counter);
                         ack_status = 0x02;  // 02...ACK
                       }

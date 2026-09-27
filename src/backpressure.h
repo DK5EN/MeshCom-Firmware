@@ -77,25 +77,16 @@ enum BpNack
 {
     BP_NACK_NONE        = 0,
     BP_NACK_QRT         = 1,   ///< refused before enqueue, ring sits in the QRT band
-    BP_NACK_QTA         = 2,   ///< enqueue attempted, the ring threw the frame away
-    // F8 (fable-dm-stage1-verdict-20260914.md): the stage 1 outbox (S1)
-    // refusing a DM because it has no free slot is a DIFFERENT condition
-    // than the TX ring's own QRT -- the ring may be empty. Reusing
-    // BP_NACK_QRT for it (as the S1-1 wave did) made outboxEmitRefuse()'s
-    // caller in loop_functions.cpp indistinguishable from real channel
-    // back-pressure to the bench tooling that greps the marker line; see
-    // outboxEmitRefuse() for the rest of the fix.
-    BP_NACK_OUTBOX_FULL = 3    ///< S1 outbox refused a DM outright, no free slot
+    BP_NACK_QTA         = 2    ///< enqueue attempted, the ring threw the frame away
 };
 
-/// Q-code of a nack ("QRT", "QTA", "OUTBOX"), "" for BP_NACK_NONE.
+/// Q-code of a nack ("QRT", "QTA"), "" for BP_NACK_NONE.
 inline const char *bpNackCode(BpNack n)
 {
     switch(n)
     {
         case BP_NACK_QRT:         return "QRT";
         case BP_NACK_QTA:         return "QTA";
-        case BP_NACK_OUTBOX_FULL: return "OUTBOX";
         default:                  return "";
     }
 }
@@ -110,13 +101,6 @@ inline const char *bpNackPrefix(BpNack n)
     {
         case BP_NACK_QRT:         return "QRT NOT SENT - ";
         case BP_NACK_QTA:         return "QTA NOT SENT - ";
-        // F8: a distinct wire prefix, not "QRT NOT SENT - " -- the plan's
-        // decision 3 approved the outbox refusing "the same way a QRT
-        // refusal is", but Confirmation 4 in the verdict notes the app
-        // could not tell outbox-full from channel-QRT with the reused QRT
-        // wording. This lets a client (mc-chat/MCProxy) render "outbox
-        // full" distinctly; see docs/client-integration-store-forward.md.
-        case BP_NACK_OUTBOX_FULL: return "OUTBOX FULL NOT SENT - ";
         default:                  return "";
     }
 }
@@ -197,7 +181,7 @@ inline bool bpIsOwnWording(const char *text)
     while(*text == ' ')
         text++;
 
-    static const BpNack kNackPrefixes[] = { BP_NACK_QRT, BP_NACK_QTA, BP_NACK_OUTBOX_FULL };
+    static const BpNack kNackPrefixes[] = { BP_NACK_QRT, BP_NACK_QTA };
     for(size_t i = 0; i < sizeof(kNackPrefixes) / sizeof(kNackPrefixes[0]); i++)
     {
         const char *prefix = bpNackPrefix(kNackPrefixes[i]);
@@ -205,6 +189,13 @@ inline bool bpIsOwnWording(const char *text)
         if(prefix_len > 0 && strncmp(text, prefix, prefix_len) == 0)
             return true;
     }
+
+    // The DM outbox (S1) that used to emit this prefix is gone (PN-xx), so
+    // this node never produces it any more -- but an older node still on the
+    // air can, and its wording must not be echoed back onto the mesh either.
+    static const char kOutboxFullPrefix[] = "OUTBOX FULL NOT SENT - ";
+    if(strncmp(text, kOutboxFullPrefix, sizeof(kOutboxFullPrefix) - 1) == 0)
+        return true;
 
     for(int n = BP_NOTICE_QRS; n <= BP_NOTICE_QRV; n++)
     {

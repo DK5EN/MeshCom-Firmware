@@ -13,7 +13,6 @@
 #include "dm_dedup.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
-#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -299,29 +298,21 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                     uint8_t ack_status = 0x01;  // ACK
 
-                    // F2 (fable-dm-stage1-verdict-20260914.md): a destination
-                    // that answers over the server must still stop the
-                    // outbox's ladder, independent of checkOwnTx() (Finding 1
-                    // reasoning applies here too).
-                    int  iackcheck    = checkOwnTx(msg_counter);
-                    bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call, (uint16_t)(iAckId & 0x3FF));
+                    int iackcheck = checkOwnTx(msg_counter);
 
-                    if(iackcheck >= 0 || dmAckStopped)
+                    if(iackcheck >= 0)
                     {
-                        if(iackcheck >= 0)
-                        {
-                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                        own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
-                            // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
-                            // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
-                            int ackSlot = findAndStopRingSlot(msg_counter);
-                            if(ackSlot >= 0 && bDisplayRetx)
-                                printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
-                                          ackSlot, msg_counter);
-                        }
+                        // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
+                        // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
+                        int ackSlot = findAndStopRingSlot(msg_counter);
+                        if(ackSlot >= 0 && bDisplayRetx)
+                            printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
+                                      ackSlot, msg_counter);
+
                         // stage 4: the destination's own ack is the final word --
-                        // forget any store node(s) that were holding this DM, also
-                        // when only the outbox still knew the NNN (dmAckStopped).
+                        // forget any store node(s) that were holding this DM.
                         stoHolderClear(msg_counter);
                         // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level

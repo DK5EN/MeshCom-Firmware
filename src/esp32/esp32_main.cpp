@@ -124,8 +124,6 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
-#include "dm_settings.h"
-#include "dm_outbox_api.h"
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #include "msgstore_settings.h"
@@ -838,10 +836,6 @@ void esp32setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
-
-    // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
-    dmSettingsLoad();
-    dmOutboxGlueInit();
 
 #if defined(ENABLE_MSGSTORE)
     // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
@@ -4016,7 +4010,6 @@ void esp32loop()
 #if defined(ENABLE_MSGSTORE)
         msgstoreLoop();   // S3: all mailbox work runs here, in the loop task
 #endif
-        dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
         retransmit_timer = millis();
     }
 

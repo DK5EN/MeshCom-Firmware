@@ -27,7 +27,6 @@
 #include "time_functions.h" // W4b: convertUNIXtoString() fuer --mheard
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
-#include "dm_settings.h"       // sender-side --dmretry, every board (stage 1)
 #include "msgstore_settings.h" // store node settings persistence (stage 3, owner C)
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"      // store node core -- link stub off ENABLE_MSGSTORE boards (owner A)
@@ -568,34 +567,6 @@ static void cmdArgNotNumber(const char *label, const char *arg)
     printfdeb("%s: <%s> is not a number\n", label, arg);
 }
 
-// Prints the current dm retry state, bench-parseable (raw Serial.printf,
-// like --maxhop's [MAXHOP] line -- printfdeb() strips ';' outside CSV mode).
-// Every board -- this is sender-side, not ENABLE_MSGSTORE.
-static void dmRetryPrintState(void)
-{
-    Serial.printf("[DMRETRY];%s\n", dmRetryModeName(dmRetryMode()));
-}
-
-// Applies a new dm retry mode, persists it, and -- when arming retries for
-// the first time (off -> 3 or 9) -- prints the interop warning: a receiving
-// node on older firmware shows every fresh-id retry as a new message
-// (docs/dm-stage1-plan-20260914.md sec. 1, "What the GUI must say").
-static void dmRetryApplyMode(enum DmRetryMode newMode)
-{
-    enum DmRetryMode prevMode = dmRetryMode();
-
-    dmRetrySet(newMode);
-    dmSettingsSave();
-
-    dmRetryPrintState();
-
-    if(prevMode == DM_RETRY_OFF && newMode != DM_RETRY_OFF)
-    {
-        Serial.printf("[DMRETRY];warning;receiving nodes must run this firmware or newer; "
-                       "older nodes show every retry as a new message\n");
-    }
-}
-
 void commandAction(char *umsg_text, bool ble)
 {
     // -info
@@ -1109,7 +1080,6 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("\n== LoRa / mesh ==\n--txpower 99            TX power dBm\n--txfreq 999.999        TX frequency MHz\n--txbw 999              bandwidth kHz\n--txsf 6-12             spreading factor\n--txcr 5-8              coding rate 4/x\n");
             // --maxhop: printfdeb needed here for the %i/%i substitution.
             printfdeb("--maxhop %d-%-13dtext hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
-            printfdeb("--dmretry off|3         Enhanced message transport protection (no value: show)\n");
             // "--store" alone (no value: show) is the one rung that compiles
             // on every board (command_ladder_lint.py does not know
             // ENABLE_MSGSTORE is mutually exclusive with anything, so the
@@ -4206,36 +4176,6 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    // Sender-side DM retry ladder, "Enhanced message transport protection"
-    // (docs/dm-stage1-plan-20260914.md sec. 1-2). Every board -- T13:
-    // persisted through dm_settings.cpp's own key/file, never through struct
-    // s_meshcom_settings. The argument form "dmretry " must be tested before
-    // the bare "dmretry" below: the exact-token match of the bare name also
-    // accepts "dmretry 3" (command_match.h).
-    if(commandCheck(msg_text+2, (char*)"dmretry ") == 0)
-    {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
-
-        enum DmRetryMode mode;
-        if(!dmRetryModeParse(_owner_c, &mode))
-        {
-            Serial.printf("[ERR];dmretry;%s not one of off|3\n", _owner_c);
-
-            return;
-        }
-
-        dmRetryApplyMode(mode);
-
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"dmretry") == 0)
-    {
-        dmRetryPrintState();
-
-        return;
-    }
-    else
     // Store node (mailbox) settings, stage 3 (docs/dm-stage3-wave-plan-20260914.md)
     // + stage 4 sender-visible custody notice (docs/dm-stage4-plan-20260914.md).
     // T13: persisted through msgstore_settings.cpp's own keys/file, never
@@ -6201,10 +6141,6 @@ void commandAction(char *umsg_text, bool ble)
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,
             // max_hop_pos bleibt der Compile-Default.
             printfdeb("...MAXHOP text %i / pos %i\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
-
-            // Sender-side DM retry ladder, "Enhanced message transport
-            // protection" -- every board (docs/dm-stage1-plan-20260914.md).
-            printfdeb("...DMRETRY mode=%s\n", dmRetryModeName(dmRetryMode()));
 
 #if defined(ENABLE_MSGSTORE)
             // Store node (mailbox), stage 3 + stage 4 notice --

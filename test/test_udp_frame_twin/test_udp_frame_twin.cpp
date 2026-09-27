@@ -66,7 +66,6 @@
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
 #include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
-#include <dm_outbox_api.h>   // F2 hookup under test: dmOutboxOnAck() (faked below, see there)
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 
 // ---------------------------------------------------------------------------
@@ -106,6 +105,7 @@ bool bGATEWAY = false;
 bool bDEBUG = false;
 bool bVIA = false;
 bool bKISS = false;          // KISS/TCP on (loop_functions.cpp on the board)
+bool bDisplayRetx = false;   // --setretx: the [RETX] log line on a server-ack ring stop
 int isPhoneReady = 1;
 unsigned int msg_counter = 0;
 unsigned int _GW_ID = 0x99999999;
@@ -204,21 +204,19 @@ static std::vector<ExternAckCall> g_extern_ack;
 static std::vector<uint32_t> g_own_tx_known;
 static std::vector<uint32_t> g_insert_calls;
 
-// dmOutboxOnAck() (wave3-anchors.md group B / F2): dm_outbox.cpp is not in
-// this env's build_src_filter (native_udp_frame_twin lists dm_stats/dm_dedup/
-// reack_limiter but not the outbox core -- test/test_dm_outbox covers its own
-// ladder logic), so the symbol both handlers now call is faked here, exactly
-// like checkOwnTx() above: a pure query, not recorded into g_sink_log, so it
-// cannot perturb the U1 corpus dump (test_u1_corpus_ordered_sink_dump_both_
-// platforms) or the committed twin-diff baseline.
-struct DmOutboxAckCall { std::string from; uint16_t nnn; };
-static std::vector<DmOutboxAckCall> g_dm_outbox_ack_calls;
-static bool g_dm_outbox_ack_return = false;
+// findAndStopRingSlot() (src/lora_functions.h/.cpp): a server-ack for an id
+// checkOwnTx() knows also stops the waiting TX-ring slot (PN retry, see the
+// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp). lora_functions.cpp
+// is not in this env's build_src_filter, so faked here exactly like
+// checkOwnTx() above: a pure recorder, kept out of g_sink_log so it cannot
+// perturb the U1 corpus dump or the committed twin-diff baseline. Returns -1
+// (no ring slot found) like the real function on a cold/empty ring.
+static std::vector<uint32_t> g_ring_stop_calls;
 
-bool dmOutboxOnAck(const char *from, uint16_t nnn)
+int findAndStopRingSlot(uint32_t msgId)
 {
-    g_dm_outbox_ack_calls.push_back(DmOutboxAckCall{from ? from : "", nnn});
-    return g_dm_outbox_ack_return;
+    g_ring_stop_calls.push_back(msgId);
+    return -1;
 }
 
 // sto_notice.* (wave4 port map, Group B): sto_notice.cpp is not in this
@@ -229,7 +227,7 @@ bool dmOutboxOnAck(const char *from, uint16_t nnn)
 // (src/sto_notice.cpp: "%-9.9s:sto%03u %s", `{`/`:ack`/`:rej` reject) closely
 // enough to drive the wiring under test, not to re-prove sto_notice's own
 // parser. stoHolderNote/stoHolderClear are pure call recorders like
-// dmOutboxOnAck() above, not sinks (kept out of g_sink_log for the same
+// checkOwnTx() above, not sinks (kept out of g_sink_log for the same
 // reason: they cannot perturb the U1 corpus dump or the twin-diff baseline).
 struct StoHolderNoteCall { uint32_t msg_id; std::string holder; uint16_t nnn; };
 static std::vector<StoHolderNoteCall> g_sto_holder_note_calls;
@@ -568,8 +566,7 @@ static void recorder_reset()
     g_sink_log.clear();
     g_own_tx_known.clear();
     g_insert_calls.clear();
-    g_dm_outbox_ack_calls.clear();
-    g_dm_outbox_ack_return = false;
+    g_ring_stop_calls.clear();
     g_sto_holder_note_calls.clear();
     g_sto_holder_clear_calls.clear();
     g_sto_holder_note_return = true;
@@ -598,6 +595,7 @@ static void recorder_reset()
     bDEBUG = false;
     bVIA = false;
     bKISS = false;
+    bDisplayRetx = false;
     isPhoneReady = 1;
     msg_counter = 0;
     memset(own_msg_id, 0, sizeof(own_msg_id));
@@ -1522,15 +1520,15 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
     }
 }
 
-// F2 (fable-dm-stage1-verdict-20260914.md, wave3-anchors.md group B): a DM's
-// ack arriving over the SERVER/UDP ingress must stop the stage 1 outbox's
-// retry ladder too, independent of checkOwnTx() -- the outbox is keyed on
-// (dst, NNN), never on own_msg_id[]. Red without the hook: dmOutboxOnAck()
-// is never called and ack_status stays 0x01 even though the outbox alone
-// knows the ladder stopped (own_msg_id[] is empty in every iteration below,
-// so iackcheck < 0 throughout -- the outbox's answer is the only thing that
-// can flip ack_status to 0x02 here).
-static void test_regression_server_ack_stops_outbox_ladder_on_both(void)
+// PN retry (dk5en-xor, replaces the removed stage 1 DM outbox): a DM's ack
+// arriving over the SERVER/UDP ingress must stop the waiting TX-ring slot
+// too, exactly when checkOwnTx() recognizes the acked id as one of our own --
+// findAndStopRingSlot(msg_counter) and stoHolderClear(msg_counter) at the
+// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp. This replaces
+// test_regression_server_ack_stops_outbox_ladder_on_both (the stage 1 outbox
+// it exercised is gone); the own-DM branch of the server-ack path was
+// otherwise uncovered by any twin test.
+static void test_regression_server_ack_own_dm_stops_ring_on_both(void)
 {
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
@@ -1538,37 +1536,63 @@ static void test_regression_server_ack_stops_outbox_ladder_on_both(void)
     // position > 0, same shape as the DR-09 attribution test above.
     uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack7", 0x7207);
 
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (7 & 0x3FF);
+
     for (int side = 0; side < 2; side++)
     {
         const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        // Case 1: checkOwnTx() knows this id -- own DM, the server ack must
+        // stop the waiting ring slot and clear any store holder.
         recorder_reset();
-        g_dm_outbox_ack_return = true;   // the outbox says: yes, an entry stopped
+        g_own_tx_known.push_back(expected_msg_id);
 
         uint8_t buf[BUF_CAP];
         copy_into(buf, tmpl, len);
         if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
         else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
 
-        char msg[128];
-        snprintf(msg, sizeof(msg), "%s did not call dmOutboxOnAck() for the server-ingress :ackNNN", name);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_dm_outbox_ack_calls.size(), msg);
-        snprintf(msg, sizeof(msg), "%s dmOutboxOnAck() from-callsign mismatch", name);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-9", g_dm_outbox_ack_calls[0].from.c_str(), msg);
-        snprintf(msg, sizeof(msg), "%s dmOutboxOnAck() NNN mismatch", name);
-        TEST_ASSERT_EQUAL_UINT16_MESSAGE(7, g_dm_outbox_ack_calls[0].nnn, msg);
-
-        snprintf(msg, sizeof(msg), "%s did not build an ack phone frame", name);
+        snprintf(msg, sizeof(msg), "%s did not build an ack phone frame for a known own-tx id", name);
         TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, msg);
-        snprintf(msg, sizeof(msg), "%s ack_status must be 0x02 when the outbox (not own_msg_id[]) "
-                                    "stopped the ladder", name);
+        snprintf(msg, sizeof(msg), "%s ack_status must be 0x02 for a known own-tx id", name);
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x02, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s did not mark own_msg_id[][4] ACK (0x02)", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x02, own_msg_id[0][4], msg);
 
-        // Wave 4 advisor F3: the holder row is cleared on every accepted ack,
-        // also when own_msg_id[] no longer knows the DM (checkOwnTx() == -1
-        // here) and only the outbox stopped -- else a stale holder outlives
-        // the NNN wrap.
-        snprintf(msg, sizeof(msg), "%s did not clear the store holder on an outbox-only ack", name);
+        snprintf(msg, sizeof(msg), "%s did not stop exactly one ring slot for the acked id", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ring_stop_calls.size(), msg);
+        if (g_ring_stop_calls.size() >= 1)
+        {
+            snprintf(msg, sizeof(msg), "%s findAndStopRingSlot() got the wrong msg id", name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_ring_stop_calls[0], msg);
+        }
+
+        snprintf(msg, sizeof(msg), "%s did not clear the store holder for the acked id", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sto_holder_clear_calls.size(), msg);
+        if (g_sto_holder_clear_calls.size() >= 1)
+        {
+            snprintf(msg, sizeof(msg), "%s stoHolderClear() got the wrong msg id", name);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_sto_holder_clear_calls[0], msg);
+        }
+
+        // Case 2: checkOwnTx() does not know this id -- a plain unattributed
+        // ack (same as the DR-09 test above), no ring stop, no holder clear.
+        recorder_reset();
+
+        uint8_t buf2[BUF_CAP];
+        copy_into(buf2, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf2, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf2, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s did not build an ack phone frame for an unknown own-tx id", name);
+        TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, msg);
+        snprintf(msg, sizeof(msg), "%s ack_status must stay 0x01 for an unknown own-tx id", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x01, g_ble[0][5], msg);
+        snprintf(msg, sizeof(msg), "%s stopped a ring slot for an id it never sent", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ring_stop_calls.size(), msg);
+        snprintf(msg, sizeof(msg), "%s cleared a store holder for an id it never sent", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sto_holder_clear_calls.size(), msg);
     }
 }
 
@@ -2302,7 +2326,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_decodeaprs_reject_suppresses_processing_on_both);
     RUN_TEST(test_agreement_conf_zero_address_guard_on_both);
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
-    RUN_TEST(test_regression_server_ack_stops_outbox_ladder_on_both);
+    RUN_TEST(test_regression_server_ack_own_dm_stops_ring_on_both);
     RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);

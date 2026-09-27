@@ -21,7 +21,6 @@
 #include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
 #include "track_warning.h"    // TRK-01: Warnhinweis-Text neben dem Track-Switch
-#include "dm_settings.h"      // stage 1: --dmretry select on the setup page, every board
 #include "nbr_matrix.h"        // NBR-W2: Nachbarschaftsmatrix -- Datenquelle fuer die neue Neighbours-Seite
 #include "nbr_views.h"         // W4b: MHeard/Pfad-Seiten lesen nur noch ueber die Abfrageschicht
 #include <TinyGPSPlus.h>       // DIST auf der MHeard-Seite -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
@@ -1181,8 +1180,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("#content_inner .mctab-on {background-color:var(--mclightblue);}\n");
     web_client.println(".mcbadge {font-size:x-small;font-weight:bold;margin-left:4px;}\n");
 
-    // stage 1 (docs/dm-stage1-plan-20260914.md): the setup page's --dmretry interop warning.
-    // Shared class name with the stage 3 mailbox card below.
+    // stage 3 mailbox card below: "before you switch this on" warning box.
     web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
 
     // content definitions -> mailbox page (stage 3, docs/design/mailbox-page-mockup.html).
@@ -2991,27 +2989,7 @@ void sub_page_setup()
 
     _create_setup_switch_element("nomsgall", "No MSG All", "do not show messages send to all", bNoMSGtoALL); // create Switch-Element inclucing Label and Description
 
-    // stage 1 (docs/dm-stage1-plan-20260914.md), mode 9 retired 2026-09-27
-    // (docs/pn-retry-snf-port-plan.md section 4 "E1"): --dmretry off|3, every
-    // board (not gated on ENABLE_MSGSTORE -- this is the sender-side ladder,
-    // independent of the store node). Fires straight through setvalue() on
-    // change, same as a switch element; no separate apply button.
-    {
-        static const char *s_dmretry_val[2] = {"off", "3"};
-        static const char *s_dmretry_lbl[2] = {"off", "3 retries"};
-        const char *cur_dmretry = dmRetryModeName(dmRetryMode());
-
-        web_client.println("<label for=\"dmretry\">Enhanced message transport protection</label>");
-        web_client.println("<select id=\"dmretry\" name=\"dmretry\" onchange=\"setvalue('dmretry', this.value, false)\">");
-        for (int idm = 0; idm < 2; idm++)
-        {
-            web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", s_dmretry_val[idm], (strcmp(s_dmretry_val[idm], cur_dmretry) == 0) ? "selected" : "", s_dmretry_lbl[idm]);
-        }
-        web_client.println("</select>");
-    }
-
     web_client.println("</div>");
-    web_client.println("<div class=\"mbx-warn\">Requires the receiving node to run this firmware or newer. Older nodes show every retry as a new message.</div>");
     web_client.println("</div>");
 
 #if defined(ENABLE_MSGSTORE)
@@ -3469,7 +3447,6 @@ void sub_page_info()
     web_client.printf("Debug GPS: %s<br>", (iGPSDEBUG ? "on" : "off"));
     web_client.printf("Debug WX: %s<br>", (bWXDEBUG ? "on" : "off"));
     web_client.printf("Debug BLE: %s<br>", (bBLEDEBUG ? "on" : "off"));
-    web_client.printf("DM retry: %s<br>", dmRetryModeName(dmRetryMode())); // stage 1: --dmretry state in the settings summary
     web_client.printf("</td></tr>\n");
     web_client.printf("<tr><td>APRS text</td><td>%s</td></tr>\n", meshcom_settings.node_atxt);
     web_client.printf("<tr><td>Mesh settings</td><td>");

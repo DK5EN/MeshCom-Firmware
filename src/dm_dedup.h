@@ -3,12 +3,11 @@
 //
 // Stage 2.1 of docs/dm-transport-impl-plan-20260913.md. Stage 0's dedup
 // (dedup_functions.cpp, is_new_packet()) is keyed on the 32-bit msg_id and
-// stops an unmodified relay copy of a frame. Stage 1's retry ladder (not
-// yet built) will re-send attempts 2..9 of the same DM with a FRESH
-// msg_id per attempt, keeping only the NNN (the {NNN transport sequence
-// number, 0..999) stable -- those are NEW by msg_id and, without this
-// layer, would be displayed and forwarded to the app again on every
-// attempt that gets through.
+// stops an unmodified relay copy of a frame. The TX-ring retry re-sends
+// attempts 2..4 of the same DM with a FRESH msg_id per attempt, keeping
+// only the NNN (the {NNN transport sequence number, 0..999) stable --
+// those are NEW by msg_id and, without this layer, would be displayed and
+// forwarded to the app again on every attempt that gets through.
 //
 // Why aged by time and not by count: node_msgid is one 0..999 counter
 // shared by DMs, positions, HEY, pings and ACKs, and a runaway sender can

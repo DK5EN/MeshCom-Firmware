@@ -12,7 +12,6 @@
 #include "lora_functions.h"
 #include "txring_functions.h"
 #include "command_functions.h"
-#include "dm_outbox_api.h"
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #endif
@@ -62,7 +61,6 @@ bool loopEnabled_retransmit(void)
 void loopAction_retransmit(void)
 {
     updateRetransmissionStatus();
-    dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
 #if defined(ENABLE_MSGSTORE)
     msgstoreLoop();   // S3: the main radio tick (advisor F1), not the EXTERNAL_RADIO one
 #endif
