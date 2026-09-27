@@ -15,6 +15,7 @@
 // afterwards if gen (or state) moved -- "no resurrection" of an entry a
 // hook already finished with.
 #include "dm_outbox_api.h"
+#include "pn_retry.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -57,40 +58,27 @@ static void copyCall(char *dst, size_t dstsz, const char *src)
     dst[i] = 0;
 }
 
-// Schedule, decision 2 (docs/dm-stage1-plan-20260914.md section 8 / wave
-// brief Core section): attempt k (2..max_attempts) is due at
-// first_ms + offset[k]. Block gap (STEP + BLOCK_GAP) is already baked into
-// the jump from attempt 3->4 and 6->7 below -- no separate "is this a block
-// boundary" branch is needed at call sites.
-//
-// (dm_outbox_api.h also defines DM_OUTBOX_ECHO_GATE_MS, 15 s, as an earlier
-// design's separate echo-decision deadline; the wave brief's concrete
-// offset table below supersedes it -- attempt 2 is always due at STEP
-// (40 s) and the echo_seen flag it reads by then is whatever OnEcho()
-// recorded up to that moment. The constant is left in the header, unused
-// here, rather than edited out of a contract file this wave may only add
-// to.)
+// Schedule (docs/pn-retry-snf-port-plan.md section 4 "E1"): attempt 2 is
+// due at first_ms + 40 s, attempt 3 at +80 s, attempt 4 at +120 s -- the
+// 40 s step, continued. max_attempts is always 4 now (mode 9's 9-attempt
+// offset table and its block-gap step are retired with it); the parameter
+// is kept only to clamp defensively if it is ever anything else.
 static uint32_t offsetForAttemptMs(uint8_t attempt, uint8_t max_attempts)
 {
-    static const uint32_t k3[2] = {40000UL, 80000UL};
-    static const uint32_t k9[8] = {40000UL, 80000UL, 180000UL, 220000UL,
-                                    260000UL, 360000UL, 400000UL, 440000UL};
+    static const uint32_t k[3] = {40000UL, 80000UL, 120000UL};
 
     if(attempt < 2)
         attempt = 2;
 
     uint8_t idx = (uint8_t)(attempt - 2);
+    uint8_t max_idx = (uint8_t)((max_attempts >= 2 ? max_attempts - 2 : 0));
 
-    if(max_attempts <= 3)
-    {
-        if(idx > 1)
-            idx = 1;
-        return k3[idx];
-    }
+    if(idx > max_idx)
+        idx = max_idx;
+    if(idx > 2)
+        idx = 2;
 
-    if(idx > 7)
-        idx = 7;
-    return k9[idx];
+    return k[idx];
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -118,8 +106,7 @@ int dmOutboxAdd(uint16_t nnn, const char *dst, const char *payload, size_t len,
     uint8_t max_attempts;
     switch(mode)
     {
-        case DM_RETRY_3: max_attempts = 3; break;
-        case DM_RETRY_9: max_attempts = 9; break;
+        case DM_RETRY_3: max_attempts = 4; break;   // official XOR ladder: attempt 1 + 3 XOR retries
         default:         return -1;   // DM_RETRY_OFF: the caller never enqueues here
     }
 
@@ -184,13 +171,18 @@ void dmOutboxOnEcho(uint32_t msg_id)
     if(msg_id == 0)
         return;
 
+    uint32_t core = pnRetryCore(msg_id);
+
     for(int i = 0; i < s_slots; i++)
     {
         if(s_entries[i].state != DMOB_LADDER)
             continue;
-        if(s_entries[i].first_id != msg_id && s_entries[i].last_id != msg_id)
+        if(pnRetryCore(s_entries[i].first_id) != core)
             continue;
 
+        // Informational only (docs/pn-retry-snf-port-plan.md section 4 "E1"):
+        // the echo gate is retired -- echo_seen no longer influences which
+        // id the next attempt uses, it is kept purely as information.
         s_entries[i].echo_seen = true;
         entryTouch(i);
     }
@@ -309,22 +301,13 @@ void dmOutboxLoop(void)
 
     s_blocked_episode_active = false;
 
-    // Echo gate, decision 1: only attempt 2's id choice depends on
-    // echo_seen; attempts 3.. always mint fresh.
+    // docs/pn-retry-snf-port-plan.md section 4 "E1": every retry attempt
+    // (2..max_attempts) is the official XOR variant of the ORIGINAL id --
+    // never first_id again, never a minted id. next_attempt 2 -> k=1,
+    // 3 -> k=2, 4 -> k=3 (pn_retry.h's pnRetryId/pnVariantIds convention).
     uint8_t  next_attempt = (uint8_t)(s_entries[candidate].attempt + 1);
-    bool     same_id;
-    uint32_t id;
-
-    if(next_attempt == 2 && !s_entries[candidate].echo_seen)
-    {
-        id      = s_entries[candidate].first_id;
-        same_id = true;
-    }
-    else
-    {
-        id      = (s_env->mint_id != NULL) ? s_env->mint_id() : 0;
-        same_id = false;
-    }
+    uint32_t id = s_entries[candidate].first_id ^
+                  ((uint32_t)(next_attempt - 1) << 10);
 
     // Snapshot before the callback (msgstore.cpp F4 precedent): transmit()
     // reads dst/payload/max_hop/nnn, none of which a hook ever mutates, but
@@ -343,10 +326,10 @@ void dmOutboxLoop(void)
     s_entries[candidate].last_id = id;
     s_entries[candidate].attempt = next_attempt;
 
-    if(same_id)
-        s_cnt.same_id_retries++;
-    else
-        s_cnt.fresh_attempts++;
+    // same_id_retries stays 0 (kept only for the OUTBOX setlog line's
+    // format, see dm_outbox_api.h): every retry attempt now carries its own
+    // XOR id, never first_id again.
+    s_cnt.fresh_attempts++;
 
     if(next_attempt >= s_entries[candidate].max_attempts)
     {

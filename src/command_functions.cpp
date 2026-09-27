@@ -1109,7 +1109,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("\n== LoRa / mesh ==\n--txpower 99            TX power dBm\n--txfreq 999.999        TX frequency MHz\n--txbw 999              bandwidth kHz\n--txsf 6-12             spreading factor\n--txcr 5-8              coding rate 4/x\n");
             // --maxhop: printfdeb needed here for the %i/%i substitution.
             printfdeb("--maxhop %d-%-13dtext hop limit (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
-            printfdeb("--dmretry off|3|9       Enhanced message transport protection (no value: show)\n");
+            printfdeb("--dmretry off|3         Enhanced message transport protection (no value: show)\n");
             // "--store" alone (no value: show) is the one rung that compiles
             // on every board (command_ladder_lint.py does not know
             // ENABLE_MSGSTORE is mutually exclusive with anything, so the
@@ -4211,7 +4211,7 @@ void commandAction(char *umsg_text, bool ble)
     // persisted through dm_settings.cpp's own key/file, never through struct
     // s_meshcom_settings. The argument form "dmretry " must be tested before
     // the bare "dmretry" below: the exact-token match of the bare name also
-    // accepts "dmretry 9" (command_match.h).
+    // accepts "dmretry 3" (command_match.h).
     if(commandCheck(msg_text+2, (char*)"dmretry ") == 0)
     {
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
@@ -4219,7 +4219,7 @@ void commandAction(char *umsg_text, bool ble)
         enum DmRetryMode mode;
         if(!dmRetryModeParse(_owner_c, &mode))
         {
-            Serial.printf("[ERR];dmretry;%s not one of off|3|9\n", _owner_c);
+            Serial.printf("[ERR];dmretry;%s not one of off|3\n", _owner_c);
 
             return;
         }

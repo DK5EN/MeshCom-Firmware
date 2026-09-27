@@ -51,11 +51,6 @@ static int glueBpState(void)
     return bpCurrentState();
 }
 
-static uint32_t glueMintId(void)
-{
-    return millis();
-}
-
 static void glueLog(const char *line)
 {
     if(bLORADEBUG)
@@ -63,10 +58,11 @@ static void glueLog(const char *line)
 }
 
 // Rebuilds the frame exactly as sendMessage() does for a DM (loop_functions.cpp
-// ~:4098-4139), with the ladder's own msg_id (same id for a same-id retry,
-// a fresh one otherwise -- the core decides which and passes it in) and no
-// node_msgid++/save_settings()/dmStatNoteSent(): those fire once, in
-// sendMessage(), for attempt 1 only.
+// ~:4098-4139), with the ladder's own msg_id (e->first_id for attempt 1, its
+// official XOR retry variant -- src/pn_retry.h -- for every attempt after
+// that; the core computes it and passes it in) and no node_msgid++/
+// save_settings()/dmStatNoteSent(): those fire once, in sendMessage(), for
+// attempt 1 only.
 static bool glueTransmit(const struct DmOutboxEntry *e, uint32_t msg_id)
 {
     if(e == NULL)
@@ -108,11 +104,18 @@ static bool glueTransmit(const struct DmOutboxEntry *e, uint32_t msg_id)
     if(slot < 0)
         return false;
 
-    // T2: own_msg_id[] is not the ladder's authority (the outbox keeps its
-    // own first_id/last_id), but every attempt still calls insertOwnTx() so
-    // echo recognition (dmstat_echo, the HEARD mark) and the stage 4 held
-    // mark keep working on whichever id is currently on the air.
-    insertOwnTx(msg_id);
+    // T2 (docs/pn-retry-snf-port-plan.md section 4 "E1"): attempt 1's
+    // sendMessage() already called insertOwnTx(first_id) for this DM. A
+    // retry attempt (msg_id != e->first_id, an official XOR variant --
+    // src/pn_retry.h) must NOT insertOwnTx() again: own_msg_id[] stays keyed
+    // on first_id alone, and HEARD / held (0x04) / give-up all run on that
+    // original id -- lora_functions.cpp folds the echo of an XOR copy back
+    // onto first_id before touching own_msg_id[]/checkOwnTx(), and
+    // dmOutboxOnEcho() is handed that folded-back original id too. Every
+    // attempt still goes into the dedup ring below so a relay of our own
+    // XOR copy is recognised as an echo, not a foreign duplicate.
+    if(msg_id == e->first_id)
+        insertOwnTx(msg_id);
 
     if(bGATEWAY && meshcom_settings.node_hasIPaddress)
         addLoraRxBuffer(msg_id, true);
@@ -122,14 +125,13 @@ static bool glueTransmit(const struct DmOutboxEntry *e, uint32_t msg_id)
     // F3 (fable-dm-stage1-verdict-20260914.md): deliberately NOT mirrored to
     // the server/EXTUDP here, unlike sendMessage()'s own upload for attempt
     // 1. sendMessage() uploads once per DM (loop_functions.cpp addNodeData/
-    // sendExtern); the ring's pre-stage-1 same-id retries never re-upload
-    // either -- attempt 1 already reached the server, and every attempt
-    // here (same-id retry or fresh-id) is a retry of that same DM, not a
-    // new message. Re-uploading each of up to nine attempts would hand the
-    // server, mcmap and every phone on every other gateway that many
-    // distinct-id copies of one DM (same class as the "OE1XAR-62 BBS posts
-    // were gwflood" incident) for no benefit: the stage 2.1 fold that makes
-    // fresh-id retries safe exists only on this firmware's RF ingress.
+    // sendExtern); every attempt here is an XOR retry variant of that same
+    // DM, not a new message. Re-uploading each of up to four attempts would
+    // hand the server, mcmap and every phone on every other gateway that
+    // many distinct-id copies of one DM (same class as the "OE1XAR-62 BBS
+    // posts were gwflood" incident) for no benefit: the stage 2.1 fold that
+    // makes XOR-variant retries safe exists only on this firmware's RF
+    // ingress.
     return true;
 }
 
@@ -188,7 +190,6 @@ static void glueReport(const struct DmOutboxEntry *e, uint8_t status)
 static const struct DmOutboxEnv dm_outbox_env = {
     glueNowMs,
     glueBpState,
-    glueMintId,
     glueTransmit,
     glueReport,
     glueLog

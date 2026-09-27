@@ -1,6 +1,8 @@
 // dm_settings.cpp -- sender-side DM retry ladder setting persistence.
 //
-// docs/dm-stage1-plan-20260914.md sections 1, 2, 8: `--dmretry off|3|9`.
+// docs/pn-retry-snf-port-plan.md section 4 "E1": `--dmretry off|3`. Mode 9
+// is gone; a raw stored value of 9 (old firmware) is read back as
+// DM_RETRY_3 rather than rejected -- see dm_settings.h.
 // dmRetryModeName/dmRetryModeParse/dmRetryMode/dmRetrySet are
 // platform-neutral and stay at the top of this file -- env:native's
 // build_src_filter links dm_settings.cpp for exactly those helpers
@@ -19,7 +21,6 @@ const char *dmRetryModeName(enum DmRetryMode m)
     switch(m)
     {
         case DM_RETRY_3: return "3";
-        case DM_RETRY_9: return "9";
         default:         return "off";
     }
 }
@@ -31,7 +32,6 @@ bool dmRetryModeParse(const char *text, enum DmRetryMode *out)
 
     if(strcmp(text, "off") == 0) { *out = DM_RETRY_OFF; return true; }
     if(strcmp(text, "3") == 0)   { *out = DM_RETRY_3;   return true; }
-    if(strcmp(text, "9") == 0)   { *out = DM_RETRY_9;   return true; }
 
     return false;
 }
@@ -63,11 +63,15 @@ void dmSettingsLoad(void)
     uint8_t raw = s_dm_prefs.getUChar("dm_retry", (uint8_t)DM_RETRY_OFF);
     s_dm_prefs.end();
 
-    // Absent key -> DM_RETRY_OFF (getUChar's own default above); any stored
-    // value that isn't 3 or 9 -- corrupt NVS, a future firmware's mode --
-    // also falls back to off rather than being trusted.
-    s_mode = (raw == (uint8_t)DM_RETRY_3 || raw == (uint8_t)DM_RETRY_9)
-                 ? (enum DmRetryMode)raw : DM_RETRY_OFF;
+    // Absent key -> DM_RETRY_OFF (getUChar's own default above). A stored 9
+    // is old firmware's retired mode 9 -- migrate it to DM_RETRY_3 (no
+    // rewrite here; a later dmSettingsSave() persists the migrated value).
+    // Any other value that isn't 3 -- corrupt NVS, a future firmware's mode
+    // -- falls back to off rather than being trusted.
+    if(raw == 9)
+        s_mode = DM_RETRY_3;
+    else
+        s_mode = (raw == (uint8_t)DM_RETRY_3) ? DM_RETRY_3 : DM_RETRY_OFF;
 }
 
 void dmSettingsSave(void)
@@ -124,13 +128,21 @@ void dmSettingsLoad(void)
         s_dm_file.close();
     }
 
-    if(!ok || !(rec.mode == (uint8_t)DM_RETRY_3 || rec.mode == (uint8_t)DM_RETRY_9))
+    if(!ok)
     {
         s_mode = DM_RETRY_OFF;
         return;
     }
 
-    s_mode = (enum DmRetryMode)rec.mode;
+    // A stored 9 is old firmware's retired mode 9 -- migrate it to
+    // DM_RETRY_3 (no rewrite here; a later dmSettingsSave() persists the
+    // migrated value). Any other value that isn't 3 falls back to off.
+    if(rec.mode == 9)
+        s_mode = DM_RETRY_3;
+    else if(rec.mode == (uint8_t)DM_RETRY_3)
+        s_mode = DM_RETRY_3;
+    else
+        s_mode = DM_RETRY_OFF;
 }
 
 void dmSettingsSave(void)

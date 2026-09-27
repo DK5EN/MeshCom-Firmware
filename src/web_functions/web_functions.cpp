@@ -2991,17 +2991,19 @@ void sub_page_setup()
 
     _create_setup_switch_element("nomsgall", "No MSG All", "do not show messages send to all", bNoMSGtoALL); // create Switch-Element inclucing Label and Description
 
-    // stage 1 (docs/dm-stage1-plan-20260914.md): --dmretry off|3|9, every board (not gated on
-    // ENABLE_MSGSTORE -- this is the sender-side ladder, independent of the store node). Fires
-    // straight through setvalue() on change, same as a switch element; no separate apply button.
+    // stage 1 (docs/dm-stage1-plan-20260914.md), mode 9 retired 2026-09-27
+    // (docs/pn-retry-snf-port-plan.md section 4 "E1"): --dmretry off|3, every
+    // board (not gated on ENABLE_MSGSTORE -- this is the sender-side ladder,
+    // independent of the store node). Fires straight through setvalue() on
+    // change, same as a switch element; no separate apply button.
     {
-        static const char *s_dmretry_val[3] = {"off", "3", "9"};
-        static const char *s_dmretry_lbl[3] = {"off", "3 attempts", "9 attempts"};
+        static const char *s_dmretry_val[2] = {"off", "3"};
+        static const char *s_dmretry_lbl[2] = {"off", "3 retries"};
         const char *cur_dmretry = dmRetryModeName(dmRetryMode());
 
         web_client.println("<label for=\"dmretry\">Enhanced message transport protection</label>");
         web_client.println("<select id=\"dmretry\" name=\"dmretry\" onchange=\"setvalue('dmretry', this.value, false)\">");
-        for (int idm = 0; idm < 3; idm++)
+        for (int idm = 0; idm < 2; idm++)
         {
             web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", s_dmretry_val[idm], (strcmp(s_dmretry_val[idm], cur_dmretry) == 0) ? "selected" : "", s_dmretry_lbl[idm]);
         }

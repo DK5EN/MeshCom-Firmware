@@ -14,9 +14,7 @@
 #define DM_OUTBOX_SLOTS_MAX   5     // S3 / nRF52840; classic ESP32 configures 3 at init
 #define DM_OUTBOX_PAYLOAD_MAX 160
 #define DM_OUTBOX_CALL_MAX    10
-#define DM_OUTBOX_STEP_MS     40000UL    // attempts inside a block
-#define DM_OUTBOX_BLOCK_GAP_MS 60000UL   // between blocks (on top of the step)
-#define DM_OUTBOX_ECHO_GATE_MS 15000UL   // attempt 1 must be heard relayed within this to earn fresh ids
+#define DM_OUTBOX_STEP_MS     40000UL    // spacing between attempts (the 40 s step, continued)
 
 enum DmOutboxState { DMOB_FREE = 0, DMOB_LADDER = 1, DMOB_DONE_ACK = 2, DMOB_DONE_GIVEUP = 3 };
 
@@ -32,15 +30,19 @@ struct DmOutboxEntry
     uint32_t first_ms;
     uint32_t next_ms;
     uint8_t  attempt;                              // attempts transmitted so far (1 after sendMessage)
-    uint8_t  max_attempts;                         // 3 or 9
+    uint8_t  max_attempts;                         // always 4 (mode 3; mode 9 retired)
     uint8_t  state;                                // DmOutboxState
-    bool     echo_seen;                            // attempt 1 heard relayed
+    bool     echo_seen;                            // attempt 1 heard relayed (informational only)
     bool     held;                                 // a store node said :sto (stage 4) -- informational
     uint8_t  gen;
 };
 
 struct DmOutboxCounters
 {
+    // same_id_retries: kept for the OUTBOX setlog line's format; every
+    // retry attempt now carries its own XOR id (src/pn_retry.h), never
+    // first_id again, so this always reads 0. fresh_attempts counts
+    // attempts 2..max_attempts (the XOR-variant transmissions).
     uint32_t added, refused_full, same_id_retries, fresh_attempts, acked, gaveup, blocked_bp;
 };
 
@@ -48,9 +50,9 @@ struct DmOutboxEnv
 {
     uint32_t (*now_ms)(void);
     int      (*bp_state)(void);                                       // 0 QUIET, 1 QRS, 2 QRT
-    uint32_t (*mint_id)(void);                                        // fresh msg_id (millis)
     // Enqueue one attempt into the TX ring as an ordinary slot with retransmission disabled.
-    // msg_id is either e->first_id (same-id retry) or a fresh one. Returns false if the ring refused.
+    // msg_id is e->first_id for attempt 1 or its XOR retry variant (src/pn_retry.h) for
+    // attempts 2..max_attempts. Returns false if the ring refused.
     bool     (*transmit)(const struct DmOutboxEntry *e, uint32_t msg_id);
     // Phone status frame for e->first_id: 0x02 acked, 0x03 failed (caller decides the held case).
     void     (*report)(const struct DmOutboxEntry *e, uint8_t status);
@@ -73,7 +75,7 @@ int  dmOutboxAdd(uint16_t nnn, const char *dst, const char *payload, size_t len,
 bool dmOutboxHasRoom(void);                                          // checked BEFORE sending attempt 1
 
 // Receive-path events
-void dmOutboxOnEcho(uint32_t msg_id);                                // own frame heard relayed
+void dmOutboxOnEcho(uint32_t msg_id);                                // own frame heard relayed (matched via pnRetryCore, informational only)
 bool dmOutboxOnAck(const char *from, uint16_t nnn);                  // :ackNNN from the destination; true if an entry stopped
 void dmOutboxOnHeld(uint16_t nnn);                                   // :sto seen (informational, ladder continues)
 
@@ -87,9 +89,9 @@ const struct DmOutboxCounters *dmOutboxCounters(void);
 uint32_t                       dmOutboxFirstIdForNnn(uint16_t nnn);  // 0 when unknown
 // F5 (fable-dm-stage1-verdict-20260914.md): the current attempt's id, read
 // BEFORE dmOutboxOnAck() frees the entry, so a call site can also stop a
-// still-queued fresh-id ring slot (findAndStopRingSlot(), lora_functions.cpp
-// -- the outbox's own first_id-based stop only ever covers attempts 1-2,
-// which keep first_id; attempt 3+ always carries a fresh id). 0 when unknown.
+// still-queued XOR-variant ring slot (findAndStopRingSlot(), lora_functions.cpp
+// -- the outbox's own first_id-based stop never covers attempt 2+, which
+// always carries an XOR retry id, src/pn_retry.h). 0 when unknown.
 uint32_t                       dmOutboxLastIdForNnn(uint16_t nnn);
 int                            dmOutboxFormatLine(char *buf, size_t n); // "OUTBOX ..." setlog line
 void                           dmOutboxReset(void);                  // tests
