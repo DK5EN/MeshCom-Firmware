@@ -9,6 +9,13 @@
 #include <task.h>
 #define BF_LOCK()   taskENTER_CRITICAL()
 #define BF_UNLOCK() taskEXIT_CRITICAL()
+#elif defined(BF_TEST_LOCK_HOOK)
+// Nur im Host-Test (env:native_byte_fifo): die Suite zaehlt mit, welche
+// Funktion die Sperre nimmt.
+void bf_test_lock(void);
+void bf_test_unlock(void);
+#define BF_LOCK()   bf_test_lock()
+#define BF_UNLOCK() bf_test_unlock()
 #else
 #define BF_LOCK()   ((void)0)
 #define BF_UNLOCK() ((void)0)
@@ -130,9 +137,17 @@ void bf_pop(byte_fifo_t *f)
 
 void bf_iter_begin(const byte_fifo_t *f, bf_iter_t *it)
 {
+    // Unter Sperre: sonst kann zwischen den drei Lesezugriffen eine
+    // Verdraengung liegen, und der Iterator startet mit einem pos von VOR
+    // und einem gen von NACH der Verdraengung. bf_iter_next() haelt das
+    // fuer gueltig, liest ein beliebiges Byte als Laenge und liefert Muell,
+    // bis left aufgebraucht ist (in-bounds, aber sichtbar auf der
+    // Web-Nachrichtenseite). Aus #1157 (f1c5b14f) nachgezogen.
+    BF_LOCK();
     it->pos = f->oldest;
     it->left = f->frames;
     it->gen = f->evict_gen;
+    BF_UNLOCK();
 }
 
 uint8_t bf_iter_next(byte_fifo_t *f, bf_iter_t *it, uint8_t *out, uint16_t outmax)

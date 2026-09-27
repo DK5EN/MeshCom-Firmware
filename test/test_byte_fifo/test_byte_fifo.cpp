@@ -17,11 +17,20 @@
 
 #include <byte_fifo.h>
 
+// BF_TEST_LOCK_HOOK (env:native_byte_fifo): byte_fifo.cpp ruft diese statt
+// der nRF52-Sperre. depth muss nach jedem Aufruf wieder 0 sein.
+static int lock_calls = 0;
+static int lock_depth = 0;
+void bf_test_lock(void) { lock_calls++; lock_depth++; }
+void bf_test_unlock(void) { lock_depth--; }
+
 static uint8_t store[64];
 static byte_fifo_t f = BYTE_FIFO_INIT(store);
 
 void setUp(void)
 {
+    lock_calls = 0;
+    lock_depth = 0;
     memset(store, 0xEE, sizeof(store));
     bf_reset(&f);
 }
@@ -294,6 +303,55 @@ static void test_unread_counts_frames_used_counts_bytes(void)
     TEST_ASSERT_EQUAL_UINT16(42, bf_used(&f));
 }
 
+// --- Regressionen aus #1157 (f1c5b14f) --------------------------------------
+
+// bf_iter_begin() las oldest/frames/evict_gen ungesperrt; eine Verdraengung
+// dazwischen liess die Web-Nachrichtenseite Muell rendern.
+static void test_iter_begin_reads_under_lock(void)
+{
+    uint8_t a[5];
+    fill(a, 5, 0x20);
+    bf_push(&f, a, 5);
+    lock_calls = 0;
+
+    bf_iter_t it;
+    bf_iter_begin(&f, &it);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "bf_iter_begin takes the ring lock");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "and releases it");
+}
+
+// Der BLE-Config-Burst (bis 12 Frames zu 245 Byte) geht auf einmal in den
+// Kommando-Ring. 3072 Byte halten ihn ohne Verlust; 2048 (vorher Klassik,
+// S3, RAK) verlieren Frames -- die ersten, also das I-Register.
+static int push_burst(byte_fifo_t *r)
+{
+    uint8_t b[245];
+    int lost = 0;
+    for (int i = 0; i < 12; i++)
+    {
+        fill(b, sizeof(b), (uint8_t)(i * 7));
+        lost += bf_push(r, b, sizeof(b));
+    }
+    return lost;
+}
+
+static void test_config_burst_fits_3072_not_2048(void)
+{
+    static uint8_t big[3072];
+    static uint8_t old[2048];
+    byte_fifo_t rb = BYTE_FIFO_INIT(big);
+    byte_fifo_t ro = BYTE_FIFO_INIT(old);
+
+    TEST_ASSERT_EQUAL_INT(0, push_burst(&rb));
+    TEST_ASSERT_EQUAL_UINT16(12, bf_unread(&rb));
+    uint8_t out[256];
+    TEST_ASSERT_EQUAL_UINT8(245, bf_peek(&rb, out, sizeof(out)));
+    expect_frame(out, 245, 0, "first burst frame survives");
+
+    TEST_ASSERT_TRUE_MESSAGE(push_burst(&ro) > 0, "2048 B cannot hold the worst-case burst");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -311,5 +369,7 @@ int main(int, char **)
     RUN_TEST(test_history_stops_after_eviction_mid_walk);
     RUN_TEST(test_unread_counts_frames_used_counts_bytes);
     RUN_TEST(test_reset_clears_everything);
+    RUN_TEST(test_iter_begin_reads_under_lock);
+    RUN_TEST(test_config_burst_fits_3072_not_2048);
     return UNITY_END();
 }

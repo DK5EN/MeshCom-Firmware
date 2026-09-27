@@ -540,6 +540,14 @@ static uint8_t phoneStore[RING_BYTES_PHONE];
 byte_fifo_t phoneRing = BYTE_FIFO_INIT(phoneStore);
 
 static uint8_t phoneComStore[RING_BYTES_PHONECOM];
+// Der BLE-Config-Burst nach dem Verbinden (config_cmds[] in esp32_main.cpp /
+// nrf52_main.cpp, --nodeset liefert SN und SN1) geht in EINEM
+// Schleifendurchlauf in diesen Ring und wird mit einem Frame je 300 ms
+// geleert. Passt er nicht ganz hinein, verdraengt bf_push() die ersten
+// ungelesenen Frames -- darunter das I-Register, und die App zeigt leere
+// Node-Settings. Obergrenze: 12 Frames zu je 245 Byte plus Laengenbyte.
+static_assert(RING_BYTES_PHONECOM >= 12 * (245 + 1),
+              "phoneComRing must hold the whole BLE config burst (12 x 246 B)");
 byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStore);
 
 bool hasMsgFromPhone = false;

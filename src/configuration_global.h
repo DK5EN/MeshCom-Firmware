@@ -306,7 +306,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define MAX_DEDUP_RING 60                  // dedup ring for received msg_ids (separate from TX ring)
 #define MAX_LOG 20                         // max count of messages in ringbuffer
 #define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 1536           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
 #define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256)
 #define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: E22_XML zaehlt zur klassischen Familie (64 Zeilen), docs/meshcom5-topologie 4.2
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
@@ -319,7 +319,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define MAX_DEDUP_RING 100                 // dedup ring for received msg_ids (was 60, wraparounds observed)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer (ram_opti)
 #define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
 #define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang (war 20 x 256)
 #define NBR_FAMILY_LARGE                   // MeshCom-5-Topologie: 128 Zeilen, 128-Bit-Masken, docs/meshcom5-topologie 4.2
 #elif defined(ENABLE_TBEAM)                // very smal version only for developer tests
@@ -327,7 +327,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define MAX_DEDUP_RING 10                  // dedup ring for received msg_ids (was 60)
 #define MAX_LOG 10                         // max count of messages in LOG-ringbuffer
 #define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war 10 x 260 Schlitze)
-#define RING_BYTES_PHONECOM 1024           // Byte-Ring BLE-Kommandos zum Telefon (war 10 x 246)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
 #define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang (war 10 x 256)
 #define NBR_FAMILY_DEV                     // MeshCom-5-Topologie: Entwickler-Variante, 32 Zeilen
 #else
@@ -347,7 +347,7 @@ static inline bool flashLayoutCompatible(int stored)
 // 260-Byte-Schlitze waren zu 70 % Reserve. 2048 Byte fassen rund 25 typische
 // Frames, also mehr als die 20 Schlitze vorher, bei 60 % weniger RAM.
 #define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 = 5200)
-#define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246 = 4920)
+#define RING_BYTES_PHONECOM 3072           // Byte-Ring BLE-Kommandos: muss den GANZEN Config-Burst fassen
 #define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256 = 5120)
 #define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: 64 Zeilen, 64-Bit-Masken, docs/meshcom5-topologie 4.2
 #endif
