@@ -7379,8 +7379,8 @@ Open:
 
 - **PN-01** bench: A -> R1 -> R2 -> B with the last hop lost, once per send path (`--dmretry off`
   and `3`); prove the XOR copy passes an old relay and the ack stops the ladder.
-- **PN-02** `M1` also exists on `dk5en-xor` (ack while the copy is READY -> extra copies, FAILED
-  after ACK); port the fix there before any upstream PR.
+- **PN-02** done 2026-09-27: `M1` fixed on `dk5en-xor` too (`dad520f8`), plus the nRF52 ring lock
+  in `findAndStopRingSlot` (`6a3baca1`); PR #1168 against `dev` open.
 - **PN-03** web rxlog ticks are missing on the lines of XOR-copy echoes (display only; fold with
   `pnRetryId(id, _GW_ID, 0)` at `web_functions.cpp` rxlog if wanted).
 - **PN-04** `dmstat_echo` now counts the first echo per DM, not one per attempt -- note in the
