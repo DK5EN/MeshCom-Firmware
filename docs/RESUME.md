@@ -1,5 +1,20 @@
 # RESUME — pick up here
 
+## 2026-09-27 night: branch cleanup -- `fork-neo-test` is the primary branch
+
+`feature-snf` (with fork-main's docs and `test_safeboot_state`) merged into `fork-neo-test`, tree
+= feature-snf. Two byte-ring fixes from #1157 that the neo ring never had follow in `30b63a9d`:
+`RING_BYTES_PHONECOM` 3072 in all classes (the BLE config burst, up to 12 x 246 B, evicted the
+I register at 1536/2048 B; now a `static_assert`) and `bf_iter_begin()` under `BF_LOCK`. Loud
+ping, SN1 WSPWD/ASYM and the MHeard throttle (`mh_phone.cpp`) were already ported. Gate: 1404
+host tests, 32/32 envs. `fork-neo` re-derived on the pinned base `6cc8b552` (no new upstream,
+operator decision), gate.sh 38/40 as expected, 0 symbol deviations; force-pushed to origin and
+`icssw-org/dk5en-neo` (`5f047aaa`, old tip `neo-backup-202609271956-fork-neo`). Retired and
+tagged `archive/<name>-20260927`: `fork-main`, `feature-snf`, `feature-neighbour-matrix`;
+`archive/fork-neo-test-pre-snf-20260927` marks the pre-merge state. Also deleted on origin:
+`dry-unification`, `fix-rxlog-order-1154`, `pr-safeboot-20260926`. Origin default branch is now
+`fork-neo-test`. Not bench-tested: the ring fixes.
+
 ## 2026-09-27 evening: release `v4.35t.09.28-neo` published (dated Monday 28 September)
 
 Tag `v4.35t.09.28-neo` on `feature-snf`: PN retries in the XOR format (ring path only, `--dmretry` and
