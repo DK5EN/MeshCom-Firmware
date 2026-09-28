@@ -39,20 +39,21 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
   <p class="lead">Drei Seiten, alle aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und einen
-  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.35t.09.28-neo mit Nachbarschaftsmatrix, Speichern-und-Weiterleiten und der Wiederholung persönlicher Nachrichten per XOR-Kennung.</p>
+  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.35u.09.28-neo mit Nachbarschaftsmatrix, Speichern-und-Weiterleiten und der Wiederholung persönlicher Nachrichten per XOR-Kennung.</p>
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.35t.09.28-neo</div>
-      <h2>Persönliche Nachrichten wiederholen sich jetzt selbst</h2>
-      <p>Kommt eine persönliche Nachricht (Direktnachricht) nicht an, schickt der Knoten sie bis zu dreimal
-      erneut, im Abstand von 40 Sekunden — mit einer leicht geänderten Kennung, damit auch alte Relais sie
-      durchlassen. Nur die Quittung des Empfängers stoppt die Wiederholung, ein bloßes Echo unterwegs nicht
-      mehr. Ältere Knoten können dieselbe Nachricht deshalb bis zu viermal anzeigen. <code>--dmretry</code>
-      ist entfallen, die Wiederholung gilt für jede Direktnachricht. Upstream als
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a> am 27.09.2026 von OE1KBC
-      nach <code>dev</code> gemergt; vor dem breiten Einsatz muss der Server seine Entdopplung umstellen.</p>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35t.09.28-neo">Release v4.35t.09.28-neo</a> · <a href="flash/">Web-Flasher</a> · <a href="meshcom-protocol.html">Protokoll-Folie</a></div>
+      <div class="eyebrow">Neu · Release v4.35u.09.28-neo</div>
+      <h2>Auf 4.35u nachgezogen, und der Haken kommt jetzt an</h2>
+      <p>Upstream hat am 27.09. das offizielle 4.35u veröffentlicht; dieser Stand trägt dessen Code
+      vollständig, ohne upstream zu mergen: den BLE-Timeout von 4 Sekunden (#1171), das RX-Log mit der
+      ältesten Zeile oben (#1169), <code>--setcall</code> ohne unnötigen Neustart (#1165) und die
+      Netzkonsole im Ethernet-Betrieb (#1166). Dazu vier eigene Korrekturen: Quittiert ein Relais oder
+      Gateway eine wiederholte persönliche Nachricht, kommt der Haken jetzt in der App an und die
+      Wiederholung hört auf — offiziell 4.35u hat diesen Fehler noch, angeboten als
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">PR #1176</a>. Und nach dem
+      Verbinden kommen alle Einstellungen in der App an, auch auf den Boards mit kleinem Kommandoring.</p>
+      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35u.09.28-neo">Release v4.35u.09.28-neo</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
@@ -70,29 +71,29 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
       <div class="meta">Firmware 4.35s · PR #1115</div>
     </a>
     <a class="card" href="pr-history.html">
-      <div class="eyebrow">Historie · 46 gemergte Pull Requests</div>
+      <div class="eyebrow">Historie · 46 gemergte Pull Requests, einer offen</div>
       <h2>Fünf Runden nach upstream, dazu neo und der 27./28.09.</h2>
       <p>Alle Beiträge dieses Forks an die offizielle Firmware seit 4.35m: Empfangslöcher im Februar, CAD im
       März, Härtung und Ausbau im Sommer, Feldfixes gegen 4.35t, zuletzt RAM-Arbeit, Safeboot-OTA und die
       PN-Wiederholung (#1168). Dazu neo, Nachbarschaftsmatrix, Speichern-und-Weiterleiten und die
-      XOR-Wiederholung. Mit Zeilenbilanz je PR und je Runde — keiner davon noch offen.</p>
-      <div class="meta">22.02. – 27.09.2026 · GitHub-API</div>
+      XOR-Wiederholung, zuletzt der Stand 4.35u. Mit Zeilenbilanz je PR und je Runde; offen ist #1176.</p>
+      <div class="meta">22.02. – 28.09.2026 · GitHub-API</div>
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
       <h2>Web-Flasher: neo direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.35t.09.28-neo mit Nachbarschaftsmatrix,
+      <p>Das aktuelle Release per USB auf den Knoten – v4.35u.09.28-neo mit Nachbarschaftsmatrix,
       Speichern-und-Weiterleiten und PN-Wiederholung per XOR-Kennung – ohne Installation und ohne esptool:
       Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
       am Knoten erkannt. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
       und Opera auf dem Desktop.</p>
-      <div class="meta">v4.35t.09.28-neo · Web Serial</div>
+      <div class="meta">v4.35u.09.28-neo · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35t.09.28-neo">v4.35t.09.28-neo</a> (28.09.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35u.09.28-neo">v4.35u.09.28-neo</a> (28.09.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>

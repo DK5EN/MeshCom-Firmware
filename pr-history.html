@@ -42,15 +42,15 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 <div class="wrap">
 <p class="small" style="margin:0 0 .6rem"><a href="./">← Übersicht</a></p>
 <div class="eyebrow">icssw-org/MeshCom-Firmware · Pull Requests von DK5EN</div>
-<h1>Fünf Runden nach upstream: von 4.35m bis 4.35t.09.26</h1>
-<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in fünf Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt. Am Ende steht, was noch kein PR ist: <b>neo</b>, der Zweig <code>fork-neo-test</code>, und darauf der Sonntagsstand vom 27.09. mit Nachbarschaftsmatrix und Speichern-und-Weiterleiten, sowie der 28.09. mit der Wiederholung persönlicher Nachrichten per XOR-Kennung.</p>
+<h1>Fünf Runden nach upstream: von 4.35m bis 4.35u</h1>
+<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in fünf Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt. Am Ende steht, was noch kein PR ist: <b>neo</b>, der Zweig <code>fork-neo-test</code>, und darauf der Sonntagsstand vom 27.09. mit Nachbarschaftsmatrix und Speichern-und-Weiterleiten, sowie der 28.09. mit der Wiederholung persönlicher Nachrichten per XOR-Kennung und, am selben Tag, dem Nachzug auf 4.35u.</p>
 <div class="stats">
 <div class="stat"><div class="k">Gemergte PRs</div><div class="v">46</div></div>
 <div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+34.760</span> <span class="minus">−7.720</span></div></div>
 <div class="stat"><div class="k">Dateiänderungen</div><div class="v">426</div></div>
 <div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 27.09.2026</div></div>
 </div>
-<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.) → <b>4.35t</b> (10.09., fortgeführt bis 13.09.) → <b>4.35t.09.20</b> (20.09.) → <b>4.35t.09.24</b> (24.09., #1153) → <code>upstream/dev</code> <b>6cc8b552</b> (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159–#1161 OE1KBC Repeat-Bit-Vorarbeiten — die letzten vier nicht von uns) → <b>4.35t.09.26</b> (26.09., dieser Fork-Stand). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
+<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.) → <b>4.35t</b> (10.09., fortgeführt bis 13.09.) → <b>4.35t.09.20</b> (20.09.) → <b>4.35t.09.24</b> (24.09., #1153) → <code>upstream/dev</code> <b>6cc8b552</b> (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159–#1161 OE1KBC Repeat-Bit-Vorarbeiten — die letzten vier nicht von uns) → <b>4.35t.09.26</b> (26.09., dieser Fork-Stand) → <b>4.35u</b> (27.09., <code>61a58daa</code>: 6cc8b552 plus #1162 und #1165–#1172, darin unsere #1162, #1168 und #1169). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
 <section>
 <div class="eyebrow">Februar 2026 · 4.35m → 4.35n</div>
 <h2>Empfangslöcher und Wiederholungen</h2>
@@ -132,7 +132,7 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 </section>
 
 <section>
-<div class="eyebrow">September 2026 · upstream dev nach 4.35t.09.24</div>
+<div class="eyebrow">September 2026 · 4.35t.09.24 → 4.35u</div>
 <h2>Vier PRs bringen RAM-Arbeit, Safeboot-OTA und PN-Wiederholung zurück in den Hauptzweig</h2>
 <p class="lead">Vier eigenständige Themen, alle direkt auf <code>dev</code>, keines mehr im Tag 4.35t.09.24. #1157 bringt die ESP32-Stack-Überlauf-Behebung bei Extern-UDP (der Loop-Task-Stack reichte nicht für die Eingangskette), macht <code>--mesh off</code> auch auf Via-Pfaden wirksam, und trägt die Byte-Ring-Umstellung der drei Ausgangsringe aus der neo-RAM-Kampagne über <code>fork-main</code> als eigenständigen PR upstream nach; gemerged 25.09. #1162 baut das Safeboot-OTA neu: die Update-Sitzung als Zustandsautomat, eine Statusseite, ein Auto-AP, wenn kein WLAN gefunden wird, und nur noch ein App-Slot statt eines Rückfalls, der auf einer einzigen Partition ohnehin nie funktionieren konnte; gemerged 26.09. #1168 ist die serverseitig zuerst nötige PN-Wiederholung per XOR-Kennung — Details weiter unten unter v4.35t.09.28-neo; gemerged 27.09. #1169 behebt, dass das Web-RX-Log die älteste Zeile zuletzt statt zuerst zeigt; gemerged 27.09.</p>
 <div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">4</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+9.535</span> <span class="minus">−1.716</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">52</div></div></div>
@@ -265,8 +265,35 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 </section>
 
 <section>
+<div class="eyebrow">28. September 2026 · Release v4.35u.09.28-neo</div>
+<h2>Nachzug auf 4.35u, und der Haken für wiederholte PNs kommt an</h2>
+<p class="lead">Upstream hat am 27.09. abends das offizielle <b>4.35u</b> veröffentlicht. <b>v4.35u.09.28-neo</b> trägt den Code aller darin enthaltenen PRs, ohne <code>upstream/dev</code> zu mergen: die Basis bleibt <code>6cc8b552</code>, die noch fehlenden PRs sind einzeln portiert und an den neo-Baum angepasst. Gebaut vom Zweig <a href="https://github.com/DK5EN/MeshCom-Firmware/tree/fork-neo-test"><code>fork-neo-test</code></a>, der seit dem Aufräumen der Zweige am 27.09. der einzige Entwicklungszweig ist. <code>FLASH_VERSION</code> bleibt 20260928, die Einstellungen bleiben beim Update erhalten; nur der Buchstabe im Versionsfeld unterscheidet diesen Stand von v4.35t.09.28-neo.</p>
+<div class="stats"><div class="stat"><div class="k">Board-Code: Dateien</div><div class="v">13</div></div><div class="stat"><div class="k">Board-Code: Zeilen</div><div class="v"><span class="plus">+202</span> <span class="minus">−21</span></div></div><div class="stat"><div class="k">Upstream-PR</div><div class="v">#1176 offen</div></div><div class="stat"><div class="k">Basis</div><div class="v">v4.35t.09.28-neo</div></div></div>
+
+<h3>Aus 4.35u portiert</h3>
+<p class="lead">Vier upstream-PRs fehlten dem Fork-Stand noch. #1162, #1168 und #1169 sind unsere eigenen; die ersten beiden waren schon im Fork, #1169 kommt jetzt dazu. #1164 (Einstellungen dort speichern, wo sie sich ändern) ist upstream noch offen und bleibt draußen.</p>
+<div class="tocwrap"><table><thead><tr><th>Commit</th><th>Datum</th><th>Inhalt</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/8bc3456c05a04f7ba45f108e0b9fb608c97dc418">8bc3456c</a></td><td>2026-09-27</td><td>#1171 (OE1KFR): BLE-Supervision-Timeout 4&nbsp;s statt 1,8&nbsp;s, <code>[BLE ]</code>-Verbindungsdiagnose</td><td class="num"><span class="plus">+69</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/25b34556a80cf463030372d227f580e8956cd7eb">25b34556</a></td><td>2026-09-27</td><td>#1169: RX-Log älteste Zeile zuerst, angepasst an den erst bei Bedarf angelegten Puffer</td><td class="num"><span class="plus">+7</span> <span class="minus">−3</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/6acf988e440c98eef07488e7a6d01bca04d6eeba">6acf988e</a></td><td>2026-09-27</td><td>#1165 (makrohard): <code>--setcall</code> mit dem gesetzten Rufzeichen schreibt nicht und startet nicht neu</td><td class="num"><span class="plus">+12</span> <span class="minus">−4</span></td><td class="num">3</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/a03b88fc32a90ec9ec598915a42cbc5cb2983717">a03b88fc</a></td><td>2026-09-27</td><td>#1166 (makrohard): Netzkonsole auch im Ethernet-Betrieb</td><td class="num"><span class="plus">+13</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/4870e7f53bdbe2da4cc72d18d4009facaa8f155e">4870e7f5</a></td><td>2026-09-27</td><td>#1166: <code>DISABLE_BATTERY</code>, im neo-Scheduler <code>loopAction_battCheck()</code></td><td class="num"><span class="plus">+12</span> <span class="minus">−2</span></td><td class="num">2</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/0925f685b4d50487a8a743f3d31657deea4eb37d">0925f685</a></td><td>2026-09-27</td><td>#1166: <code>DISABLE_BLE</code> für Boards ohne nutzbaren BLE-Controller</td><td class="num"><span class="plus">+9</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+</tbody></table></div>
+
+<h3>Eigene Korrekturen</h3>
+<p class="lead">Seit #1168 trägt jede Wiederholung einer PN eine eigene msg_id (Bit 10–11 gekippt). Die Tabelle der eigenen Sendungen kennt aber nur die Original-id: Quittierte ein Relais oder Gateway eine Wiederholung, fand der Knoten nichts, schickte der App keinen Haken, wiederholte weiter und sendete die Quittung sogar als fremde weiter. Offiziell 4.35u hat diesen Fehler noch; die Korrektur ist als <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">PR #1176</a> angeboten (+64 −2, 5 Dateien). Dazu zwei Befunde aus dem Aufräumen der Zweige, die upstream schon mit #1157 hatte, der neo-Byte-Ring aber nie.</p>
+<div class="tocwrap"><table><thead><tr><th>Commit</th><th>Datum</th><th>Inhalt</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/30b63a9d7f16cf8d3b0eca568f7d11da568671e1">30b63a9d</a></td><td>2026-09-27</td><td>Kommandoring fasst den ganzen Konfigurations-Burst (3.072&nbsp;Byte), Verlaufs-Iterator unter der Sperre — aus #1157 nachgezogen</td><td class="num"><span class="plus">+88</span> <span class="minus">−4</span></td><td class="num">5</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/8b3d70bafea486c9214c3ff690ff21b82ee94f9c">8b3d70ba</a></td><td>2026-09-27</td><td>Relais-/Gateway-Quittung für eine PN-Wiederholung: Haken in der App, Wiederholung stoppt</td><td class="num"><span class="plus">+54</span></td><td class="num">3</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/949dba25338dd60139bd7c340319bde0b263bc94">949dba25</a></td><td>2026-09-27</td><td>Gateway sendet die eigene Wiederholung nach einem Server-Echo nicht erneut</td><td class="num"><span class="plus">+47</span> <span class="minus">−2</span></td><td class="num">3</td></tr>
+</tbody></table></div>
+<p class="small">Die Kopfzahl ist der Nettovergleich des Board-Codes gegen v4.35t.09.28-neo (<code>git diff --shortstat</code> über <code>src lib variants config platformio.ini</code>), inklusive Versionsbuchstabe. Die Zeilen je Commit zählen auch Tests und summieren sich nicht zur Kopfzahl. Nichts davon lief bisher auf Hardware.</p>
+</section>
+
+<section>
 <div class="eyebrow">Quelle</div>
-<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 27.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst. Die neo-Zahlen zählen nur den Code, der auf das Board kommt: <code>git diff --shortstat 6cc8b552 fork-neo-test -- src lib variants config platformio.ini</code> (6cc8b552 ist upstream/dev vom 26.09.2026, Tag 4.35t.09.24 plus #1157–#1161); Tests, Werkzeuge und Dokumentation des Zweigs sind darin nicht enthalten. Heap- und Flash-Werte aus dem Changelog, Abschnitt „Auf der Bank gemessen“.</p>
+<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 28.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst. Die neo-Zahlen zählen nur den Code, der auf das Board kommt: <code>git diff --shortstat 6cc8b552 fork-neo-test -- src lib variants config platformio.ini</code> (6cc8b552 ist upstream/dev vom 26.09.2026, Tag 4.35t.09.24 plus #1157–#1161); Tests, Werkzeuge und Dokumentation des Zweigs sind darin nicht enthalten. Heap- und Flash-Werte aus dem Changelog, Abschnitt „Auf der Bank gemessen“.</p>
 </section>
 </div>
 </body>
