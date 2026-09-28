@@ -6,12 +6,12 @@ Campaign doc and resume point. Branch `fork-neo-test`, base `af33af8b`
 
 ## Status
 
-| Wave | Content                                                       | State                |
-| ---- | ------------------------------------------------------------- | -------------------- |
-| S    | Scouting: lifetimes, task contexts, Bluefruit copy semantics  | done                 |
-| 1    | Staging rewrite + shared scratch + regression test            | done                 |
-| G    | Gate: native tests, RAK + T-Echo build, symbol check, advisor | done                 |
-| H    | Bench: flash RAK-90, BLE settings read/write-back, msgid kept | open: RAK not on USB |
+| Wave | Content                                                       | State                                              |
+| ---- | ------------------------------------------------------------- | -------------------------------------------------- |
+| S    | Scouting: lifetimes, task contexts, Bluefruit copy semantics  | done                                               |
+| 1    | Staging rewrite + shared scratch + regression test            | done                                               |
+| G    | Gate: native tests, RAK + T-Echo build, symbol check, advisor | done                                               |
+| H    | Bench: flash RAK-90, BLE settings read/write-back, msgid kept | done: characteristic does not exist, see finding 5 |
 
 ## Measured starting point (wiscore_rak4631, `nm -S`)
 
@@ -52,6 +52,22 @@ size twice: once in RAM, once as the initialiser image in flash.
 4. `applyPendingBleSettings()` (nrf52_main.cpp:1726), `init_flash()` and
    `flash_reset()` all run in the Arduino loop task and never nest, so one
    v1-sized scratch can serve the read direction and the legacy blob.
+
+5. **Bench 2026-09-28: the settings characteristic never exists on nRF52.**
+   RAK-90 on `dbc57632` exposes service 0xF0A0 with no characteristic. The
+   characteristic asks for a fixed length of `sizeof(s_ble_settings_v1) + 1`
+   = 2001 bytes; S140 allows at most `BLE_GATTS_FIX_ATTR_LEN_MAX` = 510, so
+   `sd_ble_gatts_characteristic_add` fails in `BLECharacteristic::begin()`.
+   This dates back to the original upstream BLE commit. Consequences: the
+   `node_msgid` reset of finding 1 was never reachable in the field,
+   `settings_rx_callback()` never runs, and the initial `write()` and the
+   write-back go to an invalid handle. The phone app uses the Nordic UART
+   service, which works (one `ble_cycle.py` cycle: connected, 17
+   notifications, clean disconnect; `--msgid` 707 -> 708 from own traffic).
+   Open operator decision: remove the dead characteristic (frees the 2 kB
+   staging image and the apply code, the scratch stays for the legacy blob) or
+   fix it (variable length up to 512 does not fit 2000 bytes either, so it
+   would need a chunked protocol).
 
 ## Design
 
