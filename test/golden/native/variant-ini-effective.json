@@ -2293,6 +2293,7 @@
    "+<settings_sanitize.cpp>",
    "+<ntp_async.cpp>",
    "+<charset_filter.cpp>",
+   "+<url_decode.cpp>",
    "+<setlog_lines.cpp>",
    "+<gps_filter.cpp>",
    "+<alt_fusion.cpp>",
@@ -2322,6 +2323,7 @@
    "test_ntp_async",
    "test_ntp_harvest",
    "test_charset_filter",
+   "test_url_decode",
    "test_beacon_rate",
    "test_maxhop",
    "test_backpressure",
@@ -2409,7 +2411,8 @@
   "test_build_src": "True",
   "test_filter": [
    "test_aprs_fuzz",
-   "test_aprs_reencode"
+   "test_aprs_reencode",
+   "test_lora_aprs_encode"
   ],
   "test_framework": "unity"
  },
@@ -2488,6 +2491,7 @@
    "-std=gnu++17",
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
+   "-D BF_TEST_LOCK_HOOK=1",
    "-I src",
    "-Wall",
    "-Wextra"
@@ -3122,6 +3126,23 @@
   "test_build_src": "False",
   "test_filter": [
    "test_pn_retry"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_safeboot": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "lib_ldf_mode": "chain+",
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_safeboot_state"
   ],
   "test_framework": "unity"
  },

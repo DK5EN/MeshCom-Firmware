@@ -79,8 +79,8 @@ Rules:
   Web Tools writes it as-is, unlike the esptool CLI which patches the header. The per-env
   `bootloader.bin` and `partitions.bin` from `.pio/build/<env>/` are the only correct sources.
   This also fixes the 16 MB partition-table gap for T-Deck by construction.
-- Keep the current release plus the previous two. The release step prunes older folders.
-  Three releases cost about 150 MB against the 1 GB Pages limit.
+- Keep only the current release (operator decision 2026-09-28: nobody should pick an old one).
+  `--keep` defaults to 1 and the release step prunes every older folder.
 - `.nojekyll` stays. Jekyll would otherwise skip nothing here, but it also must not rewrite
   anything.
 
@@ -160,7 +160,7 @@ The page fetches this once and resolves `flash/<version>/<board>/manifest.json` 
 One script, run from the firmware checkout after step 5 of the release skill:
 
 ```
-uv run tools/pages_flasher.py publish --version v4.35t.09.13 --keep 3 [--base-url .]
+uv run tools/pages_flasher.py publish --version v4.35t.09.13 [--keep 1] [--base-url .]
 ```
 
 Steps it performs:
@@ -238,7 +238,7 @@ T-Deck reboots on port open.
 | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | Bootloader header mismatch bricks boot on one board | Per-env bootloader from the build tree, bench flash on all three chip cases |
 | A user flashes the wrong board                      | Display names with photos later; first version shows the env name and chip  |
-| `gh-pages` grows without bound                      | `--keep 3` prune in the publish step, size printed on every run             |
+| `gh-pages` grows without bound                      | `--keep 1` prune in the publish step, size printed on every run             |
 | Pages bandwidth                                     | Math in section 3; revisit if the monthly Pages traffic warning appears     |
 | ESP Web Tools bundle update changes behaviour       | Vendored, version pinned in a `VERSION` file, updated deliberately          |
 | User on Safari or a phone                           | Detect `navigator.serial`, show the download fallback and browser note      |
@@ -250,7 +250,7 @@ T-Deck reboots on port open.
   new build in `--info`.
 - Safeboot status page on each shows the safeboot version shipped with the release.
 - `pages_flasher.py check` passes against the live site.
-- `gh-pages` holds exactly three release folders after two consecutive publishes with `--keep 3`.
+- `gh-pages` holds exactly one release folder after two consecutive publishes with the default `--keep 1`.
 - RAK4631 entry offers the `.uf2` download and shows the UF2 instructions.
 - Release skill documents step 5b, and a dry run of the skill text reaches the flasher step
   without manual detours.

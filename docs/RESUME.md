@@ -37,7 +37,11 @@ offered upstream as [PR #1177](https://github.com/icssw-org/MeshCom-Firmware/pul
 only (this fork's native test suite isn't carried upstream).
 
 Re-flashed the fix to DK5EN-90 and repeated the same send: `TX_FRAME` capture now carries the ZWJ
-intact, console line renders one composed glyph. Tag `v4.35u.09.28.2-neo` on `fork-neo-test`
+intact, console line renders one composed glyph. The same OTA round also reflashed DK5EN-1 and
+DK5EN-98, which had been running the 24 h XOR-retry soak since 2026-09-27 17:39
+(`docs/soak-xor-20260927.md`); this ended that soak early, at 14:33, with the user's explicit
+go-ahead -- actual data window 2026-09-27 17:39 -> 2026-09-28 14:33 (~21 h) instead of the planned
+full 24 h. Tag `v4.35u.09.28.2-neo` on `fork-neo-test`
 `16839a8d` (includes a refreshed `safeboot.bin`/`safeboot-s3.bin` — ESP32 builds aren't byte-
 reproducible, so the tracked bins needed a re-commit before tagging). GitHub release with 39
 assets, marked Latest; `v4.35u.09.28-neo` stays as a release but is out of the flasher. gh-pages
@@ -61,7 +65,9 @@ envs / 1,408 cases (1 skipped), 32 release envs, RAK4631 flash 96.1 %. `FLASH_VE
 20260928 -- the letter is the only difference to `v4.35t.09.28-neo`. Rebuilt safeboot bins were
 header-only noise (build time/hash, bytes 177-240) and not committed. `fork-neo` / `dk5en-neo`
 re-derived (`a7c66251`, only the version letter vs `17c9b936`; gate.sh not re-run). Open: nothing of
-this build on hardware; XOR soak ends today 17:39 (runs `ce9bf157`); PR #1176 waits for Kurt.
+this build on hardware; XOR soak (runs `ce9bf157`) was planned to end today 17:39 but ended early at
+14:33 via an operator-approved OTA to `v4.35u.09.28.2-neo` (see that release's entry above); PR
+#1176 waits for Kurt.
 
 ## 2026-09-27 late: upstream PRs #1165/#1166/#1169/#1171 ported, two PN-retry fixes
 
@@ -99,8 +105,10 @@ release but is **no longer in the web flasher** (operator decision: offer only t
 PR history now 46 merged -- #1162, #1168, #1169). Upstream PR #1168 was merged by OE1KBC at 17:17.
 Gate: selftest green, 45 native envs / 1384 cases, 32 release envs, RAK4631 flash 96.1 %.
 `FLASH_VERSION 20260928`. DK5EN-1 and DK5EN-98 run the code-identical build from `ce9bf157` in the
-24 h soak (`docs/soak-xor-20260927.md`, until 2026-09-28 17:39, interim PASS). Open: final soak
-verdict, multi-hop bench PN-01, server dedup PN-05. `tools/pages-sync.sh` keeps `flash/` since the follow-up fix (KEEP list, `--self-test`); before
+24 h soak (`docs/soak-xor-20260927.md`, planned until 2026-09-28 17:39, interim PASS). It ended
+early instead, at 2026-09-28 14:33, via an operator-approved OTA to `v4.35u.09.28.2-neo` (actual
+window 2026-09-27 17:39 -> 09-28 14:33, ~21 h; see that release's RESUME entry above). Open: final
+soak verdict for that ~21 h window, multi-hop bench PN-01, server dedup PN-05. `tools/pages-sync.sh` keeps `flash/` since the follow-up fix (KEEP list, `--self-test`); before
 that its full mirror would have deleted the flasher.
 
 ## 2026-09-27: PN XOR retry ported onto `feature-snf`, then the outbox removed

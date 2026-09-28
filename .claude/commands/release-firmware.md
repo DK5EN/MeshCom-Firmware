@@ -56,7 +56,10 @@ path.
   `FLASH_STRUCT_VERSION` moves ONLY on a real settings-layout change — it
   wipes fleet configs, never touch it casually.
 
-## Step 1 — Release documents (three files, distinct jobs)
+## Step 1 — Release documents
+
+Two files are updated for every release; a topic changelog only when the
+content fits one:
 
 - `release-notes.md` (repo root, **English**) — the GitHub release body and
   nothing else; only the current release. Keep the structure: `[!IMPORTANT]`
@@ -69,34 +72,58 @@ path.
   for em dashes) — running journal. New section at the TOP, below the header
   that names FLASH_VERSION. Must end with "Was fuer dieses Release auf
   Hardware geprueft wurde" and "Was ausdruecklich NICHT geprueft wurde".
-- `docs/CHANGELOG-stability.md` (**English**) — one continuously numbered
-  list. New `## New in <tag>` section ABOVE the previous one; numbering
-  continues from the last item (08.31.2 ended at 156).
+- Topic changelog, only if the release's content fits one
+  (`docs/CHANGELOG-snf.md`, `docs/CHANGELOG-neo.md`,
+  `docs/CHANGELOG-meshcom5.md`) — update it and list it under
+  release-notes.md's "Changelogs" section. `docs/CHANGELOG-neo.md` is
+  **German, no umlauts**, one `## <tag>: <Titel>` heading per release, newest
+  first. `docs/CHANGELOG-stability.md` is retired for the neo line (stale
+  since 2026-09-12.2, per its own header) — do not append to it; on the rare
+  release that still needs it, continue numbering from its actual current
+  highest item, checked fresh (`grep -oE '^[0-9]+\.' docs/CHANGELOG-stability.md
+  | sort -n | tail -1` — 221 as of 2026-09-28), never a number remembered from
+  an earlier release. A release that fits no topic changelog updates neither
+  it nor `docs/CHANGELOG-stability.md` — `release-notes.md` and `release.md`
+  alone are enough.
 
-Then: `npx --yes prettier@3 --write release-notes.md release.md docs/CHANGELOG-stability.md`
-(a `.prettierignore` already protects binaries).
+Before writing "what changed", check completeness, not just plausibility:
+
+```
+git log --oneline <prev-tag>..HEAD -- src variants platformio.ini
+```
+
+Every commit this lists must show up in release-notes.md, even folded into
+one bullet — a scope claim not checked against the actual range is not
+trustworthy (the 09.28.2 release notes said "a single fix" but the tag also
+shipped `dbc57632`).
+
+Then: `npx --yes prettier@3 --write release-notes.md release.md` (add the
+topic changelog too if you touched it). A `.prettierignore` already protects
+binaries.
 
 ## Step 2 — Gates (all must be green before tagging)
 
-Full native suite, 12 host envs (baseline 591 cases as of 09.05 — the
-count in release-notes.md must match reality):
+Gate = every `[env:native*]` env in `platformio.ini`, enumerated at run time
+(the list grows; do not hardcode it), each run individually — **never** bare
+`pio test`, it walks every environment including board envs and flashes
+whatever hardware is attached — plus the golden selftest:
 
 ```
-pio test -e native -e native_aprs -e native_parsers -e native_batt_detect \
-  -e native_conf_frame -e native_extern -e native_config -e native_xml \
-  -e native_aprs_fuzz -e native_capture -e native_dedup -e native_extradio
+for e in $(grep -oE '^\[env:native[^]]*\]' platformio.ini | tr -d '[]' | sed 's/^env://'); do
+  pio test -e "$e" || { echo "FAILED: $e" >&2; exit 1; }
+done
+bash test/golden/selftest.sh
 ```
 
-## Step 3 — Commit docs, tag, push
+Copy the total case count this run actually reports into release-notes.md —
+never a count remembered from an earlier release.
 
-Commit the doc changes on the working branch, push, then:
+## Step 3 — Build all 32 release environments, then verify
 
-```
-git tag -a <tag> -m "<one-line summary>"
-git push origin <tag>
-```
-
-## Step 4 — Build all 32 release environments
+Build and verify BEFORE tagging, so the tag always matches what these
+commands actually produce. Tagging first and building after is what let a
+release ship with stale safeboot bins and then need its tag moved to fix it —
+see the safeboot check below.
 
 Sequential, one `pio run` invocation (~16 min). Never run parallel pio
 builds of the same env — the build cache corrupts. The Bash tool's background
@@ -130,10 +157,18 @@ plus both safeboot outputs — anything less means rebuild.
 
 **Safeboot check after the build:** the safeboot envs' post script
 (`tools/safeboot.py`) copies `safeboot.bin`/`safeboot-s3.bin` into the repo
-root, where they are **tracked in git**. The build is deterministic — if
-`git status` shows them modified (or `md5 -q` differs from the tracked
-files), the tracked bins were stale: commit them and move the tag BEFORE
-publishing, so tag content and shipped assets match.
+root, where they are **tracked in git**. ESP32 app builds are NOT
+byte-reproducible (two clean builds of identical source differ in ~10% of
+bytes, a pure layout shift) — but for the safeboot images the only field this
+touches is one fixed header: `git status` showing them modified after every
+build is expected, not proof of staleness. Diff the new bins against the
+tracked copies: a difference confined to the `esp_app_desc` `app_elf_sha256`
+field (bytes 177-208) plus the trailing digest that covers it (64-65 bytes
+total) is that expected header-only noise — either discard it (`git checkout
+-- safeboot.bin safeboot-s3.bin`) or commit it deliberately in Step 4; either
+is fine as long as it's settled here, before tagging. A difference outside
+that range, or a size change, is real staleness — stop and investigate before
+Step 4.
 
 **Field-command string scan after the build (INS-01/INS-04):** a compile-guard
 change can drop shipped commands without a compiler or test complaint. Both
@@ -147,6 +182,23 @@ for e in t_deck t_deck_plus; do B=.pio/build/$e/firmware.bin; \
 
 Expected: `mute=2 stat=1 udplog=1 injectraw=0`. On nRF52 scan the `.elf`, not
 the ASCII `.hex`.
+
+## Step 4 — Commit docs + safeboot bins, tag, push
+
+Commit the Step 1 doc changes together with whatever Step 3's safeboot check
+decided (a refresh commit if the bins were kept, nothing extra if they were
+discarded), push, then tag:
+
+```
+git tag -a <tag> -m "<one-line summary>"
+git push origin <tag>
+```
+
+Create and push the tag only after Step 3's build and safeboot check already
+match the working tree — never before. Moving an already-pushed tag
+(`git tag -d`, `git push origin :refs/tags/<tag>`, re-tag, re-push) is a last
+resort for a real problem found after the push, not a standard part of this
+procedure, and needs the operator's explicit, on-the-spot consent every time.
 
 ## Step 5 — Assemble the 39 assets
 
@@ -188,14 +240,23 @@ partition; the firmware's own OTA writes `ota_0` alone. It is therefore the
 delivery route for any release that moves the partition layout or ships a new
 safeboot image. Design: `docs/meshcom-web-flasher-plan.md`.
 
-Runs against the same `.pio/build` tree step 4 produced, so it goes after
+Runs against the same `.pio/build` tree step 3 produced, so it goes after
 step 5 and before the GitHub release:
 
 ```
 uv run --with pytest pytest tools/tests/test_pages_flasher.py
 node --test tools/tests/test_flasher_detect.mjs
-uv run tools/pages_flasher.py publish --version <tag> --keep 3
+uv run tools/pages_flasher.py publish --version <tag> --keep 1
 ```
+
+**Always pass `--keep 1` explicitly, even though the tool's own default is now
+1 too** (changed from 3). Operator policy: only the latest release is ever
+offered in the flasher, so nobody picks a wrong one (older GitHub release
+objects stay, just not in the flasher). This skill used to show `--keep 3` as
+an example here while the tool still defaulted to 3, and that example was
+followed literally on 2026-09-28, leaving two versions live in the flasher
+until caught and corrected — name `--keep 1` regardless of what the tool
+currently defaults to.
 
 `publish` builds a detached `gh-pages` worktree from `origin/gh-pages`, writes
 `flash/<tag>/<env>/` for all 30 boards, regenerates `flash/releases.json` and
@@ -219,6 +280,17 @@ uv run tools/pages_flasher.py check --version <tag>
 ```
 
 It fetches every part over HTTPS and compares SHA-256 against the local build.
+
+**Then refresh the presentation site, in this order — not before the flasher
+push above:** `publish` rebuilds its `gh-pages` worktree from
+`origin/gh-pages` via `checkout -B gh-pages`, which would discard a
+pages-sync commit made first but not yet pushed.
+
+1. Update anything in `docs/presentation/` that names a version or PR history
+   (index card, protocol section) for this release.
+2. `bash tools/pages-sync.sh -m "docs(pages): sync docs/presentation for <tag>" --push`
+   — mirrors `docs/presentation/` onto `gh-pages`, protecting `flash/` (run
+   `tools/pages-sync.sh --self-test` if in doubt about that guard).
 
 ## Step 6 — Publish
 
@@ -246,11 +318,56 @@ must show 39 assets, not draft. (`isLatest` is not a valid `--json` field.)
   dk5en-98.local, RAK DFU) live in the flash tooling and auto-memory, not
   here.
 
+## Permissions this procedure needs (ask for these up front, don't rediscover mid-run)
+
+Every step below touches a shared or hard-to-reverse resource. None of it is
+covered by generic commit/PR permission — confirm explicitly before running
+each class of action, even inside an otherwise-approved release:
+
+- **`git push origin <branch>`** (the release-doc commit in Step 1/4, the
+  safeboot-bin refresh folded into that same Step 4 commit, `docs/RESUME.md`
+  in Step 7) — pushes to the fork's default branch.
+- **`git push origin <tag>`** — pushes a public release tag. Step 4 pushes it
+  only after Step 3's build and safeboot check already match the tree, so it
+  should never need to move afterward. If a real problem is still found once
+  it's pushed, moving it (`git tag -d`, `git push origin :refs/tags/<tag>`,
+  re-tag, re-push) is a last resort, not a standard step of this procedure —
+  ask for the operator's explicit, on-the-spot consent before doing it.
+- **`git push` to `gh-pages`** (`pages_flasher.py publish --push`,
+  `tools/pages-sync.sh --push`) — before asking, say exactly which live
+  flasher release folders this run's `--keep` will prune, or that pages-sync
+  is about to overwrite the mirrored site. A denial is a signal about what's
+  being removed, not a blanket block on the action: one 2026-09-28 run was
+  denied by the auto-mode classifier because it pruned a live release nobody
+  had asked to remove, while three other gh-pages pushes that same day went
+  through without incident.
+- **`gh release create`** — publishes a public GitHub release with 39 assets.
+- **`gh release delete`** (Step 7, only when replacing an earlier release) —
+  destructive; confirm which of release object vs. tag the user wants gone
+  before adding `--cleanup-tag`.
+- **Flashing any bench node** — OTA via `tools/webflash.py`, `esptool` for the
+  T-Beam, DFU or `pio run -t upload` for the RAK, or a UF2 copy (the optional
+  last bullet of Step 7, and the per-board methods it names). `pio run` is
+  allowlisted and raises no harness prompt by itself, so this permission must
+  be asked for explicitly, not inferred from the absence of a prompt. If a
+  node is mid-soak or mid-capture, flashing it ends that run early — confirm
+  which nodes and that ending any running test on them is fine, every time,
+  for every flash method (precedent: 2026-09-28 14:33, DK5EN-1 + DK5EN-98
+  OTA'd mid-soak with the user's explicit go-ahead, ending the 24 h XOR soak
+  ~3 h early at a ~21 h actual window; logged in `docs/RESUME.md` and
+  auto-memory `soak-xor-20260927`).
+
 ## Honesty rules for the release text
 
 - Only claim bench verification for boards that actually had bench time this
   cycle; everything else goes under "built and shipped, not on our bench".
 - Every known-but-unfixed defect goes into "Known gaps, stated plainly" —
   releasing with an open defect is the user's call, hiding it is not.
-- The native-test count and item numbers in release-notes.md must match the
-  actual gate output and CHANGELOG numbering of THIS release.
+- The native-test count in release-notes.md must be copied from Step 2's
+  actual output for this run, never carried over from an earlier release. If
+  a topic changelog was touched in Step 1, its numbering/section title in
+  release-notes.md must match what that file actually contains now.
+- Release-notes.md's account of "what changed" must cover every commit Step 1's
+  `git log <prev-tag>..HEAD -- src variants platformio.ini` lists — a scope
+  claim not checked against that range is not trustworthy (the 09.28.2 notes
+  said "a single fix" but the tag also shipped `dbc57632`).

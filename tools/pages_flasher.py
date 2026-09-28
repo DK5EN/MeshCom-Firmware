@@ -15,8 +15,10 @@ Only the human-facing display names are a table, and they live here, once.
 
 Usage:
     uv run tools/pages_flasher.py stage   --version v4.35t.09.21-neo
-    uv run tools/pages_flasher.py publish --version v4.35t.09.21-neo --keep 3
+    uv run tools/pages_flasher.py publish --version v4.35t.09.21-neo [--push]
     uv run tools/pages_flasher.py check   --version v4.35t.09.21-neo
+
+--keep defaults to 1: the flasher offers only the newest release.
 """
 
 from __future__ import annotations
@@ -600,7 +602,8 @@ def cmd_check(args) -> int:
 def main(argv=None) -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--version", required=True)
-    common.add_argument("--keep", type=int, default=3)
+    common.add_argument("--keep", type=int, default=1,
+                        help="release folders kept on gh-pages (default 1: only the newest)")
     common.add_argument("--envs", nargs="*", default=None)
     common.add_argument("--date", type=lambda v: _dt.date.fromisoformat(v).isoformat(),
                         default=None, help="release date shown in the flasher (YYYY-MM-DD, default today)")
