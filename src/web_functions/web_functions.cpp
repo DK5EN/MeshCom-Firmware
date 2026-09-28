@@ -850,8 +850,10 @@ void deliver_scaffold(bool bget_password)
     // send silently turned the next quick message into a broadcast to '*'
     // (DJ8MEH, 2026-09-11). A DM call sign is still cleared as before.
     web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200 && this.responseText.indexOf(\"sendmessage ok\")>=0){var sc=document.getElementById(\"sendcall\");if(!/^[0-9]+$/.test(sc.value))sc.value=\"\"; document.getElementById(\"messagetext\").value=\"\"; updateCharsLeft();}};xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();}\n");
-    // this functions is counting and displaying the amount of chars left that the user can use to write a message
-    web_client.println("function updateCharsLeft() {let maxlength=149;if(document.getElementById(\"sendcall\").value.length>0) {maxlength-=(document.getElementById(\"sendcall\").value.length)+2;}let msglength=document.getElementById(\"messagetext\").value.length;if(msglength>maxlength){document.getElementById(\"messagetext\").value=document.getElementById(\"messagetext\").value.substring(0,maxlength);msglength=maxlength;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
+    // counts what is left of the node's 150-byte message limit (send_message() adds ":" or ":{call}").
+    // #1173: count UTF-8 bytes, not characters -- "ą" costs 2, an emoji 4 -- and cut an over-long
+    // text between characters (for..of walks code points, so no surrogate pair is split).
+    web_client.println("var mcEnc=new TextEncoder();function updateCharsLeft() {let maxlength=149;let call=document.getElementById(\"sendcall\").value;if(call.length>0) {maxlength-=mcEnc.encode(call).length+2;}let t=document.getElementById(\"messagetext\");let msglength=mcEnc.encode(t.value).length;if(msglength>maxlength){let out=\"\";msglength=0;for(const ch of t.value){let b=mcEnc.encode(ch).length;if(msglength+b>maxlength)break;out+=ch;msglength+=b;}t.value=out;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
     // MC-msg-history: BLEtoPhoneBuff/MAX_RING is only 20 slots and is shared
     // with positions and acks, so a handful of new messages can push an old
     // message out of the node's own ring within minutes. The browser tab
@@ -2479,7 +2481,7 @@ void sub_page_messages()
     web_client.println("<td><label for=\"sendcall\" class=\"font-small font-bold\">DM Call (or empty):</label></td>");
     web_client.println("<td><input type=\"text\" id=\"sendcall\" name=\"sendcall\" maxlength=\"9\" size=\"9\" oninput=\"updateCharsLeft()\";></td>");
     web_client.println("</tr><tr>");
-    web_client.println("<td><label for=\"messagetext\" class=\"font-small font-bold\">Message:</label><p class=\"font-small\"><span id=\"indicator_charsleft\">149</span> chars left</p></td>");
+    web_client.println("<td><label for=\"messagetext\" class=\"font-small font-bold\">Message:</label><p class=\"font-small\"><span id=\"indicator_charsleft\">149</span> bytes left</p></td>");
     web_client.println("<td><textarea id=\"messagetext\" name=\"messagetext\" maxlength=\"149\" rows=\"5\" cols=\"40\" oninput=\"updateCharsLeft()\";></textarea></td>");
     web_client.println("</tr><tr>");
     web_client.println("<td><button onclick=\"updateMessages()\"><i class=\"btnrefresh\"></i>Update</button></td></td><td><button id=\"sendmessage\" onclick=\"sendMessage(); updateCharsLeft(); updateMessages();\"><i class=\"btncheckmark\"></i>Send</button></td>");
