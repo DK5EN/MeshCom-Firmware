@@ -56,13 +56,10 @@ constexpr size_t kCounterFieldCount = sizeof(kCounterFields) / sizeof(kCounterFi
 
 File counters_file(InternalFS);
 
-// The ONE v1-sized scratch image this file uses for the legacy blob: init_flash() reads the blob
-// into it, flash_reset() renders its defaults image into it. File-scope static on purpose: the
-// nRF52 loop task (which runs setup() and every command handler) has a 4 kB stack
-// (LOOP_STACK_SZ, cores/nRF5/main.cpp), and flash_reset() already keeps a 2 kB s_meshcom_settings
-// on that stack -- a second 2 kB object there would overflow it. Both users run in the same task
-// and never overlap, so one buffer is enough.
-s_ble_settings_v1 s_legacyV1Image;
+// The legacy blob's v1 image (init_flash() reads the blob into it, flash_reset() renders its
+// defaults into it) lives in bleSettingsV1Scratch() (ble_settings_v1.h), not on the stack: the
+// nRF52 loop task has a 4 kB stack (LOOP_STACK_SZ, cores/nRF5/main.cpp) and flash_reset() already
+// keeps a 2 kB s_meshcom_settings there. See the scratch's ownership contract.
 
 // ---------------------------------------------------------------------------
 // Legacy-blob-rewritten detection (addendum to D1-04 W3 step 4, task 7): a
@@ -299,7 +296,7 @@ void init_flash(void)
 	// overwritten by the blob once, on the first W3c boot. Accepted: a dev-bench-only, one-time
 	// cost, versus silently hiding a user's reconfiguration on the fleet path.
 	// -------------------------------------------------------------------------------------------
-	s_ble_settings_v1 &legacy_v1_image = s_legacyV1Image; // file-scope static: kept off the stack (see Task 1)
+	s_ble_settings_v1 &legacy_v1_image = bleSettingsV1Scratch(); // shared loop-task scratch, see above
 	bool legacy_file_present = lora_file.open(settings_name, FILE_O_READ);
 	uint32_t legacy_stored_size = legacy_file_present ? lora_file.size() : 0;
 	if (legacy_file_present)
@@ -624,7 +621,7 @@ void flash_reset(void)
 		// geschriebenen Abbilds wird gleich danach festgehalten, sobald meshcom_settings selbst wieder
 		// gefuellt ist -- siehe init_flash()).
 		s_meshcom_settings default_settings;
-		s_ble_settings_v1 &default_image = s_legacyV1Image; // shared static, see its definition above
+		s_ble_settings_v1 &default_image = bleSettingsV1Scratch(); // shared loop-task scratch, see above
 		bleSettingsToV1(default_settings, default_image);
 		size_t put = lora_file.write((uint8_t *)&default_image, sizeof(s_ble_settings_v1));
 		lora_file.flush();
@@ -649,7 +646,7 @@ void flash_reset(void)
 		if (lora_file.open(settings_name, FILE_O_WRITE))
 		{
 			s_meshcom_settings default_settings;
-			s_ble_settings_v1 &default_image = s_legacyV1Image; // shared static, see its definition above
+			s_ble_settings_v1 &default_image = bleSettingsV1Scratch(); // shared loop-task scratch, see above
 			bleSettingsToV1(default_settings, default_image);
 			size_t put = lora_file.write((uint8_t *)&default_image, sizeof(s_ble_settings_v1));
 			lora_file.flush();

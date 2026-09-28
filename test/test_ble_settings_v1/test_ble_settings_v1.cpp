@@ -27,6 +27,7 @@
 #include <cstring>
 
 #include <nrf52/ble_settings_v1.h>
+#include <nrf52/ble_settings_stage.h> // BleSettingsV1Stage / stageBleSettingsV1() / tryApplyBleSettingsV1Stage()
 #include <config_json.h> // CFG_FIELD_LIST -- the canonical app-settable field list
 
 void setUp(void) {}
@@ -480,6 +481,98 @@ static void test_every_cfg_field_survives_conversion(void)
 #undef CFG_FIELD_CHECK
 }
 
+// =============================================================================
+// 7. Apply path: seqlock staging + try-apply (src/nrf52/ble_settings_stage.h).
+// =============================================================================
+
+static void setV1Call(char (&arr)[10], const char *s)
+{
+    strncpy(arr, s, sizeof(arr));
+}
+
+static void test_apply_direct_conversion_preserves_live_only_fields(void)
+{
+    // Regression: node_msgid is the one nRF52 member bleSettingsFromV1() never
+    // writes (a counter, counters_store.h). Converting into a scratch struct
+    // and copying it whole over `live` reset it to 0; the in-place apply must
+    // keep it.
+    s_meshcom_settings live;
+    memset(&live, 0, sizeof(live));
+    live.node_msgid = 123;
+
+    BleSettingsV1Stage stage{};
+    s_ble_settings_v1 image = validImage();
+    image.node_msgid = 7; // must NOT be applied inbound
+    setV1Call(image.node_call, "DK5EN-9");
+    stageBleSettingsV1(stage, image);
+
+    uint32_t appliedSeq = 0;
+    BleSettingsV1ApplyResult result = tryApplyBleSettingsV1Stage(stage, &appliedSeq, live);
+
+    TEST_ASSERT_TRUE_MESSAGE(result == BleSettingsV1ApplyResult::Applied,
+                              "a freshly staged image must apply");
+    TEST_ASSERT_EQUAL_MEMORY_MESSAGE(image.node_call, live.node_call, sizeof(live.node_call),
+                                      "node_call must be updated from the staged image");
+    TEST_ASSERT_EQUAL_INT32_MESSAGE(123, live.node_msgid,
+                                      "node_msgid must NOT be clobbered by a settings write");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(stage.seq, appliedSeq, "appliedSeq must advance to the applied seq");
+    TEST_ASSERT_TRUE_MESSAGE(tryApplyBleSettingsV1Stage(stage, &appliedSeq, live) == BleSettingsV1ApplyResult::None,
+                              "an applied image must not be applied (and saved) a second time");
+}
+
+static void test_apply_busy_while_seq_odd(void)
+{
+    s_meshcom_settings live;
+    memset(&live, 0, sizeof(live));
+    live.node_msgid = 42;
+
+    BleSettingsV1Stage stage{};
+    stage.seq = 1; // odd: a write is (hypothetically) in progress
+
+    uint32_t appliedSeq = 0;
+    BleSettingsV1ApplyResult result = tryApplyBleSettingsV1Stage(stage, &appliedSeq, live);
+
+    TEST_ASSERT_TRUE_MESSAGE(result == BleSettingsV1ApplyResult::Busy, "an odd seq must report Busy");
+    TEST_ASSERT_EQUAL_INT32_MESSAGE(42, live.node_msgid, "a Busy result must leave `live` untouched");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(0u, appliedSeq, "a Busy result must not advance appliedSeq");
+}
+
+static void test_apply_none_when_nothing_new(void)
+{
+    s_meshcom_settings live;
+    memset(&live, 0, sizeof(live));
+
+    BleSettingsV1Stage stage{}; // seq starts at 0, nothing ever staged
+
+    uint32_t appliedSeq = 0; // already caught up with seq == 0
+    BleSettingsV1ApplyResult result = tryApplyBleSettingsV1Stage(stage, &appliedSeq, live);
+
+    TEST_ASSERT_TRUE_MESSAGE(result == BleSettingsV1ApplyResult::None, "seq == appliedSeq must report None");
+}
+
+static void test_apply_last_of_two_writes_wins(void)
+{
+    s_meshcom_settings live;
+    memset(&live, 0, sizeof(live));
+
+    BleSettingsV1Stage stage{};
+
+    s_ble_settings_v1 first = validImage();
+    setV1Call(first.node_call, "FIRST-1");
+    stageBleSettingsV1(stage, first);
+
+    s_ble_settings_v1 second = validImage();
+    setV1Call(second.node_call, "SECOND-2");
+    stageBleSettingsV1(stage, second);
+
+    uint32_t appliedSeq = 0;
+    BleSettingsV1ApplyResult result = tryApplyBleSettingsV1Stage(stage, &appliedSeq, live);
+
+    TEST_ASSERT_TRUE_MESSAGE(result == BleSettingsV1ApplyResult::Applied, "the pending write must apply");
+    TEST_ASSERT_EQUAL_MEMORY_MESSAGE(second.node_call, live.node_call, sizeof(live.node_call),
+                                      "the LAST staged image before an apply must be the one applied");
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -490,6 +583,10 @@ int main(void)
     RUN_TEST(test_bad_markers_rejected);
     RUN_TEST(test_v1_only_members_ignored_inbound_and_zeroed_outbound);
     RUN_TEST(test_every_cfg_field_survives_conversion);
+    RUN_TEST(test_apply_direct_conversion_preserves_live_only_fields);
+    RUN_TEST(test_apply_busy_while_seq_odd);
+    RUN_TEST(test_apply_none_when_nothing_new);
+    RUN_TEST(test_apply_last_of_two_writes_wins);
 
     return UNITY_END();
 }

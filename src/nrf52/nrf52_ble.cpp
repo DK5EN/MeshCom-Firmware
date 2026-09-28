@@ -12,6 +12,7 @@
 
 #include "WisBlock-API.h"
 #include "ble_settings_v1.h"
+#include "ble_settings_stage.h"
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
@@ -283,34 +284,22 @@ void bleuart_rx_callback(uint16_t conn_handle)
 
 }
 
-// CONC-17: settings_rx_callback() runs in the BLE stack's task context, which
-// can be preempted mid-memcpy by the FreeRTOS timer-service task that drives
-// OnRxDone (priority 2, see C-01/09-concurrency-map.md) — a torn copy of
-// meshcom_settings could put a beacon on the air with a spliced callsign or
-// frequency. The callback stages the incoming wire-format bytes into this
-// private buffer (no shared state touched) and only sets a flag;
-// applyPendingBleSettings(), called once per Main Loop iteration, converts
-// the staged v1 image into a local s_meshcom_settings and only THEN copies
-// it into the live meshcom_settings under a short critical section.
-static s_ble_settings_v1 s_pendingBleSettingsV1;
-static volatile bool s_bBleSettingsPending = false;
-
-// Scratch buffers, file-scope static rather than on-stack: both types are
-// ~2 KB, too large to put on the Main Loop task's stack repeatedly.
-// s_convertedBleSettings holds the member-by-member conversion result of a
-// pending write, built OUTSIDE the critical section (see
-// applyPendingBleSettings()); s_bleSettingsOutBuf holds the v1 image handed
-// to write()/notify() for the read direction.
-// CONC-17: the BLE task may stage a NEW image into s_pendingBleSettingsV1 at
-// any moment, including while applyPendingBleSettings() is converting. So the
-// staging buffer is snapshotted under the lock and the conversion reads the
-// snapshot, never the shared buffer -- otherwise a second settings write
-// arriving mid-conversion splices two images into one and that spliced result
-// gets applied AND saved. Before the v1 freeze this could not happen: the only
-// read of the staging buffer was itself inside the critical section.
-static s_ble_settings_v1 s_bleSettingsSnapshot;
-static s_meshcom_settings s_convertedBleSettings;
-static s_ble_settings_v1 s_bleSettingsOutBuf;
+// CONC-17: settings_rx_callback() runs in the Bluefruit Ada callback task,
+// which can be preempted mid-write by a higher-priority task or, on a tick
+// wake-up, an equal-priority one — a torn image could put a beacon on the air
+// with a spliced callsign or frequency once applied.
+// The callback stages the wire bytes with the seqlock writer in
+// ble_settings_stage.h (counter odd, memcpy, counter even) and wakes the loop
+// task. applyPendingBleSettings(), called once per Main Loop iteration,
+// converts the staged image straight onto meshcom_settings inside a short
+// critical section. No snapshot and no converted copy are needed: inside the
+// section the callback task cannot run, and an odd counter (a write paused
+// mid-copy) makes the apply back off and retry. Converting in place also
+// keeps node_msgid, which bleSettingsFromV1() deliberately never writes; a
+// whole-struct copy from a scratch struct would reset it and replay message
+// ids into the neighbours' dedup rings.
+static BleSettingsV1Stage s_bleSettingsStage;
+static uint32_t s_appliedBleSettingsSeq = 0;
 
 /**
  * @brief Initialize the settings characteristic
@@ -328,9 +317,11 @@ BLEService init_settings_characteristic(void)
 	g_lora_data.begin();
 
 	// The characteristic ships the frozen v1 wire image, never
-	// s_meshcom_settings directly (see ble_settings_v1.h).
-	bleSettingsToV1(meshcom_settings, s_bleSettingsOutBuf);
-	g_lora_data.write((void *)&s_bleSettingsOutBuf, sizeof(s_bleSettingsOutBuf));
+	// s_meshcom_settings directly (see ble_settings_v1.h). write() copies
+	// synchronously, so the shared scratch is free again when it returns.
+	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
+	bleSettingsToV1(meshcom_settings, outImage);
+	g_lora_data.write((void *)&outImage, sizeof(outImage));
 
 	return lora_service;
 }
@@ -369,12 +360,9 @@ void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *da
 			return;
 		}
 
-		// CONC-17: stage only, apply from the Main Loop (see comment above
-		// s_pendingBleSettingsV1). Still just a memcpy of the raw wire
-		// bytes -- the member-by-member conversion happens later, outside
-		// any critical section, in applyPendingBleSettings().
-		memcpy((void *)&s_pendingBleSettingsV1, data, sizeof(s_ble_settings_v1));
-		s_bBleSettingsPending = true;
+		// CONC-17: stage only, apply from the Main Loop (see the comment
+		// above s_bleSettingsStage).
+		stageBleSettingsV1(s_bleSettingsStage, *rcvdSettings);
 
 		// Notify task about the event
 		if (g_task_sem != NULL)
@@ -392,40 +380,41 @@ void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *da
  */
 void applyPendingBleSettings(void)
 {
-	if (!s_bBleSettingsPending)
-		return;
-	s_bBleSettingsPending = false;
+	BleSettingsV1ApplyResult result;
+	int tries = 0;
+	for (;;)
+	{
+		// The critical section keeps the callback task out while the staged
+		// image is read and converted (see the comment above s_bleSettingsStage).
+		taskENTER_CRITICAL();
+		result = tryApplyBleSettingsV1Stage(s_bleSettingsStage, &s_appliedBleSettingsSeq, meshcom_settings);
+		taskEXIT_CRITICAL();
 
-	// Take a consistent snapshot of the staged image before reading it: the
-	// BLE task writes s_pendingBleSettingsV1 from settings_rx_callback() and
-	// can preempt this function. One bounded memcpy, the same shape and cost
-	// as the apply below.
-	taskENTER_CRITICAL();
-	memcpy((void *)&s_bleSettingsSnapshot, (const void *)&s_pendingBleSettingsV1,
-	       sizeof(s_bleSettingsSnapshot));
-	taskEXIT_CRITICAL();
+		if (result != BleSettingsV1ApplyResult::Busy)
+			break;
 
-	// Convert OUTSIDE the critical section: bleSettingsFromV1() walks every
-	// member one at a time and only ever touches these two scratch buffers,
-	// never meshcom_settings and never the shared staging buffer, so it can
-	// take as long as it needs without holding interrupts off.
-	bleSettingsFromV1(s_bleSettingsSnapshot, s_convertedBleSettings);
+		// Busy: a write was paused mid-copy. Yield so the callback task can
+		// finish; bounded, and the next Main Loop iteration retries anyway
+		// because the staged sequence still differs from the applied one.
+		if (++tries >= 20)
+			return;
+		delay(1);
+	}
 
-	// Short, non-blocking copy — safe to run with interrupts masked, unlike
-	// the delay()-based patterns fixed under N-16.
-	taskENTER_CRITICAL();
-	memcpy((void *)&meshcom_settings, &s_convertedBleSettings, sizeof(meshcom_settings));
-	taskEXIT_CRITICAL();
+	if (result != BleSettingsV1ApplyResult::Applied)
+		return; // None: nothing staged since the last apply
 
 	// Save new settings
 	save_settings();
 
-	// Update settings
-	bleSettingsToV1(meshcom_settings, s_bleSettingsOutBuf);
-	g_lora_data.write((void *)&s_bleSettingsOutBuf, sizeof(s_bleSettingsOutBuf));
+	// Update settings. write() and notify() both copy before returning
+	// (notify() per MTU chunk), so the shared scratch is free afterwards.
+	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
+	bleSettingsToV1(meshcom_settings, outImage);
+	g_lora_data.write((void *)&outImage, sizeof(outImage));
 
 	// Inform connected device about new settings
-	g_lora_data.notify((void *)&s_bleSettingsOutBuf, sizeof(s_bleSettingsOutBuf));
+	g_lora_data.notify((void *)&outImage, sizeof(outImage));
 
 	/*KBC
 	if (meshcom_settings.resetRequest)

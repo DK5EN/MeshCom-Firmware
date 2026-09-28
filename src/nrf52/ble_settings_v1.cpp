@@ -18,6 +18,7 @@
  * lines from each function -- the v1 struct itself must NOT change.
  */
 #include "ble_settings_v1.h"
+#include "ble_settings_stage.h"
 
 #include <cstring>
 
@@ -438,4 +439,12 @@ bool bleSettingsV1LengthOk(size_t len)
 bool bleSettingsV1MarkersOk(const s_ble_settings_v1 &img)
 {
 	return (img.valid_mark_1 == BLE_SETTINGS_V1_MARK_1) && (img.valid_mark_2 == BLE_SETTINGS_V1_MARK_2);
+}
+
+s_ble_settings_v1 &bleSettingsV1Scratch()
+{
+	// Ownership contract: see the declaration. BleSettingsV1Storage keeps it
+	// in .bss; a plain s_ble_settings_v1 would carry a .data initialiser image.
+	static BleSettingsV1Storage storage;
+	return storage.img;
 }

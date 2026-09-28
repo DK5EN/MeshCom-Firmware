@@ -84,6 +84,7 @@ src/nbr_views.h
 src/nrf52/WisBlock-API.cpp
 src/nrf52/WisBlock-API.h
 src/nrf52/api_functions.cpp
+src/nrf52/ble_settings_stage.h
 src/nrf52/ble_settings_v1.cpp
 src/nrf52/ble_settings_v1.h
 src/nrf52/gateway_service_nrf52.cpp

@@ -471,4 +471,17 @@ bool bleSettingsV1LengthOk(size_t len);
 /** True iff both frozen marker bytes are present in `img`. */
 bool bleSettingsV1MarkersOk(const s_ble_settings_v1 &img);
 
+/**
+ * The one v1-sized scratch image of the nRF52 loop task. Users:
+ * init_settings_characteristic() and applyPendingBleSettings() (nrf52_ble.cpp,
+ * the image handed to write()/notify()), init_flash() and flash_reset()
+ * (nrf52_flash.cpp, the legacy blob). All run in the loop task; flash_reset()
+ * overwrites it, so init_flash() re-reads the blob into it after every
+ * flash_reset() call. Never touch it from the BLE callback task or the LORA
+ * task. Zero-initialised (.bss); every user writes every member before
+ * reading. Padding bytes are not rewritten, so the image sent to the app may
+ * carry the padding of the last blob read here; readers go by member offset.
+ */
+s_ble_settings_v1 &bleSettingsV1Scratch();
+
 #endif // BLE_SETTINGS_V1_H
