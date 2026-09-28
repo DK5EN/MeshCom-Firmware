@@ -18,7 +18,7 @@ spliced sentence passes the NMEA checksum and is accepted as a valid fix.
 **Reported:** 2026-09-01 by OE5HWN (`OE5HWN-14`, T-Beam Supreme, firmware 4.35p), as
 "the altitude on the WX dashboard is wrong".
 **Branch:** `v4.35p_prio` @ `ab3c5b65` · **Upstream merge-base:** `2dac2eac`
-**Related:** [`N-25`](bug-N25-gps-baud-scan-watchdog.md) (same board, GPS baud scan),
+**Related:** [`N-25`](archive/bug-N25-gps-baud-scan-watchdog.md) (same board, GPS baud scan),
 §3.8f timing campaign (loop stalls), `MEM-01`/`MEM-02` (why the obvious fix is the wrong one).
 
 > **Scope note for the implementer.** Every file:line here was read against the tree at `ab3c5b65`.

@@ -2,7 +2,7 @@
 
 Device `DK5EN-14`, firmware `d26e39d5` (unmodified behaviour + instrumentation only, see
 `src/instrument.h`). **Every later fix is judged against these numbers.** Recorded before any
-defect from [`tdeck-gui-verdict.md`](tdeck-gui-verdict.md) was touched.
+defect from [`tdeck-gui-verdict.md`](../tdeck-gui-verdict.md) was touched.
 
 Conditions: USB powered, WLAN associated (`192.168.68.71`), GPS active, SD card present with
 `/maps/europe` (5 909 tiles, z0-z9), no user interaction, no LoRa traffic addressed to the node.

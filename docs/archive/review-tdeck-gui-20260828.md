@@ -2,12 +2,12 @@
 
 Target: `src/t-deck/` (7 798 lines; `lv_obj_functions.cpp` 4 313, `event_functions.cpp` 985,
 `tdeck_main.cpp` 808, `tdeck_sdmap.cpp` 305, `tdeck_helpers.cpp` 277). Rule taxonomy:
-[`codequality-rules.md`](codequality-rules.md); defect classes carried forward from
+[`codequality-rules.md`](../codequality-rules.md); defect classes carried forward from
 [`code-audit-20260626.md`](code-audit-20260626.md).
 
 Occasion: the device (`DK5EN-14`) was handed over by the upstream FW maintainer, who was hunting an
 unlocated heap defect in the T-Deck. The brief was therefore not "find that bug" but "find that
-**class** of bug". Bring-up context and hardware notes: [`BACKLOG.md`](BACKLOG.md) §3.8a/§3.8b.
+**class** of bug". Bring-up context and hardware notes: [`BACKLOG.md`](../BACKLOG.md) §3.8a/§3.8b.
 
 Hardware: ESP32-S3, 16 MB flash, 8 MB OPI PSRAM, LVGL 8.3.11, SD on SPI shared with TFT and LoRa.
 Measured free internal heap in steady state: **~95 KB** (`[HEAP] … 95 936 90 252 81 908`).

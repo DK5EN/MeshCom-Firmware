@@ -1,8 +1,8 @@
 # WLAN-Bericht: Warum ESP32-Knoten am WLAN scheiterten — und was es behoben hat
 
 Datum 2026-08-30. Branch `tdeck-partial-refresh-trace`, Commits `f34fd2ae` … `66d965e7`.
-Vorarbeit: [`wifi-findings-20260829.md`](wifi-findings-20260829.md) (Treiberanalyse, Fragen a–g),
-Backlog-Zeilen TM-34, TM-24, TM-11/TD-01, TM-17, HL-01/02 in [`BACKLOG.md`](BACKLOG.md) §3.8f.
+Vorarbeit: [`wifi-findings-20260829.md`](../wifi-findings-20260829.md) (Treiberanalyse, Fragen a–g),
+Backlog-Zeilen TM-34, TM-24, TM-11/TD-01, TM-17, HL-01/02 in [`BACKLOG.md`](../BACKLOG.md) §3.8f.
 Rohdaten: `tools/bench/runs/bootloop_*/` (je Arm `summary.txt` + `summary.csv`).
 
 ---

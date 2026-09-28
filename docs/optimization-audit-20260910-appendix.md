@@ -987,7 +987,7 @@ MEM-01, see above) and the `resource_watch.py` DRAM-headroom gate as the standin
 
 ## 5. Wire-contract documentation inventory (docs describing on-wire/on-air formats, not the audit's job to re-derive)
 
-- **BLE JSON frame format:** `docs/ble-review.md` (full doc — MTU complex §4, app-source-code
+- **BLE JSON frame format:** `docs/archive/ble-review.md` (full doc — MTU complex §4, app-source-code
   cross-check §5, three-stage test architecture §6) is the primary source-of-truth discussion;
   implementation lives in `src/*/ble_json_frame.h` referenced by C27 (`code-quality-2.0.md:895`,
   "the reference fix (`ble_json_frame.h`) existed and had been applied to one path"). Also see
@@ -1001,7 +1001,7 @@ MEM-01, see above) and the `resource_watch.py` DRAM-headroom gate as the standin
 - **Mesh UDP (port 1799) / EXTUDP frame format:** `EXTERN_PORT 1799` defined at
   `src/configuration_global.h:167`. Format/behavior documented across `docs/ext_udp_telemetry.md`,
   `docs/bench-extudp-regression.md`, `docs/backpressure-protocol.md` (TX-side backpressure over the
-  same path), and `docs/bug-N25-gps-baud-scan-watchdog.md` / `docs/mcp23017-digital-field.md`
+  same path), and `docs/archive/bug-N25-gps-baud-scan-watchdog.md` / `docs/mcp23017-digital-field.md`
   (peripheral-specific EXTUDP fields). Source of truth: `src/extudp_functions.cpp` (queue, framing,
   escaping — see C27 finding "EXTUDP escaped `\"`/`\\` by hand before ArduinoJson escaped them
   again").
@@ -1908,7 +1908,7 @@ every classic ESP32 and ESP32-S3 env except `BOARD_TRACKER`/`BOARD_HELTEC` — i
 by 2.5 and needs no hardware decision.
 
 **R3-02** is the only lever that meaningfully moves the T-Beam IRAM number, and it is already
-measured (`docs/mem-headroom-classic-esp32-20260905.md` §2): `spiram_psram.c` is 4 427 B of the
+measured (`docs/archive/mem-headroom-classic-esp32-20260905.md` §2): `spiram_psram.c` is 4 427 B of the
 4 952 B recovered, and it is in IRAM because it runs with the cache disabled. It is blocked on
 one bench observation, not on code: read `[PSRM]` on T-Beam-92 right after `[HEAP] (init)`. The
 only field log available reads `[PSRM] 0`, i.e. PSRAM init already fails silently under our

@@ -370,7 +370,7 @@ Per-key notes:
 For the state of MCProxy's, the phone app's, and the firmware's own
 decoder's handling of each key relative to this grammar — including which
 keys each consumer drops, mis-types, or reads at the wrong offset — see
-`docs/aprs-parser-drift-20260911.md` §2 (per-key drift matrix) and §3
+`docs/archive/aprs-parser-drift-20260911.md` §2 (per-key drift matrix) and §3
 (frame/trailer drift).
 
 ---

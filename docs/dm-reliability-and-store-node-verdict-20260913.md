@@ -1,8 +1,8 @@
 # Verdict: DM retry ladder, ACK dedup, and the store node
 
-Review, 2026-09-13. Reviews `docs/MeshCom-Store-Node-Concept-20260911.md` and the four changes
-proposed in session, against `docs/proposal-dm-transport-reliability-20260909.md`,
-`docs/concept-dm-store-and-forward.md`, `docs/review/advisor-dm-store-and-forward-20260830.md`
+Review, 2026-09-13. Reviews `docs/archive/MeshCom-Store-Node-Concept-20260911.md` and the four changes
+proposed in session, against `docs/archive/proposal-dm-transport-reliability-20260909.md`,
+`docs/archive/concept-dm-store-and-forward.md`, `docs/review/advisor-dm-store-and-forward-20260830.md`
 and the firmware as of `7427f425`. Nothing in code.
 
 Reviewed by eight independent finders with adversarial verification; findings and refuted claims
@@ -314,7 +314,7 @@ message that parses as a DM — the bug class of the 2026-09-11 broadcast incide
 
 ## 6. The store node, revised
 
-Changes against `docs/MeshCom-Store-Node-Concept-20260911.md`:
+Changes against `docs/archive/MeshCom-Store-Node-Concept-20260911.md`:
 
 - **3.2 store set:** `heard` moves from v2 to v1, scoped to directly-heard callsigns inside the
   existing 12 h mheard window, with T7's honesty requirement on the GUI and T8's gateway-injection
@@ -477,7 +477,7 @@ model is **rejected** (D7); the evidence gate is **left out** — the ladder rat
 
 ## 11. Corrections to the existing documents
 
-- `docs/proposal-dm-transport-reliability-20260909.md` §2 and §5 S4: "a gateway that hears a DM
+- `docs/archive/proposal-dm-transport-reliability-20260909.md` §2 and §5 S4: "a gateway that hears a DM
   emits the binary 0x41 with status 0x01" is **false for DMs**. Emission is gated on `*`, `WLNK-1`,
   `APRS2SOTA` or a group at `src/lora_functions.cpp:1236`, and the UDP/server ingress path never
   emits an on-air `0x41` either. S4 has no signal to trigger on as written, and its "removes most
@@ -491,7 +491,7 @@ model is **rejected** (D7); the evidence gate is **left out** — the ladder rat
 - `docs/review/advisor-dm-store-and-forward-20260830.md` M5: the nRF52 ACK path does **not** run in
   the FreeRTOS timer-service task. See T4. The flash finding in M5 stands; the stack-overflow
   hazard does not.
-- `docs/MeshCom-Store-Node-Concept-20260911.md` §3.6 "no custody acknowledgement" is stated as a
+- `docs/archive/MeshCom-Store-Node-Concept-20260911.md` §3.6 "no custody acknowledgement" is stated as a
   design preference; it is a hard constraint (T9). §3.2 `heard` moves to v1 per D4, with the T8
   guard and the privacy gate in section 6. §3.4 "max_hop 0" was the correct phrasing and is
   restored.

@@ -34,7 +34,7 @@ F5-4 index bound, F5-2 password+clamp, F5-1 real comparison, F5-3 output escapin
 
 ## Framing: what is already an accepted risk, and what is not
 
-`docs/code-audit-20260626.md:264-278` (§7 Authentication & Security) records deliberate
+`docs/archive/code-audit-20260626.md:264-278` (§7 Authentication & Security) records deliberate
 `EXCEPTION` decisions for: open `WiFi.softAP()` (#44, #45), `SECMODE_OPEN` BLE (#46), empty web
 password = open access (#47), URL-parameter auth (#48), hardcoded BLE PIN `000000` (#49), and
 **OTA without auth and without firmware validation (#50)** — all justified as
@@ -53,7 +53,7 @@ rationales do not hold and are called out below:
 3. `--info` deliberately reveals credentials the same codebase deliberately redacts elsewhere
    (F5-7) — that is an inconsistency, not a decision.
 
-`docs/code-audit-fixes-20260627.md:36-37` claims D1 (HMAC plaintext-bypass) and D2 (password in
+`docs/archive/code-audit-fixes-20260627.md:36-37` claims D1 (HMAC plaintext-bypass) and D2 (password in
 serial log) fixed in `6ba4f3c7`. **Both verified genuinely fixed** — `src/net_console.cpp:163-186`
 now goes straight to HMAC with `ct_equal()`, and `:167` logs `s_password:<***>`.
 
@@ -916,7 +916,7 @@ the highest-priority work items alongside F5-1..F5-3.
 
 **Verified genuinely FIXED (do not re-report):** audit #51 (net-console HMAC plaintext bypass) and
 #52 (password in serial log) — `src/net_console.cpp:163-186` now uses `mbedtls_md_hmac` +
-`ct_equal()` with no shortcut, and `:167` logs `<***>`. `docs/code-audit-fixes-20260627.md:36-37`
+`ct_equal()` with no shortcut, and `:167` logs `<***>`. `docs/archive/code-audit-fixes-20260627.md:36-37`
 credits `6ba4f3c7`; the claim is accurate.
 
 ---

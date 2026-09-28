@@ -62,7 +62,7 @@ Three things this release is **not**:
 The items below reference the engineering logs in this repository:
 [docs/architecture/08-defect-catalogue.md](architecture/08-defect-catalogue.md)
 (IDs like N-xx, SEC-xx, CONC-xx) and
-[docs/code-audit-fixes-20260627.md](code-audit-fixes-20260627.md) (IDs like
+[docs/archive/code-audit-fixes-20260627.md](archive/code-audit-fixes-20260627.md) (IDs like
 A1, B2, C3), where the findings are documented with evidence. Every fix is one
 focused commit in this repository's history.
 
@@ -95,7 +95,7 @@ both boards. `FLASH_VERSION` goes to 20260912, `FLASH_STRUCT_VERSION` stays at
 own `dev` `v4.35t.09.12` a few hours earlier (item 221).
 
 Items 212-216 were found by a parser-drift analysis against the firmware's own wire
-format (`docs/aprs-parser-drift-20260911.md`): the encoder emits 17 `/X=`
+format (`docs/archive/aprs-parser-drift-20260911.md`): the encoder emits 17 `/X=`
 position keys, and its own decoder only understood 14.
 
 212. **Decoder now reads `/R=`, `/U=` and `/I=`** (`6fd9c3a5`, N-32).
@@ -121,7 +121,7 @@ position keys, and its own decoder only understood 14.
      17-key `/X=` grammar (format, unit, condition, order, the 100-byte
      budget and drop order); `README.md` and `BACKLOG.md` are corrected
      where they contradicted it (see
-     `docs/aprs-parser-drift-20260911.md` §4).
+     `docs/archive/aprs-parser-drift-20260911.md` §4).
 216. **Decoder splits `#name` off the position comment; `--setname` rejects
      `#`** (`b6d9f3cf`, N-35). `PositionToAPRS()` appends `#` + `node_name`
      after the free-text comment, but `decodeAPRSPOS()` read the comment
@@ -146,7 +146,7 @@ position keys, and its own decoder only understood 14.
 
 Three field reports against 4.35t, all fixed 2026-09-12 and offered to
 upstream `dev` as [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140)
-(`docs/pr-deepsleep-keylock-draft-20260912.md`):
+(`docs/archive/pr-deepsleep-keylock-draft-20260912.md`):
 
 218. **Long press switches the node off again** (`40c29e7f`, DS-03). Since
      item 197 the shared deep-sleep helpers arm the user button as wake

@@ -95,7 +95,7 @@ Die Zeilenangaben oben (`src/lora_functions.cpp:NNN` u. ä.) beziehen sich auf `
   jeweils letzten Aussendung. Ein Echo stoppt die Wiederholung nicht mehr, nur ein `:ackNNN`. Die
   Outbox-Leiter und `--dmretry` (zuletzt `off|3`, Modus 9 schon vorher entfallen, weil er sich nicht
   in drei Bitvarianten ausdrücken lässt) sind seit 2026-09-27 entfernt (Nachtrag in
-  `docs/pn-retry-snf-port-plan.md`); ein gespeicherter `dm_retry`-Wert (NVS, nRF52 `/dm.cfg`) wird
+  `docs/archive/pn-retry-snf-port-plan.md`); ein gespeicherter `dm_retry`-Wert (NVS, nRF52 `/dm.cfg`) wird
   ignoriert.
 - **`dm_dedup`** fängt Wiederholungen einer an uns adressierten PN ab; es gibt kein eigenes
   Anzeige-Tor dafür.

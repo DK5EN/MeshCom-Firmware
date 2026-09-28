@@ -414,7 +414,7 @@ Schreibweise im Folgenden: X⊕k.
   - `feature-snf` hatte diese Outbox samt beider Korrekturen (Original-Zähler statt `millis()`,
     keine gleiche msg_id in Aussendung 2) bis 2026-09-27; seither ist die Outbox samt `--dmretry`
     entfernt, und jede PN läuft über den einen Ring-Weg mit XOR-ids (Nachtrag in
-    `docs/pn-retry-snf-port-plan.md`).
+    `docs/archive/pn-retry-snf-port-plan.md`).
 - **Kosten**: RAM für den zweiten Dedup (Vollform zusätzlich Outbox), spürbar auf klassischem ESP32;
   Server-Parser; meshmap braucht die NNN oder eine Inhaltsdedup; alte Empfänger zeigen so viele Kopien,
   wie es Aussendungen gibt (bis 9).

@@ -182,7 +182,7 @@ traffic, so time-to-delivery is load dependent, not just beacon-interval depende
 
 ## Bench coverage after 2026-09-26
 
-Test IDs from `docs/dm-transport-impl-plan-20260913.md` (T-0.x, T-3.x), `docs/dm-stage1-plan-20260914.md`
+Test IDs from `docs/dm-transport-impl-plan-20260913.md` (T-0.x, T-3.x), `docs/archive/dm-stage1-plan-20260914.md`
 (T-1.x) and `docs/dm-stage4-plan-20260914.md` (T-4.x).
 
 | Covered (partly)                                                                                   | Evidence     |

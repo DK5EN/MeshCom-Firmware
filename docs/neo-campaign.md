@@ -722,9 +722,9 @@ campaign is what gives those two boards room again.
 Der Umbau von `neo-ram-reclaim` (Byte-Ringe, Web-Header im `String`,
 Display-Cache, dazu der Extern-UDP-Stack-Fix) ist nach dem Nachtlauf auf
 DK5EN-98 nach `fork-neo-test` gemerged. Urteil, Messwerte und die Funde beim
-Merge stehen in `docs/reclaim-abschluss-20260921.md`; die beiden
-Auswertungsdokumente `docs/reclaim-auswertung-20260920.md` und
-`docs/reclaim-auswertung-20260921.md` liegen als Beleg daneben.
+Merge stehen in `docs/archive/reclaim-abschluss-20260921.md`; die beiden
+Auswertungsdokumente `docs/archive/reclaim-auswertung-20260920.md` und
+`docs/archive/reclaim-auswertung-20260921.md` liegen als Beleg daneben.
 
 **Für die Ableitung wichtig: der Filtersatz ist gewachsen.** Vier Dateien waren
 in keiner Pfadliste und wären bei `tools/neo/derive.sh` wortlos liegengeblieben

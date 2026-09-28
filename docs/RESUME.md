@@ -110,7 +110,7 @@ reference `dk5en-xor` `a605e9f5`) on the one remaining send path: the ring retry
 40 s apart. The outbox ladder and `--dmretry` (`off|3`, mode 9 already gone) were removed the same
 day -- after the XOR switch the two paths were nearly identical, so one path stays. Server acks stop
 the ring slot; repeat copies are not re-uploaded or re-stored. Plan, decisions, advisor findings and
-the removal rationale: `docs/pn-retry-snf-port-plan.md` (§7); open items BACKLOG §3.8ba (PN-01..05).
+the removal rationale: `docs/archive/pn-retry-snf-port-plan.md` (§7); open items BACKLOG §3.8ba (PN-01..05).
 Host tests and full sweep green, advisor approved, nothing flashed.
 
 ## 2026-09-26 evening: release `v4.35t.09.27-neo` published (dated Sunday 27 September)
@@ -128,7 +128,7 @@ not run on a board; the S&F bench coverage table in `docs/snf-port-campaign.md` 
 `feature-snf` = `feature-neighbour-matrix` `0d4b914c` plus the DM store-and-forward stages 0 (without
 0.1), 2.1, 1, 3 and 4 from `fork-main`, five waves, each advisor-reviewed. State, decisions P1-P5
 and gate figures: `docs/snf-port-campaign.md`; user-facing: `docs/CHANGELOG-snf.md`; open items:
-BACKLOG §3.8az (DM-01..DM-16). Next: the bench, `docs/dm-bench-session-plan-20260914.md`, after the
+BACKLOG §3.8az (DM-01..DM-16). Next: the bench, `docs/archive/dm-bench-session-plan-20260914.md`, after the
 neighbour-matrix soak. Not pushed.
 
 ## Where we are, 2026-09-17 night: the closing run is done (start here)
@@ -151,7 +151,7 @@ this branch.
 toggling not reproduced over serial, web GUI or BLE (120 s soak each); the wrong temperature
 was `BME280 off` + a 999999 offset from the golden corpus. Fix: `--tempoff in|out` and the web
 `tempoffset*` params clamp to -50..50, proven on the Heltec. See
-`docs/toggle-soak-20260918.md`. Afternoon: H6-01 fixed (socket re-arm instead of WiFi teardown),
+`docs/archive/toggle-soak-20260918.md`. Afternoon: H6-01 fixed (socket re-arm instead of WiFi teardown),
 `--onewire gpio` clamped, CJ-01 filed (config_json bounds reject a normal export). Run
 `backup_nodes.py --restore` before the next capture. ETH-02b proven on hardware 21:23 (`test/golden/hw/G2/rak-90/eth02b-README.md`).
 
@@ -461,7 +461,7 @@ Field report: on a T-Deck Plus running 4.35t the message tone cannot be switched
 `--mute on/off` and the four persistence commands sat inside `#if INSTRUMENT_ENABLED` in
 `commandAction()` since the firmware-only cut; INS-01 missed them. The GUI "Sound on" switch
 calls exactly that command since HL-03, so it was a no-op in every shipped image (upstream
-v4.35t, v4.35t.09.12, fork 09.12.2). Bugreport `docs/bugreport-tdeck-mute-4.35t.md`, BACKLOG
+v4.35t, v4.35t.09.12, fork 09.12.2). Bugreport `docs/archive/bugreport-tdeck-mute-4.35t.md`, BACKLOG
 §3.8ag. **Fixed** `e8f16117` (five handlers moved into their own T-Deck field block ahead of the
 guard) + `62d16acf` (SYM+M toggles through `--mute` so it saves). Gates: t_deck, t_deck_plus,
 Heltec V3, RAK4631 built; 673/673 native; string scan of both T-Deck images `[AUDIO];mute;` 2,
@@ -471,7 +471,7 @@ Heltec V3, RAK4631 built; 673/673 native; string scan of both T-Deck images `[AU
 survives reboot, no boot tone; node left at its original state mute 1. SYM+M not hand-tested
 (node has KEYLOCK on). PR branch `pr-tdeck-mute-20260913` on upstream `1cb2d9e6` in the `-pr`
 worktree, two cherry-picked commits: [PR #1141](https://github.com/icssw-org/MeshCom-Firmware/pull/1141) opened 2026-09-13 (state OPEN, two commits `708eaf22`/`a577f4fb`, t_deck_plus + Heltec V3 built in the worktree, scan mute=2 stat=1 injectraw=0). Draft
-`docs/pr-tdeck-mute-draft-20260913.md`.
+`docs/archive/pr-tdeck-mute-draft-20260913.md`.
 
 **Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
 `usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
@@ -605,7 +605,7 @@ Phase A done except `P0.9`. **Phase B: all five carve-outs are in, G1 is
 complete and clean, and `B4` has its first two twins.** Base tagged
 `dry-base-20260911`. BACKLOG §3.8af carries
 the status tables, the decisions and the bench lessons; the Gantt
-(`docs/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
+(`docs/archive/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
 same stand as a vertical bar positioned by plan progress.
 
 **B2 — the five carves**, each gated on a 32-env build, the resource baseline
@@ -855,7 +855,7 @@ PRs had overtaken. Docs only, no code touched.
 
 ## 2026-09-11: APRS parser contract wave shipped in three repos, items 212-217, nothing flashed
 
-Trigger was a parser-drift analysis (`docs/aprs-parser-drift-20260911.md`): the firmware emits
+Trigger was a parser-drift analysis (`docs/archive/aprs-parser-drift-20260911.md`): the firmware emits
 17 `/X=` position keys and its own decoder understood 14; MCProxy and the mobile app each lost a
 different subset, and no document listed the keys. Four waves plus a `#name` follow-up, all on
 `fork-main` after the upstream sync `0ba9f063` (`upstream/dev` at `6edc7499`, v4.35t; `674413ce` is the base of PR #1135, not the sync point):
@@ -918,8 +918,8 @@ publishes 4.35t the fork follows upstream to the next letter.
 
 ## 2026-09-09 (evening): DM transport reliability designed, simulator built, nothing in code
 
-Two documents, no firmware change. `docs/proposal-dm-transport-reliability-20260909.md` (English,
-six options with a comparison and bench checks) and `docs/konzept-dm-transportsicherung-20260909.html`
+Two documents, no firmware change. `docs/archive/proposal-dm-transport-reliability-20260909.md` (English,
+six options with a comparison and bench checks) and `docs/archive/konzept-dm-transportsicherung-20260909.html`
 (German, konzeptpapier layout, single file; the same file sits on the Desktop as
 `MeshCom-DM-Transportsicherung.html`). Backlog §3.8ad carries the items `DM-01..DM-06`.
 
@@ -1500,7 +1500,7 @@ verdict).
 
 Three-channel overnight soak (22:00-07:58, build v4.35p.08.31.4) with a REAL
 router reboot at 05:35 — full write-up appended to
-`docs/wifi-soak-report-20260831.md` (Nachtrag). Headlines: 93 (WLAN, gapless
+`docs/archive/wifi-soak-report-20260831.md` (Nachtrag). Headlines: 93 (WLAN, gapless
 serial view) reconnected in 96 s onto a different BSSID/channel with NTP
 resync 3 s after got_ip; RAK-90 (W5100S) 3 link flaps, DHCP renew with new
 IP, 0 resets; gateway 98 hub-side 100 % uptime/0 events (96 s < the 3-min
@@ -1723,7 +1723,7 @@ alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
   "reset" each on T-Deck/T-Beam is the port-open reboot at t=0), `same_ip` 55/55/55, every
   join WPA2-PSK, BSSID re-picks between the two Orbi radios after drops (14/6/13) as
   designed. Consistent with the Wave-W 51-min fragment (3989/4123/4123). Report:
-  `docs/wifi-soak-report-20260831.md`; summary + events CSVs checked in under
+  `docs/archive/wifi-soak-report-20260831.md`; summary + events CSVs checked in under
   `tools/bench/runs/wifisoak_night_20260830-224246/` (raw `.log`s stay untracked, 6 MB).
 - **TM-45 filed (Medium, both platforms)** — the soak was the first run with NTP as the only
   clock, and NTP got **0 replies in 9.1 h** (545–548 timeouts per board, 60-s cadence):

@@ -18,8 +18,8 @@ anfasst. **Abschnitt "Korrekturen 2026-09-02"** unten geht dem Rest vor, wo beid
 widerspricht.
 
 Herkunft: Nachtmessung der OE3-Bergknoten 1./2.09.2026
-(`docs/report-2026-09-02-oe3-bergknoten.htm`, Abschnitt "Debug-Flags") und
-Konzeptbericht `docs/report-2026-09-02-adaptiver-relay-slot.htm` (PR-A).
+(`docs/archive/report-2026-09-02-oe3-bergknoten.htm`, Abschnitt "Debug-Flags") und
+Konzeptbericht `docs/archive/report-2026-09-02-adaptiver-relay-slot.htm` (PR-A).
 Code-Stellen geprüft gegen `v4.35p_prio` @ `3b34dfc1`.
 
 ## Ziel

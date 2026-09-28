@@ -292,7 +292,7 @@ API inside `taskENTER_CRITICAL()`.
 `src/lora_functions.cpp:1495` (`addTxRingEntry`), `:1477` (`advanceIReadPastEmpty`), `:1599` (`doTX`).
 **Severity: HIGH.**
 
-`docs/code-audit-fixes-20260627.md:33` records C1 as "`iWrite/iRead` → `std::atomic<uint8_t>` ✅ done"
+`docs/archive/code-audit-fixes-20260627.md:33` records C1 as "`iWrite/iRead` → `std::atomic<uint8_t>` ✅ done"
 and `docs/code-audit-20260712.md:171` frames the remaining work as "indices/paths that fix did not cover".
 Both understate the problem: **making the indices atomic does not make the enqueue atomic.** The
 enqueue is:
@@ -362,7 +362,7 @@ verdict's sprint plan says — that judgement is correct.
 **File:** `src/esp32/esp32_main.cpp:473`.
 **Severity: LOW (correctness), MED (false confidence).**
 
-`docs/code-audit-fixes-20260627.md:29` records "B2 `scanFlag` → `std::atomic<bool>` ✅ done
+`docs/archive/code-audit-fixes-20260627.md:29` records "B2 `scanFlag` → `std::atomic<bool>` ✅ done
 f121f3a1". Grep of the whole tree: `scanFlag` appears **only** at its own definition. The ESP32 CAD
 path uses the blocking `radio.scanChannel()` (`esp32_main.cpp:2380,:2399`), not an async CAD
 callback. So an audit item was closed by hardening a variable that does not participate in any
@@ -587,7 +587,7 @@ it loses the yield hint.
 **File:** `src/extudp_functions.cpp:507-522` (producer), `:524-535` (consumer), `:47-58` (struct).
 **Severity: MED.**
 
-`docs/code-audit-20260626.md:87-125` (RACE-01) hardened `used` to
+`docs/archive/code-audit-20260626.md:87-125` (RACE-01) hardened `used` to
 `std::atomic<bool>` with `release`/`acquire`, which is correct **as far as it goes** — but the
 producer never inspects it:
 
@@ -657,7 +657,7 @@ The ISR body itself (`if(gKeyNum == 0) gKeyNum = 1;`) is a read-modify-write, bu
 the three handlers is actually attached (`:1029` and `:1037` are commented out) there is no
 ISR-vs-ISR race — only ISR-vs-task.
 
-Note `docs/code-audit-fixes-20260627.md:31` records B4 as "pulseTimes ISR race — already `volatile`,
+Note `docs/archive/code-audit-fixes-20260627.md:31` records B4 as "pulseTimes ISR race — already `volatile`,
 no change". That is correct for `gps_functions.cpp`, but `gKeyNum` is the same pattern and was never
 looked at.
 

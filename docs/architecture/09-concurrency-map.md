@@ -833,7 +833,7 @@ against `1ba101f4`, before the rebase onto `upstream/dev`; `git diff --stat 1ba1
 ### 8.3 Claims carried over from the raw report **without** independent re-verification
 
 - The `esp32_audio` and T-Deck TFT semaphore entries are recorded as "pre-existing exceptions" per
-  `docs/code-audit-20260626.md` item 24. I confirmed the declarations
+  `docs/archive/code-audit-20260626.md` item 24. I confirmed the declarations
   (`esp32_audio.cpp:26`, `t-deck/tdeck_main.cpp:47`, `:401`) but did not analyse those paths.
 - ~~The claim that ESP32 `std::atomic` RMWs are meaningfully expensive is not measured.~~
   **Now measured** — see §5. The RMWs are inline `S32C1I` CAS loops, no libcall, no interrupt

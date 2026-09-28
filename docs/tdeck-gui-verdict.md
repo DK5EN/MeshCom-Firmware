@@ -1,7 +1,7 @@
 # T-Deck Plus GUI — Fable Verdict (stage 2, 2026-08-28)
 
 Stage 2 of a two-stage review. Stage 1 (`/code-review medium`) is
-[`review-tdeck-gui-20260828.md`](review-tdeck-gui-20260828.md) — 16 findings, not repeated here.
+[`review-tdeck-gui-20260828.md`](archive/review-tdeck-gui-20260828.md) — 16 findings, not repeated here.
 Stage 2 ran seven independent finders (heap, concurrency, correctness, performance, bounds,
 test-audit, altitude), each blind to the others, followed by verification.
 
@@ -189,7 +189,7 @@ What survives of G09: the allocation is still unbounded and unvalidated against 
 size, so crafted or corrupt content under `/maps/**` can exhaust the 8 MB PSRAM. Fix it, but as an
 input-validation issue, not as an internal-heap issue.
 
-**H1 measured on hardware (see [`tdeck-baseline-20260828.md`](tdeck-baseline-20260828.md), run 2):
+**H1 measured on hardware (see [`tdeck-baseline-20260828.md`](archive/tdeck-baseline-20260828.md), run 2):
 mechanism confirmed, failure mode refuted.** 60 messages driven onto the open group tab produced
 exactly the predicted divergence — the model froze at 50, the view grew to 60 — so the unbounded
 view growth is real. But the internal heap _did not decline_ (77 648 -> 91 072 B, i.e. it rose), and

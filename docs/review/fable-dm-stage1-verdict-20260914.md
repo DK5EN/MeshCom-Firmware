@@ -1,6 +1,6 @@
 # DM stage 1 — Fable Verdict (2026-09-14)
 
-Subject: commit `731e0ebc` (wave S1-1), diff `86974a8e..731e0ebc`. Spec: `docs/dm-stage1-plan-20260914.md`
+Subject: commit `731e0ebc` (wave S1-1), diff `86974a8e..731e0ebc`. Spec: `docs/archive/dm-stage1-plan-20260914.md`
 sections 1-5, 8 and the S1-1 notes; traps T1/T2/T2b/T11 in
 `docs/dm-reliability-and-store-node-verdict-20260913.md`. Native: `pio test -e native -f test_dm_outbox
 -f test_dm_stats` = 29/29 green (22 + 7). Line numbers are the tree at `731e0ebc`.
@@ -89,7 +89,7 @@ correct as specified. Mode `off` is byte-identical to today.
 
 ## Finding 6: doc claims that the tree does not match
 
-- **File:** `docs/dm-stage1-plan-20260914.md` S1-1 notes ("echo, ack and held hooks only when the
+- **File:** `docs/archive/dm-stage1-plan-20260914.md` S1-1 notes ("echo, ack and held hooks only when the
   mode is not off"), commit message
 - **Severity:** Low (documentation)
 - **Failure scenario:** All three hooks are unconditional (`lora_functions.cpp:1123-1124`, `:1141`,
@@ -258,7 +258,7 @@ Diff `731e0ebc..1595542c`. Native: `pio test -e native -f test_dm_outbox -f test
   the wire and no `own_msg_id[]` 0x03 write for a held message. Test updated to assert the held
   report call (`test_main.cpp:553-556`).
 - **F6 — CONFIRMED.** Plan S1-1 note corrected and an S1-2 rework section added
-  (`docs/dm-stage1-plan-20260914.md`); code unchanged, as it should be.
+  (`docs/archive/dm-stage1-plan-20260914.md`); code unchanged, as it should be.
 - **F7 — CONFIRMED sharp.** `test_echo_on_last_id_also_gates` (`:275-305`) runs mode 9 to attempt 3
   (always fresh), asserts `last_id != first_id` and `echo_seen == false`, then echoes `last_id` —
   deleting the `last_id` disjunct at `dm_outbox.cpp:307` fails it. `test_held_on_unknown_nnn`

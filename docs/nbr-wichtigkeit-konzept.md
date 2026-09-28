@@ -5,10 +5,10 @@ und v2 (Zwischenstand gegen den Feldlauf). Nichts davon ist Code. Was sich gegen
 hat, steht in Abschnitt 2.6; die Zahlen stammen aus dem **Zwischenstand nach 11,9 von 24 h** und sind
 nach dem Laufende (22.09. 19:20) mit `tools/nbrsnap.py` und `tools/nbrrelay.py` neu zu ziehen.
 
-**Vorgaenger:** `docs/nachbarschaftsmatrix-campaign.md` (Stufe 1, was gebaut ist),
-`docs/nachbarschaftsmatrix-verdict.md` (Advisor-Befunde), `docs/nbr-logformat.md` (Logformat),
+**Vorgaenger:** `docs/archive/nachbarschaftsmatrix-campaign.md` (Stufe 1, was gebaut ist),
+`docs/archive/nachbarschaftsmatrix-verdict.md` (Advisor-Befunde), `docs/nbr-logformat.md` (Logformat),
 `docs/adr-nc-importance-backoff.md` (ADR 02: Wichtigkeit aus dem HEY-`NC`, Slot-Mechanik, die
-Guardrails E5 aus dem Feldausfall 60ea7d8), `docs/Relay-Prioritaeten-Verdict.html` (Overhear-Abbruch,
+Guardrails E5 aus dem Feldausfall 60ea7d8), `docs/archive/Relay-Prioritaeten-Verdict.html` (Overhear-Abbruch,
 MPR-Kostenrechnung, Stufe "Zaehler zuerst").
 
 ---

@@ -130,7 +130,7 @@ Fourteen releases. The relevant ones:
 **Why this matters here:** the firmware ships BLE as the primary phone interface
 (`MAX_MSG_LEN_PHONE 300`, `addBLEOutBuffer`, `BLEtoPhoneBuff[MAX_RING][305]`). The 2.4.0
 multi-mbuf truncation fix and the 2.5.1 use-after-free are exactly the class of bug that
-produces "the phone app sometimes drops messages" reports. `docs/report-ble-tx-latency.md`
+produces "the phone app sometimes drops messages" reports. `docs/archive/report-ble-tx-latency.md`
 already documents work in this area.
 
 **Risks:**

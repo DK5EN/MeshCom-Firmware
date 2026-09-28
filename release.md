@@ -363,7 +363,7 @@ nicht dieses Image betrifft:
   Neustart, Absturz oder Ringueberlauf.
 - **W4-Bench auf DK5EN-1, 2026-09-25**: KISS/TCP, `IS1`, `SN1` und der
   `--via`-Fix nach dem Upstream-Merge auf `e4a2393f` (siehe
-  `docs/neo-upstream-merge-20260925.md`).
+  `docs/archive/neo-upstream-merge-20260925.md`).
 
 Beide Laeufe pruefen fruehere Zwischenstaende dieses Branches, nicht den
 heutigen Merge.
@@ -413,7 +413,7 @@ offiziellen 4.35t).
 ### Was dazugekommen ist
 
 Ausloeser der Punkte 212-216 war eine Parser-Drift-Analyse
-(`docs/aprs-parser-drift-20260911.md`): die Firmware emittiert 17
+(`docs/archive/aprs-parser-drift-20260911.md`): die Firmware emittiert 17
 `/X=`-Positionsschluessel, ihr eigener Decoder kannte nur 14.
 
 - **Decoder liest `/R=`, `/U=`, `/I=`** (Punkt 212, `decodeAPRSPOS()` in
@@ -2227,8 +2227,8 @@ Variantenoption `GPS_BAUDRATE_SOFTCHECK` aus 15 `configuration.h` unbedingt
 ueberschrieben hat -- der zweite Zweig war auf ALLEN Boards unerreichbar. Die
 Flash-Groesse ist vorher und nachher byteidentisch, was den toten Code belegt.
 
-Volle Analyse: [`docs/bug-N25-gps-baud-scan-watchdog.md`](docs/bug-N25-gps-baud-scan-watchdog.md).
-Messprotokoll der Bankpruefung: [`docs/gps-sensor-bench-20260822.md`](docs/gps-sensor-bench-20260822.md).
+Volle Analyse: [`docs/archive/bug-N25-gps-baud-scan-watchdog.md`](docs/archive/bug-N25-gps-baud-scan-watchdog.md).
+Messprotokoll der Bankpruefung: [`docs/archive/gps-sensor-bench-20260822.md`](docs/archive/gps-sensor-bench-20260822.md).
 
 ### N-27 -- BME680-Treiber haelt ein I2C-ACK fuer eine Chip-Erkennung (Medium)
 
@@ -2313,7 +2313,7 @@ Schwerpunkte:
 Die vollstaendige Auflistung mit Referenz auf die jeweiligen Findings steht in
 [`docs/CHANGELOG-stability.md`](docs/CHANGELOG-stability.md). Die Befunde selbst
 sind in [`docs/architecture/08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md)
-und [`docs/code-audit-fixes-20260627.md`](docs/code-audit-fixes-20260627.md)
+und [`docs/archive/code-audit-fixes-20260627.md`](docs/archive/code-audit-fixes-20260627.md)
 dokumentiert; offene Punkte in [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ---

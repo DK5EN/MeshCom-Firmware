@@ -1,7 +1,7 @@
 # DM stage 3 — store node wave plan
 
 Prepared 2026-09-14 from `docs/dm-transport-impl-plan-20260913.md` (stage 3, D2-D8),
-`docs/MeshCom-Store-Node-Concept-20260911.md` (§3, §7, §8) and the verdict's §3.5/T7/T8/T12/T13/T14.
+`docs/archive/MeshCom-Store-Node-Concept-20260911.md` (§3, §7, §8) and the verdict's §3.5/T7/T8/T12/T13/T14.
 Dispatch mechanics per `orchestrate-waves`. Fork-first: no upstream PR until the role is accepted.
 
 ## Wave status log

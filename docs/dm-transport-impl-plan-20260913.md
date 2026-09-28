@@ -1,7 +1,7 @@
 # DM transport reliability + store node — implementation and test plan
 
 Plan, 2026-09-13. Derived from `docs/dm-reliability-and-store-node-verdict-20260913.md` (design and
-traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
+traps), `docs/archive/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 `docs/review/fable-dm-store-node-verdict-20260913.md` (review findings). Nothing in code yet.
 
 ## Stage status log
@@ -9,7 +9,7 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 | Stage | Content                                 | Status                                                                                                                                                                                                             |
 | ----- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                                                                                               |
-| 1     | Outbox + the 9-send ladder              | **in tree 2026-09-14** behind `--dmretry off\|3\|9` (default off, "Enhanced message transport protection"); docs/dm-stage1-plan-20260914.md; 731e0ebc + rework 1595542c, advisor APPROVED; bench T-1.1..T-1.9 open |
+| 1     | Outbox + the 9-send ladder              | **in tree 2026-09-14** behind `--dmretry off\|3\|9` (default off, "Enhanced message transport protection"); docs/archive/dm-stage1-plan-20260914.md; 731e0ebc + rework 1595542c, advisor APPROVED; bench T-1.1..T-1.9 open |
 | 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below)                                                                                                        |
 | 3     | Store node + mailbox GUI                | **code in tree 2026-09-14** (59f21e5b + rework 96050d72), advisor re-check pending; bench T-3.1..T-3.9 open                                                                                                        |
 | 4     | Sender-visible custody notice           | **in tree 2026-09-14** (66dea241 + rework 150b0a4a), advisor APPROVED; bench T-4.1..T-4.7 open; client guide docs/client-integration-store-forward.md                                                              |

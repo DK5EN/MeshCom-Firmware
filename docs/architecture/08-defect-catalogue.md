@@ -1142,7 +1142,7 @@ Suite ueber dem Ring fand am ersten Tag einen echten High-Defekt.
 
 ### N-25 — GPS-Baudscan loest den Task-Watchdog aus und schickt den Knoten in den Boot-Loop — **FIXED (Wellen 0 bis 3, auf echter Hardware reproduziert und verifiziert)** — Critical
 
-Vollstaendige Analyse: `docs/bug-N25-gps-baud-scan-watchdog.md`. Kurzfassung:
+Vollstaendige Analyse: `docs/archive/bug-N25-gps-baud-scan-watchdog.md`. Kurzfassung:
 `4c21cb49` (Audit-Befund C3) abonnierte den Task-Watchdog in der ersten Zeile
 von `esp32setup()`. `WZ_GPS_Init()` laeuft aber aus `esp32loop()`
 (`esp32_main.cpp:2706`) und blockiert dort ohne eine einzige Fuetterung rund
@@ -1176,7 +1176,7 @@ Welle 4 (S2, die vier unbegrenzten
 Schleifen B-1/B-2/B-6/B-10 und der AP-Zweig B-13), Welle 5 (Coredump-
 Partition), Welle 6 (B-1 bis B-15 als Katalogeintraege). Ebenso offen die
 Hardware-Pruefungen 8.4 (Board mit `--gps on` ohne Modul) und 8.5
-(Batteriestart ohne USB) — siehe `docs/gps-sensor-bench-20260822.md`.
+(Batteriestart ohne USB) — siehe `docs/archive/gps-sensor-bench-20260822.md`.
 
 ### N-26 — RAK-GPS-Pfad merkt sich das Fehlschlagen der Erkennung nicht — **VERIFIED (auf echter Hardware, Kontrollfall gegen Upstream)** — Medium
 
@@ -1379,7 +1379,7 @@ setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
 `decodeAPRSPOS()` (`src/aprs_functions.cpp`) scannt der Reihe nach `/B= /A= /P= /H=
 /T= /O= /F= /Q= /G= /N /C= /V= /Y= /D=` — 14 Schluessel. Der eigene Encoder
 (`PositionToAPRS()`, `src/loop_functions.cpp`) emittiert aber 17
-(`docs/aprs-parser-drift-20260911.md` §2, formalisiert in
+(`docs/archive/aprs-parser-drift-20260911.md` §2, formalisiert in
 `docs/architecture/11-wire-format.md` §1.8): `/R=` (bis zu sechs Gruppen,
 semikolongetrennt), `/U=` (INA226-Busspannung, `%.2f`) und `/I=` (INA226-Strom,
 `%.1f`) fehlten dem Decoder komplett — kein Scan-Loop, kein Feld. Jeder Konsument,
@@ -1760,7 +1760,7 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 | 1.12    | APRS Decoder: `#name` nicht getrennt    | `N-35`          | small       | FIXED 2026-09-11                                         |
 
 **Wave 1's original 8 items are closed** — all done or deliberately accepted as risk; items 1.9-1.12
-were added 2026-09-11 (APRS parser contract fixes, `docs/aprs-parser-drift-20260911.md`). See the
+were added 2026-09-11 (APRS parser contract fixes, `docs/archive/aprs-parser-drift-20260911.md`). See the
 Standing risk box in `docs/BACKLOG.md` for what "done" means here (fixed locally, not yet upstream).
 
 ### Wave 2 — remaining prior-verdict Track A

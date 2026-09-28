@@ -6,7 +6,7 @@ dashboard (`meshmap.oevsv.at/admin`, "Flottenaktivitaet" chart). Data source:
 `interlink` log (live file 2026-08-26 22:53 UTC onwards, ~97 MB, and the
 2026-08-25 / 2026-08-26 gzip archives).
 
-Related: [hey-supp.md](hey-supp.md) (Trickle-HEY suppression measurement).
+Related: [hey-supp.md](../hey-supp.md) (Trickle-HEY suppression measurement).
 
 ---
 

@@ -696,4 +696,4 @@ Do not re-check these.
 - `.gitignore:10` is `.*` with only `!/.gitignore` negated ✓ (V-06 valid).
 - `tools/meshcom_monitor/` holds exactly 17 `.log` files ✓ (but see F1-3 for what is in them).
 - `tools/serial_monitor.py` has `--replay` (`:1035`) and `--no-dtr` (`:1029`) ✓.
-- `docs/loradebug-serial-output.md` and `docs/report-ble-tx-latency.md` exist ✓; 9 `docs/code-audit-*.md` files ✓.
+- `docs/loradebug-serial-output.md` and `docs/archive/report-ble-tx-latency.md` exist ✓; 9 `docs/code-audit-*.md` files ✓.

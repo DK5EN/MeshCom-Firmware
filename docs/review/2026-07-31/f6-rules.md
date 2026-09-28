@@ -35,7 +35,7 @@ Counts are over `src/` (332 source files). "Evidence" is one representative site
 | BND-01 | NEVER `sprintf`/`strcpy`/`strcat`/`gets`; format strings ALWAYS literals | **fail** | `src/printfdeb_functions.cpp:118` `Serial.printf(temp)` — **non-literal format string fed with over-the-air data** | 4 `sprintf`, 5 `strcpy`, 2 `strcat`, 1 non-literal fmt |
 | BND-02 | All `memcpy`: validate length BEFORE copy, assert `len <= buffer_size` | **fail** | `src/esp32/esp32_main.cpp:310`; `src/lora_functions.cpp:211,385` | 149 `memcpy` sites, only a handful length-guarded |
 | BND-03 | `snprintf` with the *correct* size parameter | **fail** | `src/web_functions/web_functions.cpp:1660` `snprintf(value, 100, …)` on `char value[40]` (decl :1601) | 43 calls pass a numeric literal instead of `sizeof(dst)` |
-| BND-04 | Check `snprintf` return for truncation | **fail** | project-wide; acknowledged in `docs/code-audit-20260626.md` Nr 77 as "~600 sites, DE-PRIO" | ~600 |
+| BND-04 | Check `snprintf` return for truncation | **fail** | project-wide; acknowledged in `docs/archive/code-audit-20260626.md` Nr 77 as "~600 sites, DE-PRIO" | ~600 |
 | BND-05 | `static_assert` on all protocol struct sizes | **fail** | no wire struct carries one | **1** `static_assert` in the entire tree; **0** packed structs |
 | §3 | Input validation on every external input | **fail** | `src/phone_commands.cpp:226,324,364,385,403,466,479–488,555` (BLE cmds unvalidated) | 5 finding groups, all DE-PRIO'd |
 | RACE-01 | Never touch shared data from two tasks unsynchronised | partial | fixed for externQueue (`src/extudp_functions.cpp:55,520,528`); still open for `transmissionState` (`src/lora_functions.cpp:9`) | — |
@@ -82,18 +82,18 @@ RACE-07 is the one section that materially improved since 2026-06-27 and it hold
 
 ## Part B: previously-claimed fixes that did not hold
 
-Sampled from `docs/code-audit-20260626.md` (the "Entscheidungsprotokoll", 95 numbered decisions),
-`docs/code-audit-20260531.md` (priority ranking) and `docs/code-audit-fixes-20260627.md` (the fix claim).
+Sampled from `docs/archive/code-audit-20260626.md` (the "Entscheidungsprotokoll", 95 numbered decisions),
+`docs/code-audit-20260531.md` (priority ranking) and `docs/archive/code-audit-fixes-20260627.md` (the fix claim).
 
 ### B-1 — Nr 59: 11× `while(true);` on radio-init failure — **MANDATED FIX, SILENTLY DROPPED**
 
-**The claim.** `docs/code-audit-20260626.md:288`:
+**The claim.** `docs/archive/code-audit-20260626.md:288`:
 
 > | 59 | CRITICAL | t-deck-pro/peri_lora.cpp | 11x `while(true);` | **FIX** | Identisches Problem; **trotz T-Deck-Pro: geteilter Code-Pfad** |
 
 The reviewer explicitly pre-rejected the "it's only T-Deck-Pro" excuse, in writing, in the decision column.
 
-**What was delivered.** `docs/code-audit-fixes-20260627.md:70`:
+**What was delivered.** `docs/archive/code-audit-fixes-20260627.md:70`:
 
 > **A2:** 8 radio-init sites in `esp32_main.cpp`; `t-deck-pro/peri_lora.cpp` (11) excluded (not built by either mandated target → unverifiable).
 
@@ -113,11 +113,11 @@ src/t-deck-pro/peri_lora.cpp:48,54,60,66,72,78,85,91,97,105,114 →  while (true
 
 ### B-2 — Nr 32: `pulseTimes` ISR race — **MANDATED FIX, RECLASSIFIED TO NO-OP BY THE IMPLEMENTER**
 
-**The claim.** `docs/code-audit-20260626.md:241`:
+**The claim.** `docs/archive/code-audit-20260626.md:241`:
 
 > | 32 | HIGH | gps_functions.cpp:174-175 | `pulseTimes` ISR Race | **FIX** | Torn Read bei GPS-Timing möglich |
 
-**What was delivered.** `docs/code-audit-fixes-20260627.md:31` marks B4 "✅ already `volatile` (no change)", and `:86`:
+**What was delivered.** `docs/archive/code-audit-fixes-20260627.md:31` marks B4 "✅ already `volatile` (no change)", and `:86`:
 
 > **B4:** `pulseTimes`/`pulseIndex` are already `volatile`; the GPS ISR is single-core (ISR↔task, barrier via `detachInterrupt`) → satisfied without change.
 
@@ -143,19 +143,19 @@ The fix report's justification is precisely the thing the rule forbids, and `gps
 
 ### B-3 — Nr 33: `scanFlag` **and** `transmissionState` — **HALF DONE**
 
-**The claim.** `docs/code-audit-20260626.md:242`: "esp32/esp32_main.cpp:443,458 | `scanFlag`/`transmissionState` ohne volatile/atomic | **FIX**". Both names, one decision.
+**The claim.** `docs/archive/code-audit-20260626.md:242`: "esp32/esp32_main.cpp:443,458 | `scanFlag`/`transmissionState` ohne volatile/atomic | **FIX**". Both names, one decision.
 
 **Current source.**
 - `src/esp32/esp32_main.cpp:473` — `std::atomic<bool> scanFlag{false};` ✅
 - `src/lora_functions.cpp:9,16,22,28,34,40,46` — `extern volatile int transmissionState;` (7 duplicate externs) ❌
 
-**Verdict: PARTIAL, and honestly declared.** `docs/code-audit-fixes-20260627.md:73–75` documents the deviation ("would ripple across 3 files for marginal benefit"). Fair disclosure — but the fix table still shows B2 as ✅ done with no asterisk, and the 7 duplicated `extern volatile int transmissionState;` declarations are themselves a §17 "single source of truth" violation nobody has flagged.
+**Verdict: PARTIAL, and honestly declared.** `docs/archive/code-audit-fixes-20260627.md:73–75` documents the deviation ("would ripple across 3 files for marginal benefit"). Fair disclosure — but the fix table still shows B2 as ✅ done with no asterisk, and the 7 duplicated `extern volatile int transmissionState;` declarations are themselves a §17 "single source of truth" violation nobody has flagged.
 
 ---
 
 ### B-4 — Nr 86: APRS FCS checked after parsing — **CRITICAL, STILL OPEN, OPENLY DEFERRED**
 
-`docs/code-audit-20260626.md:350` mandates **FIX** ("Korrupte Pakete werden vollständig verarbeitet"). `docs/code-audit-fixes-20260627.md:88–92` defers it with a genuine technical reason (the FCS coverage end-offset is computed *during* the variable-length parse, so it isn't known at entry) and lists it under Open items.
+`docs/archive/code-audit-20260626.md:350` mandates **FIX** ("Korrupte Pakete werden vollständig verarbeitet"). `docs/archive/code-audit-fixes-20260627.md:88–92` defers it with a genuine technical reason (the FCS coverage end-offset is computed *during* the variable-length parse, so it isn't known at entry) and lists it under Open items.
 
 Current source confirms: `src/aprs_functions.cpp` still parses fields before the FCS check; only the max-frame-size guard (Nr 87) landed at `:9,149`.
 
@@ -165,7 +165,7 @@ Current source confirms: `src/aprs_functions.cpp` still parses fields before the
 
 ### B-5 — Priority list vs. decision table inside the *same* document
 
-`docs/code-audit-20260626.md:169–176` prints the carried-forward priority ranking:
+`docs/archive/code-audit-20260626.md:169–176` prints the carried-forward priority ranking:
 
 > 2. **WiFi.softAP without password** — CRITICAL, 3 sites
 > 6. **web_header unbounded concat** — CRITICAL
@@ -181,7 +181,7 @@ Current source confirms: `src/aprs_functions.cpp` still parses fields before the
 
 ### B-6 — Nr 71: the `-Werror` exception rests on a factually false premise
 
-`docs/code-audit-20260626.md:310`:
+`docs/archive/code-audit-20260626.md:310`:
 
 > | 71 | CRITICAL | platformio.ini:152,179,219 | `-Werror` fehlt | EXCEPTION | **Würde bei aktuell ignoriertem Warning-Bestand Build brechen** |
 > *("would break the build given the currently-ignored stock of warnings")*
@@ -232,7 +232,7 @@ That is 16 of 19 sampled claims verified true. The audit process is **mostly hon
 
 `tools/code_audit_scan.py` is 170 lines, 11 regexes, line-oriented, no multi-line, no preprocessor, no type information, no cross-file state. Structural blind spots:
 
-**1. It cannot see the length in a `memcpy`.** One regex, `\bmemcpy\s*\(`, tags all 149 call sites MEDIUM/"verify length before call" with zero analysis. An attacker-controlled length is indistinguishable from `memcpy(a, b, 4)`. Because ~100% of the hits are noise, BND-02 has been trained out of the reviewers' attention — visible in `docs/code-audit-20260626.md:212–218`, where six of eight `memcpy` findings are DE-PRIO/EXCEPTION on generic grounds.
+**1. It cannot see the length in a `memcpy`.** One regex, `\bmemcpy\s*\(`, tags all 149 call sites MEDIUM/"verify length before call" with zero analysis. An attacker-controlled length is indistinguishable from `memcpy(a, b, 4)`. Because ~100% of the hits are noise, BND-02 has been trained out of the reviewers' attention — visible in `docs/archive/code-audit-20260626.md:212–218`, where six of eight `memcpy` findings are DE-PRIO/EXCEPTION on generic grounds.
 
 **2. No check for non-literal format strings** — the very rule at `codequality-rules.md:29` and `:147`. There is no `printf\s*\(\s*[A-Za-z_]` pattern. This is how `Serial.printf(temp)` at `src/printfdeb_functions.cpp:118` survived eight audits (F6-3). A one-line `-Wformat=2` in the build found it instantly.
 
@@ -369,7 +369,7 @@ Ordered by (value ÷ cost), all costs measured on this tree.
 **File:** `src/t-deck-pro/peri_lora.cpp:48,54,60,66,72,78,85,91,97,105,114`
 **Severity:** HIGH (CRITICAL as originally classified)
 
-`docs/code-audit-20260626.md:288` mandates **FIX** with the rationale "trotz T-Deck-Pro: geteilter Code-Pfad" — explicitly rejecting the T-Deck-Pro exemption. `docs/code-audit-fixes-20260627.md:70` then skips it using that exact exemption, and the A2 row is reported **✅ done** with no entry in the Deviations section.
+`docs/archive/code-audit-20260626.md:288` mandates **FIX** with the rationale "trotz T-Deck-Pro: geteilter Code-Pfad" — explicitly rejecting the T-Deck-Pro exemption. `docs/archive/code-audit-fixes-20260627.md:70` then skips it using that exact exemption, and the A2 row is reported **✅ done** with no entry in the Deviations section.
 
 **Failure scenario:** any SX126x init error (bad SPI, cold-solder, brownout during boot) leaves the node spinning in `while (true);` with no WDT armed — permanently dead, no reboot, no log. `t_deck_pro` is in `default_envs` and CI publishes `t_deck_pro.bin` as a release artifact (`.github/workflows/meshcom-ci.yml:72,108`), so this ships to users.
 
@@ -432,7 +432,7 @@ Currently safe only because `node_mcp17t` is `char[16][16]` (`src/esp32/esp32_fl
 **File:** `platformio.ini:158, 185, 225`
 **Severity:** MEDIUM (meta — but it is the gate that would have caught F6-3 and F6-4)
 
-Decision Nr 71 (`docs/code-audit-20260626.md:310`) excepts COMP-01 because `-Werror` "would break the build given the currently-ignored stock of warnings". Measured: 9 warnings total, 4 in `src/`, all trivial.
+Decision Nr 71 (`docs/archive/code-audit-20260626.md:310`) excepts COMP-01 because `-Werror` "would break the build given the currently-ignored stock of warnings". Measured: 9 warnings total, 4 in `src/`, all trivial.
 
 **Failure scenario:** the build provides no type or bounds feedback, so §11 and COMP-02 are 100 % unenforced (425 conversion-class warnings appear the moment `-Wconversion` is added), and a remotely-triggerable format-string bug (F6-3) lived through eight audits.
 
@@ -458,7 +458,7 @@ The only workflow triggers on `push: tags`. There is no `pull_request` or branch
 **Files:** `docs/codequality-rules.md:6` vs `CLAUDE.md` "Minimal Changes Only"
 **Severity:** LOW (governance) — but it is the stated reason a CRITICAL is still open
 
-`codequality-rules.md:6` says violations "are treated as bugs". `CLAUDE.md` mandates cherry-picking "the absolute minimum" and forbids refactoring. `docs/code-audit-fixes-20260627.md:88–92` defers the CRITICAL APRS FCS-ordering fix (Nr 86) precisely because fixing it "requires restructuring, which violates the minimal-changes rule".
+`codequality-rules.md:6` says violations "are treated as bugs". `CLAUDE.md` mandates cherry-picking "the absolute minimum" and forbids refactoring. `docs/archive/code-audit-fixes-20260627.md:88–92` defers the CRITICAL APRS FCS-ordering fix (Nr 86) precisely because fixing it "requires restructuring, which violates the minimal-changes rule".
 
 **Failure scenario:** any finding whose correct fix is structural is permanently unfixable, and the CRITICAL backlog can only grow. Four audits have now carried Nr 86 forward.
 
@@ -481,7 +481,7 @@ The only workflow triggers on `push: tags`. There is no `pull_request` or branch
 
 ### F6-9: Documented priority list contradicts the decision table inside the same audit
 
-**File:** `docs/code-audit-20260626.md:169–176` vs `:268–269, :371`
+**File:** `docs/archive/code-audit-20260626.md:169–176` vs `:268–269, :371`
 **Severity:** LOW
 
 Items ranked #2 (`WiFi.softAP` open) and #6 (`web_header` unbounded) in the carried-forward priority list are marked permanent **EXCEPTION** 100 lines earlier in the same document. Both are unchanged in the current tree (`src/udp_functions.cpp:540`, `src/safeboot/main.cpp:68,187`, `src/web_functions/web_functions.cpp:31`).
@@ -576,7 +576,7 @@ Consequence: the architecture set cannot tell you where an atomic is genuinely n
 
 ### F6-10: Architecture remediation ranking is ordered by deletable LOC, inverting the audit's safety ranking
 
-**Files:** `docs/architecture/04-complexity-and-duplication.md:204–218`, `:122–123`; vs `docs/code-audit-20260626.md:404–423`
+**Files:** `docs/architecture/04-complexity-and-duplication.md:204–218`, `:122–123`; vs `docs/archive/code-audit-20260626.md:404–423`
 **Severity:** MEDIUM (governance)
 
 The two ranked backlogs share zero items. The architecture set ranks by "Deletes / unifies" LOC and effort; the audits rank by safety severity. `OnRxDone()` is called "the highest-consequence code in the firmware ... and the least testable" (`04:122–123`) and ranked 8 of 9, below four file merges. The one open CRITICAL on that path (APRS FCS-before-parse) is absent from the architecture set entirely.
