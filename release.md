@@ -7,6 +7,55 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Release v4.35u.09.28.2-neo (Montag, 2026-09-28)
+
+Zweiter Schnitt desselben Tages auf `v4.35u.09.28-neo` (`fed0eb0e`). Versionsbuchstabe und
+`FLASH_VERSION` bleiben unveraendert (20260928) -- einziger Unterschied ist der Git-Commit
+(`8de8d3da`).
+
+**Fehlerbehebung:** `is_format_char()` in `src/charset_filter.cpp` behandelte U+200D (ZERO WIDTH
+JOINER) als Teil des pauschalen Bereichs U+200B-U+200F und entfernte es aus jeder Nachricht. Anders
+als seine Nachbarn im selben Block traegt U+200D kein eigenes Glyph, sondern verbindet die
+Codepoints links und rechts davon zu einem einzigen Schriftzeichen -- z. B. Shrug-Symbol (U+1F937)
+
+- ZWJ + Male-Sign (U+2642) + Variation-Selector (U+FE0F) ergibt "person shrugging" nur, wenn das
+  ZWJ erhalten bleibt. Das bisherige Entfernen zerlegte die Sequenz in zwei getrennte Glyphen statt
+  ein unsichtbares Zeichen zu entfernen.
+
+Gefunden per Bankversuch auf einem RAK4631 (`--loradebug on` / `--txcapture on`): der `TX_FRAME`-
+Mitschnitt der tatsaechlich gesendeten Bytes zeigte die fehlende 3-Byte-ZWJ-Sequenz (E2 80 8D)
+zwischen den beiden Emoji-Haelften. Die Ausnahme fuer U+200D existiert bereits im separaten
+Web-Proxy-Projekt (MCProxy, `text_decode.py`, dort seit 2026-08-30 fuer denselben Fehlerfall);
+dieser Fix portiert dieselbe, bereits bewaehrte Ausnahme in den Firmware-eigenen Zeichensatzfilter.
+Alle anderen Zeichen im Bereich U+200B-U+200F (Zero Width Space, Zero Width Non-Joiner, Bidi-
+Override/Embedding, BOM) werden weiterhin entfernt.
+
+Auch upstream angeboten als [PR #1177](https://github.com/icssw-org/MeshCom-Firmware/pull/1177)
+(nur Quellcode, ohne Testaenderungen, da upstream die native Testsuite dieses Forks nicht
+mitfuehrt).
+
+Tests: 875 Host-Faelle in den 12 Gate-Envs, alle gruen, davon 2 neue Regressionstests
+(`test_charset_filter`). 32 Release-Envs gebaut.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Der Fix selbst, Ende zu Ende, auf einem RAK4631 (DK5EN-90): Vor-Fix-Stand geflasht, Shrug-Emoji per
+Seriell-Konsole gesendet, `TX_FRAME`-Mitschnitt zeigt fehlende ZWJ-Bytes; Fix geflasht, derselbe
+Versand wiederholt, `TX_FRAME`-Mitschnitt zeigt die ZWJ-Bytes intakt und die Konsolenzeile ein
+zusammengesetztes Glyph statt zweier getrennter Zeichen.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der Fix auf einem anderen Board als dem RAK4631 -- der Zeichensatzfilter ist board-unabhaengiger
+  gemeinsamer Code, aber kein anderes Board hat in dieser Session ein ZWJ-Emoji gesendet.
+- Ein Relay auf aelterer Firmware entfernt das ZWJ weiterhin, wenn es die Nachricht neu kodiert und
+  weiterleitet -- im selben Bankversuch beobachtet (ein Nachbarknoten noch auf `v4.35u.09.28-neo`
+  hat das ZWJ beim Relayen erneut entfernt). Erwartet, bis dieser Knoten neu geflasht ist, kein
+  Fehler dieses Fixes.
+- Alles, was `v4.35u.09.28-neo` als offen auffuehrt, gilt unveraendert weiter.
+
+---
+
 ## Release v4.35u.09.28-neo (Montag, 2026-09-28)
 
 Upstream hat am 27.09. abends das offizielle `v4.35u` veroeffentlicht (`61a58daa`, upstream/dev
