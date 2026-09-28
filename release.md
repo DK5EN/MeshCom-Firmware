@@ -7,6 +7,54 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Release v4.35u.09.28.3-neo (Montag, 2026-09-28)
+
+Dritter Schnitt desselben Tages, auf `v4.35u.09.28.2-neo`. Versionsbuchstabe und `FLASH_VERSION`
+bleiben unveraendert (20260928) -- Unterschied sind der Git-Commit (Fix `ea16bfef`) und die
+Build-Zeit in `--info`. Ersetzt alle frueheren Releases, auch im Web-Flasher.
+
+**Fehlerbehebung (Issue #1173):** Der Browser schickt jeden Formularwert prozentkodiert (`ą` als
+`%C4%85`). `decodeURLPercentCoding()` in `src/web_functions/web_functions.cpp` dekodierte aber nicht,
+sondern ersetzte eine feste Liste von rund 60 Codes (deutsche Umlaute, `ß`, einige italienische
+Vokale, ASCII-Satzzeichen) und liess jeden anderen Code woertlich stehen. Polnisch, Tschechisch,
+Kyrillisch, Emoji usw. gingen deshalb als Text wie `%C4%85` auf HF. Ausserdem wurde `%25` vor den
+spaeteren Codes dekodiert, ein getipptes `%28` kam als `(` an.
+
+Neu ist `src/url_decode.{h,cpp}`: ein Dekoder in einem Durchlauf, jedes `%XX` wird sein Byte. Die
+alten Eigenheiten bleiben (`+` wird Leerzeichen, Zeilenumbruch wird `-`, `"` faellt weg), dekodierte
+Steuerzeichen fallen jetzt ebenfalls weg, damit `%00` nichts abschneidet. `decodeURLPercentCoding()`
+ruft nur noch diesen Dekoder auf -- Setup-Seite, Funktionsaufrufe und Login profitieren mit.
+Nebenbei: die 150-Byte-Kuerzung in `send_message()` schneidet an einer Zeichengrenze
+(`charset_utf8_safe_truncate()`), das JavaScript `updateMessages()` ruft kein `decodeURIComponent()`
+mehr auf die rohe HTML-Antwort auf (warf bei jedem `%` einen Fehler und liess das Panel stehen, und
+verdeckte den Fehler auf dem Bildschirm des Senders), und HTML-Antworten tragen
+`charset=utf-8` im HTTP-Header.
+
+Upstream angeboten als [PR #1178](https://github.com/icssw-org/MeshCom-Firmware/pull/1178) (nur
+Quellcode). PR #1176 und #1177 sind inzwischen upstream gemergt.
+
+Tests: 889 Host-Faelle in den 12 Gate-Envs, alle gruen, davon 14 neue
+(`test_url_decode`); gegen eine C-Portierung des alten Dekoders schlagen 6 davon fehl. 32
+Release-Envs gebaut.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Der Fix selbst, ueber die Weboberflaeche eines Heltec V3 (DK5EN-1): mit dem Vorstand kam `ąęś äö`
+an Gruppe 9 als `%C4%85%C4%99%C5%9B äö` im Nachrichtenspeicher an; nach OTA auf diesen Stand steht
+`ąęśćłóżź äö 100% ok` exakt so im Speicher, und der HTTP-Header traegt `charset=utf-8`.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Empfang auf einem zweiten Knoten -- geprueft ist der Nachrichtenspeicher des sendenden Knotens,
+  der genau den Text haelt, der ans Funkmodul geht. Gruppe 9 erscheint nicht im Server-Archiv.
+- Der Fix auf einem anderen Board als dem Heltec V3; die nRF52-Builds (RAK4631, T114, T-Echo)
+  kompilieren den Dekoder, wurden aber nicht benutzt.
+- Die Zeichenanzeige unter dem Eingabefeld zaehlt weiter Zeichen statt Bytes; bei vielen
+  Mehrbyte-Zeichen kuerzt der Knoten vor dem angezeigten Limit (sauber an einer Zeichengrenze).
+- Alles, was `v4.35u.09.28.2-neo` als offen auffuehrt, gilt unveraendert weiter.
+
+---
+
 ## Release v4.35u.09.28.2-neo (Montag, 2026-09-28)
 
 Zweiter Schnitt desselben Tages auf `v4.35u.09.28-neo` (`fed0eb0e`). Versionsbuchstabe und
