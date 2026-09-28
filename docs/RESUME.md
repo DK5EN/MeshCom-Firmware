@@ -1,5 +1,17 @@
 # RESUME — pick up here
 
+## 2026-09-28 morning: release `v4.35u.09.28-neo` published
+
+Version letter `u` after upstream's official `v4.35u` (`61a58daa`, 27.09.). Tag on `fork-neo-test`
+`fed0eb0e`; GitHub release with 39 assets, marked Latest; `v4.35t.09.28-neo` stays as a release but
+is out of the flasher. gh-pages `c4401cce` (flasher, `check` 30 boards / 0 mismatches) + `24cddc32`
+(index card, PR history section "Nachzug auf 4.35u"), both eyeballed live in Chrome. Gate: 46 native
+envs / 1,408 cases (1 skipped), 32 release envs, RAK4631 flash 96.1 %. `FLASH_VERSION` stays
+20260928 -- the letter is the only difference to `v4.35t.09.28-neo`. Rebuilt safeboot bins were
+header-only noise (build time/hash, bytes 177-240) and not committed. `fork-neo` / `dk5en-neo`
+re-derived (`a7c66251`, only the version letter vs `17c9b936`; gate.sh not re-run). Open: nothing of
+this build on hardware; XOR soak ends today 17:39 (runs `ce9bf157`); PR #1176 waits for Kurt.
+
 ## 2026-09-27 late: upstream PRs #1165/#1166/#1169/#1171 ported, two PN-retry fixes
 
 Ported onto `fork-neo-test` (no upstream/dev merge): #1171 BLE 4 s supervision timeout +
