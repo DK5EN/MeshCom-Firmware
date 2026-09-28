@@ -1,5 +1,17 @@
 # RESUME — pick up here
 
+## 2026-09-27 late: upstream PRs #1165/#1166/#1169/#1171 ported, two PN-retry fixes
+
+Ported onto `fork-neo-test` (no upstream/dev merge): #1171 BLE 4 s supervision timeout +
+diagnostics, #1169 RX log oldest first (on the lazy RX log buffer), #1165 `--setcall` unchanged
+= no save/reboot, #1166 net console in Ethernet mode + `DISABLE_BLE` / `DISABLE_BATTERY` (battery
+flag in `loopAction_battCheck()`). #1164 not ported, stays open upstream until reworked. Own
+fixes: `handleACK()` folds a relay ACK for a PN retry copy to the original id (`8b3d70ba`, app
+gets 0x01, retries stop), and the UDP server-echo own-TX check does the same (`949dba25`);
+upstream dev has the `handleACK()` bug too -- upstream PR candidate. Advisor pass APPROVED.
+Gate: 1407 host tests, 32/32 envs; `fork-neo` re-derived on `6cc8b552`, gate.sh 38/40, 0
+symbol deviations, pushed to origin and `dk5en-neo`. Not bench-tested.
+
 ## 2026-09-27 night: branch cleanup -- `fork-neo-test` is the primary branch
 
 `feature-snf` (with fork-main's docs and `test_safeboot_state`) merged into `fork-neo-test`, tree
