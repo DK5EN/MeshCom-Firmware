@@ -144,6 +144,49 @@ static void test_bidi_and_zero_width_stripped(void)
     TEST_ASSERT_EQUAL_STRING("ABCDE", buf);
 }
 
+static void test_zwj_preserved_in_compound_emoji(void)
+{
+    // Regression for the 2026-09-28 RAK4631 bench finding: "person shrugging"
+    // is U+1F937 SHRUG (F0 9F A4 B7) + U+200D ZWJ (E2 80 8D) + U+2642 MALE
+    // SIGN (E2 99 82) + U+FE0F VARIATION SELECTOR-16 (EF B8 8F). Before this
+    // fix, is_format_char() dropped the ZWJ as part of its 0x200B-0x200F
+    // range, and the on-air TX_FRAME capture confirmed it: the joiner never
+    // left the node, so the compound glyph fell apart into two separate
+    // emoji on every receiver.
+    char buf[] = {
+        (char)0xF0, (char)0x9F, (char)0xA4, (char)0xB7,  // shrug
+        (char)0xE2, (char)0x80, (char)0x8D,               // ZWJ
+        (char)0xE2, (char)0x99, (char)0x82,               // male sign
+        (char)0xEF, (char)0xB8, (char)0x8F                // VS16
+    };
+    char expect[sizeof(buf)];
+    memcpy(expect, buf, sizeof(buf));
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(expect), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(expect));
+}
+
+static void test_other_zero_width_chars_in_200b_range_still_stripped(void)
+{
+    // The ZWJ exception is narrow: its immediate neighbours in the same
+    // block -- U+200B ZERO WIDTH SPACE and U+200C ZERO WIDTH NON-JOINER --
+    // carry no joining semantics for MeshCom's use case and keep being
+    // stripped, same as before this fix.
+    char buf[] = {
+        'A', (char)0xE2, (char)0x80, (char)0x8B,  // U+200B ZWSP
+        'B', (char)0xE2, (char)0x80, (char)0x8C,  // U+200C ZWNJ
+        'C', 0
+    };
+    size_t orig_len = strlen(buf);
+
+    size_t out = charset_filter_apply(buf, orig_len, CHARSET_FILTER_PLAIN);
+
+    buf[out] = 0;
+    TEST_ASSERT_EQUAL_STRING("ABC", buf);
+}
+
 // ---- charset_filter_apply(): separator-strip mode (CHR-02) ----------------
 
 static void test_separator_mode_strips_exact_derived_set(void)
@@ -509,6 +552,8 @@ int main(int, char **)
     RUN_TEST(test_invalid_and_overlong_dropped_without_corrupting_neighbors);
     RUN_TEST(test_overlong_3_and_4_byte_dropped);
     RUN_TEST(test_bidi_and_zero_width_stripped);
+    RUN_TEST(test_zwj_preserved_in_compound_emoji);
+    RUN_TEST(test_other_zero_width_chars_in_200b_range_still_stripped);
     RUN_TEST(test_separator_mode_strips_exact_derived_set);
     RUN_TEST(test_separator_mode_still_strips_controls_and_format_chars);
     RUN_TEST(test_truncate_noop_when_within_limit);
