@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "v4.35u.09.28.2-neo",
+      "version": "v4.35u.09.28.3-neo",
       "date": "2026-09-28",
-      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35u.09.28.2-neo",
+      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35u.09.28.3-neo",
       "boards": [
         {
           "env": "E22-DevKitC",
