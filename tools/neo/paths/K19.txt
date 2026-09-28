@@ -469,3 +469,4 @@ test/test_udp_send_twin/stubs/nrf_eth.h
 test/test_udp_send_twin/stubs/udp_functions.h
 test/test_udp_send_twin/test_udp_send_twin.cpp
 test/test_unconfigured/test_unconfigured.cpp
+test/test_url_decode/test_url_decode.cpp

@@ -150,6 +150,8 @@ src/ui_common/gps_protocol.cpp
 src/ui_common/gps_protocol.h
 src/ui_common/scr_mgr.c
 src/ui_common/scr_mgr.h
+src/url_decode.cpp
+src/url_decode.h
 src/via_functions.cpp
 src/web_functions/web_functions.cpp
 src/web_functions/web_functions.h
