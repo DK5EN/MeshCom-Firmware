@@ -1,5 +1,33 @@
 # RESUME — pick up here
 
+## 2026-09-28 afternoon: release `v4.35u.09.28.2-neo` published — ZWJ emoji fix
+
+Same-day second cut of `v4.35u.09.28-neo`. Found live on the bench: a RAK4631 (DK5EN-90)
+`--txcapture` of a shrug emoji (`🤷‍♂️`, U+1F937 + ZWJ + U+2642 + U+FE0F) sent from the serial
+console showed the 3-byte ZWJ sequence (`E2 80 8D`) missing from the actual on-air `TX_FRAME`.
+Cause: `is_format_char()` in `src/charset_filter.cpp` stripped U+200D as part of its blanket
+U+200B-U+200F range; MCProxy's `text_decode.py` already carries the identical exception for the
+identical failure mode (added there 2026-08-30) but it was never ported to the firmware's own
+filter. Fixed by carving U+200D out (`8de8d3da`); everything else in that range (ZWSP, ZWNJ, bidi
+overrides, BOM) still strips as before. Two new regression tests in `test_charset_filter`. Also
+offered upstream as [PR #1177](https://github.com/icssw-org/MeshCom-Firmware/pull/1177), source-
+only (this fork's native test suite isn't carried upstream).
+
+Re-flashed the fix to DK5EN-90 and repeated the same send: `TX_FRAME` capture now carries the ZWJ
+intact, console line renders one composed glyph. Tag `v4.35u.09.28.2-neo` on `fork-neo-test`
+`16839a8d` (includes a refreshed `safeboot.bin`/`safeboot-s3.bin` — ESP32 builds aren't byte-
+reproducible, so the tracked bins needed a re-commit before tagging). GitHub release with 39
+assets, marked Latest; `v4.35u.09.28-neo` stays as a release but is out of the flasher. gh-pages
+`7be24bd8` (flasher, `check` 30 boards / 0 mismatches). Gate: 875 host cases across the 12 gate
+envs (all green), 32 release envs, T-Deck field-command string scan clean
+(`mute=2 stat=1 udplog=1 injectraw=0`).
+
+Open: only the RAK4631 had bench time for this specific fix (the filter is shared, board-
+independent code, so it applies everywhere identically); a neighbouring node still on
+`v4.35u.09.28-neo` was observed re-stripping the ZWJ on relay during the same bench session
+(expected — that node hasn't been reflashed, not a defect). Everything else `v4.35u.09.28-neo`
+listed as open carries over unchanged.
+
 ## 2026-09-28 morning: release `v4.35u.09.28-neo` published
 
 Version letter `u` after upstream's official `v4.35u` (`61a58daa`, 27.09.). Tag on `fork-neo-test`
