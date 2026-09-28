@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## 2026-09-28 evening: release `v4.35u.09.28.3-neo` published — WebUI UTF-8 fix (#1173)
+
+Same-day third cut, replacing all earlier releases. Issue #1173 (Polish diacritics garbled when sent
+from the web interface) was a firmware bug: `decodeURLPercentCoding()` only replaced a whitelist of
+~60 percent escapes, so `ą` went on air as the literal text `%C4%85`. The message panel's
+`decodeURIComponent()` hid it on the sender's own screen (and threw on any bare `%`). Fixed in
+`ea16bfef`: new single-pass decoder `src/url_decode.{h,cpp}`, UTF-8-safe 150-byte cut, JS decode
+dropped, `charset=utf-8` in the HTTP header; 14-case `test_url_decode` (6 fail against a port of the
+old decoder). Upstream: [PR #1178](https://github.com/icssw-org/MeshCom-Firmware/pull/1178) from
+`pr-webui-utf8-20260928`, source only; issue #1173 has a comment saying the fix ships in the next
+release. PRs #1176 and #1177 are merged upstream.
+
+Bench: DK5EN-1 (Heltec V3, live gateway) OTA'd to the fix build with the user's go-ahead. Before,
+`ąęś äö` to group 9 was stored as `%C4%85%C4%99%C5%9B äö`; after, `ąęśćłóżź äö 100% ok` is stored
+exactly as typed. DK5EN-1 runs a build of `ea16bfef` from 17:14, not the release image itself
+(identical source). Tag `v4.35u.09.28.3-neo` on `03adfd48`; safeboot bins unchanged. GitHub release
+with 39 assets, Latest; the `.2` release object is deleted, its tag kept. gh-pages `82c6748a`, flasher
+offers only `-3` (`.2` pruned, `check` 30 boards / 0 mismatches). Gate: 889 host cases across the 12
+gate envs, 32 release envs, T-Deck string scan clean.
+
+Open: only the Heltec V3 had bench time and no second node received the test message (group 9 is
+not in the server archive); the web character counter still counts characters, not bytes.
+
 ## 2026-09-28 afternoon: release `v4.35u.09.28.2-neo` published — ZWJ emoji fix
 
 Same-day second cut of `v4.35u.09.28-neo`. Found live on the bench: a RAK4631 (DK5EN-90)
