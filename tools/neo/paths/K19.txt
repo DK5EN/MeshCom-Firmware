@@ -400,6 +400,7 @@ test/test_kbd_repeat/test_main.cpp
 test/test_kiss_frame/test_kiss_frame.cpp
 test/test_loop_scheduler/stubs/configuration.h
 test/test_loop_scheduler/test_loop_scheduler.cpp
+test/test_lora_aprs_encode/test_lora_aprs_encode.cpp
 test/test_mask_secret/test_mask_secret.cpp
 test/test_maxhop/test_maxhop.cpp
 test/test_mc_text/test_mc_text.cpp
