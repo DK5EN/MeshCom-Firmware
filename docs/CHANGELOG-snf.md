@@ -56,6 +56,29 @@ default: `--dmretry off`, `--store off`.
 - `--storecall`, `--storetime`, `--storeslots`, `--storenotice` on classic ESP32 answer "unknown
   command" instead of "unavailable" (exact command matching).
 
+## Released as v4.35u.09.28-neo
+
+Version letter `u`, after upstream's official `v4.35u` (27 September 2026). Built from
+`fork-neo-test`; carries the code of every upstream PR in `v4.35u` without merging upstream/dev.
+
+1. **Upstream #1171, #1169, #1165, #1166 ported** (`8bc3456c`, `25b34556`, `6acf988e`, `a03b88fc`,
+   `4870e7f5`, `0925f685`): BLE 4 s supervision timeout and `[BLE ]` diagnostics; RX log oldest
+   first on the lazily allocated RX log buffer; `--setcall` with the current callsign saves nothing
+   and does not reboot; net console in Ethernet mode; opt-in `DISABLE_BLE` and `DISABLE_BATTERY`
+   (the battery flag in `loopAction_battCheck()`). Upstream #1164 is not ported.
+2. **The BLE command ring holds the whole config burst** (`30b63a9d`). `RING_BYTES_PHONECOM` is
+   3072 on every board (was 1536 E22_XML, 2048 classic/S3/RAK, 1024 TBEAM dev); up to 12 x 246 B go
+   in at once after a connect, and a smaller ring evicted the first unread frames, the I register
+   among them. A `static_assert` next to `phoneComStore` refuses a ring that cannot hold it.
+3. **`bf_iter_begin()` reads under the ring lock** (`30b63a9d`); an eviction between its three reads
+   made the web messages page render garbage on nRF52. Items 2 and 3 are upstream since #1157.
+4. **A relay/gateway ACK for a DM retry copy is recognised** (`8b3d70ba`). `handleACK()` folds the
+   copy's msg_id back to the original (`pnOwnTxLookupId()`, `src/pn_retry.h`) before `checkOwnTx()`:
+   the app gets its 0x01 frame, the retries stop, and the node no longer relays its own ACK.
+   Upstream PR #1176.
+5. **A gateway does not re-send its own retry copy after a server echo** (`949dba25`), in both UDP
+   handlers. Also in PR #1176.
+
 ## Released as v4.35t.09.28-neo
 
 1. **Personal-message retries use the XOR format** (`src/pn_retry.h`, `docs/pn-retry-xor-impl-plan.md`).

@@ -5,8 +5,8 @@
 #pragma once
 
 #define SOURCE_VERSION "4.35"
-#define SOURCE_VERSION_SUB "t"
-#define SOURCE_VERSION_WEB_SUB "t"
+#define SOURCE_VERSION_SUB "u"
+#define SOURCE_VERSION_WEB_SUB "u"
 
 // Werkseinstellung des Rufzeichens und der zugehoerige "Node ist noch nicht
 // konfiguriert"-Test. Beides stand bisher als Literal an fuenf Stellen in drei
@@ -113,7 +113,9 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
 //
 // FLASH_VERSION 20260928 ist der Release-Stempel von v4.35t.09.28-neo
-// (PN-Wiederholung mit XOR-msg_id, --dmretry entfernt; davor 20260927 fuer
+// (PN-Wiederholung mit XOR-msg_id, --dmretry entfernt) und von
+// v4.35u.09.28-neo (Versionsbuchstabe u wie upstream 4.35u; die beiden
+// unterscheidet nur der Buchstabe im Versionsfeld; davor 20260927 fuer
 // v4.35t.09.27-neo, 20260912 fuer v4.35t.09.12.2 und die neo-Builds bis
 // v4.35t.09.26-neo) --
 // rein informativ, loest kein clear_flash() aus.

@@ -3,70 +3,64 @@
 
 ## What this release is
 
-**The Sunday 27 September 2026 build, dated 28 September: neo plus the neighbour matrix and store-and-forward from `v4.35t.09.27-neo`, plus personal-message (DM) retries in the new XOR format.** It is `v4.35t.09.28-neo` — everything in `v4.35t.09.27-neo` unchanged, with the direct-message retry mechanism replaced end to end.
+**`v4.35u.09.28-neo`: this fork's neo line moved to the version letter `u`, after upstream released the official `v4.35u` on 27 September 2026.** It carries everything in official `v4.35u` (the upstream pull requests #1162 and #1165–#1172), plus neo, the neighbour matrix, store-and-forward and the personal-message retries this fork already shipped in `v4.35t.09.28-neo`, plus four fixes that are not in any official release yet.
 
-**How to tell this build apart:** `FLASH_VERSION 20260928` in the boot log (`[INIT]...FLASH layout 20260724 ok, build 20260928`) and in the `DM` setlog line. The version field on the air stays `4.35t` — a fixed five characters. `FLASH_STRUCT_VERSION` stands at `20260724`, unchanged — **your configuration survives this update.** The new retry format needs no settings storage of its own.
+**How to tell this build apart:** the version field on the air and in `--info` reads `4.35u` (it read `4.35t` in `v4.35t.09.28-neo`). The flash stamp stays `FLASH_VERSION 20260928`, the same as `v4.35t.09.28-neo`, so the letter is the only difference between the two. `FLASH_STRUCT_VERSION` stands at `20260724`, unchanged — **your configuration survives this update.**
 
-## Personal-message (DM) retries: the XOR format
+## Relation to official `v4.35u`
 
-Full design: [`docs/pn-retry-xor-impl-plan.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-xor-impl-plan.md), concept paper [`docs/pn-zustellung-dedup.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-zustellung-dedup.md). Upstream: [PR #1168](https://github.com/icssw-org/MeshCom-Firmware/pull/1168) (merged into `dev` 2026-09-27).
+Official `v4.35u` is upstream `dev` at `61a58daa`: the base this fork builds on (`6cc8b552`, 26 September) plus nine merged pull requests. This build carries the code of all of them:
 
-- **Retry k (1..3) of a DM this node sent carries the original `msg_id` with bits 10–11 XOR k and a recomputed FCS.** The first send is byte-identical to before. Old relays, which dedup on the full 32-bit `msg_id`, forward the retry as a new frame instead of dropping it as a duplicate of the original — the problem this format is built to fix.
-- **An echo of the DM no longer ends the retry ladder.** Only the destination's `:ackNNN` does, over LoRa or over the server; a server-side ack now also stops the waiting ring slot. A DM sent on behalf of a KISS client keeps the old behaviour: byte-identical retries, released on the first echo.
-- **Repeat copies are recognised by their bit pattern** and are not uploaded to the server, EXTUDP or KISS again, and not stored again by a store node. A DM addressed to this node that arrives again is re-acknowledged but not shown twice.
-- **`--dmretry` and the DM outbox are removed.** With the XOR format, the outbox ladder and the ring retry had become nearly identical, so only one path is left: every DM is sent once and retried up to 3 times, 40 s apart. The `--dmretry off|3|9` setting, its web setup select, the `--info` line and the `OUTBOX FULL NOT SENT` refusal are gone (mode 9 was already unusable with three retry-id bit variants). A DM held by a store node still uses the app's "held" status; a DM the ring gives up on shows "failed" unless a store node holds it.
-- **A race between an incoming ack and a retry copy still in the send queue is fixed (M1).** Before this fix, an ack that arrived while a retry copy was queued but not yet sent could miss that copy, letting it go out anyway and its echo restart the wait — up to three redundant copies and a spurious "failed" after an ack.
+- **#1162** safeboot OTA as a state machine, status page, auto-AP, one app slot — in this fork since `v4.35t.09.26-neo`.
+- **#1168** personal-message retries with XOR `msg_id` — in this fork since `v4.35t.09.28-neo`.
+- **#1169** web RX log lists the oldest line first (this fork's own PR, issue #1154) — new in this build.
+- **#1171** (OE1KFR) BLE: 4 s supervision timeout instead of 1.8 s, which iOS rejected and which cut Android's 5 s default short; plus `[BLE ]` connection diagnostics behind `--bledebug` — new in this build.
+- **#1165** (makrohard) `--setcall` with the callsign already set confirms it without writing flash or rebooting — new in this build.
+- **#1166** (makrohard) the net console on TCP 2323 also starts in Ethernet mode (T-ETH-ELITE), and two opt-in build flags, `DISABLE_BLE` and `DISABLE_BATTERY`, for boards without a usable BLE controller or battery divider. No board in this release sets either flag. — new in this build.
+- **#1167, #1170, #1172** documentation (`docs/wiederholungen.md`, not carried here) and the version letter.
 
-## Compatibility, stated plainly
+Upstream's pull request #1164 (settings saved where they change) is still open and not in this build.
 
-This retry format now applies to **every** DM, not only ones that previously opted into `--dmretry 3`:
+## New in this build, not in any official release
 
-- **Older receivers may show the same DM up to 4 times** (once per retry-id bit variant) — they dedup on the full `msg_id`, which the XOR bits deliberately change.
-- **Older store nodes delay delivery by up to roughly 2 minutes** — they treat every retry copy as a new send and reset the hold timer each time.
-- **A stored `dm_retry` setting (ESP32 NVS, nRF52 `/dm.cfg`) is read and ignored.** There is no `--dmretry` command left to set it.
-- **The `OUTBOX FULL NOT SENT` refusal no longer exists** on this firmware, though its text prefix stays in the echo guard so an older sender's retry format is still recognised.
-- **The central MeshCom server must dedup on `msg_id & 0xFFFFF3FF`**, not the full 32-bit id, before this firmware is widely deployed — see [`docs/pn-retry-server.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/pn-retry-server.md). Until it does, a region with many nodes on this firmware may see each PN's retries surfaced by the server as separate messages.
-
-## Also in this delta
-
-- **Soak tooling.** `tools/bench/soak_dm.py` sends test DMs between two of our own nodes over their web servers (never `*` or a group); `tools/soakstatus.py` evaluates a capture window for reboots, heap drift, DM counters, retry markers, per-DM ack time and neighbour-matrix consistency. Protocol: [`docs/soak-xor-20260927.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/soak-xor-20260927.md).
-- **A host-suite gap from the outbox removal is closed.** `native_udp_frame_twin` had lost its fake for the new server-ack ring stop and stopped linking partway through this delta; it now carries that fake and a test for the own-DM server-ack branch.
-
-## Relation to `v4.35t.09.27-neo`
-
-Everything in `v4.35t.09.27-neo` is in this build unchanged: the neighbour matrix (MeshCom 5 topology, stages 1–3), store-and-forward for direct messages (stages 0, 1, 2.1, 3, 4), and everything it in turn carried from `v4.35t.09.26-neo`. Only the DM retry mechanism itself changes, as described above.
+1. **The BLE command ring now holds the whole configuration burst.** After an app connects, the node sends its configuration in one go — up to 12 frames of up to 246 bytes. The command ring was 1,536 bytes on the E22_XML boards and 2,048 bytes on classic ESP32, ESP32-S3 and RAK4631, so the first frames could be pushed out before the app read them; the I register was among them, and the app showed empty node settings. The ring is 3,072 bytes on every board now, and a compile-time check refuses any board whose ring cannot hold the burst. Upstream has this since #1157; the neo byte ring had never received it.
+2. **The web messages page no longer renders garbage on the RAK4631 when the ring moves under it.** The history iterator read three ring fields without the lock (same origin as item 1).
+3. **A relay or gateway ACK for a retried personal message now reaches the app and stops the retries.** A retry copy carries its own `msg_id` (bits 10–11 flipped); the node looked the ACK up under that id, found nothing, sent the app no tick, kept retrying and even relayed its own ACK as a foreign one. It now folds the id back to the original. Offered upstream as [PR #1176](https://github.com/icssw-org/MeshCom-Firmware/pull/1176) — official `v4.35u` has this bug.
+4. **A gateway no longer transmits its own retry copy again when the server echoes it back** after it has left the dedup ring. Same cause, same fix, also in PR #1176.
 
 ## What changes on the air
 
-With default settings, compared with `v4.35t.09.27-neo`:
+With default settings, compared with `v4.35t.09.28-neo`:
 
-1. **A DM retry no longer has the same `msg_id` as the original send** — bits 10–11 carry the retry count XORed in, so mesh relays and dedup-by-`msg_id` receivers see it as a new frame.
-2. **A DM retry no longer stops on an echo of the DM**, only on the destination's ack.
-3. Everything already listed as changing on the air in `v4.35t.09.27-neo` (the `HN` neighbourhood report, symmetric `NCNT`, duplicate-DM re-acknowledgement, `{` in DM text going out as `(`) is unchanged here.
+1. **The version field reads `4.35u`.**
+2. **A relay/gateway ACK for a DM retry stops the remaining retries** (item 3 above), so fewer retry copies go out.
+3. **A gateway sends no second copy of its own DM retry after a server echo** (item 4 above).
+
+Nothing else changes on the air. The BLE timeout, the RX log, `--setcall`, the net console and the command ring act on the phone link, the web page or the node itself.
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **Host suite:** 45 native environments, 1,384 test cases; `test/golden/selftest.sh` green.
-- **Build:** 32 release environments build clean. RAK4631 flash usage 96.1 % (783,580 of 815,104 bytes), down from 96.4 % in the previous release: the outbox removal deletes more code than the retry-id header adds.
-- **PN-XOR retry bench, 27 September, DK5EN-1 and DK5EN-98 (both Heltec V3), direct LoRa link:** both nodes have run this exact firmware since 17:25/17:32 (build `ce9bf157`; the two commits since then only add soak tooling and the `FLASH_VERSION` stamp, no source change). A 24 h soak has been running since 17:39; the interim result at ~20 minutes in was PASS on every acceptance criterion (no reboot, heap stable, every test DM acked — one in 4.6 s via the server path, one in 10.0 s via direct LoRa, neither needed a retry, zero neighbour-matrix consistency violations). Both nodes hear each other directly at a strong link, so this soak proves 24 h stability and the ack path, not multi-hop loss recovery. The final 24 h verdict is not in yet.
-- **RAK4631 and every other board in the 32 release environments** build from the same source but had no bench time on the XOR retry format this cycle.
+- **Host suite:** 46 native environments, 1,408 test cases, 1,407 passed and 1 skipped. New regression tests, each failing without its fix: the command-ring burst and the iterator lock (`test_byte_fifo`), the ACK fold (`test_pn_retry`), the server-echo fold for both platforms (`test_udp_frame_twin`).
+- **Build:** 32 release environments build clean. RAK4631 flash usage 96.1 % (783,532 of 815,104 bytes).
+- **Independent review:** an advisor pass over the ported pull requests and the ACK fix found no rework; its one finding became item 4.
+- **Not on hardware.** No board had bench time on this build. The 24 h soak of DK5EN-1 and DK5EN-98 that runs until 28 September 17:39 tests the XOR retry build of `v4.35t.09.28-neo` (`ce9bf157`), not this one.
 
 ### Built and shipped, not on our bench
 
-Every board other than DK5EN-1 and DK5EN-98 above.
+All 30 boards in this release.
 
 ## Known gaps, stated plainly
 
-- **The final 24 h soak verdict is not in at the time of writing.** The interim report is PASS; re-run `tools/soakstatus.py` after the window closes for the final BLUF.
-- **Multi-hop loss recovery is not bench-proven (`BACKLOG` PN-01).** DK5EN-1 and DK5EN-98 hear each other directly, so the retry ladder has not been exercised against a lost last hop or a marginal link. That needs a node pair with a real multi-hop or fringe-signal path.
-- **The central server's masked dedup is not shipped.** Until it is, a network with several nodes on this firmware may show a PN's retries as separate messages on server-fed paths (APRS-IS, mcmap, other gateways' server feeds).
-- **Everything `v4.35t.09.27-neo` and `v4.35t.09.26-neo` already listed as unproven carries over unchanged** — see their sections in [`release.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/release.md), and [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-neo.md) for the neo campaign's own gaps.
+- **Nothing in this build ran on hardware.** The four upstream ports are behaviourally the same as upstream's code, but only the build and a scan of the firmware images for their strings prove they are in; no host test reaches them.
+- **The ACK tick in the app for a retried DM (item 3) is not proven end to end** — the host test covers the lookup, not a real relay ACK.
+- **`DISABLE_BLE` and `DISABLE_BATTERY` were built once with both flags set** (BLE init gone from the image, the disabled marker present) but no board ships with them.
+- **Everything `v4.35t.09.28-neo` listed as open carries over:** multi-hop loss recovery for DM retries (`BACKLOG` PN-01), the central server's masked dedup (`msg_id & 0xFFFFF3FF`), the final 24 h soak verdict, and the older gaps listed in [`release.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35u.09.28-neo/release.md) and [`docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35u.09.28-neo/docs/CHANGELOG-neo.md).
 
 ## Installing
 
-**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, 30 boards, board detection built in. From this release on, only `v4.35t.09.28-neo` is offered there; older releases are removed from the flasher (their GitHub release objects stay).
+**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, 30 boards, board detection built in. Only `v4.35u.09.28-neo` is offered there; older releases are removed from the flasher (their GitHub release objects stay).
 
 Otherwise, pick the asset for your board below. ESP32 boards take the `.bin` over USB or, if the node is already reachable, over WiFi with `tools/webflash.py`. The three nRF52 boards (`wiscore_rak4631`, `heltec_t114`, `t_echo`) ship both a `.uf2` — double-tap reset, copy the file to the volume that appears — and a DFU `.zip` for `adafruit-nrfutil` over serial.
 
@@ -74,11 +68,10 @@ Otherwise, pick the asset for your board below. ESP32 boards take the `.bin` ove
 
 ## Changelogs
 
-- [Personal-message retries — `docs/CHANGELOG-snf.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-snf.md)
-- [Neighbour matrix — `docs/CHANGELOG-meshcom5.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-meshcom5.md)
-- [Store-and-forward — `docs/CHANGELOG-snf.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-snf.md)
-- [neo code-quality campaign — `docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.28-neo/docs/CHANGELOG-neo.md)
+- [This release and the personal-message retries — `docs/CHANGELOG-snf.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35u.09.28-neo/docs/CHANGELOG-snf.md)
+- [Neighbour matrix — `docs/CHANGELOG-meshcom5.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35u.09.28-neo/docs/CHANGELOG-meshcom5.md)
+- [neo code-quality campaign — `docs/CHANGELOG-neo.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35u.09.28-neo/docs/CHANGELOG-neo.md)
 
 ## Upstream
 
-The XOR retry format is [PR #1168](https://github.com/icssw-org/MeshCom-Firmware/pull/1168), merged into upstream `dev` on 2026-09-27. The neighbour matrix and store-and-forward have not been offered upstream yet. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.
+Everything official `v4.35u` contains is in this build. The ACK and server-echo fixes are offered as [PR #1176](https://github.com/icssw-org/MeshCom-Firmware/pull/1176). The neighbour matrix, store-and-forward and the neo rework have not been offered upstream yet. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.

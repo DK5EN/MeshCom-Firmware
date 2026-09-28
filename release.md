@@ -1,9 +1,56 @@
-# Release Notes -- MeshCom Firmware v4.35t
+# Release Notes -- MeshCom Firmware v4.35u
 
-Firmware `4.35t`, `FLASH_VERSION 20260928`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35u`, `FLASH_VERSION 20260928`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
+
+---
+
+## Release v4.35u.09.28-neo (Montag, 2026-09-28)
+
+Upstream hat am 27.09. abends das offizielle `v4.35u` veroeffentlicht (`61a58daa`, upstream/dev
+nach #1162 und #1165 bis #1172). Dieser Stand zieht den Versionsbuchstaben nach und enthaelt den
+Code aller dieser PRs, ohne upstream/dev zu mergen: die Basis bleibt `6cc8b552`, die noch fehlenden
+PRs sind gezielt portiert. Gebaut von `fork-neo-test`, dem Hauptzweig seit dem Aufraeumen der Zweige
+am 27.09. (`fork-main`, `feature-snf`, `feature-neighbour-matrix` stillgelegt, Tags
+`archive/<name>-20260927`).
+
+`SOURCE_VERSION_SUB` und `SOURCE_VERSION_WEB_SUB` gehen auf `u`. `FLASH_VERSION` bleibt 20260928
+wie bei `v4.35t.09.28-neo` -- der Buchstabe im Versionsfeld ist der einzige Unterschied im
+`--info`. `FLASH_STRUCT_VERSION` bleibt 20260724, die Einstellungen bleiben erhalten.
+
+**Portiert aus upstream (nicht in `v4.35t.09.28-neo`):** #1171 BLE-Supervision-Timeout 4 s statt
+1,8 s plus `[BLE ]`-Diagnose; #1169 RX-Log aelteste Zeile zuerst, angepasst an den erst bei Bedarf
+angelegten RX-Log-Puffer; #1165 `--setcall` mit dem schon gesetzten Rufzeichen schreibt nicht und
+startet nicht neu; #1166 Netzkonsole im Ethernet-Modus, dazu `DISABLE_BLE` und `DISABLE_BATTERY`
+(der Batterie-Schalter sitzt in `loopAction_battCheck()`, weil neo die Batteriemessung in den
+Scheduler verlegt hat). #1164 ist nicht portiert und bleibt upstream offen.
+
+**Eigene Korrekturen:** der BLE-Kommandoring fasst jetzt den ganzen Konfigurations-Burst (3072 Byte
+auf allen Boards, `static_assert` dagegen), der Verlaufs-Iterator liest unter der Ringsperre -- beide
+aus #1157, im neo-Byte-Ring nie nachgezogen. `handleACK()` faltet die msg_id einer
+Wiederholungskopie auf das Original zurueck, bevor es nachschlaegt (App-Haken, Stopp der
+Wiederholung), und die Server-Echo-Pruefung beider UDP-Pfade ebenso. Upstream hat den
+`handleACK()`-Fehler auch: PR #1176.
+
+Tests: 1408 Host-Faelle in 46 Envs, 1407 gruen, 1 uebersprungen, 32 Release-Envs gebaut,
+Advisor-Pass ohne Nacharbeit. `fork-neo` bzw. `icssw-org/dk5en-neo` sind mit demselben Stand neu
+abgeleitet (Basis `6cc8b552`, gate.sh 38/40 wie erwartet, keine Symbolabweichung).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Nichts. Kein Board hatte Bankzeit auf diesem Stand.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die vier portierten upstream-PRs auf Hardware (BLE-Timeout mit iOS/Android, RX-Log-Reihenfolge,
+  `--setcall`, Netzkonsole auf T-ETH-ELITE).
+- Der App-Haken fuer eine per Relais quittierte PN-Wiederholung, Ende zu Ende.
+- Ein Board mit `DISABLE_BLE`/`DISABLE_BATTERY` -- einmal mit beiden Schaltern gebaut, keines
+  liefert sie aus.
+- Der 24-h-Soak von DK5EN-1 und DK5EN-98 bis 28.09. 17:39 laeuft auf dem Stand `ce9bf157`
+  (`v4.35t.09.28-neo`), nicht auf diesem.
 
 ---
 
