@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diff nach Feature</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --surface-2: #f3f2ee;
+    --border: #e2e0d8;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #85837c;
+    --warm: #e34948;
+    --cool: #2a78d6;
+    --ok: #0b7a0b;
+    --bad: #c42f2f;
+    --part: #9a6700;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --surface-2: #232320;
+      --border: #38372f;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8d84;
+      --warm: #e66767;
+      --cool: #3987e5;
+      --ok: #3fbf3f;
+      --bad: #f07070;
+      --part: #e0a526;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-2: #232320;
+    --border: #38372f;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8d84;
+    --warm: #e66767;
+    --cool: #3987e5;
+    --ok: #3fbf3f;
+    --bad: #f07070;
+    --part: #e0a526;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding-block: 32px 48px; padding-inline: 20px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { font-size: 15px; font-weight: 650; margin: 36px 0 12px; }
+  .sub { font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.5; max-width: 70ch; }
+  code {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px;
+    padding: 0 4px; font-size: 12px;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 22px 0 8px; }
+  .tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .tile .v { font-size: 22px; font-weight: 650; margin-top: 4px; }
+  .tile .n { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; color: var(--text-secondary); margin: 18px 0 14px; }
+  .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .sw.del { background: var(--warm); }
+  .sw.mout { background: repeating-linear-gradient(135deg, var(--warm) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--warm); }
+  .sw.new { background: var(--cool); }
+  .sw.min { background: repeating-linear-gradient(45deg, var(--cool) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--cool); }
+
+  .chart-scroll { overflow-x: auto; }
+  .chart { min-width: 560px; display: flex; flex-direction: column; gap: 4px; }
+  .row { display: grid; grid-template-columns: 230px 1fr 70px; align-items: center; gap: 10px; min-height: 24px; }
+  .row .label { font-size: 12.5px; color: var(--text-secondary); text-align: right; line-height: 1.2; }
+  .row .label small { color: var(--text-muted); font-size: 11px; }
+  .div { position: relative; height: 16px; display: grid; grid-template-columns: 1fr 1fr; }
+  .div::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--border); }
+  .half { display: flex; height: 100%; gap: 2px; }
+  .half.l { justify-content: flex-end; }
+  .seg { height: 100%; border-radius: 3px; min-width: 0; }
+  .seg.del { background: var(--warm); }
+  .seg.mout { background: repeating-linear-gradient(135deg, var(--warm) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--warm); }
+  .seg.new { background: var(--cool); }
+  .seg.min { background: repeating-linear-gradient(45deg, var(--cool) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--cool); }
+  .row .net { font-size: 12px; font-weight: 600; text-align: right; color: var(--text-secondary); }
+  .ticks { display: grid; grid-template-columns: 230px 1fr 70px; gap: 10px; margin-top: 6px; }
+  .ticks .t { position: relative; height: 14px; font-size: 10.5px; color: var(--text-muted); }
+  .ticks .t span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .ticks .t span:first-child { transform: none; }
+  .ticks .t span:last-child { transform: translateX(-100%); }
+
+  .tip {
+    position: fixed; pointer-events: none; z-index: 5; background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.5;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .tip b { font-weight: 650; }
+
+  details { margin-top: 28px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  .method { font-size: 12px; color: var(--text-muted); line-height: 1.55; margin-top: 24px; max-width: 75ch; }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Fork-Diff nach Feature</h1>
+  <p class="sub">Firmware-Quellcode (<code>src/</code> + <code>include/</code>), <code>fork-neo-test</code> 16839a8d direkt gegen den aktuellen <code>upstream/dev</code> 10ab0344 (Zwei-Punkte-Diff). Jede Kategorie ist aufgeteilt in Code, der wirklich neu oder wirklich gelöscht ist, und Code, der nur verschoben wurde.</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Dateien</div><div class="v">215</div><div class="n">69 neu, 60 gelöscht, 85 geändert, 1 umbenannt</div></div>
+    <div class="tile"><div class="k">Hinzugefügt</div><div class="v" style="color:var(--cool)">+25.074</div><div class="n">davon 7.734 verschoben</div></div>
+    <div class="tile"><div class="k">Entfernt</div><div class="v" style="color:var(--warm)">&minus;27.928</div><div class="n">davon 5.219 verschoben</div></div>
+    <div class="tile"><div class="k">Netto</div><div class="v">&minus;2.854</div><div class="n">Fork-Firmware ist kleiner</div></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="sw del"></span>gelöscht</span>
+    <span><span class="sw mout"></span>verschoben (raus)</span>
+    <span><span class="sw new"></span>neu geschrieben</span>
+    <span><span class="sw min"></span>verschoben/kopiert (rein)</span>
+  </div>
+
+  <div class="chart-scroll">
+    <div class="chart" id="chart" role="img" aria-label="Divergierendes Balkendiagramm: entfernte Zeilen links, hinzugefügte rechts, je Feature"></div>
+    <div class="ticks"><span></span><div class="t" id="ticks"></div><span></span></div>
+  </div>
+
+
+  <details>
+    <summary>Tabelle anzeigen</summary>
+    <div class="chart-scroll"><table id="tbl"></table></div>
+  </details>
+
+  <p class="method">Methode: <code>git diff --numstat upstream/dev HEAD -- src include</code>, Dateien per Pfad den Features zugeordnet (jede Zuordnung stichprobenartig am Dateikopf geprüft). Verschoben vs. neu per <code>git diff --color-moved=plain</code>: Git erkennt Blöcke ab etwa 20 Zeichen, die woanders entfernt wurden. Ein Block, der an zwei Stellen eingefügt wurde, zählt beide Male als „rein“, deshalb ist „rein“ größer als „raus“. Die Verschiebe-Zahlen sind eine Untergrenze.</p>
+</div>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+  const DATA = [
+    ["Toter Code", "Fonts, AVR/ESP8266-Stubs, nRF52-Reste", 61, 7, 0, 18299, 808],
+    ["Nachbarschaftsmatrix + Topologie", "löst MHeard ab", 13, 4070, 1595, 818, 515],
+    ["Settings-Vereinheitlichung", "Schema, Store, Setter, Flash", 17, 2556, 979, 667, 587],
+    ["Loop-/Task-Struktur", "ESP32/nRF52-Mains, Gateway", 19, 1906, 548, 932, 823],
+    ["Serielle Kommandos", "command_functions", 4, 982, 808, 473, 898],
+    ["External UDP / Frame-Codecs", "", 10, 1225, 992, 181, 485],
+    ["DM Store-and-Forward", "Retry, Dedup, Zähler", 16, 1510, 766, 0, 0],
+    ["Geräte-UI", "T-Deck, T5, gemeinsamer GPS-Code", 24, 543, 327, 409, 493],
+    ["LoRa-Funk", "", 4, 945, 257, 387, 173],
+    ["Web-GUI", "", 4, 1140, 439, 143, 19],
+    ["nRF52 BLE-Settings", "", 5, 1116, 585, 0, 0],
+    ["APRS-Parser", "", 5, 208, 43, 147, 299],
+    ["TX-Ring / Backpressure", "", 4, 285, 68, 19, 1],
+    ["KISS-Framing", "", 3, 130, 121, 27, 93],
+    ["Phone/App-Frames", "", 6, 201, 54, 69, 15],
+    ["Länderprofil / Funk-Einheiten", "", 4, 212, 86, 0, 0],
+    ["Charset / Emoji", "", 3, 117, 58, 1, 0],
+    ["Safeboot OTA", "nur Kommentare", 3, 76, 0, 74, 0],
+    ["Diagnose / Instrumentierung", "", 7, 58, 6, 31, 1],
+    ["Sonstiges", "GPS, Onewire, Via", 3, 53, 2, 32, 9],
+  ];
+  const fmt = n => n.toLocaleString("de-DE");
+  const MAX = 20000;
+  const chart = document.getElementById("chart");
+  const tip = document.getElementById("tip");
+  const pct = n => (n / MAX * 100) + "%";
+
+  for (const [name, note, files, nw, min, del, mout] of DATA) {
+    const add = nw + min, rem = del + mout, net = add - rem;
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML =
+      `<span class="label">${name}${note ? `<br><small>${note}</small>` : ""}</span>
+       <div class="div">
+         <div class="half l"><div class="seg mout" style="width:${pct(mout)}"></div><div class="seg del" style="width:${pct(del)}"></div></div>
+         <div class="half"><div class="seg new" style="width:${pct(nw)}"></div><div class="seg min" style="width:${pct(min)}"></div></div>
+       </div>
+       <span class="net">${net > 0 ? "+" : net < 0 ? "−" : ""}${fmt(Math.abs(net))}</span>`;
+    const html =
+      `<b>${name}</b> &middot; ${files} Dateien<br>
+       neu geschrieben: +${fmt(nw)}<br>verschoben rein: +${fmt(min)}<br>
+       gelöscht: &minus;${fmt(del)}<br>verschoben raus: &minus;${fmt(mout)}<br>
+       <b>netto ${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}</b>`;
+    row.addEventListener("mousemove", e => {
+      tip.innerHTML = html; tip.hidden = false;
+      const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+      tip.style.left = x + "px"; tip.style.top = (e.clientY + 14) + "px";
+    });
+    row.addEventListener("mouseleave", () => { tip.hidden = true; });
+    chart.appendChild(row);
+  }
+
+  const ticks = document.getElementById("ticks");
+  [["−20k", 0], ["−10k", 25], ["0", 50], ["+10k", 75], ["+20k", 100]].forEach(([t, l]) => {
+    const s = document.createElement("span"); s.textContent = t; s.style.left = l + "%"; ticks.appendChild(s);
+  });
+
+  const tbl = document.getElementById("tbl");
+  let rows = "<thead><tr><th>Feature</th><th>Dateien</th><th>neu</th><th>verschoben rein</th><th>gelöscht</th><th>verschoben raus</th><th>netto</th></tr></thead><tbody>";
+  for (const [name, , files, nw, min, del, mout] of DATA) {
+    const net = nw + min - del - mout;
+    rows += `<tr><td>${name}</td><td>${files}</td><td>+${fmt(nw)}</td><td>+${fmt(min)}</td><td>&minus;${fmt(del)}</td><td>&minus;${fmt(mout)}</td><td>${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}</td></tr>`;
+  }
+  rows += `<tr><td><b>Summe</b></td><td>215</td><td>+17.340</td><td>+7.734</td><td>&minus;22.709</td><td>&minus;5.219</td><td><b>&minus;2.854</b></td></tr></tbody>`;
+  tbl.innerHTML = rows;
+</script>
+</body>
+</html>
