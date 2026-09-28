@@ -17,6 +17,8 @@ src/byte_fifo.cpp
 src/byte_fifo.h
 src/capture_functions.cpp
 src/capture_functions.h
+src/charset_filter.cpp
+src/charset_filter.h
 src/clock.cpp
 src/command_functions.cpp
 src/command_match.h
