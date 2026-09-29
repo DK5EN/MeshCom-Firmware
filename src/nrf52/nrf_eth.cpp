@@ -856,6 +856,18 @@ void NrfETH::startUDP()
 
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
+      else if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+      {
+        // v4.35v: MeshCom-DL internet server meshcom.hamnet.network (the ESP32
+        // path resolves the name; nRF52 keeps fixed IPs like OE/IT above).
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Internet UDP-DEST DL 192.68.17.26");
+
+        udp_dest_addr = IPAddress(192, 68, 17, 26);
+        srv_path = "inet";
+
+        timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
+      }
       else
       {
         if(bDisplayCont)
@@ -1008,6 +1020,16 @@ void NrfETH::startFIXUDP()
         printlndeb("[UDP-DEST] Internet UDP-DEST IT 145.239.75.155");
         
       udp_dest_addr = IPAddress(145, 239, 75, 155);
+
+      timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
+    }
+    else if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+    {
+      // v4.35v: MeshCom-DL internet server meshcom.hamnet.network (fixed IP, see startUDP()).
+      if(bDisplayCont)
+        printlndeb("[UDP-DEST] Internet UDP-DEST DL 192.68.17.26");
+
+      udp_dest_addr = IPAddress(192, 68, 17, 26);
 
       timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
     }

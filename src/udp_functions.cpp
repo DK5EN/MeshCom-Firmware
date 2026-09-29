@@ -1121,10 +1121,15 @@ void startMeshComUDP()
           printlndeb("[WIFI]...Hamnet NTP-DEST 44.143.0.9");
           ntp_literal = IPAddress(44, 143, 0, 9);
         }
-        else
+        else if(node_ip[1] == 148)
         {
           printlndeb("[WIFI]...Hamnet NTP-DEST 44.148.224.123");
           ntp_literal = IPAddress(44, 148, 224, 123);
+        }
+        else
+        {
+          printlndeb("[WIFI]...Hamnet NTP-DEST 44.143.0.9");
+          ntp_literal = IPAddress(44, 143, 0, 9);
         }
       }
       else
@@ -1133,6 +1138,13 @@ void startMeshComUDP()
         {
           printlndeb("[WIFI]...Internet UDP-DEST meshcom.dig-italia.it");
           srv_host = "meshcom.dig-italia.it";
+          srv_path = "inet";
+        }
+        else
+        if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+        {
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.hamnet.network");
+          srv_host = "meshcom.hamnet.network";
           srv_path = "inet";
         }
         else
