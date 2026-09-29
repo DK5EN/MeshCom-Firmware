@@ -1,9 +1,69 @@
-# Release Notes -- MeshCom Firmware v4.35u
+# Release Notes -- MeshCom Firmware v4.35v
 
-Firmware `4.35u`, `FLASH_VERSION 20260928`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35v`, `FLASH_VERSION 20260929`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
+
+---
+
+## Release v4.35v.09.29-neo (Dienstag, 2026-09-29)
+
+Offizielles `v4.35v` plus die neo-Linie plus eine Kampagne zu BLE, Batterie und Zeitzaehlern.
+`FLASH_VERSION` 20260929, `FLASH_STRUCT_VERSION` unveraendert -- die Einstellungen bleiben erhalten.
+Ersetzt alle frueheren Releases, auch im Web-Flasher. Plan, Befunde und Bench-Ergebnisse:
+[`docs/ble-batt-campaign-20260929.md`](docs/ble-batt-campaign-20260929.md).
+
+**BLE (Knoten -> Telefon):** Beide Drains nahmen einen Rahmen aus dem Ring, bevor er gesendet war,
+und ignorierten das Ergebnis -- NimBLEs `notify()` ohne Argumente kann keinen Fehler melden, Bluefruits
+`write()` liefert 0 bei voller SoftDevice-Queue. Jetzt bleibt ein abgelehnter Rahmen liegen und wird
+im naechsten Fenster wiederholt, nach fuenf Versuchen verworfen und gezaehlt (`src/ble_phone_drain.h`,
+BLE-N1). Die ausgehandelte MTU wird gelesen, zu lange Rahmen werden gezaehlt (BLE-N2), `--info` zeigt
+`tx s r d t e mtu`. Ein Wettlauf zwischen Lesen und Verdraengen auf nRF52 ist zu (BLE-N3,
+`bf_peek_gen()`/`bf_pop_if()`), und der RAK trennt ein Telefon mit falscher PIN sofort statt erst beim
+naechsten Schreiben (BLE-N4, auf der Bank gefunden).
+
+**Batterie:** Konzept `docs/archive/concept-battery-consolidation-20260923.md` vollstaendig -- ein
+gemeinsamer Filter (Zeitkonstante 30 s), ein Prozentverlauf fuer alle Boards (1S und 2S), ein
+BAT-01-Detektor statt zwei, 100-ms-Takt statt der neo-Regression von 30 s. Beim Heltec V3/V4/Stick
+ist der Teiler nur noch 100 ms je 30 s eingeschaltet -- die rote LED bleibt ohne Akku nicht mehr
+30 s an. USB-Boards ohne Zelle melden 0 % und senden kein `/B=` mehr (vorher 100 %).
+
+**Zeit:** Die Minutenstempel der Nachbarschaftsmatrix sprangen beim `millis()`-Ueberlauf (49,7 Tage)
+von 6046 auf 0, der naechste Sweep loeschte die ganze Matrix (TIME-01, `uptimeMin16()` an 39
+Stellen). Gefunden mit den neuen Teleport-Tests (`test/support/teleport_clock.h`). Der Batteriefilter
+fror nach einem Zeitsprung >= 2^31 ms ein (TIME-02).
+
+**Weiter:** INS-05 (bewusster Neustart hinterlaesst keinen Loop-Abschnitt), DM-17 (`:rej` zaehlt
+nicht als ACK), GW-02; Soak-Befunde F1-F8 vom 28.09. (`15fa385a`); Zeichenzaehler der Weboberflaeche
+zaehlt Bytes (#1173); RAK4631 mit `-Os` statt `-Ofast` (Flash 95,5 % -> 69,2 %). Aus offiziell
+`v4.35v`: DL-Internet-Server, HAMNET-NTP-Rueckfall, WIDE1-1 im Track-Beacon (#1174), Einmal-Position
+ohne TRACK-Punkt sendet die Knotenposition (#1175, makrohard, hier per Cherry-Pick).
+
+Tests: 1588 Host-Faelle in 48 nativen Envs, alle gruen, dazu der Golden-Selftest. 32
+Release-Envs gebaut.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Heltec V3 (DK5EN-1): BLE-Burst 5/5 vollstaendig, 6/6 kaputte Rahmen ueberlebt, PIN mit und ohne
+  Code, 40/40 Gruppe-9-Nachrichten vom Mock-Server beim BLE-Client, Batterie ohne Zelle nach dem
+  Erkennungsfenster 0,00 V / 0 %.
+- RAK4631 (DK5EN-90, `-Os`): BLE-Burst 5/5, 6/6 kaputte Rahmen, PIN 3/3 (nach BLE-N4),
+  Settings-Rueckschreiben ueber 0x95 ohne Aenderung an 92 Feldern, LoRa senden und empfangen gegen
+  den Heltec, Ethernet und NTP.
+- DK5EN-98 (Heltec V3): Soak auf diesem Stand seit 2026-09-29 10:07, laeuft bis 2026-10-02 10:10.
+- Die Bench-Images unterscheiden sich von diesem Tag nur durch den #1175-Cherry-Pick und den
+  Flash-Stempel.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Alle anderen Boards: gebaut, nicht auf der Bank -- die Batterieaenderung betrifft sie alle.
+- Die Heltec-LED mit eigenen Augen; das 100-ms-Fenster ist in einer Host-Simulation gemessen.
+- Der `node_msgid`-Fix (`dbc57632`) ueber die Settings-Characteristic des RAK.
+- Die Auswertung des laufenden Soaks.
+- Offen und bekannt: Kommandoflut schneller als etwa 3/s ueberlaeuft den Config-Ring (gezaehlt),
+  UDP-Stack verliert bei 50 Datagrammen/s, Heltec erkennt "kein Akku" erst nach 3 Minuten, DM-18
+  (`:rej` liest die falsche Nachrichten-ID), T114/T-Echo weiter mit `-Ofast`.
 
 ---
 

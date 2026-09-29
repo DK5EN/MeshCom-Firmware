@@ -76,6 +76,39 @@ auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25) und auf
 verhaelt sich hier wie upstream; wo dieser Branch davon abweicht, steht es in
 den beiden folgenden Abschnitten.
 
+## v4.35v.09.29-neo: Batterie, BLE, Minutenstempel
+
+Das Release `v4.35v.09.29-neo` ist `v4.35u.09.28.3-neo` plus offizielles `v4.35v` plus die Kampagne
+vom 2026-09-29 ([`ble-batt-campaign-20260929.md`](ble-batt-campaign-20260929.md)). Die
+Batterie-Vereinheitlichung ist Dedup im Sinne dieses Branches; die BLE- und Zeitfixe sind
+Fehlerbehebungen, die dabei gefunden wurden.
+
+**118. Eine Batterie-Pipeline fuer alle Boards** (`5d0bc44a`, Fehlerbehebung). Filter, Abtastrate
+und Prozentverlauf hingen davon ab, welche der beiden Dateien ein Board uebersetzt
+(`batt_functions.cpp` mit EMA, `batt_function_old.cpp` ohne Filter), der BAT-01-Detektor stand
+zweimal. Jetzt `src/batt_pipeline.h`: EMA auf Wandzeit (tau 30 s), Einschwingregel vor jeder
+Unterspannungsentscheidung, ein Detektor, ein Prozentverlauf ueber Bruchteile von `--maxv`,
+Abtastplaner, und der Brown-Block von `--analog` (bitgleich). Nachweis: `test_batt_pipeline` (59),
+`test_batt_detect` (26), Bench Heltec V3 und RAK4631.
+
+**119. Die neo-Kadenz der Batteriepruefung war eine Regression** (`5d0bc44a`, Fehlerbehebung). Der
+Kommentar in `loop_actions_esp32.cpp` nannte 30 s "verhaltensgleich"; das galt nur fuer nRF52. Auf
+ESP32 lief der Filter 60x langsamer als upstream, und der Heltec-Teiler blieb 30 s eingeschaltet
+(rote LED ohne Akku). Jetzt 100-ms-Takt, Teiler 100 ms je 30 s.
+
+**120. Ein abgelehnter BLE-Rahmen ging verloren** (`cf1693ca`, Fehlerbehebung). Pop vor dem Senden,
+Ergebnis ignoriert. Jetzt `src/ble_phone_drain.h`: Pop nur nach Erfolg, Wiederholung, gezaehltes
+Verwerfen, MTU-Zaehler, Lesen und Generation unter einer Sperre. Nachweis:
+`test_ble_phone_harness` (25, davon 10 rot gegen die alte Logik), `test_byte_fifo`.
+
+**121. Die Minutenstempel der Nachbarschaftsmatrix sprangen beim `millis()`-Ueberlauf**
+(`c9d1fcc0`, Fehlerbehebung). `(uint16_t)(millis()/60000)` springt nach 49,7 Tagen von 6046 auf 0;
+der naechste Sweep loeschte die Matrix. `uptimeMin16()` an 39 Stellen. Nachweis:
+`test_nbr_matrix` `test_teleport_*` (rot mit der alten Ableitung).
+
+**122. RAK4631 mit `-Os`** (`be8de121`, Restrukturierung des Builds). Flash 95,5 % -> 69,2 %, RAM
+gleich; Fast-Math entfaellt auf dem RAK. Bench: BLE, LoRa, Ethernet auf DK5EN-90.
+
 ## v4.35t.09.28-neo: PN-Wiederholung im XOR-Format
 
 Das Release `v4.35t.09.28-neo` (Branch `feature-snf`) ist `v4.35t.09.27-neo` unveraendert plus

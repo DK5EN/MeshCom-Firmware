@@ -2300,6 +2300,7 @@
    "+<radio_units.cpp>",
    "+<msgid_counter.cpp>",
    "+<dm_stats.cpp>",
+   "+<loop_breadcrumb.cpp>",
    "+<reack_limiter.cpp>",
    "+<dm_dedup.cpp>",
    "+<msgstore.cpp>",
@@ -2339,6 +2340,8 @@
    "test_radio_units",
    "test_msgid_counter",
    "test_dm_stats",
+   "test_loop_breadcrumb",
+   "test_hey_policy",
    "test_reack_limiter",
    "test_dm_dedup",
    "test_dm_text_escape",
@@ -2442,6 +2445,26 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_batt_pipeline": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_type": "debug",
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_batt_pipeline"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_ble_phone_frame": {
   "build_flags": [
    "-std=gnu++17",
@@ -2455,6 +2478,31 @@
   "test_build_src": "False",
   "test_filter": [
    "test_ble_phone_frame"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_ble_phone_harness": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<byte_fifo.cpp>"
+  ],
+  "build_type": "debug",
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_ble_phone_harness"
   ],
   "test_framework": "unity"
  },
@@ -4985,7 +5033,8 @@
    "-D SERIAL_BUFFER_SIZE=250",
    "-Isrc/nrf52",
    "-I variants/wiscore_rak4631",
-   "-D DISABLE_NET_CONSOLE"
+   "-D DISABLE_NET_CONSOLE",
+   "-Os"
   ],
   "build_src_filter": [
    "+<*>",
@@ -5006,6 +5055,9 @@
    "-Wformat=2",
    "-Wno-unused-parameter",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-Ofast"
   ],
   "extends": [
    "nrf52_base"
