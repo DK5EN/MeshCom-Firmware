@@ -1,5 +1,6 @@
 //2025-09-16 23:036
 #include "command_functions.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "capture_functions.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
@@ -5392,7 +5393,7 @@ void commandAction(char *umsg_text, bool ble)
         // ist mit mheard_functions.* weg -- Quelle ist nur noch die Topologie
         // (src/nbr_views.h), 12h-Fenster, neueste zuerst, dieselben Felder wie
         // die Web-MHeard-Seite (web_functions.cpp: sub_page_mheard()).
-        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        uint16_t now_min = uptimeMin16();
         bool bClockValid = (meshcom_settings.node_date_year >= 2025);
         unsigned long nowEpoch = bClockValid ? getUnixClock() : 0;
 
@@ -5494,7 +5495,7 @@ void commandAction(char *umsg_text, bool ble)
         // Eintrittszeilen A, ergaenzt -- wo billig -- um die B's, ueber die
         // jedes A hereinkommt (dieselbe Logik wie sub_page_path() in
         // web_functions.cpp).
-        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        uint16_t now_min = uptimeMin16();
 
         int path_total = nbrRouteCount(nbrMatrix, now_min);
         printfdeb("[PATH] rows=%d\n", path_total);
@@ -5540,7 +5541,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"neighbours") == 0 || commandCheck(msg_text+2, (char*)"nbr") == 0)
     {
-        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        uint16_t now_min = uptimeMin16();
 
         // Konzept 4.2/4.5: "leer" heisst wirklich noch nichts gehoert, nicht
         // nur ausserhalb des 720-min-Fensters -- Zeile 0 traegt vor der
@@ -5636,7 +5637,7 @@ void commandAction(char *umsg_text, bool ble)
 
     if(commandCheck(msg_text+2, (char*)"nbrreset") == 0)
     {
-        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+        uint16_t now_min = uptimeMin16();
 
         nbrReset(nbrMatrix, now_min);
 

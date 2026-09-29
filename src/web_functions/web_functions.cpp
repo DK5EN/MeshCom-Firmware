@@ -3,6 +3,7 @@
  *  @date        2025-12-03
  */
 #include "mc_text.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include <Arduino.h>
 
 #include <configuration.h>
@@ -1469,7 +1470,7 @@ void sub_page_mheard()
     // Konzept 4.6: dieselbe Minuten-seit-Boot-Uhr wie der OnRxDone-Haken und
     // die Neighbours-Seite (nbrFresh() etc.) -- alle Leser rechnen gegen
     // dieselbe Uhr.
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     // Konzept 4.6, Regel 2: ohne gueltige Uhr (Jahr < 2025, wie bisher
     // isWallClockValid() in mheard_functions.cpp) bleibt die Topologie
@@ -1664,7 +1665,7 @@ static void nbrPrintCall(uint8_t row)
  */
 void sub_page_path()
 {
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     _create_meshcom_subheader("Path Information");
     web_client.println("<div id=\"content_inner\">");
@@ -1986,7 +1987,7 @@ void sub_page_neighbours()
     // Vertragspunkt mit dem OnRxDone-Haken (lora_functions.cpp): dieselbe
     // Minuten-seit-Boot-Umrechnung, sonst laufen Web-Seite und Schreiber
     // gegen unterschiedliche Uhren.
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     _create_meshcom_subheader("Neighbours");
     web_client.println("<div id=\"content_inner\">");
@@ -2570,7 +2571,7 @@ void sub_page_mailbox()
         // msgstore_glue.cpp's glueHeardAgeMs(), the neighbour-matrix topology directly.
         int32_t heard_ms;
         {
-            uint16_t now_min = (uint16_t)(millis() / 60000UL);
+            uint16_t now_min = uptimeMin16();
             int row = nbrFind(nbrMatrix, e->dst);
             NbrMhView v;
             heard_ms = nbrMhGet(nbrMatrix, row, now_min, &v) ? (int32_t)v.age_min * 60000L : -1;

@@ -43,6 +43,7 @@
 
 
 #include <Arduino.h>
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "clock.h"
 
 #include <time.h>
@@ -349,7 +350,7 @@ bool Clock::SetClock(/*const*/ time_t tsNow, /*const*/ bool boUseUTC /*= true*/)
 	// hier. tsNow traegt bereits den UTC-Offset (jeder Aufrufer rechnet ihn
 	// VOR diesem Aufruf ein, siehe z. B. setCurrentTime() oben), also exakt
 	// dieselbe Epochen-Konvention wie ueberall sonst in der Matrix.
-	nbrSetClock(nbrMatrix, (uint32_t)tsNow, (uint16_t)(millis() / 60000UL));
+	nbrSetClock(nbrMatrix, (uint32_t)tsNow, uptimeMin16());
 #if defined(SETTEST)
 	Serial.printf("[clock] new date/time: %04u/%02u/%02u %2u:%02u:%02u\n",
                       1900 + suClock_m.tm_year, 1 + suClock_m.tm_mon,

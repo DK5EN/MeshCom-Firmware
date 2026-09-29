@@ -10,6 +10,7 @@
  */
 
 #include "lv_obj_functions.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include <configuration.h>
 #include <aprs_structures.h>
 #include <debugconf.h>
@@ -4602,7 +4603,7 @@ void tdeck_refresh_mh_view()
     if (mh_ta == NULL || tv == NULL || lv_tabview_get_tab_act(tv) != TDECK_TAB_MHEARD)
         return;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     uint8_t idx[NBR_MAX_ROWS];
     int n = nbrMhRows(nbrMatrix, now_min, NBR_WINDOW_MIN, idx, NBR_MAX_ROWS);
@@ -4669,7 +4670,7 @@ void tdeck_refresh_path_view()
     if (path_ta == NULL || tv == NULL || lv_tabview_get_tab_act(tv) != TDECK_TAB_PATH)
         return;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     char buf[64];
     char via[48];

@@ -1,4 +1,5 @@
 #include "mc_text.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "Arduino.h"
 #include "configuration.h"
 
@@ -1010,7 +1011,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
            is_equ(aprsmsg.msg_destination_call, "HN") &&
            !is_equ(aprsmsg.msg_source_call, meshcom_settings.node_call))
         {
-            uint16_t now_min_hn = (uint16_t)(millis() / 60000UL);
+            uint16_t now_min_hn = uptimeMin16();
 
             // Gleiches Lazy-Init/Positions-/GW-Flag-Muster wie beim regulaeren
             // '@'/':'/'!'-Zweig weiter unten (Stufe 1) -- ohne Zeile 0 faende
@@ -1081,7 +1082,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
            strchr(aprsmsg.msg_source_path, ',') != NULL &&
            !is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
         {
-            uint16_t now_min_cover = (uint16_t)(millis() / 60000UL);
+            uint16_t now_min_cover = uptimeMin16();
             // Nur ein Vorabtest, ob der Relayer ueberhaupt etwas decken
             // koennte (relevant=0, msg_id=0 -- das unterdrueckt jede
             // SYM-COVER-Zeile hier, die eigentliche, slotgenaue Maske
@@ -1255,7 +1256,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 // Contract mit der Web-Seite (W3): Minuten seit Boot, nicht
                 // die Wanduhr (die steht nach einem Kaltstart auf 1970).
-                uint16_t now_min = (uint16_t)(millis() / 60000UL);
+                uint16_t now_min = uptimeMin16();
 
                 // Lazy Init deckt Boot UND ein Laufzeit-"--setcall" gleich mit
                 // ab -- kein zusaetzlicher Haken in setup() oder im Settings-
@@ -2131,7 +2132,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // append own signal report (NCT,RSSI,SNR) before UDP out, so the
                                 // server gets the same report the mesh gets — the relay path below
                                 // skips its append (RcvBuffer is re-encoded there anyway)
-                                appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
+                                appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, uptimeMin16()));
                                 bHeyReportAppended = true;
 
                                 memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
@@ -2246,7 +2247,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // eigene Aussendung.
                                 if(bNBRRELAY)
                                 {
-                                    now_min_relay = (uint16_t)(millis() / 60000UL);
+                                    now_min_relay = uptimeMin16();
                                     nn_relay = nbrRelayNeed(nbrMatrix, aprsmsg.msg_source_path, now_min_relay,
                                                              bNBRSYM, (uint32_t)aprsmsg.msg_id);
                                 }
@@ -2266,7 +2267,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 }
 
                                 if(aprsmsg.payload_type == '@' && !bHeyReportAppended)
-                                    appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
+                                    appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, uptimeMin16()));
                                 
                                 memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
 

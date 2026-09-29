@@ -3,6 +3,7 @@
 // 20230326: Version 4.00: START
 
 #include "configuration.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "capture_functions.h"
 
 #include <Arduino.h>
@@ -1945,7 +1946,7 @@ void nrf52loop()
 
     // check NCNT modified -- MeshCom 5 (Welle 4, Konzept 4.8): lokaler
     // Vergleich, nicht die Sendefassung -- nbrNcnt(), nicht nbrNcntAir().
-    int incnt = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
+    int incnt = nbrNcnt(nbrMatrix, uptimeMin16());
     if(ncnt_hold != incnt)
     {
         INSTR_SECTION("pos_timer");
@@ -2047,7 +2048,7 @@ void nrf52loop()
 
         // Check for topology change -- lokaler Vergleich (Konzept 4.8: die
         // Trickle-Ruecksetzung ist kein Sender).
-        int current_neighbors = nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
+        int current_neighbors = nbrNcnt(nbrMatrix, uptimeMin16());
         if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
         {
             trickle_interval_ms = TRICKLE_IMIN_S * 1000UL;
@@ -2087,7 +2088,7 @@ void nrf52loop()
     if(bNBRDEBUG && (uint32_t)(millis() - nbrsnap_timer) >= 900000UL)
     {
         nbrsnap_timer = millis();
-        nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
+        nbrLogSnapshot(nbrMatrix, uptimeMin16());
     }
 
     // Nachbarschaftsmatrix (Welle 2, edge pool): Minuten-Sweep (nbrSweep(),
@@ -2099,7 +2100,7 @@ void nrf52loop()
     // trotzdem den Funktionsaufruf bei jedem Loop-Durchlauf.
     {
         static uint16_t s_nbr_sweep_min = 0xFFFF;
-        uint16_t now_min_sweep = (uint16_t)(millis() / 60000UL);
+        uint16_t now_min_sweep = uptimeMin16();
         if(now_min_sweep != s_nbr_sweep_min)
         {
             s_nbr_sweep_min = now_min_sweep;

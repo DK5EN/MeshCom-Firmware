@@ -19,6 +19,7 @@
 // on this branch (src/aprs_structures.h), not Arduino `String`: every
 // assignment below goes through src/mc_text.h instead.
 #include "Arduino.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "configuration.h"   // defines ENABLE_MSGSTORE -- must come BEFORE the guard
 
 #if defined(ENABLE_MSGSTORE)
@@ -54,7 +55,7 @@ static const char *glueOwnCall(void)
 // held our own call either).
 static int32_t glueHeardAgeMs(const char *call)
 {
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
     int row = nbrFind(nbrMatrix, call);
 
     NbrMhView v;

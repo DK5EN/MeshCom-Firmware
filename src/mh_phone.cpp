@@ -17,6 +17,7 @@
 // prueft nur mhJsonBuild().
 
 #include "mh_phone.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "ble_json_frame.h"
 #include "configuration_global.h"   // BLE_JSON_PAYLOAD_MAX (unbedingt, board-unabhaengig)
 
@@ -257,7 +258,7 @@ void mhPhoneListStart(void)
     s_mh_n = 0;
     s_mh_cursor = -1;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     int total = nbrMhRows(nbrMatrix, now_min, NBR_WINDOW_MIN, nullptr, 0);
     if (total <= 0)
@@ -292,7 +293,7 @@ void mhPhoneListStep(void)
     if (s_mh_cursor < 0)
         return;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     for (; s_mh_cursor < s_mh_n; s_mh_cursor++)
     {

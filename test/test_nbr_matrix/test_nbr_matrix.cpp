@@ -22,8 +22,10 @@
 #include <unity.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "../../src/nbr_matrix.cpp"
+#include "../support/teleport_clock.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -2646,6 +2648,110 @@ void test_gw_flag_does_not_survive_row_eviction(void)
     }
 }
 
+// --- millis() teleportation (test/support/teleport_clock.h) -----------------
+//
+// The firmware hands the matrix `(uint16_t)(millis() / 60000UL)` (loop_functions.cpp,
+// lora_functions.cpp, the once-a-minute nbrSweep() call in esp32_main.cpp/nrf52_main.cpp,
+// ...). 2^32 ms is 71582.788 minutes, not a multiple of 65536: at the millis()
+// wrap that minute counter is NOT continuous (6046 -> 0), it jumps by 59490 min
+// (= 98 mod 256). The matrix itself is wrap safe against a continuous 16-bit
+// minute counter (test_gw_lapse_is_wraparound_safe); the two teleport tests
+// below run the same scenario with (a) the firmware's derivation and (b) a
+// continuous minute counter, `(uint16_t)true_minutes`, to pin down which side a
+// failure is on.
+
+static uint16_t teleMin(const TeleportClock &c, bool continuous)
+{
+    return continuous ? (uint16_t)c.true_minutes() : c.fw_minutes();
+}
+
+// Gateway flag hold (NBR_GW_HOLD_MIN = 45 min after the last HG) with the
+// millis() wrap 1 s .. 100 min after the HG: held for exactly 44 true minutes,
+// lapsed from the 45th, exactly one lapse, never back (also not 256 min later,
+// when the 8-bit stamp comes round again), one nbrSweep() per minute as the loop does.
+static void teleGwHold(bool continuous)
+{
+    const uint32_t offs[] = {1000u, 60000u, 10u * 60000u + 30000u, 30u * 60000u, 44u * 60000u,
+                             45u * 60000u, 46u * 60000u, 100u * 60000u};
+    for (unsigned oi = 0; oi < sizeof(offs) / sizeof(offs[0]); oi++)
+    {
+        NbrMatrix m;
+        TeleportClock c;
+        c.teleport_to(TeleportClock::kWrapMinus(offs[oi]));   // HG this long before the wrap
+        nbrInit(m, "DK5EN-93", teleMin(c, continuous));
+        nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, teleMin(c, continuous));
+        TEST_ASSERT_TRUE(nbrFind(m, "OE1GGG-1") > 0);
+        const uint64_t hgMin = c.true_minutes();
+
+        bool wasHeld = true;
+        int lapses = 0, revives = 0;
+        for (uint32_t t = 0; t < 300u * 60000u; t += 5000)
+        {
+            c.advance(5000);
+            nbrSweep(m, teleMin(c, continuous));
+            int r = nbrFind(m, "OE1GGG-1");
+            bool held = r > 0 && gw_of(m, r);
+            bool expect = (c.true_minutes() - hgMin) < (uint64_t)NBR_GW_HOLD_MIN;
+            char msg[96];
+            snprintf(msg, sizeof(msg), "HG %u ms before the wrap, true elapsed %u min: flag %s",
+                     (unsigned)offs[oi], (unsigned)(c.true_minutes() - hgMin), expect ? "must hold" : "must be gone");
+            TEST_ASSERT_EQUAL_MESSAGE(expect, held, msg);
+            if (wasHeld && !held) lapses++;
+            if (!wasHeld && held) revives++;
+            wasHeld = held;
+        }
+        TEST_ASSERT_EQUAL_INT(1, lapses);
+        TEST_ASSERT_EQUAL_INT(0, revives);
+    }
+}
+
+void test_teleport_gw_hold_lapses_once_across_millis_wrap(void)
+{
+    teleGwHold(false);
+}
+
+void test_teleport_gw_hold_lapses_once_with_continuous_minutes_across_wrap(void)
+{
+    teleGwHold(true);
+}
+
+// A row heard 1 min .. 10 h before the wrap is still there 20 min after it
+// (the 12 h window has not passed); the sweep must not wipe fresh rows.
+static void teleRowsSurvive(bool continuous)
+{
+    const uint32_t offs[] = {1000u, 60000u, 5u * 60000u, 30u * 60000u, 600u * 60000u};
+    for (unsigned oi = 0; oi < sizeof(offs) / sizeof(offs[0]); oi++)
+    {
+        NbrMatrix m;
+        TeleportClock c;
+        c.teleport_to(TeleportClock::kWrapMinus(offs[oi]));
+        nbrInit(m, "DK5EN-93", teleMin(c, continuous));
+        nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_UNKNOWN, -80, 5, teleMin(c, continuous));
+        TEST_ASSERT_TRUE(nbrFind(m, "OE1GGG-1") > 0);
+        const uint64_t heardMin = c.true_minutes();
+
+        for (uint32_t t = 0; t < offs[oi] + 20u * 60000u; t += 10000)
+        {
+            c.advance(10000);
+            nbrSweep(m, teleMin(c, continuous));
+            char msg[96];
+            snprintf(msg, sizeof(msg), "heard %u ms before the wrap, true age %u min: row must still be there",
+                     (unsigned)offs[oi], (unsigned)(c.true_minutes() - heardMin));
+            TEST_ASSERT_TRUE_MESSAGE(nbrFind(m, "OE1GGG-1") > 0, msg);
+        }
+    }
+}
+
+void test_teleport_rows_survive_millis_wrap(void)
+{
+    teleRowsSurvive(false);
+}
+
+void test_teleport_rows_survive_millis_wrap_with_continuous_minutes(void)
+{
+    teleRowsSurvive(true);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2733,5 +2839,9 @@ int main(int, char **)
     RUN_TEST(test_horizon_g_bit_latest_wins);
     RUN_TEST(test_copy_mask_contains_the_relayer_cover_mask_does_not);
     RUN_TEST(test_gw_flag_does_not_survive_row_eviction);
+    RUN_TEST(test_teleport_gw_hold_lapses_once_across_millis_wrap);
+    RUN_TEST(test_teleport_gw_hold_lapses_once_with_continuous_minutes_across_wrap);
+    RUN_TEST(test_teleport_rows_survive_millis_wrap);
+    RUN_TEST(test_teleport_rows_survive_millis_wrap_with_continuous_minutes);
     return UNITY_END();
 }

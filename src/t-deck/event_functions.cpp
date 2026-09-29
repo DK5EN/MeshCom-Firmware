@@ -10,6 +10,7 @@
  */
 
 #include <configuration.h>
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include <debugconf.h>
 #include "event_functions.h"
 #include "tdeck_extern.h"
@@ -494,7 +495,7 @@ void btn_event_handler_clear_messages(lv_event_t * e)
  */
 void btn_event_handler_clear_mheards(lv_event_t * e)
 {
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
     nbrReset(nbrMatrix, now_min);
 
     if (SD.exists("/topo.dat"))

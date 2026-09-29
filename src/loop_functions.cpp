@@ -1,4 +1,5 @@
 #include "mc_text.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "Arduino.h"
 
 #include <atomic>
@@ -3331,7 +3332,7 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     // MeshCom 5 (docs/meshcom5-campaign.md Welle 4): STAT-Zeile ist ein
     // Monitor-Feld (Konsole 2323), kein Funk -- nbrNcnt(), nicht die auf
     // NBR_NCNT_AIR_MAX gekappte Sendefassung.
-    f->mh             = (uint16_t)nbrNcnt(nbrMatrix, (uint16_t)(millis() / 60000UL));
+    f->mh             = (uint16_t)nbrNcnt(nbrMatrix, uptimeMin16());
     f->heap           = heap;
     f->trk_interval_s = trickle_interval_ms / 1000UL;
     f->trk_consistent = trickle_consistent_count;
@@ -4753,7 +4754,7 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
         // statt der alten 99 als Literal) -- ohne ihn kann GCC cncnt's feste
         // Breite nicht aus dem Rueckgabewert einer Funktion herleiten
         // (-Werror=format-truncation).
-        int incnt = nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL));
+        int incnt = nbrNcntAir(nbrMatrix, uptimeMin16());
         if(incnt > 0)
         {
             if(incnt > NBR_NCNT_AIR_MAX)
@@ -5133,7 +5134,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         // Positionsrahmen -- fuer die Echo-Tabelle, nicht fuer Relays/Text/
         // den HN-Bericht (die haben eigene Aufrufstellen bzw. gar keine).
         nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
-                     (uint16_t)(millis() / 60000UL));
+                     uptimeMin16());
 
         // An APP als Anzeige retour senden
         if(isPhoneReady == 1)
@@ -5212,7 +5213,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     // Positionsrahmen (vom Telefon ausgeloest), gleiche Aufrufstelle wie
     // sendPosition()'s Mesh-Zweig oben.
     nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
-                 (uint16_t)(millis() / 60000UL));
+                 uptimeMin16());
 }
 
 unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *src_override)
@@ -5345,7 +5346,7 @@ void sendHey()
     // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<n> im HEY
     // geht auf die Luft -- nbrNcntAir(), auf NBR_NCNT_AIR_MAX gekappt.
     snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;",
-             nbrNcntAir(nbrMatrix, (uint16_t)(millis() / 60000UL)));
+             nbrNcntAir(nbrMatrix, uptimeMin16()));
    
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -5369,7 +5370,7 @@ void sendHey()
     // (eigene, ausgeschlossene Aufrufstelle: der HN-Bericht wird nie relayt
     // und ist keine im 2-Hop-Fenster sichtbare Echo-Kette).
     nbrNoteOwnTx(nbrMatrix, (uint32_t)aprsmsg.msg_id, aprsmsg.payload_type,
-                 (uint16_t)(millis() / 60000UL));
+                 uptimeMin16());
 
     // GW-01: no gateway self-upload of the own '@' HEY. The bare copy
     // (rssi/snr 0, no signal report) always reached the server seconds before
@@ -5412,7 +5413,7 @@ void sendNbrReport()
     if(meshcom_settings.node_call[0] != 0x00 && meshcom_settings.node_pingtime > 0)
         return;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     char nbr_payload[128];
     // MeshCom 5 (docs/meshcom5-campaign.md Welle 4, Konzept 4.8): R<heard> im

@@ -13,6 +13,7 @@
 // dieselbe 10-Minuten-Regel teilen (Konzept 4.12).
 
 #include "topo_ui.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 
 #include <Arduino.h>
 #include <configuration.h>
@@ -168,7 +169,7 @@ void topoUiBoot(void)
         return;
     vBooted = true;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     if (SD.exists("/topo.dat"))
     {

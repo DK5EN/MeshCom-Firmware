@@ -1,4 +1,5 @@
 #include <string.h>
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "mc_text.h"
 #include "Arduino.h"
 #include "configuration.h"
@@ -170,7 +171,7 @@ void checkVia(struct aprsMessage &aprsmsg)
                 // der Via-Menge (Konzept 4.11).
                 char cMH[NBR_CALL_LEN];
                 int inct=0;
-                uint16_t now_min = (uint16_t)(millis() / 60000UL);
+                uint16_t now_min = uptimeMin16();
                 uint8_t rows[NBR_MAX_ROWS];
                 int nrows = nbrMhRows(nbrMatrix, now_min, 60, rows, NBR_MAX_ROWS);
                 if(nrows > NBR_MAX_ROWS)

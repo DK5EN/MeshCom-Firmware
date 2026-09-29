@@ -26,6 +26,8 @@
 
 #include <dm_stats.h>
 
+#include "../support/teleport_clock.h"
+
 static uint32_t g_next_base = 100;
 
 static void primeSentTable(uint32_t now_ms)
@@ -259,6 +261,128 @@ static void test_klemmung_bei_zu_kleinem_puffer(void)
     TEST_ASSERT_EQUAL_INT((int)strlen(klein), len);
 }
 
+// ---------------------------------------------------------------------------
+// millis() teleportation (test/support/teleport_clock.h): RTT is `now_ms -
+// sent_ms` in uint32_t, so a DM sent before the wrap and acked after it must
+// still get its true delta, whatever the size of the gap.
+// ---------------------------------------------------------------------------
+
+static void rttClear(void)
+{
+    for(int i = 0; i < DMSTAT_RTT_BUCKETS; i++)
+        dmstat_rtt[i].store(0);
+}
+
+// Exactly one count, in exactly bucket `want`, nowhere else.
+static void assertOnlyBucket(int want, const char *msg)
+{
+    for(int i = 0; i < DMSTAT_RTT_BUCKETS; i++)
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(i == want ? 1u : 0u, dmstat_rtt[i].load(), msg);
+}
+
+// Sent k ms before the wrap (k = 0 .. right on it), acked rtt ms later (after
+// the wrap for every rtt > k): the bucket is the one of the TRUE rtt, with
+// the exact bucket edges.
+static void test_teleport_rtt_across_wrap_is_true_delta(void)
+{
+    const uint32_t rtts[] = {0, 1, 14999, 15000, 39999, 40000, 119999, 120000,
+                             539999, 540000, 1799999, 1800000, 0x7FFFFFFFu, 0x80000001u, 0xFFFFFFFFu};
+    const uint32_t ks[] = {0, 1, 999, 14999, 20000, 600000};
+    for(unsigned ki = 0; ki < sizeof(ks) / sizeof(ks[0]); ki++)
+    {
+        for(unsigned ri = 0; ri < sizeof(rtts) / sizeof(rtts[0]); ri++)
+        {
+            rttClear();
+            uint32_t base = g_next_base;
+            g_next_base += 8;
+            uint16_t nnn = (uint16_t)(base % 1000);
+
+            TeleportClock c;
+            c.teleport_to(TeleportClock::kWrapMinus(ks[ki]));
+            dmStatNoteSent(nnn, c.now_ms);
+            c.advance(rtts[ri]);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "k=%u rtt=%u", (unsigned)ks[ki], (unsigned)rtts[ri]);
+            TEST_ASSERT_TRUE_MESSAGE(dmStatNoteAck(nnn, c.now_ms), msg);
+            assertOnlyBucket(dmStatRttBucket(rtts[ri]), msg);
+        }
+    }
+}
+
+// A stale entry, far older than the 30 min histogram window: the ack still
+// finds it (nothing expires by time), books the true delta into the top
+// bucket, and once (a second ack finds nothing).
+static void test_teleport_stale_entry_is_booked_in_top_bucket_once(void)
+{
+    const uint32_t ages[] = {1800000u, 86400000u, 0x7FFFFFFFu, 0x80000000u, 0x80000001u,
+                             2592000000u /* 30 d */, 0xFFFFFFFFu /* just under 49.7 d */};
+    for(unsigned i = 0; i < sizeof(ages) / sizeof(ages[0]); i++)
+    {
+        rttClear();
+        uint32_t base = g_next_base;
+        g_next_base += 8;
+        uint16_t nnn = (uint16_t)(base % 1000);
+
+        TeleportClock c;
+        c.teleport_to(TeleportClock::kWrapMinus(40000));   // sent just before the wrap
+        dmStatNoteSent(nnn, c.now_ms);
+        c.advance(ages[i]);                                  // the node idles, then the ack arrives
+
+        char msg[48];
+        snprintf(msg, sizeof(msg), "age=%u", (unsigned)ages[i]);
+        TEST_ASSERT_TRUE_MESSAGE(dmStatNoteAck(nnn, c.now_ms), msg);
+        assertOnlyBucket(5, msg);
+        TEST_ASSERT_FALSE_MESSAGE(dmStatNoteAck(nnn, c.now_ms + 10), msg);
+        assertOnlyBucket(5, msg);
+    }
+}
+
+// NNN counter wrapped onto a never-acked entry from before the millis() wrap:
+// the re-note replaces the send time, the RTT counts from the NEW send.
+static void test_teleport_renote_after_wrap_replaces_send_time(void)
+{
+    rttClear();
+    uint32_t base = g_next_base;
+    g_next_base += 8;
+    uint16_t nnn = (uint16_t)(base % 1000);
+
+    TeleportClock c;
+    c.teleport_to(TeleportClock::kWrapMinus(19999));
+    dmStatNoteSent(nnn, c.now_ms);       // old send, 20 s before the wrap
+    c.advance(21000);                    // now 1 s after the wrap
+    dmStatNoteSent(nnn, c.now_ms);       // same NNN again: replaces
+    c.advance(4000);
+    TEST_ASSERT_TRUE(dmStatNoteAck(nnn, c.now_ms));
+    assertOnlyBucket(0, "rtt from the re-send (4 s), not from the old send (25 s)");
+}
+
+// Table slots keep working across the wrap: a burst of DMs straddling it
+// (older ones overwritten in ring order) each get their own true RTT.
+static void test_teleport_table_burst_straddling_wrap(void)
+{
+    rttClear();
+    uint32_t base = g_next_base;
+    g_next_base += 8;
+
+    TeleportClock c;
+    c.teleport_to(TeleportClock::kWrapMinus(3500));
+    uint32_t sentAt[8];
+    for(int i = 0; i < 8; i++)
+    {
+        sentAt[i] = c.now_ms;
+        dmStatNoteSent((uint16_t)((base + i) % 1000), c.now_ms);
+        c.advance(1000);                 // DM 4 lands after the wrap
+    }
+    // ack them all 16 s after the last send: rtt = 16 s + (7 - i) s -> buckets 1 (<40 s)
+    c.advance(16000);
+    for(int i = 0; i < 8; i++)
+        TEST_ASSERT_TRUE(dmStatNoteAck((uint16_t)((base + i) % 1000), c.now_ms));
+    for(int i = 0; i < DMSTAT_RTT_BUCKETS; i++)
+        TEST_ASSERT_EQUAL_UINT32(i == 1 ? 8u : 0u, dmstat_rtt[i].load());
+    (void)sentAt;
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -271,5 +395,9 @@ int main(int, char **)
     RUN_TEST(test_tabelle_ueberschreibt_nach_acht_eintraegen);
     RUN_TEST(test_format_exakter_string_und_reset);
     RUN_TEST(test_klemmung_bei_zu_kleinem_puffer);
+    RUN_TEST(test_teleport_rtt_across_wrap_is_true_delta);
+    RUN_TEST(test_teleport_stale_entry_is_booked_in_top_bucket_once);
+    RUN_TEST(test_teleport_renote_after_wrap_replaces_send_time);
+    RUN_TEST(test_teleport_table_burst_straddling_wrap);
     return UNITY_END();
 }

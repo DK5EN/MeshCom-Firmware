@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "src/assets.h"
 #include "stdio.h"
 #include "ui_deckpro.h"
@@ -1327,7 +1328,7 @@ void ui_mheard_disp()
 
     row++;
 
-    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+    uint16_t now_min = uptimeMin16();
 
     uint8_t idx[NBR_MAX_ROWS];
     int n = nbrMhRows(nbrMatrix, now_min, NBR_WINDOW_MIN, idx, NBR_MAX_ROWS);

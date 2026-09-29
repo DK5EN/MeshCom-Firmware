@@ -321,6 +321,7 @@ test/support/debugconf.h
 test/support/gwflood_frames.txt
 test/support/nrf52/WisBlock-API.h
 test/support/printfdeb_functions.h
+test/support/teleport_clock.h
 test/support/traces/ack_honoured.txt
 test/support/traces/altb_fusion_series.h
 test/support/traces/dedup_trace.txt
