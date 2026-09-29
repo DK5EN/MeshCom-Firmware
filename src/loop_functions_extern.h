@@ -192,9 +192,6 @@ extern unsigned long analog_oversample_timer;
 extern uint16_t ADCraw;
 extern float ADCalpha;
 extern float ADCexp1;
-extern float ADCexp1pre;
-extern float ADCexp12;
-extern float ADCexp12pre;
 extern float ADCexp2;
 
 // same set of variables for BATT

@@ -2243,7 +2243,8 @@ static void update_header_batt_indicator(float batt, int proz)
     // BAT-01: batt==0.0f is the established "no reading" convention (grounded pin, or the
     // ADC-path no-battery detection in batt_functions.cpp) -- without this, a genuinely
     // absent battery fell through to the percent branch below and showed a misleading
-    // "100%"/full-battery icon (mv_to_percent() returns 100 for <1000 mV).
+    // "100%"/full-battery icon (before the battery consolidation mv_to_percent() returned 100
+    // for <1000 mV; it returns 0 for "no reading" now, this branch still decides first).
     const bool usb_powered = (batt <= 0.0f) || (batt > usb_voltage_threshold);
 
     if(usb_powered)

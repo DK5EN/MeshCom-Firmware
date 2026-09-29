@@ -5,9 +5,18 @@
 // are the pure decision core that turns that signature into a hysteresis-gated
 // present/absent verdict -- no Arduino calls, so they run natively against synthetic mV
 // series here instead of against real hardware.
+//
+// Battery consolidation wave 3: the detector now lives in src/batt_pipeline.h (batt_functions.h
+// includes it, names unchanged), so the tests above run against the shared detector. The second
+// half of this file covers the sample core batt_functions.cpp wires around it
+// (battFeedSample(): detector on the raw sample -> dt based EMA -> "no reading" rules, and
+// battLowVoltage(), battHardwarePresent(), mv_to_percent(), battSampleCount()).
 #include <unity.h>
 
+#include <stdio.h>
+
 #include "batt_functions.h"
+#include "../support/teleport_clock.h"
 
 // Single-cell Li-Ion band used throughout (matches the T-Deck/T-Deck Plus/E213/E290/
 // wireless-paper boards this detector actually ships on -- fBattMax ~4.2 V): the same
@@ -20,6 +29,7 @@ static batt_detect_state_t g_state;
 void setUp(void)
 {
     battDetectReset(&g_state);
+    battPipelineReset();
 }
 
 void tearDown(void) {}
@@ -170,6 +180,338 @@ static void test_2s_pack_band_bleibt_present(void)
     TEST_ASSERT_TRUE(present);
 }
 
+
+// ----------------------------------------------------- sample core (batt_functions.cpp)
+
+// pack max 4.1 V (BAT_MAX_VOLTAGE of the single-cell boards), in mV
+static const float kPackMv = 4100.0f;
+
+// Feeds `n` identical raw samples `periodMs` apart starting at t0; returns the last reported value.
+static float feedConst(float rawMv, int n, uint32_t periodMs, uint32_t t0, uint32_t *tEnd = nullptr)
+{
+    float out = 0.0f;
+    uint32_t t = t0;
+    for(int i = 0; i < n; i++, t += periodMs)
+        out = battFeedSample(rawMv, kPackMv, t);
+    if(tEnd) *tEnd = t;
+    return out;
+}
+
+// The old path seeded the filter with fBattMax (a fake full cell) and ramped down from there;
+// the pipeline seeds with the first sample, so a real 3.9 V cell reads 3.9 V from the first second.
+static void test_core_erstes_sample_seedet_ema(void)
+{
+    float mv = battFeedSample(3900.0f, kPackMv, 1000);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 3900.0f, mv);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 3900.0f, battFilteredMv());
+    TEST_ASSERT_FALSE(battSettled());
+}
+
+// EMA tau is 30 s of REAL time: after one tau a 100 mV step is 63.2 % through, whatever the
+// sample cadence (1 s fixed profile, 100 ms tick, 30 s switched profile -> 1 sample per tau).
+static void test_core_ema_tau_ist_kadenzunabhaengig(void)
+{
+    const uint32_t periods[] = {100, 1000, 5000};
+    for(size_t i = 0; i < sizeof(periods) / sizeof(periods[0]); i++)
+    {
+        battPipelineReset();
+        uint32_t t = 0;
+        feedConst(3900.0f, 1, periods[i], 0, &t);
+        uint32_t tEnd = 0;
+        // step to 4000 mV (100 mV: under the 250 mV detector delta), then run for exactly 30 s
+        float mv = feedConst(4000.0f, (int)(30000 / periods[i]), periods[i], t, &tEnd);
+        TEST_ASSERT_FLOAT_WITHIN(2.0f, 3900.0f + 100.0f * 0.632f, mv);
+    }
+}
+
+// battSampleCount(): once per real sample, monotonic (init_batt()/reset does not rewind it)
+static void test_core_sample_zaehler(void)
+{
+    uint32_t n0 = battSampleCount();
+    feedConst(3900.0f, 5, 1000, 0);
+    TEST_ASSERT_EQUAL_UINT32(n0 + 5, battSampleCount());
+    battPipelineReset();
+    TEST_ASSERT_EQUAL_UINT32(n0 + 5, battSampleCount());
+}
+
+// Floating pin: detector flips to absent after ABSENT_STREAK samples, the value becomes
+// "no reading" (0) and battHardwarePresent() turns false (no /B= on air).
+static void test_core_floating_pin_meldet_no_reading(void)
+{
+    TEST_ASSERT_TRUE(battHardwarePresent());   // before the first sample: fail-safe present
+
+    battFeedSample(3900.0f, kPackMv, 0);
+    TEST_ASSERT_TRUE(battHardwarePresent());
+
+    const float swing[] = {3716.0f, 4886.0f};
+    float mv = 1.0f;
+    uint32_t t = 1000;
+    for(int i = 0; i <= BATT_DETECT_ABSENT_STREAK + 1; i++, t += 1000)
+        mv = battFeedSample(swing[i % 2], kPackMv, t);
+
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+    TEST_ASSERT_FALSE(battDetected());
+    TEST_ASSERT_FALSE(battHardwarePresent());
+    TEST_ASSERT_FALSE(battLowVoltage(3300.0f));
+}
+
+// The cell comes back: the EMA restarts on the first plausible sample (not an average with the
+// floating-pin noise) and the settle rule starts over.
+static void test_core_akku_zurueck_reseedet_ema(void)
+{
+    const float swing[] = {3716.0f, 4886.0f};
+    uint32_t t = 0;
+    for(int i = 0; i <= BATT_DETECT_ABSENT_STREAK + 1; i++, t += 1000)
+        battFeedSample(swing[i % 2], kPackMv, t);
+    TEST_ASSERT_FALSE(battDetected());
+
+    // the first stable sample still jumps from the last noisy one (implausible), so the
+    // plausible streak reaches PRESENT_STREAK one sample later
+    float mv = 0.0f;
+    for(int i = 0; i <= BATT_DETECT_PRESENT_STREAK; i++, t += 1000)
+        mv = battFeedSample(3800.0f, kPackMv, t);
+
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, 3800.0f, mv);
+    TEST_ASSERT_FALSE(battSettled());
+    TEST_ASSERT_TRUE(battHardwarePresent());
+}
+
+// Filtered value < 1000 mV reports 0 ("no reading": T-Deck header shows USB, /B= suppressed).
+// A small pack max (1500 mV) keeps the detector's band around 900 mV so this isolates the rule.
+static void test_core_unter_1000mv_ist_no_reading(void)
+{
+    float mv = 1.0f;
+    for(int i = 0; i < 4; i++)
+        mv = battFeedSample(900.0f, 1500.0f, 1000u * (uint32_t)i);
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+    TEST_ASSERT_FALSE(battHardwarePresent());
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv_to_percent(mv));
+}
+
+// mv_to_percent(): 0 for 0 mV (no reading, not "USB = 100 %" any more), otherwise battPercent()
+// scaled to node_maxv (fBattMax defaults to BAT_MAX_VOLTAGE, 4.1 V here).
+static void test_core_mv_to_percent(void)
+{
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv_to_percent(0.0f));
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv_to_percent(999.0f));
+    TEST_ASSERT_EQUAL_FLOAT(100.0f, mv_to_percent(4100.0f));
+    TEST_ASSERT_EQUAL_FLOAT(100.0f, mv_to_percent(4300.0f));
+    TEST_ASSERT_EQUAL_FLOAT((float)battPercent(3800.0f, 4100.0f), mv_to_percent(3800.0f));
+    TEST_ASSERT_TRUE(mv_to_percent(3900.0f) > mv_to_percent(3700.0f));
+    TEST_ASSERT_TRUE(mv_to_percent(3300.0f) < 5.0f);
+}
+
+// Low-voltage rule: only on the settled EMA (3 tau = 90 s AND 8 samples), never on a bad first
+// sample, only inside 1 V < EMA <= threshold.
+static void test_core_low_voltage_nur_settled(void)
+{
+    uint32_t t = 0;
+    for(int i = 0; i < 60; i++, t += 1000)                 // 60 s at 3.25 V: not settled yet
+        battFeedSample(3250.0f, kPackMv, t);
+    TEST_ASSERT_FALSE(battSettled());
+    TEST_ASSERT_FALSE(battLowVoltage(3300.0f));
+
+    for(int i = 0; i < 40; i++, t += 1000)                 // 100 s total: settled
+        battFeedSample(3250.0f, kPackMv, t);
+    TEST_ASSERT_TRUE(battSettled());
+    TEST_ASSERT_TRUE(battLowVoltage(3300.0f));
+    TEST_ASSERT_FALSE(battLowVoltage(3200.0f));            // above threshold: no
+}
+
+// A sagging FIRST sample (boot on a weak cell) must not put the node to sleep: it seeds the EMA,
+// but the settle rule keeps battLowVoltage() false until the filter has washed the seed out.
+static void test_core_schlechtes_erstes_sample_loest_nichts_aus(void)
+{
+    uint32_t t = 0;
+    battFeedSample(3000.0f, kPackMv, t);
+    t += 1000;
+    for(int i = 0; i < 6; i++, t += 1000)                  // 8 samples in total, only 7 s
+        battFeedSample(3900.0f, kPackMv, t);
+    TEST_ASSERT_FALSE(battSettled());
+    TEST_ASSERT_FALSE(battLowVoltage(3300.0f));
+}
+
+// A battery at a healthy voltage is never "low", settled or not.
+static void test_core_gesunder_akku_nie_low(void)
+{
+    feedConst(3900.0f, 200, 1000, 0);
+    TEST_ASSERT_TRUE(battSettled());
+    TEST_ASSERT_FALSE(battLowVoltage(3300.0f));
+}
+
+// ----------------------------------------------------- millis() teleportation
+// The full sample core (battFeedSample: detector on the raw sample -> dt EMA ->
+// "no reading" rules -> settle rule) with the clock put just before the uint32
+// wrap, across it, and on big forward hops (test/support/teleport_clock.h).
+
+struct CoreRun
+{
+    float mv[130];
+    float filt[130];
+    bool settled[130];
+    bool low[130];
+};
+
+// 130 samples, 1 s apart, starting at absolute millis() t0: 3250 mV for ten
+// samples, then 3200 mV (both plausible, both below a 3300 mV threshold).
+static void coreRun(uint32_t t0, CoreRun *r)
+{
+    battPipelineReset();
+    TeleportClock c;
+    c.teleport_to(t0);
+    for(int i = 0; i < 130; i++)
+    {
+        r->mv[i] = battFeedSample(i < 10 ? 3250.0f : 3200.0f, kPackMv, c.now_ms);
+        r->filt[i] = battFilteredMv();
+        r->settled[i] = battSettled();
+        r->low[i] = battLowVoltage(3300.0f);
+        c.advance(1000);
+    }
+}
+
+// Across the wrap the whole core must behave exactly as in a run without one,
+// and the low-voltage decision may come at no other sample than the one where
+// the settle rule (3 tau = 90 s, 8 samples) is met.
+static void test_teleport_core_across_wrap_matches_unwrapped_run(void)
+{
+    static CoreRun ref, w;
+    coreRun(100000u, &ref);
+
+    const uint32_t ks[] = {0, 1, 500, 999, 1000, 1001, 45000, 89999, 90000, 119999};
+    for(unsigned ki = 0; ki < sizeof(ks) / sizeof(ks[0]); ki++)
+    {
+        coreRun(TeleportClock::kWrapMinus(ks[ki]), &w);
+        int firstSettled = -1, firstLow = -1;
+        for(int i = 0; i < 130; i++)
+        {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "k=%u i=%d", (unsigned)ks[ki], i);
+            TEST_ASSERT_EQUAL_FLOAT_MESSAGE(ref.mv[i], w.mv[i], msg);
+            TEST_ASSERT_EQUAL_FLOAT_MESSAGE(ref.filt[i], w.filt[i], msg);
+            TEST_ASSERT_EQUAL_MESSAGE(ref.settled[i], w.settled[i], msg);
+            TEST_ASSERT_EQUAL_MESSAGE(ref.low[i], w.low[i], msg);
+            if(firstSettled < 0 && w.settled[i]) firstSettled = i;
+            if(firstLow < 0 && w.low[i]) firstLow = i;
+        }
+        TEST_ASSERT_EQUAL_INT(90, firstSettled);
+        TEST_ASSERT_EQUAL_INT(90, firstLow);
+    }
+}
+
+// Forward hop of J ms in the middle of a run of healthy samples: the core
+// must resume within one sample (see test_teleport_ema_hop_* in
+// test_batt_pipeline for the mechanism when J >= 2^31).
+static void teleCoreHop(uint32_t J, bool firstMustFold)
+{
+    battPipelineReset();
+    TeleportClock c;
+    c.teleport_to(1000);
+    for(int i = 0; i < 11; i++)
+    {
+        battFeedSample(3900.0f, kPackMv, c.now_ms);
+        c.advance(1000);
+    }
+    c.advance(J - 1000u);
+
+    float mv = battFeedSample(3800.0f, kPackMv, c.now_ms);   // the jump sample (100 mV step: no detector trip)
+    TEST_ASSERT_TRUE(battDetected());
+    if(firstMustFold)
+        TEST_ASSERT_FLOAT_WITHIN_MESSAGE(1.0f, 3800.0f, mv, "a forward hop is a huge dt: alpha -> 1");
+
+    c.advance(1000);
+    mv = battFeedSample(3800.0f, kPackMv, c.now_ms);
+    TEST_ASSERT_TRUE_MESSAGE(mv < 3899.0f, "core frozen: reported value did not move within one sample after the hop");
+
+    for(int i = 0; i < 60; i++)
+    {
+        c.advance(1000);
+        mv = battFeedSample(3800.0f, kPackMv, c.now_ms);
+    }
+    TEST_ASSERT_TRUE_MESSAGE(mv < 3820.0f, "core did not converge after the hop");
+    TEST_ASSERT_TRUE(battHardwarePresent());
+}
+
+static void test_teleport_core_hop_1h(void)          { teleCoreHop(TeleportClock::kHour, true); }
+static void test_teleport_core_hop_2p31_minus_1(void) { teleCoreHop(0x7FFFFFFFu, true); }
+static void test_teleport_core_hop_2p31(void)        { teleCoreHop(0x80000000u, false); }
+static void test_teleport_core_hop_2p31_plus_1(void) { teleCoreHop(0x80000001u, false); }
+static void test_teleport_core_hop_0xFFFFFFFF(void)  { teleCoreHop(0xFFFFFFFFu, false); }   // == one ms BACK
+
+// A hop must not hand a bad first sample the low-voltage decision: seed with a
+// sagging 3000 mV, hop 1 h, then a real 3900 mV: value follows at once, but 2
+// samples are not "settled" and battLowVoltage() stays false until 8 samples.
+static void test_teleport_core_hop_keeps_settle_rule(void)
+{
+    battPipelineReset();
+    TeleportClock c;
+    c.teleport_to(TeleportClock::kWrapMinus(500));
+    battFeedSample(3000.0f, kPackMv, c.now_ms);
+    c.advance(TeleportClock::kHour);
+    float mv = battFeedSample(3900.0f, kPackMv, c.now_ms);
+    TEST_ASSERT_FLOAT_WITHIN(1.0f, 3900.0f, mv);
+    TEST_ASSERT_FALSE(battSettled());
+    TEST_ASSERT_FALSE(battLowVoltage(4000.0f));   // threshold above the value: only the settle rule can say no
+    for(int i = 0; i < 5; i++)
+    {
+        c.advance(1000);
+        battFeedSample(3900.0f, kPackMv, c.now_ms);
+        TEST_ASSERT_FALSE(battLowVoltage(4000.0f));
+    }
+    c.advance(1000);
+    battFeedSample(3900.0f, kPackMv, c.now_ms);   // 8th sample
+    TEST_ASSERT_TRUE(battSettled());
+    TEST_ASSERT_TRUE(battLowVoltage(4000.0f));
+}
+
+// Floating pin -> "absent" -> cell returns, all across the wrap: the EMA is
+// re-seeded on the first plausible sample and the settle rule restarts THEN:
+// exactly 90 s (and 8 samples) after the re-seed, whichever side of the wrap
+// the re-seed fell on; never earlier, never carried over from before.
+static void test_teleport_core_settle_rule_restarts_across_wrap(void)
+{
+    const uint32_t ks[] = {5000, 20000, 26000, 30000, 40000, 60000, 100000, 150000};
+    for(unsigned ki = 0; ki < sizeof(ks) / sizeof(ks[0]); ki++)
+    {
+        battPipelineReset();
+        TeleportClock c;
+        c.teleport_to(TeleportClock::kWrapMinus(ks[ki]));
+
+        for(int i = 0; i < 5; i++, c.advance(1000))
+            battFeedSample(3900.0f, kPackMv, c.now_ms);
+        TEST_ASSERT_TRUE(battDetected());
+
+        const float swing[] = {3716.0f, 4886.0f};
+        float mv = 1.0f;
+        for(int i = 0; i <= BATT_DETECT_ABSENT_STREAK + 1; i++, c.advance(1000))
+            mv = battFeedSample(swing[i % 2], kPackMv, c.now_ms);
+        TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+        TEST_ASSERT_FALSE(battDetected());
+
+        // stable cell again; the first non-zero report is the re-seed
+        uint32_t seedMs = 0;
+        bool seeded = false;
+        int settledAfterMs = -1;
+        for(int i = 0; i < 260 && settledAfterMs < 0; i++, c.advance(1000))
+        {
+            mv = battFeedSample(3800.0f, kPackMv, c.now_ms);
+            if(!seeded && mv > 0.0f)
+            {
+                seeded = true;
+                seedMs = c.now_ms;
+                TEST_ASSERT_FLOAT_WITHIN(0.5f, 3800.0f, mv);   // fresh seed, no noise averaged in
+            }
+            if(seeded && battSettled())
+                settledAfterMs = (int)(uint32_t)(c.now_ms - seedMs);
+        }
+        char msg[64];
+        snprintf(msg, sizeof(msg), "k=%u", (unsigned)ks[ki]);
+        TEST_ASSERT_TRUE_MESSAGE(seeded, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(90000, settledAfterMs, msg);
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -181,5 +523,23 @@ int main(int, char **)
     RUN_TEST(test_present_streak_grenzwert_bei_erholung);
     RUN_TEST(test_reset_stellt_failsafe_present_wieder_her);
     RUN_TEST(test_2s_pack_band_bleibt_present);
+    RUN_TEST(test_core_erstes_sample_seedet_ema);
+    RUN_TEST(test_core_ema_tau_ist_kadenzunabhaengig);
+    RUN_TEST(test_core_sample_zaehler);
+    RUN_TEST(test_core_floating_pin_meldet_no_reading);
+    RUN_TEST(test_core_akku_zurueck_reseedet_ema);
+    RUN_TEST(test_core_unter_1000mv_ist_no_reading);
+    RUN_TEST(test_core_mv_to_percent);
+    RUN_TEST(test_core_low_voltage_nur_settled);
+    RUN_TEST(test_core_schlechtes_erstes_sample_loest_nichts_aus);
+    RUN_TEST(test_core_gesunder_akku_nie_low);
+    RUN_TEST(test_teleport_core_across_wrap_matches_unwrapped_run);
+    RUN_TEST(test_teleport_core_hop_1h);
+    RUN_TEST(test_teleport_core_hop_2p31_minus_1);
+    RUN_TEST(test_teleport_core_hop_2p31);
+    RUN_TEST(test_teleport_core_hop_2p31_plus_1);
+    RUN_TEST(test_teleport_core_hop_0xFFFFFFFF);
+    RUN_TEST(test_teleport_core_hop_keeps_settle_rule);
+    RUN_TEST(test_teleport_core_settle_rule_restarts_across_wrap);
     return UNITY_END();
 }

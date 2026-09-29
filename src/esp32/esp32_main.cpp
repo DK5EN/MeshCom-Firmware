@@ -3789,14 +3789,15 @@ void esp32loop()
     if(tx_is_active == false && is_receiving == false)
         test_inject_service();
 
-    // D1-10 loop scheduler: BattTimeWait (30 s battery/PMU read) moved to
+    // D1-10 loop scheduler: BattTimeWait (the battery sampler tick, 100 ms since the
+    // battery consolidation; the sampler itself decides when to read) moved to
     // the scheduler call above; its zero-init stays here (see the comment
     // there).
 
     // [OE3WAS] Lüftersteuerung -- split off from the battery-read block above into its own
-    // 0.5 sec timer (DRY unification, operator decision 2026-09-11): BattTimeWait was slowed
-    // to 30 sec to unify with the nRF52 cadence, but this 1W T-Beam fan/NTC control must not
-    // wait up to 30 sec to react to overtemp -- that would be a thermal regression. Only
+    // 0.5 sec timer (DRY unification, operator decision 2026-09-11): BattTimeWait was then
+    // 30 sec (it is the 100 ms sampler tick since the battery consolidation), and this 1W T-Beam
+    // fan/NTC control must not depend on the battery cadence to react to overtemp -- that would be a thermal regression. Only
     // LilyGo_T-Beam-1W defines NTC_PIN/FAN_CTRL, so this whole block compiles away elsewhere.
     #if defined(NTC_PIN) && defined(FAN_CTRL) // BOARD_TBEAM_1W
     static unsigned long FanTimeWait = 0;

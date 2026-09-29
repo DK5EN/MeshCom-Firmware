@@ -21,6 +21,8 @@ bool loopEnabled_bmp3(void)
 }
 #endif
 
+// The concept's "no samples during TX": while the radio transmits or
+// receives, the battCheck tick is skipped (see loopInterval_battCheck, 100 ms).
 bool loopEnabled_battCheck(void)
 {
     return tx_is_active == false && is_receiving == false;

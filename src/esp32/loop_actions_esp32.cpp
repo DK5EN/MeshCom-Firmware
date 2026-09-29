@@ -9,6 +9,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "batt_functions.h"
+#include "batt_pipeline.h"
 #include "lora_functions.h"
 #include "txring_functions.h"
 #include "command_functions.h"
@@ -196,11 +197,26 @@ void loopAction_ina226(void)
 #endif
 
 // ---- BattTimeWait ----------------------------------------------------
-// enabled() carries the `tx_is_active == false && is_receiving == false`
-// guard that used to sit INSIDE the old `if(elapsed>=30000)` body (see
-// src/loop_scheduler.cpp, loopEnabled_battCheck) -- when tx/rx is active the
-// old code did not reset the timer either, so folding the guard into
-// enabled() (which also skips the reset) is behaviour-identical.
+// The scheduler entry is the 100 ms TICK of the battery sampler, not a 30 s
+// read (loopInterval_battCheck, see src/loop_scheduler.h). enabled() carries
+// the `tx_is_active == false && is_receiving == false` guard: a tick that
+// falls into a TX/RX window is skipped, which is the battery concept's "no
+// samples during TX". What is actually sampled, and how often, is decided
+// per board by batt_pipeline.h battSchedTick() (read_batt() for the ADC
+// path, the local FIXED 1 s scheduler for the PMU path below).
+
+// Sample counter both battery files export (incremented once per real READ).
+// Declared here so this file compiles no matter which of them a board links.
+uint32_t battSampleCount(void);
+
+#if defined(MODUL_FW_TBEAM) && !defined(DISABLE_BATTERY)
+// PMU path: one PMU read per second (FIXED profile, never ARM), the battery
+// voltage goes through the shared EMA and the percent comes from the shared
+// curve, same as every other board.
+static batt_sched_t s_pmuSched;
+static batt_ema_t   s_pmuEma;
+static bool         s_pmuInit = false;
+#endif
 
 void loopAction_battCheck(void)
 {
@@ -213,23 +229,40 @@ void loopAction_battCheck(void)
         battProbeState = BATT_PROBE_NONE;
 
     #elif defined(MODUL_FW_TBEAM)
+        if(!s_pmuInit)
+        {
+            battSchedInit(&s_pmuSched, BATT_SCHED_PROFILE_FIXED);
+            battEmaInit(&s_pmuEma, BATT_EMA_TAU_MS_DEFAULT);
+            s_pmuInit = true;
+        }
+
+        const uint32_t now = millis();
+        if(battSchedTick(&s_pmuSched, now) != BATT_SCHED_READ)
+            return;   // cached global_batt/global_proz stay valid between reads
+
         int pmu_proz=0;
         if(PMU != NULL)
         {
-            global_batt = (float)PMU->getBattVoltage();
-            global_proz = (int)PMU->getBatteryPercent();
+            const float pmu_mv = (float)PMU->getBattVoltage();
+            pmu_proz = (int)PMU->getBatteryPercent();   // only the "no battery" verdict, see below
 
             // no BATT
-            if(global_proz < 0)
+            if(pmu_proz < 0)
             {
                 if(bDisplayCont)
                     printfdeb("[readBatteryVoltage]...no battery is connected\n");
+
+                // Fresh seed when a cell is plugged in later.
+                battEmaInit(&s_pmuEma, BATT_EMA_TAU_MS_DEFAULT);
 
                 global_batt = (float)PMU->getVbusVoltage();
                 global_proz=100.0;
             }
             else
             {
+                global_batt = battEmaUpdate(&s_pmuEma, pmu_mv, now);
+                global_proz = (int)battPercent(global_batt, meshcom_settings.node_maxv * 1000.0f);
+
                 if(global_proz < 1.0 && global_batt < 3200.0)
                     global_proz = 2;
             }
@@ -246,31 +279,54 @@ void loopAction_battCheck(void)
             battProbeState = BATT_PROBE_NONE;
         }
 
-        if(bDisplayCont)
+        // One PMU read per second now: print at most every 10 s (upstream cadence),
+        // or --display cont floods the console.
+        static uint32_t s_lastPmuPrint = 0;
+        if(bDisplayCont && (uint32_t)(millis() - s_lastPmuPrint) >= 10000UL)
+        {
+            s_lastPmuPrint = millis();
             printfdeb("[readBatteryVoltage]...PMU.volt %.1f PMU.proz %i %i\n", global_batt, global_proz, pmu_proz);
+        }
     #else
+
+        // read_batt() returns the FILTERED mV (cached between its own samples,
+        // see batt_pipeline.h); print/label only when it took a new sample.
+        static uint32_t s_lastSampleCount = 0;
 
         global_batt = read_batt();
         global_proz = mv_to_percent(global_batt);
 
-        #ifndef USE_BATT
-        if(bDisplayCont)  // neue Ausgabe erfolgt in batt_functions
+        const uint32_t sampleCount = battSampleCount();
+        if(sampleCount != s_lastSampleCount)
         {
-            #if not defined(BOARD_T_DECK_PRO) and not defined(BOARD_TBEAM_1W)
-            printfdeb("[readBatteryVoltage] %s ... %.2f V %i %% max_batt %.3f V\n", getTimeString().c_str(), global_batt/1000., global_proz, meshcom_settings.node_maxv);
+            s_lastSampleCount = sampleCount;
+
+            #ifndef USE_BATT
+            // FIXED boards sample every second now: print at most every 10 s
+            // (upstream cadence), or --display cont floods the console.
+            static uint32_t s_lastBattPrint = 0;
+            if(bDisplayCont && (uint32_t)(millis() - s_lastBattPrint) >= 10000UL)  // neue Ausgabe erfolgt in batt_functions
+            {
+                s_lastBattPrint = millis();
+                #if not defined(BOARD_T_DECK_PRO) and not defined(BOARD_TBEAM_1W)
+                printfdeb("[readBatteryVoltage] %s ... %.2f V %i %% max_batt %.3f V\n", getTimeString().c_str(), global_batt/1000., global_proz, meshcom_settings.node_maxv);
+                #endif
+            }
+            #endif
+
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            // Only touch the label (a TFT flush) when the shown text changes.
+            static int s_lastLabelCv = -1;
+            static int s_lastLabelPct = -1;
+            const int labelCv = (int)(global_batt / 10.0f);
+            if(labelCv != s_lastLabelCv || (int)global_proz != s_lastLabelPct)
+            {
+                s_lastLabelCv = labelCv;
+                s_lastLabelPct = (int)global_proz;
+                tdeck_update_batt_label(global_batt/1000., global_proz);
+            }
             #endif
         }
-        #endif
-
-        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-        tdeck_update_batt_label(global_batt/1000., global_proz);
-        #endif
 
     #endif
-
-    // BattWaitCounter is gone: it existed only to throttle the debug
-    // prints above when this block ran every 500 ms (it let them
-    // through on every 21st pass, about every 10 s). The block's own
-    // 30 s cadence is the throttle now, so the counter would have
-    // stretched those prints to roughly every 10 minutes.
 }

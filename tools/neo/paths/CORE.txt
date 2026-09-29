@@ -10,6 +10,7 @@ src/aprs_functions.h
 src/aprs_structures.h
 src/backpressure.h
 src/batt_function_old.cpp
+src/batt_pipeline.h
 src/ble_json_frame.h
 src/ble_phone_frame.h
 src/ble_phone_drain.h

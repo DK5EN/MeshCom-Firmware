@@ -345,6 +345,7 @@ test/test_aprs_reencode/test_aprs_reencode.cpp
 test/test_aprs_spec/test_aprs_spec.cpp
 test/test_backpressure/test_backpressure.cpp
 test/test_batt_detect/test_main.cpp
+test/test_batt_pipeline/test_main.cpp
 test/test_beacon_rate/test_beacon_rate.cpp
 test/test_ble_json_frame/test_ble_json_frame.cpp
 test/test_ble_phone_frame/test_ble_phone_frame.cpp

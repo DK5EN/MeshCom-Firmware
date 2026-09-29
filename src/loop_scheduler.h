@@ -95,9 +95,11 @@
 //     block reads or writes these. Independent -- which is also why gating
 //     the whole entry on !bDisplayLog (rather than only its print, as the
 //     old ESP32 code did) cannot be observed from anywhere else.
-// All 7 entries have intervals >= 2 s, so the worst case is a one-pass
+// Six of the 7 entries have intervals >= 2 s, so the worst case is a one-pass
 // timing shift (rarely, a value gets read a few ms fresher than before),
-// never a skipped or duplicated firing.
+// never a skipped or duplicated firing. battCheck is the exception: a 100 ms
+// tick whose action only calls into the sampler, which decides itself whether
+// a sample is due (batt_pipeline.h battSchedTick()).
 //
 // heapMonTimer was a `static unsigned long` local to each platform's loop
 // function; it is now the single file-scope global declared below. Its
@@ -148,7 +150,12 @@ inline uint32_t loopInterval_heapMon(void)    { return 60000; }
 inline uint32_t loopInterval_bmp3(void)       { return 60000; }
 inline uint32_t loopInterval_mcu811(void)     { return 60000; }
 inline uint32_t loopInterval_ina226(void)     { return 60000; }
-inline uint32_t loopInterval_battCheck(void)  { return 30000; }
+// battCheck is the 100 ms TICK of the battery sampler (batt_pipeline.h,
+// battSchedTick()), not a 30 s read: the sampling cadence (1 s fixed divider,
+// 30 s switched divider with a 100 ms arm-to-read window) lives in the
+// per-board read_batt(). The old 30 s value was a neo regression -- upstream
+// ticked every 500 ms and the battery filter followed the call rate.
+inline uint32_t loopInterval_battCheck(void)  { return 100; }
 
 // ---- Shared (identical on both platforms) enabled() functions ----
 // Defined inline here (not per-platform) because the underlying guard is
@@ -167,7 +174,11 @@ inline uint32_t loopInterval_battCheck(void)  { return 30000; }
 #if defined(ENABLE_BMP390)
 bool loopEnabled_bmp3(void);   // == bBMP3ON && bmp3_found, no seed on either platform
 #endif
-bool loopEnabled_battCheck(void); // == tx_is_active==false && is_receiving==false, no seed
+// == tx_is_active==false && is_receiving==false, no seed. This gate IS the
+// battery concept's "no samples during TX": a tick that falls into a TX/RX
+// window is skipped (BattTimeWait is not reset either), so the sampler never
+// reads the ADC while the PA sags the rail.
+bool loopEnabled_battCheck(void);
 
 // ---- Per-platform functions ----
 // Real definitions live in src/esp32/loop_actions_esp32.cpp (ESP32 builds)

@@ -16,13 +16,17 @@
 #include <unity.h>
 
 #include <atomic>
+#include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include <Arduino.h>
 #include <configuration.h>
 
 #include <loop_scheduler.h>
 #include <loop_functions_extern.h>
+
+#include "../support/teleport_clock.h"
 
 // ---- Timer globals the table's entries point at ---------------------
 // "the EXISTING global (never a new variable)" -- in production these are
@@ -332,11 +336,15 @@ static void test_table_has_seven_unique_named_entries(void)
 
 static void test_battcheck_and_ina226_intervals_are_the_2026_09_11_unification(void)
 {
-    // BACKLOG, DRY unification operator decision 2026-09-11: BattTimeWait
-    // slowed to 30 s and INA226TimeWait's cadence unified with it at 60 s,
-    // matching the nRF52 side. Pin the decided numbers so a future change
-    // to either cadence is a deliberate table edit, not a silent drift.
-    TEST_ASSERT_EQUAL_UINT32(30000, loopInterval_battCheck());
+    // BACKLOG, DRY unification operator decision 2026-09-11: INA226TimeWait's
+    // cadence unified at 60 s, matching the nRF52 side. BattTimeWait was
+    // slowed to 30 s then, which the battery consolidation (concept
+    // 2026-09-23, wave 3) reverted as a neo regression: battCheck is now the
+    // 100 ms TICK of the sampler in batt_pipeline.h (the 1 s / 30 s sampling
+    // cadence is decided by battSchedTick(), not by the table). Pin the
+    // decided numbers so a future change to either cadence is a deliberate
+    // table edit, not a silent drift.
+    TEST_ASSERT_EQUAL_UINT32(100,   loopInterval_battCheck());
     TEST_ASSERT_EQUAL_UINT32(60000, loopInterval_ina226());
     // Advisor (2026-09-17): the cadence tests above compare against the
     // same accessor on both sides, so a wrong constant would pass them.
@@ -346,6 +354,255 @@ static void test_battcheck_and_ina226_intervals_are_the_2026_09_11_unification(v
     TEST_ASSERT_EQUAL_UINT32(60000, loopInterval_heapMon());
     TEST_ASSERT_EQUAL_UINT32(60000, loopInterval_bmp3());
     TEST_ASSERT_EQUAL_UINT32(60000, loopInterval_mcu811());
+}
+
+
+// ---- (7) millis() teleportation -------------------------------------------
+// The scheduler compares `(uint32_t)(now - *timer) >= interval` and resets
+// with `*timer = millis()`. Put the clock just before the uint32 wrap, across
+// it and on big forward hops and keep ticking (1 ms steps, the real code, a
+// virtual clock): every entry must keep firing at exactly its interval, never
+// burst, never stall.
+
+struct TeleTrace
+{
+    // table order as g_counts: retransmit, mcpRefresh, battCheck, heapMon, bmp3, mcu811, ina226
+    std::vector<uint32_t> t[7];
+};
+
+static const int kNEnt = 7;
+
+static uint32_t teleInterval(int e)
+{
+    switch (e)
+    {
+    case 0: return loopInterval_retransmit();
+    case 1: return loopInterval_mcpRefresh();
+    case 2: return loopInterval_battCheck();
+    case 3: return loopInterval_heapMon();
+    case 4: return loopInterval_bmp3();
+    case 5: return loopInterval_mcu811();
+    default: return loopInterval_ina226();
+    }
+}
+
+static unsigned long *teleTimer(int e)
+{
+    unsigned long *tm[kNEnt] = {&retransmit_timer, &mcp_refresh_timer, &BattTimeWait, &heapMonTimer,
+                                &BMP3TimeWait, &MCU811TimeWait, &INA226TimeWait};
+    return tm[e];
+}
+
+static const char *teleName(int e)
+{
+    static const char *nm[kNEnt] = {"retransmit", "mcpRefresh", "battCheck", "heapMon", "bmp3", "mcu811", "ina226"};
+    return nm[e];
+}
+
+static void teleSnap(int out[kNEnt])
+{
+    out[0] = g_counts.retransmit;
+    out[1] = g_counts.mcpRefresh;
+    out[2] = g_counts.battCheck;
+    out[3] = g_counts.heapMon;
+    out[4] = g_counts.bmp3;
+    out[5] = g_counts.mcu811;
+    out[6] = g_counts.ina226;
+}
+
+// One scheduler pass at `now`, mirrored into the stub millis(); records the
+// time of every fire and fails on a burst (one entry twice in one pass).
+static void teleStep(uint32_t now, TeleTrace &tr)
+{
+    int before[kNEnt], after[kNEnt];
+    teleSnap(before);
+    mc_test_set_millis(now);
+    loopSchedulerRun(now);
+    teleSnap(after);
+    for (int e = 0; e < kNEnt; e++)
+    {
+        int d = after[e] - before[e];
+        TEST_ASSERT_TRUE_MESSAGE(d == 0 || d == 1, teleName(e));   // never twice in one pass
+        if (d == 1)
+            tr.t[e].push_back(now);
+    }
+}
+
+static void teleDrive(TeleportClock &c, uint64_t span_ms, TeleTrace &tr)
+{
+    c.tick(span_ms, 1, [&](uint32_t now) { teleStep(now, tr); });
+}
+
+// Fire times must be exactly first, first+I, first+2I, ... (mod 2^32).
+static void teleAssertSteadyGaps(const TeleTrace &tr, int e)
+{
+    for (size_t i = 1; i < tr.t[e].size(); i++)
+    {
+        uint32_t gap = (uint32_t)(tr.t[e][i] - tr.t[e][i - 1]);
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s gap #%u", teleName(e), (unsigned)i);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(teleInterval(e), gap, msg);
+    }
+}
+
+// Timers parked mid-cycle (each at a different phase) k ms before the wrap,
+// then ticked across it: the fire times must be exactly timer + n*interval,
+// for k inside one 100 ms battCheck tick, inside the 2 s / 30 s windows and
+// right on the wrap.
+static void test_teleport_midcycle_across_wrap_exact_fire_times(void)
+{
+    const uint32_t ks[] = {0, 1, 50, 99, 100, 101, 1999, 2000, 2001, 29999, 30000, 30001};
+    for (unsigned ki = 0; ki < sizeof(ks) / sizeof(ks[0]); ki++)
+    {
+        setUp();
+        TeleportClock c;
+        const uint32_t T0 = TeleportClock::kWrapMinus(ks[ki]);
+        c.teleport_to(T0);
+
+        uint32_t timer0[kNEnt];
+        for (int e = 0; e < kNEnt; e++)
+        {
+            uint32_t phase = (uint32_t)((uint64_t)teleInterval(e) * 3 / 7);   // 3/7 into the cycle
+            timer0[e] = T0 - phase;
+            *teleTimer(e) = timer0[e];
+        }
+
+        TeleTrace tr;
+        teleDrive(c, 130000, tr);   // crosses the wrap for every k above
+
+        for (int e = 0; e < kNEnt; e++)
+        {
+            const uint32_t I = teleInterval(e);
+            size_t want = 0;
+            for (uint32_t t = 1;; t++)    // count expected fires inside the 130 s span
+            {
+                uint64_t off = (uint64_t)(I - (uint32_t)((uint64_t)I * 3 / 7)) + (uint64_t)(t - 1) * I;
+                if (off > 130000) break;
+                want++;
+            }
+            char msg[96];
+            snprintf(msg, sizeof(msg), "%s k=%u fire count", teleName(e), (unsigned)ks[ki]);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE((uint32_t)want, (uint32_t)tr.t[e].size(), msg);
+            for (size_t i = 0; i < tr.t[e].size(); i++)
+            {
+                uint32_t expect = (uint32_t)(timer0[e] + (uint32_t)(i + 1) * I);
+                snprintf(msg, sizeof(msg), "%s k=%u fire #%u", teleName(e), (unsigned)ks[ki], (unsigned)i);
+                TEST_ASSERT_EQUAL_UINT32_MESSAGE(expect, tr.t[e][i], msg);
+            }
+        }
+    }
+}
+
+// Run normally, then teleport (a huge forward hop to just before the wrap,
+// and hops of 1 h, 2^31-1, 2^31, 2^31+1, 2^32-1 ms). An entry that is
+// overdue fires ONCE on the first pass (the timer is reset to millis()
+// afterwards, so no catch-up burst), and every entry resumes at exactly its
+// interval; none may stay silent longer than one interval after the hop.
+static void teleForwardJumpCase(bool absolute, uint32_t param)
+{
+    setUp();
+    TeleportClock c;
+    c.teleport_to(5000);
+    TeleTrace warm;
+    teleDrive(c, 70000, warm);   // steady state: every entry has fired at least once
+    for (int e = 0; e < kNEnt; e++)
+        TEST_ASSERT_TRUE_MESSAGE(warm.t[e].size() >= 1, teleName(e));
+
+    if (absolute)
+        c.teleport_to(param);
+    else
+        c.advance(param);
+    const uint32_t jumpAt = c.now_ms;
+
+    TeleTrace tr;
+    teleDrive(c, 130000, tr);
+
+    for (int e = 0; e < kNEnt; e++)
+    {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s never fires after the jump (stall)", teleName(e));
+        TEST_ASSERT_TRUE_MESSAGE(!tr.t[e].empty(), msg);
+        snprintf(msg, sizeof(msg), "%s first fire later than one interval after the jump", teleName(e));
+        TEST_ASSERT_TRUE_MESSAGE((uint32_t)(tr.t[e][0] - jumpAt) <= teleInterval(e), msg);
+        teleAssertSteadyGaps(tr, e);
+        snprintf(msg, sizeof(msg), "%s fires too rarely", teleName(e));
+        TEST_ASSERT_TRUE_MESSAGE(tr.t[e].size() >= 130000 / teleInterval(e) - 1, msg);
+    }
+}
+
+static void test_teleport_run_then_hop_to_just_before_wrap(void)
+{
+    const uint32_t ks[] = {0, 50, 99, 100, 1999, 2000, 29999, 30000, 59999};
+    for (unsigned i = 0; i < sizeof(ks) / sizeof(ks[0]); i++)
+        teleForwardJumpCase(true, TeleportClock::kWrapMinus(ks[i]));
+}
+
+static void test_teleport_forward_jump_1h(void)         { teleForwardJumpCase(false, TeleportClock::kHour); }
+static void test_teleport_forward_jump_2p31_minus_1(void) { teleForwardJumpCase(false, 0x7FFFFFFFu); }
+static void test_teleport_forward_jump_2p31(void)       { teleForwardJumpCase(false, 0x80000000u); }
+static void test_teleport_forward_jump_2p31_plus_1(void) { teleForwardJumpCase(false, 0x80000001u); }
+static void test_teleport_forward_jump_2p32_minus_1(void) { teleForwardJumpCase(false, 0xFFFFFFFFu); }
+
+// Boot seed: esp32_main.cpp ~2317 `if (BattTimeWait == 0) BattTimeWait =
+// millis() - 30000;` (nrf52_main.cpp ~1362: - 31000). millis() is uint32_t
+// on the target, so the subtraction wraps to just under 2^32 at a small boot
+// millis; the first battCheck must fire on the FIRST pass (no 49-day stall)
+// and then keep its 100 ms cadence.
+static void teleBootSeedCase(uint32_t seedMs)
+{
+    const uint32_t boots[] = {0, 1, 50, 1000, 29999, 30000, 30001, 31000, 60000};
+    for (unsigned i = 0; i < sizeof(boots) / sizeof(boots[0]); i++)
+    {
+        setUp();
+        TeleportClock c;
+        c.teleport_to(boots[i]);
+        mc_test_set_millis(c.now_ms);
+
+        // target arithmetic: unsigned long is 32 bit there
+        if (BattTimeWait == 0)
+            BattTimeWait = (uint32_t)(millis() - seedMs);
+
+        TeleTrace tr;
+        teleStep(c.now_ms, tr);   // first pass
+        char msg[64];
+        snprintf(msg, sizeof(msg), "boot=%u seed=%u first pass", (unsigned)boots[i], (unsigned)seedMs);
+        TEST_ASSERT_EQUAL_MESSAGE(1, g_counts.battCheck, msg);
+        TEST_ASSERT_EQUAL_UINT32(c.now_ms, (uint32_t)BattTimeWait);   // timer reset to millis()
+
+        teleDrive(c, 1000, tr);
+        TEST_ASSERT_EQUAL_MESSAGE(1 + 10, (int)tr.t[2].size(), msg);   // 100 ms cadence afterwards
+        teleAssertSteadyGaps(tr, 2);
+    }
+}
+
+static void test_teleport_boot_seed_esp32_minus_30000(void) { teleBootSeedCase(30000); }
+static void test_teleport_boot_seed_nrf52_minus_31000(void) { teleBootSeedCase(31000); }
+
+// enabled() flips off across the wrap (radio busy) and back on: the entry
+// stays overdue while gated, fires exactly once when re-enabled, no burst.
+static void test_teleport_gated_entry_across_wrap_fires_once_on_release(void)
+{
+    setUp();
+    TeleportClock c;
+    c.teleport_to(TeleportClock::kWrapMinus(2500));
+    BattTimeWait = c.now_ms;
+    TeleTrace tr;
+    teleDrive(c, 1000, tr);
+    const size_t before = tr.t[2].size();
+    TEST_ASSERT_EQUAL_UINT32(10, (uint32_t)before);
+
+    tx_is_active = true;
+    teleDrive(c, 5000, tr);            // covers the wrap; gated
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)before, (uint32_t)tr.t[2].size());
+
+    tx_is_active = false;
+    teleDrive(c, 1000, tr);
+    // overdue -> one fire on the first pass, then the 100 ms cadence
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)before + 1 + 9, (uint32_t)tr.t[2].size());
+    // first fire right on the first pass after the release (1 ms), not an interval later
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)(tr.t[2][before] - (tr.t[2][before - 1] + 5000)));
+    for (size_t i = before + 1; i < tr.t[2].size(); i++)
+        TEST_ASSERT_EQUAL_UINT32(100, (uint32_t)(tr.t[2][i] - tr.t[2][i - 1]));
 }
 
 int main(int, char **)
@@ -373,6 +630,17 @@ int main(int, char **)
 
     RUN_TEST(test_table_has_seven_unique_named_entries);
     RUN_TEST(test_battcheck_and_ina226_intervals_are_the_2026_09_11_unification);
+
+    RUN_TEST(test_teleport_midcycle_across_wrap_exact_fire_times);
+    RUN_TEST(test_teleport_run_then_hop_to_just_before_wrap);
+    RUN_TEST(test_teleport_forward_jump_1h);
+    RUN_TEST(test_teleport_forward_jump_2p31_minus_1);
+    RUN_TEST(test_teleport_forward_jump_2p31);
+    RUN_TEST(test_teleport_forward_jump_2p31_plus_1);
+    RUN_TEST(test_teleport_forward_jump_2p32_minus_1);
+    RUN_TEST(test_teleport_boot_seed_esp32_minus_30000);
+    RUN_TEST(test_teleport_boot_seed_nrf52_minus_31000);
+    RUN_TEST(test_teleport_gated_entry_across_wrap_fires_once_on_release);
 
     return UNITY_END();
 }

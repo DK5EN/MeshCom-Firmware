@@ -183,14 +183,16 @@ void loopAction_ina226(void)
 #endif
 
 // ---- BattTimeWait ----------------------------------------------------
-// enabled() carries the `tx_is_active == false && is_receiving == false`
-// guard that used to sit INSIDE the old `if(elapsed>=30000)` body (see
-// src/loop_scheduler.cpp, loopEnabled_battCheck) -- when tx/rx is active the
-// old code did not reset the timer either, so folding the guard into
-// enabled() (which also skips the reset) is behaviour-identical.
+// The scheduler entry is the 100 ms TICK of the battery sampler, not a 30 s
+// read (loopInterval_battCheck, see src/loop_scheduler.h). enabled() carries
+// the `tx_is_active == false && is_receiving == false` guard: a tick that
+// falls into a TX/RX window is skipped, which is the battery concept's "no
+// samples during TX". What is actually sampled, and how often, is decided by
+// batt_pipeline.h battSchedTick() inside read_batt() (batt_function_old.cpp).
 
 void loopAction_battCheck(void)
 {
+    // read_batt() returns the FILTERED mV, cached between its own samples.
     global_batt = read_batt();
     global_proz = mv_to_percent(global_batt);
 }
