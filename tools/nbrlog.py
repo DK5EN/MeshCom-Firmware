@@ -65,10 +65,25 @@ RE_PREFIX = re.compile(
 
 NBR_MARKER = "[NBR]|"
 
+#: Platzhalter fuer "ich" in den Kantenereignissen der Deckungsrechnung (kein gueltiges Rufzeichen).
+OWN = "\0"
+
 #: Zeitstempelspruenge ab dieser Dauer gelten als Mitschnitt-Luecke.
 GAP_THRESHOLD_S = 120.0
 
 EARTH_RADIUS_KM = 6371.0088
+
+#: Firmware-Vorgaben fuer die Deckungsrechnung (src/nbr_matrix.h / configuration_global.h):
+#: NBR_SHARE_PCT, NBR_CNT_HALVE_MIN, NBR_WINDOW_MIN. Per CLI ueberschreibbar
+#: (--share-pct, --halve-min, --window-min), z. B. fuer einen Lauf mit anderen Build-Flags.
+NBR_SHARE_PCT = 10
+NBR_CNT_HALVE_MIN = 90
+NBR_WINDOW_MIN = 720
+
+#: Ein NBR-Marker mitten in der Zeile gilt nur dann als eine an eine andere Konsolenzeile
+#: angeklebte (statt verstuemmelte) Zeile, wenn davor ein Firmware-Tag wie ``[MC-DBG]``,
+#: ``[RETX]`` oder ``[CHECK]`` steht (aeltere Firmware beendet Hex-Dumps ohne Newline).
+RE_GLUE_PREFIX = re.compile(r"^\[[A-Za-z0-9_-]+\]")
 
 #: Bekannte Firmware-Urteile aus docs/nbr-logformat.md (nur zur Anzeige, kein
 #: hartes Gate -- ein unbekannter Wert wird einfach durchgereicht).
@@ -319,6 +334,35 @@ class SnapBlock:
     incomplete: bool = False
 
 
+@dataclass(frozen=True)
+class CoverageParams:
+    """Parameter der Deckungsrechnung (Firmware-Vorgaben, siehe oben)."""
+
+    share_pct: int = NBR_SHARE_PCT
+    halve_min: int = NBR_CNT_HALVE_MIN
+    window_min: int = NBR_WINDOW_MIN
+
+
+#: Firmware-Vorgaben als Standard von ``analyze``; ``analyze(state, None)`` ist die alte Rechnung
+#: (jede Kante zaehlt, egal wie oft und wie alt: Union ueber den ganzen Lauf).
+DEFAULT_COVERAGE = CoverageParams()
+
+
+@dataclass
+class GwRec:
+    """``[NBR]|GW|<min>|<call>|<0|1>|<HG|H|EXP>`` -- Gateway-Flag einer Zeile hat sich geaendert.
+
+    Tolerant geparst: fehlende oder unbekannte Felder werden leer/roh durchgereicht.
+    """
+
+    host: datetime
+    up: int
+    call: str
+    flag: str
+    reason: str
+    session: int
+
+
 @dataclass
 class NbrState:
     """Akkumulierter Zustand waehrend des Parsens, ueber alle Dateien hinweg."""
@@ -360,6 +404,14 @@ class NbrState:
     #: [NBR]|CHECK, Konsistenzpruefung Masken <-> Kantenpool.
     checks: list[CheckRec] = field(default_factory=list)
     pos: list[PosRec] = field(default_factory=list)
+    #: Gateway-Wechsel ([NBR]|GW), nur gezaehlt und im Bericht aufgelistet.
+    gw_events: list[GwRec] = field(default_factory=list)
+    #: Kanten-Ereignisse in Logreihenfolge fuer die Deckungsrechnung:
+    #: (session, up, kind, x, y, cnt) -- kind 0 = EDGE/ME mit absolutem ``cnt`` (Firmware-Zaehler
+    #: nach dem Treffer; ME ist die Kante (from, ich) mit y == OWN), kind 1 = angewendeter
+    #: HN-Bericht-Eintrag (ein Treffer, ``cnt`` None), kind 2 = EVICT (alle Kanten von Rufzeichen
+    #: x fallen weg), kind 3 = EVICT-E (nur die Kante (x, y) faellt weg).
+    cov_events: list[tuple[int, int, int, str, str, int | None]] = field(default_factory=list)
     snaps: list[SnapBlock] = field(default_factory=list)
     open_snap: SnapBlock | None = None
 
@@ -391,6 +443,7 @@ def _h_me(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     state.me.append(
         MeRec(host, up, frm, type_, int(rssi), int(cnt), state.session, _parse_snr(snr_raw))
     )
+    state.cov_events.append((state.session, up, 0, frm, OWN, int(cnt)))
 
 
 def _h_edge(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -409,6 +462,7 @@ def _h_edge(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
             _parse_snr(snr_raw),
         )
     )
+    state.cov_events.append((state.session, up, 0, frm, to, int(cnt)))
 
 
 def _h_sym(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -423,6 +477,9 @@ def _h_rpt(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
         raise _Discard("malformed:RPT")
     (x, m, snr, status) = f
     state.rpts.append(RptRec(host, up, x, m, int(snr), status, state.session))
+    if status == "ok":
+        # Ein angewendeter Eintrag ist ein Treffer auf der Kante (<m> wird von <x> gehoert).
+        state.cov_events.append((state.session, up, 1, m, x, None))
 
 
 def _h_rptsum(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -460,11 +517,13 @@ def _h_evict(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     state.evicts.append(
         EvictRec(host, up, int(idx), old, new, state.session)
     )
+    state.cov_events.append((state.session, up, 2, old, "", None))
 
 
 def _h_evict_e(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     (frm, to) = f
     state.evicts_e.append(EvictERec(host, up, frm, to, state.session))
+    state.cov_events.append((state.session, up, 3, frm, to, None))
 
 
 def _h_evict_kind(kind: str):
@@ -491,6 +550,12 @@ def _h_pos(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     state.pos.append(
         PosRec(host, up, call, float(lat), float(lon), int(mesh), int(hw), state.session)
     )
+
+
+def _h_gw(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    """Nie ein Fehler: unbekannte oder fehlende Felder werden leer/roh uebernommen."""
+    call, flag, reason = (f + ["", "", ""])[:3]
+    state.gw_events.append(GwRec(host, up, call, flag, reason, state.session))
 
 
 def _h_snap(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -550,6 +615,7 @@ HANDLERS = {
     "ECHO": _h_echo,
     "CHECK": _h_check,
     "POS": _h_pos,
+    "GW": _h_gw,
     "SNAP": _h_snap,
     "ROW": _h_row,
     "ENDSNAP": _h_endsnap,
@@ -577,13 +643,19 @@ def parse_nbr_line(state: NbrState, host: datetime, rest: str) -> None:
     if idx == -1:
         state.discard_reasons["foreign_line"] += 1
         return
+    midline = False
     if idx != 0:
-        # Zeichen vor dem Marker verschluckt/verstuemmelt (Reconnect-Luecke).
-        # Ein Teilrekonstrukt waere Ratewerk -- die ganze Zeile faellt weg.
-        state.discard_reasons["garbled_prefix"] += 1
-        return
+        # Steht vor dem Marker ein Firmware-Tag (``[MC-DBG] CRC_PAYLOAD...``, ``[RETX]``,
+        # ``[CHECK]``), hat aeltere Firmware eine andere Konsolenzeile ohne Newline beendet und
+        # die NBR-Zeile klebt dahinter: der Marker ist intakt, die Zeile also verwertbar.
+        # Jedes andere Vorspiel (Reconnect-Luecke, Binaermuell) bleibt verworfen -- ein
+        # Teilrekonstrukt waere Ratewerk.
+        if not RE_GLUE_PREFIX.match(rest):
+            state.discard_reasons["garbled_prefix"] += 1
+            return
+        midline = True
 
-    body = rest[len(NBR_MARKER):]
+    body = rest[idx + len(NBR_MARKER):]
     tail = body.find(NBR_MARKER)
     if tail != -1:
         # Zwei Konsolenzeilen ohne Newline dazwischen verschweisst (ebenfalls
@@ -603,6 +675,10 @@ def parse_nbr_line(state: NbrState, host: datetime, rest: str) -> None:
     try:
         up = int(parts[1])
     except ValueError:
+        if subtype == "GW":  # nie ein Fehler: ohne Minute mitzaehlen
+            state.gw_events.append(GwRec(host, -1, *(parts[2:5] + ["", "", ""])[:3], state.session))
+            state.nbr_lines += 1
+            return
         state.discard_reasons[f"malformed:{subtype}"] += 1
         return
 
@@ -625,6 +701,8 @@ def parse_nbr_line(state: NbrState, host: datetime, rest: str) -> None:
         state.discard_reasons[f"malformed:{subtype}"] += 1
         return
     state.nbr_lines += 1
+    if midline:
+        state.anomalies["nbr_mitten_in_zeile"] += 1
 
 
 def process_line(state: NbrState, line: str, since: date | None) -> None:
@@ -780,6 +858,106 @@ def heard_sets(
     return out
 
 
+@dataclass
+class FirmwareCoverage:
+    """Deckungssicht der Firmware zum letzten Schnappschuss (Ergebnis von ``firmware_coverage``)."""
+
+    snap: SnapBlock
+    params: CoverageParams
+    #: direkt gehoerte Zeilen (frische Kante (x, ich) und Zeile im Schnappschuss)
+    direct: set[str]
+    #: <y> -> Knoten x mit frischer Kante (x, y), die den Anteil erfuellt (nur <y> direkt)
+    heard: dict[str, set[str]]
+    #: (y, x, cnt, maxd): frische Kanten, die am Anteil scheiterten
+    dropped: list[tuple[str, str, int, int]]
+
+
+def replay_edges(
+    events: list[tuple[int, int, int, str, str, int | None]],
+    session: int,
+    until_up: int,
+    params: CoverageParams,
+    own: str | None = None,
+) -> dict[tuple[str, str], list[int]]:
+    """Spielt die Kantenereignisse einer Sitzung bis ``until_up`` nach: (x, y) -> [cnt, last_up].
+
+    Wie die Firmware: EDGE/ME liefern den Zaehler nach dem Treffer (absolut), ein angewendeter
+    HN-Bericht-Eintrag ist ein Treffer (cnt + 1, Saettigung 255; eine Kante ausserhalb des
+    Fensters faengt bei 0 neu an), und alle ``halve_min`` Minuten seit dem Start der Sitzung
+    wird jeder Zaehler zu ``(cnt + 1) >> 1`` (nbrSweep(); faellt nie auf 0). Das eigene
+    Rufzeichen ``own`` ist Zeile 0 der Firmware und wird auf ``OWN`` abgebildet.
+    """
+    edges: dict[tuple[str, str], list[int]] = {}
+    last_halve = 0
+
+    def halve_to(up: int) -> None:
+        nonlocal last_halve
+        while params.halve_min > 0 and up - last_halve >= params.halve_min:
+            last_halve += params.halve_min
+            for e in edges.values():
+                e[0] = (e[0] + 1) >> 1
+
+    for sess, up, kind, x, y, cnt in events:
+        if sess != session:
+            continue
+        if up > until_up:
+            break
+        halve_to(up)
+        if own is not None:
+            x, y = (OWN if x == own else x), (OWN if y == own else y)
+        if kind == 2:
+            for k in [k for k in edges if x in k]:
+                del edges[k]
+            continue
+        if kind == 3:
+            edges.pop((x, y), None)
+            continue
+        e = edges.get((x, y))
+        if kind == 0 and cnt is not None:
+            edges[(x, y)] = [cnt, up]
+        else:
+            if e is None or up - e[1] >= params.window_min:
+                e = [0, up]
+            e[0] = min(255, e[0] + 1)
+            e[1] = up
+            edges[(x, y)] = e
+    halve_to(until_up)
+    return edges
+
+
+def firmware_coverage(state: NbrState, params: CoverageParams) -> FirmwareCoverage | None:
+    """Rechnet die Deckung der Firmware (nbrICtx/nbrICovers) zum LETZTEN Schnappschuss nach.
+
+    - Nur Ereignisse der Sitzung des Schnappschusses bis zu dessen ``up`` (die Matrix ist nach
+      einem Boot leer); eine Verdraengung (EVICT/EVICT-E) nullt die Kanten der Zeile bzw. die Kante.
+    - Frisch: letzter Treffer weniger als ``window_min`` Minuten her.
+    - Anteil: eine Kante (x, y) deckt nur, wenn ``cnt * 100 >= share_pct * maxd[x]``, ``maxd[x]``
+      ist der groesste Zaehler ueber alle frischen Kanten von x zu DIREKTEN Nachbarn.
+    ``None``, wenn es keinen Schnappschuss gibt (dann bleibt nur die Union ueber den Lauf).
+    """
+    if not state.snaps:
+        return None
+    snap = state.snaps[-1]
+    t = snap.up
+    edges = replay_edges(state.cov_events, snap.session, t, params, snap.own)
+    fresh = {k: c for k, (c, last) in edges.items() if t - last < params.window_min}
+    direct = {x for (x, y) in fresh if y == OWN and x != OWN}
+    maxd: dict[str, int] = defaultdict(int)
+    for (x, y), c in fresh.items():
+        if y in direct:
+            maxd[x] = max(maxd[x], c)
+    heard: dict[str, set[str]] = {n: set() for n in direct}
+    dropped: list[tuple[str, str, int, int]] = []
+    for (x, y), c in fresh.items():
+        if y not in heard or x in (OWN, y):
+            continue
+        if c * 100 >= params.share_pct * maxd[x]:
+            heard[y].add(x)
+        else:
+            dropped.append((y, x, c, maxd[x]))
+    return FirmwareCoverage(snap, params, direct, heard, sorted(dropped))
+
+
 def a3_kreuzmatrix(state: NbrState, neighbours: list[str], heard: dict[str, set[str]]) -> dict[str, Any]:
     je_nachbar = [
         {"rufzeichen": n, "anzahl_gehoert": len(heard[n]), "gehoert": sorted(heard[n])}
@@ -797,14 +975,15 @@ def a3_kreuzmatrix(state: NbrState, neighbours: list[str], heard: dict[str, set[
 
 
 def latest_firmware_row(
-    state: NbrState, call: str
+    state: NbrState, call: str, only_snap: SnapBlock | None = None
 ) -> tuple[str | None, str | None, int | None]:
     """(<verdict>, <meshneed>, snapshot-up) aus dem letzten Snapshot mit ``call``.
 
     Beide Felder kommen aus derselben ROW-Zeile -- nie aus verschiedenen
-    Snapshots gemischt.
+    Snapshots gemischt. Mit ``only_snap`` zaehlt nur dieser eine Schnappschuss
+    (die Deckungsrechnung gilt fuer genau seinen Zeitpunkt).
     """
-    for snap in reversed(state.snaps):
+    for snap in [only_snap] if only_snap is not None else reversed(state.snaps):
         for row in snap.rows_entries:
             if row.call == call:
                 return row.verdict, row.meshneed, snap.up
@@ -816,6 +995,7 @@ def a4_urteil(
     neighbours: list[str],
     heard: dict[str, set[str]],
     own_heard: set[str],
+    only_snap: SnapBlock | None = None,
 ) -> dict[str, Any]:
     """Abschnitt 4 -- Betreiberfrage "muss dieser direkte Nachbar selbst meshen?".
 
@@ -842,7 +1022,7 @@ def a4_urteil(
         uncovered = own_set - covered
         mine = "exklusiv" if uncovered else "redundant"
         mine_meshneed = "MESH" if mine == "exklusiv" else "RED"
-        fw_verdict, fw_meshneed, fw_up = latest_firmware_row(state, n)
+        fw_verdict, fw_meshneed, fw_up = latest_firmware_row(state, n, only_snap)
         if fw_meshneed is None or fw_meshneed == "NA":
             # None: kein Snapshot / altes Format. "NA" waere fuer einen
             # direkten Nachbarn ohnehin unerwartet (die Frage ist fuer ihn
@@ -1237,16 +1417,80 @@ def a11_hn_berichte(state: NbrState) -> dict[str, Any]:
     }
 
 
-def analyze(state: NbrState) -> dict[str, Any]:
+def a12_gateway(state: NbrState) -> dict[str, Any]:
+    """Abschnitt 12 -- Gateway-Flag je Zeile.
+
+    Massgeblich ist das Flag ``NBR_FLAG_GW`` (Bit 0) in den ROW-Zeilen des letzten Schnappschusses,
+    in dem die Zeile steht; die ``[NBR]|GW``-Zeilen (Wechsel-Ereignisse, nur in neuerer Firmware)
+    dienen als Rueckfall und als Ereignisliste.
+    """
+    last_flag: dict[str, bool] = {}
+    for snap in state.snaps:
+        for row in snap.rows_entries:
+            last_flag[row.call] = bool(row.flags & 1)
+    last_event: dict[str, GwRec] = {}
+    per_call: Counter = Counter()
+    for g in state.gw_events:
+        last_event[g.call] = g
+        per_call[g.call] += 1
+    calls = sorted({c for c, v in last_flag.items() if v} | set(last_event))
+    rows = []
+    for c in calls:
+        ev = last_event.get(c)
+        ev_flag = None if ev is None else ev.flag == "1"
+        if c in last_flag:
+            gw, quelle = last_flag[c], "ROW"
+        else:
+            gw, quelle = ev_flag, "GW"
+        rows.append(
+            {
+                "rufzeichen": c,
+                "gateway": gw,
+                "quelle": quelle,
+                "letztes_ereignis": None if ev is None else {"host": fmt_dt(ev.host), "flag": ev.flag, "grund": ev.reason},
+                "anzahl_ereignisse": per_call.get(c, 0),
+            }
+        )
+    return {
+        "ereignisse_gesamt": len(state.gw_events),
+        "je_grund": dict(sorted(Counter(g.reason for g in state.gw_events).items())),
+        "je_rufzeichen": rows,
+    }
+
+
+def analyze(state: NbrState, params: CoverageParams | None = DEFAULT_COVERAGE) -> dict[str, Any]:
+    """``params`` None = alte Union-Rechnung (Kante zaehlt immer), sonst Firmware-Deckung."""
     own_call = own_call_of(state)
     neighbours = direct_neighbours(state)
     heard = heard_sets(state, neighbours)
     # Fuer Abschnitt 4/4b (Fund 2b): der eigene Call darf in keiner gehoerten
     # Menge auftauchen. Ohne bekannten eigenen Call (keine SNAP-Zeile im
     # Mitschnitt) wird NICHT geraten -- die Filterung faellt dann einfach aus.
-    heard_for_urteil = heard_sets(state, neighbours, exclude=own_call)
-    own_heard = set(neighbours)
-    urteil = a4_urteil(state, neighbours, heard_for_urteil, own_heard)
+    fw = firmware_coverage(state, params) if params is not None else None
+    if fw is not None:
+        heard_for_urteil = {n: set(fw.heard.get(n, set())) for n in neighbours}
+        own_heard = set(fw.direct)
+        only_snap: SnapBlock | None = fw.snap
+    else:
+        heard_for_urteil = heard_sets(state, neighbours, exclude=own_call)
+        own_heard = set(neighbours)
+        only_snap = None
+    urteil = a4_urteil(state, neighbours, heard_for_urteil, own_heard, only_snap)
+    urteil["modell"] = (
+        {
+            "art": "firmware",
+            "share_pct": params.share_pct,
+            "halve_min": params.halve_min,
+            "window_min": params.window_min,
+            "schnappschuss_up": fw.snap.up,
+            "direkt": sorted(fw.direct),
+            "am_anteil_gescheitert": [
+                {"hoerer": y, "knoten": x, "cnt": c, "maxd": m} for y, x, c, m in fw.dropped
+            ],
+        }
+        if fw is not None
+        else {"art": "union"}
+    )
     return {
         "meta": {
             "generated_by": "tools/nbrlog.py",
@@ -1266,6 +1510,7 @@ def analyze(state: NbrState) -> dict[str, Any]:
         "9_positionen": a9_positionen(state, own_call),
         "10_symmetrie": a10_symmetrie(state),
         "11_hn_berichte": a11_hn_berichte(state),
+        "12_gateway": a12_gateway(state),
     }
 
 
@@ -1552,6 +1797,17 @@ def render_md(res: dict[str, Any]) -> str:
             "Menge) konnte nicht angewendet werden, das Urteil unten ist damit "
             "mit Vorsicht zu lesen."
         )
+    modell = urt.get("modell", {"art": "union"})
+    out.append("")
+    if modell["art"] == "firmware":
+        out.append(
+            f"Rechnung wie die Firmware, zum letzten Schnappschuss (up {modell['schnappschuss_up']}): "
+            f"Anteil >= {modell['share_pct']} % des staerksten direkten Hoerers, Zaehler alle "
+            f"{modell['halve_min']} min halbiert, Kanten nur {modell['window_min']} min frisch; "
+            f"{len(modell['am_anteil_gescheitert'])} frische Kante(n) am Anteil gescheitert."
+        )
+    else:
+        out.append("Rechnung als Union ueber den ganzen Lauf (kein Anteil, keine Halbierung, kein Fenster).")
     out.append("")
     out.append(
         _md_table(
@@ -1818,6 +2074,31 @@ def render_md(res: dict[str, Any]) -> str:
         out.append(
             f"**{hn['rpt_malformed_gesamt']}x DROP|RPT** -- fehlerhafte HN-Berichte verworfen, "
             "nichts angewendet.\n"
+        )
+
+    gw = res.get("12_gateway", {})
+    out.append("## 12. Gateway-Flag")
+    out.append("")
+    out.append(
+        f"{gw.get('ereignisse_gesamt', 0)} `[NBR]|GW`-Wechselzeilen "
+        f"({', '.join(f'{k}: {v}' for k, v in gw.get('je_grund', {}).items()) or 'keine'}). "
+        "Massgeblich ist das Flag der ROW-Zeilen im letzten Schnappschuss, die GW-Zeilen sind der Rueckfall."
+    )
+    out.append("")
+    if gw.get("je_rufzeichen"):
+        out.append(
+            _md_table(
+                ["Rufzeichen", "Gateway", "Quelle", "Wechsel-Zeilen", "letzter Wechsel"],
+                [
+                    [
+                        r["rufzeichen"], "ja" if r["gateway"] else ("nein" if r["gateway"] is False else "?"),
+                        r["quelle"], r["anzahl_ereignisse"],
+                        f"{r['letztes_ereignis']['host']} -> {r['letztes_ereignis']['flag']} ({r['letztes_ereignis']['grund']})"
+                        if r["letztes_ereignis"] else "-",
+                    ]
+                    for r in gw["je_rufzeichen"]
+                ],
+            )
         )
 
     return "\n".join(out) + "\n"
@@ -2302,6 +2583,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Zielverzeichnis fuer --fetch (Standard: ~/Downloads/nbrlog-<host>/)",
     )
     ap.add_argument("--since", metavar="YYYY-MM-DD", help="nur Zeilen ab diesem Datum auswerten")
+    ap.add_argument(
+        "--share-pct", type=int, default=NBR_SHARE_PCT, metavar="N",
+        help=f"Firmware NBR_SHARE_PCT: eine Kante deckt ab N %% des staerksten direkten Hoerers "
+        f"(Standard {NBR_SHARE_PCT}; 0 = Ein-Treffer-Regel)",
+    )
+    ap.add_argument(
+        "--halve-min", type=int, default=NBR_CNT_HALVE_MIN, metavar="MIN",
+        help=f"Firmware NBR_CNT_HALVE_MIN: Kantenzaehler alle MIN Minuten halbieren "
+        f"(Standard {NBR_CNT_HALVE_MIN}; 0 = nie)",
+    )
+    ap.add_argument(
+        "--window-min", type=int, default=NBR_WINDOW_MIN, metavar="MIN",
+        help=f"Firmware NBR_WINDOW_MIN: Frischefenster der Kanten (Standard {NBR_WINDOW_MIN})",
+    )
+    ap.add_argument(
+        "--union", action="store_true",
+        help="alte Rechnung: jede Kante ueber den ganzen Lauf zaehlt (ohne Anteil, Halbierung, Fenster)",
+    )
     ap.add_argument("--out", type=Path, default=None, help="Markdown-Bericht in diese Datei schreiben")
     ap.add_argument("--json", dest="json_out", type=Path, default=None, help="Auswertung zusaetzlich als JSON schreiben")
     ap.add_argument("--self-test", action="store_true", help="gegen die eingebauten Fixtures pruefen, ohne Netz")
@@ -2337,7 +2636,10 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     state = parse_files(log_paths, since_date)
-    res = analyze(state)
+    res = analyze(
+        state,
+        None if args.union else CoverageParams(args.share_pct, args.halve_min, args.window_min),
+    )
     md_text = render_md(res)
 
     if args.out:

@@ -8,9 +8,15 @@ und HN-Berichte legen nie eine Zeile an. Dieses Skript prueft das je Schnappschu
   - Hop 1: fuer die Zeile gibt es eine ME-Zeile innerhalb von 12 h vor dem Schnappschuss.
   - Hop 2: es gibt eine EDGE-Zeile "<to> hat <Zeile> gehoert" innerhalb von 12 h, und <to> ist
     Hop 1.
-  - Server-Rufzeichen: Absender, die im selben Mitschnitt per RX-UDP (Server-Kopie) kamen und
-    in keinem per Funk gehoerten POS/HEY-Frame stehen, plus die Liste aus der Auswertung
-    2026-09-23 (Welle 6, docs/nbr-stage2-campaign.md). Keines davon darf eine Zeile haben.
+  - Server-Rufzeichen: (Liste aus der Auswertung 2026-09-23, Welle 6, docs/nbr-stage2-campaign.md,
+    plus Absender, die im selben Mitschnitt per RX-UDP (Server-Kopie) kamen) MINUS jedes
+    Rufzeichen, das in einem per Funk gehoerten POS/HEY-Frame als Absender oder Relais steht:
+    was per Funk POS/HEY sendet oder weiterreicht, ist eine Funkstation, egal was die statische
+    Liste sagt. Keines der Server-Rufzeichen darf eine Zeile haben.
+  - Veraltete Zeilen ("stale"): der Schnappschuss protokolliert vertragsgemaess JEDE belegte
+    Zeile (docs/nbr-logformat.md), auch eine ohne Hoerer oder ueber dem Fenster (Urteil UNK,
+    Hoerer 0 oder Alter >= 720 min) und eine, deren einziger Hoerer selbst nur Hop 2 ist. Diese
+    Zeilen werden gemeldet ("stale"), zaehlen aber nicht als Befund.
 
 Dazu Summen ueber den Zeitraum: EDGE-Zeilen mit Typ T (muessen 0 sein) und die Typen der
 Server-Frames (nur ':' erwartet -- '!' oder '@' hiesse, der Server schickt jetzt auch POS/HEY
@@ -29,7 +35,8 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-WINDOW = timedelta(minutes=720)
+WINDOW_MIN = 720
+WINDOW = timedelta(minutes=WINDOW_MIN)
 
 # Absender, die in 34 h (22.09. 09:28 bis 23.09. 19:11) nur als Text und nie in einem POS/HEY
 # per Funk auftauchten, dazu HB9JAY-6 (23.09. 20:03, von DK5EN-98 eingespeist) und HB9HDI-5
@@ -91,6 +98,22 @@ def main(argv: list[str] | None = None) -> int:
         )
         return "hop2 via " + ",".join(via) if via else "FAIL: kein direkter Hoerer"
 
+    def stale_reason(call: str, at: datetime, row: list[str]) -> str:
+        """Grund, warum eine Zeile ohne direkten Hoerer vertragsgemaess veraltet ist, sonst ''.
+
+        row = ROW-Felder ab <up>: [up, idx, call, flags, age, hearers, verdict, meshneed].
+        """
+        try:
+            age, hearers, verdict = int(row[4]), int(row[5]), row[6]
+        except (IndexError, ValueError):
+            return ""
+        if verdict == "UNK" and (hearers == 0 or age >= WINDOW_MIN):
+            return "stale: " + ("keine Hoerer" if hearers == 0 else f"Alter {age} min")
+        via = sorted(to for (frm, to), t in edge_last.items() if frm == call and at - t <= WINDOW)
+        if hearers >= 1 and via:
+            return "stale: Hoerer nur Hop 2 (" + ",".join(via) + ")"
+        return ""
+
     for fn in args.files:
         with open(fn, errors="replace") as fh:
             for line in fh:
@@ -120,10 +143,15 @@ def main(argv: list[str] | None = None) -> int:
                         text_edges += 1
                 elif kind == "SNAP":
                     snaps.append((ts, f[1], []))
-                elif snaps:  # ROW
-                    snaps[-1][2].append((f[2], hop(f[2], ts)))
+                elif kind == "ROW" and snaps:
+                    h = hop(f[2], ts)
+                    if h.startswith("FAIL"):
+                        h = stale_reason(f[2], ts, f) or h
+                    snaps[-1][2].append((f[2], h))
 
-    server = KNOWN_SERVER | (udp_src - rf_posthey)
+    # Wer per Funk POS/HEY sendet oder weiterreicht, ist eine Funkstation -- auch wenn er in
+    # der statischen Liste steht oder zusaetzlich als Server-Kopie ankam.
+    server = (KNOWN_SERVER | udp_src) - rf_posthey
 
     if not snaps:
         print("kein Schnappschuss im Zeitraum (SNAP alle 15 min ab Boot)")
@@ -132,18 +160,20 @@ def main(argv: list[str] | None = None) -> int:
     bad_snaps = 0
     last_detail: list[str] = []
     for at, own, calls in snaps:
-        detail, fails, n1, n2 = [], 0, 0, 0
+        detail, fails, n1, n2, n_stale = [], 0, 0, 0, 0
         for call, h in calls:
             if call == own:
                 continue
             n1 += h == "hop1"
             n2 += h.startswith("hop2")
+            n_stale += h.startswith("stale")
             flag = "  <-- SERVER" if call in server else ""
             fails += h.startswith("FAIL") or bool(flag)
             detail.append(f"  {call:11} {h}{flag}")
         bad_snaps += fails > 0
         print(
-            f"{at:%Y-%m-%d %H:%M}  Zeilen {sum(c != own for c, _ in calls):2}  Hop1 {n1:2}  Hop2 {n2:2}  Befunde {fails}"
+            f"{at:%Y-%m-%d %H:%M}  Zeilen {sum(c != own for c, _ in calls):2}  Hop1 {n1:2}  Hop2 {n2:2}"
+            f"  stale {n_stale:2}  Befunde {fails}"
         )
         if fails:
             print("\n".join(d for d in detail if "FAIL" in d or "SERVER" in d))

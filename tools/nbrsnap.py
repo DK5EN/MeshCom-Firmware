@@ -9,6 +9,12 @@ Daraus je direktem Nachbarn #N (gehoerte Knoten) und #X (davon von niemand ander
 Hoerweite gehoert) -- die Rechnung aus nbrRowMeshNeed(), als Zahl. Dazu der <meshneed>-Verlauf
 aus den ROW-Zeilen und die Verdraengungen von Direktzeilen.
 
+Die Deckung wird wie in der Firmware gerechnet (nbrICtx/nbrICovers in src/nbr_matrix.cpp): eine
+Kante (x, y) deckt nur, wenn sie frisch ist UND ihr Zaehler mindestens NBR_SHARE_PCT (10) Prozent
+des staerksten Zaehlers von x zu einem direkten Nachbarn erreicht; die Zaehler werden alle
+NBR_CNT_HALVE_MIN (90) Minuten seit dem Boot zu (cnt + 1) >> 1 halbiert, das Frischefenster ist
+NBR_WINDOW_MIN (720). Alle drei per Flag ueberschreibbar (--share-pct, --halve-min, --window-min).
+
     python3 tools/nbrsnap.py --since 2026-09-21 log1 [log2 ...]
 
 Zeilenformat: docs/nbr-logformat.md. Das eigene Rufzeichen kommt aus der SNAP-Zeile, sonst --own.
@@ -20,7 +26,10 @@ import sys
 from collections import Counter, OrderedDict, defaultdict
 from datetime import datetime
 
+#: Firmware-Vorgaben (src/nbr_matrix.h), per CLI ueberschreibbar.
 WINDOW = 720
+SHARE_PCT = 10
+HALVE_MIN = 90
 
 
 def parse_host(line: str) -> datetime | None:
@@ -36,7 +45,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--since", metavar="YYYY-MM-DD[THH:MM]", help="nur Zeilen ab diesem Zeitpunkt")
     ap.add_argument("--own", help="eigenes Rufzeichen, falls keine SNAP-Zeile im Log steht")
     ap.add_argument("--watch", nargs="*", default=None, help="Nachbarn fuer die Zeitreihe (Default: alle direkten)")
+    ap.add_argument(
+        "--share-pct", type=int, default=SHARE_PCT, metavar="N",
+        help=f"Firmware NBR_SHARE_PCT: Kante deckt ab N %% des staerksten direkten Hoerers (Standard {SHARE_PCT}; 0 = jede frische Kante)",
+    )
+    ap.add_argument(
+        "--halve-min", type=int, default=HALVE_MIN, metavar="MIN",
+        help=f"Firmware NBR_CNT_HALVE_MIN: Zaehler alle MIN Minuten seit Boot halbieren (Standard {HALVE_MIN}; 0 = nie)",
+    )
+    ap.add_argument(
+        "--window-min", type=int, default=WINDOW, metavar="MIN",
+        help=f"Firmware NBR_WINDOW_MIN: Frischefenster der Kanten (Standard {WINDOW})",
+    )
     args = ap.parse_args(argv)
+    window, share_pct, halve_min = args.window_min, args.share_pct, args.halve_min
 
     since = None
     if args.since:
@@ -46,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
     edges: dict[tuple[str, str], int] = {}  # (frm, to) -> last_up, "to hat frm gehoert"
     me_hits: dict[str, int] = {}  # frm -> last_up, cell[frm][0], wird bei EVICT genullt
     me_calls: set[str] = set()  # alle je direkt gehoerten Rufzeichen (ME-Zeilen), nie genullt
+    cnt: dict[tuple[str, str], int] = {}  # (frm, to) -> Zaehler der Kante (Firmware, nach Halbierung)
+    halve = {"last": 0}  # Zeitpunkt der letzten Halbierung dieser Sitzung (up)
+    last_up: int | None = None
     evicts: list[tuple[int, str, str]] = []
     snaps: list[dict] = []
     union_heard: dict[str, set[str]] = defaultdict(set)
@@ -54,10 +79,21 @@ def main(argv: list[str] | None = None) -> int:
     cur: dict | None = None
     n_lines = 0
 
+    def fresh_at(up: int, t: int) -> bool:
+        return (up - t) % 65536 < window
+
     def zero_call(c: str) -> None:
         for k in [k for k in edges if c in k]:
             del edges[k]
+            cnt.pop(k, None)
         me_hits.pop(c, None)
+
+    def do_halve(up: int) -> None:
+        # nbrSweep(): alle halve_min Minuten seit dem Boot wird jeder Zaehler zu (cnt + 1) >> 1.
+        while halve_min > 0 and up - halve["last"] >= halve_min:
+            halve["last"] += halve_min
+            for k, c in cnt.items():
+                cnt[k] = (c + 1) >> 1
 
     for fn in args.files:
         with open(fn, encoding="utf-8", errors="replace") as f:
@@ -69,13 +105,34 @@ def main(argv: list[str] | None = None) -> int:
                 if host is None or (since and host < since):
                     continue
                 n_lines += 1
+                if line.count("[NBR]|") != 1:
+                    continue  # zwei Zeilen ohne Newline verschweisst: nicht raten
                 f_ = line[i + 6 :].rstrip("\n").split("|")
-                kind, up = f_[0], int(f_[1])
+                try:
+                    kind, up = f_[0], int(f_[1])
+                except (IndexError, ValueError):
+                    continue  # unlesbare Zeile (auch ein GW ohne Minute): nie ein Fehler
+                if last_up is not None and up < last_up:
+                    # Neustart: die Matrix ist leer, die Halbierung beginnt von vorn.
+                    edges.clear()
+                    cnt.clear()
+                    me_hits.clear()
+                    halve["last"] = 0
+                last_up = up
+                do_halve(up)
                 if kind == "EDGE":
                     frm, to = f_[2], f_[3]
                     edges[(frm, to)] = up
+                    cnt[(frm, to)] = int(f_[6]) if len(f_) > 6 and f_[6].isdigit() else 1
                     if frm != to:
                         union_heard[to].add(frm)
+                elif kind == "RPT" and len(f_) > 5 and f_[5] == "ok":
+                    # angewendeter HN-Bericht-Eintrag: ein Treffer auf (<m>, <x>)
+                    k = (f_[3], f_[2])
+                    if k not in edges or not fresh_at(up, edges[k]):
+                        cnt[k] = 0
+                    cnt[k] = min(255, cnt.get(k, 0) + 1)
+                    edges[k] = up
                 elif kind == "ME":
                     me_hits[f_[2]] = up
                     me_calls.add(f_[2])
@@ -89,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                     # zero_call() betrifft das nicht union_heard (das ist die
                     # Union ueber den GANZEN Lauf, nie rueckwirkend genullt).
                     edges.pop((f_[2], f_[3]), None)
+                    cnt.pop((f_[2], f_[3]), None)
                 elif kind == "SNAP":
                     own = f_[2]
                     cur = {"up": up, "host": host, "rows": OrderedDict(), "nrows": int(f_[3]), "max": int(f_[4])}
@@ -101,18 +159,31 @@ def main(argv: list[str] | None = None) -> int:
                     rows = set(cur["rows"])
                     up = cur["up"]
 
-                    def fresh(t: int) -> bool:
-                        return (up - t) % 65536 < WINDOW
+                    def fresh(t: int, up: int = up) -> bool:
+                        return fresh_at(up, t)
 
                     direct = {c for c, t in me_hits.items() if c in rows and fresh(t) and c != own}
+                    # maxd[x]: groesster Zaehler ueber frische Kanten von x zu direkten Nachbarn
+                    maxd: dict[str, int] = {}
+                    for (a, b), t in edges.items():
+                        if b in direct and fresh(t):
+                            maxd[a] = max(maxd.get(a, 0), cnt.get((a, b), 1))
+
+                    def cov(a: str, b: str, maxd: dict[str, int] = maxd) -> bool:
+                        t = edges.get((a, b))
+                        return t is not None and fresh(t) and cnt.get((a, b), 1) * 100 >= share_pct * maxd.get(a, 0)
+
                     res = {}
                     for x in sorted(direct):
-                        hx = {frm for (frm, to), t in edges.items() if to == x and frm in rows and frm not in (x, own) and fresh(t)}
+                        hx = {
+                            frm
+                            for (frm, to), t in edges.items()
+                            if to == x and frm in rows and frm not in (x, own) and cov(frm, to)
+                        }
                         excl = [
                             f2
                             for f2 in hx
-                            if f2 not in direct
-                            and not any((f2, m) in edges and fresh(edges[(f2, m)]) for m in direct if m != x)
+                            if f2 not in direct and not any(cov(f2, m) for m in direct if m != x)
                         ]
                         res[x] = (len(hx), len(excl))
                     cur["res"] = res

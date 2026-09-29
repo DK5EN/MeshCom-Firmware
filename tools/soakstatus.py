@@ -9,9 +9,12 @@ Usage::
 
 Reads two node captures (DK5EN-1's local USB serial log, DK5EN-98's net-console
 log fetched from the rpizero logger) plus the sender log written by
-``tools/bench/soak_dm.py``, and reports:
+``tools/bench/soak_dm.py``, and reports (every node is optional: ``--nodes DK5EN-98``
+or ``--dk1-dir none`` evaluates a single-node soak, e.g. DK5EN-98 only):
 
-  * per node: capture liveness (gaps, dead-since), reboots, heap drift, WiFi
+  * per node: capture liveness (gaps between lines AND from --since to the
+    first line / from the last line to --until or now; a node with no line in
+    the window is reported as "capture missing"), reboots, heap drift, WiFi
     downs, GW keepalive count, TX count, RX errors, channel utilization,
     the summed DM setlog counters, [RETX]/[RX] marker counts, and NBR
     matrix CHECK violations (via ``tools/nbrlog.py``, called as a
@@ -19,7 +22,13 @@ log fetched from the rpizero logger) plus the sender log written by
     re-implement NBR parsing).
   * per test DM (from soak_dm.py's log): sender msg-id/NNN, transmissions
     (original + PNRETRY), ack yes/no + path (LoRa vs server/UDP) + latency,
-    give-up yes/no; receiver: received yes/no, copy count.
+    give-up yes/no; receiver: received yes/no, copy count. The ack path is the
+    EARLIEST of the server ack (``[UDP-MSGID] ack_msg_id:<orig> ACK...02``) and the
+    LoRa ack (``[ACK-MSGID] ack_msg_id:<orig>``); the ``[RETX]`` markers are only a
+    fallback (they are not printed when the ack beats the first LoRa TX). Latency
+    counts from the sender's own first TX line of that DM (the sender log only has
+    whole seconds). Copies are real receptions: RX-UDP lines plus RF ``[LOG] NNN``
+    reception lines (the MH-LoRa/RX-LoRa2 lines of the same reception do not count).
 
 Both node logs share one host-timestamp convention, "YYYY-MM-DD HH:MM:SS.mmm"
 followed by two spaces then the device's own line (see
@@ -153,6 +162,12 @@ RE_SERVER_ACK = re.compile(
 RE_LORA_ACK = re.compile(
     r"\[RETX\] DM-ACK for retid:(?P<retid>\d+) stop retransmit msg-id:(?P<msgid>[0-9A-Fa-f]{8})"
 )
+# Ack lines that exist whether or not the LoRa retry ladder printed its [RETX]
+# markers: the server ack (udp_frame_*.cpp, "[UDP-MSGID] ack_msg_id:<orig> ACK...02")
+# and the LoRa ack (lora_functions.cpp, glued behind the device clock:
+# "17:54:36[ACK-MSGID] ack_msg_id:<orig>"). Both carry the ORIGINAL msg-id.
+RE_UDP_ACK = re.compile(r"\[UDP-MSGID\]\s*ack_msg_id:(?P<msgid>[0-9A-Fa-f]{8})\b.*?\bACK\W*02")
+RE_LORA_ACK_ID = re.compile(r"\[ACK-MSGID\]\s*ack_msg_id:(?P<msgid>[0-9A-Fa-f]{8})\b")
 RE_PNREPEAT = re.compile(r"\[RX\] PNREPEAT msg-id:(?P<msgid>[0-9A-Fa-f]{8})")
 RE_GIVEUP_DM = re.compile(r"\[MC-DBG\] RETRANSMIT_GIVEUP_DM msg_id=(?P<msgid>[0-9A-Fa-f]{8}) dest=(?P<dest>\S+)")
 
@@ -169,11 +184,12 @@ RE_BOOT_RESET = re.compile(r"\[BOOT\] RESET_REASON=")
 # printBuffer_aprs on the outgoing path -- same msg-id as the frame that
 # created it, incl. a PNRETRY-rewritten one).
 RE_TX_TAG = re.compile(r"\b(NEW-TXT|TX-LoRa\d?|TX-UDP)\b")
-# Receiver-side frame lines carrying the payload text: RX-LoRa2 (direct LoRa
-# RX, text/pos/hey), RX-UDP (via the server), MH-LoRa (overheard, last hop
-# isn't us -- see docs' "known limits": at ~-75 dBm direct range this mostly
-# won't fire for these two nodes).
-RE_RX_TAG = re.compile(r"\b(RX-LoRa2|RX-UDP|MH-LoRa)\b")
+# Receiver-side REAL receptions carrying the payload text: one RX-UDP line per
+# server copy, one RF "[LOG] NNN : x<id> ..." line per LoRa reception. The
+# MH-LoRa / RX-LoRa2 lines printed for the same LoRa reception are not extra
+# copies and are not counted.
+RE_RX_UDP = re.compile(r"\bRX-UDP\b")
+RE_RX_RF = re.compile(r"\[LOG\]\s+\d+\s+\S+\s+x[0-9A-Fa-f]{8}\b")
 # The msg-id embedded in every printBuffer_aprs line: " x<8 hex> ".
 RE_LINE_MSGID = re.compile(r"\sx([0-9A-Fa-f]{8})\b")
 # The APRS message-number suffix on an outgoing DM's payload -- no closing
@@ -206,6 +222,29 @@ def parse_when(text: str) -> datetime:
         return datetime.fromisoformat(text)
     except ValueError as exc:
         raise argparse.ArgumentTypeError(f"unrecognized date/time: {text!r}") from exc
+
+
+def dir_or_none(text: str) -> Path | None:
+    """--dk1-dir / --dk98-dir: a directory, or "none" to leave that node out of the run."""
+    return None if text.strip().lower() in ("none", "-", "") else Path(text)
+
+
+def select_nodes(nodes_arg: str | None, dirs: dict[str, Path | None]) -> dict[str, Path]:
+    """Nodes to evaluate -> capture directory. Default (both nodes, both dirs) is the two-node soak;
+    ``--nodes DK5EN-98`` or ``--dk1-dir none`` narrows it. Raises ValueError on an unknown name or an
+    empty selection."""
+    wanted = list(dirs)
+    if nodes_arg:
+        by_upper = {n.upper(): n for n in dirs}
+        wanted = []
+        for tok in (t.strip() for t in nodes_arg.split(",") if t.strip()):
+            if tok.upper() not in by_upper:
+                raise ValueError(f"unknown node {tok!r} (choose from {', '.join(dirs)})")
+            wanted.append(by_upper[tok.upper()])
+    chosen = {n: d for n, d in dirs.items() if n in wanted and d is not None}
+    if not chosen:
+        raise ValueError("no node left to evaluate (--nodes / --dk1-dir / --dk98-dir)")
+    return chosen
 
 
 def fmt_dt(d: datetime) -> str:
@@ -338,6 +377,17 @@ class NodeMetrics:
     nbr_gaps: list[dict[str, Any]]
     nbr_check_total: int
     nbr_check_violations: list[dict[str, Any]]
+    #: seconds from the window start (--since) to the first line, and from the
+    #: last line to the window end (--until, or now while the window is open).
+    #: A capture that dies mid-window has no gap BETWEEN lines -- only these
+    #: two see it. With no line at all, both equal the whole window.
+    lead_gap_s: float = 0.0
+    tail_gap_s: float = 0.0
+
+    @property
+    def capture_missing(self) -> bool:
+        """No line at all in the window (capture never started, wrong dir, or dead before --since)."""
+        return self.line_count == 0
 
     @property
     def reboots_total(self) -> int:
@@ -350,8 +400,18 @@ class NodeMetrics:
         return [g for g in self.nbr_gaps if g["dauer_s"] > BLUF_GAP_MAX_S]
 
     @property
+    def edge_gaps(self) -> list[str]:
+        """Human-readable start/end gaps above the BLUF threshold."""
+        out = []
+        if self.lead_gap_s > BLUF_GAP_MAX_S:
+            out.append(f"no line for the first {self.lead_gap_s:.0f}s of the window")
+        if self.tail_gap_s > BLUF_GAP_MAX_S:
+            out.append(f"no line for the last {self.tail_gap_s:.0f}s of the window")
+        return out
+
+    @property
     def alive(self) -> bool:
-        return not self.gaps_over_bluf_threshold
+        return not self.capture_missing and not self.gaps_over_bluf_threshold and not self.edge_gaps
 
     @property
     def heap_ok(self) -> bool:
@@ -363,7 +423,19 @@ class NodeMetrics:
 DM_SUM_FIELDS = ["sent", "echo", "gwack", "ack", "giveup", "giveuph", "att", "reack", "reack_lim", "enq", "ovw"]
 
 
-def compute_node_metrics(node: str, sliced: SlicedLog, nbr_json: dict[str, Any]) -> NodeMetrics:
+def _edge_gap(start: datetime | None, end: datetime | None) -> float:
+    if start is None or end is None:
+        return 0.0
+    return max(0.0, (end - start).total_seconds())
+
+
+def compute_node_metrics(
+    node: str,
+    sliced: SlicedLog,
+    nbr_json: dict[str, Any],
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> NodeMetrics:
     heap_samples: list[int] = []
     stat_util: list[int] = []
     chan_util: list[int] = []
@@ -463,6 +535,8 @@ def compute_node_metrics(node: str, sliced: SlicedLog, nbr_json: dict[str, Any])
         nbr_gaps=rahmen.get("luecken", []),
         nbr_check_total=druck.get("check_gesamt", 0),
         nbr_check_violations=druck.get("check_verstoesse", []),
+        lead_gap_s=_edge_gap(since, sliced.lines[0][0] if sliced.lines else until),
+        tail_gap_s=_edge_gap(sliced.lines[-1][0] if sliced.lines else since, until),
     )
 
 
@@ -502,6 +576,8 @@ class DmResult:
     receiver_copies: int
     receiver_first_ts: datetime | None
     note: str
+    #: host time of the sender's own first TX line for this DM (latency reference).
+    tx_ts: datetime | None = None
 
 
 def parse_soak_log(path: Path, since: datetime, until: datetime) -> tuple[list[SoakSend], str | None]:
@@ -594,27 +670,37 @@ def correlate_dm(
             giveup_ts = host
             break
 
-    # -- ack: server ACK / DM-ACK (LoRa) lines report the reconstructed
-    # ORIGINAL msg-id (see RE_SERVER_ACK/RE_LORA_ACK docstrings above), so
-    # compare against original_msgid, not the whole tx_msgids set.
+    # -- ack: both ack lines carry the reconstructed ORIGINAL msg-id, so compare
+    # against original_msgid, not the whole tx_msgids set. The path is whichever
+    # ack line came FIRST: the server ack ("[UDP-MSGID] ack_msg_id:<orig> ACK...02")
+    # or the LoRa ack ("[ACK-MSGID] ack_msg_id:<orig>"). The [RETX] markers are
+    # printed only when the ack arrives after the first LoRa TX, so they are just
+    # a fallback for logs that lack the two lines above.
     acked = False
     ack_ts: datetime | None = None
     ack_path: str | None = None
     already_acked_only = False
     if original_msgid:
+        candidates: list[tuple[datetime, str]] = []
+        fallback: list[tuple[datetime, str]] = []
         for host, rest in sender_lines:
             if not (window_start <= host <= window_end):
                 continue
-            m = RE_SERVER_ACK.search(rest)
-            if m and m.group("msgid").upper() == original_msgid:
-                acked, ack_ts, ack_path = True, host, "server/UDP"
-                break
-            m = RE_LORA_ACK.search(rest)
-            if m and m.group("msgid").upper() == original_msgid:
-                acked, ack_ts, ack_path = True, host, "LoRa"
-                break
-        if not acked:
-            # Fallback: a later retry's "already acked" cleanup confirms an
+            for pattern, path_name, bucket in (
+                (RE_UDP_ACK, "server/UDP", candidates),
+                (RE_LORA_ACK_ID, "LoRa", candidates),
+                (RE_SERVER_ACK, "server/UDP", fallback),
+                (RE_LORA_ACK, "LoRa", fallback),
+            ):
+                m = pattern.search(rest)
+                if m and m.group("msgid").upper() == original_msgid:
+                    bucket.append((host, path_name))
+        found = candidates or fallback
+        if found:
+            ack_ts, ack_path = min(found, key=lambda c: c[0])  # min() is stable: ties keep log order
+            acked = True
+        else:
+            # Last resort: a later retry's "already acked" cleanup confirms an
             # earlier ack whose own log line fell outside our window/log.
             for host, rest in sender_lines:
                 if not (window_start <= host <= window_end):
@@ -625,30 +711,24 @@ def correlate_dm(
                     already_acked_only = True
                     break
 
-    ack_latency = (ack_ts - send.sent_ts).total_seconds() if ack_ts else None
+    # Latency counts from the sender's own first TX line (host time of the same
+    # capture); the soak log only has whole seconds and is written after the
+    # node's HTTP answer. Falls back to the soak log's send time.
+    tx_ts = msgid_first_seen.get(original_msgid) if original_msgid else None
+    ack_latency = (ack_ts - (tx_ts or send.sent_ts)).total_seconds() if ack_ts else None
 
-    # -- receiver side: any RX-tagged line carrying this DM's payload.
+    # -- receiver side: REAL receptions carrying this DM's payload -- one RX-UDP
+    # line per server copy, one RF "[LOG] NNN" line per LoRa reception. The
+    # MH-LoRa / RX-LoRa2 lines of the same LoRa reception are not extra copies.
     receiver_copies = 0
     receiver_first_ts: datetime | None = None
-    # Keyed by (tag, msg-id): the same msg-id arriving via two different
-    # marker tags (e.g. RX-LoRa2 direct-air AND RX-UDP via the server) is
-    # two distinct physical deliveries and both count; the same tag+msg-id
-    # printed twice (e.g. a relay-processing artifact) is deduped.
-    seen_rx_keys: set[tuple[str, str]] = set()
     for host, rest in receiver_lines:
         if not (window_start <= host <= window_end):
             continue
         if text not in rest:
             continue
-        tag_m = RE_RX_TAG.search(rest)
-        if not tag_m:
+        if not (RE_RX_UDP.search(rest) or RE_RX_RF.search(rest)):
             continue
-        mid_m = RE_LINE_MSGID.search(rest)
-        mid = mid_m.group(1).upper() if mid_m else f"noid@{host.isoformat()}"
-        key = (tag_m.group(1), mid)
-        if key in seen_rx_keys:
-            continue
-        seen_rx_keys.add(key)
         receiver_copies += 1
         if receiver_first_ts is None:
             receiver_first_ts = host
@@ -657,6 +737,8 @@ def correlate_dm(
     note = ""
     if not tx_msgids:
         note = "own TX frame not found in sender log (window/text mismatch or capture gap)"
+    elif send.to not in node_lines:
+        note = "receiver capture not part of this run (received/copies not evaluated)"
     elif not received and not acked:
         note = "no trace at receiver and no ack seen -- likely lost or outside match window"
     elif not received and acked:
@@ -667,7 +749,7 @@ def correlate_dm(
     return DmResult(
         send.seq, send.frm, send.to, send.sent_ts, True, original_msgid, nnn,
         len(tx_msgids), tx_msgids, giveup, giveup_ts, acked, ack_ts, ack_path,
-        ack_latency, received, receiver_copies, receiver_first_ts, note,
+        ack_latency, received, receiver_copies, receiver_first_ts, note, tx_ts,
     )
 
 
@@ -731,10 +813,26 @@ def fetch_dk98(dest_dir: Path, host: str, remote_dir: str, since: datetime, unti
 def build_bluf(nodes: dict[str, NodeMetrics], dm_results: list[DmResult]) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
 
-    total_reboots = sum(n.reboots_total for n in nodes.values())
+    # A node with no line in the window is its own FAIL ("capture missing"); the
+    # per-node checks below skip it instead of failing again on empty data.
+    missing = [n.node for n in nodes.values() if n.capture_missing]
+    present = {k: n for k, n in nodes.items() if not n.capture_missing}
+    checks.append(
+        {
+            "criterion": "every capture present (>= 1 line in the window)",
+            "passed": not missing,
+            "detail": (
+                "; ".join(f"{n.node}: {n.line_count} lines" for n in nodes.values())
+                if not missing
+                else "capture missing: " + ", ".join(missing)
+            ),
+        }
+    )
+
+    total_reboots = sum(n.reboots_total for n in present.values())
     reboot_detail = "; ".join(
         f"{n.node}: {n.reboots_total} (boot-marker={n.reboots_boot_marker}, nbr-up-wrap={n.nbr_reboots})"
-        for n in nodes.values()
+        for n in present.values()
     )
     checks.append(
         {
@@ -744,10 +842,10 @@ def build_bluf(nodes: dict[str, NodeMetrics], dm_results: list[DmResult]) -> lis
         }
     )
 
-    heap_ok = all(n.heap_ok for n in nodes.values())
+    heap_ok = all(n.heap_ok for n in present.values())
     heap_detail = "; ".join(
         f"{n.node}: first={n.heap_first} last={n.heap_last} drift={n.heap_drift}"
-        for n in nodes.values()
+        for n in present.values()
     )
     checks.append({"criterion": f"heap last >= baseline - {HEAP_DRIFT_BUDGET_B} B", "passed": heap_ok, "detail": heap_detail})
 
@@ -763,24 +861,34 @@ def build_bluf(nodes: dict[str, NodeMetrics], dm_results: list[DmResult]) -> lis
         }
     )
 
-    total_violations = sum(len(n.nbr_check_violations) for n in nodes.values())
+    total_violations = sum(len(n.nbr_check_violations) for n in present.values())
     checks.append(
         {
             "criterion": "0 NBR CHECK violations",
             "passed": total_violations == 0,
-            "detail": f"{total_violations} violation(s) across {sum(n.nbr_check_total for n in nodes.values())} CHECK lines",
+            "detail": f"{total_violations} violation(s) across {sum(n.nbr_check_total for n in present.values())} CHECK lines",
         }
     )
 
-    alive_ok = all(n.alive for n in nodes.values())
+    alive_ok = all(n.alive for n in present.values())
     gap_detail = "; ".join(
-        f"{n.node}: " + (
-            "no gap > 10 min" if n.alive else
-            ", ".join(f"{g['von']}..{g['bis']} ({g['dauer_s']}s)" for g in n.gaps_over_bluf_threshold)
+        f"{n.node}: "
+        + (
+            "no gap > 10 min (incl. window start and end)"
+            if n.alive
+            else ", ".join(
+                [f"{g['von']}..{g['bis']} ({g['dauer_s']}s)" for g in n.gaps_over_bluf_threshold] + n.edge_gaps
+            )
         )
-        for n in nodes.values()
+        for n in present.values()
     )
-    checks.append({"criterion": "both captures alive (no gap > 10 min)", "passed": alive_ok, "detail": gap_detail})
+    checks.append(
+        {
+            "criterion": "every capture alive (no gap > 10 min, incl. window start and end)",
+            "passed": alive_ok,
+            "detail": gap_detail,
+        }
+    )
 
     return checks
 
@@ -821,6 +929,13 @@ def render_report(
                 lines.append(f"  - boot marker at {e}")
             for e in m.nbr_reboot_events:
                 lines.append(f"  - NBR up-counter wrap at {e['host']} ({e['up_vorher']} -> {e['up_nachher']})")
+        if m.capture_missing:
+            lines.append("- **CAPTURE MISSING**: no line at all in the window")
+        else:
+            lines.append(
+                f"- Window edges: first line {m.lead_gap_s:.0f}s after --since, last line {m.tail_gap_s:.0f}s before "
+                f"the window end" + (f" -- **{'; '.join(m.edge_gaps)}**" if m.edge_gaps else "")
+            )
         lines.append(
             f"- Gaps > {GAP_THRESHOLD_S:.0f}s: {len(m.nbr_gaps)}"
             + (f", of which > 10 min: {len(m.gaps_over_bluf_threshold)}" if m.nbr_gaps else "")
@@ -935,6 +1050,8 @@ def to_json(
         d["last_ts"] = fmt_dt(m.last_ts) if m.last_ts else None
         d["reboots_total"] = m.reboots_total
         d["alive"] = m.alive
+        d["capture_missing"] = m.capture_missing
+        d["edge_gaps"] = m.edge_gaps
         d["heap_ok"] = m.heap_ok
         return d
 
@@ -944,6 +1061,7 @@ def to_json(
         e["giveup_ts"] = fmt_dt(d.giveup_ts) if d.giveup_ts else None
         e["ack_ts"] = fmt_dt(d.ack_ts) if d.ack_ts else None
         e["receiver_first_ts"] = fmt_dt(d.receiver_first_ts) if d.receiver_first_ts else None
+        e["tx_ts"] = fmt_dt(d.tx_ts) if d.tx_ts else None
         return e
 
     return {
@@ -982,6 +1100,8 @@ FIXTURE_DK1 = """\
 
 FIXTURE_DK98 = """\
 2026-09-27 17:39:29.000  16:39:28 RX-UDP  069 : xEA25A324 H02 S0 T0 M01 DK5EN-1>DK5EN-98:soak 20260927 #1 DK5EN-1>DK5EN-98{804 HW:43 MOD:8/8 FCS:0FF6 FW:35:t LH:AB
+2026-09-27 17:39:29.100  16:39:28 [LOG] 069 : xEA25A324 H02 S0 T0 M01 DK5EN-1>DK5EN-98:soak 20260927 #1 DK5EN-1>DK5EN-98{804 HW:43 MOD:8/8 FCS:0FF6 FW:35:t LH:AB RSSI:-80 SNR:5 DUP:n OWN:- t=1
+2026-09-27 17:39:29.100  16:39:28 MH-LoRa 069 : xEA25A324 H02 S0 T0 M01 DK5EN-1>DK5EN-98:soak 20260927 #1 DK5EN-1>DK5EN-98{804 HW:43 MOD:8/8 FCS:0FF6 FW:35:t LH:AB
 2026-09-27 17:39:29.100  16:39:28 RX-LoRa2 069 : xEA25A324 H02 S0 T0 M01 DK5EN-1>DK5EN-98:soak 20260927 #1 DK5EN-1>DK5EN-98{804 HW:43 MOD:8/8 FCS:0FF6 FW:35:t LH:AB
 2026-09-27 17:38:56.516  16:38:54 [LOG] STAT util=5 rx=9000 tx=6000 newid=8 dup=0 err=0 txn=9 txfail=0 ringmax=1/20 drop=0/0/0/0/0 mh=1 heap=140000 trk=240/1 fw=35t/20260927 up=300 t=300003
 2026-09-27 17:38:56.516  16:38:54 [LOG] DM sent=0 echo=0 gwack=0 ack=1 giveup=0 giveuph=0 att=1 reack=0/0 rtt=0/1/0/0/0/0 ring=enq:9 ovw:0
@@ -1033,8 +1153,8 @@ def run_self_test() -> int:
             nbr_a = run_nbrlog(sliced_a_path, work_path)
             nbr_b = run_nbrlog(sliced_b_path, work_path)
 
-        metrics_a = compute_node_metrics(NODE_A, sliced_a, nbr_a)
-        metrics_b = compute_node_metrics(NODE_B, sliced_b, nbr_b)
+        metrics_a = compute_node_metrics(NODE_A, sliced_a, nbr_a, since, until)
+        metrics_b = compute_node_metrics(NODE_B, sliced_b, nbr_b, since, until)
 
         _check("dk1 heap first", metrics_a.heap_first, 133040, failures)
         _check("dk1 heap last", metrics_a.heap_last, 133040, failures)
@@ -1049,6 +1169,10 @@ def run_self_test() -> int:
         _check("dk1 retx server_ACK", metrics_a.retx_counts.get("server_ACK"), 1, failures)
         _check("dk1 channel util samples", metrics_a.channel_util_samples, [20], failures)
         _check("dk1 reboots (no second CLIENT SETUP)", metrics_a.reboots_boot_marker, 0, failures)
+        # the fixture ends 17:42, the window at 19:00: no gap between lines, but a dead tail
+        _check("dk1 tail gap (last line -> --until)", round(metrics_a.tail_gap_s), 4675, failures)
+        _check("dk1 alive (dead tail)", metrics_a.alive, False, failures)
+        _check("dk1 capture_missing", metrics_a.capture_missing, False, failures)
 
         _check("dk98 heap first", metrics_b.heap_first, 140000, failures)
         _check("dk98 dm ack sum", metrics_b.dm_sums["ack"], 1, failures)
@@ -1072,7 +1196,7 @@ def run_self_test() -> int:
             sliced_r_path = work2_path / "r.log"
             sliced_r.write_sliced_copy(sliced_r_path)
             nbr_r = run_nbrlog(sliced_r_path, work2_path)
-        metrics_r = compute_node_metrics("REBOOT-TEST", sliced_r, nbr_r)
+        metrics_r = compute_node_metrics("REBOOT-TEST", sliced_r, nbr_r, since, until)
         _check("reboot fixture reboots_boot_marker", metrics_r.reboots_boot_marker, 1, failures)
         _check("reboot fixture reboots_total", metrics_r.reboots_total, 1, failures)
 
@@ -1093,7 +1217,7 @@ def run_self_test() -> int:
             sliced_g_path = work3_path / "g.log"
             sliced_g.write_sliced_copy(sliced_g_path)
             nbr_g = run_nbrlog(sliced_g_path, work3_path)
-        metrics_g = compute_node_metrics("GAP-TEST", sliced_g, nbr_g)
+        metrics_g = compute_node_metrics("GAP-TEST", sliced_g, nbr_g, since, until)
         _check("gap fixture gap count", len(metrics_g.nbr_gaps), 1, failures)
         _check("gap fixture alive (>10min gap)", metrics_g.alive, False, failures)
         _check("gap fixture heap_ok (drift 1000B < budget)", metrics_g.heap_ok, True, failures)
@@ -1112,8 +1236,10 @@ def run_self_test() -> int:
         _check("dm1 transmissions", d1.transmissions, 1, failures)
         _check("dm1 acked", d1.acked, True, failures)
         _check("dm1 ack_path", d1.ack_path, "server/UDP", failures)
-        _check("dm1 ack_latency", round(d1.ack_latency_s or -1, 1), 4.6, failures)
+        # counted from the sender's own first TX line (17:39:25.617), not the whole-second soak-log time
+        _check("dm1 ack_latency", round(d1.ack_latency_s or -1, 1), 4.0, failures)
         _check("dm1 received", d1.received, True, failures)
+        # RX-UDP + one RF reception (its [LOG]/MH-LoRa/RX-LoRa2 lines are ONE copy) = 2
         _check("dm1 receiver_copies", d1.receiver_copies, 2, failures)
         _check("dm1 giveup", d1.giveup, False, failures)
 
@@ -1124,7 +1250,7 @@ def run_self_test() -> int:
         _check("dm2 received", d2.received, False, failures)
 
         bluf = build_bluf({NODE_A: metrics_a, NODE_B: metrics_b}, results)
-        _check("bluf has 5 criteria", len(bluf), 5, failures)
+        _check("bluf has 6 criteria", len(bluf), 6, failures)
         unacked_check = next(c for c in bluf if c["criterion"] == "every test DM acked or explained")
         _check("bluf unacked check fails (dm2 unacked)", unacked_check["passed"], False, failures)
 
@@ -1159,8 +1285,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fetch", action="store_true", help="scp DK5EN-98's logs from the rpizero logger first")
     ap.add_argument("--fetch-host", default=DEFAULT_FETCH_HOST)
     ap.add_argument("--fetch-remote", default=DEFAULT_FETCH_REMOTE)
-    ap.add_argument("--dk1-dir", type=Path, default=DEFAULT_DK1_DIR)
-    ap.add_argument("--dk98-dir", type=Path, default=DEFAULT_DK98_DIR)
+    ap.add_argument(
+        "--nodes",
+        default=None,
+        help=f"comma-separated nodes to evaluate ({NODE_A},{NODE_B}); default both. "
+        f"A single-node soak: --nodes {NODE_B}",
+    )
+    ap.add_argument("--dk1-dir", type=dir_or_none, default=DEFAULT_DK1_DIR, help="DK5EN-1 capture dir, or 'none' to skip that node")
+    ap.add_argument("--dk98-dir", type=dir_or_none, default=DEFAULT_DK98_DIR, help="DK5EN-98 capture dir, or 'none' to skip that node")
     ap.add_argument("--soak-log", type=Path, default=DEFAULT_SOAK_LOG)
     ap.add_argument("--match-window-min", type=float, default=DEFAULT_MATCH_WINDOW_MIN)
     ap.add_argument("--out", type=Path, default=None, help="write the Markdown report here")
@@ -1176,30 +1308,48 @@ def main(argv: list[str] | None = None) -> int:
 
     until = args.until or datetime.now()
 
-    if args.fetch:
-        fetch_dk98(args.dk98_dir, args.fetch_host, args.fetch_remote, args.since, until)
+    try:
+        node_dirs = select_nodes(args.nodes, {NODE_A: args.dk1_dir, NODE_B: args.dk98_dir})
+    except ValueError as exc:
+        ap.error(str(exc))
 
-    sliced = {
-        NODE_A: load_and_slice(args.dk1_dir, args.since, until),
-        NODE_B: load_and_slice(args.dk98_dir, args.since, until),
-    }
+    if args.fetch:
+        if NODE_B in node_dirs:
+            fetch_dk98(node_dirs[NODE_B], args.fetch_host, args.fetch_remote, args.since, until)
+        else:
+            print(f"NOTE: --fetch skipped, {NODE_B} is not part of this run", file=sys.stderr)
+
+    sliced = {node: load_and_slice(d, args.since, until) for node, d in node_dirs.items()}
 
     with tempfile.TemporaryDirectory(prefix="soakstatus-") as work:
         work_path = Path(work)
         nbr_json: dict[str, dict[str, Any]] = {}
         for node, sl in sliced.items():
+            nbr_json[node] = {}
+            if not sl.lines:
+                continue  # capture missing: nothing to hand to nbrlog.py
             sliced_path = work_path / f"{node}.log"
             sl.write_sliced_copy(sliced_path)
             try:
                 nbr_json[node] = run_nbrlog(sliced_path, work_path)
             except RuntimeError as exc:
                 print(f"WARNING: tools/nbrlog.py failed for {node}: {exc}", file=sys.stderr)
-                nbr_json[node] = {}
 
-        nodes = {node: compute_node_metrics(node, sliced[node], nbr_json[node]) for node in sliced}
+        nodes = {
+            node: compute_node_metrics(node, sliced[node], nbr_json[node], args.since, until) for node in sliced
+        }
 
     node_lines = {node: sl.lines for node, sl in sliced.items()}
     sends, tag = parse_soak_log(args.soak_log, args.since, until)
+    # A test DM whose SENDER is not part of this run cannot be judged (no TX/ack lines to read).
+    skipped = [s for s in sends if s.frm not in node_lines]
+    sends = [s for s in sends if s.frm in node_lines]
+    if skipped:
+        print(
+            f"NOTE: {len(skipped)} test DM(s) from a node outside this run left out: "
+            + ", ".join(f"#{s.seq} {s.frm}>{s.to}" for s in skipped),
+            file=sys.stderr,
+        )
     dm_results = [
         correlate_dm(s, tag or args.since.strftime("%Y%m%d"), node_lines, timedelta(minutes=args.match_window_min))
         for s in sends
