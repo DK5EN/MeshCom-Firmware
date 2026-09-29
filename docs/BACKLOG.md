@@ -7432,6 +7432,19 @@ Open (advisor optional items, 2026-09-29):
   is not enough: a rejection would then mark the DM ACKed (0x02) and stop its retransmit. Needs a
   decision on what a `:rej` should do to the own DM (status, retries) before any fix.
 
+Found in the BLE/battery campaign 2026-09-29 (`docs/ble-batt-campaign-20260929.md`), open:
+
+- **BLE-FLOOD** the drain sends one config frame per 300 ms; read commands faster than ~3/s
+  overrun the 3 KB config ring (loss counted in `--info` `e`). Needs a test against the real app
+  before the cadence changes.
+- **UDP-INGRESS** at 50 datagrams/s the ESP32 UDP socket drops datagrams before the firmware
+  reads them (rx 87 of 140 injected); invisible to the firmware counters.
+- **BAT-NOISE** switched-divider boards take one raw reading per 30 s, so the EMA barely smooths
+  there; an 8x average would hide the floating-divider signature BAT-01 needs. Bench-test the
+  detector with averaging before changing it.
+- **BLE-SETTINGS-HW** the `node_msgid` fix (`dbc57632`, settings characteristic) still has no
+  hardware test; `ble_stress.py` writes over NUS 0x95 only.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)

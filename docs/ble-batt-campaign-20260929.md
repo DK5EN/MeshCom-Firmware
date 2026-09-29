@@ -90,17 +90,58 @@ of MH), all valid JSON, max 229 B. The faults need load or a refused notify to s
   `battHardwarePresent()` treats a reported 0 mV as absent (no `/B=000` on USB boards).
 - `-Os` for `wiscore_rak4631` (operator request): `build_unflags = -Ofast`, `-Os`.
 
+## Hardware results (2026-09-29, HEAD 1404e77d)
+
+Both bench nodes flashed with the gated image (Heltec over USB, RAK over serial DFU -- `--dfu`
+lands in the bootloader without the UF2 drive on this board; the 1200-baud touch of a normal
+`pio run -t upload` from the running app works).
+
+| Test (`tools/bench/ble_stress.py`)       | DK5EN-1 (Heltec V3)                                          | DK5EN-90 (RAK4631, -Os)                     |
+| ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------- |
+| `burst` x5                               | 5/5 complete, 15 registers, max 225 B, MTU 255               | 5/5 complete, 13 registers + 3 MH, MTU 250  |
+| `malformed` (6 frames)                   | 6/6 survived                                                 | 6/6 survived                                |
+| `pin` no PIN                             | PASS                                                         | PASS                                        |
+| `pin` PIN set                            | 3/3                                                          | 2/3 before BLE-N4, 3/3 after                |
+| `settings-roundtrip` (0x95)              | --                                                           | PASS, 92 fields unchanged, msgid 209 -> 209 |
+| `flood --commands` (8 cmd/s)             | 33/70 replies lost, all counted: `e33` (config ring overrun) | --                                          |
+| mock server, group 9, 40 frames at 10/s  | 40/40 at the phone, `e0 d0 r0`                               | --                                          |
+| mock server, group 9, 100 frames at 50/s | 36/100 at the phone, `e0`: lost in the UDP stack (rx 87/140) | --                                          |
+| LoRa TX `-Os` image -> Heltec            | received RSSI -35 SNR 6, relayed                             | sent                                        |
+| battery, no cell                         | 3.93 V after boot, 0.00 V / 0 % after the detector window    | 4.26 V / 100 %                              |
+
+- **BLE-N4** (found on the bench, fixed `1404e77d`): nRF52 dropped a phone with a wrong PIN hash
+  only on its next write -- the disconnect check sat in the BLE RX callback, but since CONC-14
+  the PIN check runs later in the Main Loop.
+- **BLE-FLOOD** (not fixed): the drain sends one config frame per 300 ms. A phone that fires
+  read commands faster than ~3/s overruns the 3 KB config ring; the loss is now counted (`e`).
+  The app sends one command at a time; changing the 300 ms cadence needs a test against the
+  real app.
+- **UDP-INGRESS** (not fixed, not BLE): at 50 datagrams/s the ESP32 UDP socket loses datagrams
+  before the firmware reads them (socket rx 87 of 140 injected); everything that was read
+  reached the phone.
+- **Not covered**: the `node_msgid` fix of `dbc57632` (BLE settings characteristic, v1 image)
+  -- the stress client writes over NUS opcode 0x95, not the settings characteristic.
+- **Operator check open**: the Heltec red LED should flash ~100 ms every 30 s without a cell.
+
+## Soak (wave 5)
+
+DK5EN-98 OTA'd 2026-09-29 10:07 to 4.35v build 09:55:55 (`tools/webflash.py`), restored to
+22 dBm, `--gateway on`, `--mesh on`. First boot line `RESET_REASON=3 SW` without
+`LAST_LOOP_SECTION` (INS-05 visible). Capture: `rpizero:~/meshlog/dk5en-98/`, `screen -S
+meshlog`, `meshlogger.py --hours 72 --flags nbrdebug,loradebug,txcapture`, started 10:10:38,
+ends 2026-10-02 10:10. Check the LAST line of the log against the window end, not only gaps.
+
 ## Wave status log
 
-| Wave | Content                                                                            | Status                                                                                 |
-| ---- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 0    | bench identity, baseline `--info` and BLE burst of both nodes                      | done                                                                                   |
-| 1    | writer B: INS-05, DM-17, GW-02; writer D: `tools/bench/ble_stress.py`              | done; advisor REWORK (deep-sleep clear placement, 0xF0 save path) applied; D committed |
-| 2    | writer H: BLE harness + BLE-N1/N2; writer P: `src/batt_pipeline.h`                 | done; BLE advisor REWORK (BLE-N3) applied                                              |
-| 3    | battery migration W3a/W3b/W3c                                                      | done; battery advisor APPROVED, two optional items applied, BAT-NOISE documented       |
-| 3t   | writer T: millis teleport tests in five suites                                     | done; TIME-01, TIME-02 found and fixed                                                 |
-| 4    | full gate (48 native envs, 32 board envs), commits, flash RAK + Heltec, bench runs | gate running                                                                           |
-| 5    | OTA DK5EN-98, restore 22 dBm / GW on / MESH on, start soak                         | planned                                                                                |
+| Wave | Content                                                                            | Status                                                                                    |
+| ---- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 0    | bench identity, baseline `--info` and BLE burst of both nodes                      | done                                                                                      |
+| 1    | writer B: INS-05, DM-17, GW-02; writer D: `tools/bench/ble_stress.py`              | done; advisor REWORK (deep-sleep clear placement, 0xF0 save path) applied; D committed    |
+| 2    | writer H: BLE harness + BLE-N1/N2; writer P: `src/batt_pipeline.h`                 | done; BLE advisor REWORK (BLE-N3) applied                                                 |
+| 3    | battery migration W3a/W3b/W3c                                                      | done; battery advisor APPROVED, two optional items applied, BAT-NOISE documented          |
+| 3t   | writer T: millis teleport tests in five suites                                     | done; TIME-01, TIME-02 found and fixed                                                    |
+| 4    | full gate (48 native envs, 32 board envs), commits, flash RAK + Heltec, bench runs | done: gate green (1588 tests, 32/32 boards), 8 commits, bench results above, BLE-N4 fixed |
+| 5    | OTA DK5EN-98, restore 22 dBm / GW on / MESH on, start soak                         | running until 2026-10-02 10:10                                                            |
 
 Note: editing `platformio.ini` changes `project.checksum`, which wipes `.pio/build` -- the first
 board build after it is a full rebuild.

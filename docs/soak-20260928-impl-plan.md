@@ -12,7 +12,7 @@ afterwards OTA DK5EN-98 only and soak until 2026-10-01 16:00.
 | 1g   | orchestrator hotspot edits in `src/lora_functions.cpp`, neo path lists, full gate | paused: gate run 1 green (46/46 native, 1464 tests, 4 boards) BEFORE the 1g additions; re-run needed |
 | 1a   | advisor pass (fable) on the whole diff                                            | APPROVED (fable, code); must-do = re-run the board builds; 4 optional items below                    |
 | 1c   | commits per finding group on fork-neo-test                                        | committed 2026-09-29 on the operator's call, final tree unbuilt (4 commits)                          |
-| 2    | OTA DK5EN-98, `--info`, rpizero logger until 10-01 16:00                          | on hold by operator (2026-09-29): OTA + soak later                                                   |
+| 2    | OTA DK5EN-98, `--info`, rpizero logger                                            | running: OTA 2026-09-29 10:07 (with the BLE/battery campaign), capture until 10-02 10:10             |
 
 ## Wave 1 ownership
 
