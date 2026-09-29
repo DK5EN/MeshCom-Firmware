@@ -18,6 +18,7 @@
 #include <spectral_scan.h>
 #include <maxhop.h>         // CS-02: drop-down values for the text hop limit
 #include <config_json.h>   // CS-03: config download/upload as one JSON object
+#include <loop_breadcrumb.h> // INS-05: loopCrumbClear() before a deliberate reboot
 #include <ArduinoJson.h>    // JSN-01: call_function()/setparam()/getparam() JSON escaping
 #include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
@@ -536,6 +537,7 @@ static void sub_config_upload(long content_length)
     delay(2000);
 
     #ifdef ESP32
+        loopCrumbClear();   // INS-05: deliberate reboot, no LAST_LOOP_SECTION at the next boot
         ESP.restart();
     #endif
 

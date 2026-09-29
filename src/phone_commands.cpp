@@ -12,6 +12,7 @@
 #include <time_functions.h>
 #if defined(ESP32) || defined(ESP8266)
 #include "mbedtls/sha256.h"
+#include "loop_breadcrumb.h"   // INS-05: loopCrumbClear() before the deliberate reboot
 #else
 #include "Adafruit_nRFCrypto.h"
 #endif
@@ -642,6 +643,7 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 			#if defined NRF52_SERIES
 				NVIC_SystemReset();
 			#else
+				loopCrumbClear();   // INS-05: deliberate reboot, no LAST_LOOP_SECTION at the next boot
 				ESP.restart();
 			#endif
 		}

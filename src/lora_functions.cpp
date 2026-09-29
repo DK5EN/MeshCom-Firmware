@@ -1660,7 +1660,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             // for the send-to-ack histogram (M0-1).
                                             // F1: count only the first ACK per own DM
                                             // (the server path may have delivered it already).
-                                            if(dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
+                                            // DM-17: a :rej is not an ack -- count only on :ack.
+                                            if(iAckPos > 0 && dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
                                                 dmstat_peer_ack.fetch_add(1);
 
                                             // BUG #8 fix: clear ringBuffer entry to stop retransmission.

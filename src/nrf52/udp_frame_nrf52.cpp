@@ -318,7 +318,8 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                         // F1: server-delivered ACK for an own DM -- ack=/rtt= count once
                         // per DM at the FIRST ack (LoRa or server), see dm_stats.h.
-                        if(dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
+                        // DM-17: a :rej is not an ack -- count only on :ack.
+                        if(iAckPos > 0 && dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
                             dmstat_peer_ack.fetch_add(1);
                         // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level

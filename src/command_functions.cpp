@@ -910,6 +910,7 @@ void commandAction(char *umsg_text, bool ble)
         delay(2000);
         
         #ifdef ESP32
+            loopCrumbClear();   // INS-05: deliberate reboot, no LAST_LOOP_SECTION at the next boot
             ESP.restart();
         #endif
         
@@ -985,6 +986,7 @@ void commandAction(char *umsg_text, bool ble)
         delay(3000);
 
         #ifdef ESP32
+            loopCrumbClear();   // INS-05: deliberate reboot, no LAST_LOOP_SECTION at the next boot
             ESP.restart();
         #endif
         
@@ -1027,6 +1029,7 @@ void commandAction(char *umsg_text, bool ble)
         if (partition)
         {
             esp_ota_set_boot_partition(partition);
+            loopCrumbClear();   // INS-05: deliberate reboot into safeboot
             esp_restart();
             return;
         }
@@ -1413,6 +1416,8 @@ void commandAction(char *umsg_text, bool ble)
             Platform::prepareToSleep();
             #endif
             #if defined(WP_DISP)
+            loopCrumbClear();   // INS-05: deliberate sleep, RTC memory survives it -- cleared last,
+                                // after the button wait and e-ink refresh that could still trip the WDT
             esp_deep_sleep_start();
             #else
             // Issue 962 / Option A: every other ESP32 board -- radio to
@@ -3596,6 +3601,7 @@ void commandAction(char *umsg_text, bool ble)
 
         bGATEWAY=false;
         meshcom_settings.node_sset &= ~0x1000;   // mask 0x1000
+        heyGatewayChanged();                     // GW-02: neighbours learn HG->H now, same hook as tg_post_gateway
 
         if(ble)
         {

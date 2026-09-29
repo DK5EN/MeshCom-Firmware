@@ -1716,6 +1716,73 @@ static void test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both(vo
     }
 }
 
+// DM-17 (soak 2026-09-28 advisor item): a `:rej` reply for an own DM entered the
+// ACK branch and fed dmStatNoteAck(), so it counted as ack= and took the RTT
+// sample (and consumed the send-table entry, so the real :ack later counted
+// nothing). Only `:ack` may count. The payload is "abc7:rej7": the ACK branch
+// takes the id from a fixed offset (iAckPos+4, which is 3 for a :rej), so the
+// head "abc" puts the digit 7 at that offset and the branch reads NNN 7 on both
+// the current offset and a corrected one. Red without the `iAckPos > 0` gate in
+// udp_frame_esp32.cpp/udp_frame_nrf52.cpp (peer_ack 1 and rtt[0] 1 after the
+// :rej). The LoRa call site (lora_functions.cpp) is not built in this env and
+// carries the same gate.
+static void test_regression_server_rej_own_dm_counts_nothing_on_both(void)
+{
+    uint8_t rejTmpl[BUF_CAP];
+    memset(rejTmpl, 0, sizeof(rejTmpl));
+    uint16_t rejLen = build_gate_datagram(rejTmpl, "DK5EN-9", "DK5EN-1", ':', "abc7:rej7", 0x7207);
+
+    uint8_t ackTmpl[BUF_CAP];
+    memset(ackTmpl, 0, sizeof(ackTmpl));
+    uint16_t ackLen = build_gate_datagram(ackTmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack7", 0x7208);
+
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (7 & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        recorder_reset();
+        g_own_tx_known.push_back(expected_msg_id);
+
+        char drain[256];
+        dmStatFormat(drain, sizeof(drain));
+
+        const uint32_t t0 = 100000;
+        dmStatNoteSent(7, t0);
+
+        // The :rej for our own DM 7, 5 s after the send.
+        mc_test_set_millis(t0 + 5000);
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, rejTmpl, rejLen);
+        if (side) handleUdpFrame_nrf52(buf, rejLen, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, rejLen, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: a :rej for an own DM counted ack=", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, dmstat_peer_ack.load(), msg);
+        snprintf(msg, sizeof(msg), "%s: a :rej for an own DM recorded an RTT sample", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, dmstat_rtt[0].load(), msg);
+
+        // The :rej must not have consumed the send-table entry: the real
+        // :ack that follows still counts once, RTT taken from the send.
+        recorder_reset();
+        g_own_tx_known.push_back(expected_msg_id);
+        mc_test_set_millis(t0 + 8000);
+        copy_into(buf, ackTmpl, ackLen);
+        if (side) handleUdpFrame_nrf52(buf, ackLen, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, ackLen, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: the :ack after a :rej did not count ack=", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_peer_ack.load(), msg);
+        snprintf(msg, sizeof(msg), "%s: the :ack after a :rej did not record its RTT sample", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_rtt[0].load(), msg);
+
+        // Leave the counters clean for the next side / test.
+        dmStatFormat(drain, sizeof(drain));
+    }
+}
+
 // Wave 4 (docs/snf-port-campaign.md, port map Group B / 150b0a4a): a
 // server-ingress `:sto` custody notice for one of our own outgoing DMs must
 // be CONSUMED -- not displayed as a chat text, not relayed to the phone as
@@ -2449,6 +2516,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
     RUN_TEST(test_regression_server_ack_own_dm_stops_ring_on_both);
     RUN_TEST(test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both);
+    RUN_TEST(test_regression_server_rej_own_dm_counts_nothing_on_both);
     RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);

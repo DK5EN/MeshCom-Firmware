@@ -160,6 +160,42 @@ static void test_take_report_clears_garbage_too(void)
     TEST_ASSERT_EQUAL_UINT32(0u, g_loopCrumb.chk);
 }
 
+// INS-05: a DELIBERATE reboot inside a section (--reboot over BLE/web, web config
+// import, --cleanflash, --ota-update) calls loopCrumbClear() right before the
+// restart, so the next boot reports no section. Contract the call sites rely on:
+// clear while a guard is live (the guard's destructor never runs, the chip
+// resets) wipes the record, nested or not, and the next take is silent. Without
+// the call the same reset is reported (test_reset_inside_section_is_reported_...).
+static void test_deliberate_reboot_inside_section_clears_the_report(void)
+{
+    char buf[80];
+
+    {
+        LoopSectionGuard outer(LSEC_WEB, 1000u);
+        LoopSectionGuard inner(LSEC_BLE_CMD, 2000u);
+        TEST_ASSERT_TRUE(loopCrumbValid(snap(), NULL));
+
+        loopCrumbClear();   // the call before ESP.restart()
+
+        // "reset" here: nothing runs the guards' destructors on a real restart,
+        // so read the record as the next boot would.
+        TEST_ASSERT_FALSE(loopCrumbValid(snap(), NULL));
+        TEST_ASSERT_FALSE(loopCrumbTakeReport(buf, sizeof(buf)));
+        TEST_ASSERT_EQUAL_STRING("", buf);
+        TEST_ASSERT_EQUAL_UINT32(0u, g_loopCrumb.tag);
+        TEST_ASSERT_EQUAL_UINT32(0u, g_loopCrumb.ms);
+        TEST_ASSERT_EQUAL_UINT32(0u, g_loopCrumb.chk);
+    }
+
+    // Control: the same reset without the clear names the innermost section.
+    {
+        LoopSectionGuard sec(LSEC_WEB, 3000u);
+        char line[80];
+        TEST_ASSERT_TRUE(loopCrumbTakeReport(line, sizeof(line)));
+        TEST_ASSERT_EQUAL_STRING("[BOOT] LAST_LOOP_SECTION=web entered_ms=3000", line);
+    }
+}
+
 // --info ...BOOT line: the summary starts empty, keeps what esp32setup() stored,
 // truncates safely, and NULL resets it.
 static void test_boot_summary_set_get_truncate(void)
@@ -193,6 +229,7 @@ int main(int, char **)
     RUN_TEST(test_nested_guard_restores_outer);
     RUN_TEST(test_reset_inside_section_is_reported_then_cleared);
     RUN_TEST(test_take_report_clears_garbage_too);
+    RUN_TEST(test_deliberate_reboot_inside_section_clears_the_report);
     RUN_TEST(test_boot_summary_set_get_truncate);
     return UNITY_END();
 }

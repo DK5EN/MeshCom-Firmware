@@ -7413,18 +7413,24 @@ wave log).
 
 Open (advisor optional items, 2026-09-29):
 
-- **INS-05** the loop breadcrumb reports a section after a DELIBERATE reboot inside it: `--reboot`
+- **INS-05** (DONE 2026-09-29, `docs/ble-batt-campaign-20260929.md`) the loop breadcrumb reports a section after a DELIBERATE reboot inside it: `--reboot`
   over BLE (`LSEC_BLE_CMD`) or web (`LSEC_WEB`), `command_functions.cpp` ~913/~988, and the web
   config import, `web_functions.cpp` ~539. The next boot prints `LAST_LOOP_SECTION=ble_cmd|web`
   next to `RESET_REASON=3 SW`. That can be told apart, but it is noise. Fix: `loopCrumbClear()`
   before those `ESP.restart()` calls, with a native test on the helper.
-- **DM-17** a `:rej` reply for an own DM counts as `ack=` and as an RTT sample. It enters the ACK
+- **DM-17** (DONE 2026-09-29, `docs/ble-batt-campaign-20260929.md`) a `:rej` reply for an own DM counts as `ack=` and as an RTT sample. It enters the ACK
   branch at `lora_functions.cpp` ~1632, `udp_frame_esp32.cpp` ~330 and `udp_frame_nrf52.cpp`.
   This predates F1. Fix: count only on `:ack`, and extend `test_udp_frame_twin` with a `:rej`
   datagram.
-- **GW-02** `--wifiap on` (`command_functions.cpp` ~3597) clears `bGATEWAY` without
+- **GW-02** (DONE 2026-09-29, `docs/ble-batt-campaign-20260929.md`) `--wifiap on` (`command_functions.cpp` ~3597) clears `bGATEWAY` without
   `heyGatewayChanged()`. Harmless today (AP mode is never a gateway, neighbours drop the flag
   after 45 min, the node reboots 5 s later). Low priority, for completeness.
+- **DM-18** (found 2026-09-29 while fixing DM-17, pre-existing, upstream code) the ACK branch parses
+  the message id at `iAckPos+4` also for a `:rej` (`udp_frame_esp32.cpp` ~332, same shape in the
+  LoRa and nRF52 branches). For `:rej` `iAckPos` is -1, so the id is read from offset 3 -- usually 0
+  -- and a rejection marks or stops the ring slot of the wrong own DM. Correcting the offset alone
+  is not enough: a rejection would then mark the DM ACKed (0x02) and stop its retransmit. Needs a
+  decision on what a `:rej` should do to the own DM (status, retries) before any fix.
 
 ## 4. State of the repository
 
