@@ -1,5 +1,27 @@
 # RESUME — pick up here
 
+## 2026-09-29: soak fixes F1-F8 + upstream v4.35v port committed, gate/OTA/soak postponed
+
+The 26 h soak of 2026-09-27/28 was evaluated: the neighbour matrix works, and there was no
+crash or leak on DK5EN-98 (verdict `docs/soak-20260928-verdict.md`). All eight findings were
+fixed in four parallel writer waves (`docs/soak-20260928-impl-plan.md`):
+
+- DM counters;
+- line ends;
+- the `LAST_LOOP_SECTION` breadcrumb, plus `--info ...BOOT`;
+- `att=`;
+- HatF on the safe side;
+- the gateway flag (HG/H latest-wins, 45-min expiry, gateway HEY at least every 15 min);
+- `nbrCopyMask`;
+- the host tools.
+
+Also committed: the upstream v4.35v DL internet server (ESP32 hostname, nRF52 fixed IP
+192.68.17.26), the HAMNET NTP fallback, and the version letter `v`. The native gate was green
+before the last four edits, and the fable advisor APPROVED the final diff. **Not done, by the
+operator's decision:** the full gate on the final tree (no board build has compiled the `--info`
+line, the v4.35v port, the letter or the nRF52 DL entry), the DK5EN-98 OTA, and the soak until
+10-01 16:00. Open items: BACKLOG §3.8bb (`INS-05`, `DM-17`, `GW-02`).
+
 ## 2026-09-28 evening: release `v4.35u.09.28.3-neo` published — WebUI UTF-8 fix (#1173)
 
 Same-day third cut, replacing all earlier releases. Issue #1173 (Polish diacritics garbled when sent

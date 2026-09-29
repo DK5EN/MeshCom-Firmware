@@ -1,5 +1,10 @@
 # Soak 2026-09-27/28 (DK5EN-98 + DK5EN-1) -- Fable Verdict
 
+> **Status 2026-09-29:** F1-F8 implemented and committed on `fork-neo-test` (plan and wave log:
+> `docs/soak-20260928-impl-plan.md`). F5 and F6 were decided by the operator: HatF uses the share
+> rule, and the gateway flag gets a 15-min refresh and a 45-min expiry. The full build gate and
+> the follow-up soak are still to run. Advisor leftovers: BACKLOG §3.8bb.
+
 Evaluated 2026-09-29. Review only: nothing in `src/` was changed. Method: five read-only
 analysis agents, then one adversarial verifier per finding cluster (Fable/Opus), each told to
 refute. Only claims that survived are listed as findings. Scratch scripts and cut logs sit in
