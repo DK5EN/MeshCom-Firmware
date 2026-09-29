@@ -39,21 +39,20 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
   <p class="lead">Drei Seiten, alle aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und einen
-  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.35u.09.28-neo mit Nachbarschaftsmatrix, Speichern-und-Weiterleiten und der Wiederholung persönlicher Nachrichten per XOR-Kennung.</p>
+  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.35v.09.29-neo: offizielles 4.35v plus Nachbarschaftsmatrix, Speichern-und-Weiterleiten, Wiederholung persönlicher Nachrichten und eine gemeinsame Batteriemessung für alle Boards.</p>
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.35u.09.28-neo</div>
-      <h2>Auf 4.35u nachgezogen, und der Haken kommt jetzt an</h2>
-      <p>Upstream hat am 27.09. das offizielle 4.35u veröffentlicht; dieser Stand trägt dessen Code
-      vollständig, ohne upstream zu mergen: den BLE-Timeout von 4 Sekunden (#1171), das RX-Log mit der
-      ältesten Zeile oben (#1169), <code>--setcall</code> ohne unnötigen Neustart (#1165) und die
-      Netzkonsole im Ethernet-Betrieb (#1166). Dazu vier eigene Korrekturen: Quittiert ein Relais oder
-      Gateway eine wiederholte persönliche Nachricht, kommt der Haken jetzt in der App an und die
-      Wiederholung hört auf — offiziell 4.35u hat diesen Fehler noch, angeboten als
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">PR #1176</a>. Und nach dem
-      Verbinden kommen alle Einstellungen in der App an, auch auf den Boards mit kleinem Kommandoring.</p>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35u.09.28-neo">Release v4.35u.09.28-neo</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
+      <div class="eyebrow">Neu · Release v4.35v.09.29-neo</div>
+      <h2>BLE verliert nichts mehr, und der Akku misst überall gleich</h2>
+      <p>Offizielles 4.35v vollständig (DL-Internetserver, WIDE1-1 im Track-Beacon, Einmal-Position ohne
+      TRACK). Dazu: Lehnt der BLE-Stack einen Rahmen ab, bleibt er liegen und wird wiederholt statt still zu
+      verschwinden; <code>--info</code> zählt es mit. Ein gemeinsamer Filter und ein Prozentverlauf für alle
+      Boards ersetzen zwei auseinandergelaufene Dateien – beim Heltec V3 ohne Akku bleibt die rote LED nicht
+      mehr 30 Sekunden an. Nach 49,7 Tagen Laufzeit löschte der Überlauf von <code>millis()</code> die
+      Nachbarschaftsmatrix; gefunden mit einem Teleport-Test, behoben. Der RAK4631 belegt mit
+      <code>-Os</code> nur noch 69 % Flash.</p>
+      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35v.09.29-neo">Release v4.35v.09.29-neo</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
@@ -82,12 +81,12 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
       <h2>Web-Flasher: neo direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.35u.09.28-neo mit Nachbarschaftsmatrix,
-      Speichern-und-Weiterleiten und PN-Wiederholung per XOR-Kennung – ohne Installation und ohne esptool:
+      <p>Das aktuelle Release per USB auf den Knoten – v4.35v.09.29-neo mit Nachbarschaftsmatrix,
+      Speichern-und-Weiterleiten, PN-Wiederholung und gemeinsamer Batteriemessung – ohne Installation und ohne esptool:
       Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
       am Knoten erkannt. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
       und Opera auf dem Desktop.</p>
-      <div class="meta">v4.35u.09.28-neo · Web Serial</div>
+      <div class="meta">v4.35v.09.29-neo · Web Serial</div>
     </a>
   </div>
 
