@@ -616,6 +616,7 @@ static void vBlankRow(NbrMatrix &m, int i)
     m.row[i].lon16 = 0x7FFF;
     m.row[i].ext = 0xFF;
     m.call[i] = 0;
+    m.gw_min[i] = 0;
 }
 
 bool nbrLoad(NbrMatrix &m, const uint8_t *buf, size_t len, uint32_t now_epoch, uint16_t now_min)
@@ -661,6 +662,15 @@ bool nbrLoad(NbrMatrix &m, const uint8_t *buf, size_t len, uint32_t now_epoch, u
             }
             if (i == 0 && !vRebase(&r.last_min, saved_min, elapsed, now_min))
                 r.last_min = now_min;
+            // Gateway-Flag fremder Zeilen wird nicht wiederhergestellt: der
+            // Verfallszeitgeber (gw_min) ist nicht im Abbild, ein gesetztes Flag
+            // wuerde zufaellig gehalten oder verfallen. Ein Gateway wird mit seinem
+            // naechsten HG neu gelernt. Zeile 0 behaelt ihr Flag (bGATEWAY).
+            if (i > 0)
+            {
+                r.flags &= (uint8_t)~NBR_FLAG_GW;
+                m.gw_min[i] = 0;
+            }
             if (!vRebase(&r.rpt_min, saved_min, elapsed, now_min))
             {
                 r.rpt_min = 0;

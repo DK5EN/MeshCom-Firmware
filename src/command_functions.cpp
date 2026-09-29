@@ -106,6 +106,7 @@ extern TinyGPSPlus gps;
 #endif
 #endif
 #include "test_inject.h"
+#include "loop_breadcrumb.h"   // F3: --info ...BOOT line
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -297,6 +298,10 @@ static void tg_post_811_off() { mcu811_found = false; }
 // against the *sset mask write / save_settings(), neither of which
 // resetExternUDP() depends on.
 static void tg_post_extudp_off() { resetExternUDP(); }
+// F6: the HEY destination ("HG" vs "H") is how neighbours learn the gateway
+// flag. Web ("--gateway %s") and BLE reach this row through commandAction()
+// too, so this one hook covers serial, BLE and web.
+static void tg_post_gateway() { heyGatewayChanged(); }
 #if defined BOARD_T5_EPAPER
 static void tg_post_t5_on() { disp_next_power(true); }
 static void tg_post_t5_off() { disp_next_power(false); }
@@ -386,8 +391,8 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--nomsgall off",       &bNoMSGtoALL,          &meshcom_settings.node_sset3,    0xFFFFFFFD,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
     { "--nopmother on",       nullptr,               &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x8000,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
     { "--nopmother off",      nullptr,               &meshcom_settings.node_sset3,    0xFFFF7FFF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
-    { "--gateway on",         &bGATEWAY,             &meshcom_settings.node_sset,     0xFFFFFFFF,   0x1000,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
-    { "--gateway off",        &bGATEWAY,             &meshcom_settings.node_sset,     0xFFFFEFFF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
+    { "--gateway on",         &bGATEWAY,             &meshcom_settings.node_sset,     0xFFFFFFFF,   0x1000,       tg_post_gateway,               TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
+    { "--gateway off",        &bGATEWAY,             &meshcom_settings.node_sset,     0xFFFFEFFF,   0x00000000,   tg_post_gateway,               TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
     { "--ackinfo on",         &bAckInfo,             nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--ackinfo off",        &bAckInfo,             nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     { "--webserver off",      &bWEBSERVER,           &meshcom_settings.node_sset2,    0xFFFFFFBF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
@@ -6126,6 +6131,11 @@ void commandAction(char *umsg_text, bool ble)
                 (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone,
                 (bNBRSYM?"on":"off"),
                 (bNBRRPTOFF?"off":(bNBRRPTON?"on":"auto")));
+
+            #if defined(ESP32)
+            // F3: why the node last booted, readable over the net console too.
+            printfdeb("...BOOT %s\n", loopCrumbBootSummary());
+            #endif
             
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));

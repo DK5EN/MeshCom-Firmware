@@ -670,6 +670,20 @@ static void nbrMhLiveAfter(const char *last_hop, const NbrMhEdgeMark &before, ui
     mhPhoneLive(row, now_min);
 }
 
+// F6 (docs/soak-20260928-verdict.md Finding 6): the HEY destination tells the
+// neighbours whether the originator is a gateway. "HG" = yes, "H" = no, any
+// other frame (HN report, text, position) says nothing about it.
+static NbrGwHint nbrGwHintFromDest(char payload_type, const char *dest)
+{
+    if(payload_type != '@')
+        return NBR_GW_UNKNOWN;
+    if(is_equ(dest, "HG"))
+        return NBR_GW_YES;
+    if(is_equ(dest, "H"))
+        return NBR_GW_NO;
+    return NBR_GW_UNKNOWN;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
@@ -1011,13 +1025,16 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                            (float)meshcom_settings.node_lon, bMESH, 0, now_min_hn);
             if(bGATEWAY)
                 nbrRowSetFlag(nbrMatrix, 0, NBR_FLAG_GW);
+            else
+                nbrRowClearFlag(nbrMatrix, 0, NBR_FLAG_GW);   // F6: --gateway off
 
             // Welle 4: Kantenminute des letzten Hops vor dem Rahmen (Live-MH).
             NbrMhEdgeMark hn_edge_before = nbrMhEdgeBefore(aprsmsg.msg_source_last);
 
-            nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
-                         aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
-                         rssi, snr, now_min_hn);
+            nbrNoteFrameGw(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
+                           aprsmsg.msg_payload,
+                           nbrGwHintFromDest(aprsmsg.payload_type, aprsmsg.msg_destination_path),
+                           rssi, snr, now_min_hn);
 
             // W3b: Direkt-Slot fuer den HN-Bericht selbst (Konzept 4.6) --
             // HN traegt nie eine Position (payload_type ist immer '@'), also
@@ -1069,8 +1086,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // koennte (relevant=0, msg_id=0 -- das unterdrueckt jede
             // SYM-COVER-Zeile hier, die eigentliche, slotgenaue Maske
             // rechnet die Schleife unten je Slot neu).
-            NbrMask cover_gate = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
-                                               bNBRSYM, nbrMaskNone(), 0, NULL);
+            // F7: nbrCopyMask() = listeners of the relayer PLUS the relayer
+            // itself -- it transmitted this copy, so it has the frame.
+            NbrMask cover_gate = nbrCopyMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                              bNBRSYM, nbrMaskNone(), 0, NULL);
 
             // Relayer unbekannt (keine Zeile/keine frischen Hoerer) -> nichts
             // zu entscheiden (Konzept 5.2).
@@ -1125,8 +1144,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // wenn ihr Bit auch in diesem Bedarf steht -- sonst
                         // waere die Annahme fuer diesen Slot folgenlos.
                         NbrMask slot_inferred = nbrMaskNone();
-                        NbrMask cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
-                                                      bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
+                        NbrMask cover = nbrCopyMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                                     bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
 
                         NbrMask nbr_before = ringNeed[nbr_i];
                         ringNeed[nbr_i] = nbrMaskAndNot(ringNeed[nbr_i], cover);
@@ -1253,6 +1272,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                (float)meshcom_settings.node_lon, bMESH, 0, now_min);
                 if(bGATEWAY)
                     nbrRowSetFlag(nbrMatrix, 0, NBR_FLAG_GW);
+                else
+                    nbrRowClearFlag(nbrMatrix, 0, NBR_FLAG_GW);   // F6: --gateway off
 
                 // Trefferzahl (frueher "[NBR] hits=%d path=%s" hinter bLORADEBUG)
                 // ist im neuen EDGE/ME/CUT/DROP-Format (docs/nbr-logformat.md,
@@ -1262,9 +1283,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // Welle 4: Kantenminute des letzten Hops vor dem Rahmen (Live-MH).
                 NbrMhEdgeMark edge_before = nbrMhEdgeBefore(aprsmsg.msg_source_last);
 
-                nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
-                             aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
-                             rssi, snr, now_min);
+                nbrNoteFrameGw(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
+                               aprsmsg.msg_payload,
+                               nbrGwHintFromDest(aprsmsg.payload_type, aprsmsg.msg_destination_path),
+                               rssi, snr, now_min);
 
                 // W3b (docs/meshcom5-campaign.md Welle 3): Direkt-Slot-Grundgeruest
                 // fuer denselben Rahmen. Position/Hoehe kommen erst unten aus dem
@@ -1636,8 +1658,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                             // 0.3/0.4: peer ACK for an own DM, plus the RTT sample
                                             // for the send-to-ack histogram (M0-1).
-                                            dmstat_peer_ack.fetch_add(1);
-                                            dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis());
+                                            // F1: count only the first ACK per own DM
+                                            // (the server path may have delivered it already).
+                                            if(dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
+                                                dmstat_peer_ack.fetch_add(1);
 
                                             // BUG #8 fix: clear ringBuffer entry to stop retransmission.
                                             // findAndStopRingSlot() compares pnRetryCore(), so this also
@@ -2879,10 +2903,13 @@ bool doTX()
 
                     setlogPrintTx(setlog_tx_buf);   // SL-03
 
-                    // 0.4: one transmission of a DM ring slot, first send or
+                    // 0.4/F4: one transmission of an OWN DM ring slot, first send or
                     // retry alike (dmstat_attempts counts both, per its
-                    // dm_stats.h doc comment).
-                    if(ringBuffer[save_read][2] == MSG_TYPE_TEXT)
+                    // dm_stats.h doc comment). Relayed foreign texts, own group
+                    // messages/broadcasts and our own :ackNNN sends do not
+                    // count (pnFrameIsOwnPn: PN-shaped, our node id, our call).
+                    if(ringBuffer[save_read][2] == MSG_TYPE_TEXT &&
+                       pnFrameIsOwnPn(lora_tx_buffer, (uint16_t)sendlng, _GW_ID, meshcom_settings.node_call))
                         dmstat_attempts.fetch_add(1);
 
                     if(bDisplayInfo)
@@ -3112,7 +3139,7 @@ bool updateRetransmissionStatus()
                         if(ringBuffer[ircheck][iq] >= 0x20 && ringBuffer[ircheck][iq] <= 0x7F)
                             printfdeb("%c", ringBuffer[ircheck][iq]);
                     }
-                    printfdeb("");
+                    printfdeb("\n");
                 }
 
                 // PN-Wiederholung (XOR, pn_retry.h): eigene PN-Kopie bekommt

@@ -1201,6 +1201,87 @@ void test_load_rejects_foreign_header_clockless_and_other_node(void)
     free(buf);
 }
 
+
+// --- 11b: Gateway-Flag und Sicherung (F6) -------------------------------------------------------------
+
+// Das Abbild traegt den Verfallszeitgeber gw_min nicht: ein gesetztes Flag einer
+// fremden Zeile kaeme zufaellig gehalten oder verfallen zurueck. nbrLoad() loescht
+// es darum auf jeder fremden Zeile (nur ein neues HG lehrt es wieder); Zeile 0
+// behaelt ihr Flag (der Aufrufer setzt es aus bGATEWAY), der Rest der Zeile bleibt.
+void test_load_clears_foreign_gateway_flag_keeps_row_zero_and_the_rest(void)
+{
+    const uint32_t E = 1759000000u;
+    NbrMatrix *ap = mk(0);
+    NbrMatrix &a = *ap;
+    nbrSetClock(a, E, 500);
+    nbrNoteFrameGw(a, "DL1GWY-1", '@', "R0;", NBR_GW_YES, -90, -3, 490);
+    heard(a, "DL1AAA-1", 495, -5);
+    nbrRowSetFlag(a, 0, NBR_FLAG_GW);
+    int g = nbrFind(a, "DL1GWY-1");
+    TEST_ASSERT_TRUE(g > 0);
+    TEST_ASSERT_TRUE(nbrRowHasFlag(a, g, NBR_FLAG_GW));
+
+    uint8_t *buf = (uint8_t *)malloc(nbrSaveSize());
+    TEST_ASSERT_EQUAL_UINT32(nbrSaveSize(), nbrSave(a, E, 500, buf, nbrSaveSize()));
+    // Ein Ziel mit alten Resten im Zeitgeber: nach dem Laden darf keiner uebrig sein.
+    NbrMatrix *bp = (NbrMatrix *)calloc(1, sizeof(NbrMatrix));
+    NbrMatrix &b = *bp;
+    memset(b.gw_min, 0xA5, sizeof(b.gw_min));
+    TEST_ASSERT_TRUE(nbrLoad(b, buf, nbrSaveSize(), E + 600u, 15));
+    int gb = nbrFind(b, "DL1GWY-1");
+    TEST_ASSERT_TRUE(gb > 0);                                   // Zeile selbst ist zurueck
+    TEST_ASSERT_FALSE(nbrRowHasFlag(b, gb, NBR_FLAG_GW));       // Flag nicht
+    TEST_ASSERT_TRUE(nbrRowHasFlag(b, gb, NBR_FLAG_USED));
+    TEST_ASSERT_EQUAL_UINT8(0, b.gw_min[gb]);
+    TEST_ASSERT_TRUE(nbrRowHasFlag(b, 0, NBR_FLAG_GW));          // Zeile 0 behaelt es
+    TEST_ASSERT_TRUE(nbrFind(b, "DL1AAA-1") > 0);
+    NbrEdgeView ev;
+    TEST_ASSERT_TRUE(nbrEdgeGet(b, gb, 0, &ev));                 // Kante zur Zeile erhalten
+    // Neues HG lehrt es wieder.
+    nbrNoteFrameGw(b, "DL1GWY-1", '@', "R0;", NBR_GW_YES, -90, -3, 16);
+    TEST_ASSERT_TRUE(nbrRowHasFlag(b, gb, NBR_FLAG_GW));
+    free(buf);
+    free(bp);
+    free(ap);
+}
+
+// Viele Gateways verfallen in EINEM Sweep (mehr als ein Stapel): jede EXP-Zeile
+// traegt das Rufzeichen ihrer Zeile, keine fehlt. Die Kopie des Rufzeichens entsteht
+// unter derselben Klammer wie die Verfallsentscheidung (nbrIGwExpire()); eine
+// Verdraengung zwischen Klammer und Log ist auf dem Host nicht ausloesbar (ein
+// Task, keine Klammer) und darum hier nicht als Wettlauf, sondern ueber die
+// Stapelgrenze geprueft.
+void test_gw_expiry_logs_every_lapsed_row_with_its_own_call(void)
+{
+#if NBR_GW_HOLD_MIN == 45 && NBR_MAX_ROWS >= 14
+    NbrMatrix *mp = mk(100);
+    NbrMatrix &m = *mp;
+    char call[16];
+    for (int k = 0; k < 12; k++)
+    {
+        snprintf(call, sizeof(call), "DL1G%02d-1", k);
+        nbrNoteFrameGw(m, call, '@', "R0;", NBR_GW_YES, -90, -3, 100);
+        TEST_ASSERT_TRUE(nbrRowHasFlag(m, nbrFind(m, call), NBR_FLAG_GW));
+    }
+    logstart();
+    nbrSweep(m, 100 + 44);
+    TEST_ASSERT_EQUAL_INT(0, count_substr(g_log, "|EXP"));
+    nbrSweep(m, 100 + 45);
+    TEST_ASSERT_EQUAL_INT(12, count_substr(g_log, "|0|EXP\n"));
+    for (int k = 0; k < 12; k++)
+    {
+        char want[64];
+        snprintf(want, sizeof(want), "[NBR]|GW|145|DL1G%02d-1|0|EXP\n", k);
+        TEST_ASSERT_NOT_NULL(strstr(g_log, want));
+        snprintf(call, sizeof(call), "DL1G%02d-1", k);
+        TEST_ASSERT_FALSE(nbrRowHasFlag(m, nbrFind(m, call), NBR_FLAG_GW));
+    }
+    free(mp);
+#else
+    TEST_IGNORE_MESSAGE("needs 45 min hold and >= 14 rows");
+#endif
+}
+
 // --- 12: leere Matrix -------------------------------------------------------------------------------
 
 void test_zero_initialised_matrix_is_safe_for_every_new_function(void)
@@ -1309,6 +1390,8 @@ void test_size_table_per_part(void)
         {"echo", sizeof(NbrMatrix::echo_id) + sizeof(NbrMatrix::echo_first) + sizeof(NbrMatrix::echo_second) +
                      sizeof(NbrMatrix::echo_min) + sizeof(NbrMatrix::echo_type),
          4u * (4u + 8u * W + 8u * W + 2u)},
+        // Gateway-Zeitgeber (F6): ein Byte je Zeile, nicht im Abbild (nbrSave()).
+        {"gw", sizeof(NbrMatrix::gw_min), 1u * NBR_MAX_ROWS},
     };
     size_t sum = 0, msum = 0;
     printf("\n[nbr_views] size table R=%d E=%d X=%d H=%d W=%d (ours / build.py)\n", NBR_MAX_ROWS, NBR_MAX_EDGES,
@@ -1384,6 +1467,8 @@ int main(int, char **)
     RUN_TEST(test_set_clock_and_boot_epoch_survive_init_and_reset);
     RUN_TEST(test_save_load_round_trip_across_reboot);
     RUN_TEST(test_load_rejects_foreign_header_clockless_and_other_node);
+    RUN_TEST(test_load_clears_foreign_gateway_flag_keeps_row_zero_and_the_rest);
+    RUN_TEST(test_gw_expiry_logs_every_lapsed_row_with_its_own_call);
     RUN_TEST(test_zero_initialised_matrix_is_safe_for_every_new_function);
     RUN_TEST(test_private_xcounts_equal_row_mesh_need_count);
     RUN_TEST(test_size_table_per_part);

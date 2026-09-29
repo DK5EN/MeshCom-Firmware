@@ -135,6 +135,12 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *src_override = nullptr);
 void sendHey();
 bool sendHeyShot();
+// F6 (hey_policy.h): true = skip this trickle HEY. Non-gateways: consistent >= k
+// as before; a gateway is never suppressed once its last own HEY is >= Imax old.
+bool heyTrickleSuppress(int consistent);
+// F6: --gateway on/off -- reset the trickle to Imin and announce the new state
+// with a HEY at once (sendHeyShot(), 30 s floor).
+void heyGatewayChanged();
 // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): periodischer, von
 // sendHey() unabhaengiger Bericht "wen ich direkt hoere" an Ziel "HN",
 // max_hop 0. Der Aufrufer (esp32_main.cpp/nrf52_main.cpp) entscheidet Takt

@@ -2055,8 +2055,8 @@ void nrf52loop()
         }
         trickle_last_neighbor_count = current_neighbors;
 
-        // Trickle suppression
-        if(trickle_consistent_count >= TRICKLE_K)
+        // Trickle suppression; F6: a gateway keeps sending at least one HG per Imax.
+        if(heyTrickleSuppress(trickle_consistent_count))
         {
             if(bDisplayInfo)
                 Serial.printf("[MC-TRICKLE] SUPPRESS consistent=%d interval=%lums\n",

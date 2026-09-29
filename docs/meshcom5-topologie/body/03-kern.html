@@ -159,9 +159,9 @@ static_assert(NBR_MAX_ROWS &lt;= 64 * NBR_MASK_WORDS, "Zeilenindex passt nicht i
 
 Direkt     = hears[ich]                                // Kante (x, ich): ich habe x gehoert
 HoertMich  = heardBy[ich]                              // Kante (ich, x): x hat mich gehoert
-D          = (Direkt | HoertMich) &amp; ~GW &amp; ~ich                   // Abhaengige
+D          = (Direkt | HoertMich) &amp; ~GW &amp; ~ich                   // Abhaengige; GW verfaellt 45 min nach dem letzten HG
 Pfad       = OR bit(p) fuer p im Pfad
-HatF       = Pfad | OR heardBy(p) fuer p im Pfad
+HatF       = Pfad | OR deckt(p) fuer p im Pfad          // mit Anteil, wie bei gedeckt; ein Streutreffer macht y nicht zu "hat den Frame"
 need       = D &amp; ~HatF
 Versorger  = Direkt &amp; HatF &amp; ~angenommen
 gedeckt    = OR deckt(M) fuer M in Versorger        // deckt(M): Stationen, die M mit Anteil hoert, 4.3
@@ -170,7 +170,7 @@ alone      = need &amp; ~gedeckt                         // Fall A, wenn != 0
 <p>Kosten je Relay-Entscheidung: heute bis zu rund 600 Zellzugriffe mit Frischetest bei 21 Zeilen, auf Masken Pfadlänge plus zweimal N Wortoperationen, bei 128 Zeilen unter 300. Die static_assert-Zeile ersetzt die heutige stille Kappung, bei der nbrBit() ab Index 32 die Maske 0 liefert. ringNeed[] und ringAlone[] werden NbrMask und kosten @@RINGS_C@@ Byte klassisch und @@RINGS_S@@ Byte auf S3 und nRF52 statt 160 Byte; test_txring schreibt sie heute als uint32_t und wird mit umgestellt.</p>
 
 <h3>4.3 Deckung und Rollen</h3>
-<p class="reco">Entscheidung: Ein Nachbar M deckt eine Station x nur, wenn sein Kantenzähler für x mindestens 10 % des Zählers des stärksten direkten Hörers von x erreicht. Die Regel gilt für #X, die Rollen, die Deckung in der Relay-Entscheidung und die Via-Wahl.</p>
+<p class="reco">Entscheidung: Ein Nachbar M deckt eine Station x nur, wenn sein Kantenzähler für x mindestens 10 % des Zählers des stärksten direkten Hörers von x erreicht. Die Regel gilt für #X, die Rollen, HatF ("hat den Frame schon") und die Deckung in der Relay-Entscheidung sowie die Via-Wahl.</p>
 <p>Das ist die Ursache dafür, dass DB0ED-99 im Live-Bild redundant erscheint. DB0ED-99 trägt DB0FHR-12 praktisch allein: in den letzten 9,5 h des Mitschnitts meldete es 347 Kanten-Treffer für DB0FHR-12, DL2JA-2 genau einen. Die heutige Regel zählt jede Zelle mit mindestens einem Treffer im 12-h-Fenster als Deckung. Der Super-Node DL2JA-2 mit 19 Hörern sammelt über Stunden für fast jede Station einen Streutreffer, und nach sechs bis neun Stunden Laufzeit hat DB0ED-99 keine exklusive Station mehr. Der Code ist seit Stufe 1 unverändert, auch der OTA vom 24.09. 23:15 änderte nur Ping und Pong. Früher sah es richtig aus, weil DK5EN-98 zwischen dem 21. und 23.09. fünfmal neu geflasht wurde und die Matrix nie alt wurde; seit dem 24.09. 23:17 läuft sie ohne Neustart.</p>
 
 <figure>
@@ -198,7 +198,8 @@ alone      = need &amp; ~gedeckt                         // Fall A, wenn != 0
 <ul>
 <li>#X(N) zählt die Stationen, die N mit Anteil hört und die weder ich direkt noch ein anderer direkter Nachbar mit Anteil hört. Super-Node ist der direkte Nachbar mit dem größten #X, wenn #X mindestens 2 und mindestens doppelt so groß wie das zweitgrößte ist; nötig heißt #X mindestens 1, redundant #X gleich 0. Eigene Blätter E_self sind direkt gehörte Stationen, die kein anderer direkter Nachbar mit Anteil hört.</li>
 <li>Die rohe Nachbarzahl #N taugt nicht als Rang: DB0ED-99 hört zehn Stationen, aber fast alle hört auch DL2JA-2.</li>
-<li>Die Anteilsregel verschiebt die Relay-Entscheidung in die sichere Richtung: eine Station, die heute ein Streutreffer deckt, zählt künftig als allein und führt zu Fall A statt zu einem Abbruch.</li>
+<li>Die Anteilsregel verschiebt die Relay-Entscheidung in die sichere Richtung: eine Station, die heute ein Streutreffer deckt, zählt künftig als allein und führt zu Fall A statt zu einem Abbruch. Das gilt auch für HatF: ein einzelner Treffer "y hat p gehört" gegen den stärksten direkten Hörer von p macht y nicht zu einem, der den Frame schon hat; y bleibt im Bedarf, im Zweifel wird relayt.</li>
+<li>Das Gateway-Flag hängt am letzten HEY des Absenders: ein HEY an "HG" setzt es, ein HEY an "H" löscht es, jeder andere Rahmen (HN-Bericht, Text, Position) lässt es stehen. Ohne neues HG verfällt es nach 45 Minuten, dem Dreifachen des längsten Trickle-Intervalls von 15 Minuten; ein Gateway sendet deshalb mindestens alle 15 Minuten ein HG. Zeile 0 folgt dem eigenen Schalter und verfällt nie. Jede Änderung steht als [NBR]|GW-Zeile im Log.</li>
 <li>Die Web-Seite zeigt neben #X die Zähler, damit eine knappe Entscheidung sichtbar ist.</li>
 </ul>
 

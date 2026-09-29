@@ -13,6 +13,7 @@
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
 #include "beacon_rate.h"
+#include "hey_policy.h"     // F6: gateway keeps its HG alive through trickle suppression
 #include "nbr_views.h"
 #include "command_functions.h"
 
@@ -4165,7 +4166,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         // check no message to own-call
         if(strDestinationCall.compareTo(meshcom_settings.node_call) == 0)
         {
-            printfdeb("[ERROR]...DM to own-all not allowed");
+            printfdeb("[ERROR]...DM to own-all not allowed\n");
             return BP_SEND_INVALID;
         }
     }
@@ -4544,7 +4545,7 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
 
     if(lat >= 0.0 && lat <= 2.0 && lon >= 0.0 && lon <= 2.0)
     {
-        printfdeb("[APRS] Error PositionToAPRS");
+        printfdeb("[APRS] Error PositionToAPRS\n");
         return "";
     }
 
@@ -5293,6 +5294,30 @@ unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *s
     return aprsmsg.msg_id;
 }
 
+// F6: last own HEY sent by sendHey() -- see heyTrickleSuppress().
+static uint32_t hey_own_last_ms = 0;
+static bool hey_own_have = false;
+
+// F6: trickle suppression decision for esp32_main.cpp / nrf52_main.cpp. A gateway
+// is not suppressed once its own last HEY is >= TRICKLE_IMAX_S old (hey_policy.h).
+bool heyTrickleSuppress(int consistent)
+{
+    return heyShouldSuppress(consistent, TRICKLE_K, bGATEWAY,
+                             heySinceLastOwn((uint32_t)millis(), hey_own_last_ms, hey_own_have),
+                             (uint32_t)TRICKLE_IMAX_S * 1000UL);
+}
+
+// F6: --gateway on/off changed the HG/H flag other nodes learn from our HEY.
+// Restart the trickle at Imin and announce the new state now; sendHeyShot()
+// applies the 30 s floor of the FL-02 path.
+void heyGatewayChanged()
+{
+    trickle_interval_ms = TRICKLE_IMIN_S * 1000UL;
+    trickle_consistent_count = 0;
+    heyinfo_timer = millis();
+    sendHeyShot();
+}
+
 // Send Hey-Message
 void sendHey()
 {
@@ -5331,6 +5356,12 @@ void sendHey()
         printBuffer_aprs((char*)"NEW-HEY", aprsmsg);
         printfdeb("");
     }
+
+    // F6: time of the last own HEY (trickle path AND shot path), for
+    // heyTrickleSuppress(). Separate from lastOwnHeyTx, which only gates the
+    // --sendhey shot and must keep that meaning.
+    hey_own_last_ms = millis();
+    hey_own_have = true;
 
     // store last message to compare later on
     insertOwnTx(aprsmsg.msg_id);

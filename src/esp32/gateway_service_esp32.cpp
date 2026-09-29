@@ -43,7 +43,7 @@ if(bGATEWAY && meshcom_settings.node_hasIPaddress)
                 // WiFi actually down → reset immediately, don't wait
                 if (!wifi_ok)
                 {
-                    printfdeb("[UDP] WiFi down — resetting");
+                    printfdeb("[UDP] WiFi down — resetting\n");
                     resetMeshComUDP();
                     last_upd_timer = millis();
                     hb_warn_logged = false;

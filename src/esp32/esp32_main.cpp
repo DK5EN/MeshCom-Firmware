@@ -16,6 +16,7 @@
 #include "dedup_functions.h"
 #include "ntp_async.h"      // NTP-01: isPending() haelt das GPS-Gate fuer --ntpsync offen
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#include "loop_breadcrumb.h" // F3: always-on LAST_LOOP_SECTION breadcrumb for TASK_WDT forensics
 #include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <RadioLib.h>
@@ -851,6 +852,22 @@ void esp32setup()
             esp_sleep_source_t wc = esp_sleep_get_wakeup_cause();
             Serial.printf("[BOOT] WAKE_CAUSE=%d %s\n", (int)wc, wakeCauseName(wc));
         }
+    }
+    // F3: where was the loop task when the previous boot ended? Unconditional
+    // (raw Serial, not behind --debug), printed once, record cleared by the read.
+    {
+        char crumb[64];
+        char summary[LOOPCRUMB_SUMMARY_LEN];
+        esp_reset_reason_t rr = esp_reset_reason();
+        int n = snprintf(summary, sizeof(summary), "RESET_REASON=%d %s", (int)rr, resetReasonName(rr));
+        if (loopCrumbTakeReport(crumb, sizeof(crumb)))
+        {
+            Serial.println(crumb);
+            const char *c = (strncmp(crumb, "[BOOT] ", 7) == 0) ? crumb + 7 : crumb;
+            if (n > 0 && (size_t)n < sizeof(summary))
+                snprintf(summary + n, sizeof(summary) - (size_t)n, " %s", c);
+        }
+        loopCrumbSetBootSummary(summary);   // shown by --info (net console readers)
     }
 #if INSTRUMENT_ENABLED
     instrument_report_prev_boot();   // CDC-01: loop gaps of the previous boot, from RTC memory
@@ -2620,7 +2637,7 @@ void esp32loop()
                 // DIO triggered while reception is ongoing
                 // that means we got a packet
 
-                { INSTR_SECTION("lora_rx"); checkRX(bRadio); }
+                { INSTR_SECTION("lora_rx"); LOOP_SECTION(LSEC_LORA_RX); checkRX(bRadio); }
 
                 // FIX BUG #2: checkRX() now restarts RX internally.
                 // Remove redundant interrupt rewiring that would double-reconfigure.
@@ -2777,13 +2794,13 @@ void esp32loop()
                 radio.clearPacketReceivedAction();
 
                 if(bLORADEBUG)
-                    printfdeb("[CHECK] radio.scanChannel() / 1");
+                    printfdeb("[CHECK] radio.scanChannel() / 1\n");
 
                 // CAD Scan 1
                 #if defined(BOARD_T_ETH_ELITE)
                 int cad_result = RADIOLIB_CHANNEL_FREE; //!!!!!!!!!!!!!! ACHTUNG !!!!!!!!!!!!!!!! muss raus
                 if(bLORADEBUG)
-                    printfdeb("[CHECK] T_ETH_ELITE BUG please fixit");
+                    printfdeb("[CHECK] T_ETH_ELITE BUG please fixit\n");
                 #else
                 int cad_result = radio.scanChannel();
                 #endif
@@ -2802,7 +2819,7 @@ void esp32loop()
                         printfdeb("[MC-DBG] CAD_BUSY_1 attempt=%d, double-check...\n", cad_attempt);
 
                     if(bLORADEBUG)
-                        printfdeb("[CHECK] radio.scanChannel() / 2");
+                        printfdeb("[CHECK] radio.scanChannel() / 2\n");
 
                     cad_result = radio.scanChannel();
                     if(bLORADEBUG)
@@ -3090,6 +3107,7 @@ void esp32loop()
     if(meshcom_settings.node_netmode == 0 && (uint32_t)(millis() - wifi_active_timer) >= 30000)
     {
         INSTR_SECTION("wifi_ping");
+        LOOP_SECTION(LSEC_WIFI_PING);
         if(!checkWifiPing())
         {
             if(ifalseping > 0)
@@ -3235,7 +3253,7 @@ void esp32loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
-            { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data); }
+            { INSTR_SECTION("ble_cmd"); LOOP_SECTION(LSEC_BLE_CMD); readPhoneCommand(bleItem.data); }
         }
     }
 
@@ -3351,7 +3369,7 @@ void esp32loop()
     }
 
     #ifdef ENABLE_GPS
-    if (bGPSON && gpsDetected) { INSTR_SECTION("gps_feed"); WZ_GPS_Feed(); }
+    if (bGPSON && gpsDetected) { INSTR_SECTION("gps_feed"); LOOP_SECTION(LSEC_GPS); WZ_GPS_Feed(); }
     #endif
 
     if ((uint32_t)(millis() - gps_refresh_timer) >= ((unsigned long)gps_refresh_intervall * 1000))
@@ -3384,7 +3402,7 @@ void esp32loop()
             #if defined (ENABLE_GPS)
                 if(gpsDetected)
                 {
-                    { INSTR_SECTION("gps"); igps = WZ_GPS_Loop(); }
+                    { INSTR_SECTION("gps"); LOOP_SECTION(LSEC_GPS); igps = WZ_GPS_Loop(); }
                     
                     if(iGPSDEBUG > 0)
                     {
@@ -3596,7 +3614,8 @@ void esp32loop()
         trickle_last_neighbor_count = current_neighbors;
 
         // Trickle suppression: skip HEY if enough consistent HEYs heard
-        if(trickle_consistent_count >= TRICKLE_K)
+        // F6: a gateway keeps sending at least one HG per Imax (hey_policy.h).
+        if(heyTrickleSuppress(trickle_consistent_count))
         {
             if(bLORADEBUG)
                 printfdeb("[MC-TRICKLE] SUPPRESS consistent=%d>=k=%d interval=%lums neighbors=%d\n",
@@ -3679,7 +3698,7 @@ void esp32loop()
     }
 
     if(meshcom_settings.node_pingcall[0] == 0x00 || meshcom_settings.node_pingtime == 0 || meshcom_settings.node_pingcount == 0)
-        { INSTR_SECTION("display_tick"); mainStartTimeLoop(); }
+        { INSTR_SECTION("display_tick"); LOOP_SECTION(LSEC_DISPLAY); mainStartTimeLoop(); }
 
     #if not defined(BOARD_T_DECK_PRO)
     if(DisplayOffWait > 0)
@@ -3916,7 +3935,7 @@ void esp32loop()
     #endif
     
     // C4 carve-out: the gateway service block lives in gateway_service_esp32.cpp
-    gatewayService_esp32();
+    { LOOP_SECTION(LSEC_GATEWAY); gatewayService_esp32(); }
 
     if(bEXTUDP)
     {
@@ -3966,7 +3985,7 @@ void esp32loop()
                     }
                     else
                     {
-                        { INSTR_SECTION("wifi_connect"); doWiFiConnect(); }
+                        { INSTR_SECTION("wifi_connect"); LOOP_SECTION(LSEC_WIFI_CONNECT); doWiFiConnect(); }
 
                         if(iWlanWait > 20)
                         {
@@ -3974,7 +3993,7 @@ void esp32loop()
                             // retrying (auto-reconnect) and got_ip is harvested
                             // from the loop. No radio reset at boot (TM-34 §8).
                             iWlanWait = 0;
-                            printfdeb("[WIFI]...no join within 20 s, driver keeps retrying");
+                            printfdeb("[WIFI]...no join within 20 s, driver keeps retrying\n");
                             bAllStarted=true;
                         }
                     }
@@ -3997,6 +4016,8 @@ void esp32loop()
 
         if(bWEBSERVER && iWlanWait == 0)
         {
+            LOOP_SECTION(LSEC_WEB);   // F3: a blocked WiFiClient::write() lands here
+
             startWebserver();
 
             loopWebserver();
@@ -4068,7 +4089,7 @@ void esp32loop()
         tft_off();
     }
 
-    { INSTR_SECTION("lvgl"); lv_task_handler(); }
+    { INSTR_SECTION("lvgl"); LOOP_SECTION(LSEC_LVGL); lv_task_handler(); }
 
     #endif
 
@@ -4285,7 +4306,7 @@ int checkRX(bool bRadio)
             printfdeb("[MC-DBG] CRC_PAYLOAD[%d]: ", dump_len);
             for(int i = 0; i < dump_len; i++)
                 printfdeb("%02X ", payload[i]);
-            printfdeb("");
+            printfdeb("\n");   // F2: printfdeb appends no line end
         }
     }
     else
@@ -4324,7 +4345,7 @@ int checkRX(bool bRadio)
             printfdeb("[MC-DBG] ERR_PAYLOAD[%d]: ", dump_len);
             for(int i = 0; i < dump_len; i++)
                 printfdeb("%02X ", payload[i]);
-            printfdeb("");
+            printfdeb("\n");   // F2: printfdeb appends no line end
         }
     }
 

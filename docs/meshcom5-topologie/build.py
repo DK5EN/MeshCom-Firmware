@@ -64,7 +64,7 @@ CALL_B, CORE_B, EDGE_B, HZ_META = 8, 12, 6, 4
 
 def newsize(s):
     R, W, E, X, H = s['R'], s['W'], s['E'], s['X'], s['H']
-    d = dict(calls=CALL_B * R, core=CORE_B * R, masks=2 * W * R, edges=EDGE_B * E, ext=EXT_B * X,
+    d = dict(calls=CALL_B * R, core=CORE_B * R, gw=R, masks=2 * W * R, edges=EDGE_B * E, ext=EXT_B * X,   # gw: 1 B je Zeile, Gateway-Zeitgeber
              hz=(CALL_B + W + HZ_META) * H,
              hdr=2 + 2 + 4 + W + W + 4,          # boot_min, last_sweep, Bootepoche, D60, Via-Maske, Via-Zustand
              echo=4 * (4 + W + W + 2))           # 4 eigene Rahmen: msg_id, Maske erste Hand, zweite Hand, Minute
@@ -178,7 +178,7 @@ def svg_ram():
             x += w
         out.append(f'<text x="{x + 6:.1f}" y="{y + 14}" class="mono">{de(sum(segs))} B</text>')
         y2 = y + 24
-        segs = [n['calls'] + n['core'], n['masks'], n['edges'], n['ext'], n['hz'] + n['hdr'] + n['echo'], n['rings']]
+        segs = [n['calls'] + n['core'] + n['gw'], n['masks'], n['edges'], n['ext'], n['hz'] + n['hdr'] + n['echo'], n['rings']]
         x = x0
         out.append(f'<text x="{x0 - 8}" y="{y2 + 14}" text-anchor="end" class="t11">neu</text>')
         for (lab, col), v in zip(c_new, segs):
@@ -301,7 +301,7 @@ for k in FAM:
     T[f'NEWALL_{suf}'] = de(NET[k]['new_all'])
     T[f'NET_{suf}'] = de(NET[k]['net'])
 for k, suf in [('klassisch', 'C'), ('S3', 'S')]:
-    for f in ['calls', 'core', 'masks', 'edges', 'ext', 'hz', 'hdr', 'echo', 'rings']:
+    for f in ['calls', 'core', 'gw', 'masks', 'edges', 'ext', 'hz', 'hdr', 'echo', 'rings']:
         T[f'{f.upper()}_{suf}'] = de(NEW[k][f])
 T['FILE_S3'] = kb(NEW['S3']['total'] + 32)
 T['SHARE_DB0ED_ZERO'] = str(sum(1 for s in SERIES if (s.get('DB0ED-99|SHARE') or 0) == 0))

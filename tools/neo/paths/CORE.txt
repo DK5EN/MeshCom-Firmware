@@ -50,10 +50,13 @@ src/extern_msg_json.h
 src/extudp_functions.cpp
 src/extudp_functions.h
 src/gateway_service.h
+src/hey_policy.h
 src/instrument.h
 src/kiss_frame.cpp
 src/kiss_frame.h
 src/kiss_functions.cpp
+src/loop_breadcrumb.cpp
+src/loop_breadcrumb.h
 src/loop_functions.cpp
 src/loop_functions.h
 src/loop_functions_extern.h

@@ -395,9 +395,11 @@ test/test_getextern/stubs/nrf52/WisBlock-API.h
 test/test_getextern/test_getextern.cpp
 test/test_gps_filter/test_main.cpp
 test/test_gwflood_frames/test_gwflood_frames.cpp
+test/test_hey_policy/test_main.cpp
 test/test_hey_report/test_hey_report.cpp
 test/test_kbd_repeat/test_main.cpp
 test/test_kiss_frame/test_kiss_frame.cpp
+test/test_loop_breadcrumb/test_main.cpp
 test/test_loop_scheduler/stubs/configuration.h
 test/test_loop_scheduler/test_loop_scheduler.cpp
 test/test_lora_aprs_encode/test_lora_aprs_encode.cpp
@@ -420,9 +422,11 @@ test/test_nbr_replay/test_nbr_replay.cpp
 test/test_nbr_report/test_nbr_report.cpp
 test/test_nbr_views/test_nbr_views.cpp
 test/test_nbrlog/test_meshlogger_flags.py
+test/test_nbrlog/test_nbr_soak_fixes.py
 test/test_nbrlog/test_nbr_stage2_tools.py
 test/test_nbrlog/test_nbr_w2c_tools.py
 test/test_nbrlog/test_nm_symsum.py
+test/test_nbrlog/test_soakstatus_fixes.py
 test/test_nrf52_settings_paths/stubs/Adafruit_LittleFS.h
 test/test_nrf52_settings_paths/stubs/InternalFileSystem.h
 test/test_nrf52_settings_paths/stubs/lora_setchip.h

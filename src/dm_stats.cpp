@@ -59,7 +59,7 @@ void dmStatNoteSent(uint16_t nnn, uint32_t now_ms)
     dmstat_sent_next = (uint8_t)((dmstat_sent_next + 1) % DMSTAT_SENT_SLOTS);
 }
 
-void dmStatNoteAck(uint16_t nnn, uint32_t now_ms)
+bool dmStatNoteAck(uint16_t nnn, uint32_t now_ms)
 {
     for(int i = 0; i < DMSTAT_SENT_SLOTS; i++)
     {
@@ -68,9 +68,10 @@ void dmStatNoteAck(uint16_t nnn, uint32_t now_ms)
         {
             dmstat_rtt[dmStatRttBucket(now_ms - e->sent_ms)].fetch_add(1);
             e->used = false;
-            return;
+            return true;
         }
     }
+    return false;
 }
 
 int dmStatFormat(char *buf, size_t n)

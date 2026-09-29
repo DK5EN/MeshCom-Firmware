@@ -66,6 +66,7 @@
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
 #include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
+#include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 
 // ---------------------------------------------------------------------------
@@ -1632,6 +1633,89 @@ static void test_regression_server_ack_own_dm_stops_ring_on_both(void)
     }
 }
 
+// F1 (soak 2026-09-28 finding 1): a server-delivered ACK for an own DM must
+// feed the ack=/rtt= counters -- once per DM, RTT taken at the FIRST ack. The
+// gateway path used to skip dmStatNoteAck()/dmstat_peer_ack entirely, so a DM
+// acked only via the server showed ack=0 and no RTT sample. Red without the
+// hook in udp_frame_esp32.cpp/udp_frame_nrf52.cpp (peer_ack stays 0).
+// The LoRa path (lora_functions.cpp) is not built in this env; its half of
+// "a later ack for the same NNN counts nothing" is the dmStatNoteAck() == false
+// contract, pinned in test_dm_stats, which both call sites gate on.
+static void test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both(void)
+{
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack7", 0x7207);
+
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (7 & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        recorder_reset();
+        g_own_tx_known.push_back(expected_msg_id);
+
+        // Drain whatever earlier tests left in the DM counters.
+        char drain[256];
+        dmStatFormat(drain, sizeof(drain));
+
+        const uint32_t t0 = 100000;
+        dmStatNoteSent(7, t0);
+
+        // First server ack, 5 s after the send -> one count, RTT bucket 0.
+        mc_test_set_millis(t0 + 5000);
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: server ack for an own DM did not count ack=", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_peer_ack.load(), msg);
+        snprintf(msg, sizeof(msg), "%s: server ack for an own DM did not record an RTT sample", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_rtt[0].load(), msg);
+
+        // The same datagram again (server re-delivery, or a LoRa ack racing
+        // it): ring/holder handling repeats, the counters must not.
+        mc_test_set_millis(t0 + 30000);
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: a repeated server ack counted ack= a second time", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_peer_ack.load(), msg);
+        snprintf(msg, sizeof(msg), "%s: a repeated server ack added a second RTT sample", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, dmstat_rtt[0].load(), msg);
+        snprintf(msg, sizeof(msg), "%s: the repeated ack's late RTT landed in a later bucket", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, dmstat_rtt[1].load(), msg);
+
+        // An own-tx id that was never noted in the send table (sent before
+        // boot): the status handling runs, but no ack count and no sample.
+        dmStatFormat(drain, sizeof(drain));
+        recorder_reset();
+        g_own_tx_known.push_back(expected_msg_id);
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        snprintf(msg, sizeof(msg), "%s: an un-noted NNN counted ack=", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, dmstat_peer_ack.load(), msg);
+
+        // A foreign id (checkOwnTx() unknown): never counted.
+        dmStatNoteSent(7, t0);
+        recorder_reset();
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        snprintf(msg, sizeof(msg), "%s: an ack for a foreign id counted ack=", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, dmstat_peer_ack.load(), msg);
+
+        // Leave no noted NNN 7 behind for the next side / test.
+        dmStatNoteAck(7, t0);
+        dmStatFormat(drain, sizeof(drain));
+    }
+}
+
 // Wave 4 (docs/snf-port-campaign.md, port map Group B / 150b0a4a): a
 // server-ingress `:sto` custody notice for one of our own outgoing DMs must
 // be CONSUMED -- not displayed as a chat text, not relayed to the phone as
@@ -2364,6 +2448,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_conf_zero_address_guard_on_both);
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
     RUN_TEST(test_regression_server_ack_own_dm_stops_ring_on_both);
+    RUN_TEST(test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both);
     RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);

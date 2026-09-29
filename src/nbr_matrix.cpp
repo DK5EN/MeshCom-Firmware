@@ -80,7 +80,7 @@ static_assert(sizeof(NbrMatrix::echo_id) + sizeof(NbrMatrix::echo_first) +
               "Echo-Tabelle: 4 x (msg_id, zwei Masken, Minute)");
 static_assert(sizeof(NbrMatrix) <=
                   8u * NBR_MAX_ROWS + 12u * NBR_MAX_ROWS + 16u * NBR_MASK_WORDS * NBR_MAX_ROWS + 6u * NBR_MAX_EDGES +
-                      13u * NBR_EXT_SLOTS + (12u + 8u * NBR_MASK_WORDS) * NBR_HZ_ENTRIES + 10u +
+                      13u * NBR_EXT_SLOTS + NBR_MAX_ROWS + (12u + 8u * NBR_MASK_WORDS) * NBR_HZ_ENTRIES + 10u +
                       4u * (4u + 16u * NBR_MASK_WORDS + 2u) + 4u + 16u,
               "NbrMatrix: Fuellung ueber 16 Byte (Feldreihenfolge pruefen)");
 
@@ -335,6 +335,23 @@ static void nbrLogEvictKind(uint16_t now_min, const char *kind, const char *old_
     nbrLog(buf);
 }
 
+// GW: das Gateway-Flag einer FREMDEN Zeile hat sich geaendert (Soak-Befund F6).
+// cause: 0 = HEY an "HG" (gesetzt), 1 = HEY an "H" (geloescht), 2 = Verfall im
+// nbrSweep() (geloescht). value ist der neue Stand 0/1.
+#define NBR_GW_CAUSE_HG  0
+#define NBR_GW_CAUSE_H   1
+#define NBR_GW_CAUSE_EXP 2
+static void nbrLogGw(uint16_t now_min, const char *call, int value, int cause)
+{
+    if (!nbrLog)
+        return;
+    static const char *const names[] = {"HG", "H", "EXP"};
+    char buf[80];
+    snprintf(buf, sizeof(buf), "[NBR]|GW|%u|%s|%d|%s", (unsigned)now_min, call, value ? 1 : 0,
+             names[(cause >= 0 && cause <= NBR_GW_CAUSE_EXP) ? cause : 0]);
+    nbrLog(buf);
+}
+
 // ECHO: ein eigener Rahmen verlaesst die Echo-Tabelle (Konzept 4.11); Masken
 // wie in NEED als NBR_MASK_HEX_LEN Hexstellen.
 static void nbrLogEcho(uint16_t now_min, uint32_t msg_id, const NbrMask &first, const NbrMask &second)
@@ -354,8 +371,8 @@ static void nbrLogEcho(uint16_t now_min, uint32_t msg_id, const NbrMask &first, 
 // nbrNoteFrame()/nbrNoteReport() sammeln unter der Klammer, was sie loggen
 // wollen, und geben es danach in derselben Reihenfolge aus. Ein Frame hat
 // hoechstens 8 Token: 2 Zeilenverdraengungen, 7 Pfadkanten + ME (je mit
-// hoechstens einer Kantenverdraengung) und 1 Horizont-Verdraengung = 19, oder
-// statt der Kanten 1 DROP -- 20 Eintraege reichen.
+// hoechstens einer Kantenverdraengung), 1 Horizont-Verdraengung und 1 GW-Zeile
+// = 20, oder statt der Kanten 1 DROP -- 20 Eintraege reichen.
 // Liegt auf dem Stack des Aufrufers (LORA-Task, 16 KB auf nRF52).
 
 enum
@@ -366,7 +383,8 @@ enum
     NBR_EV_ME,        // a = Token-Index, cnt, snr
     NBR_EV_DROPFULL,
     NBR_EV_EVICTH,    // c1 = altes, c2 = neues Rufzeichen eines Horizont-Eintrags
-    NBR_EV_EVICTX     // nur nbrNoteDirect(): altes/neues Rufzeichen eines Direkt-Slots
+    NBR_EV_EVICTX,    // nur nbrNoteDirect(): altes/neues Rufzeichen eines Direkt-Slots
+    NBR_EV_GW         // a = neuer Stand 0/1, b = Ursache (NBR_GW_CAUSE_*), c1 = Rufzeichen
 };
 
 struct NbrEv
@@ -551,6 +569,7 @@ static void nbrIRowBlank(NbrMatrix &m, int idx)
     m.row[idx].lat16 = (int16_t)NBR_POS_UNKNOWN;
     m.row[idx].lon16 = (int16_t)NBR_POS_UNKNOWN;
     m.row[idx].ext = 0xFF;
+    m.gw_min[idx] = 0;
 }
 
 // Zeile idx vollstaendig leeren: ihre Kanten frei (je zwei Maskenbits), ihr
@@ -1172,9 +1191,59 @@ static int nbrIMeStep(NbrMatrix &m, uint64_t w, const char *tok, uint8_t tok_idx
     return 1;
 }
 
+// Gilt das Gateway-Flag der Zeile x zum Zeitpunkt now_min? Leser prueften die
+// Frische schon immer selbst (siehe NBR_WINDOW_MIN): auch das Gateway-Flag
+// zaehlt nur NBR_GW_HOLD_MIN Minuten nach dem letzten HG, ob nbrSweep() das
+// Flag inzwischen geloescht hat oder nicht (Entscheidungen haengen nicht vom
+// Sweep ab). Zeile 0 ist hier nie gefragt (sie ist aus dem Bedarf ohnehin raus).
+static inline bool nbrIGwHeld(const NbrMatrix &m, int x, uint16_t now_min)
+{
+#if NBR_GW_HOLD_MIN > 0
+    return (m.row[x].flags & NBR_FLAG_GW) && (uint8_t)((int)now_min - (int)m.gw_min[x]) < NBR_GW_HOLD_MIN;
+#else
+    (void)now_min;
+    return (m.row[x].flags & NBR_FLAG_GW) != 0; // 0 = kein Verfall (nur Kompat-Wiedergabe)
+#endif
+}
+
+// Gateway-Flag einer FREMDEN Zeile r, spaetester gewinnt (nbr_matrix.h,
+// nbrNoteFrameGw()): JA setzt und stempelt den Verfallszeitgeber, NEIN loescht,
+// alles andere laesst den Stand. Nur eine Aenderung des Flags wird geloggt.
+static void nbrIGwNote(NbrMatrix &m, int r, int8_t hint, uint16_t now_min, NbrEvList *lg)
+{
+    bool had = (m.row[r].flags & NBR_FLAG_GW) != 0;
+    int cause;
+    if (hint == NBR_GW_YES)
+    {
+        m.gw_min[r] = (uint8_t)now_min;
+        if (had)
+            return;
+        m.row[r].flags |= NBR_FLAG_GW;
+        cause = NBR_GW_CAUSE_HG;
+    }
+    else if (hint == NBR_GW_NO && had)
+    {
+        m.row[r].flags &= (uint8_t)~NBR_FLAG_GW;
+        cause = NBR_GW_CAUSE_H;
+    }
+    else
+        return;
+    NbrEv *ev = nbrIEvAdd(lg, NBR_EV_GW);
+    if (ev)
+    {
+        ev->a = (hint == NBR_GW_YES) ? 1 : 0;
+        ev->b = (uint8_t)cause;
+        nbrIDecode(m.call[r], ev->c1);
+    }
+}
+
+// gw_hint: Stand fuer das Zeilenflag, hz_hint: Stand fuer das Horizont-Bit G
+// (beide NbrGwHint). Die tri-state-Fassung uebergibt denselben Wert; der bool-
+// Einstieg nbrNoteFrame() bildet dest_gw ab wie bisher (Zeile: true = JA,
+// false = UNBEKANNT; Horizont: true = JA, false auf '@' = NEIN).
 static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64_t *words, int ntok,
-                         char type, const char *payload, bool dest_gw, int8_t snr_here, uint16_t now_min,
-                         NbrEvList *lg)
+                         char type, const char *payload, int8_t gw_hint, int8_t hz_hint, int8_t snr_here,
+                         uint16_t now_min, NbrEvList *lg)
 {
     // Text: nur der ME-Schritt (siehe nbr_matrix.h).
     if (type == ':')
@@ -1272,8 +1341,14 @@ static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64
     if (type == '@')
     {
         int sender = row_idx[0];
-        if (dest_gw && sender >= 0)
-            m.row[sender].flags |= NBR_FLAG_GW;
+        if (sender == 0)
+        {
+            // Eigenes Echo: Zeile 0 gehoert dem Aufrufer (bGATEWAY), nur JA setzt wie bisher.
+            if (gw_hint == NBR_GW_YES)
+                m.row[0].flags |= NBR_FLAG_GW;
+        }
+        else if (sender > 0)
+            nbrIGwNote(m, sender, gw_hint, now_min, lg);
         nbrIApplyHeyGroups(m, row_idx, ntok, payload);
         // Eine Gruppe kann (nur mit NBR_SNR_AVG_N == 1) den SNR einer Kante
         // (x, 0) setzen: die SYM-Hysterese folgt.
@@ -1289,8 +1364,8 @@ static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64
     {
         bool fresh_row = nbrIRowShown(m, row_idx[0], now_min);
         if (!fresh_row && row_idx[start] > 0)
-            nbrIHzTouch(m, words[0], tokens[0], row_idx[start], (uint8_t)start, type == '@', dest_gw, now_min,
-                        lg);
+            nbrIHzTouch(m, words[0], tokens[0], row_idx[start], (uint8_t)start,
+                        type == '@' && hz_hint != NBR_GW_UNKNOWN, hz_hint == NBR_GW_YES, now_min, lg);
     }
 
     // Echo eines eigenen Rahmens (Konzept 4.11).
@@ -1675,22 +1750,25 @@ static NbrNeed nbrIRelayNeed(const NbrMatrix &m, const uint64_t *words, int ntok
         pidx[i] = nbrIFindWord(m, words[i]);
         nbrMaskSet(inpath, pidx[i]);
     }
-    // HatF = Pfad | Hoerer der Pfadteilnehmer (blosse Kante, keine Anteilsregel).
+    // HatF = Pfad | Hoerer der Pfadteilnehmer MIT Anteilsregel (Soak-Befund F5):
+    // ein Streutreffer y-hoert-p gegen den staerksten direkten Hoerer von p
+    // macht y nicht zu "hat den Frame" (Kante (p, y): maxd[] ist am Sender p
+    // normiert, wie in der Deckung).
+    NbrCtx cbuf;
+    const NbrCtx &c = nbrICtx(m, now_min, cbuf);
     NbrMask hasf = inpath;
     for (int e = 0; e < NBR_MAX_EDGES; e++)
     {
         const NbrEdge &ed = m.edge[e];
         if (nbrIEdgeLive(ed) && nbrMaskTest(inpath, ed.x) && ed.y != 0 && nbrIUsed(m, ed.y) &&
-            nbrIFresh(ed.last_min, now_min))
+            nbrICovers(m, c, ed))
             nbrMaskSet(hasf, ed.y);
     }
 
-    NbrCtx cbuf;
-    const NbrCtx &c = nbrICtx(m, now_min, cbuf);
     NbrMask dep = nbrMaskOr(c.direct, nbrIHeardMeMask(m, now_min));
     nbrMaskClear(dep, 0);
     for (int x = nbrMaskNext(dep, -1); x >= 0; x = nbrMaskNext(dep, x))
-        if (m.row[x].flags & NBR_FLAG_GW)
+        if (nbrIGwHeld(m, x, now_min))
             nbrMaskClear(dep, x);
     if (nbrMaskEmpty(dep))
         return r;
@@ -1902,13 +1980,53 @@ void nbrReset(NbrMatrix &m, uint16_t now_min)
     NBR_UNLOCK();
 }
 
+// Gateway-Flag fremder Zeilen: NBR_GW_HOLD_MIN nach dem letzten HG vorbei
+// (Minute mod 256, umlaufsicher); Zeile 0 nie. In Stuecken zu NBR_GW_BATCH
+// Zeilen: Entscheidung UND Kopie des Rufzeichens fallen unter DIESELBE Klammer,
+// geloggt wird danach aus der Kopie -- eine Verdraengung zwischen Klammer und
+// Log kann so kein anderes Rufzeichen mehr ins Log bringen. Ohne Verfall
+// (NBR_GW_HOLD_MIN 0) nichts zu tun.
+#define NBR_GW_BATCH 8
+static void nbrIGwExpire(NbrMatrix &m, uint16_t now_min)
+{
+#if NBR_GW_HOLD_MIN > 0
+    for (;;)
+    {
+        uint64_t words[NBR_GW_BATCH];
+        int n = 0;
+        NBR_LOCK();
+        for (int i = 1; i < NBR_MAX_ROWS && n < NBR_GW_BATCH; i++)
+            if (nbrIUsed(m, i) && (m.row[i].flags & NBR_FLAG_GW) &&
+                (uint8_t)((int)now_min - (int)m.gw_min[i]) >= NBR_GW_HOLD_MIN)
+            {
+                m.row[i].flags &= (uint8_t)~NBR_FLAG_GW;
+                words[n++] = m.call[i];
+            }
+        NBR_UNLOCK();
+        for (int k = 0; k < n; k++)
+        {
+            char call[NBR_CALL_LEN];
+            nbrIDecode(words[k], call);
+            nbrLogGw(now_min, call, 0, NBR_GW_CAUSE_EXP);
+        }
+        if (n < NBR_GW_BATCH)
+            break;
+    }
+#else
+    (void)m;
+    (void)now_min;
+#endif
+}
+
 void nbrSweep(NbrMatrix &m, uint16_t now_min)
 {
     NbrEchoOut echo[4];
     int n_echo = 0;
+    bool swept = false;
     NBR_LOCK();
     if (nbrIReady(m) && now_min != m.last_sweep)
     {
+        swept = true;
         for (int e = 0; e < NBR_MAX_EDGES; e++)
             if (nbrIEdgeLive(m.edge[e]) && !nbrIFresh(m.edge[e].last_min, now_min))
                 nbrIEdgeFree(m, e);
@@ -1942,6 +2060,8 @@ void nbrSweep(NbrMatrix &m, uint16_t now_min)
     NBR_UNLOCK();
     for (int k = 0; k < n_echo; k++)
         nbrLogEcho(now_min, echo[k].id, echo[k].first, echo[k].second);
+    if (swept)
+        nbrIGwExpire(m, now_min);
 }
 
 bool nbrRowGet(const NbrMatrix &m, int row, NbrRowView *out)
@@ -2014,7 +2134,24 @@ void nbrRowSetFlag(NbrMatrix &m, int row, uint8_t flag)
         return;
     NBR_LOCK();
     if (row == 0 || nbrIUsed(m, row))
+    {
         m.row[row].flags |= flag;
+        // Fremde Zeile mit GW von Hand gesetzt (kein HG-Rahmen, keine Uhr hier):
+        // Zeitgeber auf die Minute des letzten Sweeps, sonst laese der Sweep einen
+        // beliebigen Rest.
+        if (row > 0 && (flag & NBR_FLAG_GW))
+            m.gw_min[row] = (uint8_t)m.last_sweep;
+    }
+    NBR_UNLOCK();
+}
+
+void nbrRowClearFlag(NbrMatrix &m, int row, uint8_t flag)
+{
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return;
+    NBR_LOCK();
+    if (row == 0 || nbrIUsed(m, row))
+        m.row[row].flags &= (uint8_t)~flag;
     NBR_UNLOCK();
 }
 
@@ -2102,6 +2239,9 @@ static void nbrIEvFlush(const NbrEvList &lg, char tokens[][NBR_CALL_LEN], char t
         case NBR_EV_EVICTH:
             nbrLogEvictKind(now_min, "EVICT-H", ev.c1, ev.c2);
             break;
+        case NBR_EV_GW:
+            nbrLogGw(now_min, ev.c1, ev.a, ev.b);
+            break;
         default:
             break;
         }
@@ -2137,8 +2277,8 @@ __attribute__((noinline)) static void nbrIDroppedMe(NbrMatrix &m, const char *pa
     nbrIEvFlush(lg, tok, type, rssi_here, path, now_min);
 }
 
-int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
-                 bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+static int nbrINoteFrameEntry(NbrMatrix &m, const char *path, char type, const char *payload, int8_t gw_hint,
+                              int8_t hz_hint, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
 {
     if (type != ':' && type != '!' && type != '@')
     {
@@ -2177,10 +2317,24 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
     NbrEvList lg;
     lg.n = 0;
     NBR_LOCK();
-    int rc = nbrINoteFrame(m, tokens, words, ntok, type, payload, dest_gw, snr_here, now_min, &lg);
+    int rc = nbrINoteFrame(m, tokens, words, ntok, type, payload, gw_hint, hz_hint, snr_here, now_min, &lg);
     NBR_UNLOCK();
     nbrIEvFlush(lg, tokens, type, rssi_here, path, now_min);
     return rc;
+}
+
+int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
+                 bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+{
+    return nbrINoteFrameEntry(m, path, type, payload, dest_gw ? NBR_GW_YES : NBR_GW_UNKNOWN,
+                              (type == '@') ? (dest_gw ? NBR_GW_YES : NBR_GW_NO) : NBR_GW_UNKNOWN, rssi_here,
+                              snr_here, now_min);
+}
+
+int nbrNoteFrameGw(NbrMatrix &m, const char *path, char type, const char *payload,
+                   NbrGwHint gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+{
+    return nbrINoteFrameEntry(m, path, type, payload, gw, gw, rssi_here, snr_here, now_min);
 }
 
 void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
@@ -2770,6 +2924,22 @@ NbrMask nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, 
     NBR_LOCK();
     nbrISymBegin(sink, m, NULL, now_min, msg_id);
     NbrMask r = nbrICoverMask(m, w, now_min, sym, relevant, inferred, sink);
+    NBR_UNLOCK();
+    nbrISymFlush(sink);
+    return r;
+}
+
+NbrMask nbrCopyMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                    const NbrMask &relevant, uint32_t msg_id, NbrMask *inferred)
+{
+    uint64_t w = nbrIEncode(relayer);
+    NbrSymSink sink;
+    NBR_LOCK();
+    nbrISymBegin(sink, m, NULL, now_min, msg_id);
+    NbrMask r = nbrICoverMask(m, w, now_min, sym, relevant, inferred, sink);
+    int idx = nbrIReady(m) ? nbrIFindWord(m, w) : -1;
+    if (idx > 0)
+        nbrMaskSet(r, idx); // der Relayer hat den Frame gesendet, also hat er ihn
     NBR_UNLOCK();
     nbrISymFlush(sink);
     return r;

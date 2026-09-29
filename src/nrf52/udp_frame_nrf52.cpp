@@ -315,6 +315,11 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                         // stage 4: the destination's own ack is the final word --
                         // forget any store node(s) that were holding this DM.
                         stoHolderClear(msg_counter);
+
+                        // F1: server-delivered ACK for an own DM -- ack=/rtt= count once
+                        // per DM at the FIRST ack (LoRa or server), see dm_stats.h.
+                        if(dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis()))
+                            dmstat_peer_ack.fetch_add(1);
                         // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                         // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,

@@ -79,6 +79,21 @@
 #ifndef NBR_HZ_ENTRIES
 #define NBR_HZ_ENTRIES 112
 #endif
+// Gateway-Flag eines FREMDEN Rufzeichens (NBR_FLAG_GW auf seiner Zeile): er
+// verfaellt so viele Minuten nach dem letzten HEY an "HG" dieses Absenders,
+// im nbrSweep() (Minutentakt). 45 = 3 x TRICKLE_IMAX_S (15 min): ein Gateway
+// sendet mindestens alle TRICKLE_IMAX_S ein HG, drei verpasste HG in Folge
+// heissen "nicht mehr da". Ein HEY an "H" loescht das Flag sofort (siehe
+// NbrGwHint). Zeile 0 (ich) verfaellt nie: sie folgt bGATEWAY, der Aufrufer
+// setzt/loescht sie (nbrRowSetFlag()/nbrRowClearFlag()). Der Zeitgeber ist das
+// niederwertige Byte der Minute des letzten HG (NbrMatrix::gw_min), darum
+// hoechstens 255; nbrSweep() muss dafuer mindestens alle ~210 min laufen (er
+// laeuft je Minute). 0 schaltet den Verfall ab (Zeilenflags bleiben bis zu
+// einem HEY an "H" stehen, wie vor F6): nur fuer die Kompat-Wiedergabe gegen
+// die dichte Referenz (test/test_nbr_replay), nie fuer eine Firmware.
+#ifndef NBR_GW_HOLD_MIN
+#define NBR_GW_HOLD_MIN 45
+#endif
 // Deckel fuer NCNT auf der Luft (nbrNcntAir() in nbr_views.h).
 #ifndef NBR_NCNT_AIR_MAX
 #define NBR_NCNT_AIR_MAX 99
@@ -87,6 +102,7 @@ static_assert(NBR_MAX_EDGES >= NBR_MAX_ROWS, "Kantenpool kleiner als die Zeilenz
 static_assert(NBR_SNR_AVG_N >= 1, "NBR_SNR_AVG_N ist mindestens 1 (= letzter Wert)");
 static_assert(NBR_EXT_SLOTS >= 1 && NBR_EXT_SLOTS <= 255, "Slotindex muss in NbrRow.ext passen (0xFF = keiner)");
 static_assert(NBR_HZ_ENTRIES >= 1, "Horizont braucht mindestens einen Eintrag");
+static_assert(NBR_GW_HOLD_MIN >= 0 && NBR_GW_HOLD_MIN <= 255, "Gateway-Zeitgeber ist ein Byte (Minute mod 256), 0 = kein Verfall");
 
 #ifndef LORA_SNR_STABLE_MIN_DB
 #error "LORA_SNR_STABLE_MIN_DB ist nicht definiert -- siehe configuration_default.h (Flottendefault, #ifndef-Wert -16)."
@@ -229,6 +245,9 @@ struct NbrEdge
 //   echo_*[4]     die letzten vier eigenen POS/HEY-Rahmen (nbrNoteOwnTx()):
 //                 msg_id, Masken erste/zweite Hand, Minute, Typ ('!'/'@', 0 = frei).
 //   boot_epoch    Wanduhr bei Minute 0 (nbrSetClock()), 0 = keine Uhr.
+//   gw_min[r]     Minute (mod 256) des letzten HEY an "HG" von Zeile r; nur
+//                 gelesen, solange NBR_FLAG_GW auf Zeile r > 0 steht (Verfall
+//                 nach NBR_GW_HOLD_MIN im nbrSweep()). NBR_MAX_ROWS Byte.
 struct NbrMatrix
 {
     uint64_t call[NBR_MAX_ROWS];
@@ -243,6 +262,7 @@ struct NbrMatrix
     uint8_t  echo_type[4];
     uint8_t  hz_meta[NBR_HZ_ENTRIES][4];
     uint8_t  ext[NBR_EXT_SLOTS][13];
+    uint8_t  gw_min[NBR_MAX_ROWS];
     uint32_t boot_epoch;
     uint32_t echo_id[4];
     uint64_t hz_call[NBR_HZ_ENTRIES];
@@ -324,6 +344,10 @@ bool nbrEdgeGet(const NbrMatrix &m, int from, int to, NbrEdgeView *out);
 bool nbrOwnCallIs(const NbrMatrix &m, const char *call);
 bool nbrRowHasFlag(const NbrMatrix &m, int row, uint8_t flag);
 void nbrRowSetFlag(NbrMatrix &m, int row, uint8_t flag);
+// Gegenstueck: loescht die Bits von flag auf der Zeile (Zeile 0 immer gueltig,
+// sonst nur eine belegte Zeile). Der Aufrufer nutzt es fuer Zeile 0, wenn
+// bGATEWAY ausgeschaltet wird (NBR_FLAG_GW); Zeile 0 verfaellt nie von selbst.
+void nbrRowClearFlag(NbrMatrix &m, int row, uint8_t flag);
 // Zahl belegter Zeilen und lebender Kanten (SNAP-Zeile, Web-Kopf).
 int nbrRowsUsed(const NbrMatrix &m);
 int nbrEdgesUsed(const NbrMatrix &m);
@@ -443,7 +467,9 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 //
 // Bei '@' setzt dest_gw=true das GW-Flag auf die Zeile des Absenders
 // (erster Pfadeintrag, ueber nbrFind() aufgeloest -- Absender ist meist
-// ausserhalb des Fensters und bekommt dafuer keine neue Zeile). Bei '@' wird
+// ausserhalb des Fensters und bekommt dafuer keine neue Zeile). dest_gw=false
+// loescht es NIE (= NBR_GW_UNKNOWN, siehe nbrNoteFrameGw() unten fuer die
+// Fassung mit "spaetester gewinnt" und Verfall). Bei '@' wird
 // zusaetzlich payload als "R<n>;g1;g2;..." gelesen (siehe
 // appendHeySignalReport(), src/aprs_functions.cpp:1134): Gruppe i (1-basiert)
 // ist "NCT,RSSI,SNR" und gehoert zum Paar (p[i-1], p[i]) -- ihre Zelle
@@ -464,6 +490,36 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // rssi_here bleibt reines Logfeld (Log: ME, <rssi>).
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
                   bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min);
+
+// Gateway-Hinweis des HEY-Ziels, "spaetester gewinnt" (Befund F6 der Soak-
+// Auswertung 2026-09-28): HEY an "HG" = JA, HEY an "H" = NEIN, alles andere
+// (HN-Bericht, Text, Position, unbekanntes Ziel) = UNBEKANNT und laesst den
+// Stand unveraendert. Der Aufrufer bildet das Ziel des empfangenen HEY darauf ab.
+enum NbrGwHint : int8_t
+{
+    NBR_GW_UNKNOWN = -1,
+    NBR_GW_NO = 0,
+    NBR_GW_YES = 1
+};
+
+// Wie nbrNoteFrame(), aber mit Tri-State statt bool dest_gw (der Aufrufer in
+// lora_functions.cpp ruft diese Fassung; der Name ist absichtlich ein anderer,
+// damit ein bool nie stillschweigend als Hinweis durchgeht):
+//   - Zeile des Absenders (Pfadeintrag 0, ueber nbrFind(), keine Neuanlage):
+//     JA setzt NBR_FLAG_GW und stempelt den Verfallszeitgeber (NBR_GW_HOLD_MIN,
+//     nbrSweep() loescht das Flag danach), NEIN loescht es sofort, UNBEKANNT
+//     laesst es. Jede Aenderung des Flags einer FREMDEN Zeile (setzen, loeschen,
+//     Verfall im Sweep) erzeugt eine Zeile [NBR]|GW|<min>|<call>|<0|1>|<HG|H|EXP>
+//     (docs/nbr-logformat.md); ein erneutes HG bei gesetztem Flag stempelt nur.
+//   - Zeile 0 (eigenes Echo, Absender == ich): JA setzt das Flag wie bisher,
+//     NEIN/UNBEKANNT laesst es -- Zeile 0 gehoert dem Aufrufer (bGATEWAY,
+//     nbrRowSetFlag()/nbrRowClearFlag()), sie verfaellt nie.
+//   - Horizont-Eintrag (Absender ab 3 Hops ohne Zeile), Bit G: JA setzt, NEIN
+//     loescht, UNBEKANNT laesst es (ein HN-Bericht loescht G also nicht mehr).
+//     G verfaellt nicht nach NBR_GW_HOLD_MIN, sondern mit dem Eintrag selbst.
+// Rueckgabe und alles uebrige wie nbrNoteFrame().
+int nbrNoteFrameGw(NbrMatrix &m, const char *path, char type, const char *payload,
+                   NbrGwHint gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min);
 
 // CONTRACT (Welle 3), Direkt-Slot (Konzept 4.6): Detailwerte des letzten
 // Direktempfangs von last_hop, bitgepackt (103 Bit in 13 Byte, NBR_EXT_SLOTS
@@ -658,9 +714,12 @@ int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min);
 // groessten cnt(x, D) ueber alle direkten Nachbarn D (Direkt, ohne mich).
 // NBR_SHARE_PCT == 0 ist die alte Ein-Treffer-Regel. Sie gilt fuer #X
 // (nbrRowMeshNeedCount/nbrRowMeshNeed), E_self (nbrExclusiveDirect), das
-// Urteil in nbrExclusive/ROW, die Allein-Maske in nbrRelayNeed und die
-// Deckung in nbrCoverMask -- NICHT fuer HatF/need ("hat den Frame"), das
-// bleibt die blosse Kante (Konzept 4.2).
+// Urteil in nbrExclusive/ROW, HatF/need und die Allein-Maske in
+// nbrRelayNeed sowie die Deckung in nbrCoverMask. HatF ("hat den Frame") zaehlt
+// einen Hoerer y eines Pfadtokens p nur, wenn die Kante (p, y) den Anteil
+// erreicht (Soak-Befund F5: ein einzelner Zufallstreffer y-hoert-p machte y zu
+// "hat den Frame" und liess einen echten Bedarf wegfallen -- HatF liegt auf
+// der sicheren Seite, im Zweifel bleibt y im Bedarf).
 
 // Direkt(X): belegte Zeilen X != 0 mit frischer, gesetzter cell[X][0].
 NbrMask nbrDirectMask(const NbrMatrix &m, uint16_t now_min);
@@ -678,9 +737,10 @@ NbrMask nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
 // EMPFANGEN, vor dem Anhaengen des eigenen Rufzeichens):
 //   need  = Abhaengige, die den Frame noch nicht haben koennen:
 //           (Direkt | HoertMich) ohne Zeile 0, ohne Zeilen mit NBR_FLAG_GW
-//           (Gateways bekommen den Frame vom Server), ohne Pfadteilnehmer und
-//           ohne jeden X, der einen Pfadteilnehmer P frisch gehoert hat
-//           (cell[P][X]).
+//           (Gateways bekommen den Frame vom Server; das Flag zaehlt nur bis
+//           NBR_GW_HOLD_MIN nach dem letzten HG, unabhaengig vom Sweep), ohne
+//           Pfadteilnehmer und ohne jeden X, der einen Pfadteilnehmer P
+//           frisch UND mit Anteil gehoert hat (cell[P][X], Anteilsregel oben).
 //   alone = Teilmenge von need ohne Alternative: kein direkter Nachbar M != X,
 //           der den Frame hat (im Pfad steht oder einen Pfadteilnehmer
 //           gehoert hat) UND den X frisch gehoert hat (cell[M][X]).
@@ -728,6 +788,20 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, boo
 // bei gesetztem relevant-Bit -- eine SYM-Zeile mit Rolle VETO statt COVER.
 NbrMask nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
                      const NbrMask &relevant, uint32_t msg_id, NbrMask *inferred);
+
+// "Wer hat die gehoerte Wiederholung" (Soak-Befund F7): nbrCoverMask() PLUS die
+// eigene Zeilenmaske des Relayers, sofern er eine Zeile hat -- der Relayer hat
+// den Frame gesendet, also hat er ihn. Gleiche Parameter und gleiches
+// Verhalten wie nbrCoverMask() (auch 0 fuer "Relayer ohne Zeile"/ich selbst,
+// dann ohne Zusatzbit; *inferred bleibt die reine Symmetrie-Menge des
+// Deckungsteils). Verwendung: nbrCoverMask() bleibt die Abfrage "kennt die
+// Matrix den Relayer" (leer = unbekannt, Aufrufer relayt wie bisher) und die
+// Wahl, wenn NUR die Hoerer des Relayers gemeint sind; nbrCopyMask() ist die
+// Maske, die vom Bedarf abgezogen wird (need &= ~copy): sonst bliebe der
+// Relayer selbst im Bedarf, wenn er im Bedarf stand (E9F11388: need =
+// {Relayer}, Wiederholung vom Relayer -> Bedarf leer statt {Relayer}).
+NbrMask nbrCopyMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                    const NbrMask &relevant, uint32_t msg_id, NbrMask *inferred);
 
 // E_self (Konzept 4): direkt gehoerte Zeilen, die kein ANDERER direkt
 // gehoerter Nachbar frisch hoert. Anders als nbrExclusive() zaehlt ein

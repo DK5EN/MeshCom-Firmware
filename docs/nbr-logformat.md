@@ -90,7 +90,29 @@ nRF52). Was sich an den Zeilen aendert:
 | `[NBR]\|EVICT-H\|<up>\|<alt>\|<neu>`                                    | neu (Welle 3): die Horizont-Tabelle war voll, der am laengsten nicht gesehene Eintrag `<alt>` wich fuer `<neu>`.                                                                                                      |
 | `[NBR]\|EVICT-X\|<up>\|<alt>\|<neu>`                                    | neu (Welle 3): alle Direkt-Slots belegt, der Slot des am laengsten nicht direkt gehoerten Nachbarn `<alt>` ging an `<neu>`; die Zeile bleibt.                                                                         |
 | `[NBR]\|ECHO\|<up>\|<msg_id>\|<first>\|<second>`                        | neu (Welle 3): ein eigener POS/HEY-Rahmen verlaesst die Echo-Tabelle (letzte 4 eigene Rahmen, Konzept 4.11). `<msg_id>` 8 Hexstellen, `<first>`/`<second>` die Masken erster (X) und zweiter Hand (Y) wie bei `NEED`. |
+| `[NBR]\|GW\|<up>\|<call>\|<0\|1>\|<HG\|H\|EXP>`                         | neu: das Gateway-Flag der FREMDEN Zeile `<call>` hat sich geaendert, neuer Stand `0`/`1`, Ursache `HG` (HEY an "HG" setzte es), `H` (HEY an "H" loeschte es) oder `EXP` (im Minuten-Sweep verfallen), siehe unten.    |
 | `[NBR]\|CHECK\|<up>\|<rows>\|<edges>\|<extra>\|<missing>\|<bad>\|<dup>` | neu: Konsistenzpruefung Masken gegen Kantenpool (`nbrCheck()`), einmal je Minute nach dem Sweep aus dem Loop-Task, nur mit `--nbrdebug on`. Alles ausser `<rows>`/`<edges>` muss `0` sein, siehe unten.               |
+
+### `GW` -- Gateway-Flag einer fremden Zeile
+
+Das Flag (`NBR_FLAG_GW`, `<flags>` Bit 0) folgt dem LETZTEN HEY des Absenders ("spaetester
+gewinnt"): ein HEY an `HG` setzt es, ein HEY an `H` loescht es, jeder andere Rahmen (HN-Bericht,
+Text, Position, unbekanntes Ziel) laesst es unveraendert. Ohne neues `HG` verfaellt es
+`NBR_GW_HOLD_MIN` = 45 min nach dem letzten `HG` dieses Absenders (3 x `TRICKLE_IMAX_S`, im
+Minuten-Sweep; die Relay-Entscheidung liest es ebenfalls nur so lange, auch ohne Sweep). Das
+Horizont-Bit G folgt derselben Regel ("HG" setzt, "H" loescht, sonst unveraendert), verfaellt aber
+nicht nach 45 min, sondern mit dem Horizont-Eintrag. Zeile 0 gehoert dem Aufrufer (`bGATEWAY`) und
+verfaellt nie. Nach `nbrLoad()` (gesichertes Abbild) ist das Flag jeder fremden Zeile aus: das
+Abbild traegt keinen Zeitgeber, der Gateway wird am naechsten `HG` neu gelernt (sichere Richtung),
+und das Loeschen erzeugt keine `GW`-Zeile.
+
+`[NBR]|GW|<up>|<call>|<0|1>|<HG|H|EXP>` erscheint genau bei einer AENDERUNG des Flags einer
+fremden Zeile: `1|HG` (Flag war aus, `HG` setzt es), `0|H` (Flag war an, `H` loescht es), `0|EXP`
+(Verfall im Sweep). Ein `HG` bei schon gesetztem Flag stempelt nur den Zeitgeber und erzeugt
+keine Zeile; ebenso `H` auf einem Nicht-Gateway. Zeile 0 wird nicht geloggt. Vor dieser Zeile
+gab es keine Aussage im Log, wann ein Knoten zum Gateway wurde oder es nicht mehr war; Parser,
+die die Zeile nicht kennen, muessen sie ueberspringen (die Kompat-Wiedergabe
+`test/test_nbr_replay` zaehlt sie, ohne sie zu vergleichen).
 
 ### `CHECK` und `--nbrcheck`
 
@@ -113,7 +135,10 @@ Bei einem Fehler endet sie auf `-> INCONSISTENT`.
 Deckung nach Anteil (`NBR_SHARE_PCT`, 10 %): eine Kante deckt nur, wenn ihr Zaehler mindestens 10 %
 des Zaehlers der staerksten Kante derselben Art erreicht. Fuer #X (`<meshneed>`, Web-Rollen) ist das
 "M hat x gehoert"; fuer die Allein-Maske und die Deckung beim Abbruch "X hat die Kopie von M gehoert",
-dieselbe Richtung wie vor dem Umbau.
+dieselbe Richtung wie vor dem Umbau. Seit dem Soak-Befund F5 gilt die Regel auch fuer HatF ("hat den
+Frame schon", `NEED`-Maske): ein Hoerer y eines Pfadtokens p zaehlt nur, wenn die Kante (p, y) den
+Anteil erreicht -- ein einzelner Streutreffer macht y nicht mehr zu einem, der den Frame schon hat,
+y bleibt im `<need>` (und meist auch im `<alone>`); im Zweifel wird relayt.
 
 ## Stufe 2: Relay-Entscheidung (`--nbrrelay count|on`, docs/nbr-wichtigkeit-konzept.md 5)
 

@@ -105,6 +105,37 @@ static void test_unbekannte_nnn_wird_ignoriert(void)
     TEST_ASSERT_NOT_NULL(strstr(buf, "rtt=0/0/0/0/0/0"));
 }
 
+// F1: dmStatNoteAck() meldet, ob DIESER Ack der erste fuer eine notierte NNN
+// war. Die Aufrufer (LoRa- und Server/UDP-Pfad) haengen dmstat_peer_ack daran,
+// damit ack= und rtt= je eigener DM genau einmal zaehlen.
+static void test_note_ack_meldet_nur_den_ersten_ack_je_nnn(void)
+{
+    uint32_t base = g_next_base;
+    g_next_base += 8;
+    uint16_t nnn = (uint16_t)base;
+
+    dmStatNoteSent(nnn, 1000u);
+    TEST_ASSERT_TRUE(dmStatNoteAck(nnn, 1000u + 5000u));   // erster Ack: Eintrag gefunden und geleert
+    TEST_ASSERT_FALSE(dmStatNoteAck(nnn, 1000u + 9000u));  // zweiter Ack (anderer Pfad/Dublette)
+    TEST_ASSERT_FALSE(dmStatNoteAck(nnn, 1000u + 20000u)); // und jeder weitere
+
+    // RTT wurde nur beim ersten Ack gebucht (5 s -> Bucket 0), nicht erneut.
+    char buf[256];
+    dmStatFormat(buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "rtt=1/0/0/0/0/0"));
+}
+
+static void test_note_ack_unbekannte_nnn_liefert_false(void)
+{
+    uint32_t base = g_next_base;
+    g_next_base += 8;
+    TEST_ASSERT_FALSE(dmStatNoteAck((uint16_t)base, 12345u));
+
+    char buf[256];
+    dmStatFormat(buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "rtt=0/0/0/0/0/0"));
+}
+
 static void test_wiederholtes_note_sent_ersetzt_den_alten_eintrag(void)
 {
     uint32_t base = g_next_base;
@@ -234,6 +265,8 @@ int main(int, char **)
     RUN_TEST(test_bucket_grenzwerte);
     RUN_TEST(test_note_sent_und_ack_buckets_und_loescht_den_eintrag);
     RUN_TEST(test_unbekannte_nnn_wird_ignoriert);
+    RUN_TEST(test_note_ack_meldet_nur_den_ersten_ack_je_nnn);
+    RUN_TEST(test_note_ack_unbekannte_nnn_liefert_false);
     RUN_TEST(test_wiederholtes_note_sent_ersetzt_den_alten_eintrag);
     RUN_TEST(test_tabelle_ueberschreibt_nach_acht_eintraegen);
     RUN_TEST(test_format_exakter_string_und_reset);

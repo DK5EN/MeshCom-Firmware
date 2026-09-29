@@ -223,7 +223,7 @@ void loopAction_battCheck(void)
             if(global_proz < 0)
             {
                 if(bDisplayCont)
-                    printfdeb("[readBatteryVoltage]...no battery is connected");
+                    printfdeb("[readBatteryVoltage]...no battery is connected\n");
 
                 global_batt = (float)PMU->getVbusVoltage();
                 global_proz=100.0;

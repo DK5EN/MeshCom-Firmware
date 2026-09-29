@@ -224,7 +224,8 @@
 //
 // Tests:
 //   compat env (native_nbr_replay: 21 rows, share 0, no halving, SNR last
-//   value, 441 edges = never full):
+//   value, no gateway-flag expiry (NBR_GW_HOLD_MIN 0), 441 edges = never full;
+//   [NBR]|GW| lines, a kind only the edge pool knows, are counted, not compared):
 //     B  dense vs. edge (no sweep), line for line over every group, after
 //        only two normalisations: EDGE/ME <cnt> blanked (one counter vs.
 //        per-type counters), mask hex compared on its low 32 bits.
@@ -235,7 +236,9 @@
 //   production envs (64/128 rows, share 10 %, halving 90 min, SNR mean 8,
 //   swept every minute like the firmware):
 //     C  every decision that differs from dense (NEED case/need/alone,
-//        ROW verdict/meshneed, E_self), with a category; OTHER must be 0;
+//        ROW verdict/meshneed, E_self), with a category (SHARE incl. the F5
+//        HatF share rule, HALVE/SNRAVG, CAPACITY, GW-EXPIRY = the F6 gateway
+//        flag lapsing 45 min after its last HG); OTHER must be 0;
 //        the DB0ED-99/DB0FHR-12 check from concept 4.3.
 //     D  NbrMask operations on the upper rows.
 //   wave 3: B, B' and the capture comparison first remove the ME_DECOUPLED
@@ -278,6 +281,16 @@ namespace dense
 #define NBR_MATRIX_SRC "../../src/nbr_matrix.cpp"
 #endif
 
+// Compat replay = frozen old rules against the dense reference and the capture:
+// the dense code never lets a gateway flag lapse, so the edge pool runs here
+// with NBR_GW_HOLD_MIN 0 (no expiry, src/nbr_matrix.h). The production envs keep
+// the default (45 min) in `edge`; edge_noexp/noshare/norules below attribute
+// each difference to its cause. The lapse itself is tested in test_nbr_matrix.
+#ifndef NBR_REPLAY_PRODUCTION
+#undef NBR_GW_HOLD_MIN
+#define NBR_GW_HOLD_MIN 0
+#endif
+
 namespace edge
 {
 #include NBR_MATRIX_SRC
@@ -301,6 +314,13 @@ namespace edge_deferred
 #pragma push_macro("NBR_SHARE_PCT")
 #pragma push_macro("NBR_CNT_HALVE_MIN")
 #pragma push_macro("NBR_SNR_AVG_N")
+#pragma push_macro("NBR_GW_HOLD_MIN")
+#undef NBR_GW_HOLD_MIN
+#define NBR_GW_HOLD_MIN 0
+namespace edge_noexp // production rules, but the gateway flag never lapses
+{
+#include NBR_MATRIX_SRC
+}
 #undef NBR_SHARE_PCT
 #define NBR_SHARE_PCT 0
 namespace edge_noshare
@@ -315,6 +335,7 @@ namespace edge_norules
 {
 #include NBR_MATRIX_SRC
 }
+#pragma pop_macro("NBR_GW_HOLD_MIN")
 #pragma pop_macro("NBR_SNR_AVG_N")
 #pragma pop_macro("NBR_CNT_HALVE_MIN")
 #pragma pop_macro("NBR_SHARE_PCT")
@@ -588,10 +609,25 @@ static bool parse_log_line(const std::string &line, LogFrame &out, std::string &
 
 static std::vector<std::string> *g_capture = NULL;
 
+// [NBR]|GW| (Gateway-Flag geaendert, Soak-Befund F6) ist eine Zeilenart, die
+// erst die Kantenpool-Implementierung kennt: weder die Dense-Referenz noch der
+// Mitschnitt (Firmware 8487ea2a) hat sie. Sie kommt darum nicht in die
+// verglichenen Gruppen, sondern wird gezaehlt (g_gw_lines) -- wie EVICT-H/
+// EVICT-X/ECHO ist sie kein Vergleichsgegenstand der Kompat-Wiedergabe. Alle
+// uebrigen Zeilen (NEED, CANCEL, SNAP mit GW+/GW-) bleiben streng verglichen,
+// eine durch den Verfall geaenderte Entscheidung faellt dort auf.
+static long g_gw_lines = 0;
+
 static void capture_cb(const char *line)
 {
-    if (g_capture)
-        g_capture->push_back(std::string(line));
+    if (!g_capture)
+        return;
+    if (strncmp(line, "[NBR]|GW|", 9) == 0)
+    {
+        g_gw_lines++;
+        return;
+    }
+    g_capture->push_back(std::string(line));
 }
 
 // --- harness-side row set: up to 128 rows, whatever the implementation -----
@@ -878,6 +914,7 @@ EDGE_ADAPTER(EdgeA, edge)
 EDGE_ADAPTER(EdgeDeferredA, edge_deferred)
 #endif
 #ifdef NBR_REPLAY_PRODUCTION
+EDGE_ADAPTER(EdgeNoExpA, edge_noexp)
 EDGE_ADAPTER(EdgeNoShareA, edge_noshare)
 EDGE_ADAPTER(EdgeNoRulesA, edge_norules)
 #endif
@@ -1959,17 +1996,19 @@ void test_production_rules_against_dense(void)
     edge_opt.probe = true;
     edge_opt.sweep_each_minute = true; // the loop task does, and only the sweep halves
 
-    static ReplayResult rd, rp, rs, rn;
+    static ReplayResult rd, rp, rx, rs, rn;
     run_replay<DenseA>(fixture_path(), rd, dense_opt);
     run_replay<EdgeA>(fixture_path(), rp, edge_opt);
+    run_replay<EdgeNoExpA>(fixture_path(), rx, edge_opt);
     run_replay<EdgeNoShareA>(fixture_path(), rs, edge_opt);
     run_replay<EdgeNoRulesA>(fixture_path(), rn, edge_opt);
     TEST_ASSERT_EQUAL_INT(0, (int)rd.parse_errors.size());
     TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rp.groups.size());
+    TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rx.groups.size());
     TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rs.groups.size());
     TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rn.groups.size());
 
-    std::vector<DecisionMap> dd = extract_decisions(rd), dp = extract_decisions(rp),
+    std::vector<DecisionMap> dd = extract_decisions(rd), dp = extract_decisions(rp), dx = extract_decisions(rx),
                              ds = extract_decisions(rs), dn = extract_decisions(rn);
     std::vector<long> dense_evict = cumulative(rd, "EVICT");
     std::vector<long> norules_evicte = cumulative(rn, "EVICT-E");
@@ -1978,6 +2017,7 @@ void test_production_rules_against_dense(void)
     cat_count["SHARE"] = 0;
     cat_count["HALVE/SNRAVG"] = 0;
     cat_count["CAPACITY"] = 0;
+    cat_count["GW-EXPIRY"] = 0;
     cat_count["OTHER"] = 0;
     long compared = 0;
     printf("\n[nbr_replay] C: rows=%d edges=%d share=%d%% halve=%dmin snr_avg=%d vs dense %d rows\n",
@@ -1997,14 +2037,16 @@ void test_production_rules_against_dense(void)
             std::string vd = dget(dd[g], *k), vp = dget(dp[g], *k);
             if (vd == vp)
                 continue;
-            std::string vs = dget(ds[g], *k), vn = dget(dn[g], *k);
+            std::string vx = dget(dx[g], *k), vs = dget(ds[g], *k), vn = dget(dn[g], *k);
             const char *cat;
             if (vn != vd)
                 cat = (dense_evict[g] > 0 && norules_evicte[g] == 0) ? "CAPACITY" : "OTHER";
             else if (vs != vn)
                 cat = "HALVE/SNRAVG";
-            else if (vp != vs)
-                cat = "SHARE";
+            else if (vx != vs)
+                cat = "SHARE"; // the share rule: for #X, E_self, alone and (F5) HatF
+            else if (vp != vx)
+                cat = "GW-EXPIRY"; // a gateway flag lapsed 45 min after its last HG (F6)
             else
                 cat = "OTHER";
             cat_count[cat]++;
@@ -2012,8 +2054,10 @@ void test_production_rules_against_dense(void)
                    k->c_str(), vd.c_str(), vp.c_str(), cat);
         }
     }
-    printf("[nbr_replay] C: %ld decisions compared; differing: SHARE=%ld HALVE/SNRAVG=%ld CAPACITY=%ld OTHER=%ld\n",
-           compared, cat_count["SHARE"], cat_count["HALVE/SNRAVG"], cat_count["CAPACITY"], cat_count["OTHER"]);
+    printf("[nbr_replay] C: %ld decisions compared; differing: SHARE=%ld HALVE/SNRAVG=%ld CAPACITY=%ld GW-EXPIRY=%ld "
+           "OTHER=%ld\n",
+           compared, cat_count["SHARE"], cat_count["HALVE/SNRAVG"], cat_count["CAPACITY"], cat_count["GW-EXPIRY"],
+           cat_count["OTHER"]);
     printf("[nbr_replay] C: EVICT dense=%ld production=%ld, EVICT-E production=%ld noshare=%ld norules=%ld\n",
            count_lines(rd, "EVICT"), count_lines(rp, "EVICT"), count_lines(rp, "EVICT-E"),
            count_lines(rs, "EVICT-E"), count_lines(rn, "EVICT-E"));
@@ -2031,13 +2075,15 @@ void test_production_rules_against_dense(void)
     // Isolated rule effects (report only): the same pool with and without
     // the share rule, and with and without halving + SNR mean, over the
     // categorised decisions plus #X per row. Capacity plays no part here.
-    long share_eff = 0, halve_eff = 0;
+    long share_eff = 0, halve_eff = 0, gw_eff = 0;
     printf("[nbr_replay] C: isolated rule effects (key: without rule => with rule)\n");
     for (size_t g = 0; g < rp.groups.size(); g++)
     {
-        DecisionMap xp = dp[g], xs = ds[g], xn = dn[g];
+        DecisionMap xp = dp[g], xx = dx[g], xs = ds[g], xn = dn[g];
         for (size_t i = 0; i < rp.groups[g].xcounts.size(); i++)
             xp[rp.groups[g].xcounts[i].first] = rp.groups[g].xcounts[i].second;
+        for (size_t i = 0; i < rx.groups[g].xcounts.size(); i++)
+            xx[rx.groups[g].xcounts[i].first] = rx.groups[g].xcounts[i].second;
         for (size_t i = 0; i < rs.groups[g].xcounts.size(); i++)
             xs[rs.groups[g].xcounts[i].first] = rs.groups[g].xcounts[i].second;
         for (size_t i = 0; i < rn.groups[g].xcounts.size(); i++)
@@ -2049,24 +2095,33 @@ void test_production_rules_against_dense(void)
             keys.insert(it->first);
         for (DecisionMap::const_iterator it = xn.begin(); it != xn.end(); ++it)
             keys.insert(it->first);
+        for (DecisionMap::const_iterator it = xx.begin(); it != xx.end(); ++it)
+            keys.insert(it->first);
         for (std::set<std::string>::const_iterator k = keys.begin(); k != keys.end(); ++k)
         {
-            std::string vp = dget(xp, *k), vs = dget(xs, *k), vn = dget(xn, *k);
+            std::string vp = dget(xp, *k), vx = dget(xx, *k), vs = dget(xs, *k), vn = dget(xn, *k);
             if (vs != vn)
             {
                 halve_eff++;
                 printf("  g%zu up=%u %s: %s => %s [HALVE/SNRAVG]\n", g, (unsigned)rp.groups[g].up, k->c_str(),
                        vn.c_str(), vs.c_str());
             }
-            if (vp != vs)
+            if (vx != vs)
             {
                 share_eff++;
                 printf("  g%zu up=%u %s: %s => %s [SHARE]\n", g, (unsigned)rp.groups[g].up, k->c_str(),
-                       vs.c_str(), vp.c_str());
+                       vs.c_str(), vx.c_str());
+            }
+            if (vp != vx)
+            {
+                gw_eff++;
+                printf("  g%zu up=%u %s: %s => %s [GW-EXPIRY]\n", g, (unsigned)rp.groups[g].up, k->c_str(),
+                       vx.c_str(), vp.c_str());
             }
         }
     }
-    printf("[nbr_replay] C: isolated effects: SHARE=%ld HALVE/SNRAVG=%ld\n", share_eff, halve_eff);
+    printf("[nbr_replay] C: isolated effects: SHARE=%ld HALVE/SNRAVG=%ld GW-EXPIRY=%ld (GW lines not compared: %ld)\n",
+           share_eff, halve_eff, gw_eff, g_gw_lines);
 
     // Trend of the check over all snapshots (report only).
     long snaps = 0, dense_zero = 0, prod_zero = 0, prod_has = 0;

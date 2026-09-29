@@ -2146,11 +2146,19 @@ void test_share_rule_one_hit_against_fifty_does_not_cover(void)
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
     TEST_ASSERT_TRUE(nbrMaskTest(r.need, iddd));
     TEST_ASSERT_FALSE(nbrMaskTest(r.alone, iddd));
-    // HatF bleibt die blosse Kante: mit AAA im Pfad hat DDD den Frame schon
-    // mit einem einzigen Treffer (need, nicht Anteil).
+    // HatF folgt der Anteilsregel (Soak-Befund F5, vorher hier als "blosse
+    // Kante" festgeschrieben): mit AAA im Pfad hat DDD den Frame NICHT schon
+    // mit einem einzigen Streutreffer gegen AAAs 50 -- DDD bleibt im Bedarf
+    // und ohne Alternative (Fall A), im Zweifel wird relayt. Ab 10 % ist DDD
+    // ein echter Hoerer von AAA und faellt aus dem Bedarf.
     eset(m, iaaa, iddd, 1, now);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0);
+    TEST_ASSERT_TRUE(nbrMaskTest(r.need, iddd));
+    TEST_ASSERT_TRUE(nbrMaskTest(r.alone, iddd));
+    eset(m, iaaa, iddd, 5, now);
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0);
     TEST_ASSERT_FALSE(nbrMaskTest(r.need, iddd));
+    TEST_ASSERT_FALSE(nbrMaskTest(r.alone, iddd));
 #else
     TEST_IGNORE_MESSAGE("NBR_SHARE_PCT != 10 in dieser Umgebung");
 #endif
@@ -2359,6 +2367,285 @@ static void test_nbr_check_counts_each_inconsistency_class(void)
     TEST_ASSERT_EQUAL_UINT16(0, c.rows);
 }
 
+
+// --- Gateway-Flag: spaetester gewinnt + Verfall (Soak-Befund F6) ----------------------------------
+
+static bool gw_of(const NbrMatrix &m, int row)
+{
+    return (rflags(m, row) & NBR_FLAG_GW) != 0;
+}
+
+// Horizont-Eintrag des Rufzeichens call, oder -1.
+static int hz_of(const NbrMatrix &m, const char *call)
+{
+    uint64_t w = nbrCallEncode(call);
+    for (int h = 0; h < NBR_HZ_ENTRIES; h++)
+        if (m.hz_call[h] == w)
+            return h;
+    return -1;
+}
+
+void test_gw_hg_sets_h_clears_other_leaves_the_flag(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 100);   // HEY an "HG"
+    int ig = nbrFind(m, "OE1GGG-1");
+    TEST_ASSERT_TRUE(ig > 0);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    // HN-Bericht / anderer Rahmen: UNBEKANNT laesst das Flag stehen.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;N0;", NBR_GW_UNKNOWN, -80, 5, 101);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    nbrNoteFrameGw(m, "OE1GGG-1", '!', NULL, NBR_GW_UNKNOWN, -80, 5, 102);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    // HEY an "H": das Gateway ist keins mehr, sofort geloescht.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_NO, -80, 5, 103);
+    TEST_ASSERT_FALSE(gw_of(m, ig));
+    // Und wieder HG: gesetzt.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 104);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    // Der bool-Einstieg bleibt wie bisher: true setzt, false loescht NIE.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_NO, -80, 5, 105);
+    TEST_ASSERT_FALSE(gw_of(m, ig));
+    nbrNoteFrame(m, "OE1GGG-1", '@', "R0;", true, -80, 5, 106);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    nbrNoteFrame(m, "OE1GGG-1", '@', "R0;", false, -80, 5, 107);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+}
+
+// Ein Gateway ohne HG faellt nach NBR_GW_HOLD_MIN aus der Liste: 44 min danach
+// noch da, bei 45 weg. Ein neues HG im Fenster stellt den Zeitgeber neu.
+void test_gw_flag_lapses_45_min_after_last_hg_and_hg_rearms(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 100);
+    int ig = nbrFind(m, "OE1GGG-1");
+    TEST_ASSERT_TRUE(ig > 0);
+    TEST_ASSERT_EQUAL_INT(45, NBR_GW_HOLD_MIN);
+    for (uint16_t t = 101; t <= 100 + 44; t++)
+    {
+        nbrSweep(m, t);
+        TEST_ASSERT_TRUE(gw_of(m, ig));
+    }
+    nbrSweep(m, 100 + 45);
+    TEST_ASSERT_FALSE(gw_of(m, ig));
+    TEST_ASSERT_TRUE(nbrRowHasFlag(m, ig, NBR_FLAG_USED));   // die Zeile bleibt
+
+    // Neues HG bei 120 setzt das Flag; ein weiteres bei 140 (im Fenster) stellt
+    // den Zeitgeber neu: weg erst 45 min nach 140, nicht nach 120.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 120);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 140);
+    for (uint16_t t = 141; t <= 140 + 44; t++)
+    {
+        nbrSweep(m, t);
+        TEST_ASSERT_TRUE(gw_of(m, ig));
+    }
+    nbrSweep(m, 140 + 45);
+    TEST_ASSERT_FALSE(gw_of(m, ig));
+
+    // Ein HEY an "H" oder ein Bericht stellt den Zeitgeber NICHT neu.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 200);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;N0;", NBR_GW_UNKNOWN, -80, 5, 230);
+    nbrSweep(m, 200 + 44);
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    nbrSweep(m, 200 + 45);
+    TEST_ASSERT_FALSE(gw_of(m, ig));
+}
+
+// Entscheidungen haengen nicht vom Sweep ab (Kopfkommentar NBR_WINDOW_MIN): auch
+// ohne nbrSweep() zaehlt das Gateway-Flag in nbrRelayNeed() nur NBR_GW_HOLD_MIN
+// Minuten nach dem letzten HG.
+void test_gw_lapse_reaches_relay_need_without_a_sweep(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 100);
+    int ig = nbrFind(m, "OE1GGG-1");
+    TEST_ASSERT_TRUE(ig > 0);
+    // GGG ist direkt gehoert und Gateway: kein Abhaengiger, kein Wissen.
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1", 100 + 44, false, 0);
+    TEST_ASSERT_FALSE(r.known);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.need));
+    // 45 min nach dem HG, KEIN Sweep gelaufen: GGG ist wieder Abhaengiger.
+    r = nbrRelayNeed(m, "OE9ORG-1", 100 + 45, false, 0);
+    TEST_ASSERT_TRUE(r.known);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ig), r.need);
+    TEST_ASSERT_TRUE(gw_of(m, ig));   // das Zeilenflag steht noch, erst der Sweep loescht es
+}
+
+// Zeile 0 verfaellt nie; nbrRowClearFlag() ist der Weg fuer "--gateway off".
+void test_gw_row_zero_never_lapses_and_can_be_cleared_by_the_caller(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrRowSetFlag(m, 0, NBR_FLAG_GW);
+    for (uint16_t t = 101; t <= 100 + 200; t++)
+        nbrSweep(m, t);
+    TEST_ASSERT_TRUE(gw_of(m, 0));
+    // Eigenes Echo eines HEY an "H"/UNBEKANNT loescht Zeile 0 nicht (Zeile 0 gehoert dem Aufrufer).
+    nbrNoteFrameGw(m, "DK5EN-93,OE1AAA-1", '@', "R0;", NBR_GW_NO, -80, 5, 301);
+    TEST_ASSERT_TRUE(gw_of(m, 0));
+    nbrRowClearFlag(m, 0, NBR_FLAG_GW);
+    TEST_ASSERT_FALSE(gw_of(m, 0));
+    TEST_ASSERT_TRUE(nbrRowHasFlag(m, 0, NBR_FLAG_USED));    // andere Bits bleiben
+    // Ungueltige/freie Zeile: folgenlos.
+    nbrRowClearFlag(m, -1, NBR_FLAG_GW);
+    nbrRowClearFlag(m, NBR_MAX_ROWS, NBR_FLAG_GW);
+    nbrRowClearFlag(m, NBR_MAX_ROWS - 1, NBR_FLAG_GW);
+}
+
+// Minutenzaehler und Zeitgeber-Byte laufen um: HG kurz vor dem 8-Bit-Umbruch
+// (Minute 250) und kurz vor dem 16-Bit-Umbruch (65520).
+void test_gw_lapse_is_wraparound_safe(void)
+{
+    const uint16_t starts[] = {250, 65520, 65535, 255, 256};
+    for (unsigned k = 0; k < sizeof(starts) / sizeof(starts[0]); k++)
+    {
+        uint16_t t0 = starts[k];
+        NbrMatrix m;
+        nbrInit(m, "DK5EN-93", t0);
+        nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, t0);
+        int ig = nbrFind(m, "OE1GGG-1");
+        TEST_ASSERT_TRUE(ig > 0);
+        for (int d = 1; d <= 44; d++)
+        {
+            nbrSweep(m, (uint16_t)(t0 + d));
+            TEST_ASSERT_TRUE(gw_of(m, ig));
+        }
+        nbrSweep(m, (uint16_t)(t0 + 45));
+        TEST_ASSERT_FALSE(gw_of(m, ig));
+    }
+}
+
+void test_gw_changes_of_foreign_rows_are_logged(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    test_log_reset();
+    nbrLog = test_log_capture;
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 100);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|GW|100|OE1GGG-1|1|HG\n"));
+    // Wiederholtes HG stempelt nur: keine zweite Zeile.
+    test_log_reset();
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 110);
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|GW|"));
+    // UNBEKANNT und ein NEIN auf ein Nicht-Gateway: keine Zeile.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;N0;", NBR_GW_UNKNOWN, -80, 5, 111);
+    nbrNoteFrameGw(m, "OE1HHH-2", '@', "R0;", NBR_GW_NO, -80, 5, 111);
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|GW|"));
+    // HEY an "H" loescht: eine Zeile.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_NO, -80, 5, 112);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|GW|112|OE1GGG-1|0|H\n"));
+    // Verfall im Sweep: eine EXP-Zeile.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 120);
+    test_log_reset();
+    for (uint16_t t = 121; t <= 120 + 45; t++)
+        nbrSweep(m, t);
+    const char *exp_line = strstr(g_log_buf, "[NBR]|GW|165|OE1GGG-1|0|EXP\n");
+    TEST_ASSERT_NOT_NULL(exp_line);
+    TEST_ASSERT_NULL(strstr(exp_line + strlen("[NBR]|GW|165|OE1GGG-1|0|EXP\n"), "|GW|"));   // genau eine Zeile
+    // Zeile 0 wird nicht geloggt.
+    test_log_reset();
+    nbrNoteFrameGw(m, "DK5EN-93,OE1AAA-1", '@', "R0;", NBR_GW_YES, -80, 5, 170);
+    TEST_ASSERT_TRUE(gw_of(m, 0));
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|GW|"));
+    nbrLog = NULL;
+}
+
+// Horizont-Bit G: spaetester gewinnt, UNBEKANNT laesst es (vorher loeschte jedes
+// '@' ohne "HG", also auch ein HN-Bericht, das Bit).
+void test_horizon_g_bit_latest_wins(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 100);   // B direkt
+    // S1AAA ist 3 Token weit weg: Horizont-Eintrag mit Eintrittszeile A.
+    const char *path = "S1AAA,OE1AAA-1,OE1BBB-2";
+    nbrNoteFrameGw(m, path, '@', "R0;", NBR_GW_YES, -80, 5, 101);
+    int h = hz_of(m, "S1AAA");
+    TEST_ASSERT_TRUE(h >= 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.hz_meta[h][1] & 1);
+    nbrNoteFrameGw(m, path, '@', "R0;N0;", NBR_GW_UNKNOWN, -80, 5, 102);   // HN: bleibt
+    TEST_ASSERT_EQUAL_UINT8(1, m.hz_meta[h][1] & 1);
+    nbrNoteFrameGw(m, path, '!', NULL, NBR_GW_UNKNOWN, -80, 5, 103);       // POS: bleibt
+    TEST_ASSERT_EQUAL_UINT8(1, m.hz_meta[h][1] & 1);
+    nbrNoteFrameGw(m, path, '@', "R0;", NBR_GW_NO, -80, 5, 104);           // "H": weg
+    TEST_ASSERT_EQUAL_UINT8(0, m.hz_meta[h][1] & 1);
+    nbrNoteFrameGw(m, path, '@', "R0;N0;", NBR_GW_UNKNOWN, -80, 5, 105);
+    TEST_ASSERT_EQUAL_UINT8(0, m.hz_meta[h][1] & 1);
+    nbrNoteFrameGw(m, path, '@', "R0;", NBR_GW_YES, -80, 5, 106);          // "HG": wieder da
+    TEST_ASSERT_EQUAL_UINT8(1, m.hz_meta[h][1] & 1);
+    // bool-Einstieg unveraendert: false auf '@' loescht G wie bisher.
+    nbrNoteFrame(m, path, '@', "R0;", false, -80, 5, 107);
+    TEST_ASSERT_EQUAL_UINT8(0, m.hz_meta[h][1] & 1);
+    nbrNoteFrame(m, path, '@', "R0;", true, -80, 5, 108);
+    TEST_ASSERT_EQUAL_UINT8(1, m.hz_meta[h][1] & 1);
+}
+
+// --- nbrCopyMask (Soak-Befund F7) -----------------------------------------------------------------
+
+void test_copy_mask_contains_the_relayer_cover_mask_does_not(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 100);   // AAA direkt, keine Hoerer
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_TRUE(iaaa > 0);
+
+    // Form E9F11388: Bedarf = {Relayer}; die Wiederholung kommt vom Relayer.
+    NbrNeed need = nbrRelayNeed(m, "OE9ORG-1", 100, false, 0);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(iaaa), need.need);
+    NbrMask cover = nbrCoverMask(m, "OE1AAA-1", 100, false, need.need, 0, NULL);
+    NbrMask copy = nbrCopyMask(m, "OE1AAA-1", 100, false, need.need, 0, NULL);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(cover));                       // "Relayer bekannt" bleibt an der Leere hier nicht ablesbar,
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(iaaa), copy);                 // ...darum die eigene Maske: der Relayer hat den Frame
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(iaaa), nbrMaskAndNot(need.need, cover));   // alt: Relayer blieb im Bedarf
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAndNot(need.need, copy)));           // neu: Bedarf leer
+
+    // Mit Hoerern: Deckung + Relayer-Bit, und nur der Deckungsteil ist Symmetrie.
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    eset(m, iaaa, ibbb, 3, 100);
+    cover = nbrCoverMask(m, "OE1AAA-1", 100, false, nbrMaskNone(), 0, NULL);
+    copy = nbrCopyMask(m, "OE1AAA-1", 100, false, nbrMaskNone(), 0, NULL);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ibbb), cover);
+    TEST_ASSERT_MASK_EQ(mbits(iaaa, ibbb), copy);
+    NbrMask inf;
+    nbrCopyMask(m, "OE1AAA-1", 100, true, nbrMaskNone(), 0, &inf);
+    TEST_ASSERT_FALSE(nbrMaskTest(inf, iaaa));
+
+    // Relayer ohne Zeile, ich selbst, ungueltiges Rufzeichen: beide leer.
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCopyMask(m, "OE1ZZZ-9", 100, false, nbrMaskNone(), 0, NULL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCopyMask(m, "DK5EN-93", 100, false, nbrMaskNone(), 0, NULL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCopyMask(m, "??", 100, false, nbrMaskNone(), 0, NULL)));
+    // Vor nbrInit(): leer.
+    static NbrMatrix cold;   // BSS: nie initialisiert
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCopyMask(cold, "OE1AAA-1", 100, false, nbrMaskNone(), 0, NULL)));
+}
+
+// Gateway-Flag ueberlebt keinen Zeilenwechsel: eine neue Zeile auf dem Index
+// eines verdraengten Gateways startet ohne Flag (Zeitgeber wird nicht gelesen).
+void test_gw_flag_does_not_survive_row_eviction(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 100);
+    int ig = nbrFind(m, "OE1GGG-1");
+    TEST_ASSERT_TRUE(gw_of(m, ig));
+    // NBR_MAX_ROWS - 1 weitere Rufzeichen verdraengen ihn irgendwann.
+    static const char *calls[] = {"OE1AAA-1", "OE1BBB-2", "OE1CCC-3", "OE1DDD-4", "OE1EEE-5", "OE1FFF-6"};
+    for (unsigned k = 0; k < sizeof(calls) / sizeof(calls[0]); k++)
+        nbrNoteFrame(m, calls[k], ':', NULL, false, -80, 5, (uint16_t)(101 + k));
+    int in = nbrFind(m, "OE1GGG-1");
+    if (in < 0)
+    {
+        for (int r = 1; r < NBR_MAX_ROWS; r++)
+            TEST_ASSERT_FALSE(gw_of(m, r));
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2437,5 +2724,14 @@ int main(int, char **)
     RUN_TEST(test_decisions_do_not_depend_on_the_sweep);
     RUN_TEST(test_echoed_hey_group_leaves_me_snr_mean_alone);
     RUN_TEST(test_nbr_check_counts_each_inconsistency_class);
+    RUN_TEST(test_gw_hg_sets_h_clears_other_leaves_the_flag);
+    RUN_TEST(test_gw_flag_lapses_45_min_after_last_hg_and_hg_rearms);
+    RUN_TEST(test_gw_lapse_reaches_relay_need_without_a_sweep);
+    RUN_TEST(test_gw_row_zero_never_lapses_and_can_be_cleared_by_the_caller);
+    RUN_TEST(test_gw_lapse_is_wraparound_safe);
+    RUN_TEST(test_gw_changes_of_foreign_rows_are_logged);
+    RUN_TEST(test_horizon_g_bit_latest_wins);
+    RUN_TEST(test_copy_mask_contains_the_relayer_cover_mask_does_not);
+    RUN_TEST(test_gw_flag_does_not_survive_row_eviction);
     return UNITY_END();
 }
