@@ -347,6 +347,7 @@ test/test_batt_detect/test_main.cpp
 test/test_beacon_rate/test_beacon_rate.cpp
 test/test_ble_json_frame/test_ble_json_frame.cpp
 test/test_ble_phone_frame/test_ble_phone_frame.cpp
+test/test_ble_phone_harness/test_ble_phone_harness.cpp
 test/test_ble_settings_v1/force_include_stub.py
 test/test_ble_settings_v1/golden_v1_image.hex
 test/test_ble_settings_v1/stubs/nrf52/WisBlock-API.h

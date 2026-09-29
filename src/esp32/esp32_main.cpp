@@ -134,6 +134,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <command_functions.h>
 #include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <phone_commands.h>
+#include "ble_phone_drain.h"   // BLE-N1/N2: BlePhoneSend, g_blePhoneStats
 #include <aprs_functions.h>
 #include <batt_functions.h>
 #include <lora_functions.h>
@@ -399,6 +400,9 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 
     void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override
     {
+        // BLE-N2: remember the negotiated MTU. The drain reads the live value
+        // on every send (esp32_ble_mtu()) and counts frames longer than MTU-3.
+        g_blePhoneStats.last_mtu = MTU;
         if(bBLEDEBUG)
         {
             Serial.printf("[BLE ];mtu;ms;%lu;mtu;%u\n", (unsigned long)millis(), MTU);
@@ -2052,17 +2056,59 @@ void esp32setup()
     esp_task_wdt_add(NULL);
 }
 
-// BLE TX Function -> Node to Client
-void esp32_write_ble(uint8_t confBuff[300], uint8_t conf_len)
+// BLE TX Function -> Node to Client.
+//
+// BLE-N1: report what the stack did, so the drain can keep the frame when it
+// was refused. The old code did pTxCharacteristic->setValue() + notify();
+// notify() without arguments is NimBLE-Arduino's ble_gatts_chr_updated(), a
+// void call that queues the value for every subscribed peer and swallows a
+// failing send (out of mbufs) -- the result was always "true". The value
+// overload notify(data, len, handle) is not better: it returns only rc == 0.
+// So the frame goes out through ble_gatts_notify_custom() directly, which
+// returns the NimBLE rc:
+//   0                 the ATT PDU is queued for the controller      -> SENT
+//   BLE_HS_ENOTCONN   the connection is gone                        -> DOWN
+//   BLE_HS_ENOMEM ... no mbuf / out of resources (also our own
+//                     ble_hs_mbuf_from_flat() failing)              -> BUSY
+// One difference to the old path: notify_custom does not look at the CCCD, it
+// sends to the connection handle regardless. The drain only runs after the
+// app-layer hello (isPhoneReady), i.e. with a subscribed phone.
+BlePhoneSend esp32_write_ble(const uint8_t *buf, uint16_t len)
 {
     #if defined(DISABLE_BLE)
-    (void)confBuff; (void)conf_len;     // no BLE stack: pTxCharacteristic was never created
+    (void)buf; (void)len;     // no BLE stack: pTxCharacteristic was never created
+    return BLE_SEND_DOWN;
     #else
     if(bBLEDEBUG)
         printfdeb("[LOOP] <%lu> WRITE BLE\n", millis());
 
-    pTxCharacteristic->setValue(confBuff, conf_len);
-    pTxCharacteristic->notify();
+    if(!deviceConnected || g_ble_conn_handle == 0xFFFF || pTxCharacteristic == nullptr)
+        return BLE_SEND_DOWN;
+
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+    int rc = BLE_HS_ENOMEM;
+    if(om != nullptr)
+        rc = ble_gatts_notify_custom(g_ble_conn_handle, pTxCharacteristic->getHandle(), om);   // frees om
+
+    if(rc == 0)
+        return BLE_SEND_SENT;
+
+    if(bBLEDEBUG)
+        Serial.printf("[BLE ];tx_rc;%lu;rc%d;msys%d\n", (unsigned long)millis(), rc, (int)os_msys_num_free());
+
+    return (rc == BLE_HS_ENOTCONN) ? BLE_SEND_DOWN : BLE_SEND_BUSY;
+    #endif
+}
+
+// BLE-N2: the live ATT MTU of the current connection, 0 if there is none.
+uint16_t esp32_ble_mtu()
+{
+    #if defined(DISABLE_BLE)
+    return 0;
+    #else
+    if(!deviceConnected || g_ble_conn_handle == 0xFFFF)
+        return 0;
+    return (uint16_t)ble_att_mtu(g_ble_conn_handle);
     #endif
 }
 

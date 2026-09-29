@@ -122,6 +122,38 @@ uint8_t bf_peek(byte_fifo_t *f, uint8_t *out, uint16_t outmax)
     return l;
 }
 
+uint8_t bf_peek_gen(byte_fifo_t *f, uint8_t *out, uint16_t outmax, uint16_t *gen)
+{
+    uint8_t l = 0;
+    BF_LOCK();
+    if (f->unread)
+    {
+        l = f->buf[f->tail];
+        uint16_t n = (l < outmax) ? l : outmax;
+        if (n)
+            bf_read_at(f, bf_adv(f, f->tail, 1), out, n);
+    }
+    *gen = f->tail_gen;
+    BF_UNLOCK();
+    return l;
+}
+
+bool bf_pop_if(byte_fifo_t *f, uint16_t gen)
+{
+    bool popped = false;
+    BF_LOCK();
+    if (f->unread && f->tail_gen == gen)
+    {
+        uint8_t l = f->buf[f->tail];
+        f->tail = bf_adv(f, f->tail, (uint16_t)(1 + l));
+        f->unread--;
+        f->tail_gen++;
+        popped = true;
+    }
+    BF_UNLOCK();
+    return popped;
+}
+
 void bf_pop(byte_fifo_t *f)
 {
     BF_LOCK();

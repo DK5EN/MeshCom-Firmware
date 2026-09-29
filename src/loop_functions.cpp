@@ -16,6 +16,7 @@
 #include "hey_policy.h"     // F6: gateway keeps its HG alive through trickle suppression
 #include "nbr_views.h"
 #include "command_functions.h"
+#include "ble_phone_drain.h"   // BLE-N1/N2: blePhonePush(), g_blePhoneStats
 
 #include "clock.h"
 
@@ -551,6 +552,11 @@ static_assert(RING_BYTES_PHONECOM >= 12 * (245 + 1),
               "phoneComRing must hold the whole BLE config burst (12 x 246 B)");
 byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStore);
 
+// BLE-N1/N2: counters of the node->phone path (sent, retried, dropped,
+// truncated, evicted, last MTU). Written by the producers below and by the
+// drain in phone_commands.cpp, shown by --info. See src/ble_phone_drain.h.
+BlePhoneStats g_blePhoneStats = {0, 0, 0, 0, 0, 0};
+
 bool hasMsgFromPhone = false;
 
 // LoRa RX/TX sequence control
@@ -686,13 +692,11 @@ unsigned long getUnixClock()
  */
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
 {
-    // Das Laengenbyte unten ist ein uint8_t. Im Nicht-'D'-Zweig kommen noch 4 Byte
+    // Das Laengenbyte im Ring ist ein uint8_t. Im Nicht-'D'-Zweig kommen noch 4 Byte
     // Zeitstempel dazu, dort muss also len+4 hineinpassen; im 'D'-Zweig (JSON) wird
-    // len unveraendert abgelegt und darf die vollen 255 nutzen.
-    uint16_t maxlen = (buffer[0] != 'D') ? (UDP_TX_BUF_SIZE - 4) : UDP_TX_BUF_SIZE;
-    if (len > maxlen)
-        len = maxlen;
-
+    // len unveraendert abgelegt und darf die vollen 255 nutzen. Die Klemmung und
+    // der Push stehen in blePhonePush() (src/ble_phone_drain.h, host-getestet).
+    //
     // CONC-15: addBLEOutBuffer() is reachable from OnRxDone (the FreeRTOS
     // timer-service task on nRF52, priority 2, see C-01) while sendToPhone()
     // drains the same ring from the Main Loop task. Der Byte-Ring sperrt
@@ -700,21 +704,17 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
     // Abschnitt ist hier nicht mehr noetig.
     //
     // Frames ausser 'D' (JSON) bekommen 4 Byte Unix-Zeit angehaengt; der Ring
-    // nimmt beide Teile in einem Zug, ohne Zwischenpuffer.
+    // nimmt beide Teile in einem Zug, ohne Zwischenpuffer. Verdraengte
+    // ungelesene Frames zaehlt g_blePhoneStats.evicted (BLE-N1).
     int lost;
     if(buffer[0] != 'D')
     {
-        unsigned long unix_time = getUnixClock();
-
         uint8_t tbuffer[4];
-        tbuffer[0] = (unix_time >> 24) & 0xFF;
-        tbuffer[1] = (unix_time >> 16) & 0xFF;
-        tbuffer[2] = (unix_time >> 8) & 0xFF;
-        tbuffer[3] = (unix_time) & 0xFF;
-        lost = bf_push2(&phoneRing, buffer, (uint8_t)len, tbuffer, 4);
+        blePhoneTimeTag((uint32_t)getUnixClock(), tbuffer);
+        lost = blePhonePush(&phoneRing, &g_blePhoneStats, buffer, &len, UDP_TX_BUF_SIZE - 4, tbuffer);
     }
     else
-        lost = bf_push(&phoneRing, buffer, (uint8_t)len);
+        lost = blePhonePush(&phoneRing, &g_blePhoneStats, buffer, &len, UDP_TX_BUF_SIZE, NULL);
 
     if(bBLEDEBUG)
     {
@@ -732,12 +732,10 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
         return;
 
     if (len > 245)
-    {
         printfdeb("[ERR]...BLE out-buffer to long <%i> <%-245.245s>\n", len, buffer);
-        len = 245; // clamp - length byte and destination buffer both size to this
-    }
 
-    int lost = bf_push(&phoneComRing, buffer, (uint8_t)len);
+    // clamp to 245 - length byte and destination buffer both size to this
+    int lost = blePhonePush(&phoneComRing, &g_blePhoneStats, buffer, &len, 245, NULL);
 
     if(bBLEDEBUG)
     {

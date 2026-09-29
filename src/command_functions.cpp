@@ -17,6 +17,7 @@
 #include "extudp_functions.h"
 #include "ntp_async.h"
 #include "ble_json_frame.h"
+#include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
 #include "configuration.h"
@@ -6158,8 +6159,14 @@ void commandAction(char *umsg_text, bool ble)
                     ((meshcom_settings.node_sset3 & 0x8000)?"on":"off"));
 
             printfdeb("...BTCODE %06i\n", meshcom_settings.bt_code);
-            printfdeb("...APRSMC: %s\n...ATXT: %s\n...NAME: %s\n...BLE : %s\n...DISPLAY %s\n...CTRY %s\n...FREQ %.4f MHz TXPWR %i dBm RXBOOST %s\n",
-                    meshcom_settings.node_aprsmc, meshcom_settings.node_atxt, meshcom_settings.node_name, (bBLElong?"long":"short"),  (bDisplayOff?"off":"on"),
+            // BLE-N1/N2: phone TX counters appended to the BLE line -- s sent, r retried
+            // (kept for the next window), d dropped after the retry cap, t frames longer
+            // than MTU-3, e unread frames evicted from a phone ring, mtu = last MTU seen.
+            char bleTxStats[72];
+            blePhoneStatsFormat(&g_blePhoneStats, bleTxStats, sizeof(bleTxStats));
+
+            printfdeb("...APRSMC: %s\n...ATXT: %s\n...NAME: %s\n...BLE : %s %s\n...DISPLAY %s\n...CTRY %s\n...FREQ %.4f MHz TXPWR %i dBm RXBOOST %s\n",
+                    meshcom_settings.node_aprsmc, meshcom_settings.node_atxt, meshcom_settings.node_name, (bBLElong?"long":"short"), bleTxStats, (bDisplayOff?"off":"on"),
                     getCountry(meshcom_settings.node_country).c_str() , getFreq(), getPower(), (bBOOSTEDGAIN?"on":"off"));
 
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,

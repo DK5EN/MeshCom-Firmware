@@ -16,6 +16,7 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
+#include "ble_phone_drain.h"   // BLE-N1/N2: BlePhoneSend, g_blePhoneStats
 #include <debugconf.h>
 #include <configuration.h>
 #include <command_functions.h>
@@ -223,7 +224,14 @@ void stop_advertising()
  */
 void connect_callback(uint16_t conn_handle)
 {
-	(void)conn_handle;
+	// BLE-N2: the MTU right after connect is the default (23) -- the phone
+	// negotiates it later. nrf52_ble_mtu() reads the live value on every send
+	// and the drain keeps g_blePhoneStats.last_mtu current; this is the start
+	// value of the connection.
+	{
+		BLEConnection *conn = Bluefruit.Connection(conn_handle);
+		g_blePhoneStats.last_mtu = conn ? conn->getMtu() : 0;
+	}
 	Bluefruit.setTxPower(4);
 	DEBUG_MSG("BLE", "Connected");
 
@@ -254,6 +262,45 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 	conffin_sent = false;
 	Bluefruit.setTxPower(0);
 	DEBUG_MSG("BLE", "Disconnected");
+}
+
+/**
+ * @brief BLE TX sink for the phone drain (src/ble_phone_drain.h): one notify.
+ *
+ * BLE-N1: what BLEUart::write() returns (Bluefruit52Lib BLEUart.cpp, with
+ * bufferTXD() off -- this firmware never enables it -- write() is
+ * `_txd.notify(conn, content, len) ? len : 0`):
+ *   - 0 when notifications are not enabled (CCCD off)  -> checked first: DOWN
+ *   - len when BLECharacteristic::notify() got every chunk to the SoftDevice
+ *   - 0 when notify() failed: no free HVN packet (conn->getHvnPacket(), the
+ *     SoftDevice TX queue is full) or sd_ble_gatts_hvx() refused -> BUSY
+ * So 0 with notifications on means "queue full, try again" and the drain keeps
+ * the frame.
+ *
+ * Known limit: notify() splits a payload longer than MTU-3 into several
+ * notifies. If the FIRST chunk was queued and a later one is refused, the
+ * frame is reported BUSY although part of it went out, and the retry sends
+ * the head chunk again. Only frames longer than MTU-3 (the ones counted as
+ * "truncated") can hit this.
+ */
+BlePhoneSend nrf52_write_ble(const uint8_t *buf, uint16_t len)
+{
+	if(!g_ble_uart_is_connected || !g_ble_uart.notifyEnabled())
+		return BLE_SEND_DOWN;
+
+	return (g_ble_uart.write(buf, (size_t)len) == (size_t)len) ? BLE_SEND_SENT : BLE_SEND_BUSY;
+}
+
+/**
+ * @brief BLE-N2: the live ATT MTU of the current connection, 0 if none.
+ */
+uint16_t nrf52_ble_mtu()
+{
+	if(!g_ble_uart_is_connected)
+		return 0;
+
+	BLEConnection *conn = Bluefruit.Connection(Bluefruit.connHandle());
+	return conn ? conn->getMtu() : 0;
 }
 
 /**

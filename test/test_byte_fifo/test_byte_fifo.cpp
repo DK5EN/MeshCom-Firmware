@@ -222,6 +222,74 @@ static void test_tail_gen_detects_eviction_during_send(void)
     TEST_ASSERT_NOT_EQUAL(g, bf_tail_gen(&f));
 }
 
+// BLE-N1 (Advisor 2026-09-29): der BLE-Drain las bf_peek() und danach
+// bf_tail_gen(). Verdraengt ein Schreiber (nRF52: OnRxDone im LORA-Task) den
+// Frame A genau dazwischen, haelt der Leser A mit der Generation von B -- und
+// pop()t B, der nie gesendet wurde. Hier die Verschraenkung von Hand.
+static void push_a_b_then_evict_a(uint8_t *out, uint16_t outmax, bool atomic,
+                                  uint16_t *gen)
+{
+    uint8_t a[20], b[20], c[30];
+    fill(a, 20, 0x10);
+    fill(b, 20, 0x40);
+    fill(c, 30, 0x70);
+    bf_push(&f, a, 20);   // 21 Byte
+    bf_push(&f, b, 20);   // 42 Byte
+    if (atomic)
+        bf_peek_gen(&f, out, outmax, gen);
+    else
+        bf_peek(&f, out, outmax);
+    // Schreiber: 31 Byte passen nur, wenn A (21) weicht -> Ende bei B.
+    TEST_ASSERT_EQUAL_INT(1, bf_push(&f, c, 30));
+    if (!atomic)
+        *gen = bf_tail_gen(&f);   // alte Reihenfolge: Generation NACH dem Peek
+}
+
+static void test_old_peek_then_gen_pops_unsent_frame(void)
+{
+    uint8_t out[32];
+    uint16_t gen = 0;
+    push_a_b_then_evict_a(out, sizeof(out), false, &gen);
+    expect_frame(out, 20, 0x10, "leser haelt A");
+    // Die alte Pruefung "gleiche Generation?" sagt ja -- und nimmt B.
+    TEST_ASSERT_EQUAL_UINT16(gen, bf_tail_gen(&f));
+    bf_pop(&f);
+    uint8_t next[32];
+    TEST_ASSERT_EQUAL_UINT8(30, bf_peek(&f, next, sizeof(next)));   // B ist weg, ungesendet
+}
+
+static void test_peek_gen_and_pop_if_keep_unsent_frame(void)
+{
+    uint8_t out[32];
+    uint16_t gen = 0;
+    push_a_b_then_evict_a(out, sizeof(out), true, &gen);
+    expect_frame(out, 20, 0x10, "leser haelt A");
+    // A ist verdraengt: pop_if nimmt nichts, B bleibt als naechster Frame.
+    TEST_ASSERT_FALSE(bf_pop_if(&f, gen));
+    uint8_t next[32];
+    TEST_ASSERT_EQUAL_UINT8(20, bf_peek(&f, next, sizeof(next)));
+    expect_frame(next, 20, 0x40, "B bleibt");
+    // Ohne Verdraengung nimmt pop_if genau den gelesenen Frame.
+    uint16_t g2 = 0;
+    bf_peek_gen(&f, next, sizeof(next), &g2);
+    TEST_ASSERT_TRUE(bf_pop_if(&f, g2));
+    TEST_ASSERT_EQUAL_UINT8(30, bf_peek(&f, next, sizeof(next)));
+}
+
+static void test_peek_gen_and_pop_if_take_the_lock(void)
+{
+    uint8_t a[5], out[8];
+    uint16_t gen = 0;
+    fill(a, 5, 0x20);
+    bf_push(&f, a, 5);
+    lock_calls = 0;
+    bf_peek_gen(&f, out, sizeof(out), &gen);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "bf_peek_gen takes the ring lock once");
+    bf_pop_if(&f, gen);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, lock_calls, "bf_pop_if takes the ring lock once");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "and releases it");
+}
+
 // --- Verlauf -----------------------------------------------------------------
 
 static void test_history_iterates_oldest_to_newest_including_read(void)
@@ -365,6 +433,9 @@ int main(int, char **)
     RUN_TEST(test_eviction_moves_tail_and_counts_unread);
     RUN_TEST(test_eviction_of_read_history_is_free);
     RUN_TEST(test_tail_gen_detects_eviction_during_send);
+    RUN_TEST(test_old_peek_then_gen_pops_unsent_frame);
+    RUN_TEST(test_peek_gen_and_pop_if_keep_unsent_frame);
+    RUN_TEST(test_peek_gen_and_pop_if_take_the_lock);
     RUN_TEST(test_history_iterates_oldest_to_newest_including_read);
     RUN_TEST(test_history_stops_after_eviction_mid_walk);
     RUN_TEST(test_unread_counts_frames_used_counts_bytes);
