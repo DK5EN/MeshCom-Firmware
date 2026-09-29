@@ -1,5 +1,25 @@
 # RESUME — pick up here
 
+## 2026-09-29 midday: release `v4.35v.09.29-neo` published, DK5EN-98 soak running
+
+Tag `v4.35v.09.29-neo` on `bfc644ab`, GitHub release with 39 assets (latest), web flasher offers
+only this release (`v4.35u.09.28.3-neo` pruned from the flasher; its GitHub release object stays),
+presentation index updated. Gate: 48 native envs, 1588/1588 tests, golden selftest green (baseline
+`variant-ini-effective.json` regenerated for six intended config changes), 32 release envs built,
+flasher check 30 boards / 0 mismatches.
+
+Content: official `v4.35v` complete (PR #1175 one-shot position cherry-picked as `cc18833e`), the
+soak fixes F1-F8 of the entry below, and the BLE/battery/timing campaign of
+`docs/ble-batt-campaign-20260929.md` (BLE-N1..N4, battery pipeline for all boards incl. the Heltec
+LED, TIME-01/02 found by the millis teleport tests, INS-05/DM-17/GW-02, RAK `-Os`).
+
+Soak: DK5EN-98 on this image since 10:07 (22 dBm, GW on, MESH on), capture
+`rpizero:~/meshlog/dk5en-98/` in `screen -S meshlog` until **2026-10-02 10:10**. Evaluate against
+the last log line, not only gaps.
+
+Deliberately open: BLE-FLOOD, UDP-INGRESS, BAT-NOISE, BLE-SETTINGS-HW (BACKLOG), DM-18, the
+operator's eye check of the Heltec LED, T114/T-Echo still `-Ofast`, nothing offered upstream yet.
+
 ## 2026-09-29: soak fixes F1-F8 + upstream v4.35v port committed, gate/OTA/soak postponed
 
 The 26 h soak of 2026-09-27/28 was evaluated: the neighbour matrix works, and there was no
