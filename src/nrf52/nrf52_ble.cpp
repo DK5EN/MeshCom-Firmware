@@ -331,6 +331,24 @@ void bleuart_rx_callback(uint16_t conn_handle)
 
 }
 
+/**
+ * @brief Act on an app-layer auth failure (wrong or missing PIN hash).
+ *
+ * readPhoneCommand() sets ble_disconnect_requested, but since CONC-14 it runs
+ * in the Main Loop from bleQueue -- after bleuart_rx_callback() has already
+ * returned. The check there therefore only fired on the phone's NEXT write: a
+ * phone that sent a wrong PIN hash and then waited stayed connected (no burst,
+ * but an open link). The Main Loop calls this right after draining bleQueue.
+ */
+void nrf52BleServiceDisconnect(void)
+{
+	if(ble_disconnect_requested)
+	{
+		ble_disconnect_requested = false;
+		Bluefruit.disconnect(Bluefruit.connHandle());
+	}
+}
+
 // CONC-17: settings_rx_callback() runs in the Bluefruit Ada callback task,
 // which can be preempted mid-write by a higher-priority task or, on a tick
 // wake-up, an equal-priority one — a torn image could put a beacon on the air
