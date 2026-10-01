@@ -61,6 +61,10 @@ see almost none.
 
 ## Finding 1: Heltec V3 without a cell reports a full battery again (regression)
 
+> **Status 2026-10-01: fixed** in `5c3a932d` (BAT-03, window spread of 8 reads 2 ms apart,
+> limit 300 mV), hardware PASS on DK5EN-1 with and without a cell. Campaign, measurements and
+> results: `docs/batt-nocell-campaign-20261001.md`.
+
 - **Severity:** medium. Wrong data on air (`/B=100` for a node on USB) and in the app/web. No false
   deep sleep: the phantom reads 4.4 V, which is never "low". No crash risk.
 - **Evidence:** DK5EN-1 (no cell, `--maxv 4.2`): 95 of 104 own position beacons carry `/B=100`;

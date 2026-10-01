@@ -80,3 +80,22 @@ set well above the 113 mV worst case and well below the 819 mV no-cell minimum: 
 - Two pre-existing golden findings from 50fdfe65/0713f47a fixed on the operator's call:
   `--ethmtu` rung and its web `/setparam` producer are now RAK-only like the help line;
   `test/golden/native/variant-ini-effective.json` regenerated (adds `test_tft_backlight` only).
+
+Gate 2 (after the advisor fixes): 48/48 native envs, 1614 cases; golden selftest OK; builds OK
+for heltec_wifi_lora_32_V3/V4, heltec_wireless_stick, wiscore_rak4631, vision-master-e213,
+wireless-paper, t_deck, E22-DevKitC, T-ETH-ELITE_1262, ttgo_tbeam. Markers: V3 image carries
+`window spread mV`, E213 image `spread:;`, the V3 release image has no `BATTPROBE`.
+
+## Hardware result (wave 2)
+
+DK5EN-1 on the release-type image (build 2026-10-01 21:08:31), 2 dBm, `--debug on` +
+`--setcont on` for the run (both switched off afterwards). Logs:
+`~/meshlog/battprobe-20261001/dk5en-1-fix-{cell,nocell}.txt`.
+
+| Case          | Production samples (30 s apart) | Window spread mV | `--info` BATT                                                    |
+| ------------- | ------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| LiPo attached | 13                              | 75-100           | 4.04 V / 80-81 % throughout                                      |
+| cell removed  | 14                              | 861-970          | 4.18-4.75 V for the 6-sample streak, then 0.00 V / 0 % and stays |
+
+PASS on the Heltec V3. Not measured on hardware: Heltec V4, Wireless Stick, E213, Wireless
+Paper (same rule, no bench board).

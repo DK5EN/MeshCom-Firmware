@@ -7439,9 +7439,10 @@ Found in the BLE/battery campaign 2026-09-29 (`docs/ble-batt-campaign-20260929.m
   before the cadence changes.
 - **UDP-INGRESS** at 50 datagrams/s the ESP32 UDP socket drops datagrams before the firmware
   reads them (rx 87 of 140 injected); invisible to the firmware counters.
-- **BAT-NOISE** switched-divider boards take one raw reading per 30 s, so the EMA barely smooths
-  there; an 8x average would hide the floating-divider signature BAT-01 needs. Bench-test the
-  detector with averaging before changing it.
+- **BAT-NOISE** DONE 2026-10-01 as BAT-03 (`5c3a932d`): switched dividers read 8 samples 2 ms
+  apart per window; a spread above 300 mV marks the sample implausible. Hardware PASS on a
+  Heltec V3 (`docs/batt-nocell-campaign-20261001.md`). Open: V4, Wireless Stick, E213, Wireless
+  Paper unmeasured; Heltec T114 has the same topology but no detector at all.
 - **BLE-SETTINGS-HW** the `node_msgid` fix (`dbc57632`, settings characteristic) still has no
   hardware test; `ble_stress.py` writes over NUS 0x95 only.
 
