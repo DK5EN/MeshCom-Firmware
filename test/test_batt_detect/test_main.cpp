@@ -341,6 +341,108 @@ static void test_core_gesunder_akku_nie_low(void)
     TEST_ASSERT_FALSE(battLowVoltage(3300.0f));
 }
 
+// ------------------------------------------------- BAT-03: window spread, switched divider
+// Heltec V3 without a cell, measured 2026-10-01 (docs/batt-nocell-campaign-20261001.md): the divider
+// sits on the charger-output sawtooth, one single read per window lands anywhere in 3.7-4.9 V. This
+// series is --battprobe LONG cycle 1 (divider on 3 s, one read every 100 ms, x 4.18 mV/count); it
+// stands in for one read per 30 s window at a random phase (pack max 4.2 V -> band 2310..4830 mV).
+static const float kNoCellSeries[] = {
+    4694, 4368, 4176, 4009, 3850, 3724, 4782, 4585, 4368, 4209, 4030, 3908, 3741, 4811, 4623, 4410,
+    4201, 4084, 3917, 3779, 4853, 4640, 4460, 4251, 4109, 3929, 3787, 4874, 4577, 4389, 4226
+};
+static const int kNoCellN = (int)(sizeof(kNoCellSeries) / sizeof(kNoCellSeries[0]));
+static const float kNoCellSpreadMv = 937.0f;   // BURST cycle 1, reads 50-57 (t = 100-114 ms)
+static const float kSwitchedMaxMv  = 4200.0f;
+
+// Shipped bug, documented: without the window spread the same series ends "present" with a
+// nonzero value (the single reads are inside the band, the 30 s deltas rarely exceed 250 mV).
+static void test_batt03_no_cell_ohne_spread_bleibt_present_bug(void)
+{
+    float mv = 0.0f;
+    uint32_t t = 0;
+    for(int i = 0; i < kNoCellN; i++, t += 30000)
+        mv = battFeedSample(kNoCellSeries[i], kSwitchedMaxMv, t);
+
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_TRUE(battHardwarePresent());
+    TEST_ASSERT_TRUE(mv > 0.0f);
+}
+
+// Fixed: the same series with the 937 mV window spread is "no reading" after ABSENT_STREAK samples.
+static void test_batt03_no_cell_mit_spread_geht_auf_absent(void)
+{
+    float mv = 1.0f;
+    uint32_t t = 0;
+    for(int i = 0; i < BATT_DETECT_ABSENT_STREAK - 1; i++, t += 30000)
+        mv = battFeedSampleSpread(kNoCellSeries[i], kNoCellSpreadMv, kSwitchedMaxMv, t);
+    TEST_ASSERT_TRUE(battHardwarePresent());   // one sample short of the streak: still the fail-safe
+    TEST_ASSERT_TRUE(mv > 0.0f);
+
+    mv = battFeedSampleSpread(kNoCellSeries[BATT_DETECT_ABSENT_STREAK - 1], kNoCellSpreadMv, kSwitchedMaxMv, t);
+    t += 30000;
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+    TEST_ASSERT_FALSE(battDetected());
+    TEST_ASSERT_FALSE(battHardwarePresent());
+
+    for(int i = BATT_DETECT_ABSENT_STREAK; i < kNoCellN; i++, t += 30000)
+        mv = battFeedSampleSpread(kNoCellSeries[i], kNoCellSpreadMv, kSwitchedMaxMv, t);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+    TEST_ASSERT_FALSE(battHardwarePresent());
+}
+
+// A real cell on the switched divider: reads 3958-4034 mV, window spread <= 120 mV (measured worst
+// case 113 mV) -> stays present, reports a value. Spread 120 is far under the 300 mV limit.
+static void test_batt03_zelle_mit_kleinem_spread_bleibt_present(void)
+{
+    const float cell[] = {3958, 3981, 4012, 3990, 3965, 4034, 4002, 3975, 3996, 4021};
+    const float spread[] = {20, 50, 113, 0, 35, 120, 60, 10, 80, 45};
+    float mv = 0.0f;
+    uint32_t t = 0;
+    for(int i = 0; i < 60; i++, t += 30000)
+        mv = battFeedSampleSpread(cell[i % 10], spread[i % 10], kSwitchedMaxMv, t);
+
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_TRUE(battHardwarePresent());
+    TEST_ASSERT_TRUE(mv > 3900.0f && mv < 4100.0f);
+}
+
+// One bad window (spread over the limit) between good ones is a single implausible sample: far
+// below ABSENT_STREAK, the verdict does not flip and the value keeps reporting.
+static void test_batt03_ein_schlechtes_fenster_kippt_nicht(void)
+{
+    uint32_t t = 0;
+    float mv = 0.0f;
+    for(int i = 0; i < 10; i++, t += 30000)
+        mv = battFeedSampleSpread(3990.0f, 30.0f, kSwitchedMaxMv, t);
+    TEST_ASSERT_TRUE(mv > 0.0f);
+
+    mv = battFeedSampleSpread(3990.0f, 900.0f, kSwitchedMaxMv, t);   // the bad window
+    t += 30000;
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_TRUE(battHardwarePresent());
+    TEST_ASSERT_TRUE(mv > 0.0f);
+
+    for(int i = 0; i < 10; i++, t += 30000)
+        mv = battFeedSampleSpread(3990.0f, 30.0f, kSwitchedMaxMv, t);
+    TEST_ASSERT_TRUE(battDetected());
+    TEST_ASSERT_TRUE(battHardwarePresent());
+    TEST_ASSERT_FLOAT_WITHIN(1.0f, 3990.0f, mv);
+}
+
+// battFeedSample() is battFeedSampleSpread(..., BATT_DETECT_SPREAD_NONE, ...): identical results.
+static void test_batt03_feedsample_delegiert_ohne_spread(void)
+{
+    float a[10], b[10];
+    for(int i = 0; i < 10; i++)
+        a[i] = battFeedSample(3900.0f + 10.0f*i, kSwitchedMaxMv, 1000u*(uint32_t)i);
+    battPipelineReset();
+    for(int i = 0; i < 10; i++)
+        b[i] = battFeedSampleSpread(3900.0f + 10.0f*i, BATT_DETECT_SPREAD_NONE, kSwitchedMaxMv, 1000u*(uint32_t)i);
+    for(int i = 0; i < 10; i++)
+        TEST_ASSERT_EQUAL_FLOAT(a[i], b[i]);
+}
+
+
 // ----------------------------------------------------- millis() teleportation
 // The full sample core (battFeedSample: detector on the raw sample -> dt EMA ->
 // "no reading" rules -> settle rule) with the clock put just before the uint32
@@ -533,6 +635,11 @@ int main(int, char **)
     RUN_TEST(test_core_low_voltage_nur_settled);
     RUN_TEST(test_core_schlechtes_erstes_sample_loest_nichts_aus);
     RUN_TEST(test_core_gesunder_akku_nie_low);
+    RUN_TEST(test_batt03_no_cell_ohne_spread_bleibt_present_bug);
+    RUN_TEST(test_batt03_no_cell_mit_spread_geht_auf_absent);
+    RUN_TEST(test_batt03_zelle_mit_kleinem_spread_bleibt_present);
+    RUN_TEST(test_batt03_ein_schlechtes_fenster_kippt_nicht);
+    RUN_TEST(test_batt03_feedsample_delegiert_ohne_spread);
     RUN_TEST(test_teleport_core_across_wrap_matches_unwrapped_run);
     RUN_TEST(test_teleport_core_hop_1h);
     RUN_TEST(test_teleport_core_hop_2p31_minus_1);

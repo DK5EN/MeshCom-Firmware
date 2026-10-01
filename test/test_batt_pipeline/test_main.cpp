@@ -453,8 +453,121 @@ static void test_detect_2s_pack_band_bleibt_present(void)
 }
 
 // Constants stay what the canonical copy has (behaviour must not move).
+// ---- BAT-03 window spread (soak 2026-09-29 Finding 1, measured 2026-10-01 on DK5EN-1) ----
+// Heltec V3 without a cell, divider on for 3 s, one read every 100 ms (--battprobe LONG,
+// cycle 1, x 4.18 mV/count): the charger-output sawtooth sampled at a random phase, which is
+// what one read per 30 s window sees.
+static const float kNoCellReadsMv[] = {
+    4694, 4368, 4176, 4009, 3850, 3724, 4782, 4585, 4368, 4209, 4030, 3908, 3741, 4811, 4623, 4410,
+    4201, 4084, 3917, 3779, 4853, 4640, 4460, 4251, 4109, 3929, 3787, 4874, 4577, 4389, 4226};
+static const int kNoCellReadsN = (int)(sizeof(kNoCellReadsMv) / sizeof(kNoCellReadsMv[0]));
+// One 8-read window, 2 ms apart: no cell = BURST cycle 1, samples 50-57; with a cell = shaped on
+// the measured worst case, a first read after idle ~26 counts above back-to-back reads (PAIR
+// windows, 113 mV incl. the first read); spread 113 mV against the 300 mV limit.
+static const float kNoCellWindowMv[] = {3917, 4795, 4318, 3862, 4748, 4259, 3858, 4703};
+static const float kCellWindowMv[]   = {4050, 3963, 3958, 3958, 3958, 3958, 3937, 3958};
+
+static void test_detect_window_spread_helper(void)
+{
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, 937.0f, battWindowSpread(kNoCellWindowMv, 8));
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, 113.0f, battWindowSpread(kCellWindowMv, 8));
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, battWindowSpread(kCellWindowMv, 1));
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, battWindowSpread(kCellWindowMv, 0));
+}
+
+// The bug as shipped in v4.35v.09.29-neo: single reads of the no-cell sawtooth stay "present".
+static void test_detect_nocell_sawtooth_single_read_bleibt_present(void)
+{
+    battDetectReset(&g_state);
+    bool present = true;
+    for (int i = 0; i < kNoCellReadsN; i++)
+        present = battDetectUpdate(&g_state, kNoCellReadsMv[i], kMinMv, kMaxMv);
+    TEST_ASSERT_TRUE(present);
+}
+
+// The fix: the same reads with the spread of their window go absent after the absent streak.
+static void test_detect_nocell_sawtooth_mit_spread_geht_auf_absent(void)
+{
+    battDetectReset(&g_state);
+    const float spread = battWindowSpread(kNoCellWindowMv, 8);
+    bool present = true;
+    for (int i = 0; i < BATT_DETECT_ABSENT_STREAK - 1; i++)
+        present = battDetectUpdateSpread(&g_state, kNoCellReadsMv[i], spread, kMinMv, kMaxMv);
+    TEST_ASSERT_TRUE(present);   // streak hysteresis unchanged
+    for (int i = BATT_DETECT_ABSENT_STREAK - 1; i < kNoCellReadsN; i++)
+        present = battDetectUpdateSpread(&g_state, kNoCellReadsMv[i], spread, kMinMv, kMaxMv);
+    TEST_ASSERT_FALSE(present);
+    TEST_ASSERT_EQUAL_INT(kNoCellReadsN, g_state.implausibleStreak);
+}
+
+static void test_detect_zelle_mit_spread_bleibt_present(void)
+{
+    battDetectReset(&g_state);
+    const float spread = battWindowSpread(kCellWindowMv, 8);
+    bool present = true;
+    for (int i = 0; i < 60; i++)
+        present = battDetectUpdateSpread(&g_state, kCellWindowMv[0] - (float)(i % 3), spread, kMinMv, kMaxMv);
+    TEST_ASSERT_TRUE(present);
+    TEST_ASSERT_EQUAL_INT(0, g_state.implausibleStreak);
+}
+
+// Plugging a cell in produced ~1.5 s of sawtooth (2026-10-01): one bad window must not flip.
+static void test_detect_einzelnes_spread_fenster_kippt_nicht(void)
+{
+    battDetectReset(&g_state);
+    const float ok = battWindowSpread(kCellWindowMv, 8);
+    const float bad = battWindowSpread(kNoCellWindowMv, 8);
+    battDetectUpdateSpread(&g_state, 3958.0f, ok, kMinMv, kMaxMv);
+    bool present = battDetectUpdateSpread(&g_state, 3958.0f, bad, kMinMv, kMaxMv);
+    TEST_ASSERT_TRUE(present);
+    TEST_ASSERT_EQUAL_INT(1, g_state.implausibleStreak);
+    present = battDetectUpdateSpread(&g_state, 3958.0f, ok, kMinMv, kMaxMv);
+    TEST_ASSERT_TRUE(present);
+    TEST_ASSERT_EQUAL_INT(0, g_state.implausibleStreak);
+}
+
+static void test_detect_spread_grenzwert(void)
+{
+    battDetectReset(&g_state);
+    battDetectUpdateSpread(&g_state, 3958.0f, BATT_DETECT_MAX_WINDOW_SPREAD_MV, kMinMv, kMaxMv);
+    TEST_ASSERT_EQUAL_INT(0, g_state.implausibleStreak);   // at the limit: plausible
+    battDetectUpdateSpread(&g_state, 3958.0f, BATT_DETECT_MAX_WINDOW_SPREAD_MV + 1.0f, kMinMv, kMaxMv);
+    TEST_ASSERT_EQUAL_INT(1, g_state.implausibleStreak);
+}
+
+// BATT_DETECT_SPREAD_NONE and the legacy entry points behave exactly as before.
+static void test_detect_spread_none_ist_legacy(void)
+{
+    batt_detect_state_t a, b;
+    battDetectReset(&a);
+    battDetectReset(&b);
+    for (int i = 0; i < kNoCellReadsN; i++)
+    {
+        const bool pa = battDetectUpdate(&a, kNoCellReadsMv[i], kMinMv, kMaxMv);
+        const bool pb = battDetectUpdateSpread(&b, kNoCellReadsMv[i], BATT_DETECT_SPREAD_NONE, kMinMv, kMaxMv);
+        TEST_ASSERT_EQUAL(pa, pb);
+        TEST_ASSERT_EQUAL_INT(a.implausibleStreak, b.implausibleStreak);
+        TEST_ASSERT_EQUAL_INT(a.plausibleStreak, b.plausibleStreak);
+    }
+}
+
+static void test_detect_feed_spread_nutzt_singleton(void)
+{
+    battDetectGlobalReset();
+    const float bad = battWindowSpread(kNoCellWindowMv, 8);
+    bool present = true;
+    for (int i = 0; i < BATT_DETECT_ABSENT_STREAK; i++)
+        present = battDetectFeedSpread(3958.0f, bad, kMinMv, kMaxMv);
+    TEST_ASSERT_FALSE(present);
+    TEST_ASSERT_FALSE(battDetected());
+    battDetectGlobalReset();
+}
+
 static void test_detect_constants_unchanged(void)
 {
+    TEST_ASSERT_EQUAL_INT(8, BATT_DETECT_WINDOW_READS);
+    TEST_ASSERT_EQUAL_INT(2, BATT_DETECT_WINDOW_STEP_MS);
+    TEST_ASSERT_EQUAL_FLOAT(300.0f, BATT_DETECT_MAX_WINDOW_SPREAD_MV);
     TEST_ASSERT_EQUAL_FLOAT(250.0f, BATT_DETECT_MAX_DELTA_MV);
     TEST_ASSERT_EQUAL_FLOAT(0.55f, BATT_DETECT_MIN_BAND_FACTOR);
     TEST_ASSERT_EQUAL_FLOAT(1.15f, BATT_DETECT_MAX_BAND_FACTOR);
@@ -1118,6 +1231,14 @@ int main(int, char **)
     RUN_TEST(test_detect_present_streak_grenzwert_bei_erholung);
     RUN_TEST(test_detect_reset_stellt_failsafe_present_wieder_her);
     RUN_TEST(test_detect_2s_pack_band_bleibt_present);
+    RUN_TEST(test_detect_window_spread_helper);
+    RUN_TEST(test_detect_nocell_sawtooth_single_read_bleibt_present);
+    RUN_TEST(test_detect_nocell_sawtooth_mit_spread_geht_auf_absent);
+    RUN_TEST(test_detect_zelle_mit_spread_bleibt_present);
+    RUN_TEST(test_detect_einzelnes_spread_fenster_kippt_nicht);
+    RUN_TEST(test_detect_spread_grenzwert);
+    RUN_TEST(test_detect_spread_none_ist_legacy);
+    RUN_TEST(test_detect_feed_spread_nutzt_singleton);
     RUN_TEST(test_detect_constants_unchanged);
     RUN_TEST(test_detect_feed_singleton_lazy_init);
     // percent

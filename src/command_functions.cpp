@@ -1237,7 +1237,7 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             printdeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
             #endif
-            printdeb("--ntpsync  request an immediate NTP refresh now\n");
+            printdeb("--ntpsync  request an immediate NTP refresh now\n--battprobe [n]  raw battery divider ADC capture, n cycles 1-10 (~7.5 s each)\n");
             printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
             delay(100);
             #endif
@@ -4940,6 +4940,19 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"heap") == 0)
     {
         instrument_report_heap("-");
+        return;
+    }
+    else
+    // --battprobe [n]: raw ADC capture of the switched Heltec battery divider (n cycles, 1..10),
+    // see battProbeRun() in batt_function_old.cpp. Runs synchronously (~7.5 s per cycle).
+    if(commandCheck(msg_text+2, (char*)"battprobe") == 0)
+    {
+        #if defined(USE_NEW_BATT)
+        printfdeb("[BATTPROBE]|unsupported\n");
+        #else
+        int bpCycles = atoi(msg_text + 11);   // "--battprobe" is 11 chars; atoi skips the blank, 0/garbage -> clamped to 1
+        battProbeRun(bpCycles);
+        #endif
         return;
     }
     else

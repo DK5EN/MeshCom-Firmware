@@ -59,6 +59,10 @@ uint32_t battSampleCount(void);
 // A battery that comes back after the detector said "absent" re-seeds the EMA with the first
 // plausible sample (and restarts the settle rule) instead of averaging the floating-pin noise in.
 float battFeedSample(float rawMv, float maxMv, uint32_t nowMs);
+// Same, plus the spread (max - min, mV) of the multi-read window the raw sample came from (BAT-03,
+// switched dividers: the charger-output sawtooth without a cell). battFeedSample() is this with
+// BATT_DETECT_SPREAD_NONE.
+float battFeedSampleSpread(float rawMv, float spreadMv, float maxMv, uint32_t nowMs);
 void  battPipelineReset(void);        // EMA, detector, cached value (init_batt(), tests)
 float battFilteredMv(void);           // EMA value, mV (0 before the first sample)
 bool  battSettled(void);              // EMA settle rule (3 tau and 8 samples) reached
@@ -107,6 +111,11 @@ void init_batt(void);
 float read_batt(void);
 uint8_t mv_to_percent(float mvolts);
 void setMaxBatt(float u_max_batt);
+
+#include "instrument.h"   // TEMPORARY -- INSTRUMENT_ENABLED, see src/instrument.h
+#if INSTRUMENT_ENABLED
+void battProbeRun(int cycles);   // TEMPORARY bench command --battprobe [n] (batt_function_old.cpp)
+#endif
 
 
 void check_efuse(void);

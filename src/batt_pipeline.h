@@ -279,11 +279,46 @@ inline void battDetectReset(batt_detect_state_t *state)
     state->present = true;   // fail-safe: "false" only after BATT_DETECT_ABSENT_STREAK implausible samples
 }
 
+// WINDOW SPREAD TEST (BAT-03, soak 2026-09-29 Finding 1). A switched divider is read in a
+// 100 ms window every 30 s. Without a cell the battery terminal is the charger output, a ~6 ms
+// sawtooth between ~3.6 and ~4.9 V; one read lands at a random phase, mostly inside the band,
+// and rarely 250 mV from the read 30 s earlier, so the two tests above stopped firing. Measured
+// on a Heltec V3 (DK5EN-1, 2026-10-01, docs/batt-nocell-campaign-20261001.md): the spread of
+// BATT_DETECT_WINDOW_READS reads BATT_DETECT_WINDOW_STEP_MS apart is 819-1267 mV without a cell
+// and 0-50 mV with one (113 mV worst case incl. the first read after idle). A spread above
+// BATT_DETECT_MAX_WINDOW_SPREAD_MV marks the sample implausible. Readers that take one read only
+// pass BATT_DETECT_SPREAD_NONE.
+#ifndef BATT_DETECT_WINDOW_READS
+#define BATT_DETECT_WINDOW_READS        8
+#endif
+#ifndef BATT_DETECT_WINDOW_STEP_MS
+#define BATT_DETECT_WINDOW_STEP_MS      2
+#endif
+#ifndef BATT_DETECT_MAX_WINDOW_SPREAD_MV
+#define BATT_DETECT_MAX_WINDOW_SPREAD_MV 300.0f
+#endif
+#define BATT_DETECT_SPREAD_NONE         (-1.0f)
+
+// max - min of n samples (any unit); 0 for n < 2.
+inline float battWindowSpread(const float *v, int n)
+{
+    if (n < 2) { return 0.0f; }
+    float lo = v[0], hi = v[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (v[i] < lo) { lo = v[i]; }
+        if (v[i] > hi) { hi = v[i]; }
+    }
+    return hi - lo;
+}
+
 // Feeds one raw (unfiltered) mV sample against a plausible band
-// [minPlausibleMv, maxPlausibleMv]; returns the updated verdict.
-inline bool battDetectUpdate(batt_detect_state_t *state, float rawMv, float minPlausibleMv, float maxPlausibleMv)
+// [minPlausibleMv, maxPlausibleMv] plus the spread of the read window it came from
+// (BATT_DETECT_SPREAD_NONE = single read, test skipped); returns the updated verdict.
+inline bool battDetectUpdateSpread(batt_detect_state_t *state, float rawMv, float spreadMv, float minPlausibleMv, float maxPlausibleMv)
 {
     bool implausible = (rawMv < minPlausibleMv) || (rawMv > maxPlausibleMv);
+    if (spreadMv > BATT_DETECT_MAX_WINDOW_SPREAD_MV) { implausible = true; }
 
     if (state->haveLast)
     {
@@ -314,6 +349,12 @@ inline bool battDetectUpdate(batt_detect_state_t *state, float rawMv, float minP
     return state->present;
 }
 
+// Single-read form (no window spread), unchanged behaviour.
+inline bool battDetectUpdate(batt_detect_state_t *state, float rawMv, float minPlausibleMv, float maxPlausibleMv)
+{
+    return battDetectUpdateSpread(state, rawMv, BATT_DETECT_SPREAD_NONE, minPlausibleMv, maxPlausibleMv);
+}
+
 // Production instance: one VBAT channel per node, so one state. A function-
 // local static inside an inline function is one object across all
 // translation units (C++11 ODR) -- the board builds compile as gnu++11, so
@@ -338,11 +379,16 @@ inline void battDetectGlobalReset(void)
     battDetectGlobal().init = true;
 }
 
-inline bool battDetectFeed(float rawMv, float minPlausibleMv, float maxPlausibleMv)
+inline bool battDetectFeedSpread(float rawMv, float spreadMv, float minPlausibleMv, float maxPlausibleMv)
 {
     if (!battDetectGlobal().init)
         battDetectGlobalReset();
-    return battDetectUpdate(&battDetectGlobal().state, rawMv, minPlausibleMv, maxPlausibleMv);
+    return battDetectUpdateSpread(&battDetectGlobal().state, rawMv, spreadMv, minPlausibleMv, maxPlausibleMv);
+}
+
+inline bool battDetectFeed(float rawMv, float minPlausibleMv, float maxPlausibleMv)
+{
+    return battDetectFeedSpread(rawMv, BATT_DETECT_SPREAD_NONE, minPlausibleMv, maxPlausibleMv);
 }
 
 // Fail-safe "present" until the first sample has been fed.

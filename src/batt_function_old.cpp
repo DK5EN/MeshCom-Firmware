@@ -3,6 +3,7 @@
 #include "printfdeb_functions.h"
 #include "batt_functions.h"
 #include "batt_pipeline.h"
+#include "instrument.h"   // TEMPORARY -- INSTRUMENT_ENABLED, see src/instrument.h
 
 // Battery path of every board WITHOUT USE_NEW_BATT (the ones with USE_NEW_BATT live in
 // batt_functions.cpp): Heltec V2/V3/V4, Wireless Stick, Wireless Tracker, Vision Master E290,
@@ -400,6 +401,13 @@ void init_batt(void)
 // A raw reader does no filtering and no scheduling; it runs only on a scheduler READ. Debug
 // prints live in the readers, so they show once per real sample, not once per 100 ms tick.
 
+#if defined(BATT_USE_DETECTOR)
+// Spread (max - min, mV) of the read window of the latest raw sample. Only the Heltec switched
+// reader fills it; every other family leaves it at NONE. battFilter() consumes it with the sample
+// and resets it, so a stale value is never reused.
+static float s_battWindowSpreadMv = BATT_DETECT_SPREAD_NONE;
+#endif
+
 #if defined(BATT_SWITCHED_DIVIDER)
 
 // Switch the divider on (scheduler ARM). The release is part of the raw reader, right after
@@ -444,7 +452,20 @@ static float battRawHeltecSwitched(void)
 	const float factor = ADC_MULTIPLIER;
 	/**/
 
+	// First read = the reported value (calibration unchanged).
 	int analogValue = analogRead(vbat_pin);
+
+	// Read window, still with the divider armed: a floating VBAT node (no cell) swings 800-1300 mV
+	// within these ~14 ms, a real cell stays within ~50 mV. The spread feeds the no-battery detector.
+	float windowMv[BATT_DETECT_WINDOW_READS];
+	windowMv[0] = factor * analogValue;
+	for (int i = 1; i < BATT_DETECT_WINDOW_READS; i++)
+	{
+		delay(BATT_DETECT_WINDOW_STEP_MS);
+		windowMv[i] = factor * analogRead(vbat_pin);
+	}
+	float windowSpreadMv = battWindowSpread(windowMv, BATT_DETECT_WINDOW_READS);
+	s_battWindowSpreadMv = windowSpreadMv;
 
 	if (battProbeState == BATT_PROBE_ACTIVE_LOW)
 		digitalWrite(ADC_CTRL_PIN, HIGH);   // Teiler wieder trennen (Strom sparen)
@@ -462,6 +483,8 @@ static float battRawHeltecSwitched(void)
 		printfdeb("%.3f\n", floatVoltage);
 		printdeb("[readBatteryVoltage] milliVolts : ");
 		printlndeb(voltage);
+		printdeb("[readBatteryVoltage] window spread mV : ");
+		printfdeb("%.0f\n", windowSpreadMv);
 	}
 
 	return floatVoltage;
@@ -693,7 +716,8 @@ static float battFilter(float rawMv, uint32_t now)
 #if defined(BATT_USE_DETECTOR)
 	// BAT-01/BAT-02: runtime "no battery" detection on the RAW sample (an EMA would smooth the
 	// floating-node signature away). max_batt is in mV (setMaxBatt(node_maxv*1000)).
-	present = battDetectFeed(rawMv, max_batt*BATT_DETECT_MIN_BAND_FACTOR, max_batt*BATT_DETECT_MAX_BAND_FACTOR);
+	present = battDetectFeedSpread(rawMv, s_battWindowSpreadMv, max_batt*BATT_DETECT_MIN_BAND_FACTOR, max_batt*BATT_DETECT_MAX_BAND_FACTOR);
+	s_battWindowSpreadMv = BATT_DETECT_SPREAD_NONE;   // consumed: never reuse a stale window
 #endif
 
 	float mv = 0.0F;
@@ -790,4 +814,201 @@ uint8_t mv_to_percent(float mvolts)
 
 	return battPercent(mvolts, max_batt);
 }
+
+// ---------------------------------------------------------------------------
+// TEMPORARY bench measurement: --battprobe [n]  (INSTRUMENT_ENABLED builds only, removed with the
+// rest of the instrument scaffolding). Raw ADC capture of the switched Heltec divider to show
+// whether a cell is attached: the BAT-01 detector sees the divider only 100 ms every 30 s, and a
+// floating charger output reads 4.2-4.7 V in that window. Measurement only: it does not feed
+// battDetectFeed()/battFilter() and leaves the divider released at exit. Runs synchronously in the
+// loop task (~7.5 s per cycle), so it feeds the loopTask WDT itself and waits with delay().
+// ---------------------------------------------------------------------------
+#if INSTRUMENT_ENABLED
+#if defined(BATT_FAMILY_HELTEC_SWITCHED)
+
+#include <esp_task_wdt.h>
+#include <math.h>
+
+#define BATTPROBE_BURST_N     151   // t = 0..300 ms every 2 ms
+#define BATTPROBE_BURST_STEP_US 2000UL
+#define BATTPROBE_PAIRS       8
+#define BATTPROBE_LONG_N      31    // t = 0..3000 ms every 100 ms
+#define BATTPROBE_PER_LINE    25    // values per printed line (printfdeb buffer is 300 B format / 600 B out)
+
+static void battProbeRelease(void)
+{
+	if (battProbeState == BATT_PROBE_ACTIVE_LOW)
+		digitalWrite(ADC_CTRL_PIN, HIGH);   // divider off
+	else
+		digitalWrite(ADC_CTRL_PIN, LOW);    // divider off
+}
+
+// delay() (yields) in slices of <= 100 ms, feeding the loopTask WDT between the slices
+static void battProbeWait(uint32_t ms)
+{
+	while (ms > 0)
+	{
+		uint32_t s = (ms > 100) ? 100 : ms;
+		delay(s);
+		esp_task_wdt_reset();
+		ms -= s;
+	}
+}
+
+// Wait until micros()-t0 >= targetUs: delay(1) while >= 1.5 ms remain, a bounded sub-1.5 ms
+// delayMicroseconds() for the tail so a 2 ms grid stays usable.
+static void battProbeWaitUntilUs(uint32_t t0, uint32_t targetUs)
+{
+	for (;;)
+	{
+		uint32_t el = micros() - t0;
+		if (el >= targetUs)
+			return;
+		uint32_t rem = targetUs - el;
+		if (rem >= 1500UL)
+			delay(1);
+		else
+			delayMicroseconds(rem);
+		esp_task_wdt_reset();
+	}
+}
+
+static void battProbePrintValues(const char *tag, int cycle, const uint16_t *v, int n)
+{
+	for (int i = 0; i < n; i += BATTPROBE_PER_LINE)
+	{
+		char buf[160];
+		int p = 0;
+		for (int j = i; j < n && j < i + BATTPROBE_PER_LINE; j++)
+		{
+			p += snprintf(buf + p, sizeof(buf) - p, "%s%u", (j > i) ? "," : "", (unsigned)v[j]);
+			if (p >= (int)sizeof(buf) - 8)
+				break;
+		}
+		printfdeb("[BATTPROBE]|%s|%d|%d|%s\n", tag, cycle, i, buf);
+		esp_task_wdt_reset();
+	}
+}
+
+// min|max|mean|stdev of v[from..n-1] in raw counts, then the same in mV (x ADC_MULTIPLIER)
+static void battProbePrintSummary(const char *tag, int cycle, const uint16_t *v, int from, int n, const char *extra)
+{
+	if (from >= n)
+		return;
+	uint16_t mn = 0xFFFF, mx = 0;
+	double sum = 0.0, sumsq = 0.0;
+	int cnt = 0;
+	for (int i = from; i < n; i++)
+	{
+		if (v[i] < mn) mn = v[i];
+		if (v[i] > mx) mx = v[i];
+		sum += v[i];
+		sumsq += (double)v[i] * (double)v[i];
+		cnt++;
+	}
+	double mean = sum / cnt;
+	double var = sumsq / cnt - mean * mean;
+	double sd = (var > 0.0) ? sqrt(var) : 0.0;
+	const double f = ADC_MULTIPLIER;
+	printfdeb("[BATTPROBE]|%s|%d|%u|%u|%.2f|%.2f|mV|%.0f|%.0f|%.1f|%.1f|n=%d%s\n", tag, cycle,
+		(unsigned)mn, (unsigned)mx, mean, sd, mn * f, mx * f, mean * f, sd * f, cnt, extra);
+}
+
+void battProbeRun(int cycles)
+{
+	if (cycles < 1) cycles = 1;
+	if (cycles > 10) cycles = 10;
+
+	const char *pol = (battProbeState == BATT_PROBE_ACTIVE_LOW) ? "LOW" :
+		(battProbeState == BATT_PROBE_NONE) ? "NONE" : "HIGH";   // UNKNOWN runs as HIGH, like the scheduler
+	printfdeb("[BATTPROBE]|START|%d|polarity=%s|maxv_mV=%.0f|factor=%.4f\n", cycles, pol, max_batt, (double)ADC_MULTIPLIER);
+
+	pinMode(vbat_pin, INPUT);
+	pinMode(ADC_CTRL_PIN, OUTPUT);
+	battProbeRelease();
+	esp_task_wdt_reset();
+
+	for (int c = 1; c <= cycles; c++)
+	{
+		// ---- 1. BURST: arm, read every 2 ms from t=0 to t=300 ms, release ----
+		uint16_t burst[BATTPROBE_BURST_N];
+		uint32_t lagMaxUs = 0, durUs = 0;
+		esp_task_wdt_reset();
+		battDividerArm();
+		uint32_t t0 = micros();
+		for (int i = 0; i < BATTPROBE_BURST_N; i++)
+		{
+			uint32_t target = (uint32_t)i * BATTPROBE_BURST_STEP_US;
+			if (i > 0)
+				battProbeWaitUntilUs(t0, target);
+			burst[i] = (uint16_t)analogRead(vbat_pin);
+			uint32_t el = micros() - t0;
+			if (el - target > lagMaxUs) lagMaxUs = el - target;
+			durUs = el;
+		}
+		battProbeRelease();
+		battProbePrintValues("BURST", c, burst, BATTPROBE_BURST_N);
+		char extra[48];
+		snprintf(extra, sizeof(extra), "|dur_ms=%lu|maxlag_us=%lu", (unsigned long)(durUs / 1000UL), (unsigned long)lagMaxUs);
+		battProbePrintSummary("BSUM", c, burst, 50, BATTPROBE_BURST_N, extra);   // samples from t >= 100 ms (index 50)
+
+		// ---- 2. PAIRS: 8 windows 500 ms apart: arm, wait 100 ms, 4 reads 1 ms apart, release ----
+		uint16_t pairs[BATTPROBE_PAIRS][4];
+		for (int k = 0; k < BATTPROBE_PAIRS; k++)
+		{
+			uint32_t w0 = millis();
+			battDividerArm();
+			battProbeWait(100);
+			for (int r = 0; r < 4; r++)
+			{
+				pairs[k][r] = (uint16_t)analogRead(vbat_pin);
+				if (r < 3)
+					delay(1);
+			}
+			battProbeRelease();
+			uint32_t used = millis() - w0;
+			if (used < 500UL)
+				battProbeWait(500UL - used);
+		}
+		for (int k = 0; k < BATTPROBE_PAIRS; k++)
+		{
+			float mean = (pairs[k][0] + pairs[k][1] + pairs[k][2] + pairs[k][3]) / 4.0F;
+			printfdeb("[BATTPROBE]|PAIR|%d|%d|%u,%u,%u,%u|%.0f\n", c, k, (unsigned)pairs[k][0], (unsigned)pairs[k][1],
+				(unsigned)pairs[k][2], (unsigned)pairs[k][3], mean * (float)ADC_MULTIPLIER);
+			esp_task_wdt_reset();
+		}
+
+		// ---- 3. LONG: arm, divider on for 3 s, read every 100 ms (31 samples), release ----
+		uint16_t lng[BATTPROBE_LONG_N];
+		battDividerArm();
+		uint32_t l0 = millis();
+		for (int i = 0; i < BATTPROBE_LONG_N; i++)
+		{
+			uint32_t target = (uint32_t)i * 100UL;
+			uint32_t el = millis() - l0;
+			if (i > 0 && el < target)
+				battProbeWait(target - el);
+			lng[i] = (uint16_t)analogRead(vbat_pin);
+		}
+		battProbeRelease();
+		battProbePrintValues("LONG", c, lng, BATTPROBE_LONG_N);
+		battProbePrintSummary("LSUM", c, lng, 1, BATTPROBE_LONG_N, "");   // samples from t >= 100 ms (index 1)
+	}
+
+	battProbeRelease();   // belt and braces: divider off at exit
+	s_battSchedInit = false;   // a READ pending from before the probe would read the released divider; re-arm
+	printfdeb("[BATTPROBE]|END\n");
+}
+
+#else   // instrument build on a board without the switched Heltec divider
+
+void battProbeRun(int cycles)
+{
+	(void)cycles;
+	printfdeb("[BATTPROBE]|unsupported\n");
+}
+
+#endif   // BATT_FAMILY_HELTEC_SWITCHED
+#endif   // INSTRUMENT_ENABLED
+
 #endif

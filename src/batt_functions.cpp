@@ -86,6 +86,11 @@ uint32_t battSampleCount(void)
 
 float battFeedSample(float rawMv, float maxMv, uint32_t nowMs)
 {
+	return battFeedSampleSpread(rawMv, BATT_DETECT_SPREAD_NONE, maxMv, nowMs);
+}
+
+float battFeedSampleSpread(float rawMv, float spreadMv, float maxMv, uint32_t nowMs)
+{
 	if (!battPipelineReady) { battPipelineReset(); }
 
 	battSamples++;
@@ -93,7 +98,8 @@ float battFeedSample(float rawMv, float maxMv, uint32_t nowMs)
 
 	// BAT-01: presence on the RAW sample. Plausible band relative to the pack maximum, so the
 	// 2S packs (TBEAM_1W, E22) on this path are covered too (see batt_pipeline.h, section 3).
-	const bool present = battDetectFeed(rawMv,
+	// BAT-03: spreadMv (window spread, switched dividers) above the limit counts as implausible.
+	const bool present = battDetectFeedSpread(rawMv, spreadMv,
 		maxMv*BATT_DETECT_MIN_BAND_FACTOR, maxMv*BATT_DETECT_MAX_BAND_FACTOR);
 
 	if (!present)
@@ -394,10 +400,25 @@ static void battTakeSample(uint32_t now)
 	const float rawVoltage = (float)analogReadMilliVolts(BAT_VOLT_PIN)*BAT_MULTIPLIER/1000.0 * fBattFaktor + BAT_VOLT_OFFSET;
 
 	#if defined(ADC_CTRL_PIN)
-		ADC_BATT_OFF();   // SWITCHED: release the divider right after the read (no drain through it)
-	#endif
+		// BAT-03: without a cell the divider sits on the charger-output sawtooth, one read lands at a
+		// random phase. Read a short window (first read = rawVoltage above), spread over all reads
+		// goes to the detector. Window is taken BEFORE the divider is released.
+		float windowMv[BATT_DETECT_WINDOW_READS];
+		windowMv[0] = rawVoltage*1000.0f;
+		for (int i = 1; i < BATT_DETECT_WINDOW_READS; i++)
+		{
+			delay(BATT_DETECT_WINDOW_STEP_MS);
+			const float v = (float)analogReadMilliVolts(BAT_VOLT_PIN)*BAT_MULTIPLIER/1000.0 * fBattFaktor + BAT_VOLT_OFFSET;
+			windowMv[i] = v*1000.0f;
+		}
+		const float windowSpreadMv = battWindowSpread(windowMv, BATT_DETECT_WINDOW_READS);
 
-	battFeedSample(rawVoltage*1000.0f, fBattMax*1000.0f, now);
+		ADC_BATT_OFF();   // SWITCHED: release the divider right after the reads (no drain through it)
+
+		battFeedSampleSpread(rawVoltage*1000.0f, windowSpreadMv, fBattMax*1000.0f, now);
+	#else
+		battFeedSample(rawVoltage*1000.0f, fBattMax*1000.0f, now);
+	#endif
 
 	#if defined(BOARD_WIRELESS_PAPER)
 	wpPushVolt(rawVoltage);   // letzte Rohwerte fuer die "AKKU LOW"-Anzeige
@@ -410,8 +431,13 @@ static void battTakeSample(uint32_t now)
 		if(bDisplayCont)
 		{
 			bDEBUGLNG = true; // für den nächsten printfdeb language en/de aktivieren
+			#if defined(ADC_CTRL_PIN)
+			printfdeb("[BATT];%s;raw:;%.3f;V;max:;%.2f;V;fact:;%.4f;filt:;%.3f;V;%.0f;%%;spread:;%.0f;mV\n",
+				getTimeString().c_str(), rawVoltage, fBattMax, fBattFaktor, battFilteredMv()/1000.0f, mv_to_percent(battFilteredMv()), windowSpreadMv);
+			#else
 			printfdeb("[BATT];%s;raw:;%.3f;V;max:;%.2f;V;fact:;%.4f;filt:;%.3f;V;%.0f;%%\n",
 				getTimeString().c_str(), rawVoltage, fBattMax, fBattFaktor, battFilteredMv()/1000.0f, mv_to_percent(battFilteredMv()));
+			#endif
 		}
 	}
 
