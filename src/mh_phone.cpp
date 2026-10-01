@@ -153,18 +153,36 @@ uint16_t mhJsonBuild(const NbrMhView &v, uint32_t now_epoch, double own_lat, dou
         time_s[8] = 0;
     }
 
+    // Unbekannte Werte gehen NICHT als Rohplatzhalter (-32768 dBm, -128 dB, 0)
+    // zur App, sondern fehlen im Rahmen (die App zeigt dann nichts statt einer
+    // erfundenen Zahl). Ohne Detail-Slot (Direktstation verdraengt, siehe
+    // nbr_views.h) liefert nbrMhGet() rssi == NBR_MH_RSSI_UNKNOWN (INT16_MIN)
+    // und plt/mod/pl/mesh 0. Ein Slot kann diesen RSSI nie ergeben (8 Bit
+    // minus 160, also >= -160), plt/mod/pl/mesh == 0 sind dagegen echte Werte
+    // und taugen nicht als Marker. NbrMhView hat kein eigenes has_detail-Feld;
+    // rssi ist der Marker, den auch die anderen Leser (Web, T-Deck, --mheard)
+    // benutzen. SNR stammt aus der Kante, nicht aus dem Slot: er fehlt nur bei
+    // NBR_SNR_UNKNOWN. DIST bleibt immer drin und numerisch (die App ruft
+    // mheard.DIST.toFixed(); ohne DIST ginge der ganze Eintrag verloren).
+    const bool has_detail = (v.rssi != NBR_MH_RSSI_UNKNOWN);
+
     JsonDocument doc;
 
-    // 13 alte Felder, alte Reihenfolge (CONTRACT, src/mh_phone.h).
+    // Bis zu 13 alte Felder, alte Reihenfolge (CONTRACT, src/mh_phone.h).
     doc["TYP"]  = "MH";
     doc["CALL"] = v.call;
     doc["DATE"] = date_s;
     doc["TIME"] = time_s;
-    doc["PLT"]  = (uint8_t)v.plt;
+    if (has_detail)
+        doc["PLT"] = (uint8_t)v.plt;
     doc["HW"]   = v.hw;
-    doc["MOD"]  = v.mod;
-    doc["RSSI"] = v.rssi;
-    doc["SNR"]  = v.snr;
+    if (has_detail)
+    {
+        doc["MOD"]  = v.mod;
+        doc["RSSI"] = v.rssi;
+    }
+    if (v.snr != NBR_SNR_UNKNOWN)
+        doc["SNR"] = v.snr;
 
     // DIST auf 0,1 km gerundet, -1 wenn die eigene oder die fremde Position
     // unbekannt ist (own 0/0, fremd NAN).
@@ -175,8 +193,11 @@ uint16_t mhJsonBuild(const NbrMhView &v, uint32_t now_epoch, double own_lat, dou
         dist_out = (double)mhRoundDist((double)nbrDistKm((float)own_lat, (float)own_lon, v.lat, v.lon));
     doc["DIST"] = dist_out;
 
-    doc["PL"]   = v.pl;
-    doc["MESH"] = v.mesh;
+    if (has_detail)
+    {
+        doc["PL"]   = v.pl;
+        doc["MESH"] = v.mesh;
+    }
     doc["NCNT"] = v.ncnt;
 
     // 7 neue Felder (Konzept 4.9), ans Ende angehaengt -- bleJsonFrameFailSoft()

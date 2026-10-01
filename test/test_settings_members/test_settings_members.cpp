@@ -47,6 +47,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -346,6 +347,174 @@ static void test_no_duplicate_descriptor_keys()
     TEST_ASSERT_TRUE_MESSAGE(offenderCount == 0, report.c_str());
 }
 
+// ---------------------------------------------------------------------------
+// test_setter_legal_values_survive_roundtrip
+//
+// Regression for the "node_postime clamped to 1440 on every boot" defect: a
+// numeric row's declared [min,max] is applied by settings_store::decode() as a
+// CLAMP (has_range) on every load -- the nRF52 settings load decodes on every
+// boot. So any value a command/BLE/web setter accepts but the row's range
+// excludes is silently rewritten on the next boot. This suite drives the REAL
+// schema (settings_schema::fields()) through the REAL codec
+// (settings_store::encode -> decode) with the extreme values each setter
+// accepts (src/command_functions.cpp, noted per row) and asserts they come
+// back unchanged.
+//
+// Rows are looked up by key name. `required` rows must exist in the schema of
+// every platform build; the others are platform-conditional rows
+// (CFG_FIELD_LIST_PLATFORM) and are skipped when absent.
+// ---------------------------------------------------------------------------
+namespace
+{
+struct SetterCase
+{
+    const char *key;
+    double value;
+    bool required;
+    const char *setter; // where the value comes from, for the failure text
+};
+
+const SetterCase kSetterCases[] = {
+    // The reported defect and its two siblings.
+    {"node_postime", 3600.0, true, "--postime 3600 (>=300 s, no ceiling)"},
+    {"node_postime", 86400.0, true, "--postime 86400"},
+    {"node_gpsdebug", 3.0, true, "--gpsdebug 3 (gps_functions.cpp iGPSDEBUG == 3)"},
+    {"node_alt", 30000.0, true, "--setalt 30000"},
+    {"node_alt", 40000.0, true, "--setalt 40000 (setter ceiling)"},
+    {"node_alt", -400.0, true, "GPS fix below sea level"},
+    // Sweep: the rest of the rows with a numeric range, at the setter's limits.
+    {"node_ptime", 1800.0, true, "--ptime out of 5..120 stores TELEMETRY_INTERVAL (30*60)"},
+    {"node_ptime", 120.0, true, "--ptime 120"},
+    {"node_pingtime", 300.0, true, "--pingtime 300 (PING_INTERVAL*5)"},
+    {"node_pingmax", 5.0, true, "--pingmax 5 (PING_MAX)"},
+    {"node_wifip", 20.0, true, "--wifitxpower 20"},
+    {"node_isamp", 7.0, true, "--isamp 7"},
+    {"node_imax", 20.0, true, "--imax 20"},
+    {"node_shunt", 0.5, true, "--shunt 0.5"},
+    {"node_contrast", 255.0, true, "--contrast 255"},
+    {"node_bpin", 99.0, true, "--button gpio 99"},
+    {"node_apin", 98.0, true, "--analog gpio 98"},
+    {"node_owgpio", 99.0, true, "--onewire gpio 99"},
+    {"node_ctry", 15.0, true, "--country (id 15 = PL, highest valid)"},
+    {"node_sf", 12.0, true, "--txsf 12"},
+    {"node_cr", 8.0, true, "--txcr 8"},
+    {"node_bw", 250.0, true, "--txbw 250 (kHz path)"},
+    {"node_ethmtu", 1500.0, true, "--ethmtu 1500"},
+    {"bt_code", 999999.0, true, "--btcode 999999"},
+    {"node_specsamples", 2048.0, false, "--specsamples 2048"},
+    {"node_specstep", 2.0, false, "--specstep 2.0"},
+    {"node_disrot", 270.0, false, "--rotate 270"},
+};
+
+// Writes `value` into the member `d` describes (I32/FLOAT only -- every
+// numeric row the cases above name).
+bool set_member(const settings_store::FieldDescriptor &d, void *state, double value)
+{
+    char *p = (char *)state + d.offset;
+    if (d.type == settings_store::FieldType::I32)
+    {
+        int32_t v = (int32_t)value;
+        memcpy(p, &v, sizeof(v));
+        return true;
+    }
+    if (d.type == settings_store::FieldType::FLOAT)
+    {
+        float v = (float)value;
+        memcpy(p, &v, sizeof(v));
+        return true;
+    }
+    return false;
+}
+
+bool get_member(const settings_store::FieldDescriptor &d, const void *state, double *out)
+{
+    const char *p = (const char *)state + d.offset;
+    if (d.type == settings_store::FieldType::I32)
+    {
+        int32_t v;
+        memcpy(&v, p, sizeof(v));
+        *out = v;
+        return true;
+    }
+    if (d.type == settings_store::FieldType::FLOAT)
+    {
+        float v;
+        memcpy(&v, p, sizeof(v));
+        *out = v;
+        return true;
+    }
+    return false;
+}
+
+const settings_store::FieldDescriptor *find_row(const char *key)
+{
+    const settings_store::FieldDescriptor *fields = settings_schema::fields();
+    for (size_t i = 0; i < settings_schema::fieldCount(); i++)
+        if (strcmp(fields[i].key, key) == 0)
+            return &fields[i];
+    return nullptr;
+}
+} // namespace
+
+static void test_setter_legal_values_survive_roundtrip()
+{
+    // The real rows must be present, or the loop below proves nothing.
+    TEST_ASSERT_TRUE_MESSAGE(settings_schema::fieldCount() > 0, "schema has no rows");
+    TEST_ASSERT_NOT_NULL_MESSAGE(find_row("node_postime"), "node_postime row missing from schema");
+
+    std::vector<char> buf(1 << 16);
+    std::string offenders;
+    size_t offenderCount = 0;
+
+    for (const SetterCase &c : kSetterCases)
+    {
+        const settings_store::FieldDescriptor *d = find_row(c.key);
+        if (!d)
+        {
+            if (c.required)
+            {
+                offenders += std::string("  ") + c.key + ": row missing from schema\n";
+                offenderCount++;
+            }
+            continue;
+        }
+
+        std::vector<char> src(sizeof(s_meshcom_settings), 0);
+        std::vector<char> dst(sizeof(s_meshcom_settings), 0);
+        if (!set_member(*d, src.data(), c.value))
+        {
+            offenders += std::string("  ") + c.key + ": not an I32/FLOAT row, test table wrong\n";
+            offenderCount++;
+            continue;
+        }
+
+        const long n = settings_store::encode(settings_schema::fields(), settings_schema::fieldCount(),
+                                              src.data(), buf.data(), buf.size());
+        TEST_ASSERT_TRUE_MESSAGE(n > 0, "encode failed");
+        settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(),
+                               dst.data(), buf.data(), (size_t)n);
+
+        double got = 0;
+        get_member(*d, dst.data(), &got);
+        if (got != c.value)
+        {
+            char line[256];
+            snprintf(line, sizeof(line),
+                     "  %s: stored %g, decoded %g (row range %g..%g) -- %s\n", c.key, c.value, got,
+                     d->min_value, d->max_value, c.setter);
+            offenders += line;
+            offenderCount++;
+        }
+    }
+
+    char summary[160];
+    snprintf(summary, sizeof(summary),
+             "%zu setter-legal value(s) did not survive encode->decode%s", offenderCount,
+             offenderCount ? ":\n" : "");
+    std::string report = std::string(summary) + offenders;
+    TEST_ASSERT_TRUE_MESSAGE(offenderCount == 0, report.c_str());
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -354,6 +523,7 @@ int main(void)
     RUN_TEST(test_every_descriptor_lies_inside_one_member);
     RUN_TEST(test_member_sizes_and_padding_sum_to_sizeof);
     RUN_TEST(test_no_duplicate_descriptor_keys);
+    RUN_TEST(test_setter_legal_values_survive_roundtrip);
 
     return UNITY_END();
 }

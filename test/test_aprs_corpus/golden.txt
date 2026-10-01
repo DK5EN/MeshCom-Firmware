@@ -8,7 +8,7 @@ f004 rc=3A id=6A8823A4 hop=2 srv=1 mesh=0 track=0 srcpath=OE1XAR-33,DK5EN-98 dst
 f005 rc=3A id=6A8823A4 hop=1 srv=1 mesh=1 track=0 srcpath=OE1XAR-33,DK5EN-90,DK5EN-91 dstpath=* dstcall=* payload={CET}2026-08-21 10:58:58 fcs=0FD6 hw=0 mod=136 fw=0 lasthw=171 appoff=1 srccall=OE1XAR-33 srclast=DK5EN-91 pathcnt=3
 f006 rc=3A id=1AE1E385 hop=4 srv=0 mesh=0 track=0 srcpath=DK5EN-98 dstpath=9999 dstcall=9999 payload=Korpus-Testframe via MCProxy DK5EN-98 fcs=1348 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-98 srclast=DK5EN-98 pathcnt=1
 f007 rc=3A id=1AE1E386 hop=4 srv=0 mesh=0 track=0 srcpath=DK5EN-98 dstpath=DK5EN-90 dstcall=DK5EN-90 payload=Korpus-DM via MCProxy an 90{902 fcs=11B1 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-98 srclast=DK5EN-98 pathcnt=1
-f008 rc=41 id=00000000 hop=0 srv=0 mesh=0 track=0 srcpath= dstpath= dstcall= payload= fcs=0000 hw=9 mod=3 fw=35 lasthw=137 appoff=0 srccall= srclast= pathcnt=0
+f008 rc=41 id=00000000 hop=0 srv=0 mesh=0 track=0 srcpath= dstpath= dstcall= payload= fcs=0000 hw=9 mod=3 fw=40 lasthw=137 appoff=0 srccall= srclast= pathcnt=0
 f009 rc=3A id=B059E03F hop=4 srv=0 mesh=1 track=0 srcpath=DK5EN-91 dstpath=DK5EN-90 dstcall=DK5EN-90 payload=Korpus-DM von 91 an 90{063 fcs=0F47 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-91 srclast=DK5EN-91 pathcnt=1
 f010 rc=3A id=91A436C5 hop=4 srv=1 mesh=0 track=0 srcpath=DK5EN-90,DK5EN-98 dstpath=DK5EN-91 dstcall=DK5EN-91 payload=DK5EN-91 :ack063 fcs=0E03 hw=9 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-90 srclast=DK5EN-98 pathcnt=2
 f011 rc=21 id=B059E041 hop=2 srv=0 mesh=1 track=1 srcpath=DK5EN-91 dstpath=* dstcall=* payload=4825.00N/01145.46E#/B=057/N1 fcs=0B98 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-91 srclast=DK5EN-91 pathcnt=1

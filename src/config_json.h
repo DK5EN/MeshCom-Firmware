@@ -232,15 +232,26 @@ struct CfgField
  * Order matters: it is the order of the JSON members AND the order of the
  * canonical CRC form (config_json.h). Append new fields at the end of the
  * platform block they belong to; reordering invalidates every file in the
- * field. */
-#define CFG_FIELD_LIST(X)                                                                     \
+ * field.
+ *
+ * RANGE RULE: a row's [lo, hi] is not only the JSON-import check -- the
+ * settings schema (settings_schema.cpp) hands it to settings_store::decode()
+ * as a CLAMP, applied on every settings load (every boot on nRF52). A range
+ * narrower than what the serial/BLE/web setter accepts therefore rewrites a
+ * legal stored value on the next boot. Keep each range at least as wide as
+ * its setter in src/command_functions.cpp; test_settings_members'
+ * test_setter_legal_values_survive_roundtrip pins the known extremes.
+ * node_postime (--postime, seconds, no setter ceiling), node_alt (--setalt
+ * 0..40000), node_gpsdebug (levels 0..3) and node_ptime (setter fallback
+ * TELEMETRY_INTERVAL = 30*60) were narrower and are the cases it caught. */
+#define CFG_FIELD_LIST(X)                                                                   \
     X("node_call",     CFG_STR,  node_call,             CFG_NORANGE,        CFG_NOESC)        \
     X("node_short",    CFG_STR,  node_short,            CFG_NORANGE,        CFG_NOESC)        \
     X("node_symid",    CFG_CHR,  node_symid,            CFG_NORANGE,        CFG_NOESC)        \
     X("node_symcd",    CFG_CHR,  node_symcd,            CFG_NORANGE,        CFG_NOESC)        \
     X("node_lat",      CFG_DBL,  node_lat,              -90.0, 90.0,        CFG_NOESC)        \
     X("node_lon",      CFG_DBL,  node_lon,              -180.0, 180.0,      CFG_NOESC)        \
-    X("node_alt",      CFG_INT,  node_alt,              -1000.0, 20000.0,   CFG_NOESC)        \
+    X("node_alt",      CFG_INT,  node_alt,              -1000.0, 40000.0,   CFG_NOESC)        \
     X("node_lat_c",    CFG_CHR,  node_lat_c,            CFG_NORANGE,        CFG_NOESC)        \
     X("node_lon_c",    CFG_CHR,  node_lon_c,            CFG_NORANGE,        CFG_NOESC)        \
     X("node_ssid",     CFG_STR,  node_ossid,            CFG_NORANGE,        CFG_NOESC)        \
@@ -290,7 +301,7 @@ struct CfgField
     X("node_ss_rx",    CFG_INT,  node_ss_rx_pin,        0.0, 99.0,          CFG_NOESC)        \
     X("node_ss_tx",    CFG_INT,  node_ss_tx_pin,        0.0, 99.0,          CFG_NOESC)        \
     X("node_ss_bd",    CFG_INT,  node_ss_baud,          0.0, 1000000.0,     CFG_NOESC)        \
-    X("node_postime",  CFG_INT,  node_postime,          0.0, 1440.0,        CFG_NOESC)        \
+    X("node_postime",  CFG_INT,  node_postime,          0.0, 86400.0,       CFG_NOESC)        \
     X("node_passwd",   CFG_STR,  node_passwd,           CFG_NORANGE,        CFG_NOESC)        \
     X("node_sset3",    CFG_INT,  node_sset3,            0.0, 65535.0,       CFG_NOESC)        \
     X("bt_code",       CFG_INT,  bt_code,               0.0, 999999.0,      CFG_NOESC)        \
@@ -309,7 +320,7 @@ struct CfgField
     X("node_format",   CFG_STR,  node_format,           CFG_NORANGE,        CFG_NOESC)        \
     X("node_eqns",     CFG_STR,  node_eqns,             CFG_NORANGE,        CFG_NOESC)        \
     X("node_values",   CFG_STR,  node_values,           CFG_NORANGE,        CFG_NOESC)        \
-    X("node_ptime",    CFG_INT,  node_parm_time,        0.0, 1440.0,        CFG_NOESC)        \
+    X("node_ptime",    CFG_INT,  node_parm_time,        0.0, 1800.0,        CFG_NOESC)        \
     X("node_wifip",    CFG_INT,  node_wifi_power,       0.0, 100.0,         CFG_NOESC)        \
     X("node_ucall",    CFG_STR,  node_lora_call,        CFG_NORANGE,        CFG_NOESC)        \
     X("node_aak",      CFG_FLT,  node_analog_alpha,     CFG_NORANGE,        CFG_NOESC)        \
@@ -327,7 +338,7 @@ struct CfgField
     X("node_ownntp",   CFG_STR,  node_ownntp,           CFG_NORANGE,        CFG_NOESC)        \
     X("node_gpsbaud",  CFG_U32,  node_gpsbaud,          1200.0, 921600.0,   CFG_NOESC)        \
     X("node_netmode",  CFG_INT,  node_netmode,          0.0, 1.0,           CFG_NOESC)        \
-    X("node_gpsdebug", CFG_INT,  node_gpsdebug,         0.0, 2.0,           CFG_NOESC)        \
+    X("node_gpsdebug", CFG_INT,  node_gpsdebug,         0.0, 3.0,           CFG_NOESC)        \
     X("node_relay",    CFG_INT,  node_relay,            0.0, 65535.0,       CFG_NOESC)        \
     X("node_via",      CFG_STR,  node_via,              CFG_NORANGE,        CFG_NOESC)        \
     X("node_sset4",    CFG_INT,  node_sset4,            0.0, 65535.0,       CFG_NOESC)        \

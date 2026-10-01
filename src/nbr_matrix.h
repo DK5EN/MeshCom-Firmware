@@ -21,13 +21,16 @@
 #include <stdio.h>
 #include <math.h>
 
-// NBR_MAX_ROWS ist board-spezifisch (21 auf ESP32-S3/RAK4631, 13 auf
-// klassischem ESP32, 11 in der Entwickler-Variante ENABLE_TBEAM, siehe
-// configuration_global.h) und steht dort neben MAX_MHEARD. Ein stiller
-// Default hier wuerde eine vergessene Definition verschlucken und der
-// Board-Wahl eine Zeilenzahl unterschieben, die zu keiner der drei
-// dokumentierten Speicherrechnungen aus Konzept 4.2 passt -- deshalb Abbruch
-// beim Bauen statt einer Zahl, die niemand gewaehlt hat.
+// NBR_MAX_ROWS ist familienspezifisch (configuration_global.h, dort neben den
+// Ring-Groessen): NBR_FAMILY_LARGE (ESP32-S3, nRF52) 128 Zeilen / 512 Kanten,
+// NBR_FAMILY_CLASSIC (klassischer ESP32) 64 Zeilen / 256 Kanten, NBR_FAMILY_DEV
+// (Entwickler-Variante ENABLE_TBEAM) 32 Zeilen / 128 Kanten. sizeof(NbrMatrix)
+// ist 13.992 B (LARGE) bzw. 5.592 B (CLASSIC); die beiden TX-Ring-Masken
+// (ringNeed/ringAlone, MAX_RING 20, samt ringKind) kosten 660 B bzw. 340 B.
+// Ein stiller Default hier wuerde eine vergessene Definition verschlucken und
+// der Board-Wahl eine Zeilenzahl unterschieben, die zu keiner dokumentierten
+// Speicherrechnung (docs/meshcom5-topologie 4.2) passt -- deshalb Abbruch beim
+// Bauen statt einer Zahl, die niemand gewaehlt hat.
 // Board-Builds: die Zeilenzahl steht in configuration_global.h, das ueber
 // configuration.h kommt; configuration.h haengt an seinem Ende ausserdem
 // configuration_default.h an (#ifndef-Flottendefaults, u. a.
@@ -153,10 +156,12 @@ struct NbrRow
 #define NBR_SNR_UNKNOWN (-128)
 
 // Unbekannte Position in Leser-Sichten (NbrRowView, NbrMhView, NbrDirectInfo):
-// ein endlicher Wert ausserhalb jedes Koordinatenbereichs, KEIN NAN. Der
-// nRF52-Build laeuft mit -Ofast (-ffast-math); dort faltet der Compiler isnan(),
-// v != v und sogar einen Bitmuster-Test auf NaN zu "false" (RAK-Test
-// 2026-09-26: --mheard zeigte "lat=N nan"). Leser pruefen mit nbrPosKnown().
+// ein endlicher Wert ausserhalb jedes Koordinatenbereichs, KEIN NAN. Die
+// nRF52-Builds heltec_t114 und t_echo laufen mit -Ofast (-ffast-math); dort
+// faltet der Compiler isnan(), v != v und sogar einen Bitmuster-Test auf NaN
+// zu "false" (RAK-Test 2026-09-26: --mheard zeigte "lat=N nan"). Der RAK4631
+// baut seit be8de121 mit -Os (ohne -ffast-math), der Workaround bleibt aber
+// fuer T114/T-Echo noetig. Leser pruefen mit nbrPosKnown().
 #define NBR_POS_NONE 999.0f
 static inline bool nbrPosKnown(float lat, float lon)
 {

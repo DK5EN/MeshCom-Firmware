@@ -827,6 +827,11 @@ void commandAction(char *umsg_text, bool ble)
         if(meshcom_settings.node_postime < (5 * 60))
             meshcom_settings.node_postime = (5 * 60);
 
+        // one day at most: the settings schema row (config_json.h) ends there, a
+        // larger value would be clamped to it silently on the next boot
+        if(meshcom_settings.node_postime > (24 * 60 * 60))
+            meshcom_settings.node_postime = (24 * 60 * 60);
+
         if(meshcom_settings.node_postime > 0)
             posinfo_interval = meshcom_settings.node_postime;
         else

@@ -1144,77 +1144,91 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // Symmetrie hinzugefuegte Hoererin loggt hier nur,
                         // wenn ihr Bit auch in diesem Bedarf steht -- sonst
                         // waere die Annahme fuer diesen Slot folgenlos.
+                        // F4-1: nbrCopyMask() kann loggen (SYM-COVER) und damit
+                        // auf den Loop-Task umschalten; dort kann ein voller
+                        // Ring den Slot raeumen und den Eintrag am Lesezeiger
+                        // hineinziehen (N-24, txring_functions.cpp). Maske also
+                        // zuerst ausserhalb des Locks rechnen, dann unter
+                        // demselben Lock wie die Ring-Mutatoren den Slot
+                        // erneut pruefen (gleiches Relay, gleicher Bedarf) und
+                        // nur dann Bedarf abziehen / freigeben. Stimmt der Slot
+                        // nicht mehr, entfaellt dieser Abzug (verpasster Abbruch,
+                        // kein Fehlabbruch). Geloggt wird nach dem Lock.
                         NbrMask slot_inferred = nbrMaskNone();
-                        NbrMask cover = nbrCopyMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
-                                                     bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
-
                         NbrMask nbr_before = ringNeed[nbr_i];
-                        ringNeed[nbr_i] = nbrMaskAndNot(ringNeed[nbr_i], cover);
-                        NbrMask nbr_after = ringNeed[nbr_i];
+                        NbrMask cover = nbrCopyMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                                     bNBRSYM, nbr_before, nbr_mid, &slot_inferred);
+
+                        NbrMask nbr_after = nbrMaskAndNot(nbr_before, cover);
                         // Bits, die dieser Abzug tatsaechlich entfernt hat
                         // UND die nur per Symmetrie-Annahme dazukamen --
                         // trailing Feld fuer CANCEL/CANCEL?.
                         NbrMask nbr_removed_inferred = nbrMaskAnd(nbrMaskAndNot(nbr_before, nbr_after), slot_inferred);
 
-                        if(nbrMaskEmpty(nbr_after))
+                        bool nbr_do_cancel = false;
+                        bool nbr_do_possible = false;
+#if defined(BOARD_RAK4630)
+                        taskENTER_CRITICAL();
+#endif
+                        if(ringBuffer[nbr_i][0] != 0 &&
+                           (ringKind[nbr_i] & 0x7F) == RING_KIND_RELAY &&
+                           ringBuffer[nbr_i][1] == RING_STATUS_DONE &&
+                           memcmp(ringBuffer[nbr_i]+3, RcvBuffer+1, 4) == 0 &&
+                           extractRingMsgId(nbr_i) == nbr_mid &&
+                           nbrMaskEmpty(ringAlone[nbr_i]) &&
+                           nbrMaskEqual(ringNeed[nbr_i], nbr_before))
                         {
-                            if(bNBRCANCEL)
-                            {
-                                // Slot freigeben mit denselben drei Schreibzugriffen
-                                // wie die ACK-Freigabe weiter oben -- aber auf einen
-                                // DONE-Slot, den getNextTxSlot() waehlen kann (die
-                                // ACK-Freigabe trifft nur SENT-Slots). Auf nRF52 kann
-                                // doTX() (Loop-Task) den Slot zwischen Auswahl und
-                                // Verbrauch verlieren: ein leerer Sendeversuch, oder
-                                // ein Frame, der trotz CANCEL-Zeile noch rausgeht.
-                                // Dasselbe Fenster hat der N-24-Umzug schon heute
-                                // (Advisor 2026-09-22, Befund 2, akzeptiert).
-                                ringBuffer[nbr_i][1] = RING_STATUS_DONE;
-                                retryCount[nbr_i] = 0;
-                                ringBuffer[nbr_i][0] = 0;
-                                stat_nbr_cancel++;
+                            ringNeed[nbr_i] = nbr_after;
 
-                                if(nbrLog != NULL)
+                            if(nbrMaskEmpty(nbr_after))
+                            {
+                                if(bNBRCANCEL)
                                 {
-                                    char before_hex[NBR_MASK_HEX_LEN + 1];
-                                    char after_hex[NBR_MASK_HEX_LEN + 1];
-                                    char removed_hex[NBR_MASK_HEX_LEN + 1];
-                                    nbrMaskHex(nbr_before, before_hex, sizeof(before_hex));
-                                    nbrMaskHex(nbr_after, after_hex, sizeof(after_hex));
-                                    nbrMaskHex(nbr_removed_inferred, removed_hex, sizeof(removed_hex));
-                                    char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
-                                    snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%s|%s|%s",
-                                             (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, before_hex, after_hex,
-                                             removed_hex);
-                                    nbrLog(nbr_line);
+                                    // Slot freigeben mit denselben drei Schreibzugriffen
+                                    // wie die ACK-Freigabe weiter oben -- aber auf einen
+                                    // DONE-Slot, den getNextTxSlot() waehlen kann (die
+                                    // ACK-Freigabe trifft nur SENT-Slots). Auf nRF52 kann
+                                    // doTX() (Loop-Task) den Slot zwischen Auswahl und
+                                    // Verbrauch verlieren: ein leerer Sendeversuch, oder
+                                    // ein Frame, der trotz CANCEL-Zeile noch rausgeht.
+                                    // Dasselbe Fenster hat der N-24-Umzug schon heute
+                                    // (Advisor 2026-09-22, Befund 2, akzeptiert).
+                                    ringBuffer[nbr_i][1] = RING_STATUS_DONE;
+                                    retryCount[nbr_i] = 0;
+                                    ringBuffer[nbr_i][0] = 0;
+                                    stat_nbr_cancel++;
+                                    nbr_do_cancel = true;
+                                }
+                                else if(!(ringKind[nbr_i] & RING_KIND_COUNTED))
+                                {
+                                    // Zaehlmodus (--nbrrelay count, Verdict M1):
+                                    // dieselbe Rechnung, aber ohne Wirkung.
+                                    stat_nbr_cancel_possible++;
+                                    ringKind[nbr_i] |= RING_KIND_COUNTED;
+                                    nbr_do_possible = true;
                                 }
                             }
-                            else if(!(ringKind[nbr_i] & RING_KIND_COUNTED))
-                            {
-                                // Zaehlmodus (--nbrrelay count, Verdict M1):
-                                // dieselbe Rechnung, aber ohne Wirkung.
-                                stat_nbr_cancel_possible++;
-                                ringKind[nbr_i] |= RING_KIND_COUNTED;
+                        }
+#if defined(BOARD_RAK4630)
+                        taskEXIT_CRITICAL();
+#endif
 
-                                if(nbrLog != NULL)
-                                {
-                                    char before_hex[NBR_MASK_HEX_LEN + 1];
-                                    char after_hex[NBR_MASK_HEX_LEN + 1];
-                                    char removed_hex[NBR_MASK_HEX_LEN + 1];
-                                    nbrMaskHex(nbr_before, before_hex, sizeof(before_hex));
-                                    nbrMaskHex(nbr_after, after_hex, sizeof(after_hex));
-                                    nbrMaskHex(nbr_removed_inferred, removed_hex, sizeof(removed_hex));
-                                    char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
-                                    snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%s|%s|%s",
-                                             (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, before_hex, after_hex,
-                                             removed_hex);
-                                    nbrLog(nbr_line);
-                                }
-                            }
+                        if((nbr_do_cancel || nbr_do_possible) && nbrLog != NULL)
+                        {
+                            char before_hex[NBR_MASK_HEX_LEN + 1];
+                            char after_hex[NBR_MASK_HEX_LEN + 1];
+                            char removed_hex[NBR_MASK_HEX_LEN + 1];
+                            nbrMaskHex(nbr_before, before_hex, sizeof(before_hex));
+                            nbrMaskHex(nbr_after, after_hex, sizeof(after_hex));
+                            nbrMaskHex(nbr_removed_inferred, removed_hex, sizeof(removed_hex));
+                            char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
+                            snprintf(nbr_line, sizeof(nbr_line),
+                                     "[NBR]|%s|%u|%08X|%c|%s|%s|%s|%s",
+                                     nbr_do_cancel ? "CANCEL" : "CANCEL?",
+                                     (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
+                                     aprsmsg.msg_source_last, before_hex, after_hex,
+                                     removed_hex);
+                            nbrLog(nbr_line);
                         }
                     }
                 }

@@ -4,9 +4,9 @@
 // ihn einziehen; die uebrigen Envs kamen mit genau einem Include davon.
 #pragma once
 
-#define SOURCE_VERSION "4.35"
-#define SOURCE_VERSION_SUB "v"
-#define SOURCE_VERSION_WEB_SUB "v"
+#define SOURCE_VERSION "4.40"
+#define SOURCE_VERSION_SUB "a"
+#define SOURCE_VERSION_WEB_SUB "a"
 
 // Werkseinstellung des Rufzeichens und der zugehoerige "Node ist noch nicht
 // konfiguriert"-Test. Beides stand bisher als Literal an fuenf Stellen in drei

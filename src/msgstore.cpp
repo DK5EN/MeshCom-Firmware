@@ -617,6 +617,17 @@ void msgstoreLoop(void)
     // must not stamp attempt/next_ms/COOLDOWN onto storage the hook has
     // since repurposed -- that would resurrect a purged entry or silently
     // promote a peer-cancelled one.
+    //
+    // What the guard closes: the long window, i.e. a hook that ran at any
+    // point DURING deliver(). What it does not close: it is a check-then-act
+    // without a lock, so a hook landing between the gen re-check below and
+    // the plain stores that follow (a handful of stores, no I/O) still wins
+    // the race and gets its slot stamped over. That window is tiny.
+    // Consequence: a slot freed in it only gets attempt/next_ms stamped while
+    // its state stays FREE (harmless, the next arm overwrites them); the one
+    // visible case is an ACK landing in it on the 9th step
+    // (MSGSTORE_LADDER_STEPS), where the COOLDOWN write lets an already
+    // acked DM re-enter the cooldown ladder.
     uint8_t gen_before = s_entries[candidate].gen;
 
     // Same race, other half: deliver() reads src/dst/payload while a hook

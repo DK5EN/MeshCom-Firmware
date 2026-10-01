@@ -336,8 +336,8 @@ void test_frame_length_worst_case(void)
     vm.plt     = '@';
     vm.hw      = 255;
     vm.mod     = 255;
-    vm.rssi    = -32768;
-    vm.snr     = -128;
+    vm.rssi    = -160;   // kleinster Slot-Wert (dBm + 160 in 8 Bit); INT16_MIN waere "kein Detail"
+    vm.snr     = -127;   // -128 ist NBR_SNR_UNKNOWN und wird nicht gesendet
     vm.lat     = 0.001f;
     vm.lon     = 0.001f;
     vm.alt     = -30000;
@@ -361,6 +361,123 @@ void test_frame_length_worst_case(void)
     printf("[mh_phone] max-fields DIST substring check: %s\n", strstr((const char *)(buf_max + 1), "\"DIST\":") ? "present" : "MISSING");
 }
 
+// --- Test 7: Direktstation OHNE Detail-Slot (verdraengt, nbrMhGet(): rssi ==
+// NBR_MH_RSSI_UNKNOWN, plt/mod/pl/mesh 0, sec 0xFF, Position unbekannt). Die
+// unbekannten Felder RSSI/SNR/PLT/MOD/PL/MESH duerfen nicht als Rohplatzhalter
+// (-32768 dBm, -128 dB, 0) zur App gehen -- sie fehlen im Rahmen; alles andere
+// bleibt, insbesondere DIST (die App ruft mheard.DIST.toFixed() und wirft bei
+// fehlendem DIST), numerisch. ------------------------------------------------
+
+static NbrMhView mkViewNoDetail(void)
+{
+    NbrMhView v = mkView();
+    v.sec  = 0xFF;
+    v.plt  = 0;
+    v.mod  = 0;
+    v.rssi = NBR_MH_RSSI_UNKNOWN;
+    v.snr  = NBR_SNR_UNKNOWN;
+    v.lat  = NBR_POS_NONE;
+    v.lon  = NBR_POS_NONE;
+    v.alt  = NBR_MH_ALT_UNKNOWN;
+    v.pl   = 0;
+    v.mesh = 0;
+    v.fw   = 0;
+    return v;
+}
+
+void test_no_detail_station_omits_unknown_fields(void)
+{
+    NbrMhView v = mkViewNoDetail();
+    uint32_t now_epoch = epoch_for(2026, 9, 26, 12, 0, 0);
+    uint8_t buf[400] = {0};
+    uint16_t n = mhJsonBuild(v, now_epoch, 48.1, 16.2, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    const char *json = (const char *)(buf + 1);
+
+    TEST_ASSERT_NULL(strstr(json, "RSSI"));
+    TEST_ASSERT_NULL(strstr(json, "SNR"));
+    TEST_ASSERT_NULL(strstr(json, "-32768"));
+    TEST_ASSERT_NULL(strstr(json, "-128"));
+    TEST_ASSERT_NULL(strstr(json, "\"PLT\":"));
+    TEST_ASSERT_NULL(strstr(json, "\"MOD\":"));
+    TEST_ASSERT_NULL(strstr(json, "\"PL\":"));
+    TEST_ASSERT_NULL(strstr(json, "\"MESH\":"));
+
+    // Rest unveraendert da; DIST immer vorhanden und numerisch (-1: Position
+    // des Nachbarn unbekannt).
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"TYP\":\"MH\""));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"CALL\":\"DK5EN-98\""));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"DATE\":\"2026-09-26\""));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"TIME\":\"11:55:00\""));   // sec 0xFF -> 0
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"HW\":14"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"NCNT\":5"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"AGE\":5"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"HM\":-13"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"ROLE\":\"N\""));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"EX\":1"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"NB\":3"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"GW\":0"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"VIA\":0"));
+
+    JsonDocument check;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(check, json).code());
+    TEST_ASSERT_TRUE(check["DIST"].is<double>() || check["DIST"].is<int>());
+    TEST_ASSERT_EQUAL_FLOAT(-1.0f, check["DIST"].as<float>());
+    TEST_ASSERT_TRUE(check["RSSI"].isNull());
+
+    // DIST bleibt auch bei bekannter Position numerisch gerundet.
+    NbrMhView vp = mkViewNoDetail();
+    vp.lat = 48.2f;
+    vp.lon = 16.3f;
+    uint8_t bufp[400] = {0};
+    TEST_ASSERT_GREATER_THAN(0, mhJsonBuild(vp, now_epoch, 48.1, 16.2, bufp, sizeof(bufp)));
+    JsonDocument checkp;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(checkp, (const char *)(bufp + 1)).code());
+    TEST_ASSERT_TRUE(checkp["DIST"].as<double>() > 0.0);
+}
+
+// Ohne Detail-Slot, aber mit bekanntem Kanten-SNR (der kommt aus der Kante,
+// nicht aus dem Slot): SNR bleibt, RSSI und die Slotfelder fehlen.
+void test_no_detail_station_keeps_known_edge_snr(void)
+{
+    NbrMhView v = mkViewNoDetail();
+    v.snr = -6;
+    uint32_t now_epoch = epoch_for(2026, 9, 26, 12, 0, 0);
+    uint8_t buf[400] = {0};
+    TEST_ASSERT_GREATER_THAN(0, mhJsonBuild(v, now_epoch, 48.1, 16.2, buf, sizeof(buf)));
+    const char *json = (const char *)(buf + 1);
+    TEST_ASSERT_NULL(strstr(json, "RSSI"));
+    TEST_ASSERT_NULL(strstr(json, "-32768"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"SNR\":-6"));
+    TEST_ASSERT_NULL(strstr(json, "\"PLT\":"));
+    TEST_ASSERT_NULL(strstr(json, "\"MESH\":"));
+}
+
+// Mit Detail-Slot: alle Werte da, auch Nullen (PL 0, MESH 0, MOD 0 sind echte
+// Messwerte, keine Platzhalter) und der kleinste Slot-RSSI (-160).
+void test_detail_station_has_all_values(void)
+{
+    NbrMhView v = mkView();
+    v.pl = 0;
+    v.mesh = 0;
+    v.mod = 0;
+    v.plt = 0;       // Slot-Code 3 "anderes"
+    v.rssi = -160;
+    uint32_t now_epoch = epoch_for(2026, 9, 26, 12, 0, 0);
+    uint8_t buf[400] = {0};
+    TEST_ASSERT_GREATER_THAN(0, mhJsonBuild(v, now_epoch, 48.1, 16.2, buf, sizeof(buf)));
+    const char *json = (const char *)(buf + 1);
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"RSSI\":-160"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"SNR\":-6"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"PLT\":0"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"MOD\":0"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"PL\":0"));
+    TEST_ASSERT_NOT_NULL(strstr(json, "\"MESH\":0"));
+    JsonDocument check;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(check, json).code());
+    TEST_ASSERT_TRUE(check["DIST"].as<double>() > 0.0);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -374,5 +491,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_dist_rounding_cases);
     RUN_TEST(test_dist_unknown_when_position_missing);
     RUN_TEST(test_frame_length_worst_case);
+    RUN_TEST(test_no_detail_station_omits_unknown_fields);
+    RUN_TEST(test_no_detail_station_keeps_known_edge_snr);
+    RUN_TEST(test_detail_station_has_all_values);
     return UNITY_END();
 }
