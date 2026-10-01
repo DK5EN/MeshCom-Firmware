@@ -243,6 +243,7 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_disp_rot": PERSIST,
     "node_dns": RUNTIME,
     "node_eqns": PERSIST,
+    "node_ethmtu": PERSIST,  # added 2026-10-01, issue #1183 (after the triage snapshot)
     "node_extern": PERSIST,
     "node_fanon": RUNTIME,
     "node_format": PERSIST,
@@ -352,11 +353,12 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 144, (
+assert len(FIELD_CLASSIFICATION) == 145, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"144 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"145 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
-    f"outright in the D1-04 W3 struct merge (see the comment above this table)")
+    f"outright in the D1-04 W3 struct merge (see the comment above this table), "
+    f"plus node_ethmtu (2026-10-01, #1183)")
 
 # ---------------------------------------------------------------------------
 # EXCLUDED_FROM_SCHEMA -- see the module docstring's "EXCLUDED_FROM_SCHEMA"

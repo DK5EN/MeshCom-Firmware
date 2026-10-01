@@ -1133,6 +1133,9 @@ void commandAction(char *umsg_text, bool ble)
             #ifndef BOARD_RAK4630
             printdeb("--setssid <ssid>/none   WLAN SSID\n--setpwd <pwd>/none     WLAN password\n--wifiap on/off         WLAN access point\n");
             #endif
+            #if defined(BOARD_RAK4630)
+            printdeb("--ethmtu 1280-1500      Ethernet MTU (web GUI, HAMNET tunnels)\n");
+            #endif
             printdeb("--wifitxpower 2-20      WiFi TX power dBm\n--setownip a.b.c.d      static IP\n--setowngw a.b.c.d      gateway\n--setownms a.b.c.d      netmask\n--setowndns a.b.c.d     DNS server\n--setownntp a.b.c.d     NTP server\n");
             #ifndef BOARD_RAK4630
             #if defined(HAS_ETHERNET)
@@ -3461,6 +3464,34 @@ void commandAction(char *umsg_text, bool ble)
         {
             meshcom_settings.node_pingmax = PING_MAX;
         }
+
+        bReturn = true;
+
+        save_settings();
+    }
+    else
+    // Issue #1183: Ethernet MTU for the RAK W5100S web server (applied as MSS = MTU - 40
+    // on the next listening socket, see web_functions.cpp). Unlike --pingmax a bad value
+    // is rejected, not reset: a typo must not silently change the path MTU.
+    if(commandCheck(msg_text+2, (char*)"ethmtu ") == 0)
+    {
+        const CmdSetResult res = cmdStoreInt(msg_text+9, &meshcom_settings.node_ethmtu, 1280, 1500, &iVar);
+
+        if(res == CMD_SET_NAN) { cmdArgNotNumber("ethmtu", msg_text+9); return; }
+
+        if(res == CMD_SET_RANGE)
+        {
+            printfdeb("ethmtu %i not between 1280 and 1500, ignored\n", iVar);
+
+            if(ble)
+            {
+                addBLECommandBack((char*)msg_text);
+            }
+
+            return;
+        }
+
+        printfdeb("set ethmtu to %i (MSS %i)\n", meshcom_settings.node_ethmtu, meshcom_settings.node_ethmtu - 40);
 
         bReturn = true;
 
@@ -6320,6 +6351,9 @@ void commandAction(char *umsg_text, bool ble)
                     {
                         printfdeb("...GW address   : %s\n", meshcom_settings.node_gw);
                         printfdeb("...DNS address  : %s\n", meshcom_settings.node_dns);
+                        #if defined(BOARD_RAK4630)
+                        printfdeb("...ETH MTU      : %i (MSS %i)\n", meshcom_settings.node_ethmtu, meshcom_settings.node_ethmtu - 40);
+                        #endif
                     }
                 }
     

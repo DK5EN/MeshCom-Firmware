@@ -160,6 +160,7 @@ static void fill_settings(void)
     meshcom_settings.node_pingtime = 60;
     snprintf(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_pingcall), "OE1XAR-1");
     meshcom_settings.node_pingmax = 5;
+    meshcom_settings.node_ethmtu = 1400;
 }
 
 static std::string do_export(void)
@@ -400,6 +401,33 @@ static void test_out_of_range_value_is_refused(void)
     TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
 }
 
+/* #1183: node_ethmtu hat die Schemagrenzen 1280..1500 -- ein Import ausserhalb
+ * (hier 1501 und 1279) weist die ganze Datei ab, der Wert bleibt unberuehrt. */
+static void test_ethmtu_out_of_range_is_refused(void)
+{
+    fill_settings();
+    std::string doc = do_export();
+
+    const char *bad_values[] = {"1501", "1279"};
+    for (const char *v : bad_values)
+    {
+        std::string bad = replace_once(doc, "\"node_ethmtu\":\"1400\"",
+                                            std::string("\"node_ethmtu\":\"") + v + "\"");
+
+        wipe_settings();
+        s_meshcom_settings before;
+        memcpy(&before, &meshcom_settings, sizeof(before));
+
+        TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
+        TEST_ASSERT_NOT_NULL(strstr(g_err, "node_ethmtu"));
+        TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
+    }
+
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(doc));
+    TEST_ASSERT_EQUAL_INT(1400, meshcom_settings.node_ethmtu);
+}
+
 /* Zu langer String fuer sein Zielfeld: dieselbe Abweisung, kein Ueberlauf. */
 static void test_oversized_string_is_refused(void)
 {
@@ -468,6 +496,7 @@ int main(int, char **)
     RUN_TEST(test_truncated_json_is_refused);
     RUN_TEST(test_unknown_key_is_ignored_and_counted);
     RUN_TEST(test_out_of_range_value_is_refused);
+    RUN_TEST(test_ethmtu_out_of_range_is_refused);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);
     RUN_TEST(test_empty_and_oversized_input_is_refused);

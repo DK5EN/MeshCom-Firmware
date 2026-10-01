@@ -15,7 +15,8 @@ unten stammt direkt aus dieser Tabelle bzw. aus einem Grep/Read gegen den aktuel
 - **107 Register auf ESP32, 103 auf nRF52** (101 gemeinsam, 6 ESP32-only, 2 nRF52-only) —
   Auszählung der Intake bestätigt, keine Abweichung gefunden: `CFG_FIELD_LIST` hat exakt 101
   Zeilen (`config_json.cpp:89-189`), der ESP32-Zweig von `CFG_FIELD_LIST_PLATFORM` 6
-  (`:202-207`), der nRF52-Zweig 2 (`:210-211`).
+  (`:202-207`), der nRF52-Zweig 2 (`:210-211`). Seit 2026-10-01 kommt `node_ethmtu` (Issue #1183)
+  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52).
 - **Ein totes Register:** `node_gpsbaud` hat außerhalb von Export/Import/Flash keinen Leser
   irgendwo im Baum (§3).
 - **Vier Key/Member-Mismatches** — historisch gewachsen, absichtlich nicht bereinigt, weil das
@@ -228,12 +229,13 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 
 ### X. APRS-Multicast & Ping
 
-| Key             | Member          | Typ (Größe) | Import-Bereich | Hinweis |
-| --------------- | --------------- | ----------- | -------------- | ------- |
-| `node_aprsmc`   | `node_aprsmc`   | string (10) | —              |         |
-| `node_pingtime` | `node_pingtime` | int         | 0..86400       |         |
-| `node_pingcall` | `node_pingcall` | string (10) | —              |         |
-| `node_pingmax`  | `node_pingmax`  | int         | 0..100         |         |
+| Key             | Member          | Typ (Größe) | Import-Bereich | Hinweis                                                                                       |
+| --------------- | --------------- | ----------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `node_aprsmc`   | `node_aprsmc`   | string (10) | —              |                                                                                               |
+| `node_pingtime` | `node_pingtime` | int         | 0..86400       |                                                                                               |
+| `node_pingcall` | `node_pingcall` | string (10) | —              |                                                                                               |
+| `node_pingmax`  | `node_pingmax`  | int         | 0..100         |                                                                                               |
+| `node_ethmtu`   | `node_ethmtu`   | int         | 1280..1500     | Ethernet-MTU des RAK-Webservers (W5100S, MSS = MTU − 40, Issue #1183); auf ESP32 ohne Wirkung |
 
 ### Y. Nur ESP32 (6 Register)
 

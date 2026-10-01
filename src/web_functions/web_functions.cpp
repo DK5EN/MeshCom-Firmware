@@ -38,6 +38,9 @@
 #include "web_setup.h"
 #include "web_nodefunctioncalls.h"
 #include "web_commonServer.h"
+#if defined(BOARD_RAK4630)
+#include "w5100.h"          // #1183: W5100.readSn*/writeSnMSSR for the web socket's MSS
+#endif
 
 
 CommonWebServer web_server(80);
@@ -59,6 +62,85 @@ unsigned long web_currentTime = millis(); // Current time
 unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
+
+#if defined(BOARD_RAK4630)
+/**
+ * Issue #1183: the W5100S has no path-MTU discovery and sends full 1460-byte MSS
+ * segments with DF set. Behind a tunnel with a path MTU below 1500 (HAMNET) the
+ * first large web page chunk is blackholed and the socket times out. The user-set
+ * Ethernet MTU therefore caps the MSS (MTU - 40) the web server advertises.
+ *
+ * Sn_MSSR is latched by the chip at Sock_OPEN (datasheet 3.2.9); writing it on a
+ * socket that is already LISTENing changes nothing. So the target is pre-written
+ * to every CLOSED socket (the register survives CLOSE, and whichever index
+ * socketBegin() picks next latches it; a UDP socket inheriting it is harmless,
+ * its datagrams stay far below 548 B), and a port-80 LISTEN socket that latched
+ * an older value is closed and re-opened through web_server.begin().
+ *
+ * Called after every available() (which re-listens on a fresh socket) and once
+ * after begin(). Steady state: SR (+MSSR) reads only, no writes. The clamp keeps
+ * a corrupt stored value away from MSS 0 or above 1460.
+ */
+static void webApplyEthMss()
+{
+    int mtu = meshcom_settings.node_ethmtu;
+
+    if (mtu < 1280) mtu = 1280;
+    if (mtu > 1500) mtu = 1500;
+
+    const uint16_t mss = (uint16_t)(mtu - 40);
+
+    // same cap as EthernetServer::available(): W5100S/W5100 have 4 sockets, and
+    // chip 0 means no Ethernet hardware (no SPI traffic then)
+    const uint8_t chip = W5100.getChip();
+    if (!chip)
+        return;
+
+    uint8_t nsock = MAX_SOCK_NUM;
+    if (nsock > 4 && (chip == 50 || chip == 51))
+        nsock = 4;
+
+    bool closedStale = false;
+
+    // pass A: pre-write CLOSED sockets, close a stale port-80 LISTEN socket
+    for (uint8_t i = 0; i < nsock; i++)
+    {
+        SPI.beginTransaction(SPI_ETHERNET_SETTINGS);
+
+        const uint8_t sr = W5100.readSnSR(i);
+
+        if (sr == SnSR::CLOSED)
+        {
+            if (W5100.readSnMSSR(i) != mss)
+                W5100.writeSnMSSR(i, mss);
+        }
+        else if (sr == SnSR::LISTEN && EthernetServer::server_port[i] == 80 && W5100.readSnMSSR(i) != mss)
+        {
+            W5100.execCmdSn(i, Sock_CLOSE);
+            EthernetServer::server_port[i] = 0;
+            closedStale = true;
+        }
+
+        SPI.endTransaction();
+    }
+
+    if (!closedStale)
+        return;
+
+    // pass B: the socket just closed must hold the target before it is re-opened
+    for (uint8_t i = 0; i < nsock; i++)
+    {
+        SPI.beginTransaction(SPI_ETHERNET_SETTINGS);
+
+        if (W5100.readSnSR(i) == SnSR::CLOSED && W5100.readSnMSSR(i) != mss)
+            W5100.writeSnMSSR(i, mss);
+
+        SPI.endTransaction();
+    }
+
+    web_server.begin();   // socketBegin() takes the first CLOSED index and latches its MSSR
+}
+#endif
 
 // password check
 char web_ip[10][20] = {0};
@@ -177,6 +259,9 @@ void startWebserver()
     {
         web_server.begin();
     }
+    #if defined(BOARD_RAK4630)
+    webApplyEthMss();
+    #endif
 #endif
     bweb_server_running = true;
 
@@ -231,6 +316,10 @@ void loopWebserver()
     #endif
 
     web_client = web_server.available(); // Create a client connection.
+
+    #if defined(BOARD_RAK4630)
+    webApplyEthMss();   // #1183: available() may just have re-listened on a fresh socket
+    #endif
 
     // HTML Page formating
     if (web_client)
@@ -2787,6 +2876,9 @@ void sub_page_setup()
     _create_setup_textinput_element("owngw", "Gateway", String(meshcom_settings.node_gw), "192.168.2.1", "setowngw", 50, false, true);           // create Textinput-Element including Label and Button
     _create_setup_textinput_element("owndns", "DNS", String(meshcom_settings.node_dns), "192.168.2.1", "setowndns", 50, false, true);             // create Textinput-Element including Label and Button
     _create_setup_textinput_element("ownntp", "NTP", String(meshcom_settings.node_ownntp), "192.168.2.1", "setownntp", 50, false, true);          // create Textinput-Element including Label and Button
+    #if defined(BOARD_RAK4630)
+    _create_setup_textinput_element("ethmtu", "ETH MTU", String(meshcom_settings.node_ethmtu), "1500", "ethmtu", 4, false, false);                 // #1183: 1280..1500, applies to the next web connection, no reboot
+    #endif
 
     _create_setup_textinput_element("extudp", "ext. UDP IP", String(meshcom_settings.node_extern), "192.168.100.100", "extudpip", 50, false, false); // create Textinput-Element including Label and Button
 
