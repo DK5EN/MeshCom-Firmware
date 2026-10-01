@@ -826,8 +826,8 @@ void NrfETH::startUDP()
         udp_dest_addr = IPAddress(44, 148, 230, 197);
         srv_path = "hamnet";
 
-        //DEBUG_MSG("NTP", "Setting Hamnet NTP");
-        timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
+        // upstream f860e934: the DL HAMNET server pairs with the DL HAMNET NTP
+        timeClient.setPoolServerIP(IPAddress(44, 148, 224, 123));
       }
       else
       {
@@ -997,8 +997,8 @@ void NrfETH::startFIXUDP()
 
       udp_dest_addr = IPAddress(44, 148, 230, 197);
     
-      //DEBUG_MSG("NTP", "Setting Hamnet NTP");
-      timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
+      // same DL HAMNET NTP as startUDP() (upstream f860e934 changed only startUDP())
+      timeClient.setPoolServerIP(IPAddress(44, 148, 224, 123));
     }
     else
     {
