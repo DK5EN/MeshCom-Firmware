@@ -4,6 +4,9 @@
 #include "capture_functions.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
+#if defined(HAS_TFT)
+#include "tft_display_functions.h"   // #1182: tftBacklight()
+#endif
 #include "printfdeb_functions.h"
 #include "command_match.h" // D2-10: commandMatches(), the ladder's matching rule
 #include "command_toggles.h" // D2-06: the table-driven on/off toggles
@@ -1360,6 +1363,12 @@ void commandAction(char *umsg_text, bool ble)
 
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
         tft_off();      // TM-33 (b): backlight off + panel sleep, like the 30 s timeout
+        #endif
+
+        #if defined(HAS_TFT)
+        // #1182: sendDisplayHead() returns early while pageHold > 0 or bSetDisplay is set
+        // and never reaches the "#C" path -- darken the backlight here as well.
+        tftBacklight();
         #endif
     }
     else

@@ -1216,6 +1216,10 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
             ledcAttachPin(SCREEN_BL, 1);
         #endif
 
+        #if defined(HAS_TFT)
+        tftBacklight();   // #1182: dark on "#C" while bDisplayIsOff, even with no lines drawn
+        #endif
+
         if(pageLineAnz > 0)
         {
             int ianz=0;
