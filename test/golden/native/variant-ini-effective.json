@@ -2346,7 +2346,8 @@
    "test_dm_dedup",
    "test_dm_text_escape",
    "test_msgstore",
-   "test_sto_notice"
+   "test_sto_notice",
+   "test_tft_backlight"
   ],
   "test_framework": "unity"
  },

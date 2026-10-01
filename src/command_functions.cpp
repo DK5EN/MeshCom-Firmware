@@ -3481,7 +3481,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     // Issue #1183: Ethernet MTU for the RAK W5100S web server (applied as MSS = MTU - 40
     // on the next listening socket, see web_functions.cpp). Unlike --pingmax a bad value
-    // is rejected, not reset: a typo must not silently change the path MTU.
+    // is rejected, not reset: a typo must not silently change the path MTU. RAK only, like
+    // its --help line: the MSS is applied by the W5100S path alone.
+    #if defined(BOARD_RAK4630)
     if(commandCheck(msg_text+2, (char*)"ethmtu ") == 0)
     {
         const CmdSetResult res = cmdStoreInt(msg_text+9, &meshcom_settings.node_ethmtu, 1280, 1500, &iVar);
@@ -3507,6 +3509,7 @@ void commandAction(char *umsg_text, bool ble)
         save_settings();
     }
     else
+    #endif
 
 #ifndef BOARD_RAK4630
     if(commandCheck(msg_text+2, (char*)"setssid ") == 0)

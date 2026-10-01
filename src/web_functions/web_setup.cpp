@@ -137,6 +137,8 @@ void webSetup_setParam(setupStruct *setupData){
 
     // Issue #1183: Ethernet MTU of the RAK W5100S web server; --ethmtu rejects
     // out-of-range input, so returnCode FAIL tells the page the value was refused.
+    // RAK only, like the --ethmtu rung it calls.
+    #if defined(BOARD_RAK4630)
     if(setupData->paramName.equals("ethmtu")) {
         snprintf(message_text, sizeof(message_text), "--ethmtu %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
@@ -144,6 +146,7 @@ void webSetup_setParam(setupStruct *setupData){
         setupData->returnValue = String(meshcom_settings.node_ethmtu);
         return;
     } else
+    #endif
 
     // CS-02: Hop-Limit fuer Textnachrichten. Wie jeder andere Parameter hier
     // ueber commandAction(), damit GUI und serielle Konsole nicht auseinander
