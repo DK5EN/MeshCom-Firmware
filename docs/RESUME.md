@@ -1,5 +1,26 @@
 # RESUME — pick up here
 
+## 2026-10-01: upstream sync check against `v4.35v.09.30`, three ports committed
+
+upstream/dev `1d4f5250` (tag `v4.35v.09.30`, PRs #1162-#1185) checked against `fork-neo-test`;
+everything except makrohard's PR #1164 and the NTP part of Kurt's `f860e934` was already in the
+fork. Committed on `fork-neo-test` (not pushed, `fork-neo` not re-derived, base stays `6cc8b552`):
+
+- `8ea1430c` cherry-pick of `f3c7a336` (save settings where they change; `--aprsmc`, T-Deck/Pro
+  locks, XML UTC offset, `{SET}` text hop, ESP32 `save_position()` every 15 min on a GPS fix).
+  The fork had already dropped save-after-every-TX, so these settings were lost on reboot here
+  too (reproduced on DK5EN-1 with `--aprsmc`). Native test `test_node_utcoff_change_is_saved_once`.
+- `6a9c44f8` cherry-pick of `b09c64b3` (T-Deck setup-page map is saved).
+- `d4610032` `save_position()` honours the `g_flash_load_in_progress` guard (advisor finding).
+- `92d7a735` RAK HAMNET + gateway server DL: NTP 44.148.224.123 in `startUDP()` and
+  `startFIXUDP()` (upstream fixed only the first).
+
+Not taken on purpose: `3f936a63` (`save_msgid()`; the fork's counters store already covers it),
+upstream's unconditional `[UDP-DEST]` log lines. Gate: 6 board envs, 48 native envs
+1591/1591 + 1 skip, fable advisor APPROVED, DK5EN-1 bench: `--aprsmc` survives a reboot. Open
+(advisor, low, same as upstream): `{SET}` from any mesh node can trigger a save per value flip.
+Scout audit of fork-only settings: no further unsaved persistent setter.
+
 ## 2026-09-29 midday: release `v4.35v.09.29-neo` published, DK5EN-98 soak running
 
 Tag `v4.35v.09.29-neo` on `bfc644ab`, GitHub release with 39 assets (latest), web flasher offers
