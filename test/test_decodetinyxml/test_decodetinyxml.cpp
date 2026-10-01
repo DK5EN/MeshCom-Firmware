@@ -57,6 +57,14 @@ String strTELE_CH_ID = "";
 String strTELE_UTCOFF = "";
 unsigned long lTELE_TIMER = 0;
 
+// Counts flash saves; normally src/nrf52 or src/esp32 flash code, not linked here.
+static int g_save_settings_calls = 0;
+bool save_settings(void)
+{
+    g_save_settings_calls++;
+    return true;
+}
+
 // ---- Sample document (see file header) --------------------------------
 static const char *kSampleDocument =
     "<StationDataList>"
@@ -100,6 +108,7 @@ void setUp(void)
 
     meshcom_settings = s_meshcom_settings();
     bSOFTSERDEBUG = false;
+    g_save_settings_calls = 0;
 }
 
 void tearDown(void) {}
@@ -431,6 +440,27 @@ static void test_node_utcoff_converts_parsed_timezone(void)
     TEST_ASSERT_EQUAL_FLOAT(-3.5f, meshcom_settings.node_utcoff);
 }
 
+// A changed station timezone is saved at once (upstream f3c7a336): it no
+// longer rides along with the next transmission, because this fork stopped
+// saving all settings after every TX. An unchanged or absent timezone must not
+// write the flash again -- the XML arrives periodically.
+static void test_node_utcoff_change_is_saved_once(void)
+{
+    TEST_ASSERT_TRUE(decodeTinyXML(String(kSampleDocument)));   // 0.0 -> +1.0
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, meshcom_settings.node_utcoff);
+    TEST_ASSERT_EQUAL_INT(1, g_save_settings_calls);
+
+    TEST_ASSERT_TRUE(decodeTinyXML(String(kSampleDocument)));   // same offset again
+    TEST_ASSERT_EQUAL_INT(1, g_save_settings_calls);
+
+    TEST_ASSERT_TRUE(decodeTinyXML(String(                      // no timezone attribute
+        "<StationDataList><StationData stationId=\"S3\" name=\"N3\">"
+        "<ChannelData channelId=\"0011\" name=\"Ch\" unit=\"U\">"
+        "<Values><VT t=\"2025-01-01T00:00:00\">7.0</VT></Values>"
+        "</ChannelData></StationData></StationDataList>")));
+    TEST_ASSERT_EQUAL_INT(1, g_save_settings_calls);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -448,5 +478,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_embedded_nul_truncates_parse_silently);
     RUN_TEST(test_vt_without_text_gets_zero_placeholder);
     RUN_TEST(test_node_utcoff_converts_parsed_timezone);
+    RUN_TEST(test_node_utcoff_change_is_saved_once);
     return UNITY_END();
 }

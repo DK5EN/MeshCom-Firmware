@@ -32,3 +32,7 @@ typedef struct s_meshcom_settings
 } s_meshcom_settings;
 
 extern s_meshcom_settings meshcom_settings;
+
+// decodeTinyXML() saves node_utcoff when the parsed offset changes (upstream
+// f3c7a336). Signature as in src/nrf52/WisBlock-API.h; the test counts calls.
+bool save_settings(void);

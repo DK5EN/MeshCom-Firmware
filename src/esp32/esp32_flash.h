@@ -7,6 +7,7 @@
 #include <meshcom_settings.h>
 
 void save_settings(void);
+void save_position(void);
 // Get LoRa parameter
 void init_flash(void);
 // LoRa parameter zurück setzen
