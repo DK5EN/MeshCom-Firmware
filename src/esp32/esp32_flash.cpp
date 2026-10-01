@@ -497,6 +497,14 @@ void save_settings(void)
 // Saves only the position (node_lat/lon/alt and the hemisphere letters).
 void save_position(void)
 {
+    if (g_flash_load_in_progress)
+    {
+        // same D1-04 W3 guard as save_settings(): begin() on the open load
+        // handle would fail and end() would close it mid-walk
+        Serial.printf("[FLASH]...save_position() REFUSED: init_flash() load still in progress -- NVS not touched\n");
+        return;
+    }
+
     preferences.begin("Credentials", false);
 
     preferences.putDouble("node_lat", meshcom_settings.node_lat);

@@ -493,6 +493,27 @@ void test_guard_refuses_save_during_load_and_logs(void)
     TEST_ASSERT_EQUAL_STRING("DK5EN-9", FakeNvs::instance().entries().at("node_call").s.c_str());
 }
 
+// ---------------------------------------------------------------------------
+// 6. save_position() (upstream f3c7a336, GPS fix every 15 min) is a second
+//    writer on the same `preferences` handle and carries the same guard.
+// ---------------------------------------------------------------------------
+void test_guard_refuses_position_save_during_load(void)
+{
+    meshcom_settings.node_lat = 48.1234;
+
+    mc_test_set_flash_load_in_progress(true);
+    save_position();
+
+    TEST_ASSERT_FALSE_MESSAGE(FakeNvs::instance().hasKey("node_lat"), "save_position() wrote while load was in progress");
+    TEST_ASSERT_EQUAL_INT(0, FakeNvs::instance().openCount());
+    TEST_ASSERT_TRUE(Serial.captured().find("save_position() REFUSED") != std::string::npos);
+
+    mc_test_set_flash_load_in_progress(false);
+    save_position();
+
+    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_lat"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -508,5 +529,6 @@ int main(int, char **)
     RUN_TEST(test_counters_save_touches_only_the_counters_namespace);
     RUN_TEST(test_init_flash_writes_no_msgid_into_credentials);
     RUN_TEST(test_guard_refuses_save_during_load_and_logs);
+    RUN_TEST(test_guard_refuses_position_save_during_load);
     return UNITY_END();
 }
