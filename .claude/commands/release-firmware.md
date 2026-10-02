@@ -20,10 +20,14 @@ path.
   unless you add `--cleanup-tag`. Ask the user which of the two they want
   gone before deleting anything.
 - Releases go on the current working branch's HEAD. Do not merge or switch
-  branches for a release. The working branch is `fork-neo-test` (primary since
-  2026-09-27; `fork-main`, `feature-snf` and `feature-neighbour-matrix` were
-  merged in and retired as `archive/<name>-20260927`). Older docs that say
-  `fork-main` or `v4.35p_prio` describe the retired pre-neo line.
+  branches for a release. The working branch is `fork-dev` (primary since
+  2026-10-02: `upstream/dev` plus one fork port commit; `fork-neo-test` is
+  retired as tag `archive/fork-neo-test-20261002`, `fork-main` as
+  `archive/fork-main-20260927`). Older docs that say `fork-neo-test`,
+  `fork-main` or `v4.35p_prio` describe retired lines. A fork release is the
+  fork-dev build, which carries a few firmware fixes upstream does not have
+  yet, so it is NOT byte-identical to the official upstream release of the
+  same version -- say so in release-notes.md.
 
 ## Versioning
 
@@ -39,9 +43,11 @@ path.
   re-release vs. replace-in-place).
 - **Check upstream's tags before naming ours**: `git ls-remote --tags upstream`.
   Upstream uses the same `v<VER>.MM.DD` shape since 2026-09-12 (`v4.35t.09.12`
-  on their `dev` merge of our PR #1140). A fork tag with an upstream tag's name
-  clobbers on every fetch, so append `.2` and say why in release-notes.md
-  (precedent: `v4.35t.09.12.2`). Also `git fetch upstream --tags` first so the
+  on their `dev` merge of our PR #1140), and since 4.40a the bare `v<VER>`
+  (`v4.40a` = their merge of our PR #1186). A fork tag with an upstream tag's
+  name clobbers on every fetch, so never reuse a bare upstream tag: use
+  `v<VER>.MM.DD` (precedent: `v4.40a.10.02`) or append `.2` and say why in
+  release-notes.md (precedent: `v4.35t.09.12.2`). The `-neo` suffix is retired. Also `git fetch upstream --tags` first so the
   upstream name exists locally and nothing is pushed under it later.
 - The letter no longer marks the fork: upstream released official `v4.35t` on
   2026-09-10 with our PR #1135 (items 104-210) inside. Release text must frame
@@ -68,8 +74,9 @@ content fits one:
   "Supported Hardware" split *bench-tested* vs *built and shipped, not on
   our bench*, "Known gaps, stated plainly" (list every open defect honestly,
   e.g. TM-49), "Installing", "Upstream". The README link also embeds the tag.
-- `release.md` (repo root, **German, no umlauts** — write `ae/oe/ue`, `--`
-  for em dashes) — running journal. New section at the TOP, below the header
+- `docs/release-journal.md` (**German, no umlauts** — write `ae/oe/ue`, `--`
+  for em dashes) — running journal; moved here on 2026-10-02 because the root
+  `release.md` is upstream's own file again and must stay untouched. New section at the TOP, below the header
   that names FLASH_VERSION. Must end with "Was fuer dieses Release auf
   Hardware geprueft wurde" and "Was ausdruecklich NICHT geprueft wurde".
 - Topic changelog, only if the release's content fits one
@@ -83,7 +90,7 @@ content fits one:
   highest item, checked fresh (`grep -oE '^[0-9]+\.' docs/CHANGELOG-stability.md
   | sort -n | tail -1` — 221 as of 2026-09-28), never a number remembered from
   an earlier release. A release that fits no topic changelog updates neither
-  it nor `docs/CHANGELOG-stability.md` — `release-notes.md` and `release.md`
+  it nor `docs/CHANGELOG-stability.md` — `release-notes.md` and `docs/release-journal.md`
   alone are enough.
 
 Before writing "what changed", check completeness, not just plausibility:
@@ -97,7 +104,7 @@ one bullet — a scope claim not checked against the actual range is not
 trustworthy (the 09.28.2 release notes said "a single fix" but the tag also
 shipped `dbc57632`).
 
-Then: `npx --yes prettier@3 --write release-notes.md release.md` (add the
+Then: `npx --yes prettier@3 --write release-notes.md docs/release-journal.md` (add the
 topic changelog too if you touched it). A `.prettierignore` already protects
 binaries.
 
