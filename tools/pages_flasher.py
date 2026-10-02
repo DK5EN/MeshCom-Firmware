@@ -401,8 +401,19 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
         hexf = build_dir / env / "firmware.hex"
         if not hexf.is_file():
             raise SystemExit(f"{env}: {hexf} missing -- build it, never ship a partial board")
+        # The DFU package (adafruit-nrfutil zip) is PlatformIO's own output; it
+        # ships byte-identical next to the UF2 for the serial-DFU path.
+        pkg = build_dir / env / "firmware.zip"
+        if not pkg.is_file():
+            raise SystemExit(f"{env}: {pkg} missing -- build it, never ship a partial board")
         uf2_from_hex(hexf, dest / "firmware.uf2")
-        builds = [{"chipFamily": "NRF52", "parts": [{"path": "firmware.uf2"}]}]
+        shutil.copy2(pkg, dest / "firmware.zip")
+        builds = [
+            {
+                "chipFamily": "NRF52",
+                "parts": [{"path": "firmware.uf2"}, {"path": "firmware.zip"}],
+            }
+        ]
     else:
         parts = []
         for offset, src, name_out in esp_parts(cfg, env, family, repo, build_dir):
@@ -588,6 +599,8 @@ def cmd_check(args) -> int:
                     local_p = Path(t) / "firmware.uf2"
                     uf2_from_hex(build_dir / env / "firmware.hex", local_p)
                     local = local_p.read_bytes()
+            elif part["path"] == "firmware.zip":
+                local = (build_dir / env / "firmware.zip").read_bytes()
             else:
                 fam = manifest["builds"][0]["chipFamily"]
                 srcs = {n: s for _, s, n in esp_parts(cfg, env, fam, REPO, build_dir)}

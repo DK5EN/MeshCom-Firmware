@@ -231,6 +231,7 @@ def test_manifest_for_s3_classic_and_nrf52(cfg, tmp_path, monkeypatch):
     envs = ["heltec_wifi_lora_32_V3", "ttgo_tbeam_SX1262", "wiscore_rak4631"]
     build = fake_build(tmp_path, envs)
     (build / "wiscore_rak4631" / "firmware.hex").write_bytes(b":00000001FF\n")
+    (build / "wiscore_rak4631" / "firmware.zip").write_bytes(b"PK-dfu-package")
     monkeypatch.setattr(
         pf, "uf2_from_hex", lambda h, o: Path(o).write_bytes(b"UF2\n")
     )
@@ -249,8 +250,12 @@ def test_manifest_for_s3_classic_and_nrf52(cfg, tmp_path, monkeypatch):
     assert classic["builds"][0]["parts"][0] == {"path": "bootloader.bin", "offset": 4096}
 
     nrf = json.loads((out / "v1" / "wiscore_rak4631" / "manifest.json").read_text())
-    assert nrf["builds"][0] == {"chipFamily": "NRF52", "parts": [{"path": "firmware.uf2"}]}
+    assert nrf["builds"][0] == {
+        "chipFamily": "NRF52",
+        "parts": [{"path": "firmware.uf2"}, {"path": "firmware.zip"}],
+    }
     assert (out / "v1" / "wiscore_rak4631" / "firmware.uf2").exists()
+    assert (out / "v1" / "wiscore_rak4631" / "firmware.zip").read_bytes() == b"PK-dfu-package"
 
 
 def test_board_folder_is_self_contained_per_env(cfg, tmp_path):
@@ -273,6 +278,48 @@ def test_missing_artifact_refuses_to_ship_a_partial_board(cfg, tmp_path):
     (build / "t_deck" / "partitions.bin").unlink()
     with pytest.raises(SystemExit):
         pf.stage_board(cfg, "t_deck", "v1", tmp_path / "out", REPO, build)
+
+
+def test_nrf52_without_dfu_package_refuses_to_ship_a_partial_board(cfg, tmp_path, monkeypatch):
+    build = fake_build(tmp_path, ["wiscore_rak4631"])
+    (build / "wiscore_rak4631" / "firmware.hex").write_bytes(b":00000001FF\n")
+    monkeypatch.setattr(
+        pf, "uf2_from_hex", lambda h, o: Path(o).write_bytes(b"UF2\n")
+    )
+    with pytest.raises(SystemExit, match="firmware.zip missing"):
+        pf.stage_board(cfg, "wiscore_rak4631", "v1", tmp_path / "out", REPO, build)
+
+
+def test_check_compares_the_dfu_package_by_sha(tmp_path, monkeypatch, capsys):
+    env = "wiscore_rak4631"
+    build = fake_build(tmp_path, [env])
+    (build / env / "firmware.zip").write_bytes(b"PK-local")
+    served = {
+        "releases.json": json.dumps({"releases": [{"version": "v1", "boards": [{"env": env}]}]}),
+        f"v1/{env}/manifest.json": json.dumps(
+            {"builds": [{"chipFamily": "NRF52",
+                         "parts": [{"path": "firmware.uf2"}, {"path": "firmware.zip"}]}]}
+        ),
+        f"v1/{env}/firmware.uf2": b"UF2\n",
+        f"v1/{env}/firmware.zip": b"PK-local",
+    }
+
+    def get(url):
+        data = served[url.removeprefix("http://x/")]
+        return data.encode() if isinstance(data, str) else data
+
+    monkeypatch.setattr(pf, "REPO", tmp_path)
+    (tmp_path / ".pio").mkdir()
+    build.rename(tmp_path / ".pio" / "build")
+    monkeypatch.setattr(pf, "load_config", lambda repo: None)
+    monkeypatch.setattr(pf, "_get", get)
+    monkeypatch.setattr(pf, "uf2_from_hex", lambda h, o: Path(o).write_bytes(b"UF2\n"))
+    args = pf.argparse.Namespace(base_url="http://x", version="v1")
+    assert pf.cmd_check(args) == 0
+
+    served[f"v1/{env}/firmware.zip"] = b"PK-stale"
+    assert pf.cmd_check(args) == 1
+    assert f"FAIL {env}/firmware.zip sha mismatch" in capsys.readouterr().out
 
 
 # --------------------------------------------------------------------------
