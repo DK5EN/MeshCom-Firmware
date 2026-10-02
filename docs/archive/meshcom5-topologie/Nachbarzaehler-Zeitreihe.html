@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nachbarzähler als Zeitreihe</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .dash .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+
+</style>
+</head>
+<body>
+<main>
+<h1>Nachbarzähler aus HEY als Zeitreihe</h1>
+<ul class="meta">
+  <li>Stand: 2026-09-24</li>
+  <li>Autor: Claude für DK5EN</li>
+  <li>Quelle Firmware: <code>MeshCom-Firmware-DEV-Main</code>, <code>src/mheard_functions.cpp</code>, <code>src/aprs_functions.cpp</code>, <code>src/lora_functions.cpp</code>, <code>src/configuration_global.h</code></li>
+  <li>Quelle mcmap: <code>proxy/src/wss/parsers.ts</code>, <code>proxy/src/interlink/ingest.ts</code>, <code>proxy/src/db/unifiedDatabase.ts</code>, <code>frontend/src/components/node/NodeProfileHeader.vue</code></li>
+  <li>Messung Produktion: oe-link, <code>interlink.log.2026-09-23.gz</code> (24 h, 2026-09-23 00:37 bis 2026-09-24 00:37 MESZ) und DB-Schnappschuss vom 2026-09-24 09:22 MESZ</li>
+  <li>Rufzeichen im Text sind reale Stationen aus dem Messzeitraum, nur als Messbeispiel zitiert</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+  <p>Jeder HEY-Rahmen trägt die Nachbarzahl seines Absenders und zusätzlich die jedes Relais, das ihn weitergereicht hat. mcmap speichert davon nur den letzten Wert des Absenders in <code>nodes.nct</code> und überschreibt ihn beim nächsten Rahmen. Die Relaiswerte wirft der Parser weg: an einem Tag rund 68 000 zuordenbare Relaiswerte von 441 Stationen, darunter 59, von denen wir sonst gar keinen Zähler haben. Einen Spitzenwert über Stunden oder Tage kann deshalb heute niemand ablesen.</p>
+  <p>Daraus folgt:</p>
+  <ol>
+    <li><b>Stufe 1, Speichern:</b> ein eigener Parser zieht Absender- und Relaiszähler aus jedem HEY, eine Stundentabelle hält Minimum, Maximum und letzten Wert je Rufzeichen 30 Tage lang, eine API-Route und ein MCP-Tool geben die Reihe aus.</li>
+    <li><b>Stufe 2, Sichtbar:</b> ein Abschnitt "Neighbors" im Knotenprofil mit Stundenkurve, Spitzenwert und Kappungsmarke, dazu eine Rangliste der Stationen nach Spitzenwert.</li>
+    <li><b>Stufe 3, Rollenurteil:</b> Zähler und Kantengraph zusammen ergeben je Station eine 2-Hop-Obergrenze und die Liste ihrer exklusiven Blätter, also die Grundlage für die Frage Supernode oder Relais.</li>
+  </ol>
+  <p class="reco">Empfehlung: Stufe 1 sofort bauen, Stufe 2 danach. Stufe 3 erst entscheiden, wenn 14 Tage Daten vorliegen, denn die wichtigste Grenze steht schon fest: die belebtesten Knoten hängen den ganzen Tag an der Firmware-Kappung von 30, ihr wahrer Spitzenwert bleibt auch mit Stufe 1 verdeckt.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>Was wird geändert</td><td>Neuer Parser neben <code>parseWssRssi</code>, neue Tabelle <code>neighbor_count_1h</code>, neue Route, neues MCP-Tool. Draht, Firmware und Protobuf bleiben unverändert.</td><td>1</td><td>4.1 bis 4.3</td></tr>
+<tr><td>2</td><td>Wie wird es sichtbar</td><td>API und MCP ab Stufe 1, Knotenprofil und Rangliste ab Stufe 2, Rollenurteil ab Stufe 3</td><td>1 bis 3</td><td>4.5, 4.6</td></tr>
+<tr><td>3</td><td>Positive und negative Folgen</td><td>Eigene Folgenbilanz, die Kappung ist der gewichtigste Nachteil</td><td>alle</td><td>5</td></tr>
+<tr><td>4</td><td>Maximum 1-Hop und 2-Hop je Zeitraum</td><td>1-Hop direkt aus der Reihe bis zur Kappungsgrenze, 2-Hop nur als Obergrenze</td><td>1, 3</td><td>4.4, 4.6</td></tr>
+<tr><td>5</td><td>Supernode oder Relais entscheiden</td><td>mcmap liefert die Messgrundlage, die Relaisentscheidung selbst gehört in die Firmware-Nachbarschaftsmatrix</td><td>3</td><td>4.6</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>Lücke</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td><code>nodes.nct</code> = letzter Absenderwert, NBCNT als Einzelzahl im Knotenprofil</td><td>Momentaufnahme</td><td>keine Historie, keine Relaiswerte</td><td>keine</td></tr>
+<tr><td>1 Speichern</td><td>Parser, Stundentabelle 30 Tage, Route, MCP-Tool</td><td>Anforderungen 1, 4 bis zur Kappung</td><td>nichts im Browser sichtbar</td><td>Schema-Migration, Deploy</td></tr>
+<tr><td>2 Sichtbar</td><td>Profilabschnitt "Neighbors", Rangliste</td><td>Anforderung 2</td><td>kein Rollenurteil</td><td>Stufe 1, Übersetzungen in allen Locales</td></tr>
+<tr><td>3 Rollenurteil</td><td>2-Hop-Obergrenze, exklusive Blätter je Station</td><td>Anforderung 5 als Messgrundlage</td><td>2-Hop bleibt Schätzung</td><td>Stufe 1 mit 14 Tagen Daten</td></tr>
+</table>
+
+<ul class="toc">
+  <li><a href="#s1">1. Ergebnis</a></li>
+  <li><a href="#s2">2. Ausgangslage</a></li>
+  <li><a href="#s3">3. Zielbild</a></li>
+  <li><a href="#s4">4. Bausteine</a></li>
+  <li><a href="#s5">5. Folgen</a></li>
+  <li><a href="#s6">6. Fehlerszenarien</a></li>
+  <li><a href="#s7">7. Rollout</a></li>
+  <li><a href="#s8">8. Offene Punkte</a></li>
+</ul>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Der Zähler misst genau eines: wie viele verschiedene Rufzeichen die Station in der letzten Stunde direkt über Funk gehört hat, gedeckelt durch die Größe ihrer MHeard-Tabelle.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Zählfenster</td><td>1 h, gleitend, nach <code>millis()</code></td><td><code>mheard_functions.cpp:103</code>, <code>:691</code></td></tr>
+<tr><td>Gezählt wird</td><td>der letzte Sender jedes empfangenen Rahmens, <code>msg_source_last</code>, also direkt gehörte Stationen, auch einseitig</td><td><code>lora_functions.cpp:1078</code></td></tr>
+<tr><td>Tabellengröße, damit Obergrenze</td><td>30 klassischer ESP32, 50 XML/SBUFFER-Builds, 80 ESP32-S3 und RAK4631, 10 Entwicklervariante</td><td><code>configuration_global.h:301-333</code></td></tr>
+<tr><td>Verdrängung</td><td>volle Tabelle verdrängt den ältesten Eintrag, der Zähler bleibt an der Tabellengröße stehen</td><td><code>mheard_functions.cpp:299 ff.</code></td></tr>
+<tr><td>Ohne gültige Uhr</td><td>Rahmen mit Datum vor 2025 werden nicht eingetragen, der Zähler bleibt 0</td><td><code>mheard_functions.cpp:303</code></td></tr>
+<tr><td>HEY-Nutzlast Absender</td><td><code>R&lt;n&gt;;</code>, der Hub liefert <code>n</code> als JSON-Feld <code>nct</code></td><td><code>loop_functions.cpp:5095</code></td></tr>
+<tr><td>HEY-Nutzlast je Relais</td><td>angehängte Gruppe <code>&lt;n&gt;,&lt;rssi&gt;,&lt;snr&gt;;</code>, <code>n</code> = Zähler des Relais, RSSI und SNR = wie das Relais den Rahmen empfing</td><td><code>aprs_functions.cpp:1145</code>, <code>lora_functions.cpp:1736</code>, <code>:1863</code></td></tr>
+<tr><td>mcmap heute, Absender</td><td><code>sanitizeNct</code> und <code>touchNodeActivity</code> schreiben den letzten Wert in <code>nodes.nct</code></td><td><code>interlink/ingest.ts:1085</code></td></tr>
+<tr><td>mcmap heute, Relais</td><td><code>parseWssRssi</code> liest nur RSSI und SNR, das erste Feld jeder Gruppe wird verworfen</td><td><code>wss/parsers.ts:66</code></td></tr>
+<tr><td>Anzeige heute</td><td>NBCNT als Einzelzahl im Knotenprofil</td><td><code>NodeProfileHeader.vue:160</code></td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 300" role="img" aria-label="Ist-Zustand">
+  <rect x="20" y="30" width="150" height="50" class="node hamf ham"/>
+  <text x="95" y="52" text-anchor="middle" class="b">Absender A</text>
+  <text x="95" y="68" text-anchor="middle" class="mono">R12;</text>
+  <rect x="210" y="30" width="170" height="50" class="node hamf ham"/>
+  <text x="295" y="52" text-anchor="middle" class="b">Relais B</text>
+  <text x="295" y="68" text-anchor="middle" class="mono">haengt 8,119,-8; an</text>
+  <rect x="420" y="30" width="170" height="50" class="node wwwf www"/>
+  <text x="505" y="52" text-anchor="middle" class="b">Gateway und Hub</text>
+  <text x="505" y="68" text-anchor="middle" class="mono">JSON nct, path, rssi</text>
+  <rect x="630" y="30" width="310" height="50" class="node prx"/>
+  <text x="785" y="52" text-anchor="middle" class="b">mcmap applyHey</text>
+  <text x="785" y="68" text-anchor="middle" class="mono">interlink/ingest.ts</text>
+  <path d="M170 55 L210 55" class="lnh"/>
+  <path d="M380 55 L420 55" class="lnh"/>
+  <path d="M590 55 L630 55" class="lnw"/>
+
+  <rect x="662" y="130" width="130" height="50" class="node srv"/>
+  <text x="727" y="152" text-anchor="middle" class="b">nodes.nct</text>
+  <text x="727" y="168" text-anchor="middle" class="t11">nur letzter Wert</text>
+  <rect x="800" y="130" width="140" height="50" class="node srv"/>
+  <text x="870" y="152" text-anchor="middle" class="b">edges, link_signal</text>
+  <text x="870" y="168" text-anchor="middle" class="t11">RSSI und SNR je Hop</text>
+  <path d="M727 80 L727 130" class="ln"/>
+  <path d="M870 80 L870 130" class="ln"/>
+  <text x="735" y="110" class="t11">nct</text>
+  <text x="878" y="110" class="t11">parseWssRssi</text>
+
+  <rect x="630" y="220" width="310" height="50" class="node bad"/>
+  <text x="785" y="242" text-anchor="middle" class="b">Relaiszaehler verworfen</text>
+  <text x="785" y="258" text-anchor="middle" class="t11">ca. 68 000 Werte am Tag, 441 Stationen</text>
+  <path d="M645 80 L645 220" class="lnx"/>
+  <text x="653" y="208" class="t11">erstes Feld jeder Relaisgruppe</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Der Absenderzähler landet als überschriebener Einzelwert in <code>nodes.nct</code>, die Relaiszähler fallen im Parser weg. Aus beiden entsteht keine Zeitreihe.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+<p>Gemessen über 24 h INTERLINK-Verkehr. Doppelte Rahmen mit gleicher <code>msg_id</code>, Zeit, Pfad und RSSI-Kette wurden vorher entfernt.</p>
+<table>
+<tr><th>Größe</th><th class="num">Wert</th><th>Bemerkung</th></tr>
+<tr><td>HEY-Rahmen, eindeutig</td><td class="num">125 944</td><td>147 430 roh</td></tr>
+<tr><td>Absender mit <code>nct</code>-Feld</td><td class="num">1 313</td><td>davon 617 von 1 440 Knoten im Schnappschuss mit 0 oder leer</td></tr>
+<tr><td>Relaisgruppen mit Zähler, dreiteilig</td><td class="num">114 167</td><td>Firmware ab 4.35n</td></tr>
+<tr><td>davon einem Rufzeichen zuordenbar</td><td class="num">ca. 68 200</td><td>Rest gehört zum hochladenden Gateway, das nicht im Pfad steht, siehe 4.1</td></tr>
+<tr><td>Relaisgruppen ohne Zähler, zweiteilig</td><td class="num">34 145</td><td>ältere Firmware oder vom Hub eingefaltete Gateway-Messung</td></tr>
+<tr><td>Relais mit Zähler</td><td class="num">441</td><td>59 davon ohne eigenen Absenderwert größer 0</td></tr>
+<tr><td>Tagesmaximum je Relais</td><td class="num">p50 5, p90 14, max 33</td><td>OE3ALB-2 33</td></tr>
+<tr><td>Zeilen der Stundentabelle</td><td class="num">ca. 21 700 je Tag</td><td>Rufzeichen mal Stunde mal Rolle; 30 Tage ca. 650 000 Zeilen, Annahme ca. 50 Byte je Zeile, also ca. 30 MB</td></tr>
+</table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p>Im Endzustand liest jeder HEY einmal zusätzlich durch einen eigenen Parser, die Stundentabelle wächst neben <code>link_signal_1h</code>, und drei Verbraucher lesen sie: API, MCP und Frontend. Die Rollenanalyse der Stufe 3 verbindet die Tabelle mit dem vorhandenen Kantengraph.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 345" role="img" aria-label="Zielbild">
+  <rect x="20" y="40" width="180" height="50" class="node prx"/>
+  <text x="110" y="62" text-anchor="middle" class="b">applyHey</text>
+  <text x="110" y="78" text-anchor="middle" class="mono">interlink + wss</text>
+  <rect x="250" y="40" width="220" height="50" class="node prx"/>
+  <text x="360" y="62" text-anchor="middle" class="b">parseHeyNeighborCounts</text>
+  <text x="360" y="78" text-anchor="middle" class="t11">neu, Stufe 1</text>
+  <rect x="520" y="40" width="200" height="50" class="node srv"/>
+  <text x="620" y="62" text-anchor="middle" class="b">neighbor_count_1h</text>
+  <text x="620" y="78" text-anchor="middle" class="t11">30 Tage, Stufe 1</text>
+  <path d="M200 65 L250 65" class="ln"/>
+  <path d="M470 65 L520 65" class="ln"/>
+
+  <rect x="520" y="165" width="200" height="50" class="node srv"/>
+  <text x="620" y="187" text-anchor="middle" class="b">edges, link_signal_1h</text>
+  <text x="620" y="203" text-anchor="middle" class="t11">vorhanden</text>
+
+  <rect x="775" y="8" width="180" height="205" class="zone"/>
+  <rect x="790" y="20" width="150" height="50" class="node"/>
+  <text x="865" y="42" text-anchor="middle" class="b">GET Reihe je Station</text>
+  <text x="865" y="58" text-anchor="middle" class="t11">Stufe 1</text>
+  <rect x="790" y="85" width="150" height="50" class="node"/>
+  <text x="865" y="107" text-anchor="middle" class="b">GET Rangliste</text>
+  <text x="865" y="123" text-anchor="middle" class="t11">Stufe 2</text>
+  <rect x="790" y="150" width="150" height="50" class="node"/>
+  <text x="865" y="172" text-anchor="middle" class="b">GET Rollenurteil</text>
+  <text x="865" y="188" text-anchor="middle" class="t11">Stufe 3</text>
+  <path d="M720 65 L755 65" class="ln"/>
+  <path d="M755 45 L755 160" class="ln"/>
+  <path d="M755 45 L790 45" class="ln"/>
+  <path d="M755 110 L790 110" class="ln"/>
+  <path d="M755 160 L790 160" class="ln"/>
+  <path d="M720 190 L790 190" class="ln"/>
+
+  <rect x="560" y="280" width="180" height="50" class="node wwwf www"/>
+  <text x="650" y="302" text-anchor="middle" class="b">MCP-Tools</text>
+  <text x="650" y="318" text-anchor="middle" class="t11">1:1 je Route</text>
+  <rect x="790" y="280" width="150" height="50" class="node wwwf www"/>
+  <text x="865" y="302" text-anchor="middle" class="b">Knotenprofil, Rangliste</text>
+  <text x="865" y="318" text-anchor="middle" class="t11">Stufe 2</text>
+  <path d="M865 213 L865 280" class="lnd"/>
+  <path d="M800 213 L800 250 L650 250 L650 280" class="lnd"/>
+  <text x="20" y="300" class="t11">Durchgezogen: Datenfluss beim Schreiben und Lesen</text>
+  <text x="20" y="316" class="t11">Gestrichelt: Verbraucher der Routen</text>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild. Die neue Tabelle ist die einzige neue Datenquelle; Rangliste und Rollenurteil sind Abfragen darüber, das MCP-Tool übersetzt nur die Routen.</figcaption>
+</figure>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Zuordnung Relaisgruppe zu Rufzeichen</h3>
+<p class="reco">Entscheidung: Gruppe i gehört zu Pfadelement i+1; eine Gruppe ohne Pfadelement wird verworfen.</p>
+<p>Prämisse: jedes Relais hängt sich an den Pfad und seine Gruppe an die Kette, also steht die Gruppe des Empfängers an derselben Stelle wie der Hop, den <code>parseWssRssi</code> heute schon so indiziert. Im Messtag hatten 59 976 Rahmen genauso viele Gruppen wie Pfadelemente; die letzte Gruppe beschreibt dort den Empfang durch das hochladende Gateway, dessen Rufzeichen der Draht nicht mitliefert.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 230" role="img" aria-label="Zuordnung">
+  <text x="20" y="30" class="b">Fall 1, zuordenbar: Gruppen = Pfadelemente - 1</text>
+  <text x="20" y="52" class="mono">path: DH8TOM-14,DL1FLW-5,DL1HTY-99    rssi: 8,129,-17;8,119,-8;</text>
+  <rect x="20" y="66" width="130" height="34" class="node"/>
+  <text x="85" y="88" text-anchor="middle" class="mono">DH8TOM-14 nct</text>
+  <rect x="200" y="66" width="130" height="34" class="node srv"/>
+  <text x="265" y="88" text-anchor="middle" class="mono">DL1FLW-5 = 8</text>
+  <rect x="380" y="66" width="140" height="34" class="node srv"/>
+  <text x="450" y="88" text-anchor="middle" class="mono">DL1HTY-99 = 8</text>
+  <path d="M150 83 L200 83" class="lnh"/><path d="M330 83 L380 83" class="lnh"/>
+
+  <text x="20" y="140" class="b">Fall 2, letzte Gruppe ohne Rufzeichen: Gruppen = Pfadelemente</text>
+  <text x="20" y="162" class="mono">path: DB0MW-12    rssi: 14,80,6;</text>
+  <rect x="20" y="176" width="130" height="34" class="node"/>
+  <text x="85" y="198" text-anchor="middle" class="mono">DB0MW-12 nct</text>
+  <rect x="200" y="176" width="180" height="34" class="node bad"/>
+  <text x="290" y="198" text-anchor="middle" class="mono">Gateway ? = 14</text>
+  <path d="M150 193 L200 193" class="lnx"/>
+  <text x="400" y="198" class="t11">verworfen: ca. 45 900 Gruppen am Tag</text>
+</svg>
+</div>
+<figcaption>Abb. 3: Zuordnung. Im ersten Fall erhalten beide Relais ihren Zähler. Im zweiten Fall hat die Gruppe kein Rufzeichen und wird nicht geraten.</figcaption>
+</figure>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Gruppe i zu Pfadelement i+1</td><td>gleiche Indizierung wie <code>parseWssRssi</code></td><td><span class="tag ok">gewählt</span> passt zu Firmware und zum vorhandenen Positionsvertrag</td></tr>
+<tr><td>letzte Gruppe dem Gateway aus <code>gwstatus</code> zuordnen</td><td>Gateway über Zeitnähe raten</td><td><span class="tag bad">verworfen</span> der Draht nennt das hochladende Gateway nicht, jede Zuordnung wäre geraten</td></tr>
+</table>
+
+<h3>4.2 Speicherform</h3>
+<p class="reco">Entscheidung: Stundentabelle <code>neighbor_count_1h(call, bucket_ts, role, n, cnt_min, cnt_max, cnt_last)</code>, 30 Tage Aufbewahrung.</p>
+<p>Prämissen: die Firmware mittelt schon über 1 h, ein feineres Raster bringt keinen neuen Inhalt. Minimum und Maximum sind gegen Doppelzählung immun, dieselbe Meldung über zwei Hubs ändert sie nicht; nur <code>n</code> wird dadurch aufgebläht und ist deshalb Belegdichte, keine Kennzahl. <code>role</code> trennt Absender- und Relaiswert, damit ihre Übereinstimmung prüfbar bleibt. 30 Tage decken vier Wochenenden und damit Ausflugs- und Contestspitzen; <code>link_signal_1h</code> hält 7 Tage, was für die Frage nach dem Spitzenwert zu kurz ist.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Rohzeile je Meldung</td><td>ca. 194 000 Zeilen am Tag</td><td><span class="tag bad">verworfen</span> neunfache Menge ohne Mehrwert, Zähler ist bereits ein Stundenwert</td></tr>
+<tr><td>Stundenaggregat, 30 Tage</td><td>Upsert je Rufzeichen, Stunde, Rolle</td><td><span class="tag ok">gewählt</span> ca. 30 MB, gleiche Bauart wie <code>link_signal_1h</code></td></tr>
+<tr><td>5-Minuten-Raster</td><td>wie <code>link_signal_5m</code></td><td><span class="tag bad">verworfen</span> misst dasselbe 1-h-Fenster zwölfmal</td></tr>
+<tr><td>Spalte in <code>link_signal_1h</code></td><td>Zähler am Link statt an der Station</td><td><span class="tag bad">verworfen</span> der Zähler ist eine Eigenschaft der Station, nicht des Links; Absenderwerte hätten keinen Link</td></tr>
+</table>
+
+<h3>4.3 Parser</h3>
+<p class="reco">Entscheidung: neue Funktion <code>parseHeyNeighborCounts(rssi, pathNodes)</code>; <code>parseWssRssi</code> und die Protobuf-Nachricht <code>HopMetric</code> bleiben unangetastet.</p>
+<ul>
+  <li><code>parseWssRssi</code> trägt einen Positionsvertrag, den Kanten, Kreuzvalidierung und Linkqualität lesen. Ein zusätzliches Feld dort wäre eine Protobuf-Änderung mit Regeneration in beiden Paketen ohne einen Leser im Frontend.</li>
+  <li>Werte laufen durch dieselbe Plausibilitätsprüfung wie <code>nct</code> heute (<code>sanitizeNct</code>, 0 bis 99).</li>
+  <li>Aufruf an beiden Einspeisepfaden, <code>interlink/ingest.ts</code> und <code>wss/stateStore.ts</code>, nach dem HEY-Duplikatfilter.</li>
+  <li>Ein Absenderwert 0 wird gespeichert, aber getrennt von fehlenden Werten; siehe 6 zur Mehrdeutigkeit von 0.</li>
+</ul>
+
+<h3>4.4 Kappung sichtbar machen</h3>
+<p class="reco">Entscheidung: die API markiert jede Stunde, deren Maximum die Tabellengröße der Hardwarefamilie erreicht, als gekappt; gespeichert wird nur der Rohwert.</p>
+<p>Prämisse: am Messtag lagen IW5EIA-12, IZ5FSA-12 und IQ5BL-12 in jeder gemeldeten Stunde bei genau 30, DB0KH-11 und DB0HOB-12 im Median bei 28 und 29. Die Stundenwerte dieser Stationen sagen nur "mindestens 30". Die Zuordnung Hardware zu Tabellengröße gilt für den Stand DEV-Main; ob die ausgerollte Firmware dieselben Werte hat, ist offen (8).</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Kappung in der API ableiten</td><td>Hardware aus <code>nodes</code>, Obergrenze aus Tabelle</td><td><span class="tag ok">gewählt</span> Regel änderbar ohne Datenmigration</td></tr>
+<tr><td>Kappungs-Flag in der Tabelle</td><td>beim Schreiben entscheiden</td><td><span class="tag bad">verworfen</span> eine falsche Regel wäre festgeschrieben</td></tr>
+<tr><td>Wahrer Wert trotz Kappung</td><td>größere MHeard-Tabelle in der Firmware</td><td><span class="tag warn">außerhalb</span> nur in der Firmware lösbar, RAM des klassischen ESP32 ist ausgereizt</td></tr>
+</table>
+
+<h3>4.5 Sichtbarkeit</h3>
+<p class="reco">Entscheidung: Stufe 1 liefert Route und MCP-Tool, Stufe 2 den Profilabschnitt und die Rangliste.</p>
+<table>
+<tr><th>Ort</th><th>Inhalt</th><th>Stufe</th></tr>
+<tr><td><code>GET /api/v2/nodes/:call/neighbor-count?window=24h|7d|30d</code></td><td>Stundenreihe mit Min, Max, Letztwert, Rolle, Kappungsmarke; Spitzenwert und Median des Fensters</td><td>1</td></tr>
+<tr><td>MCP <code>neighbor_count_series</code></td><td>1:1-Übersetzung der Route, anonyme Route, also ein Ratenlimit-Slot</td><td>1</td></tr>
+<tr><td><code>GET /api/v2/neighbor-count/top?window=…</code> und MCP <code>neighbor_count_top</code></td><td>Stationen nach Spitzenwert, mit Anteil gekappter Stunden</td><td>2</td></tr>
+<tr><td>Knotenprofil, neuer Abschnitt "Neighbors"</td><td>Stundenkurve, Spitzenwert, Median, Kappungslinie, Hinweis "direkt gehört, letzte Stunde"; ersetzt die Einzelzahl NBCNT im Kopf nicht</td><td>2</td></tr>
+<tr><td>Rangliste</td><td>als Tabelle neben der Connections-Ansicht</td><td>2</td></tr>
+</table>
+<p>Architekturregel: das MCP-Tool enthält keine Logik. Rangliste und Rollenurteil entstehen deshalb als Routen, nie im Tool.</p>
+
+<h3>4.6 Rollenurteil, 2-Hop</h3>
+<p class="reco">Entscheidung: Stufe 3 liefert je Station eine 2-Hop-Obergrenze und die Liste exklusiver Blätter; die Relaisentscheidung selbst bleibt in der Firmware-Nachbarschaftsmatrix.</p>
+<ul>
+  <li>2-Hop-Obergrenze: Summe der Spitzenwerte aller 1-Hop-Nachbarn aus dem Kantengraph. Sie zählt jede gemeinsame Station mehrfach und ist deshalb nur eine Schranke nach oben.</li>
+  <li>Exklusives Blatt: ein Nachbar, der im Fenster nur über diese eine Station eine Kante zu einem Gateway hat.</li>
+  <li>Der Kantengraph sieht nur Pfade, die ein Gateway erreichen. Heute ist er rund drei- bis viermal dünner als der Selbstbericht: 1-h-Maximum 11 Nachbarn im Graph gegen 37 im Zähler.</li>
+  <li>Bezug zur Firmware: <code>NBR_MAX_ROWS</code> ist 21 und damit kleiner als die 30 bis 37 direkten Nachbarn der belebtesten Stationen in einer Stunde. Die Reihe aus Stufe 1 ist die Messgrundlage für diese Größenwahl.</li>
+</ul>
+
+<h2 id="s5">5. Folgen</h2>
+<p>Unterm Strich überwiegt der Nutzen für die Größenfragen, aber die Kappung begrenzt gerade die Aussage über Supernodes.</p>
+<table>
+<tr><th>Folge</th><th>Art</th><th>Gewicht</th></tr>
+<tr><td>Spitzenwert je Station über 24 h, 7 und 30 Tage erstmals ablesbar</td><td><span class="tag ok">positiv</span></td><td>hoch</td></tr>
+<tr><td>59 Stationen bekommen überhaupt erst einen Zähler, weil sie nur als Relais melden</td><td><span class="tag ok">positiv</span></td><td>mittel</td></tr>
+<tr><td>Große Relais melden dicht: p90 365 Meldungen am Tag; kleine lückenhaft, Median 29 Meldungen an 11 Stunden des Tages</td><td><span class="tag ok">positiv</span></td><td>mittel</td></tr>
+<tr><td>Keine Änderung an Draht, Firmware oder Protobuf</td><td><span class="tag ok">positiv</span></td><td>mittel</td></tr>
+<tr><td>Belegt die Größenwahl der Firmware-Nachbarschaftsmatrix mit Messwerten</td><td><span class="tag ok">positiv</span></td><td>mittel</td></tr>
+<tr><td>Kappung: die belebtesten Stationen zeigen dauerhaft 30, ihr wahres Maximum bleibt unbekannt</td><td><span class="tag bad">negativ</span></td><td>hoch</td></tr>
+<tr><td>Der Zähler nennt eine Anzahl, keine Namen; 2-Hop bleibt Obergrenze</td><td><span class="tag bad">negativ</span></td><td>hoch</td></tr>
+<tr><td>Einseitiges Hören zählt mit: A hört B heißt nicht, dass B A hört</td><td><span class="tag bad">negativ</span></td><td>mittel</td></tr>
+<tr><td>ca. 45 900 Gateway-Gruppen am Tag bleiben unzuordenbar</td><td><span class="tag bad">negativ</span></td><td>mittel</td></tr>
+<tr><td>Schema-Migration, ca. 30 MB mehr Datenbank, ein Upsert je HEY auf dem einen Kern von srv06</td><td><span class="tag warn">Aufwand</span></td><td>niedrig bis mittel</td></tr>
+<tr><td>Neue öffentliche Route und MCP-Tool sind dauerhafte Schnittstellen</td><td><span class="tag warn">Aufwand</span></td><td>niedrig</td></tr>
+</table>
+
+<h2 id="s6">6. Fehlerszenarien</h2>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>Wert 0 heißt "keine Nachbarn", "alte Firmware" oder "keine Uhr"</td><td>Rolle und Firmwareversion je Zeile auswertbar</td><td>Anzeige unterscheidet 0 von fehlend, Rangliste ignoriert 0</td><td>echte 0 und Uhrfehler bleiben ununterscheidbar</td><td>1</td></tr>
+<tr><td>Zuordnung verrutscht bei neuer Firmware-Kettenform</td><td>Anteil Rahmen mit Gruppen größer Pfadelemente je Stunde im Log</td><td>Parser verwirft statt zu raten, Zähler im Log</td><td>bis zur Erkennung falsche Werte bei einzelnen Stationen</td><td>1</td></tr>
+<tr><td>Neustart oder Hub-Ausfall</td><td>Lücke in der Reihe</td><td>Lücke bleibt Lücke, keine Interpolation</td><td>keine</td><td>1</td></tr>
+<tr><td>Schreiblast verzögert den Stream-Takt</td><td>Stall-Zeilen im app.log</td><td>Upserts pro Takt bündeln wie bei <code>link_signal</code></td><td>keine</td><td>1</td></tr>
+<tr><td>Kappungsregel falsch für ausgerollte Firmware</td><td>Häufung von Maxima knapp unter oder über der Regel</td><td>Regel in der API korrigieren, Daten bleiben gültig</td><td>Markierung bis zur Korrektur falsch</td><td>1</td></tr>
+</table>
+
+<h2 id="s7">7. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>1</td><td>Parser mit Testfällen aus beiden Kettenformen, Migration, Tabelle, Aufräumen nach 30 Tagen</td><td>Tests grün; gegen einen Tag Log-Replay ca. 68 000 zugeordnete Relaiswerte und 441 Relais</td></tr>
+<tr><td>2</td><td>1</td><td>Route und MCP-Tool, Doku im MCP-Design-Record</td><td>Reihe für IW5EIA-12 zeigt 24 Stunden mit Kappungsmarke</td></tr>
+<tr><td>3</td><td>1</td><td>Probelauf und Deploy nach Runbook</td><td>nach 24 h in Produktion ca. 21 700 Zeilen je Tag, keine neuen Stall-Zeilen</td></tr>
+<tr><td>4</td><td>2</td><td>Profilabschnitt, Rangliste, Übersetzungen</td><td>Sichtprüfung im Browser, Dark und Light</td></tr>
+<tr><td>5</td><td>3</td><td>nach 14 Tagen: Auswertung Spitzenwerte und Kappungsanteil, dann Entscheidung über Stufe 3</td><td>Bericht in <code>docs/findings/</code></td></tr>
+</table>
+
+<h2 id="s8">8. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Tabellengrößen der ausgerollten Firmware je Board</td><td>bestimmt die Kappungsregel in 4.4</td><td>Release-Stand der Firmware lesen, gegen Häufungen bei 30 und 80 in den Daten prüfen</td></tr>
+<tr><td>Kann der Hub das hochladende Gateway mitliefern</td><td>würde ca. 45 900 Gruppen am Tag zuordenbar machen</td><td>Anfrage an den Hub-Betreiber, nur falls Stufe 3 gebaut wird</td></tr>
+<tr><td>Liefert der WSS-Pfad dieselbe Kettenform wie INTERLINK</td><td>der Parser läuft an beiden Pfaden</td><td>Stichprobe aus dem WSS-Log vor Schritt 1</td></tr>
+</table>
+</main>
+</body>
+</html>

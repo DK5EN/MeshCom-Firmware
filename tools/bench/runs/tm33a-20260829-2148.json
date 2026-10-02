@@ -1,0 +1,819 @@
+{
+  "boot": {
+    "ok": false,
+    "boot_msgs": [
+      "MeshCom 4.35p",
+      "(build: Aug 29 2026 / 21:47:28)",
+      "GPS enabled",
+      "Touch: OK",
+      "SDCard: OK",
+      "Keyboard: OK",
+      "Radio: OK",
+      "WiFi connected"
+    ],
+    "audio_outcome": null,
+    "init_summary": null,
+    "init_log_lines": [
+      "[INIT]...efuse not used",
+      "[INIT]...initMheard",
+      "[INIT]...init_flash",
+      "[INIT]...build Aug 29 2026 / 21:47:27",
+      "[INIT]...FLASH layout 20260724 ok, build 20260828",
+      "[INIT]...initTDeck",
+      "[INIT]...TFT: OK",
+      "[INIT]...LVGL draw buffer: PSRAM",
+      "[INIT]...T-DECK based on Arduino V8.3.11",
+      "[INIT]...using LVGL_Arduino_Display_LIB",
+      "[INIT]...Keyboard registered",
+      "[INIT]...MeshCom 4.35p",
+      "[INIT]...Touch: OK",
+      "[INIT]...SD_MMC Card Type: SDHC",
+      "[INIT]...SD Card Size: 30436 MB",
+      "[INIT]...Total space: 30417 MB",
+      "[INIT]...SDCard: OK",
+      "[INIT]...Keyboard: OK",
+      "[INIT]...init_batt",
+      "[INIT].._GW_ID: A1AD65E0",
+      "[INIT]...Initialize clock: ok"
+    ],
+    "fail_lines": []
+  },
+  "input": {
+    "ok": true,
+    "keys_sent": 7,
+    "keys_consumed": 7,
+    "key_repaints": 2,
+    "key_latency_p50_ms": 52.4,
+    "key_latency_p95_ms": 85.0,
+    "ball": [
+      {
+        "dir": "right",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          110,
+          80
+        ],
+        "last": [
+          180,
+          80
+        ],
+        "latency_p50_ms": 14.0,
+        "latency_p95_ms": 14.1,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "down",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          180,
+          110
+        ],
+        "last": [
+          180,
+          180
+        ],
+        "latency_p50_ms": 12.4,
+        "latency_p95_ms": 13.7,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "left",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          150,
+          180
+        ],
+        "last": [
+          80,
+          180
+        ],
+        "latency_p50_ms": 8.2,
+        "latency_p95_ms": 9.0,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "up",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          80,
+          150
+        ],
+        "last": [
+          80,
+          80
+        ],
+        "latency_p50_ms": 9.3,
+        "latency_p95_ms": 11.9,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      }
+    ]
+  },
+  "inject": {
+    "ok": true,
+    "results": [
+      {
+        "i": 0,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 5,
+        "displayed": true,
+        "msg_list": 1,
+        "msg_list_growth": -1,
+        "inv_count": 212,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 12,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 7,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 7,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 6,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_width lv_obj_style_gen.c:8"
+            ]
+          },
+          {
+            "count": 6,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refr_size lv_obj_pos.c:195",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 5,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:772",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_obj_refresh_style lv_obj_style.c:173",
+              "trans_anim_cb lv_obj_style.c:813",
+              "anim_timer lv_anim.c:392",
+              "lv_timer_exec lv_timer.c:313",
+              "esp32loop lv_api_map.h:37",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_obj_refresh_style lv_obj_style.c:209",
+              "trans_anim_cb lv_obj_style.c:813",
+              "anim_timer lv_anim.c:392",
+              "lv_timer_exec lv_timer.c:313",
+              "esp32loop lv_api_map.h:37",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 1,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 9,
+        "displayed": true,
+        "msg_list": 2,
+        "msg_list_growth": 1,
+        "inv_count": 90,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 8,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 5,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refr_size lv_obj_pos.c:195",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_width lv_obj_style_gen.c:8"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:772",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 2,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 3,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 3,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 4,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 4,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 5,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      }
+    ]
+  },
+  "trim": {
+    "ok": true,
+    "count": 60,
+    "inject_fail": 0,
+    "probe_missed": 0,
+    "max_children": 50,
+    "final_children": 50,
+    "expected_final": 50,
+    "limit": 50,
+    "samples": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50
+    ],
+    "h0": {
+      "kind": "INSTR-HEAP",
+      "tag": "h0",
+      "int_free": 100268,
+      "int_min": 99716,
+      "int_largest": 90100,
+      "psram_free": 8015419,
+      "psram_largest": 7995380
+    },
+    "h1": {
+      "kind": "INSTR-HEAP",
+      "tag": "h1",
+      "int_free": 83608,
+      "int_min": 78312,
+      "int_largest": 69620,
+      "psram_free": 7885363,
+      "psram_largest": 7864308
+    },
+    "delta": {
+      "psram_free": -130056,
+      "int_free": -16660,
+      "int_min": -21404,
+      "int_largest": -20480,
+      "psram_largest": -131072
+    }
+  }
+}

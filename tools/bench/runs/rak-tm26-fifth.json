@@ -1,0 +1,103 @@
+{
+  "instr": {
+    "ok": true,
+    "seconds": 90.0,
+    "loop_n": 768,
+    "loop_avg_us": 109212,
+    "loop_max_us": 1723633,
+    "gaps": 5,
+    "gap_events": [
+      "-[INSTR-LOOP] gap ms 1579 in hey_tx section_ms 1355 sections_ms 1455",
+      "[INSTR-LOOP] gap ms 1719 in eth_udp section_ms 1620 sections_ms 3240",
+      "[INSTR-LOOP] gap ms 1722 in eth_udp section_ms 1623 sections_ms 3246",
+      "[INSTR-LOOP] gap ms 828 in hey_tx section_ms 712 sections_ms 759",
+      "[INSTR-LOOP] gap ms 1716 in eth_udp section_ms 1617 sections_ms 3234",
+      "[INSTR-LOOP] gap ms 1723 in eth_udp section_ms 1624 sections_ms 3248"
+    ],
+    "sections": {
+      "eth_state": {
+        "n": 769,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "clock": {
+        "n": 769,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 769,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_rx_timeout": {
+        "n": 707,
+        "avg_us": 17,
+        "max_us": 977
+      },
+      "ble_settings": {
+        "n": 769,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "hey_tx": {
+        "n": 1,
+        "avg_us": 712891,
+        "max_us": 712891
+      },
+      "telemetry": {
+        "n": 5,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 762,
+        "avg_us": 66,
+        "max_us": 15625
+      },
+      "eth_udp": {
+        "n": 769,
+        "avg_us": 8504,
+        "max_us": 1624024
+      },
+      "gateway": {
+        "n": 769,
+        "avg_us": 8504,
+        "max_us": 1624024
+      },
+      "display_tick": {
+        "n": 769,
+        "avg_us": 1,
+        "max_us": 976
+      },
+      "serial_cmd": {
+        "n": 769,
+        "avg_us": 3,
+        "max_us": 2929
+      },
+      "lora_sm": {
+        "n": 28,
+        "avg_us": 3452,
+        "max_us": 6836
+      },
+      "eth_heartbeat": {
+        "n": 3,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_tx": {
+        "n": 5,
+        "avg_us": 5664,
+        "max_us": 6836
+      },
+      "eth_dhcp": {
+        "n": 1,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 111216,
+    "heap_largest": 97804,
+    "worst_section": "eth_udp"
+  }
+}

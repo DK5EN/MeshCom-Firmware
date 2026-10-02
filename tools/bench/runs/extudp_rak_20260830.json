@@ -1,0 +1,203 @@
+{
+  "extudp": {
+    "ok": true,
+    "port": "/dev/cu.usbmodem201301",
+    "pre_state": {
+      "answered_lines": 35,
+      "call": "DK5EN-90",
+      "uptime_ms": 1070322,
+      "ip": "192.168.68.72",
+      "extudp": true,
+      "ext_ip": "192.168.68.58",
+      "gateway": "on",
+      "debug": "off",
+      "build": "Aug 30 2026 / 20:19:24"
+    },
+    "position": {
+      "lat": 0.0,
+      "lon": 0.0,
+      "has_position": false,
+      "gps": "off"
+    },
+    "node_ip": "192.168.68.72",
+    "host_ip": "192.168.68.58",
+    "ext_started": "[EXT] to IP:192.168.68.58",
+    "rebooted_to_apply": true,
+    "baseline_uptime_ms": 23667,
+    "peer_call": "DK5EN-93",
+    "send": [
+      {
+        "trigger": "sendpos",
+        "ok": true,
+        "skipped": true,
+        "fail_reason": "node has no position (LAT 0.0 LON 0.0, GPS off): sendPosition() returns before sendExtern(), so this trigger cannot reach the EXTUDP path on this node"
+      },
+      {
+        "trigger": "own_msg",
+        "datagram": "{\"src_type\":\"node\",\"type\":\"msg\",\"src\":\"DK5EN-90\",\"dst\":\"TEST\",\"msg\":\"tm43 17556{312\",\"msg_id\":\"91A43538\",\"firmware\":\"4.35\",\"fw_sub\":\"p\",\"rssi\":0,\"snr\":0}",
+        "datagram_bytes": 153,
+        "out_lines": 1,
+        "suppressed_by_fl01": false,
+        "ok": true
+      },
+      {
+        "trigger": "lora_from_peer",
+        "datagram": "{\"src_type\":\"lora\",\"type\":\"msg\",\"src\":\"DK5EN-93\",\"dst\":\"TEST\",\"msg\":\"tm43lora 17556{576\",\"msg_id\":\"EA25A240\",\"firmware\":35,\"fw_sub\":\"p\",\"rssi\":-27,\"snr\":6}",
+        "datagram_bytes": 155,
+        "out_lines": 2,
+        "suppressed_by_fl01": false,
+        "ok": true
+      }
+    ],
+    "receive": [
+      {
+        "case": "msg_to_txring",
+        "inc_line": "[EXT] Inc: {\"type\":\"msg\",\"dst\":\"TEST\",\"msg\":\"tm43 rx 17556\"}",
+        "echo_datagram": "{\"src_type\":\"node\",\"type\":\"msg\",\"src\":\"DK5EN-90\",\"dst\":\"TEST\",\"msg\":\"tm43 rx 17556{313\",\"msg_id\":\"91A43539\",\"firmware\":\"4.35\",\"fw_sub\":\"p\",\"rssi\":0,\"snr\":0}",
+        "tx_evidence": [],
+        "hwm": {
+          "n": 1,
+          "min": 106,
+          "max": 106,
+          "len_max": 49
+        },
+        "ok": true
+      },
+      {
+        "case": "tele",
+        "accepted": true,
+        "refused_real_sensors": false,
+        "line": "[EXT] tele accepted: temp=23.3 hum=60.0 press=1018.5 temp2=0.0 qnh=0.0 gasres=0.0 co2=0.0",
+        "beacon_datagram": null,
+        "beacon_suppressed_by_fl01": false,
+        "beacon_inapplicable_no_position": true,
+        "ok": true
+      }
+    ],
+    "reject": [
+      {
+        "vector": "broken_json",
+        "bytes": 33,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] deserializeJson() failed: IncompleteInput"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "missing_dst",
+        "bytes": 31,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] missing dst/msg"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "missing_msg",
+        "bytes": 27,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] missing dst/msg"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "dst_too_long",
+        "bytes": 54,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] invalid lengths dst:10 msg:12"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "msg_too_long",
+        "bytes": 187,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] invalid lengths dst:4 msg:151"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "truncated_mid_json",
+        "bytes": 25,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] deserializeJson() failed: IncompleteInput"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "full_255_byte_datagram",
+        "bytes": 255,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] Inc: {\"type\":\"msg\",\"dst\":\"TEST\",\"msg\":\"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        ],
+        "ok": true
+      }
+    ],
+    "inbound_alive_after_vectors": true,
+    "echo_after_reject": true,
+    "soak": {
+      "seconds": 601.5,
+      "datagrams_sent_to_node": 197,
+      "of_which_valid_messages": 50,
+      "datagrams_from_node": 34,
+      "console_lines": 929,
+      "inbound_seen": 197,
+      "heartbeats": 0,
+      "heartbeat_gaps": [],
+      "boot_lines": []
+    },
+    "hwm": {
+      "tx": {
+        "n": 43,
+        "min": 69,
+        "max": 164,
+        "len_max": 274
+      },
+      "rx": {
+        "n": 207,
+        "min": 69,
+        "max": 106,
+        "len_max": 254
+      }
+    },
+    "live": {
+      "uptime_start_ms": 23667,
+      "uptime_end_ms": 691145,
+      "uptime_monotonic": true,
+      "crash_lines": [],
+      "unexpected_boot_lines": [],
+      "console_echoes": true,
+      "ok": true
+    },
+    "post_state": {
+      "answered_lines": 42,
+      "call": "DK5EN-90",
+      "uptime_ms": 691145,
+      "ip": "192.168.68.72",
+      "extudp": true,
+      "ext_ip": "192.168.68.58",
+      "gateway": "on",
+      "debug": "on",
+      "build": "Aug 30 2026 / 20:19:24"
+    },
+    "restore": {
+      "extudp": true,
+      "ext_ip": "192.168.68.58",
+      "debug": "off",
+      "matches_pre": true
+    }
+  }
+}

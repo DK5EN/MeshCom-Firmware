@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Nachbarschaftsmatrix als Kantenpool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .dash .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+
+  svg .wwwf { fill:#e9f1fd; }
+  .bits { font-family: ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 1px; }
+  .tag.step { background:#5b6b7b; }
+</style></head><body><main>
+<h1>Nachbarschaftsmatrix als Kantenpool: Speicher, Sendeentscheidung, Rollen</h1>
+<ul class="meta">
+<li>Stand: 2026-09-24</li>
+<li>Autor: DK5EN, mit Claude</li>
+<li>Codebasis: MeshCom-Firmware Fork, Branch <code>feature-neighbour-matrix</code> ab <code>d9fc5c5a</code></li>
+<li>Quelle Matrix: <code>src/nbr_matrix.h</code> (Strukturen 78 bis 170, Masken 440 bis 520), <code>src/nbr_matrix.cpp</code> (Entscheidung 1107 bis 1400)</li>
+<li>Quelle Relay-Faelle: <code>src/configuration_global.h</code> 471 bis 477, <code>src/txring_functions.cpp</code> 283 bis 372, <code>src/lora_functions.cpp</code> 840 bis 900 und 1836 bis 1890</li>
+<li>Quelle Rollen: <code>src/web_functions/web_functions.cpp</code> <code>sub_page_neighbours()</code> 1596 bis 1820</li>
+<li>Quelle Pfadtabelle: <code>src/mheard_functions.cpp</code> <code>updateHeyPath()</code> 478 bis 662, <code>sub_page_path()</code> 1543, <code>src/configuration_global.h</code> 301 bis 353</li>
+<li>Quelle Feldzahlen: <code>docs/nbr-wichtigkeit-konzept.md</code> Abschnitt 2, <code>docs/nbr-stage2-campaign.md</code> Wellen 5 und 6, Mitschnitt <code>rpizero:~/meshlog/dk5en-98/2026-09-24.log</code></li>
+<li>Quelle Flottenzahlen: mcmap-Produktionsschnappschuss vom 2026-09-24 (823 Knoten), vom Betreiber uebergeben</li>
+<li>Quelle RAM: <code>tools/resource_watch.py snapshot</code>; alle 32 Umgebungen frisch gebaut am 2026-09-24 auf feature-neighbour-matrix d9fc5c5a, sequenziell mit tools/resource_watch.py snapshot</li>
+<li>Rufzeichen: Schnappschuss von DK5EN-98; fremde Rufzeichen erscheinen nur als Beobachtung, nie als Sender</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>Die Nachbarschaftsmatrix speichert heute N mal N Zellen zu 6 Byte. Bei 21 Zeilen sind das 2,6 von 3,15 kB, jede weitere Zeile kostet 282 Byte, und der Speicher waechst quadratisch. Im Feld sind 67 von 420 Zellen belegt, waehrend 46 Rufzeichen in 12 Stunden um 21 Zeilen konkurrieren. Die Flotte zeigt, wo das zaehlt: 823 Knoten melden im Median 3 Nachbarn, die staerksten 30 bis 37 in einer Stunde und ueber 40 in 24 Stunden, ihre 2-Hop-Nachbarschaft haelt in 24 Stunden 48 (p90) bis 113 Stationen. Die Matrix laeuft also genau an den Super-Nodes voll, und dort entscheidet heute die Verdraengung ueber die Rolle. Die meisten dieser Knoten sind klassische ESP32 mit 13 Zeilen.</p>
+<p>Daraus folgt:</p>
+<ol>
+<li><b>Stufe 1, Kantenpool und Masken:</b> Zellen werden zu Eintraegen eines Pools fester Groesse, jede Zeile traegt zwei 64-Bit-Masken, die Sendeentscheidung und die Rollen rechnen nur noch auf den Masken. 64 Zeilen und 256 Kanten kosten 3848 Byte auf klassischem ESP32, 64 Zeilen und 384 Kanten 4616 Byte auf S3 und nRF52. Funkverhalten und Logformat bleiben identisch.</li>
+<li><b>Stufe 1b, Pfadtabelle hinter Compile-Flag:</b> Default an, im Fork auf klassischem ESP32 aus. Das gibt dort 2840 Byte frei; Pool und Masken brauchen 2518 Byte mehr als die heutige Matrix, netto bleiben 322 Byte uebrig.</li>
+<li><b>Stufe 2, nur S3 und nRF52:</b> 128 Zeilen mit 128-Bit-Masken und 512 Kanten fuer 9736 Byte, wenn der Feldlauf zeigt, dass der Rang an Super-Nodes mit 64 Zeilen zu stark gekappt wird.</li>
+</ol>
+<p class="reco">Empfehlung: Stufe 1 und 1b nach der Auswertung von Feldlauf 2 (ab 2026-09-23 20:01) umsetzen, Abnahme ueber den Replay-Vergleich der [NBR]-Zeilen im Host-Test; Stufe 2 erst nach 24 Stunden Feld auf einem Super-Node.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table><thead><tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr></thead><tbody><tr><td>1</td><td>Was ein Kantenpool ist</td><td>Pool fester Groesse fuer belegte Zellen, zwei Masken je Zeile, Verdraengung nach Alter</td><td>1</td><td>4.1</td></tr><tr><td>2</td><td>Grafiken</td><td>Abb. 1 bis 8, davon Abb. 6 animiert</td><td>-</td><td>2 bis 4</td></tr><tr><td>3</td><td>Was zu Fall A und Fall B fuehrt, mit Folgen</td><td>Allein-Menge nicht leer heisst Fall A; Folgen aus zwei Feldtagen</td><td>0</td><td>4.3</td></tr><tr><td>4</td><td>Entscheider fuer Super-Node und Redundant</td><td>#X je direktem Nachbarn, Super bei #X &gt;= 2 und doppeltem Abstand</td><td>0</td><td>4.4</td></tr><tr><td>5</td><td>Speichereffiziente Rechnung</td><td>Alle Mengen als 64-Bit-Masken, popcount, O(N) Wortoperationen</td><td>1</td><td>4.2</td></tr><tr><td>6</td><td>Uebersicht 32 Plattformen</td><td>RAM-Tabelle und Abb. 8 aus dem Build aller Umgebungen</td><td>-</td><td>4.5</td></tr><tr><td>7</td><td>Pfadtabelle behalten oder abschalten</td><td>Compile-Flag, Default an, klassischer ESP32 im Fork aus</td><td>1b</td><td>4.6</td></tr></tbody></table>
+
+<h3>Ausbaustufen</h3>
+<table><thead><tr><th>Stufe</th><th>Was steht</th><th>Erfuellt</th><th>Luecke am Super-Node</th><th>Luecke auf klassischem ESP32</th><th>Voraussetzung</th></tr></thead><tbody><tr><td>0 heute</td><td>Dichte Matrix 21/13 Zeilen, Fall A/B, Rollen</td><td>Sendeentscheidung, Rang bis 21 Zeilen</td><td>40 Nachbarn passen nicht in 21 Zeilen, Verdraengung entscheidet</td><td>13 Zeilen, Rang nur bis 12 Nachbarn</td><td>-</td></tr><tr><td>1</td><td>Kantenpool, 64-Bit-Masken, 64 Zeilen</td><td>1-Hop-Maximum 41 und 2-Hop p90 48 der Flotte in 24 h</td><td>2-Hop p99 84 wird gekappt, Ordnung bleibt</td><td>keine, 64 Zeilen auch dort</td><td>Replay-Paritaet im Host-Test</td></tr><tr><td>1b</td><td>Pfadtabelle per Flag aus (klassisch)</td><td>64 Zeilen auf klassischem ESP32 fuer 322 B weniger als heute</td><td>-</td><td>kein --path, keine Pfadseite</td><td>Upstream-Default bleibt an</td></tr><tr><td>2</td><td>128 Zeilen, 128-Bit-Masken (S3, nRF52)</td><td>2-Hop p99 84 und Maximum 113</td><td>-</td><td>nicht vorgesehen</td><td>Feldnachweis, dass 64 Zeilen den Rang verfaelschen</td></tr></tbody></table>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+<li><a href="#s1">Ergebnis</a></li>
+<li><a href="#s2">Ausgangslage</a></li>
+<li><a href="#s3">Zielbild</a></li>
+<li><a href="#s4">Bausteine</a>: 4.1 Kantenpool, 4.2 Rechnen auf Masken, 4.3 Fall A und Fall B, 4.4 Super-Node und Redundant, 4.5 RAM der 32 Plattformen, 4.6 Pfadtabelle</li>
+<li><a href="#s5">Fehlerszenarien</a></li>
+<li><a href="#s6">Rollout</a></li>
+<li><a href="#s7">Offene Punkte</a></li>
+<li><a href="#a">Anhang</a>: A Umbaustellen, B Schnappschuss als Testdatensatz, C Baudaten der 32 Umgebungen, D Flottenmessung, E Befundregister</li>
+</ol>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p class="reco">Befund: Der Speicher sitzt in den Zellen, der Engpass in den Zeilen. Die Sendeentscheidung braucht von den Zellen nur Spalte 0, Zeile 0 und die Spalten der direkten Nachbarn.</p>
+<table><thead><tr><th>Element</th><th>Wert</th><th>Quelle</th></tr></thead><tbody><tr><td>Zeile <code>NbrRow</code></td><td>24 B: call[10], rpt_min, lat, lon, last_min, flags, hw</td><td>src/nbr_matrix.h:84</td></tr><tr><td>Zelle <code>NbrCell</code></td><td>6 B: cnt_text, cnt_pos, cnt_hey, snr, last_min; cell[X][Y] = 'Y hat X gehoert'</td><td>src/nbr_matrix.h:150</td></tr><tr><td>Zeilen je Board</td><td>21 auf S3, nRF52 und ENABLE_XML; 13 auf klassischem ESP32; 11 in der Entwicklervariante</td><td>src/configuration_global.h:309, 320, 330, 352</td></tr><tr><td>Groesse heute</td><td>21 Zeilen 3154 B, 13 Zeilen 1330 B; jede weitere Zeile bei 21: 282 B</td><td>gerechnet aus den Strukturen</td></tr><tr><td>Fenster</td><td>12 h (NBR_WINDOW_MIN 720), Geister-Sweep alle 1024 min gegen den 16-Bit-Ueberlauf</td><td>src/nbr_matrix.h:59 bis 70</td></tr><tr><td>Masken</td><td>uint32_t ueber Zeilenindizes, nbrBit() liefert 0 ab Index 32</td><td>src/nbr_matrix.cpp:1107</td></tr><tr><td>Entscheidung liest</td><td>Spalte 0 (Direkt), Zeile 0 (HoertMich), Hoerer der Pfadteilnehmer, Spalten der Versorger</td><td>src/nbr_matrix.cpp:1225 bis 1300</td></tr><tr><td>Indirekte Spalten</td><td>gefuellt nur durch weitergeleitete HN-Berichte; gelesen nur von nbrRowExclusive(), LEAF-Urteil und Entfernung</td><td>src/nbr_matrix.cpp:1005, 1036, 1454</td></tr><tr><td>Pfadpaar-Kanten</td><td>landen immer in der Spalte des letzten Hops, der per Definition direkt ist</td><td>src/nbr_matrix.cpp:655</td></tr><tr><td>Feld DK5EN-98</td><td>67 von 420 Zellen belegt, 21 von 21 Zeilen, 16 Verdraengungen in 11 h, 0 DROP FULL</td><td>[NBR]|SNAP 660 im Mitschnitt vom 24.09.</td></tr><tr><td>Feld DK5EN-98, Lauf 1</td><td>46 Rufzeichen in 12 h auf 21 Zeilen, 56 Verdraengungen in 11,9 h, davon 2 auf direkte Zeilen</td><td>docs/nbr-wichtigkeit-konzept.md 2.3</td></tr><tr><td>Pfadtabelle</td><td>71 B je Eintrag; 100 Eintraege auf S3/nRF52, 40 klassisch, 50 XML</td><td>src/loop_functions_extern.h:455 bis 458</td></tr></tbody></table>
+<figure><div class="fig"><svg viewBox="0 0 960 320" role="img" aria-label="Ist-Zustand der Nachbarschaftsmatrix"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="40" y="30" class="b">NbrMatrix heute, 21 Zeilen: 3154 B BSS</text>
+<rect x="40" y="44" width="330" height="66" class="node"/>
+<text x="205.0" y="58" text-anchor="middle" class="b">rows[21] x 24 B = 504 B</text>
+<text x="205.0" y="76" text-anchor="middle" class="t11">call[10], rpt_min, lat, lon (float),</text>
+<text x="205.0" y="92" text-anchor="middle" class="t11">last_min, flags, hw</text>
+<rect x="40" y="124" width="330" height="66" class="node prx"/>
+<text x="205.0" y="138" text-anchor="middle" class="b">cells[21][21] x 6 B = 2646 B</text>
+<text x="205.0" y="156" text-anchor="middle" class="t11">cnt_text, cnt_pos, cnt_hey, snr, last_min</text>
+<text x="205.0" y="172" text-anchor="middle" class="t11">cell[X][Y] = 'Y hat X gehoert'</text>
+<rect x="40" y="204" width="330" height="66" class="node bad"/>
+<text x="205.0" y="218" text-anchor="middle" class="b">Belegt im Feld: 67 von 420 Zellen (16 %)</text>
+<text x="205.0" y="236" text-anchor="middle" class="t11">Zeilen: 21 von 21, 16 Verdraengungen in 11 h</text>
+<text x="205.0" y="252" text-anchor="middle" class="t11">jede weitere Zeile: +282 B</text>
+<text x="40" y="296" class="t11">Quelle: [NBR]|SNAP 660, DK5EN-98, 2026-09-24 07:02</text>
+<text x="585.5" y="30" text-anchor="middle" class="b">cells[X][Y], Schnappschuss 07:25</text>
+<text x="585.5" y="46" text-anchor="middle" class="t11">Spalte Y = Hoerer, Zeile X = Gehoerter</text>
+<rect x="470" y="60" width="10" height="10" fill="#c9d3dd"/>
+<rect x="481" y="60" width="10" height="10" fill="#1f6feb"/>
+<rect x="492" y="60" width="10" height="10" fill="#1f6feb"/>
+<rect x="503" y="60" width="10" height="10" fill="#1f6feb"/>
+<rect x="514" y="60" width="10" height="10" fill="#1f6feb"/>
+<rect x="525" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="60" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="71" width="10" height="10" fill="#1f6feb"/>
+<rect x="481" y="71" width="10" height="10" fill="#c9d3dd"/>
+<rect x="492" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="503" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="514" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="547" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="580" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="71" width="10" height="10" fill="#7b4fbf"/>
+<rect x="668" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="71" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="82" width="10" height="10" fill="#1f6feb"/>
+<rect x="481" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="492" y="82" width="10" height="10" fill="#c9d3dd"/>
+<rect x="503" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="82" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="93" width="10" height="10" fill="#1f6feb"/>
+<rect x="481" y="93" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="93" width="10" height="10" fill="#c9d3dd"/>
+<rect x="514" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="93" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="104" width="10" height="10" fill="#1f6feb"/>
+<rect x="481" y="104" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="104" width="10" height="10" fill="#c9d3dd"/>
+<rect x="525" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="104" width="10" height="10" fill="#7b4fbf"/>
+<rect x="547" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="104" width="10" height="10" fill="#7b4fbf"/>
+<rect x="580" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="104" width="10" height="10" fill="#7b4fbf"/>
+<rect x="635" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="104" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="115" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="115" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="115" width="10" height="10" fill="#c9d3dd"/>
+<rect x="536" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="115" width="10" height="10" fill="#7b4fbf"/>
+<rect x="602" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="115" width="10" height="10" fill="#7b4fbf"/>
+<rect x="679" y="115" width="10" height="10" fill="#7b4fbf"/>
+<rect x="690" y="115" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="126" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="126" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="126" width="10" height="10" fill="#c9d3dd"/>
+<rect x="547" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="126" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="536" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="137" width="10" height="10" fill="#c9d3dd"/>
+<rect x="558" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="613" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="679" y="137" width="10" height="10" fill="#7b4fbf"/>
+<rect x="690" y="137" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="148" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="148" width="10" height="10" fill="#c9d3dd"/>
+<rect x="569" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="148" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="159" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="159" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="159" width="10" height="10" fill="#c9d3dd"/>
+<rect x="580" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="159" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="170" width="10" height="10" fill="#1f6feb"/>
+<rect x="481" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="514" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="536" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="580" y="170" width="10" height="10" fill="#c9d3dd"/>
+<rect x="591" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="602" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="635" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="170" width="10" height="10" fill="#7b4fbf"/>
+<rect x="679" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="170" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="181" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="181" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="181" width="10" height="10" fill="#7b4fbf"/>
+<rect x="536" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="181" width="10" height="10" fill="#c9d3dd"/>
+<rect x="602" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="181" width="10" height="10" fill="#7b4fbf"/>
+<rect x="624" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="181" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="192" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="192" width="10" height="10" fill="#c9d3dd"/>
+<rect x="613" y="192" width="10" height="10" fill="#7b4fbf"/>
+<rect x="624" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="192" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="203" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="203" width="10" height="10" fill="#7b4fbf"/>
+<rect x="602" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="203" width="10" height="10" fill="#c9d3dd"/>
+<rect x="624" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="203" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="214" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="214" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="214" width="10" height="10" fill="#c9d3dd"/>
+<rect x="635" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="214" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="225" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="225" width="10" height="10" fill="#c9d3dd"/>
+<rect x="646" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="225" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="236" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="236" width="10" height="10" fill="#c9d3dd"/>
+<rect x="657" y="236" width="10" height="10" fill="#7b4fbf"/>
+<rect x="668" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="236" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="247" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="247" width="10" height="10" fill="#7b4fbf"/>
+<rect x="635" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="247" width="10" height="10" fill="#c9d3dd"/>
+<rect x="668" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="247" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="258" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="258" width="10" height="10" fill="#7b4fbf"/>
+<rect x="525" y="258" width="10" height="10" fill="#7b4fbf"/>
+<rect x="536" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="258" width="10" height="10" fill="#7b4fbf"/>
+<rect x="558" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="258" width="10" height="10" fill="#c9d3dd"/>
+<rect x="679" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="258" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="269" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="269" width="10" height="10" fill="#7b4fbf"/>
+<rect x="536" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="269" width="10" height="10" fill="#7b4fbf"/>
+<rect x="679" y="269" width="10" height="10" fill="#c9d3dd"/>
+<rect x="690" y="269" width="10" height="10" fill="#f3f6f9"/>
+<rect x="470" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="481" y="280" width="10" height="10" fill="#7b4fbf"/>
+<rect x="492" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="503" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="514" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="525" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="536" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="547" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="558" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="569" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="580" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="591" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="602" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="613" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="624" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="635" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="646" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="657" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="668" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="679" y="280" width="10" height="10" fill="#f3f6f9"/>
+<rect x="690" y="280" width="10" height="10" fill="#c9d3dd"/>
+<text x="464" y="68" text-anchor="end" class="t11">1</text>
+<text x="464" y="289" text-anchor="end" class="t11">21</text>
+<text x="473" y="305" class="t11">1</text>
+<text x="689" y="305" class="t11">21</text>
+<text x="440" y="175.5" text-anchor="middle" class="t11">X</text>
+<text x="585.5" y="319" text-anchor="middle" class="t11">Y</text>
+<rect x="731" y="57" width="12" height="12" fill="#1f6feb"/><text x="749" y="67" class="t11">Spalte 0 / Zeile 0: ich</text>
+<rect x="731" y="77" width="12" height="12" fill="#7b4fbf"/><text x="749" y="87" class="t11">andere belegte Zelle</text>
+<rect x="731" y="97" width="12" height="12" fill="#c9d3dd"/><text x="749" y="107" class="t11">Diagonale, nie belegt</text>
+<rect x="731" y="117" width="12" height="12" fill="#f3f6f9"/><text x="749" y="127" class="t11">leer: 353 Zellen</text>
+<text x="731" y="158" class="t11">Entscheidung liest nur</text>
+<text x="731" y="173" class="t11">Spalte 0, Zeile 0 und die</text>
+<text x="731" y="188" class="t11">Spalten direkter Nachbarn;</text>
+<text x="731" y="203" class="t11">der Rest ist Anzeige.</text></svg></div><figcaption>Abb. 1: Ist-Zustand. 84 % des Speichers sind Zellen, 84 % der Zellen sind leer, und die Zeilen sind trotzdem voll. Die Sendeentscheidung liest nur die blauen Kreuze und die Spalten der fuenf direkten Nachbarn.</figcaption></figure>
+<h3>Mengengeruest</h3>
+<p>Die Flottenzahlen stammen aus dem mcmap-Schnappschuss vom 24.09. Der gemeldete Nachbarzaehler kommt aus <code>getMheardCount()</code> und zaehlt eine rollende Stunde, gekappt durch MAX_MHEARD (30 klassisch, 80 auf S3 und nRF52); fuenf von 262 TLORA-V2.1.6-Knoten stehen genau auf 30 und sind vermutlich gesaettigt. Der Linkgraph des Servers kennt nur Hops, die ein Gateway erreicht haben, und unterzaehlt 1-Hop-Nachbarn um den Faktor 3 bis 4. Beides sind Untergrenzen.</p>
+<table><thead><tr><th>Groesse</th><th>heute</th><th>Ziel</th><th>Bemerkung</th></tr></thead><tbody><tr><td>Nachbarn je Knoten, 1 h (823 Knoten)</td><td>Median 3, p90 11, p99 30, max 37</td><td>-</td><td>gemeldeter Zaehler, gekappt bei 30 auf klassischem ESP32</td></tr><tr><td>1-Hop-Nachbarn, Maximum</td><td>1 h: 11, 6 h: 25, 24 h: 41, 7 d: 59</td><td>64 Zeilen</td><td>aus dem Linkgraph, Untergrenze</td></tr><tr><td>2-Hop-Nachbarschaft, 24 h</td><td>p90 48, p99 84, max 113</td><td>64 Zeilen (Stufe 1), 128 (Stufe 2)</td><td>aus dem Linkgraph, Untergrenze</td></tr><tr><td>2-Hop-Nachbarschaft, 6 h</td><td>p90 33, p99 58, max 70</td><td>64 Zeilen</td><td>-</td></tr><tr><td>Zeilen DK5EN-98</td><td>21 von 21 voll, 46 Rufzeichen in 12 h</td><td>64</td><td>kein Super-Node, hoert 5 direkt</td></tr><tr><td>Kanten DK5EN-98</td><td>67 belegt, 3,2 je Zeile</td><td>4 je Zeile, 256 Kanten</td><td>Annahme fuer Super-Nodes: mehr Berichte je Zeile, Stufe 1 auf S3/nRF52 deshalb 6 je Zeile</td></tr><tr><td>Fenster</td><td>12 h</td><td>12 h, spaeter 24 h pruefen</td><td>Flottenmessung: 1 h erklaert Blaetter faelschlich exklusiv; 12 bis 24 h noetig</td></tr><tr><td>Boards im Feld</td><td>klassischer ESP32 ist die haeufigste Familie</td><td>Stufe 1 muss dort passen</td><td>Betreibervorgabe 2026-09-24</td></tr></tbody></table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p class="reco">Entscheidung: Zeilen und Kanten trennen. Zeilen bleiben ein Feld fester Groesse mit zwei Bitmasken, Kanten liegen in einem zweiten Feld fester Groesse. Jede Entscheidung laeuft auf den Masken, jede Anzeige auf dem Pool.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 370" role="img" aria-label="Zielbild Kantenpool mit Masken"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><rect x="30" y="20" width="250" height="330" class="zone"/>
+<text x="155" y="40" text-anchor="middle" class="b">Schreiber</text>
+<rect x="300" y="20" width="370" height="330" class="zone"/>
+<text x="485" y="40" text-anchor="middle" class="b">NbrMatrix, Arduino-frei (nbr_matrix.cpp)</text>
+<rect x="690" y="20" width="250" height="330" class="zone"/>
+<text x="815" y="40" text-anchor="middle" class="b">Leser</text>
+<rect x="45" y="60" width="220" height="66" class="node"/>
+<text x="155.0" y="74" text-anchor="middle" class="b">OnRxDone-Haken</text>
+<text x="155.0" y="92" text-anchor="middle" class="t11">lora_functions.cpp: Pfad, Typ,</text>
+<text x="155.0" y="108" text-anchor="middle" class="t11">SNR jedes dekodierten Frames</text>
+<rect x="45" y="150" width="220" height="66" class="node"/>
+<text x="155.0" y="164" text-anchor="middle" class="b">HN-Bericht im HEY</text>
+<text x="155.0" y="182" text-anchor="middle" class="t11">nbrNoteReport(): 'S hat X gehoert'</text>
+<text x="155.0" y="198" text-anchor="middle" class="t11">mit SNR, bis 8 Eintraege</text>
+<rect x="45" y="240" width="220" height="66" class="node"/>
+<text x="155.0" y="254" text-anchor="middle" class="b">Sweep je Minute</text>
+<text x="155.0" y="272" text-anchor="middle" class="t11">Kante aelter als Fenster: frei,</text>
+<text x="155.0" y="288" text-anchor="middle" class="t11">Bits in beiden Masken loeschen</text>
+<rect x="320" y="60" width="330" height="66" class="node srv"/>
+<text x="485.0" y="74" text-anchor="middle" class="b">rows[64] x 36 B = 2304 B</text>
+<text x="485.0" y="92" text-anchor="middle" class="t11">call, lat16, lon16, last_min, rpt_min, flags, hw</text>
+<text x="485.0" y="108" text-anchor="middle" class="t11">hears: uint64_t     heardby: uint64_t</text>
+<rect x="320" y="170" width="330" height="66" class="node prx"/>
+<text x="485.0" y="184" text-anchor="middle" class="b">Kantenpool edges[256] x 6 B = 1536 B</text>
+<text x="485.0" y="202" text-anchor="middle" class="t11">x, y, cnt, snr, last_min</text>
+<text x="485.0" y="218" text-anchor="middle" class="t11">jede Kante setzt hears(y) Bit x, heardby(x) Bit y</text>
+<text x="485" y="285" text-anchor="middle" class="t11">Zeile 0 = ich, nie verdraengt; Direktzeilen geschuetzt</text>
+<text x="485" y="301" text-anchor="middle" class="t11">Verdraengung: aelteste Hop-2-Zeile, dann aelteste Kante</text>
+<text x="485" y="317" text-anchor="middle" class="t11">Fenster NBR_WINDOW_MIN 12 h, Geister-Sweep bleibt</text>
+<rect x="705" y="60" width="220" height="66" class="node srv"/>
+<text x="815.0" y="74" text-anchor="middle" class="b">Relay-Entscheidung</text>
+<text x="815.0" y="92" text-anchor="middle" class="t11">need, alone, cover:</text>
+<text x="815.0" y="108" text-anchor="middle" class="t11">nur Masken, O(N) Wortoperationen</text>
+<rect x="705" y="140" width="220" height="66" class="node srv"/>
+<text x="815.0" y="154" text-anchor="middle" class="b">Rollen: #N, #X, Super</text>
+<text x="815.0" y="172" text-anchor="middle" class="t11">Masken und popcount,</text>
+<text x="815.0" y="188" text-anchor="middle" class="t11">kein Zellzugriff</text>
+<rect x="705" y="220" width="220" height="66" class="node"/>
+<text x="815.0" y="234" text-anchor="middle" class="b">Web, --neighbours, [NBR]-Log</text>
+<text x="815.0" y="252" text-anchor="middle" class="t11">Pool: Zaehler T/P/H und SNR</text>
+<text x="815.0" y="268" text-anchor="middle" class="t11">Masken: D/I, Hoerer</text>
+<rect x="705" y="300" width="220" height="50" class="node"/>
+<text x="815.0" y="314" text-anchor="middle" class="b">Symmetrie-Annahme (--nbrsym)</text>
+<text x="815.0" y="332" text-anchor="middle" class="t11">SNR der Gegenkante aus dem Pool</text>
+<path d="M265 83 L320 83" class="ln" marker-end="url(#arr)"/>
+<path d="M265 173 L300 173 L300 190 L320 190" class="ln" marker-end="url(#arr)"/>
+<path d="M265 263 L300 263 L300 210 L320 210" class="ln" marker-end="url(#arr)"/>
+<path d="M485 130 L485 170" class="ln" marker-end="url(#arr)"/>
+<path d="M650 83 L705 83" class="ln" marker-end="url(#arr)"/>
+<path d="M650 100 L680 100 L680 163 L705 163" class="ln" marker-end="url(#arr)"/>
+<path d="M650 200 L680 200 L680 243 L705 243" class="ln" marker-end="url(#arr)"/>
+<path d="M650 215 L672 215 L672 323 L705 323" class="ln" marker-end="url(#arr)"/></svg></div><figcaption>Abb. 2: Zielbild Stufe 1. Zeilen tragen zwei Bitmasken, Kanten liegen in einem Pool fester Groesse. Die Sendeentscheidung und die Rollen rechnen nur noch auf den Masken; Zaehler und SNR liest nur die Anzeige und die Symmetrie-Annahme.</figcaption></figure>
+<table><thead><tr><th>Komponente</th><th>Ort</th><th>Rolle</th></tr></thead><tbody><tr><td><code>NbrRow</code>, 36 B</td><td>src/nbr_matrix.h</td><td>call[10], lat16, lon16 in 0,01 Grad, last_min, rpt_min, flags, hw, hears (uint64_t), heardby (uint64_t)</td></tr><tr><td><code>NbrEdge</code>, 6 B</td><td>src/nbr_matrix.h</td><td>x, y, cnt, snr, last_min; frei bei x == 0xFF</td></tr><tr><td><code>nbrEdgeFind(m, x, y)</code></td><td>src/nbr_matrix.cpp</td><td>linearer Scan ueber den Pool, ersetzt jeden Zugriff <code>m.cells[x][y]</code>; NULL, wenn keine Kante</td></tr><tr><td><code>nbrEdgeHit(m, x, y, typ, snr, now)</code></td><td>src/nbr_matrix.cpp</td><td>Kante anlegen oder treffen, beide Masken setzen, bei vollem Pool aelteste Kante freigeben</td></tr><tr><td><code>nbrSweep(m, now)</code></td><td>src/nbr_matrix.cpp</td><td>je Minute: Kanten aelter als das Fenster freigeben und Bits loeschen; ersetzt den Frischetest je Zelle</td></tr><tr><td>Masken-API</td><td>src/nbr_matrix.cpp</td><td>nbrDirectMask, nbrHeardMeMask, nbrHearersMask werden Einzeiler auf rows[].hears / heardby</td></tr><tr><td>Web, Kommando, Log</td><td>web_functions.cpp, command_functions.cpp, nbr_matrix.cpp</td><td>lesen Zaehler und SNR ueber nbrEdgeFind(); Zeilenformat der [NBR]-Zeilen unveraendert</td></tr><tr><td>Host-Test</td><td>env native_nbr_matrix, tools/nbrsnap.py</td><td>Replay des Feldlogs: SNAP-, ROW- und NEED-Zeilen muessen byte-identisch bleiben</td></tr></tbody></table>
+
+<h2 id="s4">4. Bausteine</h2>
+<h3 id="s41">4.1 Kantenpool</h3>
+<p class="reco">Entscheidung: Ein Pool fester Groesse mit 6-Byte-Eintraegen ersetzt die N mal N Zellen; die Kapazitaet haengt nicht mehr an der Zeilenzahl.</p>
+<p>Eine Zelle der heutigen Matrix ist eine Beobachtung "Y hat X gehoert" mit drei Zaehlern nach Frametyp, dem zuletzt gesehenen SNR und einer Minute. Von 420 moeglichen Beobachtungen hat DK5EN-98 nach elf Stunden 67. Ein Kantenpool speichert nur diese 67: jeder Eintrag traegt die beiden Zeilenindizes x und y dazu, sonst denselben Inhalt. Die Tabelle ist damit eine Liste von Kanten eines Graphen, keine Kreuztabelle mehr. Wer eine Zelle sucht, durchlaeuft die Liste; wer weiss, welche Zeilen sich hoeren, liest die Masken der Zeilen, die jede Kante beim Anlegen setzt. Die Praemisse fuer die Groesse: 67 Kanten auf 21 Zeilen sind 3,2 je Zeile, ein Super-Node bekommt ueber HN-Berichte bis zu 8 Kanten je berichtendem Nachbarn dazu, darum 4 je Zeile auf klassischem ESP32 und 6 auf S3 und nRF52.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 330" role="img" aria-label="Kantenpool erklaert"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="148" y="34" text-anchor="middle" class="b">Dichte Matrix, N = 6</text>
+<text x="148" y="50" text-anchor="middle" class="t11">36 Zellen x 6 B = 216 B</text>
+<rect x="70" y="70" width="24" height="24" fill="#c9d3dd"/>
+<rect x="96" y="70" width="24" height="24" fill="#f3f6f9"/>
+<rect x="122" y="70" width="24" height="24" fill="#7b4fbf"/>
+<text x="134.0" y="87.0" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">C</text>
+<rect x="148" y="70" width="24" height="24" fill="#f3f6f9"/>
+<rect x="174" y="70" width="24" height="24" fill="#f3f6f9"/>
+<rect x="200" y="70" width="24" height="24" fill="#f3f6f9"/>
+<text x="62" y="86" text-anchor="end" class="mono">0</text>
+<text x="82" y="238" text-anchor="middle" class="mono">0</text>
+<rect x="70" y="96" width="24" height="24" fill="#7b4fbf"/>
+<text x="82.0" y="113.0" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">A</text>
+<rect x="96" y="96" width="24" height="24" fill="#c9d3dd"/>
+<rect x="122" y="96" width="24" height="24" fill="#f3f6f9"/>
+<rect x="148" y="96" width="24" height="24" fill="#f3f6f9"/>
+<rect x="174" y="96" width="24" height="24" fill="#f3f6f9"/>
+<rect x="200" y="96" width="24" height="24" fill="#f3f6f9"/>
+<text x="62" y="112" text-anchor="end" class="mono">1</text>
+<text x="108" y="238" text-anchor="middle" class="mono">1</text>
+<rect x="70" y="122" width="24" height="24" fill="#7b4fbf"/>
+<text x="82.0" y="139.0" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">B</text>
+<rect x="96" y="122" width="24" height="24" fill="#f3f6f9"/>
+<rect x="122" y="122" width="24" height="24" fill="#c9d3dd"/>
+<rect x="148" y="122" width="24" height="24" fill="#f3f6f9"/>
+<rect x="174" y="122" width="24" height="24" fill="#f3f6f9"/>
+<rect x="200" y="122" width="24" height="24" fill="#f3f6f9"/>
+<text x="62" y="138" text-anchor="end" class="mono">2</text>
+<text x="134" y="238" text-anchor="middle" class="mono">2</text>
+<rect x="70" y="148" width="24" height="24" fill="#f3f6f9"/>
+<rect x="96" y="148" width="24" height="24" fill="#f3f6f9"/>
+<rect x="122" y="148" width="24" height="24" fill="#7b4fbf"/>
+<text x="134.0" y="165.0" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">D</text>
+<rect x="148" y="148" width="24" height="24" fill="#c9d3dd"/>
+<rect x="174" y="148" width="24" height="24" fill="#f3f6f9"/>
+<rect x="200" y="148" width="24" height="24" fill="#f3f6f9"/>
+<text x="62" y="164" text-anchor="end" class="mono">3</text>
+<text x="160" y="238" text-anchor="middle" class="mono">3</text>
+<rect x="70" y="174" width="24" height="24" fill="#f3f6f9"/>
+<rect x="96" y="174" width="24" height="24" fill="#f3f6f9"/>
+<rect x="122" y="174" width="24" height="24" fill="#f3f6f9"/>
+<rect x="148" y="174" width="24" height="24" fill="#f3f6f9"/>
+<rect x="174" y="174" width="24" height="24" fill="#c9d3dd"/>
+<rect x="200" y="174" width="24" height="24" fill="#f3f6f9"/>
+<text x="62" y="190" text-anchor="end" class="mono">4</text>
+<text x="186" y="238" text-anchor="middle" class="mono">4</text>
+<rect x="70" y="200" width="24" height="24" fill="#f3f6f9"/>
+<rect x="96" y="200" width="24" height="24" fill="#f3f6f9"/>
+<rect x="122" y="200" width="24" height="24" fill="#f3f6f9"/>
+<rect x="148" y="200" width="24" height="24" fill="#f3f6f9"/>
+<rect x="174" y="200" width="24" height="24" fill="#f3f6f9"/>
+<rect x="200" y="200" width="24" height="24" fill="#c9d3dd"/>
+<text x="62" y="216" text-anchor="end" class="mono">5</text>
+<text x="212" y="238" text-anchor="middle" class="mono">5</text>
+<text x="46" y="148" text-anchor="middle" class="t11">X</text>
+<text x="148" y="254" text-anchor="middle" class="t11">Y</text>
+<path d="M240 150 L330 150" class="ln" marker-end="url(#arr)"/>
+<text x="285" y="140" text-anchor="middle" class="t11">nur belegte</text>
+<text x="285" y="166" text-anchor="middle" class="t11">Zellen</text>
+<text x="490" y="34" text-anchor="middle" class="b">Kantenpool, 8 Eintraege x 6 B = 48 B</text>
+<text x="490" y="50" text-anchor="middle" class="t11">Kapazitaet unabhaengig von N</text>
+<rect x="340" y="60" width="300" height="186" class="node"/>
+<text x="358" y="78" text-anchor="middle" class="b">#</text>
+<text x="400" y="78" text-anchor="middle" class="b">x</text>
+<text x="440" y="78" text-anchor="middle" class="b">y</text>
+<text x="490" y="78" text-anchor="middle" class="b">cnt</text>
+<text x="540" y="78" text-anchor="middle" class="b">snr</text>
+<text x="600" y="78" text-anchor="middle" class="b">last_min</text>
+<text x="358" y="98" text-anchor="middle" class="mono">A</text>
+<text x="400" y="98" text-anchor="middle" class="mono">1</text>
+<text x="440" y="98" text-anchor="middle" class="mono">0</text>
+<text x="490" y="98" text-anchor="middle" class="mono">12</text>
+<text x="540" y="98" text-anchor="middle" class="mono">-7</text>
+<text x="600" y="98" text-anchor="middle" class="mono">641</text>
+<text x="358" y="118" text-anchor="middle" class="mono">B</text>
+<text x="400" y="118" text-anchor="middle" class="mono">2</text>
+<text x="440" y="118" text-anchor="middle" class="mono">0</text>
+<text x="490" y="118" text-anchor="middle" class="mono">3</text>
+<text x="540" y="118" text-anchor="middle" class="mono">-12</text>
+<text x="600" y="118" text-anchor="middle" class="mono">655</text>
+<text x="358" y="138" text-anchor="middle" class="mono">C</text>
+<text x="400" y="138" text-anchor="middle" class="mono">0</text>
+<text x="440" y="138" text-anchor="middle" class="mono">2</text>
+<text x="490" y="138" text-anchor="middle" class="mono">5</text>
+<text x="540" y="138" text-anchor="middle" class="mono">-9</text>
+<text x="600" y="138" text-anchor="middle" class="mono">660</text>
+<text x="358" y="158" text-anchor="middle" class="mono">D</text>
+<text x="400" y="158" text-anchor="middle" class="mono">3</text>
+<text x="440" y="158" text-anchor="middle" class="mono">2</text>
+<text x="490" y="158" text-anchor="middle" class="mono">1</text>
+<text x="540" y="158" text-anchor="middle" class="mono">-15</text>
+<text x="600" y="158" text-anchor="middle" class="mono">630</text>
+<text x="358" y="178" text-anchor="middle" class="mono">4</text>
+<text x="490" y="178" text-anchor="middle" class="mono">frei (x = 0xFF)</text>
+<text x="358" y="198" text-anchor="middle" class="mono">5</text>
+<text x="490" y="198" text-anchor="middle" class="mono">frei (x = 0xFF)</text>
+<text x="358" y="218" text-anchor="middle" class="mono">6</text>
+<text x="490" y="218" text-anchor="middle" class="mono">frei (x = 0xFF)</text>
+<text x="358" y="238" text-anchor="middle" class="mono">7</text>
+<text x="490" y="238" text-anchor="middle" class="mono">frei (x = 0xFF)</text>
+<text x="665" y="34" class="b">Masken je Zeile, Bit i = Zeile i</text>
+<text x="665" y="50" class="t11">jede Kante setzt zwei Bits, Bit 0 = ich</text>
+<text x="665" y="78" class="mono">rows[0].hears   = 000110  A,B</text>
+<text x="665" y="96" class="mono">rows[2].hears   = 001001  C,D</text>
+<text x="665" y="114" class="mono">rows[1].heardby = 000001  A</text>
+<text x="665" y="132" class="mono">rows[2].heardby = 000001  B</text>
+<text x="665" y="150" class="mono">rows[0].heardby = 000100  C</text>
+<text x="665" y="168" class="mono">rows[3].heardby = 000100  D</text>
+<text x="665" y="200" class="mono">Direkt(X)   = rows[0].hears</text>
+<text x="665" y="218" class="mono">HoertMich(X)= rows[0].heardby</text>
+<text x="665" y="236" class="mono">Hoerer(P)   = rows[P].heardby</text>
+<rect x="40" y="262" width="880" height="58" class="zone"/>
+<text x="60" y="282" class="t11">Neue Zeile: dichte Matrix waechst um 2N+1 Zellen (282 B bei N = 21), der Pool um 0 B; die Zeile kostet 36 B.</text>
+<text x="60" y="300" class="t11">Pool voll: aelteste Kante ohne Zeile 0 weicht. Zeile verdraengt: ihre Kanten werden frei, ihr Bit in allen Masken geloescht.</text></svg></div><figcaption>Abb. 3: Was ein Kantenpool ist. Nur Zellen, die je einen Treffer hatten, werden zu Eintraegen; jeder Eintrag setzt ein Bit in der Hoerer-Maske des Gehoerten und in der Hoert-Maske des Hoerers. Die Rechnung laeuft auf den Masken, der Pool liefert Zaehler und SNR.</figcaption></figure>
+<table><thead><tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr></thead><tbody><tr><td>Dichte Matrix, wie heute</td><td>cells[N][N] x 6 B</td><td><span class="tag bad">verworfen</span> quadratisch: 64 Zeilen kosten 26 kB</td></tr><tr><td>Zelle auf 4 B kuerzen</td><td>ein Zaehler statt drei, uint16 Minute</td><td><span class="tag bad">verworfen</span> spart ein Drittel, bleibt quadratisch</td></tr><tr><td>Rechteckig: alle Zeilen, nur direkte Spalten</td><td>cells[N][M], M Spaltenslots mit eigener Verdraengung</td><td><span class="tag bad">verworfen</span> am Super-Node ist M = 20 bis 40, dazu ein zweiter Allokator; Abb. 4</td></tr><tr><td>Kantenpool plus zwei Masken je Zeile</td><td>edges[E] x 6 B, hears/heardby als uint64_t</td><td><span class="tag ok">gewaehlt</span> linear in Zeilen und Kanten, Entscheidung ohne Poolzugriff</td></tr><tr><td>Nur Masken, kein Pool</td><td>rows mit Masken, keine Zaehler, kein SNR je Kante</td><td><span class="tag warn">Teilmenge</span> Entscheidung geht, aber die Symmetrie-Annahme braucht den SNR der Gegenkante; ohne ihn faellt DL2JA-1 zurueck in Fall A (96 % der Relays im Lauf 1)</td></tr></tbody></table>
+<figure><div class="fig"><svg viewBox="0 0 960 370" role="img" aria-label="Wachstum der Matrix je Layout"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><path d="M90 300.0 L900 300.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="304.0" text-anchor="end" class="t11">0</text>
+<path d="M90 266.2 L900 266.2" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="270.25" text-anchor="end" class="t11">4 kB</text>
+<path d="M90 232.5 L900 232.5" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="236.5" text-anchor="end" class="t11">8 kB</text>
+<path d="M90 198.8 L900 198.8" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="202.75" text-anchor="end" class="t11">12 kB</text>
+<path d="M90 165.0 L900 165.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="169.0" text-anchor="end" class="t11">16 kB</text>
+<path d="M90 131.2 L900 131.2" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="135.25" text-anchor="end" class="t11">20 kB</text>
+<path d="M90 97.5 L900 97.5" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="101.5" text-anchor="end" class="t11">24 kB</text>
+<path d="M90 63.8 L900 63.8" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="67.75" text-anchor="end" class="t11">28 kB</text>
+<path d="M90 30.0 L900 30.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="34.0" text-anchor="end" class="t11">32 kB</text>
+<text x="90.0" y="316" text-anchor="middle" class="t11">0</text>
+<text x="292.5" y="316" text-anchor="middle" class="t11">16</text>
+<text x="495.0" y="316" text-anchor="middle" class="t11">32</text>
+<text x="697.5" y="316" text-anchor="middle" class="t11">48</text>
+<text x="900.0" y="316" text-anchor="middle" class="t11">64</text>
+<text x="900" y="332" text-anchor="end" class="t11">Zeilen N, inkl. Zeile 0</text>
+<path d="M254.5 30 L254.5 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M355.8 30 L355.8 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M608.9 30 L608.9 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M697.5 30 L697.5 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="603.9" y="38" class="t11" text-anchor="end" transform="rotate(90 603.9 38)">41: 1-Hop max 24 h</text>
+<text x="692.5" y="38" class="t11" text-anchor="end" transform="rotate(90 692.5 38)">48: 2-Hop p90 24 h</text>
+<text x="254.53125" y="346" text-anchor="middle" class="t11">13: heute klassisch</text>
+<text x="355.78125" y="360" text-anchor="middle" class="t11">21: heute S3 und RAK</text>
+<polyline points="115.3,299.4 128.0,298.9 140.6,298.3 153.3,297.7 165.9,296.9 178.6,296.1 191.2,295.1 203.9,294.0 216.6,292.9 229.2,291.6 241.9,290.2 254.5,288.8 267.2,287.2 279.8,285.5 292.5,283.8 305.2,281.9 317.8,279.9 330.5,277.8 343.1,275.7 355.8,273.4 368.4,271.0 381.1,268.5 393.8,265.9 406.4,263.3 419.1,260.5 431.7,257.6 444.4,254.6 457.0,251.5 469.7,248.3 482.3,245.0 495.0,241.6 507.7,238.2 520.3,234.6 533.0,230.9 545.6,227.1 558.3,223.2 570.9,219.2 583.6,215.1 596.2,210.9 608.9,206.6 621.6,202.2 634.2,197.7 646.9,193.0 659.5,188.3 672.2,183.5 684.8,178.6 697.5,173.6 710.2,168.5 722.8,163.3 735.5,158.0 748.1,152.5 760.8,147.0 773.4,141.4 786.1,135.7 798.8,129.9 811.4,123.9 824.1,117.9 836.7,111.8 849.4,105.6 862.0,99.2 874.7,92.8 887.3,86.3 900.0,79.6" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="288.8" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 13, 1330 B</title></circle>
+<circle cx="355.8" cy="273.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 21, 3154 B</title></circle>
+<circle cx="900.0" cy="79.6" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 64, 26116 B</title></circle>
+<polyline points="115.3,297.5 128.0,296.3 140.6,295.1 153.3,293.9 165.9,292.7 178.6,291.5 191.2,290.2 203.9,289.0 216.6,287.8 229.2,286.6 241.9,285.4 254.5,284.2 267.2,283.0 279.8,281.7 292.5,280.5 305.2,279.3 317.8,278.1 330.5,276.9 343.1,275.7 355.8,274.5 368.4,273.2 381.1,272.0 393.8,270.8 406.4,269.6 419.1,268.4 431.7,267.2 444.4,265.9 457.0,264.7 469.7,263.5 482.3,262.3 495.0,261.1 507.7,259.9 520.3,258.7 533.0,257.4 545.6,256.2 558.3,255.0 570.9,253.8 583.6,252.6 596.2,251.4 608.9,250.2 621.6,248.9 634.2,247.7 646.9,246.5 659.5,245.3 672.2,244.1 684.8,242.9 697.5,241.6 710.2,240.4 722.8,239.2 735.5,238.0 748.1,236.8 760.8,235.6 773.4,234.4 786.1,233.1 798.8,231.9 811.4,230.7 824.1,229.5 836.7,228.3 849.4,227.1 862.0,225.9 874.7,224.6 887.3,223.4 900.0,222.2" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="284.2" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 13, 1876 B</title></circle>
+<circle cx="355.8" cy="274.5" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 21, 3028 B</title></circle>
+<circle cx="900.0" cy="222.2" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 64, 9220 B</title></circle>
+<polyline points="115.3,298.9 128.0,298.4 140.6,297.9 153.3,297.4 165.9,296.9 178.6,296.4 191.2,295.9 203.9,295.4 216.6,294.9 229.2,294.4 241.9,293.9 254.5,293.4 267.2,292.8 279.8,292.3 292.5,291.8 305.2,291.3 317.8,290.8 330.5,290.3 343.1,289.8 355.8,289.3 368.4,288.8 381.1,288.3 393.8,287.8 406.4,287.3 419.1,286.8 431.7,286.3 444.4,285.8 457.0,285.3 469.7,284.7 482.3,284.2 495.0,283.7 507.7,283.2 520.3,282.7 533.0,282.2 545.6,281.7 558.3,281.2 570.9,280.7 583.6,280.2 596.2,279.7 608.9,279.2 621.6,278.7 634.2,278.2 646.9,277.7 659.5,277.2 672.2,276.6 684.8,276.1 697.5,275.6 710.2,275.1 722.8,274.6 735.5,274.1 748.1,273.6 760.8,273.1 773.4,272.6 786.1,272.1 798.8,271.6 811.4,271.1 824.1,270.6 836.7,270.1 849.4,269.6 862.0,269.1 874.7,268.5 887.3,268.0 900.0,267.5" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="293.4" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 13, 788 B</title></circle>
+<circle cx="355.8" cy="289.3" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 21, 1268 B</title></circle>
+<circle cx="900.0" cy="267.5" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 64, 3848 B</title></circle>
+<text x="894.0" y="71.64625000000001" text-anchor="end" class="t11">26,1 kB</text>
+<text x="894.0" y="214.20625" text-anchor="end" class="t11">9,2 kB</text>
+<text x="894.0" y="283.5325" text-anchor="end" class="t11">3,8 kB</text>
+<path d="M100 38 L122 38" stroke="#2a78d6" stroke-width="2"/>
+<text x="130" y="42" class="t11">dicht heute: 24N + 6N^2</text>
+<path d="M100 56 L122 56" stroke="#eb6834" stroke-width="2"/>
+<text x="130" y="60" class="t11">rechteckig, 20 Hoerer (Super-Node): 144N</text>
+<path d="M100 74 L122 74" stroke="#1baf7a" stroke-width="2"/>
+<text x="130" y="78" class="t11">Kantenpool Stufe 1: 36N + 4N x 6 B</text></svg></div><figcaption>Abb. 4: Speicher je Zeilenzahl. Die dichte Matrix ueberschreitet bei 41 Zeilen (1-Hop-Maximum der Flotte in 24 h) 12 kB; der Kantenpool bleibt bei 64 Zeilen unter 4 kB. Die rechteckige Variante hilft nur dort nicht, wo es zaehlt: am Super-Node mit 20 und mehr Hoerern.</figcaption></figure>
+<p>Regeln fuer den Pool:</p>
+<ul>
+<li>Eine Kante entsteht beim ersten Treffer und setzt zwei Bits: Bit x in <code>rows[y].hears</code>, Bit y in <code>rows[x].heardby</code>. Die Diagonale bleibt leer.</li>
+<li>Der Sweep laeuft einmal je Minute ueber den Pool statt alle 1024 Minuten ueber alle Zellen; eine Kante aelter als das Fenster wird frei, ihre zwei Bits werden geloescht. Damit entfaellt der Frischetest je Zellzugriff in jeder Entscheidung.</li>
+<li>Ist der Pool voll, weicht die aelteste Kante, die weder Spalte 0 noch Zeile 0 beruehrt; erst danach die aelteste ueberhaupt. Das schuetzt Direkt und HoertMich, die Grundlage jeder Entscheidung.</li>
+<li>Wird eine Zeile verdraengt, werden ihre Kanten frei und ihr Bit in allen Masken geloescht, ein Durchlauf ueber Pool und Zeilen.</li>
+<li>Die Suche nach einer Kante ist ein linearer Scan ueber hoechstens 384 Eintraege. Je Frame fallen hoechstens 8 Pfad-Token und 8 Berichtseintraege an, also unter 20 Suchen; bei einem Frame je 14 s ist das bedeutungslos, bei fuenf Frames je Sekunde am Super-Node unter 40.000 Vergleiche je Sekunde.</li>
+</ul>
+
+<h3 id="s42">4.2 Rechnen auf Masken</h3>
+<p class="reco">Entscheidung: Jede Menge der Sendeentscheidung und jede Rolle ist ein 64-Bit-Wort; die Rechnung besteht aus OR, AND NOT und popcount ueber hoechstens N Woerter.</p>
+<p>Die Praemisse: die Entscheidung fragt nie nach Zaehlern oder Minuten, nur nach "frisch und gesetzt". Genau das ist ein Bit, sobald der Sweep veraltete Kanten selbst entfernt. Mit Bit 0 fuer die eigene Zeile:</p>
+<pre>Direkt        = rows[0].hears                       // ich hoere X
+HoertMich     = rows[0].heardby                     // X hat mich gehoert
+D             = (Direkt | HoertMich) &amp; ~GW &amp; ~1      // Abhaengige, Gateways bekommen den Frame vom Server
+Pfad          = OR bit(p)            fuer p im Pfad
+HatF          = Pfad | OR rows[p].heardby            // wer den Frame hat oder einen Traeger gehoert hat
+need          = D &amp; ~HatF
+Versorger     = Direkt &amp; HatF &amp; ~angenommen
+gedeckt       = OR rows[M].heardby   fuer M in Versorger   // X hat M gehoert
+alone         = need &amp; ~gedeckt                     // Fall A, wenn != 0
+Deckung(L)    = rows[L].heardby                     // beim Mithoeren einer Kopie von L
+hoert(N)      = rows[N].hears &amp; ~1 &amp; ~bit(N)
+#X(N)         = popcount(hoert(N) &amp; ~Direkt &amp; ~OR hoert(M) fuer M in Direkt, M != N)
+E_self        = Direkt &amp; ~OR hoert(M) fuer M in Direkt</pre>
+<p>Kosten je Relay-Entscheidung: heute bis zu (N-1) mal (Pfadlaenge + N-1) Zellzugriffe mit Frischetest, bei N = 21 rund 600; auf Masken sind es Pfadlaenge plus zweimal N Wortoperationen, bei N = 64 unter 150, ohne einen einzigen Poolzugriff. Die Symmetrie-Annahme ist der einzige Leser des Pools in der Entscheidung: sie braucht den SNR der Gegenkante "M hat X gehoert" und nur dann, wenn die Beobachtung fehlt. Das Rechenbeispiel aus dem Schnappschuss 07:25 zeigt beide Faelle an einem Frame von OE7XWT-12 ueber DL2JA-2:</p>
+<table><thead><tr><th>Menge</th><th>Rechnung auf Masken</th><th>Inhalt im Schnappschuss</th><th class=num>Bits</th></tr></thead><tbody><tr><td>Direkt</td><td>rows[0].hears</td><td>DL2JA-2, DK5EN-1, DL2UD-1, DB0ED-99, DL2JA-1</td><td class=num>5</td></tr><tr><td>HoertMich</td><td>rows[0].heardby</td><td>DL2JA-2, DK5EN-1, DL2UD-1, DB0ED-99</td><td class=num>4</td></tr><tr><td>Gateways</td><td>NBR_FLAG_GW als Maske</td><td>DL2JA-2, DK5EN-1, DB0FHR-12, DL2JA-3, OE2XZR-12, DG7RJ-8</td><td class=num>6</td></tr><tr><td>Abhaengige D</td><td>(Direkt | HoertMich) &amp; ~GW &amp; ~1</td><td>DL2UD-1, DB0ED-99, DL2JA-1</td><td class=num>3</td></tr><tr><td>Pfad(F)</td><td>Bits der Pfad-Token</td><td>OE7XWT-12, DL2JA-2</td><td class=num>2</td></tr><tr><td>Hoerer(OE7XWT-12)</td><td>rows[OE7XWT-12].heardby</td><td>DL2JA-2, DB0ED-99, DB0HOB-12, DB0FHR-12</td><td class=num>4</td></tr><tr><td>Hoerer(DL2JA-2)</td><td>rows[DL2JA-2].heardby</td><td>ich, DK5EN-1, DL2UD-1, DB0ED-99, DC2MAC-1, DL3NCU-1, DG7RJ-8</td><td class=num>7</td></tr><tr><td>HatF</td><td>Pfad | Hoerer(P) fuer jedes P im Pfad</td><td>Vereinigung der drei Zeilen darueber</td><td class=num>11</td></tr><tr><td><b>need</b></td><td>D &amp; ~HatF</td><td><b>DL2JA-1</b></td><td class=num>1</td></tr><tr><td>Versorger</td><td>Direkt &amp; HatF</td><td>DL2JA-2, DK5EN-1, DL2UD-1, DB0ED-99</td><td class=num>4</td></tr><tr><td>gedeckt</td><td>OR rows[M].heardby fuer M in Versorger</td><td>enthaelt DL2JA-1 nicht: DL2JA-1 hat nie etwas wiederholt, seine Spalte ist leer</td><td class=num>-</td></tr><tr><td><b>alone ohne --nbrsym</b></td><td>need &amp; ~gedeckt</td><td><b>DL2JA-1: Fall A</b>, Vorrang, nie Abbruch</td><td class=num>1</td></tr><tr><td>Symmetrie-Annahme</td><td>Gegenkante aus dem Pool: DL2JA-2 hat DL2JA-1 gehoert, SNR &gt;= -16 dB</td><td>DL2JA-1 hoert DL2JA-2 vermutlich: Alternative gefunden, Zeile [NBR]|SYM|ALT</td><td class=num>-</td></tr><tr><td><b>alone mit --nbrsym</b></td><td>need &amp; ~(gedeckt | angenommen)</td><td><b>leer: Fall B</b>, Sperre 20 s, Abbruch sobald eine Kopie DL2JA-1 deckt</td><td class=num>0</td></tr></tbody></table>
+<p>Speicher fuer die Entscheidung: zwei Woerter je Zeile, 16 B mal 64 Zeilen gleich 1 kB, in den 36 B je Zeile enthalten. Zwei Ring-Seitenfelder <code>ringNeed[]</code> und <code>ringAlone[]</code> werden uint64_t, 2 mal 20 mal 8 B gleich 320 B statt 160 B.</p>
+
+<h3 id="s43">4.3 Fall A und Fall B</h3>
+<p class="reco">Entscheidung: unveraendert gegenueber Stufe 2 des Konzepts; der Kantenpool aendert nur die Rechnung, nicht die Regel.</p>
+<p>Ein Relay-Kandidat bekommt beim Einreihen zwei Masken: <code>need</code>, die direkten Nachbarn und Rueckhoerer, die den Frame noch nicht haben koennen, und <code>alone</code>, die davon, die ihn von niemandem sonst bekommen koennen. Ist <code>alone</code> nicht leer, ist es Fall A: es haengt mindestens ein Knoten allein an mir. Ist <code>alone</code> leer, ist es Fall B, auch wenn <code>need</code> leer ist. Hat die Matrix kein Wissen, weil der Pfad ungueltig ist oder keine abhaengige Zeile existiert, gibt es keinen Fall, das Relay laeuft wie heute.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 460" role="img" aria-label="Entscheidungsfluss Fall A und Fall B"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><rect x="40" y="30" width="220" height="50" class="node"/>
+<text x="150.0" y="44" text-anchor="middle" class="b">Frame dekodiert</text>
+<text x="150.0" y="62" text-anchor="middle" class="t11">OnRxDone(), vor dem Pfad-Umbau</text>
+<rect x="300" y="30" width="260" height="66" class="node"/>
+<text x="430.0" y="44" text-anchor="middle" class="b">Relay-Kandidat?</text>
+<text x="430.0" y="62" text-anchor="middle" class="t11">Mesh an, Hop frei, kein Duplikat,</text>
+<text x="430.0" y="78" text-anchor="middle" class="t11">nicht gwcap, nicht hop0</text>
+<rect x="600" y="30" width="320" height="66" class="node"/>
+<text x="760.0" y="44" text-anchor="middle" class="b">Wissen vorhanden?</text>
+<text x="760.0" y="62" text-anchor="middle" class="t11">--nbrrelay on, Pfad gueltig,</text>
+<text x="760.0" y="78" text-anchor="middle" class="t11">Abhaengige D nicht leer (known)</text>
+<rect x="600" y="140" width="320" height="66" class="node"/>
+<text x="760.0" y="154" text-anchor="middle" class="b">Nein: Fluten wie heute</text>
+<text x="760.0" y="172" text-anchor="middle" class="t11">RING_KIND_OTHER, Prio-Basis 4500/5500 ms,</text>
+<text x="760.0" y="188" text-anchor="middle" class="t11">kein Nachrang, kein Abbruch</text>
+<rect x="300" y="140" width="260" height="66" class="node srv"/>
+<text x="430.0" y="154" text-anchor="middle" class="b">Ja: need und alone aus Masken</text>
+<text x="430.0" y="172" text-anchor="middle" class="t11">need  = D ohne HatF</text>
+<text x="430.0" y="188" text-anchor="middle" class="t11">alone = need ohne Alternative</text>
+<rect x="300" y="236" width="260" height="34" class="node"/>
+<text x="430" y="258" text-anchor="middle" class="b">alone != 0 ?</text>
+<rect x="40" y="310" width="410" height="82" class="node srv"/>
+<text x="245.0" y="324" text-anchor="middle" class="b">Fall A: Vorrang, nie Abbruch</text>
+<text x="245.0" y="342" text-anchor="middle" class="t11">Basis 3500 ms + Slots 0..2, vor Relay 4500 und POS 5500</text>
+<text x="245.0" y="358" text-anchor="middle" class="t11">fremde Kopie: nur REFUSE-Zeile, Slot bleibt</text>
+<text x="245.0" y="374" text-anchor="middle" class="t11">ab 8 s Wartezeit: 150 ms Schutzabstand je Re-Arm, dann CAD</text>
+<rect x="490" y="310" width="430" height="82" class="node prx"/>
+<text x="705.0" y="324" text-anchor="middle" class="b">Fall B: Nachrang, Abbruch bei Deckung</text>
+<text x="705.0" y="342" text-anchor="middle" class="t11">POS/HEY: Sperre 20 s ab Einreihen, Slots 7..9; Text: heutige Basis</text>
+<text x="705.0" y="358" text-anchor="middle" class="t11">fremde Kopie von L: need &amp;= ~Hoerer(L); need == 0: CANCEL</text>
+<text x="705.0" y="374" text-anchor="middle" class="t11">gehaltener Slot blockiert niemanden; ab 60 s Kurzsuche wie A</text>
+<path d="M260 53 L300 53" class="ln" marker-end="url(#arr)"/>
+<path d="M560 53 L600 53" class="ln" marker-end="url(#arr)"/>
+<path d="M760 100 L760 140" class="ln" marker-end="url(#arr)"/>
+<text x="768" y="126" class="t11">nein</text>
+<path d="M600 80 L580 80 L580 163 L560 163" class="ln" marker-end="url(#arr)"/>
+<text x="585" y="120" class="t11">ja</text>
+<path d="M430 206 L430 236" class="ln" marker-end="url(#arr)"/>
+<path d="M300 253 L245 253 L245 310" class="ln" marker-end="url(#arr)"/>
+<text x="252" y="300" class="t11">ja</text>
+<path d="M560 253 L705 253 L705 310" class="ln" marker-end="url(#arr)"/>
+<text x="712" y="300" class="t11">nein, auch bei need = 0</text>
+<text x="480" y="445" text-anchor="middle" class="t11">Text als Fall B: heutige Basis und Slots, aber Abbruch. Alles ohne Wissen bleibt heutiges Fluten (Konzept 1: nichts unterdruecken auf Verdacht).</text></svg></div><figcaption>Abb. 5: Wie ein Relay in Fall A oder Fall B kommt. Entschieden wird je Frame beim Einreihen aus den Masken; der Fall bestimmt Basis, Slots, Re-Arm-Verhalten und ob ein Abbruch zulaessig ist.</figcaption></figure>
+<table><thead><tr><th>Fall</th><th>Basis und Slots</th><th>Re-Arm bei fremdem Empfang</th><th>Abbruch</th><th>Zweck</th></tr></thead><tbody><tr><td>A</td><td>3500 ms + Slots 0..2, vor Relay 4500, POS und HEY 5500, hinter ACK und DM 3000</td><td>bis 8 s Wartezeit voll; danach nur 150 ms Schutzabstand plus Jitter, dann CAD</td><td>nie; fremde Kopie erzeugt eine REFUSE-Zeile</td><td>der Knoten, an dem Blaetter haengen, kommt zuerst und verhungert nicht mehr</td></tr><tr><td>B, POS und HEY</td><td>Prio-Basis + Slots 7..9; einmalige Sperre 20 s ab Einreihen, kein Aufaddieren je Re-Arm</td><td>innerhalb der Sperre max(Rest, Basis); ab 60 s Kurzsuche wie A</td><td>sobald gehoerte Kopien need auf 0 bringen</td><td>die Flut der Nachbarn abwarten und dann nur senden, wenn noch jemand fehlt</td></tr><tr><td>B, Text</td><td>heutige Basis und Slots</td><td>wie heute</td><td>wie B</td><td>Menschen warten auf Text</td></tr><tr><td>kein Wissen</td><td>Prio-Basis wie heute</td><td>wie heute</td><td>nie</td><td>nichts unterdruecken auf Verdacht</td></tr></tbody></table>
+<p>Die Praemissen der Zahlen: 3500 ms liegt zwischen ACK und dem heutigen Relay, damit ein Fall-A-Relay jede Wiederholung der Alt-Firmware schlaegt. 20 s Sperre faengt die Haelfte der fremden Kopien am Standort DK5EN-98 (Median 19 bis 26 s), 82 % der Abbrueche fielen im Feld in die ersten 60 s, daher der 60-s-Deckel. 8 s fuer die Re-Arm-Kappung entsprechen etwa zwei vollen Backoffs.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 320" role="img" aria-label="Zeitachse Fall A und Fall B"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="238" y="68" text-anchor="end" class="b">Super-Node, Fall A</text>
+<text x="238" y="84" text-anchor="end" class="t11">alone != 0: 8 Blaetter nur ueber ihn</text>
+<path d="M250 90 L920 90" stroke="#e3e8ee"/>
+<text x="238" y="128" text-anchor="end" class="b">Redundant 1, Fall B</text>
+<text x="238" y="144" text-anchor="end" class="t11">alone = 0: alle Abhaengigen gedeckt</text>
+<path d="M250 150 L920 150" stroke="#e3e8ee"/>
+<text x="238" y="188" text-anchor="end" class="b">Redundant 2, Fall B</text>
+<text x="238" y="204" text-anchor="end" class="t11">alone = 0</text>
+<path d="M250 210 L920 210" stroke="#e3e8ee"/>
+<text x="238" y="248" text-anchor="end" class="b">Alt-Firmware</text>
+<text x="238" y="264" text-anchor="end" class="t11">ohne Matrix: Re-Arm je Empfang</text>
+<path d="M250 270 L920 270" stroke="#e3e8ee"/>
+<path d="M250 292 L920 292" class="ln"/>
+<path d="M250.0 288 L250.0 296" class="ln"/>
+<text x="250.0" y="310" text-anchor="middle" class="mono">0 s</text>
+<path d="M384.0 288 L384.0 296" class="ln"/>
+<text x="384.0" y="310" text-anchor="middle" class="mono">5 s</text>
+<path d="M518.0 288 L518.0 296" class="ln"/>
+<text x="518.0" y="310" text-anchor="middle" class="mono">10 s</text>
+<path d="M652.0 288 L652.0 296" class="ln"/>
+<text x="652.0" y="310" text-anchor="middle" class="mono">15 s</text>
+<path d="M786.0 288 L786.0 296" class="ln"/>
+<text x="786.0" y="310" text-anchor="middle" class="mono">20 s</text>
+<path d="M920.0 288 L920.0 296" class="ln"/>
+<text x="920.0" y="310" text-anchor="middle" class="mono">25 s</text>
+<text x="250.0" y="40" class="t11">t = 0: Frame von S kommt bei allen drei an</text>
+<rect x="250.0" y="70" width="0" height="16" fill="#cde2fb" rx="3"><animate attributeName="width" values="0;0;93.8;93.8" keyTimes="0;0.0000;0.1400;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1400;0.1400;1" dur="12.5s" repeatCount="indefinite"/><rect x="343.8" y="68" width="10" height="20" fill="#1f6feb"/><text x="357.8" y="81" class="t11">TX nach 3,5 s, Basis 3500 ms plus Slot</text></g>
+<rect x="250.0" y="130" width="0" height="16" fill="#fde6cf" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="128" width="10" height="20" fill="#c62828"/><text x="371.2" y="124" class="t11">Kopie des Super gehoert: need &amp;= ~Hoerer(Super) = 0, CANCEL</text></g>
+<rect x="357.2" y="130" width="428.8" height="16" fill="none" stroke="#d9822b" stroke-dasharray="4 3" rx="3"/>
+<text x="780.0" y="142" text-anchor="end" class="t11">geplante Sperre bis 20 s</text>
+<rect x="250.0" y="190" width="0" height="16" fill="#fde6cf" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="188" width="10" height="20" fill="#c62828"/><text x="371.2" y="184" class="t11">Kopie des Super gehoert: need &amp;= ~Hoerer(Super) = 0, CANCEL</text></g>
+<rect x="357.2" y="190" width="428.8" height="16" fill="none" stroke="#d9822b" stroke-dasharray="4 3" rx="3"/>
+<text x="780.0" y="202" text-anchor="end" class="t11">geplante Sperre bis 20 s</text>
+<rect x="250.0" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="248" width="10" height="20" fill="#1f2a37"/><text x="371.2" y="244" class="t11">Re-Arm</text></g>
+<rect x="357.2" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;147.4;147.4" keyTimes="0;0.1600;0.3800;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.3800;0.3800;1" dur="12.5s" repeatCount="indefinite"/><rect x="504.6" y="248" width="10" height="20" fill="#1f2a37"/><text x="518.6" y="244" class="t11">Re-Arm</text></g>
+<rect x="504.6" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;254.6;254.6" keyTimes="0;0.3800;0.7600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.7600;0.7600;1" dur="12.5s" repeatCount="indefinite"/><rect x="759.2" y="248" width="10" height="20" fill="#5b6b7b"/><text x="755.2" y="244" class="t11" text-anchor="end">TX nach 19 s, Feld-Median DL2UD-1</text></g>
+<line x1="250" y1="30" x2="250" y2="292" stroke="#c62828" stroke-width="1.2"><animate attributeName="x1" from="250" to="920" dur="12.5s" repeatCount="indefinite"/><animate attributeName="x2" from="250" to="920" dur="12.5s" repeatCount="indefinite"/></line></svg></div><figcaption>Abb. 6: Zeitachse eines Frames an drei Nachbarn mit Matrix und einem ohne (Animation, 12,5 s je Durchlauf, 0,5 s je Sekunde). Der Super-Node sendet als Erster, die redundanten Knoten hoeren seine Kopie und brechen ab, bevor ihre Sperre ablaeuft; die Alt-Firmware startet ihren Backoff bei jedem Empfang neu und sendet als Letzte, im Feld nach 19 s (Median).</figcaption></figure>
+<p>Folgen, aus dem Feld gemessen:</p>
+<table><thead><tr><th>Was</th><th>vor Stufe 2 (Lauf 1, 11,9 h)</th><th>erster Tag --nbrrelay on (23.09., 9 h)</th><th>nach Welle 5 und 6 (24.09., 11 h)</th></tr></thead><tbody><tr><td>Eigene Relays je Stunde</td><td>76</td><td>22</td><td>48</td></tr><tr><td>Verzoegerung der Super-Node-Kopie DL2JA-2</td><td>109 s Median, TX-verhungert durch Re-Arm</td><td>unveraendert, Alt-Firmware</td><td>unveraendert, Alt-Firmware</td></tr><tr><td>Fall-B-Wartezeit</td><td>-</td><td>Median 137 s, max 16 min: Sperre wurde je Re-Arm neu addiert</td><td>POS p90 42 s, max 65 s; HEY p90 42 s, max 72 s</td></tr><tr><td>Verworfene Relays (RING_DROP)</td><td>0</td><td>149 Relays und 10 HN-Meldungen</td><td>0</td></tr><tr><td>Abbrueche</td><td>0</td><td>62 % der Fall-B-Entscheidungen</td><td>208 von 661 Fall B (31 %), 81 Fall A, 0 REFUSE-Fehler</td></tr><tr><td>Kosten je gehoertem Frame waehrend des Wartens</td><td>6 bis 9 s zusaetzlich</td><td>-</td><td>Fall A: gekappt ab 8 s</td></tr></tbody></table>
+<p>Zwei Folgen verdienen den Blick des Betreibers. Erstens: Fall A haengt an der Symmetrie-Annahme. Ohne <code>--nbrsym</code> stand DL2JA-1, das nie etwas wiederholt, dauerhaft in der Allein-Maske und zwang 96 % aller Relays in Fall A; mit der Annahme wird es gedeckt, sobald ein Versorger es mit mindestens -16 dB gehoert hat. Zweitens: der Abbruch wirkt nur bei Knoten mit der neuen Firmware. Der Super-Node DL2JA-2 sendet weiter nach 109 s, weil seine Alt-Firmware bei jedem Empfang neu wartet; erst mit der Kappung aus Fall A auf seinem Geraet sendet er als Erster, wie Abb. 6 zeigt.</p>
+
+<h3 id="s44">4.4 Super-Node, Needed, Redundant</h3>
+<p class="reco">Entscheidung: Die Rolle eines Nachbarn ist sein exklusiver Beitrag #X aus meiner Sicht; Super-Node ist der direkte Nachbar mit dem groessten #X, wenn #X mindestens 2 und mindestens doppelt so gross wie das zweitgroesste ist.</p>
+<p>#X(N) zaehlt die Knoten, die N hoert und die weder ich direkt noch ein anderer direkter Nachbar hoert. Das ist <code>nbrRowMeshNeedCount()</code>, auf Masken ein popcount. Needed heisst #X mindestens 1, Redundant heisst #X gleich 0; beides gibt es nur fuer direkte Zeilen, indirekte Zeilen zeigen einen Strich. Eigene Blaetter, E_self, sind direkt gehoerte Zeilen, die kein anderer direkter Nachbar hoert; sie machen mich selbst noetig und faerben die Zeile rot. Die rohe Nachbarzahl #N taugt nicht als Rang: DB0ED-99 hoert zehn, aber sieben davon hoert auch DL2JA-2 und drei hoere ich selbst.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 470" role="img" aria-label="Nachbarschaftsgraph DK5EN-98"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="30" y="28" class="b">Schnappschuss DK5EN-98, 2026-09-24 07:25, Fenster 12 h</text>
+<rect x="30" y="230" width="150" height="50" class="node wwwf"/>
+<text x="105.0" y="244" text-anchor="middle" class="b">DK5EN-98</text>
+<text x="105.0" y="262" text-anchor="middle" class="t11">ich, Zeile 0</text>
+<rect x="260" y="70" width="190" height="50" class="node srv"/>
+<text x="355.0" y="84" text-anchor="middle" class="b">DL2JA-2</text>
+<text x="355.0" y="102" text-anchor="middle" class="t11">Super, #X 8, #N 19</text>
+<path d="M180 255 L220 255 L220 95 L260 95" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="150" width="190" height="50" class="node bad"/>
+<text x="355.0" y="164" text-anchor="middle" class="b">DK5EN-1</text>
+<text x="355.0" y="182" text-anchor="middle" class="t11">Blatt: nur ich hoere es</text>
+<path d="M180 255 L220 255 L220 175 L260 175" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="230" width="190" height="50" class="node"/>
+<text x="355.0" y="244" text-anchor="middle" class="b">DL2UD-1</text>
+<text x="355.0" y="262" text-anchor="middle" class="t11">Redundant, #X 0</text>
+<path d="M180 255 L220 255 L220 255 L260 255" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="310" width="190" height="50" class="node"/>
+<text x="355.0" y="324" text-anchor="middle" class="b">DB0ED-99</text>
+<text x="355.0" y="342" text-anchor="middle" class="t11">Redundant, #X 0, #N 10</text>
+<path d="M180 255 L220 255 L220 335 L260 335" class="ln" marker-end="url(#arr)"/>
+<rect x="260" y="390" width="190" height="50" class="node"/>
+<text x="355.0" y="404" text-anchor="middle" class="b">DL2JA-1</text>
+<text x="355.0" y="422" text-anchor="middle" class="t11">Redundant, relayt nie</text>
+<path d="M180 255 L220 255 L220 415 L260 415" class="ln" marker-end="url(#arr)"/>
+<rect x="560" y="50" width="180" height="174" class="zone"/>
+<text x="650" y="68" text-anchor="middle" class="b">8 exklusiv an DL2JA-2</text>
+<text x="650" y="88" text-anchor="middle" class="mono">DL2JA-3</text>
+<text x="650" y="106" text-anchor="middle" class="mono">OE2XZR-12</text>
+<text x="650" y="124" text-anchor="middle" class="mono">DB0MMR-12</text>
+<text x="650" y="142" text-anchor="middle" class="mono">DF2KX-12</text>
+<text x="650" y="160" text-anchor="middle" class="mono">DG7RJ-12</text>
+<text x="650" y="178" text-anchor="middle" class="mono">DG7RJ-8</text>
+<text x="650" y="196" text-anchor="middle" class="mono">DO7GH</text>
+<text x="650" y="214" text-anchor="middle" class="mono">DG3MNF-4</text>
+<rect x="560" y="254" width="180" height="156" class="zone"/>
+<text x="650" y="272" text-anchor="middle" class="b">7 doppelt gehoert</text>
+<text x="650" y="292" text-anchor="middle" class="mono">DB0HOB-12</text>
+<text x="650" y="310" text-anchor="middle" class="mono">DC2MAC-1</text>
+<text x="650" y="328" text-anchor="middle" class="mono">DB0FHR-12</text>
+<text x="650" y="346" text-anchor="middle" class="mono">DL3NCU-1</text>
+<text x="650" y="364" text-anchor="middle" class="mono">DD7MH-55</text>
+<text x="650" y="382" text-anchor="middle" class="mono">DB0ISM-1</text>
+<text x="650" y="400" text-anchor="middle" class="mono">OE7XWT-12</text>
+<path d="M450 92 L560 92" class="lnh" marker-end="url(#arr)"/>
+<text x="505" y="84" text-anchor="middle" class="t11">hoert</text>
+<path d="M450 100 L520 100 L520 294 L560 294" class="lnh" marker-end="url(#arr)"/>
+<path d="M450 332 L540 332 L540 314 L560 314" class="ln" marker-end="url(#arr)"/>
+<text x="505" y="324" text-anchor="middle" class="t11">hoert auch</text>
+<text x="770" y="60" class="b">Rollen aus meiner Sicht:</text>
+<text x="770" y="82" class="t11">#X(N) = Knoten, die N hoert und</text>
+<text x="770" y="98" class="t11">die weder ich noch ein anderer</text>
+<text x="770" y="114" class="t11">direkter Nachbar hoert.</text>
+<text x="770" y="146" class="t11">Super: groesstes #X, mindestens 2</text>
+<text x="770" y="162" class="t11">und mindestens doppelt so gross</text>
+<text x="770" y="178" class="t11">wie das zweitgroesste.</text>
+<text x="770" y="210" class="t11">Needed: #X &gt;= 1.</text>
+<text x="770" y="226" class="t11">Redundant: #X = 0.</text>
+<text x="770" y="258" class="t11">Blatt (rot): nur ich hoere es,</text>
+<text x="770" y="274" class="t11">darum 'Mesh needed' fuer mich.</text>
+<text x="770" y="306" class="t11">DB0ED-99 hoert 10, davon 7</text>
+<text x="770" y="322" class="t11">auch DL2JA-2 und 3 auch ich:</text>
+<text x="770" y="338" class="t11">#X 0, obwohl #N 10.</text></svg></div><figcaption>Abb. 7: Die Nachbarschaft von DK5EN-98 am 24.09. Der Rang haengt am exklusiven Beitrag, nicht an der Nachbarzahl: DL2JA-2 versorgt acht Knoten allein und ist Super-Node, DB0ED-99 hoert zehn und ist redundant.</figcaption></figure>
+<p>Der Rang wird fuer die Sendeentscheidung nicht gebraucht: sie haengt nur an der eigenen Bedarfsmenge, und die Ordnung entsteht daraus von selbst. Ein Knoten mit vielen exklusiven Blaettern ist bei fast jedem Frame in Fall A und sendet vorn; ein Knoten ohne exklusive Blaetter ist in Fall B, wartet und bricht ab. Zwei Fall-A-Knoten nebeneinander trennen sich ueber CAD und den Abbruch beim Verlierer. Es gibt keine Election, kein neues Frame und kein neues Feld. Der Rang bleibt Anzeige und das wertvollste Diagnoseprodukt der Matrix: eine ueber Wochen exklusive Zeile ist der dokumentierte Fall fuer einen zweiten Standort.</p>
+<table><thead><tr><th>Option fuer den Rang</th><th>Mechanik</th><th>Bewertung</th></tr></thead><tbody><tr><td>#X aus meiner Matrix</td><td>popcount ueber Masken</td><td><span class="tag ok">gewaehlt</span> lokal, ohne Funkverkehr, Ordnung stabil ueber 46 Schnappschuesse</td></tr><tr><td>Nachbarzaehler NCT aus dem HEY</td><td>R&lt;n&gt; je Nachbar</td><td><span class="tag bad">verworfen</span> ueberschaetzt DB0ED-99 um Faktor 10, Untergrenze durch MAX_MHEARD</td></tr><tr><td>Election ueber HEY-Ziel HN</td><td>neues Ziel, Rang auf Luft</td><td><span class="tag bad">verworfen</span> jede heutige Firmware verwirft das Ziel beim Dekodieren</td></tr><tr><td>Entfernungsgewicht</td><td>#X mal f(Reichweite)</td><td><span class="tag bad">verworfen</span> zaehlt doppelt, braucht Kalibrierdaten; nur Anzeige</td></tr></tbody></table>
+<p>Was die Kappung der Zeilen mit dem Rang macht, ist gemessen: mit 21 Zeilen sah DK5EN-98 fuer DL2JA-2 10 statt 29 exklusive Knoten, die Ordnung 10 zu 1 blieb. Mit 64 Zeilen deckt Stufe 1 die 2-Hop-Nachbarschaft von 90 % der Knoten in 24 h vollstaendig; an den staerksten Super-Nodes bleibt die Zahl gekappt, die Ordnung nicht. Die Verdraengung schuetzt direkte Zeilen, verdraengt also nur Hop-2-Zeilen und nie die Menge, auf der die Sendeentscheidung rechnet.</p>
+
+<h3 id="s45">4.5 RAM der 32 Plattformen</h3>
+<p class="reco">Entscheidung: Stufe 1 auf allen Familien mit 64 Zeilen; die Kantenzahl folgt der Familie, die Pfadtabelle finanziert den Pool auf klassischem ESP32.</p>
+<p>Gemessen ist das Linker-Segment fuer statische Daten. Auf klassischem ESP32 ist <code>dram0_0_seg</code> 124.580 Byte lang, weil der Bluetooth-Stack den Rest des DRAM reserviert; der Heap entsteht aus dem Rest dieses Segments und aus zwei weiteren Regionen. Auf S3 umfasst das Segment 345.856 Byte inklusive Heap, jedes statische Byte fehlt dort dem Heap eins zu eins. nRF52 meldet die RAM-Zeile des Builds, der Heap ist der Rest der 248 kB abzueglich der Stacks. alle 32 Umgebungen frisch gebaut am 2026-09-24 auf feature-neighbour-matrix d9fc5c5a, sequenziell mit tools/resource_watch.py snapshot. Die engste Umgebung ist E22_XML-DevKitC mit 24.8 kB Reserve im statischen Segment; jede klassische Umgebung hat mindestens 24.8 kB, seit der RAM-Rueckgewinn vom 20.09. die drei Ausgangsringe auf Byte-Ringe umgestellt hat.</p>
+<figure><div class="fig"><svg viewBox="0 0 960 680" role="img" aria-label="RAM je Plattform"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><rect x="250" y="12" width="12" height="12" fill="#2a78d6"/>
+<text x="268" y="22" class="b">statisch belegt</text>
+<rect x="400" y="12" width="12" height="12" fill="#e3e8ee"/>
+<text x="418" y="22" class="b">Segmentlaenge</text>
+<text x="860" y="22" text-anchor="end" class="t11">frei = Laenge minus belegt</text>
+<text x="242" y="51" text-anchor="end" class="mono">E22_1262-DevKitC</text>
+<rect x="250" y="40" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="40" width="166.4" height="14" fill="#2a78d6" rx="3"><title>E22_1262-DevKitC: 94348 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="51" class="t11">92.1 / 121.7 kB, frei 29.5 kB, klassisch</text>
+<text x="242" y="71" text-anchor="end" class="mono">E22-DevKitC</text>
+<rect x="250" y="60" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="60" width="166.4" height="14" fill="#2a78d6" rx="3"><title>E22-DevKitC: 94348 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="71" class="t11">92.1 / 121.7 kB, frei 29.5 kB, klassisch</text>
+<text x="242" y="91" text-anchor="end" class="mono">E22_XML-DevKitC</text>
+<rect x="250" y="80" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="80" width="175.0" height="14" fill="#2a78d6" rx="3"><title>E22_XML-DevKitC: 99236 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="91" class="t11">96.9 / 121.7 kB, frei 24.8 kB, klassisch XML</text>
+<text x="242" y="111" text-anchor="end" class="mono">E22_1268_S3-DevKitC-1-N16R8</text>
+<rect x="250" y="100" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="100" width="307.9" height="14" fill="#2a78d6" rx="3"><title>E22_1268_S3-DevKitC-1-N16R8: 174592 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="111" text-anchor="end" class="t11">170.5 / 337.8 kB, frei 167.2 kB, S3</text>
+<text x="242" y="131" text-anchor="end" class="mono">E22_1262_S3-DevKitC-1-N16R8</text>
+<rect x="250" y="120" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="120" width="307.9" height="14" fill="#2a78d6" rx="3"><title>E22_1262_S3-DevKitC-1-N16R8: 174592 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="131" text-anchor="end" class="t11">170.5 / 337.8 kB, frei 167.2 kB, S3</text>
+<text x="242" y="151" text-anchor="end" class="mono">heltec_wifi_lora_32_V2</text>
+<rect x="250" y="140" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="140" width="165.9" height="14" fill="#2a78d6" rx="3"><title>heltec_wifi_lora_32_V2: 94068 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="151" class="t11">91.9 / 121.7 kB, frei 29.8 kB, klassisch</text>
+<text x="242" y="171" text-anchor="end" class="mono">heltec_wifi_lora_32_V3</text>
+<rect x="250" y="160" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="160" width="298.2" height="14" fill="#2a78d6" rx="3"><title>heltec_wifi_lora_32_V3: 169056 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="171" text-anchor="end" class="t11">165.1 / 337.8 kB, frei 172.7 kB, S3</text>
+<text x="242" y="191" text-anchor="end" class="mono">heltec_wifi_lora_32_V4</text>
+<rect x="250" y="180" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="180" width="299.7" height="14" fill="#2a78d6" rx="3"><title>heltec_wifi_lora_32_V4: 169944 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="191" text-anchor="end" class="t11">166.0 / 337.8 kB, frei 171.8 kB, S3</text>
+<text x="242" y="211" text-anchor="end" class="mono">heltec_wireless_stick</text>
+<rect x="250" y="200" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="200" width="298.2" height="14" fill="#2a78d6" rx="3"><title>heltec_wireless_stick: 169056 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="211" text-anchor="end" class="t11">165.1 / 337.8 kB, frei 172.7 kB, S3</text>
+<text x="242" y="231" text-anchor="end" class="mono">heltec_wireless_tracker</text>
+<rect x="250" y="220" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="220" width="300.4" height="14" fill="#2a78d6" rx="3"><title>heltec_wireless_tracker: 170336 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="231" text-anchor="end" class="t11">166.3 / 337.8 kB, frei 171.4 kB, S3</text>
+<text x="242" y="251" text-anchor="end" class="mono">heltec_t114</text>
+<rect x="250" y="240" width="415.4" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="240" width="143.5" height="14" fill="#2a78d6" rx="3"><title>heltec_t114: 81384 von 235520 B (RAM-Zeile), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="659.3960029607698" y="251" text-anchor="end" class="t11">79.5 / 230.0 kB, frei 150.5 kB, nRF52</text>
+<text x="242" y="271" text-anchor="end" class="mono">vision-master-e290</text>
+<rect x="250" y="260" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="260" width="308.8" height="14" fill="#2a78d6" rx="3"><title>vision-master-e290: 175064 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="271" text-anchor="end" class="t11">171.0 / 337.8 kB, frei 166.8 kB, S3</text>
+<text x="242" y="291" text-anchor="end" class="mono">vision-master-e213</text>
+<rect x="250" y="280" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="280" width="303.7" height="14" fill="#2a78d6" rx="3"><title>vision-master-e213: 172200 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="291" text-anchor="end" class="t11">168.2 / 337.8 kB, frei 169.6 kB, S3</text>
+<text x="242" y="311" text-anchor="end" class="mono">wireless-paper</text>
+<rect x="250" y="300" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="300" width="301.7" height="14" fill="#2a78d6" rx="3"><title>wireless-paper: 171080 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="311" text-anchor="end" class="t11">167.1 / 337.8 kB, frei 170.7 kB, S3</text>
+<text x="242" y="331" text-anchor="end" class="mono">T-ETH-ELITE_1262</text>
+<rect x="250" y="320" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="320" width="315.2" height="14" fill="#2a78d6" rx="3"><title>T-ETH-ELITE_1262: 178696 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="331" text-anchor="end" class="t11">174.5 / 337.8 kB, frei 163.2 kB, S3</text>
+<text x="242" y="351" text-anchor="end" class="mono">LilyGo_T-Beam-1W</text>
+<rect x="250" y="340" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="340" width="307.0" height="14" fill="#2a78d6" rx="3"><title>LilyGo_T-Beam-1W: 174080 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="351" text-anchor="end" class="t11">170.0 / 337.8 kB, frei 167.8 kB, S3</text>
+<text x="242" y="371" text-anchor="end" class="mono">LilyGo_T3_S3_V1_3</text>
+<rect x="250" y="360" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="360" width="304.2" height="14" fill="#2a78d6" rx="3"><title>LilyGo_T3_S3_V1_3: 172496 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="371" text-anchor="end" class="t11">168.5 / 337.8 kB, frei 169.3 kB, S3</text>
+<text x="242" y="391" text-anchor="end" class="mono">LilyGo_T_Connect_Pro</text>
+<rect x="250" y="380" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="380" width="313.6" height="14" fill="#2a78d6" rx="3"><title>LilyGo_T_Connect_Pro: 177784 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="391" text-anchor="end" class="t11">173.6 / 337.8 kB, frei 164.1 kB, S3</text>
+<text x="242" y="411" text-anchor="end" class="mono">ttgo-lora32-v21</text>
+<rect x="250" y="400" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="400" width="166.0" height="14" fill="#2a78d6" rx="3"><title>ttgo-lora32-v21: 94108 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="411" class="t11">91.9 / 121.7 kB, frei 29.8 kB, klassisch</text>
+<text x="242" y="431" text-anchor="end" class="mono">ttgo_tbeam</text>
+<rect x="250" y="420" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="420" width="166.1" height="14" fill="#2a78d6" rx="3"><title>ttgo_tbeam: 94164 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="431" class="t11">92.0 / 121.7 kB, frei 29.7 kB, klassisch</text>
+<text x="242" y="451" text-anchor="end" class="mono">ttgo_tbeam_SX1262</text>
+<rect x="250" y="440" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="440" width="166.3" height="14" fill="#2a78d6" rx="3"><title>ttgo_tbeam_SX1262: 94284 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="451" class="t11">92.1 / 121.7 kB, frei 29.6 kB, klassisch</text>
+<text x="242" y="471" text-anchor="end" class="mono">ttgo_tbeam_SX1268</text>
+<rect x="250" y="460" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="460" width="166.3" height="14" fill="#2a78d6" rx="3"><title>ttgo_tbeam_SX1268: 94284 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="471" class="t11">92.1 / 121.7 kB, frei 29.6 kB, klassisch</text>
+<text x="242" y="491" text-anchor="end" class="mono">ttgo_tbeam_supreme</text>
+<rect x="250" y="480" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="480" width="303.2" height="14" fill="#2a78d6" rx="3"><title>ttgo_tbeam_supreme: 171928 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="491" text-anchor="end" class="t11">167.9 / 337.8 kB, frei 169.9 kB, S3</text>
+<text x="242" y="511" text-anchor="end" class="mono">t_deck</text>
+<rect x="250" y="500" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="500" width="349.7" height="14" fill="#2a78d6" rx="3"><title>t_deck: 198280 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="511" text-anchor="end" class="t11">193.6 / 337.8 kB, frei 144.1 kB, S3</text>
+<text x="242" y="531" text-anchor="end" class="mono">t_deck_plus</text>
+<rect x="250" y="520" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="520" width="349.7" height="14" fill="#2a78d6" rx="3"><title>t_deck_plus: 198280 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="531" text-anchor="end" class="t11">193.6 / 337.8 kB, frei 144.1 kB, S3</text>
+<text x="242" y="551" text-anchor="end" class="mono">t_deck_pro</text>
+<rect x="250" y="540" width="610.0" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="540" width="353.8" height="14" fill="#2a78d6" rx="3"><title>t_deck_pro: 200592 von 345856 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="854.0" y="551" text-anchor="end" class="t11">195.9 / 337.8 kB, frei 141.9 kB, S3</text>
+<text x="242" y="571" text-anchor="end" class="mono">t_echo</text>
+<rect x="250" y="560" width="438.9" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="560" width="152.9" height="14" fill="#2a78d6" rx="3"><title>t_echo: 86664 von 248832 B (RAM-Zeile), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="682.8749074759437" y="571" text-anchor="end" class="t11">84.6 / 243.0 kB, frei 158.4 kB, nRF52</text>
+<text x="242" y="591" text-anchor="end" class="mono">wiscore_rak4631</text>
+<rect x="250" y="580" width="438.9" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="580" width="143.6" height="14" fill="#2a78d6" rx="3"><title>wiscore_rak4631: 81408 von 248832 B (RAM-Zeile), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="682.8749074759437" y="591" text-anchor="end" class="t11">79.5 / 243.0 kB, frei 163.5 kB, nRF52</text>
+<text x="242" y="611" text-anchor="end" class="mono">esp32-loraprs-e22</text>
+<rect x="250" y="600" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="600" width="166.2" height="14" fill="#2a78d6" rx="3"><title>esp32-loraprs-e22: 94236 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="611" class="t11">92.0 / 121.7 kB, frei 29.6 kB, klassisch</text>
+<text x="242" y="631" text-anchor="end" class="mono">esp32-loraprs-ra01</text>
+<rect x="250" y="620" width="219.7" height="14" fill="#e3e8ee" rx="3"/>
+<rect x="250" y="620" width="165.7" height="14" fill="#2a78d6" rx="3"><title>esp32-loraprs-ra01: 93940 von 124580 B (dram0_0_seg), 2026-09-24, feature-neighbour-matrix d9fc5c5a</title></rect>
+<text x="475.72670706883787" y="631" class="t11">91.7 / 121.7 kB, frei 29.9 kB, klassisch</text>
+<text x="250" y="666" class="t11">ESP32: Linker-Segment dram0_0_seg (statische Daten; auf S3 liegt dort auch der Heap). nRF52: RAM-Zeile des Builds. Quelle je Balken im Tooltip.</text></svg></div><figcaption>Abb. 8: Statischer RAM je Board-Umgebung. Stufe 1 kostet auf klassischem ESP32 3,8 kB und gibt mit Stufe 1b 2,8 kB zurueck; die Reserve jeder Umgebung steht rechts am Balken.</figcaption></figure>
+<table><thead><tr><th>Umgebung</th><th>Familie</th><th class=num>RAM belegt / Segment (kB)</th><th class=num>frei (kB)</th><th class=num>Matrix heute: Zeilen / kB</th><th class=num>Stufe 1: Zeilen / kB</th><th class=num>Stufe 2 (kB)</th><th class=num>Pfadtabelle: Eintraege / kB</th></tr></thead><tbody><tr><td>esp32-safeboot</td><td>Safeboot</td><td class=num>keine Matrix</td><td class=num>-</td><td class=num>-</td><td class=num>-</td><td class=num>-</td><td class=num>-</td></tr><tr><td>esp32-S3-safeboot</td><td>Safeboot</td><td class=num>keine Matrix</td><td class=num>-</td><td class=num>-</td><td class=num>-</td><td class=num>-</td><td class=num>-</td></tr><tr><td>E22_1262-DevKitC</td><td>ESP32 klassisch</td><td class=num>92.1 / 121.7</td><td class=num>29.5</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>E22-DevKitC</td><td>ESP32 klassisch</td><td class=num>92.1 / 121.7</td><td class=num>29.5</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>E22_XML-DevKitC</td><td>ESP32 klassisch, ENABLE_XML</td><td class=num>96.9 / 121.7</td><td class=num>24.8</td><td class=num>21 / 3.1</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>50 / 3.5</td></tr><tr><td>E22_1268_S3-DevKitC-1-N16R8</td><td>ESP32-S3</td><td class=num>170.5 / 337.8</td><td class=num>167.2</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>E22_1262_S3-DevKitC-1-N16R8</td><td>ESP32-S3</td><td class=num>170.5 / 337.8</td><td class=num>167.2</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>heltec_wifi_lora_32_V2</td><td>ESP32 klassisch</td><td class=num>91.9 / 121.7</td><td class=num>29.8</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>heltec_wifi_lora_32_V3</td><td>ESP32-S3</td><td class=num>165.1 / 337.8</td><td class=num>172.7</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>heltec_wifi_lora_32_V4</td><td>ESP32-S3</td><td class=num>166.0 / 337.8</td><td class=num>171.8</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>heltec_wireless_stick</td><td>ESP32-S3</td><td class=num>165.1 / 337.8</td><td class=num>172.7</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>heltec_wireless_tracker</td><td>ESP32-S3</td><td class=num>166.3 / 337.8</td><td class=num>171.4</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>heltec_t114</td><td>nRF52840</td><td class=num>79.5 / 230.0</td><td class=num>150.5</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>vision-master-e290</td><td>ESP32-S3</td><td class=num>171.0 / 337.8</td><td class=num>166.8</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>vision-master-e213</td><td>ESP32-S3</td><td class=num>168.2 / 337.8</td><td class=num>169.6</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>wireless-paper</td><td>ESP32-S3</td><td class=num>167.1 / 337.8</td><td class=num>170.7</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>T-ETH-ELITE_1262</td><td>ESP32-S3</td><td class=num>174.5 / 337.8</td><td class=num>163.2</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>LilyGo_T-Beam-1W</td><td>ESP32-S3</td><td class=num>170.0 / 337.8</td><td class=num>167.8</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>LilyGo_T3_S3_V1_3</td><td>ESP32-S3</td><td class=num>168.5 / 337.8</td><td class=num>169.3</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>LilyGo_T_Connect_Pro</td><td>ESP32-S3</td><td class=num>173.6 / 337.8</td><td class=num>164.1</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>ttgo-lora32-v21</td><td>ESP32 klassisch</td><td class=num>91.9 / 121.7</td><td class=num>29.8</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>ttgo_tbeam</td><td>ESP32 klassisch</td><td class=num>92.0 / 121.7</td><td class=num>29.7</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>ttgo_tbeam_SX1262</td><td>ESP32 klassisch</td><td class=num>92.1 / 121.7</td><td class=num>29.6</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>ttgo_tbeam_SX1268</td><td>ESP32 klassisch</td><td class=num>92.1 / 121.7</td><td class=num>29.6</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>ttgo_tbeam_supreme</td><td>ESP32-S3</td><td class=num>167.9 / 337.8</td><td class=num>169.9</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>t_deck</td><td>ESP32-S3</td><td class=num>193.6 / 337.8</td><td class=num>144.1</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>t_deck_plus</td><td>ESP32-S3</td><td class=num>193.6 / 337.8</td><td class=num>144.1</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>t_deck_pro</td><td>ESP32-S3</td><td class=num>195.9 / 337.8</td><td class=num>141.9</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>t_echo</td><td>nRF52840</td><td class=num>84.6 / 243.0</td><td class=num>158.4</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>wiscore_rak4631</td><td>nRF52840</td><td class=num>79.5 / 243.0</td><td class=num>163.5</td><td class=num>21 / 3.1</td><td class=num>64 / 4.5</td><td class=num>9.5</td><td class=num>100 / 6.9</td></tr><tr><td>esp32-loraprs-e22</td><td>ESP32 klassisch</td><td class=num>92.0 / 121.7</td><td class=num>29.6</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr><tr><td>esp32-loraprs-ra01</td><td>ESP32 klassisch</td><td class=num>91.7 / 121.7</td><td class=num>29.9</td><td class=num>13 / 1.3</td><td class=num>64 / 3.8</td><td class=num>-</td><td class=num>40 / 2.8</td></tr></tbody></table>
+<table><thead><tr><th>Familie</th><th>Umgebungen</th><th>Matrix heute</th><th>Stufe 1</th><th>Pfadtabelle</th><th>Netto Stufe 1 + 1b</th></tr></thead><tbody><tr><td>ESP32 klassisch</td><td>9</td><td>1330 B, 13 Zeilen</td><td>3848 B, 64 Zeilen, 256 Kanten</td><td>2840 B, 40 Eintraege</td><td>-322 B</td></tr><tr><td>ESP32 klassisch, XML</td><td>1</td><td>3154 B, 21 Zeilen</td><td>3848 B, 64 Zeilen, 256 Kanten</td><td>3550 B, 50 Eintraege</td><td>-2856 B</td></tr><tr><td>ESP32-S3</td><td>17</td><td>3154 B, 21 Zeilen</td><td>4616 B, 64 Zeilen, 384 Kanten</td><td>7100 B, 100 Eintraege, bleibt</td><td>+1462 B</td></tr><tr><td>nRF52840</td><td>3</td><td>3154 B, 21 Zeilen</td><td>4616 B, 64 Zeilen, 384 Kanten</td><td>7100 B, 100 Eintraege, bleibt</td><td>+1462 B</td></tr><tr><td>Safeboot</td><td>2</td><td>keine Matrix</td><td>-</td><td>-</td><td>0</td></tr></tbody></table>
+<p>Die Praemisse fuer 64 Zeilen ist die Flottenmessung: 41 direkte Nachbarn in 24 h als Maximum und 48 als p90 der 2-Hop-Nachbarschaft passen hinein, 84 (p99) nicht. Die Praemisse fuer 64-Bit-Masken ist dieselbe Zahl: 32 Bit reichen nicht mehr, 128 Bit kosten je Zeile 16 B mehr und sind Stufe 2. Der klassische ESP32 bekommt dieselbe Zeilenzahl wie S3, weil die Flotte ihn genau dort einsetzt, wo die Matrix voll laeuft, und die Rechnung auf Masken ihn nicht mehr kostet als den S3.</p>
+
+<h3 id="s46">4.6 Pfadtabelle</h3>
+<p class="reco">Entscheidung: Compile-Flag <code>MC_PATHINFO</code>, Default 1 fuer Upstream-Paritaet; im Fork setzen die neun klassischen ESP32-Umgebungen 0, sobald Stufe 1 gebaut ist.</p>
+<p>Die Pfadtabelle haelt je Absender den zuletzt gesehenen kuerzesten Pfad als Text, die Hop-Zahl und ein G-Bit fuer "ueber ein Gateway gekommen", 12 h lang, mit 71 Byte je Eintrag. Sie speist die Web-Seite Path Information, das Kommando <code>--path</code>, die Pfadseite am T-Deck-Display und auf T-Deck die Sicherung nach SD. Kein BLE-Client und keine Entscheidung liest sie. Die Matrix ersetzt sie nicht eins zu eins: das 2-Hop-Fenster verwirft Pfade ab drei Hops mit Absicht, die Pfadtabelle zeigt sie, etwa <code>3G/DB0HOB-12,DB0ED-99</code> fuer DL1MSE-12. Fuer alles innerhalb von zwei Hops zeigt die Matrix mehr: wer wen hoert, mit Zaehler und SNR, statt eines einzelnen Pfads.</p>
+<table><thead><tr><th>Option</th><th>Mechanik</th><th>RAM klassisch</th><th>Bewertung</th></tr></thead><tbody><tr><td>Behalten wie heute</td><td>MAX_MHPATH 40/100</td><td>0 B frei</td><td><span class="tag warn">Stufe 0</span> upstream-identisch, zahlt den Pool nicht</td></tr><tr><td>Verkleinern</td><td>MAX_MHPATH 40 auf 20, 100 auf 50</td><td>1420 B frei</td><td><span class="tag warn">Teilmenge</span> fuer S3 und nRF52 sinnvoll, dort ist die Tabelle mit 7,1 kB groesser als die Matrix</td></tr><tr><td>Compile-Flag, Default an</td><td>MC_PATHINFO schaltet Puffer, Seite, Kommando und T-Deck-Seite gemeinsam</td><td>2840 B frei bei 0</td><td><span class="tag ok">gewaehlt</span> Upstream sieht keine Aenderung, der Fork entscheidet je Umgebung</td></tr><tr><td>Entfernen</td><td>Code und Puffer weg</td><td>2840 B frei</td><td><span class="tag bad">verworfen</span> aendert Upstream-Verhalten und die 3-Hop-Sicht</td></tr></tbody></table>
+<p>Das Flag liegt an vier Stellen: den vier Puffern in <code>mheard_functions.cpp</code>, <code>updateHeyPath()</code>, <code>sub_page_path()</code> mit dem Menuepunkt, sowie <code>showPath()</code>, <code>showPathTDECK()</code> und der SD-Sicherung. T-Deck-Umgebungen sind S3 und behalten das Flag auf 1. Der String-Scan des Images nach dem Bau prueft, dass "Path Information" bei 0 verschwunden ist, so wie es die Instrument-Regel fuer jede Guard-Aenderung verlangt.</p>
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<table><thead><tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Luecke</th><th>ab Stufe</th></tr></thead><tbody><tr><td>Pool voll am Super-Node</td><td>Zaehler EVICT-E im [NBR]-Log, --info</td><td>aelteste Kante ohne Bezug zu Zeile 0 weicht; Direkt und HoertMich bleiben</td><td>Rang gekappt, Entscheidung vollstaendig</td><td>1</td></tr><tr><td>Zeile verdraengt, Kanten bleiben liegen</td><td>Host-Test: nach Verdraengung keine Kante mit dem alten Index</td><td>Verdraengung loescht Kanten und Bits in einem Durchlauf</td><td>keine</td><td>1</td></tr><tr><td>16-Bit-Minute laeuft ueber (45 Tage)</td><td>Geist-Sweep wie heute</td><td>Sweep je Minute entfernt Kanten mit Alter ueber dem Fenster, bevor sie 32768 erreichen</td><td>keine</td><td>1</td></tr><tr><td>Zeilenindex ab 64</td><td>static_assert auf NBR_MAX_ROWS &lt;= 64</td><td>Compile-Fehler, kein stiller Bitverlust wie heute bei nbrBit() ab 32</td><td>keine</td><td>1</td></tr><tr><td>Symmetrie ohne SNR, weil die Gegenkante verdraengt wurde</td><td>SYM-Zeile fehlt</td><td>keine Annahme, Fall A, sichere Richtung</td><td>mehr Fluten</td><td>1</td></tr><tr><td>Server-Frame ueber ein Gateway erzeugt falsche Direktheit</td><td>ME-Zeile fehlt fuer die Zeile</td><td>Text speist nur den ME-Schritt, Spalte 0 nur per Empfang</td><td>POS/HEY vom Server bleiben ein Restrisiko</td><td>0</td></tr><tr><td>Fenster 1 h statt 12 h</td><td>Flottenmessung</td><td>12 h bleibt, 24 h als Kommandowert pruefen</td><td>Blaetter, die nur nachts exklusiv sind</td><td>offen</td></tr></tbody></table>
+
+<h2 id="s6">6. Rollout</h2>
+<table><thead><tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr></thead><tbody><tr><td>1</td><td>1</td><td>Pool, Masken, Sweep in nbr_matrix.{{h,cpp}} hinter derselben API; Zugriffe m.cells[x][y] auf nbrEdgeFind() umgestellt</td><td>Host-Tests native_nbr_matrix, native_nbr_report, test_txring gruen; Replay des Mitschnitts vom 24.09.: SNAP, ROW, NEED, CANCEL, REFUSE byte-identisch zum dichten Build</td></tr><tr><td>2</td><td>1</td><td>ringNeed/ringAlone auf uint64_t, nbrBit() 64 Bit, NBR_MAX_ROWS 64 je Familie</td><td>tools/resource_watch.py: kein ESP32-Segment unter 20 kB frei, nRF52 unter 60 %</td></tr><tr><td>3</td><td>1b</td><td>MC_PATHINFO in den neun klassischen Umgebungen auf 0</td><td>String-Scan: 'Path Information' fehlt im Image; --path meldet 'nicht gebaut'</td></tr><tr><td>4</td><td>1</td><td>OTA auf DK5EN-98 und DK5EN-93, 24 h mit --nbrrelay on</td><td>tools/nbrhopcheck.py gruen, Relays je Stunde und CANCEL-Quote im Korridor vom 24.09., 0 RING_DROP</td></tr><tr><td>5</td><td>1</td><td>Bench T-Beam DK5EN-92 als klassischer ESP32</td><td>freier Heap nach 1 h mindestens wie vor dem Flash, Toleranz 1 kB</td></tr><tr><td>6</td><td>2</td><td>128-Bit-Masken auf S3 und nRF52, nur nach Feldnachweis</td><td>Rang an einem Super-Node mit 64 gegen 128 Zeilen verglichen</td></tr></tbody></table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table><thead><tr><th>Punkt</th><th>Warum es zaehlt</th><th>Klaerungsweg</th></tr></thead><tbody><tr><td>Kantenzahl am Super-Node</td><td>256 Kanten sind aus 3,2 je Zeile und einer Annahme zu HN-Berichten abgeleitet</td><td>einen Super-Node mit der neuen Firmware laufen lassen, EVICT-E zaehlen</td></tr><tr><td>Freier Heap auf klassischem ESP32 im Betrieb</td><td>statisches Segment hat Reserve, der Laufzeit-Heap mit WiFi und BLE ist nicht gemessen</td><td>--info auf DK5EN-92 vor und nach Stufe 1</td></tr><tr><td>Fenster 24 h</td><td>Flottenmessung empfiehlt 12 bis 24 h; 12 h ist heute</td><td>NBR_WINDOW_MIN als Kommandowert, Feldvergleich</td></tr><tr><td>Entfernungsfilter fuer #X an Gateway-Nachbarn</td><td>DL2JA-2 zaehlte 29 exklusive, 12 davon in Reichweite</td><td>lat16/lon16 der Zeile, Filter nur in der Anzeige</td></tr></tbody></table>
+<h2 id="a">Anhang: Befunde und Rohdaten</h2><p>Die Anhaenge sammeln, was das Papier oben verwendet, in zitierfaehiger Form: Umbaustellen im Code, der Schnappschuss als Testdatensatz, die Baudaten aller Umgebungen, die Flottenmessung und ein nummeriertes Befundregister.</p><h3 id="aa">Anhang A: Umbaustellen im Code fuer Stufe 1 und 1b</h3><table><thead><tr><th>Datei</th><th>Stelle</th><th>Heute</th><th>Umbau</th></tr></thead><tbody><tr><td>src/nbr_matrix.h</td><td>78 bis 170</td><td>NbrRow 24 B, NbrCell 6 B, cells[N][N]</td><td>NbrRow 36 B mit hears/heardby (uint64_t), lat16/lon16; NbrEdge 6 B; edges[NBR_MAX_EDGES]; static_assert NBR_MAX_ROWS &lt;= 64</td></tr><tr><td>src/nbr_matrix.h</td><td>440 bis 520</td><td>Masken-API uint32_t: nbrDirectMask, nbrHeardMeMask, nbrHearersMask, nbrCoverMask, NbrNeed</td><td>uint64_t; nbrMaskCount ueber __builtin_popcountll</td></tr><tr><td>src/nbr_matrix.cpp</td><td>35 Zugriffe m.cells[x][y] in 17 Funktionen</td><td>nbrInit 151/156, nbrZeroRowAndColumn, nbrMaybeSweep 291, nbrApplyGroup 409, nbrFillUnknownSnr 452, nbrNoteFrame 565/655/679, nbrNoteReport 928/943, nbrHearers 987, nbrHeardDirectly 1002, nbrRowExclusive 1014, nbrRowMeshNeedCount 1072/1084, nbrHeardMeMask 1139, nbrHearersMask 1155, nbrHearsSym 1192/1199, nbrRelayNeed 1322, nbrReach 1454, nbrFormatRow 1488, nbrLogSnapshot 1536</td><td>Schreiber auf nbrEdgeHit(); Leser der Entscheidung auf Masken; Leser der Anzeige auf nbrEdgeFind(); nbrBit() 64 Bit</td></tr><tr><td>src/nbr_matrix.cpp</td><td>12 nbrLog()-Schreiber</td><td>[NBR]-Zeilen ME, EDGE, EVICT, SYM, RPT, SNAP, ROW, NEED</td><td>Format unveraendert (docs/nbr-logformat.md); neu EVICT-E fuer verdraengte Kanten</td></tr><tr><td>src/web_functions/web_functions.cpp</td><td>1582, 1662, 1755, 1830</td><td>nbrRowIsDirect(), #N-Zaehlung, D/I-SNR, Zellanzeige</td><td>Masken fuer D/I und #N, nbrEdgeFind() fuer SNR und Zaehler</td></tr><tr><td>src/command_functions.cpp</td><td>4877, 4901 bis 4923</td><td>--path, --neighbours</td><td>--path hinter MC_PATHINFO; --neighbours unveraendert (nutzt nbrExclusive/nbrFormatRow)</td></tr><tr><td>src/txring_functions.{h,cpp}</td><td>60 bis 61, 696 bis 697, 764 bis 765</td><td>ringNeed[], ringAlone[] uint32_t</td><td>uint64_t, 320 B statt 160 B</td></tr><tr><td>src/lora_functions.cpp</td><td>840 bis 900, 1836 bis 1890</td><td>Cover-Scan und Einreihen mit uint32_t-Lokalen</td><td>uint64_t; Logik unveraendert</td></tr><tr><td>src/configuration_global.h</td><td>309, 320, 330, 352</td><td>NBR_MAX_ROWS 21/21/11/13</td><td>64 je Familie; neu NBR_MAX_EDGES 256 klassisch, 384 S3 und nRF52; MC_PATHINFO Default 1</td></tr><tr><td>src/mheard_functions.cpp</td><td>106 bis 116, 265, 478, 999, 1194</td><td>Pfadpuffer, savePathPersistence, updateHeyPath, showPath, showPathTDECK</td><td>alles unter #if MC_PATHINFO</td></tr><tr><td>src/web_functions/web_functions.cpp, src/t-deck/tdeck_main.cpp</td><td>1543, Menue; 264</td><td>sub_page_path(), loadPathPersistence()</td><td>unter #if MC_PATHINFO; String-Scan des Images auf 'Path Information'</td></tr><tr><td>test/</td><td>test_nbr_matrix (66 Tests), test_nbr_report (3), test_nbrlog, test_txring, test_txring_flood</td><td>gruen am 23.09.</td><td>bleiben gruen; neu: Pool voll, Zeile verdraengt loescht Kanten, Sweep loescht Bits, Replay-Paritaet gegen den Mitschnitt</td></tr><tr><td>tools/nbrsnap.py, tools/nbrhopcheck.py</td><td>Feldauswertung</td><td>rekonstruieren die Matrix aus [NBR]-Zeilen</td><td>unveraendert nutzbar, weil das Logformat bleibt</td></tr></tbody></table><h3 id="ab">Anhang B: Schnappschuss DK5EN-98, 2026-09-24 07:25, als Testdatensatz</h3><p>Zeilen mit den Spalten der Web-Seite, danach die 67 Kanten als Liste X,Y,Summe mit der Zellsemantik "Y hat X gehoert". Die Summe ist cnt_text + cnt_pos + cnt_hey. Eignet sich als Fixture fuer den Replay-Vergleich und als Rechenbeispiel fuer 4.2.</p><table><thead><tr><th class=num>#</th><th>Rufzeichen</th><th>D/I</th><th>G</th><th>M</th><th class=num>#N</th><th class=num>#X</th><th>Role</th></tr></thead><tbody><tr><td class=num>1</td><td>DK5EN-98</td><td>-</td><td>Y</td><td>Y</td><td class=num>5</td><td class=num>-</td><td>-</td></tr><tr><td class=num>2</td><td>DL2JA-2</td><td>D</td><td>Y</td><td>Y</td><td class=num>19</td><td class=num>8</td><td>Super</td></tr><tr><td class=num>3</td><td>DK5EN-1</td><td>D</td><td>Y</td><td>Y</td><td class=num>2</td><td class=num>0</td><td>Redundant</td></tr><tr><td class=num>4</td><td>DL2UD-1</td><td>D</td><td>N</td><td>Y</td><td class=num>3</td><td class=num>0</td><td>Redundant</td></tr><tr><td class=num>5</td><td>DB0ED-99</td><td>D</td><td>N</td><td>Y</td><td class=num>10</td><td class=num>0</td><td>Redundant</td></tr><tr><td class=num>6</td><td>DB0HOB-12</td><td>I</td><td>N</td><td>Y</td><td class=num>5</td><td class=num>-</td><td>-</td></tr><tr><td class=num>7</td><td>DC2MAC-1</td><td>I</td><td>N</td><td>Y</td><td class=num>2</td><td class=num>-</td><td>-</td></tr><tr><td class=num>8</td><td>DB0FHR-12</td><td>I</td><td>Y</td><td>Y</td><td class=num>1</td><td class=num>-</td><td>-</td></tr><tr><td class=num>9</td><td>DL2JA-3</td><td>I</td><td>Y</td><td>Y</td><td class=num>0</td><td class=num>-</td><td>-</td></tr><tr><td class=num>10</td><td>DL3NCU-1</td><td>I</td><td>N</td><td>Y</td><td class=num>3</td><td class=num>-</td><td>-</td></tr><tr><td class=num>11</td><td>DL2JA-1</td><td>D</td><td>N</td><td>Y</td><td class=num>0</td><td class=num>0</td><td>Redundant</td></tr><tr><td class=num>12</td><td>DD7MH-55</td><td>I</td><td>N</td><td>Y</td><td class=num>3</td><td class=num>-</td><td>-</td></tr><tr><td class=num>13</td><td>OE2XZR-12</td><td>I</td><td>Y</td><td>Y</td><td class=num>1</td><td class=num>-</td><td>-</td></tr><tr><td class=num>14</td><td>DB0MMR-12</td><td>I</td><td>N</td><td>Y</td><td class=num>2</td><td class=num>-</td><td>-</td></tr><tr><td class=num>15</td><td>DB0ISM-1</td><td>I</td><td>N</td><td>Y</td><td class=num>3</td><td class=num>-</td><td>-</td></tr><tr><td class=num>16</td><td>DF2KX-12</td><td>I</td><td>N</td><td>Y</td><td class=num>0</td><td class=num>-</td><td>-</td></tr><tr><td class=num>17</td><td>DG7RJ-12</td><td>I</td><td>N</td><td>Y</td><td class=num>0</td><td class=num>-</td><td>-</td></tr><tr><td class=num>18</td><td>DG7RJ-8</td><td>I</td><td>Y</td><td>Y</td><td class=num>2</td><td class=num>-</td><td>-</td></tr><tr><td class=num>19</td><td>OE7XWT-12</td><td>I</td><td>N</td><td>Y</td><td class=num>4</td><td class=num>-</td><td>-</td></tr><tr><td class=num>20</td><td>DO7GH</td><td>I</td><td>N</td><td>Y</td><td class=num>2</td><td class=num>-</td><td>-</td></tr><tr><td class=num>21</td><td>DG3MNF-4</td><td>I</td><td>N</td><td>Y</td><td class=num>0</td><td class=num>-</td><td>-</td></tr></tbody></table><pre>X,Y,Summe
+1,2,12
+1,3,289
+1,4,93
+1,5,49
+2,1,610
+2,3,3
+2,4,159
+2,5,138
+2,7,1
+2,10,5
+2,18,1
+3,1,492
+4,1,443
+4,2,15
+5,1,750
+5,2,66
+5,7,1
+5,10,1
+5,15,1
+6,2,53
+6,5,358
+6,12,17
+6,19,4
+6,20,1
+7,2,17
+7,5,21
+8,2,1
+8,5,282
+8,6,26
+8,13,8
+8,19,7
+8,20,1
+9,2,11
+10,2,11
+10,5,35
+11,1,70
+11,2,23
+11,4,72
+11,5,23
+11,6,3
+11,10,19
+11,12,1
+11,15,2
+11,19,3
+12,2,76
+12,5,98
+12,6,16
+12,14,1
+13,2,24
+13,14,5
+14,2,58
+14,12,18
+15,2,13
+15,5,20
+16,2,12
+17,2,6
+17,18,3
+18,2,42
+18,15,5
+19,2,68
+19,5,14
+19,6,18
+19,8,7
+20,2,22
+20,6,4
+20,19,2
+21,2,9</pre><p>Kontrollsummen: 67 Kanten, #N jeder Zeile ist die Spaltensumme dieser Liste; die Gateway-Zeilen (G = Y) sind 1, 2, 3, 8, 9, 13, 18; direkt gehoert sind 2, 3, 4, 5, 11.</p><h3 id="ac">Anhang C: Baudaten aller 32 Umgebungen, 2026-09-24</h3><p>Sequenzieller Build auf feature-neighbour-matrix d9fc5c5a mit tools/resource_watch.py snapshot, alle 32 Umgebungen gruen. RAM-Zeile und Flash-Zeile aus dem PlatformIO-Bericht, dram0_0_seg und iram0_0_seg aus firmware.map (nur ESP32). Die T-Beam-Varianten melden 1.310.720 B RAM inklusive 4 MB PSRAM; massgeblich ist dort dram0_0_seg.</p><table><thead><tr><th>Umgebung</th><th class=num>RAM-Zeile (B)</th><th class=num>dram0_0_seg (B)</th><th class=num>iram0_0_seg (B)</th><th class=num>Flash (B)</th></tr></thead><tbody><tr><td>esp32-safeboot</td><td class=num>43.628 / 327.680</td><td class=num>-</td><td class=num>-</td><td class=num>686.215 / 3.403.776</td></tr><tr><td>esp32-S3-safeboot</td><td class=num>38.756 / 327.680</td><td class=num>-</td><td class=num>-</td><td class=num>643.055 / 3.403.776</td></tr><tr><td>E22_1262-DevKitC</td><td class=num>94.344 / 532.480</td><td class=num>94.348 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.583.865 / 3.403.776</td></tr><tr><td>E22-DevKitC</td><td class=num>94.344 / 532.480</td><td class=num>94.348 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.583.765 / 3.403.776</td></tr><tr><td>E22_XML-DevKitC</td><td class=num>99.232 / 532.480</td><td class=num>99.236 / 124.580</td><td class=num>127.044 / 131.072</td><td class=num>1.603.933 / 3.403.776</td></tr><tr><td>E22_1268_S3-DevKitC-1-N16R8</td><td class=num>101.100 / 327.680</td><td class=num>174.592 / 345.856</td><td class=num>89.864 / 362.240</td><td class=num>1.486.957 / 3.403.776</td></tr><tr><td>E22_1262_S3-DevKitC-1-N16R8</td><td class=num>101.100 / 327.680</td><td class=num>174.592 / 345.856</td><td class=num>89.864 / 362.240</td><td class=num>1.487.001 / 3.403.776</td></tr><tr><td>heltec_wifi_lora_32_V2</td><td class=num>94.064 / 327.680</td><td class=num>94.068 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.574.445 / 3.403.776</td></tr><tr><td>heltec_wifi_lora_32_V3</td><td class=num>100.316 / 327.680</td><td class=num>169.056 / 345.856</td><td class=num>85.116 / 362.240</td><td class=num>1.470.209 / 3.403.776</td></tr><tr><td>heltec_wifi_lora_32_V4</td><td class=num>100.452 / 327.680</td><td class=num>169.944 / 345.856</td><td class=num>85.868 / 362.240</td><td class=num>1.470.073 / 3.403.776</td></tr><tr><td>heltec_wireless_stick</td><td class=num>100.316 / 327.680</td><td class=num>169.056 / 345.856</td><td class=num>85.116 / 362.240</td><td class=num>1.467.189 / 3.403.776</td></tr><tr><td>heltec_wireless_tracker</td><td class=num>100.844 / 327.680</td><td class=num>170.336 / 345.856</td><td class=num>85.868 / 362.240</td><td class=num>1.494.361 / 3.403.776</td></tr><tr><td>heltec_t114</td><td class=num>81.384 / 235.520</td><td class=num>-</td><td class=num>-</td><td class=num>647.984 / 815.104</td></tr><tr><td>vision-master-e290</td><td class=num>104.628 / 327.680</td><td class=num>175.064 / 345.856</td><td class=num>86.812 / 362.240</td><td class=num>1.508.541 / 3.403.776</td></tr><tr><td>vision-master-e213</td><td class=num>102.708 / 327.680</td><td class=num>172.200 / 345.856</td><td class=num>85.868 / 362.240</td><td class=num>1.463.577 / 3.403.776</td></tr><tr><td>wireless-paper</td><td class=num>102.340 / 327.680</td><td class=num>171.080 / 345.856</td><td class=num>85.116 / 362.240</td><td class=num>1.448.277 / 3.403.776</td></tr><tr><td>T-ETH-ELITE_1262</td><td class=num>101.332 / 327.680</td><td class=num>178.696 / 345.856</td><td class=num>93.744 / 362.240</td><td class=num>1.514.709 / 3.403.776</td></tr><tr><td>LilyGo_T-Beam-1W</td><td class=num>101.020 / 532.480</td><td class=num>174.080 / 345.856</td><td class=num>89.436 / 362.240</td><td class=num>1.491.189 / 3.403.776</td></tr><tr><td>LilyGo_T3_S3_V1_3</td><td class=num>101.088 / 327.680</td><td class=num>172.496 / 345.856</td><td class=num>87.780 / 362.240</td><td class=num>1.487.201 / 3.403.776</td></tr><tr><td>LilyGo_T_Connect_Pro</td><td class=num>101.588 / 327.680</td><td class=num>177.784 / 345.856</td><td class=num>92.564 / 362.240</td><td class=num>1.548.977 / 3.403.776</td></tr><tr><td>ttgo-lora32-v21</td><td class=num>94.104 / 327.680</td><td class=num>94.108 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.572.345 / 3.403.776</td></tr><tr><td>ttgo_tbeam</td><td class=num>94.160 / 1.310.720</td><td class=num>94.164 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.602.241 / 3.403.776</td></tr><tr><td>ttgo_tbeam_SX1262</td><td class=num>94.280 / 1.310.720</td><td class=num>94.284 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.610.397 / 3.403.776</td></tr><tr><td>ttgo_tbeam_SX1268</td><td class=num>94.280 / 1.310.720</td><td class=num>94.284 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.610.073 / 3.403.776</td></tr><tr><td>ttgo_tbeam_supreme</td><td class=num>100.644 / 327.680</td><td class=num>171.928 / 345.856</td><td class=num>87.660 / 362.240</td><td class=num>1.505.657 / 3.403.776</td></tr><tr><td>t_deck</td><td class=num>120.724 / 327.680</td><td class=num>198.280 / 345.856</td><td class=num>93.936 / 362.240</td><td class=num>2.197.505 / 12.582.912</td></tr><tr><td>t_deck_plus</td><td class=num>120.724 / 327.680</td><td class=num>198.280 / 345.856</td><td class=num>93.936 / 362.240</td><td class=num>2.197.229 / 12.582.912</td></tr><tr><td>t_deck_pro</td><td class=num>126.368 / 327.680</td><td class=num>200.592 / 345.856</td><td class=num>90.596 / 362.240</td><td class=num>2.002.841 / 6.553.600</td></tr><tr><td>t_echo</td><td class=num>86.664 / 248.832</td><td class=num>-</td><td class=num>-</td><td class=num>674.236 / 815.104</td></tr><tr><td>wiscore_rak4631</td><td class=num>81.408 / 248.832</td><td class=num>-</td><td class=num>-</td><td class=num>717.504 / 815.104</td></tr><tr><td>esp32-loraprs-e22</td><td class=num>94.232 / 532.480</td><td class=num>94.236 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.583.509 / 3.403.776</td></tr><tr><td>esp32-loraprs-ra01</td><td class=num>93.936 / 532.480</td><td class=num>93.940 / 124.580</td><td class=num>126.100 / 131.072</td><td class=num>1.572.265 / 3.403.776</td></tr></tbody></table><p>Lesart: auf klassischem ESP32 liegt iram0_0_seg bei 126.100 von 131.072 B; das ist kein Anwendungscode und durch Refactoring nicht zu gewinnen. Der statische DRAM-Bedarf der klassischen Familie ist seit der Baseline vom 11.09. um rund 19 kB gesunken (Byte-Ringe, 20.09.).</p><h3 id="ad">Anhang D: Flottenmessung mcmap, 2026-09-24</h3><p>Vom Betreiber uebergeben. Der gemeldete Nachbarzaehler stammt aus getMheardCount() (src/mheard_functions.cpp:691): direkt auf HF gehoerte Stationen der letzten Stunde, Eintraege bleiben 12 h in der Liste, gekappt durch MAX_MHEARD (30 klassisch, 80 S3 und nRF52). mcmap haelt nur den letzten Wert je Knoten, keine Historie. Der Linkgraph des Servers enthaelt nur Hops auf Pfaden, die ein Gateway erreicht haben.</p><table><thead><tr><th>Groesse (823 Knoten)</th><th class=num>Median</th><th class=num>p90</th><th class=num>p99</th><th>Maximum</th></tr></thead><tbody><tr><td>Gemeldeter Nachbarzaehler, 1 h</td><td class=num>3</td><td class=num>11</td><td class=num>30</td><td>37 (OE3GXW-1, OE1FUC-12)</td></tr></tbody></table><table><thead><tr><th>Fenster</th><th class=num>1-Hop max</th><th class=num>2-Hop p90</th><th class=num>2-Hop p99</th><th class=num>2-Hop max</th></tr></thead><tbody><tr><td>1 h</td><td class=num>11</td><td class=num>12</td><td class=num>22</td><td class=num>25</td></tr><tr><td>6 h</td><td class=num>25</td><td class=num>33</td><td class=num>58</td><td class=num>70</td></tr><tr><td>24 h</td><td class=num>41</td><td class=num>48</td><td class=num>84</td><td class=num>113</td></tr><tr><td>7 d</td><td class=num>59</td><td class=num>80</td><td class=num>133</td><td class=num>326 (HB4LO-7, vermutlich Ausreisser, ungeprueft)</td></tr></tbody></table><ul><li>Der Linkgraph unterzaehlt 1-Hop-Nachbarn um den Faktor 3 bis 4 gegenueber dem gemeldeten Zaehler.</li><li>Fuenf von 262 TLORA-V2.1.6-Knoten melden genau 30 und sind vermutlich gesaettigt.</li><li>Die staerksten Knoten (IZ5RGO-10, IW5EIA-12, DB0HOB-12) hoeren 7 bis 12 Stationen je Stunde, aber 40 bis 55 in 7 Tagen: das Fenster zaehlt mehr als der Knoten.</li><li>Keine der beiden Quellen liefert einen verlaesslichen 2-Hop-Zaehler: die Knoten melden nur Summen, der Linkgraph sieht nur gatewaynahe Links.</li></ul><h3 id="ae">Anhang E: Befundregister</h3><p>Ein Befund je Zeile, mit Quelle, damit spaetere Arbeiten ihn zitieren koennen, ohne das Papier neu zu lesen.</p><table><thead><tr><th>Nr</th><th>Befund</th><th>Quelle</th></tr></thead><tbody><tr><td>F1</td><td>84 % des Matrixspeichers sind Zellen, 84 % der Zellen sind leer: 67 von 420 belegt bei 21 Zeilen.</td><td>[NBR]|SNAP 660, DK5EN-98, 24.09. 07:02; Strukturen nbr_matrix.h</td></tr><tr><td>F2</td><td>Die Zeilen sind der Engpass: 21 von 21 belegt, 16 Verdraengungen in 11 h; 46 Rufzeichen in 12 h im Lauf 1.</td><td>Mitschnitt 24.09.; docs/nbr-wichtigkeit-konzept.md 2.3</td></tr><tr><td>F3</td><td>Jede weitere Zeile kostet heute 24 + 6 x (2N + 1) Byte, bei N = 21 also 282 B.</td><td>gerechnet</td></tr><tr><td>F4</td><td>Die Sendeentscheidung liest nur Spalte 0, Zeile 0, die Hoerer der Pfadteilnehmer und die Spalten der Versorger; alles direkte Zeilen.</td><td>src/nbr_matrix.cpp 1225 bis 1300</td></tr><tr><td>F5</td><td>Spalten indirekter Zeilen werden nur durch weitergeleitete HN-Berichte gefuellt, weil Pfadpaar-Kanten immer in der Spalte des letzten Hops landen; Leser sind nur nbrRowExclusive(), das LEAF-Urteil und die Entfernung.</td><td>src/nbr_matrix.cpp 655, 928 bis 943, 1005, 1036, 1454</td></tr><tr><td>F6</td><td>Ein rechteckiger Zuschnitt (alle Zeilen, nur direkte Spalten) spart am Super-Node nichts, weil dort 20 bis 40 Spalten direkt sind, und braucht einen zweiten Allokator.</td><td>Abschnitt 4.1, Abb. 4</td></tr><tr><td>F7</td><td>Masken sind uint32_t; nbrBit() liefert ab Index 32 still 0. Mehr als 32 Zeilen brauchen 64-Bit-Masken.</td><td>src/nbr_matrix.cpp 1107 bis 1110</td></tr><tr><td>F8</td><td>Flotte: Nachbarzaehler Median 3, p90 11, p99 30, max 37 (1 h); 2-Hop in 24 h p90 48, p99 84, max 113; 1-Hop max 41 in 24 h, 59 in 7 d.</td><td>Anhang D</td></tr><tr><td>F9</td><td>Der HEY-Zaehler ist ein 1-h-Wert, gekappt bei MAX_MHEARD; 5 von 262 TLORA V2.1.6 stehen auf 30 und sind gesaettigt.</td><td>Anhang D</td></tr><tr><td>F10</td><td>Ein 1-h-Fenster erklaert Blaetter faelschlich exklusiv; 12 bis 24 h sind noetig. Die Matrix arbeitet mit 12 h.</td><td>Anhang D; NBR_WINDOW_MIN</td></tr><tr><td>F11</td><td>Klassischer ESP32 ist die haeufigste Familie und steht unter den staerksten Knoten; die Dimensionierung muss dort passen.</td><td>Betreiber, 24.09.; Anhang D</td></tr><tr><td>F12</td><td>Statischer DRAM nach dem RAM-Rueckgewinn: klassisch mindestens 29,5 kB frei, XML 24,8 kB, S3 mindestens 141 kB, nRF52 mindestens 150 kB; alle 32 Umgebungen bauen gruen.</td><td>Anhang C</td></tr><tr><td>F13</td><td>IRAM auf klassischem ESP32 ist zu 96 % belegt, aber nicht durch Anwendungscode; kein Hebel fuer dieses Vorhaben.</td><td>Anhang C</td></tr><tr><td>F14</td><td>Die Pfadtabelle kostet 71 B je Eintrag (2.840 klassisch, 3.550 XML, 7.100 S3 und nRF52) und speist nur Web-Seite, --path, T-Deck-Seite und SD-Sicherung; keine Entscheidung, kein BLE.</td><td>src/loop_functions_extern.h 455 bis 458; src/mheard_functions.cpp</td></tr><tr><td>F15</td><td>Die Matrix ersetzt die Pfadtabelle nicht eins zu eins: das 2-Hop-Fenster verwirft Pfade ab drei Hops mit Absicht, die Pfadtabelle zeigt sie und das G-Bit.</td><td>src/nbr_matrix.h 235 bis 245; sub_page_path()</td></tr><tr><td>F16</td><td>Fall A heisst alone != 0 (jemand haengt allein an mir); Basis 3500 ms, Slots 0..2, Kappung des Re-Arm ab 8 s, nie Abbruch. Fall B heisst alone == 0; einmalige Sperre 20 s, Slots 7..9, Abbruch bei Deckung, Deckel 60 s; Text bleibt bei der heutigen Basis.</td><td>src/configuration_global.h 471 bis 477; src/txring_functions.cpp 283 bis 372</td></tr><tr><td>F17</td><td>Die je Re-Arm neu addierte Sperre kostete am ersten on-Tag 149 Relays und 10 HN-Meldungen bei 137 s Median-Wartezeit; als einmalige Frist sind es 0 Verluste und p90 42 s.</td><td>docs/nbr-stage2-campaign.md Welle 5; Auswertung 24.09.</td></tr><tr><td>F18</td><td>Nach Welle 5 und 6: 48 eigene Relays je Stunde (vorher 76), 208 Abbrueche bei 661 Fall-B- und 81 Fall-A-Entscheidungen, 0 RING_DROP, kein Neustart.</td><td>Auswertung 24.09. 07:05</td></tr><tr><td>F19</td><td>Der Super-Node DL2JA-2 wiederholt im Median 109 s nach der ersten Kopie, weil jeder Empfang seinen Backoff neu startet; jeder gehoerte Frame kostet 6 bis 9 s. Das aendert sich erst mit der Fall-A-Kappung auf seinem Geraet.</td><td>docs/nbr-wichtigkeit-konzept.md 2.4</td></tr><tr><td>F20</td><td>Ohne --nbrsym stand DL2JA-1 (relayt nie) dauerhaft in der Allein-Maske und zwang 96 % aller Relays in Fall A.</td><td>docs/nbr-wichtigkeit-konzept.md 4</td></tr><tr><td>F21</td><td>Rolle: #X = Knoten, die der Nachbar hoert und sonst niemand in meiner Hoerweite; Super bei #X >= 2 und doppeltem Abstand; Needed ab 1; Redundant bei 0. #N taugt nicht: DB0ED-99 hoert 10 mit #X 0.</td><td>web_functions.cpp 1670 bis 1700; Abb. 7</td></tr><tr><td>F22</td><td>Die Kappung der Zeilen aendert die Zahl, nicht die Ordnung: 10 zu 1 statt 29 zu 1. Das #X eines Gateway-Nachbarn ist um Serverzufuhr ueberhoeht (29 gemeldet, 12 in Reichweite).</td><td>docs/nbr-wichtigkeit-konzept.md 2.1</td></tr><tr><td>F23</td><td>Rechenbeispiel: Frame OE7XWT-12 ueber DL2JA-2 ergibt need = {DL2JA-1}; ohne Symmetrie Fall A, mit Symmetrie Fall B.</td><td>Abschnitt 4.2, Anhang B</td></tr><tr><td>F24</td><td>Kantenpool Stufe 1: 64 Zeilen zu 36 B plus 256 Kanten zu 6 B = 3.848 B klassisch, 384 Kanten = 4.616 B auf S3 und nRF52; netto mit abgeschalteter Pfadtabelle 322 B weniger als heute auf klassischem ESP32.</td><td>Abschnitt 4.5</td></tr><tr><td>F25</td><td>Alle Entscheidungsmengen sind 64-Bit-Woerter; eine Relay-Entscheidung braucht unter 150 Wortoperationen statt rund 600 Zellzugriffen mit Frischetest.</td><td>Abschnitt 4.2</td></tr></tbody></table></main></body></html>

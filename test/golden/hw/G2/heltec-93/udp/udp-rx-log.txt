@@ -1,0 +1,259 @@
+[WIFI];scan;skipped;first_bringup;ms;<NUM>
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[readBatteryVoltage] <TS> ... 0.00 V 0 % max_batt 4.200 V
+.[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;<NUM>
+...[WIFI];event;connected;ms;<NUM>
+[WIFI];assoc;connected;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-63;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+.[WIFI];event;got_ip;ms;<NUM>
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-62;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+
+[WIFI]...connect OK
+[WIFI]...now listening at IP <ADDR>, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;<NUM>
+[CON ]...HMAC console init.
+[CON ]...Console started on port 2323
+[BOOT];ready;ms;<NUM>;ip;1
+TimeClient no update possible --> CPU-Mode
+[WIFI];dns;meshcom.oevsv.at;ip;<ADDR>;ms;<NUM>
+[WIFI];dns;pool.ntp.org;ip;<ADDR>;ms;<NUM>
+[NTP];ok;epoch;1789681085;rtt;65
+--srvip <ADDR>
+[SRVIP];<ADDR>;set
+[WIFI]...now listening at IP <ADDR>, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;<NUM>
+[WIFI]...BENCH srvip override -> <ADDR>
+[WIFI];dns;meshcom.oevsv.at;ip;<ADDR>;ms;<NUM>
+[WIFI];dns;pool.ntp.org;ip;<ADDR>;ms;<NUM>
+--udplog on
+[UDP];log;1
+--gateway on
+[GW];keep;tx;ok;1;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;27;ok;1
+[readBatteryVoltage] <TS> ... 4.08 V 82 % max_batt 4.200 V
+<TS> [LOG] TX xEA25A0C8 @ H02 prio=5 src=o wait=4506 q=1 cad=0 len=30 t=34509
+[GW];keep;tx;ok;1;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;27;ok;1
+[UDP];rx;ip;<ADDR>;port;1990;len;14;head;42454154
+[GW];rx;type;BEAT;len;14;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;79;head;47415445
+[GW];rx;type;DATA;len;79;ms;<NUM>
+<TS> [LOG] GWI xE9F113AB ! H01 from=DK5EN-1 t=60134
+[UDP];rx;ip;<ADDR>;port;1990;len;83;head;47415445
+[GW];rx;type;CET;len;83;ms;<NUM>
+<TS> [LOG] GWI x6A8825A4 : H00 from=DK5EN-62 t=61239
+[UDP];rx;ip;<ADDR>;port;1990;len;136;head;47415445
+[GW];rx;type;DATA;len;136;ms;<NUM>
+<TS> [LOG] GWI x91A436B7 ! H01 from=DK5EN-90 t=62163
+<TS> [LOG] TX x6A8825A4 : H00 prio=3 src=g wait=1679 q=3 cad=0 len=88 t=62918
+[WIFI];link;up;rssi;-66;bssid;<ADDR>;chan;3;age_s;55;got_ip_n;1;ip;1;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;66;head;47415445
+[GW];rx;type;CET;len;66;ms;<NUM>
+<TS> [LOG] GWI x6A8823A4 : H02 from=DK5EN-33 t=63184
+[readBatteryVoltage] <TS> ... 4.08 V 82 % max_batt 4.200 V
+[UDP];rx;ip;<ADDR>;port;1990;len;75;head;47415445
+[GW];rx;type;CET;len;75;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x1AE1E385 : H04 from=DK5EN-98 t=65271
+[UDP];rx;ip;<ADDR>;port;1990;len;68;head;47415445
+[GW];rx;type;DATA;len;68;ms;<NUM>
+<TS> [LOG] GWI x1AE1E386 : H04 from=DK5EN-98 t=66256
+[UDP];rx;ip;<ADDR>;port;1990;len;16;head;47415445
+[UDP];rx;ip;<ADDR>;port;1990;len;63;head;47415445
+[GW];rx;type;DATA;len;63;ms;<NUM>
+<TS> [LOG] GWI xB059E03F : H04 from=DK5EN-91 t=68207
+<TS> [LOG] TX x6A8823A4 : H02 prio=3 src=g wait=5316 q=6 cad=0 len=71 t=68500
+[UDP];rx;ip;<ADDR>;port;1990;len;62;head;47415445
+[GW];rx;type;DATA;len;62;ms;<NUM>
+<TS> [LOG] GWI x91A436C5 : H04 from=DK5EN-90 t=69230
+[UDP];rx;ip;<ADDR>;port;1990;len;61;head;47415445
+[GW];rx;type;DATA;len;61;ms;<NUM>
+<TS> [LOG] GWI xB059E041 ! H02 from=DK5EN-91 t=70250
+[UDP];rx;ip;<ADDR>;port;1990;len;37;head;47415445
+[GW];rx;type;DATA;len;37;ms;<NUM>
+<TS> [LOG] GWI xB059E040 @ H04 from=DK5EN-91 t=71277
+[UDP];rx;ip;<ADDR>;port;1990;len;98;head;47415445
+[GW];rx;type;DATA;len;98;ms;<NUM>
+<TS> [LOG] GWI xE507106D : H04 from=DK5EN-10 t=72303
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x25298100 ! H01 from=DK5EN-93 t=73323
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x25298101 : H00 from=DK5EN-93 t=74283
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x25298102 ! H01 from=DK5EN-93 t=75269
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x25298103 : H00 from=DK5EN-93 t=76331
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x25298104 ! H01 from=DK5EN-93 t=77317
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x25298105 : H00 from=DK5EN-93 t=78379
+<TS> [LOG] TX x1AE1E385 : H04 prio=3 src=g wait=13385 q=15 cad=0 len=75 t=78656
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x25298106 ! H01 from=DK5EN-93 t=79266
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x25298107 : H00 from=DK5EN-93 t=80322
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x25298108 ! H01 from=DK5EN-93 t=81314
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x25298109 : H00 from=DK5EN-93 t=82370
+[UDP];rx;ip;<ADDR>;port;1990;len;70;head;47415445
+[GW];rx;type;DATA;len;70;ms;<NUM>
+<TS> [LOG] GWI x2529810A ! H01 from=DK5EN-93 t=83362
+<TS> [LOG] TX x1AE1E386 : H04 prio=3 src=g wait=17993 q=17 cad=0 len=73 t=84249
+[UDP];rx;ip;<ADDR>;port;1990;len;135;head;47415445
+[GW];rx;type;DATA;len;135;ms;<NUM>
+<TS> [LOG] GWI x2529810B : H00 from=DK5EN-93 t=84421
+[UDP];rx;ip;<ADDR>;port;1990;len;107;head;47415445
+[GW];rx;type;DATA;len;107;ms;<NUM>
+<TS> [LOG] GWI x25298254 : H00 from=DK5EN-93 t=85342
+[UDP];rx;ip;<ADDR>;port;1990;len;167;head;47415445
+[GW];rx;type;DATA;len;167;ms;<NUM>
+<TS> [LOG] GWI x25298290 : H00 from=DK5EN-93 t=86364
+[UDP];rx;ip;<ADDR>;port;1990;len;207;head;47415445
+[GW];rx;type;DATA;len;207;ms;<NUM>
+<TS> [LOG] GWI x252982B8 : H00 from=DK5EN-93 t=87392
+[UDP];rx;ip;<ADDR>;port;1990;len;4;head;42454154
+[GW];rx;type;BEAT;len;4;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;34;head;434F4E46
+[GW];rx;type;CONF;len;34;ms;<NUM>
+[CONF] lat received (not applied): 481234567
+[CONF] lon received (not applied): 117654321
+[CONF] alt received (not applied): 520
+[CONF] Call:DK5EN-1 Short:BNCH set from server
+<TS> [LOG] TX xB059E03F : H04 prio=3 src=g wait=21713 q=19 cad=0 len=68 t=89920
+[GW];keep;tx;ok;1;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;27;ok;1
+[UDP];rx;ip;<ADDR>;port;1990;len;14;head;42454154
+[GW];rx;type;BEAT;len;14;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;2;head;47410000
+[GW];rx;type;OTHER;len;2;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;79;head;58585858
+[GW];rx;type;OTHER;len;79;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;91;head;47415445
+[WIFI];event;disconnected;reason;8;ms;<NUM>
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-62;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;<NUM>
+[WIFI-DBG] resetMeshComUDP: WiFi disconnected, flags reset for reconnect
+E (95196) wifi:timeout when WiFi un-init, type=4
+s[readBatteryVoltage] <TS> ... 4.13 V 89 % max_batt 4.200 V
+s23:39:31 [LOG] TX x91A436C5 : H04 prio=3 src=g wait=26164 q=19 cad=0 len=67 t=95394
+s[WIFI]...SSID: ORBI63 CHAN: 3 RSSI: <RF> BSSID: <ADDR>
+[WIFI]...SSID: ORBI63 CHAN: 3 RSSI: <RF> BSSID: <ADDR>
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[WIFI]...Wait connect ....[WIFI];event;connected;ms;<NUM>
+[WIFI];assoc;connected;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-66;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+.[WIFI];event;got_ip;ms;<NUM>
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-66;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+<TS> [LOG] TX xE507106D : H04 prio=3 src=g wait=28803 q=18 cad=0 len=103 t=101106
+
+[WIFI]...connect OK
+[WIFI]...now listening at IP <ADDR>, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;<NUM>
+[WIFI]...BENCH srvip override -> <ADDR>
+[WIFI];dns;meshcom.oevsv.at;ip;<ADDR>;ms;<NUM>
+[GW];keep;tx;ok;1;ms;<NUM>
+[WIFI];dns;pool.ntp.org;ip;<ADDR>;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;27;ok;1
+[UDP];rx;ip;<ADDR>;port;123;len;48;head;240206E7
+[NTP];ok;epoch;1789681178;rtt;93
+[UDP];rx;ip;<ADDR>;port;1990;len;14;head;42454154
+[GW];rx;type;BEAT;len;14;ms;<NUM>
+[WIFI];event;disconnected;reason;8;ms;<NUM>
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-66;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;<NUM>
+[INIT]...Enabling Vext for OLED power
+[INIT]...Resetting OLED display
+
+
+============
+CLIENT SETUP
+============
+[BOOT] RESET_REASON=3 SW
+[INSTR-PREV];valid;1;gaps;0;loop_max_us;<NUM>;loop_n;17127;up_ms;104562;threshold_ms;250;worst_ms;0;in;-
+[HEAP] <TS> <NUM> <NUM> <NUM> (init)
+[PSRM] <TS> 0
+[EFUS]...Two Point: NOT supported
+[EFUS]...Vref: NOT supported
+[INIT]...initMheard
+[INIT]...init_flash
+[INIT]...build Sep 17 2026 / <TS>
+[INIT]...FLASH layout 20260724 ok, build 20260912
+[TIME]...Loaded time persistence: saved_time=1789678525, mheard_time=0, msg_time=0
+[INIT]...init_batt
+[INIT]...ADC_CTRL_PIN probe: high=913 low=1 -> active HIGH
+[ADC ]...Characterized using Default Vref
+[INIT]...MCP23017 not found
+[INIT]...RTC not found
+[OBUT]...One Button GPIO(1) not activated
+[INIT].._GW_ID: 433A8968
+[INIT]...Initialize clock: ok
+[INIT]...Auto detecting display:
+[INIT]...OLED on Wire1 SDA 17 SCL 18: ack=0 clock=400000
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 1 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[BLE ]...Device started with BLE-Name <MC-8968-DK5EN-1>
+[BLE ]...Device-Address <<ADDR>>
+[BLE ]...Waiting a client connection to notify...
+==============
+CLIENT STARTED
+==============
+[WIFI];scan;skipped;first_bringup;ms;<NUM>
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[readBatteryVoltage] <TS> ... 0.00 V 0 % max_batt 4.200 V
+.[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;<NUM>
+...[WIFI];event;connected;ms;<NUM>
+[WIFI];assoc;connected;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-63;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+.[WIFI];event;got_ip;ms;<NUM>
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;<ADDR>;chan;3;rssi;-62;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;<NUM>
+
+[WIFI]...connect OK
+[WIFI]...now listening at IP <ADDR>, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;<NUM>
+[CON ]...HMAC console init.
+[CON ]...Console started on port 2323
+[BOOT];ready;ms;<NUM>;ip;1
+TimeClient no update possible --> CPU-Mode
+[WIFI];dns;meshcom.oevsv.at;ip;<ADDR>;ms;<NUM>
+[GW];keep;tx;ok;1;ms;<NUM>
+[WIFI];dns;pool.ntp.org;ip;<ADDR>;ms;<NUM>
+[GW];rx;type;BEAT;len;19;ms;<NUM>
+[NTP];ok;epoch;1789681189;rtt;19
+[GW];keep;tx;ok;1;ms;<NUM>
+[GW];rx;type;BEAT;len;19;ms;<NUM>
+[readBatteryVoltage] <TS> ... 4.45 V 100 % max_batt 4.200 V
+<TS> [LOG] TX xEA25A12C @ H02 prio=5 src=o wait=4505 q=1 cad=0 len=29 t=34505
+[GW];rx;type;CET;len;55;ms;<NUM>
+<TS> [LOG] GWI x6AAA2B5C : H02 from=OE1XAR-33 t=54285
+<TS> [LOG] TX x6AAA2B5C : H02 prio=3 src=g wait=3798 q=1 cad=0 len=59 t=58083
+[GW];keep;tx;ok;1;ms;<NUM>
+[GW];rx;type;BEAT;len;19;ms;<NUM>
+[WIFI];link;up;rssi;-66;bssid;<ADDR>;chan;3;age_s;55;got_ip_n;1;ip;1;ms;<NUM>
+[readBatteryVoltage] <TS> ... 4.45 V 100 % max_batt 4.200 V
+<TS> [LOG] 060 : x6AAA2B5C H02 S1 T0 M00 OE1XAR-33,DK5EN-98>*:{CET}<TS> <TS> HW:00 MOD:8/8 FCS:0D91 FW:00:# LH:AB RSSI:<RF> SNR:<RF> DUP:d OWN:- t=64173

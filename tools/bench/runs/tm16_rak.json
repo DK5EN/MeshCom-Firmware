@@ -1,0 +1,42 @@
+{
+  "boot": {
+    "ok": true,
+    "port_gone_after_s": null,
+    "boots": [
+      {
+        "client_started": 10.58,
+        "resetreas": "0x00000004",
+        "eth_init": 11.83,
+        "eth_ip": 17.66,
+        "gateway": 17.66,
+        "ready": 17.66,
+        "ready_fw_ms": 19401,
+        "ip": 1,
+        "eth": 1
+      },
+      {
+        "start_client": 23.96,
+        "flash": 23.96,
+        "client_started": 35.35,
+        "resetreas": "0x00000004",
+        "eth_init": 36.58,
+        "eth_ip": 42.4,
+        "gateway": 42.61,
+        "ready": 42.61,
+        "ready_fw_ms": 19505,
+        "ip": 1,
+        "eth": 1
+      }
+    ],
+    "boot_count": 2,
+    "crash_lines": [],
+    "double_boot": true
+  },
+  "info": {
+    "ok": true,
+    "answered_lines": 34,
+    "call_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "hw_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "gateway_line": "...Webserver  on / Webpwd <> / Gateway on "
+  }
+}

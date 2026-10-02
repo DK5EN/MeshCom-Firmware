@@ -1,0 +1,143 @@
+{
+  "boot": {
+    "ok": true,
+    "port_gone_after_s": null,
+    "boots": [
+      {
+        "start_client": 11.15,
+        "flash": 11.15,
+        "client_started": 22.56,
+        "resetreas": "0x00000004",
+        "eth_init": 23.98,
+        "eth_ip": 29.67,
+        "gateway": 29.67,
+        "ready": 29.67,
+        "ready_fw_ms": 19518,
+        "ip": 1,
+        "eth": 1
+      }
+    ],
+    "boot_count": 1,
+    "crash_lines": [],
+    "double_boot": false
+  },
+  "info": {
+    "ok": true,
+    "answered_lines": 34,
+    "call_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "hw_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "gateway_line": "...Webserver  on / Webpwd <> / Gateway on "
+  },
+  "instr": {
+    "ok": true,
+    "seconds": 60.0,
+    "loop_n": 601,
+    "loop_avg_us": 101065,
+    "loop_max_us": 803711,
+    "gaps": 1,
+    "gap_events": [
+      "[INSTR-LOOP] gap ms 803 in hey_tx section_ms 686 sections_ms 733"
+    ],
+    "sections": {
+      "eth_state": {
+        "n": 602,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "clock": {
+        "n": 602,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 602,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_rx_timeout": {
+        "n": 558,
+        "avg_us": 15,
+        "max_us": 977
+      },
+      "ble_settings": {
+        "n": 602,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "hey_tx": {
+        "n": 1,
+        "avg_us": 686524,
+        "max_us": 686524
+      },
+      "telemetry": {
+        "n": 4,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 598,
+        "avg_us": 112,
+        "max_us": 16601
+      },
+      "eth_udp": {
+        "n": 602,
+        "avg_us": 141,
+        "max_us": 16601
+      },
+      "gateway": {
+        "n": 602,
+        "avg_us": 142,
+        "max_us": 16601
+      },
+      "display_tick": {
+        "n": 602,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_off": {
+        "n": 106,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "serial_cmd": {
+        "n": 602,
+        "avg_us": 4,
+        "max_us": 2930
+      },
+      "lora_sm": {
+        "n": 17,
+        "avg_us": 3216,
+        "max_us": 5859
+      },
+      "lora_tx": {
+        "n": 4,
+        "avg_us": 5370,
+        "max_us": 5859
+      },
+      "eth_heartbeat": {
+        "n": 3,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 111148,
+    "heap_largest": 97720,
+    "worst_section": "hey_tx"
+  },
+  "lora": {
+    "ok": false,
+    "first_line": null,
+    "tx_lines": [],
+    "peer_port": "",
+    "peer_heard_us": null
+  },
+  "mheard": {
+    "ok": true,
+    "calls_heard": [
+      "DK5EN-92",
+      "DK5EN-93",
+      "DK5EN-98"
+    ],
+    "lines": 16
+  }
+}

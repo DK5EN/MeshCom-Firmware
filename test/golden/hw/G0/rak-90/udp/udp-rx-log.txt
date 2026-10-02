@@ -1,0 +1,157 @@
+[GW];srv;OE;host;<ADDR>;path;bench;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;46;ok;1;ms;<NUM>
+[ETH];stall;udp_tx;ms;<NUM>;task;loop
+[UDP];rx;ip;<ADDR>;port;1990;len;14;ms;<NUM>
+[GW];rx;type;BEAT;len;14;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;79;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-1,DK5EN-2","msg":"","lat":48.4225,"lat_dir":"N","long":11.7865,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID1>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 259
+[EXT];tx;len;259;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;79;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;83;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-62,DK5EN-77,DK5EN-2,DK5EN-91","dst":"9999","msg":"{CET}<TS> <TS>","msg_id":"<ID2>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 183
+[EXT];tx;len;183;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;CET;len;83;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;136;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-90,DK5EN-91","msg":"","lat":48.4071,"lat_dir":"N","long":11.74,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","hw_id":9,"msg_id":"<ID3>","alt":1657,"batt":99,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 259
+[EXT];tx;len;259;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;136;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;66;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-33,DK5EN-98","dst":"9999","msg":"{CET}<TS> <TS>","msg_id":"<ID4>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 166
+[EXT];tx;len;166;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;CET;len;66;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;75;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-33,DK5EN-90,DK5EN-91","dst":"9999","msg":"{CET}<TS> <TS>","msg_id":"<ID4>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 175
+[EXT];tx;len;175;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;CET;len;75;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-98","dst":"9999","msg":"Korpus-Testframe via MCProxy DK5EN-98","msg_id":"<ID5>","firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 171
+[EXT];tx;len;171;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;68;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-98","dst":"DK5EN-90","msg":"Korpus-DM via MCProxy an 90{902","msg_id":"<ID6>","firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 169
+[EXT];tx;len;169;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;68;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;16;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;85;ok;1;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;63;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-91","dst":"DK5EN-90","msg":"Korpus-DM von 91 an 90{063","msg_id":"<ID7>","firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 164
+[EXT];tx;len;164;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;63;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;85;ok;1;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;62;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-90,DK5EN-98","dst":"DK5EN-91","msg":"DK5EN-91 :ack063","msg_id":"<ID8>","firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 163
+[EXT];tx;len;163;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;62;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;61;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-91","msg":"","lat":48.4166,"lat_dir":"N","long":11.7576,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","hw_id":43,"msg_id":"<ID9>","alt":0,"batt":57,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 250
+[EXT];tx;len;250;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;61;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;37;ms;<NUM>
+[GW];rx;type;DATA;len;37;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;98;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-10,DK5EN-98","dst":"DK5EN-10","msg":"Hi dr Om from france best 73 in n. E. Italy jn66ic  ","msg_id":"<ID10>","firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 199
+[EXT];tx;len;199;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;98;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID11>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 000 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID12>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID13>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 001 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID14>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID15>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 002 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID16>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID17>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 003 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID18>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID19>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 004 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID20>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;70;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID21>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 252
+[EXT];tx;len;252;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;70;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;135;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 005 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRST","msg_id":"<ID22>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 235
+[EXT];tx;len;235;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;135;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;107;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 100 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 01","msg_id":"<ID23>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 207
+[EXT];tx;len;207;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;107;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;167;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 160 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxy","msg_id":"<ID24>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 267
+[EXT];tx;len;267;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;167;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;207;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"msg","src":"DK5EN-93","dst":"9999","msg":"BBS 200 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ a","msg_id":"<ID25>","firmware":0,"fw_sub":"#","rssi":<RF>,"snr":<RF>} Len: 307
+[EXT];tx;len;307;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;207;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;4;ms;<NUM>
+[GW];rx;type;BEAT;len;4;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;34;ms;<NUM>
+[GW];rx;type;CONF;len;34;ms;<NUM>
+[GW];keep;tx;ok;1;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;2;ms;<NUM>
+[GW];rx;type;OTHER;len;2;ms;<NUM>
+[UDP];tx;ip;<ADDR>;port;1990;len;46;ok;1;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;14;ms;<NUM>
+[GW];rx;type;BEAT;len;14;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;79;ms;<NUM>
+[GW];rx;type;OTHER;len;79;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;91;ms;<NUM>
+[ETH];event;reset;ms;<NUM>
+[GW];srv;OE;host;<ADDR>;path;bench;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;123;len;48;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;93;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-1,DK5EN-2","msg":"","lat":48.4225,"lat_dir":"N","long":11.7865,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID1>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 259
+[EXT];tx;len;259;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;93;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;79;ms;<NUM>
+[EXT] Out: {"src_type":"udp","type":"pos","src":"DK5EN-1,DK5EN-2","msg":"","lat":48.4225,"lat_dir":"N","long":11.7865,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"<ID1>","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 259
+[EXT];tx;len;259;stack_hwm;<NUM>;ms;<NUM>
+[GW];rx;type;DATA;len;79;ms;<NUM>
+[UDP];rx;ip;<ADDR>;port;1990;len;4;ms;<NUM>
+[ETH];stall;hw_init;ms;<NUM>;task;loop
+[EXT] to IP:<ADDR>
+[EXT]...now listening at IP <ADDR>, UDP port 1799
+[EXT]...now sending   to IP <ADDR>, UDP port 1799
+[ETH];event;link;up;ip;0;ms;<NUM>
+[ETH];link;down;link;1;link_age_s;<NUM>;ip;<ADDR>;dest;;hb_age_s;<NUM>;got_ip_n;0;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;<NUM>;tx_fail;0;tx_max_ms;<NUM>;ms;<NUM>
+[EXT] Out: {"src_type":"lora","type":"pos","src":"DB0ISM-1,DB0ED-99,DK5EN-98","msg":"","lat":48.2206,"lat_dir":"N","long":11.6664,"long_dir":"E","aprs_symbol":"r","aprs_symbol_group":"/","hw_id":43,"msg_id":"<ID26>","alt":1617,"batt":70,"firmware":35,"fw_sub":"p","rssi":<RF>,"snr":<RF>} Len: 274
+[EXT] Tele-Out: {"src_type":"lora","type":"tele","src":"DB0ISM-1,DB0ED-99,DK5EN-98","batt":70,"temp1":0,"temp2":0,"hum":0,"qfe":0,"qnh":0,"pressure_alt":0,"gas":0,"co2":0} Len: 155
+[EXT];tx;len;274;stack_hwm;<NUM>;ms;<NUM>
+[ETH];event;reset;ms;<NUM>
+[ETH];stall;dhcp_begin;ms;<NUM>;task;loop
+[ETH];event;got_ip;<ADDR>;ms;<NUM>
+[GW];srv;OE;host;<ADDR>;path;inet;ms;<NUM>
+[ETH];link;up;link;1;link_age_s;<NUM>;ip;<ADDR>;dest;<ADDR>;hb_age_s;<NUM>;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;1;rx_n;1;rx_max_ms;<NUM>;tx_fail;0;tx_max_ms;<NUM>;ms;<NUM>
+[EXT] Out: {"src_type":"lora","type":"msg","src":"F5GKW-87,DL2JA-2,DK5EN-92","dst":"*","msg":"F5GKW-87 &F8KFZ-87 Heltec V3 3 upgraded 4.35t","msg_id":"<ID27>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>} Len: 196
+[EXT];tx;len;196;stack_hwm;<NUM>;ms;<NUM>
+[GW];keep;tx;ok;1;ms;<NUM>
+[GW];rx;type;BEAT;len;19;ms;<NUM>

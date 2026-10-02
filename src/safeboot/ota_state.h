@@ -7,7 +7,8 @@
 //
 // This header is the state machine described in
 // docs/safeboot-ota-contract.md ("State machine" + "/ota/state" sections),
-// binding for this campaign. It encodes two bugs that must stay impossible:
+// binding for this campaign. It encodes the two bugs from docs/BACKLOG.md
+// that must stay impossible:
 //   - TM-46: an unsigned cross-task millis() delta wrapping to ~2^32 and
 //     aborting a healthy upload as "stalled". Every delta here is computed
 //     as (int32_t)(now - then), which is wrap-safe regardless of which side

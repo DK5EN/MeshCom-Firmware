@@ -20,18 +20,13 @@ APRS2SOTA. Gruppen, `*` und alle anderen Meldungen verhalten sich wie bisher.
   Puffer umgeschrieben (auf nRF52 `static`, wegen des 4-KB-Loop-Tasks). Ihre msg_id kommt in den eigenen
   Dedup-Ring, damit das eigene Echo nicht als fremde Meldung gilt.
 - Ein Echo der eigenen PN bricht die Wiederholung nicht mehr ab, sondern startet die 40-s-Wartezeit neu.
-- Hat das Ziel schon geackt (Original-id in `own_msg_id` auf 0x02), gibt das Echo den Slot frei,
-  und eine fällige Wiederholung wird verworfen statt gesendet. Das deckt ein `:ackNNN` ab, das
-  eintrifft, während eine Kopie noch READY wartet: `findAndStopRingSlot` lässt READY-Slots bewusst
-  in Ruhe, weil `doTX()` sie gerade übernehmen kann.
 - "Eigene PN" heißt: eigene Knotenkennung in der msg_id **und** eigenes Rufzeichen als Quelle
   (`pnFrameIsOwnPn`). Eine PN, die `sendMessage()` für einen KISS-Client sendet, trägt zwar unsere
   msg_id, aber das Rufzeichen des Clients; ihr `:ackNNN` geht an den Client und stoppt unseren Slot nie.
   Sie bleibt deshalb beim alten Verhalten: byte-gleiche Wiederholung, Abbruch beim ersten Echo. Der
   Client wiederholt selbst.
 - Ein `:ackNNN` stoppt die Wiederholung — über LoRa und jetzt auch über den Server-Pfad (ESP32 und
-  nRF52). `findAndStopRingSlot` vergleicht dafür den 30-Bit-Kern, ist exportiert und nimmt auf nRF52
-  die Ring-Sperre, weil der Server-Pfad dort im Loop-Task läuft.
+  nRF52). `findAndStopRingSlot` vergleicht dafür den 30-Bit-Kern und ist exportiert.
 - "Gehört" (Status 0x00 ans Telefon) wird auch für das Echo einer Wiederholung gemeldet, immer mit der
   Original-msg_id.
 - Höchstens 4 Aussendungen (`MAX_RETRANSMIT` 3, per `static_assert` auf ≤ 3 festgehalten, weil k = 4
@@ -89,3 +84,29 @@ APRS2SOTA. Gruppen, `*` und alle anderen Meldungen verhalten sich wie bisher.
   `CheckGroup` kennt 1–99999 und 100001. Abweichung nur bei Zielen wie 000000 oder 999999, die kein
   Rufzeichen sein können.
 - **Alte Empfänger** zeigen jede Wiederholung als eigene Nachricht (bis zu 4) und quittieren jede.
+
+## Fork feature-snf
+
+Die Zeilenangaben oben (`src/lora_functions.cpp:NNN` u. ä.) beziehen sich auf `dk5en-xor`. Auf
+`feature-snf` gilt stattdessen:
+
+- **Ein Sendeweg**: jede PN läuft über die Ring-Wiederholung mit XOR-ids wie oben beschrieben --
+  Aussendung 1 die Original-id, Aussendung 2–4 `first_id ^ ((n-1) << 10)` im 40-s-Takt ab der
+  jeweils letzten Aussendung. Ein Echo stoppt die Wiederholung nicht mehr, nur ein `:ackNNN`. Die
+  Outbox-Leiter und `--dmretry` (zuletzt `off|3`, Modus 9 schon vorher entfallen, weil er sich nicht
+  in drei Bitvarianten ausdrücken lässt) sind seit 2026-09-27 entfernt (Nachtrag in
+  `docs/archive/pn-retry-snf-port-plan.md`); ein gespeicherter `dm_retry`-Wert (NVS, nRF52 `/dm.cfg`) wird
+  ignoriert.
+- **`dm_dedup`** fängt Wiederholungen einer an uns adressierten PN ab; es gibt kein eigenes
+  Anzeige-Tor dafür.
+- **Store-Knoten** bekommt Wiederholungskopien nicht noch einmal (Entscheidung E2): `rx_pn_repeat`
+  geht nicht in `msgstoreStore`.
+- **Aufgabe, Held-Markierung und 0x03-Telefonframe** laufen auf der Original-id; die
+  Wiederholungskopie wird davor darauf zurückgefaltet.
+- **Server-ACK stoppt den Ring-Slot**: `udp_frame_esp32.cpp` und `udp_frame_nrf52.cpp` rufen nach
+  erkanntem eigenem `:ackNNN` `findAndStopRingSlot`; auf nRF52 unter der Ring-Sperre, weil der
+  Aufruf jetzt auch aus dem Loop-Task kommt.
+- **Backpressure-Tiefe** (`txRingDepth`) zählt wartende PN-Slots weiter mit (Entscheidung E3,
+  hingenommen).
+- **Dedup-Ring mit 10 Einträgen** bei `ENABLE_TBEAM` begrenzt die Wiedererkennung von
+  Wiederholungen entsprechend; hingenommen.

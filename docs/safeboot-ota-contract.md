@@ -1,8 +1,8 @@
 # Safeboot OTA: interface contract (2026-09-13)
 
 Binding for the safeboot campaign: firmware (`src/safeboot/`), the OTA page (`src/safeboot/ota.html`),
-and the OTA client and abort bench (`tools/webflash.py`, `tools/bench/ota_abort.py` in the DK5EN
-fork) are built against this document in parallel. Change it here first, then everywhere.
+the OTA client (`tools/webflash.py`) and the abort bench (`tools/bench/ota_abort.py`) are built
+against this document in parallel. Change it here first, then everywhere.
 
 ## Decisions (operator, 2026-09-13)
 

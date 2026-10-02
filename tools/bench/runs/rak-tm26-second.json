@@ -1,0 +1,73 @@
+{
+  "instr": {
+    "ok": false,
+    "seconds": 60.0,
+    "loop_n": 507,
+    "loop_avg_us": 106181,
+    "loop_max_us": 3353516,
+    "gaps": 1,
+    "gap_events": [
+      "-[INSTR-LOOP] gap ms 1665 in hey_tx section_ms 1513",
+      "[INSTR-LOOP] gap ms 3353 in eth_udp_tx section_ms 24"
+    ],
+    "sections": {
+      "telemetry": {
+        "n": 3,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 506,
+        "avg_us": 94,
+        "max_us": 24414
+      },
+      "eth_udp": {
+        "n": 508,
+        "avg_us": 98,
+        "max_us": 24414
+      },
+      "display_tick": {
+        "n": 508,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "serial_cmd": {
+        "n": 508,
+        "avg_us": 5,
+        "max_us": 2930
+      },
+      "eth_heartbeat": {
+        "n": 2,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_tx": {
+        "n": 2,
+        "avg_us": 5371,
+        "max_us": 5860
+      },
+      "eth_dhcp": {
+        "n": 1,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 111284,
+    "heap_largest": 42252,
+    "worst_section": "eth_udp_tx"
+  },
+  "lora": {
+    "ok": false,
+    "first_line": null,
+    "tx_lines": []
+  },
+  "mheard": {
+    "ok": true,
+    "calls_heard": [
+      "DK5EN-14",
+      "DK5EN-92",
+      "DK5EN-93"
+    ],
+    "lines": 14
+  }
+}

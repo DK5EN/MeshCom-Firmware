@@ -1,0 +1,19 @@
+07:35:23 --- port open
+07:35:25 [EXT] Inc: {"type":"msg","dst":"DK5EN-1","msg":"eth03 probe"}
+07:35:25 [EXT] Out: {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"eth03 probe{803","msg_id":"91A43723","firmware":"4.35","fw_sub":"t","rssi":0,"snr":0} Len: 157
+07:35:25 [EXT];tx;len;157;stack_hwm;590;ms;156635
+07:35:25 [EXT];rx;len;50;stack_hwm;590;ms;156635
+07:35:25 [EXT] Inc: {"type":"msg","dst":"DK5EN-1","msg":"eth03 probe"}
+07:35:25 [EXT] Out: {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"eth03 probe{804","msg_id":"91A43724","firmware":"4.35","fw_sub":"t","rssi":0,"snr":0} Len: 157
+07:35:25 [EXT];tx;len;157;stack_hwm;590;ms;156745
+07:35:25 [EXT];rx;len;50;stack_hwm;590;ms;156745
+07:35:26 [EXT] Inc: {"type":"msg","dst":"DK5EN-1","msg":"eth03 probe"}
+07:35:26 [EXT] Out: {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"eth03 probe{805","msg_id":"91A43725","firmware":"4.35","fw_sub":"t","rssi":0,"snr":0} Len: 157
+07:35:26 [EXT];tx;len;157;stack_hwm;590;ms;157251
+07:35:26 [EXT];rx;len;50;stack_hwm;590;ms;157251
+07:35:26 [EXT] Inc: {"type":"msg","dst":"DK5EN-1","msg":"eth03 probe"}
+07:35:26 [EXT] Out: {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"eth03 probe{806","msg_id":"91A43726","firmware":"4.35","fw_sub":"t","rssi":0,"snr":0} Len: 157
+07:35:26 [EXT];tx;len;157;stack_hwm;590;ms;157758
+07:35:26 [EXT];rx;len;50;stack_hwm;590;ms;157758
+07:35:32 [EXT] Out: {"src_type":"lora","type":"msg","src":"DK5EN-1","dst":"DK5EN-90","msg":"DK5EN-90 :ack803","msg_id":"EA25A25A","firmware":35,"fw_sub":"t","rssi":-50,"snr":6} Len: 156
+07:35:32 [EXT];tx;len;156;stack_hwm;590;ms;163564

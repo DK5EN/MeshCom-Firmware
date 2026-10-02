@@ -1,0 +1,43 @@
+<svg viewBox="0 0 960 460" role="img" aria-label="Entscheidungsfluss Fall A und Fall B"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><rect x="40" y="30" width="220" height="50" class="node"/>
+<text x="150.0" y="44" text-anchor="middle" class="b">Frame dekodiert</text>
+<text x="150.0" y="62" text-anchor="middle" class="t11">OnRxDone(), vor dem Pfad-Umbau</text>
+<rect x="300" y="30" width="260" height="66" class="node"/>
+<text x="430.0" y="44" text-anchor="middle" class="b">Relay-Kandidat?</text>
+<text x="430.0" y="62" text-anchor="middle" class="t11">Mesh an, Hop frei, kein Duplikat,</text>
+<text x="430.0" y="78" text-anchor="middle" class="t11">nicht gwcap, nicht hop0</text>
+<rect x="600" y="30" width="320" height="66" class="node"/>
+<text x="760.0" y="44" text-anchor="middle" class="b">Wissen vorhanden?</text>
+<text x="760.0" y="62" text-anchor="middle" class="t11">--nbrrelay on, Pfad gueltig,</text>
+<text x="760.0" y="78" text-anchor="middle" class="t11">Abhaengige D nicht leer (known)</text>
+<rect x="600" y="140" width="320" height="66" class="node"/>
+<text x="760.0" y="154" text-anchor="middle" class="b">Nein: Fluten wie heute</text>
+<text x="760.0" y="172" text-anchor="middle" class="t11">RING_KIND_OTHER, Prio-Basis 4500/5500 ms,</text>
+<text x="760.0" y="188" text-anchor="middle" class="t11">kein Nachrang, kein Abbruch</text>
+<rect x="300" y="140" width="260" height="66" class="node srv"/>
+<text x="430.0" y="154" text-anchor="middle" class="b">Ja: need und alone aus Masken</text>
+<text x="430.0" y="172" text-anchor="middle" class="t11">need  = D ohne HatF</text>
+<text x="430.0" y="188" text-anchor="middle" class="t11">alone = need ohne Alternative</text>
+<rect x="300" y="236" width="260" height="34" class="node"/>
+<text x="430" y="258" text-anchor="middle" class="b">alone != 0 ?</text>
+<rect x="40" y="310" width="410" height="82" class="node srv"/>
+<text x="245.0" y="324" text-anchor="middle" class="b">Fall A: Vorrang, nie Abbruch</text>
+<text x="245.0" y="342" text-anchor="middle" class="t11">Basis 3500 ms + Slots 0..2, vor Relay 4500 und POS 5500</text>
+<text x="245.0" y="358" text-anchor="middle" class="t11">fremde Kopie: nur REFUSE-Zeile, Slot bleibt</text>
+<text x="245.0" y="374" text-anchor="middle" class="t11">ab 8 s Wartezeit: 150 ms Schutzabstand je Re-Arm, dann CAD</text>
+<rect x="490" y="310" width="430" height="82" class="node prx"/>
+<text x="705.0" y="324" text-anchor="middle" class="b">Fall B: Nachrang, Abbruch bei Deckung</text>
+<text x="705.0" y="342" text-anchor="middle" class="t11">POS/HEY: Sperre 20 s ab Einreihen, Slots 7..9; Text: heutige Basis</text>
+<text x="705.0" y="358" text-anchor="middle" class="t11">fremde Kopie von L: need &amp;= ~Hoerer(L); need == 0: CANCEL</text>
+<text x="705.0" y="374" text-anchor="middle" class="t11">gehaltener Slot blockiert niemanden; ab 60 s Kurzsuche wie A</text>
+<path d="M260 53 L300 53" class="ln" marker-end="url(#arr)"/>
+<path d="M560 53 L600 53" class="ln" marker-end="url(#arr)"/>
+<path d="M760 100 L760 140" class="ln" marker-end="url(#arr)"/>
+<text x="768" y="126" class="t11">nein</text>
+<path d="M600 80 L580 80 L580 163 L560 163" class="ln" marker-end="url(#arr)"/>
+<text x="585" y="120" class="t11">ja</text>
+<path d="M430 206 L430 236" class="ln" marker-end="url(#arr)"/>
+<path d="M300 253 L245 253 L245 310" class="ln" marker-end="url(#arr)"/>
+<text x="252" y="300" class="t11">ja</text>
+<path d="M560 253 L705 253 L705 310" class="ln" marker-end="url(#arr)"/>
+<text x="712" y="300" class="t11">nein, auch bei need = 0</text>
+<text x="480" y="445" text-anchor="middle" class="t11">Text als Fall B: heutige Basis und Slots, aber Abbruch. Alles ohne Wissen bleibt heutiges Fluten (Konzept 1: nichts unterdruecken auf Verdacht).</text></svg>

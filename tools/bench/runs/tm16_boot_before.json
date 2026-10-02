@@ -1,0 +1,50 @@
+{
+  "boot": {
+    "ok": true,
+    "boot_msgs": [
+      "MeshCom 4.35p",
+      "(build: Aug 30 2026 / 10:08:34)",
+      "GPS enabled",
+      "Touch: OK",
+      "SDCard: OK",
+      "Keyboard: OK",
+      "Radio: OK",
+      "WiFi connected"
+    ],
+    "audio_outcome": null,
+    "init_summary": {
+      "kind": "BOOT",
+      "variant": "init",
+      "sd": 1,
+      "touch": 1,
+      "touch_tries": 1,
+      "kb": 1,
+      "psram_buf": 1,
+      "t_ms": 3796
+    },
+    "init_log_lines": [
+      "[INIT]...efuse not used",
+      "[INIT]...initMheard",
+      "[INIT]...init_flash",
+      "[INIT]...build Aug 30 2026 / 10:08:32",
+      "[INIT]...FLASH layout 20260724 ok, build 20260828",
+      "[INIT]...initTDeck",
+      "[INIT]...TFT: OK",
+      "[INIT]...LVGL draw buffer: PSRAM",
+      "[INIT]...T-DECK based on Arduino V8.3.11",
+      "[INIT]...using LVGL_Arduino_Display_LIB",
+      "[INIT]...Keyboard registered",
+      "[INIT]...MeshCom 4.35p",
+      "[INIT]...Touch: OK",
+      "[INIT]...SD_MMC Card Type: SDHC",
+      "[INIT]...SD Card Size: 30436 MB",
+      "[INIT]...Total space: 30417 MB",
+      "[INIT]...SDCard: OK",
+      "[INIT]...Keyboard: OK",
+      "[INIT]...init_batt",
+      "[INIT].._GW_ID: A1AD65E0",
+      "[INIT]...Initialize clock: ok"
+    ],
+    "fail_lines": []
+  }
+}

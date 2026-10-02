@@ -1,0 +1,36 @@
+{
+  "disptest": {
+    "ok": true,
+    "phase": "square",
+    "stride": 7,
+    "steps_expected": 23,
+    "steps_seen": 23,
+    "steps_ok": 23,
+    "mismatches": [],
+    "mismatch_count": 0,
+    "first_mismatch": null,
+    "begin": {
+      "kind": "DISPTEST",
+      "variant": "begin",
+      "phase": "square",
+      "stride": 7,
+      "w": 320,
+      "h": 240,
+      "steps": 23,
+      "ms": 11812
+    },
+    "end": {
+      "kind": "DISPTEST",
+      "variant": "end",
+      "steps": 23,
+      "ms": 1549
+    },
+    "device_ms": 1549,
+    "wall_s": 1.9,
+    "fps": 14.8,
+    "step_ms_min": 65,
+    "step_ms_p50": 66,
+    "step_ms_max": 68,
+    "wrong_px": []
+  }
+}

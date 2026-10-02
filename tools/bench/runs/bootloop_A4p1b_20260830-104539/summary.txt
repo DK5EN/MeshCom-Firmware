@@ -1,0 +1,9 @@
+arm A4p1b  port /dev/cu.usbmodem1101
+
+boots                     24
+first join <= 25 s        24/24
+got_ip ms  median/max     14116 / 14648   (n=24)
+ready ms   median/max     14962 / 15488
+disconnect events         0
+connection-error bursts   0
+[WIFI];stall lines        0

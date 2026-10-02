@@ -1,0 +1,54 @@
+{
+  "port": "/dev/cu.usbserial-0001",
+  "args": {
+    "port": "/dev/cu.usbserial-0001",
+    "cycles": 2,
+    "hold": 2.0,
+    "quiet": 15.0,
+    "wake_pulse": 0.2,
+    "boot_timeout": 40.0,
+    "keep_button": false,
+    "runs_dir": "tools/bench/runs",
+    "json": null
+  },
+  "verdict": "PASS",
+  "error": null,
+  "button_before": "on",
+  "log_path": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/deepsleep_button_20260913-100945.log",
+  "cycles": [
+    {
+      "cycle": 1,
+      "obut_ack": true,
+      "go_after_ms": 868,
+      "quiet_ok": true,
+      "regression_line": null,
+      "regression_delay_ms": null,
+      "quiet_lines": [],
+      "wake_reset_num": 8,
+      "wake_reset": "DEEPSLEEP",
+      "wake_cause_num": 3,
+      "wake_cause": "EXT1",
+      "ready_seen": true,
+      "boot_ms": 7685,
+      "alive": true,
+      "ok": true
+    },
+    {
+      "cycle": 2,
+      "obut_ack": true,
+      "go_after_ms": 877,
+      "quiet_ok": true,
+      "regression_line": null,
+      "regression_delay_ms": null,
+      "quiet_lines": [],
+      "wake_reset_num": 8,
+      "wake_reset": "DEEPSLEEP",
+      "wake_cause_num": 3,
+      "wake_cause": "EXT1",
+      "ready_seen": true,
+      "boot_ms": 7662,
+      "alive": true,
+      "ok": true
+    }
+  ]
+}

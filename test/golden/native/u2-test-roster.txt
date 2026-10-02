@@ -1,0 +1,44 @@
+# U2 twin (test/test_udp_send_twin/test_udp_send_twin.cpp), before-state.
+#
+# RENAMED 2026-09-12 by the orchestrator, from u2-twin-diff-before.txt.
+# The content below was accurate; the NAME was not. section 9.1 reserves
+# '<uut>-twin-diff-before.txt' for the fixture the after-run compares against,
+# and a file sitting at that name is what a script will pick up -- a header
+# explaining that it is something else only helps a human who opens it. The
+# real fixture is still owed (BACKLOG M3-02); squatting on its name would have
+# let G2 compare against this and look satisfied.
+#
+# WHAT THIS IS NOT: docs/testplan-dry-unification-20260910.md section 4.4
+# lists "u2-*.txt" alongside u1's sink-sequence/diff triple, same pattern:
+# ring drained on both platforms, datagram bytes/order/pointer-movement
+# recorded per platform and diffed. That recording does not exist either --
+# test_udp_send_twin.cpp is, like the U1 twin, a fixed set of named Unity
+# tests asserting specific ring/datagram outcomes inline per test
+# (TEST_ASSERT_*), not a corpus-driven dump-and-diff. See u1-twin-diff-
+# before.txt's header for the fuller version of this same caveat; it applies
+# here unchanged.
+#
+# WHAT THIS IS INSTEAD: the ordered list of named tests this suite runs
+# today and their status, taken verbatim from `pio test -e
+# native_udp_send_twin` (2026-09-12, all green, matching drift-matrix.csv's
+# U2 rows as currently decided). Comparable the same way: re-run the command,
+# diff the (test-name, status) listing against this file.
+#
+# Format: "<status> <test_name>", one per RUN_TEST() in main(), in RUN_TEST
+# order. Regenerate: pio test -e native_udp_send_twin (strip the file:line:
+# prefix and the "[...]" bracket punctuation Unity prints).
+PASSED test_same_ring_drains_to_the_same_datagrams
+PASSED test_datagram_is_the_slot_from_offset_one
+PASSED test_pointer_moves_one_slot_per_pass_and_wraps
+PASSED test_sent_slot_is_zeroed
+PASSED test_empty_ring_sends_nothing
+PASSED test_busy_flag_holds_the_slot_on_both_sides
+PASSED test_mid_send_eviction_does_not_double_advance
+PASSED test_drift_esp32_has_three_preconditions_nrf52_has_none
+PASSED test_drift_failed_write_decodes_on_esp32_only
+PASSED test_drift_esp32_calls_endpacket_after_a_failed_write
+PASSED test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it
+PASSED test_drift_rx01_unconfigured_guard_is_esp32_only
+PASSED test_drift_nrf52_prefixes_the_print_with_mesh_when_via_is_on
+PASSED test_frame_survives_the_drain_intact_on_both_sides
+PASSED test_short_slot_is_not_decoded_on_either_side

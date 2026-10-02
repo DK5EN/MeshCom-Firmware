@@ -1,0 +1,153 @@
+RAK4631 DK5EN-90, image built from af00c402 (W3 fix wave), 2026-09-12.
+
+The boot that loaded the keyed store written by the migration boot. Every
+integer field in the store reads `ld` or `lu`: newlib-nano's printf has no
+long-long conversion, so settings_store.cpp's "%lld"/"%llu" emitted the tail
+of the conversion literally. `--info` above the dump shows the consequence --
+EXTUDP off, BTCODE 000000, webserver off, GPSDEBUG off, MAXHOP text 4 -- i.e.
+every integer setting back at its struct default, while the STRING fields and
+the radio parameters sanitize_loaded_settings() repairs survived. That split
+is the "sharpest open lead" of docs/w3-settings-verdict.md, explained.
+
+Credentials and the BLE pairing code are masked; nothing else is edited.
+
+[SETST];save;rename_failed;bytes=1527
+--info--MeshCom 4.35t (build: Sep 12 2026 / 22:45:05)
+...UPDATE: 
+...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [INIT]
+...BATT 4.25 V ...BATT 100 % ...MAXV 4.200 V
+...TIME 41954 ms
+...Flash-Version 20260724
+...NOMSGALL off ...MESH on ...BUTTON (10) off ...SOFTSER off ... SOFTSERREAD off
+...PASSWD <>
+...DEBUG man ...DEBUG en
+...DEBUG off ...LORADEBUG off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
+...WXDEBUG off ...BLEDEBUG off
+...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+...BTCODE 000000
+...APRSMC: APRSMC
+...ATXT: github.com/dk5en/mcapp
+...NAME: Martin
+...BLE : short
+...DISPLAY off
+...CTRY EU8
+...FREQ 433.1750 MHz TXPWR 22 dBm RXBOOST off
+...MAXHOP text 4 / pos 2
+
+...Webserver  off / Webpwd <> / Gateway off 
+...NETWORK Mode:WiFi
+...hasIpAddress: no
+--dumpsettings[SETST];dump;begin;bytes=1528
+node_call=DK5EN-90
+node_short=5EN40
+node_symid=47
+node_symcd=35
+node_lat=0
+node_lon=0
+node_alt=0
+node_lat_c=32
+node_lon_c=32
+node_ssid=<masked>
+node_pwd=<masked>
+node_honly=0
+node_sset=0
+node_maxv=4.19999981
+node_extern=192.168.68.58
+max_hop_text=4
+node_power=-20
+node_freq=433175008
+node_bw=1
+node_sf=0
+node_cr=0
+node_atxt=github.com/dk5en/mcapp
+node_sset2=0
+node_owgpio=16
+node_utcof=2
+node_mcp17=0
+node_mcp17o=0
+node_mcp17i=0
+node_mcp170=
+node_mcp171=
+node_mcp172=
+node_mcp173=
+node_mcp174=
+node_mcp175=
+node_mcp176=
+node_mcp177=
+node_mcp178=
+node_mcp179=
+node_mcp1710=
+node_mcp1711=
+node_mcp1712=
+node_mcp1713=
+node_mcp1714=
+node_mcp1715=
+node_gcb0=0
+node_gcb1=0
+node_gcb2=0
+node_gcb3=0
+node_gcb4=0
+node_gcb5=0
+node_ctry=0
+node_track=433775008
+node_pream=0
+node_ss_rx=0
+node_ss_tx=0
+node_ss_bd=0
+node_postime=0
+node_passwd=<masked>
+node_sset3=0
+bt_code=<masked>
+node_bpin=0
+node_ownip=
+node_owngw=
+node_ownms=
+node_name=Martin
+node_webpwd=<masked>
+node_lssid=<masked>
+node_lpwd=<masked>
+node_apin=99
+node_afakt=1
+node_parm=
+node_unit=
+node_format=
+node_eqns=
+node_values=
+node_ptime=15
+node_wifip=60
+node_ucall=
+node_aak=0
+node_aslo=0
+node_aoff=0
+node_atten=0
+node_gwsrv=OE
+node_tmpiof=0
+node_tmpoof=0
+node_shunt=0.00200000009
+node_imax=20
+node_isamp=7
+node_owndns=
+node_contrast=255
+node_ownntp=
+node_gpsbaud=38400
+node_netmode=0
+node_gpsdebug=0
+node_relay=0
+node_via=
+node_sset4=2
+node_aprsmc=APRSMC
+node_pingtime=0
+node_pingcall=
+node_pingmax=0
+send_repeat_time=0
+auto_join=0
+node_fversion=20260724
+node_mversion=9
+node_fwversion=4.35t
+node_cflash=0
+node_msgid=0
+node_ackid=0
+
+[SETST];dump;end;read_error=0
+

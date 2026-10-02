@@ -1,0 +1,53 @@
+<svg viewBox="0 0 960 370" role="img" aria-label="Wachstum der Matrix je Layout"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><path d="M90 300.0 L900 300.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="304.0" text-anchor="end" class="t11">0</text>
+<path d="M90 266.2 L900 266.2" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="270.25" text-anchor="end" class="t11">4 kB</text>
+<path d="M90 232.5 L900 232.5" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="236.5" text-anchor="end" class="t11">8 kB</text>
+<path d="M90 198.8 L900 198.8" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="202.75" text-anchor="end" class="t11">12 kB</text>
+<path d="M90 165.0 L900 165.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="169.0" text-anchor="end" class="t11">16 kB</text>
+<path d="M90 131.2 L900 131.2" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="135.25" text-anchor="end" class="t11">20 kB</text>
+<path d="M90 97.5 L900 97.5" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="101.5" text-anchor="end" class="t11">24 kB</text>
+<path d="M90 63.8 L900 63.8" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="67.75" text-anchor="end" class="t11">28 kB</text>
+<path d="M90 30.0 L900 30.0" stroke="#e3e8ee" stroke-width="1"/>
+<text x="82" y="34.0" text-anchor="end" class="t11">32 kB</text>
+<text x="90.0" y="316" text-anchor="middle" class="t11">0</text>
+<text x="292.5" y="316" text-anchor="middle" class="t11">16</text>
+<text x="495.0" y="316" text-anchor="middle" class="t11">32</text>
+<text x="697.5" y="316" text-anchor="middle" class="t11">48</text>
+<text x="900.0" y="316" text-anchor="middle" class="t11">64</text>
+<text x="900" y="332" text-anchor="end" class="t11">Zeilen N, inkl. Zeile 0</text>
+<path d="M254.5 30 L254.5 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M355.8 30 L355.8 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M608.9 30 L608.9 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M697.5 30 L697.5 300" stroke="#c9d3dd" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="603.9" y="38" class="t11" text-anchor="end" transform="rotate(90 603.9 38)">41: 1-Hop max 24 h</text>
+<text x="692.5" y="38" class="t11" text-anchor="end" transform="rotate(90 692.5 38)">48: 2-Hop p90 24 h</text>
+<text x="254.53125" y="346" text-anchor="middle" class="t11">13: heute klassisch</text>
+<text x="355.78125" y="360" text-anchor="middle" class="t11">21: heute S3 und RAK</text>
+<polyline points="115.3,299.4 128.0,298.9 140.6,298.3 153.3,297.7 165.9,296.9 178.6,296.1 191.2,295.1 203.9,294.0 216.6,292.9 229.2,291.6 241.9,290.2 254.5,288.8 267.2,287.2 279.8,285.5 292.5,283.8 305.2,281.9 317.8,279.9 330.5,277.8 343.1,275.7 355.8,273.4 368.4,271.0 381.1,268.5 393.8,265.9 406.4,263.3 419.1,260.5 431.7,257.6 444.4,254.6 457.0,251.5 469.7,248.3 482.3,245.0 495.0,241.6 507.7,238.2 520.3,234.6 533.0,230.9 545.6,227.1 558.3,223.2 570.9,219.2 583.6,215.1 596.2,210.9 608.9,206.6 621.6,202.2 634.2,197.7 646.9,193.0 659.5,188.3 672.2,183.5 684.8,178.6 697.5,173.6 710.2,168.5 722.8,163.3 735.5,158.0 748.1,152.5 760.8,147.0 773.4,141.4 786.1,135.7 798.8,129.9 811.4,123.9 824.1,117.9 836.7,111.8 849.4,105.6 862.0,99.2 874.7,92.8 887.3,86.3 900.0,79.6" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="288.8" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 13, 1330 B</title></circle>
+<circle cx="355.8" cy="273.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 21, 3154 B</title></circle>
+<circle cx="900.0" cy="79.6" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"><title>dicht heute: 24N + 6N^2: N = 64, 26116 B</title></circle>
+<polyline points="115.3,297.5 128.0,296.3 140.6,295.1 153.3,293.9 165.9,292.7 178.6,291.5 191.2,290.2 203.9,289.0 216.6,287.8 229.2,286.6 241.9,285.4 254.5,284.2 267.2,283.0 279.8,281.7 292.5,280.5 305.2,279.3 317.8,278.1 330.5,276.9 343.1,275.7 355.8,274.5 368.4,273.2 381.1,272.0 393.8,270.8 406.4,269.6 419.1,268.4 431.7,267.2 444.4,265.9 457.0,264.7 469.7,263.5 482.3,262.3 495.0,261.1 507.7,259.9 520.3,258.7 533.0,257.4 545.6,256.2 558.3,255.0 570.9,253.8 583.6,252.6 596.2,251.4 608.9,250.2 621.6,248.9 634.2,247.7 646.9,246.5 659.5,245.3 672.2,244.1 684.8,242.9 697.5,241.6 710.2,240.4 722.8,239.2 735.5,238.0 748.1,236.8 760.8,235.6 773.4,234.4 786.1,233.1 798.8,231.9 811.4,230.7 824.1,229.5 836.7,228.3 849.4,227.1 862.0,225.9 874.7,224.6 887.3,223.4 900.0,222.2" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="284.2" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 13, 1876 B</title></circle>
+<circle cx="355.8" cy="274.5" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 21, 3028 B</title></circle>
+<circle cx="900.0" cy="222.2" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"><title>rechteckig, 20 Hoerer (Super-Node): 144N: N = 64, 9220 B</title></circle>
+<polyline points="115.3,298.9 128.0,298.4 140.6,297.9 153.3,297.4 165.9,296.9 178.6,296.4 191.2,295.9 203.9,295.4 216.6,294.9 229.2,294.4 241.9,293.9 254.5,293.4 267.2,292.8 279.8,292.3 292.5,291.8 305.2,291.3 317.8,290.8 330.5,290.3 343.1,289.8 355.8,289.3 368.4,288.8 381.1,288.3 393.8,287.8 406.4,287.3 419.1,286.8 431.7,286.3 444.4,285.8 457.0,285.3 469.7,284.7 482.3,284.2 495.0,283.7 507.7,283.2 520.3,282.7 533.0,282.2 545.6,281.7 558.3,281.2 570.9,280.7 583.6,280.2 596.2,279.7 608.9,279.2 621.6,278.7 634.2,278.2 646.9,277.7 659.5,277.2 672.2,276.6 684.8,276.1 697.5,275.6 710.2,275.1 722.8,274.6 735.5,274.1 748.1,273.6 760.8,273.1 773.4,272.6 786.1,272.1 798.8,271.6 811.4,271.1 824.1,270.6 836.7,270.1 849.4,269.6 862.0,269.1 874.7,268.5 887.3,268.0 900.0,267.5" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="254.5" cy="293.4" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 13, 788 B</title></circle>
+<circle cx="355.8" cy="289.3" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 21, 1268 B</title></circle>
+<circle cx="900.0" cy="267.5" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"><title>Kantenpool Stufe 1: 36N + 4N x 6 B: N = 64, 3848 B</title></circle>
+<text x="894.0" y="71.64625000000001" text-anchor="end" class="t11">26,1 kB</text>
+<text x="894.0" y="214.20625" text-anchor="end" class="t11">9,2 kB</text>
+<text x="894.0" y="283.5325" text-anchor="end" class="t11">3,8 kB</text>
+<path d="M100 38 L122 38" stroke="#2a78d6" stroke-width="2"/>
+<text x="130" y="42" class="t11">dicht heute: 24N + 6N^2</text>
+<path d="M100 56 L122 56" stroke="#eb6834" stroke-width="2"/>
+<text x="130" y="60" class="t11">rechteckig, 20 Hoerer (Super-Node): 144N</text>
+<path d="M100 74 L122 74" stroke="#1baf7a" stroke-width="2"/>
+<text x="130" y="78" class="t11">Kantenpool Stufe 1: 36N + 4N x 6 B</text></svg>

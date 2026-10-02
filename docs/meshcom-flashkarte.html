@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshCom Flashkarte RAK4631</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f2f3f0; --surface:#fff; --surface2:#fafbf9; --ink:#16191a; --muted:#5c6360;
+  --rule:#d9ded9; --rule2:#eceee9;
+  --code:#b05327; --bt:#2d5f8a; --wifi:#3f8c78; --sys:#79817e; --libc:#8a6ba3; --libs:#a8842f;
+  --free:#e6e9e4; --warn:#a8321f; --good:#3f7d52;
+  --f-head:'Chivo',system-ui,sans-serif;
+  --f-body:'Source Serif 4',Georgia,serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14171a; --surface:#1c2023; --surface2:#202528; --ink:#e3e8e4; --muted:#98a29f;
+  --rule:#2d3336; --rule2:#252b2e;
+  --code:#d4703c; --bt:#5f96c9; --wifi:#5fb79e; --sys:#98a2a0; --libc:#ad8bc6; --libs:#c9a54a;
+  --free:#262c30; --warn:#e0654e; --good:#68ad7e;
+}}
+:root[data-theme="dark"]{
+  --bg:#14171a; --surface:#1c2023; --surface2:#202528; --ink:#e3e8e4; --muted:#98a29f;
+  --rule:#2d3336; --rule2:#252b2e;
+  --code:#d4703c; --bt:#5f96c9; --wifi:#5fb79e; --sys:#98a2a0; --libc:#ad8bc6; --libs:#c9a54a;
+  --free:#262c30; --warn:#e0654e; --good:#68ad7e;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);line-height:1.6;
+     font-size:16px;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:0 72px}
+h1,h2,h3,.lbl{font-family:var(--f-head);text-wrap:balance}
+h1{font-size:clamp(28px,5vw,46px);font-weight:800;letter-spacing:-.02em;margin:0 0 6px;line-height:1.08}
+h2{font-size:clamp(21px,3vw,28px);font-weight:700;letter-spacing:-.01em;margin:0 0 4px}
+h3{font-size:17px;font-weight:600;margin:0 0 6px}
+p{margin:0 0 14px;max-width:68ch}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.88em;font-variant-numeric:tabular-nums}
+a{color:var(--code)}
+
+header.top{border-bottom:2px solid var(--ink);padding-block:36px 20px;margin-bottom:34px}
+.sub{font-size:clamp(16px,2.2vw,19px);color:var(--muted);max-width:60ch;margin:0}
+.prov{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font-family:var(--f-mono);font-size:11px;border:1px solid var(--rule);
+      background:var(--surface);padding:4px 9px;border-radius:2px;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:600}
+
+section{margin-block:52px}
+.intro{color:var(--muted)}
+
+/* ---- legend ---- */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:16px 0 22px;padding:12px 14px;
+        background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+.lg{display:flex;align-items:center;gap:7px;font-size:12.5px;font-family:var(--f-head)}
+.sw{width:13px;height:13px;border-radius:2px;flex:0 0 auto}
+.sw.free{background:var(--free);border:1px dashed var(--muted)}
+
+/* ---- the map ---- */
+.board{border:1px solid var(--rule);background:var(--surface);border-radius:3px;
+       padding:16px 16px 14px;margin-bottom:14px}
+.bhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:12px}
+.bname{font-family:var(--f-head);font-weight:700;font-size:17px}
+.bnodes{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);
+        border:1px solid var(--rule);padding:2px 7px;border-radius:2px}
+.bseg{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:auto}
+.bnote{font-size:13.5px;color:var(--muted);margin:0 0 12px;max-width:none}
+
+.row{display:grid;grid-template-columns:78px 1fr;gap:10px;align-items:center;margin-bottom:7px}
+.rowlab{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);text-align:right}
+.rowlab b{display:block;color:var(--ink);font-weight:600;font-size:12px}
+.bar{position:relative;height:30px;display:flex;background:var(--free);border-radius:2px;
+     overflow:hidden;border:1px solid var(--rule2)}
+.seg{height:100%;min-width:1px;cursor:default;transition:filter .12s}
+.seg:hover{filter:brightness(1.18)}
+.seg.code{background:var(--code)} .seg.bt{background:var(--bt)}
+.seg.wifi{background:var(--wifi)} .seg.sys{background:var(--sys)}
+.seg.libc{background:var(--libc)} .seg.libs{background:var(--libs)}
+.figs{display:flex;justify-content:space-between;gap:12px;font-family:var(--f-mono);
+      font-size:11.5px;color:var(--muted);margin:3px 0 12px;padding-left:88px}
+.figs .d{font-weight:600}
+.d.neg{color:var(--good)} .d.zero{color:var(--warn)}
+.hr-tight{border:0;border-top:1px solid var(--rule2);margin:12px 0}
+
+.tt{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);
+    font-family:var(--f-mono);font-size:11.5px;padding:6px 9px;border-radius:3px;
+    opacity:0;transition:opacity .1s;max-width:260px;line-height:1.45}
+.tt.on{opacity:1}
+
+/* ---- tables ---- */
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--rule2);white-space:nowrap}
+th{font-family:var(--f-head);font-size:11px;font-weight:600;letter-spacing:.08em;
+   text-transform:uppercase;color:var(--muted);background:var(--surface2)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td.s{font-family:var(--f-mono);font-size:12.5px}
+tr.hi td{background:color-mix(in srgb,var(--code) 9%,transparent)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;
+     vertical-align:baseline}
+
+/* ---- callouts ---- */
+.find{border-left:3px solid var(--code);background:var(--surface);padding:16px 18px;
+      border-radius:0 3px 3px 0;margin:20px 0}
+.find.warn{border-left-color:var(--warn)}
+.find.good{border-left-color:var(--good)}
+.find p:last-child{margin-bottom:0}
+.big{font-family:var(--f-mono);font-size:clamp(26px,4.5vw,40px);font-weight:600;
+     letter-spacing:-.02em;line-height:1;color:var(--code)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.stat{border:1px solid var(--rule);background:var(--surface);border-radius:3px;padding:16px 18px}
+.stat .lbl{margin-bottom:8px;display:block}
+.stat .big{margin-bottom:6px}
+.stat p{font-size:13.5px;color:var(--muted);margin:0}
+ul{padding-left:20px;max-width:68ch}li{margin-bottom:7px}
+footer{border-top:1px solid var(--rule);margin-top:56px;padding-top:18px;
+       font-size:12.5px;color:var(--muted)}
+@media (max-width:560px){
+  .row{grid-template-columns:62px 1fr;gap:8px}
+  .figs{padding-left:70px;flex-direction:column;gap:2px}
+  .bseg{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+:root{--c-web:#2a78d6;--c-cmd:#eb6834;--c-nbr:#1baf7a;--c-mesh:#eda100;--c-peri:#e87ba4;--c-ble:#008300;--c-plat:#4a3aa7;}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){--c-web:#3987e5;--c-cmd:#d95926;--c-nbr:#199e70;--c-mesh:#c98500;--c-peri:#d55181;--c-ble:#008300;--c-plat:#9085e9; color-scheme:dark;} }
+:root[data-theme="dark"]{--c-web:#3987e5;--c-cmd:#d95926;--c-nbr:#199e70;--c-mesh:#c98500;--c-peri:#d55181;--c-ble:#008300;--c-plat:#9085e9; color-scheme:dark;}
+.fbar{display:flex;gap:2px;height:34px;background:var(--surface);border-radius:2px;overflow:hidden}
+.fbar .seg{border-radius:0}
+.fbar .seg.free{background:var(--free)}
+.frow{display:grid;grid-template-columns:118px 1fr;gap:12px;align-items:center;margin-bottom:6px}
+.ffig{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin:0 0 14px 130px}
+.ffig b{color:var(--ink)}
+.lg .v{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin-left:2px}
+@media (max-width:560px){.frow{grid-template-columns:1fr;gap:4px}.ffig{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>MeshCom Flashkarte RAK4631</h1>
+  <p class="sub">Wo die 815 kB Programmspeicher des RAK4631 hingehen, was davon tatsächlich
+     gebraucht wird, und welche Hebel wie viel zurückgeben. Gemessen an der Linker-Map,
+     nicht geschätzt.</p>
+  <div class="prov">
+    <span class="chip">gemessen <b>28.09.2026</b></span>
+    <span class="chip">Stand <b>v4.35u.09.28-neo · fed0eb0e</b></span>
+    <span class="chip">Basis <b>upstream/dev 10ab0344</b></span>
+    <span class="chip">Region <b>FLASH 0x26000–0xED000</b>, 815 104 B über SoftDevice S140</span>
+    <span class="chip">Kopfzahl <b>HEAD nach dbc57632: 774 188 B / 95,0 %</b></span>
+    <span class="chip">RAM-Seite: <a href="meshcom-speicherkarte.html">Speicherkarte</a></span>
+  </div>
+</header>
+
+<section>
+  <h2>Das Ergebnis in einem Satz</h2>
+  <p>Der RAK ist zu <b>95,0 %</b> voll (Stand HEAD). Vor <code>dbc57632</code> waren es
+     <b>96,1 %</b>: der Commit strich 9 936 B <code>.data</code>-Initialisierungsbilder, indem
+     er die BLE-Einstellungen von sechs RAM-Kopien auf drei zurückschnitt (siehe
+     <a href="meshcom-speicherkarte.html">Speicherkarte</a>). Der grösste verbleibende Hebel
+     ist trotzdem kein Code: das Adafruit-Framework baut alles mit <code>-Ofast</code>. Mit
+     <code>-Os</code> sinkt dasselbe Image ohne eine geänderte Zeile auf <b>70,4 %</b>. Danach
+     bleiben drei gezielte Posten mit auf <code>-Ofast</code>-Basis zusammen rund 67 kB (rund
+     61 kB, sobald sie mit <code>-Os</code> gebaut werden), keiner davon eine Funktion, die ein
+     RAK-Nutzer vermissen würde.</p>
+  <div class="grid2">
+    <div class="stat">
+      <span class="lbl">Belegt auf HEAD</span>
+      <div class="big" style="color:var(--warn)">774 188 B</div>
+      <p>von 815 104 B, 40 916 B frei — 95,0 %, nach <code>dbc57632</code>. upstream/dev liegt
+         bei 672 552 B (82,5 %).</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">Was der Fork dazulegt</span>
+      <div class="big">+110 964 B</div>
+      <p>Stand fed0eb0e (vor <code>dbc57632</code>), 783 516 B. Davon 35,8 kB
+         Nachbarschaftsmatrix (netto, MHeard entfällt), 22,4 kB Web-GUI, 13,8 kB
+         Einstellungsspeicher und BLE-v1.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">Gewinn durch <code>-Os</code></span>
+      <div class="big" style="color:var(--good)">−209 928 B</div>
+      <p>Stand fed0eb0e (vor <code>dbc57632</code>). Gebaut und gemessen: 573 588 B. Nur
+         <code>src/</code> mit <code>-Os</code>, Bibliotheken bleiben <code>-Ofast</code>:
+         638 392 B (−145 124).</p>
+    </div>
+  </div>
+  <p class="intro">Karte, Tabellen und die <code>-Os</code>-Messung ab hier sind auf
+     fed0eb0e gebaut, dem Stand vor <code>dbc57632</code> — nur die Kopfzahl oben ist HEAD.
+     Ein neuer Bau auf HEAD braucht den nRF52-Toolchain-Zugriff, der aktuell nicht zur
+     Verfügung steht; die Karte wird beim nächsten Messlauf nachgezogen.</p>
+</section>
+
+<section id="map">
+  <h2>Karte: der Flash in sieben Blöcken</h2>
+  <p class="intro">Jeder Balken ist die ganze Flash-Region, massstäblich. Oben
+     <code>upstream/dev</code>, in der Mitte u wie ausgeliefert, unten dasselbe u mit
+     <code>-Os</code> gebaut. Zeiger auf ein Segment zeigt die Bytes und die grössten Objekte darin.</p>
+  <div class="legend" id="legend"></div>
+  <div class="board" id="fmap"></div>
+</section>
+
+<section>
+  <h2>Wohin der Flash geht</h2>
+  <p class="intro">Feiner aufgeteilt. Die letzte Spalte sagt, ob ein RAK4631 den Block
+     braucht. Sortiert wie die Karte.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Block</th><th class="n">upstream</th><th class="n">u</th><th class="n">u mit -Os</th><th>Auf dem RAK</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:var(--c-web)"></span>Web-GUI</td><td class="n">95 430</td><td class="n">117 705</td><td class="n">104 663</td><td>gebraucht; 41 kB davon ist statisches HTML/JS</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-cmd)"></span>Kommandos, Hilfe, Einstellungen</td><td class="n">103 785</td><td class="n">127 764</td><td class="n">93 242</td><td>gebraucht; enthält die Mehrfachbeschreibung der Einstellungen</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-nbr)"></span>Nachbarschaftsmatrix (upstream: MHeard)</td><td class="n">27 200</td><td class="n">63 034</td><td class="n">24 386</td><td>gebraucht; schrumpft mit <code>-Os</code> auf ein Drittel</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-mesh)"></span>Mesh-Kern: LoRa, APRS, Ringe, Plattform-Loop</td><td class="n">99 583</td><td class="n">106 900</td><td class="n">79 593</td><td>gebraucht</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-mesh)"></span>EXTUDP / Gateway</td><td class="n">33 875</td><td class="n">41 036</td><td class="n">14 602</td><td>gebraucht über Ethernet; 24 kB davon ArduinoJson-Inlining</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-mesh)"></span>Store &amp; Forward, DM</td><td class="n">0</td><td class="n">8 838</td><td class="n">6 309</td><td>gebraucht (Fork-Funktion)</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-peri)"></span>Sensoren (BME680, BMP3xx, SHTC3, LPS22 …)</td><td class="n">44 762</td><td class="n">44 786</td><td class="n">29 711</td><td>zur Laufzeit geschaltet; WisBlock-Module existieren, kein toter Code</td></tr>
+      <tr class="hi"><td><span class="dot" style="background:var(--c-peri)"></span>GPS (SparkFun u-blox + TinyGPS++)</td><td class="n">31 096</td><td class="n">31 096</td><td class="n">26 840</td><td>TinyGPS++ gebraucht; <b>SparkFun nur für einen Baudraten-Test</b></td></tr>
+      <tr><td><span class="dot" style="background:var(--c-peri)"></span>Ethernet + NTP</td><td class="n">27 504</td><td class="n">24 543</td><td class="n">16 842</td><td>gebraucht (RAK13800)</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-peri)"></span>Display (U8g2)</td><td class="n">12 518</td><td class="n">12 518</td><td class="n">10 802</td><td>optional, OLED am I²C</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-ble)"></span>BLE: Bluefruit, cc310-Krypto, unsere Anbindung</td><td class="n">53 885</td><td class="n">59 941</td><td class="n">54 622</td><td>gebraucht; cc310 trägt das LESC-Pairing</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-plat)"></span>libc, libm, libgcc</td><td class="n">49 685</td><td class="n">51 000</td><td class="n">50 943</td><td>gebraucht; enthält <code>printf</code> mit Gleitkomma</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-plat)"></span>Arduino-Kern, FreeRTOS, Treiber</td><td class="n">28 413</td><td class="n">28 810</td><td class="n">20 562</td><td>gebraucht</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-plat)"></span>Dateisystem (LittleFS)</td><td class="n">25 222</td><td class="n">25 921</td><td class="n">11 595</td><td>gebraucht (Einstellungen, Mailbox)</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-plat)"></span>USB: CDC-Konsole</td><td class="n">15 611</td><td class="n">15 611</td><td class="n">12 680</td><td>gebraucht (serielle Konsole)</td></tr>
+      <tr><td><span class="dot" style="background:var(--c-plat)"></span>SX126x-Treiber</td><td class="n">13 596</td><td class="n">13 596</td><td class="n">8 828</td><td>gebraucht</td></tr>
+      <tr class="hi"><td><span class="dot" style="background:var(--c-plat)"></span>USB: MSC, HID, MIDI, Vendor, Video, USB-Host</td><td class="n">12 221</td><td class="n">12 221</td><td class="n">9 843</td><td><b>tot</b>; nur die CDC-Konsole wird benutzt</td></tr>
+      <tr><td><b>Summe der Map-Einträge</b></td><td class="n"><b>674 386</b></td><td class="n"><b>785 320</b></td><td class="n"><b>576 063</b></td><td>PlatformIO meldet 672 552 / 783 516 / 573 588; die Differenz ist Overlap durch String-Merging (identische Zeichenketten je Objektdatei gezählt, im ELF nur einmal abgelegt), keine Füllbytes</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Was der Fork dazulegt</h2>
+  <p class="intro">Die grössten Veränderungen je Objektdatei, upstream gegen u, beide mit
+     <code>-Ofast</code>. Neue Dateien stehen mit 0 auf der upstream-Seite.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Datei</th><th class="n">upstream</th><th class="n">u</th><th class="n">Δ</th><th>Was dahinter steht</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td class="s">nbr_matrix.cpp</td><td class="n">0</td><td class="n">50 027</td><td class="n">+50 027</td><td>Nachbarschaftsmatrix; mit <code>-Os</code> nur 18 032</td></tr>
+      <tr><td class="s">mheard_functions.cpp</td><td class="n">27 200</td><td class="n">0</td><td class="n">−27 200</td><td>von der Matrix ersetzt</td></tr>
+      <tr><td class="s">web_functions.cpp</td><td class="n">87 750</td><td class="n">110 115</td><td class="n">+22 365</td><td>Nachrichten-Tabs, Mailbox-, Nachbar-, Queue-Seite</td></tr>
+      <tr><td class="s">command_functions.cpp</td><td class="n">56 759</td><td class="n">65 083</td><td class="n">+8 324</td><td>S&amp;F-, NBR-, Ping-Kommandos und Hilfetext</td></tr>
+      <tr><td class="s">mh_phone.cpp</td><td class="n">0</td><td class="n">7 901</td><td class="n">+7 901</td><td>MHeard-JSON für die App aus der Matrix</td></tr>
+      <tr><td class="s">lora_functions.cpp</td><td class="n">16 564</td><td class="n">23 093</td><td class="n">+6 529</td><td>PN-Retry, Relay-Entscheidung</td></tr>
+      <tr><td class="s">nrf52_ble.cpp</td><td class="n">3 406</td><td class="n">9 462</td><td class="n">+6 056</td><td>BLE-Einstellungstausch v1; die Charakteristik entsteht auf dem RAK nie (siehe „Toter Code" unten)</td></tr>
+      <tr><td class="s">nbr_views.cpp</td><td class="n">0</td><td class="n">5 098</td><td class="n">+5 098</td><td>Matrix-Ansichten für Konsole und Web</td></tr>
+      <tr><td class="s">udp_frame_nrf52.cpp</td><td class="n">0</td><td class="n">4 969</td><td class="n">+4 969</td><td>aus <code>nrf_eth.cpp</code> herausgelöst (dort −2 961)</td></tr>
+      <tr><td class="s">msgstore.cpp</td><td class="n">0</td><td class="n">4 415</td><td class="n">+4 415</td><td>Store &amp; Forward</td></tr>
+      <tr><td class="s">ble_settings_v1 · settings_schema · settings_store (+nrf52)</td><td class="n">0</td><td class="n">13 805</td><td class="n">+13 805</td><td>schlüsselbasierter Einstellungsspeicher und BLE-v1-Abbild</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Die Hebel, nach Ertrag</h2>
+  <p class="intro">Gemessen heisst: gebaut oder aus der Map abgelesen. Obergrenze heisst: die
+     Grösse der Objekte, die wegfallen würden; ein Ersatz kostet davon ein paar hundert Byte.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="n">Byte</th><th>Was</th><th>Wie</th><th>Beleg</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td class="n">−209 928</td><td><code>-Os</code> statt <code>-Ofast</code>, ganzer Build</td><td><code>build_unflags = -Ofast</code> und <code>-Os</code> in <code>[env:wiscore_rak4631]</code>, nicht in <code>[nrf52_base]</code> — <code>heltec_t114</code> und <code>t_echo</code> extenden dieselbe Base und bräuchten sonst denselben Soak mit</td><td>gebaut</td></tr>
+      <tr><td class="n">−145 124</td><td>dasselbe nur für <code>src/</code></td><td><code>-Os</code> in <code>build_src_flags</code>; Framework und Bibliotheken bleiben schnell</td><td>gebaut</td></tr>
+      <tr class="hi"><td class="n">−27 281</td><td>Web-Scaffold gzip-komprimiert ausliefern</td><td>statisches HTML/JS aus <code>deliver_scaffold()</code> als ein gzip-Blob mit <code>Content-Encoding: gzip</code>; Titel und <code>#if</code>-Teile getrennt</td><td>Blob gemessen: 41 447 → 14 166 B</td></tr>
+      <tr class="hi"><td class="n">−27 840</td><td>SparkFun-u-blox-Bibliothek</td><td><code>myGPS.begin()</code> in <code>nrf52_main.cpp:826/843</code> durch die vorhandene <code>sendUBX_MON_VER()</code>/<code>readUBXbin()</code>-Probe ersetzen</td><td>Obergrenze; −24 340 bei <code>-Os</code></td></tr>
+      <tr class="hi"><td class="n">−12 221</td><td>ungenutzte TinyUSB-Klassen</td><td><code>-DCFG_TUD_MSC=0 -DCFG_TUD_HID=0 -DCFG_TUD_MIDI=0 -DCFG_TUD_VENDOR=0 -DCFG_TUD_VIDEO=0</code>; der USB-Host braucht mehr (s. u.)</td><td>Obergrenze; −9 843 bei <code>-Os</code></td></tr>
+      <tr><td class="n">≈ −4 500</td><td>zwei Feldtabellen aus derselben Liste</td><td><code>cfg_fields</code> (4 848 B) und <code>settings_schema::kFields</code> (4 200 B) aus einer Tabelle bedienen</td><td>Tabellen gemessen, Ersparnis geschätzt</td></tr>
+      <tr><td class="n">≈ −550</td><td>WiFi-Kommandos ohne Wirkung</td><td><code>--wifiap</code>, <code>--wifitxpower</code>, BLE <code>0x55</code> und eine Hilfezeile unter <code>#ifndef BOARD_RAK4630</code></td><td>geschätzt</td></tr>
+    </tbody>
+  </table></div>
+  <div class="find warn">
+    <p><b><code>-Os</code> ist eine Messung, keine Empfehlung ohne Bench.</b> Das Framework setzt
+       <code>-Ofast</code> in <code>nordicnrf52/builder/frameworks/arduino/adafruit.py:84</code> und
+       <code>:129</code>; kein MeshCom-Ini überschreibt es. <code>-Ofast</code> schliesst
+       <code>-ffast-math</code> ein, das heisst, mit <code>-Os</code> ändert sich auch das
+       Gleitkommaverhalten: <code>isnan()</code>-Prüfungen, die der Compiler heute wegfaltet,
+       greifen dann wieder. Vor einem Wechsel braucht es einen Funk- und BLE-Soak auf dem RAK.
+       Gesetzt in <code>[env:wiscore_rak4631]</code> betrifft der Schalter nur den RAK; stünde er
+       stattdessen in <code>[nrf52_base]</code>, liefe derselbe Wechsel auch in
+       <code>heltec_t114</code> und <code>t_echo</code> mit, und beide bräuchten ihren eigenen
+       Soak, bevor ihr Release-Build so gebaut würde.
+       Die RAM-Belegung ändert sich nicht (92 696 statt 92 780 B).</p>
+  </div>
+</section>
+
+<section>
+  <h2>DRY: der Optimierer dupliziert mehr als wir</h2>
+  <p>Die Frage war, wo Code-Dopplungen Flash kosten. Die Antwort aus dem Maschinencode:
+     kaum im Quelltext, sehr viel durch <code>-Ofast</code>.</p>
+  <div class="grid2">
+    <div class="stat">
+      <span class="lbl">Byte-gleiche Funktionen im Image</span>
+      <div class="big">722 B</div>
+      <p>Acht Paare mit identischem Maschinencode, fast alle in Bibliotheken
+         (SSD1306/SH1106-Treiber, IRQ-Handler). Aus <code>src/</code> nur
+         <code>logRxDropUnconfigured</code>/<code>logTxLeakUnconfigured</code>, 84 B.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">ArduinoJson, <code>-Ofast</code> → <code>-Os</code></span>
+      <div class="big">51 948 → 14 137</div>
+      <p>Verteilt auf <code>extudp_functions</code> (24 kB), <code>config_json</code> (12 kB),
+         <code>command_functions</code> (11 kB) und Web (5 kB). Das Mehr ist Inlining je
+         Aufrufstelle, kein doppelter Quelltext.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">Batterie auf dem RAK</span>
+      <div class="big" style="color:var(--good)">556 B</div>
+      <p>Nur <code>batt_function_old.cpp</code> landet im Image; <code>batt_functions.cpp</code>
+         wird gelinkt, trägt aber 0 Byte bei. Die Batterie-Dopplung kostet den RAK keinen Flash.</p>
+    </div>
+  </div>
+  <p>Echte Dopplung im Quelltext gibt es an einer Stelle, und sie ist fachlich, nicht kopiert:
+     <b>die rund hundert Einstellungen werden an sechs Stellen beschrieben.</b></p>
+  <div class="tw"><table>
+    <thead><tr><th>Beschreibung</th><th>Ort</th><th class="n">Byte (u)</th><th>Rolle</th></tr></thead>
+    <tbody>
+      <tr><td class="s">cfg_fields</td><td class="s">config_json.cpp:52</td><td class="n">4 848</td><td>JSON-Export/Import, aus <code>CFG_FIELD_LIST</code></td></tr>
+      <tr><td class="s">settings_schema::kFields</td><td class="s">settings_schema.cpp:185</td><td class="n">4 200</td><td>Einstellungsspeicher, aus derselben <code>CFG_FIELD_LIST</code></td></tr>
+      <tr><td class="s">commandAction() + Texte</td><td class="s">command_functions.cpp</td><td class="n">45 315</td><td>jedes <code>--set…</code> von Hand; 16 923 B davon Zeichenketten</td></tr>
+      <tr><td class="s">webSetup_setParam/getParam</td><td class="s">web_setup.cpp:22, :752</td><td class="n">6 264</td><td>übersetzt Web-Parameter in Kommandotexte</td></tr>
+      <tr><td class="s">bleSettingsToV1/FromV1</td><td class="s">nrf52/ble_settings_v1.cpp</td><td class="n">4 352</td><td>Feld-für-Feld-Abbild für den Alt-Flash-Blob; die App-Charakteristik 0xF0A1 entsteht auf dem RAK nie (siehe „Toter Code" unten), diese beiden Funktionen bleiben trotzdem nötig</td></tr>
+      <tr><td class="s">sanitize_loaded_settings()</td><td class="s">nrf52/nrf52_flash.cpp</td><td class="n">3 560</td><td>Grenzwerte je Feld, von Hand</td></tr>
+      <tr><td class="s">COMMAND_TOGGLES</td><td class="s">command_functions.cpp</td><td class="n">1 512</td><td>Tabelle für die Ein/Aus-Schalter</td></tr>
+    </tbody>
+  </table></div>
+  <p>Eine Feldtabelle mit Name, Typ, Grenzen und Kommando-Alias könnte JSON, Speicher, Web,
+     BLE-v1 und die Grenzwertprüfung bedienen. Die beiden generierten Tabellen zusammenzulegen
+     ist der kleine, sichere Schritt (≈ 4,5 kB). Den Rest in eine Tabelle zu ziehen ist der
+     Kern von OPT-01 aus dem Audit vom 10.09. und nach wie vor nicht begonnen; sein Ertrag hängt
+     davon ab, wie viel von <code>commandAction()</code> tabellarisch wird.</p>
+</section>
+
+<section>
+  <h2>Toter Code auf dem RAK</h2>
+  <p class="intro">Code, der im Image steht, auf einem RAK4631 aber nie etwas tun kann.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="n">Byte</th><th>Was</th><th>Warum tot</th><th>Abschalten über</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td class="n">27 840</td><td>SparkFun u-blox GNSS</td><td>nur <code>begin()</code> als Baudraten-Test; das Ergebnis wird bloss ausgegeben, geparst wird mit TinyGPS++</td><td>Ersatz durch UBX-MON-VER-Probe, dann <code>lib_ignore</code></td></tr>
+      <tr class="hi"><td class="n">12 221</td><td>TinyUSB MSC, HID, MIDI, Vendor, Video, Host (MAX3421)</td><td>der RAK benutzt nur die CDC-Konsole; UF2 macht der Bootloader</td><td><code>CFG_TUD_*=0</code> per <code>-D</code> (<code>tusb_config_nrf.h:73–86</code> hat <code>#ifndef</code>); <code>CFG_TUH_ENABLED</code> ist dort unbedingt gesetzt (<code>:48–55</code>) und braucht einen Patch</td></tr>
+      <tr class="hi"><td class="n">≤ 6 056</td><td>BLE-Einstellungscharakteristik 0xF0A1 (Setup, <code>settings_rx_callback</code>, Staging-Bild, <code>applyPendingBleSettings</code>)</td><td><code>setFixedLen(sizeof(s_ble_settings_v1)+1)</code> = 2001 B (<code>nrf52_ble.cpp:314</code>) überschreitet S140s <code>BLE_GATTS_FIX_ATTR_LEN_MAX</code> von 510 B; <code>sd_ble_gatts_characteristic_add</code> schlägt fehl, die Charakteristik existiert nie, <code>settings_rx_callback</code> läuft nie (Bench 28.09., docs/rak-settings-ram-plan.md Finding 5)</td><td>Charakteristik-Setup, Callback, Staging-Bild und Apply-Funktion entfernen; <code>bleSettingsToV1/FromV1</code> bleiben für den Alt-Flash-Blob nötig. Obergrenze = ganzes <code>nrf52_ble.cpp</code>-Delta, nicht separat gemessen</td></tr>
+      <tr><td class="n">≈ 550</td><td><code>--wifitxpower</code>, BLE <code>0x55</code>, tote Web-Getter für SSID/Passwort/Netconsole</td><td>kein WiFi auf dem RAK; <code>--wifiap</code> selbst und sein Hilfetext stehen schon unter <code>#ifndef BOARD_RAK4630</code> (<code>command_functions.cpp:3459–3629</code>) und sind gar nicht erst im RAK-Image, aber <code>--wifitxpower</code> (<code>:4117–4131</code>, Hilfe <code>:1126</code>) und BLE <code>0x55</code> (<code>phone_commands.cpp:575–625</code>) haben keine solche Guard; <code>webSetup_getParam()</code> liest <code>setssid</code>/<code>setpwd</code>/<code>netconsole</code> ebenfalls ungeschützt zurück (<code>web_setup.cpp:991–999, :1036</code>)</td><td><code>#ifndef BOARD_RAK4630</code> auf <code>--wifitxpower</code>, BLE <code>0x55</code> und die drei Web-Getter ausweiten</td></tr>
+    </tbody>
+  </table></div>
+  <p>Nicht tot, obwohl es so aussieht: die Sensortreiber (44,8 kB) werden zur Laufzeit mit
+     <code>--set…</code> gewählt, und es gibt für jeden passende WisBlock-Module. Ein
+     abgespeckter RAK-Build ohne Sensoren wäre eine Produktentscheidung, keine Aufräumarbeit.
+     Ebenso <code>libnrf_cc310</code> (31 kB): Bluefruit braucht es für das LESC-Pairing
+     (<code>nRFCrypto_ECC</code>), <code>phone_commands.cpp:210</code> zusätzlich für SHA-256.
+     Die ESP32-only-Pfade (KISS/TCP, OTA, Net-Console) sind schon sauber ausgeklammert und
+     stehen nicht im Image. SSID/Passwort nur teilweise: <code>--wifiap</code> und die
+     Setter fehlen im RAK-Image, aber BLE <code>0x55</code> und drei Web-Getter sind noch drin
+     (siehe Zeile oben).</p>
+</section>
+
+<section>
+  <h2>Was diese Karte nicht zeigt</h2>
+  <ul>
+    <li><b>Laufzeit.</b> Die Map zeigt, was im Image steht, nicht wie oft es läuft.
+        „Gebraucht" heisst hier: auf einem RAK4631 erreichbar und sinnvoll.</li>
+    <li><b>Das Verhalten mit <code>-Os</code>.</b> Die Zahlen sind gebaut und gelinkt, das Image
+        ist nicht geflasht. Funk-Timing, BLE und Gleitkomma sind ungeprüft.</li>
+    <li><b>Ersatzkosten.</b> Bei u-blox, USB und den Feldtabellen ist die Obergrenze angegeben.
+        Was der Ersatz kostet, zeigt erst der Bau.</li>
+    <li><b>Die ESP32-Boards.</b> Dort ist Flash kein Engpass (43–53 % belegt); ihr Problem ist
+        DRAM, siehe Speicherkarte.</li>
+  </ul>
+</section>
+
+<footer>
+  MeshCom Firmware · Flashkarte RAK4631 vom 28.09.2026 · Messgrundlage: Linker-Map
+  (<code>-Wl,-Map</code>) von drei sauberen Bauten derselben Umgebung
+  <code>wiscore_rak4631</code>: upstream/dev 10ab0344, fork-neo-test fed0eb0e, fed0eb0e mit
+  <code>-Os</code>; Maschinencode-Vergleich über <code>arm-none-eabi-objdump</code>;
+  gzip-Ertrag an dem aus dem ELF geschnittenen Zeichenketten-Blob gemessen
+</footer>
+</div>
+<div class="tt" id="tt"></div>
+
+<script>const DATA={"length": 815104, "cats": [{"k": "web", "l": "Web-GUI"}, {"k": "cmd", "l": "Kommandos & Einstellungen"}, {"k": "nbr", "l": "Nachbarschaftsmatrix"}, {"k": "mesh", "l": "Mesh-Kern, S&F, Gateway"}, {"k": "peri", "l": "Ethernet, GPS, Sensoren, Display"}, {"k": "ble", "l": "BLE-Stack"}, {"k": "plat", "l": "Plattform: USB, LittleFS, Funk, libc, Kern"}], "bars": [{"k": "up", "l": "upstream/dev", "pio": 672552, "seg": [{"k": "web", "b": 95430, "top": [["web_functions/web_functions.cpp", 87750], ["web_functions/web_setup.cpp", 7166], ["web_functions/webUIComponents.cpp", 281], ["web_functions/web_nodefunctioncalls.cpp", 233]]}, {"k": "cmd", "b": 103785, "top": [["command_functions.cpp", 56759], ["config_json.cpp", 28280], ["nrf52/nrf52_flash.cpp", 10315], ["phone_commands.cpp", 3061]]}, {"k": "nbr", "b": 27200, "top": [["mheard_functions.cpp", 27200]]}, {"k": "mesh", "b": 133458, "top": [["loop_functions.cpp", 34687], ["extudp_functions.cpp", 33875], ["nrf52/nrf52_main.cpp", 17548], ["lora_functions.cpp", 16564]]}, {"k": "peri", "b": 115880, "top": [["SparkFun_u-blox_GNSS_Arduino_Library.cpp", 27840], ["nrf52/nrf_eth.cpp", 10023], ["bme68x.c", 9121], ["u8g2_fonts.c", 6587]]}, {"k": "ble", "b": 53885, "top": [["libnrf_cc310_0.9.13-no-interrupts.a", 31376], ["nrf52/nrf52_ble.cpp", 3406], ["bluefruit.cpp", 2873], ["BLESecurity.cpp", 2864]]}, {"k": "plat", "b": 144748, "top": [["libc_nano.a", 30053], ["libFrameworkArduino.a", 24429], ["lfs.c", 20980], ["libm.a", 15066]]}]}, {"k": "u", "l": "v4.35u (-Ofast)", "pio": 783516, "seg": [{"k": "web", "b": 117705, "top": [["web_functions/web_functions.cpp", 110115], ["web_functions/web_setup.cpp", 7148], ["web_functions/webUIComponents.cpp", 281], ["web_functions/web_nodefunctioncalls.cpp", 161]]}, {"k": "cmd", "b": 127764, "top": [["command_functions.cpp", 65083], ["config_json.cpp", 28152], ["nrf52/nrf52_flash.cpp", 11242], ["nrf52/ble_settings_v1.cpp", 4380]]}, {"k": "nbr", "b": 63034, "top": [["nbr_matrix.cpp", 50027], ["mh_phone.cpp", 7901], ["nbr_views.cpp", 5098], ["topo_ui.cpp", 8]]}, {"k": "mesh", "b": 156774, "top": [["loop_functions.cpp", 36289], ["extudp_functions.cpp", 34804], ["lora_functions.cpp", 23093], ["nrf52/nrf52_main.cpp", 15630]]}, {"k": "peri", "b": 112943, "top": [["SparkFun_u-blox_GNSS_Arduino_Library.cpp", 27840], ["bme68x.c", 9121], ["nrf52/nrf_eth.cpp", 7062], ["u8g2_fonts.c", 6587]]}, {"k": "ble", "b": 59941, "top": [["libnrf_cc310_0.9.13-no-interrupts.a", 31376], ["nrf52/nrf52_ble.cpp", 9462], ["bluefruit.cpp", 2873], ["BLESecurity.cpp", 2864]]}, {"k": "plat", "b": 147159, "top": [["libc_nano.a", 31069], ["libFrameworkArduino.a", 24742], ["lfs.c", 21595], ["libm.a", 15206]]}]}, {"k": "os", "l": "v4.35u mit -Os", "pio": 573588, "seg": [{"k": "web", "b": 104663, "top": [["web_functions/web_functions.cpp", 97546], ["web_functions/web_setup.cpp", 6704], ["web_functions/webUIComponents.cpp", 268], ["web_functions/web_nodefunctioncalls.cpp", 145]]}, {"k": "cmd", "b": 93242, "top": [["command_functions.cpp", 50916], ["config_json.cpp", 14151], ["nrf52/nrf52_flash.cpp", 8348], ["settings_schema.cpp", 4252]]}, {"k": "nbr", "b": 24386, "top": [["nbr_matrix.cpp", 18032], ["nbr_views.cpp", 3739], ["mh_phone.cpp", 2611], ["topo_ui.cpp", 4]]}, {"k": "mesh", "b": 100504, "top": [["loop_functions.cpp", 26259], ["lora_functions.cpp", 16364], ["nrf52/nrf52_main.cpp", 13889], ["extudp_functions.cpp", 9513]]}, {"k": "peri", "b": 84195, "top": [["SparkFun_u-blox_GNSS_Arduino_Library.cpp", 24340], ["u8g2_fonts.c", 6587], ["nrf52/nrf_eth.cpp", 5986], ["bme68x.c", 4609]]}, {"k": "ble", "b": 54622, "top": [["libnrf_cc310_0.9.13-no-interrupts.a", 31376], ["nrf52/nrf52_ble.cpp", 9411], ["bluefruit.cpp", 2450], ["BLECharacteristic.cpp", 1777]]}, {"k": "plat", "b": 114451, "top": [["libc_nano.a", 31032], ["libFrameworkArduino.a", 17385], ["libm.a", 15206], ["lfs.c", 8681]]}]}]};
+
+const nf0=new Intl.NumberFormat("de-DE");const nf={format:v=>nf0.format(v).replace(/\./g," ")};
+function render(){
+  const u=DATA.bars[1];
+  document.getElementById("legend").innerHTML=DATA.cats.map((c,i)=>
+    `<span class="lg"><span class="sw" style="background:var(--c-${c.k})"></span>${c.l}<span class="v">${nf.format(u.seg[i].b)}</span></span>`).join("")
+    +`<span class="lg"><span class="sw free"></span>frei</span>`;
+  document.getElementById("fmap").innerHTML=DATA.bars.map(b=>{
+    const used=b.seg.reduce((a,s)=>a+s.b,0);
+    const segs=b.seg.map((s,i)=>{const c=DATA.cats[i];
+      const top=s.top.map(t=>`${t[0]} ${nf.format(t[1])}`).join("<br>");
+      return `<div class="seg" tabindex="0" style="background:var(--c-${c.k});flex:${s.b} 1 0;min-width:0"
+        data-t="${c.l}" data-b="${nf.format(s.b)} Byte · ${(100*s.b/DATA.length).toFixed(1)} % der Region" data-p="${top}"></div>`}).join("");
+    const pct=(100*b.pio/DATA.length).toFixed(1).replace(".",",");
+    return `<div class="frow"><span class="rowlab"><b>${b.l.split(" (")[0].split(" mit")[0]}</b>${b.k=="os"?"mit -Os":(b.k=="u"?"-Ofast":"-Ofast")}</span>
+      <div class="fbar" role="img" aria-label="${b.l}: ${nf.format(b.pio)} von ${nf.format(DATA.length)} Byte belegt">${segs}<div class="seg free" style="flex:${DATA.length-b.pio} 1 0;min-width:0" data-t="frei" data-b="${nf.format(DATA.length-b.pio)} Byte" data-p=""></div></div></div>
+      <div class="ffig"><b>${nf.format(b.pio)}</b> Byte belegt · ${pct} % · frei ${nf.format(DATA.length-b.pio)} Byte</div>`}).join("");
+}
+function tooltips(){
+  const tt=document.getElementById("tt");
+  const show=s=>{tt.innerHTML=`<b>${s.dataset.t}</b><br>${s.dataset.b}${s.dataset.p?"<br><br>"+s.dataset.p:""}`;tt.classList.add("on")};
+  document.addEventListener("pointerover",e=>{const s=e.target.closest(".seg");if(!s){tt.classList.remove("on");return}show(s)});
+  document.addEventListener("focusin",e=>{const s=e.target.closest(".seg");if(!s)return;show(s);const r=s.getBoundingClientRect();tt.style.left=Math.max(8,r.left)+"px";tt.style.top=(r.bottom+8)+"px"});
+  document.addEventListener("pointermove",e=>{if(!tt.classList.contains("on"))return;const pad=14;let x=e.clientX+pad,y=e.clientY+pad;const r=tt.getBoundingClientRect();
+    if(x+r.width>innerWidth-8)x=e.clientX-r.width-pad;if(y+r.height>innerHeight-8)y=e.clientY-r.height-pad;tt.style.left=Math.max(8,x)+"px";tt.style.top=Math.max(8,y)+"px"});
+  document.addEventListener("pointerleave",()=>tt.classList.remove("on"));
+}
+render();tooltips();
+</script>
+</body>
+</html>

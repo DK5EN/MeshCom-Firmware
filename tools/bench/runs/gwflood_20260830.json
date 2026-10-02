@@ -1,0 +1,264 @@
+{
+  "host": "192.168.68.58",
+  "client": [
+    "192.168.68.66",
+    1990
+  ],
+  "table": [
+    {
+      "gap_s": 8.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 4.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 2.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 1.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 0.5,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    }
+  ],
+  "sent": [
+    {
+      "gap": 8.0,
+      "k": 0,
+      "msg_id": 2111346432,
+      "t_send": 236023.161507333
+    },
+    {
+      "gap": 8.0,
+      "k": 1,
+      "msg_id": 2111346433,
+      "t_send": 236031.240740916
+    },
+    {
+      "gap": 8.0,
+      "k": 2,
+      "msg_id": 2111346434,
+      "t_send": 236039.321613083
+    },
+    {
+      "gap": 8.0,
+      "k": 3,
+      "msg_id": 2111346435,
+      "t_send": 236047.412564958
+    },
+    {
+      "gap": 8.0,
+      "k": 4,
+      "msg_id": 2111346436,
+      "t_send": 236055.488772083
+    },
+    {
+      "gap": 8.0,
+      "k": 5,
+      "msg_id": 2111346437,
+      "t_send": 236063.56508325
+    },
+    {
+      "gap": 4.0,
+      "k": 0,
+      "msg_id": 2111346438,
+      "t_send": 236079.806228291
+    },
+    {
+      "gap": 4.0,
+      "k": 1,
+      "msg_id": 2111346439,
+      "t_send": 236083.880227208
+    },
+    {
+      "gap": 4.0,
+      "k": 2,
+      "msg_id": 2111346440,
+      "t_send": 236087.951437208
+    },
+    {
+      "gap": 4.0,
+      "k": 3,
+      "msg_id": 2111346441,
+      "t_send": 236092.038307708
+    },
+    {
+      "gap": 4.0,
+      "k": 4,
+      "msg_id": 2111346442,
+      "t_send": 236096.134127083
+    },
+    {
+      "gap": 4.0,
+      "k": 5,
+      "msg_id": 2111346443,
+      "t_send": 236100.219050958
+    },
+    {
+      "gap": 2.0,
+      "k": 0,
+      "msg_id": 2111346444,
+      "t_send": 236112.419980208
+    },
+    {
+      "gap": 2.0,
+      "k": 1,
+      "msg_id": 2111346445,
+      "t_send": 236114.489860583
+    },
+    {
+      "gap": 2.0,
+      "k": 2,
+      "msg_id": 2111346446,
+      "t_send": 236116.56256325
+    },
+    {
+      "gap": 2.0,
+      "k": 3,
+      "msg_id": 2111346447,
+      "t_send": 236118.621086708
+    },
+    {
+      "gap": 2.0,
+      "k": 4,
+      "msg_id": 2111346448,
+      "t_send": 236120.624981916
+    },
+    {
+      "gap": 2.0,
+      "k": 5,
+      "msg_id": 2111346449,
+      "t_send": 236122.696676041
+    },
+    {
+      "gap": 1.0,
+      "k": 0,
+      "msg_id": 2111346450,
+      "t_send": 236132.840835375
+    },
+    {
+      "gap": 1.0,
+      "k": 1,
+      "msg_id": 2111346451,
+      "t_send": 236133.917253041
+    },
+    {
+      "gap": 1.0,
+      "k": 2,
+      "msg_id": 2111346452,
+      "t_send": 236135.004488375
+    },
+    {
+      "gap": 1.0,
+      "k": 3,
+      "msg_id": 2111346453,
+      "t_send": 236136.088446083
+    },
+    {
+      "gap": 1.0,
+      "k": 4,
+      "msg_id": 2111346454,
+      "t_send": 236137.164033208
+    },
+    {
+      "gap": 1.0,
+      "k": 5,
+      "msg_id": 2111346455,
+      "t_send": 236138.242661583
+    },
+    {
+      "gap": 0.5,
+      "k": 0,
+      "msg_id": 2111346456,
+      "t_send": 236147.388449375
+    },
+    {
+      "gap": 0.5,
+      "k": 1,
+      "msg_id": 2111346457,
+      "t_send": 236147.958357041
+    },
+    {
+      "gap": 0.5,
+      "k": 2,
+      "msg_id": 2111346458,
+      "t_send": 236148.550764333
+    },
+    {
+      "gap": 0.5,
+      "k": 3,
+      "msg_id": 2111346459,
+      "t_send": 236149.075543375
+    },
+    {
+      "gap": 0.5,
+      "k": 4,
+      "msg_id": 2111346460,
+      "t_send": 236149.630695041
+    },
+    {
+      "gap": 0.5,
+      "k": 5,
+      "msg_id": 2111346461,
+      "t_send": 236150.181638083
+    }
+  ],
+  "tx_ids": [
+    1512890651,
+    3928334734,
+    3928334735,
+    3928334736
+  ],
+  "rx_ids": [
+    451011323,
+    451011324,
+    1339019546,
+    1512890651,
+    1906610846,
+    3924890378,
+    3928334734,
+    3928334736,
+    3968196633
+  ],
+  "instr": [
+    "[INSTR-HEAP] instr int_free 133816 int_min 128776 int_largest 122868 psram_free 0 psram_largest 0",
+    "[INSTR-FLUSH] n 32 total_us 1104310 avg_us 34509 max_us 35083",
+    "[INSTR-LOOP] n 29999 total_us 167317997 avg_us 5577 max_us 254010",
+    "[INSTR-SECT] display_rx n 30000 total_us 98626 avg_us 3 max_us 36001",
+    "[INSTR-SECT] gps n 55 total_us 3077144 avg_us 55948 max_us 190168",
+    "[INSTR-SECT] display_tick n 30000 total_us 521975 avg_us 17 max_us 35286",
+    "[INSTR-SECT] udp n 30000 total_us 3631777 avg_us 121 max_us 66732",
+    "[INSTR-SECT] lora_rx n 27 total_us 1300213 avg_us 48156 max_us 82888",
+    "[INSTR-SECT] wifi_ping n 6 total_us 1657 avg_us 276 max_us 463",
+    "[INSTR-GAPS] n 1 threshold_ms 250",
+    "[INSTR-GUI] not_available_on_this_board"
+  ],
+  "loop_gaps": [
+    "[INSTR-LOOP] gap ms 254 in gps section_ms 190 sections_ms 237"
+  ]
+}

@@ -1,0 +1,247 @@
+[INIT]...Enabling Vext for OLED power
+[INIT]...Resetting OLED display
+
+
+============
+CLIENT SETUP
+============
+[BOOT] RESET_REASON=1 POWERON
+[INSTR-PREV];valid;0
+[HEAP] 00:00:00 249864 244716 212980 (init)
+[PSRM] 00:00:00 0
+[EFUS]...Two Point: NOT supported
+[EFUS]...Vref: NOT supported
+[INIT]...initMheard
+[INIT]...init_flash
+[INIT]...build Sep 12 2026 / 16:44:24
+[INIT]...FLASH layout 20260724 ok, build 20260910
+[TIME]...Loaded time persistence: saved_time=1789223695, mheard_time=0, msg_time=0
+[INIT]...init_batt
+[INIT]...ADC_CTRL_PIN probe: high=962 low=1 -> active HIGH
+[ADC ]...Characterized using Default Vref
+bBMPON:0 bBMEON:1
+[INIT]...setupBMX280 - I2C:76
+[INIT]...BME280 started
+bBME680ON:0
+[INIT]...MCP23017 not found
+[INIT]...RTC not found
+[OBUT]...One Button GPIO(0) not activated
+[INIT].._GW_ID: 433A8968
+[INIT]...Initialize clock: ok
+[INIT]...Auto detecting display:
+[INIT]...OLED on Wire1 SDA 17 SCL 18: ack=0 clock=400000
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 2 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[BLE ]...Device started with BLE-Name <MC-8968-DK5EN-93>
+[BLE ]...Device-Address <48:ca:43:3a:89:69>
+[BLE ]...Waiting a client connection to notify...
+==============
+CLIENT STARTED
+==============
+[WIFI]...bWIFIAP=false
+[WIFI]...WiFi full radio reset
+[WIFI];scan;skipped;first_bringup;ms;2916
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[GPS ]...Init GPIO RX=47 TX=48
+[GPS ]...38400 baud --> 62 chars (NMEA ok)
+[GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 882 ms)
+[GPS ]...erkannte Baudrate: 38400
+[GPS ]...Try to init L76K/UBLOX
+[GPS ]...clear NMEA-Buffer
+[GPS ]>>> $PCAS06,0*1B
+[GPS ]...wait[GPS ]<<< $GPTXT,01,01,01,PCAS inv format*3D
+ ...
+check Input
+[GPS ]...UBLOX connected
+[GPS ]...UBX_CFG_PRT 38400
+[GPS ]...Sende UBX_CFG_RATE
+[GPS ]...Sende UBX_CFG_CFG
+[GPS ]...UBLOX Flash save
+[GPS ]...UBLOX config finished
+[GPS ]...wait[GPS ]...Sende UBX_MON_VER
+[GPS_VER] ub..d.1.00 (59842)..................00070000..PROTVER 14.00.................GPS;SBAS;GLO;QZSS.............q.$GPRMC,144712.00,A,4824.46281,N,01144.30399,E,0.034,,120926,,,A*7F.$GPGGA,144712.00,4824.46281,N,01144.30399,E,1,09,0.90,488.4,M,46.2,M,,*5A.
+[GPS ]...UBLOX erkannt
+[GPS ]...fix:no sat:0 hdop:0.0
+[GPS ]...Time <UTC>: 00:00:00 / Date: 0.00.00
+[readBatteryVoltage] 16:34:56 ... 0.00 V 0 % max_batt 4.200 V
+.[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;6377
+[INSTR-LOOP] gap ms 3440 in wifi_connect section_ms 0 sections_ms 0
+[WIFI];event;connected;ms;6700
+[WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-57;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6701
+[WIFI];event;got_ip;ms;7219
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-55;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;7219
+
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.69, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7392
+16:34:57[Web]...mDNS responder started
+16:34:57[Web]...WEBServer started
+[CON ]...HMAC console init.
+[CON ]...Console started on port 2323
+[BOOT];ready;ms;7413;ip;1
+TimeClient no update possible --> CPU-Mode
+[WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;37
+[WIFI];dns;pool.ntp.org;ip;49.12.35.6;ms;36
+[NTP];ok;epoch;1789224433;rtt;88
+16:47:15 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:0.9
+[GPS ]...Time <UTC>: 14:47:15 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407713 lon:11.738399 alt:488.3
+16:47:18 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:18 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407713 lon:11.738406 alt:488.7
+16:47:21 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:10 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:21 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407713 lon:11.738414 alt:489.0
+16:47:24 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:24 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407711 lon:11.738421 alt:488.7
+16:47:27 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:27 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407709 lon:11.738426 alt:487.9
+16:47:30 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:30 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407705 lon:11.738429 alt:486.5
+16:47:33 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:33 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407702 lon:11.738435 alt:485.2
+16:47:35 [WIFI]..WiFi connected
+16:47:36 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:8 hdop:1.1
+[GPS ]...Time <UTC>: 14:47:36 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407700 lon:11.738440 alt:484.5
+16:47:39 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:39 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407697 lon:11.738442 alt:483.9
+--extudp onWiFI is open
+[EXT] URL:192.168.68.58 to IP:192.168.68.58
+[EXT]...now listening at IP 192.168.68.69, UDP port 1799
+[EXT]...now sending   to IP , UDP port 1799
+[readBatteryVoltage] ADC : 1020
+[readBatteryVoltage] Float : 4263.600
+[readBatteryVoltage] milliVolts : 4263
+[readBatteryVoltage] 16:47:41 ... 4.26 V 100 % max_batt 4.200 V
+16:47:42 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:42 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407693 lon:11.738435 alt:483.3
+--info--MeshCom 4.35t (build: Sep 12 2026 / 16:44:23)
+...UPDATE: 2026-09-12 16:34:58
+...Call: <DK5EN-93> ...ID 433A8968 ...NODE 43 <HELTEC_V3> ...UTC-OFF 2.000000 [GPS]
+...BATT 4.26 V ...BATT 100 % ...MAXV 4.200 V
+...TIME 38204 ms
+...Flash-Version 20260724
+...NOMSGALL off ...MESH off ...BUTTON (0) off ...SOFTSER off ... SOFTSERREAD off
+...PASSWD <>
+...DEBUG man ...DEBUG en
+...DEBUG on ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+...WXDEBUG on ...BLEDEBUG off
+...DisplayInfo off ...DisplayCont on ...DisplyLog off ...contrast 255 ...ackinfo off
+...EXTUDP on ...EXT IP 192.168.68.58 ...NOPMOTHER off
+...BTCODE 000000
+...APRSMC: APRSMC
+...ATXT: 
+...NAME: 
+...BLE : short
+...DISPLAY off
+...CTRY EU8
+...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+...MAXHOP text 2 / pos 2
+
+...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+...BATTERY PIN 1 factor 0.0000
+
+...Webserver  on / Webpwd <> / Gateway off 
+...NETConsole on (port 2323)
+...WIFI-AP    off
+...SSID <ORBI63> / PASSWORD <***>
+...NETWORK Mode:WiFi
+...hasIpAddress: yes
+...IP address   : 192.168.68.69
+...SUBNET-MASK  : 255.255.252.0
+...GW address   : 192.168.68.1
+...DNS address  : 217.237.150.188
+...UDP-HBeat : 38298
+16:47:45 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:45 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407690 lon:11.738425 alt:482.7
+--injectraw 3AA1E3E11A04444B35454E2D3916:47:48 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:48 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407688 lon:11.738415 alt:482.0
+383E393939393A45585430312D4120636F6E74726F6C002B880BA223AB707E[INJ];raw;len;44;res;58
+[MESH]...<false>...Payload<EXT01-A control>
+16:47:48 MESH    : <no via info>return MESH=false
+[EXT] Out: {"src_type":"lora","type":"msg","src":"DK5EN-98","dst":"9999","msg":"EXT01-A control","msg_id":"1AE1E3A1","firmware":35,"fw_sub":"p","rssi":-50,"snr":10} Len: 153
+[EXT];tx;len;153;stack_hwm;3036;ms;42935
+16:47:51 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:51 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407683 lon:11.738412 alt:480.9
+16:47:54 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:54 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407680 lon:11.738405 alt:480.3
+--injectraw 3AA2E3E11A04444B35454E2D39383E3130303030313A45585430312D422074656C656D65747279002B880CBC23AB707E[INJ];raw;len;48;res;58
+[MESH]...<false>...Payload<EXT01-B telemetry>
+16:47:56 MESH    : <no via info>return MESH=false
+[EXT] Out:  Len: 0
+WiFI is open
+[EXT] URL:192.168.68.58 to IP:192.168.68.58
+[EXT]...now listening at IP 192.168.68.69, UDP port 1799
+[EXT]...now sending   to IP , UDP port 1799
+16:47:57 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:47:57 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407677 lon:11.738401 alt:480.3
+16:48:00 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:8 hdop:1.1
+[GPS ]...Time <UTC>: 14:48:00 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407675 lon:11.738402 alt:480.6
+16:48:03 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:8 hdop:1.0
+[GPS ]...Time <UTC>: 14:48:03 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407675 lon:11.738402 alt:480.6
+--injectraw 3AA3E3E11A04444B35454E2D39383E393939393A45585430312D43206166746572002B880AB723AB707E[INJ];raw;len;42;res;58
+[MESH]...<false>...Payload<EXT01-C after>
+16:48:04 MESH    : <no via info>return MESH=false
+[EXT] Out: {"src_type":"lora","type":"msg","src":"DK5EN-98","dst":"9999","msg":"EXT01-C after","msg_id":"1AE1E3A3","firmware":35,"fw_sub":"p","rssi":-50,"snr":10} Len: 151
+[EXT];tx;len;151;stack_hwm;3036;ms;58946
+16:48:05 [WIFI]..WiFi connected
+16:48:06 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:8 hdop:1.1
+[GPS ]...Time <UTC>: 14:48:06 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407674 lon:11.738404 alt:480.7
+Pressure (BMX280): 967.92
+Temperature (BMX280): 25.95
+Humidity (BMX280): 36.72
+16:48:09 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:8 hdop:1.0
+[GPS ]...Time <UTC>: 14:48:09 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407674 lon:11.738404 alt:480.9
+[HEAP] 16:48:11 135632 131596 122868 (mon)
+[WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;59;got_ip_n;1;ip;1;ms;66380
+[readBatteryVoltage] 16:48:11 ... 4.26 V 100 % max_batt 4.200 V
+16:48:12 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:9 hdop:1.0
+[GPS ]...Time <UTC>: 14:48:12 / Date: 2026.09.12
+[GPS ]...position  : lat:48.407675 lon:11.738406 alt:481.5

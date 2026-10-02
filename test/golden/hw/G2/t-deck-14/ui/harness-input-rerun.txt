@@ -1,0 +1,14 @@
+=== running scenario: input ===
+
+========================================================================
+T-Deck Plus bench summary
+========================================================================
+
+[input] PASS
+  keys=7/7 repaints=2 latency p50=86.0 p95=165.7 ms
+    ball right: steps=10/10 reads=4 moved=70/70px repaints=4 latency p50=8.3 p95=8.6 ms refr p50=None max=None ms (110, 80)->(180, 80)
+    ball down : steps=10/10 reads=4 moved=70/70px repaints=4 latency p50=8.4 p95=8.9 ms refr p50=None max=None ms (180, 110)->(180, 180)
+    ball left : steps=10/10 reads=4 moved=70/70px repaints=4 latency p50=8.2 p95=8.4 ms refr p50=None max=None ms (150, 180)->(80, 180)
+    ball up   : steps=10/10 reads=4 moved=70/70px repaints=4 latency p50=8.5 p95=8.9 ms refr p50=None max=None ms (80, 150)->(80, 80)
+
+summary written to summary.json

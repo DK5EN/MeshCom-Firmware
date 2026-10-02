@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Bench captures are evidence: raw single-line configExportJson and serial logs
+# exactly as the node emitted them (the RAK console sends CRLF). Exempt from LF
+# normalization so the committed bytes are the captured bytes.
+docs/bench/**/*.json -text
+docs/bench/**/*.txt  -text

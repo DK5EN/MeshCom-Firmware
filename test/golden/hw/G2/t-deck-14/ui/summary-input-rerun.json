@@ -1,0 +1,96 @@
+{
+  "input": {
+    "ok": true,
+    "keys_sent": 7,
+    "keys_consumed": 7,
+    "key_repaints": 2,
+    "key_latency_p50_ms": 86.0,
+    "key_latency_p95_ms": 165.7,
+    "ball": [
+      {
+        "dir": "right",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          110,
+          80
+        ],
+        "last": [
+          180,
+          80
+        ],
+        "latency_p50_ms": 8.3,
+        "latency_p95_ms": 8.6,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "down",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          180,
+          110
+        ],
+        "last": [
+          180,
+          180
+        ],
+        "latency_p50_ms": 8.4,
+        "latency_p95_ms": 8.9,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "left",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          150,
+          180
+        ],
+        "last": [
+          80,
+          180
+        ],
+        "latency_p50_ms": 8.2,
+        "latency_p95_ms": 8.4,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      },
+      {
+        "dir": "up",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          80,
+          150
+        ],
+        "last": [
+          80,
+          80
+        ],
+        "latency_p50_ms": 8.5,
+        "latency_p95_ms": 8.9,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4
+      }
+    ]
+  }
+}

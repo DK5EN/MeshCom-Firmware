@@ -11,7 +11,6 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "dedup_functions.h"
-#include "pn_retry.h"
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -810,32 +809,35 @@ void NrfETH::startUDP()
     {
       if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
       {
-        printlndeb("[UDP-DEST] Setting I-NET UDP-DEST 145.239.75.155");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Setting I-NET UDP-DEST 145.239.75.155");
 
         udp_dest_addr = IPAddress(145, 239, 75, 155);
         srv_path = "inet";
 
-        printlndeb("[UDP-DEST]...NTP-DEST 162.159.200.1");
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
       else
       if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
       {
-        printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
+
         udp_dest_addr = IPAddress(44, 148, 230, 197);
         srv_path = "hamnet";
 
         // upstream f860e934: the DL HAMNET server pairs with the DL HAMNET NTP
-        printlndeb("[UDP-DEST]...Hamnet NTP-DEST 44.148.224.123");
         timeClient.setPoolServerIP(IPAddress(44, 148, 224, 123));
       }
       else
       {
-        printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.143.8.143");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.143.8.143");
+
         udp_dest_addr = IPAddress(44, 143, 8, 143);
         srv_path = "hamnet";
 
-        printlndeb("[UDP-DEST]...Hamnet NTP-DEST 44.143.0.9");
+        //DEBUG_MSG("NTP", "Setting Hamnet NTP");
         timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
       }
     }
@@ -846,32 +848,36 @@ void NrfETH::startUDP()
       // fell through to the OE default, regardless of node_gwsrv.
       if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
       {
-        printlndeb("[UDP-DEST] Internet UDP-DEST IT 145.239.75.155");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Internet UDP-DEST IT 145.239.75.155");
+
         udp_dest_addr = IPAddress(145, 239, 75, 155);
         srv_path = "inet";
 
-        printlndeb("[UDP-DEST]...NTP-DEST 162.159.200.1");
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
-      else
-      if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+      else if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
       {
         // v4.35v: MeshCom-DL internet server meshcom.hamnet.network (the ESP32
         // path resolves the name; nRF52 keeps fixed IPs like OE/IT above).
-        printlndeb("[UDP-DEST] Internet UDP-DEST DL 192.68.17.26");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Internet UDP-DEST DL 192.68.17.26");
+
         udp_dest_addr = IPAddress(192, 68, 17, 26);
         srv_path = "inet";
 
-        printlndeb("[UDP-DEST]...NTP-DEST 162.159.200.1");
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
       else
       {
-        printlndeb("[UDP-DEST] Setting I-NET UDP-DEST OE 89.185.97.38");
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Setting I-NET UDP-DEST OE 89.185.97.38");
+
+        //DEBUG_MSG("UDP-DEST", "Setting I-NET UDP-DEST 213.47.219.169");
         udp_dest_addr = IPAddress(89, 185, 97, 38);
         srv_path = "inet";
 
-        printlndeb("[UDP-DEST]...NTP-DEST 162.159.200.1");
+        //DEBUG_MSG("NTP", "Setting I-NET 3.at.pool.ntp.org NTP");
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
     }

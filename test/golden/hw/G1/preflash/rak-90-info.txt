@@ -1,0 +1,32 @@
+--info
+--MeshCom 4.35t (build: Sep 11 2026 / 13:40:24)
+...UPDATE: 2026-09-11 19:05:53
+...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]
+...BATT 4.24 V ...BATT 100 % ...MAXV 4.200 V
+...TIME 9804150 ms
+...Flash-Version 20260724
+...NOMSGALL off ...MESH on ...BUTTON (10) off ...SOFTSER off ... SOFTSERREAD off
+...PASSWD <>
+...DEBUG man ...DEBUG en
+...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+...WXDEBUG off ...BLEDEBUG off
+...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+...EXTUDP on ...EXT IP 192.168.68.58 ...NOPMOTHER off
+...BTCODE 100000
+...APRSMC: APRSMC
+...ATXT: github.com/dk5en/mcapp
+...NAME: Martin
+...BLE : short
+...DISPLAY off
+...CTRY EU8
+...FREQ 433.1750 MHz TXPWR 22 dBm RXBOOST off
+...MAXHOP text 2 / pos 2
+...GC-1:20 GC-2:232 GC-3:262 GC-4:9 GC-5:26244
+...Webserver  on / Webpwd <> / Gateway off
+...NETWORK Mode:WiFi
+...hasIpAddress: yes
+...IP address   : 192.168.68.68
+...SUBNET-MASK  : 255.255.252.0
+...GW address   : 192.168.68.1
+...DNS address  : 217.237.150.188
+...UDP-HBeat : 9711523

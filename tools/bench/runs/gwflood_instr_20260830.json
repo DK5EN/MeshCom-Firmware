@@ -1,0 +1,304 @@
+{
+  "host": "192.168.68.58",
+  "client": [
+    "192.168.68.66",
+    1990
+  ],
+  "table": [
+    {
+      "gap_s": 8.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 4.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 2.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 1.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 0.5,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    }
+  ],
+  "sent": [
+    {
+      "gap": 8.0,
+      "k": 0,
+      "msg_id": 1143021568,
+      "t_send": 236308.479346958
+    },
+    {
+      "gap": 8.0,
+      "k": 1,
+      "msg_id": 1143021569,
+      "t_send": 236316.572929083
+    },
+    {
+      "gap": 8.0,
+      "k": 2,
+      "msg_id": 1143021570,
+      "t_send": 236324.651274291
+    },
+    {
+      "gap": 8.0,
+      "k": 3,
+      "msg_id": 1143021571,
+      "t_send": 236332.723883958
+    },
+    {
+      "gap": 8.0,
+      "k": 4,
+      "msg_id": 1143021572,
+      "t_send": 236340.781849916
+    },
+    {
+      "gap": 8.0,
+      "k": 5,
+      "msg_id": 1143021573,
+      "t_send": 236348.867706833
+    },
+    {
+      "gap": 4.0,
+      "k": 0,
+      "msg_id": 1143021574,
+      "t_send": 236365.078175583
+    },
+    {
+      "gap": 4.0,
+      "k": 1,
+      "msg_id": 1143021575,
+      "t_send": 236369.150776375
+    },
+    {
+      "gap": 4.0,
+      "k": 2,
+      "msg_id": 1143021576,
+      "t_send": 236373.24289775
+    },
+    {
+      "gap": 4.0,
+      "k": 3,
+      "msg_id": 1143021577,
+      "t_send": 236377.331163458
+    },
+    {
+      "gap": 4.0,
+      "k": 4,
+      "msg_id": 1143021578,
+      "t_send": 236381.41439125
+    },
+    {
+      "gap": 4.0,
+      "k": 5,
+      "msg_id": 1143021579,
+      "t_send": 236385.466970041
+    },
+    {
+      "gap": 2.0,
+      "k": 0,
+      "msg_id": 1143021580,
+      "t_send": 236397.705826958
+    },
+    {
+      "gap": 2.0,
+      "k": 1,
+      "msg_id": 1143021581,
+      "t_send": 236399.781606
+    },
+    {
+      "gap": 2.0,
+      "k": 2,
+      "msg_id": 1143021582,
+      "t_send": 236401.873639166
+    },
+    {
+      "gap": 2.0,
+      "k": 3,
+      "msg_id": 1143021583,
+      "t_send": 236403.968251
+    },
+    {
+      "gap": 2.0,
+      "k": 4,
+      "msg_id": 1143021584,
+      "t_send": 236406.056538625
+    },
+    {
+      "gap": 2.0,
+      "k": 5,
+      "msg_id": 1143021585,
+      "t_send": 236408.144115958
+    },
+    {
+      "gap": 1.0,
+      "k": 0,
+      "msg_id": 1143021586,
+      "t_send": 236418.304107541
+    },
+    {
+      "gap": 1.0,
+      "k": 1,
+      "msg_id": 1143021587,
+      "t_send": 236419.397924291
+    },
+    {
+      "gap": 1.0,
+      "k": 2,
+      "msg_id": 1143021588,
+      "t_send": 236420.482426166
+    },
+    {
+      "gap": 1.0,
+      "k": 3,
+      "msg_id": 1143021589,
+      "t_send": 236421.581261666
+    },
+    {
+      "gap": 1.0,
+      "k": 4,
+      "msg_id": 1143021590,
+      "t_send": 236422.676112208
+    },
+    {
+      "gap": 1.0,
+      "k": 5,
+      "msg_id": 1143021591,
+      "t_send": 236423.764900041
+    },
+    {
+      "gap": 0.5,
+      "k": 0,
+      "msg_id": 1143021592,
+      "t_send": 236433.093005666
+    },
+    {
+      "gap": 0.5,
+      "k": 1,
+      "msg_id": 1143021593,
+      "t_send": 236433.650671333
+    },
+    {
+      "gap": 0.5,
+      "k": 2,
+      "msg_id": 1143021594,
+      "t_send": 236434.226208791
+    },
+    {
+      "gap": 0.5,
+      "k": 3,
+      "msg_id": 1143021595,
+      "t_send": 236434.776515083
+    },
+    {
+      "gap": 0.5,
+      "k": 4,
+      "msg_id": 1143021596,
+      "t_send": 236435.309305916
+    },
+    {
+      "gap": 0.5,
+      "k": 5,
+      "msg_id": 1143021597,
+      "t_send": 236435.876732333
+    }
+  ],
+  "tx_ids": [
+    3928334737,
+    3928334738
+  ],
+  "rx_ids": [
+    468869498,
+    523432194,
+    1090969862,
+    1090969863,
+    1788056941,
+    1906610847,
+    2709741943,
+    3497038586,
+    3928334735,
+    3928334737,
+    3928334738
+  ],
+  "instr": [
+    "[INSTR-HEAP] instr int_free 133764 int_min 128412 int_largest 122868 psram_free 0 psram_largest 0",
+    "[INSTR-FLUSH] n 40 total_us 1383423 avg_us 34585 max_us 35117",
+    "[INSTR-LOOP] n 30238 total_us 167682998 avg_us 5545 max_us 206018",
+    "[INSTR-SECT] display_rx n 30239 total_us 134067 avg_us 4 max_us 36290",
+    "[INSTR-SECT] gps n 55 total_us 2831204 avg_us 51476 max_us 189207",
+    "[INSTR-SECT] display_tick n 30239 total_us 658586 avg_us 21 max_us 35281",
+    "[INSTR-SECT] lora_rx n 27 total_us 1288525 avg_us 47723 max_us 84184",
+    "[INSTR-SECT] udp n 30239 total_us 3793138 avg_us 125 max_us 57558",
+    "[INSTR-SECT] wifi_ping n 6 total_us 719 avg_us 119 max_us 238",
+    "[INSTR-GAPS] n 0 threshold_ms 250",
+    "[INSTR-GUI] not_available_on_this_board"
+  ],
+  "loop_gaps": [],
+  "udp_rx_seen": [
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154"
+  ],
+  "queued_udp": [],
+  "udpstat": [
+    "[UDPSTAT];bind;1990;ip;192.168.68.66;dest;192.168.68.58;rx;38;rx_last_ms;180229;rx_from;192.168.68.58;1990;rx_len;14;tx;16;tx_fail;0;tx_last_ms;180190"
+  ]
+}

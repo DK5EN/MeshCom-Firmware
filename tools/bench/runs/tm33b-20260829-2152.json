@@ -1,0 +1,795 @@
+{
+  "boot": {
+    "ok": true,
+    "boot_msgs": [
+      "MeshCom 4.35p",
+      "(build: Aug 29 2026 / 21:47:28)",
+      "GPS enabled",
+      "Touch: OK",
+      "SDCard: OK",
+      "Keyboard: OK",
+      "Radio: OK",
+      "WiFi connected"
+    ],
+    "audio_outcome": null,
+    "init_summary": {
+      "kind": "BOOT",
+      "variant": "init",
+      "sd": 1,
+      "touch": 1,
+      "touch_tries": 1,
+      "kb": 1,
+      "psram_buf": 1,
+      "t_ms": 3791
+    },
+    "init_log_lines": [
+      "[INIT]...efuse not used",
+      "[INIT]...initMheard",
+      "[INIT]...init_flash",
+      "[INIT]...build Aug 29 2026 / 21:47:27",
+      "[INIT]...FLASH layout 20260724 ok, build 20260828",
+      "[INIT]...initTDeck",
+      "[INIT]...TFT: OK",
+      "[INIT]...LVGL draw buffer: PSRAM",
+      "[INIT]...T-DECK based on Arduino V8.3.11",
+      "[INIT]...using LVGL_Arduino_Display_LIB",
+      "[INIT]...Keyboard registered",
+      "[INIT]...MeshCom 4.35p",
+      "[INIT]...Touch: OK",
+      "[INIT]...SD_MMC Card Type: SDHC",
+      "[INIT]...SD Card Size: 30436 MB",
+      "[INIT]...Total space: 30417 MB",
+      "[INIT]...SDCard: OK",
+      "[INIT]...Keyboard: OK",
+      "[INIT]...init_batt",
+      "[INIT].._GW_ID: A1AD65E0",
+      "[INIT]...Initialize clock: ok"
+    ],
+    "fail_lines": []
+  },
+  "displaycmd": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      },
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      }
+    ]
+  },
+  "sleep": {
+    "ok": true,
+    "s0": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 16846,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 540,
+      "sleeping": null
+    },
+    "s1": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 21074,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 543,
+      "sleeping": null
+    },
+    "s2": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 22955,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 540,
+      "sleeping": null
+    },
+    "tft_off_acked": true,
+    "tft_on_acked": true,
+    "inject_ok": true,
+    "refr_px_while_asleep": [
+      2072,
+      76800,
+      2356,
+      2072,
+      2072
+    ],
+    "screen_changed_by_wake": false,
+    "wake_matches_forced_repaint": true,
+    "full_refresh_after_wake": false,
+    "max_px_after_wake": 2072,
+    "redraw_count_after_wake": 10,
+    "top_backtraces_after_wake": [
+      {
+        "count": 3,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2135",
+          "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+          "esp32loop esp32_main.cpp:3421",
+          "loop main.cpp:68",
+          "loopTask main.cpp:50"
+        ]
+      },
+      {
+        "count": 3,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2136",
+          "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+          "esp32loop esp32_main.cpp:3421",
+          "loop main.cpp:68",
+          "loopTask main.cpp:50"
+        ]
+      },
+      {
+        "count": 2,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2135",
+          "tdeck_update_time_label lv_obj_functions.cpp:3678",
+          "mainStartTimeLoop loop_functions.cpp:2152",
+          "esp32loop esp32_main.cpp:3323",
+          "loop main.cpp:68",
+          "loopTask main.cpp:50"
+        ]
+      },
+      {
+        "count": 2,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2136",
+          "tdeck_update_time_label lv_obj_functions.cpp:3678",
+          "mainStartTimeLoop loop_functions.cpp:2152",
+          "esp32loop esp32_main.cpp:3323",
+          "loop main.cpp:68",
+          "loopTask main.cpp:50"
+        ]
+      }
+    ]
+  },
+  "inject": {
+    "ok": true,
+    "results": [
+      {
+        "i": 0,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 5,
+        "displayed": true,
+        "msg_list": 3,
+        "msg_list_growth": 1,
+        "inv_count": 90,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 8,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 5,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 4,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refr_size lv_obj_pos.c:195",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_width lv_obj_style_gen.c:8"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:772",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 1,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 9,
+        "displayed": true,
+        "msg_list": 4,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 2,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 5,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 3,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 6,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 4,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 10,
+        "displayed": true,
+        "msg_list": 7,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2135",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2136",
+              "tdeck_update_batt_label lv_obj_functions.cpp:3641",
+              "esp32loop esp32_main.cpp:3421",
+              "loop main.cpp:68",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,233 @@
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:26:48 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:26:51 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:26:54 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:26:57 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:00 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:03 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:06 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:09 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:12 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:15 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:18 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:21 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:0 hdop:25.5
+[GPS ]...Time <UTC>: 18:27:24 / Date: 2026.09.01
+
+[INSTR-LOOP] gap ms 579 in display_rx section_ms 570 sections_ms 571
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:26 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:29 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:32 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:4 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:35 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:4 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:38 / Date: 2026.09.01
+
+[HEAP] 20:27:41 132420 121692 122868 (mon)
+[WIFI];link;up;rssi;-74;bssid;C8:0E:14:70:5F:6E;chan;8;age_s;120;got_ip_n;1;ip;1              ;ms;128305
+[GPS ]...fix:no sat:4 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:41 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:4 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:46 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:48 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:51 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:54 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:27:57 / Date: 2026.09.01
+
+[GPS ]...fix:no sat:5 hdop:3.0
+[GPS ]...Time <UTC>: 18:28:00 / Date: 2026.09.01
+
+20:28:03 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:03 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247924 lon:14.257376 alt:274.9
+20:28:06 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:06 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247919 lon:14.257409 alt:273.3
+20:28:09 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:09 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247920 lon:14.257415 alt:270.2
+20:28:12 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:12 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247920 lon:14.257435 alt:269.3
+20:28:15 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:15 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247931 lon:14.257473 alt:271.1
+20:28:18 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:18 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247943 lon:14.257516 alt:273.3
+20:28:21 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:21 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247949 lon:14.257548 alt:275.6
+20:28:25 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:25 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247956 lon:14.257580 alt:278.1
+20:28:28 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:28 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247962 lon:14.257611 alt:280.9
+20:28:31 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:31 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247966 lon:14.257646 alt:283.5
+20:28:34 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:34 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247961 lon:14.257665 alt:283.9
+20:28:37 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:37 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247957 lon:14.257672 alt:284.1
+20:28:40 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:40 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247954 lon:14.257674 alt:283.8
+[HEAP] 20:28:40 132212 121692 122868 (mon)
+[WIFI];link;up;rssi;-74;bssid;C8:0E:14:70:5F:6E;chan;8;age_s;180;got_ip_n;1;ip;1;ms;188308
+20:28:43 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:43 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247954 lon:14.257676 alt:284.3
+20:28:46 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:46 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247946 lon:14.257685 alt:284.8
+20:28:49 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:49 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247945 lon:14.257684 alt:284.4
+20:28:52 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:52 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247959 lon:14.257671 alt:283.8
+20:28:55 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:55 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247962 lon:14.257669 alt:283.0
+20:28:58 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:28:58 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247959 lon:14.257669 alt:281.9
+20:29:01 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:29:01 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247960 lon:14.257667 alt:281.3
+20:29:05 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:29:05 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247961 lon:14.257662 alt:280.4
+20:29:08 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:29:08 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247962 lon:14.257659 alt:279.8
+20:29:11 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:29:11 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247962 lon:14.257657 alt:279.4
+20:29:14 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.8
+[GPS ]...Time <UTC>: 18:29:14 / Date: 2026.09.01
+
+
+# --- gap: corrupt-sample block (source lines 655-685) ---
+[GPS ]...position  : lat:48.247870 lon:14.257688 alt:277.3
+20:34:20 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.7
+[GPS ]...Time <UTC>: 18:34:20 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247870 lon:14.257691 alt:278.2
+20:34:23 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.7
+[GPS ]...Time <UTC>: 18:34:23 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247870 lon:14.257689 alt:278.1
+20:34:25 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.7
+[GPS ]...Time <UTC>: 18:34:26 / Date: 2015.14.00
+
+[GPS ]...position  : lat:48.247871 lon:0.000000 alt:278.0
+20:34:29 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.7
+[GPS ]...Time <UTC>: 18:34:29 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247872 lon:14.257685 alt:277.9
+20:34:32 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:7 hdop:2.7
+[GPS ]...Time <UTC>: 18:34:32 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247874 lon:14.257684 alt:277.8
+20:34:37 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+[GPS ]...fix:yes sat:6 hdop:3.3
+[GPS ]...Time <UTC>: 18:34:37 / Date: 2026.09.01
+
+[GPS ]...position  : lat:48.247877 lon:14.257680 alt:277.7

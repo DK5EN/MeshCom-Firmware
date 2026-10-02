@@ -1,0 +1,98 @@
+{
+  "instr": {
+    "ok": false,
+    "seconds": 90.0,
+    "loop_n": 772,
+    "loop_avg_us": 117637,
+    "loop_max_us": 3364258,
+    "gaps": 5,
+    "gap_events": [
+      "-[INSTR-LOOP] gap ms 1696 in hey_tx section_ms 1556 sections_ms 1638",
+      "[INSTR-LOOP] gap ms 3329 in unattributed section_ms 0 sections_ms 0",
+      "[INSTR-LOOP] gap ms 3329 in unattributed section_ms 0 sections_ms 0",
+      "[INSTR-LOOP] gap ms 3364 in eth_udp_tx section_ms 34 sections_ms 103",
+      "[INSTR-LOOP] gap ms 904 in hey_tx section_ms 789 sections_ms 834",
+      "[INSTR-LOOP] gap ms 3360 in eth_udp_tx section_ms 31 sections_ms 93"
+    ],
+    "sections": {
+      "eth_state": {
+        "n": 773,
+        "avg_us": 1,
+        "max_us": 976
+      },
+      "clock": {
+        "n": 773,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 773,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_rx_timeout": {
+        "n": 737,
+        "avg_us": 19,
+        "max_us": 977
+      },
+      "hey_tx": {
+        "n": 1,
+        "avg_us": 789062,
+        "max_us": 789062
+      },
+      "telemetry": {
+        "n": 5,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 770,
+        "avg_us": 149,
+        "max_us": 34180
+      },
+      "eth_udp": {
+        "n": 773,
+        "avg_us": 160,
+        "max_us": 34180
+      },
+      "gateway": {
+        "n": 773,
+        "avg_us": 160,
+        "max_us": 34180
+      },
+      "display_tick": {
+        "n": 773,
+        "avg_us": 1,
+        "max_us": 977
+      },
+      "serial_cmd": {
+        "n": 773,
+        "avg_us": 3,
+        "max_us": 2929
+      },
+      "lora_sm": {
+        "n": 23,
+        "avg_us": 2335,
+        "max_us": 5859
+      },
+      "lora_tx": {
+        "n": 4,
+        "avg_us": 5127,
+        "max_us": 5859
+      },
+      "eth_heartbeat": {
+        "n": 3,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_dhcp": {
+        "n": 1,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 111220,
+    "heap_largest": 97808,
+    "worst_section": "hey_tx"
+  }
+}

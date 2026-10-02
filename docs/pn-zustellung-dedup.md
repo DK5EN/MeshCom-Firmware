@@ -411,6 +411,10 @@ Schreibweise im Folgenden: X⊕k.
   - Aussendung 2 verwendet dieselbe msg_id, wenn kein Echo gehört wurde
     (`fork-main:src/dm_outbox.cpp:318-327`). Genau im Fall P2 (R1 hat das Original, A hat R1s Echo
     nicht gehört) verwirft R1 diese Aussendung. Die Regel sollte entfallen.
+  - `feature-snf` hatte diese Outbox samt beider Korrekturen (Original-Zähler statt `millis()`,
+    keine gleiche msg_id in Aussendung 2) bis 2026-09-27; seither ist die Outbox samt `--dmretry`
+    entfernt, und jede PN läuft über den einen Ring-Weg mit XOR-ids (Nachtrag in
+    `docs/archive/pn-retry-snf-port-plan.md`).
 - **Kosten**: RAM für den zweiten Dedup (Vollform zusätzlich Outbox), spürbar auf klassischem ESP32;
   Server-Parser; meshmap braucht die NNN oder eine Inhaltsdedup; alte Empfänger zeigen so viele Kopien,
   wie es Aussendungen gibt (bis 9).

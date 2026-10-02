@@ -1,0 +1,474 @@
+<title>MeshCom Speicherkarte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f2f3f0; --surface:#fff; --surface2:#fafbf9; --ink:#16191a; --muted:#5c6360;
+  --rule:#d9ded9; --rule2:#eceee9;
+  --code:#b05327; --bt:#2d5f8a; --wifi:#3f8c78; --sys:#79817e; --libc:#8a6ba3; --libs:#a8842f;
+  --free:#e6e9e4; --warn:#a8321f; --good:#3f7d52;
+  --f-head:'Chivo',system-ui,sans-serif;
+  --f-body:'Source Serif 4',Georgia,serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14171a; --surface:#1c2023; --surface2:#202528; --ink:#e3e8e4; --muted:#98a29f;
+  --rule:#2d3336; --rule2:#252b2e;
+  --code:#d4703c; --bt:#5f96c9; --wifi:#5fb79e; --sys:#98a2a0; --libc:#ad8bc6; --libs:#c9a54a;
+  --free:#262c30; --warn:#e0654e; --good:#68ad7e;
+}}
+:root[data-theme="dark"]{
+  --bg:#14171a; --surface:#1c2023; --surface2:#202528; --ink:#e3e8e4; --muted:#98a29f;
+  --rule:#2d3336; --rule2:#252b2e;
+  --code:#d4703c; --bt:#5f96c9; --wifi:#5fb79e; --sys:#98a2a0; --libc:#ad8bc6; --libs:#c9a54a;
+  --free:#262c30; --warn:#e0654e; --good:#68ad7e;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);line-height:1.6;
+     font-size:16px;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:0 72px}
+h1,h2,h3,.lbl{font-family:var(--f-head);text-wrap:balance}
+h1{font-size:clamp(28px,5vw,46px);font-weight:800;letter-spacing:-.02em;margin:0 0 6px;line-height:1.08}
+h2{font-size:clamp(21px,3vw,28px);font-weight:700;letter-spacing:-.01em;margin:0 0 4px}
+h3{font-size:17px;font-weight:600;margin:0 0 6px}
+p{margin:0 0 14px;max-width:68ch}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.88em;font-variant-numeric:tabular-nums}
+a{color:var(--code)}
+
+header.top{border-bottom:2px solid var(--ink);padding-block:36px 20px;margin-bottom:34px}
+.sub{font-size:clamp(16px,2.2vw,19px);color:var(--muted);max-width:60ch;margin:0}
+.prov{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font-family:var(--f-mono);font-size:11px;border:1px solid var(--rule);
+      background:var(--surface);padding:4px 9px;border-radius:2px;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:600}
+
+section{margin-block:52px}
+.intro{color:var(--muted)}
+
+/* ---- legend ---- */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:16px 0 22px;padding:12px 14px;
+        background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+.lg{display:flex;align-items:center;gap:7px;font-size:12.5px;font-family:var(--f-head)}
+.sw{width:13px;height:13px;border-radius:2px;flex:0 0 auto}
+.sw.free{background:var(--free);border:1px dashed var(--muted)}
+
+/* ---- the map ---- */
+.board{border:1px solid var(--rule);background:var(--surface);border-radius:3px;
+       padding:16px 16px 14px;margin-bottom:14px}
+.bhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:12px}
+.bname{font-family:var(--f-head);font-weight:700;font-size:17px}
+.bnodes{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);
+        border:1px solid var(--rule);padding:2px 7px;border-radius:2px}
+.bseg{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:auto}
+.bnote{font-size:13.5px;color:var(--muted);margin:0 0 12px;max-width:none}
+
+.row{display:grid;grid-template-columns:78px 1fr;gap:10px;align-items:center;margin-bottom:7px}
+.rowlab{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);text-align:right}
+.rowlab b{display:block;color:var(--ink);font-weight:600;font-size:12px}
+.bar{position:relative;height:30px;display:flex;background:var(--free);border-radius:2px;
+     overflow:hidden;border:1px solid var(--rule2)}
+.seg{height:100%;min-width:1px;cursor:default;transition:filter .12s}
+.seg:hover{filter:brightness(1.18)}
+.seg.code{background:var(--code)} .seg.bt{background:var(--bt)}
+.seg.wifi{background:var(--wifi)} .seg.sys{background:var(--sys)}
+.seg.libc{background:var(--libc)} .seg.libs{background:var(--libs)}
+.figs{display:flex;justify-content:space-between;gap:12px;font-family:var(--f-mono);
+      font-size:11.5px;color:var(--muted);margin:3px 0 12px;padding-left:88px}
+.figs .d{font-weight:600}
+.d.neg{color:var(--good)} .d.zero{color:var(--warn)}
+.hr-tight{border:0;border-top:1px solid var(--rule2);margin:12px 0}
+
+.tt{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);
+    font-family:var(--f-mono);font-size:11.5px;padding:6px 9px;border-radius:3px;
+    opacity:0;transition:opacity .1s;max-width:260px;line-height:1.45}
+.tt.on{opacity:1}
+
+/* ---- tables ---- */
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--rule2);white-space:nowrap}
+th{font-family:var(--f-head);font-size:11px;font-weight:600;letter-spacing:.08em;
+   text-transform:uppercase;color:var(--muted);background:var(--surface2)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td.s{font-family:var(--f-mono);font-size:12.5px}
+tr.hi td{background:color-mix(in srgb,var(--code) 9%,transparent)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;
+     vertical-align:baseline}
+
+/* ---- callouts ---- */
+.find{border-left:3px solid var(--code);background:var(--surface);padding:16px 18px;
+      border-radius:0 3px 3px 0;margin:20px 0}
+.find.warn{border-left-color:var(--warn)}
+.find.good{border-left-color:var(--good)}
+.find p:last-child{margin-bottom:0}
+.big{font-family:var(--f-mono);font-size:clamp(26px,4.5vw,40px);font-weight:600;
+     letter-spacing:-.02em;line-height:1;color:var(--code)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.stat{border:1px solid var(--rule);background:var(--surface);border-radius:3px;padding:16px 18px}
+.stat .lbl{margin-bottom:8px;display:block}
+.stat .big{margin-bottom:6px}
+.stat p{font-size:13.5px;color:var(--muted);margin:0}
+ul{padding-left:20px;max-width:68ch}li{margin-bottom:7px}
+footer{border-top:1px solid var(--rule);margin-top:56px;padding-top:18px;
+       font-size:12.5px;color:var(--muted)}
+@media (max-width:560px){
+  .row{grid-template-columns:62px 1fr;gap:8px}
+  .figs{padding-left:70px;flex-direction:column;gap:2px}
+  .bseg{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<div class="wrap">
+
+<header class="top">
+  <h1>MeshCom Speicherkarte</h1>
+  <p class="sub">Wo der Speicher liegt, wer ihn hält, und was die DRY-Kampagne daran bewegt hat.
+     <code>upstream/dev</code> gegen <code>fork-neo</code>, gemessen an der Linker-Map.</p>
+  <div class="prov">
+    <span class="chip">gemessen <b>20.09.2026</b></span>
+    <span class="chip">Basis <b>upstream/dev 4058b25b</b></span>
+    <span class="chip">Vergleich <b>fork-neo = fork-neo-test</b></span>
+    <span class="chip">6 Boards, 11 Regionen</span>
+    <span class="chip">Flotte <b>1444 Knoten</b></span>
+  </div>
+</header>
+
+<section>
+  <h2>Das Ergebnis in einem Satz</h2>
+  <p>Die Kampagne hat auf jedem Board rund <b>10 bis 11 kB DRAM</b> freigemacht — und
+     <b>null IRAM</b>. Das ist kein Versäumnis, sondern eine Eigenschaft der Plattform:
+     im IRAM liegt keine einzige Zeile unseres Codes.</p>
+  <div class="grid2">
+    <div class="stat">
+      <span class="lbl">Anteil unseres Codes am IRAM</span>
+      <div class="big">0,0 %</div>
+      <p>Auf allen vier klassischen ESP32-Boards. Kein <code>src/</code>-Symbol
+         liegt in <code>iram0_0_seg</code>.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">Anteil unseres Codes am DRAM</span>
+      <div class="big">42 %</div>
+      <p>Davon allein 20 440 Byte in vier Ringpuffern — der grösste
+         Einzelposten der ganzen Region.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">T-Beam, freier IRAM bei upstream</span>
+      <div class="big">20 B</div>
+      <p>Zwanzig Byte. neo bringt ihn auf 4 972 — durch die PSRAM-Flags im
+         Board-JSON, nicht durch Code.</p>
+    </div>
+  </div>
+</section>
+
+<section id="ram">
+  <h2>Karte 1 — RAM</h2>
+  <p class="intro">Jeder Balken ist eine vollständige Speicherregion, massstäblich.
+     Die Segmente sind die Anteile, der helle Rest ist frei. Oben <code>upstream/dev</code>,
+     darunter <code>fork-neo</code>. Zeiger auf ein Segment zeigt die Bytes.</p>
+  <div class="legend" id="legend"></div>
+  <div id="map-ram"></div>
+</section>
+
+<section id="iram">
+  <h2>Karte 2 — IRAM</h2>
+  <p class="intro"><code>iram0_0_seg</code> hält den Code, der im schnellen internen RAM
+     liegen muss: Interrupt-Handler, Funkzeitkritisches, alles was während eines
+     Flash-Schreibvorgangs laufen darf. Nur ESP32 — der nRF52 kennt die Trennung nicht.</p>
+  <div id="map-iram"></div>
+</section>
+
+<section>
+  <h2>Warum das IRAM-Ziel nicht aufgehen konnte</h2>
+  <div class="find warn">
+    <p><b>Drei von vier klassischen ESP32-Boards belegen exakt dieselbe Zahl:
+       126 100 Byte IRAM.</b> TLORA V2.1.6, T-Beam und E22-DevKitC, auf beiden Branches,
+       auf die Stelle genau. Drei verschiedene Boards mit drei verschiedenen Funkchips
+       und drei verschiedenen Peripherien — dieselbe Zahl.</p>
+    <p>Das ist nur möglich, wenn der Inhalt vollständig von der Plattform kommt und
+       nichts von der Anwendung. Genau das misst die Karte: <b>0,0 %</b> des IRAM
+       tragen <code>src/</code>-Symbole.</p>
+  </div>
+  <p>Aufgeteilt nach Herkunft sieht der IRAM des TLORA so aus:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Herkunft</th><th class="n">Byte</th><th class="n">Anteil</th><th>Beeinflussbar durch</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:var(--sys)"></span>FreeRTOS / ESP-IDF</td><td class="n">58 577</td><td class="n">46,5 %</td><td>SDK-Konfiguration, nicht Anwendungscode</td></tr>
+      <tr><td><span class="dot" style="background:var(--bt)"></span>Bluetooth / BLE</td><td class="n">32 658</td><td class="n">25,9 %</td><td>BLE ganz abschalten — sonst nichts</td></tr>
+      <tr><td><span class="dot" style="background:var(--wifi)"></span>WiFi + IP</td><td class="n">15 876</td><td class="n">12,6 %</td><td>WiFi abschalten</td></tr>
+      <tr><td><span class="dot" style="background:var(--libc)"></span>libc / C++</td><td class="n">15 151</td><td class="n">12,0 %</td><td>vorgebaut, nicht konfigurierbar</td></tr>
+      <tr class="hi"><td><span class="dot" style="background:var(--code)"></span>Unser Code</td><td class="n">0</td><td class="n">0,0 %</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <p>Der einzige gemessene IRAM-Gewinn der Kampagne sind die 4 952 Byte auf dem T-Beam.
+     Die kamen aus dem Board-JSON: PSRAM-Unterstützung, die dieses Board nicht hat,
+     wurde mitkompiliert. Ein Konfigurationsfehler, kein Codeproblem — und der Beweis
+     dafür ist, dass der T-Beam danach auf demselben Wert landet wie die anderen beiden.</p>
+</section>
+
+<section>
+  <h2>Wo unser DRAM liegt</h2>
+  <p class="intro">Die grössten statischen Einzelposten. Die Spalte ganz rechts sagt,
+     wann ein Knoten den Puffer überhaupt anfasst — der Schlüssel zum Zurückholen.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Symbol</th><th>Datei</th><th class="n">Byte</th><th>Gebraucht</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td class="s">BLEtoPhoneBuff</td><td class="s">loop_functions.cpp</td><td class="n">5 200</td><td>nur mit verbundenem Telefon</td></tr>
+      <tr><td class="s">ringBuffer</td><td class="s">loop_functions.cpp</td><td class="n">5 200</td><td>immer — die Sendeschlange</td></tr>
+      <tr class="hi"><td class="s">ringBufferUDPout</td><td class="s">loop_functions.cpp</td><td class="n">5 120</td><td>nur auf Gateway/EXTUDP-Knoten</td></tr>
+      <tr class="hi"><td class="s">BLEComToPhoneBuff</td><td class="s">loop_functions.cpp</td><td class="n">4 920</td><td>nur mit verbundenem Telefon</td></tr>
+      <tr><td class="s">mheardPathBuffer1</td><td class="s">mheard_functions.cpp</td><td class="n">2 080</td><td>immer (5 200 auf S3/nRF52)</td></tr>
+      <tr><td class="s">meshcom_settings</td><td class="s">esp32_flash.cpp</td><td class="n">2 032</td><td>immer</td></tr>
+      <tr><td class="s">pageLastTextLong2</td><td class="s">loop_functions.cpp</td><td class="n">1 200</td><td>nur mit Display</td></tr>
+      <tr><td class="s">ringbufferRAWLoraRX</td><td class="s">loop_functions.cpp</td><td class="n">0</td><td>Heap, erst beim Öffnen der rxlog-Seite</td></tr>
+    </tbody>
+  </table></div>
+  <div class="find">
+    <p><b>15 240 Byte — 12 % der gesamten DRAM-Region — liegen in drei Puffern,
+       die ein reiner HF-Knoten nie anfasst.</b> Der letzte Eintrag der Tabelle zeigt,
+       dass das Muster auf dieser Plattform trägt: <code>ringbufferRAWLoraRX</code> war
+       einmal genauso statisch und wird heute erst angelegt, wenn jemand die Seite öffnet.
+       Über 34 Umgebungen hat das 109 040 Byte zurückgegeben.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Die Rufzeichen-Frage</h2>
+  <p>Die naheliegende Idee — Rufzeichen einmal speichern und überall darauf zeigen —
+     zielt auf die falschen 700 Byte. Die Schlüsseltabellen
+     <code>mheardCalls[30][10]</code> und <code>mheardPathCalls[40][10]</code> sind klein.
+     Rufzeichen liegen woanders: <b>in den Frames</b>, und Frames liegen in vier
+     voneinander unabhängigen Warteschlangen.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Warteschlange</th><th class="n">Slots</th><th class="n">Byte/Slot</th><th class="n">gesamt</th><th>befüllt von</th></tr></thead>
+    <tbody>
+      <tr><td class="s">ringBuffer</td><td class="n">20</td><td class="n">260</td><td class="n">5 200</td><td class="s">addTxRingEntry()</td></tr>
+      <tr><td class="s">BLEtoPhoneBuff</td><td class="n">20</td><td class="n">260</td><td class="n">5 200</td><td class="s">addBLEOutBuffer()</td></tr>
+      <tr><td class="s">ringBufferUDPout</td><td class="n">20</td><td class="n">256</td><td class="n">5 120</td><td class="s">addUdpOutBuffer()</td></tr>
+      <tr><td class="s">BLEComToPhoneBuff</td><td class="n">20</td><td class="n">246</td><td class="n">4 920</td><td class="s">addBLEComToPhoneBuffer()</td></tr>
+    </tbody>
+  </table></div>
+  <p>Jeder Frame trägt Quelle, Ziel und den Relay-Pfad als Text. Die vier Schlangen
+     werden unabhängig befüllt, und nichts dedupliziert über Puffergrenzen — der
+     Dedup-Ring schlägt auf <code>msg_id</code> an, nicht auf Rufzeichen.</p>
+  <div class="find">
+    <p><b>Ein einziges gehörtes Rufzeichen kann in 60 bis 80 gleichzeitigen Kopien
+       im RAM liegen.</b> Ein Pointer hilft dabei nicht: ein Frame in der Sendeschlange
+       muss Drahtformat bleiben, sonst kann man ihn nicht wiederholen. Der Hebel ist,
+       <i>welche</i> Schlangen ein Knoten überhaupt braucht — nicht, wie ein Rufzeichen
+       darin dargestellt wird.</p>
+  </div>
+  <p>Zwei Nebenbefunde aus derselben Untersuchung: die Strukturfelder reservieren
+     <b>21 Byte je Rufzeichen</b> (<code>MC_CALL_LEN_Z</code>, per <code>static_assert</code>
+     abgesichert) für Rufzeichen, die real höchstens neun Zeichen haben — in
+     <code>aprsMessage</code> sind das 326 der rund 608 Byte. Und
+     <code>checkRegexCall()</code> kappt die Länge nicht: das Muster enthält
+     <code>[0-9]+</code> ohne Obergrenze, ein längeres Rufzeichen würde beim Kopieren
+     nach <code>mheardCalls[10]</code> still abgeschnitten.</p>
+</section>
+<section>
+  <h2>Die Ringpuffer — vier Klassen, und die grösste ist die engste</h2>
+  <p class="intro"><code>src/configuration_global.h:261–300</code> teilt die sechs Puffergrössen
+     nach Plattform auf. So verteilt sich die Flotte darauf:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Klasse</th><th>Boards</th><th class="n">Knoten</th><th class="n">MHEARD</th><th class="n">MHPATH</th><th class="n">RING</th><th class="n">DEDUP</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td>klassischer ESP32</td><td>TLORA V2.1.6, T-Beam V1.1/V1.2, E22, Heltec V2.1</td><td class="n">903</td><td class="n">30</td><td class="n">40</td><td class="n">20</td><td class="n">70</td></tr>
+      <tr><td>ESP32-S3 + nRF52</td><td>Heltec V3, T-Deck+, RAK4631, T-Beam 1W, Stick V3, Supreme</td><td class="n">465</td><td class="n">80</td><td class="n">100</td><td class="n">20</td><td class="n">100</td></tr>
+      <tr><td>XML</td><td>nur E22_XML-DevKitC</td><td class="n">?</td><td class="n">50</td><td class="n">50</td><td class="n">20</td><td class="n">60</td></tr>
+      <tr><td>„TBEAM"</td><td>niemand — das Makro wird nirgends definiert</td><td class="n">0</td><td class="n">10</td><td class="n">10</td><td class="n">10</td><td class="n">10</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>63 % der Flotte sitzt in der Klasse mit den kleinsten Tabellen</b> — und zugleich
+     der knappsten DRAM-Region. Die vierte Zeile ist toter Code: <code>ENABLE_TBEAM</code>
+     wird in keinem Variant und keiner <code>platformio.ini</code> gesetzt. Sie liest sich
+     aber wie ein Alarm, weil ihr Kommentar „very smal version only for developer tests"
+     lautet und jeder Leser sie dem T-Beam zuordnet.</p>
+
+  <h3>Gemessen gegen die Wirklichkeit</h3>
+  <p class="intro">Zwölf Stunden auf DK5EN-98, Heltec V3 mit Mesh und Gateway, Hop 2,
+     am echten Netz. 13 910 Zeilen Konsolenmitschrift, 2 906 empfangene Frames,
+     133 STAT-Fenster.</p>
+  <div class="grid2">
+    <div class="stat">
+      <span class="lbl">Verschiedene Rufzeichen in 12 h</span>
+      <div class="big">121</div>
+      <p>93 Basisrufzeichen. Nach 1 h waren es 57, nach 6 h 107 — und in den letzten
+         drei Stunden kamen noch 9 dazu. <b>Kein Plateau.</b></p>
+    </div>
+    <div class="stat">
+      <span class="lbl">MHEARD-Slots, klassischer ESP32</span>
+      <div class="big" style="color:var(--warn)">30</div>
+      <p>Für 121 gesehene Rufzeichen. Die Tabelle läuft im Betrieb dauernd um.
+         Auf S3/nRF52 sind es 80 — auch das ist weniger als 121.</p>
+    </div>
+    <div class="stat">
+      <span class="lbl">TX-Ring, höchster Stand</span>
+      <div class="big" style="color:var(--good)">4 / 20</div>
+      <p>Über alle 133 Fenster, und <b>null</b> Verwerfungen auf jeder der fünf
+         Prioritäten. Der Sendepuffer ist bei dieser Last nicht das Problem.</p>
+    </div>
+  </div>
+
+  <div class="find warn">
+    <h3>Der Dedup-Ring ist zu kurz — und zwar genau dann, wenn es darauf ankommt</h3>
+    <p>Der Ring zählt Einträge, nicht Zeit. Sein Fenster schrumpft also, wenn die Last
+       steigt. Aus 48 Knotenstunden ist der nötige Korridor bekannt: <b>länger als
+       39,6 min</b> (längste gemessene Paketlebensdauer) und <b>kürzer als 48,5 min</b>
+       (kürzeste beobachtete ID-Wiederverwendung).</p>
+    <p>Aus dem Dauerlauf: im Median 2,2 neue IDs pro Minute, in der Spitze 3,8.</p>
+    <div class="tw" style="margin-top:12px"><table>
+      <thead><tr><th>Klasse</th><th class="n">Slots</th><th class="n">Fenster bei Median</th><th class="n">Fenster bei Spitze</th><th>im Korridor?</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>klassischer ESP32 (903 Knoten)</td><td class="n">70</td><td class="n">31,8 min</td><td class="n">18,4 min</td><td style="color:var(--warn)">nein, in beiden Fällen zu kurz</td></tr>
+        <tr><td>ESP32-S3 + nRF52 (465 Knoten)</td><td class="n">100</td><td class="n">45,5 min</td><td class="n">26,3 min</td><td>im Median ja, unter Last nein</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:12px">Ein Frame, das noch im Netz unterwegs ist, kann damit
+       erneut angenommen und weitergeflutet werden. Der bekannte Fix ist nicht „mehr Slots",
+       sondern <b>Alterung nach Uhrzeit</b>, rund 45 Minuten, mit einem Array, das gerade
+       45 Minuten Spitzenlast fasst: bei 3,8 IDs/min sind das 171 Einträge à 5 Byte —
+       <b>855 statt 350 Byte.</b> Fünfhundert Byte, gegen die 15 240, die drei
+       bedingt gebrauchte Puffer belegen.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Wo RAM zurückzuholen ist</h2>
+  <p class="intro">Nach gemessenem Ertrag, nicht nach Aufwand sortiert. Alle Zahlen
+     gelten für den klassischen ESP32 — 63 % der Flotte, und die einzige Klasse,
+     in der es knapp ist.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="n">Byte</th><th>Was</th><th>Wie</th><th>Kostet</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td class="n">10 120</td><td>die beiden BLE-Telefonpuffer</td><td>erst bei der ersten BLE-Verbindung anlegen, wie <code>rawLogEnsure()</code></td><td>ein <code>calloc</code> und eine <code>NULL</code>-Prüfung je Schreiber</td></tr>
+      <tr class="hi"><td class="n">5 120</td><td><code>ringBufferUDPout</code></td><td>erst anlegen, wenn Gateway oder EXTUDP eingeschaltet wird</td><td>dasselbe Muster; beide Schalter sind zur Laufzeit umlegbar</td></tr>
+      <tr><td class="n">1 200</td><td><code>pageLastTextLong2</code></td><td>nur auf Knoten mit Display</td><td>ein <code>#if</code></td></tr>
+      <tr><td class="n">−505</td><td>Dedup-Ring auf 171 Einträge</td><td>Alterung nach Uhrzeit statt nach Anzahl</td><td>kostet RAM, kauft Korrektheit</td></tr>
+      <tr><td class="n">?</td><td>MHEARD von 30 auf ≥121</td><td>braucht erst den Platz aus den Zeilen darüber</td><td>91 Slots × 34 B ≈ 3 100 Byte</td></tr>
+    </tbody>
+  </table></div>
+  <p>Die ersten beiden Zeilen zusammen sind <b>15 240 Byte</b> — genug, um den Dedup-Ring
+     korrekt zu machen <i>und</i> die MHeard-Tabelle auf die Grösse zu bringen, die das
+     Netz tatsächlich hat, und immer noch mehr als 11 kB übrig zu haben.</p>
+  <div class="find good">
+    <p><b>Für IRAM gibt es keine solche Liste.</b> Dort liegt nichts von uns. Wer auf dem
+       klassischen ESP32 IRAM braucht, muss eine Funktion aufgeben — BLE kostet 32 658 Byte,
+       WiFi 15 876. Beides sind Produktentscheidungen, keine Aufräumarbeiten.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Was diese Karte nicht zeigt</h2>
+  <ul>
+    <li><b>Den Heap.</b> Eine Linker-Map kennt nur statische Belegung. Was zur Laufzeit
+        angefordert wird, erscheint hier als „frei".</li>
+    <li><b>Die Spitzen.</b> Alle Feldzahlen stammen von einem Knoten an einem Ort über
+        zwölf Stunden. Ein dichteres Ballungsgebiet sieht andere Raten — und der
+        Dedup-Korridor wird dort enger, nicht weiter.</li>
+    <li><b>Welche E22-Variante im Feld läuft.</b> <code>E22-DevKitC</code> und
+        <code>E22_XML-DevKitC</code> melden beide <code>MODUL_HARDWARE EBYTE_E22</code>.
+        Die 69 E22-Knoten sind nicht auseinanderzuhalten, obwohl sie in verschiedenen
+        Speicherklassen sitzen.</li>
+    <li><b>Die Genauigkeit der Regionsgrenzen.</b> Die Balken folgen derselben
+        Spannenmessung wie das Gate (<code>origin</code> bis <code>_bss_end</code> bzw.
+        <code>_iram_end</code>). Die Segmentanteile kommen aus der Symbolliste und sind
+        auf diese Spanne normiert; sie weichen um Bruchteile eines Prozents ab.</li>
+  </ul>
+</section>
+
+<footer>
+  MeshCom Firmware · Speicherkarte vom 20.09.2026 ·
+  Messgrundlage: <code>tools/resource_watch.py</code> für die Regionen,
+  die Linker-Map je Symbol für die Anteile, <code>arm-none-eabi-nm</code> für den nRF52 ·
+  Feldzahlen aus dem Zwölf-Stunden-Dauerlauf DK5EN-1 / -92 / -98
+</footer>
+</div>
+<div class="tt" id="tt"></div>
+
+<script>const DATA={"labels": {"code": "Unser Code (src/)", "bt": "Bluetooth / BLE", "wifi": "WiFi + IP", "libc": "libc / C++", "libs": "Bibliotheken", "sys": "FreeRTOS / ESP-IDF"}, "boards": [{"env": "ttgo-lora32-v21", "label": "TLORA V2.1.6", "nodes": 476, "note": null, "regions": {"dram0_0_seg": {"upstream": {"length": 124580, "used": 112884, "fam": {"code": 53617, "wifi": 25212, "sys": 15271, "bt": 12413, "libs": 4470, "libc": 1901}, "top": [{"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 1800}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}]}, "neo": {"length": 124580, "used": 102964, "fam": {"code": 43695, "wifi": 25211, "sys": 15275, "bt": 12412, "libs": 4470, "libc": 1901}, "top": [{"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "buf$11788", "o": "ar:libU8g2.a", "b": 1024}, {"s": "TxRxCxt", "o": "sdk:libpp", "b": 960}, {"s": "COMMON", "o": "sdk:libwpa_supplicant", "b": 892}]}}, "iram0_0_seg": {"upstream": {"length": 131072, "used": 126100, "fam": {"sys": 52138, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 10276}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}, "neo": {"length": 131072, "used": 126100, "fam": {"sys": 52138, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 10276}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}}}}, {"env": "ttgo_tbeam", "label": "T-Beam V1.1 + V1.2", "nodes": 341, "note": null, "regions": {"dram0_0_seg": {"upstream": {"length": 124580, "used": 114276, "fam": {"code": 54929, "wifi": 25212, "sys": 15349, "bt": 12413, "libs": 4472, "libc": 1901}, "top": [{"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 1800}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "adc_chars", "o": "src/batt_function_old.cpp", "b": 1296}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}]}, "neo": {"length": 124580, "used": 103012, "fam": {"code": 43747, "wifi": 25211, "sys": 15271, "bt": 12412, "libs": 4470, "libc": 1901}, "top": [{"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "buf$11727", "o": "ar:libU8g2.a", "b": 1024}, {"s": "TxRxCxt", "o": "sdk:libpp", "b": 960}, {"s": "COMMON", "o": "sdk:libwpa_supplicant", "b": 892}]}}, "iram0_0_seg": {"upstream": {"length": 131072, "used": 131052, "fam": {"sys": 57003, "bt": 32654, "wifi": 15876, "libc": 15143, "libs": 10375}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1.40", "o": "sdk:libesp_hw_support", "b": 2922}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}]}, "neo": {"length": 131072, "used": 126100, "fam": {"sys": 52138, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 10276}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}}}}, {"env": "heltec_wifi_lora_32_V3", "label": "Heltec V3", "nodes": 305, "note": "ESP32-S3: IRAM und DRAM teilen sich ein grosses SRAM, die Regionen sind hier keine Schranke.", "regions": {"dram0_0_seg": {"upstream": {"length": 345856, "used": 184984, "fam": {"sys": 78571, "code": 61880, "wifi": 27658, "libs": 11861, "bt": 4815, "libc": 198}, "top": [{"s": "*fill*", "o": "(linker/fill)", "b": 68732}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 5200}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 4800}, {"s": ".data", "o": "ar:libfreertos.a", "b": 4204}, {"s": "g_cnxMgr", "o": "sdk:libnet80211", "b": 3800}, {"s": "ftm_initiator", "o": "sdk:libnet80211", "b": 2776}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 2600}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9089", "o": "sdk:libmdns", "b": 1460}, {"s": "adc_chars", "o": "src/batt_function_old.cpp", "b": 1296}, {"s": ".rodata.str1.1", "o": "ar:libphy.a", "b": 1203}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "s_wifi_nvs", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}]}, "neo": {"length": 345856, "used": 173992, "fam": {"sys": 78563, "code": 50898, "wifi": 27658, "libs": 11861, "bt": 4815, "libc": 198}, "top": [{"s": "*fill*", "o": "(linker/fill)", "b": 68732}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": ".data", "o": "ar:libfreertos.a", "b": 4204}, {"s": "g_cnxMgr", "o": "sdk:libnet80211", "b": 3800}, {"s": "ftm_initiator", "o": "sdk:libnet80211", "b": 2776}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "mheardRecords", "o": "src/mheard_functions.cpp", "b": 1600}, {"s": "packet$9089", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.1", "o": "ar:libphy.a", "b": 1203}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "s_wifi_nvs", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "buf$11727", "o": "ar:libU8g2.a", "b": 1024}, {"s": "mheardPathCalls", "o": "src/mheard_functions.cpp", "b": 1000}]}}, "iram0_0_seg": {"upstream": {"length": 362240, "used": 85116, "fam": {"libs": 41787, "sys": 24809, "bt": 12614, "wifi": 5801, "libc": 104}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 2783}, {"s": ".iram1.45", "o": "ar:libesp_hw_support.a", "b": 1683}, {"s": ".iram1", "o": "ar:libfreertos.a", "b": 1432}, {"s": ".text.rtc_sleep_init", "o": "ar:libesp_hw_support.a", "b": 1090}, {"s": ".iram1.6", "o": "ar:libbtdm_app.a", "b": 1042}, {"s": ".iram1.12", "o": "ar:libbtdm_app.a", "b": 991}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 917}, {"s": ".iram1", "o": "ar:libphy.a", "b": 902}, {"s": ".iram1.3", "o": "ar:libbtdm_app.a", "b": 810}, {"s": ".iram1.6", "o": "ar:libbtdm_app.a", "b": 794}, {"s": ".iram1.3", "o": "ar:libbtdm_app.a", "b": 752}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 746}, {"s": ".text.tlsf_free", "o": "sdk:libheap", "b": 744}, {"s": ".text.spi_flash_hal_configure_host_io_mode", "o": "sdk:libhal", "b": 737}, {"s": ".iram1", "o": "ar:libphy.a", "b": 679}, {"s": ".text.spi_flash_hal_gpspi_configure_host_io_mode", "o": "sdk:libhal", "b": 599}, {"s": ".iram1.27", "o": "ar:libesp_system.a", "b": 591}, {"s": ".iram1.30", "o": "sdk:libdriver", "b": 587}, {"s": ".text.wdt_hal_init", "o": "sdk:libhal", "b": 579}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 528}, {"s": ".text.vTaskSwitchContext", "o": "ar:libfreertos.a", "b": 524}, {"s": ".iram1.39", "o": "ar:libspi_flash.a", "b": 502}]}, "neo": {"length": 362240, "used": 85116, "fam": {"libs": 41787, "sys": 24809, "bt": 12614, "wifi": 5801, "libc": 104}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 2783}, {"s": ".iram1.45", "o": "ar:libesp_hw_support.a", "b": 1683}, {"s": ".iram1", "o": "ar:libfreertos.a", "b": 1432}, {"s": ".text.rtc_sleep_init", "o": "ar:libesp_hw_support.a", "b": 1090}, {"s": ".iram1.6", "o": "ar:libbtdm_app.a", "b": 1042}, {"s": ".iram1.12", "o": "ar:libbtdm_app.a", "b": 991}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 917}, {"s": ".iram1", "o": "ar:libphy.a", "b": 902}, {"s": ".iram1.3", "o": "ar:libbtdm_app.a", "b": 810}, {"s": ".iram1.6", "o": "ar:libbtdm_app.a", "b": 794}, {"s": ".iram1.3", "o": "ar:libbtdm_app.a", "b": 752}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 746}, {"s": ".text.tlsf_free", "o": "sdk:libheap", "b": 744}, {"s": ".text.spi_flash_hal_configure_host_io_mode", "o": "sdk:libhal", "b": 737}, {"s": ".iram1", "o": "ar:libphy.a", "b": 679}, {"s": ".text.spi_flash_hal_gpspi_configure_host_io_mode", "o": "sdk:libhal", "b": 599}, {"s": ".iram1.27", "o": "ar:libesp_system.a", "b": 591}, {"s": ".iram1.30", "o": "sdk:libdriver", "b": 587}, {"s": ".text.wdt_hal_init", "o": "sdk:libhal", "b": 579}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 528}, {"s": ".text.vTaskSwitchContext", "o": "ar:libfreertos.a", "b": 524}, {"s": ".iram1.39", "o": "ar:libspi_flash.a", "b": 502}]}}}}, {"env": "E22-DevKitC", "label": "EBYTE E22", "nodes": 69, "note": null, "regions": {"dram0_0_seg": {"upstream": {"length": 124580, "used": 113116, "fam": {"code": 53693, "wifi": 25212, "sys": 15277, "bt": 12413, "libs": 4620, "libc": 1901}, "top": [{"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 1800}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}]}, "neo": {"length": 124580, "used": 103196, "fam": {"code": 43771, "wifi": 25211, "sys": 15281, "bt": 12412, "libs": 4620, "libc": 1901}, "top": [{"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2080}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "buf$11727", "o": "ar:libU8g2.a", "b": 1024}, {"s": "TxRxCxt", "o": "sdk:libpp", "b": 960}, {"s": "COMMON", "o": "sdk:libwpa_supplicant", "b": 892}]}}, "iram0_0_seg": {"upstream": {"length": 131072, "used": 126100, "fam": {"sys": 52138, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 10276}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}, "neo": {"length": 131072, "used": 126100, "fam": {"sys": 52138, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 10276}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}}}}, {"env": "E22_XML-DevKitC", "label": "EBYTE E22 (XML-Variante)", "nodes": null, "note": "Meldet dieselbe Hardwarekennung wie E22-DevKitC -- im Feld nicht unterscheidbar.", "regions": {"dram0_0_seg": {"upstream": {"length": 124580, "used": 123420, "fam": {"code": 58137, "wifi": 25213, "sys": 15287, "bt": 12413, "libc": 7664, "libs": 4705}, "top": [{"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 3000}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2600}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "_ZN12_GLOBAL__N_17ctype_wE", "o": "ar:libstdc++.a", "b": 1248}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}]}, "neo": {"length": 124580, "used": 106764, "fam": {"code": 47254, "wifi": 25212, "sys": 15281, "bt": 12412, "libs": 4704, "libc": 1901}, "top": [{"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": ".data", "o": "sdk:libbt", "b": 4380}, {"s": ".data", "o": "sdk:libfreertos", "b": 4204}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 3820}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 2600}, {"s": "COMMON", "o": "ar:libbtdm_app.a", "b": 2048}, {"s": "meshcom_settings", "o": "src/esp32/esp32_flash.cpp", "b": 2032}, {"s": "packet$9066", "o": "sdk:libmdns", "b": 1460}, {"s": ".rodata.str1.4", "o": "ar:libphy.a", "b": 1385}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "dns_table", "o": "sdk:liblwip", "b": 1184}, {"s": "COMMON", "o": "sdk:libnet80211", "b": 1180}, {"s": "s_coredump_stack", "o": "sdk:libespcoredump", "b": 1124}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": ".data", "o": "sdk:libxtensa", "b": 1024}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "buf$11788", "o": "ar:libU8g2.a", "b": 1024}, {"s": "mheardRecords", "o": "src/mheard_functions.cpp", "b": 1000}, {"s": "TxRxCxt", "o": "sdk:libpp", "b": 960}]}}, "iram0_0_seg": {"upstream": {"length": 131072, "used": 127616, "fam": {"sys": 52155, "bt": 32658, "wifi": 15876, "libc": 15714, "libs": 11212}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}, "neo": {"length": 131072, "used": 127044, "fam": {"sys": 52146, "bt": 32658, "wifi": 15876, "libc": 15151, "libs": 11212}, "top": [{"s": ".iram1", "o": "ar:libphy.a", "b": 4023}, {"s": ".text", "o": "ar:libc.a", "b": 3064}, {"s": ".iram1.22", "o": "ar:libbtdm_app.a", "b": 2991}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2677}, {"s": ".iram1.10", "o": "ar:libbtdm_app.a", "b": 2192}, {"s": ".iram1", "o": "ar:libphy.a", "b": 2162}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 2039}, {"s": ".iram1.27", "o": "ar:libbtdm_app.a", "b": 1490}, {"s": ".text", "o": "ar:libc.a", "b": 1454}, {"s": ".text.rtc_sleep_init", "o": "sdk:libesp_hw_support", "b": 1397}, {"s": ".iram1.15", "o": "ar:libbtdm_app.a", "b": 1266}, {"s": ".iram1.34", "o": "ar:libbtdm_app.a", "b": 1198}, {"s": ".iram1", "o": "sdk:libfreertos", "b": 1172}, {"s": ".iram1.49", "o": "sdk:libesp_hw_support", "b": 999}, {"s": ".iram1.5", "o": "ar:libbtdm_app.a", "b": 990}, {"s": ".text", "o": "ar:libc.a", "b": 950}, {"s": ".iram1.17", "o": "ar:libbtdm_app.a", "b": 946}, {"s": ".text.tlsf_realloc", "o": "sdk:libheap", "b": 932}, {"s": ".iram1.7", "o": "ar:libbtdm_app.a", "b": 782}, {"s": ".text.tlsf_malloc", "o": "sdk:libheap", "b": 761}, {"s": ".iram1", "o": "sdk:libesp_system", "b": 760}, {"s": ".iram1.11", "o": "ar:libbtdm_app.a", "b": 758}]}}}}, {"env": "wiscore_rak4631", "label": "RAK4631 (nRF52840)", "nodes": 39, "note": "Der nRF52 kennt keine IRAM/DRAM-Trennung. Ein RAM, 256 kB, kein Linker-Map -- gemessen am Symboltabelle.", "regions": {"ram": {"upstream": {"length": 262144, "used": 88318, "fam": {"code": 68425, "libs": 19152, "sys": 741}, "top": [{"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 6100}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5500}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "mheardBuffer", "o": "src/mheard_functions.cpp", "b": 4800}, {"s": "_cache_buffer", "o": "lib:InternalFileSytem", "b": 4096}, {"s": "ringbufferRAWLoraRX", "o": "src/loop_functions.cpp", "b": 2600}, {"s": "_ZL20s_pendingBleSettings", "o": "src/nrf52/nrf52_ble.cpp", "b": 2000}, {"s": "g_flash_content", "o": "src/nrf52/nrf52_flash.cpp", "b": 2000}, {"s": "meshcom_settings", "o": "src/nrf52/nrf52_flash.cpp", "b": 2000}, {"s": "Bluefruit", "o": "lib:Bluefruit52Lib", "b": 1940}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZL11externQueue", "o": "src/extudp_functions.cpp", "b": 1028}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "_ZZ30vApplicationGetTimerTaskMemoryE16uxTimerTaskStack", "o": "arduino-core", "b": 1024}, {"s": "buf.15651", "o": "lib:U8g2", "b": 1024}, {"s": "mheardPathCalls", "o": "src/mheard_functions.cpp", "b": 1000}, {"s": "mheardCalls", "o": "src/mheard_functions.cpp", "b": 800}, {"s": "_ZL8cap_ring", "o": "src/capture_functions.cpp", "b": 768}, {"s": "_cdcd_itf", "o": "lib:Adafruit_TinyUSB_Arduino", "b": 728}]}, "neo": {"length": 262144, "used": 86779, "fam": {"code": 66861, "libs": 19177, "sys": 741}, "top": [{"s": "BLEtoPhoneBuff", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "mheardPathBuffer1", "o": "src/mheard_functions.cpp", "b": 5200}, {"s": "ringBuffer", "o": "src/loop_functions.cpp", "b": 5200}, {"s": "ringBufferUDPout", "o": "src/loop_functions.cpp", "b": 5120}, {"s": "BLEComToPhoneBuff", "o": "src/loop_functions.cpp", "b": 4920}, {"s": "_cache_buffer", "o": "lib:InternalFileSytem", "b": 4096}, {"s": "_ZL19s_bleSettingsOutBuf", "o": "src/nrf52/nrf52_ble.cpp", "b": 2000}, {"s": "_ZL21s_bleSettingsSnapshot", "o": "src/nrf52/nrf52_ble.cpp", "b": 2000}, {"s": "_ZL22s_pendingBleSettingsV1", "o": "src/nrf52/nrf52_ble.cpp", "b": 2000}, {"s": "_ZN12_GLOBAL__N_115s_legacyV1ImageE", "o": "src/nrf52/nrf52_flash.cpp", "b": 2000}, {"s": "_ZL22s_convertedBleSettings", "o": "src/nrf52/nrf52_ble.cpp", "b": 1984}, {"s": "meshcom_settings", "o": "src/nrf52/nrf52_flash.cpp", "b": 1984}, {"s": "Bluefruit", "o": "lib:Bluefruit52Lib", "b": 1940}, {"s": "mheardRecords", "o": "src/mheard_functions.cpp", "b": 1600}, {"s": "pageLastTextLong2", "o": "src/loop_functions.cpp", "b": 1200}, {"s": "pageLastText", "o": "src/loop_functions.cpp", "b": 1050}, {"s": "_ZZ12work_webpagebiE18web_header_collect", "o": "src/web_functions/web_functions.cpp", "b": 1024}, {"s": "_ZZ30vApplicationGetTimerTaskMemoryE16uxTimerTaskStack", "o": "arduino-core", "b": 1024}, {"s": "buf.15651", "o": "lib:U8g2", "b": 1024}, {"s": "mheardPathCalls", "o": "src/mheard_functions.cpp", "b": 1000}, {"s": "mheardCalls", "o": "src/mheard_functions.cpp", "b": 800}, {"s": "_ZL8cap_ring", "o": "src/capture_functions.cpp", "b": 768}]}}}}]};
+const ORDER = ["code", "bt", "wifi", "sys", "libc", "libs"];
+const nf = new Intl.NumberFormat("de-DE");
+
+function legend() {
+  const el = document.getElementById("legend");
+  el.innerHTML = ORDER.map(k =>
+    `<span class="lg"><span class="sw" style="background:var(--${k})"></span>${DATA.labels[k]}</span>`
+  ).join("") + `<span class="lg"><span class="sw free"></span>frei</span>`;
+}
+
+function bar(reg, region) {
+  const segs = ORDER.filter(k => reg.fam[k]).map(k => {
+    const b = reg.fam[k], pct = 100 * b / reg.length;
+    return `<div class="seg ${k}" style="width:${pct}%" data-t="${DATA.labels[k]}"
+             data-b="${nf.format(b)} Byte" data-p="${(100 * b / reg.used).toFixed(1)} % der Belegung"></div>`;
+  }).join("");
+  const free = reg.length - reg.used;
+  return `<div class="bar">${segs}</div>`;
+}
+
+function board(b) {
+  const regs = Object.keys(b.regions);
+  return regs.map(rn => {
+    const r = b.regions[rn];
+    if (!r.upstream || !r.neo) return "";
+    const d = r.neo.used - r.upstream.used;
+    const dcls = d < 0 ? "neg" : (d === 0 ? "zero" : "");
+    const dtxt = d === 0 ? "±0" : (d > 0 ? "+" : "−") + nf.format(Math.abs(d));
+    return `<div class="board" data-region="${rn}">
+      <div class="bhead">
+        <span class="bname">${b.label}</span>
+        ${b.nodes ? `<span class="bnodes">${b.nodes} Knoten im Feld</span>` : ""}
+        <span class="bseg"><code>${rn}</code> · ${nf.format(r.neo.length)} Byte gross</span>
+      </div>
+      ${b.note ? `<p class="bnote">${b.note}</p>` : ""}
+      <div class="row"><span class="rowlab"><b>upstream</b>dev</span>${bar(r.upstream, rn)}</div>
+      <div class="row"><span class="rowlab"><b>neo</b>fork</span>${bar(r.neo, rn)}</div>
+      <div class="figs">
+        <span>belegt ${nf.format(r.upstream.used)} → ${nf.format(r.neo.used)} Byte</span>
+        <span class="d ${dcls}">${dtxt} Byte</span>
+        <span>frei auf neo: ${nf.format(r.neo.length - r.neo.used)} Byte</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function render() {
+  legend();
+  const ram = [], iram = [];
+  for (const b of DATA.boards) {
+    for (const rn of Object.keys(b.regions)) {
+      const one = { ...b, regions: { [rn]: b.regions[rn] } };
+      (rn === "iram0_0_seg" ? iram : ram).push(board(one));
+    }
+  }
+  document.getElementById("map-ram").innerHTML = ram.join("");
+  document.getElementById("map-iram").innerHTML = iram.join("");
+}
+
+function tooltips() {
+  const tt = document.getElementById("tt");
+  document.addEventListener("pointerover", e => {
+    const s = e.target.closest(".seg");
+    if (!s) { tt.classList.remove("on"); return; }
+    tt.innerHTML = `${s.dataset.t}<br>${s.dataset.b}<br>${s.dataset.p}`;
+    tt.classList.add("on");
+  });
+  document.addEventListener("pointermove", e => {
+    if (!tt.classList.contains("on")) return;
+    const pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    const r = tt.getBoundingClientRect();
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad;
+    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
+    tt.style.left = Math.max(8, x) + "px";
+    tt.style.top = Math.max(8, y) + "px";
+  });
+  document.addEventListener("pointerleave", () => tt.classList.remove("on"));
+}
+
+render();
+tooltips();
+</script>

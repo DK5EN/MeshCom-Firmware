@@ -1,0 +1,10 @@
+arm A4p1_heltec  port /dev/cu.usbserial-0001
+
+boots                     12
+first join <= 25 s        12/12
+got_ip ms  median/max     11157 / 11498   (n=12)
+ready ms   median/max     11896 / 12326
+disconnect events         0
+connection-error bursts   0
+[WIFI];stall lines        0
+!! boots with no reset marker: 12 -- port open did not reboot the node; results for those rows are not a boot

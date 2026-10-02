@@ -1,0 +1,102 @@
+{
+  "instr": {
+    "ok": true,
+    "seconds": 600.0,
+    "loop_n": 5959,
+    "loop_avg_us": 100811,
+    "loop_max_us": 1716797,
+    "gaps": 5,
+    "gap_events": [
+      "[INSTR-LOOP] gap ms 1716 in unattributed section_ms 0 sections_ms 0",
+      "[INSTR-LOOP] gap ms 1713 in unattributed section_ms 0 sections_ms 0",
+      "[INSTR-LOOP] gap ms 882 in hey_tx section_ms 763 sections_ms 814",
+      "[INSTR-LOOP] gap ms 986 in hey_tx section_ms 869 sections_ms 916",
+      "[INSTR-LOOP] gap ms 906 in hey_tx section_ms 789 sections_ms 836"
+    ],
+    "sections": {
+      "eth_state": {
+        "n": 5602,
+        "avg_us": 0,
+        "max_us": 1953
+      },
+      "clock": {
+        "n": 5960,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 5960,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_sm": {
+        "n": 139,
+        "avg_us": 2065,
+        "max_us": 5860
+      },
+      "ble_settings": {
+        "n": 5960,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "hey_tx": {
+        "n": 3,
+        "avg_us": 807291,
+        "max_us": 869140
+      },
+      "telemetry": {
+        "n": 40,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "gateway": {
+        "n": 5960,
+        "avg_us": 142,
+        "max_us": 126953
+      },
+      "display_tick": {
+        "n": 5960,
+        "avg_us": 0,
+        "max_us": 976
+      },
+      "serial_cmd": {
+        "n": 5960,
+        "avg_us": 0,
+        "max_us": 1953
+      },
+      "lora_rx_timeout": {
+        "n": 5733,
+        "avg_us": 17,
+        "max_us": 1954
+      },
+      "lora_tx": {
+        "n": 24,
+        "avg_us": 5289,
+        "max_us": 5860
+      },
+      "eth_heartbeat": {
+        "n": 20,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_off": {
+        "n": 504,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_dhcp": {
+        "n": 10,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 5581,
+        "avg_us": 117,
+        "max_us": 32227
+      }
+    },
+    "heap_free": 111080,
+    "heap_largest": 97632,
+    "worst_section": "hey_tx"
+  }
+}

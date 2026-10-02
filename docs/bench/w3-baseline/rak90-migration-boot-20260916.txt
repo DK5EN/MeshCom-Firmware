@@ -1,0 +1,64 @@
+=====================================
+[INIT] START CLIENT
+00:00:00;[HEAP];135020;135040;67510;(init)
+[INIT]...initMheard
+[INIT]...init_batt
+[SETST];path;legacy_rewritten
+[SETST];path;keyed_absent
+[SETST];save;ok;bytes=15
+[SETST];save;encoded;bytes=1458
+[SETST];save;rename_failed;bytes=1458
+[SETST];fs;rename_failed;file;/MeshCom-RAK;2000
+[SETST];fs;rename_failed;file;/counters.txt;15
+[SETST];fs;rename_failed;file;/MeshCom-Settings-Store;1458
+[SETST];fs;rename_failed;total;files;3;dirs;3;bytes;3473;content_blocks;29;of;224;not_entered;0
+[SETST];save;rename_failed_twice;bytes=1458
+[SETST];path;legacy_migration_failed
+[SETST];save;ok;bytes=9
+[INIT]...FLASH layout 20260724 ok, build 20260912
+[SETST];save;encoded;bytes=1458
+[SETST];save;skipped_unchanged;bytes=1458
+[OBUT]...One Button GPIO(10) not activated
+[INIT]...Initialize clock: ok
+=====================================
+GPS: trying 9600 baud
+GPS: trying 38400 baud
+GPS: speed not found
+[INIT]...Adafruit SHTC3 check
+[INIT]...Couldn't find SHTC3
+[INIT]...init helper_string:MC-690d-DK5EN-90
+[INIT]...BLE init
+[INIT]...MCP23017 not found
+[INIT]...INA226 not found
+[INIT]...RTC not found
+[INIT]...Auto detecting display:
+[INIT]...Display not found
+[INIT]...CLIENT STARTED
+[BOOT] RESETREAS=0x00000004
+[INIT]...Radio-Sync: 1424
+[SETST];save;encoded;bytes=1458
+[SETST];save;skipped_unchanged;bytes=1458
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_FREQUENCY: 433.1750 433175000 MHz
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...RF_POWER: 22 dBm
+[INIT]...Radio-Sync: 242B
+=====================================
+[ETH];stall;hw_init;ms;199;task;loop
+
+Initialize Ethernet
+[ETH];stall;dhcp_begin;ms;4165;task;loop
+Ethernet.localIP(): 192.168.68.66
+
+My IP address: 192.168.68.66
+Default GW address: 192.168.68.1
+DNS address: 217.237.150.188
+SNM: 255.255.252.0
+[ETH];event;got_ip;192.168.68.66;ms;43533
+[GW];srv;OE;host;89.185.97.38;path;inet;ms;43534
+[BOOT];ready;ms;43535;ip;1;eth;1
+[ETH];event;link;up;ip;1;ms;43541
+[ETH];link;up;link;1;link_age_s;0;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;0;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;43541
+[NTP];ok;epoch;1789548777;rtt;108

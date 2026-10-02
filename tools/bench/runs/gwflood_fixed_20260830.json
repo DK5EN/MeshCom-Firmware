@@ -1,0 +1,346 @@
+{
+  "host": "192.168.68.58",
+  "client": [
+    "192.168.68.66",
+    1990
+  ],
+  "table": [
+    {
+      "gap_s": 8.0,
+      "ingress": 6,
+      "tx": 6,
+      "rx": 4,
+      "tx_lat_med_s": 1787848633.72,
+      "tx_lat_max_s": 1787848651.42
+    },
+    {
+      "gap_s": 4.0,
+      "ingress": 6,
+      "tx": 4,
+      "rx": 3,
+      "tx_lat_med_s": 1787848657.25,
+      "tx_lat_max_s": 1787848694.54
+    },
+    {
+      "gap_s": 2.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 1.0,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    },
+    {
+      "gap_s": 0.5,
+      "ingress": 6,
+      "tx": 0,
+      "rx": 0,
+      "tx_lat_med_s": null,
+      "tx_lat_max_s": null
+    }
+  ],
+  "sent": [
+    {
+      "gap": 8.0,
+      "k": 0,
+      "msg_id": 49937920,
+      "t_send": 236584.4910195
+    },
+    {
+      "gap": 8.0,
+      "k": 1,
+      "msg_id": 49937921,
+      "t_send": 236592.566288708
+    },
+    {
+      "gap": 8.0,
+      "k": 2,
+      "msg_id": 49937922,
+      "t_send": 236600.649922541
+    },
+    {
+      "gap": 8.0,
+      "k": 3,
+      "msg_id": 49937923,
+      "t_send": 236608.727780916
+    },
+    {
+      "gap": 8.0,
+      "k": 4,
+      "msg_id": 49937924,
+      "t_send": 236616.811310041
+    },
+    {
+      "gap": 8.0,
+      "k": 5,
+      "msg_id": 49937925,
+      "t_send": 236624.9021615
+    },
+    {
+      "gap": 4.0,
+      "k": 0,
+      "msg_id": 49937926,
+      "t_send": 236641.105689541
+    },
+    {
+      "gap": 4.0,
+      "k": 1,
+      "msg_id": 49937927,
+      "t_send": 236645.195685916
+    },
+    {
+      "gap": 4.0,
+      "k": 2,
+      "msg_id": 49937928,
+      "t_send": 236649.279304833
+    },
+    {
+      "gap": 4.0,
+      "k": 3,
+      "msg_id": 49937929,
+      "t_send": 236653.352454458
+    },
+    {
+      "gap": 4.0,
+      "k": 4,
+      "msg_id": 49937930,
+      "t_send": 236657.432129958
+    },
+    {
+      "gap": 4.0,
+      "k": 5,
+      "msg_id": 49937931,
+      "t_send": 236661.514985458
+    },
+    {
+      "gap": 2.0,
+      "k": 0,
+      "msg_id": 49937932,
+      "t_send": 236673.724297041
+    },
+    {
+      "gap": 2.0,
+      "k": 1,
+      "msg_id": 49937933,
+      "t_send": 236675.816960041
+    },
+    {
+      "gap": 2.0,
+      "k": 2,
+      "msg_id": 49937934,
+      "t_send": 236677.9103605
+    },
+    {
+      "gap": 2.0,
+      "k": 3,
+      "msg_id": 49937935,
+      "t_send": 236679.961988666
+    },
+    {
+      "gap": 2.0,
+      "k": 4,
+      "msg_id": 49937936,
+      "t_send": 236682.027195333
+    },
+    {
+      "gap": 2.0,
+      "k": 5,
+      "msg_id": 49937937,
+      "t_send": 236684.110421291
+    },
+    {
+      "gap": 1.0,
+      "k": 0,
+      "msg_id": 49937938,
+      "t_send": 236694.357352125
+    },
+    {
+      "gap": 1.0,
+      "k": 1,
+      "msg_id": 49937939,
+      "t_send": 236695.455210541
+    },
+    {
+      "gap": 1.0,
+      "k": 2,
+      "msg_id": 49937940,
+      "t_send": 236696.528967458
+    },
+    {
+      "gap": 1.0,
+      "k": 3,
+      "msg_id": 49937941,
+      "t_send": 236697.60988175
+    },
+    {
+      "gap": 1.0,
+      "k": 4,
+      "msg_id": 49937942,
+      "t_send": 236698.693515125
+    },
+    {
+      "gap": 1.0,
+      "k": 5,
+      "msg_id": 49937943,
+      "t_send": 236699.761018541
+    },
+    {
+      "gap": 0.5,
+      "k": 0,
+      "msg_id": 49937944,
+      "t_send": 236709.00011675
+    },
+    {
+      "gap": 0.5,
+      "k": 1,
+      "msg_id": 49937945,
+      "t_send": 236709.560606916
+    },
+    {
+      "gap": 0.5,
+      "k": 2,
+      "msg_id": 49937946,
+      "t_send": 236710.1336325
+    },
+    {
+      "gap": 0.5,
+      "k": 3,
+      "msg_id": 49937947,
+      "t_send": 236710.702524958
+    },
+    {
+      "gap": 0.5,
+      "k": 4,
+      "msg_id": 49937948,
+      "t_send": 236711.290672875
+    },
+    {
+      "gap": 0.5,
+      "k": 5,
+      "msg_id": 49937949,
+      "t_send": 236711.87460725
+    }
+  ],
+  "tx_ids": [
+    49937920,
+    49937921,
+    49937922,
+    49937923,
+    49937924,
+    49937925,
+    49937926,
+    49937927,
+    49937929,
+    49937930
+  ],
+  "rx_ids": [
+    49937922,
+    49937923,
+    49937924,
+    49937925,
+    49937926,
+    49937927,
+    49937929,
+    451011327,
+    1090969865,
+    1179206607,
+    1906610850,
+    3928334738
+  ],
+  "instr": [
+    "[INSTR-HEAP] instr int_free 133832 int_min 128576 int_largest 122868 psram_free 0 psram_largest 0",
+    "[INSTR-FLUSH] n 37 total_us 1278395 avg_us 34551 max_us 35088",
+    "[INSTR-LOOP] n 29766 total_us 167490995 avg_us 5626 max_us 333999",
+    "[INSTR-SECT] display_rx n 29767 total_us 30653 avg_us 1 max_us 10",
+    "[INSTR-SECT] gps n 55 total_us 2947204 avg_us 53585 max_us 189630",
+    "[INSTR-SECT] display_tick n 29767 total_us 604799 avg_us 20 max_us 35290",
+    "[INSTR-SECT] lora_rx n 16 total_us 748291 avg_us 46768 max_us 73487",
+    "[INSTR-SECT] udp n 29767 total_us 4270121 avg_us 143 max_us 68291",
+    "[INSTR-SECT] wifi_ping n 6 total_us 1549 avg_us 258 max_us 370",
+    "[INSTR-GAPS] n 1 threshold_ms 250",
+    "[INSTR-GUI] not_available_on_this_board"
+  ],
+  "loop_gaps": [
+    "[INSTR-LOOP] gap ms 333 in gps section_ms 189 sections_ms 189"
+  ],
+  "udp_rx_seen": [
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;76;head;47415445",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154",
+    "[UDP];rx;ip;192.168.68.58;port;1990;len;14;head;42454154"
+  ],
+  "queued_udp": [
+    "[MC-DBG] RING_WRITE slot=0 type=21 status=FF len=81 msg_id=02F9FE00 queued=0/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=1 type=21 status=FF len=81 msg_id=02F9FE01 queued=0/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=3 type=21 status=FF len=81 msg_id=02F9FE02 queued=1/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=4 type=21 status=FF len=81 msg_id=02F9FE03 queued=2/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=5 type=21 status=FF len=81 msg_id=02F9FE04 queued=3/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=6 type=21 status=FF len=81 msg_id=02F9FE05 queued=4/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=7 type=21 status=FF len=81 msg_id=02F9FE06 queued=5/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=8 type=21 status=FF len=81 msg_id=02F9FE07 queued=6/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=9 type=21 status=FF len=81 msg_id=02F9FE08 queued=7/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=10 type=21 status=FF len=81 msg_id=02F9FE09 queued=8/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=11 type=21 status=FF len=81 msg_id=02F9FE0A queued=9/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=13 type=21 status=FF len=81 msg_id=02F9FE0B queued=11/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=14 type=21 status=FF len=81 msg_id=02F9FE0C queued=12/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=15 type=21 status=FF len=81 msg_id=02F9FE0D queued=13/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=16 type=21 status=FF len=81 msg_id=02F9FE0E queued=14/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=17 type=21 status=FF len=81 msg_id=02F9FE0F queued=15/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=18 type=21 status=FF len=81 msg_id=02F9FE10 queued=16/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=19 type=21 status=FF len=81 msg_id=02F9FE11 queued=17/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=0 type=21 status=FF len=81 msg_id=02F9FE12 queued=18/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=1 type=21 status=FF len=81 msg_id=02F9FE13 queued=19/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=2 type=21 status=FF len=81 msg_id=02F9FE14 queued=14/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=3 type=21 status=FF len=81 msg_id=02F9FE15 queued=15/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=4 type=21 status=FF len=81 msg_id=02F9FE16 queued=16/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=5 type=21 status=FF len=81 msg_id=02F9FE17 queued=17/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=6 type=21 status=FF len=81 msg_id=02F9FE18 queued=17/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=7 type=21 status=FF len=81 msg_id=02F9FE19 queued=18/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=8 type=21 status=FF len=81 msg_id=02F9FE1A queued=19/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=9 type=21 status=FF len=81 msg_id=02F9FE1B queued=19/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=9 type=21 status=FF len=81 msg_id=02F9FE1C queued=19/20 src=udp_rx",
+    "[MC-DBG] RING_WRITE slot=9 type=21 status=FF len=81 msg_id=02F9FE1D queued=19/20 src=udp_rx"
+  ],
+  "udpstat": [
+    "[UDPSTAT];bind;1990;ip;192.168.68.66;dest;192.168.68.58;rx;38;rx_last_ms;180352;rx_from;192.168.68.58;1990;rx_len;14;tx;13;tx_fail;0;tx_last_ms;180253"
+  ]
+}

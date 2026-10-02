@@ -1,0 +1,23 @@
+    5.236 hello pin=no             04102030
+    7.336 timesync 1767225600      062000b95569
+   14.714 text '--info'            08a02d2d696e666f
+   16.876 text '--seset'           09a02d2d7365736574
+   19.035 text '--wifiset'         0ba02d2d77696669736574
+   21.196 text '--nodeset'         0ba02d2d6e6f6465736574
+   23.295 text '--analogset'       0da02d2d616e616c6f67736574
+   25.456 text '--wx'              06a02d2d7778
+   27.556 text '--pos'             07a02d2d706f73
+   29.656 text '--io'              06a02d2d696f
+   31.756 text '--tel'             07a02d2d74656c
+   33.855 text '--aprsset'         0ba02d2d61707273736574
+   35.955 text '--conffin'         0ba02d2d636f6e6666696e
+   38.055 text '--mheard'          0aa02d2d6d6865617264
+   40.156 text '--path'            08a02d2d70617468
+   42.257 text '--info'            08a02d2d696e666f
+   44.356 text '--infoX'           09a02d2d696e666f58
+   46.456 text '--heap'            08a02d2d68656170
+   48.556 text '--heap tag'        0ca02d2d6865617020746167
+   50.656 text '--softser app'     0fa02d2d736f667473657220617070
+   52.755 text '--softser app0'    10a02d2d736f66747365722061707030
+   54.856 text '--maxhop'          0aa02d2d6d6178686f70
+   56.956 text '--maxhop 5'        0ca02d2d6d6178686f702035

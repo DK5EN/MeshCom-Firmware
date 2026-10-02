@@ -1,0 +1,12 @@
+[SETST];path;legacy_rewritten
+[SETST];path;sanity_gate_rejected;read_ok=1;fields_set=105;unknown_keys=0;malformed_lines=0;node_call_empty=0
+[SETST];save;ok;bytes=15
+[SETST];save;encoded;bytes=1458
+[SETST];save;skipped_unchanged;bytes=1458
+[SETST];path;legacy_migrated
+[SETST];save;ok;bytes=9
+[INIT]...FLASH layout 20260724 ok, build 20260912
+[SETST];save;encoded;bytes=1458
+[SETST];save;skipped_unchanged;bytes=1458
+[SETST];save;encoded;bytes=1458
+[SETST];save;skipped_unchanged;bytes=1458

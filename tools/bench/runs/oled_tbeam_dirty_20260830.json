@@ -1,0 +1,51 @@
+{
+  "dirty": {
+    "ok": false,
+    "seconds": 15.0,
+    "have_skipped": true,
+    "frames_delta": 1,
+    "skipped_delta": 0,
+    "pairs": [
+      "frame",
+      "frame",
+      "frame"
+    ],
+    "skip_seen": false,
+    "stat0": {
+      "page": 0,
+      "last": 0,
+      "hold": 1,
+      "lines": 0,
+      "info": 1,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 9,
+      "frames": 2,
+      "last_us": 39275,
+      "posdisp": 1,
+      "offwait_ms": 0,
+      "u8g2": 1,
+      "crc": 2345410871,
+      "skipped": 0
+    },
+    "stat1": {
+      "page": 0,
+      "last": 1,
+      "hold": 0,
+      "lines": 4,
+      "info": 1,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 0,
+      "frames": 3,
+      "last_us": 38307,
+      "posdisp": 1,
+      "offwait_ms": 24880,
+      "u8g2": 1,
+      "crc": 3955602926,
+      "skipped": 0
+    }
+  }
+}

@@ -1,0 +1,378 @@
+2026-09-18T11:49:43.067  ### attached /dev/cu.usbserial-573C0005841 dtr=False
+2026-09-18T11:49:43.272  ets Jul 29 2019 12:21:46
+2026-09-18T11:49:43.273  
+2026-09-18T11:49:43.273  rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+2026-09-18T11:49:43.273  configsip: 0, SPIWP:0xee
+2026-09-18T11:49:43.273  clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+2026-09-18T11:49:43.273  mode:DIO, clock div:2
+2026-09-18T11:49:43.273  load:0x3fff0030,len:1184
+2026-09-18T11:49:43.273  load:0x40078000,len:13232
+2026-09-18T11:49:43.273  load:0x40080400,len:3028
+2026-09-18T11:49:43.273  entry 0x400805e4
+2026-09-18T11:49:44.491  
+2026-09-18T11:49:44.492  
+2026-09-18T11:49:44.492  ============
+2026-09-18T11:49:44.492  CLIENT SETUP
+2026-09-18T11:49:44.492  ============
+2026-09-18T11:49:44.492  [BOOT] RESET_REASON=1 POWERON
+2026-09-18T11:49:44.492  [HEAP] 00:00:00 162564 160224 110580 (init)
+2026-09-18T11:49:44.492  [PSRM] 00:00:00 0
+2026-09-18T11:49:44.492  [EFUS]...Two Point: NOT supported
+2026-09-18T11:49:44.492  [EFUS]...Vref: Supported
+2026-09-18T11:49:44.492  [INIT]...initMheard
+2026-09-18T11:49:44.492  [INIT]...init_flash
+2026-09-18T11:49:44.492  [INIT]...build Sep 18 2026 / 11:48:01
+2026-09-18T11:49:44.492  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T11:49:44.492  [TIME]...Loaded time persistence: saved_time=1789662852, mheard_time=0, msg_time=0
+2026-09-18T11:49:44.492  [INIT]...init_batt
+2026-09-18T11:49:44.492  [ADC ]...Characterized using eFuse Vref
+2026-09-18T11:49:44.492  [INIT]...Start check AXP
+2026-09-18T11:49:44.492  [INIT]...AXP2101 PMU init succeeded, using AXP2101 PMU
+2026-09-18T11:49:44.492  [INIT]...AXP-Chip-Model:4 AXP-Chip-ID:74
+2026-09-18T11:49:44.492  [INIT]...AXP2101 chip
+2026-09-18T11:49:44.492  =======================================================================
+2026-09-18T11:49:44.492  DC1  : +   Voltage:3300 mV 
+2026-09-18T11:49:44.492  DC2  : -   Voltage:900 mV 
+2026-09-18T11:49:44.492  DC3  : -   Voltage:900 mV 
+2026-09-18T11:49:44.493  DC4  : -   Voltage:1100 mV 
+2026-09-18T11:49:44.493  ALDO1: -   Voltage:1800 mV 
+2026-09-18T11:49:44.493  ALDO2: +   Voltage:3300 mV 
+2026-09-18T11:49:44.698  ALDO3: +   Voltage:3300 mV 
+2026-09-18T11:49:44.698  ALDO4: -   Voltage:2900 mV 
+2026-09-18T11:49:44.698  BLDO1: -   Voltage:1800 mV 
+2026-09-18T11:49:44.698  BLDO2: -   Voltage:2800 mV 
+2026-09-18T11:49:44.698  VBACK: +   Voltage:3300 mV 
+2026-09-18T11:49:44.698  =======================================================================
+2026-09-18T11:49:44.698  [INIT]...All AXP2101 started
+2026-09-18T11:49:44.698  [INIT]...MCP23017 not found
+2026-09-18T11:49:44.698  [INIT]...INA226 not found
+2026-09-18T11:49:44.698  [INIT]...RTC not found
+2026-09-18T11:49:44.698  [OBUT]...One Button GPIO(38) started
+2026-09-18T11:49:44.698  [INIT].._GW_ID: E0D041B8
+2026-09-18T11:49:44.698  [INIT]...Initialize clock: ok
+2026-09-18T11:49:44.698  [INIT]...Auto detecting display:
+2026-09-18T11:49:44.698  [INIT]...Display type: 0x04
+2026-09-18T11:49:44.698  [INIT]...OLED panel is 0.9 inch -> SSD1306
+2026-09-18T11:49:45.106  [LoRa]...SX1276 Chip Initializing ... success
+2026-09-18T11:49:45.106  [LoRa]...RF_FREQUENCY: 433.175 MHz
+2026-09-18T11:49:45.106  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T11:49:45.106  [LoRa]...RF_SF: 11
+2026-09-18T11:49:45.106  [LoRa]...RF_CR: 4/6
+2026-09-18T11:49:45.308  [LoRa]...RF_POWER: 2 dBm
+2026-09-18T11:49:45.309  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T11:49:45.309  [LoRa]...Starting to listen ... success
+2026-09-18T11:49:45.309  [LoRa]...All settings successfully changed
+2026-09-18T11:49:45.309  [BLE ]...Device started with BLE-Name <MC-41b8-DK5EN-92>
+2026-09-18T11:49:45.512  [BLE ]...Device-Address <08:f9:e0:d0:41:ba>
+2026-09-18T11:49:45.512  [BLE ]...Waiting a client connection to notify...
+2026-09-18T11:49:45.512  ==============
+2026-09-18T11:49:45.512  CLIENT STARTED
+2026-09-18T11:49:45.512  ==============
+2026-09-18T11:49:45.799  ### boot marker seen
+2026-09-18T11:49:46.118  [WIFI];scan;skipped;first_bringup;ms;2240
+2026-09-18T11:49:46.118  [WIFI]...try connecting to SSID: ORBI63 
+2026-09-18T11:49:46.118  [WIFI];policy;pmf_off;rc;0
+2026-09-18T11:49:46.118  [HEAP] 00:00:00 96848 96728 90100 (mon)
+2026-09-18T11:49:46.118  [GPS ]...Init GPIO RX=34 TX=12
+2026-09-18T11:49:46.118  [GPS ]...38400 baud --> 62 chars (NMEA ok)
+2026-09-18T11:49:46.118  [GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 78 ms)
+2026-09-18T11:49:46.118  [GPS ]...erkannte Baudrate: 38400
+2026-09-18T11:49:46.118  [GPS ]...Try to init L76K/UBLOX
+2026-09-18T11:49:46.118  [GPS ]...clear NMEA-Buffer
+2026-09-18T11:49:46.118  [GPS ]>>> $PCAS06,0*1B
+2026-09-18T11:49:46.731  [GPS ]...wait[GPS ]<<< $GPTXT,01,01,01,PCAS inv format*3D
+2026-09-18T11:49:46.731   ...
+2026-09-18T11:49:46.731  check Input
+2026-09-18T11:49:46.731  [GPS ]...UBLOX connected
+2026-09-18T11:49:46.731  [GPS ]...UBX_CFG_PRT 38400
+2026-09-18T11:49:47.546  [GPS ]...Sende UBX_CFG_RATE
+2026-09-18T11:49:47.546  [GPS ]...Sende UBX_CFG_CFG
+2026-09-18T11:49:47.751  [GPS ]...UBLOX Flash save
+2026-09-18T11:49:47.751  [GPS ]...UBLOX config finished
+2026-09-18T11:49:47.751  [GPS ]...wait[GPS ]...Sende UBX_MON_VER
+2026-09-18T11:49:48.771  [GPS_VER] $GPRMC,094951.00,A,4824.45282,N,01144.30740,E,0.165,,180926,,,A*75.$GPGGA,094951.00,4824.45282,N,01144.30740,E,1,04,4.18,486.0,M,46.2,M,,*5C.
+2026-09-18T11:49:48.771  [GPS ]...UBLOX erkannt
+2026-09-18T11:49:48.771  .[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;4886
+2026-09-18T11:49:48.805  ### sent: --netconsole on
+2026-09-18T11:49:49.173  --netconsole on
+2026-09-18T11:49:49.377  ...net console on ( port 2323)
+2026-09-18T11:49:49.785  [WIFI];event;connected;ms;5882
+2026-09-18T11:49:49.786  [WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-56;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;5883
+2026-09-18T11:49:50.395  .[WIFI];event;got_ip;ms;6545
+2026-09-18T11:49:50.396  [WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-53;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6546
+2026-09-18T11:49:50.799  
+2026-09-18T11:49:50.799  [WIFI]...connect OK
+2026-09-18T11:49:50.799  [WIFI]...now listening at IP 192.168.68.76, UDP port 1990
+2026-09-18T11:49:50.799  [WIFI]...Internet UDP-DEST meshcom.oevsv.at
+2026-09-18T11:49:50.799  [WIFI]...Internet NTP-DEST pool.ntp.org
+2026-09-18T11:49:50.799  [GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;6912
+2026-09-18T11:49:50.799  [CON ]...HMAC console init.
+2026-09-18T11:49:50.799  [CON ]...Console started on port 2323
+2026-09-18T11:49:50.799  [BOOT];ready;ms;6927;ip;1
+2026-09-18T11:49:50.799  TimeClient no update possible --> CPU-Mode
+2026-09-18T11:49:50.799  [WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;68
+2026-09-18T11:49:50.799  [WIFI];dns;pool.ntp.org;ip;185.248.188.98;ms;66
+2026-09-18T11:49:50.800  [NTP];ok;epoch;1789724990;rtt;82
+2026-09-18T11:49:51.409  [CON ]...accept() fd=51 free=79844
+2026-09-18T11:49:51.409  [CON ]...Client authenticated on port 2323. free heap=74364
+2026-09-18T11:49:57.182  ### verdict OK for probe:--netconsole on
+2026-09-18T11:49:57.182  ### sent: --info
+2026-09-18T11:49:57.527  --info
+2026-09-18T11:49:57.527  --MeshCom 4.35t (build: Sep 18 2026 / 11:48:00)
+2026-09-18T11:49:57.527  ...UPDATE: 2026-09-17 17:34:15
+2026-09-18T11:49:57.527  ...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [NTP]
+2026-09-18T11:49:57.527  ...BATT 5.21 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T11:49:57.527  ...TIME 13619 ms
+2026-09-18T11:49:57.527  ...Flash-Version 20260724
+2026-09-18T11:49:57.527  ...NOMSGALL off ...MESH off ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T11:49:57.527  ...PASSWD <>
+2026-09-18T11:49:57.527  ...DEBUG man ...DEBUG en
+2026-09-18T11:49:57.527  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T11:49:57.527  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T11:49:57.527  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T11:49:57.527  ...EXTUDP off ...EXT IP none ...NOPMOTHER off
+2026-09-18T11:49:57.527  ...BTCODE 000000
+2026-09-18T11:49:57.527  ...APRSMC: APRSMC
+2026-09-18T11:49:57.527  ...ATXT: 
+2026-09-18T11:49:57.527  ...NAME: 
+2026-09-18T11:49:57.527  ...BLE : short
+2026-09-18T11:49:57.527  ...DISPLAY off
+2026-09-18T11:49:57.527  ...CTRY EU8
+2026-09-18T11:49:57.527  ...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+2026-09-18T11:49:57.527  ...MAXHOP text 4 / pos 2
+2026-09-18T11:49:57.527  
+2026-09-18T11:49:57.527  ...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+2026-09-18T11:49:57.527  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T11:49:57.527  ...NETConsole on (port 2323)
+2026-09-18T11:49:57.527  ...WIFI-AP    off
+2026-09-18T11:49:57.527  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T11:49:57.527  ...NETWORK Mode:WiFi
+2026-09-18T11:49:57.527  ...hasIpAddress: yes
+2026-09-18T11:49:57.527  ...IP address   : 192.168.68.76
+2026-09-18T11:49:57.527  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T11:49:57.527  ...GW address   : 192.168.68.1
+2026-09-18T11:49:57.527  ...DNS address  : 217.237.150.188
+2026-09-18T11:49:57.527  ...UDP-HBeat : 13714
+2026-09-18T11:50:05.354  ### verdict OK for probe:--info
+2026-09-18T11:50:05.354  ### sent: --setboostedgain on
+2026-09-18T11:50:05.888  --setboostedgain on
+2026-09-18T11:50:05.888  
+2026-09-18T11:50:05.888  ...wrong command --setboostedgain on
+2026-09-18T11:50:46.020  [HEAP] 10:50:45 81276 76840 73716 (mon)
+2026-09-18T11:50:48.665  [WIFI];link;up;rssi;-53;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;58;got_ip_n;1;ip;1;ms;64892
+2026-09-18T11:51:46.072  [HEAP] 10:51:45 84412 74352 77812 (mon)
+2026-09-18T11:51:48.714  [WIFI];link;up;rssi;-54;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;118;got_ip_n;1;ip;1;ms;124897
+2026-09-18T11:52:05.833  ### verdict OK for --setboostedgain on
+2026-09-18T11:52:05.834  ### sent: --setboostedgain off
+2026-09-18T11:52:06.424  --setboostedgain off
+2026-09-18T11:52:06.424  
+2026-09-18T11:52:06.424  ...wrong command --setboostedgain off
+2026-09-18T11:52:46.124  [HEAP] 10:52:45 84444 74352 77812 (mon)
+2026-09-18T11:52:48.777  [WIFI];link;up;rssi;-54;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;178;got_ip_n;1;ip;1;ms;184903
+2026-09-18T11:53:48.667  [WIFI];link;up;rssi;-54;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;238;got_ip_n;1;ip;1;ms;244908
+2026-09-18T11:54:06.346  ### verdict OK for --setboostedgain off
+2026-09-18T11:54:06.346  ### sent: --webserver off
+2026-09-18T11:54:06.758  --webserver off
+2026-09-18T11:54:48.699  [WIFI];link;up;rssi;-55;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;298;got_ip_n;1;ip;1;ms;304911
+2026-09-18T11:55:46.095  [HEAP] 10:55:45 84476 74352 77812 (mon)
+2026-09-18T11:55:48.754  [WIFI];link;up;rssi;-53;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;358;got_ip_n;1;ip;1;ms;364913
+2026-09-18T11:56:06.738  ### verdict OK for --webserver off
+2026-09-18T11:56:06.738  ### sent: --webserver on
+2026-09-18T11:56:07.089  --webserver on
+2026-09-18T11:56:48.716  [WIFI];link;up;rssi;-54;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;418;got_ip_n;1;ip;1;ms;424918
+2026-09-18T11:57:48.838  [WIFI];link;up;rssi;-55;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;478;got_ip_n;1;ip;1;ms;484919
+2026-09-18T11:58:07.095  ### verdict OK for --webserver on
+2026-09-18T11:58:07.095  ### sent: --display on
+2026-09-18T11:58:07.555  --display on
+2026-09-18T11:58:48.740  [WIFI];link;up;rssi;-55;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;538;got_ip_n;1;ip;1;ms;544919
+2026-09-18T11:59:48.791  [WIFI];link;up;rssi;-54;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;598;got_ip_n;1;ip;1;ms;604925
+2026-09-18T12:00:07.405  ### verdict OK for --display on
+2026-09-18T12:00:07.406  ### sent: --display off
+2026-09-18T12:00:07.927  --display off
+2026-09-18T12:00:46.202  [HEAP] 11:00:45 84316 72700 77812 (mon)
+2026-09-18T12:00:48.841  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;658;got_ip_n;1;ip;1;ms;664927
+2026-09-18T12:01:46.036  [HEAP] 11:01:45 84452 72700 77812 (mon)
+2026-09-18T12:01:48.683  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;718;got_ip_n;1;ip;1;ms;724928
+2026-09-18T12:02:07.744  ### verdict OK for --display off
+2026-09-18T12:02:07.744  ### sent: --gateway on
+2026-09-18T12:02:08.050  --gateway on
+2026-09-18T12:02:08.255  [GW];keep;tx;ok;1;ms;744367
+2026-09-18T12:02:08.255  [GW];rx;type;BEAT;len;20;ms;744469
+2026-09-18T12:02:38.163  [GW];keep;tx;ok;1;ms;774373
+2026-09-18T12:02:38.365  [GW];rx;type;BEAT;len;20;ms;774482
+2026-09-18T12:02:46.110  [HEAP] 11:02:45 84424 72700 77812 (mon)
+2026-09-18T12:02:48.753  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;778;got_ip_n;1;ip;1;ms;784934
+2026-09-18T12:03:08.285  [GW];keep;tx;ok;1;ms;804384
+2026-09-18T12:03:08.286  [GW];rx;type;BEAT;len;20;ms;804490
+2026-09-18T12:03:38.216  [GW];keep;tx;ok;1;ms;834388
+2026-09-18T12:03:38.216  [GW];rx;type;BEAT;len;20;ms;834488
+2026-09-18T12:03:48.819  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;838;got_ip_n;1;ip;1;ms;844940
+2026-09-18T12:04:08.052  ### verdict OK for --gateway on
+2026-09-18T12:04:08.052  ### sent: --gateway off
+2026-09-18T12:04:08.143  --[GW];keep;tx;ok;1;ms;864393
+2026-09-18T12:04:08.343  gatew[GW];rx;type;BEAT;len;20;ms;864509
+2026-09-18T12:04:08.548  ay off
+2026-09-18T12:04:46.198  [HEAP] 11:04:45 84264 72700 77812 (mon)
+2026-09-18T12:04:48.849  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;898;got_ip_n;1;ip;1;ms;904941
+2026-09-18T12:04:50.886  [NTP];ok;epoch;1789725890;rtt;68
+2026-09-18T12:05:46.235  [HEAP] 11:05:45 81232 72700 73716 (mon)
+2026-09-18T12:05:48.683  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;958;got_ip_n;1;ip;1;ms;964947
+2026-09-18T12:06:08.393  ### verdict OK for --gateway off
+2026-09-18T12:06:08.393  ### sent: --mesh on
+2026-09-18T12:06:08.615  --mesh on
+2026-09-18T12:06:46.082  [HEAP] 11:06:45 84424 72700 77812 (mon)
+2026-09-18T12:06:48.728  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1018;got_ip_n;1;ip;1;ms;1024951
+2026-09-18T12:07:46.113  [HEAP] 11:07:45 84400 72700 77812 (mon)
+2026-09-18T12:07:48.760  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1078;got_ip_n;1;ip;1;ms;1084955
+2026-09-18T12:08:08.628  ### verdict OK for --mesh on
+2026-09-18T12:08:08.628  ### sent: --mesh off
+2026-09-18T12:08:08.915  --mesh off
+2026-09-18T12:08:46.155  [HEAP] 11:08:45 84424 72700 77812 (mon)
+2026-09-18T12:08:48.793  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1138;got_ip_n;1;ip;1;ms;1144957
+2026-09-18T12:09:48.819  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1198;got_ip_n;1;ip;1;ms;1204961
+2026-09-18T12:10:08.894  ### verdict OK for --mesh off
+2026-09-18T12:10:08.895  ### sent: --extudp on
+2026-09-18T12:10:09.183  --extudp on
+2026-09-18T12:10:09.183  
+2026-09-18T12:10:09.183  Please set EXPUDP IP first
+2026-09-18T12:10:48.715  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1258;got_ip_n;1;ip;1;ms;1264963
+2026-09-18T12:11:46.116  [HEAP] 11:11:45 84348 72700 77812 (mon)
+2026-09-18T12:11:48.763  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1318;got_ip_n;1;ip;1;ms;1324964
+2026-09-18T12:12:09.185  ### verdict OK for --extudp on
+2026-09-18T12:12:09.185  ### sent: --extudp off
+2026-09-18T12:12:09.530  --extudp off
+2026-09-18T12:12:46.207  [HEAP] 11:12:45 84372 72700 77812 (mon)
+2026-09-18T12:12:48.851  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1378;got_ip_n;1;ip;1;ms;1384967
+2026-09-18T12:13:26.688  [GPS ]...position  : lat:48.407544 lon:11.738619 alt:487.9
+2026-09-18T12:13:29.748  [GPS ]...position  : lat:48.407548 lon:11.738632 alt:483.8
+2026-09-18T12:13:32.812  [GPS ]...position  : lat:48.407551 lon:11.738646 alt:480.6
+2026-09-18T12:13:35.865  [GPS ]...position  : lat:48.407553 lon:11.738658 alt:477.4
+2026-09-18T12:13:38.924  [GPS ]...position  : lat:48.407555 lon:11.738669 alt:474.7
+2026-09-18T12:13:41.782  [GPS ]...position  : lat:48.407558 lon:11.738680 alt:472.8
+2026-09-18T12:13:44.849  [GPS ]...position  : lat:48.407560 lon:11.738688 alt:471.4
+2026-09-18T12:13:47.904  [GPS ]...position  : lat:48.407563 lon:11.738693 alt:470.3
+2026-09-18T12:13:48.724  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1438;got_ip_n;1;ip;1;ms;1444969
+2026-09-18T12:13:50.964  [GPS ]...position  : lat:48.407565 lon:11.738693 alt:469.6
+2026-09-18T12:13:54.018  [GPS ]...position  : lat:48.407568 lon:11.738694 alt:468.5
+2026-09-18T12:13:56.870  [GPS ]...position  : lat:48.407571 lon:11.738694 alt:467.6
+2026-09-18T12:13:59.911  [GPS ]...position  : lat:48.407576 lon:11.738695 alt:466.5
+2026-09-18T12:14:02.957  [GPS ]...position  : lat:48.407576 lon:11.738691 alt:466.0
+2026-09-18T12:14:06.014  [GPS ]...position  : lat:48.407581 lon:11.738696 alt:465.2
+2026-09-18T12:14:09.078  [GPS ]...position  : lat:48.407586 lon:11.738701 alt:464.9
+2026-09-18T12:14:09.503  ### verdict OK for --extudp off
+2026-09-18T12:14:09.504  ### step run: cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address A53B5215-4472-F03A-5A5D-575274D96CC9 --cycles 3 --hold 30 --gap 10
+2026-09-18T12:14:10.096  BLE Connected with: 84:2f:57:82:2a:8c
+2026-09-18T12:14:12.125  [GPS ]...position  : lat:48.407589 lon:11.738704 alt:465.0
+2026-09-18T12:14:13.958  GPS<{"TYP":"G","LAT":48.4076,"LON":11.7387,"ALT":471,"SAT":6,"SFIX":true,"HDOP":2,"RATE":1800,"NEXT":329,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 11:14:13"}>
+2026-09-18T12:14:14.971  [GPS ]...position  : lat:48.407595 lon:11.738715 alt:465.0
+2026-09-18T12:14:18.024  [GPS ]...position  : lat:48.407602 lon:11.738730 alt:464.4
+2026-09-18T12:14:21.083  [GPS ]...position  : lat:48.407605 lon:11.738726 alt:464.1
+2026-09-18T12:14:24.151  [GPS ]...position  : lat:48.407610 lon:11.738736 alt:464.0
+2026-09-18T12:14:27.201  [GPS ]...position  : lat:48.407623 lon:11.738786 alt:464.3
+2026-09-18T12:14:30.052  [GPS ]...position  : lat:48.407626 lon:11.738800 alt:464.2
+2026-09-18T12:14:33.107  [GPS ]...position  : lat:48.407630 lon:11.738810 alt:463.7
+2026-09-18T12:14:36.159  [GPS ]...position  : lat:48.407635 lon:11.738829 alt:463.4
+2026-09-18T12:14:39.210  [GPS ]...position  : lat:48.407633 lon:11.738822 alt:463.3
+2026-09-18T12:14:42.252  [GPS ]...position  : lat:48.407630 lon:11.738812 alt:463.2
+2026-09-18T12:14:44.290  BLE disconnected. Reason: 0x0213
+2026-09-18T12:14:45.099  [GPS ]...position  : lat:48.407626 lon:11.738793 alt:462.9
+2026-09-18T12:14:46.119  [HEAP] 11:14:46 83972 72700 77812 (mon)
+2026-09-18T12:14:48.145  [GPS ]...position  : lat:48.407624 lon:11.738790 alt:462.8
+2026-09-18T12:14:48.758  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1498;got_ip_n;1;ip;1;ms;1504974
+2026-09-18T12:14:51.203  [GPS ]...position  : lat:48.407623 lon:11.738787 alt:462.6
+2026-09-18T12:14:54.252  BLE Connected with: 84:2f:57:82:2a:8c
+2026-09-18T12:14:54.253  [GPS ]...position  : lat:48.407620 lon:11.738776 alt:462.1
+2026-09-18T12:14:57.304  [GPS ]...position  : lat:48.407619 lon:11.738774 alt:461.5
+2026-09-18T12:14:58.521  GPS<{"TYP":"G","LAT":48.4076,"LON":11.7388,"ALT":467,"SAT":6,"SFIX":true,"HDOP":2,"RATE":1800,"NEXT":285,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 11:14:58"}>
+2026-09-18T12:15:00.359  [GPS ]...position  : lat:48.407618 lon:11.738768 alt:461.3
+2026-09-18T12:15:03.408  [GPS ]...position  : lat:48.407618 lon:11.738765 alt:460.8
+2026-09-18T12:15:06.249  [GPS ]...position  : lat:48.407617 lon:11.738755 alt:460.5
+2026-09-18T12:15:09.309  [GPS ]...position  : lat:48.407612 lon:11.738739 alt:460.5
+2026-09-18T12:15:12.371  [GPS ]...position  : lat:48.407606 lon:11.738722 alt:460.5
+2026-09-18T12:15:15.427  [GPS ]...position  : lat:48.407600 lon:11.738704 alt:460.3
+2026-09-18T12:15:18.490  [GPS ]...position  : lat:48.407594 lon:11.738685 alt:459.8
+2026-09-18T12:15:21.331  [GPS ]...position  : lat:48.407591 lon:11.738675 alt:459.2
+2026-09-18T12:15:24.387  [GPS ]...position  : lat:48.407589 lon:11.738670 alt:459.2
+2026-09-18T12:15:27.436  [GPS ]...position  : lat:48.407588 lon:11.738668 alt:458.7
+2026-09-18T12:15:28.662  BLE disconnected. Reason: 0x0213
+2026-09-18T12:15:30.491  [GPS ]...position  : lat:48.407586 lon:11.738663 alt:458.4
+2026-09-18T12:15:33.547  [GPS ]...position  : lat:48.407586 lon:11.738658 alt:457.8
+2026-09-18T12:15:36.599  [GPS ]...position  : lat:48.407587 lon:11.738657 alt:457.4
+2026-09-18T12:15:39.241  BLE Connected with: 84:2f:57:82:2a:8c
+2026-09-18T12:15:39.445  [GPS ]...position  : lat:48.407590 lon:11.738660 alt:457.1
+2026-09-18T12:15:42.497  [GPS ]...position  : lat:48.407594 lon:11.738663 alt:456.6
+2026-09-18T12:15:43.316  GPS<{"TYP":"G","LAT":48.4076,"LON":11.7387,"ALT":465,"SAT":6,"SFIX":true,"HDOP":2,"RATE":1800,"NEXT":240,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 11:15:42"}>
+2026-09-18T12:15:45.553  [GPS ]...position  : lat:48.407599 lon:11.738669 alt:455.9
+2026-09-18T12:15:46.163  [HEAP] 11:15:45 83828 72700 77812 (mon)
+2026-09-18T12:15:48.602  [GPS ]...position  : lat:48.407602 lon:11.738673 alt:455.7
+2026-09-18T12:15:48.807  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1558;got_ip_n;1;ip;1;ms;1564974
+2026-09-18T12:15:51.660  [GPS ]...position  : lat:48.407605 lon:11.738678 alt:455.1
+2026-09-18T12:15:54.513  [GPS ]...position  : lat:48.407608 lon:11.738682 alt:454.2
+2026-09-18T12:15:57.566  [GPS ]...position  : lat:48.407611 lon:11.738684 alt:453.7
+2026-09-18T12:16:00.608  [GPS ]...position  : lat:48.407614 lon:11.738683 alt:452.5
+2026-09-18T12:16:03.648  [GPS ]...position  : lat:48.407618 lon:11.738686 alt:451.6
+2026-09-18T12:16:09.762  [GPS ]...position  : lat:48.407625 lon:11.738690 alt:451.4
+2026-09-18T12:16:12.604  [GPS ]...position  : lat:48.407631 lon:11.738694 alt:450.0
+2026-09-18T12:16:13.420  BLE disconnected. Reason: 0x0213
+2026-09-18T12:16:15.660  [GPS ]...position  : lat:48.407635 lon:11.738695 alt:449.5
+2026-09-18T12:16:18.702  [GPS ]...position  : lat:48.407639 lon:11.738695 alt:449.7
+2026-09-18T12:16:21.754  [GPS ]...position  : lat:48.407643 lon:11.738697 alt:450.0
+2026-09-18T12:16:23.236  ### run rc=0
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:09.648  cycle 1/3 scanning for A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:12.165  cycle 1 connected A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:13.964  cycle 1 hello sent, holding 30 s
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:43.965  cycle 1 notifications=21 still_connected=True
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:43.967  cycle 1 disconnected
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:53.968  cycle 2/3 scanning for A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:56.506  cycle 2 connected A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:14:58.365  cycle 2 hello sent, holding 30 s
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:15:28.367  cycle 2 notifications=17 still_connected=True
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:15:28.368  cycle 2 disconnected
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:15:38.370  cycle 3/3 scanning for A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:15:41.267  cycle 3 connected A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:15:43.186  cycle 3 hello sent, holding 30 s
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:16:13.187  cycle 3 notifications=17 still_connected=True
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:16:13.188  cycle 3 disconnected
+2026-09-18T12:16:23.236  ### run| 2026-09-18T12:16:23.190  === ble cycles done failures=0
+2026-09-18T12:16:23.237  ### verdict OK for run:cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address A53B5215-4472-F03A-5A5D-575274D96CC9 --cycles 3 --hold 30 --gap 10
+2026-09-18T12:16:23.237  ### sent: --info
+2026-09-18T12:16:23.589  --info
+2026-09-18T12:16:23.589  --MeshCom 4.35t (build: Sep 18 2026 / 11:48:00)
+2026-09-18T12:16:23.589  ...UPDATE: 2026-09-17 17:34:15
+2026-09-18T12:16:23.589  ...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [GPS]
+2026-09-18T12:16:23.589  ...BATT 5.22 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T12:16:23.589  ...TIME 1599685 ms
+2026-09-18T12:16:23.589  ...Flash-Version 20260724
+2026-09-18T12:16:23.589  ...NOMSGALL off ...MESH off ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T12:16:23.589  ...PASSWD <>
+2026-09-18T12:16:23.589  ...DEBUG man ...DEBUG en
+2026-09-18T12:16:23.589  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T12:16:23.589  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T12:16:23.589  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T12:16:23.589  ...EXTUDP off ...EXT IP none ...NOPMOTHER off
+2026-09-18T12:16:23.589  ...BTCODE 000000
+2026-09-18T12:16:23.589  ...APRSMC: APRSMC
+2026-09-18T12:16:23.589  ...ATXT: 
+2026-09-18T12:16:23.589  ...NAME: 
+2026-09-18T12:16:23.589  ...BLE : short
+2026-09-18T12:16:23.589  ...DISPLAY off
+2026-09-18T12:16:23.589  ...CTRY EU8
+2026-09-18T12:16:23.589  ...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+2026-09-18T12:16:23.589  ...MAXHOP text 4 / pos 2
+2026-09-18T12:16:23.589  
+2026-09-18T12:16:23.589  ...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+2026-09-18T12:16:23.589  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T12:16:23.589  ...NETConsole on (port 2323)
+2026-09-18T12:16:23.589  ...WIFI-AP    off
+2026-09-18T12:16:23.589  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T12:16:23.589  ...NETWORK Mode:WiFi
+2026-09-18T12:16:23.589  ...hasIpAddress: yes
+2026-09-18T12:16:23.589  ...IP address   : 192.168.68.76
+2026-09-18T12:16:23.589  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T12:16:23.589  ...GW address   : 192.168.68.1
+2026-09-18T12:16:23.589  ...DNS address  : 217.237.150.188
+2026-09-18T12:16:23.589  ...UDP-HBeat : 735381
+2026-09-18T12:16:24.805  [GPS ]...position  : lat:48.407638 lon:11.738685 alt:455.0
+2026-09-18T12:16:27.852  [GPS ]...position  : lat:48.407635 lon:11.738679 alt:460.7
+2026-09-18T12:16:30.697  [GPS ]...position  : lat:48.407637 lon:11.738682 alt:465.7
+2026-09-18T12:16:31.408  ### verdict OK for probe:--info

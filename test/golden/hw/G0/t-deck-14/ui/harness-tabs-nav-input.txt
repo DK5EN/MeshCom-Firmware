@@ -1,0 +1,13 @@
+=== running scenario: tabs ===
+[tabs] PASS
+  tab 0: inv=  19 refr=  6 px= 14652 repainted=True
+  tab 1: inv=  36 refr= 11 px= 84335 repainted=True
+  tab 2: inv=  19 refr=  6 px= 79965 repainted=True
+  tab 3: inv=  29 refr=  6 px= 82999 repainted=True
+  tab 4: inv= 211 refr=  8 px=194692 repainted=True
+  tab 5: inv=  16 refr=  5 px= 77560 repainted=True
+  tab 6: inv=  11 refr=  5 px= 77116 repainted=True
+  tab 7: inv= 234 refr=  9 px=142356 repainted=True
+[nav] PASS
+[input] PASS
+  keys=7/7 repaints=3 latency p50=24.0 p95=365.4 ms

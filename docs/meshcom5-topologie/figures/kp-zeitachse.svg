@@ -1,0 +1,43 @@
+<svg viewBox="0 0 960 320" role="img" aria-label="Zeitachse Fall A und Fall B"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1f2a37"/></marker></defs><text x="238" y="68" text-anchor="end" class="b">Super-Node, Fall A</text>
+<text x="238" y="84" text-anchor="end" class="t11">alone != 0: 8 Blaetter nur ueber ihn</text>
+<path d="M250 90 L920 90" stroke="#e3e8ee"/>
+<text x="238" y="128" text-anchor="end" class="b">Redundant 1, Fall B</text>
+<text x="238" y="144" text-anchor="end" class="t11">alone = 0: alle Abhaengigen gedeckt</text>
+<path d="M250 150 L920 150" stroke="#e3e8ee"/>
+<text x="238" y="188" text-anchor="end" class="b">Redundant 2, Fall B</text>
+<text x="238" y="204" text-anchor="end" class="t11">alone = 0</text>
+<path d="M250 210 L920 210" stroke="#e3e8ee"/>
+<text x="238" y="248" text-anchor="end" class="b">Alt-Firmware</text>
+<text x="238" y="264" text-anchor="end" class="t11">ohne Matrix: Re-Arm je Empfang</text>
+<path d="M250 270 L920 270" stroke="#e3e8ee"/>
+<path d="M250 292 L920 292" class="ln"/>
+<path d="M250.0 288 L250.0 296" class="ln"/>
+<text x="250.0" y="310" text-anchor="middle" class="mono">0 s</text>
+<path d="M384.0 288 L384.0 296" class="ln"/>
+<text x="384.0" y="310" text-anchor="middle" class="mono">5 s</text>
+<path d="M518.0 288 L518.0 296" class="ln"/>
+<text x="518.0" y="310" text-anchor="middle" class="mono">10 s</text>
+<path d="M652.0 288 L652.0 296" class="ln"/>
+<text x="652.0" y="310" text-anchor="middle" class="mono">15 s</text>
+<path d="M786.0 288 L786.0 296" class="ln"/>
+<text x="786.0" y="310" text-anchor="middle" class="mono">20 s</text>
+<path d="M920.0 288 L920.0 296" class="ln"/>
+<text x="920.0" y="310" text-anchor="middle" class="mono">25 s</text>
+<text x="250.0" y="40" class="t11">t = 0: Frame von S kommt bei allen drei an</text>
+<rect x="250.0" y="70" width="0" height="16" fill="#cde2fb" rx="3"><animate attributeName="width" values="0;0;93.8;93.8" keyTimes="0;0.0000;0.1400;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1400;0.1400;1" dur="12.5s" repeatCount="indefinite"/><rect x="343.8" y="68" width="10" height="20" fill="#1f6feb"/><text x="357.8" y="81" class="t11">TX nach 3,5 s, Basis 3500 ms plus Slot</text></g>
+<rect x="250.0" y="130" width="0" height="16" fill="#fde6cf" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="128" width="10" height="20" fill="#c62828"/><text x="371.2" y="124" class="t11">Kopie des Super gehoert: need &amp;= ~Hoerer(Super) = 0, CANCEL</text></g>
+<rect x="357.2" y="130" width="428.8" height="16" fill="none" stroke="#d9822b" stroke-dasharray="4 3" rx="3"/>
+<text x="780.0" y="142" text-anchor="end" class="t11">geplante Sperre bis 20 s</text>
+<rect x="250.0" y="190" width="0" height="16" fill="#fde6cf" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="188" width="10" height="20" fill="#c62828"/><text x="371.2" y="184" class="t11">Kopie des Super gehoert: need &amp;= ~Hoerer(Super) = 0, CANCEL</text></g>
+<rect x="357.2" y="190" width="428.8" height="16" fill="none" stroke="#d9822b" stroke-dasharray="4 3" rx="3"/>
+<text x="780.0" y="202" text-anchor="end" class="t11">geplante Sperre bis 20 s</text>
+<rect x="250.0" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;107.2;107.2" keyTimes="0;0.0000;0.1600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.1600;0.1600;1" dur="12.5s" repeatCount="indefinite"/><rect x="357.2" y="248" width="10" height="20" fill="#1f2a37"/><text x="371.2" y="244" class="t11">Re-Arm</text></g>
+<rect x="357.2" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;147.4;147.4" keyTimes="0;0.1600;0.3800;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.3800;0.3800;1" dur="12.5s" repeatCount="indefinite"/><rect x="504.6" y="248" width="10" height="20" fill="#1f2a37"/><text x="518.6" y="244" class="t11">Re-Arm</text></g>
+<rect x="504.6" y="250" width="0" height="16" fill="#c9d3dd" rx="3"><animate attributeName="width" values="0;0;254.6;254.6" keyTimes="0;0.3800;0.7600;1" dur="12.5s" repeatCount="indefinite"/></rect>
+<g opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.7600;0.7600;1" dur="12.5s" repeatCount="indefinite"/><rect x="759.2" y="248" width="10" height="20" fill="#5b6b7b"/><text x="755.2" y="244" class="t11" text-anchor="end">TX nach 19 s, Feld-Median DL2UD-1</text></g>
+<line x1="250" y1="30" x2="250" y2="292" stroke="#c62828" stroke-width="1.2"><animate attributeName="x1" from="250" to="920" dur="12.5s" repeatCount="indefinite"/><animate attributeName="x2" from="250" to="920" dur="12.5s" repeatCount="indefinite"/></line></svg>

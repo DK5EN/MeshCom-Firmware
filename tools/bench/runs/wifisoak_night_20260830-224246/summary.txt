@@ -1,0 +1,49 @@
+wifisoak wifisoak_night_20260830-224246  elapsed 9.10 h  (final)
+
+== tdeck
+resets seen               1
+first got_ip ms           10351
+ready ms / ip             10404 / 1
+drops sent                55
+reconnect after drop ms   n=55 median=4459 p90=5037 max=5329
+unsolicited disconnects   0
+BSSID changes             14
+    5A:AF:97:2E:2B:8B got_ip x46   chan [3] rssi min/med/max -75/-74/-68  auth=7 pmf=0 wpa3=0
+    46:AF:97:2E:2B:86 got_ip x10   chan [3] rssi min/med/max -76/-74/-73  auth=7 pmf=0 wpa3=0
+harvest same_ip           55
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -83/-75/-67  (n=539)
+dns                       2 resolutions, max 67 ms
+
+== heltec
+resets seen               0
+first got_ip ms           7193
+ready ms / ip             7957 / 1
+drops sent                55
+reconnect after drop ms   n=55 median=4016 p90=4086 max=4155
+unsolicited disconnects   0
+BSSID changes             6
+    5A:AF:97:2E:2B:8B got_ip x53   chan [3] rssi min/med/max -57/-56/-50  auth=7 pmf=0 wpa3=0
+    46:AF:97:2E:2B:86 got_ip x3    chan [3] rssi min/med/max -75/-74/-72  auth=7 pmf=0 wpa3=0
+harvest same_ip           55
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -78/-56/-49  (n=539)
+dns                       2 resolutions, max 96 ms
+
+== tbeam
+resets seen               1
+first got_ip ms           6850
+ready ms / ip             7754 / 1
+drops sent                55
+reconnect after drop ms   n=55 median=4032 p90=5002 max=5221
+unsolicited disconnects   0
+BSSID changes             13
+    5A:AF:97:2E:2B:8B got_ip x46   chan [3] rssi min/med/max -66/-57/-55  auth=7 pmf=0 wpa3=0
+    46:AF:97:2E:2B:86 got_ip x10   chan [3] rssi min/med/max -74/-72/-68  auth=7 pmf=0 wpa3=0
+harvest same_ip           55
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -85/-58/-54  (n=539)
+dns                       2 resolutions, max 114 ms

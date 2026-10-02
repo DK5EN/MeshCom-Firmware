@@ -1,0 +1,442 @@
+{
+  "E22-DevKitC": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94348
+    },
+    "flash_total": 3403776,
+    "flash_used": 1583765,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 532480,
+    "ram_used": 94344
+  },
+  "E22_1262-DevKitC": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94348
+    },
+    "flash_total": 3403776,
+    "flash_used": 1583865,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 532480,
+    "ram_used": 94344
+  },
+  "E22_1262_S3-DevKitC-1-N16R8": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 174592
+    },
+    "flash_total": 3403776,
+    "flash_used": 1487001,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 89864
+    },
+    "ram_total": 327680,
+    "ram_used": 101100
+  },
+  "E22_1268_S3-DevKitC-1-N16R8": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 174592
+    },
+    "flash_total": 3403776,
+    "flash_used": 1486957,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 89864
+    },
+    "ram_total": 327680,
+    "ram_used": 101100
+  },
+  "E22_XML-DevKitC": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 99236
+    },
+    "flash_total": 3403776,
+    "flash_used": 1603933,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 127044
+    },
+    "ram_total": 532480,
+    "ram_used": 99232
+  },
+  "LilyGo_T-Beam-1W": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 174080
+    },
+    "flash_total": 3403776,
+    "flash_used": 1491189,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 89436
+    },
+    "ram_total": 532480,
+    "ram_used": 101020
+  },
+  "LilyGo_T3_S3_V1_3": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 172496
+    },
+    "flash_total": 3403776,
+    "flash_used": 1487201,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 87780
+    },
+    "ram_total": 327680,
+    "ram_used": 101088
+  },
+  "LilyGo_T_Connect_Pro": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 177784
+    },
+    "flash_total": 3403776,
+    "flash_used": 1548977,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 92564
+    },
+    "ram_total": 327680,
+    "ram_used": 101588
+  },
+  "T-ETH-ELITE_1262": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 178696
+    },
+    "flash_total": 3403776,
+    "flash_used": 1514709,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 93744
+    },
+    "ram_total": 327680,
+    "ram_used": 101332
+  },
+  "esp32-S3-safeboot": {
+    "date": "2026-09-24",
+    "flash_total": 3403776,
+    "flash_used": 643055,
+    "ram_total": 327680,
+    "ram_used": 38756
+  },
+  "esp32-loraprs-e22": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94236
+    },
+    "flash_total": 3403776,
+    "flash_used": 1583509,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 532480,
+    "ram_used": 94232
+  },
+  "esp32-loraprs-ra01": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 93940
+    },
+    "flash_total": 3403776,
+    "flash_used": 1572265,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 532480,
+    "ram_used": 93936
+  },
+  "esp32-safeboot": {
+    "date": "2026-09-24",
+    "flash_total": 3403776,
+    "flash_used": 686215,
+    "ram_total": 327680,
+    "ram_used": 43628
+  },
+  "heltec_t114": {
+    "date": "2026-09-24",
+    "flash_total": 815104,
+    "flash_used": 647984,
+    "ram_total": 235520,
+    "ram_used": 81384
+  },
+  "heltec_wifi_lora_32_V2": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94068
+    },
+    "flash_total": 3403776,
+    "flash_used": 1574445,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 327680,
+    "ram_used": 94064
+  },
+  "heltec_wifi_lora_32_V3": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 169056
+    },
+    "flash_total": 3403776,
+    "flash_used": 1470209,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85116
+    },
+    "ram_total": 327680,
+    "ram_used": 100316
+  },
+  "heltec_wifi_lora_32_V4": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 169944
+    },
+    "flash_total": 3403776,
+    "flash_used": 1470073,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85868
+    },
+    "ram_total": 327680,
+    "ram_used": 100452
+  },
+  "heltec_wireless_stick": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 169056
+    },
+    "flash_total": 3403776,
+    "flash_used": 1467189,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85116
+    },
+    "ram_total": 327680,
+    "ram_used": 100316
+  },
+  "heltec_wireless_tracker": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 170336
+    },
+    "flash_total": 3403776,
+    "flash_used": 1494361,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85868
+    },
+    "ram_total": 327680,
+    "ram_used": 100844
+  },
+  "t_deck": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 198280
+    },
+    "flash_total": 12582912,
+    "flash_used": 2197505,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 93936
+    },
+    "ram_total": 327680,
+    "ram_used": 120724
+  },
+  "t_deck_plus": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 198280
+    },
+    "flash_total": 12582912,
+    "flash_used": 2197229,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 93936
+    },
+    "ram_total": 327680,
+    "ram_used": 120724
+  },
+  "t_deck_pro": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 200592
+    },
+    "flash_total": 6553600,
+    "flash_used": 2002841,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 90596
+    },
+    "ram_total": 327680,
+    "ram_used": 126368
+  },
+  "t_echo": {
+    "date": "2026-09-24",
+    "flash_total": 815104,
+    "flash_used": 674236,
+    "ram_total": 248832,
+    "ram_used": 86664
+  },
+  "ttgo-lora32-v21": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94108
+    },
+    "flash_total": 3403776,
+    "flash_used": 1572345,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 327680,
+    "ram_used": 94104
+  },
+  "ttgo_tbeam": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94164
+    },
+    "flash_total": 3403776,
+    "flash_used": 1602241,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 1310720,
+    "ram_used": 94160
+  },
+  "ttgo_tbeam_SX1262": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94284
+    },
+    "flash_total": 3403776,
+    "flash_used": 1610397,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 1310720,
+    "ram_used": 94280
+  },
+  "ttgo_tbeam_SX1268": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 124580,
+      "used": 94284
+    },
+    "flash_total": 3403776,
+    "flash_used": 1610073,
+    "iram0_0_seg": {
+      "length": 131072,
+      "used": 126100
+    },
+    "ram_total": 1310720,
+    "ram_used": 94280
+  },
+  "ttgo_tbeam_supreme": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 171928
+    },
+    "flash_total": 3403776,
+    "flash_used": 1505657,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 87660
+    },
+    "ram_total": 327680,
+    "ram_used": 100644
+  },
+  "vision-master-e213": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 172200
+    },
+    "flash_total": 3403776,
+    "flash_used": 1463577,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85868
+    },
+    "ram_total": 327680,
+    "ram_used": 102708
+  },
+  "vision-master-e290": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 175064
+    },
+    "flash_total": 3403776,
+    "flash_used": 1508541,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 86812
+    },
+    "ram_total": 327680,
+    "ram_used": 104628
+  },
+  "wireless-paper": {
+    "date": "2026-09-24",
+    "dram0_0_seg": {
+      "length": 345856,
+      "used": 171080
+    },
+    "flash_total": 3403776,
+    "flash_used": 1448277,
+    "iram0_0_seg": {
+      "length": 362240,
+      "used": 85116
+    },
+    "ram_total": 327680,
+    "ram_used": 102340
+  },
+  "wiscore_rak4631": {
+    "date": "2026-09-24",
+    "flash_total": 815104,
+    "flash_used": 717504,
+    "ram_total": 248832,
+    "ram_used": 81408
+  }
+}
