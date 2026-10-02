@@ -183,6 +183,23 @@
       .copy:hover {
         border-color: var(--accent);
       }
+      .nrf-progress {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .nrf-progress progress {
+        flex: 1;
+        height: 14px;
+        accent-color: var(--accent);
+      }
+      .nrf-progress span {
+        min-width: 3.5em;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+      }
       .hint {
         margin: 8px 0 0;
         font-size: 0.82rem;
@@ -277,6 +294,16 @@
         text-decoration: none;
         font-weight: 600;
       }
+      button.dl {
+        border: 0;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.dl:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
       footer {
         margin-top: 48px;
         padding-top: 18px;
@@ -327,9 +354,37 @@
           <div id="esp-slot"></div>
 
           <div id="nrf-slot" hidden>
-            <a class="dl" id="uf2-link" href="#" download>firmware.uf2 herunterladen</a>
+            <button class="dl" id="nrf-usb" type="button">Per USB flashen (nRF52)</button>
+            <button class="dl" id="nrf-step2" type="button" hidden>Schritt 2: Bootloader-Port waehlen</button>
+            <div class="nrf-progress" id="nrf-progress" hidden>
+              <progress id="nrf-bar" max="100" value="0"></progress>
+              <span id="nrf-pct">0 %</span>
+            </div>
+            <p class="meta" id="nrf-status" role="status"></p>
+            <p class="note" id="nrf-no-serial" hidden>
+              Per USB flashen geht nur in Chrome, Edge oder Opera auf dem Desktop (Web Serial).
+              In diesem Browser bleibt der Weg ueber die UF2-Datei unten.
+            </p>
             <div class="meta">
-              nRF52-Boards lassen sich nicht ueber Web Serial flashen. Stattdessen:
+              Ablauf: Oben auf &bdquo;Board erkennen&ldquo; klicken und den Port des Boards
+              <strong>einmal</strong> waehlen; Board und Version sind danach vorgewaehlt. Dann auf
+              &bdquo;Per USB flashen&ldquo; klicken: Das Board wird in den Bootloader geschaltet,
+              meldet sich als neues USB-Geraet neu und wird ohne weitere Abfrage geflasht. Nur wenn
+              der Bootloader-Port nicht von selbst gefunden wird, erscheint der Knopf &bdquo;Schritt
+              2: Bootloader-Port waehlen&ldquo; &mdash; ein Klick darauf, im Dialog den neuen Port
+              waehlen (&bdquo;Das Board meldet sich neu, bitte den neuen Port waehlen&ldquo;). Ohne
+              vorheriges &bdquo;Board erkennen&ldquo; fragt &bdquo;Per USB flashen&ldquo; selbst
+              einmal nach dem Port.
+              Das Board waehrenddessen nicht abziehen.
+            </div>
+            <p class="hint">
+              Reagiert das Board auf USB nicht, laesst sich der Bootloader auch mit dem seriellen
+              oder BLE-Befehl <code>--dfu</code> starten (das Board startet dann im UF2-Bootloader
+              neu) oder mit zweimaligem Druck auf die Reset-Taste.
+            </p>
+            <div class="meta">
+              <strong>Alternative: UF2-Datei.</strong>
+              <p><a class="dl" id="uf2-link" href="#" download>firmware.uf2 herunterladen</a></p>
               <ol>
                 <li>Reset-Taste zweimal kurz hintereinander druecken &mdash; das Board meldet sich
                   als USB-Laufwerk.</li>

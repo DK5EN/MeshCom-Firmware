@@ -9,6 +9,9 @@
       "parts": [
         {
           "path": "firmware.uf2"
+        },
+        {
+          "path": "firmware.zip"
         }
       ]
     }
