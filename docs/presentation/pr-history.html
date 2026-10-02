@@ -40,6 +40,7 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 .share .seg{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff}
 .s-orig{background:#64748b}.s-pr{background:var(--acc)}.s-x{background:var(--acc2)}.s-oth{background:#0ea5e9}
 td .note{color:var(--fg3)}
+table.sh th{width:auto}
 </style>
 </head>
 <body>
@@ -68,9 +69,9 @@ td .note{color:var(--fg3)}
 <div class="share" role="img" aria-label="Zusammensetzung der Kernfirmware 4.40a: 41,1 % Original, 41,0 % PRs dieses Forks, 0,5 % Einzelcommits dieses Forks, 17,4 % andere Autoren">
 <span class="seg s-orig" style="width:41.12%">Original 41,1 %</span><span class="seg s-pr" style="width:40.99%">PRs DK5EN 41,0 %</span><span class="seg s-x" style="width:0.49%"></span><span class="seg s-oth" style="width:17.41%">andere 17,4 %</span>
 </div>
-<p class="small">Original = Zeilen, die schon vor dem ersten PR in upstream standen. PRs DK5EN = Zeilen aus Commits der 44 gemergten PRs dieses Forks, die heute noch stehen (48.196). Einzelcommits ohne PR: 573 Zeilen. Andere = Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</p>
+<p class="small">Original = Zeilen, die schon vor dem ersten PR in upstream standen. PRs DK5EN = Zeilen aus Commits von 44 der 51 gemergten PRs dieses Forks, die heute noch stehen (48.196). Einzelcommits ohne PR: 573 Zeilen. Andere = Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</p>
 <h3>Je Runde: wie viel der Runde steht heute noch</h3>
-<div class="tocwrap"><table class="cap"><thead><tr><th>Runde</th><th>PRs</th><th>Zeilen heute</th><th>Anteil</th></tr></thead><tbody>
+<div class="tocwrap"><table class="sh"><colgroup><col style="width:52%"><col style="width:10%"><col style="width:20%"><col style="width:18%"></colgroup><thead><tr><th>Runde</th><th>PRs</th><th>Zeilen heute</th><th>Anteil</th></tr></thead><tbody>
 <tr><td>Februar 2026 · 4.35m → 4.35n<div class="note small">Empfangslöcher und Wiederholungen</div></td><td class="num">3</td><td class="num">188</td><td class="num">0,2 %</td></tr>
 <tr><td>März 2026 · 4.35n → 4.35p<div class="note small">CAD kommt in den Sendepfad</div></td><td class="num">21</td><td class="num">493</td><td class="num">0,4 %</td></tr>
 <tr><td>August / September 2026 · 4.35p → 4.35t<div class="note small">Fünf Monate Feldbetrieb, dann Härtung und Ausbau</div></td><td class="num">9</td><td class="num">16.241</td><td class="num">13,8 %</td></tr>
@@ -80,7 +81,7 @@ td .note{color:var(--fg3)}
 </tbody></table></div>
 <p class="small">Gezählt werden nur Zeilen, die in den PRs der Runde entstanden und im aktuellen Stand noch stehen; spätere Umbauten nehmen sie der Runde wieder weg. Die Spalte „Zeilen“ in den Tabellen unten zeigt dagegen, was GitHub zum Zeitpunkt des Merge gezählt hat.</p>
 <h3>Die zehn PRs mit dem größten Anteil in 4.40a</h3>
-<div class="tocwrap"><table class="cap"><thead><tr><th>PR</th><th>Titel</th><th>Zeilen heute</th><th>Dateien</th></tr></thead><tbody>
+<div class="tocwrap"><table class="sh"><colgroup><col style="width:14%"><col style="width:52%"><col style="width:18%"><col style="width:16%"></colgroup><thead><tr><th>PR</th><th>Titel</th><th>Zeilen heute</th><th>Dateien</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a><div class="note small">2026-10-02</div></td><td>feat: 4.40a – Store-and-Forward, Nachbarschaftsmatrix statt MHeard/Pfadtabelle, serielle Konfiguration, Fehlerkorrekturen</td><td class="num">28.297</td><td class="num">210</td></tr>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a><div class="note small">2026-09-01</div></td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num">9.590</td><td class="num">71</td></tr>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a><div class="note small">2026-08-27</div></td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num">2.637</td><td class="num">57</td></tr>
@@ -94,7 +95,7 @@ td .note{color:var(--fg3)}
 </tbody></table></div>
 <p class="small">Die übrigen 34 PRs tragen zusammen 907 Zeilen bei, dazu kommen 573 Zeilen aus Einzelcommits ohne PR. PR #1186 allein stellt 28.297 Zeilen, das sind 24,1 % der Kernfirmware.</p>
 <h3>Wo am meisten neu ist</h3>
-<div class="tocwrap"><table class="cap"><thead><tr><th>Bereich</th><th>Zeilen heute</th><th>davon Original</th></tr></thead><tbody>
+<div class="tocwrap"><table class="sh"><colgroup><col style="width:56%"><col style="width:22%"><col style="width:22%"></colgroup><thead><tr><th>Bereich</th><th>Zeilen heute</th><th>davon Original</th></tr></thead><tbody>
 <tr><td>src/ Kernlogik (Funk, Mesh, Kommandos, APRS)</td><td class="num">55.432</td><td class="num">27,6 %</td></tr>
 <tr><td>src/nrf52</td><td class="num">10.859</td><td class="num">29,2 %</td></tr>
 <tr><td>src/esp32</td><td class="num">8.798</td><td class="num">36,1 %</td></tr>
