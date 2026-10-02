@@ -210,11 +210,11 @@ Deliberately **not** implemented, so the firmware side does not wait on it:
 - **No push notification on `failed` or on `acked`-after-`held`** (section 4's suggestion).
   MCProxy's push dispatcher subscribes to inbound mesh messages, not to status events; adding a
   second source is its own change. Delivery status is shown in every view, just not pushed.
-- **No `held` synthesis from the `:sto` text** (section 3). The rule is conditioned on "a node that
-  never sends `0x04`", which a client cannot cheaply establish, and guessing wrong double-counts on
-  fork firmware. MCProxy therefore leaves the text a visible DM — its history filter matches
-  `:ack` only, so the text was never at risk of being silently filtered — and suppresses only the
-  push for it, alongside `:ack` and `:rej`.
+- **`held` IS synthesised from the `:sto` text (since 2026-10-02; this point originally said the
+  opposite).** MCProxy, mc-chat and the web app absorb a matched notice into `held(holder)` like an
+  inline `:ack`, and hide the text, matched or not. Double counting does not happen: a node that
+  delivers both the text (extUDP) and `0x04` (BLE) names the same holder, and equal rank never
+  overwrites. Matching uses sender + counter, plus the held destination when it is present.
 - **No store-node configuration surfaces** (section 5's commands, `--mbox`, `/?page=mailbox`).
   Separate feature; the `SN` field above is the only part of section 5 MCProxy asks for.
 
@@ -241,8 +241,9 @@ a phone behind a node and false for a client that _is_ the node.
 `^\S{1,9}\s*:sto\d{3}( \S+)?$` — the held destination optional. Without it the notice cannot be
 attributed: the sender knows a store node holds _something_ with counter NNN, but the counter is
 per-sender and reused, so matching on it alone attributes the hold to whichever conversation
-happened to reuse that number. mc-chat therefore records no status when the token is absent and
-shows the text only. Making it mandatory costs a few bytes on a frame that is already rate-limited
+happened to reuse that number. (Until 2026-10-02 mc-chat recorded no status when the token was
+absent; all three clients now match on sender + counter inside a 1 h window and hide the text,
+which narrows but does not close that ambiguity.) Making it mandatory costs a few bytes on a frame that is already rate-limited
 to one per holder per message per hour, and it is the difference between an attributable state and
 an informational line.
 
