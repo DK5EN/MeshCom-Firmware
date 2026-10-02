@@ -1449,6 +1449,31 @@ Leerzeichen im Namen bleiben erlaubt.
 > Branch `aprs-position-name`). Kein Hardware-Test — Regressionsabdeckung in
 > `test/test_decodeaprspos/` (`native_parsers`).
 
+### N-36 — Frischer ESP32-Knoten spannt den WLAN-AP nicht auf — **FIXED (2026-10-02, auf echter Hardware reproduziert und verifiziert)** — Medium, Inbetriebnahme
+
+Gemeldet von Pit fuer einen frisch geflashten Heltec V3: der Knoten zeigt
+`AP : <call>` im Display, aber keine IP, und der AP ist in der Luft nicht zu
+sehen. Erst ein beliebiges `--setssid` hilft.
+
+Ursache: `startNetwork()` (`src/udp_functions.cpp`) bricht seit `ed4ed3bba`
+(v4.35p, 2026-04-01) bei leerer SSID oder `"none"` ab, und zwar **vor** dem
+`bWIFIAP`-Zweig. Ein frischer oder geloeschter Knoten hat `node_ssid = "none"`
+(`esp32_flash.cpp`), also kommt `WiFi.softAP(node_call)` nie zur Ausfuehrung —
+weder beim Erstboot (`isNodeUnconfigured()` setzt `bWIFIAP`) noch nach
+`--wifiap on`. Im AP-Modus wird die SSID gar nicht benutzt; die Pruefung war nur
+fuer STA gemeint (Begleit-Hunk in `ed4ed3bba`: `--webserver on` verlangt eine
+SSID). Safeboot (`src/safeboot/main.cpp`) hatte die Logik schon richtig.
+
+Fix: Praedikat `wifiSsidMissingBlocksStart(apMode, ssid)` in
+`src/wifi_start_gate.h`, blockiert nur im STA-Modus. Regressionstest
+`test/test_wifi_start_gate/` (`native`).
+
+> **STATUS 2026-10-02 — FIXED, Upstream-PR offen.** Heltec V3 (DK5EN-1), NVS
+> geloescht. 4.40a: `WIFI-AP on`, aber `[WIFI]...no connection possible`, keine
+> IP. Mit Fix: `[WIFI]...AP mode ssid<XX0XXX-00> connected`, IP 192.168.4.1;
+> nach `--setcall DK5EN-1` und `--wifiap on` AP `DK5EN-1` auf 192.168.4.1.
+> Advisor-Pass (Watchdog-, T-Deck-, Ethernet-, Safeboot-Pfade) ohne Befund.
+
 ## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
 
 Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
