@@ -22,15 +22,15 @@ Effort: about one day including bench flashes on three boards.
 
 ## 2. Facts this plan rests on (all verified 2026-09-18)
 
-| Fact                                                                                                                           | How verified                                                   |
-| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| Pages site is the `gh-pages` branch of DK5EN/MeshCom-Firmware, HTTPS enforced, 11 files, 1.9 MB                                | `gh api repos/DK5EN/MeshCom-Firmware/pages`, `git ls-tree`     |
-| esptool.oevsv.at is ESP Web Tools, self-hosted JS, five parts per board at real offsets                                        | page source, `/api/fwdata` JSON                                |
-| GitHub release assets send no `Access-Control-Allow-Origin`, even on a cross-origin GET                                        | `curl` with `Origin: https://dk5en.github.io`                  |
-| The running app never writes the safeboot partition; safeboot's updater opens `U_FLASH` only                                   | `src/command_functions.cpp:840`, `src/safeboot/ElegantOTA.cpp` |
-| Upload offsets: S3 bootloader 0x0, classic bootloader 0x1000, otadata 0xE000, partitions 0x8000, safeboot 0x10000, app 0xC0000 | `platformio.ini:1082`, `platformio.ini:1086`                   |
-| T-Deck and T-Deck Plus use the 16 MB partition table; the release ships only the 4 MB table                                    | `variants/t_deck*/platformio.ini:6`, decoded release asset     |
-| nRF52 boards (RAK4631, T114, T-Echo) cannot be flashed via Web Serial; OEVSV offers a download                                 | OEVSV JS, Adafruit UF2 bootloader                              |
+| Fact                                                                                                                                    | How verified                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Pages site is the `gh-pages` branch of DK5EN/MeshCom-Firmware, HTTPS enforced, 11 files, 1.9 MB                                         | `gh api repos/DK5EN/MeshCom-Firmware/pages`, `git ls-tree`     |
+| esptool.oevsv.at is ESP Web Tools, self-hosted JS, five parts per board at real offsets                                                 | page source, `/api/fwdata` JSON                                |
+| GitHub release assets send no `Access-Control-Allow-Origin`, even on a cross-origin GET                                                 | `curl` with `Origin: https://dk5en.github.io`                  |
+| The running app never writes the safeboot partition; safeboot's updater opens `U_FLASH` only                                            | `src/command_functions.cpp:840`, `src/safeboot/ElegantOTA.cpp` |
+| Upload offsets: S3 bootloader 0x0, classic bootloader 0x1000, otadata 0xE000, partitions 0x8000, safeboot 0x10000, app 0xC0000          | `platformio.ini:1082`, `platformio.ini:1086`                   |
+| T-Deck and T-Deck Plus use the 16 MB partition table; the release ships only the 4 MB table                                             | `variants/t_deck*/platformio.ini:6`, decoded release asset     |
+| nRF52 boards (RAK4631, T114, T-Echo) flash over Web Serial via the Adafruit serial-DFU protocol (see section 14); UF2 stays as fallback | nrfutil-web, Adafruit bootloader                               |
 
 ## 3. Decision record: why same-origin over a CDN mirror
 
@@ -111,8 +111,9 @@ ESP32-S3 example (offsets decimal, as ESP Web Tools expects):
 
 Classic ESP32 differs only in `"chipFamily": "ESP32"` and bootloader offset 4096.
 
-nRF52 boards get `"chipFamily": "NRF52"` with one part and no offset. The page hides the
-install button for that family and shows a download link plus the UF2 drag-and-drop steps.
+nRF52 boards get `"chipFamily": "NRF52"` with no offsets and two parts: `firmware.uf2` and
+`firmware.zip` (DFU package). The ESP Web Tools button stays hidden for that family; the page
+shows its own USB button (section 14) plus the UF2 download as fallback.
 
 Chip family is derived from the env's `extends` line in `platformio.ini`
 (`esp32_s3`, `esp32_classic`, `nrf52_base`), never from a hand-maintained list.
@@ -381,3 +382,16 @@ Still open:
   v1.2 boot log, RAK, shared E22 ID, silent node, lost port); a live Web Serial run on the four
   bench boards is owed, especially the T-Deck, which reboots on port open.
 - Boards without MeshCom are narrowed to their chip family only; flash size is not read.
+
+## 14. nRF52 over Web Serial (2026-10-02)
+
+- Library: `takkaO/nrfutil-web` 1.0.0 (BSD-3-Clause, jszip inlined), vendored as one ESM bundle in
+  `pages/flash/nrfutil/` with licences and rebuild commands in its `README.txt`.
+- `tools/pages_flasher.py` copies PlatformIO's own `.pio/build/<env>/firmware.zip`
+  (adafruit-nrfutil package) byte-identical next to the UF2; `check` compares it by sha.
+- Page flow: 1200 bps touch on the running app port, board re-enumerates, user picks the new
+  port, `performDfu` streams the package. Two port prompts are unavoidable (new USB device).
+- `--dfu` is not part of this path: it reboots into the UF2 (drive) bootloader. The 1200 bps
+  touch needs no firmware command. `--dfu` stays the hint for a hung CDC or BLE/net access.
+- Bench proof 2026-10-02: the same `firmware.zip` flashed with adafruit-nrfutil (1200 bps touch,
+  single bank) onto the bench RAK4631 DK5EN-90; it booted FW 4.40a with settings intact.
