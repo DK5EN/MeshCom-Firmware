@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <configuration.h>
 #include <country_profile.h>
 
 #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
@@ -108,6 +109,40 @@ static void test_unknown_codes_fall_to_the_eu_default(void)
     TEST_ASSERT_EQUAL_MEMORY(&eu, &sixteen, sizeof(eu));
 }
 
+static void test_track_freq_is_per_platform_unit(void)
+{
+    // RF-09 (OPT-D14): Poland (15) used to carry a bare 434.855f in the shared
+    // track_freq column, which is MHz -- right on ESP32, 434.855 Hz on the
+    // nRF52 (RADIOLIB_ERR_INVALID_FREQUENCY on --track on). Every other
+    // table-driven code must keep track_freq == this platform's
+    // LORA_APRS_FREQUENCY, so the split cannot drift. Code 5 (868) is the
+    // documented 999 "none" sentinel (RF-08) and is pinned as such.
+    CountryProfile p;
+    memset(&p, 0, sizeof(p));
+    TEST_ASSERT_TRUE(countryProfile(15, p));
+#if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
+    TEST_ASSERT_FLOAT_WITHIN(1.0f, 434855000.0f, p.track_freq);
+#else
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 434.855f, p.track_freq);
+#endif
+
+    for (int i = 0; i < N_CODES; i++)
+    {
+        int code = CODES[i];
+        if (code == 7 || code == 15)
+            continue;
+        memset(&p, 0, sizeof(p));
+        TEST_ASSERT_TRUE(countryProfile(code, p));
+        char msg[64];
+        snprintf(msg, sizeof(msg), "code %d", code);
+        if (code == 5)
+            TEST_ASSERT_EQUAL_FLOAT_MESSAGE(999.0f, p.track_freq, msg);
+        else
+            TEST_ASSERT_EQUAL_FLOAT_MESSAGE((float)LORA_APRS_FREQUENCY,
+                                            p.track_freq, msg);
+    }
+}
+
 static void test_table_matches_the_committed_baseline(void)
 {
     printf("\n--- countryProfile(), " SIDE " side ---\n");
@@ -149,6 +184,7 @@ int main(int, char **)
     RUN_TEST(test_country_7_is_not_a_table_entry);
     RUN_TEST(test_every_other_code_is_a_table_entry);
     RUN_TEST(test_unknown_codes_fall_to_the_eu_default);
+    RUN_TEST(test_track_freq_is_per_platform_unit);
     RUN_TEST(test_table_matches_the_committed_baseline);
     return UNITY_END();
 }

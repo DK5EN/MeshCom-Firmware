@@ -52,3 +52,8 @@ test/golden/native/variant-ini-effective.json (regenerate), .gitignore (REG-06),
   stage 2). Wave 3: W10 CSMA carve-out + test (pio slot); W11 CQ-04 dead lv_conf.h (needs
   t_deck/t_deck_plus builds). Not this campaign: W0.2 (five cold board builds), BL-07 fix
   (behaviour change in the gateway service, wants its own review).
+- Wave 2 landed 2026-10-03 ~22:10: W8 RF-09 fixed (columns split, twin test, nrf52 golden
+  dump one line), W9 ruff syntax gate (ruff.toml, stage 2, 0 errors). Gate green: 48 envs,
+  1641 cases, 497 pytest; wiscore_rak4631 and heltec_wifi_lora_32_V3 build SUCCESS. Advisor:
+  orchestrator read the diff itself (no separate fable-review pass); one comment corrected
+  (the nRF52 track path never read node_track_freq, so no on-air effect).

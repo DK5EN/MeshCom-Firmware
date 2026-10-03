@@ -13,10 +13,12 @@
 #                  DK5EN-98 logs under ~/Downloads/dk5en-98-nbr/; when absent
 #                  they come from the ~/meshlog/dk5en-98-nbr/ copy, else are
 #                  fetched from rpizero (and mirrored into ~/meshlog).
-# Stage 2  tools:  pytest over tools/bench, tools/tests, tools/mock; the
-#                  PEP-723 scripts in test/test_nbrlog; node --test over
-#                  tools/tests/*.mjs; the jsdom-based safeboot page test; the
-#                  four --self-test tools not covered by selftest.sh.
+# Stage 2  tools:  ruff syntax gate (E9/F63/F7/F82 over tools, test/golden,
+#                  test/test_nbrlog; config in ruff.toml); pytest over
+#                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
+#                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
+#                  the jsdom-based safeboot page test; the four --self-test
+#                  tools not covered by selftest.sh.
 # Stage 3  bench:  tools/bench/bench_suite.py -- identity guard, per-board
 #                  harness, OTA regression, optional flash/EXTUDP/deep-sleep
 #                  on every fleet.json node that is attached over USB.
@@ -93,6 +95,8 @@ step_detail() {
     [ -n "$l" ] && { echo "${l#selftest: }"; return; }
     l=$(grep -oE '^nbrlog: [^:]+: [0-9]+ checks' "$1" | tail -1)
     [ -n "$l" ] && { echo "${l##*: }"; return; }
+    grep -q '^All checks passed!' "$1" && { echo "0 errors"; return; }
+    l=$(grep -oE '^Found [0-9]+ errors?' "$1" | tail -1); [ -n "$l" ] && { echo "${l#Found }"; return; }
     l=$(grep -oE '[0-9]+ passed' "$1" | tail -1); [ -n "$l" ] && { echo "$l"; return; }
     l=$(grep -oE '^# pass [0-9]+' "$1" | tail -1); [ -n "$l" ] && { echo "${l#\# }"; return; }
     l=$(grep -cE '^(PASS|ok|OK)\b' "$1"); [ "$l" -gt 0 ] && { echo "$l checks"; return; }
@@ -165,6 +169,9 @@ stage1() {
 # ---------------------------------------------------------------- stage 2
 stage2() {
     echo "== Stage 2: host tools (pytest, nbrlog scripts, node, self-tests)"
+    run_step "ruff syntax gate" stage2-ruff \
+        uv run --quiet --with ruff ruff check --select E9,F63,F7,F82 --output-format concise \
+        tools test/golden test/test_nbrlog
     run_step "pytest tools/bench tools/tests tools/mock" stage2-pytest \
         uv run --quiet --with pytest pytest -q tools/bench tools/tests tools/mock
     local f

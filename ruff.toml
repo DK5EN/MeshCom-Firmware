@@ -1,0 +1,29 @@
+# Python lint gate for tools/, test/golden and test/test_nbrlog.
+#
+# Deliberately narrow: syntax errors and undefined names only. This is a
+# "does it even parse and resolve" gate, not a style gate; adopting style
+# rules (and the reformatting they would force on thousands of lines in
+# tools/) is a separate decision, see docs/BACKLOG.md CQ-09.
+#
+#   E9   syntax errors / IO errors while parsing
+#   F63  invalid comparisons and assertions (is-literal, assert on tuple, ...)
+#   F7   misplaced statements (return/yield/break/continue outside scope)
+#   F82  undefined names
+#
+# Run: uv run --quiet --with ruff ruff check tools test/golden test/test_nbrlog
+# (wired into tools/regression.sh stage 2 as "ruff syntax gate").
+
+target-version = "py311"
+line-length = 100
+extend-exclude = [".pio", "node_modules", "lib", "docs"]
+
+[lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[lint.per-file-ignores]
+# PlatformIO extra scripts: SCons injects Import() and env into the namespace.
+"tools/ensure_safeboot.py" = ["F821"]
+"tools/ensure_tasmota_framework.py" = ["F821"]
+"tools/force_include_settings_stub.py" = ["F821"]
+"tools/safeboot.py" = ["F821"]
+"tools/set_custom_name.py" = ["F821"]
