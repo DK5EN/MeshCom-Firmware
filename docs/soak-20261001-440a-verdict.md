@@ -161,3 +161,11 @@ capture cannot say when it cleared or whether it started before the OTA. Two thi
 - The heartbeat-staleness diagnostic in `gatewayService_esp32()` arms only after the first BEAT
   has set `last_upd_timer`, so a node that never receives a BEAT after boot never warns. That
   is a defect in the watchdog, not in the downlink, and is tracked as BL-07 in `docs/BACKLOG.md`.
+
+## Resolution 2026-10-03 (operator)
+
+The central server had blocked firmware v4.40a; that is why no BEAT, CET or downstream
+datagram reached the node while its uplink stayed fine and the hub kept it at 100 % gateway
+uptime. The block has been lifted, BEATs arrive again (live check above). Case closed; BL-07 in
+`docs/BACKLOG.md` is closed with this explanation. The watchdog observation stays as a note
+only.
