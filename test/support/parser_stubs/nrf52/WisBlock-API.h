@@ -2,7 +2,7 @@
 // (PT-01, BACKLOG SS3.8j).
 //
 // Schattet test/support/nrf52/WisBlock-API.h: env:native_parsers listet
-// "-I test/test_decodemheard/stubs" vor "-I test/support" (platformio.ini),
+// "-I test/support/parser_stubs" vor "-I test/support" (platformio.ini),
 // darum gewinnt diese Datei fuer alle hier kompilierten
 // Uebersetzungseinheiten (Regexp.cpp, regex_functions.cpp, aprs_functions.cpp,
 // via_functions.cpp), nicht nur fuer via -- und fuer native_topo_shadow, das
@@ -19,7 +19,7 @@
 #pragma once
 
 #ifndef NATIVE_BUILD
-#error "test/test_decodemheard/stubs/nrf52/WisBlock-API.h darf nur im nativen Testbuild verwendet werden"
+#error "test/support/parser_stubs/nrf52/WisBlock-API.h darf nur im nativen Testbuild verwendet werden"
 #endif
 
 typedef struct

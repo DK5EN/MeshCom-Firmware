@@ -105,7 +105,7 @@
 #include "nbr_views.h"
 
 // ============================================================================
-// Link stubs (own copy, NOT test/test_decodemheard/stubs/parser_link_stubs.h:
+// Link stubs (own copy, NOT test/support/parser_stubs/parser_link_stubs.h:
 // getUnixClock()/getTimeString() must be REPLAY-DRIVEN here, from the
 // capture's own logger timestamp ("own copy, not the shared header", the
 // pattern the former test_mheard_aging.cpp used). Regexp.cpp/regex_functions.cpp/

@@ -31,7 +31,7 @@
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/via_functions.cpp
 // (env:native_parsers linkt beide Parser in jedes Testprogramm der Env,
-// siehe test/test_decodemheard/stubs/parser_link_stubs.h)
+// siehe test/support/parser_stubs/parser_link_stubs.h)
 s_meshcom_settings meshcom_settings;
 bool bDisplayInfo = false;
 bool bDisplayCont = false;

@@ -119,11 +119,13 @@ python3 test/golden/drift_matrix_lint.py --self-test
 # --phase implementation is TEMPORARY. The M2 review happened on 2026-09-12 and
 # filled all 29 verdicts, so the empty-verdict check is now enforced HARD and
 # --phase pre-review is obsolete. What this phase still downgrades is the
-# asserting_test column: 10 rows are decided but not yet implemented, so the
-# test that would fail does not exist yet. Drop the flag -- run this line with
-# no --phase at all -- once the unification waves have written them. A phase
-# flag left in place after its window has passed is how a requirement quietly
-# expires, which is why the script prints the count on every run.
+# asserting_test column. Test-suite inventory 2026-10-03: exactly ONE row is
+# left without a test, DR-16 (nRF52 bAllStarted/extra_hey_time gating, decided
+# nrf52-changes, deliberately not ported -- see src/nrf52/nrf52_main.cpp near
+# bTeleFirst). DR-03 now names test_gateway_service_twin. Drop the flag -- run
+# this line with no --phase at all -- once DR-16 has its test or is re-decided.
+# A phase flag left in place after its window has passed is how a requirement
+# quietly expires, which is why the script prints the count on every run.
 python3 test/golden/drift_matrix_lint.py --phase implementation
 # The W3 upgrade proof's instrument. Not a golden gate -- it is pointed at real
 # hardware by a human after the nRF52 cutover, comparing a fresh config export

@@ -33,7 +33,7 @@
 #pragma once
 
 #ifndef NATIVE_BUILD
-#error "test/test_decodemheard/stubs/parser_link_stubs.h darf nur im nativen Testbuild verwendet werden"
+#error "test/support/parser_stubs/parser_link_stubs.h darf nur im nativen Testbuild verwendet werden"
 #endif
 
 #include <cstdarg>
