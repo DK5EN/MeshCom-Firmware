@@ -411,7 +411,14 @@ def run(args: argparse.Namespace, opener: Callable[[str], Any] = real_opener,
     if not sess.wait_for(RE_CLIENT_STARTED, args.boot_wait_s, since_ts=t_open):
         warnings.append(f"did not see CLIENT STARTED after opening the port within "
                          f"{args.boot_wait_s:.0f}s -- continuing anyway")
-    time.sleep(1.0)
+    else:
+        # CLIENT STARTED comes seconds before WiFi and NTP; the guard's --info
+        # taken then reads "no IP, clock INIT" and refuses a healthy node
+        # (bench runs 2-4, 2026-10-03). [BOOT];ready;ms;N;ip;X is the marker
+        # that the main loop runs; give WiFi two more seconds after it.
+        if not sess.wait_for(RE_BOOT_READY, args.boot_wait_s, since_ts=t_open):
+            warnings.append(f"no [BOOT];ready within {args.boot_wait_s:.0f}s after CLIENT STARTED -- continuing anyway")
+        time.sleep(2.0)
 
     if args.node and not args.no_identity_guard:
         info_text = send_and_collect(sess, "--info", RE_INFO_WEBSERVER, args.snapshot_timeout_s)

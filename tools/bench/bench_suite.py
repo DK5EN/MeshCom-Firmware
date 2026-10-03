@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -109,12 +110,35 @@ def discover_ports(fleet: dict, comports: Iterable[Any]) -> Dict[str, str]:
     return found
 
 
-def flash_steps(name: str, env: str, dev: str) -> List[Step]:
-    build = Step(f"build {env}", name, ["pio", "run", "-e", env], FLASH_TIMEOUT_S, gate=True)
-    if env in TDECK_ENVS or env in RAK_ENVS:
-        # Native USB (T-Deck) and serial DFU (RAK, must be running, not in UF2
-        # mode) both go through pio's own uploader; the explicit --upload-port
-        # keeps pio's autodetect off the wrong board.
+INSTRUMENT_MARKER = "SRVIP\\];err"   # printed only by instrument images (src/instrument.h)
+
+
+def flash_steps(name: str, env: str, dev: str, instrument: bool = False) -> List[Step]:
+    """Build (optionally as an instrument image), prove the image, upload.
+
+    The bench harnesses drive --oledstat/--instr/--btn and friends, which
+    live behind INSTRUMENT_ENABLED in src/command_functions.cpp; a release
+    image answers "wrong command" (first stage-3 run, 2026-10-03). The flag
+    must be the no-space form -DINSTRUMENT_ENABLED=1 (PlatformIO splits the
+    env var on whitespace) and changing PLATFORMIO_BUILD_FLAGS wipes
+    .pio/build, so the next host gate rebuilds cold. The verify step string-
+    scans the ELF for an instrument-only marker before anything is flashed.
+    """
+    build_env = {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"} if instrument else {}
+    build = Step(f"build {env}", name, ["pio", "run", "-e", env], FLASH_TIMEOUT_S, gate=True,
+                 env=build_env)
+    steps = [build]
+    if instrument:
+        steps.append(Step(f"verify instrument {env}", name,
+                          ["sh", "-c", f"strings .pio/build/{env}/firmware.elf | grep -q '{INSTRUMENT_MARKER}'"],
+                          60, gate=True))
+    if env in RAK_ENVS:
+        # Serial DFU (RAK, must be running, not in UF2 mode) goes through pio's
+        # own uploader; the explicit --upload-port keeps pio's autodetect off
+        # the wrong board. ESP32 boards, the T-Deck included, take the esptool
+        # path below: the variant upload_command would rewrite bootloader,
+        # partitions and the root safeboot image, which a regression run must
+        # not touch (app partition is 0xC0000 on every safeboot layout).
         up = Step(f"flash {env}", name,
                   ["pio", "run", "-e", env, "--target", "upload", "--upload-port", dev],
                   FLASH_TIMEOUT_S, gate=True)
@@ -128,7 +152,8 @@ def flash_steps(name: str, env: str, dev: str) -> List[Step]:
                    "--port", dev, "-b", "460800", "write_flash", "0xC0000",
                    f".pio/build/{env}/firmware.bin"],
                   FLASH_TIMEOUT_S, gate=True)
-    return [build, up]
+    steps.append(up)
+    return steps
 
 
 def jsdom_node_path() -> str:
@@ -139,7 +164,8 @@ def jsdom_node_path() -> str:
 
 def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: bool = True,
          extudp: bool = False, deepsleep: bool = False, soak_seconds: int = 600,
-         badge: bool = True, mesh: bool = True, out: Path = Path(".")) -> List[Step]:
+         badge: bool = True, mesh: bool = True, instrument: bool = False,
+         identity_steps: bool = True, out: Path = Path(".")) -> List[Step]:
     """The ordered step list for the attached nodes. Pure: no I/O."""
     steps: List[Step] = []
     nodes = fleet.get("nodes", {})
@@ -149,19 +175,23 @@ def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: boo
         node = nodes[name]
         env = node["board"]
         dev = attached[name]
-        steps.append(Step(f"identity {name}", name,
-                          [py, str(BENCH / "identity_guard.py"), "--node", name, "--port", dev],
-                          timeout_s=60, gate=True))
+        if identity_steps:
+            # main() runs the guard through probe_hosts() before planning and
+            # passes identity_steps=False then: a second guard 7 s later hits
+            # a node that the first one just rebooted (run 3, 2026-10-03).
+            steps.append(Step(f"identity {name}", name,
+                              [py, str(BENCH / "identity_guard.py"), "--node", name, "--port", dev],
+                              timeout_s=60, gate=True))
         if flash:
-            steps.extend(flash_steps(name, env, dev))
+            steps.extend(flash_steps(name, env, dev, instrument))
         summary = str(out / f"{name}-harness.json")
         if env in TDECK_ENVS:
             steps.append(Step(f"tdeck harness {name}", name,
                               [py, str(BENCH / "tdeck_harness.py"), "--scenario", "all",
-                               "--port", dev, "--out", summary]))
+                               "--port", dev, "--out", summary, "--node", name]))
         elif env in RAK_ENVS:
             argv = [py, str(BENCH / "rak_harness.py"), "--scenario", "all",
-                    "--port", dev, "--out", summary]
+                    "--port", dev, "--out", summary, "--node", name]
             if esp32_ports:
                 argv += ["--peer-port", esp32_ports[0]]
             steps.append(Step(f"rak harness {name}", name, argv))
@@ -169,24 +199,39 @@ def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: boo
                 steps.append(Step(f"rak extudp {name}", name,
                                   [py, str(BENCH / "rak_harness.py"), "--scenario", "extudp",
                                    "--port", dev, "--out", str(out / f"{name}-extudp.json"),
-                                   "--soak-seconds", str(soak_seconds)],
+                                   "--soak-seconds", str(soak_seconds), "--node", name],
                                   timeout_s=soak_seconds + 10 * 60))
         else:
             steps.append(Step(f"oled harness {name}", name,
                               [py, str(BENCH / "oled_harness.py"), "--scenario", "all",
                                "--port", dev, "--out", summary]))
+        if (ota or badge) and node.get("family") == "esp32" and node.get("host"):
+            # The harness reboots the node (port open) and leaves it mid-boot;
+            # ota_regression.py runs its own identity guard first and refused
+            # every node in the first stage-3 runs ("no WiFi IP yet"). Wait for
+            # the web server before OTA, and again before the badge test, since
+            # OTA reboots once more and the T-Beam's WiFi needs about a minute.
+            steps.append(Step(f"wait web {name}", name,
+                              [py, str(BENCH / "wait_http.py"), f"http://{node['host']}/",
+                               "--timeout", "180"], 240))
         if ota and node.get("family") == "esp32" and node.get("host"):
             steps.append(Step(f"ota regression {name}", name,
                               [py, str(BENCH / "ota_regression.py"), "--port", dev, "--env", env,
-                               "--ip", node["host"], "--settings-check"], OTA_TIMEOUT_S))
+                               "--ip", node["host"], "--settings-check", "--node", name],
+                              OTA_TIMEOUT_S))
         if badge and node.get("family") == "esp32" and node.get("host"):
+            if ota:
+                steps.append(Step(f"wait web {name} (after ota)", name,
+                                  [py, str(BENCH / "wait_http.py"), f"http://{node['host']}/",
+                                   "--timeout", "180"], 240))
             steps.append(Step(f"webgui badge {name}", name,
                               ["node", "--insecure-http-parser", "tools/webgui_badge_test.js",
                                f"http://{node['host']}/"],
                               BADGE_TIMEOUT_S, env={"NODE_PATH": jsdom_node_path()}))
         if deepsleep and env in DEEPSLEEP_ENVS:
             steps.append(Step(f"deepsleep {name}", name,
-                              [py, str(BENCH / "deepsleep_button.py"), "--port", dev]))
+                              [py, str(BENCH / "deepsleep_button.py"), "--port", dev,
+                               "--node", name]))
     if mesh and len(attached) >= 2:
         argv = [py, str(BENCH / "mesh_exchange.py"), "--out", str(out / "mesh-exchange.json")]
         for n in sorted(attached):
@@ -215,6 +260,62 @@ def list_comports() -> Optional[List[Any]]:
     except ImportError:
         return None
     return list(list_ports.comports())
+
+
+IP_RE = re.compile(r"\bip (\d+\.\d+\.\d+\.\d+)")
+
+
+def probe_hosts(attached: Dict[str, str], fleet: dict,
+                runner: Callable[..., Any] = subprocess.run,
+                echo: Callable[[str], None] = print) -> Dict[str, str]:
+    """Ask each attached node for its live IP through identity_guard.py and
+    override fleet.json's host with it. DHCP hands the bench nodes new
+    addresses after every reboot (run 2 on 2026-10-03: the T-Deck came back
+    on the T-Beam's old address), so a static host column is wrong within a
+    session. Returns the live hosts; nodes without an IP keep their entry."""
+    live: Dict[str, str] = {}
+    failed: Dict[str, str] = {}
+    for name in sorted(attached):
+        argv = [sys.executable, str(BENCH / "identity_guard.py"), "--node", name,
+                "--port", attached[name]]
+        try:
+            proc = runner(argv, cwd=ROOT, capture_output=True, text=True, timeout=90)
+            out = (proc.stdout or "") + (proc.stderr or "")
+            rc = proc.returncode
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            out, rc = str(exc), 1
+        if rc != 0:
+            failed[name] = out.strip().splitlines()[-1][:200] if out.strip() else f"identity guard rc {rc}"
+            echo(f"identity {name}: FAIL -- {failed[name]}")
+            continue
+        echo(f"identity {name}: ok")
+        m = IP_RE.search(out)
+        if m and m.group(1) != "0.0.0.0":
+            live[name] = m.group(1)
+            if fleet["nodes"][name].get("host") != m.group(1):
+                echo(f"host {name}: {fleet['nodes'][name].get('host')} -> {m.group(1)} (live)")
+            fleet["nodes"][name]["host"] = m.group(1)
+        else:
+            echo(f"host {name}: no IP in --info, keeping {fleet['nodes'][name].get('host')}")
+    return live, failed
+
+
+def persist_hosts(fleet: dict, path: Path = FLEET_FILE) -> bool:
+    """Write the live hosts back into fleet.json so tools that read the
+    registry themselves (ota_regression.py's guard over the 2323 console)
+    see the same addresses. Only the host fields change."""
+    try:
+        on_disk = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    changed = False
+    for name, node in fleet.get("nodes", {}).items():
+        if name in on_disk.get("nodes", {}) and on_disk["nodes"][name].get("host") != node.get("host"):
+            on_disk["nodes"][name]["host"] = node.get("host")
+            changed = True
+    if changed:
+        path.write_text(json.dumps(on_disk, indent=2) + "\n")
+    return changed
 
 
 def port_busy(dev: str) -> bool:
@@ -250,7 +351,10 @@ def run_steps(steps: List[Step], out: Path, runner: Callable[..., Any] = subproc
                 rc = -1
                 detail = f"timeout after {s.timeout_s} s"
         secs = time.monotonic() - t0
-        status = "OK" if rc == 0 else "FAIL"
+        if rc == 3:
+            status, detail = "SKIP", "tool reported not applicable (exit 3), see log"
+        else:
+            status = "OK" if rc == 0 else "FAIL"
         results.append(Result(s.name, s.node, s.argv, status, rc, round(secs, 1), str(log), detail))
         echo(f"{status:6s} {s.name} ({secs:.0f} s){' -- ' + detail if detail else ''}")
         if status == "FAIL" and s.gate:
@@ -263,6 +367,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--out", default=None, help="log/summary directory (default tools/bench/runs/bench-<ts>)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, run nothing")
     ap.add_argument("--flash", action="store_true", help="build and flash every attached node first")
+    ap.add_argument("--instrument", action="store_true",
+                    help="with --flash: build INSTRUMENT_ENABLED=1 images (the harnesses need them; wipes .pio/build)")
     ap.add_argument("--no-ota", action="store_true", help="skip the OTA regression on the WiFi boards")
     ap.add_argument("--extudp", action="store_true", help="also run the RAK EXTUDP scenario (TM-43, long)")
     ap.add_argument("--deepsleep", action="store_true", help="also run DS-03 on a Heltec V3")
@@ -286,7 +392,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"SKIP   {n}: {d} is held by another process (lsof) -- close it first")
         attached.pop(n)
 
-    steps = plan(fleet, attached, flash=a.flash, ota=not a.no_ota, extudp=a.extudp,
+    probed = False
+    if attached and not a.dry_run:
+        _live, failed = probe_hosts(attached, fleet)
+        for n, why in failed.items():
+            print(f"SKIP   {n}: identity guard failed -- {why}")
+            attached.pop(n)
+        if persist_hosts(fleet, a.fleet):
+            print(f"fleet.json hosts updated: {a.fleet}")
+        probed = True
+    steps = plan(fleet, attached, flash=a.flash, instrument=a.instrument, identity_steps=not probed, ota=not a.no_ota, extudp=a.extudp,
                  deepsleep=a.deepsleep, soak_seconds=a.soak_seconds,
                  badge=not a.no_badge, mesh=not a.no_mesh, out=out)
     print(f"attached: {', '.join(f'{n}@{d}' for n, d in sorted(attached.items())) or 'none'}")

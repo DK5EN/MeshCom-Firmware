@@ -213,18 +213,40 @@ def read_info_net(host: str, timeout: float = 4.0) -> str:
     return out.decode(errors="replace")
 
 
-def read_info_serial(port: str, timeout: float = 5.0) -> str:
+def serial_dtr_for(port: str) -> bool:
+    """True for native-USB ports (usbmodem), False for USB-UART bridges."""
+    return "usbmodem" in port
+
+
+def read_info_serial(port: str, timeout: float = 5.0, boot_wait: float = 45.0) -> str:
     import serial  # pyserial, only needed here
 
     s = serial.Serial()
     s.port, s.baudrate, s.timeout = port, 115200, 0.2
-    # DTR on: nRF52/S3 native USB stay mute without it (see serial_session notes).
-    s.dtr, s.rts = True, False
+    # DTR per port family (same rule as rak_harness.dtr_for): nRF52/S3 native
+    # USB (/dev/cu.usbmodem*) stays mute without DTR and does not reset on
+    # open; a CP2102/CH9102 bridge (/dev/cu.usbserial*) wires DTR to GPIO0, so
+    # DTR held high for the whole read is a PRG-button long press -- on the
+    # Heltec V3 that is the DS-03 deep-sleep gesture. Bench runs 3 and 4 on
+    # 2026-10-03 found DK5EN-1 asleep after this guard had "pressed" the button.
+    s.dtr, s.rts = serial_dtr_for(port), False
     s.open()
     out = b""
-    end = time.time() + 1.5
+    # A USB-UART bridge resets the ESP32 on open no matter what DTR/RTS say
+    # (bench-fleet-ports). Asking --info 1.5 s later hits the boot and reports
+    # "no IP, clock INIT" (runs 3-5 on 2026-10-03). So: if boot output shows
+    # up, wait for [BOOT];ready (up to boot_wait s) and settle 2 s; a node
+    # that did not reboot answers nothing in the first 3 s and is asked at once.
+    end = time.time() + 3.0
     while time.time() < end:
         out += s.read(4096)
+    if b"CLIENT" in out or b"[BOOT]" in out or b"rst:" in out:
+        end = time.time() + boot_wait
+        while time.time() < end and b"[BOOT];ready" not in out:
+            out += s.read(4096)
+        settle = time.time() + 2.0
+        while time.time() < settle:
+            out += s.read(4096)
     for ch in b"--info":
         s.write(bytes([ch]))
         time.sleep(0.02)
@@ -237,6 +259,8 @@ def read_info_serial(port: str, timeout: float = 5.0) -> str:
 
 
 def self_test() -> int:
+    assert serial_dtr_for("/dev/cu.usbmodem1101") is True
+    assert serial_dtr_for("/dev/cu.usbserial-0001") is False
     fleet = load_fleet()
     failures: list[str] = []
 

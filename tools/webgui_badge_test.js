@@ -14,6 +14,7 @@
 // a bare LF, which Node's strict HTTP parser rejects (curl and browsers
 // tolerate it). The test writes nothing to the node except two reads per
 // session; the synthetic messages never leave the browser.
+const { TextEncoder, TextDecoder } = require('util');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
 const HOST = process.argv[2] || 'http://dk5en-98.local/';
@@ -64,6 +65,12 @@ async function load(seedStorage) {
     pretendToBeVisual: true,
     virtualConsole: vc,
     beforeParse(window) {
+      // jsdom's window has no TextEncoder/TextDecoder (Node's globals are not
+      // copied in); the charsleft counter in the scaffold calls
+      // new TextEncoder().encode() and threw on every tab switch (first
+      // stage-3 bench run, 2026-10-03).
+      window.TextEncoder = TextEncoder;
+      window.TextDecoder = TextDecoder;
       if (seedStorage) for (const k of Object.keys(seedStorage)) window.localStorage.setItem(k, seedStorage[k]);
     },
   });
@@ -89,7 +96,16 @@ async function load(seedStorage) {
   check('watermark persisted after seed', !!win.localStorage.getItem('mcWm'), win.localStorage.getItem('mcWm'));
   const tabs = Object.keys(b);
   const groups = tabs.filter((k) => /^[0-9]+$/.test(k));
-  check('at least two group tabs on this node', groups.length >= 2, groups.join(','));
+  if (groups.length < 2) {
+    // Every check below drives traffic on two group tabs. A bench node with
+    // no groups configured (only All/*/DM, e.g. DK5EN-92 and DK5EN-14 on
+    // 2026-10-03) cannot run them; report "not applicable" (exit 3, which
+    // tools/bench/bench_suite.py records as SKIP) instead of crashing on
+    // b[undefined].
+    console.log('SKIP badge checks: node has no group tabs configured (' + tabs.join(',') + ') -- set two groups with --setgrp to run them');
+    dom.window.close();
+    process.exit(3);
+  }
   const g1 = groups[0], g2 = groups[1];
 
   // select '*' so that group traffic is not on the visible tab

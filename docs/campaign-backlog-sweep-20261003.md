@@ -62,3 +62,7 @@ test/golden/native/variant-ini-effective.json (regenerate), .gitignore (REG-06),
   after an -I walk proved it unreachable (t_deck and t_deck_plus Flash/RAM unchanged within
   the known 4-byte build noise). Gate: see commit. Campaign closed; the remainder is in
   docs/BACKLOG.md 3.2 and needs either the bench (REG-01, BL-07 check) or the operator.
+- Bench session 2026-10-03 23:xx (REG-01): five stage-3 runs on Heltec/T-Beam/T-Deck, result in
+  docs/bench-20261003-stage3.md. OTA regression and mesh exchange green on all three, driver and
+  guard fixed (DTR-as-button on CP2102, boot-ready wait, live DHCP hosts). New rows TD-20,
+  OLED-FLAKY.
