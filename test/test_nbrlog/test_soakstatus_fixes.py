@@ -38,6 +38,16 @@ TOOLS_DIR = Path(
 )
 
 
+CHECKS = 0  # Zaehler fuer die Schlusszeile "nbrlog: <name>: <M> checks"
+
+
+def tally(cond):
+    """Zaehlt jede tatsaechlich ausgefuehrte Pruefung, gibt die Bedingung unveraendert zurueck."""
+    global CHECKS
+    CHECKS += 1
+    return cond
+
+
 def load_module(name: str):
     spec = importlib.util.spec_from_file_location(name, TOOLS_DIR / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
@@ -47,7 +57,7 @@ def load_module(name: str):
 
 
 def check(label: str, got, want, failures: list[str]) -> None:
-    if got != want:
+    if tally(got != want):
         failures.append(f"{label}: erwartet {want!r}, bekommen {got!r}")
 
 
@@ -389,6 +399,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print("test_soakstatus_fixes: alle Pruefungen bestanden (soakstatus.py T3).")
+    print(f"nbrlog: {Path(__file__).stem}: {CHECKS} checks")
     return 0
 
 

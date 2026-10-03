@@ -73,6 +73,7 @@ def test_plan_rak_with_esp32_peer_sets_peer_port_and_ota_for_wifi_node():
     assert names(steps) == [
         "identity rak-90", "rak harness rak-90",
         "identity t-beam-92", "oled harness t-beam-92", "ota regression t-beam-92",
+        "webgui badge t-beam-92", "mesh exchange",
     ]
     rak = steps[1].argv
     assert rak[rak.index("--peer-port") + 1] == "/dev/tty.tbeam"
@@ -90,13 +91,13 @@ def test_plan_tdeck_uses_tdeck_harness_and_skips_ota_without_host():
 
 
 def test_plan_no_ota_flag_and_unattached_nodes_produce_nothing():
-    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, ota=False)
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, ota=False, badge=False)
     assert names(steps) == ["identity t-beam-92", "oled harness t-beam-92"]
     assert bs.plan(FLEET, {}) == []
 
 
 def test_plan_flash_esp32_bridge_uses_esptool_460800_app_only():
-    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, flash=True, ota=False)
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, flash=True, ota=False, badge=False)
     assert names(steps) == ["identity t-beam-92", "build ttgo_tbeam", "flash ttgo_tbeam",
                             "oled harness t-beam-92"]
     up = steps[2].argv
@@ -130,6 +131,54 @@ def test_plan_extudp_and_deepsleep_are_opt_in_and_board_specific():
     assert "rak extudp rak-90" not in names(plain) and "deepsleep heltec-1" not in names(plain)
 
 
+def test_plan_badge_for_esp32_with_host_after_ota_before_deepsleep():
+    steps = bs.plan(FLEET, {"heltec-1": "/dev/tty.h"}, deepsleep=True)
+    assert names(steps) == ["identity heltec-1", "oled harness heltec-1", "ota regression heltec-1",
+                            "webgui badge heltec-1", "deepsleep heltec-1"]
+    badge = steps[3]
+    assert badge.argv == ["node", "--insecure-http-parser", "tools/webgui_badge_test.js",
+                          "http://192.168.68.62/"]
+    assert badge.env["NODE_PATH"].endswith("/node_modules")
+    assert not badge.gate
+
+
+def test_plan_badge_node_path_honours_jsdom_dir_env(monkeypatch):
+    monkeypatch.setenv("MESHCOM_JSDOM_DIR", "/j")
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"})
+    assert steps[-1].env == {"NODE_PATH": "/j/node_modules"}
+
+
+def test_plan_badge_absent_for_rak_and_for_nodes_without_host_or_with_flag():
+    assert not any("badge" in n for n in names(bs.plan(FLEET, {"rak-90": "/dev/tty.rak"})))
+    fleet = {"nodes": {"t-deck-14": {**FLEET["nodes"]["t-deck-14"], "usb_serial": "X"}}}
+    assert not any("badge" in n for n in names(bs.plan(fleet, {"t-deck-14": "/dev/tty.td"})))
+    assert not any("badge" in n for n in names(bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, badge=False)))
+
+
+def test_plan_badge_still_runs_with_no_ota():
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, ota=False)
+    assert names(steps)[-1] == "webgui badge t-beam-92"
+
+
+def test_plan_mesh_exchange_with_two_nodes_is_last_ungated_and_lists_every_port():
+    attached = {"t-beam-92": "/dev/tty.tb", "rak-90": "/dev/tty.rak", "heltec-1": "/dev/tty.h"}
+    steps = bs.plan(FLEET, attached, out=Path("/o"))
+    mesh = steps[-1]
+    assert mesh.name == "mesh exchange" and mesh.node == "fleet" and not mesh.gate
+    assert mesh.timeout_s == 10 * 60
+    assert mesh.argv[1].endswith("tools/bench/mesh_exchange.py")
+    assert mesh.argv[mesh.argv.index("--out") + 1] == "/o/mesh-exchange.json"
+    ports = [mesh.argv[i + 1] for i, a in enumerate(mesh.argv) if a == "--port"]
+    assert ports == ["/dev/tty.h", "/dev/tty.rak", "/dev/tty.tb"]     # sorted by node name
+
+
+def test_plan_mesh_exchange_absent_with_one_node_or_no_mesh_flag():
+    assert "mesh exchange" not in names(bs.plan(FLEET, {"rak-90": "/dev/tty.rak"}))
+    two = {"rak-90": "/dev/tty.rak", "t-beam-92": "/dev/tty.tb"}
+    assert "mesh exchange" in names(bs.plan(FLEET, two))
+    assert "mesh exchange" not in names(bs.plan(FLEET, two, mesh=False))
+
+
 # ---------------------------------------------------------------- runner
 
 class FakeRun:
@@ -138,9 +187,11 @@ class FakeRun:
     def __init__(self, rc_by_token):
         self.rc_by_token = rc_by_token
         self.calls = []
+        self.envs = []
 
-    def __call__(self, argv, cwd, stdout, stderr, timeout):
+    def __call__(self, argv, cwd, stdout, stderr, timeout, env=None):
         self.calls.append(list(argv))
+        self.envs.append(env)
         stdout.write("fake output\n")
         rc = 0
         for key, code in self.rc_by_token.items():
@@ -169,7 +220,8 @@ def test_runner_skips_a_node_after_its_gate_fails_but_continues_others(tmp_path)
     assert not any("rak_harness.py" in " ".join(c) for c in fake.calls)
     # one log per executed step, first line is the command
     logs = sorted(tmp_path.glob("stage3-*.log"))
-    assert len(logs) == 4
+    assert len(logs) == 6      # identity x2, oled, ota, badge, mesh; the skipped rak harness has none
+    assert by_name["webgui badge t-beam-92"].status == "OK" and by_name["mesh exchange"].status == "OK"
     assert logs[0].read_text().startswith("$ ")
 
 
@@ -177,7 +229,31 @@ def test_runner_non_gate_failure_does_not_skip_later_steps(tmp_path):
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, out=tmp_path)
     fake = FakeRun({"oled_harness.py": 1})
     results = bs.run_steps(steps, tmp_path, runner=fake, echo=lambda s: None)
-    assert [r.status for r in results] == ["OK", "FAIL", "OK"]
+    assert [r.status for r in results] == ["OK", "FAIL", "OK", "OK"]    # identity, oled, ota, badge
+
+
+def test_runner_merges_step_env_over_os_environ_only_when_set(tmp_path, monkeypatch):
+    monkeypatch.setenv("MESHCOM_MARKER", "kept")
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, out=tmp_path)
+    fake = FakeRun({})
+    bs.run_steps(steps, tmp_path, runner=fake, echo=lambda s: None)
+    by_name = dict(zip(names(steps), fake.envs))
+    assert by_name["identity t-beam-92"] is None
+    env = by_name["webgui badge t-beam-92"]
+    assert env["NODE_PATH"].endswith("/node_modules") and env["MESHCOM_MARKER"] == "kept"
+
+
+def test_main_flags_no_badge_and_no_mesh_thread_through_plan(tmp_path, monkeypatch, capsys):
+    fleet_file = tmp_path / "fleet.json"
+    fleet_file.write_text(json.dumps(FLEET))
+    ports = [port("/dev/tty.rak", "230D6EBB3266D20E"), port("/dev/tty.tb", "573C000584")]
+    monkeypatch.setattr(bs, "list_comports", lambda: ports)
+    assert bs.main(["--dry-run", "--fleet", str(fleet_file)]) == 0
+    full = capsys.readouterr().out
+    assert "webgui badge t-beam-92" in full and "mesh exchange" in full
+    assert bs.main(["--dry-run", "--no-badge", "--no-mesh", "--fleet", str(fleet_file)]) == 0
+    slim = capsys.readouterr().out
+    assert "webgui badge" not in slim and "mesh exchange" not in slim
 
 
 def test_runner_timeout_is_a_failure_with_detail(tmp_path):

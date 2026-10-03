@@ -27,6 +27,16 @@ TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 FIXTURE = TOOLS_DIR / "testdata" / "nbr" / "nbr_sample_stage2.log"
 
 
+CHECKS = 0  # Zaehler fuer die Schlusszeile "nbrlog: <name>: <M> checks"
+
+
+def tally(cond):
+    """Zaehlt jede tatsaechlich ausgefuehrte Pruefung, gibt die Bedingung unveraendert zurueck."""
+    global CHECKS
+    CHECKS += 1
+    return cond
+
+
 def load_module(name: str):
     spec = importlib.util.spec_from_file_location(name, TOOLS_DIR / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
@@ -58,11 +68,11 @@ def main() -> int:
     #    Felder muessen also schon rein positionell ignoriert werden. --
     nbrsnap = load_module("nbrsnap")
     rc, out = run_capturing(nbrsnap.main, [str(FIXTURE)])
-    if rc != 0:
+    if tally(rc != 0):
         failures.append(f"nbrsnap.py: Exitcode {rc} statt 0 auf der Stage-2-Fixture")
-    if "eigen: DK5EN-98" not in out:
+    if tally("eigen: DK5EN-98" not in out):
         failures.append(f"nbrsnap.py: eigenes Rufzeichen nicht erkannt, Ausgabe:\n{out}")
-    if "DK5EN-93" not in out or "DK5EN-94" not in out:
+    if tally("DK5EN-93" not in out or "DK5EN-94" not in out):
         failures.append(f"nbrsnap.py: direkte Nachbarn fehlen in der Ausgabe:\n{out}")
 
     # -- nbrrelay.py: dieselbe Toleranzpruefung, plus die Randbedingung, dass
@@ -70,20 +80,20 @@ def main() -> int:
     #    NBR-Fixture) nicht mit IndexError abstuerzen darf (rx_t leer). --
     nbrrelay = load_module("nbrrelay")
     rc, out = run_capturing(nbrrelay.main, ["--own", "DK5EN-98", str(FIXTURE)])
-    if rc != 0:
+    if tally(rc != 0):
         failures.append(f"nbrrelay.py: Exitcode {rc} statt 0 auf der Stage-2-Fixture")
-    if "0 Frames" not in out:
+    if tally("0 Frames" not in out):
         failures.append(f"nbrrelay.py: erwartet 0 RX-Frames (keine [LOG]-Zeilen in der Fixture):\n{out}")
-    if "direkt gehoert ['DK5EN-93', 'DK5EN-94']" not in out:
+    if tally("direkt gehoert ['DK5EN-93', 'DK5EN-94']" not in out):
         failures.append(
             f"nbrrelay.py: ME-Zeilen mit neuem <snr>-Feld nicht als direkte Nachbarn erkannt:\n{out}"
         )
 
     # -- own aus der SNAP-Zeile ableiten (kein --own) muss ebenfalls klappen --
     rc, out = run_capturing(nbrrelay.main, [str(FIXTURE)])
-    if rc != 0:
+    if tally(rc != 0):
         failures.append(f"nbrrelay.py ohne --own: Exitcode {rc} statt 0")
-    if "eigen: DK5EN-98" not in out:
+    if tally("eigen: DK5EN-98" not in out):
         failures.append(f"nbrrelay.py ohne --own: eigenes Rufzeichen nicht aus SNAP abgeleitet:\n{out}")
 
     if failures:
@@ -92,6 +102,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print("test_nbr_stage2_tools: alle Pruefungen bestanden (nbrsnap.py, nbrrelay.py).")
+    print(f"nbrlog: {Path(__file__).stem}: {CHECKS} checks")
     return 0
 
 

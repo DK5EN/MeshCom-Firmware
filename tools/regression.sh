@@ -10,8 +10,9 @@
 # Stage 1  host:   every [env:native*] in platformio.ini, one `pio test` each,
 #                  then test/golden/selftest.sh (lints, tool self-tests, mock
 #                  server). The topo_shadow full-window case needs four raw
-#                  DK5EN-98 logs under ~/Downloads/dk5en-98-nbr/; they are
-#                  fetched from rpizero when absent and reachable.
+#                  DK5EN-98 logs under ~/Downloads/dk5en-98-nbr/; when absent
+#                  they come from the ~/meshlog/dk5en-98-nbr/ copy, else are
+#                  fetched from rpizero (and mirrored into ~/meshlog).
 # Stage 2  tools:  pytest over tools/bench, tools/tests, tools/mock; the
 #                  PEP-723 scripts in test/test_nbrlog; node --test over
 #                  tools/tests/*.mjs; the jsdom-based safeboot page test; the
@@ -59,7 +60,15 @@ STEP_NAMES=()
 STEP_STATUS=()
 STEP_DETAIL=()
 FAILS=0
-record() {   # record <name> <OK|FAIL|SKIP> <detail>
+record() {   # record <name> <OK|FAIL|SKIP> <detail>; a name is recorded once
+    local i=0
+    while [ $i -lt ${#STEP_NAMES[@]} ]; do
+        if [ "${STEP_NAMES[$i]}" = "$1" ]; then
+            echo "regression.sh: step '$1' recorded twice -- second record ignored" >&2
+            return 0
+        fi
+        i=$((i + 1))
+    done
     STEP_NAMES+=("$1"); STEP_STATUS+=("$2"); STEP_DETAIL+=("$3")
     [ "$2" = "FAIL" ] && FAILS=$((FAILS + 1))
     printf '%-6s %-44s %s\n' "$2" "$1" "$3"
@@ -74,9 +83,16 @@ run_step() {
     else record "$name" FAIL "exit $rc, see $log"; fi
     return $rc
 }
-# step_detail <log>: best-effort one-line count pulled from a log.
+# step_detail <log>: one-line count pulled from a log. The tools that count
+# themselves win: selftest.sh's closing "selftest: N commands run" line, then
+# the test_nbrlog scripts' "nbrlog: <name>: M checks" line; only after those
+# the pytest / node TAP / PASS-line heuristics.
 step_detail() {
     local l
+    l=$(grep -oE '^selftest: [0-9]+ commands' "$1" | tail -1)
+    [ -n "$l" ] && { echo "${l#selftest: }"; return; }
+    l=$(grep -oE '^nbrlog: [^:]+: [0-9]+ checks' "$1" | tail -1)
+    [ -n "$l" ] && { echo "${l##*: }"; return; }
     l=$(grep -oE '[0-9]+ passed' "$1" | tail -1); [ -n "$l" ] && { echo "$l"; return; }
     l=$(grep -oE '^# pass [0-9]+' "$1" | tail -1); [ -n "$l" ] && { echo "${l#\# }"; return; }
     l=$(grep -cE '^(PASS|ok|OK)\b' "$1"); [ "$l" -gt 0 ] && { echo "$l checks"; return; }
@@ -89,15 +105,30 @@ pio_busy() {
 
 # ---------------------------------------------------------------- stage 1
 TOTAL_CASES=0; TOTAL_OK=0; TOTAL_FAIL=0; TOTAL_SKIP=0; ENV_COUNT=0
+# The raw window is looked up in this order: ~/Downloads/dk5en-98-nbr (the only
+# path test_topo_shadow reads), then the second copy in ~/meshlog/dk5en-98-nbr
+# (copied into ~/Downloads), then rpizero (and a successful fetch is mirrored
+# into ~/meshlog so the second copy exists afterwards).
+raw_window_complete() {   # raw_window_complete <dir>: all four day logs present and non-empty
+    local d
+    for d in 21 22 23 24; do [ -s "$1/2026-09-$d.log" ] || return 1; done
+}
 ensure_topo_raw() {
-    local dir="$HOME/Downloads/dk5en-98-nbr" missing=0 d
-    for d in 21 22 23 24; do [ -s "$dir/2026-09-$d.log" ] || missing=1; done
-    if [ $missing = 0 ]; then record "topo_shadow raw window" OK "$dir"; return; fi
-    [ "$LIST" = 1 ] && { echo "PLAN   topo_shadow raw window: fetch from rpizero if absent"; return; }
+    local dir="$HOME/Downloads/dk5en-98-nbr" bak="$HOME/meshlog/dk5en-98-nbr" d
+    if raw_window_complete "$dir"; then record "topo_shadow raw window" OK "$dir"; return; fi
+    [ "$LIST" = 1 ] && { echo "PLAN   topo_shadow raw window: ~/Downloads, else ~/meshlog copy, else fetch from rpizero"; return; }
+    if raw_window_complete "$bak"; then
+        mkdir -p "$dir"
+        for d in 21 22 23 24; do cp -p "$bak/2026-09-$d.log" "$dir/"; done
+        record "topo_shadow raw window" OK "from ~/meshlog ($bak -> $dir)"
+        return
+    fi
     mkdir -p "$dir"
     if scp -q -o BatchMode=yes -o ConnectTimeout=5 \
         'rpizero.local:~/meshlog/dk5en-98/2026-09-2[1-4].log' "$dir/" 2>/dev/null; then
-        record "topo_shadow raw window" OK "fetched from rpizero into $dir"
+        mkdir -p "$bak"
+        for d in 21 22 23 24; do [ -s "$dir/2026-09-$d.log" ] && cp -p "$dir/2026-09-$d.log" "$bak/"; done
+        record "topo_shadow raw window" OK "fetched from rpizero into $dir (copy in $bak)"
     else
         record "topo_shadow raw window" SKIP "not local, rpizero unreachable -- full-window case will be IGNOREd"
     fi

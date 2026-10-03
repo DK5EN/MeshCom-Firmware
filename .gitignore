@@ -441,3 +441,11 @@ compile_commands.json
 # NBR-Logfixtures: der Selbsttest von tools/nbrlog.py haengt an ihnen,
 # sie sind Testdaten und kein Mitschnitt.
 !tools/testdata/nbr/*.log
+
+# REG-06 / CQ-11 (2026-10-03): the regression skill is part of the gate and travels
+# with the repo; the blanket .* rule above hides the rest of .claude/ on purpose.
+!.claude/
+.claude/*
+!.claude/commands/
+.claude/commands/*
+!.claude/commands/full-regression.md

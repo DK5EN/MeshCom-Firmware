@@ -18,8 +18,21 @@ in <out>/bench-summary.json. Exit 1 if any step failed. Steps run strictly one
 after another: the harnesses hold serial ports, pio must not run twice at
 once, and the RAK's mheard scenario wants an ESP32 peer that is idle.
 
-What is deliberately NOT here: the cross-node LoRa exchange (TM-26, no tool
-yet), the AP-reboot run (TM-38, the bench Mac loses its own WLAN), the CDC
+Two further steps are on by default (opt out with --no-badge / --no-mesh):
+
+  * REG-04 "webgui badge <node>": tools/webgui_badge_test.js (jsdom) against the
+    live web GUI of every attached ESP32 node that has a `host` in fleet.json.
+    Runs after the node's OTA step, so the node is back and reachable. jsdom is
+    not a repo dependency: tools/regression.sh installs it into
+    $MESHCOM_JSDOM_DIR (default ~/.cache/meshcom-jsdom) and the step points
+    NODE_PATH at its node_modules. `--insecure-http-parser` is needed because
+    the node's web server ends its status line with a bare LF.
+  * REG-05 / TM-26 "mesh exchange": one final cross-node step when at least two
+    nodes are attached. The tool tools/bench/mesh_exchange.py is written by a
+    sibling task; its CLI is `--port <dev>` repeated once per attached node,
+    plus `--out <json>`. This module only builds that argv.
+
+What is deliberately NOT here: the AP-reboot run (TM-38, the bench Mac loses its own WLAN), the CDC
 unplug proof (needs a hand on the cable) and the operator eye/ear checks --
 see docs/automation-runner-runbook.md 2.4/2.5/2.7.
 """
@@ -27,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -46,6 +60,8 @@ DEEPSLEEP_ENVS = {"heltec_wifi_lora_32_V3"}       # DS-03: CP2102 DTR == PRG but
 HARNESS_TIMEOUT_S = 15 * 60
 FLASH_TIMEOUT_S = 10 * 60
 OTA_TIMEOUT_S = 10 * 60
+BADGE_TIMEOUT_S = 5 * 60
+MESH_TIMEOUT_S = 10 * 60
 
 
 @dataclass
@@ -55,6 +71,7 @@ class Step:
     argv: List[str]
     timeout_s: int = HARNESS_TIMEOUT_S
     gate: bool = False          # a failing gate step skips the node's later steps
+    env: Dict[str, str] = field(default_factory=dict)   # merged over os.environ when non-empty
 
 
 @dataclass
@@ -114,9 +131,15 @@ def flash_steps(name: str, env: str, dev: str) -> List[Step]:
     return [build, up]
 
 
+def jsdom_node_path() -> str:
+    """NODE_PATH for the jsdom cache that tools/regression.sh installs."""
+    base = os.environ.get("MESHCOM_JSDOM_DIR", os.path.expanduser("~/.cache/meshcom-jsdom"))
+    return base + "/node_modules"
+
+
 def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: bool = True,
          extudp: bool = False, deepsleep: bool = False, soak_seconds: int = 600,
-         out: Path = Path(".")) -> List[Step]:
+         badge: bool = True, mesh: bool = True, out: Path = Path(".")) -> List[Step]:
     """The ordered step list for the attached nodes. Pure: no I/O."""
     steps: List[Step] = []
     nodes = fleet.get("nodes", {})
@@ -156,9 +179,19 @@ def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: boo
             steps.append(Step(f"ota regression {name}", name,
                               [py, str(BENCH / "ota_regression.py"), "--port", dev, "--env", env,
                                "--ip", node["host"], "--settings-check"], OTA_TIMEOUT_S))
+        if badge and node.get("family") == "esp32" and node.get("host"):
+            steps.append(Step(f"webgui badge {name}", name,
+                              ["node", "--insecure-http-parser", "tools/webgui_badge_test.js",
+                               f"http://{node['host']}/"],
+                              BADGE_TIMEOUT_S, env={"NODE_PATH": jsdom_node_path()}))
         if deepsleep and env in DEEPSLEEP_ENVS:
             steps.append(Step(f"deepsleep {name}", name,
                               [py, str(BENCH / "deepsleep_button.py"), "--port", dev]))
+    if mesh and len(attached) >= 2:
+        argv = [py, str(BENCH / "mesh_exchange.py"), "--out", str(out / "mesh-exchange.json")]
+        for n in sorted(attached):
+            argv += ["--port", attached[n]]
+        steps.append(Step("mesh exchange", "fleet", argv, MESH_TIMEOUT_S))
     return steps
 
 
@@ -208,8 +241,9 @@ def run_steps(steps: List[Step], out: Path, runner: Callable[..., Any] = subproc
             fh.write("$ " + " ".join(s.argv) + "\n")
             fh.flush()
             try:
+                extra = {"env": {**os.environ, **s.env}} if s.env else {}
                 proc = runner(s.argv, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT,
-                              timeout=s.timeout_s)
+                              timeout=s.timeout_s, **extra)
                 rc = proc.returncode
                 detail = ""
             except subprocess.TimeoutExpired:
@@ -232,6 +266,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--no-ota", action="store_true", help="skip the OTA regression on the WiFi boards")
     ap.add_argument("--extudp", action="store_true", help="also run the RAK EXTUDP scenario (TM-43, long)")
     ap.add_argument("--deepsleep", action="store_true", help="also run DS-03 on a Heltec V3")
+    ap.add_argument("--no-badge", action="store_true", help="skip the web GUI badge test (REG-04) on the WiFi boards")
+    ap.add_argument("--no-mesh", action="store_true", help="skip the cross-node mesh exchange (REG-05)")
     ap.add_argument("--soak-seconds", type=int, default=600, help="extudp soak tail (default 600)")
     ap.add_argument("--fleet", type=Path, default=FLEET_FILE)
     a = ap.parse_args(argv)
@@ -251,7 +287,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         attached.pop(n)
 
     steps = plan(fleet, attached, flash=a.flash, ota=not a.no_ota, extudp=a.extudp,
-                 deepsleep=a.deepsleep, soak_seconds=a.soak_seconds, out=out)
+                 deepsleep=a.deepsleep, soak_seconds=a.soak_seconds,
+                 badge=not a.no_badge, mesh=not a.no_mesh, out=out)
     print(f"attached: {', '.join(f'{n}@{d}' for n, d in sorted(attached.items())) or 'none'}")
     if absent:
         print(f"not attached: {', '.join(absent)}")

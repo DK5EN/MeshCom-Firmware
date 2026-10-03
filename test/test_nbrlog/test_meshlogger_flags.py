@@ -33,6 +33,16 @@ from unittest import mock
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 
 
+CHECKS = 0  # Zaehler fuer die Schlusszeile "nbrlog: <name>: <M> checks"
+
+
+def tally(cond):
+    """Zaehlt jede tatsaechlich ausgefuehrte Pruefung, gibt die Bedingung unveraendert zurueck."""
+    global CHECKS
+    CHECKS += 1
+    return cond
+
+
 def load_meshlogger():
     spec = importlib.util.spec_from_file_location("meshlogger", TOOLS_DIR / "meshlogger.py")
     mod = importlib.util.module_from_spec(spec)
@@ -93,10 +103,10 @@ def main() -> int:
         meshlogger, [], info_reply=b"...TXCAPTURE off\n...LORADEBUG off\n"
     )
     on_cmds = [c for c in sent_flag_commands(fake_default) if c.endswith(" on")]
-    if on_cmds != ["--txcapture on", "--loradebug on"]:
+    if tally(on_cmds != ["--txcapture on", "--loradebug on"]):
         failures.append(f"Standardflags: bekommen {on_cmds!r}, erwartet ['--txcapture on', '--loradebug on']")
     off_cmds = [c for c in sent_flag_commands(fake_default) if c.endswith(" off")]
-    if off_cmds != ["--txcapture off", "--loradebug off"]:
+    if tally(off_cmds != ["--txcapture off", "--loradebug off"]):
         failures.append(f"Standard-Restore: bekommen {off_cmds!r}, erwartet beide Flags auf 'off' zurueckgesetzt")
 
     # -- 2) --flags nbrdebug setzt genau nbrdebug; nicht im --info gefunden
@@ -105,7 +115,7 @@ def main() -> int:
         meshlogger, ["--flags", "nbrdebug"], info_reply=b"...LORADEBUG off\n"
     )
     cmds = sent_flag_commands(fake_nbr)
-    if cmds != ["--nbrdebug on"]:
+    if tally(cmds != ["--nbrdebug on"]):
         failures.append(
             f"--flags nbrdebug: bekommen {cmds!r}, erwartet genau ['--nbrdebug on'] "
             "(auf on gesetzt, aber beim Beenden NICHT ausgeschaltet, da Zustand unbekannt)"
@@ -117,6 +127,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print("test_meshlogger_flags: alle Pruefungen bestanden.")
+    print(f"nbrlog: {Path(__file__).stem}: {CHECKS} checks")
     return 0
 
 

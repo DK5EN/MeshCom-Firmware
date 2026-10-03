@@ -42,6 +42,16 @@ from unittest import mock
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 
 
+CHECKS = 0  # Zaehler fuer die Schlusszeile "nbrlog: <name>: <M> checks"
+
+
+def tally(cond):
+    """Zaehlt jede tatsaechlich ausgefuehrte Pruefung, gibt die Bedingung unveraendert zurueck."""
+    global CHECKS
+    CHECKS += 1
+    return cond
+
+
 def load_module():
     spec = importlib.util.spec_from_file_location("nm_symsum", TOOLS_DIR / "nm_symsum.py")
     mod = importlib.util.module_from_spec(spec)
@@ -94,7 +104,7 @@ def main() -> int:
     # -- parse_nm_output: liest nur vollstaendige "addr size type name"-Zeilen --
     parsed = mod.parse_nm_output(NM_SAMPLE)
     names = {name for _size, _typ, name in parsed}
-    if "free" in names:
+    if tally("free" in names):
         failures.append("parse_nm_output: eine U-Zeile ohne Groesse wurde nicht uebersprungen")
     if len(parsed) != NM_SAMPLE.count("\n") - 1:  # eine Zeile (U free) faellt raus
         failures.append(f"parse_nm_output: {len(parsed)} Zeilen geparst, erwartet {NM_SAMPLE.count(chr(10)) - 1}")
@@ -114,7 +124,7 @@ def main() -> int:
     ]
     for name, expected in cases:
         got = mod.classify(name)
-        if got != expected:
+        if tally(got != expected):
             failures.append(f"classify({name!r}) = {got!r}, erwartet {expected!r}")
     # classify() entscheidet rein nach Namen -- dass mheardFreshMs() (eine
     # Funktion) trotzdem "mheard" liefert, ist beabsichtigt: measure() filtert
@@ -123,17 +133,17 @@ def main() -> int:
     for name in ["nbrLog", "stat_nbr_cancel", "bNBRSYM", "nbrreport_timer", "nbrsnap_timer",
                  "tg_post_nbrrelay_on()"]:
         got = mod.classify(name)
-        if got is not None:
+        if tally(got is not None):
             failures.append(f"classify({name!r}) = {got!r}, erwartet None (kein Topologie-Symbol)")
 
     # -- measure(): Typ-Filter (nur b/B/d/D) und Groesse-0-Ausschluss ueber run_nm --
     with mock.patch.object(mod, "run_nm", return_value=NM_SAMPLE):
         result = mod.measure("E22-DevKitC", Path("/fake/E22-DevKitC.elf"), Path("/fake/nm"))
-    if result.groups != EXPECT_GROUPS:
+    if tally(result.groups != EXPECT_GROUPS):
         failures.append(f"measure(): Gruppen {result.groups} != erwartet {EXPECT_GROUPS}")
-    if result.total != EXPECT_TOTAL:
+    if tally(result.total != EXPECT_TOTAL):
         failures.append(f"measure(): total {result.total} != erwartet {EXPECT_TOTAL}")
-    if result.unmatched_count != EXPECT_UNMATCHED:
+    if tally(result.unmatched_count != EXPECT_UNMATCHED):
         failures.append(f"measure(): unmatched_count {result.unmatched_count} != erwartet {EXPECT_UNMATCHED}")
 
     # -- nm_for(): dieselbe Heuristik wie tools/neo/gate.sh --
@@ -151,7 +161,7 @@ def main() -> int:
     ]
     for env, expected in nm_cases:
         got = mod.nm_for(env)
-        if got != expected:
+        if tally(got != expected):
             failures.append(f"nm_for({env!r}) = {got}, erwartet {expected}")
 
     # -- family_for(): build.py-Familien --
@@ -167,7 +177,7 @@ def main() -> int:
     ]
     for env, expected in fam_cases:
         got = mod.family_for(env)
-        if got != expected:
+        if tally(got != expected):
             failures.append(f"family_for({env!r}) = {got!r}, erwartet {expected!r}")
 
     # -- collect_targets(): --elf-Mapping plus Verzeichnis-Scan (<env>.elf) --
@@ -183,7 +193,7 @@ def main() -> int:
             "heltec_wifi_lora_32_V3": tdir / "heltec_wifi_lora_32_V3.elf",
             "wiscore_rak4631": tdir / "wiscore_rak4631.elf",
         }
-        if targets != expected_targets:
+        if tally(targets != expected_targets):
             failures.append(f"collect_targets(): {targets} != erwartet {expected_targets}")
 
     # -- main(): Ende-zu-Ende mit gemocktem run_nm, Text- und JSON-Ausgabe --
@@ -194,40 +204,41 @@ def main() -> int:
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = mod.main(["--elf", f"E22-DevKitC={elf_path}"])
-            if rc != 0:
+            if tally(rc != 0):
                 failures.append(f"main(): Exitcode {rc} statt 0")
             out = buf.getvalue()
-            if str(EXPECT_TOTAL) not in out:
+            if tally(str(EXPECT_TOTAL) not in out):
                 failures.append(f"main(): Gesamtsumme {EXPECT_TOTAL} nicht in der Tabelle:\n{out}")
 
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = mod.main(["--elf", f"E22-DevKitC={elf_path}", "--json"])
-            if rc != 0:
+            if tally(rc != 0):
                 failures.append(f"main() --json: Exitcode {rc} statt 0")
+            tally(True)  # JSON-Parsing zaehlt als eine Pruefung
             try:
                 doc = json.loads(buf.getvalue())
             except json.JSONDecodeError as exc:
                 failures.append(f"main() --json: keine gueltige JSON-Ausgabe ({exc})")
             else:
                 env_doc = doc.get("envs", {}).get("E22-DevKitC")
-                if env_doc is None:
+                if tally(env_doc is None):
                     failures.append(f"main() --json: kein Eintrag fuer E22-DevKitC:\n{doc}")
-                elif env_doc["total"] != EXPECT_TOTAL or env_doc["family"] != "klassisch":
+                elif tally(env_doc["total"] != EXPECT_TOTAL or env_doc["family"] != "klassisch"):
                     failures.append(f"main() --json: unerwarteter Eintrag {env_doc}")
 
     # -- main(): fehlendes ELF fuehrt zu rc=2, kein Traceback --
     buf = io.StringIO()
     with redirect_stdout(buf), redirect_stdout(buf):
         rc = mod.main(["--elf", "ghost=/does/not/exist.elf"])
-    if rc != 2:
+    if tally(rc != 2):
         failures.append(f"main() mit fehlendem ELF: Exitcode {rc} statt 2")
 
     # -- main(): keine Targets --
     err = io.StringIO()
     with redirect_stdout(io.StringIO()), mock.patch.object(sys, "stderr", err):
         rc = mod.main([])
-    if rc != 2:
+    if tally(rc != 2):
         failures.append(f"main() ohne Targets: Exitcode {rc} statt 2")
 
     if failures:
@@ -236,6 +247,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print("test_nm_symsum: alle Pruefungen bestanden.")
+    print(f"nbrlog: {Path(__file__).stem}: {CHECKS} checks")
     return 0
 
 
