@@ -57,3 +57,8 @@ test/golden/native/variant-ini-effective.json (regenerate), .gitignore (REG-06),
   1641 cases, 497 pytest; wiscore_rak4631 and heltec_wifi_lora_32_V3 build SUCCESS. Advisor:
   orchestrator read the diff itself (no separate fable-review pass); one comment corrected
   (the nRF52 track path never read node_track_freq, so no on-air effect).
+- Wave 3 landed 2026-10-03 ~22:40: W10 CSMA carve-out (`src/csma_timing.h`, 10 native cases,
+  lora_functions.cpp diff 23 lines, heltec build SUCCESS), W11 `src/t-deck/lv_conf.h` deleted
+  after an -I walk proved it unreachable (t_deck and t_deck_plus Flash/RAM unchanged within
+  the known 4-byte build noise). Gate: see commit. Campaign closed; the remainder is in
+  docs/BACKLOG.md 3.2 and needs either the bench (REG-01, BL-07 check) or the operator.

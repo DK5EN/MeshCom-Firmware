@@ -2314,6 +2314,7 @@
   "test_filter": [
    "test_regex_call",
    "test_compress",
+   "test_csma_timing",
    "test_millis_rollover",
    "test_ack_validate",
    "test_ack_replay",
