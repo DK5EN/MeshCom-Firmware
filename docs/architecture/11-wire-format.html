@@ -748,7 +748,12 @@ carry <code>&quot;TYP&quot;</code> as discriminator):</p>
 <tr>
 <td><code>SN</code></td>
 <td><code>--nodeset</code></td>
-<td>GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM</td>
+<td>GW, WS, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, NOPMOTHER, BLED, GWS (228 of 244 bytes: no room left, see <code>SN1</code>)</td>
+</tr>
+<tr>
+<td><code>SN1</code></td>
+<td><code>--nodeset</code> (second frame, sent right after <code>SN</code>)</td>
+<td>VIA, VIACALL, WSPWD, ASYM, TZ (TZ-01: <code>node_tz</code>, POSIX rule string, <code>&quot;&quot;</code> when unset, last key; 65 B before TZ-01, 99 B with the ESP32 default rule <code>CET-1CEST,M3.5.0,M10.5.0/3</code>, worst case 168 B)</td>
 </tr>
 <tr>
 <td><code>W</code></td>
@@ -870,6 +875,23 @@ becomes public.</li>
 (<code>phone_commands.cpp:552</code>); anything else is silently ignored while the
 ASCII <code>--symid</code> path accepts more.</li>
 </ul>
+<p><strong>Time zone over BLE (TZ-01).</strong> There is no new frame type. The app sets
+the POSIX TZ rule as a <code>--settz &lt;rule&gt;</code> command in a <code>0xA0</code> text message
+(e.g. <code>--settz CET-1CEST,M3.5.0,M10.5.0/3</code>); it starts with <code>--</code>, so it is
+dispatched through <code>commandAction()</code> like any other command
+(<code>src/command_functions.cpp:743–787</code>). <code>--settz none</code> (or a bare <code>--settz</code>)
+clears the rule. A rejected rule (parse error, <code>Jn</code>/<code>n</code> day rules, more than
+39 characters) changes nothing. On success the node
+re-sends <code>SN</code> + <code>SN1</code> (<code>sendNodeSetting()</code>), so the new rule arrives as the
+<code>TZ</code> key of <code>SN1</code> (<code>src/command_functions.cpp:6751</code>) and the derived offset
+as <code>UTCOF</code> of <code>SN</code>. While a rule is set, <code>UTCOF</code> is a derived value: it
+follows the DST switches by itself, and a <code>--utcoff</code> from the app clears the
+rule again (the fixed offset wins). <code>TZ</code> is the last key of <code>SN1</code>, so
+<code>bleJsonFrameFailSoft()</code> drops it first on overflow; the worst case (39-char
+rule) stays far below the 244-byte limit. <code>node_tz</code> is written to flash
+under the keyed setting <code>node_tz</code> (<code>char[40]</code>), without a
+<code>FLASH_STRUCT_VERSION</code> bump; the frozen BLE settings v1 layout
+(<code>ble_settings_v1.h</code>) does not carry it.</p>
 <p>Settings written over BLE are staged and applied from the main loop
 (<code>applyPendingBleSettings()</code>, CONC-17) — a mock phone must not assume the
 settings notification arrives synchronously with the write.</p>

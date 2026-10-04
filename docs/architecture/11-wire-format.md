@@ -808,11 +808,11 @@ enforces them silently — no error reaches the phone):
 the POSIX TZ rule as a `--settz <rule>` command in a `0xA0` text message
 (e.g. `--settz CET-1CEST,M3.5.0,M10.5.0/3`); it starts with `--`, so it is
 dispatched through `commandAction()` like any other command
-(`src/command_functions.cpp:742–790`). `--settz none` (or a bare `--settz`)
+(`src/command_functions.cpp:743–787`). `--settz none` (or a bare `--settz`)
 clears the rule. A rejected rule (parse error, `Jn`/`n` day rules, more than
 39 characters) changes nothing. On success the node
 re-sends `SN` + `SN1` (`sendNodeSetting()`), so the new rule arrives as the
-`TZ` key of `SN1` (`src/command_functions.cpp:6750`) and the derived offset
+`TZ` key of `SN1` (`src/command_functions.cpp:6751`) and the derived offset
 as `UTCOF` of `SN`. While a rule is set, `UTCOF` is a derived value: it
 follows the DST switches by itself, and a `--utcoff` from the app clears the
 rule again (the fixed offset wins). `TZ` is the last key of `SN1`, so
