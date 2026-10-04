@@ -20,7 +20,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tdeck_harness import TDeckSession  # noqa: E402
@@ -31,6 +31,17 @@ PAGE_MAX = 6
 # TM-42: group the central server filters, so injected test traffic never
 # reaches the map/dashboard. See docs/automation-runner-runbook.md §2.6.
 TEST_GROUP = "TEST"
+
+# dirty scenario: a bench node on the air redraws the OLED on every RX/TX/relay,
+# so an idle-window frame is only a finding when no LoRa log line precedes it.
+FRAME_RE = re.compile(r"\[OLED\];frame")
+SKIP_RE = re.compile(r"\[OLED\];skip")
+OLED_KIND_RE = re.compile(r"\[OLED\];(skip|frame)")
+LORA_RE = re.compile(r"\[LOG\] (?:\d{3} @|RLY|TX) |MH-LoRa|RX-LoRa|TX-LoRa")
+LORA_EXPLAIN_S = 2.5          # a LoRa line this long before a frame explains it
+BURST_LEN = 4                 # --display on pushes per skip burst
+BURST_GAP_S = 0.12
+BURST_TRIES = 3
 
 
 class OledSession(TDeckSession):
@@ -55,6 +66,26 @@ def oledstat(s: OledSession) -> Optional[Dict[str, int]]:
         except ValueError:
             pass
     return out
+
+
+def explain_idle_frames(frames: List[float], lora: List[float],
+                        window_s: float = LORA_EXPLAIN_S) -> Tuple[List[float], List[float]]:
+    """Split idle-window frame timestamps into (explained, unexplained). A frame
+    is explained when a LoRa line sits 0..window_s seconds BEFORE it; a LoRa line
+    after the frame cannot have caused it."""
+    explained: List[float] = []
+    unexplained: List[float] = []
+    for f in frames:
+        if any(0.0 <= f - l <= window_s for l in lora):
+            explained.append(f)
+        else:
+            unexplained.append(f)
+    return explained, unexplained
+
+
+def burst_has_skip(lines: List[str]) -> bool:
+    """True when at least one [OLED];skip line is among the burst's lines."""
+    return any(SKIP_RE.search(l) for l in lines)
 
 
 def frames_since(s: OledSession, idx: int) -> List[Dict[str, int]]:
@@ -141,6 +172,14 @@ def scenario_pos(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
     # sendDisplayPosition() draws nothing while the message ring is held
     # (pageHold > 0 for ~5 s after a message) or with the position display
     # off (--msg mode); wait the hold out and switch to --all for the test.
+    # It also draws nothing while the display is off (bDisplayIsOff, restored
+    # from the saved setting after a fresh flash): make sure it is ON first.
+    st_disp = oledstat(s)
+    display_was_off = bool(st_disp and (st_disp.get("isoff") == 1 or st_disp.get("off") == 1))
+    if display_was_off:
+        s.send("--display on"); time.sleep(1.0)
+        st_disp = oledstat(s)
+    display_still_off = bool(st_disp and (st_disp.get("isoff") == 1 or st_disp.get("off") == 1))
     st0 = None
     for _ in range(12):
         st0 = oledstat(s)
@@ -166,7 +205,8 @@ def scenario_pos(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
     ok = st["acked"] and st2["acked"] and st["frames"] >= 1 and st2["frames"] >= 1 and not (st["crashed"] or st2["crashed"])
     return {"ok": ok, "steps": [st, st2], "hold_before": st0.get("hold") if st0 else None,
             "offwait_before_ms": st0.get("offwait_ms") if st0 else None,
-            "posdisp_switched": restore_msg}
+            "posdisp_switched": restore_msg, "display_was_off": display_was_off,
+            "display_still_off": display_still_off}
 
 
 def scenario_display(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
@@ -199,36 +239,55 @@ def scenario_display(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]
 
 
 def scenario_dirty(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
-    """TM-10: unchanged frames are not pushed. Two parts: (1) an idle window
-    of --dirty-seconds must push no frame at all; (2) two --display on in
-    quick succession draw the same head page twice, the second must be
-    reported as [OLED];skip (the page carries a clock, so a pair straddling a
-    second boundary legitimately differs -- up to three pairs are tried).
+    """TM-10: unchanged frames are not pushed. Two parts: (1) over an idle
+    window of --dirty-seconds every [OLED];frame must be explained by a LoRa
+    line (RX/RLY/TX) within 2.5 s before it -- a bench node on the air redraws
+    on traffic, so "idle" cannot mean "no frame"; (2) after one --display on, a
+    burst of 4 --display on 120 ms apart draws the same head page repeatedly and
+    at least one must be reported as [OLED];skip (the page carries a clock, so
+    a second boundary can split one burst -- up to three bursts are tried).
     Fails on firmware without the skipped counter."""
+    s.send("--oledlog on"); time.sleep(0.2)
     st0 = oledstat(s)
+    idx0 = s.length()
     time.sleep(args.dirty_seconds)
+    idx1 = s.length()
     st1 = oledstat(s)
     have = bool(st0 and st1) and "skipped" in st0 and "skipped" in st1
     frames_delta = (st1["frames"] - st0["frames"]) if have else None
     skipped_delta = (st1["skipped"] - st0["skipped"]) if have else None
 
-    s.send("--oledlog on"); time.sleep(0.2)
-    pairs = []
+    window = s.records_range(idx0, idx1)
+    frame_t = [r[0] for r in window if FRAME_RE.search(r[2])]
+    lora_recs = [(r[0], r[2]) for r in window if LORA_RE.search(r[2])]
+    explained, unexplained = explain_idle_frames(frame_t, [t for t, _ in lora_recs])
+    explaining = [l.strip()[:100] for t, l in lora_recs
+                  if any(0.0 <= f - t <= LORA_EXPLAIN_S for f in explained)]
+
+    s.send("--display on"); time.sleep(0.6)    # first push after idle may legitimately be a frame
+    bursts: List[List[Optional[str]]] = []
     skip_seen = False
-    for _ in range(3):
-        s.send("--display on"); time.sleep(0.25)
-        idx = s.send("--display on")
-        m = s.wait_for(r"\[OLED\];(skip|frame)", 2.0, since=idx)
-        kind = m.group(1) if m else None
-        pairs.append(kind)
-        if kind == "skip":
+    for _ in range(BURST_TRIES):
+        idx = s.length()
+        for i in range(BURST_LEN):
+            s.send("--display on")
+            if i < BURST_LEN - 1:
+                time.sleep(BURST_GAP_S)
+        s.wait_for(r"\[OLED\];(skip|frame)", 2.0, since=idx)
+        time.sleep(0.4)
+        lines = [l for _, _, l in s.records_since(idx)]
+        bursts.append([m.group(1) for m in (OLED_KIND_RE.search(l) for l in lines) if m])
+        if burst_has_skip(lines):
             skip_seen = True
             break
         time.sleep(0.6)
     s.send("--oledlog off")
-    ok = have and frames_delta == 0 and skip_seen
+    ok = have and len(unexplained) == 0 and skip_seen
     return {"ok": ok, "seconds": args.dirty_seconds, "have_skipped": have,
-            "frames_delta": frames_delta, "skipped_delta": skipped_delta, "pairs": pairs,
+            "frames_delta": frames_delta, "skipped_delta": skipped_delta,
+            "idle_frames": len(frame_t), "idle_frames_explained": len(explained),
+            "unexplained_idle_frames": len(unexplained), "lora_lines_in_window": len(lora_recs),
+            "explaining_lines": explaining, "pairs": bursts,
             "skip_seen": skip_seen, "stat0": st0, "stat1": st1}
 
 
@@ -294,7 +353,7 @@ HELP = {
     "display": "--display off/on x3, both must redraw, off flag follows",
     "track": "triple click: track (GPS) page on and off",
     "timing": "OLED frame push avg/max and loop max over a window",
-    "dirty": "TM-10: no frame pushed over an idle window; a repeated identical page is skipped",
+    "dirty": "TM-10: every idle-window frame explained by LoRa traffic; a repeated identical page is skipped",
 }
 
 
@@ -322,7 +381,7 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
         elif name == "timing":
             print(f"  flush n={r.get('flush_n')} avg_us={r.get('flush_avg_us')} max_us={r.get('flush_max_us')}  loop max_us={r.get('loop_max_us')}")
         elif name == "dirty":
-            print(f"  {r.get('seconds')}s idle: frames_delta={r.get('frames_delta')} skipped_delta={r.get('skipped_delta')} have_skipped={r.get('have_skipped')}  repeat-on pairs={r.get('pairs')} skip_seen={r.get('skip_seen')}")
+            print(f"  {r.get('seconds')}s idle: frames_delta={r.get('frames_delta')} idle_frames={r.get('idle_frames')} explained={r.get('idle_frames_explained')} unexplained={r.get('unexplained_idle_frames')} skipped_delta={r.get('skipped_delta')} have_skipped={r.get('have_skipped')}  bursts={r.get('pairs')} skip_seen={r.get('skip_seen')}")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

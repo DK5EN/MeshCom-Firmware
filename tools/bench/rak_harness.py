@@ -261,18 +261,18 @@ def scenario_instr(s: RakSession, args: argparse.Namespace) -> Dict[str, Any]:
 
 
 def scenario_lora(s: RakSession, args: argparse.Namespace) -> Dict[str, Any]:
-    """--sendpos must produce a LoRa transmission: OnTXDone (printed with
-    --debug on) within 15 s; CSMA may hold the frame while the channel is busy."""
-    s.send("--debug on")
-    s.pump(0.5)
-    idx = s.send("--sendpos")
-    m = s.wait_for(r"OnTXDone|TX-LoRa", 15.0, since=idx)
-    s.pump(1.0)
-    tx_lines = [l for l in s.lines_since(idx) if re.search(r"OnTXDone|TX-LoRa", l)]
-    s.send("--debug off")
-    s.pump(0.5)
-    # Cross-node proof when --peer-port is given: the peer (an ESP32 bench node;
-    # opening its port reboots it) must list DK5EN-90 in --mheard afterwards.
+    """--sendpos must produce a LoRa transmission (TX-LoRa / OnTXDone, printed
+    only with --loradebug on) and, with --peer-port, the peer must list
+    DK5EN-90 in --mheard afterwards.
+
+    Order matters (2026-10-04, runs 6/7 and two re-runs): the peer is an ESP32
+    whose port open reboots it and whose neighbour matrix lives in RAM, so it
+    is opened and booted BEFORE the RAK transmits -- opened afterwards it had
+    forgotten everything and reported "heard nobody" although the frame was on
+    air. The immediate-position path also has a floor (BEACON_SHOT_MIN_MS,
+    30 s, src/beacon_rate.h) and CSMA on a busy channel, so the TX wait is
+    75 s, not 15."""
+    peer = None
     peer_heard = None
     if args.peer_port:
         try:
@@ -281,14 +281,34 @@ def scenario_lora(s: RakSession, args: argparse.Namespace) -> Dict[str, Any]:
             peer = TDeckSession(port=args.peer_port, boot_timeout=40.0, ready_timeout=45.0)
             peer.probe_cmd = "--oledstat"; peer.probe_pattern = r"\[OLEDSTAT\]"; peer.wake_cmd = None
             peer.open()
+            time.sleep(5.0)          # radio up after the reboot
+        except Exception as e:  # noqa: BLE001
+            peer_heard = f"error: {e}"
+            peer = None
+    s.send("--debug on")
+    s.send("--loradebug on")
+    s.pump(0.5)
+    idx = s.send("--sendpos")
+    m = s.wait_for(r"OnTXDone|TX-LoRa", 75.0, since=idx)
+    s.pump(1.0)
+    tx_lines = [l for l in s.lines_since(idx) if re.search(r"OnTXDone|TX-LoRa", l)]
+    s.send("--debug off"); s.send("--loradebug off")
+    s.pump(0.5)
+    if peer is not None:
+        try:
+            time.sleep(3.0)      # let the peer decode and file the frame
             pidx = peer.send("--mheard")
             peer.wait_for(r"MHeard|MH", 4.0, since=pidx)
             time.sleep(1.5)
             peer_heard = any(re.search(r"\bDK5EN-90\b", l) for _, _, l in peer.records_since(pidx))
-            peer.close()
         except Exception as e:  # noqa: BLE001
             peer_heard = f"error: {e}"
-    ok = (m is not None) if peer_heard is None else (peer_heard is True)
+        finally:
+            try:
+                peer.close()
+            except Exception:  # noqa: BLE001
+                pass
+    ok = (m is not None) if peer_heard is None else (m is not None and peer_heard is True)
     return {"ok": ok, "first_line": m.string.strip()[:120] if m else None,
             "tx_lines": tx_lines[:5], "peer_port": args.peer_port, "peer_heard_us": peer_heard}
 

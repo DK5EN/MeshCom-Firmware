@@ -244,6 +244,13 @@ def read_info_serial(port: str, timeout: float = 5.0, boot_wait: float = 45.0) -
         end = time.time() + boot_wait
         while time.time() < end and b"[BOOT];ready" not in out:
             out += s.read(4096)
+        # [BOOT];ready;ms;N;ip;0 means the main loop runs but WiFi has no
+        # address yet; the ESP32 guard needs the IP, so give the join up to
+        # 30 s more (the T-Beam needs ~20 s after a reboot).
+        if b"[BOOT];ready" in out and b";ip;0" in out.split(b"[BOOT];ready", 1)[1][:40]:
+            end = time.time() + 30.0
+            while time.time() < end and b"got_ip" not in out and b"IP address" not in out:
+                out += s.read(4096)
         settle = time.time() + 2.0
         while time.time() < settle:
             out += s.read(4096)

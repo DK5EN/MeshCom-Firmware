@@ -750,9 +750,9 @@ def self_test() -> int:
     real_rows, real_hard, real_warn = run_checks(real_table, real_text,
                                                  require_pinned=True)
     expect(
-        "the real tree has 80 rows and no hard failures (%d rows, %d hard, %d warn)"
+        "the real tree has 82 rows and no hard failures (%d rows, %d hard, %d warn)"
         % (len(real_rows), len(real_hard), len(real_warn)),
-        len(real_rows) == 80 and real_hard == [],
+        len(real_rows) == 82 and real_hard == [],   # 82 since --redrawlog refr/obj (TD-20, 2026-10-04)
     )
     if real_hard:
         for h in real_hard:

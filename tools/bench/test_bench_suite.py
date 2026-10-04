@@ -61,47 +61,47 @@ def test_real_fleet_file_loads_and_has_usb_serials():
 
 def test_plan_rak_alone_identity_then_harness_no_peer_no_ota():
     steps = bs.plan(FLEET, {"rak-90": "/dev/tty.rak"})
-    assert names(steps) == ["identity rak-90", "rak harness rak-90"]
-    assert steps[0].gate and not steps[1].gate
-    assert "--peer-port" not in steps[1].argv
-    assert "--port" in steps[1].argv and steps[1].argv[steps[1].argv.index("--port") + 1] == "/dev/tty.rak"
-    assert steps[1].argv[-2:] == ["--node", "rak-90"]
+    assert names(steps) == ["identity rak-90", "prepare rak-90", "rak harness rak-90"]
+    assert steps[0].gate and steps[1].gate and not steps[2].gate
+    assert "--peer-port" not in steps[2].argv
+    assert "--port" in steps[2].argv and steps[2].argv[steps[2].argv.index("--port") + 1] == "/dev/tty.rak"
+    assert steps[2].argv[-2:] == ["--node", "rak-90"]
 
 
 def test_plan_rak_with_esp32_peer_sets_peer_port_and_ota_for_wifi_node():
     attached = {"rak-90": "/dev/tty.rak", "t-beam-92": "/dev/tty.tbeam"}
     steps = bs.plan(FLEET, attached, out=Path("/o"))
     assert names(steps) == [
-        "identity rak-90", "rak harness rak-90",
-        "identity t-beam-92", "oled harness t-beam-92", "wait web t-beam-92",
+        "identity rak-90", "prepare rak-90", "rak harness rak-90",
+        "identity t-beam-92", "prepare t-beam-92", "oled harness t-beam-92", "wait web t-beam-92",
         "ota regression t-beam-92", "wait web t-beam-92 (after ota)", "webgui badge t-beam-92",
         "mesh exchange",
     ]
-    rak = steps[1].argv
+    rak = steps[2].argv
     assert rak[rak.index("--peer-port") + 1] == "/dev/tty.tbeam"
     ota = next(st for st in steps if st.name == "ota regression t-beam-92").argv
     assert ota[ota.index("--ip") + 1] == "192.168.68.73"
     assert ota[ota.index("--env") + 1] == "ttgo_tbeam"
     assert "--settings-check" in ota
-    assert steps[3].argv[-1] == "/o/t-beam-92-harness.json"
+    assert steps[5].argv[-1] == "/o/t-beam-92-harness.json"
 
 
 def test_plan_tdeck_uses_tdeck_harness_and_skips_ota_without_host():
     fleet = {"nodes": {"t-deck-14": {**FLEET["nodes"]["t-deck-14"], "usb_serial": "X"}}}
     steps = bs.plan(fleet, {"t-deck-14": "/dev/tty.td"})
-    assert names(steps) == ["identity t-deck-14", "tdeck harness t-deck-14"]
+    assert names(steps) == ["identity t-deck-14", "prepare t-deck-14", "tdeck harness t-deck-14"]
 
 
 def test_plan_no_ota_flag_and_unattached_nodes_produce_nothing():
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, ota=False, badge=False)
-    assert names(steps) == ["identity t-beam-92", "oled harness t-beam-92"]
+    assert names(steps) == ["identity t-beam-92", "prepare t-beam-92", "oled harness t-beam-92"]
     assert bs.plan(FLEET, {}) == []
 
 
 def test_plan_flash_esp32_bridge_uses_esptool_460800_app_only():
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, flash=True, ota=False, badge=False)
     assert names(steps) == ["identity t-beam-92", "build ttgo_tbeam", "flash ttgo_tbeam",
-                            "oled harness t-beam-92"]
+                            "prepare t-beam-92", "oled harness t-beam-92"]
     up = steps[2].argv
     assert up[:4] == ["pio", "pkg", "exec", "-p"]
     assert "460800" in up and "0xC0000" in up
@@ -136,12 +136,12 @@ def test_plan_extudp_and_deepsleep_are_opt_in_and_board_specific():
 
 def test_plan_badge_for_esp32_with_host_after_ota_before_deepsleep():
     steps = bs.plan(FLEET, {"heltec-1": "/dev/tty.h"}, deepsleep=True)
-    assert names(steps) == ["identity heltec-1", "oled harness heltec-1", "wait web heltec-1",
+    assert names(steps) == ["identity heltec-1", "prepare heltec-1", "oled harness heltec-1", "wait web heltec-1",
                             "ota regression heltec-1", "wait web heltec-1 (after ota)",
                             "webgui badge heltec-1", "deepsleep heltec-1"]
-    assert steps[2].argv[1:3] == [str(bs.BENCH / "wait_http.py"), "http://192.168.68.62/"]
-    assert steps[6].argv[-2:] == ["--node", "heltec-1"]
-    badge = steps[5]
+    assert steps[3].argv[1:3] == [str(bs.BENCH / "wait_http.py"), "http://192.168.68.62/"]
+    assert steps[7].argv[-2:] == ["--node", "heltec-1"]
+    badge = steps[6]
     assert badge.argv == ["node", "--insecure-http-parser", "tools/webgui_badge_test.js",
                           "http://192.168.68.62/"]
     assert badge.env["NODE_PATH"].endswith("/node_modules")
@@ -185,6 +185,38 @@ def test_plan_mesh_exchange_absent_with_one_node_or_no_mesh_flag():
     assert "mesh exchange" not in names(bs.plan(FLEET, two, mesh=False))
 
 
+def test_plan_prepare_runs_right_after_flash_and_before_every_harness():
+    attached = {"rak-90": "/dev/tty.rak", "t-beam-92": "/dev/tty.tb", "heltec-1": "/dev/tty.h"}
+    steps = bs.plan(FLEET, attached, flash=True, out=Path("/o"))
+    ns = names(steps)
+    harness = {"rak-90": "rak harness rak-90", "t-beam-92": "oled harness t-beam-92",
+               "heltec-1": "oled harness heltec-1"}
+    flash = {"rak-90": "flash wiscore_rak4631", "t-beam-92": "flash ttgo_tbeam",
+             "heltec-1": "flash heltec_wifi_lora_32_V3"}
+    for node, h in harness.items():
+        assert ns.index(flash[node]) + 1 == ns.index(f"prepare {node}") == ns.index(h) - 1
+    prep = next(s for s in steps if s.name == "prepare t-beam-92")
+    assert prep.gate and prep.node == "t-beam-92"
+    assert prep.argv == [sys.executable, str(bs.BENCH / "prepare_node.py"),
+                         "--port", "/dev/tty.tb", "--node", "t-beam-92"]
+    # without --flash it follows the identity step directly, and without identity steps it is first
+    assert names(bs.plan(FLEET, {"rak-90": "/dev/tty.rak"}))[:2] == ["identity rak-90", "prepare rak-90"]
+    assert names(bs.plan(FLEET, {"rak-90": "/dev/tty.rak"}, identity_steps=False))[0] == "prepare rak-90"
+
+
+def test_plan_no_prepare_drops_the_step_and_main_flag_threads_through(tmp_path, monkeypatch, capsys):
+    attached = {"rak-90": "/dev/tty.rak", "t-beam-92": "/dev/tty.tb"}
+    assert not any(n.startswith("prepare") for n in names(bs.plan(FLEET, attached, prepare=False)))
+    fleet_file = tmp_path / "fleet.json"
+    fleet_file.write_text(json.dumps(FLEET))
+    monkeypatch.setattr(bs, "list_comports",
+                        lambda: [port("/dev/tty.rak", "230D6EBB3266D20E"), port("/dev/tty.tb", "573C000584")])
+    assert bs.main(["--dry-run", "--fleet", str(fleet_file)]) == 0
+    assert "prepare rak-90" in capsys.readouterr().out
+    assert bs.main(["--dry-run", "--no-prepare", "--fleet", str(fleet_file)]) == 0
+    assert "prepare " not in capsys.readouterr().out
+
+
 # ---------------------------------------------------------------- runner
 
 class FakeRun:
@@ -217,16 +249,16 @@ def test_runner_skips_a_node_after_its_gate_fails_but_continues_others(tmp_path)
     results = bs.run_steps(steps, tmp_path, runner=fake, echo=echoed.append)
     by_name = {r.name: r for r in results}
     assert by_name["identity rak-90"].status == "FAIL"
-    assert by_name["rak harness rak-90"].status == "SKIP"
+    assert by_name["prepare rak-90"].status == "SKIP" and by_name["rak harness rak-90"].status == "SKIP"
     assert "gate" in by_name["rak harness rak-90"].detail
-    assert by_name["identity t-beam-92"].status == "OK"
+    assert by_name["identity t-beam-92"].status == "OK" and by_name["prepare t-beam-92"].status == "OK"
     assert by_name["oled harness t-beam-92"].status == "OK"
     assert by_name["ota regression t-beam-92"].status == "OK"
     # the skipped harness was never launched
     assert not any("rak_harness.py" in " ".join(c) for c in fake.calls)
     # one log per executed step, first line is the command
     logs = sorted(tmp_path.glob("stage3-*.log"))
-    assert len(logs) == 8      # identity x2, oled, wait, ota, wait, badge, mesh; the skipped rak harness has none
+    assert len(logs) == 9      # identity x2, prepare, oled, wait, ota, wait, badge, mesh; the skipped rak prepare/harness have none
     assert by_name["webgui badge t-beam-92"].status == "OK" and by_name["mesh exchange"].status == "OK"
     assert logs[0].read_text().startswith("$ ")
 
@@ -235,7 +267,7 @@ def test_runner_non_gate_failure_does_not_skip_later_steps(tmp_path):
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, out=tmp_path)
     fake = FakeRun({"oled_harness.py": 1})
     results = bs.run_steps(steps, tmp_path, runner=fake, echo=lambda s: None)
-    assert [r.status for r in results] == ["OK", "FAIL", "OK", "OK", "OK", "OK"]    # identity, oled, wait, ota, wait, badge
+    assert [r.status for r in results] == ["OK", "OK", "FAIL", "OK", "OK", "OK", "OK"]    # identity, prepare, oled, wait, ota, wait, badge
 
 
 def test_runner_merges_step_env_over_os_environ_only_when_set(tmp_path, monkeypatch):
@@ -266,8 +298,8 @@ def test_runner_timeout_is_a_failure_with_detail(tmp_path):
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, ota=False, out=tmp_path)
     fake = FakeRun({"oled_harness.py": "timeout"})
     results = bs.run_steps(steps, tmp_path, runner=fake, echo=lambda s: None)
-    assert results[1].status == "FAIL" and results[1].rc == -1
-    assert "timeout" in results[1].detail
+    assert results[2].status == "FAIL" and results[2].rc == -1      # identity, prepare, oled
+    assert "timeout" in results[2].detail
 
 
 def test_summary_counts_and_names_absent_nodes():
@@ -304,7 +336,9 @@ def test_harness_and_ota_steps_pass_the_fleet_node_name():
     assert by["tdeck harness t-deck-14"][-2:] == ["--node", "t-deck-14"]
     assert by["ota regression t-deck-14"][-2:] == ["--node", "t-deck-14"]
     oled = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, ota=False, badge=False)
-    assert "--node" not in oled[1].argv          # oled_harness.py has no identity-guard flag
+    oled_argv = next(s.argv for s in oled if s.name == "oled harness t-beam-92")
+    assert "--node" not in oled_argv          # oled_harness.py has no identity-guard flag
+    assert by["prepare t-deck-14"][-2:] == ["--node", "t-deck-14"]
 
 
 def test_instrument_flash_builds_with_the_no_space_flag_and_verifies_the_elf():
@@ -358,7 +392,7 @@ def test_probe_hosts_reports_a_refused_node_and_plan_can_omit_identity_steps(tmp
     live, failed = bs.probe_hosts({"heltec-1": "/dev/h"}, fleet, runner=refused, echo=lambda s: None)
     assert live == {} and "refused" in failed["heltec-1"]
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, ota=False, badge=False, identity_steps=False)
-    assert names(steps) == ["oled harness t-beam-92"]
+    assert names(steps) == ["prepare t-beam-92", "oled harness t-beam-92"]
     # persist_hosts writes only changed host fields
     f = tmp_path / "fleet.json"
     f.write_text(json.dumps({"nodes": {"t-beam-92": {"host": "1.1.1.1", "board": "ttgo_tbeam"}}}))
@@ -374,6 +408,15 @@ def test_runner_maps_exit_3_to_skip(tmp_path):
     by = {r.name: r for r in results}
     assert by["webgui badge t-beam-92"].status == "SKIP" and by["webgui badge t-beam-92"].rc == 3
     assert by["oled harness t-beam-92"].status == "OK"
+
+
+def test_instrument_flag_reaches_the_rak_upload_step_too():
+    steps = bs.plan(FLEET, {"rak-90": "/dev/tty.rak"}, flash=True, instrument=True, mesh=False)
+    by = {s.name: s for s in steps}
+    assert by["build wiscore_rak4631"].env == {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"}
+    assert by["flash wiscore_rak4631"].env == {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"}
+    plain = {s.name: s for s in bs.plan(FLEET, {"rak-90": "/dev/tty.rak"}, flash=True, mesh=False)}
+    assert plain["flash wiscore_rak4631"].env == {}
 
 
 if __name__ == "__main__":

@@ -18,7 +18,11 @@ in <out>/bench-summary.json. Exit 1 if any step failed. Steps run strictly one
 after another: the harnesses hold serial ports, pio must not run twice at
 once, and the RAK's mheard scenario wants an ESP32 peer that is idle.
 
-Two further steps are on by default (opt out with --no-badge / --no-mesh):
+Three further steps are on by default (opt out with --no-prepare / --no-badge / --no-mesh):
+
+  * "prepare <node>": tools/bench/prepare_node.py, right after the flash steps
+    and before the harness. Idempotent: writes the bench groups 9;20;232;262 and
+    the board's debug / GPS / track settings only where they differ (gate step).
 
   * REG-04 "webgui badge <node>": tools/webgui_badge_test.js (jsdom) against the
     live web GUI of every attached ESP32 node that has a `host` in fleet.json.
@@ -63,6 +67,7 @@ FLASH_TIMEOUT_S = 10 * 60
 OTA_TIMEOUT_S = 10 * 60
 BADGE_TIMEOUT_S = 5 * 60
 MESH_TIMEOUT_S = 10 * 60
+PREPARE_TIMEOUT_S = 4 * 60
 
 
 @dataclass
@@ -135,13 +140,18 @@ def flash_steps(name: str, env: str, dev: str, instrument: bool = False) -> List
     if env in RAK_ENVS:
         # Serial DFU (RAK, must be running, not in UF2 mode) goes through pio's
         # own uploader; the explicit --upload-port keeps pio's autodetect off
-        # the wrong board. ESP32 boards, the T-Deck included, take the esptool
-        # path below: the variant upload_command would rewrite bootloader,
-        # partitions and the root safeboot image, which a regression run must
-        # not touch (app partition is 0xC0000 on every safeboot layout).
+        # the wrong board. The upload target re-evaluates the project checksum,
+        # so it MUST see the same PLATFORMIO_BUILD_FLAGS as the build step --
+        # without them pio rebuilt a plain image and flashed that (run 6,
+        # 2026-10-04: --instr answered "wrong command" on the RAK although the
+        # verify step had passed on the instrument ELF). ESP32 boards, the
+        # T-Deck included, take the esptool path below: the variant
+        # upload_command would rewrite bootloader, partitions and the root
+        # safeboot image, which a regression run must not touch (app partition
+        # is 0xC0000 on every safeboot layout).
         up = Step(f"flash {env}", name,
                   ["pio", "run", "-e", env, "--target", "upload", "--upload-port", dev],
-                  FLASH_TIMEOUT_S, gate=True)
+                  FLASH_TIMEOUT_S, gate=True, env=build_env)
     else:
         # CP2102/CH9102 bridges: esptool at 460800 (921600 fails on them),
         # app only at 0xC0000 -- the variant's upload_command would also
@@ -165,7 +175,7 @@ def jsdom_node_path() -> str:
 def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: bool = True,
          extudp: bool = False, deepsleep: bool = False, soak_seconds: int = 600,
          badge: bool = True, mesh: bool = True, instrument: bool = False,
-         identity_steps: bool = True, out: Path = Path(".")) -> List[Step]:
+         identity_steps: bool = True, prepare: bool = True, out: Path = Path(".")) -> List[Step]:
     """The ordered step list for the attached nodes. Pure: no I/O."""
     steps: List[Step] = []
     nodes = fleet.get("nodes", {})
@@ -184,6 +194,14 @@ def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: boo
                               timeout_s=60, gate=True))
         if flash:
             steps.extend(flash_steps(name, env, dev, instrument))
+        if prepare:
+            # prepare_node.py puts the node into the state the harnesses assume
+            # (groups 9;20;232;262, debug/GPS/track per board; operator decision
+            # 2026-10-04). After the flash (a flash restores defaults) and before
+            # the harness; it runs its own identity guard before any write.
+            steps.append(Step(f"prepare {name}", name,
+                              [py, str(BENCH / "prepare_node.py"), "--port", dev, "--node", name],
+                              PREPARE_TIMEOUT_S, gate=True))
         summary = str(out / f"{name}-harness.json")
         if env in TDECK_ENVS:
             steps.append(Step(f"tdeck harness {name}", name,
@@ -374,6 +392,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--deepsleep", action="store_true", help="also run DS-03 on a Heltec V3")
     ap.add_argument("--no-badge", action="store_true", help="skip the web GUI badge test (REG-04) on the WiFi boards")
     ap.add_argument("--no-mesh", action="store_true", help="skip the cross-node mesh exchange (REG-05)")
+    ap.add_argument("--no-prepare", action="store_true",
+                    help="skip prepare_node.py (groups, debug, GPS, track) before each harness")
     ap.add_argument("--soak-seconds", type=int, default=600, help="extudp soak tail (default 600)")
     ap.add_argument("--fleet", type=Path, default=FLEET_FILE)
     a = ap.parse_args(argv)
@@ -403,7 +423,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         probed = True
     steps = plan(fleet, attached, flash=a.flash, instrument=a.instrument, identity_steps=not probed, ota=not a.no_ota, extudp=a.extudp,
                  deepsleep=a.deepsleep, soak_seconds=a.soak_seconds,
-                 badge=not a.no_badge, mesh=not a.no_mesh, out=out)
+                 badge=not a.no_badge, mesh=not a.no_mesh, prepare=not a.no_prepare, out=out)
     print(f"attached: {', '.join(f'{n}@{d}' for n, d in sorted(attached.items())) or 'none'}")
     if absent:
         print(f"not attached: {', '.join(absent)}")

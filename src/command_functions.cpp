@@ -339,8 +339,10 @@ static void tg_post_softser_on() { setupSOFTSER(); }
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 static void tg_post_spitrace_on() { tdeck_dbg_spitrace(true); }
 static void tg_post_spitrace_off() { tdeck_dbg_spitrace(false); }
-static void tg_post_redrawlog_on() { tdeck_dbg_redrawlog(true); }
-static void tg_post_redrawlog_off() { tdeck_dbg_redrawlog(false); }
+static void tg_post_redrawlog_on() { tdeck_dbg_redrawlog(3); }
+static void tg_post_redrawlog_off() { tdeck_dbg_redrawlog(0); }
+static void tg_post_redrawlog_refr() { tdeck_dbg_redrawlog(1); }
+static void tg_post_redrawlog_obj() { tdeck_dbg_redrawlog(2); }
 static void tg_post_drawer_on() { tdeck_dbg_drawer(true); }
 static void tg_post_drawer_off() { tdeck_dbg_drawer(false); }
 static void tg_post_balledge_on() { tdeck_dbg_balledge(true); }
@@ -482,6 +484,8 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--spitrace off",       nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_spitrace_off,          TG_DIRTY_NONE,   0 },
     { "--redrawlog on",       nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_redrawlog_on,          TG_DIRTY_NONE,   0 },
     { "--redrawlog off",      nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_redrawlog_off,         TG_DIRTY_NONE,   0 },
+    { "--redrawlog refr",     nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_redrawlog_refr,        TG_DIRTY_NONE,   0 },
+    { "--redrawlog obj",      nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_redrawlog_obj,         TG_DIRTY_NONE,   0 },
     { "--drawer on",          nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_drawer_on,             TG_DIRTY_NONE,   0 },
     { "--drawer off",         nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_drawer_off,            TG_DIRTY_NONE,   0 },
     { "--balledge on",        nullptr,               nullptr,                         0xFFFFFFFF,   0x00000000,   tg_post_balledge_on,           TG_DIRTY_NONE,   0 },
@@ -1240,7 +1244,7 @@ void commandAction(char *umsg_text, bool ble)
             #if INSTRUMENT_ENABLED
             printdeb("\n== Bench (instrument build) ==\n--injectmsg <grp|call> <text>  queue a text as if received via LoRa\n--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)\n--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)\n");
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printdeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
+            printdeb("--redrawlog on/off/refr/obj, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
             #endif
             printdeb("--ntpsync  request an immediate NTP refresh now\n--battprobe [n]  raw battery divider ADC capture, n cycles 1-10 (~7.5 s each)\n");
             printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");

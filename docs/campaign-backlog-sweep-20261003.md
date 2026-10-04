@@ -66,3 +66,24 @@ test/golden/native/variant-ini-effective.json (regenerate), .gitignore (REG-06),
   docs/bench-20261003-stage3.md. OTA regression and mesh exchange green on all three, driver and
   guard fixed (DTR-as-button on CP2102, boot-ready wait, live DHCP hosts). New rows TD-20,
   OLED-FLAKY.
+
+## Bench-fix campaign 2026-10-04 (follow-up to REG-01)
+
+Goal: T-Beam, T-Deck and RAK green under `tools/regression.sh --stage 3`; Heltec unplugged
+by the operator. Operator decisions 2026-10-04: bench nodes get groups `9;20;232;262`; the
+driver may write node settings itself as a `prepare <node>` step (groups, T-Deck debug).
+
+Wave 0 (scouts, read-only): S1 prepare-step command facts (`--setgrc`, `--debug`, --info
+formats); S2 root cause of the OLED `pos`/`dirty` flakes; S3 TD-20 per-scenario verdicts
+(`tabs`, `input`, `msg_roll`); S4 what the RAK needs under the driver (nRF52 instrument
+marker, DFU upload, --info IP wording, `--mheard` on 4.40a).
+
+Wave 1 (writers, disjoint): W-A tools/bench/prepare_node.py + plan step in bench_suite.py
+(+ RAK driver changes from S4); W-B oled_harness.py (pos/dirty); W-C tdeck_harness.py
+(TD-20); W-D rak_harness.py / mesh_exchange.py if S4 finds drift. Gate: stage 2 host, then
+stage 3 on the three attached nodes (serial, orchestrator).
+
+- Bench-fix campaign landed 2026-10-04 ~09:20 (runs 6/7): prepare step, RAK under the driver
+  (DFU flash, instrument flag on the upload step, bench QTH), OLED dirty/pos root-caused in the
+  harness, T-Deck redrawlog levels + tabs/REFR fixes, mesh exchange 3x2 with the RAK. Open:
+  TD-20 narrowed to input/msg_roll (console input path), RAK lora wait verify.

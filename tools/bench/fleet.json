@@ -28,7 +28,7 @@
       "board": "wiscore_rak4631",
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
-      "host": null
+      "host": "192.168.68.77"
     }
   },
   "taken_ssids": {

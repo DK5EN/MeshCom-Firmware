@@ -51,6 +51,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ELF = str(REPO_ROOT / ".pio/build/t_deck_plus/firmware.elf")
 BOOT_MARKER = "CLIENT STARTED"
 READY_MARKER = "[BOOT];ready"
+# LoRa activity that legitimately blocks the loop (TD-20, see _roll_phase)
+LORA_EVENT_RE = re.compile(r"TX-LoRa|RX-LoRa|MH-LoRa|OnTXDone|\[LOG\] (?:\d{3} @|RLY|TX) ")
+LORA_EXPLAIN_S = 2.5
 # TM-42: group the central server filters, so injected test traffic never
 # reaches the map/dashboard. See docs/automation-runner-runbook.md §2.6.
 TEST_GROUP = "TEST"
@@ -460,23 +463,56 @@ def scenario_idle(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     }
 
 
+_REDRAWLOG_LEVELS = {"off": 0, "refr": 1, "obj": 2, "on": 3}
+
+
+def _set_redrawlog(session: TDeckSession, mode: str, timeout: float = 2.0) -> bool:
+    """Switch the T-Deck redraw log (off|refr|obj|on) and wait for the firmware's
+    `[REDRAWLOG];level;N` ack, so the first measured action starts on a quiet
+    line. TD-20 (2026-10-04): `on` prints a ~200 B [REDRAW] line with an 8-frame
+    backtrace per invalidated object; a `--tab 3` floods the 115200 baud link
+    for seconds and the closing [REFR] reaches the host long after the
+    scenario's window. `refr` prints only [REFRSTART]/[REFR]; `obj` adds the
+    per-object [REDRAW] without the bt tail. Returns False if no ack arrived
+    (older firmware): the caller carries on after a short settle."""
+    level = _REDRAWLOG_LEVELS[mode]
+    idx = session.send(f"--redrawlog {mode}")
+    ok = session.wait_for(rf"\[REDRAWLOG\];level;{level}\b", timeout, since=idx) is not None
+    if not ok:
+        time.sleep(0.1)
+    return ok
+
+
 def scenario_tabs(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Per tab: switch, expect a repaint ([REFR]) within 500 ms.
+
+    TD-20 (2026-10-04): runs with `--redrawlog refr` -- only [REFRSTART]/[REFR]
+    are printed, so the 500 ms bar is no longer eaten by the [REDRAW] flood.
+    inv_count comes from the --uistat inv_total counter delta (no per-object
+    rows in this mode)."""
     list_idx = session.send("--tab list")
     session.wait_for(r"\[TAB\]", 1.0, since=list_idx)
     listing = session.collect(0.3, since=list_idx)
 
+    # Re-selecting the tab that is already active repaints nothing, so a
+    # 500 ms repaint bar on it is a wrong expectation (run 5/6, 2026-10-04:
+    # only tab 0, the active one, "failed"). Walk the ring starting one past
+    # the active tab; the last switch then lands back on it.
+    active = 0
+    m_active = re.search(r"\[TAB\];active;(\d+)", "\n".join(listing) if isinstance(listing, list) else (listing or ""))
+    if m_active:
+        active = int(m_active.group(1)) % 8
     per_tab = []
     ok = True
-    for i in range(8):
-        session.send("--redrawlog on")
-        time.sleep(0.1)
+    for i in [(active + 1 + k) % 8 for k in range(8)]:
+        pre = get_uistat(session)
+        _set_redrawlog(session, "refr")
         set_idx = session.send(f"--tab {i}")
         set_match = session.wait_for(r"\[TAB\];set;", 1.0, since=set_idx)
         refr_match = session.wait_for(r"\[REFR\]", 0.5, since=set_idx)
         session.collect(1.5)  # fill the rest of the ~2s observation window
         end = session.length()
-        session.send("--redrawlog off")
-        time.sleep(0.1)
+        _set_redrawlog(session, "off")
         post = get_uistat(session)
 
         parsed = _parsed_range(session, set_idx, end)
@@ -487,7 +523,11 @@ def scenario_tabs(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
             {
                 "idx": i,
                 "tab_set_seen": set_match is not None,
-                "inv_count": rsum["total"],
+                "inv_count": (
+                    int(post["inv_total"]) - int(pre["inv_total"])
+                    if pre and post and "inv_total" in pre and "inv_total" in post
+                    else rsum["total"]
+                ),
                 "refr_count": fsum["count"],
                 "px": fsum["sum_px"],
                 "repainted_within_500ms": repainted,
@@ -1033,7 +1073,11 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     distinguishes the two cases, so the scenario refuses to run with the lock
     on rather than pretend to measure through it. The trackball is
     unaffected: mouse_read() is not gated by the lock, which is why the
-    trackball kept working while the keyboard did not."""
+    trackball kept working while the keyboard did not.
+
+    TD-20 (2026-10-04): runs with `--redrawlog refr` (only [REFRSTART]/[REFR]);
+    the per-object [REDRAW] flood delayed the [REFR] after [BALL] past the
+    latency window. No [REDRAW] rows are read here."""
     lock = _keylock_state(session)
     if lock is not False:
         return {
@@ -1050,15 +1094,13 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
 
     # -- keyboard
     text = args.input_text
-    session.send("--redrawlog on")
-    time.sleep(0.1)
+    _set_redrawlog(session, "refr")
     idx = session.send(f"--key {text}")
     session.wait_for(r"\[KEY\];inject;", 2.0, since=idx)
     time.sleep(0.5 + 0.05 * len(text))
     key_lines = [l for _, _, l in session.records_since(idx) if re.search(r"\[KEY\];[0-9a-f]{2};", l)]
     key_lat = _latency_ms(session, idx, r"\[KEY\];[0-9a-f]{2};", r"\[REFR\]")
-    session.send("--redrawlog off")
-    time.sleep(0.1)
+    _set_redrawlog(session, "off")
     # clear what we typed
     session.send("--key " + "\\b" * len(text))
     time.sleep(0.5)
@@ -1074,8 +1116,7 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     ball_results = []
     for direction, n in (("right", args.input_ball_steps), ("down", args.input_ball_steps),
                          ("left", args.input_ball_steps), ("up", args.input_ball_steps)):
-        session.send("--redrawlog on")
-        time.sleep(0.1)
+        _set_redrawlog(session, "refr")
         # inject like a hand rolls: a few edges per indev read, not the whole
         # request in one 10 ms read (mouse_read() consumes at most
         # BALL_MAX_STEPS_PER_READ per read and discards the rest -- that is
@@ -1103,11 +1144,10 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
         lat = _latency_ms(session, idx, r"\[BALL\];x;", r"\[REFR\]")
         refr_ms = []
         for _, _, l in session.records_since(idx):
-            m = re.search(r"\[REFR\];.*?;ms;(\d+)", l)
+            m = re.search(r"\[REFR\];ms;\d+;px;\d+;t_ms;(\d+)", l)   # refresh duration; the old regex read nothing on 4.40a's format
             if m:
                 refr_ms.append(float(m.group(1)))
-        session.send("--redrawlog off")
-        time.sleep(0.1)
+        _set_redrawlog(session, "off")
         moved = 0
         if len(events) >= 2:
             (x0, y0), (x1, y1) = events[0], events[-1]
@@ -1283,8 +1323,7 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
     measure: main-loop gaps attributed to the lvgl section, gaps between
     consecutive [BALL] reads on the device clock, refresh times, and
     content-sized flushes (> 50 kpx)."""
-    session.send("--redrawlog off")
-    time.sleep(0.1)
+    _set_redrawlog(session, "refr")
     # Park the cursor at a known x first: mouse_read() clamps at the screen
     # edges and a clamped step reports no activity, which looked like a stall
     # in the first version of this scenario. Left edge, then 8 steps in, then
@@ -1312,11 +1351,13 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
     snap1 = _instr_snapshot(session)
     instr = _instr_delta(snap0, snap1)
     ball_ms: List[int] = []
+    ball_host: List[float] = []
+    lora_host: List[float] = []
     loop_gaps: List[Dict[str, Any]] = []
     refr_ms: List[int] = []
     big_flush = 0
     sdmap_ms: List[int] = []
-    for _, _, l in recs:
+    for t_host, _, l in recs:
         m = re.search(r"\[ SDMAP \]\.\.\.Karte zusammengesetzt.*?, (\d+) ms \(", l)
         if m:
             sdmap_ms.append(int(m.group(1)))
@@ -1324,6 +1365,10 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
         m = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;\d(?:;steps;\d+)?;ms;(\d+)", l)
         if m:
             ball_ms.append(int(m.group(3)))
+            ball_host.append(t_host)
+            continue
+        if LORA_EVENT_RE.search(l):
+            lora_host.append(t_host)
             continue
         m = re.search(r"\[INSTR-LOOP\][; ]gap[; ]ms[; ](\d+)[; ]in[; ](\w+)", l)
         if m:
@@ -1335,12 +1380,27 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
             if int(m.group(1)) > 50000:
                 big_flush += 1
     ball_gaps = [ball_ms[i] - ball_ms[i - 1] for i in range(1, len(ball_ms))]
-    stalls = [g for g in ball_gaps if g >= gap_ms]
+    # A [BALL] read gap that sits right after a LoRa TX/RX is the radio, not
+    # the GUI: a relay TX at SF11 blocks the loop for up to a second, and a
+    # bench node on the air relays all the time (runs 5/6, 2026-10-04: exactly
+    # one 800-860 ms gap per phase, no lvgl loop gap). Such gaps are reported
+    # as explained, not as stalls (TD-20).
+    stalls, explained = [], []
+    for i, g in enumerate(ball_gaps):
+        if g < gap_ms:
+            continue
+        t_prev, t_cur = ball_host[i], ball_host[i + 1]
+        if any(t_prev - LORA_EXPLAIN_S <= t <= t_cur for t in lora_host):
+            explained.append(g)
+        else:
+            stalls.append(g)
     return {
         "sent_cmds": k,
         "ball_reads": len(ball_ms),
         "ball_gap_max_ms": max(ball_gaps) if ball_gaps else None,
         "ball_stalls": stalls,
+        "ball_stalls_explained_by_lora": explained,
+        "lora_lines": len(lora_host),
         "loop_gaps_lvgl": [g["ms"] for g in loop_gaps if g["in"] == "lvgl"],
         "loop_gaps_other": [g for g in loop_gaps if g["in"] != "lvgl"],
         "refr_max_ms": max(refr_ms) if refr_ms else None,
@@ -1363,7 +1423,11 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
     and off, roll again. Verdict: the second roll must not show a main-loop
     gap in the lvgl section or a [BALL] read gap of --msgroll-gap-ms or more.
     A control phase that already stalls is reported as such (the instrument
-    is then not discriminating on this build)."""
+    is then not discriminating on this build).
+
+    TD-20 (2026-10-04): the roll phases run with `--redrawlog refr` so refr_max
+    sees [REFR] without the [REDRAW] flood; the diagnostic pass keeps
+    `--redrawlog on` because it symbolizes the `bt;` backtraces."""
     gap_ms = args.msgroll_gap_ms
     idx_all = session.length()
     session.send("--tft on")
@@ -1394,6 +1458,7 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
 
     after = _roll_phase(session, args.msgroll_seconds, gap_ms, args.msgroll_cadence_ms)
     uistat_after = get_uistat(session)
+    _set_redrawlog(session, "off")      # leave the node quiet (roll phases ran on refr)
 
     # Diagnostic pass only when the stall is present: a short roll with the
     # redraw log on, and the invalidation backtraces that precede each loop
@@ -1401,8 +1466,7 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
     diag: Optional[Dict[str, Any]] = None
     stalled = bool(after["loop_gaps_lvgl"]) or bool(after["ball_stalls"])
     if stalled:
-        session.send("--redrawlog on")
-        time.sleep(0.1)
+        _set_redrawlog(session, "on")
         idx = session.length()
         t0 = time.monotonic()
         k = 0
@@ -1411,7 +1475,7 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
             k += 1
             time.sleep(0.06)
         time.sleep(0.5)
-        session.send("--redrawlog off")
+        _set_redrawlog(session, "off")
         time.sleep(0.2)
         recs = [l for _, _, l in session.records_since(idx)]
         gap_idx = [i for i, l in enumerate(recs) if re.search(r"\[INSTR-LOOP\][; ]gap", l)]
