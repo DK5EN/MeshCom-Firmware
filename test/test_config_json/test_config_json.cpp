@@ -88,6 +88,7 @@ static void fill_settings(void)
     meshcom_settings.node_owgpio = 36;
     meshcom_settings.node_temp2 = 19.75f;
     meshcom_settings.node_utcoff = 2.0f;
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "CET-1CEST,M3.5.0,M10.5.0/3");
     meshcom_settings.node_gas_res = 12345.5f;
     meshcom_settings.node_co2 = 412.0f;
 
@@ -224,6 +225,8 @@ static void test_roundtrip_restores_every_field(void)
      * bei %.8f verlustfrei rundreisefaehig. */
     TEST_ASSERT_TRUE(meshcom_settings.node_lat == 48.26940877);
     TEST_ASSERT_TRUE(meshcom_settings.node_lon == 16.40922749);
+    /* TZ-01: POSIX TZ string, byte-exact (commas, slashes, digits) */
+    TEST_ASSERT_EQUAL_STRING("CET-1CEST,M3.5.0,M10.5.0/3", meshcom_settings.node_tz);
     TEST_ASSERT_EQUAL_FLOAT(4.24f, meshcom_settings.node_maxv);
     TEST_ASSERT_EQUAL_FLOAT(0.002f, meshcom_settings.node_shunt);
     TEST_ASSERT_EQUAL_FLOAT(433.175f, meshcom_settings.node_freq);
@@ -316,6 +319,66 @@ static void test_canonical_form_is_as_documented(void)
     TEST_ASSERT_EQUAL_INT(123, meshcom_settings.node_alt);
     /* fehlende Schluessel behalten den bisherigen Wert */
     TEST_ASSERT_EQUAL_INT(4, meshcom_settings.max_hop_text);
+}
+
+/* TZ-01: eine Datei OHNE node_tz (Export einer aelteren Firmware) bleibt
+ * importierbar -- die CRC deckt nur vorhandene Schluessel ab -- und laesst
+ * das node_tz des Knotens byteidentisch unveraendert. Gleicher Aufbau wie
+ * test_canonical_form_is_as_documented (Dokument von Hand gebaut). */
+static void test_import_without_node_tz_keeps_current_value(void)
+{
+    wipe_settings();
+    meshcom_settings.max_hop_text = 4;
+    meshcom_settings.node_gpsbaud = 38400;
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "CET-1CEST,M3.5.0,M10.5.0/3");
+
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[512];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
+    TEST_ASSERT_EQUAL_STRING("TEST-1", meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_STRING("CET-1CEST,M3.5.0,M10.5.0/3", meshcom_settings.node_tz);
+}
+
+/* TZ-01: ein leeres node_tz (= feste node_utcoff) wird als "" exportiert und
+ * kommt als "" zurueck; ein 39-Zeichen-String passt, ein 40-Zeichen-String
+ * (kein Platz fuer das NUL) weist die Datei ab. */
+static void test_node_tz_empty_and_length_limit(void)
+{
+    fill_settings();
+    meshcom_settings.node_tz[0] = '\0';
+    std::string doc = do_export();
+    TEST_ASSERT_TRUE(doc.find("\"node_tz\":\"\"") != std::string::npos);
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    TEST_ASSERT_EQUAL_INT(39, (int)strlen(meshcom_settings.node_tz));
+    std::string doc39 = do_export();
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(doc39));
+    TEST_ASSERT_EQUAL_INT(39, (int)strlen(meshcom_settings.node_tz));
+
+    /* 40 Zeichen: der Wert selbst wird im Dokument verlaengert (die CRC passt
+     * dann nicht mehr, aber der Wertcheck laeuft vor der CRC -- config_json.h) */
+    std::string bad = replace_once(doc39, "\"node_tz\":\"X", "\"node_tz\":\"XX");
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
+    TEST_ASSERT_NOT_NULL(strstr(g_err, "node_tz"));
 }
 
 static void test_crc_mismatch_is_refused(void)
@@ -491,6 +554,8 @@ int main(int, char **)
     RUN_TEST(test_reexport_is_identical);
     RUN_TEST(test_crc_survives_reformatting);
     RUN_TEST(test_canonical_form_is_as_documented);
+    RUN_TEST(test_import_without_node_tz_keeps_current_value);
+    RUN_TEST(test_node_tz_empty_and_length_limit);
     RUN_TEST(test_crc_mismatch_is_refused);
     RUN_TEST(test_layout_mismatch_is_refused);
     RUN_TEST(test_truncated_json_is_refused);

@@ -3389,6 +3389,26 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_tz_rule": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<tz_rule.cpp>"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_tz_rule"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_udp_frame_twin": {
   "build_flags": [
    "-std=gnu++17",
