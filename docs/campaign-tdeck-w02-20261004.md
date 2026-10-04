@@ -73,3 +73,24 @@ DK5EN-98 (running until 2026-10-05 11:17); mark them in that evaluation.
   `map` 27/27 steps. Lesson: never start a stage-1 run while an OTA upload reads
   `.pio/build/<env>/firmware.bin` (the flag checksum wipes the directory; the node fell back
   into its app unharmed, the guard then failed once). Committed as wave 1.
+- Wave 1 committed `4c905ea0`, pushed with `94ca1a50` (DR-16 re-decided, TM-43 soak, open-points
+  paper archived). Wave 2 dispatched 2026-10-04 ~15:15: W-C TD-11 (no pio), W-D W0.2 (owns the
+  pio slot, builds the five envs itself). Orchestrator hotspot: `msg_ack` harness scenario.
+- Wave 2 landed 2026-10-04 ~15:40. W-C TD-11: `MsgBubble` msg_id/status, glyph on the footer
+  label, `tdeck_set_msg_status()` hooked at the four transitions (orchestrator folded the id
+  reconstruction into `own_msg_id_u32()`), `[MSGSTAT]` console lines; harness `msg_ack` PASS on
+  DK5EN-14 (ACK after 11 s, bubble found), `map_rebuild` and `map` unchanged green. W-D W0.2:
+  flags on the five envs, 3 of 5 clean with `-Werror`; orchestrator fixed the three shared-file
+  blockers of `t_deck_pro` (`gps_protocol.cpp` unused `ubxFrame`, `web_functions.cpp`
+  `current_fStep` declaration under the same guard as its use, `loop_functions.cpp` bounded
+  memcpy copies) so it is 4 of 5; `t5_epaper` stays without `-Werror` (T5-01, four real defects
+  in `ui.cpp`). `nrf52_base` gained `-Wall -Wextra -Wno-missing-field-initializers`, RAK/T114/
+  T-Echo clean. Inventory undercount: the night job counted src/ only per env log; the t5/t_deck_pro
+  builds also warn in shared files under their guards (listed in T5-01).
+- Wave 2 advisor (Fable) APPROVED, five low/medium notes, three applied: `esp32-external-radio`
+  (extends `t_deck_pro`, red before W0.2) gets the flag set without `-Werror`; the msg_id capture
+  ignores the receive path (`!bWithAudio`), so a late relay of our own frame after a reboot
+  takes no id; `msg_ack` docstring says what `found` means. Accepted as is: msg_id low 10 bits
+  repeat after ~1000 own messages per boot (same ambiguity as own_msg_id); the RAK instrument
+  image is built once in the gate because stage 3 builds the RAK with `INSTRUMENT_ENABLED=1`
+  and the new `-Wall -Wextra` on `nrf52_base` must hold there too.

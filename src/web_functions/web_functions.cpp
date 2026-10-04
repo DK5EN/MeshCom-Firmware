@@ -3282,7 +3282,9 @@ void sub_page_spectrum()
     uint16_t step_pixel_height = 10; // the amout of pixel we use for a single frequency step
 
     uint16_t num_fsteps = roundf((meshcom_settings.node_specend - spec_curr_freq) / meshcom_settings.node_specstep);
+    #if not defined(BOARD_T_DECK_PRO)
     uint16_t current_fStep = 0;                                       // current iteration  counter
+    #endif
     uint16_t start_x = 60;                                            // x-position where the diagramm starts
     uint16_t start_y = 10;                                            // y-position where the diagramm starts
     uint16_t end_x = start_x + ((num_fsteps + 1) * step_pixel_width); // calculate the end. Use one more fstep as the last frequency step also starts a scan and giving a result

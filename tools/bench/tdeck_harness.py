@@ -1990,6 +1990,84 @@ def scenario_map_persist_check(session: TDeckSession, args: argparse.Namespace) 
     }
 
 
+# --------------------------------------------------------------------------
+# msg_ack: TD-11, the own-message status reaches the T-Deck bubble
+# --------------------------------------------------------------------------
+
+_MSGSTAT_RE = re.compile(r"\[MSGSTAT\];([0-9A-Fa-f]{8});(new|\d);?(\d)?")
+
+
+def scenario_msg_ack(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-11: a DM sent from the T-Deck to one of our own bench nodes
+    (`--ack-peer`, default DK5EN-90, the RAK on the bench; never a foreign
+    callsign) must get its status into the message bubble: the firmware
+    tracks heard/ACK/failed/held per own message in own_msg_id[i][4], and
+    tdeck_set_msg_status() now pushes every transition into the bubble and
+    logs `[MSGSTAT];<msg_id>;<status>;<found>`; the outgoing bubble logs
+    `[MSGSTAT];<msg_id>;new` when it gets its id.
+
+    PASS iff: the `new` line names an id, an ACK transition (status 2) for
+    that id arrives within --ack-timeout seconds with found=1 (the model
+    bubble was found and its status set; the live label is refreshed when it
+    is on screen, otherwise on the next tab select), and no crash line. `heard` (status 1) is recorded
+    but not required: with only one neighbour the ACK can precede the echo.
+    Needs the peer powered and in range; it is not in SCENARIO_ORDER for
+    that reason.
+    """
+    session.send("--tft on")
+    session.send("--tab 0")
+    session.send("--loradebug on")
+    time.sleep(0.5)
+    nonce = int(time.time()) % 100000
+    idx = session.send(f"::{{{args.ack_peer}}}tm11 {nonce}")
+    m_new = session.wait_for(r"\[MSGSTAT\];([0-9A-Fa-f]{8});new|" + CRASH_PATTERN, 6.0, since=idx)
+    if m_new is None or "MSGSTAT" not in m_new.string:
+        session.send("--loradebug off")
+        return {"ok": False, "reason": "no [MSGSTAT];<id>;new line after the send (bubble got no id)",
+                "line": m_new.string.strip()[:120] if m_new else None}
+    msg_id = m_new.group(1).upper()
+    deadline = time.monotonic() + args.ack_timeout
+    transitions: List[Dict[str, Any]] = []
+    seen_ack = False
+    crashed = None
+    scan_from = idx
+    while time.monotonic() < deadline and not seen_ack and crashed is None:
+        time.sleep(0.3)
+        recs = session.records_since(scan_from)
+        scan_from += len(recs)
+        for _, _, l in recs:
+            if re.search(CRASH_PATTERN, l):
+                crashed = l.strip()[:120]
+                break
+            mm = _MSGSTAT_RE.search(l)
+            if mm and mm.group(1).upper() == msg_id and mm.group(2) != "new":
+                tr = {"status": int(mm.group(2)), "found": int(mm.group(3)) if mm.group(3) else None,
+                      "t_s": round(time.monotonic() - (deadline - args.ack_timeout), 1)}
+                transitions.append(tr)
+                if tr["status"] == 2:
+                    seen_ack = True
+    session.send("--loradebug off")
+    time.sleep(0.2)
+    ack = next((t for t in transitions if t["status"] == 2), None)
+    heard = next((t for t in transitions if t["status"] == 1), None)
+    reason = None
+    if crashed:
+        reason = f"crash: {crashed}"
+    elif ack is None:
+        reason = f"no ACK transition for {msg_id} within {args.ack_timeout}s (peer {args.ack_peer} off, out of range, or status not pushed)"
+    elif ack.get("found") != 1:
+        reason = "ACK transition logged but the bubble was not found (found != 1)"
+    return {
+        "ok": reason is None,
+        "reason": reason,
+        "peer": args.ack_peer,
+        "msg_id": msg_id,
+        "heard": heard,
+        "ack": ack,
+        "transitions": transitions,
+    }
+
+
 def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     idx0 = session.send("--heap h0")
     m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
@@ -2873,6 +2951,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "map_rebuild": scenario_map_rebuild,
     "map_persist_seed": scenario_map_persist_seed,
     "map_persist_check": scenario_map_persist_check,
+    "msg_ack": scenario_msg_ack,
     "nav": scenario_nav,
     "input": scenario_input,
     "msg_roll": scenario_msg_roll,
@@ -3241,6 +3320,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=1,
         help="disptest square/circle growth in pixels per step (default: 1)",
     )
+    p.add_argument("--ack-peer", default="DK5EN-90", help="msg_ack: own bench node that receives the DM and ACKs it (default: DK5EN-90, never a foreign callsign)")
+    p.add_argument("--ack-timeout", type=float, default=45.0, help="msg_ack: seconds to wait for the ACK transition (default: 45)")
     p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10; 40 recycles marker slots)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
     p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")

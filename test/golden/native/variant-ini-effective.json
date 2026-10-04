@@ -1191,6 +1191,11 @@
    "-<gps_l76k.cpp>",
    "-<esp32/esp32_gps.cpp>"
   ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers"
+  ],
   "extends": [
    "env:t_deck_pro"
   ],
@@ -1628,8 +1633,10 @@
    "+<../variants/wiscore_rak4631/*>"
   ],
   "build_src_flags": [
+   "-Wall -Wextra",
    "-Wformat=2",
    "-Wno-unused-parameter",
+   "-Wno-missing-field-initializers",
    "-Werror"
   ],
   "debug_tool": "jlink",
@@ -3497,6 +3504,11 @@
    "+<t-deck-pro/bq27220.cpp>",
    "+<t-deck-pro/bq27220_data_memory.c>"
   ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers"
+  ],
   "framework": [
    "arduino"
   ],
@@ -3843,6 +3855,12 @@
    "-<gps_l76k.cpp>",
    "-<esp32/esp32_gps.cpp>"
   ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers",
+   "-Werror"
+  ],
   "framework": [
    "arduino"
   ],
@@ -3970,8 +3988,10 @@
    "+<../variants/wiscore_rak4631/*>"
   ],
   "build_src_flags": [
+   "-Wall -Wextra",
    "-Wformat=2",
    "-Wno-unused-parameter",
+   "-Wno-missing-field-initializers",
    "-Werror"
   ],
   "debug_tool": "jlink",
@@ -4657,6 +4677,12 @@
    "-<safeboot/*>",
    "-<lib/lvgl/*>"
   ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers",
+   "-Werror"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4756,6 +4782,12 @@
    "-<ui_common/*>",
    "-<safeboot/*>",
    "-<lib/lvgl/*>"
+  ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers",
+   "-Werror"
   ],
   "extends": [
    "env:vision-master-e213"
@@ -4859,6 +4891,12 @@
    "-<safeboot/*>",
    "-<lib/lvgl/*>"
   ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers",
+   "-Werror"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4955,6 +4993,12 @@
    "-<ui_common/*>",
    "-<safeboot/*>",
    "-<lib/lvgl/*>"
+  ],
+  "build_src_flags": [
+   "-Wall -Wextra",
+   "-Wformat=2",
+   "-Wno-missing-field-initializers",
+   "-Werror"
   ],
   "framework": [
    "arduino"
@@ -5059,8 +5103,10 @@
    "+<../variants/wiscore_rak4631/*>"
   ],
   "build_src_flags": [
+   "-Wall -Wextra",
    "-Wformat=2",
    "-Wno-unused-parameter",
+   "-Wno-missing-field-initializers",
    "-Werror"
   ],
   "build_unflags": [

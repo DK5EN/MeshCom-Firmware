@@ -686,6 +686,14 @@ static NbrGwHint nbrGwHintFromDest(char payload_type, const char *dest)
     return NBR_GW_UNKNOWN;
 }
 
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+// TD-11: the msg_id of an own_msg_id ring entry (bytes 0-3, little-endian)
+static inline uint32_t own_msg_id_u32(int i)
+{
+    return (uint32_t)own_msg_id[i][0] | ((uint32_t)own_msg_id[i][1] << 8) | ((uint32_t)own_msg_id[i][2] << 16) | ((uint32_t)own_msg_id[i][3] << 24);
+}
+#endif
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
@@ -1485,7 +1493,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // otherwise be downgraded by the very echo that proves
                     // the mesh still relays it.
                     if(own_msg_id[heardIcheck][4] != 0x02 && own_msg_id[heardIcheck][4] != 0x03 && own_msg_id[heardIcheck][4] != 0x04)
+                    {
+                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+                        bool bTdeckHeardNew = (own_msg_id[heardIcheck][4] != 0x01);   // every relay echo lands here, report the transition only
+                        #endif
+
                         own_msg_id[heardIcheck][4]=0x01; // 0x01 HEARD
+
+                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+                        // TD-11: OnRxDone() runs in esp32loop(), the LVGL task, no lock needed
+                        if(bTdeckHeardNew)
+                            tdeck_set_msg_status(own_msg_id_u32(heardIcheck), 0x01);
+                        #endif
+                    }
                 }
             }
             else
@@ -1668,6 +1688,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         {
                                             own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
+                                            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+                                            tdeck_set_msg_status(own_msg_id_u32(iackcheck), 0x02);   // TD-11: esp32loop(), no lock needed
+                                            #endif
+
                                             // S4: the destination's own ack is the final word --
                                             // forget any store node(s) that were holding this DM.
                                             stoHolderClear(msg_counter);
@@ -1707,6 +1731,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                            stoHolderNote(msg_counter, aprsmsg.msg_source_call, stoNnn, millis()))
                                         {
                                             own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                                            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+                                            tdeck_set_msg_status(own_msg_id_u32(iStoCheck), 0x04);   // TD-11: esp32loop(), no lock needed
+                                            #endif
 
                                             uint16_t stoPlen = buildAckPhoneFrame(print_buff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call);
                                             addBLEOutBuffer(print_buff, stoPlen);
@@ -3104,7 +3132,14 @@ bool updateRetransmissionStatus()
                                 else
                                 {
                                     if(idx >= 0 && own_msg_id[idx][4] != 0x02)
+                                    {
                                         own_msg_id[idx][4] = 0x03;
+
+                                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+                                        // TD-11: updateRetransmissionStatus() runs in esp32loop(), no lock needed
+                                        tdeck_set_msg_status(own_msg_id_u32(idx), 0x03);
+                                        #endif
+                                    }
 
                                     // M1: das Ziel hat schon geackt (0x02) --
                                     // kein FAILED an die App, obwohl diese
