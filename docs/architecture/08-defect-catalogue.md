@@ -1504,6 +1504,9 @@ Haken (`mcTickKeep`). Tests: `test/test_own_msg_status/`, Twin-Fall
 > nach 22 Pongs Haken weg, Nachricht noch gelistet. Neues Image: Haken nach 25
 > Pongs unveraendert. Advisor-Pass (Fable): ein Must-fix (spaetes ACK bei
 > recyceltem Platz), umgesetzt und per Twin-Test belegt (vorher rot, nachher gruen).
+> Nebenbefund (Haken auf empfangenen Nachrichten) live geprueft 2026-10-04 18:56:
+> DK5EN-92 mit neuem Image als Gateway hat drei Nachrichten von DM3KS-12
+> (`0x2efb0088..8a`) vom Server auf LoRa gegeben und zurueckgehoert (Ring-Zustand 01) -- ohne Haken angezeigt; dieselben ids auf DK5EN-98 (4.40a) mit Haken.
 
 ## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
 

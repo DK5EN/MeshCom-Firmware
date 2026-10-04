@@ -21,6 +21,14 @@ approved the swap.
   image (17:52 build): ACK tick unchanged after 25 pongs. `tools/webgui_tick_test.js` all pass on
   both nodes. Note: `PING_MAX` is 5, a first run with `--pingmax 22` sent only 5 pings and was void.
 
+- Wave 2 (received-tick proof on a gateway, 2026-10-04 evening): done. Before = DK5EN-98
+  (production gateway, 4.40a): 7 of 9 received messages carried a tick. After = DK5EN-92 (new
+  image) as temporary gateway (`--gateway on`, `--setinfo on`, both off again), DK5EN-14 relaying:
+  three server-forwarded DM3KS-12 messages `0x2efb0088..8a` were heard back (checkOwnTx hit, ring
+  state 01) and render without tick on -92; the same ids on -98 render with a tick. Eyeballed and
+  screenshotted in Chrome (`~/Desktop/web04-evidence/`). Script lesson: the gateway logs
+  `[GW];rx`, not `[UDP]`.
+
 ## Fixed API (all agents code against this)
 
 `src/own_msg_status.h` / `.cpp` (pure, native-testable, no Arduino includes):
