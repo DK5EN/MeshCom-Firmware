@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-108 suites with tests, 1681 `RUN_TEST` cases, 53 native environments. Five
+109 suites with tests, 1696 `RUN_TEST` cases, 54 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     55 |  1133 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     56 |  1148 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |    98 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -46,7 +46,10 @@ env `native_netif_mtu`). Extended: `test_command_setters` (source pin: one
 `--mtu`/`--ethmtu` rung, no board guard, default 1280). `test_ble_session` (BLC-01: ESP32
 reconnect-within-one-tick race against `src/ble_session.h`, disconnect classes,
 counter line; Regression, own env `native_ble_session`); `tools/bench/test_ble_cycle.py`
-(38 pytest cases, pure parts of `ble_cycle.py`).
+(38 pytest cases, pure parts of `ble_cycle.py`). `test_msgstore_hook` (SNF-GW-01: store/ack decision
+shared by OnRxDone and the GATE handlers, `RM1 ` exclusion, path element match;
+own env `native_msgstore_hook`). Extended: `test_msgstore` (+9: lock pairing on
+every entry point, no env callback under the lock, `msgstoreSameBaseCall`).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -187,7 +190,8 @@ flashes whatever is attached.
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
 | test_millis_rollover         | Regression    |     4 | native                                                       |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
-| test_msgstore                | Unit          |    51 | native                                                       |
+| test_msgstore                | Unit          |    60 | native                                                       |
+| test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |
 | test_nbr_matrix              | Unit          |    88 | native_nbr_matrix                                            |
 | test_nbr_replay              | Oracle/Replay |    15 | native_nbr_replay, native_nbr_replay64, native_nbr_replay128 |
 | test_nbr_report              | Unit          |     4 | native_nbr_report                                            |

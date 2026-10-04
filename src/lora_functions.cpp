@@ -23,6 +23,7 @@
 #include "own_msg_status.h"  // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
 #if defined(ENABLE_MSGSTORE)
+#include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
 #endif
 
@@ -1842,35 +1843,30 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                           strcmp(pMboxComma1 + 1, aprsmsg.msg_source_call) != 0 &&
                                                           iMboxTagPos > 0);
 
-                                int iMboxAckPos = mcIndexOfStr(aprsmsg.msg_payload, ":ack");
+                                // SNF-GW-01: the ack/store decision lives in msgstore_hook.h,
+                                // shared with the GATE handlers. isGroup and eligible are
+                                // side-effect free, so computing them up front is safe.
+                                MboxDecision mboxDec = mboxClassify(destination_call, aprsmsg.msg_payload,
+                                                                    CheckGroup(destination_call) != 0,
+                                                                    bMboxPeerDelivery,   // F6: don't store a peer's own delivery frame
+                                                                    rx_pn_repeat,        // E2: a repeat XOR copy must not push stored_ms out again
+                                                                    msgstoreEligible(destination_call));
 
-                                if(iMboxAckPos > 0)
+                                if(mboxDec.action == MBOX_ACK)
                                 {
                                     // S3: purge hook -- :ackNNN heard for someone else's DM.
-                                    uint16_t mboxAckNnn = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iMboxAckPos + 4), strlen(aprsmsg.msg_payload));
-                                    msgstoreOnAck(aprsmsg.msg_source_call, destination_call, mboxAckNnn);
+                                    msgstoreOnAck(aprsmsg.msg_source_call, destination_call, mboxDec.nnn);
                                 }
                                 else
-                                if(strcmp(destination_call, "*") != 0 &&
-                                   CheckGroup(destination_call) == 0 &&
-                                   mcIndexOfStr(aprsmsg.msg_payload, ":rej") <= 0 &&
-                                   !mcStartsWith(aprsmsg.msg_payload, "{") &&   // {ping}/{pong}/{MCP}/{SET}/{CET}: control frames, never a DM
-                                   !bMboxPeerDelivery &&                        // F6: don't store a peer's own delivery frame
-                                   !rx_pn_repeat &&                             // E2: a repeat XOR copy must not push stored_ms out again
-                                   msgstoreEligible(destination_call))
+                                if(mboxDec.action == MBOX_STORE)
                                 {
                                     // S3: store hook -- a DM for our store set.
-                                    int iMboxEnqPos = mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1);
-                                    if(iMboxEnqPos > 0)
-                                    {
-                                        uint16_t mboxNnn = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iMboxEnqPos + 1), strlen(aprsmsg.msg_payload));
-                                        char mboxPayload[MC_PAYLOAD_LEN];
-                                        mcSet(mboxPayload, sizeof(mboxPayload), aprsmsg.msg_payload);
-                                        mcTruncate(mboxPayload, sizeof(mboxPayload), (size_t)iMboxEnqPos);
+                                    char mboxPayload[MC_PAYLOAD_LEN];
+                                    mcSet(mboxPayload, sizeof(mboxPayload), aprsmsg.msg_payload);
+                                    mcTruncate(mboxPayload, sizeof(mboxPayload), mboxDec.textLen);
 
-                                        msgstoreStore(aprsmsg.msg_source_call, destination_call,
-                                                      mboxNnn, mboxPayload, strlen(mboxPayload));
-                                    }
+                                    msgstoreStore(aprsmsg.msg_source_call, destination_call,
+                                                  mboxDec.nnn, mboxPayload, strlen(mboxPayload));
                                 }
 
                                 // S3: peer-cancel hook -- a hop-0 delivery frame (rly_hop

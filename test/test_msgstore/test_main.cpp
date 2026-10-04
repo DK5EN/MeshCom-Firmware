@@ -75,11 +75,23 @@ static void heardSet(const char *call, int32_t age_ms)
     g_heard_count++;
 }
 
-static uint32_t fakeNowMs(void) { return g_now; }
-static const char *fakeOwnCall(void) { return g_own; }
+// SNF-GW-02: every env callback records a violation when it runs while the
+// msgstore critical section is held (msgstoreTestLockDepth() != 0). The
+// section must stay free of env callbacks (clock, own call, random source,
+// gates, deliver, notify); tearDown() asserts the flag stayed clear.
+static int g_lock_violations = 0;
+static void lockProbe(void)
+{
+    if(msgstoreTestLockDepth() != 0)
+        g_lock_violations++;
+}
+
+static uint32_t fakeNowMs(void) { lockProbe(); return g_now; }
+static const char *fakeOwnCall(void) { lockProbe(); return g_own; }
 
 static int32_t fakeHeardAgeMs(const char *call)
 {
+    lockProbe();
     if(call == NULL)
         return -1;
     for(int i = 0; i < g_heard_count; i++)
@@ -88,16 +100,17 @@ static int32_t fakeHeardAgeMs(const char *call)
     return -1;
 }
 
-static int     fakeBpState(void) { return g_bp; }
-static uint8_t fakeUtilPct(void) { return g_util; }
+static int     fakeBpState(void) { lockProbe(); return g_bp; }
+static uint8_t fakeUtilPct(void) { lockProbe(); return g_util; }
 
 // Deterministic: the low end of the range by default, so ladder timing in
 // the tests is exact instead of merely bounded; g_random_return_hi flips it
 // to the high end for the one test that pins the upper edge.
-static uint32_t fakeRandomBetween(uint32_t lo, uint32_t hi) { return g_random_return_hi ? hi : lo; }
+static uint32_t fakeRandomBetween(uint32_t lo, uint32_t hi) { lockProbe(); return g_random_return_hi ? hi : lo; }
 
 static bool fakeDeliver(const struct MsgStoreEntry *e)
 {
+    lockProbe();
     g_deliver_calls++;
     if(e != NULL)
     {
@@ -119,13 +132,14 @@ static bool fakeDeliver(const struct MsgStoreEntry *e)
     return g_deliver_result;
 }
 
-static void fakeLog(const char *line) { (void)line; }
+static void fakeLog(const char *line) { lockProbe(); (void)line; }
 
 // Stage 4: records the entry it was handed (same shape as fakeDeliver()) and
 // answers g_notify_result -- so "notify() false retries" (verdict-precedent
 // on deliver()) and the exact entry fields can both be asserted.
 static bool fakeNotify(const struct MsgStoreEntry *e)
 {
+    lockProbe();
     g_notify_calls++;
     if(e != NULL)
     {
@@ -147,6 +161,8 @@ void setUp(void)
 {
     msgstoreReset();
     msgstoreInit(&g_env);
+    msgstoreTestLockStatsReset();
+    g_lock_violations = 0;
 
     g_now = 1000;
     strcpy(g_own, "DK5EN");
@@ -175,7 +191,17 @@ void setUp(void)
     g_notify_last_nnn    = 0;
 }
 
-void tearDown(void) {}
+// SNF-GW-02: whatever a test did, every lock was released, none nested, and
+// no env callback ran inside the critical section.
+void tearDown(void)
+{
+    uint32_t enters = 0, exits = 0, dmax = 0;
+    msgstoreTestLockStats(&enters, &exits, &dmax);
+    TEST_ASSERT_EQUAL_UINT32(enters, exits);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreTestLockDepth());
+    TEST_ASSERT_TRUE(dmax <= 1);
+    TEST_ASSERT_EQUAL_INT(0, g_lock_violations);
+}
 
 // ------------------------------------------------------------ eligibility
 
@@ -1215,6 +1241,304 @@ static void test_null_arguments_are_safe(void)
     TEST_ASSERT_EQUAL_UINT32(0, msgstoreNextActionInMs());
 }
 
+
+// ------------------------------------------------- SNF-GW-02: lock pairing
+
+// Run `call` against a clean stats window and return the section counts.
+struct LockDelta { uint32_t enters, exits, dmax; };
+
+static LockDelta lockWindowBegin(void)
+{
+    msgstoreTestLockStatsReset();
+    LockDelta d = {0, 0, 0};
+    return d;
+}
+
+static LockDelta lockWindowEnd(void)
+{
+    LockDelta d;
+    msgstoreTestLockStats(&d.enters, &d.exits, &d.dmax);
+    return d;
+}
+
+static void assertPaired(LockDelta d, bool must_lock)
+{
+    TEST_ASSERT_EQUAL_UINT32(d.enters, d.exits);
+    TEST_ASSERT_TRUE(d.dmax <= 1);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreTestLockDepth());
+    if(must_lock)
+        TEST_ASSERT_TRUE(d.enters >= 1);
+}
+
+static void test_lock_store_paths_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, 2, MSGSTORE_HOLD_DEFAULT_H);
+
+    // new entry
+    lockWindowBegin();
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 1, "hallo", 5));
+    assertPaired(lockWindowEnd(), true);
+
+    // refresh (same payload) -- early return path inside the section
+    lockWindowBegin();
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 1, "hallo", 5));
+    assertPaired(lockWindowEnd(), true);
+
+    // replace (wrapped NNN, other payload) -- second early return path
+    lockWindowBegin();
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 1, "andere", 6));
+    assertPaired(lockWindowEnd(), true);
+
+    // fill the second slot, then table full -> drop path
+    TEST_ASSERT_EQUAL(1, msgstoreStore("OE1ABC", "DK5EN-9", 2, "zwei", 4));
+    lockWindowBegin();
+    TEST_ASSERT_EQUAL(-1, msgstoreStore("OE1ABC", "DK5EN-9", 3, "drei", 4));
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->dropped_slots);
+
+    // rejected before the section: null, bad length, own call -- paired (0/0)
+    lockWindowBegin();
+    TEST_ASSERT_EQUAL(-1, msgstoreStore(NULL, "DK5EN-9", 1, "a", 1));
+    TEST_ASSERT_EQUAL(-1, msgstoreStore("OE1ABC", "DK5EN-9", 1, "a", 0));
+    TEST_ASSERT_EQUAL(-1, msgstoreStore("DK5EN", "DK5EN-9", 1, "a", 1));
+    TEST_ASSERT_EQUAL(-1, msgstoreStore("OE1ABC", "DK5EN", 1, "a", 1));
+    assertPaired(lockWindowEnd(), false);
+}
+
+static void test_lock_ack_paths_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+
+    // no match -- full scan, falls out of the loop
+    lockWindowBegin();
+    msgstoreOnAck("DK5EN-8", "OE1ABC", 5);
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_NOT_NULL(msgstoreEntry(0));
+
+    // match -- leaves the loop early
+    lockWindowBegin();
+    msgstoreOnAck("DK5EN-9", "OE1ABC", 5);
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_NULL(msgstoreEntry(0));
+
+    // null arguments return before the section
+    lockWindowBegin();
+    msgstoreOnAck(NULL, "OE1ABC", 5);
+    msgstoreOnAck("DK5EN-9", NULL, 5);
+    assertPaired(lockWindowEnd(), false);
+}
+
+static void test_lock_presence_paths_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+
+    // nothing held for that call
+    lockWindowBegin();
+    msgstorePresence("DK5EN-9");
+    assertPaired(lockWindowEnd(), true);
+
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    TEST_ASSERT_EQUAL(1, msgstoreStore("OE1ABC", "DK5EN-9", 6, "welt", 4));
+
+    // inside the 60 s settle window: scanned, nothing armed
+    g_now += 30000;
+    lockWindowBegin();
+    msgstorePresence("DK5EN-9");
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_HELD, msgstoreEntry(0)->state);
+
+    // two matches: the random draw sits between the locked phases, both slots arm
+    g_now += 40000;
+    lockWindowBegin();
+    msgstorePresence("DK5EN-9");
+    LockDelta d = lockWindowEnd();
+    assertPaired(d, true);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_ARMED, msgstoreEntry(0)->state);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_ARMED, msgstoreEntry(1)->state);
+    TEST_ASSERT_EQUAL_UINT32(g_now + MSGSTORE_JITTER_MIN_MS, msgstoreEntry(0)->next_ms);
+    TEST_ASSERT_EQUAL_UINT32(g_now + MSGSTORE_JITTER_MIN_MS, msgstoreEntry(1)->next_ms);
+
+    // null / empty return before the section
+    lockWindowBegin();
+    msgstorePresence(NULL);
+    msgstorePresence("");
+    assertPaired(lockWindowEnd(), false);
+}
+
+static void test_lock_peer_delivery_paths_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(0));   // ARMED
+
+    lockWindowBegin();
+    msgstoreOnPeerDelivery("OE1XYZ", 5);   // no match
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_ARMED, msgstoreEntry(0)->state);
+
+    lockWindowBegin();
+    msgstoreOnPeerDelivery("OE1ABC", 5);   // match
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_HELD, msgstoreEntry(0)->state);
+
+    lockWindowBegin();
+    msgstoreOnPeerDelivery(NULL, 5);
+    assertPaired(lockWindowEnd(), false);
+}
+
+static void test_lock_loop_paths_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+
+    // empty table: expiry/choose section only
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+
+    // due delivery: choose + snapshot + stamp
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(0));
+    lockWindowBegin();
+    msgstoreLoop();
+    LockDelta d = lockWindowEnd();
+    assertPaired(d, true);
+    TEST_ASSERT_TRUE(d.enters >= 3);
+    TEST_ASSERT_EQUAL_INT(1, g_deliver_calls);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(0)->attempt);
+
+    // deliver() refuses: return after the snapshot section
+    g_now += MSGSTORE_STEP_MS;
+    g_deliver_result = false;
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(0)->attempt);
+    g_deliver_result = true;
+
+    // gate blocks (back-pressure): capblocked stamp section
+    g_now += MSGSTORE_ACTION_GAP_MS;
+    g_bp = 1;
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+    g_bp = 0;
+
+    // notice path: choose + snapshot + stamp
+    msgstoreSetNotice(true);
+    TEST_ASSERT_EQUAL(1, msgstoreStore("OE1ABC", "DK5EN-9", 6, "welt", 4));
+    g_now += MSGSTORE_ACTION_GAP_MS;
+    lockWindowBegin();
+    msgstoreLoop();
+    d = lockWindowEnd();
+    assertPaired(d, true);
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(1)->notice);
+
+    // notify() refuses: early return after the snapshot section
+    TEST_ASSERT_EQUAL(2, msgstoreStore("OE1ABC", "DK5EN-9", 7, "drei", 4));
+    g_now += MSGSTORE_ACTION_GAP_MS;
+    g_notify_result = false;
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(2)->notice);
+    g_notify_result = true;
+
+    // expiry pass: storetime elapsed
+    g_now += 25UL * 3600UL * 1000UL;
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_EQUAL_INT(0, msgstoreUsed());
+}
+
+static void test_lock_operator_actions_paired(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+
+    lockWindowBegin();
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(0));
+    TEST_ASSERT_FALSE(msgstoreDeliverNow(0));    // ARMED already: refused inside the section
+    TEST_ASSERT_FALSE(msgstoreDeliverNow(-1));
+    TEST_ASSERT_FALSE(msgstoreDeliverNow(MSGSTORE_SLOTS_MAX));
+    assertPaired(lockWindowEnd(), true);
+
+    lockWindowBegin();
+    TEST_ASSERT_TRUE(msgstorePurge(0));
+    TEST_ASSERT_FALSE(msgstorePurge(0));         // already FREE
+    TEST_ASSERT_FALSE(msgstorePurge(-1));
+    TEST_ASSERT_FALSE(msgstorePurge(MSGSTORE_SLOTS_MAX));
+    assertPaired(lockWindowEnd(), true);
+
+    lockWindowBegin();
+    msgstorePurgeAll();
+    assertPaired(lockWindowEnd(), true);
+
+    // configure: shrink path
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    lockWindowBegin();
+    msgstoreConfigure(MSGSTORE_OWN, 1, MSGSTORE_HOLD_DEFAULT_H);
+    assertPaired(lockWindowEnd(), true);
+}
+
+static void test_lock_not_held_in_env_callbacks_across_flow(void)
+{
+    // fakeNowMs/OwnCall/Random/Deliver/Notify/gates all call lockProbe();
+    // run a flow that exercises every one of them, tearDown() asserts the
+    // violation counter is zero.
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    msgstoreSetNotice(true);
+    TEST_ASSERT_TRUE(msgstoreEligible("DK5EN-9"));
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    g_now += 70000;
+    msgstorePresence("DK5EN-9");
+    g_now += MSGSTORE_JITTER_MAX_MS;
+    msgstoreLoop();                       // notice (notify)
+    g_now += MSGSTORE_ACTION_GAP_MS;
+    msgstoreLoop();                       // delivery (deliver)
+    TEST_ASSERT_TRUE(g_notify_calls >= 1);
+    TEST_ASSERT_TRUE(g_deliver_calls >= 1);
+    TEST_ASSERT_EQUAL_INT(0, g_lock_violations);
+}
+
+static void test_lock_hook_during_deliver_still_guarded(void)
+{
+    // The re-entrant ack runs from inside deliver() (outside the lock) and
+    // takes the lock itself: a depth-1 section, then the loop's stamp section.
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    TEST_ASSERT_EQUAL(0, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(0));
+    g_deliver_reentrant_ack = true;
+    lockWindowBegin();
+    msgstoreLoop();
+    assertPaired(lockWindowEnd(), true);
+    TEST_ASSERT_NULL(msgstoreEntry(0));   // ack purged, loop did not resurrect it
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->purged_ack);
+}
+
+// ----------------------------------------------- SNF-GW-02: sameBaseCall
+
+static void test_same_base_call_exported(void)
+{
+    TEST_ASSERT_TRUE(msgstoreSameBaseCall("DK5EN-1", "DK5EN-92"));
+    TEST_ASSERT_TRUE(msgstoreSameBaseCall("DK5EN-1", "DK5EN-1"));
+    TEST_ASSERT_TRUE(msgstoreSameBaseCall("DK5EN", "DK5EN-0"));   // SNF-GW-D4: bare == -0
+    TEST_ASSERT_TRUE(msgstoreSameBaseCall("DK5EN-0", "DK5EN"));
+    TEST_ASSERT_TRUE(msgstoreSameBaseCall("DK5EN", "DK5EN"));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("DK5EN-1", "DK5EM-1"));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("DK5EN", "DK5EM"));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("DK5EN-1", "DK5E-1"));    // prefix is not the same base
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("DK5EN-1", "DK5ENX-1"));
+    // empty / NULL / SSID-only never match, not even each other
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("", ""));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("-1", "-1"));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall(NULL, "DK5EN"));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall("DK5EN", NULL));
+    TEST_ASSERT_FALSE(msgstoreSameBaseCall(NULL, NULL));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1283,6 +1607,16 @@ int main(int, char **)
     RUN_TEST(test_format_line_shows_sto);
 
     RUN_TEST(test_null_arguments_are_safe);
+
+    RUN_TEST(test_lock_store_paths_paired);
+    RUN_TEST(test_lock_ack_paths_paired);
+    RUN_TEST(test_lock_presence_paths_paired);
+    RUN_TEST(test_lock_peer_delivery_paths_paired);
+    RUN_TEST(test_lock_loop_paths_paired);
+    RUN_TEST(test_lock_operator_actions_paired);
+    RUN_TEST(test_lock_not_held_in_env_callbacks_across_flow);
+    RUN_TEST(test_lock_hook_during_deliver_still_guarded);
+    RUN_TEST(test_same_base_call_exported);
 
     return UNITY_END();
 }

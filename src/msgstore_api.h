@@ -99,8 +99,17 @@ const char   *msgstoreListCsv(void);
 const char   *msgstoreModeName(enum MsgStoreMode mode);
 const char   *msgstoreStateName(uint8_t state);
 
-// ---- receive-path events (A hooks; never from msg_server frames) ----
+// ---- receive-path events (A hooks; also the UDP GATE handlers) ----
+// Task safety (SNF-GW-02): msgstoreStore, msgstoreOnAck, msgstorePresence and
+// msgstoreOnPeerDelivery may be called from a task other than msgstoreLoop()
+// (nRF52: OnRxDone in the LORA task and the GATE handlers in the loop task).
+// Each takes the internal critical section (src/msgstore_lock.h) around its
+// slot-table access, so two hooks, or a hook and the read-modify-write
+// sections of msgstoreLoop(), never interleave. The operator actions below
+// and msgstoreConfigure() take it too. Callers need no lock of their own and
+// must not call these from inside an env callback of the same task.
 bool msgstoreEligible(const char *dst);                     // store-set test, false when mode is OFF
+bool msgstoreSameBaseCall(const char *a, const char *b);    // same callsign before the first '-' (SSID ignored; "DK5EN" == "DK5EN-0"); false when either base is empty/NULL
 int  msgstoreStore(const char *src, const char *dst, uint16_t nnn,
                    const char *payload, size_t len);        // slot, -1 dropped; same (src,nnn,payload) refreshes
 void msgstoreOnAck(const char *acker, const char *sender, uint16_t nnn);   // :ackNNN from acker to sender
@@ -125,6 +134,16 @@ int                            msgstoreFormatLine(char *buf, size_t n); // "MBOX
 
 // ---- test-only ----
 void msgstoreReset(void);
+#if defined(NATIVE_BUILD)
+// Host build only: counters of the internal critical section (the firmware
+// builds use taskENTER_CRITICAL / portENTER_CRITICAL, see msgstore_lock.h).
+// enters == exits and depth == 0 whenever no msgstore call is in flight;
+// depth_max > 1 would mean a nested section. msgstoreTestLockDepth() is for
+// fake env callbacks: it must read 0 there (no callback inside the lock).
+void     msgstoreTestLockStats(uint32_t *enters, uint32_t *exits, uint32_t *depth_max);
+uint32_t msgstoreTestLockDepth(void);
+void     msgstoreTestLockStatsReset(void);
+#endif
 
 // Firmware glue (src/msgstore_glue.cpp): installs the Arduino-side MsgStoreEnv.
 // Called once at boot from the platform main before msgstoreSettingsLoad().
