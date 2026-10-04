@@ -7,7 +7,7 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.76"
+      "host": "192.168.68.71"
     },
     "t-deck-14": {
       "call": "DK5EN-14",

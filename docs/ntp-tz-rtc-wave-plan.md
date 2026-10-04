@@ -1,7 +1,7 @@
 # NTP / TZ string / RTC: wave plan
 
 Date: 2026-10-04. Base: `fork-dev` at `26324810`. Findings: `docs/ntp-tz-rtc-findings.md`.
-Status: **W1-W3 committed, W4 docs committed, W4 bench OPEN** (flashing a bench node was blocked by the session's auto-mode permission; needs the operator).
+Status: **DONE 2026-10-04.** W1-W4 committed; bench passed on DK5EN-1 (Heltec V3) and DK5EN-90 (RAK4631). RTC fixes host-tested only (no RTC chip on the bench). No upstream PR (operator).
 
 ## BLUF
 
@@ -143,20 +143,24 @@ command path. Spec: `docs/architecture/11-wire-format.md` section 4.2/4.4 (W4).
 | W1   | done: advisor REWORK (nRF52 GPS write used frozen node_date_*), fixed and re-built                                                                                                                    | `9242f693`  |
 | W2   | done: B2 stopped on D2 (init_flash seeds every boot); default moved to the flash-clear branch                                                                                                         | `614f1b36`  |
 | W3   | done: advisor REWORK (web echo of node_tz could inject markup -- tzParse accepts `<plaintext>`-style names; now HTML-escaped; --utcoff clears only on a parsed value; `none` case-insensitive on web) | `bcf8f083`  |
-| W4   | docs done (BACKLOG RTC-1..3/TZ-01 + open RTC-04..06/TZ-02, test-suite-map, wire format SN1/--settz, settings-registers, d1-04 row, schema lint); bench NOT run                                        | see git log |
+| W4   | done: docs; bench passed on DK5EN-1 + DK5EN-90 (build `a9e64cf6`), see below                                                                                                                          | see git log |
 
-## W4 bench: open, for the operator
+## W4 bench result (2026-10-04, build `a9e64cf6`)
 
-Flashing was refused by the session's permission layer, so nothing ran on hardware. DK5EN-1 was
-not reachable (not on USB here, no web server at `.76`/`.62`); DK5EN-92 (T-Beam, `.75`, guard ok,
-before: `UTC-OFF 2.0 [NTP]`, Flash-Version 20260724) is the ready substitute.
+Flashed over USB after the operator's go: DK5EN-1 (Heltec V3, `/dev/cu.usbserial-0001`, esptool
+hash verified) and DK5EN-90 (RAK4631, DFU "Device programmed."). Identity guard ok on both
+(2 dBm, own callsigns). No RF test traffic. Logs: session scratchpad, not kept.
 
-1. `pio run -e ttgo_tbeam` and `python3 tools/webflash.py --env ttgo_tbeam 192.168.68.75`
-   (`pio run -e wiscore_rak4631 --target upload --upload-port <port of 230D6EBB3266D20E>` for RAK).
-2. `--info`: expect `...TZ none` (updated node keeps an empty rule, D2).
-3. `--settz CET-1CEST,M3.5.0,M10.5.0/3` -> `TZ ..., now CEST UTC+2.0`.
-4. DST jump without a time source: `--settz XST-1XDT,M1.1.0,M10.1.0/HH:MM` with HH:MM = local
-   time + 2 min on a first Sunday of October (or adjust the rule to today); within ~3 min
-   `--info` shows `TZOFF +1.0 [XST]` and the clock 1 h back.
-5. `--settz J60` -> rejected, nothing changed. Reboot -> rule persists. `--utcoff 2` -> rule
-   cleared. Restore: `--settz none`, `--utcoff 2`.
+| Check                                            | DK5EN-1 (ESP32)                                          | DK5EN-90 (nRF52)                                                 |
+| ------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
+| Updated node keeps an empty rule (D2)            | `TZ none`, UTC-OFF 1.0 kept                              | `TZ none`, UTC-OFF 2.0 kept                                      |
+| `--settz J60`                                    | rejected, nothing changed                                | rejected, nothing changed                                        |
+| `--settz CET-1CEST,M3.5.0,M10.5.0/3`             | `now CEST UTC+2.0`; `--pos` DATE `CEST`                  | `now CEST UTC+2.0`                                               |
+| Switch without a time source (`M10.1.0/<now+N>`) | XDT +2 -> XST +1 within 49 s of the edge, `19:05:11 XST` | XDT +2 -> XST +1, `19:11:28 XST` (NTP sets the clock every pass) |
+| Rule survives a reboot                           | yes (port reopen)                                        | yes (`--reboot`)                                                 |
+| `--utcoff` clears a rule (D1)                    | `utcoff: TZ rule cleared`                                | not repeated                                                     |
+| Web info row / setup field                       | `Timezone none`, field present                           | not checked                                                      |
+| Restored                                         | `TZ none`, UTC-OFF 1.0                                   | `TZ none`, UTC-OFF 2.0                                           |
+
+Cosmetic: `--settz J60` names the reason class "format", not "only M rules" (the classifier
+looks for `J` after a comma only). RTC-1..3 stay host-tested only (RTC-04).
