@@ -745,25 +745,25 @@ and the BACKLOG rows per wave, and never runs two `pio` processes.
 
 Status:
 
-| Feature | Wave | State                                                                                    | Commit      |
-| ------- | ---- | ---------------------------------------------------------------------------------------- | ----------- |
-| NMTU    | W1   | done: bench DK5EN-1 app+Safeboot MSS 1240/1436, AP path and classic Safeboot not benched | this commit |
-| BLC     | W1   | not started                                                                              |             |
-| SNF-GW  | W1   | not started                                                                              |             |
-| SNF-GW  | W2   | not started                                                                              |             |
-| SNF-GW  | W3   | not started                                                                              |             |
-| RM      | W1   | not started                                                                              |             |
-| RM      | W2   | not started                                                                              |             |
-| RM      | W3   | not started                                                                              |             |
-| AU      | W0   | not started                                                                              |             |
-| AU      | W1   | not started                                                                              |             |
-| AU      | W2   | not started                                                                              |             |
-| AU      | W3   | not started                                                                              |             |
-| AU      | W4   | not started                                                                              |             |
-| AU      | W5   | not started                                                                              |             |
+| Feature | Wave | State                                                                                                                                                                                             | Commit      |
+| ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| NMTU    | W1   | done: bench DK5EN-1 app+Safeboot MSS 1240/1436, AP path and classic Safeboot not benched                                                                                                          | this commit |
+| BLC     | W1   | done: ble_cycle 50x gap0 + 20x unclean on DK5EN-1 and DK5EN-90, 0 failures, advert median 346-654 ms (max 2865, scanner-inclusive); RAK counters con=70 dis=70 match; open B1 bleQueue carry-over | this commit |
+| SNF-GW  | W1   | not started                                                                                                                                                                                       |             |
+| SNF-GW  | W2   | not started                                                                                                                                                                                       |             |
+| SNF-GW  | W3   | not started                                                                                                                                                                                       |             |
+| RM      | W1   | not started                                                                                                                                                                                       |             |
+| RM      | W2   | not started                                                                                                                                                                                       |             |
+| RM      | W3   | not started                                                                                                                                                                                       |             |
+| AU      | W0   | not started                                                                                                                                                                                       |             |
+| AU      | W1   | not started                                                                                                                                                                                       |             |
+| AU      | W2   | not started                                                                                                                                                                                       |             |
+| AU      | W3   | not started                                                                                                                                                                                       |             |
+| AU      | W4   | not started                                                                                                                                                                                       |             |
+| AU      | W5   | not started                                                                                                                                                                                       |             |
 
-Next: BLC W1. Line references of section 8 re-verified at 5b614bb4 (unchanged). Before dispatch the
-orchestrator adds `[env:native_ble_session]` to `platformio.ini` and regenerates the golden json.
+Next: SNF-GW W1. Line references of section 7 re-verified 2026-10-04 (scout); mock server is
+`tools/mock/meshcom_server.py` (tests `tools/mock/test_mock_server.py`).
 
 ## 10. Questions for the maintainers and other repos
 

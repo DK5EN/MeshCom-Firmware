@@ -1523,6 +1523,23 @@ evidence per finding: [`docs/review/2026-08-29-upstream-sync-verdict.md`](../rev
 | UP-05 | 2026-08-29 | `fc83554e..2cb6bb4d` | `command_functions.cpp:4961-4990`                             | `I` register 239/244 chars with six group calls; next key truncates it                                        | Low    | watch                                                                                                                                          |
 | UP-06 | 2026-08-29 | pre-existing         | `regex_functions.cpp:9`, `aprs_functions.cpp:194,292`         | Callsign regex `[0-9]+` unbounded: 119-char callsigns pass validation and reach `MAX_CALL_LEN` consumers      | Medium | open — trace consumers, PR                                                                                                                     |
 
+### N-38 — ESP32 BLE: reconnect between two loop passes skips the session reset — **FIXED (2026-10-04, BLC-01)** — Medium, BLE
+
+**Where:** `src/esp32/esp32_main.cpp` loop edge `!deviceConnected && oldDeviceConnected` (was the only
+place that cleared `isPhoneReady`, `bAckInfo`, `config_to_phone_prepare`, `conffin_sent`).
+
+**Defect:** a central that disconnects and a new one that connects between two loop passes leave the
+loop no edge to see. The new central inherited `isPhoneReady == 1` and skipped the hello and PIN check
+for the session. nRF52 resets inside its callbacks and never had the race.
+
+**Fix:** the per-session reset (`bleSessionReset`, `src/ble_session.h`) runs in `onConnect` and
+`onDisconnect`; it also clears a pending wrong-PIN `ble_disconnect_requested` so it cannot hit the next
+central. The loop edge only logs. Pinned by `test_ble_session`
+(`test_race_reconnect_within_one_tick_resets_session` fails on the old semantics).
+
+**Residual (open, BLC backlog B1):** a hello of the old central still queued in `bleQueue` is processed
+after the new central connected. Fix candidate: tag queue items with the connection handle.
+
 ### N-30 — Stored XSS: Mesh-Nachrichtentext landet unescaped im Web-UI — **FIXED (`81cfc064`, Wave 1 2026-08-31)** — High, RF→LAN
 
 Jeder LoRa-/Mesh-Sender konnte Script im Browser des Operators ausfuehren: die
