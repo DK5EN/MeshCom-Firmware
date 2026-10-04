@@ -5005,7 +5005,11 @@ void commandAction(char *umsg_text, bool ble)
         if(sscanf(msg_text+12, "%15s %lf %lf", call, &lat, &lon) == 3)
         {
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            // same two calls as a received POSITION frame (lora_functions.cpp),
+            // so the injected station also reaches the POS table and, with
+            // --persistsd on, /pos.dat -- the TD-15 bench seeds it this way.
             tdeck_add_pos_point(String(call), fabs(lat), lat < 0 ? 'S' : 'N', fabs(lon), lon < 0 ? 'W' : 'E');
+            tdeck_add_to_pos_view(String(call), fabs(lat), lat < 0 ? 'S' : 'N', fabs(lon), lon < 0 ? 'W' : 'E', 0);
             Serial.printf("[INJECTPOS];ok;%s;%.5f;%.5f\n", call, lat, lon);
             #else
             inject_position(call, lat, lon, -60, 6);

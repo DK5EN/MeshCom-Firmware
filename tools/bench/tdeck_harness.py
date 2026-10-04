@@ -816,6 +816,10 @@ def _zoom_step(session: TDeckSession, direction: str) -> Dict[str, Any]:
             step["compose_ms"] = int(mm.group(4))
             step["tiles"] = int(mm.group(2))
             step["tiles_missing"] = int(mm.group(3))
+            mm = re.search(r"decode (\d+) ms", l)
+            step["decode_ms"] = int(mm.group(1)) if mm else None
+            mm = _SDMAP_CACHE_RE.search(l)
+            step["cache"] = (int(mm.group(1)), int(mm.group(2))) if mm else None
     return step
 
 
@@ -1616,6 +1620,9 @@ _SDMAP_BUILT_RE = re.compile(
 _SDMAP_SKIPPED_RE = re.compile(
     r"Karte unveraendert, Aufbau uebersprungen(?:\s+from=(\w+))?"
 )
+# TD-09: cumulative decoded-tile cache counters, "cache <hits>/<misses>",
+# printed inside the parenthesised detail of the compose line.
+_SDMAP_CACHE_RE = re.compile(r"cache (\d+)/(\d+)")
 
 
 def scenario_map_tab_pick(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
@@ -1748,6 +1755,238 @@ def scenario_map_tab_pick(session: TDeckSession, args: argparse.Namespace) -> Di
         "sdmap_skipped": sdmap_skipped,
         "ref_h": ref_h,
         "loop_gaps_lvgl": loop_gaps_lvgl,
+    }
+
+
+# --------------------------------------------------------------------------
+# map_rebuild: TD-09, the second zoom cycle is served from the tile cache
+# --------------------------------------------------------------------------
+
+def scenario_map_rebuild(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-09: decoded-tile cache in PSRAM (src/t-deck/tile_cache.h, used by
+    tdeck_sdmap.cpp). Two zoom-in/zoom-out cycles on the map tab over the
+    same tiles. The first cycle may read and decode (misses); on the second
+    cycle every tile of both rebuilds must be a cache hit: "decode 0 ms" and
+    the cumulative hit counter grows by exactly the number of tiles drawn
+    (tiles minus missing ones, which are a miss on every rebuild). Without
+    the cache every rebuild decodes again (~170 ms per tile) and the `cache`
+    field is absent, which FAILs. The compose times are reported, not
+    asserted: cycle 1 is often already served from the cache (the tab open
+    and the pre-step decoded the same tiles), so a time comparison between
+    the cycles is a coin flip.
+
+    PASS iff: every step acked, no crash, the two steps of cycle 2 report a
+    compose line with a cache field, decode_ms of both cycle-2 steps is 0,
+    and hits(end of cycle 2) - hits(end of cycle 1) == tiles drawn in cycle
+    2. A map set with a single zoom level cannot be tested (reason given).
+    """
+    session.send("--tft on")
+    session.send("--tab 3")
+    time.sleep(2.5)
+    # Leave the bound: --map ends at the upper zoom bound, so step out once
+    # first; from there "in" then "out" always changes the zoom.
+    pre = _zoom_step(session, "out")
+    if pre["crash"] or not pre["acked"]:
+        return {"ok": False, "reason": "pre-step not acked", "pre": pre}
+    steps: List[Dict[str, Any]] = []
+    for cycle in (1, 2):
+        for d in ("in", "out"):
+            st = _zoom_step(session, d)
+            st["cycle"] = cycle
+            steps.append(st)
+            if st["crash"] or not st["acked"]:
+                break
+    crashed = next((st["crash"] for st in steps if st["crash"]), None)
+    all_acked = all(st["acked"] for st in steps) and len(steps) == 4
+    zooms = {st["zoom"] for st in steps if st["zoom"] is not None}
+    if len(zooms) < 2:
+        return {"ok": False, "reason": "map set has a single zoom level, nothing to rebuild",
+                "steps": steps}
+    c1 = [st for st in steps if st.get("cycle") == 1 and st.get("compose_ms") is not None]
+    c2 = [st for st in steps if st.get("cycle") == 2 and st.get("compose_ms") is not None]
+    # "cache 0/0" on every line means the allocation failed (cache off)
+    cache_lines = [st for st in steps if st.get("cache") and st["cache"] != (0, 0)]
+    hits_c1_end = c1[-1]["cache"][0] if c1 and c1[-1].get("cache") else None
+    hits_c2_end = c2[-1]["cache"][0] if c2 and c2[-1].get("cache") else None
+    c2_drawn = sum((st.get("tiles") or 0) - (st.get("tiles_missing") or 0) for st in c2)
+    hits_delta = (hits_c2_end - hits_c1_end) if (hits_c1_end is not None and hits_c2_end is not None) else None
+    hits_match = hits_delta is not None and c2_drawn > 0 and hits_delta == c2_drawn
+    c2_decode_zero = len(c2) == 2 and all(st.get("decode_ms") == 0 for st in c2)
+    c1_max = max((st["compose_ms"] for st in c1), default=None)
+    c2_max = max((st["compose_ms"] for st in c2), default=None)
+    reason = None
+    if crashed:
+        reason = f"crash: {crashed}"
+    elif not all_acked:
+        reason = "a zoom step was not acked"
+    elif not cache_lines:
+        reason = "no cache field in any compose line (cache not built in, or PSRAM allocation failed)"
+    elif len(c2) != 2:
+        reason = f"cycle 2 produced {len(c2)} compose lines, expected 2"
+    elif not c2_decode_zero:
+        reason = "cycle 2 still decoded: " + ", ".join(str(st.get("decode_ms")) for st in c2)
+    elif not hits_match:
+        reason = f"hits grew by {hits_delta} over cycle 2, expected the {c2_drawn} tiles drawn"
+    return {
+        "ok": reason is None,
+        "reason": reason,
+        "pre": pre,
+        "steps": steps,
+        "cycle1_compose_ms_max": c1_max,
+        "cycle2_compose_ms_max": c2_max,
+        "hits_end_cycle1": hits_c1_end,
+        "hits_end_cycle2": hits_c2_end,
+        "cycle2_tiles_drawn": c2_drawn,
+        "cache_last": cache_lines[-1]["cache"] if cache_lines else None,
+    }
+
+
+# --------------------------------------------------------------------------
+# map_persist_seed / map_persist_check: TD-15, markers survive a reboot
+# --------------------------------------------------------------------------
+
+PERSIST_STATIONS = 5
+PERSIST_CALL_BASE = 50   # DK5EM-51..56: not DK5EN, and clear of --map's DK5EM-01..40
+PERSIST_SEED_TOTAL = PERSIST_STATIONS + 1   # plus the trigger station after the save window
+PERSIST_SAVE_WINDOW_S = 32.0   # savePosPersistence() writes at most every 30 s
+MAP_POINT_RING = 30   # MAX_POINTS: map_points is the ring index of drawn markers, not a count
+PERSIST_CALLS = [f"DK5EM-{PERSIST_CALL_BASE + i:02d}" for i in range(1, PERSIST_SEED_TOTAL + 1)]
+
+
+def _instr_map_points(session: TDeckSession) -> Optional[int]:
+    idx = session.send("--instr")
+    m = session.wait_for(r"\[INSTR-GUI\];", 2.0, since=idx)
+    rec = parse_line(m.string) if m else None
+    return rec.get("map_points") if rec else None
+
+
+def scenario_map_persist_seed(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-15 part 1 of 2: seed /pos.dat. `--persistsd on` (acked by
+    `[PERSIST];sd;1`), then PERSIST_STATIONS stations within 0.5 km via
+    --injectpos, which feeds the map and the POS table like a received
+    POSITION frame. The POS table (newest row first) goes to /pos.dat on an
+    addition while persistence is on, but at most every 30 s
+    (savePosPersistence), so after the five stations the scenario waits out
+    that window and injects one more trigger station, whose save carries all
+    six. Evidence that every station reached the POS table is the
+    `[POSVIEW]...add <call> act posrow:<n>` line tdeck_add_to_pos_view()
+    logs under --debug (a re-run with the same callsigns and coordinates
+    changes no marker, so the drawn-marker ring index `map_points` is
+    reported only). The save itself is proven by map_persist_check.
+
+    Part 2 is `map_persist_check` in a NEW harness invocation: opening the
+    port reboots the T-Deck, which is the reboot under test. Run them
+    back to back: `--scenario map_persist_seed`, then
+    `--scenario map_persist_check`.
+    """
+    home = _own_position(session)
+    if home is None:
+        return {"ok": False, "reason": "no own position (--pos gave 0/0 or no answer)"}
+    lat, lon = home
+    idx = session.send("--persistsd on")
+    m = session.wait_for(r"\[PERSIST\];sd;(\d)", 3.0, since=idx)
+    if m is None or m.group(1) != "1":
+        return {"ok": False, "reason": "--persistsd on not acknowledged with [PERSIST];sd;1",
+                "line": m.string.strip()[:100] if m else None}
+    session.send("--tft on")
+    session.send("--debug on")   # tdeck_add_to_pos_view() logs [POSVIEW] under bDEBUG
+    session.send("--tab 3")
+    time.sleep(2.0)
+    points_before = _instr_map_points(session)
+    stations = []
+    inject_ok = True
+    first_idx = session.length()
+    for i, call in enumerate(PERSIST_CALLS, start=1):
+        if i == PERSIST_SEED_TOTAL:
+            time.sleep(PERSIST_SAVE_WINDOW_S)   # the trigger station's save must not be throttled
+        slat, slon = _offset(lat, lon, 0.15 + 0.07 * i, (i * 73) % 360)
+        idx = session.send(f"--injectpos {call} {slat:.5f} {slon:.5f}")
+        m = session.wait_for(r"\[INJECTPOS\];(ok|err)|" + CRASH_PATTERN, 6.0, since=idx)
+        ok = m is not None and "INJECTPOS];ok" in m.string
+        stations.append({"call": call, "lat": round(slat, 5), "lon": round(slon, 5), "ok": ok,
+                         "line": m.string.strip()[:100] if m else None})
+        if not ok:
+            inject_ok = False
+        time.sleep(1.0)
+    time.sleep(2.0)   # let the SD write finish before the next port open reboots the node
+    points_after = _instr_map_points(session)
+    posview = []
+    for _, _, l in session.records_since(first_idx):
+        mm = re.search(r"\[POSVIEW\]\.\.\.add (\S+) act posrow", l)
+        if mm:
+            posview.append(mm.group(1))
+    posview_missing = [c for c in PERSIST_CALLS if c not in posview]
+    reason = None
+    if not inject_ok:
+        reason = "an injection was not acknowledged"
+    elif posview_missing:
+        reason = f"no [POSVIEW] add line for {', '.join(posview_missing)} (debug off, or the POS table path was not reached)"
+    return {
+        "ok": reason is None,
+        "reason": reason,
+        "home": {"lat": lat, "lon": lon},
+        "stations": stations,
+        "posview_added": [c for c in PERSIST_CALLS if c in posview],
+        "map_points_before": points_before,
+        "map_points_after": points_after,
+        "next": "run --scenario map_persist_check in a new harness invocation (port open = reboot)",
+    }
+
+
+def scenario_map_persist_check(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-15 part 2 of 2: after the reboot that opening the port caused, the
+    stations seeded by `map_persist_seed` must be back on the map without any
+    new frame: loadPosPersistence() restores the marker arrays from /pos.dat,
+    not only the POS table. Opening the MAP tab runs refresh_map(), which
+    draws every marker slot and, with --debug on, logs
+    `[ MAP ]...check add call: <call>` per marker: the seeded callsigns must
+    all be in those lines. Afterwards persistence is turned off again
+    (`--persistsd off`, `[PERSIST];sd;0`) so later bench runs do not write
+    the SD card.
+
+    PASS iff: the boot log shows no "POS not persisting" line, every seeded
+    callsign (PERSIST_CALLS) was drawn after `--tab 3`, and the off command
+    was acknowledged. On the unfixed build none of them is drawn (the markers
+    were RAM-only); the /pos.dat rows from the field (real stations) are
+    restored too and reported as a count.
+    """
+    boot_lines = [l for _, _, l in session.records_since(0)]
+    not_persisting = [l for l in boot_lines if "POS not persisting" in l]
+    persist_lines = [l for l in boot_lines if "[PERSIST]" in l]
+    session.send("--tft on")
+    session.send("--debug on")   # refresh_map() logs each drawn marker under bDEBUG
+    time.sleep(0.3)
+    tab_idx = session.send("--tab 3")
+    time.sleep(3.0)
+    drawn = []
+    for _, _, l in session.records_since(tab_idx):
+        mm = re.search(r"\[ MAP \]\.\.\.check add call: (\S+)", l)
+        if mm:
+            drawn.append(mm.group(1))
+    seeded_found = [c for c in PERSIST_CALLS if c in drawn]
+    seeded_missing = [c for c in PERSIST_CALLS if c not in drawn]
+    points = _instr_map_points(session)
+    idx = session.send("--persistsd off")
+    m_off = session.wait_for(r"\[PERSIST\];sd;(\d)", 3.0, since=idx)
+    restored_off = m_off is not None and m_off.group(1) == "0"
+    reason = None
+    if not_persisting:
+        reason = "persistence was off at boot (run map_persist_seed first)"
+    elif not drawn:
+        reason = "no '[ MAP ]...check add call' line after --tab 3 (debug off, or nothing restored)"
+    elif seeded_missing:
+        reason = f"seeded stations not drawn after the reboot: {', '.join(seeded_missing)}"
+    elif not restored_off:
+        reason = "--persistsd off not acknowledged"
+    return {
+        "ok": reason is None,
+        "reason": reason,
+        "seeded_found": seeded_found,
+        "seeded_missing": seeded_missing,
+        "drawn_total": len(set(drawn)),
+        "map_points_after_boot": points,
+        "persist_boot_lines": persist_lines[:5],
+        "persistsd_off_acked": restored_off,
     }
 
 
@@ -2631,6 +2870,9 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "uptime": scenario_uptime,
     "map": scenario_map,
     "map_tab_pick": scenario_map_tab_pick,
+    "map_rebuild": scenario_map_rebuild,
+    "map_persist_seed": scenario_map_persist_seed,
+    "map_persist_check": scenario_map_persist_check,
     "nav": scenario_nav,
     "input": scenario_input,
     "msg_roll": scenario_msg_roll,
@@ -2656,6 +2898,7 @@ SCENARIO_ORDER = [
     "disptest",
     "map",
     "map_tab_pick",
+    "map_rebuild",
     "nav",
     "input",
     "msg_roll",

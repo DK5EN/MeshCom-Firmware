@@ -30,8 +30,8 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1651 Unity cases today) plus `test/golden/selftest.sh`.
-- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (547 cases), the
+- Stage 1: every `[env:native*]` (48 envs, 1670 Unity cases today) plus `test/golden/selftest.sh`.
+- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (553 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
 - Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,
@@ -93,6 +93,10 @@ Hard bench rules:
 
 ## Hottest first (details in BACKLOG)
 
+- T-Deck campaign (`docs/campaign-tdeck-w02-20261004.md`): wave 1 done (TD-15 map restore +
+  hemisphere fix, TD-09 tile cache), not yet offered upstream. Wave 2 open: TD-11 (ACK status in
+  the message bubble) and W0.2 (warning flags on the five envs without `extends = esp32`,
+  inventory in the campaign doc).
 - N-36 (softAP on a fresh ESP32) is fixed on `fork-dev`; the upstream PR text is drafted
   (`docs/pr-draft-n36-20261003.md`), not filed.
 - RX-01: the SX127x T-Beam missed a direct beacon during its `RX_TIMEOUT` receive restart (one
@@ -106,9 +110,11 @@ Hard bench rules:
 
 ## Last three sessions
 
-- **2026-10-04:** bench campaign: `prepare <node>` step, RAK under the driver (DFU, instrument
-  flag on the upload), OLED `dirty`/`pos` and T-Deck TD-20 root-caused in the harnesses (LoRa
-  frames, trackball clamp), OTA image built by the driver; stage 3 green on three nodes.
+- **2026-10-04:** bench campaign (prepare step, RAK under the driver, TD-20 = trackball clamp,
+  stage 3 green on three nodes); RX-01 24 h soak on DK5EN-98 started (console on rpizero,
+  passive Extern-UDP sniffer on mcapp, evaluate 2026-10-05 after 11:17); T-Deck campaign wave 1:
+  TD-15 map restore after reboot, TD-09 PSRAM tile cache, MEM-04 re-measured and closed, W0.2
+  warning inventory; three new harness scenarios (`map_rebuild`, `map_persist_seed/check`).
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix
