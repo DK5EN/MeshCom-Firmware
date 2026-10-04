@@ -1,5 +1,10 @@
 # Disappearing delivery ticks — Fable Verdict and Improvement Plan (2026-10-04)
 
+> **Status 2026-10-04:** Findings 1-3 fixed on `fork-dev` (B1-B4 plus the advisor's late-ACK
+> must-fix), bench-verified on DK5EN-92/-14. Fork only. Implementation log:
+> [`webgui-ack-ticks-impl-plan.md`](webgui-ack-ticks-impl-plan.md). The MCApp part (section C)
+> went to the webapp agent as `~/Desktop/webapp-ack-matcher-issue.md`.
+
 Report: DK1TCP-77 (Pit), 2026-10-04 11:22 — "mit den 'Rückmeldungs-Haken' geht es in der Web-GUI
 manchmal noch etwas durcheinander. Bereits quittierte Hak. verschwinden wieder."
 

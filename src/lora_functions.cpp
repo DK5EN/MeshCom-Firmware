@@ -20,6 +20,7 @@
 #include "dm_dedup.h"       // stage 2.1: second dedup layer, keyed on (source call, NNN)
 #include "instrument.h"     // stage 0.5: --airgap (bAirgap), INSTRUMENT_ENABLED
 #include "pn_retry.h"       // PN retry (XOR form): pnRetryCore/pnRetryId/pnFrameIsOwnPn etc.
+#include "own_msg_status.h"  // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -462,6 +463,8 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
     // wurde als fremdes weitergesendet. Ab hier gilt die Original-id.
     msg_id = pnOwnTxLookupId(msg_id, _GW_ID);
     int itxcheck = checkOwnTx(msg_id);
+    if(itxcheck < 0)
+        ownMsgStatusSet(msg_id, 0x02);   // late ACK (a held DM is acked hours later): the ring slot is gone, the durable status row is not
 
     if(bIsNew || itxcheck >= 0)
     {
@@ -494,7 +497,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
                     }
                 }
 
-                own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
+                setOwnMsgStatus(itxcheck, 0x02);   // 02...ACK
             }
 
             // stop retransmission in ring buffer for this msg_id
@@ -685,14 +688,6 @@ static NbrGwHint nbrGwHintFromDest(char payload_type, const char *dest)
         return NBR_GW_NO;
     return NBR_GW_UNKNOWN;
 }
-
-#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-// TD-11: the msg_id of an own_msg_id ring entry (bytes 0-3, little-endian)
-static inline uint32_t own_msg_id_u32(int i)
-{
-    return (uint32_t)own_msg_id[i][0] | ((uint32_t)own_msg_id[i][1] << 8) | ((uint32_t)own_msg_id[i][2] << 16) | ((uint32_t)own_msg_id[i][3] << 24);
-}
-#endif
 
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
@@ -1494,17 +1489,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // the mesh still relays it.
                     if(own_msg_id[heardIcheck][4] != 0x02 && own_msg_id[heardIcheck][4] != 0x03 && own_msg_id[heardIcheck][4] != 0x04)
                     {
-                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                        bool bTdeckHeardNew = (own_msg_id[heardIcheck][4] != 0x01);   // every relay echo lands here, report the transition only
-                        #endif
-
-                        own_msg_id[heardIcheck][4]=0x01; // 0x01 HEARD
-
-                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                        // TD-11: OnRxDone() runs in esp32loop(), the LVGL task, no lock needed
-                        if(bTdeckHeardNew)
-                            tdeck_set_msg_status(own_msg_id_u32(heardIcheck), 0x01);
-                        #endif
+                        // every relay echo lands here; setOwnMsgStatus() reports the transition only
+                        setOwnMsgStatus(heardIcheck, 0x01); // 0x01 HEARD
                     }
                 }
             }
@@ -1684,13 +1670,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         }
                                 
                                         int iackcheck = checkOwnTx(msg_counter);
+                                        if(iackcheck < 0)
+                                            ownMsgStatusSet(msg_counter, 0x02);   // late ACK (a held DM is acked hours later): the ring slot is gone, the durable status row is not
                                         if(iackcheck >= 0)
                                         {
-                                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
-
-                                            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                                            tdeck_set_msg_status(own_msg_id_u32(iackcheck), 0x02);   // TD-11: esp32loop(), no lock needed
-                                            #endif
+                                            setOwnMsgStatus(iackcheck, 0x02);   // 02...ACK
 
                                             // S4: the destination's own ack is the final word --
                                             // forget any store node(s) that were holding this DM.
@@ -1730,11 +1714,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                            (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
                                            stoHolderNote(msg_counter, aprsmsg.msg_source_call, stoNnn, millis()))
                                         {
-                                            own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
-
-                                            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                                            tdeck_set_msg_status(own_msg_id_u32(iStoCheck), 0x04);   // TD-11: esp32loop(), no lock needed
-                                            #endif
+                                            setOwnMsgStatus(iStoCheck, 0x04);   // 04...HELD
 
                                             uint16_t stoPlen = buildAckPhoneFrame(print_buff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call);
                                             addBLEOutBuffer(print_buff, stoPlen);
@@ -3133,12 +3113,7 @@ bool updateRetransmissionStatus()
                                 {
                                     if(idx >= 0 && own_msg_id[idx][4] != 0x02)
                                     {
-                                        own_msg_id[idx][4] = 0x03;
-
-                                        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                                        // TD-11: updateRetransmissionStatus() runs in esp32loop(), no lock needed
-                                        tdeck_set_msg_status(own_msg_id_u32(idx), 0x03);
-                                        #endif
+                                        setOwnMsgStatus(idx, 0x03);
                                     }
 
                                     // M1: das Ziel hat schon geackt (0x02) --

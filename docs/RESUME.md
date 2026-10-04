@@ -30,7 +30,7 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1684 Unity cases today) plus `test/golden/selftest.sh`.
+- Stage 1: every `[env:native*]` (48 envs, 1698 Unity cases today) plus `test/golden/selftest.sh`.
 - Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (553 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
@@ -48,8 +48,9 @@
 
 ## Bench fleet
 
-State of `tools/bench/fleet.json`, 2026-10-04. RAK, T-Beam and T-Deck are on USB and run
-instrument images (`INSTRUMENT_ENABLED=1`) of `fork-dev`; the Heltec is unplugged.
+State of `tools/bench/fleet.json`, 2026-10-04. RAK, T-Beam and T-Deck are on USB; the RAK runs an
+instrument image (`INSTRUMENT_ENABLED=1`) of `fork-dev`, T-Beam and T-Deck run the plain WEB-04
+image (17:52 build, OTA 2026-10-04 evening); the Heltec is unplugged.
 
 | Node     | Board           | USB serial              | Port last seen                | IP            |
 | -------- | --------------- | ----------------------- | ----------------------------- | ------------- |
@@ -93,6 +94,10 @@ Hard bench rules:
 
 ## Hottest first (details in BACKLOG)
 
+- WEB-04 (web GUI delivery ticks vanish, DK1TCP-77): fixed and bench-verified on `fork-dev`
+  2026-10-04, fork only. MCApp's own ack-matcher bugs went to the webapp agent
+  (`~/Desktop/webapp-ack-matcher-issue.md`). Verdict and log:
+  `docs/webgui-ack-ticks-verdict-20261004.md`, `docs/webgui-ack-ticks-impl-plan.md`.
 - T-Deck campaign (`docs/campaign-tdeck-w02-20261004.md`): both waves done on 2026-10-04 (TD-15
   map restore + hemisphere fix, TD-09 tile cache, TD-11 ACK glyph, W0.2 warning flags on the five
   envs and on `nrf52_base`), nothing offered upstream yet: one German PR for TD-09/TD-11/TD-15
@@ -120,7 +125,8 @@ Hard bench rules:
   paper closed and archived (`docs/archive/regression-offene-punkte-20261003.md`).
   Evening: T-Deck campaign wave 2 (TD-11 ACK glyph in the bubble, W0.2 flags on five envs +
   nrf52_base, `msg_ack` harness scenario), then T5-01 and EXT-01 fixed blind (five of five envs
-  with `-Werror`), and EXT-03: Extern-UDP refuses broadcast/multicast targets.
+  with `-Werror`), and EXT-03: Extern-UDP refuses broadcast/multicast targets. Evening: WEB-04 web GUI ticks (verdict via fable-review, one
+  orchestrated wave, advisor must-fix for late ACKs, before/after bench on DK5EN-92/-14).
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix

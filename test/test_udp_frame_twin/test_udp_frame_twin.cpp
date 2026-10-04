@@ -68,6 +68,7 @@
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
 #include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
+#include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -366,6 +367,15 @@ int checkOwnTx(unsigned int msg_id)
         if (g_own_tx_known[i] == msg_id)
             return (int)i;
     return -1;
+}
+
+// setOwnMsgStatus(): the one write path of own_msg_id[idx][4] on hardware
+// (loop_functions.cpp, web GUI tick fix). Modelled as the plain slot write the
+// handlers did before, so the ACK/HELD assertions below keep reading own_msg_id.
+void setOwnMsgStatus(int idx, uint8_t state)
+{
+    if (idx >= 0 && idx < MAX_RING)
+        own_msg_id[idx][4] = state;
 }
 
 void insertOwnTx(unsigned int id)
@@ -1726,6 +1736,38 @@ static void test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both(vo
 // udp_frame_esp32.cpp/udp_frame_nrf52.cpp (peer_ack 1 and rtt[0] 1 after the
 // :rej). The LoRa call site (lora_functions.cpp) is not built in this env and
 // carries the same gate.
+// Web GUI tick fix (docs/webgui-ack-ticks-verdict-20261004.md, advisor
+// must-fix): a held DM is acked hours later, long after its own_msg_id ring
+// slot was recycled. checkOwnTx() then finds nothing, so before the fix the
+// durable status row kept 0x04 and the web page showed "held" forever. The
+// server-ingress ack must upgrade the row by msg_id on both platforms.
+static void test_regression_server_late_ack_upgrades_status_row_on_both(void)
+{
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack7", 0x7207);
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (7 & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        recorder_reset();               // ring knows nothing: the slot was recycled
+        ownMsgStatusReset();
+        ownMsgStatusRegister(expected_msg_id);
+        ownMsgStatusSet(expected_msg_id, 0x04);   // held by a store node
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: late ack did not upgrade the durable status row to ACK", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0x02, ownMsgStatusGet(expected_msg_id), msg);
+    }
+}
+
 static void test_regression_server_rej_own_dm_counts_nothing_on_both(void)
 {
     uint8_t rejTmpl[BUF_CAP];
@@ -2516,6 +2558,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
     RUN_TEST(test_regression_server_ack_own_dm_stops_ring_on_both);
     RUN_TEST(test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both);
+    RUN_TEST(test_regression_server_late_ack_upgrades_status_row_on_both);
     RUN_TEST(test_regression_server_rej_own_dm_counts_nothing_on_both);
     RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);

@@ -2311,7 +2311,8 @@
    "+<reack_limiter.cpp>",
    "+<dm_dedup.cpp>",
    "+<msgstore.cpp>",
-   "+<sto_notice.cpp>"
+   "+<sto_notice.cpp>",
+   "+<own_msg_status.cpp>"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2361,7 +2362,8 @@
    "test_dm_text_escape",
    "test_msgstore",
    "test_sto_notice",
-   "test_tft_backlight"
+   "test_tft_backlight",
+   "test_own_msg_status"
   ],
   "test_framework": "unity"
  },
@@ -3412,6 +3414,7 @@
    "+<dm_stats.cpp>",
    "+<dm_dedup.cpp>",
    "+<reack_limiter.cpp>",
+   "+<own_msg_status.cpp>",
    "+<esp32/udp_frame_esp32.cpp>",
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],

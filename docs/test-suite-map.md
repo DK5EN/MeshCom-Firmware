@@ -165,6 +165,7 @@ flashes whatever is attached.
 | test_nrf52_settings_paths    | Integration   |    26 | native_nrf52_settings_paths                                  |
 | test_ntp_async               | Regression    |    10 | native                                                       |
 | test_ntp_harvest             | Regression    |     4 | native                                                       |
+| test_own_msg_status          | Regression    |    13 | native                                                       |
 | test_pn_retry                | Unit          |    34 | native_pnretry                                               |
 | test_pos_tag_nan             | Regression    |     7 | native_parsers                                               |
 | test_printfdeb_format        | Regression    |    13 | native                                                       |
@@ -184,7 +185,7 @@ flashes whatever is attached.
 | test_txprio_replay           | Oracle/Replay |     1 | native_aprs                                                  |
 | test_txring                  | Unit          |    43 | native_aprs                                                  |
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
-| test_udp_frame_twin          | Twin          |    30 | native_udp_frame_twin                                        |
+| test_udp_frame_twin          | Twin          |    31 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |
 | test_url_decode              | Regression    |    14 | native                                                       |

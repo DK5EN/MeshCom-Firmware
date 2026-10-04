@@ -1474,6 +1474,37 @@ Fix: Praedikat `wifiSsidMissingBlocksStart(apMode, ssid)` in
 > nach `--setcall DK5EN-1` und `--wifiap on` AP `DK5EN-1` auf 192.168.4.1.
 > Advisor-Pass (Watchdog-, T-Deck-, Ethernet-, Safeboot-Pfade) ohne Befund.
 
+### N-37 — Web-GUI: Zustell-Haken eigener Nachrichten verschwinden wieder — **FIXED (2026-10-04, auf echter Hardware reproduziert und verifiziert)** — Medium, Web-GUI
+
+Gemeldet von Pit (DK1TCP-77): "Bereits quittierte Haken verschwinden wieder."
+
+Ursache: Die Nachrichtenseite (`sub_content_messages()`, `/?getmessages`) las
+den Zustand eines eigenen Textes live aus `own_msg_id[][4]` (`checkOwnTx()`).
+Das ist ein 20-Platz-Ring, in den jeder eigene Rahmen schreibt: Positionen,
+eigene ACKs, Pongs, HEY, Telemetrie und auf einem Gateway jeder vom Server auf
+LoRa weitergereichte Rahmen. Nach rund 20 eigenen Rahmen ist der Platz weg, die
+Nachricht steht aber noch in der Liste (`phoneRing` wird von anderem Verkehr
+gefuellt), und der 30-s-Refresh ersetzt die Sprechblase durch eine ohne Haken.
+Nebenbefunde: empfangene Nachrichten zeigten auf einem Gateway einen Haken
+(weitergereichte Fremd-ids im Ring), und der T-Deck-Haken (TD-11) bekam das
+0x41-ACK sowie Server-ACK/held nicht.
+
+Fix: eigene Status-Tabelle nur fuer eigene Texte (`src/own_msg_status.*`,
+rangmonoton), ein Setter `setOwnMsgStatus()` fuer alle neun Schreibstellen,
+spaete ACKs bei recyceltem Ring-Platz schreiben die Tabelle per msg_id, kein
+Haken auf empfangenen Nachrichten, der Browser behaelt einen hoeherrangigen
+Haken (`mcTickKeep`). Tests: `test/test_own_msg_status/`, Twin-Fall
+`test_regression_server_late_ack_upgrades_status_row_on_both`,
+`tools/webgui_tick_test.js`. Details:
+[`webgui-ack-ticks-verdict-20261004.md`](../webgui-ack-ticks-verdict-20261004.md).
+
+> **STATUS 2026-10-04 — FIXED, nur Fork.** Bench DK5EN-92 (Anzeige) und
+> DK5EN-14 (pingt, jedes Pong belegt einen Ring-Platz auf -92), 2 dBm, nur DMs
+> zwischen eigenen Knoten. Altes Image: DM quittiert (ACK-Haken nach 10 s),
+> nach 22 Pongs Haken weg, Nachricht noch gelistet. Neues Image: Haken nach 25
+> Pongs unveraendert. Advisor-Pass (Fable): ein Must-fix (spaetes ACK bei
+> recyceltem Platz), umgesetzt und per Twin-Test belegt (vorher rot, nachher gruen).
+
 ## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
 
 Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
