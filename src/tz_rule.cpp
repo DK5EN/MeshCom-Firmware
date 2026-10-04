@@ -226,3 +226,35 @@ const char *tzAbbrev(const TzRule *r, uint32_t utc)
 {
     return isDst(r, utc) ? r->dstName : r->stdName;
 }
+
+// ------------------------------------------------------------ reject reason
+
+const char *tzRejectReason(const char *tz)
+{
+    int n = 0;
+    while (tz[n])
+        n++;
+    if (n > TZ_MAX_LEN)
+        return "too long (max 39 characters)";
+
+    // Jn / n day rules: a segment (start of the string or after a comma) that
+    // is [J]digits, optionally followed by /time. Names such as JST are not.
+    for (const char *seg = tz; seg != nullptr; )
+    {
+        const char *c = seg;
+        if (*c == 'J' || *c == 'j')
+            c++;
+        if (isDigit(*c))
+        {
+            while (isDigit(*c))
+                c++;
+            if (*c == '\0' || *c == ',' || *c == '/')
+                return "only M rules supported (Mm.w.d)";
+        }
+        while (*seg && *seg != ',')
+            seg++;
+        seg = (*seg == ',') ? seg + 1 : nullptr;
+    }
+
+    return "format (std offset dst,Mm.w.d/time,Mm.w.d/time)";
+}

@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-106 suites with tests, 1663 `RUN_TEST` cases, 51 native environments. Five
+106 suites with tests, 1664 `RUN_TEST` cases, 51 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     54 |  1129 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     54 |  1130 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     22 |   228 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |    98 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -209,7 +209,7 @@ flashes whatever is attached.
 | test_txring                  | Unit          |    43 | native_aprs                                                  |
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
 | test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
-| test_tz_rule                 | Unit          |    10 | native_tz_rule                                               |
+| test_tz_rule                 | Unit          |    11 | native_tz_rule                                               |
 | test_udp_frame_twin          | Twin          |    31 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |

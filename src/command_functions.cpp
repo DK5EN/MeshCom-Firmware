@@ -44,7 +44,7 @@
 #endif
 #include "tinyxml_functions.h"
 #include "clock.h"
-#include "tz_rule.h" // TZ-01: tzParse(), TZ_MAX_LEN for --settz
+#include "tz_rule.h" // TZ-01: tzParse(), tzRejectReason() for --settz
 
 #ifdef ESP32
 #include "esp32/esp32_functions.h"
@@ -581,26 +581,6 @@ void commandAction(char *msg_text, int iphone, bool rxFromPhone)
 static void cmdArgNotNumber(const char *label, const char *arg)
 {
     printfdeb("%s: <%s> is not a number\n", label, arg);
-}
-
-/**
- * TZ-01: why tzParse() refused a --settz argument, as one of three classes
- * (tzParse itself only answers true/false). Cheap pre-checks on the text;
- * everything else is "format".
- */
-static const char *tzRejectReason(const char *tz)
-{
-    if(strlen(tz) > TZ_MAX_LEN)
-        return "too long (max 39 characters)";
-
-    // Jn / n rules: the character after a comma is 'J' or a digit instead of 'M'
-    for(const char *c = strchr(tz, ','); c != NULL; c = strchr(c + 1, ','))
-    {
-        if(c[1] == 'J' || c[1] == 'j' || (c[1] >= '0' && c[1] <= '9'))
-            return "only M rules supported (Mm.w.d)";
-    }
-
-    return "format (std offset dst,Mm.w.d/time,Mm.w.d/time)";
 }
 
 void commandAction(char *umsg_text, bool ble)

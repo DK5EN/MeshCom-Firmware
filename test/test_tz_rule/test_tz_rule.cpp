@@ -174,6 +174,39 @@ static void test_length_limit(void)
     TEST_ASSERT_FALSE(tzParse(bad40, &r));
 }
 
+// --settz reject reason (bench 2026-10-04: "--settz J60" was refused correctly but
+// reported as "format" instead of "only M rules").
+static void test_reject_reason(void)
+{
+    const char *M = "only M rules supported (Mm.w.d)";
+    const char *F = "format (std offset dst,Mm.w.d/time,Mm.w.d/time)";
+    // J / n day rules, standalone or in the rule position
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("J60"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("j60"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("J60,J300"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("60,300"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("CET-1CEST,J60,J300"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("CET-1CEST,60,300"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("CET-1CEST,M3.5.0,J300"));
+    TEST_ASSERT_EQUAL_STRING(M, tzRejectReason("CET-1CEST,J60/2,J300/3"));
+    // names that merely start with J are not day rules
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("JST"));
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("JST-9JDT"));
+    // plain format errors
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason(""));
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("CET"));
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("CET-1CEST"));
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("CET-1CEST,M13.5.0,M10.5.0"));
+    TEST_ASSERT_EQUAL_STRING(F, tzRejectReason("UTC0x"));
+    // length wins over everything
+    TEST_ASSERT_EQUAL_STRING("too long (max 39 characters)",
+                             tzRejectReason("J60,J300,J60,J300,J60,J300,J60,J300,J60,J300"));
+    // every string classified "only M rules" is in fact refused by tzParse
+    TzRule r;
+    TEST_ASSERT_FALSE(tzParse("J60", &r));
+    TEST_ASSERT_FALSE(tzParse("CET-1CEST,J60,J300", &r));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -189,5 +222,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_fields);
     RUN_TEST(test_rejects);
     RUN_TEST(test_length_limit);
+    RUN_TEST(test_reject_reason);
     return UNITY_END();
 }

@@ -40,4 +40,8 @@ int32_t tzOffsetSec(const TzRule *r, uint32_t utc);
 // "CET" / "CEST" / "+0530" -- points into *r
 const char *tzAbbrev(const TzRule *r, uint32_t utc);
 
+// Why tzParse() refused s, as one of three reason classes for the user
+// ("too long", "only M rules", "format"). Only meaningful when tzParse() failed.
+const char *tzRejectReason(const char *s);
+
 #endif

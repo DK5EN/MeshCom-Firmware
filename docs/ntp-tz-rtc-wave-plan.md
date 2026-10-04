@@ -162,5 +162,8 @@ hash verified) and DK5EN-90 (RAK4631, DFU "Device programmed."). Identity guard 
 | Web info row / setup field                       | `Timezone none`, field present                           | not checked                                                      |
 | Restored                                         | `TZ none`, UTC-OFF 1.0                                   | `TZ none`, UTC-OFF 2.0                                           |
 
-Cosmetic: `--settz J60` names the reason class "format", not "only M rules" (the classifier
-looks for `J` after a comma only). RTC-1..3 stay host-tested only (RTC-04).
+Found on the bench and fixed afterwards: `--settz J60` named the reason class "format" instead of
+"only M rules" (the classifier only looked after a comma). `tzRejectReason()` moved into
+`src/tz_rule.cpp` and now treats any `[J]digits[/time]` segment as a day rule; `test_reject_reason`
+in `test_tz_rule` (RED before, GREEN after). Host-tested, not re-flashed. RTC-1..3 stay
+host-tested only (RTC-04).
