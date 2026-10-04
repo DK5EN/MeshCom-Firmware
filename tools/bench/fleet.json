@@ -14,7 +14,7 @@
       "board": "t_deck_plus",
       "family": "esp32",
       "usb_serial": "E0:72:A1:AD:65:E0",
-      "host": "192.168.68.70"
+      "host": "dk5en-14.local"
     },
     "t-beam-92": {
       "call": "DK5EN-92",
