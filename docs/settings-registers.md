@@ -16,7 +16,7 @@ unten stammt direkt aus dieser Tabelle bzw. aus einem Grep/Read gegen den aktuel
   Auszählung der Intake bestätigt, keine Abweichung gefunden: `CFG_FIELD_LIST` hat exakt 101
   Zeilen (`config_json.cpp:89-189`), der ESP32-Zweig von `CFG_FIELD_LIST_PLATFORM` 6
   (`:202-207`), der nRF52-Zweig 2 (`:210-211`). Seit 2026-10-01 kommt `node_ethmtu` (Issue #1183)
-  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52).
+  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52), seit 2026-10-04 `node_tz` (TZ-01) als 103. (109 ESP32, 105 nRF52).
 - **Ein totes Register:** `node_gpsbaud` hat außerhalb von Export/Import/Flash keinen Leser
   irgendwo im Baum (§3).
 - **Vier Key/Member-Mismatches** — historisch gewachsen, absichtlich nicht bereinigt, weil das
@@ -90,10 +90,11 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 
 ### G. Diverses I/O & Zeitzone
 
-| Key           | Member        | Typ (Größe) | Import-Bereich | Hinweis |
-| ------------- | ------------- | ----------- | -------------- | ------- |
-| `node_owgpio` | `node_owgpio` | int         | 0..99          |         |
-| `node_utcof`  | `node_utcoff` | float       | -12..14        |         |
+| Key           | Member        | Typ (Größe) | Import-Bereich | Hinweis                                                                                            |
+| ------------- | ------------- | ----------- | -------------- | -------------------------------------------------------------------------------------------------- |
+| `node_owgpio` | `node_owgpio` | int         | 0..99          |                                                                                                    |
+| `node_utcof`  | `node_utcoff` | float       | -12..14        | mit gesetztem `node_tz` abgeleitet                                                                 |
+| `node_tz`     | `node_tz`     | string (40) | —              | POSIX-TZ-Regel (TZ-01), leer = fester `node_utcoff`; Import prüft nur die Länge, nicht `tzParse()` |
 
 ### H. MCP17-I/O-Erweiterung
 

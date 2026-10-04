@@ -83,10 +83,15 @@ passes with debug off — and vice versa.
 | **Node identity**       | `--setcall` `--setname` `--setlat` `--setlon` `--setalt` `--symid` `--symcd`                                                   |
 | **Behaviour toggles**   | `--gateway on/off` `--mesh on/off` `--relay on/off` `--shortpath on/off` `--setretx on/off` `--nomsgall on/off` `--via on/off` |
 | **Debug channels**      | `--debug on/off/csv/man/en/de` `--loradebug` `--bledebug` `--gpsdebug` `--viadebug` `--wxdebug` `--softserdebug`               |
-| **Timing**              | `--postime <s>` `--ptime` `--webtimer` `--utcoff` `--settime` `--setrtc`                                                       |
+| **Timing**              | `--postime <s>` `--ptime` `--webtimer` `--utcoff` `--settz` `--settime` `--setrtc`                                             |
 | **Channel measurement** | `--spectrum` `--specstart` `--specend` `--specstep` `--specsamples`                                                            |
 | **Persistence**         | `--save` `--cleanflash` `--spiffs reset` `--reboot` `--format`                                                                 |
 | **Remote access**       | `--netconsole on/off` `--passwd` `--webserver on/off`                                                                          |
+
+Time zone (TZ-01): `--settz <POSIX rule>` (e.g. `CET-1CEST,M3.5.0,M10.5.0/3`) derives
+`node_utcoff` from a DST rule; `--settz none` (or a bare `--settz`) clears the rule and keeps the
+last derived offset; `--utcoff` clears a set rule, a manual offset wins. `--info` prints
+`...TZ <rule|none> ...TZOFF <+h.h> h [<abbrev|->]`.
 
 This is unusually good coverage for scripted testing: almost every relevant state is both
 **settable** and **readable** from outside, which is exactly what an integration harness

@@ -666,7 +666,8 @@ carry `"TYP"` as discriminator):
 | `I`       | `--info`                                          | FWVER, CALL, ID (gateway id), HWID, MAXV, BLE ("long"/"short"), BATP, BATV, GCB0…GCB5 (groups), CTRY, BOOST, BPIN                                                                                              |
 | `SE`+`S1` | `--seset`                                         | SE: BME, BMP, BMP3, BMP3F, AHT, AHTF, BMXF, 680, 680F, 811, 811F, SS, LPS33, OW, OWPIN, OWF, USERPIN · S1: INA226, SHUNT, IMAX, SAMP, SHT, SHTF, 226, 226F                                                     |
 | `SW`+`S2` | `--wifiset`                                       | SW: SSID, IP, GW, AP, DNS, SUB · S2: OWNIP, OWNGW, OWNMS, OWNDNS, OWNNTP, EUDP, EUDPIP, TXPOW                                                                                                                  |
-| `SN`      | `--nodeset`                                       | GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM                                                                                                     |
+| `SN`      | `--nodeset`                                       | GW, WS, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, NOPMOTHER, BLED, GWS (228 of 244 bytes: no room left, see `SN1`)                                                           |
+| `SN1`     | `--nodeset` (second frame, sent right after `SN`) | VIA, VIACALL, WSPWD, ASYM, TZ (TZ-01: `node_tz`, POSIX rule string, `""` when unset, last key; 65 B before TZ-01, 99 B with the ESP32 default rule `CET-1CEST,M3.5.0,M10.5.0/3`, worst case 168 B)             |
 | `W`       | `--wx`                                            | TEMP, TOFFI, TOUT, TOFFO, HUM, PRES, QNH, ALT, GAS, CO2, VBUS, VSHUNT, VAMP, VPOW                                                                                                                              |
 | `G`       | `--pos`                                           | LAT, LON (signed decimal degrees), ALT, SAT, SFIX, HDOP, RATE, NEXT, DIST, DIRn, DIRo, DATE                                                                                                                    |
 | `SA`      | `--aprsset`                                       | ATXT, SYMID, SYMCD, NAME                                                                                                                                                                                       |
@@ -802,6 +803,24 @@ enforces them silently — no error reaches the phone):
 - `0x95` accepts only symbol table ids `/` (0x2F) and `\` (0x5C)
   (`phone_commands.cpp:552`); anything else is silently ignored while the
   ASCII `--symid` path accepts more.
+
+**Time zone over BLE (TZ-01).** There is no new frame type. The app sets
+the POSIX TZ rule as a `--settz <rule>` command in a `0xA0` text message
+(e.g. `--settz CET-1CEST,M3.5.0,M10.5.0/3`); it starts with `--`, so it is
+dispatched through `commandAction()` like any other command
+(`src/command_functions.cpp:742–790`). `--settz none` (or a bare `--settz`)
+clears the rule. A rejected rule (parse error, `Jn`/`n` day rules, more than
+39 characters) changes nothing. On success the node
+re-sends `SN` + `SN1` (`sendNodeSetting()`), so the new rule arrives as the
+`TZ` key of `SN1` (`src/command_functions.cpp:6750`) and the derived offset
+as `UTCOF` of `SN`. While a rule is set, `UTCOF` is a derived value: it
+follows the DST switches by itself, and a `--utcoff` from the app clears the
+rule again (the fixed offset wins). `TZ` is the last key of `SN1`, so
+`bleJsonFrameFailSoft()` drops it first on overflow; the worst case (39-char
+rule) stays far below the 244-byte limit. `node_tz` is written to flash
+under the keyed setting `node_tz` (`char[40]`), without a
+`FLASH_STRUCT_VERSION` bump; the frozen BLE settings v1 layout
+(`ble_settings_v1.h`) does not carry it.
 
 Settings written over BLE are staged and applied from the main loop
 (`applyPendingBleSettings()`, CONC-17) — a mock phone must not assume the

@@ -1,7 +1,7 @@
 # NTP / TZ string / RTC: wave plan
 
 Date: 2026-10-04. Base: `fork-dev` at `26324810`. Findings: `docs/ntp-tz-rtc-findings.md`.
-Status: **APPROVED 2026-10-04, running.** D1-D4 decided by the operator; no upstream PR (everything stays in the fork for now).
+Status: **W1-W3 committed, W4 docs committed, W4 bench OPEN** (flashing a bench node was blocked by the session's auto-mode permission; needs the operator).
 
 ## BLUF
 
@@ -124,9 +124,39 @@ TzRule*, uint32_t utc)`, `const char* tzAbbrev(const TzRule*, uint32_t utc)`.
 
 ## Status
 
-| Wave | State   | Commit |
-| ---- | ------- | ------ |
-| W1   | planned |        |
-| W2   | planned |        |
-| W3   | planned |        |
-| W4   | planned |        |
+Deviation: W1 and W2 have disjoint file sets, so they run as one parallel wave (3 writers). Every
+`pio` call goes through one `lockf` lock (one pio process machine-wide). They still get separate
+commits. Orchestrator added `[env:native_rtc_offset]` and `[env:native_tz_rule]` to
+`platformio.ini` before dispatch.
+
+W1+W2 gate (combined tree): Unity 50 envs / 1718 cases green; golden selftest red only on
+`variant-ini-effective` (the two new native envs), baseline regenerated after reading the diff;
+`heltec_wifi_lora_32_V3`, `ttgo_tbeam`, `wiscore_rak4631`, `t_deck_plus` build. W3 interface
+(`tzApplyNow()`, `tzActiveAbbrev()`) declared in `src/clock.h` by the orchestrator.
+
+W3 BLE vocabulary (D4, from recon): `SN` is at 228 of 244 bytes, so `TZ` goes into `SN1` (65 B
+today, about 99 B with the CET rule, at most 110 B). Put = `--settz` over the existing 0xA0 text
+command path. Spec: `docs/architecture/11-wire-format.md` section 4.2/4.4 (W4).
+
+| Wave | State                                                                                                                                                                                                 | Commit      |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| W1   | done: advisor REWORK (nRF52 GPS write used frozen node_date_*), fixed and re-built                                                                                                                    | `9242f693`  |
+| W2   | done: B2 stopped on D2 (init_flash seeds every boot); default moved to the flash-clear branch                                                                                                         | `614f1b36`  |
+| W3   | done: advisor REWORK (web echo of node_tz could inject markup -- tzParse accepts `<plaintext>`-style names; now HTML-escaped; --utcoff clears only on a parsed value; `none` case-insensitive on web) | `bcf8f083`  |
+| W4   | docs done (BACKLOG RTC-1..3/TZ-01 + open RTC-04..06/TZ-02, test-suite-map, wire format SN1/--settz, settings-registers, d1-04 row, schema lint); bench NOT run                                        | see git log |
+
+## W4 bench: open, for the operator
+
+Flashing was refused by the session's permission layer, so nothing ran on hardware. DK5EN-1 was
+not reachable (not on USB here, no web server at `.76`/`.62`); DK5EN-92 (T-Beam, `.75`, guard ok,
+before: `UTC-OFF 2.0 [NTP]`, Flash-Version 20260724) is the ready substitute.
+
+1. `pio run -e ttgo_tbeam` and `python3 tools/webflash.py --env ttgo_tbeam 192.168.68.75`
+   (`pio run -e wiscore_rak4631 --target upload --upload-port <port of 230D6EBB3266D20E>` for RAK).
+2. `--info`: expect `...TZ none` (updated node keeps an empty rule, D2).
+3. `--settz CET-1CEST,M3.5.0,M10.5.0/3` -> `TZ ..., now CEST UTC+2.0`.
+4. DST jump without a time source: `--settz XST-1XDT,M1.1.0,M10.1.0/HH:MM` with HH:MM = local
+   time + 2 min on a first Sunday of October (or adjust the rule to today); within ~3 min
+   `--info` shows `TZOFF +1.0 [XST]` and the clock 1 h back.
+5. `--settz J60` -> rejected, nothing changed. Reboot -> rule persists. `--utcoff 2` -> rule
+   cleared. Restore: `--settz none`, `--utcoff 2`.

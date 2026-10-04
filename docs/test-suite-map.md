@@ -1,7 +1,7 @@
 # Test suite map
 
 Inventory of every automated test in this fork, by category and by gate, as
-of 2026-10-03. It is the reference behind `tools/regression.sh` (the
+of 2026-10-04. It is the reference behind `tools/regression.sh` (the
 end-to-end regression, three stages) and the `/full-regression` skill. Counts
 are from the tree at that date; `tools/regression.sh` prints the live numbers
 on every run and those win over anything written here.
@@ -10,16 +10,16 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-96 suites with tests, 1563 `RUN_TEST` cases, 48 native environments. Five
+106 suites with tests, 1663 `RUN_TEST` cases, 51 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     47 |  1061 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
-| Regression    |     19 |   200 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
-| Contract      |     12 |   108 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
-| Twin          |      6 |    96 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
+| Unit          |     54 |  1129 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Regression    |     22 |   228 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
+| Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
+| Twin          |      6 |    98 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
 | Integration   |      3 |    57 | several modules on a fake platform (BLE harness on real rings, ESP32 NVS, nRF52 settings paths)  |
 | Oracle/Replay |      8 |    37 | field captures replayed through the real code (aprs_corpus, dedup/ack/txprio, nbr_replay, topo)  |
 | Fuzz          |      1 |     4 | aprs_fuzz against frames the radio rejected on air (crc/capture/ack corpora)                     |
@@ -27,6 +27,22 @@ why the gate reports more cases than the table sums to.
 The category is the header comment's own claim. Many unit suites also cite a
 defect id; "Regression" is used only where the incident is the suite's sole
 reason to exist.
+
+Added with the NTP/TZ/RTC campaign (2026-10-04, `docs/ntp-tz-rtc-wave-plan.md`):
+`test_rtc_offset` (RTC-1..3: UTC round trip, refresh gate; Regression),
+`test_tz_rule` (TZ-01 POSIX rule parser against the host `localtime_r` oracle;
+Unit) and `test_tz_anchor` (TZ-01 clock re-anchor arithmetic; Unit), each in its
+own env (`native_rtc_offset`, `native_tz_rule`, `native_tz_anchor`). Extended:
+`test_config_json` (+2: a file without `node_tz` keeps the current value, empty
+value and the 39-character limit; the round trip itself is pinned inside the
+existing round-trip case), `test_decodetinyxml` (+2: station offset kept while a TZ rule is
+set, applied when not) and `test_ble_phone_harness` (SN1 frame size pinned at
+99 bytes, case count unchanged).
+
+The per-suite sums were recomputed from the tree on 2026-10-04 (every
+`RUN_TEST` under `test/test_*`). The totals before that date were stale: the
+old header said 96 suites / 1563 cases, while the table below already listed
+97 suites / 1577 cases.
 
 ### Everything else
 
@@ -46,7 +62,7 @@ reason to exist.
 
 | Gate                                 | What it runs                                                                                              |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| CI `ci-build.yml`                    | `pio test -e native` and `native_aprs` only (2 of 48 envs), board builds, resource delta                  |
+| CI `ci-build.yml`                    | `pio test -e native` and `native_aprs` only (2 of 51 envs), board builds, resource delta                  |
 | Release (`/release-firmware` step 2) | every `[env:native*]` sequentially plus `selftest.sh`; step 5 adds the pages/flasher tests                |
 | `tools/regression.sh` stage 1        | same as the release gate; also fetches the topo_shadow raw window from rpizero when absent                |
 | `tools/regression.sh` stage 2        | pytest over tools/, nbrlog scripts, node tests, jsdom page test, the four stray self-tests                |
@@ -59,10 +75,10 @@ flashes whatever is attached.
 
 ## 3. Inert and special files
 
-- `test/test_compress/` (two upstream helper copies, no `RUN_TEST`, no env)
-  and `test/test_invariant_TinyGsmClientSequansMonarch.h` come from
-  icssw-org/dev and are never compiled. Kept to avoid a permanent fork diff;
-  not counted above.
+- `test/test_invariant_TinyGsmClientSequansMonarch.h` comes from
+  icssw-org/dev and is never compiled. Kept to avoid a permanent fork diff;
+  not counted above. (`test/test_compress/` was inert too until the W0.6 sweep
+  gave it 12 cases in env `native`; it is counted above now.)
 - `test/support/parser_stubs/` (until 2026-10-03 `test/test_decodemheard/stubs/`)
   is the link-stub set for `native_parsers` and `native_topo_shadow`. The
   `test_decodemheard` suite itself went with R2-01; its stubs stayed.
@@ -74,15 +90,15 @@ flashes whatever is attached.
   branches of size guards; every configured env takes the `#if` branch, so
   none of them fires today. `test_aprs_fuzz`'s capture-corpus guard is dead
   since `capture_corpus.txt` was committed.
-- `docs/testplan/drift-matrix.csv` row DR-16 (nRF52 `bAllStarted` gating) is
-  the one decided-but-unimplemented row that keeps
-  `drift_matrix_lint.py --phase implementation` in `selftest.sh`.
+- `docs/testplan/drift-matrix.csv` row DR-16 (nRF52 `bAllStarted` gating) was
+  closed on 2026-10-04 as `both-valid` and is pinned by `test_drift_dr16_gates`;
+  `selftest.sh` no longer runs `drift_matrix_lint.py --phase implementation`.
 
 ## 4. Review of 2026-10-03 (retire candidates)
 
 | Candidate                                  | Verdict | Why                                                                                           |
 | ------------------------------------------ | ------- | --------------------------------------------------------------------------------------------- |
-| `test_compress`, TinyGsm header            | keep    | upstream files, inert; deleting them costs a fork diff on every sync                          |
+| `test_compress`, TinyGsm header            | keep    | upstream files; `test_compress` has run since 2026-10-03, the TinyGsm header is inert         |
 | `test_decodemheard/stubs`                  | moved   | to `test/support/parser_stubs`; the empty suite directory is gone                             |
 | `test_gateway_service_twin`                | keep    | not tautological: pins DR-14/15 call parity so a "unifying" change fails a test, not a review |
 | always-firing `TEST_IGNORE` (3 reported)   | 1 real  | only topo_shadow's full window; now fed from rpizero by stage 1                               |
@@ -121,15 +137,18 @@ flashes whatever is attached.
 | test_command_match           | Unit          |    11 | native_command_match                                         |
 | test_command_setters         | Unit          |    18 | native_command_setters                                       |
 | test_command_toggles         | Unit          |    33 | native_command_toggles                                       |
+| test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
-| test_config_json             | Contract      |    15 | native_config                                                |
-| test_country_twin            | Twin          |     4 | native_country_esp32, native_country_nrf52                   |
+| test_config_json             | Contract      |    17 | native_config                                                |
+| test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
+| test_csma_timing             | Unit          |    10 | native                                                       |
 | test_decodeaprspos           | Unit          |    22 | native_parsers                                               |
-| test_decodetinyxml           | Unit          |    12 | native_xml                                                   |
+| test_decodetinyxml           | Unit          |    14 | native_xml                                                   |
 | test_dedup_replay            | Oracle/Replay |     2 | native_dedup                                                 |
 | test_dm_dedup                | Unit          |    12 | native                                                       |
 | test_dm_stats                | Unit          |    13 | native                                                       |
 | test_dm_text_escape          | Unit          |    11 | native                                                       |
+| test_drift_dr16_gates        | Regression    |     7 | native                                                       |
 | test_esp32_flash_lifecycle   | Regression    |    13 | native_esp32_flash_lifecycle                                 |
 | test_esp32_settings_nvs      | Integration   |     6 | native_esp32_settings_nvs                                    |
 | test_extern_msg_json         | Contract      |     6 | native                                                       |
@@ -138,6 +157,7 @@ flashes whatever is attached.
 | test_external_radio_protocol | Unit          |    66 | native_extradio                                              |
 | test_external_radio_tcp      | Unit          |    37 | native_extradio                                              |
 | test_external_radio_txq      | Unit          |    23 | native_extradio                                              |
+| test_extudp_target           | Unit          |     7 | native                                                       |
 | test_gateway_service_twin    | Twin          |    12 | native_gateway_twin                                          |
 | test_getextern               | Unit          |    32 | native_extern                                                |
 | test_gps_filter              | Regression    |    17 | native                                                       |
@@ -167,11 +187,13 @@ flashes whatever is attached.
 | test_ntp_harvest             | Regression    |     4 | native                                                       |
 | test_own_msg_status          | Regression    |    13 | native                                                       |
 | test_pn_retry                | Unit          |    34 | native_pnretry                                               |
+| test_pos_persist             | Unit          |     9 | native                                                       |
 | test_pos_tag_nan             | Regression    |     7 | native_parsers                                               |
 | test_printfdeb_format        | Regression    |    13 | native                                                       |
 | test_radio_units             | Regression    |    14 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
+| test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
 | test_serial_command_twin     | Twin          |     6 | native_serial_esp32, native_serial_nrf52                     |
 | test_setlog_lines            | Unit          |    29 | native                                                       |
@@ -181,10 +203,13 @@ flashes whatever is attached.
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
 | test_sto_notice              | Unit          |    26 | native                                                       |
 | test_tft_backlight           | Regression    |     4 | native                                                       |
+| test_tile_cache              | Unit          |    10 | native                                                       |
 | test_topo_shadow             | Oracle/Replay |     2 | native_topo_shadow                                           |
 | test_txprio_replay           | Oracle/Replay |     1 | native_aprs                                                  |
 | test_txring                  | Unit          |    43 | native_aprs                                                  |
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
+| test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
+| test_tz_rule                 | Unit          |    10 | native_tz_rule                                               |
 | test_udp_frame_twin          | Twin          |    31 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |
