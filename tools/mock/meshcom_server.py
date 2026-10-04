@@ -4,7 +4,9 @@
 
 Implements the server side of ``docs/architecture/11-wire-format.md`` §2:
 
-* node -> server: ``KEEP`` (heartbeat), ``DATA`` (LoRa frame envelope)
+* node -> server: ``KEEP`` (heartbeat), ``DATA`` (LoRa frame envelope),
+  ``STOR`` (store-node announce set, docs/snf-gateway-concept-20261002.md
+  section 5.3 -- a PROPOSED datagram, not part of doc 11)
 * server -> node: ``BEAT`` (heartbeat ack), ``GATE`` (frame to transmit),
   ``CONF`` (config TLV, built for tests but not spontaneously emitted here)
 
@@ -41,14 +43,19 @@ MAX_ZEROS = 6  # src/configuration_global.h:156
 DEFAULT_PORT = 1990  # src/configuration_global.h:165 UDP_PORT
 DEFAULT_SERVER_CALLSIGN = "MOCK-SRV"
 REGISTRY_TTL = 120.0  # seconds; brief's expiry window for stale clients
+STOR_TTL = 45 * 60.0  # snapshot expires after 3 missed 15 min refreshes
+UDP_TX_BUF_SIZE = 255  # STOR datagram stays below this (concept 5.3)
 
 _KEEP_PREFIX = b"KEEP"
 _DATA_PREFIX = b"DATA"
 _BEAT_PREFIX = b"BEAT"
 _GATE_PREFIX = b"GATE"
 _CONF_PREFIX = b"CONF"
+_STOR_PREFIX = b"STOR"
 
 _HEX8_RE = re.compile(rb"^[0-9A-Fa-f]{8}$")
+_STOR_CALL_RE = re.compile(r"^[A-Za-z0-9/-]{1,9}$")
+_STOR_SEQ_RE = re.compile(r"^([0-9]{1,3})/([0-9]{1,3})$")
 
 # KEEP layout: "KEEP" + %08X gw_id(8) + %-9.9s callsign(9) + %-4.4s version(4)
 #            + %-1.1s sub(1) + <grc_ids> + 0x00   (sendKEEP(), udp_functions.cpp:1113)
@@ -68,6 +75,10 @@ class KeepParseError(ValueError):
 
 class DataHeaderError(ValueError):
     """Raised when a DATA header fails validation."""
+
+
+class StorParseError(ValueError):
+    """Raised when a STOR datagram fails validation."""
 
 
 @dataclass
@@ -211,6 +222,98 @@ def parse_data_header(payload: bytes) -> DataHeader:
     modulation = mod_raw.decode("ascii")
 
     return DataHeader(gateway_id, callsign, version, sub, rssi, snr, modulation)
+
+
+def parse_stor(payload: bytes) -> dict:
+    """Parse a STOR announce chunk. Raises StorParseError on malformed input.
+
+    Layout (docs/snf-gateway-concept-20261002.md section 5.3, same header as
+    KEEP): "STOR" + %08X gw_id(8) + %-9.9s call(9) + %-4.4s ver(4)
+    + %-1.1s sub(1) + hold_h(decimal) + ";" + seq "/" total + ";"
+    + CALL ";" CALL ";" ... + NUL, at most UDP_TX_BUF_SIZE (255) bytes in
+    total. An empty list ("...24;1/1;") withdraws the whole snapshot.
+    A trailing NUL is tolerated and stripped; a NUL anywhere else is an error.
+    """
+    if len(payload) > UDP_TX_BUF_SIZE:
+        raise StorParseError(f"STOR too long: {len(payload)} > {UDP_TX_BUF_SIZE}")
+    if not payload.startswith(_STOR_PREFIX):
+        raise StorParseError("STOR bad prefix")
+    if payload.endswith(b"\x00"):
+        payload = payload[:-1]
+    if b"\x00" in payload:
+        raise StorParseError("STOR contains a NUL before the end")
+    if len(payload) < _KEEP_FIXED_LEN:
+        raise StorParseError(f"STOR header too short ({len(payload)}B)")
+
+    gw_hex = payload[4:12]
+    if not _HEX8_RE.match(gw_hex):
+        raise StorParseError(f"STOR gwid not 8 hex chars: {gw_hex!r}")
+    try:
+        head = payload[12:26].decode("ascii")
+        tail = payload[26:].decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise StorParseError("STOR is not ASCII") from exc
+
+    call = head[0:9].rstrip(" ")
+    ver = head[9:13].rstrip(" ")
+    sub = head[13:14]
+    if not call:
+        raise StorParseError("STOR gateway call is empty")
+
+    if not tail.endswith(";"):
+        raise StorParseError("STOR list does not end with ';'")
+    # "24;1/1;A;B;" -> ["24", "1/1", "A", "B", ""]; the last element is the
+    # empty remainder after the final ';'.
+    parts = tail.split(";")
+    if len(parts) < 3:
+        raise StorParseError("STOR needs hold_h;seq/total; before the list")
+    hold_raw, seq_raw, calls_raw = parts[0], parts[1], parts[2:-1]
+
+    if not (hold_raw.isascii() and hold_raw.isdigit()):
+        raise StorParseError(f"STOR hold_h not a decimal number: {hold_raw!r}")
+    m = _STOR_SEQ_RE.match(seq_raw)
+    if not m:
+        raise StorParseError(f"STOR seq/total malformed: {seq_raw!r}")
+    seq, total = int(m.group(1)), int(m.group(2))
+    if total < 1 or not 1 <= seq <= total:
+        raise StorParseError(f"STOR seq {seq} outside 1..{total}")
+
+    for c in calls_raw:
+        if not _STOR_CALL_RE.match(c):
+            raise StorParseError(f"STOR bad callsign in list: {c!r}")
+
+    return {
+        "gwid": int(gw_hex, 16),
+        "call": call,
+        "ver": ver,
+        "sub": sub,
+        "hold_h": int(hold_raw),
+        "seq": seq,
+        "total": total,
+        "calls": list(calls_raw),
+    }
+
+
+def dest_call_of(frame: bytes) -> str | None:
+    """Destination callsign of a raw LoRa text frame (type 0x3A), or None.
+
+    Body from [6] reads "SRC,VIA>DEST:payload"; DEST is what sits between
+    '>' and the first ':'. Anything else (other frame types, no path, group
+    destinations are returned as-is and simply never match a snapshot).
+    """
+    if not frame or frame[0] != 0x3A:
+        return None
+    body = frame[6:]
+    gt = body.find(b">")
+    if gt <= 0:
+        return None
+    colon = body.find(b":", gt)
+    if colon == -1:
+        return None
+    try:
+        return body[gt + 1:colon].decode("ascii").strip() or None
+    except UnicodeDecodeError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +534,8 @@ class MockMeshComServer:
         registry_ttl: float = REGISTRY_TTL,
         recorder: DatagramRecorder | None = None,
         redistribute: bool = True,
+        stor_routing: bool = False,
+        stor_ttl: float = STOR_TTL,
     ) -> None:
         self.host = host
         self.callsign = callsign
@@ -442,8 +547,16 @@ class MockMeshComServer:
         # (README). A golden capture must contain only what the replay sent,
         # so the capture runs of steps H6/H7 turn it off.
         self.redistribute = redistribute
+        # STOR routing is ALSO a mock assumption (README): the real server's
+        # reaction to STOR is unknown, so it is off unless asked for.
+        self.stor_routing = stor_routing
+        self.stor_ttl = stor_ttl
 
         self.clients: dict[tuple[str, int], ClientInfo] = {}
+        # gateway call -> {"calls", "hold_h", "t" (monotonic), "addr"}
+        self.stor_snapshots: dict[str, dict] = {}
+        # (addr, gwid) -> chunks of the round being assembled
+        self._stor_rounds: dict[tuple[tuple[str, int], int], dict] = {}
         self._lock = threading.Lock()
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -498,6 +611,7 @@ class MockMeshComServer:
         if self.recorder is not None:
             self.recorder.record("rx", addr, data)
         self._expire_clients()
+        self._expire_stor()
 
         if _has_excess_zero_run(data):
             logger.info(
@@ -518,6 +632,8 @@ class MockMeshComServer:
             self._handle_keep(data, addr)
         elif indicator == _DATA_PREFIX:
             self._handle_data(data, addr)
+        elif indicator == _STOR_PREFIX:
+            self._handle_stor(data, addr)
         else:
             logger.info(
                 "event=drop reason=unknown_indicator indicator=%r addr=%s:%s",
@@ -538,6 +654,90 @@ class MockMeshComServer:
                     a[0], a[1], self.clients[a].callsign,
                 )
                 del self.clients[a]
+
+    def _expire_stor(self) -> None:
+        now = time.monotonic()
+        with self._lock:
+            stale = [
+                c for c, snap in self.stor_snapshots.items()
+                if now - snap["t"] > self.stor_ttl
+            ]
+            for c in stale:
+                logger.info(
+                    "event=stor_expire gw=%s calls=%d",
+                    c, len(self.stor_snapshots[c]["calls"]),
+                )
+                del self.stor_snapshots[c]
+
+    def _handle_stor(self, data: bytes, addr: tuple[str, int]) -> None:
+        """Assemble STOR chunks into a snapshot. Never answered: whether the
+        real server replies to STOR is unknown (the datagram is a proposal,
+        concept 5.3), so the mock stays silent rather than invent a reply.
+
+        Round rules: a chunk with seq 1 starts a new round and discards any
+        unfinished one. Chunks 2..n join the round in progress in any order
+        among themselves; a chunk with no round in progress (for example 2/2
+        arriving before 1/2), with a different total, or with a seq the round
+        already holds is a straggler of an older round and is dropped. A round
+        with a missing chunk is never applied.
+        """
+        try:
+            f = parse_stor(data)
+        except StorParseError as exc:
+            logger.info(
+                "event=drop reason=bad_stor addr=%s:%s error=%s",
+                addr[0], addr[1], exc,
+            )
+            return
+
+        key = (addr, f["gwid"])
+        with self._lock:
+            rnd = self._stor_rounds.get(key)
+            if f["seq"] == 1:
+                rnd = {"total": f["total"], "chunks": {}}
+                self._stor_rounds[key] = rnd
+            elif (
+                rnd is None
+                or rnd["total"] != f["total"]
+                or f["seq"] in rnd["chunks"]
+            ):
+                logger.info(
+                    "event=drop reason=stor_stale addr=%s:%s gw=%s seq=%d/%d",
+                    addr[0], addr[1], f["call"], f["seq"], f["total"],
+                )
+                return
+            rnd["chunks"][f["seq"]] = f["calls"]
+            if len(rnd["chunks"]) < rnd["total"]:
+                return
+            calls = [c for s in sorted(rnd["chunks"]) for c in rnd["chunks"][s]]
+            del self._stor_rounds[key]
+            self.stor_snapshots[f["call"]] = {
+                "calls": calls,
+                "hold_h": f["hold_h"],
+                "t": time.monotonic(),
+                "addr": addr,
+            }
+
+        logger.info("event=stor gw=%s calls=%d", f["call"], len(calls))
+        logger.debug(
+            "event=stor_snapshot gw=%s hold_h=%d calls=%s", f["call"], f["hold_h"], calls
+        )
+
+    def _stor_targets(self, frame: bytes, sender: tuple[str, int]) -> list[tuple[str, int]]:
+        """Gateways whose live snapshot lists the frame's destination call."""
+        dest = dest_call_of(frame)
+        if dest is None:
+            return []
+        dest = dest.upper()
+        now = time.monotonic()
+        with self._lock:
+            return [
+                snap["addr"]
+                for snap in self.stor_snapshots.values()
+                if snap["addr"] != sender
+                and now - snap["t"] <= self.stor_ttl
+                and dest in (c.upper() for c in snap["calls"])
+            ]
 
     def _handle_keep(self, data: bytes, addr: tuple[str, int]) -> None:
         try:
@@ -581,11 +781,16 @@ class MockMeshComServer:
             header.rssi, header.snr, header.modulation, len(frame),
         )
 
-        if not self.redistribute:
-            return
-
-        with self._lock:
-            targets = [a for a in self.clients if a != addr]
+        targets: list[tuple[str, int]] = []
+        if self.redistribute:
+            with self._lock:
+                targets = [a for a in self.clients if a != addr]
+        if self.stor_routing:
+            # In addition to the redistribution above, never instead of it;
+            # a gateway that is already a target gets the frame only once.
+            for t in self._stor_targets(frame, addr):
+                if t not in targets:
+                    targets.append(t)
         for target in targets:
             self.send_gate(frame, target, relayed=True)
 
@@ -735,6 +940,11 @@ def main(argv: list[str] | None = None) -> int:
         help="do not forward received DATA frames back out as GATE; a capture "
              "run must contain only what the replay sent",
     )
+    parser.add_argument(
+        "--stor-routing", action="store_true",
+        help="MOCK ASSUMPTION: also forward a DATA text frame as GATE to the "
+             "gateway whose live STOR snapshot lists its destination call",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -752,6 +962,7 @@ def main(argv: list[str] | None = None) -> int:
         registry_ttl=args.registry_ttl,
         recorder=recorder,
         redistribute=not args.no_redistribute,
+        stor_routing=args.stor_routing,
     )
     logger.info(
         "event=listen host=%s port=%d callsign=%s", args.host, server.port, args.callsign

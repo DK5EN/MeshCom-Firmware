@@ -16,11 +16,14 @@ Python 3 only — no external dependencies.
   injected frames verbatim, so a foreign callsign there would go on the air
   under a licence we do not hold. Only frames relayed from a registered
   gateway's own `DATA` are exempt (`relayed=True`).
+  `parse_stor()` / `StorParseError` and the `STOR` handling are described in
+  the next section.
 - `mock_client.py` — a minimal softnode-style client: sends `KEEP`, receives
   `BEAT`, can send a `DATA`-wrapped LoRa frame, and prints anything received
   (`BEAT`/`GATE`/`CONF`) as hex plus a short summary.
 - `test_mock_server.py` — stdlib `unittest` suite covering the protocol
-  surface end-to-end over real UDP sockets.
+  surface end-to-end over real UDP sockets, including `STOR` parsing, chunk
+  assembly, expiry and routing on/off.
 
 ## Running the server
 
@@ -31,7 +34,54 @@ python3 tools/mock/meshcom_server.py --port 1990 --verbose
 Options: `--host`, `--port` (default 1990), `--callsign` (server-side
 callsign sent in `BEAT`, default `MOCK-SRV`), `--beat-status` (adds the
 optional status TLV to every `BEAT`), `--registry-ttl` (seconds before an
-idle client is expired, default 120), `--verbose`.
+idle client is expired, default 120), `--stor-routing` (see below),
+`--verbose` (debug log, includes one `event=stor_snapshot` line with the full
+call list per applied `STOR` snapshot).
+
+## STOR (store-node announce set, SNF-GW-08, issue #1188)
+
+The mock understands the `STOR` datagram proposed in
+`docs/snf-gateway-concept-20261002.md` section 5.3. It is a **proposal**, not
+part of doc 11, and the real server does not implement it (yet).
+
+```
+STOR<gwid:8 hex><call:9><ver:4><sub:1><hold_h>;<seq>/<total>;<CALL>;<CALL>;...;\0
+```
+
+- `parse_stor(payload) -> dict` validates strictly and raises `StorParseError`:
+  prefix, 8 hex gwid, ASCII, a decimal `hold_h`, `seq/total` with
+  `1 <= seq <= total`, a trailing `;`, calls of 1..9 chars from `[A-Za-z0-9/-]`
+  with no empty element, at most 255 bytes. One trailing NUL is stripped, a NUL
+  anywhere else is an error. An empty list (`...24;1/1;`) is valid and means
+  "withdraw everything". It returns `gwid` (int), `call`, `ver`, `sub`,
+  `hold_h`, `seq`, `total`, `calls`.
+- Chunks are assembled per `(source addr, gwid)`. A chunk with `seq` 1 starts a
+  new round and drops an unfinished one. Chunks 2..n join the round in any
+  order. A chunk with no round in progress, with a different `total`, or with a
+  `seq` the round already holds is a straggler of an older round and is
+  dropped. A round with a missing chunk is never applied, and the previous
+  snapshot stays in place until its own expiry.
+- A complete round is stored as
+  `server.stor_snapshots[gw_call] = {"calls", "hold_h", "t" (monotonic), "addr"}`
+  and logged as `event=stor gw=... calls=n`. An empty snapshot is kept as an
+  entry with `calls == []`. Snapshots older than 45 min (`stor_ttl`, 3 x 15 min)
+  are expired lazily in the same path as the client registry.
+- `STOR` is recorded by the recorder like every other datagram and is **never
+  answered**. What the real server would reply, if anything, is unknown, so
+  the mock does not invent a reply. `STOR` does not register the sender as a
+  client; only `KEEP` does.
+
+**Routing is a mock assumption, default off.** With `--stor-routing`
+(constructor `stor_routing=True`) a `DATA` text frame (type `0x3A`) whose
+destination call (`SRC>DEST:`) is in a live snapshot is also forwarded as
+`GATE` to that snapshot's gateway. This follows the concept's _expected_ server
+behaviour ("in addition to whatever the server does today, never instead"),
+not a verified one. It is added on top of the normal redistribution (a
+gateway that is already a target gets one copy, not two), also works with
+`--no-redistribute`, never goes back to the sender, ignores expired and
+withdrawn snapshots, and keeps `relayed=True` semantics: only genuine `DATA`
+from a registered gateway is relayed unchecked, `send_gate()` injection keeps
+the own-callsign guard.
 
 ## Golden-capture mode (test plan P0.6, steps H6/H7)
 
@@ -153,5 +203,6 @@ about server-side routing policy. This mock's choice — forward every valid
 `DATA` frame as `GATE` to all _other_ registered clients, never back to the
 sender — is a mock assumption, not a documented or verified real-server
 behavior. Real-server routing semantics (dedup, group filtering, etc.)
-remain unmocked; acceptable for a wire-shape test double, but do not read
+remain unmocked, and the optional `--stor-routing` forwarding above is the
+same kind of assumption; acceptable for a wire-shape test double, but do not read
 `TestDataRedistribution` as proof of real-server routing policy.

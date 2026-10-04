@@ -196,7 +196,9 @@
     M(int, node_pingcount, 0)                                                                            \
     M(unsigned long, node_pingduration, 0)                                                               \
     /* POSIX TZ string; empty = fixed node_utcoff (TZ-01). Persisted + exported as "node_tz". */          \
-    A(char, node_tz, [40], {0})
+    A(char, node_tz, [40], {0})                                                                          \
+    /* SNF-D7 (#1188): 1 = announce the mailbox calls to the server (STOR); default 0 until approved. Persisted. */ \
+    M(int, node_stor, 0)
 
 /* ESP32-only members (every ESP32 board). */
 #ifdef ESP32

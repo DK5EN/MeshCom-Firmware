@@ -1,6 +1,8 @@
 # Store node as gateway: taking PMs from the central server
 
-Status: DRAFT, 2026-10-02. Concept only, no code written. Line numbers refer to `fork-dev` at
+Status: stage 1 and option 3b (`STOR`) IMPLEMENTED on fork-dev 2026-10-04 (`--stor`, default off,
+pending the server operator's approval); option 3a (echo-HEY) dropped (SNF-D6). Original text,
+2026-10-02: Line numbers refer to `fork-dev` at
 `42dbf03a`.
 
 ## 1. Bottom line

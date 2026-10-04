@@ -3417,6 +3417,22 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_stor_announce": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_stor_announce"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_topo_shadow": {
   "build_flags": [
    "-std=gnu++17",

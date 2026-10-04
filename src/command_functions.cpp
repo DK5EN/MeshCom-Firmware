@@ -1170,7 +1170,7 @@ void commandAction(char *umsg_text, bool ble)
             // boards where the modal --store lines below do not compile.
             printdeb("--store                 mailbox status (no value: show)\n");
             #if defined(ENABLE_MSGSTORE)
-            printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--mbox                  store-node mailbox contents\n");
+            printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
             #endif
             printdeb("--mesh on/off           relay foreign frames\n");
             #ifndef BOARD_RAK4630
@@ -4506,6 +4506,45 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // SNF-D7 (#1188): STOR = announce the mailbox calls to the central server.
+    // node_stor is an ordinary persisted setting (config_json.h row), default
+    // off until the server operator approves. commandCheck() is exact-token:
+    // "stor" never matches "store ..." and no --store* rung matches "stor", so
+    // the --store family is order-independent. Between the two stor rungs the
+    // argument form ("stor ") must stay first: the bare token also matches
+    // "stor on" (a space ends the token).
+    if(commandCheck(msg_text+2, (char*)"stor ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            meshcom_settings.node_stor = 1;
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            meshcom_settings.node_stor = 0;
+        }
+        else
+        {
+            Serial.printf("[ERR];stor;must be on or off\n");
+
+            return;
+        }
+
+        save_settings();
+        Serial.printf("[STOR];%s\n", meshcom_settings.node_stor ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"stor") == 0)
+    {
+        Serial.printf("[STOR];%s\n", meshcom_settings.node_stor ? "on" : "off");
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"mbox") == 0)
     {
         // F3 (fable-dm-stage4-verdict-20260914.md): matches the STAT path's
@@ -6327,9 +6366,9 @@ void commandAction(char *umsg_text, bool ble)
 #if defined(ENABLE_MSGSTORE)
             // Store node (mailbox), stage 3 + stage 4 notice --
             // docs/dm-stage3-wave-plan-20260914.md / dm-stage4-plan-20260914.md.
-            printfdeb("...STORE mode=%s used=%d/%u time=%uh notice=%s\n",
+            printfdeb("...STORE mode=%s used=%d/%u time=%uh notice=%s stor=%s\n",
                 msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
-                (msgstoreNotice()?"on":"off"));
+                (msgstoreNotice()?"on":"off"), (meshcom_settings.node_stor?"on":"off"));
 #endif
 
             for(int ig=0;ig<6;ig++)

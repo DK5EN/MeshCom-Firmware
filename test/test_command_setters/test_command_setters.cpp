@@ -17,6 +17,7 @@
 #include <string>
 
 #include "command_setters.h"
+#include "command_match.h"
 
 static void test_a_plain_number_parses()
 {
@@ -286,6 +287,84 @@ static void test_ethmtu_rung_schema_row_and_default_match_the_assumptions()
                              "node_ethmtu default is not 1280 (NMTU-D2)");
 }
 
+// ---- --stor (SNF-D7, issue icssw-org/MeshCom-Firmware#1188) ---------------
+// Same constraint as --ethmtu: the rung lives in command_functions.cpp, which
+// no native env compiles. The first test runs the real matcher on the names
+// involved; the second pins rung, guard, schema row and default in the sources.
+
+// "stor" must never swallow a --store* line, and no --store* rung may swallow
+// "stor". commandMatches() is exact-token (trailing space = argument prefix),
+// so this holds whatever the rung order is.
+static void test_stor_does_not_collide_with_the_store_family()
+{
+    TEST_ASSERT_TRUE(commandMatches("stor on", "stor "));
+    TEST_ASSERT_TRUE(commandMatches("stor off", "stor "));
+    TEST_ASSERT_TRUE(commandMatches("stor", "stor"));
+    // A space terminates the exact token, so the bare rung DOES match "stor on":
+    // the argument rung must stay above it (pinned against the source below).
+    TEST_ASSERT_TRUE(commandMatches("stor on", "stor"));
+    TEST_ASSERT_FALSE(commandMatches("stor", "stor "));          // bare form is a different rung
+
+    const char *store_lines[] = {"store", "store own", "store off", "store list", "store heard",
+                                 "storecall DK5EN-1", "storecall", "storetime 24", "storetime",
+                                 "storeslots 10", "storeslots", "storenotice on", "storenotice"};
+    for (const char *line : store_lines)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "stor "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "stor"), line);
+    }
+
+    const char *store_rungs[] = {"store", "store off", "store own", "store list", "store heard",
+                                 "storecall ", "storecall", "storetime ", "storetime",
+                                 "storeslots ", "storeslots", "storenotice ", "storenotice"};
+    for (const char *rung : store_rungs)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("stor on", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("stor", rung), rung);
+    }
+}
+
+static void test_stor_rung_schema_row_and_default_match_the_assumptions()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    // the rung sits inside the store-node block: after its "#if defined(ENABLE_MSGSTORE)"
+    // opener and before the matching "#endif // ENABLE_MSGSTORE"
+    const size_t guardOpen = cmd.find("#if defined(ENABLE_MSGSTORE)\n    if(commandCheck(msg_text+2, (char*)\"storecall \") == 0)");
+    TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos, "store-node ladder block not found");
+    const size_t guardClose = cmd.find("#endif // ENABLE_MSGSTORE", guardOpen);
+    TEST_ASSERT_TRUE_MESSAGE(guardClose != std::string::npos, "store-node ladder block is not closed");
+
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"stor \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --stor rung in command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(rung > guardOpen && rung < guardClose, "--stor rung is outside the ENABLE_MSGSTORE block");
+    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"stor\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bare != std::string::npos && bare > guardOpen && bare < guardClose,
+                             "bare --stor (show) rung missing or outside the ENABLE_MSGSTORE block");
+
+    TEST_ASSERT_TRUE_MESSAGE(rung < bare, "bare --stor rung is above the argument rung and would shadow --stor on/off");
+
+    const std::string body = cmd.substr(rung, 900);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+7") != std::string::npos, "--stor argument offset is not +7");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_stor = 1") != std::string::npos, "--stor on does not set node_stor");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_stor = 0") != std::string::npos, "--stor off does not clear node_stor");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--stor rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[STOR];%s") != std::string::npos, "--stor rung does not print [STOR];on|off");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--stor on/off           announce mailbox calls to the server (STOR, default off)") != std::string::npos,
+                             "--stor help line missing");
+
+    const std::string cfg = read_repo_file("src/config_json.h");
+    const size_t row = cfg.find("X(\"node_stor\"");
+    TEST_ASSERT_TRUE_MESSAGE(row != std::string::npos, "no node_stor schema row");
+    const std::string rowtxt = cfg.substr(row, 100);
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("CFG_INT") != std::string::npos, "node_stor is not CFG_INT");
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("0.0, 1.0") != std::string::npos, "node_stor schema range is not 0..1");
+
+    const std::string set = read_repo_file("src/meshcom_settings.h");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_stor, 0)") != std::string::npos,
+                             "node_stor default is not 0 (SNF-D7: off until the operator approves)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -307,5 +386,7 @@ int main(int, char **)
     RUN_TEST(test_ethmtu_bounds_are_inclusive);
     RUN_TEST(test_ethmtu_rejects_out_of_range_and_junk_and_keeps_the_value);
     RUN_TEST(test_ethmtu_rung_schema_row_and_default_match_the_assumptions);
+    RUN_TEST(test_stor_does_not_collide_with_the_store_family);
+    RUN_TEST(test_stor_rung_schema_row_and_default_match_the_assumptions);
     return UNITY_END();
 }

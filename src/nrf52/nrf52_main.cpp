@@ -2942,5 +2942,6 @@ void sendHeartbeat()
         return;
 
     sendKEEP();
+    storTick();   // SNF-GW W3 (no-op unless --stor on and gateway)
 
 }

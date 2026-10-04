@@ -462,6 +462,381 @@ class TestKeepParsingEdgeCases(unittest.TestCase):
         self.assertEqual(fields["groups"], ["232"])
 
 
+# ---------------------------------------------------------------------------
+# 9. STOR (docs/snf-gateway-concept-20261002.md section 5.3)
+# ---------------------------------------------------------------------------
+
+
+def build_stor(
+    gwid: int,
+    call: str,
+    calls: list[str],
+    *,
+    seq: int = 1,
+    total: int = 1,
+    hold_h: int = 24,
+    ver: str = "4.40",
+    sub: str = "a",
+) -> bytes:
+    body = (
+        f"STOR{gwid:08X}{call:<9.9}{ver:<4.4}{sub:<1.1}"
+        f"{hold_h};{seq}/{total};" + "".join(f"{c};" for c in calls)
+    )
+    return body.encode("ascii") + b"\x00"
+
+
+def text_frame(dest: str, src: str = "DK5EN-93") -> bytes:
+    body = f"{src}>{dest}:hello".encode("ascii")
+    return bytes([0x3A, 1, 2, 3, 4, 0xB0]) + body + b"\x00\x00" + bytes.fromhex("00AB237E")
+
+
+class TestParseStor(unittest.TestCase):
+    def test_valid_single_chunk_matches_concept_example(self) -> None:
+        raw = b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;DK5EN-92;DK5EN-93;\x00"
+        self.assertEqual(
+            srv.parse_stor(raw),
+            {
+                "gwid": 0x1A2B3C4D,
+                "call": "DK5EN-90",
+                "ver": "4.40",
+                "sub": "a",
+                "hold_h": 24,
+                "seq": 1,
+                "total": 1,
+                "calls": ["DK5EN-92", "DK5EN-93"],
+            },
+        )
+        self.assertEqual(srv.parse_stor(raw), srv.parse_stor(raw[:-1]))  # NUL optional
+
+    def test_builder_matches_concept_example_bytes(self) -> None:
+        self.assertEqual(
+            build_stor(0x1A2B3C4D, "DK5EN-90", ["DK5EN-92", "DK5EN-93"]),
+            b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;DK5EN-92;DK5EN-93;\x00",
+        )
+
+    def test_multi_chunk_header_fields(self) -> None:
+        f = srv.parse_stor(build_stor(1, "DK5EN-90", ["A-1"], seq=2, total=3, hold_h=6))
+        self.assertEqual((f["seq"], f["total"], f["hold_h"], f["calls"]), (2, 3, 6, ["A-1"]))
+
+    def test_empty_list_is_a_withdrawal(self) -> None:
+        f = srv.parse_stor(b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;\x00")
+        self.assertEqual(f["calls"], [])
+        self.assertEqual((f["seq"], f["total"]), (1, 1))
+
+    def test_max_length_255_accepted_256_rejected(self) -> None:
+        calls = ["AAAAAAAAA"] * 22  # 22 * 10 B + 34 B header ("240;1/1;") = 254 + NUL
+        ok = build_stor(1, "DK5EN-90", calls, hold_h=240)
+        self.assertEqual(len(ok), 255)
+        self.assertEqual(len(srv.parse_stor(ok)["calls"]), 22)
+        too_long = build_stor(1, "DK5EN-90", calls, hold_h=2400)
+        self.assertEqual(len(too_long), 256)
+        with self.assertRaisesRegex(srv.StorParseError, "too long"):
+            srv.parse_stor(too_long)
+
+    def test_malformed_cases(self) -> None:
+        good = b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;DK5EN-92;\x00"
+        cases = {
+            "bad prefix": b"KEEP" + good[4:],
+            "short header": b"STOR1A2B3C4DDK5EN\x00",
+            "non-hex gwid": b"STOR1A2B3CZZ" + good[12:],
+            "non-ascii": good.replace(b"DK5EN-92", b"DK5\xc3\xa4N-92"),
+            "missing trailing semicolon": b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;DK5EN-92\x00",
+            "no seq field": b"STOR1A2B3C4DDK5EN-90 4.40a24;\x00",
+            "hold_h not numeric": b"STOR1A2B3C4DDK5EN-90 4.40ax4;1/1;A;\x00",
+            "hold_h empty": b"STOR1A2B3C4DDK5EN-90 4.40a;1/1;A;\x00",
+            "hold_h negative": b"STOR1A2B3C4DDK5EN-90 4.40a-1;1/1;A;\x00",
+            "seq no slash": b"STOR1A2B3C4DDK5EN-90 4.40a24;1-1;A;\x00",
+            "seq zero": b"STOR1A2B3C4DDK5EN-90 4.40a24;0/1;A;\x00",
+            "seq above total": b"STOR1A2B3C4DDK5EN-90 4.40a24;3/2;A;\x00",
+            "total zero": b"STOR1A2B3C4DDK5EN-90 4.40a24;0/0;A;\x00",
+            "empty call in list": b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;A;;B;\x00",
+            "bad call char": b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;A B;\x00",
+            "call too long": b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;ABCDEFGHIJ;\x00",
+            "embedded NUL": b"STOR1A2B3C4DDK5EN-90 4.40a24;1/1;A;\x00B;\x00",
+            "too long": good[:-1] + b"A;" * 130 + b"\x00",
+            "blank gateway call": b"STOR1A2B3C4D         4.40a24;1/1;A;\x00",
+        }
+        for name, raw in cases.items():
+            with self.subTest(name), self.assertRaises(srv.StorParseError):
+                srv.parse_stor(raw)
+
+    def test_dest_call_of(self) -> None:
+        self.assertEqual(srv.dest_call_of(text_frame("DK5EN-92")), "DK5EN-92")
+        self.assertIsNone(srv.dest_call_of(b"\x21" + text_frame("X")[1:]))  # not a text frame
+        self.assertIsNone(srv.dest_call_of(bytes([0x3A, 1, 2, 3, 4, 0xB0]) + b"no path"))
+
+
+class StorServerTestCase(ServerTestCase):
+    """ServerTestCase plus a fake store gateway socket and a STOR helper."""
+
+    def stor(self, sock: socket.socket, call: str, calls: list[str], **kw) -> None:
+        sock.sendto(build_stor(0x1A2B3C4D, call, calls, **kw), self.server_addr)
+
+    def snapshot_for(self, call: str):
+        wait_until(lambda: call in self.server.stor_snapshots, timeout=0.5)
+        return self.server.stor_snapshots.get(call)
+
+    def settle(self) -> None:
+        """Round-trip a KEEP so every earlier datagram has been handled (the
+        server thread is sequential and answers each KEEP)."""
+        probe = free_udp_socket()
+        self.addCleanup(probe.close)
+        probe.sendto(cli.build_keep(0x0F0F0F0F, "PROBE"), self.server_addr)
+        probe.recvfrom(4096)
+
+
+class TestStorAssembly(StorServerTestCase):
+    def test_single_chunk_snapshot_stored_and_not_answered(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["DK5EN-92", "DK5EN-93"])
+        snap = self.snapshot_for("DK5EN-90")
+        self.assertEqual(snap["calls"], ["DK5EN-92", "DK5EN-93"])
+        self.assertEqual(snap["hold_h"], 24)
+        self.assertEqual(snap["addr"], sock.getsockname())
+        self.assertIsInstance(snap["t"], float)
+        sock.settimeout(0.3)
+        with self.assertRaises(socket.timeout):  # the mock never answers STOR
+            sock.recvfrom(4096)
+
+    def test_stor_does_not_register_a_client(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1"])
+        self.snapshot_for("DK5EN-90")
+        self.assertEqual(len(self.server.clients), 0)
+
+    def test_multi_chunk_in_order_is_applied_when_complete(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1", "A-2"], seq=1, total=3)
+        self.stor(sock, "DK5EN-90", ["A-3"], seq=2, total=3)
+        self.settle()
+        self.assertNotIn("DK5EN-90", self.server.stor_snapshots)  # 2 of 3
+        self.stor(sock, "DK5EN-90", ["A-4"], seq=3, total=3)
+        snap = self.snapshot_for("DK5EN-90")
+        self.assertEqual(snap["calls"], ["A-1", "A-2", "A-3", "A-4"])
+
+    def test_chunks_two_and_three_may_arrive_out_of_order(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1"], seq=1, total=3)
+        self.stor(sock, "DK5EN-90", ["A-3"], seq=3, total=3)
+        self.stor(sock, "DK5EN-90", ["A-2"], seq=2, total=3)
+        snap = self.snapshot_for("DK5EN-90")
+        self.assertEqual(snap["calls"], ["A-1", "A-2", "A-3"])  # seq order, not arrival
+
+    def test_round_with_missing_chunk_is_not_applied(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1"], seq=1, total=3)
+        self.stor(sock, "DK5EN-90", ["A-3"], seq=3, total=3)
+        self.settle()
+        self.assertEqual(self.server.stor_snapshots, {})
+
+    def test_missing_chunk_keeps_previous_snapshot(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["OLD-1"])
+        self.snapshot_for("DK5EN-90")
+        self.stor(sock, "DK5EN-90", ["N-1"], seq=1, total=2)  # 2/2 never comes
+        self.settle()
+        self.assertEqual(self.server.stor_snapshots["DK5EN-90"]["calls"], ["OLD-1"])
+
+    def test_chunk_without_round_is_dropped(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-2"], seq=2, total=2)  # 1/2 not seen yet
+        self.stor(sock, "DK5EN-90", ["A-1"], seq=1, total=2)  # starts a round, no 2/2
+        self.settle()
+        self.assertEqual(self.server.stor_snapshots, {})
+
+    def test_seq1_starts_new_round_and_old_round_stragglers_are_dropped(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["OLD-1"], seq=1, total=2)
+        self.stor(sock, "DK5EN-90", ["NEW-1"], seq=1, total=2)  # new round
+        self.stor(sock, "DK5EN-90", ["NEW-2"], seq=2, total=2)
+        snap = self.snapshot_for("DK5EN-90")
+        self.assertEqual(snap["calls"], ["NEW-1", "NEW-2"])
+        # a late chunk 2/2 of the older round: no round in progress -> dropped
+        self.stor(sock, "DK5EN-90", ["OLD-2"], seq=2, total=2)
+        self.settle()
+        self.assertEqual(self.server.stor_snapshots["DK5EN-90"]["calls"], ["NEW-1", "NEW-2"])
+
+    def test_duplicate_chunk_in_open_round_is_dropped(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1"], seq=1, total=3)
+        self.stor(sock, "DK5EN-90", ["A-2"], seq=2, total=3)
+        self.stor(sock, "DK5EN-90", ["STALE"], seq=2, total=3)  # older-round straggler
+        self.stor(sock, "DK5EN-90", ["A-3"], seq=3, total=3)
+        snap = self.snapshot_for("DK5EN-90")
+        self.assertEqual(snap["calls"], ["A-1", "A-2", "A-3"])
+
+    def test_new_snapshot_replaces_old_and_empty_list_withdraws(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self.stor(sock, "DK5EN-90", ["A-1", "A-2"])
+        self.snapshot_for("DK5EN-90")
+        self.stor(sock, "DK5EN-90", [])
+        self.assertTrue(
+            wait_until(lambda: self.server.stor_snapshots["DK5EN-90"]["calls"] == [])
+        )
+
+    def test_malformed_stor_is_dropped_without_crash(self) -> None:
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        sock.sendto(b"STOR1A2B3C4DDK5EN-90 4.40a24;9/1;A;\x00", self.server_addr)
+        self.settle()
+        self.assertEqual(self.server.stor_snapshots, {})
+        self.stor(sock, "DK5EN-90", ["A-1"])  # server still alive
+        self.assertIsNotNone(self.snapshot_for("DK5EN-90"))
+
+    def test_stor_is_recorded(self) -> None:
+        rec = srv.DatagramRecorder()
+        server = srv.MockMeshComServer("127.0.0.1", 0, recorder=rec)
+        server.start()
+        self.addCleanup(server.stop)
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        raw = build_stor(1, "DK5EN-90", ["A-1"])
+        sock.sendto(raw, ("127.0.0.1", server.port))
+        self.assertTrue(wait_until(lambda: "DK5EN-90" in server.stor_snapshots))
+        self.assertEqual([(r.direction, r.data) for r in rec.records], [("rx", raw)])
+        self.assertEqual(rec.records[0].indicator, "STOR")
+
+
+class TestStorExpiry(unittest.TestCase):
+    def test_snapshot_expires_after_ttl(self) -> None:
+        server = srv.MockMeshComServer("127.0.0.1", 0, stor_ttl=0.2)
+        server.start()
+        self.addCleanup(server.stop)
+        addr = ("127.0.0.1", server.port)
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        sock.sendto(build_stor(1, "DK5EN-90", ["A-1"]), addr)
+        self.assertTrue(wait_until(lambda: "DK5EN-90" in server.stor_snapshots))
+
+        # Expiry is lazy (top of _handle_datagram), like the client registry.
+        def expired() -> bool:
+            sock.sendto(b"\x00", addr)
+            return "DK5EN-90" not in server.stor_snapshots
+
+        self.assertTrue(wait_until(expired, timeout=1.5, interval=0.05))
+
+    def test_default_ttl_is_45_minutes_and_refresh_resets_it(self) -> None:
+        server = srv.MockMeshComServer("127.0.0.1", 0)
+        self.addCleanup(server.sock.close)
+        self.assertEqual(server.stor_ttl, 45 * 60)
+        addr = ("127.0.0.1", 40000)
+        server._handle_datagram(build_stor(1, "DK5EN-90", ["A-1"]), addr)
+        server.stor_snapshots["DK5EN-90"]["t"] -= 44 * 60  # nearly stale
+        server._handle_datagram(b"\x00", addr)
+        self.assertIn("DK5EN-90", server.stor_snapshots)
+        server._handle_datagram(build_stor(1, "DK5EN-90", ["A-1"]), addr)  # refresh
+        server.stor_snapshots["DK5EN-90"]["t"] -= 44 * 60
+        server._handle_datagram(b"\x00", addr)
+        self.assertIn("DK5EN-90", server.stor_snapshots)
+        server.stor_snapshots["DK5EN-90"]["t"] -= 2 * 60  # now 46 min old
+        server._handle_datagram(b"\x00", addr)
+        self.assertNotIn("DK5EN-90", server.stor_snapshots)
+
+
+class TestStorRouting(unittest.TestCase):
+    """Routing is a mock assumption and OFF by default."""
+
+    def make(self, **kw):
+        server = srv.MockMeshComServer("127.0.0.1", 0, registry_ttl=120.0, **kw)
+        server.start()
+        self.addCleanup(server.stop)
+        addr = ("127.0.0.1", server.port)
+        socks = {}
+        for name, gw in (("src", 0x11111111), ("store", 0x22222222), ("other", 0x33333333)):
+            s = free_udp_socket(0.3)
+            self.addCleanup(s.close)
+            s.sendto(cli.build_keep(gw, name.upper()), addr)
+            s.recvfrom(4096)
+            socks[name] = s
+        socks["store"].sendto(build_stor(0x22222222, "STORE", ["DK5EN-92"]), addr)
+        self.assertTrue(wait_until(lambda: "STORE" in server.stor_snapshots))
+        return server, addr, socks
+
+    @staticmethod
+    def got(sock: socket.socket) -> bytes | None:
+        try:
+            return sock.recvfrom(4096)[0]
+        except socket.timeout:
+            return None
+
+    def test_default_off_routes_nothing_extra(self) -> None:
+        server, addr, s = self.make(redistribute=False)
+        self.assertFalse(server.stor_routing)
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", text_frame("DK5EN-92")), addr)
+        self.assertIsNone(self.got(s["store"]))
+        self.assertIsNone(self.got(s["other"]))
+
+    def test_on_forwards_to_listing_gateway_only_when_redistribute_off(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        fr = text_frame("DK5EN-92")
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", fr), addr)
+        self.assertEqual(self.got(s["store"]), b"GATE" + fr)
+        self.assertIsNone(self.got(s["other"]))
+        self.assertIsNone(self.got(s["src"]))
+
+    def test_on_is_in_addition_to_redistribution_without_duplicates(self) -> None:
+        server, addr, s = self.make(stor_routing=True)
+        fr = text_frame("DK5EN-92")
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", fr), addr)
+        self.assertEqual(self.got(s["store"]), b"GATE" + fr)
+        self.assertEqual(self.got(s["other"]), b"GATE" + fr)  # redistribution kept
+        self.assertIsNone(self.got(s["store"]))  # exactly one copy
+        self.assertIsNone(self.got(s["src"]))
+
+    def test_unlisted_destination_is_not_routed(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", text_frame("DK5EN-77")), addr)
+        self.assertIsNone(self.got(s["store"]))
+
+    def test_non_text_frame_is_not_routed(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        fr = b"\x21" + text_frame("DK5EN-92")[1:]
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", fr), addr)
+        self.assertIsNone(self.got(s["store"]))
+
+    def test_expired_snapshot_is_not_routed_to(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        server.stor_snapshots["STORE"]["t"] -= 46 * 60
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", text_frame("DK5EN-92")), addr)
+        self.assertIsNone(self.got(s["store"]))
+
+    def test_withdrawn_snapshot_is_not_routed_to(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        s["store"].sendto(build_stor(0x22222222, "STORE", []), addr)
+        self.assertTrue(wait_until(lambda: server.stor_snapshots["STORE"]["calls"] == []))
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", text_frame("DK5EN-92")), addr)
+        self.assertIsNone(self.got(s["store"]))
+
+    def test_sender_never_gets_its_own_frame_back(self) -> None:
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        fr = text_frame("DK5EN-92")
+        s["store"].sendto(cli.build_data(0x22222222, "STORE", fr), addr)
+        self.assertIsNone(self.got(s["store"]))
+
+    def test_routed_foreign_path_frame_is_relayed_not_guarded(self) -> None:
+        """Genuine DATA from a registered gateway keeps relayed=True: a foreign
+        source callsign in its path must still be forwarded, as for redistribute."""
+        server, addr, s = self.make(redistribute=False, stor_routing=True)
+        fr = text_frame("DK5EN-92", src="DL2JA-1")
+        s["src"].sendto(cli.build_data(0x11111111, "SRC", fr), addr)
+        self.assertEqual(self.got(s["store"]), b"GATE" + fr)
+
+    def test_injection_guard_unchanged_by_routing(self) -> None:
+        server, addr, s = self.make(stor_routing=True)
+        with self.assertRaises(srv.ForeignCallsignError):
+            server.send_gate(text_frame("DK5EN-92", src="DL2JA-1"), s["store"].getsockname())
+
+
 if __name__ == "__main__":
     unittest.main()
 

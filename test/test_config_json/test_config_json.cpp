@@ -162,6 +162,7 @@ static void fill_settings(void)
     snprintf(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_pingcall), "OE1XAR-1");
     meshcom_settings.node_pingmax = 5;
     meshcom_settings.node_ethmtu = 1400;
+    meshcom_settings.node_stor = 1; /* SNF-D7: default is 0, so 1 proves the round trip */
 }
 
 static std::string do_export(void)
@@ -227,6 +228,8 @@ static void test_roundtrip_restores_every_field(void)
     TEST_ASSERT_TRUE(meshcom_settings.node_lon == 16.40922749);
     /* TZ-01: POSIX TZ string, byte-exact (commas, slashes, digits) */
     TEST_ASSERT_EQUAL_STRING("CET-1CEST,M3.5.0,M10.5.0/3", meshcom_settings.node_tz);
+    /* SNF-D7 (#1188): STOR switch, default 0 -- the fill value 1 must survive */
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_stor);
     TEST_ASSERT_EQUAL_FLOAT(4.24f, meshcom_settings.node_maxv);
     TEST_ASSERT_EQUAL_FLOAT(0.002f, meshcom_settings.node_shunt);
     TEST_ASSERT_EQUAL_FLOAT(433.175f, meshcom_settings.node_freq);
@@ -491,6 +494,74 @@ static void test_ethmtu_out_of_range_is_refused(void)
     TEST_ASSERT_EQUAL_INT(1400, meshcom_settings.node_ethmtu);
 }
 
+/* SNF-D7 (#1188): node_stor has the schema bounds 0..1 -- an import outside
+ * (2 and -1) refuses the whole file and leaves the value untouched. */
+static void test_stor_out_of_range_is_refused(void)
+{
+    fill_settings();
+    std::string doc = do_export();
+    TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_stor\":\"1\"") != std::string::npos,
+                             "node_stor is not exported");
+
+    const char *bad_values[] = {"2", "-1"};
+    for (const char *v : bad_values)
+    {
+        std::string bad = replace_once(doc, "\"node_stor\":\"1\"",
+                                            std::string("\"node_stor\":\"") + v + "\"");
+
+        wipe_settings();
+        s_meshcom_settings before;
+        memcpy(&before, &meshcom_settings, sizeof(before));
+
+        TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
+        TEST_ASSERT_NOT_NULL(strstr(g_err, "node_stor"));
+        TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
+    }
+
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(doc));
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_stor);
+}
+
+/* SNF-D7: a file WITHOUT node_stor (export of an older firmware) stays
+ * importable -- the CRC covers present keys only -- and leaves the node's own
+ * node_stor unchanged, in both states (hand-built document, same shape as
+ * test_import_without_node_tz_keeps_current_value). */
+static void test_import_without_node_stor_keeps_current_value(void)
+{
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[512];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    for (int keep = 0; keep <= 1; keep++)
+    {
+        wipe_settings();
+        meshcom_settings.max_hop_text = 4;
+        meshcom_settings.node_gpsbaud = 38400;
+        meshcom_settings.node_stor = keep;
+
+        TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
+        TEST_ASSERT_EQUAL_STRING("TEST-1", meshcom_settings.node_call);
+        TEST_ASSERT_EQUAL_INT(keep, meshcom_settings.node_stor);
+    }
+}
+
 /* Zu langer String fuer sein Zielfeld: dieselbe Abweisung, kein Ueberlauf. */
 static void test_oversized_string_is_refused(void)
 {
@@ -562,6 +633,8 @@ int main(int, char **)
     RUN_TEST(test_unknown_key_is_ignored_and_counted);
     RUN_TEST(test_out_of_range_value_is_refused);
     RUN_TEST(test_ethmtu_out_of_range_is_refused);
+    RUN_TEST(test_stor_out_of_range_is_refused);
+    RUN_TEST(test_import_without_node_stor_keeps_current_value);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);
     RUN_TEST(test_empty_and_oversized_input_is_refused);

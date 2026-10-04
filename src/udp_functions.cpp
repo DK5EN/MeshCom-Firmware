@@ -28,6 +28,14 @@
 #include "setlog_lines.h"
 #include "wifi_start_gate.h"
 
+#if defined(ENABLE_MSGSTORE)
+#include "stor_announce.h"   // SNF-GW W3: STOR announce of the mailbox calls
+#include "msgstore_api.h"
+#include "nbr_matrix.h"
+#include "nbr_views.h"
+#include "uptime_min.h"
+#endif
+
 #if defined(ESP32)
 #include "esp_task_wdt.h"
 #endif
@@ -1220,6 +1228,7 @@ void sendMeshComHeartbeat()
     if(bGATEWAY)
     {
       sendKEEP();
+      storTick();
     }
 }
 
@@ -1262,6 +1271,73 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     // wie viele UNGELESENE Frames die Verdraengung getroffen hat.
     if(lost > 0 && bLORADEBUG)
         printfdeb("[MC-DBG] RING_OVERFLOW buf=udp lost=%i\n", lost);
+}
+
+// SNF-GW W3 (#1188, decisions SNF-D6/D7): tell the server which calls this
+// store node holds PMs for. Off unless --stor on (node_stor) on a gateway: the
+// server operator has not approved the STOR datagram yet. The set is the store
+// set intersected with the calls heard DIRECTLY on LoRa within the last 12 h
+// (NBR_WINDOW_MIN), never the exact own call. Sent every 15 min and once 60 s
+// after the set changed (src/stor_announce.h); called with every KEEP (30 s).
+void storTick()
+{
+#if defined(ENABLE_MSGSTORE)
+    static StorTimer s_storTimer;
+    static bool s_storInit = false;
+    static StorSet s_cur;
+    static char s_heard[STOR_MAX_CALLS][STOR_CALL_LEN];
+
+    if(!s_storInit)
+    {
+        storTimerInit(s_storTimer);
+        s_storInit = true;
+    }
+
+    const bool enabled = bGATEWAY && meshcom_settings.node_stor == 1;
+    if(!enabled)
+    {
+        storTimerDue(s_storTimer, s_cur, millis(), false);   // forgets "sent": re-enable sends at once
+        return;
+    }
+
+    const uint16_t now_min = uptimeMin16();
+    uint8_t rows[STOR_MAX_CALLS];
+    int n = nbrMhRows(nbrMatrix, now_min, NBR_WINDOW_MIN, rows, STOR_MAX_CALLS);
+    if(n > STOR_MAX_CALLS)
+        n = STOR_MAX_CALLS;
+
+    const char *heard[STOR_MAX_CALLS];
+    int k = 0;
+    for(int i = 0; i < n; i++)
+    {
+        NbrMhView v;
+        if(!nbrMhGet(nbrMatrix, rows[i], now_min, &v))
+            continue;
+        snprintf(s_heard[k], STOR_CALL_LEN, "%s", v.call);
+        heard[k] = s_heard[k];
+        k++;
+    }
+
+    storBuildSet(s_cur, heard, k, meshcom_settings.node_call,
+                 [](const char *call, void *) { return msgstoreEligible(call); }, nullptr);
+
+    const uint32_t now = millis();
+    if(!storTimerDue(s_storTimer, s_cur, now, true))
+        return;
+
+    const int total = storChunkCount(s_cur, meshcom_settings.node_call);
+    for(int seq = 1; seq <= total; seq++)
+    {
+        char buf[STOR_DATAGRAM_MAX];
+        int len = storEncodeChunk(buf, sizeof(buf), _GW_ID, meshcom_settings.node_call,
+                                  SOURCE_VERSION, SOURCE_VERSION_SUB, (int)msgstoreHoldHours(),
+                                  s_cur, seq, total);
+        if(len > 0)
+            addUdpOutBuffer((uint8_t *)buf, (uint16_t)(len + 1));   // incl. the NUL, like KEEP
+    }
+    storTimerSent(s_storTimer, s_cur, now);
+    Serial.printf("[STOR];tx;calls;%d;chunks;%d\n", s_cur.n, total);
+#endif
 }
 
 void sendKEEP()

@@ -10,15 +10,15 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-109 suites with tests, 1702 `RUN_TEST` cases, 54 native environments. Five
+110 suites with tests, 1728 `RUN_TEST` cases, 55 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     56 |  1148 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     57 |  1172 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
-| Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
+| Contract      |     12 |   112 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |   104 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
 | Integration   |      3 |    57 | several modules on a fake platform (BLE harness on real rings, ESP32 NVS, nRF52 settings paths)  |
 | Oracle/Replay |      8 |    37 | field captures replayed through the real code (aprs_corpus, dedup/ack/txprio, nbr_replay, topo)  |
@@ -51,7 +51,12 @@ shared by OnRxDone and the GATE handlers, `RM1 ` exclusion, path element match;
 own env `native_msgstore_hook`). Extended: `test_msgstore` (+9: lock pairing on
 every entry point, no env callback under the lock, `msgstoreSameBaseCall`). `test_udp_frame_twin` (+6, SNF-GW-03/04: server PM to
 a sibling SSID stored on both twins, echo guard, server `:ack` purge, PN repeat,
-frames outside the mailbox incl. an unconfigured source, PM to the exact own call).
+frames outside the mailbox incl. an unconfigured source, PM to the exact own call). `test_stor_announce` (SNF-GW W3: STOR announce set,
+encoder byte-exact against the concept example, chunking, 15 min / 60 s timer;
+own env `native_stor_announce`). Extended: `test_command_setters` (+2, `--stor`
+rung and ladder collisions), `test_config_json` (+2, `node_stor` range and absent
+key); `tools/mock/test_mock_server.py` (STOR parser, chunk assembly, expiry,
+routing).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -150,11 +155,11 @@ flashes whatever is attached.
 | test_charset_filter          | Unit          |    29 | native                                                       |
 | test_checkvia                | Unit          |    13 | native_parsers                                               |
 | test_command_match           | Unit          |    11 | native_command_match                                         |
-| test_command_setters         | Unit          |    18 | native_command_setters                                       |
+| test_command_setters         | Unit          |    20 | native_command_setters                                       |
 | test_command_toggles         | Unit          |    33 | native_command_toggles                                       |
 | test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
-| test_config_json             | Contract      |    17 | native_config                                                |
+| test_config_json             | Contract      |    19 | native_config                                                |
 | test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
 | test_csma_timing             | Unit          |    10 | native                                                       |
 | test_decodeaprspos           | Unit          |    22 | native_parsers                                               |
@@ -218,6 +223,7 @@ flashes whatever is attached.
 | test_settings_roundtrip      | Contract      |     9 | native_settings_roundtrip                                    |
 | test_settings_sanitize       | Regression    |    15 | native                                                       |
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
+| test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
 | test_sto_notice              | Unit          |    26 | native                                                       |
 | test_tft_backlight           | Regression    |     4 | native                                                       |
 | test_tile_cache              | Unit          |    10 | native                                                       |
