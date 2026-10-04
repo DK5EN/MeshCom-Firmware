@@ -108,4 +108,10 @@ DK5EN-98 (running until 2026-10-05 11:17); mark them in that evaluation.
   and badge on both, mesh exchange 6/6). The one red step was a harness false positive: the
   RAK `boot` scenario's crash regex matched `assert` inside "Wasserturm" in a received beacon;
   word-bounded with a test. RAK then DFU-flashed with the tree (instrument image, build
-  16:44:49): EXT-01 confirmed on nRF52 too, RAK harness 5/5. Ready to commit.
+  16:44:49): EXT-01 confirmed on nRF52 too, RAK harness 5/5. Committed `9d82ab5d`.
+- EXT-03 (operator: a field node had 255.255.255.255 as Extern-UDP target) 2026-10-04 17:00:
+  `src/extudp_target.h` + `test_extudp_target` (7 cases), hooked into `--extudpip` and
+  `startExternUDP()`. Live on DK5EN-14 (192.168.68.70/22, build 16:56): 255.255.255.255,
+  192.168.71.255 (own broadcast), 239.1.1.1 and the own IP refused with a reason, 192.168.68.255
+  (a host in /22) and 192.168.68.74 accepted. Stage 1,2 PASS (1684 cases), Heltec and RAK
+  control builds clean. Not committed yet.

@@ -30,7 +30,7 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1677 Unity cases today) plus `test/golden/selftest.sh`.
+- Stage 1: every `[env:native*]` (48 envs, 1684 Unity cases today) plus `test/golden/selftest.sh`.
 - Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (553 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
@@ -120,7 +120,7 @@ Hard bench rules:
   paper closed and archived (`docs/archive/regression-offene-punkte-20261003.md`).
   Evening: T-Deck campaign wave 2 (TD-11 ACK glyph in the bubble, W0.2 flags on five envs +
   nrf52_base, `msg_ack` harness scenario), then T5-01 and EXT-01 fixed blind (five of five envs
-  with `-Werror`).
+  with `-Werror`), and EXT-03: Extern-UDP refuses broadcast/multicast targets.
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix
