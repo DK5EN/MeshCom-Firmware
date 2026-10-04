@@ -70,6 +70,19 @@ the two that touch `command_functions.cpp`, `config_json.h` and `esp32_main.cpp`
 | D8  | RM McApp side        | Separate paper on the Desktop; the tag is computed on the McApp backend, never in the browser.  |
 | D9  | Docs delivery        | This paper, the McApp paper and BACKLOG rows committed on `fork-dev`.                           |
 
+### 3.2a Decisions of the approval round (2026-10-04 evening)
+
+These supersede the rows they name.
+
+| Id      | Decision                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NMTU-D2 | Default MTU is 1280 in the app (all boards) and in Safeboot; `--mtu 1500` raises it. No migration: a stored value (4.40a nodes hold 1500) is kept; the release note tells users to run `--mtu 1280`.                                                                                                                                                                                                            |
+| AU-D2   | Replaces D2/AU-D7. `node_updchan` 0 = prod (`icssw-org/MeshCom-Firmware`, default), 1 = dev (`DK5EN/MeshCom-Firmware`), both compiled in. No free repo string, no `node_updrepo`. `--updchan prod\|dev`. Not in the RM allowlist.                                                                                                                                                                               |
+| AU-D9   | Both channels read `releases/latest` only; prereleases and drafts are skipped. Every dev test release becomes "Latest" on the fork and is what the web flasher serves; release notes must say so.                                                                                                                                                                                                               |
+| AU-D10  | The release build sets `-D MC_BUILD_TAG="vX.YYz[.MM.DD]"`; a local build has an empty tag. One comparator for both channels: `(major, minor, letter)` first; on a tie the `MM.DD` date decides, a candidate is newer if its date lies 1..182 days after the running date modulo the year (New Year safe); a tag without date is the oldest of its version. Empty running tag = `SOURCE_VERSION`+`SUB`, no date. |
+| SNF-D6  | STOR announces the store set intersected with calls heard directly on LoRa within 12 h. The exact own call (call+SSID) is never announced (delivered directly); own base call with another SSID is announced when heard. No echo-HEY (option 3a dropped).                                                                                                                                                       |
+| SNF-D7  | `node_stor` int row 0/1, default 0, `--stor on\|off`, `--info` line. Off = no STOR datagram. Not in the RM allowlist. The real server is used only after the operator's approval; bench uses the mock server, extended for STOR in SNF-GW W3.                                                                                                                                                                   |
+
 ### 3.3 Hotspot files shared by several features
 
 The orchestrator owns these at every gate; writer briefs never list them unless the row says so.
@@ -630,6 +643,14 @@ recon report).
   `lora_functions.cpp`, the two UDP twins. The concept's open question "review with Kurt first"
   (BACKLOG row SNF-GW) still applies to the PR, not to the fork build.
 
+#### W3 STOR announce (2 writers + orchestrator, SNF-D6/D7)
+
+| Owner | Files (exclusive)                                                                                                                                                                                               | Verification                                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| C1    | `src/stor_announce.h` (new: announce-set builder, encoder per `snf-gateway-concept-20261002.md` 5.3, chunking below 255 B, change debounce), `test/test_stor_announce/` (new)                                   | `pio test -e native_stor_announce`                          |
+| C2    | `src/command_functions.cpp` (`--stor on\|off`, help, `--info`), `src/config_json.h`, `src/meshcom_settings.h` (`node_stor`), schema lint, `test/test_command_setters/`, mock server STOR support under `tools/` | `pio test -e native_command_setters`; selftest; mock pytest |
+| orch  | `src/udp_functions.cpp` (send next to `sendKEEP()`, 15 min + debounced on change), `platformio.ini`, golden json                                                                                                | stage 1+2; mock-server bench on DK5EN-90 and DK5EN-1        |
+
 ## 8. BLC: BLE AutoReconnect (#1191)
 
 ### 8.1 Facts (recon `scout-1191.md`)
@@ -714,7 +735,7 @@ reconnect itself is an app change, specified in 8.4 for the app maintainers.
 | ---- | ------- | ----- | ----------------------------------------------------------------------------------------------- |
 | 1    | NMTU    | 1     | smallest, touches `esp32_main.cpp` and `command_functions.cpp` once, rebuilds Safeboot early    |
 | 2    | BLC     | 1     | small, independent, closes a real race; `esp32_main.cpp` again but after NMTU has landed        |
-| 3    | SNF-GW  | 2     | no settings surface, no `command_functions.cpp`; `lora_functions.cpp` before RM's hook          |
+| 3    | SNF-GW  | 3     | no settings surface, no `command_functions.cpp`; `lora_functions.cpp` before RM's hook          |
 | 4    | RM      | 3     | `lora_functions.cpp` hook lands after SNF-GW's helper exists (RM's custody exclusion uses it)   |
 | 5    | AU      | 5     | largest, hardware-serialized waves, `variants/*` sweep, Safeboot binaries rebuilt a second time |
 
@@ -730,6 +751,7 @@ Status:
 | BLC     | W1   | not started |        |
 | SNF-GW  | W1   | not started |        |
 | SNF-GW  | W2   | not started |        |
+| SNF-GW  | W3   | not started |        |
 | RM      | W1   | not started |        |
 | RM      | W2   | not started |        |
 | RM      | W3   | not started |        |
