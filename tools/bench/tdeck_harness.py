@@ -37,6 +37,12 @@ except ImportError:  # pragma: no cover - exercised only when pyserial is missin
     serial = None  # type: ignore[assignment]
 
 from tdeck_parse import (
+    BALL_MAX_STEPS_PER_READ,
+    BALL_SCREEN_H,
+    BALL_SCREEN_W,
+    BALL_STEP_PX,
+    ball_chunks,
+    ball_walk_fits,
     disptest_expected,
     heap_delta,
     parse_line,
@@ -1051,6 +1057,39 @@ def _keylock_state(session: TDeckSession) -> Optional[bool]:
     return None
 
 
+BALL_XY_RE = re.compile(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;\d")
+
+
+def _park_cursor(session: TDeckSession, legs: Sequence[Tuple[str, int]] = (),
+                 pause_s: float = 0.1) -> Optional[Tuple[int, int]]:
+    """Drive the cursor into the top-left clamp corner, then along `legs`;
+    returns the position from the last [BALL] line, or None when no line came.
+
+    mouse_read() consumes at most BALL_MAX_STEPS_PER_READ counted edges per
+    indev read and discards the rest, so the corner takes several 8-step
+    commands with a pause between them (an indev read is 10 ms, the serial
+    reader takes one main-loop pass per byte), and `legs` are split the same
+    way. A clamped step prints no [BALL] line, which is why the corner itself
+    is silent and the caller must pass legs that move (TD-20)."""
+    idx = session.length()
+    corner_cmds = (max(BALL_SCREEN_W, BALL_SCREEN_H) // BALL_STEP_PX) // BALL_MAX_STEPS_PER_READ + 1
+    for direction in ("left", "up"):
+        for _ in range(corner_cmds):
+            session.send(f"--ball {direction} {BALL_MAX_STEPS_PER_READ}")
+            time.sleep(pause_s)
+    for direction, n in legs:
+        for chunk in ball_chunks(n):
+            session.send(f"--ball {direction} {chunk}")
+            time.sleep(pause_s)
+    time.sleep(0.4)
+    pos: Optional[Tuple[int, int]] = None
+    for _, _, l in session.records_since(idx):
+        m = BALL_XY_RE.search(l)
+        if m:
+            pos = (int(m.group(1)), int(m.group(2)))
+    return pos
+
+
 def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     """Keyboard and trackball tests. Keys are injected into keypad_get_key()
     (the I2C keyboard path) on the chat tab, trackball steps into mouse_read()
@@ -1077,7 +1116,14 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
 
     TD-20 (2026-10-04): runs with `--redrawlog refr` (only [REFRSTART]/[REFR]);
     the per-object [REDRAW] flood delayed the [REFR] after [BALL] past the
-    latency window. No [REDRAW] rows are read here."""
+    latency window. No [REDRAW] rows are read here. The "lost step" of runs
+    5-7 (steps 9 of 10 on `right` and `down`) was the screen clamp: the old
+    pre-walk (`--ball right 14`, `down 8`) assumed the cursor at 0/0 and 14
+    consumed steps, but mouse_read() caps one read at BALL_MAX_STEPS_PER_READ
+    and the cursor stood where the previous scenario left it, so the tenth
+    step ran into x=310 / y=220 and printed no [BALL] line. The walk now
+    starts from a parked, known position and is simulated against the clamp
+    first (tdeck_parse.ball_walk_fits)."""
     lock = _keylock_state(session)
     if lock is not False:
         return {
@@ -1105,17 +1151,32 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     session.send("--key " + "\\b" * len(text))
     time.sleep(0.5)
 
-    # -- trackball: move the cursor away from the screen edge (it starts at
-    # 0/0 and mouse_read() clamps at the borders), then walk a square.
+    # -- trackball: park in the top-left clamp corner, step to a known start
+    # (x 150 / y 70 with the 14x20 cursor), then walk a square that the clamp
+    # simulation has cleared -- a clamped step prints no [BALL] line and
+    # would count as "lost" (TD-20).
     session.send(f"--tab {args.input_tab}")
     time.sleep(0.5)
-    session.send("--ball right 14")
-    time.sleep(0.5)
-    session.send("--ball down 8")
-    time.sleep(0.5)
+    start = _park_cursor(session, (("right", 14), ("down", 5)))
+    if start is None:
+        return {
+            "ok": False,
+            "error": "no [BALL] line while parking the cursor -- trackball injection "
+                     "or the [BALL] print is missing (instrument image?)",
+        }
+    legs = (("right", args.input_ball_steps), ("down", args.input_ball_steps),
+            ("left", args.input_ball_steps), ("up", args.input_ball_steps))
+    fits, clamped_leg = ball_walk_fits(start[0], start[1], legs)
+    if not fits:
+        return {
+            "ok": False,
+            "error": "a walk of %d steps from %s runs into the screen clamp on leg "
+                     "'%s'; a clamped step prints no [BALL] line (TD-20)"
+                     % (args.input_ball_steps, start, clamped_leg),
+            "start": start,
+        }
     ball_results = []
-    for direction, n in (("right", args.input_ball_steps), ("down", args.input_ball_steps),
-                         ("left", args.input_ball_steps), ("up", args.input_ball_steps)):
+    for direction, n in legs:
         _set_redrawlog(session, "refr")
         # inject like a hand rolls: a few edges per indev read, not the whole
         # request in one 10 ms read (mouse_read() consumes at most
@@ -1188,6 +1249,7 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
         "key_repaints": len(key_lat),
         "key_latency_p50_ms": _pct(key_lat, 0.5),
         "key_latency_p95_ms": _pct(key_lat, 0.95),
+        "ball_start": start,
         "ball": ball_results,
     }
 
@@ -1325,13 +1387,16 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
     content-sized flushes (> 50 kpx)."""
     _set_redrawlog(session, "refr")
     # Park the cursor at a known x first: mouse_read() clamps at the screen
-    # edges and a clamped step reports no activity, which looked like a stall
-    # in the first version of this scenario. Left edge, then 8 steps in, then
-    # +-4 commands x 3 steps x 10 px stays well inside the 320 px width.
-    session.send("--ball left 40")
-    time.sleep(0.4)
-    session.send("--ball right 8")
-    time.sleep(0.4)
+    # edges and a clamped step prints no [BALL] line. The old park was one
+    # `--ball left 40`, which mouse_read() cuts to BALL_MAX_STEPS_PER_READ
+    # (8 steps = 80 px, the rest discarded), so the cursor stayed near the
+    # right edge and the first four `right` commands of every phase were
+    # clamped: that was the one ~800 ms [BALL] gap per phase of runs 5-7
+    # (TD-20), not the radio and not the GUI. Corner park, then 8 steps in:
+    # +-4 commands x 3 steps x 10 px from x 90 stays inside the clamp.
+    start = _park_cursor(session, (("right", BALL_MAX_STEPS_PER_READ),))
+    roll_fits, roll_clamped = (False, "unparked") if start is None else \
+        ball_walk_fits(start[0], start[1], (("right", 12), ("left", 12)))
     snap0 = _instr_snapshot(session)
     idx = session.length()
     t0 = time.monotonic()
@@ -1380,11 +1445,11 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
             if int(m.group(1)) > 50000:
                 big_flush += 1
     ball_gaps = [ball_ms[i] - ball_ms[i - 1] for i in range(1, len(ball_ms))]
-    # A [BALL] read gap that sits right after a LoRa TX/RX is the radio, not
-    # the GUI: a relay TX at SF11 blocks the loop for up to a second, and a
-    # bench node on the air relays all the time (runs 5/6, 2026-10-04: exactly
-    # one 800-860 ms gap per phase, no lvgl loop gap). Such gaps are reported
-    # as explained, not as stalls (TD-20).
+    # A [BALL] read gap that sits right after a LoRa TX/RX is attributed to
+    # the radio, not the GUI: a relay TX at SF11 blocks the loop for up to a
+    # second, and a bench node on the air relays all the time. Such gaps are
+    # reported as explained, not as stalls. (The one 800-860 ms gap per phase
+    # of runs 5-7 was not this; it was the clamp, see the park above.)
     stalls, explained = [], []
     for i, g in enumerate(ball_gaps):
         if g < gap_ms:
@@ -1395,6 +1460,9 @@ def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: 
         else:
             stalls.append(g)
     return {
+        "park_start": start,
+        "park_fits": roll_fits,
+        "park_clamped_leg": roll_clamped,
         "sent_cmds": k,
         "ball_reads": len(ball_ms),
         "ball_gap_max_ms": max(ball_gaps) if ball_gaps else None,
@@ -1507,10 +1575,14 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
     if control.get("loop_avg_us") and after.get("loop_avg_us"):
         slowdown = round(after["loop_avg_us"] / control["loop_avg_us"], 2)
     loop_slowed = slowdown is not None and slowdown >= 1.5
-    ok = control_clean and not stalled and not loop_slowed and injected == args.msgroll_msgs \
-        and drawer_on["acked"] and drawer_off["acked"]
+    # A phase whose park failed measured the clamp, not the GUI: its gaps are
+    # void either way, so the verdict is "not ok" with the leg named (TD-20).
+    parked = bool(control["park_fits"]) and bool(after["park_fits"])
+    ok = parked and control_clean and not stalled and not loop_slowed \
+        and injected == args.msgroll_msgs and drawer_on["acked"] and drawer_off["acked"]
     return {
         "ok": ok,
+        "parked": parked,
         "control_clean": control_clean,
         "stalled_after": stalled,
         "loop_slowdown_x": slowdown,

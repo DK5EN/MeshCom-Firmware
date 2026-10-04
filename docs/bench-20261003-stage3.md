@@ -54,14 +54,14 @@ times. All three bench nodes now run instrument builds of `0d905dc8`.
 Heltec unplugged, RAK DK5EN-90 added. Operator decisions: groups `9;20;232;262` on every
 bench node; the driver may write node settings (`prepare <node>`).
 
-| Step                       | RAK DK5EN-90                    | T-Beam DK5EN-92 | T-Deck DK5EN-14             |
-| -------------------------- | ------------------------------- | --------------- | --------------------------- |
-| build/verify/flash (instr) | ok (DFU 46 s)                   | ok              | ok                          |
-| prepare                    | groups, bench QTH               | groups, GPS on  | groups                      |
-| board harness              | 4/5 (`lora`: TX wait too short) | 8/8             | 20/22 (`input`, `msg_roll`) |
-| OTA regression             | n/a                             | PASS 59 s       | PASS 60 s                   |
-| web GUI badge              | n/a                             | PASS            | PASS                        |
-| mesh exchange              | PASS, 3x2 pairs, 143 s          |                 |                             |
+| Step                       | RAK DK5EN-90                    | T-Beam DK5EN-92 | T-Deck DK5EN-14                                                        |
+| -------------------------- | ------------------------------- | --------------- | ---------------------------------------------------------------------- |
+| build/verify/flash (instr) | ok (DFU 46 s)                   | ok              | ok                                                                     |
+| prepare                    | groups, bench QTH               | groups, GPS on  | groups                                                                 |
+| board harness              | 4/5 (`lora`: TX wait too short) | 8/8             | 20/22 (`input`, `msg_roll`; both green in the 09:40 re-run, see below) |
+| OTA regression             | n/a                             | PASS 59 s       | PASS 60 s                                                              |
+| web GUI badge              | n/a                             | PASS            | PASS                                                                   |
+| mesh exchange              | PASS, 3x2 pairs, 143 s          |                 |                                                                        |
 
 Fixed on the way: the RAK upload step now carries the instrument flag (pio's upload target
 rebuilt a plain image without it); the RAK gets a bench position (`sendPosition()` returns at
@@ -72,6 +72,23 @@ explain LoRa-caused frames and look for the skip in a burst (5/5 green afterward
 `lora` scenario switches `--loradebug on` itself (the TX-LoRa print is gated on it and the mesh
 tool switches it off), opens the ESP32 peer BEFORE the RAK transmits (the peer's matrix is RAM
 only and the port open reboots it) and waits a full beacon floor (75 s) for the TX; verified
-PASS with the T-Beam as peer at 09:11. Still red: T-Deck `input` (one
-injected step lost now and then) and `msg_roll` (one ~800 ms [BALL] read gap per phase, no
-lvgl gap), both consistent with one swallowed serial command on the T-Deck console.
+PASS with the T-Beam as peer at 09:11.
+
+### TD-20 closed: the T-Deck "lost step" was the screen clamp (2026-10-04, 09:40)
+
+The run-7 log (`tdeck_run_20261004-085333.log`) names the step that went missing: in `input` it
+is always the one that would move the cursor from x 310 to 320 or from y 220 to 230, and in
+`msg_roll` the ~800 ms gap is the first four `right` commands of each phase, sent while the cursor
+stood at x 290..310. `mouse_read()` consumes at most `BALL_MAX_STEPS_PER_READ` (8) counted edges
+per indev read and drops the rest, so the harness's park commands (`--ball left 40`, `right 14`)
+moved 80 px, not 400 or 140, and the cursor stayed where the previous scenario left it; a step
+that runs into the clamp is consumed but prints no `[BALL]` line, which the harness counted as
+lost. The serial console swallowed nothing: every `[BALL];inject` ack is in the log.
+
+Fix (harness only): `_park_cursor()` drives the cursor into the top-left clamp corner in 8-step
+chunks 100 ms apart, then to a known start; `tdeck_parse.ball_walk()`/`ball_walk_fits()` mirror
+the clamp and refuse a walk that would hit it (five unit tests pin the run-7 positions). Re-run
+on DK5EN-14: `input` PASS, 10/10 steps in all four directions from (140, 50), latency p95 2-6 ms;
+`msg_roll` PASS, 59/59 reads per phase, max gap 308 ms, no lvgl gap, slowdown 0.99x. The
+garbled command echoes in the log (`all right 3[BALL];inject`) are HWCDC TX drops of the echo
+under the redraw flood, cosmetic.

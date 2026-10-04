@@ -880,3 +880,72 @@ def disptest_expected(
         for i in range(disptest_steps(p, stride)):
             out.append((p, i, disptest_crc(p, i, stride)))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Trackball geometry -- mirrors mouse_read() in src/t-deck/tdeck_main.cpp
+# ---------------------------------------------------------------------------
+# One trackball step moves the cursor BALL_STEP_PX. mouse_read() consumes at
+# most BALL_MAX_STEPS_PER_READ counted edges per indev read and DISCARDS the
+# rest (stall protection, TM-18), so a single `--ball left 40` is 8 steps, not
+# 40. A step that would push the cursor past the screen edge is consumed but
+# moves nothing and prints no [BALL] line (activity_detected stays false).
+# TD-20 (run 7, 2026-10-04): every "lost" trackball step of the input and
+# msg_roll scenarios was such a clamped step -- the park commands assumed 40
+# steps and left the cursor near the right edge.
+BALL_STEP_PX = 10
+BALL_MAX_STEPS_PER_READ = 8
+BALL_SCREEN_W = 320
+BALL_SCREEN_H = 240
+BALL_CURSOR_W = 14   # mouse_cursor_icon.header.w
+BALL_CURSOR_H = 20   # mouse_cursor_icon.header.h
+BALL_DIRECTIONS = ("right", "up", "left", "down")   # mouse_read() dir index 0..3
+
+_BALL_DELTA = {"right": (1, 0), "up": (0, -1), "left": (-1, 0), "down": (0, 1)}
+
+
+def ball_chunks(n: int, cap: int = BALL_MAX_STEPS_PER_READ) -> List[int]:
+    """Split n steps into `--ball` commands no larger than the per-read cap."""
+    out: List[int] = []
+    while n > 0:
+        out.append(min(cap, n))
+        n -= out[-1]
+    return out
+
+
+def ball_can_move(x: int, y: int, direction: str) -> bool:
+    """mouse_read()'s clamp condition for one step in `direction`."""
+    if direction == "right":
+        return x < BALL_SCREEN_W - BALL_CURSOR_W
+    if direction == "up":
+        return y > BALL_CURSOR_H
+    if direction == "left":
+        return x > BALL_CURSOR_W
+    if direction == "down":
+        return y < BALL_SCREEN_H - BALL_CURSOR_H
+    raise ValueError("unknown trackball direction %r" % (direction,))
+
+
+def ball_walk(x: int, y: int, direction: str, steps: int) -> Tuple[int, int, int]:
+    """Simulate `steps` consumed steps from (x, y). Returns (x, y, moved);
+    moved < steps means the walk ran into the clamp and the missing steps
+    printed no [BALL] line."""
+    dx, dy = _BALL_DELTA[direction]
+    moved = 0
+    for _ in range(steps):
+        if not ball_can_move(x, y, direction):
+            break
+        x += dx * BALL_STEP_PX
+        y += dy * BALL_STEP_PX
+        moved += 1
+    return x, y, moved
+
+
+def ball_walk_fits(x: int, y: int, legs: Sequence[Tuple[str, int]]) -> Tuple[bool, Optional[str]]:
+    """Whether every leg of a walk from (x, y) stays clear of the clamp;
+    returns (fits, first clamped direction)."""
+    for direction, n in legs:
+        x, y, moved = ball_walk(x, y, direction, n)
+        if moved < n:
+            return False, direction
+    return True, None

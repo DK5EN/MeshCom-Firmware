@@ -26,6 +26,11 @@ from tdeck_parse import (
     DISPTEST_TRI_FRAMES,
     DISPTEST_TRI_STEPS,
     DISPTEST_W,
+    BALL_MAX_STEPS_PER_READ,
+    ball_can_move,
+    ball_chunks,
+    ball_walk,
+    ball_walk_fits,
     disptest_crc,
     disptest_expected,
     disptest_frame,
@@ -703,6 +708,64 @@ class TestDispTestRender(unittest.TestCase):
             disptest_frame("square", 160)
         with self.assertRaises(ValueError):
             disptest_frame("colors", -1)
+
+
+class TestBallGeometry(unittest.TestCase):
+    """TD-20 (run 7, 2026-10-04): the "lost" trackball steps of the input and
+    msg_roll scenarios were clamped steps. These pin mouse_read()'s per-read
+    cap and clamp as the harness models them; before the fix the harness had
+    no model and parked with a single `--ball left 40`."""
+
+    def test_ball_chunks_respect_the_per_read_cap(self) -> None:
+        self.assertEqual(BALL_MAX_STEPS_PER_READ, 8)
+        self.assertEqual(ball_chunks(40), [8, 8, 8, 8, 8])
+        self.assertEqual(ball_chunks(14), [8, 6])
+        self.assertEqual(ball_chunks(3), [3])
+        self.assertEqual(ball_chunks(0), [])
+
+    def test_run7_input_right_leg_lost_its_tenth_step_to_the_clamp(self) -> None:
+        # run 7: cursor at (220, 130) after the old pre-walk; `right 10` printed
+        # x 250, 280, 310 and nothing for the last step -- steps 9 of 10.
+        self.assertEqual(ball_walk(220, 130, "right", 10), (310, 130, 9))
+        # same phase, `down 10` from y 130: 160, 190, 220, then the clamp
+        self.assertEqual(ball_walk(310, 130, "down", 10), (310, 220, 9))
+        self.assertFalse(ball_can_move(310, 130, "right"))
+        self.assertFalse(ball_can_move(310, 220, "down"))
+        self.assertTrue(ball_can_move(300, 130, "right"))
+
+    def test_run7_msg_roll_park_was_eight_steps_not_forty(self) -> None:
+        # run 7, phase 1: cursor at x 290; one `--ball left 40` is one read of 8
+        x, _, moved = ball_walk(290, 200, "left", min(40, BALL_MAX_STEPS_PER_READ))
+        self.assertEqual((x, moved), (210, 8))
+        x, _, _ = ball_walk(x, 200, "right", 8)
+        self.assertEqual(x, 290)
+        # the roll's first four `right 3` commands: 2 steps move, 10 are clamped
+        moved_total = 0
+        for _ in range(4):
+            x, _, moved = ball_walk(x, 200, "right", 3)
+            moved_total += moved
+        self.assertEqual((x, moved_total), (310, 2))
+
+    def test_parked_walks_stay_clear_of_the_clamp(self) -> None:
+        # corner park ends at x 10 / y 20 (14x20 cursor, 10 px grid)
+        self.assertFalse(ball_can_move(10, 20, "left"))
+        self.assertFalse(ball_can_move(10, 20, "up"))
+        x, y, moved = ball_walk(10, 20, "right", 14)
+        self.assertEqual(moved, 14)
+        x, y, moved = ball_walk(x, y, "down", 5)
+        self.assertEqual((x, y, moved), (150, 70, 5))
+        square = (("right", 10), ("down", 10), ("left", 10), ("up", 10))
+        self.assertEqual(ball_walk_fits(x, y, square), (True, None))
+        # msg_roll: 8 steps in from the corner, +-12 steps per half cycle
+        x, _, _ = ball_walk(10, 20, "right", 8)
+        self.assertEqual(ball_walk_fits(x, 20, (("right", 12), ("left", 12))), (True, None))
+
+    def test_ball_walk_fits_names_the_clamped_leg(self) -> None:
+        square = (("right", 10), ("down", 10), ("left", 10), ("up", 10))
+        self.assertEqual(ball_walk_fits(220, 130, square), (False, "right"))
+        self.assertEqual(ball_walk_fits(150, 170, square), (False, "down"))
+        with self.assertRaises(ValueError):
+            ball_can_move(0, 0, "sideways")
 
 
 if __name__ == "__main__":

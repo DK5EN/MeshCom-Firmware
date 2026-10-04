@@ -86,4 +86,7 @@ stage 3 on the three attached nodes (serial, orchestrator).
 - Bench-fix campaign landed 2026-10-04 ~09:20 (runs 6/7): prepare step, RAK under the driver
   (DFU flash, instrument flag on the upload step, bench QTH), OLED dirty/pos root-caused in the
   harness, T-Deck redrawlog levels + tabs/REFR fixes, mesh exchange 3x2 with the RAK. Open:
-  TD-20 narrowed to input/msg_roll (console input path), RAK lora wait verify.
+  TD-20 narrowed to input/msg_roll, RAK lora wait verify.
+- TD-20 closed 2026-10-04 09:40: the lost step and the 800 ms gap were the trackball screen
+  clamp (park commands capped at 8 steps per read), not the console; harness parks in the corner
+  and simulates walks (`tdeck_parse.ball_walk_fits`); `input` and `msg_roll` PASS on DK5EN-14.
