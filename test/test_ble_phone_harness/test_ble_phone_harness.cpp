@@ -231,14 +231,20 @@ void tearDown(void) {}
 
 struct Reg { const char *name; uint16_t len; };
 
+// SN1 = 99 since TZ-01 (was 65): the frame is the type byte plus the JSON, and
+// 65 + 34 = 99, where 34 = len(,"TZ":"<tz>") = 7 + 26 + 1 for the ESP32 default
+// rule "CET-1CEST,M3.5.0,M10.5.0/3" (26 chars). The characters of a POSIX TZ
+// (, / < > + - . :) need no JSON escaping. Worst case, a 39-char TZ with the
+// longest VIACALL (39) and WSPWD (19): 1 + 167 JSON bytes = 168, still below
+// BLE_JSON_PAYLOAD_MAX 244 (TZ is the last key, so fail-soft would drop it first).
 static const Reg HELTEC[] = {
     {"I", 223}, {"IS1", 42}, {"SE", 224}, {"S1", 113}, {"SW", 129}, {"S2", 112},
-    {"SN", 228}, {"SN1", 65}, {"W", 139}, {"G", 162}, {"SA", 59}, {"IO", 108},
+    {"SN", 228}, {"SN1", 99}, {"W", 139}, {"G", 162}, {"SA", 59}, {"IO", 108},
     {"TM", 99}, {"AN", 132}, {"CONFFIN", 20}};
 
 static const Reg RAK[] = {
     {"I", 223}, {"IS1", 42}, {"SE", 224}, {"S1", 113}, {"SW", 129}, {"S2", 112},
-    {"SN", 228}, {"SN1", 65}, {"W", 139}, {"G", 162}, {"SA", 59}, {"IO", 108},
+    {"SN", 228}, {"SN1", 99}, {"W", 139}, {"G", 162}, {"SA", 59}, {"IO", 108},
     {"TM", 99}, {"MH1", 206}, {"MH2", 207}, {"CONFFIN", 20}};
 
 static void run_burst(const Reg *regs, size_t n)

@@ -461,6 +461,33 @@ static void test_node_utcoff_change_is_saved_once(void)
     TEST_ASSERT_EQUAL_INT(1, g_save_settings_calls);
 }
 
+// TZ-01 (docs/ntp-tz-rtc-wave-plan.md W3): while a POSIX TZ rule is set,
+// node_utcoff is the value DERIVED from that rule. The station's "+HH:MM"
+// attribute must not overwrite it (and must not write the flash either);
+// with node_tz empty the old behaviour is unchanged (tests above).
+static void test_node_utcoff_not_overwritten_while_tz_rule_set(void)
+{
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "%s", "CET-1CEST,M3.5.0,M10.5.0/3");
+    meshcom_settings.node_utcoff = 2.0f;   // CEST, derived from the rule
+
+    TEST_ASSERT_TRUE(decodeTinyXML(String(kSampleDocument)));   // timezone="+01:00"
+    TEST_ASSERT_EQUAL_STRING("+01:00", strTELE_UTCOFF.c_str()); // still parsed
+    TEST_ASSERT_EQUAL_FLOAT(2.0f, meshcom_settings.node_utcoff);
+    TEST_ASSERT_EQUAL_INT(0, g_save_settings_calls);
+    TEST_ASSERT_EQUAL_STRING("CET-1CEST,M3.5.0,M10.5.0/3", meshcom_settings.node_tz);
+}
+
+// Same document with node_tz empty: the station offset still wins and is saved.
+static void test_node_utcoff_still_follows_station_when_tz_empty(void)
+{
+    meshcom_settings.node_tz[0] = '\0';
+    meshcom_settings.node_utcoff = 2.0f;
+
+    TEST_ASSERT_TRUE(decodeTinyXML(String(kSampleDocument)));   // timezone="+01:00"
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, meshcom_settings.node_utcoff);
+    TEST_ASSERT_EQUAL_INT(1, g_save_settings_calls);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -479,5 +506,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_vt_without_text_gets_zero_placeholder);
     RUN_TEST(test_node_utcoff_converts_parsed_timezone);
     RUN_TEST(test_node_utcoff_change_is_saved_once);
+    RUN_TEST(test_node_utcoff_not_overwritten_while_tz_rule_set);
+    RUN_TEST(test_node_utcoff_still_follows_station_when_tz_empty);
     return UNITY_END();
 }

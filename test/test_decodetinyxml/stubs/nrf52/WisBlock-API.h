@@ -3,8 +3,8 @@
 // loop_functions.h zieht auf Nicht-ESP32-Plattformen das echte
 // nrf52/WisBlock-API.h herein (BLE-, SoftDevice- und SDK-Header), das nativ
 // nicht kompiliert. decodeTinyXML() (src/tinyxml_functions.cpp) schreibt in
-// sechs meshcom_settings-Felder (node_parm_1, node_unit, node_values,
-// node_parm_t, node_parm_id, node_utcoff) -- das ist der Ausschnitt, den
+// sieben meshcom_settings-Felder (node_parm_1, node_unit, node_values,
+// node_parm_t, node_parm_id, node_utcoff, node_tz lesend) -- das ist der Ausschnitt, den
 // dieser Shim traegt. Groessen gegen das Original gespiegelt
 // (src/nrf52/WisBlock-API.h, zweiter s_meshcom_settings-Block: node_parm_t
 // dort nur 25 Byte -- kuerzer als der erste Block/esp32_flash.h mit 150; ein
@@ -29,6 +29,7 @@ typedef struct s_meshcom_settings
     char node_unit[50] = {0};
     char node_values[50] = {0};
     float node_utcoff = 0;
+    char node_tz[40] = {0};   // TZ-01: decodeTinyXML() leaves node_utcoff alone while a rule is set
 } s_meshcom_settings;
 
 extern s_meshcom_settings meshcom_settings;
