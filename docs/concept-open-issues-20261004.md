@@ -323,6 +323,40 @@ edits.
 - Whether a release that changes the partition layout gets a marker asset (for example
   `LAYOUT-CHANGE`) so AU can refuse it. v1 cannot detect it.
 
+### 4.7 W0 results (bench 2026-10-05) -- the design does not fit, decision needed
+
+Throwaway INSTRUMENT probe (not committed): `WiFiClientSecure` with the IDF certificate bundle
+that `libmbedtls.a` already links (`_binary_x509_crt_bundle_start`, 63.7 KB, no embedding
+needed), GET `api.github.com/repos/DK5EN/MeshCom-Firmware/releases/latest`.
+
+| Board                | Result                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| DK5EN-1 Heltec V3    | HTTP 200, 67 KB JSON with `tag_name`, handshake 2.2 s; free heap 119 KB, minimum during TLS 63 KB               |
+| DK5EN-92 T-Beam v1.2 | in the loop task: TASK_WDT reset. In its own task: HTTP 200, handshake 5.3 s; free heap 58.6 KB, minimum 5.4 KB |
+
+Flash cost of the TLS stack (WiFiClientSecure + mbedtls TLS/x509 + bundle), measured as the
+image delta on Heltec V3: **188 KB**. Release Heltec V3 is 1,558,821 B today, so an AU image is
+about 1.76 MB. The 4 MB table (`partitions-4MB-safeboot.csv`, used by Heltec V3 and most S3 and
+all classic boards) gives `ota_0` 3324 KB, stage region `slot/2` = 1,701,888 B: **an AU image no
+longer fits its own staging region** (it would need 3.5 MB for running + staged). Only the
+16 MB-table boards (T-Deck, T-Deck Plus) fit as designed.
+
+Consequences:
+
+- AU-D6 decided: classic ESP32 out of v1 (5.4 KB minimum heap, WDT unless a dedicated task, and
+  the image size rule above).
+- The download must run in its own FreeRTOS task (S3 too: 2.2 s blocking handshake plus the body).
+- D3 (stage the raw image in the `ota_0` tail) fails on 4 MB-table S3 boards. Options in 4.8.
+
+### 4.8 Options after W0
+
+| Option                                | How                                                                                                                                                                                                                               | Cost / risk                                                                                                                            |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Compressed staging (recommended)   | Releases also carry `<env>.bin.zz` (zlib). The app stages the compressed image (about 1.0-1.1 MB) in the tail; Safeboot inflates it into the head with the ROM `tinfl` (ESP32/S3 ROM miniz), CRC + `esp_image_verify` as planned. | Release process adds one asset per env; prod works only once icssw-org publishes the `.zz` assets. Safeboot code small (ROM inflater). |
+| B. Trim the certificate set           | Embed only the roots for github.com and objects.githubusercontent.com instead of the 64 KB bundle.                                                                                                                                | Saves about 60 KB: image 1.70 MB against a 1.70 MB limit -- no margin, the next feature breaks AU. GitHub CA changes break it.         |
+| C. New partition table on 8 MB boards | Heltec V3 has 8 MB flash; give it an 8 MB table with a staging partition.                                                                                                                                                         | One-time USB/web-flasher reflash of every such node; 4 MB-flash boards stay excluded.                                                  |
+| D. 16 MB-table boards only            | Ship AU for T-Deck / T-Deck Plus first.                                                                                                                                                                                           | Tiny audience; the Heltec V3 fleet gets nothing.                                                                                       |
+
 ## 5. NMTU: MTU setting for firmware and Safeboot (#1190)
 
 ### 5.1 Facts (recon `scout-1190.md`)
@@ -755,14 +789,14 @@ Status:
 | RM      | W1   | done: hmac_sha256.h, remote_cmd.{h,cpp}, tools/remote_cmd.py + 21 shared vectors; setout form a0..b7 on/off; rate rejects do not count to the lockout; host only                                                                                                                                                                                | this commit |
 | RM      | W2   | done: rm_queue.h + RX hook (LoRa, own call, --rm on + passwd), rm_runtime (exec table, hwm two-slot store on nRF52, fail closed), --rm; bench RAK<->Heltec both directions: status/display/sync/reboot, hwm survives reboot, replay rejected, replies shown at the sender; fixed on the bench: nRF52 rename failure, replies parsed as commands | this commit |
 | RM      | W3   | done: web switch `rm` + info row (live on DK5EN-1), docs/adr-remote-hmac.md (TOTP ADR archived), 11-wire-format RM1 + :sto/STOR sections                                                                                                                                                                                                        | this commit |
-| AU      | W0   | not started                                                                                                                                                                                                                                                                                                                                     |             |
+| AU      | W0   | done (bench): TLS ok on S3 and (in a task) classic; TLS costs 188 KB flash -> raw staging does not fit 4 MB-table boards; decision needed (4.8)                                                                                                                                                                                                 |             |
 | AU      | W1   | not started                                                                                                                                                                                                                                                                                                                                     |             |
 | AU      | W2   | not started                                                                                                                                                                                                                                                                                                                                     |             |
 | AU      | W3   | not started                                                                                                                                                                                                                                                                                                                                     |             |
 | AU      | W4   | not started                                                                                                                                                                                                                                                                                                                                     |             |
 | AU      | W5   | not started                                                                                                                                                                                                                                                                                                                                     |             |
 
-Next: AU W0 (feasibility: TLS heap on classic + S3, Safeboot size, ota_0 tail write). SNF-GW open: M1-M4 against the real server and STOR
+Next: operator decision on AU (section 4.8), then AU W1. SNF-GW open: M1-M4 against the real server and STOR
 approval by the server operator. Line references of section 7 re-verified 2026-10-04 (scout); mock server is
 `tools/mock/meshcom_server.py` (tests `tools/mock/test_mock_server.py`).
 
