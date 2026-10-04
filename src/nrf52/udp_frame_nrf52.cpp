@@ -28,6 +28,10 @@
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"        // F1/stage 4: :sto custody notice on server ingress
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_hook.h"     // SNF-GW-04: shared ack/store classification (mboxClassify)
+#include "msgstore_api.h"      // SNF-GW-04: msgstoreStore/OnAck/Eligible
+#endif
 
 // C1/U1 carve of handleUdpFrame_nrf52() out of nrf_eth.cpp; see udp_frame.h
 // for why it moved and why the two platform copies are not merged. Moved
@@ -183,6 +187,14 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
               logRxDropUnconfigured(source_call);
 
           bool bUDPtoLoraSend = !bSrcUnconfigured;
+
+#if defined(ENABLE_MSGSTORE)
+          // SNF-GW-04: echo guard input. Must be read HERE, before the own call
+          // is appended to the source path below -- that append precedes the
+          // is-new gate on this side, so at the gate the path always ends in
+          // the own call and the guard would always fire.
+          bool bSrcPathHadOwnCall = mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call);
+#endif
 
           mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
           mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -476,6 +488,31 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           if(is_new_packet(udp_mid))
           {
+#if defined(ENABLE_MSGSTORE)
+            // SNF-GW-04 (docs/concept-open-issues-20261004.md section 7, #1188): a text frame
+            // from the server for someone else -- a server-side ":ackNNN" purges a held DM, a
+            // PM with "{NNN" for the store set goes into the mailbox. Same decision as OnRxDone
+            // (msgstore_hook.h). Runs in the loop task; the msgstore hooks take their own lock.
+            // Echo guard (path already carried the own call) is bSrcPathHadOwnCall, see above.
+            if(msg_type_b == MSG_TYPE_TEXT && !bSrcUnconfigured &&
+               strcmp(destination_call, meshcom_settings.node_call) != 0 &&
+               !bSrcPathHadOwnCall)
+            {
+                MboxDecision md = mboxClassify(destination_call, aprsmsg.msg_payload,
+                                               CheckGroup(destination_call) != 0, false,
+                                               pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),
+                                               msgstoreEligible(destination_call));
+                if(md.action == MBOX_ACK)
+                    msgstoreOnAck(aprsmsg.msg_source_call, destination_call, md.nnn);
+                else if(md.action == MBOX_STORE)
+                {
+                    char mboxText[MC_PAYLOAD_LEN];
+                    mcSet(mboxText, sizeof(mboxText), aprsmsg.msg_payload);
+                    mcTruncate(mboxText, sizeof(mboxText), md.textLen);
+                    msgstoreStore(aprsmsg.msg_source_call, destination_call, md.nnn, mboxText, strlen(mboxText));
+                }
+            }
+#endif
             // Eigene PN-Retry-Kopie (Bits 10-11 gekippt, pn_retry.h) vom Server zurueck:
             // own_msg_id[] kennt nur die Original-id -- zurueckfalten, sonst sendet der
             // Knoten seine eigene Kopie noch einmal, sobald sie aus dem Dedup-Ring ist.

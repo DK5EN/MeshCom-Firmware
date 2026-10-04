@@ -750,7 +750,7 @@ Status:
 | NMTU    | W1   | done: bench DK5EN-1 app+Safeboot MSS 1240/1436, AP path and classic Safeboot not benched                                                                                                          | this commit |
 | BLC     | W1   | done: ble_cycle 50x gap0 + 20x unclean on DK5EN-1 and DK5EN-90, 0 failures, advert median 346-654 ms (max 2865, scanner-inclusive); RAK counters con=70 dis=70 match; open B1 bleQueue carry-over | this commit |
 | SNF-GW  | W1   | done: msgstore_hook.h shared decision (+RM1 exclusion), MSGSTORE_LOCK on all hooks and msgstoreLoop sections, msgstoreSameBaseCall; host-only wave, no bench                                      | this commit |
-| SNF-GW  | W2   | not started                                                                                                                                                                                       |             |
+| SNF-GW  | W2   | done: GATE hook both twins, server :ack purge, :sto upload; bench DK5EN-90 + mock (INSTRUMENT image for --srvip): PM to DK5EN-93 held, :sto at the mock, server :ack124 purged                    | this commit |
 | SNF-GW  | W3   | not started                                                                                                                                                                                       |             |
 | RM      | W1   | not started                                                                                                                                                                                       |             |
 | RM      | W2   | not started                                                                                                                                                                                       |             |
@@ -762,7 +762,7 @@ Status:
 | AU      | W4   | not started                                                                                                                                                                                       |             |
 | AU      | W5   | not started                                                                                                                                                                                       |             |
 
-Next: SNF-GW W2. Line references of section 7 re-verified 2026-10-04 (scout); mock server is
+Next: SNF-GW W3 (STOR). Line references of section 7 re-verified 2026-10-04 (scout); mock server is
 `tools/mock/meshcom_server.py` (tests `tools/mock/test_mock_server.py`).
 
 ## 10. Questions for the maintainers and other repos

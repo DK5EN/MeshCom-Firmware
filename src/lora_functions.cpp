@@ -693,6 +693,30 @@ static NbrGwHint nbrGwHintFromDest(char payload_type, const char *dest)
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
+// PN-Wiederholung (XOR, pn_retry.h): gleiche PN unter einer anderen
+// Wiederholungsvariante schon gesehen? Reiner msg-id-Dedup sieht das nicht --
+// checkOwnRx() ist die stille Ringabfrage (kein zweites is_new_packet()).
+// Geteilt von OnRxDone und den beiden GATE-Handlern (SNF-GW-03), die den
+// Frame zuvor mit is_new_packet() als neu erkannt haben muessen.
+bool pnRxIsRepeat(const struct aprsMessage &aprsmsg, uint8_t msg_type)
+{
+    if(msg_type != MSG_TYPE_TEXT ||
+       !pnPayloadIsPn(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload)) ||
+       !pnDestIsPersonal(aprsmsg.msg_destination_call, strlen(aprsmsg.msg_destination_call)))
+        return false;
+
+    uint32_t pn_variants[3];
+    pnVariantIds(aprsmsg.msg_id, pn_variants);
+    for(int pv = 0; pv < 3; pv++)
+    {
+        uint8_t pn_variant_buf[4];
+        pnIdToLe(pn_variants[pv], pn_variant_buf);
+        if(checkOwnRx(pn_variant_buf) >= 0)
+            return true;
+    }
+    return false;
+}
+
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
     // Testfang-Hook (Katalog doc 08 §4, Mechanismus 2): akzeptierte Frames als
@@ -964,22 +988,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         bool rx_pn_shape = msg_type_b_lora == MSG_TYPE_TEXT &&
            pnPayloadIsPn(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload)) &&
            pnDestIsPersonal(aprsmsg.msg_destination_call, strlen(aprsmsg.msg_destination_call));
-        bool rx_pn_repeat = false;
-        if(rx_is_new && rx_pn_shape)
-        {
-            uint32_t pn_variants[3];
-            pnVariantIds(aprsmsg.msg_id, pn_variants);
-            for(int pv = 0; pv < 3 && !rx_pn_repeat; pv++)
-            {
-                uint8_t pn_variant_buf[4];
-                pnIdToLe(pn_variants[pv], pn_variant_buf);
-                if(checkOwnRx(pn_variant_buf) >= 0)
-                    rx_pn_repeat = true;
-            }
-
-            if(rx_pn_repeat && bDisplayInfo)
-                printfdeb("[RX] PNREPEAT msg-id:%08X\n", aprsmsg.msg_id);
-        }
+        bool rx_pn_repeat = rx_is_new && rx_pn_shape && pnRxIsRepeat(aprsmsg, msg_type_b_lora);
+        if(rx_pn_repeat && bDisplayInfo)
+            printfdeb("[RX] PNREPEAT msg-id:%08X\n", aprsmsg.msg_id);
 
         if(bDisplayLog)
         {

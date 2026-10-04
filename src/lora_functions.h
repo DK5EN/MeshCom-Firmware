@@ -21,6 +21,7 @@ void loraDeepSleep();
 #endif
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
+bool pnRxIsRepeat(const struct aprsMessage &aprsmsg, uint8_t msg_type); // SNF-GW-03: XOR repeat of a PN already in the RX ring
 void OnRxTimeout(void);
 void OnRxError(void);
 // is_new_packet() wird jetzt in dedup_functions.h deklariert.

@@ -25,6 +25,10 @@
 #include "conf_frame.h"
 #include "setlog_lines.h"
 #include "udp_frame.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
+#include "msgstore_api.h"   // SNF-GW-03: store node hook on the server ingress
+#endif
 
 // C1/U1 carve of handleUdpFrame_esp32() out of udp_functions.cpp; see
 // udp_frame.h for why it moved and why the two platform copies are not
@@ -276,6 +280,35 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           }
 
           bLED_ORANGE = true;
+
+#if defined(ENABLE_MSGSTORE)
+          // SNF-GW-03 (issue #1188): store-node hook on the server ingress. Runs
+          // BEFORE the own-call append below, so the echo guard sees the path
+          // exactly as the server sent it (a frame carrying our own call is our
+          // own upload coming back). Same decision helper as OnRxDone and the
+          // nRF52 twin (msgstore_hook.h); the LoRa one-shot copy is untouched.
+          if(bUdpMsgIsNew && msg_type_b == MSG_TYPE_TEXT && !bSrcUnconfigured &&
+             strcmp(destination_call, meshcom_settings.node_call) != 0 &&
+             !mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call))
+          {
+              MboxDecision mboxDec = mboxClassify(destination_call, aprsmsg.msg_payload,
+                                                  CheckGroup(destination_call) != 0,
+                                                  false,                                       // peer delivery is RF-only
+                                                  pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),        // XOR copy via the server must not refresh stored_ms
+                                                  msgstoreEligible(destination_call));
+
+              if(mboxDec.action == MBOX_ACK)
+                  msgstoreOnAck(aprsmsg.msg_source_call, destination_call, mboxDec.nnn);   // server-side :ackNNN purges a held PM
+              else
+              if(mboxDec.action == MBOX_STORE)
+              {
+                  char mboxText[MC_PAYLOAD_LEN];
+                  mcSet(mboxText, sizeof(mboxText), aprsmsg.msg_payload);
+                  mcTruncate(mboxText, sizeof(mboxText), mboxDec.textLen);
+                  msgstoreStore(aprsmsg.msg_source_call, destination_call, mboxDec.nnn, mboxText, strlen(mboxText));
+              }
+          }
+#endif
 
           mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
           mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);

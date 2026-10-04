@@ -69,6 +69,8 @@
 #include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
+#include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
+#include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -275,6 +277,53 @@ bool stoHolderNote(uint32_t msg_id, const char *holder, uint16_t nnn, uint32_t n
 void stoHolderClear(uint32_t msg_id)
 {
     g_sto_holder_clear_calls.push_back(msg_id);
+}
+
+// SNF-GW-04 (docs/concept-open-issues-20261004.md section 7, #1188): the
+// store-node ingress hook both handlers now call before the own-call path
+// append. msgstore.cpp and lora_functions.cpp are not in this env's
+// build_src_filter (test/test_msgstore and test/test_msgstore_hook cover the
+// store core and mboxClassify() themselves), so the four symbols the hook
+// reaches are faked as pure call recorders, kept out of g_sink_log like the
+// sto_notice fakes above (the U1 corpus dump must not change with them).
+// msgstoreEligible() models store mode `own` (same base call as the node,
+// SSID ignored) behind g_ms_mode_own, default OFF so every pre-existing case
+// sees "not eligible"; pnRxIsRepeat() returns g_ms_pn_repeat. CheckGroup()
+// is the real one (aprs_functions.cpp is linked).
+struct MsStoreCall { std::string src; std::string dst; uint16_t nnn; std::string text; };
+struct MsAckCall { std::string acker; std::string sender; uint16_t nnn; };
+static std::vector<MsStoreCall> g_ms_store;
+static std::vector<MsAckCall> g_ms_ack;
+static bool g_ms_mode_own = false;
+static bool g_ms_pn_repeat = false;
+
+static bool ms_same_base(const char *a, const char *b)
+{
+    size_t la = strcspn(a, "-"), lb = strcspn(b, "-");
+    return la > 0 && la == lb && memcmp(a, b, la) == 0;
+}
+
+bool msgstoreEligible(const char *dst)
+{
+    return g_ms_mode_own && dst && ms_same_base(dst, meshcom_settings.node_call);
+}
+
+int msgstoreStore(const char *src, const char *dst, uint16_t nnn, const char *payload, size_t len)
+{
+    g_ms_store.push_back(MsStoreCall{src ? src : "", dst ? dst : "", nnn,
+                                     std::string(payload ? payload : "", payload ? len : 0)});
+    return 0;
+}
+
+void msgstoreOnAck(const char *acker, const char *sender, uint16_t nnn)
+{
+    g_ms_ack.push_back(MsAckCall{acker ? acker : "", sender ? sender : "", nnn});
+}
+
+bool pnRxIsRepeat(const struct aprsMessage &aprsmsg, uint8_t msg_type)
+{
+    (void)aprsmsg; (void)msg_type;
+    return g_ms_pn_repeat;
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +630,10 @@ static void recorder_reset()
     g_sto_holder_note_calls.clear();
     g_sto_holder_clear_calls.clear();
     g_sto_holder_note_return = true;
+    g_ms_store.clear();
+    g_ms_ack.clear();
+    g_ms_mode_own = false;
+    g_ms_pn_repeat = false;
 
     udp_is_busy = false;
     lora_tx_msg_len = 0;
@@ -1894,6 +1947,172 @@ static void test_regression_sto_notice_consumed_yields_held_status_on_both(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// SNF-GW-04 (#1188): server ingress of the store node. A GATE text frame for a
+// callsign that is not this node's exact call runs the same ack/store
+// decision OnRxDone runs (msgstore_hook.h), BEFORE the own call is appended to
+// the source path. Before the hook, neither handler ever called msgstore*, so a
+// PM from the server to a sibling SSID of the node was never held.
+// ---------------------------------------------------------------------------
+
+// 0 = both sides. Set to 1 only to look at the nRF52 side on its own while the
+// ESP32 copy is known to disagree (fail-before demonstration).
+#ifndef MS_FIRST_SIDE
+#define MS_FIRST_SIDE 0
+#endif
+
+// Feeds one GATE text datagram to one side after a full reset. Node is
+// DK5EN-90 with store mode `own`; the caller adjusts g_ms_* afterwards via
+// `setup`.
+static void ms_feed(int side, const char *srcPath, const char *dest, const char *payload,
+                    uint32_t msg_id, void (*setup)(void) = nullptr)
+{
+    recorder_reset();
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "DK5EN-90");
+    g_ms_mode_own = true;
+    if (setup) setup();
+
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, srcPath, dest, ':', payload, msg_id);
+
+    uint8_t buf[BUF_CAP];
+    copy_into(buf, tmpl, len);
+    if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+}
+
+static void test_regression_server_pm_to_sibling_ssid_is_stored_on_both(void)
+{
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[120];
+
+        ms_feed(side, "DK5EN-14", "DK5EN-92", "hallo{123", 0x5101);
+
+        snprintf(msg, sizeof(msg), "%s: server PM to sibling SSID must be stored exactly once", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ms_store.size(), msg);
+        TEST_ASSERT_EQUAL_STRING("DK5EN-14", g_ms_store[0].src.c_str());
+        TEST_ASSERT_EQUAL_STRING("DK5EN-92", g_ms_store[0].dst.c_str());
+        TEST_ASSERT_EQUAL_UINT16(123, g_ms_store[0].nnn);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("hallo", g_ms_store[0].text.c_str(), "stored text must be stripped of {NNN");
+        snprintf(msg, sizeof(msg), "%s: a store must not also record an ack", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_ack.size(), msg);
+    }
+}
+
+static void test_agreement_server_pm_with_own_call_in_path_not_stored_on_both(void)
+{
+    // Echo guard: the path already carries this node's call (the frame went
+    // out through us once) -- must be judged BEFORE the handler appends it.
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[120];
+
+        ms_feed(side, "DK5EN-14,DK5EN-90", "DK5EN-92", "hallo{123", 0x5102);
+
+        snprintf(msg, sizeof(msg), "%s: echo of an own-path frame was stored", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: echo guard frame recorded an ack", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_ack.size(), msg);
+    }
+}
+
+static void test_agreement_server_ack_for_held_pm_reaches_msgstore_on_both(void)
+{
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[120];
+
+        ms_feed(side, "DK5EN-92", "DK5EN-14", "x:ack123", 0x5103);
+
+        snprintf(msg, sizeof(msg), "%s: server :ack123 must call msgstoreOnAck once", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ms_ack.size(), msg);
+        TEST_ASSERT_EQUAL_STRING("DK5EN-92", g_ms_ack[0].acker.c_str());
+        TEST_ASSERT_EQUAL_STRING("DK5EN-14", g_ms_ack[0].sender.c_str());
+        TEST_ASSERT_EQUAL_UINT16(123, g_ms_ack[0].nnn);
+        snprintf(msg, sizeof(msg), "%s: an ack must not store", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+    }
+}
+
+static void ms_setup_pn_repeat(void) { g_ms_pn_repeat = true; }
+static void ms_setup_mode_off(void) { g_ms_mode_own = false; }
+
+static void test_agreement_server_pm_pn_repeat_not_stored_on_both(void)
+{
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[120];
+
+        ms_feed(side, "DK5EN-14", "DK5EN-92", "hallo{123", 0x5104, ms_setup_pn_repeat);
+
+        snprintf(msg, sizeof(msg), "%s: a repeat XOR copy of a PN was stored", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_ack.size(), msg);
+    }
+}
+
+static void test_agreement_server_frames_outside_the_mailbox_make_no_call_on_both(void)
+{
+    struct Case { const char *label; const char *dest; const char *payload; void (*setup)(void); };
+    static const Case cases[] = {
+        { "group",        "9",        "hallo{123",     nullptr },
+        { "star",         "*",        "hallo{123",     nullptr },
+        { "ping",         "DK5EN-92", "{ping}",        nullptr },
+        { "rm1 command",  "DK5EN-92", "RM1 status{12", nullptr },
+        { "not eligible", "DK5EN-92", "hallo{123",     ms_setup_mode_off },
+        { "other base",   "DK6ABC-1", "hallo{123",     nullptr },
+    };
+    // Advisor SNF-GW W2 R1: a PM from an unconfigured source (XX0XXX) is
+    // dropped by the RF path (RX-01) and must not be stored from the server
+    // either. Fed below with that source; pinned on both sides.
+
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        uint32_t id = 0x5200;
+        for (const Case &c : cases)
+        {
+            ms_feed(side, "DK5EN-14", c.dest, c.payload, ++id, c.setup);
+
+            char msg[120];
+            snprintf(msg, sizeof(msg), "%s: %s frame reached msgstoreStore", name, c.label);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+            snprintf(msg, sizeof(msg), "%s: %s frame reached msgstoreOnAck", name, c.label);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_ack.size(), msg);
+        }
+
+        ms_feed(side, "XX0XXX", "DK5EN-92", "hallo{123", ++id);
+        char msg[120];
+        snprintf(msg, sizeof(msg), "%s: PM from an unconfigured source was stored", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+    }
+}
+
+static void test_agreement_server_pm_to_exact_own_call_not_stored_on_both(void)
+{
+    // Delivered directly as before; the hook is for frames addressed to
+    // someone else only.
+    for (int side = MS_FIRST_SIDE; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[120];
+
+        ms_feed(side, "DK5EN-14", "DK5EN-90", "hallo{123", 0x5105);
+
+        snprintf(msg, sizeof(msg), "%s: PM to the exact own call was stored", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_store.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ms_ack.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: PM to the exact own call must still be displayed", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+    }
+}
+
 static void test_agreement_extudp_ack_json_mirrors_ble_ack_on_both(void)
 {
     // DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3, implemented
@@ -2561,6 +2780,12 @@ int main(int, char **argv)
     RUN_TEST(test_regression_server_late_ack_upgrades_status_row_on_both);
     RUN_TEST(test_regression_server_rej_own_dm_counts_nothing_on_both);
     RUN_TEST(test_regression_sto_notice_consumed_yields_held_status_on_both);
+    RUN_TEST(test_regression_server_pm_to_sibling_ssid_is_stored_on_both);
+    RUN_TEST(test_agreement_server_pm_with_own_call_in_path_not_stored_on_both);
+    RUN_TEST(test_agreement_server_ack_for_held_pm_reaches_msgstore_on_both);
+    RUN_TEST(test_agreement_server_pm_pn_repeat_not_stored_on_both);
+    RUN_TEST(test_agreement_server_frames_outside_the_mailbox_make_no_call_on_both);
+    RUN_TEST(test_agreement_server_pm_to_exact_own_call_not_stored_on_both);
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);
     RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);

@@ -3498,6 +3498,7 @@
    "-std=gnu++17",
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
+   "-D ENABLE_MSGSTORE=1",
    "-I test/test_udp_frame_twin/stubs",
    "-I test/support",
    "-I src",

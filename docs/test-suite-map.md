@@ -10,7 +10,7 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-109 suites with tests, 1696 `RUN_TEST` cases, 54 native environments. Five
+109 suites with tests, 1702 `RUN_TEST` cases, 54 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
@@ -19,7 +19,7 @@ why the gate reports more cases than the table sums to.
 | Unit          |     56 |  1148 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
-| Twin          |      6 |    98 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
+| Twin          |      6 |   104 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
 | Integration   |      3 |    57 | several modules on a fake platform (BLE harness on real rings, ESP32 NVS, nRF52 settings paths)  |
 | Oracle/Replay |      8 |    37 | field captures replayed through the real code (aprs_corpus, dedup/ack/txprio, nbr_replay, topo)  |
 | Fuzz          |      1 |     4 | aprs_fuzz against frames the radio rejected on air (crc/capture/ack corpora)                     |
@@ -49,7 +49,9 @@ counter line; Regression, own env `native_ble_session`); `tools/bench/test_ble_c
 (38 pytest cases, pure parts of `ble_cycle.py`). `test_msgstore_hook` (SNF-GW-01: store/ack decision
 shared by OnRxDone and the GATE handlers, `RM1 ` exclusion, path element match;
 own env `native_msgstore_hook`). Extended: `test_msgstore` (+9: lock pairing on
-every entry point, no env callback under the lock, `msgstoreSameBaseCall`).
+every entry point, no env callback under the lock, `msgstoreSameBaseCall`). `test_udp_frame_twin` (+6, SNF-GW-03/04: server PM to
+a sibling SSID stored on both twins, echo guard, server `:ack` purge, PN repeat,
+frames outside the mailbox incl. an unconfigured source, PM to the exact own call).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -225,7 +227,7 @@ flashes whatever is attached.
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
 | test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
 | test_tz_rule                 | Unit          |    11 | native_tz_rule                                               |
-| test_udp_frame_twin          | Twin          |    31 | native_udp_frame_twin                                        |
+| test_udp_frame_twin          | Twin          |    37 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |
 | test_url_decode              | Regression    |    14 | native                                                       |
