@@ -349,7 +349,7 @@ edits.
 ### 5.2 Design
 
 - Keep the setting key `node_ethmtu` (no migration). Add `--mtu <1280..1500>` as the user-facing
-  command on every board, keep `--ethmtu` as an alias (RAK users and docs). Default stays 1500.
+  command on every board, keep `--ethmtu` as an alias (RAK users and docs). Default 1280 (NMTU-D2 in 3.2a).
 - ESP32 app: header-only `src/esp32/netif_mtu.h` with `applyNetifMtu(uint16_t)` that sets `mtu` on
   the STA and AP netifs. Called from the WiFi event handler on `GOT_IP` and `AP_START`, and from
   the Ethernet `GOT_IP` on T-ETH-ELITE, always before the first `accept()`. The WiFi OFF/STA cycles
@@ -367,7 +367,7 @@ edits.
 | Id      | Question                                                   | Default                                                                                                                                                            |
 | ------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | NMTU-D1 | Rename the setting                                         | no, key stays `node_ethmtu`; `--mtu` and `--ethmtu` both set it                                                                                                    |
-| NMTU-D2 | ESP32 default                                              | 1500, no behaviour change unless set                                                                                                                               |
+| NMTU-D2 | ESP32 default                                              | superseded: 1280, see 3.2a                                                                                                                                         |
 | NMTU-D3 | If `netif->mtu` does not move the SYN-ACK MSS on the bench | ship the setting as "outgoing only" (it still caps our send segments, which helps the AU download) and record the gap; a pcb-level hack on AsyncTCP is not pursued |
 | NMTU-D4 | Pin the RAK13800-W5100S library                            | yes, to the commit in use today (`platformio.ini:84` is unpinned)                                                                                                  |
 | NMTU-D5 | Safeboot binaries                                          | rebuilt and committed with the wave                                                                                                                                |
@@ -745,26 +745,25 @@ and the BACKLOG rows per wave, and never runs two `pio` processes.
 
 Status:
 
-| Feature | Wave | State       | Commit |
-| ------- | ---- | ----------- | ------ |
-| NMTU    | W1   | not started |        |
-| BLC     | W1   | not started |        |
-| SNF-GW  | W1   | not started |        |
-| SNF-GW  | W2   | not started |        |
-| SNF-GW  | W3   | not started |        |
-| RM      | W1   | not started |        |
-| RM      | W2   | not started |        |
-| RM      | W3   | not started |        |
-| AU      | W0   | not started |        |
-| AU      | W1   | not started |        |
-| AU      | W2   | not started |        |
-| AU      | W3   | not started |        |
-| AU      | W4   | not started |        |
-| AU      | W5   | not started |        |
+| Feature | Wave | State                                                                                    | Commit      |
+| ------- | ---- | ---------------------------------------------------------------------------------------- | ----------- |
+| NMTU    | W1   | done: bench DK5EN-1 app+Safeboot MSS 1240/1436, AP path and classic Safeboot not benched | this commit |
+| BLC     | W1   | not started                                                                              |             |
+| SNF-GW  | W1   | not started                                                                              |             |
+| SNF-GW  | W2   | not started                                                                              |             |
+| SNF-GW  | W3   | not started                                                                              |             |
+| RM      | W1   | not started                                                                              |             |
+| RM      | W2   | not started                                                                              |             |
+| RM      | W3   | not started                                                                              |             |
+| AU      | W0   | not started                                                                              |             |
+| AU      | W1   | not started                                                                              |             |
+| AU      | W2   | not started                                                                              |             |
+| AU      | W3   | not started                                                                              |             |
+| AU      | W4   | not started                                                                              |             |
+| AU      | W5   | not started                                                                              |             |
 
-Next: NMTU W1. Before dispatch the orchestrator adds `[env:native_netif_mtu]` to `platformio.ini`,
-regenerates the golden json, pins the W5100S library, and re-verifies the line references in
-section 5 against HEAD.
+Next: BLC W1. Line references of section 8 re-verified at 5b614bb4 (unchanged). Before dispatch the
+orchestrator adds `[env:native_ble_session]` to `platformio.ini` and regenerates the golden json.
 
 ## 10. Questions for the maintainers and other repos
 

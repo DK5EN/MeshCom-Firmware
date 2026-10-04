@@ -243,12 +243,37 @@ static std::string read_repo_file(const char *rel)
 static void test_ethmtu_rung_schema_row_and_default_match_the_assumptions()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
-    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"ethmtu \")");
-    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --ethmtu rung in command_functions.cpp");
-    const std::string body = cmd.substr(rung, 700);
-    TEST_ASSERT_TRUE_MESSAGE(body.find("cmdStoreInt(msg_text+9, &meshcom_settings.node_ethmtu, 1280, 1500") != std::string::npos,
-                             "--ethmtu rung does not range-check 1280..1500 through cmdStoreInt");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--ethmtu rung does not save");
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"mtu \") == 0 || commandCheck(msg_text+2, (char*)\"ethmtu \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --mtu/--ethmtu alias rung in command_functions.cpp");
+    const std::string body = cmd.substr(rung, 1400);
+    // --mtu argument at msg_text+6 ("mtu " after "--"), the --ethmtu alias at msg_text+9
+    TEST_ASSERT_TRUE_MESSAGE(body.find("bMtuShort ? msg_text+6 : msg_text+9") != std::string::npos,
+                             "--mtu / --ethmtu argument offsets are not +6 / +9");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("cmdStoreInt(mtuArg, &meshcom_settings.node_ethmtu, 1280, 1500") != std::string::npos,
+                             "--mtu rung does not range-check 1280..1500 through cmdStoreInt");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--mtu rung does not save");
+    // not behind a board guard: the rung is on every board
+    // the nearest preprocessor line above the rung must not be an opening #if
+    // (comments and the "else" between rungs are allowed in between)
+    size_t lineEnd = cmd.rfind("\n", rung);
+    std::string ppline;
+    while (lineEnd != std::string::npos && lineEnd > 0)
+    {
+        const size_t lineStart = cmd.rfind("\n", lineEnd - 1);
+        const size_t from = (lineStart == std::string::npos) ? 0 : lineStart + 1;
+        const std::string line = cmd.substr(from, lineEnd - from);
+        const size_t first = line.find_first_not_of(" \t");
+        if (first != std::string::npos && line[first] == '#')
+        {
+            ppline = line.substr(first);
+            break;
+        }
+        if (lineStart == std::string::npos)
+            break;
+        lineEnd = lineStart;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(ppline.find("#if") == std::string::npos,
+                             ("--mtu rung sits inside an #if guard: " + ppline).c_str());
 
     const std::string cfg = read_repo_file("src/config_json.h");
     const size_t row = cfg.find("X(\"node_ethmtu\"");
@@ -257,8 +282,8 @@ static void test_ethmtu_rung_schema_row_and_default_match_the_assumptions()
     TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("1280.0, 1500.0") != std::string::npos, "schema range is not 1280..1500");
 
     const std::string set = read_repo_file("src/meshcom_settings.h");
-    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_ethmtu, 1500)") != std::string::npos,
-                             "node_ethmtu default is not 1500 (today's behaviour)");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_ethmtu, 1280)") != std::string::npos,
+                             "node_ethmtu default is not 1280 (NMTU-D2)");
 }
 
 int main(int, char **)

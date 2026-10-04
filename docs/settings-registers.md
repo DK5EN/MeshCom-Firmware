@@ -230,13 +230,13 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 
 ### X. APRS-Multicast & Ping
 
-| Key             | Member          | Typ (Größe) | Import-Bereich | Hinweis                                                                                       |
-| --------------- | --------------- | ----------- | -------------- | --------------------------------------------------------------------------------------------- |
-| `node_aprsmc`   | `node_aprsmc`   | string (10) | —              |                                                                                               |
-| `node_pingtime` | `node_pingtime` | int         | 0..86400       |                                                                                               |
-| `node_pingcall` | `node_pingcall` | string (10) | —              |                                                                                               |
-| `node_pingmax`  | `node_pingmax`  | int         | 0..100         |                                                                                               |
-| `node_ethmtu`   | `node_ethmtu`   | int         | 1280..1500     | Ethernet-MTU des RAK-Webservers (W5100S, MSS = MTU − 40, Issue #1183); auf ESP32 ohne Wirkung |
+| Key             | Member          | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                      |
+| --------------- | --------------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node_aprsmc`   | `node_aprsmc`   | string (10) | —              |                                                                                                                                                              |
+| `node_pingtime` | `node_pingtime` | int         | 0..86400       |                                                                                                                                                              |
+| `node_pingcall` | `node_pingcall` | string (10) | —              |                                                                                                                                                              |
+| `node_pingmax`  | `node_pingmax`  | int         | 0..100         |                                                                                                                                                              |
+| `node_ethmtu`   | `node_ethmtu`   | int         | 1280..1500     | MTU auf allen Boards, Default 1280 (`--mtu`, Alias `--ethmtu`; RAK: W5100S-MSS = MTU − 40, Issues #1183/#1190); ESP32 und Safeboot: lwIP-netif-MTU (NMTU-01) |
 
 ### Y. Nur ESP32 (6 Register)
 

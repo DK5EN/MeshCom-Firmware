@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-106 suites with tests, 1664 `RUN_TEST` cases, 51 native environments. Five
+107 suites with tests, 1667 `RUN_TEST` cases, 52 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     54 |  1130 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     55 |  1133 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     22 |   228 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   110 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |    98 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -38,6 +38,12 @@ value and the 39-character limit; the round trip itself is pinned inside the
 existing round-trip case), `test_decodetinyxml` (+2: station offset kept while a TZ rule is
 set, applied when not) and `test_ble_phone_harness` (SN1 frame size pinned at
 99 bytes, case count unchanged).
+
+Added with the #1187-#1191 campaign (2026-10-04, `docs/concept-open-issues-20261004.md`):
+`test_netif_mtu` (NMTU-01: MTU clamp of `src/esp32/netif_mtu.h` and a source pin
+that the apply hooks avoid `AP_START` and precede both web servers; Unit, own
+env `native_netif_mtu`). Extended: `test_command_setters` (source pin: one
+`--mtu`/`--ethmtu` rung, no board guard, default 1280).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -182,6 +188,7 @@ flashes whatever is attached.
 | test_nbr_replay              | Oracle/Replay |    15 | native_nbr_replay, native_nbr_replay64, native_nbr_replay128 |
 | test_nbr_report              | Unit          |     4 | native_nbr_report                                            |
 | test_nbr_views               | Unit          |    28 | native_nbr_views, native_nbr_views64                         |
+| test_netif_mtu               | Unit          |     3 | native_netif_mtu                                             |
 | test_nrf52_settings_paths    | Integration   |    26 | native_nrf52_settings_paths                                  |
 | test_ntp_async               | Regression    |    10 | native                                                       |
 | test_ntp_harvest             | Regression    |     4 | native                                                       |
