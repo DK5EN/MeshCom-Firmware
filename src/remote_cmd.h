@@ -1,0 +1,109 @@
+// RM-02: protocol core of the authenticated remote management DM ("RM1").
+// docs/concept-open-issues-20261004.md section 6 (issue #1189).
+//
+// Arduino-free, no printf, no malloc: parse, canonical string, key, tag
+// verification, allowlist, counter / replay window, rate limit and lockout,
+// reply build. Nothing here executes a command or touches flash; the caller
+// (RM-03, loop task only) runs the command after RM_OK and persists the
+// returned high-water mark.
+//
+// Wire format:  RM1 <ctr> <cmd>[ <args>] <tag>
+//   tag = first 8 bytes (16 hex chars) of HMAC-SHA256(K, canonical)
+//   K   = SHA-256(node_passwd with trailing spaces stripped)
+//   canonical = "RM1|" dst "|" src "|" ctr "|" cmd [" " args]
+// Reply:        RM1 <ctr> ok <status> <rtag>  /  RM1 <ctr> err <reason> <rtag>
+//   rtag over "RM1R|" dst "|" src "|" ctr "|" result
+
+#ifndef REMOTE_CMD_H
+#define REMOTE_CMD_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+enum RmVerdict : uint8_t
+{
+    RM_OK = 0,        // execute, then rmAccept() and reply
+    RM_CACHED,        // same ctr + valid tag within RM_CACHE_MS: re-send reply, do not execute
+    RM_SYNC,          // valid "sync": reply "ok ctr=<hwm> v=<version>", no rmAccept()
+    RM_REJ_FORMAT,    // silent
+    RM_REJ_TAG,       // silent
+    RM_REJ_REPLAY,    // silent
+    RM_REJ_BLOCKED,   // not on the allowlist, bad args or forbidden characters; silent
+    RM_REJ_RATE,      // silent
+    RM_REJ_LOCKOUT,   // silent
+    RM_REJ_DISABLED   // empty password; silent
+};
+
+// "ok","cached","sync","format","tag","replay","blocked","rate","lockout","disabled"
+const char *rmVerdictName(RmVerdict v);
+
+#define RM_RATE_MS 10000u        // minimum spacing of accepted commands
+#define RM_CACHE_MS 600000u      // lost-reply recovery window (10 min)
+#define RM_REJ_WINDOW_MS 90000u  // 3 rejects inside this window ...
+#define RM_REJ_LIMIT 3
+#define RM_LOCKOUT_MS 300000u    // ... lock RM1 for 5 min
+#define RM_MAX_RESULT 63          // longest result text a reply can carry
+
+struct RmCmd
+{
+    uint32_t ctr;
+    char cmd[16];
+    char args[24];
+    char tag[17]; // 16 lower-case hex + NUL
+};
+
+// Syntax only: "RM1 " prefix, single spaces, no leading/trailing space,
+// decimal ctr 1..4294967295 (no leading zeros; 0 only with cmd "sync"),
+// lower-case cmd/args, 16 lower-case hex tag. Allowlist is rmCheck()'s job.
+bool rmParse(const char *text, RmCmd &out);
+
+// K = SHA-256(passwd with trailing spaces stripped); all-zero key for empty.
+void rmDeriveKey(const char *passwd, uint8_t key[32]);
+
+// Canonical string into out (NUL-terminated); returns its length, 0 if it
+// does not fit or an argument is null.
+size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, size_t n);
+
+struct RmState
+{
+    uint32_t hwm;           // persisted high-water mark
+    uint32_t lastCtr;       // last accepted command
+    char lastReply[64];     // RESULT text of the last accepted command ("ok rebooting");
+                            // the caller re-sends rmReply(cmd, lastReply, ...) on RM_CACHED
+    uint32_t lastAcceptMs;  // acceptance time of lastCtr (cache window)
+    uint8_t rejCount;       // rejects inside the current window
+    uint32_t rejWindowMs;   // start of the reject window
+    uint32_t lockUntilMs;
+    bool lockActive;
+    char lastTag[17];       // tag of the last accepted command
+    bool haveLast;
+    // appended by RM-02 (rmStateInit() sets them, callers never touch them):
+    uint32_t lastRateMs;    // time of the last accepted command OR sync (rate limit)
+    bool haveRate;
+};
+
+void rmStateInit(RmState &s, uint32_t hwm);
+
+// Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute.
+// maxTxPower bounds "txpower <n>" (0 <= n <= maxTxPower). Every reject counts
+// towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT and RM_REJ_RATE
+// (a rate reject requires a valid tag). The lockout is reachable without the
+// key (3 junk DMs per 5 min keep RM unavailable): accepted by design, RM fails
+// closed, never open (ADR). RM_SYNC
+// stamps the rate limiter itself; it never moves hwm.
+RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
+                  int maxTxPower, uint32_t nowMs);
+
+// After the caller executed an RM_OK command: records hwm, result, time.
+// CONTRACT: call it for EVERY RM_OK, also when execution failed (pass the
+// "err <reason>" result) -- otherwise the same ctr stays executable and the
+// rate limiter is not stamped.
+// Returns the new hwm to persist. result is truncated to RM_MAX_RESULT.
+uint32_t rmAccept(RmState &s, const RmCmd &c, const char *result, uint32_t nowMs);
+
+// "RM1 <ctr> <result> <rtag>" into out (NUL-terminated); returns the length,
+// 0 if it does not fit, result is longer than RM_MAX_RESULT or the password is empty.
+size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *src, const char *passwd,
+               char *out, size_t n);
+
+#endif // REMOTE_CMD_H

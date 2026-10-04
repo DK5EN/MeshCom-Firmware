@@ -2910,6 +2910,22 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_hmac_sha256": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_hmac_sha256"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_kiss_frame": {
   "build_flags": [
    "-std=gnu++17",
@@ -3239,6 +3255,26 @@
   "test_build_src": "False",
   "test_filter": [
    "test_pn_retry"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_remote_cmd": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<remote_cmd.cpp>"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_remote_cmd"
   ],
   "test_framework": "unity"
  },

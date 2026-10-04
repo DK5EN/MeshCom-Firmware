@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-110 suites with tests, 1728 `RUN_TEST` cases, 55 native environments. Five
+112 suites with tests, 1779 `RUN_TEST` cases, 57 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     57 |  1172 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     59 |  1223 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   112 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |   104 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -56,7 +56,11 @@ encoder byte-exact against the concept example, chunking, 15 min / 60 s timer;
 own env `native_stor_announce`). Extended: `test_command_setters` (+2, `--stor`
 rung and ladder collisions), `test_config_json` (+2, `node_stor` range and absent
 key); `tools/mock/test_mock_server.py` (STOR parser, chunk assembly, expiry,
-routing).
+routing). `test_hmac_sha256` (RM-01: portable SHA-256 / HMAC
+against FIPS 180-4 and RFC 4231) and `test_remote_cmd` (RM-02: RM1 parse, tag,
+counter, allowlist, rate limit, lockout; reproduces all 21 vectors of
+`tools/tests/remote_cmd_vectors.json`, the Python reference `tools/remote_cmd.py`,
+pytest `tools/tests/test_remote_cmd.py`).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -186,6 +190,7 @@ flashes whatever is attached.
 | test_hey_report              | Unit          |     8 | native_aprs                                                  |
 | test_kbd_repeat              | Unit          |    39 | native                                                       |
 | test_kiss_ax25               | Unit          |    23 | native_extradio                                              |
+| test_hmac_sha256             | Unit          |    20 | native_hmac_sha256                                           |
 | test_kiss_frame              | Unit          |    18 | native_kiss_frame                                            |
 | test_loop_breadcrumb         | Unit          |    11 | native                                                       |
 | test_loop_scheduler          | Twin          |    26 | native_loop_scheduler                                        |
@@ -215,6 +220,7 @@ flashes whatever is attached.
 | test_radio_units             | Regression    |    14 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
+| test_remote_cmd              | Unit          |    31 | native_remote_cmd                                            |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
 | test_serial_command_twin     | Twin          |     6 | native_serial_esp32, native_serial_nrf52                     |
