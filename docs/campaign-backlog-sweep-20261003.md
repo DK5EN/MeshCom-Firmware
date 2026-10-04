@@ -90,3 +90,6 @@ stage 3 on the three attached nodes (serial, orchestrator).
 - TD-20 closed 2026-10-04 09:40: the lost step and the 800 ms gap were the trackball screen
   clamp (park commands capped at 8 steps per read), not the console; harness parks in the corner
   and simulates walks (`tdeck_parse.ball_walk_fits`); `input` and `msg_roll` PASS on DK5EN-14.
+- Runs 8/9 (2026-10-04 09:57, 10:24): full `--stage all` green apart from one mesh pair that
+  passed on the standalone rerun (RX-01, SX127x RX restart during a peer's preamble); the OTA
+  step now builds and verifies its own image. REG-01 done; bench campaign closed.

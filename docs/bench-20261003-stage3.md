@@ -92,3 +92,31 @@ on DK5EN-14: `input` PASS, 10/10 steps in all four directions from (140, 50), la
 `msg_roll` PASS, 59/59 reads per phase, max gap 308 ms, no lvgl gap, slowdown 0.99x. The
 garbled command echoes in the log (`all right 3[BALL];inject`) are HWCDC TX drops of the echo
 under the redraw flood, cosmetic.
+
+### Runs 8 and 9: full `--stage all`, OTA image rebuilt by the driver (2026-10-04, 09:57 and 10:24)
+
+Run 8 (`--stage all`, 48 envs 1651 cases, 547 pytest) went red on two steps only: `ota
+regression` on the T-Beam and the T-Deck, "firmware not found: .pio/build/<env>/firmware.bin".
+Stage 1 ran without `PLATFORMIO_BUILD_FLAGS`, which flips PlatformIO's project checksum against
+the instrument builds of the day before, and the build directory was wiped with the board images
+in it. The driver now plans `build <env>` + `verify instrument <env>` before every OTA step when
+no flash step in the same run built the image, and `--instrument` is the default
+(`--no-instrument` for release images), so the OTA flashes the fleet's standing instrument image.
+The reverse wipe stands: the next stage 1 after a bench run builds cold.
+
+Run 9 (`--stage 2,3`): 18 of 19 steps green -- RAK 5/5, T-Beam 8/8, T-Deck 22/22 (TD-20
+closed), OTA 59 s / 59 s, badge PASS on both WiFi boards. Red: mesh exchange, "DK5EN-90 not
+heard by DK5EN-92". The T-Beam log shows why: the RAK's beacon went out at 10:45:36 and in the
+same second the T-Beam fired `RX_TIMEOUT_FIRE` and restarted `startReceive()` undeferred; the
+beacon arrived only as relayed copies (via DK5EN-98 at 10:45:41, via DK5EN-14 at 10:46:00),
+and MHeard records the last hop, so the pair read as unheard. The standalone rerun passed 6/6.
+Logged as RX-01 (the defer logic uses SX126x IRQ masks; the SX127x T-Beam has no preamble IRQ).
+
+| Step                       | RAK DK5EN-90           | T-Beam DK5EN-92 | T-Deck DK5EN-14 |
+| -------------------------- | ---------------------- | --------------- | --------------- |
+| prepare                    | ok                     | ok              | ok              |
+| board harness              | 5/5                    | 8/8             | 22/22           |
+| build + verify (OTA image) | n/a                    | ok 43 s         | ok 55 s         |
+| OTA regression             | n/a                    | PASS 59 s       | PASS 59 s       |
+| web GUI badge              | n/a                    | PASS            | PASS            |
+| mesh exchange              | 5/6, rerun 6/6 (RX-01) |                 |                 |

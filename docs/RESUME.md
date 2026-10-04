@@ -1,6 +1,7 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-03, branch `fork-dev`, HEAD `cfcfcb3c`, last release `v4.40a.10.02`.
+**Stand:** 2026-10-04, branch `fork-dev` (bench campaign commits `0968cccf`..HEAD), last release
+`v4.40a.10.02`.
 
 ## Branch model
 
@@ -29,12 +30,15 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1627 Unity cases today) plus `test/golden/selftest.sh`.
-- Stage 2: pytest over `tools/bench`, `tools/tests`, `tools/mock` (467 cases), the
+- Stage 1: every `[env:native*]` (48 envs, 1651 Unity cases today) plus `test/golden/selftest.sh`.
+- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (547 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
-- Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard, per-board
-  harness, OTA; `--flash`, `--extudp`, `--deepsleep` are opt-in). Never run against hardware yet.
+- Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,
+  `prepare <node>`, per-board harness, OTA with its own image build, web GUI badge, mesh exchange;
+  `--flash`, `--extudp`, `--deepsleep` are opt-in, `--instrument` is the default). Green on RAK,
+  T-Beam and T-Deck on 2026-10-04 (run 9, `docs/bench-20261003-stage3.md`). A bench run flips the
+  PlatformIO checksum (`PLATFORMIO_BUILD_FLAGS`), so the next stage 1 builds cold.
 - **Never run bare `pio test`**: it walks the board envs and flashes attached hardware.
 - **One `pio` process at a time**: shared build cache; `selftest.sh` itself calls
   `pio project config`.
@@ -44,20 +48,25 @@
 
 ## Bench fleet
 
-State of `tools/bench/fleet.json`, 2026-10-01. Nothing is attached today.
+State of `tools/bench/fleet.json`, 2026-10-04. RAK, T-Beam and T-Deck are on USB and run
+instrument images (`INSTRUMENT_ENABLED=1`) of `fork-dev`; the Heltec is unplugged.
 
-| Node     | Board           | USB serial       | Port last seen                | IP            |
-| -------- | --------------- | ---------------- | ----------------------------- | ------------- |
-| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E | /dev/cu.usbmodem1101          | ETH, DHCP     |
-| DK5EN-14 | T-Deck Plus     | (native USB)     | /dev/cu.usbmodem2101          | WiFi          |
-| DK5EN-92 | T-Beam v1.2     | 573C000584       | /dev/cu.usbserial-573C0005841 | 192.168.68.73 |
-| DK5EN-1  | Heltec V3       | 0001             | /dev/cu.usbserial-0001        | 192.168.68.62 |
+| Node     | Board           | USB serial              | Port last seen                | IP            |
+| -------- | --------------- | ----------------------- | ----------------------------- | ------------- |
+| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E        | /dev/cu.usbmodem1101          | 192.168.68.77 |
+| DK5EN-14 | T-Deck Plus     | E0:72:A1:AD:65:E0 (MAC) | /dev/cu.usbmodem101           | 192.168.68.70 |
+| DK5EN-92 | T-Beam v1.2     | 573C000584              | /dev/cu.usbserial-573C0005841 | 192.168.68.75 |
+| DK5EN-1  | Heltec V3       | 0001                    | /dev/cu.usbserial-0001        | 192.168.68.76 |
 
 DK5EN-98 is the production Heltec V3 (logger on rpizero), not a bench node.
 
 Handling:
 
-- Ports move. Resolve by USB serial (ioreg or pyserial), never by name.
+- Ports move and DHCP moves the IPs per reboot; the driver reads the live IP from `--info` and
+  writes it back to `fleet.json`. Resolve ports by USB serial (ioreg or pyserial), never by name.
+- Harness `--node` takes the fleet key (`t-deck-14`), not the callsign.
+- Heltec V3 on CP2102: DTR is the PRG button, a held DTR is a long press (deep sleep). The guard
+  asserts DTR only on native-USB ports.
 - Opening a port reboots every ESP32. The RAK needs DTR. The T-Beam flashes at 460800 (921600
   fails).
 - The RAK web GUI has no mDNS (the Ethernet path ships no responder): reach it by IP from the
@@ -84,9 +93,10 @@ Hard bench rules:
 
 ## Hottest first (details in BACKLOG)
 
-- N-36 (softAP on a fresh ESP32) is fixed on `fork-dev`; the upstream PR is not filed.
-- The 4.40a soak on DK5EN-98 (OTA 2026-10-01 23:27) is not evaluated.
-- First stage-3 run of the regression runner on real hardware.
+- N-36 (softAP on a fresh ESP32) is fixed on `fork-dev`; the upstream PR text is drafted
+  (`docs/pr-draft-n36-20261003.md`), not filed.
+- RX-01: the SX127x T-Beam missed a direct beacon during its `RX_TIMEOUT` receive restart (one
+  observation, run 9); measure over a soak before touching upstream's defer logic.
 - DR-16: drift-matrix verdict vs the code comment near `bTeleFirst` in `src/nrf52/nrf52_main.cpp`;
   the one row that keeps `--phase implementation` in `selftest.sh`.
 - `--mesh off` still transmits on two RF paths (gateway DM-ACK, DM-store custody); operator
@@ -96,10 +106,10 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-10-04:** bench campaign: `prepare <node>` step, RAK under the driver (DFU, instrument
+  flag on the upload), OLED `dirty`/`pos` and T-Deck TD-20 root-caused in the harnesses (LoRa
+  frames, trackball clamp), OTA image built by the driver; stage 3 green on three nodes.
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix
   (`42dbf03a`).
-- **2026-10-01:** upstream sync check against `v4.35v.09.30`: three cherry-picks (settings saved
-  where they change, T-Deck setup-page map, RAK HAMNET NTP) plus the `save_position()` guard;
-  native gate green, advisor approved.

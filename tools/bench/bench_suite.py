@@ -118,25 +118,39 @@ def discover_ports(fleet: dict, comports: Iterable[Any]) -> Dict[str, str]:
 INSTRUMENT_MARKER = "SRVIP\\];err"   # printed only by instrument images (src/instrument.h)
 
 
-def flash_steps(name: str, env: str, dev: str, instrument: bool = False) -> List[Step]:
-    """Build (optionally as an instrument image), prove the image, upload.
+def build_env_for(instrument: bool) -> Dict[str, str]:
+    """PLATFORMIO_BUILD_FLAGS for an instrument image, or nothing."""
+    return {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"} if instrument else {}
+
+
+def build_steps(name: str, env: str, instrument: bool = False) -> List[Step]:
+    """Build (optionally as an instrument image) and prove the image.
 
     The bench harnesses drive --oledstat/--instr/--btn and friends, which
     live behind INSTRUMENT_ENABLED in src/command_functions.cpp; a release
     image answers "wrong command" (first stage-3 run, 2026-10-03). The flag
     must be the no-space form -DINSTRUMENT_ENABLED=1 (PlatformIO splits the
     env var on whitespace) and changing PLATFORMIO_BUILD_FLAGS wipes
-    .pio/build, so the next host gate rebuilds cold. The verify step string-
-    scans the ELF for an instrument-only marker before anything is flashed.
+    .pio/build, so the next host gate rebuilds cold -- and the other way
+    round: a host gate run without the flag wipes the board images, which is
+    why the OTA step rebuilds its image instead of trusting .pio/build
+    (run 8, 2026-10-04: "firmware not found" on both WiFi boards after a
+    `--stage all` that started with stage 1). The verify step string-scans
+    the ELF for an instrument-only marker before anything is flashed.
     """
-    build_env = {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"} if instrument else {}
-    build = Step(f"build {env}", name, ["pio", "run", "-e", env], FLASH_TIMEOUT_S, gate=True,
-                 env=build_env)
-    steps = [build]
+    steps = [Step(f"build {env}", name, ["pio", "run", "-e", env], FLASH_TIMEOUT_S, gate=True,
+                  env=build_env_for(instrument))]
     if instrument:
         steps.append(Step(f"verify instrument {env}", name,
                           ["sh", "-c", f"strings .pio/build/{env}/firmware.elf | grep -q '{INSTRUMENT_MARKER}'"],
                           60, gate=True))
+    return steps
+
+
+def flash_steps(name: str, env: str, dev: str, instrument: bool = False) -> List[Step]:
+    """build_steps() plus the upload for the board family."""
+    build_env = build_env_for(instrument)
+    steps = build_steps(name, env, instrument)
     if env in RAK_ENVS:
         # Serial DFU (RAK, must be running, not in UF2 mode) goes through pio's
         # own uploader; the explicit --upload-port keeps pio's autodetect off
@@ -223,6 +237,14 @@ def plan(fleet: dict, attached: Dict[str, str], *, flash: bool = False, ota: boo
             steps.append(Step(f"oled harness {name}", name,
                               [py, str(BENCH / "oled_harness.py"), "--scenario", "all",
                                "--port", dev, "--out", summary]))
+        if ota and not flash and node.get("family") == "esp32" and node.get("host"):
+            # The OTA step flashes .pio/build/<env>/firmware.bin; without a
+            # flash step in this run that image is whatever the last pio
+            # invocation left, and a host gate (stage 1) run without the
+            # instrument flag wipes it (project checksum). Build it here, as
+            # the flash step would, so the OTA image is the fleet's standing
+            # instrument image and proven as such.
+            steps.extend(build_steps(name, env, instrument))
         if (ota or badge) and node.get("family") == "esp32" and node.get("host"):
             # The harness reboots the node (port open) and leaves it mid-boot;
             # ota_regression.py runs its own identity guard first and refused
@@ -385,8 +407,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--out", default=None, help="log/summary directory (default tools/bench/runs/bench-<ts>)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, run nothing")
     ap.add_argument("--flash", action="store_true", help="build and flash every attached node first")
-    ap.add_argument("--instrument", action="store_true",
-                    help="with --flash: build INSTRUMENT_ENABLED=1 images (the harnesses need them; wipes .pio/build)")
+    ap.add_argument("--instrument", dest="instrument", action="store_true", default=True,
+                    help="build INSTRUMENT_ENABLED=1 images for --flash and the OTA step (default: on; the "
+                         "harnesses need them and the fleet runs them; wipes .pio/build)")
+    ap.add_argument("--no-instrument", dest="instrument", action="store_false",
+                    help="build release images instead (the harness steps will answer 'wrong command')")
     ap.add_argument("--no-ota", action="store_true", help="skip the OTA regression on the WiFi boards")
     ap.add_argument("--extudp", action="store_true", help="also run the RAK EXTUDP scenario (TM-43, long)")
     ap.add_argument("--deepsleep", action="store_true", help="also run DS-03 on a Heltec V3")

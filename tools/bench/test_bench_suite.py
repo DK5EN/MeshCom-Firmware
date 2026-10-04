@@ -73,9 +73,9 @@ def test_plan_rak_with_esp32_peer_sets_peer_port_and_ota_for_wifi_node():
     steps = bs.plan(FLEET, attached, out=Path("/o"))
     assert names(steps) == [
         "identity rak-90", "prepare rak-90", "rak harness rak-90",
-        "identity t-beam-92", "prepare t-beam-92", "oled harness t-beam-92", "wait web t-beam-92",
-        "ota regression t-beam-92", "wait web t-beam-92 (after ota)", "webgui badge t-beam-92",
-        "mesh exchange",
+        "identity t-beam-92", "prepare t-beam-92", "oled harness t-beam-92", "build ttgo_tbeam",
+        "wait web t-beam-92", "ota regression t-beam-92", "wait web t-beam-92 (after ota)",
+        "webgui badge t-beam-92", "mesh exchange",
     ]
     rak = steps[2].argv
     assert rak[rak.index("--peer-port") + 1] == "/dev/tty.tbeam"
@@ -136,12 +136,13 @@ def test_plan_extudp_and_deepsleep_are_opt_in_and_board_specific():
 
 def test_plan_badge_for_esp32_with_host_after_ota_before_deepsleep():
     steps = bs.plan(FLEET, {"heltec-1": "/dev/tty.h"}, deepsleep=True)
-    assert names(steps) == ["identity heltec-1", "prepare heltec-1", "oled harness heltec-1", "wait web heltec-1",
+    assert names(steps) == ["identity heltec-1", "prepare heltec-1", "oled harness heltec-1",
+                            "build heltec_wifi_lora_32_V3", "wait web heltec-1",
                             "ota regression heltec-1", "wait web heltec-1 (after ota)",
                             "webgui badge heltec-1", "deepsleep heltec-1"]
-    assert steps[3].argv[1:3] == [str(bs.BENCH / "wait_http.py"), "http://192.168.68.62/"]
-    assert steps[7].argv[-2:] == ["--node", "heltec-1"]
-    badge = steps[6]
+    assert steps[4].argv[1:3] == [str(bs.BENCH / "wait_http.py"), "http://192.168.68.62/"]
+    assert steps[8].argv[-2:] == ["--node", "heltec-1"]
+    badge = steps[7]
     assert badge.argv == ["node", "--insecure-http-parser", "tools/webgui_badge_test.js",
                           "http://192.168.68.62/"]
     assert badge.env["NODE_PATH"].endswith("/node_modules")
@@ -258,7 +259,7 @@ def test_runner_skips_a_node_after_its_gate_fails_but_continues_others(tmp_path)
     assert not any("rak_harness.py" in " ".join(c) for c in fake.calls)
     # one log per executed step, first line is the command
     logs = sorted(tmp_path.glob("stage3-*.log"))
-    assert len(logs) == 9      # identity x2, prepare, oled, wait, ota, wait, badge, mesh; the skipped rak prepare/harness have none
+    assert len(logs) == 10     # identity x2, prepare, oled, build, wait, ota, wait, badge, mesh; the skipped rak prepare/harness have none
     assert by_name["webgui badge t-beam-92"].status == "OK" and by_name["mesh exchange"].status == "OK"
     assert logs[0].read_text().startswith("$ ")
 
@@ -267,7 +268,7 @@ def test_runner_non_gate_failure_does_not_skip_later_steps(tmp_path):
     steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tbeam"}, out=tmp_path)
     fake = FakeRun({"oled_harness.py": 1})
     results = bs.run_steps(steps, tmp_path, runner=fake, echo=lambda s: None)
-    assert [r.status for r in results] == ["OK", "OK", "FAIL", "OK", "OK", "OK", "OK"]    # identity, prepare, oled, wait, ota, wait, badge
+    assert [r.status for r in results] == ["OK", "OK", "FAIL", "OK", "OK", "OK", "OK", "OK"]    # identity, prepare, oled, build, wait, ota, wait, badge
 
 
 def test_runner_merges_step_env_over_os_environ_only_when_set(tmp_path, monkeypatch):
@@ -421,3 +422,40 @@ def test_instrument_flag_reaches_the_rak_upload_step_too():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_plan_ota_without_flash_builds_and_verifies_the_image_first():
+    # run 8, 2026-10-04: a `--stage all` that starts with stage 1 wipes the board
+    # images (PLATFORMIO_BUILD_FLAGS is in the project checksum); the OTA step
+    # then failed with "firmware not found". The plan now builds the OTA image
+    # itself, instrumented by default, proven by the ELF scan, and skips that
+    # when a flash step in the same run already built it.
+    steps = bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, instrument=True, badge=False)
+    assert names(steps) == ["identity t-beam-92", "prepare t-beam-92", "oled harness t-beam-92",
+                            "build ttgo_tbeam", "verify instrument ttgo_tbeam", "wait web t-beam-92",
+                            "ota regression t-beam-92"]
+    build = steps[3]
+    assert build.gate and build.env == {"PLATFORMIO_BUILD_FLAGS": "-DINSTRUMENT_ENABLED=1"}
+    assert build.argv == ["pio", "run", "-e", "ttgo_tbeam"]
+    flashed = names(bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, flash=True, instrument=True, badge=False))
+    assert flashed.count("build ttgo_tbeam") == 1 and flashed.index("build ttgo_tbeam") < flashed.index("flash ttgo_tbeam")
+    assert "build ttgo_tbeam" not in names(bs.plan(FLEET, {"t-beam-92": "/dev/tty.tb"}, ota=False))
+    assert "build wiscore_rak4631" not in names(bs.plan(FLEET, {"rak-90": "/dev/tty.r"}))
+
+
+def test_main_instrument_is_default_and_no_instrument_turns_it_off(tmp_path, monkeypatch, capsys):
+    fleet = tmp_path / "fleet.json"
+    fleet.write_text(json.dumps(FLEET))
+    monkeypatch.setattr(bs, "list_comports", lambda: [SimpleNamespace(device="/dev/tty.tb", serial_number="573C000584")])
+    monkeypatch.setattr(bs, "probe_hosts", lambda attached, fleet, **kw: ({}, {}))
+    seen = {}
+    real_plan = bs.plan
+
+    def spy(fleet_, attached, **kw):
+        seen.update(kw)
+        return real_plan(fleet_, attached, **kw)
+    monkeypatch.setattr(bs, "plan", spy)
+    assert bs.main(["--fleet", str(fleet), "--dry-run", "--out", str(tmp_path)]) == 0
+    assert seen["instrument"] is True
+    assert bs.main(["--fleet", str(fleet), "--dry-run", "--out", str(tmp_path), "--no-instrument"]) == 0
+    assert seen["instrument"] is False
