@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-112 suites with tests, 1779 `RUN_TEST` cases, 57 native environments. Five
+112 suites with tests, 1780 `RUN_TEST` cases, 57 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     59 |  1223 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     59 |  1224 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   112 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |   104 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -220,7 +220,7 @@ flashes whatever is attached.
 | test_radio_units             | Regression    |    14 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
-| test_remote_cmd              | Unit          |    31 | native_remote_cmd                                            |
+| test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
 | test_serial_command_twin     | Twin          |     6 | native_serial_esp32, native_serial_nrf52                     |

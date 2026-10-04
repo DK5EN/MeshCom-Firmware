@@ -22,6 +22,8 @@
 #include "pn_retry.h"       // PN retry (XOR form): pnRetryCore/pnRetryId/pnFrameIsOwnPn etc.
 #include "own_msg_status.h"  // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
+#include "rm_queue.h"       // RM-04: RM1 remote-management DMs, OnRxDone -> loop task (every board)
+#include "remote_cmd.h"     // RM: rmIsReply() -- replies are shown, never queued as commands
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -212,6 +214,34 @@ static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8
 #if defined(BOARD_RAK4630)
     taskEXIT_CRITICAL();
 #endif
+}
+
+// RM-04 (#1189): an authenticated remote-management command ("RM1 <ctr> <cmd>
+// ... <tag>") is not a chat message. LoRa only (!msg_server): a server-delivered
+// "RM1 " DM stays ordinary text (RM-D6). Called with the DM text already
+// stripped of its "{NNN" suffix, after dedup and ack. true = consumed: the
+// caller must neither display it nor hand it to BLE. A full queue also counts
+// as consumed (command dropped, the sender retries with a fresh counter); the
+// verify, enable and rate-limit decisions are rmDrain()'s, in the loop task.
+static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
+{
+    if (aprsmsg.msg_server || !mcStartsWith(text, "RM1 "))
+        return false;
+
+    // A REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read, not a
+    // command: show it like any DM (bench 2026-10-05: the SysOp node parsed the replies as
+    // commands, hid them and locked itself out).
+    if (rmIsReply(text))
+        return false;
+
+    // RM disabled (--rm off) or no node_passwd: an "RM1 " DM is ordinary text
+    // (concept 6.2 "Enable"), shown and forwarded like any other DM.
+    if (meshcom_settings.node_rm != 1 ||
+        meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ')
+        return false;
+
+    rmQueuePush(aprsmsg.msg_source_call, text);
+    return true;
 }
 
 /**
@@ -1793,6 +1823,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                             mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), strippedPayload);
 
+                                            // RM-04: remote-management command -> queue for the
+                                            // loop task, no display, no BLE (ack went out above).
+                                            if(!rmTryQueue(aprsmsg, strippedPayload))
+                                            {
                                             uint8_t tempRcvBuffer[255];
 
                                             uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
@@ -1804,6 +1838,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
 
                                             addBLEOutBuffer(tempRcvBuffer, tempsize);
+                                            }
                                         }
                                     }
                                     else
@@ -1811,12 +1846,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         //
                                         // next sequence to send incomming DM-Message to Display and/or APP via BLE
                                         //
+                                        // RM-04: a DM without "{NNN" (no ack to send) can be a
+                                        // remote-management command too.
+                                        if(!rmTryQueue(aprsmsg, aprsmsg.msg_payload))
+                                        {
                                         queueDisplayText(aprsmsg, rssi, snr);
 
                                         if(bDisplayVia)
                                             printfdeb("[MESHx]...SRC-PATH:%s ... DST-PATH:%s TEXT:%s\n", aprsmsg.msg_source_path, aprsmsg.msg_destination_path, aprsmsg.msg_payload);
 
                                         addBLEOutBuffer(RcvBuffer, size);
+                                        }
                                     }
                                 }
                             }

@@ -16,7 +16,7 @@ unten stammt direkt aus dieser Tabelle bzw. aus einem Grep/Read gegen den aktuel
   Auszählung der Intake bestätigt, keine Abweichung gefunden: `CFG_FIELD_LIST` hat exakt 101
   Zeilen (`config_json.cpp:89-189`), der ESP32-Zweig von `CFG_FIELD_LIST_PLATFORM` 6
   (`:202-207`), der nRF52-Zweig 2 (`:210-211`). Seit 2026-10-01 kommt `node_ethmtu` (Issue #1183)
-  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52), seit 2026-10-04 `node_tz` (TZ-01) als 103. (109 ESP32, 105 nRF52), seit 2026-10-04 `node_stor` (SNF-D7, Issue #1188) als 104. (110 ESP32, 106 nRF52).
+  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52), seit 2026-10-04 `node_tz` (TZ-01) als 103. (109 ESP32, 105 nRF52), seit 2026-10-04 `node_stor` (SNF-D7, Issue #1188) als 104. (110 ESP32, 106 nRF52), seit 2026-10-05 `node_rm` (RM-06, Issue #1189) als 105. (111 ESP32, 107 nRF52).
 - **Ein totes Register:** `node_gpsbaud` hat außerhalb von Export/Import/Flash keinen Leser
   irgendwo im Baum (§3).
 - **Vier Key/Member-Mismatches** — historisch gewachsen, absichtlich nicht bereinigt, weil das
@@ -243,6 +243,12 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 | Key         | Member      | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                          |
 | ----------- | ----------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `node_stor` | `node_stor` | int         | 0..1           | `--stor on/off` (nur Boards mit `ENABLE_MSGSTORE`), Default 0 = aus, bis der Server-Betreiber zustimmt (SNF-D7, #1188); 0 = kein STOR-Datagramm; nicht in der RM-Allowlist; nicht in der Web-GUI |
+
+### X3. Remote-Management (RM1)
+
+| Key       | Member    | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                                                                                                                                            |
+| --------- | --------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node_rm` | `node_rm` | int         | 0..1           | `--rm on/off` (alle Boards), Default 0 = aus (RM-06, #1189); 1 = authentifizierte `RM1`-DMs werden ausgeführt, wirkt nur mit nicht-leerem `node_passwd` (`--rm on` ohne Passwort warnt `[RM];warn;no passwd, RM stays inactive`); `rm` steht auf der harten Sperrliste, nicht per RM setzbar; nicht in der Web-GUI |
 
 ### Y. Nur ESP32 (6 Register)
 

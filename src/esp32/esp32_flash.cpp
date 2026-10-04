@@ -310,6 +310,29 @@ bool countersSave(void)
     counters_preferences.end();
     return ok;
 }
+
+// RM-05 (#1189): remote-management high-water mark, key "rm_hwm" in the same "Counters" namespace
+// (never cleared by clear_flash(), see below). Own short-lived handle: begin()/end() inside each
+// call, so it cannot close the counters_preferences handle another path may hold open.
+uint32_t rmHwmLoad(void)
+{
+    Preferences p;
+    if (!p.begin("Counters", true))
+        return 0;
+    uint32_t v = p.getUInt("rm_hwm", 0);
+    p.end();
+    return v;
+}
+
+bool rmHwmSave(uint32_t hwm)
+{
+    Preferences p;
+    if (!p.begin("Counters", false))
+        return false;
+    bool ok = p.putUInt("rm_hwm", hwm) > 0;
+    p.end();
+    return ok;
+}
 #endif // !MC_SAFEBOOT
 
 void init_flash(void)

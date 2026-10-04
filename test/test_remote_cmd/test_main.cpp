@@ -820,6 +820,30 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
     TEST_ASSERT_TRUE(s.lockActive);
 }
 
+// Bench 2026-10-05: the SysOp node parsed RM1 replies as commands, hid them and
+// locked itself out. Replies must be recognised and never treated as commands.
+static void test_reply_is_recognised_and_never_parses_as_a_command(void)
+{
+    TEST_ASSERT_TRUE(rmIsReply("RM1 4 ok v=4.40a up=0 bat=100 heap=126 gw=0 mesh=1 ca54fd46ae80638c"));
+    TEST_ASSERT_TRUE(rmIsReply("RM1 43 err range 0123456789abcdef"));
+    TEST_ASSERT_TRUE(rmIsReply("RM1 0 ok ctr=4 v=4.40a 2488cf9479d2490d"));
+    TEST_ASSERT_FALSE(rmIsReply("RM1 4 status 4939f03c4188e4e3"));
+    TEST_ASSERT_FALSE(rmIsReply("RM1 0 sync ca30595c2d6dbbd6"));
+    TEST_ASSERT_FALSE(rmIsReply("RM1 x ok a"));
+    TEST_ASSERT_FALSE(rmIsReply("RM1  ok a"));
+    TEST_ASSERT_FALSE(rmIsReply("RM2 4 ok a"));
+    TEST_ASSERT_FALSE(rmIsReply("RM1 4 okay 0123456789abcdef"));
+    TEST_ASSERT_FALSE(rmIsReply(nullptr));
+    RmCmd c;
+    // a reply never yields an executable command
+    if (rmParse("RM1 4 ok v=4.40a 0123456789abcdef", c))
+    {
+        RmState s;
+        rmStateInit(s, 0);
+        TEST_ASSERT_NOT_EQUAL(RM_OK, rmCheck(s, c, "DK5EN-90", "DK5EN-1", "secret", 22, 1000));
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -853,6 +877,7 @@ int main(int, char **)
     RUN_TEST(test_reply_shape_and_limits);
     RUN_TEST(test_accept_stores_result_and_truncates);
     RUN_TEST(test_verdict_names);
+    RUN_TEST(test_reply_is_recognised_and_never_parses_as_a_command);
     RUN_TEST(test_millis_wrap_rate_cache_and_lockout);
     return UNITY_END();
 }

@@ -141,6 +141,7 @@ void sendHeartbeat();
 #include <aprs_functions.h>
 #include <batt_functions.h>
 #include <lora_functions.h>
+#include "rm_runtime.h" // RM-05 (#1189): rmInit(), rmDrain()
 #include "txring_functions.h" // BP-02: txRingDepth() declaration
 #include <udp_functions.h>
 #include <web_functions/web_functions.h>
@@ -577,6 +578,10 @@ void nrf52setup()
     msgstoreGlueInit();
     msgstoreSettingsLoad();
 #endif
+
+    // RM-05 (#1189): remote-management state (high-water mark from its own flash file), after the
+    // settings load so node_call/node_passwd are final.
+    rmInit();
 
     // "-0" und "-01" sind nicht die kanonische Schreibweise der SSID. Was aus
     // dem Flash kommt, wird deshalb einmal beim Start geradegezogen -- das
@@ -1448,6 +1453,10 @@ void nrf52loop()
         if(_pendText) sendDisplayText(_msg, _rssi, _snr);
         if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
     }
+
+    // RM-05 (#1189): authenticated remote-management DMs queued by OnRxDone (LORA task); crypto,
+    // execution, flash write and the reply all run here, in the loop task.
+    rmDrain();
 
     // Channel utilization report (every 10s). SL-05: the drain of the
     // ch_util accumulators feeds stat_util_rx_5m/tx_5m for the STAT line

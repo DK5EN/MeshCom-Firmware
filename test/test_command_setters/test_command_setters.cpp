@@ -365,6 +365,81 @@ static void test_stor_rung_schema_row_and_default_match_the_assumptions()
                              "node_stor default is not 0 (SNF-D7: off until the operator approves)");
 }
 
+// ---- --rm (RM-06, issue icssw-org/MeshCom-Firmware#1189) -------------------
+// Same constraint as --stor: the rung lives in command_functions.cpp, which no
+// native env compiles. The first test runs the real matcher on the names
+// involved; the second pins rung, order, schema row and default in the sources.
+
+// "rm" is an exact token: it must not swallow any other command, and no other
+// rung may swallow "rm" / "rm on".
+static void test_rm_does_not_collide_with_other_commands()
+{
+    TEST_ASSERT_TRUE(commandMatches("rm on", "rm "));
+    TEST_ASSERT_TRUE(commandMatches("rm off", "rm "));
+    TEST_ASSERT_TRUE(commandMatches("rm", "rm"));
+    // A space terminates the exact token, so the bare rung DOES match "rm on":
+    // the argument rung must stay above it (pinned against the source below).
+    TEST_ASSERT_TRUE(commandMatches("rm on", "rm"));
+    TEST_ASSERT_FALSE(commandMatches("rm", "rm "));              // bare form is a different rung
+
+    const char *others[] = {"reboot", "rotate 1", "relay on", "reflush", "regex", "regex x",
+                            "rmonitor", "rmon", "rmi", "rm1", "route", "mesh on", "store", "stor on"};
+    for (const char *line : others)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rm "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rm"), line);
+    }
+
+    const char *rungs[] = {"reboot", "rotate ", "relay on", "relay off", "reflush", "regex",
+                           "store", "stor ", "stor", "mesh on", "mesh off"};
+    for (const char *rung : rungs)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("rm on", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("rm", rung), rung);
+    }
+}
+
+static void test_rm_rung_schema_row_and_default_match_the_assumptions()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"rm \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --rm rung in command_functions.cpp");
+    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"rm\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bare != std::string::npos, "bare --rm (show) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(rung < bare, "bare --rm rung is above the argument rung and would shadow --rm on/off");
+
+    // all boards: the rung is NOT inside the ENABLE_MSGSTORE block
+    const size_t guardOpen = cmd.find("#if defined(ENABLE_MSGSTORE)\n    if(commandCheck(msg_text+2, (char*)\"storecall \") == 0)");
+    const size_t guardClose = cmd.find("#endif // ENABLE_MSGSTORE", guardOpen);
+    TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardClose != std::string::npos, "store-node ladder block not found");
+    TEST_ASSERT_TRUE_MESSAGE(rung > guardClose, "--rm rung sits inside the ENABLE_MSGSTORE block (must work on all boards)");
+
+    const std::string body = cmd.substr(rung, 1400);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+5") != std::string::npos, "--rm argument offset is not +5");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 1") != std::string::npos, "--rm on does not set node_rm");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 0") != std::string::npos, "--rm off does not clear node_rm");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--rm rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];%s") != std::string::npos, "--rm rung does not print [RM];on|off");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];warn;no passwd, RM stays inactive") != std::string::npos,
+                             "--rm on with an empty passwd does not warn");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("node_passwd[0] == 0x00") != std::string::npos, "--rm passwd-empty check missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--rm on/off             remote management via LoRa (RM1, needs --passwd)") != std::string::npos,
+                             "--rm help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"...RM: %s ok=%lu rej=%lu\\n\"") != std::string::npos, "--info RM line missing");
+
+    const std::string cfg = read_repo_file("src/config_json.h");
+    const size_t row = cfg.find("X(\"node_rm\"");
+    TEST_ASSERT_TRUE_MESSAGE(row != std::string::npos, "no node_rm schema row");
+    const std::string rowtxt = cfg.substr(row, 100);
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("CFG_INT") != std::string::npos, "node_rm is not CFG_INT");
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("0.0, 1.0") != std::string::npos, "node_rm schema range is not 0..1");
+
+    const std::string set = read_repo_file("src/meshcom_settings.h");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_rm, 0)") != std::string::npos,
+                             "node_rm default is not 0 (RM-06: off until the operator enables it)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -388,5 +463,7 @@ int main(int, char **)
     RUN_TEST(test_ethmtu_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_stor_does_not_collide_with_the_store_family);
     RUN_TEST(test_stor_rung_schema_row_and_default_match_the_assumptions);
+    RUN_TEST(test_rm_does_not_collide_with_other_commands);
+    RUN_TEST(test_rm_rung_schema_row_and_default_match_the_assumptions);
     return UNITY_END();
 }

@@ -56,6 +56,9 @@ struct RmCmd
 // decimal ctr 1..4294967295 (no leading zeros; 0 only with cmd "sync"),
 // lower-case cmd/args, 16 lower-case hex tag. Allowlist is rmCheck()'s job.
 bool rmParse(const char *text, RmCmd &out);
+// True for a REPLY text "RM1 <ctr> ok ..." / "RM1 <ctr> err ..." (never a command: no allowlisted
+// command is named ok/err). The receive hook shows replies to the operator instead of queueing them.
+bool rmIsReply(const char *text);
 
 // K = SHA-256(passwd with trailing spaces stripped); all-zero key for empty.
 void rmDeriveKey(const char *passwd, uint8_t key[32]);

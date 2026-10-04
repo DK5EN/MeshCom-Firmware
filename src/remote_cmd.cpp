@@ -456,3 +456,15 @@ size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *
     outStr(r, rtag);
     return outEnd(r);
 }
+
+bool rmIsReply(const char *text)
+{
+    if (text == nullptr || strncmp(text, "RM1 ", 4) != 0)
+        return false;
+    const char *p = text + 4;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    if (p == text + 4 || *p != ' ')
+        return false;
+    return strncmp(p + 1, "ok ", 3) == 0 || strncmp(p + 1, "err ", 4) == 0;
+}

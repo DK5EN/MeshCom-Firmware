@@ -195,6 +195,74 @@ bool countersSave()
 	return writeFileAtomic(kCountersPath, kCountersTmpPath, buf, (size_t)written);
 }
 
+// RM-05 (#1189): remote-management high-water mark, apart from counters.txt and the settings
+// record (src/counters_store.h). Two slot files, no rename: writeFileAtomic()'s rename onto an
+// existing 2-byte file failed twice on every save on DK5EN-90 (bench 2026-10-05,
+// "rename_failed_twice"), while the in-place write path is reliable. Each save overwrites the slot
+// that holds the SMALLER value, so the other slot always keeps the previous mark; a torn write
+// loses at most the newest mark, and the caller does not execute a command whose mark did not
+// reach flash. Load = max of the two readable slots, 0 when neither is.
+static const char *const kRmHwmSlot[2] = {"/rm_hwm.a", "/rm_hwm.b"};
+
+static bool rmHwmReadSlot(int i, uint32_t &out)
+{
+	File f(InternalFS);
+	if (!f.open(kRmHwmSlot[i], FILE_O_READ))
+	{
+		f.close();
+		return false;
+	}
+	char buf[16] = {0};
+	int got = f.read(buf, sizeof(buf) - 1);
+	f.close();
+	if (got <= 1 || buf[got - 1] != '\n')   // a torn write lacks the trailing LF
+		return false;
+	buf[got - 1] = '\0';
+	char *end = nullptr;
+	unsigned long v = strtoul(buf, &end, 10);
+	if (end == buf || *end != '\0')
+		return false;
+	out = (uint32_t)v;
+	return true;
+}
+
+uint32_t rmHwmLoad()
+{
+	uint32_t a = 0, b = 0;
+	bool ha = rmHwmReadSlot(0, a), hb = rmHwmReadSlot(1, b);
+	if (!ha && !hb)
+		return 0;
+	if (!ha) return b;
+	if (!hb) return a;
+	return a > b ? a : b;
+}
+
+bool rmHwmSave(uint32_t hwm)
+{
+	uint32_t a = 0, b = 0;
+	bool ha = rmHwmReadSlot(0, a), hb = rmHwmReadSlot(1, b);
+	int slot = (!ha) ? 0 : (!hb) ? 1 : (a <= b ? 0 : 1);
+
+	char buf[16];
+	int n = snprintf(buf, sizeof(buf), "%lu\n", (unsigned long)hwm);
+	if (n <= 0 || n >= (int)sizeof(buf))
+		return false;
+
+	InternalFS.remove(kRmHwmSlot[slot]);   // FILE_O_WRITE appends on Adafruit LittleFS
+	File f(InternalFS);
+	if (!f.open(kRmHwmSlot[slot], FILE_O_WRITE))
+	{
+		f.close();
+		return false;
+	}
+	size_t put = f.write((const uint8_t *)buf, (size_t)n);
+	f.flush();
+	f.close();
+
+	uint32_t back = 0;
+	return put == (size_t)n && rmHwmReadSlot(slot, back) && back == hwm;
+}
+
 void flash_int_reset(void);
 
 /**

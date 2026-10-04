@@ -349,6 +349,7 @@ struct CfgField
     X("node_ethmtu",   CFG_INT,  node_ethmtu,           1280.0, 1500.0,     CFG_NOESC)        \
     X("node_tz",       CFG_STR,  node_tz,               CFG_NORANGE,        CFG_NOESC)        \
     X("node_stor",     CFG_INT,  node_stor,             0.0, 1.0,           CFG_NOESC)        \
+    X("node_rm",       CFG_INT,  node_rm,               0.0, 1.0,           CFG_NOESC)        \
     CFG_FIELD_LIST_PLATFORM(X)
 
 /* Platform-only persisted fields.

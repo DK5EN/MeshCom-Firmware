@@ -24,6 +24,7 @@
 #include "ble_json_frame.h"
 #include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
 #include "ble_session.h"       // BLC-03: BleStats, g_bleStats, bleStatsFormat()
+#include "rm_runtime.h"       // RM-06: RmStats, g_rmStats for the --info RM line
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
 #include "configuration.h"
@@ -1173,6 +1174,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
             #endif
             printdeb("--mesh on/off           relay foreign frames\n");
+            printdeb("--rm on/off             remote management via LoRa (RM1, needs --passwd)\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
             printdeb("--relay on/off          board relay output (GPIO)\n");
@@ -4594,6 +4596,52 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // RM-06 (#1189): --rm switches the HMAC-authenticated RM1 remote-management
+    // protocol (docs/concept-open-issues-20261004.md section 6.2 "Enable").
+    // node_rm is an ordinary persisted setting (config_json.h row), default off;
+    // all boards, not behind ENABLE_MSGSTORE. RM1 DMs are only acted on with
+    // node_rm == 1 AND a non-empty node_passwd, so turning it on without a
+    // password still stores the flag but warns. "rm" is also on the RM core's
+    // hard block list, so a remote RM1 command can never reach this rung.
+    // commandCheck() is exact-token ("rm" never matches reboot/rotate/regex/
+    // reflush/relay ..., none of those rungs matches "rm"); the argument rung
+    // ("rm ") must stay above the bare one, because a space ends the token and
+    // the bare rung would also match "rm on".
+    if(commandCheck(msg_text+2, (char*)"rm ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+5);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            meshcom_settings.node_rm = 1;
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            meshcom_settings.node_rm = 0;
+        }
+        else
+        {
+            Serial.printf("[ERR];rm;must be on or off\n");
+
+            return;
+        }
+
+        save_settings();
+        Serial.printf("[RM];%s\n", meshcom_settings.node_rm ? "on" : "off");
+
+        if(meshcom_settings.node_rm && (meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' '))
+            Serial.printf("[RM];warn;no passwd, RM stays inactive\n");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"rm") == 0)
+    {
+        Serial.printf("[RM];%s\n", meshcom_settings.node_rm ? "on" : "off");
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"txpower ") == 0)
     {
         bArgOk = cmdArgInt(msg_text+10, &iVar);
@@ -6358,6 +6406,14 @@ void commandAction(char *umsg_text, bool ble)
             char bleLinkStats[128];
             bleStatsFormat(g_bleStats, bleLinkStats, sizeof bleLinkStats);
             printfdeb("...%s\n", bleLinkStats);
+
+            // RM-06 (#1189): RM1 remote management -- switch plus the reject/accept counters.
+            {
+                const RmStats &rm = g_rmStats;
+                unsigned long rmRej = (unsigned long)rm.rej_format + rm.rej_tag + rm.rej_replay + rm.rej_blocked +
+                                      rm.rej_rate + rm.rej_lockout + rm.rej_disabled;
+                printfdeb("...RM: %s ok=%lu rej=%lu\n", meshcom_settings.node_rm ? "on" : "off", (unsigned long)rm.ok, rmRej);
+            }
 
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,
             // max_hop_pos bleibt der Compile-Default.

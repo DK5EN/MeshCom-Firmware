@@ -198,7 +198,9 @@
     /* POSIX TZ string; empty = fixed node_utcoff (TZ-01). Persisted + exported as "node_tz". */          \
     A(char, node_tz, [40], {0})                                                                          \
     /* SNF-D7 (#1188): 1 = announce the mailbox calls to the server (STOR); default 0 until approved. Persisted. */ \
-    M(int, node_stor, 0)
+    M(int, node_stor, 0)                                                                                 \
+    /* RM-06 (#1189): 1 = act on authenticated RM1 remote-management DMs (needs node_passwd); default 0. Persisted. */ \
+    M(int, node_rm, 0)
 
 /* ESP32-only members (every ESP32 board). */
 #ifdef ESP32

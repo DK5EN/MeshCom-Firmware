@@ -31,7 +31,27 @@
 #ifndef COUNTERS_STORE_H
 #define COUNTERS_STORE_H
 
+#include <stdint.h>
+
 void countersLoad();
 bool countersSave();
+
+/**
+ * RM-05 (#1189): high-water mark of the authenticated remote-management counter (remote_cmd.h).
+ * Same reasoning as node_msgid above, stricter: it is a replay defence, so it must never go DOWN
+ * through a settings restore, a config import (it is not a settings field and never reaches the
+ * config JSON) or a flash wipe of the settings record.
+ *
+ *   ESP32  Preferences namespace "Counters", key "rm_hwm" (UInt). The namespace survives
+ *          clear_flash() on purpose, see esp32_flash.cpp.
+ *   nRF52  /rm_hwm.txt in InternalFS (decimal + LF), temp-then-rename like the other files.
+ *
+ *   rmHwmLoad()     -- stored mark, 0 when absent or unreadable. Called once at boot (rmInit()).
+ *   rmHwmSave(v)    -- writes v, false on a storage failure (the caller prints a marker, runs on
+ *                      and retries with the next accepted command). Loop task only, never from
+ *                      RX context.
+ */
+uint32_t rmHwmLoad();
+bool rmHwmSave(uint32_t hwm);
 
 #endif // COUNTERS_STORE_H
