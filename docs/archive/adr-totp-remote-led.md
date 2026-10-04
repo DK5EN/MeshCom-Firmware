@@ -1,3 +1,5 @@
+> Superseded by [docs/adr-remote-hmac.md](../adr-remote-hmac.md).
+
 # ADR: TOTP-basierte Remote-LED-Steuerung via MeshCom-Textnachricht
 
 **Status:** Proposed
@@ -32,12 +34,13 @@ TOTP:<6-stelliger-code>:<befehl>
 
 **Befehle (Phase 1):**
 
-| Befehl | Wirkung |
-|--------|---------|
+| Befehl | Wirkung              |
+| ------ | -------------------- |
 | `ON`   | GPIO auf HIGH setzen |
-| `OFF`  | GPIO auf LOW setzen |
+| `OFF`  | GPIO auf LOW setzen  |
 
 **Beispiele:**
+
 ```
 TOTP:482913:ON
 TOTP:482913:OFF
@@ -47,10 +50,10 @@ TOTP:482913:OFF
 
 Der Node antwortet dem Absender mit einer **persönlichen Nachricht** (DM):
 
-| Antwort | Bedeutung |
-|---------|-----------|
-| `TOTP ACK ON`  | Befehl erkannt, GPIO eingeschaltet |
-| `TOTP ACK OFF` | Befehl erkannt, GPIO ausgeschaltet |
+| Antwort        | Bedeutung                                               |
+| -------------- | ------------------------------------------------------- |
+| `TOTP ACK ON`  | Befehl erkannt, GPIO eingeschaltet                      |
+| `TOTP ACK OFF` | Befehl erkannt, GPIO ausgeschaltet                      |
 | `TOTP NACK`    | Authentifizierung fehlgeschlagen oder ungültiger Befehl |
 
 ### 4. Nachrichtenempfang
@@ -63,10 +66,10 @@ Der Node antwortet dem Absender mit einer **persönlichen Nachricht** (DM):
 
 Auf der Setup-Seite des Webservers werden zwei neue Felder ergänzt:
 
-| Feld | Typ | Beschreibung | Default |
-|------|-----|-------------|---------|
-| TOTP Secret | Text (Base32, 16 Zeichen) | Shared Secret für TOTP | leer (Feature deaktiviert) |
-| TOTP GPIO Pin | Zahl | GPIO-Pin der geschaltet wird | 35 |
+| Feld          | Typ                       | Beschreibung                 | Default                    |
+| ------------- | ------------------------- | ---------------------------- | -------------------------- |
+| TOTP Secret   | Text (Base32, 16 Zeichen) | Shared Secret für TOTP       | leer (Feature deaktiviert) |
+| TOTP GPIO Pin | Zahl                      | GPIO-Pin der geschaltet wird | 35                         |
 
 - **QR-Code-Pairing**: Die Webseite generiert clientseitig (JavaScript, ~3KB inline) einen QR-Code im `otpauth://totp/MeshCom:<callsign>?secret=<base32>&algorithm=SHA1&digits=6&period=30` Format. Kein Firmware-Overhead — der ESP32 liefert nur die URI, der Browser rendert den QR-Code.
 - **Wenn Secret leer**: Feature ist deaktiviert, keine TOTP-Auswertung
@@ -108,10 +111,12 @@ Textnachricht empfangen (lora_functions.cpp / loop_functions.cpp)
 ```
 
 **Neue Dateien:**
+
 - `src/totp_functions.cpp` — TOTP-Validierung, Command-Handling, GPIO-Steuerung
 - `src/totp_functions.h` — Header
 
 **Bestehende Dateien (minimale Änderungen):**
+
 - `esp32_flash.h` — 2 Felder in Struct
 - `esp32_flash.cpp` — 2× get/put in init_flash()/save_settings()
 - `web_functions.cpp` — UI-Elemente auf Setup-Seite (TOTP-Sektion)
@@ -121,13 +126,13 @@ Textnachricht empfangen (lora_functions.cpp / loop_functions.cpp)
 
 ### 8. Sicherheitsüberlegungen
 
-| Risiko | Mitigation |
-|--------|-----------|
-| Secret im Klartext auf Webseite | Web-Passwort schützt Zugang; Secret nur bei Konfiguration sichtbar |
-| Replay-Angriff (gleicher Code nochmal) | TOTP-Code ist nur 30s gültig; ±1 Fenster ist akzeptabler Kompromiss |
-| Brute-Force (6 Stellen = 1M Kombinationen) | Rate-Limiting: max. 3 Fehlversuche pro 90s, danach 5 Min Sperre |
-| NTP-Drift | ±1 Zeitschritt fängt moderate Drift ab; NTP wird regelmäßig gesynct |
-| MeshCom-Nachrichten sind unverschlüsselt | TOTP-Code ist Einmal-Code — Mitlesen bringt nichts, da er nach 30s verfällt |
+| Risiko                                     | Mitigation                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| Secret im Klartext auf Webseite            | Web-Passwort schützt Zugang; Secret nur bei Konfiguration sichtbar          |
+| Replay-Angriff (gleicher Code nochmal)     | TOTP-Code ist nur 30s gültig; ±1 Fenster ist akzeptabler Kompromiss         |
+| Brute-Force (6 Stellen = 1M Kombinationen) | Rate-Limiting: max. 3 Fehlversuche pro 90s, danach 5 Min Sperre             |
+| NTP-Drift                                  | ±1 Zeitschritt fängt moderate Drift ab; NTP wird regelmäßig gesynct         |
+| MeshCom-Nachrichten sind unverschlüsselt   | TOTP-Code ist Einmal-Code — Mitlesen bringt nichts, da er nach 30s verfällt |
 
 ### 9. Abhängigkeiten
 
@@ -137,14 +142,14 @@ Textnachricht empfangen (lora_functions.cpp / loop_functions.cpp)
 
 ### 10. Aufwandsschätzung (Dateien/Änderungen)
 
-| Bereich | Dateien | Umfang |
-|---------|---------|--------|
-| TOTP-Library einbinden | lib/ | ~3 Dateien (extern) |
-| TOTP Command Handler | src/totp_functions.cpp/h | ~150 Zeilen (neu) |
-| Settings + Flash | esp32_flash.h/cpp | ~10 Zeilen (Erweiterung) |
-| Webserver UI + QR | web_functions.cpp, web_setup.cpp | ~80 Zeilen (Erweiterung) |
+| Bereich                 | Dateien                                    | Umfang                   |
+| ----------------------- | ------------------------------------------ | ------------------------ |
+| TOTP-Library einbinden  | lib/                                       | ~3 Dateien (extern)      |
+| TOTP Command Handler    | src/totp_functions.cpp/h                   | ~150 Zeilen (neu)        |
+| Settings + Flash        | esp32_flash.h/cpp                          | ~10 Zeilen (Erweiterung) |
+| Webserver UI + QR       | web_functions.cpp, web_setup.cpp           | ~80 Zeilen (Erweiterung) |
 | Nachrichtenempfang Hook | loop_functions.cpp oder lora_functions.cpp | ~10 Zeilen (Erweiterung) |
-| Heltec V3 Board-LED | configuration.h | 1 Zeile |
+| Heltec V3 Board-LED     | configuration.h                            | 1 Zeile                  |
 
 ---
 

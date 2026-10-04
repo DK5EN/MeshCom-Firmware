@@ -31,6 +31,7 @@ To set a parameter to the node, use:
 	/setparam/?volt=on|off				If set to on, battery SOC will be displayed as voltage instead of percentage
 	/setparam/?mesh=on|off				Enables mesh / forwarding of received LoRa messages via radio
 	/setparam/?gateway=on|off			Enables the gateway function
+	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --rm; stays inactive while no --passwd is set; read-back is the stored switch)
 	/setparam/?setlat=XX.xxxxxx			Sets the latitude in decimal degrees (D.D°)
 	/setparam/?setlon=XX.xxxxxx			Sets the longitude in decimal degrees (D.D°)
 	/setparam/?setalt=XXX				Sets the altitude (in meters)

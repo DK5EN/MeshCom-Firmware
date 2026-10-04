@@ -44,7 +44,8 @@ bool countersSave();
  *
  *   ESP32  Preferences namespace "Counters", key "rm_hwm" (UInt). The namespace survives
  *          clear_flash() on purpose, see esp32_flash.cpp.
- *   nRF52  /rm_hwm.txt in InternalFS (decimal + LF), temp-then-rename like the other files.
+ *   nRF52  two slot files /rm_hwm.a and /rm_hwm.b (decimal + LF), no rename: each save overwrites the
+ *          slot with the smaller value, load = max (rename onto the file failed on DK5EN-90).
  *
  *   rmHwmLoad()     -- stored mark, 0 when absent or unreadable. Called once at boot (rmInit()).
  *   rmHwmSave(v)    -- writes v, false on a storage failure (the caller prints a marker, runs on

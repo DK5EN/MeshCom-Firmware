@@ -30,6 +30,7 @@
 #include <TinyGPSPlus.h>       // DIST auf der MHeard-Seite -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
 #include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
+#include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #include <url_decode.h>         // #1173: decodeURLPercentCoding() -- full percent-decoding of WebUI parameters
 #include <charset_filter.h>     // #1173: UTF-8-safe cut of the 150-byte web message
 #include "clock.h"              // TZ-01: tzActiveAbbrev() -- flags an unparsable node_tz on the info page
@@ -2906,6 +2907,13 @@ void sub_page_setup()
     _create_setup_switch_element("kissauth", "KISS Auth", "require HMAC auth on port 8001 (uses --passwd)", bKISSAUTH);
     #endif
     _create_setup_switch_element("gateway", "Gateway", "enable gateway", bGATEWAY);   // create Switch-Element inclucing Label and Description
+    // RM-07 (#1189): RM1 remote management (--rm). Never shows node_passwd or a tag: the hint is shown only while
+    // node_passwd is empty (RM stays inactive without it), and the generic setvalue() JS shows/hides it live.
+    {
+        const bool rmNoPasswd = (meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ');
+        _create_setup_switch_element("rm", "Remote management (RM1)", "authenticated remote commands by DM, needs --passwd", meshcom_settings.node_rm == 1,
+                                     rmNoPasswd ? "needs --passwd" : nullptr, rmNoPasswd && meshcom_settings.node_rm == 1);
+    }
 
     web_client.println("</div></div>");
 
@@ -3416,6 +3424,12 @@ void sub_page_info()
     web_client.printf("<tr><td>Settings</td><td>");
     web_client.printf("Gateway: %s<br>", (bGATEWAY ? "on" : "off"));
     web_client.printf("Mesh: %s<br>", (bMESH ? "on" : "off"));
+    { // RM-07 (#1189): label equals the setup switch label (info_switch_lint); counters as in --info, no passwd, no tag
+        const RmStats &rm = g_rmStats;
+        unsigned long rmRej = (unsigned long)rm.rej_format + rm.rej_tag + rm.rej_replay + rm.rej_blocked +
+                              rm.rej_rate + rm.rej_lockout + rm.rej_disabled;
+        web_client.printf("Remote management (RM1): %s (ok=%lu rej=%lu)<br>", (meshcom_settings.node_rm == 1 ? "on" : "off"), (unsigned long)rm.ok, rmRej);
+    }
     web_client.printf("Via: %s<br>", (bVIA ? "on" : "off"));
     web_client.printf("Userbutton: %s<br>", (bButtonCheck ? "on" : "off"));
     #if defined(ANALOG_PIN)

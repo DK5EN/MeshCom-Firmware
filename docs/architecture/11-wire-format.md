@@ -12,6 +12,9 @@ Addendum: §1.8 (the `/X=` position-comment key space) was added 2026-09-11
 against firmware `fork-main` `c6ac16bd` (v4.35t base); the rest of this
 document is unchanged from the 4.35p baseline above.
 
+Addendum 2026-10-05: §1.9 (RM1 command DM) and §2.3 (`:sto` and the store node / `STOR`
+datagram) were added against fork-dev `1cab9347` (firmware 4.40a).
+
 Purpose: precise enough to implement **mock services and test doubles** for
 `mc-chat`, `MCProxy` and `mcmap` — a fake node, a fake gateway, a fake server,
 and a fake BLE peripheral. Machine-readable companion vectors live in
@@ -216,6 +219,8 @@ consumes them in `loop_functions.cpp` and marks them no-retransmission
 | `{MCP}…` / `{mcp}…`        | Remote IO switching (`:2141`): payload carries a 3-digit sequence check derived from the frame's own `msg_id & 0x3FF`, a password checked against `node_passwd`, and `A | B<n> ON/OFF`mapped to`--setout`. |
 | `{ping}` / `{pong}`        | Connectivity test with RSSI/SNR display echo (`:2115`).                                                                                                                 |
 | `:ackNNN` / `:rejNNN`      | Text-level acknowledgement (§1.5).                                                                                                                                      |
+| `RM1 <ctr> <cmd> <tag>`    | Authenticated remote-management command DM to the exact own call (§1.9). Never shown, never stored.                                                                     |
+| `:stoNNN`                  | Store-node custody notice (§2.3.1).                                                                                                                                     |
 
 ### 1.8 Position comment tail: the `/X=` key space
 
@@ -373,6 +378,111 @@ keys each consumer drops, mis-types, or reads at the wrong offset — see
 `docs/archive/aprs-parser-drift-20260911.md` §2 (per-key drift matrix) and §3
 (frame/trailer drift).
 
+### 1.9 RM1 command DM
+
+Authenticated remote management (issue #1189). A normal DM (`0x3A` text frame) to the **exact own
+call** whose text starts with `RM1 `. Decision record: `docs/adr-remote-hmac.md`. Reference
+implementation and vector generator: `tools/remote_cmd.py`; firmware: `src/remote_cmd.{h,cpp}`,
+`src/rm_runtime.cpp`, `src/rm_queue.h`, receive hook `rmTryQueue()` in `src/lora_functions.cpp`.
+
+**Plaintext plus tag.** Command and reply are readable on the air. The tag authenticates, it does
+not encrypt (amateur-radio law).
+
+#### 1.9.1 Grammar
+
+```
+command  RM1 <ctr> <cmd>[ <args>] <tag>
+reply    RM1 <ctr> ok <status> <rtag>
+         RM1 <ctr> err <reason> <rtag>
+```
+
+- `ctr`: decimal 1..4294967295, no leading zeros, strictly greater than the node's persisted
+  high-water mark. `0` is reserved for `sync`.
+- `cmd` at most 15 characters, `args` at most 23, all printable ASCII, **lower case** (only the
+  literal `RM1` is upper case), single spaces, no leading or trailing space.
+- `tag` / `rtag`: 16 lower-case hex characters, the **last** token.
+- `ok`/`err` as the third token identify a reply (`rmIsReply()`); no command is called `ok` or `err`.
+  A reply carries a result text of at most 63 characters.
+- A command that does not parse is dropped without a reply.
+
+#### 1.9.2 Canonical strings and tag
+
+```
+K          = SHA-256(node_passwd with trailing spaces stripped)             32 bytes
+canonical  = "RM1|"  + dst + "|" + src + "|" + ctr + "|" + cmd [+ " " + args]
+tag        = first 8 bytes of HMAC-SHA256(K, canonical), 16 lower-case hex
+reply canonical = "RM1R|" + dst + "|" + src + "|" + ctr + "|" + result      (result = "ok ..." / "err ...")
+reply tag  = same construction over the reply canonical
+```
+
+`dst` is the managed node's full call as configured, `src` is the sender call from the frame
+(both with SSID, upper case). In a reply `dst` and `src` keep their command roles (managed node,
+sender), so the same pair of calls appears in the same order. `node_passwd` is at most 14 characters.
+
+#### 1.9.3 Allowlist
+
+| Command                                      | Arguments                     | Reply status text                                              |
+| -------------------------------------------- | ----------------------------- | -------------------------------------------------------------- |
+| `reboot`                                     | none                          | `rebooting` (the node restarts 8 s after the reply)            |
+| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> gw=<0/1> mesh=<0/1>`       |
+| `sendpos`, `sendtrack`                       | none                          | `sent`                                                         |
+| `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                 | `<name>=<on/off>`                                              |
+| `txpower`                                    | `<n>`, 0 to the board maximum | `txpower=<n>`                                                  |
+| `setout`                                     | `<a0..a7\|b0..b7> <on\|off>`  | `<pin>=<on/off>`; `err not output` if the pin is not an output |
+| `sync`                                       | none, ctr 0                   | `ctr=<hwm> v=<ver>`                                            |
+
+Everything else is rejected, whatever the tag. Hard-blocked: `cleanflash`, `ota-update`, `dfu`,
+`deepsleep`, `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`,
+`updchan`, `autoupdate`, `rm`, `stor`, and any argument containing `--`, `;`, `{` or `%`. Error
+reasons in a reply: `failed` (the setting did not take effect), `not output`, `storage` (the
+high-water mark could not be persisted, the command was **not** executed).
+
+#### 1.9.4 Examples
+
+Test vectors from `tools/tests/remote_cmd_vectors.json` (generated by `tools/remote_cmd.py --gen-vectors`, reproduced by the C++ host test). Password `secret`, managed node `DK5EN-90`,
+sender `DK5EN-1`:
+
+| ctr | cmd + args     | canonical                                  | DM text                                |
+| --- | -------------- | ------------------------------------------ | -------------------------------------- |
+| 1   | `reboot`       | `RM1\|DK5EN-90\|DK5EN-1\|1\|reboot`        | `RM1 1 reboot 18f287b79c551022`        |
+| 0   | `sync`         | `RM1\|DK5EN-90\|DK5EN-1\|0\|sync`          | `RM1 0 sync 4edaf48f44b63f31`          |
+| 43  | `setout a2 on` | `RM1\|DK5EN-90\|DK5EN-1\|43\|setout a2 on` | `RM1 43 setout a2 on b9f9d30f5a4c89ed` |
+| 44  | `txpower 2`    | `RM1\|DK5EN-90\|DK5EN-1\|44\|txpower 2`    | `RM1 44 txpower 2 8f627761e4db39ea`    |
+| 46  | `display off`  | `RM1\|DK5EN-90\|DK5EN-1\|46\|display off`  | `RM1 46 display off 4d0dac9eaf89d168`  |
+
+Key for `secret`: `2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b`. Reply
+vectors (the first two for `DK5EN-90` answering `DK5EN-1` with `secret`; the third with the
+password `secret` followed by trailing spaces, which are stripped before hashing; the last for
+`DK5EN-92` answering `DK5EN-14` with the password `abcdefghijklmn`):
+
+```
+RM1 1 ok rebooting facf04f881d89cde
+RM1 44 err range ade99d27f3001d3c
+RM1 0 ok ctr=42 v=4.40a c639dacb86c267de
+RM1 2 ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1 6ba7ba274709c895
+```
+
+(The `err range` vector exercises the reply grammar; the firmware itself refuses an out-of-range
+`txpower` silently as `blocked`.)
+
+#### 1.9.5 Behaviour a mock or client must know
+
+- **Silent on failure.** A bad tag, a command off the allowlist or a counter at or below the
+  high-water mark gets no reply (no oracle). The node prints `[RM];reject;<verdict>`.
+- **Lost-reply recovery.** The same `ctr` with the same valid tag within 10 min re-sends the cached
+  reply and does not execute again; at most one cached reply per 10 s.
+- **Rate limit.** One accepted command (or `sync`) per 10 s. A rate reject needs a valid tag and
+  does not count toward the lockout.
+- **Lockout.** Three counted rejects (`tag`, `replay`, `blocked`, in-check `format`) within 90 s lock
+  RM1 for 5 min. Reachable without the key, accepted by design (ADR).
+- **Counter.** The mark is persisted before execution. `sync` returns it; the client stores the
+  counter per target.
+- **Accepted only** over LoRa, as a DM to the exact own call, with `--rm on` and a non-empty
+  `node_passwd`; otherwise `RM1 ` is ordinary text. `RM1 ` DMs are never taken into store-node
+  custody (§2.3).
+- The reply is a DM to `src` sent through `sendMessage()`; an operator's node shows it as a
+  normal DM.
+
 ---
 
 ## 2. Server UDP protocol (port 1990)
@@ -513,6 +623,90 @@ trips the check; a 7+ zero-byte run in the middle of an otherwise valid
 datagram passes real firmware. The mock server
 (`tools/mock/meshcom_server.py`) deliberately implements the stricter
 any-run reading — stricter than firmware is safe for a test double.
+
+### 2.3 :sto and the store node / STOR datagram
+
+A store node (`--store own|list|heard`, boards built with `ENABLE_MSGSTORE`: ESP32-S3 and
+RAK4631) holds DMs for stations it cannot reach right now and delivers them when the destination is
+heard directly. Two wire elements belong to it: the `:sto` custody notice (LoRa text frame, with a
+server upload on gateways) and the `STOR` datagram (gateway to server). Design:
+`docs/snf-gateway-concept-20261002.md`, `docs/concept-open-issues-20261004.md` section 7.
+
+#### 2.3.1 The `:sto` custody notice
+
+When the store node takes a DM into custody it tells the original sender with an ordinary text
+frame. Payload, built by `stoNoticeBuild()` (`src/sto_notice.cpp`) as `"%-9.9s:sto%03u %s"`:
+
+```
+<sender call, space padded to exactly 9>:sto<NNN> <held destination call>
+DK5EN-93 :sto017 DK5EN-14
+```
+
+`NNN` is the 3-digit counter of the held DM (the `{NNN` of the original), the trailing call is the
+held destination in readable form for old firmware. No `{`, no `:ack`, no `:rej`: old firmware shows
+it as a short DM and nothing acks or stores it. The tag sits at byte 9 like the `:ack` payload (§1.5);
+`stoNoticeParse()` anchors there and rejects payloads containing `{`, `:ack` or `:rej`.
+
+Frame as `glueNotify()` (`src/msgstore_glue.cpp`) builds it: type `:`, source call and source path
+the store node's own call, destination call and path the original sender, `msg_id` from `millis()`,
+queued once into the TX ring (kind "other", not a relay slot). The notice has no `{NNN` of its own
+and is not retried by the TX ring; the mailbox's own ladder decides when it is sent again.
+
+**Server upload (SNF-GW-05).** On a gateway with an IP address (`bGATEWAY` and
+`node_hasIPaddress`) the same frame is also sent to the server as a `DATA` datagram with rssi 0 and
+snr 0 (§2.1, "own transmission"), and registered as own TX (`insertOwnTx`, `addLoraRxBuffer`) so the
+server's reflection of it is not taken for a new foreign frame. The LoRa copy is kept. Bench:
+`:sto124` uploaded to the mock server on UDP 1990.
+
+**Server to store node.** A PM that the server delivers as `GATE` to a gateway store node for a call
+not equal to its own exact call goes through the same store decision as a frame heard on LoRa
+(`mboxClassify`, `src/msgstore_hook.h`). A server-side `:ackNNN` for a held PM purges the slot. An
+`RM1 ` DM is never stored.
+
+The sender keeps a 16-slot holder table (`stoHolderNote()`), one state update per (holder, NNN) per
+hour, so a messages page can show `held by <call>`.
+
+#### 2.3.2 The `STOR` datagram
+
+A gateway-to-server datagram that announces which calls this node holds a mailbox for. Same header
+as `KEEP` (§2.1), NUL-terminated, one chunk per UDP datagram:
+
+```
+"STOR" + %08X gateway_id + %-9.9s gateway call + %-4.4s version + %-1.1s sub
+       + <hold_h> + ";" + <seq> + "/" + <total> + ";" + CALL1 + ";" + CALL2 + ";" ... + 0x00
+
+STOR48A4690DDK5EN-90 4.40a24;1/1;DK5EN-1;DK5EN-92;DK5EN-98;      (bench, DK5EN-90, 3 calls)
+STOR48A4690DDK5EN-90 4.40a24;1/1;                                (empty set: withdraws everything)
+```
+
+| Field        | Meaning                                                 |
+| ------------ | ------------------------------------------------------- |
+| `gateway_id` | node id of the store node, as in `KEEP`/`DATA`          |
+| `hold_h`     | `--storetime` in hours (0..999); how long custody lasts |
+| `seq/total`  | chunk counter, 1-based                                  |
+| `CALLn`      | the announce set, each call followed by `;`             |
+
+- **Announce set (SNF-D6).** Store set (calls the active `--store` mode accepts) intersected with the
+  calls heard **directly on LoRa within 12 h** (neighbour matrix, `NBR_WINDOW_MIN`). The exact own
+  call (call and SSID) is never announced, it is delivered directly; the own base call with another
+  SSID is announced when heard. Sorted by `strcmp`, de-duplicated; at most 64 calls (the 64
+  `strcmp`-smallest are kept). A call longer than 9 characters, empty, or containing `;` is dropped,
+  never truncated (a truncated call would name another station).
+- **Chunking.** A datagram stays at or below 255 bytes including the NUL. The plan reserves the worst
+  case header (3-digit `hold_h`, 2-digit `seq` and `total`, 36 bytes), leaving 218 bytes of calls
+  per chunk, so every chunk of a snapshot is planned the same way (about 20 calls per datagram).
+- **Snapshot semantics.** Every send is a full snapshot, not a delta. An empty set is one chunk with
+  no calls. A snapshot that is not refreshed for 3 periods (45 min) expires on the server side;
+  disabling the feature sends no withdrawal.
+- **Timer (`storTick()`, `src/udp_functions.cpp`).** Evaluated with every `KEEP` (30 s) on a
+  gateway: first send, then every 15 min, and once when the set changed and stayed stable for 60 s.
+  A further change restarts the 60 s debounce. Marker `[STOR];tx;calls;<n>;chunks;<k>`.
+- **Off by default.** `--stor on|off` (`node_stor`, default 0), only effective on a gateway and only
+  on `ENABLE_MSGSTORE` builds. **The server operator has not approved the datagram:** nothing may be
+  sent to the real server until they do. Bench traffic goes to `tools/mock`, which parses `STOR`,
+  assembles chunks and expires a snapshot after 45 min. `stor` is not on the RM1 allowlist.
+- **Expected server behaviour (not implemented anywhere yet).** A PM for a listed call is sent to
+  this gateway in addition to whatever the server does today, never instead of it.
 
 ---
 
