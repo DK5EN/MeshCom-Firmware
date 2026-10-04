@@ -2736,7 +2736,7 @@ bool doTX()
 
         // For out-of-order reads: clear slot data length so getNextTxSlot skips it
         // and advance iRead past any empty leading slots
-        #if not defined BOARD_RAK4630
+        #if !defined(BOARD_RAK4630) && !defined(BOARD_T5_EPAPER)   // every use sits under #ifndef BOARD_T5_EPAPER
         int iReadBeforeAdvance = iRead; // saved for startTransmit failure rollback
         #endif
 

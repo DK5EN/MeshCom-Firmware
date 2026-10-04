@@ -36,7 +36,9 @@ from identity_guard import IdentityError, require  # noqa: E402
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"   # DK5EN-90
 BAUD = 115200
-CRASH = r"HardFault|assert|Backtrace|\[BOOT\] RESETREAS=0x0000000[28]"   # 0x2 watchdog, 0x8 lockup
+# Word-bounded: a received frame once read "...Wasserturm Ismaning..." and the bare
+# "assert" token flagged it as a crash (2026-10-04). 0x2 watchdog, 0x8 lockup.
+CRASH = r"\bHardFault\b|\bassert(ion)?\b|\bBacktrace\b|\[BOOT\] RESETREAS=0x0000000[28]"
 SEP = r"[; ]"
 PHASES = [
     ("start_client", r"\[INIT\] START CLIENT"),

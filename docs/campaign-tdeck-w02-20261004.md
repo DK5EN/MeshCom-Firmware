@@ -94,3 +94,18 @@ DK5EN-98 (running until 2026-10-05 11:17); mark them in that evaluation.
   repeat after ~1000 own messages per boot (same ambiguity as own_msg_id); the RAK instrument
   image is built once in the gate because stage 3 builds the RAK with `INSTRUMENT_ENABLED=1`
   and the new `-Wall -Wextra` on `nrf52_base` must hold there too.
+- Follow-up 2026-10-04 ~16:10 (operator: "fix the T5 findings blind, and EXT-01"): the four
+  `ui.cpp` defects fixed after the t-deck-pro twin, `BOARD_LORA_IRQ` mapped to `LORA_DIO1` (the
+  DIO1 safety net is now active on the T5), `flushDeferredDisplayUpdates()` and
+  `iReadBeforeAdvance` guarded like their uses, `t5_epaper` builds with `-Werror`: five of five.
+  EXT-01: argument-less `--extudpip` clears the field; checked over the T-Deck net console.
+  Controls heltec V3, RAK, T-Beam, T-Deck Plus (instrument) SUCCESS. The bench USB hub dropped
+  off the Mac during this step (no USB device enumerated, RAK unreachable); the T-Deck was
+  reached over WiFi instead.
+- Hub replugged 16:14, full `tools/regression.sh --stage all -- --extudp --soak-seconds 120` on
+  the tree: stage 1/2 green (1677 cases, 555 pytest), stage 3 19/20 (RAK harness, extudp soak
+  with the fixed restore, T-Beam 8 steps, T-Deck harness 22 scenarios incl. `map_rebuild`, OTA
+  and badge on both, mesh exchange 6/6). The one red step was a harness false positive: the
+  RAK `boot` scenario's crash regex matched `assert` inside "Wasserturm" in a received beacon;
+  word-bounded with a test. RAK then DFU-flashed with the tree (instrument image, build
+  16:44:49): EXT-01 confirmed on nRF52 too, RAK harness 5/5. Ready to commit.

@@ -3507,7 +3507,8 @@
   "build_src_flags": [
    "-Wall -Wextra",
    "-Wformat=2",
-   "-Wno-missing-field-initializers"
+   "-Wno-missing-field-initializers",
+   "-Werror"
   ],
   "framework": [
    "arduino"

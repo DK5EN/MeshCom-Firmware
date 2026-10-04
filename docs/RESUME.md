@@ -96,8 +96,9 @@ Hard bench rules:
 - T-Deck campaign (`docs/campaign-tdeck-w02-20261004.md`): both waves done on 2026-10-04 (TD-15
   map restore + hemisphere fix, TD-09 tile cache, TD-11 ACK glyph, W0.2 warning flags on the five
   envs and on `nrf52_base`), nothing offered upstream yet: one German PR for TD-09/TD-11/TD-15
-  and one for W0.2 are the next step. T5-01 (four real defects in `src/t5-epaper/ui.cpp`, no
-  hardware) and EXT-01 (`--extudpip` without argument) await a decision.
+  and one for W0.2 + T5-01 + EXT-01 are the next step. All three bench nodes run instrument images of
+  this tree since 2026-10-04 16:45 (RAK DFU, T-Beam and T-Deck OTA); `--stage all` green apart
+  from a fixed harness false positive.
 - N-36 (softAP on a fresh ESP32) is fixed on `fork-dev`; the upstream PR text is drafted
   (`docs/pr-draft-n36-20261003.md`), not filed.
 - RX-01: the SX127x T-Beam missed a direct beacon during its `RX_TIMEOUT` receive restart (one
@@ -118,7 +119,8 @@ Hard bench rules:
   selftest), TM-43 Extern-UDP soak on the RAK run for the first time, the regression open-points
   paper closed and archived (`docs/archive/regression-offene-punkte-20261003.md`).
   Evening: T-Deck campaign wave 2 (TD-11 ACK glyph in the bubble, W0.2 flags on five envs +
-  nrf52_base, `msg_ack` harness scenario, T5-01 filed).
+  nrf52_base, `msg_ack` harness scenario), then T5-01 and EXT-01 fixed blind (five of five envs
+  with `-Werror`).
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix

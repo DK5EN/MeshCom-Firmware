@@ -53,6 +53,9 @@ Timeout timerSerial;
 #endif //ARDUINO_ARCH_ESP32
 
 // Kompatibilitaets-Macro: DIO1-Pin hat je nach Board verschiedene Namen
+#if defined(BOARD_T5_EPAPER)
+  #include <t5-epaper/utilities.h>   // T5-01: BOARD_LORA_IRQ is the SX1262 DIO1 (pin defines only)
+#endif
 #ifndef LORA_DIO1
   #if defined(E22_DIO1)
     #define LORA_DIO1 E22_DIO1
@@ -62,6 +65,8 @@ Timeout timerSerial;
     #define LORA_DIO1 RADIO_IRQ_PIN
   #elif defined(PIN_LORA_DIO_1)
     #define LORA_DIO1 PIN_LORA_DIO_1
+  #elif defined(BOARD_LORA_IRQ)
+    #define LORA_DIO1 BOARD_LORA_IRQ
   #else
     #warning "LORA_DIO1 not defined -- safety net digitalRead() disabled"
   #endif
@@ -2120,6 +2125,8 @@ uint16_t esp32_ble_mtu()
 // is needed -- OnRxDone runs inside esp32loop() on ESP32, so producer and
 // consumer are one task. Factored so both
 // the local-radio loop and the external-radio path flush pending RX displays.
+// the T5 drives its e-paper from its own task; the only other caller is the external-radio drain
+#if !defined(BOARD_T5_EPAPER) || defined(EXTERNAL_RADIO)
 static void flushDeferredDisplayUpdates()
 {
     bool _pendText = bPendingDisplayText;
@@ -2138,6 +2145,7 @@ static void flushDeferredDisplayUpdates()
     if(_pendText) sendDisplayText(_msg, _rssi, _snr);
     if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
 }
+#endif
 
 void esp32loop()
 {
