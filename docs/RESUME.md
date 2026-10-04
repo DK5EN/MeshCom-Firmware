@@ -30,7 +30,7 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1670 Unity cases today) plus `test/golden/selftest.sh`.
+- Stage 1: every `[env:native*]` (48 envs, 1677 Unity cases today) plus `test/golden/selftest.sh`.
 - Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (553 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
@@ -101,8 +101,6 @@ Hard bench rules:
   (`docs/pr-draft-n36-20261003.md`), not filed.
 - RX-01: the SX127x T-Beam missed a direct beacon during its `RX_TIMEOUT` receive restart (one
   observation, run 9); measure over a soak before touching upstream's defer logic.
-- DR-16: drift-matrix verdict vs the code comment near `bTeleFirst` in `src/nrf52/nrf52_main.cpp`;
-  the one row that keeps `--phase implementation` in `selftest.sh`.
 - `--mesh off` still transmits on two RF paths (gateway DM-ACK, DM-store custody); operator
   decision pending.
 - GPS: altitude Kalman re-seed length and baro fusion tau (both measured, neither changed).
@@ -115,6 +113,9 @@ Hard bench rules:
   passive Extern-UDP sniffer on mcapp, evaluate 2026-10-05 after 11:17); T-Deck campaign wave 1:
   TD-15 map restore after reboot, TD-09 PSRAM tile cache, MEM-04 re-measured and closed, W0.2
   warning inventory; three new harness scenarios (`map_rebuild`, `map_persist_seed/check`).
+  Afternoon: DR-16 re-decided (both-valid, `test_drift_dr16_gates`, `--phase` gone from the
+  selftest), TM-43 Extern-UDP soak on the RAK run for the first time, the regression open-points
+  paper closed and archived (`docs/archive/regression-offene-punkte-20261003.md`).
 - **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
   inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
 - **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix

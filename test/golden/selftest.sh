@@ -124,17 +124,11 @@ run python3 test/golden/twin_diff.py --self-test
 run python3 test/golden/twin_diff.py --check test/golden/native/u1-esp32.txt test/golden/native/u1-nrf52.txt test/golden/native/u1-twin-diff-before.txt
 run python3 test/golden/twin_diff.py --check test/golden/native/u2-esp32.txt test/golden/native/u2-nrf52.txt test/golden/native/u2-twin-diff-before.txt
 run python3 test/golden/drift_matrix_lint.py --self-test
-# --phase implementation is TEMPORARY. The M2 review happened on 2026-09-12 and
-# filled all 29 verdicts, so the empty-verdict check is now enforced HARD and
-# --phase pre-review is obsolete. What this phase still downgrades is the
-# asserting_test column. Test-suite inventory 2026-10-03: exactly ONE row is
-# left without a test, DR-16 (nRF52 bAllStarted/extra_hey_time gating, decided
-# nrf52-changes, deliberately not ported -- see src/nrf52/nrf52_main.cpp near
-# bTeleFirst). DR-03 now names test_gateway_service_twin. Drop the flag -- run
-# this line with no --phase at all -- once DR-16 has its test or is re-decided.
-# A phase flag left in place after its window has passed is how a requirement
-# quietly expires, which is why the script prints the count on every run.
-run python3 test/golden/drift_matrix_lint.py --phase implementation
+# No --phase: the M2 review (2026-09-12) filled all verdicts, and the last row
+# without an asserting_test, DR-16, was re-decided on 2026-10-04 as both-valid
+# (bTeleFirst ported, bAllStarted/extra_hey_time an ESP32-only gate -- see
+# src/nrf52/nrf52_main.cpp near bTeleFirst). Every check is enforced hard.
+run python3 test/golden/drift_matrix_lint.py
 # The W3 upgrade proof's instrument. Not a golden gate -- it is pointed at real
 # hardware by a human after the nRF52 cutover, comparing a fresh config export
 # against the baselines in docs/bench/w3-baseline/ that were captured while the

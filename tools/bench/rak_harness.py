@@ -455,6 +455,17 @@ def _wait_shot_floor(s: RakSession, idx: int) -> bool:
     return any(re.search(POS_SUPPRESSED, l) for l in s.lines_since(idx))
 
 
+def _restore_ip_arg(ext_ip: Optional[str]) -> str:
+    """Argument for `--extudpip` that puts the node back into the state --info
+    showed before the scenario. An empty field (the normal cleared state: --info
+    prints "EXT IP" with nothing after it) and the literal "none" both mean
+    "cleared", and the only command that clears is `--extudpip none`. Sending an
+    empty argument instead made the firmware copy stale buffer bytes into
+    node_extern (seen 2026-10-04 on DK5EN-90: EXT IP "5 t=219029")."""
+    v = (ext_ip or "").strip()
+    return "none" if v in ("", "none") else v
+
+
 def scenario_extudp(s: RakSession, args: argparse.Namespace) -> Dict[str, Any]:
     """TM-43: EXTUDP send + receive + rejection + liveness + soak, on hardware.
 
@@ -815,7 +826,7 @@ def scenario_extudp(s: RakSession, args: argparse.Namespace) -> Dict[str, Any]:
         # ---- restore exactly the state the node was found in ----------
         restore: Dict[str, Any] = {}
         try:
-            s.send(f"--extudpip {pre['ext_ip'] if pre.get('ext_ip') not in (None, 'none') else 'none'}")
+            s.send(f"--extudpip {_restore_ip_arg(pre.get('ext_ip'))}")
             s.pump(1.0)
             s.send("--extudp on" if pre.get("extudp") else "--extudp off")
             s.pump(1.0)
