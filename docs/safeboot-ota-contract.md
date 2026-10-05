@@ -88,7 +88,9 @@ against this document in parallel. Change it here first, then everywhere.
   "image_valid": false,
   "app_valid": false,
   "fallback_in_ms": -1,
-  "uptime_ms": 98000
+  "uptime_ms": 98000,
+  "heap_free": 98304,
+  "heap_block": 61440
 }
 ```
 
@@ -108,6 +110,8 @@ against this document in parallel. Change it here first, then everywhere.
   re-checked after every abort). False after an aborted upload has written into the single app
   slot: the node then stays in safeboot until a full upload succeeds. It becomes true again after a
   successful upload (state `done`) and is re-checked when the partition switch is applied.
+- `heap_free`, `heap_block`: free heap and largest free block in bytes, diagnostics only (bench: proves
+  the 44 KB inflate block of a `.bin.zz` upload is released again); may be absent on older Safeboot.
 - `fallback_in_ms`: remaining time of the 180 s fallback-to-app window; `-1` while an upload is
   in progress (the window is suspended, the stall watchdog applies instead) and `-1` while
   `app_valid` is false (no fallback possible). `done` means the

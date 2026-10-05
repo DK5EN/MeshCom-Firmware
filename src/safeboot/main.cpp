@@ -847,11 +847,13 @@ void wifiConnect() {
      int off = 0;
      off = appendf(g_json_buf, sizeof(g_json_buf), off,
        "{\"state\":\"%s\",\"reason\":\"%s\",\"generation\":%lu,\"received\":%lu,\"total\":%lu,"
-       "\"image_valid\":%s,\"app_valid\":%s,\"fallback_in_ms\":%ld,\"uptime_ms\":%lu}",
+       "\"image_valid\":%s,\"app_valid\":%s,\"fallback_in_ms\":%ld,\"uptime_ms\":%lu,"
+       "\"heap_free\":%lu,\"heap_block\":%lu}",
        safeboot::OtaSession::stateName(st.state), safeboot::OtaSession::reasonName(st.reason),
        (unsigned long)st.generation, (unsigned long)st.received, (unsigned long)st.total,
        st.image_valid ? "true" : "false", st.app_valid ? "true" : "false",
-       (long)st.fallback_in_ms, (unsigned long)millis());
+       (long)st.fallback_in_ms, (unsigned long)millis(),
+       (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getMaxAllocHeap());
 
      AsyncWebServerResponse *response = request->beginResponse(200, "application/json", g_json_buf);
      response->addHeader("Cache-Control", "no-store");

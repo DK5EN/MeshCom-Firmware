@@ -440,7 +440,7 @@ def scenario_kill50(target: str, sess: "otr.SerialSession", fw: Path, args: argp
     fallback window otherwise (see `assert_abort_and_recover`)."""
     assertions: list[Assertion] = []
     t0 = time.time()
-    md5 = hashlib.md5(fw.read_bytes()).hexdigest()
+    md5 = webflash.inspect_firmware(fw.read_bytes(), fw.name)[0]
 
     safe_get(get, f"http://{target}/callfunction/?otaupdate", 10.0)
     up = wait_safeboot_up(target, get, args.safeboot_poll_s)
@@ -475,7 +475,7 @@ def scenario_stall(target: str, sess: "otr.SerialSession", fw: Path, args: argpa
     like kill50 (see `assert_abort_and_recover`)."""
     assertions: list[Assertion] = []
     t0 = time.time()
-    md5 = hashlib.md5(fw.read_bytes()).hexdigest()
+    md5 = webflash.inspect_firmware(fw.read_bytes(), fw.name)[0]
 
     safe_get(get, f"http://{target}/callfunction/?otaupdate", 10.0)
     up = wait_safeboot_up(target, get, args.safeboot_poll_s)
@@ -510,7 +510,7 @@ def scenario_doublestart(target: str, sess: "otr.SerialSession", fw: Path, args:
     second session must then succeed like the control scenario."""
     assertions: list[Assertion] = []
     t0 = time.time()
-    md5 = hashlib.md5(fw.read_bytes()).hexdigest()
+    md5 = webflash.inspect_firmware(fw.read_bytes(), fw.name)[0]
 
     safe_get(get, f"http://{target}/callfunction/?otaupdate", 10.0)
     up = wait_safeboot_up(target, get, args.safeboot_poll_s)
@@ -585,7 +585,7 @@ def scenario_cancel(target: str, sess: "otr.SerialSession", fw: Path, args: argp
     upload on the same session must succeed."""
     assertions: list[Assertion] = []
     t0 = time.time()
-    md5 = hashlib.md5(fw.read_bytes()).hexdigest()
+    md5 = webflash.inspect_firmware(fw.read_bytes(), fw.name)[0]
 
     # -- Part A: cancel with nothing running -------------------------------
     safe_get(get, f"http://{target}/callfunction/?otaupdate", 10.0)
