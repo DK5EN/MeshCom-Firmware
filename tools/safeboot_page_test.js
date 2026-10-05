@@ -297,6 +297,13 @@ const STATE_ABORTED_APP_VALID = {
     check('app_valid true again: cancel button re-enabled', q(win, 'cancelButton').disabled === false);
     check('app_valid true again: tooltip cleared', q(win, 'cancelButton').title === '');
 
+    // New Updater-derived abort reasons render their own sentence.
+    for (const [r, txt] of [['not_bootable', 'not bootable'], ['activate_failed', 'activate'], ['update_error', 'finalisation']]) {
+      win.__safeboot.renderState(Object.assign({}, STATE_ABORTED_APP_VALID, { reason: r }));
+      const t = q(win, 'stateReason').textContent;
+      check('reason ' + r + ': own sentence', t.includes(txt) && t.includes('(' + r + ')'), t);
+    }
+
     // Older node: /ota/state has no app_valid field at all -> today's behaviour.
     win.__safeboot.renderState(STATE_ABORTED);
     check('app_valid missing: notice stays hidden', q(win, 'appInvalidNotice').hidden === true);

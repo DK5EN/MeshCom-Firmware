@@ -190,6 +190,90 @@ static void test_md5_mismatch_aborts_without_switch(void) {
     TEST_ASSERT_EQUAL(1, countIn(actions, OtaSession::ActionType::Abort, OtaSession::Reason::Md5Mismatch));
 }
 
+// A node whose ota_0 was invalidated by an earlier aborted attempt starts
+// the upload with app_valid false. A successful upload must flip it back, so
+// the "image incomplete" notice does not stay next to "Update installed".
+static void test_successful_upload_makes_app_valid(void) {
+    OtaSession s;
+    s.begin(0);
+    s.setAppValid(false);
+    TEST_ASSERT_FALSE(s.state().app_valid);
+
+    s.onStart(1000, 100);
+    s.onChunk(1010, 100);
+    s.onFinalReceived(1020);
+    s.onVerified(1030, true);
+
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Done, st.state);
+    TEST_ASSERT_TRUE(st.image_valid);
+    TEST_ASSERT_TRUE(st.app_valid);
+}
+
+// Update.end() failure reasons other than the MD5 check (Defect 1): each
+// aborts without a partition switch and carries its own contract string.
+static void abortWithReason(OtaSession& s, OtaSession::Reason reason) {
+    s.begin(0);
+    s.onStart(1000, 100);
+    s.onChunk(1010, 100);
+    s.onFinalReceived(1020);
+    s.onVerified(1030, false, reason);
+}
+
+static void test_not_bootable_aborts_without_switch(void) {
+    OtaSession s;
+    abortWithReason(s, OtaSession::Reason::NotBootable);
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Aborted, st.state);
+    TEST_ASSERT_EQUAL(OtaSession::Reason::NotBootable, st.reason);
+    TEST_ASSERT_EQUAL_STRING("not_bootable", OtaSession::reasonName(st.reason));
+    TEST_ASSERT_FALSE(st.image_valid);
+    ActionList actions = drainActions(s);
+    TEST_ASSERT_EQUAL(0, countIn(actions, OtaSession::ActionType::SwitchPartition, OtaSession::Reason::None));
+    TEST_ASSERT_EQUAL(1, countIn(actions, OtaSession::ActionType::Abort, OtaSession::Reason::NotBootable));
+}
+
+static void test_activate_failed_aborts_without_switch(void) {
+    OtaSession s;
+    abortWithReason(s, OtaSession::Reason::ActivateFailed);
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Aborted, st.state);
+    TEST_ASSERT_EQUAL(OtaSession::Reason::ActivateFailed, st.reason);
+    TEST_ASSERT_EQUAL_STRING("activate_failed", OtaSession::reasonName(st.reason));
+    TEST_ASSERT_FALSE(st.image_valid);
+    ActionList actions = drainActions(s);
+    TEST_ASSERT_EQUAL(0, countIn(actions, OtaSession::ActionType::SwitchPartition, OtaSession::Reason::None));
+    TEST_ASSERT_EQUAL(1, countIn(actions, OtaSession::ActionType::Abort, OtaSession::Reason::ActivateFailed));
+}
+
+static void test_update_error_aborts_without_switch(void) {
+    OtaSession s;
+    abortWithReason(s, OtaSession::Reason::UpdateError);
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Aborted, st.state);
+    TEST_ASSERT_EQUAL(OtaSession::Reason::UpdateError, st.reason);
+    TEST_ASSERT_EQUAL_STRING("update_error", OtaSession::reasonName(st.reason));
+    TEST_ASSERT_FALSE(st.image_valid);
+    ActionList actions = drainActions(s);
+    TEST_ASSERT_EQUAL(0, countIn(actions, OtaSession::ActionType::SwitchPartition, OtaSession::Reason::None));
+    TEST_ASSERT_EQUAL(1, countIn(actions, OtaSession::ActionType::Abort, OtaSession::Reason::UpdateError));
+}
+
+static void test_update_error_reason_names(void) {
+    TEST_ASSERT_EQUAL_STRING("not_bootable", OtaSession::reasonName(OtaSession::Reason::NotBootable));
+    TEST_ASSERT_EQUAL_STRING("activate_failed", OtaSession::reasonName(OtaSession::Reason::ActivateFailed));
+    TEST_ASSERT_EQUAL_STRING("update_error", OtaSession::reasonName(OtaSession::Reason::UpdateError));
+}
+
+static void test_from_updater_error_mapping(void) {
+    TEST_ASSERT_EQUAL(OtaSession::Reason::Md5Mismatch, OtaSession::fromUpdaterError(7));
+    TEST_ASSERT_EQUAL(OtaSession::Reason::NotBootable, OtaSession::fromUpdaterError(3));
+    TEST_ASSERT_EQUAL(OtaSession::Reason::ActivateFailed, OtaSession::fromUpdaterError(9));
+    TEST_ASSERT_EQUAL(OtaSession::Reason::UpdateError, OtaSession::fromUpdaterError(0));
+    TEST_ASSERT_EQUAL(OtaSession::Reason::UpdateError, OtaSession::fromUpdaterError(1));
+    TEST_ASSERT_EQUAL(OtaSession::Reason::UpdateError, OtaSession::fromUpdaterError(12));
+}
+
 // ---------------------------------------------------------------------
 // 7. Incomplete upload: final frame never arrived.
 // ---------------------------------------------------------------------
@@ -778,6 +862,12 @@ int main(int, char**) {
     RUN_TEST(test_stale_generation_disconnect_is_ignored);
     RUN_TEST(test_disconnect_after_done_does_not_retract_verdict);
     RUN_TEST(test_md5_mismatch_aborts_without_switch);
+    RUN_TEST(test_successful_upload_makes_app_valid);
+    RUN_TEST(test_not_bootable_aborts_without_switch);
+    RUN_TEST(test_activate_failed_aborts_without_switch);
+    RUN_TEST(test_update_error_aborts_without_switch);
+    RUN_TEST(test_update_error_reason_names);
+    RUN_TEST(test_from_updater_error_mapping);
     RUN_TEST(test_incomplete_upload_reason_contract_string);
     RUN_TEST(test_millis_wraparound_does_not_false_abort);
     RUN_TEST(test_reversed_order_tick_before_stored_chunk_does_not_abort);

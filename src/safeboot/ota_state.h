@@ -63,6 +63,9 @@ public:
         Timeout,
         Cancel,
         ApplyFailed,
+        NotBootable,
+        ActivateFailed,
+        UpdateError,
     };
 
     enum class ActionType : uint8_t {
@@ -208,10 +211,12 @@ public:
     // in the real firmware). `ok` true -> Done, image_valid true, exactly
     // one SWITCH_PARTITION action queued (the only place that action is
     // ever produced), plus a reboot-to-app request for the now-verified
-    // image. `ok` false -> Aborted with `fail_reason` (the caller decides
-    // between md5_mismatch and incomplete_upload; both are valid contract
-    // reasons and this class does not need to tell them apart). No-op
-    // outside Receiving/Verifying.
+    // image; app_valid becomes true (a complete image was just written and
+    // verified) and the fallback window re-arms. `ok` false -> Aborted with
+    // `fail_reason` (the caller maps the Updater error to md5_mismatch,
+    // not_bootable, activate_failed, update_error or incomplete_upload; this
+    // class does not need to tell them apart). No-op outside
+    // Receiving/Verifying.
     void onVerified(uint32_t now, bool ok, Reason fail_reason = Reason::Md5Mismatch) {
         now_ = now;
         if (state_ == State::Receiving || state_ == State::Verifying) {
@@ -219,6 +224,7 @@ public:
                 state_ = State::Done;
                 reason_ = Reason::None;
                 image_valid_ = true;
+                app_valid_ = true;
                 pushAction(ActionType::SwitchPartition, Reason::None);
                 pushAction(ActionType::RebootToApp, Reason::None);
                 fallback_armed_ms_ = now;
@@ -277,8 +283,9 @@ public:
     // onVerified/etc -- most recently ran), regardless of when it last
     // elapsed while suspended. onVerified(ok=true) is unaffected by this
     // flag either way: a complete upload always proceeds to Done +
-    // SwitchPartition, and the caller re-checks the image and calls
-    // setAppValid(true) afterwards.
+    // SwitchPartition, and sets app_valid itself. The caller re-checks the
+    // image after draining SwitchPartition and may demote it again with
+    // setAppValid(false).
     void setAppValid(bool v) {
         app_valid_ = v;
         if (v) {
@@ -334,6 +341,18 @@ public:
         return "unknown";
     }
 
+    // Arduino Updater error code (UPDATE_ERROR_*) left by a failed
+    // Update.end(true) -> contract abort reason. Numeric codes mirror Update.h;
+    // ElegantOTA.cpp static_asserts them against the macros.
+    static Reason fromUpdaterError(uint8_t err) {
+        switch (err) {
+            case 7: return Reason::Md5Mismatch;     // UPDATE_ERROR_MD5
+            case 3: return Reason::NotBootable;     // UPDATE_ERROR_READ
+            case 9: return Reason::ActivateFailed;  // UPDATE_ERROR_ACTIVATE
+            default: return Reason::UpdateError;
+        }
+    }
+
     static const char* reasonName(Reason r) {
         switch (r) {
             case Reason::None: return "";
@@ -347,6 +366,9 @@ public:
             case Reason::Timeout: return "timeout";
             case Reason::Cancel: return "cancel";
             case Reason::ApplyFailed: return "apply_failed";
+            case Reason::NotBootable: return "not_bootable";
+            case Reason::ActivateFailed: return "activate_failed";
+            case Reason::UpdateError: return "update_error";
         }
         return "unknown";
     }

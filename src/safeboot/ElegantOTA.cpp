@@ -8,6 +8,12 @@
 extern safeboot::OtaSession g_ota;
 extern portMUX_TYPE g_ota_mux;
 
+// Maps the Updater error left behind by a failed Update.end() to the contract
+// abort reason, so a field report can tell a transfer problem (md5_mismatch)
+// from an image problem (not_bootable / activate_failed).
+static_assert(UPDATE_ERROR_MD5 == 7 && UPDATE_ERROR_READ == 3 && UPDATE_ERROR_ACTIVATE == 9,
+              "OtaSession::fromUpdaterError codes must mirror Update.h");
+
 ElegantOTAClass::ElegantOTAClass(){}
 
 void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username, const char * password){
@@ -379,6 +385,8 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           portEXIT_CRITICAL(&g_ota_mux);
 
             if (!Update.end(true)) { //true to set the size to the current progress
+                // Capture the error code before printError() or anything else touches it.
+                const safeboot::OtaSession::Reason fail_reason = safeboot::OtaSession::fromUpdaterError(Update.getError());
                 // Save error to string
                 StreamString str;
                 Update.printError(str);
@@ -386,7 +394,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
                 _update_error_str.concat("\n");
                 Serial.println(_update_error_str.c_str());
                 portENTER_CRITICAL(&g_ota_mux);
-                g_ota.onVerified(millis(), false, safeboot::OtaSession::Reason::Md5Mismatch);
+                g_ota.onVerified(millis(), false, fail_reason);
                 portEXIT_CRITICAL(&g_ota_mux);
             } else {
                 // TM-49: end(true) succeeded -- length and the client-supplied

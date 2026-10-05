@@ -98,11 +98,14 @@ against this document in parallel. Change it here first, then everywhere.
   reason `apply_failed`.
 - `reason`: empty in `idle`/`receiving`/`done`; on `aborted` one of `stale_session`,
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
-  `begin_failed`; `verifying` is the window between the last chunk and the `Update.end()` verdict.
+  `not_bootable` (Updater could not enable/boot-check the written image), `activate_failed`
+  (the boot partition switch rejected the image), `update_error` (any other `Update.end()`
+  failure), `begin_failed`; `verifying` is the window between the last chunk and the `Update.end()` verdict.
 - `received`/`total`: bytes of the current or last session; `total` 0 when unknown.
 - `app_valid`: true when the app partition holds a complete, verified image (checked at boot and
   re-checked after every abort). False after an aborted upload has written into the single app
-  slot: the node then stays in safeboot until a full upload succeeds.
+  slot: the node then stays in safeboot until a full upload succeeds. It becomes true again after a
+  successful upload (state `done`) and is re-checked when the partition switch is applied.
 - `fallback_in_ms`: remaining time of the 180 s fallback-to-app window; `-1` while an upload is
   in progress (the window is suspended, the stall watchdog applies instead) and `-1` while
   `app_valid` is false (no fallback possible). `done` means the

@@ -1030,6 +1030,9 @@ void wifiConnect() {
 
        case safeboot::OtaSession::ActionType::SwitchPartition:
          setBootPartition_APP();
+         // onVerified(ok) already set app_valid; re-check so the flag
+         // reflects the real image (demotes to false if the switch failed).
+         refreshAppValid();
          break;
 
        case safeboot::OtaSession::ActionType::RebootToApp:
