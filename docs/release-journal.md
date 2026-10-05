@@ -1,11 +1,50 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20260929`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261005`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.05 (Montag, 2026-10-05)
+
+`fork-dev` auf dem offiziellen `v4.40a` plus die fuenf Features fuer die offenen upstream-Issues
+#1187-#1191 und die Backlog-Wellen seit `v4.40a.10.02`. Anders als 10.02 ist dieser Build NICHT
+byte-gleich mit upstream. `FLASH_VERSION` 20261005, `FLASH_STRUCT_VERSION` 20260724 unveraendert --
+die Einstellungen bleiben erhalten. Neues Safeboot-Image (Staged-Apply, MTU); es kommt nur per
+Web-Flasher oder USB auf den Knoten, OTA schreibt nur `ota_0`.
+
+Inhalt: Auto Update (#1187, ESP32, aus; komprimierte `.bin.zz`-Assets, fuenf GitHub-Wurzeln,
+Safeboot entpackt mit dem ROM-tinfl, klassischer ESP32 pausiert BLE fuer TLS, altes Safeboot wird
+nach einer Uebergabe erkannt), S&F fuer PNs vom Server und `--stor` (#1188, STOR aus bis zur
+Freigabe durch den Server-Betreiber), RM1-Fernsteuerung per LoRa mit HMAC (#1189, aus), MTU auf
+allen Boards mit Default 1280 (#1190), BLE-Reconnect-Haertung (#1191). Dazu TZ-Regeln, RTC in UTC,
+Web-Haken, EXTUDP-Abwehr von Broadcast/Multicast, T-Deck-Kartenmarker und Kachel-Cache, softAP auf
+frischen Knoten. Konzept: `docs/concept-open-issues-20261004.md`.
+
+Dieses Release ist zugleich der Test des Dev-Kanals von Auto Update gegen das eigene Repository.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Host: 1977 Testfaelle in 60 Umgebungen gruen, Golden-Selftest 48 Kommandos, 764 pytest-Faelle.
+- Bauen: 32 Release-Umgebungen mit `MC_BUILD_TAG=v4.40a.10.05`.
+- DK5EN-1 (Heltec V3): MTU in App und Safeboot, BLE 50+20 Zyklen, RM in beide Richtungen, Auto Update
+  Ende-zu-Ende ueber das Bank-LAN (Staging, Safeboot entpackt 1,72 MB in 10,3 s, neue Version bootet),
+  GitHub-Check auf beiden Kanaelen, Web-GUI.
+- DK5EN-90 (RAK4631): BLE 50+20 Zyklen, Store-Knoten und STOR gegen den Mock-Server, RM inkl.
+  Zaehler ueber Neustart und Replay-Abwehr.
+- DK5EN-92 (T-Beam v1.2): Auto-Update-Check mit BLE-Pause, danach BLE-Verbindungen 3/3.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der Download eines echten GitHub-Releases bis zur Installation (wird mit diesem Release selbst geprueft).
+- Die Erkennung eines alten Safeboot wurde auf DK5EN-92 geprueft (Staging + Uebergabe an das alte 4.40a-Safeboot, App meldet `safeboot;old`).
+- STOR gegen den echten Server, Messungen M1-M4.
+- MTU im AP-Pfad, im klassischen Safeboot und auf T-ETH.
+- Alle Boards ausser den drei oben genannten (gebaut, nicht gebencht).
 
 ---
 
