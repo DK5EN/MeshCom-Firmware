@@ -1,11 +1,51 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261005`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261006`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.06 (Montag, 2026-10-05, datiert 2026-10-06)
+
+`v4.40a.10.05` plus die Web-GUI fuer drei der neuen Features. `FLASH_VERSION` 20261006,
+`FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot
+unveraendert gegenueber 10.05, das Release geht also per OTA und per Auto Update (Dev-Kanal) auf
+Knoten, die schon das Safeboot von 10.05 haben.
+
+Inhalt: Firmware-Update-Karte mit einer Auswahl off/prod/dev (prod/dev installieren automatisch,
+`notify` bleibt Konsole), MTU-Karte 1280/1400/1500/eigener Wert mit MSS-Anzeige, Karte
+Fernsteuerung mit Status dieses Knotens und Sendefeld fuer einen anderen Knoten (`POST /rmsend`,
+`GET /rmstatus`, Passwort nie geloggt oder gespeichert, Antworten per HMAC geprueft, auch ueber den
+Server). Konsolenbefehl `--rm` heisst jetzt `--remotemgmt`; `node_rm` und der Web-Schluessel `rm`
+bleiben. Kopfzeile "Meshcom 4.40a". Absolute Fristen in beiden Web-Body-Lesern gegen langsam
+tropfende Clients.
+
+Warum 10.06 statt 10.05.2: der Versionsvergleich von Auto Update kennt nur `v<VER>.MM.DD`. Ein
+`.2`-Tag waere fuer Auto Update unsichtbar, auch fuer alle Knoten mit 10.05. Same-day-Releases
+werden deshalb auf den Folgetag datiert, solange der Parser kein Suffix kennt.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Host: 1983 Testfaelle in 60 Umgebungen gruen, Golden-Selftest, pytest- und Tool-Suiten.
+- Bauen: 32 Release-Umgebungen mit `MC_BUILD_TAG=v4.40a.10.06`.
+- DK5EN-1 (Heltec V3): Web-Karten Auto Update (Auswahl und Rueckmeldung), MTU, Kopfzeile;
+  Sendefeld Fernsteuerung an DK5EN-90 ueber LoRa: status, sync, display off, display on mit
+  gepruefter Antwort (8 gesendet, 7 beantwortet, ein verlorener Rahmen, Wiederholung beantwortet);
+  Web-Schalter `rm` laeuft ueber `--remotemgmt`.
+- DK5EN-90 (RAK4631): `--remotemgmt on|off` und Hilfezeile an der Konsole; Befehle ausgefuehrt,
+  Zaehler und Befehlslog in `/rmstatus`.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Abweisung eines falschen Passworts auf der Bank (der Zaehler ging beim Neuflashen verloren;
+  durch Unit-Tests abgedeckt).
+- Auto Update von 10.05 auf 10.06 ueber GitHub (folgt nach der Veroeffentlichung auf einem Knoten
+  mit Dev-Kanal).
+- Alle Boards ausser Heltec V3 und RAK4631 fuer die neuen Web-Karten.
 
 ---
 
