@@ -35,7 +35,9 @@ werden deshalb auf den Folgetag datiert, solange der Parser kein Suffix kennt.
 - DK5EN-1 (Heltec V3): Web-Karten Auto Update (Auswahl und Rueckmeldung), MTU, Kopfzeile;
   Sendefeld Fernsteuerung an DK5EN-90 ueber LoRa: status, sync, display off, display on mit
   gepruefter Antwort (8 gesendet, 7 beantwortet, ein verlorener Rahmen, Wiederholung beantwortet);
-  Web-Schalter `rm` laeuft ueber `--remotemgmt`.
+  Web-Schalter `rm` laeuft ueber `--remotemgmt`. Nach der Veroeffentlichung: Auto Update Dev-Kanal
+  fand 10.06, Download von GitHub 1,11 MB in 10,8 s, Safeboot entpackte 1,74 MB in 10,6 s, Knoten
+  bootet `tag=v4.40a.10.06`.
 - DK5EN-90 (RAK4631): `--remotemgmt on|off` und Hilfezeile an der Konsole; Befehle ausgefuehrt,
   Zaehler und Befehlslog in `/rmstatus`.
 
@@ -43,8 +45,6 @@ werden deshalb auf den Folgetag datiert, solange der Parser kein Suffix kennt.
 
 - Abweisung eines falschen Passworts auf der Bank (der Zaehler ging beim Neuflashen verloren;
   durch Unit-Tests abgedeckt).
-- Auto Update von 10.05 auf 10.06 ueber GitHub (folgt nach der Veroeffentlichung auf einem Knoten
-  mit Dev-Kanal).
 - Alle Boards ausser Heltec V3 und RAK4631 fuer die neuen Web-Karten.
 
 ---

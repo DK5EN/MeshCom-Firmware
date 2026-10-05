@@ -1,6 +1,18 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-05, branch `fork-dev`, last release `v4.40a.10.05` (Auto Update dev-channel test passed).
+**Stand:** 2026-10-05, branch `fork-dev`, last release `v4.40a.10.06` (dated 10-06, published 10-05).
+
+## 2026-10-05 -- web GUI for #1187/#1189/#1190, release v4.40a.10.06
+
+- Shipped (fork-dev `e1801d9f`, `839e952b`): Auto Update as one web selector off/prod/dev, MTU card,
+  remote-management card + send panel (`POST /rmsend`, `GET /rmstatus`), header "Meshcom 4.40a";
+  console `--rm` renamed to `--remotemgmt` (`node_rm` and web key `rm` unchanged).
+- Release `v4.40a.10.06` from `573b6444`: 66 assets, flasher keep 1 (10.05 pruned, 30/30 verified),
+  Safeboot unchanged from 10.05. Dated ahead because the AU tag parser rejects a `.2` suffix: never cut
+  a same-day `.N` release while AU exists; date it the next day instead.
+- AU dev channel on DK5EN-1: check found 10.06, GitHub download 1.11 MB in 10.8 s, Safeboot apply
+  1.74 MB in 10.6 s, boots `tag=v4.40a.10.06`.
+- Bench nodes: DK5EN-1 runs v4.40a.10.06 (updchan dev); DK5EN-90 runs the 839e952b dev build, RM off.
 
 ## 2026-10-05 -- campaign #1187-#1191 done, release v4.40a.10.05
 
