@@ -52,6 +52,7 @@
 #ifdef ESP32
 #include "esp32/esp32_functions.h"
 #include "esp32/esp32_sleep.h"
+#include "esp32/fw_update_net.h" // AU-05 (#1187): fwNetStart/fwNetGetStatus for --update, --info AU line
 #endif
 
 #if defined(NRF52_SERIES)
@@ -1157,7 +1158,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n");
+            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
@@ -4681,6 +4682,10 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
         Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
+        // WiFi STA is started at boot only (esp32_main.cpp gate); AU on a node without
+        // any other network service needs one reboot to bring WiFi up.
+        if(meshcom_settings.node_autoupd > 0 && WiFi.status() != WL_CONNECTED)
+            Serial.printf("[AU];note;WiFi not up -- reboot to start it for auto update\n");
 
         return;
     }
@@ -4720,6 +4725,85 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"updchan") == 0)
     {
         Serial.printf("[AU];chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+
+        return;
+    }
+    // AU-05 (#1187): run the update steps now. "update " (argument form) is an exact
+    // prefix, so it never matches "updchan" / "autoupdate" and vice versa. Not on the RM
+    // allowlist. All three answer at once; the network job runs in the background, the
+    // result is read with --update status.
+    else
+    if(commandCheck(msg_text+2, (char*)"update ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
+
+        FwNetStatus _au;
+        fwNetGetStatus(_au);
+        const bool _auBusy = (_au.state == FWS_BUSY);
+        const bool _auNewer = _au.availNewer && _au.availTag[0] != '\0';
+
+        if(casecmp(_owner_c, (char*)"check") == 0)
+        {
+            if(_auBusy || !fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
+                Serial.printf("[ERR];update;check not started (busy or no WiFi)\n");
+            else
+                Serial.printf("[AU];check;started;chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+        }
+        else if(casecmp(_owner_c, (char*)"install") == 0)
+        {
+            if(_auBusy)
+            {
+                Serial.printf("[ERR];update;busy\n");
+            }
+            else if(_au.staged && _au.availTag[0] != '\0' && strcmp(_au.stagedTag, _au.availTag) == 0)
+            {
+                // before the availNewer test: staging records the tag as installed, so the
+                // next CHECK reports "not newer" and this case would otherwise be unreachable
+                Serial.printf("[AU];install;already_staged;%s\n", _au.stagedTag);
+            }
+            else if(_auNewer && !_au.installable)
+            {
+                // newer release without a matching .bin.zz asset and digest: nothing to download
+                Serial.printf("[AU];install;no_asset;%s\n", _au.availTag);
+            }
+            else if(_auNewer)
+            {
+                if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
+                    Serial.printf("[AU];install;started;%s;handover;%s\n", _au.availTag, meshcom_settings.node_autoupd == 2 ? "in_window" : "needs_mode_auto");
+                else
+                    Serial.printf("[ERR];update;install not started (busy or no WiFi)\n");
+            }
+            else
+            {
+                // nothing known to be newer yet: check first, the user retries when it is done
+                if(fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
+                    Serial.printf("[AU];install;check_first;retry_when_done\n");
+                else
+                    Serial.printf("[ERR];update;check not started (busy or no WiFi)\n");
+            }
+        }
+        else if(casecmp(_owner_c, (char*)"status") == 0)
+        {
+            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s\n",
+                meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
+                meshcom_settings.node_updchan ? "dev" : "prod",
+                _au.availTag[0] ? _au.availTag : "none",
+                _au.availNewer ? 1 : 0,
+                (_au.staged && _au.stagedTag[0]) ? _au.stagedTag : "none",
+                _auBusy ? 1 : 0,
+                _au.lastErr[0] ? _au.lastErr : "none");
+        }
+        else
+        {
+            Serial.printf("[ERR];update;must be check, install or status\n");
+        }
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"update") == 0)
+    {
+        Serial.printf("[ERR];update;must be check, install or status\n");
 
         return;
     }
@@ -6509,6 +6593,13 @@ void commandAction(char *umsg_text, bool ble)
             #define MC_BUILD_TAG ""
             #endif
             printfdeb("...AU env=%s tag=%s\n", MC_ENV_NAME, MC_BUILD_TAG[0] ? MC_BUILD_TAG : "(local)");
+            {
+                // AU-05: what the last check found and what is staged for the Safeboot apply
+                FwNetStatus _auInfo;
+                fwNetGetStatus(_auInfo);
+                printfdeb("...AU avail=%s staged=%s\n", _auInfo.availTag[0] ? _auInfo.availTag : "none",
+                    (_auInfo.staged && _auInfo.stagedTag[0]) ? _auInfo.stagedTag : "none");
+            }
             #endif
 
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,

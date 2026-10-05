@@ -33,6 +33,8 @@ SPIClass ethSPI(FSPI);
 
 #include "esp32_pmu.h"
 #include "esp32_flash.h"
+#include "fw_update.h"       // AU-05 (#1187): update policy (fwTick and friends)
+#include "fw_update_net.h"   // AU-05: CHECK / DOWNLOAD worker (own task)
 #include <esp_adc_cal.h>
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -2024,7 +2026,8 @@ void esp32setup()
 
     ///////////////////////////////////////////////////////
     // WIFI
-    if(bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE)
+    // AU-05 (#1187): the firmware auto update needs the STA link on its own, independent of the gateway flag
+    if(bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE || meshcom_settings.node_autoupd > 0)
     {
         bAllStarted=false;
 
@@ -2161,6 +2164,152 @@ static void flushDeferredDisplayUpdates()
     if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
 }
 #endif
+
+// ---------------------------------------------------------------------------
+// AU-05 (#1187): firmware auto update, loop side. Once per second, from esp32loop().
+// The decisions live in src/fw_update.h (fwTick, fwAttemptAllowed ...); the network
+// work (CHECK, DOWNLOAD) runs in its own task behind src/esp32/fw_update_net.h. This
+// function only feeds the policy and starts jobs. W3 (Safeboot apply) is not wired
+// yet: FW_HANDOVER only logs.
+// ---------------------------------------------------------------------------
+static FwTimer s_auTimer;
+static bool s_auTimerInit = false;
+static uint32_t s_auLastTickMs = 0;
+static uint32_t s_auNextTryMs = 0;      // back-off after fwNetStart() refused (busy / no link)
+static bool s_auBackoff = false;
+static bool s_auSawBusy = false;        // a job was observed running and its result is not consumed yet
+static char s_auNotifiedTag[24] = "";   // [AU];notify printed for this tag
+static char s_auHandoverTag[24] = "";   // [AU];handover printed for this tag
+
+static bool auTagSame(const char *a, const char *b)
+{
+    return strncmp(a, b, 23) == 0;
+}
+
+// 30 s pause after fwNetStart() said no, so a refused start is not retried every second.
+// Wrap-safe: the flag is cleared when the deadline is reached (1 Hz caller).
+static bool auBackedOff(uint32_t now)
+{
+    if(s_auBackoff && (int32_t)(now - s_auNextTryMs) >= 0)
+        s_auBackoff = false;
+    return s_auBackoff;
+}
+static void auBackOff(uint32_t now)
+{
+    s_auNextTryMs = now + 30000u;
+    s_auBackoff = true;
+}
+
+static void auTick(void)
+{
+    const uint32_t now = millis();
+    if((uint32_t)(now - s_auLastTickMs) < 1000u)
+        return;
+    s_auLastTickMs = now;
+
+    // WiFi STA with an address (the Ethernet path is not an AU transport)
+    const bool wifiUp = (WiFi.status() == WL_CONNECTED) && ((uint32_t)WiFi.localIP() != 0u);
+
+    if(wifiUp && !s_auTimerInit)
+    {
+        fwTimerInit(s_auTimer, now, (uint32_t)ESP.getEfuseMac());
+        s_auTimerInit = true;
+    }
+    if(!s_auTimerInit)
+        return;
+
+    FwPolicyIn in;
+    in.mode = (uint8_t)(meshcom_settings.node_autoupd < 0 ? 0 : (meshcom_settings.node_autoupd > 2 ? 2 : meshcom_settings.node_autoupd));
+    in.wifiUp = wifiUp;
+    // TLS needs a real clock: NTP (bNTPDateTimeValid is cleared every 5 min while a phone is
+    // ready, which AU skips anyway) or a clock that GPS / RTC / NTP has set since boot.
+    in.timeValid = bNTPDateTimeValid ||
+                   (meshcom_settings.node_date_year > 2023 &&
+                    (memcmp(cTimeSource, "GPS", 3) == 0 || memcmp(cTimeSource, "RTC", 3) == 0 || memcmp(cTimeSource, "NTP", 3) == 0));
+    in.phoneConnected = (isPhoneReady == 1);
+    // global_batt is the filtered pack voltage in mV; "no reading" = 0 mV = mains / USB. The same
+    // fail-safe as the /B= tag: battHardwarePresent() is false without a battery reading.
+    in.onBattery = battHardwarePresent();
+    in.battMv = (uint16_t)(global_batt <= 0.0f ? 0.0f : (global_batt > 65000.0f ? 65000.0f : global_batt));
+    // Node time is UTC + node_utcoff; with a TZ-01 rule node_utcoff is re-derived from it, so this
+    // is the rule's local time (UTC without a rule and offset 0).
+    {
+        int h = meshcom_settings.node_date_hour, m = meshcom_settings.node_date_minute;
+        in.localMinuteOfDay = (uint16_t)((h < 0 || h > 23 || m < 0 || m > 59) ? 0 : h * 60 + m);
+    }
+    const bool battOk = !in.onBattery || in.battMv >= FW_BATT_FLOOR_MV;   // AU-D17
+
+    FwNetStatus st;
+    fwNetGetStatus(st);
+
+    // ---- consume the result of a finished job (also one started by --update) ----
+    if(st.state == FWS_BUSY)
+        s_auSawBusy = true;
+    else if(s_auSawBusy && (st.state == FWS_DONE_OK || st.state == FWS_DONE_FAIL))
+    {
+        s_auSawBusy = false;
+        if(st.job == FWJ_DOWNLOAD && st.state == FWS_DONE_FAIL)
+            fwAttemptFailed(s_auTimer, st.availTag, now);
+        if(st.job == FWJ_CHECK && st.state == FWS_DONE_OK && st.availNewer && in.mode == 1 &&
+           !auTagSame(s_auNotifiedTag, st.availTag))
+        {
+            snprintf(s_auNotifiedTag, sizeof(s_auNotifiedTag), "%s", st.availTag);
+            // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
+            Serial.printf("[AU];notify;%s\n", st.availTag);
+        }
+    }
+    if(st.state == FWS_BUSY)
+        return;
+
+    FwAction act = fwTick(s_auTimer, in, fwNetStagedPending(), now);
+
+    if(act == FW_HANDOVER)
+    {
+        // Safeboot apply is W3. Until then: no reboot, log once per staged tag.
+        char tag[24];
+        if(st.staged && st.stagedTag[0])
+            snprintf(tag, sizeof(tag), "%s", st.stagedTag);
+        else
+        {
+            FwStageRecord rec;
+            tag[0] = '\0';
+            if(fwNetLoadRecord(rec))
+                snprintf(tag, sizeof(tag), "%s", rec.tag);
+        }
+        if(!auTagSame(s_auHandoverTag, tag))
+        {
+            snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", tag);
+            Serial.printf("[AU];handover;deferred_w3;%s\n", tag);
+        }
+        return;
+    }
+
+    if(act == FW_CHECK && !auBackedOff(now))
+    {
+        if(fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
+        {
+            fwCheckDone(s_auTimer, now);
+            s_auSawBusy = true;
+        }
+        else
+            auBackOff(now);
+        return;
+    }
+
+    // mode 2: a CHECK found a newer, installable release (matching .bin.zz asset and digest) that is
+    // not staged yet -> DOWNLOAD (AU-D17: battery floor). A release without the asset must not
+    // consume the 3 attempts of AU-D5. Mode 1 never gets here: it only prints the notify line.
+    if(in.mode == 2 && st.availNewer && st.installable && st.availTag[0] && wifiUp && in.timeValid && !in.phoneConnected && battOk &&
+       !(st.staged && auTagSame(st.stagedTag, st.availTag)) &&
+       !auBackedOff(now) &&
+       fwAttemptAllowed(s_auTimer, st.availTag, now))
+    {
+        if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
+            s_auSawBusy = true;
+        else
+            auBackOff(now);
+    }
+}
 
 void esp32loop()
 {
@@ -3183,6 +3332,9 @@ void esp32loop()
         #endif
     }
     #endif
+
+    // AU-05 (#1187): firmware auto update tick (self-gated to once per second)
+    auTick();
 
     // check WiFI connected with Ping every 30 sec
     if(meshcom_settings.node_netmode == 0 && (uint32_t)(millis() - wifi_active_timer) >= 30000)

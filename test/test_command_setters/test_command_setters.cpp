@@ -566,6 +566,177 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
                              "node_updchan default is not 0 (AU-D2: prod)");
 }
 
+// ---- --update check/install/status (AU-05, issue icssw-org/MeshCom-Firmware#1187) --
+// Same ESP32 block as --autoupdate / --updchan, after the --updchan rungs.
+
+static void test_update_does_not_collide_with_other_commands()
+{
+    TEST_ASSERT_TRUE(commandMatches("update check", "update "));
+    TEST_ASSERT_TRUE(commandMatches("update install", "update "));
+    TEST_ASSERT_TRUE(commandMatches("update status", "update "));
+    TEST_ASSERT_TRUE(commandMatches("update", "update"));
+    // a space ends the exact token, so the bare rung also matches "update status":
+    // the argument rung must stay above it (pinned against the source below)
+    TEST_ASSERT_TRUE(commandMatches("update status", "update"));
+    TEST_ASSERT_FALSE(commandMatches("update", "update "));
+
+    // exact-token: neither the neighbouring AU commands nor look-alikes reach the update rungs
+    const char *others[] = {"updchan", "updchan dev", "autoupdate", "autoupdate auto", "updates", "updatex",
+                            "ota-update", "upd", "updchannel", "setname x", "rm on", "reboot"};
+    for (const char *line : others)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "update "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "update"), line);
+    }
+
+    // and the update rungs do not swallow the earlier AU rungs
+    const char *rungs[] = {"autoupdate ", "autoupdate", "updchan ", "updchan"};
+    for (const char *rung : rungs)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("update check", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("update", rung), rung);
+    }
+}
+
+static void test_update_rungs_sit_in_the_esp32_block_with_the_expected_output()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    const size_t bareCh = cmd.find("commandCheck(msg_text+2, (char*)\"updchan\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bareCh != std::string::npos, "bare --updchan rung missing");
+    const size_t rungUp = cmd.find("commandCheck(msg_text+2, (char*)\"update \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rungUp != std::string::npos, "no --update rung in command_functions.cpp");
+    const size_t bareUp = cmd.find("commandCheck(msg_text+2, (char*)\"update\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bareUp != std::string::npos, "bare --update (usage) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(rungUp < bareUp, "bare --update rung is above the argument rung and would shadow --update <verb>");
+    TEST_ASSERT_TRUE_MESSAGE(rungUp > bareCh, "--update rung is not behind the --updchan rungs (same ESP32 block)");
+
+    // same closed ESP32 block as --autoupdate: opens after --rm, closes behind the bare --update rung,
+    // no nested preprocessor line in between, and the chain continues with the txpower rung
+    const size_t rungAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
+    TEST_ASSERT_TRUE(rungAu != std::string::npos);
+    const size_t guardOpen = cmd.rfind("#if defined(ESP32)", rungAu);
+    const size_t guardClose = cmd.find("#endif", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardClose != std::string::npos && guardClose > bareUp,
+                             "the --update rungs are outside the --autoupdate ESP32 block");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#if defined(ESP32)", guardOpen + 1) > guardClose,
+                             "--update rungs are not in the one closed ESP32 block");
+    const size_t instr = cmd.find("\n#if INSTRUMENT_ENABLED", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose,
+                             "--update rungs sit inside the INSTRUMENT_ENABLED block (must be a field command)");
+    const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
+    TEST_ASSERT_TRUE_MESSAGE(after != std::string::npos && after - guardClose < 40, "ladder chain after the ESP32 block is broken");
+
+    const std::string body = cmd.substr(rungUp, bareUp - rungUp);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+9") != std::string::npos, "--update argument offset is not +9");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("\"check\"") != std::string::npos && body.find("\"install\"") != std::string::npos &&
+                                 body.find("\"status\"") != std::string::npos,
+                             "--update verbs check/install/status missing");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetStart(FWJ_CHECK") != std::string::npos, "--update check does not start a CHECK");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetStart(FWJ_DOWNLOAD") != std::string::npos, "--update install does not start a DOWNLOAD");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetGetStatus(") != std::string::npos, "--update does not read the net status");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];check;started") != std::string::npos, "--update check output line missing");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];install;") != std::string::npos, "--update install output line missing");
+    // AU-05 rework: already_staged is decided BEFORE availNewer (staging makes the next CHECK say
+    // "not newer"), and a newer release without a .zz asset/digest never starts a job
+    const size_t posStaged = body.find("[AU];install;already_staged;");
+    const size_t posNoAsset = body.find("[AU];install;no_asset;");
+    const size_t posStart = body.find("fwNetStart(FWJ_DOWNLOAD");
+    TEST_ASSERT_TRUE_MESSAGE(posStaged != std::string::npos, "--update install: already_staged line missing");
+    TEST_ASSERT_TRUE_MESSAGE(posNoAsset != std::string::npos, "--update install: no_asset line missing");
+    TEST_ASSERT_TRUE_MESSAGE(posStaged < posNoAsset && posNoAsset < posStart,
+                             "--update install order must be already_staged, no_asset, then the DOWNLOAD start");
+    {
+        const size_t stagedTest = body.find("_au.staged &&");
+        const size_t newerTest = body.find("else if(_auNewer");
+        TEST_ASSERT_TRUE_MESSAGE(stagedTest != std::string::npos && newerTest != std::string::npos && stagedTest < newerTest,
+                                 "--update install tests staged AFTER availNewer (already_staged unreachable)");
+        const std::string stagedCond = body.substr(stagedTest, body.find("\n", stagedTest) - stagedTest);   // the condition line only
+        TEST_ASSERT_TRUE_MESSAGE(stagedCond.find("_auNewer") == std::string::npos && stagedCond.find("availNewer") == std::string::npos,
+                                 "already_staged must not depend on availNewer");
+        TEST_ASSERT_TRUE_MESSAGE(body.find("_auNewer && !_au.installable") != std::string::npos,
+                                 "--update install does not refuse a release that is not installable");
+    }
+    TEST_ASSERT_TRUE_MESSAGE(body.find("check_first;retry_when_done") != std::string::npos,
+                             "--update install without a known newer release does not check first");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s") != std::string::npos,
+                             "--update status line format changed");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[ERR];update;") != std::string::npos, "--update has no error line");
+    // none of the verbs writes a setting
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") == std::string::npos, "--update must not persist anything");
+
+    // help line and the extra --info line, both inside an ESP32 guard
+    const size_t help = cmd.find("--update check/install/status  firmware update now (ESP32)");
+    TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--update help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", help) > cmd.rfind("#endif", help), "--update help line is not inside an ESP32 guard");
+    const size_t info = cmd.find("\"...AU avail=%s staged=%s\\n\"");
+    TEST_ASSERT_TRUE_MESSAGE(info != std::string::npos, "--info AU avail/staged line missing");
+    // the guard opens at the AU: line (12-space indent); the nested #ifndef/#endif pairs for
+    // MC_ENV_NAME / MC_BUILD_TAG sit at the same indent, so look for the guard's own closer
+    // (an #endif whose #if is the ESP32 one) by checking that no #endif follows the last
+    // "#if defined(ESP32)" before the next "#endif" that is not paired with an #ifndef
+    const size_t infoGuard = cmd.rfind("#if defined(ESP32)", info);
+    TEST_ASSERT_TRUE_MESSAGE(infoGuard != std::string::npos, "--info AU avail/staged line has no ESP32 guard");
+    const std::string between = cmd.substr(infoGuard, info - infoGuard);
+    size_t opens = 0, closes = 0;
+    for (size_t at = 0; (at = between.find("#if", at)) != std::string::npos; at += 3) opens++;
+    for (size_t at = 0; (at = between.find("#endif", at)) != std::string::npos; at += 6) closes++;
+    TEST_ASSERT_TRUE_MESSAGE(closes < opens, "--info AU avail/staged line is outside its ESP32 guard");
+    // the pinned --info literals of AU-03 stay as they are
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"...AU: %s chan=%s\\n\"") != std::string::npos, "--info AU mode line literal changed");
+
+    // the ESP32-only header is included inside an ESP32 guard
+    const size_t inc = cmd.find("#include \"esp32/fw_update_net.h\"");
+    TEST_ASSERT_TRUE_MESSAGE(inc != std::string::npos, "esp32/fw_update_net.h is not included");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#ifdef ESP32", inc) > cmd.rfind("#endif", inc), "esp32/fw_update_net.h include is not inside an ESP32 guard");
+
+    // not on the RM allowlist (positive list): no rung may name "update" there
+    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("\"update\"") == std::string::npos, "update is on the RM allowlist");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("fwNet") == std::string::npos, "the RM path reaches the update worker");
+}
+
+// AU-05 wiring in esp32_main.cpp: the WiFi gate and the once-per-second tick.
+static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
+{
+    const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
+
+    const size_t gate = m.find("if(bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE || meshcom_settings.node_autoupd > 0)");
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos, "WiFi STA gate does not include node_autoupd > 0");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwTimerInit(s_auTimer") != std::string::npos, "fwTimerInit is not called");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwTick(s_auTimer") != std::string::npos, "fwTick is not called");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwNetStart(FWJ_CHECK") != std::string::npos, "the tick never starts a CHECK");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwNetStart(FWJ_DOWNLOAD") != std::string::npos, "the tick never starts a DOWNLOAD");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwCheckDone(s_auTimer") != std::string::npos, "fwCheckDone is not called");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwAttemptAllowed(s_auTimer") != std::string::npos, "fwAttemptAllowed is not called");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("fwAttemptFailed(s_auTimer") != std::string::npos, "fwAttemptFailed is not called");
+    // the automatic DOWNLOAD needs an installable release (matching .bin.zz asset + digest), so a
+    // prod release without the asset does not burn the 3 attempts; mode 1 only notifies
+    {
+        const size_t dl = m.find("in.mode == 2 && st.availNewer && st.installable");
+        TEST_ASSERT_TRUE_MESSAGE(dl != std::string::npos, "the automatic DOWNLOAD is not gated on st.installable");
+        const size_t start = m.find("fwNetStart(FWJ_DOWNLOAD", dl);
+        const size_t attempt = m.find("fwAttemptAllowed(s_auTimer", dl);
+        TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos && attempt != std::string::npos && attempt < start,
+                                 "fwAttemptAllowed must be evaluated inside the installable gate");
+    }
+    TEST_ASSERT_TRUE_MESSAGE(m.find("!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV") != std::string::npos,
+                             "AU-D17: the download is not gated on the battery floor");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("[AU];handover;deferred_w3") != std::string::npos, "FW_HANDOVER marker missing");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("[AU];notify;%s") != std::string::npos, "notify marker missing");
+    // the Safeboot apply is the next wave: the tick must not reboot
+    const size_t tick = m.find("static void auTick(void)");
+    const size_t loop = m.find("void esp32loop()");
+    TEST_ASSERT_TRUE_MESSAGE(tick != std::string::npos && loop != std::string::npos && tick < loop, "auTick is not defined before esp32loop");
+    const std::string body = m.substr(tick, loop - tick);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("esp_restart") == std::string::npos && body.find("ESP.restart") == std::string::npos &&
+                                 body.find("esp32_reboot") == std::string::npos,
+                             "auTick reboots (Safeboot apply is not wired yet)");
+    // the call sits inside esp32loop()
+    const size_t call = m.find("    auTick();\n", loop);
+    TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "esp32loop() never calls auTick()");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -593,5 +764,8 @@ int main(int, char **)
     RUN_TEST(test_rm_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_autoupdate_updchan_do_not_collide_with_other_commands);
     RUN_TEST(test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions);
+    RUN_TEST(test_update_does_not_collide_with_other_commands);
+    RUN_TEST(test_update_rungs_sit_in_the_esp32_block_with_the_expected_output);
+    RUN_TEST(test_au_tick_and_wifi_gate_are_wired_in_esp32_main);
     return UNITY_END();
 }
