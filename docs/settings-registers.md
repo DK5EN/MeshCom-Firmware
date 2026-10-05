@@ -16,7 +16,7 @@ unten stammt direkt aus dieser Tabelle bzw. aus einem Grep/Read gegen den aktuel
   Auszählung der Intake bestätigt, keine Abweichung gefunden: `CFG_FIELD_LIST` hat exakt 101
   Zeilen (`config_json.cpp:89-189`), der ESP32-Zweig von `CFG_FIELD_LIST_PLATFORM` 6
   (`:202-207`), der nRF52-Zweig 2 (`:210-211`). Seit 2026-10-01 kommt `node_ethmtu` (Issue #1183)
-  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52), seit 2026-10-04 `node_tz` (TZ-01) als 103. (109 ESP32, 105 nRF52), seit 2026-10-04 `node_stor` (SNF-D7, Issue #1188) als 104. (110 ESP32, 106 nRF52), seit 2026-10-05 `node_rm` (RM-06, Issue #1189) als 105. (111 ESP32, 107 nRF52).
+  als 102. gemeinsames Register hinzu (108 ESP32, 104 nRF52), seit 2026-10-04 `node_tz` (TZ-01) als 103. (109 ESP32, 105 nRF52), seit 2026-10-04 `node_stor` (SNF-D7, Issue #1188) als 104. (110 ESP32, 106 nRF52), seit 2026-10-05 `node_rm` (RM-06, Issue #1189) als 105. (111 ESP32, 107 nRF52), seit 2026-10-05 `node_autoupd` und `node_updchan` (AU-03, Issue #1187) als 106. und 107. (113 ESP32, 109 nRF52).
 - **Ein totes Register:** `node_gpsbaud` hat außerhalb von Export/Import/Flash keinen Leser
   irgendwo im Baum (§3).
 - **Vier Key/Member-Mismatches** — historisch gewachsen, absichtlich nicht bereinigt, weil das
@@ -249,6 +249,13 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 | Key       | Member    | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                                                                                                                                            |
 | --------- | --------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `node_rm` | `node_rm` | int         | 0..1           | `--rm on/off` (alle Boards), Default 0 = aus (RM-06, #1189); 1 = authentifizierte `RM1`-DMs werden ausgeführt, wirkt nur mit nicht-leerem `node_passwd` (`--rm on` ohne Passwort warnt `[RM];warn;no passwd, RM stays inactive`); `rm` steht auf der harten Sperrliste, nicht per RM setzbar; nicht in der Web-GUI |
+
+### X4. Firmware-Auto-Update (AU)
+
+| Key            | Member         | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------- | -------------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node_autoupd` | `node_autoupd` | int         | 0..2           | `--autoupdate off/notify/auto` (nur ESP32; Ausgabe `[AU];mode;<m>`, ohne Argument zeigt es den Wert), Default 0 = aus (AU-D1, #1187); 1 = prüfen und melden, 2 = prüfen, laden und installieren; steht nicht in der RM-Allowlist; nicht in der Web-GUI; `--info` zeigt `...AU: <mode> chan=<prod\|dev>` (nur ESP32); das Register steht aus Schema-Gründen auch im nRF52-Zweig, dort ohne Konsolenbefehl und ohne Wirkung |
+| `node_updchan` | `node_updchan` | int         | 0..1           | `--updchan prod/dev` (nur ESP32; Ausgabe `[AU];chan;prod\|dev`, ohne Argument zeigt es den Wert), Default 0 = prod (`icssw-org/MeshCom-Firmware`), 1 = dev (`DK5EN/MeshCom-Firmware`), beide fest einkompiliert, kein freier Repo-String (AU-D2, #1187); steht nicht in der RM-Allowlist; nicht in der Web-GUI                                                                                                            |
 
 ### Y. Nur ESP32 (6 Register)
 

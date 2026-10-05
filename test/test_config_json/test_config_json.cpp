@@ -164,6 +164,8 @@ static void fill_settings(void)
     meshcom_settings.node_ethmtu = 1400;
     meshcom_settings.node_stor = 1; /* SNF-D7: default is 0, so 1 proves the round trip */
     meshcom_settings.node_rm = 1;   /* RM-06: default is 0, so 1 proves the round trip */
+    meshcom_settings.node_autoupd = 2; /* AU-03: default is 0, so 2 proves the round trip */
+    meshcom_settings.node_updchan = 1; /* AU-03: default is 0, so 1 proves the round trip */
 }
 
 static std::string do_export(void)
@@ -233,6 +235,9 @@ static void test_roundtrip_restores_every_field(void)
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_stor);
     /* RM-06 (#1189): RM1 switch, default 0 -- the fill value 1 must survive */
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_rm);
+    /* AU-03 (#1187): auto update mode and channel, defaults 0 -- the fill values 2 / 1 must survive */
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_updchan);
     TEST_ASSERT_EQUAL_FLOAT(4.24f, meshcom_settings.node_maxv);
     TEST_ASSERT_EQUAL_FLOAT(0.002f, meshcom_settings.node_shunt);
     TEST_ASSERT_EQUAL_FLOAT(433.175f, meshcom_settings.node_freq);
@@ -632,6 +637,85 @@ static void test_import_without_node_rm_keeps_current_value(void)
     }
 }
 
+/* AU-03 (#1187): node_autoupd has the schema bounds 0..2, node_updchan 0..1 --
+ * an import outside refuses the whole file and leaves the value untouched. */
+static void test_autoupd_updchan_out_of_range_is_refused(void)
+{
+    fill_settings();
+    std::string doc = do_export();
+    TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_autoupd\":\"2\"") != std::string::npos,
+                             "node_autoupd is not exported");
+    TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_updchan\":\"1\"") != std::string::npos,
+                             "node_updchan is not exported");
+
+    struct Case { const char *key; const char *good; const char *bad[2]; };
+    const Case cases[] = {
+        {"node_autoupd", "2", {"3", "-1"}},
+        {"node_updchan", "1", {"2", "-1"}},
+    };
+    for (const Case &c : cases)
+    {
+        for (const char *v : c.bad)
+        {
+            std::string bad = replace_once(doc, std::string("\"") + c.key + "\":\"" + c.good + "\"",
+                                                std::string("\"") + c.key + "\":\"" + v + "\"");
+
+            wipe_settings();
+            s_meshcom_settings before;
+            memcpy(&before, &meshcom_settings, sizeof(before));
+
+            TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
+            TEST_ASSERT_NOT_NULL(strstr(g_err, c.key));
+            TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
+        }
+    }
+
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(doc));
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_updchan);
+}
+
+/* AU-03: a file WITHOUT node_autoupd / node_updchan (export of an older firmware)
+ * stays importable and leaves the node's own values unchanged -- a restore must
+ * never silently switch auto update on or move the update channel. */
+static void test_import_without_autoupd_updchan_keeps_current_values(void)
+{
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[512];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    for (int keep = 0; keep <= 2; keep++)
+    {
+        wipe_settings();
+        meshcom_settings.max_hop_text = 4;
+        meshcom_settings.node_gpsbaud = 38400;
+        meshcom_settings.node_autoupd = keep;
+        meshcom_settings.node_updchan = keep & 1;
+
+        TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
+        TEST_ASSERT_EQUAL_STRING("TEST-1", meshcom_settings.node_call);
+        TEST_ASSERT_EQUAL_INT(keep, meshcom_settings.node_autoupd);
+        TEST_ASSERT_EQUAL_INT(keep & 1, meshcom_settings.node_updchan);
+    }
+}
+
 /* Zu langer String fuer sein Zielfeld: dieselbe Abweisung, kein Ueberlauf. */
 static void test_oversized_string_is_refused(void)
 {
@@ -707,6 +791,8 @@ int main(int, char **)
     RUN_TEST(test_import_without_node_stor_keeps_current_value);
     RUN_TEST(test_rm_out_of_range_is_refused);
     RUN_TEST(test_import_without_node_rm_keeps_current_value);
+    RUN_TEST(test_autoupd_updchan_out_of_range_is_refused);
+    RUN_TEST(test_import_without_autoupd_updchan_keeps_current_values);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);
     RUN_TEST(test_empty_and_oversized_input_is_refused);

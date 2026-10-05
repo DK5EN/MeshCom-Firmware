@@ -297,6 +297,8 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_tz": PERSIST,  # added 2026-10-04, TZ-01 (after the triage snapshot)
     "node_stor": PERSIST,  # added 2026-10-04, SNF-D7 / #1188 (after the triage snapshot)
     "node_rm": PERSIST,  # added 2026-10-05, RM-06 / #1189 (after the triage snapshot)
+    "node_autoupd": PERSIST,  # added 2026-10-05, AU-03 / #1187 (after the triage snapshot)
+    "node_updchan": PERSIST,  # added 2026-10-05, AU-03 / #1187 (after the triage snapshot)
     "node_parm": PERSIST,
     "node_parm_1": RUNTIME,
     "node_parm_id": RUNTIME,
@@ -356,13 +358,14 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 148, (
+assert len(FIELD_CLASSIFICATION) == 150, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"148 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"150 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "
-    f"node_stor (2026-10-04, SNF-D7 / #1188) and node_rm (2026-10-05, RM-06 / #1189)")
+    f"node_stor (2026-10-04, SNF-D7 / #1188) and node_rm (2026-10-05, RM-06 / #1189) and node_autoupd/node_updchan "
+    f"(2026-10-05, AU-03 / #1187)")
 
 # ---------------------------------------------------------------------------
 # EXCLUDED_FROM_SCHEMA -- see the module docstring's "EXCLUDED_FROM_SCHEMA"

@@ -440,6 +440,132 @@ static void test_rm_rung_schema_row_and_default_match_the_assumptions()
                              "node_rm default is not 0 (RM-06: off until the operator enables it)");
 }
 
+// ---- --autoupdate / --updchan (AU-03, issue icssw-org/MeshCom-Firmware#1187) --
+// ESP32 only: both rungs sit inside an `#if defined(ESP32)` block placed after
+// the --rm rung and OUTSIDE the INSTRUMENT_ENABLED block (a field command).
+
+static void test_autoupdate_updchan_do_not_collide_with_other_commands()
+{
+    TEST_ASSERT_TRUE(commandMatches("autoupdate notify", "autoupdate "));
+    TEST_ASSERT_TRUE(commandMatches("autoupdate", "autoupdate"));
+    // a space ends the exact token, so the bare rung also matches "autoupdate off":
+    // the argument rung must stay above it (pinned against the source below)
+    TEST_ASSERT_TRUE(commandMatches("autoupdate off", "autoupdate"));
+    TEST_ASSERT_FALSE(commandMatches("autoupdate", "autoupdate "));
+    TEST_ASSERT_TRUE(commandMatches("updchan dev", "updchan "));
+    TEST_ASSERT_TRUE(commandMatches("updchan", "updchan"));
+    TEST_ASSERT_TRUE(commandMatches("updchan dev", "updchan"));
+    TEST_ASSERT_FALSE(commandMatches("updchan", "updchan "));
+
+    const char *others[] = {"update", "update check", "updates", "auto", "audiodbg 1", "ota-update", "upd",
+                            "utcoff", "updchannel", "autoupdates", "autoupdate2", "rm on"};
+    for (const char *line : others)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "autoupdate "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "autoupdate"), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "updchan "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "updchan"), line);
+    }
+
+    // none of the existing rungs with a similar name may swallow the new commands
+    const char *rungs[] = {"audiodbg ", "ota-update", "utcoff", "rm ", "rm", "reboot", "update", "updrepo ", "upd"};
+    for (const char *rung : rungs)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("autoupdate notify", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("autoupdate", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("updchan dev", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("updchan", rung), rung);
+    }
+}
+
+static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    const size_t rungAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rungAu != std::string::npos, "no --autoupdate rung in command_functions.cpp");
+    const size_t bareAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bareAu != std::string::npos, "bare --autoupdate (show) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(rungAu < bareAu, "bare --autoupdate rung is above the argument rung and would shadow --autoupdate <mode>");
+    const size_t rungCh = cmd.find("commandCheck(msg_text+2, (char*)\"updchan \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rungCh != std::string::npos, "no --updchan rung in command_functions.cpp");
+    const size_t bareCh = cmd.find("commandCheck(msg_text+2, (char*)\"updchan\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bareCh != std::string::npos, "bare --updchan (show) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(rungCh < bareCh, "bare --updchan rung is above the argument rung and would shadow --updchan prod/dev");
+
+    // ESP32 only: the rungs sit between an `#if defined(ESP32)` (directly after the --rm rung)
+    // and its `#endif`, and NOT inside the INSTRUMENT_ENABLED surface that starts later
+    const size_t rmBare = cmd.find("commandCheck(msg_text+2, (char*)\"rm\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rmBare != std::string::npos && rmBare < rungAu, "AU rungs are not placed after the --rm rung");
+    const size_t guardOpen = cmd.rfind("#if defined(ESP32)", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardOpen > rmBare,
+                             "--autoupdate rung is not inside its own #if defined(ESP32) after --rm");
+    const size_t guardClose = cmd.find("#endif", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(guardClose != std::string::npos && guardClose > bareCh,
+                             "the ESP32 block closes before the --updchan rungs");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#if defined(ESP32)", guardOpen + 1) > guardClose,
+                             "--autoupdate/--updchan rungs are not in one closed ESP32 block");
+    const size_t instr = cmd.find("\n#if INSTRUMENT_ENABLED", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose,
+                             "--autoupdate rungs sit inside the INSTRUMENT_ENABLED block (must be a field command)");
+    // the chain continues after the block with the txpower rung's own else
+    const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
+    TEST_ASSERT_TRUE_MESSAGE(after != std::string::npos && after - guardClose < 40, "ladder chain after the ESP32 block is broken");
+
+    const std::string bodyAu = cmd.substr(rungAu, 1400);
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("msg_text+13") != std::string::npos, "--autoupdate argument offset is not +13");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 0") != std::string::npos, "--autoupdate off does not set 0");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 1") != std::string::npos, "--autoupdate notify does not set 1");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 2") != std::string::npos, "--autoupdate auto does not set 2");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("save_settings()") != std::string::npos, "--autoupdate rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("[AU];mode;%s") != std::string::npos, "--autoupdate rung does not print [AU];mode;<m>");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("\"notify\"") != std::string::npos && bodyAu.find("\"auto\"") != std::string::npos,
+                             "--autoupdate mode names missing");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("[ERR];autoupdate;") != std::string::npos, "--autoupdate has no error line");
+
+    const std::string bodyCh = cmd.substr(rungCh, 900);
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("msg_text+10") != std::string::npos, "--updchan argument offset is not +10");
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("meshcom_settings.node_updchan = 0") != std::string::npos, "--updchan prod does not set 0");
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("meshcom_settings.node_updchan = 1") != std::string::npos, "--updchan dev does not set 1");
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("save_settings()") != std::string::npos, "--updchan rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[AU];chan;%s") != std::string::npos, "--updchan rung does not print [AU];chan;prod|dev");
+    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[ERR];updchan;") != std::string::npos, "--updchan has no error line");
+
+    // help lines (ESP32 guard) and the --info line (ESP32 guard)
+    const size_t help = cmd.find("--autoupdate off/notify/auto  firmware auto update (ESP32)");
+    TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--autoupdate help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--updchan prod/dev       update source: prod icssw-org, dev DK5EN") != std::string::npos,
+                             "--updchan help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", help) > cmd.rfind("#endif", help), "--autoupdate help line is not inside an ESP32 guard");
+    const size_t info = cmd.find("\"...AU: %s chan=%s\\n\"");
+    TEST_ASSERT_TRUE_MESSAGE(info != std::string::npos, "--info AU line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", info) > cmd.rfind("#endif", info), "--info AU line is not inside an ESP32 guard");
+
+    // RM allowlist is a positive list: neither command may appear in remote_cmd.cpp
+    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("autoupdate") == std::string::npos, "autoupdate is on the RM allowlist");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("updchan") == std::string::npos, "updchan is on the RM allowlist");
+
+    const std::string cfg = read_repo_file("src/config_json.h");
+    const size_t rowAu = cfg.find("X(\"node_autoupd\"");
+    TEST_ASSERT_TRUE_MESSAGE(rowAu != std::string::npos, "no node_autoupd schema row");
+    const std::string rowAuTxt = cfg.substr(rowAu, 100);
+    TEST_ASSERT_TRUE_MESSAGE(rowAuTxt.find("CFG_INT") != std::string::npos, "node_autoupd is not CFG_INT");
+    TEST_ASSERT_TRUE_MESSAGE(rowAuTxt.find("0.0, 2.0") != std::string::npos, "node_autoupd schema range is not 0..2");
+    const size_t rowCh = cfg.find("X(\"node_updchan\"");
+    TEST_ASSERT_TRUE_MESSAGE(rowCh != std::string::npos, "no node_updchan schema row");
+    const std::string rowChTxt = cfg.substr(rowCh, 100);
+    TEST_ASSERT_TRUE_MESSAGE(rowChTxt.find("CFG_INT") != std::string::npos, "node_updchan is not CFG_INT");
+    TEST_ASSERT_TRUE_MESSAGE(rowChTxt.find("0.0, 1.0") != std::string::npos, "node_updchan schema range is not 0..1");
+    TEST_ASSERT_TRUE_MESSAGE(cfg.find("X(\"node_updrepo\"") == std::string::npos, "node_updrepo must not exist (AU-D2)");
+
+    const std::string set = read_repo_file("src/meshcom_settings.h");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_autoupd, 0)") != std::string::npos,
+                             "node_autoupd default is not 0 (AU-D1: off)");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_updchan, 0)") != std::string::npos,
+                             "node_updchan default is not 0 (AU-D2: prod)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -465,5 +591,7 @@ int main(int, char **)
     RUN_TEST(test_stor_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_rm_does_not_collide_with_other_commands);
     RUN_TEST(test_rm_rung_schema_row_and_default_match_the_assumptions);
+    RUN_TEST(test_autoupdate_updchan_do_not_collide_with_other_commands);
+    RUN_TEST(test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions);
     return UNITY_END();
 }

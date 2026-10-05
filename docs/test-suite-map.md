@@ -10,13 +10,13 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-112 suites with tests, 1780 `RUN_TEST` cases, 57 native environments. Five
+114 suites with tests, 1864 `RUN_TEST` cases, 59 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
 | Category      | Suites | Cases | What it is                                                                                       |
 | ------------- | -----: | ----: | ------------------------------------------------------------------------------------------------ |
-| Unit          |     59 |  1224 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
+| Unit          |     61 |  1308 | one function or class, no fixture (nbr_matrix 88, batt_pipeline 67, external_radio\_\* 126)      |
 | Regression    |     23 |   242 | pins one past incident or bug id (N-08, BAT-01, BP-11, #1173, #1174, #1182, DJ8MEH log)          |
 | Contract      |     12 |   112 | wire formats and schemas (BLE settings v1, EXTUDP JSON keys, settings_members, config_json)      |
 | Twin          |      6 |   104 | ESP32-vs-nRF52 dumps (udp_frame, udp_send, country, serial_command, gateway_service, loop_sched) |
@@ -60,7 +60,11 @@ routing). `test_hmac_sha256` (RM-01: portable SHA-256 / HMAC
 against FIPS 180-4 and RFC 4231) and `test_remote_cmd` (RM-02: RM1 parse, tag,
 counter, allowlist, rate limit, lockout; reproduces all 21 vectors of
 `tools/tests/remote_cmd_vectors.json`, the Python reference `tools/remote_cmd.py`,
-pytest `tools/tests/test_remote_cmd.py`).
+pytest `tools/tests/test_remote_cmd.py`). `test_fw_update` (AU-01: tag compare with the MM.DD
+half-year window, staging layout incl. the inflated bound, stage record FWS2,
+policy timer, reinstall guard, millis-wrap latch) and `test_fw_update_assets`
+(AU-02: asset names and the streaming release-JSON scanner on live GitHub
+fixtures); `tools/tests/test_flash_map.py` (14 cases).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
@@ -190,6 +194,8 @@ flashes whatever is attached.
 | test_hey_report              | Unit          |     8 | native_aprs                                                  |
 | test_kbd_repeat              | Unit          |    39 | native                                                       |
 | test_kiss_ax25               | Unit          |    23 | native_extradio                                              |
+| test_fw_update               | Unit          |    62 | native_fw_update                                             |
+| test_fw_update_assets        | Unit          |    22 | native_fw_update_assets                                      |
 | test_hmac_sha256             | Unit          |    20 | native_hmac_sha256                                           |
 | test_kiss_frame              | Unit          |    18 | native_kiss_frame                                            |
 | test_loop_breadcrumb         | Unit          |    11 | native                                                       |

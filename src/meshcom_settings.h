@@ -200,7 +200,11 @@
     /* SNF-D7 (#1188): 1 = announce the mailbox calls to the server (STOR); default 0 until approved. Persisted. */ \
     M(int, node_stor, 0)                                                                                 \
     /* RM-06 (#1189): 1 = act on authenticated RM1 remote-management DMs (needs node_passwd); default 0. Persisted. */ \
-    M(int, node_rm, 0)
+    M(int, node_rm, 0)                                                                                   \
+    /* AU-03 (#1187): firmware auto update, 0 off / 1 notify / 2 auto; default 0. Persisted; the console rung is ESP32 only. */ \
+    M(int, node_autoupd, 0)                                                                              \
+    /* AU-03 (#1187): update channel, 0 prod (icssw-org) / 1 dev (DK5EN); default 0. Persisted. */           \
+    M(int, node_updchan, 0)
 
 /* ESP32-only members (every ESP32 board). */
 #ifdef ESP32

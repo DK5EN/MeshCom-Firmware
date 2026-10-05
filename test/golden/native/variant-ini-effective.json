@@ -54,6 +54,9 @@
   "extends": [
    "esp32_classic"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -169,6 +172,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -289,6 +295,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -412,6 +421,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -533,6 +545,9 @@
   "extends": [
    "esp32_classic"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -651,6 +666,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -767,6 +785,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -914,6 +935,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -1035,6 +1059,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -1199,6 +1226,9 @@
   "extends": [
    "env:t_deck_pro"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -1297,6 +1327,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -1413,6 +1446,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -1643,6 +1679,9 @@
   "extends": [
    "nrf52_base"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -1743,6 +1782,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -1857,6 +1899,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -1977,6 +2022,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -2089,6 +2137,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -2227,6 +2278,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -2314,6 +2368,9 @@
    "+<sto_notice.cpp>",
    "+<own_msg_status.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
   ],
@@ -2388,6 +2445,9 @@
    "+<dm_dedup.cpp>",
    "+<reack_limiter.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2427,6 +2487,9 @@
    "+<charset_filter.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2455,6 +2518,9 @@
    "+<batt_functions.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2475,6 +2541,9 @@
    "-fno-omit-frame-pointer"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -2490,6 +2559,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2516,6 +2588,9 @@
    "+<byte_fifo.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2531,6 +2606,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2581,6 +2659,9 @@
    "-<*>",
    "+<byte_fifo.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2606,6 +2687,9 @@
    "+<capture_functions.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2621,6 +2705,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2639,6 +2726,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -2654,6 +2744,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2676,6 +2769,9 @@
    "-<*>",
    "+<conf_frame.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2697,6 +2793,9 @@
   "build_src_filter": [
    "-<*>",
    "+<config_json.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2722,6 +2821,9 @@
    "-<*>",
    "+<country_profile.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2743,6 +2845,9 @@
   "build_src_filter": [
    "-<*>",
    "+<country_profile.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2769,6 +2874,9 @@
    "+<dedup_functions.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2805,6 +2913,9 @@
    "+<msgid_counter.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2837,6 +2948,9 @@
    "+<settings_schema.cpp>"
   ],
   "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2863,6 +2977,9 @@
    "+<charset_filter.cpp>",
    "+<extudp_functions.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
   ],
@@ -2878,12 +2995,53 @@
    "-D EXTERNAL_RADIO=1",
    "-std=c++17"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_filter": [
    "test_external_radio_protocol",
    "test_external_radio_tcp",
    "test_external_radio_txq",
    "test_kiss_ax25"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_fw_update": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_fw_update"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_fw_update_assets": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_fw_update_assets"
   ],
   "test_framework": "unity"
  },
@@ -2903,6 +3061,9 @@
    "+<esp32/gateway_service_esp32.cpp>",
    "+<nrf52/gateway_service_nrf52.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2918,6 +3079,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2939,6 +3103,9 @@
   "build_src_filter": [
    "-<*>",
    "+<kiss_frame.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2962,6 +3129,9 @@
    "-<*>",
    "+<loop_scheduler.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -2977,6 +3147,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2999,6 +3172,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
   ],
@@ -3018,6 +3194,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3034,6 +3213,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3056,6 +3238,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3074,6 +3259,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3094,6 +3282,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3110,6 +3301,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3130,6 +3324,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3153,6 +3350,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3168,6 +3368,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3229,6 +3432,9 @@
    "+<charset_filter.cpp>",
    "+<via_functions.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
   ],
@@ -3251,6 +3457,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3271,6 +3480,9 @@
    "-<*>",
    "+<remote_cmd.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3287,6 +3499,9 @@
    "-Wall",
    "-Wextra"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
@@ -3302,6 +3517,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "lib_ldf_mode": "chain+",
   "platform": "native",
@@ -3326,6 +3544,9 @@
    "-<*>",
    "+<esp32/serial_command_esp32.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3348,6 +3569,9 @@
   "build_src_filter": [
    "-<*>",
    "+<nrf52/serial_command_nrf52.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3377,6 +3601,9 @@
    "+<settings_store.cpp>",
    "+<settings_schema.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3404,6 +3631,9 @@
    "+<settings_store.cpp>",
    "+<settings_schema.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3423,6 +3653,9 @@
   "build_src_filter": [
    "-<*>",
    "+<settings_store.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3446,6 +3679,9 @@
    "-<*>",
    "+<settings_store.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3461,6 +3697,9 @@
    "-I src",
    "-Wall",
    "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3494,6 +3733,9 @@
    "+<nbr_matrix.cpp>",
    "+<nbr_views.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
   ],
@@ -3518,6 +3760,9 @@
    "-<*>",
    "+<tz_rule.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3537,6 +3782,9 @@
   "build_src_filter": [
    "-<*>",
    "+<tz_rule.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3575,6 +3823,9 @@
    "+<esp32/udp_frame_esp32.cpp>",
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3603,6 +3854,9 @@
    "+<esp32/udp_drain_esp32.cpp>",
    "+<nrf52/udp_drain_nrf52.cpp>"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
@@ -3625,6 +3879,9 @@
   "build_src_filter": [
    "-<*>",
    "+<tinyxml_functions.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "lib_deps": [
    "https://github.com/leethomason/tinyxml2"
@@ -3670,6 +3927,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -3786,6 +4046,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -3921,6 +4184,9 @@
   "extends": [
    "esp32_s3"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4022,6 +4288,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -4160,6 +4429,9 @@
   "extends": [
    "nrf52_base"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4260,6 +4532,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -4378,6 +4653,9 @@
   "extends": [
    "esp32_classic"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4494,6 +4772,9 @@
   ],
   "extends": [
    "esp32_classic"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -4612,6 +4893,9 @@
   "extends": [
    "esp32_classic"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4727,6 +5011,9 @@
   ],
   "extends": [
    "esp32_s3"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -4845,6 +5132,9 @@
    "-Wno-missing-field-initializers",
    "-Werror"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -4954,6 +5244,9 @@
   "extends": [
    "env:vision-master-e213"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -5059,6 +5352,9 @@
    "-Wno-missing-field-initializers",
    "-Werror"
   ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
   "framework": [
    "arduino"
   ],
@@ -5161,6 +5457,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"
@@ -5276,6 +5575,9 @@
   ],
   "extends": [
    "nrf52_base"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
   ],
   "framework": [
    "arduino"

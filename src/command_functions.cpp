@@ -1156,6 +1156,9 @@ void commandAction(char *umsg_text, bool ble)
             #ifdef ESP32
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
+            #if defined(ESP32)
+            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n");
+            #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
 
@@ -4641,6 +4644,86 @@ void commandAction(char *umsg_text, bool ble)
 
         return;
     }
+    // The leading `else` sits INSIDE the ESP32 block: on nRF52 the block is gone
+    // and the chain continues with the txpower rung's own `else` below.
+    #if defined(ESP32)
+    // AU-03 (#1187): firmware auto update switches. ESP32 only -- the update path
+    // (Safeboot) does not exist on nRF52. Both are ordinary persisted settings
+    // (config_json.h rows); the scheduler that acts on them is a later wave. Neither
+    // is on the RM allowlist (remote_cmd.cpp allowed() is a positive list), so a
+    // remote RM1 command can never reach these rungs. commandCheck() is exact-token:
+    // "autoupdate" / "updchan" collide with no other rung (ladder has no "update*"
+    // name). The argument rung ("autoupdate ") must stay above the bare one, because
+    // a space ends the token and the bare rung would also match "autoupdate notify".
+    else
+    if(commandCheck(msg_text+2, (char*)"autoupdate ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
+
+        if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            meshcom_settings.node_autoupd = 0;
+        }
+        else if(casecmp(_owner_c, (char*)"notify") == 0)
+        {
+            meshcom_settings.node_autoupd = 1;
+        }
+        else if(casecmp(_owner_c, (char*)"auto") == 0)
+        {
+            meshcom_settings.node_autoupd = 2;
+        }
+        else
+        {
+            Serial.printf("[ERR];autoupdate;must be off, notify or auto\n");
+
+            return;
+        }
+
+        save_settings();
+        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"autoupdate") == 0)
+    {
+        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"updchan ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
+
+        if(casecmp(_owner_c, (char*)"prod") == 0)
+        {
+            meshcom_settings.node_updchan = 0;
+        }
+        else if(casecmp(_owner_c, (char*)"dev") == 0)
+        {
+            meshcom_settings.node_updchan = 1;
+        }
+        else
+        {
+            Serial.printf("[ERR];updchan;must be prod or dev\n");
+
+            return;
+        }
+
+        save_settings();
+        Serial.printf("[AU];chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"updchan") == 0)
+    {
+        Serial.printf("[AU];chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+
+        return;
+    }
+    #endif
     else
     if(commandCheck(msg_text+2, (char*)"txpower ") == 0)
     {
@@ -6414,6 +6497,19 @@ void commandAction(char *umsg_text, bool ble)
                                       rm.rej_rate + rm.rej_lockout + rm.rej_disabled;
                 printfdeb("...RM: %s ok=%lu rej=%lu\n", meshcom_settings.node_rm ? "on" : "off", (unsigned long)rm.ok, rmRej);
             }
+
+            #if defined(ESP32)
+            // AU-03 (#1187): firmware auto update mode and channel.
+            printfdeb("...AU: %s chan=%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
+                meshcom_settings.node_updchan ? "dev" : "prod");
+            #ifndef MC_ENV_NAME
+            #define MC_ENV_NAME ""
+            #endif
+            #ifndef MC_BUILD_TAG
+            #define MC_BUILD_TAG ""
+            #endif
+            printfdeb("...AU env=%s tag=%s\n", MC_ENV_NAME, MC_BUILD_TAG[0] ? MC_BUILD_TAG : "(local)");
+            #endif
 
             // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,
             // max_hop_pos bleibt der Compile-Default.
