@@ -53,6 +53,7 @@
 #include "esp32/esp32_functions.h"
 #include "esp32/esp32_sleep.h"
 #include "esp32/fw_update_net.h" // AU-05 (#1187): fwNetStart/fwNetGetStatus for --update, --info AU line
+#include "safeboot/safeboot_ver.h" // AU-12 (#1187): AU_SAFEBOOT_MIN for the capability refuse / status
 #endif
 
 #if defined(NRF52_SERIES)
@@ -4681,6 +4682,15 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"auto") == 0)
         {
+            // AU-12: auto may only be switched on while Safeboot can apply a staged update. Refuse
+            // BEFORE the setting is touched or saved; off and notify never need Safeboot.
+            if(!fwNetSafebootCapable())
+            {
+                Serial.printf("[ERR];autoupdate;safeboot_too_old;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
+                Serial.printf("[AU];note;flash once with the web flasher to install the new Safeboot\n");
+
+                return;
+            }
             meshcom_settings.node_autoupd = 2;
         }
         else
@@ -4830,6 +4840,8 @@ void commandAction(char *umsg_text, bool ble)
                 // the operator may have updated Safeboot meanwhile: try even with the old-Safeboot flag
                 if(fwNetSafebootOld())
                     Serial.printf("[AU];apply;note;old_safeboot_flag_set_trying_anyway\n");
+                else if(!fwNetSafebootCapable())
+                    Serial.printf("[AU];apply;note;safeboot_too_old;ver;%d;trying_anyway\n", fwNetSafebootVersion());
                 if(!fwNetMarkHandover(_rec.tag))   // before the reboot, as in the auto path
                 {
                     Serial.printf("[ERR];update;nvs\n");
@@ -4847,7 +4859,7 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"status") == 0)
         {
-            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s\n",
+            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d\n",
                 meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
                 meshcom_settings.node_updchan ? "dev" : "prod",
                 _au.availTag[0] ? _au.availTag : "none",
@@ -4855,7 +4867,8 @@ void commandAction(char *umsg_text, bool ble)
                 (_au.staged && _au.stagedTag[0]) ? _au.stagedTag : "none",
                 _auBusy ? 1 : 0,
                 _au.lastErr[0] ? _au.lastErr : "none",
-                fwNetSafebootOld() ? "old" : "ok");
+                !fwNetSafebootCapable() ? "old" : "ok",
+                fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
         }
         else
         {

@@ -35,6 +35,7 @@ SPIClass ethSPI(FSPI);
 #include "esp32_flash.h"
 #include "fw_update.h"       // AU-05 (#1187): update policy (fwTick and friends)
 #include "fw_update_net.h"   // AU-05: CHECK / DOWNLOAD worker (own task)
+#include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the boot demotion
 #include <esp_adc_cal.h>
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -2364,6 +2365,23 @@ static void auTick(void)
         return;
     s_auLastTickMs = now;
 
+    // AU-12: boot demotion, once per boot at the first tick (settings are loaded long before). A node
+    // that was in auto mode with a Safeboot too old to apply updates drops to notify and says so. Only
+    // auto mode triggers the Safeboot partition scan here (cached by fwNetSafebootVersion; the web pages and
+    // --update status trigger it too, once per boot). The setting is written once; there is no reboot and no retry.
+    static bool s_auBootCapChecked = false;
+    if(!s_auBootCapChecked)
+    {
+        s_auBootCapChecked = true;
+        if(meshcom_settings.node_autoupd == 2 && !fwNetSafebootCapable())
+        {
+            meshcom_settings.node_autoupd = 1;
+            save_settings();
+            // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
+            Serial.printf("[AU];refuse;safeboot_too_old;mode;notify;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
+        }
+    }
+
     // WiFi STA with an address (the Ethernet path is not an AU transport)
     const bool wifiUp = (WiFi.status() == WL_CONNECTED) && ((uint32_t)WiFi.localIP() != 0u);
 
@@ -2426,9 +2444,9 @@ static void auTick(void)
         // re-validated here (fwNetLoadRecord drops a stale one and clears the cached flag, so a
         // gone record ends the handovers). One attempt per tag and boot: if there is no Safeboot
         // partition the function returns and the tick must not retry every second.
-        // old Safeboot (it ignored the last handover): no automatic handover, or every update window
+        // old Safeboot (too old by version scan, or it ignored the last handover): no automatic handover, or every update window
         // would reboot the node into the same dead end. --update apply still tries.
-        if(fwNetSafebootOld())
+        if(!fwNetSafebootCapable())   // AU-12: version scan + nocap backstop
         {
             if(!s_auBlockedPrinted)
             {

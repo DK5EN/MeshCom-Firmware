@@ -30,6 +30,7 @@
 #include "../fw_update_roots.h"
 #include "../hmac_sha256.h"
 #include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
+#include "../safeboot/safeboot_ver.h" // SafebootVerScan, AU_SAFEBOOT_MIN
 #include "fw_update_net.h"
 
 // Measurement stub (-DFWNET_STUB): the five entry points as no-ops, so the flash cost of
@@ -46,6 +47,8 @@ void fwNetClearRecord(void) {}
 bool fwNetMarkHandover(const char *) { return false; }
 void fwNetUnmarkHandover(void) {}
 bool fwNetSafebootOld(void) { return false; }
+int fwNetSafebootVersion(void) { return -1; }
+bool fwNetSafebootCapable(void) { return false; }
 void fwNetLastInstalledTag(char *out, size_t n)
 {
     if (out != nullptr && n > 0)
@@ -229,6 +232,8 @@ const char *runningVersion()
 // a NEW Safeboot removes "hand" and "nocap" first thing at boot. If the app boots with "hand" set
 // and the record still there, Safeboot did not process it: it is an old one that ignores FWS2.
 // "nocap" = 1 then suppresses the automatic handover (a reboot loop every update window).
+// This is only the backstop: fwNetSafebootVersion() reads the Safeboot image up front (AU-12) and
+// fwNetSafebootCapable() combines both verdicts.
 #define FWNET_KEY_HAND "hand"
 #define FWNET_KEY_NOCAP "nocap"
 
@@ -1055,6 +1060,15 @@ void fwNetTask(void *)
 bool s_hcClaimed = false;
 bool s_safebootOld = false;
 
+// AU-12: "nocap" stores the Safeboot version it was earned under (+1, so it is never 0). Safeboot's own
+// setup() removes the key; a reflash through the web flasher boots ota_0 directly and never runs it, so
+// the tag is what lets the scan retire a verdict that belongs to the image that was replaced.
+uint8_t nocapTag()
+{
+    const int v = fwNetSafebootVersion();
+    return (uint8_t)((v < 0 ? 0 : (v > 250 ? 250 : v)) + 1);
+}
+
 void bootCheckOnce()
 {
     portENTER_CRITICAL(&s_mux);
@@ -1082,7 +1096,7 @@ void bootCheckOnce()
         if (p.begin(FWNET_NS, false))
         {
             if (markOld)
-                p.putUChar(FWNET_KEY_NOCAP, 1);
+                p.putUChar(FWNET_KEY_NOCAP, nocapTag());
             p.remove(FWNET_KEY_HAND);
             p.end();
         }
@@ -1095,7 +1109,15 @@ void bootCheckOnce()
         Preferences p;
         if (p.begin(FWNET_NS, false))
         {
-            old = p.getUChar(FWNET_KEY_NOCAP, 0) != 0;
+            const uint8_t nc = p.getUChar(FWNET_KEY_NOCAP, 0);
+            old = nc != 0 && nc == nocapTag();
+            if (nc != 0 && !old)
+            {
+                // AU-12: earned under another Safeboot (a web-flasher reflash does not run Safeboot's
+                // setup(), so nothing else clears it): the verdict no longer applies
+                p.remove(FWNET_KEY_NOCAP);
+                auLog("[AU];safeboot;nocap;cleared;ver;%d\n", fwNetSafebootVersion());
+            }
             p.end();
         }
     }
@@ -1299,6 +1321,70 @@ bool fwNetSafebootOld(void)
     v = s_safebootOld;
     portEXIT_CRITICAL(&s_mux);
     return v;
+}
+
+// Safeboot capability version (AU-12): one scan of the "safeboot" partition per boot, cached.
+// State 0 = unclaimed, 1 = a task is scanning, 2 = s_sbVer is final. Never holds s_mux over flash reads.
+static uint8_t s_sbState = 0;
+static int s_sbVer = -1;
+
+int fwNetSafebootVersion(void)
+{
+    portENTER_CRITICAL(&s_mux);
+    const bool mine = (s_sbState == 0);
+    if (mine)
+        s_sbState = 1;
+    portEXIT_CRITICAL(&s_mux);
+
+    if (!mine)
+    {
+        for (;;) // another task is scanning: wait for its verdict
+        {
+            uint8_t st;
+            int v;
+            portENTER_CRITICAL(&s_mux);
+            st = s_sbState;
+            v = s_sbVer;
+            portEXIT_CRITICAL(&s_mux);
+            if (st == 2)
+                return v;
+            vTaskDelay(1);
+        }
+    }
+
+    int ver = -1;
+    const esp_partition_t *p =
+        esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot");
+    if (p != nullptr)
+    {
+        SafebootVerScan sc;
+        uint8_t buf[256];
+        bool ok = true;
+        for (size_t off = 0; off < p->size; off += sizeof(buf))
+        {
+            const size_t n = (p->size - off) < sizeof(buf) ? (p->size - off) : sizeof(buf);
+            if (esp_partition_read(p, off, buf, n) != ESP_OK)
+            {
+                ok = false;
+                break;
+            }
+            sc.feed(buf, n);
+        }
+        if (ok)
+            ver = sc.version();
+    }
+    portENTER_CRITICAL(&s_mux);
+    s_sbVer = ver;
+    s_sbState = 2;
+    portEXIT_CRITICAL(&s_mux);
+    auLog("[AU];safeboot;ver;%d;need;%d\n", ver, (int)AU_SAFEBOOT_MIN);
+    return ver;
+}
+
+bool fwNetSafebootCapable(void)
+{
+    const int v = fwNetSafebootVersion();
+    return v >= AU_SAFEBOOT_MIN && !fwNetSafebootOld();
 }
 
 void fwNetClearRecord(void)

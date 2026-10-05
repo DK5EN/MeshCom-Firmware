@@ -232,6 +232,7 @@ flashes whatever is attached.
 | test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
+| test_safeboot_ver            | Unit          |    16 | native_safeboot                                              |
 | test_serial_command_twin     | Twin          |     6 | native_serial_esp32, native_serial_nrf52                     |
 | test_setlog_lines            | Unit          |    29 | native                                                       |
 | test_settings_members        | Contract      |     5 | native_settings_members_esp32, native_settings_members_nrf52 |

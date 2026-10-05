@@ -992,8 +992,15 @@ static void test_stage_flash_goes_through_one_guarded_helper()
     // no partition-API erase/write/read on ota_0 in code (a running-partition write aborts, IDF 4.4 region_protected)
     for (const char *api : {"esp_partition_write(", "esp_partition_erase_range(", "esp_partition_read("})
     {
+        // AU-12: fwNetSafebootVersion() reads the separate "safeboot" factory partition (never ota_0, never
+        // the running slot) with esp_partition_read; that one function is exempt from the ota_0 rule.
+        const size_t sbBeg = net.find("int fwNetSafebootVersion(void)\n{");
+        const size_t sbEnd = net.find("bool fwNetSafebootCapable(void)\n{");
         for (size_t at = 0; (at = net.find(api, at)) != std::string::npos; at += 8)
         {
+            if (sbBeg != std::string::npos && sbEnd != std::string::npos && at > sbBeg && at < sbEnd &&
+                std::string(api) == "esp_partition_read(")
+                continue;
             const size_t ls = net.rfind('\n', at) + 1;
             const std::string line = net.substr(ls, net.find('\n', at) - ls);
             TEST_ASSERT_TRUE_MESSAGE(line.find("//") != std::string::npos && line.find("//") < at - ls, api);
@@ -1079,7 +1086,7 @@ static void test_old_safeboot_guard_marks_gates_and_reports()
     const std::string b = net.substr(bc, net.find("\nvoid ensureStagedLoaded()", bc) - bc);
     TEST_ASSERT_TRUE_MESSAGE(b.find("s_hcClaimed") != std::string::npos, "the boot check is not once-only");
     const size_t ld = b.find("fwNetLoadRecord(r)");
-    const size_t nc = b.find("putUChar(FWNET_KEY_NOCAP, 1)");
+    const size_t nc = b.find("putUChar(FWNET_KEY_NOCAP, nocapTag())");
     const size_t rm = b.find("p.remove(FWNET_KEY_HAND)");
     TEST_ASSERT_TRUE_MESSAGE(ld != std::string::npos && nc != std::string::npos && rm != std::string::npos && ld < nc && nc < rm,
                              "boot check order must be: load record, set nocap, remove hand");
@@ -1095,7 +1102,7 @@ static void test_old_safeboot_guard_marks_gates_and_reports()
     const std::string t = m.substr(tick, loop - tick);
     const size_t ho = t.find("if(act == FW_HANDOVER)");
     const size_t blocked = t.find("[AU];handover;blocked;old_safeboot", ho);
-    const size_t gate = t.find("if(fwNetSafebootOld())", ho);
+    const size_t gate = t.find("if(!fwNetSafebootCapable())", ho);   // AU-12: capability, not only the nocap flag
     const size_t mark = t.find("fwNetMarkHandover(rec.tag)", ho);
     const size_t reboot = t.find("auRebootToSafeboot()", ho);
     TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && blocked != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
@@ -1119,14 +1126,100 @@ static void test_old_safeboot_guard_marks_gates_and_reports()
     // apply is not gated on the flag (no return/else on fwNetSafebootOld)
     TEST_ASSERT_TRUE_MESSAGE(a.find("if(fwNetSafebootOld())\n                    Serial.printf") != std::string::npos, "--update apply gates on the flag instead of only noting it");
 
-    // status gains ;safeboot;old|ok, existing prefix unchanged
-    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s\\n") != std::string::npos,
-                             "--update status lacks the safeboot field");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootOld() ? \"old\" : \"ok\"") != std::string::npos, "--update status does not report old|ok");
+    // status: ;safeboot;old|ok (old whenever the Safeboot is not capable), existing prefix unchanged, AU-12 version fields appended last
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d\\n") != std::string::npos,
+                             "--update status lacks the safeboot / sbver / sbneed fields");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("!fwNetSafebootCapable() ? \"old\" : \"ok\"") != std::string::npos, "--update status does not derive old|ok from the capability");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootVersion(), AU_SAFEBOOT_MIN);") != std::string::npos, "--update status does not pass the version and AU_SAFEBOOT_MIN last");
 
     // clearing the record also clears the marker (a hopeless handover must not leave one behind)
     const size_t clr = net.find("bool nvsClearRecord()\n{");
     TEST_ASSERT_TRUE_MESSAGE(net.substr(clr, net.find("\n}\n", clr) - clr).find("p.remove(FWNET_KEY_HAND)") != std::string::npos, "nvsClearRecord() does not remove hand");
+}
+
+// AU-12 (#1187): versioned Safeboot. Auto update may only be switched on, and may only run, while the
+// Safeboot partition is capable (version >= AU_SAFEBOOT_MIN). Source-scan only: the scanner itself is
+// covered by test_safeboot_ver, the fw_update_net.cpp bodies by the bench.
+// AU-12 rework (advisor F1/F2/F6): the nocap verdict is tied to the Safeboot version it was earned under,
+// the web aumode path cannot change the channel when auto is refused, --update apply names a too-old Safeboot.
+static void test_safeboot_nocap_is_version_tagged_and_web_order()
+{
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("p.putUChar(FWNET_KEY_NOCAP, nocapTag());") != std::string::npos, "nocap is not written with the version tag");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("old = nc != 0 && nc == nocapTag();") != std::string::npos, "a nocap of another Safeboot version still counts");
+    const size_t clr = net.find("p.remove(FWNET_KEY_NOCAP);");
+    TEST_ASSERT_TRUE_MESSAGE(clr != std::string::npos && net.find("[AU];safeboot;nocap;cleared", clr) != std::string::npos, "a stale nocap is not cleared and logged");
+
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    const size_t au = web.find("\"--autoupdate auto\");", web.find("AU-12: auto first"));
+    const size_t ch = web.find("\"--updchan %s\", auDev", au);
+    TEST_ASSERT_TRUE_MESSAGE(au != std::string::npos && ch != std::string::npos && au < ch, "aumode must run --autoupdate auto before --updchan");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("if(meshcom_settings.node_autoupd == 2) {", au) < ch, "--updchan must run only when auto took");
+
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("[AU];apply;note;safeboot_too_old;ver;%d;trying_anyway") != std::string::npos, "--update apply is silent on a too-old Safeboot");
+}
+
+static void test_safeboot_capability_gates_auto_update()
+{
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+    const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    // the two declarations exist, inside the ESP32 guard of the header
+    const size_t g = hdr.find("#if defined(ESP32)");
+    const size_t dv = hdr.find("int fwNetSafebootVersion(void);");
+    const size_t dc = hdr.find("bool fwNetSafebootCapable(void);");
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos && dv != std::string::npos && dc != std::string::npos,
+                             "fwNetSafebootVersion()/fwNetSafebootCapable() are not declared in fw_update_net.h");
+    TEST_ASSERT_TRUE_MESSAGE(dv > g && dc > g, "the capability declarations are outside the ESP32 guard");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("#endif // ESP32", g) > dc, "the capability declarations are not inside the ESP32 guard");
+
+    // --autoupdate: refuse before anything is changed or saved; off / notify carry no capability check
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
+    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos && bare != std::string::npos && rung < bare, "--autoupdate rungs not found");
+    const std::string body = cmd.substr(rung, bare - rung);
+    const size_t bOff = body.find("casecmp(_owner_c, (char*)\"off\") == 0");
+    const size_t bNotify = body.find("casecmp(_owner_c, (char*)\"notify\") == 0");
+    const size_t bAuto = body.find("casecmp(_owner_c, (char*)\"auto\") == 0");
+    const size_t bElse = body.find("must be off, notify or auto");
+    TEST_ASSERT_TRUE_MESSAGE(bOff != std::string::npos && bNotify != std::string::npos && bAuto != std::string::npos && bElse != std::string::npos &&
+                                 bOff < bNotify && bNotify < bAuto && bAuto < bElse,
+                             "--autoupdate off/notify/auto branch order changed");
+    const std::string offNotify = body.substr(bOff, bAuto - bOff);
+    TEST_ASSERT_TRUE_MESSAGE(offNotify.find("fwNetSafeboot") == std::string::npos, "--autoupdate off/notify must not need Safeboot");
+    const std::string autoBr = body.substr(bAuto, bElse - bAuto);
+    const size_t chk = autoBr.find("if(!fwNetSafebootCapable())");
+    const size_t err = autoBr.find("[ERR];autoupdate;safeboot_too_old;ver;%d;need;%d\\n");
+    const size_t hint = autoBr.find("[AU];note;flash once with the web flasher to install the new Safeboot");
+    const size_t ret = autoBr.find("return;", chk);
+    const size_t set2 = autoBr.find("meshcom_settings.node_autoupd = 2;");
+    TEST_ASSERT_TRUE_MESSAGE(chk != std::string::npos && err != std::string::npos && hint != std::string::npos && ret != std::string::npos && set2 != std::string::npos,
+                             "--autoupdate auto lacks the capability check, the refuse line, the hint or the return");
+    TEST_ASSERT_TRUE_MESSAGE(chk < err && err < hint && hint < ret && ret < set2, "--autoupdate auto must refuse (and return) before node_autoupd = 2");
+    TEST_ASSERT_TRUE_MESSAGE(autoBr.find("save_settings") == std::string::npos, "the auto branch saves before the shared save_settings() after the refuse");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings();", bElse) != std::string::npos && bElse < body.find("save_settings();", bElse),
+                             "the shared save_settings() must stay after the refuse");
+    TEST_ASSERT_TRUE_MESSAGE(autoBr.find("fwNetSafebootVersion(), AU_SAFEBOOT_MIN") != std::string::npos, "the refuse line does not report version and need");
+
+    // boot demotion: once, only when auto, to notify, saved, announced; no reboot
+    const size_t tick = m.find("static void auTick(void)");
+    const size_t loop = m.find("void esp32loop()");
+    TEST_ASSERT_TRUE_MESSAGE(tick != std::string::npos && loop != std::string::npos && tick < loop, "auTick() not found");
+    const std::string t = m.substr(tick, loop - tick);
+    const size_t once = t.find("static bool s_auBootCapChecked = false;");
+    const size_t cond = t.find("meshcom_settings.node_autoupd == 2 && !fwNetSafebootCapable()");
+    const size_t dem = t.find("meshcom_settings.node_autoupd = 1;", cond);
+    const size_t sv = t.find("save_settings();", dem);
+    const size_t msg = t.find("[AU];refuse;safeboot_too_old;mode;notify;ver;%d;need;%d\\n", sv);
+    const size_t timerInit = t.find("fwTimerInit(");
+    TEST_ASSERT_TRUE_MESSAGE(once != std::string::npos && cond != std::string::npos && dem != std::string::npos && sv != std::string::npos && msg != std::string::npos,
+                             "auTick lacks the boot demotion (once-flag, condition, node_autoupd = 1, save_settings, refuse line)");
+    TEST_ASSERT_TRUE_MESSAGE(once < cond && cond < dem && dem < sv && sv < msg, "boot demotion order must be: once flag, condition, set notify, save, announce");
+    TEST_ASSERT_TRUE_MESSAGE(t.find("s_auBootCapChecked = true;", once) < cond, "the demotion once-flag is not set before the check");
+    TEST_ASSERT_TRUE_MESSAGE(msg < timerInit, "the boot demotion must run before the AU timer is initialised");
+    TEST_ASSERT_TRUE_MESSAGE(t.substr(once, msg - once).find("ESP.restart") == std::string::npos, "the boot demotion must not reboot");
 }
 
 int main(int, char **)
@@ -1165,5 +1258,7 @@ int main(int, char **)
     RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);
     RUN_TEST(test_old_safeboot_guard_marks_gates_and_reports);
+    RUN_TEST(test_safeboot_capability_gates_auto_update);
+    RUN_TEST(test_safeboot_nocap_is_version_tagged_and_web_order);
     return UNITY_END();
 }

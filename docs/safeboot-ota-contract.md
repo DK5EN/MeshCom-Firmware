@@ -177,3 +177,27 @@ Markers: `[SAFEBOOT];apply;start;tag;..;zlen;..;ilen;..;try;N`, `[SAFEBOOT];appl
 record and restart (at most 3 tries, NVS `fwstage`/`tries`); deterministic failures drop it and `last`.
 Any entry into Safeboot (also a manual `--ota-update` for a web upload) applies a staged record first.
 Design: `docs/concept-open-issues-20261004.md` section 4 (AU-D11, D15, D19).
+
+## Capability version (AU-12, since 2026-10-05)
+
+The Safeboot image's `esp_app_desc_t` is blank, so its capability version travels as one marker literal in
+the image: `MCSB;ver;NNN` (3 digits), emitted by `src/safeboot/main.cpp` from `SAFEBOOT_MARKER` in
+`src/safeboot/safeboot_ver.h`, plus the boot line `[SAFEBOOT];ver;N`. The app scans the `safeboot` factory
+partition once per boot (`fwNetSafebootVersion()`, 256 B chunks) and derives:
+
+| Version | Meaning                                                                                   |
+| ------- | ----------------------------------------------------------------------------------------- |
+| -1      | no `safeboot` partition, or unreadable                                                    |
+| 0       | no marker and not AU-aware (older than the staged-apply image): too old                   |
+| 1       | no marker, but the strings `FWS2`, `fwstage` and `nocap` are all present (first AU image) |
+| N >= 2  | marker found; N is the Safeboot capability version (current: 2)                           |
+
+`AU_SAFEBOOT_MIN` (currently 1) is the lowest version auto update runs on. Raise `SAFEBOOT_VERSION` whenever
+Safeboot gains behaviour the app relies on, and `AU_SAFEBOOT_MIN` in the same change if the app needs it; a
+Safeboot newer than the app knows is accepted. While `fwNetSafebootCapable()` is false (version below the
+minimum, or the handover-failure flag `nocap` set): `--autoupdate auto` is refused
+(`[ERR];autoupdate;safeboot_too_old`), a stored auto mode drops to notify at boot
+(`[AU];refuse;safeboot_too_old;mode;notify`), the automatic handover is blocked, the web dropdown is greyed
+out with a footnote ("flash once with the web flasher"), and `--update status` ends in
+`;safeboot;old;sbver;N;sbneed;M`. Notify, off and `--update apply` stay available. OTA and auto update never
+replace Safeboot; only the web flasher does.

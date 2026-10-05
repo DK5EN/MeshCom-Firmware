@@ -235,6 +235,16 @@ bool fwNetMarkHandover(const char *tag);
 void fwNetUnmarkHandover(void);
 bool fwNetSafebootOld(void);
 
+// Safeboot capability version (AU-12, src/safeboot/safeboot_ver.h). The Safeboot partition is scanned
+// once per boot (first call) for its embedded version marker; the result is cached.
+//   fwNetSafebootVersion  -1 = partition missing or unreadable, 0 = old (no marker, not AU-aware),
+//                         1 = first AU-aware image (recognised by strings), N >= 2 = marker version.
+//   fwNetSafebootCapable  true when the version is >= AU_SAFEBOOT_MIN and fwNetSafebootOld() is false
+//                         (the handover backstop above still overrides a good scan). Auto update may
+//                         only be switched on, and the automatic handover only runs, while this is true.
+int fwNetSafebootVersion(void);
+bool fwNetSafebootCapable(void);
+
 // Removes the record and Safeboot's "tries" counter and clears the cached staged flag. Used
 // when a handover cannot succeed (no Safeboot partition, boot partition not settable), so
 // it is not retried at every boot (also removes "hand"). The "last" tag (reinstall guard) stays.

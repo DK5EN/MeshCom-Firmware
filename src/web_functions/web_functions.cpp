@@ -33,6 +33,7 @@
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #if defined(ESP32)
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
+#include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the Firmware Update card footnote (header-only)
 #ifndef MC_ENV_NAME
 #define MC_ENV_NAME ""
 #endif
@@ -3173,13 +3174,14 @@ void sub_page_setup()
     {
         const int au_mode = meshcom_settings.node_autoupd;                 // 0 off, 1 notify (console only), 2 auto
         const int au_chan = meshcom_settings.node_updchan ? 1 : 0;         // 0 prod, 1 dev
+        const bool au_sb_ok = fwNetSafebootCapable();                      // AU-12: Safeboot new enough for staged updates
         web_client.println("<div class=\"cardlayout collapsablecard\">");
         web_client.println("<label class=\"cardlabel\">Firmware Update</label>");
         web_client.println("<span>Open this for the firmware auto update.</span>\n");
         web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
         web_client.println("<div class=\"grid grid2\">");
         web_client.println("<label for=\"aumode\">Auto update</label>");
-        web_client.println("<select id=\"aumode\" name=\"aumode\" onchange=\"setvalue('aumode',this.value,true);\">");
+        web_client.printf("<select id=\"aumode\" name=\"aumode\"%s onchange=\"setvalue('aumode',this.value,true);\">\r\n", au_sb_ok ? "" : " disabled");
         // notify (console only): a selected, disabled placeholder, so choosing prod or dev always fires onchange
         if (au_mode == 1)
             web_client.printf("\t<option value=\"\" selected disabled>notify (%s, set on the console)</option>\n", au_chan ? "dev" : "prod");
@@ -3190,6 +3192,18 @@ void sub_page_setup()
         if (au_mode == 1)
             web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">(notify mode set on the console -- choosing prod/dev switches to automatic install)</p>");
         web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">prod/dev install automatically at 03:00-05:00 local; WiFi starts after a reboot if no other network service is on</p>");
+        if (!au_sb_ok)
+        {
+            // AU-12: auto update is locked until Safeboot is new enough; OTA and auto update never replace Safeboot
+            const int au_sb_ver = fwNetSafebootVersion();
+            char au_sb_found[16];
+            if (au_sb_ver >= 1)
+                snprintf(au_sb_found, sizeof(au_sb_found), "v%d", au_sb_ver);
+            else
+                snprintf(au_sb_found, sizeof(au_sb_found), "%s", au_sb_ver == 0 ? "none (old)" : "unreadable");
+            web_client.printf("<p class=\"font-small\" style=\"grid-column:1/-1\">Auto update needs a newer Safeboot (found: %s, required: v%d). Flash this node once with the web flasher to install it; OTA and auto update never replace Safeboot.</p>\n",
+                au_sb_found, AU_SAFEBOOT_MIN);
+        }
         web_client.println("</div>");
         web_client.println("</div>");
     }
@@ -3809,7 +3823,7 @@ void sub_page_info()
                 web_client.printf(" (staged: %s)", htmlEscape(String(au.stagedTag)).c_str());
             else if (auNewer && !au.installable)
                 web_client.print(" (no installable image for this board)");
-            if (fwNetSafebootOld())
+            if (!fwNetSafebootCapable())
                 web_client.print(" -- Safeboot on this node is too old to install updates: update it once via the web flasher");
             web_client.print("<br>");
             if (auNewer && au.installable && !auSame && au.state != FWS_BUSY)

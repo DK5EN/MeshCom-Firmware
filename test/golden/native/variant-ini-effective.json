@@ -3544,7 +3544,8 @@
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
-   "test_safeboot_state"
+   "test_safeboot_state",
+   "test_safeboot_ver"
   ],
   "test_framework": "unity"
  },

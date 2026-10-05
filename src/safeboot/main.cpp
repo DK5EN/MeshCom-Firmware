@@ -26,7 +26,14 @@
 #include "../configuration_global.h"
 #include "../esp32/esp32_flash.h"
 #include "../esp32/netif_mtu.h"
+#include "safeboot_ver.h"
 #include "safeboot_log.h" // keep last: renames Serial on the S3
+
+// AU-12: capability version marker. The image's esp_app_desc_t is blank, so the app finds the version by
+// scanning this partition for the marker literal (safeboot_ver.h). Exactly one literal, kept by `used`.
+static const char kSafebootMarker[] __attribute__((used)) = SAFEBOOT_MARKER;
+static_assert(sizeof(SAFEBOOT_MARKER) - 1 == SAFEBOOT_MARKER_PREFIX_LEN + SAFEBOOT_MARKER_DIGITS,
+              "SAFEBOOT_MARKER must be prefix + zero-padded digits");
 
 #if SAFEBOOT_LOG_TEE
 SafebootTee SafebootSerial;
@@ -703,6 +710,7 @@ void wifiConnect() {
    delay(1000);
    Serial.println("\n-----------------------------");
    Serial.println("OTA UDATE started");
+   Serial.printf("[SAFEBOOT];ver;%d\n", SAFEBOOT_VERSION);
 
    // AU-07: apply a staged update (offline, before any network). Returns
    // only if there is nothing staged or the apply failed; on success it

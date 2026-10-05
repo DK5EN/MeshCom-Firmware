@@ -267,10 +267,13 @@ void webSetup_setParam(setupStruct *setupData){
                 snprintf(message_text, sizeof(message_text), "--autoupdate off");
                 commandAction(message_text, bPhoneReady);
             } else {
-                snprintf(message_text, sizeof(message_text), "--updchan %s", auDev ? "dev" : "prod");
-                commandAction(message_text, bPhoneReady);
+                // AU-12: auto first, so a refusal (Safeboot too old) leaves the channel untouched
                 snprintf(message_text, sizeof(message_text), "--autoupdate auto");
                 commandAction(message_text, bPhoneReady);
+                if(meshcom_settings.node_autoupd == 2) {
+                    snprintf(message_text, sizeof(message_text), "--updchan %s", auDev ? "dev" : "prod");
+                    commandAction(message_text, bPhoneReady);
+                }
             }
         }
         const char *cur = (meshcom_settings.node_autoupd == 2) ? (meshcom_settings.node_updchan ? "dev" : "prod") : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
