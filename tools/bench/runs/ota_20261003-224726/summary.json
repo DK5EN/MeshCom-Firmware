@@ -1,0 +1,16 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "env": "t_deck_plus",
+  "host": null,
+  "ip": "192.168.68.71",
+  "target": "192.168.68.71",
+  "bin": ".pio/build/t_deck_plus/firmware.bin",
+  "expect_hardware": "TDECK+",
+  "started": "2026-10-03 22:47:26",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261003-224726",
+  "verdict": "FAIL",
+  "fails": [
+    "t-deck-14: refused -- no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console"
+  ],
+  "warnings": []
+}

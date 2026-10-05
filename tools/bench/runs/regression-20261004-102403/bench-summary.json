@@ -1,0 +1,336 @@
+{
+  "summary": "18 ok, 1 failed, 0 skipped of 19 steps; nodes: rak-90@/dev/cu.usbmodem1101, t-beam-92@/dev/cu.usbserial-573C0005841, t-deck-14@/dev/cu.usbmodem101; not attached: heltec-1",
+  "steps": [
+    {
+      "name": "prepare rak-90",
+      "node": "rak-90",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--node",
+        "rak-90"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 7.2,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-01-prepare-rak-90.log",
+      "detail": ""
+    },
+    {
+      "name": "rak harness rak-90",
+      "node": "rak-90",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/rak_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--out",
+        "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/rak-90-harness.json",
+        "--node",
+        "rak-90",
+        "--peer-port",
+        "/dev/cu.usbserial-573C0005841"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 173.6,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-02-rak-harness-rak-90.log",
+      "detail": ""
+    },
+    {
+      "name": "prepare t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--node",
+        "t-beam-92"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 12.5,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-03-prepare-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "oled harness t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/oled_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--out",
+        "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/t-beam-92-harness.json"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 108.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-04-oled-harness-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "build ttgo_tbeam",
+      "node": "t-beam-92",
+      "argv": [
+        "pio",
+        "run",
+        "-e",
+        "ttgo_tbeam"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 42.9,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-05-build-ttgo_tbeam.log",
+      "detail": ""
+    },
+    {
+      "name": "verify instrument ttgo_tbeam",
+      "node": "t-beam-92",
+      "argv": [
+        "sh",
+        "-c",
+        "strings .pio/build/ttgo_tbeam/firmware.elf | grep -q 'SRVIP\\];err'"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.0,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-06-verify-instrument-ttgo_tbeam.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.75/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-07-wait-web-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "ota regression t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/ota_regression.py",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--env",
+        "ttgo_tbeam",
+        "--ip",
+        "192.168.68.75",
+        "--settings-check",
+        "--node",
+        "t-beam-92"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 59.4,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-08-ota-regression-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-beam-92 (after ota)",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.75/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-09-wait-web-t-beam-92-(after-ota).log",
+      "detail": ""
+    },
+    {
+      "name": "webgui badge t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "node",
+        "--insecure-http-parser",
+        "tools/webgui_badge_test.js",
+        "http://192.168.68.75/"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 7.6,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-10-webgui-badge-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "prepare t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbmodem101",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 5.4,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-11-prepare-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "tdeck harness t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/tdeck_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbmodem101",
+        "--out",
+        "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/t-deck-14-harness.json",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 505.2,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-12-tdeck-harness-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "build t_deck_plus",
+      "node": "t-deck-14",
+      "argv": [
+        "pio",
+        "run",
+        "-e",
+        "t_deck_plus"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 55.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-13-build-t_deck_plus.log",
+      "detail": ""
+    },
+    {
+      "name": "verify instrument t_deck_plus",
+      "node": "t-deck-14",
+      "argv": [
+        "sh",
+        "-c",
+        "strings .pio/build/t_deck_plus/firmware.elf | grep -q 'SRVIP\\];err'"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.0,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-14-verify-instrument-t_deck_plus.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.70/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-15-wait-web-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "ota regression t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/ota_regression.py",
+        "--port",
+        "/dev/cu.usbmodem101",
+        "--env",
+        "t_deck_plus",
+        "--ip",
+        "192.168.68.70",
+        "--settings-check",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 58.7,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-16-ota-regression-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-deck-14 (after ota)",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.70/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-17-wait-web-t-deck-14-(after-ota).log",
+      "detail": ""
+    },
+    {
+      "name": "webgui badge t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "node",
+        "--insecure-http-parser",
+        "tools/webgui_badge_test.js",
+        "http://192.168.68.70/"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 7.4,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-18-webgui-badge-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "mesh exchange",
+      "node": "fleet",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/mesh_exchange.py",
+        "--out",
+        "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/mesh-exchange.json",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--port",
+        "/dev/cu.usbmodem101"
+      ],
+      "status": "FAIL",
+      "rc": 1,
+      "seconds": 143.0,
+      "log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/regression-20261004-102403/stage3-19-mesh-exchange.log",
+      "detail": ""
+    }
+  ]
+}

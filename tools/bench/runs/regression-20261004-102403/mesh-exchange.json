@@ -1,0 +1,70 @@
+{
+  "calls": [
+    "DK5EN-90",
+    "DK5EN-92",
+    "DK5EN-14"
+  ],
+  "heard": {
+    "DK5EN-14": [
+      "DK5EN-90",
+      "DK5EN-92",
+      "DK5EN-98"
+    ],
+    "DK5EN-90": [
+      "DK5EN-14",
+      "DK5EN-92",
+      "DK5EN-98"
+    ],
+    "DK5EN-92": [
+      "DK5EN-14",
+      "DK5EN-98"
+    ]
+  },
+  "matrix": {
+    "DK5EN-14": {
+      "DK5EN-90": true,
+      "DK5EN-92": true
+    },
+    "DK5EN-90": {
+      "DK5EN-14": true,
+      "DK5EN-92": false
+    },
+    "DK5EN-92": {
+      "DK5EN-14": true,
+      "DK5EN-90": true
+    }
+  },
+  "mheard_raw": {
+    "DK5EN-14": "receiveflag\n[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n\n[MC-DBG] RX_FLAG_PROCESS ts=159165\n[MC-DBG] RX_RESTARTED src=after_readData state=0\n[LoRa]...Received packet: RSSI:\t\t-44 dBm / SNR:\t\t5 dB / Frequency error:\t2289.16 Hz\n[MC-DBG] RX_DEDUP_DUP msg_id=1AE1E30B slot=7\n[NBR]|ME|2|DK5EN-92|T|-44|113|5\n10:46:51 MH-LoRa 059 : x1AE1E30B H03 S0 T0 M01 DK5EN-98,DK5EN-92>OE5HWN-12:OE5HWN-12:ack285 HW:43 MOD:8/8 FCS:0E05 FW:40:a LH:8C\n\n[MC-DBG] ONRXDONE_TIME ms=2\nOnRxDone\n[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n[MC-TEST] RX_FRAME len=59 rssi=-44 snr=5 hex=3A0BE3E11A13444B35454E2D39382C444B35454E2D39323E4F453548574E2D31323A4F453548574E2D31323A61636B323835002B880E05288C617E\n[MC-DBG] CHANNEL_UTIL rx=706ms tx=709ms util=14%\n[MC-DBG] ONRXDONE_STATS max=2ms warn=0 (>50ms)\n--mheard\n[MH] window=720min rows=4\n[MH] call=DK5EN-92 2026.10.04 10:46:51 typ=TXT hw=TB_2101 mod=8/8 rssi=-44dBm snr=5dB dist=0.0km ncnt=2 age=0min hm=11dB role=R ex=0 nb=5 gw=N lat=N48.408 lon=E011.738 alt=490m\n[MH] call=DK5EN-98 2026.10.04 10:46:39 typ=HEY hw=HELTV3 mod=8/8 rssi=-71dBm snr=6dB dist=0.0km ncnt=6 age=0min hm=6dB role=S ex=4 nb=9 gw=N lat=N48.408 lon=E011.738 alt=480m\n[MH] call=DK5EN-90 2026.10.04 10:45:37 typ=POS hw=RAK4631 mod=8/8 rssi=-58dBm snr=7dB dist=0.1km ncnt=3 age=1min hm=6dB role=R ex=0 nb=4 gw=N lat=N48.408 lon=E011.738 alt=484m\n[MH] call=DK5EN-1 2026.10.04 09:01:48 typ=HEY hw=HELTV3 mod=8/8 rssi=-45dBm snr=7dB dist=0.0km ncnt=4 age=105min hm=6dB role=R ex=0 nb=5 gw=N lat=N48.408 lon=E011.738 alt=484m",
+    "DK5EN-90": "[MC-DBG] CHANNEL_UTIL rx=2023ms tx=0ms util=20%\n[MC-DBG] ONRXDONE_STATS max=5ms warn=0 (>50ms)\n--mheard\n[MH] window=720min rows=3\n[MH] call=DK5EN-14 2026.10.04 10:46:47 typ=TXT hw=TDECK_PLUS mod=8/8 rssi=-59dBm snr=7dB dist=0.0km ncnt=3 age=0min hm=6dB role=R ex=0 nb=3 gw=N lat=N48.408 lon=E011.738 alt=515m\n[MH] call=DK5EN-98 2026.10.04 10:46:43 typ=TXT hw=HELTEC_V3 mod=8/8 rssi=-66dBm snr=7dB dist=0.0km ncnt=7 age=0min hm=6dB role=S ex=2 nb=6 gw=N lat=N48.408 lon=E011.738 alt=480m\n[MH] call=DK5EN-92 2026.10.04 10:45:28 typ=HEY hw=TBEAM_AXP2101 mod=8/8 rssi=-61dBm snr=7dB dist=0.1km ncnt=2 age=1min hm=12dB role=R ex=0 nb=4 gw=N lat=N48.408 lon=E011.738 alt=490m\n[ETH];link;up;link;1;link_age_s;1140;ip;192.168.68.77;dest;89.185.97.38;hb_age_s;1140;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;1159554\n[MC-DBG] RX_DEDUP_DUP msg_id=1AE1E30B slot=44\n10:46:51 [LOG] 059 : x1AE1E30B H03 S0 T0 M01 DK5EN-98,DK5EN-92>OE5HWN-12:OE5HWN-12:ack285 HW:43 MOD:8/8 FCS:0E05 FW:40:a LH:8C RSSI:-62 SNR:7 DUP:d OWN:- t=1160422\n[NBR]|ME|19|DK5EN-92|T|-62|31|7\n10:46:51 MH-LoRa 059 : x1AE1E30B H03 S0 T0 M01 DK5EN-98,DK5EN-92>OE5HWN-12:OE5HWN-12:ack285 HW:43 MOD:8/8 FCS:0E05 FW:40:a LH:8C\n\n[MC-DBG] ONRXDONE_TIME ms=5\nOnRxDone\n[MC-DBG] RX_BUF_RELEASE buf=0\n[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n[MC-TEST] RX_FRAME len=59 rssi=-62 snr=7 hex=3A0BE3E11A13444B35454E2D39382C444B35454E2D39323E4F453548574E2D31323A4F453548574E2D31323A61636B323835002B880E05288C617E",
+    "DK5EN-92": "[MC-DBG] RX_TIMEOUT_FIRE ts=135289 wait=3035 delta=3035\n[MC-SM] IDLE -> RX_LISTEN rc=0\n[MC-DBG] RX_RESTART src=timeout state=0\n10:46:50 [LoRa]...Receive Timeout, startReceive again with sucess\n[MC-SM] IDLE -> TX_PREPARE rc=0\n[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=2\n[CHECK] radio.scanChannel() / 1\n[MC-DBG] CAD_SCAN result=-15\n[MC-DBG] CAD_FREE attempt=2\n[MC-DBG] RING_TX_READ slot=6 prio=3 type=3A status=FF len=59 msg_id=1AE1E30B retry=0 queued=1/20 lat=12786ms\n[MC-DBG] RADIO_TX len=59 kind=msg\n10:46:50 [LOG] TX x1AE1E30B : H03 prio=3 src=r wait=12786 q=1 cad=0 len=59 t=135341\n10:46:50 TX-LoRa  059 : x1AE1E30B H03 S0 T0 M01 DK5EN-98,DK5EN-92>OE5HWN-12:OE5HWN-12:ack285 HW:43 MOD:8/8 FCS:0E05 FW:40:a LH:8C\n[MC-SM] TX_PREPARE -> TX_ACTIVE rc=0\n[MC-DBG] TX_START qlen=0\ntransmittedFlag\n[MC-SM] TX_ACTIVE -> TX_DONE rc=0\n[MC-DBG] TX_DONE state=0 ts=136054\ntransmission finished!\nOnTXDone\n[MC-SM] TX_DONE -> RX_LISTEN rc=0\n[MC-DBG] RX_RESTARTED src=after_tx state=0\n--mheard\n[MH] window=720min rows=2\n[MH] call=DK5EN-98 2026.10.04 10:46:38 typ=HEY hw=HELTEC_V3 mod=8/8 rssi=-65dBm snr=13dB dist=NAkm ncnt=0 age=0min hm=5dB role=N ex=1 nb=3 gw=N lat=NA lon=NA alt=NAm\n[MH] call=DK5EN-14 2026.10.04 10:45:33 typ=POS hw=TDECK_PLUS mod=8/8 rssi=-54dBm snr=14dB dist=NAkm ncnt=0 age=1min hm=NAdB role=R ex=0 nb=3 gw=N lat=NA lon=NA alt=NAm"
+  },
+  "missing": [
+    [
+      "DK5EN-90",
+      "DK5EN-92"
+    ]
+  ],
+  "ok": false,
+  "ports": [
+    "/dev/cu.usbmodem1101",
+    "/dev/cu.usbserial-573C0005841",
+    "/dev/cu.usbmodem101"
+  ],
+  "tx_evidence": {
+    "DK5EN-14": [
+      "10:46:33 TX-LoRa  105 ! x4106E191 H01 S0 T1 M01 DK5EN-92,DK5EN-14>*!4824.45N/01144.29E#Mobil Node#Martin/B=100/A=001608/N2/R=9;20;232;262; HW:12 MOD:8/8 FCS:1894 FW:40:a LH:AE",
+      "OnTXDone",
+      "10:46:47 TX-LoRa  059 : x1AE1E30B H03 S0 T0 M01 DK5EN-98,DK5EN-14>OE5HWN-12:OE5HWN-12:ack285 HW:43 MOD:8/8 FCS:0DFF FW:40:a LH:AE"
+    ],
+    "DK5EN-90": [
+      "10:45:36 TX-LoRa  079 ! x91A43596 H02 S0 T1 M00 DK5EN-90>*!4824.48N/01144.28E#/B=100/A=001588/N3/R=9;20;232;262; HW:09 MOD:8/8 FCS:1095 FW:40:a LH:89",
+      "OnTXDone"
+    ],
+    "DK5EN-92": [
+      "10:46:05 TX-LoRa  096 ! x4106E191 H02 S0 T1 M01 DK5EN-92>*!4824.45N/01144.29E#Mobil Node#Martin/B=100/A=001608/N2/R=9;20;232;262; HW:12 MOD:8/8 FCS:1680 FW:40:a LH:8C",
+      "OnTXDone",
+      "10:46:21 TX-LoRa  029 @ x4106E192 H04 S0 T0 M01 DK5EN-92>H@R2; HW:12 MOD:8/8 FCS:0616 FW:40:a LH:8C"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "port": "/dev/cu.usbserial-0001",
+  "env": "heltec_wifi_lora_32_V3",
+  "host": null,
+  "ip": "192.168.68.76",
+  "target": "192.168.68.76",
+  "bin": ".pio/build/heltec_wifi_lora_32_V3/firmware.bin",
+  "expect_hardware": "HELTEC_V3",
+  "started": "2026-10-03 22:31:31",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261003-223131",
+  "verdict": "FAIL",
+  "fails": [
+    "heltec-1: refused -- no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console; clock not set (UPDATE year None, source INIT)"
+  ],
+  "warnings": []
+}

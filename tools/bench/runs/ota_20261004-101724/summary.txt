@@ -1,0 +1,25 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261004-101724
+started            2026-10-04 10:17:24
+port               /dev/cu.usbmodem101
+env                t_deck_plus  expect_hw TDECK+
+target             http://192.168.68.70/
+firmware           .pio/build/t_deck_plus/firmware.bin  md5 ?
+field         before                    after
+build         Oct  4 2026 / 08:21:50    -
+call          DK5EN-14                  -
+hardware      TDECK+                    -
+hw_idx        46                        -
+lora_bw       250                       -
+lora_cr       6                         -
+lora_freq     433.1750                  -
+lora_power    2                         -
+lora_sf       11                        -
+maxhop_pos    2                         -
+maxhop_text   4                         -
+node_id       A1AD65E0                  -
+version       4.40a                     -
+webserver     on                        -
+wifi_localip  192.168.68.70             -
+wifi_ssid     ORBI63                    -
+verdict            FAIL
+  !! firmware not found: .pio/build/t_deck_plus/firmware.bin

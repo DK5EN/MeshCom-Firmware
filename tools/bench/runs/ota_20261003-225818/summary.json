@@ -1,0 +1,16 @@
+{
+  "port": "/dev/cu.usbserial-573C0005841",
+  "env": "ttgo_tbeam",
+  "host": null,
+  "ip": "192.168.68.75",
+  "target": "192.168.68.75",
+  "bin": ".pio/build/ttgo_tbeam/firmware.bin",
+  "expect_hardware": "TBEAM",
+  "started": "2026-10-03 22:58:18",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261003-225818",
+  "verdict": "FAIL",
+  "fails": [
+    "t-beam-92: refused -- no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console; clock not set (UPDATE year None, source INIT)"
+  ],
+  "warnings": []
+}

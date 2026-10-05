@@ -1,0 +1,82 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "env": "t_deck_plus",
+  "host": null,
+  "ip": "192.168.68.70",
+  "target": "192.168.68.70",
+  "bin": ".pio/build/t_deck_plus/firmware.bin",
+  "expect_hardware": "TDECK+",
+  "started": "2026-10-04 08:31:45",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261004-083145",
+  "before": {
+    "version": "4.40a",
+    "build": "Oct  4 2026 / 08:21:50",
+    "call": "DK5EN-14",
+    "node_id": "A1AD65E0",
+    "hw_idx": "46",
+    "hardware": "TDECK+",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.70"
+  },
+  "ota_md5": "ebb45c78d347096cf18a27c5c61a72c4",
+  "ota": {
+    "ok": true,
+    "stage": "done",
+    "error": null,
+    "timings": {
+      "precheck_s": 2.4023313330253586,
+      "trigger_safeboot_s": 10.014809165993938,
+      "safeboot_wait_s": 0.9933308330073487,
+      "ota_start_s": 0.01600670799962245,
+      "upload_s": 15.029212916997494,
+      "reboot_wait_s": 16.64590233299532,
+      "total_s": 45.10810158299864
+    },
+    "before": {
+      "hardware": "TDECK+",
+      "build": "Oct  4 2026 / 08:21:58",
+      "version": "4.40a"
+    },
+    "after": {
+      "hardware": "TDECK+",
+      "build": "Oct  4 2026 / 08:21:58",
+      "version": "4.40a"
+    },
+    "md5": "ebb45c78d347096cf18a27c5c61a72c4",
+    "fw_size": 2288768
+  },
+  "boot_ready": true,
+  "wifi_rejoined": true,
+  "resets_after_ota": 2,
+  "after": {
+    "version": "4.40a",
+    "build": "Oct  4 2026 / 08:21:50",
+    "call": "DK5EN-14",
+    "node_id": "A1AD65E0",
+    "hw_idx": "46",
+    "hardware": "TDECK+",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.70"
+  },
+  "settings_diffs": [],
+  "warnings": [],
+  "fails": [],
+  "verdict": "PASS",
+  "total_s": 63.88469099998474
+}

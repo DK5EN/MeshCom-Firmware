@@ -1,0 +1,140 @@
+{
+  "boot": {
+    "ok": false,
+    "port_gone_after_s": null,
+    "boots": [
+      {
+        "start_client": 11.01,
+        "flash": 11.83,
+        "client_started": 23.24,
+        "resetreas": "0x00000004",
+        "eth_init": 23.44,
+        "ready": 27.1,
+        "ready_fw_ms": 16932,
+        "ip": 0,
+        "eth": 1,
+        "eth_ip": 57.25
+      }
+    ],
+    "boot_count": 1,
+    "crash_lines": [
+      "00:00:27 [LOG] 123 ! xF6A5B173 H00 S1 T0 M01 DB0ISM-1,DB0ED-99,DK5EN-98>*!4813.24N/01139.99ErWasserturm Ismaning/B=080/A=001617/N8/R=20;262;2628;26283;9; HW:43 MOD:8/8 FCS:1F65 FW:35:p LH:AB RSSI:-64 SNR:6 DUP:n OWN:- t=45459"
+    ],
+    "double_boot": false
+  },
+  "info": {
+    "ok": true,
+    "answered_lines": 39,
+    "call_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "hw_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "gateway_line": "...Webserver  on / Webpwd <> / Gateway off "
+  },
+  "instr": {
+    "ok": true,
+    "seconds": 60.0,
+    "loop_n": 603,
+    "loop_avg_us": 100746,
+    "loop_max_us": 115235,
+    "gaps": 0,
+    "gap_events": [],
+    "sections": {
+      "clock": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_sm": {
+        "n": 10,
+        "avg_us": 878,
+        "max_us": 5859
+      },
+      "ble_settings": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "hey_tx": {
+        "n": 1,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "telemetry": {
+        "n": 4,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_tick": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "serial_cmd": {
+        "n": 604,
+        "avg_us": 1,
+        "max_us": 976
+      },
+      "webserver_loop": {
+        "n": 604,
+        "avg_us": 863,
+        "max_us": 977
+      },
+      "lora_rx_timeout": {
+        "n": 599,
+        "avg_us": 14,
+        "max_us": 977
+      },
+      "lora_tx": {
+        "n": 1,
+        "avg_us": 5859,
+        "max_us": 5859
+      },
+      "pos_timer": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "udp": {
+        "n": 604,
+        "avg_us": 93,
+        "max_us": 977
+      },
+      "eth_state": {
+        "n": 604,
+        "avg_us": 1,
+        "max_us": 977
+      },
+      "eth_dhcp": {
+        "n": 2,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 103064,
+    "heap_largest": 33880,
+    "worst_section": "lora_sm"
+  },
+  "lora": {
+    "ok": true,
+    "first_line": "16:22:56 TX-LoRa  079 ! x91A43723 H02 S0 T1 M00 DK5EN-90>*!4824.48N/01144.28E#/B=100/A=001588/N3/R=9;20;232;262; HW:09 M",
+    "tx_lines": [
+      "16:22:56 TX-LoRa  079 ! x91A43723 H02 S0 T1 M00 DK5EN-90>*!4824.48N/01144.28E#/B=100/A=001588/N3/R=9;20;232;262; HW:09 MOD:8/8 FCS:1024 FW:40:a LH:89",
+      "OnTXDone"
+    ],
+    "peer_port": "/dev/cu.usbserial-573C0005841",
+    "peer_heard_us": true
+  },
+  "mheard": {
+    "ok": true,
+    "calls_heard": [
+      "DK5EN-14",
+      "DK5EN-92",
+      "DK5EN-98"
+    ],
+    "lines": 13
+  }
+}

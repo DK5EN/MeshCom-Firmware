@@ -1,0 +1,25 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261004-100831
+started            2026-10-04 10:08:31
+port               /dev/cu.usbserial-573C0005841
+env                ttgo_tbeam  expect_hw TBEAM
+target             http://192.168.68.75/
+firmware           .pio/build/ttgo_tbeam/firmware.bin  md5 ?
+field         before                    after
+build         Oct  4 2026 / 08:17:21    -
+call          DK5EN-92                  -
+hardware      TBEAM_AXP2101             -
+hw_idx        12                        -
+lora_bw       250                       -
+lora_cr       6                         -
+lora_freq     433.1750                  -
+lora_power    2                         -
+lora_sf       11                        -
+maxhop_pos    2                         -
+maxhop_text   4                         -
+node_id       E0D041B8                  -
+version       4.40a                     -
+webserver     on                        -
+wifi_localip  192.168.68.75             -
+wifi_ssid     ORBI63                    -
+verdict            FAIL
+  !! firmware not found: .pio/build/ttgo_tbeam/firmware.bin

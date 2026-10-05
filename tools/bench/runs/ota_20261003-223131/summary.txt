@@ -1,0 +1,8 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261003-223131
+started            2026-10-03 22:31:31
+port               /dev/cu.usbserial-0001
+env                heltec_wifi_lora_32_V3  expect_hw HELTEC_V3
+target             http://192.168.68.76/
+firmware           .pio/build/heltec_wifi_lora_32_V3/firmware.bin  md5 ?
+verdict            FAIL
+  !! heltec-1: refused -- no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console; clock not set (UPDATE year None, source INIT)

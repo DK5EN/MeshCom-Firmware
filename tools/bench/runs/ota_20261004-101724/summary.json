@@ -1,0 +1,34 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "env": "t_deck_plus",
+  "host": null,
+  "ip": "192.168.68.70",
+  "target": "192.168.68.70",
+  "bin": ".pio/build/t_deck_plus/firmware.bin",
+  "expect_hardware": "TDECK+",
+  "started": "2026-10-04 10:17:24",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261004-101724",
+  "before": {
+    "version": "4.40a",
+    "build": "Oct  4 2026 / 08:21:50",
+    "call": "DK5EN-14",
+    "node_id": "A1AD65E0",
+    "hw_idx": "46",
+    "hardware": "TDECK+",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.70"
+  },
+  "verdict": "FAIL",
+  "fails": [
+    "firmware not found: .pio/build/t_deck_plus/firmware.bin"
+  ],
+  "warnings": []
+}

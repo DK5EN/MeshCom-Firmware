@@ -1,0 +1,8 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261003-232532
+started            2026-10-03 23:25:32
+port               /dev/cu.usbmodem101
+env                t_deck_plus  expect_hw TDECK+
+target             http://192.168.68.70/
+firmware           .pio/build/t_deck_plus/firmware.bin  md5 ?
+verdict            FAIL
+  !! t-deck-14: refused -- no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console

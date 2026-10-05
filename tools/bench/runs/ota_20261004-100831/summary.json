@@ -1,0 +1,34 @@
+{
+  "port": "/dev/cu.usbserial-573C0005841",
+  "env": "ttgo_tbeam",
+  "host": null,
+  "ip": "192.168.68.75",
+  "target": "192.168.68.75",
+  "bin": ".pio/build/ttgo_tbeam/firmware.bin",
+  "expect_hardware": "TBEAM",
+  "started": "2026-10-04 10:08:31",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261004-100831",
+  "before": {
+    "version": "4.40a",
+    "build": "Oct  4 2026 / 08:17:21",
+    "call": "DK5EN-92",
+    "node_id": "E0D041B8",
+    "hw_idx": "12",
+    "hardware": "TBEAM_AXP2101",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.75"
+  },
+  "verdict": "FAIL",
+  "fails": [
+    "firmware not found: .pio/build/ttgo_tbeam/firmware.bin"
+  ],
+  "warnings": []
+}
