@@ -46,7 +46,7 @@ authentication tag.
 - **Where accepted:** LoRa only (`!msg_server`), DM to the exact own call, never group or broadcast.
   The gateway ingress twins are not wired. `RM1 ` DMs are excluded from store-node custody
   (`mboxClassify`), so they never occupy a mailbox slot.
-- **Enable:** `--rm on|off` (default off) and a non-empty `node_passwd`. Otherwise an `RM1 ` DM is
+- **Enable:** `--remotemgmt on|off` (default off) and a non-empty `node_passwd`. Otherwise an `RM1 ` DM is
   ordinary text, shown and forwarded like any other DM.
 - **Execution:** the receive hook (`rmTryQueue` in `lora_functions.cpp`) only copies the text into a
   2-slot queue (`rm_queue.h`, cross-task lock, drop newest). `rmDrain()` in the loop task parses,
@@ -95,7 +95,7 @@ storm); the node prints a serial marker `[RM];reject;<verdict>` and counts it fo
 | `blocked`  | not on the allowlist, bad arguments or forbidden characters                         | none         | yes                   |
 | `rate`     | valid tag, but less than 10 s since the last accepted command or `sync`             | none         | no                    |
 | `lockout`  | RM1 locked for 5 min                                                                | none         | no                    |
-| `disabled` | empty `node_passwd` (the hook already drops `RM1` DMs when `--rm` is off)           | none         | no                    |
+| `disabled` | empty `node_passwd` (the hook already drops `RM1` DMs when `--remotemgmt` is off)   | none         | no                    |
 
 Other markers: `[RM];ok;ctr;<n>` and `[RM];fail;ctr;<n>` (command accepted, execution succeeded or
 not), `[RM];cached;ctr;<n>[;suppressed]`, `[RM];sync;ctr;<hwm>`, `[RM];reboot`,

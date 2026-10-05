@@ -31,7 +31,7 @@ To set a parameter to the node, use:
 	/setparam/?volt=on|off				If set to on, battery SOC will be displayed as voltage instead of percentage
 	/setparam/?mesh=on|off				Enables mesh / forwarding of received LoRa messages via radio
 	/setparam/?gateway=on|off			Enables the gateway function
-	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --rm; stays inactive while no --passwd is set; read-back is the stored switch)
+	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --remotemgmt; stays inactive while no --passwd is set; read-back is the stored switch)
 	/setparam/?aumode=off|prod|dev		(ESP32 only) Firmware auto update, one setting (off = --autoupdate off; prod|dev = --updchan prod|dev then --autoupdate auto, automatic install at 03:00-05:00 local; read-back is off|notify|prod|dev: "notify" while the console set notify mode, prod/dev only in automatic mode; any other value fails)
 	/setparam/?mtu=1280..1500		Sets the MTU of the node's IP interface (same as --mtu; the web server advertises MSS = MTU - 40; default 1280 for HAMNET / VPN, 1500 for a plain LAN; all boards; read-back is the stored MTU, an out-of-range value fails)
 	/setparam/?autoupdate=off|notify|auto	(ESP32 only) kept for compatibility, the setup page uses aumode: Firmware auto update mode (same as --autoupdate; auto installs at 03:00-05:00 local; read-back is the stored mode)
@@ -146,3 +146,59 @@ To send a message using the Web-API, use:
 
 
 This API call is most likely to be changed soon.
+
+
+
+============================================
+Remote Management of another node (RM1, all boards)
+============================================
+
+The setup page's "Remote management" card signs an authenticated RM1 command with the TARGET node's
+password and sends it as a DM from this node (same protocol as the console; the target must have --remotemgmt on
+and the same --passwd). Two dedicated endpoints serve it; they are NOT part of /setparam or /callfunction.
+
+SECURITY: the target password travels once, in clear text, over plain HTTP between the browser and this
+node. Do this only inside a LAN you trust, and set a web password on this node (--webpwd) so that nobody
+else can reach these endpoints. This node uses the password only to derive a key (SHA-256), signs the
+command, keeps the derived key in RAM for 10 minutes to verify the reply and never stores it. The node does
+not log it: the request is not echoed to the debug console, the password is not part of any URL, and the
+receive buffer is wiped after the call.
+
+
+POST /rmsend
+
+	Body (application/x-www-form-urlencoded, every value percent-coded):
+
+		dst=AB1CDE-12&pw=<target password>&cmd=gps&args=on
+
+	dst		the target call incl. SSID (upper case)
+	pw		the target's password (1..14 characters)
+	cmd		reboot | status | sendpos | sendtrack | gps | track | display | gateway | mesh | txpower | setout | sync
+	args		on|off for gps/track/display/gateway/mesh, <n> dBm for txpower (<= board maximum),
+			"<a0..b7> <on|off>" for setout, empty otherwise (sync counter: cmd=sync)
+
+	Answer (JSON):	{"ok":true,"ctr":1760000123}		sent, ctr = the counter used (0 for sync)
+			{"ok":false,"err":"<reason>"}		HTTP 422; reason: size | short | form | passwd | cmd | dst |
+							busy (same target within 10 s) | ctr | store | send
+
+	A GET /rmsend is refused with 405: a password in a URL would be logged by browsers and proxies.
+
+	The command is only SENT: the target's reply arrives later by DM and is verified by the node
+	(see /rmstatus). A reply that fails the check is reported as unverified, never as success.
+
+
+GET /rmstatus
+
+	No parameters. Answer (JSON, printable ASCII only, < > & as \u escapes; never a key, a tag or a password):
+
+	{"on":1,"pw":1,"ok":3,"rej":0,"lock":0,"lockS":0,"hwm":1760000100,
+	 "log":[{"ago":42,"src":"DK5EN-1","ctr":1760000100,"cmd":"gps on","res":"gps=on"}],
+	 "sent":[{"dst":"DK5EN-12","ctr":1760000123,"cmd":"status","ago":8,"rep":1,"ver":1,"reply":"ok v=4.40a up=12"}]}
+
+	on, pw		RM switch of this node, a password is set (yes/no only)
+	ok, rej		commands accepted / rejected since boot (all rejection reasons summed)
+	lock, lockS	lockout active (3 rejects in 90 s) and the seconds left
+	hwm		persisted counter high-water mark
+	log		the last 5 commands THIS node executed, newest first: seconds ago, requester, counter, command, result
+	sent		the last 5 commands this node SENT, newest first: rep = some reply arrived, ver = its tag matched
+			(verified); rep=1 with ver=0 is an UNVERIFIED reply, reply holds its raw (truncated) text

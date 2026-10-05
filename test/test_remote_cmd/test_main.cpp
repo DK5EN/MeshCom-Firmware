@@ -422,7 +422,7 @@ static void test_blocked_commands_rejected_even_with_valid_tag(void)
 {
     const char *blocked[] = {"cleanflash", "ota-update", "dfu",     "deepsleep", "setcall", "passwd", "webpwd",
                              "btcode",     "setssid",    "setpwd",  "wifiset",   "updrepo", "updchan", "autoupdate",
-                             "rm",         "stor",       "unknown", "sync2",     "Reboot",  "rebootx"};
+                             "rm",         "remotemgmt", "stor",       "unknown", "sync2",     "Reboot",  "rebootx"};
     for (size_t i = 0; i < sizeof(blocked) / sizeof(blocked[0]); i++)
     {
         RmState s;

@@ -92,7 +92,7 @@ def test_allowlisted_commands_build(cmd: str, args: str) -> None:
         ("cleanflash", ""), ("ota-update", ""), ("dfu", ""), ("deepsleep", ""),
         ("setcall", "DK5EN-9"), ("passwd", "x"), ("webpwd", "x"), ("btcode", "1"),
         ("setssid", "x"), ("setpwd", "x"), ("wifiset", "x"), ("updrepo", "x"),
-        ("updchan", "x"), ("autoupdate", "on"), ("rm", "on"), ("stor", ""),
+        ("updchan", "x"), ("autoupdate", "on"), ("rm", "on"), ("remotemgmt", "on"), ("stor", ""),
         ("reboot", "--cleanflash"), ("reboot", "; reboot"), ("status", "{x"),
         ("status", "%41"), ("gps", "on --reboot"), ("txpower", "2;3"),
         ("unknown", ""), ("REBOOT", ""), ("gps", "ON"),

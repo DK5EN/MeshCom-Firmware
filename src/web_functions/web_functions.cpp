@@ -504,8 +504,11 @@ static int web_read_body(long content_length)
 
     long          got = 0;
     unsigned long last = millis();
+    const unsigned long start = last;
 
-    while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME)
+    // Total deadline as well as the idle one: a client dripping one byte per
+    // ~2 s would otherwise pin the loop task past the 5 s ESP32 task WDT.
+    while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 4000UL)
     {
         yield();
 
@@ -527,6 +530,235 @@ static int web_read_body(long content_length)
     web_cfg_buf[got] = '\0';
 
     return (got == content_length) ? (int)got : -3;
+}
+
+/**
+ * ###########################################################################################################################
+ * RM-09 / W2 (#1189): remote management web endpoints -- POST /rmsend and GET /rmstatus.
+ *
+ * Both run in the loop task (the ESP32 and the nRF52 web server are both driven from there), which is
+ * what the rm_runtime.h sender/status API requires.
+ *
+ * W2-1: the TARGET's password travels in the BODY of POST /rmsend only. It is therefore never part of a
+ * request line, so it never reaches web_header or web_currentLine (the request-line Strings), the bDEBUG
+ * request echo in work_webpage() (that one is switched off for /rmsend anyway), /setparam, /callfunction or
+ * any param print. The handler reads the body straight from the socket into ONE fixed stack buffer, parses
+ * it in place, hands the password pointer to rmSendCommand() (no copy there either) and wipes the buffer
+ * with volatile stores before it returns.
+ */
+
+/** volatile wipe: a plain memset on a dead buffer may be optimised away (nRF52 builds with -Ofast) */
+static void rm_wipe(void *p, size_t n)
+{
+    volatile uint8_t *v = (volatile uint8_t *)p;
+    while (n--)
+        *v++ = 0;
+}
+
+/** overwrites the bytes of a request String in place before it is cleared or freed */
+static void rm_wipe_string(String &s)
+{
+    for (unsigned int i = 0; i < s.length(); i++)
+        s.setCharAt(i, 'x');
+    s = "";
+}
+
+/** decodes %XX in place (the page sends encodeURIComponent(); '+' stays a literal '+'); false on a control byte */
+static bool rm_form_decode(char *s)
+{
+    char *w = s;
+    for (const char *r = s; *r; r++)
+    {
+        unsigned char ch = (unsigned char)*r;
+        if (ch == '%' && isxdigit((unsigned char)r[1]) && isxdigit((unsigned char)r[2]))
+        {
+            const char h[3] = {r[1], r[2], 0};
+            ch = (unsigned char)strtoul(h, nullptr, 16);
+            r += 2;
+        }
+        if (ch < 0x20 || ch == 0x7f)
+            return false;
+        *w++ = (char)ch;
+    }
+    *w = '\0';
+    return true;
+}
+
+/** writes a JSON string literal of printable ASCII only; < > & as \u escapes, anything else '?' */
+static void rm_json_str(const char *in)
+{
+    char out[200];
+    size_t n = 0;
+    out[n++] = '"';
+    for (; in != nullptr && *in && n < sizeof(out) - 8; in++)
+    {
+        const unsigned char ch = (unsigned char)*in;
+        if (ch == '"' || ch == '\\')
+        {
+            out[n++] = '\\';
+            out[n++] = (char)ch;
+        }
+        else if (ch == '<' || ch == '>' || ch == '&')
+            n += (size_t)snprintf(out + n, 8, "\\u%04x", (unsigned)ch);
+        else if (ch < 0x20 || ch > 0x7e)
+            out[n++] = '?';
+        else
+            out[n++] = (char)ch;
+    }
+    out[n++] = '"';
+    out[n] = '\0';
+    web_client.print(out);
+}
+
+/** POST /rmsend   body: dst=<call>&pw=<target password>&cmd=<cmd>&args=<args>   (all percent-encoded)
+ *  answer: {"ok":true,"ctr":N} or {"ok":false,"err":"<reason>"} -- never an echo of any input */
+static void sub_rm_send(long content_length)
+{
+    const size_t BODY_MAX = 200;
+    char body[BODY_MAX + 1];
+    char err[16] = {0};
+    uint32_t ctr = 0;
+    bool ok = false;
+
+    body[0] = '\0';
+
+    if (content_length <= 0 || content_length > (long)BODY_MAX)
+        strcpy(err, "size");
+    else
+    {
+        long got = 0;
+        unsigned long last = millis();
+        const unsigned long start = last;
+        // advisor W2 R1: absolute deadline (a 200-byte body arrives in ms; a slow drip
+        // must not stall the loop task into the 5 s task WDT)
+        while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 3000UL)
+        {
+            yield();
+            if (web_client.available())
+            {
+                int c = web_client.read();
+                if (c < 0)
+                    break;
+                body[got++] = (char)c;
+                last = millis();
+            }
+            else if (!web_client.connected())
+                break;
+        }
+        body[got] = '\0';
+        if (got != content_length)
+            strcpy(err, "short");
+    }
+
+    if (err[0] == '\0')
+    {
+        const char *dst = "", *pw = "", *cmd = "", *args = "";
+        bool form_ok = true;
+        char *p = body;
+        while (*p && form_ok)
+        {
+            char *amp = strchr(p, '&');
+            if (amp != nullptr)
+                *amp = '\0';
+            char *eq = strchr(p, '=');
+            if (eq != nullptr)
+            {
+                *eq = '\0';
+                char *val = eq + 1;
+                if (!rm_form_decode(val))
+                    form_ok = false;
+                else if (strcmp(p, "dst") == 0)
+                    dst = val;
+                else if (strcmp(p, "pw") == 0)
+                    pw = val;
+                else if (strcmp(p, "cmd") == 0)
+                    cmd = val;
+                else if (strcmp(p, "args") == 0)
+                    args = val;
+            }
+            if (amp == nullptr)
+                break;
+            p = amp + 1;
+        }
+
+        if (!form_ok)
+            strcpy(err, "form");
+        else
+        {
+            // the wire form of command and arguments is lower case (rmCommandAllowed() requires it)
+            for (char *q = (char *)cmd; *q; q++)
+                *q = (char)tolower((unsigned char)*q);
+            for (char *q = (char *)args; *q; q++)
+                *q = (char)tolower((unsigned char)*q);
+
+            ok = rmSendCommand(dst, pw, cmd, args, err, sizeof(err), &ctr);
+        }
+    }
+
+    rm_wipe(body, sizeof(body)); // dst/pw/cmd/args point into it: the password is gone from here on
+
+    send_http_header(ok ? 200 : 422, RESPONSE_TYPE_JSON);
+    if (ok)
+        web_client.printf("{\"ok\":true,\"ctr\":%lu}\n", (unsigned long)ctr);
+    else
+    {
+        web_client.print("{\"ok\":false,\"err\":");
+        rm_json_str(err[0] ? err : "send");
+        web_client.println("}");
+    }
+}
+
+/** GET /rmstatus -- this node's RM state, the last 5 executed commands and the last 5 sent ones.
+ *  Never a key, a tag or a password. All text is printable ASCII, < > & escaped (rm_json_str).
+ *  {"on":0|1,"pw":0|1,"ok":N,"rej":N,"lock":0|1,"lockS":N,"hwm":N,
+ *   "log":[{"ago":S,"src":"","ctr":N,"cmd":"","res":""},...],
+ *   "sent":[{"dst":"","ctr":N,"cmd":"","ago":S,"rep":0|1,"ver":0|1,"reply":""},...]} */
+static void sub_rm_status(void)
+{
+    const uint32_t now = (uint32_t)millis();
+
+    send_http_header(200, RESPONSE_TYPE_JSON);
+
+    {
+        RmStatus st;
+        rmGetStatus(st);
+        const unsigned long rej = (unsigned long)st.stats.rej_format + st.stats.rej_tag + st.stats.rej_replay +
+                                  st.stats.rej_blocked + st.stats.rej_rate + st.stats.rej_lockout + st.stats.rej_disabled;
+        web_client.printf("{\"on\":%d,\"pw\":%d,\"ok\":%lu,\"rej\":%lu,\"lock\":%d,\"lockS\":%lu,\"hwm\":%lu,\"log\":[",
+                          st.on ? 1 : 0, st.passwdSet ? 1 : 0, (unsigned long)st.stats.ok, rej, st.lockActive ? 1 : 0,
+                          (unsigned long)st.lockRemainS, (unsigned long)st.hwm);
+        for (uint8_t i = 0; i < st.nlog && i < 5; i++)
+        {
+            web_client.printf("%s{\"ago\":%lu,\"src\":", i ? "," : "", (unsigned long)((uint32_t)(now - st.log[i].ms) / 1000UL));
+            rm_json_str(st.log[i].src);
+            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)st.log[i].ctr);
+            rm_json_str(st.log[i].cmd);
+            web_client.print(",\"res\":");
+            rm_json_str(st.log[i].result);
+            web_client.print("}");
+        }
+        web_client.print("]");
+    }
+
+    {
+        RmSent sent[5];
+        const uint8_t n = rmGetSent(sent, 5);
+        web_client.print(",\"sent\":[");
+        for (uint8_t i = 0; i < n && i < 5; i++)
+        {
+            web_client.printf("%s{\"dst\":", i ? "," : "");
+            rm_json_str(sent[i].dst);
+            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)sent[i].ctr);
+            rm_json_str(sent[i].cmd);
+            web_client.printf(",\"ago\":%lu,\"rep\":%d,\"ver\":%d,\"reply\":", (unsigned long)((uint32_t)(now - sent[i].sentMs) / 1000UL),
+                              sent[i].replied ? 1 : 0, sent[i].verified ? 1 : 0);
+            rm_json_str(sent[i].reply);
+            web_client.print("}");
+        }
+        web_client.print("]");
+    }
+
+    web_client.println("}");
 }
 
 /**
@@ -678,6 +910,7 @@ String work_webpage(bool bget_password, int webid)
     // longer than WEB_HEADER_MAX. Picked off the line as it completes,
     // so it does not depend on that 1 kB window.
     long web_content_length = -1;
+    bool web_rm_quiet = false; // W2-1: set once the request line is /rmsend, suppresses the bDEBUG echo
 
     if (bDEBUG)
     {
@@ -696,11 +929,17 @@ String work_webpage(bool bget_password, int webid)
             // if there's bytes to read from the client,
             char c = web_client.read(); // read a byte, then
 
-            if (bDEBUG)
-                Serial.write(c); // print it out the serial monitor
-
             if (web_header.length() < WEB_HEADER_MAX)
                 web_header += c;
+
+            // W2-1: nothing of a /rmsend request is echoed to the serial monitor (its body is never
+            // read here, but a GET variant would carry the target password in the request line)
+            if (!web_rm_quiet && web_header.length() == 12 &&
+                (web_header.startsWith("POST /rmsend") || web_header.startsWith("GET /rmsend")))
+                web_rm_quiet = true;
+
+            if (bDEBUG && !web_rm_quiet)
+                Serial.write(c); // print it out the serial monitor
 
             if (c == '\n')
             {
@@ -753,7 +992,21 @@ String work_webpage(bool bget_password, int webid)
                     else
                     {
 
-                        if (web_header.indexOf("/callfunction/") >= 0)
+                        if (web_header.startsWith("POST /rmsend"))
+                        { // W2-1: remote management send, the password is in the BODY, read by the handler
+                            sub_rm_send(web_content_length);
+                        }
+                        else if (web_header.startsWith("GET /rmsend"))
+                        { // W2-1: refused, and the request line is wiped in case it carried a password
+                            rm_wipe_string(web_header);
+                            send_http_header(405, RESPONSE_TYPE_JSON);
+                            web_client.println("{\"ok\":false,\"err\":\"use POST\"}");
+                        }
+                        else if (web_header.startsWith("GET /rmstatus"))
+                        { // W2: status + sent list for the remote management card
+                            sub_rm_status();
+                        }
+                        else if (web_header.indexOf("/callfunction/") >= 0)
                         { // user requested to invoke a function
                             // ### !!function will generate a HTML header itself
                             call_function(web_header);
@@ -878,6 +1131,9 @@ String work_webpage(bool bget_password, int webid)
                             web_content_length = web_currentLine.substring(15).toInt();
                     }
 
+                    if (web_currentLine.startsWith("GET /rmsend"))
+                        rm_wipe_string(web_currentLine); // W2-1: never leave a password in a freed String
+
                     web_currentLine = "";
                 }
             }
@@ -938,7 +1194,7 @@ void deliver_scaffold(bool bget_password)
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='setup'){rmCardInit();rmPoll();}}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
     //
     // BP-09: the input fields used to be cleared unconditionally, right after
@@ -1037,6 +1293,25 @@ void deliver_scaffold(bool bget_password)
 
     // This function is used to toggle a css class so setup cars can collapse / expand
     web_client.println("function togglecard(element){element.parentElement.classList.toggle(\"cardopen\");}");
+
+    // RM-09 (#1189): remote management card. Lives here because sub-pages are injected with innerHTML (their own
+    // <script> never runs). Everything received is written with textContent (never innerHTML), so a reply text
+    // cannot inject markup. rmKeep holds the typed fields (also the password) so a page reload of the setup page
+    // does not lose them; it exists in this tab's memory only. The password goes in the POST body of /rmsend.
+    web_client.println("var rmKeep={dst:'',pw:'',cmd:'',args:''};");
+    web_client.println("function rmAgo(s){return s<120?s+' s':s<7200?Math.round(s/60)+' min':Math.round(s/3600)+' h';}");
+    web_client.println("function rmCell(tr,t,cls){var td=document.createElement('td');td.textContent=String(t);if(cls)td.className=cls;tr.appendChild(td);return td;}");
+    web_client.println("function rmArgSel(){var c=document.getElementById('rm_cmd');if(!c)return;var on=(c.value=='txpower'||c.value=='setout');document.getElementById('rm_args').style.display=on?'':'none';document.getElementById('rm_args_l').style.display=on?'':'none';document.getElementById('rm_args').placeholder=(c.value=='txpower')?'dBm':'a0 on';}");
+    web_client.println("function rmCardInit(){var d=document.getElementById('rm_dst');if(!d)return;d.value=rmKeep.dst;document.getElementById('rm_pw_in').value=rmKeep.pw;if(rmKeep.cmd)document.getElementById('rm_cmd').value=rmKeep.cmd;document.getElementById('rm_args').value=rmKeep.args;rmArgSel();}");
+    web_client.println("function rmRender(j){var e;if(!(e=document.getElementById('rm_cnt')))return;document.getElementById('rm_pwset').textContent=j.pw?'yes':'no';e.textContent='ok '+j.ok+', rejected '+j.rej;var l=document.getElementById('rm_lock');l.textContent=j.lock?('ACTIVE, '+j.lockS+' s left'):'no';l.className=j.lock?'rmbad':'';document.getElementById('rm_hwm').textContent=j.hwm;"
+                       "var b=document.getElementById('rm_log');b.textContent='';for(var i=0;i<j.log.length;i++){var r=j.log[i],tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}if(!j.log.length){var t=document.createElement('tr');rmCell(t,'none yet');b.appendChild(t);}"
+                       "b=document.getElementById('rm_sent');b.textContent='';for(var k=0;k<j.sent.length;k++){var s=j.sent[k],tq=document.createElement('tr');rmCell(tq,s.dst);rmCell(tq,s.ctr);rmCell(tq,s.cmd);rmCell(tq,rmAgo(s.ago)+' ago');rmCell(tq,s.rep?s.reply:'');"
+                       "if(s.rep&&s.ver)rmCell(tq,'\\u2713 verified','rmok');else if(s.rep)rmCell(tq,'UNVERIFIED reply','rmbad');else rmCell(tq,'waiting');b.appendChild(tq);}if(!j.sent.length){var u=document.createElement('tr');rmCell(u,'none yet');b.appendChild(u);}}");
+    web_client.println("function rmPoll(){if(!document.getElementById('rmcard'))return;fetch('/rmstatus').then(function(r){return r.json();}).then(rmRender).catch(function(){});}");
+    web_client.println("setInterval(function(){var c=document.getElementById('rmcard');if(cpage=='setup'&&c&&c.classList.contains('cardopen'))rmPoll();},3000);");
+    web_client.println("function rmSend(sync){var m=document.getElementById('rm_msg');var sel=document.getElementById('rm_cmd').value;var sp=sel.indexOf(' ');var cmd=sync?'sync':(sp>0?sel.substring(0,sp):sel);var a=sync?'':(sp>0?sel.substring(sp+1):'');if(!sync&&(cmd=='txpower'||cmd=='setout'))a=document.getElementById('rm_args').value.trim();"
+                       "var dst=document.getElementById('rm_dst').value.trim().toUpperCase();var pw=document.getElementById('rm_pw_in').value;if(!dst||!pw){m.textContent='target call and password needed';m.className='font-small rmbad';return;}m.textContent='sending ...';m.className='font-small';"
+                       "fetch('/rmsend',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'dst='+encodeURIComponent(dst)+'&pw='+encodeURIComponent(pw)+'&cmd='+encodeURIComponent(cmd)+'&args='+encodeURIComponent(a)}).then(function(r){return r.json();}).then(function(j){if(j.ok){m.textContent='sent, counter '+j.ctr+' - waiting for the reply';m.className='font-small';}else{m.textContent='not sent: '+j.err;m.className='font-small rmbad';}rmPoll();}).catch(function(){m.textContent='request failed';m.className='font-small rmbad';});}");
 
     // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
     // and injected with innerHTML, which never runs a <script> tag it carries,
@@ -1212,6 +1487,14 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".collapsablecard>div {max-height:0px;-webkit-transition:opacity .15s .0s,max-height .25s .10s;transition:opacity .15s .0s,max-height .25s .10s,margin .0s .50s;	opacity:0.0;overflow:hidden;margin:0px;}\n");
     web_client.println(".cardopen>div {-webkit-transition:opacity .15s .10s,max-height .25s .0s;transition:opacity .15s .10s,max-height .25s .0s;max-height:1000px;opacity:1;margin:7px;}\n");
     web_client.println(".cardopen>span:first-of-type {display:none;}\n");
+    // RM-09 (#1189): remote management card -- taller than the 1000 px cap of an ordinary card, label/value grid, tables
+    web_client.println(".rmcard.cardopen>div {max-height:3000px;}\n");
+    web_client.println(".rmgrid {display:grid;grid-template-columns:max-content 1fr;align-items:center;gap:7px 10px;margin:7px 0px;}\n");
+    web_client.println(".rmgrid input,.rmgrid select {width:100%;}\n");
+    web_client.println(".rmtab {width:100%;border-collapse:collapse;}\n");
+    web_client.println(".rmtab th,.rmtab td {padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;font-size:x-small;word-break:break-word;}\n");
+    web_client.println(".rmok {color:#1a7f37;font-weight:bold;}\n");
+    web_client.println(".rmbad {color:var(--mcred);font-weight:bold;}\n");
 
     // content definitions -> WQ-01 LoRa Queue panel (rxlog page)
     web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:#fff;border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
@@ -2969,15 +3252,64 @@ void sub_page_setup()
     _create_setup_switch_element("kissauth", "KISS Auth", "require HMAC auth on port 8001 (uses --passwd)", bKISSAUTH);
     #endif
     _create_setup_switch_element("gateway", "Gateway", "enable gateway", bGATEWAY);   // create Switch-Element inclucing Label and Description
-    // RM-07 (#1189): RM1 remote management (--rm). Never shows node_passwd or a tag: the hint is shown only while
-    // node_passwd is empty (RM stays inactive without it), and the generic setvalue() JS shows/hides it live.
+    web_client.println("</div></div>");
+
+    // RM-07 / RM-09 (#1189): Remote management card, all boards. "This node": the --remotemgmt switch (setparam rm; its
+    // hint shows only while node_passwd is empty, never the password, a key or a tag) and the live state from
+    // /rmstatus. "Manage another node": signs a command with the TARGET's password and sends the RM1 DM through
+    // POST /rmsend (the password is in the body only, see sub_rm_send()). The elements are filled by the scaffold
+    // JS (rmPoll/rmRender, sub-page scripts never run) through textContent, so nothing received is ever HTML.
     {
         const bool rmNoPasswd = (meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ');
+        web_client.println("<div id=\"rmcard\" class=\"cardlayout collapsablecard rmcard\">");
+        web_client.println("<label class=\"cardlabel\">Remote management</label>");
+        web_client.println("<span>Open this to manage the remote commands of this node, or another node.</span>\n");
+        web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);rmPoll();\"><i></i></button>\n");
+        web_client.println("<div>");
+        web_client.println("<p class=\"font-bold\">This node</p>");
+        web_client.println("<div class=\"grid grid2\">");
         _create_setup_switch_element("rm", "Remote management (RM1)", "authenticated remote commands by DM, needs --passwd", meshcom_settings.node_rm == 1,
                                      rmNoPasswd ? "needs --passwd" : nullptr, rmNoPasswd && meshcom_settings.node_rm == 1);
+        web_client.println("</div>");
+        web_client.println("<div class=\"rmgrid\">");
+        web_client.println("<span>password set</span><span id=\"rm_pwset\">-</span>");
+        web_client.println("<span>commands</span><span id=\"rm_cnt\">-</span>");
+        web_client.println("<span>lockout</span><span id=\"rm_lock\">-</span>");
+        web_client.println("<span>counter high-water</span><span id=\"rm_hwm\">-</span>");
+        web_client.println("</div>");
+        web_client.println("<p class=\"font-small\">last executed commands</p>");
+        web_client.println("<table class=\"rmtab\"><thead><tr><th>ago</th><th>from</th><th>ctr</th><th>command</th><th>result</th></tr></thead><tbody id=\"rm_log\"></tbody></table>");
+        web_client.println("<hr>");
+        web_client.println("<p class=\"font-bold\">Manage another node</p>");
+        web_client.println("<div class=\"rmgrid\">");
+        web_client.println("<label for=\"rm_dst\">target call</label>");
+        web_client.println("<input type=\"text\" id=\"rm_dst\" maxlength=\"9\" autocomplete=\"off\" autocapitalize=\"characters\" placeholder=\"DK5EN-12\" oninput=\"this.value=this.value.toUpperCase();rmKeep.dst=this.value;\"/>");
+        web_client.println("<label for=\"rm_pw_in\">target password</label>");
+        web_client.println("<input type=\"password\" id=\"rm_pw_in\" maxlength=\"14\" autocomplete=\"off\" oninput=\"rmKeep.pw=this.value;\"/>");
+        web_client.println("<label for=\"rm_cmd\">command</label>");
+        web_client.println("<select id=\"rm_cmd\" onchange=\"rmKeep.cmd=this.value;rmArgSel();\">");
+        static const char *const rmCmds[] = {"reboot", "status", "sendpos", "sendtrack", "gps on", "gps off", "track on", "track off",
+                                             "display on", "display off", "gateway on", "gateway off", "mesh on", "mesh off",
+                                             "txpower", "setout", "sync"};
+        for (size_t i = 0; i < sizeof(rmCmds) / sizeof(rmCmds[0]); i++)
+            web_client.printf("\t<option value=\"%s\">%s</option>\n", rmCmds[i],
+                              strcmp(rmCmds[i], "txpower") == 0 ? "txpower &lt;n&gt;" :
+                              strcmp(rmCmds[i], "setout") == 0 ? "setout &lt;a0..b7&gt; &lt;on|off&gt;" : rmCmds[i]);
+        web_client.println("</select>");
+        web_client.println("<label for=\"rm_args\" id=\"rm_args_l\" style=\"display:none\">argument</label>");
+        web_client.println("<input type=\"text\" id=\"rm_args\" maxlength=\"20\" autocomplete=\"off\" style=\"display:none\" oninput=\"rmKeep.args=this.value;\"/>");
+        web_client.println("</div>");
+        web_client.println("<div class=\"flex-auto-wrap\">");
+        web_client.println("<button type=\"button\" onclick=\"rmSend(false);\">Send</button>");
+        web_client.println("<button type=\"button\" onclick=\"rmSend(true);\">Sync counter</button>");
+        web_client.println("</div>");
+        web_client.println("<p id=\"rm_msg\" class=\"font-small\"></p>");
+        web_client.println("<p class=\"font-small\">The target password is sent to this node over HTTP (LAN), used once to sign, kept only as a derived key for 10 minutes to check the reply, never stored.</p>");
+        web_client.println("<p class=\"font-small\">last sent commands</p>");
+        web_client.println("<table class=\"rmtab\"><thead><tr><th>to</th><th>ctr</th><th>command</th><th>sent</th><th>reply</th><th></th></tr></thead><tbody id=\"rm_sent\"></tbody></table>");
+        web_client.println("</div>");
+        web_client.println("</div>");
     }
-
-    web_client.println("</div></div>");
 
     // Position Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");
@@ -3855,6 +4187,9 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type)
     case 404:
         status_text = "Not Found";
         break; // use this if a request was not known
+    case 405:
+        status_text = "Method Not Allowed";
+        break; // W2-1: GET /rmsend (the password must travel in a POST body)
     case 422:
         status_text = "Unprocessable Entity";
         break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)

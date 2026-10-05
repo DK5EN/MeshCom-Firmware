@@ -694,7 +694,7 @@ does not count toward the lockout.</li>
 RM1 for 5 min. Reachable without the key, accepted by design (ADR).</li>
 <li><strong>Counter.</strong> The mark is persisted before execution. <code>sync</code> returns it; the client stores the
 counter per target.</li>
-<li><strong>Accepted only</strong> over LoRa, as a DM to the exact own call, with <code>--rm on</code> and a non-empty
+<li><strong>Accepted only</strong> over LoRa, as a DM to the exact own call, with <code>--remotemgmt on</code> and a non-empty
 <code>node_passwd</code>; otherwise <code>RM1 </code> is ordinary text. <code>RM1 </code> DMs are never taken into store-node
 custody (§2.3).</li>
 <li>The reply is a DM to <code>src</code> sent through <code>sendMessage()</code>; an operator&#39;s node shows it as a

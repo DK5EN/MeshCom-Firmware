@@ -506,7 +506,7 @@ client can verify it is the node that answered. Length budget: about 60 characte
 - **Where accepted:** LoRa only (`!msg_server`), DM to the exact own call, never group or
   broadcast. The gateway ingress twins are not wired. `RM1 ` DMs are excluded from store-node
   custody (they would be rejected by the counter anyway, but they must not occupy a slot).
-- **Enable:** `--rm on|off` (default off) and a non-empty `node_passwd`; otherwise `RM1` DMs are
+- **Enable:** `--remotemgmt on|off` (default off) and a non-empty `node_passwd`; otherwise `RM1` DMs are
   ordinary text.
 - **Counter state:** high-water mark persisted on every accepted command (loop task, one small
   write; the pattern of `src/msgid_counter.h`), plus the last `(ctr, reply)` in RAM.
@@ -820,11 +820,12 @@ commands) and a "manage another node" panel (target call + password + allowliste
 with a time-based counter and sends the RM1 DM; replies verified with the key held in RAM for 10 min,
 password never stored; travels once over plain HTTP in the LAN).
 
-| Wave | Content                                                              | State                 | Commit |
-| ---- | -------------------------------------------------------------------- | --------------------- | ------ |
-| W1-A | RM backend: rmBuildCommand/rmVerifyReply, rmSendCommand, status, log | done                  | this   |
-| W1-B | Web: AU dropdown off/prod/dev, MTU card, header "Meshcom 4.40a"      | done, live on DK5EN-1 | this   |
-| W2   | Web: RM card + send panel                                            | not started           |        |
+| Wave | Content                                                               | State                 | Commit |
+| ---- | --------------------------------------------------------------------- | --------------------- | ------ |
+| W1-A | RM backend: rmBuildCommand/rmVerifyReply, rmSendCommand, status, log  | done                  | this   |
+| W1-B | Web: AU dropdown off/prod/dev, MTU card, header "Meshcom 4.40a"       | done, live on DK5EN-1 | this   |
+| W2   | Web: RM card + send panel (POST /rmsend, GET /rmstatus)               | done, benched         | this   |
+| W2b  | Console command renamed `--rm` to `--remotemgmt` (web key stays `rm`) | done                  | this   |
 
 W2 constraints (advisor W1): the target password must not travel through the generic `/setparam` path
 (it logs request bytes and keeps heap Strings) -- a dedicated handler excluded from debug prints;

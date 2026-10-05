@@ -1189,7 +1189,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
             #endif
             printdeb("--mesh on/off           relay foreign frames\n");
-            printdeb("--rm on/off             remote management via LoRa (RM1, needs --passwd)\n");
+            printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
             printdeb("--relay on/off          board relay output (GPIO)\n");
@@ -4611,20 +4611,19 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    // RM-06 (#1189): --rm switches the HMAC-authenticated RM1 remote-management
+    // RM-06 (#1189): --remotemgmt switches the HMAC-authenticated RM1 remote-management
     // protocol (docs/concept-open-issues-20261004.md section 6.2 "Enable").
     // node_rm is an ordinary persisted setting (config_json.h row), default off;
     // all boards, not behind ENABLE_MSGSTORE. RM1 DMs are only acted on with
     // node_rm == 1 AND a non-empty node_passwd, so turning it on without a
-    // password still stores the flag but warns. "rm" is also on the RM core's
-    // hard block list, so a remote RM1 command can never reach this rung.
-    // commandCheck() is exact-token ("rm" never matches reboot/rotate/regex/
-    // reflush/relay ..., none of those rungs matches "rm"); the argument rung
-    // ("rm ") must stay above the bare one, because a space ends the token and
-    // the bare rung would also match "rm on".
-    if(commandCheck(msg_text+2, (char*)"rm ") == 0)
+    // password still stores the flag but warns. "remotemgmt" is not on the RM core's
+    // allowlist (a positive list), so a remote RM1 command can never reach this rung.
+    // commandCheck() is exact-token (no other rung matches "remotemgmt"); the
+    // argument rung ("remotemgmt ") must stay above the bare one, because a
+    // space ends the token and the bare rung would also match "remotemgmt on".
+    if(commandCheck(msg_text+2, (char*)"remotemgmt ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+5);
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
 
         if(casecmp(_owner_c, (char*)"on") == 0)
         {
@@ -4636,7 +4635,7 @@ void commandAction(char *umsg_text, bool ble)
         }
         else
         {
-            Serial.printf("[ERR];rm;must be on or off\n");
+            Serial.printf("[ERR];remotemgmt;must be on or off\n");
 
             return;
         }
@@ -4650,7 +4649,7 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    if(commandCheck(msg_text+2, (char*)"rm") == 0)
+    if(commandCheck(msg_text+2, (char*)"remotemgmt") == 0)
     {
         Serial.printf("[RM];%s\n", meshcom_settings.node_rm ? "on" : "off");
 

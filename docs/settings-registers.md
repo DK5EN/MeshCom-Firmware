@@ -246,9 +246,9 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 
 ### X3. Remote-Management (RM1)
 
-| Key       | Member    | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                                                                                                                                            |
-| --------- | --------- | ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `node_rm` | `node_rm` | int         | 0..1           | `--rm on/off` (alle Boards), Default 0 = aus (RM-06, #1189); 1 = authentifizierte `RM1`-DMs werden ausgeführt, wirkt nur mit nicht-leerem `node_passwd` (`--rm on` ohne Passwort warnt `[RM];warn;no passwd, RM stays inactive`); `rm` steht auf der harten Sperrliste, nicht per RM setzbar; nicht in der Web-GUI |
+| Key       | Member    | Typ (Größe) | Import-Bereich | Hinweis                                                                                                                                                                                                                                                                                                                            |
+| --------- | --------- | ----------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node_rm` | `node_rm` | int         | 0..1           | `--remotemgmt on/off` (alle Boards), Default 0 = aus (RM-06, #1189); 1 = authentifizierte `RM1`-DMs werden ausgeführt, wirkt nur mit nicht-leerem `node_passwd` (`--remotemgmt on` ohne Passwort warnt `[RM];warn;no passwd, RM stays inactive`); `rm` steht auf der harten Sperrliste, nicht per RM setzbar; nicht in der Web-GUI |
 
 ### X4. Firmware-Auto-Update (AU)
 

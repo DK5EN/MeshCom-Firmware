@@ -366,37 +366,37 @@ static void test_stor_rung_schema_row_and_default_match_the_assumptions()
                              "node_stor default is not 0 (SNF-D7: off until the operator approves)");
 }
 
-// ---- --rm (RM-06, issue icssw-org/MeshCom-Firmware#1189) -------------------
+// ---- --remotemgmt (RM-06, issue icssw-org/MeshCom-Firmware#1189) -----------
 // Same constraint as --stor: the rung lives in command_functions.cpp, which no
 // native env compiles. The first test runs the real matcher on the names
 // involved; the second pins rung, order, schema row and default in the sources.
 
-// "rm" is an exact token: it must not swallow any other command, and no other
-// rung may swallow "rm" / "rm on".
+// "remotemgmt" is an exact token: it must not swallow any other command, and no
+// other rung may swallow "remotemgmt" / "remotemgmt on". The old name "rm" is gone.
 static void test_rm_does_not_collide_with_other_commands()
 {
-    TEST_ASSERT_TRUE(commandMatches("rm on", "rm "));
-    TEST_ASSERT_TRUE(commandMatches("rm off", "rm "));
-    TEST_ASSERT_TRUE(commandMatches("rm", "rm"));
-    // A space terminates the exact token, so the bare rung DOES match "rm on":
+    TEST_ASSERT_TRUE(commandMatches("remotemgmt on", "remotemgmt "));
+    TEST_ASSERT_TRUE(commandMatches("remotemgmt off", "remotemgmt "));
+    TEST_ASSERT_TRUE(commandMatches("remotemgmt", "remotemgmt"));
+    // A space terminates the exact token, so the bare rung DOES match "remotemgmt on":
     // the argument rung must stay above it (pinned against the source below).
-    TEST_ASSERT_TRUE(commandMatches("rm on", "rm"));
-    TEST_ASSERT_FALSE(commandMatches("rm", "rm "));              // bare form is a different rung
+    TEST_ASSERT_TRUE(commandMatches("remotemgmt on", "remotemgmt"));
+    TEST_ASSERT_FALSE(commandMatches("remotemgmt", "remotemgmt "));   // bare form is a different rung
 
-    const char *others[] = {"reboot", "rotate 1", "relay on", "reflush", "regex", "regex x",
-                            "rmonitor", "rmon", "rmi", "rm1", "route", "mesh on", "store", "stor on"};
+    const char *others[] = {"reboot", "rotate 1", "relay on", "reflush", "regex", "regex x", "rm", "rm on",
+                            "remote on", "remotemgm on", "remotemgmts", "route", "mesh on", "store", "stor on"};
     for (const char *line : others)
     {
-        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rm "), line);
-        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rm"), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "remotemgmt "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "remotemgmt"), line);
     }
 
     const char *rungs[] = {"reboot", "rotate ", "relay on", "relay off", "reflush", "regex",
                            "store", "stor ", "stor", "mesh on", "mesh off"};
     for (const char *rung : rungs)
     {
-        TEST_ASSERT_FALSE_MESSAGE(commandMatches("rm on", rung), rung);
-        TEST_ASSERT_FALSE_MESSAGE(commandMatches("rm", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("remotemgmt on", rung), rung);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches("remotemgmt", rung), rung);
     }
 }
 
@@ -404,29 +404,31 @@ static void test_rm_rung_schema_row_and_default_match_the_assumptions()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
 
-    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"rm \") == 0");
-    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --rm rung in command_functions.cpp");
-    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"rm\") == 0");
-    TEST_ASSERT_TRUE_MESSAGE(bare != std::string::npos, "bare --rm (show) rung missing");
-    TEST_ASSERT_TRUE_MESSAGE(rung < bare, "bare --rm rung is above the argument rung and would shadow --rm on/off");
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"remotemgmt \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --remotemgmt rung in command_functions.cpp");
+    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"remotemgmt\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bare != std::string::npos, "bare --remotemgmt (show) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("(char*)\"rm\") == 0") == std::string::npos && cmd.find("(char*)\"rm \") == 0") == std::string::npos,
+                             "old --rm rung is still present (renamed to --remotemgmt)");
+    TEST_ASSERT_TRUE_MESSAGE(rung < bare, "bare --remotemgmt rung is above the argument rung and would shadow --remotemgmt on/off");
 
     // all boards: the rung is NOT inside the ENABLE_MSGSTORE block
     const size_t guardOpen = cmd.find("#if defined(ENABLE_MSGSTORE)\n    if(commandCheck(msg_text+2, (char*)\"storecall \") == 0)");
     const size_t guardClose = cmd.find("#endif // ENABLE_MSGSTORE", guardOpen);
     TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardClose != std::string::npos, "store-node ladder block not found");
-    TEST_ASSERT_TRUE_MESSAGE(rung > guardClose, "--rm rung sits inside the ENABLE_MSGSTORE block (must work on all boards)");
+    TEST_ASSERT_TRUE_MESSAGE(rung > guardClose, "--remotemgmt rung sits inside the ENABLE_MSGSTORE block (must work on all boards)");
 
     const std::string body = cmd.substr(rung, 1400);
-    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+5") != std::string::npos, "--rm argument offset is not +5");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 1") != std::string::npos, "--rm on does not set node_rm");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 0") != std::string::npos, "--rm off does not clear node_rm");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--rm rung does not save");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];%s") != std::string::npos, "--rm rung does not print [RM];on|off");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+13") != std::string::npos, "--remotemgmt argument offset is not +13");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 1") != std::string::npos, "--remotemgmt on does not set node_rm");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rm = 0") != std::string::npos, "--remotemgmt off does not clear node_rm");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--remotemgmt rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];%s") != std::string::npos, "--remotemgmt rung does not print [RM];on|off");
     TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];warn;no passwd, RM stays inactive") != std::string::npos,
-                             "--rm on with an empty passwd does not warn");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("node_passwd[0] == 0x00") != std::string::npos, "--rm passwd-empty check missing");
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--rm on/off             remote management via LoRa (RM1, needs --passwd)") != std::string::npos,
-                             "--rm help line missing");
+                             "--remotemgmt on with an empty passwd does not warn");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("node_passwd[0] == 0x00") != std::string::npos, "--remotemgmt passwd-empty check missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)") != std::string::npos,
+                             "--remotemgmt help line missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"...RM: %s ok=%lu rej=%lu\\n\"") != std::string::npos, "--info RM line missing");
 
     const std::string cfg = read_repo_file("src/config_json.h");
@@ -443,7 +445,7 @@ static void test_rm_rung_schema_row_and_default_match_the_assumptions()
 
 // ---- --autoupdate / --updchan (AU-03, issue icssw-org/MeshCom-Firmware#1187) --
 // ESP32 only: both rungs sit inside an `#if defined(ESP32)` block placed after
-// the --rm rung and OUTSIDE the INSTRUMENT_ENABLED block (a field command).
+// the --remotemgmt rung and OUTSIDE the INSTRUMENT_ENABLED block (a field command).
 
 static void test_autoupdate_updchan_do_not_collide_with_other_commands()
 {
@@ -459,7 +461,7 @@ static void test_autoupdate_updchan_do_not_collide_with_other_commands()
     TEST_ASSERT_FALSE(commandMatches("updchan", "updchan "));
 
     const char *others[] = {"update", "update check", "updates", "auto", "audiodbg 1", "ota-update", "upd",
-                            "utcoff", "updchannel", "autoupdates", "autoupdate2", "rm on"};
+                            "utcoff", "updchannel", "autoupdates", "autoupdate2", "remotemgmt on"};
     for (const char *line : others)
     {
         TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "autoupdate "), line);
@@ -469,7 +471,7 @@ static void test_autoupdate_updchan_do_not_collide_with_other_commands()
     }
 
     // none of the existing rungs with a similar name may swallow the new commands
-    const char *rungs[] = {"audiodbg ", "ota-update", "utcoff", "rm ", "rm", "reboot", "update", "updrepo ", "upd"};
+    const char *rungs[] = {"audiodbg ", "ota-update", "utcoff", "remotemgmt ", "remotemgmt", "reboot", "update", "updrepo ", "upd"};
     for (const char *rung : rungs)
     {
         TEST_ASSERT_FALSE_MESSAGE(commandMatches("autoupdate notify", rung), rung);
@@ -494,13 +496,13 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(bareCh != std::string::npos, "bare --updchan (show) rung missing");
     TEST_ASSERT_TRUE_MESSAGE(rungCh < bareCh, "bare --updchan rung is above the argument rung and would shadow --updchan prod/dev");
 
-    // ESP32 only: the rungs sit between an `#if defined(ESP32)` (directly after the --rm rung)
+    // ESP32 only: the rungs sit between an `#if defined(ESP32)` (directly after the --remotemgmt rung)
     // and its `#endif`, and NOT inside the INSTRUMENT_ENABLED surface that starts later
-    const size_t rmBare = cmd.find("commandCheck(msg_text+2, (char*)\"rm\") == 0");
-    TEST_ASSERT_TRUE_MESSAGE(rmBare != std::string::npos && rmBare < rungAu, "AU rungs are not placed after the --rm rung");
+    const size_t rmBare = cmd.find("commandCheck(msg_text+2, (char*)\"remotemgmt\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rmBare != std::string::npos && rmBare < rungAu, "AU rungs are not placed after the --remotemgmt rung");
     const size_t guardOpen = cmd.rfind("#if defined(ESP32)", rungAu);
     TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardOpen > rmBare,
-                             "--autoupdate rung is not inside its own #if defined(ESP32) after --rm");
+                             "--autoupdate rung is not inside its own #if defined(ESP32) after --remotemgmt");
     // the block ends behind the bare --update rung; the --update body carries one nested
     // "#if INSTRUMENT_ENABLED" pair (stagelan, AU-08) that is not the block's closer
     const size_t bareUpdate = cmd.find("commandCheck(msg_text+2, (char*)\"update\") == 0", rungAu);
@@ -588,7 +590,7 @@ static void test_update_does_not_collide_with_other_commands()
 
     // exact-token: neither the neighbouring AU commands nor look-alikes reach the update rungs
     const char *others[] = {"updchan", "updchan dev", "autoupdate", "autoupdate auto", "updates", "updatex",
-                            "ota-update", "upd", "updchannel", "setname x", "rm on", "reboot"};
+                            "ota-update", "upd", "updchannel", "setname x", "remotemgmt on", "reboot"};
     for (const char *line : others)
     {
         TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "update "), line);
@@ -617,7 +619,7 @@ static void test_update_rungs_sit_in_the_esp32_block_with_the_expected_output()
     TEST_ASSERT_TRUE_MESSAGE(rungUp < bareUp, "bare --update rung is above the argument rung and would shadow --update <verb>");
     TEST_ASSERT_TRUE_MESSAGE(rungUp > bareCh, "--update rung is not behind the --updchan rungs (same ESP32 block)");
 
-    // same closed ESP32 block as --autoupdate: opens after --rm, closes behind the bare --update rung,
+    // same closed ESP32 block as --autoupdate: opens after --remotemgmt, closes behind the bare --update rung,
     // no nested preprocessor line in between, and the chain continues with the txpower rung
     const size_t rungAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
     TEST_ASSERT_TRUE(rungAu != std::string::npos);

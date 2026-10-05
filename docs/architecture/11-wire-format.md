@@ -477,7 +477,7 @@ RM1 2 ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1 6ba7ba274709c895
   RM1 for 5 min. Reachable without the key, accepted by design (ADR).
 - **Counter.** The mark is persisted before execution. `sync` returns it; the client stores the
   counter per target.
-- **Accepted only** over LoRa, as a DM to the exact own call, with `--rm on` and a non-empty
+- **Accepted only** over LoRa, as a DM to the exact own call, with `--remotemgmt on` and a non-empty
   `node_passwd`; otherwise `RM1 ` is ordinary text. `RM1 ` DMs are never taken into store-node
   custody (§2.3).
 - The reply is a DM to `src` sent through `sendMessage()`; an operator's node shows it as a

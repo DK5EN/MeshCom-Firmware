@@ -242,9 +242,9 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
-    // RM-07 (#1189): RM1 remote management, routed through "--rm on|off"; read-back is node_rm
+    // RM-07 (#1189): RM1 remote management, routed through "--remotemgmt on|off"; read-back is node_rm
     if(setupData->paramName.equals("rm")) {
-        snprintf(message_text, sizeof(message_text), "--rm %s", setupData->paramValue.c_str());
+        snprintf(message_text, sizeof(message_text), "--remotemgmt %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
         setupData->returnCode = ((meshcom_settings.node_rm == 1) == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = (meshcom_settings.node_rm == 1)?"on":"off";

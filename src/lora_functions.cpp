@@ -218,14 +218,15 @@ static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8
 
 // RM-04 (#1189): an authenticated remote-management command ("RM1 <ctr> <cmd>
 // ... <tag>") is not a chat message. LoRa only (!msg_server): a server-delivered
-// "RM1 " DM stays ordinary text (RM-D6). Called with the DM text already
+// "RM1 " COMMAND stays ordinary text (RM-D6). A REPLY is accepted from either path (W2-3): the
+// HMAC tag makes a server-relayed reply as trustworthy as a radio one. Called with the DM text already
 // stripped of its "{NNN" suffix, after dedup and ack. true = consumed: the
 // caller must neither display it nor hand it to BLE. A full queue also counts
 // as consumed (command dropped, the sender retries with a fresh counter); the
 // verify, enable and rate-limit decisions are rmDrain()'s, in the loop task.
 static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
 {
-    if (aprsmsg.msg_server || !mcStartsWith(text, "RM1 "))
+    if (!mcStartsWith(text, "RM1 "))
         return false;
 
     // A REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read, not a
@@ -240,7 +241,11 @@ static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
         return false;
     }
 
-    // RM disabled (--rm off) or no node_passwd: an "RM1 " DM is ordinary text
+    // commands stay LoRa-only (RM-D6): a server-delivered "RM1 " command is ordinary text
+    if (aprsmsg.msg_server)
+        return false;
+
+    // RM disabled (--remotemgmt off) or no node_passwd: an "RM1 " DM is ordinary text
     // (concept 6.2 "Enable"), shown and forwarded like any other DM.
     if (meshcom_settings.node_rm != 1 ||
         meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ')

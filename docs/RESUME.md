@@ -15,7 +15,7 @@
 - Open: STOR needs the server operator's approval; SNF M1-M4 against the real server; prod AU needs
   icssw-org to publish `.bin.zz` assets; upstream PRs for the five features not opened; BLE backlog B1
   (bleQueue carry-over); classic Safeboot headroom 1.5 KB (drop ESPmDNS next time it grows).
-- Bench nodes: DK5EN-1 runs v4.40a.10.05 (new Safeboot); DK5EN-90 normal build, `--rm off`;
+- Bench nodes: DK5EN-1 runs v4.40a.10.05 (new Safeboot); DK5EN-90 normal build, `--remotemgmt off`;
   DK5EN-92 runs an INSTRUMENT v4.40a.10.05 with the OLD Safeboot (flagged `safeboot;old`, a staged
   test record remains, AU off). node_passwd on DK5EN-1/-90 set to bench values (rmbench1/rmbench90).
 
