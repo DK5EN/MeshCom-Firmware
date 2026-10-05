@@ -1,0 +1,19 @@
+{
+  "name": "MeshCom RAKwireless WisBlock RAK4631 (SX1262)",
+  "version": "v4.40a.10.05",
+  "new_install_prompt_erase": true,
+  "new_install_improv_wait_time": 0,
+  "builds": [
+    {
+      "chipFamily": "NRF52",
+      "parts": [
+        {
+          "path": "firmware.uf2"
+        },
+        {
+          "path": "firmware.zip"
+        }
+      ]
+    }
+  ]
+}
