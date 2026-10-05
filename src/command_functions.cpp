@@ -4695,7 +4695,7 @@ void commandAction(char *umsg_text, bool ble)
         Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
         // WiFi STA is started at boot only (esp32_main.cpp gate); AU on a node without
         // any other network service needs one reboot to bring WiFi up.
-        if(meshcom_settings.node_autoupd > 0 && WiFi.status() != WL_CONNECTED)
+        if(meshcom_settings.node_autoupd > 0 && !meshcom_settings.node_hasIPaddress)
             Serial.printf("[AU];note;WiFi not up -- reboot to start it for auto update\n");
 
         return;
