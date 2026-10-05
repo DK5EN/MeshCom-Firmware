@@ -30,7 +30,12 @@
 - AU-12 (Safeboot capability version): Safeboot carries `MCSB;ver;002`, the app scans the partition and
   locks auto update (command, boot demotion, handover, greyed web dropdown + footnote) below
   `AU_SAFEBOOT_MIN`. Contract: `docs/safeboot-ota-contract.md` "Capability version". Needs a web-flasher
-  update on every node whose Safeboot predates 2026-10-05; not yet released or bench-flashed.
+  update on every node whose Safeboot predates 2026-10-05; not yet released. Bench 2026-10-05 passed:
+  DK5EN-92 with the pre-AU Safeboot (git 12e35ad0, v0): `safeboot;old;sbver;0`, `--autoupdate auto` refused,
+  web `aumode=dev` fails with the channel untouched, dropdown disabled + footnote, a config-import auto mode
+  demoted to notify at boot; v1 (strings) and v2 (marker) read correctly on DK5EN-92/-1; DK5EN-1 full USB
+  flash gives `sbver;2` and `[SAFEBOOT];ver;2`. DK5EN-92 restored to the current Safeboot (v2), AU off. The
+  nocap-reflash path (F1) is host-tested only.
 - Bench nodes: DK5EN-1 runs v4.40a.10.05 (new Safeboot); DK5EN-90 normal build, `--remotemgmt off`;
   DK5EN-92 runs an INSTRUMENT v4.40a.10.05 with the OLD Safeboot (flagged `safeboot;old`, a staged
   test record remains, AU off). node_passwd on DK5EN-1/-90 set to bench values (rmbench1/rmbench90).
