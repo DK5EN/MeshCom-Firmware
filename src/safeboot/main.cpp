@@ -5,6 +5,7 @@
 
 #include "ElegantOTA.h"
 #include "ota_state.h"
+#include "fw_apply.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
 
@@ -14,6 +15,8 @@
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_image_format.h>
+#include <esp_rom_crc.h>
+#include <miniz.h> // ROM tinfl_decompress (ESP32 and ESP32-S3)
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -469,6 +472,217 @@ void wifiConnect() {
  }
 
 
+ // ---------------------------------------------------------------------
+ // AU-07 (#1187): offline apply of a staged update.
+ //
+ // The app stores a compressed (.bin.zz, zlib) release at the END of ota_0
+ // and an FWS2 record in NVS "fwstage"/"rec" (src/fw_update.h). Here, before
+ // WiFi and the web server exist:
+ //   CRC32 of the staged bytes == rec.crc32   (else: drop the record)
+ //   erase ota_0 [0, roundup4K(ilen))         (never reaches the staged tail)
+ //   inflate with the ROM tinfl into ota_0    (32 KB circular dictionary)
+ //   esp_image_verify(ota_0), boot pointer -> ota_0, restart
+ // A power loss after the erase leaves the record and the tail intact, so
+ // the next boot retries; "fwstage"/"tries" bounds that to FW_APPLY_MAX_TRIES.
+ // A deterministic failure (CRC, inflate, verify) drops the record and falls
+ // through to the normal Safeboot AP/OTA mode (ota_0 invalid -> app_valid
+ // false). No SHA-256 here by design: CRC + adler32 + esp_image_verify.
+ // ---------------------------------------------------------------------
+ #define FWSTAGE_NS "fwstage"
+ #define FWSTAGE_KEY_REC "rec"
+ #define FWSTAGE_KEY_TRIES "tries"
+ #define FWSTAGE_KEY_LAST "last"
+ #define FWAPPLY_IN_BUF 4096u
+
+ static bool g_apply_failed = false; // replayed into g_ota after g_ota.begin()
+
+ struct FwFlashRd {
+   const esp_partition_t *part;
+   uint32_t base;
+   bool read(uint32_t pos, uint8_t *dst, size_t n) { return esp_partition_read(part, base + pos, dst, n) == ESP_OK; }
+ };
+
+ struct FwFlashWr {
+   const esp_partition_t *part;
+   bool write(uint32_t pos, const uint8_t *src, size_t n) {
+     if (esp_partition_write(part, pos, src, n) != ESP_OK) return false;
+     g_ota.onApplyProgress(millis(), pos + (uint32_t)n); // no web server yet: no lock needed
+     delay(1); // let the idle task run between writes
+     return true;
+   }
+ };
+
+ // One tinfl_decompress() call: zlib header + adler32 are parsed and checked
+ // by tinfl; the output goes to the circular dictionary (no NON_WRAPPING flag).
+ struct FwTinflDec {
+   tinfl_decompressor d;
+   int step(const uint8_t *in, size_t *inSize, uint8_t *dictStart, uint8_t *outNext, size_t *outSize, bool more) {
+     mz_uint32 flags = TINFL_FLAG_PARSE_ZLIB_HEADER | (more ? TINFL_FLAG_HAS_MORE_INPUT : 0);
+     return (int)tinfl_decompress(&d, in, inSize, dictStart, outNext, outSize, flags);
+   }
+ };
+
+ // Drops the record and the attempt counter. "last" (the app's reinstall
+ // guard) stays, except after a deterministic apply failure (dropLast): then
+ // the app may fetch that tag once more, so one flash bit error does not cost
+ // the update until the next release.
+ static void fwStageDrop(bool dropLast) {
+   Preferences p;
+   if (p.begin(FWSTAGE_NS, false)) {
+     p.remove(FWSTAGE_KEY_REC);
+     p.remove(FWSTAGE_KEY_TRIES);
+     if (dropLast) p.remove(FWSTAGE_KEY_LAST);
+     p.end();
+   }
+ }
+
+ // nullptr = success. *keep tells the caller whether the record survives the
+ // failure; *erased whether ota_0 was already touched (the app is then invalid).
+ static const char *fwApplyRun(const esp_partition_t *ota0, const FwApplyPlan &plan, const FwStageRecord &rec, bool *keep, bool *erased, uint32_t *written) {
+   *keep = true; // until a deterministic verdict
+   *erased = false;
+   *written = 0;
+   const size_t memLen = sizeof(FwTinflDec) + 8 + TINFL_LZ_DICT_SIZE + FWAPPLY_IN_BUF;
+   uint8_t *mem = (uint8_t *)malloc(memLen);
+   if (!mem) return "nomem";
+   FwTinflDec *dec = (FwTinflDec *)mem;
+   uint8_t *dict = mem + ((sizeof(FwTinflDec) + 7) & ~(size_t)7);
+   uint8_t *in = dict + TINFL_LZ_DICT_SIZE;
+   const char *err = nullptr;
+
+   FwFlashRd rd = {ota0, plan.srcOff};
+   FwFlashWr wr = {ota0};
+
+   // (a) CRC32 (zlib) over the staged bytes, chained from 0
+   uint32_t crc = 0;
+   for (uint32_t pos = 0; pos < plan.zlen;) {
+     uint32_t n = plan.zlen - pos;
+     if (n > FWAPPLY_IN_BUF) n = FWAPPLY_IN_BUF;
+     if (!rd.read(pos, in, n)) { err = "read"; goto done; }
+     crc = esp_rom_crc32_le(crc, in, n);
+     pos += n;
+     delay(0);
+   }
+   if (crc != rec.crc32) { *keep = false; err = "crc"; goto done; }
+
+   // (b) erase [0, roundup4K(ilen)) in 64 KB steps; from here the old image is gone
+   g_ota.onApplyProgress(millis(), 0);
+   *erased = true; // even a failed first erase may have damaged the head
+   for (uint32_t o = 0; o < plan.eraseLen;) {
+     uint32_t c = plan.eraseLen - o;
+     if (c > 0x10000u) c = 0x10000u;
+     if (esp_partition_erase_range(ota0, o, c) != ESP_OK) { err = "erase"; goto done; }
+     o += c;
+     delay(1);
+   }
+
+   // (c) stream-inflate tail -> head
+   {
+     tinfl_init(&dec->d);
+     FwInflateResult r = fwInflateStream(*dec, rd, wr, in, FWAPPLY_IN_BUF, dict, TINFL_LZ_DICT_SIZE, plan.zlen, plan.ilen, written);
+     if (r != FWI_OK) {
+       err = fwInflateReason(r);
+       *keep = (r == FWI_READ || r == FWI_WRITE);
+       goto done;
+     }
+   }
+
+   // (d) esp_image_verify on ota_0 (also logs [SAFEBOOT];app;image;...)
+   if (!checkAppImageValid()) { *keep = false; err = "verify"; goto done; }
+
+ done:
+   free(mem);
+   return err;
+ }
+
+ static void applyStagedUpdate() {
+   uint8_t buf[FW_STAGE_ENC_LEN];
+   size_t n = 0;
+   uint8_t tries = 0;
+   {
+     Preferences p;
+     if (!p.begin(FWSTAGE_NS, true)) return; // namespace absent: nothing staged
+     if (p.isKey(FWSTAGE_KEY_REC) && p.getBytesLength(FWSTAGE_KEY_REC) == FW_STAGE_ENC_LEN) {
+       n = p.getBytes(FWSTAGE_KEY_REC, buf, sizeof(buf));
+     } else if (p.isKey(FWSTAGE_KEY_REC)) {
+       n = 1; // wrong size: falls into the decode failure below
+     }
+     tries = p.getUChar(FWSTAGE_KEY_TRIES, 0);
+     p.end();
+   }
+   if (n == 0) return;
+
+   const char *why = "ok";
+   FwStageRecord rec;
+   FwApplyPlan plan;
+   const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
+   if (n != FW_STAGE_ENC_LEN || !fwRecordDecode(buf, n, rec)) {
+     why = "record";
+   } else if (!ota0) {
+     why = "no_ota0";
+   } else if (!fwApplyPlan(rec, ota0->size, plan, &why)) {
+     // why set by the plan
+   } else if (tries >= FW_APPLY_MAX_TRIES) {
+     why = "tries";
+   } else {
+     why = nullptr;
+   }
+   if (why) {
+     Serial.printf("[SAFEBOOT];apply;fail;%s\n", why);
+     g_apply_failed = true;
+     fwStageDrop(false); // plan / record problems: keep "last", no re-download loop
+     return;
+   }
+
+   { // count the attempt before touching flash: a hang or power loss still counts
+     Preferences p;
+     if (p.begin(FWSTAGE_NS, false)) {
+       p.putUChar(FWSTAGE_KEY_TRIES, (uint8_t)(tries + 1));
+       p.end();
+     }
+   }
+
+   unsigned long t0 = millis();
+   Serial.printf("[SAFEBOOT];apply;start;tag;%s;zlen;%lu;ilen;%lu;try;%u\n", rec.tag, (unsigned long)plan.zlen, (unsigned long)plan.ilen, (unsigned)(tries + 1));
+   g_ota.onApplyBegin(t0, plan.ilen);
+
+   bool keep = false, erased = false;
+   uint32_t written = 0;
+   const char *err = fwApplyRun(ota0, plan, rec, &keep, &erased, &written);
+   if (err) {
+     Serial.printf("[SAFEBOOT];apply;fail;%s\n", err);
+     g_ota.onApplyEnd(millis(), false);
+     g_apply_failed = true;
+     if (!keep) {
+       fwStageDrop(true); // deterministic: the app may fetch this tag once more
+     } else if (erased) {
+       // The head is gone, the record and the tail are intact: retry on the
+       // next boot without waiting for a power cycle (bounded by "tries").
+       Serial.printf("[SAFEBOOT];apply;retry;restart;try;%u\n", (unsigned)(tries + 1));
+       Serial.flush();
+       delay(1000);
+       ESP.restart();
+     }
+     // keep && !erased: ota_0 is untouched, continue as normal Safeboot; the record stays
+     return;
+   }
+
+   // (e) boot pointer -> ota_0 (re-validates the image), record gone, restart
+   if (esp_ota_set_boot_partition(ota0) != ESP_OK) {
+     Serial.println("[SAFEBOOT];apply;fail;boot");
+     g_ota.onApplyEnd(millis(), false);
+     g_apply_failed = true;
+     fwStageDrop(true);
+     return;
+   }
+   fwStageDrop(false); // success: "last" stays
+   g_ota.onApplyEnd(millis(), true);
+   Serial.printf("[SAFEBOOT];apply;ok;bytes;%lu;ms;%lu\n", (unsigned long)written, (unsigned long)(millis() - t0));
+   Serial.flush();
+   delay(200);
+   ESP.restart();
+ }
+
 
  void setup() {
 
@@ -477,6 +691,11 @@ void wifiConnect() {
    delay(1000);
    Serial.println("\n-----------------------------");
    Serial.println("OTA UDATE started");
+
+   // AU-07: apply a staged update (offline, before any network). Returns
+   // only if there is nothing staged or the apply failed; on success it
+   // restarts into the new app.
+   applyStagedUpdate();
 
    // Connect to saved ssid or as fallback spawn an AP. Non-blocking for the
    // STA-join case: returns as soon as esp_wifi_connect() has been kicked
@@ -625,7 +844,8 @@ void wifiConnect() {
      portENTER_CRITICAL(&g_ota_mux);
      safeboot::OtaSession::State st = g_ota.state().state;
      portEXIT_CRITICAL(&g_ota_mux);
-     busy = (st == safeboot::OtaSession::State::Receiving || st == safeboot::OtaSession::State::Verifying);
+     busy = (st == safeboot::OtaSession::State::Receiving || st == safeboot::OtaSession::State::Verifying ||
+             st == safeboot::OtaSession::State::Applying);
 
      if (busy || g_safeboot_scan.in_progress) {
        request->send(409, "text/plain", "busy");
@@ -644,6 +864,10 @@ void wifiConnect() {
 
    portENTER_CRITICAL(&g_ota_mux);
    g_ota.begin(millis());
+   if (g_apply_failed) { // begin() reset the state: put the apply verdict back
+     g_ota.onApplyBegin(millis(), 0);
+     g_ota.onApplyEnd(millis(), false);
+   }
    portEXIT_CRITICAL(&g_ota_mux);
 
    // Boot-time check of the ota_0 image (docs/safeboot-ota-contract.md

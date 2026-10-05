@@ -2169,8 +2169,8 @@ static void flushDeferredDisplayUpdates()
 // AU-05 (#1187): firmware auto update, loop side. Once per second, from esp32loop().
 // The decisions live in src/fw_update.h (fwTick, fwAttemptAllowed ...); the network
 // work (CHECK, DOWNLOAD) runs in its own task behind src/esp32/fw_update_net.h. This
-// function only feeds the policy and starts jobs. W3 (Safeboot apply) is not wired
-// yet: FW_HANDOVER only logs.
+// function only feeds the policy and starts jobs; FW_HANDOVER reboots into Safeboot
+// through auRebootToSafeboot() (command_functions.cpp, shared with --ota-update).
 // ---------------------------------------------------------------------------
 static FwTimer s_auTimer;
 static bool s_auTimerInit = false;
@@ -2265,21 +2265,26 @@ static void auTick(void)
 
     if(act == FW_HANDOVER)
     {
-        // Safeboot apply is W3. Until then: no reboot, log once per staged tag.
-        char tag[24];
-        if(st.staged && st.stagedTag[0])
-            snprintf(tag, sizeof(tag), "%s", st.stagedTag);
-        else
+        // AU-08: reboot into Safeboot, which applies the staged image. The record is re-read and
+        // re-validated here (fwNetLoadRecord drops a stale one and clears the cached flag, so a
+        // gone record ends the handovers). One attempt per tag and boot: if there is no Safeboot
+        // partition the function returns and the tick must not retry every second.
+        if(st.staged && st.stagedTag[0] && auTagSame(s_auHandoverTag, st.stagedTag))
+            return;   // already attempted this boot: no NVS read every second
+        FwStageRecord rec;
+        if(!fwNetLoadRecord(rec))
+            return;
+        if(!auTagSame(s_auHandoverTag, rec.tag))
         {
-            FwStageRecord rec;
-            tag[0] = '\0';
-            if(fwNetLoadRecord(rec))
-                snprintf(tag, sizeof(tag), "%s", rec.tag);
-        }
-        if(!auTagSame(s_auHandoverTag, tag))
-        {
-            snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", tag);
-            Serial.printf("[AU];handover;deferred_w3;%s\n", tag);
+            snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", rec.tag);
+            Serial.printf("[AU];handover;%s\n", rec.tag);
+            if(!auRebootToSafeboot())
+            {
+                // hopeless (no Safeboot partition, or it cannot be set as boot partition): drop the
+                // record so the next boot does not try again, and the staged flag no longer fires
+                Serial.printf("[AU];fail;nosafeboot\n");
+                fwNetClearRecord();
+            }
         }
         return;
     }

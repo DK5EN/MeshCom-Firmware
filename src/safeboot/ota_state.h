@@ -39,6 +39,8 @@ public:
         Verifying,
         Done,
         Aborted,
+        Applying, // offline apply of a staged update (fw_apply.h, #1187 AU-07):
+                  // `received`/`total` count inflated bytes written / expected
     };
 
     // -- /ota/state.reason (aborted) plus the two reboot-to-app reasons
@@ -60,6 +62,7 @@ public:
         BeginFailed,
         Timeout,
         Cancel,
+        ApplyFailed,
     };
 
     enum class ActionType : uint8_t {
@@ -109,6 +112,55 @@ public:
         image_valid_ = false;
         last_data_ms_ = now;
         fallback_armed_ms_ = now;
+        refreshStatus();
+    }
+
+    // -- Offline apply of a staged update (#1187 AU-07). Runs once at boot,
+    // before WiFi and the web server, so no HTTP client can observe it today;
+    // the state exists so /ota/state stays truthful if the apply is ever
+    // moved off the boot path. While Applying: tick() neither stalls nor
+    // arms the fallback (fallback_in_ms is -1), cancel is refused, and no
+    // upload may start (the caller must not call onStart()).
+    void onApplyBegin(uint32_t now, uint32_t total_bytes) {
+        now_ = now;
+        state_ = State::Applying;
+        reason_ = Reason::None;
+        ++generation_;
+        received_ = 0;
+        total_ = total_bytes;
+        image_valid_ = false;
+        last_data_ms_ = now;
+        refreshStatus();
+    }
+
+    // Inflated bytes written so far. No-op outside Applying.
+    void onApplyProgress(uint32_t now, uint32_t done_bytes) {
+        now_ = now;
+        if (state_ == State::Applying) {
+            received_ = done_bytes;
+            last_data_ms_ = now;
+        }
+        refreshStatus();
+    }
+
+    // The apply finished. ok -> Done with image_valid (the caller verified
+    // ota_0 and restarts into the app); !ok -> Aborted(apply_failed), the
+    // fallback window re-arms from now (it stays suspended while app_valid
+    // is false, see setAppValid()). No-op outside Applying.
+    void onApplyEnd(uint32_t now, bool ok) {
+        now_ = now;
+        if (state_ == State::Applying) {
+            if (ok) {
+                state_ = State::Done;
+                reason_ = Reason::None;
+                image_valid_ = true;
+            } else {
+                state_ = State::Aborted;
+                reason_ = Reason::ApplyFailed;
+                image_valid_ = false;
+            }
+            fallback_armed_ms_ = now;
+        }
         refreshStatus();
     }
 
@@ -206,7 +258,8 @@ public:
     // queues an immediate reboot to the app and returns true.
     bool onCancelRequest(uint32_t now) {
         now_ = now;
-        bool accepted = app_valid_ && !(state_ == State::Receiving || state_ == State::Verifying);
+        bool accepted = app_valid_ && !(state_ == State::Receiving || state_ == State::Verifying ||
+                                        state_ == State::Applying);
         if (accepted) {
             pushAction(ActionType::RebootToApp, Reason::Cancel);
         }
@@ -276,6 +329,7 @@ public:
             case State::Verifying: return "verifying";
             case State::Done: return "done";
             case State::Aborted: return "aborted";
+            case State::Applying: return "applying";
         }
         return "unknown";
     }
@@ -292,6 +346,7 @@ public:
             case Reason::BeginFailed: return "begin_failed";
             case Reason::Timeout: return "timeout";
             case Reason::Cancel: return "cancel";
+            case Reason::ApplyFailed: return "apply_failed";
         }
         return "unknown";
     }
@@ -324,7 +379,8 @@ private:
         status_.total = total_;
         status_.image_valid = image_valid_;
         status_.app_valid = app_valid_;
-        if (state_ == State::Receiving || state_ == State::Verifying || !app_valid_) {
+        if (state_ == State::Receiving || state_ == State::Verifying || state_ == State::Applying ||
+            !app_valid_) {
             status_.fallback_in_ms = -1;
         } else {
             int32_t elapsed = static_cast<int32_t>(now_ - fallback_armed_ms_);

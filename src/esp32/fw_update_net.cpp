@@ -1,5 +1,6 @@
 // fw_update_net.cpp -- network and staging layer of the firmware auto update (#1187, AU-04)
-// See fw_update_net.h for the contract. Decisions: AU-D11 (compressed staging at the
+// See fw_update_net.h for the contract (STAGELAN, the bench-LAN staging job, exists only with
+// INSTRUMENT_ENABLED and shares stagePrepare()/stageFinish() with DOWNLOAD). Decisions: AU-D11 (compressed staging at the
 // end of ota_0), AU-D12 (trimmed roots), AU-D13 (small heap), AU-D15/16/17.
 
 #if defined(ESP32)
@@ -10,6 +11,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+#include <esp_flash.h>
 #include <esp_heap_caps.h>
 #include <esp_image_format.h>
 #include <esp_ota_ops.h>
@@ -27,15 +29,20 @@
 #include "../fw_update_http.h"
 #include "../fw_update_roots.h"
 #include "../hmac_sha256.h"
+#include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
 #include "fw_update_net.h"
 
 // Measurement stub (-DFWNET_STUB): the five entry points as no-ops, so the flash cost of
 // the real layer (TLS, HTTPClient, mbedtls) is the difference between the two builds.
 #ifdef FWNET_STUB
 bool fwNetStart(FwNetJob, uint8_t) { return false; }
+#if INSTRUMENT_ENABLED
+bool fwNetStartLan(const char *, uint32_t, const char *) { return false; }
+#endif
 void fwNetGetStatus(FwNetStatus &out) { memset(&out, 0, sizeof(out)); }
 bool fwNetStagedPending(void) { return false; }
 bool fwNetLoadRecord(FwStageRecord &) { return false; }
+void fwNetClearRecord(void) {}
 void fwNetLastInstalledTag(char *out, size_t n)
 {
     if (out != nullptr && n > 0)
@@ -96,6 +103,17 @@ struct Avail
 Avail s_av;
 
 char s_err[48]; // dynamic error text of the running job (one job at a time)
+
+#if INSTRUMENT_ENABLED
+// Arguments of the running STAGELAN job, copied in under s_mux by startJob().
+struct LanArg
+{
+    char url[200];
+    uint32_t ilen;
+    char tag[24];
+};
+LanArg s_lan;
+#endif
 
 // ---------------------------------------------------------------------------
 // markers: formatted into a stack buffer, written in one call (Print::printf
@@ -163,7 +181,10 @@ const char *runningVersion()
 #define FWNET_NS "fwstage"
 #define FWNET_KEY_REC "rec"
 #define FWNET_KEY_LAST "last"
+#define FWNET_KEY_TRIES "tries" // Safeboot's apply-attempt counter (src/safeboot/main.cpp)
 
+// Removes the record AND Safeboot's attempt counter: a new tag must not inherit the failed
+// attempts of an old one (AU-08 R4). Neither key present is success.
 bool nvsClearRecord()
 {
     Preferences p;
@@ -172,6 +193,8 @@ bool nvsClearRecord()
     bool ok = true;
     if (p.isKey(FWNET_KEY_REC))
         ok = p.remove(FWNET_KEY_REC);
+    if (p.isKey(FWNET_KEY_TRIES))
+        ok = p.remove(FWNET_KEY_TRIES) && ok;
     p.end();
     return ok;
 }
@@ -479,6 +502,92 @@ const char *runCheck(FwChannel ch)
 // DOWNLOAD
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Stage-area flash access. THE ONLY code in the firmware that writes ota_0 while running
+// from it.
+//
+// Why not esp_partition_erase_range()/esp_partition_write(): every erase/write on the
+// default flash chip goes through CHECK_WRITE_ADDRESS -> os_func->region_protected(), which
+// is esp_partition_main_flash_region_safe(). It marks the WHOLE running app partition (and
+// the bootloader / partition table) as protected, and with
+// CONFIG_SPI_FLASH_DANGEROUS_WRITE_ABORTS that is abort(). The rule is a conservative
+// guard against overwriting code that is executing; it cannot know that we only touch the
+// tail of the slot.
+//
+// Why our range is safe: stagePrepare() has fwStageLayout() prove that the running image
+// ends below stageOff (the image is mapped and executed only from [0, image_len); nothing
+// at or above stageOff is mapped, cached as code or read by the running app), and that the
+// inflated image also fits below stageOff. So an erase/write at or above ota0->address +
+// stageOff cannot touch a byte that executes or that Safeboot will later write its head
+// into.
+//
+// How: a private esp_flash_t, copied from *esp_flash_default_chip, with a private
+// esp_flash_os_functions_t copied from the default one and region_protected = NULL (the
+// check is skipped when the hook is NULL). Everything else (start/end flash lock, yield,
+// temp buffers, os_func_data, host, chip driver) is the default chip's, so locking and the
+// cache handling stay the IDF's. The private chip is used by stageFlash() and nowhere else,
+// and stageFlash() re-checks the range on EVERY call: inside ota_0 and at or above the
+// armed stage start. Public API only (esp_flash.h).
+// ---------------------------------------------------------------------------
+
+enum StageOp : uint8_t
+{
+    STAGE_ERASE,
+    STAGE_WRITE,
+    STAGE_READ
+};
+
+struct StageFlash
+{
+    bool armed;
+    uint32_t base;  // absolute flash address of ota_0
+    uint32_t size;  // size of ota_0
+    uint32_t lo;    // stage offset inside ota_0 (fwStageLayout), the lowest offset any call may use
+    esp_flash_t chip;
+    esp_flash_os_functions_t os;
+};
+StageFlash s_sf;
+
+// Arms the private chip for [ota0->address + stageOff, ota0 end). False if the default chip
+// is missing or the offset is outside the partition.
+bool stageFlashArm(const esp_partition_t *ota0, uint32_t stageOff)
+{
+    s_sf.armed = false;
+    if (ota0 == nullptr || esp_flash_default_chip == nullptr || esp_flash_default_chip->os_func == nullptr ||
+        stageOff == 0 || stageOff >= ota0->size)
+        return false;
+    s_sf.os = *esp_flash_default_chip->os_func;
+    s_sf.os.region_protected = nullptr;
+    s_sf.chip = *esp_flash_default_chip;
+    s_sf.chip.os_func = &s_sf.os;
+    s_sf.base = ota0->address;
+    s_sf.size = ota0->size;
+    s_sf.lo = stageOff;
+    s_sf.armed = true;
+    return true;
+}
+
+void stageFlashDisarm() { s_sf.armed = false; }
+
+// rel is an offset inside ota_0. The range [rel, rel+len) must lie inside ota_0 and at or
+// above the armed stage start, else nothing is touched and ESP_ERR_INVALID_ARG comes back.
+esp_err_t stageFlash(StageOp op, uint32_t rel, void *buf, uint32_t len)
+{
+    if (!s_sf.armed || len == 0 || rel < s_sf.lo || rel > s_sf.size || len > s_sf.size - rel)
+        return ESP_ERR_INVALID_ARG;
+    const uint32_t addr = s_sf.base + rel;
+    switch (op)
+    {
+    case STAGE_ERASE:
+        return esp_flash_erase_region(&s_sf.chip, addr, len);
+    case STAGE_WRITE:
+        return buf != nullptr ? esp_flash_write(&s_sf.chip, buf, addr, len) : ESP_ERR_INVALID_ARG;
+    case STAGE_READ:
+        return buf != nullptr ? esp_flash_read(&s_sf.chip, buf, addr, len) : ESP_ERR_INVALID_ARG;
+    }
+    return ESP_ERR_INVALID_ARG;
+}
+
 struct DlCtx
 {
     const esp_partition_t *part;
@@ -496,7 +605,7 @@ bool dlFeed(void *v, const uint8_t *d, size_t n)
         return false;
     sha256Update(k.sha, d, n);
     k.crc = esp_rom_crc32_le(k.crc, d, (uint32_t)n);
-    if (esp_partition_write(k.part, k.base + k.written, d, n) != ESP_OK)
+    if (stageFlash(STAGE_WRITE, k.base + k.written, (void *)d, (uint32_t)n) != ESP_OK)
         return false;
     k.written += (uint32_t)n;
     portENTER_CRITICAL(&s_mux);
@@ -528,31 +637,24 @@ const char *refuse(const char *why)
     return why;
 }
 
-const char *runDownload()
+// Everything DOWNLOAD and STAGELAN have in common, in two steps around the transfer:
+//   stagePrepare  layout (running image below the stage, inflated image below it), heap, the
+//                 stage record removed (the area is about to be destroyed), erase
+//   stageFinish   SHA-256 (against `expectSha` if given, else just computed), read-back CRC,
+//                 the FWS2 record, the reinstall guard, the status
+struct Stage
 {
-    // snapshot of the CHECK result
-    Avail av;
-    char tag[24];
-    uint32_t zlen, ilen;
-    bool newer;
-    portENTER_CRITICAL(&s_mux);
-    av = s_av;
-    copyStr(tag, sizeof(tag), s_st.availTag);
-    zlen = s_st.zlen;
-    ilen = s_st.ilen;
-    newer = s_st.availNewer;
-    portEXIT_CRITICAL(&s_mux);
+    const esp_partition_t *ota0;
+    uint32_t off;
+    uint8_t *blk;
+    DlCtx dl;
+};
 
-    // refusals below are not download attempts: nothing was touched, the caller must not
-    // count them (it keys Install on FwNetStatus::installable)
-    if (!av.checked || !newer || tag[0] == '\0')
-        return refuse("nocheck");
-    if (!av.found || av.url[0] == '\0')
-        return refuse("noasset");
-    if (!av.haveDigest)
-        return refuse("nodigest");
-    if (zlen == 0)
-        return refuse("noasset");
+// Returns nullptr, or the reason. On a reason nothing is left allocated and no record
+// survives; refusals before the first destructive step were printed by refuse().
+const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBlock)
+{
+    memset(&sg, 0, sizeof(sg));
 
     // layout: the stage area is the end of ota_0, the running image must stay below it
     const esp_partition_t *run = esp_ota_get_running_partition();
@@ -572,16 +674,26 @@ const char *runDownload()
     if (lr != FW_OK)
         return refuse(layoutReason(lr));
 
-    if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < FWNET_MIN_BLOCK)
+    if (!stageFlashArm(ota0, off))
+        return refuse("noflash");
+
+    if (minBlock != 0 && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < minBlock)
+    {
+        stageFlashDisarm();
         return refuse("lowheap");
+    }
     uint8_t *blk = (uint8_t *)heap_caps_malloc(FWNET_BLK, MALLOC_CAP_8BIT);
     if (blk == nullptr)
+    {
+        stageFlashDisarm();
         return "nomem";
+    }
 
     // from here on the stage area is destroyed: no record may survive
     if (!nvsClearRecord())
     {
         heap_caps_free(blk);
+        stageFlashDisarm();
         return refuse("nvs");
     }
     portENTER_CRITICAL(&s_mux);
@@ -590,58 +702,52 @@ const char *runDownload()
     s_st.bytesDone = 0;
     portEXIT_CRITICAL(&s_mux);
 
-    const char *err = nullptr;
-    DlCtx dl;
-    memset(&dl, 0, sizeof(dl));
-    dl.part = ota0;
-    dl.base = off;
-    dl.zlen = zlen;
-    sha256Init(dl.sha);
+    sg.ota0 = ota0;
+    sg.off = off;
+    sg.blk = blk;
+    sg.dl.part = ota0;
+    sg.dl.base = off;
+    sg.dl.zlen = zlen;
+    sha256Init(sg.dl.sha);
 
     // erase in 64 KB steps with a yield between them
+    const char *err = nullptr;
     const uint32_t eraseLen = (zlen + 0xFFFu) & ~0xFFFu;
     for (uint32_t e = 0; e < eraseLen && err == nullptr; e += 0x10000u)
     {
         uint32_t n = eraseLen - e < 0x10000u ? eraseLen - e : 0x10000u;
-        if (esp_partition_erase_range(ota0, off + e, n) != ESP_OK)
+        if (stageFlash(STAGE_ERASE, off + e, nullptr, n) != ESP_OK)
             err = "erase";
         vTaskDelay(1);
     }
-
-    uint32_t t0 = millis();
-    if (err == nullptr)
+    if (err != nullptr)
     {
-        WiFiClientSecure client;
-        client.setCACert(FW_UPDATE_ROOTS_PEM);
-        client.setHandshakeTimeout(FWNET_HANDSHAKE_S);
-        HTTPClient http;
-        Resp rs = {false, -1, false};
-        err = httpGet(http, client, String(av.url), false, rs);
-        if (err == nullptr && (rs.encoded || rs.chunked))
-            err = "enc";
-        if (err == nullptr && rs.clen != (int32_t)zlen)
-            err = "size";
-        if (err == nullptr)
-        {
-            Pump pump = {blk, 0, dlFeed, &dl};
-            err = pumpBody(client, pump, false, (int32_t)zlen, zlen, FWNET_DL_DEADLINE_MS);
-        }
-        http.end();
+        heap_caps_free(blk);
+        sg.blk = nullptr;
+        stageFlashDisarm();
+        nvsClearRecord();
+        return err;
     }
+    return nullptr;
+}
+
+// `err` is the outcome of the transfer (nullptr = the body arrived). Frees sg.blk.
+const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t ilen,
+                        const uint8_t *expectSha)
+{
+    const uint32_t zlen = sg.dl.zlen;
     if (err != nullptr && strcmp(err, "feed") == 0)
         err = "write"; // flash write failed or the peer sent more than zlen
-    if (err == nullptr && dl.written != zlen)
+    if (err == nullptr && sg.dl.written != zlen)
         err = "short";
-    const uint32_t ms = millis() - t0;
-    if (err == nullptr)
-        auLog("[AU];dl;bytes;%u;ms;%u\n", (unsigned)dl.written, (unsigned)ms);
 
-    // digest (mandatory)
+    // digest: compared if the caller has one (DOWNLOAD: mandatory), else only recorded
     uint8_t dig[32];
+    memset(dig, 0, sizeof(dig));
     if (err == nullptr)
     {
-        sha256Final(dl.sha, dig);
-        if (memcmp(dig, av.sha, sizeof(dig)) != 0)
+        sha256Final(sg.dl.sha, dig);
+        if (expectSha != nullptr && memcmp(dig, expectSha, sizeof(dig)) != 0)
             err = "digest";
     }
 
@@ -652,17 +758,19 @@ const char *runDownload()
         for (uint32_t o = 0; o < zlen && err == nullptr;)
         {
             size_t n = zlen - o < FWNET_BLK ? zlen - o : FWNET_BLK;
-            if (esp_partition_read(ota0, off + o, blk, n) != ESP_OK)
+            if (stageFlash(STAGE_READ, sg.off + o, sg.blk, (uint32_t)n) != ESP_OK)
                 err = "readback";
             else
-                crc = esp_rom_crc32_le(crc, blk, (uint32_t)n);
+                crc = esp_rom_crc32_le(crc, sg.blk, (uint32_t)n);
             o += (uint32_t)n;
             vTaskDelay(1);
         }
-        if (err == nullptr && crc != dl.crc)
+        if (err == nullptr && crc != sg.dl.crc)
             err = "crc";
     }
-    heap_caps_free(blk);
+    heap_caps_free(sg.blk);
+    sg.blk = nullptr;
+    stageFlashDisarm(); // the private chip is not used past this point
 
     // record (the commit), then the reinstall guard
     if (err == nullptr)
@@ -672,7 +780,7 @@ const char *runDownload()
         rec.magic = FW_STAGE_MAGIC;
         copyStr(rec.tag, sizeof(rec.tag), tag);
         copyStr(rec.env, sizeof(rec.env), MC_ENV_NAME);
-        rec.off = off;
+        rec.off = sg.off;
         rec.zlen = zlen;
         rec.ilen = ilen;
         rec.crc32 = crc;
@@ -712,6 +820,124 @@ const char *runDownload()
     return nullptr;
 }
 
+const char *runDownload()
+{
+    // snapshot of the CHECK result
+    Avail av;
+    char tag[24];
+    uint32_t zlen, ilen;
+    bool newer;
+    portENTER_CRITICAL(&s_mux);
+    av = s_av;
+    copyStr(tag, sizeof(tag), s_st.availTag);
+    zlen = s_st.zlen;
+    ilen = s_st.ilen;
+    newer = s_st.availNewer;
+    portEXIT_CRITICAL(&s_mux);
+
+    // refusals below are not download attempts: nothing was touched, the caller must not
+    // count them (it keys Install on FwNetStatus::installable)
+    if (!av.checked || !newer || tag[0] == '\0')
+        return refuse("nocheck");
+    if (!av.found || av.url[0] == '\0')
+        return refuse("noasset");
+    if (!av.haveDigest)
+        return refuse("nodigest");
+    if (zlen == 0)
+        return refuse("noasset");
+
+    Stage sg;
+    const char *err = stagePrepare(sg, zlen, ilen, FWNET_MIN_BLOCK);
+    if (err != nullptr)
+        return err;
+
+    uint32_t t0 = millis();
+    {
+        WiFiClientSecure client;
+        client.setCACert(FW_UPDATE_ROOTS_PEM);
+        client.setHandshakeTimeout(FWNET_HANDSHAKE_S);
+        HTTPClient http;
+        Resp rs = {false, -1, false};
+        err = httpGet(http, client, String(av.url), false, rs);
+        if (err == nullptr && (rs.encoded || rs.chunked))
+            err = "enc";
+        if (err == nullptr && rs.clen != (int32_t)zlen)
+            err = "size";
+        if (err == nullptr)
+        {
+            Pump pump = {sg.blk, 0, dlFeed, &sg.dl};
+            err = pumpBody(client, pump, false, (int32_t)zlen, zlen, FWNET_DL_DEADLINE_MS);
+        }
+        http.end();
+    }
+    if (err == nullptr && sg.dl.written == zlen)
+        auLog("[AU];dl;bytes;%u;ms;%u\n", (unsigned)sg.dl.written, (unsigned)(millis() - t0));
+    return stageFinish(sg, err, tag, ilen, av.sha);
+}
+
+#if INSTRUMENT_ENABLED
+// STAGELAN: DOWNLOAD's stage path fed from the bench LAN over plain http (no TLS, no redirect).
+// The compressed length is the Content-Length; the SHA-256 is computed and recorded.
+const char *runStageLan()
+{
+    const LanArg a = s_lan;
+    FwLanUrl u;
+    if (!fwLanUrlParse(a.url, u))
+        return refuse("url");
+
+    static const char *kHdr[] = {"Transfer-Encoding", "Content-Encoding"};
+    WiFiClient client;
+    HTTPClient http;
+    http.setReuse(false); // "Connection: close"
+    http.setTimeout(15000);
+    http.setConnectTimeout(10000);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http.collectHeaders(kHdr, 2);
+    if (!http.begin(client, String(u.host), u.port, String(u.path)))
+        return "begin";
+    const int code = http.GET();
+    if (code != HTTP_CODE_OK)
+    {
+        if (code > 0)
+            snprintf(s_err, sizeof(s_err), "http %d", code);
+        else
+            snprintf(s_err, sizeof(s_err), "conn %d", code);
+        http.end();
+        return s_err;
+    }
+    const bool chunked = http.header("Transfer-Encoding").equalsIgnoreCase("chunked");
+    String ce = http.header("Content-Encoding");
+    const bool encoded = ce.length() > 0 && !ce.equalsIgnoreCase("identity");
+    const int32_t clen = http.getSize();
+    if (chunked || encoded)
+    {
+        http.end();
+        return "enc";
+    }
+    if (clen <= 0)
+    {
+        http.end();
+        return "size";
+    }
+    const uint32_t zlen = (uint32_t)clen;
+
+    Stage sg;
+    const char *err = stagePrepare(sg, zlen, a.ilen, 0);
+    if (err != nullptr)
+    {
+        http.end();
+        return err;
+    }
+    const uint32_t t0 = millis();
+    Pump pump = {sg.blk, 0, dlFeed, &sg.dl};
+    err = pumpBody(client, pump, false, clen, zlen, FWNET_DL_DEADLINE_MS);
+    http.end();
+    if (err == nullptr && sg.dl.written == zlen)
+        auLog("[AU];dl;bytes;%u;ms;%u\n", (unsigned)sg.dl.written, (unsigned)(millis() - t0));
+    return stageFinish(sg, err, a.tag, a.ilen, nullptr);
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // task
 // ---------------------------------------------------------------------------
@@ -720,7 +946,11 @@ void fwNetTask(void *)
 {
     s_err[0] = '\0';
     heapMark("start");
-    const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh) : runDownload();
+    const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
+#if INSTRUMENT_ENABLED
+                      : (s_argJob == FWJ_STAGELAN) ? runStageLan()
+#endif
+                                                   : runDownload();
     heapMark("end"); // after every client object is gone
     if (err != nullptr)
         auLog("[AU];fail;%s\n", err);
@@ -768,10 +998,16 @@ void ensureStagedLoaded()
 // public API
 // ---------------------------------------------------------------------------
 
-bool fwNetStart(FwNetJob job, uint8_t channel)
+namespace
 {
-    if (job != FWJ_CHECK && job != FWJ_DOWNLOAD)
-        return false;
+// Shared start: marks the job running, records its arguments (inside the critical section,
+// so a refused start never touches the running job's), creates the task.
+#if INSTRUMENT_ENABLED
+bool startJob(FwNetJob job, uint8_t channel, const LanArg *lan)
+#else
+bool startJob(FwNetJob job, uint8_t channel)
+#endif
+{
     if (WiFi.status() != WL_CONNECTED)
         return false;
 
@@ -789,6 +1025,10 @@ bool fwNetStart(FwNetJob job, uint8_t channel)
         s_st.lastErr[0] = '\0';
         s_argJob = job;
         s_argCh = channel;
+#if INSTRUMENT_ENABLED
+        if (lan != nullptr)
+            s_lan = *lan;
+#endif
         ok = true;
     }
     portEXIT_CRITICAL(&s_mux);
@@ -806,6 +1046,35 @@ bool fwNetStart(FwNetJob job, uint8_t channel)
     }
     return true;
 }
+} // namespace
+
+bool fwNetStart(FwNetJob job, uint8_t channel)
+{
+    if (job != FWJ_CHECK && job != FWJ_DOWNLOAD)
+        return false;
+#if INSTRUMENT_ENABLED
+    return startJob(job, channel, nullptr);
+#else
+    return startJob(job, channel);
+#endif
+}
+
+#if INSTRUMENT_ENABLED
+bool fwNetStartLan(const char *url, uint32_t ilen, const char *tag)
+{
+    FwLanUrl u;
+    FwVersion v;
+    LanArg a;
+    if (url == nullptr || tag == nullptr || strlen(url) >= sizeof(a.url) || strlen(tag) >= sizeof(a.tag) ||
+        !fwLanUrlParse(url, u) || ilen == 0 || ilen > 16u * 1024u * 1024u || !fwParseTag(tag, v))
+        return false;
+    memset(&a, 0, sizeof(a));
+    copyStr(a.url, sizeof(a.url), url);
+    a.ilen = ilen;
+    copyStr(a.tag, sizeof(a.tag), tag);
+    return startJob(FWJ_STAGELAN, 0, &a);
+}
+#endif
 
 void fwNetGetStatus(FwNetStatus &out)
 {
@@ -854,10 +1123,26 @@ bool fwNetLoadRecord(FwStageRecord &out)
     if (have && !ok && p.isKey(FWNET_KEY_REC))
     {
         p.remove(FWNET_KEY_REC);
+        p.remove(FWNET_KEY_TRIES);
         auLog("[AU];refuse;stalerec\n");
+        // the cached "staged" flag must follow, or fwTick would hand over every second
+        portENTER_CRITICAL(&s_mux);
+        s_st.staged = false;
+        s_st.stagedTag[0] = '\0';
+        portEXIT_CRITICAL(&s_mux);
     }
     p.end();
     return ok;
+}
+
+void fwNetClearRecord(void)
+{
+    nvsClearRecord();
+    portENTER_CRITICAL(&s_mux);
+    s_st.staged = false;
+    s_st.stagedTag[0] = '\0';
+    s_stagedKnown = true;
+    portEXIT_CRITICAL(&s_mux);
 }
 
 void fwNetLastInstalledTag(char *out, size_t n)

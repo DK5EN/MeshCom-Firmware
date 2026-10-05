@@ -18,6 +18,7 @@
 
 #include "command_setters.h"
 #include "command_match.h"
+#include "esp32/fw_update_net.h" // fwLanUrlParse() (AU-08), the pure part outside the ESP32 guard
 
 static void test_a_plain_number_parses()
 {
@@ -500,13 +501,18 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     const size_t guardOpen = cmd.rfind("#if defined(ESP32)", rungAu);
     TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardOpen > rmBare,
                              "--autoupdate rung is not inside its own #if defined(ESP32) after --rm");
-    const size_t guardClose = cmd.find("#endif", rungAu);
+    // the block ends behind the bare --update rung; the --update body carries one nested
+    // "#if INSTRUMENT_ENABLED" pair (stagelan, AU-08) that is not the block's closer
+    const size_t bareUpdate = cmd.find("commandCheck(msg_text+2, (char*)\"update\") == 0", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(bareUpdate != std::string::npos, "bare --update rung missing (block closer anchor)");
+    const size_t guardClose = cmd.find("#endif", bareUpdate);
     TEST_ASSERT_TRUE_MESSAGE(guardClose != std::string::npos && guardClose > bareCh,
                              "the ESP32 block closes before the --updchan rungs");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("#if defined(ESP32)", guardOpen + 1) > guardClose,
                              "--autoupdate/--updchan rungs are not in one closed ESP32 block");
     const size_t instr = cmd.find("\n#if INSTRUMENT_ENABLED", rungAu);
-    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose,
+    const size_t rungUpdate = cmd.find("commandCheck(msg_text+2, (char*)\"update \") == 0", rungAu);
+    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose || (rungUpdate != std::string::npos && instr > rungUpdate),
                              "--autoupdate rungs sit inside the INSTRUMENT_ENABLED block (must be a field command)");
     // the chain continues after the block with the txpower rung's own else
     const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
@@ -616,22 +622,29 @@ static void test_update_rungs_sit_in_the_esp32_block_with_the_expected_output()
     const size_t rungAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
     TEST_ASSERT_TRUE(rungAu != std::string::npos);
     const size_t guardOpen = cmd.rfind("#if defined(ESP32)", rungAu);
-    const size_t guardClose = cmd.find("#endif", rungAu);
+    // the closer is the first #endif behind the bare --update rung: the --update body itself carries one
+    // nested "#if INSTRUMENT_ENABLED" pair (the bench-only stagelan verb, AU-08), pinned further down
+    const size_t guardClose = cmd.find("#endif", bareUp);
     TEST_ASSERT_TRUE_MESSAGE(guardOpen != std::string::npos && guardClose != std::string::npos && guardClose > bareUp,
                              "the --update rungs are outside the --autoupdate ESP32 block");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("#if defined(ESP32)", guardOpen + 1) > guardClose,
                              "--update rungs are not in the one closed ESP32 block");
+    // the --update verbs are field commands: the only INSTRUMENT_ENABLED region inside the block is the
+    // stagelan verb nested in the --update body, nothing before it (--autoupdate / --updchan stay field)
     const size_t instr = cmd.find("\n#if INSTRUMENT_ENABLED", rungAu);
-    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose,
+    TEST_ASSERT_TRUE_MESSAGE(instr == std::string::npos || instr > guardClose || (instr > rungUp && instr < bareUp),
                              "--update rungs sit inside the INSTRUMENT_ENABLED block (must be a field command)");
+    if (instr != std::string::npos && instr < guardClose)
+        TEST_ASSERT_TRUE_MESSAGE(cmd.find("strncmp(_owner_c, \"stagelan \", 9) == 0", instr) - instr < 400,
+                                 "the INSTRUMENT_ENABLED region inside --update is not the stagelan verb");
     const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
     TEST_ASSERT_TRUE_MESSAGE(after != std::string::npos && after - guardClose < 40, "ladder chain after the ESP32 block is broken");
 
     const std::string body = cmd.substr(rungUp, bareUp - rungUp);
     TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+9") != std::string::npos, "--update argument offset is not +9");
     TEST_ASSERT_TRUE_MESSAGE(body.find("\"check\"") != std::string::npos && body.find("\"install\"") != std::string::npos &&
-                                 body.find("\"status\"") != std::string::npos,
-                             "--update verbs check/install/status missing");
+                                 body.find("\"status\"") != std::string::npos && body.find("\"apply\"") != std::string::npos,
+                             "--update verbs check/install/status/apply missing");
     TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetStart(FWJ_CHECK") != std::string::npos, "--update check does not start a CHECK");
     TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetStart(FWJ_DOWNLOAD") != std::string::npos, "--update install does not start a DOWNLOAD");
     TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetGetStatus(") != std::string::npos, "--update does not read the net status");
@@ -666,7 +679,7 @@ static void test_update_rungs_sit_in_the_esp32_block_with_the_expected_output()
     TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") == std::string::npos, "--update must not persist anything");
 
     // help line and the extra --info line, both inside an ESP32 guard
-    const size_t help = cmd.find("--update check/install/status  firmware update now (ESP32)");
+    const size_t help = cmd.find("--update check/install/status/apply  firmware update now (ESP32)");
     TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--update help line missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", help) > cmd.rfind("#endif", help), "--update help line is not inside an ESP32 guard");
     const size_t info = cmd.find("\"...AU avail=%s staged=%s\\n\"");
@@ -722,19 +735,322 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     }
     TEST_ASSERT_TRUE_MESSAGE(m.find("!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV") != std::string::npos,
                              "AU-D17: the download is not gated on the battery floor");
-    TEST_ASSERT_TRUE_MESSAGE(m.find("[AU];handover;deferred_w3") != std::string::npos, "FW_HANDOVER marker missing");
+    TEST_ASSERT_TRUE_MESSAGE(m.find("deferred_w3") == std::string::npos, "the deferred_w3 handover marker is still there");
     TEST_ASSERT_TRUE_MESSAGE(m.find("[AU];notify;%s") != std::string::npos, "notify marker missing");
-    // the Safeboot apply is the next wave: the tick must not reboot
+    // AU-08: FW_HANDOVER prints the marker, then reboots through the ONE shared function (no restart
+    // call of its own in the tick)
     const size_t tick = m.find("static void auTick(void)");
     const size_t loop = m.find("void esp32loop()");
     TEST_ASSERT_TRUE_MESSAGE(tick != std::string::npos && loop != std::string::npos && tick < loop, "auTick is not defined before esp32loop");
     const std::string body = m.substr(tick, loop - tick);
     TEST_ASSERT_TRUE_MESSAGE(body.find("esp_restart") == std::string::npos && body.find("ESP.restart") == std::string::npos &&
                                  body.find("esp32_reboot") == std::string::npos,
-                             "auTick reboots (Safeboot apply is not wired yet)");
+                             "auTick restarts on its own (it must go through auRebootToSafeboot)");
+    {
+        const size_t ho = body.find("if(act == FW_HANDOVER)");
+        TEST_ASSERT_TRUE_MESSAGE(ho != std::string::npos, "FW_HANDOVER branch missing in auTick");
+        const size_t hoEnd = body.find("if(act == FW_CHECK", ho);
+        TEST_ASSERT_TRUE_MESSAGE(hoEnd != std::string::npos, "FW_CHECK branch does not follow the FW_HANDOVER branch");
+        const std::string h = body.substr(ho, hoEnd - ho);
+        const size_t load = h.find("fwNetLoadRecord(rec)");
+        const size_t mark = h.find("[AU];handover;%s");
+        const size_t reboot = h.find("auRebootToSafeboot()");
+        TEST_ASSERT_TRUE_MESSAGE(load != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
+                                 "handover must validate the record, print [AU];handover;<tag> and call auRebootToSafeboot()");
+        TEST_ASSERT_TRUE_MESSAGE(load < mark && mark < reboot, "handover order must be: load record, marker, reboot");
+        TEST_ASSERT_TRUE_MESSAGE(h.find("s_auHandoverTag") != std::string::npos, "handover is not limited to one attempt per tag");
+        // R1/R5: a handover that returns (no Safeboot / boot partition not settable) drops the record, and an
+        // attempted tag is not re-read from NVS every second
+        const size_t fail = h.find("[AU];fail;nosafeboot");
+        const size_t clr = h.find("fwNetClearRecord()");
+        TEST_ASSERT_TRUE_MESSAGE(reboot < fail && fail < clr, "a failed handover must print nosafeboot and then fwNetClearRecord()");
+        const size_t cached = h.find("auTagSame(s_auHandoverTag, st.stagedTag)");
+        TEST_ASSERT_TRUE_MESSAGE(cached != std::string::npos && cached < load, "the attempted-tag cache check must come before fwNetLoadRecord()");
+    }
     // the call sits inside esp32loop()
     const size_t call = m.find("    auTick();\n", loop);
     TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "esp32loop() never calls auTick()");
+}
+
+// ---- AU-08 (#1187): shared Safeboot reboot, --update apply, bench-only stagelan --------------
+
+static void test_ota_update_and_the_handover_share_one_reboot_function()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    // the sequence exists exactly once, in auRebootToSafeboot(), inside an ESP32 guard
+    const size_t fn = cmd.find("bool auRebootToSafeboot(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "auRebootToSafeboot() is not defined in command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#ifdef ESP32", fn) > cmd.rfind("#endif", fn), "auRebootToSafeboot() is not inside an ESP32 guard");
+    const size_t fnEnd = cmd.find("\n}\n", fn);
+    const std::string body = cmd.substr(fn, fnEnd - fn);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("ESP_PARTITION_SUBTYPE_APP_FACTORY, \"safeboot\"") != std::string::npos, "the Safeboot partition lookup is gone");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("esp_ota_set_boot_partition(partition)") != std::string::npos, "the boot partition is not set");
+    // R1: the boot-partition result is checked and a failure returns BEFORE the breadcrumb clear and the restart
+    const size_t setBoot = body.find("if (esp_ota_set_boot_partition(partition) != ESP_OK)");
+    TEST_ASSERT_TRUE_MESSAGE(setBoot != std::string::npos, "the esp_ota_set_boot_partition() result is not checked");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("return false", setBoot) < body.find("loopCrumbClear()") &&
+                                 body.find("return false", setBoot) < body.find("esp_restart()"),
+                             "a failed esp_ota_set_boot_partition() must return before loopCrumbClear()/esp_restart()");
+    const size_t crumb = body.find("loopCrumbClear()");
+    const size_t restart = body.find("esp_restart()");
+    TEST_ASSERT_TRUE_MESSAGE(crumb != std::string::npos && restart != std::string::npos && crumb < restart,
+                             "loopCrumbClear() must run before esp_restart() (INS-05)");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("return false") != std::string::npos, "no failure return without a Safeboot partition");
+
+    // no second copy: the partition lookup / restart appear once in the file, the --ota-update rung calls the function
+    size_t n = 0;
+    for (size_t at = 0; (at = cmd.find("\"safeboot\"", at)) != std::string::npos; at += 10) n++;
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(1, n, "the Safeboot partition lookup exists more than once");
+    const size_t ota = cmd.find("commandCheck(msg_text+2, (char*)\"ota-update\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(ota != std::string::npos, "--ota-update rung missing");
+    const std::string rung = cmd.substr(ota, cmd.find("#endif", ota) - ota);
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("auRebootToSafeboot()") != std::string::npos, "--ota-update does not call auRebootToSafeboot()");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("esp_restart") == std::string::npos && rung.find("esp_ota_set_boot_partition") == std::string::npos,
+                             "--ota-update still carries its own reboot sequence");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#ifdef ESP32", ota) > cmd.rfind("#endif", ota), "--ota-update is not inside an ESP32 guard");
+
+    // the prototype is in the ESP32-guarded part of the net header, so esp32_main.cpp sees it
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("bool auRebootToSafeboot(void);") != std::string::npos, "auRebootToSafeboot() prototype missing");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("bool auRebootToSafeboot(void);") > hdr.find("#if defined(ESP32)"), "prototype is outside the ESP32 guard");
+}
+
+static void test_update_apply_hands_over_now_and_is_not_remote()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t rungUp = cmd.find("commandCheck(msg_text+2, (char*)\"update \") == 0");
+    const size_t bareUp = cmd.find("commandCheck(msg_text+2, (char*)\"update\") == 0");
+    TEST_ASSERT_TRUE(rungUp != std::string::npos && bareUp != std::string::npos && rungUp < bareUp);
+    const std::string body = cmd.substr(rungUp, bareUp - rungUp);
+
+    const size_t apply = body.find("casecmp(_owner_c, (char*)\"apply\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(apply != std::string::npos, "--update apply verb missing");
+    const size_t status = body.find("casecmp(_owner_c, (char*)\"status\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(status != std::string::npos && apply < status, "--update apply is not a branch of the verb chain before status");
+    const std::string a = body.substr(apply, status - apply);
+    const size_t load = a.find("fwNetLoadRecord(_rec)");
+    const size_t none = a.find("[AU];apply;nothing_staged");
+    const size_t mark = a.find("[AU];handover;%s");
+    const size_t reboot = a.find("auRebootToSafeboot()");
+    TEST_ASSERT_TRUE_MESSAGE(load != std::string::npos && none != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
+                             "--update apply needs: record check, nothing_staged line, handover marker, reboot");
+    TEST_ASSERT_TRUE_MESSAGE(load < none && none < mark && mark < reboot, "--update apply order must be record check, nothing_staged, marker, reboot");
+    // operator action: no window / mode / idle gate in front of it
+    TEST_ASSERT_TRUE_MESSAGE(a.find("localMinuteOfDay") == std::string::npos && a.find("node_autoupd") == std::string::npos &&
+                                 a.find("fwTick") == std::string::npos && a.find("isPhoneReady") == std::string::npos,
+                             "--update apply is gated on the update window / mode / phone");
+    TEST_ASSERT_TRUE_MESSAGE(a.find("_auBusy") != std::string::npos, "--update apply does not refuse while a job runs");
+
+    // not on the RM allowlist
+    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("apply") == std::string::npos && rm.find("auRebootToSafeboot") == std::string::npos,
+                             "apply / the Safeboot reboot is reachable from the RM path");
+}
+
+static void test_stagelan_is_instrument_only_everywhere()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+
+    // command_functions.cpp: the verb string occurs only between "#if INSTRUMENT_ENABLED" and its "#endif"
+    const size_t verb = cmd.find("strncmp(_owner_c, \"stagelan \", 9) == 0");
+    TEST_ASSERT_TRUE_MESSAGE(verb != std::string::npos, "stagelan verb missing");
+    const size_t open = cmd.rfind("#if INSTRUMENT_ENABLED", verb);
+    const size_t close = cmd.find("#endif", verb);
+    TEST_ASSERT_TRUE_MESSAGE(open != std::string::npos && close != std::string::npos && verb - open < 400 &&
+                                 cmd.rfind("#endif", verb) < open,
+                             "the stagelan verb is not directly inside its own #if INSTRUMENT_ENABLED region");
+    const std::string region = cmd.substr(open, close - open);
+    TEST_ASSERT_TRUE_MESSAGE(region.find("fwNetStartLan(") != std::string::npos, "stagelan does not start the LAN job");
+    TEST_ASSERT_TRUE_MESSAGE(region.find("%199s %lu %23s") != std::string::npos, "stagelan argument format is not <url> <ilen> <tag>");
+    TEST_ASSERT_TRUE_MESSAGE(region.find("[AU];stagelan;started;") != std::string::npos, "stagelan has no started marker");
+    // every other occurrence of the word outside this region is a comment line
+    for (size_t at = 0; (at = cmd.find("stagelan", at)) != std::string::npos; at += 8)
+    {
+        if (at > open && at < close) continue;
+        const size_t ls = cmd.rfind('\n', at) + 1;
+        const std::string line = cmd.substr(ls, cmd.find('\n', at) - ls);
+        TEST_ASSERT_TRUE_MESSAGE(line.find("//") != std::string::npos && line.find("//") < at - ls,
+                                 "the word stagelan appears in non-comment code outside the INSTRUMENT_ENABLED region");
+    }
+    // not on the RM allowlist
+    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("stagelan") == std::string::npos, "stagelan is on the RM allowlist");
+
+    // fw_update_net.cpp: no string literal says "stagelan", the LAN code sits in INSTRUMENT_ENABLED regions
+    TEST_ASSERT_TRUE_MESSAGE(net.find("\"stagelan") == std::string::npos && net.find("stagelan\"") == std::string::npos,
+                             "a stagelan string literal exists in fw_update_net.cpp");
+    const char *lanOnly[] = {"const char *runStageLan()", "bool fwNetStartLan(const char *url, uint32_t ilen, const char *tag)\n{",
+                             "LanArg s_lan;", "fwLanUrlParse(a.url, u)", "http.begin(client, String(u.host)"};
+    for (const char *sym : lanOnly)
+    {
+        const size_t at = net.find(sym);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, sym);
+        const size_t o = net.rfind("#if INSTRUMENT_ENABLED", at);
+        const size_t c = net.rfind("#endif", at);
+        TEST_ASSERT_TRUE_MESSAGE(o != std::string::npos && (c == std::string::npos || c < o), sym);
+    }
+    // the task dispatch reaches runStageLan only under the guard, the generic start refuses FWJ_STAGELAN
+    const size_t disp = net.find("runStageLan()\n#endif");
+    TEST_ASSERT_TRUE_MESSAGE(disp != std::string::npos, "the task dispatch of FWJ_STAGELAN is not inside an #if INSTRUMENT_ENABLED");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("if (job != FWJ_CHECK && job != FWJ_DOWNLOAD)\n        return false;") != std::string::npos,
+                             "fwNetStart() no longer refuses FWJ_STAGELAN");
+    // plain http, no redirects, same stage steps as DOWNLOAD
+    const size_t lan = net.find("const char *runStageLan()");
+    const std::string lb = net.substr(lan, net.find("\n#endif", lan) - lan);
+    TEST_ASSERT_TRUE_MESSAGE(lb.find("WiFiClientSecure") == std::string::npos, "STAGELAN uses TLS (it must be plain http)");
+    TEST_ASSERT_TRUE_MESSAGE(lb.find("HTTPC_DISABLE_FOLLOW_REDIRECTS") != std::string::npos, "STAGELAN follows redirects");
+    TEST_ASSERT_TRUE_MESSAGE(lb.find("stagePrepare(") != std::string::npos && lb.find("stageFinish(") != std::string::npos &&
+                                 lb.find("dlFeed") != std::string::npos,
+                             "STAGELAN does not go through the shared stage steps");
+    TEST_ASSERT_TRUE_MESSAGE(lb.find("stageFinish(sg, err, a.tag, a.ilen, nullptr)") != std::string::npos,
+                             "STAGELAN must record the computed SHA-256 (no digest to compare)");
+    const size_t dlPos = net.find("const char *runDownload()");
+    const std::string db = net.substr(dlPos, lan - dlPos);
+    TEST_ASSERT_TRUE_MESSAGE(db.find("stagePrepare(") != std::string::npos && db.find("stageFinish(sg, err, tag, ilen, av.sha)") != std::string::npos,
+                             "DOWNLOAD no longer goes through the shared stage steps with the API digest");
+    // the net header declares the job and the start function without a string
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("FWJ_STAGELAN") != std::string::npos && hdr.find("bool fwNetStartLan(") != std::string::npos,
+                             "net header lacks FWJ_STAGELAN / fwNetStartLan");
+}
+
+static void test_lan_url_accepts_only_plain_http_to_private_ipv4()
+{
+    FwLanUrl u;
+    TEST_ASSERT_TRUE(fwLanUrlParse("http://192.168.68.10:8000/fw/heltec.bin.zz", u));
+    TEST_ASSERT_EQUAL_STRING("192.168.68.10", u.host);
+    TEST_ASSERT_EQUAL_UINT16(8000, u.port);
+    TEST_ASSERT_EQUAL_STRING("/fw/heltec.bin.zz", u.path);
+    TEST_ASSERT_TRUE(fwLanUrlParse("http://10.0.0.5/x.zz", u));
+    TEST_ASSERT_EQUAL_UINT16(80, u.port);
+    TEST_ASSERT_TRUE(fwLanUrlParse("http://172.16.0.1:1/a", u));
+    TEST_ASSERT_TRUE(fwLanUrlParse("http://172.31.255.254:65535/a", u));
+    TEST_ASSERT_EQUAL_UINT16(65535, u.port);
+
+    const char *bad[] = {
+        nullptr,
+        "",
+        "https://192.168.1.2/a.zz",            // TLS scheme
+        "HTTP://192.168.1.2/a.zz",             // case-sensitive scheme, keep it strict
+        "ftp://192.168.1.2/a.zz",
+        "http://example.com/a.zz",             // hostname
+        "http://localhost/a.zz",
+        "http://8.8.8.8/a.zz",                 // public
+        "http://127.0.0.1/a.zz",               // loopback
+        "http://169.254.1.1/a.zz",             // link-local
+        "http://172.15.0.1/a.zz",              // just below 172.16/12
+        "http://172.32.0.1/a.zz",              // just above
+        "http://192.169.0.1/a.zz",
+        "http://11.0.0.1/a.zz",
+        "http://0.0.0.0/a.zz",
+        "http://192.168.1.2",                  // no path
+        "http://192.168.1.2:8000",             // no path
+        "http://192.168.1.2:/a",               // empty port
+        "http://192.168.1.2:0/a",              // port 0
+        "http://192.168.1.2:65536/a",          // port too big
+        "http://192.168.1.2:123456/a",
+        "http://192.168.1.256/a",              // octet overflow
+        "http://192.168.1/a",                  // too few octets
+        "http://192.168.1.2.3/a",              // too many
+        "http://192.168.01.2/a",               // leading zero (octal ambiguity)
+        "http://192.168.1.2@10.0.0.1/a",       // userinfo trick
+        "http://10.0.0.1@evil/a",
+        "http://user:pw@10.0.0.1/a",
+        "http://10.0.0.1:80:90/a",
+        "http://10.0.0.1/a b",                 // space
+        "http://10.0.0.1/a\tb",                // control char
+        "http://10.0.0.1/a#frag",
+        "http://10.0.0.1/a\\b",
+        "http:// 10.0.0.1/a",
+        "http://10.0.0.1\n/a",
+    };
+    for (const char *url : bad)
+        TEST_ASSERT_FALSE_MESSAGE(fwLanUrlParse(url, u), url ? url : "(null)");
+    // a refused URL leaves an empty host (a caller that ignores the result cannot connect anywhere)
+    TEST_ASSERT_FALSE(fwLanUrlParse("http://8.8.8.8/a", u));
+    TEST_ASSERT_EQUAL_STRING("", u.host);
+
+    // path capacity: 159 characters fit, 160 do not
+    std::string ok = "http://10.0.0.1/";
+    ok.append(158, 'a');
+    TEST_ASSERT_TRUE(fwLanUrlParse(ok.c_str(), u));
+    TEST_ASSERT_EQUAL_UINT(159, (unsigned)strlen(u.path));
+    ok.append(1, 'a');
+    TEST_ASSERT_FALSE(fwLanUrlParse(ok.c_str(), u));
+}
+
+// AU-08 rework: the stage area is written through ONE helper on a private flash chip, and R4 (tries).
+static void test_stage_flash_goes_through_one_guarded_helper()
+{
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+
+    // no partition-API erase/write/read on ota_0 in code (a running-partition write aborts, IDF 4.4 region_protected)
+    for (const char *api : {"esp_partition_write(", "esp_partition_erase_range(", "esp_partition_read("})
+    {
+        for (size_t at = 0; (at = net.find(api, at)) != std::string::npos; at += 8)
+        {
+            const size_t ls = net.rfind('\n', at) + 1;
+            const std::string line = net.substr(ls, net.find('\n', at) - ls);
+            TEST_ASSERT_TRUE_MESSAGE(line.find("//") != std::string::npos && line.find("//") < at - ls, api);
+        }
+    }
+
+    // the private chip: copy of the default chip + private os table without region_protected
+    TEST_ASSERT_TRUE_MESSAGE(net.find("#include <esp_flash.h>") != std::string::npos, "esp_flash.h is not included");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("s_sf.os = *esp_flash_default_chip->os_func;") != std::string::npos, "the os table is not copied from the default chip");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("s_sf.os.region_protected = nullptr;") != std::string::npos, "region_protected is not cleared on the private os table");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("s_sf.chip = *esp_flash_default_chip;") != std::string::npos, "the chip is not copied from the default chip");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("s_sf.chip.os_func = &s_sf.os;") != std::string::npos, "the private chip does not use the private os table");
+
+    // exactly one place calls the esp_flash_* functions, and it is the helper
+    size_t nEr = 0, nWr = 0, nRd = 0;
+    for (size_t at = 0; (at = net.find("esp_flash_erase_region(&s_sf.chip", at)) != std::string::npos; at++) nEr++;
+    for (size_t at = 0; (at = net.find("esp_flash_write(&s_sf.chip", at)) != std::string::npos; at++) nWr++;
+    for (size_t at = 0; (at = net.find("esp_flash_read(&s_sf.chip", at)) != std::string::npos; at++) nRd++;
+    TEST_ASSERT_EQUAL_UINT(1, nEr);
+    TEST_ASSERT_EQUAL_UINT(1, nWr);
+    TEST_ASSERT_EQUAL_UINT(1, nRd);
+    const size_t fn = net.find("esp_err_t stageFlash(StageOp op, uint32_t rel, void *buf, uint32_t len)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "the stageFlash() helper is missing");
+    const std::string hb = net.substr(fn, net.find("\n}\n", fn) - fn);
+    TEST_ASSERT_TRUE_MESSAGE(hb.find("esp_flash_erase_region(&s_sf.chip") != std::string::npos &&
+                                 hb.find("esp_flash_write(&s_sf.chip") != std::string::npos &&
+                                 hb.find("esp_flash_read(&s_sf.chip") != std::string::npos,
+                             "the esp_flash_* calls are not inside stageFlash()");
+    // the range guard comes first: armed, non-empty, at or above the stage start, inside ota_0, no overflow
+    const size_t guard = hb.find("if (!s_sf.armed || len == 0 || rel < s_sf.lo || rel > s_sf.size || len > s_sf.size - rel)");
+    TEST_ASSERT_TRUE_MESSAGE(guard != std::string::npos && guard < hb.find("esp_flash_"), "the stage range assert is missing or not before the flash calls");
+    // the chip is armed from fwStageLayout's offset only, after the layout check, and disarmed again
+    const size_t prep = net.find("const char *stagePrepare(");
+    const size_t layout = net.find("fwStageLayout(", prep);
+    const size_t arm = net.find("stageFlashArm(ota0, off)", prep);
+    TEST_ASSERT_TRUE_MESSAGE(layout != std::string::npos && arm != std::string::npos && layout < arm, "the chip is armed before the layout check");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("stageFlashDisarm();", net.find("const char *stageFinish(")) != std::string::npos, "stageFinish() does not disarm the private chip");
+    // only the stage steps call the helper
+    for (size_t at = 0; (at = net.find("stageFlash(STAGE_", at)) != std::string::npos; at++)
+    {
+        const bool inDl = at > net.find("bool dlFeed(") && at < net.find("const char *layoutReason(");
+        const bool inPrep = at > prep && at < net.find("const char *stageFinish(");
+        const bool inFin = at > net.find("const char *stageFinish(") && at < net.find("const char *runDownload()");
+        TEST_ASSERT_TRUE_MESSAGE(inDl || inPrep || inFin, "stageFlash() is called outside dlFeed/stagePrepare/stageFinish");
+    }
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("esp_flash") == std::string::npos, "the private chip leaked into the net header");
+
+    // R4: clearing the record also removes Safeboot's attempt counter, in the clear helper and on a stale record
+    const size_t clr = net.find("bool nvsClearRecord()\n{");
+    TEST_ASSERT_TRUE_MESSAGE(clr != std::string::npos, "nvsClearRecord() missing");
+    const std::string cb = net.substr(clr, net.find("\n}\n", clr) - clr);
+    TEST_ASSERT_TRUE_MESSAGE(cb.find("p.remove(FWNET_KEY_TRIES)") != std::string::npos, "nvsClearRecord() does not remove \"tries\"");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("#define FWNET_KEY_TRIES \"tries\"") != std::string::npos, "the tries key name changed (Safeboot uses \"tries\")");
+    const size_t stale = net.find("[AU];refuse;stalerec");
+    TEST_ASSERT_TRUE_MESSAGE(stale != std::string::npos && net.rfind("p.remove(FWNET_KEY_TRIES)", stale) > net.rfind("bool fwNetLoadRecord(", stale),
+                             "a stale record does not take Safeboot's tries counter with it");
+    // stagePrepare clears through nvsClearRecord() before the erase
+    TEST_ASSERT_TRUE_MESSAGE(net.find("nvsClearRecord()", prep) < net.find("stageFlash(STAGE_ERASE", prep), "stagePrepare erases before it clears the record/tries");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("void fwNetClearRecord(void);") != std::string::npos, "fwNetClearRecord() prototype missing");
 }
 
 int main(int, char **)
@@ -767,5 +1083,10 @@ int main(int, char **)
     RUN_TEST(test_update_does_not_collide_with_other_commands);
     RUN_TEST(test_update_rungs_sit_in_the_esp32_block_with_the_expected_output);
     RUN_TEST(test_au_tick_and_wifi_gate_are_wired_in_esp32_main);
+    RUN_TEST(test_ota_update_and_the_handover_share_one_reboot_function);
+    RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
+    RUN_TEST(test_stagelan_is_instrument_only_everywhere);
+    RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
+    RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);
     return UNITY_END();
 }

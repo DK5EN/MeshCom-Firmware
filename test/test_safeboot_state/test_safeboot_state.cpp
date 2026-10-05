@@ -10,6 +10,9 @@
 
 #include <unity.h>
 
+#include <string.h>
+
+#include <safeboot/fw_apply.h>
 #include <safeboot/ota_state.h>
 
 using safeboot::OtaSession;
@@ -369,6 +372,404 @@ static void test_setappvalid_true_rearms_fallback_from_that_moment(void) {
     TEST_ASSERT_EQUAL(1, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Timeout));
 }
 
+// ---------------------------------------------------------------------
+// AU-07: Applying state (offline apply of a staged update).
+// ---------------------------------------------------------------------
+static void test_applying_state_is_truthful_and_quiet(void) {
+    OtaSession s;
+    s.begin(0);
+    s.onApplyBegin(100, 1000);
+    TEST_ASSERT_EQUAL_STRING("applying", OtaSession::stateName(s.state().state));
+    TEST_ASSERT_EQUAL_UINT32(1000, s.state().total);
+    TEST_ASSERT_EQUAL_INT32(-1, s.state().fallback_in_ms);
+    TEST_ASSERT_FALSE(s.state().image_valid);
+
+    s.onApplyProgress(200, 400);
+    TEST_ASSERT_EQUAL_UINT32(400, s.state().received);
+
+    // no stall abort, no fallback reboot, cancel refused while applying
+    s.tick(100 + OtaSession::STALL_MS + OtaSession::FALLBACK_MS + 5000);
+    TEST_ASSERT_EQUAL_INT(0, drainActions(s).count);
+    TEST_ASSERT_FALSE(s.onCancelRequest(300));
+    TEST_ASSERT_EQUAL_INT(0, drainActions(s).count);
+}
+
+static void test_apply_ok_ends_done_with_image_valid(void) {
+    OtaSession s;
+    s.begin(0);
+    s.onApplyBegin(10, 500);
+    s.onApplyEnd(20, true);
+    TEST_ASSERT_EQUAL_STRING("done", OtaSession::stateName(s.state().state));
+    TEST_ASSERT_TRUE(s.state().image_valid);
+    TEST_ASSERT_EQUAL_STRING("", OtaSession::reasonName(s.state().reason));
+}
+
+static void test_apply_failed_ends_aborted_and_rearms_fallback(void) {
+    OtaSession s;
+    s.begin(0);
+    s.onApplyBegin(10, 500);
+    s.onApplyEnd(20, false);
+    TEST_ASSERT_EQUAL_STRING("aborted", OtaSession::stateName(s.state().state));
+    TEST_ASSERT_EQUAL_STRING("apply_failed", OtaSession::reasonName(s.state().reason));
+    TEST_ASSERT_FALSE(s.state().image_valid);
+    // app still valid (a CRC failure never touched ota_0): the fallback runs from the verdict
+    s.tick(20 + OtaSession::FALLBACK_MS + 1);
+    TEST_ASSERT_EQUAL_INT(1, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Timeout));
+    // progress / end outside Applying are no-ops
+    s.onApplyProgress(30, 99);
+    s.onApplyEnd(30, true);
+    TEST_ASSERT_EQUAL_STRING("aborted", OtaSession::stateName(s.state().state));
+}
+
+static void test_apply_failed_with_invalid_app_stays_quiet(void) {
+    OtaSession s;
+    s.begin(0);
+    s.onApplyBegin(10, 500);
+    s.onApplyEnd(20, false);
+    s.setAppValid(false); // erase happened, inflate failed
+    s.tick(20 + 10 * OtaSession::FALLBACK_MS);
+    TEST_ASSERT_EQUAL_INT(0, drainActions(s).count);
+    TEST_ASSERT_EQUAL_INT32(-1, s.state().fallback_in_ms);
+    // an upload still works afterwards
+    s.onStart(50000, 0);
+    TEST_ASSERT_EQUAL_STRING("receiving", OtaSession::stateName(s.state().state));
+}
+
+// ---------------------------------------------------------------------
+// AU-07: fwApplyPlan.
+// ---------------------------------------------------------------------
+#define SLOT 0x1A0000u // 1664 KB ota_0 of the 4 MB safeboot table
+
+static FwStageRecord goodRec(void) {
+    FwStageRecord r;
+    memset(&r, 0, sizeof(r));
+    r.magic = FW_STAGE_MAGIC;
+    r.off = 0x120000;
+    r.zlen = 0x7C000;  // 0x120000 + 0x7C000 = 0x19C000 <= SLOT
+    r.ilen = 0x118123; // below off, not 4 KB aligned
+    r.crc32 = 0xDEADBEEF;
+    return r;
+}
+
+static void test_plan_valid(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    TEST_ASSERT_TRUE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("ok", why);
+    TEST_ASSERT_EQUAL_UINT32(r.off, p.srcOff);
+    TEST_ASSERT_EQUAL_UINT32(r.zlen, p.zlen);
+    TEST_ASSERT_EQUAL_UINT32(r.ilen, p.ilen);
+    TEST_ASSERT_EQUAL_UINT32(0x119000, p.eraseLen); // 0x118123 rounded up to 4 KB
+    TEST_ASSERT_TRUE(p.eraseLen <= r.off);          // the staged tail is never erased
+    TEST_ASSERT_TRUE(fwApplyPlan(r, SLOT, p, nullptr)); // reason is optional
+}
+
+static void test_plan_erase_len_exact_multiple_and_boundaries(void) {
+    FwApplyPlan p;
+    FwStageRecord r = goodRec();
+    r.ilen = 0x118000; // already aligned: no extra sector
+    TEST_ASSERT_TRUE(fwApplyPlan(r, SLOT, p, nullptr));
+    TEST_ASSERT_EQUAL_UINT32(0x118000, p.eraseLen);
+
+    r.ilen = r.off; // exactly up to the stage area is allowed
+    TEST_ASSERT_TRUE(fwApplyPlan(r, SLOT, p, nullptr));
+    TEST_ASSERT_EQUAL_UINT32(r.off, p.eraseLen);
+
+    r = goodRec();
+    r.zlen = SLOT - r.off; // tail ends exactly at the slot end
+    TEST_ASSERT_TRUE(fwApplyPlan(r, SLOT, p, nullptr));
+}
+
+static void test_plan_refuses_off_plus_zlen_beyond_slot(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    r.zlen = SLOT - r.off + 1;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("range", why);
+    TEST_ASSERT_EQUAL_UINT32(0, p.eraseLen);
+
+    r = goodRec();
+    r.off = SLOT + 0x10000; // off beyond the slot
+    r.zlen = 1;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("range", why);
+
+    r = goodRec();
+    r.zlen = 0xFFFFFFF0u; // 32-bit wrap must not slip through
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("range", why);
+}
+
+static void test_plan_refuses_inflate_reaching_the_stage_area(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    r.ilen = r.off + 1;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("overlap", why);
+    r.ilen = 0xFFFFFFFFu; // would wrap the 4 KB round-up
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("overlap", why);
+}
+
+static void test_plan_refuses_unaligned_off(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    r.off += 0x1000; // 4 KB aligned but not 64 KB aligned
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("align", why);
+    r = goodRec();
+    r.off += 1;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("align", why);
+}
+
+static void test_plan_refuses_zero_sizes(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    r.zlen = 0;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("size", why);
+    r = goodRec();
+    r.ilen = 0;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("size", why);
+}
+
+static void test_plan_refuses_bad_magic_and_decode_roundtrip(void) {
+    FwApplyPlan p;
+    const char* why = nullptr;
+    FwStageRecord r = goodRec();
+    r.magic = 0x12345678;
+    TEST_ASSERT_FALSE(fwApplyPlan(r, SLOT, p, &why));
+    TEST_ASSERT_EQUAL_STRING("magic", why);
+
+    // the record as the app stores it survives encode -> decode -> plan
+    r = goodRec();
+    uint8_t buf[FW_STAGE_ENC_LEN];
+    TEST_ASSERT_EQUAL_UINT(FW_STAGE_ENC_LEN, fwRecordEncode(r, buf, sizeof(buf)));
+    FwStageRecord d;
+    TEST_ASSERT_TRUE(fwRecordDecode(buf, sizeof(buf), d));
+    TEST_ASSERT_TRUE(fwApplyPlan(d, SLOT, p, nullptr));
+    TEST_ASSERT_EQUAL_UINT32(r.crc32, d.crc32);
+
+    // a record with a damaged magic never decodes (Safeboot drops it as "record")
+    buf[0] ^= 0xFF;
+    TEST_ASSERT_FALSE(fwRecordDecode(buf, sizeof(buf), d));
+    buf[0] ^= 0xFF;
+    TEST_ASSERT_FALSE(fwRecordDecode(buf, sizeof(buf) - 1, d));
+}
+
+// ---------------------------------------------------------------------
+// AU-07: fwInflateStream with a fake decompressor (identity: the "stream"
+// is the output). Drives the chunking, the circular dictionary wrap, the
+// MORE_INPUT flag and the ilen bound without the ROM tinfl.
+// ---------------------------------------------------------------------
+enum FakeMode { FAKE_IDENTITY, FAKE_NEVER_DONE, FAKE_ERROR_AT_HALF, FAKE_STALL };
+
+struct FakeDec {
+    FakeMode mode = FAKE_IDENTITY;
+    uint32_t consumed = 0;
+    uint32_t calls = 0;
+    uint32_t moreFalseCalls = 0;
+    uint32_t zlen = 0;
+    size_t dictSize = 0; // set by the test: tinfl's BAD_PARAM contract is checked on every call
+    int step(const uint8_t* in, size_t* inSize, uint8_t* dictStart, uint8_t* outNext, size_t* outSize, bool more) {
+        calls++;
+        if (!more) moreFalseCalls++;
+        // tinfl_decompress() returns BAD_PARAM unless the dictionary is a power of two and
+        // the output window runs exactly to its end.
+        TEST_ASSERT_TRUE(dictSize != 0 && (dictSize & (dictSize - 1)) == 0);
+        TEST_ASSERT_TRUE(outNext >= dictStart);
+        TEST_ASSERT_EQUAL_UINT32((uint32_t)dictSize, (uint32_t)((size_t)(outNext - dictStart) + *outSize));
+        const size_t inAvail = *inSize;
+        const size_t outCap = *outSize;
+        if (mode == FAKE_STALL) {
+            *inSize = 0;
+            *outSize = 0;
+            return FWI_ST_HAS_MORE_OUTPUT;
+        }
+        const size_t n = inAvail < outCap ? inAvail : outCap;
+        if (mode == FAKE_ERROR_AT_HALF && consumed + n > zlen / 2) {
+            *inSize = 0;
+            *outSize = 0;
+            return -1; // TINFL_STATUS_FAILED
+        }
+        for (size_t i = 0; i < n; i++) outNext[i] = in[i];
+        *inSize = n;
+        *outSize = n;
+        consumed += (uint32_t)n;
+        if (mode == FAKE_NEVER_DONE) return FWI_ST_NEEDS_MORE_INPUT;
+        if (n < inAvail) return FWI_ST_HAS_MORE_OUTPUT; // dictionary full, input left
+        return more ? FWI_ST_NEEDS_MORE_INPUT : FWI_ST_DONE;
+    }
+};
+
+struct MemRd {
+    const uint8_t* data;
+    uint32_t len;
+    bool fail = false;
+    uint32_t reads = 0;
+    bool read(uint32_t pos, uint8_t* dst, size_t n) {
+        reads++;
+        if (fail || pos + n > len) return false;
+        memcpy(dst, data + pos, n);
+        return true;
+    }
+};
+
+struct MemWr {
+    uint8_t out[4096];
+    uint32_t next = 0; // enforces sequential writes
+    int failAfter = -1;
+    int writes = 0;
+    bool sequential = true;
+    bool write(uint32_t pos, const uint8_t* src, size_t n) {
+        if (pos != next || pos + n > sizeof(out)) {
+            sequential = false;
+            return false;
+        }
+        if (failAfter >= 0 && writes >= failAfter) return false;
+        memcpy(out + pos, src, n);
+        next += (uint32_t)n;
+        writes++;
+        return true;
+    }
+};
+
+static uint8_t g_src[1000];
+static uint8_t g_in[16];
+static uint8_t g_dict[64];
+
+static void fillSrc(uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) g_src[i] = (uint8_t)(i * 7 + 3);
+}
+
+static void test_inflate_streams_through_small_buffers_and_wraps_the_dictionary(void) {
+    fillSrc(1000);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.zlen = 1000;
+    MemRd rd = {g_src, 1000};
+    MemWr wr;
+    uint32_t total = 0;
+    FwInflateResult r = fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 1000, 1000, &total);
+    TEST_ASSERT_EQUAL_INT(FWI_OK, r);
+    TEST_ASSERT_EQUAL_UINT32(1000, total);
+    TEST_ASSERT_TRUE(wr.sequential);
+    TEST_ASSERT_EQUAL_MEMORY(g_src, wr.out, 1000);
+    TEST_ASSERT_EQUAL_UINT32(63, rd.reads); // ceil(1000 / 16) chunks
+    TEST_ASSERT_EQUAL_UINT32(1, dec.moreFalseCalls); // only the final chunk is announced as the end
+}
+
+static void test_inflate_more_input_flag_only_clear_on_the_last_chunk(void) {
+    fillSrc(32);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.zlen = 32;
+    MemRd rd = {g_src, 32};
+    MemWr wr;
+    uint32_t total = 0;
+    TEST_ASSERT_EQUAL_INT(FWI_OK, fwInflateStream(dec, rd, wr, g_in, 16, g_dict, 64, 32, 32, &total));
+    TEST_ASSERT_EQUAL_UINT32(1, dec.moreFalseCalls); // 2 chunks, only the second is "last"
+    TEST_ASSERT_EQUAL_UINT32(2, dec.calls);
+}
+
+static void test_inflate_refuses_output_beyond_ilen_without_writing_it(void) {
+    fillSrc(100);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.zlen = 100;
+    MemRd rd = {g_src, 100};
+    MemWr wr;
+    uint32_t total = 0;
+    FwInflateResult r = fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 50, &total);
+    TEST_ASSERT_EQUAL_INT(FWI_OVERFLOW, r);
+    TEST_ASSERT_TRUE(total <= 50);
+    TEST_ASSERT_TRUE(wr.next <= 50);
+}
+
+static void test_inflate_short_output_is_a_size_error(void) {
+    fillSrc(100);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.zlen = 100;
+    MemRd rd = {g_src, 100};
+    MemWr wr;
+    uint32_t total = 0;
+    FwInflateResult r = fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 120, &total);
+    TEST_ASSERT_EQUAL_INT(FWI_SIZE, r);
+    TEST_ASSERT_EQUAL_UINT32(100, total);
+}
+
+static void test_inflate_truncated_input(void) {
+    fillSrc(100);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.mode = FAKE_NEVER_DONE;
+    dec.zlen = 100;
+    MemRd rd = {g_src, 100};
+    MemWr wr;
+    uint32_t total = 0;
+    TEST_ASSERT_EQUAL_INT(FWI_TRUNC, fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 100, &total));
+}
+
+static void test_inflate_decoder_error_and_stall(void) {
+    fillSrc(100);
+    FakeDec dec;
+    dec.dictSize = sizeof(g_dict);
+    dec.mode = FAKE_ERROR_AT_HALF;
+    dec.zlen = 100;
+    MemRd rd = {g_src, 100};
+    MemWr wr;
+    uint32_t total = 0;
+    TEST_ASSERT_EQUAL_INT(FWI_DATA, fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 100, &total));
+
+    FakeDec stall;
+
+    stall.dictSize = sizeof(g_dict);
+    stall.mode = FAKE_STALL;
+    MemRd rd2 = {g_src, 100};
+    MemWr wr2;
+    TEST_ASSERT_EQUAL_INT(FWI_DATA, fwInflateStream(stall, rd2, wr2, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 100, &total));
+    TEST_ASSERT_TRUE(stall.calls < 10); // gave up instead of spinning
+}
+
+static void test_inflate_io_errors_and_params(void) {
+    fillSrc(100);
+    uint32_t total = 0;
+    {
+        FakeDec dec;
+        dec.dictSize = sizeof(g_dict);
+        dec.zlen = 100;
+        MemRd rd = {g_src, 100};
+        rd.fail = true;
+        MemWr wr;
+        TEST_ASSERT_EQUAL_INT(FWI_READ, fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 100, &total));
+    }
+    {
+        FakeDec dec;
+        dec.dictSize = sizeof(g_dict);
+        dec.zlen = 100;
+        MemRd rd = {g_src, 100};
+        MemWr wr;
+        wr.failAfter = 2;
+        TEST_ASSERT_EQUAL_INT(FWI_WRITE, fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, sizeof(g_dict), 100, 100, &total));
+    }
+    {
+        FakeDec dec;
+        dec.dictSize = sizeof(g_dict);
+        MemRd rd = {g_src, 100};
+        MemWr wr;
+        TEST_ASSERT_EQUAL_INT(FWI_PARAM, fwInflateStream(dec, rd, wr, g_in, sizeof(g_in), g_dict, 48, 100, 100, &total));
+        TEST_ASSERT_EQUAL_INT(FWI_PARAM, fwInflateStream(dec, rd, wr, g_in, 0, g_dict, 64, 100, 100, &total));
+    }
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_good_path_reaches_done_with_one_switch_partition);
@@ -388,5 +789,23 @@ int main(int, char**) {
     RUN_TEST(test_app_invalid_suspends_fallback_and_refuses_cancel);
     RUN_TEST(test_app_invalid_then_good_upload_still_switches_partition);
     RUN_TEST(test_setappvalid_true_rearms_fallback_from_that_moment);
+    RUN_TEST(test_applying_state_is_truthful_and_quiet);
+    RUN_TEST(test_apply_ok_ends_done_with_image_valid);
+    RUN_TEST(test_apply_failed_ends_aborted_and_rearms_fallback);
+    RUN_TEST(test_apply_failed_with_invalid_app_stays_quiet);
+    RUN_TEST(test_plan_valid);
+    RUN_TEST(test_plan_erase_len_exact_multiple_and_boundaries);
+    RUN_TEST(test_plan_refuses_off_plus_zlen_beyond_slot);
+    RUN_TEST(test_plan_refuses_inflate_reaching_the_stage_area);
+    RUN_TEST(test_plan_refuses_unaligned_off);
+    RUN_TEST(test_plan_refuses_zero_sizes);
+    RUN_TEST(test_plan_refuses_bad_magic_and_decode_roundtrip);
+    RUN_TEST(test_inflate_streams_through_small_buffers_and_wraps_the_dictionary);
+    RUN_TEST(test_inflate_more_input_flag_only_clear_on_the_last_chunk);
+    RUN_TEST(test_inflate_refuses_output_beyond_ilen_without_writing_it);
+    RUN_TEST(test_inflate_short_output_is_a_size_error);
+    RUN_TEST(test_inflate_truncated_input);
+    RUN_TEST(test_inflate_decoder_error_and_stall);
+    RUN_TEST(test_inflate_io_errors_and_params);
     return UNITY_END();
 }

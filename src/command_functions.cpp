@@ -198,6 +198,34 @@ static_assert(MAXHOP_TEXT_FALLBACK == MAX_HOP_TEXT_DEFAULT,
 static_assert(MAXHOP_TEXT_MAX < MAX_HOP_LIMIT,
               "the serial --maxhop range must stay inside the on-air hop limit");
 
+#ifdef ESP32
+// AU-08 (#1187): the one place that reboots into Safeboot. `--ota-update` (operator), the AU
+// handover in esp32_main.cpp (auTick) and `--update apply` all end here, so there is exactly
+// one copy of the sequence. Safeboot applies a staged update if it finds an FWS2 record,
+// otherwise it starts the OTA web page. Declared in esp32/fw_update_net.h. Returns false, without
+// restarting, if there is no Safeboot partition or it cannot be made the boot partition.
+bool auRebootToSafeboot(void)
+{
+    if((bWEBSERVER || bGATEWAY) && meshcom_settings.node_hasIPaddress)
+        startDisplay((char*)"OTA using WiFi", meshcom_settings.node_ip, meshcom_settings.node_gw);
+    else
+        startDisplay((char*)"OTA starting as AP", (char*)"192.168.4.1", (char*)"255.255.255.0");
+
+    delay(2000);
+    const esp_partition_t* partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot");
+    if (!partition)
+        return false;
+
+    // AU-08 R1: a boot partition that did not take must not be followed by a restart: the node
+    // would reboot into the app again and, with a staged record, hand over again at every boot.
+    if (esp_ota_set_boot_partition(partition) != ESP_OK)
+        return false;
+    loopCrumbClear();   // INS-05: deliberate reboot into safeboot
+    esp_restart();
+    return true;   // not reached
+}
+#endif
+
 int commandCheck(char *msg, char *command)
 {
     return commandMatches(msg, command) ? 0 : -1;
@@ -1094,24 +1122,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"ota-update") == 0)
     {
-        if((bWEBSERVER || bGATEWAY) && meshcom_settings.node_hasIPaddress)
-            startDisplay((char*)"OTA using WiFi", meshcom_settings.node_ip, meshcom_settings.node_gw);
-        else
-            startDisplay((char*)"OTA starting as AP", (char*)"192.168.4.1", (char*)"255.255.255.0");
-
-        delay(2000);
-        const esp_partition_t* partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot");
-        if (partition)
-        {
-            esp_ota_set_boot_partition(partition);
-            loopCrumbClear();   // INS-05: deliberate reboot into safeboot
-            esp_restart();
-            return;
-        }
-        else
-        {
-            return;
-        }
+        auRebootToSafeboot();   // returns only without a safeboot partition
 
         return;
     }
@@ -1158,7 +1169,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status  firmware update now (ESP32)\n");
+            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
@@ -4742,6 +4753,26 @@ void commandAction(char *umsg_text, bool ble)
         const bool _auBusy = (_au.state == FWS_BUSY);
         const bool _auNewer = _au.availNewer && _au.availTag[0] != '\0';
 
+#if INSTRUMENT_ENABLED
+        // bench only: --update stagelan <http://ip:port/path.bin.zz> <ilen> <tag>. The URL must be
+        // plain http to a private IPv4 (fwLanUrlParse); not in a release build.
+        if(strncmp(_owner_c, "stagelan ", 9) == 0)
+        {
+            char _lurl[200], _ltag[24];
+            unsigned long _lilen = 0;
+            _lurl[0] = '\0';
+            _ltag[0] = '\0';
+            if(_auBusy)
+                Serial.printf("[ERR];update;busy\n");
+            else if(sscanf(_owner_c + 9, "%199s %lu %23s", _lurl, &_lilen, _ltag) != 3)
+                Serial.printf("[ERR];update;stagelan <http://ip:port/path.bin.zz> <ilen> <tag>\n");
+            else if(!fwNetStartLan(_lurl, (uint32_t)_lilen, _ltag))
+                Serial.printf("[ERR];update;stagelan not started (url not private http, bad ilen/tag, busy or no WiFi)\n");
+            else
+                Serial.printf("[AU];stagelan;started;%s\n", _ltag);
+        }
+        else
+#endif
         if(casecmp(_owner_c, (char*)"check") == 0)
         {
             if(_auBusy || !fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
@@ -4782,6 +4813,26 @@ void commandAction(char *umsg_text, bool ble)
                     Serial.printf("[ERR];update;check not started (busy or no WiFi)\n");
             }
         }
+        else if(casecmp(_owner_c, (char*)"apply") == 0)
+        {
+            // operator action (bench): hand over now, no update window, no idle / phone / battery
+            // test. Needs a valid staged record; fwNetLoadRecord() drops a stale one.
+            FwStageRecord _rec;
+            if(_auBusy)
+            {
+                Serial.printf("[ERR];update;busy\n");
+            }
+            else if(!fwNetLoadRecord(_rec))
+            {
+                Serial.printf("[AU];apply;nothing_staged\n");
+            }
+            else
+            {
+                Serial.printf("[AU];handover;%s\n", _rec.tag);
+                if(!auRebootToSafeboot())
+                    Serial.printf("[ERR];update;no safeboot partition\n");
+            }
+        }
         else if(casecmp(_owner_c, (char*)"status") == 0)
         {
             Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s\n",
@@ -4795,7 +4846,7 @@ void commandAction(char *umsg_text, bool ble)
         }
         else
         {
-            Serial.printf("[ERR];update;must be check, install or status\n");
+            Serial.printf("[ERR];update;must be check, install, status or apply\n");
         }
 
         return;
@@ -4803,7 +4854,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"update") == 0)
     {
-        Serial.printf("[ERR];update;must be check, install or status\n");
+        Serial.printf("[ERR];update;must be check, install, status or apply\n");
 
         return;
     }
