@@ -150,6 +150,11 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         snprintf(res, n, "ok v=%s%s up=%lu bat=%d heap=%lu gw=%d mesh=%d", SOURCE_VERSION, SOURCE_VERSION_SUB,
                  (unsigned long)(millis() / 60000UL), (int)global_proz, (unsigned long)freeHeapKb(),
                  bGATEWAY ? 1 : 0, bMESH ? 1 : 0);
+#if defined(REMOTE_LED_PIN)
+        const size_t used = strlen(res);
+        if (used < n)
+            snprintf(res + used, n - used, " led=%d", bRemoteLed ? 1 : 0);
+#endif
         return true;
     }
 
@@ -212,6 +217,22 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         }
         snprintf(res, n, "ok %c%c=%s", a[0], a[1], want ? "on" : "off");
         return true;
+    }
+
+    if (strcmp(cmd, "led") == 0)
+    {
+#if defined(REMOTE_LED_PIN)
+        // a = "on" | "off" (allowlisted). Held until "led off" or the next boot, no timer.
+        const bool want = (strcmp(a, "on") == 0);
+        bRemoteLed = want;
+        pinMode(REMOTE_LED_PIN, OUTPUT);
+        digitalWrite(REMOTE_LED_PIN, want ? HIGH : LOW);
+        snprintf(res, n, "ok led=%s", want ? "on" : "off");
+        return true;
+#else
+        snprintf(res, n, "err unsupported");
+        return false;
+#endif
     }
 
     snprintf(res, n, "err blocked"); // unreachable: rmCheck() only passes the table above

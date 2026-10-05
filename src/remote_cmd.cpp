@@ -137,7 +137,7 @@ bool allowed(const RmCmd &c, int maxTxPower)
         return a[0] == '\0';
 
     if (strcmp(cmd, "gps") == 0 || strcmp(cmd, "track") == 0 || strcmp(cmd, "display") == 0 ||
-        strcmp(cmd, "gateway") == 0 || strcmp(cmd, "mesh") == 0)
+        strcmp(cmd, "led") == 0 || strcmp(cmd, "gateway") == 0 || strcmp(cmd, "mesh") == 0)
         return isOnOff(a);
 
     if (strcmp(cmd, "txpower") == 0)

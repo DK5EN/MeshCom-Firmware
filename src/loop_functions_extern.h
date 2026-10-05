@@ -27,6 +27,20 @@ extern int ifalseping;
 extern int BOARD_HARDWARE;
 extern bool bUSER_BOARD_LED;
 
+// RM "led on|off": steady LED held on by the remote command (rm_runtime.cpp), never persisted.
+// REMOTE_LED_PIN is the pad it drives: BOARD_LED where the variant has one (all active HIGH), or
+// set by the variant itself (Heltec V3: white LED GPIO35, no BOARD_LED so no blinker). Not defined
+// on nRF52, on boards without an LED, nor where BOARD_LED shares its GPIO with OneWire_GPIO
+// (ttgo_tbeam: both are GPIO4). Needs configuration.h included before this header.
+#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES) && \
+    !(defined(OneWire_GPIO) && (OneWire_GPIO == BOARD_LED))
+    #define REMOTE_LED_PIN BOARD_LED
+#endif
+#if defined(REMOTE_LED_PIN)
+extern bool bRemoteLed;           // true while "led on" holds the pin; the BOARD_LED blinker yields
+void remoteLedForceOff(void);     // pin LOW + bRemoteLed=false; call before deep sleep
+#endif
+
 extern unsigned long rebootAuto;
 
 extern bool bRadio;

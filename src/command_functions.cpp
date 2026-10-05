@@ -354,7 +354,13 @@ static void tg_post_ina226_on() { setupINA226(); }
 static void tg_post_ina226_off() { ina226_found = false; }
 #endif
 #ifdef BOARD_LED
-static void tg_post_board_led_off() { digitalWrite(BOARD_LED, LOW); }
+static void tg_post_board_led_off()
+{
+#if defined(REMOTE_LED_PIN)
+    if(bRemoteLed) return;   // keep an RM `led on` lit
+#endif
+    digitalWrite(BOARD_LED, LOW);
+}
 #endif
 #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
 static void tg_post_gps_on() { gpsInitDone = false; init_loop_function(); }
@@ -1514,6 +1520,9 @@ void commandAction(char *umsg_text, bool ble)
             Platform::prepareToSleep();
             #endif
             #if defined(WP_DISP)
+            #if defined(REMOTE_LED_PIN)
+            remoteLedForceOff();   // RM `led on` must not outlive the node
+            #endif
             loopCrumbClear();   // INS-05: deliberate sleep, RTC memory survives it -- cleared last,
                                 // after the button wait and e-ink refresh that could still trip the WDT
             esp_deep_sleep_start();

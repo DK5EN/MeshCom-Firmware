@@ -60,6 +60,7 @@ ALLOWLIST: Dict[str, Any] = {
     "gps": ("on", "off"),
     "track": ("on", "off"),
     "display": ("on", "off"),
+    "led": ("on", "off"),
     "gateway": ("on", "off"),
     "mesh": ("on", "off"),
     "txpower": "int",
@@ -269,6 +270,8 @@ _VECTOR_CMDS = [
     ("p@ss w0rd!", "DK5EN-92", "DK5EN-14", 7, "reboot", ""),
     ("secret", "DK5EN-92", "DK5EN-1", 1, "reboot", ""),  # dst binding vs vector 1
     ("secret", "DK5EN-90", "DK5EN-14", 1, "reboot", ""),  # src binding vs vector 1
+    ("secret", "DK5EN-90", "DK5EN-1", 52, "led", "on"),
+    ("secret", "DK5EN-90", "DK5EN-1", 53, "led", "off"),
 ]
 
 _VECTOR_REPLIES = [

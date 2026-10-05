@@ -90,6 +90,21 @@ int ifalseping = 0;
 int BOARD_HARDWARE = MODUL_HARDWARE;
 bool bUSER_BOARD_LED = false;
 
+#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES) && \
+    !(defined(OneWire_GPIO) && (OneWire_GPIO == BOARD_LED))
+    #define REMOTE_LED_PIN BOARD_LED   // same rule as loop_functions_extern.h
+#endif
+#if defined(REMOTE_LED_PIN)
+bool bRemoteLed = false;   // RM "led on": never persisted, off after boot
+
+void remoteLedForceOff(void)
+{
+    bRemoteLed = false;
+    pinMode(REMOTE_LED_PIN, OUTPUT);
+    digitalWrite(REMOTE_LED_PIN, LOW);
+}
+#endif
+
 bool bRadio=false;
 
 bool bLED_RED=false;

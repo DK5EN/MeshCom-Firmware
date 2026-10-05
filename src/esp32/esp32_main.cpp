@@ -2200,6 +2200,12 @@ void esp32setup()
         pinMode(BOARD_LED, OUTPUT);
     #endif
 
+    #if defined(REMOTE_LED_PIN) && !defined(BOARD_LED)
+        // RM "led on|off" on a board without the BOARD_LED blinker (Heltec V3): off after boot
+        pinMode(REMOTE_LED_PIN, OUTPUT);
+        digitalWrite(REMOTE_LED_PIN, LOW);
+    #endif
+
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
         tdeck_clear_text_ta();
     #endif
@@ -2665,10 +2671,15 @@ void esp32loop()
                     }
                 #endif
 
-                if(bLED)
-                    digitalWrite(BOARD_LED, HIGH);
-                else
-                    digitalWrite(BOARD_LED, LOW);
+                #if defined(REMOTE_LED_PIN) && (REMOTE_LED_PIN == BOARD_LED)
+                if(!bRemoteLed)   // RM "led on" holds the pin: the blinker only keeps its phase
+                #endif
+                {
+                    if(bLED)
+                        digitalWrite(BOARD_LED, HIGH);
+                    else
+                        digitalWrite(BOARD_LED, LOW);
+                }
                 bLED = !bLED;
 
                 led_timer = millis();

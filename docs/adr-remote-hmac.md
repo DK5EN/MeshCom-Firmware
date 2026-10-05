@@ -68,12 +68,13 @@ canonical (reply)   = "RM1R|" dst "|" src "|" ctr "|" result
 `dst` stops replay against a sibling node that shares the password; binding `src` ties the reply
 address. The reply tag lets the operator's client verify that the node answered. Examples and test
 vectors are in `docs/architecture/11-wire-format.md` and `tools/tests/remote_cmd_vectors.json`
-(21 shared vectors, reproduced by the C++ host test).
+(23 shared vectors, reproduced by the C++ host test).
 
 ### Allowlist
 
 `reboot`, `status`, `sendpos`, `sendtrack`, `sync` (no arguments); `gps`, `track`, `display`,
-`gateway`, `mesh` (`on|off`); `txpower <n>` (0 to the board maximum); `setout <a0..a7|b0..b7>
+`led`, `gateway`, `mesh` (`on|off`; `led` on a board without a usable LED pin replies `err unsupported`, its state is
+never persisted and is off after boot); `txpower <n>` (0 to the board maximum); `setout <a0..a7|b0..b7>
 <on|off>`. Never reachable, whatever the tag: `cleanflash`, `ota-update`, `dfu`, `deepsleep`,
 `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`, `updchan`,
 `autoupdate`, `rm`, `stor`, and any argument containing `--`, `;`, `{` or `%`.

@@ -138,7 +138,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(17, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(19, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -407,7 +407,8 @@ static void test_allowlist_accepts_every_command(void)
                           {"gps", "on"},    {"gps", "off"},    {"track", "on"},    {"track", "off"},
                           {"display", "on"}, {"display", "off"}, {"gateway", "on"}, {"gateway", "off"},
                           {"mesh", "on"},   {"mesh", "off"},   {"txpower", "0"},   {"txpower", "22"},
-                          {"setout", "a0 on"}, {"setout", "b7 off"}, {"setout", "a7 off"}, {"setout", "b0 on"}};
+                          {"setout", "a0 on"}, {"setout", "b7 off"}, {"setout", "a7 off"}, {"setout", "b0 on"},
+                          {"led", "on"},    {"led", "off"}};
     for (size_t i = 0; i < sizeof(ok) / sizeof(ok[0]); i++)
     {
         RmState s;
@@ -442,7 +443,9 @@ static void test_bad_args_rejected(void)
                            {"setout", "1 0"}, {"setout", "8 1"}, {"setout", "a8 on"}, {"setout", "c0 on"},
                            {"setout", "2"}, {"setout", "a2 on1"}, {"setout", "A2 on"}, {"setout", "a2 ON"},
                            {"setout", "a2 1"}, {"setout", "a2"}, {"setout", "a2  on"}, {"setout", "a on"},
-                           {"setout", "a12 on"}, {"setout", "a2 onn"}, {"sync", "x"}};
+                           {"setout", "a12 on"}, {"setout", "a2 onn"}, {"sync", "x"},
+                           {"led", ""},       {"led", "blink"}, {"led", "1"},       {"led", "ON"},
+                           {"led", "on off"}, {"led", " on"}};
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
     {
         RmState s;
@@ -855,7 +858,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(17, n);
+    TEST_ASSERT_EQUAL_INT(19, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -913,6 +916,11 @@ static void test_command_allowed_predicate(void)
     TEST_ASSERT_TRUE(rmCommandAllowed("status", nullptr, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("sync", "", 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("gps", "on", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("led", "on", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("led", "off", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "blink", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "1", 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 22));

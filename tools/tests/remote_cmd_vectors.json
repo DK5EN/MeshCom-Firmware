@@ -205,6 +205,30 @@
       "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
       "tag": "1d94205863009666",
       "dm_text": "RM1 1 reboot 1d94205863009666"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 52,
+      "cmd": "led",
+      "args": "on",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|52|led on",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "b835abe73b60cb26",
+      "dm_text": "RM1 52 led on b835abe73b60cb26"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 53,
+      "cmd": "led",
+      "args": "off",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|53|led off",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "68d9e509e44ec425",
+      "dm_text": "RM1 53 led off 68d9e509e44ec425"
     }
   ],
   "replies": [

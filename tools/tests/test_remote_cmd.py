@@ -54,6 +54,11 @@ def test_vector_file_is_current() -> None:
     assert rc.generate_vectors() == VECTORS
 
 
+def test_allowlist_command_count() -> None:
+    assert len(rc.ALLOWLIST) == 13
+    assert rc.ALLOWLIST["led"] == ("on", "off")
+
+
 def test_vector_coverage() -> None:
     cmds = VECTORS["commands"]
     assert any(v["passwd"] != v["passwd"].rstrip(" ") for v in cmds)  # trailing spaces
@@ -62,6 +67,8 @@ def test_vector_coverage() -> None:
     assert any(v["ctr"] == 4294967295 for v in cmds)
     assert any(v["cmd"] == "setout" and v["args"] == "a2 on" for v in cmds)
     assert any(v["cmd"] == "setout" and v["args"] == "b7 off" for v in cmds)
+    assert any(v["cmd"] == "led" and v["args"] == "on" for v in cmds)
+    assert any(v["cmd"] == "led" and v["args"] == "off" for v in cmds)
     # trailing spaces do not change the key
     assert rc.derive_key("secret   ") == rc.derive_key("secret")
 
@@ -79,6 +86,7 @@ def test_dst_and_src_are_bound() -> None:
         ("gps", "on"), ("gps", "off"), ("track", "on"), ("display", "off"),
         ("gateway", "on"), ("mesh", "off"), ("txpower", "2"), ("txpower", "22"),
         ("setout", "a2 on"), ("setout", "a0 off"), ("setout", "b7 off"), ("setout", "b0 on"),
+        ("led", "on"), ("led", "off"),
     ],
 )
 def test_allowlisted_commands_build(cmd: str, args: str) -> None:
@@ -102,6 +110,7 @@ def test_allowlisted_commands_build(cmd: str, args: str) -> None:
         ("setout", "a2 1"), ("setout", "a2"), ("setout", "A2 on"), ("setout", "a2 ON"),
         ("setout", "a2  on"), ("setout", "a22 on"), ("setout", "a2 onoff"), ("gps", " on"), ("gps", "on "), ("", ""),
         ("reboot", "ä"), ("status", "\t"),
+        ("led", ""), ("led", "blink"), ("led", "1"), ("led", "ON"), ("led", "on off"), ("led", " on"),
     ],
 )
 def test_blocked_or_malformed_refused(cmd: str, args: str) -> None:

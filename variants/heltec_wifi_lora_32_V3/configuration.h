@@ -87,6 +87,10 @@ definitions for HELTEC_V3
 // Funktionsentfernung, keine Bereinigung.
 #define OneWire_GPIO -1
 
+// RM "led on|off": white user LED, GPIO35, active HIGH. Deliberately not BOARD_LED: that would
+// enable the 1 s blinker and the `--board led` console command on this board.
+#define REMOTE_LED_PIN 35
+
 #define GPS_RX_PIN 47
 #define GPS_TX_PIN 48
 

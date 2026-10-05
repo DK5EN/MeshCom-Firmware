@@ -3304,7 +3304,7 @@ void sub_page_setup()
         web_client.println("<select id=\"rm_cmd\" onchange=\"rmKeep.cmd=this.value;rmArgSel();\">");
         static const char *const rmCmds[] = {"reboot", "status", "sendpos", "sendtrack", "gps on", "gps off", "track on", "track off",
                                              "display on", "display off", "gateway on", "gateway off", "mesh on", "mesh off",
-                                             "txpower", "setout", "sync"};
+                                             "led on", "led off", "txpower", "setout", "sync"};
         for (size_t i = 0; i < sizeof(rmCmds) / sizeof(rmCmds[0]); i++)
             web_client.printf("\t<option value=\"%s\">%s</option>\n", rmCmds[i],
                               strcmp(rmCmds[i], "txpower") == 0 ? "txpower &lt;n&gt;" :
