@@ -232,6 +232,7 @@ flashes whatever is attached.
 | test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
 | test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
 | test_rm_sender_policy        | Unit          |    24 | native_rm_sender_policy                                      |
+| test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |

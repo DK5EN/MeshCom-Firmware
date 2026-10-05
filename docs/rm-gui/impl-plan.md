@@ -14,9 +14,9 @@ bench nodes DK5EN-1 (Heltec V3, 192.168.68.71) and DK5EN-92 (T-Beam, 192.168.68.
 | W1b  | sender policy, validators, status token, `rmSendCommandKey`           | done                              |
 | W1c  | web request guard (X-MC / Origin proof, Host allowlist) + native test | done                              |
 | G1   | wiring (guard, CORS, /rmsend viaSync, /rmstatus, --passwd), gate      | done (advisor 2 passes: APPROVED) |
-| W2a  | handlers (/rmpasswd, /rmnodes, /rmheard, send by slot), parse header  | pending                           |
-| W2b  | Remote page HTML, scaffold JS, jsdom test                             | pending                           |
-| G2   | orchestrator wiring in web_functions.cpp (route, nav, loadPage)       | pending                           |
+| W2a  | handlers (/rmpasswd, /rmnodes, /rmheard, send by slot), parse header  | done                              |
+| W2b  | Remote page HTML, scaffold JS, jsdom test                             | done                              |
+| G2   | wiring (route, nav, loadPage, old card removed), gate, advisor        | done                              |
 | W3   | bench: flash DK5EN-1 and DK5EN-92, browser click-through, docs        | pending                           |
 
 Gate = `tools/regression.sh --stage 1,2`, clean sequential builds (heltec_wifi_lora_32_V3,
@@ -147,6 +147,18 @@ the route, the nav button and the `loadPage()` hook; W2b must not edit `web_func
 W0) is orchestrator-owned. Every `pio` call goes through
 `/private/tmp/claude-501/-Users-martinwerner-WebDev-MeshCom-Firmware-DEV-Main/d8e813ea-a8d3-4475-bd29-d3d9f628187b/scratchpad/pio_locked.sh`
 (one pio process at a time).
+
+## Deferred (known, not done)
+
+- "Manage" button on each MHEARD card (the Remote page already shows heard-node chips).
+- A save into a slot that holds a different call overwrites it silently when the page's slot list is
+  stale (second browser tab); the handler could answer `used`.
+- "Forget all" always answers ok (`rmNodesWipe()` returns void).
+- `/?page=remote` is routed by `indexOf` over the whole header (like every other page); matching the
+  request line would be cleaner.
+- Measure the RAK4631 loop-task stack high-water mark during the RAK bench (slot send and save paths).
+- `docs/architecture/11-wire-format.html` still shows the old status form (no generator found).
+- `tools/webgui_rm_test.js` needs `jsdom@24` (`NODE_PATH`), it is not in `tools/regression.sh`.
 
 ## Open at the end
 

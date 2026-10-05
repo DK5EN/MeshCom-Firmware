@@ -33,6 +33,9 @@
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #include "web_guard.h"          // RM GUI W1c: Host allowlist (DNS rebinding) and Sec-Fetch-Site (CSRF), header-only
 #include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_form_decode / rm_json_str shared with web_rm_page.cpp
+#include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
+#include "web_rm_handlers.h"   // RM GUI W2a: /rmpasswd, /rmnodes, /rmheard, rmSendBySlot()
+#include "web_rm_parse.h"      // RM GUI W2a: rmParseSendBody()
 // RM GUI W1c: set per request by the guard in work_webpage(); send_http_header() and sub_config_download()
 // drop the CORS headers when it is false (state-changing paths, /config, /rmstatus).
 static bool web_cors_ok = true;
@@ -554,11 +557,11 @@ static int web_read_body(long content_length)
  */
 
 /** POST /rmsend   body: dst=<call>&pw=<target password>&cmd=<cmd>&args=<args>   (all percent-encoded)
- *  answer: {"ok":true,"ctr":N} or {"ok":false,"err":"<reason>"} -- never an echo of any input */
+ *             or: slot=<0..2>&cmd=<cmd>&args=<args>   (a saved node: its key comes from the store, never a password)
+ *  answer: {"ok":true,"ctr":N[,"viaSync":true]} or {"ok":false,"err":"<reason>"} -- never an echo of any input */
 static void sub_rm_send(long content_length)
 {
-    const size_t BODY_MAX = 200;
-    char body[BODY_MAX + 1];
+    char body[RM_FORM_BODY_MAX + 1];
     char err[16] = {0};
     uint32_t ctr = 0;
     bool ok = false;
@@ -566,77 +569,19 @@ static void sub_rm_send(long content_length)
 
     body[0] = '\0';
 
-    if (content_length <= 0 || content_length > (long)BODY_MAX)
-        strcpy(err, "size");
+    // RM GUI W2a: shared absolute-deadline body read and the pure parser (web_rm_parse.h)
+    const char *e = rmReadBody(body, sizeof(body), content_length);
+    if (e != nullptr)
+        snprintf(err, sizeof(err), "%s", e);
     else
     {
-        long got = 0;
-        unsigned long last = millis();
-        const unsigned long start = last;
-        // advisor W2 R1: absolute deadline (a 200-byte body arrives in ms; a slow drip
-        // must not stall the loop task into the 5 s task WDT)
-        while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 3000UL)
-        {
-            yield();
-            if (web_client.available())
-            {
-                int c = web_client.read();
-                if (c < 0)
-                    break;
-                body[got++] = (char)c;
-                last = millis();
-            }
-            else if (!web_client.connected())
-                break;
-        }
-        body[got] = '\0';
-        if (got != content_length)
-            strcpy(err, "short");
-    }
-
-    if (err[0] == '\0')
-    {
-        const char *dst = "", *pw = "", *cmd = "", *args = "";
-        bool form_ok = true;
-        char *p = body;
-        while (*p && form_ok)
-        {
-            char *amp = strchr(p, '&');
-            if (amp != nullptr)
-                *amp = '\0';
-            char *eq = strchr(p, '=');
-            if (eq != nullptr)
-            {
-                *eq = '\0';
-                char *val = eq + 1;
-                if (!rm_form_decode(val))
-                    form_ok = false;
-                else if (strcmp(p, "dst") == 0)
-                    dst = val;
-                else if (strcmp(p, "pw") == 0)
-                    pw = val;
-                else if (strcmp(p, "cmd") == 0)
-                    cmd = val;
-                else if (strcmp(p, "args") == 0)
-                    args = val;
-            }
-            if (amp == nullptr)
-                break;
-            p = amp + 1;
-        }
-
-        if (!form_ok)
-            strcpy(err, "form");
+        const RmSendReq q = rmParseSendBody(body);
+        if (q.err != nullptr)
+            snprintf(err, sizeof(err), "%s", q.err);
+        else if (q.slot >= 0)
+            ok = rmSendBySlot(q.slot, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync);
         else
-        {
-            // the wire form of command and arguments is lower case (rmCommandAllowed() requires it)
-            for (char *q = (char *)cmd; *q; q++)
-                *q = (char)tolower((unsigned char)*q);
-            for (char *q = (char *)args; *q; q++)
-                *q = (char)tolower((unsigned char)*q);
-
-            ok = rmSendCommand(dst, pw, cmd, args, err, sizeof(err), &ctr, &viaSync);
-        }
+            ok = rmSendCommand(q.dst, q.pw, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync);
     }
 
     rm_wipe(body, sizeof(body)); // dst/pw/cmd/args point into it: the password is gone from here on
@@ -1007,6 +952,27 @@ String work_webpage(bool bget_password, int webid)
                         { // W2: status + sent list for the remote management card
                             sub_rm_status();
                         }
+                        else if (web_header.startsWith("POST /rmpasswd"))
+                        { // RM GUI: set / clear node_passwd, the password is in the BODY
+                            sub_rm_passwd(web_content_length);
+                        }
+                        else if (web_header.startsWith("GET /rmnodes"))
+                        { // RM GUI: the three saved nodes (slot, used, call), never a key
+                            sub_rm_nodes_get();
+                        }
+                        else if (web_header.startsWith("POST /rmnodes"))
+                        { // RM GUI: save / delete / forget saved nodes, the password is in the BODY
+                            sub_rm_nodes_post(web_content_length);
+                        }
+                        else if (web_header.startsWith("GET /rmheard"))
+                        { // RM GUI: up to 12 heard nodes for the Remote page chips
+                            sub_rm_heard();
+                        }
+                        else if (web_header.indexOf("/?page=remote") >= 0)
+                        { // RM GUI: the Remote page
+                            send_http_header(200, RESPONSE_TYPE_TEXT);
+                            sub_page_remote();
+                        }
                         else if (web_header.indexOf("/callfunction/") >= 0)
                         { // user requested to invoke a function
                             // ### !!function will generate a HTML header itself
@@ -1200,7 +1166,7 @@ void deliver_scaffold(bool bget_password)
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='setup'){rmCardInit();rmPoll();}}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
     //
     // BP-09: the input fields used to be cleared unconditionally, right after
@@ -1300,24 +1266,9 @@ void deliver_scaffold(bool bget_password)
     // This function is used to toggle a css class so setup cars can collapse / expand
     web_client.println("function togglecard(element){element.parentElement.classList.toggle(\"cardopen\");}");
 
-    // RM-09 (#1189): remote management card. Lives here because sub-pages are injected with innerHTML (their own
-    // <script> never runs). Everything received is written with textContent (never innerHTML), so a reply text
-    // cannot inject markup. rmKeep holds the typed fields (also the password) so a page reload of the setup page
-    // does not lose them; it exists in this tab's memory only. The password goes in the POST body of /rmsend.
-    web_client.println("var rmKeep={dst:'',pw:'',cmd:'',args:''};");
-    web_client.println("function rmAgo(s){return s<120?s+' s':s<7200?Math.round(s/60)+' min':Math.round(s/3600)+' h';}");
-    web_client.println("function rmCell(tr,t,cls){var td=document.createElement('td');td.textContent=String(t);if(cls)td.className=cls;tr.appendChild(td);return td;}");
-    web_client.println("function rmArgSel(){var c=document.getElementById('rm_cmd');if(!c)return;var on=(c.value=='txpower'||c.value=='setout');document.getElementById('rm_args').style.display=on?'':'none';document.getElementById('rm_args_l').style.display=on?'':'none';document.getElementById('rm_args').placeholder=(c.value=='txpower')?'dBm':'a0 on';}");
-    web_client.println("function rmCardInit(){var d=document.getElementById('rm_dst');if(!d)return;d.value=rmKeep.dst;document.getElementById('rm_pw_in').value=rmKeep.pw;if(rmKeep.cmd)document.getElementById('rm_cmd').value=rmKeep.cmd;document.getElementById('rm_args').value=rmKeep.args;rmArgSel();}");
-    web_client.println("function rmRender(j){var e;if(!(e=document.getElementById('rm_cnt')))return;document.getElementById('rm_pwset').textContent=j.pw?'yes':'no';e.textContent='ok '+j.ok+', rejected '+j.rej;var l=document.getElementById('rm_lock');l.textContent=j.lock?('ACTIVE, '+j.lockS+' s left'):'no';l.className=j.lock?'rmbad':'';document.getElementById('rm_hwm').textContent=j.hwm;"
-                       "var b=document.getElementById('rm_log');b.textContent='';for(var i=0;i<j.log.length;i++){var r=j.log[i],tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}if(!j.log.length){var t=document.createElement('tr');rmCell(t,'none yet');b.appendChild(t);}"
-                       "b=document.getElementById('rm_sent');b.textContent='';for(var k=0;k<j.sent.length;k++){var s=j.sent[k],tq=document.createElement('tr');rmCell(tq,s.dst);rmCell(tq,s.ctr);rmCell(tq,s.cmd);rmCell(tq,rmAgo(s.ago)+' ago');rmCell(tq,s.rep?s.reply:'');"
-                       "if(s.rep&&s.ver)rmCell(tq,'\\u2713 verified','rmok');else if(s.rep)rmCell(tq,'UNVERIFIED reply','rmbad');else rmCell(tq,'waiting');b.appendChild(tq);}if(!j.sent.length){var u=document.createElement('tr');rmCell(u,'none yet');b.appendChild(u);}}");
-    web_client.println("function rmPoll(){if(!document.getElementById('rmcard'))return;fetch('/rmstatus').then(function(r){return r.json();}).then(rmRender).catch(function(){});}");
-    web_client.println("setInterval(function(){var c=document.getElementById('rmcard');if(cpage=='setup'&&c&&c.classList.contains('cardopen'))rmPoll();},3000);");
-    web_client.println("function rmSend(sync){var m=document.getElementById('rm_msg');var sel=document.getElementById('rm_cmd').value;var sp=sel.indexOf(' ');var cmd=sync?'sync':(sp>0?sel.substring(0,sp):sel);var a=sync?'':(sp>0?sel.substring(sp+1):'');if(!sync&&(cmd=='txpower'||cmd=='setout'))a=document.getElementById('rm_args').value.trim();"
-                       "var dst=document.getElementById('rm_dst').value.trim().toUpperCase();var pw=document.getElementById('rm_pw_in').value;if(!dst||!pw){m.textContent='target call and password needed';m.className='font-small rmbad';return;}m.textContent='sending ...';m.className='font-small';"
-                       "fetch('/rmsend',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'dst='+encodeURIComponent(dst)+'&pw='+encodeURIComponent(pw)+'&cmd='+encodeURIComponent(cmd)+'&args='+encodeURIComponent(a)}).then(function(r){return r.json();}).then(function(j){if(j.ok){m.textContent='sent, counter '+j.ctr+' - waiting for the reply';m.className='font-small';}else{m.textContent='not sent: '+j.err;m.className='font-small rmbad';}rmPoll();}).catch(function(){m.textContent='request failed';m.className='font-small rmbad';});}");
+    // RM GUI W2b: Remote page scripts (state tiles, saved nodes, password, polling). Lives here because
+    // sub-pages are injected with innerHTML and their <script> never runs.
+    rmScaffoldJs();
 
     // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
     // and injected with innerHTML, which never runs a <script> tag it carries,
@@ -1493,14 +1444,6 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".collapsablecard>div {max-height:0px;-webkit-transition:opacity .15s .0s,max-height .25s .10s;transition:opacity .15s .0s,max-height .25s .10s,margin .0s .50s;	opacity:0.0;overflow:hidden;margin:0px;}\n");
     web_client.println(".cardopen>div {-webkit-transition:opacity .15s .10s,max-height .25s .0s;transition:opacity .15s .10s,max-height .25s .0s;max-height:1000px;opacity:1;margin:7px;}\n");
     web_client.println(".cardopen>span:first-of-type {display:none;}\n");
-    // RM-09 (#1189): remote management card -- taller than the 1000 px cap of an ordinary card, label/value grid, tables
-    web_client.println(".rmcard.cardopen>div {max-height:3000px;}\n");
-    web_client.println(".rmgrid {display:grid;grid-template-columns:max-content 1fr;align-items:center;gap:7px 10px;margin:7px 0px;}\n");
-    web_client.println(".rmgrid input,.rmgrid select {width:100%;}\n");
-    web_client.println(".rmtab {width:100%;border-collapse:collapse;}\n");
-    web_client.println(".rmtab th,.rmtab td {padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;font-size:x-small;word-break:break-word;}\n");
-    web_client.println(".rmok {color:#1a7f37;font-weight:bold;}\n");
-    web_client.println(".rmbad {color:var(--mcred);font-weight:bold;}\n");
 
     // content definitions -> WQ-01 LoRa Queue panel (rxlog page)
     web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:#fff;border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
@@ -1595,6 +1538,7 @@ void deliver_scaffold(bool bget_password)
     web_client.print("IuNTE5NzYgOS4xMzA4IDIuNjYyMjcgOS42NjI2NiAyLjk4NTE4IDEwLjA4MzVDMy4xMzI1NiAxMC4yNzU2IDMuMzM5NyAxMC40MzcgMy42NjExOSAxMC42MzlDNC4xMzM4IDEwLjkzNiA0LjQzNzg5IDExLjQ0MTkgNC40Mzc4NiAxMkM0LjQzNzgzIDEyLjU1ODEgNC4xMzM3NSAxMy4wNjM5IDMuNjYxMTggMTMuMzYwOEMzLjMzOTY1IDEzLjU2MjkgMy4xMzI0OCAxMy43MjQ0IDIuOTg1MDggMTMuOTE2NUMyLjY2MjE3IDE0LjMzNzMgMi41MTk2NiAxNC44NjkxIDIuNTg4OSAxNS4zOTVDMi42NDA4MiAxNS43ODk0IDIuODczNzkgMTYuMTkzIDMuMzM5NzMgMTdDMy44MDU2OCAxNy44MDcgNC4wMzg2NSAxOC4yMTA2IDQuMzU0MjYgMTguNDUyN0M0Ljc3NTA4IDE4Ljc3NTYgNS4zMDY5NCAxOC45MTgxIDUuODMyODQgMTguODQ4OUM2LjA3Mjg5IDE4LjgxNzMgNi4zMTYzMiAxOC43MTg2IDYuNjUyMDQgMTguNTQxMkM3LjE0NTQ3IDE4LjI4MDQgNy43MzU1NiAxOC4yNyA4LjIxODkgMTguNTQ5QzguNzAyMjQgMTguODI4MSA4Ljk4ODI2IDE5LjM0NDMgOS4wMDkxMSAxOS45MDIxQzkuMDIzMzEgMjAuMjgxNSA5LjA1OTU3IDIwLjU0MTcgOS4xNTIyMyAyMC43NjU0QzkuMzU1MjIgMjEuMjU1NCA5Ljc0NDU3IDIxLjY0NDggMTAuMjM0NiAyMS44NDc4QzEwLjYwMjIgMjIgMTEuMDY4MSAyMiAxMiAyMkMxMi45MzE5IDIyIDEzLjM5NzggMjIgMTMuNzY1NCAyMS44NDc4QzE0LjI1NTQgMjEuNjQ0OCAxNC42NDQ4IDIxLjI1NTQgMTQuODQ3NyAyMC43NjU0QzE0Ljk0MDQgM");
     web_client.print("jAuNTQxNyAxNC45NzY3IDIwLjI4MTUgMTQuOTkwOSAxOS45MDJDMTUuMDExNyAxOS4zNDQzIDE1LjI5NzcgMTguODI4MSAxNS43ODEgMTguNTQ5QzE2LjI2NDMgMTguMjY5OSAxNi44NTQ0IDE4LjI4MDQgMTcuMzQ3OSAxOC41NDEyQzE3LjY4MzYgMTguNzE4NiAxNy45MjcgMTguODE3MiAxOC4xNjcgMTguODQ4OEMxOC42OTI5IDE4LjkxODEgMTkuMjI0OCAxOC43NzU2IDE5LjY0NTYgMTguNDUyN0MxOS45NjEyIDE4LjIxMDUgMjAuMTk0MiAxNy44MDcgMjAuNjYwMSAxNi45OTk5QzIxLjEyNjEgMTYuMTkyOSAyMS4zNTkxIDE1Ljc4OTQgMjEuNDExIDE1LjM5NUMyMS40ODAyIDE0Ljg2OTEgMjEuMzM3NyAxNC4zMzcyIDIxLjAxNDggMTMuOTE2NEMyMC44Njc0IDEzLjcyNDMgMjAuNjYwMiAxMy41NjI4IDIwLjMzODcgMTMuMzYwOEMxOS44NjYyIDEzLjA2MzkgMTkuNTYyMSAxMi41NTggMTkuNTYyMSAxMS45OTk5QzE5LjU2MjEgMTEuNDQxOCAxOS44NjYyIDEwLjkzNjEgMjAuMzM4NyAxMC42MzkyQzIwLjY2MDMgMTAuNDM3MSAyMC44Njc1IDEwLjI3NTcgMjEuMDE0OSAxMC4wODM1QzIxLjMzNzggOS42NjI3MyAyMS40ODAzIDkuMTMwODcgMjEuNDExMSA4LjYwNDk3QzIxLjM1OTIgOC4yMTA1NSAyMS4xMjYyIDcuODA3MDMgMjAuNjYwMiA3QzIwLjE5NDMgNi4xOTI5NyAxOS45NjEzIDUuNzg5NDUgMTkuNjQ1NyA1LjU0NzI3QzE5LjIyNDkgNS4yMjQzNiAxOC42OTMgNS4wODE4NSAxOC4xNjcxIDUuMTUxMDlDMTcuOTI3MSA1LjE4MjY5IDE3LjY4MzcgNS4y");
     web_client.println("ODEzNiAxNy4zNDc5IDUuNDU4OEMxNi44NTQ1IDUuNzE5NTkgMTYuMjY0NCA1LjczMDAyIDE1Ljc4MTEgNS40NTA5NkMxNS4yOTc3IDUuMTcxOTEgMTUuMDExNyA0LjY1NTY2IDE0Ljk5MDkgNC4wOTc5NEMxNC45NzY3IDMuNzE4NDggMTQuOTQwNCAzLjQ1ODMzIDE0Ljg0NzcgMy4yMzQ2M0MxNC42NDQ4IDIuNzQ0NTggMTQuMjU1NCAyLjM1NTIzIDEzLjc2NTQgMi4xNTIyNFoiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiPjwvcGF0aD48L2c+PC9zdmc+\"></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('remote',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"#ffffff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"11\" r=\"2\"></circle><path d=\"M8.5 7.5a5 5 0 0 0 0 7M15.5 7.5a5 5 0 0 1 0 7M5.5 4.5a9 9 0 0 0 0 13M18.5 4.5a9 9 0 0 1 0 13M12 13v8M9 21h6\"></path></g></svg></Button>\n");   // RM GUI W2b: Remote
 
     web_client.println("<Button class=\"nav_button extra_space\" onclick=\"if(confirm('Node will reboot, are you sure?')){callfunction('reboot','');}\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#FFFFFF\" stroke-width=\"0.032\"></g><g><path d=\"m 8 0 c -0.550781 0 -1 0.449219 -1 1 v 5 c 0 0.550781 0.449219 1 1 1 s 1 -0.449219 1 -1 v -5 c 0 -0.550781 -0.449219 -1 -1 -1 z m -7 1 l 2.050781 2.050781 c -2.117187 2.117188 -2.652343 5.355469 -1.332031 8.039063 c 1.324219 2.683594 4.214844 4.238281 7.179688 3.851562 c 2.96875 -0.386718 5.367187 -2.625 5.960937 -5.554687 c 0.59375 -2.933594 -0.75 -5.929688 -3.335937 -7.433594 c -0.476563 -0.28125 -1.089844 -0.117187 -1.367188 0.359375 s -0.117188 1.089844 0.359375 1.367188 c 1.851563 1.078124 2.808594 3.207031 2.382813 5.3125 c -0.421876 2.101562 -2.128907 3.691406 -4.253907 3.96875 c -2.128906 0.273437 -4.183593 -0.828126 -5.128906 -2.753907 s -0.566406 -4.226562 0.949219 -5.742187 l 1.535156 1.535156 v -4.003906 c 0 -0.519532 -0.449219 -0.996094 -1 -0.996094 z m 0 0 \" fill=\"#FFFFFF\"></path></g></svg></Button>\n");
 
@@ -3272,63 +3216,6 @@ void sub_page_setup()
     #endif
     _create_setup_switch_element("gateway", "Gateway", "enable gateway", bGATEWAY);   // create Switch-Element inclucing Label and Description
     web_client.println("</div></div>");
-
-    // RM-07 / RM-09 (#1189): Remote management card, all boards. "This node": the --remotemgmt switch (setparam rm; its
-    // hint shows only while node_passwd is empty, never the password, a key or a tag) and the live state from
-    // /rmstatus. "Manage another node": signs a command with the TARGET's password and sends the RM1 DM through
-    // POST /rmsend (the password is in the body only, see sub_rm_send()). The elements are filled by the scaffold
-    // JS (rmPoll/rmRender, sub-page scripts never run) through textContent, so nothing received is ever HTML.
-    {
-        const bool rmNoPasswd = (meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ');
-        web_client.println("<div id=\"rmcard\" class=\"cardlayout collapsablecard rmcard\">");
-        web_client.println("<label class=\"cardlabel\">Remote management</label>");
-        web_client.println("<span>Open this to manage the remote commands of this node, or another node.</span>\n");
-        web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);rmPoll();\"><i></i></button>\n");
-        web_client.println("<div>");
-        web_client.println("<p class=\"font-bold\">This node</p>");
-        web_client.println("<div class=\"grid grid2\">");
-        _create_setup_switch_element("rm", "Remote management (RM1)", "authenticated remote commands by DM, needs --passwd", meshcom_settings.node_rm == 1,
-                                     rmNoPasswd ? "needs --passwd" : nullptr, rmNoPasswd && meshcom_settings.node_rm == 1);
-        web_client.println("</div>");
-        web_client.println("<div class=\"rmgrid\">");
-        web_client.println("<span>password set</span><span id=\"rm_pwset\">-</span>");
-        web_client.println("<span>commands</span><span id=\"rm_cnt\">-</span>");
-        web_client.println("<span>lockout</span><span id=\"rm_lock\">-</span>");
-        web_client.println("<span>counter high-water</span><span id=\"rm_hwm\">-</span>");
-        web_client.println("</div>");
-        web_client.println("<p class=\"font-small\">last executed commands</p>");
-        web_client.println("<table class=\"rmtab\"><thead><tr><th>ago</th><th>from</th><th>ctr</th><th>command</th><th>result</th></tr></thead><tbody id=\"rm_log\"></tbody></table>");
-        web_client.println("<hr>");
-        web_client.println("<p class=\"font-bold\">Manage another node</p>");
-        web_client.println("<div class=\"rmgrid\">");
-        web_client.println("<label for=\"rm_dst\">target call</label>");
-        web_client.println("<input type=\"text\" id=\"rm_dst\" maxlength=\"9\" autocomplete=\"off\" autocapitalize=\"characters\" placeholder=\"DK5EN-12\" oninput=\"this.value=this.value.toUpperCase();rmKeep.dst=this.value;\"/>");
-        web_client.println("<label for=\"rm_pw_in\">target password</label>");
-        web_client.println("<input type=\"password\" id=\"rm_pw_in\" maxlength=\"14\" autocomplete=\"off\" oninput=\"rmKeep.pw=this.value;\"/>");
-        web_client.println("<label for=\"rm_cmd\">command</label>");
-        web_client.println("<select id=\"rm_cmd\" onchange=\"rmKeep.cmd=this.value;rmArgSel();\">");
-        static const char *const rmCmds[] = {"reboot", "status", "sendpos", "sendtrack", "gps on", "gps off", "track on", "track off",
-                                             "display on", "display off", "gateway on", "gateway off", "mesh on", "mesh off",
-                                             "led on", "led off", "txpower", "setout", "sync"};
-        for (size_t i = 0; i < sizeof(rmCmds) / sizeof(rmCmds[0]); i++)
-            web_client.printf("\t<option value=\"%s\">%s</option>\n", rmCmds[i],
-                              strcmp(rmCmds[i], "txpower") == 0 ? "txpower &lt;n&gt;" :
-                              strcmp(rmCmds[i], "setout") == 0 ? "setout &lt;a0..b7&gt; &lt;on|off&gt;" : rmCmds[i]);
-        web_client.println("</select>");
-        web_client.println("<label for=\"rm_args\" id=\"rm_args_l\" style=\"display:none\">argument</label>");
-        web_client.println("<input type=\"text\" id=\"rm_args\" maxlength=\"20\" autocomplete=\"off\" style=\"display:none\" oninput=\"rmKeep.args=this.value;\"/>");
-        web_client.println("</div>");
-        web_client.println("<div class=\"flex-auto-wrap\">");
-        web_client.println("<button type=\"button\" onclick=\"rmSend(false);\">Send</button>");
-        web_client.println("<button type=\"button\" onclick=\"rmSend(true);\">Sync counter</button>");
-        web_client.println("</div>");
-        web_client.println("<p id=\"rm_msg\" class=\"font-small\"></p>");
-        web_client.println("<p class=\"font-small\">The target password is sent to this node over HTTP (LAN), used once to sign, kept only as a derived key for 10 minutes to check the reply, never stored.</p>");
-        web_client.println("<p class=\"font-small\">last sent commands</p>");
-        web_client.println("<table class=\"rmtab\"><thead><tr><th>to</th><th>ctr</th><th>command</th><th>sent</th><th>reply</th><th></th></tr></thead><tbody id=\"rm_sent\"></tbody></table>");
-        web_client.println("</div>");
-        web_client.println("</div>");
-    }
 
     // Position Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");

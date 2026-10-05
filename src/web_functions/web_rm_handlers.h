@@ -1,0 +1,47 @@
+/**
+ * RM GUI W2a (docs/rm-gui/impl-plan.md, contract C4) -- server side of the Remote page.
+ *
+ * All handlers run in the loop task like the rest of the web server (the key store and the sender
+ * API of rm_runtime.h are loop-task only). Called by the route chain in web_functions.cpp (G2):
+ *
+ *   POST /rmpasswd  -> sub_rm_passwd(content_length)
+ *   GET  /rmnodes   -> sub_rm_nodes_get()
+ *   POST /rmnodes   -> sub_rm_nodes_post(content_length)
+ *   GET  /rmheard   -> sub_rm_heard()
+ *   POST /rmsend with slot=  -> rmParseSendBody() (web_rm_parse.h), then rmSendBySlot()
+ *
+ * Every state-changing request is a POST body, parsed in place (web_rm_parse.h), never echoed, and the
+ * body buffer is wiped (rm_wipe) before the handler answers. Answers are JSON: 200 {"ok":true} or
+ * 422 {"ok":false,"err":"<token>"}; tokens: size short form act slot call pw cmd dup store.
+ */
+#ifndef _WEB_RM_HANDLERS_H_
+#define _WEB_RM_HANDLERS_H_
+
+#include <stddef.h>
+#include <stdint.h>
+
+/** Reads a POST body of content_length bytes from web_client into buf (cap bytes incl. NUL) with an
+ *  absolute deadline (a slow drip must not stall the loop task into the task WDT). Returns nullptr on
+ *  success, else a static token: "size" (content_length <= 0 or does not fit) or "short" (the peer
+ *  stopped early). The buffer is NUL-terminated in every case. */
+const char *rmReadBody(char *buf, size_t cap, long content_length);
+
+/** POST /rmpasswd   act=set&pw=<pw>  |  act=clear   -> nodePasswdApply() */
+void sub_rm_passwd(long content_length);
+
+/** GET /rmnodes   {"nodes":[{"slot":0,"used":1,"call":"DK5EN-1"},...3 entries]}   never a key */
+void sub_rm_nodes_get(void);
+
+/** POST /rmnodes   act=save&slot=0..2&call=<call>&pw=<pw>  |  act=del&slot=n  |  act=forget */
+void sub_rm_nodes_post(long content_length);
+
+/** GET /rmheard   {"heard":[{"call":"","hw":"HELTEC_V3","age_s":120,"rssi":-95},...]}  at most 12 */
+void sub_rm_heard(void);
+
+/** Sends cmd/args (wire form: lower case) to the node saved in slot 0..2 with that slot's key. Loads the
+ *  store into a local struct, hands the key to rmSendCommandKey(), scrubs the struct on every path.
+ *  false + err token: "slot" (out of range or unused), else the tokens of rmSendCommandKey()
+ *  ("cmd", "busy", "limit", ...). */
+bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync);
+
+#endif // _WEB_RM_HANDLERS_H_
