@@ -90,8 +90,25 @@ inline size_t rmqCopy(char *dst, size_t dstN, const char *s)
     return (s[i] == '\0') ? i : (size_t)-1;
 }
 
+// RM-09: a SECOND instance of the same FIFO for REPLIES ("RM1 <ctr> ok|err ...") to commands this
+// node sent (rmSendCommand()); the command queue above stays for commands to this node. Same lock,
+// same slot shape, same drop-newest policy.
+inline RmQueueState &rmqReplyState(void)
+{
+    static RmQueueState st;
+    return st;
+}
+
+// Set by the loop task while at least one sent command still waits for its reply: the receive hook
+// queues replies only then, so unsolicited "RM1 <n> ok ..." DMs cannot occupy the two slots.
+inline volatile bool &rmqReplyWanted(void)
+{
+    static volatile bool w = false;
+    return w;
+}
+
 // Producer (OnRxDone). false = queue full or src/text too long: dropped.
-inline bool rmQueuePush(const char *src, const char *text)
+inline bool rmqPushTo(RmQueueState &q, const char *src, const char *text)
 {
     if (src == NULL || text == NULL)
         return false;
@@ -107,12 +124,12 @@ inline bool rmQueuePush(const char *src, const char *text)
 
     bool ok = false;
     RMQ_LOCK();
-    if (rmqState().count < RM_QUEUE_SLOTS)
+    if (q.count < RM_QUEUE_SLOTS)
     {
-        RmQueueSlot &s = rmqState().slot[(rmqState().head + rmqState().count) % RM_QUEUE_SLOTS];
+        RmQueueSlot &s = q.slot[(q.head + q.count) % RM_QUEUE_SLOTS];
         rmqCopy(s.src, sizeof(s.src), src);
         rmqCopy(s.text, sizeof(s.text), text);
-        rmqState().count++;
+        q.count++;
         ok = true;
     }
     RMQ_UNLOCK();
@@ -120,24 +137,38 @@ inline bool rmQueuePush(const char *src, const char *text)
 }
 
 // Consumer (loop task). false = empty. Oldest first.
-inline bool rmQueuePop(char *src, size_t srcN, char *text, size_t textN)
+inline bool rmqPopFrom(RmQueueState &q, char *src, size_t srcN, char *text, size_t textN)
 {
     if (src == NULL || srcN == 0 || text == NULL || textN == 0)
         return false;
 
     bool ok = false;
     RMQ_LOCK();
-    if (rmqState().count > 0)
+    if (q.count > 0)
     {
-        RmQueueSlot &s = rmqState().slot[rmqState().head];
+        RmQueueSlot &s = q.slot[q.head];
         rmqCopy(src, srcN, s.src);
         rmqCopy(text, textN, s.text);
-        rmqState().head = (uint8_t)((rmqState().head + 1) % RM_QUEUE_SLOTS);
-        rmqState().count--;
+        q.head = (uint8_t)((q.head + 1) % RM_QUEUE_SLOTS);
+        q.count--;
         ok = true;
     }
     RMQ_UNLOCK();
     return ok;
+}
+
+// Command queue (commands addressed to this node).
+inline bool rmQueuePush(const char *src, const char *text) { return rmqPushTo(rmqState(), src, text); }
+inline bool rmQueuePop(char *src, size_t srcN, char *text, size_t textN)
+{
+    return rmqPopFrom(rmqState(), src, srcN, text, textN);
+}
+
+// Reply queue (replies to commands this node sent).
+inline bool rmReplyPush(const char *src, const char *text) { return rmqPushTo(rmqReplyState(), src, text); }
+inline bool rmReplyPop(char *src, size_t srcN, char *text, size_t textN)
+{
+    return rmqPopFrom(rmqReplyState(), src, srcN, text, textN);
 }
 
 // Test helpers (also fine on firmware).
@@ -154,7 +185,17 @@ inline void rmQueueReset(void)
     RMQ_LOCK();
     rmqState().head = 0;
     rmqState().count = 0;
+    rmqReplyState().head = 0;
+    rmqReplyState().count = 0;
     RMQ_UNLOCK();
+}
+
+inline uint8_t rmReplyQueueCount(void)
+{
+    RMQ_LOCK();
+    uint8_t c = rmqReplyState().count;
+    RMQ_UNLOCK();
+    return c;
 }
 
 #endif // RM_QUEUE_H

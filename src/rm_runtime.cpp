@@ -10,6 +10,7 @@
 #include "counters_store.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
+#include "hmac_sha256.h"
 #include "remote_cmd.h"
 #include "rm_queue.h"
 #include "rm_runtime.h"
@@ -27,6 +28,32 @@ constexpr uint32_t kRebootDelayMs = 8000;
 
 RmState s_state;
 bool s_inited = false;
+
+// --- RM-09: executed-command log and sent-command book ---------------------------------------
+constexpr uint8_t kLogN = 5;
+RmLogEntry s_log[kLogN];   // newest first
+uint8_t s_nlog = 0;
+
+constexpr uint8_t kSentN = 5;
+struct SentSlot
+{
+    RmSent pub;
+    uint8_t key[32];       // K of the TARGET; live only while keyLive
+    bool keyLive;
+};
+SentSlot s_sent[kSentN];   // newest first
+uint8_t s_nsent = 0;
+uint32_t s_lastSent = 0;   // persisted ("rm_snd"), loaded at rmInit()
+
+// hwm per managed node as learnt from verified replies (RAM only; the sync command refreshes it)
+struct PeerHwm
+{
+    char dst[10];
+    uint32_t hwm;
+    bool used;
+};
+PeerHwm s_peer[4];
+uint8_t s_peerNext = 0;
 bool s_rebootPending = false;
 uint32_t s_rebootAtMs = 0;
 
@@ -191,6 +218,151 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
     return false;
 }
 
+// --- RM-09 helpers ----------------------------------------------------------------------------
+void wipeKey(SentSlot &e)
+{
+    hmac_sha256_detail::wipe(e.key, sizeof(e.key));
+    e.keyLive = false;
+}
+
+// rmqReplyWanted(): the receive hook queues replies only while a verifiable reply can still arrive.
+void refreshReplyWanted()
+{
+    bool want = false;
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (s_sent[i].keyLive)
+            want = true;
+    rmqReplyWanted() = want;
+}
+
+// keys older than RM_CACHE_MS (the target's lost-reply window) are of no use any more
+void expireKeys(uint32_t now)
+{
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (s_sent[i].keyLive && (uint32_t)(now - s_sent[i].pub.sentMs) > RM_CACHE_MS)
+            wipeKey(s_sent[i]);
+    refreshReplyWanted();
+}
+
+void logExecuted(const char *src, const RmCmd &c, const char *result, uint32_t now)
+{
+    memmove(&s_log[1], &s_log[0], sizeof(RmLogEntry) * (kLogN - 1));
+    RmLogEntry &e = s_log[0];
+    memset(&e, 0, sizeof(e));
+    e.ms = now;
+    snprintf(e.src, sizeof(e.src), "%s", src);
+    e.ctr = c.ctr;
+    if (c.args[0] != '\0')
+        snprintf(e.cmd, sizeof(e.cmd), "%s %s", c.cmd, c.args);
+    else
+        snprintf(e.cmd, sizeof(e.cmd), "%s", c.cmd);
+    snprintf(e.result, sizeof(e.result), "%s", result);
+    if (s_nlog < kLogN)
+        s_nlog++;
+}
+
+void peerSet(const char *dst, uint32_t hwm)
+{
+    for (uint8_t i = 0; i < 4; i++)
+        if (s_peer[i].used && strcmp(s_peer[i].dst, dst) == 0)
+        {
+            if (hwm > s_peer[i].hwm)
+                s_peer[i].hwm = hwm;
+            return;
+        }
+    PeerHwm &p = s_peer[s_peerNext];
+    s_peerNext = (uint8_t)((s_peerNext + 1) % 4);
+    snprintf(p.dst, sizeof(p.dst), "%s", dst);
+    p.hwm = hwm;
+    p.used = true;
+}
+
+bool peerGet(const char *dst, uint32_t &hwm)
+{
+    for (uint8_t i = 0; i < 4; i++)
+        if (s_peer[i].used && strcmp(s_peer[i].dst, dst) == 0)
+        {
+            hwm = s_peer[i].hwm;
+            return true;
+        }
+    return false;
+}
+
+// true when the node clock is trustworthy (NTP, RTC or GPS fix) and plausible (>= 2024-01-01)
+bool clockUnix(uint32_t &out)
+{
+    if (!(bNTPDateTimeValid || bRTCON || posinfo_fix) || meshcom_settings.node_date_year < 2024)
+        return false;
+    const uint32_t t = (uint32_t)getUnixClock();
+    if (t < 1704067200u)
+        return false;
+    out = t;
+    return true;
+}
+
+// ctr of a leading "ctr=<n>" inside a sync result "ok ctr=<n> v=..."
+bool parseSyncCtr(const char *result, uint32_t &out)
+{
+    if (strncmp(result, "ok ctr=", 7) != 0)
+        return false;
+    uint64_t v = 0;
+    const char *p = result + 7;
+    if (*p < '0' || *p > '9')
+        return false;
+    while (*p >= '0' && *p <= '9')
+    {
+        v = v * 10 + (uint64_t)(*p - '0');
+        if (v > 0xFFFFFFFFULL)
+            return false;
+        p++;
+    }
+    out = (uint32_t)v;
+    return true;
+}
+
+// Loop task: matches one queued reply against the pending sent commands.
+void handleReply(const char *src, const char *text)
+{
+    // ctr of the reply ("RM1 <ctr> ok|err ...", rmIsReply() was true in the receive hook)
+    uint64_t ctr = 0;
+    const char *p = text + 4;
+    while (*p >= '0' && *p <= '9')
+    {
+        ctr = ctr * 10 + (uint64_t)(*p - '0');
+        if (ctr > 0xFFFFFFFFULL)
+            return;
+        p++;
+    }
+
+    for (uint8_t i = 0; i < s_nsent; i++)
+    {
+        SentSlot &e = s_sent[i];
+        if (!e.keyLive || e.pub.verified || e.pub.ctr != (uint32_t)ctr || strcmp(e.pub.dst, src) != 0)
+            continue;
+
+        char result[RM_MAX_RESULT + 1];
+        const bool ok =
+            rmVerifyReply(text, e.pub.dst, meshcom_settings.node_call, e.pub.ctr, e.key, result, sizeof(result));
+        e.pub.replied = true;
+        e.pub.verified = ok;
+        if (ok)
+        {
+            snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
+            wipeKey(e);
+            uint32_t h = 0;
+            if (e.pub.ctr == 0 && parseSyncCtr(result, h))
+                peerSet(e.pub.dst, h);
+            else if (e.pub.ctr != 0)
+                peerSet(e.pub.dst, e.pub.ctr); // the target accepted this ctr (ok and err alike)
+        }
+        else // keep the key: an authentic reply may still follow and then overwrites this one
+            snprintf(e.pub.reply, sizeof(e.pub.reply), "%.*s", (int)(sizeof(e.pub.reply) - 1), text);
+        Serial.printf("[RM];reply;%s;ctr;%lu;verified;%d\n", e.pub.dst, (unsigned long)e.pub.ctr, ok ? 1 : 0);
+        refreshReplyWanted();
+        return;
+    }
+}
+
 void countReject(RmVerdict v)
 {
     switch (v)
@@ -210,6 +382,7 @@ void countReject(RmVerdict v)
 void rmInit(void)
 {
     rmStateInit(s_state, rmHwmLoad());
+    s_lastSent = rmSndLoad();
     s_inited = true;
     Serial.printf("[RM];init;hwm;%lu\n", (unsigned long)s_state.hwm);
 }
@@ -230,6 +403,22 @@ void rmDrain(void)
 
     static char src[RM_QUEUE_SRC_LEN];
     static char text[RM_QUEUE_TEXT_LEN];
+
+    // RM-09: replies to commands we sent (one per pass), then key expiry
+    if (s_nsent > 0)
+    {
+        if (rmReplyPop(src, sizeof(src), text, sizeof(text)))
+            handleReply(src, text);
+        expireKeys(millis());
+    }
+    else
+    {
+        // nothing pending: drop a stray reply that slipped in before the flag was cleared
+        while (rmReplyPop(src, sizeof(src), text, sizeof(text)))
+        {
+        }
+    }
+
     if (!rmQueuePop(src, sizeof(src), text, sizeof(text)))
         return;
 
@@ -278,6 +467,7 @@ void rmDrain(void)
                 Serial.printf("[RM];hwm_save;failed\n");
         }
 
+        logExecuted(src, cmd, result, millis());
         Serial.printf("[RM];%s;ctr;%lu\n", done ? "ok" : "fail", (unsigned long)cmd.ctr);
         sendReply(cmd, result, src);
 
@@ -323,4 +513,194 @@ void rmDrain(void)
         Serial.printf("[RM];reject;%s\n", rmVerdictName(v));
         break;
     }
+}
+
+// ---- RM-09 ----------------------------------------------------------------------------------------
+
+void rmGetStatus(RmStatus &out)
+{
+    if (!s_inited)
+        rmInit();
+    memset(&out, 0, sizeof(out));
+    out.on = (meshcom_settings.node_rm == 1);
+    out.passwdSet = !passwdEmpty();
+    const uint32_t now = millis();
+    if (s_state.lockActive && (int32_t)(now - s_state.lockUntilMs) < 0)
+    {
+        out.lockActive = true;
+        out.lockRemainS = ((uint32_t)(s_state.lockUntilMs - now) + 999u) / 1000u;
+    }
+    out.hwm = s_state.hwm;
+    out.stats = g_rmStats;
+    out.nlog = s_nlog;
+    for (uint8_t i = 0; i < s_nlog; i++)
+        out.log[i] = s_log[i];
+}
+
+namespace
+{
+void setErr(char *err, size_t errN, const char *why)
+{
+    if (err != nullptr && errN > 0)
+        snprintf(err, errN, "%s", why);
+}
+} // namespace
+
+bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const char *args, char *err,
+                   size_t errN, uint32_t *ctrOut)
+{
+    if (!s_inited)
+        rmInit();
+    if (args == nullptr)
+        args = "";
+
+    // dst: own copy, folded to upper case, a call incl. SSID (9 chars at most), never our own
+    char to[10];
+    size_t dl = 0;
+    if (dst != nullptr)
+        for (; dst[dl] != '\0' && dl < sizeof(to) - 1; dl++)
+        {
+            char ch = dst[dl];
+            if (ch >= 'a' && ch <= 'z')
+                ch = (char)(ch - 'a' + 'A');
+            if (!((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-'))
+                break;
+            to[dl] = ch;
+        }
+    if (dst == nullptr || dl == 0 || dst[dl] != '\0')
+    {
+        setErr(err, errN, "dst");
+        return false;
+    }
+    to[dl] = '\0';
+    if (strcmp(to, meshcom_settings.node_call) == 0)
+    {
+        setErr(err, errN, "dst");
+        return false;
+    }
+
+    // password: 1..14 characters after stripping trailing spaces (node_passwd is char[15])
+    size_t pl = (passwd != nullptr) ? strlen(passwd) : 0;
+    while (pl > 0 && passwd[pl - 1] == ' ')
+        pl--;
+    if (pl == 0 || (passwd != nullptr && strlen(passwd) > sizeof(meshcom_settings.node_passwd) - 1))
+    {
+        setErr(err, errN, "passwd");
+        return false;
+    }
+
+    if (cmd == nullptr || !rmCommandAllowed(cmd, args, TX_POWER_MAX))
+    {
+        setErr(err, errN, "cmd");
+        return false;
+    }
+    const bool isSync = (strcmp(cmd, "sync") == 0);
+
+    // the target rate-limits to one accepted command per RM_RATE_MS: do not waste airtime on a refusal
+    const uint32_t now = millis();
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (strcmp(s_sent[i].pub.dst, to) == 0 && (uint32_t)(now - s_sent[i].pub.sentMs) < RM_RATE_MS)
+        {
+            setErr(err, errN, "busy");
+            return false;
+        }
+
+    // counter: max(last sent + 1, unix time, known hwm of the target + 1); sync always 0
+    uint32_t ctr = 0;
+    if (!isSync)
+    {
+        if (s_lastSent == 0xFFFFFFFFu)
+        {
+            setErr(err, errN, "ctr");
+            return false;
+        }
+        ctr = s_lastSent + 1;
+        uint32_t t = 0;
+        if (clockUnix(t) && t > ctr)
+            ctr = t;
+        uint32_t ph = 0;
+        if (peerGet(to, ph))
+        {
+            if (ph == 0xFFFFFFFFu)
+            {
+                setErr(err, errN, "ctr");
+                return false;
+            }
+            if (ph + 1 > ctr)
+                ctr = ph + 1;
+        }
+    }
+
+    uint8_t key[32];
+    rmDeriveKey(passwd, key);
+
+    static char wire[96];
+    static char out[128];
+    size_t n = rmBuildCommand(to, meshcom_settings.node_call, ctr, cmd, args, key, wire, sizeof(wire));
+    if (n == 0)
+    {
+        hmac_sha256_detail::wipe(key, sizeof(key));
+        setErr(err, errN, "cmd");
+        return false;
+    }
+
+    // the counter reaches flash BEFORE the frame leaves: a reboot must never re-use it
+    if (!isSync && !rmSndSave(ctr))
+    {
+        hmac_sha256_detail::wipe(key, sizeof(key));
+        Serial.printf("[RM];snd_save;failed\n");
+        setErr(err, errN, "store");
+        return false;
+    }
+    if (!isSync)
+        s_lastSent = ctr;
+
+    // DM form as sendReply() builds it: ":{CALL}text"
+    snprintf(out, sizeof(out), ":{%s}%s", to, wire);
+    const int rc = sendMessage(out, (int)strlen(out));
+    memset(wire, 0, sizeof(wire)); // the tag is not needed any more
+    memset(out, 0, sizeof(out));
+    if (rc != BP_SEND_OK)
+    {
+        hmac_sha256_detail::wipe(key, sizeof(key));
+        Serial.printf("[RM];send_failed;%d\n", rc);
+        setErr(err, errN, "send");
+        return false;
+    }
+
+    // book it (newest first); the oldest entry drops out, its key with it
+    if (s_nsent == kSentN)
+        wipeKey(s_sent[kSentN - 1]);
+    else
+        s_nsent++;
+    memmove(&s_sent[1], &s_sent[0], sizeof(SentSlot) * (kSentN - 1));
+    SentSlot &e = s_sent[0];
+    memset(&e, 0, sizeof(e));
+    snprintf(e.pub.dst, sizeof(e.pub.dst), "%s", to);
+    e.pub.ctr = ctr;
+    if (args[0] != '\0')
+        snprintf(e.pub.cmd, sizeof(e.pub.cmd), "%s %s", cmd, args);
+    else
+        snprintf(e.pub.cmd, sizeof(e.pub.cmd), "%s", cmd);
+    e.pub.sentMs = now;
+    memcpy(e.key, key, sizeof(e.key));
+    e.keyLive = true;
+    hmac_sha256_detail::wipe(key, sizeof(key));
+    refreshReplyWanted();
+
+    Serial.printf("[RM];send;%s;ctr;%lu\n", to, (unsigned long)ctr);
+    if (ctrOut != nullptr)
+        *ctrOut = ctr;
+    setErr(err, errN, "");
+    return true;
+}
+
+uint8_t rmGetSent(RmSent *out, uint8_t max)
+{
+    if (out == nullptr)
+        return 0;
+    uint8_t n = (s_nsent < max) ? s_nsent : max;
+    for (uint8_t i = 0; i < n; i++)
+        out[i] = s_sent[i].pub;
+    return n;
 }

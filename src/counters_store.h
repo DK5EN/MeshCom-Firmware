@@ -55,4 +55,17 @@ bool countersSave();
 uint32_t rmHwmLoad();
 bool rmHwmSave(uint32_t hwm);
 
+/**
+ * RM-09: counter of the OUTGOING side (rmSendCommand() in rm_runtime.h) -- the last counter this
+ * node put into a sent RM1 command. Same storage and survival rules as the high-water mark:
+ *
+ *   ESP32  Preferences namespace "Counters", key "rm_snd" (UInt).
+ *   nRF52  two slot files /rm_snd.a and /rm_snd.b, same no-rename scheme as rm_hwm.
+ *
+ *   rmSndLoad()     -- stored value, 0 when absent or unreadable. Called once at boot (rmInit()).
+ *   rmSndSave(v)    -- false on a storage failure; rmSendCommand() then refuses to send. Loop task only.
+ */
+uint32_t rmSndLoad();
+bool rmSndSave(uint32_t ctr);
+
 #endif // COUNTERS_STORE_H

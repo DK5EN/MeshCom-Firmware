@@ -146,6 +146,16 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
+    // #1190: MTU preset dropdown of the setup page; same --mtu command and range check as "ethmtu",
+    // read-back is the stored value (a refused value leaves it unchanged -> FAIL).
+    if(setupData->paramName.equals("mtu")) {
+        snprintf(message_text, sizeof(message_text), "--mtu %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (meshcom_settings.node_ethmtu == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = String(meshcom_settings.node_ethmtu);
+        return;
+    } else
+
     // CS-02: Hop-Limit fuer Textnachrichten. Wie jeder andere Parameter hier
     // ueber commandAction(), damit GUI und serielle Konsole nicht auseinander
     // laufen (HL-01/HL-03).
@@ -244,6 +254,31 @@ void webSetup_setParam(setupStruct *setupData){
 #if defined(ESP32)
     // AU-09 (#1187): firmware auto update mode and channel, routed through "--autoupdate off|notify|auto"
     // and "--updchan prod|dev"; read-back is the stored value (a bad value leaves it unchanged -> FAIL).
+    // AU-09 / #1187: combined Auto-update dropdown, off|prod|dev. off -> "--autoupdate off"; prod/dev ->
+    // "--updchan <ch>" then "--autoupdate auto" (automatic install in the update window). Read-back:
+    // "off" while node_autoupd == 0, else the stored channel; any other input runs nothing and fails.
+    // "autoupdate" and "updchan" below stay for Web API compatibility.
+    if(setupData->paramName.equals("aumode")) {
+        const bool auOff = setupData->paramValue.equalsIgnoreCase("off");
+        const bool auProd = setupData->paramValue.equalsIgnoreCase("prod");
+        const bool auDev = setupData->paramValue.equalsIgnoreCase("dev");
+        if(auOff || auProd || auDev) {
+            if(auOff) {
+                snprintf(message_text, sizeof(message_text), "--autoupdate off");
+                commandAction(message_text, bPhoneReady);
+            } else {
+                snprintf(message_text, sizeof(message_text), "--updchan %s", auDev ? "dev" : "prod");
+                commandAction(message_text, bPhoneReady);
+                snprintf(message_text, sizeof(message_text), "--autoupdate auto");
+                commandAction(message_text, bPhoneReady);
+            }
+        }
+        const char *cur = (meshcom_settings.node_autoupd == 2) ? (meshcom_settings.node_updchan ? "dev" : "prod") : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
+        setupData->returnCode = ((auOff || auProd || auDev) && setupData->paramValue.equalsIgnoreCase(cur))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = cur;
+        return;
+    } else
+
     if(setupData->paramName.equals("autoupdate")) {
         snprintf(message_text, sizeof(message_text), "--autoupdate %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
@@ -861,6 +896,11 @@ void webSetup_getParam(setupStruct *setupData){
         return;
     } else
 
+    if(setupData->paramName.equals("mtu")) {         // #1190
+        setupData->returnValue = String(meshcom_settings.node_ethmtu);
+        return;
+    } else
+
     if(setupData->paramName.equals("ethmtu")) {
         setupData->returnValue = String(meshcom_settings.node_ethmtu);
         return;
@@ -919,6 +959,11 @@ void webSetup_getParam(setupStruct *setupData){
     } else
 
 #if defined(ESP32)
+    if(setupData->paramName.equals("aumode")) {       // AU-09 (#1187)
+        setupData->returnValue = (meshcom_settings.node_autoupd == 2) ? (meshcom_settings.node_updchan ? "dev" : "prod") : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
+        return;
+    } else
+
     if(setupData->paramName.equals("autoupdate")) {   // AU-09 (#1187)
         setupData->returnValue = (meshcom_settings.node_autoupd == 2) ? "auto" : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
         return;

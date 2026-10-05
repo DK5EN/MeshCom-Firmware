@@ -811,6 +811,26 @@ Status:
 | AU      | W4   | done: web setup card (auto update mode, channel), info row (env, tag, avail/installable, staged, error, Check now), banner with Install / Apply now; checked live on DK5EN-1                                                                                                                                                                                        | this commit |
 | AU      | W5   | done: release v4.40a.10.05 with 27 .bin.zz assets; dev-channel test on DK5EN-1: GitHub check, real download 1,102,751 B in 10.8 s, Safeboot apply 1,728,752 B in 10.5 s, boots v4.40a.10.05; old-Safeboot guard benched on DK5EN-92                                                                                                                                 | bfe5310c    |
 
+### 9.1 Follow-up: web GUI (operator, 2026-10-05)
+
+Decisions: Auto Update as ONE dropdown off/prod/dev (prod/dev = automatic install, setparam `aumode`);
+MTU as its own always-visible card with 1280/1400/1500 (+custom), setparam `mtu`, info line with MSS;
+Remote management card with this node's status (switch, password set, counters, lockout, hwm, last 5
+commands) and a "manage another node" panel (target call + password + allowlisted command; this node signs
+with a time-based counter and sends the RM1 DM; replies verified with the key held in RAM for 10 min,
+password never stored; travels once over plain HTTP in the LAN).
+
+| Wave | Content                                                              | State                 | Commit |
+| ---- | -------------------------------------------------------------------- | --------------------- | ------ |
+| W1-A | RM backend: rmBuildCommand/rmVerifyReply, rmSendCommand, status, log | done                  | this   |
+| W1-B | Web: AU dropdown off/prod/dev, MTU card, header "Meshcom 4.40a"      | done, live on DK5EN-1 | this   |
+| W2   | Web: RM card + send panel                                            | not started           |        |
+
+W2 constraints (advisor W1): the target password must not travel through the generic `/setparam` path
+(it logs request bytes and keeps heap Strings) -- a dedicated handler excluded from debug prints;
+unverified replies are HTML-escaped and shown as unverified; consider accepting replies that arrive via
+the server (HMAC makes them safe), commands stay LoRa-only.
+
 Next: campaign complete. Open: STOR server approval, SNF M1-M4, prod .bin.zz assets upstream, upstream PRs.
 `tools/mock/meshcom_server.py` (tests `tools/mock/test_mock_server.py`).
 

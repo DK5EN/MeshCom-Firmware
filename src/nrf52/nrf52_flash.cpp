@@ -203,11 +203,13 @@ bool countersSave()
 // loses at most the newest mark, and the caller does not execute a command whose mark did not
 // reach flash. Load = max of the two readable slots, 0 when neither is.
 static const char *const kRmHwmSlot[2] = {"/rm_hwm.a", "/rm_hwm.b"};
+// RM-09: the last-SENT counter of the outgoing side (rmSendCommand) uses the same two-slot layout.
+static const char *const kRmSndSlot[2] = {"/rm_snd.a", "/rm_snd.b"};
 
-static bool rmHwmReadSlot(int i, uint32_t &out)
+static bool rmSlotRead(const char *const slots[2], int i, uint32_t &out)
 {
 	File f(InternalFS);
-	if (!f.open(kRmHwmSlot[i], FILE_O_READ))
+	if (!f.open(slots[i], FILE_O_READ))
 	{
 		f.close();
 		return false;
@@ -226,10 +228,10 @@ static bool rmHwmReadSlot(int i, uint32_t &out)
 	return true;
 }
 
-uint32_t rmHwmLoad()
+static uint32_t rmSlotLoad(const char *const slots[2])
 {
 	uint32_t a = 0, b = 0;
-	bool ha = rmHwmReadSlot(0, a), hb = rmHwmReadSlot(1, b);
+	bool ha = rmSlotRead(slots, 0, a), hb = rmSlotRead(slots, 1, b);
 	if (!ha && !hb)
 		return 0;
 	if (!ha) return b;
@@ -237,20 +239,20 @@ uint32_t rmHwmLoad()
 	return a > b ? a : b;
 }
 
-bool rmHwmSave(uint32_t hwm)
+static bool rmSlotSave(const char *const slots[2], uint32_t v)
 {
 	uint32_t a = 0, b = 0;
-	bool ha = rmHwmReadSlot(0, a), hb = rmHwmReadSlot(1, b);
+	bool ha = rmSlotRead(slots, 0, a), hb = rmSlotRead(slots, 1, b);
 	int slot = (!ha) ? 0 : (!hb) ? 1 : (a <= b ? 0 : 1);
 
 	char buf[16];
-	int n = snprintf(buf, sizeof(buf), "%lu\n", (unsigned long)hwm);
+	int n = snprintf(buf, sizeof(buf), "%lu\n", (unsigned long)v);
 	if (n <= 0 || n >= (int)sizeof(buf))
 		return false;
 
-	InternalFS.remove(kRmHwmSlot[slot]);   // FILE_O_WRITE appends on Adafruit LittleFS
+	InternalFS.remove(slots[slot]);   // FILE_O_WRITE appends on Adafruit LittleFS
 	File f(InternalFS);
-	if (!f.open(kRmHwmSlot[slot], FILE_O_WRITE))
+	if (!f.open(slots[slot], FILE_O_WRITE))
 	{
 		f.close();
 		return false;
@@ -260,8 +262,13 @@ bool rmHwmSave(uint32_t hwm)
 	f.close();
 
 	uint32_t back = 0;
-	return put == (size_t)n && rmHwmReadSlot(slot, back) && back == hwm;
+	return put == (size_t)n && rmSlotRead(slots, slot, back) && back == v;
 }
+
+uint32_t rmHwmLoad() { return rmSlotLoad(kRmHwmSlot); }
+bool rmHwmSave(uint32_t hwm) { return rmSlotSave(kRmHwmSlot, hwm); }
+uint32_t rmSndLoad() { return rmSlotLoad(kRmSndSlot); }
+bool rmSndSave(uint32_t ctr) { return rmSlotSave(kRmSndSlot, ctr); }
 
 void flash_int_reset(void);
 

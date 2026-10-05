@@ -231,8 +231,14 @@ static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
     // A REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read, not a
     // command: show it like any DM (bench 2026-10-05: the SysOp node parsed the replies as
     // commands, hid them and locked itself out).
+    // RM-09: ALSO hand it to the loop task (reply queue) while a command we sent still waits for its
+    // reply; rmDrain() matches and verifies it. The display behaviour is unchanged.
     if (rmIsReply(text))
+    {
+        if (rmqReplyWanted())
+            rmReplyPush(aprsmsg.msg_source_call, text);
         return false;
+    }
 
     // RM disabled (--rm off) or no node_passwd: an "RM1 " DM is ordinary text
     // (concept 6.2 "Enable"), shown and forwarded like any other DM.

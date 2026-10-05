@@ -1314,7 +1314,7 @@ void deliver_scaffold(bool bget_password)
     {
         web_client.println("<Button class=\"nav_button\" onclick=\"if(confirm('Logging out, are you sure?')){login('')};\"><svg fill=\"#ffffff\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path d=\"M7.707,8.707,5.414,11H17a1,1,0,0,1,0,2H5.414l2.293,2.293a1,1,0,1,1-1.414,1.414l-4-4a1,1,0,0,1,0-1.414l4-4A1,1,0,1,1,7.707,8.707ZM21,1H13a1,1,0,0,0,0,2h7V21H13a1,1,0,0,0,0,2h8a1,1,0,0,0,1-1V2A1,1,0,0,0,21,1Z\"></path></g></svg></Button>\n");
     }
-    web_client.printf("</div>\n<div id=\"head_layer\"><p class=\"font-small\">Meshcom 4.0 %s%s</p><p class=\"font-bold\">%s</p></div>\n</div>\n", SOURCE_VERSION, SOURCE_VERSION_WEB_SUB, meshcom_settings.node_call);
+    web_client.printf("</div>\n<div id=\"head_layer\"><p class=\"font-small\">Meshcom %s%s</p><p class=\"font-bold\">%s</p></div>\n</div>\n", SOURCE_VERSION, SOURCE_VERSION_WEB_SUB, meshcom_settings.node_call);
     web_client.println("<div id=\"content_layer\">\n");
 
     // initial content
@@ -2884,32 +2884,55 @@ void sub_page_setup()
     web_client.println("</div></div>");
 
 #if defined(ESP32)
-    // AU-09 (#1187): firmware auto update. The selects apply on change through setparam autoupdate /
-    // updchan (web_setup.cpp routes them through --autoupdate / --updchan, read-back is the stored value).
+    // AU-09 (#1187): firmware auto update, ONE dropdown off / prod / dev. It applies on change through
+    // setparam aumode (web_setup.cpp runs --updchan + --autoupdate, read-back is the stored state).
+    // The old params autoupdate / updchan stay valid for the Web API but have no select any more.
     {
-        const int au_mode = meshcom_settings.node_autoupd;
-        static const char *s_au_val[3] = {"off", "notify", "auto"};
-        static const char *s_au_lbl[3] = {"off", "notify (check, tell me)", "auto (install in the update window)"};
+        const int au_mode = meshcom_settings.node_autoupd;                 // 0 off, 1 notify (console only), 2 auto
+        const int au_chan = meshcom_settings.node_updchan ? 1 : 0;         // 0 prod, 1 dev
         web_client.println("<div class=\"cardlayout collapsablecard\">");
         web_client.println("<label class=\"cardlabel\">Firmware Update</label>");
         web_client.println("<span>Open this for the firmware auto update.</span>\n");
         web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
         web_client.println("<div class=\"grid grid2\">");
-        web_client.println("<label for=\"autoupdate\">Auto update</label>");
-        web_client.println("<select id=\"autoupdate\" name=\"autoupdate\" onchange=\"setvalue('autoupdate',this.value,true);\">");
-        for (int ia = 0; ia < 3; ia++)
-            web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", s_au_val[ia], (ia == au_mode) ? "selected" : "", s_au_lbl[ia]);
+        web_client.println("<label for=\"aumode\">Auto update</label>");
+        web_client.println("<select id=\"aumode\" name=\"aumode\" onchange=\"setvalue('aumode',this.value,true);\">");
+        // notify (console only): a selected, disabled placeholder, so choosing prod or dev always fires onchange
+        if (au_mode == 1)
+            web_client.printf("\t<option value=\"\" selected disabled>notify (%s, set on the console)</option>\n", au_chan ? "dev" : "prod");
+        web_client.printf("\t<option value=\"off\" %s>off</option>\n", (au_mode == 0) ? "selected" : "");
+        web_client.printf("\t<option value=\"prod\" %s>prod (icssw-org releases)</option>\n", (au_mode == 2 && au_chan == 0) ? "selected" : "");
+        web_client.printf("\t<option value=\"dev\" %s>dev (DK5EN releases)</option>\n", (au_mode == 2 && au_chan == 1) ? "selected" : "");
         web_client.println("</select>");
-        web_client.println("<label for=\"updchan\">Update channel</label>");
-        web_client.println("<select id=\"updchan\" name=\"updchan\" onchange=\"setvalue('updchan',this.value,true);\">");
-        web_client.printf("\t<option value=\"prod\" %s>prod (icssw-org releases)</option>\n", (meshcom_settings.node_updchan == 0) ? "selected" : "");
-        web_client.printf("\t<option value=\"dev\" %s>dev (DK5EN releases)</option>\n", (meshcom_settings.node_updchan != 0) ? "selected" : "");
-        web_client.println("</select>");
+        if (au_mode == 1)
+            web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">(notify mode set on the console -- choosing prod/dev switches to automatic install)</p>");
+        web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">prod/dev install automatically at 03:00-05:00 local; WiFi starts after a reboot if no other network service is on</p>");
         web_client.println("</div>");
-        web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto installs at 03:00-05:00 local; WiFi starts after a reboot if no other network service is on</p>");
         web_client.println("</div>");
     }
 #endif
+
+    // NMTU-01 / #1190: MTU, always visible (not collapsible), all boards. Applies on change through
+    // setparam mtu (--mtu, read-back node_ethmtu); the MSS shown is MTU - 40. A stored value outside the
+    // three presets (console --mtu 1350) gets its own selected "custom" option so the page never lies.
+    {
+        const int mtu_cur = meshcom_settings.node_ethmtu;
+        const bool mtu_preset = (mtu_cur == 1280 || mtu_cur == 1400 || mtu_cur == 1500);
+        web_client.println("<div class=\"cardlayout\">");
+        web_client.println("<label class=\"cardlabel\">MTU</label>");
+        web_client.println("<div class=\"grid grid3\">");
+        web_client.println("<label for=\"mtu\">MTU</label>");
+        web_client.println("<select id=\"mtu\" name=\"mtu\" onchange=\"document.getElementById('mtu_mss').textContent='MSS '+(parseInt(this.value)-40);setvalue('mtu',this.value,true);\">");
+        web_client.printf("\t<option value=\"1280\" %s>1280 (HAMNET / VPN, default)</option>\n", (mtu_cur == 1280) ? "selected" : "");
+        web_client.printf("\t<option value=\"1400\" %s>1400</option>\n", (mtu_cur == 1400) ? "selected" : "");
+        web_client.printf("\t<option value=\"1500\" %s>1500 (plain LAN)</option>\n", (mtu_cur == 1500) ? "selected" : "");
+        if (!mtu_preset)
+            web_client.printf("\t<option value=\"%i\" selected>custom (%i)</option>\n", mtu_cur, mtu_cur);
+        web_client.println("</select>");
+        web_client.printf("<span id=\"mtu_mss\">MSS %i</span>\n", mtu_cur - 40);
+        web_client.println("</div>");
+        web_client.println("</div>");
+    }
 
     // IP Network Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");
@@ -2928,7 +2951,6 @@ void sub_page_setup()
     _create_setup_textinput_element("owngw", "Gateway", String(meshcom_settings.node_gw), "192.168.2.1", "setowngw", 50, false, true);           // create Textinput-Element including Label and Button
     _create_setup_textinput_element("owndns", "DNS", String(meshcom_settings.node_dns), "192.168.2.1", "setowndns", 50, false, true);             // create Textinput-Element including Label and Button
     _create_setup_textinput_element("ownntp", "NTP", String(meshcom_settings.node_ownntp), "192.168.2.1", "setownntp", 50, false, true);          // create Textinput-Element including Label and Button
-    _create_setup_textinput_element("ethmtu", "MTU", String(meshcom_settings.node_ethmtu), "1280", "ethmtu", 4, false, false);                     // #1183/#1190: 1280..1500, all boards; RAK applies it to the next web connection, no reboot
 
     _create_setup_textinput_element("extudp", "ext. UDP IP", String(meshcom_settings.node_extern), "192.168.100.100", "extudpip", 50, false, false); // create Textinput-Element including Label and Button
 
@@ -3492,9 +3514,12 @@ void sub_page_info()
     { // AU-09 (#1187): auto update state; "Check now" runs --update check, the result shows on the next reload
         FwNetStatus au;
         fwNetGetStatus(au);
-        web_client.printf("<tr><td>Auto update</td><td>mode %s, channel %s<br>env %s, running %s<br>", 
-            meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
-            meshcom_settings.node_updchan ? "dev" : "prod", MC_ENV_NAME[0] ? MC_ENV_NAME : "(unknown)", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
+        // combined mode as on the setup page: off / prod / dev (automatic install); notify (console only) + channel
+        const char *auChan = meshcom_settings.node_updchan ? "dev" : "prod";
+        web_client.printf("<tr><td>Auto update</td><td>mode %s%s%s<br>env %s, running %s<br>",
+            meshcom_settings.node_autoupd == 0 ? "off" : (meshcom_settings.node_autoupd == 1 ? "notify" : auChan),
+            meshcom_settings.node_autoupd == 1 ? ", channel " : "", meshcom_settings.node_autoupd == 1 ? auChan : "",
+            MC_ENV_NAME[0] ? MC_ENV_NAME : "(unknown)", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
         web_client.printf("available %s (newer %s, installable %s)<br>", au.availTag[0] ? htmlEscape(String(au.availTag)).c_str() : "none",
             au.availNewer ? "yes" : "no", au.installable ? "yes" : "no");
         web_client.printf("staged %s<br>last error %s<br>", (au.staged && au.stagedTag[0]) ? htmlEscape(String(au.stagedTag)).c_str() : "none",
@@ -3652,6 +3677,9 @@ void sub_page_info()
     //    web_client.printf("<tr><td><b>hasIpAddress</b></td><td>%s</td></tr>\n", (meshcom_settings.node_hasIPaddress?"yes":"no"));
     
     web_client.printf("<tr><td>hasIpAddress</td><td>%s</td></tr>\n", (meshcom_settings.node_hasIPaddress ? "yes" : "no"));
+
+    // NMTU-01 / #1190: configured MTU and the MSS derived from it (all boards)
+    web_client.printf("<tr><td>MTU</td><td>MTU %i (MSS %i)</td></tr>\n", (int)meshcom_settings.node_ethmtu, (int)meshcom_settings.node_ethmtu - 40);
 
     if (meshcom_settings.node_hasIPaddress)
     {

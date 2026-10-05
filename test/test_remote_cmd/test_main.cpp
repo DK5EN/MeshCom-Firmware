@@ -17,6 +17,7 @@
 
 #include <hmac_sha256.h>
 #include <remote_cmd.h>
+#include <rm_queue.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -844,6 +845,205 @@ static void test_reply_is_recognised_and_never_parses_as_a_command(void)
     }
 }
 
+// ---- RM-09: sender side (builder, reply verifier, allowlist predicate, reply queue) -------------
+
+static void test_build_command_reproduces_every_vector(void)
+{
+    std::string json;
+    if (!read_repo_file("tools/tests/remote_cmd_vectors.json", json))
+        TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
+
+    static std::string objs[64];
+    const size_t n = objectsOf(json, "commands", objs, 64);
+    TEST_ASSERT_EQUAL_INT(17, n);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "build vector %u", (unsigned)i);
+
+        std::string passwd, dst, src, cmd, args, dm;
+        uint32_t ctr = 0;
+        TEST_ASSERT_TRUE_MESSAGE(jsonString(objs[i], "passwd", passwd) && jsonString(objs[i], "dst", dst) &&
+                                     jsonString(objs[i], "src", src) && jsonString(objs[i], "cmd", cmd) &&
+                                     jsonString(objs[i], "args", args) && jsonString(objs[i], "dm_text", dm) &&
+                                     jsonUint(objs[i], "ctr", ctr),
+                                 msg);
+
+        uint8_t key[32];
+        rmDeriveKey(passwd.c_str(), key);
+        char out[160];
+        const size_t len = rmBuildCommand(dst.c_str(), src.c_str(), ctr, cmd.c_str(), args.c_str(), key, out, sizeof(out));
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(dm.size(), len, msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(dm.c_str(), out, msg);
+
+        // what the builder emits is what the receiver accepts
+        RmCmd c;
+        TEST_ASSERT_TRUE_MESSAGE(rmParse(out, c), msg);
+        RmState st;
+        rmStateInit(st, 0);
+        const RmVerdict v = rmCheck(st, c, dst.c_str(), src.c_str(), passwd.c_str(), 22, 1000000);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
+
+        // and every vector command passes the public allowlist predicate
+        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(cmd.c_str(), args.c_str(), 22), msg);
+    }
+    printf("[vectors] commands built: %u/%u\n", (unsigned)n, (unsigned)n);
+}
+
+static void test_build_command_limits(void)
+{
+    uint8_t key[32];
+    rmDeriveKey("secret", key);
+    char out[160];
+    char tiny[10];
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "reboot", "", key, tiny, sizeof(tiny)));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(nullptr, SRC, 1, "reboot", "", key, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "", "", key, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "averyveryverylongcmd", "", key, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "reboot", "0123456789012345678901234", key, out, sizeof(out)));
+    // args == nullptr is "no args"
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 1, "reboot", nullptr, key, out, sizeof(out)) > 0);
+    TEST_ASSERT_EQUAL_STRING("RM1 1 reboot 18f287b79c551022", out);
+}
+
+static void test_command_allowed_predicate(void)
+{
+    TEST_ASSERT_TRUE(rmCommandAllowed("status", "", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("status", nullptr, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("sync", "", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("gps", "on", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "10", 5));
+    TEST_ASSERT_FALSE(rmCommandAllowed("status", "x", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "ON", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("GPS", "on", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "c1 on", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2  on", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2 on ", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("wifi", "on", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setpasswd", "x", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("", "", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed(nullptr, "", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "on;reboot", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("reboot", "--now", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("averyveryverylongcmd", "", 22));
+}
+
+static void test_verify_reply_vectors_and_tampering(void)
+{
+    std::string json;
+    if (!read_repo_file("tools/tests/remote_cmd_vectors.json", json))
+        TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
+
+    static std::string objs[32];
+    const size_t n = objectsOf(json, "replies", objs, 32);
+    TEST_ASSERT_EQUAL_INT(4, n);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "verify reply vector %u", (unsigned)i);
+
+        std::string passwd, dst, src, result, text;
+        uint32_t ctr = 0;
+        TEST_ASSERT_TRUE_MESSAGE(jsonString(objs[i], "passwd", passwd) && jsonString(objs[i], "dst", dst) &&
+                                     jsonString(objs[i], "src", src) && jsonString(objs[i], "result", result) &&
+                                     jsonString(objs[i], "reply_text", text) && jsonUint(objs[i], "ctr", ctr),
+                                 msg);
+        uint8_t key[32];
+        rmDeriveKey(passwd.c_str(), key);
+
+        char got[80];
+        memset(got, 'x', sizeof(got));
+        TEST_ASSERT_TRUE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), src.c_str(), ctr, key, got, sizeof(got)), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(result.c_str(), got, msg);
+
+        // wrong ctr, wrong dst, wrong src, wrong key
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), src.c_str(), ctr + 1, key, got, sizeof(got)), msg);
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(text.c_str(), "DK5EN-99", src.c_str(), ctr, key, got, sizeof(got)), msg);
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), "DK5EN-99", ctr, key, got, sizeof(got)), msg);
+        uint8_t other[32];
+        rmDeriveKey("not-the-secret", other);
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), src.c_str(), ctr, other, got, sizeof(got)), msg);
+
+        // tampered status: every byte of the result part flipped once
+        for (size_t k = 4; k + 17 < text.size(); k++)
+        {
+            std::string t = text;
+            t[k] = (t[k] == 'z') ? 'y' : (char)(t[k] + 1);
+            got[0] = 'x';
+            got[1] = '\0';
+            TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(t.c_str(), dst.c_str(), src.c_str(), ctr, key, got, sizeof(got)), msg);
+            TEST_ASSERT_EQUAL_CHAR_MESSAGE('x', got[0], "result must stay untouched on failure");
+        }
+        // tampered tag
+        {
+            std::string t = text;
+            t[t.size() - 1] = (t[t.size() - 1] == '0') ? '1' : '0';
+            TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(t.c_str(), dst.c_str(), src.c_str(), ctr, key, got, sizeof(got)), msg);
+        }
+        // result buffer too small
+        char small[3];
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), src.c_str(), ctr, key, small, sizeof(small)), msg);
+    }
+    printf("[vectors] replies verified: %u/%u\n", (unsigned)n, (unsigned)n);
+}
+
+static void test_verify_reply_rejects_malformed_and_commands(void)
+{
+    uint8_t key[32];
+    rmDeriveKey("secret", key);
+    char got[80];
+    // a COMMAND is never a reply, even with a valid tag over its own canonical
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 1 reboot 18f287b79c551022", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 1 ok rebooting", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 1 ok rebooting facf04f881d89cdeX", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 01 ok rebooting facf04f881d89cde", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM2 1 ok rebooting facf04f881d89cde", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 1 ok rebooting FACF04F881D89CDE", DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply(nullptr, DST, SRC, 1, key, got, sizeof(got)));
+    TEST_ASSERT_FALSE(rmVerifyReply("RM1 1 ok rebooting facf04f881d89cde", DST, SRC, 1, key, nullptr, 0));
+    // build -> reply -> verify round trip through the core
+    RmCmd c;
+    memset(&c, 0, sizeof(c));
+    c.ctr = 77;
+    char wire[160];
+    TEST_ASSERT_TRUE(rmReply(c, "ok txpower=2", DST, SRC, "secret", wire, sizeof(wire)) > 0);
+    TEST_ASSERT_TRUE(rmVerifyReply(wire, DST, SRC, 77, key, got, sizeof(got)));
+    TEST_ASSERT_EQUAL_STRING("ok txpower=2", got);
+}
+
+static void test_reply_queue_is_separate_from_command_queue(void)
+{
+    char src[RM_QUEUE_SRC_LEN], text[RM_QUEUE_TEXT_LEN];
+    rmQueueReset();
+    TEST_ASSERT_EQUAL_UINT8(0, rmReplyQueueCount());
+    TEST_ASSERT_TRUE(rmReplyPush("DK5EN-90", "RM1 1 ok rebooting facf04f881d89cde"));
+    TEST_ASSERT_TRUE(rmQueuePush("DK5EN-1", "RM1 2 status c70d9ec28da06758"));
+    TEST_ASSERT_EQUAL_UINT8(1, rmReplyQueueCount());
+    TEST_ASSERT_EQUAL_UINT8(1, rmQueueCount());
+    TEST_ASSERT_TRUE(rmReplyPush("DK5EN-92", "RM1 3 ok x aaaaaaaaaaaaaaaa"));
+    TEST_ASSERT_FALSE(rmReplyPush("DK5EN-93", "RM1 4 ok x aaaaaaaaaaaaaaaa")); // drop newest
+    TEST_ASSERT_TRUE(rmReplyPop(src, sizeof(src), text, sizeof(text)));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", src);
+    TEST_ASSERT_EQUAL_STRING("RM1 1 ok rebooting facf04f881d89cde", text);
+    TEST_ASSERT_TRUE(rmQueuePop(src, sizeof(src), text, sizeof(text)));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-1", src);
+    TEST_ASSERT_TRUE(rmReplyPop(src, sizeof(src), text, sizeof(text)));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-92", src);
+    TEST_ASSERT_FALSE(rmReplyPop(src, sizeof(src), text, sizeof(text)));
+    TEST_ASSERT_FALSE(rmReplyPush(nullptr, "RM1 1 ok a b"));
+    TEST_ASSERT_FALSE(rmReplyPush("TOOLONGCALL", "RM1 1 ok a b"));
+    rmqReplyWanted() = true;
+    TEST_ASSERT_TRUE(rmqReplyWanted());
+    rmqReplyWanted() = false;
+    rmQueueReset();
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -879,5 +1079,11 @@ int main(int, char **)
     RUN_TEST(test_verdict_names);
     RUN_TEST(test_reply_is_recognised_and_never_parses_as_a_command);
     RUN_TEST(test_millis_wrap_rate_cache_and_lockout);
+    RUN_TEST(test_build_command_reproduces_every_vector);
+    RUN_TEST(test_build_command_limits);
+    RUN_TEST(test_command_allowed_predicate);
+    RUN_TEST(test_verify_reply_vectors_and_tampering);
+    RUN_TEST(test_verify_reply_rejects_malformed_and_commands);
+    RUN_TEST(test_reply_queue_is_separate_from_command_queue);
     return UNITY_END();
 }

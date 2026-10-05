@@ -333,6 +333,27 @@ bool rmHwmSave(uint32_t hwm)
     p.end();
     return ok;
 }
+
+// RM-09: last counter this node SENT in an outgoing RM1 command (rmSendCommand), key "rm_snd".
+uint32_t rmSndLoad(void)
+{
+    Preferences p;
+    if (!p.begin("Counters", true))
+        return 0;
+    uint32_t v = p.getUInt("rm_snd", 0);
+    p.end();
+    return v;
+}
+
+bool rmSndSave(uint32_t ctr)
+{
+    Preferences p;
+    if (!p.begin("Counters", false))
+        return false;
+    bool ok = p.putUInt("rm_snd", ctr) > 0;
+    p.end();
+    return ok;
+}
 #endif // !MC_SAFEBOOT
 
 void init_flash(void)

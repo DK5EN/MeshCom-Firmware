@@ -104,6 +104,25 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 // Returns the new hwm to persist. result is truncated to RM_MAX_RESULT.
 uint32_t rmAccept(RmState &s, const RmCmd &c, const char *result, uint32_t nowMs);
 
+// RM-09 (sender side, web "remote management"): the allowlist of rmCheck() as a predicate on plain
+// strings (cmd and args as they appear on the wire, lower case; "" for no args). Includes the
+// forbidden-character rule; txpower is bounded by maxTxPower.
+bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower);
+
+// RM-09: builds "RM1 <ctr> <cmd>[ <args>] <tag>" (what rmParse() accepts) with the 16-hex tag of
+// HMAC-SHA256(key, canonical). dst = managed node, src = this node. key = rmDeriveKey() of the
+// TARGET's password. Pure builder: the allowlist is rmCommandAllowed()'s job. Returns the length,
+// 0 if it does not fit, an argument is null/oversized or cmd is empty.
+size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char *cmd, const char *args,
+                      const uint8_t key[32], char *out, size_t n);
+
+// RM-09: checks a REPLY text "RM1 <ctr> <result> <rtag>" against dst (managed node), src (this node),
+// the expected ctr and the key; the tag covers "RM1R|dst|src|ctr|result". On success copies the result
+// ("ok ..." / "err ...") to result and returns true; false on any mismatch (result untouched then),
+// also when result does not fit n.
+bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t ctr, const uint8_t key[32],
+                   char *result, size_t n);
+
 // "RM1 <ctr> <result> <rtag>" into out (NUL-terminated); returns the length,
 // 0 if it does not fit, result is longer than RM_MAX_RESULT or the password is empty.
 size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *src, const char *passwd,

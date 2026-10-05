@@ -168,6 +168,15 @@ void tagOf(const char *passwd, const char *text, char tagHex[17])
     hmac_sha256_detail::wipe(mac, sizeof(mac));
 }
 
+// same, with the key already derived (sender side)
+void tagOfKey(const uint8_t key[32], const char *text, char tagHex[17])
+{
+    uint8_t mac[32];
+    hmacSha256(key, 32, reinterpret_cast<const uint8_t *>(text), strlen(text), mac);
+    hexLower(mac, 8, tagHex);
+    hmac_sha256_detail::wipe(mac, sizeof(mac));
+}
+
 bool tagEqual(const char *a, const char *b)
 {
     return ctEqual(reinterpret_cast<const uint8_t *>(a), reinterpret_cast<const uint8_t *>(b), 16);
@@ -467,4 +476,129 @@ bool rmIsReply(const char *text)
     if (p == text + 4 || *p != ' ')
         return false;
     return strncmp(p + 1, "ok ", 3) == 0 || strncmp(p + 1, "err ", 4) == 0;
+}
+
+bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower)
+{
+    if (cmd == nullptr)
+        return false;
+    if (args == nullptr)
+        args = "";
+    RmCmd c;
+    memset(&c, 0, sizeof(c));
+    if (strlen(cmd) == 0 || strlen(cmd) >= sizeof(c.cmd) || strlen(args) >= sizeof(c.args))
+        return false;
+    memcpy(c.cmd, cmd, strlen(cmd));
+    memcpy(c.args, args, strlen(args));
+    // wire form is lower case ASCII, single spaces (rmParse); anything else could never be received
+    for (const char *p = cmd; *p; p++)
+        if (*p < 'a' || *p > 'z')
+            return false;
+    for (const char *p = args; *p; p++)
+        if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e || (*p >= 'A' && *p <= 'Z') ||
+            (*p == ' ' && (p[1] == ' ' || p[1] == '\0' || p == args)))
+            return false;
+    return !isForbiddenText(c.cmd) && !isForbiddenText(c.args) && allowed(c, maxTxPower);
+}
+
+size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char *cmd, const char *args,
+                      const uint8_t key[32], char *out, size_t n)
+{
+    if (dst == nullptr || src == nullptr || cmd == nullptr || key == nullptr || out == nullptr || n == 0)
+        return 0;
+    if (args == nullptr)
+        args = "";
+    RmCmd c;
+    memset(&c, 0, sizeof(c));
+    if (strlen(cmd) == 0 || strlen(cmd) >= sizeof(c.cmd) || strlen(args) >= sizeof(c.args))
+        return 0;
+    c.ctr = ctr;
+    memcpy(c.cmd, cmd, strlen(cmd));
+    memcpy(c.args, args, strlen(args));
+
+    char canon[160];
+    if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
+        return 0;
+    char tag[17];
+    tagOfKey(key, canon, tag);
+
+    Out o;
+    outInit(o, out, n);
+    outStr(o, "RM1 ");
+    outU32(o, ctr);
+    outStr(o, " ");
+    outStr(o, cmd);
+    if (args[0] != '\0')
+    {
+        outStr(o, " ");
+        outStr(o, args);
+    }
+    outStr(o, " ");
+    outStr(o, tag);
+    return outEnd(o);
+}
+
+bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t ctr, const uint8_t key[32],
+                   char *result, size_t n)
+{
+    if (text == nullptr || dst == nullptr || src == nullptr || key == nullptr || result == nullptr || n == 0)
+        return false;
+    if (!rmIsReply(text))
+        return false;
+
+    const size_t len = strlen(text);
+    if (len < 4 + 1 + 1 + 3 + 1 + 16 || len > 160)
+        return false;
+
+    // "RM1 " <ctr> " " <result> " " <16 hex>
+    const size_t tagPos = len - 16;
+    if (text[tagPos - 1] != ' ')
+        return false;
+    for (size_t i = tagPos; i < len; i++)
+        if (!isLowerHex(text[i]))
+            return false;
+
+    size_t i = 4;
+    uint64_t got = 0;
+    const size_t ctrStart = i;
+    while (text[i] >= '0' && text[i] <= '9')
+    {
+        got = got * 10 + (uint64_t)(text[i] - '0');
+        if (got > 0xFFFFFFFFULL)
+            return false;
+        i++;
+    }
+    const size_t ctrLen = i - ctrStart;
+    if (ctrLen == 0 || (ctrLen > 1 && text[ctrStart] == '0') || text[i] != ' ' || (uint32_t)got != ctr)
+        return false;
+    i++;
+
+    const size_t resLen = (tagPos - 1) - i; // result runs up to the space before the tag
+    if (tagPos - 1 <= i || resLen > RM_MAX_RESULT || resLen + 1 > n)
+        return false;
+
+    char canon[200];
+    Out o;
+    outInit(o, canon, sizeof(canon));
+    outStr(o, "RM1R|");
+    outStr(o, dst);
+    outStr(o, "|");
+    outStr(o, src);
+    outStr(o, "|");
+    outU32(o, ctr);
+    outStr(o, "|");
+    char res[RM_MAX_RESULT + 1];
+    memcpy(res, text + i, resLen);
+    res[resLen] = '\0';
+    outStr(o, res);
+    if (outEnd(o) == 0)
+        return false;
+
+    char want[17];
+    tagOfKey(key, canon, want);
+    if (!tagEqual(want, text + tagPos))
+        return false;
+
+    memcpy(result, res, resLen + 1);
+    return true;
 }
