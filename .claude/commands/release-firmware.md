@@ -37,7 +37,11 @@ path.
   tree currently carries -- read it from `SOURCE_VERSION` +
   `SOURCE_VERSION_SUB` in `src/configuration_global.h`, never from an older
   tag. The letter follows upstream and changes without notice (4.35p ->
-  4.35s on 2026-09-03). A second cut on the same day appends `.2`:
+  4.35s on 2026-09-03). **Since Auto Update (v4.40a.10.05) never use a `.N`
+  suffix:** `fwParseTag()` accepts only `v<VER>` and `v<VER>.MM.DD`, so a `.2`
+  tag is invisible to every node's AU. Date a same-day re-cut to the next day
+  instead (precedent: v4.40a.10.06, published 2026-10-05; FLASH_VERSION and
+  `--date` follow the tag date). Historic note: a second cut on the same day appended `.2`:
   `v<VER>.MM.DD.2` (precedents: v4.35p.08.27.2-stability, v4.35p.07.24.2).
   Ask the user for the tag name if there is any ambiguity (same-day
   re-release vs. replace-in-place).
