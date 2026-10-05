@@ -1,0 +1,81 @@
+Archive member included to satisfy reference by file (symbol)
+
+/Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libnet80211.a(ieee80211_api.o)
+                              .pio/build/demo/src/main.cpp.o (ieee80211_api)
+
+Discarded input sections
+
+ .text          0x0000000000000000        0x4 /foo/discarded.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+iram0_0_seg      0x0000000040374000 0x0000000000050000 xr
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+LOAD .pio/build/demo/src/main.cpp.o
+
+.iram0.text     0x0000000040374000      0x100
+ *(.iram1 .iram1.*)
+ .iram1.1       0x0000000040374000       0x40 /Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libesp_system.a(panic.c.obj)
+                0x0000000040374000                panic_handler
+ .iram1.2       0x0000000040374040       0xc0 /Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libdriver.a(gpio.c.obj)
+
+.dram0.data     0x000000003fc98000       0x30
+ .data.counter  0x000000003fc98000       0x30 .pio/build/demo/src/main.cpp.o
+                0x000000003fc98000                counter
+
+.dram0.bss      0x000000003fc99000     0x9000
+ .bss.huge      0x000000003fc99000     0x9000 .pio/build/demo/src/main.cpp.o
+
+.flash.text     0x0000000042000020      0xa20
+ *(EXCLUDE_FILE(*libfoo.a) .literal .text .text.*)
+ .literal._Z8mainloopv
+                0x0000000042000020       0x10 .pio/build/demo/src/main.cpp.o
+                                          0x14 (size before relaxing)
+ .text._Z8mainloopv
+                0x0000000042000030      0x100 .pio/build/demo/src/main.cpp.o
+                0x0000000042000030                mainloop()
+ .text._Z5helpv
+                0x0000000042000130       0x80 .pio/build/demo/src/web/page.cpp.o
+ .text.ieee80211_api
+                0x00000000420001b0      0x400 /Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libnet80211.a(ieee80211_api.o)
+ .text.lcd_init 0x00000000420005b0       0x50 .pio/build/demo/lib1a2/libLVGL core.a(lv_obj.c.o)
+ .text.mbedtls_ssl_handshake
+                0x0000000042000600      0x200 /Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libmbedtls.a(ssl_tls.c.obj)
+ .text.begin    0x0000000042000800       0x60 .pio/build/demo/lib2b3/libWire.a(Wire.cpp.o)
+ .text.vfprintf
+                0x0000000042000860      0x180 /Users/x/.platformio/packages/toolchain-xtensa-esp32s3/bin/../lib/gcc/xtensa-esp32s3-elf/8.4.0/../../../../xtensa-esp32s3-elf/lib/libc.a(lib_a-vfprintf.o)
+ *fill*         0x00000000420009e0       0x20
+ .text.setup    0x0000000042000a00       0x40 .pio/build/demo/FrameworkArduino/libFrameworkArduino.a(main.cpp.o)
+                0x0000000042000a40                . = ALIGN (0x4)
+
+.flash_rodata_dummy
+                0x000000003c000020    0x20000
+ *fill*         0x000000003c000020    0x20000
+
+.flash.rodata   0x000000003c020020      0x260
+                0x000000003c020020                _flash_rodata_start = ABSOLUTE (.)
+ .rodata._ZL4html
+                0x000000003c020020      0x100 .pio/build/demo/src/web/page.cpp.o
+ .rodata.str1.1
+                0x000000003c020120       0x80 .pio/build/demo/src/main.cpp.o
+ .rodata.str1.1
+                0x000000003c020140       0x40 .pio/build/demo/src/web/page.cpp.o
+                                         0x20 (merged)
+ .rodata.str1.1
+                0x000000003c0201a0       0x20 .pio/build/demo/src/web/page.cpp.o
+ .rodata.lv_font_default
+                0x000000003c0201c0       0x80 .pio/build/demo/lib1a2/libLVGL core.a(lv_font.c.o)
+ .rodata.cert_bundle
+                0x000000003c020240       0x40 /Users/x/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/lib/libmbedtls.a(x509_crt_bundle.S.obj)
+
+.flash.rodata_noload
+                0x000000003c020300       0x10
+ .noload.x      0x000000003c020300       0x10 .pio/build/demo/src/main.cpp.o
+
+.xt.prop        0x0000000000000000      0x500
+ .xt.prop.x     0x0000000000000000      0x500 .pio/build/demo/src/main.cpp.o
+OUTPUT(.pio/build/demo/firmware.elf elf32-xtensa-le)
