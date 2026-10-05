@@ -31,6 +31,11 @@
 #include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
+#include "web_guard.h"          // RM GUI W1c: Host allowlist (DNS rebinding) and Sec-Fetch-Site (CSRF), header-only
+#include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_form_decode / rm_json_str shared with web_rm_page.cpp
+// RM GUI W1c: set per request by the guard in work_webpage(); send_http_header() and sub_config_download()
+// drop the CORS headers when it is false (state-changing paths, /config, /rmstatus).
+static bool web_cors_ok = true;
 #if defined(ESP32)
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
 #include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the Firmware Update card footnote (header-only)
@@ -548,69 +553,6 @@ static int web_read_body(long content_length)
  * with volatile stores before it returns.
  */
 
-/** volatile wipe: a plain memset on a dead buffer may be optimised away (nRF52 builds with -Ofast) */
-static void rm_wipe(void *p, size_t n)
-{
-    volatile uint8_t *v = (volatile uint8_t *)p;
-    while (n--)
-        *v++ = 0;
-}
-
-/** overwrites the bytes of a request String in place before it is cleared or freed */
-static void rm_wipe_string(String &s)
-{
-    for (unsigned int i = 0; i < s.length(); i++)
-        s.setCharAt(i, 'x');
-    s = "";
-}
-
-/** decodes %XX in place (the page sends encodeURIComponent(); '+' stays a literal '+'); false on a control byte */
-static bool rm_form_decode(char *s)
-{
-    char *w = s;
-    for (const char *r = s; *r; r++)
-    {
-        unsigned char ch = (unsigned char)*r;
-        if (ch == '%' && isxdigit((unsigned char)r[1]) && isxdigit((unsigned char)r[2]))
-        {
-            const char h[3] = {r[1], r[2], 0};
-            ch = (unsigned char)strtoul(h, nullptr, 16);
-            r += 2;
-        }
-        if (ch < 0x20 || ch == 0x7f)
-            return false;
-        *w++ = (char)ch;
-    }
-    *w = '\0';
-    return true;
-}
-
-/** writes a JSON string literal of printable ASCII only; < > & as \u escapes, anything else '?' */
-static void rm_json_str(const char *in)
-{
-    char out[200];
-    size_t n = 0;
-    out[n++] = '"';
-    for (; in != nullptr && *in && n < sizeof(out) - 8; in++)
-    {
-        const unsigned char ch = (unsigned char)*in;
-        if (ch == '"' || ch == '\\')
-        {
-            out[n++] = '\\';
-            out[n++] = (char)ch;
-        }
-        else if (ch == '<' || ch == '>' || ch == '&')
-            n += (size_t)snprintf(out + n, 8, "\\u%04x", (unsigned)ch);
-        else if (ch < 0x20 || ch > 0x7e)
-            out[n++] = '?';
-        else
-            out[n++] = (char)ch;
-    }
-    out[n++] = '"';
-    out[n] = '\0';
-    web_client.print(out);
-}
-
 /** POST /rmsend   body: dst=<call>&pw=<target password>&cmd=<cmd>&args=<args>   (all percent-encoded)
  *  answer: {"ok":true,"ctr":N} or {"ok":false,"err":"<reason>"} -- never an echo of any input */
 static void sub_rm_send(long content_length)
@@ -620,6 +562,7 @@ static void sub_rm_send(long content_length)
     char err[16] = {0};
     uint32_t ctr = 0;
     bool ok = false;
+    bool viaSync = false; // RM GUI W1b: the command waits behind an automatic sync (ctr 0)
 
     body[0] = '\0';
 
@@ -692,7 +635,7 @@ static void sub_rm_send(long content_length)
             for (char *q = (char *)args; *q; q++)
                 *q = (char)tolower((unsigned char)*q);
 
-            ok = rmSendCommand(dst, pw, cmd, args, err, sizeof(err), &ctr);
+            ok = rmSendCommand(dst, pw, cmd, args, err, sizeof(err), &ctr, &viaSync);
         }
     }
 
@@ -700,7 +643,7 @@ static void sub_rm_send(long content_length)
 
     send_http_header(ok ? 200 : 422, RESPONSE_TYPE_JSON);
     if (ok)
-        web_client.printf("{\"ok\":true,\"ctr\":%lu}\n", (unsigned long)ctr);
+        web_client.printf("{\"ok\":true,\"ctr\":%lu%s}\n", (unsigned long)ctr, viaSync ? ",\"viaSync\":true" : "");
     else
     {
         web_client.print("{\"ok\":false,\"err\":");
@@ -713,7 +656,8 @@ static void sub_rm_send(long content_length)
  *  Never a key, a tag or a password. All text is printable ASCII, < > & escaped (rm_json_str).
  *  {"on":0|1,"pw":0|1,"ok":N,"rej":N,"lock":0|1,"lockS":N,"hwm":N,
  *   "log":[{"ago":S,"src":"","ctr":N,"cmd":"","res":""},...],
- *   "sent":[{"dst":"","ctr":N,"cmd":"","ago":S,"rep":0|1,"ver":0|1,"reply":""},...]} */
+ *   "sent":[{"dst":"","ctr":N,"cmd":"","ago":S,"rep":0|1,"ver":0|1,"reply":"","st":"queued|waiting|noanswer|ok|err|unverified","msg":""},...],
+ *   "targets":[{"dst":"","locked":0|1,"retry":S,"pending":0|1,"chainErr":null|"token","chainMsg":null|"sentence"},...]} */
 static void sub_rm_status(void)
 {
     const uint32_t now = (uint32_t)millis();
@@ -754,6 +698,34 @@ static void sub_rm_status(void)
             web_client.printf(",\"ago\":%lu,\"rep\":%d,\"ver\":%d,\"reply\":", (unsigned long)((uint32_t)(now - sent[i].sentMs) / 1000UL),
                               sent[i].replied ? 1 : 0, sent[i].verified ? 1 : 0);
             rm_json_str(sent[i].reply);
+            web_client.print(",\"st\":");
+            rm_json_str(sent[i].stateName);
+            web_client.print(",\"msg\":");
+            rm_json_str(sent[i].msg);
+            web_client.print("}");
+        }
+        web_client.print("]");
+    }
+
+    {   // RM GUI W1b: per managed node, the sender policy as the GUI needs it (locked after 2 unanswered sends)
+        RmTarget tg[4];
+        const uint8_t nt = rmGetTargets(tg, 4);
+        web_client.print(",\"targets\":[");
+        for (uint8_t i = 0; i < nt && i < 4; i++)
+        {
+            web_client.printf("%s{\"dst\":", i ? "," : "");
+            rm_json_str(tg[i].dst);
+            web_client.printf(",\"locked\":%d,\"retry\":%lu,\"pending\":%d,\"chainErr\":", tg[i].locked ? 1 : 0, (unsigned long)tg[i].retryS,
+                              tg[i].pending ? 1 : 0);
+            if (tg[i].chainErr != nullptr)
+                rm_json_str(tg[i].chainErr);
+            else
+                web_client.print("null");
+            web_client.print(",\"chainMsg\":");
+            if (tg[i].chainMsg != nullptr)
+                rm_json_str(tg[i].chainMsg);
+            else
+                web_client.print("null");
             web_client.print("}");
         }
         web_client.print("]");
@@ -806,7 +778,8 @@ static void sub_config_download(void)
     web_client.println("Content-type:application/json");
     web_client.printf("Content-Disposition: attachment; filename=\"meshcom-%s.json\"\n", fname);
     web_client.printf("Content-Length: %u\n", (unsigned int)n);
-    web_client.println("Access-Control-Allow-Origin: *");
+    if (web_cors_ok)
+        web_client.println("Access-Control-Allow-Origin: *");
     web_client.println("Connection: close");
     web_client.println("Cache-Control: no-cache, no-store, must-revalidate");
     web_client.println("Pragma: no-cache");
@@ -887,6 +860,7 @@ static void sub_config_upload(long content_length)
  * ###########################################################################################################################
  * Handle Web requests and call the matching sub function
  */
+
 String work_webpage(bool bget_password, int webid)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -935,9 +909,9 @@ String work_webpage(bool bget_password, int webid)
 
             // W2-1: nothing of a /rmsend request is echoed to the serial monitor (its body is never
             // read here, but a GET variant would carry the target password in the request line)
-            if (!web_rm_quiet && web_header.length() == 12 &&
-                (web_header.startsWith("POST /rmsend") || web_header.startsWith("GET /rmsend")))
-                web_rm_quiet = true;
+            if (!web_rm_quiet && ((web_header.length() == 8 && web_header.startsWith("POST /rm")) ||
+                                  (web_header.length() == 7 && web_header.startsWith("GET /rm"))))
+                web_rm_quiet = true; // /rmsend, /rmpasswd, /rmnodes, ... (RM GUI W2 adds more /rm* paths)
 
             if (bDEBUG && !web_rm_quiet)
                 Serial.write(c); // print it out the serial monitor
@@ -950,6 +924,32 @@ String work_webpage(bool bget_password, int webid)
                 if (web_currentLine.length() == 0)
                 {
                     // Serial.println(web_header);
+
+                    // RM GUI W1c: refuse DNS-rebinding Hosts and cross-site browser requests before any
+                    // routing -- /setparam, /callfunction, /rmsend ... are plain GETs a foreign page could
+                    // fire with an <img>. curl/python tools send no Sec-Fetch-Site and an IP/.local Host.
+                    // Must run before the /?nodepassword branch below overwrites web_header.
+                    String wg_path = "/";
+                    {
+                        int wa = web_header.indexOf(' ');
+                        int wb = (wa >= 0) ? web_header.indexOf(' ', wa + 1) : -1;
+                        if (wa >= 0 && wb > wa)
+                            wg_path = web_header.substring(wa + 1, wb);
+                    }
+                    const WebGuardVerdict wgv = webGuardCheck(web_header.c_str(), web_header.length(), wg_path.c_str());
+                    web_cors_ok = webGuardCorsAllowed(wg_path.c_str(), web_header.startsWith("POST"));
+                    if (wgv != WG_OK)
+                    {
+                        if (bDEBUG)
+                            Serial.printf("[WEB];guard;%s\n", wgv == WG_BAD_HOST ? "bad_host" : "cross_site");
+                        rm_wipe_string(web_header);
+                        rm_wipe_string(web_currentLine);
+                        web_cors_ok = false;
+                        send_http_header(403, RESPONSE_TYPE_JSON);
+                        web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+                        web_client.stop();
+                        continue;
+                    }
 
                     // user sends authentication
                     if (web_header.indexOf("/?nodepassword") >= 0)
@@ -1185,6 +1185,11 @@ void deliver_scaffold(bool bget_password)
 
     // ECMA-Script/Javascript
     web_client.println("<script type=\"text/javascript\">\n");
+    // RM GUI: every request of the page carries `X-MC: 1`. The node refuses state-changing requests
+    // (setparam, callfunction, sendmessage, every POST) without it or without a same-host Origin: a foreign
+    // web page cannot set a custom header without a CORS preflight, which the node does not answer.
+    web_client.println("(function(){var f=window.fetch;if(f){window.fetch=function(u,o){o=o||{};var h=new Headers(o.headers||{});h.set('X-MC','1');o.headers=h;return f.call(window,u,o);};}"
+                       "var s=window.XMLHttpRequest&&XMLHttpRequest.prototype.send;if(s){XMLHttpRequest.prototype.send=function(b){try{this.setRequestHeader('X-MC','1');}catch(e){}return s.call(this,b);};}})();");
     // these variables will hold the last loaded page name and sender in order to force a refresh
     web_client.println("cpage=\"info\";csender=undefined;\nsetInterval(autorefresh,30000);");
     // This function will be called in intervalls - can be used to auto-refresh content depending on what page is loaded
@@ -4198,6 +4203,9 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type)
     case 401:
         status_text = "Unauthorized";
         break; // use this when ever a request was successful
+    case 403:
+        status_text = "Forbidden";
+        break; // RM GUI W1c: web guard (rebinding Host / cross-site request)
     case 404:
         status_text = "Not Found";
         break; // use this if a request was not known
@@ -4217,9 +4225,12 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type)
         web_client.println("Content-type:application/json");
     else
         web_client.println("Content-type:text/html; charset=utf-8");
-    web_client.println("Access-Control-Allow-Origin: *"); // tell modern browsers that CORS is okay for us
-    web_client.println("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-    web_client.println("Access-Control-Allow-Headers: access-control-allow-headers,access-control-allow-methods,access-control-allow-origin, Origin, Content-Type, Accept");
+    if (web_cors_ok) // RM GUI W1c: no CORS on state-changing paths, /config and /rmstatus
+    {
+        web_client.println("Access-Control-Allow-Origin: *"); // tell modern browsers that CORS is okay for us
+        web_client.println("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+        web_client.println("Access-Control-Allow-Headers: access-control-allow-headers,access-control-allow-methods,access-control-allow-origin, Origin, Content-Type, Accept");
+    }
     web_client.println("Connection: close");                                  // tell broser that the connection will be closed (in opposite to keep-alive)
     web_client.println("Cache-Control: no-cache, no-store, must-revalidate"); // set caching policy
     web_client.println("Pragma: no-cache");                                   // Disable caching or request/respinse

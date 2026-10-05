@@ -14,6 +14,10 @@
 #include "remote_cmd.h"
 #include "rm_queue.h"
 #include "rm_runtime.h"
+#include "rm_sender_policy.h"
+#include "rm_validate.h"
+
+static_assert(RM_POLICY_COOLDOWN_MS == RM_RATE_MS, "sender spacing must equal the target's rate limit");
 
 #if defined(NRF52_SERIES)
 extern uint32_t nrf52_getFreeHeap(void); // nrf52_main.cpp
@@ -40,10 +44,34 @@ struct SentSlot
     RmSent pub;
     uint8_t key[32];       // K of the TARGET; live only while keyLive
     bool keyLive;
+    uint32_t verifiedMs;   // millis() when the verified reply was booked
+    bool expired;          // older than RM_CACHE_MS: aged out of the sender policy (guards the millis() wrap)
 };
 SentSlot s_sent[kSentN];   // newest first
 uint8_t s_nsent = 0;
 uint32_t s_lastSent = 0;   // persisted ("rm_snd"), loaded at rmInit()
+
+// One command waiting behind an automatic sync (sender without a trusted clock and without a learnt
+// counter mark for the target). It holds the target's key like a sent entry does and is wiped on every exit.
+struct PendingCmd
+{
+    bool used;
+    char dst[10];
+    uint8_t key[32];
+    char cmd[16];
+    char args[24];
+    uint32_t syncMs;       // sentMs of the sync entry this command waits for
+};
+PendingCmd s_pend;
+
+// Why the last chained command was not sent (one slot, cleared by the next accepted send to that
+// target); rmGetTargets() reports it so the GUI can show a sentence instead of silence.
+struct ChainErr
+{
+    char dst[10];
+    const char *tok;       // static token of the table (rm_sender_policy.h), nullptr = none
+};
+ChainErr s_chainErr;
 
 // hwm per managed node as learnt from verified replies (RAM only; the sync command refreshes it)
 struct PeerHwm
@@ -147,14 +175,22 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 
     if (strcmp(cmd, "status") == 0)
     {
-        snprintf(res, n, "ok v=%s%s up=%lu bat=%d heap=%lu gw=%d mesh=%d", SOURCE_VERSION, SOURCE_VERSION_SUB,
-                 (unsigned long)(millis() / 60000UL), (int)global_proz, (unsigned long)freeHeapKb(),
-                 bGATEWAY ? 1 : 0, bMESH ? 1 : 0);
+        // s=<letters> p=<cur>/<max> replace gw= and mesh=; led= stays as the capability flag of older
+        // consumers. Worst case 61 of 63 characters, see rm_sender_policy.h and its native test.
+        char ver[12];
+        snprintf(ver, sizeof(ver), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+        RmSwitches sw = {};
+        sw.gps = stGps();
+        sw.track = stTrack();
+        sw.display = stDisplay();
+        sw.mesh = stMesh();
+        sw.gateway = stGateway();
 #if defined(REMOTE_LED_PIN)
-        const size_t used = strlen(res);
-        if (used < n)
-            snprintf(res + used, n - used, " led=%d", bRemoteLed ? 1 : 0);
+        sw.ledSupported = true;
+        sw.led = bRemoteLed;
 #endif
+        rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
+                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX);
         return true;
     }
 
@@ -260,8 +296,12 @@ void refreshReplyWanted()
 void expireKeys(uint32_t now)
 {
     for (uint8_t i = 0; i < s_nsent; i++)
-        if (s_sent[i].keyLive && (uint32_t)(now - s_sent[i].pub.sentMs) > RM_CACHE_MS)
-            wipeKey(s_sent[i]);
+        if ((uint32_t)(now - s_sent[i].pub.sentMs) > RM_CACHE_MS)
+        {
+            s_sent[i].expired = true; // sticks: ages the entry out of the sender policy even after a millis() wrap
+            if (s_sent[i].keyLive)
+                wipeKey(s_sent[i]);
+        }
     refreshReplyWanted();
 }
 
@@ -368,6 +408,7 @@ void handleReply(const char *src, const char *text)
         e.pub.verified = ok;
         if (ok)
         {
+            e.verifiedMs = millis();
             snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
             wipeKey(e);
             uint32_t h = 0;
@@ -398,6 +439,8 @@ void countReject(RmVerdict v)
     default: break;
     }
 }
+
+void pendingStep(uint32_t now); // below: runs the command queued behind an automatic sync
 } // namespace
 
 void rmInit(void)
@@ -439,6 +482,8 @@ void rmDrain(void)
         {
         }
     }
+
+    pendingStep(millis()); // a command queued behind an automatic sync goes out once the sync is verified
 
     if (!rmQueuePop(src, sizeof(src), text, sizeof(text)))
         return;
@@ -565,102 +610,45 @@ void setErr(char *err, size_t errN, const char *why)
     if (err != nullptr && errN > 0)
         snprintf(err, errN, "%s", why);
 }
-} // namespace
 
-bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const char *args, char *err,
-                   size_t errN, uint32_t *ctrOut)
+void polEntryOf(const SentSlot &e, RmPolEntry &p)
 {
-    if (!s_inited)
-        rmInit();
-    if (args == nullptr)
-        args = "";
+    p.sentMs = e.pub.sentMs;
+    p.replied = e.pub.replied;
+    p.verified = e.pub.verified;
+    p.replyErr = e.pub.verified && rmReplyIsErr(e.pub.reply);
+    p.expired = e.expired;
+}
 
-    // dst: own copy, folded to upper case, a call incl. SSID (9 chars at most), never our own
-    char to[10];
-    size_t dl = 0;
-    if (dst != nullptr)
-        for (; dst[dl] != '\0' && dl < sizeof(to) - 1; dl++)
-        {
-            char ch = dst[dl];
-            if (ch >= 'a' && ch <= 'z')
-                ch = (char)(ch - 'a' + 'A');
-            if (!((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-'))
-                break;
-            to[dl] = ch;
-        }
-    if (dst == nullptr || dl == 0 || dst[dl] != '\0')
-    {
-        setErr(err, errN, "dst");
-        return false;
-    }
-    to[dl] = '\0';
-    if (strcmp(to, meshcom_settings.node_call) == 0)
-    {
-        setErr(err, errN, "dst");
-        return false;
-    }
-
-    // password: 1..14 characters after stripping trailing spaces (node_passwd is char[15])
-    size_t pl = (passwd != nullptr) ? strlen(passwd) : 0;
-    while (pl > 0 && passwd[pl - 1] == ' ')
-        pl--;
-    if (pl == 0 || (passwd != nullptr && strlen(passwd) > sizeof(meshcom_settings.node_passwd) - 1))
-    {
-        setErr(err, errN, "passwd");
-        return false;
-    }
-
-    if (cmd == nullptr || !rmCommandAllowed(cmd, args, TX_POWER_MAX))
-    {
-        setErr(err, errN, "cmd");
-        return false;
-    }
-    const bool isSync = (strcmp(cmd, "sync") == 0);
-
-    // the target rate-limits to one accepted command per RM_RATE_MS: do not waste airtime on a refusal
-    const uint32_t now = millis();
+// policy decision for one target (upper-case call), from the sent book
+RmPolDecision policyFor(const char *to, uint32_t now)
+{
+    RmPolEntry pe[kSentN];
+    uint8_t n = 0;
     for (uint8_t i = 0; i < s_nsent; i++)
-        if (strcmp(s_sent[i].pub.dst, to) == 0 && (uint32_t)(now - s_sent[i].pub.sentMs) < RM_RATE_MS)
-        {
-            setErr(err, errN, "busy");
-            return false;
-        }
+        if (strcmp(s_sent[i].pub.dst, to) == 0)
+            polEntryOf(s_sent[i], pe[n++]);
+    return rmPolicyMaySend(pe, n, now);
+}
 
-    // counter: max(last sent + 1, unix time, known hwm of the target + 1); sync always 0
-    uint32_t ctr = 0;
-    if (!isSync)
-    {
-        if (s_lastSent == 0xFFFFFFFFu)
-        {
-            setErr(err, errN, "ctr");
-            return false;
-        }
-        ctr = s_lastSent + 1;
-        uint32_t t = 0;
-        if (clockUnix(t) && t > ctr)
-            ctr = t;
-        uint32_t ph = 0;
-        if (peerGet(to, ph))
-        {
-            if (ph == 0xFFFFFFFFu)
-            {
-                setErr(err, errN, "ctr");
-                return false;
-            }
-            if (ph + 1 > ctr)
-                ctr = ph + 1;
-        }
-    }
+void dropPending()
+{
+    hmac_sha256_detail::wipe(s_pend.key, sizeof(s_pend.key));
+    memset(&s_pend, 0, sizeof(s_pend));
+}
 
-    uint8_t key[32];
-    rmDeriveKey(passwd, key);
+// Builds, persists the counter (not for sync), sends and books one frame. key stays the caller's: a
+// copy goes into the pending-reply entry (live for RM_CACHE_MS, wiped by wipeKey()).
+bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char *cmd, const char *args,
+                 uint32_t now, char *err, size_t errN)
+{
+    const bool isSync = (strcmp(cmd, "sync") == 0);
 
     static char wire[96];
     static char out[128];
     size_t n = rmBuildCommand(to, meshcom_settings.node_call, ctr, cmd, args, key, wire, sizeof(wire));
     if (n == 0)
     {
-        hmac_sha256_detail::wipe(key, sizeof(key));
         setErr(err, errN, "cmd");
         return false;
     }
@@ -668,7 +656,7 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
     // the counter reaches flash BEFORE the frame leaves: a reboot must never re-use it
     if (!isSync && !rmSndSave(ctr))
     {
-        hmac_sha256_detail::wipe(key, sizeof(key));
+        memset(wire, 0, sizeof(wire));
         Serial.printf("[RM];snd_save;failed\n");
         setErr(err, errN, "store");
         return false;
@@ -683,7 +671,6 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
     memset(out, 0, sizeof(out));
     if (rc != BP_SEND_OK)
     {
-        hmac_sha256_detail::wipe(key, sizeof(key));
         Serial.printf("[RM];send_failed;%d\n", rc);
         setErr(err, errN, "send");
         return false;
@@ -706,22 +693,271 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
     e.pub.sentMs = now;
     memcpy(e.key, key, sizeof(e.key));
     e.keyLive = true;
-    hmac_sha256_detail::wipe(key, sizeof(key));
     refreshReplyWanted();
+    if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, to) == 0)
+        s_chainErr.tok = nullptr; // an accepted send to that target ends the old chain error
 
     Serial.printf("[RM];send;%s;ctr;%lu\n", to, (unsigned long)ctr);
+    return true;
+}
+
+// fromChain: the call comes from pendingStep() (the command that waited for its sync): no pending
+// check, no second automatic sync.
+bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
+                 size_t errN, uint32_t *ctrOut, bool *viaSync, bool fromChain)
+{
+    if (!s_inited)
+        rmInit();
+    if (viaSync != nullptr)
+        *viaSync = false;
+    if (args == nullptr)
+        args = "";
+    if (key == nullptr)
+    {
+        setErr(err, errN, "passwd");
+        return false;
+    }
+
+    // dst: own copy folded to upper case, then ONE shared validator (rm_validate.h); never our own call
+    char to[RM_CALL_MAX + 1];
+    size_t dl = 0;
+    if (dst != nullptr)
+        for (; dst[dl] != '\0' && dl < RM_CALL_MAX; dl++)
+        {
+            char ch = dst[dl];
+            if (ch >= 'a' && ch <= 'z')
+                ch = (char)(ch - 'a' + 'A');
+            to[dl] = ch;
+        }
+    if (dst == nullptr || dst[dl] != '\0')
+    {
+        setErr(err, errN, "dst");
+        return false;
+    }
+    to[dl] = '\0';
+    if (!rmValidateCall(to) || strcmp(to, meshcom_settings.node_call) == 0)
+    {
+        setErr(err, errN, "dst");
+        return false;
+    }
+
+    if (cmd == nullptr || !rmCommandAllowed(cmd, args, TX_POWER_MAX) || strlen(cmd) >= sizeof(s_pend.cmd) ||
+        strlen(args) >= sizeof(s_pend.args))
+    {
+        setErr(err, errN, "cmd");
+        return false;
+    }
+    const bool isSync = (strcmp(cmd, "sync") == 0);
+    const uint32_t now = millis();
+
+    // a command is already queued behind this target's automatic sync: a second click must not stack
+    if (!fromChain && s_pend.used && strcmp(s_pend.dst, to) == 0)
+    {
+        setErr(err, errN, "busy");
+        return false;
+    }
+
+    // sender policy BEFORE any counter is touched: spacing of 10 s, at most 2 unanswered sends in 90 s
+    const RmPolDecision d = policyFor(to, now);
+    if (!d.allowed)
+    {
+        setErr(err, errN, d.reason == RM_POL_LIMIT ? "limit" : "busy");
+        return false;
+    }
+
+    uint32_t t = 0;
+    const bool clock = clockUnix(t);
+    uint32_t ph = 0;
+    const bool mark = peerGet(to, ph);
+
+    // automatic sync: only without a trusted clock AND without a learnt mark for this target
+    if (!fromChain && rmPolicyNeedSync(clock, mark, isSync))
+    {
+        if (s_pend.used) // one chain at a time (one key, one command held)
+        {
+            setErr(err, errN, "busy");
+            return false;
+        }
+        if (!bookAndSend(to, key, 0, "sync", "", now, err, errN))
+            return false;
+        s_pend.used = true;
+        snprintf(s_pend.dst, sizeof(s_pend.dst), "%s", to);
+        memcpy(s_pend.key, key, sizeof(s_pend.key));
+        snprintf(s_pend.cmd, sizeof(s_pend.cmd), "%s", cmd);
+        snprintf(s_pend.args, sizeof(s_pend.args), "%s", args);
+        s_pend.syncMs = now;
+        Serial.printf("[RM];chain;%s;sync_first\n", to);
+        if (viaSync != nullptr)
+            *viaSync = true;
+        if (ctrOut != nullptr)
+            *ctrOut = 0;
+        setErr(err, errN, "");
+        return true;
+    }
+
+    // counter: max(last sent + 1, unix time, known hwm of the target + 1); sync always 0
+    uint32_t ctr = 0;
+    if (!isSync)
+    {
+        if (s_lastSent == 0xFFFFFFFFu)
+        {
+            setErr(err, errN, "ctr");
+            return false;
+        }
+        ctr = s_lastSent + 1;
+        if (clock && t > ctr)
+            ctr = t;
+        if (mark)
+        {
+            if (ph == 0xFFFFFFFFu)
+            {
+                setErr(err, errN, "ctr");
+                return false;
+            }
+            if (ph + 1 > ctr)
+                ctr = ph + 1;
+        }
+    }
+
+    if (!bookAndSend(to, key, ctr, cmd, args, now, err, errN))
+        return false;
     if (ctrOut != nullptr)
         *ctrOut = ctr;
     setErr(err, errN, "");
     return true;
 }
 
+void setChainErr(const char *dst, const char *tok)
+{
+    snprintf(s_chainErr.dst, sizeof(s_chainErr.dst), "%s", dst);
+    s_chainErr.tok = tok;
+}
+
+void pendingStep(uint32_t now)
+{
+    if (!s_pend.used)
+        return;
+    int idx = -1;
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (s_sent[i].pub.ctr == 0 && s_sent[i].pub.sentMs == s_pend.syncMs && strcmp(s_sent[i].pub.dst, s_pend.dst) == 0)
+        {
+            idx = (int)i;
+            break;
+        }
+    const bool gone = (idx < 0);
+    const SentSlot *e = gone ? nullptr : &s_sent[idx];
+    const RmPendAction act =
+        rmPendingDecide(!gone && e->pub.verified, !gone && e->pub.replied, !gone && e->expired, gone,
+                        (uint32_t)(now - s_pend.syncMs), gone ? 0u : (uint32_t)(now - e->verifiedMs));
+    if (act == RM_PEND_WAIT)
+        return;
+
+    // SEND and DROP both end the chain: the held key is wiped on every path
+    char dst[10];
+    snprintf(dst, sizeof(dst), "%s", s_pend.dst);
+    if (act == RM_PEND_SEND)
+    {
+        char err[16] = {0};
+        uint32_t c = 0;
+        const bool ok = sendKeyImpl(s_pend.dst, s_pend.key, s_pend.cmd, s_pend.args, err, sizeof(err), &c, nullptr, true);
+        Serial.printf("[RM];chain;%s;%s\n", dst, ok ? "sent" : err);
+        if (!ok)
+            setChainErr(dst, rmTokenStatic(err, "send"));
+    }
+    else
+    {
+        Serial.printf("[RM];chain;%s;%s\n", dst, gone ? "lost" : "no_sync_answer");
+        setChainErr(dst, gone ? "lost" : "nosync");
+    }
+    dropPending();
+}
+} // namespace
+
+bool rmSendCommandKey(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
+                      size_t errN, uint32_t *ctrOut, bool *viaSync)
+{
+    return sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false);
+}
+
+bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const char *args, char *err,
+                   size_t errN, uint32_t *ctrOut, bool *viaSync)
+{
+    // password: strip trailing spaces (every key derivation does), then the shared validator; a raw
+    // string longer than node_passwd (14) is refused, never truncated
+    size_t pl = (passwd != nullptr) ? strlen(passwd) : 0;
+    const size_t raw = pl;
+    while (pl > 0 && passwd[pl - 1] == ' ')
+        pl--;
+    if (raw > RM_PASSWD_MAX || !rmValidatePasswordN(passwd, pl))
+    {
+        if (viaSync != nullptr)
+            *viaSync = false;
+        setErr(err, errN, "passwd");
+        return false;
+    }
+
+    uint8_t key[32];
+    rmDeriveKey(passwd, key);
+    const bool ok = sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false);
+    hmac_sha256_detail::wipe(key, sizeof(key));
+    return ok;
+}
+
 uint8_t rmGetSent(RmSent *out, uint8_t max)
 {
     if (out == nullptr)
         return 0;
+    const uint32_t now = millis();
     uint8_t n = (s_nsent < max) ? s_nsent : max;
     for (uint8_t i = 0; i < n; i++)
+    {
         out[i] = s_sent[i].pub;
+        RmPolEntry pe;
+        polEntryOf(s_sent[i], pe);
+        const RmEntryState st = rmPolicyState(pe, now);
+        out[i].state = (uint8_t)st;
+        out[i].stateName = rmStateName(st);
+        out[i].msg = rmEntryMessage(st, s_sent[i].pub.reply);
+    }
     return n;
+}
+
+uint8_t rmGetTargets(RmTarget *out, uint8_t max)
+{
+    if (out == nullptr)
+        return 0;
+    const uint32_t now = millis();
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nsent && n < max; i++)
+    {
+        bool seen = false;
+        for (uint8_t j = 0; j < n; j++)
+            if (strcmp(out[j].dst, s_sent[i].pub.dst) == 0)
+                seen = true;
+        if (seen)
+            continue;
+        RmTarget &t = out[n++];
+        memset(&t, 0, sizeof(t));
+        snprintf(t.dst, sizeof(t.dst), "%s", s_sent[i].pub.dst);
+        const RmPolDecision d = policyFor(t.dst, now);
+        t.locked = (d.reason == RM_POL_LIMIT);
+        t.retryS = d.retryS;
+        t.pending = s_pend.used && strcmp(s_pend.dst, t.dst) == 0;
+        if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, t.dst) == 0)
+        {
+            t.chainErr = s_chainErr.tok;
+            t.chainMsg = rmErrTokenMessage(s_chainErr.tok);
+        }
+    }
+    return n;
+}
+
+bool rmTargetMaySend(const char *dst, uint32_t *retryS)
+{
+    if (dst == nullptr)
+        return false;
+    const RmPolDecision d = policyFor(dst, millis());
+    if (retryS != nullptr)
+        *retryS = d.retryS;
+    return d.allowed;
 }

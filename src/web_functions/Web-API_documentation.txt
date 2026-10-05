@@ -17,6 +17,13 @@ Setting Parameters
 ============================================
 To set a parameter to the node, use:
 
+	NOTE (RM GUI, request guard): every state-changing request (/setparam, /callfunction, /?sendmessage,
+	/?nodepassword and any POST) must carry the header "X-MC: 1" (the web page adds it itself), for example
+	curl -H 'X-MC: 1' 'http://<node>/setparam/?onewire=on'. Without it, or with a Host that is not an IP address,
+	a single-label name or a *.local / *.fritz.box / *.lan / *.home.arpa / *.internal / *.speedport.ip /
+	*.localdomain / *.home name, the node answers 403. Typing a /setparam URL into the browser bar is refused
+	for the same reason.
+
 	/setparam/?setcall=AB1CDE-12		Sets the nodes call-sign 
 	/setparam/?onewiregpio=XX			Sets the GPIO to be used for the 1-Wire bus
 	/setparam/?onewire=on|off			Enables 1-Wire at the configured GPIO

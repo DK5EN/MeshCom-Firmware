@@ -7,6 +7,7 @@
 #include <mask_secret.h>
 
 void commandAction(char *msg_text, bool ble);
+void nodePasswdApply(const char *pw);   // the one place that changes node_passwd ("none"/empty clears), see command_functions.cpp
 void commandAction(char *msg_text, int iphone, bool rxFromPhone);
 
 void sendAnalogSetting();

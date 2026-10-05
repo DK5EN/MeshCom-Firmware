@@ -17,6 +17,7 @@
 #include <counters_store.h> // countersLoad()/countersSave() -- node_msgid's own file (D1-04 W3 step 4)
 #include <settings_store.h> // settings_store::FieldDescriptor/encode()/decode(), for the counters file below
 #include <crc32_util.h>	  // crc32_buf() -- legacy-blob-rewritten detection (D1-04 W3 step 4 addendum, task 7)
+#include <rm_nodes_store.h>	  // RM GUI known-node store (contract C1): codec, slot logic, rmNodesLoad/Save/Wipe
 
 #include "WisBlock-API.h"
 #include "settings_store_nrf52.h" // settingsStoreLoad()/settingsStoreSave()/writeFileAtomic(), the keyed store (W3/C1 cutover)
@@ -269,6 +270,88 @@ uint32_t rmHwmLoad() { return rmSlotLoad(kRmHwmSlot); }
 bool rmHwmSave(uint32_t hwm) { return rmSlotSave(kRmHwmSlot, hwm); }
 uint32_t rmSndLoad() { return rmSlotLoad(kRmSndSlot); }
 bool rmSndSave(uint32_t ctr) { return rmSlotSave(kRmSndSlot, ctr); }
+
+// RM GUI (contract C1, rm_nodes_store.h): the three known-node slots, a 145-byte binary record
+// (magic, version, seq, CRC32) in /rm_nodes.a and /rm_nodes.b. Same no-rename scheme as rm_hwm
+// above: write() removes the slot file (FILE_O_WRITE appends), opens, writes, flushes, closes; the
+// header's rmNodesDualSave() then reads the file back and compares every byte. Slot choice (invalid
+// or lower seq gets overwritten, load takes the highest valid seq) is rmNodesPick*() in the header,
+// host tested. Both files unreadable is a normal state: load() reports "no saved nodes", nothing
+// here ever formats the filesystem.
+static const char *const kRmNodesSlot[2] = {"/rm_nodes.a", "/rm_nodes.b"};
+
+namespace
+{
+struct RmNodesFs
+{
+	size_t read(int slot, uint8_t *buf, size_t cap)
+	{
+		File f(InternalFS);
+		if (!f.open(kRmNodesSlot[slot], FILE_O_READ))
+		{
+			f.close();
+			return 0;
+		}
+		int got = f.read(buf, cap);
+		f.close();
+		return got > 0 ? (size_t)got : 0;
+	}
+
+	bool write(int slot, const uint8_t *buf, size_t len)
+	{
+		InternalFS.remove(kRmNodesSlot[slot]); // FILE_O_WRITE appends on Adafruit LittleFS
+		File f(InternalFS);
+		if (!f.open(kRmNodesSlot[slot], FILE_O_WRITE))
+		{
+			f.close();
+			return false;
+		}
+		size_t put = f.write(buf, len);
+		f.flush();
+		f.close();
+		return put == len;
+	}
+};
+
+bool rmNodesFileExists(const char *path)
+{
+	File f(InternalFS);
+	bool ok = f.open(path, FILE_O_READ);
+	f.close();
+	return ok;
+}
+} // namespace
+
+bool rmNodesLoad(RmNodes &n)
+{
+	RmNodesFs s;
+	return rmNodesDualLoad(s, n);
+}
+
+bool rmNodesSave(const RmNodes &n)
+{
+	RmNodesFs s;
+	return rmNodesDualSave(s, n);
+}
+
+// Remove both slot files. true when neither file is left (a missing file counts as removed).
+static bool rmNodesWipeChecked()
+{
+	bool ok = true;
+	for (int i = 0; i < 2; i++)
+	{
+		if (!rmNodesFileExists(kRmNodesSlot[i]))
+			continue;
+		InternalFS.remove(kRmNodesSlot[i]);
+		if (rmNodesFileExists(kRmNodesSlot[i]))
+			ok = false;
+	}
+	if (!ok)
+		Serial.printf("[RMNODES];wipe_failed\n");
+	return ok;
+}
+
+void rmNodesWipe() { (void)rmNodesWipeChecked(); }
 
 void flash_int_reset(void);
 
@@ -681,6 +764,10 @@ void flash_reset(void)
 	lora_file.close();
 	bool legacy_removed = !legacy_existed || InternalFS.remove(settings_name);
 	bool keyed_removed = settingsStoreRemove(); // also removes the keyed store's temp file, if any
+	// RM GUI: the saved known nodes hold derived RM keys, so a factory reset (and a
+	// FLASH_STRUCT_VERSION bump, which comes through here) forgets them like node_passwd. A file that
+	// survives its own removal takes the same fallback-format path below as the other stores.
+	bool rmnodes_removed = rmNodesWipeChecked();
 	// DECISION (W3c, advisor finding 4): the counters file is deliberately NOT removed here. A
 	// settings reset is not a reason to replay message ids into every neighbour's dedup ring; the
 	// counter keeps running across the reset (before W3c it restarted at 0 -> 100, which was a
@@ -713,10 +800,10 @@ void flash_reset(void)
 	// when the targeted removal above or the rewrite that must follow it could not proceed -- a
 	// filesystem that cannot delete its own files or take a fresh write of a few hundred bytes is
 	// suspect enough that starting over is safer than continuing to poke at it file-by-file.
-	if (!legacy_removed || !keyed_removed || !wrote_defaults)
+	if (!legacy_removed || !keyed_removed || !rmnodes_removed || !wrote_defaults)
 	{
-		Serial.printf("[SETST];flash_reset;fallback_format;legacy_removed=%d;keyed_removed=%d;wrote_defaults=%d\n",
-					  legacy_removed ? 1 : 0, keyed_removed ? 1 : 0, wrote_defaults ? 1 : 0);
+		Serial.printf("[SETST];flash_reset;fallback_format;legacy_removed=%d;keyed_removed=%d;rmnodes_removed=%d;wrote_defaults=%d\n",
+					  legacy_removed ? 1 : 0, keyed_removed ? 1 : 0, rmnodes_removed ? 1 : 0, wrote_defaults ? 1 : 0);
 		InternalFS.format();
 		if (lora_file.open(settings_name, FILE_O_WRITE))
 		{

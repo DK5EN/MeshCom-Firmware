@@ -104,7 +104,10 @@ PostFn = Callable[[str, Path], "tuple[int, str]"]
 
 
 def http_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
-    with urllib.request.urlopen(url, timeout=timeout) as resp:
+    # X-MC: the node refuses state-changing requests (callfunction, setparam, sendmessage) without it
+    # (CSRF guard, src/web_functions/web_guard.h); a foreign web page cannot set it.
+    req = urllib.request.Request(url, headers={"X-MC": "1"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.status, resp.read().decode(errors="replace")
 
 

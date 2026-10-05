@@ -25,6 +25,7 @@
 #include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
 #include "ble_session.h"       // BLC-03: BleStats, g_bleStats, bleStatsFormat()
 #include "rm_runtime.h"       // RM-06: RmStats, g_rmStats for the --info RM line
+#include "rm_validate.h"      // RM GUI W1b: one password validator for --passwd, the web field and the sender
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
 #include "configuration.h"
@@ -540,6 +541,36 @@ static const ToggleRow COMMAND_TOGGLES[] =
 };
 
 static const size_t COMMAND_TOGGLES_N = sizeof(COMMAND_TOGGLES) / sizeof(COMMAND_TOGGLES[0]);
+
+// RM GUI: the ONE place that changes node_passwd (console --passwd and the web Remote page). pw must already
+// have passed rmPasswordProblemN() (the callers do); nullptr, "" or "none" clears the password (open access).
+// Re-keys the net console 2323 and KISS (ESP32), saves the settings.
+void nodePasswdApply(const char *pw)
+{
+    if(pw == nullptr || pw[0] == 0x00 || strcmp(pw, "none") == 0)
+    {
+        memset(meshcom_settings.node_passwd, 0, sizeof(meshcom_settings.node_passwd));
+        #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
+        netConsoleSetPassword("");
+        #endif
+        #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+        kissSetPassword("");
+        #endif
+        printfdeb("...net console password cleared (open access)\n");
+    }
+    else
+    {
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "%-14.14s", pw);
+        #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
+        netConsoleSetPassword(meshcom_settings.node_passwd);
+        #endif
+        #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+        kissSetPassword(meshcom_settings.node_passwd);
+        #endif
+    }
+
+    save_settings();
+}
 
 void commandAction(char *msg_text, int iphone, bool rxFromPhone)
 {
@@ -3139,32 +3170,25 @@ void commandAction(char *umsg_text, bool ble)
     {
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
 
-        _owner_c[14] = 0x00;    // max. 14 chars
+        // RM GUI: strip trailing blanks as every key derivation does, then reject (never truncate) a password
+        // that RM would silently ignore: leading blank, longer than 14, non-printable or non-ASCII.
+        {
+            size_t pwl = strlen(_owner_c);
+            while(pwl > 0 && _owner_c[pwl - 1] == ' ')
+                _owner_c[--pwl] = 0x00;
 
-        if(strcmp(_owner_c, "none") == 0)
-        {
-            // --passwd none clears the password (open access)
-            memset(meshcom_settings.node_passwd, 0, sizeof(meshcom_settings.node_passwd));
-            #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
-            netConsoleSetPassword("");
-            #endif
-            #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
-            kissSetPassword("");
-            #endif
-            printfdeb("...net console password cleared (open access)\n");
-        }
-        else
-        {
-            snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "%-14.14s", _owner_c);
-            #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
-            netConsoleSetPassword(meshcom_settings.node_passwd);
-            #endif
-            #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
-            kissSetPassword(meshcom_settings.node_passwd);
-            #endif
+            if(strcmp(_owner_c, "none") != 0)
+            {
+                const RmPasswdProblem pwp = rmPasswordProblemN(_owner_c, pwl);
+                if(pwp != RM_PW_OK)
+                {
+                    printfdeb("...passwd refused: %s\n", rmPasswordProblemText(pwp));
+                    return;
+                }
+            }
         }
 
-        save_settings();
+        nodePasswdApply(_owner_c);   // already validated above; "none" clears
 
         return;
     }

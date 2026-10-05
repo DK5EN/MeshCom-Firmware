@@ -50,7 +50,8 @@ def send_dm(host: str, to_call: str, text: str, timeout: float = 15.0) -> tuple[
     query = "sendmessage&tocall=" + urllib.parse.quote(to_call) + "&message=" + urllib.parse.quote(text)
     url = f"http://{host}/?{query}"
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        req = urllib.request.Request(url, headers={"X-MC": "1"})  # CSRF guard of the node web server
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read(200).decode("utf-8", "replace")
             answer = "ok" if "sendmessage ok" in body else ("refused" if "refused" in body else "other")
             return resp.status, answer

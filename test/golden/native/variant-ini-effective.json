@@ -3509,6 +3509,44 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_rm_nodes_store": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_rm_nodes_store"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_rm_sender_policy": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_rm_sender_policy"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_rtc_offset": {
   "build_flags": [
    "-std=gnu++17",
@@ -3881,6 +3919,25 @@
   "test_build_src": "True",
   "test_filter": [
    "test_udp_send_twin"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_web_guard": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_web_guard"
   ],
   "test_framework": "unity"
  },

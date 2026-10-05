@@ -230,6 +230,9 @@ flashes whatever is attached.
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
 | test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
+| test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
+| test_rm_sender_policy        | Unit          |    24 | native_rm_sender_policy                                      |
+| test_web_guard               | Unit          |    28 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
 | test_safeboot_ver            | Unit          |    16 | native_safeboot                                              |

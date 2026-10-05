@@ -15,6 +15,7 @@
 #include <settings_schema.h>
 #include <settings_store.h>
 #include <counters_store.h>
+#include <rm_nodes_store.h>
 
 #include <cstring>
 
@@ -354,7 +355,81 @@ bool rmSndSave(uint32_t ctr)
     p.end();
     return ok;
 }
+#if !defined(NATIVE_BUILD)
+// RM GUI (contract C1, rm_nodes_store.h): the three known-node slots, ONE blob in its own namespace
+// "RmNodes", key "nodes". Own short-lived handle per call (begin()/end() inside), like rmHwm above.
+// The record carries magic, version, length and CRC, so a missing, short, long or damaged blob
+// reads as "no saved nodes". The sequence (compare, write, read back) is rmNodesBlobSave() in the
+// header; this class only supplies the two storage primitives.
+//
+// Native test builds (NATIVE_BUILD) compile the fail-closed fallback below instead: the fake
+// Preferences in test/test_esp32_*/stubs has no getBytes()/putBytes()/getBytesLength(). The logic
+// itself is covered by test/test_rm_nodes_store through the same templates.
+namespace
+{
+struct RmNodesNvs
+{
+    size_t read(int, uint8_t *buf, size_t cap)
+    {
+        Preferences p;
+        if (!p.begin("RmNodes", true))
+            return 0;
+        size_t len = p.getBytesLength("nodes");
+        size_t got = 0;
+        if (len > 0)
+        {
+            if (len > cap)
+                len = cap; // anything longer than a record is invalid anyway
+            got = p.getBytes("nodes", buf, len);
+        }
+        p.end();
+        return got;
+    }
+
+    bool write(int, const uint8_t *buf, size_t len)
+    {
+        Preferences p;
+        if (!p.begin("RmNodes", false))
+            return false;
+        bool ok = p.putBytes("nodes", buf, len) == len;
+        p.end();
+        return ok;
+    }
+};
+} // namespace
+
+bool rmNodesLoad(RmNodes &n)
+{
+    RmNodesNvs s;
+    return rmNodesBlobLoad(s, n);
+}
+
+bool rmNodesSave(const RmNodes &n)
+{
+    RmNodesNvs s;
+    return rmNodesBlobSave(s, n);
+}
+#else
+bool rmNodesLoad(RmNodes &n)
+{
+    rmNodesScrub(n);
+    return false;
+}
+
+bool rmNodesSave(const RmNodes &) { return false; }
+#endif // !NATIVE_BUILD
 #endif // !MC_SAFEBOOT
+
+// Forget the known nodes. Outside the MC_SAFEBOOT guard on purpose: clear_flash() calls it in
+// every build that has clear_flash(). Only begin()/clear()/end(), which the native fakes model.
+void rmNodesWipe(void)
+{
+    Preferences p;
+    if (!p.begin("RmNodes", false))
+        return;
+    p.clear();
+    p.end();
+}
 
 void init_flash(void)
 {
@@ -512,6 +587,10 @@ void clear_flash(void)
 
     printfdeb("[INIT]...FLASH #entries %i after clear\n", preferences.freeEntries());
     preferences.end();
+
+    // RM GUI: the saved known nodes are credentials (derived RM keys), not counters, so a factory
+    // reset and a FLASH_STRUCT_VERSION bump (esp32_main.cpp) forget them together with node_passwd.
+    rmNodesWipe();
 }
 
 void save_settings(void)
