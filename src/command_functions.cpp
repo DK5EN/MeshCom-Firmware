@@ -4828,21 +4828,35 @@ void commandAction(char *umsg_text, bool ble)
             }
             else
             {
-                Serial.printf("[AU];handover;%s\n", _rec.tag);
-                if(!auRebootToSafeboot())
-                    Serial.printf("[ERR];update;no safeboot partition\n");
+                // the operator may have updated Safeboot meanwhile: try even with the old-Safeboot flag
+                if(fwNetSafebootOld())
+                    Serial.printf("[AU];apply;note;old_safeboot_flag_set_trying_anyway\n");
+                if(!fwNetMarkHandover(_rec.tag))   // before the reboot, as in the auto path
+                {
+                    Serial.printf("[ERR];update;nvs\n");
+                }
+                else
+                {
+                    Serial.printf("[AU];handover;%s\n", _rec.tag);
+                    if(!auRebootToSafeboot())
+                    {
+                        fwNetUnmarkHandover();
+                        Serial.printf("[ERR];update;no safeboot partition\n");
+                    }
+                }
             }
         }
         else if(casecmp(_owner_c, (char*)"status") == 0)
         {
-            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s\n",
+            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s\n",
                 meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
                 meshcom_settings.node_updchan ? "dev" : "prod",
                 _au.availTag[0] ? _au.availTag : "none",
                 _au.availNewer ? 1 : 0,
                 (_au.staged && _au.stagedTag[0]) ? _au.stagedTag : "none",
                 _auBusy ? 1 : 0,
-                _au.lastErr[0] ? _au.lastErr : "none");
+                _au.lastErr[0] ? _au.lastErr : "none",
+                fwNetSafebootOld() ? "old" : "ok");
         }
         else
         {

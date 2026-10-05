@@ -2336,6 +2336,7 @@ static bool s_auBackoff = false;
 static bool s_auSawBusy = false;        // a job was observed running and its result is not consumed yet
 static char s_auNotifiedTag[24] = "";   // [AU];notify printed for this tag
 static char s_auHandoverTag[24] = "";   // [AU];handover printed for this tag
+static bool s_auBlockedPrinted = false; // [AU];handover;blocked;old_safeboot printed this boot
 
 static bool auTagSame(const char *a, const char *b)
 {
@@ -2425,6 +2426,17 @@ static void auTick(void)
         // re-validated here (fwNetLoadRecord drops a stale one and clears the cached flag, so a
         // gone record ends the handovers). One attempt per tag and boot: if there is no Safeboot
         // partition the function returns and the tick must not retry every second.
+        // old Safeboot (it ignored the last handover): no automatic handover, or every update window
+        // would reboot the node into the same dead end. --update apply still tries.
+        if(fwNetSafebootOld())
+        {
+            if(!s_auBlockedPrinted)
+            {
+                s_auBlockedPrinted = true;
+                Serial.printf("[AU];handover;blocked;old_safeboot\n");
+            }
+            return;
+        }
         if(st.staged && st.stagedTag[0] && auTagSame(s_auHandoverTag, st.stagedTag))
             return;   // already attempted this boot: no NVS read every second
         FwStageRecord rec;
@@ -2433,6 +2445,13 @@ static void auTick(void)
         if(!auTagSame(s_auHandoverTag, rec.tag))
         {
             snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", rec.tag);
+            // the "hand" marker goes in BEFORE the reboot: it is how the next boot tells an old
+            // Safeboot (record untouched) from a new one (marker consumed)
+            if(!fwNetMarkHandover(rec.tag))
+            {
+                Serial.printf("[AU];fail;nvs\n");
+                return;
+            }
             Serial.printf("[AU];handover;%s\n", rec.tag);
             if(!auRebootToSafeboot())
             {

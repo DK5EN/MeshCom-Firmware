@@ -43,6 +43,9 @@ void fwNetGetStatus(FwNetStatus &out) { memset(&out, 0, sizeof(out)); }
 bool fwNetStagedPending(void) { return false; }
 bool fwNetLoadRecord(FwStageRecord &) { return false; }
 void fwNetClearRecord(void) {}
+bool fwNetMarkHandover(const char *) { return false; }
+void fwNetUnmarkHandover(void) {}
+bool fwNetSafebootOld(void) { return false; }
 void fwNetLastInstalledTag(char *out, size_t n)
 {
     if (out != nullptr && n > 0)
@@ -222,9 +225,15 @@ const char *runningVersion()
 #define FWNET_KEY_REC "rec"
 #define FWNET_KEY_LAST "last"
 #define FWNET_KEY_TRIES "tries" // Safeboot's apply-attempt counter (src/safeboot/main.cpp)
+// Old-Safeboot detection (AU-08): the app writes "hand" (= the staged tag) before every handover;
+// a NEW Safeboot removes "hand" and "nocap" first thing at boot. If the app boots with "hand" set
+// and the record still there, Safeboot did not process it: it is an old one that ignores FWS2.
+// "nocap" = 1 then suppresses the automatic handover (a reboot loop every update window).
+#define FWNET_KEY_HAND "hand"
+#define FWNET_KEY_NOCAP "nocap"
 
 // Removes the record AND Safeboot's attempt counter: a new tag must not inherit the failed
-// attempts of an old one (AU-08 R4). Neither key present is success.
+// attempts of an old one (AU-08 R4), and the handover marker. Neither key present is success.
 bool nvsClearRecord()
 {
     Preferences p;
@@ -235,6 +244,8 @@ bool nvsClearRecord()
         ok = p.remove(FWNET_KEY_REC);
     if (p.isKey(FWNET_KEY_TRIES))
         ok = p.remove(FWNET_KEY_TRIES) && ok;
+    if (p.isKey(FWNET_KEY_HAND))
+        ok = p.remove(FWNET_KEY_HAND) && ok;
     p.end();
     return ok;
 }
@@ -1038,8 +1049,64 @@ void fwNetTask(void *)
     vTaskDelete(nullptr);
 }
 
+// Once per boot (first status read / first tick / first web read). "hand" present means the last
+// boot was a handover: record still valid = Safeboot did not touch it = old Safeboot -> "nocap";
+// record gone = it was applied (or went stale). "hand" is consumed either way.
+bool s_hcClaimed = false;
+bool s_safebootOld = false;
+
+void bootCheckOnce()
+{
+    portENTER_CRITICAL(&s_mux);
+    const bool mine = !s_hcClaimed;
+    s_hcClaimed = true;
+    portEXIT_CRITICAL(&s_mux);
+    if (!mine)
+        return;
+
+    bool hand = false;
+    {
+        Preferences p;
+        if (p.begin(FWNET_NS, false))
+        {
+            hand = p.isKey(FWNET_KEY_HAND);
+            p.end();
+        }
+    }
+    bool markOld = false;
+    if (hand)
+    {
+        FwStageRecord r;
+        markOld = fwNetLoadRecord(r); // drops a stale record (e.g. the version just applied)
+        Preferences p;
+        if (p.begin(FWNET_NS, false))
+        {
+            if (markOld)
+                p.putUChar(FWNET_KEY_NOCAP, 1);
+            p.remove(FWNET_KEY_HAND);
+            p.end();
+        }
+        if (markOld)
+            auLog("[AU];refuse;old_safeboot\n");
+    }
+    bool old = markOld;
+    if (!old)
+    {
+        Preferences p;
+        if (p.begin(FWNET_NS, false))
+        {
+            old = p.getUChar(FWNET_KEY_NOCAP, 0) != 0;
+            p.end();
+        }
+    }
+    portENTER_CRITICAL(&s_mux);
+    s_safebootOld = old;
+    portEXIT_CRITICAL(&s_mux);
+}
+
 void ensureStagedLoaded()
 {
+    bootCheckOnce();
     bool known;
     portENTER_CRITICAL(&s_mux);
     known = s_stagedKnown;
@@ -1200,6 +1267,38 @@ bool fwNetLoadRecord(FwStageRecord &out)
     }
     p.end();
     return ok;
+}
+
+bool fwNetMarkHandover(const char *tag)
+{
+    if (tag == nullptr || tag[0] == '\0')
+        return false;
+    Preferences p;
+    if (!p.begin(FWNET_NS, false))
+        return false;
+    const bool ok = p.putString(FWNET_KEY_HAND, tag) != 0;
+    p.end();
+    return ok;
+}
+
+void fwNetUnmarkHandover(void)
+{
+    Preferences p;
+    if (!p.begin(FWNET_NS, false))
+        return;
+    if (p.isKey(FWNET_KEY_HAND))
+        p.remove(FWNET_KEY_HAND);
+    p.end();
+}
+
+bool fwNetSafebootOld(void)
+{
+    bootCheckOnce();
+    bool v;
+    portENTER_CRITICAL(&s_mux);
+    v = s_safebootOld;
+    portEXIT_CRITICAL(&s_mux);
+    return v;
 }
 
 void fwNetClearRecord(void)

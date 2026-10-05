@@ -221,9 +221,23 @@ bool esp32BleResume(void);
 // stale: it is removed from NVS and false is returned.
 bool fwNetLoadRecord(FwStageRecord &out);
 
+// Old-Safeboot guard (AU-08). OTA and AU rewrite only ota_0, so a node updated over the air keeps
+// its old Safeboot, which ignores the FWS2 record and boots the app again.
+//   fwNetMarkHandover   NVS "fwstage"/"hand" = tag; MUST precede auRebootToSafeboot() on every
+//                       handover (auto and --update apply). False if the write failed: do not hand over.
+//   fwNetUnmarkHandover removes "hand" again when the reboot call returned (nothing happened).
+//   fwNetSafebootOld    true while "nocap" is set. At the first call per boot: "hand" present and the
+//                       record still valid -> Safeboot did not process it -> set "nocap", print
+//                       [AU];refuse;old_safeboot; "hand" is consumed. A NEW Safeboot removes "hand" and
+//                       "nocap" at boot. The automatic handover is suppressed while true; the
+//                       operator's `--update apply` still tries.
+bool fwNetMarkHandover(const char *tag);
+void fwNetUnmarkHandover(void);
+bool fwNetSafebootOld(void);
+
 // Removes the record and Safeboot's "tries" counter and clears the cached staged flag. Used
 // when a handover cannot succeed (no Safeboot partition, boot partition not settable), so
-// it is not retried at every boot. The "last" tag (reinstall guard) stays.
+// it is not retried at every boot (also removes "hand"). The "last" tag (reinstall guard) stays.
 void fwNetClearRecord(void);
 
 // NVS "fwstage"/"last"; "" if none. n must be >= 1.

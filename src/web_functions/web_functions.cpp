@@ -3455,6 +3455,8 @@ void sub_page_info()
                 web_client.printf(" (staged: %s)", htmlEscape(String(au.stagedTag)).c_str());
             else if (auNewer && !au.installable)
                 web_client.print(" (no installable image for this board)");
+            if (fwNetSafebootOld())
+                web_client.print(" -- Safeboot on this node is too old to install updates: update it once via the web flasher");
             web_client.print("<br>");
             if (auNewer && au.installable && !auSame && au.state != FWS_BUSY)
                 web_client.println("<button type=\"button\" onclick=\"callfunction('updinstall','');setTimeout(function(){loadPage(cpage,csender,false);},3000);\">Install</button>");

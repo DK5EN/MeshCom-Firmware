@@ -686,6 +686,18 @@ void wifiConnect() {
 
  void setup() {
 
+   // AU-07: tell the app this Safeboot understands staged records. The app
+   // writes "hand" (and may set "nocap") before every handover to detect an
+   // OLD Safeboot; clearing them here, unconditionally, ends that verdict.
+   {
+     Preferences p;
+     if (p.begin(FWSTAGE_NS, false)) {
+       p.remove("hand");
+       p.remove("nocap");
+       p.end();
+     }
+   }
+
    Serial.begin(115200);
    // whait for serial
    delay(1000);

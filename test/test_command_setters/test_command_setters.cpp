@@ -1053,6 +1053,80 @@ static void test_stage_flash_goes_through_one_guarded_helper()
     TEST_ASSERT_TRUE_MESSAGE(hdr.find("void fwNetClearRecord(void);") != std::string::npos, "fwNetClearRecord() prototype missing");
 }
 
+// AU-08 follow-up: old-Safeboot guard. OTA rewrites only ota_0, so an updated node keeps a Safeboot
+// that ignores FWS2; without this the auto handover would reboot the node every update window.
+static void test_old_safeboot_guard_marks_gates_and_reports()
+{
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+    const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    // NVS keys (the Safeboot side uses the same names)
+    TEST_ASSERT_TRUE_MESSAGE(net.find("#define FWNET_KEY_HAND \"hand\"") != std::string::npos, "the hand key name changed");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("#define FWNET_KEY_NOCAP \"nocap\"") != std::string::npos, "the nocap key name changed");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("bool fwNetMarkHandover(const char *tag);") != std::string::npos &&
+                                 hdr.find("void fwNetUnmarkHandover(void);") != std::string::npos &&
+                                 hdr.find("bool fwNetSafebootOld(void);") != std::string::npos,
+                             "the old-Safeboot API is not declared in fw_update_net.h");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("bool fwNetSafebootOld(void);") > hdr.find("#if defined(ESP32)"), "fwNetSafebootOld is outside the ESP32 guard");
+
+    // boot check: hand + still-valid record => nocap + [AU];refuse;old_safeboot; hand always consumed; once
+    const size_t bc = net.find("void bootCheckOnce()\n{");
+    TEST_ASSERT_TRUE_MESSAGE(bc != std::string::npos, "bootCheckOnce() missing");
+    const std::string b = net.substr(bc, net.find("\nvoid ensureStagedLoaded()", bc) - bc);
+    TEST_ASSERT_TRUE_MESSAGE(b.find("s_hcClaimed") != std::string::npos, "the boot check is not once-only");
+    const size_t ld = b.find("fwNetLoadRecord(r)");
+    const size_t nc = b.find("putUChar(FWNET_KEY_NOCAP, 1)");
+    const size_t rm = b.find("p.remove(FWNET_KEY_HAND)");
+    TEST_ASSERT_TRUE_MESSAGE(ld != std::string::npos && nc != std::string::npos && rm != std::string::npos && ld < nc && nc < rm,
+                             "boot check order must be: load record, set nocap, remove hand");
+    TEST_ASSERT_TRUE_MESSAGE(b.find("if (markOld)\n                p.putUChar") != std::string::npos, "nocap is not conditional on a surviving record");
+    TEST_ASSERT_TRUE_MESSAGE(b.find("[AU];refuse;old_safeboot") != std::string::npos, "the old_safeboot refuse line is missing");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("bootCheckOnce();", net.find("void ensureStagedLoaded()")) != std::string::npos, "the status load does not run the boot check");
+    const size_t so = net.find("bool fwNetSafebootOld(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(so != std::string::npos && net.find("bootCheckOnce();", so) - so < 60, "fwNetSafebootOld() does not run the boot check first");
+
+    // auto path: nocap gates it, marker before the reboot, once per boot
+    const size_t tick = m.find("static void auTick(void)");
+    const size_t loop = m.find("void esp32loop()");
+    const std::string t = m.substr(tick, loop - tick);
+    const size_t ho = t.find("if(act == FW_HANDOVER)");
+    const size_t blocked = t.find("[AU];handover;blocked;old_safeboot", ho);
+    const size_t gate = t.find("if(fwNetSafebootOld())", ho);
+    const size_t mark = t.find("fwNetMarkHandover(rec.tag)", ho);
+    const size_t reboot = t.find("auRebootToSafeboot()", ho);
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && blocked != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
+                             "auto handover lacks the old-Safeboot gate, the blocked marker or the hand marker");
+    TEST_ASSERT_TRUE_MESSAGE(gate < blocked && blocked < mark && mark < reboot, "auto path order must be: nocap gate, blocked marker, hand marker, reboot");
+    TEST_ASSERT_TRUE_MESSAGE(t.find("return;", blocked) < mark, "the blocked branch does not return before the handover");
+    TEST_ASSERT_TRUE_MESSAGE(t.find("s_auBlockedPrinted") != std::string::npos, "the blocked marker is not once per boot");
+
+    // --update apply: note when flagged, still tries, marker before the reboot, unmarked if the reboot returns
+    const size_t rungUp = cmd.find("commandCheck(msg_text+2, (char*)\"update \") == 0");
+    const size_t bareUp = cmd.find("commandCheck(msg_text+2, (char*)\"update\") == 0");
+    const std::string body = cmd.substr(rungUp, bareUp - rungUp);
+    const size_t ap = body.find("casecmp(_owner_c, (char*)\"apply\") == 0");
+    const std::string a = body.substr(ap, body.find("casecmp(_owner_c, (char*)\"status\") == 0") - ap);
+    const size_t note = a.find("[AU];apply;note;old_safeboot_flag_set_trying_anyway");
+    const size_t amark = a.find("fwNetMarkHandover(_rec.tag)");
+    const size_t areboot = a.find("auRebootToSafeboot()");
+    TEST_ASSERT_TRUE_MESSAGE(note != std::string::npos && amark != std::string::npos && areboot != std::string::npos, "--update apply lacks the note, the hand marker or the reboot");
+    TEST_ASSERT_TRUE_MESSAGE(a.find("fwNetSafebootOld()") < note && note < amark && amark < areboot, "--update apply order must be: flag note, hand marker, reboot");
+    TEST_ASSERT_TRUE_MESSAGE(a.find("fwNetUnmarkHandover()", areboot) != std::string::npos, "--update apply leaves the hand marker if the reboot returned");
+    // apply is not gated on the flag (no return/else on fwNetSafebootOld)
+    TEST_ASSERT_TRUE_MESSAGE(a.find("if(fwNetSafebootOld())\n                    Serial.printf") != std::string::npos, "--update apply gates on the flag instead of only noting it");
+
+    // status gains ;safeboot;old|ok, existing prefix unchanged
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s\\n") != std::string::npos,
+                             "--update status lacks the safeboot field");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootOld() ? \"old\" : \"ok\"") != std::string::npos, "--update status does not report old|ok");
+
+    // clearing the record also clears the marker (a hopeless handover must not leave one behind)
+    const size_t clr = net.find("bool nvsClearRecord()\n{");
+    TEST_ASSERT_TRUE_MESSAGE(net.substr(clr, net.find("\n}\n", clr) - clr).find("p.remove(FWNET_KEY_HAND)") != std::string::npos, "nvsClearRecord() does not remove hand");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1088,5 +1162,6 @@ int main(int, char **)
     RUN_TEST(test_stagelan_is_instrument_only_everywhere);
     RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);
+    RUN_TEST(test_old_safeboot_guard_marks_gates_and_reports);
     return UNITY_END();
 }
