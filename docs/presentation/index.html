@@ -39,19 +39,19 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
   <p class="lead">Drei Seiten, alle aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und einen
-  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.02: das offizielle 4.40a mit Speichern-und-Weiterleiten, der Nachbarschaftsmatrix anstelle von MHeard und Pfadtabelle und 19 neuen Kommandos.</p>
+  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.05: 4.40a mit Auto Update, Fernsteuerung per LoRa, Speichern-und-Weiterleiten über den Server, MTU-Einstellung und BLE-Härtung.</p>
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.40a.10.02</div>
-      <h2>4.40a: Speichern-und-Weiterleiten und die Nachbarschaftsmatrix</h2>
-      <p>Eine Direktnachricht an eine nicht erreichbare Station geht nicht mehr verloren: ein Mailbox-Knoten hält
-      sie und liefert sie aus, sobald er das Ziel wieder hört (standardmäßig aus, nur ESP32-S3 und nRF52840). Die
-      Nachbarschaftsmatrix ersetzt MHeard-Liste und Pfadtabelle: jeder Knoten rechnet lokal, wer wen hört, und
-      leitet danach mit Vorrang weiter oder hält sich zurück. Dazu 19 neue Kommandos und Korrekturen an BLE,
-      Ethernet, TX-Ring und Weboberfläche. Der RAK4631 belegt mit <code>-Os</code> nur noch rund 70 % Flash.
-      Der Code ist über PR #1186 in der offiziellen Firmware 4.40a.</p>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.02">Release v4.40a.10.02</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
+      <div class="eyebrow">Neu · Release v4.40a.10.05</div>
+      <h2>Auto Update, Fernsteuerung per LoRa, S&amp;F über den Server</h2>
+      <p>Fünf neue Funktionen für die offenen upstream-Issues #1187–#1191, alle standardmäßig aus:
+      Firmware-Auto-Update über GitHub (ESP32; komprimiertes Image im freien Ende des eigenen Slots,
+      Safeboot entpackt und prüft es offline), Speichern-und-Weiterleiten für Direktnachrichten, die über
+      den zentralen Server kommen, samt <code>--stor</code>-Ankündigung, HMAC-gesicherte Fernsteuerung per
+      LoRa (<code>RM1</code>), eine MTU-Einstellung auf allen Boards mit Default 1280 und robusteres
+      BLE-Wiederverbinden. Neues Safeboot-Image – es kommt nur über den Web-Flasher auf den Knoten.</p>
+      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.05">Release v4.40a.10.05</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
@@ -89,18 +89,18 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
       <h2>Web-Flasher: 4.40a direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.02 mit Nachbarschaftsmatrix,
-      Speichern-und-Weiterleiten und 19 neuen Kommandos – ohne Installation und ohne esptool:
+      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.05 mit Auto Update, Fernsteuerung
+      per LoRa und dem neuen Safeboot – ohne Installation und ohne esptool:
       Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
       am Knoten erkannt. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
       und Opera auf dem Desktop.</p>
-      <div class="meta">v4.40a.10.02 · Web Serial</div>
+      <div class="meta">v4.40a.10.05 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.02">v4.40a.10.02</a> (02.10.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.05">v4.40a.10.05</a> (05.10.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>

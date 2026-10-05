@@ -809,10 +809,9 @@ Status:
 | AU      | W2   | done: fw_update_net (task, 5 trimmed roots, chunked decoder, digest+CRC, FWS2 record), auTick, --update check/install/status, make_zz.py; bench DK5EN-1: prod not newer, dev v4.40a.10.02 newer + no_asset; classic DK5EN-92: tls -9984 (verify failed, suspected heap) -- AU-D13 open                                                                              | this commit |
 | AU      | W3   | done: Safeboot apply (CRC, erase head, ROM tinfl inflate, esp_image_verify, tries<=3, self-restart retry), app handover + --update apply, stage writes via a guarded private esp_flash_t (IDF protects the running partition), INSTRUMENT stagelan; bench DK5EN-1 end-to-end: 1.1 MB .zz staged in 9 s, Safeboot applied 1,722,160 B in 10.3 s, booted v4.40a.10.06 | this commit |
 | AU      | W4   | done: web setup card (auto update mode, channel), info row (env, tag, avail/installable, staged, error, Check now), banner with Install / Apply now; checked live on DK5EN-1                                                                                                                                                                                        | this commit |
-| AU      | W5   | not started                                                                                                                                                                                                                                                                                                                                                         |             |
+| AU      | W5   | done: release v4.40a.10.05 with 27 .bin.zz assets; dev-channel test on DK5EN-1: GitHub check, real download 1,102,751 B in 10.8 s, Safeboot apply 1,728,752 B in 10.5 s, boots v4.40a.10.05; old-Safeboot guard benched on DK5EN-92                                                                                                                                 | bfe5310c    |
 
-Next: AU W5 -- dev-channel GitHub release test (needs operator approval: the release becomes Latest), then campaign close. SNF-GW open: M1-M4 against the real server and STOR
-approval by the server operator. Line references of section 7 re-verified 2026-10-04 (scout); mock server is
+Next: campaign complete. Open: STOR server approval, SNF M1-M4, prod .bin.zz assets upstream, upstream PRs.
 `tools/mock/meshcom_server.py` (tests `tools/mock/test_mock_server.py`).
 
 ## 10. Questions for the maintainers and other repos
