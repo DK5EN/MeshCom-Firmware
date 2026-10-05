@@ -383,7 +383,7 @@ const STATE_ABORTED_APP_VALID = {
     const win = dom.window;
     win.XMLHttpRequest = FakeXHR;
     win.calculateMD5 = async () => 'deadbeefdeadbeefdeadbeefdeadbeef';
-    win.__safeboot._test.setSelectedFile(new win.File(['x'], 'firmware.bin'));
+    win.__safeboot._test.setSelectedFile(new win.File(['a'], 'firmware.bin'));
 
     await win.uploadFirmware();
     await sleep(20);
@@ -446,12 +446,123 @@ const STATE_ABORTED_APP_VALID = {
     // alone.
     win.__safeboot.renderInfo(INFO_STA_CONNECTED);
     check('rescan re-enabled once info is healthy again', q(win, 'rescanButton').disabled === false);
-    win.__safeboot._test.setSelectedFile(new win.File(['x'], 'firmware.bin'));
+    win.__safeboot._test.setSelectedFile(new win.File(['a'], 'firmware.bin'));
     win.calculateMD5 = () => new Promise(() => {}); // never resolves: stay "mid-upload"
     win.uploadFirmware(); // fire and forget
     await sleep(10);
     check('rescan disabled while an upload is in progress', q(win, 'rescanButton').disabled === true);
 
+    dom.window.close();
+  }
+
+  // ---------- dual-format upload: dropdown gone, .bin / .bin.zz handling ----------
+  {
+    const dom = await loadPage();
+    const win = dom.window;
+    check('upload-type dropdown removed (no #type element)', q(win, 'type') === null);
+    check('no <select> left on the page', win.document.querySelectorAll('select').length === 0);
+    check('page no longer says "Select Upload Type"', !HTML.includes('Select Upload Type'));
+    check('hashing typo "Genersting" is gone', !HTML.includes('Genersting'));
+    check('file input accepts .bin and .zz', /accept="\.bin,\.zz"/.test(HTML));
+
+    win.__safeboot.renderState(Object.assign({}, STATE_ABORTED, { reason: 'inflate_failed' }));
+    const t = q(win, 'stateReason').textContent;
+    check('reason inflate_failed: own sentence with raw reason in parentheses',
+      t.includes('.zz') && t.includes('unpacked') && t.includes('(inflate_failed)'), t);
+    dom.window.close();
+  }
+
+  {
+    // .zz in a browser without DecompressionStream (jsdom has none): clear
+    // message, nothing is sent to the node, the page stays usable.
+    let startCalls = 0;
+    const fetchImpl = async (url) => {
+      if (String(url).includes('/ota/start')) { startCalls++; return { status: 200, text: async () => '' }; }
+      return hangingFetch();
+    };
+    const dom = await loadPage(fetchImpl);
+    const win = dom.window;
+    check('jsdom has no DecompressionStream (test premise)', typeof win.DecompressionStream === 'undefined');
+    win.__safeboot._test.setSelectedFile(new win.File(['\x78x'], 'firmware.bin.zz'));
+    await win.uploadFirmware();
+    await sleep(10);
+    check('.zz without DecompressionStream: clear message',
+      q(win, 'status').textContent === 'This browser cannot unpack .zz -- use the .bin file', q(win, 'status').textContent);
+    check('.zz without DecompressionStream: /ota/start not called', startCalls === 0);
+    check('.zz without DecompressionStream: no upload in progress', win.__safeboot._test.uploadInProgress === false);
+    dom.window.close();
+  }
+
+  // The format is decided by the first byte (0x78 = zlib), not by the file name.
+  for (const [name, isZz, body] of [['firmware.bin', false, 'a'], ['firmware.bin.zz', true, '\x78x'], ['renamed.bin', true, '\x78x']]) {
+    // /ota/start carries mode=fr and the MD5 of the image the node will see:
+    // the file itself for .bin, the inflated image (calculateInflatedMD5) for .zz.
+    const startUrls = [];
+    const fetchImpl = async (url) => {
+      const u = String(url);
+      if (u.includes('/ota/start')) { startUrls.push(u); return { status: 400, text: async () => 'stop here' }; }
+      return hangingFetch();
+    };
+    const dom = await loadPage(fetchImpl);
+    const win = dom.window;
+    const calls = { plain: 0, inflated: 0 };
+    win.DecompressionStream = function () {}; // present, so the .zz path is taken
+    win.calculateMD5 = async () => { calls.plain++; return '11111111111111111111111111111111'; };
+    win.calculateInflatedMD5 = async () => { calls.inflated++; return '22222222222222222222222222222222'; };
+    win.__safeboot._test.setSelectedFile(new win.File([body], name));
+    await win.uploadFirmware();
+    await sleep(10);
+    const want = isZz ? '22222222222222222222222222222222' : '11111111111111111111111111111111';
+    check(name + ': /ota/start called once', startUrls.length === 1, startUrls.length);
+    check(name + ': start URL is mode=fr with the right hash',
+      startUrls[0] === 'http://dk5en-93.local/ota/start?mode=fr&hash=' + want
+      || (startUrls[0] || '').endsWith('/ota/start?mode=fr&hash=' + want), startUrls[0]);
+    check(name + ': hashed via ' + (isZz ? 'the inflated image' : 'the file'),
+      isZz ? (calls.inflated === 1 && calls.plain === 0) : (calls.plain === 1 && calls.inflated === 0), JSON.stringify(calls));
+    dom.window.close();
+  }
+
+  {
+    // drop handler: .bin and .bin.zz accepted, anything else refused with the new text
+    const dom = await loadPage();
+    const win = dom.window;
+    const drop = (name) => {
+      const ev = new win.Event('drop', { cancelable: true });
+      ev.dataTransfer = { files: [new win.File(['a'], name)] };
+      q(win, 'dropZone').dispatchEvent(ev);
+    };
+    drop('firmware.bin');
+    check('drop .bin: accepted', q(win, 'uploadButton').disabled === false && q(win, 'dropZone').textContent === 'firmware.bin');
+    drop('firmware.bin.zz');
+    check('drop .bin.zz: accepted', q(win, 'uploadButton').disabled === false && q(win, 'dropZone').textContent === 'firmware.bin.zz');
+    drop('notes.txt');
+    check('drop .txt: refused with the .bin / .bin.zz hint',
+      q(win, 'uploadButton').disabled === true && q(win, 'status').textContent === 'Please select a .bin or .bin.zz file!', q(win, 'status').textContent);
+    drop('firmware.zz');
+    check('drop bare .zz (not .bin.zz): refused', q(win, 'uploadButton').disabled === true);
+    dom.window.close();
+  }
+
+  {
+    // calculateInflatedMD5 for real (Node supplies Response/DecompressionStream,
+    // jsdom has neither): the MD5 of the INFLATED image of a zlib stream, which
+    // is what the node's Update.setMD5() will be compared against.
+    const zlib = require('zlib');
+    const crypto = require('crypto');
+    const dom = await loadPage();
+    const win = dom.window;
+    win.Response = Response;
+    win.DecompressionStream = DecompressionStream;
+    const image = Buffer.alloc(100000);
+    for (let i = 0; i < image.length; i++) image[i] = (i * 31 + (i >> 8)) & 0xff;
+    image[0] = 0xe9;
+    const zz = zlib.deflateSync(image);
+    check('test premise: zlib stream starts with 0x78', zz[0] === 0x78, zz[0]);
+    const fakeFile = { name: 'firmware.bin.zz', stream: () => new Blob([zz]).stream() };
+    const got = await win.calculateInflatedMD5(fakeFile);
+    const want = crypto.createHash('md5').update(image).digest('hex');
+    check('calculateInflatedMD5 = md5 of the inflated image', got === want, got + ' vs ' + want);
+    check('... which differs from the md5 of the compressed bytes', got !== crypto.createHash('md5').update(zz).digest('hex'));
     dom.window.close();
   }
 

@@ -100,8 +100,10 @@ against this document in parallel. Change it here first, then everywhere.
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
   `not_bootable` (Updater could not enable/boot-check the written image), `activate_failed`
   (the boot partition switch rejected the image), `update_error` (any other `Update.end()`
-  failure), `begin_failed`; `verifying` is the window between the last chunk and the `Update.end()` verdict.
-- `received`/`total`: bytes of the current or last session; `total` 0 when unknown.
+  failure), `begin_failed`, `inflate_failed` (a `.bin.zz` upload whose zlib stream could not be
+  unpacked: bad header, corrupt data or adler32 mismatch); `verifying` is the window between the last chunk and the `Update.end()` verdict.
+- `received`/`total`: bytes of the current or last session; `total` 0 when unknown. For a `.bin.zz`
+  upload `received` counts the received (compressed) bytes.
 - `app_valid`: true when the app partition holds a complete, verified image (checked at boot and
   re-checked after every abort). False after an aborted upload has written into the single app
   slot: the node then stays in safeboot until a full upload succeeds. It becomes true again after a
@@ -124,12 +126,34 @@ scan is already running, `409 no_sta` when the STA is not configured. Results ap
 `GET /ota/cancel` (`409 app_invalid` when `app_valid` is false). `/ota/upload` answers `200 OK` only when the image was verified, otherwise
 `400` with the abort reason text; `/ota/cancel` answers `400` while an upload is in progress.
 
+## Upload formats: `.bin` and `.bin.zz` (since 2026-10-05)
+
+`POST /ota/upload` takes either a raw ESP image (`.bin`) or the same image as a zlib stream
+(`.bin.zz`, what the Auto Update stages). No new endpoint, no change to `/ota/start`, no dependence on
+the file name: the node decides from the **first byte of the upload body**.
+
+- `0x78` (zlib CMF byte) -> zlib path: the body is inflated on the fly (ROM `tinfl`, 32 KB circular
+  dictionary, malloc'ed at the first chunk and freed on done, a data or write error, a
+  superseding `/ota/start` and disconnect; after a stall abort it is released at the next chunk) and every produced span goes to `Update.write()`.
+- anything else, in particular `0xE9` (ESP image magic) -> raw path, unchanged.
+- `hash=` in `/ota/start` is the MD5 of the **inflated image** (the bytes `Update.write()` sees), also
+  for a `.zz` upload. The web page computes it with `DecompressionStream('deflate')` + SparkMD5 and
+  uploads the compressed file unchanged; a browser without `DecompressionStream` is told to use the
+  `.bin` file.
+- `inflate_failed` (HTTP 400): bad zlib header, corrupt stream or adler32 mismatch; the rest of that
+  request is ignored. A short `Update.write()` stays `write_failed`; a body that ends before the zlib
+  stream does (truncated `.zz`) is `incomplete_upload` and `Update.end()` is not called. Once the
+  stream is complete, the usual `Update.end(true)` verdict follows (`md5_mismatch`, `not_bootable`,
+  `activate_failed`). Bytes after the end of the zlib stream are ignored. A heap shortage for the
+  44 KB inflate state aborts with `update_error`.
+
 ## Serial markers (unchanged names, complete list)
 
 `[SAFEBOOT];wifi;pmf_off;rc;<n>`, `[SAFEBOOT];wifi;retry;reason;no_connect_12s`,
 `[SAFEBOOT];wifi;ap_sta;reason;join_timeout_25s` (replaces `fallback_ap`),
 `[SAFEBOOT];wifi;event;<connected|disconnected|got_ip>;reason;<n>`,
 `[SAFEBOOT];ota;start`, `[SAFEBOOT];ota;abort;reason;<r>`, `[SAFEBOOT];ota;rearm;reason;<r>`,
+`[SAFEBOOT];ota;format;<raw|zlib>` (once per upload, when the first body byte is sniffed),
 `[SAFEBOOT];ota;verify;result;ok`, `[SAFEBOOT];ota;end;result;<success|error>`,
 `[SAFEBOOT];fallback;reason;<timeout|cancel>`, `[SAFEBOOT];app;image;<valid|invalid>;rc;<n>` (at boot
 and after every abort).

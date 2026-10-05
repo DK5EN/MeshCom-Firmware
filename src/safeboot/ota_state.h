@@ -66,6 +66,7 @@ public:
         NotBootable,
         ActivateFailed,
         UpdateError,
+        InflateFailed, // .bin.zz upload: bad zlib header/stream or adler32 (zstream.h)
     };
 
     enum class ActionType : uint8_t {
@@ -369,6 +370,7 @@ public:
             case Reason::NotBootable: return "not_bootable";
             case Reason::ActivateFailed: return "activate_failed";
             case Reason::UpdateError: return "update_error";
+            case Reason::InflateFailed: return "inflate_failed";
         }
         return "unknown";
     }

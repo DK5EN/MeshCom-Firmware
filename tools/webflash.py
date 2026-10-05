@@ -6,6 +6,7 @@ Drives the firmware's built-in OTA flow (src/safeboot/, ElegantOTA):
   2. poll http://<host>/update                    -> safeboot web server up
   3. GET  /ota/start?mode=fr&hash=<md5>           -> open update session
   4. POST /ota/upload (multipart firmware.bin)    -> write + verify + reboot
+     (firmware.bin or a zlib-compressed firmware.bin.zz, see below)
   5. poll http://<host>/                          -> back in app, report build
 
 The node must already run a MeshCom firmware with the safeboot partition
@@ -18,8 +19,16 @@ CLI usage:
     python3 tools/webflash.py oe0xyz-1.local
     python3 tools/webflash.py --env ttgo_tbeam 192.168.1.90
     python3 tools/webflash.py --bin path/to/firmware.bin --expect-hw HELTEC_V3
+    python3 tools/webflash.py --bin firmware.bin.zz    # zlib-compressed image, uploaded as-is
     python3 tools/webflash.py --force                  # skip hardware check
     python3 tools/webflash.py --self-test               # offline parser checks, no network
+
+Compressed images: a firmware file whose first byte is 0x78 and that inflates
+as a zlib stream is uploaded unchanged (the safeboot node sniffs 0xE9 = raw ESP
+image vs 0x78 = zlib and stream-inflates), but the MD5 sent in /ota/start is the
+MD5 of the INFLATED image. Decided by content, not by the `.zz` suffix. A file
+that looks like zlib but does not inflate (corrupt, truncated) is refused with
+stage "firmware_invalid" before the node is touched.
 
 Library usage (TM-40, tools/bench/ota_regression.py): import `flash()` and
 call it directly -- it returns a structured `OtaResult` and never calls
@@ -39,6 +48,7 @@ import re
 import socket
 import sys
 import time
+import zlib
 import urllib.error
 import urllib.request
 import uuid
@@ -297,6 +307,31 @@ def upload_multipart_controlled(url: str, path: Path, *, stop_after_fraction: Op
             pass
 
 
+ZLIB_MAGIC = 0x78  # first byte of a zlib stream (CM=8, 32 KiB window); ESP images start 0xE9
+
+
+def inspect_firmware(data: bytes, name: str = "") -> tuple[str, Optional[int], Optional[str]]:
+    """Return (md5, inflated_size, error) for the bytes that will be uploaded.
+
+    md5 is always the MD5 of the image the node ends up with: of `data` itself
+    for a raw image, of the inflated bytes for a zlib stream (inflated_size is
+    then not None). error is set when the data is, or is named like, a zlib
+    stream but does not inflate completely.
+    """
+    looks_zlib = bool(data) and data[0] == ZLIB_MAGIC
+    if not looks_zlib:
+        if name.endswith(".zz"):
+            return hashlib.md5(data).hexdigest(), None, \
+                f"{name} is named .zz but is not a zlib stream (first byte " \
+                f"{'0x%02x' % data[0] if data else 'none'}, expected 0x78)"
+        return hashlib.md5(data).hexdigest(), None, None
+    try:
+        inflated = zlib.decompress(data)
+    except zlib.error as e:
+        return "", None, f"firmware looks like a zlib stream (0x78) but does not inflate: {e}"
+    return hashlib.md5(inflated).hexdigest(), len(inflated), None
+
+
 def resolve_firmware(env: str, file: Optional[Path]) -> Path:
     return file if file is not None else Path(".pio/build") / env / "firmware.bin"
 
@@ -380,9 +415,16 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
                           md5="", error=f"firmware binary not found: {fw}")
 
     data = fw.read_bytes()
-    md5 = hashlib.md5(data).hexdigest()
     fw_size = len(data)
-    phase("firmware", f"{fw} ({fw_size} bytes, md5 {md5})")
+    md5, inflated_size, fw_error = inspect_firmware(data, fw.name)
+    if fw_error:
+        return OtaResult(ok=False, stage="firmware_invalid", fw_path=str(fw), fw_size=fw_size,
+                          md5=md5, error=fw_error)
+    if inflated_size is not None:
+        phase("firmware", f"{fw} (compressed {fw_size} bytes -> {inflated_size} bytes inflated, "
+                          f"md5 {md5})")
+    else:
+        phase("firmware", f"{fw} ({fw_size} bytes, md5 {md5})")
 
     phase("precheck", f"http://{host}/")
     t = time.monotonic()
@@ -651,6 +693,63 @@ def run_self_test() -> int:
     check("same-build flow ok", res2.ok)
     check("same-build flow flagged", bool(res2.note) and "unchanged" in (res2.note or ""))
 
+    # compressed images: md5 is of the inflated bytes, file uploaded unchanged
+    import zlib as _zlib
+    raw = b"\xe9" + bytes(range(256)) * 40
+    zz = _zlib.compress(raw, 9)
+    check("zz test data starts 0x78", zz[0] == 0x78)
+    plain_md5, plain_infl, plain_err = inspect_firmware(raw, "firmware.bin")
+    check("plain bin md5 unchanged", plain_md5 == hashlib.md5(raw).hexdigest()
+          and plain_infl is None and plain_err is None)
+    zz_md5, zz_infl, zz_err = inspect_firmware(zz, "firmware.bin.zz")
+    check("zz md5 is md5 of inflated", zz_md5 == hashlib.md5(raw).hexdigest()
+          and zz_md5 != hashlib.md5(zz).hexdigest() and zz_err is None)
+    check("zz inflated size", zz_infl == len(raw))
+    check("zz decided by content, not suffix",
+          inspect_firmware(zz, "firmware.bin")[:2] == (zz_md5, len(raw)))
+    check("truncated zz rejected", inspect_firmware(zz[:len(zz) // 2], "x.bin.zz")[2] is not None)
+    check("corrupt zz rejected",
+          inspect_firmware(zz[:20] + bytes(b ^ 0xFF for b in zz[20:40]) + zz[40:], "x.bin.zz")[2]
+          is not None)
+    check(".zz that is not zlib rejected", inspect_firmware(raw, "x.bin.zz")[2] is not None)
+
+    def zz_flow(blob: bytes, suffix: str) -> tuple[OtaResult, list[str], list[tuple[str, int]]]:
+        urls: list[str] = []
+        posts: list[tuple[str, int]] = []
+        pages = [_FIXTURE_TDECK_PLUS, _FIXTURE_SAFEBOOT,
+                 _FIXTURE_TDECK_PLUS.replace("Aug 31 2026 12:00:00", "Sep 12 2026 22:07:05")]
+
+        def g(url: str, timeout: float = 5.0) -> tuple[int, str]:
+            urls.append(url)
+            if url.endswith("/"):
+                return 200, pages.pop(0) if len(pages) > 1 else pages[0]
+            return 200, "ok"
+
+        def p(url: str, path: Path) -> tuple[int, str]:
+            posts.append((url, path.stat().st_size))
+            return 200, "ok"
+
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as t:
+            t.write(blob)
+            path = Path(t.name)
+        try:
+            r = flash("fixture", path, expect_hw="TDECK+", poll_interval=0.0, get=g, poster=p)
+        finally:
+            path.unlink(missing_ok=True)
+        return r, urls, posts
+
+    r_ok, urls_ok, posts_ok = zz_flow(zz, ".bin.zz")
+    check("zz flow ok", r_ok.ok)
+    check("zz flow hash param is inflated md5",
+          any(f"/ota/start?mode=fr&hash={zz_md5}" in u for u in urls_ok))
+    check("zz flow uploads compressed file unchanged", posts_ok and posts_ok[0][1] == len(zz))
+    check("zz flow fw_size is uploaded size", r_ok.fw_size == len(zz) and r_ok.md5 == zz_md5)
+    for label, blob in (("corrupt", zz[:20] + bytes(b ^ 0xFF for b in zz[20:40]) + zz[40:]),
+                        ("truncated", zz[:len(zz) // 2])):
+        r_bad, urls_bad, posts_bad = zz_flow(blob, ".bin.zz")
+        check(f"{label} zz flow fails firmware_invalid", not r_bad.ok and r_bad.stage == "firmware_invalid")
+        check(f"{label} zz flow made no HTTP call", not urls_bad and not posts_bad)
+
     if failures:
         print(f"SELF-TEST FAILED ({len(failures)}): {', '.join(failures)}", file=sys.stderr)
         return 1
@@ -669,7 +768,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help=f"PlatformIO env for the default bin path and the expected "
                               f"hardware, see ENV_HARDWARE (default {DEFAULT_ENV})")
     parser.add_argument("--bin", "--file", dest="bin", type=Path, default=None,
-                         help="firmware.bin path (default .pio/build/<env>/firmware.bin)")
+                         help="firmware.bin or zlib-compressed firmware.bin.zz path "
+                              "(default .pio/build/<env>/firmware.bin)")
     parser.add_argument("--expect-hw", default=None,
                          help="abort unless the node reports this hardware "
                               "(default: looked up from --env via ENV_HARDWARE, "
@@ -710,6 +810,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if result.stage == "firmware_missing":
         print(f"error: {result.error} (build it first: pio run -e {args.env})")
+        return 1
+    if result.stage == "firmware_invalid":
+        print(f"error: {result.error}")
         return 1
     if result.before:
         b = result.before

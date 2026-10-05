@@ -14,6 +14,7 @@
 
 #include <safeboot/fw_apply.h>
 #include <safeboot/ota_state.h>
+#include <safeboot/zstream.h>
 
 using safeboot::OtaSession;
 
@@ -854,6 +855,336 @@ static void test_inflate_io_errors_and_params(void) {
     }
 }
 
+// ---------------------------------------------------------------------
+// .bin.zz upload: reason string + abort path (docs/safeboot-ota-contract.md)
+// ---------------------------------------------------------------------
+static void test_inflate_failed_aborts_without_switch(void) {
+    OtaSession s;
+    s.begin(0);
+    s.onStart(1000, 0);
+    s.onChunk(1010, 100);
+    // The upload handler reports a bad zlib stream straight from Receiving.
+    s.onVerified(1020, false, OtaSession::Reason::InflateFailed);
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Aborted, st.state);
+    TEST_ASSERT_EQUAL(OtaSession::Reason::InflateFailed, st.reason);
+    TEST_ASSERT_EQUAL_STRING("inflate_failed", OtaSession::reasonName(st.reason));
+    TEST_ASSERT_FALSE(st.image_valid);
+    ActionList actions = drainActions(s);
+    TEST_ASSERT_EQUAL(0, countIn(actions, OtaSession::ActionType::SwitchPartition, OtaSession::Reason::None));
+    TEST_ASSERT_EQUAL(1, countIn(actions, OtaSession::ActionType::Abort, OtaSession::Reason::InflateFailed));
+}
+
+static void test_inflate_failed_reason_name(void) {
+    TEST_ASSERT_EQUAL_STRING("inflate_failed", OtaSession::reasonName(OtaSession::Reason::InflateFailed));
+    // appended at the end: the existing reason names are untouched
+    TEST_ASSERT_EQUAL_STRING("update_error", OtaSession::reasonName(OtaSession::Reason::UpdateError));
+}
+
+// ---------------------------------------------------------------------
+// zstream.h: ZStreamInflater (push model) with a mock decompressor. The mock
+// "stream" is the output (identity, like FakeDec above) and ends with the
+// byte 0xFF, which the mock turns into DONE; bytes after it must never be
+// consumed. It enforces the tinfl contract on every call.
+// ---------------------------------------------------------------------
+enum ZMode { ZM_IDENTITY, ZM_ERROR_AT, ZM_STALL, ZM_EXPAND };
+
+struct ZDec {
+    ZMode mode = ZM_IDENTITY;
+    size_t dictSize = 0;
+    uint32_t errorAtConsumed = 0; // ZM_ERROR_AT: fail once this many bytes were consumed
+    uint32_t consumed = 0;
+    uint32_t calls = 0;
+    uint32_t moreFalseCalls = 0;
+    bool ended = false;
+    uint8_t carry = 0, carryByte = 0; // ZM_EXPAND: output still owed for the last input byte
+    int step(const uint8_t* in, size_t* inSize, uint8_t* dictStart, uint8_t* outNext, size_t* outSize, bool more) {
+        calls++;
+        if (!more) moreFalseCalls++;
+        TEST_ASSERT_TRUE(dictSize != 0 && (dictSize & (dictSize - 1)) == 0);
+        TEST_ASSERT_TRUE(outNext >= dictStart);
+        TEST_ASSERT_EQUAL_UINT32((uint32_t)dictSize, (uint32_t)((size_t)(outNext - dictStart) + *outSize));
+        TEST_ASSERT_FALSE(ended); // nothing may be fed after DONE
+        const size_t inAvail = *inSize;
+        const size_t outCap = *outSize;
+        if (mode == ZM_STALL) {
+            *inSize = 0;
+            *outSize = 0;
+            return ZS_ST_HAS_MORE_OUTPUT;
+        }
+        if (mode == ZM_EXPAND) {
+            // Every input byte b (0xFF = end marker) becomes 5 copies of b, so
+            // the output can outrun the input and the window end can cut a run:
+            // the rest is flushed by a later call that consumes nothing.
+            size_t prod = 0, used = 0;
+            for (;;) {
+                while (carry > 0 && prod < outCap) { outNext[prod++] = carryByte; carry--; }
+                if (carry > 0 || used >= inAvail || prod >= outCap) break;
+                if (in[used] == 0xFF) {
+                    used++;
+                    *inSize = used;
+                    *outSize = prod;
+                    ended = true;
+                    return ZS_ST_DONE;
+                }
+                carryByte = in[used++];
+                carry = 5;
+            }
+            *inSize = used;
+            *outSize = prod;
+            if (carry > 0 || (used < inAvail)) return ZS_ST_HAS_MORE_OUTPUT;
+            return ZS_ST_NEEDS_MORE_INPUT;
+        }
+        if (mode == ZM_ERROR_AT && consumed >= errorAtConsumed) {
+            *inSize = 0;
+            *outSize = 0;
+            return -3; // TINFL_STATUS_FAILED
+        }
+        size_t n = 0;
+        while (n < inAvail && n < outCap) {
+            const uint8_t b = in[n];
+            n++;
+            if (b == 0xFF) { // end of stream marker: not part of the output
+                n--;         // handled below
+                break;
+            }
+        }
+        // copy payload bytes
+        for (size_t i = 0; i < n; i++) outNext[i] = in[i];
+        consumed += (uint32_t)n;
+        if (n < inAvail && in[n] == 0xFF) {
+            // end marker reached (and there is room: it produces no output)
+            *inSize = n + 1;
+            *outSize = n;
+            consumed++;
+            ended = true;
+            return ZS_ST_DONE;
+        }
+        *inSize = n;
+        *outSize = n;
+        if (n < inAvail) return ZS_ST_HAS_MORE_OUTPUT; // dictionary window full, input left
+        return ZS_ST_NEEDS_MORE_INPUT;
+    }
+};
+
+struct ZSink {
+    uint8_t out[4096];
+    uint32_t len = 0;
+    int writes = 0;
+    int failAfter = -1; // fail the write with this index (0-based) and every later one
+    bool write(const uint8_t* src, size_t n) {
+        if (failAfter >= 0 && writes >= failAfter) return false;
+        if (len + n > sizeof(out)) return false;
+        memcpy(out + len, src, n);
+        len += (uint32_t)n;
+        writes++;
+        return true;
+    }
+};
+
+static uint8_t g_zsrc[1100]; // payload + 0xFF + trailing bytes
+static uint8_t g_zdict[64];
+
+// payload of n bytes (never 0xFF), the end marker, then `trailing` junk bytes
+static uint32_t fillZ(uint32_t n, uint32_t trailing) {
+    for (uint32_t i = 0; i < n; i++) g_zsrc[i] = (uint8_t)((i * 7 + 3) % 251); // 0..250
+    g_zsrc[n] = 0xFF;
+    for (uint32_t i = 0; i < trailing; i++) g_zsrc[n + 1 + i] = (uint8_t)(0xA0 + i);
+    return n + 1 + trailing;
+}
+
+static ZsResult pushChunked(ZStreamInflater<ZDec>& inf, ZSink& sink, const uint8_t* src, uint32_t len, uint32_t chunk) {
+    ZsResult r = ZS_MORE;
+    for (uint32_t pos = 0; pos < len; pos += chunk) {
+        const uint32_t n = (len - pos < chunk) ? (len - pos) : chunk;
+        r = inf.push(src + pos, n, sink);
+        if (r != ZS_MORE) break;
+    }
+    return r;
+}
+
+static void test_zstream_one_byte_chunks(void) {
+    const uint32_t total = fillZ(500, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, pushChunked(inf, sink, g_zsrc, total, 1));
+    TEST_ASSERT_TRUE(inf.done());
+    TEST_ASSERT_EQUAL_UINT32(500, sink.len);
+    TEST_ASSERT_EQUAL_UINT32(500, inf.outTotal());
+    TEST_ASSERT_EQUAL_MEMORY(g_zsrc, sink.out, 500);
+    TEST_ASSERT_EQUAL_UINT32(0, dec.moreFalseCalls); // push always announces more input
+}
+
+static void test_zstream_one_big_chunk_wraps_the_dictionary(void) {
+    // 1000 bytes through a 64-byte dictionary in a single push: the loop must
+    // flush each full window and continue with the input that is left.
+    const uint32_t total = fillZ(1000, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, inf.push(g_zsrc, total, sink));
+    TEST_ASSERT_EQUAL_UINT32(1000, sink.len);
+    TEST_ASSERT_EQUAL_MEMORY(g_zsrc, sink.out, 1000);
+    TEST_ASSERT_TRUE(sink.writes >= 1000 / 64); // at least one write per dictionary window
+}
+
+static void test_zstream_expanding_decoder_flushes_after_input_is_consumed(void) {
+    // 40 input bytes + end marker -> 200 output bytes through a 64-byte window.
+    // The window end cuts runs mid-way, so tinfl-style HAS_MORE_OUTPUT arrives
+    // with all input consumed and needs an inSize-0 flush call.
+    uint8_t src[41];
+    uint8_t want[200];
+    for (int i = 0; i < 40; i++) {
+        src[i] = (uint8_t)(i + 1);
+        for (int k = 0; k < 5; k++) want[i * 5 + k] = (uint8_t)(i + 1);
+    }
+    src[40] = 0xFF;
+    const uint32_t chunk[] = {1, 2, 41};
+    for (uint32_t c = 0; c < 3; c++) {
+        ZDec dec;
+        dec.mode = ZM_EXPAND;
+        dec.dictSize = sizeof(g_zdict);
+        ZStreamInflater<ZDec> inf;
+        TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+        ZSink sink;
+        ZsResult r = ZS_MORE;
+        for (uint32_t pos = 0; pos < 41 && r == ZS_MORE; pos += chunk[c]) {
+            uint32_t n = (41 - pos < chunk[c]) ? 41 - pos : chunk[c];
+            r = inf.push(src + pos, n, sink);
+        }
+        TEST_ASSERT_EQUAL_INT(ZS_DONE, r);
+        TEST_ASSERT_EQUAL_UINT32(200, sink.len);
+        TEST_ASSERT_EQUAL_MEMORY(want, sink.out, 200);
+    }
+}
+
+static void test_zstream_odd_chunks_and_output_larger_than_dict(void) {
+    const uint32_t total = fillZ(1000, 0);
+    const uint32_t sizes[] = {3, 7, 63, 64, 65, 129, 500};
+    for (uint32_t k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+        ZDec dec;
+        dec.dictSize = sizeof(g_zdict);
+        ZStreamInflater<ZDec> inf;
+        TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+        ZSink sink;
+        TEST_ASSERT_EQUAL_INT(ZS_DONE, pushChunked(inf, sink, g_zsrc, total, sizes[k]));
+        TEST_ASSERT_EQUAL_UINT32(1000, sink.len);
+        TEST_ASSERT_EQUAL_MEMORY(g_zsrc, sink.out, 1000);
+    }
+}
+
+static void test_zstream_data_error_is_reported_and_sticky(void) {
+    const uint32_t total = fillZ(500, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    dec.mode = ZM_ERROR_AT;
+    dec.errorAtConsumed = 250;
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    TEST_ASSERT_EQUAL_INT(ZS_DATA, pushChunked(inf, sink, g_zsrc, total, 50));
+    TEST_ASSERT_FALSE(inf.done());
+    const uint32_t callsBefore = dec.calls;
+    // later chunks of the request are ignored: same error, decoder not touched
+    TEST_ASSERT_EQUAL_INT(ZS_DATA, inf.push(g_zsrc, 10, sink));
+    TEST_ASSERT_EQUAL_UINT32(callsBefore, dec.calls);
+}
+
+static void test_zstream_stalled_decoder_gives_up(void) {
+    fillZ(100, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    dec.mode = ZM_STALL;
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    TEST_ASSERT_EQUAL_INT(ZS_DATA, inf.push(g_zsrc, 100, sink));
+    TEST_ASSERT_TRUE(dec.calls < 10); // no endless loop
+}
+
+static void test_zstream_truncated_stream_never_reports_done(void) {
+    fillZ(500, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    // 500 payload bytes, the end marker never arrives
+    TEST_ASSERT_EQUAL_INT(ZS_MORE, pushChunked(inf, sink, g_zsrc, 500, 64));
+    TEST_ASSERT_FALSE(inf.done());
+    TEST_ASSERT_EQUAL_UINT32(500, sink.len); // everything received was still written
+    // an empty chunk (the final upload frame carries len 0) changes nothing
+    TEST_ASSERT_EQUAL_INT(ZS_MORE, inf.push(g_zsrc, 0, sink));
+    TEST_ASSERT_FALSE(inf.done());
+}
+
+static void test_zstream_bytes_after_done_are_ignored(void) {
+    const uint32_t total = fillZ(100, 40);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    // trailing junk in the same chunk as the end of the stream ...
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, inf.push(g_zsrc, total, sink));
+    TEST_ASSERT_EQUAL_UINT32(100, sink.len);
+    // ... and in later chunks: still done, nothing more written, decoder untouched
+    const uint32_t callsBefore = dec.calls;
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, inf.push(g_zsrc, 40, sink));
+    TEST_ASSERT_TRUE(inf.done());
+    TEST_ASSERT_EQUAL_UINT32(100, sink.len);
+    TEST_ASSERT_EQUAL_UINT32(callsBefore, dec.calls);
+}
+
+static void test_zstream_write_failure_propagates_and_is_sticky(void) {
+    const uint32_t total = fillZ(500, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    ZSink sink;
+    sink.failAfter = 3;
+    TEST_ASSERT_EQUAL_INT(ZS_WRITE, inf.push(g_zsrc, total, sink));
+    TEST_ASSERT_FALSE(inf.done());
+    TEST_ASSERT_EQUAL_INT(3, sink.writes);
+    TEST_ASSERT_EQUAL_INT(ZS_WRITE, inf.push(g_zsrc, 10, sink)); // sticky, no further write attempt
+    TEST_ASSERT_EQUAL_INT(3, sink.writes);
+}
+
+static void test_zstream_rejects_bad_dictionary_and_uninitialised_use(void) {
+    ZDec dec;
+    ZStreamInflater<ZDec> inf;
+    ZSink sink;
+    TEST_ASSERT_EQUAL_INT(ZS_PARAM, inf.push(g_zsrc, 1, sink)); // never init()ed
+    TEST_ASSERT_FALSE(inf.init(&dec, g_zdict, 48));             // not a power of two
+    TEST_ASSERT_FALSE(inf.init(&dec, g_zdict, 0));
+    TEST_ASSERT_FALSE(inf.init(&dec, nullptr, 64));
+    TEST_ASSERT_FALSE(inf.init(nullptr, g_zdict, 64));
+    TEST_ASSERT_EQUAL_INT(ZS_PARAM, inf.push(g_zsrc, 1, sink));
+}
+
+static void test_zstream_init_resets_a_used_inflater(void) {
+    const uint32_t total = fillZ(100, 0);
+    ZDec dec;
+    dec.dictSize = sizeof(g_zdict);
+    ZStreamInflater<ZDec> inf;
+    ZSink sink;
+    TEST_ASSERT_TRUE(inf.init(&dec, g_zdict, sizeof(g_zdict)));
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, inf.push(g_zsrc, total, sink));
+    ZDec dec2;
+    dec2.dictSize = sizeof(g_zdict);
+    TEST_ASSERT_TRUE(inf.init(&dec2, g_zdict, sizeof(g_zdict)));
+    TEST_ASSERT_FALSE(inf.done());
+    ZSink sink2;
+    TEST_ASSERT_EQUAL_INT(ZS_DONE, inf.push(g_zsrc, total, sink2));
+    TEST_ASSERT_EQUAL_UINT32(100, sink2.len);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_good_path_reaches_done_with_one_switch_partition);
@@ -897,5 +1228,18 @@ int main(int, char**) {
     RUN_TEST(test_inflate_truncated_input);
     RUN_TEST(test_inflate_decoder_error_and_stall);
     RUN_TEST(test_inflate_io_errors_and_params);
+    RUN_TEST(test_inflate_failed_aborts_without_switch);
+    RUN_TEST(test_inflate_failed_reason_name);
+    RUN_TEST(test_zstream_one_byte_chunks);
+    RUN_TEST(test_zstream_one_big_chunk_wraps_the_dictionary);
+    RUN_TEST(test_zstream_expanding_decoder_flushes_after_input_is_consumed);
+    RUN_TEST(test_zstream_odd_chunks_and_output_larger_than_dict);
+    RUN_TEST(test_zstream_data_error_is_reported_and_sticky);
+    RUN_TEST(test_zstream_stalled_decoder_gives_up);
+    RUN_TEST(test_zstream_truncated_stream_never_reports_done);
+    RUN_TEST(test_zstream_bytes_after_done_are_ignored);
+    RUN_TEST(test_zstream_write_failure_propagates_and_is_sticky);
+    RUN_TEST(test_zstream_rejects_bad_dictionary_and_uninitialised_use);
+    RUN_TEST(test_zstream_init_resets_a_used_inflater);
     return UNITY_END();
 }
