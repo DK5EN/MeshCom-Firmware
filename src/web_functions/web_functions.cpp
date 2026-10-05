@@ -31,6 +31,15 @@
 #include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
+#if defined(ESP32)
+#include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
+#ifndef MC_ENV_NAME
+#define MC_ENV_NAME ""
+#endif
+#ifndef MC_BUILD_TAG
+#define MC_BUILD_TAG ""
+#endif
+#endif
 #include <url_decode.h>         // #1173: decodeURLPercentCoding() -- full percent-decoding of WebUI parameters
 #include <charset_filter.h>     // #1173: UTF-8-safe cut of the 150-byte web message
 #include "clock.h"              // TZ-01: tzActiveAbbrev() -- flags an unparsable node_tz on the info page
@@ -1228,6 +1237,9 @@ void deliver_scaffold(bool bget_password)
 
     // stage 3 mailbox card below: "before you switch this on" warning box.
     web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
+    // AU-09 (#1187): firmware-update banner at the top of the info (home) page.
+    web_client.println(".au-banner {background:var(--mclightgreen);border:solid 1px var(--mcgray);border-radius:5px;padding:6px 8px;margin:7px;}\n");
+    web_client.println(".au-banner button {margin:4px 6px 0 0;}\n");
 
     // content definitions -> mailbox page (stage 3, docs/design/mailbox-page-mockup.html).
     // Kept unconditional (not #if ENABLE_MSGSTORE) because this is a string literal inside
@@ -2871,6 +2883,34 @@ void sub_page_setup()
 
     web_client.println("</div></div>");
 
+#if defined(ESP32)
+    // AU-09 (#1187): firmware auto update. The selects apply on change through setparam autoupdate /
+    // updchan (web_setup.cpp routes them through --autoupdate / --updchan, read-back is the stored value).
+    {
+        const int au_mode = meshcom_settings.node_autoupd;
+        static const char *s_au_val[3] = {"off", "notify", "auto"};
+        static const char *s_au_lbl[3] = {"off", "notify (check, tell me)", "auto (install in the update window)"};
+        web_client.println("<div class=\"cardlayout collapsablecard\">");
+        web_client.println("<label class=\"cardlabel\">Firmware Update</label>");
+        web_client.println("<span>Open this for the firmware auto update.</span>\n");
+        web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
+        web_client.println("<div class=\"grid grid2\">");
+        web_client.println("<label for=\"autoupdate\">Auto update</label>");
+        web_client.println("<select id=\"autoupdate\" name=\"autoupdate\" onchange=\"setvalue('autoupdate',this.value,true);\">");
+        for (int ia = 0; ia < 3; ia++)
+            web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", s_au_val[ia], (ia == au_mode) ? "selected" : "", s_au_lbl[ia]);
+        web_client.println("</select>");
+        web_client.println("<label for=\"updchan\">Update channel</label>");
+        web_client.println("<select id=\"updchan\" name=\"updchan\" onchange=\"setvalue('updchan',this.value,true);\">");
+        web_client.printf("\t<option value=\"prod\" %s>prod (icssw-org releases)</option>\n", (meshcom_settings.node_updchan == 0) ? "selected" : "");
+        web_client.printf("\t<option value=\"dev\" %s>dev (DK5EN releases)</option>\n", (meshcom_settings.node_updchan != 0) ? "selected" : "");
+        web_client.println("</select>");
+        web_client.println("</div>");
+        web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto installs at 03:00-05:00 local; WiFi starts after a reboot if no other network service is on</p>");
+        web_client.println("</div>");
+    }
+#endif
+
     // IP Network Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");
     web_client.println("<label class=\"cardlabel\">IP Network Settings</label>");
@@ -3398,6 +3438,35 @@ void sub_page_info()
     _create_meshcom_subheader("Node Information");
     web_client.println("<div id=\"content_inner\">");
 
+#if defined(ESP32)
+    // AU-09 (#1187): banner while a newer release is known or an image is staged. "Install" starts the
+    // download (--update install), "Apply now" hands over to Safeboot at once (--update apply, reboots).
+    {
+        FwNetStatus au;
+        fwNetGetStatus(au);
+        const bool auNewer = au.availNewer && au.availTag[0] != '\0';
+        const bool auStaged = au.staged && au.stagedTag[0] != '\0';
+        if (auNewer || auStaged)
+        {
+            const char *auTag = auNewer ? au.availTag : au.stagedTag;
+            const bool auSame = auNewer && auStaged && strcmp(au.availTag, au.stagedTag) == 0;
+            web_client.printf("<div class=\"au-banner\" id=\"au_banner\"><b>Firmware %s available</b>", htmlEscape(String(auTag)).c_str());
+            if (auStaged)
+                web_client.printf(" (staged: %s)", htmlEscape(String(au.stagedTag)).c_str());
+            else if (auNewer && !au.installable)
+                web_client.print(" (no installable image for this board)");
+            web_client.print("<br>");
+            if (auNewer && au.installable && !auSame && au.state != FWS_BUSY)
+                web_client.println("<button type=\"button\" onclick=\"callfunction('updinstall','');setTimeout(function(){loadPage(cpage,csender,false);},3000);\">Install</button>");
+            if (auStaged)
+                web_client.println("<button type=\"button\" onclick=\"if(confirm('Node will reboot to apply the staged update, are you sure?')){callfunction('updapply','');setTimeout(function(){window.location.reload();},15000);}\">Apply now</button>");
+            if (au.state == FWS_BUSY)
+                web_client.print("update job running ...");
+            web_client.println("</div>");
+        }
+    }
+#endif
+
     web_client.println("<table class=\"table mw-600\">");
     web_client.println("<thead><tr class=\"font-bold\"><td>Item</td><td>Value</td></tr></thead>");
 
@@ -3417,6 +3486,21 @@ void sub_page_info()
         web_client.printf("<tr><td>Battery</td><td>USB (no battery)</td></tr>\n");
     else
         web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV</td></tr>\n", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
+#if defined(ESP32)
+    { // AU-09 (#1187): auto update state; "Check now" runs --update check, the result shows on the next reload
+        FwNetStatus au;
+        fwNetGetStatus(au);
+        web_client.printf("<tr><td>Auto update</td><td>mode %s, channel %s<br>env %s, running %s<br>", 
+            meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
+            meshcom_settings.node_updchan ? "dev" : "prod", MC_ENV_NAME[0] ? MC_ENV_NAME : "(unknown)", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
+        web_client.printf("available %s (newer %s, installable %s)<br>", au.availTag[0] ? htmlEscape(String(au.availTag)).c_str() : "none",
+            au.availNewer ? "yes" : "no", au.installable ? "yes" : "no");
+        web_client.printf("staged %s<br>last error %s<br>", (au.staged && au.stagedTag[0]) ? htmlEscape(String(au.stagedTag)).c_str() : "none",
+            au.lastErr[0] ? htmlEscape(String(au.lastErr)).c_str() : "none");
+        web_client.printf("%s<button type=\"button\" onclick=\"callfunction('updcheck','');setTimeout(function(){loadPage(cpage,csender,false);},4000);\">Check now</button></td></tr>\n",
+            au.state == FWS_BUSY ? "job running ...<br>" : "");
+    }
+#endif
     // WEB-SW: grouped switch overview, one <tr> per group, labels matching
     // sub_page_setup()'s _create_setup_switch_element() calls verbatim, same
     // #if guards as there. test/golden/info_switch_lint.py checks every

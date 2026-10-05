@@ -241,6 +241,28 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
+#if defined(ESP32)
+    // AU-09 (#1187): firmware auto update mode and channel, routed through "--autoupdate off|notify|auto"
+    // and "--updchan prod|dev"; read-back is the stored value (a bad value leaves it unchanged -> FAIL).
+    if(setupData->paramName.equals("autoupdate")) {
+        snprintf(message_text, sizeof(message_text), "--autoupdate %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        const char *cur = (meshcom_settings.node_autoupd == 2) ? "auto" : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
+        setupData->returnCode = setupData->paramValue.equalsIgnoreCase(cur)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = cur;
+        return;
+    } else
+
+    if(setupData->paramName.equals("updchan")) {
+        snprintf(message_text, sizeof(message_text), "--updchan %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        const char *cur = meshcom_settings.node_updchan ? "dev" : "prod";
+        setupData->returnCode = setupData->paramValue.equalsIgnoreCase(cur)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = cur;
+        return;
+    } else
+#endif
+
     if(setupData->paramName.equals("gateway")) {
         snprintf(message_text, sizeof(message_text), "--gateway %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
@@ -895,6 +917,18 @@ void webSetup_getParam(setupStruct *setupData){
         setupData->returnValue = (meshcom_settings.node_rm == 1)?"on":"off";
         return;
     } else
+
+#if defined(ESP32)
+    if(setupData->paramName.equals("autoupdate")) {   // AU-09 (#1187)
+        setupData->returnValue = (meshcom_settings.node_autoupd == 2) ? "auto" : ((meshcom_settings.node_autoupd == 1) ? "notify" : "off");
+        return;
+    } else
+
+    if(setupData->paramName.equals("updchan")) {      // AU-09 (#1187)
+        setupData->returnValue = meshcom_settings.node_updchan ? "dev" : "prod";
+        return;
+    } else
+#endif
 
     if(setupData->paramName.equals("gateway")) {
         setupData->returnValue = bGATEWAY?"on":"off";

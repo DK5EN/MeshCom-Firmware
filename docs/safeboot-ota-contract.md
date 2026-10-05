@@ -92,7 +92,10 @@ against this document in parallel. Change it here first, then everywhere.
 }
 ```
 
-- `state`: `idle` | `receiving` | `verifying` | `done` | `aborted`.
+- `state`: `idle` | `receiving` | `verifying` | `done` | `aborted` | `applying` (AU, 2026-10-05: Safeboot
+  inflates a staged `.bin.zz` from the end of `ota_0` at boot; while applying, `fallback_in_ms` is -1,
+  cancel and `/ota/start` are refused). A failed apply is reported afterwards as `aborted` with
+  reason `apply_failed`.
 - `reason`: empty in `idle`/`receiving`/`done`; on `aborted` one of `stale_session`,
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
   `begin_failed`; `verifying` is the window between the last chunk and the `Update.end()` verdict.
@@ -136,3 +139,14 @@ Pure C++ (no Arduino), driven by events with an injected clock in ms:
 `fallback_in_ms` is -1, cancel is refused). Outputs: current `/ota/state` record, and actions the caller
 must perform (`abort(reason)`, `switch_partition`, `reboot_to_app`). Constants: stall 30 000 ms,
 fallback 180 000 ms. Signed deltas everywhere (the TM-46 cross-task race).
+
+## Staged apply (Auto Update, #1187, since 2026-10-05)
+
+Before WiFi starts, Safeboot reads NVS `fwstage`/`rec` (FWS2, 112 B, written by the app). If present:
+CRC32 of the staged `.bin.zz` at `ota_0 + off` (before any erase), erase `[0, roundup4K(ilen))`, inflate
+with the ROM `tinfl` into `ota_0`, `esp_image_verify`, set boot, drop the record (keep `last`), restart.
+Markers: `[SAFEBOOT];apply;start;tag;..;zlen;..;ilen;..;try;N`, `[SAFEBOOT];apply;ok;bytes;..;ms;..`,
+`[SAFEBOOT];apply;fail;<reason>`, `[SAFEBOOT];apply;retry;restart;try;N`. Power-type failures keep the
+record and restart (at most 3 tries, NVS `fwstage`/`tries`); deterministic failures drop it and `last`.
+Any entry into Safeboot (also a manual `--ota-update` for a web upload) applies a staged record first.
+Design: `docs/concept-open-issues-20261004.md` section 4 (AU-D11, D15, D19).

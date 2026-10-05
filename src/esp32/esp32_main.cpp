@@ -298,6 +298,8 @@ extern bool hb_warn_logged;
 
 // FreeRTOS Queue for BLE data from NimBLE task to Main Loop
 #include "freertos/queue.h"
+#include "freertos/semphr.h"   // AU-10: BLE pause guard
+#include "esp_heap_caps.h"
 
 struct BleQueueItem {
     uint8_t data[MAX_MSG_LEN_PHONE];
@@ -462,6 +464,231 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
     }
 
 } chrCallbacks;
+
+// ---------------------------------------------------------------------------
+// BLE stack bring-up (esp32setup() and the AU-10 resume) and the AU-10 pause.
+//
+// AU-10 (#1187, AU-D18): on the classic ESP32 the TLS handshake of the firmware update does
+// not fit next to NimBLE. The update job task (src/esp32/fw_update_net.cpp) calls
+// esp32BlePause() before CHECK / DOWNLOAD and esp32BleResume() when it is done. The pause is
+// NimBLEDevice::deinit(true): deinit(false) would keep the NimBLEServer with its GATT objects,
+// but the host forgets the registered services on deinit (ble_hs_deinit) while the library
+// believes them started (m_gattsStarted, service defs built), so after a re-init the table
+// would be empty. deinit(true) deletes server, advertising and services; the resume rebuilds
+// them with bleStackStart(), the same function the boot uses.
+//
+// Concurrency: pServer / pService / pTxCharacteristic and every NimBLE call of the loop task are
+// used only under bleLifeLock() (non-blocking try-lock, false while a pause or resume is in
+// flight or BLE is down). The job task holds s_bleLife (blocking) across the deinit and the
+// init. The NimBLE host-task callbacks (onConnect, onDisconnect, onWrite) never take it.
+// ---------------------------------------------------------------------------
+#define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
+#define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+
+static SemaphoreHandle_t s_bleLife = NULL;         // created in esp32setup(); NULL = no guarding (DISABLE_BLE)
+static volatile bool s_bleDown = false;            // BLE stack stopped by esp32BlePause() (or a failed resume)
+static volatile bool s_bleResumeFailed = false;    // the last esp32BleResume() failed; the loop retries
+static char s_bleManuf[60] = {0};                  // manufacturer data string, built once at boot
+
+// Loop-task side. True: the BLE objects may be used now, the caller MUST bleLifeUnlock().
+static inline bool bleLifeLock(void)
+{
+    if(s_bleLife == NULL)
+        return true;
+    if(xSemaphoreTake(s_bleLife, 0) != pdTRUE)
+        return false;
+    if(s_bleDown)
+    {
+        xSemaphoreGive(s_bleLife);
+        return false;
+    }
+    return true;
+}
+
+static inline void bleLifeUnlock(void)
+{
+    if(s_bleLife != NULL)
+        xSemaphoreGive(s_bleLife);
+}
+
+#if !defined(DISABLE_BLE)   // opt-out -D DISABLE_BLE: board without a usable BLE controller
+// Brings the whole NimBLE stack up: stack, security, server, service, both characteristics,
+// callbacks, advertising data. startAdv false = leave advertising off (BENCH_BLE_ADV_LATE boot).
+// False if NimBLEDevice::init() failed (the objects are then not created, the pointers stay NULL).
+static bool bleStackStart(bool startAdv)
+{
+    const std::string strBLEName = cBLEName;
+    const std::string strBLEManufData = s_bleManuf;
+
+    if(!NimBLEDevice::init(strBLEName))
+    {
+        printfdeb("[BLE ]...init failed\n");
+        return false;
+    }
+
+    printfdeb("[BLE ]...Device-Address <%s>\n", NimBLEDevice::toString().c_str());
+
+    //NimBLEDevice::setDeviceName(strBLEName);
+
+    NimBLEDevice::setPower(9); // +9dbm
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
+    NimBLEDevice::setSecurityAuth(false, false, false);
+
+    /*if(meshcom_settings.bt_code >= 100000 && meshcom_settings.bt_code <= 999999)
+        NimBLEDevice::setSecurityPasskey(meshcom_settings.bt_code);
+    else
+        NimBLEDevice::setSecurityPasskey(PIN);*/
+
+    // Create the BLE Server. serverCallbacks is a static object: deleteCallbacks = false, or
+    // NimBLEDevice::deinit(true) (AU-10 pause) would delete it with the server.
+    pServer = NimBLEDevice::createServer();
+    pServer->setCallbacks(&serverCallbacks, false);
+    pServer->advertiseOnDisconnect(true);
+
+    // Create the BLE Service
+    pService = pServer->createService(SERVICE_UUID);
+
+    // Create a BLE Characteristic
+    pTxCharacteristic = pService->createCharacteristic(
+                        CHARACTERISTIC_UUID_TX,
+                        NIMBLE_PROPERTY::WRITE  |
+                        // Require a secure connection for read and write access
+                        //NIMBLE_PROPERTY::WRITE_AUTHEN |  // only allow writing if paired / encrypted
+                        //NIMBLE_PROPERTY::WRITE_ENC |  // only allow writing if paired / encrypted
+                        NIMBLE_PROPERTY::READ   |
+                        //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
+                        //NIMBLE_PROPERTY::READ_AUTHEN |
+                        NIMBLE_PROPERTY::NOTIFY );
+
+    NimBLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+                        CHARACTERISTIC_UUID_RX,
+                        NIMBLE_PROPERTY::WRITE  |
+                        // Require a secure connection for read and write access
+                        //NIMBLE_PROPERTY::WRITE_AUTHEN |  // only allow writing if paired / encrypted
+                        //NIMBLE_PROPERTY::WRITE_ENC |  // only allow writing if paired / encrypted
+                        NIMBLE_PROPERTY::READ   |
+                        //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
+                        //NIMBLE_PROPERTY::READ_AUTHEN |
+                        NIMBLE_PROPERTY::NOTIFY );
+
+    pRxCharacteristic->setCallbacks(&chrCallbacks);
+
+    // Start the service
+    pService->start();
+
+    // Start advertising
+    NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
+    pAdvertising->reset();
+
+    std::string advName = strBLEName;
+    if(!bBLElong && advName.size() > 26)
+      advName = advName.substr(0, 26); // keep first 26 chars for short adverts
+
+    pAdvertising->setName(advName);  // BLE Local Name (possibly shortened)
+
+    if (bBLElong)
+    {
+        pAdvertising->setManufacturerData(strBLEManufData);
+        pAdvertising->addServiceUUID(SERVICE_UUID);
+    }
+    else
+    {
+        // For short adverts we skip adding the 128-bit service UUID which
+
+    }
+
+    if (bBLElong)
+        pAdvertising->enableScanResponse(true);
+    else
+        pAdvertising->enableScanResponse(false);
+
+    if(startAdv)
+        pAdvertising->start();
+    else
+    {
+        // TM-11 experiment (BENCH_BLE_ADV_LATE): advertising starts in esp32loop() once
+        // [BOOT];ready fired (WiFi joined or given up) -- TD-01 hypothesis: BLE advertising
+        // during the first association attempt makes it fail.
+        printfdeb("[BLE ]...advertising deferred until the network phase settled (BENCH_BLE_ADV_LATE)\n");
+    }
+
+    printfdeb("[BLE ]...Waiting a client connection to notify...\n");
+    return true;
+}
+#endif   // !DISABLE_BLE
+
+bool esp32BlePause(void)
+{
+#if defined(DISABLE_BLE)
+    return false;
+#else
+    if(s_bleLife == NULL || s_bleDown || pServer == NULL)
+        return false;   // no guard, already down, or BLE never came up: nothing to pause
+    if(deviceConnected || isPhoneReady != 0)
+    {
+        Serial.print("[AU];ble;pause;skip;phone\n");
+        return false;
+    }
+
+    xSemaphoreTake(s_bleLife, portMAX_DELAY);
+
+    // Advertising off first: no new central can connect. Re-check afterwards, a phone may
+    // have connected between the check above and the stop.
+    NimBLEDevice::stopAdvertising();
+    if(deviceConnected || isPhoneReady != 0 || pServer->getConnectedCount() > 0)
+    {
+        NimBLEDevice::getAdvertising()->start();
+        xSemaphoreGive(s_bleLife);
+        Serial.print("[AU];ble;pause;skip;phone\n");
+        return false;
+    }
+
+    // From here the loop sees BLE as down (bleLifeLock() fails) and the pointers are NULL
+    s_bleDown = true;
+    pTxCharacteristic = nullptr;
+    pService = NULL;
+    pServer = NULL;
+
+    // clearAll = true: server, services, characteristics and the advertising object are
+    // deleted and rebuilt by esp32BleResume() (see the block comment above). The controller
+    // memory stays reserved for the resume (no esp_bt_controller_mem_release()).
+    const bool stopped = NimBLEDevice::deinit(true);
+    deviceConnected = false;
+    g_ble_conn_handle = 0xFFFF;
+    xSemaphoreGive(s_bleLife);
+
+    if(!stopped)
+        Serial.print("[AU];ble;pause;deinit;fail\n");   // the resume rebuilds the objects on the running stack
+    Serial.printf("[AU];ble;pause;heap;%u;blk;%u\n", (unsigned)esp_get_free_heap_size(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    return true;
+#endif
+}
+
+bool esp32BleResume(void)
+{
+#if defined(DISABLE_BLE)
+    return true;
+#else
+    if(s_bleLife == NULL || !s_bleDown)
+        return true;   // never paused (or already back)
+
+    xSemaphoreTake(s_bleLife, portMAX_DELAY);
+    const bool ok = s_bleDown ? bleStackStart(true) : true;   // a concurrent resume may have won
+    if(ok)
+    {
+        s_bleDown = false;
+        s_bleResumeFailed = false;
+    }
+    else
+        s_bleResumeFailed = true;
+    xSemaphoreGive(s_bleLife);
+
+    Serial.print(ok ? "[AU];ble;resume;ok\n" : "[AU];ble;resume;fail\n");
+    return ok;
+#endif
+}
 
 
 
@@ -1898,109 +2125,23 @@ void esp32setup()
 
     // Create the BLE Device & WiFiAP
     snprintf(cBLEName, sizeof(cBLEName), "M%s-%02x%02x-%s", g_ble_dev_name, dmac[1], dmac[0], meshcom_settings.node_call);
-    char cManufData[60]={0};
-    snprintf(cManufData, sizeof(cManufData), "MCM%s-%02x%02x-%s", g_ble_dev_name,  dmac[1], dmac[0], meshcom_settings.node_call);
-    
-    
+    snprintf(s_bleManuf, sizeof(s_bleManuf), "MCM%s-%02x%02x-%s", g_ble_dev_name,  dmac[1], dmac[0], meshcom_settings.node_call);
+
+
     const std::__cxx11::string strBLEName = cBLEName;
-    const std::__cxx11::string strBLEManufData = cManufData;
 
     printfdeb("[BLE ]...Device started with BLE-Name <%s>\n", strBLEName.c_str());
 
     bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
 
     #if !defined(DISABLE_BLE)   // opt-out -D DISABLE_BLE: board without a usable BLE controller
-    NimBLEDevice::init(strBLEName);
-
-    printfdeb("[BLE ]...Device-Address <%s>\n", NimBLEDevice::toString().c_str());
-    
-    //NimBLEDevice::setDeviceName(strBLEName);
-
-    NimBLEDevice::setPower(9); // +9dbm
-    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
-    NimBLEDevice::setSecurityAuth(false, false, false);
-    
-    /*if(meshcom_settings.bt_code >= 100000 && meshcom_settings.bt_code <= 999999)
-        NimBLEDevice::setSecurityPasskey(meshcom_settings.bt_code);
-    else
-        NimBLEDevice::setSecurityPasskey(PIN);*/
-
-#define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
-#define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-#define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
-
-    // Create the BLE Server
-    pServer = NimBLEDevice::createServer();
-    pServer->setCallbacks(&serverCallbacks);
-    pServer->advertiseOnDisconnect(true);
-
-    // Create the BLE Service
-    pService = pServer->createService(SERVICE_UUID);
-
-    // Create a BLE Characteristic
-    pTxCharacteristic = pService->createCharacteristic(
-                        CHARACTERISTIC_UUID_TX,
-                        NIMBLE_PROPERTY::WRITE  |
-                        // Require a secure connection for read and write access
-                        //NIMBLE_PROPERTY::WRITE_AUTHEN |  // only allow writing if paired / encrypted
-                        //NIMBLE_PROPERTY::WRITE_ENC |  // only allow writing if paired / encrypted
-                        NIMBLE_PROPERTY::READ   |
-                        //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
-                        //NIMBLE_PROPERTY::READ_AUTHEN |
-                        NIMBLE_PROPERTY::NOTIFY );
-
-    NimBLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
-                        CHARACTERISTIC_UUID_RX,
-                        NIMBLE_PROPERTY::WRITE  |
-                        // Require a secure connection for read and write access
-                        //NIMBLE_PROPERTY::WRITE_AUTHEN |  // only allow writing if paired / encrypted
-                        //NIMBLE_PROPERTY::WRITE_ENC |  // only allow writing if paired / encrypted
-                        NIMBLE_PROPERTY::READ   |
-                        //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
-                        //NIMBLE_PROPERTY::READ_AUTHEN |
-                        NIMBLE_PROPERTY::NOTIFY );
-
-    pRxCharacteristic->setCallbacks(&chrCallbacks);
-
-    // Start the service
-    pService->start();
-
-    // Start advertising
-    NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
-    pAdvertising->reset();
-
-    std::string advName = strBLEName;
-    if(!bBLElong && advName.size() > 26)
-      advName = advName.substr(0, 26); // keep first 26 chars for short adverts
-
-    pAdvertising->setName(advName);  // BLE Local Name (possibly shortened)
-
-    if (bBLElong)
-    {
-        pAdvertising->setManufacturerData(strBLEManufData);
-        pAdvertising->addServiceUUID(SERVICE_UUID);
-    }
-    else
-    {
-        // For short adverts we skip adding the 128-bit service UUID which
-    
-    }
-
-    if (bBLElong)
-        pAdvertising->enableScanResponse(true);
-    else
-        pAdvertising->enableScanResponse(false);
-    
+    s_bleLife = xSemaphoreCreateMutex();   // AU-10: guards the BLE objects against pause / resume
     #if defined(BENCH_BLE_ADV_LATE)
-    // TM-11 experiment: advertising starts in esp32loop() once [BOOT];ready
-    // fired (WiFi joined or given up) -- TD-01 hypothesis: BLE advertising
-    // during the first association attempt makes it fail.
-    printfdeb("[BLE ]...advertising deferred until the network phase settled (BENCH_BLE_ADV_LATE)\n");
+    const bool bleAdvNow = false;
     #else
-    pAdvertising->start();
+    const bool bleAdvNow = true;
     #endif
- 
-    printfdeb("[BLE ]...Waiting a client connection to notify...\n");
+    bleStackStart(bleAdvNow);   // the same function the AU-10 resume uses
     #else
     printfdeb("[BLE ]...disabled (DISABLE_BLE)\n");
     #endif
@@ -2106,13 +2247,24 @@ BlePhoneSend esp32_write_ble(const uint8_t *buf, uint16_t len)
     if(bBLEDEBUG)
         printfdeb("[LOOP] <%lu> WRITE BLE\n", millis());
 
-    if(!deviceConnected || g_ble_conn_handle == 0xFFFF || pTxCharacteristic == nullptr)
+    if(!deviceConnected || g_ble_conn_handle == 0xFFFF)
         return BLE_SEND_DOWN;
+
+    // AU-10: the stack and pTxCharacteristic are gone while the update job has BLE paused
+    // (that only happens with no phone connected, so this is a race guard, not a normal path)
+    if(!bleLifeLock())
+        return BLE_SEND_DOWN;
+    if(pTxCharacteristic == nullptr)
+    {
+        bleLifeUnlock();
+        return BLE_SEND_DOWN;
+    }
 
     struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
     int rc = BLE_HS_ENOMEM;
     if(om != nullptr)
         rc = ble_gatts_notify_custom(g_ble_conn_handle, pTxCharacteristic->getHandle(), om);   // frees om
+    bleLifeUnlock();
 
     if(rc == 0)
         return BLE_SEND_SENT;
@@ -2132,7 +2284,11 @@ uint16_t esp32_ble_mtu()
     #else
     if(!deviceConnected || g_ble_conn_handle == 0xFFFF)
         return 0;
-    return (uint16_t)ble_att_mtu(g_ble_conn_handle);
+    if(!bleLifeLock())   // AU-10: no host calls while the stack is stopped
+        return 0;
+    const uint16_t mtu = (uint16_t)ble_att_mtu(g_ble_conn_handle);
+    bleLifeUnlock();
+    return mtu;
     #endif
 }
 
@@ -2341,8 +2497,12 @@ void esp32loop()
             Serial.printf("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
                           (hasIPaddress || meshcom_settings.node_hasIPaddress) ? 1 : 0);
             #if defined(BENCH_BLE_ADV_LATE) && !defined(DISABLE_BLE)
-            NimBLEDevice::getAdvertising()->start();
-            Serial.printf("[BLE ];advertising;started;ms;%lu\n", (unsigned long)millis());
+            if(bleLifeLock())   // AU-10: BLE may be paused by an update job
+            {
+                NimBLEDevice::getAdvertising()->start();
+                bleLifeUnlock();
+                Serial.printf("[BLE ];advertising;started;ms;%lu\n", (unsigned long)millis());
+            }
             #endif
         }
     }
@@ -3446,11 +3606,14 @@ void esp32loop()
     {
     	g_ble_uart_is_connected = true;
 
-        // Disconnect if app-layer auth failed
-        if(ble_disconnect_requested)
+        // Disconnect if app-layer auth failed. AU-10: pServer is NULL and the stack stopped while
+        // an update job has BLE paused; the request stays pending until the lock is free.
+        if(ble_disconnect_requested && bleLifeLock())
         {
             ble_disconnect_requested = false;
-            pServer->disconnect(g_ble_conn_handle);
+            if(pServer != NULL)
+                pServer->disconnect(g_ble_conn_handle);
+            bleLifeUnlock();
         }
 	}
 
@@ -3500,10 +3663,33 @@ void esp32loop()
         if((uint32_t)(millis() - s_bleAdvChk) >= 5000UL)
         {
             s_bleAdvChk = millis();
+
+            // AU-10: a resume that failed after an update job is retried here (30 s apart, 5 times;
+            // blocks the loop for the NimBLE bring-up, about a second). Not while the job runs:
+            // it retries itself three times.
+            static uint32_t s_bleRetryMs = 0;
+            static uint8_t s_bleRetries = 0;
+            if(s_bleDown && s_bleResumeFailed && s_bleRetries < 5 &&
+               (uint32_t)(millis() - s_bleRetryMs) >= 30000UL)
+            {
+                FwNetStatus _fst;
+                fwNetGetStatus(_fst);
+                if(_fst.state != FWS_BUSY)
+                {
+                    s_bleRetryMs = millis();
+                    s_bleRetries++;
+                    esp32BleResume();
+                }
+            }
+            if(!s_bleDown)
+                s_bleRetries = 0;
+
+            // AU-10: the lock fails while BLE is paused or being resumed (and pServer is NULL then)
             if(!deviceConnected && pServer != NULL && pService != NULL
                #if defined(BENCH_BLE_ADV_LATE)
                && s_bootReadyLogged
                #endif
+               && bleLifeLock()   // last: it takes the lock, the body releases it
               )
             {
                 NimBLEAdvertising *pAdv = NimBLEDevice::getAdvertising();
@@ -3514,6 +3700,7 @@ void esp32loop()
                     if(bBLEDEBUG)
                         Serial.printf("[BLE ];adv_restart;ms;%lu;ok;%d\n", (unsigned long)millis(), (int)ok);
                 }
+                bleLifeUnlock();
             }
         }
 

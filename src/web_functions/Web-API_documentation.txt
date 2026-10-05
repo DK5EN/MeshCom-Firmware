@@ -32,6 +32,8 @@ To set a parameter to the node, use:
 	/setparam/?mesh=on|off				Enables mesh / forwarding of received LoRa messages via radio
 	/setparam/?gateway=on|off			Enables the gateway function
 	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --rm; stays inactive while no --passwd is set; read-back is the stored switch)
+	/setparam/?autoupdate=off|notify|auto	(ESP32 only) Firmware auto update mode (same as --autoupdate; auto installs at 03:00-05:00 local; read-back is the stored mode)
+	/setparam/?updchan=prod|dev		(ESP32 only) Firmware update channel (same as --updchan; prod = icssw-org releases, dev = DK5EN releases; read-back is the stored channel)
 	/setparam/?setlat=XX.xxxxxx			Sets the latitude in decimal degrees (D.D°)
 	/setparam/?setlon=XX.xxxxxx			Sets the longitude in decimal degrees (D.D°)
 	/setparam/?setalt=XXX				Sets the altitude (in meters)
@@ -123,6 +125,9 @@ Functions available so far:
 	/callfunction/?sendpos				The node will send its position or path 
 	/callfunction/?reboot				The node will reboot 
 	/callfunction/?otaupdate			The node will binto the OTA updater
+	/callfunction/?updcheck			(ESP32 only) Check for a newer release now (same as --update check; 200 if the job started, 422 if busy or WiFi is down; read the result on the info page)
+	/callfunction/?updinstall		(ESP32 only) Download and stage the newest release (same as --update install; 200 if the job started or the image is already staged, 422 otherwise)
+	/callfunction/?updapply			(ESP32 only) Apply the staged image now (same as --update apply): the node reboots into Safeboot; 422 if nothing is staged
 
 
 

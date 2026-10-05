@@ -14,7 +14,7 @@
 //             read-back, then the FWS2 record into NVS.
 //
 // Battery, phone, WiFi-up policy and the retry timer (fwAttemptFailed) are the
-// caller's job (fw_update.h). Serial markers: [AU];check|refuse|dl|stage|fail|heap.
+// caller's job (fw_update.h). Serial markers: [AU];check|refuse|dl|stage|fail|heap|ble|alloc|tls.
 //
 // Bench staging (INSTRUMENT_ENABLED builds only, no symbol and no string in a release image):
 //   STAGELAN  the same stage path as DOWNLOAD (fwStageLayout, erase, write, read-back CRC,
@@ -128,6 +128,7 @@ inline bool fwLanUrlParse(const char *url, FwLanUrl &out)
 
 #if defined(ESP32)
 
+#include "sdkconfig.h" // CONFIG_IDF_TARGET_ESP32 (AU_BLE_PAUSE)
 #include "../fw_update.h"
 
 enum FwNetJob : uint8_t
@@ -185,6 +186,35 @@ void fwNetGetStatus(FwNetStatus &out);
 // A valid FWS2 record exists in NVS. Cached (read once, refreshed by DOWNLOAD),
 // cheap enough for every loop pass.
 bool fwNetStagedPending(void);
+
+// ---------------------------------------------------------------------------
+// BLE pause around CHECK / DOWNLOAD (AU-10, AU-D18). On the classic ESP32 the NimBLE stack
+// (controller, HCI buffers, host pools) holds heap that the TLS handshake needs: W0 measured
+// 58 KB free before TLS and a 5.4 KB minimum, and the P-384 chain verification then fails
+// with -9984. AU_BLE_PAUSE=1 (default on the classic ESP32 only; -DAU_BLE_PAUSE=0/1 overrides)
+// makes the job task stop the BLE stack when no phone is connected, run, and bring BLE back
+// up exactly as at boot before the job reports DONE. The two functions are defined in
+// esp32_main.cpp, which owns the BLE objects.
+// ---------------------------------------------------------------------------
+#ifndef AU_BLE_PAUSE
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#define AU_BLE_PAUSE 1
+#else
+#define AU_BLE_PAUSE 0
+#endif
+#endif
+
+// Stops advertising and the whole NimBLE stack (NimBLEDevice::deinit(true): the GATT
+// objects are rebuilt by the resume). Returns true if the stack WAS stopped (the caller must
+// call esp32BleResume()), false if nothing was done: no BLE, a phone is connected or ready,
+// or BLE is already down. Prints [AU];ble;pause;heap;<free>;blk;<largest> or
+// [AU];ble;pause;skip;<why>. Called from the job task, never from the loop task.
+bool esp32BlePause(void);
+
+// Re-initialises BLE exactly as at boot (stack, server, service, characteristics, callbacks,
+// advertising). True if BLE is up afterwards (also if it was never paused). Prints
+// [AU];ble;resume;ok|fail. Safe to call again after a failure.
+bool esp32BleResume(void);
 
 // Reads and decodes the record from NVS. False if there is none or it is invalid.
 // A record for another env, or whose tag is not newer than the running version, is

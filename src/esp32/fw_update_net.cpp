@@ -143,6 +143,46 @@ void heapMark(const char *when)
           (unsigned)uxTaskGetStackHighWaterMark(nullptr)); // bytes of stack never used
 }
 
+// Failed heap allocations while a job runs (heap_caps failed-alloc hook). mbedtls maps an
+// allocation failure inside the signature check of the chain verification to the same
+// -9984 (X509 verify failed) as a genuinely untrusted chain, and WiFiClientSecure frees the
+// TLS context (and with it the verify flags) before lastError() can be asked. A non-zero
+// count at the failure is the tell for "ran out of heap", zero means "untrusted". The hook
+// runs in the allocating context: counters only, no printing, no locking.
+volatile uint32_t s_afN, s_afFirstSize, s_afFirstCaps, s_afMaxSize;
+const char *volatile s_afFirstFn;
+
+void onAllocFail(size_t size, uint32_t caps, const char *fn)
+{
+    if (__atomic_fetch_add(&s_afN, 1u, __ATOMIC_RELAXED) == 0u)
+    {
+        s_afFirstSize = (uint32_t)size;
+        s_afFirstCaps = caps;
+        s_afFirstFn = fn;
+    }
+    if ((uint32_t)size > s_afMaxSize)
+        s_afMaxSize = (uint32_t)size;
+}
+
+void allocFailArm()
+{
+    s_afN = 0;
+    s_afFirstSize = 0;
+    s_afFirstCaps = 0;
+    s_afMaxSize = 0;
+    s_afFirstFn = nullptr;
+    heap_caps_register_failed_alloc_callback(onAllocFail); // one slot, idempotent
+}
+
+void allocFailMark(const char *when)
+{
+    const uint32_t n = s_afN;
+    const char *fn = s_afFirstFn;
+    auLog("[AU];alloc;%s;fails;%u;first;%u;caps;%x;max;%u;fn;%s\n", when, (unsigned)n,
+          (unsigned)s_afFirstSize, (unsigned)s_afFirstCaps, (unsigned)s_afMaxSize,
+          fn != nullptr ? fn : "-");
+}
+
 void copyStr(char *dst, size_t n, const char *src)
 {
     size_t i = 0;
@@ -338,6 +378,10 @@ const char *httpFail(int code, WiFiClientSecure &c)
     if (le != 0)
     {
         auLog("[AU];tls;%d;%s\n", le, eb);
+        // -9984 alone cannot tell "alloc failed" from "untrusted": the fail counter and the
+        // heap low-water mark can (fails > 0 and min near 0 = heap, else the chain)
+        allocFailMark("tls");
+        heapMark("tlsfail");
         snprintf(s_err, sizeof(s_err), "tls %d", le);
     }
     else
@@ -946,14 +990,37 @@ void fwNetTask(void *)
 {
     s_err[0] = '\0';
     heapMark("start");
+    allocFailArm();
+#if AU_BLE_PAUSE
+    // AU-D18: free the NimBLE stack's heap for the TLS handshake. Only CHECK and DOWNLOAD talk
+    // TLS; esp32BlePause() declines (false) while a phone is connected or ready.
+    const bool blePaused = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD) && esp32BlePause();
+#endif
     const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
 #if INSTRUMENT_ENABLED
                       : (s_argJob == FWJ_STAGELAN) ? runStageLan()
 #endif
                                                    : runDownload();
     heapMark("end"); // after every client object is gone
+    allocFailMark("end");
     if (err != nullptr)
         auLog("[AU];fail;%s\n", err);
+
+#if AU_BLE_PAUSE
+    // BLE comes back BEFORE the status leaves BUSY: nothing else starts a job meanwhile, and the
+    // loop treats BLE as down for the whole pause (esp32_main.cpp guards every BLE path).
+    if (blePaused)
+    {
+        bool up = false;
+        for (int i = 0; i < 3 && !up; i++)
+        {
+            if (i > 0)
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            up = esp32BleResume();
+        }
+        heapMark("resumed"); // a failed resume is retried by the loop (esp32_main.cpp)
+    }
+#endif
 
     portENTER_CRITICAL(&s_mux);
     if (err != nullptr)
