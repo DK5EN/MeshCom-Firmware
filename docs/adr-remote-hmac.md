@@ -197,3 +197,15 @@ DK5EN-1 (Heltec V3) to DK5EN-90 (RAK4631) and the reverse direction:
   was observed.
 - Fixed on the bench: the nRF52 rename failure on the mark file (now two slot files without rename),
   and replies parsed as commands at the sender (now `rmIsReply()`).
+
+## Bench evidence (2026-10-05 evening, `led on|off`, 2 dBm, DM only, own calls)
+
+DK5EN-92 (T-Beam, sender over USB serial) to DK5EN-1 (Heltec V3, OTA-flashed with `fbba3f46`):
+
+- `led on` (ctr 10) was answered `RM1 10 ok led=on`; the reply tag verified with `tools/remote_cmd.py --verify`.
+- `status` (ctr 14) after `led off` (ctr 13) reported `led=0`. The replies to ctr 12 and 13 were not
+  heard at the sender, the node state confirms ctr 13 executed.
+- `--remotemgmt` on DK5EN-1 was switched on for the test and restored to off afterwards.
+- Not done on hardware: the visible state of the white LED (not observed by the tester), the
+  `err unsupported` path on a T-Beam (DK5EN-92 still runs the previous image), and any
+  `BOARD_LED` board other than the V3 (compile-only).
