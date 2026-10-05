@@ -7,17 +7,17 @@ bench nodes DK5EN-1 (Heltec V3, 192.168.68.71) and DK5EN-92 (T-Beam, 192.168.68.
 
 ## Wave status log
 
-| Wave | Content                                                               | Status                            |
-| ---- | --------------------------------------------------------------------- | --------------------------------- |
-| W0   | native envs in platformio.ini, pio lock helper, this plan             | done                              |
-| W1a  | key store codec + ESP32/nRF52 persistence + native test               | done                              |
-| W1b  | sender policy, validators, status token, `rmSendCommandKey`           | done                              |
-| W1c  | web request guard (X-MC / Origin proof, Host allowlist) + native test | done                              |
-| G1   | wiring (guard, CORS, /rmsend viaSync, /rmstatus, --passwd), gate      | done (advisor 2 passes: APPROVED) |
-| W2a  | handlers (/rmpasswd, /rmnodes, /rmheard, send by slot), parse header  | done                              |
-| W2b  | Remote page HTML, scaffold JS, jsdom test                             | done                              |
-| G2   | wiring (route, nav, loadPage, old card removed), gate, advisor        | done                              |
-| W3   | bench: flash DK5EN-1 and DK5EN-92, browser click-through, docs        | pending                           |
+| Wave | Content                                                               | Status                              |
+| ---- | --------------------------------------------------------------------- | ----------------------------------- |
+| W0   | native envs in platformio.ini, pio lock helper, this plan             | done                                |
+| W1a  | key store codec + ESP32/nRF52 persistence + native test               | done                                |
+| W1b  | sender policy, validators, status token, `rmSendCommandKey`           | done                                |
+| W1c  | web request guard (X-MC / Origin proof, Host allowlist) + native test | done                                |
+| G1   | wiring (guard, CORS, /rmsend viaSync, /rmstatus, --passwd), gate      | done (advisor 2 passes: APPROVED)   |
+| W2a  | handlers (/rmpasswd, /rmnodes, /rmheard, send by slot), parse header  | done                                |
+| W2b  | Remote page HTML, scaffold JS, jsdom test                             | done                                |
+| G2   | wiring (route, nav, loadPage, old card removed), gate, advisor        | done                                |
+| W3   | bench: flash DK5EN-1 and DK5EN-92, browser click-through, docs        | done (2026-10-06, see Bench result) |
 
 Gate = `tools/regression.sh --stage 1,2`, clean sequential builds (heltec_wifi_lora_32_V3,
 ttgo_tbeam, wiscore_rak4631, plus one S3 board), string scan of the images, then an advisor pass
@@ -147,6 +147,25 @@ the route, the nav button and the `loadPage()` hook; W2b must not edit `web_func
 W0) is orchestrator-owned. Every `pio` call goes through
 `/private/tmp/claude-501/-Users-martinwerner-WebDev-MeshCom-Firmware-DEV-Main/d8e813ea-a8d3-4475-bd29-d3d9f628187b/scratchpad/pio_locked.sh`
 (one pio process at a time).
+
+## Bench result (2026-10-06, DK5EN-1 Heltec V3 `192.168.68.71`, DK5EN-92 T-Beam `192.168.68.75`, 2 dBm, DM to own node only)
+
+- Both nodes OTA-flashed with e6f6c35b (identity guard first).
+- Guard on hardware: img-style GET `/setparam` without `X-MC` and an attacker Referer 403, with `X-MC` 200,
+  rebinding Host 403, cross-origin POST 403, OPTIONS preflight 403, no CORS header on `/rmstatus`.
+- `/rmpasswd`: leading space, 15+ characters and `none` refused (`pw`), a valid password accepted.
+- `/rmnodes`: save, duplicate (`dup`), bad slot (`slot`); the list never contains a key; the saved node
+  survived a reboot of DK5EN-92.
+- Send by slot DK5EN-92 -> DK5EN-1: `status` (`s=gtdMwl p=2/22 led=0`), `led on`, `led off` confirmed; a lost
+  command ended as "no answer after 75 s"; the sender policy locked the target after two unanswered sends.
+  Replies can take longer than 14 s over LoRa.
+- Chrome (Remote page on DK5EN-92 via `dk5en-92.local`): sidebar intact (Setup icon + Remote mast), heard chips,
+  saved-node chip, Test connection, tiles with state from the last answer, countdown after each send,
+  Light on / off confirmed by the node (white LED lit on DK5EN-1), activity list in plain sentences.
+- Not done: Restart / Mesh off / TX power tiles and the page's password field were not clicked (the API
+  behind them was), RAK4631 hardware (compile only, flash 77.3 %), T-Beam `Light` hidden path, `http://<IP>/`
+  was refused by the Chrome tool itself, the `.local` name worked.
+- Observation: DK5EN-1 once reported `battery 0 %` in a status 4 min after boot (earlier `bat=100`).
 
 ## Deferred (known, not done)
 
