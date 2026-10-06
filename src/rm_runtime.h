@@ -68,6 +68,24 @@ struct RmStatus
 
 void rmGetStatus(RmStatus &out);
 
+// Everything of RmStatus except the log (no big object on the web handler's stack); the log, the sent
+// book and the targets are then streamed one entry at a time with the index accessors below. The book
+// cannot change between two calls (rmDrain() runs in this same loop task, never inside a web handler);
+// each accessor still returns false for an index past the current count, so a walk stops, never overreads.
+struct RmStatusHead
+{
+    bool on;
+    bool passwdSet;
+    bool lockActive;
+    uint32_t lockRemainS;
+    uint32_t hwm;
+    RmStats stats;
+};
+void rmGetStatusHead(RmStatusHead &out);
+
+uint8_t rmLogCount(void);                    // executed commands kept (<= 5), newest first
+bool rmLogAt(uint8_t i, RmLogEntry *out);    // false when i >= count
+
 // A command this node sent. verified = the reply's tag matched (HMAC under the target's key).
 struct RmSent
 {
@@ -119,7 +137,10 @@ bool rmSendCommandKey(const char *dst, const uint8_t key[32], const char *cmd, c
                       size_t errN, uint32_t *ctrOut, bool *viaSync = nullptr,
                    bool force = false);
 
-// Last (up to 5) sent commands, newest first; returns the count copied.
+// The sent book (up to 12 entries), newest first. rmSentAt() copies ONE entry (state/stateName/msg filled
+// as in rmGetSent); false when i >= rmSentCount(). rmGetSent() copies up to max entries, returns the count.
+uint8_t rmSentCount(void);
+bool rmSentAt(uint8_t i, RmSent *out);
 uint8_t rmGetSent(RmSent *out, uint8_t max);
 
 // Per managed node seen in the sent book (newest first), for the JSON writer.
@@ -136,6 +157,10 @@ struct RmTarget
                            // to this node
     const char *chainMsg;  // plain sentence for chainErr (static), nullptr when chainErr is
 };
+// Distinct managed nodes: every dst of the sent book once (newest first), then the pending chain's target
+// when it has no book entry yet. rmTargetAt() fills ONE; false when i >= rmTargetCount().
+uint8_t rmTargetCount(void);
+bool rmTargetAt(uint8_t i, RmTarget *out);
 uint8_t rmGetTargets(RmTarget *out, uint8_t max);
 
 // Policy probe for one call (upper case): true = a send would pass the sender policy now; retryS (optional)

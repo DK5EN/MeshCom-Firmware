@@ -13,6 +13,7 @@
 #include "hmac_sha256.h"
 #include "remote_cmd.h"
 #include "rm_queue.h"
+#include "rm_exec_ext.h"
 #include "rm_runtime.h"
 #include "rm_sender_policy.h"
 #include "rm_validate.h"
@@ -279,7 +280,14 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 #endif
     }
 
-    snprintf(res, n, "err blocked"); // unreachable: rmCheck() only passes the table above
+    // extended commands (rm_exec_ext.h): reads first, then writes
+    int ext = rmExecRead(c, res, n);
+    if (ext == 0)
+        ext = rmExecWrite(c, res, n);
+    if (ext != 0)
+        return ext > 0;
+
+    snprintf(res, n, "err blocked"); // unreachable: rmCheck() only passes the tables above
     return false;
 }
 
@@ -618,7 +626,7 @@ void rmDrain(void)
 
 // ---- RM-09 ----------------------------------------------------------------------------------------
 
-void rmGetStatus(RmStatus &out)
+void rmGetStatusHead(RmStatusHead &out)
 {
     if (!s_inited)
         rmInit();
@@ -633,9 +641,32 @@ void rmGetStatus(RmStatus &out)
     }
     out.hwm = s_state.hwm;
     out.stats = g_rmStats;
+}
+
+void rmGetStatus(RmStatus &out)
+{
+    RmStatusHead h;
+    rmGetStatusHead(h);
+    memset(&out, 0, sizeof(out));
+    out.on = h.on;
+    out.passwdSet = h.passwdSet;
+    out.lockActive = h.lockActive;
+    out.lockRemainS = h.lockRemainS;
+    out.hwm = h.hwm;
+    out.stats = h.stats;
     out.nlog = s_nlog;
     for (uint8_t i = 0; i < s_nlog; i++)
         out.log[i] = s_log[i];
+}
+
+uint8_t rmLogCount(void) { return s_nlog; }
+
+bool rmLogAt(uint8_t i, RmLogEntry *out)
+{
+    if (out == nullptr || i >= s_nlog)
+        return false;
+    *out = s_log[i];
+    return true;
 }
 
 namespace
@@ -988,55 +1019,101 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
     return ok;
 }
 
+uint8_t rmSentCount(void) { return s_nsent; }
+
+bool rmSentAt(uint8_t i, RmSent *out)
+{
+    if (out == nullptr || i >= s_nsent) // a shrunken book ends the caller's walk, never a read past the count
+        return false;
+    *out = s_sent[i].pub;
+    RmPolEntry pe;
+    polEntryOf(s_sent[i], pe);
+    const RmEntryState st = rmPolicyState(pe, millis());
+    out->state = (uint8_t)st;
+    out->stateName = rmStateName(st);
+    out->msg = rmEntryMessage(st, s_sent[i].pub.reply);
+    return true;
+}
+
 uint8_t rmGetSent(RmSent *out, uint8_t max)
 {
     if (out == nullptr)
         return 0;
-    const uint32_t now = millis();
-    uint8_t n = (s_nsent < max) ? s_nsent : max;
-    for (uint8_t i = 0; i < n; i++)
-    {
-        out[i] = s_sent[i].pub;
-        RmPolEntry pe;
-        polEntryOf(s_sent[i], pe);
-        const RmEntryState st = rmPolicyState(pe, now);
-        out[i].state = (uint8_t)st;
-        out[i].stateName = rmStateName(st);
-        out[i].msg = rmEntryMessage(st, s_sent[i].pub.reply);
-    }
+    uint8_t n = 0;
+    while (n < max && rmSentAt(n, &out[n]))
+        n++;
     return n;
+}
+
+namespace
+{
+// The idx-th distinct managed node, newest first: every dst of the sent book once, then the pending
+// chain's target when it has no book entry yet. nullptr past the end.
+const char *targetDstAt(uint8_t idx)
+{
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nsent; i++)
+    {
+        bool dup = false;
+        for (uint8_t j = 0; j < i && !dup; j++)
+            dup = (strcmp(s_sent[j].pub.dst, s_sent[i].pub.dst) == 0);
+        if (dup)
+            continue;
+        if (n == idx)
+            return s_sent[i].pub.dst;
+        n++;
+    }
+    if (s_pend.used)
+    {
+        bool inBook = false;
+        for (uint8_t i = 0; i < s_nsent && !inBook; i++)
+            inBook = (strcmp(s_sent[i].pub.dst, s_pend.dst) == 0);
+        if (!inBook && n == idx)
+            return s_pend.dst;
+    }
+    return nullptr;
+}
+} // namespace
+
+uint8_t rmTargetCount(void)
+{
+    uint8_t n = 0;
+    while (targetDstAt(n) != nullptr)
+        n++;
+    return n;
+}
+
+bool rmTargetAt(uint8_t i, RmTarget *out)
+{
+    const char *dst = targetDstAt(i);
+    if (out == nullptr || dst == nullptr)
+        return false;
+    const uint32_t now = millis();
+    RmTarget &t = *out;
+    memset(&t, 0, sizeof(t));
+    snprintf(t.dst, sizeof(t.dst), "%s", dst);
+    const RmPolDecision d = policyFor(t.dst, now);
+    t.locked = (d.reason == RM_POL_LIMIT);
+    t.retryS = d.retryS;
+    t.canForce = d.canForce;
+    const RmProof *pf = rmProofFind(s_proof, t.dst);
+    t.cap = (pf != nullptr) ? pf->cap : 0;
+    t.pending = s_pend.used && strcmp(s_pend.dst, t.dst) == 0;
+    if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, t.dst) == 0)
+    {
+        t.chainErr = s_chainErr.tok;
+        t.chainMsg = rmErrTokenMessage(s_chainErr.tok);
+    }
+    return true;
 }
 
 uint8_t rmGetTargets(RmTarget *out, uint8_t max)
 {
     if (out == nullptr)
         return 0;
-    const uint32_t now = millis();
     uint8_t n = 0;
-    for (uint8_t i = 0; i < s_nsent && n < max; i++)
-    {
-        bool seen = false;
-        for (uint8_t j = 0; j < n; j++)
-            if (strcmp(out[j].dst, s_sent[i].pub.dst) == 0)
-                seen = true;
-        if (seen)
-            continue;
-        RmTarget &t = out[n++];
-        memset(&t, 0, sizeof(t));
-        snprintf(t.dst, sizeof(t.dst), "%s", s_sent[i].pub.dst);
-        const RmPolDecision d = policyFor(t.dst, now);
-        t.locked = (d.reason == RM_POL_LIMIT);
-        t.retryS = d.retryS;
-        t.canForce = d.canForce;
-        const RmProof *pf = rmProofFind(s_proof, t.dst);
-        t.cap = (pf != nullptr) ? pf->cap : 0;
-        t.pending = s_pend.used && strcmp(s_pend.dst, t.dst) == 0;
-        if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, t.dst) == 0)
-        {
-            t.chainErr = s_chainErr.tok;
-            t.chainMsg = rmErrTokenMessage(s_chainErr.tok);
-        }
-    }
+    while (n < max && rmTargetAt(n, &out[n]))
+        n++;
     return n;
 }
 

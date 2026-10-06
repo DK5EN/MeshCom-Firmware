@@ -38,12 +38,14 @@ void sub_rm_nodes_post(long content_length);
 /** GET /rmheard   {"heard":[{"call":"","hw":"HELTEC_V3","age_s":120,"rssi":-95},...]}  at most 12 */
 void sub_rm_heard(void);
 
-/** Sends cmd/args (wire form: lower case) to the node saved in slot 0..2 with that slot's key. Loads the
- *  store into a local struct, hands the key to rmSendCommandKey(), scrubs the struct on every path.
- *  false + err token: "slot" (out of range or unused), else the tokens of rmSendCommandKey()
- *  ("cmd", "busy", "limit", ...). */
+/** Sends cmd (wire form: lower case) and args (as typed) to the node saved in slot 0..2 with that slot's
+ *  key. Loads the store into a local struct, hands the key to rmSendCommandKey(), scrubs the struct on
+ *  every path. expectCall (optional, nullptr or "" = no guard): the send is refused unless the slot
+ *  currently holds exactly that call (case-insensitive), before any key is derived or counter used.
+ *  false + err token: "slot" (out of range, unused or guard mismatch), else the tokens of
+ *  rmSendCommandKey() ("cmd", "busy", "limit", ...). */
 bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync,
-                 bool force = false);
+                  bool force = false, const char *expectCall = nullptr);
 
 /** Policy probe for a saved slot (for the /rmsend refusal reply): returns true when a send would pass now;
  *  retryS = seconds until it would, canForce = refused with LIMIT and the one-shot after a re-key is armed.

@@ -77,6 +77,11 @@
 //                                                                       tx frames sent; rt retransmissions;
 //                                                                       dr dropped; u channel utilisation
 //                                                                       percent (0..100)
+//                                                                       Firmware note: tx and dr are the
+//                                                                       counters of the running statistics
+//                                                                       interval, not totals since boot; rt
+//                                                                       and u are 0 where the node keeps no
+//                                                                       such value.
 //  mbox    m=heard u=12/50 b=1834 a=3/20 st=<c> dl=<c> ak=<c>           m off | own | list | heard; u
 //          dr=<c> bl=<c> nt=<c>                                         used/slots; b stored bytes; a
 //                                                                       mailbox actions in the last hour

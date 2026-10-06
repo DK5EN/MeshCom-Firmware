@@ -139,7 +139,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(19, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(32, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -196,9 +196,9 @@ static void test_vectors_replies_reproduced(void)
     if (!read_repo_file("tools/tests/remote_cmd_vectors.json", json))
         TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
 
-    static std::string objs[32];
+    static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(8, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(25, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -314,7 +314,7 @@ static void test_parse_rejects_malformed(void)
         "RM1 1 reboot 3F9AC2E17B0D5E44",          // upper-case tag
         "RM1 1 reboot 3f9ac2e17b0d5e4g",          // non-hex
         "RM1 1 REBOOT 3f9ac2e17b0d5e44",          // upper-case cmd
-        "RM1 1 gps ON 3f9ac2e17b0d5e44",          // upper-case args
+        "RM1 1 Gps on 3f9ac2e17b0d5e44",          // mixed-case cmd (capitals in args parse since W2-A; the shape refuses "gps ON", see test_ext_args_survive_parse_build_and_check)
         "RM1 0 reboot 3f9ac2e17b0d5e44",          // ctr 0 only with sync
         "RM1 01 reboot 3f9ac2e17b0d5e44",         // leading zero
         "RM1 00 sync 3f9ac2e17b0d5e44",
@@ -1002,7 +1002,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(19, n);
+    TEST_ASSERT_EQUAL_INT(32, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1091,9 +1091,9 @@ static void test_verify_reply_vectors_and_tampering(void)
     if (!read_repo_file("tools/tests/remote_cmd_vectors.json", json))
         TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
 
-    static std::string objs[32];
-    const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT(8, n);
+    static std::string objs[64];
+    const size_t n = objectsOf(json, "replies", objs, 64);
+    TEST_ASSERT_EQUAL_INT(25, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1109,7 +1109,7 @@ static void test_verify_reply_vectors_and_tampering(void)
         uint8_t key[32];
         rmDeriveKey(passwd.c_str(), key);
 
-        char got[80];
+        char got[RM_MAX_RESULT + 1];
         memset(got, 'x', sizeof(got));
         TEST_ASSERT_TRUE_MESSAGE(rmVerifyReply(text.c_str(), dst.c_str(), src.c_str(), ctr, key, got, sizeof(got)), msg);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(result.c_str(), got, msg);
@@ -1306,6 +1306,118 @@ static void test_allowlist_table_equivalence(void)
     }
 }
 
+// ---- W2-A: the nine extended names, syntax only (concept 4.4) ------------------------------------------
+
+static void test_ext_allowlist_accepts_and_rejects(void)
+{
+    struct { const char *cmd, *args; bool ok; } v[] = {
+        {"radio", "", true}, {"radio", "x", false}, {"sens", "", true}, {"sens", "1", false},
+        {"txq", "", true}, {"txq", "x", false}, {"mbox", "", true}, {"mbox", "0", false},
+        {"maxhop", "", true}, {"maxhop", "on", false},
+        {"name", "", true}, {"name", "Martin", true}, {"name", "martin", true}, {"name", "A", true},
+        {"name", "Max Mustermann", true}, {"name", "1234567890123456789", true},
+        {"name", "12345678901234567890", false}, // 20 chars
+        {"name", "a{b", false}, {"name", "a|b", false}, {"name", "a:b", false}, {"name", "a}b", false},
+        {"name", "a;b", false}, {"name", "a%b", false}, {"name", "a--b", false},
+        {"atxt", "", true}, {"atxt", "MeshCom Garten", true}, {"atxt", "a{b", false}, {"atxt", "a|b", false},
+        {"atxt", "a:b", false}, {"atxt", "123456789012345678901234567890123456789", true}, // 39
+        {"atxt", "1234567890123456789012345678901234567890", false},                        // 40
+        {"pos", "", true}, {"pos", "48.40812 11.73812 492", true}, {"pos", "-48.4 -11.7 3", true},
+        {"pos", "1 2", false}, {"pos", "a b c", false}, {"pos", "1 2 3 4", false}, {"pos", "48.4,11.7,492", false},
+        {"mh", "0", true}, {"mh", "999", true}, {"mh", "1000", false}, {"mh", "", false},
+        {"mh", "DK5EN-98", true}, {"mh", "dk5en-98", true}, {"mh", "DK5EN", true}, {"mh", "DK5EN-98 x", false},
+        {"mh", "DK5EN-", false}, {"mh", "DK5EN-123", false}, {"mh", "DK5|EN", false},
+        // the old shapes keep their exact lower-case grammar
+        {"gps", "ON", false}, {"txpower", "1O", false}, {"setout", "A0 on", false}, {"setout", "a0 ON", false},
+        {"Radio", "", false}, {"RADIO", "", false},
+    };
+    for (auto &t : v)
+    {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s '%s'", t.cmd, t.args);
+        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 22), msg);
+    }
+}
+
+static void test_ext_args_survive_parse_build_and_check(void)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    const char *cases[][2] = {{"name", "Martin"}, {"atxt", "MeshCom Garten"}, {"mh", "DK5EN-98"}, {"pos", "48.40812 11.73812 492"}};
+    for (auto &t : cases)
+    {
+        char wire[160];
+        const size_t n = rmBuildCommand(DST, SRC, 7, t[0], t[1], key, wire, sizeof(wire));
+        TEST_ASSERT_TRUE_MESSAGE(n > 0, t[0]);
+        RmCmd c;
+        TEST_ASSERT_TRUE_MESSAGE(rmParse(wire, c), t[0]);
+        TEST_ASSERT_EQUAL_STRING(t[0], c.cmd);
+        TEST_ASSERT_EQUAL_STRING(t[1], c.args); // capitals kept byte for byte
+        RmState s;
+        rmStateInit(s, 0);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(RM_OK, rmCheck(s, c, DST, SRC, PW, 22, 1000), t[0]);
+    }
+    // a capital in the command name or in the tag region stays refused on the wire
+    RmCmd c;
+    TEST_ASSERT_FALSE(rmParse("RM1 7 Name Martin 0123456789abcdef", c));
+    TEST_ASSERT_FALSE(rmParse("RM1 7 name Martin 0123456789abcdeF", c));
+    char w0[160];
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 7, "Name", "Martin", key, w0, sizeof(w0)) > 0);
+    TEST_ASSERT_FALSE(rmParse(w0, c)); // the receiver never sees a capital in the command name
+    // old lower-case-only shape: "gps ON" is a counted BLOCKED reject
+    char wire[160];
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 8, "gps", "ON", key, wire, sizeof(wire)) > 0);
+    TEST_ASSERT_TRUE(rmParse(wire, c));
+    TEST_ASSERT_EQUAL_STRING("ON", c.args); // the parser keeps the bytes, the shape refuses them
+    RmState s;
+    rmStateInit(s, 0);
+    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000));
+}
+
+// the canonical string joins fields with '|' and the (cmd, args) split is the first space: no args text can
+// forge another split or another field
+static void test_ext_separator_cannot_be_injected_through_args(void)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    char wire[160];
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", "x|RM1|a|b|9|reboot", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", "Max|Muster", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", "|", 22));
+    // a correctly tagged frame with a separator in the text is still a counted BLOCKED reject
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 5, "name", "Max|Muster", key, wire, sizeof(wire)) > 0);
+    RmCmd bad;
+    TEST_ASSERT_TRUE(rmParse(wire, bad));
+    RmState bs;
+    rmStateInit(bs, 0);
+    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(bs, bad, DST, SRC, PW, 22, 1000));
+    // a second command smuggled through the args of a free-text command is a different tag on a different
+    // canonical: (name, "x reboot") and (name x, reboot) cannot collide because only ONE space-split exists
+    RmCmd a, b;
+    memset(&a, 0, sizeof(a));
+    memset(&b, 0, sizeof(b));
+    a.ctr = b.ctr = 5;
+    strcpy(a.cmd, "name");
+    strcpy(a.args, "x reboot");
+    strcpy(b.cmd, "name x");
+    strcpy(b.args, "reboot");
+    char ca[96], cb[96];
+    TEST_ASSERT_TRUE(rmCanonical(a, DST, SRC, ca, sizeof(ca)) > 0);
+    TEST_ASSERT_TRUE(rmCanonical(b, DST, SRC, cb, sizeof(cb)) > 0);
+    // identical canonical strings, but cmd "name x" is never allowlisted and rmParse never yields a cmd with a space
+    TEST_ASSERT_FALSE(rmCommandAllowed("name x", "reboot", 22));
+    RmCmd p;
+    TEST_ASSERT_TRUE(rmParse("RM1 5 name x reboot 0123456789abcdef", p));
+    TEST_ASSERT_EQUAL_STRING("name", p.cmd);
+    TEST_ASSERT_EQUAL_STRING("x reboot", p.args);
+    TEST_ASSERT_TRUE(strchr(ca, '|') != nullptr);
+    // only the 5 fixed '|' separators exist in the canonical string
+    int bars = 0;
+    for (const char *q = ca; *q; q++)
+        bars += (*q == '|');
+    TEST_ASSERT_EQUAL_INT(4, bars);
+}
+
 static void test_legacy_replies_stay_within_63_and_cap_token(void)
 {
     // worst-case status and the sync reply of the existing commands stay readable by older operators
@@ -1340,8 +1452,8 @@ static void test_status_vectors_parse(void)
 {
     std::string json;
     TEST_ASSERT_TRUE(read_repo_file("tools/tests/remote_cmd_vectors.json", json));
-    static std::string objs[32];
-    const size_t n = objectsOf(json, "replies", objs, 32);
+    static std::string objs[64];
+    const size_t n = objectsOf(json, "replies", objs, 64);
     int seen = 0, caps = 0;
     for (size_t i = 0; i < n; i++)
     {
@@ -1423,6 +1535,9 @@ int main(int, char **)
     RUN_TEST(test_args_39_roundtrip_and_40_refused);
     RUN_TEST(test_sanitiser_vectors);
     RUN_TEST(test_allowlist_table_equivalence);
+    RUN_TEST(test_ext_allowlist_accepts_and_rejects);
+    RUN_TEST(test_ext_args_survive_parse_build_and_check);
+    RUN_TEST(test_ext_separator_cannot_be_injected_through_args);
     RUN_TEST(test_legacy_replies_stay_within_63_and_cap_token);
     RUN_TEST(test_status_vectors_parse);
     RUN_TEST(test_receiver_unlock_clears_lock_only);

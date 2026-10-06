@@ -29,7 +29,7 @@
 
 static_assert(RM_FORM_SLOTS == RM_NODES_SLOTS, "parser and store disagree on the slot count");
 
-#define RM_BODY_MAX RM_FORM_BODY_MAX // 200
+#define RM_BODY_MAX RM_FORM_BODY_MAX // 260
 #define RM_BODY_TIMEOUT_MS 2000UL    // no byte for this long
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body
 #define RM_HEARD_MAX 12
@@ -185,12 +185,13 @@ void sub_rm_nodes_post(long content_length)
 }
 
 bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync,
-                  bool force)
+                  bool force, const char *expectCall)
 {
     bool ok = false;
     RmNodes ns; // local: scrubbed on every path
 
-    if (slot < 0 || slot >= RM_NODES_SLOTS || !rmNodesLoad(ns) || !ns.slot[slot].used)
+    if (slot < 0 || slot >= RM_NODES_SLOTS || !rmNodesLoad(ns) || !ns.slot[slot].used ||
+        (expectCall != nullptr && expectCall[0] != '\0' && !rmCallEq(expectCall, ns.slot[slot].call))) // guard: nothing derived, no counter
     {
         if (err != nullptr && errN > 0)
             snprintf(err, errN, "slot");

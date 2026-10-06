@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "hmac_sha256.h"
+#include "rm_text.h"
 
 static_assert(RM_MAX_ARGS == 39, "args cap is part of the wire contract (concept 2.2)");
 static_assert(RM_MAX_RESULT == 108, "4+10+1+108+1+16 = 140 = the DM text limit");
@@ -139,21 +140,29 @@ enum RmArgShape : uint8_t
     RM_ARGS_ONOFF,   // "on" | "off"
     RM_ARGS_TXPOWER, // 0..maxTxPower, at most 3 digits
     RM_ARGS_SETOUT,  // "<pin> <on|off>", pin a0..a7 or b0..b7 (the console's --setout MCP pins)
+    // extended commands (RM ext W2-A): SYNTAX only, ranges and the strict charset are the executor's
+    // job (err range / err text). Capitals are allowed here and only here (concept 2.4).
+    RM_ARGS_NAME,    // none (read) | free text 1..19 (write)
+    RM_ARGS_ATXT,    // none (read) | free text 1..39 (write)
+    RM_ARGS_POS,     // none (read) | "<lat> <lon> <alt>" (write)
+    RM_ARGS_MH,      // row index 0..999 | callsign with optional SSID
 };
 
 struct RmAllowRow
 {
     const char *name;
     RmArgShape shape;
-    bool write; // class: false = read-only, true = changes node state
 };
 
 const RmAllowRow RM_ALLOWLIST[] = {
-    {"reboot", RM_ARGS_NONE, true},     {"status", RM_ARGS_NONE, false},    {"sendpos", RM_ARGS_NONE, true},
-    {"sendtrack", RM_ARGS_NONE, true},  {"sync", RM_ARGS_NONE, false},      {"gps", RM_ARGS_ONOFF, true},
-    {"track", RM_ARGS_ONOFF, true},     {"display", RM_ARGS_ONOFF, true},   {"led", RM_ARGS_ONOFF, true},
-    {"gateway", RM_ARGS_ONOFF, true},   {"mesh", RM_ARGS_ONOFF, true},      {"txpower", RM_ARGS_TXPOWER, true},
-    {"setout", RM_ARGS_SETOUT, true},
+    {"reboot", RM_ARGS_NONE},     {"status", RM_ARGS_NONE},    {"sendpos", RM_ARGS_NONE},
+    {"sendtrack", RM_ARGS_NONE},  {"sync", RM_ARGS_NONE},      {"gps", RM_ARGS_ONOFF},
+    {"track", RM_ARGS_ONOFF},     {"display", RM_ARGS_ONOFF},   {"led", RM_ARGS_ONOFF},
+    {"gateway", RM_ARGS_ONOFF},   {"mesh", RM_ARGS_ONOFF},      {"txpower", RM_ARGS_TXPOWER},
+    {"setout", RM_ARGS_SETOUT},   {"radio", RM_ARGS_NONE},     {"sens", RM_ARGS_NONE},
+    {"txq", RM_ARGS_NONE},       {"mbox", RM_ARGS_NONE},      {"maxhop", RM_ARGS_NONE},
+    {"name", RM_ARGS_NAME},      {"atxt", RM_ARGS_ATXT},      {"pos", RM_ARGS_POS},
+    {"mh", RM_ARGS_MH},
 };
 
 bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
@@ -172,6 +181,20 @@ bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
     case RM_ARGS_SETOUT:
         return strlen(a) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
                isOnOff(a + 3);
+    case RM_ARGS_NAME:
+        return a[0] == '\0' || rmArgIsFreeText(a, 19);
+    case RM_ARGS_ATXT:
+        return a[0] == '\0' || rmArgIsFreeText(a, 39);
+    case RM_ARGS_POS:
+        return a[0] == '\0' || rmArgIsPos(a);
+    case RM_ARGS_MH:
+    {
+        // an all-digit token is a row index only (4+ digits must not pass as a callsign)
+        bool digits = a[0] != '\0';
+        for (const char *q = a; *q; q++)
+            digits = digits && *q >= '0' && *q <= '9';
+        return digits ? rmArgIsRowIndex(a) : rmArgIsCall(a);
+    }
     }
     return false;
 }
@@ -272,10 +295,12 @@ bool rmParse(const char *text, RmCmd &out)
     if (len >= 200 || len < 4 + 1 + 1 + 1 + 1 + 16 || strncmp(text, "RM1 ", 4) != 0)
         return false;
 
+    // printable ASCII only. Capitals are refused in the command name and the tag (checked below); the
+    // args may carry them where an allowlist shape allows it (free text, callsign), nothing is case-folded
     for (size_t i = 3; i < len; i++) // "RM1" itself is upper case
     {
         const unsigned char ch = (unsigned char)text[i];
-        if (ch < 0x20 || ch > 0x7e || (ch >= 'A' && ch <= 'Z'))
+        if (ch < 0x20 || ch > 0x7e)
             return false;
     }
     if (text[len - 1] == ' ')
@@ -314,7 +339,7 @@ bool rmParse(const char *text, RmCmd &out)
     size_t cl = 0;
     while (i < bodyEnd && text[i] != ' ')
     {
-        if (cl + 1 >= sizeof(out.cmd))
+        if (cl + 1 >= sizeof(out.cmd) || (text[i] >= 'A' && text[i] <= 'Z'))
             return false;
         out.cmd[cl++] = text[i++];
     }
@@ -532,13 +557,13 @@ bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower)
         return false;
     memcpy(c.cmd, cmd, strlen(cmd));
     memcpy(c.args, args, strlen(args));
-    // wire form is lower case ASCII, single spaces (rmParse); anything else could never be received
+    // wire form: lower case command name, printable ASCII args (capitals only where a shape allows them,
+    // allowed() decides), single spaces (rmParse); anything else could never be received
     for (const char *p = cmd; *p; p++)
         if (*p < 'a' || *p > 'z')
             return false;
     for (const char *p = args; *p; p++)
-        if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e || (*p >= 'A' && *p <= 'Z') ||
-            (*p == ' ' && (p[1] == ' ' || p[1] == '\0' || p == args)))
+        if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e || (*p == ' ' && (p[1] == ' ' || p[1] == '\0' || p == args)))
             return false;
     return !isForbiddenText(c.cmd) && !isForbiddenText(c.args) && allowed(c, maxTxPower);
 }

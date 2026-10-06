@@ -70,6 +70,17 @@ ALLOWLIST: Dict[str, Any] = {
     "txpower": "int",
     "setout": "out",
     "sync": None,
+    # extended commands (RM ext W2-A): syntax only, ranges and the strict charset are the
+    # executor's job (err range / err text). Capitals are allowed in the args of these shapes only.
+    "radio": None,
+    "sens": None,
+    "txq": None,
+    "mbox": None,
+    "maxhop": None,
+    "name": "name",  # none (read) | free text 1..19 (write)
+    "atxt": "atxt",  # none (read) | free text 1..39 (write)
+    "pos": "pos",    # none (read) | "<lat> <lon> <alt>" (write)
+    "mh": "mh",      # row index 0..999 | callsign with optional SSID
 }
 
 # Hard-blocked whatever the tag (6.4). Checked before the allowlist so the
@@ -87,6 +98,11 @@ _INT_RE = re.compile(r"^(0|[1-9][0-9]{0,2})$")
 _OUT_RE = re.compile(r"[ab][0-7] (on|off)")
 _CALL_RE = re.compile(r"^[A-Z0-9/]{2,12}(-[0-9]{1,2})?$")   # upper case: the node binds its configured call
 _SEND_CALL_RE = re.compile(r"^[A-Z0-9/]{2,12}-[0-9]{1,2}$")
+_ROW_RE = re.compile(r"[0-9]{1,3}")
+_COORD = r"-?[0-9]{1,3}(\.[0-9]{1,6})?"
+_POS_RE = re.compile(_COORD + " " + _COORD + " [0-9]{1,5}")
+_MHCALL_RE = re.compile(r"[A-Z0-9]{3,9}|[A-Z0-9]{2,8}-[0-9]{1,2}")  # 3..9 chars total, either case on the wire
+_TEXT_BAD = set("{}|:")  # wire-level: '|' is the canonical separator
 _TAG_RE = re.compile(r"^[0-9a-f]{16}$")
 
 
@@ -135,6 +151,27 @@ def _check_ctr(ctr: int) -> None:
         raise RmError("ctr out of range 0..%d" % CTR_MAX)
 
 
+_MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh")
+
+
+def _check_ext_args(cmd: str, shape: str, args: str) -> None:
+    """Syntax of the extended shapes (mirrors argsMatch in src/remote_cmd.cpp)."""
+    if shape in ("name", "atxt", "pos") and args == "":
+        return  # read form
+    if shape in ("name", "atxt"):
+        limit = 19 if shape == "name" else 39
+        if not 1 <= len(args) <= limit or any(c in _TEXT_BAD for c in args):
+            raise RmError("%s needs free text of 1..%d characters without { } | :" % (cmd, limit))
+    elif shape == "pos":
+        if not _POS_RE.fullmatch(args):
+            raise RmError("pos needs '<lat> <lon> <alt>'")
+    elif args.isdigit():  # an all-digit token is a row index only
+        if not _ROW_RE.fullmatch(args):
+            raise RmError("mh row index is 0..999")
+    elif not (len(args) <= 9 and _MHCALL_RE.fullmatch(args.upper())):
+        raise RmError("mh needs a row index 0..999 or a callsign")
+
+
 def validate_command(cmd: str, args: str, ctr: int) -> None:
     """Raise RmError unless (cmd, args, ctr) is an allowlisted RM1 command."""
     _check_ctr(ctr)
@@ -150,8 +187,11 @@ def validate_command(cmd: str, args: str, ctr: int) -> None:
         raise RmError("command %r is hard-blocked" % cmd)
     if not text.isascii() or not text.isprintable():
         raise RmError("non-printable or non-ASCII text")
-    if text != text.lower():
-        raise RmError("cmd/args must be lower case")
+    if cmd != cmd.lower():
+        raise RmError("cmd must be lower case")
+    # args stay lower case except where a shape allows capitals (free text, callsign); nothing is case-folded
+    if args != args.lower() and ALLOWLIST.get(cmd) not in _MIXED_CASE_SHAPES:
+        raise RmError("args must be lower case")
     if "  " in text or text != text.strip():
         raise RmError("single spaces only, no leading/trailing space")
     if cmd not in ALLOWLIST:
@@ -167,6 +207,8 @@ def validate_command(cmd: str, args: str, ctr: int) -> None:
     elif shape == "out":
         if not _OUT_RE.fullmatch(args):
             raise RmError("setout needs '<a0..a7|b0..b7> <on|off>'")
+    elif shape in _MIXED_CASE_SHAPES:
+        _check_ext_args(cmd, shape, args)
     elif args not in shape:
         raise RmError("%s needs one of %s" % (cmd, "|".join(shape)))
 
@@ -280,6 +322,20 @@ _VECTOR_CMDS = [
     ("secret", "DK5EN-90", "DK5EN-14", 1, "reboot", ""),  # src binding vs vector 1
     ("secret", "DK5EN-90", "DK5EN-1", 52, "led", "on"),
     ("secret", "DK5EN-90", "DK5EN-1", 53, "led", "off"),
+    # RM ext W2-A: the nine extended names (read and write forms; mh row and call)
+    ("secret", "DK5EN-90", "DK5EN-1", 60, "radio", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 61, "sens", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 62, "txq", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 63, "mbox", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 64, "maxhop", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 65, "name", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 66, "name", "Martin"),
+    ("secret", "DK5EN-90", "DK5EN-1", 67, "atxt", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 68, "atxt", "MeshCom Garten"),
+    ("secret", "DK5EN-90", "DK5EN-1", 69, "pos", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 70, "pos", "48.40812 11.73812 492"),
+    ("secret", "DK5EN-90", "DK5EN-1", 71, "mh", "0"),
+    ("secret", "DK5EN-90", "DK5EN-1", 72, "mh", "DK5EN-98"),
 ]
 
 _VECTOR_REPLIES = [
@@ -293,6 +349,24 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 55, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22"),
     ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1"),
     ("secret", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a rm=%d" % CAP_LEVEL),
+    # RM ext W2-A: worst-case result of every extended formatter (strings of test_rm_format) and the error tokens
+    ("secret", "DK5EN-90", "DK5EN-1", 80, "ok f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99"),
+    ("secret", "DK5EN-90", "DK5EN-1", 81, "ok t=-99.9 h=100 p=1099.9 t2=-99.9"),
+    ("secret", "DK5EN-90", "DK5EN-1", 82, "ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100"),
+    ("secret", "DK5EN-90", "DK5EN-1", 83, "ok m=heard u=65535/65535 b=999999 a=65535/65535 st=4294M dl=4294M ak=4294M dr=4294M bl=4294M nt=4294M"),
+    ("secret", "DK5EN-90", "DK5EN-1", 84, "ok t=99 p=99"),
+    ("secret", "DK5EN-90", "DK5EN-1", 85, "ok n=NNNNNNNNNNNNNNNNNNN"),
+    ("secret", "DK5EN-90", "DK5EN-1", 86, "ok a=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+    ("secret", "DK5EN-90", "DK5EN-1", 87, "ok -89.99999 -179.99999 40000 nofix"),
+    ("secret", "DK5EN-90", "DK5EN-1", 4294967294, "ok 999 107 DK5EN-001 180 DK5EN-002 180 DK5EN-003 180 DK5EN-004 180 DK5EN-005 180 DK5EN-006 180 DK5EN-007 180"),
+    ("secret", "DK5EN-90", "DK5EN-1", 89, "ok d g=1 m=1 r=-140 s=-20 la=-90.0000 lo=-180.0000 di=9999.9 a=40000 n=255 x=255 h=255 t=65535"),
+    ("secret", "DK5EN-90", "DK5EN-1", 90, "ok r h=255 k=255 g=1 m=1 rc=-99.9@DK5EN-001 t=65535 v=DK5EN-001,DK5EN-002,DK5EN-003,DK5EN-004,DK5EN-005"),
+    ("secret", "DK5EN-90", "DK5EN-1", 91, "err text"),
+    ("secret", "DK5EN-90", "DK5EN-1", 92, "err unknown"),
+    ("secret", "DK5EN-90", "DK5EN-1", 93, "err unsupported"),
+    ("secret", "DK5EN-90", "DK5EN-1", 94, "err end"),
+    ("secret", "DK5EN-90", "DK5EN-1", 95, "err gps"),
+    ("secret", "DK5EN-90", "DK5EN-1", 96, "err hidden"),
 ]
 
 

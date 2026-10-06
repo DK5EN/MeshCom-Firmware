@@ -17,7 +17,7 @@
 //     part of an error, and the value pointers of a failed parse point at a static empty string.
 //
 // Error tokens: "size" (body longer than RM_FORM_BODY_MAX), "form", "act", "slot", "call", "pw",
-// "cmd" (cmd or args missing, over-long or not lower-case printable).
+// "cmd" (cmd or args missing, over-long or not printable ASCII).
 #ifndef WEB_RM_PARSE_H
 #define WEB_RM_PARSE_H
 
@@ -301,11 +301,33 @@ static inline RmNodesReq rmParseNodesBody(char *body)
     return r;
 }
 
+// Case-insensitive call compare (the slot guard: a typed "dk5en-12" equals the saved "DK5EN-12").
+static inline bool rmCallEq(const char *a, const char *b)
+{
+    if (a == nullptr || b == nullptr)
+        return false;
+    for (; *a != '\0' && *b != '\0'; a++, b++)
+    {
+        char x = *a, y = *b;
+        if (x >= 'a' && x <= 'z')
+            x = (char)(x - 'a' + 'A');
+        if (y >= 'a' && y <= 'z')
+            y = (char)(y - 'a' + 'A');
+        if (x != y)
+            return false;
+    }
+    return *a == *b;
+}
+
 // ---------------------------------------------------------------------------------------------------
 // POST /rmsend   dst=<call>&pw=<pw>&cmd=<cmd>&args=<args>   |   slot=0..2&cmd=<cmd>&args=<args>
 // (args optional in both; an optional force=1|0 may follow in both, absent = 0, any other value, a
-// duplicate or an empty value is the "form" error). cmd and args are folded to lower case (the wire form, rmCommandAllowed()
-// requires it); dst is folded to upper case and must pass rmValidateCall(). The password of the dst
+// duplicate or an empty value is the "form" error). cmd is folded to lower case (the wire form,
+// rmCommandAllowed() requires it); args reach the wire exactly as typed (names keep their capitals; the
+// allowlist still refuses e.g. "gps ON"); dst is folded to upper case and must pass rmValidateCall(). The
+// slot form takes an optional call=<CALL> (folded like dst): rmSendBySlot() refuses the send unless the
+// saved slot holds exactly that call (page "Run again" guard); call with the dst form is a "form" error,
+// an invalid call is the "call" error. The password of the dst
 // form is NOT judged here: rmSendCommand() owns that rule (it strips trailing spaces first); it must
 // only be present and free of control bytes. The allowlist is rmCommandAllowed()'s job.
 
@@ -316,8 +338,9 @@ struct RmSendReq
     const char *dst;  // dst form: upper case, rmValidateCall() passed; else ""
     const char *pw;   // dst form: as sent (non-empty); else ""
     const char *cmd;  // lower case, 1..15 printable bytes
-    const char *args; // lower case, 0..39 printable bytes ("" when absent)
+    const char *args; // as typed, 0..39 printable bytes ("" when absent)
     bool force;       // optional field force=1 (true) | force=0 / absent (false)
+    const char *call; // slot form guard: upper case, rmValidateCall() passed; "" when absent
 };
 
 static inline RmSendReq rmParseSendBody(char *body)
@@ -330,14 +353,15 @@ static inline RmSendReq rmParseSendBody(char *body)
     r.cmd = rmparse::emptyStr();
     r.args = rmparse::emptyStr();
     r.force = false;
+    r.call = rmparse::emptyStr();
     if (rmparse::bodyTooLong(body))
     {
         r.err = RM_ERR_SIZE;
         return r;
     }
-    static const char *const keys[] = {"slot", "dst", "pw", "cmd", "args", "force"};
-    char *v[6];
-    if (!rmparse::split(body, keys, 6, v))
+    static const char *const keys[] = {"slot", "dst", "pw", "cmd", "args", "force", "call"};
+    char *v[7];
+    if (!rmparse::split(body, keys, 7, v))
     {
         r.err = RM_ERR_FORM;
         return r;
@@ -351,6 +375,12 @@ static inline RmSendReq rmParseSendBody(char *body)
         }
     }
     const bool slotForm = v[0] != nullptr;
+    if (v[6] != nullptr && !slotForm)
+    {
+        // call is the slot form's guard; the dst form names its target itself
+        r.err = RM_ERR_FORM;
+        return r;
+    }
     if (slotForm && (v[1] != nullptr || v[2] != nullptr))
     {
         // slot together with dst/pw: two forms in one request
@@ -366,6 +396,15 @@ static inline RmSendReq rmParseSendBody(char *body)
             return r;
         }
         r.slot = s;
+        if (v[6] != nullptr)
+        {
+            if (strlen(v[6]) > RM_CALL_MAX || (rmparse::upper(v[6]), !rmValidateCall(v[6])))
+            {
+                r.err = RM_ERR_CALL;
+                r.slot = -1;
+                return r;
+            }
+        }
     }
     else
     {
@@ -398,9 +437,7 @@ static inline RmSendReq rmParseSendBody(char *body)
         r.slot = -1;
         return r;
     }
-    rmparse::lower(v[3]);
-    if (v[4] != nullptr)
-        rmparse::lower(v[4]);
+    rmparse::lower(v[3]); // cmd only: args stay as typed
     if (!slotForm)
     {
         r.dst = v[1];
@@ -409,6 +446,8 @@ static inline RmSendReq rmParseSendBody(char *body)
     r.cmd = v[3];
     r.args = v[4] != nullptr ? v[4] : rmparse::emptyStr();
     r.force = v[5] != nullptr && v[5][0] == '1';
+    if (v[6] != nullptr)
+        r.call = v[6];
     return r;
 }
 

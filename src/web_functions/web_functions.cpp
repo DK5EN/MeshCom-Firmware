@@ -559,6 +559,7 @@ static int web_read_body(long content_length)
 /** POST /rmsend   body: dst=<call>&pw=<target password>&cmd=<cmd>&args=<args>   (all percent-encoded)
  *             or: slot=<0..2>&cmd=<cmd>&args=<args>   (a saved node: its key comes from the store, never a password)
  *             optional &force=1: use the one "try once more" after a re-key (only where canForce is reported)
+ *             optional &call=<CALL> (slot form only): refused with "slot" unless the slot holds exactly that call
  *  answer: {"ok":true,"ctr":N[,"viaSync":true]} or {"ok":false,"err":"<reason>","retry":S,"canForce":0|1}
  *  -- never an echo of any input */
 static void sub_rm_send(long content_length)
@@ -584,7 +585,7 @@ static void sub_rm_send(long content_length)
             snprintf(err, sizeof(err), "%s", q.err);
         else if (q.slot >= 0)
         {
-            ok = rmSendBySlot(q.slot, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync, q.force);
+            ok = rmSendBySlot(q.slot, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync, q.force, q.call);
             if (!ok)
                 rmSlotTargetInfo(q.slot, &retryS, &canForce);
         }
@@ -609,7 +610,8 @@ static void sub_rm_send(long content_length)
     }
 }
 
-/** GET /rmstatus -- this node's RM state, the last 5 executed commands and the last 5 sent ones.
+/** GET /rmstatus -- this node's RM state, the last 5 executed commands, the whole sent book (<= 12) and
+ *  every managed node (distinct dst of the book + the pending chain's target); streamed entry by entry.
  *  Never a key, a tag or a password. All text is printable ASCII, < > & escaped (rm_json_str).
  *  {"on":0|1,"pw":0|1,"ok":N,"rej":N,"lock":0|1,"lockS":N,"hwm":N,
  *   "log":[{"ago":S,"src":"","ctr":N,"cmd":"","res":""},...],
@@ -622,65 +624,64 @@ static void sub_rm_status(void)
     send_http_header(200, RESPONSE_TYPE_JSON);
 
     {
-        RmStatus st;
-        rmGetStatus(st);
+        RmStatusHead st;
+        rmGetStatusHead(st);
         const unsigned long rej = (unsigned long)st.stats.rej_format + st.stats.rej_tag + st.stats.rej_replay +
                                   st.stats.rej_blocked + st.stats.rej_rate + st.stats.rej_lockout + st.stats.rej_disabled;
         web_client.printf("{\"on\":%d,\"pw\":%d,\"ok\":%lu,\"rej\":%lu,\"lock\":%d,\"lockS\":%lu,\"hwm\":%lu,\"log\":[",
                           st.on ? 1 : 0, st.passwdSet ? 1 : 0, (unsigned long)st.stats.ok, rej, st.lockActive ? 1 : 0,
                           (unsigned long)st.lockRemainS, (unsigned long)st.hwm);
-        for (uint8_t i = 0; i < st.nlog && i < 5; i++)
+        RmLogEntry le; // one entry at a time (P10): no copy of the whole log on the stack
+        for (uint8_t i = 0, shown = 0; i < rmLogCount() && rmLogAt(i, &le); i++, shown++)
         {
-            web_client.printf("%s{\"ago\":%lu,\"src\":", i ? "," : "", (unsigned long)((uint32_t)(now - st.log[i].ms) / 1000UL));
-            rm_json_str(st.log[i].src);
-            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)st.log[i].ctr);
-            rm_json_str(st.log[i].cmd);
+            web_client.printf("%s{\"ago\":%lu,\"src\":", shown ? "," : "", (unsigned long)((uint32_t)(now - le.ms) / 1000UL));
+            rm_json_str(le.src);
+            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)le.ctr);
+            rm_json_str(le.cmd);
             web_client.print(",\"res\":");
-            rm_json_str(st.log[i].result);
+            rm_json_str(le.result);
             web_client.print("}");
         }
         web_client.print("]");
     }
 
     {
-        RmSent sent[5];
-        const uint8_t n = rmGetSent(sent, 5);
+        RmSent sent; // the whole book (<= 12), one entry at a time
         web_client.print(",\"sent\":[");
-        for (uint8_t i = 0; i < n && i < 5; i++)
+        for (uint8_t i = 0; rmSentAt(i, &sent); i++)
         {
             web_client.printf("%s{\"dst\":", i ? "," : "");
-            rm_json_str(sent[i].dst);
-            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)sent[i].ctr);
-            rm_json_str(sent[i].cmd);
-            web_client.printf(",\"ago\":%lu,\"rep\":%d,\"ver\":%d,\"reply\":", (unsigned long)((uint32_t)(now - sent[i].sentMs) / 1000UL),
-                              sent[i].replied ? 1 : 0, sent[i].verified ? 1 : 0);
-            rm_json_str(sent[i].reply);
+            rm_json_str(sent.dst);
+            web_client.printf(",\"ctr\":%lu,\"cmd\":", (unsigned long)sent.ctr);
+            rm_json_str(sent.cmd);
+            web_client.printf(",\"ago\":%lu,\"rep\":%d,\"ver\":%d,\"reply\":", (unsigned long)((uint32_t)(now - sent.sentMs) / 1000UL),
+                              sent.replied ? 1 : 0, sent.verified ? 1 : 0);
+            rm_json_str(sent.reply);
             web_client.print(",\"st\":");
-            rm_json_str(sent[i].stateName);
+            rm_json_str(sent.stateName);
             web_client.print(",\"msg\":");
-            rm_json_str(sent[i].msg);
+            rm_json_str(sent.msg);
             web_client.print("}");
         }
         web_client.print("]");
     }
 
     {   // RM GUI W1b: per managed node, the sender policy as the GUI needs it (locked after 2 unanswered sends)
-        RmTarget tg[4];
-        const uint8_t nt = rmGetTargets(tg, 4);
+        RmTarget tg; // every distinct dst of the book plus the pending chain's target, one at a time
         web_client.print(",\"targets\":[");
-        for (uint8_t i = 0; i < nt && i < 4; i++)
+        for (uint8_t i = 0; rmTargetAt(i, &tg); i++)
         {
             web_client.printf("%s{\"dst\":", i ? "," : "");
-            rm_json_str(tg[i].dst);
-            web_client.printf(",\"locked\":%d,\"retry\":%lu,\"canForce\":%d,\"cap\":%u,\"pending\":%d,\"chainErr\":", tg[i].locked ? 1 : 0,
-                              (unsigned long)tg[i].retryS, tg[i].canForce ? 1 : 0, (unsigned)tg[i].cap, tg[i].pending ? 1 : 0);
-            if (tg[i].chainErr != nullptr)
-                rm_json_str(tg[i].chainErr);
+            rm_json_str(tg.dst);
+            web_client.printf(",\"locked\":%d,\"retry\":%lu,\"canForce\":%d,\"cap\":%u,\"pending\":%d,\"chainErr\":", tg.locked ? 1 : 0,
+                              (unsigned long)tg.retryS, tg.canForce ? 1 : 0, (unsigned)tg.cap, tg.pending ? 1 : 0);
+            if (tg.chainErr != nullptr)
+                rm_json_str(tg.chainErr);
             else
                 web_client.print("null");
             web_client.print(",\"chainMsg\":");
-            if (tg[i].chainMsg != nullptr)
-                rm_json_str(tg[i].chainMsg);
+            if (tg.chainMsg != nullptr)
+                rm_json_str(tg.chainMsg);
             else
                 web_client.print("null");
             web_client.print("}");

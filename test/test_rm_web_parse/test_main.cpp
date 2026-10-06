@@ -288,6 +288,102 @@ static void test_send_force_field(void)
     }
 }
 
+static void test_send_call_guard_and_args_case(void)
+{
+    struct CallCase
+    {
+        const char *body;
+        const char *err; // nullptr = ok
+        int slot;
+        const char *call; // expected r.call ("" when absent / on error)
+        const char *cmd;
+        const char *args;
+    };
+    const CallCase cases[] = {
+        // call present, case folded like dst
+        {"slot=1&cmd=reboot&call=DK5EN-12", nullptr, 1, "DK5EN-12", "reboot", ""},
+        {"slot=1&cmd=reboot&call=dk5en-12", nullptr, 1, "DK5EN-12", "reboot", ""},
+        {"slot=2&cmd=reboot&call=%64k5en-12&force=1", nullptr, 2, "DK5EN-12", "reboot", ""}, // %64 = 'd'
+        {"call=OE1ABC-15&slot=0&cmd=gps&args=on", nullptr, 0, "OE1ABC-15", "gps", "on"},     // field order free
+        // absent: today's behaviour, call is ""
+        {"slot=1&cmd=reboot", nullptr, 1, "", "reboot", ""},
+        // empty, duplicate, too long, invalid characters: "call" / "form"
+        {"slot=1&cmd=reboot&call=", RM_ERR_CALL, -1, "", "", ""},
+        {"slot=1&cmd=reboot&call=DK5EN-1&call=DK5EN-1", RM_ERR_FORM, -1, "", "", ""},
+        {"slot=1&cmd=reboot&call=DK5EN-1234", RM_ERR_CALL, -1, "", "", ""},   // 10 > RM_CALL_MAX
+        {"slot=1&cmd=reboot&call=DK5%20N-1", RM_ERR_CALL, -1, "", "", ""},    // space
+        {"slot=1&cmd=reboot&call=DK5EN%2F1", RM_ERR_CALL, -1, "", "", ""},    // '/'
+        {"slot=1&cmd=reboot&call=%3Cb%3E", RM_ERR_CALL, -1, "", "", ""},      // <b>
+        {"slot=1&cmd=reboot&call=DK5EN%00", RM_ERR_FORM, -1, "", "", ""},     // control byte
+        // call with the dst form is two forms in one request
+        {"dst=DK5EN-1&pw=x&cmd=reboot&call=DK5EN-1", RM_ERR_FORM, -1, "", "", ""},
+        // a bad slot still wins by its own token; call does not hide a cmd error
+        {"slot=3&cmd=reboot&call=DK5EN-1", RM_ERR_SLOT, -1, "", "", ""},
+        {"slot=1&cmd=&call=DK5EN-1", RM_ERR_CMD, -1, "", "", ""},
+        // args case: as typed on the wire, cmd still folded
+        {"slot=0&cmd=gps&args=Martin", nullptr, 0, "", "gps", "Martin"},
+        {"slot=0&cmd=gps&args=%4Dartin", nullptr, 0, "", "gps", "Martin"},
+        {"slot=0&cmd=GPS&args=ON", nullptr, 0, "", "gps", "ON"},
+        {"dst=dk5en-1&pw=x&cmd=SetName&args=Hans%20MuLLer", nullptr, -1, "", "setname", "Hans MuLLer"},
+    };
+    for (const CallCase &c : cases)
+    {
+        Buf b(c.body);
+        RmSendReq r = rmParseSendBody(b.b);
+        char msg[300];
+        snprintf(msg, sizeof msg, "body '%s'", c.body);
+        if (c.err == nullptr)
+        {
+            TEST_ASSERT_NULL_MESSAGE(r.err, msg);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(c.slot, r.slot, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.call, r.call, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.cmd, r.cmd, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.args, r.args, msg);
+        }
+        else
+        {
+            TEST_ASSERT_NOT_NULL_MESSAGE(r.err, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.err, r.err, msg);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(-1, r.slot, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("", r.call, msg); // no input byte on the error path
+        }
+    }
+}
+
+static void test_send_worst_case_slot_body_fits(void)
+{
+    // slot form, every field fully %-encoded: slot + cmd(15) + args(39) + force + call(9)
+    std::string s = "slot=0&cmd=";
+    for (int i = 0; i < RM_FORM_CMD_MAX; i++)
+        s += "%61";
+    s += "&args=";
+    for (int i = 0; i < RM_FORM_ARGS_MAX; i++)
+        s += "%41";
+    s += "&force=1&call=";
+    s += "%4F%45%31%41%42%43%2D%31%35"; // "OE1ABC-15", the longest valid call
+    TEST_ASSERT_TRUE_MESSAGE(s.size() <= (size_t)RM_FORM_BODY_MAX, "worst-case slot form must fit RM_FORM_BODY_MAX");
+    Buf b(s.c_str());
+    RmSendReq r = rmParseSendBody(b.b);
+    TEST_ASSERT_NULL(r.err);
+    TEST_ASSERT_EQUAL_INT(39, (int)strlen(r.args));
+    TEST_ASSERT_EQUAL_STRING("OE1ABC-15", r.call);
+}
+
+static void test_call_eq(void)
+{
+    TEST_ASSERT_TRUE(rmCallEq("DK5EN-12", "dk5en-12"));
+    TEST_ASSERT_TRUE(rmCallEq("dk5en-12", "DK5EN-12"));
+    TEST_ASSERT_TRUE(rmCallEq("OE1ABC-15", "OE1ABC-15"));
+    TEST_ASSERT_FALSE(rmCallEq("DK5EN-1", "DK5EN-12")); // prefix
+    TEST_ASSERT_FALSE(rmCallEq("DK5EN-12", "DK5EN-1"));
+    TEST_ASSERT_FALSE(rmCallEq("DK5EN-12", "DK5EN-13"));
+    TEST_ASSERT_FALSE(rmCallEq("", "DK5EN-1"));
+    TEST_ASSERT_TRUE(rmCallEq("", ""));
+    TEST_ASSERT_FALSE(rmCallEq(nullptr, "A"));
+    TEST_ASSERT_FALSE(rmCallEq("A", nullptr));
+}
+
+
 static void test_send_table(void)
 {
     static const SendCase cases[] = {
@@ -295,7 +391,7 @@ static void test_send_table(void)
         {"dst=dk5en-1&pw=hunter2&cmd=reboot&args=", nullptr, -1, "DK5EN-1", "hunter2", "reboot", ""},
         {"dst=DK5EN-1&pw=hunter2&cmd=reboot", nullptr, -1, "DK5EN-1", "hunter2", "reboot", ""},        // args optional
         {"dst=DK5EN-1&pw=a%20b%26c&cmd=TXPOWER&args=10", nullptr, -1, "DK5EN-1", "a b&c", "txpower", "10"},
-        {"dst=DK5EN-1&pw=a+b&cmd=gps&args=ON", nullptr, -1, "DK5EN-1", "a+b", "gps", "on"},             // '+' literal
+        {"dst=DK5EN-1&pw=a+b&cmd=gps&args=ON", nullptr, -1, "DK5EN-1", "a+b", "gps", "ON"},             // '+' literal; args keep their case (W2-D)
         {"cmd=gps&args=on%20x&dst=DK5EN-1&pw=x", nullptr, -1, "DK5EN-1", "x", "gps", "on x"},
         // trailing space in the dst-form password is rmSendCommand()'s business (it strips), not ours
         {"dst=DK5EN-1&pw=abc%20&cmd=gps", nullptr, -1, "DK5EN-1", "abc ", "gps", ""},
@@ -536,6 +632,9 @@ int main(int, char **)
     RUN_TEST(test_nodes_table);
     RUN_TEST(test_send_table);
     RUN_TEST(test_send_force_field);
+    RUN_TEST(test_send_call_guard_and_args_case);
+    RUN_TEST(test_send_worst_case_slot_body_fits);
+    RUN_TEST(test_call_eq);
     RUN_TEST(test_body_size_limits);
     RUN_TEST(test_values_point_into_body);
     RUN_TEST(test_leak_error_tokens_never_contain_canary);

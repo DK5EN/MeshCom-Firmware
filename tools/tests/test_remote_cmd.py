@@ -55,7 +55,7 @@ def test_vector_file_is_current() -> None:
 
 
 def test_allowlist_command_count() -> None:
-    assert len(rc.ALLOWLIST) == 13
+    assert len(rc.ALLOWLIST) == 22
     assert rc.ALLOWLIST["led"] == ("on", "off")
 
 
@@ -157,7 +157,7 @@ def test_dm_text_is_firmware_safe() -> None:
         text = v.get("dm_text") or v["reply_text"]
         assert text.startswith("RM1 ")
         assert not any(c in text for c in "{%;:\n\r")
-        assert len(text) <= 100
+        assert len(text) <= (140 if "reply_text" in v else 100)
 
 
 GOOD = rc.build_reply(DST, SRC, 42, "ok rebooting", PW)
@@ -218,3 +218,25 @@ def test_lower_case_call_refused() -> None:
     for dst, src in (("dk5en-90", "DK5EN-1"), ("DK5EN-90", "dk5en-1")):
         with pytest.raises(rc.RmError):
             rc.build_command(dst, src, 5, "status", "", "secret")
+
+
+EXT_CASES = [
+    ("radio", "", True), ("radio", "x", False), ("sens", "", True), ("txq", "x", False), ("mbox", "", True),
+    ("maxhop", "", True), ("name", "", True), ("name", "Martin", True), ("name", "1234567890123456789", True),
+    ("name", "12345678901234567890", False), ("name", "a{b", False), ("name", "a|b", False), ("name", "a:b", False),
+    ("atxt", "MeshCom Garten", True), ("atxt", "a" * 39, True), ("atxt", "a" * 40, False), ("atxt", "a|b", False),
+    ("pos", "", True), ("pos", "48.40812 11.73812 492", True), ("pos", "1 2", False), ("pos", "a b c", False),
+    ("mh", "0", True), ("mh", "999", True), ("mh", "1000", False), ("mh", "DK5EN-98", True),
+    ("mh", "dk5en-98", True), ("mh", "DK5EN-98 x", False), ("mh", "", False),
+    ("gps", "ON", False), ("setout", "A0 on", False), ("Radio", "", False),
+]
+
+
+def test_extended_shapes_match_the_firmware_table() -> None:
+    for cmd, args, ok in EXT_CASES:
+        try:
+            rc.validate_command(cmd, args, 5)
+            got = True
+        except rc.RmError:
+            got = False
+        assert got is ok, (cmd, args)
