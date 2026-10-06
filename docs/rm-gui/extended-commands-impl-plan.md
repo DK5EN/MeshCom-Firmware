@@ -138,33 +138,45 @@ Extern-UDP). All three are accepted.
 | W0c  | done 2026-10-06: `dmTextIsRm1Frame()` / `dmTextNoRetransmit(text, isDM)` in `dm_text_escape.h`; an `RM1 ` DM gets no `{NNN` and ring status 0xFF from any origin; group texts unaffected (advisor rework). On-air proof is a bench item in W3: `[NEW-TXT]` line without a trailing `{NNN`, no ACK frame at the receiver                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | W1   | done 2026-10-06: formatters (`rm_format.h`), text validation and XSS escaping incl. over-the-air sinks (`rm_text.h`, `web_functions.cpp`, lint), sender policy (window 150 s, budget 2 / 10 with the `rm=2` capability gate, 12-slot book, per-target forget, one forced attempt after a re-key, receiver unlock, password clear switches RM off), receiver no longer counts authenticated replays, page fixes P1-P6 and P9 with Run again. Two advisor passes with rework. Gate 67 envs / 2170 cases, 785 pytest, 142 page checks. Carried into W2: `/rmstatus` lists only 4 targets and 5 sent entries (P10); Run again by slot should also post the call so a slot changed in another tab is refused; BLE settings write can leave an empty password with RM on (harmless, backlog)                                                                                                                                                                                          |
 | W2   | done 2026-10-06: 22 command names in the allowlist (args keep their case), read executors `rm_exec_read.cpp` and write executors `rm_exec_write.cpp` behind `rm_exec_ext.h`, Python twin and vectors (32 commands, 25 replies, longest 108 / 140), `/rmstatus` streamed (12 sent entries, all targets), slot guard `call=`, page cards (Radio, Name, APRS text, Position, Sensors, TX queue, Mailbox, Max hop, heard list with driver and details), capability gate, forced attempt. Advisor: firmware side approved, page side reworked (forced attempt and slot sends bound to their node, run stops on page leave). Gate 67 envs / 2176 cases, 816 pytest, 238 page checks. Notes: `pos` answers `err hidden` exactly when no position is set (the firmware has no other beacon switch); `txq` reports `rt` and `u` as 0 (no counter exists) and `tx`/`dr` per statistics interval; routed `mh` never carries `rc`; no host test env for the two executor files (bench only) |
-| W3   | partly done 2026-10-06: gates green on 3ffa916f (67 envs / 2176 cases, 816 pytest, 238 page checks; flash t_echo 76.4 %, heltec_t114 73.5 %, RAK4631 80.7 %, Heltec V3 53.3 %, T-Beam 56.6 %, E22_XML 56.6 % with RAM 20.2 %); identity guard passed on both nodes over USB. OPEN: flash and bench (section 9): the OTA flash was refused by the session's permission mode                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| W3   | done 2026-10-06 except the items listed in section 9: gates green on 3ffa916f (67 envs / 2176 cases, 816 pytest, 238 page checks; flash t_echo 76.4 %, heltec_t114 73.5 %, RAK4631 80.7 %, Heltec V3 53.3 %, T-Beam 56.6 %, E22_XML 56.6 % with RAM 20.2 %); both nodes OTA-flashed and benched DK5EN-92 to DK5EN-1 (section 9)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
-## 9. Bench checklist (open)
+## 9. Bench result (2026-10-06) and what is still open
 
-Nodes (2026-10-06): DK5EN-1 Heltec V3 `dk5en-1.local` (192.168.68.56, USB serial 0001), DK5EN-92
-T-Beam `dk5en-92.local` (192.168.68.57, USB serial 573C000584). 192.168.68.62 is the production
-node DK5EN-98: never a target. Both bench nodes passed `tools/bench/identity_guard.py` over USB
-(own call, 2 dBm).
+Setup: DK5EN-1 Heltec V3 (192.168.68.56) and DK5EN-92 T-Beam (192.168.68.57), both OTA-flashed with
+the 3ffa916f build (`tools/webflash.py`), identity guard passed before and after (own calls,
+2 dBm). Sender DK5EN-92 through its web API (`/rmsend` with the saved slot of DK5EN-1 and
+`call=DK5EN-1`), target DK5EN-1, DMs on air. 192.168.68.62 is the production node DK5EN-98: never
+a target; `tools/webflash.py` without a host argument targets dk5en-98.local.
 
-1. Flash both: `python3 tools/webflash.py --env heltec_wifi_lora_32_V3 dk5en-1.local` and
-   `python3 tools/webflash.py --env ttgo_tbeam dk5en-92.local` (always name the host: the tool's
-   default is dk5en-98.local). Identity guard again afterwards.
-2. Both nodes: own password set, `--remotemgmt on`, each saved as a node on the other's Remote page.
-3. From DK5EN-92 to DK5EN-1 and back, Remote page or `tools/remote_cmd.py --send-host`:
-   - Check connection: the `sync` reply ends in `rm=2`, the cards unlock;
-   - every read, compared with the node's own console: `radio` and `maxhop` and `name`/`atxt`
-     against `--info`, `pos` against `--pos`, `sens` against the WX page, `mh 0` and following
-     pages against `--mheard`, `mh <call>` against `--mheard` / `--path`, `txq`, `mbox` on DK5EN-1
-     (DK5EN-92 must answer `err unsupported`);
-   - writes: `name Martin` (capital kept, survives a reboot), `atxt`, `pos` with GPS off, `pos`
-     with GPS on answers `err gps`, a text with `<` answers `err text`, `pos 91 0 0` `err range`;
-   - `--passwd none` on a node prints `[RM];off;passwd_cleared` and `--remotemgmt` reads off.
-4. Transport: with `--info on` the `[NEW-TXT]` line of an `RM1 ` DM has no trailing `{NNN`, the
-   receiver sends no ACK, the sender shows no retry.
-5. Policy: wrong password at the fastest rate the page allows: two tag rejects, no lockout; one
-   "Try once more" after a re-key; then the right password. `sync` twice within 60 s: the second
-   is not answered. A replayed frame: `[RM];reject;replay`, no lockout after three.
-6. Web: a node name `<b>x` set over the console shows as text on every page; the RX-log page
-   shows a received text with `<` as text.
-7. Not exercised: any radio parameter write (none exists), T-Echo and T114 (no hardware).
+| Check                        | Result                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sync`                       | `ok ctr=... v=4.40a rm=2`; the sender then reports `cap` 2 for the target                                                                                          |
+| `status`                     | `ok v=4.40a up=1 bat=100 heap=118 s=gtdMwl p=2/22 led=0` (54 characters, legacy form intact)                                                                       |
+| `radio`                      | `ok f=433.175 sf=11 cr=6 bw=250 p=2/22`                                                                                                                            |
+| `name`, `atxt`, `pos` (read) | `ok n=Martin`, `ok a=MeshCom Freising`, `ok 48.40760 11.73840 485 set`                                                                                             |
+| `sens`                       | `err unsupported` (no sensor on the Heltec)                                                                                                                        |
+| `maxhop`, `txq`, `mbox`      | `ok t=4 p=2`; `ok q=2/20 bp=quiet tx=1 rt=0 dr=0 u=0`; `ok m=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0`                                                  |
+| `mh 0`                       | `ok 3 - DK5EN-92 0 DK5EN-98 1 DL2JA-2 6`; same three calls as the target's own `/rmheard`                                                                          |
+| `mh <call>`                  | direct: `ok d g=0 m=1 r=-41 s=6 la=- lo=- di=- a=- n=3 x=0 h=2 t=0`; lower-case argument accepted; unknown call `err unknown`; `mh 5` `err end`                    |
+| Writes                       | `name Bench Node 1`, `atxt Bench Test (W3)`, `pos 48.40812 11.73812 492`: each answered with the stored value, read back, restored; `pos 91 0 0` `err range`       |
+| Persistence                  | `name Bench Node 2`, remote `reboot`, `name` after the reboot still `Bench Node 2`; restored to `Martin`                                                           |
+| `sync` limiter               | a second `sync` inside 60 s stayed unanswered                                                                                                                      |
+| Wrong password               | first wrong-key frame sent, second refused locally with `limit` and `canForce` 1 (an unanswered `sync` already counted); one wrong-key frame = one reject; no lock |
+| Right password afterwards    | works after the window; the target's capability is learned again by the next `sync`                                                                                |
+| `/rmstatus` depth            | 12 sent entries listed                                                                                                                                             |
+| Loss                         | 3 of about 40 frames stayed unanswered (2 dBm next to the 22 dBm production node); with no retry ladder a lost frame shows as "no answer" and is repeated by hand  |
+| Reply latency                | 9 to 39 s per command                                                                                                                                              |
+
+Still open:
+
+1. Reverse direction and `mbox` on the T-Beam (`err unsupported`): needs remote management on and
+   the password of DK5EN-92.
+2. `--passwd none` switching remote management off (`[RM];off;passwd_cleared`): would discard a
+   node password that is not known here.
+3. Transport on the wire: `[NEW-TXT]` line without `{NNN`, no ACK at the receiver (needs a serial
+   or net-console log; opening USB reboots the node, the net console needs the node password).
+4. `pos` with GPS on (`err gps`), the forced attempt after a re-key (it locks the target for
+   5 minutes when the password is wrong), a replayed frame (`[RM];reject;replay`, no lockout).
+5. The Remote page in a browser (cards, heard-list reader, Run again), and the escaping of a
+   hostile name on the node's pages.
+6. T-Echo and T114 (no hardware), RAK4631 (compile and link only).
