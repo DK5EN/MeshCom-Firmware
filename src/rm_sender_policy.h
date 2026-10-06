@@ -4,7 +4,8 @@
 // math is unsigned 32-bit subtraction, so a millis() wrap at 2^32 is harmless.
 //
 //  1. Send policy per target: a rejected RM1 frame (wrong key, stale counter, even a wrong-key sync)
-//     is SILENT on air and counts toward the target's lockout (3 within 90 s = 5 min locked, and the
+//     is SILENT on air and counts toward the target's lockout of THIS sender's call (3 within 90 s =
+//     5 min locked; per sender since 2026-10-06, an older target locks itself for everybody; the
 //     sender can not see any of it). So the sender allows at most N unanswered sends to one target
 //     inside RM_POLICY_WINDOW_MS (150 s = 90 s reject window + 30 s path delay + 30 s margin) and
 //     spaces sends to one target by 10 s (the target rate limits to one per 10 s). N is 2 until a
@@ -237,7 +238,7 @@ inline const char *rmStateMessage(RmEntryState s)
         return "Sent. Waiting for the node to answer, this can take up to a minute.";
     case RM_ST_NOANSWER:
         return "No answer after 75 seconds. Check the password, the distance and that remote "
-               "management is on at the other node. A third failed try locks it for 5 minutes.";
+               "management is on at the other node. A third failed try locks you out of it for 5 minutes.";
     case RM_ST_OK:
         return "Done. The node confirmed the command.";
     case RM_ST_ERR:
@@ -266,7 +267,7 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"storage", "The node could not save its counter, so it did not run the command."},
         {"blocked", "The node does not accept this command or value."},
         {"rate", "Too fast. The node accepts one command every 10 seconds."},
-        {"lockout", "The node is locked for 5 minutes after too many wrong tries."},
+        {"lockout", "The node has locked you out for 5 minutes after too many wrong tries."},
         {"replay", "The node has seen this counter already. Try again."},
         {"tag", "The password does not match the one on the node."},
         {"sync", "The counters are out of step. Check the connection first, then try again."},
@@ -275,7 +276,7 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"cached", "The node repeated its earlier answer."},
         // sender-side refusals
         {"limit", "Two tries to this node are still unanswered. Wait before trying again, a third "
-                  "wrong try could lock it for 5 minutes."},
+                  "wrong try could lock you out for 5 minutes."},
         {"busy", "Wait a few seconds. This node takes one command every 10 seconds."},
         {"passwd", "The password is not valid: 1 to 14 plain characters, no space at the start or end."},
         {"dst", "That call sign is not valid, or it is this node."},

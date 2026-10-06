@@ -279,7 +279,7 @@ void rmScaffoldJs()
     web_client.println("rmTxt('rm_cnt','Executed '+j.ok+', rejected '+j.rej+', counter high-water '+j.hwm+'.');}\n"
                        "function rmRenderSelf(){var j=rmStat,o=rmEl('rm_on');if(!j)return;o.checked=!!j.on;o.disabled=!j.pw&&!j.on;o.style.display=rmEl('rm_onlbl').style.display=j.pw||j.on?'':'none';\n"
                        "rmTxt('rm_pwstate','password: '+(j.pw?'set':'not set'),'font-small');");
-    web_client.println("rmTxt('rm_lockstate',j.lock?'Remote commands blocked for '+(j.lockS||1)+' s after wrong attempts':'','font-small');\n"
+    web_client.println("rmTxt('rm_lockstate',j.lock?'A sender is blocked for '+(j.lockS||1)+' s after wrong attempts':'','font-small');\n"
                        "rmTxt('rm_onhint',j.pw?'':'Set a password first, then switch remote management on.','font-small');}\n"
                        "function rmRender(){if(!rmShown||!rmEl('rm_page'))return;var k=rmKn(),dis=!rmValidCall(rmSel.call)||rmLocked();\n"
                        "rmRenderNode();rmRenderTiles(k,dis);rmRenderLock();rmRenderMsgs();rmRenderCards();rmRenderLog();rmRenderSelf();");

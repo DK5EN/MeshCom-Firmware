@@ -233,21 +233,70 @@ bool tagEqual(const char *a, const char *b)
     return ctEqual(reinterpret_cast<const uint8_t *>(a), reinterpret_cast<const uint8_t *>(b), 16);
 }
 
-RmVerdict reject(RmState &s, RmVerdict v, uint32_t now)
-{
-    if (s.rejCount == 0 || (uint32_t)(now - s.rejWindowMs) >= RM_REJ_WINDOW_MS)
-    {
-        s.rejCount = 1;
-        s.rejWindowMs = now;
-    }
-    else if (s.rejCount < 255)
-        s.rejCount++;
+// Reject table (per sender, see RmRejSrc). A call is compared and stored as its first
+// sizeof(RmRejSrc::call) - 1 = 9 characters (a callsign-SSID is at most 9); nullptr is the empty call.
+const size_t REJ_CALL_LEN = sizeof(RmRejSrc::call) - 1;
 
-    if (s.rejCount >= RM_REJ_LIMIT)
+bool rejLocked(const RmRejSrc &r, uint32_t now)
+{
+    return r.lockActive && (int32_t)(now - r.lockUntilMs) < 0;
+}
+
+// The sender's entry, nullptr if it has none. Never creates one.
+RmRejSrc *rejFind(RmState &s, const char *src)
+{
+    const char *call = src ? src : "";
+    for (RmRejSrc &r : s.rej)
+        if (r.used && strncmp(r.call, call, REJ_CALL_LEN) == 0)
+            return &r;
+    return nullptr;
+}
+
+// The sender's entry, created if needed. A full table gives up, in this order: an unused entry, the
+// entry with the oldest lastMs that is not locked at `now` (an expired lock counts as not locked),
+// and only if all are locked the one with the oldest lastMs.
+RmRejSrc *rejSlot(RmState &s, const char *src, uint32_t now)
+{
+    RmRejSrc *r = rejFind(s, src);
+    if (r)
+        return r;
+    RmRejSrc *unused = nullptr, *oldOpen = nullptr, *oldAny = nullptr;
+    for (RmRejSrc &e : s.rej)
     {
-        s.lockActive = true;
-        s.lockUntilMs = now + RM_LOCKOUT_MS;
-        s.rejCount = 0;
+        if (!e.used)
+        {
+            unused = &e;
+            break;
+        }
+        if (!oldAny || (uint32_t)(now - e.lastMs) > (uint32_t)(now - oldAny->lastMs))
+            oldAny = &e;
+        if (!rejLocked(e, now) && (!oldOpen || (uint32_t)(now - e.lastMs) > (uint32_t)(now - oldOpen->lastMs)))
+            oldOpen = &e;
+    }
+    r = unused ? unused : (oldOpen ? oldOpen : oldAny);
+    memset(r, 0, sizeof(*r));
+    r->used = true;
+    strncpy(r->call, src ? src : "", REJ_CALL_LEN);
+    return r;
+}
+
+RmVerdict reject(RmState &s, const char *src, RmVerdict v, uint32_t now)
+{
+    RmRejSrc *r = rejSlot(s, src, now);
+    if (r->rejCount == 0 || (uint32_t)(now - r->rejWindowMs) >= RM_REJ_WINDOW_MS)
+    {
+        r->rejCount = 1;
+        r->rejWindowMs = now;
+    }
+    else if (r->rejCount < 255)
+        r->rejCount++;
+    r->lastMs = now;
+
+    if (r->rejCount >= RM_REJ_LIMIT)
+    {
+        r->lockActive = true;
+        r->lockUntilMs = now + RM_LOCKOUT_MS;
+        r->rejCount = 0;
     }
     return v;
 }
@@ -406,8 +455,49 @@ void rmStateInit(RmState &s, uint32_t hwm)
 
 void rmReceiverUnlock(RmState &s)
 {
-    s.lockActive = false;
-    s.rejCount = 0;
+    memset(s.rej, 0, sizeof(s.rej));
+}
+
+void rmRejSweep(RmState &s, uint32_t nowMs)
+{
+    for (RmRejSrc &r : s.rej)
+    {
+        if (!r.used)
+            continue;
+        if (r.lockActive)
+        {
+            if (!rejLocked(r, nowMs))
+                memset(&r, 0, sizeof(r)); // lock over: the sender starts fresh
+        }
+        else if (r.rejCount == 0 || (uint32_t)(nowMs - r.rejWindowMs) >= RM_REJ_WINDOW_MS)
+            memset(&r, 0, sizeof(r)); // window over: these strikes can never complete a lockout
+    }
+}
+
+bool rmSenderLocked(const RmState &s, const char *src, uint32_t nowMs)
+{
+    const char *call = src ? src : "";
+    for (const RmRejSrc &r : s.rej)
+        if (r.used && strncmp(r.call, call, REJ_CALL_LEN) == 0)
+            return rejLocked(r, nowMs);
+    return false;
+}
+
+uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs)
+{
+    uint8_t n = 0;
+    uint32_t mx = 0;
+    for (const RmRejSrc &r : s.rej)
+        if (r.used && rejLocked(r, nowMs))
+        {
+            n++;
+            const uint32_t rem = (uint32_t)(r.lockUntilMs - nowMs);
+            if (rem > mx)
+                mx = rem;
+        }
+    if (maxRemainMs)
+        *maxRemainMs = mx;
+    return n;
 }
 
 RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
@@ -416,32 +506,34 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     if (strippedLen(passwd) == 0)
         return RM_REJ_DISABLED;
 
-    if (s.lockActive)
+    rmRejSweep(s, nowMs);
+    RmRejSrc *lk = rejFind(s, src);
+    if (lk && lk->lockActive)
     {
-        if ((int32_t)(nowMs - s.lockUntilMs) < 0)
+        if ((int32_t)(nowMs - lk->lockUntilMs) < 0)
             return RM_REJ_LOCKOUT;
-        s.lockActive = false;
-        s.rejCount = 0;
+        lk->lockActive = false;
+        lk->rejCount = 0;
     }
 
     if (dst == nullptr || src == nullptr || c.tag[16] != '\0' || c.cmd[sizeof(c.cmd) - 1] != '\0' ||
         c.args[sizeof(c.args) - 1] != '\0')
-        return reject(s, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs);
 
     const bool isSync = strcmp(c.cmd, "sync") == 0;
     if ((c.ctr == 0) != isSync)
-        return reject(s, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs);
 
     if (isForbiddenText(c.cmd) || isForbiddenText(c.args) || !allowed(c, maxTxPower))
-        return reject(s, RM_REJ_BLOCKED, nowMs);
+        return reject(s, src, RM_REJ_BLOCKED, nowMs);
 
     char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
     if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
-        return reject(s, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs);
     char want[17];
     tagOf(passwd, canon, want);
     if (!tagEqual(want, c.tag))
-        return reject(s, RM_REJ_TAG, nowMs);
+        return reject(s, src, RM_REJ_TAG, nowMs);
 
     if (!isSync)
     {

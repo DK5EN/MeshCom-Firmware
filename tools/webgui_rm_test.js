@@ -744,7 +744,7 @@ function leaks(P, canary) {
       const vis = P.el('rm_on').style.display !== 'none' && P.el('rm_onlbl').style.display !== 'none';
       check('W1d toggle visible for pw=' + pw + ' on=' + on, vis === !!(pw || on));
       const lt = P.text('rm_lockstate');
-      check('W1d lock label ' + (pw && !on ? 'shows seconds' : 'empty') + ' pw=' + pw + ' on=' + on, pw && !on ? /^Remote commands blocked for 42 s after wrong attempts$/.test(lt) : lt === '', lt);
+      check('W1d lock label ' + (pw && !on ? 'shows seconds' : 'empty') + ' pw=' + pw + ' on=' + on, pw && !on ? /^A sender is blocked for 42 s after wrong attempts$/.test(lt) : lt === '', lt);
       check('W1d lock label never says "not locked"', !/not locked/.test(lt));
       P.w.rmPageLeave();
     }

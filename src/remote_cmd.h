@@ -71,6 +71,20 @@ void rmDeriveKey(const char *passwd, uint8_t key[32]);
 // does not fit or an argument is null.
 size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, size_t n);
 
+// Reject counter and lockout are kept per sender (callsign-SSID as passed to rmCheck), whatever path
+// the frame took: one sender's wrong frames never lock another sender.
+#define RM_REJ_SOURCES 6 // senders whose rejects are tracked at once (least recently used is replaced)
+struct RmRejSrc
+{
+    char call[10];        // sender call incl. SSID, as passed to rmCheck (exact compare)
+    bool used;
+    bool lockActive;
+    uint8_t rejCount;     // rejects inside the current window
+    uint32_t rejWindowMs; // start of the reject window
+    uint32_t lockUntilMs;
+    uint32_t lastMs;      // time of the last counted reject (replacement order)
+};
+
 struct RmState
 {
     uint32_t hwm;           // persisted high-water mark
@@ -78,10 +92,7 @@ struct RmState
     char lastReply[RM_MAX_RESULT + 1]; // RESULT text of the last accepted command ("ok rebooting");
                             // the caller re-sends rmReply(cmd, lastReply, ...) on RM_CACHED
     uint32_t lastAcceptMs;  // acceptance time of lastCtr (cache window)
-    uint8_t rejCount;       // rejects inside the current window
-    uint32_t rejWindowMs;   // start of the reject window
-    uint32_t lockUntilMs;
-    bool lockActive;
+    RmRejSrc rej[RM_REJ_SOURCES]; // per-sender reject counter and lockout
     char lastTag[17];       // tag of the last accepted command
     bool haveLast;
     // appended by RM-02 (rmStateInit() sets them, callers never touch them):
@@ -95,16 +106,28 @@ struct RmState
 
 void rmStateInit(RmState &s, uint32_t hwm);
 
-// Clears the lockout (lockActive) and the reject counter, nothing else: hwm, lastCtr, the reply cache,
-// the rate limiter and the sync limiter stay. The operator standing at the node (own password change,
+// Clears the lockout and the reject counter of EVERY sender (the whole table), nothing else: hwm,
+// lastCtr, the reply cache, the rate limiter and the sync limiter stay. The operator standing at the node (own password change,
 // console or web) may always unlock it; it is never reachable from the air.
 void rmReceiverUnlock(RmState &s);
+
+// True while `src` is locked out at nowMs (read-only, never changes state). A call longer than 9
+// characters is compared and stored as its first 9; nullptr is the empty call "".
+bool rmSenderLocked(const RmState &s, const char *src, uint32_t nowMs);
+// Number of senders locked at nowMs; *maxRemainMs (may be nullptr) = longest remaining lock time in
+// ms, 0 if none.
+uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs);
+
+// Ages the reject table: an expired lock is cleared and an entry without a lock whose window is over
+// is freed. rmCheck() calls it first; the firmware also calls it from its loop (rmDrain), because an
+// entry nobody touches for 2^31 ms (24.8 days) would otherwise read as locked again.
+void rmRejSweep(RmState &s, uint32_t nowMs);
 
 // Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute.
 // maxTxPower bounds "txpower <n>" (0 <= n <= maxTxPower). Every reject counts
 // towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT, RM_REJ_RATE and
-// RM_REJ_REPLAY (each of the last two requires a VALID tag: the lockout throttles key
-// guessing, a valid tag is not a guess, and a replayed or overtaken frame reveals and
+// RM_REJ_REPLAY (each of the last two requires a VALID tag: the lockout answers wrong
+// keys, a valid tag is not one, and a replayed or overtaken frame reveals and
 // executes nothing; counting it let a jittery legitimate path lock the node). A strike
 // exactly RM_REJ_WINDOW_MS after the window start opens a new window. The lockout is reachable without the
 // key (3 junk DMs per 5 min keep RM unavailable): accepted by design, RM fails

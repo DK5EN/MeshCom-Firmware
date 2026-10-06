@@ -223,7 +223,8 @@ GET /rmstatus
 
 	on, pw		RM switch of this node, a password is set (yes/no only)
 	ok, rej		commands accepted / rejected since boot (all rejection reasons summed)
-	lock, lockS	lockout active (3 rejects in 90 s) and the seconds left
+	lock, lockS	at least one sender (callsign-SSID) is locked out (3 rejects of that sender in 90 s) and the
+			seconds until the last such lockout ends; other senders are not affected
 	hwm		persisted counter high-water mark
 	targets		(added to the document above) one object per distinct dst of the sent book plus the target
 			of a command still waiting behind a sync: dst, locked, retry, canForce, cap, pending,

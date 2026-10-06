@@ -106,11 +106,13 @@ not), `[RM];cached;ctr;<n>[;suppressed]`, `[RM];sync;ctr;<hwm>`, `[RM];reboot`,
 
 - At most one accepted command per 10 s (`RM_RATE_MS`); `sync` stamps the same limiter.
 - After 3 counted rejects within 90 s the node ignores RM1 for 5 min (`RM_REJ_LIMIT`,
-  `RM_REJ_WINDOW_MS`, `RM_LOCKOUT_MS`; the numbers come from the TOTP ADR).
+  `RM_REJ_WINDOW_MS`, `RM_LOCKOUT_MS`; the numbers come from the TOTP ADR). Since 2026-10-06 this
+  is counted and applied per sender callsign-SSID (see Amendments, "Lockout per sender").
 - **Rate rejects do not count.** A rate reject needs a valid tag, so it is not an attack signal.
 - **Parse failures do not count.** A text that does not parse never reaches `rmCheck()`; `rmDrain()`
   only bumps a statistic.
-- **Accepted DoS surface:** every other reject (`tag`, `replay`, `blocked`) is reachable without the
+- **Accepted DoS surface (narrowed 2026-10-06 to frames under the operator's own call, and the
+  brute-force argument below no longer applies; see Amendments, "Lockout per sender"):** every other reject (`tag`, `replay`, `blocked`) is reachable without the
   key. Three junk DMs per 5 min, to the exact own call and with a well-formed `RM1` syntax, keep RM
   unavailable for the legitimate operator. RM fails closed, never open. The alternative (not
   counting unauthenticated rejects) would remove the brute-force limit on the 64-bit tag, which is
@@ -159,7 +161,8 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   Whoever reads a config export can send RM1 commands. This is accepted and goes into the release
   notes. A separate RM key would need a new setting and a separate provisioning path.
 - The tag is 64 bits and the counter 32. Online guessing at LoRa rates, with a lockout after 3
-  rejects per 90 s, is not feasible; offline guessing of a weak `node_passwd` from one captured
+  rejects per 90 s (since 2026-10-06 the per-sender lockout no longer limits it; 64 bits alone
+  do), is not feasible; offline guessing of a weak `node_passwd` from one captured
   frame is. The password should be long and random. There is no key stretching: the key is a single
   SHA-256 of the password.
 - The sender's `src` is spoofable. The tag binds it, so a spoofed `src` needs the key anyway; who may
@@ -201,9 +204,8 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   travelled. The old rule keyed on the server flag, which a gateway also sets on every frame it
   relays over RF, so a node behind a gateway dropped every command silently. Consequences: a
   frame that arrives on both paths gets the cached reply for its second copy and runs once;
-  wrong-key frames can now reach a node from the internet side too, so the 5-minute lockout of
-  remote management can be triggered from there (it never affected anything but remote
-  management).
+  wrong-key frames can now reach a node from the internet side too; since the lockout is per
+  sender they lock only the callsign they are sent under.
 - **Proof decay.** Two sends in a row without a verified reply (waiting ones included) put a
   target back on the unproven budget of 2 until a reply verifies again (`rmPolicyLimit()`). A
   target that got a new password answers nothing, and a sender still holding the old, proven key
@@ -212,10 +214,16 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   seconds between a verified reply and the late arrival of two older, overtaken frames can still
   see more than two wrong-key frames (the streak only counts sends newer than the verified one;
   counting older ones would cost every lossy path its budget).
-- **Residual risks of the server path.** (1) Lockout: three wrong-tag frames in 90 s lock remote
-  management for 5 minutes, and such frames can now be sent from the internet side, repeatedly.
-  One lockout state serves both paths, so this also blocks management over LoRa; a separate
-  reject counter per path would confine it and is not built. (2) A local KISS client sees a
+- **Lockout per sender (operator decision 2026-10-06).** The reject counter and the 5-minute
+  lockout are kept per sender, keyed on the callsign-SSID of the frame, whatever path it took
+  (`RmRejSrc`, 6 senders tracked, the least recently rejected unlocked one is replaced). One
+  sender's wrong frames never lock another sender, so junk under foreign calls, from the internet
+  or over the air, cannot block the operator. `/rmstatus` `lock` now means "at least one sender is
+  locked". Accepted limits: the callsign is not authenticated, so frames sent under the operator's
+  own call still lock that call, on both paths; and the lockout no longer throttles key guessing
+  (a guesser changes the call), which a 64-bit tag does not need. A weak password remains open to
+  an offline search from one recorded frame, as before.
+- **Residual risks of the server path.** (1) see "Lockout per sender". (2) A local KISS client sees a
   server-delivered command like any DM (same as on the LoRa path). (3) A command without `{NNN`
   that arrives on both paths occupies both queue slots for a moment and may cause a second cached
   reply when the copies are more than 10 s apart; it runs once.

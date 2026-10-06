@@ -84,7 +84,7 @@ struct Sim
                 counted++;
             if (v == RM_REJ_RATE)
                 rate++;
-            if (rs.lockActive)
+            if (rmSenderLocked(rs, SRC, f.arriveMs))
                 locked = true;
             if ((v == RM_OK || v == RM_SYNC) && (rnd() % 100) >= replyLossPct)
             {
@@ -323,7 +323,7 @@ static void run_right_key_reordered(bool oldReceiverModel, bool randomDelay, uin
             }
             if (oldReceiverModel && (v == RM_REJ_REPLAY || v == RM_REJ_FORMAT || v == RM_REJ_TAG || v == RM_REJ_BLOCKED))
                 strikes.push_back(f.arriveMs);
-            if (s.rs.lockActive)
+            if (rmSenderLocked(s.rs, SRC, f.arriveMs))
                 s.locked = true;
         }
         s.age(now);
@@ -496,6 +496,51 @@ void test_proof_streak_rule(void)
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmPolicyLimit(nullptr, e, 5, now));
 }
 
+// ---- per-sender lockout: junk under other calls never locks the operator --------------------------
+// Operator decision 2026-10-06: the reject counter is keyed on the sender's callsign-SSID. Twenty
+// other calls send wrong-tag frames as fast as they like (from the internet side nothing slows them
+// down) for 30 simulated minutes while the operator, with the right key, sends a command every 15 s.
+// Every one of the operator's commands must be accepted; the operator is never locked.
+void test_junk_from_other_senders_never_locks_the_operator(void)
+{
+    RmState rs;
+    rmStateInit(rs, 0);
+    uint8_t good[32], bad[32];
+    rmDeriveKey(PW, good);
+    rmDeriveKey("guess", bad);
+    uint32_t ctr = 0, accepted = 0, sent = 0, junk = 0, junkLocked = 0, rng = 99;
+    for (uint32_t now = 1000u; now < 1800000u; now += 500u)
+    {
+        // junk: two frames per second, rotating over 20 foreign calls
+        char call[10], wire[96];
+        rng = rng * 1664525u + 1013904223u;
+        snprintf(call, sizeof(call), "XX%uXX-%u", (unsigned)((rng >> 8) % 10), (unsigned)((rng >> 16) % 2));
+        RmCmd j;
+        TEST_ASSERT_TRUE(rmBuildCommand(DST, call, 1000u + junk, "status", "", bad, wire, sizeof(wire)) > 0);
+        TEST_ASSERT_TRUE(rmParse(wire, j));
+        const RmVerdict jv = rmCheck(rs, j, DST, call, PW, 22, now);
+        TEST_ASSERT_TRUE(jv == RM_REJ_TAG || jv == RM_REJ_LOCKOUT);
+        junk++;
+        junkLocked += (jv == RM_REJ_LOCKOUT);
+
+        if (now % 15000u == 1000u)
+        {
+            RmCmd c;
+            TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, ++ctr, "status", "", good, wire, sizeof(wire)) > 0);
+            TEST_ASSERT_TRUE(rmParse(wire, c));
+            const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 22, now);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("ok", rmVerdictName(v), "the operator's command was not accepted");
+            rmAccept(rs, c, "ok", now);
+            accepted++;
+            sent++;
+        }
+        TEST_ASSERT_FALSE(rmSenderLocked(rs, SRC, now));
+    }
+    TEST_ASSERT_EQUAL_UINT32(sent, accepted);
+    TEST_ASSERT_TRUE(sent > 100 && junk > 3000);
+    TEST_ASSERT_TRUE_MESSAGE(junkLocked > 0, "the junk senders themselves must run into their own lockout");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -507,5 +552,6 @@ int main(int, char **)
     RUN_TEST(test_wrong_key_window_edge_30s_delay);
     RUN_TEST(test_target_rekeyed_proven_sender_never_locks);
     RUN_TEST(test_proof_streak_rule);
+    RUN_TEST(test_junk_from_other_senders_never_locks_the_operator);
     return UNITY_END();
 }

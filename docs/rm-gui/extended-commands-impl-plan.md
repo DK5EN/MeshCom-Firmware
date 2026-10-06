@@ -207,6 +207,11 @@ the target counted two rejects and did not lock. The server path is not benched:
 first copy came through the gateway relay, and no bench node is a gateway (that needs the mock
 server or the operator's go for the real one); it rests on the twin tests.
 
+Third change of the evening (operator decision): the reject counter and the lockout are per sender
+callsign-SSID, independent of the path (`RmRejSrc` in `remote_cmd.h`, 6 senders). Junk under other
+calls can no longer lock the operator out, which was the open availability point of the server
+path. `/rmstatus` `lock` means "at least one sender is locked".
+
 Also seen: the receiver's reject window is a fixed 90 s window that starts with the first reject,
 not a sliding one (four rejects spread over 158 s did not lock).
 

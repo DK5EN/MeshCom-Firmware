@@ -526,6 +526,10 @@ void rmDrain(void)
 
     pendingStep(millis()); // a command queued behind an automatic sync goes out once the sync is verified
 
+    // ages the per-sender reject table even when no RM frame arrives (a lock nobody touches for
+    // 2^31 ms would read as locked again)
+    rmRejSweep(s_state, millis());
+
     if (!rmQueuePop(src, sizeof(src), text, sizeof(text)))
         return;
 
@@ -634,10 +638,12 @@ void rmGetStatusHead(RmStatusHead &out)
     out.on = (meshcom_settings.node_rm == 1);
     out.passwdSet = !passwdEmpty();
     const uint32_t now = millis();
-    if (s_state.lockActive && (int32_t)(now - s_state.lockUntilMs) < 0)
+    // the lockout is per sender (callsign-SSID): "active" = at least one sender is locked, with the longest time left
+    uint32_t remainMs = 0;
+    if (rmLockedSenders(s_state, now, &remainMs) > 0)
     {
         out.lockActive = true;
-        out.lockRemainS = ((uint32_t)(s_state.lockUntilMs - now) + 999u) / 1000u;
+        out.lockRemainS = (remainMs + 999u) / 1000u;
     }
     out.hwm = s_state.hwm;
     out.stats = g_rmStats;

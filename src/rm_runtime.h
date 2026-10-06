@@ -58,8 +58,8 @@ struct RmStatus
 {
     bool on;               // node_rm == 1
     bool passwdSet;        // node_passwd not empty
-    bool lockActive;       // 3 rejects in 90 s: RM1 locked
-    uint32_t lockRemainS;  // seconds until the lockout ends (0 when not active)
+    bool lockActive;       // at least one sender is locked out (3 rejects of that callsign-SSID in 90 s)
+    uint32_t lockRemainS;  // seconds until the last such lockout ends (0 when not active)
     uint32_t hwm;          // persisted counter high-water mark
     RmStats stats;
     uint8_t nlog;          // used entries of log[]
@@ -173,7 +173,7 @@ bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce = nullptr
 // touches the persisted send counter, learnt counter marks or receiver state.
 void rmForgetTarget(const char *dst);
 
-// The receiver lockout (lockActive, rejCount) is cleared, e.g. after a new node password was applied.
+// The receiver lockout of every sender (reject table) is cleared, e.g. after a new node password was applied.
 void rmRuntimeReceiverUnlock(void);
 
 // Boot: loads the persisted high-water mark (counters_store.h) into the protocol state. Call once
