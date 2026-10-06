@@ -1,5 +1,5 @@
 {
-  "_comment": "Bench fleet registry for tools/bench/identity_guard.py. Operator rules 2026-09-26: no test on a node without its own callsign (never XX0XXX), every callsign SSID unique, bench TX power at most 2 dBm, ESP32 nodes need WiFi, a set clock and the web server. No secrets in this file; WiFi credentials live in ~/MeshCom-bench-backups/. Hosts are the 2323 net-console addresses as of 2026-10-03 22:20 (identity_guard --info over USB): a node without a host (RAK = nRF52, T-Deck native USB reports its MAC as the serial number) is checked with --port. DK5EN-1 has its net console off by default (web /setparam/?netconsole=on) and its USB port is held by the soak capture.",
+  "_comment": "Bench fleet registry for tools/bench/identity_guard.py. Operator rules 2026-09-26: no test on a node without its own callsign (never XX0XXX), every callsign SSID unique, bench TX power at most 2 dBm, ESP32 nodes need WiFi, a set clock and the web server. No secrets in this file; WiFi credentials live in ~/MeshCom-bench-backups/. Hosts are the 2323 net-console addresses; DK5EN-1 and DK5EN-92 by mDNS name since 2026-10-06 (their DHCP leases moved to .56 and .57, and 192.168.68.62 is the production node DK5EN-98): a node without a host (RAK = nRF52, T-Deck native USB reports its MAC as the serial number) is checked with --port. DK5EN-1 has its net console off by default (web /setparam/?netconsole=on) and its USB port is held by the soak capture.",
   "max_txpower_dbm": 2,
   "nodes": {
     "heltec-1": {
@@ -7,7 +7,7 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.71"
+      "host": "dk5en-1.local"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
@@ -21,7 +21,7 @@
       "board": "ttgo_tbeam",
       "family": "esp32",
       "usb_serial": "573C000584",
-      "host": "192.168.68.75"
+      "host": "dk5en-92.local"
     },
     "rak-90": {
       "call": "DK5EN-90",

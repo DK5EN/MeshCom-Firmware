@@ -233,6 +233,9 @@ flashes whatever is attached.
 | test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
 | test_rm_sender_policy        | Unit          |    24 | native_rm_sender_policy                                      |
 | test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
+| test_rm_format               | Unit          |    18 | native_rm_format                                             |
+| test_rm_text                 | Unit          |     8 | native_rm_text                                               |
+| test_rm_policy_rx            | Regression    |     6 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |

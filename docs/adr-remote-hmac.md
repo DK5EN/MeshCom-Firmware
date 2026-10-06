@@ -173,6 +173,27 @@ a settings restore, a config import or a BLE settings write can never rewind it.
 - Not covered: a gateway/internet path (RM-D6), reply retries beyond the normal PN ladder (RM-D4),
   commands that change credentials or update the firmware.
 
+## Amendments 2026-10-06 (extended commands, docs/rm-gui/extended-commands-concept.md)
+
+- **Replay accounting.** A frame with a valid tag and a stale counter stays rejected (`replay`) but
+  is no longer counted toward the lockout. The lockout throttles key guessing, and a valid tag is
+  not a guess; counting it let a right-key sender with reordered frames lock the target within 70 s
+  and let anyone lock a node by replaying one sniffed frame three times. Rejects before the tag
+  check and wrong tags are counted as before; the reject window boundary is `>=`.
+- **`sync` limiter.** `sync` has its own 60 s limiter and neither stamps nor obeys the command
+  limiter (a captured `sync` verified forever and blocked commands for 10 s per replay).
+- **Sizes.** Result at most 108 characters (reply DM text at most 140), arguments at most 39;
+  replies of the first 13 commands stay at 63 or less. Every reply passes `rmSanitizeResult()`.
+- **Capability.** The `sync` reply ends in `rm=2`; `status` never carries a capability token.
+  A sender uses its budget of 10 unanswered sends only for a target that reported `rm>=2`.
+- **Transport.** A DM whose text starts with `RM1 ` goes on air once: no `{NNN` suffix, no DM ACK,
+  no retry ladder, whatever its origin (Remote page, BLE, Extern-UDP).
+- **Public traffic.** Commands and replies are readable on the public server and in the mcmap
+  archive, including `mh`, route and count replies. `pos` answers only while a position is set
+  (the node then beacons it anyway); a remote `pos 0 0 0` clears it and stops the beacon.
+- **Text.** Names and APRS texts set remotely are validated with a refuse-never-alter allowlist
+  and all node pages escape settings and over-the-air text.
+
 ## Alternatives rejected
 
 - **TOTP (RFC 6238, the earlier ADR).** Needs a trustworthy clock; the target nodes may have none

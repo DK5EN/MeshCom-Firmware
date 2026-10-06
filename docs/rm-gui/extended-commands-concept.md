@@ -1,7 +1,7 @@
 # Remote management: extended commands and page fixes - concept
 
-Status: DRAFT 2 (2026-10-06), after fable-review; decided by the operator (section 9), in
-implementation (`extended-commands-impl-plan.md`).
+Status: IMPLEMENTED on fork-dev (cb7267bb..3ffa916f, 2026-10-06), host gates green, bench open
+(`extended-commands-impl-plan.md` sections 8 and 9). Sections 5 and 9 carry the final rules.
 Review record: `extended-commands-verdict.md` (findings, refuted claims). Evidence per claim:
 the six verifier reports named there.
 
