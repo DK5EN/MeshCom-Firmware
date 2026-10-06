@@ -43,7 +43,9 @@ void sub_page_remote()
                        "#rm_page .rmlock{font-weight:bold;min-height:1.4em;}\n"
                        "#rm_page .rmact{padding:3px 0;border-bottom:solid 1px #e0e0e0;}\n"
                        "#rm_page .rmtab{width:100%;border-collapse:collapse;}");
-    web_client.println("#rm_page .rmtab th,#rm_page .rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;font-size:x-small;word-break:break-word;}\n"
+    web_client.println("#rm_page .rmtab th,#rm_page .rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;font-size:x-small;}");
+    web_client.println("#rm_msgs td:nth-child(4),#rm_log td:nth-child(5){word-break:break-word;}\n"
+                       "#rm_msgs td:nth-child(1),#rm_msgs td:nth-child(3),#rm_log td:nth-child(1),#rm_page .rmtab button{white-space:nowrap;}\n"
                        "</style>\n"
                        "<div id=\"rm_page\">\n"
                        "<p id=\"rm_auth\" class=\"rmbad\" style=\"display:none\"></p>\n"

@@ -282,6 +282,10 @@ function leaks(P, canary) {
   check('scaffold JS parses (new Function)', syntaxOk);
   check('no </script, <!-- in the JS; no <script in the page', !/<\/script|<!--/i.test(JS) && !/<script/i.test(HTML));
   check('no confirm()/alert() in the JS', !/\b(confirm|alert)\s*\(/.test(JS));
+  // jsdom has no layout: pin the two style rules that keep the tables readable. A blanket
+  // word-break on every cell lets the browser squeeze the narrow columns to one letter per line.
+  check('table buttons, time and state cells stay on one line', /#rm_msgs td:nth-child\(1\),#rm_msgs td:nth-child\(3\),[^{]*\.rmtab button\{white-space:nowrap;\}/.test(HTML));
+  check('only the reply/result cells break inside words', !/\.rmtab td\{[^}]*word-break/.test(HTML) && /#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(5\)\{word-break:break-word;\}/.test(HTML));
   check('no localStorage/sessionStorage/innerHTML in the JS', !/localStorage|sessionStorage|innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(JS));
   {
     const w0 = new JSDOM('', { runScripts: 'outside-only' }).window;
