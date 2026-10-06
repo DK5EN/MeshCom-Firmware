@@ -1564,6 +1564,7 @@
  "env:heltec_t114": {
   "board": "heltec_t114",
   "build_flags": [
+   "-Os",
    "-DRADIOLIB_EXCLUDE_CC1101=1",
    "-DRADIOLIB_EXCLUDE_NRF24=1",
    "-DRADIOLIB_EXCLUDE_RF69=1",
@@ -1674,6 +1675,9 @@
    "-Wno-unused-parameter",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-Ofast"
   ],
   "debug_tool": "jlink",
   "extends": [
@@ -4435,6 +4439,7 @@
  "env:t_echo": {
   "board": "nrf52840_dk_adafruit",
   "build_flags": [
+   "-Os",
    "-DRADIOLIB_EXCLUDE_CC1101=1",
    "-DRADIOLIB_EXCLUDE_NRF24=1",
    "-DRADIOLIB_EXCLUDE_RF69=1",
@@ -4520,6 +4525,9 @@
    "-Wno-unused-parameter",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-Ofast"
   ],
   "debug_tool": "jlink",
   "extends": [

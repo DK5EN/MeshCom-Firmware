@@ -13,6 +13,9 @@
 #                  DK5EN-98 logs under ~/Downloads/dk5en-98-nbr/; when absent
 #                  they come from the ~/meshlog/dk5en-98-nbr/ copy, else are
 #                  fetched from rpizero (and mirrored into ~/meshlog).
+#                  Then one `pio run` per nRF52 board env (BOARD_LINK_ENVS):
+#                  the image must link and stay at or below
+#                  BOARD_FLASH_MAX_PCT of flash.
 # Stage 2  tools:  ruff syntax gate (E9/F63/F7/F82 over tools, test/golden,
 #                  test/test_nbrlog; config in ruff.toml); pytest over
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
@@ -137,8 +140,28 @@ ensure_topo_raw() {
         record "topo_shadow raw window" SKIP "not local, rpizero unreachable -- full-window case will be IGNOREd"
     fi
 }
+# The nRF52 boards have the smallest flash (815104 B) and no native env links
+# their image: t_echo overflowed unnoticed for two commits (2026-10-06).
+BOARD_LINK_ENVS="t_echo heltec_t114 wiscore_rak4631"
+BOARD_FLASH_MAX_PCT=95
+board_links() {
+    local e log rc pct
+    for e in $BOARD_LINK_ENVS; do
+        if [ "$LIST" = 1 ]; then printf 'PLAN   %-44s pio run -e %s (flash <= %s %%)\n' "board link $e" "$e" "$BOARD_FLASH_MAX_PCT"; continue; fi
+        log="$OUT/stage1-link-$e.log"
+        pio run -e "$e" > "$log" 2>&1; rc=$?
+        pct=$(grep -E '^Flash: ' "$log" | tail -1 | grep -oE '[0-9]+\.[0-9]+%' | tr -d '%')
+        if [ $rc -ne 0 ] || [ -z "$pct" ]; then
+            record "board link $e" FAIL "exit $rc, no image -- $log"
+        elif awk -v p="$pct" -v m="$BOARD_FLASH_MAX_PCT" 'BEGIN { exit !(p > m) }'; then
+            record "board link $e" FAIL "flash $pct % above $BOARD_FLASH_MAX_PCT % -- $log"
+        else
+            record "board link $e" OK "flash $pct %"
+        fi
+    done
+}
 stage1() {
-    echo "== Stage 1: host (Unity envs + golden selftest)"
+    echo "== Stage 1: host (Unity envs + golden selftest + nRF52 board links)"
     if [ "$LIST" != 1 ] && pio_busy; then
         record "stage 1" FAIL "another pio process is running -- one pio at a time"; return 1
     fi
@@ -164,6 +187,7 @@ stage1() {
         fi
     done
     run_step "golden selftest" stage1-selftest sh test/golden/selftest.sh
+    board_links
 }
 
 # ---------------------------------------------------------------- stage 2

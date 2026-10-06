@@ -1,6 +1,7 @@
 # Remote management: extended commands and page fixes - concept
 
-Status: DRAFT 2 (2026-10-06), after fable-review. Plan only, nothing implemented.
+Status: DRAFT 2 (2026-10-06), after fable-review; decided by the operator (section 9), in
+implementation (`extended-commands-impl-plan.md`).
 Review record: `extended-commands-verdict.md` (findings, refuted claims). Evidence per claim:
 the six verifier reports named there.
 
@@ -100,11 +101,11 @@ accepted. Free text is validated with a refuse-never-alter allowlist (4.3). One 
 | `wiscore_rak4631`        | 77.3 % (-Os since 2026-09-29, about 185 kB free); the older 96 % figure was the -Ofast build                                                      | GO                    |
 | ESP32-S3, classic ESP32  | headroom large; E22_XML DRAM headroom about 19 kB (estimate, was 24.9 kB on 10-04); the buffer widening costs +772 B static RAM                   | GO, measure           |
 
-The T-Echo and T114 gate gap: the RM GUI gate (64 native envs plus compile of the RAK and ESP32
-boards) never built either board. W-1 adds both to the gate. Preferred fix: do not link the RM web
-layer (`web_rm_*`, scaffold JS) on boards that cannot start the web server; the RM protocol core
-stays. Fallback: trim. The new commands must not be built on the two boards
-beyond what W-1 measures.
+W-1 outcome (2026-10-06): the cause was the framework's `-Ofast`, which only the RAK env overrode.
+With `-Os` `t_echo` links at 594 904 B (73.0 %) and `heltec_t114` at 571 084 B (70.1 %), so both
+boards are GO and the new commands are built on them. `tools/regression.sh` stage 1 now links the
+three nRF52 board envs and fails above 95 % flash. Not linking the web layer on boards that cannot
+start the web server (about 140 kB) is a backlog row, no longer needed for space.
 
 Airtime (corrects the finder's figures, about 2x too low): at the default profile (preamble 32,
 CR 4/6) one `mh` page costs 4.65 s of channel time, 24.4 s at the slow profile. An unanswered
@@ -214,9 +215,8 @@ older of two reordered frames counts as a replay strike). Final design:
    counter, learnt counter marks or any receiver state. Own-password change calls
    `rmReceiverUnlock()` (lock flag and reject count only).
 7. Rate rejects never count toward the lockout; the page shows the countdown, not "locked".
-
-Operator decision open: allow one "try once more anyway" after a re-key (locks the target 5 min if
-that password is also wrong)?
+8. After a re-key the page offers one "try once more anyway" beyond the unproven limit, without a
+   warning dialog (operator decision; a wrong password then locks the target for 5 min).
 
 ## 6. Page changes
 
@@ -268,13 +268,14 @@ that password is also wrong)?
 Hotspots stay orchestrator-owned: `rm_runtime.cpp`, `remote_cmd.cpp`, `command_functions.cpp`,
 `web_functions.cpp`, `platformio.ini`. One `pio` process at a time through `scratchpad/pio_locked.sh`.
 
-## 9. Open points for the operator
+## 9. Operator decisions (2026-10-06)
 
-1. Radio SF/CR/BW/frequency read-only now (recommended) or the RAM trial (Option 3R) in this campaign.
-2. `maxhop` read-only (recommended) or a bounded write.
-3. Public replies: `pos`, `mh`, route and counts go to the public server and mcmap archive (as
-   `status` already does). Acceptable? `pos` only when the node already beacons its position? Stop
-   gateways uploading `RM1 ` DMs (partial, needs upstream)? An ADR consequence line is added in any case.
-4. 10 s spacing stays (a 3 s spacing cannot work); accept "10 tries" as "10 once the key is proven"?
-5. "Try once more anyway" after a re-key.
-6. MHEARD window for the `mh` list: 3 h like the web page, or 12 h like the CLI.
+1. Radio SF/CR/BW/frequency: read-only.
+2. `maxhop`: read-only.
+3. Public replies: accepted; the `pos` read answers only when the node already beacons its position.
+4. Sender limit: 10 s spacing; 2 unanswered while the key is unproven, 10 once it is proven.
+5. "Try once more anyway" after a re-key: yes, one extra attempt, no warning dialog.
+6. MHEARD window for the `mh` list: 3 h.
+7. Flash (2.5): `-Os` on `t_echo` and `heltec_t114`; the new commands are built on all boards.
+
+Implementation plan and wave status: `extended-commands-impl-plan.md`.
