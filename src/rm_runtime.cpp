@@ -695,7 +695,8 @@ RmPolDecision policyFor(const char *to, uint32_t now, bool force = false)
         if (strcmp(s_sent[i].pub.dst, to) == 0)
             polEntryOf(s_sent[i], pe[n++]);
     const RmProof *pf = rmProofFind(s_proof, to);
-    return rmPolicyMaySend(pe, n, now, rmProofLimit(pf), pf != nullptr && pf->oneShot, force);
+    // RM-PROOF: two sends in a row without a verified reply suspend the proven budget (the target may be re-keyed)
+    return rmPolicyMaySend(pe, n, now, rmPolicyLimit(pf, pe, n, now), pf != nullptr && pf->oneShot, force);
 }
 
 void dropPending()

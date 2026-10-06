@@ -411,6 +411,91 @@ void test_wrong_key_window_edge_30s_delay(void)
         run_wrong_key_edge(d0);
 }
 
+// ---- RM-PROOF: the TARGET gets a new password, the sender still holds the old, proven key -----------
+// Bench 2026-10-06: five old-key frames inside the proven budget of 10 locked DK5EN-1 for 5 minutes.
+// The sender sends as fast as rmPolicyLimit() allows for 30 simulated minutes; the target must never lock.
+static void run_target_rekeyed(uint32_t base, uint32_t jitter)
+{
+    Sim s;
+    RmProof pb[RM_PROOF_N];
+    memset(pb, 0, sizeof(pb));
+    const uint8_t fp[4] = {7, 7, 7, 7};
+    RmProof *p = rmProofSetKey(pb, DST, fp);
+    // phase 1: right key, replies arrive: proven, capability 2
+    bool v = false;
+    s.send(PW, "status", 0, 1000u);
+    s.deliver(2000u, PW, 0, &v);
+    TEST_ASSERT_TRUE(v);
+    rmProofVerified(pb, DST, fp);
+    rmProofSetCap(pb, DST, fp, 2);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmPolicyLimit(p, s.book.data(), (uint8_t)s.book.size(), 3000u));
+    // phase 2: the target now has another password; the sender keeps signing with the old one
+    uint32_t sent = 0;
+    for (uint32_t now = 20000u; now < 1800000u; now += 1000u)
+    {
+        s.age(now);
+        s.deliver(now, "newpw", 0, nullptr);
+        TEST_ASSERT_FALSE_MESSAGE(s.locked, "target locked by a proven sender after the target was re-keyed");
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now,
+                                                rmPolicyLimit(p, s.book.data(), (uint8_t)s.book.size(), now), p->oneShot, false);
+        if (d.allowed)
+        {
+            s.send(PW, "status", now, base + (jitter ? s.rnd() % jitter : 0));
+            sent++;
+        }
+    }
+    s.deliver(4000000u, "newpw", 0, nullptr);
+    TEST_ASSERT_FALSE(s.locked);
+    TEST_ASSERT_TRUE_MESSAGE(sent > 10 && s.counted > 10, "the run must produce tag rejects");
+}
+
+void test_target_rekeyed_proven_sender_never_locks(void)
+{
+    run_target_rekeyed(2000u, 0);
+    run_target_rekeyed(0, 30000u);
+    run_target_rekeyed(30000u, 0);
+}
+
+// the proof comes back with the next verified reply, and losses that are not in a row keep the budget
+void test_proof_streak_rule(void)
+{
+    RmProof pb[RM_PROOF_N];
+    memset(pb, 0, sizeof(pb));
+    const uint8_t fp[4] = {1, 1, 1, 1};
+    RmProof *p = rmProofSetKey(pb, DST, fp);
+    rmProofVerified(pb, DST, fp);
+    rmProofSetCap(pb, DST, fp, 2);
+    RmPolEntry e[6];
+    memset(e, 0, sizeof(e));
+    const uint32_t now = 100000u;
+    // lost, answered, lost, answered, lost (newest): streak 1, budget stays 10
+    for (int i = 0; i < 5; i++)
+    {
+        e[i].sentMs = now - 10000u * (uint32_t)(i + 1);
+        e[i].replied = e[i].verified = (i % 2) == 1;
+    }
+    TEST_ASSERT_EQUAL_UINT8(1, rmPolicyUnverifiedStreak(e, 5, now));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmPolicyLimit(p, e, 5, now));
+    // two in a row without a verified reply (the newest two): budget 2
+    e[1].replied = e[1].verified = false;
+    e[2].replied = e[2].verified = true;
+    TEST_ASSERT_EQUAL_UINT8(2, rmPolicyUnverifiedStreak(e, 5, now));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmPolicyLimit(p, e, 5, now));
+    // an unverified reply is no answer
+    e[0].replied = true;
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmPolicyLimit(p, e, 5, now));
+    // the newest one verifies: the proof is back
+    e[0].verified = true;
+    TEST_ASSERT_EQUAL_UINT8(0, rmPolicyUnverifiedStreak(e, 5, now));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmPolicyLimit(p, e, 5, now));
+    // expired entries do not count, an unproven target stays at 2, no entries = 0
+    e[0].verified = e[0].replied = false;
+    e[0].expired = e[1].expired = true;
+    TEST_ASSERT_EQUAL_UINT8(0, rmPolicyUnverifiedStreak(e, 5, now));
+    TEST_ASSERT_EQUAL_UINT8(0, rmPolicyUnverifiedStreak(nullptr, 0, now));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmPolicyLimit(nullptr, e, 5, now));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -420,5 +505,7 @@ int main(int, char **)
     RUN_TEST(test_forget_does_not_refill_budget);
     RUN_TEST(test_right_key_reordered_frames_never_lock);
     RUN_TEST(test_wrong_key_window_edge_30s_delay);
+    RUN_TEST(test_target_rekeyed_proven_sender_never_locks);
+    RUN_TEST(test_proof_streak_rule);
     return UNITY_END();
 }

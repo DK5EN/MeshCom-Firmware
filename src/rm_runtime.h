@@ -150,7 +150,7 @@ struct RmTarget
     bool locked;           // 2 unanswered sends inside 90 s: sends are refused ("limit")
     uint32_t retryS;       // seconds until a send is accepted again (spacing included), 0 = now
     bool canForce;         // refused with LIMIT and the one-shot after a re-key is armed: a send with force=1 may go once
-    uint8_t cap;           // capability level of the target (sync reply rm=<n>): >= 2 allows 10 unanswered sends once proven, 0 = unknown/old
+    uint8_t cap;           // capability level of the target (sync reply rm=<n>): >= 2 allows 10 unanswered sends while proven (rmPolicyLimit), 0 = unknown/old
     bool pending;          // a command waits behind an automatic sync for this node
     const char *chainErr;  // token (static) why the last chained command was NOT sent ("nosync", "lost",
                            // "limit", "busy", "send", ...), nullptr = none; cleared by the next accepted send

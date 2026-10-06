@@ -12,7 +12,8 @@
 //     not count authenticated replays toward its lockout); then N is 10. A target of unknown or old
 //     firmware (cap 0) keeps 2 for good: an old receiver counts a reordered right-key frame as a
 //     strike. After a re-key (key fingerprint changed) the proof and the capability are gone and
-//     ONE forced attempt beyond the limit is allowed.
+//     ONE forced attempt beyond the limit is allowed. Two sends in a row without a verified reply
+//     suspend the proof (rmPolicyLimit): the target may have been re-keyed.
 //  2. Entry state: queued / waiting / noanswer / ok / err / unverified as a function of timestamps.
 //  3. Plain sentences for every state and every RM error token.
 //  4. The compact `status` reply: `s=<letters> p=<cur>/<max>` encode/decode and the whole formatter,
@@ -590,6 +591,47 @@ inline void rmProofForget(RmProof *b, const char *dst)
 inline uint8_t rmProofLimit(const RmProof *p)
 {
     return (p != nullptr && p->proven && p->cap >= RM_POLICY_CAP_PROVEN) ? (uint8_t)RM_POLICY_LIMIT_PROVEN : (uint8_t)RM_POLICY_LIMIT_UNPROVEN;
+}
+
+// RM-PROOF (bench 2026-10-06): a proof is a statement about the past. When the TARGET gets a new password
+// the sender's key stays "proven" although every frame is now a counted wrong-key reject there; with the
+// budget of 10 five such frames locked the target. So the proof only holds while replies keep verifying:
+// RM_POLICY_PROOF_DROP sends in a row without a verified reply (still waiting ones included, a wrong key
+// is never answered) put the target back on the unproven budget until the next reply verifies.
+#define RM_POLICY_PROOF_DROP 2u
+
+// Sends to ONE target that are newer than its newest verified send (any order in, expired entries ignored).
+inline uint8_t rmPolicyUnverifiedStreak(const RmPolEntry *e, uint8_t n, uint32_t nowMs)
+{
+    if (e == nullptr)
+        return 0;
+    bool haveVer = false;
+    uint32_t verAge = 0;
+    for (uint8_t i = 0; i < n; i++)
+    {
+        if (e[i].expired || !e[i].verified)
+            continue;
+        const uint32_t age = rmPolicyAgeMs(nowMs, e[i].sentMs);
+        if (!haveVer || age < verAge)
+        {
+            haveVer = true;
+            verAge = age;
+        }
+    }
+    uint8_t k = 0;
+    for (uint8_t i = 0; i < n; i++)
+        if (!e[i].expired && !e[i].verified && (!haveVer || rmPolicyAgeMs(nowMs, e[i].sentMs) < verAge))
+            k++;
+    return k;
+}
+
+// The unanswered budget for one target: rmProofLimit(), cut back to the unproven budget by the streak rule.
+inline uint8_t rmPolicyLimit(const RmProof *p, const RmPolEntry *e, uint8_t n, uint32_t nowMs)
+{
+    const uint8_t lim = rmProofLimit(p);
+    if (lim > RM_POLICY_LIMIT_UNPROVEN && rmPolicyUnverifiedStreak(e, n, nowMs) >= RM_POLICY_PROOF_DROP)
+        return (uint8_t)RM_POLICY_LIMIT_UNPROVEN;
+    return lim;
 }
 
 #endif // RM_SENDER_POLICY_H
