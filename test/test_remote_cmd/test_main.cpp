@@ -591,14 +591,84 @@ static void test_sync_does_not_move_hwm_and_is_rate_limited(void)
     rmStateInit(s, 42);
     ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 1000));
     TEST_ASSERT_EQUAL_UINT32(42, s.hwm);
-    // a second sync inside 10 s is rate limited, after 10 s fine
+    // a second sync inside 60 s is rate limited (own limiter), after 60 s fine
     ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(0, "sync"), 6000));
-    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 11000));
-    // a command right after a sync is rate limited too
-    ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(43, "status"), 12000));
-    ASSERT_VERDICT(RM_OK, chk(s, mk(43, "status"), 21000));
+    ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(0, "sync"), 11000));
+    // a sync never blocks a command: the command limiter is untouched by it
+    ASSERT_VERDICT(RM_OK, chk(s, mk(43, "status"), 12000));
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 1000 + RM_SYNC_RATE_MS));
     // sync with a wrong tag is rejected
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, withBadTag(mk(0, "sync")), 100000));
+}
+
+// Finding 2 (extended-commands-verdict): a captured sync frame replayed every few seconds used to
+// stamp the command limiter on every acceptance, so every genuine command was rate-rejected.
+static void test_sync_replay_does_not_block_commands(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    const uint32_t t0 = 100000;
+    const RmCmd sync = mk(0, "sync");
+    ASSERT_VERDICT(RM_SYNC, chk(s, sync, t0));
+    uint32_t ctr = 0;
+    for (uint32_t dt = 1000; dt < RM_SYNC_RATE_MS; dt += 10000)
+    {
+        // identical replay of the captured frame: silent rate reject
+        ASSERT_VERDICT(RM_REJ_RATE, chk(s, sync, t0 + dt));
+        // the genuine command with a fresh counter at the same moment goes through
+        const RmCmd c = mk(++ctr, "status");
+        ASSERT_VERDICT(RM_OK, chk(s, c, t0 + dt));
+        rmAccept(s, c, "ok", t0 + dt);
+        TEST_ASSERT_EQUAL_UINT8(0, s.rejCount);
+        TEST_ASSERT_FALSE(s.lockActive);
+    }
+    TEST_ASSERT_EQUAL_UINT32(6, ctr);
+    // once the 60 s are over the same frame verifies again, still without moving hwm
+    ASSERT_VERDICT(RM_SYNC, chk(s, sync, t0 + RM_SYNC_RATE_MS));
+    TEST_ASSERT_EQUAL_UINT32(ctr, s.hwm);
+}
+
+static void test_sync_limiter_60s(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    const uint32_t t0 = 5000;
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), t0));
+    ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(0, "sync"), t0 + RM_SYNC_RATE_MS - 1));
+    // the rate reject does not restart the window
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), t0 + RM_SYNC_RATE_MS));
+    TEST_ASSERT_EQUAL_UINT8(0, s.rejCount);
+    TEST_ASSERT_FALSE(s.lockActive);
+
+    // a sync at nowMs == 0 counts as accepted (haveSync, not a zero timestamp)
+    RmState z;
+    rmStateInit(z, 0);
+    ASSERT_VERDICT(RM_SYNC, chk(z, mk(0, "sync"), 0));
+    ASSERT_VERDICT(RM_REJ_RATE, chk(z, mk(0, "sync"), RM_SYNC_RATE_MS - 1));
+    ASSERT_VERDICT(RM_SYNC, chk(z, mk(0, "sync"), RM_SYNC_RATE_MS));
+
+    // millis() wrap between the two syncs
+    RmState w;
+    rmStateInit(w, 0);
+    const uint32_t tw = 0xFFFFFFFFu - 20000u;
+    ASSERT_VERDICT(RM_SYNC, chk(w, mk(0, "sync"), tw));
+    ASSERT_VERDICT(RM_REJ_RATE, chk(w, mk(0, "sync"), tw + 30000u));
+    ASSERT_VERDICT(RM_REJ_RATE, chk(w, mk(0, "sync"), tw + (RM_SYNC_RATE_MS - 1)));
+    ASSERT_VERDICT(RM_SYNC, chk(w, mk(0, "sync"), tw + RM_SYNC_RATE_MS));
+}
+
+static void test_command_does_not_block_sync(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    const RmCmd c = mk(1, "status");
+    ASSERT_VERDICT(RM_OK, chk(s, c, 100000));
+    rmAccept(s, c, "ok", 100000);
+    // right after an accepted command (inside the 10 s command spacing) a sync is still answered
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 100001));
+    // and the sync did not open a command window either: the command limiter still runs from the command
+    ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(2, "status"), 105000));
+    ASSERT_VERDICT(RM_OK, chk(s, mk(2, "status"), 110000));
 }
 
 static void test_sync_leaves_cache_window_alone(void)
@@ -1075,6 +1145,9 @@ int main(int, char **)
     RUN_TEST(test_same_ctr_with_other_tag_is_not_cached);
     RUN_TEST(test_ctr_zero_only_with_sync);
     RUN_TEST(test_sync_does_not_move_hwm_and_is_rate_limited);
+    RUN_TEST(test_sync_replay_does_not_block_commands);
+    RUN_TEST(test_sync_limiter_60s);
+    RUN_TEST(test_command_does_not_block_sync);
     RUN_TEST(test_sync_leaves_cache_window_alone);
     RUN_TEST(test_rate_limit_one_per_10_seconds);
     RUN_TEST(test_three_rejects_lock_out_for_5_minutes_then_recover);

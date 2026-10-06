@@ -50,8 +50,14 @@ So `RM_MAX_RESULT = 108` and a formatter body gets 105 characters. The firmware 
 
 Version skew: replies of the existing commands stay at 63 characters or less, because older
 operator firmware rejects a longer reply as unverified. New commands are only sent to targets that
-report support (capability token `rm=2` in `sync`/`status`); the page keeps the new cards disabled
+report support (capability token `rm=2` in the `sync` reply only, see below); the page keeps the new cards disabled
 until then. An unknown command is a counted reject even with the right password.
+
+Capability token rule (McApp ask 1, 2026-10-06): `rm=<n>` is carried by the `sync` reply only,
+`ok ctr=<hwm> v=<ver> rm=2`. `status` never carries it: its worst case is already 62 characters and
+the token would push it past the 63 that older firmware and older McApp accept. Every future
+capability token follows the same rule (one carrier, `sync`). A consumer treats the token as sticky
+and resets it on a version change in `v=` or a verified `reboot`.
 
 ### 2.2 Buffers that must change together (W0, with `static_assert`s)
 
@@ -207,8 +213,11 @@ older of two reordered frames counts as a replay strike). Final design:
    target in 357 of 1000 simulated wrong-password runs today).
 3. Per target, over all keys: 2 unanswered while the current key is unproven; 10 once a reply under
    that key's fingerprint verified (fingerprint and flag in RAM only).
-4. RM command frames go out without the `{NNN` suffix (no DM ACK, no retry ladder). This sender-only
-   change is the precondition for 3: a retried stale frame is otherwise a replay strike.
+4. `RM1 ` frames go out without the `{NNN` suffix (no DM ACK, no retry ladder), from any origin:
+   the DM send path treats a payload starting with `RM1 ` like `{CET}`/`{MCP}`/`{SET}`
+   (`user_msg_status = 0xFF`), whether it comes from the Remote page, BLE (0xA0) or Extern-UDP
+   (McApp ask 2: McApp is a second RM1 sender and cannot see late retry keyings). This is the
+   precondition for 3: a retried stale frame is otherwise a replay strike.
 5. Sent book 12 slots, never evicts a counted entry, and refuses with `busy` before a counter is used.
 6. "Reset on new password" becomes: per-target forget when a saved node slot is written or forgotten
    (drops pending chain, chain error, proof; wipes keys on delete). Never touches the persisted send

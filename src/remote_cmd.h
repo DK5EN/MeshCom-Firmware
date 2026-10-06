@@ -38,6 +38,7 @@ enum RmVerdict : uint8_t
 const char *rmVerdictName(RmVerdict v);
 
 #define RM_RATE_MS 10000u        // minimum spacing of accepted commands
+#define RM_SYNC_RATE_MS 60000u   // minimum spacing of accepted syncs (own limiter, independent of RM_RATE_MS)
 #define RM_CACHE_MS 600000u      // lost-reply recovery window (10 min)
 #define RM_REJ_WINDOW_MS 90000u  // 3 rejects inside this window ...
 #define RM_REJ_LIMIT 3
@@ -81,8 +82,12 @@ struct RmState
     char lastTag[17];       // tag of the last accepted command
     bool haveLast;
     // appended by RM-02 (rmStateInit() sets them, callers never touch them):
-    uint32_t lastRateMs;    // time of the last accepted command OR sync (rate limit)
+    uint32_t lastRateMs;    // time of the last accepted command (rate limit; sync does not touch it)
     bool haveRate;
+    // appended by W0a: sync has its own limiter so a replayed sync can neither starve commands nor
+    // be answered more than once per RM_SYNC_RATE_MS:
+    uint32_t lastSyncMs;    // time of the last accepted sync
+    bool haveSync;
 };
 
 void rmStateInit(RmState &s, uint32_t hwm);
@@ -93,7 +98,8 @@ void rmStateInit(RmState &s, uint32_t hwm);
 // (a rate reject requires a valid tag). The lockout is reachable without the
 // key (3 junk DMs per 5 min keep RM unavailable): accepted by design, RM fails
 // closed, never open (ADR). RM_SYNC
-// stamps the rate limiter itself; it never moves hwm.
+// has its own limiter (RM_SYNC_RATE_MS, a second authenticated sync inside it is RM_REJ_RATE, silent):
+// it neither stamps nor obeys the command limiter, and it never moves hwm.
 RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
                   int maxTxPower, uint32_t nowMs);
 

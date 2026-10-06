@@ -176,8 +176,8 @@ inline bool rmPolicyNeedSync(bool clockTrusted, bool haveTargetMark, bool cmdIsS
 //                an answer, so it must not keep the chain alive (hang found by the advisor pass)
 //   ageMs        now - sync send time
 //   sinceVerifiedMs  now - time the verified reply was booked (only read when syncVerified)
-// SEND only RM_PEND_SEND_DELAY_MS after a VERIFIED sync reply (the target stamped its rate limiter with
-// the sync). DROP when the sync is gone or expired, or when it is not verified and RM_NOANSWER_MS have
+// SEND only RM_PEND_SEND_DELAY_MS after a VERIFIED sync reply (the sender's own RM_POLICY_COOLDOWN_MS
+// spacing after the sync send; the target's sync limiter is separate since W0a). DROP when the sync is gone or expired, or when it is not verified and RM_NOANSWER_MS have
 // passed, whatever replied says. WAIT otherwise. All ages are unsigned differences (millis() wrap safe).
 enum RmPendAction : uint8_t
 {

@@ -395,15 +395,19 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 
     // Only an authenticated sender reaches this point; a rate reject is not an
     // attack signal and does not count towards the lockout (advisor RM W1 N1).
-    if (s.haveRate && (uint32_t)(nowMs - s.lastRateMs) < RM_RATE_MS)
-        return RM_REJ_RATE;
-
+    // A sync has its own limiter: a replayed sync frame (ctr 0 skips the replay check) must
+    // neither starve genuine commands nor be answered more than once per RM_SYNC_RATE_MS.
     if (isSync)
     {
-        s.lastRateMs = nowMs;
-        s.haveRate = true;
+        if (s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
+            return RM_REJ_RATE;
+        s.lastSyncMs = nowMs;
+        s.haveSync = true;
         return RM_SYNC;
     }
+
+    if (s.haveRate && (uint32_t)(nowMs - s.lastRateMs) < RM_RATE_MS)
+        return RM_REJ_RATE;
     return RM_OK;
 }
 

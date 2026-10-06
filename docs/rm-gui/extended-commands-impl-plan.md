@@ -52,14 +52,14 @@ Orchestrator-owned hotspots (no writer edits them inside a parallel wave): `src/
 `src/remote_cmd.cpp`, `src/command_functions.cpp`, `src/web_functions/web_functions.cpp`,
 `platformio.ini`, `tools/regression.sh`.
 
-| Wave | Content                                                                                                                                                                    | Writers                          | Gate additions                                                          |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
-| W-1  | `-Os` on `t_echo` and `heltec_t114`; board link step in `tools/regression.sh` (t_echo, heltec_t114, wiscore_rak4631, flash ceiling); concept 2.5 corrected; backlog row B  | orchestrator                     | both envs link, flash below ceiling `[D2]`                              |
-| W0a  | `sync` replay fix: own limiter 60 s, never blocks commands; regression test red before, green after                                                                        | 1 implementer (serial, hotspots) | `native_remote_cmd`, pytest twin                                        |
-| W0b  | Buffers and `static_assert`s (concept 2.2), `RM_MAX_RESULT` 108, table allowlist, `rmSanitizeResult()`, `rm=2` token, Python twin and vectors, jsdom suite into the gate   | 1 implementer (serial, hotspots) | `lockActive` byte-compare test, `strlen(wire) <= 140`, jsdom in stage 2 |
-| W1   | Four parallel writers on disjoint new files, hotspot edits applied by the orchestrator at the gate (section 3)                                                             | 4 implementers                   | each writer's own native env or jsdom; whole gate after                 |
-| W2   | `execute()` dispatch glue (orchestrator), page cards P7, P8, P10-P12 (1 implementer on `web_rm_page.cpp` and the jsdom test)                                               | orchestrator + 1 implementer     | full gate, board link step                                              |
-| W3   | Full gate `--stage 1,2`, size build on all RM boards incl. E22_XML-DevKitC, advisor on the campaign diff, flash and bench DK5EN-1 and DK5EN-92, RAK compile, docs, backlog | orchestrator                     | bench list of concept section 7                                         |
+| Wave | Content                                                                                                                                                                                                        | Writers                          | Gate additions                                                          |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| W-1  | `-Os` on `t_echo` and `heltec_t114`; board link step in `tools/regression.sh` (t_echo, heltec_t114, wiscore_rak4631, flash ceiling); concept 2.5 corrected; backlog row B                                      | orchestrator                     | both envs link, flash below ceiling `[D2]`                              |
+| W0a  | `sync` replay fix: own limiter 60 s, never blocks commands; regression test red before, green after                                                                                                            | 1 implementer (serial, hotspots) | `native_remote_cmd`, pytest twin                                        |
+| W0b  | Buffers and `static_assert`s (concept 2.2), `RM_MAX_RESULT` 108, table allowlist, `rmSanitizeResult()`, `rm=2` token in the `sync` reply, Python twin and vectors incl. McApp ask 3, jsdom suite into the gate | 1 implementer (serial, hotspots) | `lockActive` byte-compare test, `strlen(wire) <= 140`, jsdom in stage 2 |
+| W1   | Four parallel writers on disjoint new files, hotspot edits applied by the orchestrator at the gate (section 3)                                                                                                 | 4 implementers                   | each writer's own native env or jsdom; whole gate after                 |
+| W2   | `execute()` dispatch glue (orchestrator), page cards P7, P8, P10-P12 (1 implementer on `web_rm_page.cpp` and the jsdom test)                                                                                   | orchestrator + 1 implementer     | full gate, board link step                                              |
+| W3   | Full gate `--stage 1,2`, size build on all RM boards incl. E22_XML-DevKitC, advisor on the campaign diff, flash and bench DK5EN-1 and DK5EN-92, RAK compile, docs, backlog                                     | orchestrator                     | bench list of concept section 7                                         |
 
 Commit per wave on `fork-dev`, explicit paths, after the gate and the advisor pass. No push, no
 release, no upstream PR without a separate request.
@@ -120,13 +120,26 @@ W1c is pulled out of the parallel wave and run serially after W1a/b/d.
 | D11 | MHEARD window for `mh`                          | 3 h, like the web page                                                                   |
 | D12 | Scope of the go                                 | whole campaign through the bench; stop before release, no push                           |
 
-## 7. Wave status
+## 7. McApp asks (2026-10-06)
 
-| Wave | Status                                                                                                                                                    |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| W-1  | done 2026-10-06: gate 64 envs / 2115 cases green, selftest 48 green, board links 73.0 / 70.1 / 77.3 %; no advisor pass (build flags and gate script only) |
-| W0a  | open                                                                                                                                                      |
-| W0b  | open                                                                                                                                                      |
-| W1   | open                                                                                                                                                      |
-| W2   | open                                                                                                                                                      |
-| W3   | open                                                                                                                                                      |
+Source: `~/Desktop/2026-10-06_mcapp-rm1-firmware-asks.md` (McApp is a second RM1 sender over BLE and
+Extern-UDP). All three are accepted.
+
+| Ask | Content                                                                                                                                                                                                                        | Wave                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| 1   | `rm=2` in the `sync` reply only (`ok ctr=<hwm> v=<ver> rm=2`); `status` never carries a capability token; rule stated in concept 2.1                                                                                           | W0b                                                        |
+| 2   | No `{NNN` suffix and no retry ladder for any DM whose payload starts with `RM1 `, from the Remote page, BLE or Extern-UDP; native test                                                                                         | W0c (new, `loop_functions.cpp`)                            |
+| 3   | Vectors: compact `status` replies (6-letter with LED, 5-letter without, 62-character worst case) and the `sync` reply with the token, each with the fields `rmStatusParse` produces; native check that parses every JSON reply | W0b (items 1-4), W2 (one worst-case reply per new command) |
+| ref | Names for the `..` counters of `txq` and `mbox` are fixed by the W1a formatters; `busy` stays a refusal of the firmware's own sender only                                                                                      | W1a, concept                                               |
+
+## 8. Wave status
+
+| Wave | Status                                                                                                                                                                                                                                               |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W-1  | done 2026-10-06: gate 64 envs / 2115 cases green, selftest 48 green, board links 73.0 / 70.1 / 77.3 %; no advisor pass (build flags and gate script only)                                                                                            |
+| W0a  | done 2026-10-06: `sync` has its own 60 s limiter (`RM_SYNC_RATE_MS`), 3 new native tests red before / green after, advisor APPROVED. Residual, accepted: a manual re-sync inside 60 s is dropped silently; the limiter is per target, not per sender |
+| W0b  | open                                                                                                                                                                                                                                                 |
+| W0c  | open                                                                                                                                                                                                                                                 |
+| W1   | open                                                                                                                                                                                                                                                 |
+| W2   | open                                                                                                                                                                                                                                                 |
+| W3   | open                                                                                                                                                                                                                                                 |
