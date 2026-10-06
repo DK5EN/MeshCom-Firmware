@@ -12,6 +12,8 @@
 #include <unity.h>
 
 #include <radio_units.h>
+#include <rm_radio_in.h>
+#include <string.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -214,6 +216,26 @@ static void test_guard_band_same_quantity_on_both_platforms_via_converter(void)
     TEST_ASSERT_FALSE(unconverted_nrf52_dec == nrf52_dec);
 }
 
+// ---- RM `radio` reply (bench 2026-10-06: RAK4631 answered f=999.999 ... cr=2) --------------------------------
+
+static void test_rm_radio_reply_same_text_on_both_platforms(void)
+{
+    char esp[RM_FMT_BODY_MAX + 1], nrf[RM_FMT_BODY_MAX + 1];
+    // ESP32: MHz, kHz, 4/N denominator
+    TEST_ASSERT_TRUE(rmFmtRadio(esp, sizeof(esp), rmRadioInFromStored(433.175f, 11, 6, 250.0f, 2, 22, false)) > 0);
+    // nRF52: Hz, bandwidth index 1, coding-rate index 2 -- the same radio
+    TEST_ASSERT_TRUE(rmFmtRadio(nrf, sizeof(nrf), rmRadioInFromStored(433175000.0f, 11, 2, 1.0f, 2, 22, true)) > 0);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", esp);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", nrf);
+}
+
+static void test_rm_radio_reply_nrf52_other_values(void)
+{
+    char b[RM_FMT_BODY_MAX + 1];
+    TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), rmRadioInFromStored(869525000.0f, 12, 4, 0.0f, 14, 22, true)) > 0);
+    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=12 cr=8 bw=125 p=14/22", b);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -235,6 +257,9 @@ int main(int, char **)
 
     RUN_TEST(test_guard_band_divisor_is_one_tenth_of_bandwidth_in_mhz);
     RUN_TEST(test_guard_band_same_quantity_on_both_platforms_via_converter);
+
+    RUN_TEST(test_rm_radio_reply_same_text_on_both_platforms);
+    RUN_TEST(test_rm_radio_reply_nrf52_other_values);
 
     return UNITY_END();
 }

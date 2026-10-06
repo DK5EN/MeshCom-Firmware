@@ -16,6 +16,7 @@
 #include "radio_units.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
+#include "rm_radio_in.h"
 #include "txring_functions.h"
 #include "uptime_min.h"
 #if defined(ENABLE_MSGSTORE)
@@ -62,14 +63,10 @@ static bool posBeacons()
 
 static int execRadio(char *res, size_t n)
 {
-    RmRadioIn in;
-    in.freqMHz = (float)meshcom_settings.node_freq;
-    in.sf = (int)meshcom_settings.node_sf;
-    in.cr = (int)meshcom_settings.node_cr;
-    // node_bw is kHz on SX127x and a chip index on the SX126x/LR11xx path (RF-01): convert like the console does.
-    in.bwKHz = radioBwStoredToKhz((float)meshcom_settings.node_bw, radioUnitsIndexed());
-    in.pCur = (int)meshcom_settings.node_power;
-    in.pMax = (int)TX_POWER_MAX; // same symbol as execute() "status"
+    // node_freq / node_bw / node_cr are Hz and indices on the SX126x nRF52 path (RF-01): convert like the console.
+    const RmRadioIn in = rmRadioInFromStored((float)meshcom_settings.node_freq, (int)meshcom_settings.node_sf,
+                                             (int)meshcom_settings.node_cr, (float)meshcom_settings.node_bw,
+                                             (int)meshcom_settings.node_power, (int)TX_POWER_MAX, radioUnitsIndexed());
     char body[RM_FMT_BODY_MAX + 1];
     return done(res, n, body, rmFmtRadio(body, sizeof(body), in));
 }

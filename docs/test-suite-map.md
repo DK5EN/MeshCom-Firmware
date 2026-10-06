@@ -226,7 +226,7 @@ flashes whatever is attached.
 | test_pos_persist             | Unit          |     9 | native                                                       |
 | test_pos_tag_nan             | Regression    |     7 | native_parsers                                               |
 | test_printfdeb_format        | Regression    |    13 | native                                                       |
-| test_radio_units             | Regression    |    14 | native                                                       |
+| test_radio_units             | Regression    |    16 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
 | test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
