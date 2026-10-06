@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "remote_cmd.h"
 #include "rm_sender_policy.h"
 
 // Verdict counters since boot (printed by --info). One per RmVerdict class; ok counts commands that
@@ -49,8 +50,8 @@ struct RmLogEntry
     uint32_t ms;       // millis() at execution
     char src[10];      // requesting call
     uint32_t ctr;
-    char cmd[40];      // "<cmd>[ <args>]"
-    char result[64];   // "ok ..." / "err ..." (what the reply carried)
+    char cmd[56];      // "<cmd>[ <args>]"
+    char result[RM_MAX_RESULT + 1]; // "ok ..." / "err ..." (what the reply carried)
 };
 
 struct RmStatus
@@ -72,16 +73,19 @@ struct RmSent
 {
     char dst[10];
     uint32_t ctr;
-    char cmd[40];          // "<cmd>[ <args>]"
+    char cmd[56];          // "<cmd>[ <args>]"
     uint32_t sentMs;       // millis() at send
     bool replied;          // some reply for (dst, ctr) arrived
     bool verified;         // ... and it is authentic
-    char reply[72];        // verified: the result text ("ok ..."); unverified: the raw text, truncated
+    char reply[RM_MAX_RESULT + 1]; // verified: the result text ("ok ..."); unverified: the raw text, truncated
     // filled by rmGetSent() from rm_sender_policy.h (contract C2): the entry state at that moment
     uint8_t state;         // RmEntryState: queued, waiting, noanswer, ok, err, unverified
     const char *stateName; // "queued" ... "unverified" (static string)
     const char *msg;       // one plain sentence for the operator (static string, never null)
 };
+static_assert(sizeof(((RmSent *)nullptr)->cmd) >= sizeof(((RmCmd *)nullptr)->cmd) + 1 + RM_MAX_ARGS &&
+                  sizeof(((RmLogEntry *)nullptr)->cmd) >= sizeof(((RmCmd *)nullptr)->cmd) + 1 + RM_MAX_ARGS,
+              "\"<cmd> <args>\" must fit the sent book and the log");
 
 // Signs and sends "RM1 <ctr> <cmd>[ <args>] <tag>" as a DM to dst (call incl. SSID, upper case; lower
 // case is folded up) via sendMessage(). passwd = the TARGET's password: used only to derive

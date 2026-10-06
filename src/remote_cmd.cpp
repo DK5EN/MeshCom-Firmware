@@ -7,6 +7,11 @@
 
 #include "hmac_sha256.h"
 
+static_assert(RM_MAX_ARGS == 39, "args cap is part of the wire contract (concept 2.2)");
+static_assert(RM_MAX_RESULT == 108, "4+10+1+108+1+16 = 140 = the DM text limit");
+static_assert(4 + 10 + 1 + RM_MAX_RESULT + 1 + 16 <= 140, "reply DM text must fit 140 chars");
+static_assert(RM_LEGACY_RESULT_MAX <= RM_MAX_RESULT, "legacy cap below the wire cap");
+
 namespace
 {
 
@@ -126,33 +131,56 @@ bool isOnOff(const char *a)
     return strcmp(a, "on") == 0 || strcmp(a, "off") == 0;
 }
 
-// allowlist of section 6.4, args included; maxTxPower bounds txpower
-bool allowed(const RmCmd &c, int maxTxPower)
+// allowlist of section 6.4 as a table: one row per command name. Adding a command is one row
+// (plus the dispatch in rm_runtime.cpp).
+enum RmArgShape : uint8_t
 {
-    const char *cmd = c.cmd;
-    const char *a = c.args;
+    RM_ARGS_NONE,    // no args
+    RM_ARGS_ONOFF,   // "on" | "off"
+    RM_ARGS_TXPOWER, // 0..maxTxPower, at most 3 digits
+    RM_ARGS_SETOUT,  // "<pin> <on|off>", pin a0..a7 or b0..b7 (the console's --setout MCP pins)
+};
 
-    if (strcmp(cmd, "reboot") == 0 || strcmp(cmd, "status") == 0 || strcmp(cmd, "sendpos") == 0 ||
-        strcmp(cmd, "sendtrack") == 0 || strcmp(cmd, "sync") == 0)
+struct RmAllowRow
+{
+    const char *name;
+    RmArgShape shape;
+    bool write; // class: false = read-only, true = changes node state
+};
+
+const RmAllowRow RM_ALLOWLIST[] = {
+    {"reboot", RM_ARGS_NONE, true},     {"status", RM_ARGS_NONE, false},    {"sendpos", RM_ARGS_NONE, true},
+    {"sendtrack", RM_ARGS_NONE, true},  {"sync", RM_ARGS_NONE, false},      {"gps", RM_ARGS_ONOFF, true},
+    {"track", RM_ARGS_ONOFF, true},     {"display", RM_ARGS_ONOFF, true},   {"led", RM_ARGS_ONOFF, true},
+    {"gateway", RM_ARGS_ONOFF, true},   {"mesh", RM_ARGS_ONOFF, true},      {"txpower", RM_ARGS_TXPOWER, true},
+    {"setout", RM_ARGS_SETOUT, true},
+};
+
+bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
+{
+    switch (shape)
+    {
+    case RM_ARGS_NONE:
         return a[0] == '\0';
-
-    if (strcmp(cmd, "gps") == 0 || strcmp(cmd, "track") == 0 || strcmp(cmd, "display") == 0 ||
-        strcmp(cmd, "led") == 0 || strcmp(cmd, "gateway") == 0 || strcmp(cmd, "mesh") == 0)
+    case RM_ARGS_ONOFF:
         return isOnOff(a);
-
-    if (strcmp(cmd, "txpower") == 0)
+    case RM_ARGS_TXPOWER:
     {
         int v = 0;
         return parseSmallInt(a, 3, v) && v >= 0 && v <= maxTxPower;
     }
-
-    if (strcmp(cmd, "setout") == 0)
-    {
-        // "<pin> <on|off>", pin a0..a7 or b0..b7 (the console's --setout MCP pins)
+    case RM_ARGS_SETOUT:
         return strlen(a) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
                isOnOff(a + 3);
     }
+    return false;
+}
 
+bool allowed(const RmCmd &c, int maxTxPower)
+{
+    for (const RmAllowRow &r : RM_ALLOWLIST)
+        if (strcmp(c.cmd, r.name) == 0)
+            return argsMatch(r.shape, c.args, maxTxPower);
     return false;
 }
 
@@ -376,7 +404,7 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     if (isForbiddenText(c.cmd) || isForbiddenText(c.args) || !allowed(c, maxTxPower))
         return reject(s, RM_REJ_BLOCKED, nowMs);
 
-    char canon[160];
+    char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
     if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
         return reject(s, RM_REJ_FORMAT, nowMs);
     char want[17];
@@ -520,7 +548,7 @@ size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char
     memcpy(c.cmd, cmd, strlen(cmd));
     memcpy(c.args, args, strlen(args));
 
-    char canon[160];
+    char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
     if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
         return 0;
     char tag[17];
@@ -605,4 +633,31 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
 
     memcpy(result, res, resLen + 1);
     return true;
+}
+
+size_t rmSanitizeResult(char *result)
+{
+    size_t n = 0;
+    for (; result[n]; n++)
+    {
+        const unsigned char ch = (unsigned char)result[n];
+        const bool ok = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+                        ch == ' ' || (ch != 0 && strchr("-./=+_@?(),*#", ch) != nullptr);
+        if (!ok)
+            result[n] = '?';
+    }
+    return n;
+}
+
+int rmCapLevel(const char *syncResult)
+{
+    if (syncResult == nullptr)
+        return 0;
+    for (const char *p = strstr(syncResult, " rm="); p != nullptr; p = strstr(p + 1, " rm="))
+    {
+        p += 4;
+        if (*p >= '0' && *p <= '9' && (p[1] == '\0' || p[1] == ' '))
+            return *p - '0';
+    }
+    return 0;
 }

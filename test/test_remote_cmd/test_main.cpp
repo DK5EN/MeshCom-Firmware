@@ -18,6 +18,7 @@
 #include <hmac_sha256.h>
 #include <remote_cmd.h>
 #include <rm_queue.h>
+#include <rm_sender_policy.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -197,7 +198,7 @@ static void test_vectors_replies_reproduced(void)
 
     static std::string objs[32];
     const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(4, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(8, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -323,7 +324,7 @@ static void test_parse_rejects_malformed(void)
         "RM1 x reboot 3f9ac2e17b0d5e44",
         "RM1 1 3f9ac2e17b0d5e44",                              // no command
         "RM1 1 abcdefghijklmnop 3f9ac2e17b0d5e44",             // cmd 16 chars
-        "RM1 1 gps abcdefghijklmnopqrstuvwx 3f9ac2e17b0d5e44", // args 24 chars
+        "RM1 1 gps abcdefghijklmnopqrstuvwxyz0123456789abcd 3f9ac2e17b0d5e44", // args 40 chars (RM_MAX_ARGS + 1)
         "RM1 1 reboot\t3f9ac2e17b0d5e44",
     };
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
@@ -333,6 +334,9 @@ static void test_parse_rejects_malformed(void)
         TEST_ASSERT_FALSE_MESSAGE(rmParse(bad[i], c), msg);
     }
     TEST_ASSERT_FALSE(rmParse(nullptr, c));
+    // the boundary on the accepted side: RM_MAX_ARGS (39) characters parse
+    TEST_ASSERT_TRUE(rmParse("RM1 1 gps abcdefghijklmnopqrstuvwxyz0123456789abc 3f9ac2e17b0d5e44", c));
+    TEST_ASSERT_EQUAL_UINT(RM_MAX_ARGS, strlen(c.args));
 }
 
 // ---- key and tag ----------------------------------------------------------
@@ -807,7 +811,7 @@ static void test_reply_shape_and_limits(void)
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, "ok rebooting", DST, SRC, PW, out, 20)); // buffer too small
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, "ok rebooting", nullptr, SRC, PW, out, sizeof(out)));
 
-    char longResult[100];
+    char longResult[RM_MAX_RESULT + 2]; // one past the cap (was 100 when the cap was 63)
     memset(longResult, 'a', sizeof(longResult));
     longResult[sizeof(longResult) - 1] = '\0';
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, longResult, DST, SRC, PW, out, sizeof(out)));
@@ -974,7 +978,7 @@ static void test_build_command_limits(void)
     TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(nullptr, SRC, 1, "reboot", "", key, out, sizeof(out)));
     TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "", "", key, out, sizeof(out)));
     TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "averyveryverylongcmd", "", key, out, sizeof(out)));
-    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "reboot", "0123456789012345678901234", key, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 1, "reboot", "01234567890123456789012345678901234567890", key, out, sizeof(out)));
     // args == nullptr is "no args"
     TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 1, "reboot", nullptr, key, out, sizeof(out)) > 0);
     TEST_ASSERT_EQUAL_STRING("RM1 1 reboot 18f287b79c551022", out);
@@ -1019,7 +1023,7 @@ static void test_verify_reply_vectors_and_tampering(void)
 
     static std::string objs[32];
     const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT(4, n);
+    TEST_ASSERT_EQUAL_INT(8, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1122,6 +1126,182 @@ static void test_reply_queue_is_separate_from_command_queue(void)
     rmQueueReset();
 }
 
+// ---- W0b: buffers, sanitiser, allowlist table, capability, status vectors -----------------------------
+
+static std::string repeat(char ch, size_t n) { return std::string(n, ch); }
+
+static void test_long_result_does_not_touch_lock_state(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    s.rejCount = 2;
+    s.lockActive = true;
+    s.lockUntilMs = 0xA5A5A5A5u;
+    const uint8_t rej = s.rejCount, lock = (uint8_t)s.lockActive;
+    const uint32_t until = s.lockUntilMs;
+    const std::string r = "ok " + repeat('x', RM_MAX_RESULT - 3);
+    TEST_ASSERT_EQUAL_UINT(RM_MAX_RESULT, r.size());
+    rmAccept(s, mk(5, "status"), r.c_str(), 1000);
+    // byte compares: host clang -O1 hides an overwrite behind bool reads
+    TEST_ASSERT_EQUAL_UINT8(rej, *(const uint8_t *)&s.rejCount);
+    TEST_ASSERT_EQUAL_UINT8(lock, *(const uint8_t *)&s.lockActive);
+    TEST_ASSERT_EQUAL_MEMORY(&until, &s.lockUntilMs, sizeof(until));
+    TEST_ASSERT_EQUAL_UINT(RM_MAX_RESULT, strlen(s.lastReply));
+    TEST_ASSERT_EQUAL_STRING(r.c_str(), s.lastReply);
+}
+
+static void test_reply_wire_is_140_and_109_is_refused(void)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    const std::string r = "ok " + repeat('y', RM_MAX_RESULT - 3);
+    RmCmd c = mk(4294967295u, "status");
+    char wire[160];
+    const size_t n = rmReply(c, r.c_str(), DST, SRC, PW, wire, sizeof(wire));
+    TEST_ASSERT_EQUAL_UINT(140, n);
+    char back[RM_MAX_RESULT + 1];
+    TEST_ASSERT_TRUE(rmVerifyReply(wire, DST, SRC, 4294967295u, key, back, sizeof(back)));
+    TEST_ASSERT_EQUAL_STRING(r.c_str(), back);
+    // 109 chars: refused on both sides (rmReply builds nothing, rmVerifyReply rejects a hand-built frame)
+    const std::string r9 = r + "z";
+    TEST_ASSERT_EQUAL_UINT(0, rmReply(c, r9.c_str(), DST, SRC, PW, wire, sizeof(wire)));
+    char frame[200];
+    snprintf(frame, sizeof(frame), "RM1 4294967295 %s 0123456789abcdef", r9.c_str());
+    TEST_ASSERT_FALSE(rmVerifyReply(frame, DST, SRC, 4294967295u, key, back, sizeof(back)));
+}
+
+static void test_args_39_roundtrip_and_40_refused(void)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    const std::string a39 = repeat('a', RM_MAX_ARGS), a40 = repeat('a', RM_MAX_ARGS + 1);
+    char wire[160];
+    // no allowlisted command takes this yet: the length gate is checked by the parser, the verdict stays "not allowed"
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", a39.c_str(), 22));
+    TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 9, "status", a40.c_str(), key, wire, sizeof(wire)));
+    const size_t n = rmBuildCommand(DST, SRC, 9, "status", a39.c_str(), key, wire, sizeof(wire));
+    TEST_ASSERT_TRUE(n > 0 && n <= 96);
+    RmCmd c;
+    TEST_ASSERT_TRUE(rmParse(wire, c));
+    TEST_ASSERT_EQUAL_STRING(a39.c_str(), c.args);
+    RmState s;
+    rmStateInit(s, 0);
+    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000)); // args on a no-args command
+    std::string frame = std::string("RM1 9 status ") + a40 + " 0123456789abcdef";
+    TEST_ASSERT_FALSE(rmParse(frame.c_str(), c));
+}
+
+static void test_sanitiser_vectors(void)
+{
+    struct { const char *in, *out; } v[] = {
+        {"<>\"'&", "?????"}, {"a:ack5", "a?ack5"}, {"{", "?"}, {"}", "?"}, {";", "?"}, {"%", "?"}, {"|", "?"},
+        {"ok caf\xC3\xA9 \x80\xFF\x01\x7F", "ok caf?? ????"},
+    };
+    for (auto &t : v)
+    {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%s", t.in);
+        rmSanitizeResult(buf);
+        TEST_ASSERT_EQUAL_STRING(t.out, buf);
+    }
+    char all[128] = " -./=+_@?(),*#";
+    for (char ch = 'a'; ch <= 'z'; ch++) strncat(all, &ch, 1);
+    for (char ch = 'A'; ch <= 'Z'; ch++) strncat(all, &ch, 1);
+    for (char ch = '0'; ch <= '9'; ch++) strncat(all, &ch, 1);
+    char copy[128];
+    snprintf(copy, sizeof(copy), "%s", all);
+    TEST_ASSERT_EQUAL_UINT(strlen(all), rmSanitizeResult(copy));
+    TEST_ASSERT_EQUAL_STRING(all, copy);
+}
+
+static void test_allowlist_table_equivalence(void)
+{
+    struct { const char *cmd, *args; bool ok; } v[] = {
+        {"reboot", "", true}, {"reboot", "x", false},     {"status", "", true},   {"status", "on", false},
+        {"sendpos", "", true}, {"sendpos", "1", false},   {"sendtrack", "", true}, {"sendtrack", "on", false},
+        {"sync", "", true},   {"sync", "1", false},       {"gps", "on", true},    {"gps", "", false},
+        {"track", "off", true}, {"track", "ON", false},   {"display", "on", true}, {"display", "1", false},
+        {"led", "off", true}, {"led", "on off", false},   {"gateway", "on", true}, {"gateway", "no", false},
+        {"mesh", "off", true}, {"mesh", "", false},       {"txpower", "0", true}, {"txpower", "22", true},
+        {"txpower", "23", false}, {"txpower", "05", false}, {"txpower", "-1", false}, {"txpower", "1234", false},
+        {"setout", "a0 on", true}, {"setout", "b7 off", true}, {"setout", "a8 on", false}, {"setout", "c1 on", false},
+        {"setout", "a1on", false}, {"setout", "a1 x", false}, {"setout", "a1 on ", false}, {"nope", "", false},
+        {"Reboot", "", false},
+    };
+    for (auto &t : v)
+    {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "%s '%s'", t.cmd, t.args);
+        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 22), msg);
+    }
+}
+
+static void test_legacy_replies_stay_within_63_and_cap_token(void)
+{
+    // worst-case status and the sync reply of the existing commands stay readable by older operators
+    char res[RM_MAX_RESULT + 1];
+    RmSwitches sw;
+    memset(&sw, 1, sizeof(sw));
+    rmFormatStatus(res, sizeof(res), "4.40A", 71582000u, 100, 9999, sw, 22, 22);
+    TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
+    snprintf(res, sizeof(res), "ok ctr=%lu v=%s%s rm=%d", 4294967295ul, "4.40a", "", RM_CAP_LEVEL);
+    TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
+    TEST_ASSERT_EQUAL_INT(2, rmCapLevel(res));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a"));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a rm="));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a rm=x"));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel(nullptr));
+    // every existing reply form passes the sanitiser unchanged
+    const char *ok[] = {"ok rebooting", "err range", "err storage", "ok ctr=42 v=4.40a rm=2",
+                        "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0", "ok gps=on", "ok setout a2 on"};
+    for (const char *r : ok)
+    {
+        char b[RM_MAX_RESULT + 1];
+        snprintf(b, sizeof(b), "%s", r);
+        rmSanitizeResult(b);
+        TEST_ASSERT_EQUAL_STRING(r, b);
+    }
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=4.40a rm=12"));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=4.40a rm=2x"));
+    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=rm=2a"));
+}
+
+static void test_status_vectors_parse(void)
+{
+    std::string json;
+    TEST_ASSERT_TRUE(read_repo_file("tools/tests/remote_cmd_vectors.json", json));
+    static std::string objs[32];
+    const size_t n = objectsOf(json, "replies", objs, 32);
+    int seen = 0, caps = 0;
+    for (size_t i = 0; i < n; i++)
+    {
+        std::string res;
+        TEST_ASSERT_TRUE(jsonString(objs[i], "result", res));
+        if (objs[i].find("\"status_sw\"") != std::string::npos)
+        {
+            RmStatusInfo st;
+            TEST_ASSERT_TRUE(rmStatusParse(res.c_str(), st));
+            std::string sw;
+            TEST_ASSERT_TRUE(jsonString(objs[i], "status_sw", sw));
+            TEST_ASSERT_EQUAL_UINT(11, sw.size());
+            for (int j = 0; j < 6; j++)
+            {
+                const int e = sw[j * 2] == '-' ? -1 : sw[j * 2] - '0';
+                TEST_ASSERT_EQUAL_INT(e, st.sw[j]);
+            }
+            TEST_ASSERT_TRUE(st.haveP);
+            seen++;
+        }
+        if (objs[i].find("\"cap\"") != std::string::npos)
+        {
+            TEST_ASSERT_EQUAL_INT(RM_CAP_LEVEL, rmCapLevel(res.c_str()));
+            caps++;
+        }
+    }
+    TEST_ASSERT_EQUAL_INT(3, seen);
+    TEST_ASSERT_EQUAL_INT(1, caps);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1166,5 +1346,12 @@ int main(int, char **)
     RUN_TEST(test_verify_reply_vectors_and_tampering);
     RUN_TEST(test_verify_reply_rejects_malformed_and_commands);
     RUN_TEST(test_reply_queue_is_separate_from_command_queue);
+    RUN_TEST(test_long_result_does_not_touch_lock_state);
+    RUN_TEST(test_reply_wire_is_140_and_109_is_refused);
+    RUN_TEST(test_args_39_roundtrip_and_40_refused);
+    RUN_TEST(test_sanitiser_vectors);
+    RUN_TEST(test_allowlist_table_equivalence);
+    RUN_TEST(test_legacy_replies_stay_within_63_and_cap_token);
+    RUN_TEST(test_status_vectors_parse);
     return UNITY_END();
 }

@@ -47,6 +47,10 @@ from typing import Any, Dict, List, Optional
 PROTO = "RM1"
 CTR_MAX = 0xFFFFFFFF
 PASSWD_MAX = 14  # node_passwd is char[15]
+ARGS_MAX = 39  # RM_MAX_ARGS in src/remote_cmd.h (RmCmd::args[40])
+RESULT_MAX = 108  # RM_MAX_RESULT: "RM1 <10> <108> <16>" is 140 chars, the DM limit
+LEGACY_RESULT_MAX = 63  # replies of the first 13 commands stay within this (version skew)
+CAP_LEVEL = 2  # "rm=<n>" token of the sync reply
 TAG_HEX_LEN = 16  # 8 bytes
 
 # cmd -> argument shape. None = no args, tuple = fixed set of allowed arg strings,
@@ -140,6 +144,8 @@ def validate_command(cmd: str, args: str, ctr: int) -> None:
     for bad in BLOCKED_CHARS:
         if bad in text:
             raise RmError("blocked sequence %r" % bad)
+    if len(args) > ARGS_MAX:
+        raise RmError("args longer than %d characters" % ARGS_MAX)
     if cmd in BLOCKED_CMDS:
         raise RmError("command %r is hard-blocked" % cmd)
     if not text.isascii() or not text.isprintable():
@@ -205,6 +211,8 @@ def build_reply(dst: str, src: str, ctr: int, result: str, passwd: str) -> str:
     """Reply DM text as the managed node sends it (used for vectors and tests)."""
     if not (result.startswith("ok ") or result.startswith("err ")):
         raise RmError("result must start with 'ok ' or 'err '")
+    if len(result) > RESULT_MAX:
+        raise RmError("result longer than %d characters" % RESULT_MAX)
     t = tag(derive_key(passwd), reply_canonical(dst, src, ctr, result))
     return "%s %d %s %s" % (PROTO, ctr, result, t)
 
@@ -280,7 +288,25 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 44, "err range"),
     ("secret   ", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a"),
     ("abcdefghijklmn", "DK5EN-92", "DK5EN-14", 2, "ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1"),
+    # McApp ask 3 (appended, existing entries above never change)
+    ("secret", "DK5EN-90", "DK5EN-1", 54, "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0"),
+    ("secret", "DK5EN-90", "DK5EN-1", 55, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22"),
+    ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1"),
+    ("secret", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a rm=%d" % CAP_LEVEL),
 ]
+
+
+def _status_expect(result: str) -> Optional[Dict[str, Any]]:
+    """Fields the firmware's rmStatusParse() must produce (from the format itself)."""
+    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)( led=[01])?$", result)
+    if not result.startswith("ok v=") or m is None:
+        return None
+    letters = m.group(1)
+    sw = [(1 if ch.isupper() else 0) for ch in letters] + [-1] * (6 - len(letters))
+    # flat scalars (the native test's JSON reader has no nesting); sw: gps,track,display,mesh,gateway,led
+    return {"status_sw": ",".join(("-" if v < 0 else str(v)) for v in sw),
+            "status_p": "%s/%s" % (m.group(2), m.group(3)),
+            "status_led": len(letters) == 6 or m.group(4) is not None}
 
 
 def generate_vectors() -> Dict[str, Any]:
@@ -305,8 +331,14 @@ def generate_vectors() -> Dict[str, Any]:
     replies: List[Dict[str, Any]] = []
     for passwd, dst, src, ctr, result in _VECTOR_REPLIES:
         text = build_reply(dst, src, ctr, result, passwd)
+        extra: Dict[str, Any] = {}
+        st = _status_expect(result)
+        if st is not None:
+            extra.update(st)
+        if result.startswith("ok ctr=") and " rm=" in result:
+            extra["cap"] = CAP_LEVEL
         replies.append(
-            {
+            {**extra,
                 "passwd": passwd,
                 "dst": dst,
                 "src": src,

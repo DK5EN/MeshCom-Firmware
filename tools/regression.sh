@@ -20,7 +20,7 @@
 #                  test/test_nbrlog; config in ruff.toml); pytest over
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
 #                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
-#                  the jsdom-based safeboot page test; the four --self-test
+#                  the jsdom-based safeboot and Remote page tests; the four --self-test
 #                  tools not covered by selftest.sh.
 # Stage 3  bench:  tools/bench/bench_suite.py -- identity guard, per-board
 #                  harness, OTA regression, optional flash/EXTUDP/deep-sleep
@@ -214,6 +214,8 @@ stage2() {
     fi
     NODE_PATH="$jsdom/node_modules" run_step "node safeboot_page_test.js" stage2-safeboot-page \
         node tools/safeboot_page_test.js
+    NODE_PATH="$jsdom/node_modules" run_step "node webgui_rm_test.js" stage2-webgui-rm \
+        node tools/webgui_rm_test.js
     for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py; do
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test

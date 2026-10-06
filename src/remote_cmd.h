@@ -43,13 +43,16 @@ const char *rmVerdictName(RmVerdict v);
 #define RM_REJ_WINDOW_MS 90000u  // 3 rejects inside this window ...
 #define RM_REJ_LIMIT 3
 #define RM_LOCKOUT_MS 300000u    // ... lock RM1 for 5 min
-#define RM_MAX_RESULT 63          // longest result text a reply can carry
+#define RM_MAX_RESULT 108         // longest result text a reply can carry; "RM1 <10 digits> <108> <16 hex>" = 140 chars
+#define RM_MAX_ARGS 39            // longest args text of a command (RmCmd::args holds this + NUL)
+#define RM_LEGACY_RESULT_MAX 63   // replies of the first 13 commands stay within this (older operators reject longer)
+#define RM_CAP_LEVEL 2            // capability level advertised in the sync reply "rm=<n>"
 
 struct RmCmd
 {
     uint32_t ctr;
     char cmd[16];
-    char args[24];
+    char args[RM_MAX_ARGS + 1];
     char tag[17]; // 16 lower-case hex + NUL
 };
 
@@ -72,7 +75,7 @@ struct RmState
 {
     uint32_t hwm;           // persisted high-water mark
     uint32_t lastCtr;       // last accepted command
-    char lastReply[64];     // RESULT text of the last accepted command ("ok rebooting");
+    char lastReply[RM_MAX_RESULT + 1]; // RESULT text of the last accepted command ("ok rebooting");
                             // the caller re-sends rmReply(cmd, lastReply, ...) on RM_CACHED
     uint32_t lastAcceptMs;  // acceptance time of lastCtr (cache window)
     uint8_t rejCount;       // rejects inside the current window
@@ -133,5 +136,11 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
 // 0 if it does not fit, result is longer than RM_MAX_RESULT or the password is empty.
 size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *src, const char *passwd,
                char *out, size_t n);
+
+// Pure result sanitiser: allowed bytes are space, A-Z a-z 0-9 and "- . / = + _ @ ? ( ) , * #";
+// every other byte becomes '?'. In place, returns the length.
+size_t rmSanitizeResult(char *result);
+// Capability level of a sync result ("ok ctr=<n> v=<ver> rm=<k>"): k, or 0 when the token is absent/malformed.
+int rmCapLevel(const char *syncResult);
 
 #endif // REMOTE_CMD_H

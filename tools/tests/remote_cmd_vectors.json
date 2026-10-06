@@ -275,6 +275,60 @@
       "reply_canonical": "RM1R|DK5EN-92|DK5EN-14|2|ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1",
       "reply_tag": "6ba7ba274709c895",
       "reply_text": "RM1 2 ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1 6ba7ba274709c895"
+    },
+    {
+      "status_sw": "0,0,0,1,0,0",
+      "status_p": "2/22",
+      "status_led": true,
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 54,
+      "result": "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|54|ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0",
+      "reply_tag": "ee9dfed9cb0f72d7",
+      "reply_text": "RM1 54 ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0 ee9dfed9cb0f72d7"
+    },
+    {
+      "status_sw": "1,0,0,0,1,-",
+      "status_p": "14/22",
+      "status_led": false,
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 55,
+      "result": "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|55|ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22",
+      "reply_tag": "33a07cc036a2742b",
+      "reply_text": "RM1 55 ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22 33a07cc036a2742b"
+    },
+    {
+      "status_sw": "1,1,1,1,1,1",
+      "status_p": "22/22",
+      "status_led": true,
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 56,
+      "result": "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|56|ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1",
+      "reply_tag": "7036dcbe0bc3cbf9",
+      "reply_text": "RM1 56 ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1 7036dcbe0bc3cbf9"
+    },
+    {
+      "cap": 2,
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 0,
+      "result": "ok ctr=42 v=4.40a rm=2",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|0|ok ctr=42 v=4.40a rm=2",
+      "reply_tag": "3f1e7088993a7dcf",
+      "reply_text": "RM1 0 ok ctr=42 v=4.40a rm=2 3f1e7088993a7dcf"
     }
   ]
 }

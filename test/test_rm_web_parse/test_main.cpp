@@ -14,7 +14,10 @@
 #include <string.h>
 #include <string>
 
+#include <remote_cmd.h>
 #include <web_functions/web_rm_parse.h>
+
+static_assert(RM_FORM_ARGS_MAX == RM_MAX_ARGS, "the web form args cap must equal the wire args cap");
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -268,9 +271,10 @@ static void test_send_table(void)
         {"slot=0", RM_ERR_CMD, -1, "", "", "", ""},
         {"slot=0&cmd=", RM_ERR_CMD, -1, "", "", "", ""},
         {"slot=0&cmd=1234567890123456", RM_ERR_CMD, -1, "", "", "", ""},                                // 16 bytes
-        {"slot=0&cmd=status&args=123456789012345678901234", RM_ERR_CMD, -1, "", "", "", ""},            // 24 bytes
+        {"slot=0&cmd=status&args=1234567890123456789012345678901234567890", RM_ERR_CMD, -1, "", "", "", ""}, // 40 bytes
         {"slot=0&cmd=123456789012345", nullptr, 0, "", "", "123456789012345", ""},                      // 15 bytes
         {"slot=0&cmd=gps&args=12345678901234567890123", nullptr, 0, "", "", "gps", "12345678901234567890123"},   // 23 bytes
+        {"slot=0&cmd=gps&args=123456789012345678901234567890123456789", nullptr, 0, "", "", "gps", "123456789012345678901234567890123456789"}, // 39 bytes (RM_FORM_ARGS_MAX)
         {"slot=0&cmd=gps%7f", RM_ERR_FORM, -1, "", "", "", ""},
         {"slot=0&cmd=gps&args=on%00", RM_ERR_FORM, -1, "", "", "", ""},
         {"slot=0&cmd=caf%C3%A9", RM_ERR_CMD, -1, "", "", "", ""},                                       // high bytes

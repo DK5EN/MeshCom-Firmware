@@ -28,7 +28,7 @@
 
 #define RM_FORM_BODY_MAX 200 // the handlers' stack buffer is this + 1
 #define RM_FORM_CMD_MAX 15   // RmCmd::cmd[16]
-#define RM_FORM_ARGS_MAX 23  // RmCmd::args[24]
+#define RM_FORM_ARGS_MAX 39  // RmCmd::args[40] (RM_MAX_ARGS in remote_cmd.h; asserted in test_rm_web_parse)
 #define RM_FORM_ACT_MAX 6    // "forget"
 #define RM_FORM_SLOTS 3
 
@@ -315,7 +315,7 @@ struct RmSendReq
     const char *dst;  // dst form: upper case, rmValidateCall() passed; else ""
     const char *pw;   // dst form: as sent (non-empty); else ""
     const char *cmd;  // lower case, 1..15 printable bytes
-    const char *args; // lower case, 0..23 printable bytes ("" when absent)
+    const char *args; // lower case, 0..39 printable bytes ("" when absent)
 };
 
 static inline RmSendReq rmParseSendBody(char *body)

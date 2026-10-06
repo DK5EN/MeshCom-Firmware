@@ -59,7 +59,7 @@ struct PendingCmd
     char dst[10];
     uint8_t key[32];
     char cmd[16];
-    char args[24];
+    char args[RM_MAX_ARGS + 1];
     uint32_t syncMs;       // sentMs of the sync entry this command waits for
 };
 PendingCmd s_pend;
@@ -111,7 +111,7 @@ const RmToggle kToggles[] = {
 // commandAction() takes a writable char*; the table literal is copied, never the received text.
 void runConsole(const char *literal)
 {
-    char buf[32];
+    char buf[64];
     snprintf(buf, sizeof(buf), "%s", literal);
     commandAction(buf, false);
 }
@@ -143,10 +143,16 @@ bool passwdEmpty()
 
 void sendReply(const RmCmd &c, const char *result, const char *src)
 {
-    static char wire[128];
+    static char wire[144]; // "RM1 <10> <108> <16>" = 140 + NUL
     static char out[160];
+    static_assert(sizeof(wire) >= 4 + 10 + 1 + RM_MAX_RESULT + 1 + 16 + 1, "wire holds the longest reply");
+    static_assert(sizeof(out) >= 2 + 9 + 1 + sizeof(wire), "out wraps wire with :{CALL}");
 
-    size_t n = rmReply(c, result, meshcom_settings.node_call, src, meshcom_settings.node_passwd, wire, sizeof(wire));
+    // the single send-side choke point: whatever a caller passes goes out sanitised (and clamped)
+    char clean[RM_MAX_RESULT + 1];
+    snprintf(clean, sizeof(clean), "%s", result);
+    rmSanitizeResult(clean);
+    size_t n = rmReply(c, clean, meshcom_settings.node_call, src, meshcom_settings.node_passwd, wire, sizeof(wire));
     if (n == 0)
     {
         Serial.printf("[RM];reply;build_failed\n");
@@ -525,6 +531,7 @@ void rmDrain(void)
         else
             snprintf(result, sizeof(result), "err storage");   // fail closed: no mark, no execution
 
+        rmSanitizeResult(result); // before the cache: a replay sends exactly what was first sent
         // CONTRACT (remote_cmd.h): rmAccept() for EVERY RM_OK, a failed execution included.
         const uint32_t hwm = rmAccept(s_state, cmd, result, millis());
         if (!saved || hwm != cmd.ctr)
@@ -568,8 +575,9 @@ void rmDrain(void)
     {
         g_rmStats.sync++;
         char result[RM_MAX_RESULT + 1];
-        snprintf(result, sizeof(result), "ok ctr=%lu v=%s%s", (unsigned long)s_state.hwm, SOURCE_VERSION,
-                 SOURCE_VERSION_SUB);
+        snprintf(result, sizeof(result), "ok ctr=%lu v=%s%s rm=%d", (unsigned long)s_state.hwm,
+                 SOURCE_VERSION, SOURCE_VERSION_SUB, RM_CAP_LEVEL);
+        rmSanitizeResult(result);
         Serial.printf("[RM];sync;ctr;%lu\n", (unsigned long)s_state.hwm);
         sendReply(cmd, result, src);
         break;
@@ -644,8 +652,11 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
 {
     const bool isSync = (strcmp(cmd, "sync") == 0);
 
+    // wire: "RM1 <10> <15 cmd> <39 args> <16>" = 87 + NUL; out adds ":{<9>}" (12) = 99 + NUL
     static char wire[96];
     static char out[128];
+    static_assert(sizeof(wire) >= 4 + 10 + 1 + 15 + 1 + RM_MAX_ARGS + 1 + 16 + 1, "wire holds the longest command");
+    static_assert(sizeof(out) >= 2 + 9 + 1 + sizeof(wire) - 1, "out wraps wire with :{CALL}");
     size_t n = rmBuildCommand(to, meshcom_settings.node_call, ctr, cmd, args, key, wire, sizeof(wire));
     if (n == 0)
     {
