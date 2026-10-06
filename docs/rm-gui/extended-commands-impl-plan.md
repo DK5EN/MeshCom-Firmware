@@ -187,16 +187,19 @@ guard on all three before and after. Remote management is back to its state from
 | Remote page in Chrome        | DK5EN-1 managing DK5EN-92: cards filled from the sent book, a card read, Run again with its two-tap confirm, heard-list reader ("Read 4 of 4"), Details of one row; no console error                               |
 | Escaping of received text    | a DM `<b id=...><img src=x onerror=...>&amp;` shows literally on the Messages page of the receiver; no element created, no handler run                                                                             |
 
-Findings of this round (both open, both in `docs/BACKLOG.md`):
+Findings of this round, both decided by the operator and fixed the same evening:
 
-1. RM-PROOF: a sender whose key was proven keeps the budget of 10 after the TARGET got a new
+1. RM-PROOF: a sender whose key was proven kept the budget of 10 after the TARGET got a new
    password. DK5EN-92 sent five old-key frames in 4 minutes and DK5EN-1 locked itself for 5 minutes
-   (three `reject;tag` inside 90 s). The budget of 2 only holds while the key is unproven.
-2. RM-GWRELAY: a command whose first copy arrives through a gateway node's relay is dropped without
-   a marker. The gateway sets the server flag on what it relays (`lora_functions.cpp`, "signal to
-   another gateway"), and the RM receiver treats the server flag as "delivered by the server"
-   (RM-D6). Seen twice next to the production gateway DK5EN-98; a node that is only reachable
-   through a gateway cannot be managed at all.
+   (three `reject;tag` inside 90 s). Fix: two sends in a row without a verified reply put the
+   target back on the budget of 2 until a reply verifies again (`rmPolicyLimit()`); native
+   simulation of the bench case in `test_rm_policy_rx`.
+2. RM-GWRELAY: a command whose first copy arrived through a gateway node's relay was dropped
+   without a marker, because the gateway sets the server flag on what it relays and the receiver
+   took the flag as "delivered by the server" (RM-D6). Decision: remote management also works over
+   the internet path. Fix: one receive hook `rm_rx_gate.h` without the server-flag rule, called
+   from `OnRxDone` and from the server ingress of both platforms (a gateway node now takes commands
+   and replies straight from the server); twin test and source lint.
 
 Also seen: the receiver's reject window is a fixed 90 s window that starts with the first reject,
 not a sliding one (four rejects spread over 158 s did not lock).

@@ -295,7 +295,8 @@ Hotspots stay orchestrator-owned: `rm_runtime.cpp`, `remote_cmd.cpp`, `command_f
 1. Radio SF/CR/BW/frequency: read-only.
 2. `maxhop`: read-only.
 3. Public replies: accepted; the `pos` read answers only when the node already beacons its position.
-4. Sender limit: 10 s spacing; 2 unanswered while the key is unproven, 10 once it is proven.
+4. Sender limit: 10 s spacing; 2 unanswered while the key is unproven, 10 once it is proven. Two sends in a row
+   without a verified reply suspend the proof until the next verified reply (bench finding RM-PROOF).
 5. "Try once more anyway" after a re-key: yes, one extra attempt, no warning dialog.
 6. MHEARD window for the `mh` list: 3 h.
 7. Flash (2.5): `-Os` on `t_echo` and `heltec_t114`; the new commands are built on all boards.

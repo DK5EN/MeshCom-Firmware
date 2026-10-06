@@ -44,7 +44,7 @@ authentication tag.
   not encrypt. This is deliberate and follows amateur-radio law: no encryption, no obscured meaning.
   The PR description must state this position.
 - **Where accepted:** LoRa only (`!msg_server`), DM to the exact own call, never group or broadcast.
-  The gateway ingress twins are not wired. `RM1 ` DMs are excluded from store-node custody
+  The gateway ingress twins are not wired. (Superseded 2026-10-06: both paths, see Amendments.) `RM1 ` DMs are excluded from store-node custody
   (`mboxClassify`), so they never occupy a mailbox slot.
 - **Enable:** `--remotemgmt on|off` (default off) and a non-empty `node_passwd`. Otherwise an `RM1 ` DM is
   ordinary text, shown and forwarded like any other DM.
@@ -170,7 +170,7 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   tests) on both platforms. The three existing mbedtls sites (console, KISS, external radio glue)
   are untouched.
 - The lockout DoS above and the relay-copy replay count are documented behaviour, not defects.
-- Not covered: a gateway/internet path (RM-D6), reply retries beyond the normal PN ladder (RM-D4),
+- Not covered: a gateway/internet path (RM-D6; superseded 2026-10-06, see Amendments), reply retries beyond the normal PN ladder (RM-D4),
   commands that change credentials or update the firmware.
 
 ## Amendments 2026-10-06 (extended commands, docs/rm-gui/extended-commands-concept.md)
@@ -185,7 +185,8 @@ a settings restore, a config import or a BLE settings write can never rewind it.
 - **Sizes.** Result at most 108 characters (reply DM text at most 140), arguments at most 39;
   replies of the first 13 commands stay at 63 or less. Every reply passes `rmSanitizeResult()`.
 - **Capability.** The `sync` reply ends in `rm=2`; `status` never carries a capability token.
-  A sender uses its budget of 10 unanswered sends only for a target that reported `rm>=2`.
+  A sender uses its budget of 10 unanswered sends only for a target that reported `rm>=2`, and
+  only while replies keep verifying (see Proof decay).
 - **Transport.** A DM whose text starts with `RM1 ` goes on air once: no `{NNN` suffix, no DM ACK,
   no retry ladder, whatever its origin (Remote page, BLE, Extern-UDP).
 - **Public traffic.** Commands and replies are readable on the public server and in the mcmap
@@ -193,6 +194,31 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   (the node then beacons it anyway); a remote `pos 0 0 0` clears it and stops the beacon.
 - **Text.** Names and APRS texts set remotely are validated with a refuse-never-alter allowlist
   and all node pages escape settings and over-the-air text.
+- **Path (supersedes "Where accepted: LoRa only" and RM-D6; operator decision 2026-10-06).** A
+  command is accepted from either path, like a reply always was: over LoRa with or without the
+  server flag, and on the server ingress of a gateway node (`rm_rx_gate.h`, called from `OnRxDone`
+  and both `udp_frame_*` handlers). The HMAC tag and the counter authenticate it wherever it
+  travelled. The old rule keyed on the server flag, which a gateway also sets on every frame it
+  relays over RF, so a node behind a gateway dropped every command silently. Consequences: a
+  frame that arrives on both paths gets the cached reply for its second copy and runs once;
+  wrong-key frames can now reach a node from the internet side too, so the 5-minute lockout of
+  remote management can be triggered from there (it never affected anything but remote
+  management).
+- **Proof decay.** Two sends in a row without a verified reply (waiting ones included) put a
+  target back on the unproven budget of 2 until a reply verifies again (`rmPolicyLimit()`). A
+  target that got a new password answers nothing, and a sender still holding the old, proven key
+  locked it with the budget of 10 on the bench. Cost: after two losses in a row the next send
+  waits until one of them is 150 s old. Residual, accepted: a target that is re-keyed in the few
+  seconds between a verified reply and the late arrival of two older, overtaken frames can still
+  see more than two wrong-key frames (the streak only counts sends newer than the verified one;
+  counting older ones would cost every lossy path its budget).
+- **Residual risks of the server path.** (1) Lockout: three wrong-tag frames in 90 s lock remote
+  management for 5 minutes, and such frames can now be sent from the internet side, repeatedly.
+  One lockout state serves both paths, so this also blocks management over LoRa; a separate
+  reject counter per path would confine it and is not built. (2) A local KISS client sees a
+  server-delivered command like any DM (same as on the LoRa path). (3) A command without `{NNN`
+  that arrives on both paths occupies both queue slots for a moment and may cause a second cached
+  reply when the copies are more than 10 s apart; it runs once.
 
 ## Alternatives rejected
 
