@@ -4356,6 +4356,13 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
                 strMsg.setCharAt(i, '(');
         }
 
+        // W0c: an RM1 frame goes out once -- no "{NNN" (the receiver sends no
+        // ACK), no DM statistics entry (it would stay sent-never-acked), see
+        // dmTextIsRm1Frame(). The escaped text is the payload as is.
+        if(dmTextIsRm1Frame(strMsg.c_str()))
+            mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), strMsg.c_str());
+        else
+        {
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
         snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "%s{%s", strMsg.c_str(), cAckId);
@@ -4371,6 +4378,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         {
             dmstat_sent.fetch_add(1);
             dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
+        }
         }
     }
 
@@ -4412,8 +4420,8 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     bool bUseOnce = false;
     if (msg_buffer[0] == 0x3A) // only Messages
     {
-        if(mcStartsWith(aprsmsg.msg_payload, "{CET}") || mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{SET}"))
-            user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
+        if(dmTextNoRetransmit(aprsmsg.msg_payload, bDM))
+            user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co. and RM1 (dm_text_escape.h)
         else if(bPingMsg)
             bUseOnce = true; // P14/P15: siehe oben
         else

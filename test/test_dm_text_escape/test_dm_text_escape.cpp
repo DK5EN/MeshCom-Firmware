@@ -93,6 +93,53 @@ static void test_nullptr_liefert_null(void)
     TEST_ASSERT_EQUAL_UINT(0, dmTextEscapeFrom(NULL));
 }
 
+// ---- W0c: RM1-Frame = genau einmal, ohne {NNN, ohne Wiederholung ------------
+
+static void test_rm1_frame_is_no_ack_no_retry(void)
+{
+    // Kommando und Antwort: beide Frames gehen einmalig raus.
+    TEST_ASSERT_TRUE(dmTextIsRm1Frame("RM1 17 status 0123456789abcdef"));
+    TEST_ASSERT_TRUE(dmTextIsRm1Frame("RM1 17 ok rebooting 0123456789abcdef"));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef", true));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 ok rebooting 0123456789abcdef", true));
+    // Mit dem (aelteren Sendern angehaengten) {NNN-Suffix gilt es ebenso.
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef{042", true));
+}
+
+static void test_rm1_prefix_is_exact(void)
+{
+    const char *no[] = {"RM10 17 status 0123456789abcdef", "rm1 17 status 0123456789abcdef",
+                        " RM1 17 status 0123456789abcdef", "xRM1 17 status 0123456789abcdef",
+                        "RM1", "RM1x 17", "Hallo RM1 17 status", "{RM1 17", ""};
+    for(size_t i = 0; i < sizeof(no) / sizeof(no[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(dmTextIsRm1Frame(no[i]), no[i]);
+        TEST_ASSERT_FALSE_MESSAGE(dmTextNoRetransmit(no[i], true), no[i]);
+    }
+    TEST_ASSERT_FALSE(dmTextIsRm1Frame(NULL));
+    TEST_ASSERT_FALSE(dmTextNoRetransmit(NULL, true));
+}
+
+static void test_no_retransmit_class_keeps_cet_mcp_set(void)
+{
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{CET}2026-10-06 12:00:00", true));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{MCP}0123", true));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{SET}4;2;", true));
+    // Suffix-Entscheidung bleibt RM1-only: {CET}/{SET} sind kein RM1-Frame.
+    TEST_ASSERT_FALSE(dmTextIsRm1Frame("{CET}2026-10-06 12:00:00"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Frame("{SET}4;2;"));
+    // Ein normaler Text und {ping} (eigener bUseOnce-Pfad) bleiben ausserhalb.
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("Hallo Welt", true));
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("{ping}", true));
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("{cet}x", true));
+    // Gruppentext: {CET}/{MCP}/{SET} bleiben ohne Wiederholung, ein Gruppentext
+    // mit fuehrendem "RM1 " wird dagegen wie jeder Gruppentext wiederholt.
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{CET}2026-10-06 12:00:00", false));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{SET}4;2;", false));
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("RM1 test", false));
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef", false));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -108,5 +155,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_set_kleingeschrieben_ist_nicht_exakt);
     RUN_TEST(test_leerer_text_liefert_null);
     RUN_TEST(test_nullptr_liefert_null);
+    RUN_TEST(test_rm1_frame_is_no_ack_no_retry);
+    RUN_TEST(test_rm1_prefix_is_exact);
+    RUN_TEST(test_no_retransmit_class_keeps_cet_mcp_set);
     return UNITY_END();
 }

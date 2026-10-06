@@ -41,4 +41,36 @@ inline size_t dmTextEscapeFrom(const char *text)
     return 0;
 }
 
+// W0c (McApp ask 2): ein Remote-Management-Frame ("RM1 <ctr> <cmd> [args] <tag>",
+// Kommando oder Antwort) geht genau einmal in die Luft: ohne "{NNN"-Suffix (der
+// Empfaenger sendet dann keinen DM-ACK) und ohne Wiederholungsleiter. Der
+// Frame traegt seinen eigenen Zaehler und HMAC; ein ACK/Retry wuerde nur
+// Airtime fressen und beim Empfaenger ein Replay-Fenster aufmachen.
+// Nur das EXAKTE fuehrende "RM1 " (4 Byte inkl. Leerzeichen) zaehlt: "RM10",
+// "rm1 ", " RM1 ", "xRM1 ", "RM1" ohne Leerzeichen und ein spaeteres "RM1 "
+// im Text treffen nicht. Bekannte Folge: eine von Hand getippte Chat-DM, die
+// mit "RM1 " beginnt, bekommt ebenfalls weder ACK noch Retry (akzeptiert).
+inline bool dmTextIsRm1Frame(const char *text)
+{
+    return text != NULL && strncmp(text, "RM1 ", 4) == 0;
+}
+
+// Eine Stelle fuer "diese DM wird nie wiederholt" (sendMessage(): Ring-Status
+// 0xFF): {CET}/{MCP}/{SET} (Zeit-/Fernwirk-/Hop-Tags, kein Fliesstext) und
+// RM1-Frames. Unveraendert: {ping} hat seinen eigenen Pfad (bUseOnce). Der
+// {NNN-Suffix ist eine getrennte Entscheidung: nur RM1 entfaellt (dmTextIsRm1Frame),
+// {CET}/{SET} behalten ihn wie bisher, {MCP} ist nie eine DM.
+// isDM: die RM1-Ausnahme gilt nur fuer Direktnachrichten; ein Gruppentext, der
+// zufaellig mit "RM1 " beginnt, wird wie jeder Gruppentext wiederholt.
+inline bool dmTextNoRetransmit(const char *text, bool isDM)
+{
+    if(text == NULL)
+        return false;
+
+    return strncmp(text, "{CET}", 5) == 0 ||
+           strncmp(text, "{MCP}", 5) == 0 ||
+           strncmp(text, "{SET}", 5) == 0 ||
+           (isDM && dmTextIsRm1Frame(text));
+}
+
 #endif // _DM_TEXT_ESCAPE_H_
