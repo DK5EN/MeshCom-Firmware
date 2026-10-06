@@ -14,6 +14,7 @@
 #include "dm_stats.h"
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"      // F1/stage 4: :sto custody notice on server ingress
+#include "rm_rx_gate.h"     // RM-GWRELAY: remote management over the server path
 #include <lora_functions.h>
 #include "pn_retry.h"
 #include <time_functions.h>
@@ -465,7 +466,16 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                   }
                 }
 
-                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed)
+                // RM-GWRELAY: a DM to the own call that came from the server can be a remote-management
+                // command or a reply (rm_rx_gate.h, same hook as OnRxDone). A command is consumed: not
+                // shown, not handed to the phone; a reply is only copied to the verifier.
+                bool bRmConsumed = false;
+                if(iAckPos <= 0 && iRefPos <= 0 && bDmDedupNew && !bStoConsumed &&
+                   strcmp(destination_call, meshcom_settings.node_call) == 0)
+                    bRmConsumed = rmRxTryQueue(aprsmsg.msg_source_call, aprsmsg.msg_payload,
+                                               rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd));
+
+                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed && !bRmConsumed)
                 {
                   sendDisplayText(aprsmsg, 99, 0);
                 }
@@ -481,7 +491,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                if(bDmDedupNew && !bStoConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew && !bStoConsumed && !bRmConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 

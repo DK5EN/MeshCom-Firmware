@@ -24,6 +24,7 @@
 #include "sto_notice.h"     // stage 4: :sto custody notice, sender side -- every board
 #include "rm_queue.h"       // RM-04: RM1 remote-management DMs, OnRxDone -> loop task (every board)
 #include "remote_cmd.h"     // RM: rmIsReply() -- replies are shown, never queued as commands
+#include "rm_rx_gate.h"     // RM: the one receive hook, shared with the server ingress
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -217,42 +218,16 @@ static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8
 }
 
 // RM-04 (#1189): an authenticated remote-management command ("RM1 <ctr> <cmd>
-// ... <tag>") is not a chat message. LoRa only (!msg_server): a server-delivered
-// "RM1 " COMMAND stays ordinary text (RM-D6). A REPLY is accepted from either path (W2-3): the
-// HMAC tag makes a server-relayed reply as trustworthy as a radio one. Called with the DM text already
-// stripped of its "{NNN" suffix, after dedup and ack. true = consumed: the
-// caller must neither display it nor hand it to BLE. A full queue also counts
-// as consumed (command dropped, the sender retries with a fresh counter); the
-// verify, enable and rate-limit decisions are rmDrain()'s, in the loop task.
+// ... <tag>") is not a chat message. The decision is rmRxTryQueue() (rm_rx_gate.h),
+// shared with the server ingress of a gateway node. Since 2026-10-06 (RM-GWRELAY)
+// the server flag no longer matters: a gateway sets it on every frame it relays,
+// and the HMAC tag authenticates a command on either path. Called with the DM text
+// already stripped of its "{NNN" suffix, after dedup and ack. true = consumed: the
+// caller must neither display it nor hand it to BLE.
 static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
 {
-    if (!mcStartsWith(text, "RM1 "))
-        return false;
-
-    // A REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read, not a
-    // command: show it like any DM (bench 2026-10-05: the SysOp node parsed the replies as
-    // commands, hid them and locked itself out).
-    // RM-09: ALSO hand it to the loop task (reply queue) while a command we sent still waits for its
-    // reply; rmDrain() matches and verifies it. The display behaviour is unchanged.
-    if (rmIsReply(text))
-    {
-        if (rmqReplyWanted())
-            rmReplyPush(aprsmsg.msg_source_call, text);
-        return false;
-    }
-
-    // commands stay LoRa-only (RM-D6): a server-delivered "RM1 " command is ordinary text
-    if (aprsmsg.msg_server)
-        return false;
-
-    // RM disabled (--remotemgmt off) or no node_passwd: an "RM1 " DM is ordinary text
-    // (concept 6.2 "Enable"), shown and forwarded like any other DM.
-    if (meshcom_settings.node_rm != 1 ||
-        meshcom_settings.node_passwd[0] == 0x00 || meshcom_settings.node_passwd[0] == ' ')
-        return false;
-
-    rmQueuePush(aprsmsg.msg_source_call, text);
-    return true;
+    return rmRxTryQueue(aprsmsg.msg_source_call, text,
+                        rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd));
 }
 
 /**

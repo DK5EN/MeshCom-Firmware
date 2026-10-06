@@ -163,6 +163,8 @@ Remote Management of another node (RM1, all boards)
 The setup page's "Remote management" card signs an authenticated RM1 command with the TARGET node's
 password and sends it as a DM from this node (same protocol as the console; the target must have --remotemgmt on
 and the same --passwd). Two dedicated endpoints serve it; they are NOT part of /setparam or /callfunction.
+The DM may reach the target over LoRa or through the MeshCom server (a gateway node takes the command
+straight from the server); the HMAC tag authenticates it on either path.
 
 SECURITY: the target password travels once, in clear text, over plain HTTP between the browser and this
 node. Do this only inside a LAN you trust, and set a web password on this node (--webpwd) so that nobody

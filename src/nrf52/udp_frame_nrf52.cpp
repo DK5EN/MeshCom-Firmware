@@ -28,6 +28,7 @@
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"        // F1/stage 4: :sto custody notice on server ingress
+#include "rm_rx_gate.h"     // RM-GWRELAY: remote management over the server path
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"     // SNF-GW-04: shared ack/store classification (mboxClassify)
 #include "msgstore_api.h"      // SNF-GW-04: msgstoreStore/OnAck/Eligible
@@ -425,7 +426,16 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                   }
                 }
 
-                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed)
+                // RM-GWRELAY: a DM to the own call that came from the server can be a remote-management
+                // command or a reply (rm_rx_gate.h, same hook as OnRxDone). A command is consumed: not
+                // shown, not handed to the phone; a reply is only copied to the verifier.
+                bool bRmConsumed = false;
+                if(iAckPos <= 0 && iRefPos <= 0 && bDmDedupNew && !bStoConsumed &&
+                   strcmp(destination_call, meshcom_settings.node_call) == 0)
+                    bRmConsumed = rmRxTryQueue(aprsmsg.msg_source_call, aprsmsg.msg_payload,
+                                               rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd));
+
+                if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed && !bRmConsumed)
                 {
                   if(!bGATEWAY)
                     sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
@@ -442,7 +452,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                if(bDmDedupNew && !bStoConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew && !bStoConsumed && !bRmConsumed) addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 

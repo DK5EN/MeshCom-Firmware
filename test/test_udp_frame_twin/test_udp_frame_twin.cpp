@@ -64,6 +64,7 @@
 
 #include <udp_functions.h>   // stub: bUDPLOG, resetMeshComUDP, handleUdpFrame_esp32
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
+#include "rm_rx_gate.h"      // RM-GWRELAY: the queues the server ingress feeds
 #include <dm_dedup.h>        // 2.1 hookup under test: dmDedupReset()
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
 #include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
@@ -2745,6 +2746,177 @@ static void test_regression_server_via_is_reset_before_checkvia_on_both(void)
     check_via_reset('!', "9", false, nullptr, "9", 0x5106);
 }
 
+// ===========================================================================
+// RM-GWRELAY (2026-10-06): remote management over the server path
+// ===========================================================================
+// A gateway node gets a DM to its own call from the server. An "RM1 " COMMAND
+// must reach the RM queue (and stay off the display and the phone), a REPLY
+// must reach the reply queue while one is awaited (and still be shown), and
+// with RM off the command is ordinary text. Before the fix neither handler
+// had the hook: commands and replies over the server were plain chat text.
+static void rm_feed(int side, const char *payload, uint32_t id)
+{
+    uint8_t buf[BUF_CAP];
+    memset(buf, 0, sizeof(buf));
+    uint16_t len = build_gate_datagram(buf, "DK5EN-2", "DK5EN-1", ':', payload, id);
+    if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+}
+
+static void test_regression_server_delivered_rm_command_and_reply_on_both(void)
+{
+    static const char *CMD = "RM1 1791300000 status 0123456789abcdef";
+    static const char *REPLY = "RM1 1791300000 ok v=4.40a up=1 0123456789abcdef";
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96], src[RM_QUEUE_SRC_LEN], text[RM_QUEUE_TEXT_LEN];
+
+        // 1. command, RM on with a password: queued, not shown, not handed to the phone, not relayed to LoRa
+        recorder_reset();
+        rmQueueReset();
+        rmqReplyWanted() = false;
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        int depth0 = txRingDepth();
+        rm_feed(side, CMD, 0x2101 + (uint32_t)side * 16);
+        snprintf(msg, sizeof(msg), "%s: server-delivered RM command not queued", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)rmQueueCount(), msg);
+        TEST_ASSERT_TRUE(rmQueuePop(src, sizeof(src), text, sizeof(text)));
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-2", src, name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(CMD, text, name);
+        snprintf(msg, sizeof(msg), "%s: RM command must not be displayed", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: RM command must not reach the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: a DM to the own call is not relayed to LoRa", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+
+        // 2. command, RM off: ordinary text (shown, phone), nothing queued
+        recorder_reset();
+        rmQueueReset();
+        meshcom_settings.node_rm = 0;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        rm_feed(side, CMD, 0x2102 + (uint32_t)side * 16);
+        snprintf(msg, sizeof(msg), "%s: RM off must not queue", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), name);
+
+        // 3. command, RM on but no password: ordinary text
+        recorder_reset();
+        rmQueueReset();
+        meshcom_settings.node_rm = 1;
+        rm_feed(side, CMD, 0x2103 + (uint32_t)side * 16);
+        snprintf(msg, sizeof(msg), "%s: no password must not queue", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, name);
+
+        // 4. reply while one is awaited: reply queue AND shown
+        recorder_reset();
+        rmQueueReset();
+        rmqReplyWanted() = true;
+        rm_feed(side, REPLY, 0x2104 + (uint32_t)side * 16);
+        snprintf(msg, sizeof(msg), "%s: server-delivered RM reply not handed to the verifier", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)rmReplyQueueCount(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), name);
+
+        // 5. reply nobody waits for: shown only
+        recorder_reset();
+        rmQueueReset();
+        rmqReplyWanted() = false;
+        rm_feed(side, REPLY, 0x2105 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmReplyQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, name);
+    }
+    rmQueueReset();
+    rmqReplyWanted() = false;
+}
+
+// A foreign sender (an older app) may still append "{NNN": the queued text is the stripped one, the DM is
+// acked exactly once as before, and a second copy with the same NNN is neither queued nor acked again as new.
+// A group text that merely starts with "RM1 " is untouched, and a full queue still consumes the command.
+static void test_regression_server_delivered_rm_command_with_msgno_group_and_full_queue_on_both(void)
+{
+    static const char *CMD = "RM1 1791300000 status 0123456789abcdef";
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char src[RM_QUEUE_SRC_LEN], text[RM_QUEUE_TEXT_LEN], pay[80];
+
+        recorder_reset();
+        rmQueueReset();
+        rmqReplyWanted() = false;
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        snprintf(pay, sizeof(pay), "%s{%d", CMD, 431 + side);
+        rm_feed(side, pay, 0x2301 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)rmQueueCount(), name);
+        TEST_ASSERT_TRUE(rmQueuePop(src, sizeof(src), text, sizeof(text)));
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(CMD, text, name);   // "{NNN" stripped before the hook
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ack_ids.size(), name);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(431u + (unsigned)side, g_ack_ids[0], name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), name);
+        // the same DM again under a new mesh id (a retry copy): DM dedup holds, nothing queued
+        rm_feed(side, pay, 0x2302 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, name);
+
+        // group text starting with "RM1 ": ordinary group traffic (the node listens to group 9)
+        recorder_reset();
+        rmQueueReset();
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        {
+            uint8_t buf[BUF_CAP];
+            memset(buf, 0, sizeof(buf));
+            uint16_t len = build_gate_datagram(buf, "DK5EN-2", "9", ':', CMD, 0x2303 + (uint32_t)side * 16);
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        }
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, name);
+
+        // full queue (2 slots): the third command is dropped but still consumed (never shown as chat)
+        recorder_reset();
+        rmQueueReset();
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        rm_feed(side, "RM1 1 status 0123456789abcdef", 0x2304 + (uint32_t)side * 16);
+        rm_feed(side, "RM1 2 status 0123456789abcdef", 0x2305 + (uint32_t)side * 16);
+        rm_feed(side, "RM1 3 status 0123456789abcdef", 0x2306 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), name);
+    }
+    rmQueueReset();
+}
+
+// an RM command addressed to ANOTHER node is none of our business: relayed like any DM, never queued
+static void test_agreement_rm_command_for_another_node_is_relayed_not_queued_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        rmQueueReset();
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        uint8_t buf[BUF_CAP];
+        memset(buf, 0, sizeof(buf));
+        uint16_t len = build_gate_datagram(buf, "DK5EN-2", "DK5EN-3", ':', "RM1 1791300000 status 0123456789abcdef", 0x2201 + (uint32_t)side);
+        int depth0 = txRingDepth();
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), name);
+    }
+    rmQueueReset();
+}
+
 int main(int, char **argv)
 {
     g_argv0 = argv[0] ? argv[0] : "";
@@ -2793,6 +2965,10 @@ int main(int, char **argv)
     RUN_TEST(test_drift_kiss_server_relay_tap_is_esp32_only);
 
     RUN_TEST(test_regression_server_via_is_reset_before_checkvia_on_both);
+
+    RUN_TEST(test_regression_server_delivered_rm_command_and_reply_on_both);
+    RUN_TEST(test_regression_server_delivered_rm_command_with_msgno_group_and_full_queue_on_both);
+    RUN_TEST(test_agreement_rm_command_for_another_node_is_relayed_not_queued_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

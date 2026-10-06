@@ -48,6 +48,10 @@ typedef struct
     // nrf52/WisBlock-API.h:188/:341) -- the two agree on both fields.
     char node_short[6] = {0x58, 0x58, 0x58, 0x34, 0x30, 0x00};
     char node_via[40] = {0};
+    // RM-GWRELAY: the server ingress of both frame handlers gates the RM hook on these two
+    // (same types and size as src/meshcom_settings.h).
+    char node_passwd[15] = {0};
+    int node_rm = 0;
 } s_meshcom_settings;
 
 extern s_meshcom_settings meshcom_settings;
