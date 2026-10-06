@@ -26,7 +26,7 @@
 
 #include "../rm_validate.h"
 
-#define RM_FORM_BODY_MAX 200 // the handlers' stack buffer is this + 1
+#define RM_FORM_BODY_MAX 260 // the handlers' stack buffer is this + 1; dst form, every field %XX: 258
 #define RM_FORM_CMD_MAX 15   // RmCmd::cmd[16]
 #define RM_FORM_ARGS_MAX 39  // RmCmd::args[40] (RM_MAX_ARGS in remote_cmd.h; asserted in test_rm_web_parse)
 #define RM_FORM_ACT_MAX 6    // "forget"
@@ -303,7 +303,8 @@ static inline RmNodesReq rmParseNodesBody(char *body)
 
 // ---------------------------------------------------------------------------------------------------
 // POST /rmsend   dst=<call>&pw=<pw>&cmd=<cmd>&args=<args>   |   slot=0..2&cmd=<cmd>&args=<args>
-// (args optional in both). cmd and args are folded to lower case (the wire form, rmCommandAllowed()
+// (args optional in both; an optional force=1|0 may follow in both, absent = 0, any other value, a
+// duplicate or an empty value is the "form" error). cmd and args are folded to lower case (the wire form, rmCommandAllowed()
 // requires it); dst is folded to upper case and must pass rmValidateCall(). The password of the dst
 // form is NOT judged here: rmSendCommand() owns that rule (it strips trailing spaces first); it must
 // only be present and free of control bytes. The allowlist is rmCommandAllowed()'s job.
@@ -316,6 +317,7 @@ struct RmSendReq
     const char *pw;   // dst form: as sent (non-empty); else ""
     const char *cmd;  // lower case, 1..15 printable bytes
     const char *args; // lower case, 0..39 printable bytes ("" when absent)
+    bool force;       // optional field force=1 (true) | force=0 / absent (false)
 };
 
 static inline RmSendReq rmParseSendBody(char *body)
@@ -327,17 +329,26 @@ static inline RmSendReq rmParseSendBody(char *body)
     r.pw = rmparse::emptyStr();
     r.cmd = rmparse::emptyStr();
     r.args = rmparse::emptyStr();
+    r.force = false;
     if (rmparse::bodyTooLong(body))
     {
         r.err = RM_ERR_SIZE;
         return r;
     }
-    static const char *const keys[] = {"slot", "dst", "pw", "cmd", "args"};
-    char *v[5];
-    if (!rmparse::split(body, keys, 5, v))
+    static const char *const keys[] = {"slot", "dst", "pw", "cmd", "args", "force"};
+    char *v[6];
+    if (!rmparse::split(body, keys, 6, v))
     {
         r.err = RM_ERR_FORM;
         return r;
+    }
+    if (v[5] != nullptr)
+    {
+        if (strcmp(v[5], "1") != 0 && strcmp(v[5], "0") != 0)
+        {
+            r.err = RM_ERR_FORM;
+            return r;
+        }
     }
     const bool slotForm = v[0] != nullptr;
     if (slotForm && (v[1] != nullptr || v[2] != nullptr))
@@ -397,6 +408,7 @@ static inline RmSendReq rmParseSendBody(char *body)
     }
     r.cmd = v[3];
     r.args = v[4] != nullptr ? v[4] : rmparse::emptyStr();
+    r.force = v[5] != nullptr && v[5][0] == '1';
     return r;
 }
 

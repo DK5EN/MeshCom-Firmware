@@ -96,7 +96,8 @@ static_assert(sizeof(((RmSent *)nullptr)->cmd) >= sizeof(((RmCmd *)nullptr)->cmd
 // viaSync (optional): set true when the command was NOT sent yet but queued behind an automatic sync
 // (see rmSendCommandKey); *ctrOut is then 0.
 bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const char *args, char *err,
-                   size_t errN, uint32_t *ctrOut, bool *viaSync = nullptr);
+                   size_t errN, uint32_t *ctrOut, bool *viaSync = nullptr,
+                   bool force = false);
 
 // Same, for a caller that already holds the 32-byte key K = SHA-256(password of the TARGET) (the
 // known-node slots). The key is copied into the pending-reply entry exactly as the password variant
@@ -115,7 +116,8 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
 // "ctr" (counter exhausted), "store" (counter not persisted), "send" (sendMessage refused).
 // A refusal consumes no counter, so a double click never burns one.
 bool rmSendCommandKey(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
-                      size_t errN, uint32_t *ctrOut, bool *viaSync = nullptr);
+                      size_t errN, uint32_t *ctrOut, bool *viaSync = nullptr,
+                   bool force = false);
 
 // Last (up to 5) sent commands, newest first; returns the count copied.
 uint8_t rmGetSent(RmSent *out, uint8_t max);
@@ -126,6 +128,8 @@ struct RmTarget
     char dst[10];
     bool locked;           // 2 unanswered sends inside 90 s: sends are refused ("limit")
     uint32_t retryS;       // seconds until a send is accepted again (spacing included), 0 = now
+    bool canForce;         // refused with LIMIT and the one-shot after a re-key is armed: a send with force=1 may go once
+    uint8_t cap;           // capability level of the target (sync reply rm=<n>): >= 2 allows 10 unanswered sends once proven, 0 = unknown/old
     bool pending;          // a command waits behind an automatic sync for this node
     const char *chainErr;  // token (static) why the last chained command was NOT sent ("nosync", "lost",
                            // "limit", "busy", "send", ...), nullptr = none; cleared by the next accepted send
@@ -136,7 +140,16 @@ uint8_t rmGetTargets(RmTarget *out, uint8_t max);
 
 // Policy probe for one call (upper case): true = a send would pass the sender policy now; retryS (optional)
 // gets the wait in seconds otherwise (0 when allowed).
-bool rmTargetMaySend(const char *dst, uint32_t *retryS);
+bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce = nullptr);
+
+// Forget ONE target (saved slot deleted / forgotten / call changed): drops its pending chain, chain error,
+// key proof and one-shot, wipes the key copies of its sent-book slots. The sent-book ENTRIES stay and keep
+// counting toward the budget until they leave the 120 s window (delete + re-add never refills it). Never
+// touches the persisted send counter, learnt counter marks or receiver state.
+void rmForgetTarget(const char *dst);
+
+// The receiver lockout (lockActive, rejCount) is cleared, e.g. after a new node password was applied.
+void rmRuntimeReceiverUnlock(void);
 
 // Boot: loads the persisted high-water mark (counters_store.h) into the protocol state. Call once
 // after the settings load. rmDrain() calls it lazily if the boot call was missed.

@@ -18,6 +18,7 @@
 #include "rm_validate.h"
 
 static_assert(RM_POLICY_COOLDOWN_MS == RM_RATE_MS, "sender spacing must equal the target's rate limit");
+static_assert(RM_POLICY_WINDOW_MS >= RM_REJ_WINDOW_MS + 60000u, "the sender budget window must exceed the target's reject window");
 
 #if defined(NRF52_SERIES)
 extern uint32_t nrf52_getFreeHeap(void); // nrf52_main.cpp
@@ -38,7 +39,7 @@ constexpr uint8_t kLogN = 5;
 RmLogEntry s_log[kLogN];   // newest first
 uint8_t s_nlog = 0;
 
-constexpr uint8_t kSentN = 5;
+constexpr uint8_t kSentN = RM_POLICY_MAX_ENTRIES;   // 12 slots; an entry that still counts toward a budget is never evicted
 struct SentSlot
 {
     RmSent pub;
@@ -63,6 +64,7 @@ struct PendingCmd
     uint32_t syncMs;       // sentMs of the sync entry this command waits for
 };
 PendingCmd s_pend;
+RmProof s_proof[RM_PROOF_N]; // per-target key proof, RAM only (rm_sender_policy.h)
 
 // Why the last chained command was not sent (one slot, cleared by the next accepted send to that
 // target); rmGetTargets() reports it so the GUI can show a sentence instead of silence.
@@ -282,6 +284,19 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 }
 
 // --- RM-09 helpers ----------------------------------------------------------------------------
+// short fingerprint of a key: first 4 bytes of SHA-256("RMFP" + key); the key itself is never stored
+void keyFp(const uint8_t key[32], uint8_t fp[4])
+{
+    uint8_t buf[36];
+    memcpy(buf, "RMFP", 4);
+    memcpy(buf + 4, key, 32);
+    uint8_t h[32];
+    sha256(buf, sizeof(buf), h);
+    memcpy(fp, h, 4);
+    hmac_sha256_detail::wipe(buf, sizeof(buf));
+    hmac_sha256_detail::wipe(h, sizeof(h));
+}
+
 void wipeKey(SentSlot &e)
 {
     hmac_sha256_detail::wipe(e.key, sizeof(e.key));
@@ -415,6 +430,18 @@ void handleReply(const char *src, const char *text)
         if (ok)
         {
             e.verifiedMs = millis();
+            uint8_t fp[4];
+            keyFp(e.key, fp); // the key of the MATCHED entry, before wipeKey()
+            rmProofVerified(s_proof, e.pub.dst, fp);
+            if (strcmp(e.pub.cmd, "sync") == 0) // the sync reply advertises the receiver generation (rm=<n>)
+            {
+                int cap = rmCapLevel(result);
+                if (cap < 0)
+                    cap = 0;
+                if (cap > 9)
+                    cap = 9;
+                rmProofSetCap(s_proof, e.pub.dst, fp, (uint8_t)cap);
+            }
             snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
             wipeKey(e);
             uint32_t h = 0;
@@ -629,14 +656,15 @@ void polEntryOf(const SentSlot &e, RmPolEntry &p)
 }
 
 // policy decision for one target (upper-case call), from the sent book
-RmPolDecision policyFor(const char *to, uint32_t now)
+RmPolDecision policyFor(const char *to, uint32_t now, bool force = false)
 {
     RmPolEntry pe[kSentN];
     uint8_t n = 0;
     for (uint8_t i = 0; i < s_nsent; i++)
         if (strcmp(s_sent[i].pub.dst, to) == 0)
             polEntryOf(s_sent[i], pe[n++]);
-    return rmPolicyMaySend(pe, n, now);
+    const RmProof *pf = rmProofFind(s_proof, to);
+    return rmPolicyMaySend(pe, n, now, rmProofLimit(pf), pf != nullptr && pf->oneShot, force);
 }
 
 void dropPending()
@@ -645,12 +673,38 @@ void dropPending()
     memset(&s_pend, 0, sizeof(s_pend));
 }
 
+// slot to free for a new entry: -2 a slot is free, -1 none (all still count), else the index to drop
+int bookVictim(uint32_t now)
+{
+    RmPolEntry pe[kSentN];
+    for (uint8_t i = 0; i < s_nsent; i++)
+        polEntryOf(s_sent[i], pe[i]);
+    return rmBookVictim(pe, s_nsent, kSentN, now);
+}
+
+// slots a new entry can take now (free + no longer counting); a chain needs 2 before its sync leaves
+uint8_t bookRoom(uint32_t now)
+{
+    RmPolEntry pe[kSentN];
+    for (uint8_t i = 0; i < s_nsent; i++)
+        polEntryOf(s_sent[i], pe[i]);
+    return rmBookRoom(pe, s_nsent, kSentN, now);
+}
+
 // Builds, persists the counter (not for sync), sends and books one frame. key stays the caller's: a
 // copy goes into the pending-reply entry (live for RM_CACHE_MS, wiped by wipeKey()).
 bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char *cmd, const char *args,
                  uint32_t now, char *err, size_t errN)
 {
     const bool isSync = (strcmp(cmd, "sync") == 0);
+
+    // a slot must be free (or hold an entry that no longer counts) BEFORE a counter is consumed
+    int victim = bookVictim(now);
+    if (victim == -1)
+    {
+        setErr(err, errN, "busy");
+        return false;
+    }
 
     // wire: "RM1 <10> <15 cmd> <39 args> <16>" = 87 + NUL; out adds ":{<9>}" (12) = 99 + NUL
     static char wire[96];
@@ -687,12 +741,16 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
         return false;
     }
 
-    // book it (newest first); the oldest entry drops out, its key with it
-    if (s_nsent == kSentN)
-        wipeKey(s_sent[kSentN - 1]);
-    else
-        s_nsent++;
-    memmove(&s_sent[1], &s_sent[0], sizeof(SentSlot) * (kSentN - 1));
+    // book it (newest first); the oldest entry that no longer counts drops out, its key with it
+    victim = bookVictim(now);
+    if (victim >= 0)
+    {
+        wipeKey(s_sent[victim]);
+        memmove(&s_sent[victim], &s_sent[victim + 1], sizeof(SentSlot) * (size_t)(s_nsent - 1 - victim));
+        s_nsent--;
+    }
+    memmove(&s_sent[1], &s_sent[0], sizeof(SentSlot) * (size_t)(s_nsent));
+    s_nsent++;
     SentSlot &e = s_sent[0];
     memset(&e, 0, sizeof(e));
     snprintf(e.pub.dst, sizeof(e.pub.dst), "%s", to);
@@ -715,7 +773,7 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
 // fromChain: the call comes from pendingStep() (the command that waited for its sync): no pending
 // check, no second automatic sync.
 bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
-                 size_t errN, uint32_t *ctrOut, bool *viaSync, bool fromChain)
+                 size_t errN, uint32_t *ctrOut, bool *viaSync, bool fromChain, bool force = false)
 {
     if (!s_inited)
         rmInit();
@@ -768,8 +826,15 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
         return false;
     }
 
-    // sender policy BEFORE any counter is touched: spacing of 10 s, at most 2 unanswered sends in 90 s
-    const RmPolDecision d = policyFor(to, now);
+    // key proof: a changed fingerprint for a known target clears "proven" and arms the one-shot; a first
+    // key arms nothing; the same key changes nothing
+    uint8_t fp[4];
+    keyFp(key, fp);
+    RmProof *pf = rmProofSetKey(s_proof, to, fp);
+
+    // sender policy BEFORE any counter is touched: spacing of 10 s, 120 s window, 2 unanswered sends
+    // while the key is unproven (10 once a reply verified); force only spends the armed one-shot
+    const RmPolDecision d = policyFor(to, now, force && !fromChain);
     if (!d.allowed)
     {
         setErr(err, errN, d.reason == RM_POL_LIMIT ? "limit" : "busy");
@@ -789,8 +854,15 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
             setErr(err, errN, "busy");
             return false;
         }
+        if (bookRoom(now) < 2) // sync AND the queued command each need a slot: refuse before the sync leaves
+        {
+            setErr(err, errN, "busy");
+            return false;
+        }
         if (!bookAndSend(to, key, 0, "sync", "", now, err, errN))
             return false;
+        if (d.usedForce && pf != nullptr)
+            pf->oneShot = false; // the forced send left: the one-shot is spent
         s_pend.used = true;
         snprintf(s_pend.dst, sizeof(s_pend.dst), "%s", to);
         memcpy(s_pend.key, key, sizeof(s_pend.key));
@@ -832,6 +904,8 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
 
     if (!bookAndSend(to, key, ctr, cmd, args, now, err, errN))
         return false;
+    if (d.usedForce && pf != nullptr)
+        pf->oneShot = false; // the forced send left: the one-shot is spent
     if (ctrOut != nullptr)
         *ctrOut = ctr;
     setErr(err, errN, "");
@@ -885,13 +959,13 @@ void pendingStep(uint32_t now)
 } // namespace
 
 bool rmSendCommandKey(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
-                      size_t errN, uint32_t *ctrOut, bool *viaSync)
+                      size_t errN, uint32_t *ctrOut, bool *viaSync, bool force)
 {
-    return sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false);
+    return sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false, force);
 }
 
 bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const char *args, char *err,
-                   size_t errN, uint32_t *ctrOut, bool *viaSync)
+                   size_t errN, uint32_t *ctrOut, bool *viaSync, bool force)
 {
     // password: strip trailing spaces (every key derivation does), then the shared validator; a raw
     // string longer than node_passwd (14) is refused, never truncated
@@ -909,7 +983,7 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
 
     uint8_t key[32];
     rmDeriveKey(passwd, key);
-    const bool ok = sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false);
+    const bool ok = sendKeyImpl(dst, key, cmd, args, err, errN, ctrOut, viaSync, false, force);
     hmac_sha256_detail::wipe(key, sizeof(key));
     return ok;
 }
@@ -953,6 +1027,9 @@ uint8_t rmGetTargets(RmTarget *out, uint8_t max)
         const RmPolDecision d = policyFor(t.dst, now);
         t.locked = (d.reason == RM_POL_LIMIT);
         t.retryS = d.retryS;
+        t.canForce = d.canForce;
+        const RmProof *pf = rmProofFind(s_proof, t.dst);
+        t.cap = (pf != nullptr) ? pf->cap : 0;
         t.pending = s_pend.used && strcmp(s_pend.dst, t.dst) == 0;
         if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, t.dst) == 0)
         {
@@ -963,12 +1040,49 @@ uint8_t rmGetTargets(RmTarget *out, uint8_t max)
     return n;
 }
 
-bool rmTargetMaySend(const char *dst, uint32_t *retryS)
+bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce)
 {
+    if (canForce != nullptr)
+        *canForce = false;
     if (dst == nullptr)
         return false;
-    const RmPolDecision d = policyFor(dst, millis());
+    char to[RM_CALL_MAX + 1];
+    size_t i = 0;
+    for (; dst[i] != '\0' && i < RM_CALL_MAX; i++)
+        to[i] = (dst[i] >= 'a' && dst[i] <= 'z') ? (char)(dst[i] - 'a' + 'A') : dst[i];
+    to[i] = '\0';
+    const RmPolDecision d = policyFor(to, millis()); // the SAME decision as the send path
     if (retryS != nullptr)
         *retryS = d.retryS;
+    if (canForce != nullptr)
+        *canForce = d.canForce;
     return d.allowed;
+}
+
+void rmForgetTarget(const char *dst)
+{
+    if (dst == nullptr)
+        return;
+    char to[RM_CALL_MAX + 1];
+    size_t n = 0;
+    for (; dst[n] != '\0' && n < RM_CALL_MAX; n++)
+        to[n] = (dst[n] >= 'a' && dst[n] <= 'z') ? (char)(dst[n] - 'a' + 'A') : dst[n];
+    to[n] = '\0';
+    if (s_pend.used && strcmp(s_pend.dst, to) == 0)
+        dropPending();
+    if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, to) == 0)
+        s_chainErr.tok = nullptr;
+    rmProofForget(s_proof, to);
+    // keys go, the entries STAY and keep counting toward the budget until they leave the window
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (strcmp(s_sent[i].pub.dst, to) == 0)
+            wipeKey(s_sent[i]);
+    refreshReplyWanted();
+    Serial.printf("[RM];forget;%s\n", to);
+}
+
+void rmRuntimeReceiverUnlock(void)
+{
+    rmReceiverUnlock(s_state);
+    Serial.printf("[RM];unlock\n");
 }

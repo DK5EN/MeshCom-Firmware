@@ -362,6 +362,22 @@ static void test_ack_correct_acker_purges(void)
     TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->purged_ack);
 }
 
+static void test_bytes_sums_used_slots_and_drops_on_purge(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, msgstoreBytes());
+    int a = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_EQUAL_INT(5, msgstoreBytes());
+    int b = msgstoreStore("OE1ABC", "DK5EN-9", 6, "hello world", 11);
+    TEST_ASSERT_TRUE(a >= 0 && b >= 0);
+    TEST_ASSERT_EQUAL_INT(16, msgstoreBytes());
+    TEST_ASSERT_EQUAL_INT(2, msgstoreUsed());
+
+    msgstoreOnAck("DK5EN-9", "OE1ABC", 5);          // delivery purges the first
+    TEST_ASSERT_EQUAL_INT(11, msgstoreBytes());
+    TEST_ASSERT_TRUE(msgstorePurge(b));
+    TEST_ASSERT_EQUAL_INT(0, msgstoreBytes());
+}
+
 // ----------------------------------------------------------------- presence
 
 static void test_presence_before_60s_ignored(void)
@@ -1557,6 +1573,7 @@ int main(int, char **)
 
     RUN_TEST(test_ack_wrong_acker_does_not_purge);
     RUN_TEST(test_ack_correct_acker_purges);
+    RUN_TEST(test_bytes_sums_used_slots_and_drops_on_purge);
 
     RUN_TEST(test_presence_before_60s_ignored);
     RUN_TEST(test_presence_after_60s_arms_with_jitter);

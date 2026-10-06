@@ -705,6 +705,45 @@ static void test_rate_limit_one_per_10_seconds(void)
     TEST_ASSERT_EQUAL_UINT32(1, s.hwm);
 }
 
+// Operator unlock (own password change): drops the lockout and the reject count, nothing else.
+static void test_receiver_unlock_clears_lock_only(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    const RmCmd first = mk(1, "status");
+    ASSERT_VERDICT(RM_OK, chk(s, first, 1000));
+    rmAccept(s, first, "ok", 1000); // gives hwm / lastCtr / lastReply / rate state real values
+
+    const RmCmd bad = withBadTag(mk(2, "status"));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 12000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 13000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 14000)); // third reject arms the lockout
+    ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, mk(2, "status"), 15000));
+    TEST_ASSERT_TRUE(s.lockActive);
+
+    // expected after-image: the before-image with only lockActive / rejCount cleared
+    RmState expect;
+    memcpy(&expect, &s, sizeof(s));
+    expect.lockActive = false;
+    expect.rejCount = 0;
+
+    rmReceiverUnlock(s);
+    TEST_ASSERT_FALSE(s.lockActive);
+    TEST_ASSERT_EQUAL_UINT8(0, s.rejCount);
+    TEST_ASSERT_EQUAL_UINT32(1, s.lastCtr);
+    TEST_ASSERT_EQUAL_STRING("ok", s.lastReply);
+    TEST_ASSERT_EQUAL_MEMORY(&expect, &s, sizeof(s)); // hwm, lastCtr, lastReply, rate and sync state untouched
+
+    ASSERT_VERDICT(RM_OK, chk(s, mk(2, "status"), 16000)); // a valid command passes at once, no 5 min wait
+
+    // the count restarted: two further wrong tags do not lock again
+    const RmCmd bad3 = withBadTag(mk(3, "status"));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad3, 30000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad3, 31000));
+    TEST_ASSERT_FALSE(s.lockActive);
+    ASSERT_VERDICT(RM_OK, chk(s, mk(3, "status"), 32000));
+}
+
 static void test_three_rejects_lock_out_for_5_minutes_then_recover(void)
 {
     RmState s;
@@ -723,11 +762,42 @@ static void test_three_rejects_lock_out_for_5_minutes_then_recover(void)
     TEST_ASSERT_FALSE(s.lockActive);
 }
 
+static void test_authenticated_replay_is_not_counted(void)
+{
+    RmState s;
+    rmStateInit(s, 9); // hwm 9: ctr <= 9 with a valid tag is a stale counter
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(5, "status"), 1000 + i * 1000));
+        TEST_ASSERT_EQUAL_UINT8(0, s.rejCount);
+        TEST_ASSERT_FALSE(s.lockActive);
+    }
+    ASSERT_VERDICT(RM_OK, chk(s, mk(10, "status"), 5000));
+}
+
+static void test_reject_window_boundary(void)
+{
+    const uint32_t t0 = 100000;
+    RmState a;
+    rmStateInit(a, 0);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0 + 1));
+    // exactly RM_REJ_WINDOW_MS after the window start: a new window, strike 1 of the new one
+    ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0 + RM_REJ_WINDOW_MS));
+    TEST_ASSERT_FALSE(a.lockActive);
+    RmState b;
+    rmStateInit(b, 0);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0 + 1));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0 + RM_REJ_WINDOW_MS - 1));
+    TEST_ASSERT_TRUE(b.lockActive);
+}
+
 static void test_lockout_counts_any_reject_reason(void)
 {
     RmState s;
     rmStateInit(s, 9);
-    ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(1, "status"), 1000));
+    ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 1000)); // replay no longer counts (valid tag), format does
     ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(10, "dfu"), 2000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, mk(10, "status", "", "OTHER"), 3000));
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, mk(10, "status"), 4000));
@@ -1332,6 +1402,8 @@ int main(int, char **)
     RUN_TEST(test_rate_limit_one_per_10_seconds);
     RUN_TEST(test_three_rejects_lock_out_for_5_minutes_then_recover);
     RUN_TEST(test_lockout_counts_any_reject_reason);
+    RUN_TEST(test_authenticated_replay_is_not_counted);
+    RUN_TEST(test_reject_window_boundary);
     RUN_TEST(test_reject_window_expires_after_90_seconds);
     RUN_TEST(test_successful_commands_do_not_clear_the_reject_count);
     RUN_TEST(test_empty_password_disables_rm);
@@ -1353,5 +1425,6 @@ int main(int, char **)
     RUN_TEST(test_allowlist_table_equivalence);
     RUN_TEST(test_legacy_replies_stay_within_63_and_cap_token);
     RUN_TEST(test_status_vectors_parse);
+    RUN_TEST(test_receiver_unlock_clears_lock_only);
     return UNITY_END();
 }

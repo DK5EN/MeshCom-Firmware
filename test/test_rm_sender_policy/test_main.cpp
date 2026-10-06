@@ -3,7 +3,7 @@
 //   pio test -e native_rm_sender_policy
 //
 // Covers the password and call validators (accept/reject tables), the per-target send policy
-// (10 s spacing, at most 2 unanswered sends in 90 s, boundaries, millis() wrap), the entry state
+// (10 s spacing, 2 unanswered sends in 120 s (10 proven), boundaries, millis() wrap), the entry state
 // classification, the plain-English sentences for every RM error token, and the compact status
 // token (`s=<letters> p=<cur>/<max>`) incl. the worst-case reply length against RM_MAX_RESULT.
 
@@ -293,19 +293,19 @@ static void test_policy_two_unanswered_inside_90s_lock_the_third(void)
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     TEST_ASSERT_EQUAL_UINT8(2, d.unanswered);
-    TEST_ASSERT_EQUAL_UINT32(60, d.retryS);  // 90 s - 30 s
+    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);  // 150 s - 30 s
 
     // order of the entries must not matter
     RmPolEntry two_r[2] = {mk(now - 30000), mk(now - 15000)};
     d = rmPolicyMaySend(two_r, 2, now);
-    TEST_ASSERT_EQUAL_UINT32(60, d.retryS);
+    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);
 
-    // boundary: the older one is exactly 90 s old -> out of the window -> one unanswered left -> allowed
-    d = rmPolicyMaySend(two, 2, now + 60000);
+    // boundary: the older one is exactly 150 s old -> out of the window -> one unanswered left -> allowed
+    d = rmPolicyMaySend(two, 2, now + 120000);
     TEST_ASSERT_TRUE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(1, d.unanswered);
     // 1 ms before: still locked, 1 s to wait
-    d = rmPolicyMaySend(two, 2, now + 59999);
+    d = rmPolicyMaySend(two, 2, now + 119999);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     TEST_ASSERT_EQUAL_UINT32(1, d.retryS);
@@ -319,18 +319,18 @@ static void test_policy_three_and_more_unanswered_wait_for_enough_to_leave(void)
     RmPolDecision d = rmPolicyMaySend(e, 3, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(3, d.unanswered);
-    // two must leave (80 s and 50 s) before only one is left: the 50 s one leaves after 40 s
-    TEST_ASSERT_EQUAL_UINT32(40, d.retryS);
-    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 3, now + 40000).allowed);
-    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 3, now + 39999).allowed);
+    // two must leave (80 s and 50 s) before only one is left: the 50 s one leaves after 100 s
+    TEST_ASSERT_EQUAL_UINT32(100, d.retryS);
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 3, now + 100000).allowed);
+    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 3, now + 99999).allowed);
 }
 
 static void test_policy_answered_and_aged_out_do_not_count(void)
 {
     const uint32_t now = 3000000;
-    // verified ok / verified err are answered; 90 s old and expired ones left the window
+    // verified ok / verified err are answered; 150 s old and expired ones left the window
     RmPolEntry e[4] = {mk(now - 20000, true, true, false), mk(now - 25000, true, true, true),
-                       mk(now - 90000), mk(now - 200000, false, false, false, true)};
+                       mk(now - 150000), mk(now - 200000, false, false, false, true)};
     RmPolDecision d = rmPolicyMaySend(e, 4, now);
     TEST_ASSERT_TRUE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(0, d.unanswered);
@@ -339,10 +339,10 @@ static void test_policy_answered_and_aged_out_do_not_count(void)
     d = rmPolicyMaySend(u, 2, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
-    // 89999 ms old still counts, 90000 does not
-    RmPolEntry b[2] = {mk(now - 89999), mk(now - 5000)};
+    // 149999 ms old still counts, 150000 does not
+    RmPolEntry b[2] = {mk(now - 149999), mk(now - 5000)};
     TEST_ASSERT_FALSE(rmPolicyMaySend(b, 2, now).allowed);
-    RmPolEntry c[2] = {mk(now - 90000), mk(now - 5000)};
+    RmPolEntry c[2] = {mk(now - 150000), mk(now - 5000)};
     d = rmPolicyMaySend(c, 2, now);
     TEST_ASSERT_EQUAL_UINT8(1, d.unanswered);               // only the 5 s one counts
     TEST_ASSERT_EQUAL_INT(RM_POL_COOLDOWN, d.reason);       // ... and it is inside the spacing, not the limit
@@ -351,8 +351,8 @@ static void test_policy_answered_and_aged_out_do_not_count(void)
 static void test_policy_cooldown_and_limit_combine_to_the_longer_wait(void)
 {
     const uint32_t now = 4000000;
-    // two unanswered, newest 2 s old (cooldown 8 s left), oldest 85 s old (limit frees in 5 s)
-    RmPolEntry e[2] = {mk(now - 2000), mk(now - 85000)};
+    // two unanswered, newest 2 s old (cooldown 8 s left), oldest 145 s old (limit frees in 5 s)
+    RmPolEntry e[2] = {mk(now - 2000), mk(now - 145000)};
     RmPolDecision d = rmPolicyMaySend(e, 2, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_UINT32(8, d.retryS);   // the spacing is the longer wait
@@ -375,10 +375,10 @@ static void test_policy_across_millis_wrap(void)
     RmPolDecision d = rmPolicyMaySend(e, 2, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
-    // oldest = s1 at age 30000 (s1 + 30000 wraps to 9999): 60 s to go
-    TEST_ASSERT_EQUAL_UINT32(60, d.retryS);
-    // 60 s later (now + 60000, wrapped past 0 again nowhere) the oldest left the window
-    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 2, now + 60000).allowed);
+    // oldest = s1 at age 30000 (s1 + 30000 wraps to 9999): 120 s to go
+    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);
+    // 120 s later (now + 120000, wrapped past 0 again nowhere) the oldest left the window
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 2, now + 120000).allowed);
 
     // cooldown boundary exactly over the wrap
     RmPolEntry w[1] = {mk(0xFFFFFFFFu - 4999u, true, true)};   // sent 5000 ms before the wrap point
@@ -637,6 +637,138 @@ static void test_status_parse_old_form_and_rejects(void)
     TEST_ASSERT_FALSE(o.ledSupported);  // 5 letters: no LED on that board
 }
 
+static void test_policy_proven_limit_10_and_11th_refused(void)
+{
+    const uint32_t now = 4000000;
+    RmPolEntry e[RM_POLICY_MAX_ENTRIES];
+    for (uint8_t i = 0; i < 9; i++)
+        e[i] = mk(now - 11000u - 10000u * i);  // 9 unanswered, newest 11 s old
+    RmPolDecision d = rmPolicyMaySend(e, 9, now, RM_POLICY_LIMIT_PROVEN);
+    TEST_ASSERT_TRUE(d.allowed);
+    e[9] = mk(now - 11000u + 10000u * 0);  // 10th, 11 s old
+    d = rmPolicyMaySend(e, 10, now, RM_POLICY_LIMIT_PROVEN);
+    TEST_ASSERT_FALSE(d.allowed);
+    TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
+    TEST_ASSERT_EQUAL_UINT8(10, d.unanswered);
+    // the oldest is 91 s old: it leaves the 150 s window in 59 s
+    TEST_ASSERT_EQUAL_UINT32(59, d.retryS);
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 10, now + 59000, RM_POLICY_LIMIT_PROVEN).allowed);
+    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 10, now + 58999, RM_POLICY_LIMIT_PROVEN).allowed);
+}
+
+static void test_proof_cleared_by_key_change_and_one_shot_rules(void)
+{
+    RmProof b[RM_PROOF_N];
+    memset(b, 0, sizeof(b));
+    const uint8_t a[4] = {1, 2, 3, 4}, c[4] = {5, 6, 7, 8};
+    RmProof *p = rmProofSetKey(b, "DK5EN-90", a);
+    TEST_ASSERT_FALSE(p->oneShot);
+    rmProofVerified(b, "DK5EN-90", c);  // a reply under another key proves nothing
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
+    rmProofVerified(b, "DK5EN-90", a);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven but cap unknown: still 2
+    rmProofSetCap(b, "DK5EN-90", a, 2);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));
+    rmProofSetKey(b, "DK5EN-90", a);  // same key: proof stays, nothing armed
+    TEST_ASSERT_TRUE(p->proven);
+    TEST_ASSERT_FALSE(p->oneShot);
+    rmProofSetKey(b, "DK5EN-90", c);  // re-key: proof gone, one-shot armed
+    TEST_ASSERT_FALSE(p->proven);
+    TEST_ASSERT_TRUE(p->oneShot);
+    rmProofForget(b, "DK5EN-90");
+    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-90"));
+    TEST_ASSERT_FALSE(rmProofSetKey(b, "DK5EN-90", c)->oneShot);  // forgotten: first key arms nothing
+
+    // spacing is not overridden by the one-shot; an allowed send does not use it
+    const uint32_t now = 4000000;
+    RmPolEntry e[2] = {mk(now - 5000), mk(now - 15000)};
+    RmPolDecision d = rmPolicyMaySend(e, 2, now, 2, true, true);
+    TEST_ASSERT_FALSE(d.allowed);
+    TEST_ASSERT_TRUE(d.canForce);
+    TEST_ASSERT_FALSE(d.usedForce);
+    RmPolEntry f[1] = {mk(now - 15000)};
+    d = rmPolicyMaySend(f, 1, now, 2, true, true);
+    TEST_ASSERT_TRUE(d.allowed);
+    TEST_ASSERT_FALSE(d.usedForce);
+}
+
+static void test_book_never_evicts_counted_entries_and_goes_busy(void)
+{
+    const uint32_t now = 4000000;
+    RmPolEntry e[12];
+    for (uint8_t i = 0; i < 12; i++)
+        e[i] = mk(now - 1000u - 5000u * i);
+    TEST_ASSERT_EQUAL_INT(-1, rmBookVictim(e, 12, 12, now));  // all counted: busy
+    TEST_ASSERT_EQUAL_INT(-2, rmBookVictim(e, 11, 12, now));  // a free slot
+    e[7] = mk(now - 30000, true, true, false);                // answered: no longer counts
+    e[10] = mk(now - 200000, false, false, false, true);      // expired
+    TEST_ASSERT_EQUAL_INT(10, rmBookVictim(e, 12, 12, now));  // the OLDEST non-counting one
+    TEST_ASSERT_EQUAL_UINT32(12, RM_POLICY_MAX_ENTRIES);
+}
+
+void test_book_room_counts_free_and_stale_slots(void)
+{
+    RmPolEntry e[12];
+    memset(e, 0, sizeof(e));
+    for (int i = 0; i < 12; i++)
+        e[i].sentMs = 100000u;  // all unanswered, young
+    TEST_ASSERT_EQUAL_UINT8(0, rmBookRoom(e, 12, 12, 101000u));
+    TEST_ASSERT_EQUAL_UINT8(2, rmBookRoom(e, 10, 12, 101000u));  // two free slots
+    e[11].verified = true;  // answered: no longer counts
+    TEST_ASSERT_EQUAL_UINT8(1, rmBookRoom(e, 12, 12, 101000u));
+    e[10].expired = true;
+    TEST_ASSERT_EQUAL_UINT8(2, rmBookRoom(e, 12, 12, 101000u));
+    TEST_ASSERT_EQUAL_UINT8(12, rmBookRoom(e, 12, 12, 100000u + RM_POLICY_WINDOW_MS));  // all aged out
+}
+
+// Capability gate: the proven budget 10 needs proven AND cap >= 2 (the target's sync reply says rm=2, i.e. it does not
+// count authenticated replays); every other target keeps the unproven budget 2, which is safe against the old receiver.
+static void test_proof_cap_gates_the_proven_limit(void)
+{
+    RmProof b[RM_PROOF_N];
+    memset(b, 0, sizeof(b));
+    const uint8_t a[4] = {1, 2, 3, 4}, c[4] = {5, 6, 7, 8};
+    RmProof *p = rmProofSetKey(b, "DK5EN-90", a);
+    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
+    rmProofVerified(b, "DK5EN-90", a);
+    TEST_ASSERT_TRUE(p->proven);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven + cap 0 (old or unknown): 2
+    rmProofSetCap(b, "DK5EN-90", a, 1);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven + cap 1: 2
+    rmProofSetCap(b, "DK5EN-90", c, 2);                                  // another fingerprint: ignored
+    TEST_ASSERT_EQUAL_UINT8(1, p->cap);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
+    rmProofSetCap(b, "DK5EN-91", a, 2);                                  // unknown target: nothing happens
+    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-91"));
+    rmProofSetCap(b, "DK5EN-90", a, 2);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));    // proven + cap 2: 10
+    rmProofSetKey(b, "DK5EN-90", a);                                     // same key: cap stays
+    TEST_ASSERT_EQUAL_UINT8(2, p->cap);
+
+    // unproven + cap 2 stays at 2
+    rmProofForget(b, "DK5EN-90");
+    p = rmProofSetKey(b, "DK5EN-90", a);
+    rmProofSetCap(b, "DK5EN-90", a, 2);
+    TEST_ASSERT_FALSE(p->proven);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(nullptr));
+
+    // a key change resets cap together with proven
+    rmProofVerified(b, "DK5EN-90", a);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));
+    rmProofSetKey(b, "DK5EN-90", c);
+    TEST_ASSERT_FALSE(p->proven);
+    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
+    rmProofVerified(b, "DK5EN-90", c);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven again, but the new key's cap is unknown
+
+    // forget clears it all
+    rmProofSetCap(b, "DK5EN-90", c, 2);
+    rmProofForget(b, "DK5EN-90");
+    p = rmProofSetKey(b, "DK5EN-90", c);
+    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -657,6 +789,10 @@ int main(int, char **)
     RUN_TEST(test_policy_cooldown_and_limit_combine_to_the_longer_wait);
     RUN_TEST(test_policy_across_millis_wrap);
     RUN_TEST(test_policy_entry_cap_is_safe);
+    RUN_TEST(test_policy_proven_limit_10_and_11th_refused);
+    RUN_TEST(test_proof_cap_gates_the_proven_limit);
+    RUN_TEST(test_proof_cleared_by_key_change_and_one_shot_rules);
+    RUN_TEST(test_book_never_evicts_counted_entries_and_goes_busy);
     RUN_TEST(test_auto_sync_is_conditional);
     RUN_TEST(test_pending_decision_table);
     RUN_TEST(test_unverified_sync_reply_does_not_hang_the_chain);
@@ -668,5 +804,6 @@ int main(int, char **)
     RUN_TEST(test_status_worst_case_length_fits_the_reply);
     RUN_TEST(test_status_format_never_overruns_a_small_buffer);
     RUN_TEST(test_status_parse_old_form_and_rejects);
+    RUN_TEST(test_book_room_counts_free_and_stale_slots);
     return UNITY_END();
 }

@@ -95,10 +95,18 @@ struct RmState
 
 void rmStateInit(RmState &s, uint32_t hwm);
 
+// Clears the lockout (lockActive) and the reject counter, nothing else: hwm, lastCtr, the reply cache,
+// the rate limiter and the sync limiter stay. The operator standing at the node (own password change,
+// console or web) may always unlock it; it is never reachable from the air.
+void rmReceiverUnlock(RmState &s);
+
 // Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute.
 // maxTxPower bounds "txpower <n>" (0 <= n <= maxTxPower). Every reject counts
-// towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT and RM_REJ_RATE
-// (a rate reject requires a valid tag). The lockout is reachable without the
+// towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT, RM_REJ_RATE and
+// RM_REJ_REPLAY (each of the last two requires a VALID tag: the lockout throttles key
+// guessing, a valid tag is not a guess, and a replayed or overtaken frame reveals and
+// executes nothing; counting it let a jittery legitimate path lock the node). A strike
+// exactly RM_REJ_WINDOW_MS after the window start opens a new window. The lockout is reachable without the
 // key (3 junk DMs per 5 min keep RM unavailable): accepted by design, RM fails
 // closed, never open (ADR). RM_SYNC
 // has its own limiter (RM_SYNC_RATE_MS, a second authenticated sync inside it is RM_REJ_RATE, silent):

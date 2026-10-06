@@ -212,7 +212,7 @@ bool tagEqual(const char *a, const char *b)
 
 RmVerdict reject(RmState &s, RmVerdict v, uint32_t now)
 {
-    if (s.rejCount == 0 || (uint32_t)(now - s.rejWindowMs) > RM_REJ_WINDOW_MS)
+    if (s.rejCount == 0 || (uint32_t)(now - s.rejWindowMs) >= RM_REJ_WINDOW_MS)
     {
         s.rejCount = 1;
         s.rejWindowMs = now;
@@ -379,6 +379,12 @@ void rmStateInit(RmState &s, uint32_t hwm)
     s.hwm = hwm;
 }
 
+void rmReceiverUnlock(RmState &s)
+{
+    s.lockActive = false;
+    s.rejCount = 0;
+}
+
 RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
                   int maxTxPower, uint32_t nowMs)
 {
@@ -417,8 +423,12 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
         if (s.haveLast && c.ctr == s.lastCtr && tagEqual(s.lastTag, c.tag) &&
             (uint32_t)(nowMs - s.lastAcceptMs) <= RM_CACHE_MS)
             return RM_CACHED;
+        // A valid tag with a stale counter is NOT counted towards the lockout: the lockout throttles
+        // key guessing, and a valid tag is not a guess. A replayed or overtaken (reordered) frame
+        // reveals nothing and executes nothing; counting it let a legitimate sender with path-delay
+        // jitter, or anyone replaying one sniffed frame three times, lock the node.
         if (c.ctr <= s.hwm)
-            return reject(s, RM_REJ_REPLAY, nowMs);
+            return RM_REJ_REPLAY;
     }
 
     // Only an authenticated sender reaches this point; a rate reject is not an

@@ -42,6 +42,12 @@ void sub_rm_heard(void);
  *  store into a local struct, hands the key to rmSendCommandKey(), scrubs the struct on every path.
  *  false + err token: "slot" (out of range or unused), else the tokens of rmSendCommandKey()
  *  ("cmd", "busy", "limit", ...). */
-bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync);
+bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync,
+                 bool force = false);
+
+/** Policy probe for a saved slot (for the /rmsend refusal reply): returns true when a send would pass now;
+ *  retryS = seconds until it would, canForce = refused with LIMIT and the one-shot after a re-key is armed.
+ *  Same decision as the send path (rmTargetMaySend -> policyFor). false + zeros for an empty/invalid slot. */
+bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce);
 
 #endif // _WEB_RM_HANDLERS_H_

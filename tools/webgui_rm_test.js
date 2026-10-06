@@ -9,7 +9,7 @@
 //
 // Prerequisites (not part of the repo):  npm i jsdom@24   (anywhere; set NODE_PATH to its node_modules)
 // Run:   NODE_PATH=<dir>/node_modules node tools/webgui_rm_test.js
-// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer node tools/webgui_rm_test.js
+// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|again node tools/webgui_rm_test.js
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
@@ -84,6 +84,8 @@ function mutate(from, to) {
 if (MUT === 'leak') mutate("fetch(u,{method:'POST'", "fetch(u+'?'+b,{method:'POST'");
 else if (MUT === 'nolock') mutate('rmLock=rmNow()+10000;', 'rmLock=0;');
 else if (MUT === 'timer') mutate('function rmPageLeave(){clearInterval(rmT.tick);', 'function rmPageLeave(){');
+else if (MUT === 'msgs') mutate('tr=rmRows[k];', 'tr=null;');
+else if (MUT === 'again') mutate('rmSendCmd(cmd,args,d,s);', 'rmSendCmd(cmd,args);');
 else if (MUT) throw new Error('unknown RM_MUTATE ' + MUT);
 if (MUT) console.log('NOTE mutation active: ' + MUT);
 
@@ -312,7 +314,7 @@ function leaks(P, canary) {
     check('s= letters GtDMwL: GPS on, Track off, Display on, Mesh on, Gateway off, Light on',
       t.gps.state === 'on' && t.track.state === 'off' && t.display.state === 'on' && t.mesh.state === 'on' && t.gateway.state === 'off' && t.led.state === 'on',
       JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v.state]))));
-    check('last status line shows version, uptime, battery', /version 4\.40a, up 2 h 10 min, battery 87 %/.test(P.text('rm_laststatus')), P.text('rm_laststatus'));
+    check('Messages row shows the verified status (was: last status line)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(P.text('rm_msgs')), P.text('rm_msgs'));
     check('tile labels read GPS on, Track off, Light on, Gateway off', t.gps.text === 'GPS on' && t.track.text === 'Track off' && t.led.text === 'Light on' && t.gateway.text === 'Gateway off', JSON.stringify(Object.values(t).map((v) => v.text)));
     check('tile order GPS, Track, Display, Light, Mesh, Gateway', Object.keys(t).join(',') === 'gps,track,display,led,mesh,gateway', Object.keys(t).join(','));
     P.w.rmPageLeave();
@@ -346,23 +348,23 @@ function leaks(P, canary) {
   // ---- TX power ------------------------------------------------------------------------------------
   {
     const P = await savedNodePage('ok v=4.35a up=5 bat=80 heap=100 gw=1 mesh=0');
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_txup'));
+    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
     await flush();
-    check('TX power capped at 15 when the node reported no limit', P.text('rm_txval') === '15 dBm' && P.el('rm_txup').disabled, P.text('rm_txval'));
-    check('TX power note says 15 dBm when unknown', /15 dBm/.test(P.text('rm_txnote')) && /not reported/.test(P.text('rm_txnote')));
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_txdn'));
-    check('TX power floor is 0', P.text('rm_txval') === '0 dBm' && P.el('rm_txdn').disabled);
+    check('TX power capped at 15 when the node reported no limit', P.text('rm_rtxval') === '15 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
+    check('TX power note says 15 dBm when unknown', /15 dBm/.test(P.text('rm_rtxnote')) && /not reported/.test(P.text('rm_rtxnote')));
+    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxdn'));
+    check('TX power floor is 0', P.text('rm_rtxval') === '0 dBm' && P.el('rm_rtxdn').disabled);
     P.w.rmPageLeave();
   }
   {
     const P = await savedNodePage(STATUS_NEW);
-    check('TX power starts at the reported value and caps at the reported max', P.text('rm_txval') === '17 dBm' && /22 dBm/.test(P.text('rm_txnote')));
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_txup'));
-    check('TX power cap follows p=cur/max (22)', P.text('rm_txval') === '22 dBm' && P.el('rm_txup').disabled, P.text('rm_txval'));
+    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && /22 dBm/.test(P.text('rm_rtxnote')));
+    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
+    check('TX power cap follows p=cur/max (22)', P.text('rm_rtxval') === '22 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
     P.w.rmPageLeave();
     const Q = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=8/10');
-    for (let i = 0; i < 30; i++) Q.click(Q.el('rm_txup'));
-    check('TX power cap 10 for p=8/10', Q.text('rm_txval') === '10 dBm', Q.text('rm_txval'));
+    for (let i = 0; i < 30; i++) Q.click(Q.el('rm_rtxup'));
+    check('TX power cap 10 for p=8/10', Q.text('rm_rtxval') === '10 dBm', Q.text('rm_rtxval'));
     Q.w.rmPageLeave();
   }
 
@@ -404,17 +406,17 @@ function leaks(P, canary) {
   }
   {
     const P = await savedNodePage(STATUS_NEW);   // cur 17
-    for (let i = 0; i < 5; i++) P.click(P.el('rm_txdn'));
-    await P.tap(P.el('rm_txapply'));
-    check('lowering TX power needs a confirm', P.sends().length === 0 && P.el('rm_txapply').textContent === 'Really? tap again' && P.text('rm_txval') === '12 dBm');
-    await P.tap(P.el('rm_txapply'));
+    for (let i = 0; i < 5; i++) P.click(P.el('rm_rtxdn'));
+    await P.tap(P.el('rm_rtxapply'));
+    check('lowering TX power needs a confirm', P.sends().length === 0 && P.el('rm_rtxapply').textContent === 'Really? tap again' && P.text('rm_rtxval') === '12 dBm');
+    await P.tap(P.el('rm_rtxapply'));
     check('lowering TX power sends "txpower 12" on the second tap', P.sends().length === 1 && /cmd=txpower&args=12/.test(P.sends()[0].body), JSON.stringify(P.sends()));
     // the fake server answers with the verified result, then raise
     P.srv.status.sent.unshift(ent('DK5EN-1', 'txpower 12', 'ok txpower=12', { ago: 1, ctr: 9 }));
     await P.T.advance(10100);
-    check('reported TX power follows the verified reply', P.text('rm_txval') === '12 dBm');
-    P.click(P.el('rm_txup')); await flush();
-    await P.tap(P.el('rm_txapply'));
+    check('reported TX power follows the verified reply', P.text('rm_rtxval') === '12 dBm');
+    P.click(P.el('rm_rtxup')); await flush();
+    await P.tap(P.el('rm_rtxapply'));
     check('raising TX power needs no confirm', P.sends().length === 2 && /cmd=txpower&args=13/.test(P.sends()[1].body), JSON.stringify(P.sends().map((s) => s.body)));
     P.w.rmPageLeave();
   }
@@ -424,7 +426,7 @@ function leaks(P, canary) {
     const P = await savedNodePage(STATUS_NEW);
     await P.tap(P.btn('Send position now', P.el('rm_info')));
     check('a send was made', P.sends().length === 1);
-    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('button'), ...P.el('rm_rs').querySelectorAll('button'), P.el('rm_txapply'), P.el('rm_test')];
+    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('button'), ...P.el('rm_rs').querySelectorAll('button'), P.el('rm_rtxapply'), P.el('rm_test')];
     check('all tiles are locked after a send', allBtns().every((b) => b.disabled), allBtns().filter((b) => !b.disabled).length + ' enabled');
     check('countdown is visible', /Next command possible in 10 s/.test(P.text('rm_lockline')), P.text('rm_lockline'));
     await P.T.advance(3000);
@@ -614,7 +616,7 @@ function leaks(P, canary) {
     await P.T.advance(100);
     const page = P.el('rm_page');
     check('hostile call/msg/reply render as text, no element is created', page.querySelectorAll('img,script,iframe,svg,object').length === 0 && P.w.__pwn === undefined);
-    check('the hostile text is visible as text (proves it was rendered)', page.textContent.includes(EVIL) && P.el('rm_act').textContent.includes(EVIL));
+    check('the hostile text is visible as text (proves it was rendered)', page.textContent.includes(EVIL) && P.el('rm_msgs').textContent.includes(EVIL));
     await P.tap(P.btn(EVIL) || page.querySelector('.rmchip'));
     check('picking a hostile chip does not execute anything', P.w.__pwn === undefined && /Not a call sign/.test(P.text('rm_callchk')));
     P.w.rmPageLeave();
@@ -655,7 +657,14 @@ function leaks(P, canary) {
     await P.tap(P.el('rm_saved').querySelector('button'));
     srv.sendReply = { ok: true, ctr: 0, viaSync: true };
     await P.tap(P.btn('Send position now', P.el('rm_info')));
-    check('viaSync: "checking the connection first, your command follows"', /checking the connection first, your command follows/i.test(P.text('rm_msg')), P.text('rm_msg'));
+    check('viaSync: accepted, no error shown (the progress text moved to the Messages card)', P.sends().length === 1 && P.text('rm_msg') === '', P.text('rm_msg'));
+    const CM = 'Checking the connection first, your command follows.';
+    await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 0, ago: 2, st: 'queued' })], targets: [{ dst: 'DK5EN-1', pending: 1, retry: 0, locked: 0, chainMsg: CM }] });
+    const vr = P.el('rm_msgs').querySelectorAll('tr');
+    check('viaSync: while pending, rm_chain shows the node and the server chain sentence', P.text('rm_chain') === 'DK5EN-1: ' + CM, P.text('rm_chain'));
+    check('viaSync: a Messages row for the queued command exists with badge "sent"', vr.length === 1 && vr[0].children[2].textContent === 'sent' && /DK5EN-1/.test(vr[0].children[1].textContent), P.text('rm_msgs'));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 0, ago: 4, st: 'queued' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0 }] });
+    check('viaSync: no longer pending, rm_chain is empty', P.text('rm_chain') === '', P.text('rm_chain'));
     srv.sendReply = null;
     await P.T.advance(10100);
     srv.sendReply = { ok: false, err: 'limit' };
@@ -679,12 +688,125 @@ function leaks(P, canary) {
     });
     const P = await mkPage(srv);
     await P.init();
-    const t = P.text('rm_act');
-    check('activity: ok status becomes "Connected. Version ..."', /Status: Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(t), t);
-    check('activity: err and no-answer sentences come from msg', /GPS off: The node tried, but the setting did not change\./.test(t) && /Send position: No answer after 75 seconds/.test(t));
-    check('activity: chain message of the target is shown', /DK5EN-1: The connection check got no answer/.test(t));
-    check('raw table lists the sent entries', P.el('rm_sent').querySelectorAll('tr').length === 3);
+    const t = P.text('rm_msgs');
+    check('messages: ok status becomes "Connected. Version ..." (was: activity)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(t), t);
+    check('messages: err and no-answer sentences come from msg (was: activity)', /The node tried, but the setting did not change\./.test(t) && /No answer after 75 seconds/.test(t));
+    check('messages: chain message of the target is shown (was: activity)', /DK5EN-1: The connection check got no answer/.test(P.text('rm_chain')));
+    check('raw table lists the sent entries', P.el('rm_msgs').querySelectorAll('tr').length === 3);
     check('heard chips: call, hardware, age; null rssi prints no "null"', (() => { const c = P.el('rm_heard').textContent; return /DK5EN-1/.test(c) && /HELTEC_V3/.test(c) && /2 min ago, -95 dBm/.test(c) && /OE1ABC-5/.test(c) && !/null/.test(c); })(), P.el('rm_heard').textContent);
+    P.w.rmPageLeave();
+  }
+
+  // ---- W1d: Messages card, lock label, toggle, clear confirm, Radio card, Advanced open, no fixed 10 s ----
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.status = srv.mkStatus({ sent: [ent('DK5EN-1', 'status', '', { ctr: 7, ago: 4, st: 'waiting' })] });
+    const P = await mkPage(srv);
+    await P.init();
+    const row0 = () => P.el('rm_msgs').querySelectorAll('tr')[0];
+    const r1 = row0();
+    check('W1d messages: waiting row is state "sent"', r1 && /sent/.test(r1.children[2].textContent) && r1.children[0].textContent === '4 s ago', r1 && r1.textContent);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'status', STATUS_NEW, { ctr: 7, ago: 14, st: 'ok' })] });
+    check('W1d messages: sent -> verified ok, same DOM node', row0() === r1 && r1.children[2].textContent === 'verified' && /Connected/.test(r1.children[3].textContent) && r1.children[2].className === 'rmok');
+    await P.setPoll({ sent: [ent('DK5EN-1', 'gps off', 'err gps', { ctr: 7, ago: 24, st: 'err', msg: 'The node tried, but the setting did not change.' })] });
+    check('W1d messages: verified err is marked, rows are keyed', P.el('rm_msgs').querySelectorAll('tr').length === 1 && row0().children[2].className === 'rmbad' && /did not change/.test(row0().children[3].textContent));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 8, ago: 5, st: 'noanswer', msg: 'No answer after 75 seconds.' }), ent('DK5EN-1', 'led on', 'ok led=on', { ctr: 9, ago: 3, ver: 0, st: 'unverified', msg: 'Not verified.' })] });
+    const rs = P.el('rm_msgs').querySelectorAll('tr');
+    check('W1d messages: no answer and unverified badges, newest first', rs.length === 2 && rs[0].children[2].textContent === 'unverified' && rs[1].children[2].textContent === 'no answer', [...rs].map((x) => x.children[2].textContent).join());
+    await P.typeCall('DK5EN-1');
+    const before = P.sends().length;
+    await P.tap(rs[1].querySelector('button'));
+    await P.tap(rs[1].querySelector('button'));   // sendpos is not a read: two-tap confirm
+    const sd = P.sends();
+    check('W1d run again sends the same cmd to the same target', sd.length === before + 1 && /cmd=sendpos/.test(sd[sd.length - 1].body || '') && /DK5EN-1|slot=0/.test(sd[sd.length - 1].body || ''), JSON.stringify(sd[sd.length - 1]));
+    check('W1d run again is disabled while the node is in cooldown', [...P.el('rm_msgs').querySelectorAll('button')].every((b) => b.disabled));
+    check('W1d old ids are gone, Radio card present', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply'].some((i) => P.el(i)) && !!P.el('rm_radio') && !!P.el('rm_rtxval'));
+    check('W1d Advanced is open on load', P.el('rm_adv').hasAttribute('open'));
+    P.w.rmPageLeave();
+  }
+  {
+    const hdr = HTML + JS;
+    check('W1d no fixed "10 s" in the emitted page text', !/10 s/.test(hdr) && !/10 seconds/.test(hdr));
+    for (const [pw, on] of [[0, 0], [0, 1], [1, 0], [1, 1]]) {
+      const srv = mkServer(); srv.status = srv.mkStatus({ pw, on, lock: pw && !on ? 1 : 0, lockS: 42 });
+      const P = await mkPage(srv); await P.init();
+      const vis = P.el('rm_on').style.display !== 'none' && P.el('rm_onlbl').style.display !== 'none';
+      check('W1d toggle visible for pw=' + pw + ' on=' + on, vis === !!(pw || on));
+      const lt = P.text('rm_lockstate');
+      check('W1d lock label ' + (pw && !on ? 'shows seconds' : 'empty') + ' pw=' + pw + ' on=' + on, pw && !on ? /^Remote commands blocked for 42 s after wrong attempts$/.test(lt) : lt === '', lt);
+      check('W1d lock label never says "not locked"', !/not locked/.test(lt));
+      P.w.rmPageLeave();
+    }
+    const srv = mkServer(); const P = await mkPage(srv); await P.init();
+    const n0 = P.calls.length;
+    await P.tap(P.el('rm_selfclear'));
+    check('W1d clear asks first, nothing sent', P.text('rm_selfmsg') === 'Clear the password? Remote management will be switched off.' && P.calls.length === n0, P.text('rm_selfmsg'));
+    await P.w.rmDisarm(); await flush();
+    check('W1d cancel (disarm) sends nothing', P.calls.length === n0 && P.text('rm_selfmsg') === '');
+    await P.tap(P.el('rm_selfclear')); await P.tap(P.el('rm_selfclear'));
+    check('W1d confirmed clear shows the new message', P.text('rm_selfmsg') === 'Password cleared. Remote management is off.', P.text('rm_selfmsg'));
+    P.w.rmPageLeave();
+  }
+
+  // ---- advisor rework: Run again goes to the row's node, dedupe, confirm, lock label -------------------
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.nodes[1] = { slot: 1, used: 1, call: 'DK5EN-2' };
+    srv.status = srv.mkStatus({ sent: [
+      ent('DK5EN-1', 'reboot', 'ok', { ago: 10, ctr: 1 }),
+      ent('DK5EN-1', 'status', STATUS_NEW, { ago: 20, ctr: 2 }),
+      ent('DK5EN-3', 'status', STATUS_NEW, { ago: 30, ctr: 3 }),
+    ] });
+    const P = await mkPage(srv);
+    await P.init();
+    await P.tap(Array.from(P.el('rm_saved').querySelectorAll('button')).find((x) => x.textContent.indexOf('DK5EN-2') === 0));
+    const row = (n) => Array.from(P.el('rm_msgs').querySelectorAll('tr')).find((r) => r.children[1].textContent.indexOf(n) === 0);
+    const rb = (n) => row(n).querySelector('button');
+    const sel = () => P.w.rmSel.call + '/' + P.w.rmSel.slot + '/' + P.el('rm_call').value;
+    await P.tap(rb('DK5EN-1 ' + P.w.rmLabel('status')));
+    check('Run again (read) goes to the ROW node by its slot while another node is selected', P.sends().length === 1 && /^slot=0&cmd=status/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    check('Run again leaves the selection unchanged and sends no password', sel() === 'DK5EN-2/1/DK5EN-2' && !new URLSearchParams(P.sends()[0].body).has('pw') && P.el('rm_pw').value === '', sel());
+    await P.T.advance(10100);
+    await P.tap(rb('DK5EN-1 Restart'));
+    check('Run again of reboot: first tap arms, names the ROW node, sends nothing', P.sends().length === 1 && rb('DK5EN-1 Restart').textContent === 'Really? tap again' && /DK5EN-1/.test(P.text('rm_msg')) && !/DK5EN-2/.test(P.text('rm_msg')), P.text('rm_msg'));
+    await P.tap(rb('DK5EN-1 Restart'));
+    check('Run again of reboot: second tap sends to the ROW node slot', P.sends().length === 2 && /^slot=0&cmd=reboot/.test(P.sends()[1].body), JSON.stringify(P.sends().map((x) => x.body)));
+    check('Run again of reboot leaves the selection unchanged', sel() === 'DK5EN-2/1/DK5EN-2', sel());
+    check('a row whose node has no saved slot has no Run again button', rb('DK5EN-3') === null && row('DK5EN-3').children[4].textContent === '', row('DK5EN-3').innerHTML);
+    P.w.rmPageLeave();
+  }
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.status = srv.mkStatus({ sent: [ent('DK5EN-1', 'txpower 5', 'ok', { ago: 10 })] });
+    const P = await mkPage(srv);
+    await P.init();
+    const b = () => P.el('rm_msgs').querySelector('button');
+    await P.tap(b());
+    check('Run again of txpower 5 needs two taps (first arms)', P.sends().length === 0 && b().textContent === 'Really? tap again');
+    await P.tap(b());
+    check('Run again of txpower 5 sends on the second tap', P.sends().length === 1 && /slot=0&cmd=txpower&args=5/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    P.w.rmPageLeave();
+  }
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.status = srv.mkStatus({ sent: [
+      ent('DK5EN-1', 'sync', '', { ctr: 0, ago: 90, st: 'noanswer', msg: 'No answer after 75 seconds. Check the password.' }),
+      ent('DK5EN-1', 'sync', '', { ctr: 0, ago: 3, st: 'waiting' }),
+    ] });
+    const P = await mkPage(srv);
+    await P.init();
+    const rows = P.el('rm_msgs').querySelectorAll('tr');
+    check('two syncs to one node: one row, the newest (waiting) owns it: badge "sent"', rows.length === 1 && rows[0].children[2].textContent === 'sent' && /^3 s ago|^3/.test(rows[0].children[0].textContent), P.text('rm_msgs'));
+    P.w.rmPageLeave();
+  }
+  {
+    const srv = mkServer(); srv.status = srv.mkStatus({ pw: 1, on: 0, lock: 1, lockS: 0 });
+    const P = await mkPage(srv); await P.init();
+    check('lock true with lockS 0 shows "1 s", never "0 s"', /blocked for 1 s after/.test(P.text('rm_lockstate')), P.text('rm_lockstate'));
     P.w.rmPageLeave();
   }
 

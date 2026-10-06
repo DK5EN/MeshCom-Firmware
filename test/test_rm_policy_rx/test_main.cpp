@@ -1,0 +1,424 @@
+// RM ext W1c: the REAL sender policy / sent book (rm_sender_policy.h) against the REAL receiver
+// (remote_cmd.cpp rmCheck/rmAccept) in virtual time. Regression for verdict finding 4: a sender with a
+// wrong key must never lock the target, whatever the path delay jitter.
+#include <unity.h>
+#include <stdint.h>
+#include <string.h>
+#include <vector>
+#include <algorithm>
+#include "remote_cmd.h"
+#include "rm_sender_policy.h"
+
+static_assert(RM_POLICY_WINDOW_MS >= RM_REJ_WINDOW_MS + 60000u, "sender window must exceed the receiver reject window");
+
+void setUp(void) {}
+void tearDown(void) {}
+
+static const char *DST = "DK5EN-90";
+static const char *SRC = "DK5EN-14";
+static const char *PW = "rightpw";
+
+struct Frame
+{
+    uint32_t arriveMs;
+    RmCmd cmd;
+    uint32_t sentMs;
+    int slot;  // index into Sim::book by sentMs match
+};
+
+struct Sim
+{
+    RmState rs;
+    uint32_t rng;
+    std::vector<RmPolEntry> book;  // newest first
+    std::vector<Frame> inflight;
+    uint32_t ctr;
+    uint32_t counted;
+    uint32_t rate;
+    uint32_t sentTotal;
+    uint8_t maxUnanswered;
+    bool locked;
+    Sim() : rng(12345), ctr(0), counted(0), rate(0), sentTotal(0), maxUnanswered(0), locked(false) { memset(&rs, 0, sizeof(rs)); }
+    uint32_t rnd() { rng = rng * 1664525u + 1013904223u; return rng >> 8; }
+
+    // sends one frame (cmd "sync" has ctr 0) with `pass`, arriving after `delayMs`
+    void send(const char *pass, const char *cmd, uint32_t now, uint32_t delayMs)
+    {
+        uint8_t key[32];
+        rmDeriveKey(pass, key);
+        const bool isSync = strcmp(cmd, "sync") == 0;
+        char wire[96];
+        TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, isSync ? 0 : ++ctr, cmd, "", key, wire, sizeof(wire)) > 0);
+        Frame f;
+        TEST_ASSERT_TRUE(rmParse(wire, f.cmd));
+        f.arriveMs = now + delayMs;
+        f.sentMs = now;
+        f.slot = 0;
+        inflight.push_back(f);
+        RmPolEntry e;
+        memset(&e, 0, sizeof(e));
+        e.sentMs = now;
+        // newest first; evict via the real book rule (never a counted entry)
+        int v = rmBookVictim(book.data(), (uint8_t)book.size(), (uint8_t)RM_POLICY_MAX_ENTRIES, now);
+        TEST_ASSERT_TRUE(v != -1);
+        if (v >= 0)
+            book.erase(book.begin() + v);
+        book.insert(book.begin(), e);
+        sentTotal++;
+    }
+
+    // delivers every frame that has arrived by `now`, in arrival order
+    void deliver(uint32_t now, const char *rightPw, uint32_t replyLossPct, bool *verifiedOut)
+    {
+        std::sort(inflight.begin(), inflight.end(), [](const Frame &a, const Frame &b) { return a.arriveMs < b.arriveMs; });
+        while (!inflight.empty() && inflight.front().arriveMs <= now)
+        {
+            Frame f = inflight.front();
+            inflight.erase(inflight.begin());
+            const RmVerdict v = rmCheck(rs, f.cmd, DST, SRC, rightPw, 22, f.arriveMs);
+            if (v == RM_OK)
+            {
+                rmAccept(rs, f.cmd, "ok", f.arriveMs);
+            }
+            if (v == RM_REJ_TAG || v == RM_REJ_REPLAY || v == RM_REJ_FORMAT || v == RM_REJ_BLOCKED)
+                counted++;
+            if (v == RM_REJ_RATE)
+                rate++;
+            if (rs.lockActive)
+                locked = true;
+            if ((v == RM_OK || v == RM_SYNC) && (rnd() % 100) >= replyLossPct)
+            {
+                for (auto &e : book)
+                    if (e.sentMs == f.sentMs)
+                        e.replied = e.verified = true;  // the verified reply reached the sender
+                if (verifiedOut)
+                    *verifiedOut = true;
+            }
+        }
+    }
+    void age(uint32_t now)
+    {
+        for (auto &e : book)
+            if (rmPolicyAgeMs(now, e.sentMs) >= 300000u)
+                e.expired = true;
+    }
+};
+
+// wrong key, fastest allowed rate, 30 simulated minutes, delay base + jitter swept; chain = sync first
+static uint32_t run_wrong_key(uint32_t base, uint32_t jitter, bool useSync, bool *lockedOut)
+{
+    Sim s;
+    s.rng = 777u + base * 31u + jitter;
+    for (uint32_t now = 0; now < 1800000u; now += 1000u)
+    {
+        s.age(now);
+        s.deliver(now, PW, 0, nullptr);
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, RM_POLICY_LIMIT_UNPROVEN);
+        if (d.unanswered > s.maxUnanswered)
+            s.maxUnanswered = d.unanswered;
+        if (d.allowed && !s.locked)
+            s.send("wrongpw", useSync ? "sync" : "status", now, (base + (jitter ? s.rnd() % (jitter + 1) : 0)) * 1000u);
+    }
+    s.deliver(4000000u, PW, 0, nullptr);
+    *lockedOut = s.locked;
+    return s.counted;
+}
+
+void test_wrong_key_at_fastest_allowed_rate_never_locks_target(void)
+{
+    uint32_t total = 0;
+    for (uint32_t base = 0; base <= 10; base += 5)
+        for (uint32_t jit = 0; jit <= 20; jit += 10)
+            for (int sync = 0; sync < 2; sync++)
+            {
+                bool locked = false;
+                total += run_wrong_key(base, jit, sync != 0, &locked);
+                TEST_ASSERT_FALSE_MESSAGE(locked, "receiver locked by a wrong-key sender inside the policy");
+            }
+    // delay 30 s fixed, and a worst case swing of 0 / 30 s
+    bool locked = false;
+    total += run_wrong_key(30, 0, false, &locked);
+    TEST_ASSERT_FALSE(locked);
+    total += run_wrong_key(0, 30, false, &locked);
+    TEST_ASSERT_FALSE(locked);
+    TEST_ASSERT_TRUE_MESSAGE(total > 20, "the run must produce tag rejects (otherwise it proves nothing)");
+    printf("wrong-key counted rejects over all runs: %u\n", (unsigned)total);
+}
+
+void test_right_key_proven_budget_10(void)
+{
+    Sim s;
+    bool proven = false;
+    uint32_t sent = 0;
+    for (uint32_t now = 0; now < 1800000u; now += 1000u)
+    {
+        s.age(now);
+        bool v = false;
+        s.deliver(now, PW, proven ? 100 : 0, &v);  // first reply gets through, then all replies are lost
+        proven = proven || v;
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now,
+                                                proven ? RM_POLICY_LIMIT_PROVEN : RM_POLICY_LIMIT_UNPROVEN);
+        if (d.unanswered > s.maxUnanswered)
+            s.maxUnanswered = d.unanswered;
+        if (d.allowed)
+        {
+            s.send(PW, "status", now, 1000u + (s.rnd() % 8000u));
+            sent++;
+        }
+    }
+    s.deliver(4000000u, PW, 100, nullptr);
+    TEST_ASSERT_TRUE(proven);
+    TEST_ASSERT_EQUAL_UINT32(0, s.counted);
+    TEST_ASSERT_FALSE(s.locked);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, s.maxUnanswered);
+    TEST_ASSERT_TRUE(sent > 20);
+}
+
+void test_rekey_one_shot(void)
+{
+    Sim s;
+    RmProof pb[RM_PROOF_N];
+    memset(pb, 0, sizeof(pb));
+    const uint8_t fpA[4] = {1, 2, 3, 4}, fpB[4] = {9, 9, 9, 9};
+    RmProof *p = rmProofSetKey(pb, DST, fpA);
+    TEST_ASSERT_FALSE(p->oneShot);  // a first key arms nothing
+    s.send("wrongA", "status", 0, 2000u);
+    s.send("wrongA", "status", 10000u, 2000u);
+    p = rmProofSetKey(pb, DST, fpB);  // re-key
+    TEST_ASSERT_TRUE(p->oneShot);
+    p = rmProofSetKey(pb, DST, fpB);  // same key again: no new arming, no refill
+    uint32_t now = 20000u;
+    RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, rmProofLimit(p), p->oneShot, false);
+    TEST_ASSERT_FALSE(d.allowed);
+    TEST_ASSERT_EQUAL(RM_POL_LIMIT, d.reason);
+    TEST_ASSERT_TRUE(d.canForce);
+    d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, rmProofLimit(p), p->oneShot, true);
+    TEST_ASSERT_TRUE(d.allowed);
+    TEST_ASSERT_TRUE(d.usedForce);
+    p->oneShot = false;  // the caller disarms
+    s.send("wrongB", "status", now, 2000u);
+    s.deliver(now + 5000u, PW, 0, nullptr);
+    // accepted consequence of decision 5: the third counted reject inside 90 s locks the target
+    TEST_ASSERT_EQUAL_UINT32(3, s.counted);
+    TEST_ASSERT_TRUE(s.locked);
+    p = rmProofSetKey(pb, DST, fpB);
+    TEST_ASSERT_FALSE(p->oneShot);  // same-key re-save never re-arms
+    // a FOURTH attempt is impossible until the window has passed
+    for (now = 21000u; now < 10000u + RM_POLICY_WINDOW_MS; now += 1000u)
+    {
+        d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, rmProofLimit(p), p->oneShot, true);
+        TEST_ASSERT_FALSE(d.allowed);
+        TEST_ASSERT_FALSE(d.canForce);
+    }
+    d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), 10000u + RM_POLICY_WINDOW_MS, 2, false, false);
+    TEST_ASSERT_TRUE(d.allowed);
+}
+
+// Runtime sequence of rmForgetTarget() + re-add (rm_runtime.cpp), same pure calls in the same order:
+//   per send: rmProofSetKey(fp) -> rmPolicyMaySend(book, now, rmProofLimit(p), p->oneShot, force) -> [send]
+//   forget:   rmProofForget(pb, dst); the book entries are NOT touched (they keep counting)
+void test_forget_does_not_refill_budget(void)
+{
+    const uint8_t fpA[4] = {1, 2, 3, 4}, fpB[4] = {9, 9, 9, 9};
+    {
+        // (a) delete + re-add with a new wrong key: proof and one-shot are gone, the book still counts
+        Sim s;
+        RmProof pb[RM_PROOF_N];
+        memset(pb, 0, sizeof(pb));
+        RmProof *p = rmProofSetKey(pb, DST, fpA);
+        s.send("wrongA", "status", 0, 2000u);
+        s.send("wrongA", "status", 10000u, 2000u);
+        rmProofForget(pb, DST);  // rmForgetTarget(): entries stay
+        p = rmProofSetKey(pb, DST, fpB);  // re-add: a FIRST key arms nothing
+        TEST_ASSERT_NOT_NULL(p);
+        TEST_ASSERT_FALSE(p->oneShot);
+        for (uint32_t now = 20000u; now < RM_POLICY_WINDOW_MS; now += 1000u)
+        {
+            RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, rmProofLimit(p), p->oneShot, true);
+            TEST_ASSERT_FALSE(d.allowed);
+            TEST_ASSERT_EQUAL(RM_POL_LIMIT, d.reason);
+            TEST_ASSERT_FALSE(d.canForce);
+            TEST_ASSERT_FALSE(d.usedForce);
+        }
+        s.deliver(30000u, PW, 0, nullptr);
+        TEST_ASSERT_TRUE(s.counted <= 3);
+        TEST_ASSERT_FALSE(s.locked);
+    }
+    {
+        // (b) only the password changes (no forget): exactly the one-shot, nothing without force
+        Sim s;
+        RmProof pb[RM_PROOF_N];
+        memset(pb, 0, sizeof(pb));
+        RmProof *p = rmProofSetKey(pb, DST, fpA);
+        s.send("wrongA", "status", 0, 2000u);
+        s.send("wrongA", "status", 10000u, 2000u);
+        p = rmProofSetKey(pb, DST, fpB);
+        TEST_ASSERT_TRUE(p->oneShot);
+        RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), 20000u, rmProofLimit(p), p->oneShot, false);
+        TEST_ASSERT_FALSE(d.allowed);
+        TEST_ASSERT_TRUE(d.canForce);
+        d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), 20000u, rmProofLimit(p), p->oneShot, true);
+        TEST_ASSERT_TRUE(d.allowed);
+        TEST_ASSERT_TRUE(d.usedForce);
+        p->oneShot = false;
+        s.send("wrongB", "status", 20000u, 2000u);
+        d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), 30000u, rmProofLimit(p), p->oneShot, true);
+        TEST_ASSERT_FALSE(d.allowed);
+        TEST_ASSERT_FALSE(d.canForce);
+        s.deliver(40000u, PW, 0, nullptr);
+        TEST_ASSERT_TRUE(s.counted <= 3);
+    }
+}
+
+// ---- reordering: the right key must never lock the target (advisor D1 / D2) -----------------------
+// Frames are sent as the policy allows (10 s apart); the path delay alternates 30 s / 0 s (or is drawn
+// from a seeded generator, 0..30 s) so slow frames are overtaken by faster ones. A reply travels back
+// with its frame's own delay. The sender limit is what the real proof book gives: 10 only when proven
+// AND the target reported cap >= 2 in its sync reply.
+// oldReceiverModel: the test itself counts a strike for every RM_REJ_REPLAY verdict and for every
+// counted reject (what a target that still runs the pre-fix receiver does) and asserts fewer than
+// RM_REJ_LIMIT inside any 90 s window. The real rmCheck stays the NEW receiver in both modes.
+static void run_right_key_reordered(bool oldReceiverModel, bool randomDelay, uint8_t cap)
+{
+    RmProof pb[RM_PROOF_N];
+    memset(pb, 0, sizeof(pb));
+    const uint8_t fp[4] = {1, 2, 3, 4};
+    RmProof *proof = rmProofSetKey(pb, DST, fp);
+    rmProofSetCap(pb, DST, fp, cap);
+    uint32_t rnd = 20261006u;
+    uint8_t maxLimit = 0;
+    Sim s;
+    struct Reply { uint32_t at; uint32_t sentMs; };
+    std::vector<Reply> replies;
+    std::vector<uint32_t> strikes;
+    uint32_t n = 0;
+    uint32_t accepted = 0;
+    for (uint32_t now = 0; now < 600000u; now += 1000u)
+    {
+        // replies that reached the sender: the entry becomes verified (the key is proven)
+        for (size_t i = 0; i < replies.size();)
+        {
+            if (replies[i].at <= now)
+            {
+                for (auto &e : s.book)
+                    if (e.sentMs == replies[i].sentMs)
+                        e.replied = e.verified = true;
+                replies.erase(replies.begin() + i);
+            }
+            else
+                i++;
+        }
+        // frames that reached the target, in arrival order
+        std::sort(s.inflight.begin(), s.inflight.end(), [](const Frame &a, const Frame &b) { return a.arriveMs < b.arriveMs; });
+        while (!s.inflight.empty() && s.inflight.front().arriveMs <= now)
+        {
+            Frame f = s.inflight.front();
+            s.inflight.erase(s.inflight.begin());
+            const RmVerdict v = rmCheck(s.rs, f.cmd, DST, SRC, PW, 22, f.arriveMs);
+            if (v == RM_OK)
+            {
+                rmAccept(s.rs, f.cmd, "ok", f.arriveMs);
+                accepted++;
+                replies.push_back({f.arriveMs + (f.arriveMs - f.sentMs), f.sentMs});
+            }
+            if (oldReceiverModel && (v == RM_REJ_REPLAY || v == RM_REJ_FORMAT || v == RM_REJ_TAG || v == RM_REJ_BLOCKED))
+                strikes.push_back(f.arriveMs);
+            if (s.rs.lockActive)
+                s.locked = true;
+        }
+        s.age(now);
+        bool proven = false;
+        for (const auto &e : s.book)
+            proven = proven || e.verified;
+        if (proven)
+            rmProofVerified(pb, DST, fp);
+        const uint8_t limit = rmProofLimit(proof);
+        if (limit > maxLimit)
+            maxLimit = limit;
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, limit);
+        if (d.allowed)
+        {
+            uint32_t delay = (n++ % 2 == 0) ? 30000u : 0u;
+            if (randomDelay)
+            {
+                rnd = rnd * 1664525u + 1013904223u;
+                delay = ((rnd >> 8) % 31u) * 1000u;
+            }
+            s.send(PW, "status", now, delay);
+        }
+    }
+    TEST_ASSERT_EQUAL_UINT8(cap >= 2 ? RM_POLICY_LIMIT_PROVEN : RM_POLICY_LIMIT_UNPROVEN, maxLimit);
+    TEST_ASSERT_FALSE(s.locked);
+    TEST_ASSERT_TRUE(accepted > 0);
+    // old receiver: never RM_REJ_LIMIT strikes inside one 90 s window
+    for (size_t i = 0; i + RM_REJ_LIMIT - 1 < strikes.size(); i++)
+        TEST_ASSERT_TRUE(strikes[i + RM_REJ_LIMIT - 1] - strikes[i] >= RM_REJ_WINDOW_MS);
+}
+
+void test_right_key_reordered_frames_never_lock(void)
+{
+    // (i) NEW receiver (the real rmCheck: a valid-tag stale counter is no strike) + sender limit 10 (proven, cap 2)
+    run_right_key_reordered(false, false, 2);
+    run_right_key_reordered(false, true, 2);
+    // (ii) OLD receiver model (every REPLAY counts) + the limit the policy gives a cap-0 target: 2 although proven
+    run_right_key_reordered(true, false, 0);
+    run_right_key_reordered(true, true, 0);
+}
+
+// D2: wrong key, the first frame is the slowest and the last the fastest; the sender frees an entry
+// at age >= RM_POLICY_WINDOW_MS from booking, the target's window is measured between ARRIVALS.
+static void run_wrong_key_edge(uint32_t firstDelayMs)
+{
+    Sim s;
+    uint32_t n = 0;
+    for (uint32_t now = 0; now < 600000u; now += 1000u)
+    {
+        s.age(now);
+        s.deliver(now, PW, 0, nullptr);
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), now, RM_POLICY_LIMIT_UNPROVEN);
+        if (d.allowed)
+        {
+            uint32_t delay = 0;
+            if (n == 0)
+                delay = firstDelayMs;
+            else if (n == 1 && firstDelayMs >= 5000u)
+                delay = firstDelayMs - 5000u;
+            s.send("wrongpw", "status", now, delay);
+            n++;
+        }
+    }
+    s.deliver(4000000u, PW, 0, nullptr);
+    TEST_ASSERT_FALSE(s.locked);
+}
+
+void test_wrong_key_window_edge_30s_delay(void)
+{
+    // the reviewer's sequence: f1 sent 0 (30 s), f2 sent 10 s (25 s); the third send must not be
+    // allowed before the sender window has passed, and then it is not a 3rd strike inside 90 s
+    {
+        Sim s;
+        s.send("wrongpw", "status", 0u, 30000u);
+        s.send("wrongpw", "status", 10000u, 25000u);
+        const RmPolDecision d = rmPolicyMaySend(s.book.data(), (uint8_t)s.book.size(), 120000u, RM_POLICY_LIMIT_UNPROVEN);
+        TEST_ASSERT_FALSE(d.allowed);
+        TEST_ASSERT_EQUAL(RM_POL_LIMIT, d.reason);
+        s.send("wrongpw", "status", 150000u, 0u);
+        s.deliver(200000u, PW, 0, nullptr);
+        TEST_ASSERT_EQUAL_UINT32(3, s.counted);
+        TEST_ASSERT_FALSE(s.locked);
+    }
+    for (uint32_t d0 = 0; d0 <= 30000u; d0 += 1000u)
+        run_wrong_key_edge(d0);
+}
+
+int main(int, char **)
+{
+    UNITY_BEGIN();
+    RUN_TEST(test_wrong_key_at_fastest_allowed_rate_never_locks_target);
+    RUN_TEST(test_right_key_proven_budget_10);
+    RUN_TEST(test_rekey_one_shot);
+    RUN_TEST(test_forget_does_not_refill_budget);
+    RUN_TEST(test_right_key_reordered_frames_never_lock);
+    RUN_TEST(test_wrong_key_window_edge_30s_delay);
+    return UNITY_END();
+}

@@ -544,7 +544,9 @@ static const size_t COMMAND_TOGGLES_N = sizeof(COMMAND_TOGGLES) / sizeof(COMMAND
 
 // RM GUI: the ONE place that changes node_passwd (console --passwd and the web Remote page). pw must already
 // have passed rmPasswordProblemN() (the callers do); nullptr, "" or "none" clears the password (open access).
-// Re-keys the net console 2323 and KISS (ESP32), saves the settings.
+// Re-keys the net console 2323 and KISS (ESP32), saves the settings. Every change (set or clear) lifts
+// the RM receiver lockout (the operator at the node may always unlock it); clearing the password also
+// switches remote management off (same statement as --remotemgmt off), persisted by the one save below.
 void nodePasswdApply(const char *pw)
 {
     if(pw == nullptr || pw[0] == 0x00 || strcmp(pw, "none") == 0)
@@ -557,6 +559,8 @@ void nodePasswdApply(const char *pw)
         kissSetPassword("");
         #endif
         printfdeb("...net console password cleared (open access)\n");
+        meshcom_settings.node_rm = 0;
+        Serial.printf("[RM];off;passwd_cleared\n");
     }
     else
     {
@@ -569,6 +573,7 @@ void nodePasswdApply(const char *pw)
         #endif
     }
 
+    rmRuntimeReceiverUnlock();
     save_settings();
 }
 

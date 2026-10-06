@@ -5,8 +5,14 @@
 //
 //  1. Send policy per target: a rejected RM1 frame (wrong key, stale counter, even a wrong-key sync)
 //     is SILENT on air and counts toward the target's lockout (3 within 90 s = 5 min locked, and the
-//     sender can not see any of it). So the sender allows at most 2 unanswered sends to one target
-//     inside 90 s and spaces sends to one target by 10 s (the target rate limits to one per 10 s).
+//     sender can not see any of it). So the sender allows at most N unanswered sends to one target
+//     inside RM_POLICY_WINDOW_MS (150 s = 90 s reject window + 30 s path delay + 30 s margin) and
+//     spaces sends to one target by 10 s (the target rate limits to one per 10 s). N is 2 until a
+//     reply under the current key verified AND the target's sync reply reported rm >= 2 (it does
+//     not count authenticated replays toward its lockout); then N is 10. A target of unknown or old
+//     firmware (cap 0) keeps 2 for good: an old receiver counts a reordered right-key frame as a
+//     strike. After a re-key (key fingerprint changed) the proof and the capability are gone and
+//     ONE forced attempt beyond the limit is allowed.
 //  2. Entry state: queued / waiting / noanswer / ok / err / unverified as a function of timestamps.
 //  3. Plain sentences for every state and every RM error token.
 //  4. The compact `status` reply: `s=<letters> p=<cur>/<max>` encode/decode and the whole formatter,
@@ -21,11 +27,18 @@
 
 // ---- constants (RM_POLICY_COOLDOWN_MS must equal RM_RATE_MS of remote_cmd.h; rm_runtime.cpp asserts it)
 #define RM_POLICY_COOLDOWN_MS 10000u   // minimum spacing of two sends to one target
-#define RM_POLICY_WINDOW_MS 90000u     // window of the unanswered-send budget (= target's reject window)
-#define RM_POLICY_MAX_UNANSWERED 2u    // a 3rd unanswered send would be the target's 3rd strike
+#define RM_POLICY_WINDOW_MS 150000u    // window of the unanswered-send budget = target reject window 90 s + 30 s path delay
+                                       // + 30 s margin for TX-queue latency (equal windows leak at the edge: path delay
+                                       // jitter, verdict finding 4; a 120 s window still leaked at 30 s delay, D2)
+#define RM_POLICY_MAX_UNANSWERED 2u    // budget while the key is UNPROVEN: a 3rd unanswered send would be the target's 3rd strike
+#define RM_POLICY_LIMIT_UNPROVEN RM_POLICY_MAX_UNANSWERED
+#define RM_POLICY_LIMIT_PROVEN 10u     // budget once a reply under the current key fingerprint verified AND the target reports rm >= 2
+#define RM_POLICY_CAP_PROVEN 2u        // capability level (sync reply `rm=<n>`) from which the proven budget is safe
 #define RM_NOANSWER_MS 75000u          // no reply for this long: "no answer"
 #define RM_QUEUED_MS 3000u             // first seconds after the send: still in the local TX queue
-#define RM_POLICY_MAX_ENTRIES 8u       // entries per target the policy looks at (the sent ring holds 5)
+#define RM_POLICY_MAX_ENTRIES 12u      // entries per target the policy looks at (= the sent book, kSentN)
+static_assert(RM_POLICY_MAX_ENTRIES >= RM_POLICY_LIMIT_PROVEN + 2, "book covers the proven budget plus answered entries");
+
 #define RM_PEND_SEND_DELAY_MS 10500u   // queued command goes out this long after the sync reply verified
 
 // ---- entry state -------------------------------------------------------------------------------------
@@ -91,7 +104,7 @@ enum RmPolReason : uint8_t
 {
     RM_POL_OK = 0,
     RM_POL_COOLDOWN,  // inside the 10 s spacing after the last send to this target
-    RM_POL_LIMIT      // 2 unanswered sends inside 90 s: a third could lock the target
+    RM_POL_LIMIT      // unanswered budget used up (2 unproven / 10 proven) inside the window
 };
 
 struct RmPolDecision
@@ -100,6 +113,8 @@ struct RmPolDecision
     RmPolReason reason;
     uint32_t retryS;  // seconds until a send is allowed again (0 when allowed); cooldown included
     uint8_t unanswered;  // unanswered sends inside the window
+    bool canForce;       // refused with LIMIT and the one-shot after a re-key is armed (send with force=1)
+    bool usedForce;      // allowed only because the one-shot was spent: the caller must disarm it
 };
 
 inline uint32_t rmPolicyCeilS(uint32_t ms)
@@ -109,10 +124,11 @@ inline uint32_t rmPolicyCeilS(uint32_t ms)
 
 // e[0..n) = ALL entries of ONE target (any order). Unanswered = not verified, not expired, younger
 // than the window. A verified err reply counts as answered: the target is alive and the key is right.
-// Boundaries: age 10000 ms is out of the cooldown; age 90000 ms is out of the window.
-inline RmPolDecision rmPolicyMaySend(const RmPolEntry *e, uint8_t n, uint32_t nowMs)
+// Boundaries: age 10000 ms is out of the cooldown; age RM_POLICY_WINDOW_MS is out of the window.
+inline RmPolDecision rmPolicyMaySend(const RmPolEntry *e, uint8_t n, uint32_t nowMs,
+                                      uint8_t limit = RM_POLICY_LIMIT_UNPROVEN, bool oneShot = false, bool force = false)
 {
-    RmPolDecision d = {true, RM_POL_OK, 0, 0};
+    RmPolDecision d = {true, RM_POL_OK, 0, 0, false, false};
     if (e == nullptr)
         return d;
     if (n > RM_POLICY_MAX_ENTRIES)
@@ -139,14 +155,20 @@ inline RmPolDecision rmPolicyMaySend(const RmPolEntry *e, uint8_t n, uint32_t no
     d.unanswered = k;
 
     uint32_t limitLeft = 0;
-    if (k >= RM_POLICY_MAX_UNANSWERED)
+    if (k >= limit && oneShot && force && cooldownLeft == 0)
     {
+        d.usedForce = true;  // the one-shot after a re-key: one send beyond the limit, the spacing still applies
+        return d;
+    }
+    if (k >= limit)
+    {
+        d.canForce = oneShot;
         // the count must fall below the limit: the (k - limit + 1) oldest have to leave the window
-        const uint8_t idx = (uint8_t)(k - RM_POLICY_MAX_UNANSWERED);  // 0-based among oldest-first
+        const uint8_t idx = (uint8_t)(k - limit);  // 0-based among oldest-first
         limitLeft = RM_POLICY_WINDOW_MS - unans[idx];
         d.reason = RM_POL_LIMIT;
     }
-    else if (cooldownLeft > 0)
+    if (d.reason != RM_POL_LIMIT && cooldownLeft > 0)
         d.reason = RM_POL_COOLDOWN;
 
     const uint32_t left = limitLeft > cooldownLeft ? limitLeft : cooldownLeft;
@@ -451,6 +473,123 @@ inline bool rmStatusParse(const char *res, RmStatusInfo &o)
         }
     }
     return true;
+}
+
+
+// --- sent book: slot choice (pure; rm_runtime.cpp keeps the storage) -------------------------------
+// An entry COUNTS while it is unanswered (not verified), not aged out and inside the policy window:
+// evicting it would let the sender exceed the target's budget.
+inline bool rmBookCounts(const RmPolEntry &e, uint32_t nowMs)
+{
+    return !e.verified && !e.expired && rmPolicyAgeMs(nowMs, e.sentMs) < RM_POLICY_WINDOW_MS;
+}
+
+// e[0..n) newest first, cap = slots. Returns the index to free for a new entry (the OLDEST entry that no
+// longer counts), -2 when a slot is free (n < cap), -1 when every entry still counts: refuse with "busy"
+// BEFORE a counter is consumed.
+inline int rmBookVictim(const RmPolEntry *e, uint8_t n, uint8_t cap, uint32_t nowMs)
+{
+    if (n < cap)
+        return -2;
+    for (int i = (int)n - 1; i >= 0; i--)
+        if (!rmBookCounts(e[i], nowMs))
+            return i;
+    return -1;
+}
+
+// slots a new entry can take right now: free slots plus entries that no longer count (same rule as
+// rmBookVictim). A chain (sync, then the queued command) needs 2 BEFORE the sync leaves, so the
+// command can never fail with "busy" after the sync went out.
+inline uint8_t rmBookRoom(const RmPolEntry *e, uint8_t n, uint8_t cap, uint32_t nowMs)
+{
+    uint8_t room = (n < cap) ? (uint8_t)(cap - n) : 0;
+    for (uint8_t i = 0; i < n && i < cap; i++)
+        if (!rmBookCounts(e[i], nowMs))
+            room++;
+    return room;
+}
+
+// --- per-target key proof, RAM only -----------------------------------------------------------------
+// fp = first 4 bytes of a hash of the key (the caller derives it; never the key itself). proven: a reply
+// verified under exactly that fp. oneShot: armed by a CHANGE of fp for a known target, spent by the first
+// send that would be refused with LIMIT. A first key for a target arms nothing; the same fp never re-arms.
+// cap: the `rm=<n>` level of the target's verified sync reply. Rationale: 10 unanswered sends are only safe
+// against a receiver that does not count authenticated replays (valid tag, stale counter) toward its
+// lockout, which the target reports as rm >= 2. Every other target keeps the limit 2, which is safe
+// against the old receiver even with reordered right-key frames.
+#define RM_PROOF_N 8
+struct RmProof
+{
+    char dst[10];
+    uint8_t fp[4];
+    bool used;
+    bool proven;
+    bool oneShot;
+    uint8_t cap;  // capability level the target reported in its sync reply (rm=<n>); 0 = unknown or old firmware
+};
+
+inline RmProof *rmProofFind(RmProof *b, const char *dst)
+{
+    for (uint8_t i = 0; i < RM_PROOF_N; i++)
+        if (b[i].used && strcmp(b[i].dst, dst) == 0)
+            return &b[i];
+    return nullptr;
+}
+
+// the saved key of dst is now fp (save, or first use). Returns the entry (nullptr only if the book is full).
+inline RmProof *rmProofSetKey(RmProof *b, const char *dst, const uint8_t fp[4])
+{
+    RmProof *p = rmProofFind(b, dst);
+    if (p == nullptr)
+    {
+        for (uint8_t i = 0; i < RM_PROOF_N && p == nullptr; i++)
+            if (!b[i].used)
+                p = &b[i];
+        if (p == nullptr)
+            return nullptr;
+        memset(p, 0, sizeof(*p));
+        p->used = true;
+        snprintf(p->dst, sizeof(p->dst), "%s", dst);
+        memcpy(p->fp, fp, 4);
+        return p;
+    }
+    if (memcmp(p->fp, fp, 4) != 0)
+    {
+        memcpy(p->fp, fp, 4);
+        p->proven = false;
+        p->cap = 0;
+        p->oneShot = true;
+    }
+    return p;
+}
+
+// a reply verified under the key with fingerprint fp
+inline void rmProofVerified(RmProof *b, const char *dst, const uint8_t fp[4])
+{
+    RmProof *p = rmProofFind(b, dst);
+    if (p != nullptr && memcmp(p->fp, fp, 4) == 0)
+        p->proven = true;
+}
+
+// the verified sync reply of dst (key fingerprint fp) reported capability level cap (same rule as above)
+inline void rmProofSetCap(RmProof *b, const char *dst, const uint8_t fp[4], uint8_t cap)
+{
+    RmProof *p = rmProofFind(b, dst);
+    if (p != nullptr && memcmp(p->fp, fp, 4) == 0)
+        p->cap = cap;
+}
+
+// the target is forgotten/deleted: proof and one-shot go (a re-added node starts fresh, without one-shot)
+inline void rmProofForget(RmProof *b, const char *dst)
+{
+    RmProof *p = rmProofFind(b, dst);
+    if (p != nullptr)
+        memset(p, 0, sizeof(*p));
+}
+
+inline uint8_t rmProofLimit(const RmProof *p)
+{
+    return (p != nullptr && p->proven && p->cap >= RM_POLICY_CAP_PROVEN) ? (uint8_t)RM_POLICY_LIMIT_PROVEN : (uint8_t)RM_POLICY_LIMIT_UNPROVEN;
 }
 
 #endif // RM_SENDER_POLICY_H

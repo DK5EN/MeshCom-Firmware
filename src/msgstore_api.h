@@ -126,6 +126,7 @@ bool msgstoreDeliverNow(int slot);                          // starts a ladder n
 
 // ---- readers ----
 int                            msgstoreUsed(void);
+int                            msgstoreBytes(void);          // payload bytes held, sum of plen over used slots (RM mailbox counter)
 const struct MsgStoreEntry    *msgstoreEntry(int slot);     // NULL if out of range or FREE
 const struct MsgStoreCounters *msgstoreCounters(void);
 uint8_t                        msgstoreActionsLastHour(void);

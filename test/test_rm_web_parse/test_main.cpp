@@ -237,6 +237,57 @@ struct SendCase
     const char *args;
 };
 
+// optional force=1|0 field (both forms); anything else is the "form" error and force stays false
+struct ForceCase
+{
+    const char *body;
+    const char *err; // nullptr = accept
+    bool force;
+};
+
+static void test_send_force_field(void)
+{
+    static const ForceCase cases[] = {
+        // slot form
+        {"slot=0&cmd=gps", nullptr, false},                  // absent
+        {"slot=0&cmd=gps&force=1", nullptr, true},
+        {"slot=0&cmd=gps&force=0", nullptr, false},
+        {"force=1&slot=2&cmd=txpower&args=7", nullptr, true}, // field order is free
+        {"slot=0&cmd=gps&force=2", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=1&force=1", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=0&force=1", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=true", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=01", RM_ERR_FORM, false},
+        {"slot=0&cmd=gps&force=%31", nullptr, true},         // decoded before the value check
+        // dst form
+        {"dst=DK5EN-1&pw=x&cmd=gps", nullptr, false},
+        {"dst=DK5EN-1&pw=x&cmd=gps&args=on&force=1", nullptr, true},
+        {"dst=DK5EN-1&pw=x&cmd=gps&force=0", nullptr, false},
+        {"dst=DK5EN-1&pw=x&cmd=gps&force=2", RM_ERR_FORM, false},
+        {"dst=DK5EN-1&pw=x&cmd=gps&force=", RM_ERR_FORM, false},
+        {"dst=DK5EN-1&pw=x&cmd=gps&force=1&force=1", RM_ERR_FORM, false},
+        // a bad force wins over a later field error (form-level check), a good force never hides one
+        {"slot=3&cmd=gps&force=1", RM_ERR_SLOT, false},
+        {"dst=DK5EN&pw=x&cmd=gps&force=1", RM_ERR_CALL, false},
+    };
+    for (const ForceCase &c : cases)
+    {
+        Buf b(c.body);
+        RmSendReq r = rmParseSendBody(b.b);
+        char msg[300];
+        snprintf(msg, sizeof msg, "body '%s'", c.body);
+        if (c.err == nullptr)
+            TEST_ASSERT_NULL_MESSAGE(r.err, msg);
+        else
+        {
+            TEST_ASSERT_NOT_NULL_MESSAGE(r.err, msg);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.err, r.err, msg);
+        }
+        TEST_ASSERT_EQUAL_INT_MESSAGE(c.force ? 1 : 0, r.force ? 1 : 0, msg);
+    }
+}
+
 static void test_send_table(void)
 {
     static const SendCase cases[] = {
@@ -484,6 +535,7 @@ int main(int, char **)
     RUN_TEST(test_passwd_null_body);
     RUN_TEST(test_nodes_table);
     RUN_TEST(test_send_table);
+    RUN_TEST(test_send_force_field);
     RUN_TEST(test_body_size_limits);
     RUN_TEST(test_values_point_into_body);
     RUN_TEST(test_leak_error_tokens_never_contain_canary);

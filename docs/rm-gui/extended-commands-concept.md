@@ -209,8 +209,9 @@ with the assert removed, locks the target with the right password in 44 % of sim
 older of two reordered frames counts as a replay strike). Final design:
 
 1. Spacing stays 10 s = `RM_RATE_MS`; the assert stays.
-2. Window 120 s (must exceed the receiver's reject window; fixes a 90 s edge leak that already locks a
-   target in 357 of 1000 simulated wrong-password runs today).
+2. Window 150 s = the receiver's 90 s reject window + 30 s path delay + 30 s margin for TX-queue
+   latency (an assert keeps it at or above the receiver window + 60 s). The first version of this
+   wave used 120 s; the advisor showed zero margin at a 30 s path delay.
 3. Per target, over all keys: 2 unanswered while the current key is unproven; 10 once a reply under
    that key's fingerprint verified (fingerprint and flag in RAM only).
 4. `RM1 ` frames go out without the `{NNN` suffix (no DM ACK, no retry ladder), from any origin:
@@ -224,8 +225,20 @@ older of two reordered frames counts as a replay strike). Final design:
    counter, learnt counter marks or any receiver state. Own-password change calls
    `rmReceiverUnlock()` (lock flag and reject count only).
 7. Rate rejects never count toward the lockout; the page shows the countdown, not "locked".
-8. After a re-key the page offers one "try once more anyway" beyond the unproven limit, without a
-   warning dialog (operator decision; a wrong password then locks the target for 5 min).
+8. Receiver (advisor rework, W1): a frame with a valid tag and a stale counter (a replayed or
+   overtaken frame) stays rejected but is no longer counted toward the lockout. The lockout throttles
+   key guessing, and a valid tag is not a guess. Before this, a sender with the right password and
+   reordered frames (path delays alternating 30 s and 0 s) locked the target within 70 s, and anyone
+   could lock a node by replaying one sniffed frame three times. Rejects before the tag check and
+   wrong tags are counted as before.
+9. The budget of 10 applies only to a target that reported the new receiver: `rm=2` in a verified
+   `sync` reply under the current key (RAM only, cleared by a key change or a forget). Every other
+   target keeps 2, which is safe against the old receiver that still counts replays. A cap on
+   "overtaken" sends was tried first and dropped: simulation showed it does not protect an old
+   receiver (frames in flight are not counted) and refuses a healthy operator in 25-40 % of attempts
+   at 20 % reply loss.
+10. After a re-key the page offers one "try once more anyway" beyond the unproven limit, without a
+    warning dialog (operator decision; a wrong password then locks the target for 5 min).
 
 ## 6. Page changes
 

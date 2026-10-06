@@ -885,6 +885,16 @@ int msgstoreUsed(void)
     return n;
 }
 
+// Same discipline as msgstoreUsed(): lock-free read of s_entries from the reader's context.
+int msgstoreBytes(void)
+{
+    int n = 0;
+    for(int i = 0; i < s_slots; i++)
+        if(s_entries[i].state != MSGSTORE_FREE)
+            n += (int)s_entries[i].plen;
+    return n;
+}
+
 const struct MsgStoreEntry *msgstoreEntry(int slot)
 {
     if(slot < 0 || slot >= MSGSTORE_SLOTS_MAX)

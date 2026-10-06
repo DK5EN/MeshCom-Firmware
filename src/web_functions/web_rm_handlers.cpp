@@ -131,7 +131,15 @@ void sub_rm_nodes_post(long content_length)
         if (req.err != nullptr)
             err = req.err;
         else if (req.act == RMN_FORGET)
+        {
+            RmNodes old; // forget every saved target BEFORE the store is wiped
+            if (rmNodesLoad(old))
+                for (int i = 0; i < RM_NODES_SLOTS; i++)
+                    if (old.slot[i].used)
+                        rmForgetTarget(old.slot[i].call);
+            rmNodesScrub(old);
             rmNodesWipe();
+        }
         else
         {
             RmNodes ns; // local, never static: holds the keys of all saved nodes
@@ -141,6 +149,7 @@ void sub_rm_nodes_post(long content_length)
             {
                 if (loaded && ns.slot[req.slot].used) // deleting an empty slot is a no-op, not an error
                 {
+                    rmForgetTarget(ns.slot[req.slot].call);
                     rmNodesScrubBuf(&ns.slot[req.slot], sizeof(ns.slot[req.slot]));
                     if (!rmNodesSave(ns))
                         err = "store";
@@ -155,6 +164,10 @@ void sub_rm_nodes_post(long content_length)
                 if (err == nullptr)
                 {
                     RmNodeSlot &s = ns.slot[req.slot];
+                    // the call of an existing slot changes: the old target is forgotten; only the password
+                    // changing keeps everything (the proof book sees the new key on the next send)
+                    if (s.used && strcmp(s.call, req.call) != 0)
+                        rmForgetTarget(s.call);
                     rmNodesScrubBuf(&s, sizeof(s));
                     strncpy(s.call, req.call, sizeof(s.call) - 1); // rest stays zero (rmNodesCallValid)
                     rmDeriveKey(req.pw, s.key);                    // K = SHA-256(password), straight from the body
@@ -171,7 +184,8 @@ void sub_rm_nodes_post(long content_length)
     rmAnswer(err);
 }
 
-bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync)
+bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t errN, uint32_t *ctrOut, bool *viaSync,
+                  bool force)
 {
     bool ok = false;
     RmNodes ns; // local: scrubbed on every path
@@ -182,10 +196,24 @@ bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t
             snprintf(err, errN, "slot");
     }
     else // rmSendCommandKey() copies dst and the key it keeps; the pointers into ns are used only during the call
-        ok = rmSendCommandKey(ns.slot[slot].call, ns.slot[slot].key, cmd, args, err, errN, ctrOut, viaSync);
+        ok = rmSendCommandKey(ns.slot[slot].call, ns.slot[slot].key, cmd, args, err, errN, ctrOut, viaSync, force);
 
     rmNodesScrub(ns);
     return ok;
+}
+
+bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce)
+{
+    bool allowed = false;
+    if (retryS != nullptr)
+        *retryS = 0;
+    if (canForce != nullptr)
+        *canForce = false;
+    RmNodes ns; // local: scrubbed on every path
+    if (slot >= 0 && slot < RM_NODES_SLOTS && rmNodesLoad(ns) && ns.slot[slot].used)
+        allowed = rmTargetMaySend(ns.slot[slot].call, retryS, canForce); // the SAME decision as the send path
+    rmNodesScrub(ns);
+    return allowed;
 }
 
 /* ---- GET /rmheard ------------------------------------------------------------------------------- */
