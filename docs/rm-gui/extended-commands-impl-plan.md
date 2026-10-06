@@ -201,6 +201,12 @@ Findings of this round, both decided by the operator and fixed the same evening:
    from `OnRxDone` and from the server ingress of both platforms (a gateway node now takes commands
    and replies straight from the server); twin test and source lint.
 
+Hardware check of the two fixes (all three nodes on 0e938a49): DK5EN-92 proven for DK5EN-1 with
+`rm=2`, DK5EN-1 re-keyed, five tries with the old key: two frames sent, three refused with `limit`,
+the target counted two rejects and did not lock. The server path is not benched: in 23 commands no
+first copy came through the gateway relay, and no bench node is a gateway (that needs the mock
+server or the operator's go for the real one); it rests on the twin tests.
+
 Also seen: the receiver's reject window is a fixed 90 s window that starts with the first reject,
 not a sliding one (four rejects spread over 158 s did not lock).
 
