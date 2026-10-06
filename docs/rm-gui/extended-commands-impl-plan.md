@@ -212,6 +212,10 @@ callsign-SSID, independent of the path (`RmRejSrc` in `remote_cmd.h`, 6 senders)
 calls can no longer lock the operator out, which was the open availability point of the server
 path. `/rmstatus` `lock` means "at least one sender is locked".
 
+Hardware check of the per-sender lockout (all three nodes on a262b304): three wrong-tag `RM1` DMs
+under DK5EN-90's call locked that call at DK5EN-1 (`/rmstatus` `lock` 1), and a command from
+DK5EN-92 sent during the lock was executed and answered.
+
 Also seen: the receiver's reject window is a fixed 90 s window that starts with the first reject,
 not a sliding one (four rejects spread over 158 s did not lock).
 
