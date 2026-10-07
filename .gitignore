@@ -429,6 +429,8 @@ tools/bench/runs/*.out
 # Eingecheckt bleiben laut Konvention die Auswertungen: summary.txt/summary.csv,
 # *_events.csv, die .json-Dateien sowie PROMPT und status.txt (traegt das Verdict).
 tools/bench/runs/**/*.out
+# gwbench run directories (logs, events.json, mock capture): evidence of one run, not source.
+tools/bench/runs/gwbench_*/
 tools/bench/runs/**/runner.err
 tools/bench/runs/**/runner.pid
 

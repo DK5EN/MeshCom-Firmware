@@ -225,3 +225,31 @@ Still open:
    which is a broadcast; covered by the host lint and tests only.
 2. T-Echo and T114: no hardware. The `radio` fix applies to both.
 3. `/rmstatus` and the page on the RAK4631 as SENDER (it was target only).
+
+## 10. Gateway bench, server path (2026-10-07)
+
+Both bench nodes (DK5EN-1 Heltec V3, DK5EN-90 RAK4631) as gateways against a mock server on the rpizero; toolbox
+`tools/bench/gwbench/`, full evidence in `docs/rm-gui/gateway-bench-20261007.md`.
+
+| Result                                                                                                                  | Evidence                                                  |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Commands and replies travel over the server path; the server copy was first in 40 of 40 commands and 37 of 37 replies   | RM-GWRELAY works end to end                               |
+| Latency of an RM command about 2.2 s (driver poll floor), RF copy needed a median 12.5 s (RAK sender) to 113 s (Heltec) | Heltec TX queue wait dominates                            |
+| No counter executed twice on either node; the second copy is a ring duplicate, `cached`, `replay` or `rate`             | 34 / 7 / 23 / 2 copies                                    |
+| Plain DM accepted once (RF copy suppressed by `[DMDUP]`), group message once, server ACK at the sender after 1 s        | RAK to Heltec only; Heltec to RAK not sent (backpressure) |
+
+Findings:
+
+- **RM-DUP (open):** a server-ingress DM to the own call creates no dedup entry and RM frames carry no `{NNN`, so the
+  RF copy of a rejected frame is counted again. One junk frame costs two strikes; the lock comes after the second
+  junk frame, not the third. Valid frames are not affected. Proposed fix: a small msg-id ring in `rm_rx_gate.h`
+  that drops the second copy of the same frame before `rmCheck`. Not implemented, awaiting decision.
+- **Bench driver holes:** the Heltec TX backpressure refused the three junk frames and the Heltec plain DM and group
+  message in the 1 to 90 direction, so those cases tested nothing (the analyzer shows it). Rerun needed with a
+  drained TX ring.
+- **Write-back of an empty value:** an empty name or text reads as `-`, the write validator accepts `-`, so the
+  driver stored a literal `-` on the RAK (driver artefact). Restore with `--setname none` and `--atxt none`.
+- **Lost reply** when the TX ring is full (`RING_DROP_NEW`); the sender sees `noanswer`. The `rate` limit counts
+  from the end of a flash-saving write.
+- Not established: why the Heltec TX ring waits minutes while the RAK waits seconds in gateway mode; why `txq`
+  reports `q=30/20`.
