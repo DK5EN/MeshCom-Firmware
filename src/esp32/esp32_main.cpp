@@ -1264,6 +1264,7 @@ void esp32setup()
     bVIA = meshcom_settings.node_sset2 & 0x4000;
 
     // nicht mehr notwendig bMHONLY =  bMHONLY =  meshcom_settings.node_sset3 & 0x0001;
+    bCHARGE_LED = meshcom_settings.node_sset3 & 0x0001;
     bNoMSGtoALL =  meshcom_settings.node_sset3 & 0x0002;
     bBLEDEBUG = meshcom_settings.node_sset3 & 0x0004;
     bAnalogCheck = meshcom_settings.node_sset3 & 0x0008;
@@ -1271,7 +1272,7 @@ void esp32setup()
     bAHT20ON = meshcom_settings.node_sset3 & 0x0020;
     bAnalogFilter = meshcom_settings.node_sset3 & 0x0040;
     bUSER_BOARD_LED = meshcom_settings.node_sset3 & 0x0080;
-    
+
     bSOFTSERDEBUG = meshcom_settings.node_sset3 & 0x0100;
     bWXDEBUG = meshcom_settings.node_sset3 & 0x0200;
     bSHT21ON = meshcom_settings.node_sset3 & 0x0400;
@@ -2201,6 +2202,7 @@ void esp32setup()
 
     #ifdef BOARD_LED
         pinMode(BOARD_LED, OUTPUT);
+        digitalWrite(BOARD_LED, BOARD_LED_ACTIVE_LOW); // Set the Board LED off after boot
     #endif
 
     #if defined(REMOTE_LED_PIN) && !defined(BOARD_LED)
@@ -2665,26 +2667,43 @@ void esp32loop()
         if(bUSER_BOARD_LED)
         {
             const uint32_t now = millis(); // millis() only once per cicle, the call to function millis() is expensive,
-
-            if (now - led_timer >= 1000UL) // repeats every 1 second, no cast needed for millis() as it is already uint32_t
+            const uint32_t flashDuration = 30;
+            const uint32_t interval =2000;  // Delay between flashes 2 sec.
+            if (!bLED)
             {
-                led_timer = now;
+                if (now - led_timer >= interval) // repeats every 2 second, no cast needed for millis() as it is already uint32_t
+                {
+                    led_timer = now;
+                    bLED = true; // LED on 
 
-                #ifdef LED_PIN
-                    if(pixels_delay == 0 && !bLED_CLEAR)
-                    {
-                        if(!bLED_RED && !bLED_GREEN && !bLED_ORANGE && !bLED_BLUE)
+                    #ifdef LED_PIN
+                        if(pixels_delay == 0 && !bLED_CLEAR)
                         {
-                            bLED_WEISS = true;
+                            if(!bLED_RED && !bLED_GREEN && !bLED_ORANGE && !bLED_BLUE)
+                            {
+                                bLED_WEISS = true;
+                            }
                         }
-                    }
-                #endif
+                    #endif
 
-                bLED = !bLED;
-                #if defined(REMOTE_LED_PIN) && (REMOTE_LED_PIN == BOARD_LED)
-                if(!bRemoteLed)   // RM "led on" holds the pin: the blinker only keeps its phase
-                #endif
-                digitalWrite(BOARD_LED, bLED); // reminder: several boards have BOARD_LED_ACTIVE_LOW == 1;
+                    #if defined(REMOTE_LED_PIN) && (REMOTE_LED_PIN == BOARD_LED)
+                    if(!bRemoteLed)   // RM "led on" holds the pin: the flasher only keeps its phase
+                    #endif
+                        digitalWrite(BOARD_LED, HIGH ^ BOARD_LED_ACTIVE_LOW);
+                }
+            }
+            else
+            {
+                // if the LED is ON, we check the short Flash period of time (30ms)
+                if (now - led_timer >= flashDuration)
+                {
+                    bLED = false;
+                    // switch the board LED OFF
+                    #if defined(REMOTE_LED_PIN) && (REMOTE_LED_PIN == BOARD_LED)
+                    if(!bRemoteLed)
+                    #endif
+                        digitalWrite(BOARD_LED, LOW ^ BOARD_LED_ACTIVE_LOW);
+                }
             }
         }
     #endif

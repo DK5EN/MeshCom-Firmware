@@ -40,6 +40,7 @@ extern bool bUSER_BOARD_LED;
 extern bool bRemoteLed;           // true while "led on" holds the pin; the BOARD_LED blinker yields
 void remoteLedForceOff(void);     // pin LOW + bRemoteLed=false; call before deep sleep
 #endif
+extern bool bCHARGE_LED;
 
 extern unsigned long rebootAuto;
 
