@@ -29,6 +29,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(NATIVE_BUILD)
 #define RMQ_LOCK()   ((void)0)
@@ -171,6 +172,77 @@ inline bool rmReplyPop(char *src, size_t srcN, char *text, size_t textN)
     return rmqPopFrom(rmqReplyState(), src, srcN, text, textN);
 }
 
+// Frames already seen (RM-DUP, 2026-10-07). A node that is a gateway or sits behind one gets the same command
+// twice: from the server and as an RF copy. Both carry the same message id. The server ingress makes no DM
+// dedup entry and an RM frame has no "{NNN", so without this ring the second copy ran through rmCheck again
+// and a wrong tag was counted twice (two strikes for one frame). Key: source call + message id + a hash of the
+// text (message ids are predictable, so a spoofed frame with the next id must not swallow the real command;
+// both genuine copies carry identical text), remembered for RM_SEEN_MS; the oldest slot is replaced. Same lock as the queues (two producer tasks on the nRF52).
+#define RM_SEEN_SLOTS 8
+#define RM_SEEN_MS    60000UL
+
+struct RmSeenSlot
+{
+    uint32_t id;
+    uint32_t ms;
+    uint32_t hash;
+    char src[RM_QUEUE_SRC_LEN];
+    uint8_t used;
+};
+
+struct RmSeenState
+{
+    RmSeenSlot slot[RM_SEEN_SLOTS];
+    uint8_t next;
+};
+
+inline RmSeenState &rmqSeenState(void)
+{
+    static RmSeenState st = {};
+    return st;
+}
+
+inline uint32_t rmqTextHash(const char *text) // FNV-1a
+{
+    uint32_t h = 2166136261u;
+    for (; text != nullptr && *text != '\0'; text++)
+        h = (h ^ (uint8_t)*text) * 16777619u;
+    return h;
+}
+
+// true = this (src, id, text) was seen within RM_SEEN_MS; false = new (now remembered). id 0 is "unknown": never a duplicate.
+inline bool rmqSeenBefore(const char *src, uint32_t id, const char *text, uint32_t nowMs)
+{
+    if (src == nullptr || text == nullptr || id == 0)
+        return false;
+    const uint32_t hash = rmqTextHash(text);
+    bool dup = false;
+    RMQ_LOCK();
+    RmSeenState &st = rmqSeenState();
+    for (uint8_t i = 0; i < RM_SEEN_SLOTS && !dup; i++)
+    {
+        RmSeenSlot &e = st.slot[i];
+        uint32_t age = (uint32_t)(nowMs - e.ms);
+        if (age > 0x80000000UL)
+            age = 0; // the other task stamped a moment after this one read the clock
+        if (e.used && e.id == id && e.hash == hash && age < RM_SEEN_MS && strncmp(e.src, src, RM_QUEUE_SRC_LEN - 1) == 0)
+            dup = true;
+    }
+    if (!dup)
+    {
+        RmSeenSlot &e = st.slot[st.next];
+        st.next = (uint8_t)((st.next + 1) % RM_SEEN_SLOTS);
+        e.used = 1;
+        e.id = id;
+        e.ms = nowMs;
+        e.hash = hash;
+        strncpy(e.src, src, RM_QUEUE_SRC_LEN - 1);
+        e.src[RM_QUEUE_SRC_LEN - 1] = '\0';
+    }
+    RMQ_UNLOCK();
+    return dup;
+}
+
 // Test helpers (also fine on firmware).
 inline uint8_t rmQueueCount(void)
 {
@@ -187,6 +259,7 @@ inline void rmQueueReset(void)
     rmqState().count = 0;
     rmqReplyState().head = 0;
     rmqReplyState().count = 0;
+    memset(&rmqSeenState(), 0, sizeof(RmSeenState));
     RMQ_UNLOCK();
 }
 

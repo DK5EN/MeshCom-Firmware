@@ -240,10 +240,14 @@ Both bench nodes (DK5EN-1 Heltec V3, DK5EN-90 RAK4631) as gateways against a moc
 
 Findings:
 
-- **RM-DUP (open):** a server-ingress DM to the own call creates no dedup entry and RM frames carry no `{NNN`, so the
-  RF copy of a rejected frame is counted again. One junk frame costs two strikes; the lock comes after the second
-  junk frame, not the third. Valid frames are not affected. Proposed fix: a small msg-id ring in `rm_rx_gate.h`
-  that drops the second copy of the same frame before `rmCheck`. Not implemented, awaiting decision.
+- **RM-DUP (fixed 2026-10-07):** a server-ingress DM to the own call creates no dedup entry and RM frames carry no
+  `{NNN`, so the RF copy of a rejected frame was counted again. One junk frame cost two strikes; the lock came
+  after the second junk frame, not the third. Valid frames were not affected. Fix: a duplicate ring in
+  `rm_queue.h` (`rmqSeenBefore`: source call, message id and a hash of the text, 8 slots, 60 s) used by
+  `rm_rx_gate.h`; the second copy of the same frame is consumed before the queue. The text hash is part of the key
+  because message ids are predictable: a spoofed frame with the next id must not swallow the real command. Tests:
+  `test_regression_same_rm_frame_twice_is_queued_once_on_both` (red before), five ring and gate cases in
+  `test_remote_cmd`. Not yet benched on hardware.
 - **Bench driver holes:** the Heltec TX backpressure refused the three junk frames and the Heltec plain DM and group
   message in the 1 to 90 direction, so those cases tested nothing (the analyzer shows it). Rerun needed with a
   drained TX ring.

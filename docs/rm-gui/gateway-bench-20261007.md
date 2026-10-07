@@ -256,3 +256,5 @@ Heltec http://192.168.68.71/rmstatus: {"on":1,"pw":1,"ok":19,"rej":18,"lock":0,"
 - Exact accept-to-check interval of the rate rejects: wall clock has 1 s resolution and `[RM]` lines have no millisecond stamp; the `<10 s` follows from the verdict itself.
 - Verdict-to-frame pairing is inferred (see top); `rf:?` marks in the table are copies without any matching verdict line (e.g. case 28).
 - Mock-side behaviour of the real server (the mock gates a frame to every other gateway, including back to the origin of an RF-heard frame) is the mock's, not evidence for production.
+
+Follow-up: finding RM-DUP (dual-path copy counted twice) is fixed in the firmware, see `extended-commands-impl-plan.md` section 10.

@@ -227,7 +227,8 @@ static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8
 static bool rmTryQueue(const struct aprsMessage &aprsmsg, const char *text)
 {
     return rmRxTryQueue(aprsmsg.msg_source_call, text,
-                        rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd));
+                        rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd),
+                        (uint32_t)aprsmsg.msg_id, (uint32_t)millis());
 }
 
 /**

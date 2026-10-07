@@ -2835,6 +2835,38 @@ static void test_regression_server_delivered_rm_command_and_reply_on_both(void)
     rmqReplyWanted() = false;
 }
 
+// RM-DUP (2026-10-07): the same RM command arrives again with the same message id (the RF copy of a frame the
+// server already delivered). It must be consumed and queued ONCE: a wrong tag would otherwise be counted twice
+// (two strikes of the lockout for one frame). A new message id (a fresh send) is queued again.
+static void test_regression_same_rm_frame_twice_is_queued_once_on_both(void)
+{
+    static const char *CMD = "RM1 1791300000 status 0123456789abcdef";
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        rmQueueReset();
+        rmqReplyWanted() = false;
+        meshcom_settings.node_rm = 1;
+        snprintf(meshcom_settings.node_passwd, sizeof(meshcom_settings.node_passwd), "secret");
+        rm_feed(side, CMD, 0x2401 + (uint32_t)side * 16);
+        rm_feed(side, CMD, 0x2401 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)rmQueueCount(), name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), name);
+        rm_feed(side, CMD, 0x2402 + (uint32_t)side * 16); // a new frame with the same text: its own message id
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)rmQueueCount(), name);
+        // same id, other text (a spoofed frame ahead of the real one): both are queued, none swallowed
+        {
+            char ps[RM_QUEUE_SRC_LEN], pt[RM_QUEUE_TEXT_LEN];
+            while (rmQueuePop(ps, sizeof(ps), pt, sizeof(pt))) {}
+        }
+        rm_feed(side, "RM1 1791300001 status 0123456789abcdef", 0x2402 + (uint32_t)side * 16);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)rmQueueCount(), name);
+    }
+    rmQueueReset();
+}
+
 // A foreign sender (an older app) may still append "{NNN": the queued text is the stripped one, the DM is
 // acked exactly once as before, and a second copy with the same NNN is neither queued nor acked again as new.
 // A group text that merely starts with "RM1 " is untouched, and a full queue still consumes the command.
@@ -2968,6 +3000,7 @@ int main(int, char **argv)
 
     RUN_TEST(test_regression_server_delivered_rm_command_and_reply_on_both);
     RUN_TEST(test_regression_server_delivered_rm_command_with_msgno_group_and_full_queue_on_both);
+    RUN_TEST(test_regression_same_rm_frame_twice_is_queued_once_on_both);
     RUN_TEST(test_agreement_rm_command_for_another_node_is_relayed_not_queued_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);

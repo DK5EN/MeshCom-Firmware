@@ -473,7 +473,8 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 if(iAckPos <= 0 && iRefPos <= 0 && bDmDedupNew && !bStoConsumed &&
                    strcmp(destination_call, meshcom_settings.node_call) == 0)
                     bRmConsumed = rmRxTryQueue(aprsmsg.msg_source_call, aprsmsg.msg_payload,
-                                               rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd));
+                                               rmRxEnabled(meshcom_settings.node_rm, meshcom_settings.node_passwd),
+                                               (uint32_t)aprsmsg.msg_id, (uint32_t)millis());
 
                 if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed && !bRmConsumed)
                 {

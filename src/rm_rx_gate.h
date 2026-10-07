@@ -9,6 +9,10 @@
 // node behind a gateway could not be managed at all. A frame that arrives on both paths is harmless: the
 // second copy has the same counter and tag and gets the cached reply (rmCheck, RM_CACHED), nothing runs twice.
 //
+// Since 2026-10-07 (RM-DUP) the second copy of the SAME FRAME (same source, same message id, within 60 s) is
+// (same text too) dropped here, before the queue: it is consumed and nothing else happens. Otherwise a wrong tag arriving
+// on both paths was counted twice and one junk frame cost two strikes of the lockout.
+//
 // Header-only; needs rmIsReply() (remote_cmd.cpp) and the queues of rm_queue.h.
 #ifndef RM_RX_GATE_H
 #define RM_RX_GATE_H
@@ -30,7 +34,8 @@ inline bool rmRxEnabled(int nodeRm, const char *passwd)
 //  - a REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read: never consumed, and
 //    queued for verification only while a command this node sent still waits for its reply
 //  - a COMMAND with RM off or no password is ordinary text
-inline bool rmRxTryQueue(const char *src, const char *text, bool enabled)
+//  - msgId/nowMs: message id of the frame (0 = unknown) and millis(), for the duplicate ring (rm_queue.h)
+inline bool rmRxTryQueue(const char *src, const char *text, bool enabled, uint32_t msgId, uint32_t nowMs)
 {
     if (src == nullptr || text == nullptr || strncmp(text, "RM1 ", 4) != 0)
         return false;
@@ -44,6 +49,9 @@ inline bool rmRxTryQueue(const char *src, const char *text, bool enabled)
 
     if (!enabled)
         return false;
+
+    if (rmqSeenBefore(src, msgId, text, nowMs))
+        return true; // same frame on the other path: already handled
 
     rmQueuePush(src, text);
     return true;

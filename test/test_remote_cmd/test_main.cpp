@@ -18,6 +18,7 @@
 #include <hmac_sha256.h>
 #include <remote_cmd.h>
 #include <rm_queue.h>
+#include <rm_rx_gate.h>
 #include <rm_sender_policy.h>
 
 void setUp(void) {}
@@ -1756,10 +1757,101 @@ static void test_reject_table_odd_sender_strings(void)
     TEST_ASSERT_EQUAL_UINT8(2, used);
 }
 
+// ---- RM-DUP: the duplicate ring and its use in the receive gate --------------------------------------------------
+
+static void test_seen_ring_same_source_and_id_is_a_duplicate_within_the_window(void)
+{
+    rmQueueReset();
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 0xEA25A006u, "a", 1000));
+    TEST_ASSERT_TRUE(rmqSeenBefore("DK5EN-1", 0xEA25A006u, "a", 1000 + 59999));
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-90", 0xEA25A006u, "a", 2000)); // other source, same id
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 0xEA25A007u, "a", 2000));  // same source, other id
+    TEST_ASSERT_FALSE_MESSAGE(rmqSeenBefore("DK5EN-1", 0, "a", 3000), "id 0 is unknown, never a duplicate");
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 0, "a", 3000));
+}
+
+static void test_seen_ring_same_id_with_other_text_is_not_a_duplicate(void)
+{
+    rmQueueReset();
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 5, "RM1 1 status aaaaaaaaaaaaaaaa", 100));
+    TEST_ASSERT_FALSE_MESSAGE(rmqSeenBefore("DK5EN-1", 5, "RM1 2 status bbbbbbbbbbbbbbbb", 101),
+                              "a spoofed frame with the same id must not swallow the real command");
+    TEST_ASSERT_TRUE(rmqSeenBefore("DK5EN-1", 5, "RM1 2 status bbbbbbbbbbbbbbbb", 102));
+}
+
+static void test_seen_ring_clock_read_before_the_other_task_stamped_is_still_a_duplicate(void)
+{
+    rmQueueReset();
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 6, "a", 5000));
+    TEST_ASSERT_TRUE_MESSAGE(rmqSeenBefore("DK5EN-1", 6, "a", 4999), "negative age counts as zero");
+}
+
+static void test_seen_ring_forgets_after_the_window_and_across_the_millis_wrap(void)
+{
+    rmQueueReset();
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 7, "a", 10));
+    TEST_ASSERT_FALSE_MESSAGE(rmqSeenBefore("DK5EN-1", 7, "a", 10 + RM_SEEN_MS), "60 s later the id is new again");
+    rmQueueReset();
+    const uint32_t nearWrap = 0xFFFFFF00u;
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 9, "a", nearWrap));
+    TEST_ASSERT_TRUE_MESSAGE(rmqSeenBefore("DK5EN-1", 9, "a", nearWrap + 1000u), "the clock wrapped, still inside the window");
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 9, "a", nearWrap + RM_SEEN_MS + 5u));
+}
+
+static void test_seen_ring_replaces_the_oldest_slot_and_reset_clears_it(void)
+{
+    rmQueueReset();
+    for (uint32_t i = 1; i <= RM_SEEN_SLOTS; i++)
+        TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", i, "a", 100 + i));
+    TEST_ASSERT_TRUE(rmqSeenBefore("DK5EN-1", RM_SEEN_SLOTS, "a", 200));
+    TEST_ASSERT_FALSE(rmqSeenBefore("DK5EN-1", 100, "a", 300));           // 9th id pushes out id 1
+    TEST_ASSERT_FALSE_MESSAGE(rmqSeenBefore("DK5EN-1", 1, "a", 301), "id 1 was the oldest and is gone");
+    rmQueueReset();
+    TEST_ASSERT_FALSE_MESSAGE(rmqSeenBefore("DK5EN-1", 100, "a", 302), "reset forgets everything");
+}
+
+static void test_gate_second_copy_of_a_command_is_consumed_but_not_queued(void)
+{
+    char src[RM_QUEUE_SRC_LEN], text[RM_QUEUE_TEXT_LEN];
+    const char *cmd = "RM1 1791300000 status 0123456789abcdef";
+    rmQueueReset();
+    TEST_ASSERT_TRUE(rmRxTryQueue("DK5EN-1", cmd, true, 0x91A434FCu, 5000));   // server copy
+    TEST_ASSERT_TRUE_MESSAGE(rmRxTryQueue("DK5EN-1", cmd, true, 0x91A434FCu, 17000), "RF copy is consumed too");
+    TEST_ASSERT_EQUAL_UINT8(1, rmQueueCount());
+    TEST_ASSERT_TRUE(rmQueuePop(src, sizeof(src), text, sizeof(text)));
+    TEST_ASSERT_TRUE(rmRxTryQueue("DK5EN-1", cmd, true, 0x91A434FDu, 18000)); // a fresh send
+    TEST_ASSERT_EQUAL_UINT8(1, rmQueueCount());
+}
+
+static void test_gate_duplicates_do_not_touch_replies_or_disabled_nodes(void)
+{
+    const char *cmd = "RM1 1791300000 status 0123456789abcdef";
+    const char *rep = "RM1 1791300000 ok v=4.40a 0123456789abcdef";
+    rmQueueReset();
+    rmqReplyWanted() = true;
+    TEST_ASSERT_FALSE(rmRxTryQueue("DK5EN-1", rep, true, 77, 1000));
+    TEST_ASSERT_FALSE(rmRxTryQueue("DK5EN-1", rep, true, 77, 1001)); // replies are shown whatever the id
+    TEST_ASSERT_EQUAL_UINT8(2, rmReplyQueueCount());
+    rmQueueReset();
+    rmqReplyWanted() = false;
+    TEST_ASSERT_FALSE(rmRxTryQueue("DK5EN-1", cmd, false, 88, 1000)); // RM off: ordinary text both times
+    TEST_ASSERT_FALSE(rmRxTryQueue("DK5EN-1", cmd, false, 88, 1001));
+    TEST_ASSERT_TRUE(rmRxTryQueue("DK5EN-1", cmd, true, 88, 1002));   // RM switched on: the id was never remembered
+    TEST_ASSERT_EQUAL_UINT8(1, rmQueueCount());
+    rmQueueReset();
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_vectors_commands_reproduced);
+    RUN_TEST(test_seen_ring_same_source_and_id_is_a_duplicate_within_the_window);
+    RUN_TEST(test_seen_ring_same_id_with_other_text_is_not_a_duplicate);
+    RUN_TEST(test_seen_ring_clock_read_before_the_other_task_stamped_is_still_a_duplicate);
+    RUN_TEST(test_seen_ring_forgets_after_the_window_and_across_the_millis_wrap);
+    RUN_TEST(test_seen_ring_replaces_the_oldest_slot_and_reset_clears_it);
+    RUN_TEST(test_gate_second_copy_of_a_command_is_consumed_but_not_queued);
+    RUN_TEST(test_gate_duplicates_do_not_touch_replies_or_disabled_nodes);
     RUN_TEST(test_vectors_replies_reproduced);
     RUN_TEST(test_parse_accepts_wellformed);
     RUN_TEST(test_parse_rejects_malformed);
