@@ -1,6 +1,65 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-05, branch `fork-dev`, last release `v4.40a.10.06` (dated 10-06, published 10-05).
+**Stand:** 2026-10-07, branch `fork-dev` (unpushed: the RM extended-commands campaign, `cb7267bb`..`661aca73`), last release `v4.40a.10.06` (dated 10-06, published 10-05).
+
+## 2026-10-07 -- RM extended commands campaign: where it stands, how to continue
+
+**Done (fork-dev, not pushed, not released):** nine new RM commands (radio, name, atxt, pos, sens, mh, txq, mbox, maxhop)
+with page cards; sender budget 2 / 10 with the proof rule (RM-PROOF); commands accepted over the server path (RM-GWRELAY,
+`rm_rx_gate.h`); reject counter and lockout per sender callsign-SSID, never per path; RAK `radio` unit fix; Remote page
+buttons no longer wrap (`37a464fa`); duplicate ring for the second copy of one frame (RM-DUP, `661aca73`); gateway bench
+toolbox `tools/bench/gwbench/` (`8b24d0ac`). Plan, decisions, both RF bench rounds and the gateway round:
+`docs/rm-gui/extended-commands-impl-plan.md` sections 6, 9, 10; evidence `docs/rm-gui/gateway-bench-20261007.md`.
+Host gate green: 67 envs, 2203 Unity cases, 823 pytest, 240 page checks.
+
+**Gateway bench 2026-10-07 (both bench nodes as gateways against a mock on the rpizero):** the server path works, the
+server copy was first in 40 of 40 commands, nothing ran twice, a command round trip is about 2 s against 10 to 110 s
+over RF alone. Finding RM-DUP (RF copy of a rejected frame counted again) is fixed in `661aca73` but **not yet benched**.
+
+**State of the bench when work stopped:**
+
+- DK5EN-1 Heltec (now `192.168.68.71`, `dk5en-1.local`) and DK5EN-90 RAK (now `192.168.68.73`, no mDNS) run the INSTRUMENT
+  image of `8b24d0ac` WITHOUT the RM-DUP fix; gateway off and confirmed on both, RM on at DK5EN-1 only. Addresses are DHCP
+  and moved overnight once: resolve before every run (`tools/bench/fleet.json` still lists old hosts).
+- The RAK's name and APRS text were cleared again after a driver bug wrote a literal `-` (restore was done by hand).
+- DK5EN-92 T-Beam (`192.168.68.57`) was not part of the gateway round. Bench passwords:
+  `~/MeshCom-bench-backups/bench-node-passwords-20261006.txt`. DK5EN-98 (`192.168.68.62`) is production, never a target.
+- The permission classifier denies OTA flashing of bench nodes ("Production Deploy") and name/text changes; the operator
+  runs those commands with `!` or grants them with `/permissions`.
+
+**Next steps, in this order:**
+
+1. Flash the instrument image of `661aca73` onto both nodes: Heltec
+   `python3 tools/webflash.py --env heltec_wifi_lora_32_V3 --bin .pio/build/heltec_wifi_lora_32_V3/firmware.bin <heltec ip>`,
+   RAK `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e wiscore_rak4631 --target upload --upload-port <usb port>`
+   (rebuild both first with the same flag, no space after `-D`; check `strings firmware.elf | grep -c 'SRVIP\];err'` is 1).
+2. Fix three driver gaps in `tools/bench/gwbench/gwrun.py`: never write back the `-` placeholder of an empty name or text;
+   treat a refused send (TX backpressure `QRT NOT SENT` at the sender, `/rmsend` refusal) as a failed case, not as `sent`;
+   wait for a drained Heltec TX ring before the negative phase.
+3. Rerun `gwrun.py` (README in the toolbox) and check: one junk frame gives rej +1 (not +2), the lock comes at the third,
+   a valid frame while locked gets no reply, the Heltec to RAK plain DM and group message arrive once with ACK.
+4. Open question from the run: the Heltec TX ring waits minutes in gateway mode (mean 203 s, ring full 19/19) while the RAK
+   waits seconds. Find out whether that is the production mesh traffic it relays or a defect before blaming RM.
+5. Put the stock images back on both nodes (build without the instrument flag), then look at the Remote page in a
+   browser: the "Run again" button must stay on one line.
+6. Decisions that stay with the operator: push `fork-dev`, release, upstream PRs (none opened for the RM campaign).
+
+**Hardware needed on the MacBook for that:**
+
+| Item                            | Why                                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- |
+| RAK4631 DK5EN-90 on USB         | serial log with DTR (`/dev/cu.usbmodem1101`), USB upload; also on the wired LAN                 |
+| Heltec V3 DK5EN-1 on power/WiFi | OTA and net console 2323, no USB needed; its GPS stays connected                                |
+| rpizero reachable by ssh        | hosts the mock MeshCom server (`~/gwmock`); a Wi-Fi mock on the Mac was unreachable for the RAK |
+| MacBook on the same LAN         | web API, ssh, loggers; Chrome or Safari for the page check                                      |
+| T-Beam DK5EN-92 (optional)      | RF-only checks and a third callsign for the per-sender lock proof                               |
+| T-Echo, T114                    | not available: stay untested                                                                    |
+
+**Tests still to run:** items 1 to 3 above (RM-DUP on hardware, plain traffic, negative phase over both paths); an RF-only
+smoke of the RM matrix on the stock images after the reflash; the page check; later, when a gateway against the real
+MeshCom server is acceptable, one RM command through the real server (does the server forward DMs without a message
+number? unknown); the forced attempt after a re-key; hostile name/APRS text on a node is not tested by design. Then the full
+`tools/regression.sh --stage all` once before any release.
 
 ## 2026-10-05 -- web GUI for #1187/#1189/#1190, release v4.40a.10.06
 
@@ -67,8 +126,8 @@
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (48 envs, 1698 Unity cases today) plus `test/golden/selftest.sh`.
-- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (553 cases), the
+- Stage 1: every `[env:native*]` (67 envs, 2203 Unity cases on 2026-10-07) plus `test/golden/selftest.sh`.
+- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (823 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
 - Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,
