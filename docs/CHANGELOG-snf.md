@@ -8,7 +8,7 @@ Released as `v4.35t.09.27-neo` together with the neighbour matrix; the personal-
 rework below shipped in `v4.35t.09.28-neo`. Bench state: the store node's basic case (absent
 destination, held DM, `:sto` notice, one-hop delivery, ack back to the sender) passed twice on
 2026-09-26 with a RAK4631 store node and a T-Beam receiver; a 24 h soak of the XOR retry format
-between DK5EN-1 and DK5EN-98 started 2026-09-27 17:39, interim PASS (`docs/soak-xor-20260927.md`).
+between DK5EN-1 and DK5EN-98 started 2026-09-27 17:39, interim PASS (`docs/archive/soak-xor-20260927.md`).
 The rest of the bench plan (`docs/archive/dm-bench-session-plan-20260914.md`) is open, see the coverage
 table at the end of `docs/snf-port-campaign.md`.
 

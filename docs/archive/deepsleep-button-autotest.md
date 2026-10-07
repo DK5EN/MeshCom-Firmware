@@ -1,5 +1,7 @@
 # Automated test for the Heltec V3 long-press deep sleep (DS-03)
 
+> **ARCHIVED 2026-10-07.** implemented as `tools/bench/deepsleep_button.py` (`866e328f`) and run on DK5EN-93. Body unchanged.
+
 Date: 2026-09-13. Status: implemented (`tools/bench/deepsleep_button.py`, commit `866e328f`) and run
 on DK5EN-93 the same day, see "Results" at the end.
 

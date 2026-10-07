@@ -1,5 +1,7 @@
 # Fable verdict: dm-reliability-and-store-node-verdict-20260913.md
 
+> **ARCHIVED 2026-10-07.** store-node advisor verdict, incorporated into `../dm-reliability-and-store-node-verdict-20260913.md`. Body unchanged.
+
 Review of the design document, 2026-09-13. Eight independent finders, every load-bearing claim
 re-verified against the tree at `7427f425` by the orchestrator before it was accepted here.
 Review only; no code touched.

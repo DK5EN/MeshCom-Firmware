@@ -6,7 +6,7 @@ reaches --deepsleep 800 ms into a held button press; the shared sleep
 helpers used to arm the same pin as an ext1 wake source before the press
 was released, so the wake condition was already true at sleep entry and the
 node rebooted at once instead of sleeping. See
-docs/deepsleep-button-autotest.md for the full design.
+docs/archive/deepsleep-button-autotest.md for the full design.
 
 On the Heltec V3 the CP2102 USB bridge wires DTR to GPIO0 (the PRG button),
 so `ser.dtr = True` is an electrically identical button press and

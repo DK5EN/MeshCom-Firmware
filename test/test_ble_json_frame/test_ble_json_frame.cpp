@@ -5,7 +5,7 @@
 // Damit setzt das Dokument die Schreibgrenze, nicht der Puffer: ein Dokument,
 // das laenger ist als bleBuffer[MAX_MSG_LEN_PHONE], schreibt ueber den
 // Stack-Rahmen hinaus. Mit den heutigen 13 Schluesseln liegt der schlechteste
-// Fall bei 284 von 299 Byte (docs/review/2026-08-29-upstream-sync-verdict.md);
+// Fall bei 284 von 299 Byte (docs/archive/2026-08-29-upstream-sync-verdict.md);
 // jeder weitere Schluessel macht den Ueberlauf scharf.
 //
 // Der Test prueft bleJsonFrame() gegen einen Puffer mit Kanarienvogel-Bytes

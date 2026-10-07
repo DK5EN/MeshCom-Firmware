@@ -1,5 +1,7 @@
 # DM stage 2.1 — Fable Verdict (2026-09-14)
 
+> **ARCHIVED 2026-10-07.** stage-2.1 advisor verdict, APPROVED; DM stages 0-4 are in tree. Body unchanged.
+
 Subject: commit `44506d0b` (diff `fe3f0640..44506d0b`) against
 `docs/dm-transport-impl-plan-20260913.md` §2.1 incl. the implementation notes, the §2.2 deferral,
 decision D6 and traps T1/T5/T12 of `docs/dm-reliability-and-store-node-verdict-20260913.md`.

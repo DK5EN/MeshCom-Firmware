@@ -469,7 +469,7 @@ this release, see the release notes.
 
 192. **ACK frames to the phone carry the callsign of the station that
      acknowledged** (stages 1 and 3 of
-     [`docs/ack-implementierungsplan.md`](ack-implementierungsplan.md)). The
+     [`docs/archive/ack-implementierungsplan.md`](archive/ack-implementierungsplan.md)). The
      BLE status frame gains a length byte at byte 6 and up to 10 characters
      `[A-Z0-9-]` after it; when the callsign is unknown the frame is
      byte-identical to before, so the official app is unaffected. Node ACK
@@ -878,7 +878,7 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      landing. Cost: ~16 B additional static RAM on boards with `ENABLE_GPS`, 0 B
      elsewhere. Bench verification (DK5EN-14) is still open — no bench node was
      attached at the time of this entry; see `archive/gps-nmea-impl-plan-20260902.md` and
-     `bug-GPS-uart-overflow-20260901.md`. Field logs from OE5HWN (T-Deck Plus and
+     `archive/bug-GPS-uart-overflow-20260901.md`. Field logs from OE5HWN (T-Deck Plus and
      T-Beam Supreme, one hour each) then showed 2375 evaluations without a single
      corrupt sample, convergence after 88 samples as modelled, and the QNH
      re-latch after a reboot. The same logs exposed a fourth defect on the T-Deck

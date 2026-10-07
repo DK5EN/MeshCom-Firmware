@@ -1,6 +1,6 @@
 # Battery "no cell" detection on switched-divider boards -- campaign 2026-10-01
 
-Source: Finding 1 of `docs/soak-20260929-verdict.md`. A Heltec V3 without a cell reports
+Source: Finding 1 of `docs/archive/soak-20260929-verdict.md`. A Heltec V3 without a cell reports
 `/B=100` again since the divider is switched on for only 100 ms every 30 s (DK5EN-1: 95/104
 beacons, live 4.21-4.68 V). Operator decisions 2026-10-01: measure first, then choose the
 discriminator; a Heltec with a real cell is available for the reference run.

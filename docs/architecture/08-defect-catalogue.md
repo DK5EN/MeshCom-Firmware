@@ -1512,7 +1512,7 @@ Haken (`mcTickKeep`). Tests: `test/test_own_msg_status/`, Twin-Fall
 
 Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
 last merge base (`BACKLOG.md` §3.8g). Findings land here so they are not rediscovered. Full
-evidence per finding: [`docs/review/2026-08-29-upstream-sync-verdict.md`](../review/2026-08-29-upstream-sync-verdict.md).
+evidence per finding: [`docs/archive/2026-08-29-upstream-sync-verdict.md`](../archive/2026-08-29-upstream-sync-verdict.md).
 
 | ID    | Found      | Upstream range       | File:line (upstream/dev)                                      | Finding                                                                                                       | Sev.   | Status                                                                                                                                         |
 | ----- | ---------- | -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |

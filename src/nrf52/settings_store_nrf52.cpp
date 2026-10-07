@@ -26,7 +26,7 @@ namespace
 {
 
 // Worst-case encoded size for the full persist set, string-keyed. The
-// docs/opt07-nrf52-settings-store-sizing-20260912.md figure of 2 937 B (cited
+// docs/archive/opt07-nrf52-settings-store-sizing-20260912.md figure of 2 937 B (cited
 // against a 4096 B cap as "50x margin" in docs/BACKLOG.md OPT-07) is
 // SUPERSEDED: it maximised only the STRING fields and left numerics at their
 // struct defaults. The Fable verdict (docs/w3-settings-verdict.md, Finding 1)

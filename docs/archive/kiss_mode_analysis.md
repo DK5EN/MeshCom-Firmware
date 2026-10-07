@@ -1,5 +1,7 @@
 # KISS/TCP interface for MeshCom — feasibility analysis
 
+> **ARCHIVED 2026-10-07.** historical feasibility notes; the interface shipped, the wire contract is `../kiss_tcp_protocol.md`. Body unchanged.
+
 Status: **historical feasibility notes.** The interface has since shipped
 (`kiss_functions.cpp` + `lib/kiss_ax25/`, ESP32, opt-out `-D DISABLE_KISS_TCP`);
 the wire contract lives in `kiss_tcp_protocol.md`. Some pre-implementation

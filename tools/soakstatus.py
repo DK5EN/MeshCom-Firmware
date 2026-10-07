@@ -65,7 +65,7 @@ from pathlib import Path
 from typing import Any
 
 # --------------------------------------------------------------------------
-# Constants -- fixed soak setup (docs/soak-xor-20260927.md documents these).
+# Constants -- fixed soak setup (docs/archive/soak-xor-20260927.md documents these).
 # --------------------------------------------------------------------------
 
 HOME = Path.home()

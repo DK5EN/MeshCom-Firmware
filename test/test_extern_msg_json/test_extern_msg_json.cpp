@@ -1,9 +1,9 @@
-// Campaign docs/campaign-extudp-hwid.md: EXTUDP "msg" (text) datagram key
+// Campaign docs/archive/campaign-extudp-hwid.md: EXTUDP "msg" (text) datagram key
 // contract (src/extern_msg_json.h). Three new keys -- hw_id, lora_mod,
 // max_hop -- are appended after the pre-existing wire shape; test_golden_*
 // and test_lora_keys_and_order pin the byte-for-byte order, and
 // the two test_worst_case_* cases are the buffer budget check from
-// docs/2026-09-16_firmware-extudp-hw-id-on-text-frames.md section 5 (the
+// docs/archive/2026-09-16_firmware-extudp-hw-id-on-text-frames.md section 5 (the
 // air-side bound is what sizes EXTERN_MSG_JSON_BUF).
 
 #include <unity.h>
@@ -62,7 +62,7 @@ static void test_node_firmware_is_string(void)
     TEST_ASSERT_EQUAL_UINT(43, doc["hw_id"].as<unsigned>());
 }
 
-// Golden "before" datagram (docs/campaign-extudp-hwid.md), captured
+// Golden "before" datagram (docs/archive/campaign-extudp-hwid.md), captured
 // 2026-09-18 on DK5EN-93 before this campaign. The old wire must survive
 // byte-for-byte as a PREFIX; the three new keys are appended, never spliced
 // in, so an old-firmware capture and a new one agree on every byte the old

@@ -2,11 +2,11 @@
 
 Review, 2026-09-13. Reviews `docs/archive/MeshCom-Store-Node-Concept-20260911.md` and the four changes
 proposed in session, against `docs/archive/proposal-dm-transport-reliability-20260909.md`,
-`docs/archive/concept-dm-store-and-forward.md`, `docs/review/advisor-dm-store-and-forward-20260830.md`
+`docs/archive/concept-dm-store-and-forward.md`, `docs/archive/advisor-dm-store-and-forward-20260830.md`
 and the firmware as of `7427f425`. Nothing in code.
 
 Reviewed by eight independent finders with adversarial verification; findings and refuted claims
-in `docs/review/fable-dm-store-node-verdict-20260913.md`. This document incorporates them.
+in `docs/archive/fable-dm-store-node-verdict-20260913.md`. This document incorporates them.
 
 ## 1. Bottom line
 
@@ -488,7 +488,7 @@ model is **rejected** (D7); the evidence gate is **left out** — the ladder rat
 - The same proposal's §5 S2 schedule ("at most 6 blind re-floods per DM per day") contradicts its
   own ladder ("+2, +10, +30, +60 min, then hourly"). Both are superseded by D1, but the
   inconsistency should be fixed if that document is kept.
-- `docs/review/advisor-dm-store-and-forward-20260830.md` M5: the nRF52 ACK path does **not** run in
+- `docs/archive/advisor-dm-store-and-forward-20260830.md` M5: the nRF52 ACK path does **not** run in
   the FreeRTOS timer-service task. See T4. The flash finding in M5 stands; the stack-overflow
   hazard does not.
 - `docs/archive/MeshCom-Store-Node-Concept-20260911.md` §3.6 "no custody acknowledgement" is stated as a

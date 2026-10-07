@@ -1,5 +1,7 @@
 # Upstream sync 2026-08-29 — Fable Verdict
 
+> **ARCHIVED 2026-10-07.** finding fixed 2026-08-29 (delay(40) pair removed). Body unchanged.
+
 Scope: `git diff fc83554e upstream/dev` (upstream `dev` `2cb6bb4d`, PRs #1104-#1112; net 5 files,
 +18/-43). Six finders (correctness, memory safety, timing, altitude, protocol, test coverage),
 every load-bearing claim verified against the `upstream/dev` tree by the orchestrator. Review only;

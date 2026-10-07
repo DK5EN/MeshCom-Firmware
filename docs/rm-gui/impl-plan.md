@@ -1,6 +1,6 @@
 # RM web GUI - implementation plan and campaign state
 
-Source: fable-review of the concept, 2026-10-05. Verdicts in this directory (`rm-gui-verdict.md`
+Source: fable-review of the concept, 2026-10-05. Verdicts in this directory (`../archive/rm-gui-verdict.md`
 first, then `verdict-*.md`; the page wire-sketch is in `verdict-ux.md`). Decisions by the user
 (2026-10-05): saved passwords live in **firmware slots**; the **/setparam CSRF fix** is in scope;
 bench nodes DK5EN-1 (Heltec V3, 192.168.68.71) and DK5EN-92 (T-Beam, 192.168.68.75) may be flashed.

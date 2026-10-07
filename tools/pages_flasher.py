@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate and publish the MeshCom web flasher for GitHub Pages.
 
-Design and rationale: docs/meshcom-web-flasher-plan.md
+Design and rationale: docs/archive/meshcom-web-flasher-plan.md
 
 The generator never carries a hand-maintained list of flash offsets or chip
 families. Both are derived from the tree:

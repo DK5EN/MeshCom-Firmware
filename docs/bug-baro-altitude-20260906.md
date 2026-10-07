@@ -17,7 +17,7 @@ BME280 + L76K GPS, indoors, stationary throughout).
 **Branch:** `fork-main`, working tree at `f3d07372` plus the uncommitted CTY-02 revert of
 2026-09-06 (upstream issue #1133 refuted) · **Upstream merge-base:** `4e649eae`
 **Destination:** fork-only for now. Not proposed upstream until bench-proven here.
-**Related:** [`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md) (GPS-01..04,
+**Related:** [`archive/bug-GPS-uart-overflow-20260901.md`](archive/bug-GPS-uart-overflow-20260901.md) (GPS-01..04,
 the filter this run stresses), BACKLOG §3.8 rows `GPS-05b`, `GPS-07`, `GPS-08`, `GPS-09`.
 
 > **Scope note for the implementer.** Every file:line below was read against the tree with the

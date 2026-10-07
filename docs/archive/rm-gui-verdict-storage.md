@@ -1,5 +1,7 @@
 # Verdict: STORAGE / PLATFORM cluster (verifier, fork-dev 02314ce2)
 
+> **ARCHIVED 2026-10-07.** closed verdict of the shipped RM GUI campaign, folded into `../rm-gui/impl-plan.md`. Body unchanged.
+
 Read now: src/counters_store.h, src/nrf52/nrf52_flash.cpp, src/nrf52/settings_store_nrf52.cpp,
 src/esp32/esp32_flash.cpp, src/main.cpp, src/esp32/esp32_main.cpp, src/nrf52/nrf52_main.cpp,
 src/web_functions/web_functions.cpp, web_commonServer.h, Adafruit core InternalFileSystem.cpp +

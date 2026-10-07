@@ -1,5 +1,7 @@
 # Firmware handover: `hw_id` (and `lora_mod`, `max_hop`) on Extern-UDP text frames
 
+> **ARCHIVED 2026-10-07.** handover executed: `src/extern_msg_json.h` with native test, shipped as `6cdfe4f0` (changelog item 225). Body unchanged.
+
 Written 2026-09-16 for a coding agent working in
 `/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main` (fork-main, last commit `2399e998` at
 the time of writing). Nothing here is implemented yet. Downstream context: MCProxy

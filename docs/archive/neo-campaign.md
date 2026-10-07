@@ -1,5 +1,7 @@
 # The neo campaign: two fork branches, one upstream branch
 
+> **ARCHIVED 2026-10-07.** the neo line was retired 2026-10-02 (tag `archive/fork-neo-test-20261002`); its open points are moot. Body unchanged.
+
 Written 2026-09-19. Living document -- update it after every stage, not at the
 end. The wave plan survives a context loss only if it is on disk.
 

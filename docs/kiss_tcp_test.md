@@ -1,6 +1,6 @@
 # KISS/TCP interface (ESP32) — usage & test guide
 
-Implementation of Variant C from `docs/kiss_mode_analysis.md`. ESP32 only,
+Implementation of Variant C from `docs/archive/kiss_mode_analysis.md`. ESP32 only,
 compiled in by default (opt-out `-D DISABLE_KISS_TCP`, set per-variant for a
 DRAM-tight board — e.g. `E22_XML-DevKitC`, see Limitations).
 

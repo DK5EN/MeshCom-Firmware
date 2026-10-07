@@ -1,5 +1,7 @@
 # Verdict: PROTOCOL / COUNTER / LOCKOUT / FEEDBACK cluster
 
+> **ARCHIVED 2026-10-07.** closed verdict of the shipped RM GUI campaign, folded into `../rm-gui/impl-plan.md`. Body unchanged.
+
 Repo fork-dev 02314ce2, read now. R = src/rm_runtime.cpp, C = src/remote_cmd.cpp, H = src/remote_cmd.h,
 W = src/web_functions/web_functions.cpp, L = src/lora_functions.cpp, CF = src/command_functions.cpp,
 ADR = docs/adr-remote-hmac.md.

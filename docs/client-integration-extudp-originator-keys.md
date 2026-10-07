@@ -2,7 +2,7 @@
 
 For MCProxy, mc-chat and anyone consuming the node's Extern-UDP JSON (port 1799). Firmware
 state: fork-main `6cdfe4f0` (2026-09-18), changelog item 225. Handover with the analysis:
-`docs/2026-09-16_firmware-extudp-hw-id-on-text-frames.md`.
+`docs/archive/2026-09-16_firmware-extudp-hw-id-on-text-frames.md`.
 
 ## 1. What changed on the wire
 

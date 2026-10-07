@@ -371,7 +371,7 @@ Server als getrennte Nachrichten sehen.
 **Auch in diesem Schnitt:** die Soak-Werkzeuge `tools/bench/soak_dm.py` (Test-DMs zwischen zwei
 eigenen Knoten ueber deren Webserver, nie `*` oder eine Gruppe) und `tools/soakstatus.py`
 (Auswertung eines Mitschnittfensters: Neustarts, Heap-Drift, DM-Zaehler, Wiederholungsmarker,
-Quittungszeit je Test-DM, NBR-Konsistenz). Protokoll: `docs/soak-xor-20260927.md`. Dazu eine
+Quittungszeit je Test-DM, NBR-Konsistenz). Protokoll: `docs/archive/soak-xor-20260927.md`. Dazu eine
 Luecke aus der Ausgangskorb-Entfernung geschlossen: `native_udp_frame_twin` verlor seine
 Attrappe fuer den neuen Server-ACK-Ring-Stopp und liess sich zeitweise nicht mehr linken; jetzt
 mit passender Attrappe und einem Test fuer den eigenen-DM-Server-ACK-Zweig.

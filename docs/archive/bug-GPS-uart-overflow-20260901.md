@@ -1,5 +1,7 @@
 # GPS-01..04 — the NMEA link is structurally lossy, and nothing downstream checks the result
 
+> **ARCHIVED 2026-10-07.** GPS-01..04/06 closed 2026-09-03 (see status box above), upstream PR #1125. Body unchanged.
+
 > **Status 2026-09-11: CLOSED.** The "not yet fixed" line below is the original 2026-09-01 state and
 > is kept for the record. `GPS-01`..`GPS-04` and `GPS-06` were implemented 2026-09-02
 > ([`archive/gps-nmea-impl-plan-20260902.md`](archive/gps-nmea-impl-plan-20260902.md)), went upstream in PR **#1125**, and were closed

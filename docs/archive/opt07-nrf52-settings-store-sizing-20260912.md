@@ -1,5 +1,7 @@
 # nRF52 keyed settings store: sizing before `W3` builds it (`OPT-07`)
 
+> **ARCHIVED 2026-10-07.** measurement closed OPT-07; the string-keyed store is built (`src/nrf52/settings_store_nrf52.cpp`). Body unchanged.
+
 Date: 2026-09-12. Branch `dry-unification`, measured in the working tree (no source changes).
 Answers the open question in `docs/BACKLOG.md` `D1-04` ("Nobody has measured the nRF52 cost") and
 closes `OPT-07`.

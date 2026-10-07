@@ -1,5 +1,7 @@
 # Test-Suite Audit — Fable Verdict (2026-08-22)
 
+> **ARCHIVED 2026-10-07.** status RESOLVED 2026-08-22, both fix waves implemented. Body unchanged.
+
 Scope: all native Unity suites, `test/support/` shims, `tools/mock/` tests.
 Six finder angles (cannot-fail, shim fidelity, golden fence, isolation,
 mock circularity, coverage lies), every load-bearing claim adversarially

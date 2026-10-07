@@ -5,7 +5,7 @@
 # throws the branch away and rebuilds it from upstream/dev by projecting the
 # chapter path lists next to this file, then applying tools/neo_strip.py inside
 # the core commit. NEVER commit to fork-neo: the next run of this script will
-# drop it without warning. See docs/neo-campaign.md section 8, model D.
+# drop it without warning. See docs/archive/neo-campaign.md section 8, model D.
 #
 #   tools/neo/derive.sh [SRC] [TARGET] [BASE]
 #

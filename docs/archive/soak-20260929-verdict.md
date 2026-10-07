@@ -1,5 +1,7 @@
 # Soak 2026-09-29 .. 10-01 (DK5EN-98, DK5EN-1, DK5EN-90) -- Verdict
 
+> **ARCHIVED 2026-10-07.** finding 1 fixed as BAT-03 (`5c3a932d`); findings 2 and 3 are by design or logging only. Body unchanged.
+
 Evaluated 2026-10-01. Review only: nothing in `src/` was changed. Method: one metric sweep over
 all three captures (scratch script, `[LOG] STAT`, `[MC-DBG]`, `[NBR]` lines), the host tools
 `tools/nbrhopcheck.py` and `tools/nbrrelay.py`, a comparison against the 09-27/28 captures of

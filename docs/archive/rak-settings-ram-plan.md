@@ -1,5 +1,7 @@
 # RAK4631: six settings copies in RAM -> three
 
+> **ARCHIVED 2026-10-07.** all waves done; RAK settings 6 -> 3 copies shipped (`dbc57632`). Body unchanged.
+
 Campaign doc and resume point. Branch `fork-neo-test`, base `af33af8b`
 (v4.35u.09.28-neo). Source figures: `docs/meshcom-speicherkarte.html` (RAM),
 `docs/meshcom-flashkarte.html` (flash).

@@ -1,5 +1,7 @@
 # Review-Archiv: ADR 02 Rev. 3 (NC-Importance-Backoff)
 
+> **ARCHIVED 2026-10-07.** closed 2026-08-22, advisor re-verdict APPROVED, 0 blocking (see README). Body unchanged.
+
 > **Status: ABGESCHLOSSEN 2026-08-22.** Alle Befunde dieses Reviews sind in
 > `docs/adr-nc-importance-backoff.md` Rev. 3 eingearbeitet (Commit `ab0160a5`),
 > Advisor-Re-Verdict: APPROVED, 0 verbleibende Blocking-Defekte. Dieses

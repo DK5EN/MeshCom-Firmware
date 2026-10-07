@@ -1,5 +1,7 @@
 # RM web GUI concept - Fable verdict
 
+> **ARCHIVED 2026-10-07.** closed verdict of the shipped RM GUI campaign, folded into `../rm-gui/impl-plan.md`. Body unchanged.
+
 Review of the concept (not code). 6 finders (about 70 candidates), 5 Opus verifiers. Detail per
 cluster: `verdict-ux.md` (contains the page wire-sketch), `verdict-security.md`,
 `verdict-protocol.md`, `verdict-storage.md`, `verdict-webtests.md`.

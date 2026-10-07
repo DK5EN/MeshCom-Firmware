@@ -927,7 +927,7 @@ static void test_unchanged_legacy_blob_does_not_override_keyed_store(void)
 // schema at all: settings_schema.h's own "nicht im Flash" fields). The
 // buffer's ~700 B of headroom over that measured worst case (on top of the
 // ~1.4x margin already recorded in
-// docs/opt07-nrf52-settings-store-sizing-20260912.md) is exactly why: this
+// docs/archive/opt07-nrf52-settings-store-sizing-20260912.md) is exactly why: this
 // branch is deliberately unreachable through any value the current schema
 // can legally hold. Exercising it would need either a mock encode() (which
 // would stop testing the real save path) or shrinking the real

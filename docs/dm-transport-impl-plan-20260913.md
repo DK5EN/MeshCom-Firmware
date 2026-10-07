@@ -2,7 +2,7 @@
 
 Plan, 2026-09-13. Derived from `docs/dm-reliability-and-store-node-verdict-20260913.md` (design and
 traps), `docs/archive/MeshCom-Store-Node-Concept-20260911.md` (the role) and
-`docs/review/fable-dm-store-node-verdict-20260913.md` (review findings). Nothing in code yet.
+`docs/archive/fable-dm-store-node-verdict-20260913.md` (review findings). Nothing in code yet.
 
 ## Stage status log
 
@@ -176,7 +176,7 @@ Deviations from the text above, decided at the wave gate:
   `src/instrument.cpp` behind `INSTRUMENT_ENABLED`, and the give-up status is `ACK_STATUS_FAILED`
   (`0x03`) in `src/ack_attribution.h`; the web GUI renders it as a ballot X.
 - Release-image string scan: `AIRGAP` count 0 on the non-instrument Heltec V3 image.
-- **Advisor rework (docs/review/fable-dm-stage0-verdict-20260913.md, same day):** the airgap
+- **Advisor rework (docs/archive/fable-dm-stage0-verdict-20260913.md, same day):** the airgap
   RX hook now sits after the platform RX plumbing and tears receive state down like the
   `handleACK()` return path (F1, nRF52 stayed TX-mute otherwise); the re-ACK branch excludes
   `{ping}`/`{pong}` (F2) and treats server-injected frames like the original ACK path (F7);

@@ -1,5 +1,7 @@
 # MeshCom Web Flasher on GitHub Pages: Design and Implementation Plan
 
+> **ARCHIVED 2026-10-07.** implemented 2026-09-21 (section 12), web flasher live on gh-pages, `tools/pages_flasher.py`. Body unchanged.
+
 Date: 2026-09-18
 Status: implemented 2026-09-21 on `fork-neo-test` (waves 1a, 1b, 3). Bench flashes (wave 2)
 and the `partitions-16MB.bin` release asset are still open -- see section 12.

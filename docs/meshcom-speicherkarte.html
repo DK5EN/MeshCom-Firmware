@@ -256,7 +256,7 @@ footer{border-top:1px solid var(--rule);margin-top:56px;padding-top:18px;
        weniger RAM, nicht die zuvor angenommenen rund 8 kB &ndash; und das Staging-Abbild ist
        ohnehin toter Code: die Charakteristik 0xF0A0 verlangt mit <code>setFixedLen(2001)</code>
        eine feste Länge, die das S140-Limit <code>BLE_GATTS_FIX_ATTR_LEN_MAX</code> (510 B)
-       überschreitet, und wird nie angelegt (<code>docs/rak-settings-ram-plan.md</code>, Befund 5,
+       überschreitet, und wird nie angelegt (<code>docs/archive/rak-settings-ram-plan.md</code>, Befund 5,
        Bench RAK-90). <code>settings_rx_callback()</code> läuft deshalb nie; nur
        <code>bleSettingsToV1()</code>/<code>bleSettingsFromV1()</code> werden noch für die
        Flash-Migration gebraucht.</p>

@@ -1,5 +1,7 @@
 # ACK mit Absender: Implementierungsplan Firmware
 
+> **ARCHIVED 2026-10-07.** plan executed: `src/ack_attribution.h`, commit `d46e2904` (ACK origin); wire format stays in `../ack-wer-hat-quittiert.md`. Body unchanged.
+
 Stand 2026-09-05, Codebasis fork-main (`d62e1a69`). Setzt `docs/ack-wer-hat-quittiert.md` um
 (Stand mit den drei normativen Entscheidungen vom 2026-09-05). Noch kein Code.
 

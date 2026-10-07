@@ -1,7 +1,7 @@
 # tools/neo
 
 `fork-neo` is a function of `fork-neo-test`, not a branch anyone works on. These
-files are that function. Background: `docs/neo-campaign.md`, section 8 (model D)
+files are that function. Background: `docs/archive/neo-campaign.md`, section 8 (model D)
 and section 4 (projection, not rebase).
 
 | File              | What it does                                                                   |

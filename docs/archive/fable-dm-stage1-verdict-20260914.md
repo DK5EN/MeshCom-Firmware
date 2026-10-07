@@ -1,5 +1,7 @@
 # DM stage 1 — Fable Verdict (2026-09-14)
 
+> **ARCHIVED 2026-10-07.** stage-1 advisor verdict, APPROVED after rework; DM stages 0-4 are in tree. Body unchanged.
+
 Subject: commit `731e0ebc` (wave S1-1), diff `86974a8e..731e0ebc`. Spec: `docs/archive/dm-stage1-plan-20260914.md`
 sections 1-5, 8 and the S1-1 notes; traps T1/T2/T2b/T11 in
 `docs/dm-reliability-and-store-node-verdict-20260913.md`. Native: `pio test -e native -f test_dm_outbox

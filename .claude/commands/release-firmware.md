@@ -313,7 +313,7 @@ The browser flasher at https://dk5en.github.io/MeshCom-Firmware/flash/ is the
 only path that writes bootloader, partition table and the safeboot factory
 partition; the firmware's own OTA writes `ota_0` alone. It is therefore the
 delivery route for any release that moves the partition layout or ships a new
-safeboot image. Design: `docs/meshcom-web-flasher-plan.md`.
+safeboot image. Design: `docs/archive/meshcom-web-flasher-plan.md`.
 
 Runs against the same `.pio/build` tree step 3 produced, so it goes after
 step 5 and before the GitHub release:

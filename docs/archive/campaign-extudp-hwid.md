@@ -1,5 +1,7 @@
 # Campaign: hw_id / lora_mod / max_hop on Extern-UDP frames
 
+> **ARCHIVED 2026-10-07.** campaign shipped as `6cdfe4f0`; client contract stays in `../client-integration-extudp-originator-keys.md`. Body unchanged.
+
 Resume point for the wave campaign started 2026-09-18. Handover:
 `docs/2026-09-16_firmware-extudp-hw-id-on-text-frames.md`. Branch `fork-main`, base
 `0138eaeb` (upstream/dev merged, ini-only delta).

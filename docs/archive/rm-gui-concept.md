@@ -1,5 +1,7 @@
 # Concept under review: web GUI for RM (remote management) -- MeshCom firmware, repo /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main (fork-dev)
 
+> **ARCHIVED 2026-10-07.** concept superseded by `../rm-gui/impl-plan.md`; RM GUI W0-W3 done and benched 2026-10-06. Body unchanged.
+
 USER REQUIREMENT (verbatim intent): a comfortable GUI that enables remote management with ease.
 Console `--` commands are NOT an option, because somebody would have to remember them. Humans are
 visual and button oriented: they need a supporting GUI, "like a McDonald's menu" (pick from pictured

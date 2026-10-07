@@ -1,5 +1,7 @@
 # Adversarial review: concept-dm-store-and-forward.md
 
+> **ARCHIVED 2026-10-07.** advisor review of the first concept, superseded by `../dm-reliability-and-store-node-verdict-20260913.md` and the shipped S&F. Body unchanged.
+
 Reviewer: independent design advisor. All file:line references personally read on
 branch `tdeck-partial-refresh-trace` (2026-08-30).
 
