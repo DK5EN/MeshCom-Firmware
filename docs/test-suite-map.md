@@ -10,7 +10,7 @@ on every run and those win over anything written here.
 
 ### Unity suites under `test/` (host, `pio test -e native*`)
 
-115 suites with tests, 1877 `RUN_TEST` cases, 60 native environments. Five
+124 suites with tests, 2031 `RUN_TEST` cases, 67 native environments. Five
 suites run in two or three environments (size or platform variants), which is
 why the gate reports more cases than the table sums to.
 
@@ -75,17 +75,17 @@ old header said 96 suites / 1563 cases, while the table below already listed
 
 ### Everything else
 
-| Category                                                                                            | Size                                                            | Runs in                                                            |
-| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Golden lints (static gates on `src/`, e.g. toggle table, help parity, settings schema, variant ini) | 17 lint scripts, 115 self-test checks                           | `test/golden/selftest.sh` (stage 1)                                |
-| Mock server suite (UDP 1990 protocol)                                                               | 115 unittest cases in `tools/mock`                              | `selftest.sh` and the stage 2 pytest                               |
-| Bench tool suites (parsers and logic of the bench scripts)                                          | 267 pytest cases in `tools/bench/test_*.py`, plus `tools/bench/gwbench/test_gwbench.py` (gateway bench toolbox, offline)                     | stage 2                                                            |
-| Pages/flasher                                                                                       | 28 pytest + 17 node cases                                       | stage 2, release step 5                                            |
-| Web GUI JS                                                                                          | 7 node cases (charsleft), `safeboot_page_test.js` (jsdom, disk) | stage 2; `webgui_badge_test.js` needs a live node and is not gated |
-| NBR log tools                                                                                       | 6 PEP-723 scripts in `test/test_nbrlog`                         | stage 2                                                            |
-| Tool self-tests (`--self-test`)                                                                     | 36 scripts; 32 inside `selftest.sh`, 4 in stage 2               | stages 1 and 2                                                     |
-| Hardware bench regressions                                                                          | harnesses per board, OTA (TM-40/49), EXTUDP (TM-43), DS-03      | stage 3 (`tools/bench/bench_suite.py`)                             |
-| Soak and field runs (24 h+ captures, `soakstatus.py`)                                               | no counter                                                      | manual, see `docs/automation-runner-runbook.md`                    |
+| Category                                                                                            | Size                                                                                                                     | Runs in                                                            |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Golden lints (static gates on `src/`, e.g. toggle table, help parity, settings schema, variant ini) | 17 lint scripts, 115 self-test checks                                                                                    | `test/golden/selftest.sh` (stage 1)                                |
+| Mock server suite (UDP 1990 protocol)                                                               | 115 unittest cases in `tools/mock`                                                                                       | `selftest.sh` and the stage 2 pytest                               |
+| Bench tool suites (parsers and logic of the bench scripts)                                          | 267 pytest cases in `tools/bench/test_*.py`, plus `tools/bench/gwbench/test_gwbench.py` (gateway bench toolbox, offline) | stage 2                                                            |
+| Pages/flasher                                                                                       | 28 pytest + 17 node cases                                                                                                | stage 2, release step 5                                            |
+| Web GUI JS                                                                                          | 7 node cases (charsleft), `safeboot_page_test.js` (jsdom, disk)                                                          | stage 2; `webgui_badge_test.js` needs a live node and is not gated |
+| NBR log tools                                                                                       | 6 PEP-723 scripts in `test/test_nbrlog`                                                                                  | stage 2                                                            |
+| Tool self-tests (`--self-test`)                                                                     | 36 scripts; 32 inside `selftest.sh`, 4 in stage 2                                                                        | stages 1 and 2                                                     |
+| Hardware bench regressions                                                                          | harnesses per board, OTA (TM-40/49), EXTUDP (TM-43), DS-03                                                               | stage 3 (`tools/bench/bench_suite.py`)                             |
+| Soak and field runs (24 h+ captures, `soakstatus.py`)                                               | no counter                                                                                                               | manual, see `docs/automation-runner-runbook.md`                    |
 
 ## 2. Gates
 
@@ -191,6 +191,7 @@ flashes whatever is attached.
 | test_gateway_service_twin    | Twin          |    12 | native_gateway_twin                                          |
 | test_getextern               | Unit          |    32 | native_extern                                                |
 | test_gps_filter              | Regression    |    17 | native                                                       |
+| test_gw_link_status          | Unit          |    16 | native                                                       |
 | test_gwflood_frames          | Contract      |     6 | native_aprs                                                  |
 | test_hey_policy              | Unit          |     7 | native                                                       |
 | test_hey_report              | Unit          |     8 | native_aprs                                                  |
@@ -256,7 +257,7 @@ flashes whatever is attached.
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
 | test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
 | test_tz_rule                 | Unit          |    11 | native_tz_rule                                               |
-| test_udp_frame_twin          | Twin          |    37 | native_udp_frame_twin                                        |
+| test_udp_frame_twin          | Twin          |    42 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |
 | test_url_decode              | Regression    |    14 | native                                                       |

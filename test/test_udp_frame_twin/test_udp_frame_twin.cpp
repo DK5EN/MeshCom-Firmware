@@ -69,6 +69,7 @@
 #include <reack_limiter.h>   // 0.2 hookup under test: reackLimiterReset()
 #include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
+#include <gw_link_status.h>  // GW-LINK hookup under test: gwLinkNoteRx() on server frames only
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 #include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
 #include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
@@ -1058,6 +1059,53 @@ static void test_agreement_live_traffic_clears_the_heartbeat_warn_latch(void)
                      "bis die handelnde Stufe den Latch faellt",
                      names[k], side ? "nrf52" : "esp32");
             TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged, msg);
+        }
+    }
+}
+
+// GW-LINK: the web/--info "Server:" line counts only real server frames as an
+// answer. BEAT and CONF must stamp gwLinkNoteRx() on both platforms; the
+// OTHER branch (no indicator, any LAN sender can hit it) must not.
+static void test_agreement_server_frames_stamp_gw_link_other_does_not(void)
+{
+    uint8_t beat_tmpl[BUF_CAP];
+    memset(beat_tmpl, 0, sizeof(beat_tmpl));
+    uint16_t beat_len = build_beat_datagram(beat_tmpl);
+
+    uint8_t conf_tmpl[BUF_CAP];
+    memset(conf_tmpl, 0, sizeof(conf_tmpl));
+    uint16_t conf_len = build_conf_datagram(conf_tmpl, "DK5EN-9");
+
+    uint8_t other_tmpl[BUF_CAP];
+    memset(other_tmpl, 0, sizeof(other_tmpl));
+    memcpy(other_tmpl, "ZZZZ", 4);
+    memset(other_tmpl + 4, 0xAB, 8);
+    uint16_t other_len = 12;
+
+    const uint8_t *tmpls[3] = { beat_tmpl, conf_tmpl, other_tmpl };
+    const uint16_t lens[3]  = { beat_len,  conf_len,  other_len };
+    const char *names[3]    = { "BEAT",    "CONF",    "OTHER"   };
+    const bool stamps[3]    = { true,      true,      false     };
+
+    for (int k = 0; k < 3; k++)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            recorder_reset();
+            gwLinkSetDest("hamnet", "44.143.8.143");   // forgets any earlier rx
+
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpls[k], lens[k]);
+            if (side) handleUdpFrame_nrf52(buf, lens[k], IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, lens[k], IPAddress(1, 2, 3, 4));
+
+            char line[96];
+            gwLinkFormat(line, sizeof(line), true, true, millis());
+            const char *want = stamps[k] ? "Hamnet 44.143.8.143, connected (last rx 0 s)"
+                                         : "Hamnet 44.143.8.143, no response yet";
+            char msg[96];
+            snprintf(msg, sizeof(msg), "GW-LINK: %s on %s", names[k], side ? "nrf52" : "esp32");
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(want, line, msg);
         }
     }
 }
@@ -2962,6 +3010,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);
+    RUN_TEST(test_agreement_server_frames_stamp_gw_link_other_does_not);
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
     RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);
     RUN_TEST(test_regression_zero_scan_oob_byte_flips_verdict_before_fix);

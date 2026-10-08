@@ -27,6 +27,7 @@
 #include "conf_frame.h"
 #include "setlog_lines.h"
 #include "wifi_start_gate.h"
+#include "gw_link_status.h"
 
 #if defined(ENABLE_MSGSTORE)
 #include "stor_announce.h"   // SNF-GW W3: STOR announce of the mailbox calls
@@ -588,6 +589,8 @@ void wifiDnsPoll()
       printfdeb("[WIFI]...BENCH srvip override -> %s\n", node_hostip.toString().c_str());
     }
     s_node_hostip = node_hostip.toString();
+    if(bench_srvip != IPAddress(0,0,0,0))
+      gwLinkSetDest("bench", s_node_hostip.c_str());   // GW-LINK: show the mock, as nRF52 does (nrf_eth.cpp startUDP)
     Serial.printf("[WIFI];dns;%s;ip;%s;ms;%lu\n", s_dnsSrv.name, s_node_hostip.c_str(), (unsigned long)(millis() - s_dnsSrv.t0));
     if((uint32_t)node_hostip != 0 && hasIPaddress)
       sendMeshComHeartbeat();     // gateway activity (KEEP)
@@ -1188,6 +1191,7 @@ void startMeshComUDP()
       // host is not chosen yet, so there is nothing to log.
       Serial.printf("[GW];srv;%.2s;host;%s;path;%s;ms;%lu\n",
                      meshcom_settings.node_gwsrv, srv_host, srv_path, (unsigned long)millis());
+      gwLinkSetDest(srv_path, srv_host);
 
       wifiDnsStart(&s_dnsSrv, srv_host);
       if(ntp_host != NULL)

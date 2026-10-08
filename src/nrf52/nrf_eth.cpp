@@ -27,6 +27,7 @@
 #include "regex_functions.h"
 #include "conf_frame.h"
 #include "setlog_lines.h"
+#include "gw_link_status.h"
 
 EthernetUDP Udp;
 
@@ -905,6 +906,7 @@ void NrfETH::startUDP()
     // for IT/DL and only falls back to a literal for the else-case).
     Serial.printf("[GW];srv;%.2s;host;%s;path;%s;ms;%lu\n",
                    meshcom_settings.node_gwsrv, s_node_hostip.c_str(), srv_path, (unsigned long)millis());
+    gwLinkSetDest(srv_path, sn);   // sn = dotted-quad of udp_dest_addr, same host as the line above
 
     Udp.begin(LOCAL_PORT); // Start UDP.
 
@@ -972,6 +974,8 @@ void NrfETH::startFIXUDP()
   snprintf(sn, sizeof(sn), "%s", meshcom_settings.node_ownip);
   s_node_ip=sn;
 
+  const char *srv_path = "inet";   // for gwLinkSetDest(): same values as the TM-39 [GW];srv path
+
   if (memcmp(meshcom_settings.node_ip, "44", 2) == 0 || meshcom_settings.node_hamnet_only)
   {
     if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
@@ -980,6 +984,7 @@ void NrfETH::startFIXUDP()
         printlndeb("[UDP-DEST] Setting I-NET UDP-DEST 145.239.75.155");
         
       udp_dest_addr = IPAddress(145, 239, 75, 155);
+      srv_path = "inet";
 
       timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
     }
@@ -990,6 +995,7 @@ void NrfETH::startFIXUDP()
         printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
 
       udp_dest_addr = IPAddress(44, 148, 230, 197);
+      srv_path = "hamnet";
     
       // same DL HAMNET NTP as startUDP() (upstream f860e934 changed only startUDP())
       timeClient.setPoolServerIP(IPAddress(44, 148, 224, 123));
@@ -1000,6 +1006,7 @@ void NrfETH::startFIXUDP()
         printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.143.8.143");
 
       udp_dest_addr = IPAddress(44, 143, 8, 143);
+      srv_path = "hamnet";
     
       //DEBUG_MSG("NTP", "Setting Hamnet NTP");
       timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
@@ -1041,6 +1048,7 @@ void NrfETH::startFIXUDP()
 
   snprintf(sn, sizeof(sn), "%i.%i.%i.%i", udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3]);
   s_node_hostip = sn;
+  gwLinkSetDest(srv_path, sn);
 
   Udp.begin(LOCAL_PORT); // Start UDP.
 

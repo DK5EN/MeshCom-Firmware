@@ -2370,7 +2370,8 @@
    "+<dm_dedup.cpp>",
    "+<msgstore.cpp>",
    "+<sto_notice.cpp>",
-   "+<own_msg_status.cpp>"
+   "+<own_msg_status.cpp>",
+   "+<gw_link_status.cpp>"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py"
@@ -2424,7 +2425,8 @@
    "test_msgstore",
    "test_sto_notice",
    "test_tft_backlight",
-   "test_own_msg_status"
+   "test_own_msg_status",
+   "test_gw_link_status"
   ],
   "test_framework": "unity"
  },
@@ -3963,6 +3965,7 @@
    "+<reack_limiter.cpp>",
    "+<own_msg_status.cpp>",
    "+<remote_cmd.cpp>",
+   "+<gw_link_status.cpp>",
    "+<esp32/udp_frame_esp32.cpp>",
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],
