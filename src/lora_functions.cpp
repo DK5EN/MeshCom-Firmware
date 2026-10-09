@@ -1884,7 +1884,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // SNF-GW-01: the ack/store decision lives in msgstore_hook.h,
                                 // shared with the GATE handlers. isGroup and eligible are
                                 // side-effect free, so computing them up front is safe.
-                                MboxDecision mboxDec = mboxClassify(destination_call, aprsmsg.msg_payload,
+                                MboxDecision mboxDec = mboxClassify(aprsmsg.msg_source_call, destination_call, aprsmsg.msg_payload,
                                                                     CheckGroup(destination_call) != 0,
                                                                     bMboxPeerDelivery,   // F6: don't store a peer's own delivery frame
                                                                     rx_pn_repeat,        // E2: a repeat XOR copy must not push stored_ms out again

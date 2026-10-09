@@ -511,7 +511,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                strcmp(destination_call, meshcom_settings.node_call) != 0 &&
                !bSrcPathHadOwnCall)
             {
-                MboxDecision md = mboxClassify(destination_call, aprsmsg.msg_payload,
+                MboxDecision md = mboxClassify(aprsmsg.msg_source_call, destination_call, aprsmsg.msg_payload,
                                                CheckGroup(destination_call) != 0, false,
                                                pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),
                                                msgstoreEligible(destination_call));

@@ -23,6 +23,10 @@ command" — and nothing is stored.
   sender's app can show "held by `<call>`" instead of concluding the DM
   failed. Bare `--storenotice` prints the current state.
 
+DMs to or from the service stations `WLNK-1` and `APRS2SOTA` are never stored, in
+any mode, so they never get a `:sto` notice either. Their sessions are interactive
+(Winlink login challenges) and these stations do not understand `:sto`.
+
 `--info` adds one line: `STORE mode=<name> used=<n>/<slots> time=<h>h
 notice=<on|off>`.
 `--mbox` prints the mailbox summary line followed by one line per held entry

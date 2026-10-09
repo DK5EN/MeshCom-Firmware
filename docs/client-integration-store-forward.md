@@ -74,6 +74,9 @@ destination  DK5EN-93            the DM's sender
 payload      "DK5EN-93 :sto017 DK5EN-14"   sender padded to 9, the NNN, the held destination
 ```
 
+No notice is ever sent to a service station (`WLNK-1`, `APRS2SOTA`): a store node does not hold
+DMs to or from them at all (`mboxIsServiceCall()`, `src/msgstore_hook.h`).
+
 New firmware consumes it on every ingress path, LoRa and server (no display, no forward to the
 phone, no ack), and emits the `0x04` frame instead. A node on **upstream firmware** forwards it to the phone as a normal DM from the
 store node. Clients therefore see it only behind old nodes. Recommended: treat a DM text matching

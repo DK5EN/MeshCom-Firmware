@@ -294,7 +294,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
              strcmp(destination_call, meshcom_settings.node_call) != 0 &&
              !mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call))
           {
-              MboxDecision mboxDec = mboxClassify(destination_call, aprsmsg.msg_payload,
+              MboxDecision mboxDec = mboxClassify(aprsmsg.msg_source_call, destination_call, aprsmsg.msg_payload,
                                                   CheckGroup(destination_call) != 0,
                                                   false,                                       // peer delivery is RF-only
                                                   pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),        // XOR copy via the server must not refresh stored_ms

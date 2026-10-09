@@ -34,8 +34,23 @@ struct MboxDecision
 };
 
 /**
+ * @brief True for the Winlink / SOTA APRS gateway calls, exact and case-sensitive
+ *        ("WLNK-1", "APRS2SOTA"). NULL or empty: false.
+ *
+ * Mirrors the special calls in src/regex_functions.cpp (checkRegexCall), which
+ * takes an Arduino String; this header must stay String-free.
+ */
+static inline bool mboxIsServiceCall(const char *call)
+{
+    if (call == 0 || call[0] == 0)
+        return false;
+    return strcmp(call, "WLNK-1") == 0 || strcmp(call, "APRS2SOTA") == 0;
+}
+
+/**
  * @brief Classifies a text frame for the store node.
  *
+ * @param src          source call of the frame (aprsmsg.msg_source_call)
  * @param dst          destination call of the frame
  * @param payload      APRS text payload
  * @param isGroup      CheckGroup(dst) != 0 (caller computes)
@@ -44,15 +59,18 @@ struct MboxDecision
  * @param eligible     msgstoreEligible(dst) (caller computes; only consulted for STORE)
  *
  * ACK: ":ack" at index > 0. Deliberately no eligibility / group test -- an ack
- * heard for any DM may purge a matching held entry.
- * STORE: not "*", not a group, no ":rej" (index > 0), no "{" prefix (control
+ * heard for any DM may purge a matching held entry. Additionally, for dst
+ * "WLNK-1" only, the whole payload "ack<digits>" (>= 1 digit, nothing else):
+ * SendAckMessage acks the Winlink gateway in that bare form.
+ * STORE: never for a service call (mboxIsServiceCall) as src or dst, not "*",
+ * not a group, no ":rej" (index > 0), no "{" prefix (control
  * frames {ping}/{pong}/{MCP}/{SET}/{CET}), no "RM1 " prefix (remote-management
  * command DM, concept section 6), not a peer delivery, not a PN repeat,
  * eligible, and a "{NNN" at index >= 1.
  */
-static inline MboxDecision mboxClassify(const char *dst, const char *payload,
-                                        bool isGroup, bool peerDelivery,
-                                        bool pnRepeat, bool eligible)
+static inline MboxDecision mboxClassify(const char *src, const char *dst, const char *payload,
+                                         bool isGroup, bool peerDelivery,
+                                         bool pnRepeat, bool eligible)
 {
     MboxDecision d = { MBOX_NONE, 0, 0 };
     if (dst == 0 || payload == 0)
@@ -68,7 +86,22 @@ static inline MboxDecision mboxClassify(const char *dst, const char *payload,
         return d;
     }
 
-    if (strcmp(dst, "*") == 0 ||
+    if (strcmp(dst, "WLNK-1") == 0 && mcStartsWith(payload, "ack") && plen > 3)
+    {
+        size_t i = 3;
+        while (i < plen && payload[i] >= '0' && payload[i] <= '9')
+            i++;
+        if (i == plen)
+        {
+            d.action = MBOX_ACK;
+            d.nnn = (uint16_t)mcSliceToLong(payload, 3, plen);
+            return d;
+        }
+    }
+
+    if (mboxIsServiceCall(src) ||
+        mboxIsServiceCall(dst) ||
+        strcmp(dst, "*") == 0 ||
         isGroup ||
         mcIndexOfStr(payload, ":rej") > 0 ||
         mcStartsWith(payload, "{") ||

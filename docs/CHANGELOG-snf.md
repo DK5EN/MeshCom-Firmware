@@ -56,6 +56,20 @@ default: `--dmretry off`, `--store off`.
 - `--storecall`, `--storetime`, `--storeslots`, `--storenotice` on classic ESP32 answer "unknown
   command" instead of "unavailable" (exact command matching).
 
+## Unreleased (fork-dev)
+
+1. **A store node never holds a DM to or from a service station** (`WLNK-1`, `APRS2SOTA`;
+   `mboxIsServiceCall()` in `src/msgstore_hook.h`). Field report 2026-10-09 (HB9VQQ-3, v4.40a,
+   `--store heard`): every Winlink reply to a nearby node was held and replayed in the 9-step
+   ladder about once an hour, so stale `Login [NNN]:` challenges reached the operator and his
+   answers failed against the current challenge until WLNK-1 locked him out. A held reply also
+   sent a `:sto` notice to WLNK-1, which the server forwards to APRS-IS as plain text and Winlink
+   parses as a login answer from the store node. With nothing stored, no notice is sent either.
+2. **The WLNK-1 ack form purges a held entry.** `SendAckMessage()` acks WLNK-1 as bare
+   `ack<digits>`, not `<call>:ack<NNN>`, so `mboxClassify()` never saw it as an ack. A text to
+   `WLNK-1` that is exactly `ack` + digits is now `MBOX_ACK`. Safety net behind item 1; for any
+   other destination `ack123` is unchanged.
+
 ## Released as v4.35u.09.28-neo
 
 Version letter `u`, after upstream's official `v4.35u` (27 September 2026). Built from
