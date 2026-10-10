@@ -1,0 +1,138 @@
+{
+  "boot": {
+    "ok": true,
+    "port_gone_after_s": null,
+    "boots": [
+      {
+        "start_client": 10.96,
+        "flash": 11.57,
+        "client_started": 22.97,
+        "resetreas": "0x00000004",
+        "eth_init": 23.38,
+        "ready": 27.05,
+        "ready_fw_ms": 16850,
+        "ip": 0,
+        "eth": 1,
+        "eth_ip": 57.2
+      }
+    ],
+    "boot_count": 1,
+    "crash_lines": [],
+    "double_boot": false
+  },
+  "info": {
+    "ok": true,
+    "answered_lines": 40,
+    "call_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "hw_line": "...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]",
+    "gateway_line": "...Webserver  on / Webpwd <> / Gateway off "
+  },
+  "instr": {
+    "ok": true,
+    "seconds": 60.0,
+    "loop_n": 603,
+    "loop_avg_us": 100743,
+    "loop_max_us": 113281,
+    "gaps": 0,
+    "gap_events": [],
+    "sections": {
+      "clock": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_sm": {
+        "n": 11,
+        "avg_us": 710,
+        "max_us": 4882
+      },
+      "ble_settings": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "hey_tx": {
+        "n": 1,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "telemetry": {
+        "n": 4,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_tick": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "serial_cmd": {
+        "n": 604,
+        "avg_us": 1,
+        "max_us": 976
+      },
+      "webserver_loop": {
+        "n": 604,
+        "avg_us": 856,
+        "max_us": 977
+      },
+      "lora_rx_timeout": {
+        "n": 599,
+        "avg_us": 16,
+        "max_us": 977
+      },
+      "lora_tx": {
+        "n": 1,
+        "avg_us": 4882,
+        "max_us": 4882
+      },
+      "pos_timer": {
+        "n": 604,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "udp": {
+        "n": 604,
+        "avg_us": 74,
+        "max_us": 977
+      },
+      "eth_state": {
+        "n": 604,
+        "avg_us": 1,
+        "max_us": 977
+      },
+      "eth_dhcp": {
+        "n": 2,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 94392,
+    "heap_largest": 29544,
+    "worst_section": "lora_sm"
+  },
+  "lora": {
+    "ok": true,
+    "first_line": "09:18:29 TX-LoRa  029 @ x91A435F7 H04 S0 T0 M00 DK5EN-90>H@R3; HW:09 MOD:8/8 FCS:06A9 FW:40:a LH:89",
+    "tx_lines": [
+      "09:18:29 TX-LoRa  029 @ x91A435F7 H04 S0 T0 M00 DK5EN-90>H@R3; HW:09 MOD:8/8 FCS:06A9 FW:40:a LH:89",
+      "OnTXDone"
+    ],
+    "peer_port": "/dev/cu.usbserial-0001",
+    "peer_heard_us": true
+  },
+  "mheard": {
+    "ok": true,
+    "calls_heard": [
+      "DK5EN-1",
+      "DK5EN-92",
+      "DK5EN-98"
+    ],
+    "lines": 20
+  }
+}

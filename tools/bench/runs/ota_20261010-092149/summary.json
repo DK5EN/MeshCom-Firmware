@@ -1,0 +1,82 @@
+{
+  "port": "/dev/cu.usbserial-573C0005841",
+  "env": "ttgo_tbeam",
+  "host": null,
+  "ip": "192.168.68.63",
+  "target": "192.168.68.63",
+  "bin": ".pio/build/ttgo_tbeam/firmware.bin",
+  "expect_hardware": "TBEAM",
+  "started": "2026-10-10 09:21:49",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261010-092149",
+  "before": {
+    "version": "4.40a",
+    "build": "Oct 10 2026 / 09:18:44",
+    "call": "DK5EN-92",
+    "node_id": "E0D041B8",
+    "hw_idx": "12",
+    "hardware": "TBEAM_AXP2101",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.63"
+  },
+  "ota_md5": "e8176d15e9b1e305a34b9a6d2bd96c3b",
+  "ota": {
+    "ok": true,
+    "stage": "done",
+    "error": null,
+    "timings": {
+      "precheck_s": 2.0351649169970187,
+      "trigger_safeboot_s": 10.014522333003697,
+      "safeboot_wait_s": 1.9955574169944157,
+      "ota_start_s": 0.025736666000739206,
+      "upload_s": 21.723663917000522,
+      "reboot_wait_s": 13.32558120899921,
+      "total_s": 49.12440287500067
+    },
+    "before": {
+      "hardware": "TBEAM_AXP2101",
+      "build": "Oct 10 2026 / 09:18:49",
+      "version": "4.40a"
+    },
+    "after": {
+      "hardware": "TBEAM_AXP2101",
+      "build": "Oct 10 2026 / 09:18:49",
+      "version": "4.40a"
+    },
+    "md5": "e8176d15e9b1e305a34b9a6d2bd96c3b",
+    "fw_size": 1949632
+  },
+  "boot_ready": true,
+  "wifi_rejoined": true,
+  "resets_after_ota": 2,
+  "after": {
+    "version": "4.40a",
+    "build": "Oct 10 2026 / 09:18:44",
+    "call": "DK5EN-92",
+    "node_id": "E0D041B8",
+    "hw_idx": "12",
+    "hardware": "TBEAM_AXP2101",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.63"
+  },
+  "settings_diffs": [],
+  "warnings": [],
+  "fails": [],
+  "verdict": "PASS",
+  "total_s": 65.09420013427734
+}

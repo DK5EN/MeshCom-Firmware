@@ -1,0 +1,82 @@
+{
+  "port": "/dev/cu.usbserial-0001",
+  "env": "heltec_wifi_lora_32_V3",
+  "host": null,
+  "ip": "192.168.68.65",
+  "target": "192.168.68.65",
+  "bin": ".pio/build/heltec_wifi_lora_32_V3/firmware.bin",
+  "expect_hardware": "HELTEC_V3",
+  "started": "2026-10-10 09:13:01",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20261010-091301",
+  "before": {
+    "version": "4.40a",
+    "build": "Oct 10 2026 / 09:09:51",
+    "call": "DK5EN-1",
+    "node_id": "433A8968",
+    "hw_idx": "43",
+    "hardware": "HELTEC_V3",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.65"
+  },
+  "ota_md5": "1d767d740e58ec4d9d41ce18762af2a7",
+  "ota": {
+    "ok": true,
+    "stage": "done",
+    "error": null,
+    "timings": {
+      "precheck_s": 3.074056167002709,
+      "trigger_safeboot_s": 10.014431292001973,
+      "safeboot_wait_s": 4.94279954200465,
+      "ota_start_s": 0.19203887500043493,
+      "upload_s": 21.62855999999738,
+      "reboot_wait_s": 12.88764049999736,
+      "total_s": 52.74433966699871
+    },
+    "before": {
+      "hardware": "HELTEC_V3",
+      "build": "Oct 10 2026 / 09:09:56",
+      "version": "4.40a"
+    },
+    "after": {
+      "hardware": "HELTEC_V3",
+      "build": "Oct 10 2026 / 09:09:56",
+      "version": "4.40a"
+    },
+    "md5": "1d767d740e58ec4d9d41ce18762af2a7",
+    "fw_size": 1831280
+  },
+  "boot_ready": true,
+  "wifi_rejoined": true,
+  "resets_after_ota": 0,
+  "after": {
+    "version": "4.40a",
+    "build": "Oct 10 2026 / 09:09:51",
+    "call": "DK5EN-1",
+    "node_id": "433A8968",
+    "hw_idx": "43",
+    "hardware": "HELTEC_V3",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.65"
+  },
+  "settings_diffs": [],
+  "warnings": [],
+  "fails": [],
+  "verdict": "PASS",
+  "total_s": 68.70964193344116
+}
