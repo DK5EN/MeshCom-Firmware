@@ -1234,6 +1234,9 @@ void commandAction(char *umsg_text, bool ble)
             #endif
             printdeb("--mesh on/off           relay foreign frames\n");
             printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
+            printdeb("--rmstrictsecurity on/off  RM brute-force protection (default off): per-sender lockout,\n"
+                     "                          receiver rate limits and sender spacing/budget. Off = no punishment.\n"
+                     "                          Caution: an off sender can push an on target into its lockout.\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
             printdeb("--relay on/off          board relay output (GPIO)\n");
@@ -4695,6 +4698,46 @@ void commandAction(char *umsg_text, bool ble)
 
         return;
     }
+    else
+    // BF-01: --rmstrictsecurity switches the RM brute-force protection (node_rmstrict, default off):
+    // the receiver's per-sender lockout (3 rejects in 90 s lock the sender for 5 min), the receiver
+    // rate limits and the sender policy (unanswered budget, 10 s spacing, one-shot force). Off, only
+    // the correctness checks (format, allowlist, tag, replay counter) reject. Known consequence of
+    // the OFF default: a sender with the flag off does not hold back, so it can push a target with the
+    // flag ON into its lockout. Console and web only: "rmstrictsecurity" is not on the RM allowlist
+    // (a positive list), so a remote RM1 command can never reach this rung. The argument rung
+    // ("rmstrictsecurity ") stays above the bare one, as for --remotemgmt.
+    if(commandCheck(msg_text+2, (char*)"rmstrictsecurity ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+19);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            meshcom_settings.node_rmstrict = 1;
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            meshcom_settings.node_rmstrict = 0;
+        }
+        else
+        {
+            Serial.printf("[ERR];rmstrictsecurity;must be on or off\n");
+
+            return;
+        }
+
+        save_settings();
+        Serial.printf("[RM];strict=%s\n", meshcom_settings.node_rmstrict ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"rmstrictsecurity") == 0)
+    {
+        Serial.printf("[RM];strict=%s\n", meshcom_settings.node_rmstrict ? "on" : "off");
+
+        return;
+    }
     // The leading `else` sits INSIDE the ESP32 block: on nRF52 the block is gone
     // and the chain continues with the txpower rung's own `else` below.
     #if defined(ESP32)
@@ -6695,7 +6738,8 @@ void commandAction(char *umsg_text, bool ble)
                 const RmStats &rm = g_rmStats;
                 unsigned long rmRej = (unsigned long)rm.rej_format + rm.rej_tag + rm.rej_replay + rm.rej_blocked +
                                       rm.rej_rate + rm.rej_lockout + rm.rej_disabled;
-                printfdeb("...RM: %s ok=%lu rej=%lu\n", meshcom_settings.node_rm ? "on" : "off", (unsigned long)rm.ok, rmRej);
+                printfdeb("...RM: %s strict=%s ok=%lu rej=%lu\n", meshcom_settings.node_rm ? "on" : "off",
+                         meshcom_settings.node_rmstrict ? "on" : "off", (unsigned long)rm.ok, rmRej);
             }
 
             #if defined(ESP32)

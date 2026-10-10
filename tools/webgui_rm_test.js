@@ -222,8 +222,8 @@ async function mkPage(srv, opts) {
     tiles() {
       const o = {};
       for (const c of P.el('rm_sw').children) {
-        if (c.tagName === 'DIV') o[c.querySelector('button').getAttribute('data-cmd')] = { state: '?', el: c, text: c.querySelector('span').textContent };
-        else o[c.getAttribute('data-cmd')] = { state: c.getAttribute('data-args') === 'off' ? 'on' : 'off', el: c, text: c.textContent };
+        const i = c.querySelector('input');
+        o[i.getAttribute('data-sw')] = { state: i.indeterminate ? '?' : i.checked ? 'on' : 'off', el: i, text: c.querySelector('label').textContent, cf: i.getAttribute('data-cf') };
       }
       return o;
     },
@@ -284,8 +284,22 @@ function leaks(P, canary) {
   check('no confirm()/alert() in the JS', !/\b(confirm|alert)\s*\(/.test(JS));
   // jsdom has no layout: pin the two style rules that keep the tables readable. A blanket
   // word-break on every cell lets the browser squeeze the narrow columns to one letter per line.
-  check('table buttons, time and state cells stay on one line', /#rm_msgs td:nth-child\(1\),#rm_msgs td:nth-child\(3\),[^{]*\.rmtab button\{white-space:nowrap;\}/.test(HTML));
-  check('only the reply/result cells break inside words', !/\.rmtab td\{[^}]*word-break/.test(HTML) && /#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(5\)\{word-break:break-word;\}/.test(HTML));
+  check('table buttons, time and state cells stay on one line', /#rm_msgs td:nth-child\(1\),[^{]*\.rmtab button\{white-space:nowrap;\}/.test(HTML));
+  check('only the reply/result cells break inside words', !/\.rmtab td\{[^}]*word-break/.test(HTML) && /#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(3\)[^{]*\{overflow-wrap:anywhere;\}/.test(HTML));
+  // CR-06: jsdom has no layout, so pin the rules that keep a 39-char word or a 10-digit ctr from widening the table
+  check('CR-06 command columns and ctr column wrap anywhere', /#rm_msgs td:nth-child\(2\),#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(3\),#rm_log td:nth-child\(4\),#rm_log td:nth-child\(5\)\{overflow-wrap:anywhere;\}/.test(HTML));
+  check('UI-09 no font-size and no x-small in the page source (sizes come from the font-small class)', !/font-size|x-small/.test(cpp) && /class="rmtab font-small"/.test(HTML));
+  check('UI-08 no #rm_page selector prefix repetition, no nested CSS', (HTML.match(/#rm_page /g) || []).length <= 1 && !/\{[^{}]*\{/.test(HTML.match(/<style>[\s\S]*<\/style>/)[0].replace(/@media[^{]*\{([^{}]*\{[^{}]*\})*\}/, '')));
+  {
+    const D = new JSDOM(HTML).window.document;
+    const cards = [...D.querySelectorAll('.cardlayout')];
+    const kids = (c, t) => [...c.children].filter((x) => x.tagName === t);
+    check('UI-03 six cards, all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 6 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
+    check('UI-04 only Advanced starts closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_adv');
+    check('UI-05 exactly one status control and one sync control, no Test/Check connection', !D.getElementById('rm_test') && !/Test connection|Check connection/.test(HTML + JS) && (JS.match(/'Refresh status'/g) || []).length === 1 && (JS.match(/'data-act':'sync'/g) || []).length === 1);
+    check('UI-07 one message line (no rm_lockline), "saved on this node" once', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 1 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
+    check('UI-08 shared sentences: Really? once, confirm sentence once, no-answer sentence once, one rmErr password text', (JS.match(/Really\? tap again/g) || []).length === 1 && (JS.match(/Tap again within 4 seconds to confirm/g) || []).length === 1 && (JS.match(/did not answer the request/g) || []).length === 1 && (JS.match(/1 to 14 plain characters/g) || []).length === 1);
+  }
   check('no localStorage/sessionStorage/innerHTML in the JS', !/localStorage|sessionStorage|innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(JS));
   {
     const w0 = new JSDOM('', { runScripts: 'outside-only' }).window;
@@ -299,7 +313,7 @@ function leaks(P, canary) {
     return ins.length >= 2 && ins.every((i) => /autocomplete="new-password"/.test(i));
   })());
   {
-    const have = new Set(Array.from(HTML.matchAll(/id="([^"]+)"/g)).map((m) => m[1]));
+    const have = new Set(Array.from(HTML.matchAll(/id="([^"]+)"/g)).map((m) => m[1]).concat(Array.from(JS.matchAll(/\.id='(rm_[a-z]+)'/g)).map((m) => m[1])));   // ids the JS builds itself count too
     const used = new Set(Array.from(JS.matchAll(/'(rm_[a-z]+)'/g)).map((m) => m[1]));
     const missing = [...used].filter((i) => !have.has(i));
     check('every element id the JS uses exists in the skeleton', missing.length === 0, missing.join(','));
@@ -329,7 +343,7 @@ function leaks(P, canary) {
       t.gps.state === 'on' && t.track.state === 'off' && t.display.state === 'on' && t.mesh.state === 'on' && t.gateway.state === 'off' && t.led.state === 'on',
       JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v.state]))));
     check('Messages row shows the verified status (was: last status line)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(P.text('rm_msgs')), P.text('rm_msgs'));
-    check('tile labels read GPS on, Track off, Light on, Gateway off', t.gps.text === 'GPS on' && t.track.text === 'Track off' && t.led.text === 'Light on' && t.gateway.text === 'Gateway off', JSON.stringify(Object.values(t).map((v) => v.text)));
+    check('switch labels read GPS, Track, Light, Gateway; Mesh and Gateway carry the off-confirm', t.gps.text === 'GPS' && t.track.text === 'Track' && t.led.text === 'Light' && t.gateway.text === 'Gateway' && t.mesh.cf === 'mesh off' && t.gateway.cf === 'gateway off' && !t.gps.cf, JSON.stringify(Object.values(t).map((v) => v.text)));
     check('tile order GPS, Track, Display, Light, Mesh, Gateway', Object.keys(t).join(',') === 'gps,track,display,led,mesh,gateway', Object.keys(t).join(','));
     P.w.rmPageLeave();
   }
@@ -339,9 +353,14 @@ function leaks(P, canary) {
     check('old gw=1 mesh=0 led=0: Gateway on, Mesh off, Light off', t.gateway.state === 'on' && t.mesh.state === 'off' && t.led.state === 'off', JSON.stringify(Object.keys(t).map((k) => k + t[k].state)));
     check('old form: GPS, Track, Display are "?"', t.gps.state === '?' && t.track.state === '?' && t.display.state === '?');
     const unk = t.gps.el;
-    check('"?" tile offers two small On/Off choices', unk.querySelectorAll('button').length === 2 && unk.querySelectorAll('button')[0].textContent === 'On' && unk.querySelectorAll('button')[1].textContent === 'Off');
-    await P.tap(unk.querySelectorAll('button')[1]);
-    check('"?" choice Off sends "gps off" by slot', P.sends().length === 1 && /cmd=gps&args=off/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    check('UI-01 every switch is one checkbox role=switch, no On/Off button pair anywhere', Array.from(P.el('rm_sw').querySelectorAll('input')).every((i) => i.type === 'checkbox' && i.getAttribute('role') === 'switch') && P.el('rm_sw').querySelectorAll('button').length === 0 && !P.btn('On') && !P.btn('Off'));
+    check('UI-01 an unknown state is indeterminate', unk.indeterminate === true && P.tiles().display.el.indeterminate === true && P.tiles().gateway.el.indeterminate === false);
+    await P.tap(unk);
+    check('unknown switch first click sends "gps on" by slot', P.sends().length === 1 && /cmd=gps&args=on/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    await P.T.advance(10100);
+    check('unknown switch stays indeterminate and flips to Off for the next click', P.tiles().gps.el.indeterminate === true && P.tiles().gps.el.checked === true);
+    await P.tap(P.tiles().gps.el);
+    check('unknown switch second click sends "gps off"', P.sends().length === 2 && /cmd=gps&args=off/.test(P.sends()[1].body), JSON.stringify(P.sends().map((x) => x.body)));
     P.w.rmPageLeave();
   }
   {
@@ -372,7 +391,7 @@ function leaks(P, canary) {
   }
   {
     const P = await savedNodePage(STATUS_NEW);
-    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && /22 dBm/.test(P.text('rm_rtxnote')));
+    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && P.text('rm_rtxnote') === '');
     for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
     check('TX power cap follows p=cur/max (22)', P.text('rm_rtxval') === '22 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
     P.w.rmPageLeave();
@@ -385,16 +404,17 @@ function leaks(P, canary) {
   // ---- confirm tap logic ---------------------------------------------------------------------------
   {
     const P = await savedNodePage(STATUS_NEW);
-    let r = P.btn('Restart', P.el('rm_rs'));
+    const rb = () => P.el('rm_info').querySelector('[data-cmd=reboot]');
+    let r = rb();
     await P.tap(r);
-    r = P.el('rm_rs').querySelector('button');
+    r = rb();
     check('first tap on Restart arms (text changes, nothing sent)', r.textContent === 'Really? tap again' && P.sends().length === 0, r.textContent);
     await P.T.advance(4100);
-    r = P.el('rm_rs').querySelector('button');
+    r = rb();
     check('armed state times out after 4 s', r.textContent === 'Restart' && P.sends().length === 0, r.textContent);
     await P.tap(r);
-    check('tap after the timeout arms again, still nothing sent', P.el('rm_rs').querySelector('button').textContent === 'Really? tap again' && P.sends().length === 0);
-    await P.tap(P.el('rm_rs').querySelector('button'));
+    check('tap after the timeout arms again, still nothing sent', rb().textContent === 'Really? tap again' && P.sends().length === 0);
+    await P.tap(rb());
     check('second tap within 4 s sends "reboot" by slot', P.sends().length === 1 && /slot=0&cmd=reboot/.test(P.sends()[0].body), JSON.stringify(P.sends()));
     P.w.rmPageLeave();
   }
@@ -402,7 +422,7 @@ function leaks(P, canary) {
     const P = await savedNodePage(STATUS_NEW);   // mesh on, gateway off, gps on, track off
     const t = P.tiles();
     await P.tap(t.mesh.el);
-    check('Mesh off needs a confirm', P.sends().length === 0 && P.tiles().mesh.state === 'on' && P.tiles().mesh.el.textContent === 'Really? tap again');
+    check('Mesh off needs a confirm', P.sends().length === 0 && P.tiles().mesh.state === 'on' && P.tiles().mesh.text === 'Mesh: Really? tap again');
     await P.tap(P.tiles().mesh.el);
     check('Mesh off sent on the second tap', P.sends().length === 1 && /cmd=mesh&args=off/.test(P.sends()[0].body));
     await P.T.advance(10100);
@@ -413,7 +433,7 @@ function leaks(P, canary) {
   {
     const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMWL p=17/22');   // gateway on
     await P.tap(P.tiles().gateway.el);
-    check('Gateway off needs a confirm', P.sends().length === 0 && P.tiles().gateway.el.textContent === 'Really? tap again');
+    check('Gateway off needs a confirm', P.sends().length === 0 && P.tiles().gateway.text === 'Gateway: Really? tap again');
     await P.tap(P.tiles().gateway.el);
     check('Gateway off sent on the second tap', P.sends().length === 1 && /cmd=gateway&args=off/.test(P.sends()[0].body));
     P.w.rmPageLeave();
@@ -440,17 +460,17 @@ function leaks(P, canary) {
     const P = await savedNodePage(STATUS_NEW);
     await P.tap(P.btn('Send position now', P.el('rm_info')));
     check('a send was made', P.sends().length === 1);
-    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('button'), ...P.el('rm_rs').querySelectorAll('button'), P.el('rm_rtxapply'), P.el('rm_test')];
+    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('input'), P.el('rm_rtxapply')];
     check('all tiles are locked after a send', allBtns().every((b) => b.disabled), allBtns().filter((b) => !b.disabled).length + ' enabled');
-    check('countdown is visible', /Next command possible in 10 s/.test(P.text('rm_lockline')), P.text('rm_lockline'));
+    check('countdown is visible', /Next command possible in 10 s/.test(P.text('rm_msg')), P.text('rm_msg'));
     await P.T.advance(3000);
-    check('countdown counts down', /in 7 s/.test(P.text('rm_lockline')), P.text('rm_lockline'));
+    check('countdown counts down', /in 7 s/.test(P.text('rm_msg')), P.text('rm_msg'));
     P.click(P.btn('Refresh status', P.el('rm_info'))); await flush();
     check('a tap while locked sends nothing', P.sends().length === 1);
     await P.T.advance(6900);
     check('still locked at 9.9 s', allBtns().every((b) => b.disabled));
     await P.T.advance(300);
-    check('unlocked after 10 s', allBtns().every((b) => !b.disabled) && P.text('rm_lockline') === '', P.text('rm_lockline'));
+    check('unlocked after 10 s', allBtns().every((b) => !b.disabled) && P.text('rm_msg') === '', P.text('rm_msg'));
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     check('sends again after the lock', P.sends().length === 2);
     P.w.rmPageLeave();
@@ -555,7 +575,7 @@ function leaks(P, canary) {
     await P.init();
     await P.typeCall('DK5EN-12');
     P.el('rm_pw').value = CANARY;
-    await P.tap(P.btn('Remember on this node'));
+    await P.tap(P.btn('Remember'));
     const c = P.calls.find((x) => rmPath(x) === '/rmnodes' && x.method === 'POST');
     const b = c && new URLSearchParams(c.body);
     check('remember: POST /rmnodes act=save into the first free slot', !!c && b.get('act') === 'save' && b.get('slot') === '0' && b.get('call') === 'DK5EN-12' && b.get('pw') === CANARY, c && c.body);
@@ -568,11 +588,11 @@ function leaks(P, canary) {
     check('forget: node is no longer saved', P.el('rm_pwrow').style.display === '' && /Nothing saved/.test(P.text('rm_saved')));
     srv.nodesReply = { ok: false, err: 'dup' };
     P.el('rm_pw').value = CANARY;
-    await P.tap(P.btn('Remember on this node'));
+    await P.tap(P.btn('Remember'));
     check('error token dup gets a plain sentence', /already saved/.test(P.text('rm_msg')), P.text('rm_msg'));
     srv.nodesReply = { ok: false, err: 'store' };
     P.el('rm_pw').value = CANARY;
-    await P.tap(P.btn('Remember on this node'));
+    await P.tap(P.btn('Remember'));
     check('error token store gets a plain sentence', /could not save/.test(P.text('rm_msg')), P.text('rm_msg'));
     P.w.rmPageLeave();
   }
@@ -584,7 +604,7 @@ function leaks(P, canary) {
     await P.typeCall('DK5EN-12');
     P.el('rm_pw').value = CANARY;
     const before = P.calls.length;
-    await P.tap(P.btn('Remember on this node'));
+    await P.tap(P.btn('Remember'));
     check('all three places used: no request, plain message', P.calls.length === before && /All 3 places/.test(P.text('rm_msg')), P.text('rm_msg'));
     P.w.rmPageLeave();
   }
@@ -671,7 +691,7 @@ function leaks(P, canary) {
     await P.tap(P.el('rm_saved').querySelector('button'));
     srv.sendReply = { ok: true, ctr: 0, viaSync: true };
     await P.tap(P.btn('Send position now', P.el('rm_info')));
-    check('viaSync: accepted, no error shown (the progress text moved to the Messages card)', P.sends().length === 1 && P.text('rm_msg') === '', P.text('rm_msg'));
+    check('viaSync: accepted, no error shown (the progress text moved to the Messages card)', P.sends().length === 1 && /^(Next command possible in \d+ s\.)?$/.test(P.text('rm_msg')) && !/rmbad/.test(P.el('rm_msg').className), P.text('rm_msg'));
     const CM = 'Checking the connection first, your command follows.';
     await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 0, ago: 2, st: 'queued' })], targets: [{ dst: 'DK5EN-1', pending: 1, retry: 0, locked: 0, chainMsg: CM }] });
     const vr = P.el('rm_msgs').querySelectorAll('tr');
@@ -735,8 +755,8 @@ function leaks(P, canary) {
     const sd = P.sends();
     check('W1d run again sends the same cmd to the same target', sd.length === before + 1 && /cmd=sendpos/.test(sd[sd.length - 1].body || '') && /DK5EN-1|slot=0/.test(sd[sd.length - 1].body || ''), JSON.stringify(sd[sd.length - 1]));
     check('W1d run again is disabled while the node is in cooldown', [...P.el('rm_msgs').querySelectorAll('button')].every((b) => b.disabled));
-    check('W1d old ids are gone, Radio card present', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply'].some((i) => P.el(i)) && !!P.el('rm_radio') && !!P.el('rm_rtxval'));
-    check('W1d Advanced is open on load', P.el('rm_adv').hasAttribute('open'));
+    check('W1d old ids are gone, TX control lives in the Node settings Radio sub-card (UI-06)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && P.el('rm_card_radio').contains(P.el('rm_rtxval')) && P.el('rm_card_radio').contains(P.el('rm_rtxapply')) && ![...P.el('rm_page').querySelectorAll('.cardlabel')].some((l) => l.textContent === 'Radio'));
+    check('UI-03/04 Advanced is a collapsablecard, closed by default, no <details>', P.el('rm_adv').classList.contains('collapsablecard') && !P.el('rm_adv').classList.contains('cardopen') && !P.el('rm_page').querySelector('details'));
     P.w.rmPageLeave();
   }
   {
@@ -788,7 +808,8 @@ function leaks(P, canary) {
     await P.tap(rb('DK5EN-1 Restart'));
     check('Run again of reboot: second tap sends to the ROW node slot', P.sends().length === 2 && /^slot=0&cmd=reboot/.test(P.sends()[1].body), JSON.stringify(P.sends().map((x) => x.body)));
     check('Run again of reboot leaves the selection unchanged', sel() === 'DK5EN-2/1/DK5EN-2', sel());
-    check('a row whose node has no saved slot has no Run again button', rb('DK5EN-3') === null && row('DK5EN-3').children[4].textContent === '', row('DK5EN-3').innerHTML);
+    check('360 px layout: Run again sits inside the reply cell, rows have 4 cells, header has 4 columns', row('DK5EN-1') && row('DK5EN-1').children.length === 4 && !!row('DK5EN-1').children[3].querySelector('button') && P.el('rm_msgs').parentNode.querySelectorAll('th').length === 4 && /@media \(max-width:600px\)\{\.rmtab thead\{display:none;\}/.test(HTML) && /\.rmtab,#rm_msgs,#rm_log\{display:block;\}/.test(HTML) && !/(#rm_msgs|#rm_log) thead/.test(HTML) && /#rm_log td:nth-child\(3\)::before\{content:"ctr ";\}/.test(HTML));
+    check('a row whose node has no saved slot has no Run again button', rb('DK5EN-3') === null && !row('DK5EN-3').querySelector('button'), row('DK5EN-3').innerHTML);
     P.w.rmPageLeave();
   }
   {
@@ -851,7 +872,7 @@ function leaks(P, canary) {
     const long = 'ok ' + 'n=' + 'A'.repeat(105);
     await P.setPoll({ sent: [ent('DK5EN-1', 'name Martin', long, { ctr: 6, ago: 2, st: 'ok', msg: long.substring(3) })] });
     const rr = P.el('rm_msgs').querySelectorAll('tr');
-    check('W2E 108-character reply renders as one row via textContent', rr.length === 1 && rr[0].children.length === 5 && rr[0].children[3].textContent.length > 100 && rr[0].querySelector('img') === null, rr.length);
+    check('W2E 108-character reply renders as one row via textContent', rr.length === 1 && rr[0].children.length === 4 && rr[0].children[3].textContent.length > 100 && rr[0].querySelector('img') === null, rr.length);
     // forced attempt
     await P.T.advance(12000);
     srv.sendReply = { ok: false, err: 'limit', canForce: 1, retry: 30 };
@@ -880,11 +901,11 @@ function leaks(P, canary) {
     P.w.rmPick('DK5EN-1');
     await P.setPoll({ targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 0 }] });
     const note = () => P.el('rm_cards').querySelector('.rmcapnote');
-    const rd = () => P.btn('Read radio', P.el('rm_cards'));
-    check('W2E gate unknown (cap 0): note and disabled Read radio', note() && /not reported support.*Press Check connection/.test(note().textContent) && rd().disabled, note() && note().textContent);
+    const rd = () => P.btn('Read', P.el('rm_card_radio'));
+    check('W2E gate unknown (cap 0): note and disabled Read radio', note() && /not reported support.*Press Re-sync counter/.test(note().textContent) && rd().disabled, note() && note().textContent);
     const n0 = P.sends().length;
-    await P.tap(P.btn('Check connection', P.el('rm_cards')));
-    check('W2E Check connection sends sync', P.sends().length === n0 + 1 && /cmd=sync/.test(P.sends()[n0].body), JSON.stringify(P.sends().slice(n0)));
+    await P.tap(P.btn('Re-sync counter', P.el('rm_info')));
+    check('W2E Re-sync counter sends sync', P.sends().length === n0 + 1 && /cmd=sync/.test(P.sends()[n0].body), JSON.stringify(P.sends().slice(n0)));
     await P.T.advance(12000);
     await P.setPoll({ sent: [ent('DK5EN-1', 'sync', 'ok', { ctr: 1, ago: 3, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 0 }] });
     check('W2E gate old firmware (sync ok, cap 0): older-firmware note', note() && /older firmware: only the basic commands work/.test(note().textContent) && rd().disabled, note() && note().textContent);
@@ -1148,6 +1169,38 @@ function leaks(P, canary) {
     const good = [['lat', '-0'], ['lat', '90.0'], ['lon', '-179.123456'], ['alt', '0'], ['alt', '40000']];
     check('ADV f: position grammar refuses leading-zero runs, ".5", "5."', bad.every((q) => P.w.rmChk(q[0], q[1]) !== false), JSON.stringify(bad.filter((q) => P.w.rmChk(q[0], q[1]) === false)));
     check('ADV f: valid positions still pass', good.every((q) => P.w.rmChk(q[0], q[1]) === false), JSON.stringify(good.filter((q) => P.w.rmChk(q[0], q[1]) !== false)));
+    P.w.rmPageLeave();
+  }
+
+  // ---- D6 pin switch, UI-07 single message line --------------------------------------------------
+  {
+    const P = await savedNodePage(STATUS_NEW);
+    const pin = P.el('rm_pinsw');
+    check('D6 Pin is one switch (no Pin on / Pin off buttons), starts indeterminate', pin.type === 'checkbox' && pin.getAttribute('role') === 'switch' && pin.indeterminate === true && !P.btn('Pin on') && !P.btn('Pin off') && !pin.disabled);
+    P.el('rm_pin').value = 'b3'; P.el('rm_pin').dispatchEvent(new P.w.Event('change', { bubbles: true })); await flush();
+    await P.tap(pin);
+    check('D6 flipping the pin switch sends "setout b3 on"', P.sends().length === 1 && /cmd=setout&args=b3(%20|\+)on/.test(P.sends()[0].body), JSON.stringify(P.sends().map((x) => x.body)));
+    check('D6 the switch then shows the last value sent from this page (on, no longer indeterminate)', P.el('rm_pinsw').checked === true && P.el('rm_pinsw').indeterminate === false);
+    P.el('rm_pin').value = 'a1'; P.el('rm_pin').dispatchEvent(new P.w.Event('change', { bubbles: true })); await flush();
+    check('D6 another pin starts indeterminate again', P.el('rm_pinsw').indeterminate === true && P.el('rm_pinsw').checked === false);
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW);   // mesh on
+    await P.tap(P.tiles().mesh.el);
+    check('UI-07 confirm hint goes to the one message line, in the confirm sentence', /^Tap again within 4 seconds to confirm: Mesh off on DK5EN-1\.$/.test(P.text('rm_msg')) && /rmconf/.test(P.el('rm_msg').className), P.text('rm_msg'));
+    await P.T.advance(4100);
+    check('UI-07 the hint disappears with the arming', P.text('rm_msg') === '', P.text('rm_msg'));
+    await P.tap(P.btn('Send position now', P.el('rm_info')));
+    check('UI-07 lock countdown shares the same line', /Next command possible in 10 s/.test(P.text('rm_msg')) && !P.el('rm_lockline'), P.text('rm_msg'));
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW);
+    await P.tap(P.btn('Send position now', P.el('rm_info')));
+    const n0 = P.sends().length;
+    P.click(P.tiles().gps.el); await flush();
+    check('UI-01 a switch is disabled and snaps back while the 10 s lock is on', P.sends().length === n0 && P.tiles().gps.el.disabled && P.tiles().gps.state === 'on', P.tiles().gps.state);
     P.w.rmPageLeave();
   }
 

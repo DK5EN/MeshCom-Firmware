@@ -201,6 +201,8 @@
     M(int, node_stor, 0)                                                                                 \
     /* RM-06 (#1189): 1 = act on authenticated RM1 remote-management DMs (needs node_passwd); default 0. Persisted. */ \
     M(int, node_rm, 0)                                                                                   \
+    /* BF-01: 1 = RM brute-force protection (per-sender lockout, receiver rate limits, sender policy); default 0 = off. Persisted. */ \
+    M(int, node_rmstrict, 0)                                                                             \
     /* AU-03 (#1187): firmware auto update, 0 off / 1 notify / 2 auto; default 0. Persisted; the console rung is ESP32 only. */ \
     M(int, node_autoupd, 0)                                                                              \
     /* AU-03 (#1187): update channel, 0 prod (icssw-org) / 1 dev (DK5EN); default 0. Persisted. */           \

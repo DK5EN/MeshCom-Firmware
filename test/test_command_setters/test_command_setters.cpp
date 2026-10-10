@@ -429,7 +429,8 @@ static void test_rm_rung_schema_row_and_default_match_the_assumptions()
     TEST_ASSERT_TRUE_MESSAGE(body.find("node_passwd[0] == 0x00") != std::string::npos, "--remotemgmt passwd-empty check missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)") != std::string::npos,
                              "--remotemgmt help line missing");
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"...RM: %s ok=%lu rej=%lu\\n\"") != std::string::npos, "--info RM line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"...RM: %s strict=%s ok=%lu rej=%lu\\n\"") != std::string::npos,
+                             "--info RM line (with strict=) missing");
 
     const std::string cfg = read_repo_file("src/config_json.h");
     const size_t row = cfg.find("X(\"node_rm\"");
@@ -441,6 +442,96 @@ static void test_rm_rung_schema_row_and_default_match_the_assumptions()
     const std::string set = read_repo_file("src/meshcom_settings.h");
     TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_rm, 0)") != std::string::npos,
                              "node_rm default is not 0 (RM-06: off until the operator enables it)");
+}
+
+// ---- --rmstrictsecurity (BF-01, docs/review/code-review-v440a-delta-20261006.md section 4) ---------
+// Same constraint as --remotemgmt: the rung lives in command_functions.cpp, which no native env
+// compiles, so the first test runs the real matcher and the second pins rung, order, schema row,
+// default and the "not over RM" rule in the sources.
+
+static void test_rmstrictsecurity_does_not_collide_with_other_commands()
+{
+    TEST_ASSERT_TRUE(commandMatches("rmstrictsecurity on", "rmstrictsecurity "));
+    TEST_ASSERT_TRUE(commandMatches("rmstrictsecurity off", "rmstrictsecurity "));
+    TEST_ASSERT_TRUE(commandMatches("rmstrictsecurity", "rmstrictsecurity"));
+    // a space ends the exact token: the bare rung also matches "rmstrictsecurity on", so the
+    // argument rung must stay above it (pinned against the source below)
+    TEST_ASSERT_TRUE(commandMatches("rmstrictsecurity on", "rmstrictsecurity"));
+    TEST_ASSERT_FALSE(commandMatches("rmstrictsecurity", "rmstrictsecurity "));
+
+    const char *others[] = {"remotemgmt", "remotemgmt on", "rm", "rm on", "rmstrict on", "rmstrictsecurityx",
+                            "rmstrictsecurit on", "reboot", "route", "store"};
+    for (const char *line : others)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rmstrictsecurity "), line);
+        TEST_ASSERT_FALSE_MESSAGE(commandMatches(line, "rmstrictsecurity"), line);
+    }
+    // and --remotemgmt is not swallowed by the new rungs
+    TEST_ASSERT_FALSE(commandMatches("remotemgmt on", "rmstrictsecurity "));
+    TEST_ASSERT_FALSE(commandMatches("remotemgmt", "rmstrictsecurity"));
+}
+
+static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumptions()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    const size_t rung = cmd.find("commandCheck(msg_text+2, (char*)\"rmstrictsecurity \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rung != std::string::npos, "no --rmstrictsecurity rung in command_functions.cpp");
+    const size_t bare = cmd.find("commandCheck(msg_text+2, (char*)\"rmstrictsecurity\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(bare != std::string::npos, "bare --rmstrictsecurity (show) rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(rung < bare, "bare --rmstrictsecurity rung is above the argument rung and would shadow on/off");
+
+    // next to --remotemgmt, on all boards (not in the ENABLE_MSGSTORE block), before the ESP32-only AU rungs
+    const size_t rmBare = cmd.find("commandCheck(msg_text+2, (char*)\"remotemgmt\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rmBare != std::string::npos && rmBare < rung, "--rmstrictsecurity rung is not behind the --remotemgmt rungs");
+    const size_t guardOpen = cmd.find("#if defined(ENABLE_MSGSTORE)\n    if(commandCheck(msg_text+2, (char*)\"storecall \") == 0)");
+    const size_t guardClose = cmd.find("#endif // ENABLE_MSGSTORE", guardOpen);
+    TEST_ASSERT_TRUE_MESSAGE(guardClose != std::string::npos && rung > guardClose,
+                             "--rmstrictsecurity rung sits inside the ENABLE_MSGSTORE block (must work on all boards)");
+    const size_t esp32Block = cmd.find("#if defined(ESP32)", bare);
+    const size_t rungAu = cmd.find("commandCheck(msg_text+2, (char*)\"autoupdate \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(esp32Block != std::string::npos && esp32Block < rungAu && bare < esp32Block,
+                             "--rmstrictsecurity rungs are not in front of the ESP32-only AU block");
+
+    const std::string body = cmd.substr(rung, 900);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_text+19") != std::string::npos, "--rmstrictsecurity argument offset is not +19");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rmstrict = 1") != std::string::npos, "--rmstrictsecurity on does not set node_rmstrict");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("meshcom_settings.node_rmstrict = 0") != std::string::npos, "--rmstrictsecurity off does not clear node_rmstrict");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("save_settings()") != std::string::npos, "--rmstrictsecurity rung does not save");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[RM];strict=%s") != std::string::npos, "--rmstrictsecurity rung does not print [RM];strict=on|off");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--rmstrictsecurity on/off") != std::string::npos, "--rmstrictsecurity help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("an off sender can push an on target into its lockout") != std::string::npos,
+                             "--rmstrictsecurity help does not state the D3 consequence");
+
+    const std::string cfg = read_repo_file("src/config_json.h");
+    const size_t row = cfg.find("X(\"node_rmstrict\"");
+    TEST_ASSERT_TRUE_MESSAGE(row != std::string::npos, "no node_rmstrict schema row");
+    const std::string rowtxt = cfg.substr(row, 100);
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("CFG_INT") != std::string::npos, "node_rmstrict is not CFG_INT");
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("0.0, 1.0") != std::string::npos, "node_rmstrict schema range is not 0..1");
+    TEST_ASSERT_TRUE_MESSAGE(rowtxt.find("CFG_NOESC") != std::string::npos, "node_rmstrict is not CFG_NOESC");
+
+    const std::string set = read_repo_file("src/meshcom_settings.h");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_rmstrict, 0)") != std::string::npos,
+                             "node_rmstrict default is not 0 (off until the operator enables it)");
+    // NVS key limit: 15 characters
+    TEST_ASSERT_TRUE(strlen("node_rmstrict") <= 15);
+
+    // never a node_sset4 bit: the flag has its own member
+    TEST_ASSERT_TRUE_MESSAGE(cmd.substr(rung, 900).find("node_sset4") == std::string::npos,
+                             "--rmstrictsecurity must not use a node_sset4 bit");
+
+    // never over RM: the RM allowlist (a positive list) must not name it
+    const std::string rc = read_repo_file("src/remote_cmd.cpp");
+    const size_t al = rc.find("const RmAllowRow RM_ALLOWLIST[]");
+    TEST_ASSERT_TRUE_MESSAGE(al != std::string::npos, "RM_ALLOWLIST not found");
+    const std::string table = rc.substr(al, rc.find("};", al) - al);
+    TEST_ASSERT_TRUE_MESSAGE(table.find("rmstrict") == std::string::npos, "rmstrictsecurity is on the RM allowlist");
+
+    // the web switch is routed through the console command and reads node_rmstrict back
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("--rmstrictsecurity %s") != std::string::npos, "web setparam rmstrict does not route through --rmstrictsecurity");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("paramName.equals(\"rmstrict\")") != std::string::npos, "web rmstrict param missing");
 }
 
 // ---- --autoupdate / --updchan (AU-03, issue icssw-org/MeshCom-Firmware#1187) --
@@ -1247,6 +1338,8 @@ int main(int, char **)
     RUN_TEST(test_stor_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_rm_does_not_collide_with_other_commands);
     RUN_TEST(test_rm_rung_schema_row_and_default_match_the_assumptions);
+    RUN_TEST(test_rmstrictsecurity_does_not_collide_with_other_commands);
+    RUN_TEST(test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_autoupdate_updchan_do_not_collide_with_other_commands);
     RUN_TEST(test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions);
     RUN_TEST(test_update_does_not_collide_with_other_commands);

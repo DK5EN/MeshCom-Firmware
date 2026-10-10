@@ -24,6 +24,15 @@
 void setUp(void) {}
 void tearDown(void) {}
 
+// BF-01: rmStateInit() leaves RmState::strict at 0 (strict security OFF, the default). Every test written
+// against the lockout / rate limiter behaviour starts from this helper, which switches strict ON; the
+// flag-OFF twins further down call rmStateInit() directly.
+static void strictInit(RmState &s, uint32_t hwm)
+{
+    rmStateInit(s, hwm);
+    s.strict = true;
+}
+
 // ---- vector file ----------------------------------------------------------
 
 // __FILE__ is relative under PlatformIO's native runner, so walk up from the
@@ -184,7 +193,7 @@ static void test_vectors_commands_reproduced(void)
 
         // and end to end through rmCheck on a fresh state
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         const RmVerdict v = rmCheck(s, c, dst.c_str(), src.c_str(), passwd.c_str(), 22, 1000000);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
     }
@@ -383,18 +392,18 @@ static void test_canonical_bounds(void)
 static void test_valid_tag_accepted_and_wrong_tag_rejected(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_OK, chk(s, mk(1, "status"), 1000));
 
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, withBadTag(mk(1, "status")), 1000));
 
     // wrong password, wrong source, wrong ctr
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, SRC, "other", MAXTX, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, "DK5EN-14", PW, MAXTX, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd d = mk(1, "status");
     d.ctr = 2;
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, d, 1000));
@@ -403,7 +412,7 @@ static void test_valid_tag_accepted_and_wrong_tag_rejected(void)
 static void test_tag_over_different_dst_rejected(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(1, "reboot", "", "DK5EN-91"); // sibling node sharing the password
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, c, 1000));
 }
@@ -427,7 +436,7 @@ static void test_allowlist_accepts_every_command(void)
     for (size_t i = 0; i < sizeof(ok) / sizeof(ok[0]); i++)
     {
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         char msg[64];
         snprintf(msg, sizeof(msg), "%s %s", ok[i].cmd, ok[i].args);
         TEST_ASSERT_EQUAL_STRING_MESSAGE("ok", rmVerdictName(chk(s, mk(1, ok[i].cmd, ok[i].args), 1000)), msg);
@@ -442,9 +451,9 @@ static void test_blocked_commands_rejected_even_with_valid_tag(void)
     for (size_t i = 0; i < sizeof(blocked) / sizeof(blocked[0]); i++)
     {
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, blocked[i]), 1000)), blocked[i]);
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, blocked[i], "x"), 1000)), blocked[i]);
     }
 }
@@ -464,7 +473,7 @@ static void test_bad_args_rejected(void)
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
     {
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         char msg[64];
         snprintf(msg, sizeof(msg), "%s [%s]", bad[i].cmd, bad[i].args);
         const bool isSync = strcmp(bad[i].cmd, "sync") == 0;
@@ -476,15 +485,15 @@ static void test_bad_args_rejected(void)
 static void test_txpower_above_max_rejected(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 22, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "23"), DST, SRC, PW, 22, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 20, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "20"), DST, SRC, PW, 20, 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "0"), DST, SRC, PW, -1, 1000));
 }
 
@@ -502,7 +511,7 @@ static void test_chained_and_forbidden_payload_rejected(void)
     for (size_t i = 0; i < sizeof(payloads) / sizeof(payloads[0]); i++)
     {
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         char msg[64];
         snprintf(msg, sizeof(msg), "[%s] [%s]", payloads[i].cmd, payloads[i].args);
         TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, payloads[i].cmd, payloads[i].args), 1000)),
@@ -515,7 +524,7 @@ static void test_chained_and_forbidden_payload_rejected(void)
 static void test_replayed_counter_rejected(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(5, "reboot");
     ASSERT_VERDICT(RM_OK, chk(s, c, 1000));
     TEST_ASSERT_EQUAL_UINT32(5, rmAccept(s, c, "ok rebooting", 1000));
@@ -535,7 +544,7 @@ static void test_replayed_counter_rejected(void)
 static void test_persisted_hwm_is_the_floor(void)
 {
     RmState s;
-    rmStateInit(s, 42);
+    strictInit(s, 42);
     ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(42, "status"), 1000));
     ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(1, "status"), 100000));
     ASSERT_VERDICT(RM_OK, chk(s, mk(43, "status"), 200000));
@@ -544,7 +553,7 @@ static void test_persisted_hwm_is_the_floor(void)
 static void test_same_ctr_and_tag_within_10_min_is_cached(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(7, "reboot");
     ASSERT_VERDICT(RM_OK, chk(s, c, 5000));
     rmAccept(s, c, "ok rebooting", 5000);
@@ -568,7 +577,7 @@ static void test_same_ctr_and_tag_within_10_min_is_cached(void)
 static void test_same_ctr_after_10_min_is_replay(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(7, "reboot");
     ASSERT_VERDICT(RM_OK, chk(s, c, 5000));
     rmAccept(s, c, "ok rebooting", 5000);
@@ -578,7 +587,7 @@ static void test_same_ctr_after_10_min_is_replay(void)
 static void test_same_ctr_with_other_tag_is_not_cached(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(7, "reboot");
     rmAccept(s, c, "ok rebooting", 5000);
     // different command under the same ctr (valid tag for that command)
@@ -590,20 +599,20 @@ static void test_same_ctr_with_other_tag_is_not_cached(void)
 static void test_ctr_zero_only_with_sync(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "reboot"), 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(5, "sync"), 1000));
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 1000));
 }
 
 static void test_sync_does_not_move_hwm_and_is_rate_limited(void)
 {
     RmState s;
-    rmStateInit(s, 42);
+    strictInit(s, 42);
     ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 1000));
     TEST_ASSERT_EQUAL_UINT32(42, s.hwm);
     // a second sync inside 60 s is rate limited (own limiter), after 60 s fine
@@ -621,7 +630,7 @@ static void test_sync_does_not_move_hwm_and_is_rate_limited(void)
 static void test_sync_replay_does_not_block_commands(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const uint32_t t0 = 100000;
     const RmCmd sync = mk(0, "sync");
     ASSERT_VERDICT(RM_SYNC, chk(s, sync, t0));
@@ -646,7 +655,7 @@ static void test_sync_replay_does_not_block_commands(void)
 static void test_sync_limiter_60s(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const uint32_t t0 = 5000;
     ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), t0));
     ASSERT_VERDICT(RM_REJ_RATE, chk(s, mk(0, "sync"), t0 + RM_SYNC_RATE_MS - 1));
@@ -657,14 +666,14 @@ static void test_sync_limiter_60s(void)
 
     // a sync at nowMs == 0 counts as accepted (haveSync, not a zero timestamp)
     RmState z;
-    rmStateInit(z, 0);
+    strictInit(z, 0);
     ASSERT_VERDICT(RM_SYNC, chk(z, mk(0, "sync"), 0));
     ASSERT_VERDICT(RM_REJ_RATE, chk(z, mk(0, "sync"), RM_SYNC_RATE_MS - 1));
     ASSERT_VERDICT(RM_SYNC, chk(z, mk(0, "sync"), RM_SYNC_RATE_MS));
 
     // millis() wrap between the two syncs
     RmState w;
-    rmStateInit(w, 0);
+    strictInit(w, 0);
     const uint32_t tw = 0xFFFFFFFFu - 20000u;
     ASSERT_VERDICT(RM_SYNC, chk(w, mk(0, "sync"), tw));
     ASSERT_VERDICT(RM_REJ_RATE, chk(w, mk(0, "sync"), tw + 30000u));
@@ -675,7 +684,7 @@ static void test_sync_limiter_60s(void)
 static void test_command_does_not_block_sync(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd c = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, c, 100000));
     rmAccept(s, c, "ok", 100000);
@@ -689,7 +698,7 @@ static void test_command_does_not_block_sync(void)
 static void test_sync_leaves_cache_window_alone(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(7, "reboot");
     rmAccept(s, c, "ok rebooting", 1000);
     ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 500000));
@@ -703,7 +712,7 @@ static void test_sync_leaves_cache_window_alone(void)
 static void test_rate_limit_one_per_10_seconds(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd a = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, a, 100000));
     rmAccept(s, a, "ok", 100000);
@@ -720,7 +729,7 @@ static void test_rate_limit_one_per_10_seconds(void)
 static void test_receiver_unlock_clears_lock_only(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd first = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, first, 1000));
     rmAccept(s, first, "ok", 1000); // gives hwm / lastCtr / lastReply / rate state real values
@@ -757,7 +766,7 @@ static void test_receiver_unlock_clears_lock_only(void)
 static void test_three_rejects_lock_out_for_5_minutes_then_recover(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(1, "status"));
 
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000));
@@ -775,7 +784,7 @@ static void test_three_rejects_lock_out_for_5_minutes_then_recover(void)
 static void test_authenticated_replay_is_not_counted(void)
 {
     RmState s;
-    rmStateInit(s, 9); // hwm 9: ctr <= 9 with a valid tag is a stale counter
+    strictInit(s, 9); // hwm 9: ctr <= 9 with a valid tag is a stale counter
     for (uint32_t i = 0; i < 3; i++)
     {
         ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(5, "status"), 1000 + i * 1000));
@@ -789,14 +798,14 @@ static void test_reject_window_boundary(void)
 {
     const uint32_t t0 = 100000;
     RmState a;
-    rmStateInit(a, 0);
+    strictInit(a, 0);
     ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0));
     ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0 + 1));
     // exactly RM_REJ_WINDOW_MS after the window start: a new window, strike 1 of the new one
     ASSERT_VERDICT(RM_REJ_TAG, chk(a, withBadTag(mk(1, "status")), t0 + RM_REJ_WINDOW_MS));
     TEST_ASSERT_FALSE(ent(a).lockActive);
     RmState b;
-    rmStateInit(b, 0);
+    strictInit(b, 0);
     ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0));
     ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0 + 1));
     ASSERT_VERDICT(RM_REJ_TAG, chk(b, withBadTag(mk(1, "status")), t0 + RM_REJ_WINDOW_MS - 1));
@@ -806,13 +815,13 @@ static void test_reject_window_boundary(void)
 static void test_lockout_counts_any_reject_reason(void)
 {
     RmState s;
-    rmStateInit(s, 9);
+    strictInit(s, 9);
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 1000)); // replay no longer counts (valid tag), format does
     ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(10, "dfu"), 2000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, mk(10, "status", "", "OTHER"), 3000));
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, mk(10, "status"), 4000));
 
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(1, "cleanflash"), 1000));
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "reboot"), 2000));
     RmCmd a = mk(1, "status");
@@ -831,7 +840,7 @@ static void test_lockout_counts_any_reject_reason(void)
 static void test_reject_window_expires_after_90_seconds(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(1, "status"));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 20000));
@@ -844,7 +853,7 @@ static void test_reject_window_expires_after_90_seconds(void)
 static void test_successful_commands_do_not_clear_the_reject_count(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(2, "status"));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 1000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 2000));
@@ -860,7 +869,7 @@ static void test_successful_commands_do_not_clear_the_reject_count(void)
 static void test_empty_password_disables_rm(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     // a command "validly" tagged with the all-zero key must not pass either
     RmCmd c = mk(1, "status", "", DST, SRC, "");
     ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", MAXTX, 1000));
@@ -913,7 +922,7 @@ static void test_reply_shape_and_limits(void)
 static void test_accept_stores_result_and_truncates(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = mk(3, "status");
     char big[120];
     memset(big, 'x', sizeof(big));
@@ -948,7 +957,7 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
 
     // rate limit and cache window across the wrap
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd a = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, a, t0));
     rmAccept(s, a, "ok", t0);
@@ -959,7 +968,7 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
     ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, a, t0 + RM_CACHE_MS + 1));
 
     // lockout armed just before the wrap, ends after it
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(1, "status"));
     const uint32_t r0 = 0xFFFFFF00u;
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, r0));
@@ -971,7 +980,7 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
     ASSERT_VERDICT(RM_OK, chk(s, good, r0 + 200 + RM_LOCKOUT_MS));
 
     // reject window across the wrap: 3 rejects 40 s apart straddling it
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u + 40000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u + 80000));
@@ -997,7 +1006,7 @@ static void test_reply_is_recognised_and_never_parses_as_a_command(void)
     if (rmParse("RM1 4 ok v=4.40a 0123456789abcdef", c))
     {
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         TEST_ASSERT_NOT_EQUAL(RM_OK, rmCheck(s, c, "DK5EN-90", "DK5EN-1", "secret", 22, 1000));
     }
 }
@@ -1038,7 +1047,7 @@ static void test_build_command_reproduces_every_vector(void)
         RmCmd c;
         TEST_ASSERT_TRUE_MESSAGE(rmParse(out, c), msg);
         RmState st;
-        rmStateInit(st, 0);
+        strictInit(st, 0);
         const RmVerdict v = rmCheck(st, c, dst.c_str(), src.c_str(), passwd.c_str(), 22, 1000000);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
 
@@ -1213,7 +1222,7 @@ static std::string repeat(char ch, size_t n) { return std::string(n, ch); }
 static void test_long_result_does_not_touch_lock_state(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     s.rej[0].used = true;
     strcpy(s.rej[0].call, SRC);
     s.rej[0].rejCount = 2;
@@ -1267,7 +1276,7 @@ static void test_args_39_roundtrip_and_40_refused(void)
     TEST_ASSERT_TRUE(rmParse(wire, c));
     TEST_ASSERT_EQUAL_STRING(a39.c_str(), c.args);
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000)); // args on a no-args command
     std::string frame = std::string("RM1 9 status ") + a40 + " 0123456789abcdef";
     TEST_ASSERT_FALSE(rmParse(frame.c_str(), c));
@@ -1366,7 +1375,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
         TEST_ASSERT_EQUAL_STRING(t[0], c.cmd);
         TEST_ASSERT_EQUAL_STRING(t[1], c.args); // capitals kept byte for byte
         RmState s;
-        rmStateInit(s, 0);
+        strictInit(s, 0);
         TEST_ASSERT_EQUAL_INT_MESSAGE(RM_OK, rmCheck(s, c, DST, SRC, PW, 22, 1000), t[0]);
     }
     // a capital in the command name or in the tag region stays refused on the wire
@@ -1382,7 +1391,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
     TEST_ASSERT_TRUE(rmParse(wire, c));
     TEST_ASSERT_EQUAL_STRING("ON", c.args); // the parser keeps the bytes, the shape refuses them
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000));
 }
 
@@ -1401,7 +1410,7 @@ static void test_ext_separator_cannot_be_injected_through_args(void)
     RmCmd bad;
     TEST_ASSERT_TRUE(rmParse(wire, bad));
     RmState bs;
-    rmStateInit(bs, 0);
+    strictInit(bs, 0);
     TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(bs, bad, DST, SRC, PW, 22, 1000));
     // a second command smuggled through the args of a free-text command is a different tag on a different
     // canonical: (name, "x reboot") and (name x, reboot) cannot collide because only ONE space-split exists
@@ -1516,7 +1525,7 @@ static void strikes3(RmState &s, const char *call, uint32_t t)
 static void test_lockout_is_per_sender(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, "DK5EN-14", 1000);
     ASSERT_VERDICT(RM_REJ_LOCKOUT, fromSender(s, "DK5EN-14", false, 1, 1003));
     TEST_ASSERT_TRUE(rmSenderLocked(s, "DK5EN-14", 1003));
@@ -1529,7 +1538,7 @@ static void test_lockout_is_per_sender(void)
 static void test_rejects_of_different_senders_do_not_add_up(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const char *calls[6] = {"DK5EN-11", "DK5EN-12", "DK5EN-13", "DK5EN-14", "DK5EN-15", "DK5EN-16"};
     for (uint32_t round = 0; round < 2; round++)
         for (uint32_t i = 0; i < 6; i++)
@@ -1546,7 +1555,7 @@ static void test_sender_lock_expires_and_window_is_per_sender(void)
 {
     const uint32_t t0 = 100000;
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, "DK5EN-14", t0); // A locked until t0 + 2 + RM_LOCKOUT_MS
     // B starts its own window later; A's lock and A's (long past) window do not touch it
     ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-92", true, 1, t0 + 100000));
@@ -1574,7 +1583,7 @@ static void test_reject_table_replacement_order(void)
 
     // a locked sender survives while an unlocked one exists, the oldest unlocked one is replaced
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, call[0], 1000); // oldest, but locked
     for (int i = 1; i < RM_REJ_SOURCES; i++)
         ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, call[i], true, 1, 1000 + 1000 * (uint32_t)i));
@@ -1594,7 +1603,7 @@ static void test_reject_table_replacement_order(void)
 
     // all locked: the one with the oldest lastMs is replaced
     RmState t;
-    rmStateInit(t, 0);
+    strictInit(t, 0);
     for (int i = 0; i < RM_REJ_SOURCES; i++)
         strikes3(t, call[i], 1000 + 1000 * (uint32_t)i);
     TEST_ASSERT_EQUAL_UINT8(RM_REJ_SOURCES, rmLockedSenders(t, 8000, nullptr));
@@ -1608,7 +1617,7 @@ static void test_reject_table_replacement_order(void)
 static void test_similar_calls_are_distinct_senders(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-1", true, 1, 1000));
     ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-12", true, 1, 1001));
     ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-1", true, 1, 1002));
@@ -1624,7 +1633,7 @@ static void test_similar_calls_are_distinct_senders(void)
 static void test_uncounted_verdicts_create_no_entry(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd first = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, first, 1000));
     rmAccept(s, first, "ok", 1000);
@@ -1645,7 +1654,7 @@ static void test_uncounted_verdicts_create_no_entry(void)
 static void test_receiver_unlock_clears_every_sender(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     const RmCmd first = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, first, 1000));
     rmAccept(s, first, "ok", 1000);
@@ -1677,7 +1686,7 @@ static void test_sender_lock_survives_millis_wrap(void)
 {
     const uint32_t t0 = 0xFFFFFFFFu - 1000u; // lock set 1 s before millis() wraps
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, "DK5EN-14", t0);
     const uint32_t afterWrap = t0 + 2000u; // numerically small now
     TEST_ASSERT_TRUE(afterWrap < t0);
@@ -1701,7 +1710,7 @@ static void test_stale_lock_does_not_return_after_half_a_millis_turn(void)
 {
     const uint32_t t0 = 5000u;
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, "DK5EN-14", t0);
     TEST_ASSERT_TRUE(rmSenderLocked(s, "DK5EN-14", t0 + 10u));
     // the locked sender stays silent; ANOTHER sender's frame after the lock ran out ages the table
@@ -1720,7 +1729,7 @@ static void test_stale_lock_does_not_return_after_half_a_millis_turn(void)
 static void test_sweep_frees_expired_locks_and_windows(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     strikes3(s, "DK5EN-14", 1000u);                                   // locked
     ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-15", true, 1, 2000u)); // one strike, window open
     rmRejSweep(s, 3000u);
@@ -1739,7 +1748,7 @@ static void test_sweep_frees_expired_locks_and_windows(void)
 static void test_reject_table_odd_sender_strings(void)
 {
     RmState s;
-    rmStateInit(s, 0);
+    strictInit(s, 0);
     RmCmd c = withBadTag(mk(1, "status"));
     ASSERT_VERDICT(RM_REJ_FORMAT, rmCheck(s, c, DST, nullptr, PW, 22, 1000u));
     TEST_ASSERT_TRUE(ent(s, "").used);
@@ -1841,6 +1850,141 @@ static void test_gate_duplicates_do_not_touch_replies_or_disabled_nodes(void)
     rmQueueReset();
 }
 
+// ---- BF-01: strict security OFF (the default) -----------------------------------------------------------
+// With RmState::strict == 0 only correctness checks reject: format, allowlist, tag, replay counter.
+// Nothing is punished and nothing waits (D2: no receiver rate limits; no lockout, also no
+// per-sender strike table). The twins above run with strict ON via strictInit().
+
+static void test_off_is_the_default_after_state_init(void)
+{
+    RmState s;
+    memset(&s, 0xA5, sizeof(s));
+    rmStateInit(s, 0);
+    TEST_ASSERT_FALSE(s.strict);
+}
+
+static void test_off_wrong_tags_from_one_sender_never_lock(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    for (uint32_t i = 0; i < 60; i++)
+        ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-14", true, 1, 1000 + i * 100));
+    TEST_ASSERT_FALSE(rmSenderLocked(s, "DK5EN-14", 7000));
+    TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(s, 7000, nullptr));
+    TEST_ASSERT_EQUAL_UINT8(0, ent(s, "DK5EN-14").rejCount); // no strike is recorded at all
+    // the right key is still answered right away
+    ASSERT_VERDICT(RM_OK, fromSender(s, "DK5EN-14", false, 1, 7001));
+}
+
+// CR-01 / D1: the claimed callsign is unauthenticated, so an attacker rotates it. With the flag OFF no
+// sender ever locks, however many callsigns and strikes there are.
+static void test_off_wrong_tags_from_rotating_callsigns_never_lock(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    uint32_t t = 1000;
+    for (int n = 0; n < 12; n++) // 12 callsigns > RM_REJ_SOURCES slots
+    {
+        char call[12];
+        snprintf(call, sizeof(call), "DL1ABC-%d", n + 1);
+        for (int k = 0; k < 4; k++)
+            ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, call, true, 1, t++));
+        // the same callsign with the right key right after its strikes: no lock
+        char msg[40];
+        snprintf(msg, sizeof(msg), "callsign %s", call);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(rmVerdictName(RM_OK), rmVerdictName(fromSender(s, call, false, 1, t++)), msg);
+        TEST_ASSERT_FALSE_MESSAGE(rmSenderLocked(s, call, t), msg);
+    }
+    TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(s, t, nullptr));
+}
+
+static void test_off_back_to_back_valid_commands_one_second_apart_all_execute(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    for (uint32_t i = 1; i <= 6; i++)
+    {
+        const RmCmd c = mk(i, "status");
+        ASSERT_VERDICT(RM_OK, chk(s, c, 100000 + i * 1000));
+        rmAccept(s, c, "ok", 100000 + i * 1000);
+    }
+    TEST_ASSERT_EQUAL_UINT32(6, s.hwm);
+    // D2: syncs have no spacing either
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 200000));
+    ASSERT_VERDICT(RM_SYNC, chk(s, mk(0, "sync"), 201000));
+}
+
+static void test_off_replay_bad_tag_blocked_and_format_are_still_rejected(void)
+{
+    RmState s;
+    rmStateInit(s, 0);
+    const RmCmd c = mk(5, "status");
+    ASSERT_VERDICT(RM_OK, chk(s, c, 1000));
+    rmAccept(s, c, "ok", 1000);
+    ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(4, "status"), 2000));                  // older counter
+    ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(5, "reboot"), 3000));                  // same counter, other command
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, withBadTag(mk(6, "status")), 4000));          // bad tag
+    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(6, "factoryreset"), 5000));            // not on the allowlist
+    ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 6000));                   // ctr 0 only with sync
+    ASSERT_VERDICT(RM_CACHED, chk(s, c, 7000));                                     // lost-reply recovery stays
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", MAXTX, 8000));      // empty password
+    TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(s, 9000, nullptr));
+}
+
+// The ON twin of the rotating-callsign test: the bound of strict mode (CR-01, decided 2026-10-06) is the
+// per-sender lockout; every rotated callsign locks after its own three strikes.
+static void test_on_rotating_callsigns_each_lock_after_three_strikes(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    uint32_t t = 1000;
+    for (int n = 0; n < 12; n++)
+    {
+        char call[12];
+        snprintf(call, sizeof(call), "DL1ABC-%d", n + 1);
+        for (int k = 0; k < 3; k++)
+            ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, call, true, 1, t++));
+        ASSERT_VERDICT(RM_REJ_LOCKOUT, fromSender(s, call, false, 1, t++));
+    }
+}
+
+// Switching the flag off must not leave a stale lock behind (the web and console switch takes effect
+// on the next frame, no reboot, no manual unlock).
+static void test_switching_off_releases_existing_locks(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    strikes3(s, "DK5EN-14", 1000);
+    TEST_ASSERT_TRUE(rmSenderLocked(s, "DK5EN-14", 1003));
+    s.strict = false;
+    ASSERT_VERDICT(RM_OK, fromSender(s, "DK5EN-14", false, 1, 1004));
+    TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(s, 1004, nullptr));
+    // and switching it back on starts from a clean table
+    s.strict = true;
+    ASSERT_VERDICT(RM_REJ_TAG, fromSender(s, "DK5EN-14", true, 2, 1005));
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s, "DK5EN-14").rejCount);
+}
+
+// BF-01: the flag is console and web only. rmstrictsecurity is not on the allowlist, so a remote
+// RM1 command can never switch it (a lockout switched off from the air would defeat the point).
+static void test_rmstrictsecurity_is_not_allowlisted(void)
+{
+    static const char *const names[] = {"rmstrictsecurity", "rmstrict", "strict", "remotemgmt"};
+    for (const char *n : names)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "on", MAXTX), n);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "off", MAXTX), n);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "", MAXTX), n);
+        for (int strict = 0; strict < 2; strict++)
+        {
+            RmState s;
+            rmStateInit(s, 0);
+            s.strict = (strict != 0);
+            ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(1, n, "on"), 1000));
+        }
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1916,5 +2060,13 @@ int main(int, char **)
     RUN_TEST(test_stale_lock_does_not_return_after_half_a_millis_turn);
     RUN_TEST(test_sweep_frees_expired_locks_and_windows);
     RUN_TEST(test_reject_table_odd_sender_strings);
+    RUN_TEST(test_off_is_the_default_after_state_init);
+    RUN_TEST(test_off_wrong_tags_from_one_sender_never_lock);
+    RUN_TEST(test_off_wrong_tags_from_rotating_callsigns_never_lock);
+    RUN_TEST(test_off_back_to_back_valid_commands_one_second_apart_all_execute);
+    RUN_TEST(test_off_replay_bad_tag_blocked_and_format_are_still_rejected);
+    RUN_TEST(test_on_rotating_callsigns_each_lock_after_three_strikes);
+    RUN_TEST(test_switching_off_releases_existing_locks);
+    RUN_TEST(test_rmstrictsecurity_is_not_allowlisted);
     return UNITY_END();
 }

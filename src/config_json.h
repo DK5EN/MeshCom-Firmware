@@ -350,6 +350,7 @@ struct CfgField
     X("node_tz",       CFG_STR,  node_tz,               CFG_NORANGE,        CFG_NOESC)        \
     X("node_stor",     CFG_INT,  node_stor,             0.0, 1.0,           CFG_NOESC)        \
     X("node_rm",       CFG_INT,  node_rm,               0.0, 1.0,           CFG_NOESC)        \
+    X("node_rmstrict", CFG_INT,  node_rmstrict,         0.0, 1.0,           CFG_NOESC)        \
     X("node_autoupd",  CFG_INT,  node_autoupd,          0.0, 2.0,           CFG_NOESC)        \
     X("node_updchan",  CFG_INT,  node_updchan,          0.0, 1.0,           CFG_NOESC)        \
     CFG_FIELD_LIST_PLATFORM(X)

@@ -89,7 +89,7 @@ BLOCKED_CMDS = frozenset(
     {
         "cleanflash", "ota-update", "dfu", "deepsleep", "setcall", "passwd",
         "webpwd", "btcode", "setssid", "setpwd", "wifiset", "updrepo",
-        "updchan", "autoupdate", "rm", "remotemgmt", "stor",
+        "updchan", "autoupdate", "rm", "remotemgmt", "stor", "rmstrictsecurity",
     }
 )
 BLOCKED_CHARS = ("--", ";", "{", "%")

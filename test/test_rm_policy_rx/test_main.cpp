@@ -38,7 +38,11 @@ struct Sim
     uint32_t sentTotal;
     uint8_t maxUnanswered;
     bool locked;
-    Sim() : rng(12345), ctr(0), counted(0), rate(0), sentTotal(0), maxUnanswered(0), locked(false) { memset(&rs, 0, sizeof(rs)); }
+    Sim() : rng(12345), ctr(0), counted(0), rate(0), sentTotal(0), maxUnanswered(0), locked(false)
+    {
+        memset(&rs, 0, sizeof(rs));
+        rs.strict = true;  // BF-01: these simulations model the flag-ON pair (sender policy + receiver lockout)
+    }
     uint32_t rnd() { rng = rng * 1664525u + 1013904223u; return rng >> 8; }
 
     // sends one frame (cmd "sync" has ctr 0) with `pass`, arriving after `delayMs`
@@ -505,6 +509,7 @@ void test_junk_from_other_senders_never_locks_the_operator(void)
 {
     RmState rs;
     rmStateInit(rs, 0);
+    rs.strict = true; // BF-01: the per-sender lockout exists only with strict security on
     uint8_t good[32], bad[32];
     rmDeriveKey(PW, good);
     rmDeriveKey("guess", bad);
@@ -541,6 +546,71 @@ void test_junk_from_other_senders_never_locks_the_operator(void)
     TEST_ASSERT_TRUE_MESSAGE(junkLocked > 0, "the junk senders themselves must run into their own lockout");
 }
 
+// ---- BF-01: the flag pair --------------------------------------------------------------------------
+// D3: with the sender's flag OFF the whole sender policy is skipped (budget, cooldown, one-shot).
+void test_off_sender_policy_allows_every_send(void)
+{
+    std::vector<RmPolEntry> book;
+    for (uint32_t i = 0; i < RM_POLICY_MAX_ENTRIES; i++)
+    {
+        RmPolEntry e;
+        memset(&e, 0, sizeof(e));
+        e.sentMs = 50000u + i;  // twelve unanswered sends within the last second: budget AND cooldown hit
+        book.push_back(e);
+    }
+    const uint32_t now = 50100u;
+    const RmPolDecision on = rmPolicyMaySend(book.data(), (uint8_t)book.size(), now, RM_POLICY_LIMIT_UNPROVEN, true, true, true);
+    TEST_ASSERT_TRUE_MESSAGE(on.usedForce || !on.allowed, "flag ON must still limit this book");
+    const RmPolDecision limited = rmPolicyMaySend(book.data(), (uint8_t)book.size(), now, RM_POLICY_LIMIT_UNPROVEN, false, false, true);
+    TEST_ASSERT_FALSE(limited.allowed);
+    TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, limited.reason);
+    const RmPolDecision off = rmPolicyMaySend(book.data(), (uint8_t)book.size(), now, RM_POLICY_LIMIT_UNPROVEN, true, true, false);
+    TEST_ASSERT_TRUE(off.allowed);
+    TEST_ASSERT_EQUAL_INT(RM_POL_OK, off.reason);
+    TEST_ASSERT_EQUAL_UINT32(0, off.retryS);
+    TEST_ASSERT_FALSE(off.canForce);
+    TEST_ASSERT_FALSE_MESSAGE(off.usedForce, "the one-shot must not be spent when the policy is off");
+}
+
+// Wrong-key frames from one call, one per second, straight into rmCheck; returns the first index that
+// hit the lockout, or -1.
+static int flood_wrong_key(RmState &rs, uint32_t frames)
+{
+    uint8_t bad[32];
+    rmDeriveKey("guess", bad);
+    for (uint32_t i = 0; i < frames; i++)
+    {
+        char wire[96];
+        RmCmd c;
+        TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, i + 1, "status", "", bad, wire, sizeof(wire)) > 0);
+        TEST_ASSERT_TRUE(rmParse(wire, c));
+        const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 22, 1000u + i * 1000u);
+        if (v == RM_REJ_LOCKOUT)
+            return (int)i;
+        TEST_ASSERT_EQUAL_STRING("tag", rmVerdictName(v));
+    }
+    return -1;
+}
+
+// D3 consequence (documented in the --rmstrictsecurity help): a flag-OFF sender does not hold back, so
+// it can push a flag-ON target into its lockout with its own wrong key.
+void test_off_sender_can_push_an_on_target_into_lockout(void)
+{
+    RmState rs;
+    rmStateInit(rs, 0);
+    rs.strict = true;
+    TEST_ASSERT_EQUAL_INT(3, flood_wrong_key(rs, 60)); // strikes at 0, 1, 2; the fourth frame meets the lock
+}
+
+// D1/D2: both sides OFF, an unbounded wrong-key stream is answered by silence (REJ_TAG) and never locks.
+void test_both_off_wrong_key_stream_never_locks(void)
+{
+    RmState rs;
+    rmStateInit(rs, 0);
+    TEST_ASSERT_EQUAL_INT(-1, flood_wrong_key(rs, 1800));
+    TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(rs, 1800000u, nullptr));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -553,5 +623,8 @@ int main(int, char **)
     RUN_TEST(test_target_rekeyed_proven_sender_never_locks);
     RUN_TEST(test_proof_streak_rule);
     RUN_TEST(test_junk_from_other_senders_never_locks_the_operator);
+    RUN_TEST(test_off_sender_policy_allows_every_send);
+    RUN_TEST(test_off_sender_can_push_an_on_target_into_lockout);
+    RUN_TEST(test_both_off_wrong_key_stream_never_locks);
     return UNITY_END();
 }

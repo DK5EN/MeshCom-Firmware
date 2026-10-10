@@ -161,3 +161,24 @@ A `/code-review` at `max` effort was started against this paper (range `e1e2acea
 - **New findings: none.** Every agent transcript ends in the rate-limit error; none contains findings text.
 - **Effect on this paper:** none. §§3-8 stand as written, unverified by a second pass. §9 (t-deck, msgstore, BLE, MTU, Safeboot `ota.h`) remains uncovered.
 - **Next step:** rerun at `medium` or `high` per area (RM core, Remote page JS, §9 paths) rather than one `max` fan-out, ideally before the fix campaign starts.
+
+## 11. Fix campaign status (`/orchestrate-waves`, started 2026-10-10)
+
+Scope settled 2026-10-10: all three waves in one session, gate and commit per wave, bench stage 3 at the end on all three connected nodes; UI-09 excludes `src/safeboot/ota.html`; FL-01 stays measurement only; local commits only.
+
+| Wave | State | Items closed                                                                                    | Notes                                                                                                                                                                                                                                                                                                                                                 |
+| ---- | ----- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | done  | BF-01 (D2, D3, Q1), DRY-08 (remote_cmd part), UI-01..08, CR-06, D5, D6, UI-09, DRY-05, CV-01    | Gate: regression stage 1,2 green (172 suites, selftest 48 commands), `webgui_rm_test.js` 260 cases, Chrome layout at 360/800 px via offline preview, Fable advisor APPROVED on W1-A. Flash vs 3518ab4f: Heltec +948 B, RAK +1832 B (81.2 %), E22 +732 B; one `compress` symbol per image (DRY-05 holds), the BF-01 strings and help text outweigh it. |
+| 2    | open  | CR-02, CR-04, CR-05, DRY-01, DRY-06, DRY-09; CR-03 to be closed as covered by RM-DUP (661aca73) | Scout anchors in the session scratchpad; no native env builds `rm_runtime.cpp`, `rm_exec_*.cpp`, `command_functions.cpp` or `phone_commands.cpp`, so DRY-01 needs a pure helper header with its own env.                                                                                                                                              |
+| 3    | open  | DRY-02, DRY-03, DRY-04, DRY-07, then FL-01 measurement                                          |                                                                                                                                                                                                                                                                                                                                                       |
+
+Wave 1 deviations and findings for later waves:
+
+- The RM strict-security switch sits in the settings page's switches card after "Gateway" (the settings page has no `--remotemgmt` switch; that lives on the RM page) and is mirrored on the info page (`info_switch_lint`).
+- Narrow screens (max-width 600 px): the RM Messages and Log tables render as stacked block rows without headers; the Log rows carry `from ` / `ctr ` CSS labels. The Run-again button sits under the reply text.
+- `rmErr.passwd` stays as an alias of `rmErr.pw`: the server emits `pw`, the runtime emits `passwd` (DRY-02 candidate).
+- The RM page's rodata grew by about 250 B (switch markup and the narrow-screen CSS outweigh the dedup); FL-01 is measured after wave 3.
+- **Open for the operator (advisor finding, not a blocker):** with the flag OFF a sniffed authentic `sync` frame re-injected with fresh message ids earns one on-air reply per copy (1:1 amplifier, no execution, no strike). D2 gates `RM_SYNC_RATE_MS` by name, so this is as decided; the advisor recommends a flag-independent _reply spacing_ for sync replies (one per `RM_RATE_MS`, same idiom as `RM_CACHED`, marker `[RM];sync;ctr;N;suppressed`) as an airtime guard in W2-A. Decide before W2-A is dispatched.
+- Wording "A third failed try locks you out for 5 minutes" (`rmStateMessage(RM_ST_NOANSWER)` in `rm_sender_policy.h` and the RM page) is only true with the flag ON; wave 3 (DRY-02, C++ as single source) rewords it.
+- `tools/remote_cmd.py` `BLOCKED_CMDS` now lists `rmstrictsecurity` (client mirror; the firmware allowlist refuses it regardless).
+- `RM_MUTATE=mh` of `tools/webgui_rm_test.js` aborts the node process with a dyld trace instead of printing FAILED; not checked against the pre-wave file.

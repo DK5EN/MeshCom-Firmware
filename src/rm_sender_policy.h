@@ -15,6 +15,8 @@
 //     strike. After a re-key (key fingerprint changed) the proof and the capability are gone and
 //     ONE forced attempt beyond the limit is allowed. Two sends in a row without a verified reply
 //     suspend the proof (rmPolicyLimit): the target may have been re-keyed.
+//     BF-01: this whole policy is active only with strict security on (node_rmstrict, default off):
+//     rmPolicyMaySend(..., strict = false) allows every send and spends no one-shot.
 //  2. Entry state: queued / waiting / noanswer / ok / err / unverified as a function of timestamps.
 //  3. Plain sentences for every state and every RM error token.
 //  4. The compact `status` reply: `s=<letters> p=<cur>/<max>` encode/decode and the whole formatter,
@@ -128,10 +130,12 @@ inline uint32_t rmPolicyCeilS(uint32_t ms)
 // than the window. A verified err reply counts as answered: the target is alive and the key is right.
 // Boundaries: age 10000 ms is out of the cooldown; age RM_POLICY_WINDOW_MS is out of the window.
 inline RmPolDecision rmPolicyMaySend(const RmPolEntry *e, uint8_t n, uint32_t nowMs,
-                                      uint8_t limit = RM_POLICY_LIMIT_UNPROVEN, bool oneShot = false, bool force = false)
+                                      uint8_t limit = RM_POLICY_LIMIT_UNPROVEN, bool oneShot = false, bool force = false,
+                                      bool strict = true)
 {
     RmPolDecision d = {true, RM_POL_OK, 0, 0, false, false};
-    if (e == nullptr)
+    // BF-01 (D3): without strict security the whole policy (budget, cooldown, one-shot force) is off
+    if (e == nullptr || !strict)
         return d;
     if (n > RM_POLICY_MAX_ENTRIES)
         n = (uint8_t)RM_POLICY_MAX_ENTRIES;

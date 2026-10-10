@@ -3105,11 +3105,15 @@
    "-Wall",
    "-Wextra"
   ],
+  "build_src_filter": [
+   "-<*>",
+   "+<hmac_sha256.cpp>"
+  ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py"
   ],
   "platform": "native",
-  "test_build_src": "False",
+  "test_build_src": "True",
   "test_filter": [
    "test_hmac_sha256"
   ],
@@ -3503,7 +3507,8 @@
   ],
   "build_src_filter": [
    "-<*>",
-   "+<remote_cmd.cpp>"
+   "+<remote_cmd.cpp>",
+   "+<hmac_sha256.cpp>"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py"
@@ -3564,7 +3569,8 @@
   ],
   "build_src_filter": [
    "-<*>",
-   "+<remote_cmd.cpp>"
+   "+<remote_cmd.cpp>",
+   "+<hmac_sha256.cpp>"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py"
@@ -3965,6 +3971,7 @@
    "+<reack_limiter.cpp>",
    "+<own_msg_status.cpp>",
    "+<remote_cmd.cpp>",
+   "+<hmac_sha256.cpp>",
    "+<gw_link_status.cpp>",
    "+<esp32/udp_frame_esp32.cpp>",
    "+<nrf52/udp_frame_nrf52.cpp>"

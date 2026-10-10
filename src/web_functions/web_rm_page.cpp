@@ -18,82 +18,95 @@
 #include "web_rm_util.h"
 #include "web_functions.h"
 
-/** Remote page body: the sub-header, then the static skeleton. The elements are filled by the scaffold JS. */
+/** Remote page body: the sub-header, then the static skeleton. The elements are filled by the scaffold JS.
+ *  Every card uses the shared collapsablecard markup (CSS and togglecard() live in web_functions.cpp): teaser span,
+ *  toggle button and exactly one body div. The class names are short and unique to this page, so no id prefix. */
 void sub_page_remote()
 {
     _create_meshcom_subheader("Remote");
     web_client.println("<div id=\"content_inner\">\n"
                        "<style>\n"
-                       "#rm_page .rmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:7px 0;}\n"
-                       "#rm_page .rmrow input[type=text],#rm_page .rmrow input[type=password]{flex:1;min-width:9em;}\n"
-                       "#rm_page .rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
-                       "#rm_page .rmchip{flex-direction:column;align-items:flex-start;min-width:7em;text-align:left;}\n"
-                       "#rm_page .rmchip.rmsel{background:var(--mclightblue);}");
-    web_client.println("#rm_page .rmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5em,1fr));gap:8px;margin:7px 0;}\n"
-                       "#rm_page .rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
-                       "#rm_page div.rmtile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:dashed 1px var(--mcgray);border-radius:5px;padding:4px;}\n"
-                       "#rm_page .rmsmall{min-height:0;padding:1px 10px;}\n"
-                       "#rm_page .rmon{background:var(--mclightgreen);}\n"
-                       "#rm_page .rmoff{background:#e6e6e6;}");
-    web_client.println("#rm_page .rmwarn{background:var(--mclightred);}\n"
-                       "#rm_page .rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
+                       ".rmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:7px 0;}\n"
+                       ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}\n"
+                       ".rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
+                       ".rmchip{flex-direction:column;align-items:flex-start;min-width:7em;text-align:left;}\n"
+                       ".rmchip.rmsel{background:var(--mclightblue);}");
+    web_client.println(".rmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5em,1fr));gap:8px;margin:7px 0;}\n"
+                       ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
+                       ".rmwarn{background:var(--mclightred);}\n"
+                       ".rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
-                       "#rm_page .rmok{color:#1a7f37;font-weight:bold;}\n"
-                       "#rm_page .rmbad{color:var(--mcred);font-weight:bold;}\n"
-                       "#rm_page .rmlock{font-weight:bold;min-height:1.4em;}\n"
-                       "#rm_page .rmact{padding:3px 0;border-bottom:solid 1px #e0e0e0;}\n"
-                       "#rm_page .rmtab{width:100%;border-collapse:collapse;}");
-    web_client.println("#rm_page .rmtab th,#rm_page .rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;font-size:x-small;}");
-    web_client.println("#rm_msgs td:nth-child(4),#rm_log td:nth-child(5){word-break:break-word;}\n"
-                       "#rm_msgs td:nth-child(1),#rm_msgs td:nth-child(3),#rm_log td:nth-child(1),#rm_page .rmtab button{white-space:nowrap;}\n"
+                       ".rmsw:indeterminate{background-color:#d4d4d4;}\n"
+                       ".rmsw:indeterminate::before{left:.9em;}");
+    web_client.println(".rmok{color:#1a7f37;font-weight:bold;}\n"
+                       ".rmbad{color:var(--mcred);font-weight:bold;}\n"
+                       ".rmlock{font-weight:bold;}\n"
+                       "#rm_msg{min-height:1.4em;}\n"
+                       ".rmtab{width:100%;border-collapse:collapse;}\n"
+                       ".rmtab th,.rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;}");
+    web_client.println("#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(3),#rm_log td:nth-child(4),#rm_log td:nth-child(5){overflow-wrap:anywhere;}\n"
+                       "#rm_msgs td:nth-child(1),#rm_log td:nth-child(1),.rmtab button{white-space:nowrap;}");
+    web_client.println("@media (max-width:600px){.rmtab thead{display:none;}\n"
+                       ".rmtab,#rm_msgs,#rm_log{display:block;}\n"
+                       "#rm_msgs tr,#rm_log tr{display:block;padding:3px 0;border-bottom:solid 1px #e0e0e0;}");
+    web_client.println("#rm_msgs td,#rm_log td{display:inline-block;border:0;padding:1px 8px 1px 0;}\n"
+                       "#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(4),#rm_log td:nth-child(5){display:block;}");
+    web_client.println("#rm_log td:nth-child(2)::before{content:\"from \";}\n"
+                       "#rm_log td:nth-child(3)::before{content:\"ctr \";}}\n"
                        "</style>\n"
                        "<div id=\"rm_page\">\n"
                        "<p id=\"rm_auth\" class=\"rmbad\" style=\"display:none\"></p>\n"
                        "<p id=\"rm_net\" class=\"font-small\"></p>\n"
-                       "<div class=\"cardlayout\">\n"
-                       "<label class=\"cardlabel\">This node</label>");
+                       "<p id=\"rm_msg\" class=\"rmmsg\"></p>\n"
+                       "<p id=\"rm_force\" class=\"rmmsg\"></p>\n"
+                       "<p id=\"rm_chain\" class=\"font-small\"></p>");
+    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">This node</label>\n"
+                       "<span>Password and remote management of this node.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div>");
     web_client.println("<div class=\"rmrow\"><input type=\"checkbox\" role=\"switch\" id=\"rm_on\" disabled><label id=\"rm_onlbl\" for=\"rm_on\">Remote management</label><span id=\"rm_pwstate\" class=\"font-small\"></span><span id=\"rm_lockstate\" class=\"font-small\"></span></div>\n"
                        "<p id=\"rm_onhint\" class=\"font-small\"></p>");
     web_client.println("<div class=\"rmrow\"><input type=\"password\" id=\"rm_selfpw\" maxlength=\"14\" autocomplete=\"new-password\" placeholder=\"New password\" aria-label=\"New password for this node\"><button type=\"button\" data-act=\"selfset\">Set</button><button type=\"button\" data-act=\"selfclear\" id=\"rm_selfclear\">Clear</button></div>\n"
                        "<p class=\"font-small\">This password also protects the net console (port 2323) and the KISS port, not only remote management.</p>\n"
                        "<p id=\"rm_selfmsg\" class=\"rmmsg\"></p>\n"
-                       "</div>");
-    web_client.println("<div class=\"cardlayout\">\n"
-                       "<label class=\"cardlabel\">Choose a node</label>\n"
-                       "<p class=\"font-small\">Nodes heard directly in the last 3 hours. Remote management may be switched off on any of them.</p>\n"
+                       "</div></div>");
+    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Choose a node</label>\n"
+                       "<span>Pick the node to manage.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div>");
+    web_client.println("<p class=\"font-small\">Nodes heard directly in the last 3 hours. Remote management may be switched off on any of them.</p>\n"
                        "<div id=\"rm_heard\" class=\"rmchips\"></div>\n"
                        "<p class=\"font-small\"><button type=\"button\" data-act=\"heard\">Refresh list</button></p>\n"
                        "<p class=\"font-small\">Saved on this node</p>\n"
                        "<div id=\"rm_saved\" class=\"rmchips\"></div>");
     web_client.println("<div class=\"rmrow\"><input type=\"text\" id=\"rm_call\" maxlength=\"9\" autocomplete=\"off\" autocapitalize=\"characters\" placeholder=\"Call sign, for example DK5EN-12\" aria-label=\"Call sign of the node\"></div>\n"
                        "<p id=\"rm_callchk\" class=\"font-small\"></p>");
-    web_client.println("<div id=\"rm_pwrow\" class=\"rmrow\"><input type=\"password\" id=\"rm_pw\" maxlength=\"14\" autocomplete=\"new-password\" placeholder=\"Password of that node\" aria-label=\"Password of the node\"><button type=\"button\" data-act=\"remember\">Remember on this node</button></div>\n"
+    web_client.println("<div id=\"rm_pwrow\" class=\"rmrow\"><input type=\"password\" id=\"rm_pw\" maxlength=\"14\" autocomplete=\"new-password\" placeholder=\"Password of that node\" aria-label=\"Password of the node\"><button type=\"button\" data-act=\"remember\">Remember</button></div>\n"
                        "<p id=\"rm_savednote\" class=\"font-small\"></p>");
-    web_client.println("<div class=\"rmrow\"><button type=\"button\" id=\"rm_test\" data-act=\"test\">Test connection</button><button type=\"button\" id=\"rm_forget\" data-act=\"forget\">Forget this node</button><button type=\"button\" id=\"rm_forgetall\" data-act=\"forgetall\">Forget all</button></div>\n"
-                       "</div>\n");
-    web_client.println("<div class=\"cardlayout\"><label class=\"cardlabel\">Messages</label>\n"
-"<p id=\"rm_msg\" class=\"rmmsg\"></p>\n"
-"<p id=\"rm_force\" class=\"rmmsg\"></p>\n"
-"<p id=\"rm_lockline\" class=\"rmlock\"></p>\n"
-"<p id=\"rm_chain\" class=\"font-small\"></p>\n");
-    web_client.println("<table class=\"rmtab\"><thead><tr><th>time</th><th>command</th><th>state</th><th>reply</th><th></th></tr></thead><tbody id=\"rm_msgs\"></tbody></table></div>\n");
-    web_client.println("<div class=\"cardlayout\"><label class=\"cardlabel\">Info</label><div id=\"rm_info\" class=\"rmtiles\"></div></div>");
-    web_client.println("<div class=\"cardlayout\"><label class=\"cardlabel\">Node settings</label><div id=\"rm_cards\"></div></div>");
-    web_client.println("<div class=\"cardlayout\"><label class=\"cardlabel\">Switches</label><div id=\"rm_sw\" class=\"rmtiles\"></div><p id=\"rm_swnote\" class=\"font-small\"></p></div>\n");
-    web_client.println("<div class=\"cardlayout\"><label class=\"cardlabel\">Radio</label>\n");
-    web_client.println("<div id=\"rm_radio\">\n"
-                       "<div class=\"rmrow\"><button type=\"button\" id=\"rm_rtxdn\" data-act=\"txdn\">-</button><b id=\"rm_rtxval\">10 dBm</b><button type=\"button\" id=\"rm_rtxup\" data-act=\"txup\">+</button><button type=\"button\" id=\"rm_rtxapply\" data-act=\"txapply\">Apply</button></div>");
-    web_client.println("<p id=\"rm_rtxnote\" class=\"font-small\"></p></div></div>\n"
-                       "<div class=\"cardlayout\"><label class=\"cardlabel\">Restart</label><div id=\"rm_rs\" class=\"rmtiles\"></div></div>\n"
-                       "<details id=\"rm_adv\" open class=\"cardlayout\"><summary class=\"font-bold\">Advanced</summary>\n"
+    web_client.println("<div class=\"rmrow\"><button type=\"button\" id=\"rm_forget\" data-act=\"forget\">Forget this node</button><button type=\"button\" id=\"rm_forgetall\" data-act=\"forgetall\">Forget all</button></div>\n"
+                       "</div></div>\n");
+    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Messages</label>\n"
+                       "<span>Commands sent from this page.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div><table class=\"rmtab font-small\"><thead><tr><th>time</th><th>command</th><th>state</th><th>reply</th></tr></thead><tbody id=\"rm_msgs\"></tbody></table></div></div>\n");
+    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Actions</label>\n"
+                       "<span>Status, switches, restart.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div><div id=\"rm_info\" class=\"rmtiles\"></div><div id=\"rm_sw\"></div><p id=\"rm_swnote\" class=\"font-small\"></p></div></div>\n");
+    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Node settings</label>\n"
+                       "<span>Radio, sensors, name, position, queues.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div id=\"rm_cards\"></div></div>\n");
+    web_client.println("<div id=\"rm_adv\" class=\"cardlayout collapsablecard\"><label class=\"cardlabel\">Advanced</label>\n"
+                       "<span>Output pin, counters, command log.</span>\n"
+                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
+                       "<div>\n"
                        "<p class=\"font-small\">Switch an output pin of the node (only works if the pin is set as an output there).</p>");
-    web_client.println("<div class=\"rmrow\"><select id=\"rm_pin\" aria-label=\"Output pin\"></select><button type=\"button\" id=\"rm_pinon\" data-act=\"pinon\">Pin on</button><button type=\"button\" id=\"rm_pinoff\" data-act=\"pinoff\">Pin off</button></div>\n");
-    web_client.println("<p class=\"font-small\">Re-sync counter: use this if the node keeps answering that the counters are out of step.</p>\n"
-                       "<div class=\"rmrow\"><button type=\"button\" id=\"rm_sync\" data-act=\"sync\">Re-sync counter</button></div>\n"
+    web_client.println("<div class=\"rmrow\"><select id=\"rm_pin\" aria-label=\"Output pin\"></select><label for=\"rm_pinsw\">Output</label><input type=\"checkbox\" role=\"switch\" class=\"rmsw\" id=\"rm_pinsw\" data-sw=\"pin\" disabled></div>\n"
                        "<p id=\"rm_cnt\" class=\"font-small\"></p>");
     web_client.println("<p class=\"font-small\">Commands run on this node</p>\n"
-                       "<table class=\"rmtab\"><thead><tr><th>ago</th><th>from</th><th>ctr</th><th>command</th><th>result</th></tr></thead><tbody id=\"rm_log\"></tbody></table>\n"
-                       "</details>\n"
+                       "<table class=\"rmtab font-small\"><thead><tr><th>ago</th><th>from</th><th>ctr</th><th>command</th><th>result</th></tr></thead><tbody id=\"rm_log\"></tbody></table>\n"
+                       "</div></div>\n"
                        "</div>\n"
                        "</div>");
 }
@@ -104,15 +117,17 @@ void rmScaffoldJs()
 {
     web_client.println("var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmTx={val:10,touched:false},rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);\n"
                        "var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position'};");
+    web_client.println("var rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
+                       "function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.';}");
     web_client.println("var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'};");
-    web_client.println("var rmErr={limit:'Two tries to this node are still unanswered. Wait a little before another try.',busy:'Wait a few seconds before the next command.',passwd:'The password is not valid: 1 to 14 plain characters, no space at the start or end.',pw:'The password is not valid: 1 to 14 plain characters, no space at the start or end.',dst:'That call sign is not valid, or it is this node.',call:'That call sign is not valid.',cmd:'That command is not allowed.',");
+    web_client.println("var rmErr={limit:'Two tries to this node are still unanswered. Wait a little before another try.',busy:'Wait a few seconds before the next command.',pw:'The password is not valid: 1 to 14 plain characters, no space at the start or end.',dst:'That call sign is not valid, or it is this node.',call:'That call sign is not valid.',cmd:'That command is not allowed.',");
     web_client.println("ctr:'This node ran out of counter values.',store:'The node could not save it. Try again.',send:'The radio queue is full. Try again in a moment.',size:'The request was too large.',short:'The request was incomplete. Try again.',act:'The request was not understood.',form:'The request could not be read.',slot:'The saved node changed. Reload the page.',dup:'This node is already saved in another place.',token:'This page is out of date. Reload it and try again.'};\n");
-    web_client.println("var rmForce=null;rmErr.range='That value is outside the allowed range.';rmErr.text='The text contains characters the node will not accept.';rmErr.unknown='The node does not know that one.';rmErr.unsupported='That is not available on this node.';\n");
+    web_client.println("var rmForce=null;rmErr.passwd=rmErr.pw;rmErr.range='That value is outside the allowed range.';rmErr.text='The text contains characters the node will not accept.';rmErr.unknown='The node does not know that one.';rmErr.unsupported='That is not available on this node.';\n");
     web_client.println("rmErr.end='There are no more rows.';rmErr.gps='The position is controlled by GPS on that node.';rmErr.hidden='That node does not send its position, so it is not shown.';rmErr.failed='The node could not do it.';\n"
                                               "function rmNow(){return Date.now();}");
     web_client.println("function rmEl(i){return document.getElementById(i);}\n"
                        "function rmTxt(i,t,c){var e=rmEl(i);if(!e)return;e.textContent=t;if(c!==undefined)e.className=c;}\n"
-                       "function rmMsg(t,c){rmTxt('rm_msg',t,'rmmsg '+(c||''));}\n"
+                       "function rmMsg(t,c){rmNote.t=t;rmNote.c='rmmsg '+(c||'');rmRenderLock();}\n"
                        "function rmEnc(s){return encodeURIComponent(s);}\n"
                        "function rmErrText(t){return Object.prototype.hasOwnProperty.call(rmErr,t)?rmErr[t]:'The request was refused ('+t+').';}\n"
                        "function rmAgo(s){return s<120?s+' s':s<7200?Math.round(s/60)+' min':Math.round(s/3600)+' h';}");
@@ -160,28 +175,27 @@ void rmScaffoldJs()
     web_client.println("function rmPost(u,b){return fetch(u,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});}\n"
                        "function rmJson(r){if(r.status==401||r.status==403){rmAuthFail();return Promise.reject(0);}return r.json();}\n"
                        "function rmAuthFail(){rmAuth=true;clearTimeout(rmT.poll);rmT.poll=0;var e=rmEl('rm_auth');if(e){e.textContent='Your session has ended. Please log in again (reload this page).';e.style.display='';}rmRender();}");
-    web_client.println("function rmCatch(e,id){if(e===0)return;rmTxt(id||'rm_msg','The node did not answer the request. Check the connection and try again.','rmmsg rmbad');}\n"
-                       "function rmHintOff(){var i,e,a=['rm_msg','rm_selfmsg'];for(i=0;i<2;i++){e=rmEl(a[i]);if(e&&/rmconf/.test(e.className))rmTxt(a[i],'','rmmsg');}}\n"
+    web_client.println("function rmCatch(e,id){if(e===0)return;if(id)rmTxt(id,rmNoAns,'rmmsg rmbad');else rmMsg(rmNoAns,'rmbad');}\n"
+                       "function rmHintOff(){var e=rmEl('rm_selfmsg');if(/rmconf/.test(rmNote.c))rmMsg('','');if(e&&/rmconf/.test(e.className))rmTxt('rm_selfmsg','','rmmsg');}\n"
                        "function rmDisarm(){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';rmHintOff();rmRender();}");
-    web_client.println("function rmConfirm(id,hint,mid){if(rmArmId==id){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';return true;}clearTimeout(rmT.arm);rmArmId=id;rmT.arm=setTimeout(rmDisarm,4000);rmRender();rmTxt(mid||'rm_msg',hint,'rmmsg rmconf');return false;}\n"
+    web_client.println("function rmConfirm(id,hint,mid){if(rmArmId==id){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';return true;}clearTimeout(rmT.arm);rmArmId=id;rmT.arm=setTimeout(rmDisarm,4000);rmRender();if(mid)rmTxt(mid,hint,'rmmsg rmconf');else rmMsg(hint,'rmconf');return false;}\n"
                        "function rmBtn(box,label,cls,dis,attrs){var b=document.createElement('button'),k;b.type='button';b.className=cls||'';b.disabled=!!dis;b.textContent=label;for(k in attrs)b.setAttribute(k,attrs[k]);box.appendChild(b);return b;}");
-    web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?'Really? tap again':label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}\n"
-                       "function rmSwTile(box,n,st,dis){var cf=(n=='mesh'||n=='gateway')?n+' off':'',nm=rmTogName[n],w,s;\n"
-                       "if(st==1)return rmTile(box,nm+' on',n,'off',cf,'rmon',dis);\n"
-                       "if(st==0)return rmTile(box,nm+' off',n,'on','','rmoff',dis);");
-    web_client.println("w=document.createElement('div');w.className='rmtile rmunk';s=document.createElement('span');s.textContent=nm+' ?';w.appendChild(s);\n"
-                       "rmTile(w,'On',n,'on','','rmsmall',dis);rmTile(w,'Off',n,'off',cf,'rmsmall',dis);box.appendChild(w);}");
-    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['gps','track','display','led','mesh','gateway'],cap=rmCap(k),ap,arm,ids=['rm_test','rm_pinon','rm_pinoff','rm_sync'];\n"
-                       "b.textContent='';for(i=0;i<d.length;i++)rmTile(b,d[i][1],d[i][0],'','','',dis);\n"
+    web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?rmReally:label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}");
+    web_client.println("function rmSwSet(i,st,dis,last,shown){i.disabled=!!dis;i.indeterminate=st<0&&!(shown&&last);i.checked=st<0?last=='on':st==1;}");
+    web_client.println("function rmSwRow(box,n,st,dis){var w=document.createElement('div'),l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';w.className='rmrow';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
+    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);w.appendChild(l);w.appendChild(i);box.appendChild(w);}");
+    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['gps','track','display','led','mesh','gateway'],p=rmEl('rm_pin').value;\n"
+                       "b.textContent='';for(i=0;i<d.length;i++)rmTile(b,d[i][1],d[i][0],'','','',dis);");
+    web_client.println("rmBtn(b,'Re-sync counter','rmtile',dis,{'data-act':'sync',title:'Use this if the node keeps answering that the counters are out of step.'});rmTile(b,'Restart','reboot','','reboot','rmwarn',dis);\n"
                        "b=rmEl('rm_sw');b.textContent='';\n"
-                       "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwTile(b,o[i],k.sw[rmTog[o[i]]],dis);}");
+                       "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
-                       "b=rmEl('rm_rs');b.textContent='';rmTile(b,'Restart','reboot','','reboot','rmwarn',dis);\n"
-                       "if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<0)rmTx.val=0;");
-    web_client.println("rmTxt('rm_rtxval',rmTx.val+' dBm');rmEl('rm_rtxup').disabled=rmTx.val>=cap;rmEl('rm_rtxdn').disabled=rmTx.val<=0;\n"
-                       "ap=rmEl('rm_rtxapply');arm=rmArmId=='txpower '+rmTx.val;ap.disabled=dis;ap.textContent=arm?'Really? tap again':'Apply';ap.className=arm?'rmarmed':'';\n"
-                       "rmTxt('rm_rtxnote',k.max!==null&&k.max>0?'Highest value this node reports: '+k.max+' dBm.':'The node has not reported its limit yet, so the highest value is 15 dBm.','font-small');\n"
-                       "for(i=0;i<ids.length;i++)rmEl(ids[i]).disabled=dis;}");
+                       "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}\n"
+                       "function rmTxBuild(p,k,dis){var cap=rmCap(k),r=document.createElement('div'),x,a;\n"
+                       "if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<0)rmTx.val=0;r.className='rmrow';a=rmArmId=='txpower '+rmTx.val;");
+    web_client.println("rmBtn(r,'-','',rmTx.val<=0,{'data-act':'txdn'}).id='rm_rtxdn';x=document.createElement('b');x.id='rm_rtxval';x.textContent=rmTx.val+' dBm';r.appendChild(x);rmBtn(r,'+','',rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';");
+    web_client.println("rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis,{'data-act':'txapply'}).id='rm_rtxapply';p.appendChild(r);\n"
+                       "x=document.createElement('div');x.id='rm_rtxnote';x.className='font-small';x.textContent=k.max!==null&&k.max>0?'':'The node has not reported its limit yet, so the highest value is 15 dBm.';p.appendChild(x);}");
     web_client.println("function rmChip(box,call,l2,l3,cls){var b=rmBtn(box,'','rmchip '+cls+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b');s.textContent=call;b.appendChild(s);\n"
                        "if(l2){s=document.createElement('span');s.className='font-small';s.textContent=l2;b.appendChild(s);}\n"
                        "if(l3){s=document.createElement('span');s.className='font-small';s.textContent=l3;b.appendChild(s);}}");
@@ -189,38 +203,38 @@ void rmScaffoldJs()
                        "h.textContent='';s.textContent='';\n"
                        "for(i=0;i<rmHeard.length;i++){x=rmHeard[i];rmChip(h,String(x.call),String(x.hw||''),rmAgo(x.age_s|0)+' ago'+(x.rssi?', '+x.rssi+' dBm':''),'');}\n"
                        "if(!rmHeard.length)h.textContent='No node heard directly yet.';\n"
-                       "for(i=0;i<rmSaved.length;i++){x=rmSaved[i];if(x&&x.used){rmChip(s,String(x.call),'saved on this node','','rmsaved');n++;}}");
+                       "for(i=0;i<rmSaved.length;i++){x=rmSaved[i];if(x&&x.used){rmChip(s,String(x.call),'','','rmsaved');n++;}}");
     web_client.println("if(!n)s.textContent='Nothing saved yet.';\n"
                        "rmEl('rm_forgetall').style.display=n?'':'none';\n"
                        "if(!c)t.textContent='';\n"
                        "else if(rmValidCall(c)){t.textContent='Call sign looks right.';t.className='font-small rmok';}\n"
                        "else{t.textContent='Not a call sign. Use letters or digits, a dash and an SSID, for example DK5EN-12.';t.className='font-small rmbad';}\n"
                        "rmEl('rm_pwrow').style.display=sv?'none':'';rmEl('rm_forget').style.display=sv?'':'none';");
-    web_client.println("rmTxt('rm_savednote',sv?'The password of '+c+' is saved on this node. No need to type it.':'Type the password of the node you want to manage. Tip: save it on this node to skip typing.','font-small');\n"
-                       "rmEl('rm_forgetall').textContent=rmArmId=='forgetall'?'Really? tap again':'Forget all';rmEl('rm_selfclear').textContent=rmArmId=='selfclear'?'Really? tap again':'Clear';}\n"
-                       "function rmRenderLock(){var n=rmLockLeft(),t='';");
-    web_client.println("if(rmBusy)t='Sending ...';else if(!rmAuth&&n>0)t=(rmSrvMsg?rmSrvMsg+' ':'')+'Next command possible in '+n+' s.';\n"
-                       "rmTxt('rm_lockline',t,'rmlock');}\n"
+    web_client.println("rmTxt('rm_savednote',sv?'The password of '+c+' is saved. No need to type it.':'Type the password of the node you want to manage. Tip: press Remember to skip typing.','font-small');\n"
+                       "rmEl('rm_forgetall').textContent=rmArmId=='forgetall'?rmReally:'Forget all';rmEl('rm_selfclear').textContent=rmArmId=='selfclear'?rmReally:'Clear';}\n"
+                       "function rmRenderLock(){var n=rmLockLeft(),t=rmNote.t,c=rmNote.c;");
+    web_client.println("if(!t){c='rmmsg rmlock';if(rmBusy)t='Sending ...';else if(!rmAuth&&n>0)t=(rmSrvMsg?rmSrvMsg+' ':'')+'Next command possible in '+n+' s.';}\n"
+                       "rmTxt('rm_msg',t,c);}\n"
                        "function rmRenderMsgs(dis){var j=rmStat,b=rmEl('rm_msgs'),a,i,e,k,tr,v,x,c,cf,n,seen={},q,d=rmEl('rm_chain'),u=0,s,z;if(!j)return;d.textContent='';\n");
     web_client.println("for(i=0;i<j.targets.length;i++){q=j.targets[i];if(rmForce&&q.dst==rmForce.d&&!q.canForce){rmForce=null;rmForceBtn();}if(q.chainMsg)d.textContent=q.dst+': '+q.chainMsg;else if(q.pending)d.textContent=q.dst+': checking the connection first, your command follows.';}\n");
     web_client.println("a=j.sent.slice(0).sort(function(x,y){return x.ago-y.ago;});\n");
     web_client.println("for(i=0;i<a.length;i++){e=a[i];k=e.dst+'#'+e.ctr+'#'+e.cmd;if(seen[k])continue;seen[k]=1;tr=rmRows[k];\n"
-"if(!tr){tr=rmRows[k]=document.createElement('tr');for(n=0;n<5;n++)tr.appendChild(document.createElement('td'));}\n");
+"if(!tr){tr=rmRows[k]=document.createElement('tr');for(n=0;n<4;n++)tr.appendChild(document.createElement('td'));}\n");
     web_client.println("c=tr.children;n=e.cmd.split(' ');v=e.st=='queued'||e.st=='waiting'?'sent':e.st=='noanswer'?'no answer':e.ver&&(e.st=='ok'||e.st=='err')?'verified':'unverified';\n"
 "x=e.st=='ok'&&v=='verified'?rmOkText(e):(rmErrOf(e)||e.msg||'');tr.title=rmErrOf(e)||e.msg||'';\n");
-    web_client.println("c[0].textContent=rmAgo(e.ago)+' ago';c[1].textContent=e.dst+' '+rmLabel(e.cmd);c[2].textContent=v;c[2].className=v=='verified'?(e.st=='ok'?'rmok':'rmbad'):v=='sent'?'':'rmbad';c[3].textContent=v=='sent'?'':x;\n");
-    web_client.println("s=rmSlotOf(e.dst);z=n[0]=='status'||n[0]=='sync'?'':'ag '+k;c[4].textContent='';c[4].title=s<0?'Save the node to run commands again':'';\n"
-"if(s>=0)rmBtn(c[4],z&&rmArmId==z?'Really? tap again':'Run again','',rmRowLocked(e.dst),{'data-act':'again','data-dst':e.dst,'data-rc':n[0],'data-ra':n.slice(1).join(' '),'data-cf':z});\n");
+    web_client.println("c[0].textContent=rmAgo(e.ago)+' ago';c[1].textContent=e.dst+' '+rmLabel(e.cmd);c[2].textContent=v;c[2].className=v=='verified'?(e.st=='ok'?'rmok':'rmbad'):v=='sent'?'':'rmbad';c[3].textContent='';z=document.createElement('div');z.textContent=v=='sent'?'':x;c[3].appendChild(z);\n");
+    web_client.println("s=rmSlotOf(e.dst);z=n[0]=='status'||n[0]=='sync'?'':'ag '+k;c[3].title=s<0?'Save the node to run commands again':'';\n"
+"if(s>=0)rmBtn(c[3],z&&rmArmId==z?rmReally:'Run again','',rmRowLocked(e.dst),{'data-act':'again','data-dst':e.dst,'data-rc':n[0],'data-ra':n.slice(1).join(' '),'data-cf':z});\n");
     web_client.println("if(b.children[u]!==tr)b.insertBefore(tr,b.children[u]||null);u++;}\n");
     web_client.println("for(k in rmRows)if(!seen[k]){if(rmRows[k].parentNode)rmRows[k].parentNode.removeChild(rmRows[k]);delete rmRows[k];}}\n");
-    web_client.println("var rmIn={},rmPK=['lat','lon','alt','src'],rmDefs=[{c:'radio',l:'Radio',b:'Read radio',f:[['f','Frequency',' MHz'],['sf','Spreading factor',''],['cr','Coding rate','',function(v){return '4/'+v;}],['bw','Bandwidth',' kHz'],['p','TX power (now/max)',' dBm']]},\n"
-                       "{c:'sens',l:'Sensors',b:'Read sensors',f:[['t','Temperature',' C'],['h','Humidity',' %'],['p','Pressure',' hPa'],['t2','Second temperature',' C']]},\n");
-    web_client.println("{c:'name',l:'Name',b:'Read name',f:[],w:[['v','Name','name',19,'n']]},{c:'atxt',l:'APRS text',b:'Read APRS text',f:[],w:[['v','APRS text','atxt',39,'a']]},\n");
-    web_client.println("{c:'pos',l:'Position',b:'Read position',p:rmPK,f:[['lat','Latitude',' deg'],['lon','Longitude',' deg'],['alt','Altitude',' m'],['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
+    web_client.println("var rmIn={},rmPK=['lat','lon','alt','src'],rmDefs=[{c:'radio',l:'Radio',f:[['f','Frequency',' MHz'],['sf','Spreading factor',''],['cr','Coding rate','',function(v){return '4/'+v;}],['bw','Bandwidth',' kHz'],['p','TX power (now/max)',' dBm']]},\n"
+                       "{c:'sens',l:'Sensors',f:[['t','Temperature',' C'],['h','Humidity',' %'],['p','Pressure',' hPa'],['t2','Second temperature',' C']]},\n");
+    web_client.println("{c:'name',l:'Name',f:[],w:[['v','Name','name',19,'n']]},{c:'atxt',l:'APRS text',f:[],w:[['v','APRS text','atxt',39,'a']]},\n");
+    web_client.println("{c:'pos',l:'Position',p:rmPK,f:[['lat','Latitude',' deg'],['lon','Longitude',' deg'],['alt','Altitude',' m'],['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
                        "w:[['lat','Latitude','lat',11],['lon','Longitude','lon',11],['alt','Altitude (m)','alt',5]]},\n");
-    web_client.println("{c:'txq',l:'TX queue',b:'Read TX queue',k:1,f:[['q','Queued (now/capacity)',''],['bp','State','',function(v){var m={quiet:'quiet',qrs:'slow down',qrt:'hold'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}],['tx','Sent',''],['rt','Retransmitted',''],['dr','Dropped',''],['u','Channel use',' %']]},\n");
-    web_client.println("{c:'mbox',l:'Mailbox',b:'Read mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Used/slots',''],['b','Bytes',''],['a','Actions last hour (done/limit)',''],['st','Stored',''],['dl','Delivered',''],['ak','Acknowledged',''],['dr','Dropped',''],['bl','Blocked',''],['nt','Notified','']]},\n"
-                       "{c:'maxhop',l:'Max hop',b:'Read max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
+    web_client.println("{c:'txq',l:'TX queue',k:1,f:[['q','Queued (now/capacity)',''],['bp','State','',function(v){var m={quiet:'quiet',qrs:'slow down',qrt:'hold'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}],['tx','Sent',''],['rt','Retransmitted',''],['dr','Dropped',''],['u','Channel use',' %']]},\n");
+    web_client.println("{c:'mbox',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Used/slots',''],['b','Bytes',''],['a','Actions last hour (done/limit)',''],['st','Stored',''],['dl','Delivered',''],['ak','Acknowledged',''],['dr','Dropped',''],['bl','Blocked',''],['nt','Notified','']]},\n"
+                       "{c:'maxhop',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
                        "function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}\n");
     web_client.println("function rmChk(k,v){var i,c,m;if(v==='')return '';\n"
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
@@ -243,7 +257,7 @@ void rmScaffoldJs()
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[3][3](q.src)+'.':'';}return '';}\n");
     web_client.println("function rmWBuild(p,d,o){var j,w,x,k,t,y;if(!d.w)return;t=/^(name|atxt)$/.test(d.w[0][2]);\n"
-                       "for(j=0;j<d.w.length;j++){w=d.w[j];x=document.createElement('input');x.id='rm_f_'+d.c+'_'+w[0];x.type='text';x.autocomplete='off';x.setAttribute('aria-label',w[1]);x.placeholder=w[1];\n"
+                       "for(j=0;j<d.w.length;j++){w=d.w[j];x=document.createElement('input');x.id='rm_f_'+d.c+'_'+w[0];x.type='text';x.autocomplete='off';x.setAttribute('aria-label',w[1]);if(d.w.length>1)x.placeholder=w[1];\n"
                        "k=o&&o[w[4]||w[0]];x.value=rmIn[x.id]!==undefined?rmIn[x.id]:(k&&k!='-'?k:'');p.appendChild(x);rmWire(x,d);}\n");
     web_client.println("y=['cnt','hint','note'];for(j=t?0:1;j<(t?3:2);j++){x=document.createElement('div');x.id='rm_f_'+d.c+'_'+y[j];x.className='font-small';if(j==2)x.textContent='Stored exactly as typed.';p.appendChild(x);}\n"
                        "rmBtn(p,'Set','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c}).id='rm_f_'+d.c+'_set';rmWUpd(d);}\n");
@@ -258,22 +272,22 @@ void rmScaffoldJs()
     // Driver match: the sent[] entry must carry the ctr the send answered with. A send answered viaSync gets its
     // ctr only later, so rmMh.ctr stays -1 there and rmMhFind falls back to the time-window match (cmd, dst, ago).
     web_client.println("function rmMhSend(){var g=rmMh.gen;rmMh.fl=1;rmMh.ctr=-1;rmMh.t=rmNow();rmOut=true;\nrmPost('/rmsend',rmMh.pre+'&cmd=mh&args='+rmEnc(rmMh.args)).then(rmJson).then(function(j){if(g!=rmMh.gen||!rmMh.on)return;\nif(j&&j.ok){rmMh.ctr=(j.viaSync||typeof j.ctr!='number')?-1:j.ctr;rmPoll();return;}rmMh.fl=0;if(j&&j.err=='busy'&&j.retry>0){rmTL[rmSel.call]=rmNow()+j.retry*1000;rmMhStep();return;}\n");
-    web_client.println("rmMhEnd(rmErrText(j&&j.err?String(j.err):'send'));}).catch(function(e){if(g==rmMh.gen&&e!==0)rmMhEnd('The node did not answer the request. Check the connection and try again.');});}\nfunction rmMhFind(){var a=rmStat?rmStat.sent:[],i,b=null,e,x=rmNow()-rmMh.t+2000;for(i=0;i<a.length;i++){e=a[i];if(e.dst==rmSel.call&&e.cmd=='mh '+rmMh.args&&(rmMh.ctr<0||e.ctr==rmMh.ctr)&&e.ago*1000<=x&&(!b||e.ago<b.ago)&&(e.st=='ok'||e.st=='err'||e.st=='noanswer'))b=e;}return b;}\n");
+    web_client.println("rmMhEnd(rmErrText(j&&j.err?String(j.err):'send'));}).catch(function(e){if(g==rmMh.gen&&e!==0)rmMhEnd(rmNoAns);});}\nfunction rmMhFind(){var a=rmStat?rmStat.sent:[],i,b=null,e,x=rmNow()-rmMh.t+2000;for(i=0;i<a.length;i++){e=a[i];if(e.dst==rmSel.call&&e.cmd=='mh '+rmMh.args&&(rmMh.ctr<0||e.ctr==rmMh.ctr)&&e.ago*1000<=x&&(!b||e.ago<b.ago)&&(e.st=='ok'||e.st=='err'||e.st=='noanswer'))b=e;}return b;}\n");
     web_client.println("function rmMhL(v,l,u,f){return l+': '+((v===undefined||v=='-')?'not present':f?f(v):v+u);}\nfunction rmYn(v){return v=='1'?'yes':'no';}\nfunction rmMhGot(e){var r=e.reply,t,i,o={},k,n,d,x;rmMh.fl=0;\nif(e.st=='noanswer'||!e.ver||typeof r!='string')return rmMhEnd('There was no answer from the node.');\n");
     web_client.println("if(r.indexOf('err ')==0){k=r.substring(4).split(' ')[0];if(k=='end'&&rmMh.job=='list')return rmMhEnd('End of the list.');return rmMhEnd(k=='unknown'?'That node is not known there.':rmErrText(k));}\nt=r.split(' ');if(t[0]!='ok')return rmMhEnd('The reply could not be read.');\nif(rmMh.job=='det'){for(i=2;i<t.length;i++){k=t[i].indexOf('=');if(k>0)o[t[i].substring(0,k)]=t[i].substring(k+1);}\n");
     web_client.println("d=t[1]=='d'?[rmMhL(o.g,'Gateway','',rmYn),rmMhL(o.m,'Mesh','',rmYn),rmMhL(o.r,'RSSI',' dBm'),rmMhL(o.s,'SNR',' dB'),rmMhL((o.la=='-'||o.lo=='-')?'-':o.la+', '+o.lo,'Position',''),rmMhL(o.di,'Distance',' km'),rmMhL(o.a,'Altitude',' m'),rmMhL(o.n,'Its neighbours',''),rmMhL(o.x,'Only it hears',''),rmMhL(o.h,'It hears',''),rmMhL(o.t,'Heard',' min ago')]:\n");
     web_client.println("[rmMhL(o.h,'Hops',''),rmMhL(o.k,'Routes',''),rmMhL(o.g,'Via gateway','',rmYn),'Relay: '+((o.rc===undefined||o.rc=='-')?'not known':o.rc),rmMhL(o.t,'Age',' min'),rmMhL(o.v,'Via','',function(v){return v.split(',').join(', ');})];\nrmMh.det={c:rmMh.args,l:d};return rmMhEnd('');}\nn=rmMh.rows.length;rmMh.total=parseInt(t[1],10)||0;for(i=3;i+1<t.length&&rmMh.rows.length<128;i+=2)rmMh.rows.push({c:t[i],m:t[i+1]});\n");
-    web_client.println("if(rmMh.rows.length==n||!/^[0-9]+$/.test(t[2]||'-')||rmMh.rows.length>=128)return rmMhEnd('End of the list.');\nrmMh.args=t[2];rmMhStep();rmRender();}\nfunction rmMhCard(b,dis){var p=document.createElement('div'),x,tb,tr,i,r;p.id='rm_card_mh';b.appendChild(p);x=document.createElement('strong');x.textContent='Heard list';p.appendChild(x);\nrmBtn(p,'Read heard list','',dis||rmMh.on,{'data-act':'mhgo'});rmBtn(p,'Stop','',!rmMh.on,{'data-act':'mhstop'});\n");
+    web_client.println("if(rmMh.rows.length==n||!/^[0-9]+$/.test(t[2]||'-')||rmMh.rows.length>=128)return rmMhEnd('End of the list.');\nrmMh.args=t[2];rmMhStep();rmRender();}\nfunction rmMhCard(b,dis){var p=document.createElement('div'),x,tb,tr,i,r;p.id='rm_card_mh';b.appendChild(p);x=document.createElement('strong');x.textContent='Heard list';p.appendChild(x);\nrmBtn(p,'Read','',dis||rmMh.on,{'data-act':'mhgo'});rmBtn(p,'Stop','',!rmMh.on,{'data-act':'mhstop'});\n");
     web_client.println("x=document.createElement('div');x.id='rm_mh_prog';x.textContent=(rmMh.total||rmMh.rows.length?'Read '+rmMh.rows.length+' of '+rmMh.total+'. ':'')+rmMh.msg;p.appendChild(x);\n");
     web_client.println("tb=document.createElement('table');tb.id='rm_mh_tab';for(i=0;i<rmMh.rows.length;i++){r=rmMh.rows[i];tr=document.createElement('tr');rmCell(tr,r.c);rmCell(tr,r.m+' min ago');x=document.createElement('td');rmBtn(x,'Details','',dis||rmMh.on,{'data-act':'mhdet','data-call':r.c});tr.appendChild(x);tb.appendChild(tr);}p.appendChild(tb);\n");
-    web_client.println("x=document.createElement('input');x.id='rm_f_mh_other';x.maxLength=9;x.placeholder='Other node';x.value=rmIn[x.id]||'';x.addEventListener('input',function(){rmIn[this.id]=this.value;});p.appendChild(x);rmBtn(p,'Details','',dis||rmMh.on,{'data-act':'mhother'});\n");
+    web_client.println("x=document.createElement('input');x.id='rm_f_mh_other';x.maxLength=9;x.placeholder='Other node';x.value=rmIn[x.id]||'';x.addEventListener('input',function(){rmIn[this.id]=this.value;});p.appendChild(x);rmBtn(p,'Look up','',dis||rmMh.on,{'data-act':'mhother'});\n");
     web_client.println("x=document.createElement('div');x.id='rm_mh_det';p.appendChild(x);if(rmMh.det){r=document.createElement('strong');r.textContent=rmMh.det.c;x.appendChild(r);for(i=0;i<rmMh.det.l.length;i++){r=document.createElement('div');r.textContent=rmMh.det.l[i];x.appendChild(r);}}}\n");
     web_client.println("function rmRenderCards(){var b=rmEl('rm_cards'),c=rmSel.call,cap=rmCapOf(c),dis=!rmValidCall(c)||rmLocked(),d,i,j,p,v,o,x,fa=document.activeElement,fid='';if(!b)return;\n"
                        "if(fa&&fa.tagName=='INPUT'&&/^rm_f_/.test(fa.id)){rmIn[fa.id]=fa.value;fid=fa.id;}b.textContent='';\n");
-    web_client.println("if(cap<2){p=document.createElement('p');p.className='font-small rmcapnote';p.textContent=rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Check connection.';b.appendChild(p);rmBtn(b,'Check connection','',dis,{'data-act':'sync'});}\n");
+    web_client.println("if(cap<2){p=document.createElement('p');p.className='font-small rmcapnote';p.textContent=rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.';b.appendChild(p);}\n");
     web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=document.createElement('div');p.id='rm_card_'+d.c;b.appendChild(p);x=document.createElement('strong');x.textContent=d.l;p.appendChild(x);\n"
-                       "rmBtn(p,d.b,'',dis||cap<2,{'data-cmd':d.c,'data-args':''});v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n");
-    web_client.println("for(j=0;o&&j<d.f.length;j++){x=document.createElement('div');x.id='rm_f_'+d.c+'_'+d.f[j][0];x.textContent=d.f[j][1]+': '+((o[d.f[j][0]]===undefined||o[d.f[j][0]]=='-')?'not present':(d.f[j][3]?d.f[j][3](o[d.f[j][0]]):o[d.f[j][0]])+d.f[j][2]);p.appendChild(x);}rmWBuild(p,d,o);");
+                       "rmBtn(p,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n");
+    web_client.println("for(j=0;o&&j<d.f.length;j++){x=document.createElement('div');x.id='rm_f_'+d.c+'_'+d.f[j][0];x.textContent=d.f[j][1]+': '+((o[d.f[j][0]]===undefined||o[d.f[j][0]]=='-')?'not present':(d.f[j][3]?d.f[j][3](o[d.f[j][0]]):o[d.f[j][0]])+d.f[j][2]);p.appendChild(x);}rmWBuild(p,d,o);if(d.c=='radio')rmTxBuild(p,rmKn(),dis);");
     web_client.println("if(d.u&&rmUns(c,d.c,v)){x=document.createElement('div');x.textContent=d.u;p.appendChild(x);}}rmMhCard(b,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"
 "function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;\n");
@@ -304,11 +318,11 @@ void rmScaffoldJs()
                        "function rmTap(b){var cmd=b.getAttribute('data-cmd'),args=b.getAttribute('data-args')||'',cf=b.getAttribute('data-cf')||'',pr=rmPre();if(!args)rmClrIn(cmd);");
     web_client.println("if(rmLocked())return;\n"
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
-                       "if(cf&&!rmConfirm(cf,'Tap again within 4 seconds to confirm: '+rmLabel((cmd+' '+args).trim())+' on '+rmSel.call+'.'))return;\n"
+                       "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),rmSel.call)))return;\n"
                        "rmSendCmd(cmd,args);}\n");
     web_client.println("function rmAgain(b){var d=b.getAttribute('data-dst'),cmd=b.getAttribute('data-rc'),args=b.getAttribute('data-ra')||'',cf=b.getAttribute('data-cf')||'',s=rmSlotOf(d);\n"
                        "if(s<0||rmRowLocked(d))return;\n"
-                       "if(cf&&!rmConfirm(cf,'Tap again within 4 seconds to confirm: '+rmLabel((cmd+' '+args).trim())+' on '+d+'.'))return;\n"
+                       "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),d)))return;\n"
                        "rmSendCmd(cmd,args,d,s);}\n");
     web_client.println("function rmTxApply(){var k=rmKn(),v=Math.min(rmTx.val,rmCap(k)),cf,pr=rmPre();if(rmLocked())return;\n"
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
@@ -326,7 +340,7 @@ void rmScaffoldJs()
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
                        "for(n=0;n<3;n++)if(!rmSaved[n]||!rmSaved[n].used){s=n;break;}");
     web_client.println("if(s<0){rmMsg('All 3 places on this node are used. Forget one first.','rmbad');return;}\n"
-                       "i.value='';rmNodesPost('act=save&slot='+s+'&call='+rmEnc(c)+'&pw='+rmEnc(pw),c+' is saved on this node.');pw='';}\n"
+                       "i.value='';rmNodesPost('act=save&slot='+s+'&call='+rmEnc(c)+'&pw='+rmEnc(pw),c+' is saved.');pw='';}\n"
                        "function rmForget(){if(rmSel.slot<0)return;rmNodesPost('act=del&slot='+rmSel.slot,rmSel.call+' is forgotten.');}");
     web_client.println("function rmForgetAll(){if(!rmConfirm('forgetall','Tap Forget all again within 4 seconds to remove every saved node.'))return;rmNodesPost('act=forget','All saved nodes are forgotten.');}\n"
                        "function rmSelfSet(){var i=rmEl('rm_selfpw'),pw=i.value,pr=rmPwProblem(pw),b;\n"
@@ -336,18 +350,19 @@ void rmScaffoldJs()
                        "function rmSelfClear(){if(!rmConfirm('selfclear','Clear the password? Remote management will be switched off.','rm_selfmsg'))return;");
     web_client.println("rmPost('/rmpasswd','act=clear').then(rmJson).then(function(j){if(j&&j.ok){rmTxt('rm_selfmsg','Password cleared. Remote management is off.','rmmsg rmok');rmPoll();}else rmTxt('rm_selfmsg',rmErrText(j&&j.err?String(j.err):'form'),'rmmsg rmbad');}).catch(function(e){rmCatch(e,'rm_selfmsg');});}\n"
                        "function rmSelfOn(){var o=rmEl('rm_on'),v=o.checked?'on':'off';o.disabled=true;");
-    web_client.println("fetch('/setparam/?rm='+v).then(rmJson).then(function(j){rmTxt('rm_selfmsg',j&&j.returncode==0?'Remote management is '+v+'.':'Could not change it. Is a password set?','rmmsg');rmPoll();}).catch(function(e){rmCatch(e,'rm_selfmsg');});}\n"
-                       "function rmPin(v){var p=rmEl('rm_pin').value;rmSendCmd('setout',p+' '+v);}\n"
+    web_client.println("fetch('/setparam/?rm='+v).then(rmJson).then(function(j){rmTxt('rm_selfmsg',j&&j.returncode==0?'Remote management is '+v+'.':'Could not change it. Is a password set?','rmmsg');rmPoll();}).catch(function(e){rmCatch(e,'rm_selfmsg');});}");
+    web_client.println("function rmSwChg(i){var n=i.getAttribute('data-sw'),v=i.checked?'on':'off',cf=v=='off'?(i.getAttribute('data-cf')||''):'',pr=rmPre(),pin=n=='pin',c=pin?'setout':n,a=pin?rmEl('rm_pin').value+' '+v:v;");
+    web_client.println("if(rmLocked()||pr){if(pr&&!rmLocked())rmMsg(pr,'rmbad');rmRender();return;}\n"
+                       "if(cf&&!rmConfirm(cf,rmCf(rmLabel(c+' '+a),rmSel.call)))return;\n"
+                       "rmSw[rmSel.call+' '+(pin?rmEl('rm_pin').value:n)]=v;rmSendCmd(c,a);}\n"
+                       "function rmChange(e){var t=e.target;if(t.id=='rm_pin')rmRender();else if(t.getAttribute&&t.getAttribute('data-sw'))rmSwChg(t);}\n"
                        "function rmClick(e){var b=e.target;while(b&&b.tagName!='BUTTON'){if(b.id=='rm_page')return;b=b.parentNode;}\n"
                        "if(!b||b.disabled)return;var a=b.getAttribute('data-act');");
     web_client.println("if(b.hasAttribute('data-cmd'))rmTap(b);\n"
                        "else if(a=='pick')rmPick(b.getAttribute('data-call'));else if(a=='mhgo')rmMhStart();");
     web_client.println("else if(a=='mhstop')rmMhStop();else if(a=='mhdet')rmMhDet(b.getAttribute('data-call'));else if(a=='mhother')rmMhDet(rmEl('rm_f_mh_other').value);\n"
-                       "else if(a=='test')rmSendCmd('status','');\n"
-                       "else if(a=='sync')rmSendCmd('sync','');\n"
-                       "else if(a=='pinon')rmPin('on');\n"
-                       "else if(a=='pinoff')rmPin('off');\n"
-                       "else if(a=='again')rmAgain(b);\n"
+                                              "else if(a=='sync')rmSendCmd('sync','');\n"
+                                              "else if(a=='again')rmAgain(b);\n"
                        "else if(a=='force'&&rmForce&&rmForce.d==rmSel.call)rmSendCmd(rmForce.c,rmForce.a,rmForce.d,rmForce.s,true);\n");
     web_client.println("else if(a=='txdn'){rmTx.val--;rmTx.touched=true;rmDisarmQuiet();rmRender();}\n"
                        "else if(a=='txup'){rmTx.val++;rmTx.touched=true;rmDisarmQuiet();rmRender();}\n"
@@ -372,6 +387,6 @@ void rmScaffoldJs()
     web_client.println("function rmPageLeave(){clearInterval(rmT.tick);clearTimeout(rmT.poll);clearTimeout(rmT.arm);rmT.tick=0;rmT.poll=0;rmT.arm=0;rmShown=false;rmArmId='';rmMhReset();}\n"
                        "function rmPageInit(){var i,p,o;rmPageLeave();if(!rmEl('rm_page'))return;rmShown=true;rmRows=Object.create(null);rmAuth=false;rmBusy=false;rmArmId='';\n"
                        "p=rmEl('rm_pin');for(i=0;i<16;i++){o=document.createElement('option');o.value=(i<8?'a':'b')+(i%8);o.textContent=o.value;p.appendChild(o);}");
-    web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_on').onchange=rmSelfOn;rmEl('rm_call').value=rmSel.call;\n"
+    web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_page').onchange=rmChange;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_on').onchange=rmSelfOn;rmEl('rm_call').value=rmSel.call;\n"
                        "rmT.tick=setInterval(rmTick,1000);rmRender();rmPoll();rmLoadNodes();rmLoadHeard();}");
 }

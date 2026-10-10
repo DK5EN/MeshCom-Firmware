@@ -243,13 +243,18 @@ bool rejLocked(const RmRejSrc &r, uint32_t now)
 }
 
 // The sender's entry, nullptr if it has none. Never creates one.
-RmRejSrc *rejFind(RmState &s, const char *src)
+const RmRejSrc *rejFindConst(const RmState &s, const char *src)
 {
     const char *call = src ? src : "";
-    for (RmRejSrc &r : s.rej)
+    for (const RmRejSrc &r : s.rej)
         if (r.used && strncmp(r.call, call, REJ_CALL_LEN) == 0)
             return &r;
     return nullptr;
+}
+
+RmRejSrc *rejFind(RmState &s, const char *src)
+{
+    return const_cast<RmRejSrc *>(rejFindConst(s, src));
 }
 
 // The sender's entry, created if needed. A full table gives up, in this order: an unused entry, the
@@ -282,6 +287,10 @@ RmRejSrc *rejSlot(RmState &s, const char *src, uint32_t now)
 
 RmVerdict reject(RmState &s, const char *src, RmVerdict v, uint32_t now)
 {
+    // BF-01: without strict security nothing is punished. The caller still gets the verdict (and counts it
+    // in its own statistics), but no strike is recorded and no lock can arm.
+    if (!s.strict)
+        return v;
     RmRejSrc *r = rejSlot(s, src, now);
     if (r->rejCount == 0 || (uint32_t)(now - r->rejWindowMs) >= RM_REJ_WINDOW_MS)
     {
@@ -460,6 +469,12 @@ void rmReceiverUnlock(RmState &s)
 
 void rmRejSweep(RmState &s, uint32_t nowMs)
 {
+    if (!s.strict)
+    {
+        // BF-01: strict security is off (also: just switched off) -- no strike or lock outlives it
+        memset(s.rej, 0, sizeof(s.rej));
+        return;
+    }
     for (RmRejSrc &r : s.rej)
     {
         if (!r.used)
@@ -476,11 +491,8 @@ void rmRejSweep(RmState &s, uint32_t nowMs)
 
 bool rmSenderLocked(const RmState &s, const char *src, uint32_t nowMs)
 {
-    const char *call = src ? src : "";
-    for (const RmRejSrc &r : s.rej)
-        if (r.used && strncmp(r.call, call, REJ_CALL_LEN) == 0)
-            return rejLocked(r, nowMs);
-    return false;
+    const RmRejSrc *r = rejFindConst(s, src);
+    return r != nullptr && rejLocked(*r, nowMs);
 }
 
 uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs)
@@ -506,15 +518,12 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     if (strippedLen(passwd) == 0)
         return RM_REJ_DISABLED;
 
+    // The sweep frees every expired lock, so a sender still flagged lockActive afterwards is locked
+    // at nowMs (an "expired lock" branch here would be unreachable). Without strict security the sweep
+    // empties the table and nothing can lock (BF-01).
     rmRejSweep(s, nowMs);
-    RmRejSrc *lk = rejFind(s, src);
-    if (lk && lk->lockActive)
-    {
-        if ((int32_t)(nowMs - lk->lockUntilMs) < 0)
-            return RM_REJ_LOCKOUT;
-        lk->lockActive = false;
-        lk->rejCount = 0;
-    }
+    if (s.strict && rmSenderLocked(s, src, nowMs))
+        return RM_REJ_LOCKOUT;
 
     if (dst == nullptr || src == nullptr || c.tag[16] != '\0' || c.cmd[sizeof(c.cmd) - 1] != '\0' ||
         c.args[sizeof(c.args) - 1] != '\0')
@@ -552,16 +561,17 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     // attack signal and does not count towards the lockout (advisor RM W1 N1).
     // A sync has its own limiter: a replayed sync frame (ctr 0 skips the replay check) must
     // neither starve genuine commands nor be answered more than once per RM_SYNC_RATE_MS.
+    // BF-01 (D2): both limiters are active only with strict security on.
     if (isSync)
     {
-        if (s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
+        if (s.strict && s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
             return RM_REJ_RATE;
         s.lastSyncMs = nowMs;
         s.haveSync = true;
         return RM_SYNC;
     }
 
-    if (s.haveRate && (uint32_t)(nowMs - s.lastRateMs) < RM_RATE_MS)
+    if (s.strict && s.haveRate && (uint32_t)(nowMs - s.lastRateMs) < RM_RATE_MS)
         return RM_REJ_RATE;
     return RM_OK;
 }

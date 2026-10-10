@@ -102,6 +102,11 @@ struct RmState
     // be answered more than once per RM_SYNC_RATE_MS:
     uint32_t lastSyncMs;    // time of the last accepted sync
     bool haveSync;
+    // appended by BF-01: strict security (node_rmstrict). 0 (the default, rmStateInit) = nothing is punished:
+    // no strike is recorded, no sender locks, the rate limiters RM_RATE_MS / RM_SYNC_RATE_MS are skipped.
+    // Correctness checks (format, allowlist, tag, replay counter) and the cached-reply path are unaffected.
+    // The caller (rm_runtime.cpp) sets it from the setting before every rmRejSweep()/rmCheck().
+    bool strict;
 };
 
 void rmStateInit(RmState &s, uint32_t hwm);
@@ -123,7 +128,9 @@ uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs)
 // entry nobody touches for 2^31 ms (24.8 days) would otherwise read as locked again.
 void rmRejSweep(RmState &s, uint32_t nowMs);
 
-// Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute.
+// Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute. Lockout and both rate
+// limits apply only while s.strict is set (BF-01); without it only format, allowlist, tag and the
+// replay counter can reject.
 // maxTxPower bounds "txpower <n>" (0 <= n <= maxTxPower). Every reject counts
 // towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT, RM_REJ_RATE and
 // RM_REJ_REPLAY (each of the last two requires a VALID tag: the lockout answers wrong

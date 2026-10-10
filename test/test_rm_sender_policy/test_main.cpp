@@ -279,6 +279,34 @@ static void test_policy_cooldown_boundary(void)
     TEST_ASSERT_EQUAL_UINT32(0, d.retryS);
 }
 
+// BF-01 (D3): the strict argument defaults to ON (today's behaviour); OFF skips budget, cooldown and
+// the one-shot force completely and reports nothing to wait for.
+static void test_policy_strict_off_skips_budget_cooldown_and_one_shot(void)
+{
+    const uint32_t now = 1000000;
+    RmPolEntry two[2] = {mk(now - 1000), mk(now - 2000)};  // two unanswered, 1-2 s old: budget AND cooldown
+    RmPolDecision d = rmPolicyMaySend(two, 2, now);        // default = strict ON
+    TEST_ASSERT_FALSE(d.allowed);
+    d = rmPolicyMaySend(two, 2, now, RM_POLICY_LIMIT_UNPROVEN, false, false, true);
+    TEST_ASSERT_FALSE(d.allowed);
+    TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
+
+    d = rmPolicyMaySend(two, 2, now, RM_POLICY_LIMIT_UNPROVEN, false, false, false);
+    TEST_ASSERT_TRUE(d.allowed);
+    TEST_ASSERT_EQUAL_INT(RM_POL_OK, d.reason);
+    TEST_ASSERT_EQUAL_UINT32(0, d.retryS);
+    TEST_ASSERT_FALSE(d.canForce);
+    TEST_ASSERT_FALSE(d.usedForce);
+
+    // an armed one-shot is not spent while the policy is off (the caller would disarm it on usedForce)
+    RmPolEntry old[2] = {mk(now - 20000), mk(now - 30000)};  // out of the cooldown, budget used up
+    d = rmPolicyMaySend(old, 2, now, RM_POLICY_LIMIT_UNPROVEN, true, true, true);
+    TEST_ASSERT_TRUE(d.allowed && d.usedForce);
+    d = rmPolicyMaySend(old, 2, now, RM_POLICY_LIMIT_UNPROVEN, true, true, false);
+    TEST_ASSERT_TRUE(d.allowed);
+    TEST_ASSERT_FALSE(d.usedForce);
+}
+
 static void test_policy_two_unanswered_inside_90s_lock_the_third(void)
 {
     const uint32_t now = 1000000;
@@ -783,6 +811,7 @@ int main(int, char **)
     RUN_TEST(test_every_error_token_has_a_sentence);
     RUN_TEST(test_policy_free_target_may_send);
     RUN_TEST(test_policy_cooldown_boundary);
+    RUN_TEST(test_policy_strict_off_skips_budget_cooldown_and_one_shot);
     RUN_TEST(test_policy_two_unanswered_inside_90s_lock_the_third);
     RUN_TEST(test_policy_three_and_more_unanswered_wait_for_enough_to_leave);
     RUN_TEST(test_policy_answered_and_aged_out_do_not_count);

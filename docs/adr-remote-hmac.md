@@ -83,7 +83,9 @@ never persisted and is off after boot); `txpower <n>` (0 to the board maximum); 
 
 `rmCheck()` returns one verdict per command. All rejects are silent on the air (no oracle, no reply
 storm); the node prints a serial marker `[RM];reject;<verdict>` and counts it for `--info`
-(`RM: on ok= rej=`).
+(`RM: on strict=off ok= rej=`). Since 2026-10-10 (BF-01) the per-sender lockout and the receiver rate limits
+only arm with `--rmstrictsecurity on` (`node_rmstrict`, default off); with the flag off only the correctness
+checks (format, allowlist, HMAC tag, replay counter) reject, and nothing is counted as a strike.
 
 | Verdict    | Meaning                                                                             | Reply        | Counts for lockout    |
 | ---------- | ----------------------------------------------------------------------------------- | ------------ | --------------------- |

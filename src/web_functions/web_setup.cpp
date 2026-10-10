@@ -251,6 +251,16 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
+    // BF-01: RM strict security (brute-force protection), routed through "--rmstrictsecurity on|off";
+    // read-back is node_rmstrict. Console and web only, never over RM.
+    if(setupData->paramName.equals("rmstrict")) {
+        snprintf(message_text, sizeof(message_text), "--rmstrictsecurity %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = ((meshcom_settings.node_rmstrict == 1) == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = (meshcom_settings.node_rmstrict == 1)?"on":"off";
+        return;
+    } else
+
 #if defined(ESP32)
     // AU-09 (#1187): firmware auto update mode and channel, routed through "--autoupdate off|notify|auto"
     // and "--updchan prod|dev"; read-back is the stored value (a bad value leaves it unchanged -> FAIL).
@@ -958,6 +968,11 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("rm")) {
         setupData->returnValue = (meshcom_settings.node_rm == 1)?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("rmstrict")) {
+        setupData->returnValue = (meshcom_settings.node_rmstrict == 1)?"on":"off";
         return;
     } else
 

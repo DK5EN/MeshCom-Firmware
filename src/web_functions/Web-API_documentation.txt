@@ -39,6 +39,7 @@ To set a parameter to the node, use:
 	/setparam/?mesh=on|off				Enables mesh / forwarding of received LoRa messages via radio
 	/setparam/?gateway=on|off			Enables the gateway function
 	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --remotemgmt; stays inactive while no --passwd is set; read-back is the stored switch)
+	/setparam/?rmstrict=on|off			RM brute-force protection (same as --rmstrictsecurity; default off): per-sender lockout, receiver rate limits and the sender budget only with on; read-back is the stored switch)
 	/setparam/?aumode=off|prod|dev		(ESP32 only) Firmware auto update, one setting (off = --autoupdate off; prod|dev = --updchan prod|dev then --autoupdate auto, automatic install at 03:00-05:00 local; read-back is off|notify|prod|dev: "notify" while the console set notify mode, prod/dev only in automatic mode; any other value fails)
 	/setparam/?mtu=1280..1500		Sets the MTU of the node's IP interface (same as --mtu; the web server advertises MSS = MTU - 40; default 1280 for HAMNET / VPN, 1500 for a plain LAN; all boards; read-back is the stored MTU, an out-of-range value fails)
 	/setparam/?autoupdate=off|notify|auto	(ESP32 only) kept for compatibility, the setup page uses aumode: Firmware auto update mode (same as --autoupdate; auto installs at 03:00-05:00 local; read-back is the stored mode)

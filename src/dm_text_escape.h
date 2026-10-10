@@ -1,23 +1,22 @@
 #ifndef _DM_TEXT_ESCAPE_H_
 #define _DM_TEXT_ESCAPE_H_
 
-// P15: Arduino-freier Kern der Klammer-Escape-Ausnahme fuer sendMessage()
-// (nativ testbar, test/test_dm_text_escape). sendMessage() ersetzt bei einer
-// DM jedes '{' im Text durch '(' (Kommentar dort: "A '{' inside the user
-// text breaks the receiver's NNN parse"). {ping} und {SET} sind aber keine
-// Fliesstext-Nachrichten, sondern eigene Tags:
-//   * ein {ping} wuerde zu (ping}{NNN -- kein Ping mehr, die Gegenstelle
-//     antwortet nie mit {pong}, und nichts stoppt eine Wiederholung.
-//   * ein {SET}n;m; wuerde zu (SET}n;m; -- das Remote-Hop-Limit-Kommando
-//     (sendDisplayText(), startsWith("{SET}")) feuert nie.
-// dmTextEscapeFrom() liefert den Index, AB DEM escaped werden muss: 0 im
-// Normalfall (unveraendertes Verhalten), sonst die Laenge des erkannten
-// Tags -- ein '{' NACH dem Tag bricht weiterhin den NNN-Parse des
-// Empfaengers (aprsmsg.msg_payload.indexOf("{", 1)) und wird wie bisher
-// escaped.
+// P15: Arduino-free core of the brace-escape exception for sendMessage()
+// (natively testable, test/test_dm_text_escape). For a DM, sendMessage()
+// replaces every '{' in the text with '(' (comment there: "A '{' inside the
+// user text breaks the receiver's NNN parse"). {ping} and {SET} are not
+// free-text messages, though, but tags of their own:
+//   * a {ping} would become (ping}{NNN -- no longer a ping, the peer never
+//     answers with {pong}, and nothing stops a retransmission.
+//   * a {SET}n;m; would become (SET}n;m; -- the remote hop-limit command
+//     (sendDisplayText(), startsWith("{SET}")) never fires.
+// dmTextEscapeFrom() returns the index FROM which escaping must start: 0 in
+// the normal case (behaviour unchanged), otherwise the length of the
+// recognised tag -- a '{' AFTER the tag still breaks the receiver's NNN parse
+// (aprsmsg.msg_payload.indexOf("{", 1)) and is escaped as before.
 //
-// Nur ein EXAKTES fuehrendes Tag zaehlt ("{pingx"/"{SETX" treffen nicht --
-// strncmp() vergleicht das schliessende '}' mit).
+// Only an EXACT leading tag counts ("{pingx"/"{SETX" do not match --
+// strncmp() also compares the closing '}').
 
 #include <stddef.h>
 #include <string.h>
@@ -41,27 +40,27 @@ inline size_t dmTextEscapeFrom(const char *text)
     return 0;
 }
 
-// W0c (McApp ask 2): ein Remote-Management-Frame ("RM1 <ctr> <cmd> [args] <tag>",
-// Kommando oder Antwort) geht genau einmal in die Luft: ohne "{NNN"-Suffix (der
-// Empfaenger sendet dann keinen DM-ACK) und ohne Wiederholungsleiter. Der
-// Frame traegt seinen eigenen Zaehler und HMAC; ein ACK/Retry wuerde nur
-// Airtime fressen und beim Empfaenger ein Replay-Fenster aufmachen.
-// Nur das EXAKTE fuehrende "RM1 " (4 Byte inkl. Leerzeichen) zaehlt: "RM10",
-// "rm1 ", " RM1 ", "xRM1 ", "RM1" ohne Leerzeichen und ein spaeteres "RM1 "
-// im Text treffen nicht. Bekannte Folge: eine von Hand getippte Chat-DM, die
-// mit "RM1 " beginnt, bekommt ebenfalls weder ACK noch Retry (akzeptiert).
+// W0c (McApp ask 2): a remote-management frame ("RM1 <ctr> <cmd> [args] <tag>",
+// command or reply) goes on air exactly once: without the "{NNN" suffix (the
+// receiver then sends no DM ACK) and without a retransmission ladder. The
+// frame carries its own counter and HMAC; an ACK/retry would only burn
+// airtime and open a replay window at the receiver.
+// Only the EXACT leading "RM1 " (4 bytes incl. the space) counts: "RM10",
+// "rm1 ", " RM1 ", "xRM1 ", "RM1" without a space and a later "RM1 " in the
+// text do not match. Known consequence: a hand-typed chat DM that starts
+// with "RM1 " likewise gets neither ACK nor retry (accepted).
 inline bool dmTextIsRm1Frame(const char *text)
 {
     return text != NULL && strncmp(text, "RM1 ", 4) == 0;
 }
 
-// Eine Stelle fuer "diese DM wird nie wiederholt" (sendMessage(): Ring-Status
-// 0xFF): {CET}/{MCP}/{SET} (Zeit-/Fernwirk-/Hop-Tags, kein Fliesstext) und
-// RM1-Frames. Unveraendert: {ping} hat seinen eigenen Pfad (bUseOnce). Der
-// {NNN-Suffix ist eine getrennte Entscheidung: nur RM1 entfaellt (dmTextIsRm1Frame),
-// {CET}/{SET} behalten ihn wie bisher, {MCP} ist nie eine DM.
-// isDM: die RM1-Ausnahme gilt nur fuer Direktnachrichten; ein Gruppentext, der
-// zufaellig mit "RM1 " beginnt, wird wie jeder Gruppentext wiederholt.
+// One place for "this DM is never retransmitted" (sendMessage(): ring status
+// 0xFF): {CET}/{MCP}/{SET} (time/remote-control/hop tags, not free text) and
+// RM1 frames. Unchanged: {ping} has its own path (bUseOnce). The {NNN suffix
+// is a separate decision: only RM1 drops it (dmTextIsRm1Frame), {CET}/{SET}
+// keep it as before, {MCP} is never a DM.
+// isDM: the RM1 exception applies to direct messages only; a group text that
+// happens to start with "RM1 " is retransmitted like any other group text.
 inline bool dmTextNoRetransmit(const char *text, bool isDM)
 {
     if(text == NULL)

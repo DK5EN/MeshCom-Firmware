@@ -526,6 +526,10 @@ void rmDrain(void)
 
     pendingStep(millis()); // a command queued behind an automatic sync goes out once the sync is verified
 
+    // BF-01: strict security (node_rmstrict) arms the receiver lockout and the receiver rate limits;
+    // off (default) the sweep also empties the reject table, so a lock never outlives a switch-off
+    s_state.strict = (meshcom_settings.node_rmstrict != 0);
+
     // ages the per-sender reject table even when no RM frame arrives (a lock nobody touches for
     // 2^31 ms would read as locked again)
     rmRejSweep(s_state, millis());
@@ -640,7 +644,7 @@ void rmGetStatusHead(RmStatusHead &out)
     const uint32_t now = millis();
     // the lockout is per sender (callsign-SSID): "active" = at least one sender is locked, with the longest time left
     uint32_t remainMs = 0;
-    if (rmLockedSenders(s_state, now, &remainMs) > 0)
+    if (meshcom_settings.node_rmstrict != 0 && rmLockedSenders(s_state, now, &remainMs) > 0)
     {
         out.lockActive = true;
         out.lockRemainS = (remainMs + 999u) / 1000u;
@@ -702,7 +706,9 @@ RmPolDecision policyFor(const char *to, uint32_t now, bool force = false)
             polEntryOf(s_sent[i], pe[n++]);
     const RmProof *pf = rmProofFind(s_proof, to);
     // RM-PROOF: two sends in a row without a verified reply suspend the proven budget (the target may be re-keyed)
-    return rmPolicyMaySend(pe, n, now, rmPolicyLimit(pf, pe, n, now), pf != nullptr && pf->oneShot, force);
+    // BF-01 (D3): the sender policy (budget, cooldown, one-shot) applies only with strict security on
+    return rmPolicyMaySend(pe, n, now, rmPolicyLimit(pf, pe, n, now), pf != nullptr && pf->oneShot, force,
+                           meshcom_settings.node_rmstrict != 0);
 }
 
 void dropPending()
