@@ -14,6 +14,7 @@
 #include "gps_functions.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
+#include "node_position.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
 #include "rm_text.h"
@@ -70,20 +71,14 @@ int writeText(const RmCmd &c, char *res, size_t n, bool isName)
     return okFrom(res, n, len);
 }
 
-// Stored magnitude + hemisphere letter back to a signed value.
-double signedValue(double magnitude, char hemisphere)
-{
-    return (hemisphere == 'S' || hemisphere == 'W') ? -magnitude : magnitude;
-}
-
 // True when the stored double reproduces the requested value at 5 decimals.
 bool sameAt5(double stored, double wanted)
 {
     return fabs(stored - wanted) < 0.000005;
 }
 
-// pos: the three console setters (--setlat/--setlon/--setalt) each save; here the same five fields are
-// set exactly as they do and settings are saved once.
+// pos: the console setters (--setlat/--setlon/--setalt) each save; here the same five fields are set
+// through the same nodeSetPosition() and settings are saved once.
 int writePos(const RmCmd &c, char *res, size_t n)
 {
     RmPosArg p;
@@ -94,38 +89,14 @@ int writePos(const RmCmd &c, char *res, size_t n)
     if (bGPSON)
         return fail(res, n, "err gps");
 
-    // Mirrors "--setlat" (command_functions.cpp:3998-4016): unsigned magnitude + hemisphere letter.
-    meshcom_settings.node_lat_c = 'N';
-    meshcom_settings.node_lat = p.lat;
-    if (p.lat < 0)
-    {
-        meshcom_settings.node_lat_c = 'S';
-        meshcom_settings.node_lat = fabs(p.lat);
-    }
-
-    // Mirrors "--setlon" (command_functions.cpp:4020-4038).
-    meshcom_settings.node_lon_c = 'E';
-    meshcom_settings.node_lon = p.lon;
-    if (p.lon < 0)
-    {
-        meshcom_settings.node_lon_c = 'W';
-        meshcom_settings.node_lon = fabs(p.lon);
-    }
-
-    // Mirrors "--setalt" (command_functions.cpp:4042-4075): the 0..40000 range is already enforced by
-    // rmPosParse. The altitude filter / barometer reference follow the new value.
-    meshcom_settings.node_alt = p.alt;
-#ifdef ENABLE_GPS
-    WZ_GPS_AltSeed((float)p.alt);
-#else
-    baroBaseRelatch((float)p.alt);
-#endif
-
-    save_settings(); // one flash write instead of three
+    // The one position setter shared with --setlat/--setlon/--setalt and the BLE frames (command_functions.cpp);
+    // the 0..40000 alt range is already enforced by rmPosParse. One flash write instead of three.
+    if (!nodeSetPosition(p.lat, p.lon, p.alt, true))
+        return fail(res, n, "err range");
 
     RmPosIn in;
-    in.lat = signedValue(meshcom_settings.node_lat, meshcom_settings.node_lat_c);
-    in.lon = signedValue(meshcom_settings.node_lon, meshcom_settings.node_lon_c);
+    in.lat = nodeSignedLat(meshcom_settings.node_lat, meshcom_settings.node_lat_c);
+    in.lon = nodeSignedLon(meshcom_settings.node_lon, meshcom_settings.node_lon_c);
     in.alt = meshcom_settings.node_alt;
     in.src = RM_POS_SET;
 

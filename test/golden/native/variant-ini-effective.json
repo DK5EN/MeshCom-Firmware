@@ -3408,6 +3408,25 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_node_position": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_node_position"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_nrf52_settings_paths": {
   "build_flags": [
    "-std=gnu++17",

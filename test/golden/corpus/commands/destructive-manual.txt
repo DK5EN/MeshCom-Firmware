@@ -30,8 +30,8 @@
 #   setalt         no range check; the script's non-numeric case persists 0 as the node's altitude
 #   setcall        changes the node callsign
 #   setctry        valid values reconfigure the radio and reboot after 15 s
-#   setlat         no range check; the script's non-numeric case persists 0.0 as the node's latitude
-#   setlon         no range check; the script's non-numeric case persists 0.0 as the node's longitude
+#   setlat         the script's non-numeric case parses as 0.0, inside the range, and persists it as the node's latitude
+#   setlon         the script's non-numeric case parses as 0.0, inside the range, and persists it as the node's longitude
 #   setowndns      changes DNS; also the duplicate-branch defect (OPT-D2)
 #   setowngw       changes the default gateway
 #   setownip       changes the static IP the 2323 capture connects to

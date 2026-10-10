@@ -165,11 +165,11 @@ flashes whatever is attached.
 | test_charset_filter          | Unit          |    29 | native                                                       |
 | test_checkvia                | Unit          |    13 | native_parsers                                               |
 | test_command_match           | Unit          |    11 | native_command_match                                         |
-| test_command_setters         | Unit          |    20 | native_command_setters                                       |
+| test_command_setters         | Unit          |    37 | native_command_setters                                       |
 | test_command_toggles         | Unit          |    33 | native_command_toggles                                       |
 | test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
-| test_config_json             | Contract      |    19 | native_config                                                |
+| test_config_json             | Contract      |    25 | native_config                                                |
 | test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
 | test_csma_timing             | Unit          |    10 | native                                                       |
 | test_decodeaprspos           | Unit          |    22 | native_parsers                                               |
@@ -227,16 +227,17 @@ flashes whatever is attached.
 | test_pos_persist             | Unit          |     9 | native                                                       |
 | test_pos_tag_nan             | Regression    |     7 | native_parsers                                               |
 | test_printfdeb_format        | Regression    |    13 | native                                                       |
+| test_node_position           | Unit          |     6 | native_node_position                                         |
 | test_radio_units             | Regression    |    16 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
-| test_remote_cmd              | Unit          |    32 | native_remote_cmd                                            |
+| test_remote_cmd              | Unit          |    82 | native_remote_cmd                                            |
 | test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
-| test_rm_sender_policy        | Unit          |    24 | native_rm_sender_policy                                      |
+| test_rm_sender_policy        | Unit          |    43 | native_rm_sender_policy                                      |
 | test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
 | test_rm_format               | Unit          |    18 | native_rm_format                                             |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
-| test_rm_policy_rx            | Regression    |     6 | native_rm_policy_rx                                          |
+| test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |

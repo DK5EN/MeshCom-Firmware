@@ -13,6 +13,7 @@
 #include "loop_functions_extern.h"
 #include "nbr_matrix.h"
 #include "nbr_views.h"
+#include "node_position.h"
 #include "radio_units.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
@@ -23,8 +24,7 @@
 #include "msgstore_api.h"
 #endif
 
-// Same 3 h window as the web page (RM_HEARD_WINDOW_MIN in src/web_functions/web_rm_handlers.cpp, decision D11).
-#define RM_READ_HEARD_WINDOW_MIN 180
+// MHEARD window: RM_HEARD_WINDOW_MIN (rm_format.h, shared with the web page, decision D11).
 #define RM_READ_MH_PAGE 8   // MHEARD rows per reply
 #define RM_READ_VIA_MAX 4   // via calls of a route reply
 
@@ -45,18 +45,19 @@ static int done(char *res, size_t n, const char *body, size_t len)
 
 static double signedLat()
 {
-    return meshcom_settings.node_lat_c == 'S' ? -(double)meshcom_settings.node_lat : (double)meshcom_settings.node_lat;
+    return nodeSignedLat(meshcom_settings.node_lat, meshcom_settings.node_lat_c);
 }
 
 static double signedLon()
 {
-    return meshcom_settings.node_lon_c == 'W' ? -(double)meshcom_settings.node_lon : (double)meshcom_settings.node_lon;
+    return nodeSignedLon(meshcom_settings.node_lon, meshcom_settings.node_lon_c);
 }
 
 // The node beacons its position iff it has a position: the sender drops every beacon with
 // lat == 0 && lon == 0 (sendPosition(), src/loop_functions.cpp:4932). There is no other switch that
 // turns the position beacon off (the timer in src/esp32/esp32_main.cpp:4033 fires unconditionally).
-static bool posBeacons()
+// 0/0 = own position unset (same rule as src/mh_phone.h); also the "distance is computable" test.
+static bool ownPosKnown()
 {
     return !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0);
 }
@@ -73,7 +74,7 @@ static int execRadio(char *res, size_t n)
 
 static int execPos(char *res, size_t n)
 {
-    if (!posBeacons())
+    if (!ownPosKnown())
         return fail(res, n, "hidden"); // D8: never reveal a position the node does not beacon
     RmPosIn in;
     in.lat = signedLat();
@@ -163,13 +164,18 @@ static int execMbox(char *res, size_t n)
 
 // ---- mh -------------------------------------------------------------------------------------------------
 
+// MHEARD rows inside the window, newest first, clamped to the index array. Returns the row count.
+static int mhRowsInWindow(uint8_t *idx, uint16_t now_min)
+{
+    int total = nbrMhRows(nbrMatrix, now_min, RM_HEARD_WINDOW_MIN, idx, NBR_MAX_ROWS);
+    return total > NBR_MAX_ROWS ? NBR_MAX_ROWS : total;
+}
+
 static int execMhPage(int row, char *res, size_t n)
 {
     uint8_t idx[NBR_MAX_ROWS]; // <= 128 bytes on every board
     const uint16_t now_min = uptimeMin16();
-    int total = nbrMhRows(nbrMatrix, now_min, RM_READ_HEARD_WINDOW_MIN, idx, NBR_MAX_ROWS); // newest first
-    if (total > NBR_MAX_ROWS)
-        total = NBR_MAX_ROWS;
+    const int total = mhRowsInWindow(idx, now_min);
     if (row >= total && !(total == 0 && row == 0))
         return fail(res, n, "end");
     RmMhRow rows[RM_READ_MH_PAGE];
@@ -205,9 +211,7 @@ static bool mhDirect(const char *call, char *res, size_t n, int *rc)
 {
     uint8_t idx[NBR_MAX_ROWS];
     const uint16_t now_min = uptimeMin16();
-    int total = nbrMhRows(nbrMatrix, now_min, RM_READ_HEARD_WINDOW_MIN, idx, NBR_MAX_ROWS);
-    if (total > NBR_MAX_ROWS)
-        total = NBR_MAX_ROWS;
+    const int total = mhRowsInWindow(idx, now_min);
     for (int k = 0; k < total; k++)
     {
         NbrMhView v;
@@ -224,9 +228,8 @@ static bool mhDirect(const char *call, char *res, size_t n, int *rc)
         in.hasPos = nbrPosKnown(v.lat, v.lon);
         in.lat = v.lat;
         in.lon = v.lon;
-        // Distance from the SIGNED own position; 0/0 = own position unset (same rule as src/mh_phone.h).
-        const bool ownKnown = !(meshcom_settings.node_lat == 0.0 && meshcom_settings.node_lon == 0.0);
-        in.hasDist = in.hasPos && ownKnown;
+        // Distance from the SIGNED own position.
+        in.hasDist = in.hasPos && ownPosKnown();
         if (in.hasDist)
             in.distKm = nbrDistKm((float)signedLat(), (float)signedLon(), v.lat, v.lon);
         in.hasAlt = v.alt != NBR_MH_ALT_UNKNOWN;

@@ -919,6 +919,54 @@ static void test_reply_shape_and_limits(void)
     TEST_ASSERT_TRUE(strcmp(a + strlen(a) - 16, b + strlen(b) - 16) != 0);
 }
 
+// DRY-06: the reply canonical is built in ONE place (rmReplyCanonical) for signer and verifier. These pin the
+// exact bytes (tag computed independently: HMAC-SHA256 under sha256("secret"), first 8 bytes), so a refactor
+// cannot change the on-air format.
+static void test_reply_canonical_and_frame_are_pinned(void)
+{
+    char canon[200];
+    const size_t cl = rmReplyCanonical(42, DST, SRC, "ok rebooting", canon, sizeof(canon));
+    TEST_ASSERT_EQUAL_STRING("RM1R|DK5EN-90|DK5EN-1|42|ok rebooting", canon);
+    TEST_ASSERT_EQUAL_UINT(strlen(canon), cl);
+    TEST_ASSERT_EQUAL_UINT(0, rmReplyCanonical(42, DST, SRC, "ok rebooting", canon, 20)); // does not fit
+    TEST_ASSERT_EQUAL_UINT(0, rmReplyCanonical(42, nullptr, SRC, "ok", canon, sizeof(canon)));
+
+    RmCmd c = mk(42, "reboot");
+    char out[160];
+    rmReply(c, "ok rebooting", DST, SRC, PW, out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("RM1 42 ok rebooting 52a704f71e8733f9", out);
+}
+
+static void test_reply_signed_verifies_and_any_byte_change_fails(void)
+{
+    RmCmd c = mk(42, "reboot");
+    char frame[160];
+    TEST_ASSERT_TRUE(rmReply(c, "ok rebooting", DST, SRC, PW, frame, sizeof(frame)) > 0);
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    char res[RM_MAX_RESULT + 1];
+    TEST_ASSERT_TRUE(rmVerifyReply(frame, DST, SRC, 42, key, res, sizeof(res)));
+    TEST_ASSERT_EQUAL_STRING("ok rebooting", res);
+
+    // every byte of the frame flipped in turn: never verifies
+    const size_t len = strlen(frame);
+    for (size_t i = 0; i < len; i++)
+    {
+        char bad[160];
+        memcpy(bad, frame, len + 1);
+        bad[i] = (char)(bad[i] ^ 0x01);
+        char r2[RM_MAX_RESULT + 1];
+        TEST_ASSERT_FALSE_MESSAGE(rmVerifyReply(bad, DST, SRC, 42, key, r2, sizeof(r2)), bad);
+    }
+    // every signed field of the canonical changed on the verifier side
+    TEST_ASSERT_FALSE(rmVerifyReply(frame, "DK5EN-91", SRC, 42, key, res, sizeof(res)));
+    TEST_ASSERT_FALSE(rmVerifyReply(frame, DST, "DK5EN-2", 42, key, res, sizeof(res)));
+    TEST_ASSERT_FALSE(rmVerifyReply(frame, DST, SRC, 43, key, res, sizeof(res)));
+    uint8_t other[32];
+    rmDeriveKey("secreT", other);
+    TEST_ASSERT_FALSE(rmVerifyReply(frame, DST, SRC, 42, other, res, sizeof(res)));
+}
+
 static void test_accept_stores_result_and_truncates(void)
 {
     RmState s;
@@ -2028,6 +2076,8 @@ int main(int, char **)
     RUN_TEST(test_successful_commands_do_not_clear_the_reject_count);
     RUN_TEST(test_empty_password_disables_rm);
     RUN_TEST(test_reply_shape_and_limits);
+    RUN_TEST(test_reply_canonical_and_frame_are_pinned);
+    RUN_TEST(test_reply_signed_verifies_and_any_byte_change_fails);
     RUN_TEST(test_accept_stores_result_and_truncates);
     RUN_TEST(test_verdict_names);
     RUN_TEST(test_reply_is_recognised_and_never_parses_as_a_command);

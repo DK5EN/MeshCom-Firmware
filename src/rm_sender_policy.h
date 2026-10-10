@@ -64,6 +64,7 @@ struct RmPolEntry
     bool verified;    // ... and its tag matched
     bool replyErr;    // verified reply starts with "err"
     bool expired;     // older than the reply window the caller tracks (aged out; guards the 2^32 wrap)
+    bool isSync;      // a counter sync (ctr 0), not a command; only rmPeerMarkMisses() reads it (set it, memset 0 = command)
 };
 
 inline uint32_t rmPolicyAgeMs(uint32_t nowMs, uint32_t thenMs)
@@ -194,6 +195,76 @@ inline RmPolDecision rmPolicyMaySend(const RmPolEntry *e, uint8_t n, uint32_t no
 inline bool rmPolicyNeedSync(bool clockTrusted, bool haveTargetMark, bool cmdIsSync)
 {
     return !cmdIsSync && !clockTrusted && !haveTargetMark;
+}
+
+// CR-02: a learnt counter mark (the target's HWM as of the last verified reply) goes stale when the
+// target's HWM moves on without this sender, e.g. a clock-based sender (ctr about 1.79e9) manages the same
+// node. The mark-based sender then sends ctr = mark + 1, which the target rejects as a replay: silent on
+// air, and rmPolicyNeedSync() stays false because a mark exists. Recovery: after RM_MARK_STALE_UNANSWERED
+// dead commands in a row the mark is dropped, so the next send runs the automatic sync again.
+// Flag independent: this is correctness, not a penalty. N = 2 = RM_POLICY_MAX_UNANSWERED: one lost frame
+// is no evidence, two commands in a row that each waited out RM_NOANSWER_MS are; a false positive costs one
+// sync frame; and under strict security the budget of 2 refuses the third send exactly until the first
+// dead one leaves the window, which is when this rule fires.
+#define RM_MARK_STALE_UNANSWERED RM_POLICY_MAX_UNANSWERED
+
+// e[0..n) = ALL entries of ONE target (any order). Counts the commands (not syncs) that got no reply at all
+// and are dead (expired, or older than RM_NOANSWER_MS) and newer than the newest verified entry of any kind
+// (a verified reply, a sync included, refreshed the mark). A reply with a bad tag is no answer but is also
+// not silence, so it is not counted. Expired entries have no usable age: they count unless a LIVE (not
+// expired) verified entry exists, which is surely newer than any expired one. With only an expired verified
+// entry the order is unknown and they count anyway: a user retrying slower than RM_CACHE_MS (10 min) must
+// still recover, and a false positive costs one sync frame.
+inline uint8_t rmPeerMarkMisses(const RmPolEntry *e, uint8_t n, uint32_t nowMs)
+{
+    if (e == nullptr)
+        return 0;
+    if (n > RM_POLICY_MAX_ENTRIES)
+        n = (uint8_t)RM_POLICY_MAX_ENTRIES;
+    bool haveLiveVer = false;
+    uint32_t verAge = 0;
+    for (uint8_t i = 0; i < n; i++)
+    {
+        if (!e[i].verified)
+            continue;
+        if (e[i].expired)
+            continue;
+        const uint32_t age = rmPolicyAgeMs(nowMs, e[i].sentMs);
+        if (!haveLiveVer || age < verAge)
+        {
+            haveLiveVer = true;
+            verAge = age;
+        }
+    }
+    uint8_t k = 0;
+    for (uint8_t i = 0; i < n; i++)
+    {
+        if (e[i].isSync || e[i].verified || e[i].replied)
+            continue;
+        if (e[i].expired)
+        {
+            if (!haveLiveVer)
+                k++;
+            continue;
+        }
+        const uint32_t age = rmPolicyAgeMs(nowMs, e[i].sentMs);
+        if (age >= RM_NOANSWER_MS && (!haveLiveVer || age < verAge))
+            k++;
+    }
+    return k;
+}
+
+inline bool rmPeerMarkStale(const RmPolEntry *e, uint8_t n, uint32_t nowMs)
+{
+    return rmPeerMarkMisses(e, n, nowMs) >= RM_MARK_STALE_UNANSWERED;
+}
+
+// Airtime guard for replies a node gives to frames ANYONE can replay (RM_CACHED, RM_SYNC): at most one
+// per spacingMs, whatever the strict flag says. true = suppress this one. haveLast = a reply was sent
+// before; unsigned subtraction, millis() wrap safe. Receiver side; the caller keeps the two statics.
+inline bool rmReplyTooSoon(bool haveLast, uint32_t lastMs, uint32_t nowMs, uint32_t spacingMs)
+{
+    return haveLast && (uint32_t)(nowMs - lastMs) < spacingMs;
 }
 
 // Chain of an automatic sync: the command waits for its sync. Pure decision, called every loop pass.
@@ -532,6 +603,7 @@ struct RmProof
     bool proven;
     bool oneShot;
     uint8_t cap;  // capability level the target reported in its sync reply (rm=<n>); 0 = unknown or old firmware
+    uint32_t lastUse;  // LRU stamp (rmProofTouch): bigger = more recent; no clock, so no millis() wrap
 };
 
 inline RmProof *rmProofFind(RmProof *b, const char *dst)
@@ -542,7 +614,23 @@ inline RmProof *rmProofFind(RmProof *b, const char *dst)
     return nullptr;
 }
 
-// the saved key of dst is now fp (save, or first use). Returns the entry (nullptr only if the book is full).
+// CR-04: the book is a cache, not a register. Every use stamps the entry with the next tick (the book's
+// highest stamp + 1); a new target takes a free slot or evicts the least recently used one. Before, the
+// 9th distinct target got nullptr for good, so a regularly managed node typed after eight one-off calls had
+// no proof and no one-shot for the rest of the session (budget stuck at 2).
+inline void rmProofTouch(RmProof *b, RmProof *p)
+{
+    uint32_t top = 0;
+    for (uint8_t i = 0; i < RM_PROOF_N; i++)
+        if (b[i].used && b[i].lastUse > top)
+            top = b[i].lastUse;
+    p->lastUse = top + 1u;
+}
+
+// the saved key of dst is now fp (save, or first use). Never nullptr. A target is recorded at SEND time
+// (not after a verified reply) on purpose: the re-key one-shot and the unproven budget are about targets
+// that never answered, so a verified-only book could not detect a changed key for them. Eviction is what
+// keeps one-off targets from pushing out the managed ones.
 inline RmProof *rmProofSetKey(RmProof *b, const char *dst, const uint8_t fp[4])
 {
     RmProof *p = rmProofFind(b, dst);
@@ -551,14 +639,21 @@ inline RmProof *rmProofSetKey(RmProof *b, const char *dst, const uint8_t fp[4])
         for (uint8_t i = 0; i < RM_PROOF_N && p == nullptr; i++)
             if (!b[i].used)
                 p = &b[i];
-        if (p == nullptr)
-            return nullptr;
+        if (p == nullptr)  // full: evict the least recently used (oldest stamp; stamps are distinct per use)
+        {
+            p = &b[0];
+            for (uint8_t i = 1; i < RM_PROOF_N; i++)
+                if (b[i].lastUse < p->lastUse)
+                    p = &b[i];
+        }
         memset(p, 0, sizeof(*p));
         p->used = true;
         snprintf(p->dst, sizeof(p->dst), "%s", dst);
         memcpy(p->fp, fp, 4);
+        rmProofTouch(b, p);
         return p;
     }
+    rmProofTouch(b, p);
     if (memcmp(p->fp, fp, 4) != 0)
     {
         memcpy(p->fp, fp, 4);
@@ -574,7 +669,10 @@ inline void rmProofVerified(RmProof *b, const char *dst, const uint8_t fp[4])
 {
     RmProof *p = rmProofFind(b, dst);
     if (p != nullptr && memcmp(p->fp, fp, 4) == 0)
+    {
         p->proven = true;
+        rmProofTouch(b, p);
+    }
 }
 
 // the verified sync reply of dst (key fingerprint fp) reported capability level cap (same rule as above)
@@ -582,7 +680,10 @@ inline void rmProofSetCap(RmProof *b, const char *dst, const uint8_t fp[4], uint
 {
     RmProof *p = rmProofFind(b, dst);
     if (p != nullptr && memcmp(p->fp, fp, 4) == 0)
+    {
         p->cap = cap;
+        rmProofTouch(b, p);
+    }
 }
 
 // the target is forgotten/deleted: proof and one-shot go (a re-added node starts fresh, without one-shot)

@@ -104,6 +104,9 @@
 
 #define RM_FMT_BODY_MAX 105 // 140 - 4 - 10 - 1 - 1 - 16 - 3 ("ok ")
 
+// Window in minutes for the "heard" lists: the web page and the RM mh reply use the same 3 h (decision D11).
+#define RM_HEARD_WINDOW_MIN (3 * 60)
+
 // ---- low-level appender into a local buffer that holds a full body ------------------------------------
 
 struct RmFmtBuf

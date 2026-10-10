@@ -153,6 +153,7 @@ static RmPolEntry mk(uint32_t sentMs, bool replied = false, bool verified = fals
     e.verified = verified;
     e.replyErr = err;
     e.expired = expired;
+    e.isSync = false;
     return e;
 }
 
@@ -797,6 +798,235 @@ static void test_proof_cap_gates_the_proven_limit(void)
     TEST_ASSERT_EQUAL_UINT8(0, p->cap);
 }
 
+// ---- CR-02: stale learnt counter mark ------------------------------------------------------------------------
+static RmPolEntry mkSync(uint32_t sentMs, bool replied = false, bool verified = false)
+{
+    RmPolEntry e = mk(sentMs, replied, verified);
+    e.isSync = true;
+    return e;
+}
+
+static void test_peer_mark_stale_after_two_dead_commands(void)
+{
+    const uint32_t now = 4000000;
+    // none, one dead, two dead (>= 75 s old, no reply at all)
+    TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(nullptr, 0, now));
+    RmPolEntry one[1] = {mk(now - RM_NOANSWER_MS)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(one, 1, now));
+    TEST_ASSERT_FALSE_MESSAGE(rmPeerMarkStale(one, 1, now), "one lost frame is no evidence");
+    RmPolEntry two[2] = {mk(now - RM_NOANSWER_MS), mk(now - 80000)};
+    TEST_ASSERT_TRUE(rmPeerMarkStale(two, 2, now));
+    TEST_ASSERT_EQUAL_UINT32(2, RM_MARK_STALE_UNANSWERED);
+    // the answer may still come: a command younger than RM_NOANSWER_MS is not dead
+    RmPolEntry young[2] = {mk(now - (RM_NOANSWER_MS - 1)), mk(now - 80000)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(young, 2, now));
+    TEST_ASSERT_FALSE(rmPeerMarkStale(young, 2, now));
+}
+
+static void test_peer_mark_stale_ignores_syncs_and_replies(void)
+{
+    const uint32_t now = 4000000;
+    // unanswered SYNCs are not command misses (a sync never uses the mark)
+    RmPolEntry s[2] = {mkSync(now - 100000), mkSync(now - 90000)};
+    TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(s, 2, now));
+    // a reply with a bad tag is no silence
+    RmPolEntry u[2] = {mk(now - 100000, true, false), mk(now - 90000)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(u, 2, now));
+    // a verified err reply is an answer too
+    RmPolEntry v[3] = {mk(now - 100000, true, true, true), mk(now - 90000), mk(now - 80000)};
+    TEST_ASSERT_EQUAL_UINT8(2, rmPeerMarkMisses(v, 3, now));  // verified one is the OLDEST: both newer ones count
+}
+
+static void test_peer_mark_stale_streak_ends_at_the_newest_verified(void)
+{
+    const uint32_t now = 4000000;
+    // two dead commands, then a verified sync refreshed the mark: not stale any more
+    RmPolEntry a[3] = {mk(now - 200000), mk(now - 190000), mkSync(now - 100000, true, true)};
+    TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(a, 3, now));
+    // ... and dead commands AFTER it count again
+    RmPolEntry b[4] = {mk(now - 200000), mk(now - 190000), mkSync(now - 100000, true, true), mk(now - 90000)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(b, 4, now));
+    // order of the array does not matter
+    RmPolEntry c[4] = {b[3], b[2], b[1], b[0]};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(c, 4, now));
+    // a verified command (ok or err) is the barrier just the same
+    RmPolEntry d[3] = {mk(now - 120000), mk(now - 110000, true, true), mk(now - 100000)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(d, 3, now));
+}
+
+static void test_peer_mark_stale_expired_entries(void)
+{
+    const uint32_t now = 4000000;
+    // nothing verified at all: expired dead commands count (the user came back an hour later)
+    RmPolEntry a[2] = {mk(1, false, false, false, true), mk(2, false, false, false, true)};
+    TEST_ASSERT_TRUE(rmPeerMarkStale(a, 2, now));
+    // an expired verified entry: the order against expired dead ones is unknown, they count anyway
+    // (a slow retry cadence must recover; a false positive costs one sync frame)
+    RmPolEntry b[3] = {mk(1, false, false, false, true), mk(2, false, false, false, true), mk(3, true, true, false, true)};
+    TEST_ASSERT_EQUAL_UINT8(2, rmPeerMarkMisses(b, 3, now));
+    // a LIVE verified entry is surely newer than every expired dead one: they do not count
+    RmPolEntry live[3] = {mk(1, false, false, false, true), mk(2, false, false, false, true), mk(now - 100000, true, true)};
+    TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(live, 3, now));
+    // a live dead command is newer than any expired verified one
+    RmPolEntry c[2] = {mk(now - 100000), mk(3, true, true, false, true)};
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(c, 2, now));
+    // millis() wrap: the ages are unsigned differences
+    const uint32_t wrapNow = 50000u;
+    RmPolEntry w[2] = {mk(wrapNow - 90000u), mk(wrapNow - 100000u)};  // sent before the wrap point
+    TEST_ASSERT_TRUE(rmPeerMarkStale(w, 2, wrapNow));
+    // more entries than the book holds are clamped, never read past
+    RmPolEntry many[20];
+    for (int i = 0; i < 20; i++)
+        many[i] = mk(now - 100000u - (uint32_t)i);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_MAX_ENTRIES, rmPeerMarkMisses(many, 20, now));
+}
+
+// CR-02 slow cadence: two commands more than RM_CACHE_MS (10 min) apart, both unanswered. By the third send both
+// are expired (and an old verified reply is expired too); the mark must still be dropped.
+static void test_peer_mark_stale_slow_retry_cadence(void)
+{
+    const uint32_t t0 = 1000000;
+    RmPolEntry book[3] = {mk(t0 + 1300000), mk(t0 + 600000), mk(t0 - 100000, true, true)};  // newest first
+    // at the second send the first one is dead but not expired yet: one miss, not stale
+    TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(&book[1], 2, t0 + 1300000));
+    // by the third send everything older than RM_CACHE_MS carries the sticky expired flag (expireKeys)
+    book[0].expired = book[1].expired = book[2].expired = true;
+    TEST_ASSERT_EQUAL_UINT8(2, rmPeerMarkMisses(book, 3, t0 + 2000000));
+    TEST_ASSERT_TRUE(rmPeerMarkStale(book, 3, t0 + 2000000));
+    // a live verified reply (the sync that follows) ends the streak again
+    RmPolEntry after[4] = {mkSync(t0 + 2000000, true, true), book[0], book[1], book[2]};
+    TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(after, 4, t0 + 2005000));
+}
+
+// ---- CR-03: airtime guard for replayable frames (RM_CACHED, RM_SYNC) ----------------------------------------------
+static void test_reply_too_soon_spacing_and_wrap(void)
+{
+    TEST_ASSERT_FALSE_MESSAGE(rmReplyTooSoon(false, 0, 5, RM_POLICY_COOLDOWN_MS), "the first reply always goes out");
+    TEST_ASSERT_TRUE(rmReplyTooSoon(true, 1000, 1000, RM_POLICY_COOLDOWN_MS));
+    TEST_ASSERT_TRUE(rmReplyTooSoon(true, 1000, 1000 + RM_POLICY_COOLDOWN_MS - 1, RM_POLICY_COOLDOWN_MS));
+    TEST_ASSERT_FALSE_MESSAGE(rmReplyTooSoon(true, 1000, 1000 + RM_POLICY_COOLDOWN_MS, RM_POLICY_COOLDOWN_MS),
+                              "exactly one spacing later is out");
+    const uint32_t last = 0xFFFFFFFFu - 4000u;  // 4 s before the wrap point
+    TEST_ASSERT_TRUE(rmReplyTooSoon(true, last, last + 9999u, RM_POLICY_COOLDOWN_MS));   // wrapped, 9.999 s
+    TEST_ASSERT_FALSE(rmReplyTooSoon(true, last, last + 10000u, RM_POLICY_COOLDOWN_MS)); // wrapped, 10 s
+    // a burst of copies: one in RM_POLICY_COOLDOWN_MS (= RM_RATE_MS), however many arrive
+    bool have = false;
+    uint32_t lastMs = 0;
+    uint32_t sent = 0;
+    for (uint32_t now = 100000; now < 130000; now += 500)
+        if (!rmReplyTooSoon(have, lastMs, now, RM_POLICY_COOLDOWN_MS))
+        {
+            have = true;
+            lastMs = now;
+            sent++;
+        }
+    TEST_ASSERT_EQUAL_UINT32(3, sent);  // t = 0 s, 10 s, 20 s of a 30 s burst
+}
+
+// ---- CR-04: proof book is LRU, never full for good ----------------------------------------------------------------
+static void callOf(char *out, size_t n, int i)
+{
+    snprintf(out, n, "DK5EN-%d", i);
+}
+
+static void test_proof_book_evicts_least_recently_used(void)
+{
+    RmProof b[RM_PROOF_N];
+    memset(b, 0, sizeof(b));
+    const uint8_t fp[4] = {1, 2, 3, 4};
+    char call[10];
+    // nine targets: the 1st is the managed node (used first), then eight one-off calls
+    for (int i = 1; i <= 9; i++)
+    {
+        callOf(call, sizeof(call), i);
+        TEST_ASSERT_NOT_NULL_MESSAGE(rmProofSetKey(b, call, fp), "the book never refuses a target");
+    }
+    TEST_ASSERT_NULL_MESSAGE(rmProofFind(b, "DK5EN-1"), "the least recently used target was evicted");
+    for (int i = 2; i <= 9; i++)
+    {
+        callOf(call, sizeof(call), i);
+        TEST_ASSERT_NOT_NULL(rmProofFind(b, call));
+    }
+    // the 9th target (it took the slot) gets the proven budget once a reply verified and the cap is known
+    RmProof *p = rmProofFind(b, "DK5EN-9");
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
+    rmProofVerified(b, "DK5EN-9", fp);
+    rmProofSetCap(b, "DK5EN-9", fp, 2);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(rmProofFind(b, "DK5EN-9")));
+}
+
+static void test_proof_book_use_keeps_a_target_alive(void)
+{
+    RmProof b[RM_PROOF_N];
+    memset(b, 0, sizeof(b));
+    const uint8_t fp[4] = {1, 2, 3, 4};
+    char call[10];
+    for (int i = 1; i <= RM_PROOF_N; i++)
+    {
+        callOf(call, sizeof(call), i);
+        rmProofSetKey(b, call, fp);
+    }
+    // the managed node DK5EN-1 is the oldest, but it is used again (a send) ...
+    rmProofVerified(b, "DK5EN-1", fp);
+    rmProofSetCap(b, "DK5EN-1", fp, 2);
+    rmProofSetKey(b, "DK5EN-1", fp);
+    // ... so a ninth target pushes out DK5EN-2 instead, and DK5EN-1 keeps its proof
+    rmProofSetKey(b, "DK5EN-90", fp);
+    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-2"));
+    TEST_ASSERT_NOT_NULL(rmProofFind(b, "DK5EN-90"));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(rmProofFind(b, "DK5EN-1")));
+    // verification and cap are uses too: DK5EN-3 is now the oldest; touching it by a verified reply saves it
+    rmProofVerified(b, "DK5EN-3", fp);
+    rmProofSetKey(b, "DK5EN-91", fp);
+    TEST_ASSERT_NOT_NULL(rmProofFind(b, "DK5EN-3"));
+    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-4"));
+    // an evicted target comes back as a first key: nothing armed, nothing proven
+    RmProof *back = rmProofSetKey(b, "DK5EN-2", fp);
+    TEST_ASSERT_NOT_NULL(back);
+    TEST_ASSERT_FALSE(back->oneShot);
+    TEST_ASSERT_FALSE(back->proven);
+    // a re-key of a surviving target still arms the one-shot
+    const uint8_t fp2[4] = {9, 9, 9, 9};
+    TEST_ASSERT_TRUE(rmProofSetKey(b, "DK5EN-1", fp2)->oneShot);
+    // forget frees the slot: the next new target does not evict anybody. DK5EN-6 is still present here
+    // (DK5EN-2 re-added above took the slot of DK5EN-5, DK5EN-4 was evicted before that).
+    TEST_ASSERT_NOT_NULL(rmProofFind(b, "DK5EN-6"));
+    rmProofForget(b, "DK5EN-6");
+    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-6"));
+    TEST_ASSERT_NOT_NULL(rmProofSetKey(b, "DK5EN-92", fp));
+    const char *survivors[] = {"DK5EN-1", "DK5EN-2", "DK5EN-3", "DK5EN-7", "DK5EN-8", "DK5EN-90", "DK5EN-91", "DK5EN-92"};
+    for (size_t i = 0; i < sizeof(survivors) / sizeof(survivors[0]); i++)
+        TEST_ASSERT_NOT_NULL_MESSAGE(rmProofFind(b, survivors[i]), survivors[i]);
+}
+
+// ---- CR-05: one call folding for the send, probe and forget paths -----------------------------------------------
+static void test_fold_call_folds_and_never_truncates(void)
+{
+    char out[RM_CALL_MAX + 1];
+    TEST_ASSERT_TRUE(rmFoldCall("dk5en-1", out));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-1", out);
+    TEST_ASSERT_TRUE(rmFoldCall("Dk5En-12", out));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-12", out);
+    TEST_ASSERT_TRUE(rmFoldCall("OE1ABC-15", out));  // exactly RM_CALL_MAX
+    TEST_ASSERT_EQUAL_STRING("OE1ABC-15", out);
+    TEST_ASSERT_TRUE_MESSAGE(rmFoldCall("", out), "folding an empty string is fine, rmValidateCall refuses it");
+    TEST_ASSERT_EQUAL_STRING("", out);
+    TEST_ASSERT_TRUE_MESSAGE(rmFoldCall("a-b/{[`@", out), "only a-z change; the validator judges the rest");
+    TEST_ASSERT_EQUAL_STRING("A-B/{[`@", out);
+    // overlength: fails, out is empty, and the result is NOT the truncated call
+    TEST_ASSERT_FALSE(rmFoldCall("DK5EN-1234", out));  // 10 characters
+    TEST_ASSERT_EQUAL_STRING("", out);
+    TEST_ASSERT_FALSE(rmFoldCall("DK5EN-1234X", out));
+    TEST_ASSERT_EQUAL_STRING("", out);
+    TEST_ASSERT_FALSE(rmFoldCall("dk5en-123456789012345678901234567890", out));
+    TEST_ASSERT_FALSE(rmFoldCall(nullptr, out));
+    TEST_ASSERT_EQUAL_STRING("", out);
+    // the truncating copies the runtime used to have would have turned "OE1ABC-155" into the valid, other call OE1ABC-15
+    TEST_ASSERT_TRUE(rmValidateCall("OE1ABC-15"));
+    TEST_ASSERT_FALSE(rmFoldCall("OE1ABC-155", out));
+    TEST_ASSERT_FALSE(rmValidateCall(out));  // out is "": nothing valid to act on
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -834,5 +1064,14 @@ int main(int, char **)
     RUN_TEST(test_status_format_never_overruns_a_small_buffer);
     RUN_TEST(test_status_parse_old_form_and_rejects);
     RUN_TEST(test_book_room_counts_free_and_stale_slots);
+    RUN_TEST(test_peer_mark_stale_after_two_dead_commands);
+    RUN_TEST(test_peer_mark_stale_ignores_syncs_and_replies);
+    RUN_TEST(test_peer_mark_stale_streak_ends_at_the_newest_verified);
+    RUN_TEST(test_peer_mark_stale_expired_entries);
+    RUN_TEST(test_peer_mark_stale_slow_retry_cadence);
+    RUN_TEST(test_reply_too_soon_spacing_and_wrap);
+    RUN_TEST(test_proof_book_evicts_least_recently_used);
+    RUN_TEST(test_proof_book_use_keeps_a_target_alive);
+    RUN_TEST(test_fold_call_folds_and_never_truncates);
     return UNITY_END();
 }

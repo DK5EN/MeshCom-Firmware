@@ -340,6 +340,42 @@ const char *rmVerdictName(RmVerdict v)
     return "?";
 }
 
+// Shared token parsers of the command frame ("RM1 <ctr> <cmd...> <tag>") and the reply frame
+// ("RM1 <ctr> <result> <tag>"): the tag is the last token, exactly 16 lower-case hex preceded by one space.
+static bool rmTagTokenValid(const char *text, size_t len)
+{
+    if (len < 17)
+        return false;
+    const size_t tagPos = len - 16;
+    if (text[tagPos - 1] != ' ')
+        return false;
+    for (size_t i = tagPos; i < len; i++)
+        if (!isLowerHex(text[i]))
+            return false;
+    return true;
+}
+
+// ctr token starting at text[i], digits only up to (excluding) limit: decimal, no leading zero, fits uint32.
+// On success ctr is set and next is the index of the first byte after the digits.
+static bool rmCtrToken(const char *text, size_t i, size_t limit, uint32_t &ctr, size_t &next)
+{
+    const size_t start = i;
+    uint64_t v = 0;
+    while (i < limit && text[i] >= '0' && text[i] <= '9')
+    {
+        v = v * 10 + (uint64_t)(text[i] - '0');
+        if (v > 0xFFFFFFFFULL)
+            return false;
+        i++;
+    }
+    const size_t digits = i - start;
+    if (digits == 0 || (digits > 1 && text[start] == '0'))
+        return false;
+    ctr = (uint32_t)v;
+    next = i;
+    return true;
+}
+
 bool rmParse(const char *text, RmCmd &out)
 {
     memset(&out, 0, sizeof(out));
@@ -365,26 +401,14 @@ bool rmParse(const char *text, RmCmd &out)
         return false;
 
     // tag: last token, exactly 16 lower-case hex preceded by a single space
-    const size_t tagPos = len - 16;
-    if (text[tagPos - 1] != ' ')
+    if (!rmTagTokenValid(text, len))
         return false;
-    for (size_t i = tagPos; i < len; i++)
-        if (!isLowerHex(text[i]))
-            return false;
+    const size_t tagPos = len - 16;
 
     // ctr
     size_t i = 4;
-    const size_t ctrStart = i;
-    uint64_t ctr = 0;
-    while (i < tagPos - 1 && text[i] >= '0' && text[i] <= '9')
-    {
-        ctr = ctr * 10 + (uint64_t)(text[i] - '0');
-        if (ctr > 0xFFFFFFFFULL)
-            return false;
-        i++;
-    }
-    const size_t ctrLen = i - ctrStart;
-    if (ctrLen == 0 || (ctrLen > 1 && text[ctrStart] == '0'))
+    uint32_t ctr = 0;
+    if (!rmCtrToken(text, i, tagPos - 1, ctr, i))
         return false;
     if (i >= tagPos - 1 || text[i] != ' ')
         return false;
@@ -417,7 +441,7 @@ bool rmParse(const char *text, RmCmd &out)
         }
     }
 
-    out.ctr = (uint32_t)ctr;
+    out.ctr = ctr;
     if (out.ctr == 0 && strcmp(out.cmd, "sync") != 0)
         return false;
     memcpy(out.tag, text + tagPos, 16);
@@ -453,6 +477,21 @@ size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, 
         outStr(o, " ");
         outStr(o, c.args);
     }
+    return outEnd(o);
+}
+
+size_t rmReplyCanonical(uint32_t ctr, const char *dst, const char *src, const char *result, char *out, size_t n)
+{
+    Out o;
+    outInit(o, out, n);
+    outStr(o, "RM1R|");
+    outStr(o, dst);
+    outStr(o, "|");
+    outStr(o, src);
+    outStr(o, "|");
+    outU32(o, ctr);
+    outStr(o, "|");
+    outStr(o, result);
     return outEnd(o);
 }
 
@@ -608,17 +647,7 @@ size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *
         return 0;
 
     char canon[200];
-    Out o;
-    outInit(o, canon, sizeof(canon));
-    outStr(o, "RM1R|");
-    outStr(o, dst);
-    outStr(o, "|");
-    outStr(o, src);
-    outStr(o, "|");
-    outU32(o, c.ctr);
-    outStr(o, "|");
-    outStr(o, result);
-    if (outEnd(o) == 0)
+    if (rmReplyCanonical(c.ctr, dst, src, result, canon, sizeof(canon)) == 0)
         return 0;
 
     char rtag[17];
@@ -720,25 +749,13 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
         return false;
 
     // "RM1 " <ctr> " " <result> " " <16 hex>
-    const size_t tagPos = len - 16;
-    if (text[tagPos - 1] != ' ')
+    if (!rmTagTokenValid(text, len))
         return false;
-    for (size_t i = tagPos; i < len; i++)
-        if (!isLowerHex(text[i]))
-            return false;
+    const size_t tagPos = len - 16;
 
     size_t i = 4;
-    uint64_t got = 0;
-    const size_t ctrStart = i;
-    while (text[i] >= '0' && text[i] <= '9')
-    {
-        got = got * 10 + (uint64_t)(text[i] - '0');
-        if (got > 0xFFFFFFFFULL)
-            return false;
-        i++;
-    }
-    const size_t ctrLen = i - ctrStart;
-    if (ctrLen == 0 || (ctrLen > 1 && text[ctrStart] == '0') || text[i] != ' ' || (uint32_t)got != ctr)
+    uint32_t got = 0;
+    if (!rmCtrToken(text, i, tagPos - 1, got, i) || text[i] != ' ' || got != ctr)
         return false;
     i++;
 
@@ -746,21 +763,11 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
     if (tagPos - 1 <= i || resLen > RM_MAX_RESULT || resLen + 1 > n)
         return false;
 
-    char canon[200];
-    Out o;
-    outInit(o, canon, sizeof(canon));
-    outStr(o, "RM1R|");
-    outStr(o, dst);
-    outStr(o, "|");
-    outStr(o, src);
-    outStr(o, "|");
-    outU32(o, ctr);
-    outStr(o, "|");
     char res[RM_MAX_RESULT + 1];
     memcpy(res, text + i, resLen);
     res[resLen] = '\0';
-    outStr(o, res);
-    if (outEnd(o) == 0)
+    char canon[200];
+    if (rmReplyCanonical(ctr, dst, src, res, canon, sizeof(canon)) == 0)
         return false;
 
     char want[17];

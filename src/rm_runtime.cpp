@@ -367,6 +367,14 @@ void peerSet(const char *dst, uint32_t hwm)
     p.used = true;
 }
 
+// CR-02: drops the learnt counter mark of dst (decision: rmPeerMarkStale(), rm_sender_policy.h)
+void peerForget(const char *dst)
+{
+    for (uint8_t i = 0; i < 4; i++)
+        if (s_peer[i].used && strcmp(s_peer[i].dst, dst) == 0)
+            memset(&s_peer[i], 0, sizeof(s_peer[i]));
+}
+
 bool peerGet(const char *dst, uint32_t &hwm)
 {
     for (uint8_t i = 0; i < 4; i++)
@@ -598,12 +606,16 @@ void rmDrain(void)
     {
         // Advisor RM W2 #2: a sniffed valid frame re-injected inside the 10 min
         // cache window must not turn the node into a reply amplifier -- at most
-        // one cached reply per RM_RATE_MS.
+        // one cached reply per RM_RATE_MS. Flag independent (airtime guard, not a penalty).
+        // CR-03: the SAME frame arriving on RF and on the server path never reaches this case twice:
+        // rmRxTryQueue() (rm_rx_gate.h, RM-DUP ring, source + message id + text within 60 s) consumes the
+        // second copy before the queue, so it cannot produce a second reply. What gets here is a re-sent
+        // or re-injected copy under a new message id; this limiter spaces those.
         static uint32_t s_lastCachedMs = 0;
         static bool s_haveCached = false;
         const uint32_t nowCached = millis();
         g_rmStats.cached++;
-        if(s_haveCached && (uint32_t)(nowCached - s_lastCachedMs) < RM_RATE_MS)
+        if (rmReplyTooSoon(s_haveCached, s_lastCachedMs, nowCached, RM_RATE_MS))
         {
             Serial.printf("[RM];cached;ctr;%lu;suppressed\n", (unsigned long)cmd.ctr);
             break;
@@ -617,6 +629,19 @@ void rmDrain(void)
     case RM_SYNC:
     {
         g_rmStats.sync++;
+        // Airtime guard, flag independent (same idiom as RM_CACHED): a sniffed authentic sync frame
+        // re-injected under fresh message ids would earn one on-air reply per copy (1:1 amplifier). At
+        // most one sync reply per RM_RATE_MS; rmCheck() itself is unchanged (no RM_REJ_RATE when strict is off).
+        static uint32_t s_lastSyncReplyMs = 0;
+        static bool s_haveSyncReply = false;
+        const uint32_t nowSync = millis();
+        if (rmReplyTooSoon(s_haveSyncReply, s_lastSyncReplyMs, nowSync, RM_RATE_MS))
+        {
+            Serial.printf("[RM];sync;ctr;%lu;suppressed\n", (unsigned long)s_state.hwm);
+            break;
+        }
+        s_haveSyncReply = true;
+        s_lastSyncReplyMs = nowSync;
         char result[RM_MAX_RESULT + 1];
         snprintf(result, sizeof(result), "ok ctr=%lu v=%s%s rm=%d", (unsigned long)s_state.hwm,
                  SOURCE_VERSION, SOURCE_VERSION_SUB, RM_CAP_LEVEL);
@@ -694,6 +719,7 @@ void polEntryOf(const SentSlot &e, RmPolEntry &p)
     p.verified = e.pub.verified;
     p.replyErr = e.pub.verified && rmReplyIsErr(e.pub.reply);
     p.expired = e.expired;
+    p.isSync = (e.pub.ctr == 0); // a counter sync carries ctr 0, a command never does
 }
 
 // policy decision for one target (upper-case call), from the sent book
@@ -709,6 +735,18 @@ RmPolDecision policyFor(const char *to, uint32_t now, bool force = false)
     // BF-01 (D3): the sender policy (budget, cooldown, one-shot) applies only with strict security on
     return rmPolicyMaySend(pe, n, now, rmPolicyLimit(pf, pe, n, now), pf != nullptr && pf->oneShot, force,
                            meshcom_settings.node_rmstrict != 0);
+}
+
+// CR-02: true when the learnt counter mark of `to` (upper-case call) is stale: the last
+// RM_MARK_STALE_UNANSWERED commands to it got no reply at all (rmPeerMarkStale, rm_sender_policy.h)
+bool markStaleFor(const char *to, uint32_t now)
+{
+    RmPolEntry pe[kSentN];
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < s_nsent; i++)
+        if (strcmp(s_sent[i].pub.dst, to) == 0)
+            polEntryOf(s_sent[i], pe[n++]);
+    return rmPeerMarkStale(pe, n, now);
 }
 
 void dropPending()
@@ -831,23 +869,14 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
         return false;
     }
 
-    // dst: own copy folded to upper case, then ONE shared validator (rm_validate.h); never our own call
+    // dst: own copy folded to upper case (rmFoldCall: overlength fails, never truncates), then ONE shared
+    // validator (rm_validate.h); never our own call
     char to[RM_CALL_MAX + 1];
-    size_t dl = 0;
-    if (dst != nullptr)
-        for (; dst[dl] != '\0' && dl < RM_CALL_MAX; dl++)
-        {
-            char ch = dst[dl];
-            if (ch >= 'a' && ch <= 'z')
-                ch = (char)(ch - 'a' + 'A');
-            to[dl] = ch;
-        }
-    if (dst == nullptr || dst[dl] != '\0')
+    if (!rmFoldCall(dst, to))
     {
         setErr(err, errN, "dst");
         return false;
     }
-    to[dl] = '\0';
     if (!rmValidateCall(to) || strcmp(to, meshcom_settings.node_call) == 0)
     {
         setErr(err, errN, "dst");
@@ -888,7 +917,17 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
     uint32_t t = 0;
     const bool clock = clockUnix(t);
     uint32_t ph = 0;
-    const bool mark = peerGet(to, ph);
+    bool mark = peerGet(to, ph);
+
+    // CR-02: a stale mark (the target's HWM moved on without us, our counters are rejected as replays, silent
+    // on air) is dropped after two dead commands in a row; without a trusted clock the automatic sync below
+    // then runs on THIS send. Flag independent: correctness, not policy.
+    if (mark && !isSync && markStaleFor(to, now))
+    {
+        peerForget(to);
+        mark = false;
+        Serial.printf("[RM];peer;%s;stale\n", to);
+    }
 
     // automatic sync: only without a trusted clock AND without a learnt mark for this target
     if (!fromChain && rmPolicyNeedSync(clock, mark, isSync))
@@ -1132,15 +1171,13 @@ uint8_t rmGetTargets(RmTarget *out, uint8_t max)
 
 bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce)
 {
+    if (retryS != nullptr)
+        *retryS = 0;
     if (canForce != nullptr)
         *canForce = false;
-    if (dst == nullptr)
-        return false;
     char to[RM_CALL_MAX + 1];
-    size_t i = 0;
-    for (; dst[i] != '\0' && i < RM_CALL_MAX; i++)
-        to[i] = (dst[i] >= 'a' && dst[i] <= 'z') ? (char)(dst[i] - 'a' + 'A') : dst[i];
-    to[i] = '\0';
+    if (!rmFoldCall(dst, to)) // same "dst" refusal as the send path: an overlength call is no target
+        return false;
     const RmPolDecision d = policyFor(to, millis()); // the SAME decision as the send path
     if (retryS != nullptr)
         *retryS = d.retryS;
@@ -1151,13 +1188,9 @@ bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce)
 
 void rmForgetTarget(const char *dst)
 {
-    if (dst == nullptr)
-        return;
     char to[RM_CALL_MAX + 1];
-    size_t n = 0;
-    for (; dst[n] != '\0' && n < RM_CALL_MAX; n++)
-        to[n] = (dst[n] >= 'a' && dst[n] <= 'z') ? (char)(dst[n] - 'a' + 'A') : dst[n];
-    to[n] = '\0';
+    if (!rmFoldCall(dst, to)) // an overlength call was never a target (the send path refuses it): nothing to forget
+        return;
     if (s_pend.used && strcmp(s_pend.dst, to) == 0)
         dropPending();
     if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, to) == 0)

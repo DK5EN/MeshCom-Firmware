@@ -84,6 +84,30 @@ inline const char *rmPasswordProblemText(RmPasswdProblem p)
 
 #define RM_CALL_MAX 9  // call incl. SSID, e.g. "DK5EN-12" (8) or "OE1ABC-15" (9)
 
+// CR-05: the ONE upper-casing of a typed call (ASCII a-z only, nothing else changes) into out, which must
+// hold RM_CALL_MAX + 1 bytes. false for nullptr or a call longer than RM_CALL_MAX; out is then "". Never
+// truncates: a truncated call would address (or forget) a DIFFERENT node. The caller reports "dst".
+// Whether the result is a valid call is rmValidateCall()'s business.
+inline bool rmFoldCall(const char *dst, char *out)
+{
+    out[0] = '\0';
+    if (dst == nullptr)
+        return false;
+    size_t i = 0;
+    for (; dst[i] != '\0'; i++)
+    {
+        if (i >= RM_CALL_MAX)
+        {
+            out[0] = '\0';
+            return false;
+        }
+        const char ch = dst[i];
+        out[i] = (ch >= 'a' && ch <= 'z') ? (char)(ch - 'a' + 'A') : ch;
+    }
+    out[i] = '\0';
+    return true;
+}
+
 // A call with SSID, already upper case: 2..7 characters of [A-Z0-9], '-', SSID of 1 or 2 digits,
 // 9 characters in total at most. Same character set as the sender (rm_runtime.cpp: [A-Z0-9-]) and
 // the host tool (tools/remote_cmd.py _SEND_CALL_RE, which additionally allows '/', not routable here).

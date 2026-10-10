@@ -71,6 +71,10 @@ void rmDeriveKey(const char *passwd, uint8_t key[32]);
 // does not fit or an argument is null.
 size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, size_t n);
 
+// Reply canonical "RM1R|<dst>|<src>|<ctr>|<result>": the ONE builder behind the reply signer (rmReply) and
+// the verifier (rmVerifyReply). Returns its length, 0 if it does not fit or an argument is null.
+size_t rmReplyCanonical(uint32_t ctr, const char *dst, const char *src, const char *result, char *out, size_t n);
+
 // Reject counter and lockout are kept per sender (callsign-SSID as passed to rmCheck), whatever path
 // the frame took: one sender's wrong frames never lock another sender.
 #define RM_REJ_SOURCES 6 // senders whose rejects are tracked at once (least recently used is replaced)

@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 #include "remote_cmd.h"
+#include "rm_queue.h"
+#include "rm_rx_gate.h"
 #include "rm_sender_policy.h"
 
 static_assert(RM_POLICY_WINDOW_MS >= RM_REJ_WINDOW_MS + 60000u, "sender window must exceed the receiver reject window");
@@ -611,6 +613,195 @@ void test_both_off_wrong_key_stream_never_locks(void)
     TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(rs, 1800000u, nullptr));
 }
 
+// ---- CR-02: a stale learnt counter mark recovers without a reboot -----------------------------------------------
+// Two senders manage ONE node with the same password. A has a trusted clock (ctr = unix time, about 1.79e9) and
+// raises the target's HWM. B has no clock and a learnt mark of 5000: its ctr = mark + 1 is a replay for the target
+// (silent on air, no reply). Before CR-02 the mark was never dropped, so B was dead until a reboot. The mini sender
+// below is the glue of rm_runtime.cpp sendKeyImpl() with the same pure calls in the same order:
+//   rmPeerMarkStale(book) -> drop the mark -> [rmPolicyNeedSync: no clock, no mark] sync, then the command.
+struct MarkSender
+{
+    const char *call;
+    bool haveMark;
+    uint32_t mark;
+    uint32_t lastSent;
+    std::vector<RmPolEntry> book;  // newest first
+    uint32_t syncs;
+    uint32_t accepted;
+    uint32_t replays;
+    MarkSender(const char *c, uint32_t m) : call(c), haveMark(true), mark(m), lastSent(0), syncs(0), accepted(0), replays(0) {}
+};
+
+static RmVerdict deliverFrame(RmState &rs, const char *from, const char *cmd, uint32_t ctr, uint32_t now)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    char wire[96];
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, from, ctr, cmd, "", key, wire, sizeof(wire)) > 0);
+    RmCmd c;
+    TEST_ASSERT_TRUE(rmParse(wire, c));
+    const RmVerdict v = rmCheck(rs, c, DST, from, PW, 22, now);
+    if (v == RM_OK)
+        rmAccept(rs, c, "ok", now);
+    return v;
+}
+
+static void bookAdd(std::vector<RmPolEntry> &book, uint32_t sentMs, bool isSync, bool answered)
+{
+    RmPolEntry e;
+    memset(&e, 0, sizeof(e));
+    e.sentMs = sentMs;
+    e.isSync = isSync;
+    e.replied = e.verified = answered;
+    const int v = rmBookVictim(book.data(), (uint8_t)book.size(), (uint8_t)RM_POLICY_MAX_ENTRIES, sentMs);
+    TEST_ASSERT_TRUE(v != -1);
+    if (v >= 0)
+        book.erase(book.begin() + v);
+    book.insert(book.begin(), e);
+}
+
+// One send of the clockless sender. recovery=false is the code before CR-02 (the mark is never dropped).
+static void markSenderSend(RmState &rs, MarkSender &b, uint32_t now, bool recovery, bool strict)
+{
+    if (recovery && b.haveMark && rmPeerMarkStale(b.book.data(), (uint8_t)b.book.size(), now))
+        b.haveMark = false;
+    const RmPolDecision d = rmPolicyMaySend(b.book.data(), (uint8_t)b.book.size(), now, RM_POLICY_LIMIT_UNPROVEN, false,
+                                            false, strict);
+    if (!d.allowed)
+        return;
+    uint32_t at = now;
+    if (!b.haveMark)  // rmPolicyNeedSync(clock = false, mark = false, isSync = false)
+    {
+        TEST_ASSERT_TRUE(rmPolicyNeedSync(false, false, false));
+        b.syncs++;
+        TEST_ASSERT_EQUAL_INT(RM_SYNC, deliverFrame(rs, b.call, "sync", 0, now));
+        bookAdd(b.book, now, true, true);  // the sync reply verified
+        b.mark = rs.hwm;                   // peerSet() from the sync result
+        b.haveMark = true;
+        at = now + RM_PEND_SEND_DELAY_MS;  // the queued command goes out this long after the verified sync
+    }
+    b.lastSent = (b.lastSent + 1 > b.mark + 1) ? b.lastSent + 1 : b.mark + 1;  // max(last sent + 1, mark + 1)
+    const RmVerdict v = deliverFrame(rs, b.call, "status", b.lastSent, at);
+    if (v == RM_OK)
+    {
+        bookAdd(b.book, at, false, true);
+        b.mark = b.lastSent;
+        b.accepted++;
+    }
+    else
+    {
+        TEST_ASSERT_EQUAL_INT(RM_REJ_REPLAY, v);  // silent on air: no reply ever comes
+        bookAdd(b.book, at, false, false);
+        b.replays++;
+    }
+}
+
+// A (clock) and B (mark 5000): B sends every 80 s. Returns B for inspection.
+static MarkSender runTwoSenders(bool recovery, bool strict, uint32_t attempts, uint32_t *aAccepted)
+{
+    RmState rs;
+    rmStateInit(rs, 0);
+    rs.strict = strict;
+    MarkSender b("DK5EN-15", 5000u);
+    TEST_ASSERT_EQUAL_INT(RM_OK, deliverFrame(rs, SRC, "status", 5000u, 500u));  // B's mark was learnt from this
+    *aAccepted = 0;
+    // A (trusted clock): ctr = unix time
+    if (deliverFrame(rs, SRC, "status", 1790000000u, 12000u) == RM_OK)
+        (*aAccepted)++;
+    for (uint32_t i = 0; i < attempts; i++)
+        markSenderSend(rs, b, 20000u + i * 80000u, recovery, strict);
+    // A is unaffected and still gets through afterwards
+    if (deliverFrame(rs, SRC, "status", 1790000000u + 20000u + attempts * 80u + 5u, 20000u + attempts * 80000u + 30000u) == RM_OK)
+        (*aAccepted)++;
+    return b;
+}
+
+void test_cr02_before_stale_mark_never_recovers(void)
+{
+    uint32_t a = 0;
+    const MarkSender b = runTwoSenders(false, false, 12, &a);  // the code before CR-02
+    TEST_ASSERT_EQUAL_UINT32(2, a);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(0, b.accepted, "without CR-02 the clockless sender is dead for good");
+    TEST_ASSERT_EQUAL_UINT32(12, b.replays);
+    TEST_ASSERT_EQUAL_UINT32(0, b.syncs);
+}
+
+void test_cr02_stale_mark_recovers_without_reboot(void)
+{
+    for (int strict = 0; strict < 2; strict++)
+    {
+        uint32_t a = 0;
+        const MarkSender b = runTwoSenders(true, strict != 0, 12, &a);
+        TEST_ASSERT_EQUAL_UINT32(2, a);
+        // attempts 1 and 2 are replays (no reply), the third drops the mark, syncs, and goes through
+        TEST_ASSERT_EQUAL_UINT32(2, b.replays);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, b.syncs, "exactly one automatic sync, then the fresh mark is used");
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(10, b.accepted, "attempts 3..12 are accepted");
+        TEST_ASSERT_TRUE(b.mark >= 1790000000u);
+    }
+}
+
+void test_cr02_one_lost_frame_keeps_the_mark(void)
+{
+    // a lone dead command (target busy, RF loss) is no evidence of a stale mark: no extra sync
+    RmState rs;
+    rmStateInit(rs, 0);
+    MarkSender b("DK5EN-15", 0u);
+    b.haveMark = true;
+    b.mark = 0;
+    bookAdd(b.book, 1000u, false, false);  // one command, never answered
+    TEST_ASSERT_FALSE(rmPeerMarkStale(b.book.data(), (uint8_t)b.book.size(), 1000u + 200000u));
+    markSenderSend(rs, b, 1000u + 200000u, true, false);
+    TEST_ASSERT_EQUAL_UINT32(0, b.syncs);
+    TEST_ASSERT_EQUAL_UINT32(1, b.accepted);
+}
+
+// ---- CR-03: the same frame on RF and on the server path produces exactly one verdict (one reply) -------------------
+// rm_runtime.cpp replies once per verdict that is RM_OK / RM_SYNC / RM_CACHED. The gate (rm_rx_gate.h, RM-DUP ring)
+// consumes the second copy before the queue, so rmDrain() sees one frame and rmCheck() runs once.
+static uint32_t drainVerdicts(RmState &rs, uint32_t now, RmVerdict *first)
+{
+    char src[RM_QUEUE_SRC_LEN], text[RM_QUEUE_TEXT_LEN];
+    uint32_t verdicts = 0;
+    while (rmQueuePop(src, sizeof(src), text, sizeof(text)))
+    {
+        RmCmd c;
+        TEST_ASSERT_TRUE(rmParse(text, c));
+        const RmVerdict v = rmCheck(rs, c, DST, src, PW, 22, now);
+        if (verdicts == 0 && first != nullptr)
+            *first = v;
+        if (v == RM_OK)
+            rmAccept(rs, c, "ok", now);
+        verdicts++;
+    }
+    return verdicts;
+}
+
+void test_cr03_dual_path_frame_yields_exactly_one_verdict(void)
+{
+    uint8_t key[32];
+    rmDeriveKey(PW, key);
+    char wire[96];
+    TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 7000u, "status", "", key, wire, sizeof(wire)) > 0);
+    RmState rs;
+    rmStateInit(rs, 0);
+    rmQueueReset();
+
+    // server copy first, the RF copy 12 s later (same source, same message id, same text): both consumed
+    TEST_ASSERT_TRUE(rmRxTryQueue(SRC, wire, true, 0x2A5B6C7Du, 5000u));
+    TEST_ASSERT_TRUE(rmRxTryQueue(SRC, wire, true, 0x2A5B6C7Du, 17000u));
+    RmVerdict first = RM_REJ_FORMAT;
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, drainVerdicts(rs, 17000u, &first), "second copy must not reach rmCheck()");
+    TEST_ASSERT_EQUAL_INT(RM_OK, first);
+
+    // the ring forgets after 60 s (RM_SEEN_MS): a copy that late is a re-send and meets the RM_CACHED limiter
+    TEST_ASSERT_TRUE(rmRxTryQueue(SRC, wire, true, 0x2A5B6C7Du, 5000u + RM_SEEN_MS + 1u));
+    first = RM_OK;
+    TEST_ASSERT_EQUAL_UINT32(1, drainVerdicts(rs, 5000u + RM_SEEN_MS + 1u, &first));
+    TEST_ASSERT_EQUAL_INT(RM_CACHED, first);
+    rmQueueReset();
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -626,5 +817,9 @@ int main(int, char **)
     RUN_TEST(test_off_sender_policy_allows_every_send);
     RUN_TEST(test_off_sender_can_push_an_on_target_into_lockout);
     RUN_TEST(test_both_off_wrong_key_stream_never_locks);
+    RUN_TEST(test_cr02_before_stale_mark_never_recovers);
+    RUN_TEST(test_cr02_stale_mark_recovers_without_reboot);
+    RUN_TEST(test_cr02_one_lost_frame_keeps_the_mark);
+    RUN_TEST(test_cr03_dual_path_frame_yields_exactly_one_verdict);
     return UNITY_END();
 }

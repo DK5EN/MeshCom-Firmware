@@ -293,11 +293,12 @@ _MANUAL_ONLY: Dict[str, str] = {
     "mesh": "`--mesh on` makes the node relay every frame it hears, and persists",
     "gateway": "`--gateway on` radiates what the server pushes down, and persists",
     # Not emitters, but they poison the payload of everything the node does
-    # transmit: none of the three range-checks its argument, and the script's
-    # `abc` case parks the node at 0.0 N / 0.0 E -- persisted, then beaconed
-    # onto the live mesh and into mcmap at the next position interval.
-    "setlat": "no range check; the script's non-numeric case persists 0.0 as the node's latitude",
-    "setlon": "no range check; the script's non-numeric case persists 0.0 as the node's longitude",
+    # transmit: lat/lon are range-checked since DRY-01 (2026-10-10), but the
+    # script's `abc` case still parses as 0.0 and parks the node at 0.0 N /
+    # 0.0 E -- persisted, then beaconed onto the live mesh and into mcmap at
+    # the next position interval.
+    "setlat": "the script's non-numeric case parses as 0.0, inside the range, and persists it as the node's latitude",
+    "setlon": "the script's non-numeric case parses as 0.0, inside the range, and persists it as the node's longitude",
     "setalt": "no range check; the script's non-numeric case persists 0 as the node's altitude",
     # The ping timer's two dials. Harmless only while node_pingcall is empty,
     # which is not a property of this script -- DK5EN-90 carries a configured

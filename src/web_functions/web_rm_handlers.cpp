@@ -21,6 +21,7 @@
 #include "../command_functions.h" // nodePasswdApply()
 #include "../remote_cmd.h"        // rmDeriveKey()
 #include "../rm_nodes_store.h"
+#include "../rm_format.h"         // RM_HEARD_WINDOW_MIN
 #include "../rm_runtime.h"        // rmSendCommandKey()
 #include "../rm_validate.h"
 #include "../nbr_matrix.h"        // nbrMatrix
@@ -34,7 +35,6 @@ static_assert(RM_FORM_SLOTS == RM_NODES_SLOTS, "parser and store disagree on the
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body
 #define RM_HEARD_MAX 12
 #define RM_HEARD_SCAN 24             // rows looked at to find RM_HEARD_MAX with a routable call
-#define RM_HEARD_WINDOW_MIN (3 * 60)
 
 const char *rmReadBody(char *buf, size_t cap, long content_length)
 {

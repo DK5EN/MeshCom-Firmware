@@ -164,13 +164,14 @@ bool rmTargetAt(uint8_t i, RmTarget *out);
 uint8_t rmGetTargets(RmTarget *out, uint8_t max);
 
 // Policy probe for one call (upper case): true = a send would pass the sender policy now; retryS (optional)
-// gets the wait in seconds otherwise (0 when allowed).
+// gets the wait in seconds otherwise (0 when allowed). An overlength call (more than RM_CALL_MAX) is no target:
+// false with retryS 0, the same "dst" refusal as the send path (CR-05, rmFoldCall in rm_validate.h).
 bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce = nullptr);
 
 // Forget ONE target (saved slot deleted / forgotten / call changed): drops its pending chain, chain error,
 // key proof and one-shot, wipes the key copies of its sent-book slots. The sent-book ENTRIES stay and keep
 // counting toward the budget until they leave the 120 s window (delete + re-add never refills it). Never
-// touches the persisted send counter, learnt counter marks or receiver state.
+// touches the persisted send counter, learnt counter marks or receiver state. An overlength call is ignored.
 void rmForgetTarget(const char *dst);
 
 // The receiver lockout of every sender (reject table) is cleared, e.g. after a new node password was applied.
