@@ -13,11 +13,13 @@ Hand this to the implementing agent as is. Section 3 is the work list in executi
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3.1  | done 27248f12, ff7adee1, fd899435. Deviations: stepper floor is max(pmin, 0) (managing allowlist is 0..max); status reply now 63-70 chars (> legacy 63, accepted); "smaller of both maxima" note not implemented |
 | 3.2  | done fd899435; Position "Source" line is still a body div, moves with 3.4                                                                                                                                        |
-| 3.3  | pending (wave 2)                                                                                                                                                                                                 |
-| 3.4  | pending (wave 3)                                                                                                                                                                                                 |
+| 3.3  | done (wave 2), RAK +136 B                                                                                                                                                                                        |
+| 3.4  | first half done (wave 3: five cards, header rows, rmkv); second half pending (wave 4: writable rows, rmg3, TX row)                                                                                               |
 | 3.5  | pending (wave 4)                                                                                                                                                                                                 |
 | 3.6  | pending (wave 5)                                                                                                                                                                                                 |
 | 3.7  | pending; RAK flash baseline is cfadb4cf = 662060 B (79d32c70 = 661124 B); after wave 1: 662756 B                                                                                                                 |
+
+RAK flash limit raised by the operator to +4 kB vs cfadb4cf (662060 B), i.e. 666156 B max; after wave 3: 664660 B.
 
 Env name in this repo is `heltec_wifi_lora_32_V3` (not `heltec_v3`).
 
