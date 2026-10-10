@@ -7,6 +7,20 @@ Settings" card) and the LoRa Queue card (`web_functions.cpp:1720`). This documen
 
 Hand this to the implementing agent as is. Section 3 is the work list in execution order.
 
+## Status (resume point)
+
+| Step | State                                                                                                                                                                                                            |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1  | done 27248f12, ff7adee1, fd899435. Deviations: stepper floor is max(pmin, 0) (managing allowlist is 0..max); status reply now 63-70 chars (> legacy 63, accepted); "smaller of both maxima" note not implemented |
+| 3.2  | done fd899435; Position "Source" line is still a body div, moves with 3.4                                                                                                                                        |
+| 3.3  | pending (wave 2)                                                                                                                                                                                                 |
+| 3.4  | pending (wave 3)                                                                                                                                                                                                 |
+| 3.5  | pending (wave 4)                                                                                                                                                                                                 |
+| 3.6  | pending (wave 5)                                                                                                                                                                                                 |
+| 3.7  | pending; RAK flash baseline is cfadb4cf = 662060 B (79d32c70 = 661124 B); after wave 1: 662756 B                                                                                                                 |
+
+Env name in this repo is `heltec_wifi_lora_32_V3` (not `heltec_v3`).
+
 ## 1. Verdict
 
 The Settings page reads as one system: every row is `label | control | action`, the controls sit in
