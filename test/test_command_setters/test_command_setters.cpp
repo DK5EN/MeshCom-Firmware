@@ -1004,6 +1004,10 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
 
     // both setparam handlers normalise before they parse and before they build the console command
     const std::string set = read_repo_file("src/web_functions/web_setup.cpp");
+    // the include must not sit inside a board guard: boards without ENABLE_MSGSTORE (T-Beam) failed to compile
+    const size_t inc = set.find("#include <command_setters.h>");
+    const size_t guard = set.find("#if");
+    TEST_ASSERT_TRUE_MESSAGE(inc != std::string::npos && inc < guard, "command_setters.h include missing or inside an #if");
     size_t n = 0;
     for (size_t at = set.find("cmdDecimalComma(value);"); at != std::string::npos; at = set.find("cmdDecimalComma(value);", at + 1))
         ++n;
