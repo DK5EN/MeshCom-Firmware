@@ -321,6 +321,7 @@ function ent(dst, cmd, reply, o) {
 }
 const STATUS_NEW = 'ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22 led=1';
 const STATUS_OLD = 'ok v=4.35a up=5 bat=80 heap=100 gw=1 mesh=0 led=0';
+const dupIds = (P) => { const seen = Object.create(null), d = []; for (const e of P.d.querySelectorAll('#rm_page [id]')) { if (seen[e.id]) d.push(e.id); seen[e.id] = 1; } return d; };
 
 // a page with a saved node DK5EN-1 selected and a verified status in the ring
 async function savedNodePage(statusReply, extraSent) {
@@ -515,18 +516,8 @@ function leaks(P, canary) {
 
   // ---- TX power ------------------------------------------------------------------------------------
   {
-    const P = await savedNodePage('ok v=4.35a up=5 bat=80 heap=100 gw=1 mesh=0');
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
-    await flush();
-    check('TX power capped at 15 when the node reported no limit', P.text('rm_rtxval') === '15 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
-    check('TX power note says 15 dBm when unknown', /15 dBm/.test(P.text('rm_rtxnote')) && /not reported/.test(P.text('rm_rtxnote')));
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxdn'));
-    check('TX power floor is 0', P.text('rm_rtxval') === '0 dBm' && P.el('rm_rtxdn').disabled);
-    P.w.rmPageLeave();
-  }
-  {
     const P = await savedNodePage(STATUS_NEW);
-    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && P.text('rm_rtxnote') === '');
+    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && P.text('rm_rtxnote') === 'Range 0 to 22 dBm on this node.');
     for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
     check('TX power cap follows p=cur/max (22)', P.text('rm_rtxval') === '22 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
     P.w.rmPageLeave();
@@ -534,6 +525,71 @@ function leaks(P, canary) {
     for (let i = 0; i < 30; i++) Q.click(Q.el('rm_rtxup'));
     check('TX power cap 10 for p=8/10', Q.text('rm_rtxval') === '10 dBm', Q.text('rm_rtxval'));
     Q.w.rmPageLeave();
+  }
+
+  // ---- TX power range from the target (plan 3.1: pmin= token, no 15 dBm fallback) ---------------------
+  {
+    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=2 led=1');
+    check('3.1a status pmin=2 p=2/22: stepper starts at 2 and "-" is disabled there', P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled && !P.el('rm_rtxup').disabled, P.text('rm_rtxval') + ' dn.disabled=' + P.el('rm_rtxdn').disabled);
+    check('3.1a note names the range of this node', P.text('rm_rtxnote') === 'Range 2 to 22 dBm on this node.', P.text('rm_rtxnote'));
+    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxup'));
+    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
+    check('3.1a stepper bounded to [2, 22] in both directions', P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
+    P.w.rmPageLeave();
+    const N = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=-4/20 pmin=-4 led=1');
+    for (let i = 0; i < 40; i++) N.click(N.el('rm_rtxdn'));
+    check('3.1a negative pmin=-4 never puts the stepper below 0 (managing node allows 0..max only)', N.text('rm_rtxval') === '0 dBm' && N.el('rm_rtxdn').disabled && N.text('rm_rtxnote') === 'Range 0 to 20 dBm on this node.', N.text('rm_rtxval') + ' ' + N.text('rm_rtxnote'));
+    const n0 = N.sends().length;
+    await N.tap(N.el('rm_rtxapply'));
+    check('3.1a Apply with cur=-4/pmin=-4 sends txpower 0, never a negative value', N.sends().length === n0 + 1 && /cmd=txpower&args=0(&|$)/.test(N.sends()[n0].body) && !/args=-/.test(N.sends()[n0].body), JSON.stringify(N.sends().slice(n0)));
+    N.w.rmPageLeave();
+    const H = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=-9 led=1');
+    for (let i = 0; i < 40; i++) H.click(H.el('rm_rtxdn'));
+    const h0 = H.sends().length;
+    await H.tap(H.el('rm_rtxapply')); await H.tap(H.el('rm_rtxapply'));
+    check('3.1a Heltec pmin=-9: floor 0, lowering to the floor sends txpower 0 after the confirm, no negative send', H.text('rm_rtxval') === '0 dBm' && H.sends().slice(h0).length === 1 && /cmd=txpower&args=0(&|$)/.test(H.sends()[h0].body) && H.sends().every((c) => !/args=-/.test(c.body)), JSON.stringify(H.sends().slice(h0)));
+    H.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW);
+    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
+    check('3.1b status without pmin floors at 0', P.text('rm_rtxval') === '0 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
+    check('3.1b note for an old target still names the range', P.text('rm_rtxnote') === 'Range 0 to 22 dBm on this node.', P.text('rm_rtxnote'));
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_OLD);
+    check('3.1c no p= in any answer: stepper and Apply are disabled', P.el('rm_rtxdn').disabled && P.el('rm_rtxup').disabled && P.el('rm_rtxapply').disabled, [P.el('rm_rtxdn').disabled, P.el('rm_rtxup').disabled, P.el('rm_rtxapply').disabled].join());
+    check('3.1c status seen but no p=: note says the firmware does not report its range, no 15 dBm', P.text('rm_rtxnote') === "This node's firmware does not report its power range." && !/15/.test(P.text('rm_rtxval') + P.text('rm_rtxnote')), P.text('rm_rtxnote') + '|' + P.text('rm_rtxval'));
+    const n0 = P.sends().length;
+    await P.tap(P.el('rm_rtxapply'));
+    check('3.1c Apply sends nothing while the range is unknown', P.sends().length === n0);
+    P.w.rmPageLeave();
+    const O = await savedNodePage('ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1');
+    check('3.1c old form (tools/remote_cmd.py vector, gw=0 mesh=1, no p=): stepper disabled, firmware sentence, not "Press Refresh status"', O.el('rm_rtxdn').disabled && O.el('rm_rtxup').disabled && O.el('rm_rtxapply').disabled && O.text('rm_rtxnote') === "This node's firmware does not report its power range.", O.text('rm_rtxnote'));
+    O.w.rmPageLeave();
+    const Q = await mkPage(mkServer());
+    await Q.init(); await Q.typeCall('DK5EN-9');
+    check('3.1c unknown node (never answered): stepper disabled with the same note', Q.el('rm_rtxdn').disabled && Q.el('rm_rtxup').disabled && Q.text('rm_rtxnote') === 'Press Refresh status to learn the power range of the node.', Q.el('rm_rtxnote') && Q.text('rm_rtxnote'));
+    Q.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=2', { ctr: 2, ago: 1 })]);
+    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
+    check('3.1d radio reply with pmin=2 raises the floor to 2', P.w.rmKn().min === 2 && P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled && P.text('rm_rtxnote') === 'Range 2 to 22 dBm on this node.', P.w.rmKn().min + ' ' + P.text('rm_rtxval') + ' ' + P.text('rm_rtxnote'));
+    check('3.1d the radio card still shows p as cur/max (pmin is not a line of its own)', /10\/22 dBm/.test(P.text('rm_v_radio_p')) && !/pmin/.test(P.el('rm_cards').textContent), P.el('rm_cards').textContent.slice(0, 120));
+    P.w.rmPageLeave();
+    const Q = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=10/22 pmin=2 led=1', [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1 })]);
+    check('3.1d radio reply without pmin resets the floor to 0', Q.w.rmKn().min === 0, Q.w.rmKn().min);
+    Q.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22 pmin=0 led=1');
+    for (let i = 0; i < 5; i++) P.click(P.el('rm_rtxdn'));
+    check('3.1 precondition: touched value 12', P.text('rm_rtxval') === '12 dBm', P.text('rm_rtxval'));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'status', 'ok v=4.40a up=140 bat=87 heap=123 s=GtDMwL p=17/22 pmin=14 led=1', { ctr: 9, ago: 1, st: 'ok' })] });
+    check('3.1 value is clamped into [min, max] after every status', P.text('rm_rtxval') === '14 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
+    P.w.rmPageLeave();
   }
 
   // ---- confirm tap logic ---------------------------------------------------------------------------
@@ -1127,7 +1183,7 @@ function leaks(P, canary) {
     await P.setPoll({ sent: [ent('DK5EN-1', 'sync', 'ok', { ctr: 1, ago: 3, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 0 }] });
     check('W2E gate old firmware (sync ok, cap 0): older-firmware note', note() && /older firmware: only the basic commands work/.test(note().textContent) && rd().disabled, note() && note().textContent);
     await P.setPoll({ sent: [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 3, st: 'ok' }), ent('DK5EN-1', 'sens', 'ok t=21.4 h=<img/src=x> p=- t2=-', { ctr: 3, ago: 2, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }] });
-    const T = (k) => (P.el('rm_f_' + k) || { textContent: '' }).textContent;
+    const T = (k) => (P.el('rm_v_' + k) || { textContent: '' }).textContent;
     check('W2E gate cap 2: no note, Read radio enabled', !note() && !rd().disabled);
     check('W2E radio reply fills the card (MHz, SF, 4/x, kHz, p cur/max)', T('radio_f') === 'Frequency: 433.175 MHz' && T('radio_sf') === 'Spreading factor: 11' && T('radio_cr') === 'Coding rate: 4/5' && T('radio_bw') === 'Bandwidth: 250 kHz' && /10\/22 dBm/.test(T('radio_p')), [T('radio_f'), T('radio_cr'), T('radio_p')].join('|'));
     check('W2E sens: absent marker shows "not present", hostile text lands as text only', T('sens_p') === 'Pressure: not present' && T('sens_t2') === 'Second temperature: not present' && T('sens_h') === 'Humidity: <img/src=x> %' && P.el('rm_cards').querySelector('img') === null, T('sens_h'));
@@ -1150,12 +1206,23 @@ function leaks(P, canary) {
     await poll([]);
     // parser: examples, worst cases, absent markers, free text
     await poll([E('radio', 'f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99', 1), E('sens', 't=-99.9 h=100 p=1099.9 t2=-99.9', 2), E('pos', '-89.99999 -179.99999 40000 nofix', 3)]);
-    check('RMX worst cases parse (radio, sens, pos nofix)', tx('rm_f_radio_f') === 'Frequency: 999.999 MHz' && tx('rm_f_sens_h') === 'Humidity: 100 %' && tx('rm_f_pos_lat') === 'Latitude: -89.99999 deg' && tx('rm_f_pos_src') === 'Source: GPS on, no fix' && tx('rm_f_pos_alt') === 'Altitude: 40000 m', tx('rm_f_radio_f') + '|' + tx('rm_f_pos_src'));
+    check('RMX worst cases parse (radio, sens, pos nofix)', tx('rm_v_radio_f') === 'Frequency: 999.999 MHz' && tx('rm_v_sens_h') === 'Humidity: 100 %' && X('rm_f_pos_lat').value === '-89.99999' && tx('rm_v_pos_src') === 'Source: GPS on, no fix' && X('rm_f_pos_alt').value === '40000', tx('rm_v_radio_f') + '|' + tx('rm_v_pos_src'));
+    await poll([E('pos', '48.40760 11.73850 482 nofix', 3)]);
+    check('3.2 D5 position inputs are the INPUT elements (ids are unique, rm_f_ is the input)', ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k) && X('rm_f_pos_' + k).tagName === 'INPUT') && X('rm_f_pos_lat').value === '48.40760' && X('rm_f_pos_lon').value === '11.73850' && X('rm_f_pos_alt').value === '482', ['lat', 'lon', 'alt'].map((k) => X('rm_f_pos_' + k) && X('rm_f_pos_' + k).tagName).join());
+    check('3.2 D5 verified pos read: no false error, Set enabled', tx('rm_f_pos_hint') === '' && X('rm_f_pos_set') && !X('rm_f_pos_set').disabled, tx('rm_f_pos_hint') + ' set.disabled=' + (X('rm_f_pos_set') && X('rm_f_pos_set').disabled));
+    await typeIn('rm_f_pos_lat', '48.4076');
+    check('3.2 D5 typing 48.4076 keeps Set enabled and the hint empty', tx('rm_f_pos_hint') === '' && !X('rm_f_pos_set').disabled, tx('rm_f_pos_hint'));
+    await typeIn('rm_f_pos_lat', '91');
+    check('3.2 D5 a really bad latitude is still refused', X('rm_f_pos_set').disabled && /Latitude must be/.test(tx('rm_f_pos_hint')), tx('rm_f_pos_hint'));
+    check('3.2 D5 position keeps a single read-only line (Source), no lat/lon/alt copies', !X('rm_v_pos_lat') && !X('rm_v_pos_lon') && !X('rm_v_pos_alt') && tx('rm_v_pos_src') === 'Source: GPS on, no fix', tx('rm_v_pos_src'));
+    P.w.rmRenderCards();
+    check('3.2 no duplicate id in #rm_page after rmRenderCards() (radio, sens, pos, name, atxt)', dupIds(P).length === 0, dupIds(P).join());
+    check('3.2 id namespace: every rm_v_ element is read-only text, every input of the cards is rm_f_', [...P.el('rm_cards').querySelectorAll('[id^="rm_v_"]')].every((e) => e.tagName === 'DIV') && [...P.el('rm_cards').querySelectorAll('input')].every((e) => /^rm_f_/.test(e.id)) && !!X('rm_v_pos_src'), 'rm_v_pos_src=' + !!X('rm_v_pos_src'));
     await poll([E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('atxt', 'a=MeshCom Garten', 3), E('name', 'n=<img src=x onerror=1>', 4)]);
-    check('RMX sens absent marker, name/atxt free text with spaces/capitals, hostile name stays text', tx('rm_f_sens_t2') === 'Second temperature: not present' && X('rm_f_atxt_v').value === 'MeshCom Garten' && X('rm_f_name_v').value === '<img src=x onerror=1>' && !P.el('rm_cards').querySelector('img'), X('rm_f_atxt_v').value);
+    check('RMX sens absent marker, name/atxt free text with spaces/capitals, hostile name stays text', tx('rm_v_sens_t2') === 'Second temperature: not present' && X('rm_f_atxt_v').value === 'MeshCom Garten' && X('rm_f_name_v').value === '<img src=x onerror=1>' && !P.el('rm_cards').querySelector('img'), X('rm_f_atxt_v').value);
     for (const [r, s] of [['48.40812 11.73812 492 gps', 'Source: from GPS'], ['1.5 2.5 3 set', 'Source: set by hand']]) {
       await poll([E('pos', r, 5)]);
-      check('RMX pos reply "' + r + '" renders', tx('rm_f_pos_src') === s && tx('rm_f_pos_lon') === 'Longitude: ' + r.split(' ')[1] + ' deg', tx('rm_f_pos_src'));
+      check('RMX pos reply "' + r + '" renders', tx('rm_v_pos_src') === s && X('rm_f_pos_lon').value === r.split(' ')[1], tx('rm_v_pos_src'));
     }
     await poll([E('name', 'n=-', 6)]);
     check('RMX name n=- (empty) leaves the input empty', X('rm_f_name_v').value === '');
@@ -1222,9 +1289,9 @@ function leaks(P, canary) {
     const nS = () => P.sends().length, lastBody = () => P.sends().length ? P.sends()[P.sends().length - 1].body : '';
     await poll([]);
     await poll([E('txq', 'ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100'), E('mbox', 'ok m=heard u=65535/65535 b=999999 a=65535/65535 st=4294M dl=4294M ak=4294M dr=4294M bl=4294M nt=4294M'), E('maxhop', 'ok t=99 p=99')]);
-    check('RMN worst cases txq/mbox/maxhop parse (a= is plain key, hold in words)', tx('rm_f_txq_bp') === 'State: hold' && tx('rm_f_txq_q') === 'Queued (now/capacity): 65535/65535' && tx('rm_f_txq_u') === 'Channel use: 100 %' && tx('rm_f_mbox_a') === 'Actions last hour (done/limit): 65535/65535' && tx('rm_f_mbox_nt') === 'Notified: 4294M' && tx('rm_f_mbox_m') === 'Mode: heard' && tx('rm_f_maxhop_t') === 'Text messages: 99', tx('rm_f_mbox_a') + '|' + tx('rm_f_txq_bp'));
+    check('RMN worst cases txq/mbox/maxhop parse (a= is plain key, hold in words)', tx('rm_v_txq_bp') === 'State: hold' && tx('rm_v_txq_q') === 'Queued (now/capacity): 65535/65535' && tx('rm_v_txq_u') === 'Channel use: 100 %' && tx('rm_v_mbox_a') === 'Actions last hour (done/limit): 65535/65535' && tx('rm_v_mbox_nt') === 'Notified: 4294M' && tx('rm_v_mbox_m') === 'Mode: heard' && tx('rm_v_maxhop_t') === 'Text messages: 99', tx('rm_v_mbox_a') + '|' + tx('rm_v_txq_bp'));
     await poll([E('txq', 'ok q=3/20 bp=qrs tx=- rt=1 dr=0 u=5'), E('mbox', 'err unsupported', { st: 'err', ctr: 31 })]);
-    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_f_txq_bp') === 'State: slow down' && tx('rm_f_txq_tx') === 'Sent: not present' && /This node has no mailbox\./.test(tx('rm_card_mbox')), tx('rm_card_mbox'));
+    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_v_txq_bp') === 'State: slow down' && tx('rm_v_txq_tx') === 'Sent: not present' && /This node has no mailbox\./.test(tx('rm_card_mbox')), tx('rm_card_mbox'));
     // driver: double press, three pages, spacing
     P.w.rmMhStart(); P.w.rmMhStart(); await flush();
     check('RMN double press starts one chain, first page asks mh 0', nS() === 1 && /cmd=mh&args=0/.test(lastBody()), nS() + ' ' + lastBody());
@@ -1274,6 +1341,8 @@ function leaks(P, canary) {
     check('RMN row Details button sends mh <CALL> once', nS() === n0 + 1 && /cmd=mh&args=DL1AB-11(&|$)/.test(lastBody()), nS() + ' ' + lastBody() + ' msg=' + tx('rm_msg'));
     await poll([E('mh DL1AB-11', 'ok r h=1 k=1 g=0 m=- rc=- t=1 v=<b>X,DL2JA-2', { ago: 0 })], 0);
     check('RMN hostile via chain is text only', /Via: <b>X, DL2JA-2/.test(tx('rm_mh_det')) && !X('rm_mh_det').querySelector('b') && /Relay: not known/.test(tx('rm_mh_det')), tx('rm_mh_det'));
+    P.w.rmRenderCards();
+    check('3.2 no duplicate id in #rm_page after rmRenderCards() (txq, mbox, maxhop, heard list with details)', dupIds(P).length === 0 && !!X('rm_mh_det'), dupIds(P).join());
     n0 = nS();
     X('rm_f_mh_other').value = 'dl1abc-9'; X('rm_f_mh_other').dispatchEvent(new P.w.Event('input', { bubbles: true }));
     await P.tap(X('rm_card_mh').querySelector('[data-act="mhother"]'));

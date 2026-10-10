@@ -15,6 +15,9 @@
  *  - tools/webgui_rm_test.js extracts the literals below and runs them in jsdom: keep the print/println
  *    string-literal form (adjacent literals are concatenated, only \\ \" \n escapes are used); the printf
  *    arguments must be (unsigned)RM_NAME_MAX / RM_ATXT_MAX, the harness resolves them from the headers.
+ *  - Ids are unique per page: read-only values use rm_v_<card>_<key>, inputs and their Set/cnt/hint/note use
+ *    rm_f_<card>_<key>. rmWUpd, rmWire, rmClrIn and rmIn look up rm_f_ only; a shared id makes rmEl() return
+ *    the read-only <div> instead of the input (D5, docs/rm-gui/ux-tidy-plan-20261010.md 3.2).
  *  - The JS carries no comments (they would cost bytes on every page load) and no preprocessor lines.
  */
 #include <Arduino.h>
@@ -143,29 +146,31 @@ void rmScaffoldJs()
     web_client.println("function rmUp(m){m=parseInt(m,10);if(isNaN(m))return '';return 'up '+(m<120?m+' min':Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''));}\n"
                        "function rmValidCall(c){return typeof c=='string'&&c.length<=9&&/^[A-Z0-9]{2,}-[0-9]{1,2}$/.test(c);}");
     web_client.println("function rmPwProblem(p){return !p.length?'Enter a password.':p.length>14?'The password can be at most 14 characters.':'';}\n"
-                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null,ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
+                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null,min:null,ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
                        "function rmKn(){return rmKnFor(rmSel.call);}\n"
-                       "function rmCap(k){return(k.max!==null&&k.max>0)?k.max:15;}\n"
+                       "function rmCap(k){return(k.max!==null&&k.max>0)?k.max:0;}");
+    web_client.println("function rmFloor(k){return k.min!==null&&k.min>0?k.min:0;}\n"
                        "function rmLockLeft(){var m=Math.max(rmLock,rmSrvLock)-rmNow();return m>0?Math.ceil(m/1000):0;}");
     web_client.println("function rmLocked(){return rmBusy||rmAuth||rmLockLeft()>0;}\n"
                        "function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}\n");
     web_client.println("var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}\n"
                        "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];return f;}");
-    web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
+    web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null,min:null},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
                        "for(i=1;i<t.length;i++){k=t[i];\n"
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
                        "else if(k.indexOf('up=')==0)o.up=k.substring(3);\n"
                        "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);");
     web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}\n"
-                       "else if(k.indexOf('p=')==0){m=/^p=(-?\\d+)\\/(-?\\d+)$/.exec(k);if(m){o.cur=+m[1];o.max=+m[2];}}");
+                       "else if(k.indexOf('p=')==0){m=/^p=(-?\\d+)\\/(-?\\d+)$/.exec(k);if(m){o.cur=+m[1];o.max=+m[2];}}\n"
+                       "else if(k.indexOf('pmin=')==0){m=/^pmin=(-?\\d+)$/.exec(k);if(m)o.min=+m[1];}");
     web_client.println("else if(k=='led=0'||k=='led=1'){o.led=true;if(o.sw[5]<0)o.sw[5]=+k.charAt(4);}\n"
                        "else if(k=='gw=0'||k=='gw=1'){if(o.sw[4]<0)o.sw[4]=+k.charAt(3);}\n"
                        "else if(k=='mesh=0'||k=='mesh=1'){if(o.sw[3]<0)o.sw[3]=+k.charAt(5);}}\n"
                        "return o;}\n"
                        "function rmApplyEntry(k,e){var c=e.cmd.split(' '),n=c[0],o,m,i;");
-    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;if(o.cur!==null){k.cur=o.cur;k.max=o.max;}k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
+    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;if(o.cur!==null){k.cur=o.cur;k.max=o.max;k.min=o.min!==null?o.min:0;}k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
                        "else if(rmTog[n]!==undefined){m=/^ok (\\w+)=(on|off)$/.exec(e.reply);if(m&&m[1]==n){k.sw[rmTog[n]]=m[2]=='on'?1:0;if(n=='led')k.led=true;}}\n");
-    web_client.println("else if(n=='radio'){m=/ p=(-?\\d+)\\/(-?\\d+)$/.exec(e.reply);if(m){k.cur=+m[1];k.max=+m[2];}}\n"
+    web_client.println("else if(n=='radio'){m=/ p=(-?\\d+)\\/(-?\\d+)(?: pmin=(-?\\d+))?$/.exec(e.reply);if(m){k.cur=+m[1];k.max=+m[2];k.min=m[3]!==undefined?+m[3]:0;}}\n"
                        "else if(n=='txpower'){m=/^ok txpower=(-?\\d+)$/.exec(e.reply);if(m)k.cur=+m[1];}}");
     web_client.println("function rmApplySent(list){var a=list.slice(0).sort(function(x,y){return y.ago-x.ago;}),i,e;\n"
                        "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);}}\n");
@@ -197,12 +202,12 @@ void rmScaffoldJs()
                        "b=rmEl('rm_sw');b.textContent='';\n"
                        "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
-                       "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}\n"
-                       "function rmTxBuild(p,k,dis){var cap=rmCap(k),r=document.createElement('div'),x,a;\n"
-                       "if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<0)rmTx.val=0;r.className='rmrow';a=rmArmId=='txpower '+rmTx.val;");
-    web_client.println("rmBtn(r,'-','',rmTx.val<=0,{'data-act':'txdn'}).id='rm_rtxdn';x=document.createElement('b');x.id='rm_rtxval';x.textContent=rmTx.val+' dBm';r.appendChild(x);rmBtn(r,'+','',rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';");
-    web_client.println("rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis,{'data-act':'txapply'}).id='rm_rtxapply';p.appendChild(r);\n"
-                       "x=document.createElement('div');x.id='rm_rtxnote';x.className='font-small';x.textContent=k.max!==null&&k.max>0?'':'The node has not reported its limit yet, so the highest value is 15 dBm.';p.appendChild(x);}");
+                       "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}");
+    web_client.println("function rmTxBuild(p,k,dis){var cap=rmCap(k),lo=rmFloor(k),ok=cap>0,r=document.createElement('div'),x,a;\n"
+                       "if(ok){if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<lo)rmTx.val=lo;}r.className='rmrow';a=ok&&rmArmId=='txpower '+rmTx.val;");
+    web_client.println("rmBtn(r,'-','',!ok||rmTx.val<=lo,{'data-act':'txdn'}).id='rm_rtxdn';x=document.createElement('b');x.id='rm_rtxval';x.textContent=ok?rmTx.val+' dBm':'-';r.appendChild(x);rmBtn(r,'+','',!ok||rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';");
+    web_client.println("rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis||!ok,{'data-act':'txapply'}).id='rm_rtxapply';p.appendChild(r);\n"
+                       "x=document.createElement('div');x.id='rm_rtxnote';x.className='font-small';x.textContent=ok?'Range '+lo+' to '+cap+' dBm on this node.':k.at?\"This node's firmware does not report its power range.\":'Press Refresh status to learn the power range of the node.';p.appendChild(x);}");
     web_client.println("function rmChip(box,call,hw,age,sv,stale){var b=rmBtn(box,'','rmchip'+(sv?' rmsaved':'')+(stale?' rmstale':'')+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b'),i,L=[hw,age];\n"
                        "s.textContent=call;b.appendChild(s);\n"
                        "for(i=0;i<2;i++){s=document.createElement('span');s.className='font-small';s.textContent=L[i];b.appendChild(s);}");
@@ -239,7 +244,7 @@ void rmScaffoldJs()
     web_client.println("var rmIn={},rmPK=['lat','lon','alt','src'],rmDefs=[{c:'radio',l:'Radio',f:[['f','Frequency',' MHz'],['sf','Spreading factor',''],['cr','Coding rate','',function(v){return '4/'+v;}],['bw','Bandwidth',' kHz'],['p','TX power (now/max)',' dBm']]},\n"
                        "{c:'sens',l:'Sensors',f:[['t','Temperature',' C'],['h','Humidity',' %'],['p','Pressure',' hPa'],['t2','Second temperature',' C']]},\n");
     web_client.println("{c:'name',l:'Name',f:[],w:[['v','Name','name',rmLen.name,'n']]},{c:'atxt',l:'APRS text',f:[],w:[['v','APRS text','atxt',rmLen.atxt,'a']]},\n");
-    web_client.println("{c:'pos',l:'Position',p:rmPK,f:[['lat','Latitude',' deg'],['lon','Longitude',' deg'],['alt','Altitude',' m'],['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
+    web_client.println("{c:'pos',l:'Position',p:rmPK,f:[['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
                        "w:[['lat','Latitude','lat',11],['lon','Longitude','lon',11],['alt','Altitude (m)','alt',5]]},\n");
     web_client.println("{c:'txq',l:'TX queue',k:1,f:[['q','Queued (now/capacity)',''],['bp','State','',function(v){var m={quiet:'quiet',qrs:'slow down',qrt:'hold'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}],['tx','Sent',''],['rt','Retransmitted',''],['dr','Dropped',''],['u','Channel use',' %']]},\n");
     web_client.println("{c:'mbox',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Used/slots',''],['b','Bytes',''],['a','Actions last hour (done/limit)',''],['st','Stored',''],['dl','Delivered',''],['ak','Acknowledged',''],['dr','Dropped',''],['bl','Blocked',''],['nt','Notified','']]},\n"
@@ -260,7 +265,7 @@ void rmScaffoldJs()
                        "if(n=='radio'&&o&&o.f)return 'Radio: '+o.f+' MHz, SF '+o.sf+', '+o.bw+' kHz, TX power '+o.p+'.';\n"
                        "if(n=='sens')return 'Sensors read.';\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
-    web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[3][3](q.src)+'.':'';}return '';}\n");
+    web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
     web_client.println("function rmWBuild(p,d,o){var j,w,x,k,t,y;if(!d.w)return;t=/^(name|atxt)$/.test(d.w[0][2]);\n"
                        "for(j=0;j<d.w.length;j++){w=d.w[j];x=document.createElement('input');x.id='rm_f_'+d.c+'_'+w[0];x.type='text';x.autocomplete='off';x.setAttribute('aria-label',w[1]);if(d.w.length>1)x.placeholder=w[1];\n"
                        "k=o&&o[w[4]||w[0]];x.value=rmIn[x.id]!==undefined?rmIn[x.id]:(k&&k!='-'?k:'');p.appendChild(x);rmWire(x,d);}\n");
@@ -292,7 +297,7 @@ void rmScaffoldJs()
     web_client.println("if(cap<2){p=document.createElement('p');p.className='font-small rmcapnote';p.textContent=rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.';b.appendChild(p);}\n");
     web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=document.createElement('div');p.id='rm_card_'+d.c;b.appendChild(p);x=document.createElement('strong');x.textContent=d.l;p.appendChild(x);\n"
                        "rmBtn(p,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n");
-    web_client.println("for(j=0;o&&j<d.f.length;j++){x=document.createElement('div');x.id='rm_f_'+d.c+'_'+d.f[j][0];x.textContent=d.f[j][1]+': '+((o[d.f[j][0]]===undefined||o[d.f[j][0]]=='-')?'not present':(d.f[j][3]?d.f[j][3](o[d.f[j][0]]):o[d.f[j][0]])+d.f[j][2]);p.appendChild(x);}rmWBuild(p,d,o);if(d.c=='radio')rmTxBuild(p,rmKn(),dis);");
+    web_client.println("for(j=0;o&&j<d.f.length;j++){x=document.createElement('div');x.id='rm_v_'+d.c+'_'+d.f[j][0];x.textContent=d.f[j][1]+': '+((o[d.f[j][0]]===undefined||o[d.f[j][0]]=='-')?'not present':(d.f[j][3]?d.f[j][3](o[d.f[j][0]]):o[d.f[j][0]])+d.f[j][2]);p.appendChild(x);}rmWBuild(p,d,o);if(d.c=='radio')rmTxBuild(p,rmKn(),dis);");
     web_client.println("if(d.u&&rmUns(c,d.c,v)){x=document.createElement('div');x.textContent=d.u;p.appendChild(x);}}rmMhCard(b,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"
 "function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;\n");
@@ -329,7 +334,7 @@ void rmScaffoldJs()
                        "if(s<0||rmRowLocked(d))return;\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),d)))return;\n"
                        "rmSendCmd(cmd,args,d,s);}\n");
-    web_client.println("function rmTxApply(){var k=rmKn(),v=Math.min(rmTx.val,rmCap(k)),cf,pr=rmPre();if(rmLocked())return;\n"
+    web_client.println("function rmTxApply(){var k=rmKn(),v=Math.min(Math.max(rmTx.val,rmFloor(k)),rmCap(k)),cf,pr=rmPre();if(rmLocked()||!rmCap(k))return;\n"
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
                        "cf=(k.cur===null||v<k.cur)?'txpower '+v:'';\n"
                        "if(cf&&!rmConfirm(cf,'Tap Apply again within 4 seconds to set the TX power of '+rmSel.call+' to '+v+' dBm.'))return;");
