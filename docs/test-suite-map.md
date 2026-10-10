@@ -173,7 +173,7 @@ flashes whatever is attached.
 | test_checkvia                | Unit          |    13 | native_parsers                                               |
 | test_command_match           | Unit          |    11 | native_command_match                                         |
 | test_command_setters         | Unit          |    37 | native_command_setters                                       |
-| test_command_toggles         | Unit          |    33 | native_command_toggles                                       |
+| test_command_toggles         | Unit          |    34 | native_command_toggles                                       |
 | test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
 | test_config_json             | Contract      |    25 | native_config                                                |

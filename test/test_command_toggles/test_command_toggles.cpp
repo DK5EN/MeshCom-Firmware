@@ -17,6 +17,8 @@
  */
 #include <unity.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include <fstream>
 #include <sstream>
@@ -825,6 +827,74 @@ static void test_real_extudp_off_post_action_resets_the_extern_socket()
         "hasExternIPaddress without reopening it while bEXTUDP is false");
 }
 
+// ---------------------------------------------------------------------------
+// "--bmx off" / "--bme off" / "--bmp off" (shared rung, not a table row): the
+// BMP390 line used `node_sset3 & 0x7FEF`. The comment said "BMP390 off" (bit
+// 0x0010), but 0x7FEF also clears 0x8000 (NOPMOTHER, `--nopmother`) and every
+// bit above 16, so turning a BME/BMP sensor off silently turned "No PM Other"
+// off. The value is saved to flash and only the SE register was re-sent, so a
+// client kept showing the old state.
+//
+// The rung lives in the ladder, which no native env links (see the EXT-02
+// comment above), so this is a source scan that EVALUATES the statement: it
+// finds the rung, takes the `node_sset3` mask statement, applies it to a word
+// with the neighbouring bits set and asserts that exactly 0x0010 went away.
+// Accepted shapes: `x = x & MASK;`, `x &= MASK;`, MASK = [~]hex literal.
+// ---------------------------------------------------------------------------
+static void test_real_bmx_off_rung_clears_only_the_bmp390_bit_of_sset3()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    size_t head = src.find("commandCheck(msg_text+2, (char*)\"bmx off\") == 0 || ");
+    TEST_ASSERT_TRUE_MESSAGE(head != std::string::npos,
+        "shared '--bmx off / --bme off / --bmp off' rung not found in src/command_functions.cpp");
+
+    // The shared rung body is short; the first node_sset3 statement after the
+    // head belongs to it. Bound the search so a removed line cannot be satisfied
+    // by an unrelated statement further down the ladder.
+    size_t pos = src.find("node_sset3", head);
+    TEST_ASSERT_TRUE_MESSAGE(pos != std::string::npos && pos - head < 1200,
+        "'--bme off' rung no longer touches node_sset3 -- the BMP390 bit (0x0010) "
+        "would stay set; update this test only if the bit moved on purpose");
+
+    size_t eol = src.find(';', pos);
+    TEST_ASSERT_TRUE_MESSAGE(eol != std::string::npos, "node_sset3 statement never ends");
+    std::string stmt = src.substr(pos, eol - pos);
+
+    // Operand of the AND: text after the last '&' (covers "& M" and "&= M").
+    size_t amp = stmt.rfind('&');
+    TEST_ASSERT_TRUE_MESSAGE(amp != std::string::npos,
+        ("node_sset3 statement in the '--bme off' rung is not a mask: " + stmt).c_str());
+    std::string operand = stmt.substr(amp + 1);
+    if (!operand.empty() && operand[0] == '=')
+        operand.erase(0, 1);
+
+    bool invert = false;
+    size_t i = operand.find_first_not_of(" \t");
+    TEST_ASSERT_TRUE_MESSAGE(i != std::string::npos, "empty mask operand");
+    if (operand[i] == '~')
+    {
+        invert = true;
+        ++i;
+    }
+    char *endp = nullptr;
+    unsigned long lit = strtoul(operand.c_str() + i, &endp, 0);
+    TEST_ASSERT_TRUE_MESSAGE(endp != operand.c_str() + i,
+        ("mask operand is not a numeric literal: " + operand).c_str());
+    uint32_t mask = invert ? ~(uint32_t)lit : (uint32_t)lit;
+
+    // BMP390 (0x0010) and NOPMOTHER (0x8000) set, plus NOMSGALL (0x0002) and a
+    // bit above 16 as collateral probes.
+    const uint32_t before = 0x0010u | 0x8000u | 0x0002u | 0x10000u;
+    const uint32_t after  = before & mask;
+
+    TEST_ASSERT_BITS_LOW_MESSAGE(0x0010u, after, "BMP390 bit 0x0010 was not cleared");
+    TEST_ASSERT_BITS_HIGH_MESSAGE(0x8000u, after,
+        "'--bme off' cleared NOPMOTHER (0x8000) -- mask is too wide");
+    TEST_ASSERT_BITS_HIGH_MESSAGE(0x0002u, after, "'--bme off' cleared NOMSGALL (0x0002)");
+    TEST_ASSERT_BITS_HIGH_MESSAGE(0x10000u, after, "'--bme off' cleared a bit above 16");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -861,5 +931,6 @@ int main(int, char **)
     RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0400);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
+    RUN_TEST(test_real_bmx_off_rung_clears_only_the_bmp390_bit_of_sset3);
     return UNITY_END();
 }
