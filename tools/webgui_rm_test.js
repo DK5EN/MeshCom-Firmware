@@ -302,9 +302,8 @@ async function mkPage(srv, opts) {
     btn(text, within) { return Array.from((within || d).querySelectorAll('button')).find((b) => b.textContent === text); },
     tiles() {
       const o = {};
-      for (const c of P.el('rm_sw').children) {
-        const i = c.querySelector('input');
-        o[i.getAttribute('data-sw')] = { state: i.indeterminate ? '?' : i.checked ? 'on' : 'off', el: i, text: c.querySelector('label').textContent, cf: i.getAttribute('data-cf') };
+      for (const i of P.el('rm_sw').querySelectorAll('input')) {
+        o[i.getAttribute('data-sw')] = { state: i.indeterminate ? '?' : i.checked ? 'on' : 'off', el: i, text: d.querySelector('label[for="' + i.id + '"]').textContent, cf: i.getAttribute('data-cf') };
       }
       return o;
     },
@@ -525,6 +524,24 @@ function leaks(P, canary) {
     for (let i = 0; i < 30; i++) Q.click(Q.el('rm_rtxup'));
     check('TX power cap 10 for p=8/10', Q.text('rm_rtxval') === '10 dBm', Q.text('rm_rtxval'));
     Q.w.rmPageLeave();
+  }
+
+  // ---- Actions card layout (plan 3.3: D1 tile grid, D2 switch column) -----------------------------------
+  {
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    const P = await savedNodePage(STATUS_NEW);
+    const tl = [...P.el('rm_info').children];
+    check('3.3 D1 five action tiles in order, all buttons', tl.map((b) => b.textContent).join('|') === 'Refresh status|Send position now|Send track now|Re-sync counter|Restart' && tl.every((b) => b.tagName === 'BUTTON' && b.classList.contains('rmtile')), tl.map((b) => b.textContent).join('|'));
+    check('3.3 D1 only Restart carries rmtile-end (and keeps rmwarn)', tl.filter((b) => b.classList.contains('rmtile-end')).map((b) => b.textContent).join() === 'Restart' && tl[4].classList.contains('rmwarn'), tl.map((b) => b.className).join('|'));
+    check('3.3 D1 stylesheet: .rmtiles is a fixed 3-column grid, no auto-fill anywhere, Restart goes to column 3', /\.rmtiles\{display:grid;grid-template-columns:repeat\(3,1fr\);/.test(css) && !/auto-fill|auto-fit/.test(css) && css.includes('.rmtile-end{grid-column:3;}'), css.match(/\.rmtiles\{[^}]*\}/)[0]);
+    const sw = P.el('rm_sw'), ins = [...sw.querySelectorAll('input')];
+    check('3.3 D2 switch container is a .grid.rmg with the 3-column set in the stylesheet', sw.classList.contains('grid') && sw.classList.contains('rmg') && css.includes('.rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}'), sw.className);
+    check('3.3 D2 each switch row is label | input | empty cell, direct children of the grid', ins.length === 6 && sw.children.length === 18 && ins.every((i) => i.parentNode === sw && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id && i.nextElementSibling.tagName === 'SPAN' && i.nextElementSibling.textContent === '' && i.nextElementSibling.children.length === 0), sw.children.length + ' children');
+    check('3.3 D2 switches start at the left of column 2 (one rule for all)', css.includes('.rmg .rmsw{justify-self:start;}') && ins.every((i) => i.classList.contains('rmsw')));
+    check('3.3 D2 ids rm_sw_<n>, data-sw and data-cf kept', ins.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_gps:gps,rm_sw_track:track,rm_sw_display:display,rm_sw_led:led,rm_sw_mesh:mesh,rm_sw_gateway:gateway' && ins.filter((i) => i.getAttribute('data-cf')).map((i) => i.id + '=' + i.getAttribute('data-cf')).join() === 'rm_sw_mesh=mesh off,rm_sw_gateway=gateway off', ins.map((i) => i.id).join());
+    await P.tap(P.tiles().mesh.el);
+    check('3.3 D2 arming text stays in the label cell and the grid keeps 18 children', P.tiles().mesh.text === 'Mesh: Really? tap again' && P.el('rm_sw').children.length === 18, P.tiles().mesh.text);
+    P.w.rmPageLeave();
   }
 
   // ---- TX power range from the target (plan 3.1: pmin= token, no 15 dBm fallback) ---------------------

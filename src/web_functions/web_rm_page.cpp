@@ -45,9 +45,12 @@ void sub_page_remote()
                        "#content_inner .rmchip.rmsel{border-color:var(--mcgray);}\n"
                        ".rmlk{width:1em;height:1em;vertical-align:-.15em;fill:currentColor;}\n"
                        ".rmsplit{justify-content:space-between;}");
-    web_client.println(".rmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5em,1fr));gap:8px;margin:7px 0;}\n"
+    web_client.println(".rmtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:7px 0;}\n"
+                       ".rmtile-end{grid-column:3;}\n"
+                       ".rmwarn{background:var(--mclightred);}");
+    web_client.println(".rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}\n"
+                       ".rmg .rmsw{justify-self:start;}\n"
                        ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
-                       ".rmwarn{background:var(--mclightred);}\n"
                        ".rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
                        ".rmsw:indeterminate{background-color:#d4d4d4;}\n"
@@ -106,7 +109,7 @@ void sub_page_remote()
     web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Actions</label>\n"
                        "<span>Status, switches, restart.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
-                       "<div><div id=\"rm_info\" class=\"rmtiles\"></div><div id=\"rm_sw\"></div><p id=\"rm_swnote\" class=\"font-small\"></p></div></div>\n");
+                       "<div><div id=\"rm_info\" class=\"rmtiles\"></div><div id=\"rm_sw\" class=\"grid rmg\"></div><p id=\"rm_swnote\" class=\"font-small\"></p></div></div>\n");
     web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Node settings</label>\n"
                        "<span>Radio, sensors, name, position, queues.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
@@ -194,11 +197,11 @@ void rmScaffoldJs()
                        "function rmBtn(box,label,cls,dis,attrs){var b=document.createElement('button'),k;b.type='button';b.className=cls||'';b.disabled=!!dis;b.textContent=label;for(k in attrs)b.setAttribute(k,attrs[k]);box.appendChild(b);return b;}");
     web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?rmReally:label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}");
     web_client.println("function rmSwSet(i,st,dis,last,shown){i.disabled=!!dis;i.indeterminate=st<0&&!(shown&&last);i.checked=st<0?last=='on':st==1;}");
-    web_client.println("function rmSwRow(box,n,st,dis){var w=document.createElement('div'),l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';w.className='rmrow';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
-    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);w.appendChild(l);w.appendChild(i);box.appendChild(w);}");
+    web_client.println("function rmSwRow(box,n,st,dis){var l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
+    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);box.appendChild(l);box.appendChild(i);box.appendChild(document.createElement('span'));}");
     web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['gps','track','display','led','mesh','gateway'],p=rmEl('rm_pin').value;\n"
                        "b.textContent='';for(i=0;i<d.length;i++)rmTile(b,d[i][1],d[i][0],'','','',dis);");
-    web_client.println("rmBtn(b,'Re-sync counter','rmtile',dis,{'data-act':'sync',title:'Use this if the node keeps answering that the counters are out of step.'});rmTile(b,'Restart','reboot','','reboot','rmwarn',dis);\n"
+    web_client.println("rmBtn(b,'Re-sync counter','rmtile',dis,{'data-act':'sync',title:'Use this if the node keeps answering that the counters are out of step.'});rmTile(b,'Restart','reboot','','reboot','rmwarn rmtile-end',dis);\n"
                        "b=rmEl('rm_sw');b.textContent='';\n"
                        "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
