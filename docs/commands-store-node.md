@@ -1,9 +1,12 @@
 # Store node (mailbox) commands
 
 Available only on boards built with `ENABLE_MSGSTORE` (ESP32-S3, nRF52840 /
-`BOARD_RAK4630`). On every other board the five setters below still parse and
-answer `[STORE];unavailable` — a web `setparam` never falls into "unknown
-command" — and nothing is stored.
+`BOARD_RAK4630`). On every other board only `--store` answers
+`[STORE];unavailable` (serial and net console, never BLE): command matching is
+exact-token, so `--store <anything>` ends at the space and lands on that one
+bare rung. `--storecall`, `--storetime`, `--storeslots` and `--storenotice` do
+not exist there and fall through to `--wrong command <cmd>`, which a BLE client
+does see. Nothing is stored either way.
 
 - `--store off|own|list|heard` — sets the store mode (default `off`). Bare
   `--store` prints the current state. Switching from `off` to anything else
@@ -44,7 +47,8 @@ notice=<on|off>`.
   `[STORE];heap;<bytes>` — printed once, on `off` -> any other mode.
 - `[STORE];list;<csv>` — after `--storecall`, and for the bare form.
 - `[STORE];notice;<on|off>` — after `--storenotice`, and for the bare form.
-- `[STORE];unavailable` — any of the five commands, on an ineligible board.
+- `[STORE];unavailable` — `--store` (bare or with any argument) on an ineligible
+  board; the other four commands answer `--wrong command` there.
 - `[ERR];storetime;...` / `[ERR];storeslots;...` / `[ERR];storecall;...` /
   `[ERR];storenotice;...` — rejected out-of-range or invalid input; nothing
   is changed or saved.
