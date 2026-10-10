@@ -980,6 +980,36 @@ static void test_update_apply_hands_over_now_and_is_not_remote()
                              "apply / the Safeboot reboot is reachable from the RM path");
 }
 
+// Web temp offset (field report 2026-10-10): maxlength="3" cut "-0.5" to "-0." and a decimal comma stopped
+// sscanf/strtod, so "-0,5" was stored as 0 and the page reported success. Only "-.5" worked.
+static void test_web_temp_offset_takes_comma_and_leading_zero()
+{
+    char v[16] = "-0,5";
+    cmdDecimalComma(v);
+    TEST_ASSERT_EQUAL_STRING("-0.5", v);
+
+    float f = 0.0f, seen = 0.0f;
+    TEST_ASSERT_EQUAL_INT(CMD_SET_OK, cmdStoreFloat(v, &f, -50.0, 50.0, &seen));
+    TEST_ASSERT_EQUAL_FLOAT(-0.5f, f);
+
+    char w[16] = "-12.5";
+    cmdDecimalComma(w);
+    TEST_ASSERT_EQUAL_STRING("-12.5", w);
+    cmdDecimalComma(nullptr);
+
+    // String(float) renders -50.00: six characters must fit
+    const std::string web = read_repo_file("src/web_functions/web_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("\"tempoffsetindoor\", 6,") != std::string::npos, "indoor offset input too short");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("\"tempoffsetoutdoor\", 6,") != std::string::npos, "outdoor offset input too short");
+
+    // both setparam handlers normalise before they parse and before they build the console command
+    const std::string set = read_repo_file("src/web_functions/web_setup.cpp");
+    size_t n = 0;
+    for (size_t at = set.find("cmdDecimalComma(value);"); at != std::string::npos; at = set.find("cmdDecimalComma(value);", at + 1))
+        ++n;
+    TEST_ASSERT_EQUAL_INT(2, (int)n);
+}
+
 static void test_stagelan_is_instrument_only_everywhere()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
@@ -1386,6 +1416,7 @@ int main(int, char **)
     RUN_TEST(test_au_tick_and_wifi_gate_are_wired_in_esp32_main);
     RUN_TEST(test_ota_update_and_the_handover_share_one_reboot_function);
     RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
+    RUN_TEST(test_web_temp_offset_takes_comma_and_leading_zero);
     RUN_TEST(test_stagelan_is_instrument_only_everywhere);
     RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);
