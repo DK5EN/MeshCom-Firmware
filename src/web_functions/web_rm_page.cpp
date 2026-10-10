@@ -271,9 +271,9 @@ void rmScaffoldJs()
     web_client.println("{c:'name',card:'ident',l:'Name',f:[],w:[['v','Name','name',rmLen.name,'n']]},{c:'atxt',card:'ident',l:'APRS text',f:[],w:[['v','APRS text','atxt',rmLen.atxt,'a']]},\n");
     web_client.println("{c:'pos',card:'pos',l:'Position',p:rmPK,f:[['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
                        "w:[['lat','Latitude','lat',11],['lon','Longitude','lon',11],['alt','Altitude (m)','alt',5]]},\n");
-    web_client.println("{c:'txq',card:'queues',g:1,l:'TX queue',k:1,f:[['q','Queued (now/capacity)',''],['bp','State','',function(v){var m={quiet:'quiet',qrs:'slow down',qrt:'hold'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}],['tx','Sent',''],['rt','Retransmitted',''],['dr','Dropped',''],['u','Channel use',' %']]},\n");
-    web_client.println("{c:'mbox',card:'queues',g:1,l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Used/slots',''],['b','Bytes',''],['a','Actions last hour (done/limit)',''],['st','Stored',''],['dl','Delivered',''],['ak','Acknowledged',''],['dr','Dropped',''],['bl','Blocked',''],['nt','Notified','']]},\n"
-                       "{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
+    web_client.println("{c:'txq',card:'queues',l:'TX queue',k:1,v:rmTxqView,t:['tx','Sent','rt','Retransmitted','dr','Dropped']},\n"
+                       "{c:'mbox',card:'queues',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Slots used',''],['b','Bytes',''],['a','Actions this hour','']],t:['st','Stored','dl','Delivered','ak','Acknowledged','dr','Dropped','bl','Blocked','nt','Notified']},\n");
+    web_client.println("{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
                        "function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}\n");
     web_client.println("function rmChk(k,v){var m;if(v==='')return '';\n"
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
@@ -318,7 +318,13 @@ void rmScaffoldJs()
     web_client.println("tb=document.createElement('table');tb.id='rm_mh_tab';for(i=0;i<rmMh.rows.length;i++){r=rmMh.rows[i];tr=document.createElement('tr');rmCell(tr,r.c);rmCell(tr,r.m+' min ago');x=document.createElement('td');rmBtn(x,'Details','',dis||rmMh.on,{'data-act':'mhdet','data-call':r.c});tr.appendChild(x);tb.appendChild(tr);}p.appendChild(tb);\n");
     web_client.println("x=document.createElement('input');x.id='rm_f_mh_other';x.maxLength=9;x.placeholder='Other node';x.value=rmIn[x.id]||'';x.addEventListener('input',function(){rmIn[this.id]=this.value;});p.appendChild(x);rmBtn(p,'Look up','',dis||rmMh.on,{'data-act':'mhother'});\n");
     web_client.println("x=document.createElement('div');x.id='rm_mh_det';p.appendChild(x);if(rmMh.det){r=document.createElement('strong');r.textContent=rmMh.det.c;x.appendChild(r);for(i=0;i<rmMh.det.l.length;i++){r=document.createElement('div');r.textContent=rmMh.det.l[i];x.appendChild(r);}}}\n");
-    web_client.println("function rmRenderCards(){var c=rmSel.call,cap=rmCapOf(c),dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"
+    web_client.println("function rmTiles(p,c,o,a){var g=rmNew('div','mbx-counters'),i,d;p.appendChild(g);for(i=0;i<a.length;i+=2){d=g.appendChild(rmNew('div','',a[i+1]));d.appendChild(rmNew('b','',o[a[i]]||'-','rm_v_'+c+'_'+a[i]));}}");
+    web_client.println("function rmTxqView(p,o){var m=/^(\\d+)\\/(\\d+)$/.exec(o.q||''),b=m?+m[2]:0,f=b>60?Math.round(m[1]*60/b):m?+m[1]:0,v=['quiet','qrs','qrt'].indexOf(o.bp),x=p.appendChild(rmNew('div','mcq-bar')),s,i;\n"
+                       "for(i=0;i<Math.min(b,60);i++)x.appendChild(rmNew('div',i<f?'mcq-cell':'mcq-cell-empty')).style.background=i<f?'#3B7DD8':'';");
+    web_client.println("x=p.appendChild(rmNew('div','font-small',(m?o.q:'-')+' queued, state ','rm_v_txq_q'));s=x.appendChild(rmNew('span',['rmok','','rmbad'][v],v<0?o.bp||'-':['quiet','slow down','hold'][v],'rm_v_txq_bp'));if(v==1)s.style.color='#E07B39';\n"
+                       "x=p.appendChild(rmNew('div','mcq-util-row'));x.appendChild(rmNew('span','mcq-util-label','use '+(isNaN(o.u)?'-':o.u+' %'),'rm_v_txq_u'));");
+    web_client.println("x.appendChild(rmNew('div','mcq-util-track')).appendChild(rmNew('div')).style.cssText='height:100%;width:'+(parseInt(o.u,10)||0)+'%;background:#3B7DD8';}\n");
+    web_client.println("function rmRenderCards(){var c=rmSel.call,cap=rmCapOf(c),dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"
                        "if(fa&&fa.tagName=='INPUT'&&/^rm_f_/.test(fa.id)){rmIn[fa.id]=fa.value;fid=fa.id;}\n"
                        "for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}");
     web_client.println("if(cap<2)B.radio.appendChild(rmNew('p','font-small rmcapnote',rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.'));\n"
@@ -327,9 +333,8 @@ void rmScaffoldJs()
     web_client.println("v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
                        "h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
                        "rmBtn(h,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});");
-    web_client.println("if(o&&!d.p){y=d.g?p:rmNew('div','rmkv');if(!d.g)p.appendChild(y);\n"
-                       "for(j=0;j<d.f.length;j++){z=(o[d.f[j][0]]===undefined||o[d.f[j][0]]=='-')?'not present':(d.f[j][3]?d.f[j][3](o[d.f[j][0]]):o[d.f[j][0]])+d.f[j][2];x='rm_v_'+d.c+'_'+d.f[j][0];\n"
-                       "if(d.g)y.appendChild(rmNew('div','',d.f[j][1]+': '+z,x));else{y.appendChild(rmNew('span','font-small',d.f[j][1]));y.appendChild(rmNew('span','',z,x));}}}");
+    web_client.println("if(o&&d.v)d.v(p,o);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
+                       "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
     web_client.println("rmWBuild(p,d,o);if(d.c=='radio')rmTxBuild(p,rmKn(),dis);\n"
                        "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}rmMhCard(B.mh,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"

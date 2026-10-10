@@ -576,7 +576,7 @@ function leaks(P, canary) {
     const rows = (c) => [...kv(c).children].map((e) => e.textContent);
     check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power (now/max)|10/22 dBm' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
     check('3.4 sens and maxhop render as .rmkv; absent marker stays "not present"', kv('sens') && rows('sens').join('|') === 'Temperature|21.4 C|Humidity|45 %|Pressure|1013.2 hPa|Second temperature|not present' && kv('maxhop') && rows('maxhop').join('|') === 'Text messages|3|Position beacons|2', (kv('sens') && rows('sens').join('|')) + ' # ' + (kv('maxhop') && rows('maxhop').join('|')));
-    check('3.4 txq and mailbox keep the generic key/value lines for now', X('rm_def_txq') && !kv('txq') && !kv('mbox') && X('rm_v_txq_q').textContent === 'Queued (now/capacity): 3/20' && X('rm_v_mbox_m').textContent === 'Mode: off');
+    check('3.4 txq (dedicated view since 3.5) has no key/value grid, mailbox has one', X('rm_def_txq') && !kv('txq') && kv('mbox') && X('rm_v_txq_q').textContent === '3/20 queued, state quiet' && vText(X('rm_v_mbox_m')) === 'Mode: off');
     check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').firstElementChild.textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)') || {}).id);
     const un = [];
     for (const c of Object.keys(where)) {
@@ -618,6 +618,39 @@ function leaks(P, canary) {
     check('3.4b TX power is one .grid.rmg row: label | [-] N dBm [+] | Apply | range note line, ids unchanged', row('radio') && ch('radio').length === 4 && cell('radio', 0).textContent === 'TX power' && [...cell('radio', 1).children].map((e) => e.id).join() === 'rm_rtxdn,rm_rtxval,rm_rtxup' && cell('radio', 2).id === 'rm_rtxapply' && cell('radio', 3).id === 'rm_rtxnote' && cell('radio', 3).classList.contains('rmhl') && cell('radio', 3).classList.contains('font-small') && /^Range 0 to 22 dBm/.test(cell('radio', 3).textContent), ch('radio').map((e) => e.tagName + '#' + e.id).join());
     check('3.4b sens/maxhop have no writable row, txq/mbox neither', !row('sens') && !row('maxhop') && !row('txq') && !row('mbox'));
     check('3.4b no duplicate id', dupIds(P).length === 0, dupIds(P).join());
+    P.w.rmPageLeave();
+  }
+
+  // ---- TX queue and Mailbox as the LoRa Queue card (plan 3.5) -------------------------------------------
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    const X = (id) => P.el(id);
+    const E = (cmd, rep, c, o) => ent('DK5EN-1', cmd, rep, Object.assign({ ctr: c, ago: 2, st: 'ok' }, o || {}));
+    const MB = 'ok m=off u=0/50 b=0 a=0/20 st=7 dl=6 ak=5 dr=4 bl=3 nt=2';
+    const poll = (q, m) => P.setPoll({ sent: [E('txq', q, 1), E('mbox', m || MB, 2, m ? { st: 'err' } : {})], targets: tg });
+    const cells = () => { const b = X('rm_def_txq') && X('rm_def_txq').querySelector('.mcq-bar'); return b ? [b.querySelectorAll('.mcq-cell').length, b.querySelectorAll('.mcq-cell-empty').length, b.children.length] : null; };
+    const tiles = (c) => { const g = X('rm_def_' + c) && X('rm_def_' + c).querySelector('.mbx-counters'); return g ? [...g.children].map((d) => d.firstChild.textContent + '=' + d.querySelector('b').textContent).join() : null; };
+    await poll('ok q=2/20 bp=quiet tx=4 rt=1 dr=0 u=5');
+    check('3.5 txq bar q=2/20: 2 filled .mcq-cell + 18 .mcq-cell-empty in one .mcq-bar (global classes)', JSON.stringify(cells()) === '[2,18,20]' && [...X('rm_def_txq').querySelectorAll('.mcq-cell')].every((c) => c.style.background !== ''), JSON.stringify(cells()));
+    check('3.5 txq caption "2/20 queued, state quiet", state word is rmok', X('rm_v_txq_q') && X('rm_v_txq_q').textContent === '2/20 queued, state quiet' && X('rm_v_txq_q').classList.contains('font-small') && X('rm_v_txq_bp').textContent === 'quiet' && X('rm_v_txq_bp').classList.contains('rmok'), X('rm_v_txq_q') && X('rm_v_txq_q').textContent);
+    const row = X('rm_def_txq') && X('rm_def_txq').querySelector('.mcq-util-row');
+    check('3.5 channel use is one .mcq-util-row: label "use 5 %" + track with a 5% fill', row && row.querySelector('.mcq-util-label').textContent === 'use 5 %' && row.querySelector('.mcq-util-track > div').style.width === '5%', row && row.textContent);
+    check('3.5 txq counters are 3 .mbx-counters tiles: Sent=4, Retransmitted=1, Dropped=0; no .rmkv, no generic lines', tiles('txq') === 'Sent=4,Retransmitted=1,Dropped=0' && !X('rm_def_txq').querySelector('.rmkv') && !X('rm_def_txq').querySelector('[id^="rm_v_txq_t"]:not(b)'), tiles('txq'));
+    check('3.5 mailbox: one .rmkv (mode, slots, bytes, actions), 6 counter tiles', [...((X('rm_def_mbox').querySelector('.rmkv') || { children: [] }).children)].map((e) => e.textContent).join('|') === 'Mode|off|Slots used|0/50|Bytes|0|Actions this hour|0/20' && tiles('mbox') === 'Stored=7,Delivered=6,Acknowledged=5,Dropped=4,Blocked=3,Notified=2', tiles('mbox'));
+    await poll('ok q=0/20 bp=qrs tx=- rt=1 dr=0 u=-');
+    check('3.5 txq q=0/20: 0 filled, 20 empty', JSON.stringify(cells()) === '[0,20,20]', JSON.stringify(cells()));
+    check('3.5 slow down is orange and has neither rmok nor rmbad; absent values show "-"', X('rm_v_txq_bp').textContent === 'slow down' && X('rm_v_txq_bp').style.color === 'rgb(224, 123, 57)' && !/rmok|rmbad/.test(X('rm_v_txq_bp').className) && tiles('txq') === 'Sent=-,Retransmitted=1,Dropped=0' && X('rm_v_txq_u').textContent === 'use -', X('rm_v_txq_bp').style.color + ' ' + tiles('txq'));
+    await poll('ok q=20/20 bp=qrt tx=1 rt=1 dr=9 u=100');
+    check('3.5 txq q=20/20: 20 filled, 0 empty; hold is rmbad', JSON.stringify(cells()) === '[20,0,20]' && X('rm_v_txq_bp').textContent === 'hold' && X('rm_v_txq_bp').classList.contains('rmbad') && X('rm_def_txq').querySelector('.mcq-util-track > div').style.width === '100%', JSON.stringify(cells()));
+    await poll('ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100');
+    check('3.5 worst case 65535/65535 draws at most 60 cells, all filled; counters keep the text', JSON.stringify(cells()) === '[60,0,60]' && X('rm_v_txq_q').textContent === '65535/65535 queued, state hold' && tiles('txq') === 'Sent=4294M,Retransmitted=4294M,Dropped=4294M', JSON.stringify(cells()));
+    await poll('ok q=3/20 bp=<b>x u=1', 'err unsupported');
+    check('3.5 hostile bp stays text; mailbox "err unsupported" shows only the sentence', X('rm_v_txq_bp').textContent === '<b>x' && X('rm_v_txq_bp').children.length === 0 && /This node has no mailbox\./.test(X('rm_def_mbox').textContent) && !X('rm_def_mbox').querySelector('.mbx-counters') && !X('rm_def_mbox').querySelector('.rmkv'), X('rm_def_mbox').textContent);
+    check('3.5 the generic-line flag is gone from rmDefs; no duplicate id', P.w.rmDefs.every((d) => d.g === undefined) && dupIds(P).length === 0, dupIds(P).join());
     P.w.rmPageLeave();
   }
 
@@ -1383,9 +1416,9 @@ function leaks(P, canary) {
     const nS = () => P.sends().length, lastBody = () => P.sends().length ? P.sends()[P.sends().length - 1].body : '';
     await poll([]);
     await poll([E('txq', 'ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100'), E('mbox', 'ok m=heard u=65535/65535 b=999999 a=65535/65535 st=4294M dl=4294M ak=4294M dr=4294M bl=4294M nt=4294M'), E('maxhop', 'ok t=99 p=99')]);
-    check('RMN worst cases txq/mbox/maxhop parse (a= is plain key, hold in words)', tx('rm_v_txq_bp') === 'State: hold' && tx('rm_v_txq_q') === 'Queued (now/capacity): 65535/65535' && tx('rm_v_txq_u') === 'Channel use: 100 %' && tx('rm_v_mbox_a') === 'Actions last hour (done/limit): 65535/65535' && tx('rm_v_mbox_nt') === 'Notified: 4294M' && tx('rm_v_mbox_m') === 'Mode: heard' && tx('rm_v_maxhop_t') === 'Text messages: 99', tx('rm_v_mbox_a') + '|' + tx('rm_v_txq_bp'));
+    check('RMN worst cases txq/mbox/maxhop parse (a= is plain key, hold in words)', tx('rm_v_txq_bp') === 'hold' && tx('rm_v_txq_q') === '65535/65535 queued, state hold' && tx('rm_v_txq_u') === 'use 100 %' && tx('rm_v_mbox_a') === 'Actions this hour: 65535/65535' && tx('rm_v_mbox_nt') === '4294M' && tx('rm_v_mbox_m') === 'Mode: heard' && tx('rm_v_maxhop_t') === 'Text messages: 99', tx('rm_v_mbox_a') + '|' + tx('rm_v_txq_bp'));
     await poll([E('txq', 'ok q=3/20 bp=qrs tx=- rt=1 dr=0 u=5'), E('mbox', 'err unsupported', { st: 'err', ctr: 31 })]);
-    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_v_txq_bp') === 'State: slow down' && tx('rm_v_txq_tx') === 'Sent: not present' && /This node has no mailbox\./.test(tx('rm_def_mbox')), tx('rm_def_mbox'));
+    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_v_txq_bp') === 'slow down' && tx('rm_v_txq_tx') === '-' && /This node has no mailbox\./.test(tx('rm_def_mbox')), tx('rm_def_mbox'));
     // driver: double press, three pages, spacing
     P.w.rmMhStart(); P.w.rmMhStart(); await flush();
     check('RMN double press starts one chain, first page asks mh 0', nS() === 1 && /cmd=mh&args=0/.test(lastBody()), nS() + ' ' + lastBody());
