@@ -320,6 +320,7 @@ function ent(dst, cmd, reply, o) {
 }
 const STATUS_NEW = 'ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22 led=1';
 const STATUS_OLD = 'ok v=4.35a up=5 bat=80 heap=100 gw=1 mesh=0 led=0';
+const vText = (e) => (!e ? '(none)' : e.parentNode.classList.contains('rmkv') ? e.previousElementSibling.textContent + ': ' + e.textContent : e.textContent);
 const dupIds = (P) => { const seen = Object.create(null), d = []; for (const e of P.d.querySelectorAll('#rm_page [id]')) { if (seen[e.id]) d.push(e.id); seen[e.id] = 1; } return d; };
 
 // a page with a saved node DK5EN-1 selected and a verified status in the ring
@@ -378,8 +379,8 @@ function leaks(P, canary) {
     const D = new JSDOM(HTML).window.document;
     const cards = [...D.querySelectorAll('.cardlayout')];
     const kids = (c, t) => [...c.children].filter((x) => x.tagName === t);
-    check('UI-03 six cards, all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 6 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
-    check('UI-04 only Advanced starts closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_adv');
+    check('UI-03 ten cards (six old + the five node-settings cards instead of one), all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 10 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
+    check('UI-04 only Advanced, Queues and Heard list start closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_card_queues,rm_card_mh,rm_adv');
     check('UI-05 exactly one status control and one sync control, no Test/Check connection', !D.getElementById('rm_test') && !/Test connection|Check connection/.test(HTML + JS) && (JS.match(/'Refresh status'/g) || []).length === 1 && (JS.match(/'data-act':'sync'/g) || []).length === 1);
     check('UI-07 one message line (no rm_lockline), no "Saved on this node" label (tiles carry the key state)', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 0 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
     check('UI-08 shared sentences: Really? once, confirm sentence once, no-answer sentence once, one rmErr password text', (JS.match(/Really\? tap again/g) || []).length === 1 && (JS.match(/Tap again within 4 seconds to confirm/g) || []).length === 1 && (JS.match(/did not answer the request/g) || []).length === 1);
@@ -544,6 +545,52 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
+  // ---- Remote page cards (plan 3.4 first half: five cards, routing, header rows, .rmkv) ----------------
+  {
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    const D = new JSDOM(HTML).window.document;
+    const ids = ['rm_card_radio', 'rm_card_ident', 'rm_card_pos', 'rm_card_queues', 'rm_card_mh'];
+    const cs = ids.map((i) => D.getElementById(i));
+    const kids = (c, t) => [...c.children].filter((x) => x.tagName === t);
+    check('3.4 five cards rm_card_radio/ident/pos/queues/mh exist, all collapsablecard with teaser span, cardtoggle button, one body div', cs.every((c) => c && c.classList.contains('cardlayout') && c.classList.contains('collapsablecard') && kids(c, 'LABEL').length === 1 && kids(c, 'SPAN').length === 1 && kids(c, 'BUTTON').length === 1 && c.querySelector(':scope > button').classList.contains('cardtoggle') && kids(c, 'DIV').length === 1), ids.filter((i, k) => !cs[k]).join());
+    check('3.4 the outer "Node settings" card and rm_cards are gone', !D.getElementById('rm_cards') && !/Node settings/.test(HTML));
+    check('3.4 Radio, Identity and Position start open; Queues and Heard list start closed with an "Open this for" teaser', cs.map((c) => c && c.classList.contains('cardopen')).join() === 'true,true,true,false,false' && /^Open this for /.test(cs[3].querySelector(':scope > span').textContent) && /^Open this for /.test(cs[4].querySelector(':scope > span').textContent), cs.map((c) => c && c.className).join('|'));
+    check('3.4 .rmkv rule in the stylesheet', css.includes('.rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}'));
+
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    const X = (id) => P.el(id);
+    const E = (cmd, rep, c, ago) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: ago === undefined ? 130 : ago, st: 'ok' });
+    await P.setPoll({ sent: [E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=2', 1), E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5, 5), E('txq', 'q=3/20 bp=quiet tx=4 rt=1 dr=0 u=5', 6), E('mbox', 'm=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0', 7), E('maxhop', 't=3 p=2', 8)], targets: tg });
+    const where = { radio: 'rm_card_radio', sens: 'rm_card_radio', name: 'rm_card_ident', atxt: 'rm_card_ident', pos: 'rm_card_pos', txq: 'rm_card_queues', mbox: 'rm_card_queues', maxhop: 'rm_card_queues' };
+    check('3.4 each def lands in its card (radio, sens | name, atxt | pos | txq, mbox, maxhop)', Object.keys(where).every((c) => X('rm_def_' + c) && X(where[c]) && X(where[c]).contains(X('rm_def_' + c))) && !X('rm_card_queues').contains(X('rm_def_radio')), Object.keys(where).map((c) => c + ':' + (X('rm_def_' + c) ? X('rm_def_' + c).parentNode.parentNode.id : '-')).join());
+    check('3.4 the heard list builder mounts in rm_card_mh (Read, Stop, progress, lookup)', X('rm_card_mh').querySelector('[data-act="mhgo"]') && X('rm_card_mh').querySelector('[data-act="mhstop"]') && X('rm_card_mh').querySelector('#rm_mh_prog') && X('rm_card_mh').querySelector('#rm_f_mh_other') && X('rm_card_mh').querySelector('[data-act="mhother"]'));
+    const hdr = (c) => X('rm_def_' + c) && X('rm_def_' + c).firstElementChild;
+    check('3.4 every def starts with a .rmrow.rmsplit header: <b> label, font-small span, Read button', Object.keys(where).every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmsplit') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), Object.keys(where).map((c) => hdr(c) && hdr(c).className).join('|'));
+    check('3.4 header labels and the "last read N min ago" age', hdr('radio')?.children[0].textContent === 'Radio' && hdr('radio')?.children[1].textContent === 'last read 2 min ago' && hdr('sens')?.children[0].textContent === 'Sensors' && hdr('name')?.children[0].textContent === 'Name', hdr('radio')?.children[1].textContent);
+    check('3.4 Position: the Source line moved into the header row, nothing else read-only', hdr('pos')?.children[1].id === 'rm_v_pos_src' && hdr('pos')?.children[1].textContent === 'Source: from GPS' && X('rm_def_pos') && !X('rm_def_pos').querySelector('.rmkv') && X('rm_def_pos').querySelectorAll('[id^="rm_v_"]').length === 1, hdr('pos')?.children[1].textContent);
+    const kv = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector('.rmkv');
+    const rows = (c) => [...kv(c).children].map((e) => e.textContent);
+    check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power (now/max)|10/22 dBm' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
+    check('3.4 sens and maxhop render as .rmkv; absent marker stays "not present"', kv('sens') && rows('sens').join('|') === 'Temperature|21.4 C|Humidity|45 %|Pressure|1013.2 hPa|Second temperature|not present' && kv('maxhop') && rows('maxhop').join('|') === 'Text messages|3|Position beacons|2', (kv('sens') && rows('sens').join('|')) + ' # ' + (kv('maxhop') && rows('maxhop').join('|')));
+    check('3.4 txq and mailbox keep the generic key/value lines for now', X('rm_def_txq') && !kv('txq') && !kv('mbox') && X('rm_v_txq_q').textContent === 'Queued (now/capacity): 3/20' && X('rm_v_mbox_m').textContent === 'Mode: off');
+    check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').firstElementChild.textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)') || {}).id);
+    const un = [];
+    for (const c of Object.keys(where)) {
+      const n0 = P.sends().length;
+      if (!hdr(c)) { un.push(c); continue; }
+      await P.tap(hdr(c).children[2]);
+      if (!(P.sends().length === n0 + 1 && new RegExp('cmd=' + c + '&args=(&|$)').test(P.sends()[n0].body))) un.push(c);
+      await P.T.advance(12000);
+    }
+    check('3.4 every def Read button still sends its cmd once', un.length === 0, un.join());
+    check('3.4 no duplicate id after the move', dupIds(P).length === 0, dupIds(P).join());
+    P.w.rmPageLeave();
+  }
+
   // ---- TX power range from the target (plan 3.1: pmin= token, no 15 dBm fallback) ---------------------
   {
     const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=2 led=1');
@@ -594,7 +641,7 @@ function leaks(P, canary) {
     const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=2', { ctr: 2, ago: 1 })]);
     for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
     check('3.1d radio reply with pmin=2 raises the floor to 2', P.w.rmKn().min === 2 && P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled && P.text('rm_rtxnote') === 'Range 2 to 22 dBm on this node.', P.w.rmKn().min + ' ' + P.text('rm_rtxval') + ' ' + P.text('rm_rtxnote'));
-    check('3.1d the radio card still shows p as cur/max (pmin is not a line of its own)', /10\/22 dBm/.test(P.text('rm_v_radio_p')) && !/pmin/.test(P.el('rm_cards').textContent), P.el('rm_cards').textContent.slice(0, 120));
+    check('3.1d the radio card still shows p as cur/max (pmin is not a line of its own)', /10\/22 dBm/.test(P.text('rm_v_radio_p')) && !/pmin/.test(P.el('rm_card_radio').textContent), P.el('rm_card_radio').textContent.slice(0, 120));
     P.w.rmPageLeave();
     const Q = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=10/22 pmin=2 led=1', [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1 })]);
     check('3.1d radio reply without pmin resets the floor to 0', Q.w.rmKn().min === 0, Q.w.rmKn().min);
@@ -1046,7 +1093,7 @@ function leaks(P, canary) {
     const sd = P.sends();
     check('W1d run again sends the same cmd to the same target', sd.length === before + 1 && /cmd=sendpos/.test(sd[sd.length - 1].body || '') && /DK5EN-1|slot=0/.test(sd[sd.length - 1].body || ''), JSON.stringify(sd[sd.length - 1]));
     check('W1d run again is disabled while the node is in cooldown', [...P.el('rm_msgs').querySelectorAll('button')].every((b) => b.disabled));
-    check('W1d old ids are gone, TX control lives in the Node settings Radio sub-card (UI-06)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && P.el('rm_card_radio').contains(P.el('rm_rtxval')) && P.el('rm_card_radio').contains(P.el('rm_rtxapply')) && ![...P.el('rm_page').querySelectorAll('.cardlabel')].some((l) => l.textContent === 'Radio'));
+    check('W1d old ids are gone, TX control lives in the Radio card (UI-06)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && P.el('rm_card_radio').contains(P.el('rm_rtxval')) && P.el('rm_card_radio').contains(P.el('rm_rtxapply')) && [...P.el('rm_page').querySelectorAll('.cardlabel')].filter((l) => l.textContent === 'Radio').length === 1);
     check('UI-03/04 Advanced is a collapsablecard, closed by default, no <details>', P.el('rm_adv').classList.contains('collapsablecard') && !P.el('rm_adv').classList.contains('cardopen') && !P.el('rm_page').querySelector('details'));
     P.w.rmPageLeave();
   }
@@ -1190,7 +1237,7 @@ function leaks(P, canary) {
     await P.init();
     P.w.rmPick('DK5EN-1');
     await P.setPoll({ targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 0 }] });
-    const note = () => P.el('rm_cards').querySelector('.rmcapnote');
+    const note = () => P.el('rm_page').querySelector('.rmcapnote');
     const rd = () => P.btn('Read', P.el('rm_card_radio'));
     check('W2E gate unknown (cap 0): note and disabled Read radio', note() && /not reported support.*Press Re-sync counter/.test(note().textContent) && rd().disabled, note() && note().textContent);
     const n0 = P.sends().length;
@@ -1200,10 +1247,10 @@ function leaks(P, canary) {
     await P.setPoll({ sent: [ent('DK5EN-1', 'sync', 'ok', { ctr: 1, ago: 3, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 0 }] });
     check('W2E gate old firmware (sync ok, cap 0): older-firmware note', note() && /older firmware: only the basic commands work/.test(note().textContent) && rd().disabled, note() && note().textContent);
     await P.setPoll({ sent: [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 3, st: 'ok' }), ent('DK5EN-1', 'sens', 'ok t=21.4 h=<img/src=x> p=- t2=-', { ctr: 3, ago: 2, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }] });
-    const T = (k) => (P.el('rm_v_' + k) || { textContent: '' }).textContent;
+    const T = (k) => { const e = P.el('rm_v_' + k); return e ? vText(e) : ''; };
     check('W2E gate cap 2: no note, Read radio enabled', !note() && !rd().disabled);
     check('W2E radio reply fills the card (MHz, SF, 4/x, kHz, p cur/max)', T('radio_f') === 'Frequency: 433.175 MHz' && T('radio_sf') === 'Spreading factor: 11' && T('radio_cr') === 'Coding rate: 4/5' && T('radio_bw') === 'Bandwidth: 250 kHz' && /10\/22 dBm/.test(T('radio_p')), [T('radio_f'), T('radio_cr'), T('radio_p')].join('|'));
-    check('W2E sens: absent marker shows "not present", hostile text lands as text only', T('sens_p') === 'Pressure: not present' && T('sens_t2') === 'Second temperature: not present' && T('sens_h') === 'Humidity: <img/src=x> %' && P.el('rm_cards').querySelector('img') === null, T('sens_h'));
+    check('W2E sens: absent marker shows "not present", hostile text lands as text only', T('sens_p') === 'Pressure: not present' && T('sens_t2') === 'Second temperature: not present' && T('sens_h') === 'Humidity: <img/src=x> %' && P.el('rm_page').querySelector('img') === null, T('sens_h'));
     const m0 = P.sends().length;
     await P.tap(rd());
     check('W2E Read radio sends cmd=radio', P.sends().length === m0 + 1 && /^slot=0&cmd=radio&args=&call=DK5EN-1$/.test(P.sends()[m0].body), JSON.stringify(P.sends().slice(m0)));
@@ -1216,7 +1263,7 @@ function leaks(P, canary) {
     srv.status = srv.mkStatus({ targets: tg });
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
-    const X = (id) => P.el(id), tx = (id) => (X(id) ? X(id).textContent : '(none)');
+    const X = (id) => P.el(id), tx = (id) => vText(X(id));
     const E = (cmd, rep, c) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: 1, st: 'ok' });
     const poll = (l) => P.setPoll({ sent: l, targets: tg });
     const typeIn = async (id, v) => { X(id).value = v; X(id).dispatchEvent(new P.w.Event('input', { bubbles: true })); await flush(); };
@@ -1234,9 +1281,9 @@ function leaks(P, canary) {
     check('3.2 D5 position keeps a single read-only line (Source), no lat/lon/alt copies', !X('rm_v_pos_lat') && !X('rm_v_pos_lon') && !X('rm_v_pos_alt') && tx('rm_v_pos_src') === 'Source: GPS on, no fix', tx('rm_v_pos_src'));
     P.w.rmRenderCards();
     check('3.2 no duplicate id in #rm_page after rmRenderCards() (radio, sens, pos, name, atxt)', dupIds(P).length === 0, dupIds(P).join());
-    check('3.2 id namespace: every rm_v_ element is read-only text, every input of the cards is rm_f_', [...P.el('rm_cards').querySelectorAll('[id^="rm_v_"]')].every((e) => e.tagName === 'DIV') && [...P.el('rm_cards').querySelectorAll('input')].every((e) => /^rm_f_/.test(e.id)) && !!X('rm_v_pos_src'), 'rm_v_pos_src=' + !!X('rm_v_pos_src'));
+    check('3.2 id namespace: every rm_v_ element is read-only text, every input of the cards is rm_f_', [...P.el('rm_page').querySelectorAll('[id^="rm_v_"]')].every((e) => e.tagName === 'DIV' || e.tagName === 'SPAN') && [...P.el('rm_page').querySelectorAll('#rm_card_radio input,#rm_card_ident input,#rm_card_pos input,#rm_card_queues input,#rm_card_mh input')].every((e) => /^rm_f_/.test(e.id)) && !!X('rm_v_pos_src'), 'rm_v_pos_src=' + !!X('rm_v_pos_src'));
     await poll([E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('atxt', 'a=MeshCom Garten', 3), E('name', 'n=<img src=x onerror=1>', 4)]);
-    check('RMX sens absent marker, name/atxt free text with spaces/capitals, hostile name stays text', tx('rm_v_sens_t2') === 'Second temperature: not present' && X('rm_f_atxt_v').value === 'MeshCom Garten' && X('rm_f_name_v').value === '<img src=x onerror=1>' && !P.el('rm_cards').querySelector('img'), X('rm_f_atxt_v').value);
+    check('RMX sens absent marker, name/atxt free text with spaces/capitals, hostile name stays text', tx('rm_v_sens_t2') === 'Second temperature: not present' && X('rm_f_atxt_v').value === 'MeshCom Garten' && X('rm_f_name_v').value === '<img src=x onerror=1>' && !P.el('rm_page').querySelector('img'), X('rm_f_atxt_v').value);
     for (const [r, s] of [['48.40812 11.73812 492 gps', 'Source: from GPS'], ['1.5 2.5 3 set', 'Source: set by hand']]) {
       await poll([E('pos', r, 5)]);
       check('RMX pos reply "' + r + '" renders', tx('rm_v_pos_src') === s && X('rm_f_pos_lon').value === r.split(' ')[1], tx('rm_v_pos_src'));
@@ -1246,7 +1293,7 @@ function leaks(P, canary) {
     // identity
     const nm = 'rm_f_name_v', nset = () => X('rm_f_name_set');
     await typeIn(nm, 'Martin');
-    check('RMX name counter and Set enabled', tx('rm_f_name_cnt') === '6/' + HDR.RM_NAME_MAX && !nset().disabled && tx('rm_f_name_note') === 'Stored exactly as typed.', tx('rm_f_name_cnt'));
+    check('RMX name counter and Set enabled', tx('rm_f_name_cnt') === '6/' + HDR.RM_NAME_MAX && !nset().disabled && !X('rm_f_name_note') && X('rm_card_ident').textContent.includes('Stored exactly as typed.'), tx('rm_f_name_cnt'));
     // DRY-03: the page checks the length only (against rmLen, from the header); characters, spaces and the word none
     // are the node's and the server's business (rmTextAllowed is not mirrored).
     for (const v of ['a<b', 'a=b', ' ab', 'a  b', 'NoNe']) {
@@ -1300,7 +1347,7 @@ function leaks(P, canary) {
     const TG = (r) => [{ dst: 'DK5EN-1', pending: 0, retry: r, locked: 0, canForce: 0, cap: 2 }, { dst: 'DK5EN-3', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
     srv.status = srv.mkStatus({ targets: TG(0) });
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
-    const X = (id) => P.el(id), tx = (id) => (X(id) ? X(id).textContent : '(none)');
+    const X = (id) => P.el(id), tx = (id) => vText(X(id));
     const E = (cmd, rep, o) => ent('DK5EN-1', cmd, rep, Object.assign({ ctr: /^mh /.test(cmd) ? srv.lastCtr : 30, ago: 1, st: 'ok' }, o || {}));
     const poll = (l, r) => P.setPoll({ sent: l, targets: TG(r || 0) });
     const nS = () => P.sends().length, lastBody = () => P.sends().length ? P.sends()[P.sends().length - 1].body : '';
@@ -1308,7 +1355,7 @@ function leaks(P, canary) {
     await poll([E('txq', 'ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100'), E('mbox', 'ok m=heard u=65535/65535 b=999999 a=65535/65535 st=4294M dl=4294M ak=4294M dr=4294M bl=4294M nt=4294M'), E('maxhop', 'ok t=99 p=99')]);
     check('RMN worst cases txq/mbox/maxhop parse (a= is plain key, hold in words)', tx('rm_v_txq_bp') === 'State: hold' && tx('rm_v_txq_q') === 'Queued (now/capacity): 65535/65535' && tx('rm_v_txq_u') === 'Channel use: 100 %' && tx('rm_v_mbox_a') === 'Actions last hour (done/limit): 65535/65535' && tx('rm_v_mbox_nt') === 'Notified: 4294M' && tx('rm_v_mbox_m') === 'Mode: heard' && tx('rm_v_maxhop_t') === 'Text messages: 99', tx('rm_v_mbox_a') + '|' + tx('rm_v_txq_bp'));
     await poll([E('txq', 'ok q=3/20 bp=qrs tx=- rt=1 dr=0 u=5'), E('mbox', 'err unsupported', { st: 'err', ctr: 31 })]);
-    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_v_txq_bp') === 'State: slow down' && tx('rm_v_txq_tx') === 'Sent: not present' && /This node has no mailbox\./.test(tx('rm_card_mbox')), tx('rm_card_mbox'));
+    check('RMN txq state in words, absent marker; mbox unsupported sentence', tx('rm_v_txq_bp') === 'State: slow down' && tx('rm_v_txq_tx') === 'Sent: not present' && /This node has no mailbox\./.test(tx('rm_def_mbox')), tx('rm_def_mbox'));
     // driver: double press, three pages, spacing
     P.w.rmMhStart(); P.w.rmMhStart(); await flush();
     check('RMN double press starts one chain, first page asks mh 0', nS() === 1 && /cmd=mh&args=0/.test(lastBody()), nS() + ' ' + lastBody());
@@ -1404,7 +1451,7 @@ function leaks(P, canary) {
     const TF = (f) => [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: f, cap: 2 }, { dst: 'DK5EN-2', pending: 0, retry: 0, locked: 0, canForce: f, cap: 2 }];
     srv.status = srv.mkStatus({ targets: TF(1) });
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
-    const X = (id) => P.el(id), tx = (id) => (X(id) ? X(id).textContent : '(none)');
+    const X = (id) => P.el(id), tx = (id) => vText(X(id));
     const nS = () => P.sends().length, last = () => (nS() ? P.sends()[nS() - 1].body : '');
     const fb = () => P.btn('Try once more', P.el('rm_force'));
     await P.T.advance(12000);
