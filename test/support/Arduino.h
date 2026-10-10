@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <type_traits>
 
 // ---------------------------------------------------------------- Basistypen
 
@@ -245,6 +246,14 @@ public:
     void begin(unsigned long) {}
     void print(const char *s) { out_ += (s ? s : ""); }
     void print(const String &s) { out_ += s.c_str(); }
+    // Floating-point only (template), so print(0) keeps resolving to print(const char *).
+    template <typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+    void print(T v)
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.2f", (double)v);
+        out_ += buf;
+    }
     void println(const char *s = "")
     {
         out_ += (s ? s : "");

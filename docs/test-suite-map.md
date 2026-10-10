@@ -73,6 +73,13 @@ The per-suite sums were recomputed from the tree on 2026-10-04 (every
 old header said 96 suites / 1563 cases, while the table below already listed
 97 suites / 1577 cases.
 
+Added 2026-10-10 (field report, AHT20 offset): `test_temp_offset` (5 cases,
+Regression, own env `native_temp_offset`) compiles `src/aht20.cpp` and
+`src/sht21.cpp` unchanged against the library stubs in
+`test/support/sensor_stubs/` and pins that the AHT20 adds `node_tempi_off` and
+the SHT21 adds `node_tempo_off`. The nRF52 SHTC3 read in `nrf52_main.cpp`
+received the same fix but has no host test.
+
 ### Everything else
 
 | Category                                                                                            | Size                                                                                                                     | Runs in                                                            |
@@ -250,6 +257,7 @@ flashes whatever is attached.
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
 | test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
 | test_sto_notice              | Unit          |    26 | native                                                       |
+| test_temp_offset             | Regression    |     5 | native_temp_offset                                           |
 | test_tft_backlight           | Regression    |     4 | native                                                       |
 | test_tile_cache              | Unit          |    10 | native                                                       |
 | test_topo_shadow             | Oracle/Replay |     2 | native_topo_shadow                                           |

@@ -3877,6 +3877,38 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_temp_offset": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D ENABLE_AHT20",
+   "-D ENABLE_SHT21",
+   "-I test/support/sensor_stubs",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<aht20.cpp>",
+   "+<sht21.cpp>"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_temp_offset"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_topo_shadow": {
   "build_flags": [
    "-std=gnu++17",
