@@ -54,6 +54,8 @@ void sub_page_remote()
                        ".rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}\n"
                        ".rmhl{grid-column:2/4;display:flex;justify-content:space-between;}");
     web_client.println(".rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}\n"
+                       ".rmdet{border-top:solid 1px #e0e0e0;margin-top:6px;padding-top:4px;}\n"
+                       "#rm_mh tr>:nth-child(2){text-align:right;}\n"
                        ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
                        ".rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
@@ -117,7 +119,7 @@ void sub_page_remote()
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
                        "<div><div id=\"rm_info\" class=\"rmtiles\"></div><div id=\"rm_sw\" class=\"grid rmg\"></div><p id=\"rm_swnote\" class=\"font-small\"></p></div></div>\n");
     web_client.println("<div id=\"rm_card_radio\" class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Radio</label>\n"
-                       "<span>Frequency, spreading factor, TX power, sensors.</span>\n"
+                       "<span>Radio settings and sensors.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
                        "<div></div></div>\n");
     web_client.println("<div id=\"rm_card_ident\" class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Identity</label>\n"
@@ -133,7 +135,7 @@ void sub_page_remote()
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
                        "<div></div></div>\n");
     web_client.println("<div id=\"rm_card_mh\" class=\"cardlayout collapsablecard\"><label class=\"cardlabel\">Heard list</label>\n"
-                       "<span>Open this for the nodes this node has heard.</span>\n"
+                       "<span>Open this for the heard list.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
                        "<div></div></div>\n");
     web_client.println("<div id=\"rm_adv\" class=\"cardlayout collapsablecard\"><label class=\"cardlabel\">Advanced</label>\n"
@@ -313,11 +315,15 @@ void rmScaffoldJs()
     web_client.println("d=t[1]=='d'?[rmMhL(o.g,'Gateway','',rmYn),rmMhL(o.m,'Mesh','',rmYn),rmMhL(o.r,'RSSI',' dBm'),rmMhL(o.s,'SNR',' dB'),rmMhL((o.la=='-'||o.lo=='-')?'-':o.la+', '+o.lo,'Position',''),rmMhL(o.di,'Distance',' km'),rmMhL(o.a,'Altitude',' m'),rmMhL(o.n,'Its neighbours',''),rmMhL(o.x,'Only it hears',''),rmMhL(o.h,'It hears',''),rmMhL(o.t,'Heard',' min ago')]:\n");
     web_client.println("[rmMhL(o.h,'Hops',''),rmMhL(o.k,'Routes',''),rmMhL(o.g,'Via gateway','',rmYn),'Relay: '+((o.rc===undefined||o.rc=='-')?'not known':o.rc),rmMhL(o.t,'Age',' min'),rmMhL(o.v,'Via','',function(v){return v.split(',').join(', ');})];\nrmMh.det={c:rmMh.args,l:d};return rmMhEnd('');}\nn=rmMh.rows.length;rmMh.total=parseInt(t[1],10)||0;for(i=3;i+1<t.length&&rmMh.rows.length<128;i+=2)rmMh.rows.push({c:t[i],m:t[i+1]});\n");
     web_client.println("if(rmMh.rows.length==n||!/^[0-9]+$/.test(t[2]||'-')||rmMh.rows.length>=128)return rmMhEnd('End of the list.');\nrmMh.args=t[2];rmMhStep();rmRender();}");
-    web_client.println("function rmNew(t,c,x,i){var e=document.createElement(t);if(c)e.className=c;if(x)e.textContent=x;if(i)e.id=i;return e;}\nfunction rmMhCard(b,dis){var p=rmNew('div'),h=rmNew('div','rmrow rmsplit'),s=rmNew('span'),x,tb,tr,i,r;b.appendChild(h);b.appendChild(p);h.appendChild(rmNew('b','','Heard list'));h.appendChild(s);\nrmBtn(s,'Read','',dis||rmMh.on,{'data-act':'mhgo'});rmBtn(s,'Stop','',!rmMh.on,{'data-act':'mhstop'});\n");
-    web_client.println("x=document.createElement('div');x.id='rm_mh_prog';x.textContent=(rmMh.total||rmMh.rows.length?'Read '+rmMh.rows.length+' of '+rmMh.total+'. ':'')+rmMh.msg;p.appendChild(x);\n");
-    web_client.println("tb=document.createElement('table');tb.id='rm_mh_tab';for(i=0;i<rmMh.rows.length;i++){r=rmMh.rows[i];tr=document.createElement('tr');rmCell(tr,r.c);rmCell(tr,r.m+' min ago');x=document.createElement('td');rmBtn(x,'Details','',dis||rmMh.on,{'data-act':'mhdet','data-call':r.c});tr.appendChild(x);tb.appendChild(tr);}p.appendChild(tb);\n");
-    web_client.println("x=document.createElement('input');x.id='rm_f_mh_other';x.maxLength=9;x.placeholder='Other node';x.value=rmIn[x.id]||'';x.addEventListener('input',function(){rmIn[this.id]=this.value;});p.appendChild(x);rmBtn(p,'Look up','',dis||rmMh.on,{'data-act':'mhother'});\n");
-    web_client.println("x=document.createElement('div');x.id='rm_mh_det';p.appendChild(x);if(rmMh.det){r=document.createElement('strong');r.textContent=rmMh.det.c;x.appendChild(r);for(i=0;i<rmMh.det.l.length;i++){r=document.createElement('div');r.textContent=rmMh.det.l[i];x.appendChild(r);}}}\n");
+    web_client.println("function rmNew(t,c,x,i){var e=document.createElement(t);if(c)e.className=c;if(x)e.textContent=x;if(i)e.id=i;return e;}\nfunction rmMhCard(b,dis){var h=b.appendChild(rmNew('div','rmrow rmsplit')),s=rmNew('span'),w=b.appendChild(rmNew('div','grid rmg rmw')),x,tb,tr,i,r,k;h.appendChild(rmNew('b','','Heard list'));");
+    web_client.println("h.appendChild(rmNew('span','font-small',(rmMh.total||rmMh.rows.length?'Read '+rmMh.rows.length+' of '+rmMh.total+'. ':'')+rmMh.msg,'rm_mh_prog'));h.appendChild(s);\n"
+                       "rmBtn(s,'Read','',dis||rmMh.on,{'data-act':'mhgo'});rmBtn(s,'Stop','',!rmMh.on,{'data-act':'mhstop'});");
+    web_client.println("w.appendChild(rmNew('span','','Other node'));x=w.appendChild(rmNew('input','','','rm_f_mh_other'));x.type='text';x.maxLength=9;x.value=rmIn[x.id]||'';x.addEventListener('input',function(){rmIn[this.id]=this.value;});rmBtn(w,'Look up','',dis||rmMh.on,{'data-act':'mhother'});");
+    web_client.println("tr=b.appendChild(rmNew('table','rmtab font-small','','rm_mh')).appendChild(rmNew('thead')).appendChild(rmNew('tr'));for(i=0;i<3;i++)tr.appendChild(rmNew('th','',['node','heard',''][i]));\n"
+                       "tb=b.lastChild.appendChild(rmNew('tbody','','','rm_mh_tab'));");
+    web_client.println("for(i=0;i<rmMh.rows.length;i++){r=rmMh.rows[i];tr=tb.appendChild(rmNew('tr'));rmCell(tr,r.c);rmCell(tr,r.m+' min ago');rmBtn(tr.appendChild(rmNew('td')),'Details','',dis||rmMh.on,{'data-act':'mhdet','data-call':r.c});}");
+    web_client.println("x=b.appendChild(rmNew('div',rmMh.det?'rmdet':'','','rm_mh_det'));if(rmMh.det){x.appendChild(rmNew('b','',rmMh.det.c));k=x.appendChild(rmNew('div','rmkv'));\n"
+                       "for(i=0;i<rmMh.det.l.length;i++){r=rmMh.det.l[i];tr=r.indexOf(': ');k.appendChild(rmNew('span','font-small',r.slice(0,tr)));k.appendChild(rmNew('span','',r.slice(tr+2)));}}}\n");
     web_client.println("function rmTiles(p,c,o,a){var g=rmNew('div','mbx-counters'),i,d;p.appendChild(g);for(i=0;i<a.length;i+=2){d=g.appendChild(rmNew('div','',a[i+1]));d.appendChild(rmNew('b','',o[a[i]]||'-','rm_v_'+c+'_'+a[i]));}}");
     web_client.println("function rmTxqView(p,o){var m=/^(\\d+)\\/(\\d+)$/.exec(o.q||''),b=m?+m[2]:0,f=b>60?Math.round(m[1]*60/b):m?+m[1]:0,v=['quiet','qrs','qrt'].indexOf(o.bp),x=p.appendChild(rmNew('div','mcq-bar')),s,i;\n"
                        "for(i=0;i<Math.min(b,60);i++)x.appendChild(rmNew('div',i<f?'mcq-cell':'mcq-cell-empty')).style.background=i<f?'#3B7DD8':'';");

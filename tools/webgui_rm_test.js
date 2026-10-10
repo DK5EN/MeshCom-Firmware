@@ -654,6 +654,39 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
+  // ---- Heard list card (plan 3.6) ---------------------------------------------------------------------
+  {
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    check('3.6 stylesheet: .rmdet sub-box rule and the right-aligned age column', css.includes('.rmdet{border-top:solid 1px #e0e0e0;margin-top:6px;padding-top:4px;}') && css.includes('#rm_mh tr>:nth-child(2){text-align:right;}'));
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    await P.setPoll({ sent: [], targets: tg });
+    const X = (id) => P.el(id);
+    P.w.rmMh.rows = [{ c: 'DL1AB-11', m: '180' }, { c: 'DL2ZZ-1<b>', m: '4' }]; P.w.rmMh.total = 2; P.w.rmMh.msg = '';
+    P.w.rmMh.det = { c: 'DL1AB-11', l: ['Hops: 1', 'Via: <b>X, DL2JA-2'] };
+    P.w.rmRenderCards();
+    const body = X('rm_card_mh').lastElementChild, k = [...body.children];
+    const sig = (e) => e.tagName + '.' + e.className;
+    check('3.6 card body order: header row, lookup row ABOVE the table, table, details box', k.length === 4 && sig(k[0]) === 'DIV.rmrow rmsplit' && sig(k[1]) === 'DIV.grid rmg rmw' && k[2].tagName === 'TABLE' && k[3].id === 'rm_mh_det', k.map(sig).join(' | '));
+    const h = k[0] && [...k[0].children];
+    check('3.6 header row: <b>Heard list</b> | progress span#rm_mh_prog | [Read][Stop]', h && h.length === 3 && h[0].tagName === 'B' && h[0].textContent === 'Heard list' && h[1].id === 'rm_mh_prog' && /^Read 2 of 2\./.test(h[1].textContent) && [...h[2].children].map((b) => b.getAttribute('data-act') + ':' + b.textContent).join() === 'mhgo:Read,mhstop:Stop', h && h.map((e) => e.tagName + '#' + e.id).join());
+    const l = k[1] && [...k[1].children];
+    check('3.6 lookup row: Other node | input#rm_f_mh_other | Look up (mhother)', l && l.length === 3 && l[0].textContent === 'Other node' && l[1].tagName === 'INPUT' && l[1].id === 'rm_f_mh_other' && l[1].type === 'text' && l[1].maxLength === 9 && l[2].getAttribute('data-act') === 'mhother' && l[2].textContent === 'Look up', l && l.map((e) => e.tagName + '#' + e.id).join());
+    const t = k[2], tb = X('rm_mh_tab');
+    check('3.6 table.rmtab.font-small#rm_mh with thead (node, heard, empty) and tbody#rm_mh_tab', t && t.id === 'rm_mh' && t.classList.contains('rmtab') && t.classList.contains('font-small') && t.tHead && [...t.tHead.querySelectorAll('th')].map((e) => e.textContent).join('|') === 'node|heard|' && tb && tb.tagName === 'TBODY' && t.tBodies[0] === tb, tb && tb.tagName);
+    const r0 = tb && tb.children[0];
+    check('3.6 rows: call | "N min ago" | Details button (mhdet, data-call); hostile call is text', tb && tb.children.length === 2 && [...r0.children].map((c) => c.tagName).join() === 'TD,TD,TD' && r0.children[0].textContent === 'DL1AB-11' && r0.children[1].textContent === '180 min ago' && r0.children[2].querySelector('button').getAttribute('data-act') === 'mhdet' && r0.children[2].querySelector('button').getAttribute('data-call') === 'DL1AB-11' && tb.children[1].children[0].textContent === 'DL2ZZ-1<b>' && !tb.querySelector('b'), tb && tb.textContent);
+    const dd = X('rm_mh_det');
+    check('3.6 details: .rmdet box, <b> call sign line, then a .rmkv grid of key | value', dd && dd.classList.contains('rmdet') && dd.firstElementChild.tagName === 'B' && dd.firstElementChild.textContent === 'DL1AB-11' && dd.children[1].classList.contains('rmkv') && [...dd.children[1].children].map((e) => e.textContent).join('|') === 'Hops|1|Via|<b>X, DL2JA-2' && dd.querySelectorAll('b').length === 1, dd && dd.textContent);
+    P.w.rmMh.det = null; P.w.rmRenderCards();
+    check('3.6 no details: the box exists (id rm_mh_det) but has no border class', X('rm_mh_det') && !X('rm_mh_det').classList.contains('rmdet') && X('rm_mh_det').children.length === 0);
+    check('3.6 no duplicate id', dupIds(P).length === 0, dupIds(P).join());
+    P.w.rmPageLeave();
+  }
+
   // ---- TX power range from the target (plan 3.1: pmin= token, no 15 dBm fallback) ---------------------
   {
     const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=2 led=1');
@@ -1446,7 +1479,8 @@ function leaks(P, canary) {
     check('RMN refused request is retried once the target allows it', nS() === 8, nS());
     P.w.rmMhStop();
     // details
-    const det = async (c, rep) => { P.w.rmMhDet(c); await flush(); await poll([E('mh ' + c, rep, { ago: 0 })], 0); return tx('rm_mh_det'); };
+    const dtx = () => { const k = X('rm_mh_det').querySelector('.rmkv'); return k ? [...k.children].map((e, i) => (i % 2 ? e.textContent + '\n' : e.textContent + ': ')).join('') : X('rm_mh_det').textContent; };
+    const det = async (c, rep) => { P.w.rmMhDet(c); await flush(); await poll([E('mh ' + c, rep, { ago: 0 })], 0); return dtx(); };
     let d = await det('DL1ABC-1', 'ok d g=1 m=0 r=-95 s=8 la=48.4231 lo=11.7871 di=4.0 a=499 n=15 x=14 h=18 t=0');
     check('RMN details direct in words', /Gateway: yes/.test(d) && /Mesh: no/.test(d) && /RSSI: -95 dBm/.test(d) && /SNR: 8 dB/.test(d) && /Position: 48.4231, 11.7871/.test(d) && /Distance: 4.0 km/.test(d) && /Altitude: 499 m/.test(d) && /Its neighbours: 15/.test(d) && /Only it hears: 14/.test(d) && /It hears: 18/.test(d) && /Heard: 0 min ago/.test(d), d);
     d = await det('DL1ABC-2', 'ok d g=1 m=1 r=-140 s=-20 la=-90.0000 lo=-180.0000 di=9999.9 a=40000 n=255 x=255 h=255 t=65535');
@@ -1467,7 +1501,7 @@ function leaks(P, canary) {
     await P.tap(X('rm_mh_tab').querySelector('[data-call="DL1AB-11"]'));
     check('RMN row Details button sends mh <CALL> once', nS() === n0 + 1 && /cmd=mh&args=DL1AB-11(&|$)/.test(lastBody()), nS() + ' ' + lastBody() + ' msg=' + tx('rm_msg'));
     await poll([E('mh DL1AB-11', 'ok r h=1 k=1 g=0 m=- rc=- t=1 v=<b>X,DL2JA-2', { ago: 0 })], 0);
-    check('RMN hostile via chain is text only', /Via: <b>X, DL2JA-2/.test(tx('rm_mh_det')) && !X('rm_mh_det').querySelector('b') && /Relay: not known/.test(tx('rm_mh_det')), tx('rm_mh_det'));
+    check('RMN hostile via chain is text only', /Via: <b>X, DL2JA-2/.test(dtx()) && X('rm_mh_det').querySelectorAll('b').length === 1 && /Relay: not known/.test(dtx()), dtx());
     P.w.rmRenderCards();
     check('3.2 no duplicate id in #rm_page after rmRenderCards() (txq, mbox, maxhop, heard list with details)', dupIds(P).length === 0 && !!X('rm_mh_det'), dupIds(P).join());
     n0 = nS();
