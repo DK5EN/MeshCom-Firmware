@@ -32,10 +32,14 @@ stdlib + pyserial (only for --port).
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
+import os
 import re
 import socket
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -189,8 +193,10 @@ def fleet_problems(fleet: dict) -> list[str]:
     return problems
 
 
-def read_info_net(host: str, timeout: float = 4.0) -> str:
-    s = socket.create_connection((host, 2323), timeout=10)
+def read_info_net(host: str, timeout: float = 4.0, password: str = "", port: int = 2323) -> str:
+    """--info over the net console. A node with a password answers the connect with
+    "NONCE: <hex>" and wants HMAC-SHA256(password, nonce) back (tools/hmac_connect.py)."""
+    s = socket.create_connection((host, port), timeout=10)
     s.settimeout(0.3)
     out = b""
     end = time.time() + 1.5
@@ -199,6 +205,21 @@ def read_info_net(host: str, timeout: float = 4.0) -> str:
             out += s.recv(4096)
         except socket.timeout:
             pass
+        if out.startswith(b"NONCE:") and b"\n" in out:
+            break
+    if out.startswith(b"NONCE:"):
+        if not password:
+            s.close()
+            raise IdentityError(f"{host}: the console wants a password (set MC_CONSOLE_PW)")
+        nonce = bytes.fromhex(out.split(b"\n", 1)[0].split()[1].decode())
+        s.sendall(hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest().encode() + b"\n")
+        s.settimeout(3)
+        reply = s.recv(64)
+        if not reply.startswith(b"OK"):
+            s.close()
+            raise IdentityError(f"{host}: console login refused ({reply.strip()!r})")
+        out = reply
+        s.settimeout(0.3)
     s.sendall(b"--info\r\n")
     end = time.time() + timeout
     while time.time() < end:
@@ -277,6 +298,39 @@ def self_test() -> int:
 
     expect("fleet consistent", fleet_problems(fleet), [])
 
+    # a password-protected console: NONCE, HMAC answer, OK, then the --info reply
+    def fake_console(pw: str) -> tuple[int, threading.Thread]:
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+
+        def serve() -> None:
+            c, _ = srv.accept()
+            nonce = bytes(range(16))
+            c.sendall(b"NONCE: " + nonce.hex().encode() + b"\r\n")
+            got = c.recv(128).strip()
+            ok = hmac.compare_digest(got, hmac.new(pw.encode(), nonce, hashlib.sha256).hexdigest().encode())
+            c.sendall(b"OK\r\n" if ok else b"FAIL\r\n")
+            if ok and b"--info" in c.recv(64):
+                c.sendall(b"call: DK5EN-92\r\n")
+            c.close()
+            srv.close()
+
+        t = threading.Thread(target=serve, daemon=True)
+        t.start()
+        return srv.getsockname()[1], t
+
+    port, t = fake_console("bench")
+    expect("hmac console login", "DK5EN-92" in read_info_net("127.0.0.1", timeout=1.0, password="bench", port=port), True)
+    t.join(3)
+    port, t = fake_console("bench")
+    try:
+        read_info_net("127.0.0.1", timeout=1.0, password="", port=port)
+        failures.append("read_info_net() did not refuse a NONCE without a password")
+    except IdentityError:
+        pass
+    t.join(3)
+
     bad = (TESTDATA / "tbeam_xx0xxx_info.txt").read_text()
     info = parse_info(bad)
     expect("placeholder call parsed", info.call, "XX0XXX-00")
@@ -334,7 +388,11 @@ def main(argv: list[str] | None = None) -> int:
         print("fleet.json inconsistent: " + "; ".join(problems))
         return 1
     if a.host:
-        text = read_info_net(a.host)
+        try:
+            text = read_info_net(a.host, password=os.environ.get("MC_CONSOLE_PW", ""))
+        except IdentityError as exc:
+            print(exc)
+            return 1
     elif a.port:
         text = read_info_serial(a.port)
     else:

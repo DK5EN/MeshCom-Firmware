@@ -7,7 +7,7 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.65"
+      "host": "192.168.68.63"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
@@ -21,7 +21,7 @@
       "board": "ttgo_tbeam",
       "family": "esp32",
       "usb_serial": "573C000584",
-      "host": "192.168.68.63"
+      "host": "192.168.68.69"
     },
     "rak-90": {
       "call": "DK5EN-90",
