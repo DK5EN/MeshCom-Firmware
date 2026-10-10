@@ -15,7 +15,7 @@ Hand this to the implementing agent as is. Section 3 is the work list in executi
 | 3.2  | done fd899435; Position "Source" line is still a body div, moves with 3.4                                                                                                                                        |
 | 3.3  | done (wave 2), RAK +136 B                                                                                                                                                                                        |
 | 3.4  | done (waves 3 and 4); RAK 665084 B after wave 4                                                                                                                                                                  |
-| 3.5  | pending (wave 4)                                                                                                                                                                                                 |
+| 3.5  | done (wave 5); RAK 665868 B. Deviations: Mode is a row of the mailbox rmkv, tiles use the global label-beside-number layout                                                                                      |
 | 3.6  | pending (wave 5)                                                                                                                                                                                                 |
 | 3.7  | pending; RAK flash baseline is cfadb4cf = 662060 B (79d32c70 = 661124 B); after wave 1: 662756 B                                                                                                                 |
 
