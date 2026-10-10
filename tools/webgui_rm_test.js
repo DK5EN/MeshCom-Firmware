@@ -309,7 +309,7 @@ async function mkPage(srv, opts) {
     btn(text, within) { return Array.from((within || d).querySelectorAll('button')).find((b) => b.textContent === text); },
     tiles() {
       const o = {};
-      for (const i of P.el('rm_sw').querySelectorAll('input')) {
+      for (const i of d.querySelectorAll('#rm_sw input.rmsw, #rm_card_pos input.rmsw')) {
         o[i.getAttribute('data-sw')] = { state: i.indeterminate ? '?' : i.checked ? 'on' : 'off', el: i, text: d.querySelector('label[for="' + i.id + '"]').textContent, cf: i.getAttribute('data-cf') };
       }
       return o;
@@ -473,8 +473,8 @@ function leaks(P, canary) {
       t.gps.state === 'on' && t.track.state === 'off' && t.display.state === 'on' && t.mesh.state === 'on' && t.gateway.state === 'off' && t.led.state === 'on',
       JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v.state]))));
     check('Messages row shows the verified status (was: last status line)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(P.text('rm_msgs')), P.text('rm_msgs'));
-    check('switch labels read GPS, Track, Light, Gateway; Mesh and Gateway carry the off-confirm', t.gps.text === 'GPS' && t.track.text === 'Track' && t.led.text === 'Light' && t.gateway.text === 'Gateway' && t.mesh.cf === 'mesh off' && t.gateway.cf === 'gateway off' && !t.gps.cf, JSON.stringify(Object.values(t).map((v) => v.text)));
-    check('tile order GPS, Track, Display, Light, Mesh, Gateway', Object.keys(t).join(',') === 'gps,track,display,led,mesh,gateway', Object.keys(t).join(','));
+    check('switch labels read Light, Gateway, GPS (enable GPS), Track (enable display of SmartBeaconing); Mesh and Gateway carry the off-confirm', t.gps.text === 'GPS (enable GPS)' && t.track.text === 'Track (enable display of SmartBeaconing)' && t.led.text === 'Light' && t.gateway.text === 'Gateway' && t.mesh.cf === 'mesh off' && t.gateway.cf === 'gateway off' && !t.gps.cf, JSON.stringify(Object.values(t).map((v) => v.text)));
+    check('switch order: Actions Display, Light, Mesh, Gateway, then Position GPS, Track', Object.keys(t).join(',') === 'display,led,mesh,gateway,gps,track', Object.keys(t).join(','));
     P.w.rmPageLeave();
   }
   {
@@ -519,11 +519,11 @@ function leaks(P, canary) {
     check('3.3 D1 stylesheet: .rmtiles is a fixed 3-column grid, no auto-fill anywhere, Restart goes to column 3', /\.rmtiles\{display:grid;grid-template-columns:repeat\(3,1fr\);/.test(css) && !/auto-fill|auto-fit/.test(css) && css.includes('.rmtile-end{grid-column:3;}'), css.match(/\.rmtiles\{[^}]*\}/)[0]);
     const sw = P.el('rm_sw'), ins = [...sw.querySelectorAll('input')];
     check('3.3 D2 switch container is a .grid.rmg with the 3-column set in the stylesheet', sw.classList.contains('grid') && sw.classList.contains('rmg') && css.includes('.rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}'), sw.className);
-    check('3.3 D2 each switch row is label | input | empty cell, direct children of the grid', ins.length === 6 && sw.children.length === 18 && ins.every((i) => i.parentNode === sw && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id && i.nextElementSibling.tagName === 'SPAN' && i.nextElementSibling.textContent === '' && i.nextElementSibling.children.length === 0), sw.children.length + ' children');
+    check('3.3 D2 each switch row is label | input | empty cell, direct children of the grid', ins.length === 4 && sw.children.length === 12 && ins.every((i) => i.parentNode === sw && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id && i.nextElementSibling.tagName === 'SPAN' && i.nextElementSibling.textContent === '' && i.nextElementSibling.children.length === 0), sw.children.length + ' children');
     check('3.3 D2 switches start at the left of column 2 (one rule for all)', css.includes('.rmg .rmsw{justify-self:start;margin:0;}') && ins.every((i) => i.classList.contains('rmsw')));
-    check('3.3 D2 ids rm_sw_<n>, data-sw and data-cf kept', ins.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_gps:gps,rm_sw_track:track,rm_sw_display:display,rm_sw_led:led,rm_sw_mesh:mesh,rm_sw_gateway:gateway' && ins.filter((i) => i.getAttribute('data-cf')).map((i) => i.id + '=' + i.getAttribute('data-cf')).join() === 'rm_sw_mesh=mesh off,rm_sw_gateway=gateway off', ins.map((i) => i.id).join());
+    check('3.3 D2 ids rm_sw_<n>, data-sw and data-cf kept', ins.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_display:display,rm_sw_led:led,rm_sw_mesh:mesh,rm_sw_gateway:gateway' && ins.filter((i) => i.getAttribute('data-cf')).map((i) => i.id + '=' + i.getAttribute('data-cf')).join() === 'rm_sw_mesh=mesh off,rm_sw_gateway=gateway off', ins.map((i) => i.id).join());
     await P.tap(P.tiles().mesh.el);
-    check('3.3 D2 arming text stays in the label cell and the grid keeps 18 children', P.tiles().mesh.text === 'Mesh: Really? tap again' && P.el('rm_sw').children.length === 18, P.tiles().mesh.text);
+    check('3.3 D2 arming text stays in the label cell and the grid keeps 12 children', P.tiles().mesh.text === 'Mesh: Really? tap again' && P.el('rm_sw').children.length === 12, P.tiles().mesh.text);
     P.w.rmPageLeave();
   }
 
@@ -552,17 +552,17 @@ function leaks(P, canary) {
     check('3.4 the heard list builder mounts in rm_card_mh (Read, Stop, progress, lookup)', X('rm_card_mh').querySelector('[data-act="mhgo"]') && X('rm_card_mh').querySelector('[data-act="mhstop"]') && X('rm_card_mh').querySelector('#rm_mh_prog') && X('rm_card_mh').querySelector('#rm_f_mh_other') && X('rm_card_mh').querySelector('[data-act="mhother"]'));
     const hdr = (c) => X('rm_def_' + c) && X('rm_def_' + c).firstElementChild;
     const QD = ['txq', 'mbox', 'maxhop'];
-    const nonQ = Object.keys(where).filter((c) => !QD.includes(c));
-    check('3.4 every non-queue def starts with a .rmrow.rmh header: <b> label, font-small span, Read button', nonQ.every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmh') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), nonQ.map((c) => hdr(c) && hdr(c).className).join('|'));
+    const nonQ = Object.keys(where).filter((c) => !QD.includes(c) && c !== 'name' && c !== 'atxt');
+    check('3.4 every non-queue, non-identity def (radio, sens, pos) starts with a .rmrow.rmh header: <b> label, font-small span, Read button', nonQ.every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmh') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), nonQ.map((c) => hdr(c) && hdr(c).className).join('|'));
     check('3.4 queue defs have a title-only .rmrow.rmsplit header: just the <b> label, no span, no button', QD.every((c) => { const h = hdr(c); return h && h.classList.contains('rmsplit') && h.children.length === 1 && h.children[0].tagName === 'B'; }), QD.map((c) => hdr(c) && hdr(c).children.length).join());
-    check('3.4 header labels and the "last read N min ago" age', hdr('radio')?.children[0].textContent === 'Radio' && hdr('radio')?.children[1].textContent === 'last read 2 min ago' && hdr('sens')?.children[0].textContent === 'Sensors' && hdr('name')?.children[0].textContent === 'Name', hdr('radio')?.children[1].textContent);
+    check('3.4 header labels and the "last read N min ago" age', hdr('radio')?.children[0].textContent === 'Radio' && hdr('radio')?.children[1].textContent === 'last read 2 min ago' && hdr('sens')?.children[0].textContent === 'Sensors' && hdr('pos')?.children[0].textContent === 'Position', hdr('radio')?.children[1].textContent);
     check('3.4 Position: the Source line moved into the header row, nothing else read-only', hdr('pos')?.children[1].id === 'rm_v_pos_src' && hdr('pos')?.children[1].textContent === 'Source: from GPS' && X('rm_def_pos') && !X('rm_def_pos').querySelector('.rmkv') && X('rm_def_pos').querySelectorAll('[id^="rm_v_"]').length === 1, hdr('pos')?.children[1].textContent);
     const kv = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector('.rmkv');
     const rows = (c) => [...kv(c).children].map((e) => e.textContent);
     check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power (now/max)|10/22 dBm' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
     check('3.4 sens and maxhop render as .rmkv; absent marker stays "not present"', kv('sens') && rows('sens').join('|') === 'Temperature|21.4 C|Humidity|45 %|Pressure|1013.2 hPa|Second temperature|not present' && kv('maxhop') && rows('maxhop').join('|') === 'Text messages|3|Position beacons|2', (kv('sens') && rows('sens').join('|')) + ' # ' + (kv('maxhop') && rows('maxhop').join('|')));
     check('3.4 txq (dedicated view since 3.5) has no key/value grid, mailbox has one', X('rm_def_txq') && !kv('txq') && kv('mbox') && X('rm_v_txq_q').textContent === '3/20 queued, state quiet' && vText(X('rm_v_mbox_m')) === 'Mode: off');
-    check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').firstElementChild.textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_swnote)') || {}).id);
+    check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').children[1].textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_swnote)') || {}).id);
     const un = [];
     for (const c of nonQ) {
       const n0 = P.sends().length;
@@ -571,17 +571,17 @@ function leaks(P, canary) {
       if (!(P.sends().length === n0 + 1 && new RegExp('cmd=' + c + '&args=(&|$)').test(P.sends()[n0].body))) un.push(c);
       await P.T.advance(12000);
     }
-    check('3.4 every non-queue def Read button still sends its cmd once', un.length === 0, un.join());
+    check('3.4 every def Read button (radio, sens, pos) still sends its cmd once', un.length === 0, un.join());
     check('3.4 no duplicate id after the move', dupIds(P).length === 0, dupIds(P).join());
     P.w.rmPageLeave();
   }
 
-  // ---- Writable rows (plan 3.4 second half: label | input | Set rows, .rmg3 position, TX row, mobile rule) ----
+  // ---- Writable rows (UI fixes wave 2: Settings row idiom label | input | check button, Position with GPS/Track, mobile rule) ----
   {
     const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
     const media = (css.match(/@media[\s\S]*$/) || [''])[0];
-    check('3.4b stylesheet: inputs fill their column, .rmg3 is a 1fr 1fr 5em grid, the hint line spans columns 2..3', css.includes('.rmg input[type=text]{width:100%;box-sizing:border-box;}') && css.includes('.rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}') && css.includes('.rmhl{grid-column:2/4;display:flex;justify-content:space-between;}'));
-    check('3.4b exactly one @media block (max-width:600px), extended with the .rmw collapse: label on its own line, then control | action', (css.match(/@media/g) || []).length === 1 && /^@media \(max-width:600px\)/.test(media) && media.includes('.rmw{grid-template-columns:1fr max-content;}') && media.includes('.rmw>:first-child,.rmw .rmhl{grid-column:1/3;}') && media.includes('.rmtab thead{display:none;}'), media.slice(0, 80));
+    check('3.4b stylesheet: one row template .rmf 9em | 1fr | 3em, the header grid .rmh uses the same 9em label column, inputs fill their column, .rmg3/.rmhl are gone', css.includes('.rmg input[type=text],.rmf input[type=text]{width:100%;box-sizing:border-box;}') && css.includes('.rmf{grid-template-columns:9em 1fr 3em;margin:7px 0;}') && css.includes('.rmh{display:grid;grid-template-columns:9em 1fr auto;}') && css.includes('.rmf>.rmsw{grid-column:3;justify-self:end;margin:0;}') && css.includes('.rmf>div:empty{display:none;}') && !/rmg3|rmhl/.test(css));
+    check('3.4b exactly one @media block (max-width:600px), extended with the .rmw collapse: label on its own line, then control | action', (css.match(/@media/g) || []).length === 1 && /^@media \(max-width:600px\)/.test(media) && media.includes('.rmw{grid-template-columns:1fr max-content;}') && media.includes('.rmw>:first-child{grid-column:1/3;}') && media.includes('.rmtab thead{display:none;}'), media.slice(0, 80));
     const srv = mkServer();
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
@@ -590,18 +590,62 @@ function leaks(P, canary) {
     const X = (id) => P.el(id);
     const E = (cmd, rep, c) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: 5, st: 'ok' });
     await P.setPoll({ sent: [ent('DK5EN-1', 'status', STATUS_NEW, { ago: 30, ctr: 9 }), E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 1), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5)], targets: tg });
-    const row = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector(':scope > .rmw');
+    const row = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector(':scope > .rmf');
     const ch = (c) => (row(c) ? [...row(c).children] : []);
-    const cell = (c, i) => ch(c)[i] || { tagName: '-', id: '-', className: '', textContent: '', children: [], classList: { contains: () => false } };
-    for (const [c, lab, key, cnt] of [['name', 'Name', 'v', '6/' + HDR.RM_NAME_MAX], ['atxt', 'APRS text', 'v', '14/' + HDR.RM_ATXT_MAX]]) {
-      check('3.4b ' + c + ' is one .grid.rmg row: label | input | Set | hint line', row(c) && row(c).classList.contains('grid') && row(c).classList.contains('rmg') && ch(c).length === 4 && cell(c, 0).tagName === 'SPAN' && cell(c, 0).textContent === lab && cell(c, 1).tagName === 'INPUT' && cell(c, 1).id === 'rm_f_' + c + '_' + key && cell(c, 2).tagName === 'BUTTON' && cell(c, 2).id === 'rm_f_' + c + '_set' && cell(c, 2).textContent === 'Set' && cell(c, 3).classList.contains('rmhl'), ch(c).map((e) => e.tagName + '#' + e.id).join());
-      const hl = cell(c, 3);
-      check('3.4b ' + c + ' hint line is one font-small line holding hint then counter (right-aligned by space-between)', hl.classList.contains('font-small') && hl.children.length === 2 && hl.children[0].id === 'rm_f_' + c + '_hint' && hl.children[1].id === 'rm_f_' + c + '_cnt' && hl.children[1].textContent === cnt, [...hl.children].map((e) => e.id + '=' + e.textContent).join());
+    const cb = (card) => [...X(card).querySelectorAll('button')].filter((b) => !b.classList.contains('cardtoggle'));
+    const ibody = X('rm_card_ident').lastElementChild;
+    check('3.4b Identity: exactly one Read in the header row (status in the fixed .rmh column), no per-def header, data-q chains name then atxt', cb('rm_card_ident').filter((b) => b.textContent === 'Read').length === 1 && ibody.firstElementChild.classList.contains('rmh') && ibody.firstElementChild.children.length === 3 && ibody.firstElementChild.children[1].textContent === 'last read 5 s ago' && ibody.firstElementChild.children[2].getAttribute('data-act') === 'qread' && ibody.firstElementChild.children[2].getAttribute('data-q') === 'name atxt' && !X('rm_def_name').querySelector('.rmh') && !X('rm_def_atxt').querySelector('.rmh') && !X('rm_card_ident').querySelector('[data-cmd="name"][data-args=""]:not([id])') && ibody.children[1].textContent === 'Stored exactly as typed.' && ibody.children[2] === X('rm_def_name'), cb('rm_card_ident').map((b) => b.textContent + '/' + b.id).join());
+    check('3.4b Identity: "Stored exactly as typed." exactly once, in the card body before the rows', (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && ibody.children[1].tagName === 'P');
+    for (const [c, lab, cnt] of [['name', 'Name', '6/' + HDR.RM_NAME_MAX], ['atxt', 'APRS text', '14/' + HDR.RM_ATXT_MAX]]) {
+      const k = ch(c), id = 'rm_f_' + c + '_v';
+      check('3.4b ' + c + ' is one .grid.rmf row: label "' + lab + ' :" | input | check button, then hint line and counter line', row(c) && row(c).classList.contains('grid') && row(c).className === 'grid rmf' && k.length === 5 && k[0].tagName === 'LABEL' && k[0].htmlFor === id && k[0].textContent === lab + ' :' && k[1].tagName === 'INPUT' && k[1].id === id && k[2].tagName === 'BUTTON' && k[2].id === id + '_set' && k[2].textContent === '' && !!k[2].querySelector('i.btncheckmark') && k[2].getAttribute('data-cmd') === c && k[3].tagName === 'DIV' && k[3].id === id + '_hint' && k[4].id === id + '_cnt' && k[4].classList.contains('rmc') && k[4].classList.contains('font-small') && k[4].textContent === cnt, k.map((e) => e.tagName + '#' + e.id).join());
     }
-    check('3.4b pos row: Position | .rmg3 with three INPUTs lat, lon, alt | Set | hint line without counter', row('pos') && ch('pos').length === 4 && cell('pos', 0).textContent === 'Position' && cell('pos', 1).classList.contains('rmg3') && [...cell('pos', 1).children].map((e) => e.tagName + '#' + e.id).join() === 'INPUT#rm_f_pos_lat,INPUT#rm_f_pos_lon,INPUT#rm_f_pos_alt' && cell('pos', 2).id === 'rm_f_pos_set' && cell('pos', 3).classList.contains('rmhl') && cell('pos', 3).children.length === 1 && cell('pos', 3).children[0].id === 'rm_f_pos_hint', ch('pos').map((e) => e.tagName + '#' + e.id + '.' + e.className).join());
-    check('3.4b pos: Source stays in the header row, inputs keep their values', X('rm_def_pos').firstElementChild.children[1].id === 'rm_v_pos_src' && X('rm_f_pos_lat').value === '48.40812' && X('rm_f_pos_alt').value === '492' && !X('rm_f_pos_set').disabled);
+    check('3.4b Name and APRS text rows use the same grid template and carry no own Read', row('name').className === row('atxt').className && !X('rm_def_name').querySelector('[data-cmd]:not([id$="_set"])') && !X('rm_def_atxt').querySelector('[data-cmd]:not([id$="_set"])'));
+    const pk = ch('pos');
+    check('3.4b pos: three rows label | input | check button (+ hint line each): "Latitude (+/-) :", "Longitude (+/-) :", "Altitude (meter) :"', row('pos') && pk.length === 12 && ['lat', 'lon', 'alt'].every((k, j) => pk[4 * j].tagName === 'LABEL' && pk[4 * j].htmlFor === 'rm_f_pos_' + k && pk[4 * j + 1].id === 'rm_f_pos_' + k && pk[4 * j + 1].tagName === 'INPUT' && pk[4 * j + 2].tagName === 'BUTTON' && pk[4 * j + 2].id === 'rm_f_pos_' + k + '_set' && !!pk[4 * j + 2].querySelector('i.btncheckmark') && pk[4 * j + 3].id === 'rm_f_pos_' + k + '_hint') && [pk[0], pk[4], pk[8]].map((e) => e.textContent).join('|') === 'Latitude (+/-) :|Longitude (+/-) :|Altitude (meter) :', pk.map((e) => e.tagName + '#' + e.id).join());
+    check('3.4b pos: the Altitude placeholder is the full text and the input has no size/maxlength that could cut it', X('rm_f_pos_alt').placeholder === 'Altitude (meter)' && !X('rm_f_pos_alt').hasAttribute('size') && !X('rm_f_pos_alt').hasAttribute('maxlength') && !X('rm_f_pos_lat').hasAttribute('maxlength'), X('rm_f_pos_alt').placeholder);
+    check('3.4b pos: one Read in the header row (data-cmd pos), Source stays in the header, inputs keep their values', cb('rm_card_pos').filter((b) => b.textContent === 'Read').length === 1 && X('rm_def_pos').firstElementChild.children[2].getAttribute('data-cmd') === 'pos' && X('rm_def_pos').firstElementChild.children[1].id === 'rm_v_pos_src' && X('rm_f_pos_lat').value === '48.40812' && X('rm_f_pos_alt').value === '492');
+    check('3.2/3.4b read latitude 48.40812 prefilled: no error shown anywhere, no check button enabled by the read alone', ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k + '_hint').textContent === '' && X('rm_f_pos_' + k + '_set').disabled === true), ['lat', 'lon', 'alt'].map((k) => X('rm_f_pos_' + k + '_hint').textContent + '/' + X('rm_f_pos_' + k + '_set').disabled).join());
+    const posIn = async (k, v) => { X('rm_f_pos_' + k).value = v; X('rm_f_pos_' + k).dispatchEvent(new P.w.Event('input', { bubbles: true })); await flush(); };
+    const dis = () => ['lat', 'lon', 'alt'].map((k) => X('rm_f_pos_' + k + '_set').disabled ? '0' : '1').join('');
+    await posIn('alt', '500');
+    check('3.4b pos: editing only Altitude enables only the Altitude check button', dis() === '001', dis());
+    const q0 = P.sends().length;
+    await P.tap(X('rm_f_pos_alt_set'));
+    const q1 = P.sends().length;
+    await P.tap(X('rm_f_pos_alt_set'));
+    check('3.4b pos: Altitude check needs the confirm tap and then sends "pos <readLat> <readLon> <newAlt>"', q1 === q0 && P.sends().length === q0 + 1 && /cmd=pos&args=48\.40812%2011\.73812%20500(&|$)/.test(P.sends()[q0].body), JSON.stringify(P.sends().slice(q0)));
+    await P.T.advance(12000);
+    await posIn('alt', '492');
+    check('3.4b pos: a value equal to the read value keeps the check disabled', dis() === '000', dis());
+    await posIn('lon', '11.7');
+    await posIn('lat', '91');
+    check('3.4b pos: an invalid value keeps its check disabled and shows the message, the valid edit stays enabled', dis() === '010' && /Latitude must be/.test(X('rm_f_pos_lat_hint').textContent), dis() + '|' + X('rm_f_pos_lat_hint').textContent);
+    await posIn('lat', '48.40812'); await posIn('lon', '11.73812');
+    check('3.4b pos: after reverting every edit nothing is enabled and no message is left', dis() === '000' && ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k + '_hint').textContent === ''), dis());
+    const sw = [...X('rm_card_pos').querySelectorAll('input.rmsw')], ct = [...X('rm_sw').querySelectorAll('input.rmsw')];
+    check('3.4b GPS and Track switches live in the Position card (rows after the position rows), not in Actions; ids and data-sw kept', sw.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_gps:gps,rm_sw_track:track' && ct.map((i) => i.getAttribute('data-sw')).join() === 'display,led,mesh,gateway' && !X('rm_sw').querySelector('#rm_sw_gps,#rm_sw_track') && sw.every((i) => i.parentNode.classList.contains('rmf') && i.parentNode !== row('pos') && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id) && !!(X('rm_def_pos').compareDocumentPosition(sw[0]) & 4), sw.map((i) => i.id).join());
+    check('3.4b switch rows read "GPS (enable GPS)" and "Track (enable display of SmartBeaconing)", the switch sits in the action column (no filler cell)', sw.map((i) => i.previousElementSibling.textContent).join('|') === 'GPS (enable GPS)|Track (enable display of SmartBeaconing)' && sw.map((i) => i.previousElementSibling.querySelector('.font-small') !== null).join() === 'true,true' && sw.every((i) => i.parentNode.children.length === 4), sw.map((i) => i.parentNode.children.length).join());
+    check('3.4b switch state comes from the s= letters (GtDMwL: GPS on, Track off)', sw[0].checked === true && sw[0].indeterminate === false && sw[1].checked === false && sw[1].indeterminate === false);
+    {
+      const s0 = P.sends().length;
+      await P.tap(sw[1]);
+      check('3.4b Track switch in the Position card sends "track on"', P.sends().length === s0 + 1 && /cmd=track&args=on/.test(P.sends()[s0].body), JSON.stringify(P.sends().slice(s0)));
+      await P.T.advance(12000);
+    }
+    {
+      const s0 = P.sends().length, rb = X('rm_card_ident').lastElementChild.firstElementChild.children[2];
+      await P.tap(rb);
+      await P.T.advance(12000);
+      await P.T.advance(12000);
+      await P.T.advance(30000);
+      check('3.4b Identity Read chains name then atxt, one per lock window, nothing more afterwards', P.sends().slice(s0).map((x) => /cmd=(\w+)&args=(&|$)/.exec(x.body)[1]).join() === 'name,atxt', JSON.stringify(P.sends().slice(s0).map((x) => x.body)));
+    }
     check('3.4b sens/maxhop have no writable row, txq/mbox neither', !row('sens') && !row('maxhop') && !row('txq') && !row('mbox'));
     check('3.4b no duplicate id', dupIds(P).length === 0, dupIds(P).join());
+    await posIn('lat', '48.4'); await posIn('alt', '0492');
+    await P.setPoll({ sent: [E('pos', '48.40000 11.73812 492 set', 20)], targets: tg });
+    check('3.4b pos: the 5-decimal reply after a set equals the typed "48.4" and "0492", no check button re-enabled', dis() === '000', dis());
     P.w.rmPageLeave();
   }
 
@@ -1034,7 +1078,7 @@ function leaks(P, canary) {
       P.w.rmMhStart(); await flush();
       check('RS-07 Read is disabled while a Heard list read runs, and a call does nothing', P.w.rmMh.on === 1 && P.qb().disabled === true);
       const n = P.sends().length;
-      P.w.rmQRead(); await flush();
+      P.w.rmQRead(P.el('rm_card_queues').querySelector('[data-act="qread"]')); await flush();
       check('RS-07 rmQRead during a Heard list read sends nothing and queues nothing', P.sends().length === n && P.w.rmQq.length === 0, P.sends().length - n);
       P.w.rmMhStop(); await P.T.advance(12000);
       check('RS-07 Read is enabled again after the Heard read stops', P.qb().disabled === false);
@@ -1057,7 +1101,7 @@ function leaks(P, canary) {
   {
     // RS-03: every card header uses the same column template, status text in the value column
     const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
-    check('RS-03 stylesheet: .rmh grid label | value | action (7em 1fr auto)', css.includes('.rmh{display:grid;grid-template-columns:7em 1fr auto;}'));
+    check('RS-03 stylesheet: .rmh grid label | value | action (9em 1fr auto, the same 9em label column as the .rmf rows)', css.includes('.rmh{display:grid;grid-template-columns:9em 1fr auto;}'));
     const srv = mkServer();
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
@@ -1065,7 +1109,7 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     await P.setPoll({ sent: [], targets: tg });
     const hs = ['rm_card_radio', 'rm_card_ident', 'rm_card_pos', 'rm_card_queues'].map((i) => [...P.el(i).lastElementChild.querySelectorAll('.rmh')]).reduce((a, b) => a.concat(b), []);
-    check('RS-03 headers of Radio (2), Identity (2), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 6 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
+    check('RS-03 headers of Radio (2), Identity (1), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 5 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
     P.w.rmPageLeave();
   }
 
@@ -1427,15 +1471,17 @@ function leaks(P, canary) {
     check('RMX worst cases parse (radio, sens, pos nofix)', tx('rm_v_radio_f') === 'Frequency: 999.999 MHz' && tx('rm_v_sens_h') === 'Humidity: 100 %' && X('rm_f_pos_lat').value === '-89.99999' && tx('rm_v_pos_src') === 'Source: GPS on, no fix' && X('rm_f_pos_alt').value === '40000', tx('rm_v_radio_f') + '|' + tx('rm_v_pos_src'));
     await poll([E('pos', '48.40760 11.73850 482 nofix', 3)]);
     check('3.2 D5 position inputs are the INPUT elements (ids are unique, rm_f_ is the input)', ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k) && X('rm_f_pos_' + k).tagName === 'INPUT') && X('rm_f_pos_lat').value === '48.40760' && X('rm_f_pos_lon').value === '11.73850' && X('rm_f_pos_alt').value === '482', ['lat', 'lon', 'alt'].map((k) => X('rm_f_pos_' + k) && X('rm_f_pos_' + k).tagName).join());
-    check('3.2 D5 verified pos read: no false error, Set enabled', tx('rm_f_pos_hint') === '' && X('rm_f_pos_set') && !X('rm_f_pos_set').disabled, tx('rm_f_pos_hint') + ' set.disabled=' + (X('rm_f_pos_set') && X('rm_f_pos_set').disabled));
+    check('3.2 D5 verified pos read: no false error, no check button enabled by the read alone', ['lat', 'lon', 'alt'].every((k) => tx('rm_f_pos_' + k + '_hint') === '' && X('rm_f_pos_' + k + '_set').disabled), ['lat', 'lon', 'alt'].map((k) => tx('rm_f_pos_' + k + '_hint') + X('rm_f_pos_' + k + '_set').disabled).join());
     await typeIn('rm_f_pos_lat', '48.4076');
-    check('3.2 D5 typing 48.4076 keeps Set enabled and the hint empty', tx('rm_f_pos_hint') === '' && !X('rm_f_pos_set').disabled, tx('rm_f_pos_hint'));
+    check('3.2 D5 typing 48.4076 (same number as the read 48.40760) shows no error and enables nothing', tx('rm_f_pos_lat_hint') === '' && X('rm_f_pos_lat_set').disabled, tx('rm_f_pos_lat_hint'));
+    await typeIn('rm_f_pos_lat', '48.4077');
+    check('3.2 D5 typing 48.4077 (differs from the read 48.40760) enables the Latitude check and keeps the hint empty', tx('rm_f_pos_lat_hint') === '' && !X('rm_f_pos_lat_set').disabled && X('rm_f_pos_lon_set').disabled && X('rm_f_pos_alt_set').disabled, tx('rm_f_pos_lat_hint'));
     await typeIn('rm_f_pos_lat', '91');
-    check('3.2 D5 a really bad latitude is still refused', X('rm_f_pos_set').disabled && /Latitude must be/.test(tx('rm_f_pos_hint')), tx('rm_f_pos_hint'));
+    check('3.2 D5 a really bad latitude is still refused', X('rm_f_pos_lat_set').disabled && /Latitude must be/.test(tx('rm_f_pos_lat_hint')), tx('rm_f_pos_lat_hint'));
     check('3.2 D5 position keeps a single read-only line (Source), no lat/lon/alt copies', !X('rm_v_pos_lat') && !X('rm_v_pos_lon') && !X('rm_v_pos_alt') && tx('rm_v_pos_src') === 'Source: GPS on, no fix', tx('rm_v_pos_src'));
     P.w.rmRenderCards();
     check('3.2 no duplicate id in #rm_page after rmRenderCards() (radio, sens, pos, name, atxt)', dupIds(P).length === 0, dupIds(P).join());
-    check('3.2 id namespace: every rm_v_ element is read-only text, every input of the cards is rm_f_', [...P.el('rm_page').querySelectorAll('[id^="rm_v_"]')].every((e) => e.tagName === 'DIV' || e.tagName === 'SPAN') && [...P.el('rm_page').querySelectorAll('#rm_card_radio input,#rm_card_ident input,#rm_card_pos input,#rm_card_queues input,#rm_card_mh input')].every((e) => /^rm_f_/.test(e.id)) && !!X('rm_v_pos_src'), 'rm_v_pos_src=' + !!X('rm_v_pos_src'));
+    check('3.2 id namespace: every rm_v_ element is read-only text, every input of the cards is rm_f_', [...P.el('rm_page').querySelectorAll('[id^="rm_v_"]')].every((e) => e.tagName === 'DIV' || e.tagName === 'SPAN') && [...P.el('rm_page').querySelectorAll('#rm_card_radio input,#rm_card_ident input,#rm_card_pos input[type=text],#rm_card_queues input,#rm_card_mh input')].every((e) => /^rm_f_/.test(e.id)) && !!X('rm_v_pos_src'), 'rm_v_pos_src=' + !!X('rm_v_pos_src'));
     await poll([E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('atxt', 'a=MeshCom Garten', 3), E('name', 'n=<img src=x onerror=1>', 4)]);
     check('RMX sens absent marker, name/atxt free text with spaces/capitals, hostile name stays text', tx('rm_v_sens_t2') === 'Second temperature: not present' && X('rm_f_atxt_v').value === 'MeshCom Garten' && X('rm_f_name_v').value === '<img src=x onerror=1>' && !P.el('rm_page').querySelector('img'), X('rm_f_atxt_v').value);
     for (const [r, s] of [['48.40812 11.73812 492 gps', 'Source: from GPS'], ['1.5 2.5 3 set', 'Source: set by hand']]) {
@@ -1445,22 +1491,22 @@ function leaks(P, canary) {
     await poll([E('name', 'n=-', 6)]);
     check('RMX name n=- (empty) leaves the input empty', X('rm_f_name_v').value === '');
     // identity
-    const nm = 'rm_f_name_v', nset = () => X('rm_f_name_set');
+    const nm = 'rm_f_name_v', nset = () => X('rm_f_name_v_set');
     await typeIn(nm, 'Martin');
-    check('RMX name counter and Set enabled', tx('rm_f_name_cnt') === '6/' + HDR.RM_NAME_MAX && !nset().disabled && !X('rm_f_name_note') && X('rm_card_ident').textContent.includes('Stored exactly as typed.'), tx('rm_f_name_cnt'));
+    check('RMX name counter and Set enabled', tx('rm_f_name_v_cnt') === '6/' + HDR.RM_NAME_MAX && !nset().disabled && !X('rm_f_name_note') && X('rm_card_ident').textContent.includes('Stored exactly as typed.'), tx('rm_f_name_v_cnt'));
     // DRY-03: the page checks the length only (against rmLen, from the header); characters, spaces and the word none
     // are the node's and the server's business (rmTextAllowed is not mirrored).
     for (const v of ['a<b', 'a=b', ' ab', 'a  b', 'NoNe']) {
       await typeIn(nm, v);
-      check('DRY-03 name "' + v + '" is not judged by the page: Set stays enabled, no hint', !nset().disabled && tx('rm_f_name_hint') === '', tx('rm_f_name_hint') + '|' + nset().disabled);
+      check('DRY-03 name "' + v + '" is not judged by the page: Set stays enabled, no hint', !nset().disabled && tx('rm_f_name_v_hint') === '', tx('rm_f_name_v_hint') + '|' + nset().disabled);
     }
     for (const [v, ok] of [['a'.repeat(HDR.RM_NAME_MAX), true], ['a'.repeat(HDR.RM_NAME_MAX + 1), false]]) {
       await typeIn(nm, v);
-      check('DRY-04 name of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused "Too long."') + ' (limit ' + HDR.RM_NAME_MAX + ' from the header)', nset().disabled === !ok && tx('rm_f_name_hint') === (ok ? '' : 'Too long.'), tx('rm_f_name_hint') + '|' + nset().disabled);
+      check('DRY-04 name of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused "Too long."') + ' (limit ' + HDR.RM_NAME_MAX + ' from the header)', nset().disabled === !ok && tx('rm_f_name_v_hint') === (ok ? '' : 'Too long.'), tx('rm_f_name_v_hint') + '|' + nset().disabled);
     }
     for (const [v, ok] of [['a'.repeat(HDR.RM_ATXT_MAX), true], ['a'.repeat(HDR.RM_ATXT_MAX + 1), false]]) {
       await typeIn('rm_f_atxt_v', v);
-      check('DRY-04 APRS text of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused') + ' (limit ' + HDR.RM_ATXT_MAX + ' from the header)', X('rm_f_atxt_set').disabled === !ok && tx('rm_f_atxt_cnt') === v.length + '/' + HDR.RM_ATXT_MAX, tx('rm_f_atxt_cnt') + '|' + X('rm_f_atxt_set').disabled);
+      check('DRY-04 APRS text of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused') + ' (limit ' + HDR.RM_ATXT_MAX + ' from the header)', X('rm_f_atxt_v_set').disabled === !ok && tx('rm_f_atxt_v_cnt') === v.length + '/' + HDR.RM_ATXT_MAX, tx('rm_f_atxt_v_cnt') + '|' + X('rm_f_atxt_v_set').disabled);
     }
     P.w.rmClrIn('atxt');
     await typeIn(nm, 'Martin');
@@ -1475,15 +1521,22 @@ function leaks(P, canary) {
     X('rm_f_atxt_v').focus();
     await poll([E('atxt', 'a=Other', 9)]);
     check('RMX focused, unedited input is not overwritten by a reply', X('rm_f_atxt_v').value === 'MeshCom Garten' && P.el('rm_f_atxt_v') === P.d.activeElement, X('rm_f_atxt_v').value);
-    // position
-    for (const [id, v, ok] of [['rm_f_pos_lat', '90.1', 0], ['rm_f_pos_lon', '-180.5', 0], ['rm_f_pos_alt', '40001', 0], ['rm_f_pos_alt', '1e2', 0], ['rm_f_pos_lat', '1,5', 0], ['rm_f_pos_lat', '48.40812', 1]]) {
-      await typeIn('rm_f_pos_lat', id == 'rm_f_pos_lat' ? v : '48.4'); await typeIn('rm_f_pos_lon', id == 'rm_f_pos_lon' ? v : '11.7'); await typeIn('rm_f_pos_alt', id == 'rm_f_pos_alt' ? v : '492');
-      check('RMX pos "' + v + '" ' + (ok ? 'accepted' : 'refused with hint'), X('rm_f_pos_set').disabled === !ok && (ok || tx('rm_f_pos_hint').length > 5), tx('rm_f_pos_hint'));
+    // position: the check buttons need a read; every edit is judged against the last read value
+    for (const k of ['lat', 'lon', 'alt']) await typeIn('rm_f_pos_' + k, k == 'lat' ? '48.4' : k == 'lon' ? '11.7' : '492');
+    check('RMX pos never read (the last poll has no pos reply): edited values leave all three check buttons disabled', ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k + '_set').disabled), ['lat', 'lon', 'alt'].map((k) => X('rm_f_pos_' + k + '_set').disabled).join());
+    await poll([E('pos', '48.40812 11.73812 492 gps', 14)]);
+    for (const k of ['lat', 'lon', 'alt']) P.w.rmClrIn('pos');
+    P.w.rmRenderCards();
+    const RD = { lat: '48.40812', lon: '11.73812', alt: '492' };
+    for (const [k, v, ok] of [['lat', '90.1', 0], ['lon', '-180.5', 0], ['alt', '40001', 0], ['alt', '1e2', 0], ['lat', '1,5', 0], ['lat', '48.4081', 1], ['alt', '', 0], ['lat', '48.40812', 0]]) {
+      await typeIn('rm_f_pos_' + k, v);
+      check('RMX pos ' + k + ' "' + v + '" ' + (ok ? 'enables only its own check button' : 'leaves its check button disabled'), ['lat', 'lon', 'alt'].every((q) => X('rm_f_pos_' + q + '_set').disabled === !(ok && q == k)) && (ok || v === '' || v === RD[k] || tx('rm_f_pos_' + k + '_hint').length > 5), ['lat', 'lon', 'alt'].map((q) => X('rm_f_pos_' + q + '_set').disabled).join() + '|' + tx('rm_f_pos_' + k + '_hint'));
+      await typeIn('rm_f_pos_' + k, RD[k]);
     }
-    await typeIn('rm_f_pos_lat', '48.40812'); await typeIn('rm_f_pos_lon', '-11.7'); await typeIn('rm_f_pos_alt', '492');
+    await typeIn('rm_f_pos_lon', '-11.7');
     const p0 = P.sends().length;
-    await P.tap(X('rm_f_pos_set')); const p1 = P.sends().length; await P.tap(X('rm_f_pos_set'));
-    check('RMX pos Set: two taps, exact body', p1 === p0 && P.sends().length === p0 + 1 && /cmd=pos&args=48\.40812%20-11\.7%20492(&|$)/.test(P.sends()[p0].body), JSON.stringify(P.sends().slice(p0)));
+    await P.tap(X('rm_f_pos_lon_set')); const p1 = P.sends().length; await P.tap(X('rm_f_pos_lon_set'));
+    check('RMX pos check: two taps, exact body (edited lon + last-read lat and alt)', p1 === p0 && P.sends().length === p0 + 1 && /cmd=pos&args=48\.40812%20-11\.7%20492(&|$)/.test(P.sends()[p0].body), JSON.stringify(P.sends().slice(p0)));
     await P.T.advance(12000);
     for (const [t, re] of [['hidden', /does not send its position/], ['gps', /controlled by GPS/]]) {
       await poll([ent('DK5EN-1', 'pos 1 2 3', 'err ' + t, { ctr: 12, ago: 1, st: 'err', msg: SRVMSG[t] })]);

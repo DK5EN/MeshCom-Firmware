@@ -36,7 +36,7 @@ void sub_page_remote()
                        "<style>\n"
                        ".rmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:7px 0;}\n"
                        ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}\n"
-                       ".rmh{display:grid;grid-template-columns:7em 1fr auto;}");
+                       ".rmh{display:grid;grid-template-columns:9em 1fr auto;}");
     web_client.println(".rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
                        ".rmchip{flex-direction:column;align-items:flex-start;min-width:7em;text-align:left;}\n"
                        "#content_inner .rmchip{border:solid 2px transparent;}\n"
@@ -51,9 +51,14 @@ void sub_page_remote()
                        ".rmwarn{background:var(--mclightred);}");
     web_client.println(".rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}\n"
                        ".rmg .rmsw{justify-self:start;margin:0;}\n"
-                       ".rmg input[type=text]{width:100%;box-sizing:border-box;}\n"
-                       ".rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}\n"
-                       ".rmhl{grid-column:2/4;display:flex;justify-content:space-between;}");
+                       ".rmg input[type=text],.rmf input[type=text]{width:100%;box-sizing:border-box;}\n"
+                       ".rmf{grid-template-columns:9em 1fr 3em;margin:7px 0;}\n"
+                       ".rmf>label{grid-column:1;}\n"
+                       ".rmf>label[for^=rm_sw]{grid-column:1/3;}");
+    web_client.println(".rmf>.rmsw{grid-column:3;justify-self:end;margin:0;}\n"
+                       ".rmf>div{grid-column:2;}\n"
+                       ".rmf>div:empty{display:none;}\n"
+                       ".rmf>.rmc{text-align:right;}");
     web_client.println(".rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}\n"
                        ".rmdet{border-top:solid 1px #e0e0e0;margin-top:6px;padding-top:4px;}\n"
                        "#rm_mh tr>:nth-child(2){text-align:right;}\n"
@@ -73,7 +78,7 @@ void sub_page_remote()
     web_client.println("@media (max-width:600px){.rmtab thead{display:none;}\n"
                        ".rmtab,#rm_msgs,#rm_log{display:block;}\n"
                        ".rmw{grid-template-columns:1fr max-content;}\n"
-                       ".rmw>:first-child,.rmw .rmhl{grid-column:1/3;}\n"
+                       ".rmw>:first-child{grid-column:1/3;}\n"
                        "#rm_msgs tr,#rm_log tr{display:block;padding:3px 0;border-bottom:solid 1px #e0e0e0;}");
     web_client.println("#rm_msgs td,#rm_log td{display:inline-block;border:0;padding:1px 8px 1px 0;}\n"
                        "#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(4),#rm_log td:nth-child(5){display:block;}");
@@ -208,9 +213,9 @@ void rmScaffoldJs()
                        "function rmBtn(box,label,cls,dis,attrs){var b=document.createElement('button'),k;b.type='button';b.className=cls||'';b.disabled=!!dis;b.textContent=label;for(k in attrs)b.setAttribute(k,attrs[k]);box.appendChild(b);return b;}");
     web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?rmReally:label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}");
     web_client.println("function rmSwSet(i,st,dis,last,shown){i.disabled=!!dis;i.indeterminate=st<0&&!(shown&&last);i.checked=st<0?last=='on':st==1;}");
-    web_client.println("function rmSwRow(box,n,st,dis){var l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
-    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);box.appendChild(l);box.appendChild(i);box.appendChild(document.createElement('span'));}");
-    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['gps','track','display','led','mesh','gateway'],p=rmEl('rm_pin').value;\n"
+    web_client.println("function rmSwRow(box,n,st,dis,x){var l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
+    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];if(x)l.appendChild(rmNew('span','font-small',' ('+x+')'));l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);box.appendChild(l);box.appendChild(i);if(!x)box.appendChild(document.createElement('span'));}");
+    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['display','led','mesh','gateway'],p=rmEl('rm_pin').value;\n"
                        "b.textContent='';for(i=0;i<d.length;i++)rmTile(b,d[i][1],d[i][0],'','','',dis);");
     web_client.println("rmBtn(b,'Re-sync counter','rmtile',dis,{'data-act':'sync',title:'Use this if the node keeps answering that the counters are out of step.'});rmTile(b,'Restart','reboot','','reboot','rmwarn rmtile-end',dis);\n"
                        "b=rmEl('rm_sw');b.textContent='';\n"
@@ -254,7 +259,7 @@ void rmScaffoldJs()
                        "{c:'sens',card:'radio',l:'Sensors',f:[['t','Temperature',' C'],['h','Humidity',' %'],['p','Pressure',' hPa'],['t2','Second temperature',' C']]},\n");
     web_client.println("{c:'name',card:'ident',l:'Name',f:[],w:[['v','Name','name',rmLen.name,'n']]},{c:'atxt',card:'ident',l:'APRS text',f:[],w:[['v','APRS text','atxt',rmLen.atxt,'a']]},\n");
     web_client.println("{c:'pos',card:'pos',l:'Position',p:rmPK,f:[['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
-                       "w:[['lat','Latitude','lat',11],['lon','Longitude','lon',11],['alt','Altitude (m)','alt',5]]},\n");
+                       "w:[['lat','Latitude (+/-)','lat',11],['lon','Longitude (+/-)','lon',11],['alt','Altitude (meter)','alt',5]]},\n");
     web_client.println("{c:'txq',card:'queues',l:'TX queue',k:1,v:rmTxqView,t:['tx','Sent','rt','Retransmitted','dr','Dropped']},\n"
                        "{c:'mbox',card:'queues',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Slots used',''],['b','Bytes',''],['a','Actions this hour','']],t:['st','Stored','dl','Delivered','ak','Acknowledged','dr','Dropped','bl','Blocked','nt','Notified']},\n");
     web_client.println("{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
@@ -263,9 +268,10 @@ void rmScaffoldJs()
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
                        "if(k=='alt')return(/^\\d{1,5}$/.test(v)&&+v<=40000)?false:'Altitude must be a whole number from 0 to 40000.';\n"
                        "return v.length>rmLen[k=='name'?'name':'atxt']?'Too long.':false;}\n");
-    web_client.println("function rmWUpd(d){var s=rmEl('rm_f_'+d.c+'_set'),h='',a=[],j,w,v,r,e=false,t=rmEl('rm_f_'+d.c+'_cnt'),c=rmSel.call;\n"
-                       "for(j=0;j<d.w.length;j++){w=d.w[j];v=rmEl('rm_f_'+d.c+'_'+w[0]).value;a.push(v);if(v==='')e=true;r=rmChk(w[2],v);if(r!==false){e=true;if(!h)h=r;}if(t)t.textContent=v.length+'/'+w[3];}\n");
-    web_client.println("s.disabled=e||!rmValidCall(c)||rmLocked()||rmCapOf(c)<2;s.setAttribute('data-args',a.join(' '));s.setAttribute('data-cf',d.c+' '+a.join(' '));rmTxt('rm_f_'+d.c+'_hint',h,'font-small rmbad');}\n"
+    web_client.println("function rmWUpd(d){var c=rmSel.call,g=!rmValidCall(c)||rmLocked()||rmCapOf(c)<2,j,w,v,r,x,s,n,t,a=[],y;\n"
+                       "for(j=0;j<d.w.length;j++)a.push(rmEl('rm_f_'+d.c+'_'+d.w[j][0]).getAttribute('data-r'));");
+    web_client.println("for(j=0;j<d.w.length;j++){w=d.w[j];n='rm_f_'+d.c+'_'+w[0];x=rmEl(n);v=x.value;r=rmChk(w[2],v);t=rmEl(n+'_cnt');if(t)t.textContent=v.length+'/'+w[3];\n"
+                       "y=a.slice();y[j]=v;s=rmEl(n+'_set');s.disabled=g||r!==false||(!!d.p&&(+v==a[j]||a.indexOf('')>=0));s.setAttribute('data-args',y.join(' '));s.setAttribute('data-cf',d.c+' '+y.join(' '));rmTxt(n+'_hint',r||'','font-small rmbad');}}\n"
                        "function rmWire(x,d){x.addEventListener('input',function(){rmIn[x.id]=x.value;rmWUpd(d);});}\n");
     web_client.println("function rmKv(r,f){var o={},t,i,a;if(typeof r!='string'||r.indexOf('ok ')!==0)return null;t=r.substring(3).split(' ');\n"
                        "for(i=0;i<t.length;i++){if(!f&&/^[na]=/.test(t[i])){o[t[i].charAt(0)]=t.slice(i).join(' ').substring(2);break;}a=t[i].indexOf('=');if(a>0)o[t[i].substring(0,a)]=t[i].substring(a+1);}return o;}\n"
@@ -275,11 +281,11 @@ void rmScaffoldJs()
                        "if(n=='sens')return 'Sensors read.';\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
-    web_client.println("function rmWBuild(p,d,o){var j,w,x,k,r,c,h;if(!d.w)return;r=rmNew('div','grid rmg rmw');p.appendChild(r);r.appendChild(rmNew('span','',d.l));c=d.w.length>1?r.appendChild(rmNew('div','rmg3')):r;\n"
-                       "for(j=0;j<d.w.length;j++){w=d.w[j];x=document.createElement('input');x.id='rm_f_'+d.c+'_'+w[0];x.type='text';x.autocomplete='off';x.setAttribute('aria-label',w[1]);if(d.w.length>1)x.placeholder=w[1];\n"
-                       "k=o&&o[w[4]||w[0]];x.value=rmIn[x.id]!==undefined?rmIn[x.id]:(k&&k!='-'?k:'');c.appendChild(x);rmWire(x,d);}");
-    web_client.println("rmBtn(r,'Set','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c}).id='rm_f_'+d.c+'_set';h=rmNew('div','font-small rmhl');r.appendChild(h);\n"
-                       "h.appendChild(rmNew('span','','','rm_f_'+d.c+'_hint'));if(/^(name|atxt)$/.test(d.w[0][2]))h.appendChild(rmNew('span','','','rm_f_'+d.c+'_cnt'));rmWUpd(d);}\n");
+    web_client.println("function rmWBuild(p,d,o){var j,w,x,k,r,n,b;if(!d.w)return;r=rmNew('div','grid rmf');p.appendChild(r);\n"
+                       "for(j=0;j<d.w.length;j++){w=d.w[j];n='rm_f_'+d.c+'_'+w[0];k=rmNew('label','',w[1]+' :');k.htmlFor=n;r.appendChild(k);x=rmNew('input','','',n);x.type='text';x.autocomplete='off';if(d.w.length>1)x.placeholder=w[1];\n"
+                       "k=o&&o[w[4]||w[0]];k=k&&k!='-'?k:'';x.setAttribute('data-r',k);x.value=rmIn[n]!==undefined?rmIn[n]:k;r.appendChild(x);rmWire(x,d);");
+    web_client.println("b=rmBtn(r,'','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c,'aria-label':'Set '+w[1]});b.id=n+'_set';b.appendChild(rmNew('i','btncheckmark'));r.appendChild(rmNew('div','font-small','',n+'_hint'));\n"
+                       "if(!d.p)r.appendChild(rmNew('div','font-small rmc','',n+'_cnt'));}rmWUpd(d);}\n");
     web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}\n"
                        "function rmCapOf(c){var a=rmStat?rmStat.targets:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c)return a[i].cap||0;return 0;}");
     web_client.println("var rmMh={on:0,job:'',args:'',fl:0,t:0,pre:'',rows:[],total:0,msg:'',det:null,gen:0,tm:0,ctr:-1};\nfunction rmUns(c,n,v){var a=rmStat?rmStat.sent:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd==n&&a[i].st=='err'&&a[i].reply=='err unsupported'&&(!v||a[i].ago<v.ago))return true;return false;}\n");
@@ -297,6 +303,7 @@ void rmScaffoldJs()
     web_client.println("d=t[1]=='d'?[rmMhL(o.g,'Gateway','',rmYn),rmMhL(o.m,'Mesh','',rmYn),rmMhL(o.r,'RSSI',' dBm'),rmMhL(o.s,'SNR',' dB'),rmMhL((o.la=='-'||o.lo=='-')?'-':o.la+', '+o.lo,'Position',''),rmMhL(o.di,'Distance',' km'),rmMhL(o.a,'Altitude',' m'),rmMhL(o.n,'Its neighbours',''),rmMhL(o.x,'Only it hears',''),rmMhL(o.h,'It hears',''),rmMhL(o.t,'Heard',' min ago')]:\n");
     web_client.println("[rmMhL(o.h,'Hops',''),rmMhL(o.k,'Routes',''),rmMhL(o.g,'Via gateway','',rmYn),'Relay: '+((o.rc===undefined||o.rc=='-')?'not known':o.rc),rmMhL(o.t,'Age',' min'),rmMhL(o.v,'Via','',function(v){return v.split(',').join(', ');})];\nrmMh.det={c:rmMh.args,l:d};return rmMhEnd('');}\nn=rmMh.rows.length;rmMh.total=parseInt(t[1],10)||0;for(i=3;i+1<t.length&&rmMh.rows.length<128;i+=2)rmMh.rows.push({c:t[i],m:t[i+1]});\n");
     web_client.println("if(rmMh.rows.length==n||!/^[0-9]+$/.test(t[2]||'-')||rmMh.rows.length>=128)return rmMhEnd('End of the list.');\nrmMh.args=t[2];rmMhStep();rmRender();}");
+    web_client.println("function rmCardHd(b,c,L,dis){var h=b.appendChild(rmNew('div','rmrow rmh')),j,v,y=null;h.appendChild(rmNew('span'));for(j=0;j<L.length;j++){v=rmLast(c,L[j]);if(v&&(!y||v.ago<y.ago))y=v;}\nh.appendChild(rmNew('span','font-small',y?'last read '+rmAgo(y.ago)+' ago':'not read yet'));rmBtn(h,'Read','',dis,{'data-act':'qread','data-q':L.join(' ')});}");
     web_client.println("function rmNew(t,c,x,i){var e=document.createElement(t);if(c)e.className=c;if(x)e.textContent=x;if(i)e.id=i;return e;}\nfunction rmMhCard(b,dis){var h=b.appendChild(rmNew('div','rmrow rmsplit')),s=rmNew('span'),w=b.appendChild(rmNew('div','grid rmg rmw')),x,tb,tr,i,r,k;h.appendChild(rmNew('b','','Heard list'));");
     web_client.println("h.appendChild(rmNew('span','font-small',(rmMh.total||rmMh.rows.length?'Read '+rmMh.rows.length+' of '+rmMh.total+'. ':'')+rmMh.msg,'rm_mh_prog'));h.appendChild(s);\n"
                        "rmBtn(s,'Read','',dis||rmMh.on,{'data-act':'mhgo'});rmBtn(s,'Stop','',!rmMh.on,{'data-act':'mhstop'});");
@@ -315,18 +322,17 @@ void rmScaffoldJs()
     web_client.println("function rmRenderCards(){var c=rmSel.call,cap=rmCapOf(c),dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"
                        "if(fa&&fa.tagName=='INPUT'&&/^rm_f_/.test(fa.id)){rmIn[fa.id]=fa.value;fid=fa.id;}\n"
                        "for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}");
-    web_client.println("if(cap<2)B.radio.appendChild(rmNew('p','font-small rmcapnote',rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.'));\n"
-                       "B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));");
-    web_client.println("h=B.queues.appendChild(rmNew('div','rmrow rmh'));h.appendChild(rmNew('span'));for(j=0,y=null;j<3;j++){v=rmLast(c,['txq','mbox','maxhop'][j]);if(v&&(!y||v.ago<y.ago))y=v;}\n"
-                       "h.appendChild(rmNew('span','font-small',y?'last read '+rmAgo(y.ago)+' ago':'not read yet'));rmBtn(h,'Read','',dis||cap<2||rmMh.on,{'data-act':'qread'});");
-    web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');p.appendChild(h);h.appendChild(rmNew('b','',d.l));\n");
+    web_client.println("if(cap<2)B.radio.appendChild(rmNew('p','font-small rmcapnote',rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.'));");
+    web_client.println("for(j=0;j<2;j++){rmCardHd(B[['ident','queues'][j]],c,[['name','atxt'],['txq','mbox','maxhop']][j],dis||cap<2||rmMh.on);if(!j)B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));}");
+    web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=d.card=='ident'?0:rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');if(h){p.appendChild(h);h.appendChild(rmNew('b','',d.l));}\n");
     web_client.println("v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
-                       "if(d.card!='queues'){h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
+                       "if(h&&d.card!='queues'){h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
                        "rmBtn(h,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});}");
     web_client.println("if(o&&d.v)d.v(p,o);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
                        "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
     web_client.println("rmWBuild(p,d,o);\n"
-                       "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}rmMhCard(B.mh,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
+                       "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}\n"
+                       "y=B.pos.appendChild(rmNew('div','grid rmf'));z=rmKn();rmSwRow(y,'gps',z.sw[0],dis,'enable GPS');rmSwRow(y,'track',z.sw[1],dis,'enable display of SmartBeaconing');rmMhCard(B.mh,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"
 "function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;\n");
     web_client.println("b=rmEl('rm_log');b.textContent='';for(i=0;i<j.log.length;i++){r=j.log[i];tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}\n");
@@ -373,7 +379,7 @@ void rmScaffoldJs()
                        "i.value='';rmNodesPost('act=save&slot='+s+'&call='+rmEnc(c)+'&pw='+rmEnc(pw),c+' is saved.');pw='';}\n"
                        "function rmForget(){if(rmSel.slot<0)return;rmNodesPost('act=del&slot='+rmSel.slot,rmSel.call+' is forgotten.');}");
     web_client.println("function rmForgetAll(){if(!rmConfirm('forgetall','Tap Forget all again within 4 seconds to remove every saved node.'))return;rmNodesPost('act=forget','All saved nodes are forgotten.');}");
-    web_client.println("function rmQRead(){var pr=rmPre();if(rmLocked()||rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value):'';rmQq=['mbox','maxhop'];rmSendCmd('txq','');}");
+    web_client.println("function rmQRead(b){var pr=rmPre(),a=b.getAttribute('data-q').split(' '),i;if(rmLocked()||rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}for(i=0;i<a.length;i++)rmClrIn(a[i]);rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value):'';rmQq=a.slice(1);rmSendCmd(a[0],'');}");
     web_client.println("function rmSwChg(i){var n=i.getAttribute('data-sw'),v=i.checked?'on':'off',cf=v=='off'?(i.getAttribute('data-cf')||''):'',pr=rmPre(),pin=n=='pin',c=pin?'setout':n,a=pin?rmEl('rm_pin').value+' '+v:v;");
     web_client.println("if(rmLocked()||pr){if(pr&&!rmLocked())rmMsg(pr,'rmbad');rmRender();return;}\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel(c+' '+a),rmSel.call)))return;\n"
@@ -387,7 +393,7 @@ void rmScaffoldJs()
                                               "else if(a=='sync')rmSendCmd('sync','');\n"
                                               "else if(a=='again')rmAgain(b);\n"
                        "else if(a=='force'&&rmForce&&rmForce.d==rmSel.call)rmSendCmd(rmForce.c,rmForce.a,rmForce.d,rmForce.s,true);\n");
-    web_client.println("else if(a=='qread')rmQRead();\n"
+    web_client.println("else if(a=='qread')rmQRead(b);\n"
                        "else if(a=='remember')rmRemember();\n"
                        "else if(a=='forget')rmForget();");
     web_client.println("else if(a=='forgetall')rmForgetAll();\n"
