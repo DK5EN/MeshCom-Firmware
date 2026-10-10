@@ -249,8 +249,9 @@ static void test_prioritaets_klassifizierung(void)
 
 // -------------------------------------------- Test 2b: addTxRingEntryOnce()
 //
-// P15: SendAckMessage()/sendPing()/SendPong() und der
-// {ping}-Zweig von sendMessage() wollten alle dasselbe -- Status DONE speichern (keine
+// P15: SendAckMessage()/sendPing()/SendPong() und die Einmal-Texte von
+// sendMessage() ({ping}, {CET}/{SET}/{MCP}, RM1 -- dmTextSendOnce()) wollten
+// alle dasselbe -- Status DONE speichern (keine
 // Wiederholung), aber als eigene DM/Gruppen-/Broadcast-Nachricht
 // klassifizieren, nicht als Relay (die TEXT-Falle: ein VORAB auf DONE
 // gesetzter Status stuft getMessagePriority() als "Relay" ein, siehe Test
@@ -309,6 +310,35 @@ static void test_add_tx_ring_entry_mit_done_klassifiziert_weiter_als_relay(void)
     BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo");
 
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "t2b_plain");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);
+}
+
+// RCA 2026-10-10: ein RM1-Frame (DM) geht genau einmal raus und muss dabei
+// als eigene DM (CRITICAL) klassifiziert werden, nicht als Relay. Der Weg
+// dafuer ist addTxRingEntryOnce(), wie ihn sendMessage() ueber
+// dmTextSendOnce() jetzt fuer alle Einmal-Texte nimmt.
+static void test_rm1_dm_once_wird_critical_und_done(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-92", "RM1 17 ok p=2/22 0123456789abcdef");
+
+    int slot = addTxRingEntryOnce(f.bytes, f.len, "user_msg");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+}
+
+// Falle pinnen (Vorher-Verhalten von sendMessage()): derselbe RM1-Frame mit
+// VORAB gesetztem Status DONE gilt als Relay (NORMAL, 4500 ms Backoff) und
+// kollidiert mit den Relays der Nachbarn. Spiegel von "t2b_plain" oben.
+static void test_rm1_dm_mit_status_done_vorab_ist_relay_klasse(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-92", "RM1 17 ok p=2/22 0123456789abcdef");
+
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "user_msg", 0);
 
     TEST_ASSERT_TRUE(slot >= 0);
     TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
@@ -1529,6 +1559,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_add_tx_ring_entry_once_broadcast_wird_high_und_done);
     RUN_TEST(test_add_tx_ring_entry_mit_done_klassifiziert_weiter_als_relay);
     RUN_TEST(test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done);
+    RUN_TEST(test_rm1_dm_once_wird_critical_und_done);
+    RUN_TEST(test_rm1_dm_mit_status_done_vorab_ist_relay_klasse);
     RUN_TEST(test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden);
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);

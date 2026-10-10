@@ -54,11 +54,16 @@ inline bool dmTextIsRm1Frame(const char *text)
     return text != NULL && strncmp(text, "RM1 ", 4) == 0;
 }
 
-// One place for "this DM is never retransmitted" (sendMessage(): ring status
-// 0xFF): {CET}/{MCP}/{SET} (time/remote-control/hop tags, not free text) and
-// RM1 frames. Unchanged: {ping} has its own path (bUseOnce). The {NNN suffix
+// One place for "this text is never retransmitted": {CET}/{MCP}/{SET}
+// (time/remote-control/hop tags, not free text) and RM1 frames. {mcp} is the
+// wire form of {MCP}: sendMessage() rewrites a typed {MCP}/{mcp} after a
+// {DEST} into "{mcp}<id>" before the tag check, so both spellings count; no
+// other lowercase variant does. {ping} is handled by dmTextSendOnce(). Both go
+// out via the Once path of the TX ring (see dmTextSendOnce()). A {CET} DM never
+// matches: dmTextEscapeFrom() knows only {ping}/{SET}, so sendMessage() turns
+// it into "(CET}..." first; {CET} counts to a group or "*". The {NNN suffix
 // is a separate decision: only RM1 drops it (dmTextIsRm1Frame), {CET}/{SET}
-// keep it as before, {MCP} is never a DM.
+// keep it as before.
 // isDM: the RM1 exception applies to direct messages only; a group text that
 // happens to start with "RM1 " is retransmitted like any other group text.
 inline bool dmTextNoRetransmit(const char *text, bool isDM)
@@ -68,8 +73,23 @@ inline bool dmTextNoRetransmit(const char *text, bool isDM)
 
     return strncmp(text, "{CET}", 5) == 0 ||
            strncmp(text, "{MCP}", 5) == 0 ||
+           strncmp(text, "{mcp}", 5) == 0 ||
            strncmp(text, "{SET}", 5) == 0 ||
            (isDM && dmTextIsRm1Frame(text));
+}
+
+// RCA 2026-10-10: every own text message that goes on air exactly once must
+// be enqueued via addTxRingEntryOnce() (classified READY -> own DM/group
+// priority, stored DONE -> no retry). Passing status 0xFF to addTxRingEntry()
+// instead makes getMessagePriority() read the slot as a relay (NORMAL,
+// base 4500 ms): an RM1 reply then shares the back-off window of every
+// neighbour relaying the request and collides with it (4 of 9 lost on the
+// bench). Covers {ping}, {CET}/{MCP}/{SET} and RM1 frames (dmTextNoRetransmit).
+inline bool dmTextSendOnce(const char *payload, bool isDM)
+{
+    if(payload == NULL)
+        return false;
+    return strncmp(payload, "{ping}", 6) == 0 || dmTextNoRetransmit(payload, isDM);
 }
 
 #endif // _DM_TEXT_ESCAPE_H_

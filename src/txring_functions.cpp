@@ -900,8 +900,9 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
 
 /**
  * P15: eigene Nachricht (DM/Gruppe/Broadcast), die nie wiederholt werden
- * soll -- SendAckMessage()/sendPing()/SendPong() und der
- * {ping}-Zweig von sendMessage() wollten bisher alle dasselbe: mit Status
+ * soll -- SendAckMessage()/sendPing()/SendPong() und
+ * die Einmal-Texte von sendMessage() ({ping}, {CET}/{SET}/{MCP}, RM1;
+ * dmTextSendOnce(), seit der RCA 2026-10-10) wollten bisher alle dasselbe: mit Status
  * DONE (0xFF, "keine Wiederholung") einreihen, aber trotzdem als eigene
  * DM/Gruppen-/Broadcast-Nachricht eingestuft werden, nicht als Relay (siehe
  * getMessagePriority(): eine TEXT-Nachricht mit Status DONE gilt dort als

@@ -4298,8 +4298,8 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
 
     // P15: ein {ping} wird nie wiederholt -- die Gegenstelle antwortet mit
     // {pong}, nie mit ACK, also stoppte nichts die Wiederholung. Hier benannt
-    // (strMsg ist schon ohne {ZIEL}-Teil) und an jeder Stelle wiederverwendet,
-    // die ein {ping} anders behandelt: dmstat_sent, bUseOnce.
+    // (strMsg ist schon ohne {ZIEL}-Teil); sperrt dmstat_sent. Das Einreihen
+    // ueber addTxRingEntryOnce() entscheidet dmTextSendOnce() weiter unten.
     const bool bPingMsg = strMsg.startsWith("{ping}");
 
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
@@ -4404,32 +4404,26 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         Serial.printf("[RING] full, depth %d of %d\n", txRingDepth(), (int)MAX_RING - 1);
     }
     // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
-    // Slot wird erst in addTxRingEntry() unter Lock gewaehlt/beschrieben.
-    uint8_t user_msg_status = 0xFF;
-    // P14/P15: {ping} wird nie wiederholt -- die Gegenstelle antwortet mit
-    // {pong}, nie mit ACK, also stoppte nichts die Wiederholung (ein Ping aus
-    // App/McApp ging dreimal in die Luft). Frueher wurde dafuer NACH dem
-    // Einreihen der Slot per Hand auf DONE nachgetragen (wie einst in
-    // SendAckMessage()): getMessagePriority() liest den Status IN
-    // addTxRingEntry() und stufte eine vorab auf DONE gesetzte DM als Relay
-    // (NORMAL) statt als persoenliche DM (CRITICAL) ein -- ein Nachtrag nach
-    // dem Aufruf war der einzige Ausweg, aber ausserhalb des Locks (siehe
-    // addTxRingEntryOnce()-Doku in txring_functions.cpp). bUseOnce waehlt
-    // stattdessen addTxRingEntryOnce() weiter unten: klassifiziert READY,
-    // speichert DONE, beides atomar.
+    // Slot wird erst im Einreihen unter Lock gewaehlt/beschrieben.
+    uint8_t user_msg_status = 0x00;
+    // RCA 2026-10-10: Texte, die genau einmal in die Luft gehen ({ping},
+    // {CET}/{MCP}/{SET}, RM1; dmTextSendOnce() in dm_text_escape.h), laufen
+    // ueber addTxRingEntryOnce(): klassifiziert READY (eigene DM/Gruppe),
+    // gespeichert DONE (keine Wiederholung), beides atomar. Ein VORAB auf DONE
+    // (0xFF) gesetzter Text gilt in getMessagePriority() als Relay (NORMAL,
+    // 4500 ms) und kollidiert mit den Relays der Nachbarn; Hintergrund siehe
+    // addTxRingEntryOnce()-Doku in txring_functions.cpp.
     bool bUseOnce = false;
     if (msg_buffer[0] == 0x3A) // only Messages
     {
-        if(dmTextNoRetransmit(aprsmsg.msg_payload, bDM))
-            user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co. and RM1 (dm_text_escape.h)
-        else if(bPingMsg)
-            bUseOnce = true; // P14/P15: siehe oben
+        if(dmTextSendOnce(aprsmsg.msg_payload, bDM))
+            bUseOnce = true;
         else
-            user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
+            user_msg_status = 0x00; // retransmission active
     }
     else
     {
-        user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission
+        user_msg_status = 0xFF; // non-text frames: no retransmission (unchanged)
     }
 
     int w = bUseOnce ? addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "user_msg", 0)

@@ -140,6 +140,38 @@ static void test_no_retransmit_class_keeps_cet_mcp_set(void)
     TEST_ASSERT_FALSE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef", false));
 }
 
+// {mcp} ist die Draht-Form: sendMessage() schreibt ein getipptes {MCP}/{mcp}
+// nach {ZIEL} in "{mcp}<id>" um, bevor der Tag-Check laeuft. {mcp} ist die
+// einzige kleingeschriebene Ausnahme ({cet}/{set} bleiben unerkannt).
+static void test_mcp_lowercase_wire_form_is_no_retransmit(void)
+{
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{mcp}0a1b2c", false));
+    TEST_ASSERT_TRUE(dmTextNoRetransmit("{mcp}0a1b2c", true));
+}
+
+static void test_send_once_covers_ping_tags_and_rm1(void)
+{
+    const char *tags[] = {"{ping}", "{CET}2026-10-06 12:00:00", "{SET}4;2;", "{MCP}0123", "{mcp}0a1b2c"};
+    for(size_t i = 0; i < sizeof(tags) / sizeof(tags[0]); i++)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(dmTextSendOnce(tags[i], true), tags[i]);
+        TEST_ASSERT_TRUE_MESSAGE(dmTextSendOnce(tags[i], false), tags[i]);
+    }
+    TEST_ASSERT_TRUE(dmTextSendOnce("RM1 17 status 0123456789abcdef", true));
+}
+
+static void test_send_once_excludes_retry_texts(void)
+{
+    // {cet}x: {mcp} ist die einzige kleingeschriebene Ausnahme.
+    TEST_ASSERT_FALSE(dmTextSendOnce("Hallo Welt", true));
+    TEST_ASSERT_FALSE(dmTextSendOnce("{cet}x", true));
+    TEST_ASSERT_FALSE(dmTextSendOnce("{pingx", true));
+    // Gruppentext mit fuehrendem "RM1 " wird wiederholt.
+    TEST_ASSERT_FALSE(dmTextSendOnce("RM1 test", false));
+    TEST_ASSERT_FALSE(dmTextSendOnce(NULL, true));
+    TEST_ASSERT_FALSE(dmTextSendOnce(NULL, false));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -158,5 +190,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_rm1_frame_is_no_ack_no_retry);
     RUN_TEST(test_rm1_prefix_is_exact);
     RUN_TEST(test_no_retransmit_class_keeps_cet_mcp_set);
+    RUN_TEST(test_mcp_lowercase_wire_form_is_no_retransmit);
+    RUN_TEST(test_send_once_covers_ping_tags_and_rm1);
+    RUN_TEST(test_send_once_excludes_retry_texts);
     return UNITY_END();
 }
