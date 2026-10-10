@@ -15,7 +15,7 @@
  *  - tools/webgui_rm_test.js extracts the literals below and runs them in jsdom: keep the print/println
  *    string-literal form (adjacent literals are concatenated, only \\ \" \n escapes are used); the printf
  *    arguments must be (unsigned)RM_NAME_MAX / RM_ATXT_MAX, the harness resolves them from the headers.
- *  - Ids are unique per page: read-only values use rm_v_<card>_<key>, inputs and their Set/cnt/hint/note use
+ *  - Ids are unique per page: read-only values use rm_v_<card>_<key>, inputs and their Set/cnt/hint use
  *    rm_f_<card>_<key>. rmWUpd, rmWire, rmClrIn and rmIn look up rm_f_ only; a shared id makes rmEl() return
  *    the read-only <div> instead of the input (D5, docs/rm-gui/ux-tidy-plan-20261010.md 3.2).
  *  - The JS carries no comments (they would cost bytes on every page load) and no preprocessor lines.
@@ -49,7 +49,7 @@ void sub_page_remote()
                        ".rmtile-end{grid-column:3;}\n"
                        ".rmwarn{background:var(--mclightred);}");
     web_client.println(".rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}\n"
-                       ".rmg .rmsw{justify-self:start;}\n"
+                       ".rmg .rmsw{justify-self:start;margin:0;}\n"
                        ".rmg input[type=text]{width:100%;box-sizing:border-box;}\n"
                        ".rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}\n"
                        ".rmhl{grid-column:2/4;display:flex;justify-content:space-between;}");
