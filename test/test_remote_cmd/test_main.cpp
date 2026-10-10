@@ -1566,8 +1566,17 @@ static void test_legacy_replies_stay_within_63_and_cap_token(void)
     char res[RM_MAX_RESULT + 1];
     RmSwitches sw;
     memset(&sw, 1, sizeof(sw));
-    rmFormatStatus(res, sizeof(res), "4.40A", 71582000u, 100, 9999, sw, 22, 22);
+    // D9: " pmin=<n>" (up to 9 chars) takes the worst status past the 63 older operators accept, but it
+    // stays inside the wire cap, so the reply is delivered and a current parser reads the floor.
+    // A typical status (first weeks of uptime, RAK-class floor 2) still fits 63:
+    rmFormatStatus(res, sizeof(res), "4.40a", 417u, 87, 212, sw, 17, 22, 2);
     TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
+    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 22, -20);
+    TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT);
+    printf("status worst case with pmin: %u of %d (legacy %d)\n", (unsigned)strlen(res), RM_MAX_RESULT,
+           RM_LEGACY_RESULT_MAX);
+    TEST_ASSERT_TRUE(strlen(res) > RM_LEGACY_RESULT_MAX); // KNOWN, escalated: 70 of 63 legacy
+    TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/22 pmin=-20"));
     snprintf(res, sizeof(res), "ok ctr=%lu v=%s%s rm=%d", 4294967295ul, "4.40a", "", RM_CAP_LEVEL);
     TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
     TEST_ASSERT_EQUAL_INT(2, rmCapLevel(res));

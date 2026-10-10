@@ -188,8 +188,9 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 
     if (strcmp(cmd, "status") == 0)
     {
-        // s=<letters> p=<cur>/<max> replace gw= and mesh=; led= stays as the capability flag of older
-        // consumers. Worst case 61 of 63 characters, see rm_sender_policy.h and its native test.
+        // s=<letters> p=<cur>/<max> pmin=<min> replace gw= and mesh=; led= stays as the capability flag of
+        // older consumers. Worst case 70 of the 108 wire characters (61 without pmin=), see
+        // rm_sender_policy.h and its native test.
         char ver[12];
         snprintf(ver, sizeof(ver), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
         RmSwitches sw = {};
@@ -203,7 +204,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         sw.led = bRemoteLed;
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
-                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX);
+                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX, (int)TX_POWER_MIN);
         return true;
     }
 

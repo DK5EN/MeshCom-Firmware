@@ -424,7 +424,7 @@ sender), so the same pair of calls appears in the same order. `node_passwd` is a
 | Command                                      | Arguments                     | Reply status text                                                          |
 | -------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
 | `reboot`                                     | none                          | `rebooting` (the node restarts 8 s after the reply)                        |
-| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max> [led=<0/1>]` |
+| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max> pmin=<min> [led=<0/1>]` |
 | `sendpos`, `sendtrack`                       | none                          | `sent`                                                                     |
 | `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                 | `<name>=<on/off>`                                                          |
 | `led`                                        | `on` or `off`                 | `led=<on/off>`; `err unsupported` on a board without a usable LED pin      |
@@ -441,7 +441,7 @@ high-water mark could not be persisted, the command was **not** executed).
 `status` since the Remote page (RM GUI W1b): `s=` carries six switches as letters in the fixed order
 `G T D M W L` = gps, track, display, mesh, gateway, led; upper case = on, lower case = off. `L` and
 `led=` are omitted on a board without an LED (`led=` stays the capability flag). `p=<cur>/<max>` is the
-TX power and the board maximum. Worst case 61 of the 63 character reply limit. The older form
+TX power and the board maximum; `pmin=<min>` (own token) is the board minimum, 0 when absent. Worst case 70 of the 108 wire characters; past the 63 that operators before pmin accept (they reject the status of an updated target). The older form
 `... gw=<0/1> mesh=<0/1> [led=<0/1>]` is still accepted by `rmStatusParse()` (and must be by any UI).
 
 #### 1.9.4 Examples

@@ -430,7 +430,8 @@ inline const char *rmEntryMessage(RmEntryState s, const char *reply)
 // ---- compact status token ----------------------------------------------------------------------------
 // Fixed order, one letter per switch: upper case = on, lower case = off.
 //   G gps   T track   D display   M mesh   W gateway   L led (omitted on boards without an LED)
-// plus p=<cur>/<max> for the TX power in dBm. Example: "s=GtDMwL p=17/22".
+// plus p=<cur>/<max> for the TX power in dBm and pmin=<min> for the lowest value the board accepts (a
+// separate token, so older parsers that match p=<cur>/<max> keep working). Example: "s=GtDMwL p=17/22 pmin=2".
 #define RM_STATUS_SWITCHES 6u
 
 struct RmSwitches
@@ -446,6 +447,7 @@ struct RmStatusInfo
     bool ledSupported;          // led letter or led= present
     bool haveP;
     int cur, max;
+    int min;                    // pmin= (TX power floor, dBm); 0 when the target does not send it
 };
 
 // "s=GtDMwL" into out. Returns the length, 0 if it does not fit.
@@ -472,21 +474,24 @@ inline int rmClampDbm(int v)
 }
 
 // The whole `status` result (without the "RM1 <ctr> " frame and tag):
-//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>[ led=<0/1>]
+//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max> pmin=<min>[ led=<0/1>]
 // led= stays as the capability flag of older consumers (present only on boards with an LED). The old
 // gw= and mesh= fields are gone: gateway and mesh are the W and M letters. Fields are ordered by
 // value, so an (impossible) overflow would cut the redundant led= first. Returns the length written
 // (always NUL-terminated; truncated, never overrun, when it does not fit n).
+// Longest form: " pmin=-99" is 9 characters; with floor -20 the worst status is 70 characters (wire cap
+// RM_MAX_RESULT 108, but past the 63 older operators accept, see test_rm_sender_policy).
 inline size_t rmFormatStatus(char *out, size_t n, const char *ver, uint32_t upMin, int bat, uint32_t heapKb,
-                             const RmSwitches &sw, int txCur, int txMax)
+                             const RmSwitches &sw, int txCur, int txMax, int txMin)
 {
     if (out == nullptr || n == 0)
         return 0;
     char tok[RM_STATUS_SWITCHES + 3];
     if (rmStatusToken(tok, sizeof(tok), sw) == 0)
         tok[0] = '\0';
-    int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d", ver != nullptr ? ver : "?",
-                     (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMax));
+    int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d pmin=%d", ver != nullptr ? ver : "?",
+                     (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMax),
+                     rmClampDbm(txMin));
     size_t len = w < 0 ? 0 : ((size_t)w >= n ? n - 1 : (size_t)w);
     if (sw.ledSupported && len < n - 1)
     {
@@ -545,6 +550,12 @@ inline bool rmStatusParse(const char *res, RmStatusInfo &o)
                 o.cur = cur;
                 o.max = mx;
             }
+        }
+        else if (l >= 6 && strncmp(t, "pmin=", 5) == 0)
+        {
+            int mn = 0, cn = 0;
+            if (sscanf(t, "pmin=%d%n", &mn, &cn) == 1 && (size_t)cn == l)
+                o.min = mn;
         }
         else if (l == 5 && strncmp(t, "led=", 4) == 0 && (t[4] == '0' || t[4] == '1'))
         {

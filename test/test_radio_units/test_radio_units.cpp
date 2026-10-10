@@ -13,6 +13,8 @@
 
 #include <radio_units.h>
 #include <rm_radio_in.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -222,18 +224,56 @@ static void test_rm_radio_reply_same_text_on_both_platforms(void)
 {
     char esp[RM_FMT_BODY_MAX + 1], nrf[RM_FMT_BODY_MAX + 1];
     // ESP32: MHz, kHz, 4/N denominator
-    TEST_ASSERT_TRUE(rmFmtRadio(esp, sizeof(esp), rmRadioInFromStored(433.175f, 11, 6, 250.0f, 2, 22, false)) > 0);
+    RmRadioIn ein = rmRadioInFromStored(433.175f, 11, 6, 250.0f, 2, 22, false);
+    ein.pMin = 2; // RAK4631 / Wireless Paper floor
+    TEST_ASSERT_TRUE(rmFmtRadio(esp, sizeof(esp), ein) > 0);
     // nRF52: Hz, bandwidth index 1, coding-rate index 2 -- the same radio
-    TEST_ASSERT_TRUE(rmFmtRadio(nrf, sizeof(nrf), rmRadioInFromStored(433175000.0f, 11, 2, 1.0f, 2, 22, true)) > 0);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", esp);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", nrf);
+    RmRadioIn nin = rmRadioInFromStored(433175000.0f, 11, 2, 1.0f, 2, 22, true);
+    nin.pMin = 2;
+    TEST_ASSERT_TRUE(rmFmtRadio(nrf, sizeof(nrf), nin) > 0);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22 pmin=2", esp);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22 pmin=2", nrf);
 }
 
 static void test_rm_radio_reply_nrf52_other_values(void)
 {
     char b[RM_FMT_BODY_MAX + 1];
-    TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), rmRadioInFromStored(869525000.0f, 12, 4, 0.0f, 14, 22, true)) > 0);
-    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=12 cr=8 bw=125 p=14/22", b);
+    RmRadioIn in = rmRadioInFromStored(869525000.0f, 12, 4, 0.0f, 14, 22, true);
+    in.pMin = -9; // default board floor
+    TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), in) > 0);
+    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=12 cr=8 bw=125 p=14/22 pmin=-9", b);
+}
+
+// D9: the floor is its own space-separated token after p=<cur>/<max>, never a third '/' field, and the
+// reply with the longest floor (-20, the settings-schema default) still fits the body budget.
+static void test_rm_radio_reply_pmin_token_and_worst_case(void)
+{
+    char b[RM_FMT_BODY_MAX + 1];
+    RmRadioIn in = rmRadioInFromStored(433.175f, 11, 5, 250.0f, 10, 22, false);
+    in.pMin = -20;
+    TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), in) > 0);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=-20", b);
+    TEST_ASSERT_NOT_NULL(strstr(b, " p=10/22 pmin=-20"));
+    TEST_ASSERT_NULL(strstr(b, "22/"));
+    // largest of every field, floor -20 and the clamp floor -99
+    RmRadioIn w = rmRadioInFromStored(999.999f, 99, 99, 999.99f, -99, -99, false);
+    w.pMin = -20;
+    size_t n = rmFmtRadio(b, sizeof(b), w);
+    TEST_ASSERT_EQUAL_STRING("f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99 pmin=-20", b);
+    TEST_ASSERT_EQUAL_UINT(strlen(b), n);
+    TEST_ASSERT_TRUE(n <= RM_FMT_BODY_MAX);
+    w.pMin = -99;
+    n = rmFmtRadio(b, sizeof(b), w);
+    TEST_ASSERT_EQUAL_STRING("f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99 pmin=-99", b);
+    TEST_ASSERT_TRUE(n <= RM_FMT_BODY_MAX);
+    printf("radio worst case: %u of %d\n", (unsigned)n, RM_FMT_BODY_MAX);
+    // absurd floor clamps to the documented -99..99 domain
+    w.pMin = INT32_MIN;
+    rmFmtRadio(b, sizeof(b), w);
+    TEST_ASSERT_NOT_NULL(strstr(b, " pmin=-99"));
+    w.pMin = INT32_MAX;
+    rmFmtRadio(b, sizeof(b), w);
+    TEST_ASSERT_NOT_NULL(strstr(b, " pmin=99"));
 }
 
 int main(int, char **)
@@ -260,6 +300,7 @@ int main(int, char **)
 
     RUN_TEST(test_rm_radio_reply_same_text_on_both_platforms);
     RUN_TEST(test_rm_radio_reply_nrf52_other_values);
+    RUN_TEST(test_rm_radio_reply_pmin_token_and_worst_case);
 
     return UNITY_END();
 }

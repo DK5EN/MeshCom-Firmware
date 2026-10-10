@@ -26,12 +26,15 @@
 //
 //  cmd     reply body                                                   keys
 //  ------  -----------------------------------------------------------  -------------------------------
-//  radio   f=433.175 sf=11 cr=5 bw=250 p=10/22                          f frequency MHz, 3 decimals,
+//  radio   f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=2                   f frequency MHz, 3 decimals,
 //                                                                       rounded; sf spreading factor;
 //                                                                       cr coding rate denominator (5 =
 //                                                                       4/5); bw kHz, no trailing zeros
 //                                                                       (250, 62.5, 31.25); p current/max
-//                                                                       TX power dBm. Never absent.
+//                                                                       TX power dBm; pmin lowest TX power
+//                                                                       dBm the board accepts (its own
+//                                                                       space-separated token, never a
+//                                                                       third / field of p). Never absent.
 //  name    n=Martin                                                     n node name, last field, as is;
 //                                                                       `n=-` when empty. Max 19 chars.
 //  atxt    a=MeshCom Garten                                             a APRS comment, last field, as
@@ -288,6 +291,7 @@ struct RmRadioIn
     float bwKHz;   // clamped 0..999.99
     int pCur;      // dBm, clamped -99..99
     int pMax;      // dBm, clamped -99..99
+    int pMin = 0;  // dBm, clamped -99..99; TX_POWER_MIN of the board (last member: brace initialisers stay valid)
 };
 
 inline size_t rmFmtRadio(char *out, size_t n, const RmRadioIn &in)
@@ -320,6 +324,8 @@ inline size_t rmFmtRadio(char *out, size_t n, const RmRadioIn &in)
     rmfI(b, in.pCur, -99, 99);
     rmfCh(b, '/');
     rmfI(b, in.pMax, -99, 99);
+    rmfStr(b, " pmin=");
+    rmfI(b, in.pMin, -99, 99);
     return rmfEmit(out, n, b);
 }
 

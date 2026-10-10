@@ -372,7 +372,7 @@ _VECTOR_REPLIES = [
 
 def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     """Fields the firmware's rmStatusParse() must produce (from the format itself)."""
-    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)( led=[01])?$", result)
+    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)( pmin=-?\d+)?( led=[01])?$", result)
     if not result.startswith("ok v=") or m is None:
         return None
     letters = m.group(1)
@@ -380,7 +380,7 @@ def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     # flat scalars (the native test's JSON reader has no nesting); sw: gps,track,display,mesh,gateway,led
     return {"status_sw": ",".join(("-" if v < 0 else str(v)) for v in sw),
             "status_p": "%s/%s" % (m.group(2), m.group(3)),
-            "status_led": len(letters) == 6 or m.group(4) is not None}
+            "status_led": len(letters) == 6 or m.group(5) is not None}
 
 
 def generate_vectors() -> Dict[str, Any]:
