@@ -99,6 +99,8 @@ WebGuardVerdict webGuardCheck(const char *header, size_t len, const char *path /
 
 ### C4 web page (W2a handlers, W2b page and JS)
 
+Layout and the TX power range (`pmin=` token) were reworked on 2026-10-10: see `docs/rm-gui/ux-tidy-plan-20261010.md`.
+
 Same-origin only; every state-changing request is a POST body (never a URL), never echoed, buffers
 wiped with `rm_wipe`. Responses are JSON written with `rm_json_str`, each `print` at most 512 bytes
 (RAK: one write is capped at 2048 B, nRF52 `printf` leaks the stack above 256 B).

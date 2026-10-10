@@ -1,5 +1,8 @@
 # verdict-ux: usability against the user requirement (verifier, cluster UX)
 
+> Layout rules for the Remote page (row grid, cards, counter tiles, queue bars, TX power range) are amended by
+> `docs/rm-gui/ux-tidy-plan-20261010.md`; where the two disagree, that file wins.
+
 Code read now: src/remote_cmd.cpp (allowed 130-157, reject 185-201, rmCheck 354-407, rmAccept 410-432),
 src/remote_cmd.h:40-45, src/rm_runtime.cpp (whole file), src/lora_functions.cpp:227-256 + 554,
 src/loop_functions_extern.h:30-42, src/configuration_default.h:109-110, variants/*/configuration.h,
