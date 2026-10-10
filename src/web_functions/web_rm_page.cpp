@@ -32,10 +32,16 @@ void sub_page_remote()
     web_client.println("<div id=\"content_inner\">\n"
                        "<style>\n"
                        ".rmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:7px 0;}\n"
-                       ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}\n"
-                       ".rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
+                       ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}");
+    web_client.println(".rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
                        ".rmchip{flex-direction:column;align-items:flex-start;min-width:7em;text-align:left;}\n"
-                       ".rmchip.rmsel{background:var(--mclightblue);}");
+                       "#content_inner .rmchip{border:solid 2px transparent;}\n"
+                       "#content_inner .rmchip.rmsaved,#content_inner .rmchip.rmsaved:hover{background:var(--mclightgreen);}");
+    // The tile colour is the key state, the border is the selection; rules carry #content_inner to beat the shared button rule.
+    web_client.println("#content_inner .rmchip.rmstale{opacity:.6;}\n"
+                       "#content_inner .rmchip.rmsel{border-color:var(--mcgray);}\n"
+                       ".rmlk{width:1em;height:1em;vertical-align:-.15em;fill:currentColor;}\n"
+                       ".rmsplit{justify-content:space-between;}");
     web_client.println(".rmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5em,1fr));gap:8px;margin:7px 0;}\n"
                        ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
                        ".rmwarn{background:var(--mclightred);}\n"
@@ -79,17 +85,17 @@ void sub_page_remote()
                        "<span>Pick the node to manage.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
                        "<div>");
-    web_client.println("<p class=\"font-small\">Nodes heard directly in the last 3 hours. Remote management may be switched off on any of them.</p>\n"
-                       "<div id=\"rm_heard\" class=\"rmchips\"></div>\n"
-                       "<p class=\"font-small\"><button type=\"button\" data-act=\"heard\">Refresh list</button></p>\n"
-                       "<p class=\"font-small\">Saved on this node</p>\n"
-                       "<div id=\"rm_saved\" class=\"rmchips\"></div>");
+    // One sprite for the padlock (closed = key missing, open = key saved), referenced by every tile.
+    web_client.println("<svg id=\"rm_sprite\" width=\"0\" height=\"0\" style=\"position:absolute\" aria-hidden=\"true\"><symbol id=\"rmlk-c\" viewBox=\"0 0 12 12\"><path d=\"M2 5h8v6H2zM3 5V4a3 3 0 016 0v1H8V4a2 2 0 00-4 0v1z\"/></symbol>"
+                       "<symbol id=\"rmlk-o\" viewBox=\"0 0 12 12\"><path d=\"M2 5h8v6H2zM3 4V3a3 3 0 016 0v1H8V3a2 2 0 00-4 0v1z\"/></symbol></svg>");
+    web_client.println("<p class=\"font-small\">Nodes heard directly in the last 3 hours and nodes with a saved key. Remote management may be switched off on any of them.</p>\n"
+                       "<div id=\"rm_nodes\" class=\"rmchips\"></div>\n"
+                       "<div class=\"rmrow rmsplit\"><button type=\"button\" data-act=\"heard\">Refresh list</button><button type=\"button\" id=\"rm_forgetall\" data-act=\"forgetall\">Forget all</button></div>");
     web_client.println("<div class=\"rmrow\"><input type=\"text\" id=\"rm_call\" maxlength=\"9\" autocomplete=\"off\" autocapitalize=\"characters\" placeholder=\"Call sign, for example DK5EN-12\" aria-label=\"Call sign of the node\"></div>\n"
                        "<p id=\"rm_callchk\" class=\"font-small\"></p>");
     web_client.println("<div id=\"rm_pwrow\" class=\"rmrow\"><input type=\"password\" id=\"rm_pw\" maxlength=\"14\" autocomplete=\"new-password\" placeholder=\"Password of that node\" aria-label=\"Password of the node\"><button type=\"button\" data-act=\"remember\">Remember</button></div>\n"
                        "<p id=\"rm_savednote\" class=\"font-small\"></p>");
-    web_client.println("<div class=\"rmrow\"><button type=\"button\" id=\"rm_forget\" data-act=\"forget\">Forget this node</button><button type=\"button\" id=\"rm_forgetall\" data-act=\"forgetall\">Forget all</button></div>\n"
-                       "</div></div>\n");
+    web_client.println("</div></div>\n");
     web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Messages</label>\n"
                        "<span>Commands sent from this page.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
@@ -197,21 +203,23 @@ void rmScaffoldJs()
     web_client.println("rmBtn(r,'-','',rmTx.val<=0,{'data-act':'txdn'}).id='rm_rtxdn';x=document.createElement('b');x.id='rm_rtxval';x.textContent=rmTx.val+' dBm';r.appendChild(x);rmBtn(r,'+','',rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';");
     web_client.println("rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis,{'data-act':'txapply'}).id='rm_rtxapply';p.appendChild(r);\n"
                        "x=document.createElement('div');x.id='rm_rtxnote';x.className='font-small';x.textContent=k.max!==null&&k.max>0?'':'The node has not reported its limit yet, so the highest value is 15 dBm.';p.appendChild(x);}");
-    web_client.println("function rmChip(box,call,l2,l3,cls){var b=rmBtn(box,'','rmchip '+cls+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b');s.textContent=call;b.appendChild(s);\n"
-                       "if(l2){s=document.createElement('span');s.className='font-small';s.textContent=l2;b.appendChild(s);}\n"
-                       "if(l3){s=document.createElement('span');s.className='font-small';s.textContent=l3;b.appendChild(s);}}");
-    web_client.println("function rmRenderNode(){var h=rmEl('rm_heard'),s=rmEl('rm_saved'),i,x,c=rmSel.call,t=rmEl('rm_callchk'),n=0,sv=rmSel.slot>=0;\n"
-                       "h.textContent='';s.textContent='';\n"
-                       "for(i=0;i<rmHeard.length;i++){x=rmHeard[i];rmChip(h,String(x.call),String(x.hw||''),rmAgo(x.age_s|0)+' ago'+(x.rssi?', '+x.rssi+' dBm':''),'');}\n"
-                       "if(!rmHeard.length)h.textContent='No node heard directly yet.';\n"
-                       "for(i=0;i<rmSaved.length;i++){x=rmSaved[i];if(x&&x.used){rmChip(s,String(x.call),'','','rmsaved');n++;}}");
-    web_client.println("if(!n)s.textContent='Nothing saved yet.';\n"
+    web_client.println("function rmChip(box,call,hw,age,sv,stale){var b=rmBtn(box,'','rmchip'+(sv?' rmsaved':'')+(stale?' rmstale':'')+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b'),i,L=[hw,age];\n"
+                       "s.textContent=call;b.appendChild(s);\n"
+                       "for(i=0;i<2;i++){s=document.createElement('span');s.className='font-small';s.textContent=L[i];b.appendChild(s);}");
+    web_client.println("var N='http://www.w3.org/2000/svg',v=document.createElementNS(N,'svg'),u=document.createElementNS(N,'use');\n"
+                       "s=document.createElement('span');s.className='font-small';v.setAttribute('class','rmlk');u.setAttribute('href',sv?'#rmlk-o':'#rmlk-c');v.appendChild(u);s.appendChild(v);s.appendChild(document.createTextNode(' '+(sv?'key saved':'no key')));b.appendChild(s);}");
+    web_client.println("function rmRenderNode(){var h=rmEl('rm_nodes'),i,x,k,c=rmSel.call,t=rmEl('rm_callchk'),n=0,sv=rmSel.slot>=0,hd=false,seen=Object.create(null),e=rmEl('rm_savednote');\n"
+                       "h.textContent='';\n"
+                       "for(i=0;i<rmHeard.length;i++){x=rmHeard[i];k=String(x.call);seen[k]=1;if(k==c)hd=true;rmChip(h,k,String(x.hw||''),rmAgo(x.age_s|0)+' ago'+(x.rssi?', '+x.rssi+' dBm':''),rmSlotOf(k)>=0,false);}");
+    web_client.println("for(i=0;i<rmSaved.length;i++){x=rmSaved[i];if(x&&x.used){n++;k=String(x.call);if(!seen[k]){seen[k]=1;rmChip(h,k,'','not heard',true,true);}}}\n"
+                       "if(!h.firstChild)h.textContent='No node heard directly yet.';\n"
                        "rmEl('rm_forgetall').style.display=n?'':'none';\n"
-                       "if(!c)t.textContent='';\n"
-                       "else if(rmValidCall(c)){t.textContent='Call sign looks right.';t.className='font-small rmok';}\n"
-                       "else{t.textContent='Not a call sign. Use letters or digits, a dash and an SSID, for example DK5EN-12.';t.className='font-small rmbad';}\n"
-                       "rmEl('rm_pwrow').style.display=sv?'none':'';rmEl('rm_forget').style.display=sv?'':'none';");
-    web_client.println("rmTxt('rm_savednote',sv?'The password of '+c+' is saved. No need to type it.':'Type the password of the node you want to manage. Tip: press Remember to skip typing.','font-small');\n"
+                       "t.textContent='';\n"
+                       "if(c&&!rmValidCall(c)){t.textContent='Not a call sign. Use letters or digits, a dash and an SSID, for example DK5EN-12.';t.className='font-small rmbad';}\n"
+                       "rmEl('rm_pwrow').style.display=sv?'none':'';");
+    web_client.println("e.className='font-small';\n"
+                       "e.textContent=sv?'Key saved for '+c+'.'+(hd?'':' Not heard in the last 3 hours, the command may not arrive.')+' ':'Type the password of '+(c||'the node you want to manage')+', or press Remember to save it.';\n"
+                       "if(sv)rmBtn(e,'Forget','',false,{'data-act':'forget'});\n"
                        "rmEl('rm_forgetall').textContent=rmArmId=='forgetall'?rmReally:'Forget all';rmEl('rm_selfclear').textContent=rmArmId=='selfclear'?rmReally:'Clear';}\n"
                        "function rmRenderLock(){var n=rmLockLeft(),t=rmNote.t,c=rmNote.c;");
     web_client.println("if(!t){c='rmmsg rmlock';if(rmBusy)t='Sending ...';else if(!rmAuth&&n>0)t=(rmSrvMsg?rmSrvMsg+' ':'')+'Next command possible in '+n+' s.';}\n"

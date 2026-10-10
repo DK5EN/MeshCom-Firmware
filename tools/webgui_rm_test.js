@@ -298,6 +298,7 @@ async function mkPage(srv, opts) {
     async tap(el) { P.click(el); await flush(); },
     async typeCall(c) { const e = P.el('rm_call'); e.value = c; e.dispatchEvent(new w.Event('input', { bubbles: true })); await flush(); },
     async setPoll(status) { srv.status = srv.mkStatus(status); await T.advance(10001); },
+    tile(call) { return Array.from(d.querySelectorAll('#rm_nodes button')).find((b) => b.getAttribute('data-call') === call); },
     btn(text, within) { return Array.from((within || d).querySelectorAll('button')).find((b) => b.textContent === text); },
     tiles() {
       const o = {};
@@ -328,7 +329,7 @@ async function savedNodePage(statusReply, extraSent) {
   srv.status = srv.mkStatus({ sent: [ent('DK5EN-1', 'status', statusReply, { ago: 30 })].concat(extraSent || []) });
   const P = await mkPage(srv);
   await P.init();
-  await P.tap(P.btn('DK5EN-1', P.el('rm_saved')) || P.el('rm_saved').querySelector('button'));
+  await P.tap(P.tile('DK5EN-1'));
   return P;
 }
 
@@ -380,7 +381,7 @@ function leaks(P, canary) {
     check('UI-03 six cards, all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 6 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
     check('UI-04 only Advanced starts closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_adv');
     check('UI-05 exactly one status control and one sync control, no Test/Check connection', !D.getElementById('rm_test') && !/Test connection|Check connection/.test(HTML + JS) && (JS.match(/'Refresh status'/g) || []).length === 1 && (JS.match(/'data-act':'sync'/g) || []).length === 1);
-    check('UI-07 one message line (no rm_lockline), "saved on this node" once', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 1 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
+    check('UI-07 one message line (no rm_lockline), no "Saved on this node" label (tiles carry the key state)', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 0 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
     check('UI-08 shared sentences: Really? once, confirm sentence once, no-answer sentence once, one rmErr password text', (JS.match(/Really\? tap again/g) || []).length === 1 && (JS.match(/Tap again within 4 seconds to confirm/g) || []).length === 1 && (JS.match(/did not answer the request/g) || []).length === 1);
     check('DRY-02/03 no rule or refusal sentence is duplicated from the server: no rmErr table, no password charset or reserved-word text', !/rmErr\b|rmErrOf|plain characters|plain letters|reserved|must not start with a space|Not allowed:|No double space/.test(JS));
   }
@@ -463,7 +464,7 @@ function leaks(P, canary) {
     check('DRY-03 pinned inputs: valid DK5EN-1, OE1ABC-15, dk5en-9 (folded); invalid DK5EN, DK5EN-123, D-1, OE1ABCDE-1, dk5en-1 (unfolded)', pinOk.every((c) => P.w.rmValidCall(c)) && pinBad.every((c) => !P.w.rmValidCall(c)), pinOk.filter((c) => !P.w.rmValidCall(c)).concat(pinBad.filter((c) => P.w.rmValidCall(c))).join(','));
     await P.init();
     await P.typeCall('dk5en-12');
-    check('call field upper-cases and shows "looks right"', P.el('rm_call').value === 'DK5EN-12' && /looks right/.test(P.text('rm_callchk')));
+    check('call field upper-cases and shows no error for a valid call', P.el('rm_call').value === 'DK5EN-12' && P.text('rm_callchk') === '' && !/looks right/.test(P.text('rm_savednote')));
     await P.typeCall('DK5EN');
     check('call field shows a format hint for a bad call', /Not a call sign/.test(P.text('rm_callchk')));
     P.w.rmPageLeave();
@@ -721,12 +722,12 @@ function leaks(P, canary) {
     const b = c && new URLSearchParams(c.body);
     check('remember: POST /rmnodes act=save into the first free slot', !!c && b.get('act') === 'save' && b.get('slot') === '0' && b.get('call') === 'DK5EN-12' && b.get('pw') === CANARY, c && c.body);
     check('remember: password not leaked and input cleared', leaks(P, CANARY).length === 0 && P.el('rm_pw').value === '', leaks(P, CANARY).join('; '));
-    check('remember: the node shows as a saved chip and the password row hides', !!P.btn('DK5EN-12', P.el('rm_saved')) || P.el('rm_saved').textContent.includes('DK5EN-12'));
+    check('remember: the node shows as a green saved tile and the password row hides', !!P.tile('DK5EN-12') && P.tile('DK5EN-12').classList.contains('rmsaved'));
     check('remember: password row hidden once saved', P.el('rm_pwrow').style.display === 'none');
-    await P.tap(P.btn('Forget this node'));
+    await P.tap(P.btn('Forget'));
     const d = P.calls.filter((x) => rmPath(x) === '/rmnodes' && x.method === 'POST').pop();
     check('forget: POST act=del&slot=0', d.body === 'act=del&slot=0', d.body);
-    check('forget: node is no longer saved', P.el('rm_pwrow').style.display === '' && /Nothing saved/.test(P.text('rm_saved')));
+    check('forget: node is no longer saved', P.el('rm_pwrow').style.display === '' && !P.tile('DK5EN-12'));
     srv.nodesReply = refuse('dup');
     P.el('rm_pw').value = CANARY;
     await P.tap(P.btn('Remember'));
@@ -790,11 +791,78 @@ function leaks(P, canary) {
     await P.init();
     await P.T.advance(100);
     const page = P.el('rm_page');
-    check('hostile call/msg/reply render as text, no element is created', page.querySelectorAll('img,script,iframe,svg,object').length === 0 && P.w.__pwn === undefined);
+    check('hostile call/msg/reply render as text, no element is created', page.querySelectorAll('img,script,iframe,object,svg:not(.rmlk):not(#rm_sprite)').length === 0 && P.w.__pwn === undefined);
     check('the hostile text is visible as text (proves it was rendered)', page.textContent.includes(EVIL) && P.el('rm_msgs').textContent.includes(EVIL));
-    await P.tap(P.btn(EVIL) || page.querySelector('.rmchip'));
+    await P.tap(P.tile(EVIL) || page.querySelector('.rmchip'));
     check('picking a hostile chip does not execute anything', P.w.__pwn === undefined && /Not a call sign/.test(P.text('rm_callchk')));
     P.w.rmPageLeave();
+  }
+
+  // ---- node tiles: one list, colour = key state, border = selection, padlock + word ---------------------
+  {
+    const srv = mkServer();
+    srv.heard = [{ call: 'DK5EN-1', hw: 'HELTEC_V3', age_s: 120, rssi: -95 }, { call: 'OE1ABC-5', hw: 'TBEAM', age_s: 4000, rssi: null }];
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.nodes[1] = { slot: 1, used: 1, call: 'DB0XYZ-2' };      // saved, never heard
+    const P = await mkPage(srv);
+    await P.init();
+    const lk = (t) => t.querySelector('use').getAttribute('href');
+    const g = P.tile('DK5EN-1'), n = P.tile('OE1ABC-5'), st = P.tile('DB0XYZ-2');
+    check('tiles: no separate heard/saved rows remain, one #rm_nodes row', !P.el('rm_heard') && !P.el('rm_saved') && !!P.el('rm_nodes') && !/Saved on this node/.test(P.el('rm_page').textContent));
+    check('tiles: saved+heard is green with the open lock and "key saved"', g.classList.contains('rmsaved') && !g.classList.contains('rmstale') && lk(g) === '#rmlk-o' && /key saved/.test(g.textContent) && /HELTEC_V3/.test(g.textContent) && /2 min ago, -95 dBm/.test(g.textContent), g.textContent);
+    check('tiles: heard-only is neutral with the closed lock and "no key"', !n.classList.contains('rmsaved') && !n.classList.contains('rmstale') && lk(n) === '#rmlk-c' && /no key/.test(n.textContent) && !/key saved/.test(n.textContent), n.textContent);
+    check('tiles: saved-but-unheard shows "not heard", open lock, "key saved", stale class', !!st && st.classList.contains('rmsaved') && st.classList.contains('rmstale') && lk(st) === '#rmlk-o' && /not heard/.test(st.textContent) && /key saved/.test(st.textContent), st && st.textContent);
+    const order = Array.from(P.el('rm_nodes').querySelectorAll('button')).map((b) => b.getAttribute('data-call'));
+    check('tiles: heard tiles keep their order, the unheard saved tile sorts last', order.join(',') === 'DK5EN-1,OE1ABC-5,DB0XYZ-2', order.join(','));
+    check('tiles: four lines per tile (call, hardware, age, key state)', g.children.length === 4 && st.children.length === 4);
+    check('tiles: Forget all is visible while something is saved', P.el('rm_forgetall').style.display === '');
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    check('tiles: the selection is a border, the old blue selection background is gone', /\.rmchip\.rmsel\{border-color:/.test(css) && !/rmsel\{background/.test(css) && !/mclightblue/.test(css) && /\.rmchip\.rmsaved[^}]*background:var\(--mclightgreen\)/.test(css));
+    check('tiles: the padlock sprite block appears exactly once with both symbols', (HTML.match(/<symbol /g) || []).length === 2 && (HTML.match(/id="rmlk-c"/g) || []).length === 1 && (HTML.match(/id="rmlk-o"/g) || []).length === 1 && P.d.querySelectorAll('symbol').length === 2);
+    const sp = HTML.match(/<symbol[\s\S]*<\/symbol>/)[0];
+    console.log('INFO sprite symbols ' + Buffer.byteLength(sp) + ' B');
+    check('tiles: the symbol pair stays under 300 B', Buffer.byteLength(sp) < 300, String(Buffer.byteLength(sp)));
+    check('tiles: the lock is 1em, currentColor, no font-size declared', /\.rmlk\{width:1em;height:1em;[^}]*fill:currentColor/.test(css));
+    // selecting a green tile
+    await P.tap(g);
+    check('pick green: border class on the tile, password row hidden, inline Forget button', P.tile('DK5EN-1').classList.contains('rmsel') && P.el('rm_pwrow').style.display === 'none' && !!P.btn('Forget', P.el('rm_savednote')), P.text('rm_savednote'));
+    check('pick green: note reads "Key saved for DK5EN-1." and nothing about the old sentence', /^Key saved for DK5EN-1\.\s*Forget$/.test(P.text('rm_savednote')) && !/No need to type it/.test(P.text('rm_savednote')) && !P.btn('Forget this node'), P.text('rm_savednote'));
+    check('pick green: the call-sign check line is empty ("looks right" is gone)', P.text('rm_callchk') === '');
+    // neutral tile
+    await P.tap(P.tile('OE1ABC-5'));
+    check('pick neutral: password row shows, Remember note, no Forget on the tile note', P.el('rm_pwrow').style.display === '' && /^Type the password of OE1ABC-5, or press Remember to save it\.$/.test(P.text('rm_savednote')) && !P.btn('Forget', P.el('rm_savednote')) && P.tile('OE1ABC-5').classList.contains('rmsel') && !P.tile('DK5EN-1').classList.contains('rmsel'), P.text('rm_savednote'));
+    // stale tile
+    await P.tap(P.tile('DB0XYZ-2'));
+    check('pick stale: like green plus the not-heard hint', P.el('rm_pwrow').style.display === 'none' && /^Key saved for DB0XYZ-2\. Not heard in the last 3 hours, the command may not arrive\.\s*Forget$/.test(P.text('rm_savednote')), P.text('rm_savednote'));
+    // Forget on a heard saved tile: key removed, tile turns neutral, still selected
+    await P.tap(P.tile('DK5EN-1'));
+    await P.tap(P.btn('Forget', P.el('rm_savednote')));
+    const d = P.calls.filter((x) => rmPath(x) === '/rmnodes' && x.method === 'POST').pop();
+    const g2 = P.tile('DK5EN-1');
+    check('forget on the tile: POST act=del&slot=0, tile turns neutral (closed lock, "no key"), stays selected', d.body === 'act=del&slot=0' && !g2.classList.contains('rmsaved') && g2.classList.contains('rmsel') && /no key/.test(g2.textContent) && g2.querySelector('use').getAttribute('href') === '#rmlk-c' && P.el('rm_pwrow').style.display === '', d.body + ' / ' + g2.textContent);
+    // forgetting a stale tile removes it
+    await P.tap(P.tile('DB0XYZ-2'));
+    await P.tap(P.btn('Forget', P.el('rm_savednote')));
+    check('forget on a stale tile: the tile disappears, Forget all hides (nothing saved)', !P.tile('DB0XYZ-2') && P.el('rm_forgetall').style.display === 'none');
+    P.w.rmPageLeave();
+  }
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    srv.nodes[2] = { slot: 2, used: 1, call: 'DB0XYZ-2' };
+    const P = await mkPage(srv);
+    await P.init();
+    await P.tap(P.btn('Forget all'));
+    check('forget all: first tap arms and sends nothing', P.btn('Really? tap again', P.el('rm_nodes').parentNode) && !P.calls.some((x) => rmPath(x) === '/rmnodes' && x.method === 'POST'));
+    await P.tap(P.btn('Really? tap again'));
+    const d = P.calls.filter((x) => rmPath(x) === '/rmnodes' && x.method === 'POST').pop();
+    check('forget all: second tap POSTs act=forget, saved tiles are gone, heard tile is neutral, button hides', !!d && d.body === 'act=forget' && !P.tile('DB0XYZ-2') && !P.tile('DK5EN-1').classList.contains('rmsaved') && P.el('rm_forgetall').style.display === 'none', d && d.body);
+    P.w.rmPageLeave();
+  }
+  {
+    const REMOVED = ['rm_heard', 'rm_saved', 'rm_forget'];
+    const ids = [...(HTML + JS).matchAll(/id=\\?"(rm_\w+)\\?"/g)].map((m) => m[1]);
+    check('removed element ids (rm_heard, rm_saved, rm_forget) occur nowhere in page or JS', REMOVED.every((i) => !ids.includes(i) && !new RegExp("'" + i + "'").test(JS)), REMOVED.filter((i) => ids.includes(i)).join(','));
   }
 
   // ---- 401 / 403 -----------------------------------------------------------------------------------
@@ -815,7 +883,7 @@ function leaks(P, canary) {
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     const P = await mkPage(srv);
     await P.init();
-    await P.tap(P.el('rm_saved').querySelector('button'));
+    await P.tap(P.tile('DK5EN-1'));
     srv.auth = 403;
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     check('403 on a send shows "log in again"', /log in again/i.test(P.text('rm_auth')) && P.el('rm_auth').style.display !== 'none', P.text('rm_auth'));
@@ -829,7 +897,7 @@ function leaks(P, canary) {
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     const P = await mkPage(srv);
     await P.init();
-    await P.tap(P.el('rm_saved').querySelector('button'));
+    await P.tap(P.tile('DK5EN-1'));
     srv.sendReply = { ok: true, ctr: 0, viaSync: true };
     await P.tap(P.btn('Send position now', P.el('rm_info')));
     check('viaSync: accepted, no error shown (the progress text moved to the Messages card)', P.sends().length === 1 && /^(Next command possible in \d+ s\.)?$/.test(P.text('rm_msg')) && !/rmbad/.test(P.el('rm_msg').className), P.text('rm_msg'));
@@ -877,7 +945,7 @@ function leaks(P, canary) {
     check('messages: err and no-answer sentences come from msg (was: activity)', /The node tried, but the setting did not change\./.test(t) && /No answer after 75 seconds/.test(t));
     check('messages: chain message of the target is shown (was: activity)', /DK5EN-1: The connection check got no answer/.test(P.text('rm_chain')));
     check('raw table lists the sent entries', P.el('rm_msgs').querySelectorAll('tr').length === 3);
-    check('heard chips: call, hardware, age; null rssi prints no "null"', (() => { const c = P.el('rm_heard').textContent; return /DK5EN-1/.test(c) && /HELTEC_V3/.test(c) && /2 min ago, -95 dBm/.test(c) && /OE1ABC-5/.test(c) && !/null/.test(c); })(), P.el('rm_heard').textContent);
+    check('heard chips: call, hardware, age; null rssi prints no "null"', (() => { const c = P.el('rm_nodes').textContent; return /DK5EN-1/.test(c) && /HELTEC_V3/.test(c) && /2 min ago, -95 dBm/.test(c) && /OE1ABC-5/.test(c) && !/null/.test(c); })(), P.el('rm_nodes').textContent);
     P.w.rmPageLeave();
   }
 
@@ -945,7 +1013,7 @@ function leaks(P, canary) {
     ] });
     const P = await mkPage(srv);
     await P.init();
-    await P.tap(Array.from(P.el('rm_saved').querySelectorAll('button')).find((x) => x.textContent.indexOf('DK5EN-2') === 0));
+    await P.tap(P.tile('DK5EN-2'));
     const row = (n) => Array.from(P.el('rm_msgs').querySelectorAll('tr')).find((r) => r.children[1].textContent.indexOf(n) === 0);
     const rb = (n) => row(n).querySelector('button');
     const sel = () => P.w.rmSel.call + '/' + P.w.rmSel.slot + '/' + P.el('rm_call').value;
