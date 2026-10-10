@@ -50,7 +50,10 @@ void sub_page_remote()
                        ".rmwarn{background:var(--mclightred);}");
     web_client.println(".rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}\n"
                        ".rmg .rmsw{justify-self:start;}\n"
-                       ".rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}\n"
+                       ".rmg input[type=text]{width:100%;box-sizing:border-box;}\n"
+                       ".rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}\n"
+                       ".rmhl{grid-column:2/4;display:flex;justify-content:space-between;}");
+    web_client.println(".rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}\n"
                        ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
                        ".rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
@@ -66,6 +69,8 @@ void sub_page_remote()
                        "#rm_msgs td:nth-child(1),#rm_log td:nth-child(1),.rmtab button{white-space:nowrap;}");
     web_client.println("@media (max-width:600px){.rmtab thead{display:none;}\n"
                        ".rmtab,#rm_msgs,#rm_log{display:block;}\n"
+                       ".rmw{grid-template-columns:1fr max-content;}\n"
+                       ".rmw>:first-child,.rmw .rmhl{grid-column:1/3;}\n"
                        "#rm_msgs tr,#rm_log tr{display:block;padding:3px 0;border-bottom:solid 1px #e0e0e0;}");
     web_client.println("#rm_msgs td,#rm_log td{display:inline-block;border:0;padding:1px 8px 1px 0;}\n"
                        "#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(4),#rm_log td:nth-child(5){display:block;}");
@@ -223,11 +228,11 @@ void rmScaffoldJs()
                        "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
                        "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}");
-    web_client.println("function rmTxBuild(p,k,dis){var cap=rmCap(k),lo=rmFloor(k),ok=cap>0,r=document.createElement('div'),x,a;\n"
-                       "if(ok){if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<lo)rmTx.val=lo;}r.className='rmrow';a=ok&&rmArmId=='txpower '+rmTx.val;");
-    web_client.println("rmBtn(r,'-','',!ok||rmTx.val<=lo,{'data-act':'txdn'}).id='rm_rtxdn';x=document.createElement('b');x.id='rm_rtxval';x.textContent=ok?rmTx.val+' dBm':'-';r.appendChild(x);rmBtn(r,'+','',!ok||rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';");
-    web_client.println("rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis||!ok,{'data-act':'txapply'}).id='rm_rtxapply';p.appendChild(r);\n"
-                       "x=document.createElement('div');x.id='rm_rtxnote';x.className='font-small';x.textContent=ok?'Range '+lo+' to '+cap+' dBm on this node.':k.at?\"This node's firmware does not report its power range.\":'Press Refresh status to learn the power range of the node.';p.appendChild(x);}");
+    web_client.println("function rmTxBuild(p,k,dis){var cap=rmCap(k),lo=rmFloor(k),ok=cap>0,r=rmNew('div','grid rmg rmw'),c=rmNew('div','rmrow'),a;\n"
+                       "if(ok){if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<lo)rmTx.val=lo;}a=ok&&rmArmId=='txpower '+rmTx.val;p.appendChild(r);r.appendChild(rmNew('span','','TX power'));r.appendChild(c);");
+    web_client.println("rmBtn(c,'-','',!ok||rmTx.val<=lo,{'data-act':'txdn'}).id='rm_rtxdn';c.appendChild(rmNew('b','',ok?rmTx.val+' dBm':'-','rm_rtxval'));rmBtn(c,'+','',!ok||rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';\n"
+                       "rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis||!ok,{'data-act':'txapply'}).id='rm_rtxapply';");
+    web_client.println("r.appendChild(rmNew('div','font-small rmhl',ok?'Range '+lo+' to '+cap+' dBm on this node.':k.at?\"This node's firmware does not report its power range.\":'Press Refresh status to learn the power range of the node.','rm_rtxnote'));}");
     web_client.println("function rmChip(box,call,hw,age,sv,stale){var b=rmBtn(box,'','rmchip'+(sv?' rmsaved':'')+(stale?' rmstale':'')+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b'),i,L=[hw,age];\n"
                        "s.textContent=call;b.appendChild(s);\n"
                        "for(i=0;i<2;i++){s=document.createElement('span');s.className='font-small';s.textContent=L[i];b.appendChild(s);}");
@@ -286,11 +291,11 @@ void rmScaffoldJs()
                        "if(n=='sens')return 'Sensors read.';\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
-    web_client.println("function rmWBuild(p,d,o){var j,w,x,k,t,y;if(!d.w)return;t=/^(name|atxt)$/.test(d.w[0][2]);\n"
+    web_client.println("function rmWBuild(p,d,o){var j,w,x,k,r,c,h;if(!d.w)return;r=rmNew('div','grid rmg rmw');p.appendChild(r);r.appendChild(rmNew('span','',d.l));c=d.w.length>1?r.appendChild(rmNew('div','rmg3')):r;\n"
                        "for(j=0;j<d.w.length;j++){w=d.w[j];x=document.createElement('input');x.id='rm_f_'+d.c+'_'+w[0];x.type='text';x.autocomplete='off';x.setAttribute('aria-label',w[1]);if(d.w.length>1)x.placeholder=w[1];\n"
-                       "k=o&&o[w[4]||w[0]];x.value=rmIn[x.id]!==undefined?rmIn[x.id]:(k&&k!='-'?k:'');p.appendChild(x);rmWire(x,d);}\n");
-    web_client.println("y=['cnt','hint'];for(j=t?0:1;j<2;j++){x=document.createElement('div');x.id='rm_f_'+d.c+'_'+y[j];x.className='font-small';p.appendChild(x);}\n"
-                       "rmBtn(p,'Set','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c}).id='rm_f_'+d.c+'_set';rmWUpd(d);}\n");
+                       "k=o&&o[w[4]||w[0]];x.value=rmIn[x.id]!==undefined?rmIn[x.id]:(k&&k!='-'?k:'');c.appendChild(x);rmWire(x,d);}");
+    web_client.println("rmBtn(r,'Set','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c}).id='rm_f_'+d.c+'_set';h=rmNew('div','font-small rmhl');r.appendChild(h);\n"
+                       "h.appendChild(rmNew('span','','','rm_f_'+d.c+'_hint'));if(/^(name|atxt)$/.test(d.w[0][2]))h.appendChild(rmNew('span','','','rm_f_'+d.c+'_cnt'));rmWUpd(d);}\n");
     web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}\n"
                        "function rmCapOf(c){var a=rmStat?rmStat.targets:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c)return a[i].cap||0;return 0;}");
     web_client.println("var rmMh={on:0,job:'',args:'',fl:0,t:0,pre:'',rows:[],total:0,msg:'',det:null,gen:0,tm:0,ctr:-1};\nfunction rmUns(c,n,v){var a=rmStat?rmStat.sent:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd==n&&a[i].st=='err'&&a[i].reply=='err unsupported'&&(!v||a[i].ago<v.ago))return true;return false;}\n");

@@ -399,7 +399,7 @@ function leaks(P, canary) {
     return ins.length >= 2 && ins.every((i) => /autocomplete="new-password"/.test(i));
   })());
   {
-    const have = new Set(Array.from(HTML.matchAll(/id="([^"]+)"/g)).map((m) => m[1]).concat(Array.from(JS.matchAll(/\.id='(rm_[a-z]+)'/g)).map((m) => m[1])));   // ids the JS builds itself count too
+    const have = new Set(Array.from(HTML.matchAll(/id="([^"]+)"/g)).map((m) => m[1]).concat(Array.from(JS.matchAll(/\.id='(rm_[a-z]+)'/g)).map((m) => m[1])).concat(Array.from(JS.matchAll(/rmNew\('[a-z]+',[^;]*?,'(rm_[a-z]+)'\)/g)).map((m) => m[1])));   // ids the JS builds itself count too
     const used = new Set(Array.from(JS.matchAll(/'(rm_[a-z]+)'/g)).map((m) => m[1]));
     const missing = [...used].filter((i) => !have.has(i));
     check('every element id the JS uses exists in the skeleton', missing.length === 0, missing.join(','));
@@ -588,6 +588,36 @@ function leaks(P, canary) {
     }
     check('3.4 every def Read button still sends its cmd once', un.length === 0, un.join());
     check('3.4 no duplicate id after the move', dupIds(P).length === 0, dupIds(P).join());
+    P.w.rmPageLeave();
+  }
+
+  // ---- Writable rows (plan 3.4 second half: label | input | Set rows, .rmg3 position, TX row, mobile rule) ----
+  {
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    const media = (css.match(/@media[\s\S]*$/) || [''])[0];
+    check('3.4b stylesheet: inputs fill their column, .rmg3 is a 1fr 1fr 5em grid, the hint line spans columns 2..3', css.includes('.rmg input[type=text]{width:100%;box-sizing:border-box;}') && css.includes('.rmg3{display:grid;grid-template-columns:1fr 1fr 5em;gap:8px;}') && css.includes('.rmhl{grid-column:2/4;display:flex;justify-content:space-between;}'));
+    check('3.4b exactly one @media block (max-width:600px), extended with the .rmw collapse: label on its own line, then control | action', (css.match(/@media/g) || []).length === 1 && /^@media \(max-width:600px\)/.test(media) && media.includes('.rmw{grid-template-columns:1fr max-content;}') && media.includes('.rmw>:first-child,.rmw .rmhl{grid-column:1/3;}') && media.includes('.rmtab thead{display:none;}'), media.slice(0, 80));
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    const X = (id) => P.el(id);
+    const E = (cmd, rep, c) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: 5, st: 'ok' });
+    await P.setPoll({ sent: [ent('DK5EN-1', 'status', STATUS_NEW, { ago: 30, ctr: 9 }), E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 1), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5)], targets: tg });
+    const row = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector(':scope > .rmw');
+    const ch = (c) => (row(c) ? [...row(c).children] : []);
+    const cell = (c, i) => ch(c)[i] || { tagName: '-', id: '-', className: '', textContent: '', children: [], classList: { contains: () => false } };
+    for (const [c, lab, key, cnt] of [['name', 'Name', 'v', '6/' + HDR.RM_NAME_MAX], ['atxt', 'APRS text', 'v', '14/' + HDR.RM_ATXT_MAX]]) {
+      check('3.4b ' + c + ' is one .grid.rmg row: label | input | Set | hint line', row(c) && row(c).classList.contains('grid') && row(c).classList.contains('rmg') && ch(c).length === 4 && cell(c, 0).tagName === 'SPAN' && cell(c, 0).textContent === lab && cell(c, 1).tagName === 'INPUT' && cell(c, 1).id === 'rm_f_' + c + '_' + key && cell(c, 2).tagName === 'BUTTON' && cell(c, 2).id === 'rm_f_' + c + '_set' && cell(c, 2).textContent === 'Set' && cell(c, 3).classList.contains('rmhl'), ch(c).map((e) => e.tagName + '#' + e.id).join());
+      const hl = cell(c, 3);
+      check('3.4b ' + c + ' hint line is one font-small line holding hint then counter (right-aligned by space-between)', hl.classList.contains('font-small') && hl.children.length === 2 && hl.children[0].id === 'rm_f_' + c + '_hint' && hl.children[1].id === 'rm_f_' + c + '_cnt' && hl.children[1].textContent === cnt, [...hl.children].map((e) => e.id + '=' + e.textContent).join());
+    }
+    check('3.4b pos row: Position | .rmg3 with three INPUTs lat, lon, alt | Set | hint line without counter', row('pos') && ch('pos').length === 4 && cell('pos', 0).textContent === 'Position' && cell('pos', 1).classList.contains('rmg3') && [...cell('pos', 1).children].map((e) => e.tagName + '#' + e.id).join() === 'INPUT#rm_f_pos_lat,INPUT#rm_f_pos_lon,INPUT#rm_f_pos_alt' && cell('pos', 2).id === 'rm_f_pos_set' && cell('pos', 3).classList.contains('rmhl') && cell('pos', 3).children.length === 1 && cell('pos', 3).children[0].id === 'rm_f_pos_hint', ch('pos').map((e) => e.tagName + '#' + e.id + '.' + e.className).join());
+    check('3.4b pos: Source stays in the header row, inputs keep their values', X('rm_def_pos').firstElementChild.children[1].id === 'rm_v_pos_src' && X('rm_f_pos_lat').value === '48.40812' && X('rm_f_pos_alt').value === '492' && !X('rm_f_pos_set').disabled);
+    check('3.4b TX power is one .grid.rmg row: label | [-] N dBm [+] | Apply | range note line, ids unchanged', row('radio') && ch('radio').length === 4 && cell('radio', 0).textContent === 'TX power' && [...cell('radio', 1).children].map((e) => e.id).join() === 'rm_rtxdn,rm_rtxval,rm_rtxup' && cell('radio', 2).id === 'rm_rtxapply' && cell('radio', 3).id === 'rm_rtxnote' && cell('radio', 3).classList.contains('rmhl') && cell('radio', 3).classList.contains('font-small') && /^Range 0 to 22 dBm/.test(cell('radio', 3).textContent), ch('radio').map((e) => e.tagName + '#' + e.id).join());
+    check('3.4b sens/maxhop have no writable row, txq/mbox neither', !row('sens') && !row('maxhop') && !row('txq') && !row('mbox'));
+    check('3.4b no duplicate id', dupIds(P).length === 0, dupIds(P).join());
     P.w.rmPageLeave();
   }
 
