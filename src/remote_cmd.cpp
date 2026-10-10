@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "hmac_sha256.h"
+#include "rm_commands.h"
 #include "rm_text.h"
 
 static_assert(RM_MAX_ARGS == 39, "args cap is part of the wire contract (concept 2.2)");
@@ -132,8 +133,8 @@ bool isOnOff(const char *a)
     return strcmp(a, "on") == 0 || strcmp(a, "off") == 0;
 }
 
-// allowlist of section 6.4 as a table: one row per command name. Adding a command is one row
-// (plus the dispatch in rm_runtime.cpp).
+// allowlist of section 6.4 as a table: one row per command name, generated from rm_commands.h. Adding
+// a command is one line there (plus the dispatch in rm_runtime.cpp).
 enum RmArgShape : uint8_t
 {
     RM_ARGS_NONE,    // no args
@@ -142,8 +143,8 @@ enum RmArgShape : uint8_t
     RM_ARGS_SETOUT,  // "<pin> <on|off>", pin a0..a7 or b0..b7 (the console's --setout MCP pins)
     // extended commands (RM ext W2-A): SYNTAX only, ranges and the strict charset are the executor's
     // job (err range / err text). Capitals are allowed here and only here (concept 2.4).
-    RM_ARGS_NAME,    // none (read) | free text 1..19 (write)
-    RM_ARGS_ATXT,    // none (read) | free text 1..39 (write)
+    RM_ARGS_NAME,    // none (read) | free text 1..RM_NAME_MAX (write)
+    RM_ARGS_ATXT,    // none (read) | free text 1..RM_ATXT_MAX (write)
     RM_ARGS_POS,     // none (read) | "<lat> <lon> <alt>" (write)
     RM_ARGS_MH,      // row index 0..999 | callsign with optional SSID
 };
@@ -154,16 +155,13 @@ struct RmAllowRow
     RmArgShape shape;
 };
 
+// One row per command of rm_commands.h (same order); the shape is the list's third column.
+#define RM_ALLOW_ROW(n, k, shape) {#n, RM_ARGS_##shape},
 const RmAllowRow RM_ALLOWLIST[] = {
-    {"reboot", RM_ARGS_NONE},     {"status", RM_ARGS_NONE},    {"sendpos", RM_ARGS_NONE},
-    {"sendtrack", RM_ARGS_NONE},  {"sync", RM_ARGS_NONE},      {"gps", RM_ARGS_ONOFF},
-    {"track", RM_ARGS_ONOFF},     {"display", RM_ARGS_ONOFF},   {"led", RM_ARGS_ONOFF},
-    {"gateway", RM_ARGS_ONOFF},   {"mesh", RM_ARGS_ONOFF},      {"txpower", RM_ARGS_TXPOWER},
-    {"setout", RM_ARGS_SETOUT},   {"radio", RM_ARGS_NONE},     {"sens", RM_ARGS_NONE},
-    {"txq", RM_ARGS_NONE},       {"mbox", RM_ARGS_NONE},      {"maxhop", RM_ARGS_NONE},
-    {"name", RM_ARGS_NAME},      {"atxt", RM_ARGS_ATXT},      {"pos", RM_ARGS_POS},
-    {"mh", RM_ARGS_MH},
+    RM_COMMAND_LIST(RM_ALLOW_ROW)
 };
+#undef RM_ALLOW_ROW
+static_assert(sizeof(RM_ALLOWLIST) / sizeof(RM_ALLOWLIST[0]) == RM_COMMAND_COUNT, "allowlist = command list");
 
 bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
 {
@@ -182,9 +180,9 @@ bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
         return strlen(a) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
                isOnOff(a + 3);
     case RM_ARGS_NAME:
-        return a[0] == '\0' || rmArgIsFreeText(a, 19);
+        return a[0] == '\0' || rmArgIsFreeText(a, RM_NAME_MAX);
     case RM_ARGS_ATXT:
-        return a[0] == '\0' || rmArgIsFreeText(a, 39);
+        return a[0] == '\0' || rmArgIsFreeText(a, RM_ATXT_MAX);
     case RM_ARGS_POS:
         return a[0] == '\0' || rmArgIsPos(a);
     case RM_ARGS_MH:

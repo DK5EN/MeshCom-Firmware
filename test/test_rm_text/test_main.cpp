@@ -60,6 +60,12 @@ static void test_text_refuses_each_byte(void)
 
 static void test_text_lengths(void)
 {
+    // DRY-04: the limits are derived from the settings struct (rm_commands.h); the literals pin today's
+    // wire contract, so a resized node_name / node_atxt fails here instead of moving the limit silently
+    TEST_ASSERT_EQUAL_UINT(19, RM_NAME_MAX);
+    TEST_ASSERT_EQUAL_UINT(39, RM_ATXT_MAX);
+    TEST_ASSERT_EQUAL_UINT(sizeof(((s_meshcom_settings *)nullptr)->node_name) - 1, RM_NAME_MAX);
+    TEST_ASSERT_EQUAL_UINT(sizeof(((s_meshcom_settings *)nullptr)->node_atxt) - 1, RM_ATXT_MAX);
     char b[64];
     memset(b, 'a', sizeof b);
     b[19] = 0;

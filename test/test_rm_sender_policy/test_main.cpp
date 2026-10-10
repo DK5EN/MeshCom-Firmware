@@ -195,6 +195,14 @@ static void test_state_names_and_messages(void)
         const char *m = rmStateMessage((RmEntryState)s);
         TEST_ASSERT_NOT_NULL(m);
         TEST_ASSERT_TRUE(strlen(m) > 10);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(m) < 190, names[s]); // fits rm_json_str in the sent[].msg field
+    }
+    // the no-answer sentence is flag-neutral: the lockout is named only as a consequence of strict security
+    {
+        const char *m = rmStateMessage(RM_ST_NOANSWER);
+        TEST_ASSERT_NOT_NULL(strstr(m, "75 seconds"));
+        TEST_ASSERT_NOT_NULL(strstr(m, "With strict security on"));
+        TEST_ASSERT_NULL(strstr(m, ". A third failed try"));
     }
     // err entries carry the sentence of the reply's token
     TEST_ASSERT_EQUAL_STRING(rmErrTokenMessage("failed"), rmEntryMessage(RM_ST_ERR, "err failed"));
@@ -214,7 +222,9 @@ static void test_every_error_token_has_a_sentence(void)
     // the RM error and verdict tokens of the contract, plus what the sender itself refuses with
     const char *tokens[] = {"failed", "not output", "unsupported", "storage", "blocked", "rate", "lockout",
                             "replay", "tag", "sync", "format", "disabled", "cached",
-                            "limit", "busy", "passwd", "dst", "cmd", "ctr", "store", "send", "size", "short", "form"};
+                            "limit", "busy", "passwd", "dst", "cmd", "ctr", "store", "send", "size", "short", "form",
+                            // DRY-02: reply tokens of the extended commands and web request refusals
+                            "range", "text", "unknown", "end", "gps", "hidden", "pw", "call", "act", "slot", "dup"};
     const char *generic = rmErrTokenMessage("no such token at all");
     for (size_t i = 0; i < sizeof(tokens) / sizeof(tokens[0]); i++)
     {
@@ -239,6 +249,19 @@ static void test_every_error_token_has_a_sentence(void)
         for (size_t j = i + 1; j < n; j++)
             TEST_ASSERT_TRUE(strcmp(tab[i].token, tab[j].token) != 0);
     }
+    // DRY-02: the table is the only source of the RM error sentences; pin its exact token list so a
+    // token cannot appear or vanish unnoticed (the page and the JSON `msg` of every endpoint use it)
+    static const char *const pinned[] = {
+        "failed", "not output", "unsupported", "storage", "blocked", "rate", "lockout", "replay", "tag", "sync",
+        "format", "disabled", "cached", "range", "text", "unknown", "end", "gps", "hidden", "limit", "busy",
+        "passwd", "dst", "cmd", "ctr", "store", "send", "size", "short", "form", "pw", "call", "act", "slot",
+        "dup", "nosync", "lost"};
+    TEST_ASSERT_EQUAL_UINT(sizeof(pinned) / sizeof(pinned[0]), n);
+    for (size_t i = 0; i < n; i++)
+        TEST_ASSERT_EQUAL_STRING(pinned[i], tab[i].token);
+    // every sentence fits the JSON string writer of the web handlers (rm_json_str, ~190 characters)
+    for (size_t i = 0; i < n; i++)
+        TEST_ASSERT_TRUE_MESSAGE(strlen(tab[i].msg) < 190, tab[i].token);
     // unknown, null and an empty token never return an empty string
     TEST_ASSERT_TRUE(strlen(rmErrTokenMessage(nullptr)) > 0);
     TEST_ASSERT_TRUE(strlen(rmErrTokenMessage("")) > 0);

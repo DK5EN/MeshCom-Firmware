@@ -15,6 +15,7 @@
 #include "nbr_views.h"
 #include "node_position.h"
 #include "radio_units.h"
+#include "rm_commands.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
 #include "rm_radio_in.h"
@@ -321,39 +322,79 @@ static int execMh(const char *args, char *res, size_t n)
     return fail(res, n, "unknown");
 }
 
+// ---- dispatch -------------------------------------------------------------------------------------------
+// One row per READ / RW command of rm_commands.h; the static_assert below fails the build when the two
+// lists drift (a command without a handler would fall through to "err blocked" at runtime).
+// A handler returns 0 = not mine (a write with args: rmExecWrite answers), 1 = done, -1 = failed.
+
+static int rdRadio(const RmCmd &, char *res, size_t n)
+{
+    return execRadio(res, n);
+}
+
+static int rdName(const RmCmd &c, char *res, size_t n)
+{
+    if (c.args[0] != '\0')
+        return 0; // write executor
+    char body[RM_FMT_BODY_MAX + 1];
+    return done(res, n, body, rmFmtName(body, sizeof(body), meshcom_settings.node_name));
+}
+
+static int rdAtxt(const RmCmd &c, char *res, size_t n)
+{
+    if (c.args[0] != '\0')
+        return 0;
+    char body[RM_FMT_BODY_MAX + 1];
+    return done(res, n, body, rmFmtAtxt(body, sizeof(body), meshcom_settings.node_atxt));
+}
+
+static int rdPos(const RmCmd &c, char *res, size_t n)
+{
+    return c.args[0] == '\0' ? execPos(res, n) : 0;
+}
+
+static int rdSens(const RmCmd &, char *res, size_t n)
+{
+    return execSens(res, n);
+}
+
+static int rdMh(const RmCmd &c, char *res, size_t n)
+{
+    return execMh(c.args, res, n);
+}
+
+static int rdTxq(const RmCmd &, char *res, size_t n)
+{
+    return execTxq(res, n);
+}
+
+static int rdMbox(const RmCmd &, char *res, size_t n)
+{
+    return execMbox(res, n);
+}
+
+static int rdMaxhop(const RmCmd &, char *res, size_t n)
+{
+    char body[RM_FMT_BODY_MAX + 1];
+    return done(res, n, body, rmFmtMaxhop(body, sizeof(body), meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos));
+}
+
+struct ReadRow
+{
+    const char *name;
+    int (*run)(const RmCmd &c, char *res, size_t n);
+};
+
+static constexpr ReadRow kReadRows[] = {
+    {"radio", rdRadio}, {"name", rdName}, {"atxt", rdAtxt}, {"pos", rdPos},     {"sens", rdSens},
+    {"mh", rdMh},       {"txq", rdTxq},   {"mbox", rdMbox}, {"maxhop", rdMaxhop},
+};
+static_assert(rmRowsMatchList(kReadRows, rmKindIsRead), "kReadRows = READ and RW rows of rm_commands.h");
+
 int rmExecRead(const RmCmd &c, char *res, size_t n)
 {
-    const char *cmd = c.cmd;
-    if (strcmp(cmd, "radio") == 0)
-        return execRadio(res, n);
-    if (strcmp(cmd, "name") == 0)
-    {
-        if (c.args[0] != '\0')
-            return 0; // write executor
-        char body[RM_FMT_BODY_MAX + 1];
-        return done(res, n, body, rmFmtName(body, sizeof(body), meshcom_settings.node_name));
-    }
-    if (strcmp(cmd, "atxt") == 0)
-    {
-        if (c.args[0] != '\0')
-            return 0;
-        char body[RM_FMT_BODY_MAX + 1];
-        return done(res, n, body, rmFmtAtxt(body, sizeof(body), meshcom_settings.node_atxt));
-    }
-    if (strcmp(cmd, "pos") == 0)
-        return c.args[0] == '\0' ? execPos(res, n) : 0;
-    if (strcmp(cmd, "sens") == 0)
-        return execSens(res, n);
-    if (strcmp(cmd, "mh") == 0)
-        return execMh(c.args, res, n);
-    if (strcmp(cmd, "txq") == 0)
-        return execTxq(res, n);
-    if (strcmp(cmd, "mbox") == 0)
-        return execMbox(res, n);
-    if (strcmp(cmd, "maxhop") == 0)
-    {
-        char body[RM_FMT_BODY_MAX + 1];
-        return done(res, n, body, rmFmtMaxhop(body, sizeof(body), meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos));
-    }
+    for (size_t i = 0; i < sizeof(kReadRows) / sizeof(kReadRows[0]); i++)
+        if (strcmp(c.cmd, kReadRows[i].name) == 0)
+            return kReadRows[i].run(c, res, n);
     return 0;
 }

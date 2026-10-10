@@ -313,7 +313,8 @@ inline const char *rmStateMessage(RmEntryState s)
         return "Sent. Waiting for the node to answer, this can take up to a minute.";
     case RM_ST_NOANSWER:
         return "No answer after 75 seconds. Check the password, the distance and that remote "
-               "management is on at the other node. A third failed try locks you out of it for 5 minutes.";
+               "management is on at the other node. With strict security on, a third failed try locks you "
+               "out for 5 minutes.";
     case RM_ST_OK:
         return "Done. The node confirmed the command.";
     case RM_ST_ERR:
@@ -349,6 +350,13 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"format", "The node could not read the message."},
         {"disabled", "Remote management is off on the node, or it has no password."},
         {"cached", "The node repeated its earlier answer."},
+        // reply tokens of the extended commands (rm_exec_read.cpp / rm_exec_write.cpp)
+        {"range", "That value is outside the allowed range."},
+        {"text", "The text contains characters the node will not accept."},
+        {"unknown", "The node does not know that one."},
+        {"end", "There are no more rows."},
+        {"gps", "The position is controlled by GPS on that node."},
+        {"hidden", "That node does not send its position, so it is not shown."},
         // sender-side refusals
         {"limit", "Two tries to this node are still unanswered. Wait before trying again, a third "
                   "wrong try could lock you out for 5 minutes."},
@@ -357,11 +365,17 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"dst", "That call sign is not valid, or it is this node."},
         {"cmd", "That command is not allowed."},
         {"ctr", "This node ran out of counter values."},
-        {"store", "This node could not save its send counter."},
+        {"store", "This node could not save that. Try again."},
         {"send", "The radio queue is full. Try again in a moment."},
         {"size", "The request was too large."},
         {"short", "The request was incomplete."},
         {"form", "The request could not be read."},
+        // web request refusals (web_rm_parse.h, web_rm_handlers.cpp)
+        {"pw", "The password is not valid: 1 to 14 plain characters, no space at the start or end."},
+        {"call", "That call sign is not valid."},
+        {"act", "The request was not understood."},
+        {"slot", "The saved node changed. Reload the page."},
+        {"dup", "This node is already saved in another place."},
         // chain outcomes (a command queued behind an automatic sync that was then not sent)
         {"nosync", "The connection check got no answer, so your command was not sent. Check the "
                    "password, the distance and that remote management is on at the other node."},

@@ -64,7 +64,8 @@ const char *rmReadBody(char *buf, size_t cap, long content_length)
     return got == content_length ? nullptr : "short";
 }
 
-/** 200 {"ok":true} or 422 {"ok":false,"err":"<token>"}; err is a static token, never input */
+/** 200 {"ok":true} or 422 {"ok":false,"err":"<token>","msg":"<sentence>"}; err is a static token, never input,
+ *  msg its sentence from rmTokenTable (rm_sender_policy.h), the one place the RM error texts live */
 static void rmAnswer(const char *err)
 {
     send_http_header(err == nullptr ? 200 : 422, RESPONSE_TYPE_JSON);
@@ -74,6 +75,8 @@ static void rmAnswer(const char *err)
     {
         web_client.print("{\"ok\":false,\"err\":");
         rm_json_str(err);
+        web_client.print(",\"msg\":");
+        rm_json_str(rmErrTokenMessage(err));
         web_client.println("}");
     }
 }

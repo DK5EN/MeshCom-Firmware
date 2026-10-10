@@ -15,6 +15,7 @@
 #include <string>
 
 #include <remote_cmd.h>
+#include <rm_sender_policy.h>
 #include <web_functions/web_rm_parse.h>
 
 static_assert(RM_FORM_ARGS_MAX == RM_MAX_ARGS, "the web form args cap must equal the wire args cap");
@@ -622,6 +623,30 @@ static void test_leak_positive_control(void)
     TEST_ASSERT_FALSE(containsRaw(b.b, sizeof b.b, CANARY));
 }
 
+// ------------------------------------------------------------------------------------------ messages
+
+// DRY-02: the page shows the server's `msg`, so every token the web handlers can answer with must have
+// its own sentence in rmTokenTable (not the generic fallback). The list is the closed set of the parser
+// (RM_ERR_*), rmReadBody ("size", "short") and the /rmnodes handler ("store", "dup"), plus the "send"
+// fallback of /rmsend. A token added to the parser without a table row fails here.
+static void test_every_web_error_token_has_a_server_sentence(void)
+{
+    const char *const toks[] = {"size", "form", "act", "slot", "call", "pw", "cmd", "short", "store", "dup", "send"};
+    const char *generic = rmErrTokenMessage("no such token at all");
+    for (const char *t : toks)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(strcmp(rmErrTokenMessage(t), generic) != 0, t);
+        // the token is a whole word of the table, so the sentence is the one the JSON `msg` carries
+        TEST_ASSERT_TRUE_MESSAGE(strlen(rmErrTokenMessage(t)) < 190, t); // rm_json_str caps a string near 190
+    }
+    // and the parser itself only ever answers with tokens of that list (tokenIsKnown)
+    Buf b("act=set&pw=");
+    RmPwdReq r = rmParsePasswdBody(b.b);
+    TEST_ASSERT_NOT_NULL(r.err);
+    TEST_ASSERT_TRUE(tokenIsKnown(r.err));
+    TEST_ASSERT_TRUE(strcmp(rmErrTokenMessage(r.err), generic) != 0);
+}
+
 // ------------------------------------------------------------------------------------------ main
 
 int main(int, char **)
@@ -639,5 +664,6 @@ int main(int, char **)
     RUN_TEST(test_values_point_into_body);
     RUN_TEST(test_leak_error_tokens_never_contain_canary);
     RUN_TEST(test_leak_positive_control);
+    RUN_TEST(test_every_web_error_token_has_a_server_sentence);
     return UNITY_END();
 }

@@ -26,6 +26,7 @@
 #include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
 #include "ble_session.h"       // BLC-03: BleStats, g_bleStats, bleStatsFormat()
 #include "rm_runtime.h"       // RM-06: RmStats, g_rmStats for the --info RM line
+#include "rm_commands.h"      // RM_NAME_MAX / RM_ATXT_MAX: the --setname / --atxt clip lengths
 #include "rm_validate.h"      // RM GUI W1b: one password validator for --passwd, the web field and the sender
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
@@ -1301,7 +1302,8 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
             printdeb("--rmstrictsecurity on/off  RM brute-force protection (default off): per-sender lockout,\n"
                      "                          receiver rate limits and sender spacing/budget. Off = no punishment.\n"
-                     "                          Caution: an off sender can push an on target into its lockout.\n");
+                     "                          Caution: an off sender can push an on target into its lockout.\n"
+                     "                          Hammering it also drops that sender's counter mark (one extra sync).\n");
             #ifndef BOARD_RAK4630
             #if defined(RELAY_SWITCH)
             printdeb("--relay on/off          board relay output (GPIO)\n");
@@ -2693,8 +2695,8 @@ void commandAction(char *umsg_text, bool ble)
         if(sVar == "none")
             sVar = "";
 
-        if(sVar.length() > 19)
-            sVar = sVar.substring(0, 19);
+        if(sVar.length() > sizeof(meshcom_settings.node_webpwd) - 1)
+            sVar = sVar.substring(0, sizeof(meshcom_settings.node_webpwd) - 1);
 
         snprintf(meshcom_settings.node_webpwd, sizeof(meshcom_settings.node_webpwd), "%s", sVar.c_str());
 
@@ -2744,8 +2746,8 @@ void commandAction(char *umsg_text, bool ble)
         // delegates to this same handler).
         sVar.replace("#", "");
 
-        if(sVar.length() > 19)
-            sVar = sVar.substring(0, 19);
+        if(sVar.length() > RM_NAME_MAX)
+            sVar = sVar.substring(0, RM_NAME_MAX);
 
         snprintf(meshcom_settings.node_name, sizeof(meshcom_settings.node_name), "%s", sVar.c_str());
 
@@ -3478,8 +3480,8 @@ void commandAction(char *umsg_text, bool ble)
         if(sVar == "none")
             sVar = "";
 
-        if(sVar.length() > 39)
-            sVar = sVar.substring(0, 39);
+        if(sVar.length() > RM_ATXT_MAX)
+            sVar = sVar.substring(0, RM_ATXT_MAX);
 
         snprintf(meshcom_settings.node_atxt, sizeof(meshcom_settings.node_atxt), "%s", sVar.c_str());
 

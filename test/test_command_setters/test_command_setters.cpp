@@ -242,6 +242,31 @@ static std::string read_repo_file(const char *rel)
     return ss.str();
 }
 
+// Command names of the X(name, KIND, SHAPE) list of src/rm_commands.h (the RM allowlist source), as
+// ",name1,name2,...,". The list starts at "#define RM_COMMAND_LIST" and ends at the first line without a
+// trailing backslash (the format contract in the header comment).
+static std::string rm_command_list_names()
+{
+    std::istringstream in(read_repo_file("src/rm_commands.h"));
+    std::string line, out = ",";
+    bool inList = false;
+    while (std::getline(in, line))
+    {
+        if (!inList)
+        {
+            inList = line.rfind("#define RM_COMMAND_LIST(X", 0) == 0;
+            continue;
+        }
+        const size_t x = line.find("X(");
+        const size_t comma = line.find(',', x == std::string::npos ? 0 : x);
+        if (x != std::string::npos && comma != std::string::npos)
+            out += line.substr(x + 2, comma - x - 2) + ",";
+        if (line.empty() || line.find_last_not_of(" \t\r") == std::string::npos || line[line.find_last_not_of(" \t\r")] != '\\')
+            break;
+    }
+    return out;
+}
+
 static void test_ethmtu_rung_schema_row_and_default_match_the_assumptions()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
@@ -522,11 +547,25 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
                              "--rmstrictsecurity must not use a node_sset4 bit");
 
     // never over RM: the RM allowlist (a positive list) must not name it
+    // RM_ALLOWLIST[] in remote_cmd.cpp is generated from the X(name, KIND, SHAPE) list of rm_commands.h
+    // (DRY-07), so that list is what gets scanned: all 22 pinned names present, the console-only ones absent.
     const std::string rc = read_repo_file("src/remote_cmd.cpp");
-    const size_t al = rc.find("const RmAllowRow RM_ALLOWLIST[]");
-    TEST_ASSERT_TRUE_MESSAGE(al != std::string::npos, "RM_ALLOWLIST not found");
-    const std::string table = rc.substr(al, rc.find("};", al) - al);
-    TEST_ASSERT_TRUE_MESSAGE(table.find("rmstrict") == std::string::npos, "rmstrictsecurity is on the RM allowlist");
+    TEST_ASSERT_TRUE_MESSAGE(rc.find("const RmAllowRow RM_ALLOWLIST[]") != std::string::npos, "RM_ALLOWLIST not found");
+    TEST_ASSERT_TRUE_MESSAGE(rc.find("RM_COMMAND_LIST(RM_ALLOW_ROW)") != std::string::npos,
+                             "RM_ALLOWLIST is no longer generated from rm_commands.h");
+    const std::string names = rm_command_list_names();
+    static const char *const pinned[] = {"reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track",
+                                         "display", "led", "gateway", "mesh", "txpower", "setout", "radio", "sens",
+                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(22, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 22 names");
+    for (const char *nm : pinned)
+        TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + nm + ",") != std::string::npos, nm);
+    size_t count = 0;
+    for (char ch : names)
+        count += (ch == ',') ? 1 : 0;
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(22 + 1, count, "rm_commands.h does not list exactly 22 commands");
+    for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd"})
+        TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + bad + ",") == std::string::npos, bad);
 
     // the web switch is routed through the console command and reads node_rmstrict back
     const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
@@ -641,7 +680,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", info) > cmd.rfind("#endif", info), "--info AU line is not inside an ESP32 guard");
 
     // RM allowlist is a positive list: neither command may appear in remote_cmd.cpp
-    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+    const std::string rm = read_repo_file("src/remote_cmd.cpp") + rm_command_list_names();
     TEST_ASSERT_TRUE_MESSAGE(rm.find("autoupdate") == std::string::npos, "autoupdate is on the RM allowlist");
     TEST_ASSERT_TRUE_MESSAGE(rm.find("updchan") == std::string::npos, "updchan is on the RM allowlist");
 

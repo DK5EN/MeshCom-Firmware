@@ -14,7 +14,8 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
-const SRC = path.join(__dirname, '..', 'src', 'web_functions', 'web_rm_page.cpp');
+const SRC = path.join(process.env.RM_PAGE_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_rm_page.cpp'));   // RM_PAGE_SRC: run against another copy (before/after evidence)
+const SRC_DIR = process.env.RM_SRC_DIR || path.join(__dirname, '..', 'src');   // RM_SRC_DIR: a copy of rm_commands.h, meshcom_settings.h, rm_sender_policy.h (evidence runs)
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -36,7 +37,57 @@ function decodeLiteral(s) {
   return o;
 }
 
+// ---- constants the page prints with printf (DRY-04) ---------------------------------------------------
+// The page emits `var rmLen={name:%u,atxt:%u}` from RM_NAME_MAX / RM_ATXT_MAX. The harness cannot run C++, so it
+// derives the same numbers from the headers: rm_commands.h defines RM_X_MAX = sizeof(s_meshcom_settings::<field>) - 1,
+// meshcom_settings.h gives the field size. Only this form and only %u are supported; anything else is an error.
+function headerConsts() {
+  const out = {};
+  const rc = fs.readFileSync(path.join(SRC_DIR, 'rm_commands.h'), 'utf8');
+  const ms = fs.readFileSync(path.join(SRC_DIR, 'meshcom_settings.h'), 'utf8');
+  for (const m of rc.matchAll(/constexpr size_t (RM_\w+_MAX) = sizeof\(s_meshcom_settings::(\w+)\) - 1;/g)) {
+    const f = new RegExp('A\\(char,\\s*' + m[2] + ',\\s*\\[(\\d+)\\]').exec(ms);   // settings table row  A(char, node_name, [20], ...)
+    if (f) out[m[1]] = +f[1] - 1;
+  }
+  return out;
+}
+const HDR = headerConsts();
+
+// the command list of rm_commands.h: [{name, kind, shape}] by the FORMAT CONTRACT regex of that file
+function headerCommands() {
+  const rc = fs.readFileSync(path.join(SRC_DIR, 'rm_commands.h'), 'utf8').split('\n');
+  const at = rc.findIndex((l) => /#define RM_COMMAND_LIST\(X\)/.test(l));
+  const list = [];
+  for (let i = at + 1; i < rc.length; i++) {
+    const m = /^\s*X\((\w+),\s*(\w+),\s*(\w+)\)/.exec(rc[i]);
+    if (m) list.push({ name: m[1], kind: m[2], shape: m[3] });
+    if (!/\\\s*$/.test(rc[i])) break;
+  }
+  return list;
+}
+
+// string-literal array `const char *<name>[] = {...};` of a C++ test file, comments dropped, escapes decoded as bytes
+function cppStrings(file, name) {
+  const t = fs.readFileSync(file, 'utf8');
+  const m = new RegExp('const char \\*' + name + '\\[\\]\\s*=\\s*\\{([\\s\\S]*?)\\};').exec(t);
+  if (!m) return null;
+  const body = m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => {
+    const b = [];
+    const q = x[1];
+    for (let i = 0; i < q.length; i++) {
+      if (q[i] !== '\\') { b.push(...Buffer.from(q[i])); continue; }
+      const c = q[++i];
+      if (c === 'x') { b.push(parseInt(q.substr(i + 1, 2), 16)); i += 2; }
+      else b.push(...Buffer.from(c === 'n' ? '\n' : c === 't' ? '\t' : c));
+    }
+    return Buffer.from(b).toString('utf8');
+  });
+}
+
 // all web_client.print/println/printf calls of void <fn>() { ... }; returns {calls:[{text,bytes,kind}], errors}
+// printf: the format literal(s) are followed by (unsigned)<CONST> arguments, each %u is replaced by HDR[<CONST>];
+// bytes counts the FORMAT literal (what sits in rodata), text is the rendered output.
 function extractCalls(src, fn) {
   const at = src.indexOf('void ' + fn + '()');
   if (at < 0) throw new Error('function not found: ' + fn);
@@ -50,6 +101,7 @@ function extractCalls(src, fn) {
   while ((m = re.exec(body))) {
     let p = re.lastIndex;
     const lits = [];
+    let args = [];
     for (;;) {
       while (/\s/.test(body[p])) p++;
       if (body[p] === '"') {
@@ -58,10 +110,26 @@ function extractCalls(src, fn) {
         lits.push(decodeLiteral(body.slice(p + 1, q)));
         p = q + 1;
       } else if (body[p] === ')') break;
-      else { errors.push(m[1] + ': non-literal argument near "' + body.slice(p, p + 30) + '"'); break; }
+      else if (m[1] === 'printf' && body[p] === ',' && lits.length) {
+        let d = 0, q = p + 1;
+        for (; q < body.length; q++) { if (body[q] === '(') d++; else if (body[q] === ')') { if (!d) break; d--; } }
+        args = body.slice(p + 1, q).split(',').map((a) => a.replace(/\(unsigned\)/, '').trim());
+        p = q;
+      } else { errors.push(m[1] + ': non-literal argument near "' + body.slice(p, p + 30) + '"'); break; }
     }
-    const text = lits.join('');
-    calls.push({ kind: m[1], text, bytes: Buffer.byteLength(text) });
+    let text = lits.join('');
+    const fmtBytes = Buffer.byteLength(text);
+    if (m[1] === 'printf') {
+      let ai = 0;
+      text = text.replace(/%(.)/g, (all, c) => {
+        if (c !== 'u') { errors.push('printf: unsupported conversion ' + all); return all; }
+        const v = HDR[args[ai++]];
+        if (v === undefined) errors.push('printf: unknown argument ' + args[ai - 1]);
+        return String(v);
+      });
+      if (ai !== args.length) errors.push('printf: ' + ai + ' conversions for ' + args.length + ' arguments');
+    }
+    calls.push({ kind: m[1], text, bytes: m[1] === 'printf' ? fmtBytes : Buffer.byteLength(text) });
   }
   return { calls, errors };
 }
@@ -123,6 +191,18 @@ function mkClock() {
   return T;
 }
 
+// The server texts: the REAL rmTokenTable of src/rm_sender_policy.h, parsed here, so the fake server answers
+// exactly {ok:false, err, msg} like the C++ handlers do (DRY-02). Adjacent literals are concatenated.
+const SRVMSG = (() => {
+  const t = fs.readFileSync(path.join(SRC_DIR, 'rm_sender_policy.h'), 'utf8');
+  const at = t.indexOf('rmTokenTable(size_t *n)');
+  const body = t.slice(at, t.indexOf('};', at));
+  const o = {};
+  for (const m of body.matchAll(/\{\s*"([^"]+)",\s*((?:"(?:[^"\\]|\\.)*"\s*)+)\}/g)) o[m[1]] = [...m[2].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => decodeLiteral(x[1])).join('');
+  return o;
+})();
+const refuse = (err, extra) => Object.assign({ ok: false, err, msg: SRVMSG[err] }, extra || {});
+
 function mkServer() {
   const s = {
     status: null, nodes: [], heard: [], auth: 0, calls: [], sendReply: null, nextCtr: 1,
@@ -149,11 +229,11 @@ function mkServer() {
       else if (act === 'forget') s.nodes = [0, 1, 2].map((n) => ({ slot: n, used: 0, call: '' }));
       return { json: { ok: true } };
     }
-    if (u === '/rmpasswd') { s.status.pw = f.get('act') === 'set' ? 1 : 0; return { json: { ok: true } }; }
+    if (u === '/rmpasswd') { if (s.passwdReply) return { json: s.passwdReply }; s.status.pw = f.get('act') === 'set' ? 1 : 0; return { json: { ok: true } }; }
     if (u === '/rmsend') {
       if (s.sendReply) return { json: s.sendReply };
       const dst = f.get('slot') !== null ? (s.nodes[+f.get('slot')] || {}).call : f.get('dst');
-      if (f.get('slot') !== null && f.get('call') !== null && f.get('call') !== dst) return { json: { ok: false, err: 'slot' } };
+      if (f.get('slot') !== null && f.get('call') !== null && f.get('call') !== dst) return { json: refuse('slot') };
       const cmd = (f.get('cmd') + ' ' + f.get('args')).trim();
       s.status.sent.unshift({ dst, ctr: s.nextCtr, cmd, ago: 0, rep: 0, ver: 0, reply: '', st: 'queued', msg: 'Handed to the radio. It goes on air in a moment.' });
       s.lastCtr = s.nextCtr;
@@ -273,7 +353,10 @@ function leaks(P, canary) {
 (async () => {
   // ---- static checks of the C++ source -------------------------------------------------------------
   check('extractor found the page and the JS', pageX.calls.length > 5 && jsX.calls.length > 20, pageX.calls.length + '/' + jsX.calls.length);
-  check('only literal arguments, no printf', pageX.errors.length === 0 && jsX.errors.length === 0 && ![...pageX.calls, ...jsX.calls].some((c) => c.kind === 'printf'), pageX.errors.concat(jsX.errors).join('; '));
+  const pf = [...pageX.calls, ...jsX.calls].filter((c) => c.kind === 'printf');
+  check('only literal arguments; the one printf is the rmLen line (format < 64 B, resolved from the headers)', pageX.errors.length === 0 && jsX.errors.length === 0 && pf.length === 1 && pf[0].bytes < 64 && /^var rmLen=\{name:\d+,atxt:\d+\};\n$/.test(pf[0].text), pageX.errors.concat(jsX.errors).join('; ') + ' ' + pf.map((c) => c.text).join('|'));
+  check('DRY-04 rmLen equals sizeof(settings field) - 1 from the headers (19/40-1 style, not typed in the page)', HDR.RM_NAME_MAX > 0 && HDR.RM_ATXT_MAX > HDR.RM_NAME_MAX && pf.length === 1 && pf[0].text.indexOf('name:' + HDR.RM_NAME_MAX + ',atxt:' + HDR.RM_ATXT_MAX + '}') > 0, JSON.stringify(HDR));
+  check('DRY-04 the page source does not hard-code the text limits 19 / 39 in the JS', !/\b(?:19|39)\b/.test(JS.replace(/var rmLen=\{[^}]*\};/, '').replace(/\d+\.\d+/g, '')), (JS.replace(/var rmLen=\{[^}]*\};/, '').match(/.{20}\b(?:19|39)\b.{10}/) || [''])[0]);
   const all = pageX.calls.concat(jsX.calls);
   const maxLit = Math.max(...all.map((c) => c.bytes));
   check('every print/println literal <= 512 bytes', maxLit <= 512, 'max ' + maxLit);
@@ -298,7 +381,8 @@ function leaks(P, canary) {
     check('UI-04 only Advanced starts closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_adv');
     check('UI-05 exactly one status control and one sync control, no Test/Check connection', !D.getElementById('rm_test') && !/Test connection|Check connection/.test(HTML + JS) && (JS.match(/'Refresh status'/g) || []).length === 1 && (JS.match(/'data-act':'sync'/g) || []).length === 1);
     check('UI-07 one message line (no rm_lockline), "saved on this node" once', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 1 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
-    check('UI-08 shared sentences: Really? once, confirm sentence once, no-answer sentence once, one rmErr password text', (JS.match(/Really\? tap again/g) || []).length === 1 && (JS.match(/Tap again within 4 seconds to confirm/g) || []).length === 1 && (JS.match(/did not answer the request/g) || []).length === 1 && (JS.match(/1 to 14 plain characters/g) || []).length === 1);
+    check('UI-08 shared sentences: Really? once, confirm sentence once, no-answer sentence once, one rmErr password text', (JS.match(/Really\? tap again/g) || []).length === 1 && (JS.match(/Tap again within 4 seconds to confirm/g) || []).length === 1 && (JS.match(/did not answer the request/g) || []).length === 1);
+    check('DRY-02/03 no rule or refusal sentence is duplicated from the server: no rmErr table, no password charset or reserved-word text', !/rmErr\b|rmErrOf|plain characters|plain letters|reserved|must not start with a space|Not allowed:|No double space/.test(JS));
   }
   check('no localStorage/sessionStorage/innerHTML in the JS', !/localStorage|sessionStorage|innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(JS));
   {
@@ -320,6 +404,47 @@ function leaks(P, canary) {
   }
   for (const k of ['rmPageInit', 'rmPageLeave']) check('exports ' + k, new JSDOM('', { runScripts: 'outside-only' }).window.eval(JS + ';typeof ' + k) === 'function');
 
+  // ---- DRY-07: the page's command lists against src/rm_commands.h ------------------------------------------
+  // THE RULE (rows are X(name, KIND, SHAPE) of rm_commands.h, parsed by the contract regex; the JS lists stay literals):
+  //   ACTION, READ, RW rows == the keys of rmCmds (the label of a command in the Messages table), nothing else in it
+  //   TOGGLE rows          == the keys of rmTog (status-letter index 0..5 in the order GTDMWL) and of rmTogName
+  //   PARAM rows           == the names rmLabel branches on (n=='<name>'), and no other branch name
+  //   READ + RW rows except mh == the cards of rmDefs (c); mh has its own card builder rmMhCard
+  // So a command added to the header without a JS entry, or a JS entry without a header row, fails here.
+  {
+    const P = await mkPage(mkServer());
+    const H = headerCommands();
+    const of = (...k) => H.filter((r) => k.includes(r.kind)).map((r) => r.name);
+    const eq = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+    const kinds = {};
+    for (const r of H) kinds[r.kind] = (kinds[r.kind] || 0) + 1;
+    check('DRY-07 header parsed: at least the 22 known rows, all five kinds present (sanity only, the set checks below do the pinning)', H.length >= 22 && ['ACTION', 'TOGGLE', 'PARAM', 'READ', 'RW'].every((k) => kinds[k] > 0), JSON.stringify(kinds));
+    check('DRY-07 rmCmds keys == ACTION + READ + RW names', eq(Object.keys(P.w.rmCmds), of('ACTION', 'READ', 'RW')), Object.keys(P.w.rmCmds).join() + ' vs ' + of('ACTION', 'READ', 'RW').join());
+    check('DRY-07 rmTog keys and rmTogName keys == TOGGLE names', eq(Object.keys(P.w.rmTog), of('TOGGLE')) && eq(Object.keys(P.w.rmTogName), of('TOGGLE')), Object.keys(P.w.rmTog).join() + ' vs ' + of('TOGGLE').join());
+    check('DRY-07 rmTog indices follow the status letters GTDMWL', Object.keys(P.w.rmTog).every((k) => 'GTDMWL'[P.w.rmTog[k]] === { gps: 'G', track: 'T', display: 'D', mesh: 'M', gateway: 'W', led: 'L' }[k]), JSON.stringify(P.w.rmTog));
+    const lab = P.w.rmLabel.toString();
+    const branches = [...lab.matchAll(/n\s*==\s*'(\w+)'/g)].map((m) => m[1]);
+    check('DRY-07 rmLabel branches == PARAM names', eq(branches, of('PARAM')), branches.join() + ' vs ' + of('PARAM').join());
+    check('DRY-07 rmDefs cards == READ + RW names except mh, mh has rmMhCard', eq(P.w.rmDefs.map((d) => d.c), of('READ', 'RW').filter((n) => n !== 'mh')) && typeof P.w.rmMhCard === 'function', P.w.rmDefs.map((d) => d.c).join());
+    const names = new Set(H.map((r) => r.name));
+    const jsNames = [].concat(Object.keys(P.w.rmCmds), Object.keys(P.w.rmTog), Object.keys(P.w.rmTogName), branches, P.w.rmDefs.map((d) => d.c));
+    check('DRY-07 every command name used by the page is a header row', jsNames.every((n) => names.has(n)), jsNames.filter((n) => !names.has(n)).join());
+    // DRY-02: node answers of the self password flow carry msg next to err
+    const srv = mkServer();
+    const Q = await mkPage(srv);
+    await Q.init();
+    srv.passwdReply = refuse('pw');
+    Q.el('rm_selfpw').value = ' bad';
+    await Q.tap(Q.btn('Set'));
+    check('DRY-02 /rmpasswd refusal shows the server msg (the page does not judge the leading space)', Q.text('rm_selfmsg') === SRVMSG.pw && Q.calls.filter((c) => rmPath(c) === '/rmpasswd').length === 1, Q.text('rm_selfmsg'));
+    srv.passwdReply = { ok: false, err: 'pw' };
+    Q.el('rm_selfpw').value = ' bad';
+    await Q.tap(Q.btn('Set'));
+    check('DRY-02 /rmpasswd refusal without msg falls back to a generic sentence', Q.text('rm_selfmsg') === 'The request was refused (pw).', Q.text('rm_selfmsg'));
+    Q.w.rmPageLeave();
+    P.w.rmPageLeave();
+  }
+
   // ---- call format check ---------------------------------------------------------------------------
   {
     const P = await mkPage(mkServer());
@@ -327,6 +452,15 @@ function leaks(P, canary) {
     const invalid = ['DK5EN', 'D-1', 'DK5EN-123', 'DK5EN-', 'ABCDEFGHI-1', 'dk5en-1', 'DK 5-1', '', '-1', 'DK-5EN-1', 'DK5EN-A', 'AB-1-2'];
     check('rmValidCall accepts the valid vectors', valid.every((c) => P.w.rmValidCall(c)), valid.filter((c) => !P.w.rmValidCall(c)).join(','));
     check('rmValidCall rejects the invalid vectors', invalid.every((c) => !P.w.rmValidCall(c)), invalid.filter((c) => P.w.rmValidCall(c)).join(','));
+    // DRY-03: rmValidCall is a cheap pre-check and must agree with the C++ rmValidateCall. The vectors are the ones
+    // test_rm_sender_policy pins for rmValidateCall (parsed from that file: ok[] must pass, bad[] must fail), plus the
+    // inputs below. The page upper-cases a typed call before it checks (rmCallInput), rmFoldCall does the same server side.
+    const cppT = path.join(__dirname, '..', 'test', 'test_rm_sender_policy', 'test_main.cpp');
+    const cOk = cppStrings(cppT, 'ok'), cBad = cppStrings(cppT, 'bad');
+    check('DRY-03 the C++ call vectors were found (ok[] and bad[] of test_call_table)', !!cOk && !!cBad && cOk.length >= 9 && cBad.length >= 20, (cOk || []).length + '/' + (cBad || []).length);
+    check('DRY-03 rmValidCall agrees with rmValidateCall on every C++ vector', (cOk || []).every((c) => P.w.rmValidCall(c)) && (cBad || []).every((c) => !P.w.rmValidCall(c)), (cOk || []).filter((c) => !P.w.rmValidCall(c)).concat((cBad || []).filter((c) => P.w.rmValidCall(c))).join(' | '));
+    const pinOk = ['DK5EN-1', 'OE1ABC-15', 'dk5en-9'.toUpperCase()], pinBad = ['DK5EN', 'DK5EN-123', 'D-1', 'OE1ABCDE-1', 'dk5en-1'];
+    check('DRY-03 pinned inputs: valid DK5EN-1, OE1ABC-15, dk5en-9 (folded); invalid DK5EN, DK5EN-123, D-1, OE1ABCDE-1, dk5en-1 (unfolded)', pinOk.every((c) => P.w.rmValidCall(c)) && pinBad.every((c) => !P.w.rmValidCall(c)), pinOk.filter((c) => !P.w.rmValidCall(c)).concat(pinBad.filter((c) => P.w.rmValidCall(c))).join(','));
     await P.init();
     await P.typeCall('dk5en-12');
     check('call field upper-cases and shows "looks right"', P.el('rm_call').value === 'DK5EN-12' && /looks right/.test(P.text('rm_callchk')));
@@ -558,7 +692,14 @@ function leaks(P, canary) {
     check('no password typed: nothing is sent, the page asks for it', P.sends().length === 0 && /password of DK5EN-12/.test(P.text('rm_msg')), P.text('rm_msg'));
     P.el('rm_pw').value = ' bad';
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
-    check('invalid password (leading space) is refused before sending', P.sends().length === 0 && /must not start with a space/.test(P.text('rm_msg')), P.text('rm_msg'));
+    check('DRY-03 a password with a leading space is not judged by the page: it is sent', P.sends().length === 1, P.sends().length);
+    await P.T.advance(12000);
+    P.el('rm_pw').value = 'x'.repeat(15);
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('DRY-03 password longer than 14 is refused before sending (length rule only)', P.sends().length === 1 && /at most 14/.test(P.text('rm_msg')), P.text('rm_msg'));
+    P.el('rm_pw').value = '';
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('DRY-03 empty password asks for one', P.sends().length === 1 && /Enter a password/.test(P.text('rm_msg')), P.text('rm_msg'));
     P.w.rmPageLeave();
   }
   {
@@ -586,11 +727,11 @@ function leaks(P, canary) {
     const d = P.calls.filter((x) => rmPath(x) === '/rmnodes' && x.method === 'POST').pop();
     check('forget: POST act=del&slot=0', d.body === 'act=del&slot=0', d.body);
     check('forget: node is no longer saved', P.el('rm_pwrow').style.display === '' && /Nothing saved/.test(P.text('rm_saved')));
-    srv.nodesReply = { ok: false, err: 'dup' };
+    srv.nodesReply = refuse('dup');
     P.el('rm_pw').value = CANARY;
     await P.tap(P.btn('Remember'));
     check('error token dup gets a plain sentence', /already saved/.test(P.text('rm_msg')), P.text('rm_msg'));
-    srv.nodesReply = { ok: false, err: 'store' };
+    srv.nodesReply = refuse('store');
     P.el('rm_pw').value = CANARY;
     await P.tap(P.btn('Remember'));
     check('error token store gets a plain sentence', /could not save/.test(P.text('rm_msg')), P.text('rm_msg'));
@@ -701,12 +842,21 @@ function leaks(P, canary) {
     check('viaSync: no longer pending, rm_chain is empty', P.text('rm_chain') === '', P.text('rm_chain'));
     srv.sendReply = null;
     await P.T.advance(10100);
-    srv.sendReply = { ok: false, err: 'limit' };
+    srv.sendReply = refuse('limit');
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     check('error token limit gets a plain sentence', /still unanswered/.test(P.text('rm_msg')), P.text('rm_msg'));
-    srv.sendReply = { ok: false, err: 'token' };
+    // DRY-02: the server text is shown verbatim; an answer with err but no msg gets a generic sentence, never blank
+    srv.sendReply = { ok: false, err: 'zzz', msg: 'Custom text from the server, shown as is.' };
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
-    check('error token "token" asks for a reload', /Reload/.test(P.text('rm_msg')), P.text('rm_msg'));
+    check('DRY-02 error answer with msg shows that msg verbatim', P.text('rm_msg') === 'Custom text from the server, shown as is.', P.text('rm_msg'));
+    await P.T.advance(12000);
+    srv.sendReply = { ok: false, err: 'zzz' };
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('DRY-02 error answer without msg falls back to a generic sentence, not blank', /^The request was refused \(zzz\)\.$/.test(P.text('rm_msg')), P.text('rm_msg'));
+    await P.T.advance(12000);
+    srv.sendReply = { ok: false };
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('DRY-02 refusal with neither err nor msg is still a sentence', P.text('rm_msg') === 'The request was refused.', P.text('rm_msg'));
     P.w.rmPageLeave();
   }
   {
@@ -857,15 +1007,14 @@ function leaks(P, canary) {
     const P = await mkPage(srv);
     await P.init();
     P.w.rmPick('DK5EN-1');
-    const exp = { range: /outside the allowed range/, text: /characters the node will not accept/, unknown: /does not know/, unsupported: /not available on this node/, end: /no more rows/, gps: /controlled by GPS/, hidden: /does not send its position/, busy: /Wait a few seconds/, failed: /could not do it/ };
-    for (const tok of Object.keys(exp)) {
+    for (const tok of ['range', 'text', 'unknown', 'unsupported', 'end', 'gps', 'hidden', 'busy', 'failed']) {
       await P.T.advance(12000);
-      srv.sendReply = { ok: false, err: tok };
+      srv.sendReply = refuse(tok);
       await P.tap(P.btn('Refresh status', P.el('rm_info')));
-      check('W2E error token ' + tok + ' gets a plain sentence', exp[tok].test(P.text('rm_msg')) && !/refused \(/.test(P.text('rm_msg')), P.text('rm_msg'));
+      check('W2E error token ' + tok + ' shows the server msg verbatim', !!SRVMSG[tok] && P.text('rm_msg') === SRVMSG[tok], P.text('rm_msg'));
     }
     // verified err reply: the Messages row shows the sentence (cell and title)
-    await P.setPoll({ sent: [ent('DK5EN-1', 'name Martin', 'err text', { ctr: 5, ago: 3, st: 'err', msg: 'x' })] });
+    await P.setPoll({ sent: [ent('DK5EN-1', 'name Martin', 'err text', { ctr: 5, ago: 3, st: 'err', msg: SRVMSG.text })] });
     const r = P.el('rm_msgs').querySelector('tr');
     check('W2E Messages row shows the sentence for err text, also as title', /characters the node will not accept/.test(r.children[3].textContent) && /characters the node will not accept/.test(r.title), r.textContent);
     // 108-character reply row stays one row, text only
@@ -875,7 +1024,7 @@ function leaks(P, canary) {
     check('W2E 108-character reply renders as one row via textContent', rr.length === 1 && rr[0].children.length === 4 && rr[0].children[3].textContent.length > 100 && rr[0].querySelector('img') === null, rr.length);
     // forced attempt
     await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'limit', canForce: 1, retry: 30 };
+    srv.sendReply = refuse('limit', { canForce: 1, retry: 30 });
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     const fb = () => P.btn('Try once more', P.el('rm_force'));
     check('W2E refusal with canForce shows "Try once more"', !!fb() && /still unanswered/.test(P.text('rm_msg')), P.text('rm_force'));
@@ -886,7 +1035,7 @@ function leaks(P, canary) {
     check('W2E Try once more repeats the command with force=1', sb.length === 1 && /cmd=status/.test(sb[0]) && /&force=1$/.test(sb[0]) && !/force/.test(P.sends()[n0 - 1].body), JSON.stringify(sb));
     check('W2E the button is gone after use', P.el('rm_force').textContent === '', P.el('rm_force').textContent);
     await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'limit', canForce: 0 };
+    srv.sendReply = refuse('limit', { canForce: 0 });
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     check('W2E canForce 0 shows no button', P.el('rm_force').textContent === '' && /still unanswered/.test(P.text('rm_msg')));
     P.w.rmPageLeave();
@@ -945,11 +1094,22 @@ function leaks(P, canary) {
     // identity
     const nm = 'rm_f_name_v', nset = () => X('rm_f_name_set');
     await typeIn(nm, 'Martin');
-    check('RMX name counter and Set enabled', tx('rm_f_name_cnt') === '6/19' && !nset().disabled && tx('rm_f_name_note') === 'Stored exactly as typed.', tx('rm_f_name_cnt'));
-    for (const [v, h] of [['a<b', 'Not allowed: <'], ['a=b', 'Not allowed: ='], [' ab', 'No space at the start or end.'], ['a  b', 'No double space.'], ['NoNe', 'The name must not be none.'], ['a'.repeat(20), 'Too long.']]) {
+    check('RMX name counter and Set enabled', tx('rm_f_name_cnt') === '6/' + HDR.RM_NAME_MAX && !nset().disabled && tx('rm_f_name_note') === 'Stored exactly as typed.', tx('rm_f_name_cnt'));
+    // DRY-03: the page checks the length only (against rmLen, from the header); characters, spaces and the word none
+    // are the node's and the server's business (rmTextAllowed is not mirrored).
+    for (const v of ['a<b', 'a=b', ' ab', 'a  b', 'NoNe']) {
       await typeIn(nm, v);
-      check('RMX name "' + v + '" refused: Set disabled, hint "' + h + '"', nset().disabled && tx('rm_f_name_hint') === h, tx('rm_f_name_hint') + '|' + nset().disabled);
+      check('DRY-03 name "' + v + '" is not judged by the page: Set stays enabled, no hint', !nset().disabled && tx('rm_f_name_hint') === '', tx('rm_f_name_hint') + '|' + nset().disabled);
     }
+    for (const [v, ok] of [['a'.repeat(HDR.RM_NAME_MAX), true], ['a'.repeat(HDR.RM_NAME_MAX + 1), false]]) {
+      await typeIn(nm, v);
+      check('DRY-04 name of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused "Too long."') + ' (limit ' + HDR.RM_NAME_MAX + ' from the header)', nset().disabled === !ok && tx('rm_f_name_hint') === (ok ? '' : 'Too long.'), tx('rm_f_name_hint') + '|' + nset().disabled);
+    }
+    for (const [v, ok] of [['a'.repeat(HDR.RM_ATXT_MAX), true], ['a'.repeat(HDR.RM_ATXT_MAX + 1), false]]) {
+      await typeIn('rm_f_atxt_v', v);
+      check('DRY-04 APRS text of ' + v.length + ' chars: ' + (ok ? 'accepted' : 'refused') + ' (limit ' + HDR.RM_ATXT_MAX + ' from the header)', X('rm_f_atxt_set').disabled === !ok && tx('rm_f_atxt_cnt') === v.length + '/' + HDR.RM_ATXT_MAX, tx('rm_f_atxt_cnt') + '|' + X('rm_f_atxt_set').disabled);
+    }
+    P.w.rmClrIn('atxt');
     await typeIn(nm, 'Martin');
     const s0 = P.sends().length;
     await P.tap(nset());
@@ -973,7 +1133,7 @@ function leaks(P, canary) {
     check('RMX pos Set: two taps, exact body', p1 === p0 && P.sends().length === p0 + 1 && /cmd=pos&args=48\.40812%20-11\.7%20492(&|$)/.test(P.sends()[p0].body), JSON.stringify(P.sends().slice(p0)));
     await P.T.advance(12000);
     for (const [t, re] of [['hidden', /does not send its position/], ['gps', /controlled by GPS/]]) {
-      await poll([ent('DK5EN-1', 'pos 1 2 3', 'err ' + t, { ctr: 12, ago: 1, st: 'err' })]);
+      await poll([ent('DK5EN-1', 'pos 1 2 3', 'err ' + t, { ctr: 12, ago: 1, st: 'err', msg: SRVMSG[t] })]);
       check('RMX err ' + t + ' shows its sentence', re.test(P.text('rm_msgs')), P.text('rm_msgs').slice(0, 120));
     }
     // radio stepper bound follows a radio reply
@@ -1017,7 +1177,7 @@ function leaks(P, canary) {
     await poll([], 0); P.w.rmMhStart(); await flush(); await poll([E('mh 0', 'ok 9 12 AA1AA-1 1', { ago: 0 })], 30); P.w.rmPick('DK5EN-3'); await flush(); await poll([], 0);
     check('RMN node change stops the driver and clears the list', nS() === 6 && P.w.rmMh.on === 0 && P.w.rmMh.rows.length === 0 && !X('rm_mh_tab').children.length, nS() + ' ' + P.w.rmMh.rows.length + JSON.stringify(P.sends().map((s) => s.body)));
     P.w.rmPick('DK5EN-1');
-    srv.sendReply = { ok: false, err: 'busy', retry: 4 };
+    srv.sendReply = refuse('busy', { retry: 4 });
     P.w.rmMhStart(); await flush();
     check('RMN spacing refusal is not an error: no sentence, driver still on', nS() === 7 && P.w.rmMh.on === 1 && !/Two tries|refused/.test(tx('rm_msg') + tx('rm_mh_prog')), nS() + tx('rm_msg') + tx('rm_mh_prog'));
     srv.sendReply = null; await poll([], 0);
@@ -1094,7 +1254,7 @@ function leaks(P, canary) {
     const nS = () => P.sends().length, last = () => (nS() ? P.sends()[nS() - 1].body : '');
     const fb = () => P.btn('Try once more', P.el('rm_force'));
     await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'limit', canForce: 1, retry: 30 };
+    srv.sendReply = refuse('limit', { canForce: 1, retry: 30 });
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     check('ADV a: refused send on DK5EN-1 offers "Try once more"', !!fb() && P.w.rmForce && P.w.rmForce.d === 'DK5EN-1' && P.w.rmForce.s === 0, JSON.stringify(P.w.rmForce));
     srv.sendReply = null;
@@ -1107,14 +1267,14 @@ function leaks(P, canary) {
     P.w.rmForceBtn(); P.w.rmPick('DK5EN-1'); await flush();
     check('ADV a: selecting the original node again does not resurrect it; nothing was sent', !fb() && nS() === forced, nS() + ' ' + forced);
     await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'limit', canForce: 1, retry: 30 };
+    srv.sendReply = refuse('limit', { canForce: 1, retry: 30 });
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     srv.sendReply = null;
     await P.tap(fb());
     check('ADV a: forced send carries call=<original node> and force=1', last() === 'slot=0&cmd=status&args=&call=DK5EN-1&force=1', last());
     await P.T.advance(12000);
     P.w.rmPick('DK5EN-2'); await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'limit', canForce: 1, retry: 30 };
+    srv.sendReply = refuse('limit', { canForce: 1, retry: 30 });
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
     const fo = P.w.rmForce; P.w.rmPick('DK5EN-1'); P.w.rmForce = fo; srv.sendReply = null; const n1 = nS();
     P.w.rmForceBtn(); if (fb()) await P.tap(fb());
@@ -1134,7 +1294,7 @@ function leaks(P, canary) {
     check('ADV b: first driver request and the follow-up page carry call=', nS() === d0 + 2 && first === 'slot=0&call=DK5EN-1&cmd=mh&args=0' && last() === 'slot=0&call=DK5EN-1&cmd=mh&args=107', first + ' | ' + last());
     // c: leaving the page stops the run, re-opening does not resume it
     P.w.rmMhStop(); await P.T.advance(12000);
-    srv.sendReply = { ok: false, err: 'busy', retry: 20 };
+    srv.sendReply = refuse('busy', { retry: 20 });
     P.w.rmMhStart(); await flush(); const c0 = nS();
     P.w.rmPageLeave(); srv.sendReply = null; await P.T.advance(60000);
     check('ADV c: leaving the page during a retry wait ends the run, nothing is sent', P.w.rmMh.on === 0 && nS() === c0 && P.w.rmMh.pre === '', nS() + ' ' + c0);
@@ -1161,9 +1321,9 @@ function leaks(P, canary) {
       check('ADV e: refusal "' + tk + '" ends the run, no later send', P.w.rmMh.on === 0 && nS() === e0 + 1, tk + ' ' + nS() + ' ' + e0);
     }
     // g: err slot
-    srv.sendReply = { ok: false, err: 'slot' }; await P.T.advance(12000);
+    srv.sendReply = refuse('slot'); await P.T.advance(12000);
     await P.tap(P.btn('Refresh status', P.el('rm_info')));
-    check('ADV g: err slot shows its sentence', tx('rm_msg') === 'The saved node changed. Reload the page.', tx('rm_msg'));
+    check('ADV g: err slot shows its sentence (the server msg)', tx('rm_msg') === SRVMSG.slot, tx('rm_msg'));
     // f: position grammar
     const bad = [['lat', '0090'], ['lon', '000001'], ['lat', '.5'], ['lat', '5.'], ['alt', '000001'], ['alt', '40001'], ['lat', '90.1']];
     const good = [['lat', '-0'], ['lat', '90.0'], ['lon', '-179.123456'], ['alt', '0'], ['alt', '40000']];

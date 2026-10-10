@@ -15,6 +15,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "node_position.h"
+#include "rm_commands.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
 #include "rm_text.h"
@@ -108,6 +109,30 @@ int writePos(const RmCmd &c, char *res, size_t n)
     return okFrom(res, n, rmFmtPos(res + 3, n - 3, in));
 }
 
+int writeName(const RmCmd &c, char *res, size_t n)
+{
+    return writeText(c, res, n, true);
+}
+
+int writeAtxt(const RmCmd &c, char *res, size_t n)
+{
+    return writeText(c, res, n, false);
+}
+
+// One row per RW command of rm_commands.h; the static_assert fails the build when the lists drift.
+struct WriteRow
+{
+    const char *name;
+    int (*run)(const RmCmd &c, char *res, size_t n);
+};
+
+constexpr WriteRow kWriteRows[] = {
+    {"name", writeName},
+    {"atxt", writeAtxt},
+    {"pos", writePos},
+};
+static_assert(rmRowsMatchList(kWriteRows, rmKindIsWrite), "kWriteRows = RW rows of rm_commands.h");
+
 } // namespace
 
 int rmExecWrite(const RmCmd &c, char *res, size_t n)
@@ -115,11 +140,8 @@ int rmExecWrite(const RmCmd &c, char *res, size_t n)
     if (res == nullptr || n == 0 || c.args[0] == '\0')
         return 0; // empty args: the read executor answers
 
-    if (strcmp(c.cmd, "name") == 0)
-        return writeText(c, res, n, true);
-    if (strcmp(c.cmd, "atxt") == 0)
-        return writeText(c, res, n, false);
-    if (strcmp(c.cmd, "pos") == 0)
-        return writePos(c, res, n);
+    for (size_t i = 0; i < sizeof(kWriteRows) / sizeof(kWriteRows[0]); i++)
+        if (strcmp(c.cmd, kWriteRows[i].name) == 0)
+            return kWriteRows[i].run(c, res, n);
     return 0;
 }

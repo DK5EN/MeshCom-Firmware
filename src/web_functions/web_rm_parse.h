@@ -17,7 +17,9 @@
 //     part of an error, and the value pointers of a failed parse point at a static empty string.
 //
 // Error tokens: "size" (body longer than RM_FORM_BODY_MAX), "form", "act", "slot", "call", "pw",
-// "cmd" (cmd or args missing, over-long or not printable ASCII).
+// "cmd" (cmd or args missing, over-long or not printable ASCII). The sentence of each token is the
+// handler's `msg`, looked up in rmTokenTable (rm_sender_policy.h); test_rm_web_parse pins that every
+// token has one.
 #ifndef WEB_RM_PARSE_H
 #define WEB_RM_PARSE_H
 

@@ -561,7 +561,7 @@ static int web_read_body(long content_length)
  *             or: slot=<0..2>&cmd=<cmd>&args=<args>   (a saved node: its key comes from the store, never a password)
  *             optional &force=1: use the one "try once more" after a re-key (only where canForce is reported)
  *             optional &call=<CALL> (slot form only): refused with "slot" unless the slot holds exactly that call
- *  answer: {"ok":true,"ctr":N[,"viaSync":true]} or {"ok":false,"err":"<reason>","retry":S,"canForce":0|1}
+ *  answer: {"ok":true,"ctr":N[,"viaSync":true]} or {"ok":false,"err":"<reason>","msg":"<sentence>","retry":S,"canForce":0|1}
  *  -- never an echo of any input */
 static void sub_rm_send(long content_length)
 {
@@ -605,8 +605,11 @@ static void sub_rm_send(long content_length)
         web_client.printf("{\"ok\":true,\"ctr\":%lu%s}\n", (unsigned long)ctr, viaSync ? ",\"viaSync\":true" : "");
     else
     {
+        const char *tok = err[0] ? err : "send";
         web_client.print("{\"ok\":false,\"err\":");
-        rm_json_str(err[0] ? err : "send");
+        rm_json_str(tok);
+        web_client.print(",\"msg\":");
+        rm_json_str(rmErrTokenMessage(tok)); // the sentence comes from rmTokenTable, the JS keeps no copy
         web_client.printf(",\"retry\":%lu,\"canForce\":%d}\n", (unsigned long)retryS, canForce ? 1 : 0);
     }
 }

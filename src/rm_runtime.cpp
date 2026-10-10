@@ -12,6 +12,7 @@
 #include "loop_functions_extern.h"
 #include "hmac_sha256.h"
 #include "remote_cmd.h"
+#include "rm_commands.h"
 #include "rm_queue.h"
 #include "rm_exec_ext.h"
 #include "rm_runtime.h"
@@ -103,13 +104,16 @@ struct RmToggle
     bool (*state)(void); // runtime flag the console command sets
 };
 
-const RmToggle kToggles[] = {
+constexpr RmToggle kToggles[] = {
     {"gps", "--gps on", "--gps off", stGps},
     {"track", "--track on", "--track off", stTrack},
     {"display", "--display on", "--display off", stDisplay},
     {"gateway", "--gateway on", "--gateway off", stGateway},
     {"mesh", "--mesh on", "--mesh off", stMesh},
 };
+// The names must be exactly the TOGGLE rows of rm_commands.h; "led" is a pin, handled in execute().
+// (Not derivable from COMMAND_TOGGLES: that table has no track/display rows.)
+static_assert(rmRowsMatchList(kToggles, rmKindIsToggle, "led"), "kToggles = TOGGLE rows of rm_commands.h minus led");
 
 // commandAction() takes a writable char*; the table literal is copied, never the received text.
 void runConsole(const char *literal)

@@ -17,6 +17,7 @@
 
 #include <hmac_sha256.h>
 #include <remote_cmd.h>
+#include <rm_commands.h>
 #include <rm_queue.h>
 #include <rm_rx_gate.h>
 #include <rm_sender_policy.h>
@@ -1152,6 +1153,78 @@ static void test_command_allowed_predicate(void)
     TEST_ASSERT_FALSE(rmCommandAllowed("averyveryverylongcmd", "", 22));
 }
 
+// DRY-07: the allowlist is generated from rm_commands.h. The expected list is pinned LITERALLY here (comparing
+// the allowlist with the macro expansion alone would be a tautology): adding, removing or renaming a command
+// needs this list changed on purpose, and an ex-command must stop being allowed.
+static void test_allowlist_is_the_pinned_command_list(void)
+{
+    static const char *const kPinned[] = {
+        "reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track", "display", "led", "gateway", "mesh",
+        "txpower", "setout", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
+    const size_t n = sizeof(kPinned) / sizeof(kPinned[0]);
+    TEST_ASSERT_EQUAL_UINT(22, n);
+    TEST_ASSERT_EQUAL_UINT(22, RM_COMMAND_COUNT);
+
+    // the list itself, name by name and in order, with a sample argument that fits the shape in column 3
+    size_t i = 0;
+#define CHECK_ROW(nm, kind, shape)                                                                               \
+    do                                                                                                           \
+    {                                                                                                            \
+        TEST_ASSERT_TRUE_MESSAGE(i < n, #nm);                                                                    \
+        TEST_ASSERT_EQUAL_STRING(kPinned[i], #nm);                                                               \
+        const char *good = !strcmp(#shape, "ONOFF")     ? "on"                                                  \
+                           : !strcmp(#shape, "TXPOWER") ? "10"                                                   \
+                           : !strcmp(#shape, "SETOUT")  ? "a0 on"                                                \
+                           : !strcmp(#shape, "MH")      ? "5"                                                    \
+                                                        : "";                                                    \
+        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(#nm, good, 22), #nm);                                          \
+        /* a stray argument never passes a no-argument shape, and a missing one never passes on/off */         \
+        if (!strcmp(#shape, "NONE"))                                                                             \
+            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "x", 22), #nm);                                      \
+        if (!strcmp(#shape, "ONOFF"))                                                                            \
+            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "", 22), #nm);                                       \
+        i++;                                                                                                     \
+    } while (0);
+    RM_COMMAND_LIST(CHECK_ROW)
+#undef CHECK_ROW
+    TEST_ASSERT_EQUAL_UINT(n, i);
+
+    // by kind: 5 actions, 6 toggles, 2 parametrised, 6 reads, 3 read/write
+    TEST_ASSERT_EQUAL_UINT(6, rmCountWhere(rmKindIsToggle));
+    TEST_ASSERT_EQUAL_UINT(9, rmCountWhere(rmKindIsRead));
+    TEST_ASSERT_EQUAL_UINT(3, rmCountWhere(rmKindIsWrite));
+    TEST_ASSERT_EQUAL_INT(RM_CK_TOGGLE, rmCommandKind("led"));
+    TEST_ASSERT_EQUAL_INT(RM_CK_RW, rmCommandKind("pos"));
+    TEST_ASSERT_EQUAL_INT(RM_CK_READ, rmCommandKind("mh"));
+    TEST_ASSERT_EQUAL_INT(-1, rmCommandKind("rmstrictsecurity"));
+
+    // and the console-only switches are not on it
+    const char *const kBlocked[] = {"rmstrictsecurity", "remotemgmt", "passwd", "setpasswd", "wifi", "rm", "stat",
+                                    "namex", "rebootx", ""};
+    for (const char *b : kBlocked)
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(b, "", 22), b);
+}
+
+// DRY-04: the free-text limits of the allowlist are RM_NAME_MAX / RM_ATXT_MAX (19 / 39 today)
+static void test_allowlist_free_text_limits(void)
+{
+    TEST_ASSERT_EQUAL_UINT(19, RM_NAME_MAX);
+    TEST_ASSERT_EQUAL_UINT(39, RM_ATXT_MAX);
+    char b[64];
+    memset(b, 'a', sizeof b);
+    b[19] = 0;
+    TEST_ASSERT_TRUE(rmCommandAllowed("name", b, 22));
+    b[19] = 'a';
+    b[20] = 0;
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", b, 22));
+    memset(b, 'a', sizeof b);
+    b[39] = 0;
+    TEST_ASSERT_TRUE(rmCommandAllowed("atxt", b, 22));
+    b[39] = 'a';
+    b[40] = 0;
+    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", b, 22));
+}
+
 static void test_verify_reply_vectors_and_tampering(void)
 {
     std::string json;
@@ -2085,6 +2158,8 @@ int main(int, char **)
     RUN_TEST(test_build_command_reproduces_every_vector);
     RUN_TEST(test_build_command_limits);
     RUN_TEST(test_command_allowed_predicate);
+    RUN_TEST(test_allowlist_is_the_pinned_command_list);
+    RUN_TEST(test_allowlist_free_text_limits);
     RUN_TEST(test_verify_reply_vectors_and_tampering);
     RUN_TEST(test_verify_reply_rejects_malformed_and_commands);
     RUN_TEST(test_reply_queue_is_separate_from_command_queue);

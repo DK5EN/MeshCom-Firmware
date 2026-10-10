@@ -140,6 +140,13 @@ static void test_name_atxt(void)
     expectStr("a=-", rmFmtAtxt(g_buf, sizeof(g_buf), ""));
     // longer than the documented maximum: never a truncated text
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtName(g_buf, sizeof(g_buf), "123456789012345678901"));
+    // DRY-04: the formatter limits are the derived constants; literals pin the wire contract (19 / 39)
+    TEST_ASSERT_EQUAL_UINT(19, RM_NAME_MAX);
+    TEST_ASSERT_EQUAL_UINT(39, RM_ATXT_MAX);
+    TEST_ASSERT_TRUE(rmFmtName(g_buf, sizeof(g_buf), "1234567890123456789") > 0);   // 19 chars
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtName(g_buf, sizeof(g_buf), "12345678901234567890")); // 20 chars
+    TEST_ASSERT_TRUE(rmFmtAtxt(g_buf, sizeof(g_buf), "123456789012345678901234567890123456789") > 0);   // 39
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtAtxt(g_buf, sizeof(g_buf), "1234567890123456789012345678901234567890")); // 40
     TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
 }
 
@@ -416,11 +423,11 @@ static void test_worst_cases_rest(void)
 {
     RmRadioIn r = {999.999f, 99, 99, 999.99f, -99, -99};
     reportWorst("radio", rmFmtRadio(g_buf, sizeof(g_buf), r), g_buf, "f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99");
-    char name[RM_FMT_NAME_MAX + 1], atxt[RM_FMT_ATXT_MAX + 1];
-    memset(name, 'N', RM_FMT_NAME_MAX);
-    name[RM_FMT_NAME_MAX] = '\0';
-    memset(atxt, 'A', RM_FMT_ATXT_MAX);
-    atxt[RM_FMT_ATXT_MAX] = '\0';
+    char name[RM_NAME_MAX + 1], atxt[RM_ATXT_MAX + 1];
+    memset(name, 'N', RM_NAME_MAX);
+    name[RM_NAME_MAX] = '\0';
+    memset(atxt, 'A', RM_ATXT_MAX);
+    atxt[RM_ATXT_MAX] = '\0';
     reportWorst("name", rmFmtName(g_buf, sizeof(g_buf), name), g_buf, "n=NNNNNNNNNNNNNNNNNNN");
     reportWorst("atxt", rmFmtAtxt(g_buf, sizeof(g_buf), atxt), g_buf, "a=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     RmPosIn p = {-89.99999, -179.99999, 40000, RM_POS_NOFIX};

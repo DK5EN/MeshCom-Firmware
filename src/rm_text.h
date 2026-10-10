@@ -23,9 +23,9 @@
 //   leading/trailing space and double space: the console trims, so they would be altered on store
 //   "none" (any case) as NAME: the console uses it to clear the name
 //
-// Console setters read (src/command_functions.cpp --setname ~2650, --atxt ~3391): they only trim,
-// map "none" to empty (case-sensitive lower case), strip '#' (setname) and truncate at 19 / 39.
-// No charset rule there is stricter than the allowlist below; the lengths match (NAME 19, ATXT 39).
+// Console setters read (src/command_functions.cpp --setname, --atxt): they only trim,
+// map "none" to empty (case-sensitive lower case), strip '#' (setname) and truncate at RM_NAME_MAX /
+// RM_ATXT_MAX (rm_commands.h, 19 / 39). No charset rule there is stricter than the allowlist below.
 
 #ifndef RM_TEXT_H
 #define RM_TEXT_H
@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rm_commands.h" // RM_NAME_MAX / RM_ATXT_MAX
 #include "rm_validate.h" // rmValidateCall (shape of a call with SSID)
 
 enum RmTextKind
@@ -43,14 +44,11 @@ enum RmTextKind
     RM_TEXT_ATXT
 };
 
-#define RM_TEXT_NAME_MAX 19
-#define RM_TEXT_ATXT_MAX 39
-
 inline bool rmTextAllowed(const char *text, RmTextKind kind)
 {
     if (text == nullptr)
         return false;
-    const size_t maxLen = (kind == RM_TEXT_NAME) ? RM_TEXT_NAME_MAX : RM_TEXT_ATXT_MAX;
+    const size_t maxLen = (kind == RM_TEXT_NAME) ? RM_NAME_MAX : RM_ATXT_MAX;
     size_t len = 0;
     while (text[len] != '\0' && len <= maxLen)
         len++;

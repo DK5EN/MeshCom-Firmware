@@ -102,6 +102,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "rm_commands.h" // RM_NAME_MAX / RM_ATXT_MAX
+
 #define RM_FMT_BODY_MAX 105 // 140 - 4 - 10 - 1 - 1 - 16 - 3 ("ok ")
 
 // Window in minutes for the "heard" lists: the web page and the RM mh reply use the same 3 h (decision D11).
@@ -323,9 +325,6 @@ inline size_t rmFmtRadio(char *out, size_t n, const RmRadioIn &in)
 
 // ---- name / atxt ----------------------------------------------------------------------------------------
 
-#define RM_FMT_NAME_MAX 19
-#define RM_FMT_ATXT_MAX 39
-
 inline size_t rmfText(char *out, size_t n, const char *key, const char *text, size_t maxLen)
 {
     RmFmtBuf b;
@@ -342,12 +341,12 @@ inline size_t rmfText(char *out, size_t n, const char *key, const char *text, si
 
 inline size_t rmFmtName(char *out, size_t n, const char *name)
 {
-    return rmfText(out, n, "n=", name, RM_FMT_NAME_MAX);
+    return rmfText(out, n, "n=", name, RM_NAME_MAX);
 }
 
 inline size_t rmFmtAtxt(char *out, size_t n, const char *atxt)
 {
-    return rmfText(out, n, "a=", atxt, RM_FMT_ATXT_MAX);
+    return rmfText(out, n, "a=", atxt, RM_ATXT_MAX);
 }
 
 // ---- pos ------------------------------------------------------------------------------------------------
