@@ -35,7 +35,8 @@ void sub_page_remote()
     web_client.println("<div id=\"content_inner\">\n"
                        "<style>\n"
                        ".rmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:7px 0;}\n"
-                       ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}");
+                       ".rmrow input[type=text],.rmrow input[type=password]{flex:1;min-width:9em;}\n"
+                       ".rmh{display:grid;grid-template-columns:7em 1fr auto;}");
     web_client.println(".rmchips{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0;}\n"
                        ".rmchip{flex-direction:column;align-items:flex-start;min-width:7em;text-align:left;}\n"
                        "#content_inner .rmchip{border:solid 2px transparent;}\n"
@@ -84,17 +85,8 @@ void sub_page_remote()
                        "<p id=\"rm_net\" class=\"font-small\"></p>\n"
                        "<p id=\"rm_msg\" class=\"rmmsg\"></p>\n"
                        "<p id=\"rm_force\" class=\"rmmsg\"></p>\n"
-                       "<p id=\"rm_chain\" class=\"font-small\"></p>");
-    web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">This node</label>\n"
-                       "<span>Password and remote management of this node.</span>\n"
-                       "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
-                       "<div>");
-    web_client.println("<div class=\"rmrow\"><input type=\"checkbox\" role=\"switch\" id=\"rm_on\" disabled><label id=\"rm_onlbl\" for=\"rm_on\">Remote management</label><span id=\"rm_pwstate\" class=\"font-small\"></span><span id=\"rm_lockstate\" class=\"font-small\"></span></div>\n"
-                       "<p id=\"rm_onhint\" class=\"font-small\"></p>");
-    web_client.println("<div class=\"rmrow\"><input type=\"password\" id=\"rm_selfpw\" maxlength=\"14\" autocomplete=\"new-password\" placeholder=\"New password\" aria-label=\"New password for this node\"><button type=\"button\" data-act=\"selfset\">Set</button><button type=\"button\" data-act=\"selfclear\" id=\"rm_selfclear\">Clear</button></div>\n"
-                       "<p class=\"font-small\">This password also protects the net console (port 2323) and the KISS port, not only remote management.</p>\n"
-                       "<p id=\"rm_selfmsg\" class=\"rmmsg\"></p>\n"
-                       "</div></div>");
+                       "<p id=\"rm_chain\" class=\"font-small\"></p>\n"
+                       "<p id=\"rm_off\" class=\"font-small\" style=\"display:none\"></p>");
     web_client.println("<div class=\"cardlayout collapsablecard cardopen\"><label class=\"cardlabel\">Choose a node</label>\n"
                        "<span>Pick the node to manage.</span>\n"
                        "<button class=\"cardtoggle\" onclick=\"togglecard(this)\"><i></i></button>\n"
@@ -157,7 +149,7 @@ void sub_page_remote()
 void rmScaffoldJs()
 {
     web_client.printf("var rmLen={name:%u,atxt:%u};\n", (unsigned)RM_NAME_MAX, (unsigned)RM_ATXT_MAX);
-    web_client.println("var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmTx={val:10,touched:false},rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);");
+    web_client.println("var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmQq=[],rmQp='',rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);");
     web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list'};");
     web_client.println("var rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
                        "function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.';}");
@@ -173,32 +165,27 @@ void rmScaffoldJs()
     web_client.println("function rmUp(m){m=parseInt(m,10);if(isNaN(m))return '';return 'up '+(m<120?m+' min':Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''));}\n"
                        "function rmValidCall(c){return typeof c=='string'&&c.length<=9&&/^[A-Z0-9]{2,}-[0-9]{1,2}$/.test(c);}");
     web_client.println("function rmPwProblem(p){return !p.length?'Enter a password.':p.length>14?'The password can be at most 14 characters.':'';}\n"
-                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null,min:null,ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
+                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
                        "function rmKn(){return rmKnFor(rmSel.call);}\n"
-                       "function rmCap(k){return(k.max!==null&&k.max>0)?k.max:0;}");
-    web_client.println("function rmFloor(k){return k.min!==null&&k.min>0?k.min:0;}\n"
                        "function rmLockLeft(){var m=Math.max(rmLock,rmSrvLock)-rmNow();return m>0?Math.ceil(m/1000):0;}");
     web_client.println("function rmLocked(){return rmBusy||rmAuth||rmLockLeft()>0;}\n"
                        "function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}\n");
     web_client.println("var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}\n"
                        "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];return f;}");
-    web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false,cur:null,max:null,min:null},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
+    web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
                        "for(i=1;i<t.length;i++){k=t[i];\n"
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
                        "else if(k.indexOf('up=')==0)o.up=k.substring(3);\n"
                        "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);");
-    web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}\n"
-                       "else if(k.indexOf('p=')==0){m=/^p=(-?\\d+)\\/(-?\\d+)$/.exec(k);if(m){o.cur=+m[1];o.max=+m[2];}}\n"
-                       "else if(k.indexOf('pmin=')==0){m=/^pmin=(-?\\d+)$/.exec(k);if(m)o.min=+m[1];}");
+    web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}");
     web_client.println("else if(k=='led=0'||k=='led=1'){o.led=true;if(o.sw[5]<0)o.sw[5]=+k.charAt(4);}\n"
                        "else if(k=='gw=0'||k=='gw=1'){if(o.sw[4]<0)o.sw[4]=+k.charAt(3);}\n"
                        "else if(k=='mesh=0'||k=='mesh=1'){if(o.sw[3]<0)o.sw[3]=+k.charAt(5);}}\n"
                        "return o;}\n"
                        "function rmApplyEntry(k,e){var c=e.cmd.split(' '),n=c[0],o,m,i;");
-    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;if(o.cur!==null){k.cur=o.cur;k.max=o.max;k.min=o.min!==null?o.min:0;}k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
+    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
                        "else if(rmTog[n]!==undefined){m=/^ok (\\w+)=(on|off)$/.exec(e.reply);if(m&&m[1]==n){k.sw[rmTog[n]]=m[2]=='on'?1:0;if(n=='led')k.led=true;}}\n");
-    web_client.println("else if(n=='radio'){m=/ p=(-?\\d+)\\/(-?\\d+)(?: pmin=(-?\\d+))?$/.exec(e.reply);if(m){k.cur=+m[1];k.max=+m[2];k.min=m[3]!==undefined?+m[3]:0;}}\n"
-                       "else if(n=='txpower'){m=/^ok txpower=(-?\\d+)$/.exec(e.reply);if(m)k.cur=+m[1];}}");
+    web_client.println("}");
     web_client.println("function rmApplySent(list){var a=list.slice(0).sort(function(x,y){return y.ago-x.ago;}),i,e;\n"
                        "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);}}\n");
     web_client.println("function rmOkText(e){var c=e.cmd.split(' '),n=c[0],o;\n"
@@ -215,9 +202,9 @@ void rmScaffoldJs()
                        "function rmJson(r){if(r.status==401||r.status==403){rmAuthFail();return Promise.reject(0);}return r.json();}\n"
                        "function rmAuthFail(){rmAuth=true;clearTimeout(rmT.poll);rmT.poll=0;var e=rmEl('rm_auth');if(e){e.textContent='Your session has ended. Please log in again (reload this page).';e.style.display='';}rmRender();}");
     web_client.println("function rmCatch(e,id){if(e===0)return;if(id)rmTxt(id,rmNoAns,'rmmsg rmbad');else rmMsg(rmNoAns,'rmbad');}\n"
-                       "function rmHintOff(){var e=rmEl('rm_selfmsg');if(/rmconf/.test(rmNote.c))rmMsg('','');if(e&&/rmconf/.test(e.className))rmTxt('rm_selfmsg','','rmmsg');}\n"
+                       "function rmQClr(){rmQq=[];rmQp='';}\nfunction rmHintOff(){if(/rmconf/.test(rmNote.c))rmMsg('','');}\n"
                        "function rmDisarm(){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';rmHintOff();rmRender();}");
-    web_client.println("function rmConfirm(id,hint,mid){if(rmArmId==id){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';return true;}clearTimeout(rmT.arm);rmArmId=id;rmT.arm=setTimeout(rmDisarm,4000);rmRender();if(mid)rmTxt(mid,hint,'rmmsg rmconf');else rmMsg(hint,'rmconf');return false;}\n"
+    web_client.println("function rmConfirm(id,hint){if(rmArmId==id){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';return true;}clearTimeout(rmT.arm);rmArmId=id;rmT.arm=setTimeout(rmDisarm,4000);rmRender();rmMsg(hint,'rmconf');return false;}\n"
                        "function rmBtn(box,label,cls,dis,attrs){var b=document.createElement('button'),k;b.type='button';b.className=cls||'';b.disabled=!!dis;b.textContent=label;for(k in attrs)b.setAttribute(k,attrs[k]);box.appendChild(b);return b;}");
     web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?rmReally:label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}");
     web_client.println("function rmSwSet(i,st,dis,last,shown){i.disabled=!!dis;i.indeterminate=st<0&&!(shown&&last);i.checked=st<0?last=='on':st==1;}");
@@ -230,11 +217,6 @@ void rmScaffoldJs()
                        "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
                        "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}");
-    web_client.println("function rmTxBuild(p,k,dis){var cap=rmCap(k),lo=rmFloor(k),ok=cap>0,r=rmNew('div','grid rmg rmw'),c=rmNew('div','rmrow'),a;\n"
-                       "if(ok){if(!rmTx.touched&&k.cur!==null)rmTx.val=k.cur;if(rmTx.val>cap)rmTx.val=cap;if(rmTx.val<lo)rmTx.val=lo;}a=ok&&rmArmId=='txpower '+rmTx.val;p.appendChild(r);r.appendChild(rmNew('span','','TX power'));r.appendChild(c);");
-    web_client.println("rmBtn(c,'-','',!ok||rmTx.val<=lo,{'data-act':'txdn'}).id='rm_rtxdn';c.appendChild(rmNew('b','',ok?rmTx.val+' dBm':'-','rm_rtxval'));rmBtn(c,'+','',!ok||rmTx.val>=cap,{'data-act':'txup'}).id='rm_rtxup';\n"
-                       "rmBtn(r,a?rmReally:'Apply',a?'rmarmed':'',dis||!ok,{'data-act':'txapply'}).id='rm_rtxapply';");
-    web_client.println("r.appendChild(rmNew('div','font-small rmhl',ok?'Range '+lo+' to '+cap+' dBm on this node.':k.at?\"This node's firmware does not report its power range.\":'Press Refresh status to learn the power range of the node.','rm_rtxnote'));}");
     web_client.println("function rmChip(box,call,hw,age,sv,stale){var b=rmBtn(box,'','rmchip'+(sv?' rmsaved':'')+(stale?' rmstale':'')+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b'),i,L=[hw,age];\n"
                        "s.textContent=call;b.appendChild(s);\n"
                        "for(i=0;i<2;i++){s=document.createElement('span');s.className='font-small';s.textContent=L[i];b.appendChild(s);}");
@@ -252,14 +234,14 @@ void rmScaffoldJs()
     web_client.println("e.className='font-small';\n"
                        "e.textContent=sv?'Key saved for '+c+'.'+(hd?'':' Not heard in the last 3 hours, the command may not arrive.')+' ':'Type the password of '+(c||'the node you want to manage')+', or press Remember to save it.';\n"
                        "if(sv)rmBtn(e,'Forget','',false,{'data-act':'forget'});\n"
-                       "rmEl('rm_forgetall').textContent=rmArmId=='forgetall'?rmReally:'Forget all';rmEl('rm_selfclear').textContent=rmArmId=='selfclear'?rmReally:'Clear';}\n"
+                       "rmEl('rm_forgetall').textContent=rmArmId=='forgetall'?rmReally:'Forget all';}\n"
                        "function rmRenderLock(){var n=rmLockLeft(),t=rmNote.t,c=rmNote.c;");
     web_client.println("if(!t){c='rmmsg rmlock';if(rmBusy)t='Sending ...';else if(!rmAuth&&n>0)t=(rmSrvMsg?rmSrvMsg+' ':'')+'Next command possible in '+n+' s.';}\n"
                        "rmTxt('rm_msg',t,c);}\n"
                        "function rmRenderMsgs(dis){var j=rmStat,b=rmEl('rm_msgs'),a,i,e,k,tr,v,x,c,cf,n,seen={},q,d=rmEl('rm_chain'),u=0,s,z;if(!j)return;d.textContent='';\n");
     web_client.println("for(i=0;i<j.targets.length;i++){q=j.targets[i];if(rmForce&&q.dst==rmForce.d&&!q.canForce){rmForce=null;rmForceBtn();}if(q.chainMsg)d.textContent=q.dst+': '+q.chainMsg;else if(q.pending)d.textContent=q.dst+': checking the connection first, your command follows.';}\n");
     web_client.println("a=j.sent.slice(0).sort(function(x,y){return x.ago-y.ago;});\n");
-    web_client.println("for(i=0;i<a.length;i++){e=a[i];k=e.dst+'#'+e.ctr+'#'+e.cmd;if(seen[k])continue;seen[k]=1;tr=rmRows[k];\n"
+    web_client.println("for(i=0;i<a.length;i++){e=a[i];k=e.dst+'#'+e.ctr+'#'+e.cmd;if(seen[k])continue;if(u>4)break;seen[k]=1;tr=rmRows[k];\n"
 "if(!tr){tr=rmRows[k]=document.createElement('tr');for(n=0;n<4;n++)tr.appendChild(document.createElement('td'));}\n");
     web_client.println("c=tr.children;n=e.cmd.split(' ');v=e.st=='queued'||e.st=='waiting'?'sent':e.st=='noanswer'?'no answer':e.ver&&(e.st=='ok'||e.st=='err')?'verified':'unverified';\n"
 "x=e.st=='ok'&&v=='verified'?rmOkText(e):(e.msg||'');tr.title=e.msg||'';\n");
@@ -301,7 +283,7 @@ void rmScaffoldJs()
     web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}\n"
                        "function rmCapOf(c){var a=rmStat?rmStat.targets:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c)return a[i].cap||0;return 0;}");
     web_client.println("var rmMh={on:0,job:'',args:'',fl:0,t:0,pre:'',rows:[],total:0,msg:'',det:null,gen:0,tm:0,ctr:-1};\nfunction rmUns(c,n,v){var a=rmStat?rmStat.sent:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd==n&&a[i].st=='err'&&a[i].reply=='err unsupported'&&(!v||a[i].ago<v.ago))return true;return false;}\n");
-    web_client.println("function rmMhReset(){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.rows=[];rmMh.total=0;rmMh.msg='';rmMh.det=null;}\nfunction rmNodeChg(n){if(n!=rmSel.call){rmIn={};rmMhReset();rmForce=null;rmForceBtn();}}\n");
+    web_client.println("function rmMhReset(){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.rows=[];rmMh.total=0;rmMh.msg='';rmMh.det=null;}\nfunction rmNodeChg(n){if(n!=rmSel.call){rmIn={};rmQClr();rmMhReset();rmForce=null;rmForceBtn();}}\n");
     web_client.println("function rmMhEnd(m){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.msg=m||'';rmRender();}\nfunction rmMhStop(){rmMhEnd('Stopped.');}\nfunction rmMhGo(job,args){var pr=rmPre();if(rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}\nif(!rmMh.pre){rmMh.pre=rmSel.slot>=0?'slot='+rmSel.slot+'&call='+rmEnc(rmSel.call):'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value);rmEl('rm_pw').value='';}\n");
     web_client.println("rmMh.on=1;rmMh.job=job;rmMh.args=args;rmMh.msg='';rmMh.det=null;if(job=='list'){rmMh.rows=[];rmMh.total=0;}rmMhStep();rmRender();}\nfunction rmMhStart(){rmMhGo('list','0');}\nfunction rmMhDet(c){c=String(c).trim().toUpperCase();if(rmMh.on)return;if(!rmValidCall(c)){rmMsg('Enter a node call such as DK5EN-12.','rmbad');return;}rmMhGo('det',c);}\n");
     web_client.println("function rmMhStep(){var w,e;if(!rmMh.on)return;if(rmMh.fl){e=rmMhFind();if(e)rmMhGot(e);else if(rmNow()-rmMh.t>120000)rmMhEnd('There was no answer from the node.');return;}\n");
@@ -335,39 +317,38 @@ void rmScaffoldJs()
                        "for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}");
     web_client.println("if(cap<2)B.radio.appendChild(rmNew('p','font-small rmcapnote',rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.'));\n"
                        "B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));");
-    web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=rmNew('div','rmrow rmsplit');p.appendChild(h);h.appendChild(rmNew('b','',d.l));\n");
+    web_client.println("h=B.queues.appendChild(rmNew('div','rmrow rmh'));h.appendChild(rmNew('span'));for(j=0,y=null;j<3;j++){v=rmLast(c,['txq','mbox','maxhop'][j]);if(v&&(!y||v.ago<y.ago))y=v;}\n"
+                       "h.appendChild(rmNew('span','font-small',y?'last read '+rmAgo(y.ago)+' ago':'not read yet'));rmBtn(h,'Read','',dis||cap<2||rmMh.on,{'data-act':'qread'});");
+    web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');p.appendChild(h);h.appendChild(rmNew('b','',d.l));\n");
     web_client.println("v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
-                       "h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
-                       "rmBtn(h,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});");
+                       "if(d.card!='queues'){h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
+                       "rmBtn(h,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});}");
     web_client.println("if(o&&d.v)d.v(p,o);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
                        "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
-    web_client.println("rmWBuild(p,d,o);if(d.c=='radio')rmTxBuild(p,rmKn(),dis);\n"
+    web_client.println("rmWBuild(p,d,o);\n"
                        "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}rmMhCard(B.mh,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"
 "function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;\n");
     web_client.println("b=rmEl('rm_log');b.textContent='';for(i=0;i<j.log.length;i++){r=j.log[i];tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}\n");
     web_client.println("rmTxt('rm_cnt','Executed '+j.ok+', rejected '+j.rej+', counter high-water '+j.hwm+'.');}\n"
-                       "function rmRenderSelf(){var j=rmStat,o=rmEl('rm_on');if(!j)return;o.checked=!!j.on;o.disabled=!j.pw&&!j.on;o.style.display=rmEl('rm_onlbl').style.display=j.pw||j.on?'':'none';\n"
-                       "rmTxt('rm_pwstate','password: '+(j.pw?'set':'not set'),'font-small');");
-    web_client.println("rmTxt('rm_lockstate',j.lock?'A sender is blocked for '+(j.lockS||1)+' s after wrong attempts':'','font-small');\n"
-                       "rmTxt('rm_onhint',j.pw?'':'Set a password first, then switch remote management on.','font-small');}\n"
+                       "function rmRenderOff(){var j=rmStat,f=!!j&&!j.on,e=rmEl('rm_off');e.style.display=f?'':'none';e.textContent=f?'Remote management is off on this node. Switch it on under Settings, Remote Admin.':'';}\n"
                        "function rmRender(){if(!rmShown||!rmEl('rm_page'))return;var k=rmKn(),dis=!rmValidCall(rmSel.call)||rmLocked();\n"
-                       "rmRenderNode();rmRenderTiles(k,dis);rmRenderLock();rmRenderMsgs();rmRenderCards();rmRenderLog();rmRenderSelf();");
+                       "rmRenderNode();rmRenderTiles(k,dis);rmRenderLock();rmRenderMsgs();rmRenderCards();rmRenderLog();rmRenderOff();");
     web_client.println("}\n"
 "function rmPre(){var c=rmSel.call,p;if(!rmValidCall(c))return 'Choose a node first.';if(rmSel.slot<0){p=rmPwProblem(rmEl('rm_pw').value);if(p)return 'Type the password of '+c+' first. '+p;}return '';}");
-    web_client.println("function rmSendCmd(cmd,args,dc,sl,fc){var call=dc||rmSel.call,ss=dc?sl:rmSel.slot,body,pw,pr=dc?'':rmPre(),full=args?cmd+' '+args:cmd;\n"
+    web_client.println("function rmSendCmd(cmd,args,dc,sl,fc){var call=dc||rmSel.call,ss=dc?sl:rmSel.slot,body,pr=dc||rmQp?'':rmPre(),full=args?cmd+' '+args:cmd;\n"
                        "if(!fc&&(dc?rmRowLocked(dc):rmLocked()))return;rmForce=null;rmTxt('rm_force','');\n"
                        "if(pr){rmMsg(pr,'rmbad');return;}\n");
     web_client.println("body='cmd='+rmEnc(cmd)+'&args='+rmEnc(args);\n"
                        "if(ss>=0)body='slot='+ss+'&'+body;\n"
-                       "else{pw=rmEl('rm_pw').value;body='dst='+rmEnc(call)+'&pw='+rmEnc(pw)+'&'+body;rmEl('rm_pw').value='';pw='';}\n"
+                       "else{body=(rmQp||'dst='+rmEnc(call)+'&pw='+rmEnc(rmEl('rm_pw').value))+'&'+body;rmEl('rm_pw').value='';}if(!rmQq.length)rmQp='';\n"
                        "if(dc)body+='&call='+rmEnc(dc);if(!dc&&ss>=0)body+='&call='+rmEnc(call);if(fc)body+='&force=1';rmBusy=true;rmMsg('','');rmRender();\n"
                        "rmPost('/rmsend',body).then(rmJson).then(function(j){");
     web_client.println("if(j&&j.ok){rmLock=rmNow()+10000;rmOut=true;rmMsg('','');rmPoll();}\n");
-    web_client.println("else{pr=j&&j.err?String(j.err):'send';rmMsg(rmErrText(j),'rmbad');if(pr=='busy')rmLock=rmNow()+10000;\n"
+    web_client.println("else{pr=j&&j.err?String(j.err):'send';rmQClr();rmMsg(rmErrText(j),'rmbad');if(pr=='busy')rmLock=rmNow()+10000;\n"
                        "\n");
-    web_client.println("if(pr=='limit'&&j.canForce&&!fc&&ss>=0&&call==rmSel.call){rmForce={c:cmd,a:args,d:call,s:ss};rmForceBtn();}}\n"
-                       "}).catch(rmCatch).then(function(){rmBusy=false;rmRender();});}\n"
+    web_client.println("if(pr=='limit'&&j.canForce&&!fc&&ss>=0&&call==rmSel.call){rmForce={c:cmd,a:args,d:call,s:ss};rmForceBtn();}}\n");
+    web_client.println("}).catch(function(e){rmQClr();rmCatch(e);}).then(function(){rmBusy=false;rmRender();});}\n"
                        "function rmForceBtn(){var b=rmEl('rm_force');if(!b)return;b.textContent='';if(rmForce&&rmForce.d==rmSel.call)rmBtn(b,'Try once more','',false,{'data-act':'force'});}\n"
                        "function rmTap(b){var cmd=b.getAttribute('data-cmd'),args=b.getAttribute('data-args')||'',cf=b.getAttribute('data-cf')||'',pr=rmPre();if(!args)rmClrIn(cmd);");
     web_client.println("if(rmLocked())return;\n"
@@ -378,14 +359,9 @@ void rmScaffoldJs()
                        "if(s<0||rmRowLocked(d))return;\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),d)))return;\n"
                        "rmSendCmd(cmd,args,d,s);}\n");
-    web_client.println("function rmTxApply(){var k=rmKn(),v=Math.min(Math.max(rmTx.val,rmFloor(k)),rmCap(k)),cf,pr=rmPre();if(rmLocked()||!rmCap(k))return;\n"
-                       "if(pr){rmMsg(pr,'rmbad');return;}\n"
-                       "cf=(k.cur===null||v<k.cur)?'txpower '+v:'';\n"
-                       "if(cf&&!rmConfirm(cf,'Tap Apply again within 4 seconds to set the TX power of '+rmSel.call+' to '+v+' dBm.'))return;");
-    web_client.println("rmSendCmd('txpower',String(v));}\n"
-                       "function rmPick(c){rmNodeChg(c);rmDisarmQuiet();rmSel.call=c;rmSel.slot=rmSlotOf(c);rmTx.touched=false;rmEl('rm_call').value=c;rmRender();}\n"
+    web_client.println("function rmPick(c){rmNodeChg(c);rmDisarmQuiet();rmSel.call=c;rmSel.slot=rmSlotOf(c);rmEl('rm_call').value=c;rmRender();}\n"
                        "function rmDisarmQuiet(){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';}\n"
-                       "function rmCallInput(){var c=rmEl('rm_call');c.value=c.value.toUpperCase();rmDisarmQuiet();rmNodeChg(c.value.trim());rmSel.call=c.value.trim();rmSel.slot=rmSlotOf(rmSel.call);rmTx.touched=false;rmRender();}");
+                       "function rmCallInput(){var c=rmEl('rm_call');c.value=c.value.toUpperCase();rmDisarmQuiet();rmNodeChg(c.value.trim());rmSel.call=c.value.trim();rmSel.slot=rmSlotOf(rmSel.call);rmRender();}");
     web_client.println("function rmLoadNodes(){fetch('/rmnodes').then(rmJson).then(function(j){rmSaved=(j&&j.nodes)||[];rmSel.slot=rmSlotOf(rmSel.call);rmRender();}).catch(function(e){rmCatch(e,'rm_net');});}\n"
                        "function rmLoadHeard(){fetch('/rmheard').then(rmJson).then(function(j){rmHeard=(j&&j.heard)||[];rmRender();}).catch(function(e){rmCatch(e,'rm_net');});}");
     web_client.println("function rmNodesPost(body,okText){rmPost('/rmnodes',body).then(rmJson).then(function(j){if(j&&j.ok){rmMsg(okText,'rmok');rmLoadNodes();}else rmMsg(rmErrText(j),'rmbad');}).catch(rmCatch);}\n"
@@ -396,15 +372,8 @@ void rmScaffoldJs()
     web_client.println("if(s<0){rmMsg('All 3 places on this node are used. Forget one first.','rmbad');return;}\n"
                        "i.value='';rmNodesPost('act=save&slot='+s+'&call='+rmEnc(c)+'&pw='+rmEnc(pw),c+' is saved.');pw='';}\n"
                        "function rmForget(){if(rmSel.slot<0)return;rmNodesPost('act=del&slot='+rmSel.slot,rmSel.call+' is forgotten.');}");
-    web_client.println("function rmForgetAll(){if(!rmConfirm('forgetall','Tap Forget all again within 4 seconds to remove every saved node.'))return;rmNodesPost('act=forget','All saved nodes are forgotten.');}\n"
-                       "function rmSelfSet(){var i=rmEl('rm_selfpw'),pw=i.value,pr=rmPwProblem(pw),b;\n"
-                       "if(pr){rmTxt('rm_selfmsg',pr,'rmmsg rmbad');return;}\n"
-                       "b='act=set&pw='+rmEnc(pw);i.value='';pw='';");
-    web_client.println("rmPost('/rmpasswd',b).then(rmJson).then(function(j){if(j&&j.ok){rmTxt('rm_selfmsg','Password set.','rmmsg rmok');rmPoll();}else rmTxt('rm_selfmsg',rmErrText(j),'rmmsg rmbad');}).catch(function(e){rmCatch(e,'rm_selfmsg');});}\n"
-                       "function rmSelfClear(){if(!rmConfirm('selfclear','Clear the password? Remote management will be switched off.','rm_selfmsg'))return;");
-    web_client.println("rmPost('/rmpasswd','act=clear').then(rmJson).then(function(j){if(j&&j.ok){rmTxt('rm_selfmsg','Password cleared. Remote management is off.','rmmsg rmok');rmPoll();}else rmTxt('rm_selfmsg',rmErrText(j),'rmmsg rmbad');}).catch(function(e){rmCatch(e,'rm_selfmsg');});}\n"
-                       "function rmSelfOn(){var o=rmEl('rm_on'),v=o.checked?'on':'off';o.disabled=true;");
-    web_client.println("fetch('/setparam/?rm='+v).then(rmJson).then(function(j){rmTxt('rm_selfmsg',j&&j.returncode==0?'Remote management is '+v+'.':'Could not change it. Is a password set?','rmmsg');rmPoll();}).catch(function(e){rmCatch(e,'rm_selfmsg');});}");
+    web_client.println("function rmForgetAll(){if(!rmConfirm('forgetall','Tap Forget all again within 4 seconds to remove every saved node.'))return;rmNodesPost('act=forget','All saved nodes are forgotten.');}");
+    web_client.println("function rmQRead(){var pr=rmPre();if(rmLocked()||rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value):'';rmQq=['mbox','maxhop'];rmSendCmd('txq','');}");
     web_client.println("function rmSwChg(i){var n=i.getAttribute('data-sw'),v=i.checked?'on':'off',cf=v=='off'?(i.getAttribute('data-cf')||''):'',pr=rmPre(),pin=n=='pin',c=pin?'setout':n,a=pin?rmEl('rm_pin').value+' '+v:v;");
     web_client.println("if(rmLocked()||pr){if(pr&&!rmLocked())rmMsg(pr,'rmbad');rmRender();return;}\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel(c+' '+a),rmSel.call)))return;\n"
@@ -418,14 +387,10 @@ void rmScaffoldJs()
                                               "else if(a=='sync')rmSendCmd('sync','');\n"
                                               "else if(a=='again')rmAgain(b);\n"
                        "else if(a=='force'&&rmForce&&rmForce.d==rmSel.call)rmSendCmd(rmForce.c,rmForce.a,rmForce.d,rmForce.s,true);\n");
-    web_client.println("else if(a=='txdn'){rmTx.val--;rmTx.touched=true;rmDisarmQuiet();rmRender();}\n"
-                       "else if(a=='txup'){rmTx.val++;rmTx.touched=true;rmDisarmQuiet();rmRender();}\n"
-                       "else if(a=='txapply')rmTxApply();\n"
+    web_client.println("else if(a=='qread')rmQRead();\n"
                        "else if(a=='remember')rmRemember();\n"
                        "else if(a=='forget')rmForget();");
     web_client.println("else if(a=='forgetall')rmForgetAll();\n"
-                       "else if(a=='selfset')rmSelfSet();\n"
-                       "else if(a=='selfclear')rmSelfClear();\n"
                        "else if(a=='heard')rmLoadHeard();}\n"
                        "function rmGot(j){var i,t,c=rmSel.call;j.sent=j.sent||[];j.log=j.log||[];j.targets=j.targets||[];rmStat=j;rmApplySent(j.sent);\n"
                        "rmOut=false;rmSrvLock=0;rmSrvMsg='';rmTL=Object.create(null);\n"
@@ -435,12 +400,12 @@ void rmScaffoldJs()
                        "function rmNext(){clearTimeout(rmT.poll);rmT.poll=0;if(rmShown&&!rmAuth)rmT.poll=setTimeout(rmPoll,rmOut?3000:10000);}\n"
                        "function rmPoll(){if(!rmShown)return;clearTimeout(rmT.poll);rmT.poll=0;");
     web_client.println("fetch('/rmstatus').then(rmJson).then(function(j){if(!rmShown)return;rmAuth=false;rmTxt('rm_auth','');rmEl('rm_auth').style.display='none';rmTxt('rm_net','');rmGot(j);rmNext();})\n"
-                       ".catch(function(e){if(e===0||!rmShown)return;rmTxt('rm_net','No answer from the node, trying again.','rmbad');rmNext();});}\n"
-                       "function rmTick(){if((typeof cpage!='undefined'&&cpage!='remote')||!rmEl('rm_page')){rmPageLeave();return;}\n"
-                       "var l=rmLocked();if(l||rmWasLocked)rmRender();rmWasLocked=l;}");
-    web_client.println("function rmPageLeave(){clearInterval(rmT.tick);clearTimeout(rmT.poll);clearTimeout(rmT.arm);rmT.tick=0;rmT.poll=0;rmT.arm=0;rmShown=false;rmArmId='';rmMhReset();}\n"
+                       ".catch(function(e){if(e===0||!rmShown)return;rmTxt('rm_net','No answer from the node, trying again.','rmbad');rmNext();});}");
+    web_client.println("function rmTick(){if((typeof cpage!='undefined'&&cpage!='remote')||!rmEl('rm_page')){rmPageLeave();return;}\n"
+                       "var l=rmLocked();if(!l&&rmQq.length){if(!rmQp&&rmPre())rmQClr();else rmSendCmd(rmQq.shift(),'');}if(l||rmWasLocked)rmRender();rmWasLocked=l;}");
+    web_client.println("function rmPageLeave(){clearInterval(rmT.tick);clearTimeout(rmT.poll);clearTimeout(rmT.arm);rmT.tick=0;rmT.poll=0;rmT.arm=0;rmShown=false;rmArmId='';rmMhReset();rmQClr();}\n"
                        "function rmPageInit(){var i,p,o;rmPageLeave();if(!rmEl('rm_page'))return;rmShown=true;rmRows=Object.create(null);rmAuth=false;rmBusy=false;rmArmId='';\n"
                        "p=rmEl('rm_pin');for(i=0;i<16;i++){o=document.createElement('option');o.value=(i<8?'a':'b')+(i%8);o.textContent=o.value;p.appendChild(o);}");
-    web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_page').onchange=rmChange;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_on').onchange=rmSelfOn;rmEl('rm_call').value=rmSel.call;\n"
+    web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_page').onchange=rmChange;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_call').value=rmSel.call;\n"
                        "rmT.tick=setInterval(rmTick,1000);rmRender();rmPoll();rmLoadNodes();rmLoadHeard();}");
 }

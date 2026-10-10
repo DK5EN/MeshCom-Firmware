@@ -9,7 +9,7 @@
 //
 // Prerequisites (not part of the repo):  npm i jsdom@24   (anywhere; set NODE_PATH to its node_modules)
 // Run:   NODE_PATH=<dir>/node_modules node tools/webgui_rm_test.js
-// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|again node tools/webgui_rm_test.js
+// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|again|qnoreject|qnopre|qnoclr|qmh|qnodrop node tools/webgui_rm_test.js
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
@@ -155,12 +155,17 @@ else if (MUT === 'timer') mutate('function rmPageLeave(){clearInterval(rmT.tick)
 else if (MUT === 'msgs') mutate('tr=rmRows[k];', 'tr=null;');
 else if (MUT === 'again') mutate('rmSendCmd(cmd,args,d,s);', 'rmSendCmd(cmd,args);');
 else if (MUT === 'text') mutate("r=rmChk(w[2],v);", "r=/^(name|atxt)$/.test(w[2])?false:rmChk(w[2],v);");
-else if (MUT === 'radio') mutate("else if(n=='radio'){", "else if(n=='radio_off'){");
+else if (MUT === 'radio') mutate("if(n=='radio'&&o&&o.f)return", "if(n=='radio_off'&&o&&o.f)return");
 else if (MUT === 'mh') mutate('w=rmTL[rmSel.call]-rmNow();', 'w=0;');
 else if (MUT === 'gate') mutate('cap=rmCapOf(c),dis=', 'cap=2,dis=');
 else if (MUT === 'nocall') mutate("if(!dc&&ss>=0)body+='&call='+rmEnc(call);", '');
 else if (MUT === 'stayforce') { mutate('rmMhReset();rmForce=null;rmForceBtn();}}', 'rmMhReset();}}'); mutate("if(rmForce&&rmForce.d==rmSel.call)rmBtn(b,", 'if(rmForce)rmBtn(b,'); mutate("a=='force'&&rmForce&&rmForce.d==rmSel.call", "a=='force'&&rmForce"); }
 else if (MUT === 'call') mutate("if(dc)body+='&call='+rmEnc(dc);", '');
+else if (MUT === 'qnoreject') mutate('}).catch(function(e){rmQClr();rmCatch(e);})', '}).catch(rmCatch)');
+else if (MUT === 'qnopre') mutate("rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value):'';", '');
+else if (MUT === 'qnoclr') mutate('if(!rmQp&&rmPre())rmQClr();else ', '');
+else if (MUT === 'qmh') mutate('if(rmLocked()||rmMh.on)return;if(pr)', 'if(rmLocked())return;if(pr)');
+else if (MUT === 'qnodrop') mutate("'send';rmQClr();", "'send';");
 else if (MUT === 'force') mutate("if(fc)body+='&force=1';", '');
 else if (MUT) throw new Error('unknown RM_MUTATE ' + MUT);
 if (MUT) console.log('NOTE mutation active: ' + MUT);
@@ -231,6 +236,7 @@ function mkServer() {
     }
     if (u === '/rmpasswd') { if (s.passwdReply) return { json: s.passwdReply }; s.status.pw = f.get('act') === 'set' ? 1 : 0; return { json: { ok: true } }; }
     if (u === '/rmsend') {
+      if (s.sendHook) { const h = s.sendHook(f); if (h) return { json: h }; }
       if (s.sendReply) return { json: s.sendReply };
       const dst = f.get('slot') !== null ? (s.nodes[+f.get('slot')] || {}).call : f.get('dst');
       if (f.get('slot') !== null && f.get('call') !== null && f.get('call') !== dst) return { json: refuse('slot') };
@@ -273,6 +279,7 @@ async function mkPage(srv, opts) {
       w.setTimeout = T.setTimeout; w.setInterval = T.setInterval; w.clearTimeout = T.clear; w.clearInterval = T.clear;
       w.fetch = (url, init) => {
         calls.push({ url: String(url), method: (init && init.method) || 'GET', headers: hdrObj(init && init.headers), body: init && init.body ? String(init.body) : '' });
+        if (srv.rejectHook && srv.rejectHook(String(url), init)) return Promise.reject(new TypeError('Failed to fetch'));
         const r = srv.handle(url, init);
         const status = r.status || 200;
         const resp = {
@@ -379,7 +386,7 @@ function leaks(P, canary) {
     const D = new JSDOM(HTML).window.document;
     const cards = [...D.querySelectorAll('.cardlayout')];
     const kids = (c, t) => [...c.children].filter((x) => x.tagName === t);
-    check('UI-03 ten cards (six old + the five node-settings cards instead of one), all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 10 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
+    check('UI-03 nine cards (five node-settings cards, Choose a node, Messages, Actions, Advanced), all collapsablecard with teaser span, cardtoggle button and exactly one body div', cards.length === 9 && cards.every((c) => c.classList.contains('collapsablecard') && kids(c, 'SPAN').length === 1 && kids(c, 'DIV').length === 1 && kids(c, 'BUTTON').length === 1 && kids(c, 'BUTTON')[0].className === 'cardtoggle' && /togglecard\(this\)/.test(kids(c, 'BUTTON')[0].getAttribute('onclick')) && kids(c, 'BUTTON')[0].querySelector('i')), cards.length + '');
     check('UI-04 only Advanced, Queues and Heard list start closed', cards.filter((c) => !c.classList.contains('cardopen')).map((c) => c.id).join() === 'rm_card_queues,rm_card_mh,rm_adv');
     check('UI-05 exactly one status control and one sync control, no Test/Check connection', !D.getElementById('rm_test') && !/Test connection|Check connection/.test(HTML + JS) && (JS.match(/'Refresh status'/g) || []).length === 1 && (JS.match(/'data-act':'sync'/g) || []).length === 1);
     check('UI-07 one message line (no rm_lockline), no "Saved on this node" label (tiles carry the key state)', !D.getElementById('rm_lockline') && !!D.getElementById('rm_msg') && ((HTML + JS).match(/saved on this node/gi) || []).length === 0 && ((HTML + JS).match(/on this node/g) || []).length >= 1);
@@ -396,7 +403,7 @@ function leaks(P, canary) {
   }
   check('password inputs are autocomplete=new-password', (() => {
     const ins = HTML.match(/<input[^>]*type="password"[^>]*>/g) || [];
-    return ins.length >= 2 && ins.every((i) => /autocomplete="new-password"/.test(i));
+    return ins.length >= 1 && ins.every((i) => /autocomplete="new-password"/.test(i));
   })());
   {
     const have = new Set(Array.from(HTML.matchAll(/id="([^"]+)"/g)).map((m) => m[1]).concat(Array.from(JS.matchAll(/\.id='(rm_[a-z]+)'/g)).map((m) => m[1])).concat(Array.from(JS.matchAll(/rmNew\('[a-z]+',[^;]*?,'(rm_[a-z]+)'\)/g)).map((m) => m[1])));   // ids the JS builds itself count too
@@ -431,19 +438,6 @@ function leaks(P, canary) {
     const names = new Set(H.map((r) => r.name));
     const jsNames = [].concat(Object.keys(P.w.rmCmds), Object.keys(P.w.rmTog), Object.keys(P.w.rmTogName), branches, P.w.rmDefs.map((d) => d.c));
     check('DRY-07 every command name used by the page is a header row', jsNames.every((n) => names.has(n)), jsNames.filter((n) => !names.has(n)).join());
-    // DRY-02: node answers of the self password flow carry msg next to err
-    const srv = mkServer();
-    const Q = await mkPage(srv);
-    await Q.init();
-    srv.passwdReply = refuse('pw');
-    Q.el('rm_selfpw').value = ' bad';
-    await Q.tap(Q.btn('Set'));
-    check('DRY-02 /rmpasswd refusal shows the server msg (the page does not judge the leading space)', Q.text('rm_selfmsg') === SRVMSG.pw && Q.calls.filter((c) => rmPath(c) === '/rmpasswd').length === 1, Q.text('rm_selfmsg'));
-    srv.passwdReply = { ok: false, err: 'pw' };
-    Q.el('rm_selfpw').value = ' bad';
-    await Q.tap(Q.btn('Set'));
-    check('DRY-02 /rmpasswd refusal without msg falls back to a generic sentence', Q.text('rm_selfmsg') === 'The request was refused (pw).', Q.text('rm_selfmsg'));
-    Q.w.rmPageLeave();
     P.w.rmPageLeave();
   }
 
@@ -514,18 +508,6 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
-  // ---- TX power ------------------------------------------------------------------------------------
-  {
-    const P = await savedNodePage(STATUS_NEW);
-    check('TX power starts at the reported value and caps at the reported max', P.text('rm_rtxval') === '17 dBm' && P.text('rm_rtxnote') === 'Range 0 to 22 dBm on this node.');
-    for (let i = 0; i < 30; i++) P.click(P.el('rm_rtxup'));
-    check('TX power cap follows p=cur/max (22)', P.text('rm_rtxval') === '22 dBm' && P.el('rm_rtxup').disabled, P.text('rm_rtxval'));
-    P.w.rmPageLeave();
-    const Q = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=8/10');
-    for (let i = 0; i < 30; i++) Q.click(Q.el('rm_rtxup'));
-    check('TX power cap 10 for p=8/10', Q.text('rm_rtxval') === '10 dBm', Q.text('rm_rtxval'));
-    Q.w.rmPageLeave();
-  }
 
   // ---- Actions card layout (plan 3.3: D1 tile grid, D2 switch column) -----------------------------------
   {
@@ -569,7 +551,10 @@ function leaks(P, canary) {
     check('3.4 each def lands in its card (radio, sens | name, atxt | pos | txq, mbox, maxhop)', Object.keys(where).every((c) => X('rm_def_' + c) && X(where[c]) && X(where[c]).contains(X('rm_def_' + c))) && !X('rm_card_queues').contains(X('rm_def_radio')), Object.keys(where).map((c) => c + ':' + (X('rm_def_' + c) ? X('rm_def_' + c).parentNode.parentNode.id : '-')).join());
     check('3.4 the heard list builder mounts in rm_card_mh (Read, Stop, progress, lookup)', X('rm_card_mh').querySelector('[data-act="mhgo"]') && X('rm_card_mh').querySelector('[data-act="mhstop"]') && X('rm_card_mh').querySelector('#rm_mh_prog') && X('rm_card_mh').querySelector('#rm_f_mh_other') && X('rm_card_mh').querySelector('[data-act="mhother"]'));
     const hdr = (c) => X('rm_def_' + c) && X('rm_def_' + c).firstElementChild;
-    check('3.4 every def starts with a .rmrow.rmsplit header: <b> label, font-small span, Read button', Object.keys(where).every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmsplit') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), Object.keys(where).map((c) => hdr(c) && hdr(c).className).join('|'));
+    const QD = ['txq', 'mbox', 'maxhop'];
+    const nonQ = Object.keys(where).filter((c) => !QD.includes(c));
+    check('3.4 every non-queue def starts with a .rmrow.rmh header: <b> label, font-small span, Read button', nonQ.every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmh') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), nonQ.map((c) => hdr(c) && hdr(c).className).join('|'));
+    check('3.4 queue defs have a title-only .rmrow.rmsplit header: just the <b> label, no span, no button', QD.every((c) => { const h = hdr(c); return h && h.classList.contains('rmsplit') && h.children.length === 1 && h.children[0].tagName === 'B'; }), QD.map((c) => hdr(c) && hdr(c).children.length).join());
     check('3.4 header labels and the "last read N min ago" age', hdr('radio')?.children[0].textContent === 'Radio' && hdr('radio')?.children[1].textContent === 'last read 2 min ago' && hdr('sens')?.children[0].textContent === 'Sensors' && hdr('name')?.children[0].textContent === 'Name', hdr('radio')?.children[1].textContent);
     check('3.4 Position: the Source line moved into the header row, nothing else read-only', hdr('pos')?.children[1].id === 'rm_v_pos_src' && hdr('pos')?.children[1].textContent === 'Source: from GPS' && X('rm_def_pos') && !X('rm_def_pos').querySelector('.rmkv') && X('rm_def_pos').querySelectorAll('[id^="rm_v_"]').length === 1, hdr('pos')?.children[1].textContent);
     const kv = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector('.rmkv');
@@ -577,16 +562,16 @@ function leaks(P, canary) {
     check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power (now/max)|10/22 dBm' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
     check('3.4 sens and maxhop render as .rmkv; absent marker stays "not present"', kv('sens') && rows('sens').join('|') === 'Temperature|21.4 C|Humidity|45 %|Pressure|1013.2 hPa|Second temperature|not present' && kv('maxhop') && rows('maxhop').join('|') === 'Text messages|3|Position beacons|2', (kv('sens') && rows('sens').join('|')) + ' # ' + (kv('maxhop') && rows('maxhop').join('|')));
     check('3.4 txq (dedicated view since 3.5) has no key/value grid, mailbox has one', X('rm_def_txq') && !kv('txq') && kv('mbox') && X('rm_v_txq_q').textContent === '3/20 queued, state quiet' && vText(X('rm_v_mbox_m')) === 'Mode: off');
-    check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').firstElementChild.textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_rtxnote):not(#rm_swnote)') || {}).id);
+    check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').firstElementChild.textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_swnote)') || {}).id);
     const un = [];
-    for (const c of Object.keys(where)) {
+    for (const c of nonQ) {
       const n0 = P.sends().length;
       if (!hdr(c)) { un.push(c); continue; }
       await P.tap(hdr(c).children[2]);
       if (!(P.sends().length === n0 + 1 && new RegExp('cmd=' + c + '&args=(&|$)').test(P.sends()[n0].body))) un.push(c);
       await P.T.advance(12000);
     }
-    check('3.4 every def Read button still sends its cmd once', un.length === 0, un.join());
+    check('3.4 every non-queue def Read button still sends its cmd once', un.length === 0, un.join());
     check('3.4 no duplicate id after the move', dupIds(P).length === 0, dupIds(P).join());
     P.w.rmPageLeave();
   }
@@ -615,7 +600,6 @@ function leaks(P, canary) {
     }
     check('3.4b pos row: Position | .rmg3 with three INPUTs lat, lon, alt | Set | hint line without counter', row('pos') && ch('pos').length === 4 && cell('pos', 0).textContent === 'Position' && cell('pos', 1).classList.contains('rmg3') && [...cell('pos', 1).children].map((e) => e.tagName + '#' + e.id).join() === 'INPUT#rm_f_pos_lat,INPUT#rm_f_pos_lon,INPUT#rm_f_pos_alt' && cell('pos', 2).id === 'rm_f_pos_set' && cell('pos', 3).classList.contains('rmhl') && cell('pos', 3).children.length === 1 && cell('pos', 3).children[0].id === 'rm_f_pos_hint', ch('pos').map((e) => e.tagName + '#' + e.id + '.' + e.className).join());
     check('3.4b pos: Source stays in the header row, inputs keep their values', X('rm_def_pos').firstElementChild.children[1].id === 'rm_v_pos_src' && X('rm_f_pos_lat').value === '48.40812' && X('rm_f_pos_alt').value === '492' && !X('rm_f_pos_set').disabled);
-    check('3.4b TX power is one .grid.rmg row: label | [-] N dBm [+] | Apply | range note line, ids unchanged', row('radio') && ch('radio').length === 4 && cell('radio', 0).textContent === 'TX power' && [...cell('radio', 1).children].map((e) => e.id).join() === 'rm_rtxdn,rm_rtxval,rm_rtxup' && cell('radio', 2).id === 'rm_rtxapply' && cell('radio', 3).id === 'rm_rtxnote' && cell('radio', 3).classList.contains('rmhl') && cell('radio', 3).classList.contains('font-small') && /^Range 0 to 22 dBm/.test(cell('radio', 3).textContent), ch('radio').map((e) => e.tagName + '#' + e.id).join());
     check('3.4b sens/maxhop have no writable row, txq/mbox neither', !row('sens') && !row('maxhop') && !row('txq') && !row('mbox'));
     check('3.4b no duplicate id', dupIds(P).length === 0, dupIds(P).join());
     P.w.rmPageLeave();
@@ -687,68 +671,12 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
-  // ---- TX power range from the target (plan 3.1: pmin= token, no 15 dBm fallback) ---------------------
-  {
-    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=2 led=1');
-    check('3.1a status pmin=2 p=2/22: stepper starts at 2 and "-" is disabled there', P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled && !P.el('rm_rtxup').disabled, P.text('rm_rtxval') + ' dn.disabled=' + P.el('rm_rtxdn').disabled);
-    check('3.1a note names the range of this node', P.text('rm_rtxnote') === 'Range 2 to 22 dBm on this node.', P.text('rm_rtxnote'));
-    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxup'));
-    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
-    check('3.1a stepper bounded to [2, 22] in both directions', P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
-    P.w.rmPageLeave();
-    const N = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=-4/20 pmin=-4 led=1');
-    for (let i = 0; i < 40; i++) N.click(N.el('rm_rtxdn'));
-    check('3.1a negative pmin=-4 never puts the stepper below 0 (managing node allows 0..max only)', N.text('rm_rtxval') === '0 dBm' && N.el('rm_rtxdn').disabled && N.text('rm_rtxnote') === 'Range 0 to 20 dBm on this node.', N.text('rm_rtxval') + ' ' + N.text('rm_rtxnote'));
-    const n0 = N.sends().length;
-    await N.tap(N.el('rm_rtxapply'));
-    check('3.1a Apply with cur=-4/pmin=-4 sends txpower 0, never a negative value', N.sends().length === n0 + 1 && /cmd=txpower&args=0(&|$)/.test(N.sends()[n0].body) && !/args=-/.test(N.sends()[n0].body), JSON.stringify(N.sends().slice(n0)));
-    N.w.rmPageLeave();
-    const H = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=2/22 pmin=-9 led=1');
-    for (let i = 0; i < 40; i++) H.click(H.el('rm_rtxdn'));
-    const h0 = H.sends().length;
-    await H.tap(H.el('rm_rtxapply')); await H.tap(H.el('rm_rtxapply'));
-    check('3.1a Heltec pmin=-9: floor 0, lowering to the floor sends txpower 0 after the confirm, no negative send', H.text('rm_rtxval') === '0 dBm' && H.sends().slice(h0).length === 1 && /cmd=txpower&args=0(&|$)/.test(H.sends()[h0].body) && H.sends().every((c) => !/args=-/.test(c.body)), JSON.stringify(H.sends().slice(h0)));
-    H.w.rmPageLeave();
-  }
-  {
-    const P = await savedNodePage(STATUS_NEW);
-    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
-    check('3.1b status without pmin floors at 0', P.text('rm_rtxval') === '0 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
-    check('3.1b note for an old target still names the range', P.text('rm_rtxnote') === 'Range 0 to 22 dBm on this node.', P.text('rm_rtxnote'));
-    P.w.rmPageLeave();
-  }
-  {
-    const P = await savedNodePage(STATUS_OLD);
-    check('3.1c no p= in any answer: stepper and Apply are disabled', P.el('rm_rtxdn').disabled && P.el('rm_rtxup').disabled && P.el('rm_rtxapply').disabled, [P.el('rm_rtxdn').disabled, P.el('rm_rtxup').disabled, P.el('rm_rtxapply').disabled].join());
-    check('3.1c status seen but no p=: note says the firmware does not report its range, no 15 dBm', P.text('rm_rtxnote') === "This node's firmware does not report its power range." && !/15/.test(P.text('rm_rtxval') + P.text('rm_rtxnote')), P.text('rm_rtxnote') + '|' + P.text('rm_rtxval'));
-    const n0 = P.sends().length;
-    await P.tap(P.el('rm_rtxapply'));
-    check('3.1c Apply sends nothing while the range is unknown', P.sends().length === n0);
-    P.w.rmPageLeave();
-    const O = await savedNodePage('ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1');
-    check('3.1c old form (tools/remote_cmd.py vector, gw=0 mesh=1, no p=): stepper disabled, firmware sentence, not "Press Refresh status"', O.el('rm_rtxdn').disabled && O.el('rm_rtxup').disabled && O.el('rm_rtxapply').disabled && O.text('rm_rtxnote') === "This node's firmware does not report its power range.", O.text('rm_rtxnote'));
-    O.w.rmPageLeave();
-    const Q = await mkPage(mkServer());
-    await Q.init(); await Q.typeCall('DK5EN-9');
-    check('3.1c unknown node (never answered): stepper disabled with the same note', Q.el('rm_rtxdn').disabled && Q.el('rm_rtxup').disabled && Q.text('rm_rtxnote') === 'Press Refresh status to learn the power range of the node.', Q.el('rm_rtxnote') && Q.text('rm_rtxnote'));
-    Q.w.rmPageLeave();
-  }
+  // ---- TX power stepper removed (RS-02): the read-only line stays, pmin is not read by the page ------------
   {
     const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22 pmin=2', { ctr: 2, ago: 1 })]);
-    for (let i = 0; i < 40; i++) P.click(P.el('rm_rtxdn'));
-    check('3.1d radio reply with pmin=2 raises the floor to 2', P.w.rmKn().min === 2 && P.text('rm_rtxval') === '2 dBm' && P.el('rm_rtxdn').disabled && P.text('rm_rtxnote') === 'Range 2 to 22 dBm on this node.', P.w.rmKn().min + ' ' + P.text('rm_rtxval') + ' ' + P.text('rm_rtxnote'));
-    check('3.1d the radio card still shows p as cur/max (pmin is not a line of its own)', /10\/22 dBm/.test(P.text('rm_v_radio_p')) && !/pmin/.test(P.el('rm_card_radio').textContent), P.el('rm_card_radio').textContent.slice(0, 120));
-    P.w.rmPageLeave();
-    const Q = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=10/22 pmin=2 led=1', [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1 })]);
-    check('3.1d radio reply without pmin resets the floor to 0', Q.w.rmKn().min === 0, Q.w.rmKn().min);
-    Q.w.rmPageLeave();
-  }
-  {
-    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22 pmin=0 led=1');
-    for (let i = 0; i < 5; i++) P.click(P.el('rm_rtxdn'));
-    check('3.1 precondition: touched value 12', P.text('rm_rtxval') === '12 dBm', P.text('rm_rtxval'));
-    await P.setPoll({ sent: [ent('DK5EN-1', 'status', 'ok v=4.40a up=140 bat=87 heap=123 s=GtDMwL p=17/22 pmin=14 led=1', { ctr: 9, ago: 1, st: 'ok' })] });
-    check('3.1 value is clamped into [min, max] after every status', P.text('rm_rtxval') === '14 dBm' && P.el('rm_rtxdn').disabled, P.text('rm_rtxval'));
+    check('RS-02 Radio card: no stepper, no Apply, no range note, no TX power row beyond the read-only line', !P.el('rm_rtxdn') && !P.el('rm_rtxval') && !P.el('rm_rtxup') && !P.el('rm_rtxapply') && !P.el('rm_rtxnote') && !/Range \d|Apply/.test(P.el('rm_card_radio').textContent) && ![...P.el('rm_card_radio').querySelectorAll('button')].some((b) => /^(-|\+|Apply)$/.test(b.textContent) || /^tx/.test(b.getAttribute('data-act') || '')), P.el('rm_card_radio').textContent);
+    check('RS-02 the read-only line "TX power (now/max)" shows cur/max, pmin is not a line of its own', P.text('rm_v_radio_p') === 'TX power (now/max): 10/22 dBm' || /10\/22 dBm/.test(P.text('rm_v_radio_p')), P.text('rm_v_radio_p'));
+    check('RS-02 no pmin anywhere in the card and none in the page JS', !/pmin/.test(P.el('rm_card_radio').textContent) && !/pmin/.test(JS), '');
     P.w.rmPageLeave();
   }
 
@@ -789,29 +717,13 @@ function leaks(P, canary) {
     check('Gateway off sent on the second tap', P.sends().length === 1 && /cmd=gateway&args=off/.test(P.sends()[0].body));
     P.w.rmPageLeave();
   }
-  {
-    const P = await savedNodePage(STATUS_NEW);   // cur 17
-    for (let i = 0; i < 5; i++) P.click(P.el('rm_rtxdn'));
-    await P.tap(P.el('rm_rtxapply'));
-    check('lowering TX power needs a confirm', P.sends().length === 0 && P.el('rm_rtxapply').textContent === 'Really? tap again' && P.text('rm_rtxval') === '12 dBm');
-    await P.tap(P.el('rm_rtxapply'));
-    check('lowering TX power sends "txpower 12" on the second tap', P.sends().length === 1 && /cmd=txpower&args=12/.test(P.sends()[0].body), JSON.stringify(P.sends()));
-    // the fake server answers with the verified result, then raise
-    P.srv.status.sent.unshift(ent('DK5EN-1', 'txpower 12', 'ok txpower=12', { ago: 1, ctr: 9 }));
-    await P.T.advance(10100);
-    check('reported TX power follows the verified reply', P.text('rm_rtxval') === '12 dBm');
-    P.click(P.el('rm_rtxup')); await flush();
-    await P.tap(P.el('rm_rtxapply'));
-    check('raising TX power needs no confirm', P.sends().length === 2 && /cmd=txpower&args=13/.test(P.sends()[1].body), JSON.stringify(P.sends().map((s) => s.body)));
-    P.w.rmPageLeave();
-  }
 
   // ---- 10 s lock -----------------------------------------------------------------------------------
   {
     const P = await savedNodePage(STATUS_NEW);
     await P.tap(P.btn('Send position now', P.el('rm_info')));
     check('a send was made', P.sends().length === 1);
-    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('input'), P.el('rm_rtxapply')];
+    const allBtns = () => [...P.el('rm_info').querySelectorAll('button'), ...P.el('rm_sw').querySelectorAll('input')];
     check('all tiles are locked after a send', allBtns().every((b) => b.disabled), allBtns().filter((b) => !b.disabled).length + ' enabled');
     check('countdown is visible', /Next command possible in 10 s/.test(P.text('rm_msg')), P.text('rm_msg'));
     await P.T.advance(3000);
@@ -967,28 +879,193 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
   {
-    // own password: set / clear / RM switch
+    // RM-02 / RS-04: "This node" card is gone from the Remote page; a pointer line shows only while RM is off on this node
+    const D0 = new JSDOM(HTML).window.document;
+    check('RS-04 no "This node" card, no #rm_on / #rm_selfpw / password Set-Clear controls on the Remote page', ![...D0.querySelectorAll('.cardlabel')].some((l) => l.textContent === 'This node') && !D0.getElementById('rm_on') && !D0.getElementById('rm_selfpw') && !D0.getElementById('rm_pwstate') && !D0.getElementById('rm_selfmsg') && !/data-act="self/.test(HTML) && !/rmSelfSet|rmSelfClear|rmSelfOn|rmRenderSelf|\/rmpasswd/.test(JS));
     const srv = mkServer();
     srv.status = srv.mkStatus({ pw: 0, on: 0 });
     const P = await mkPage(srv);
     await P.init();
-    check('no password: RM switch disabled with "set a password first"', P.el('rm_on').disabled && /Set a password first/.test(P.text('rm_onhint')) && P.text('rm_pwstate') === 'password: not set');
-    P.el('rm_selfpw').value = CANARY;
-    await P.tap(P.btn('Set'));
-    const c = P.calls.find((x) => rmPath(x) === '/rmpasswd');
-    check('Set: POST /rmpasswd act=set with the password in the body only', !!c && c.method === 'POST' && c.body === 'act=set&pw=' + encodeURIComponent(CANARY), c && c.body);
-    check('Set: no leak, input cleared', leaks(P, CANARY).length === 0 && P.el('rm_selfpw').value === '', leaks(P, CANARY).join('; '));
-    await P.T.advance(100);
-    check('after Set the status shows "password: set" and the switch is enabled', P.text('rm_pwstate') === 'password: set' && !P.el('rm_on').disabled, P.text('rm_pwstate'));
-    P.el('rm_on').checked = true;
-    P.el('rm_on').dispatchEvent(new P.w.Event('change', { bubbles: true }));
-    await flush();
-    check('RM switch calls GET /setparam/?rm=on', P.calls.some((x) => x.url === '/setparam/?rm=on' && x.method === 'GET'));
-    await P.tap(P.btn('Clear'));
-    check('Clear needs a second tap', !P.calls.some((x) => rmPath(x) === '/rmpasswd' && x.body === 'act=clear') && P.btn('Really? tap again'));
-    await P.tap(P.btn('Really? tap again'));
-    check('Clear sends act=clear on the second tap', P.calls.some((x) => rmPath(x) === '/rmpasswd' && x.body === 'act=clear'));
-    check('the console/KISS warning is on the page', /net console \(port 2323\) and the KISS port/.test(P.d.body.textContent));
+    const off = () => P.el('rm_off') || { style: { display: 'missing' }, textContent: 'missing' };
+    check('RS-04 RM off on this node: the pointer line shows, as text, with the Settings pointer', off().style.display !== 'none' && off().textContent === 'Remote management is off on this node. Switch it on under Settings, Remote Admin.', off().style.display + '|' + off().textContent);
+    await P.setPoll({ pw: 1, on: 1 });
+    check('RS-04 RM on: the pointer line is hidden and empty', off().style.display === 'none' && off().textContent === '', off().style.display + '|' + off().textContent);
+    await P.setPoll({ pw: 1, on: 0 });
+    check('RS-04 RM switched off again: the pointer line comes back', off().style.display !== 'none' && /Settings, Remote Admin/.test(off().textContent));
+    P.w.rmPageLeave();
+  }
+  {
+    // RS-01: Messages shows only the newest 5 rows
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    const mk = (n) => { const a = []; for (let i = 1; i <= n; i++) a.push(ent('DK5EN-1', 'status', 'ok v=4.40a up=1 bat=87 s=GtDMwL', { ctr: i, ago: i * 10, st: 'ok' })); return a; };
+    await P.setPoll({ sent: mk(4), targets: tg });
+    check('RS-01 4 commands: 4 rows', P.el('rm_msgs').children.length === 4, P.el('rm_msgs').children.length);
+    await P.setPoll({ sent: mk(9), targets: tg });
+    const ag = () => [...P.el('rm_msgs').children].map((r) => r.children[0].textContent).join('|');
+    check('RS-01 9 commands: exactly 5 rows, the newest 5 (10..50 s ago)', P.el('rm_msgs').children.length === 5 && ag() === '10 s ago|20 s ago|30 s ago|40 s ago|50 s ago', ag());
+    check('RS-01 every kept row still has its Run again button', [...P.el('rm_msgs').children].every((r) => /Run again/.test(r.children[3].textContent)), P.el('rm_msgs').textContent);
+    check('RS-01 storage unchanged: the poll answer still holds 9 entries', P.w.rmStat.sent.length === 9, P.w.rmStat.sent.length);
+    await P.setPoll({ sent: mk(2), targets: tg });
+    check('RS-01 shrinking back to 2 commands leaves 2 rows (no stale row)', P.el('rm_msgs').children.length === 2, P.el('rm_msgs').children.length);
+    P.w.rmPageLeave();
+  }
+  {
+    // RS-07: one card-level Read in the Queues card
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    await P.setPoll({ sent: [], targets: tg });
+    const qb = () => [...P.el('rm_card_queues').querySelectorAll('button')].filter((b) => !b.classList.contains('cardtoggle'));
+    check('RS-07 Queues card: exactly one Read button, in the first header row, no per-row Read', qb().length === 1 && qb()[0].textContent === 'Read' && qb()[0].getAttribute('data-act') === 'qread' && P.el('rm_card_queues').lastElementChild.firstElementChild.contains(qb()[0]) && !P.el('rm_card_queues').querySelector('[data-cmd]'), qb().map((b) => b.textContent).join());
+    const hd = P.el('rm_card_queues').lastElementChild.firstElementChild;
+    check('RS-07 header: empty label cell | status "not read yet" | Read', hd.classList.contains('rmh') && hd.children.length === 3 && hd.children[1].textContent === 'not read yet' && hd.children[2] === qb()[0], hd.className + '|' + [...hd.children].map((e) => e.textContent).join('|'));
+    const n0 = P.sends().length;
+    await P.tap(qb()[0]);
+    check('RS-07 Read sends txq first', P.sends().length === n0 + 1 && /cmd=txq&args=(&|$)/.test(P.sends()[n0].body), JSON.stringify(P.sends().slice(n0)));
+    await P.T.advance(12000);
+    await P.T.advance(12000);
+    check('RS-07 then mbox and maxhop, one per lock window, in order', P.sends().slice(n0).map((s) => /cmd=(\w+)/.exec(s.body)[1]).join() === 'txq,mbox,maxhop', JSON.stringify(P.sends().slice(n0).map((s) => s.body)));
+    await P.T.advance(30000);
+    check('RS-07 nothing more is sent afterwards', P.sends().length === n0 + 3, P.sends().length - n0);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'txq', 'ok q=1/20 bp=quiet tx=1 rt=0 dr=0 u=1', { ctr: 1, ago: 70, st: 'ok' })], targets: tg });
+    check('RS-07 status shows the age of the newest read ("last read ...") in the fixed column', P.el('rm_card_queues').lastElementChild.firstElementChild.children[1].textContent === 'last read 70 s ago', P.el('rm_card_queues').lastElementChild.firstElementChild.children[1].textContent);
+    P.w.rmPageLeave();
+  }
+  {
+    // RS-07 rework: the card-level Read chain on unsaved nodes, on errors, and when the page or node changes mid-chain
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    const mkChain = async (saved) => {
+      const srv = mkServer();
+      if (saved) srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+      srv.status = srv.mkStatus({ targets: tg });
+      const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+      await P.setPoll({ sent: [], targets: tg });
+      if (!saved) P.el('rm_pw').value = 'secretpw';
+      P.qb = () => [...P.el('rm_card_queues').querySelectorAll('button')].find((b) => b.getAttribute('data-act') === 'qread');
+      P.cmds = () => P.sends().map((x) => /cmd=(\w+)/.exec(x.body)[1]).join();
+      return P;
+    };
+    {
+      const P = await mkChain(false);
+      check('RS-07 unsaved node with a typed password: Read is enabled', P.qb().disabled === false);
+      await P.tap(P.qb());
+      await P.T.advance(12000);
+      await P.T.advance(12000);
+      await P.T.advance(30000);
+      check('RS-07 unsaved node: the chain completes, txq,mbox,maxhop all sent', P.cmds() === 'txq,mbox,maxhop', P.cmds() + ' | ' + P.text('rm_msg'));
+      check('RS-07 unsaved node: every chained send carries dst and the typed password in the body, never in a URL', P.sends().length === 3 && P.sends().every((x) => x.url === '/rmsend' && /^dst=DK5EN-1&pw=secretpw&cmd=/.test(x.body)), JSON.stringify(P.sends().map((x) => x.body)));
+      check('RS-07 unsaved node: no "Type the password" error, password field cleared, queue and held prefix released', !/password/.test(P.text('rm_msg')) && P.el('rm_pw').value === '' && P.w.rmQq.length === 0 && P.w.rmQp === '', P.text('rm_msg'));
+      await P.tap(P.btn('Refresh status'));
+      check('RS-07 unsaved node: after the chain a plain command asks for the password again (prefix not kept)', P.sends().length === 3 && /Type the password/.test(P.text('rm_msg')), P.text('rm_msg'));
+      P.w.rmPageLeave();
+    }
+    {
+      // node remembered mid-chain: the last steps go by slot, the held prefix must still be released
+      const P = await mkChain(false);
+      await P.tap(P.qb());
+      P.srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+      P.w.rmSel.slot = 0;
+      await P.T.advance(12000);
+      await P.T.advance(12000);
+      await P.T.advance(30000);
+      check('RS-07 remembered mid-chain: mbox and maxhop go by slot', P.cmds() === 'txq,mbox,maxhop' && P.sends().slice(1).every((x) => /^slot=0&/.test(x.body)), JSON.stringify(P.sends().map((x) => x.body)));
+      check('RS-07 remembered mid-chain: the held prefix is released after the last step', P.w.rmQp === '', P.w.rmQp);
+      P.w.rmSel.slot = -1;
+      await P.tap(P.btn('Re-sync counter'));
+      check('RS-07 forgotten afterwards: Re-sync asks for the password again', P.sends().length === 3 && /Type the password/.test(P.text('rm_msg')), P.text('rm_msg'));
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(true);
+      P.srv.sendHook = (f) => (f.get('cmd') === 'mbox' ? { ok: false, err: 'zzz', msg: 'Mailbox refused.' } : null);
+      await P.tap(P.qb());
+      await P.T.advance(12000);
+      await P.T.advance(60000);
+      check('RS-07 an err reply mid-chain clears the queue: maxhop is never sent', P.cmds() === 'txq,mbox' && P.w.rmQq.length === 0, P.cmds());
+      check('RS-07 the err reply is shown once', P.text('rm_msg') === 'Mailbox refused.', P.text('rm_msg'));
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(true);
+      P.srv.rejectHook = (u, init) => u === '/rmsend' && /cmd=mbox/.test(String(init && init.body));
+      await P.tap(P.qb());
+      await P.T.advance(12000);
+      await P.T.advance(60000);
+      check('RS-07 a network reject mid-chain clears the queue: maxhop is never sent', P.cmds() === 'txq,mbox' && P.w.rmQq.length === 0, P.cmds());
+      check('RS-07 the "no answer" message stays (a later chain step does not wipe it)', /did not answer/.test(P.text('rm_msg')), P.text('rm_msg'));
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(false);
+      await P.tap(P.qb());
+      P.w.rmPick('OE1ABC-5');
+      await P.T.advance(12000);
+      await P.T.advance(60000);
+      check('RS-07 rmPick to another node mid-chain sends nothing more (the typed password never goes to the other node)', P.cmds() === 'txq' && P.w.rmQq.length === 0 && P.w.rmQp === '', P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(true);
+      await P.tap(P.qb());
+      P.w.rmPageLeave();
+      await P.T.advance(60000);
+      P.show(); P.w.rmPageInit(); await flush();
+      await P.T.advance(60000);
+      check('RS-07 rmPageLeave mid-chain sends nothing more, not even after the page is entered again', P.cmds() === 'txq' && P.w.rmQq.length === 0, P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(true);
+      await P.tap(P.qb());
+      P.w.rmForget(); await flush();
+      await P.T.advance(12000);
+      await P.T.advance(30000);
+      check('RS-07 node forgotten mid-chain (no key, no password): the chain is dropped silently, no error per command', P.cmds() === 'txq' && P.w.rmQq.length === 0 && !/Type the password/.test(P.text('rm_msg')), P.cmds() + ' | ' + P.text('rm_msg'));
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mkChain(true);
+      P.w.rmMhStart(); await flush();
+      check('RS-07 Read is disabled while a Heard list read runs, and a call does nothing', P.w.rmMh.on === 1 && P.qb().disabled === true);
+      const n = P.sends().length;
+      P.w.rmQRead(); await flush();
+      check('RS-07 rmQRead during a Heard list read sends nothing and queues nothing', P.sends().length === n && P.w.rmQq.length === 0, P.sends().length - n);
+      P.w.rmMhStop(); await P.T.advance(12000);
+      check('RS-07 Read is enabled again after the Heard read stops', P.qb().disabled === false);
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1, st: 'ok' })]);
+      check('Messages: a verified radio read shows the radio sentence (RM_MUTATE=radio guard)', /Radio: 433\.175 MHz, SF 11, 250 kHz, TX power 10\/22\./.test(P.text('rm_msgs')), P.text('rm_msgs'));
+      P.w.rmPageLeave();
+    }
+    {
+      const srv = mkServer(); srv.auth = 401;
+      const P = await mkPage(srv);
+      P.show(); P.w.rmPageInit(); await flush();
+      const off = P.el('rm_off');
+      check('RS-04 before the first poll answer (rmStat null) the pointer line is hidden and empty', P.w.rmStat === null && off.style.display === 'none' && off.textContent === '', off.style.display + '|' + off.textContent);
+      P.w.rmPageLeave();
+    }
+  }
+  {
+    // RS-03: every card header uses the same column template, status text in the value column
+    const css = HTML.match(/<style>[\s\S]*<\/style>/)[0];
+    check('RS-03 stylesheet: .rmh grid label | value | action (7em 1fr auto)', css.includes('.rmh{display:grid;grid-template-columns:7em 1fr auto;}'));
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0, cap: 2 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    await P.setPoll({ sent: [], targets: tg });
+    const hs = ['rm_card_radio', 'rm_card_ident', 'rm_card_pos', 'rm_card_queues'].map((i) => [...P.el(i).lastElementChild.querySelectorAll('.rmh')]).reduce((a, b) => a.concat(b), []);
+    check('RS-03 headers of Radio (2), Identity (2), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 6 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
     P.w.rmPageLeave();
   }
 
@@ -1189,32 +1266,13 @@ function leaks(P, canary) {
     const sd = P.sends();
     check('W1d run again sends the same cmd to the same target', sd.length === before + 1 && /cmd=sendpos/.test(sd[sd.length - 1].body || '') && /DK5EN-1|slot=0/.test(sd[sd.length - 1].body || ''), JSON.stringify(sd[sd.length - 1]));
     check('W1d run again is disabled while the node is in cooldown', [...P.el('rm_msgs').querySelectorAll('button')].every((b) => b.disabled));
-    check('W1d old ids are gone, TX control lives in the Radio card (UI-06)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && P.el('rm_card_radio').contains(P.el('rm_rtxval')) && P.el('rm_card_radio').contains(P.el('rm_rtxapply')) && [...P.el('rm_page').querySelectorAll('.cardlabel')].filter((l) => l.textContent === 'Radio').length === 1);
+    check('W1d old ids are gone, the Radio card exists once and has no TX stepper (RS-02)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && [...P.el('rm_page').querySelectorAll('.cardlabel')].filter((l) => l.textContent === 'Radio').length === 1);
     check('UI-03/04 Advanced is a collapsablecard, closed by default, no <details>', P.el('rm_adv').classList.contains('collapsablecard') && !P.el('rm_adv').classList.contains('cardopen') && !P.el('rm_page').querySelector('details'));
     P.w.rmPageLeave();
   }
   {
     const hdr = HTML + JS;
     check('W1d no fixed "10 s" in the emitted page text', !/10 s/.test(hdr) && !/10 seconds/.test(hdr));
-    for (const [pw, on] of [[0, 0], [0, 1], [1, 0], [1, 1]]) {
-      const srv = mkServer(); srv.status = srv.mkStatus({ pw, on, lock: pw && !on ? 1 : 0, lockS: 42 });
-      const P = await mkPage(srv); await P.init();
-      const vis = P.el('rm_on').style.display !== 'none' && P.el('rm_onlbl').style.display !== 'none';
-      check('W1d toggle visible for pw=' + pw + ' on=' + on, vis === !!(pw || on));
-      const lt = P.text('rm_lockstate');
-      check('W1d lock label ' + (pw && !on ? 'shows seconds' : 'empty') + ' pw=' + pw + ' on=' + on, pw && !on ? /^A sender is blocked for 42 s after wrong attempts$/.test(lt) : lt === '', lt);
-      check('W1d lock label never says "not locked"', !/not locked/.test(lt));
-      P.w.rmPageLeave();
-    }
-    const srv = mkServer(); const P = await mkPage(srv); await P.init();
-    const n0 = P.calls.length;
-    await P.tap(P.el('rm_selfclear'));
-    check('W1d clear asks first, nothing sent', P.text('rm_selfmsg') === 'Clear the password? Remote management will be switched off.' && P.calls.length === n0, P.text('rm_selfmsg'));
-    await P.w.rmDisarm(); await flush();
-    check('W1d cancel (disarm) sends nothing', P.calls.length === n0 && P.text('rm_selfmsg') === '');
-    await P.tap(P.el('rm_selfclear')); await P.tap(P.el('rm_selfclear'));
-    check('W1d confirmed clear shows the new message', P.text('rm_selfmsg') === 'Password cleared. Remote management is off.', P.text('rm_selfmsg'));
-    P.w.rmPageLeave();
   }
 
   // ---- advisor rework: Run again goes to the row's node, dedupe, confirm, lock label -------------------
@@ -1431,9 +1489,9 @@ function leaks(P, canary) {
       await poll([ent('DK5EN-1', 'pos 1 2 3', 'err ' + t, { ctr: 12, ago: 1, st: 'err', msg: SRVMSG[t] })]);
       check('RMX err ' + t + ' shows its sentence', re.test(P.text('rm_msgs')), P.text('rm_msgs').slice(0, 120));
     }
-    // radio stepper bound follows a radio reply
+    // the read-only TX power line follows a radio reply
     await poll([E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 13)]);
-    check('RMX radio reply sets the TX power stepper bound (max 22)', P.w.rmCap(P.w.rmKn()) === 22, P.w.rmCap(P.w.rmKn()));
+    check('RMX radio reply shows the read-only TX power line (10/22 dBm)', /10\/22 dBm/.test(tx('rm_v_radio_p')), tx('rm_v_radio_p'));
     P.w.rmPageLeave();
   }
   {
@@ -1531,12 +1589,6 @@ function leaks(P, canary) {
     await poll([ent('DK5EN-3', 'mh 0', 'ok 3 - AA1AA-1 1', { ago: 0, ctr: srv.lastCtr, st: 'ok' })], 0);
     n0 = nS(); P.w.rmMhStart(); await flush();
     check('RMN dst form: a new run without a password sends nothing and asks for it', nS() === n0 && P.w.rmMh.on === 0 && /Type the password of DK5EN-3/.test(tx('rm_msg')), nS() + ' ' + tx('rm_msg'));
-    P.w.rmPageLeave();
-  }
-  {
-    const srv = mkServer(); srv.status = srv.mkStatus({ pw: 1, on: 0, lock: 1, lockS: 0 });
-    const P = await mkPage(srv); await P.init();
-    check('lock true with lockS 0 shows "1 s", never "0 s"', /blocked for 1 s after/.test(P.text('rm_lockstate')), P.text('rm_lockstate'));
     P.w.rmPageLeave();
   }
 

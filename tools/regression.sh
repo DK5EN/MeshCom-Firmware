@@ -216,6 +216,8 @@ stage2() {
         node tools/safeboot_page_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_rm_test.js" stage2-webgui-rm \
         node tools/webgui_rm_test.js
+    NODE_PATH="$jsdom/node_modules" run_step "node webgui_settings_test.js" stage2-webgui-settings \
+        node tools/webgui_settings_test.js
     for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py; do
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test

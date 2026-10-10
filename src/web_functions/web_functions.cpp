@@ -1183,7 +1183,7 @@ void deliver_scaffold(bool bget_password)
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='setup'&&typeof raSt=='function')raSt();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
     //
     // BP-09: the input fields used to be cleared unconditionally, right after
@@ -1286,6 +1286,28 @@ void deliver_scaffold(bool bget_password)
     // RM GUI W2b: Remote page scripts (state tiles, saved nodes, password, polling). Lives here because
     // sub-pages are injected with innerHTML and their <script> never runs.
     rmScaffoldJs();
+
+    // Remote Admin card of the Settings page (sub_page_setup()): scripts of sub-pages never run, so the logic lives here;
+    // loadPage() calls raSt() after the setup fragment is in. Password only in the POST body, never in a URL.
+    // RA-JS-BEGIN
+    web_client.println("var raA=0,raT=0;\n"
+                       "function raM(t,b){var e=rmEl('ra_msg');if(e){e.textContent=t;e.style.color=b?'var(--mcred)':'';}}\n"
+                       "function raX(e,t){raM(e===0?'Log in again to change these settings.':t,1);}\n"
+                       "function raDis(m){clearTimeout(raT);raA=0;var b=rmEl('ra_clr');if(b)b.textContent='Clear';if(m)raM('');}");
+    web_client.println("function raSt(){fetch('/rmstatus').then(rmJson).then(function(j){var o=rmEl('ra_on');if(!o)return;o.checked=!!j.on;o.disabled=!j.pw&&!j.on;\n"
+                       "rmEl('ra_hint').textContent=j.pw?'':'Set a password first, then switch remote management on.';\n"
+                       "rmEl('ra_st').textContent='password: '+(j.pw?'set':'not set')+(j.lock?', a sender is blocked for '+(j.lockS||1)+' s after wrong attempts':'');})\n"
+                       ".catch(function(e){raX(e,'Could not read the state of this node. Reload the page.');});}");
+    web_client.println("function raP(b,t){rmPost('/rmpasswd',b).then(rmJson).then(function(j){if(j&&j.ok)raM(t);else raM(rmErrText(j),1);raSt();})\n"
+                       ".catch(function(e){raX(e,'The node did not answer. Try again.');});}");
+    web_client.println("function raSet(){var i=rmEl('ra_pw'),p=i.value,e=rmPwProblem(p);raDis();\n"
+                       "if(e){raM(e,1);return;}i.value='';raP('act=set&pw='+rmEnc(p),'Password set.');}\n"
+                       "function raClr(){if(!raA){raA=1;rmEl('ra_clr').textContent='Really? tap again';raM('Clear the password? Remote management will be switched off.');raT=setTimeout(function(){raDis(1);},4000);return;}\n"
+                       "raDis();raP('act=clear','Password cleared. Remote management is off.');}");
+    web_client.println("function raOn(){var o=rmEl('ra_on'),v=o.checked?'on':'off';o.disabled=true;fetch('/setparam/?rm='+v).then(rmJson).then(function(j){var k=j&&j.returncode==0;\n"
+                       "raM(k?'Remote management is '+v+'.':'Could not change it. Is a password set?',!k);raSt();})\n"
+                       ".catch(function(e){raX(e,'The node did not answer. Try again.');raSt();});}");
+    // RA-JS-END
 
     // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
     // and injected with innerHTML, which never runs a <script> tag it carries,
@@ -3228,6 +3250,25 @@ void sub_page_setup()
         web_client.println("</div>");
         web_client.println("</div>");
     }
+
+    // Remote Admin card: password and remote management of this node (moved from the Remote page). Filled by raSt().
+    // RA-HTML-BEGIN
+    web_client.println("<div class=\"cardlayout collapsablecard\">");
+    web_client.println("<label class=\"cardlabel\">Remote Admin</label>");
+    web_client.println("<span>Open this for the password and remote management.</span>\n");
+    web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
+    web_client.println("<div class=\"grid grid3\">");
+    web_client.println("<label for=\"ra_on\">Remote management</label><span></span>"
+                       "<input type=\"checkbox\" role=\"switch\" id=\"ra_on\" disabled onchange=\"raOn()\">"
+                       "<span id=\"ra_hint\" class=\"font-small\" style=\"grid-column:1/-1\"></span>");
+    web_client.println("<label for=\"ra_pw\">Password :</label>"
+                       "<input type=\"password\" id=\"ra_pw\" maxlength=\"14\" size=\"10\" autocomplete=\"new-password\" placeholder=\"New password\">"
+                       "<button id=\"ra_set\" onclick=\"raSet()\">Set</button>");
+    web_client.println("<span id=\"ra_st\" class=\"font-small\" style=\"grid-column:1/3\"></span><button id=\"ra_clr\" onclick=\"raClr()\">Clear</button>"
+                       "<p id=\"ra_msg\" class=\"font-small\" style=\"grid-column:1/-1\"></p>"
+                       "<p class=\"font-small\" style=\"grid-column:1/-1\">This password also protects the net console (port 2323) and the KISS port, not only remote management.</p>");
+    web_client.println("</div></div>");
+    // RA-HTML-END
 
     // IP Network Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");
