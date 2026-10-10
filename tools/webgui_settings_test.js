@@ -120,7 +120,10 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
   check('N1 hint sits in its own full-width row, not in the narrow middle column', /id="ra_hint"[^>]*style="grid-column:1\/-1"/.test(html) && !/<label for="ra_on">Remote management<\/label><span id="ra_hint"/.test(html));
   check('2323/KISS note present', html.indexOf('This password also protects the net console (port 2323) and the KISS port, not only remote management.') >= 0);
 
+  const shown = (id) => w.getComputedStyle($(id)).display !== 'none';
+  check('empty hint and message rows take no space (no gap above the note)', !shown('ra_hint') && !shown('ra_msg'), shown('ra_hint') + '|' + shown('ra_msg'));
   w.raSt(); await settle();
+  check('the hint row shows once it has text', shown('ra_hint'));
   check('toggle disabled without password', $('ra_on').disabled === true);
   check('hint without password', $('ra_hint').textContent === 'Set a password first, then switch remote management on.');
   check('status text not set', $('ra_st').textContent === 'password: not set');

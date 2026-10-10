@@ -3260,7 +3260,8 @@ void sub_page_setup()
     web_client.println("<div class=\"grid grid3\">");
     web_client.println("<label for=\"ra_on\">Remote management</label><span></span>"
                        "<input type=\"checkbox\" role=\"switch\" id=\"ra_on\" disabled onchange=\"raOn()\">"
-                       "<span id=\"ra_hint\" class=\"font-small\" style=\"grid-column:1/-1\"></span>");
+                       "<span id=\"ra_hint\" class=\"font-small\" style=\"grid-column:1/-1\"></span>"
+                       "<style>#ra_hint:empty,#ra_msg:empty{display:none}</style>");
     web_client.println("<label for=\"ra_pw\">Password :</label>"
                        "<input type=\"password\" id=\"ra_pw\" maxlength=\"14\" size=\"10\" autocomplete=\"new-password\" placeholder=\"New password\">"
                        "<button id=\"ra_set\" onclick=\"raSet()\">Set</button>");

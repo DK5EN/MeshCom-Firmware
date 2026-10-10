@@ -38,14 +38,19 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 Ports move between sessions. **Resolve the port by USB serial number** (`ioreg` or pyserial), never by device name. Registry: `tools/bench/fleet.json`.
 
-| Node     | Board       | USB serial        | Host (net console 2323) |
-| -------- | ----------- | ----------------- | ----------------------- |
-| DK5EN-90 | RAK4631     | 230D6EBB3266D20E  | none (Ethernet, DHCP)   |
-| DK5EN-14 | T-Deck Plus | none (native USB) | none                    |
-| DK5EN-92 | T-Beam v1.2 | 573C000584        | 192.168.68.73           |
-| DK5EN-1  | Heltec V3   | 0001              | 192.168.68.62           |
+| Node     | Board       | USB serial        | Net console 2323 | Last seen IP (2026-10-10) |
+| -------- | ----------- | ----------------- | ---------------- | ------------------------- |
+| DK5EN-90 | RAK4631     | 230D6EBB3266D20E  | none (nRF52)     | 192.168.68.71 (Ethernet)  |
+| DK5EN-14 | T-Deck Plus | none (native USB) | none             | none                      |
+| DK5EN-92 | T-Beam v1.2 | 573C000584        | yes              | 192.168.68.69             |
+| DK5EN-1  | Heltec V3   | 0001              | yes              | 192.168.68.63             |
 
-DK5EN-98 is the production Heltec V3 (logger on rpizero); it is not a bench node.
+DK5EN-98 is the production Heltec V3 (logger on rpizero, last seen at 192.168.68.62); it is not a bench node.
+
+**All addresses come from DHCP and change between sessions.** Never trust the IP column or `fleet.json`
+blindly: confirm the callsign on the node's start page before any flash or test (or sweep the /24 for
+start pages). Consoles with a password need the HMAC login; `identity_guard.py` reads it from
+`MC_CONSOLE_PW`.
 
 ### RAK4631 (nRF52840)
 
