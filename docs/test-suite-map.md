@@ -172,7 +172,7 @@ flashes whatever is attached.
 | test_charset_filter          | Unit          |    29 | native                                                       |
 | test_checkvia                | Unit          |    13 | native_parsers                                               |
 | test_command_match           | Unit          |    11 | native_command_match                                         |
-| test_command_setters         | Unit          |    37 | native_command_setters                                       |
+| test_command_setters         | Unit          |    39 | native_command_setters                                       |
 | test_command_toggles         | Unit          |    34 | native_command_toggles                                       |
 | test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
@@ -240,11 +240,12 @@ flashes whatever is attached.
 | test_radio_units             | Regression    |    16 | native                                                       |
 | test_reack_limiter           | Unit          |     8 | native                                                       |
 | test_regex_call              | Unit          |    13 | native                                                       |
-| test_remote_cmd              | Unit          |    82 | native_remote_cmd                                            |
+| test_remote_cmd              | Unit          |   101 | native_remote_cmd                                            |
 | test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
 | test_rm_sender_policy        | Unit          |    43 | native_rm_sender_policy                                      |
 | test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
 | test_rm_format               | Unit          |    18 | native_rm_format                                             |
+| test_charge_led_mode         | Regression    |     7 | native_charge_led_mode                                       |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |

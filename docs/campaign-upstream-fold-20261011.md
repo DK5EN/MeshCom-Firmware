@@ -5,13 +5,13 @@ in this campaign (preparation mode). Corpus and decisions: `docs/upstream-corpus
 
 ## Status
 
-| Wave | Content                                                                                     | State                  |
-| ---- | ------------------------------------------------------------------------------------------- | ---------------------- |
-| W0   | `web-guard-flag` merged (ff), worktrees removed, `fix-tempoff-input` deleted local + origin | done                   |
-| W1   | `.zz` → `.autoupdate` rename, buffers 48 B, Safeboot page + bins rebuilt (`2522dccb`)       | done, gate green       |
-| W2   | 11 upstream cherry-picks (`-x`) e1e2acea..90ac580d, golden regen, toggle-lint pin 82 → 84   | done, advisor APPROVED |
-| W3   | LED feature + upstream LED bug fixes + V4 remote LED + hemisphere dead code                 | open, spec below       |
-| W4   | Bench: T-Beam DK5EN-92 (charge LED), Heltec V3 DK5EN-1 (RM led on/flash/off)                | open                   |
+| Wave | Content                                                                                          | State                  |
+| ---- | ------------------------------------------------------------------------------------------------ | ---------------------- |
+| W0   | `web-guard-flag` merged (ff), worktrees removed, `fix-tempoff-input` deleted local + origin      | done                   |
+| W1   | `.zz` → `.autoupdate` rename, buffers 48 B, Safeboot page + bins rebuilt (`2522dccb`)            | done, gate green       |
+| W2   | 11 upstream cherry-picks (`-x`) e1e2acea..90ac580d, golden regen, toggle-lint pin 82 → 84        | done, advisor APPROVED |
+| W3   | LED feature + upstream LED bug fixes + V4 remote LED + hemisphere dead code (14783b1d..13d28041) | done, advisor 2 rounds |
+| W4   | Bench: T-Beam DK5EN-92 (charge LED), Heltec V3 DK5EN-1 (RM led on/flash/off)                     | open, next             |
 
 W2 skipped on purpose: f5f8d38f, 9a246a16, 5211600d (#1200/#1201, already in the fork), b82e36c0 +
 0eb33bfa (YAML add and revert, net zero). Conflict resolutions keep the RM hold: every
@@ -73,7 +73,33 @@ A and B run in parallel (disjoint files, spec fixed above). Gate: `tools/regress
 builds ttgo_tbeam, ttgo_tbeam_supreme, heltec V3, V4, E22-DevKitC, E22_1262_S3, wiscore_rak4631,
 t_echo; advisor (Opus) before commit. Every pio call through the lock wrapper (one pio at a time).
 
-### W4 bench
+## W3 result (2026-10-11)
+
+Commits: `14783b1d` CHG-03, `e31c31e1` CHG-04, `a4da854c` CHG-01/02, `ca985372` RM led flash +
+chgled + LED-POL + V4, `13d28041` T-Deck dead code. Gate `--stage 1,2` PASS (71 envs, 2368/2368);
+board builds green: ttgo_tbeam, ttgo_tbeam_supreme, heltec V3, V4, E22-DevKitC, E22_XML-DevKitC,
+E22_1262_S3-DevKitC-1-N16R8, wiscore_rak4631, t_echo.
+
+Deviations from the spec above:
+
+- CHG-01/02 marker is **`node_sset2` bit 0x8000** (`SSET2_CHGLED_CFG`, `src/charge_led_mode.h`),
+  not a `node_sset3` bit: all 16 low sset3 bits are taken, and settings decode clamps sset3 to
+  0..65535 (also upstream), so a bit above 15 would become 65535 = every sset3 flag on after a
+  downgrade. The console rows keep the upstream masks; the post hooks set the marker and both rows
+  are `TG_POST_FIRST` (hook before `save_settings()`). `--gateway pos` / `--netconsole off` masks
+  widened (0x7EFF/0x6FFF cleared bit 15). Old firmware typing those two commands clears the marker:
+  harmless, the node falls back to auto.
+- Console `--charge led on` = follows charging (auto); steady on exists only as RM `chgled on`.
+- LED-POL folded into the RM feature commit (same functions); defensive only, both active-low
+  variants share BOARD_LED with OneWire and get no `REMOTE_LED_PIN`.
+- `ttgo_tbeam` has no `REMOTE_LED_PIN` (GPIO4 = OneWire), so on DK5EN-92 `led` answers
+  `err unsupported`; `chgled` is AXP-only and answers `err unsupported` on Heltec V3.
+- GUI: "Light flash" switch + "Charge LED" select (harness forbids extra tiles); a pre-W3 node's
+  `err blocked` to `chgled` marks it not supported.
+- Not covered natively: rm_runtime reply text and pin levels (Arduino-bound); pinned via Python
+  vectors, jsdom GUI test and W4 bench.
+
+## W4 bench
 
 - DK5EN-92 (T-Beam v1.2, AXP192): charge LED follows charging after the update; `--charge led off`
   darkens it; RM `chgled on/off/auto` from DK5EN-1.
