@@ -159,8 +159,17 @@ Dropped (operator, 2026-10-11): fork only, no wave 3.
 
 ## 8. Status
 
-| Wave | State                                                                                                                                                                                                                                                              |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0    | Done. No host harness drives `OnRxDone`; the test covers the predicate in `[env:native]`.                                                                                                                                                                          |
-| 1    | Done 2026-10-11. `src/hey_echo_upload.h`, call site in `OnRxDone` own-echo branch, `test_hey_echo_upload` (10 cases, fail-before shown). Advisor: pass 1 rework (own-origin gate), pass 2 APPROVED. Gate: stage 1,2 PASS (2320 cases), T-Beam/RAK/Heltec V3 build. |
-| 2    | Bench pending: DK5EN-1 gateway (server on), DK5EN-92 neighbour (mesh on), both 2 dBm. Expect a GWU line for the echo, a feed row `"path":"DK5EN-1,DK5EN-92"` with one group, and an mcmap edge DK5EN-1 -> DK5EN-92.                                                |
+| Wave | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Done. No host harness drives `OnRxDone`; the test covers the predicate in `[env:native]`.                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1    | Done 2026-10-11. `src/hey_echo_upload.h`, call site in `OnRxDone` own-echo branch, `test_hey_echo_upload` (10 cases, fail-before shown). Advisor: pass 1 rework (own-origin gate), pass 2 APPROVED. Gate: stage 1,2 PASS (2320 cases), T-Beam/RAK/Heltec V3 build.                                                                                                                                                                                                               |
+| 2    | Done 2026-10-11 11:35-11:39 UTC+2. DK5EN-1 (9d7eab21, gateway on) uploaded every echo of its HEYs `EA25A2BD..C1` (GWU + TX-UDP, frame unchanged), via DK5EN-14, DK5EN-92, DK5EN-98 and two-hop via DK5EN-98. Server feed: all 5 uploads with `S0` published (`"path":"DK5EN-1,DK5EN-14","rssi":"4,38,6;"`, `"path":"DK5EN-1,DK5EN-92","rssi":"4,59,12;"`); mcmap `link_quality_overview DK5EN-1 tx` shows new edges DK5EN-1->DK5EN-14 and DK5EN-1->DK5EN-92. Open finding below. |
+
+### Open finding: echoes relayed by a server gateway are not published
+
+The 5 uploads whose last relay was DK5EN-98 (a server-connected gateway) carry `msg_server` (`S1`,
+set by DK5EN-98 when it relayed) and none of them appears in the INTERLINK feed, while all 5 `S0`
+uploads do. Inferred: the hub ignores `DATA` frames with the `msg_server` bit. Effect: the edge from
+our gateway to a neighbour that is itself a server gateway does not come from the echo; that
+neighbour's own direct upload (`"path":"DK5EN-1","rssi":"9,65,6;"`) names no receiver. Not changed
+in firmware; a hub-side question.
