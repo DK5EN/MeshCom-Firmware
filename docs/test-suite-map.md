@@ -201,6 +201,7 @@ flashes whatever is attached.
 | test_gw_link_status          | Unit          |    16 | native                                                       |
 | test_gwflood_frames          | Contract      |     6 | native_aprs                                                  |
 | test_hey_policy              | Unit          |     7 | native                                                       |
+| test_hey_echo_upload         | Unit          |    10 | native                                                       |
 | test_hey_report              | Unit          |     8 | native_aprs                                                  |
 | test_kbd_repeat              | Unit          |    39 | native                                                       |
 | test_kiss_ax25               | Unit          |    23 | native_extradio                                              |

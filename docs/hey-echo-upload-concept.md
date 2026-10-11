@@ -1,6 +1,6 @@
 # HEY echo upload: gateway pushes its own HG echoes to the server
 
-Status: concept, 2026-10-11. Not implemented. Written for an Opus orchestrator running
+Status: implemented 2026-10-11 (wave 1, see section 8); bench pending. Originally Written for an Opus orchestrator running
 `/orchestrate-waves`. Code references are against `fork-dev` at 6d058a5f; upstream `dev` (1a9932e9)
 has the same logic at shifted line numbers, so this is an upstream PR candidate.
 
@@ -8,8 +8,8 @@ has the same logic at shifted line numbers, so this is an upstream PR candidate.
 
 A gateway never uploads the signal reports that its neighbours append to its own HG HEY. The echo
 is recognised as an own frame and only feeds the "heard" status; the server upload sits in the
-other branch. Fix: in the own-echo branch, a gateway uploads every HEY echo it hears, unchanged,
-with its own RSSI/SNR in the `DATA` header. No new msg_id, no change to the relay or dedup logic,
+other branch. Fix: in the own-echo branch, a gateway uploads every echo of its own HEY it hears,
+with its own signal-report group appended like every other gateway HEY upload. No new msg_id, no change to the relay or dedup logic,
 no self-upload of the bare HG (GW-01 stays).
 
 ## 2. Current behaviour (verified by code reading, not on the bench)
@@ -40,6 +40,8 @@ the PR, do not fix.
    second hop, ...) goes to the server. No "first echo per neighbour" filter.
 3. **GW-01 stays.** The bare HG is still not self-uploaded; the echoes carry the HG content plus
    the reports.
+4. **No upstream PR** for this change (operator, 2026-10-11). Fork only.
+5. **Server side:** HEY dedup is explicitly disabled on the server, so all echo rows arrive.
 
 ## 4. Target behaviour
 
@@ -47,14 +49,30 @@ In the `heardIcheck >= 0` branch (`src/lora_functions.cpp:1543`), add: when
 
 - `bGATEWAY` is set, and
 - `msg_type_b_lora == MSG_TYPE_HEY` (payload `'@'`, destination `HG`), and
-- the frame is not HN (already diverted at `:1104`, so implicit), and
+- the frame is not HN: foreign HN is diverted at `:1104`; our own HN (`sendNbrReport()`, also in
+  `own_msg_id[]`) goes out with `max_hop` 0 and is never relayed (`:2347`), so no echo exists, and
+- the originator is this node (`aprsmsg.msg_source_call` == `meshcom_settings.node_call`), and
 - the last hop is not the own call (`aprsmsg.msg_source_last` != `meshcom_settings.node_call`;
   defensive, an echo always carries a relay call)
 
-then call `addNodeData(RcvBuffer, size, rssi, snr)` with the frame **as received**: no report
-appended by the gateway (the gateway's own view of the last hop is already in the `DATA` header's
-rssi/snr), no re-encode, no `max_hop` change. Log it via the existing `setlogFormatGwu()` line like
-the upload at `:2268-2275`, so `--log` shows it.
+then, exactly like the existing gateway HEY upload (`HEY always send to Server` block): append the
+gateway's own group with `appendHeySignalReport()`, re-encode into `RcvBuffer`, log the
+`setlogFormatGwu()` line, `addNodeData(RcvBuffer, size, rssi, snr)`. No `max_hop` change.
+
+Two changes against the first draft of this concept, both from the wave-1 review:
+
+- **Own report appended.** Not needed for the goal, kept for a uniform wire shape. Checked
+  against mcmap and the live INTERLINK feed (2026-10-11): the hub no longer names the uploading
+  gateway and no longer appends its header RSSI/SNR (since late Aug 2026), so the feed row of an
+  echo is `"path":"G,N","rssi":"<N's group>;<G's group>;"`. mcmap builds edge `path[i] ->
+path[i+1]` from group `i` (`proxy/src/interlink/ingest.ts`, `wss/stateStore.ts`), so edge G->N
+  gets N's report of hearing G either way; the trailing group belongs to the anonymous uploader
+  and is not used for an edge today. Every other gateway HEY upload has carried that trailing
+  group since 4.35t, so the echo keeps the same shape; mcmap's shape heuristics see no new class.
+- **Own-origin gate.** `heardIcheck >= 0` is not "own frame": a gateway that forwards a foreign HEY
+  from the server to LoRa also calls `insertOwnTx()` (`src/esp32/udp_frame_esp32.cpp:550`,
+  `src/nrf52/udp_frame_nrf52.cpp:544`), so neighbour relays of that foreign HEY land in the
+  own-echo branch too. Without the source-call check they would be uploaded.
 
 Do not change: relay decision (the echo is never relayed: own-echo branch, plus the loop check at
 `:2331`), dedup ring, `is_new_packet()`, HEARD status, `own_msg_id[]`, GW-01, the HEY format.
@@ -63,8 +81,10 @@ Keep the decision testable: put the predicate in a small header-only helper, mat
 `src/hey_policy.h` idiom, e.g. `src/hey_echo_upload.h`:
 
 ```cpp
-// true: a gateway uploads this own-HEY echo to the server unchanged
-inline bool heyEchoShouldUpload(bool isGateway, uint8_t msgType, const char* lastHop, const char* ownCall);
+// true: a gateway uploads this own-HEY echo to the server
+inline bool heyEchoShouldUpload(bool is_gateway, uint8_t msg_type, uint8_t msg_type_hey,
+                                char payload_type, bool pn_repeat, const char* last_hop,
+                                const char* source_call, const char* own_call);
 ```
 
 The call site in `OnRxDone` stays a few lines.
@@ -134,7 +154,12 @@ committed; do not dispatch onto a dirty hotspot.
 
 ## 7. Upstream PR
 
-Minimal diff: helper header, a few lines in `OnRxDone`, the test. German description: what
-changed (`OnRxDone`, own-echo branch, new helper), why (the gateway's own link reports never
-reached the server; GW-01 removed the only other path), what stays unchanged (msg_id, relay, dedup,
-GW-01). Target upstream `dev`; the maintainers merge.
+Dropped (operator, 2026-10-11): fork only, no wave 3.
+
+## 8. Status
+
+| Wave | State                                                                                                                                                                                                                                                              |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0    | Done. No host harness drives `OnRxDone`; the test covers the predicate in `[env:native]`.                                                                                                                                                                          |
+| 1    | Done 2026-10-11. `src/hey_echo_upload.h`, call site in `OnRxDone` own-echo branch, `test_hey_echo_upload` (10 cases, fail-before shown). Advisor: pass 1 rework (own-origin gate), pass 2 APPROVED. Gate: stage 1,2 PASS (2320 cases), T-Beam/RAK/Heltec V3 build. |
+| 2    | Bench pending: DK5EN-1 gateway (server on), DK5EN-92 neighbour (mesh on), both 2 dBm. Expect a GWU line for the echo and an mcmap edge DK5EN-1 -> DK5EN-92.                                                                                                        |

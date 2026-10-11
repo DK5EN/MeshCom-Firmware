@@ -25,6 +25,7 @@
 #include "rm_queue.h"       // RM-04: RM1 remote-management DMs, OnRxDone -> loop task (every board)
 #include "remote_cmd.h"     // RM: rmIsReply() -- replies are shown, never queued as commands
 #include "rm_rx_gate.h"     // RM: the one receive hook, shared with the server ingress
+#include "hey_echo_upload.h"  // gateway upload of own HEY echoes
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -1582,6 +1583,31 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // every relay echo lands here; setOwnMsgStatus() reports the transition only
                         setOwnMsgStatus(heardIcheck, 0x01); // 0x01 HEARD
                     }
+                }
+
+                // Own HEY came back relayed (docs/hey-echo-upload-concept.md): a gateway
+                // uploads that echo like every other HEY. Same msg_id, no relay, no
+                // dedup/HEARD change. Mirrors the HEY upload in the relay block below,
+                // including our own signal report (path G,N).
+                if(heyEchoShouldUpload(bGATEWAY, msg_type_b_lora, MSG_TYPE_HEY, aprsmsg.payload_type,
+                                       rx_pn_repeat, aprsmsg.msg_source_last,
+                                       aprsmsg.msg_source_call, meshcom_settings.node_call))
+                {
+                    appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, uptimeMin16()));
+
+                    memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
+                    size = encodeAPRS(RcvBuffer, aprsmsg);
+                    if(size + 2 > UDP_TX_BUF_SIZE)
+                        size = UDP_TX_BUF_SIZE - 2;
+
+                    if(bDisplayLog)
+                    {
+                        setlogFormatGwu(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
+                                        aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, (uint32_t)millis());
+                        setlogPrint(setlog_buf);
+                    }
+
+                    addNodeData(RcvBuffer, size, rssi, snr);
                 }
             }
             else
