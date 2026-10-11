@@ -68,7 +68,8 @@ static int execRadio(char *res, size_t n)
     // node_freq / node_bw / node_cr are Hz and indices on the SX126x nRF52 path (RF-01): convert like the console.
     RmRadioIn in = rmRadioInFromStored((float)meshcom_settings.node_freq, (int)meshcom_settings.node_sf,
                                              (int)meshcom_settings.node_cr, (float)meshcom_settings.node_bw,
-                                             (int)meshcom_settings.node_power, (int)TX_POWER_MAX, radioUnitsIndexed());
+                                             (int)meshcom_settings.node_power, TX_POWER_MIN > 0 ? (int)TX_POWER_MIN : 0, (int)TX_POWER_MAX,
+                                             radioUnitsIndexed()); // min: remote floor max(0, TX_POWER_MIN)
     char body[RM_FMT_BODY_MAX + 1];
     return done(res, n, body, rmFmtRadio(body, sizeof(body), in));
 }

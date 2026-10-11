@@ -1592,10 +1592,10 @@ static void test_replies_fit_the_cap_and_carry_no_retired_fields(void)
     char res[RM_MAX_RESULT + 1];
     RmSwitches sw;
     memset(&sw, 1, sizeof(sw));
-    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 22);
+    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 2, 22);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT);
     printf("status worst case: %u of %d\n", (unsigned)strlen(res), RM_MAX_RESULT);
-    TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/22"));
+    TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/2/22"));
     TEST_ASSERT_NULL(strstr(res, " pmin="));
     TEST_ASSERT_NULL(strstr(res, " led="));
     snprintf(res, sizeof(res), "ok ctr=%lu v=%s%s", 4294967295ul, "4.40a", "");

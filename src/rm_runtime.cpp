@@ -67,6 +67,7 @@ struct PendingCmd
 };
 PendingCmd s_pend;
 RmProof s_proof[RM_PROOF_N]; // per-target key proof, RAM only (rm_sender_policy.h)
+RmTxRange s_txRange[RM_TXRANGE_MAX]; // per-target txpower range learnt from verified replies, RAM only
 
 // Why the last chained command was not sent (one slot, cleared by the next accepted send to that
 // target); rmGetTargets() reports it so the GUI can show a sentence instead of silence.
@@ -188,7 +189,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 
     if (strcmp(cmd, "status") == 0)
     {
-        // s=<letters> p=<cur>/<max>; the worst case stays well inside the 108 wire characters, see
+        // s=<letters> p=<cur>/<min>/<max>; the worst case stays well inside the 108 wire characters, see
         // rm_sender_policy.h and its native test.
         char ver[12];
         snprintf(ver, sizeof(ver), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
@@ -203,7 +204,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         sw.led = bRemoteLed;
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
-                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX);
+                       (int)meshcom_settings.node_power, TX_POWER_MIN > 0 ? (int)TX_POWER_MIN : 0, (int)TX_POWER_MAX);
         return true;
     }
 
@@ -422,6 +423,38 @@ bool parseSyncCtr(const char *result, uint32_t &out)
     return true;
 }
 
+// True when the sent command line "<cmd>[ <args>]" starts with the command name `name`.
+static bool sentCmdIs(const char *line, const char *name)
+{
+    const size_t l = strlen(name);
+    return strncmp(line, name, l) == 0 && (line[l] == '\0' || line[l] == ' ');
+}
+
+// A VERIFIED reply tells the sender what the target accepts for txpower: p=<cur>/<min>/<max> in the reply
+// to `status` or `radio` (other commands also carry a p= with another meaning: only these two are read),
+// and "err range <min>..<max>" in the reply to `txpower`. Malformed values are ignored.
+static void learnTxRange(const char *dst, const char *sentCmd, const char *result)
+{
+    int mn = 0, mx = 0;
+    bool got = false;
+    if (sentCmdIs(sentCmd, "status"))
+    {
+        RmStatusInfo st;
+        if (rmStatusParse(result, st) && st.haveP)
+        {
+            mn = st.min;
+            mx = st.max;
+            got = true;
+        }
+    }
+    else if (sentCmdIs(sentCmd, "radio"))
+        got = rmRadioPParse(result, nullptr, &mn, &mx);
+    else if (sentCmdIs(sentCmd, "txpower"))
+        got = rmErrRangeParse(result, &mn, &mx);
+    if (got)
+        rmTxRangeLearn(s_txRange, RM_TXRANGE_MAX, dst, mn, mx, millis());
+}
+
 // Loop task: matches one queued reply against the pending sent commands.
 void handleReply(const char *src, const char *text)
 {
@@ -456,6 +489,7 @@ void handleReply(const char *src, const char *text)
             snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
             wipeKey(e);
             uint32_t h = 0;
+            learnTxRange(e.pub.dst, e.pub.cmd, result);
             if (e.pub.ctr == 0 && parseSyncCtr(result, h))
                 peerSet(e.pub.dst, h);
             else if (e.pub.ctr != 0)
@@ -906,11 +940,24 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
         return false;
     }
 
-    if (cmd == nullptr || !rmCommandAllowed(cmd, args, 0, TX_POWER_MAX) || strlen(cmd) >= sizeof(s_pend.cmd) ||
+    // txpower: the shape check runs against the widest range (a refusal there is `cmd`), then the value is
+    // held against the range learnt for THIS target (or 0..22 while unknown); the sender's own TX_POWER_MAX
+    // does not bound a remote target
+    if (cmd == nullptr || !rmCommandAllowed(cmd, args, 0, 99) || strlen(cmd) >= sizeof(s_pend.cmd) ||
         strlen(args) >= sizeof(s_pend.args))
     {
         setErr(err, errN, "cmd");
         return false;
+    }
+    if (strcmp(cmd, "txpower") == 0)
+    {
+        int mn = 0, mx = 0;
+        const bool learned = rmTxRangeGet(s_txRange, RM_TXRANGE_MAX, to, &mn, &mx);
+        if (rmTxPowerSendAllowed(learned, mn, mx, atoi(args)) != RM_TXSEND_OK)
+        {
+            setErr(err, errN, "range");
+            return false;
+        }
     }
     const bool isSync = (strcmp(cmd, "sync") == 0);
     const uint32_t now = millis();
@@ -1217,12 +1264,21 @@ void rmForgetTarget(const char *dst)
     if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, to) == 0)
         s_chainErr.tok = nullptr;
     rmProofForget(s_proof, to);
+    rmTxRangeForget(s_txRange, RM_TXRANGE_MAX, to);
     // keys go, the entries STAY and keep counting toward the budget until they leave the window
     for (uint8_t i = 0; i < s_nsent; i++)
         if (strcmp(s_sent[i].pub.dst, to) == 0)
             wipeKey(s_sent[i]);
     refreshReplyWanted();
     Serial.printf("[RM];forget;%s\n", to);
+}
+
+bool rmTargetTxRange(const char *dst, int *minDbm, int *maxDbm)
+{
+    char to[RM_CALL_MAX + 1];
+    if (!rmFoldCall(dst, to))
+        return false;
+    return rmTxRangeGet(s_txRange, RM_TXRANGE_MAX, to, minDbm, maxDbm);
 }
 
 void rmRuntimeReceiverUnlock(void)

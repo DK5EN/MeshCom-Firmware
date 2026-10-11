@@ -71,23 +71,23 @@ static void test_count(void)
 
 static void test_radio_example_and_bw(void)
 {
-    RmRadioIn r = {433.175f, 11, 5, 250.0f, 10, 22};
-    expectStr("f=433.175 sf=11 cr=5 bw=250 p=10/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    RmRadioIn r = {433.175f, 11, 5, 250.0f, 10, 2, 22};
+    expectStr("f=433.175 sf=11 cr=5 bw=250 p=10/2/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
     r.bwKHz = 125.0f;
-    expectStr("f=433.175 sf=11 cr=5 bw=125 p=10/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    expectStr("f=433.175 sf=11 cr=5 bw=125 p=10/2/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
     r.bwKHz = 62.5f;
-    expectStr("f=433.175 sf=11 cr=5 bw=62.5 p=10/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    expectStr("f=433.175 sf=11 cr=5 bw=62.5 p=10/2/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
     r.bwKHz = 31.25f;
-    expectStr("f=433.175 sf=11 cr=5 bw=31.25 p=10/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    expectStr("f=433.175 sf=11 cr=5 bw=31.25 p=10/2/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
     r.bwKHz = 7.8f;
-    expectStr("f=433.175 sf=11 cr=5 bw=7.8 p=10/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    expectStr("f=433.175 sf=11 cr=5 bw=7.8 p=10/2/22", rmFmtRadio(g_buf, sizeof(g_buf), r));
 }
 
 static void test_radio_sentinels(void)
 {
     // one DISTINCT sentinel per field: any swap of two fields fails
-    RmRadioIn r = {868.125f, 12, 6, 62.5f, -3, 27};
-    expectStr("f=868.125 sf=12 cr=6 bw=62.5 p=-3/27", rmFmtRadio(g_buf, sizeof(g_buf), r));
+    RmRadioIn r = {868.125f, 12, 6, 62.5f, -3, 0, 27};
+    expectStr("f=868.125 sf=12 cr=6 bw=62.5 p=-3/0/27", rmFmtRadio(g_buf, sizeof(g_buf), r));
     // non-finite freq or bw: no body, out[0] == '\0'
     const float bad[] = {NAN, INFINITY, -INFINITY};
     for (size_t i = 0; i < 3; i++)
@@ -104,29 +104,29 @@ static void test_radio_sentinels(void)
         TEST_ASSERT_EQUAL_UINT8('\0', (uint8_t)g_buf[0]);
     }
     // extreme finite / integer values clamp to the documented domain
-    RmRadioIn e = {1e30f, INT32_MAX, INT32_MIN, 1e30f, INT32_MIN, INT32_MAX};
-    expectStr("f=999.999 sf=99 cr=0 bw=999.99 p=-99/99", rmFmtRadio(g_buf, sizeof(g_buf), e));
-    RmRadioIn z = {-0.0f, INT32_MIN, INT32_MAX, -0.0f, 0, 0};
-    expectStr("f=0.000 sf=0 cr=99 bw=0 p=0/0", rmFmtRadio(g_buf, sizeof(g_buf), z));
-    RmRadioIn neg = {-1e30f, -5, 100, -3.0f, 99, -99};
-    expectStr("f=0.000 sf=0 cr=99 bw=0 p=99/-99", rmFmtRadio(g_buf, sizeof(g_buf), neg));
+    RmRadioIn e = {1e30f, INT32_MAX, INT32_MIN, 1e30f, INT32_MIN, INT32_MIN, INT32_MAX};
+    expectStr("f=999.999 sf=99 cr=0 bw=999.99 p=-99/-99/99", rmFmtRadio(g_buf, sizeof(g_buf), e));
+    RmRadioIn z = {-0.0f, INT32_MIN, INT32_MAX, -0.0f, 0, 0, 0};
+    expectStr("f=0.000 sf=0 cr=99 bw=0 p=0/0/0", rmFmtRadio(g_buf, sizeof(g_buf), z));
+    RmRadioIn neg = {-1e30f, -5, 100, -3.0f, 99, 5, -99};
+    expectStr("f=0.000 sf=0 cr=99 bw=0 p=99/5/-99", rmFmtRadio(g_buf, sizeof(g_buf), neg));
 }
 
 static void test_radio_rounding(void)
 {
-    RmRadioIn r = {0, 11, 5, 250.0f, 10, 22};
+    RmRadioIn r = {0, 11, 5, 250.0f, 10, 2, 22};
     r.freqMHz = (float)433.1749999;
     rmFmtRadio(g_buf, sizeof(g_buf), r);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/22", g_buf);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/2/22", g_buf);
     r.freqMHz = (float)433.17549;
     rmFmtRadio(g_buf, sizeof(g_buf), r);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/22", g_buf);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/2/22", g_buf);
     r.freqMHz = (float)869.5249;
     rmFmtRadio(g_buf, sizeof(g_buf), r);
-    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=11 cr=5 bw=250 p=10/22", g_buf);
+    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=11 cr=5 bw=250 p=10/2/22", g_buf);
     r.freqMHz = (float)433.1744;  // rounds down, must not become .175
     rmFmtRadio(g_buf, sizeof(g_buf), r);
-    TEST_ASSERT_EQUAL_STRING("f=433.174 sf=11 cr=5 bw=250 p=10/22", g_buf);
+    TEST_ASSERT_EQUAL_STRING("f=433.174 sf=11 cr=5 bw=250 p=10/2/22", g_buf);
 }
 
 // ---- name / atxt --------------------------------------------------------------------------------------------
@@ -421,8 +421,8 @@ static void test_maxhop(void)
 
 static void test_worst_cases_rest(void)
 {
-    RmRadioIn r = {999.999f, 99, 99, 999.99f, -99, -99};
-    reportWorst("radio", rmFmtRadio(g_buf, sizeof(g_buf), r), g_buf, "f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99");
+    RmRadioIn r = {999.999f, 99, 99, 999.99f, -99, -99, -99};
+    reportWorst("radio", rmFmtRadio(g_buf, sizeof(g_buf), r), g_buf, "f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99/-99");
     char name[RM_NAME_MAX + 1], atxt[RM_ATXT_MAX + 1];
     memset(name, 'N', RM_NAME_MAX);
     name[RM_NAME_MAX] = '\0';
@@ -438,8 +438,8 @@ static void test_worst_cases_rest(void)
     RmSensIn ab = {true, true, true, true, -1e30f, 1e30f, 1e30f, -1e30f};
     TEST_ASSERT_TRUE(rmFmtSens(g_buf, sizeof(g_buf), ab) <= RM_FMT_BODY_MAX);
     TEST_ASSERT_TRUE(charsetOk(g_buf));
-    RmRadioIn abr = {1e30f, INT32_MAX, INT32_MIN, 1e30f, INT32_MIN, INT32_MAX};
-    expectStr("f=999.999 sf=99 cr=0 bw=999.99 p=-99/99", rmFmtRadio(g_buf, sizeof(g_buf), abr));
+    RmRadioIn abr = {1e30f, INT32_MAX, INT32_MIN, 1e30f, INT32_MIN, INT32_MIN, INT32_MAX};
+    expectStr("f=999.999 sf=99 cr=0 bw=999.99 p=-99/-99/99", rmFmtRadio(g_buf, sizeof(g_buf), abr));
     TEST_ASSERT_TRUE(charsetOk(g_buf));
 }
 
@@ -448,7 +448,7 @@ static void test_worst_cases_rest(void)
 static void test_small_buffer(void)
 {
     char b[8];
-    RmRadioIn r = {433.175f, 11, 5, 250.0f, 10, 22};
+    RmRadioIn r = {433.175f, 11, 5, 250.0f, 10, 2, 22};
     memset(b, 'x', sizeof(b));
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtRadio(b, sizeof(b), r));
     TEST_ASSERT_EQUAL_CHAR('\0', b[0]);

@@ -224,36 +224,36 @@ static void test_rm_radio_reply_same_text_on_both_platforms(void)
 {
     char esp[RM_FMT_BODY_MAX + 1], nrf[RM_FMT_BODY_MAX + 1];
     // ESP32: MHz, kHz, 4/N denominator
-    RmRadioIn ein = rmRadioInFromStored(433.175f, 11, 6, 250.0f, 2, 22, false);
+    RmRadioIn ein = rmRadioInFromStored(433.175f, 11, 6, 250.0f, 2, 2, 22, false);
     TEST_ASSERT_TRUE(rmFmtRadio(esp, sizeof(esp), ein) > 0);
     // nRF52: Hz, bandwidth index 1, coding-rate index 2 -- the same radio
-    RmRadioIn nin = rmRadioInFromStored(433175000.0f, 11, 2, 1.0f, 2, 22, true);
+    RmRadioIn nin = rmRadioInFromStored(433175000.0f, 11, 2, 1.0f, 2, 2, 22, true);
     TEST_ASSERT_TRUE(rmFmtRadio(nrf, sizeof(nrf), nin) > 0);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", esp);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/22", nrf);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/2/22", esp);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=6 bw=250 p=2/2/22", nrf);
 }
 
 static void test_rm_radio_reply_nrf52_other_values(void)
 {
     char b[RM_FMT_BODY_MAX + 1];
-    RmRadioIn in = rmRadioInFromStored(869525000.0f, 12, 4, 0.0f, 14, 22, true);
+    RmRadioIn in = rmRadioInFromStored(869525000.0f, 12, 4, 0.0f, 14, 2, 22, true);
     TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), in) > 0);
-    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=12 cr=8 bw=125 p=14/22", b);
+    TEST_ASSERT_EQUAL_STRING("f=869.525 sf=12 cr=8 bw=125 p=14/2/22", b);
 }
 
-// The radio reply carries p=<cur>/<max> and no TX power floor (pmin= went with the compatibility layer,
+// The radio reply carries p=<cur>/<min>/<max> (pmin= went with the compatibility layer,
 // 2026-10-11); the reply with the largest value in every field still fits the body budget.
 static void test_rm_radio_reply_no_floor_token_and_worst_case(void)
 {
     char b[RM_FMT_BODY_MAX + 1];
-    RmRadioIn in = rmRadioInFromStored(433.175f, 11, 5, 250.0f, 10, 22, false);
+    RmRadioIn in = rmRadioInFromStored(433.175f, 11, 5, 250.0f, 10, 2, 22, false);
     TEST_ASSERT_TRUE(rmFmtRadio(b, sizeof(b), in) > 0);
-    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/22", b);
+    TEST_ASSERT_EQUAL_STRING("f=433.175 sf=11 cr=5 bw=250 p=10/2/22", b);
     TEST_ASSERT_NULL(strstr(b, "pmin"));
     TEST_ASSERT_NULL(strstr(b, "22/"));
-    RmRadioIn w = rmRadioInFromStored(999.999f, 99, 99, 999.99f, -99, -99, false);
+    RmRadioIn w = rmRadioInFromStored(999.999f, 99, 99, 999.99f, -99, -99, -99, false);
     size_t n = rmFmtRadio(b, sizeof(b), w);
-    TEST_ASSERT_EQUAL_STRING("f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99", b);
+    TEST_ASSERT_EQUAL_STRING("f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99/-99", b);
     TEST_ASSERT_EQUAL_UINT(strlen(b), n);
     TEST_ASSERT_TRUE(n <= RM_FMT_BODY_MAX);
     printf("radio worst case: %u of %d\n", (unsigned)n, RM_FMT_BODY_MAX);

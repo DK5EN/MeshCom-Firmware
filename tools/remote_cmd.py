@@ -341,14 +341,14 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 1, "ok rebooting"),
     ("secret", "DK5EN-90", "DK5EN-1", 44, "err range"),
     ("secret   ", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a"),
-    ("abcdefghijklmn", "DK5EN-92", "DK5EN-14", 2, "ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22"),
+    ("abcdefghijklmn", "DK5EN-92", "DK5EN-14", 2, "ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/2/22"),
     # McApp ask 3 (appended; entries change only with the wire format, e.g. the 2026-10-11 compat removal)
-    ("secret", "DK5EN-90", "DK5EN-1", 54, "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22"),
-    ("secret", "DK5EN-90", "DK5EN-1", 55, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22"),
-    ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22"),
+    ("secret", "DK5EN-90", "DK5EN-1", 54, "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/2/22"),
+    ("secret", "DK5EN-90", "DK5EN-1", 55, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22"),
+    ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/0/22"),
     ("secret", "DK5EN-90", "DK5EN-1", 0, "ok ctr=4294967295 v=4.40a"),  # sync reply at the counter ceiling
     # RM ext W2-A: worst-case result of every extended formatter (strings of test_rm_format) and the error tokens
-    ("secret", "DK5EN-90", "DK5EN-1", 80, "ok f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99"),
+    ("secret", "DK5EN-90", "DK5EN-1", 80, "ok f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99/-99"),
     ("secret", "DK5EN-90", "DK5EN-1", 81, "ok t=-99.9 h=100 p=1099.9 t2=-99.9"),
     ("secret", "DK5EN-90", "DK5EN-1", 82, "ok q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100"),
     ("secret", "DK5EN-90", "DK5EN-1", 83, "ok m=heard u=65535/65535 b=999999 a=65535/65535 st=4294M dl=4294M ak=4294M dr=4294M bl=4294M nt=4294M"),
@@ -370,14 +370,14 @@ _VECTOR_REPLIES = [
 
 def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     """Fields the firmware's rmStatusParse() must produce (from the format itself)."""
-    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)$", result)
+    m = re.search(r" s=([A-Za-z]{5,6}) p=(-?\d+)/(-?\d+)/(-?\d+)$", result)
     if not result.startswith("ok v=") or m is None:
         return None
     letters = m.group(1)
     sw = [(1 if ch.isupper() else 0) for ch in letters] + [-1] * (6 - len(letters))
     # flat scalars (the native test's JSON reader has no nesting); sw: gps,track,display,mesh,gateway,led
     return {"status_sw": ",".join(("-" if v < 0 else str(v)) for v in sw),
-            "status_p": "%s/%s" % (m.group(2), m.group(3)),
+            "status_p": "%s/%s/%s" % (m.group(2), m.group(3), m.group(4)),
             "status_led": len(letters) == 6}
 
 

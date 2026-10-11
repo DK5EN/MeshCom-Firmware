@@ -287,6 +287,7 @@ struct RmRadioIn
     int cr;        // clamped 0..99
     float bwKHz;   // clamped 0..999.99
     int pCur;      // dBm, clamped -99..99
+    int pMin;      // dBm, clamped -99..99 (remote floor)
     int pMax;      // dBm, clamped -99..99
 };
 
@@ -318,6 +319,8 @@ inline size_t rmFmtRadio(char *out, size_t n, const RmRadioIn &in)
     }
     rmfStr(b, " p=");
     rmfI(b, in.pCur, -99, 99);
+    rmfCh(b, '/');
+    rmfI(b, in.pMin, -99, 99);
     rmfCh(b, '/');
     rmfI(b, in.pMax, -99, 99);
     return rmfEmit(out, n, b);

@@ -9,7 +9,7 @@
 //
 // Prerequisites (not part of the repo):  npm i jsdom@24   (anywhere; set NODE_PATH to its node_modules)
 // Run:   NODE_PATH=<dir>/node_modules node tools/webgui_rm_test.js
-// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|again|qnoreject|qnopre|qnoclr|qmh|qnodrop node tools/webgui_rm_test.js
+// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|txp|refrange|locrange|qnoreject|qnopre|qnoclr|qmh|qnodrop node tools/webgui_rm_test.js
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
@@ -153,7 +153,9 @@ if (MUT === 'leak') mutate("fetch(u,{method:'POST'", "fetch(u+'?'+b,{method:'POS
 else if (MUT === 'nolock') mutate('rmLock=rmNow()+10000;', 'rmLock=0;');
 else if (MUT === 'timer') mutate('function rmPageLeave(){clearInterval(rmT.tick);', 'function rmPageLeave(){');
 else if (MUT === 'msgs') mutate('tr=rmRows[k];', 'tr=null;');
-else if (MUT === 'again') mutate('rmSendCmd(cmd,args,d,s);', 'rmSendCmd(cmd,args);');
+else if (MUT === 'txp') mutate("return m?m[1]+' dBm ('+m[2]+'..'+m[3]+')':String(v)+' dBm';", "return String(v)+' dBm';");
+else if (MUT === 'refrange') mutate("if(q&&e.st=='err')x=", "if(0)x=");
+else if (MUT === 'locrange') mutate("pr=='range'&&j.range?", "0?");
 else if (MUT === 'text') mutate("r=rmChk(w[2],v);", "r=/^(name|atxt)$/.test(w[2])?false:rmChk(w[2],v);");
 else if (MUT === 'radio') mutate("if(n=='radio'&&o&&o.f)return", "if(n=='radio_off'&&o&&o.f)return");
 else if (MUT === 'mh') mutate('w=rmTL[rmSel.call]-rmNow();', 'w=0;');
@@ -325,7 +327,7 @@ function ent(dst, cmd, reply, o) {
   o = o || {};
   return { dst, ctr: o.ctr || 1, cmd, ago: o.ago === undefined ? 5 : o.ago, rep: reply ? 1 : 0, ver: o.ver === 0 ? 0 : 1, reply: reply || '', st: o.st || (reply ? 'ok' : 'waiting'), msg: o.msg || 'Done. The node confirmed the command.' };
 }
-const STATUS_NEW = 'ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22';
+const STATUS_NEW = 'ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/2/22';
 const STATUS_OLD = 'ok v=4.35a up=5 bat=80 heap=100 gw=1 mesh=0 led=0';
 const vText = (e) => (!e ? '(none)' : e.parentNode.classList.contains('rmkv') ? e.previousElementSibling.textContent + ': ' + e.textContent : e.textContent);
 const dupIds = (P) => { const seen = Object.create(null), d = []; for (const e of P.d.querySelectorAll('#rm_page [id]')) { if (seen[e.id]) d.push(e.id); seen[e.id] = 1; } return d; };
@@ -493,10 +495,10 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
   {
-    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMw p=17/22');
+    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMw p=17/2/22');
     check('Light hidden when the status has no L letter (5-letter s=)', !P.tiles().led, Object.keys(P.tiles()).join(','));
     P.w.rmPageLeave();
-    const L6 = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/22');
+    const L6 = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMwL p=17/2/22');
     check('NC-04 a 6-letter s= shows the Light switch', !!L6.tiles().led && L6.tiles().led.state === 'on', Object.keys(L6.tiles()).join(','));
     L6.w.rmPageLeave();
     const Q = await mkPage(mkServer());
@@ -505,7 +507,7 @@ function leaks(P, canary) {
     Q.w.rmPageLeave();
   }
   {
-    const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'gps off', 'ok gps=off', { ago: 2, ctr: 2 }), ent('DK5EN-1', 'status', 'ok v=4.40a up=1 bat=1 heap=1 s=GtDMwL p=17/22', { ago: 10, ctr: 3, ver: 0, st: 'unverified' })]);
+    const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'gps off', 'ok gps=off', { ago: 2, ctr: 2 }), ent('DK5EN-1', 'status', 'ok v=4.40a up=1 bat=1 heap=1 s=GtDMwL p=17/2/22', { ago: 10, ctr: 3, ver: 0, st: 'unverified' })]);
     check('newer verified toggle reply wins, unverified status is ignored', P.tiles().gps.state === 'off', P.tiles().gps.state);
     P.w.rmPageLeave();
   }
@@ -548,7 +550,7 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     const X = (id) => P.el(id);
     const E = (cmd, rep, c, ago) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: ago === undefined ? 130 : ago, st: 'ok' });
-    await P.setPoll({ sent: [E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 1), E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5, 5), E('txq', 'q=3/20 bp=quiet tx=4 rt=1 dr=0 u=5', 6), E('mbox', 'm=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0', 7), E('maxhop', 't=3 p=2', 8)], targets: tg });
+    await P.setPoll({ sent: [E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/2/22', 1), E('sens', 't=21.4 h=45 p=1013.2 t2=-', 2), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5, 5), E('txq', 'q=3/20 bp=quiet tx=4 rt=1 dr=0 u=5', 6), E('mbox', 'm=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0', 7), E('maxhop', 't=3 p=2', 8)], targets: tg });
     const where = { radio: 'rm_card_radio', sens: 'rm_card_radio', name: 'rm_card_ident', atxt: 'rm_card_ident', pos: 'rm_card_pos', txq: 'rm_card_queues', mbox: 'rm_card_queues', maxhop: 'rm_card_queues' };
     check('3.4 each def lands in its card (radio, sens | name, atxt | pos | txq, mbox, maxhop)', Object.keys(where).every((c) => X('rm_def_' + c) && X(where[c]) && X(where[c]).contains(X('rm_def_' + c))) && !X('rm_card_queues').contains(X('rm_def_radio')), Object.keys(where).map((c) => c + ':' + (X('rm_def_' + c) ? X('rm_def_' + c).parentNode.parentNode.id : '-')).join());
     check('3.4 the heard list builder mounts in rm_card_mh (Read, Stop, progress, lookup)', X('rm_card_mh').querySelector('[data-act="mhgo"]') && X('rm_card_mh').querySelector('[data-act="mhstop"]') && X('rm_card_mh').querySelector('#rm_mh_prog') && X('rm_card_mh').querySelector('#rm_f_mh_other') && X('rm_card_mh').querySelector('[data-act="mhother"]'));
@@ -561,7 +563,7 @@ function leaks(P, canary) {
     check('3.4 Position: the Source line moved into the header row, nothing else read-only', hdr('pos')?.children[1].id === 'rm_v_pos_src' && hdr('pos')?.children[1].textContent === 'Source: from GPS' && X('rm_def_pos') && !X('rm_def_pos').querySelector('.rmkv') && X('rm_def_pos').querySelectorAll('[id^="rm_v_"]').length === 1, hdr('pos')?.children[1].textContent);
     const kv = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector('.rmkv');
     const rows = (c) => [...kv(c).children].map((e) => e.textContent);
-    check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power (now/max)|10/22 dBm' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
+    check('3.4 radio renders as a .rmkv grid: key (font-small) | value, values in rm_v_ ids', kv('radio') && kv('radio').children.length === 10 && [...kv('radio').children].filter((e, i) => i % 2 === 0).every((e) => e.classList.contains('font-small')) && rows('radio').join('|') === 'Frequency|433.175 MHz|Spreading factor|11|Coding rate|4/5|Bandwidth|250 kHz|TX power|10 dBm (2..22)' && X('rm_v_radio_f').parentNode === kv('radio') && X('rm_v_radio_f').previousElementSibling.textContent === 'Frequency', kv('radio') && rows('radio').join('|'));
     check('3.4 sens and maxhop render as .rmkv; absent marker stays "not present"', kv('sens') && rows('sens').join('|') === 'Temperature|21.4 C|Humidity|45 %|Pressure|1013.2 hPa|Second temperature|not present' && kv('maxhop') && rows('maxhop').join('|') === 'Text messages|3|Position beacons|2', (kv('sens') && rows('sens').join('|')) + ' # ' + (kv('maxhop') && rows('maxhop').join('|')));
     check('3.4 txq (dedicated view since 3.5) has no key/value grid, mailbox has one', X('rm_def_txq') && !kv('txq') && kv('mbox') && X('rm_v_txq_q').textContent === '3/20 queued, state quiet' && vText(X('rm_v_mbox_m')) === 'Mode: off');
     check('3.4 Identity hint "Stored exactly as typed." appears once, at the top of the Identity card, no per-field notes', X('rm_card_ident') && (X('rm_card_ident').textContent.match(/Stored exactly as typed\./g) || []).length === 1 && X('rm_card_ident').querySelector(':scope > div').children[1].textContent === 'Stored exactly as typed.' && !P.d.querySelector('[id$="_note"]:not(#rm_swnote)'), (P.d.querySelector('[id$="_note"]:not(#rm_swnote)') || {}).id);
@@ -591,7 +593,7 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     const X = (id) => P.el(id);
     const E = (cmd, rep, c) => ent('DK5EN-1', cmd, 'ok ' + rep, { ctr: c, ago: 5, st: 'ok' });
-    await P.setPoll({ sent: [ent('DK5EN-1', 'status', STATUS_NEW, { ago: 30, ctr: 9 }), E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 1), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5)], targets: tg });
+    await P.setPoll({ sent: [ent('DK5EN-1', 'status', STATUS_NEW, { ago: 30, ctr: 9 }), E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/2/22', 1), E('name', 'n=Martin', 3), E('atxt', 'a=MeshCom Garten', 4), E('pos', '48.40812 11.73812 492 gps', 5)], targets: tg });
     const row = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector(':scope > .rmf');
     const ch = (c) => (row(c) ? [...row(c).children] : []);
     const cb = (card) => [...X(card).querySelectorAll('button')].filter((b) => !b.classList.contains('cardtoggle'));
@@ -719,9 +721,9 @@ function leaks(P, canary) {
 
   // ---- TX power stepper removed (RS-02): the read-only line stays, pmin is not read by the page ------------
   {
-    const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1 })]);
+    const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22', { ctr: 2, ago: 1 })]);
     check('RS-02 Radio card: no stepper, no Apply, no range note, no TX power row beyond the read-only line', !P.el('rm_rtxdn') && !P.el('rm_rtxval') && !P.el('rm_rtxup') && !P.el('rm_rtxapply') && !P.el('rm_rtxnote') && !/Range \d|Apply/.test(P.el('rm_card_radio').textContent) && ![...P.el('rm_card_radio').querySelectorAll('button')].some((b) => /^(-|\+|Apply)$/.test(b.textContent) || /^tx/.test(b.getAttribute('data-act') || '')), P.el('rm_card_radio').textContent);
-    check('RS-02 the read-only line "TX power (now/max)" shows cur/max, pmin is not a line of its own', P.text('rm_v_radio_p') === 'TX power (now/max): 10/22 dBm' || /10\/22 dBm/.test(P.text('rm_v_radio_p')), P.text('rm_v_radio_p'));
+    check('RS-02 the read-only line "TX power" shows cur and the min..max range', /^10 dBm \(2\.\.22\)$/.test(P.text('rm_v_radio_p')), P.text('rm_v_radio_p'));
     check('RS-02 no pmin anywhere in the card and none in the page JS', !/pmin/.test(P.el('rm_card_radio').textContent) && !/pmin/.test(JS), '');
     P.w.rmPageLeave();
   }
@@ -756,7 +758,7 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
   {
-    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMWL p=17/22');   // gateway on
+    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMWL p=17/2/22');   // gateway on
     await P.tap(P.tiles().gateway.el);
     check('Gateway off needs a confirm', P.sends().length === 0 && P.tiles().gateway.text === 'Gateway: Really? tap again');
     await P.tap(P.tiles().gateway.el);
@@ -953,7 +955,7 @@ function leaks(P, canary) {
     await P.setPoll({ sent: mk(9), targets: tg });
     const ag = () => [...P.el('rm_msgs').children].map((r) => r.children[0].textContent).join('|');
     check('RS-01 9 commands: exactly 5 rows, the newest 5 (10..50 s ago)', P.el('rm_msgs').children.length === 5 && ag() === '10 s ago|20 s ago|30 s ago|40 s ago|50 s ago', ag());
-    check('RS-01 every kept row still has its Run again button', [...P.el('rm_msgs').children].every((r) => /Run again/.test(r.children[3].textContent)), P.el('rm_msgs').textContent);
+    check('RS-01 every kept row has no button at all (Run again is gone)', [...P.el('rm_msgs').children].every((r) => !r.querySelector('button') && !/again/i.test(r.textContent)), P.el('rm_msgs').textContent);
     check('RS-01 storage unchanged: the poll answer still holds 9 entries', P.w.rmStat.sent.length === 9, P.w.rmStat.sent.length);
     await P.setPoll({ sent: mk(2), targets: tg });
     check('RS-01 shrinking back to 2 commands leaves 2 rows (no stale row)', P.el('rm_msgs').children.length === 2, P.el('rm_msgs').children.length);
@@ -1087,8 +1089,8 @@ function leaks(P, canary) {
       P.w.rmPageLeave();
     }
     {
-      const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 1, st: 'ok' })]);
-      check('Messages: a verified radio read shows the radio sentence (RM_MUTATE=radio guard)', /Radio: 433\.175 MHz, SF 11, 250 kHz, TX power 10\/22\./.test(P.text('rm_msgs')), P.text('rm_msgs'));
+      const P = await savedNodePage(STATUS_NEW, [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22', { ctr: 2, ago: 1, st: 'ok' })]);
+      check('Messages: a verified radio read shows the radio sentence (RM_MUTATE=radio guard)', /Radio: 433\.175 MHz, SF 11, 250 kHz, TX power 10 dBm \(2\.\.22\)\./.test(P.text('rm_msgs')), P.text('rm_msgs'));
       P.w.rmPageLeave();
     }
     {
@@ -1305,13 +1307,6 @@ function leaks(P, canary) {
     await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 8, ago: 5, st: 'noanswer', msg: 'No answer after 75 seconds.' }), ent('DK5EN-1', 'led on', 'ok led=on', { ctr: 9, ago: 3, ver: 0, st: 'unverified', msg: 'Not verified.' })] });
     const rs = P.el('rm_msgs').querySelectorAll('tr');
     check('W1d messages: no answer and unverified badges, newest first', rs.length === 2 && rs[0].children[2].textContent === 'unverified' && rs[1].children[2].textContent === 'no answer', [...rs].map((x) => x.children[2].textContent).join());
-    await P.typeCall('DK5EN-1');
-    const before = P.sends().length;
-    await P.tap(rs[1].querySelector('button'));
-    await P.tap(rs[1].querySelector('button'));   // sendpos is not a read: two-tap confirm
-    const sd = P.sends();
-    check('W1d run again sends the same cmd to the same target', sd.length === before + 1 && /cmd=sendpos/.test(sd[sd.length - 1].body || '') && /DK5EN-1|slot=0/.test(sd[sd.length - 1].body || ''), JSON.stringify(sd[sd.length - 1]));
-    check('W1d run again is disabled while the node is in cooldown', [...P.el('rm_msgs').querySelectorAll('button')].every((b) => b.disabled));
     check('W1d old ids are gone, the Radio card exists once and has no TX stepper (RS-02)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && [...P.el('rm_page').querySelectorAll('.cardlabel')].filter((l) => l.textContent === 'Radio').length === 1);
     check('UI-03/04 Advanced is a collapsablecard, closed by default, no <details>', P.el('rm_adv').classList.contains('collapsablecard') && !P.el('rm_adv').classList.contains('cardopen') && !P.el('rm_page').querySelector('details'));
     P.w.rmPageLeave();
@@ -1321,48 +1316,6 @@ function leaks(P, canary) {
     check('W1d no fixed "10 s" in the emitted page text', !/10 s/.test(hdr) && !/10 seconds/.test(hdr));
   }
 
-  // ---- advisor rework: Run again goes to the row's node, dedupe, confirm, lock label -------------------
-  {
-    const srv = mkServer();
-    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
-    srv.nodes[1] = { slot: 1, used: 1, call: 'DK5EN-2' };
-    srv.status = srv.mkStatus({ sent: [
-      ent('DK5EN-1', 'reboot', 'ok', { ago: 10, ctr: 1 }),
-      ent('DK5EN-1', 'status', STATUS_NEW, { ago: 20, ctr: 2 }),
-      ent('DK5EN-3', 'status', STATUS_NEW, { ago: 30, ctr: 3 }),
-    ] });
-    const P = await mkPage(srv);
-    await P.init();
-    await P.tap(P.tile('DK5EN-2'));
-    const row = (n) => Array.from(P.el('rm_msgs').querySelectorAll('tr')).find((r) => r.children[1].textContent.indexOf(n) === 0);
-    const rb = (n) => row(n).querySelector('button');
-    const sel = () => P.w.rmSel.call + '/' + P.w.rmSel.slot + '/' + P.el('rm_call').value;
-    await P.tap(rb('DK5EN-1 ' + P.w.rmLabel('status')));
-    check('Run again (read) goes to the ROW node by its slot while another node is selected', P.sends().length === 1 && /^slot=0&cmd=status/.test(P.sends()[0].body), JSON.stringify(P.sends()));
-    check('Run again leaves the selection unchanged and sends no password', sel() === 'DK5EN-2/1/DK5EN-2' && !new URLSearchParams(P.sends()[0].body).has('pw') && P.el('rm_pw').value === '', sel());
-    await P.T.advance(10100);
-    await P.tap(rb('DK5EN-1 Restart'));
-    check('Run again of reboot: first tap arms, names the ROW node, sends nothing', P.sends().length === 1 && rb('DK5EN-1 Restart').textContent === 'Really? tap again' && /DK5EN-1/.test(P.text('rm_msg')) && !/DK5EN-2/.test(P.text('rm_msg')), P.text('rm_msg'));
-    await P.tap(rb('DK5EN-1 Restart'));
-    check('Run again of reboot: second tap sends to the ROW node slot', P.sends().length === 2 && /^slot=0&cmd=reboot/.test(P.sends()[1].body), JSON.stringify(P.sends().map((x) => x.body)));
-    check('Run again of reboot leaves the selection unchanged', sel() === 'DK5EN-2/1/DK5EN-2', sel());
-    check('360 px layout: Run again sits inside the reply cell, rows have 4 cells, header has 4 columns', row('DK5EN-1') && row('DK5EN-1').children.length === 4 && !!row('DK5EN-1').children[3].querySelector('button') && P.el('rm_msgs').parentNode.querySelectorAll('th').length === 4 && /@media \(max-width:600px\)\{\.rmtab thead\{display:none;\}/.test(HTML) && /\.rmtab,#rm_msgs,#rm_log\{display:block;\}/.test(HTML) && !/(#rm_msgs|#rm_log) thead/.test(HTML) && /#rm_log td:nth-child\(3\)::before\{content:"ctr ";\}/.test(HTML));
-    check('a row whose node has no saved slot has no Run again button', rb('DK5EN-3') === null && !row('DK5EN-3').querySelector('button'), row('DK5EN-3').innerHTML);
-    P.w.rmPageLeave();
-  }
-  {
-    const srv = mkServer();
-    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
-    srv.status = srv.mkStatus({ sent: [ent('DK5EN-1', 'txpower 5', 'ok', { ago: 10 })] });
-    const P = await mkPage(srv);
-    await P.init();
-    const b = () => P.el('rm_msgs').querySelector('button');
-    await P.tap(b());
-    check('Run again of txpower 5 needs two taps (first arms)', P.sends().length === 0 && b().textContent === 'Really? tap again');
-    await P.tap(b());
-    check('Run again of txpower 5 sends on the second tap', P.sends().length === 1 && /slot=0&cmd=txpower&args=5/.test(P.sends()[0].body), JSON.stringify(P.sends()));
-    P.w.rmPageLeave();
-  }
   {
     const srv = mkServer();
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
@@ -1376,17 +1329,34 @@ function leaks(P, canary) {
     check('two syncs to one node: one row, the newest (waiting) owns it: badge "sent"', rows.length === 1 && rows[0].children[2].textContent === 'sent' && /^3 s ago|^3/.test(rows[0].children[0].textContent), P.text('rm_msgs'));
     P.w.rmPageLeave();
   }
-  // ---- W2-E part 1: error sentences, forced attempt, Run again call= ----------------------------
+  // ---- TX power clamp (wave 2b): 3-part p=, refusal wording, no Run again -------------------------------
   {
     const srv = mkServer();
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
-    srv.status = srv.mkStatus({ sent: [ent('DK5EN-1', 'txpower 5', 'ok', { ago: 10 })] });
+    srv.status = srv.mkStatus({ sent: [
+      ent('DK5EN-1', 'txpower 30', 'err range 2..22', { ctr: 1, ago: 10, st: 'err', msg: 'The node refused the value.' }),
+      ent('DK5EN-1', 'txpower -9', 'err range -5..22', { ctr: 5, ago: 15, st: 'err', msg: 'm' }),
+      ent('DK5EN-1', 'txpower 5', 'ok', { ctr: 2, ago: 20, st: 'ok' }),
+      ent('DK5EN-1', 'reboot', 'ok', { ctr: 3, ago: 30, st: 'ok' }),
+      ent('DK5EN-3', 'status', STATUS_NEW, { ctr: 4, ago: 40, st: 'ok' }),
+    ] });
     const P = await mkPage(srv);
     await P.init();
-    await P.tap(P.el('rm_msgs').querySelector('button'));
-    await P.tap(P.el('rm_msgs').querySelector('button'));
-    const s0 = P.sends().map((c) => c.body);
-    check('W2E Run again posts call=<row dst> with the slot', s0.length === 1 && /^slot=0&cmd=txpower&args=5&call=DK5EN-1$/.test(s0[0]), JSON.stringify(s0));
+    const r0 = P.el('rm_msgs').children[0];
+    check('TXP status p=17/2/22 parses to "17 dBm (2..22)", the rest of the status still parses', P.w.rmParseStatus(STATUS_NEW).p === '17 dBm (2..22)' && P.w.rmParseStatus(STATUS_NEW).ver === '4.40a' && P.w.rmParseStatus(STATUS_NEW).sw[0] === 1, JSON.stringify(P.w.rmParseStatus(STATUS_NEW)));
+    check('TXP status without p= has no p, malformed p= is shown raw', P.w.rmParseStatus('ok v=4.40a up=1 bat=1 s=GtDMwL').p === undefined && P.w.rmParseStatus('ok v=4.40a up=1 p=17/22').p === '17/22 dBm');
+    check('TXP target refusal "err range 2..22" reads "Refused: DK5EN-1 accepts 2..22 dBm."', r0.children[3].textContent === 'Refused: DK5EN-1 accepts 2..22 dBm.', r0.children[3].textContent);
+    check('TXP negative bounds are shown as given', P.el('rm_msgs').children[1].children[3].textContent === 'Refused: DK5EN-1 accepts -5..22 dBm.', P.el('rm_msgs').children[1].children[3].textContent);
+    check('TXP no row renders any button (Run again is gone), even with a saved node', P.el('rm_msgs').querySelectorAll('button').length === 0 && !/again/i.test(P.el('rm_msgs').textContent), P.text('rm_msgs'));
+    check('TXP the page no longer carries the again action', !/data-act'?:'again|rmAgain/.test(JS));
+    await P.tap(P.tile('DK5EN-1'));
+    srv.sendReply = refuse('range', { range: '2..22' });
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('TXP local refusal with j.range reads "Refused: DK5EN-1 accepts 2..22 dBm."', P.text('rm_msg') === 'Refused: DK5EN-1 accepts 2..22 dBm.', P.text('rm_msg'));
+    await P.T.advance(12000);
+    srv.sendReply = { ok: false, err: 'range', msg: 'Value outside the range.' };
+    await P.tap(P.btn('Refresh status', P.el('rm_info')));
+    check('TXP local refusal without j.range falls back to the server msg', P.text('rm_msg') === 'Value outside the range.', P.text('rm_msg'));
     P.w.rmPageLeave();
   }
   {
@@ -1445,9 +1415,9 @@ function leaks(P, canary) {
     await P.tap(rd());
     check('NC-01 Read radio without any Re-sync sends cmd=radio', P.sends().length === n0 + 1 && /cmd=radio/.test(P.sends()[n0].body), JSON.stringify(P.sends().slice(n0)));
     await P.T.advance(12000);
-    await P.setPoll({ sent: [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/22', { ctr: 2, ago: 3, st: 'ok' }), ent('DK5EN-1', 'sens', 'ok t=21.4 h=<img/src=x> p=- t2=-', { ctr: 3, ago: 2, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0 }] });
+    await P.setPoll({ sent: [ent('DK5EN-1', 'radio', 'ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22', { ctr: 2, ago: 3, st: 'ok' }), ent('DK5EN-1', 'sens', 'ok t=21.4 h=<img/src=x> p=- t2=-', { ctr: 3, ago: 2, st: 'ok' })], targets: [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0 }] });
     const T = (k) => { const e = P.el('rm_v_' + k); return e ? vText(e) : ''; };
-    check('W2E radio reply fills the card (MHz, SF, 4/x, kHz, p cur/max)', T('radio_f') === 'Frequency: 433.175 MHz' && T('radio_sf') === 'Spreading factor: 11' && T('radio_cr') === 'Coding rate: 4/5' && T('radio_bw') === 'Bandwidth: 250 kHz' && /10\/22 dBm/.test(T('radio_p')), [T('radio_f'), T('radio_cr'), T('radio_p')].join('|'));
+    check('W2E radio reply fills the card (MHz, SF, 4/x, kHz, p cur dBm (min..max))', T('radio_f') === 'Frequency: 433.175 MHz' && T('radio_sf') === 'Spreading factor: 11' && T('radio_cr') === 'Coding rate: 4/5' && T('radio_bw') === 'Bandwidth: 250 kHz' && /10 dBm \(2\.\.22\)/.test(T('radio_p')), [T('radio_f'), T('radio_cr'), T('radio_p')].join('|'));
     check('W2E sens: absent marker shows "not present", hostile text lands as text only', T('sens_p') === 'Pressure: not present' && T('sens_t2') === 'Second temperature: not present' && T('sens_h') === 'Humidity: <img/src=x> %' && P.el('rm_page').querySelector('img') === null, T('sens_h'));
     const m0 = P.sends().length;
     await P.tap(rd());
@@ -1543,8 +1513,8 @@ function leaks(P, canary) {
       check('RMX err ' + t + ' shows its sentence', re.test(P.text('rm_msgs')), P.text('rm_msgs').slice(0, 120));
     }
     // the read-only TX power line follows a radio reply
-    await poll([E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/22', 13)]);
-    check('RMX radio reply shows the read-only TX power line (10/22 dBm)', /10\/22 dBm/.test(tx('rm_v_radio_p')), tx('rm_v_radio_p'));
+    await poll([E('radio', 'f=433.175 sf=11 cr=5 bw=250 p=10/2/22', 13)]);
+    check('RMX radio reply shows the read-only TX power line (10 dBm (2..22))', /10 dBm \(2\.\.22\)/.test(tx('rm_v_radio_p')), tx('rm_v_radio_p'));
     P.w.rmPageLeave();
   }
   {

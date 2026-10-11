@@ -173,6 +173,10 @@ bool rmTargetMaySend(const char *dst, uint32_t *retryS, bool *canForce = nullptr
 // touches the persisted send counter, learnt counter marks or receiver state. An overlength call is ignored.
 void rmForgetTarget(const char *dst);
 
+// The txpower range (dBm) learnt for dst from VERIFIED replies (status/radio p=<cur>/<min>/<max>, or an
+// "err range <min>..<max>" answer), RAM only. false = unknown (fresh boot, or never answered).
+bool rmTargetTxRange(const char *dst, int *minDbm, int *maxDbm);
+
 // The receiver lockout of every sender (reject table) is cleared, e.g. after a new node password was applied.
 void rmRuntimeReceiverUnlock(void);
 

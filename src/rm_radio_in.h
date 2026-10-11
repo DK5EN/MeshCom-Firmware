@@ -10,7 +10,7 @@
 #include "radio_units.h"
 #include "rm_format.h"
 
-inline RmRadioIn rmRadioInFromStored(float freq, int sf, int cr, float bw, int pCur, int pMax, bool indexed)
+inline RmRadioIn rmRadioInFromStored(float freq, int sf, int cr, float bw, int pCur, int pMin, int pMax, bool indexed)
 {
     RmRadioIn in;
     in.freqMHz = radioFreqStoredToMhz(freq, indexed);
@@ -18,6 +18,7 @@ inline RmRadioIn rmRadioInFromStored(float freq, int sf, int cr, float bw, int p
     in.cr = radioCrStoredToDenom(cr, indexed);
     in.bwKHz = radioBwStoredToKhz(bw, indexed);
     in.pCur = pCur;
+    in.pMin = pMin;
     in.pMax = pMax;
     return in;
 }

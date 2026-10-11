@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeshCom Wire Format</title>
-<meta name="source-sha256" content="77bc01d5583127896e4b819b70134e8d5f0d5c5e01415a1b91e99df53b8ba67a">
+<meta name="source-sha256" content="b856534da50a5e31bc193fccdbe1eb91ca18194f7f8b68cb3e296f98c2d8ea74">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -646,7 +646,7 @@ sender), so the same pair of calls appears in the same order. <code>node_passwd<
 <tr>
 <td><code>status</code></td>
 <td>none</td>
-<td><code>v=&lt;ver&gt; up=&lt;min&gt; bat=&lt;%&gt; heap=&lt;kB&gt; s=&lt;letters&gt; p=&lt;cur&gt;/&lt;max&gt;</code></td>
+<td><code>v=&lt;ver&gt; up=&lt;min&gt; bat=&lt;%&gt; heap=&lt;kB&gt; s=&lt;letters&gt; p=&lt;cur&gt;/&lt;min&gt;/&lt;max&gt;</code></td>
 </tr>
 <tr>
 <td><code>sendpos</code>, <code>sendtrack</code></td>
@@ -697,8 +697,13 @@ consume). Check order: disabled, lockout, frame format, canonical string and tag
 <code>sync</code>) cache, replay, rate, allowlist.</p>
 <p><code>status</code>: <code>s=</code> carries the switches as letters in the fixed order <code>G T D M W L</code> = gps, track,
 display, mesh, gateway, led; upper case = on, lower case = off. <code>L</code> is omitted on a board without an
-LED, so <code>s=</code> is 6 letters with an LED and 5 (<code>GTDMW</code>) without. <code>p=&lt;cur&gt;/&lt;max&gt;</code> is the TX power and
-the board maximum. There is no <code>led=</code> token, no <code>pmin=</code> token and no <code>gw=</code>/<code>mesh=</code> form; a parser
+LED, so <code>s=</code> is 6 letters with an LED and 5 (<code>GTDMW</code>) without. <code>p=&lt;cur&gt;/&lt;min&gt;/&lt;max&gt;</code> is the TX power, the
+remote floor <code>max(0, TX_POWER_MIN)</code> and the board maximum in dBm (e.g. <code>p=2/2/22</code> on a RAK4631); the
+<code>radio</code> reply carries the same token. A 2-part <code>p=&lt;cur&gt;/&lt;max&gt;</code> is rejected. The sender learns <code>&lt;min&gt;</code> and
+<code>&lt;max&gt;</code> per target in RAM from every verified <code>status</code> or <code>radio</code> reply and from an <code>err range</code> answer, and
+refuses a <code>txpower</code> outside that range locally (error token <code>range</code>; <code>/rmsend</code> adds
+<code>&quot;range&quot;:&quot;&lt;min&gt;..&lt;max&gt;&quot;</code>). While the range is unknown (fresh boot) it sends 0..22 and relies on the
+target's <code>err range</code>. There is no <code>led=</code> token, no <code>pmin=</code> token and no <code>gw=</code>/<code>mesh=</code> form; a parser
 does not accept them. Replies are limited only by the 108-character wire cap. The <code>sync</code> reply
 carries no capability token: the sender budget is 2 unanswered sends while the key is unproven and
 10 once a reply under the current key verified; two unverified sends in a row drop it back to 2 (streak rule). No capability level gates it.</p>
@@ -754,7 +759,7 @@ password <code>secret</code> followed by trailing spaces, which are stripped bef
 <pre><code>RM1 1 ok rebooting facf04f881d89cde
 RM1 44 err range ade99d27f3001d3c
 RM1 0 ok ctr=42 v=4.40a c639dacb86c267de
-RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22 73baeaf0695e81ea
+RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/2/22 018c2cf78fc2df3b
 </code></pre>
 <p>(The <code>err range</code> vector exercises the reply grammar; the firmware sends <code>err range &lt;min&gt;..&lt;max&gt;</code>,
 see 1.9.3.)</p>

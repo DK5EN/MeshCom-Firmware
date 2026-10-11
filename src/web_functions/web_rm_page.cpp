@@ -176,12 +176,14 @@ void rmScaffoldJs()
     web_client.println("function rmLocked(){return rmBusy||rmAuth||rmLockLeft()>0;}\n"
                        "function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}\n");
     web_client.println("var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}\n"
+                       "function rmTxp(v){var m=/^(-?\\d+)\\/(-?\\d+)\\/(-?\\d+)$/.exec(String(v));return m?m[1]+' dBm ('+m[2]+'..'+m[3]+')':String(v)+' dBm';}\n"
                        "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];return f;}");
     web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
                        "for(i=1;i<t.length;i++){k=t[i];\n"
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
                        "else if(k.indexOf('up=')==0)o.up=k.substring(3);\n"
-                       "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);");
+                       "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);\n"
+                       "else if(k.indexOf('p=')==0)o.p=rmTxp(k.substring(2));");
     web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}");
     web_client.println("}\n"
                        "return o;}\n"
@@ -247,13 +249,12 @@ void rmScaffoldJs()
     web_client.println("for(i=0;i<a.length;i++){e=a[i];k=e.dst+'#'+e.ctr+'#'+e.cmd;if(seen[k])continue;if(u>4)break;seen[k]=1;tr=rmRows[k];\n"
 "if(!tr){tr=rmRows[k]=document.createElement('tr');for(n=0;n<4;n++)tr.appendChild(document.createElement('td'));}\n");
     web_client.println("c=tr.children;n=e.cmd.split(' ');v=e.st=='queued'||e.st=='waiting'?'sent':e.st=='noanswer'?'no answer':e.ver&&(e.st=='ok'||e.st=='err')?'verified':'unverified';\n"
-"x=e.st=='ok'&&v=='verified'?rmOkText(e):(e.msg||'');tr.title=e.msg||'';\n");
+"x=e.st=='ok'&&v=='verified'?rmOkText(e):(e.msg||'');\n"
+"q=/^err range (-?\\d+)\\.\\.(-?\\d+)$/.exec(e.reply||'');if(q&&e.st=='err')x='Refused: '+e.dst+' accepts '+q[1]+'..'+q[2]+' dBm.';tr.title=e.msg||'';\n");
     web_client.println("c[0].textContent=rmAgo(e.ago)+' ago';c[1].textContent=e.dst+' '+rmLabel(e.cmd);c[2].textContent=v;c[2].className=v=='verified'?(e.st=='ok'?'rmok':'rmbad'):v=='sent'?'':'rmbad';c[3].textContent='';z=document.createElement('div');z.textContent=v=='sent'?'':x;c[3].appendChild(z);\n");
-    web_client.println("s=rmSlotOf(e.dst);z=n[0]=='status'||n[0]=='sync'?'':'ag '+k;c[3].title=s<0?'Save the node to run commands again':'';\n"
-"if(s>=0)rmBtn(c[3],z&&rmArmId==z?rmReally:'Run again','',rmRowLocked(e.dst),{'data-act':'again','data-dst':e.dst,'data-rc':n[0],'data-ra':n.slice(1).join(' '),'data-cf':z});\n");
     web_client.println("if(b.children[u]!==tr)b.insertBefore(tr,b.children[u]||null);u++;}\n");
     web_client.println("for(k in rmRows)if(!seen[k]){if(rmRows[k].parentNode)rmRows[k].parentNode.removeChild(rmRows[k]);delete rmRows[k];}}\n");
-    web_client.println("var rmIn={},rmPK=['lat','lon','alt','src'],rmDefs=[{c:'radio',card:'radio',l:'Radio',f:[['f','Frequency',' MHz'],['sf','Spreading factor',''],['cr','Coding rate','',function(v){return '4/'+v;}],['bw','Bandwidth',' kHz'],['p','TX power (now/max)',' dBm']]},\n"
+    web_client.println("var rmIn={},rmPK=['lat','lon','alt','src'],rmDefs=[{c:'radio',card:'radio',l:'Radio',f:[['f','Frequency',' MHz'],['sf','Spreading factor',''],['cr','Coding rate','',function(v){return '4/'+v;}],['bw','Bandwidth',' kHz'],['p','TX power','',rmTxp]]},\n"
                        "{c:'sens',card:'radio',l:'Sensors',f:[['t','Temperature',' C'],['h','Humidity',' %'],['p','Pressure',' hPa'],['t2','Second temperature',' C']]},\n");
     web_client.println("{c:'name',card:'ident',l:'Name',f:[],w:[['v','Name','name',rmLen.name,'n']]},{c:'atxt',card:'ident',l:'APRS text',f:[],w:[['v','APRS text','atxt',rmLen.atxt,'a']]},\n");
     web_client.println("{c:'pos',card:'pos',l:'Position',p:rmPK,f:[['src','Source','',function(v){var m={gps:'from GPS',nofix:'GPS on, no fix',set:'set by hand'};return Object.prototype.hasOwnProperty.call(m,v)?m[v]:v;}]],\n"
@@ -275,7 +276,7 @@ void rmScaffoldJs()
                        "for(i=0;i<t.length;i++){if(!f&&/^[na]=/.test(t[i])){o[t[i].charAt(0)]=t.slice(i).join(' ').substring(2);break;}a=t[i].indexOf('=');if(a>0)o[t[i].substring(0,a)]=t[i].substring(a+1);}return o;}\n"
                        "function rmPosKv(p,r){var o={},t,i;if(typeof r!='string'||r.indexOf('ok ')!==0)return null;t=r.substring(3).split(' ');if(t.length!=p.length)return null;for(i=0;i<p.length;i++)o[p[i]]=t[i];return o;}");
     web_client.println("function rmOkNew(e,c,n){var o=rmKv(e.reply),q=rmPosKv(rmPK,e.reply),t=c.slice(1).join(' '),w=n=='name'?'name':'APRS text';\n"
-                       "if(n=='radio'&&o&&o.f)return 'Radio: '+o.f+' MHz, SF '+o.sf+', '+o.bw+' kHz, TX power '+o.p+'.';\n"
+                       "if(n=='radio'&&o&&o.f)return 'Radio: '+o.f+' MHz, SF '+o.sf+', '+o.bw+' kHz, TX power '+rmTxp(o.p)+'.';\n"
                        "if(n=='sens')return 'Sensors read.';\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
@@ -347,7 +348,7 @@ void rmScaffoldJs()
                        "if(dc)body+='&call='+rmEnc(dc);if(!dc&&ss>=0)body+='&call='+rmEnc(call);if(fc)body+='&force=1';rmBusy=true;rmMsg('','');rmRender();\n"
                        "rmPost('/rmsend',body).then(rmJson).then(function(j){");
     web_client.println("if(j&&j.ok){rmLock=rmNow()+10000;rmOut=true;rmMsg('','');rmPoll();}\n");
-    web_client.println("else{pr=j&&j.err?String(j.err):'send';rmQClr();rmMsg(rmErrText(j),'rmbad');if(pr=='busy')rmLock=rmNow()+10000;\n"
+    web_client.println("else{pr=j&&j.err?String(j.err):'send';rmQClr();rmMsg(pr=='range'&&j.range?'Refused: '+call+' accepts '+j.range+' dBm.':rmErrText(j),'rmbad');if(pr=='busy')rmLock=rmNow()+10000;\n"
                        "\n");
     web_client.println("if(pr=='limit'&&j.canForce&&!fc&&ss>=0&&call==rmSel.call){rmForce={c:cmd,a:args,d:call,s:ss};rmForceBtn();}}\n");
     web_client.println("}).catch(function(e){rmQClr();rmCatch(e);}).then(function(){rmBusy=false;rmRender();});}\n"
@@ -357,10 +358,6 @@ void rmScaffoldJs()
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),rmSel.call)))return;\n"
                        "rmSendCmd(cmd,args);}\n");
-    web_client.println("function rmAgain(b){var d=b.getAttribute('data-dst'),cmd=b.getAttribute('data-rc'),args=b.getAttribute('data-ra')||'',cf=b.getAttribute('data-cf')||'',s=rmSlotOf(d);\n"
-                       "if(s<0||rmRowLocked(d))return;\n"
-                       "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),d)))return;\n"
-                       "rmSendCmd(cmd,args,d,s);}\n");
     web_client.println("function rmPick(c){rmNodeChg(c);rmDisarmQuiet();rmSel.call=c;rmSel.slot=rmSlotOf(c);rmEl('rm_call').value=c;rmRender();}\n"
                        "function rmDisarmQuiet(){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';}\n"
                        "function rmCallInput(){var c=rmEl('rm_call');c.value=c.value.toUpperCase();rmDisarmQuiet();rmNodeChg(c.value.trim());rmSel.call=c.value.trim();rmSel.slot=rmSlotOf(rmSel.call);rmRender();}");
@@ -387,7 +384,6 @@ void rmScaffoldJs()
                        "else if(a=='pick')rmPick(b.getAttribute('data-call'));else if(a=='mhgo')rmMhStart();");
     web_client.println("else if(a=='mhstop')rmMhStop();else if(a=='mhdet')rmMhDet(b.getAttribute('data-call'));else if(a=='mhother')rmMhDet(rmEl('rm_f_mh_other').value);\n"
                                               "else if(a=='sync')rmSendCmd('sync','');\n"
-                                              "else if(a=='again')rmAgain(b);\n"
                        "else if(a=='force'&&rmForce&&rmForce.d==rmSel.call)rmSendCmd(rmForce.c,rmForce.a,rmForce.d,rmForce.s,true);\n");
     web_client.println("else if(a=='qread')rmQRead(b);\n"
                        "else if(a=='remember')rmRemember();\n"

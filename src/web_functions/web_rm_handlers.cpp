@@ -206,8 +206,10 @@ bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t
     return ok;
 }
 
-bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce)
+bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce, char *callOut, size_t callN)
 {
+    if (callOut != nullptr && callN > 0)
+        callOut[0] = '\0';
     bool allowed = false;
     if (retryS != nullptr)
         *retryS = 0;
@@ -215,7 +217,11 @@ bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce)
         *canForce = false;
     RmNodes ns; // local: scrubbed on every path
     if (slot >= 0 && slot < RM_NODES_SLOTS && rmNodesLoad(ns) && ns.slot[slot].used)
+    {
         allowed = rmTargetMaySend(ns.slot[slot].call, retryS, canForce); // the SAME decision as the send path
+        if (callOut != nullptr && callN > 0)
+            snprintf(callOut, callN, "%s", ns.slot[slot].call); // the call only, never the password
+    }
     rmNodesScrub(ns);
     return allowed;
 }

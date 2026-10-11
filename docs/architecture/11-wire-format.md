@@ -424,7 +424,7 @@ sender), so the same pair of calls appears in the same order. `node_passwd` is a
 | Command                                      | Arguments                    | Reply status text                                                     |
 | -------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
 | `reboot`                                     | none                         | `rebooting` (the node restarts 8 s after the reply)                   |
-| `status`                                     | none                         | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>`        |
+| `status`                                     | none                         | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<min>/<max>`  |
 | `sendpos`, `sendtrack`                       | none                         | `sent`                                                                |
 | `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                | `<name>=<on/off>`                                                     |
 | `led`                                        | `on` or `off`                | `led=<on/off>`; `err unsupported` on a board without a usable LED pin |
@@ -451,8 +451,13 @@ consume). Check order: disabled, lockout, frame format, canonical string and tag
 
 `status`: `s=` carries the switches as letters in the fixed order `G T D M W L` = gps, track,
 display, mesh, gateway, led; upper case = on, lower case = off. `L` is omitted on a board without an
-LED, so `s=` is 6 letters with an LED and 5 (`GTDMW`) without. `p=<cur>/<max>` is the TX power and
-the board maximum. There is no `led=` token, no `pmin=` token and no `gw=`/`mesh=` form; a parser
+LED, so `s=` is 6 letters with an LED and 5 (`GTDMW`) without. `p=<cur>/<min>/<max>` is the TX power, the
+remote floor `max(0, TX_POWER_MIN)` and the board maximum in dBm (e.g. `p=2/2/22` on a RAK4631); the
+`radio` reply carries the same token. A 2-part `p=<cur>/<max>` is rejected. The sender learns `<min>` and
+`<max>` per target in RAM from every verified `status` or `radio` reply and from an `err range` answer, and
+refuses a `txpower` outside that range locally (error token `range`; `/rmsend` adds
+`"range":"<min>..<max>"`). While the range is unknown (fresh boot) it sends 0..22 and relies on the
+target's `err range`. There is no `led=` token, no `pmin=` token and no `gw=`/`mesh=` form; a parser
 does not accept them. Replies are limited only by the 108-character wire cap. The `sync` reply
 carries no capability token: the sender budget is 2 unanswered sends while the key is unproven and
 10 once a reply under the current key verified; two unverified sends in a row drop it back to 2 (streak rule). No capability level gates it.
@@ -479,7 +484,7 @@ password `secret` followed by trailing spaces, which are stripped before hashing
 RM1 1 ok rebooting facf04f881d89cde
 RM1 44 err range ade99d27f3001d3c
 RM1 0 ok ctr=42 v=4.40a c639dacb86c267de
-RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22 73baeaf0695e81ea
+RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/2/22 018c2cf78fc2df3b
 ```
 
 (The `err range` vector exercises the reply grammar; the firmware sends `err range <min>..<max>`,

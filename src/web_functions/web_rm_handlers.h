@@ -50,6 +50,6 @@ bool rmSendBySlot(int slot, const char *cmd, const char *args, char *err, size_t
 /** Policy probe for a saved slot (for the /rmsend refusal reply): returns true when a send would pass now;
  *  retryS = seconds until it would, canForce = refused with LIMIT and the one-shot after a re-key is armed.
  *  Same decision as the send path (rmTargetMaySend -> policyFor). false + zeros for an empty/invalid slot. */
-bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce);
+bool rmSlotTargetInfo(int slot, uint32_t *retryS, bool *canForce, char *callOut = nullptr, size_t callN = 0);
 
 #endif // _WEB_RM_HANDLERS_H_

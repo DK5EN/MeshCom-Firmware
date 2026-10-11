@@ -17,7 +17,7 @@
 //     rmPolicyMaySend(..., strict = false) allows every send and spends no one-shot.
 //  2. Entry state: queued / waiting / noanswer / ok / err / unverified as a function of timestamps.
 //  3. Plain sentences for every state and every RM error token.
-//  4. The compact `status` reply: `s=<letters> p=<cur>/<max>` encode/decode and the whole formatter,
+//  4. The compact `status` reply: `s=<letters> p=<cur>/<min>/<max>` encode/decode and the whole formatter,
 //     so the 63-char reply limit (RM_MAX_RESULT) is asserted on the real code in a native test.
 #ifndef RM_SENDER_POLICY_H
 #define RM_SENDER_POLICY_H
@@ -348,7 +348,7 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"disabled", "Remote management is off on the node, or it has no password."},
         {"cached", "The node repeated its earlier answer."},
         // reply tokens of the extended commands (rm_exec_read.cpp / rm_exec_write.cpp)
-        {"range", "That value is outside the allowed range."},
+        {"range", "That value is outside the range the node accepts."},
         {"text", "The text contains characters the node will not accept."},
         {"unknown", "The node does not know that one."},
         {"end", "There are no more rows."},
@@ -427,7 +427,8 @@ inline const char *rmEntryMessage(RmEntryState s, const char *reply)
 // ---- compact status token ----------------------------------------------------------------------------
 // Fixed order, one letter per switch: upper case = on, lower case = off.
 //   G gps   T track   D display   M mesh   W gateway   L led (omitted on boards without an LED)
-// plus p=<cur>/<max> for the TX power in dBm. Example: "s=GtDMwL p=17/22".
+// plus p=<cur>/<min>/<max> for the TX power in dBm (min/max = the range the node accepts remotely).
+// Example: "s=GtDMwL p=17/2/22".
 #define RM_STATUS_SWITCHES 6u
 
 struct RmSwitches
@@ -442,7 +443,7 @@ struct RmStatusInfo
     int8_t sw[RM_STATUS_SWITCHES];  // gps, track, display, mesh, gateway, led: -1 unknown, 0 off, 1 on
     bool ledSupported;          // led letter present
     bool haveP;
-    int cur, max;
+    int cur, min, max;
 };
 
 // "s=GtDMwL" into out. Returns the length, 0 if it does not fit.
@@ -469,20 +470,20 @@ inline int rmClampDbm(int v)
 }
 
 // The whole `status` result (without the "RM1 <ctr> " frame and tag):
-//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>
+//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<min>/<max>
 // s= carries the switches (gateway and mesh are the W and M letters; the L letter only on boards with
 // an LED). Returns the length written (always NUL-terminated; truncated, never overrun, when it does
 // not fit n). Worst case is far below the wire cap RM_MAX_RESULT, see test_rm_sender_policy.
 inline size_t rmFormatStatus(char *out, size_t n, const char *ver, uint32_t upMin, int bat, uint32_t heapKb,
-                             const RmSwitches &sw, int txCur, int txMax)
+                             const RmSwitches &sw, int txCur, int txMin, int txMax)
 {
     if (out == nullptr || n == 0)
         return 0;
     char tok[RM_STATUS_SWITCHES + 3];
     if (rmStatusToken(tok, sizeof(tok), sw) == 0)
         tok[0] = '\0';
-    const int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d", ver != nullptr ? ver : "?",
-                           (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMax));
+    const int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d/%d", ver != nullptr ? ver : "?",
+                           (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMin), rmClampDbm(txMax));
     return w < 0 ? 0 : ((size_t)w >= n ? n - 1 : (size_t)w);
 }
 
@@ -525,13 +526,14 @@ inline bool rmStatusParse(const char *res, RmStatusInfo &o)
             if (cnt == RM_STATUS_SWITCHES)
                 o.ledSupported = true;
         }
-        else if (l >= 5 && strncmp(t, "p=", 2) == 0)
+        else if (l >= 7 && strncmp(t, "p=", 2) == 0)
         {
-            int cur = 0, mx = 0, cn = 0;
-            if (sscanf(t, "p=%d/%d%n", &cur, &mx, &cn) == 2 && (size_t)cn == l)
+            int cur = 0, mn = 0, mx = 0, cn = 0;
+            if (sscanf(t, "p=%d/%d/%d%n", &cur, &mn, &mx, &cn) == 3 && (size_t)cn == l)
             {
                 o.haveP = true;
                 o.cur = cur;
+                o.min = mn;
                 o.max = mx;
             }
         }
@@ -539,6 +541,142 @@ inline bool rmStatusParse(const char *res, RmStatusInfo &o)
     return o.haveS;
 }
 
+
+// ---- per-target TX power range (sender side, RAM only) ---------------------------------------------------
+// The sender learns what a target accepts for `txpower` from VERIFIED replies only: `status` and `radio`
+// carry p=<cur>/<min>/<max>, and the target answers an out-of-range value with `err range <min>..<max>`.
+// Until a range is known, 0..RM_TXPOWER_UNKNOWN_MAX goes out and the target's own `err range` decides.
+#define RM_TXRANGE_MAX 8
+#define RM_TXPOWER_UNKNOWN_MAX 22
+struct RmTxRange
+{
+    char dst[10];
+    int8_t min, max;
+    bool used;
+    uint32_t lastUse;  // caller's clock, stamped on learn only; the least recently learnt row is evicted
+};
+
+inline bool rmTxRangeValid(int mn, int mx)
+{
+    return mn >= -99 && mx <= 99 && mn <= mx;
+}
+
+// Parses the p=<cur>/<min>/<max> token of a `radio` result ("ok f=... p=10/2/22"). Only the 3-part form.
+inline bool rmRadioPParse(const char *res, int *cur, int *mn, int *mx)
+{
+    if (res == nullptr || strncmp(res, "ok ", 3) != 0)
+        return false;
+    const char *p = res + 2;
+    while (*p != '\0')
+    {
+        while (*p == ' ')
+            p++;
+        const char *t = p;
+        while (*p != '\0' && *p != ' ')
+            p++;
+        const size_t l = (size_t)(p - t);
+        if (l >= 7 && strncmp(t, "p=", 2) == 0)
+        {
+            int c = 0, a = 0, b = 0, cn = 0;
+            if (sscanf(t, "p=%d/%d/%d%n", &c, &a, &b, &cn) == 3 && (size_t)cn == l)
+            {
+                if (cur != nullptr)
+                    *cur = c;
+                if (mn != nullptr)
+                    *mn = a;
+                if (mx != nullptr)
+                    *mx = b;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Parses "err range <min>..<max>" (the target's answer to an out-of-range txpower).
+inline bool rmErrRangeParse(const char *res, int *mn, int *mx)
+{
+    if (res == nullptr || strncmp(res, "err range ", 10) != 0)
+        return false;
+    int a = 0, b = 0, cn = 0;
+    if (sscanf(res + 10, "%d..%d%n", &a, &b, &cn) != 2 || res[10 + cn] != '\0')
+        return false;
+    if (mn != nullptr)
+        *mn = a;
+    if (mx != nullptr)
+        *mx = b;
+    return true;
+}
+
+inline bool rmTxRangeGet(const RmTxRange *t, uint8_t n, const char *dst, int *mn, int *mx)
+{
+    if (t == nullptr || dst == nullptr)
+        return false;
+    for (uint8_t i = 0; i < n; i++)
+        if (t[i].used && strcmp(t[i].dst, dst) == 0)
+        {
+            if (mn != nullptr)
+                *mn = t[i].min;
+            if (mx != nullptr)
+                *mx = t[i].max;
+            return true;
+        }
+    return false;
+}
+
+// Stores/overwrites dst's range. Returns false (table unchanged) for a malformed range or call.
+inline bool rmTxRangeLearn(RmTxRange *t, uint8_t n, const char *dst, int mn, int mx, uint32_t now)
+{
+    if (t == nullptr || n == 0 || dst == nullptr || dst[0] == '\0' || strlen(dst) >= sizeof(t[0].dst) ||
+        !rmTxRangeValid(mn, mx))
+        return false;
+    RmTxRange *r = nullptr;
+    for (uint8_t i = 0; i < n && r == nullptr; i++)
+        if (t[i].used && strcmp(t[i].dst, dst) == 0)
+            r = &t[i];
+    for (uint8_t i = 0; i < n && r == nullptr; i++)
+        if (!t[i].used)
+            r = &t[i];
+    if (r == nullptr)  // full: evict the least recently learnt
+    {
+        r = &t[0];
+        for (uint8_t i = 1; i < n; i++)
+            if ((int32_t)(t[i].lastUse - r->lastUse) < 0)
+                r = &t[i];
+    }
+    memset(r, 0, sizeof(*r));
+    snprintf(r->dst, sizeof(r->dst), "%s", dst);
+    r->min = (int8_t)mn;
+    r->max = (int8_t)mx;
+    r->used = true;
+    r->lastUse = now;
+    return true;
+}
+
+inline void rmTxRangeForget(RmTxRange *t, uint8_t n, const char *dst)
+{
+    if (t == nullptr || dst == nullptr)
+        return;
+    for (uint8_t i = 0; i < n; i++)
+        if (t[i].used && strcmp(t[i].dst, dst) == 0)
+            memset(&t[i], 0, sizeof(t[i]));
+}
+
+// Sender clamp for `txpower <v>`: a learned range decides; without one, 0..RM_TXPOWER_UNKNOWN_MAX goes out.
+enum RmTxSend
+{
+    RM_TXSEND_OK = 0,
+    RM_TXSEND_RANGE = 1  // refuse locally with err token `range`
+};
+inline int rmTxPowerSendAllowed(bool learned, int mn, int mx, int value)
+{
+    if (!learned)
+    {
+        mn = 0;
+        mx = RM_TXPOWER_UNKNOWN_MAX;
+    }
+    return (value >= mn && value <= mx) ? RM_TXSEND_OK : RM_TXSEND_RANGE;
+}
 
 // --- sent book: slot choice (pure; rm_runtime.cpp keeps the storage) -------------------------------
 // An entry COUNTS while it is unanswered (not verified), not aged out and inside the policy window:

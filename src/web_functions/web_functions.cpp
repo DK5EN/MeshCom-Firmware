@@ -562,6 +562,7 @@ static int web_read_body(long content_length)
  *             optional &force=1: use the one "try once more" after a re-key (only where canForce is reported)
  *             optional &call=<CALL> (slot form only): refused with "slot" unless the slot holds exactly that call
  *  answer: {"ok":true,"ctr":N[,"viaSync":true]} or {"ok":false,"err":"<reason>","msg":"<sentence>","retry":S,"canForce":0|1}
+ *  err "range" (txpower outside the range learnt for that target) adds "range":"<min>..<max>"
  *  -- never an echo of any input */
 static void sub_rm_send(long content_length)
 {
@@ -572,6 +573,7 @@ static void sub_rm_send(long content_length)
     bool viaSync = false; // RM GUI W1b: the command waits behind an automatic sync (ctr 0)
     uint32_t retryS = 0;  // refusal only: seconds until the target accepts a send again
     bool canForce = false; // refusal only: the one "try once more" after a re-key is available (force=1)
+    char rangeDst[16] = {0}; // refusal "range" only: the target call, copied before the body is wiped
 
     body[0] = '\0';
 
@@ -588,13 +590,16 @@ static void sub_rm_send(long content_length)
         {
             ok = rmSendBySlot(q.slot, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync, q.force, q.call);
             if (!ok)
-                rmSlotTargetInfo(q.slot, &retryS, &canForce);
+                rmSlotTargetInfo(q.slot, &retryS, &canForce, rangeDst, sizeof(rangeDst));
         }
         else
         {
             ok = rmSendCommand(q.dst, q.pw, q.cmd, q.args, err, sizeof(err), &ctr, &viaSync, q.force);
             if (!ok)
+            {
                 rmTargetMaySend(q.dst, &retryS, &canForce);
+                snprintf(rangeDst, sizeof(rangeDst), "%s", q.dst != nullptr ? q.dst : "");
+            }
         }
     }
 
@@ -610,6 +615,9 @@ static void sub_rm_send(long content_length)
         rm_json_str(tok);
         web_client.print(",\"msg\":");
         rm_json_str(rmErrTokenMessage(tok)); // the sentence comes from rmTokenTable, the JS keeps no copy
+        int rMin = 0, rMax = 0;
+        if (strcmp(tok, "range") == 0 && rmTargetTxRange(rangeDst, &rMin, &rMax))
+            web_client.printf(",\"range\":\"%d..%d\"", rMin, rMax); // the txpower range learnt for that target
         web_client.printf(",\"retry\":%lu,\"canForce\":%d}\n", (unsigned long)retryS, canForce ? 1 : 0);
     }
 }

@@ -5,7 +5,7 @@
 // Covers the password and call validators (accept/reject tables), the per-target send policy
 // (10 s spacing, 2 unanswered sends in 120 s (10 proven), boundaries, millis() wrap), the entry state
 // classification, the plain-English sentences for every RM error token, and the compact status
-// token (`s=<letters> p=<cur>/<max>`) incl. the worst-case reply length against RM_MAX_RESULT.
+// token (`s=<letters> p=<cur>/<min>/<max>`) incl. the worst-case reply length against RM_MAX_RESULT.
 
 #include <unity.h>
 
@@ -581,12 +581,13 @@ static void test_status_token_round_trip_all_combinations(void)
                 continue;  // the led bit only exists on boards with an LED
             const int txCur = (int)(bits % 24) - 2;
             char res[96];
-            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 22);
+            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 2, 22);
             RmStatusInfo o;
             TEST_ASSERT_TRUE_MESSAGE(rmStatusParse(res, o), res);
             TEST_ASSERT_TRUE_MESSAGE(o.haveS, res);
             TEST_ASSERT_TRUE_MESSAGE(o.haveP, res);
             TEST_ASSERT_EQUAL_INT_MESSAGE(txCur, o.cur, res);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(2, o.min, res);
             TEST_ASSERT_EQUAL_INT_MESSAGE(22, o.max, res);
             TEST_ASSERT_NULL_MESSAGE(strstr(res, "pmin="), res);
             TEST_ASSERT_NULL_MESSAGE(strstr(res, "led="), res);
@@ -603,16 +604,16 @@ static void test_status_token_round_trip_all_combinations(void)
 static void test_status_format_shape(void)
 {
     char res[96];
-    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/22", res);
+    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 2, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/2/22", res);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
     // board without LED: no L letter
-    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/22", res);
+    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 2, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/2/22", res);
     // only the compact form: no led=, pmin=, gw= or mesh= field, with or without an LED
     for (int led = 0; led < 2; led++)
     {
-        rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(0x1F, led != 0), 17, 22);
+        rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(0x1F, led != 0), 17, 2, 22);
         TEST_ASSERT_NULL(strstr(res, " led="));
         TEST_ASSERT_NULL(strstr(res, " pmin="));
         TEST_ASSERT_NULL(strstr(res, "gw="));
@@ -628,48 +629,51 @@ static void test_status_worst_case_length_fits_the_reply(void)
     char res[160];
     size_t worst = 0;
     const int curs[] = {-99, -20, -9, 0, 9, 22, 99};
+    const int mins[] = {-99, 0, 2, 99};
     const int maxs[] = {0, 9, 22, 99};
     const uint32_t ups[] = {0, 71582u, 99999u};
     for (unsigned bits = 0; bits < 64; bits += 63)  // all on, all off
         for (size_t a = 0; a < sizeof(curs) / sizeof(curs[0]); a++)
-            for (size_t b = 0; b < sizeof(maxs) / sizeof(maxs[0]); b++)
-                for (size_t c = 0; c < sizeof(ups) / sizeof(ups[0]); c++)
-                {
-                    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", ups[c], 100, 9999, sw(bits, true),
-                                                    curs[a], maxs[b]);
-                    TEST_ASSERT_EQUAL_UINT(strlen(res), n);
-                    if (n > worst)
-                        worst = n;
-                }
+            for (size_t m = 0; m < sizeof(mins) / sizeof(mins[0]); m++)
+                for (size_t b = 0; b < sizeof(maxs) / sizeof(maxs[0]); b++)
+                    for (size_t c = 0; c < sizeof(ups) / sizeof(ups[0]); c++)
+                    {
+                        const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", ups[c], 100, 9999, sw(bits, true),
+                                                        curs[a], mins[m], maxs[b]);
+                        TEST_ASSERT_EQUAL_UINT(strlen(res), n);
+                        if (n > worst)
+                            worst = n;
+                    }
     printf("status worst case: %u of %d\n", (unsigned)worst, RM_MAX_RESULT_REPLY);
     TEST_ASSERT_TRUE(worst <= RM_MAX_RESULT_REPLY);
     // the exact worst string, so a field change shows up here first
-    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, 99);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/99", res);
-    TEST_ASSERT_EQUAL_UINT(55, strlen(res));
-    TEST_ASSERT_EQUAL_UINT(55, worst);
+    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, -99, 99);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/-99/99", res);
+    TEST_ASSERT_EQUAL_UINT(59, strlen(res));
+    TEST_ASSERT_EQUAL_UINT(59, worst);
+    TEST_ASSERT_TRUE(worst <= RM_MAX_RESULT_REPLY);
 
     // the worst a real board can report: TX power -20..22
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/22", res);
-    TEST_ASSERT_EQUAL_UINT(55, strlen(res));
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 2, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/2/22", res);
+    TEST_ASSERT_EQUAL_UINT(57, strlen(res));
 
     // out-of-range inputs are clamped, the length stays bounded
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, 1000);
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, -1000, 1000);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT_REPLY);
-    TEST_ASSERT_NOT_NULL(strstr(res, "p=-99/99"));
+    TEST_ASSERT_NOT_NULL(strstr(res, "p=-99/-99/99"));
 }
 
 static void test_status_format_never_overruns_a_small_buffer(void)
 {
     char res[24];
     memset(res, 'x', sizeof(res));
-    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, 99);
+    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, -99, 99);
     TEST_ASSERT_TRUE(n <= 19);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
     TEST_ASSERT_EQUAL_CHAR('x', res[20]);  // nothing past n bytes
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0));
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
 }
 
 static void test_status_parse_old_forms_are_rejected(void)
@@ -679,10 +683,14 @@ static void test_status_parse_old_forms_are_rejected(void)
     TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1", o));
     TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=1 mesh=1 led=0", o));
     TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 led=1", o));
-    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 p=17/22", o));  // no s=
+    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 p=17/2/22", o));  // no s=
     // the compact form still parses; a stray old field next to s= is ignored, never read
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 s=GTDMWL p=17/22", o));
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 s=GTDMWL p=17/2/22", o));
     TEST_ASSERT_TRUE(o.haveS);
+    TEST_ASSERT_TRUE(o.haveP);
+    TEST_ASSERT_EQUAL_INT(17, o.cur);
+    TEST_ASSERT_EQUAL_INT(2, o.min);
+    TEST_ASSERT_EQUAL_INT(22, o.max);
     TEST_ASSERT_TRUE(o.ledSupported);
     TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=gtdmw gw=1 mesh=1 led=1 pmin=2", o));
     TEST_ASSERT_EQUAL_INT(0, o.sw[4]);
@@ -698,14 +706,111 @@ static void test_status_parse_old_forms_are_rejected(void)
     TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a s=GTDMWLX", o));
     TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=x/y", o));  // bad p= ignored, not fatal
     TEST_ASSERT_FALSE(o.haveP);
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=-3/22", o));
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=-3/0/22", o));
     TEST_ASSERT_TRUE(o.haveP);
     TEST_ASSERT_EQUAL_INT(-3, o.cur);
+    TEST_ASSERT_EQUAL_INT(0, o.min);
     TEST_ASSERT_EQUAL_INT(22, o.max);
     TEST_ASSERT_FALSE(o.ledSupported);  // 5 letters: no LED on that board
-    // a third '/' field after p= is rejected
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=2/22/2", o));
+    // the retired 2-part form and a 4th '/' field are rejected (still a status result)
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=17/22", o));
     TEST_ASSERT_FALSE(o.haveP);
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=2/22/2/1", o));
+    TEST_ASSERT_FALSE(o.haveP);
+}
+
+static void test_radio_p_token_parse(void)
+{
+    int c = 0, mn = 0, mx = 0;
+    TEST_ASSERT_TRUE(rmRadioPParse("ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22", &c, &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(10, c);
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    TEST_ASSERT_TRUE(rmRadioPParse("ok f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99/-99", &c, &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(-99, mn);
+    TEST_ASSERT_FALSE(rmRadioPParse("ok f=433.175 sf=11 cr=5 bw=250 p=10/22", &c, &mn, &mx));  // 2-part
+    TEST_ASSERT_FALSE(rmRadioPParse("ok f=433.175 sf=11 cr=5 bw=250", &c, &mn, &mx));
+    TEST_ASSERT_FALSE(rmRadioPParse("ok f=1 p=1/2/3/4", &c, &mn, &mx));
+    TEST_ASSERT_FALSE(rmRadioPParse("err range", &c, &mn, &mx));
+    TEST_ASSERT_FALSE(rmRadioPParse(nullptr, &c, &mn, &mx));
+}
+
+static void test_err_range_parse(void)
+{
+    int mn = 0, mx = 0;
+    TEST_ASSERT_TRUE(rmErrRangeParse("err range 2..22", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    TEST_ASSERT_TRUE(rmErrRangeParse("err range 0..14", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(14, mx);
+    TEST_ASSERT_FALSE(rmErrRangeParse("err range", &mn, &mx));
+    TEST_ASSERT_FALSE(rmErrRangeParse("err range 2-22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmErrRangeParse("err range 2..22x", &mn, &mx));
+    TEST_ASSERT_FALSE(rmErrRangeParse("err blocked", &mn, &mx));
+    TEST_ASSERT_FALSE(rmErrRangeParse(nullptr, &mn, &mx));
+}
+
+static void test_tx_range_table_learn_get_evict(void)
+{
+    RmTxRange t[RM_TXRANGE_MAX];
+    memset(t, 0, sizeof(t));
+    int mn = -1, mx = -1;
+    TEST_ASSERT_FALSE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DK5EN-90", &mn, &mx));
+    TEST_ASSERT_TRUE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-90", 2, 22, 100));
+    TEST_ASSERT_TRUE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DK5EN-90", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    // relearn overwrites in place
+    TEST_ASSERT_TRUE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-90", 0, 14, 200));
+    TEST_ASSERT_TRUE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DK5EN-90", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(0, mn);
+    TEST_ASSERT_EQUAL_INT(14, mx);
+    uint8_t used = 0;
+    for (uint8_t i = 0; i < RM_TXRANGE_MAX; i++)
+        used += t[i].used ? 1 : 0;
+    TEST_ASSERT_EQUAL_UINT8(1, used);
+    // malformed values are rejected and change nothing
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-90", 22, 2, 300));
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-90", -100, 22, 300));
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-90", 0, 100, 300));
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "", 0, 22, 300));
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, nullptr, 0, 22, 300));
+    TEST_ASSERT_FALSE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DK5EN-1234567", 0, 22, 300));  // overlength
+    TEST_ASSERT_TRUE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DK5EN-90", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(14, mx);
+    // fill the table, then a ninth target evicts the least recently used one (DK5EN-90, lastUse 200)
+    for (int i = 1; i < RM_TXRANGE_MAX; i++)
+    {
+        char c[12];
+        snprintf(c, sizeof(c), "DL1AA-%d", i);
+        TEST_ASSERT_TRUE(rmTxRangeLearn(t, RM_TXRANGE_MAX, c, 2, 22, 1000u + (uint32_t)i));
+    }
+    TEST_ASSERT_TRUE(rmTxRangeLearn(t, RM_TXRANGE_MAX, "DL9ZZ-1", 5, 20, 5000));
+    TEST_ASSERT_FALSE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DK5EN-90", &mn, &mx));
+    TEST_ASSERT_TRUE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DL1AA-1", &mn, &mx));
+    TEST_ASSERT_TRUE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DL9ZZ-1", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(5, mn);
+    // forget drops the row
+    rmTxRangeForget(t, RM_TXRANGE_MAX, "DL9ZZ-1");
+    TEST_ASSERT_FALSE(rmTxRangeGet(t, RM_TXRANGE_MAX, "DL9ZZ-1", &mn, &mx));
+}
+
+static void test_tx_power_send_clamp(void)
+{
+    // RAK range 2..22 learned: 1 refused as `range`, 2 allowed, 22 allowed, 23 refused
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_RANGE, rmTxPowerSendAllowed(true, 2, 22, 1));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_OK, rmTxPowerSendAllowed(true, 2, 22, 2));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_OK, rmTxPowerSendAllowed(true, 2, 22, 22));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_RANGE, rmTxPowerSendAllowed(true, 2, 22, 23));
+    // a learned narrower ceiling is honoured, a learned wider one too (the sender's own max is not used)
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_RANGE, rmTxPowerSendAllowed(true, 0, 14, 15));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_OK, rmTxPowerSendAllowed(true, 0, 30, 30));
+    // unknown range: 0..22 allowed, 23 refused
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_OK, rmTxPowerSendAllowed(false, 0, 0, 0));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_OK, rmTxPowerSendAllowed(false, 0, 0, 22));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_RANGE, rmTxPowerSendAllowed(false, 0, 0, 23));
+    TEST_ASSERT_EQUAL_INT(RM_TXSEND_RANGE, rmTxPowerSendAllowed(false, 0, 0, -1));
+    TEST_ASSERT_EQUAL_INT(22, RM_TXPOWER_UNKNOWN_MAX);
 }
 
 static void test_policy_proven_limit_10_and_11th_refused(void)
@@ -1090,6 +1195,10 @@ int main(int, char **)
     RUN_TEST(test_peer_mark_stale_expired_entries);
     RUN_TEST(test_peer_mark_stale_slow_retry_cadence);
     RUN_TEST(test_reply_too_soon_spacing_and_wrap);
+    RUN_TEST(test_radio_p_token_parse);
+    RUN_TEST(test_err_range_parse);
+    RUN_TEST(test_tx_range_table_learn_get_evict);
+    RUN_TEST(test_tx_power_send_clamp);
     RUN_TEST(test_proof_book_evicts_least_recently_used);
     RUN_TEST(test_proof_book_use_keeps_a_target_alive);
     RUN_TEST(test_fold_call_folds_and_never_truncates);
