@@ -11,7 +11,7 @@ in this campaign (preparation mode). Corpus and decisions: `docs/upstream-corpus
 | W1   | `.zz` → `.autoupdate` rename, buffers 48 B, Safeboot page + bins rebuilt (`2522dccb`)            | done, gate green       |
 | W2   | 11 upstream cherry-picks (`-x`) e1e2acea..90ac580d, golden regen, toggle-lint pin 82 → 84        | done, advisor APPROVED |
 | W3   | LED feature + upstream LED bug fixes + V4 remote LED + hemisphere dead code (14783b1d..13d28041) | done, advisor 2 rounds |
-| W4   | Bench: T-Beam DK5EN-92 (charge LED), Heltec V3 DK5EN-1 (RM led on/flash/off)                     | open, next             |
+| W4   | Bench: T-Beam DK5EN-92 (charge LED), Heltec V3 DK5EN-1 (RM led on/flash/off)                     | done, all checks pass  |
 
 W2 skipped on purpose: f5f8d38f, 9a246a16, 5211600d (#1200/#1201, already in the fork), b82e36c0 +
 0eb33bfa (YAML add and revert, net zero). Conflict resolutions keep the RM hold: every
@@ -105,3 +105,28 @@ Deviations from the spec above:
   darkens it; RM `chgled on/off/auto` from DK5EN-1.
 - DK5EN-1 (Heltec V3, GPIO35): RM `led on/flash/off`.
 - Bench rules: TX ≤ 2 dBm, `identity_guard.py` first, DM to own node or group TEST only.
+
+## W4 result (2026-10-11)
+
+Both nodes USB-flashed at `891e26a5` (Heltec V3 `pio upload`, T-Beam esptool 460800); identity
+guard ok before and after (DK5EN-1 192.168.68.63, DK5EN-92 192.168.68.69, 2 dBm, web on, GPS
+clock). RM over the air as DMs between own nodes, through the senders' web API (saved slots; the
+operator saved DK5EN-92 on DK5EN-1). LED states observed by the operator. T-Beam has no 18650 cell,
+so auto and off both look dark; `chgled on` is the discriminating check.
+
+| Check                                                 | Reply / result                    | Observed            |
+| ----------------------------------------------------- | --------------------------------- | ------------------- |
+| T-Beam boot after update, never configured            | info: `auto (follows charging)`   | dark (no cell)      |
+| DK5EN-92 -> DK5EN-1 `led on`                          | `ok led=on`                       | white LED steady    |
+| `led flash`                                           | `ok led=flash`                    | short flash per 2 s |
+| `led off`                                             | `ok led=off`                      | dark                |
+| DK5EN-1 -> DK5EN-92 `chgled on`                       | `ok chgled=on`                    | charge LED lit      |
+| `chgled off`                                          | `ok chgled=off`                   | dark                |
+| `chgled auto`                                         | `ok chgled=auto`                  | -                   |
+| `chgled on` to Heltec, `led on` to T-Beam             | `err unsupported` both            | -                   |
+| `chgled on`, then reboot                              | override gone, info `auto`        | dark                |
+| `--charge led off`, reboot, `--charge led on`, reboot | info `off`, `off`, `auto`, `auto` | -                   |
+
+Note: status letters are `GtdMw` on the T-Beam (no `REMOTE_LED_PIN`, so no `L`); unchanged
+behaviour, the spec's "6 letters" holds only for boards with the remote LED. Heltec V4 remains
+built but untested on hardware.
