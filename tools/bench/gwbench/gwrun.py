@@ -29,7 +29,7 @@ MOCK_DIR = "gwmock"          # ~/gwmock on the pi
 ALLOWED_HOSTS: set = set()   # filled from the resolved node addresses
 ALLOWED_CALLS = {"DK5EN-1", "DK5EN-90", "TEST"}
 RM_READ = ["sync", "status", "radio", "name", "atxt", "pos", "sens", "mh 0", "mh {PEER}", "txq", "mbox", "maxhop"]
-PHASES = ["guard", "setup", "rm", "neg", "plain", "teardown"]
+PHASES = ["guard", "setup", "rm", "neg", "plain", "refused", "teardown"]
 MOCK_IP = ""
 
 
@@ -277,6 +277,38 @@ class Run:
                 self.rm_case(src, dst, "maxhop", str(old), tag=" (restore)")
                 self.ev("verify_restore:maxhop", d, result="same" if self.rm_case(src, dst, "maxhop")["reply"] == r["reply"] else "DIFFERENT")
 
+    def p_refused(self) -> None:
+        """RM-STRIKE / sender clamp (txpower-clamp plan, waves 1-2): DK5EN-1 manages the RAK (floor 2 dBm).
+        Every value sent is <= 2 dBm, so even a wrongly accepted command stays inside the bench rule."""
+        src, dst, d = self.n1, self.n90, "1>90"
+        # a fresh sender boot empties its learnt range table: the first txpower 1 must go on air
+        src.con("--reboot")
+        self.nap(25)
+        t0 = time.time()
+        while not names_call(src.base, src.call):
+            if time.time() - t0 > 90:
+                raise Abort("DK5EN-1 web page not back 90 s after --reboot")
+            self.nap(3)
+        self.nap(5)
+        p90 = dst.pos(); b = http(dst.base, "/rmstatus")
+        r = self.rm_send(src, dst, "txpower", "1")
+        a = http(dst.base, "/rmstatus")
+        m = re.search(r"\[RM\];refused;ctr;(\d+)", dst.text(p90))
+        ok = r["result"] == "err" and r["ver"] and r["reply"] == "err range 2..22" and m is not None and not a.get("lock")
+        self.ev("refused:on-air txpower 1", d, result="PASS" if ok else "FAIL", reply=r["reply"], ver=r["ver"],
+                marker=m.group(0) if m else None, lock=a.get("lock"), ok_d=a["ok"] - b["ok"], rej_d=a["rej"] - b["rej"])
+        self.nap(12)
+        j = http(src.base, "/rmsend", "dst=%s&pw=%s&cmd=txpower&args=1" % (dst.call, q(dst.pw)))
+        ok = isinstance(j, dict) and not j.get("ok") and j.get("err") == "range" and j.get("range") == "2..22"
+        self.ev("refused:local txpower 1", d, result="PASS" if ok else "FAIL", reply=json.dumps(j))
+        r = self.rm_send(src, dst, "radio")
+        ok = r["result"] == "ok" and re.search(r"\bp=-?\d+/2/22$", r["reply"] or "") is not None
+        self.ev("refused:radio p=", d, result="PASS" if ok else "FAIL", reply=r["reply"], ver=r["ver"])
+        self.nap(12)
+        r = self.rm_send(src, dst, "txpower", "2")
+        ok = r["result"] == "ok" and r["reply"] == "ok txpower=2"
+        self.ev("refused:in-range txpower 2", d, result="PASS" if ok else "FAIL", reply=r["reply"], ver=r["ver"])
+
     def junk(self, src: Node, dst: Node, n: int) -> None:
         """Wrong-tag RM frame as a plain DM (the sender policy would refuse a third wrong-password send by design)."""
         hwm = int(http(dst.base, "/rmstatus")["hwm"])
@@ -372,7 +404,7 @@ class Run:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--phases", default="guard,setup,rm,neg,plain", help="comma list of guard,setup,rm,neg,plain; teardown always runs")
+    ap.add_argument("--phases", default="guard,setup,rm,neg,plain", help="comma list of guard,setup,rm,neg,plain,refused; teardown always runs (refused: LoRa only, run without setup)")
     ap.add_argument("--run-dir", default=None)
     ap.add_argument("--rak-port", default="/dev/cu.usbmodem1101")
     ap.add_argument("--rak-host", default="192.168.68.73", help="RAK web address (DHCP, no mDNS); the page must name DK5EN-90")

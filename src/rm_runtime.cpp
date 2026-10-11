@@ -423,35 +423,11 @@ bool parseSyncCtr(const char *result, uint32_t &out)
     return true;
 }
 
-// True when the sent command line "<cmd>[ <args>]" starts with the command name `name`.
-static bool sentCmdIs(const char *line, const char *name)
-{
-    const size_t l = strlen(name);
-    return strncmp(line, name, l) == 0 && (line[l] == '\0' || line[l] == ' ');
-}
-
-// A VERIFIED reply tells the sender what the target accepts for txpower: p=<cur>/<min>/<max> in the reply
-// to `status` or `radio` (other commands also carry a p= with another meaning: only these two are read),
-// and "err range <min>..<max>" in the reply to `txpower`. Malformed values are ignored.
+// A VERIFIED reply may teach the sender what the target accepts for txpower (selection: rmTxRangeFromReply()).
 static void learnTxRange(const char *dst, const char *sentCmd, const char *result)
 {
     int mn = 0, mx = 0;
-    bool got = false;
-    if (sentCmdIs(sentCmd, "status"))
-    {
-        RmStatusInfo st;
-        if (rmStatusParse(result, st) && st.haveP)
-        {
-            mn = st.min;
-            mx = st.max;
-            got = true;
-        }
-    }
-    else if (sentCmdIs(sentCmd, "radio"))
-        got = rmRadioPParse(result, nullptr, &mn, &mx);
-    else if (sentCmdIs(sentCmd, "txpower"))
-        got = rmErrRangeParse(result, &mn, &mx);
-    if (got)
+    if (rmTxRangeFromReply(sentCmd, result, &mn, &mx))
         rmTxRangeLearn(s_txRange, RM_TXRANGE_MAX, dst, mn, mx, millis());
 }
 
@@ -489,6 +465,7 @@ void handleReply(const char *src, const char *text)
             snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
             wipeKey(e);
             uint32_t h = 0;
+            // only verified replies may reach this (inside the `if (ok)` branch)
             learnTxRange(e.pub.dst, e.pub.cmd, result);
             if (e.pub.ctr == 0 && parseSyncCtr(result, h))
                 peerSet(e.pub.dst, h);

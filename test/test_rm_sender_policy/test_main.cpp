@@ -735,6 +735,38 @@ static void test_radio_p_token_parse(void)
     TEST_ASSERT_FALSE(rmRadioPParse(nullptr, &c, &mn, &mx));
 }
 
+static void test_tx_range_from_reply_selection(void)
+{
+    int mn = -1, mx = -1;
+    TEST_ASSERT_TRUE(rmTxRangeFromReply("status", "ok v=4.40a s=GtDMwL p=17/2/22", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    mn = mx = -1;
+    TEST_ASSERT_TRUE(rmTxRangeFromReply("radio", "ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    mn = mx = -1;
+    TEST_ASSERT_TRUE(rmTxRangeFromReply("txpower 1", "err range 2..22", &mn, &mx));
+    TEST_ASSERT_EQUAL_INT(2, mn);
+    TEST_ASSERT_EQUAL_INT(22, mx);
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("txpower 5", "ok txpower=5", &mn, &mx));
+
+    mn = mx = -1;
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("sens", "ok t=21.4 h=45 p=1013.2 t2=-", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("maxhop", "ok t=3 p=2", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("maxhop", "ok t=3 p=2/2/22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("sens", "ok p=1/2/3", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("status", "ok v=4.40a s=GtDMwL p=17/22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("statusx", "ok v=4.40a s=GtDMwL p=17/2/22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("radios", "ok f=433.175 p=10/2/22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("txpower 1", "err range 5..2", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply(nullptr, "err range 2..22", &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("txpower 1", nullptr, &mn, &mx));
+    TEST_ASSERT_FALSE(rmTxRangeFromReply("txpower 1", "err range 2..22", nullptr, &mx));
+    TEST_ASSERT_EQUAL_INT(-1, mn); // never written on a refusal
+    TEST_ASSERT_EQUAL_INT(-1, mx);
+}
+
 static void test_err_range_parse(void)
 {
     int mn = 0, mx = 0;
@@ -1197,6 +1229,7 @@ int main(int, char **)
     RUN_TEST(test_reply_too_soon_spacing_and_wrap);
     RUN_TEST(test_radio_p_token_parse);
     RUN_TEST(test_err_range_parse);
+    RUN_TEST(test_tx_range_from_reply_selection);
     RUN_TEST(test_tx_range_table_learn_get_evict);
     RUN_TEST(test_tx_power_send_clamp);
     RUN_TEST(test_proof_book_evicts_least_recently_used);

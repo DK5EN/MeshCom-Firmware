@@ -46,6 +46,11 @@ connect the node to the **real** MeshCom server. Therefore:
 - Every RM command in both directions, with write commands restored afterwards.
 - Junk frames, lockout, valid command while locked, unlock.
 - Plain DM and group `TEST` in both directions.
+- Phase `refused` (opt-in, LoRa only, run as `--phases guard,refused` without `setup`): reboots
+  DK5EN-1 (empty learnt range), sends `txpower 1` to the RAK (floor 2 dBm) and expects a verified
+  `err range 2..22`, the target marker `[RM];refused;ctr;<n>` and no lock; then the local refusal
+  (`/rmsend` 422, `"range":"2..22"`), a `radio` read with `p=<cur>/2/22` and `txpower 2` -> `ok
+txpower=2`. Every value sent is at most 2 dBm. Stock image is enough.
 - Analysis per frame: copies seen via RF and via the server, which came first, duplicates
   suppressed, mock DATA in and GATE out, foreign frames re-radiated, anomalies.
 

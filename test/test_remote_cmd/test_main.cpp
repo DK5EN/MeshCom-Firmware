@@ -1637,6 +1637,11 @@ static void test_status_vectors_parse(void)
                 TEST_ASSERT_EQUAL_INT(e, st.sw[j]);
             }
             TEST_ASSERT_TRUE(st.haveP);
+            std::string sp;
+            TEST_ASSERT_TRUE(jsonString(objs[i], "status_p", sp));
+            char pbuf[24];
+            snprintf(pbuf, sizeof(pbuf), "%d/%d/%d", st.cur, st.min, st.max);
+            TEST_ASSERT_EQUAL_STRING(sp.c_str(), pbuf);
             seen++;
         }
         TEST_ASSERT_NULL_MESSAGE(strstr(res.c_str(), " rm="), res.c_str()); // no reply carries a capability level

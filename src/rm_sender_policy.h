@@ -608,6 +608,45 @@ inline bool rmErrRangeParse(const char *res, int *mn, int *mx)
     return true;
 }
 
+// True when the sent command line "<cmd>[ <args>]" starts with the whole word `name`.
+inline bool rmSentCmdIs(const char *line, const char *name)
+{
+    if (line == nullptr || name == nullptr)
+        return false;
+    const size_t l = strlen(name);
+    return strncmp(line, name, l) == 0 && (line[l] == '\0' || line[l] == ' ');
+}
+
+// Which verified reply teaches the sender a target's txpower range: p=<cur>/<min>/<max> in the reply to `status`
+// or `radio`, "err range <min>..<max>" in the reply to `txpower`. Every other command (`sens`: p is pressure,
+// `maxhop`: p is hops, ...) is never read. Returns true with a valid range in *mn / *mx.
+inline bool rmTxRangeFromReply(const char *sentCmd, const char *result, int *mn, int *mx)
+{
+    if (sentCmd == nullptr || result == nullptr || mn == nullptr || mx == nullptr)
+        return false;
+    int a = 0, b = 0;
+    bool got = false;
+    if (rmSentCmdIs(sentCmd, "status"))
+    {
+        RmStatusInfo st;
+        if (rmStatusParse(result, st) && st.haveP)
+        {
+            a = st.min;
+            b = st.max;
+            got = true;
+        }
+    }
+    else if (rmSentCmdIs(sentCmd, "radio"))
+        got = rmRadioPParse(result, nullptr, &a, &b);
+    else if (rmSentCmdIs(sentCmd, "txpower"))
+        got = rmErrRangeParse(result, &a, &b);
+    if (!got || !rmTxRangeValid(a, b))
+        return false;
+    *mn = a;
+    *mx = b;
+    return true;
+}
+
 inline bool rmTxRangeGet(const RmTxRange *t, uint8_t n, const char *dst, int *mn, int *mx)
 {
     if (t == nullptr || dst == nullptr)
