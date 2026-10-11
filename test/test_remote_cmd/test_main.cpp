@@ -298,7 +298,24 @@ static RmCmd mk(uint32_t ctr, const char *cmd, const char *args = "", const char
 
 static RmCmd withBadTag(RmCmd c)
 {
+    // every call is a DIFFERENT wrong guess (tag[2..3] carry a call counter): identical frames count as one strike
+    static uint32_t guess = 0;
+    static const char hx[] = "0123456789abcdef";
+    guess++;
     c.tag[0] = (c.tag[0] == '0') ? '1' : '0';
+    c.tag[2] = hx[guess & 15u];
+    c.tag[3] = hx[(guess >> 4) & 15u];
+    return c;
+}
+
+// A further, different wrong guess derived from an already wrong frame (the same frame again is not a new strike).
+static RmCmd nextBad(RmCmd c)
+{
+    static uint32_t n = 0;
+    static const char hx[] = "0123456789abcdef";
+    n++;
+    c.tag[4] = hx[n & 15u];
+    c.tag[5] = hx[(n >> 4) & 15u];
     return c;
 }
 
@@ -601,6 +618,102 @@ static void test_same_ctr_and_tag_within_10_min_is_cached(void)
     TEST_ASSERT_EQUAL_STRING(a, b);
 }
 
+// RM1 repeats (wave 3): copies of one send reach the target 42 / 84 / 126 s later as ring frames with other msg_ids
+// but the same ctr + tag. The RM-DUP ring is not involved here (rmCheck keys on ctr + tag only).
+static void test_ladder_copies_are_cached_never_executed_twice(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd c = mk(9, "status");
+    const uint32_t t0 = 20000;
+    ASSERT_VERDICT(RM_OK, chk(s, c, t0));
+    rmAccept(s, c, "ok s=1", t0);
+    for (uint32_t k = 1; k <= 3; k++)
+    {
+        ASSERT_VERDICT(RM_CACHED, chk(s, c, t0 + k * 42000u));
+        TEST_ASSERT_EQUAL_UINT8(0, ent(s).rejCount);
+        TEST_ASSERT_EQUAL_UINT32(9, s.hwm);
+    }
+}
+
+static void test_ladder_copy_after_newer_ctr_is_replay_without_strike(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd c = mk(9, "status");
+    const uint32_t t0 = 20000;
+    ASSERT_VERDICT(RM_OK, chk(s, c, t0));
+    rmAccept(s, c, "ok s=1", t0);
+    RmCmd n = mk(10, "status");
+    ASSERT_VERDICT(RM_OK, chk(s, n, t0 + 20000));
+    rmAccept(s, n, "ok s=2", t0 + 20000);
+    ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, c, t0 + 42000u));
+    ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, c, t0 + 84000u));
+    TEST_ASSERT_EQUAL_UINT8(0, ent(s).rejCount);
+    TEST_ASSERT_EQUAL_UINT32(10, s.hwm);
+}
+
+// Same guess = one strike: a wrong frame repeated unchanged (ring copies of one RM1) counts once per window.
+static RmCmd wrongTag(RmCmd c, char k)
+{
+    c = withBadTag(c);
+    c.tag[1] = k; // distinct guesses: tag[0] is already wrong, tag[1] tells them apart
+    return c;
+}
+
+static void test_same_wrong_frame_four_times_is_one_strike(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    const RmCmd bad = wrongTag(mk(5, "status"), 'a');
+    for (uint32_t k = 0; k < 4; k++)
+    {
+        ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000 + k * 42000u));
+        TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+        TEST_ASSERT_FALSE(rmSenderLocked(s, SRC, 10000 + k * 42000u));
+    }
+}
+
+static void test_three_different_wrong_tags_still_lock(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, wrongTag(mk(5, "status"), 'a'), 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, wrongTag(mk(5, "status"), 'b'), 20000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, wrongTag(mk(5, "status"), 'c'), 30000));
+    TEST_ASSERT_TRUE(rmSenderLocked(s, SRC, 30001));
+}
+
+static void test_same_tag_other_ctr_counts(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd a = wrongTag(mk(5, "status"), 'a');
+    RmCmd b = a;
+    b.ctr = 6;
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, 20000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+}
+
+static void test_same_frame_after_the_window_counts(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    const RmCmd bad = wrongTag(mk(5, "status"), 'a');
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000 + RM_REJ_WINDOW_MS - 1));
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000 + RM_REJ_WINDOW_MS)); // new window, strike 1 again
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    TEST_ASSERT_EQUAL_UINT32(10000 + RM_REJ_WINDOW_MS, ent(s).rejWindowMs);
+    // and the repeat of the new window's frame is free again, a different guess counts
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000 + RM_REJ_WINDOW_MS + 5000));
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, wrongTag(mk(5, "status"), 'b'), 10000 + RM_REJ_WINDOW_MS + 6000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+}
+
 static void test_same_ctr_after_10_min_is_replay(void)
 {
     RmState s;
@@ -762,9 +875,9 @@ static void test_receiver_unlock_clears_lock_only(void)
     rmAccept(s, first, "ok", 1000); // gives hwm / lastCtr / lastReply / rate state real values
 
     const RmCmd bad = withBadTag(mk(2, "status"));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 12000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 13000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 14000)); // third reject arms the lockout
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 12000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 13000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 14000)); // third reject arms the lockout
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, mk(2, "status"), 15000));
     TEST_ASSERT_TRUE(ent(s).lockActive);
 
@@ -796,9 +909,9 @@ static void test_three_rejects_lock_out_for_5_minutes_then_recover(void)
     strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(1, "status"));
 
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 10000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 20000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 30000)); // third reject arms the lockout
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 20000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 30000)); // third reject arms the lockout
     TEST_ASSERT_TRUE(ent(s).lockActive);
 
     RmCmd good = mk(1, "status");
@@ -882,12 +995,12 @@ static void test_successful_commands_do_not_clear_the_reject_count(void)
     RmState s;
     strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(2, "status"));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 1000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 2000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 1000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 2000));
     RmCmd good = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, good, 3000));
     rmAccept(s, good, "ok", 3000);
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 4000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 4000));
     TEST_ASSERT_TRUE(ent(s).lockActive);
 }
 
@@ -1046,9 +1159,9 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
     strictInit(s, 0);
     const RmCmd bad = withBadTag(mk(1, "status"));
     const uint32_t r0 = 0xFFFFFF00u;
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, r0));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, r0 + 100));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, r0 + 200));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), r0));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), r0 + 100));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), r0 + 200));
     RmCmd good = mk(1, "status");
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, good, r0 + 250));
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, good, r0 + 200 + RM_LOCKOUT_MS - 1)); // past the wrap
@@ -1056,9 +1169,9 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
 
     // reject window across the wrap: 3 rejects 40 s apart straddling it
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u + 40000));
-    ASSERT_VERDICT(RM_REJ_TAG, chk(s, bad, 0xFFFFD000u + 80000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 0xFFFFD000u));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 0xFFFFD000u + 40000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, nextBad(bad), 0xFFFFD000u + 80000));
     TEST_ASSERT_TRUE(ent(s).lockActive);
 }
 
@@ -1897,12 +2010,12 @@ static void test_reject_table_odd_sender_strings(void)
     ASSERT_VERDICT(RM_REJ_FORMAT, rmCheck(s, c, DST, nullptr, PW, 0, 22, 1000u));
     TEST_ASSERT_TRUE(ent(s, "").used);
     TEST_ASSERT_EQUAL_UINT8(1, ent(s, "").rejCount);
-    rmCheck(s, c, DST, "", PW, 0, 22, 1100u);
+    rmCheck(s, nextBad(c), DST, "", PW, 0, 22, 1100u);
     TEST_ASSERT_EQUAL_UINT8(2, ent(s, "").rejCount);
-    rmCheck(s, c, DST, "DL1ABC-12", PW, 0, 22, 1200u);                   // 9 characters
+    rmCheck(s, nextBad(c), DST, "DL1ABC-12", PW, 0, 22, 1200u);                   // 9 characters
     TEST_ASSERT_TRUE(ent(s, "DL1ABC-12").used);
     TEST_ASSERT_EQUAL_STRING("DL1ABC-12", ent(s, "DL1ABC-12").call);
-    rmCheck(s, c, DST, "DL1ABC-123456789", PW, 0, 22, 1300u);            // too long: first 9 characters
+    rmCheck(s, nextBad(c), DST, "DL1ABC-123456789", PW, 0, 22, 1300u);            // too long: first 9 characters
     TEST_ASSERT_EQUAL_UINT8(2, ent(s, "DL1ABC-12").rejCount);
     uint8_t used = 0;
     for (const RmRejSrc &r : s.rej)
@@ -2197,6 +2310,79 @@ static void test_bad_tag_out_of_range_still_a_strike(void)
     TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
 }
 
+// Two guessers' frames interleave within the sender's unproven budget (2 sends, repeats at 0/42/84/126 s):
+// every copy of a frame already struck with inside the window is free, whichever strike it was.
+static void test_interleaved_wrong_frames_and_their_copies_are_two_strikes(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    const RmCmd a = wrongTag(mk(5, "status"), 'a');
+    const RmCmd b = wrongTag(mk(6, "status"), 'b');
+    const uint32_t t0 = 10000;
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, t0));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, t0 + 10000u));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, t0 + 42000u));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, t0 + 52000u));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, t0 + 84000u));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+    TEST_ASSERT_FALSE(rmSenderLocked(s, SRC, t0 + 84001u));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, wrongTag(mk(7, "status"), 'c'), t0 + 85000u)); // a third guess locks
+    TEST_ASSERT_TRUE(rmSenderLocked(s, SRC, t0 + 85001u));
+}
+
+// The tag covers ctr, cmd and args: ctr + tag held fixed while cmd or args vary is a new HMAC guess each time.
+static void test_same_ctr_and_tag_other_args_counts(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd a = wrongTag(mk(5, "txpower", "1"), 'a');
+    RmCmd b = a;
+    snprintf(b.args, sizeof(b.args), "%s", "2");
+    RmCmd c = a;
+    snprintf(c.args, sizeof(c.args), "%s", "3");
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, 20000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, 30000)); // the variants themselves are free again
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, 40000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, c, 50000)); // third distinct variant inside 90 s
+    TEST_ASSERT_TRUE(rmSenderLocked(s, SRC, 50001));
+}
+
+static void test_same_ctr_and_tag_other_cmd_counts(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd a = wrongTag(mk(5, "status"), 'a');
+    RmCmd b = a;
+    snprintf(b.cmd, sizeof(b.cmd), "%s", "gps");
+    RmCmd c = a;
+    snprintf(c.cmd, sizeof(c.cmd), "%s", "info");
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, a, 10000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, b, 20000));
+    ASSERT_VERDICT(RM_REJ_TAG, chk(s, c, 30000));
+    TEST_ASSERT_TRUE(rmSenderLocked(s, SRC, 30001));
+}
+
+// FORMAT rejects may carry unterminated cmd / args / tag fields: the frame identity is read bounded by the field sizes.
+static void test_unterminated_fields_are_hashed_bounded(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    RmCmd c;
+    memset(&c, 'a', sizeof(c)); // no NUL anywhere
+    c.ctr = 3;
+    ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, c, 10000));
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, c, 20000)); // identical: same guess
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    c.args[RM_MAX_ARGS - 1] = 'b'; // a different frame
+    ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, c, 30000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+}
+
 static void test_refused_consumes_the_counter(void)
 {
     RmState s;
@@ -2313,6 +2499,16 @@ int main(int, char **)
     RUN_TEST(test_refused_below_floor_names_the_range);
     RUN_TEST(test_refused_blocked_text);
     RUN_TEST(test_bad_tag_out_of_range_still_a_strike);
+    RUN_TEST(test_ladder_copies_are_cached_never_executed_twice);
+    RUN_TEST(test_ladder_copy_after_newer_ctr_is_replay_without_strike);
+    RUN_TEST(test_same_wrong_frame_four_times_is_one_strike);
+    RUN_TEST(test_three_different_wrong_tags_still_lock);
+    RUN_TEST(test_same_tag_other_ctr_counts);
+    RUN_TEST(test_same_frame_after_the_window_counts);
+    RUN_TEST(test_interleaved_wrong_frames_and_their_copies_are_two_strikes);
+    RUN_TEST(test_same_ctr_and_tag_other_args_counts);
+    RUN_TEST(test_same_ctr_and_tag_other_cmd_counts);
+    RUN_TEST(test_unterminated_fields_are_hashed_bounded);
     RUN_TEST(test_refused_consumes_the_counter);
     RUN_TEST(test_refused_is_rate_and_replay_gated);
     return UNITY_END();

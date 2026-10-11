@@ -53,6 +53,8 @@ RINGDROP = re.compile(r"^\[MC-DBG\]\s+RING_DROP_(?P<k>NEW|PRIO|STALE)\s+slot=\d+
 TXLOG = re.compile(r"^\[LOG\]\s+TX\s+x(?P<id>[0-9A-F]{8})\s+:?\s*H\w+\s+prio=(?P<prio>\d)\s+src=(?P<src>\S)\s+wait=(?P<wait>\d+)\s+q=(?P<q>\d+)")
 GWU = re.compile(r"^\[LOG\]\s+(?P<k>GWU|RLY)\s+x(?P<id>[0-9A-F]{8})")
 RM_OK = re.compile(r"^\[RM\];(?P<v>ok|fail|cached|sync);ctr;(?P<ctr>\d+)(?P<sfx>;suppressed)?")
+RM_STOP = re.compile(r"^\[RM\];stop;ctr;(?P<ctr>\d+)(?:;slot;(?P<slot>\d+))?")
+PNRETRY = re.compile(r"^\[RETX\]\s+(?:PNRETRY|RM1RETRY)\s+k=(?P<k>\d+)\s+msg-id:(?P<id>[0-9A-F]{8})")
 RM_REJ = re.compile(r"^\[RM\];reject;(?P<why>\w+)")
 RM_SEND = re.compile(r"^\[RM\];send;(?P<dst>[^;]+);ctr;(?P<ctr>\d+)")
 RM_REPLY = re.compile(r"^\[RM\];reply;(?P<dst>[^;]+);ctr;(?P<ctr>\d+);verified;(?P<v>\d)")
@@ -190,6 +192,12 @@ def classify(rest: str, t: float, seq: int, node: str) -> Optional[Ev]:
     m = RM_SENDFAIL.match(rest)
     if m:
         return Ev(t, seq, node, "rm", raw=rest, k="reply_send_failed", extra={"rc": int(m.group("rc"))})
+    m = RM_STOP.match(rest)
+    if m:
+        return Ev(t, seq, node, "rm", raw=rest, k="stop", ctr=int(m.group("ctr")))
+    m = PNRETRY.match(rest)
+    if m:
+        return Ev(t, seq, node, "pnretry", raw=rest, msgid=m.group("id"), k=m.group("k"))
     m = RM_OK.match(rest)
     if m:
         v = m.group("v") + ("_suppressed" if m.group("sfx") else "")
@@ -362,6 +370,9 @@ class Run:
             if e.kind == "rm_send" and e.dest == target and t_send - 2 <= e.t <= t_send + 6:
                 return e
         return None
+
+    def repeat_cases(self) -> List[Tuple[int, Dict[str, Any]]]:
+        return [(i, e) for i, e in enumerate(self.events) if str(e.get("case", "")).startswith("repeat:") and "t_send" in e]
 
     def rm_cases(self) -> List[Tuple[int, Dict[str, Any]]]:
         return [(i, e) for i, e in enumerate(self.events) if str(e.get("case", "")).startswith("rm:") and "t_send" in e]
@@ -734,7 +745,176 @@ def trace(run: Run, pat: str, tail: float) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- main report
-def report(d: str, tail: float) -> None:
+# ---------------------------------------------------------------------------------------------------- per-command repeat / late-copy audit
+LADDER_S = 260.0  # s after t_send in which counters, verified rows and repeats of one command are looked for
+
+
+def core_id(mid: str) -> int:
+    """pnRetryCore: msg id without the retry-variant bits 10-11."""
+    return int(mid, 16) & ~0xC00 & 0xFFFFFFFF
+
+
+@dataclass
+class CmdAudit:
+    case: str
+    dirs: str
+    ctr: int
+    lat: Optional[float]
+    win: str = "-"  # path of the first reply copy at the sender: rf | srv
+    cmd_late: List[str] = field(default_factory=list)
+    rep_late: List[str] = field(default_factory=list)
+    repeats: int = 0
+    execs: int = 0
+    cached: int = 0
+    strikes: List[str] = field(default_factory=list)
+    verified_rows: int = 0
+    stop_t: Optional[float] = None
+    stop_src: str = "-"
+    stray: List[str] = field(default_factory=list)
+    fails: List[str] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
+
+
+def audit_case(run: Run, idx: int, e: Dict[str, Any], tail: float) -> Optional[CmdAudit]:
+    r = analyze_case(run, idx, e, tail)
+    if r is None or r.ctr < 0:
+        return None
+    src, dst = side(e["dir"])
+    ts = e["t_send"]
+    hi = ts + LADDER_S
+    nxt = min([x["t_send"] for x in run.events if "t_send" in x and x["t_send"] > ts + 1] + [hi])
+    a = CmdAudit(e["case"], e["dir"], r.ctr, None)
+    ver = sorted((v for v in run.logs[src] if v.kind == "rm_reply" and v.ctr == r.ctr and v.dest == dst and ts - 2 <= v.t <= hi), key=lambda v: v.seq)
+    good = [v for v in ver if v.k == "1"]
+    a.verified_rows = len(good)
+    v0 = good[0] if good else None
+    a.lat = (v0.t - ts) if v0 else (e.get("lat") if e.get("result") in ("ok", "err") else None)
+    if len(good) > 1:
+        a.fails.append("second verified row (%d rows for ctr %d)" % (len(good), r.ctr))
+    # target side: executions, cache answers, strikes
+    for x in run.logs[dst]:
+        if x.kind != "rm" or not (ts - 2 <= x.t <= hi):
+            continue
+        if x.k in ("ok", "fail") and x.ctr == r.ctr:
+            a.execs += 1
+        elif x.k == "cached" and x.ctr == r.ctr:
+            a.cached += 1
+        elif x.k.startswith("reject_") and x.k not in ("reject_replay", "reject_rate") and x.t < nxt:
+            a.strikes.append("%s@+%ds" % (x.k[7:], round(x.t - ts)))
+    if a.execs > 1:
+        a.fails.append("second execution at the target (%d x [RM];ok|fail;ctr;%d)" % (a.execs, r.ctr))
+    if a.strikes:
+        a.fails.append("strike after the command: " + ",".join(a.strikes))
+    # reply copies at the sender: winning path, late ones (log order after the verifying copy)
+    reps = sorted((c for c in run.copies[src] if c.reply and c.ctr == r.ctr and c.ev.origin == dst and ts - 2 <= c.ev.t <= hi), key=lambda c: c.ev.seq)
+    if reps:
+        a.win = reps[0].via
+    if v0 is not None:
+        for c in reps:
+            if c.ev.seq > v0.seq:
+                a.rep_late.append("%s@+%ds" % (c.via, round(c.ev.t - ts)))
+    # command copies at the target (any retry variant of the frame): late = after the sender verified
+    ids = set()
+    for x in run.logs[src]:
+        if x.kind in ("new", "udp_tx", "rf_tx") and x.dest == dst and x.typ == ":" and ts - 2 <= x.t <= ts + 12:
+            m0 = RMTEXT.match(x.text)
+            if m0 and int(m0.group("ctr")) == r.ctr:
+                ids.add(core_id(x.msgid))
+    if v0 is not None:
+        for c in run.copies[dst]:
+            if not c.reply and c.ctr == r.ctr and ts - 2 <= c.ev.t <= hi and c.ev.t > v0.t and (not ids or core_id(c.ev.msgid) in ids):
+                a.cmd_late.append("%s@+%ds%s" % (c.via, round(c.ev.t - ts), "(%s)" % (c.verdict or ("dup" if c.dup else "?"))))
+    # repeats sent: distinct msg ids with equal core, plus PNRETRY lines
+    sent: Dict[str, float] = {}
+    for x in run.logs[src]:
+        if not (ts - 2 <= x.t <= hi) or x.msgid == "":
+            continue
+        if x.kind in ("new", "udp_tx", "rf_tx"):
+            m = RMTEXT.match(x.text)
+            if m and int(m.group("ctr")) == r.ctr and x.dest == dst:
+                sent.setdefault(x.msgid, x.t)
+        elif x.kind == "pnretry" and core_id(x.msgid) in ids:
+            sent.setdefault(x.msgid, x.t)
+    a.repeats = max(0, len(sent) - 1)
+    # stop: explicit marker, else the verifying reply
+    stop = [x for x in run.logs[src] if x.kind == "rm" and x.k == "stop" and x.ctr == r.ctr and ts - 2 <= x.t <= hi]
+    stop_ev = None
+    if stop:
+        stop_ev = stop[0]
+        a.stop_t, a.stop_src = stop_ev.t, "marker"
+    elif v0 is not None:
+        stop_ev = v0
+        a.stop_t, a.stop_src = v0.t, "verified"
+    if stop_ev is not None:
+        # Stray rule: a repeat ENQUEUED after the stop (its `[RETX] RM1RETRY|PNRETRY` line follows the stop in the sender log) is a FAIL.
+        # A copy already queued (RETX line before the stop) may still go out ONCE after it (READY/CSMA/on air at the stop): allowed,
+        # noted; a second TX after the stop is a FAIL. Order is the log order (seq), not the second-resolution timestamp.
+        first = min(sent, key=sent.get) if sent else ""
+        enq = {x.msgid: x for x in run.logs[src] if x.kind == "pnretry" and x.msgid in sent and ts - 2 <= x.t <= hi}
+        inflight: List[str] = []
+        for x in run.logs[src]:
+            if x.seq <= stop_ev.seq or x.t > hi or not x.msgid or x.msgid not in sent or x.msgid == first:
+                continue
+            if x.kind == "pnretry":
+                a.stray.append("enqueued %s@+%ds" % (x.msgid, round(x.t - ts)))
+            elif x.kind in ("udp_tx", "rf_tx"):
+                q = enq.get(x.msgid)
+                if q is not None and q.seq > stop_ev.seq:
+                    continue  # its enqueue is already counted as stray
+                inflight.append("%s %s@+%ds" % (x.kind, x.msgid, round(x.t - ts)))
+        if a.stray:
+            a.fails.append("stray repeat after the stop (%s): %s" % (a.stop_src, ", ".join(a.stray)))
+        if len(inflight) > 1:
+            a.stray.extend(inflight)
+            a.fails.append("stray repeat after the stop (%s): %d copies sent after it (one in-flight copy is allowed): %s" % (a.stop_src, len(inflight), ", ".join(inflight)))
+        elif inflight:
+            a.notes.append("one in-flight copy sent after the stop (queued before it, allowed): " + inflight[0])
+    # scenario expectations (repeat cases)
+    ex = e.get("expect") or {}
+    if "exec" in ex and a.execs != ex["exec"]:
+        a.fails.append("expected %d execution(s), saw %d" % (ex["exec"], a.execs))
+    if "min_repeats" in ex and a.repeats < ex["min_repeats"]:
+        a.fails.append("expected >= %d repeat(s), saw %d" % (ex["min_repeats"], a.repeats))
+    if "min_cached" in ex and a.cached < ex["min_cached"]:
+        a.fails.append("expected >= %d [RM];cached, saw %d%s" % (ex["min_cached"], a.cached, " (reply beat airgap-on: rerun)" if e.get("reply_beat_airgap") else ""))
+    if "max_cached" in ex and a.cached > ex["max_cached"]:
+        a.fails.append("expected <= %d [RM];cached (copy after the stop?), saw %d" % (ex["max_cached"], a.cached))
+    if e.get("case", "").startswith("repeat:") and not good:
+        a.fails.append("no verified reply (result %s)" % e.get("result"))
+    if e.get("case", "").startswith("repeat:") and not any(x.kind == "pnretry" for x in run.logs[src]):
+        a.notes.append("no [RETX] PNRETRY|RM1RETRY lines (--setretx on missing?); repeats counted from TX lines only")
+    return a
+
+
+def table_audit(run: Run, tail: float) -> int:
+    rows: List[CmdAudit] = []
+    for i, e in run.rm_cases() + run.repeat_cases():
+        a = audit_case(run, i, e, tail)
+        if a is not None:
+            rows.append(a)
+    print("\n== RM command audit (latency measured only, no threshold; win = path of the first reply copy at the sender)")
+    print("%-26s %-5s %5s %6s %-4s %4s %4s %4s %4s %5s %5s %4s" % ("case", "dir", "ctr", "lat_s", "win", "reps", "exec", "cach", "verf", "lateC", "lateR", "strk"))
+    for a in rows:
+        print("%-26s %-5s %5d %6s %-4s %4d %4d %4d %4d %5d %5d %4d" % (a.case[:26], a.dirs, a.ctr, f1(a.lat, 6).strip(), a.win, a.repeats, a.execs, a.cached,
+                                                                     a.verified_rows, len(a.cmd_late), len(a.rep_late), len(a.strikes)))
+    for a in rows:
+        if a.cmd_late or a.rep_late:
+            print("  late copies %s %s ctr %d: command [%s] reply [%s]" % (a.case, a.dirs, a.ctr, " ".join(a.cmd_late), " ".join(a.rep_late)))
+        for n in a.notes:
+            print("  note %s %s: %s" % (a.case, a.dirs, n))
+    fails = 0
+    for a in rows:
+        for f in a.fails:
+            fails += 1
+            print("FAIL %s %s ctr %d: %s" % (a.case, a.dirs, a.ctr, f))
+    lats = [a.lat for a in rows if a.lat is not None]
+    if lats:
+        print("latency (verified reply - /rmsend): n=%d median %.1f s max %.1f s" % (len(lats), statistics.median(lats), max(lats)))
+    print("audit: %d command(s), %d FAIL" % (len(rows), fails))
+    return fails
+
+
+def report(d: str, tail: float) -> int:
     run = Run(d)
     print("run %s  (log times are local, 1 s resolution; mock times use mock.log start + udp-log offset)" % d)
     print("\n== RM cases (rf/srv = copies at the receiver in [t_send-2, t_send+lat+%.0f]; late = copies after the window)" % tail)
@@ -744,6 +924,7 @@ def report(d: str, tail: float) -> None:
     table_plain(run)
     table_foreign(run)
     table_anom(run)
+    return table_audit(run, tail)
 
 
 # ---------------------------------------------------------------------------------------------------- selftest
@@ -865,8 +1046,7 @@ def main() -> int:
     if a.trace:
         trace(Run(a.run_dir), a.trace, a.tail)
         return 0
-    report(a.run_dir, a.tail)
-    return 0
+    return 1 if report(a.run_dir, a.tail) else 0
 
 
 if __name__ == "__main__":

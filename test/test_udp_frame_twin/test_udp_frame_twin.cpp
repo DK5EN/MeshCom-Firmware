@@ -210,7 +210,7 @@ static std::vector<ExternAckCall> g_extern_ack;
 static std::vector<uint32_t> g_own_tx_known;
 static std::vector<uint32_t> g_insert_calls;
 
-// findAndStopRingSlot() (src/lora_functions.h/.cpp): a server-ack for an id
+// findAndStopRingSlotNoRm1() (src/lora_functions.h/.cpp; skips RM1 command slots): a server-ack for an id
 // checkOwnTx() knows also stops the waiting TX-ring slot (PN retry, see the
 // call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp). lora_functions.cpp
 // is not in this env's build_src_filter, so faked here exactly like
@@ -219,7 +219,7 @@ static std::vector<uint32_t> g_insert_calls;
 // (no ring slot found) like the real function on a cold/empty ring.
 static std::vector<uint32_t> g_ring_stop_calls;
 
-int findAndStopRingSlot(uint32_t msgId)
+int findAndStopRingSlotNoRm1(uint32_t msgId)
 {
     g_ring_stop_calls.push_back(msgId);
     return -1;
@@ -1672,7 +1672,7 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
 // PN retry (dk5en-xor, replaces the removed stage 1 DM outbox): a DM's ack
 // arriving over the SERVER/UDP ingress must stop the waiting TX-ring slot
 // too, exactly when checkOwnTx() recognizes the acked id as one of our own --
-// findAndStopRingSlot(msg_counter) and stoHolderClear(msg_counter) at the
+// findAndStopRingSlotNoRm1(msg_counter) and stoHolderClear(msg_counter) at the
 // call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp. This replaces
 // test_regression_server_ack_stops_outbox_ladder_on_both (the stage 1 outbox
 // it exercised is gone); the own-DM branch of the server-ack path was
@@ -1713,7 +1713,7 @@ static void test_regression_server_ack_own_dm_stops_ring_on_both(void)
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ring_stop_calls.size(), msg);
         if (g_ring_stop_calls.size() >= 1)
         {
-            snprintf(msg, sizeof(msg), "%s findAndStopRingSlot() got the wrong msg id", name);
+            snprintf(msg, sizeof(msg), "%s findAndStopRingSlotNoRm1() got the wrong msg id", name);
             TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_ring_stop_calls[0], msg);
         }
 

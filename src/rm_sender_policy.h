@@ -7,7 +7,7 @@
 //     is SILENT on air and counts toward the target's lockout of THIS sender's call (3 within 90 s =
 //     5 min locked, per sender; the
 //     sender can not see any of it). So the sender allows at most N unanswered sends to one target
-//     inside RM_POLICY_WINDOW_MS (150 s = 90 s reject window + 30 s path delay + 30 s margin) and
+//     inside RM_POLICY_WINDOW_MS (RM_POLICY_WINDOW_MS = ladder 126 s + 90 s reject window + 30 s path delay + 30 s margin) and
 //     spaces sends to one target by 10 s (the target rate limits to one per 10 s). N is 2 until a
 //     reply under the current key verified; then N is 10 (the target does not count authenticated
 //     replays toward its lockout). After a re-key (key fingerprint changed) the proof is gone and
@@ -29,13 +29,24 @@
 
 // ---- constants (RM_POLICY_COOLDOWN_MS must equal RM_RATE_MS of remote_cmd.h; rm_runtime.cpp asserts it)
 #define RM_POLICY_COOLDOWN_MS 10000u   // minimum spacing of two sends to one target
-#define RM_POLICY_WINDOW_MS 150000u    // window of the unanswered-send budget = target reject window 90 s + 30 s path delay
-                                       // + 30 s margin for TX-queue latency (equal windows leak at the edge: path delay
-                                       // jitter, verdict finding 4; a 120 s window still leaked at 30 s delay, D2)
+// RM1 repeats (wave 3): one send = copy 1 at 0 s plus RM_REPEAT_COPIES-1 ring repeats on the PN ladder
+// (0x15 ticks of 2 s = 42 s, lora_functions.cpp). All copies carry the same ctr and tag, so they are ONE send in the
+// budget and the sent book; the reply to the last copy can still be in flight RM_REPLY_ALLOWANCE_MS after it.
+#define RM_REPEAT_COPIES 4u            // copy 1 + 3 repeats (MAX_RETRANSMIT 3)
+#define RM_REPEAT_GAP_MS 42000u        // ladder step: 0x15 ticks x 2 s
+#define RM_REPEAT_LAST_MS ((RM_REPEAT_COPIES - 1u) * RM_REPEAT_GAP_MS)   // last copy leaves 126 s after the send
+#define RM_REPLY_ALLOWANCE_MS 45000u   // reply allowance after the last copy (the old single-copy order: ~75 s - 30 s)
+#define RM_POLICY_WINDOW_MS (RM_REPEAT_LAST_MS + 150000u)
+                                       // window of the unanswered-send budget = last copy 126 s + (target reject window
+                                       // 90 s + 30 s path delay + 30 s margin for TX-queue latency; equal windows leak at
+                                       // the edge: path delay jitter, verdict finding 4; a 120 s window still leaked at
+                                       // 30 s delay, D2) = 276 s, so a send is counted until its LAST copy has aged out
 #define RM_POLICY_MAX_UNANSWERED 2u    // budget while the key is UNPROVEN: a 3rd unanswered send would be the target's 3rd strike
 #define RM_POLICY_LIMIT_UNPROVEN RM_POLICY_MAX_UNANSWERED
 #define RM_POLICY_LIMIT_PROVEN 10u     // budget once a reply under the current key fingerprint verified
-#define RM_NOANSWER_MS 75000u          // no reply for this long: "no answer"
+#define RM_NOANSWER_MS (RM_REPEAT_LAST_MS + RM_REPLY_ALLOWANCE_MS)   // 171 s: end of the ladder + reply allowance = "no answer"
+static_assert(RM_NOANSWER_MS >= RM_REPEAT_LAST_MS + RM_REPLY_ALLOWANCE_MS, "no answer is declared only after the last copy had its chance");
+static_assert(RM_POLICY_WINDOW_MS >= RM_NOANSWER_MS + 60000u, "the unanswered-send budget must outlive the no-answer verdict by the path delay + margin (60 s), else a send leaves the budget before it is declared unanswered");
 #define RM_QUEUED_MS 3000u             // first seconds after the send: still in the local TX queue
 #define RM_POLICY_MAX_ENTRIES 12u      // entries per target the policy looks at (= the sent book, kSentN)
 static_assert(RM_POLICY_MAX_ENTRIES >= RM_POLICY_LIMIT_PROVEN + 2, "book covers the proven budget plus answered entries");
@@ -291,6 +302,36 @@ inline RmPendAction rmPendingDecide(bool syncVerified, bool syncReplied, bool sy
     if (syncVerified)
         return sinceVerifiedMs >= RM_PEND_SEND_DELAY_MS ? RM_PEND_SEND : RM_PEND_WAIT;
     return ageMs >= RM_NOANSWER_MS ? RM_PEND_DROP : RM_PEND_WAIT;
+}
+
+// ---- RM1 repeats: reply matching and copy cancel (wave 3) -----------------------------------------------
+// A reply may be booked against a sent entry only while the entry still holds its key, is not verified yet and
+// ctr and target match. A second reply for the same ctr (RF and server path, or the cached reply to a later copy)
+// finds the entry verified (key wiped) and matches nothing: no second verification, no second count, no second row.
+inline bool rmReplyMatchesEntry(bool keyLive, bool verified, bool ctrEq, bool dstEq)
+{
+    return keyLive && !verified && ctrEq && dstEq;
+}
+
+// The ring copies of one send are stopped through the ORIGINAL msg_id, exactly once (verified reply, forget of the
+// target, key expiry, eviction from the book). take() hands the id out the first time only.
+struct RmCopyCancel
+{
+    uint32_t msgId;
+    bool live;
+};
+inline void rmCopyCancelArm(RmCopyCancel &c, uint32_t msgId)
+{
+    c.msgId = msgId;
+    c.live = true;
+}
+inline bool rmCopyCancelTake(RmCopyCancel &c, uint32_t *msgId)
+{
+    if (!c.live)
+        return false;
+    c.live = false;
+    *msgId = c.msgId;
+    return true;
 }
 
 // ---- reply text helpers ------------------------------------------------------------------------------

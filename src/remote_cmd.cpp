@@ -282,24 +282,63 @@ RmRejSrc *rejSlot(RmState &s, const char *src, uint32_t now)
     return r;
 }
 
-RmVerdict reject(RmState &s, const char *src, RmVerdict v, uint32_t now)
+// FNV-1a over "cmd args". Both fields are read bounded by their size, so an unterminated field (a FORMAT reject)
+// is safe.
+uint32_t cmdArgsHash(const RmCmd &c)
+{
+    uint32_t h = 2166136261u;
+    const size_t nc = strnlen(c.cmd, sizeof(c.cmd));
+    const size_t na = strnlen(c.args, sizeof(c.args));
+    for (size_t i = 0; i < nc; i++)
+        h = (h ^ (uint8_t)c.cmd[i]) * 16777619u;
+    h = (h ^ (uint8_t)' ') * 16777619u;
+    for (size_t i = 0; i < na; i++)
+        h = (h ^ (uint8_t)c.args[i]) * 16777619u;
+    return h;
+}
+
+// "Same guess = one strike": a counted reject whose frame (ctr + 16 tag chars + hash of "cmd args") equals one of
+// the frames that sender already struck with in the current window (RmRejSrc::frame) adds no strike (ring copies /
+// repeats of one command are one guess; a key guesser gains nothing from repeating a frame). A different ctr, tag,
+// cmd or args counts as before.
+RmVerdict reject(RmState &s, const char *src, RmVerdict v, uint32_t now, const RmCmd &c)
 {
     // BF-01: without strict security nothing is punished. The caller still gets the verdict (and counts it
     // in its own statistics), but no strike is recorded and no lock can arm.
     if (!s.strict)
         return v;
     RmRejSrc *r = rejSlot(s, src, now);
-    if (r->rejCount == 0 || (uint32_t)(now - r->rejWindowMs) >= RM_REJ_WINDOW_MS)
+    RmRejFrame f;
+    memset(&f, 0, sizeof(f));
+    f.ctr = c.ctr;
+    f.cmdArgsHash = cmdArgsHash(c);
+    memcpy(f.tag, c.tag, strnlen(c.tag, sizeof(f.tag))); // safe for a tag field that is not NUL-terminated
+    const bool windowOpen = r->rejCount != 0 && (uint32_t)(now - r->rejWindowMs) < RM_REJ_WINDOW_MS;
+    if (windowOpen)
+        for (uint8_t i = 0; i < r->nFrames; i++)
+            if (r->frame[i].ctr == f.ctr && r->frame[i].cmdArgsHash == f.cmdArgsHash &&
+                memcmp(r->frame[i].tag, f.tag, sizeof(f.tag)) == 0)
+                return v;
+    if (!windowOpen)
     {
         r->rejCount = 1;
         r->rejWindowMs = now;
+        r->nFrames = 0;
+        r->nextFrame = 0;
     }
     else if (r->rejCount < 255)
         r->rejCount++;
     r->lastMs = now;
+    r->frame[r->nextFrame] = f;
+    r->nextFrame = (uint8_t)((r->nextFrame + 1) % RM_REJ_FRAMES);
+    if (r->nFrames < RM_REJ_FRAMES)
+        r->nFrames++;
 
     if (r->rejCount >= RM_REJ_LIMIT)
     {
+        r->nFrames = 0;
+        r->nextFrame = 0;
+        memset(r->frame, 0, sizeof(r->frame));
         r->lockActive = true;
         r->lockUntilMs = now + RM_LOCKOUT_MS;
         r->rejCount = 0;
@@ -565,19 +604,19 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 
     if (dst == nullptr || src == nullptr || c.tag[16] != '\0' || c.cmd[sizeof(c.cmd) - 1] != '\0' ||
         c.args[sizeof(c.args) - 1] != '\0')
-        return reject(s, src, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
 
     const bool isSync = strcmp(c.cmd, "sync") == 0;
     if ((c.ctr == 0) != isSync)
-        return reject(s, src, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
 
     char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
     if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
-        return reject(s, src, RM_REJ_FORMAT, nowMs);
+        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
     char want[17];
     tagOf(passwd, canon, want);
     if (!tagEqual(want, c.tag))
-        return reject(s, src, RM_REJ_TAG, nowMs);
+        return reject(s, src, RM_REJ_TAG, nowMs, c);
 
     if (!isSync)
     {
@@ -602,7 +641,7 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
         // a sync carries no arguments; with a valid tag but args it is a malformed frame, not an answerable
         // command (no counter to consume), so it stays a strike
         if (!allowed(c, minTxPower, maxTxPower))
-            return reject(s, src, RM_REJ_BLOCKED, nowMs);
+            return reject(s, src, RM_REJ_BLOCKED, nowMs, c);
         if (s.strict && s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
             return RM_REJ_RATE;
         s.lastSyncMs = nowMs;

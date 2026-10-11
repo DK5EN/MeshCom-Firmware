@@ -100,10 +100,9 @@ static void test_rm1_frame_is_no_ack_no_retry(void)
     // Kommando und Antwort: beide Frames gehen einmalig raus.
     TEST_ASSERT_TRUE(dmTextIsRm1Frame("RM1 17 status 0123456789abcdef"));
     TEST_ASSERT_TRUE(dmTextIsRm1Frame("RM1 17 ok rebooting 0123456789abcdef"));
-    TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef", true));
+    // Nur die Antwort ist send-once; das Kommando wiederholt wie eine PN.
+    TEST_ASSERT_FALSE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef", true));
     TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 ok rebooting 0123456789abcdef", true));
-    // Mit dem (aelteren Sendern angehaengten) {NNN-Suffix gilt es ebenso.
-    TEST_ASSERT_TRUE(dmTextNoRetransmit("RM1 17 status 0123456789abcdef{042", true));
 }
 
 static void test_rm1_prefix_is_exact(void)
@@ -115,6 +114,7 @@ static void test_rm1_prefix_is_exact(void)
     {
         TEST_ASSERT_FALSE_MESSAGE(dmTextIsRm1Frame(no[i]), no[i]);
         TEST_ASSERT_FALSE_MESSAGE(dmTextNoRetransmit(no[i], true), no[i]);
+        TEST_ASSERT_FALSE_MESSAGE(dmTextIsRm1Command(no[i]), no[i]);
     }
     TEST_ASSERT_FALSE(dmTextIsRm1Frame(NULL));
     TEST_ASSERT_FALSE(dmTextNoRetransmit(NULL, true));
@@ -157,7 +157,25 @@ static void test_send_once_covers_ping_tags_and_rm1(void)
         TEST_ASSERT_TRUE_MESSAGE(dmTextSendOnce(tags[i], true), tags[i]);
         TEST_ASSERT_TRUE_MESSAGE(dmTextSendOnce(tags[i], false), tags[i]);
     }
-    TEST_ASSERT_TRUE(dmTextSendOnce("RM1 17 status 0123456789abcdef", true));
+    // RM1 REPLY is send-once; an RM1 COMMAND repeats like a PN (wave 3a).
+    TEST_ASSERT_TRUE(dmTextSendOnce("RM1 17 ok rebooting 0123456789abcdef", true));
+    TEST_ASSERT_TRUE(dmTextSendOnce("RM1 17 err denied 0123456789abcdef", true));
+    TEST_ASSERT_FALSE(dmTextSendOnce("RM1 17 status 0123456789abcdef", true));
+    TEST_ASSERT_FALSE(dmTextSendOnce("RM1 7 reboot 0123456789abcdef", true));
+}
+
+static void test_rm1_reply_vs_command(void)
+{
+    TEST_ASSERT_TRUE(dmTextIsRm1Reply("RM1 5 ok x 0123456789abcdef"));
+    TEST_ASSERT_TRUE(dmTextIsRm1Reply("RM1 5 err x 0123456789abcdef"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Reply("RM1 5 status 0123456789abcdef"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Reply("RM1 ok x"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Reply("RM1 5ok x"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Reply(NULL));
+    TEST_ASSERT_TRUE(dmTextIsRm1Command("RM1 5 status 0123456789abcdef"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Command("RM1 5 ok x 0123456789abcdef"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Command("Hallo"));
+    TEST_ASSERT_FALSE(dmTextIsRm1Command(NULL));
 }
 
 static void test_send_once_excludes_retry_texts(void)
@@ -191,6 +209,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_rm1_prefix_is_exact);
     RUN_TEST(test_no_retransmit_class_keeps_cet_mcp_set);
     RUN_TEST(test_mcp_lowercase_wire_form_is_no_retransmit);
+    RUN_TEST(test_rm1_reply_vs_command);
     RUN_TEST(test_send_once_covers_ping_tags_and_rm1);
     RUN_TEST(test_send_once_excludes_retry_texts);
     return UNITY_END();

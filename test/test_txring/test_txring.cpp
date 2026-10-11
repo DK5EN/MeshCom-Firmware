@@ -331,6 +331,19 @@ static void test_rm1_dm_once_wird_critical_und_done(void)
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
 }
 
+// Wave 3a: an RM1 COMMAND is enqueued like a PN (status 0x00): own-DM priority
+// CRITICAL, not DONE, so the retransmit ladder picks it up.
+static void test_rm1_command_status0_wird_critical_und_nicht_done(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-92", "RM1 17 status 0123456789abcdef");
+
+    int slot = addTxRingEntry(f.bytes, f.len, 0x00, "user_msg", 0);
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_TRUE(ringBuffer[slot][1] != RING_STATUS_DONE);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+}
+
 // Falle pinnen (Vorher-Verhalten von sendMessage()): derselbe RM1-Frame mit
 // VORAB gesetztem Status DONE gilt als Relay (NORMAL, 4500 ms Backoff) und
 // kollidiert mit den Relays der Nachbarn. Spiegel von "t2b_plain" oben.
@@ -1561,6 +1574,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done);
     RUN_TEST(test_rm1_dm_once_wird_critical_und_done);
     RUN_TEST(test_rm1_dm_mit_status_done_vorab_ist_relay_klasse);
+    RUN_TEST(test_rm1_command_status0_wird_critical_und_nicht_done);
     RUN_TEST(test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden);
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);

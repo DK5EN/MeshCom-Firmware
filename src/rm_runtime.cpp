@@ -10,6 +10,7 @@
 #include "counters_store.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
+#include "lora_functions.h"
 #include "hmac_sha256.h"
 #include "remote_cmd.h"
 #include "rm_commands.h"
@@ -49,6 +50,7 @@ struct SentSlot
     bool keyLive;
     uint32_t verifiedMs;   // millis() when the verified reply was booked
     bool expired;          // older than RM_CACHE_MS: aged out of the sender policy (guards the millis() wrap)
+    RmCopyCancel copies;   // original msg_id of the command; stops the PN-ring repeats (RAM only)
 };
 SentSlot s_sent[kSentN];   // newest first
 uint8_t s_nsent = 0;
@@ -310,8 +312,15 @@ void keyFp(const uint8_t key[32], uint8_t fp[4])
     hmac_sha256_detail::wipe(h, sizeof(h));
 }
 
+// Every path that ends the wait for a reply (verified reply, forget, key expiry, eviction) stops the ring copies.
 void wipeKey(SentSlot &e)
 {
+    uint32_t origId = 0;
+    if (rmCopyCancelTake(e.copies, &origId))
+    {
+        int slot = findAndStopRingSlot(origId);  // -1: copy READY / on air, the ladder releases it
+        Serial.printf("[RM];stop;ctr;%lu;slot;%d\n", (unsigned long)e.pub.ctr, slot);
+    }
     hmac_sha256_detail::wipe(e.key, sizeof(e.key));
     e.keyLive = false;
 }
@@ -448,7 +457,7 @@ void handleReply(const char *src, const char *text)
     for (uint8_t i = 0; i < s_nsent; i++)
     {
         SentSlot &e = s_sent[i];
-        if (!e.keyLive || e.pub.verified || e.pub.ctr != (uint32_t)ctr || strcmp(e.pub.dst, src) != 0)
+        if (!rmReplyMatchesEntry(e.keyLive, e.pub.verified, e.pub.ctr == (uint32_t)ctr, strcmp(e.pub.dst, src) == 0))
             continue;
 
         char result[RM_MAX_RESULT + 1];
@@ -847,7 +856,8 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
 
     // DM form as sendReply() builds it: ":{CALL}text"
     snprintf(out, sizeof(out), ":{%s}%s", to, wire);
-    const int rc = sendMessage(out, (int)strlen(out));
+    unsigned int origMsgId = 0;
+    const int rc = sendMessage(out, (int)strlen(out), nullptr, &origMsgId);
     memset(wire, 0, sizeof(wire)); // the tag is not needed any more
     memset(out, 0, sizeof(out));
     if (rc != BP_SEND_OK)
@@ -856,7 +866,6 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
         setErr(err, errN, "send");
         return false;
     }
-
     // book it (newest first); the oldest entry that no longer counts drops out, its key with it
     victim = bookVictim(now);
     if (victim >= 0)
@@ -865,6 +874,9 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
         memmove(&s_sent[victim], &s_sent[victim + 1], sizeof(SentSlot) * (size_t)(s_nsent - 1 - victim));
         s_nsent--;
     }
+    // a stale "RM1 stopped" entry with this id core (also one the eviction above just left) must not
+    // cut the new command's repeats
+    rm1StoppedForget((uint32_t)origMsgId);
     memmove(&s_sent[1], &s_sent[0], sizeof(SentSlot) * (size_t)(s_nsent));
     s_nsent++;
     SentSlot &e = s_sent[0];
@@ -878,6 +890,7 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
     e.pub.sentMs = now;
     memcpy(e.key, key, sizeof(e.key));
     e.keyLive = true;
+    rmCopyCancelArm(e.copies, (uint32_t)origMsgId);
     refreshReplyWanted();
     if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, to) == 0)
         s_chainErr.tok = nullptr; // an accepted send to that target ends the old chain error

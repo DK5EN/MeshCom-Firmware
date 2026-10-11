@@ -163,8 +163,8 @@ static void test_state_classification_and_boundaries(void)
     TEST_ASSERT_EQUAL_INT(RM_ST_QUEUED, rmPolicyState(mk(t0), t0));
     TEST_ASSERT_EQUAL_INT(RM_ST_QUEUED, rmPolicyState(mk(t0), t0 + RM_QUEUED_MS - 1));
     TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(t0), t0 + RM_QUEUED_MS));
-    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(t0), t0 + 74999));
-    TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(mk(t0), t0 + 75000));
+    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(t0), t0 + RM_NOANSWER_MS - 1));
+    TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(mk(t0), t0 + RM_NOANSWER_MS));
     TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(mk(t0), t0 + 600000));
     TEST_ASSERT_EQUAL_INT(RM_ST_OK, rmPolicyState(mk(t0, true, true, false), t0 + 5000));
     TEST_ASSERT_EQUAL_INT(RM_ST_ERR, rmPolicyState(mk(t0, true, true, true), t0 + 5000));
@@ -182,8 +182,8 @@ static void test_state_across_millis_wrap(void)
     const uint32_t sent = 0xFFFFFFF0u;           // 16 ms before the wrap
     TEST_ASSERT_EQUAL_INT(RM_ST_QUEUED, rmPolicyState(mk(sent), 5));            // age 21 ms
     TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(sent), 10000));       // age ~10 s
-    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(sent), 74983));       // 74999 ms
-    TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(mk(sent), 74984));      // 75000 ms
+    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(mk(sent), (uint32_t)(sent + RM_NOANSWER_MS - 1)));
+    TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(mk(sent), (uint32_t)(sent + RM_NOANSWER_MS)));
 }
 
 static void test_state_names_and_messages(void)
@@ -345,19 +345,19 @@ static void test_policy_two_unanswered_inside_90s_lock_the_third(void)
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     TEST_ASSERT_EQUAL_UINT8(2, d.unanswered);
-    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);  // 150 s - 30 s
+    TEST_ASSERT_EQUAL_UINT32((RM_POLICY_WINDOW_MS - 30000u) / 1000u, d.retryS);  // window - 30 s
 
     // order of the entries must not matter
     RmPolEntry two_r[2] = {mk(now - 30000), mk(now - 15000)};
     d = rmPolicyMaySend(two_r, 2, now);
-    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);
+    TEST_ASSERT_EQUAL_UINT32((RM_POLICY_WINDOW_MS - 30000u) / 1000u, d.retryS);
 
-    // boundary: the older one is exactly 150 s old -> out of the window -> one unanswered left -> allowed
-    d = rmPolicyMaySend(two, 2, now + 120000);
+    // boundary: the older one is exactly RM_POLICY_WINDOW_MS old -> out of the window -> one unanswered left -> allowed
+    d = rmPolicyMaySend(two, 2, now + (RM_POLICY_WINDOW_MS - 30000u));
     TEST_ASSERT_TRUE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(1, d.unanswered);
     // 1 ms before: still locked, 1 s to wait
-    d = rmPolicyMaySend(two, 2, now + 119999);
+    d = rmPolicyMaySend(two, 2, now + (RM_POLICY_WINDOW_MS - 30000u) - 1u);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     TEST_ASSERT_EQUAL_UINT32(1, d.retryS);
@@ -372,9 +372,9 @@ static void test_policy_three_and_more_unanswered_wait_for_enough_to_leave(void)
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(3, d.unanswered);
     // two must leave (80 s and 50 s) before only one is left: the 50 s one leaves after 100 s
-    TEST_ASSERT_EQUAL_UINT32(100, d.retryS);
-    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 3, now + 100000).allowed);
-    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 3, now + 99999).allowed);
+    TEST_ASSERT_EQUAL_UINT32((RM_POLICY_WINDOW_MS - 50000u) / 1000u, d.retryS);
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 3, now + (RM_POLICY_WINDOW_MS - 50000u)).allowed);
+    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 3, now + (RM_POLICY_WINDOW_MS - 50000u) - 1u).allowed);
 }
 
 static void test_policy_answered_and_aged_out_do_not_count(void)
@@ -382,7 +382,7 @@ static void test_policy_answered_and_aged_out_do_not_count(void)
     const uint32_t now = 3000000;
     // verified ok / verified err are answered; 150 s old and expired ones left the window
     RmPolEntry e[4] = {mk(now - 20000, true, true, false), mk(now - 25000, true, true, true),
-                       mk(now - 150000), mk(now - 200000, false, false, false, true)};
+                       mk(now - RM_POLICY_WINDOW_MS), mk(now - RM_POLICY_WINDOW_MS - 50000u, false, false, false, true)};
     RmPolDecision d = rmPolicyMaySend(e, 4, now);
     TEST_ASSERT_TRUE(d.allowed);
     TEST_ASSERT_EQUAL_UINT8(0, d.unanswered);
@@ -391,10 +391,10 @@ static void test_policy_answered_and_aged_out_do_not_count(void)
     d = rmPolicyMaySend(u, 2, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
-    // 149999 ms old still counts, 150000 does not
-    RmPolEntry b[2] = {mk(now - 149999), mk(now - 5000)};
+    // one ms inside the window still counts, exactly the window does not
+    RmPolEntry b[2] = {mk(now - (RM_POLICY_WINDOW_MS - 1u)), mk(now - 5000)};
     TEST_ASSERT_FALSE(rmPolicyMaySend(b, 2, now).allowed);
-    RmPolEntry c[2] = {mk(now - 150000), mk(now - 5000)};
+    RmPolEntry c[2] = {mk(now - RM_POLICY_WINDOW_MS), mk(now - 5000)};
     d = rmPolicyMaySend(c, 2, now);
     TEST_ASSERT_EQUAL_UINT8(1, d.unanswered);               // only the 5 s one counts
     TEST_ASSERT_EQUAL_INT(RM_POL_COOLDOWN, d.reason);       // ... and it is inside the spacing, not the limit
@@ -404,7 +404,7 @@ static void test_policy_cooldown_and_limit_combine_to_the_longer_wait(void)
 {
     const uint32_t now = 4000000;
     // two unanswered, newest 2 s old (cooldown 8 s left), oldest 145 s old (limit frees in 5 s)
-    RmPolEntry e[2] = {mk(now - 2000), mk(now - 145000)};
+    RmPolEntry e[2] = {mk(now - 2000), mk(now - (RM_POLICY_WINDOW_MS - 5000u))};
     RmPolDecision d = rmPolicyMaySend(e, 2, now);
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_UINT32(8, d.retryS);   // the spacing is the longer wait
@@ -428,9 +428,9 @@ static void test_policy_across_millis_wrap(void)
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     // oldest = s1 at age 30000 (s1 + 30000 wraps to 9999): 120 s to go
-    TEST_ASSERT_EQUAL_UINT32(120, d.retryS);
-    // 120 s later (now + 120000, wrapped past 0 again nowhere) the oldest left the window
-    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 2, now + 120000).allowed);
+    TEST_ASSERT_EQUAL_UINT32((RM_POLICY_WINDOW_MS - 30000u) / 1000u, d.retryS);
+    // 120 s later (now + (RM_POLICY_WINDOW_MS - 30000u), wrapped past 0 again nowhere) the oldest left the window
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 2, now + (RM_POLICY_WINDOW_MS - 30000u)).allowed);
 
     // cooldown boundary exactly over the wrap
     RmPolEntry w[1] = {mk(0xFFFFFFFFu - 4999u, true, true)};   // sent 5000 ms before the wrap point
@@ -471,8 +471,8 @@ static void test_pending_decision_table(void)
 {
     // no reply yet: wait until 75 s, then drop
     TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, false, false, false, 0, 0));
-    TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, false, false, false, 74999, 0));
-    TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, false, false, false, 75000, 0));
+    TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, false, false, false, RM_NOANSWER_MS - 1, 0));
+    TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, false, false, false, RM_NOANSWER_MS, 0));
     TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, false, false, false, 400000, 0));
     // verified: send only 10.5 s after the verified reply
     TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(true, true, false, false, 4000, 0));
@@ -485,8 +485,8 @@ static void test_pending_decision_table(void)
     TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, false, true, false, 1000, 0));
     TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(true, true, true, false, 20000, 20000));
     // an unverified reply is no answer: it waits like silence and drops at 75 s
-    TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, true, false, false, 74999, 0));
-    TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, true, false, false, 75000, 0));
+    TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, true, false, false, RM_NOANSWER_MS - 1, 0));
+    TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, true, false, false, RM_NOANSWER_MS, 0));
 }
 
 // Regression: a reply to the sync that does NOT verify (garbled or forged "RM1 0 ...") set replied=1,
@@ -494,8 +494,8 @@ static void test_pending_decision_table(void)
 // and the single pending slot forever and every later send got "busy".
 static void test_unverified_sync_reply_does_not_hang_the_chain(void)
 {
-    const RmPendAction a = rmPendingDecide(false /*verified*/, true /*replied*/, false, false, 75000, 0);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(RM_PEND_DROP, a, "unverified reply must not hold the chain past 75 s");
+    const RmPendAction a = rmPendingDecide(false /*verified*/, true /*replied*/, false, false, RM_NOANSWER_MS, 0);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(RM_PEND_DROP, a, "unverified reply must not hold the chain past RM_NOANSWER_MS");
     // and far later (the old code would still say WAIT here)
     TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, true, false, false, 3600000u, 0));
 }
@@ -509,10 +509,10 @@ static void test_pending_decision_across_millis_wrap(void)
     TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(true, true, false, false, now - syncMs, now - verMs));  // 10499
     now = 500;
     TEST_ASSERT_EQUAL_INT(RM_PEND_SEND, rmPendingDecide(true, true, false, false, now - syncMs, now - verMs));  // 10500
-    // silence across the wrap: 74999 vs 75000 ms
-    now = 55000u - 1u;
+    // silence across the wrap: RM_NOANSWER_MS - 1 vs RM_NOANSWER_MS
+    now = (uint32_t)(syncMs + RM_NOANSWER_MS - 1u);
     TEST_ASSERT_EQUAL_INT(RM_PEND_WAIT, rmPendingDecide(false, false, false, false, now - syncMs, 0));
-    now = 55000u;
+    now = (uint32_t)(syncMs + RM_NOANSWER_MS);
     TEST_ASSERT_EQUAL_INT(RM_PEND_DROP, rmPendingDecide(false, false, false, false, now - syncMs, 0));
 }
 
@@ -858,10 +858,10 @@ static void test_policy_proven_limit_10_and_11th_refused(void)
     TEST_ASSERT_FALSE(d.allowed);
     TEST_ASSERT_EQUAL_INT(RM_POL_LIMIT, d.reason);
     TEST_ASSERT_EQUAL_UINT8(10, d.unanswered);
-    // the oldest is 91 s old: it leaves the 150 s window in 59 s
-    TEST_ASSERT_EQUAL_UINT32(59, d.retryS);
-    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 10, now + 59000, RM_POLICY_LIMIT_PROVEN).allowed);
-    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 10, now + 58999, RM_POLICY_LIMIT_PROVEN).allowed);
+    // the oldest is 91 s old: it leaves the window in (window - 91) s
+    TEST_ASSERT_EQUAL_UINT32((RM_POLICY_WINDOW_MS - 91000u) / 1000u, d.retryS);
+    TEST_ASSERT_TRUE(rmPolicyMaySend(e, 10, now + (RM_POLICY_WINDOW_MS - 91000u), RM_POLICY_LIMIT_PROVEN).allowed);
+    TEST_ASSERT_FALSE(rmPolicyMaySend(e, 10, now + (RM_POLICY_WINDOW_MS - 91000u) - 1u, RM_POLICY_LIMIT_PROVEN).allowed);
 }
 
 static void test_proof_cleared_by_key_change_and_one_shot_rules(void)
@@ -973,11 +973,11 @@ static void test_peer_mark_stale_after_two_dead_commands(void)
     RmPolEntry one[1] = {mk(now - RM_NOANSWER_MS)};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(one, 1, now));
     TEST_ASSERT_FALSE_MESSAGE(rmPeerMarkStale(one, 1, now), "one lost frame is no evidence");
-    RmPolEntry two[2] = {mk(now - RM_NOANSWER_MS), mk(now - 80000)};
+    RmPolEntry two[2] = {mk(now - RM_NOANSWER_MS), mk(now - (RM_NOANSWER_MS + 5000u))};
     TEST_ASSERT_TRUE(rmPeerMarkStale(two, 2, now));
     TEST_ASSERT_EQUAL_UINT32(2, RM_MARK_STALE_UNANSWERED);
     // the answer may still come: a command younger than RM_NOANSWER_MS is not dead
-    RmPolEntry young[2] = {mk(now - (RM_NOANSWER_MS - 1)), mk(now - 80000)};
+    RmPolEntry young[2] = {mk(now - (RM_NOANSWER_MS - 1)), mk(now - (RM_NOANSWER_MS + 5000u))};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(young, 2, now));
     TEST_ASSERT_FALSE(rmPeerMarkStale(young, 2, now));
 }
@@ -986,13 +986,13 @@ static void test_peer_mark_stale_ignores_syncs_and_replies(void)
 {
     const uint32_t now = 4000000;
     // unanswered SYNCs are not command misses (a sync never uses the mark)
-    RmPolEntry s[2] = {mkSync(now - 100000), mkSync(now - 90000)};
+    RmPolEntry s[2] = {mkSync(now - (RM_NOANSWER_MS + 25000u)), mkSync(now - (RM_NOANSWER_MS + 15000u))};
     TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(s, 2, now));
     // a reply with a bad tag is no silence
-    RmPolEntry u[2] = {mk(now - 100000, true, false), mk(now - 90000)};
+    RmPolEntry u[2] = {mk(now - (RM_NOANSWER_MS + 25000u), true, false), mk(now - (RM_NOANSWER_MS + 15000u))};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(u, 2, now));
     // a verified err reply is an answer too
-    RmPolEntry v[3] = {mk(now - 100000, true, true, true), mk(now - 90000), mk(now - 80000)};
+    RmPolEntry v[3] = {mk(now - (RM_NOANSWER_MS + 25000u), true, true, true), mk(now - (RM_NOANSWER_MS + 15000u)), mk(now - (RM_NOANSWER_MS + 5000u))};
     TEST_ASSERT_EQUAL_UINT8(2, rmPeerMarkMisses(v, 3, now));  // verified one is the OLDEST: both newer ones count
 }
 
@@ -1000,16 +1000,16 @@ static void test_peer_mark_stale_streak_ends_at_the_newest_verified(void)
 {
     const uint32_t now = 4000000;
     // two dead commands, then a verified sync refreshed the mark: not stale any more
-    RmPolEntry a[3] = {mk(now - 200000), mk(now - 190000), mkSync(now - 100000, true, true)};
+    RmPolEntry a[3] = {mk(now - (RM_NOANSWER_MS + 80000u)), mk(now - (RM_NOANSWER_MS + 70000u)), mkSync(now - (RM_NOANSWER_MS + 25000u), true, true)};
     TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(a, 3, now));
     // ... and dead commands AFTER it count again
-    RmPolEntry b[4] = {mk(now - 200000), mk(now - 190000), mkSync(now - 100000, true, true), mk(now - 90000)};
+    RmPolEntry b[4] = {mk(now - (RM_NOANSWER_MS + 80000u)), mk(now - (RM_NOANSWER_MS + 70000u)), mkSync(now - (RM_NOANSWER_MS + 25000u), true, true), mk(now - (RM_NOANSWER_MS + 15000u))};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(b, 4, now));
     // order of the array does not matter
     RmPolEntry c[4] = {b[3], b[2], b[1], b[0]};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(c, 4, now));
     // a verified command (ok or err) is the barrier just the same
-    RmPolEntry d[3] = {mk(now - 120000), mk(now - 110000, true, true), mk(now - 100000)};
+    RmPolEntry d[3] = {mk(now - (RM_NOANSWER_MS + 45000u)), mk(now - (RM_NOANSWER_MS + 35000u), true, true), mk(now - (RM_NOANSWER_MS + 25000u))};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(d, 3, now));
 }
 
@@ -1024,19 +1024,19 @@ static void test_peer_mark_stale_expired_entries(void)
     RmPolEntry b[3] = {mk(1, false, false, false, true), mk(2, false, false, false, true), mk(3, true, true, false, true)};
     TEST_ASSERT_EQUAL_UINT8(2, rmPeerMarkMisses(b, 3, now));
     // a LIVE verified entry is surely newer than every expired dead one: they do not count
-    RmPolEntry live[3] = {mk(1, false, false, false, true), mk(2, false, false, false, true), mk(now - 100000, true, true)};
+    RmPolEntry live[3] = {mk(1, false, false, false, true), mk(2, false, false, false, true), mk(now - (RM_NOANSWER_MS + 25000u), true, true)};
     TEST_ASSERT_EQUAL_UINT8(0, rmPeerMarkMisses(live, 3, now));
     // a live dead command is newer than any expired verified one
-    RmPolEntry c[2] = {mk(now - 100000), mk(3, true, true, false, true)};
+    RmPolEntry c[2] = {mk(now - (RM_NOANSWER_MS + 25000u)), mk(3, true, true, false, true)};
     TEST_ASSERT_EQUAL_UINT8(1, rmPeerMarkMisses(c, 2, now));
     // millis() wrap: the ages are unsigned differences
     const uint32_t wrapNow = 50000u;
-    RmPolEntry w[2] = {mk(wrapNow - 90000u), mk(wrapNow - 100000u)};  // sent before the wrap point
+    RmPolEntry w[2] = {mk(wrapNow - (RM_NOANSWER_MS + 15000u)), mk(wrapNow - (RM_NOANSWER_MS + 25000u))};  // sent before the wrap point
     TEST_ASSERT_TRUE(rmPeerMarkStale(w, 2, wrapNow));
     // more entries than the book holds are clamped, never read past
     RmPolEntry many[20];
     for (int i = 0; i < 20; i++)
-        many[i] = mk(now - 100000u - (uint32_t)i);
+        many[i] = mk(now - (RM_NOANSWER_MS + 25000u) - (uint32_t)i);
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_MAX_ENTRIES, rmPeerMarkMisses(many, 20, now));
 }
 
@@ -1184,6 +1184,45 @@ static void test_fold_call_folds_and_never_truncates(void)
     TEST_ASSERT_FALSE(rmValidateCall(out));  // out is "": nothing valid to act on
 }
 
+// ---- RM1 repeats (wave 3): timing, verified-once, copy cancel -------------------------------------------
+
+static void test_noanswer_covers_the_whole_ladder(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(126000u, RM_REPEAT_LAST_MS);   // copies at 0 / 42 / 84 / 126 s
+    TEST_ASSERT_TRUE(RM_NOANSWER_MS >= RM_REPEAT_LAST_MS + RM_REPLY_ALLOWANCE_MS);
+    TEST_ASSERT_EQUAL_UINT32(171000u, RM_NOANSWER_MS);
+    TEST_ASSERT_TRUE(RM_POLICY_WINDOW_MS >= RM_NOANSWER_MS + 60000u);
+    // a send is still "waiting" when the last copy leaves, and only then times out
+    RmPolEntry e = {};
+    e.sentMs = 1000;
+    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(e, 1000 + RM_REPEAT_LAST_MS));
+    TEST_ASSERT_EQUAL_INT(RM_ST_WAITING, rmPolicyState(e, 1000 + RM_NOANSWER_MS - 1));
+    TEST_ASSERT_EQUAL_INT(RM_ST_NOANSWER, rmPolicyState(e, 1000 + RM_NOANSWER_MS));
+}
+
+static void test_second_reply_matches_nothing(void)
+{
+    // first reply: key live, not verified -> matches
+    TEST_ASSERT_TRUE(rmReplyMatchesEntry(true, false, true, true));
+    // after it verified the key is wiped and verified is set: a duplicate (RF + server, or cached reply
+    // to a later copy) matches no entry, so it can not verify, count or create a second row
+    TEST_ASSERT_FALSE(rmReplyMatchesEntry(false, true, true, true));
+    TEST_ASSERT_FALSE(rmReplyMatchesEntry(true, true, true, true));
+    TEST_ASSERT_FALSE(rmReplyMatchesEntry(true, false, false, true));
+    TEST_ASSERT_FALSE(rmReplyMatchesEntry(true, false, true, false));
+}
+
+static void test_copy_cancel_hands_out_the_original_id_once(void)
+{
+    RmCopyCancel c = {};
+    uint32_t id = 0;
+    TEST_ASSERT_FALSE(rmCopyCancelTake(c, &id));   // never armed (e.g. zeroed slot): nothing to stop
+    rmCopyCancelArm(c, 0x1234u);
+    TEST_ASSERT_TRUE(rmCopyCancelTake(c, &id));
+    TEST_ASSERT_EQUAL_UINT32(0x1234u, id);
+    TEST_ASSERT_FALSE(rmCopyCancelTake(c, &id));   // verify, then forget/expire: one stop only
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1235,5 +1274,8 @@ int main(int, char **)
     RUN_TEST(test_proof_book_evicts_least_recently_used);
     RUN_TEST(test_proof_book_use_keeps_a_target_alive);
     RUN_TEST(test_fold_call_folds_and_never_truncates);
+    RUN_TEST(test_noanswer_covers_the_whole_ladder);
+    RUN_TEST(test_second_reply_matches_nothing);
+    RUN_TEST(test_copy_cancel_hands_out_the_original_id_once);
     return UNITY_END();
 }

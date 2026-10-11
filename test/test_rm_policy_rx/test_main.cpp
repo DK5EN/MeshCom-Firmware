@@ -680,7 +680,8 @@ static void markSenderSend(RmState &rs, MarkSender &b, uint32_t now, bool recove
     }
 }
 
-// A (clock) and B (mark 5000): B sends every 80 s. Returns B for inspection.
+// A (clock) and B (mark 5000): B sends every 100 s (a retry cadence above RM_NOANSWER_MS / 2: with the 4-copy
+// ladder a command is dead only after 171 s, so the second dead command needs two sends 171 s apart). Returns B for inspection.
 static MarkSender runTwoSenders(bool recovery, bool strict, uint32_t attempts, uint32_t *aAccepted)
 {
     RmState rs;
@@ -693,9 +694,9 @@ static MarkSender runTwoSenders(bool recovery, bool strict, uint32_t attempts, u
     if (deliverFrame(rs, SRC, "status", 1790000000u, 12000u) == RM_OK)
         (*aAccepted)++;
     for (uint32_t i = 0; i < attempts; i++)
-        markSenderSend(rs, b, 20000u + i * 80000u, recovery, strict);
+        markSenderSend(rs, b, 20000u + i * 100000u, recovery, strict);
     // A is unaffected and still gets through afterwards
-    if (deliverFrame(rs, SRC, "status", 1790000000u + 20000u + attempts * 80u + 5u, 20000u + attempts * 80000u + 30000u) == RM_OK)
+    if (deliverFrame(rs, SRC, "status", 1790000000u + 20000u + attempts * 100u + 5u, 20000u + attempts * 100000u + 30000u) == RM_OK)
         (*aAccepted)++;
     return b;
 }
@@ -717,10 +718,12 @@ void test_cr02_stale_mark_recovers_without_reboot(void)
         uint32_t a = 0;
         const MarkSender b = runTwoSenders(true, strict != 0, 12, &a);
         TEST_ASSERT_EQUAL_UINT32(2, a);
-        // attempts 1 and 2 are replays (no reply), the third drops the mark, syncs, and goes through
-        TEST_ASSERT_EQUAL_UINT32(2, b.replays);
+        // attempts 1 and 2 are replays (no reply). The 3rd is a replay too without the policy (strict off) and is
+        // refused by the budget (2 unanswered inside the 276 s window) with strict on. The 4th finds both dead
+        // (>= 171 s), drops the mark, syncs, and goes through.
+        TEST_ASSERT_EQUAL_UINT32(strict != 0 ? 2u : 3u, b.replays);
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, b.syncs, "exactly one automatic sync, then the fresh mark is used");
-        TEST_ASSERT_EQUAL_UINT32_MESSAGE(10, b.accepted, "attempts 3..12 are accepted");
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(9, b.accepted, "attempts 4..12 are accepted (the 3rd was a replay or refused)");
         TEST_ASSERT_TRUE(b.mark >= 1790000000u);
     }
 }

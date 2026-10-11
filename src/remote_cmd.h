@@ -76,6 +76,19 @@ size_t rmReplyCanonical(uint32_t ctr, const char *dst, const char *src, const ch
 
 // Reject counter and lockout are kept per sender (callsign-SSID as passed to rmCheck), whatever path
 // the frame took: one sender's wrong frames never lock another sender.
+// "Same guess = one strike": the frames of the counted strikes of the current window are remembered per sender.
+// A window holds at most RM_REJ_LIMIT - 1 counted strikes (the last one locks and forgets them), so this ring
+// holds all of them. Identity = ctr + 16 tag chars + FNV-1a of "cmd args" (the tag covers cmd and args: holding
+// ctr + tag fixed while they vary is a new HMAC guess each time). No per-frame time: the window starts with the
+// first remembered strike, and a row whose window is over is swept, so every remembered frame is inside it.
+#define RM_REJ_FRAMES (RM_REJ_LIMIT - 1)
+struct RmRejFrame
+{
+    uint32_t ctr;
+    uint32_t cmdArgsHash; // FNV-1a over cmd, one space, args (each bounded by its field size)
+    char tag[16];         // raw, not NUL-terminated
+};
+
 #define RM_REJ_SOURCES 6 // senders whose rejects are tracked at once (least recently used is replaced)
 struct RmRejSrc
 {
@@ -86,6 +99,9 @@ struct RmRejSrc
     uint32_t rejWindowMs; // start of the reject window
     uint32_t lockUntilMs;
     uint32_t lastMs;      // time of the last counted reject (replacement order)
+    uint8_t nFrames;      // counted strikes of the current window whose frame is remembered (<= RM_REJ_FRAMES)
+    uint8_t nextFrame;    // ring slot the next counted strike writes
+    RmRejFrame frame[RM_REJ_FRAMES]; // the identical frame again is the same guess, no new strike
 };
 
 struct RmState

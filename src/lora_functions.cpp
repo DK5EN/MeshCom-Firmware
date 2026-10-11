@@ -350,7 +350,7 @@ static bool extTxqAckInvalidateIfOwned(int slot)
  * RAK4631 unter derselben Ring-Sperre wie anderswo in dieser Datei
  * (queueDisplayText() etc.).
  */
-int findAndStopRingSlot(uint32_t msgId)
+static int findAndStopRingSlotImpl(uint32_t msgId, bool skipRm1Cmd)
 {
 #if defined(BOARD_RAK4630)
     taskENTER_CRITICAL();
@@ -361,6 +361,11 @@ int findAndStopRingSlot(uint32_t msgId)
         {
             if(pnRetryCore(extractRingMsgId(i)) == pnRetryCore(msgId))
             {
+                // Wave 3a: a binary / DM / server ACK must not stop an own RM1
+                // COMMAND slot -- only the RM layer does (verified reply).
+                if(skipRm1Cmd &&
+                   pnFrameIsOwnRm1Cmd(&ringBuffer[i][2], (uint16_t)ringBuffer[i][0], _GW_ID, meshcom_settings.node_call))
+                    continue;
 #if defined(EXTERNAL_RADIO)
                 // ACK-before-result. If this slot is owned by an in-flight
                 // external TX, drop the ownership record now (deliberate release)
@@ -386,6 +391,57 @@ int findAndStopRingSlot(uint32_t msgId)
     taskEXIT_CRITICAL();
 #endif
     return -1;
+}
+
+// ORIGINAL ids of own RM1 commands the RM layer stopped (reply verified).
+// findAndStopRingSlotImpl() skips READY slots and slots doTX() cleared to len
+// 0, so it can miss the copy that is READY / CSMA-waiting / on air and return
+// -1. The 40 s ladder (updateRetransmissionStatus) looks the slot up here at
+// the threshold and releases it instead of producing another copy: at most
+// that one in-flight copy goes out after the stop, nothing behind it. RAM
+// only, zero-initialised (= empty). Task scope as ringBuffer: guarded by the
+// RAK critical section like the ring itself.
+static Rm1StoppedSet rm1Stopped;
+
+// Stops any matching pending slot, an own RM1 command slot included (the RM
+// layer calls this with the ORIGINAL msg_id when a reply verifies). On a miss
+// it records the id in rm1Stopped (see below). NoRm1 below must NOT do this:
+// a binary / DM / server ACK does not end the RM1 repeats.
+int findAndStopRingSlot(uint32_t msgId)
+{
+    const int slot = findAndStopRingSlotImpl(msgId, false);
+    // No waiting slot found: the copy is READY, in CSMA or on air. Remember the id so the ladder
+    // releases that slot at its next threshold instead of sending another copy (only on a miss, so
+    // a stopped id never lingers in the set).
+    if(slot < 0)
+    {
+#if defined(BOARD_RAK4630)
+        taskENTER_CRITICAL();
+#endif
+        pnRm1StoppedAdd(&rm1Stopped, msgId);
+#if defined(BOARD_RAK4630)
+        taskEXIT_CRITICAL();
+#endif
+    }
+    return slot;
+}
+
+// Same, but leaves an own RM1 command slot alone: used by the gateway binary
+// ACK and the DM :ack path, which must not end the RM1 repeats.
+int findAndStopRingSlotNoRm1(uint32_t msgId)
+{
+    return findAndStopRingSlotImpl(msgId, true);
+}
+
+void rm1StoppedForget(uint32_t origMsgId)
+{
+#if defined(BOARD_RAK4630)
+    taskENTER_CRITICAL();
+#endif
+    pnRm1StoppedTake(&rm1Stopped, origMsgId);
+#if defined(BOARD_RAK4630)
+    taskEXIT_CRITICAL();
+#endif
 }
 
 // SL-01 -- Dedup-Verdikt zaehlen, genau einmal je Frame und dort, wo die
@@ -519,7 +575,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
             }
 
             // stop retransmission in ring buffer for this msg_id
-            int ackSlot = findAndStopRingSlot(msg_id);
+            int ackSlot = findAndStopRingSlotNoRm1(msg_id);
             if(ackSlot >= 0 && bDisplayRetx)
                 printfdeb("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n",
                               ackSlot, msg_id);
@@ -945,10 +1001,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // 0x02, ueber die Original-id). Dann nicht neu starten, sondern
             // wie bisher freigeben, sonst bleibt der Slot bis zum naechsten
             // Schwellwert (40 s) belegt.
+            // Wave 3a: an own RM1 command repeats like a PN (only the RM layer
+            // stops it); its echo restarts the wait the same way.
             bool pnEcho = dbg_type == MSG_TYPE_TEXT &&
-               pnFrameIsOwnPn(ringBuffer[rxSlot] + 2, dbg_lng, _GW_ID, meshcom_settings.node_call);
+               (pnFrameIsOwnPn(ringBuffer[rxSlot] + 2, dbg_lng, _GW_ID, meshcom_settings.node_call) ||
+                pnFrameIsOwnRm1Cmd(ringBuffer[rxSlot] + 2, dbg_lng, _GW_ID, meshcom_settings.node_call));
             bool pnEchoAcked = false;
-            if(pnEcho)
+            // An RM1 command ignores a 0x02 ("acked") own-status mark: a gateway
+            // ACK must not end the repeats, only the RM layer does.
+            if(pnEcho && !pnFrameIsOwnRm1Cmd(ringBuffer[rxSlot] + 2, dbg_lng, _GW_ID, meshcom_settings.node_call))
             {
                 uint32_t pnEchoOrigId = pnRetryId(pnFrameMsgId(ringBuffer[rxSlot] + 2), _GW_ID, 0);
                 int pnEchoIdx = checkOwnTx(pnEchoOrigId);
@@ -1720,7 +1781,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             // BUG #8 fix: clear ringBuffer entry to stop retransmission.
                                             // findAndStopRingSlot() compares pnRetryCore(), so this also
                                             // matches a still-queued XOR-retry copy of this msg_id.
-                                            int dmSlot = findAndStopRingSlot(msg_counter);
+                                            int dmSlot = findAndStopRingSlotNoRm1(msg_counter);
                                             if(dmSlot >= 0 && bDisplayRetx)
                                                 printfdeb("\n[RETX] DM-ACK for retid:%i stop retransmit msg-id:%08X\n",
                                                             dmSlot, msg_counter);
@@ -3084,6 +3145,38 @@ bool updateRetransmissionStatus()
                     }
                 }
 
+                // RM1 command: the RM layer stopped it (verified reply) while a
+                // copy was READY / on air, so findAndStopRingSlot() missed this
+                // slot. Release it instead of another copy or a give-up (same
+                // idea as M1 above; status 0x02 cannot be used here, a gateway
+                // ACK sets it). The stop is consumed with the release.
+                if(pnFrameIsOwnRm1Cmd(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                {
+                    uint32_t rm1SlotOrigId = pnRetryId(pnFrameMsgId(&ringBuffer[ircheck][2]), _GW_ID, 0);
+                    bool rm1WasStopped;
+#if defined(BOARD_RAK4630)
+                    taskENTER_CRITICAL();
+#endif
+                    rm1WasStopped = pnRm1StoppedTake(&rm1Stopped, rm1SlotOrigId);
+                    if(rm1WasStopped)
+                    {
+                        ringBuffer[ircheck][1] = RING_STATUS_DONE;
+                        ringBuffer[ircheck][0] = 0;
+                        retryCount[ircheck] = 0;
+                    }
+#if defined(BOARD_RAK4630)
+                    taskEXIT_CRITICAL();
+#endif
+                    if(rm1WasStopped)
+                    {
+                        if(bDisplayRetx)
+                            printfdeb("\n[RETX] RM1 stopped, release retid:%i msg-id:%08X\n",
+                                          ircheck, rm1SlotOrigId);
+
+                        continue;
+                    }
+                }
+
                 // Check retry cap
                 if(retryCount[ircheck] >= MAX_RETRANSMIT)
                 {
@@ -3110,7 +3203,10 @@ bool updateRetransmissionStatus()
                         // checkOwnTx() zurueckfalten, sonst findet weder die
                         // 0x04-Held-Pruefung noch das 0x03-Telefonframe unten
                         // den eigenen own_msg_id-Eintrag.
-                        if(pnFrameIsOwnPn(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                        // Ein eigenes RM1-Kommando (auch handgetippt mit '{' ab
+                        // Index 1) traegt dieselben Retry-ids.
+                        if(pnFrameIsOwnPn(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call) ||
+                           pnFrameIsOwnRm1Cmd(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
                             ring_msg_id = pnRetryId(ring_msg_id, _GW_ID, 0);
 
                         struct aprsMessage giveupMsg;
@@ -3240,8 +3336,10 @@ bool updateRetransmissionStatus()
 
                 // Nur eigene PN (eigenes Rufzeichen als Quelle): eine PN, die
                 // sendMessage() fuer einen KISS-Client sendet, bleibt 1:1.
+                // Wave 3a: own RM1 commands take the same retry-id path.
                 if(pnEligible &&
-                   pnFrameIsOwnPn(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                   (pnFrameIsOwnPn(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call) ||
+                    pnFrameIsOwnRm1Cmd(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call)))
                 {
                     pnNewId = pnRetryId(pnFrameMsgId(pnLocalFrame), _GW_ID,
                                         (uint8_t)(retryCount[ircheck] + 1));
@@ -3281,7 +3379,9 @@ bool updateRetransmissionStatus()
                             addLoraRxBuffer(pnNewId, false);
 
                         if(bDisplayRetx)
-                            printfdeb("\n[RETX] PNRETRY k=%u msg-id:%08X\n",
+                            printfdeb("\n[RETX] %s k=%u msg-id:%08X\n",
+                                          pnFrameIsOwnRm1Cmd(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call)
+                                              ? "RM1RETRY" : "PNRETRY",
                                           (unsigned)(retryCount[ircheck] + 1), pnNewId);
                     }
                 }

@@ -497,6 +497,77 @@ void test_frame_is_own_pn_rejects_kiss_client_source(void)
 }
 
 // ===========================================================================
+// pnFrameIsOwnRm1Cmd (wave 3a: RM1 commands repeat on the PN ladder)
+// ===========================================================================
+
+void test_frame_is_own_rm1_cmd(void)
+{
+    uint32_t gw_id = 0x00155120u;
+    uint32_t id = ((gw_id & 0x3FFFFFu) << 10) | 0x07Bu;
+    uint8_t frame[160];
+    const char *cmd = "RM1 7 status 0123456789abcdef";
+
+    uint16_t n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", cmd, 0x04, 0x03);
+    TEST_ASSERT_TRUE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    TEST_ASSERT_FALSE(pnFrameIsPn(frame, n));        // no {NNN: not a PN
+    TEST_ASSERT_FALSE(pnFrameIsOwnPn(frame, n, gw_id, "DK5EN-1"));
+
+    // replies stay send-once
+    n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", "RM1 5 ok rebooting 0123456789abcdef", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", "RM1 5 err denied 0123456789abcdef", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+
+    // group / broadcast destination
+    n = buildFrame(frame, id, "DK5EN-1", "9", cmd, 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    n = buildFrame(frame, id, "DK5EN-1", "*", cmd, 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+
+    // foreign source call, foreign node id
+    n = buildFrame(frame, id, "DK5EN-7", "DK5EN-90", cmd, 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    n = buildFrame(frame, id ^ (1u << 12), "DK5EN-1", "DK5EN-90", cmd, 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+
+    // PN with {NNN and plain text
+    n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", "Hallo{123", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    TEST_ASSERT_TRUE(pnFrameIsOwnPn(frame, n, gw_id, "DK5EN-1"));
+    n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", "Hallo Welt", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    // not exactly "RM1 "
+    n = buildFrame(frame, id, "DK5EN-1", "DK5EN-90", "RM10 7 status 0123456789abcdef", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(frame, n, gw_id, "DK5EN-1"));
+    TEST_ASSERT_FALSE(pnFrameIsOwnRm1Cmd(NULL, 0, gw_id, "DK5EN-1"));
+}
+
+void test_rm1_cmd_retry_copies_keep_payload_and_hi_bits(void)
+{
+    uint32_t gw_id = 0x00155120u;
+    uint32_t id = ((gw_id & 0x3FFFFFu) << 10) | 0x07Bu;
+    uint8_t orig[160], copy[160];
+    uint16_t n = buildFrame(orig, id, "DK5EN-1", "DK5EN-90",
+                             "RM1 7 status 0123456789abcdef", 0x04, 0x03);
+    int fcs = pnFrameFcsOffset(orig, n);
+    TEST_ASSERT_TRUE(fcs > 6);
+
+    for (uint8_t k = 1; k <= 3; k++)
+    {
+        memcpy(copy, orig, n);
+        uint32_t rid = pnRetryId(id, gw_id, k);
+        TEST_ASSERT_TRUE(rid != id);
+        TEST_ASSERT_EQUAL_UINT32(id >> 12, rid >> 12);
+        TEST_ASSERT_TRUE(pnFrameSetMsgId(copy, n, rid));
+        TEST_ASSERT_EQUAL_UINT32(rid, pnFrameMsgId(copy));
+        // bytes 5..fcs-1 (everything but id and FCS) identical
+        TEST_ASSERT_EQUAL_MEMORY(orig + 5, copy + 5, (size_t)(fcs - 5));
+        TEST_ASSERT_TRUE(pnFrameIsOwnRm1Cmd(copy, n, gw_id, "DK5EN-1"));
+        TEST_ASSERT_EQUAL_UINT32(pnRetryCore(id), pnRetryCore(rid));
+    }
+}
+
+// ===========================================================================
 // pnFrameMsgId / pnFrameFcsOffset / pnFrameSetMsgId
 // ===========================================================================
 
@@ -606,6 +677,104 @@ void test_frame_golden_fcs_offset_and_set_msg_id(void)
 }
 
 // ---------------------------------------------------------------------------
+// RM1 stopped set (rework): remembers ORIGINAL ids of stopped RM1 commands so
+// the ladder releases the next copy instead of sending it
+// ---------------------------------------------------------------------------
+
+void test_rm1_stopped_empty_contains_nothing(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 0x12345000u));
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 0));
+}
+
+void test_rm1_stopped_add_has_take(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    pnRm1StoppedAdd(&s, 0x00ABC07Bu);
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, 0x00ABC07Bu));
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 0x00ABC07Cu));
+    TEST_ASSERT_TRUE(pnRm1StoppedTake(&s, 0x00ABC07Bu));
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 0x00ABC07Bu));
+    TEST_ASSERT_FALSE(pnRm1StoppedTake(&s, 0x00ABC07Bu));
+}
+
+void test_rm1_stopped_id_zero_ignored(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    pnRm1StoppedAdd(&s, 0);
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 0));
+    // a zero add must not consume a slot: 8 real adds all survive
+    for (uint32_t i = 1; i <= PN_RM1_STOPPED_MAX; i++)
+        pnRm1StoppedAdd(&s, i << 12);
+    for (uint32_t i = 1; i <= PN_RM1_STOPPED_MAX; i++)
+        TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, i << 12));
+}
+
+// Advisor wave 3 pass 2 (M1): a stop that misses long after its ladder ended (key expiry after
+// 10 min, forget, eviction) leaves an entry; a later own RM1 command whose counter wraps onto the
+// same core must still repeat. rm1StoppedForget() (lora_functions.cpp) takes the entry when the new
+// command is enqueued, before its first threshold looks the id up.
+void test_rm1_stopped_stale_entry_purged_on_enqueue(void)
+{
+    uint32_t gw_id = 0x00155122u;
+    uint32_t oldCmd = (((gw_id >> 2) & 0xFFFFFu) << 12) | ((gw_id & 3u) << 10) | 0x07Bu;
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    pnRm1StoppedAdd(&s, oldCmd);                  // expiry stop of an old command: slot long gone
+    uint32_t newCmd = oldCmd;                     // node_msgid wrapped onto the same core
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, newCmd)); // without the purge the new slot would be released
+    pnRm1StoppedTake(&s, newCmd);                 // what rm1StoppedForget() does on enqueue
+    for (uint8_t k = 1; k <= 3; k++)
+        TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, pnRetryId(newCmd, gw_id, k)));
+}
+
+void test_rm1_stopped_retry_copy_matches_original(void)
+{
+    uint32_t gw_id = 0x00155122u;
+    uint32_t orig = (((gw_id >> 2) & 0xFFFFFu) << 12) | ((gw_id & 3u) << 10) | 0x07Bu;
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    pnRm1StoppedAdd(&s, orig);
+    for (uint8_t k = 0; k <= 3; k++)
+        TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, pnRetryId(orig, gw_id, k)));
+    // a stop recorded with a retry-copy id matches the original, too
+    Rm1StoppedSet t;
+    pnRm1StoppedInit(&t);
+    pnRm1StoppedAdd(&t, pnRetryId(orig, gw_id, 2));
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&t, orig));
+    // a different counter is not matched
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, orig + 1));
+}
+
+void test_rm1_stopped_ring_overwrites_oldest(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    for (uint32_t i = 1; i <= PN_RM1_STOPPED_MAX + 1; i++)
+        pnRm1StoppedAdd(&s, i << 12);
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, 1u << 12));  // oldest gone
+    for (uint32_t i = 2; i <= PN_RM1_STOPPED_MAX + 1; i++)
+        TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, i << 12));
+}
+
+void test_rm1_stopped_duplicate_add_keeps_one_entry(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    pnRm1StoppedAdd(&s, 5u << 12);
+    for (int i = 0; i < 20; i++)
+        pnRm1StoppedAdd(&s, 5u << 12);  // repeated stop of the same id
+    for (uint32_t i = 6; i < 6 + PN_RM1_STOPPED_MAX - 1; i++)
+        pnRm1StoppedAdd(&s, i << 12);
+    // 1 + (MAX-1) distinct ids fit: the duplicate adds did not push 5 out
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, 5u << 12));
+}
+
+// ---------------------------------------------------------------------------
 // runner
 // ---------------------------------------------------------------------------
 void setUp(void) {}
@@ -648,6 +817,9 @@ int main(int, char **)
     RUN_TEST(test_frame_source_is_own_call_only);
     RUN_TEST(test_frame_is_own_pn_rejects_kiss_client_source);
 
+    RUN_TEST(test_frame_is_own_rm1_cmd);
+    RUN_TEST(test_rm1_cmd_retry_copies_keep_payload_and_hi_bits);
+
     RUN_TEST(test_frame_msg_id_le);
     RUN_TEST(test_frame_set_msg_id_updates_bytes_and_fcs);
     RUN_TEST(test_frame_set_msg_id_no_terminator_leaves_frame_unchanged);
@@ -655,6 +827,14 @@ int main(int, char **)
     RUN_TEST(test_frame_golden_fcs_offset_and_set_msg_id);
     RUN_TEST(test_own_tx_lookup_folds_retry_copy_to_original);
     RUN_TEST(test_own_tx_lookup_leaves_foreign_id_alone);
+
+    RUN_TEST(test_rm1_stopped_empty_contains_nothing);
+    RUN_TEST(test_rm1_stopped_add_has_take);
+    RUN_TEST(test_rm1_stopped_id_zero_ignored);
+    RUN_TEST(test_rm1_stopped_retry_copy_matches_original);
+    RUN_TEST(test_rm1_stopped_ring_overwrites_oldest);
+    RUN_TEST(test_rm1_stopped_duplicate_add_keeps_one_entry);
+    RUN_TEST(test_rm1_stopped_stale_entry_purged_on_enqueue);
 
     return UNITY_END();
 }

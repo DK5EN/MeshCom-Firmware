@@ -43,6 +43,12 @@ bool updateRetransmissionStatus(void);
 // eine Retry-Variante umgeschrieben wurde. Auch vom Server-ACK-Pfad
 // (udp_frame_esp32.cpp, udp_frame_nrf52.cpp) aufgerufen. Slot oder -1.
 int findAndStopRingSlot(uint32_t msgId);
+// As above, but skips an own RM1 command slot (binary/DM/server ACKs must not stop it).
+int findAndStopRingSlotNoRm1(uint32_t msgId);
+// A new own RM1 command was enqueued under origMsgId: drop a stale "RM1 stopped" entry with the same
+// id core (left by a stop that missed long after its ladder ended: expiry, forget, eviction), so it
+// cannot release the new command's slot at its first threshold.
+void rm1StoppedForget(uint32_t origMsgId);
 
 unsigned long csma_compute_timeout(int attempt);
 unsigned long csma_compute_timeout_prio(int attempt, uint8_t priority);

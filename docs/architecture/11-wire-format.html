@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeshCom Wire Format</title>
-<meta name="source-sha256" content="b856534da50a5e31bc193fccdbe1eb91ca18194f7f8b68cb3e296f98c2d8ea74">
+<meta name="source-sha256" content="363bd3274f7f966982d22892a33a7b14bd97766ae791a8fd1fcaf2d52d1e9d7b">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -767,15 +767,43 @@ see 1.9.3.)</p>
 <ul>
 <li><strong>Silent on failure.</strong> A bad tag or a counter at or below the high-water mark gets no reply (no
 oracle). A valid-tag command off the allowlist is answered (1.9.3, refused). The node prints <code>[RM];reject;&lt;verdict&gt;</code>.</li>
+<li><strong>Repeats (2026-10-11).</strong> An RM1 command (not <code>ok</code>/<code>err</code>) is sent like a PN without the <code>{NNN</code>
+suffix: copy 1, then up to 3 repeats on the ring ladder (about 0, 42, 84, 126 s). Each repeat
+carries <code>msg_id = pnRetryId(orig, gw, k)</code> (bits 10-11 XOR-rotated, <code>msg_id &gt;&gt; 12</code> unchanged) and a
+byte-identical payload (same <code>ctr</code>, same tag). The own or relayed echo restarts the 42 s wait; a
+gateway binary ACK, a server ACK or a DM <code>:ack</code> never ends the repeats. Only the sender's RM layer
+stops them (<code>findAndStopRingSlot(original msg_id)</code>, marker <code>[RM];stop;ctr;&lt;n&gt;</code>): when a reply for
+that <code>ctr</code> verifies, and on forget, key expiry or eviction of the sent entry. After the last
+repeat the slot is dropped silently: no DM statistics, no failure notice. All copies are one send
+in the sender's budget and sent book. If the stop finds no waiting copy (it is READY, in CSMA or on air:
+<code>[RM];stop;ctr;&lt;n&gt;;slot;-1</code>), the original id goes into a small RAM &quot;RM1 stopped&quot; set (8 entries)
+and the ladder releases that slot at its next threshold instead of sending another copy: at most
+the one copy already in flight still goes out, none after it. ACKs never record into that set. A stop that misses long after the ladder ended (key expiry, forget, eviction) also leaves an entry; the sender drops any entry with the same id core when it enqueues a new RM1 command (<code>rm1StoppedForget()</code>), so a stale entry can never cut a new command's repeats. An RM1 reply goes out once, never repeated; a lost reply is
+recovered by the next command copy hitting the reply cache. Every echo restarts the wait, so with relays
+the ladder stretches (about 45-60 s per step, the last copy up to about 180 s): &quot;no answer&quot; can
+then show while a last copy is still pending; a reply that verifies later still stops it. A <code>sync</code>
+(ctr 0) repeats too: with strict security a copy inside <code>RM_SYNC_RATE_MS</code> (60 s) is a silent
+<code>rate</code>, a later one is answered again; the second reply matches nothing at the sender (harmless).</li>
+<li><strong>No answer.</strong> The sender marks a command &quot;no answer&quot; after 171 s (<code>RM_NOANSWER_MS</code> = last repeat
+126 s + 45 s reply allowance); the unanswered-send window is 276 s (<code>RM_POLICY_WINDOW_MS</code>).</li>
 <li><strong>Lost-reply recovery.</strong> The same <code>ctr</code> with the same valid tag within 10 min re-sends the cached
-reply and does not execute again; at most one cached reply per 10 s.</li>
+reply and does not execute again; at most one cached reply per 10 s. A later repeat therefore never
+executes twice; a copy that arrives after a newer <code>ctr</code> was accepted is a silent <code>replay</code>, no strike.</li>
 <li><strong>Rate limit.</strong> One accepted command (or <code>sync</code>) per 10 s. A rate reject needs a valid tag and
 does not count toward the lockout.</li>
-<li><strong>Lockout.</strong> Three counted rejects (<code>tag</code>, in-check <code>format</code>, <code>blocked</code> only for a malformed <code>sync</code>) within 90 s lock
-RM1 for 5 min. Reachable without the key, accepted by design (ADR).</li>
+<li><strong>Lockout.</strong> Three counted rejects (<code>tag</code>, in-check <code>format</code>, <code>blocked</code> only for a malformed <code>sync</code>) from one
+sender within 90 s (<code>RM_REJ_WINDOW_MS</code>) lock RM1 for that sender for 5 min. Reachable without the
+key, accepted by design (ADR). The same guess counts once: per sender the node remembers the frames
+of the strikes already counted in the current window (at most two, the third locks), and a
+rejected frame identical to one of them counts no new strike. Identical means the same <code>ctr</code>, the
+same 16 tag characters and the same cmd and args (32-bit FNV-1a hash of <code>cmd args</code>); a frame that
+differs in any of them is a new guess and counts, also with <code>ctr</code> and tag held fixed. The repeats of
+one or two wrong-key commands therefore never lock their sender, however they interleave. The
+remembered frames are forgotten when the window ends or a lock arms; the verdict and the
+<code>[RM];reject;&lt;verdict&gt;</code> line are unchanged. With strict security off nothing is counted.</li>
 <li><strong>Counter.</strong> The mark is persisted before execution. <code>sync</code> returns it; the client stores the
 counter per target.</li>
-<li><strong>Accepted only</strong> over LoRa, as a DM to the exact own call, with <code>--remotemgmt on</code> and a non-empty
+<li><strong>Accepted only</strong> over LoRa (and, on a gateway node, from the server path, <code>rm_rx_gate.h</code>), as a DM to the exact own call, with <code>--remotemgmt on</code> and a non-empty
 <code>node_passwd</code>; otherwise <code>RM1 </code> is ordinary text. <code>RM1 </code> DMs are never taken into store-node
 custody (§2.3).</li>
 <li>The reply is a DM to <code>src</code> sent through <code>sendMessage()</code>; an operator's node shows it as a

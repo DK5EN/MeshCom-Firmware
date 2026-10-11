@@ -4356,9 +4356,12 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
                 strMsg.setCharAt(i, '(');
         }
 
-        // W0c: an RM1 frame goes out once -- no "{NNN" (the receiver sends no
-        // ACK), no DM statistics entry (it would stay sent-never-acked), see
-        // dmTextIsRm1Frame(). The escaped text is the payload as is.
+        // W0c / wave 3a: an RM1 frame (command or reply) carries no "{NNN" (the
+        // receiver sends no ACK) and no DM statistics entry (it would stay
+        // sent-never-acked), see dmTextIsRm1Frame(). The escaped text is the
+        // payload as is. A reply goes out once (dmTextSendOnce()); a command is
+        // enqueued like a PN and repeats on the 40 s ladder until the RM layer
+        // stops it (pnFrameIsOwnRm1Cmd(), findAndStopRingSlot()).
         if(dmTextIsRm1Frame(strMsg.c_str()))
             mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), strMsg.c_str());
         else
@@ -4407,7 +4410,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // Slot wird erst im Einreihen unter Lock gewaehlt/beschrieben.
     uint8_t user_msg_status = 0x00;
     // RCA 2026-10-10: Texte, die genau einmal in die Luft gehen ({ping},
-    // {CET}/{MCP}/{SET}, RM1; dmTextSendOnce() in dm_text_escape.h), laufen
+    // {CET}/{MCP}/{SET}, RM1-Antwort; dmTextSendOnce() in dm_text_escape.h), laufen
     // ueber addTxRingEntryOnce(): klassifiziert READY (eigene DM/Gruppe),
     // gespeichert DONE (keine Wiederholung), beides atomar. Ein VORAB auf DONE
     // (0xFF) gesetzter Text gilt in getMessagePriority() als Relay (NORMAL,
@@ -4419,7 +4422,7 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         if(dmTextSendOnce(aprsmsg.msg_payload, bDM))
             bUseOnce = true;
         else
-            user_msg_status = 0x00; // retransmission active
+            user_msg_status = 0x00; // retransmission active (PN, RM1 command: 40 s ladder)
     }
     else
     {

@@ -12,6 +12,9 @@ SAFE ORDER (each step confirmed from the log before the next):
   gw on    `--gateway on` (saved, no reboot) only now; the mock must log KEEP of both calls from both node IPs within 90 s.
   teardown ALWAYS: `--gateway off` first, THEN `--srvip 0.0.0.0` (clearing srvip while gateway is on would restart UDP
            towards the REAL server), RM at 90 restored, stop loggers + mock.
+LoRa-only mode (--lora-only): no setup phase, no mock, no --srvip; the guard still insists on gateway OFF on both nodes.
+Phase `repeat` (opt-in, INSTRUMENT image): RM1 repeat ladder tests with `--airgap on|off` (RAM only; drops all RX and own TX);
+  teardown ALWAYS sends `--airgap off` to both nodes and waits for `[AIRGAP];off`.
 Residual risk: gateway-on is persisted, srvip is RAM only: a reboot while gateway is on reconnects to the real server;
 gwguard.BootGuard watches both logs and sends `--gateway off` on a boot marker.
 Rules in code: destinations only DK5EN-1/DK5EN-90/TEST, only the two resolved node hosts, no radio/pos write, same-value write-back.
@@ -19,7 +22,7 @@ Rules in code: destinations only DK5EN-1/DK5EN-90/TEST, only the two resolved no
 import argparse, json, os, re, signal, socket, subprocess, sys, threading, time, urllib.error, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gwguard
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
@@ -29,7 +32,13 @@ MOCK_DIR = "gwmock"          # ~/gwmock on the pi
 ALLOWED_HOSTS: set = set()   # filled from the resolved node addresses
 ALLOWED_CALLS = {"DK5EN-1", "DK5EN-90", "TEST"}
 RM_READ = ["sync", "status", "radio", "name", "atxt", "pos", "sens", "mh 0", "mh {PEER}", "txq", "mbox", "maxhop"]
-PHASES = ["guard", "setup", "rm", "neg", "plain", "refused", "teardown"]
+PHASES = ["guard", "setup", "rm", "neg", "plain", "refused", "repeat", "teardown"]
+DEFAULT_PHASES = "guard,setup,rm,neg,plain"
+LORA_ONLY_PHASES = "guard,rm,neg,plain"
+RM_WAIT = 200          # s: "No answer" comes after the whole repeat ladder (~170 s)
+LADDER_END = 140       # s after /rmsend: copy 4 would be out by ~126 s; observe past it
+REPLY_GAP_OFF = 25     # s after /rmsend: airgap off at the sender (copy 2 is due at ~42 s)
+COPY1_WAIT = 10        # s after /rmsend ok when no TX-LoRa marker shows up
 MOCK_IP = ""
 
 
@@ -117,6 +126,8 @@ class Run:
         self.raise_trip = True
         self.rm90_before: Optional[int] = None
         self.udplog_on = False
+        self.dbg_on = False
+        self.airgap_used = False
 
     def nap(self, sec: float) -> None:
         """sleep in slices; a boot-guard trip aborts the run into teardown."""
@@ -229,26 +240,43 @@ class Run:
     def gw_off_sender(self, n: Node) -> bool:
         return gwguard.gateway_off_sender(n, http, lambda x: x.con("--gateway off"))
 
-    def rm_send(self, src: Node, dst: Node, cmd: str, args: str = "", pw: Optional[str] = None, force: bool = False, wait: int = 100) -> Dict[str, Any]:
+    def rm_post(self, src: Node, dst: Node, cmd: str, args: str = "", pw: Optional[str] = None, force: bool = False) -> Tuple[Optional[Dict[str, Any]], float]:
+        """POST /rmsend until accepted. Returns (refusal result or None, t0 of the accepted send)."""
         guard_call(dst.call)
         if cmd in ("radio", "pos") and args:
             raise Abort("bench rule: no radio/pos writes")
+        if cmd == "txpower":
+            try:
+                dbm = int(args.strip())
+            except ValueError:
+                raise Abort("bench rule: txpower argument %r is not an integer" % args) from None
+            if dbm > 2:
+                raise Abort("bench rule: no txpower write above 2 dBm")
         body = "dst=%s&pw=%s&cmd=%s&args=%s" % (dst.call, q(pw or dst.pw), cmd, q(args)) + ("&force=1" if force else "")
-        want = (cmd + " " + args).strip(); j: Any = {}
+        j: Any = {}
         for _ in range(25):
             j = http(src.base, "/rmsend", body)
             if isinstance(j, dict) and j.get("ok"):
-                break
+                return None, time.time()
             if isinstance(j, dict) and j.get("err") in ("busy", "limit", "cooldown"):
                 self.nap(max(1, int(j.get("retry", 3))) + 1); continue
-            return {"result": "refused", "reply": json.dumps(j), "lat": 0.0, "ver": None, "t0": time.time()}
-        t0 = time.time()
+            break
+        return {"result": "refused", "reply": json.dumps(j), "lat": 0.0, "ver": None, "t0": time.time()}, time.time()
+
+    def rm_wait(self, src: Node, dst: Node, cmd: str, args: str, t0: float, wait: int = RM_WAIT) -> Dict[str, Any]:
+        want = (cmd + " " + args).strip()
         while time.time() - t0 < wait:
             self.nap(2)
             for e in http(src.base, "/rmstatus").get("sent", []):
                 if e["dst"] == dst.call and e["cmd"] == want and e["ago"] <= time.time() - t0 + 5 and e["st"] in ("ok", "err", "unverified", "noanswer"):
                     return {"result": e["st"], "reply": e["reply"], "lat": round(time.time() - t0, 1), "ver": e["ver"], "t0": t0}
         return {"result": "timeout", "reply": "", "lat": round(time.time() - t0, 1), "ver": None, "t0": t0}
+
+    def rm_send(self, src: Node, dst: Node, cmd: str, args: str = "", pw: Optional[str] = None, force: bool = False, wait: int = RM_WAIT) -> Dict[str, Any]:
+        ref, t0 = self.rm_post(src, dst, cmd, args, pw, force)
+        if ref is not None:
+            return ref
+        return self.rm_wait(src, dst, cmd, args, t0, wait)
 
     def rm_case(self, src: Node, dst: Node, cmd: str, args: str = "", tag: str = "") -> Dict[str, Any]:
         b = http(dst.base, "/rmstatus"); r = self.rm_send(src, dst, cmd, args); a = http(dst.base, "/rmstatus")
@@ -309,28 +337,123 @@ class Run:
         ok = r["result"] == "ok" and r["reply"] == "ok txpower=2"
         self.ev("refused:in-range txpower 2", d, result="PASS" if ok else "FAIL", reply=r["reply"], ver=r["ver"])
 
+    # ------------------------------------------------------------------ airgap / debug switches (INSTRUMENT image, RAM only)
+    def airgap(self, n: Node, state: str, tries: int = 3) -> bool:
+        if state == "on":
+            self.airgap_used = True  # before the first `on`: teardown must clear it even if we abort in between
+        for _ in range(tries):
+            p = n.pos(); n.con("--airgap " + state)
+            if n.wait(r"\[AIRGAP\];%s\b" % state, p, 8):
+                self.ev("airgap", n.call, result=state)
+                return True
+        return False
+
+    def airgap_probe(self) -> None:
+        for n in self.nodes:
+            p = n.pos(); n.con("--airgap")
+            if not n.wait(r"\[AIRGAP\];(?:on|off)\b", p, 10):
+                raise Abort("%s: --airgap not answered (stock image or wrong command?); phase repeat needs the INSTRUMENT image on both nodes" % n.call)
+            if re.search(r"\[AIRGAP\];on\b", n.text(p)):
+                raise Abort("%s: airgap already on at start; refusing (power-cycle or send --airgap off by hand)" % n.call)
+
+    def dbg_enable(self) -> None:
+        """RAM-only log switches: --setinfo on (NEW-TXT/TX-LoRa lines), --setretx on ([RETX] PNRETRY lines). Cleared in teardown."""
+        if self.dbg_on:
+            return
+        self.dbg_on = True
+        for n in self.nodes:
+            n.con("--setinfo on"); n.con("--setretx on")
+        self.nap(2)
+
+    def nap_until(self, t: float) -> None:
+        self.nap(max(0.0, t - time.time()))
+
+    def wait_copy1(self, src: Node, dst: Node, p: int, t0: float) -> Tuple[Optional[int], str]:
+        """Return (ctr, marker) once copy 1 has left the sender. Marker `TX-LoRa` = the sender's own TX line (needs --setinfo on);
+        fallback `wait10s` = COPY1_WAIT seconds after /rmsend returned ok (no reliable marker seen)."""
+        if not src.wait(r"\[RM\];send;%s;ctr;\d+" % re.escape(dst.call), p, 15):
+            return None, "no [RM];send"
+        ctr = int(re.findall(r"\[RM\];send;%s;ctr;(\d+)" % re.escape(dst.call), src.text(p))[-1])
+        if src.wait(r"TX-Lo[Rr]a[^\n]*RM1 %d " % ctr, p, COPY1_WAIT):
+            return ctr, "TX-LoRa"
+        self.nap_until(t0 + COPY1_WAIT)
+        return ctr, "wait10s"
+
+    def p_repeat(self) -> None:
+        """RM1 repeat ladder (txpower-clamp plan, wave 3). LoRa only, `status` DK5EN-1 > DK5EN-90, nothing written, no TX power change.
+        The verdicts (one execution, cached answer, stop, no stray copy) come from gwanalyze, which reads the events and the logs."""
+        if "setup" in self.a.phases:
+            raise Abort("phase repeat is LoRa only: do not combine it with setup (gateway on)")
+        self.airgap_probe()
+        for n in self.nodes:
+            if not self.airgap(n, "off"):
+                raise Abort(n.call + ": --airgap off not confirmed before the test")
+        self.dbg_enable()
+        src, dst, d = self.n1, self.n90, "1>90"
+        # (a) lost command: the target is deaf while copy 1 is on air; copy 2 (~42 s) must execute and verify
+        self.airgap(dst, "on") or self.fail_airgap(dst)
+        p1 = src.pos(); ref, t0 = self.rm_post(src, dst, "status")
+        if ref is not None:
+            raise Abort("repeat a: /rmsend refused: %s" % ref["reply"])
+        ctr, marker = self.wait_copy1(src, dst, p1, t0)
+        self.airgap(dst, "off") or self.fail_airgap(dst)
+        t_off = time.time() - t0
+        r = self.rm_wait(src, dst, "status", "", t0)
+        self.nap_until(t0 + LADDER_END)
+        self.ev("repeat:lost-command", d, result=r["result"], lat=r["lat"], ver=r["ver"], reply=r["reply"], t_send=t0, ctr=ctr, copy1_marker=marker,
+                airgap_off_at=round(t_off, 1), expect={"min_repeats": 1, "exec": 1, "max_cached": 0})
+        self.nap(10)
+        # (b) lost reply: the sender is deaf while the target answers; copy 2 must be answered from the reply cache
+        p1 = src.pos(); ref, t0 = self.rm_post(src, dst, "status")
+        if ref is not None:
+            raise Abort("repeat b: /rmsend refused: %s" % ref["reply"])
+        ctr, marker = self.wait_copy1(src, dst, p1, t0)
+        self.airgap(src, "on") or self.fail_airgap(src)
+        raced = ctr is not None and re.search(r"\[RM\];reply;%s;ctr;%d;verified;1" % (re.escape(dst.call), ctr), src.text(p1)) is not None
+        self.nap_until(t0 + REPLY_GAP_OFF)
+        self.airgap(src, "off") or self.fail_airgap(src)
+        r = self.rm_wait(src, dst, "status", "", t0)
+        self.nap_until(t0 + LADDER_END)
+        self.ev("repeat:lost-reply", d, result=r["result"], lat=r["lat"], ver=r["ver"], reply=r["reply"], t_send=t0, ctr=ctr, copy1_marker=marker,
+                reply_beat_airgap=raced, expect={"min_repeats": 1, "exec": 1, "min_cached": 1})
+
+    def fail_airgap(self, n: Node) -> None:
+        raise Abort("%s: --airgap change not confirmed by [AIRGAP];..." % n.call)
+
     def junk(self, src: Node, dst: Node, n: int) -> None:
         """Wrong-tag RM frame as a plain DM (the sender policy would refuse a third wrong-password send by design)."""
         hwm = int(http(dst.base, "/rmstatus")["hwm"])
         http(src.base, "/?sendmessage&tocall=%s&message=%s" % (guard_call(dst.call), q("RM1 %d status 0123456789abcde%d" % (hwm + 50 + n, n))))
 
     def p_neg(self) -> None:
-        # Every frame reaches the target twice (RF and server). One junk frame must count as ONE reject.
+        """Wrong-tag RM1 frames as plain DMs. Since the RM1 repeat ladder every such DM goes out 4x (copy 1 + up to 3 repeats
+        ~42 s apart) and nothing ever answers it, so the ladder runs to its end (LADDER_END, past 135 s). Expectations are on the
+        target's strike/lock state, not on raw reject counts (each copy, and each RF/server delivery, is a `[RM];reject` line and
+        raises `rej`; the target's "same guess = one strike" rule dedups against every strike counted in the window, at most 2):
+          x1: ONE junk frame, full ladder: all copies are one guess -> rej_d >= 1 and NO lock.
+          x3: three DISTINCT junk frames (other ctr and tag) 15 s apart, inside the 90 s strike window -> lock, rej_d >= 3.
+              Repeat copies of the earlier frames add no strike (same guess) and are `lockout` once locked. The check waits the full
+              ladder after the last send, so no repeat is still pending when the lock is read, reset or tested (lock lasts 300 s)."""
         for src, dst in ((self.n1, self.n90), (self.n90, self.n1)):
             d = "%s>%s" % (src.call[6:], dst.call[6:])
             http(dst.base, "/rmpasswd", "act=set&pw=" + q(dst.pw)); self.nap(2)  # clean reject table
-            b = http(dst.base, "/rmstatus"); t0 = time.time(); self.junk(src, dst, 0); self.nap(30); a = http(dst.base, "/rmstatus")
-            self.ev("neg:junk x1", d, result="ok" if a["rej"] - b["rej"] == 1 and not a["lock"] else "UNEXPECTED", rej_d=a["rej"] - b["rej"], lock=a["lock"], t_send=t0)
-            t0 = time.time()
-            for k in (1, 2):
-                self.junk(src, dst, k); self.nap(15)
-            self.nap(10); a = http(dst.base, "/rmstatus")
-            self.ev("neg:junk x3 lock", d, result="locked" if a["lock"] and a["rej"] - b["rej"] == 3 else "UNEXPECTED", rej_d=a["rej"] - b["rej"], lock=a["lock"], lockS=a["lockS"], t_send=t0)
-            r = self.rm_send(src, dst, "status", wait=100); a2 = http(dst.base, "/rmstatus")
+            b = http(dst.base, "/rmstatus"); t0 = time.time(); self.junk(src, dst, 0); self.nap_until(t0 + LADDER_END); a = http(dst.base, "/rmstatus")
+            rd = a["rej"] - b["rej"]
+            self.ev("neg:junk x1", d, result="ok" if rd >= 1 and not a["lock"] else "UNEXPECTED", rej_d=rd, lock=a["lock"], t_send=t0, expect="rej_d>=1, no lock")
+            http(dst.base, "/rmpasswd", "act=set&pw=" + q(dst.pw)); self.nap(2)  # fresh strike window for the lock test
+            b = http(dst.base, "/rmstatus"); t0 = time.time(); t_last = t0
+            for k in (1, 2, 3):
+                t_last = time.time(); self.junk(src, dst, k)
+                if k < 3:
+                    self.nap(15)
+            self.nap_until(t_last + LADDER_END); a = http(dst.base, "/rmstatus")
+            rd = a["rej"] - b["rej"]
+            self.ev("neg:junk x3 lock", d, result="locked" if a["lock"] and rd >= 3 else "UNEXPECTED", rej_d=rd, lock=a["lock"], lockS=a["lockS"], t_send=t0, expect="lock, rej_d>=3")
+            r = self.rm_send(src, dst, "status"); a2 = http(dst.base, "/rmstatus")
             self.ev("neg:valid cmd while locked", d, result=r["result"], reply=r["reply"], ok_d=a2["ok"] - a["ok"], t_send=r["t0"])
             http(dst.base, "/rmpasswd", "act=set&pw=" + q(dst.pw)); self.nap(2)
             self.ev("neg:unlock", "local@" + dst.call[6:], result="ok" if not http(dst.base, "/rmstatus")["lock"] else "STILL locked")
-            r = self.rm_send(src, dst, "sync", wait=100)
+            r = self.rm_send(src, dst, "sync")
             self.ev("neg:sync after unlock", d, result=r["result"], reply=r["reply"], t_send=r["t0"])
         self.ev("neg:per-sender", "-", result="skipped: needs a third sender callsign (covered in the RF round)")
         self.ev("neg:replay", "-", result="covered by the double delivery: every command arrives twice with the same counter and tag")
@@ -359,6 +482,20 @@ class Run:
 
     def teardown(self) -> None:
         self.raise_trip = False
+        if self.airgap_used or "repeat" in self.a.phases:
+            for n in self.nodes:
+                if n.cmd:
+                    ok = False
+                    for _ in range(3):
+                        p = n.pos(); n.con("--airgap off")
+                        if n.wait(r"\[AIRGAP\];off\b", p, 8):
+                            ok = True
+                            break
+                    print(("AIRGAP OFF CONFIRMED " if ok else "AIRGAP STATE UNCONFIRMED ") + n.call, flush=True)
+        if self.dbg_on:
+            for n in self.nodes:
+                if n.cmd:
+                    n.con("--setretx off"); n.con("--setinfo off")
         if self.guard:
             self.guard.stop_ev.set(); self.guard.join_senders(125)
         for n in self.nodes:
@@ -394,7 +531,10 @@ class Run:
             self.start_loggers()
             for name in PHASES[:-1]:
                 if name in self.a.phases:
-                    print("== phase", name, flush=True); getattr(self, "p_" + name)()
+                    print("== phase", name, flush=True)
+                    if name != "guard" and self.a.lora_only:
+                        self.dbg_enable()
+                    getattr(self, "p_" + name)()
         except Abort as e:
             print("ABORT:", e); self.ev("abort", "-", result=str(e))
         finally:
@@ -402,19 +542,54 @@ class Run:
         print("run dir:", self.dir)
 
 
+def print_plan(a: argparse.Namespace) -> None:
+    print("DRY RUN (no I/O): phases", a.phases, "+ teardown; RAK host", a.rak_host)
+    if a.lora_only:
+        print("mode: LoRa only: gateway OFF on both nodes (guard aborts otherwise); no mock, no --srvip, no setup phase; "
+              "--setinfo on / --setretx on (RAM only) for the TX and PNRETRY log lines")
+    else:
+        print("mode: both nodes as gateways against the mock on", MOCK_SSH)
+    if "rm" in a.phases:
+        print("rm:", RM_READ)
+    if "repeat" in a.phases:
+        print("repeat plan (INSTRUMENT image on both nodes, otherwise abort; RM1 `status` DK5EN-1 > DK5EN-90, no write, no TX power change):")
+        print("  probe `--airgap` on both nodes; both must answer [AIRGAP];off")
+        print("  a lost command : --airgap on at DK5EN-90; /rmsend status; wait for copy 1 on air (sender TX-LoRa line, else %d s after /rmsend);"
+              % COPY1_WAIT)
+        print("                   --airgap off at DK5EN-90; expect copy 2 (~42 s) executes ([RM];ok once), reply verified, no copy after the stop; observe to %d s" % LADDER_END)
+        print("  b lost reply   : /rmsend status; wait for copy 1 on air; --airgap on at DK5EN-1; --airgap off at DK5EN-1 at +%d s;" % REPLY_GAP_OFF)
+        print("                   expect copy 2 answered from the cache ([RM];cached, no second [RM];ok) and verified; observe to %d s" % LADDER_END)
+        print("  teardown       : --airgap off on both nodes, wait for [AIRGAP];off (always), then --setretx off / --setinfo off")
+        print("  analysis       : gwanalyze.py <run dir> (FAIL lines and exit 1 on second execution, strike, second verified row, stray repeat)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--phases", default="guard,setup,rm,neg,plain", help="comma list of guard,setup,rm,neg,plain,refused; teardown always runs (refused: LoRa only, run without setup)")
+    ap.add_argument("--phases", default=None, help="comma list of guard,setup,rm,neg,plain,refused,repeat; teardown always runs (default %s; with --lora-only %s). "
+                    "refused/repeat: LoRa only, run without setup; repeat needs the INSTRUMENT image (--airgap)" % (DEFAULT_PHASES, LORA_ONLY_PHASES))
+    ap.add_argument("--lora-only", action="store_true", help="gateway OFF on both nodes: no mock, no --srvip, no setup phase (guard confirms gateway off)")
     ap.add_argument("--run-dir", default=None)
     ap.add_argument("--rak-port", default="/dev/cu.usbmodem1101")
     ap.add_argument("--rak-host", default="192.168.68.73", help="RAK web address (DHCP, no mDNS); the page must name DK5EN-90")
     ap.add_argument("--heltec-host", default=None, help="default: resolve dk5en-1.local")
     ap.add_argument("--loradebug", action="store_true", help="also --loradebug on (RX-UDP line with msg id; noisy)")
     ap.add_argument("--dry-run", action="store_true")
-    a = ap.parse_args(); a.phases = a.phases.split(",")
+    a = ap.parse_args()
+    a.phases = (a.phases or (LORA_ONLY_PHASES if a.lora_only else DEFAULT_PHASES)).split(",")
+    bad = [p for p in a.phases if p not in PHASES[:-1]]
+    if bad:
+        ap.error("unknown phase(s): %s" % ",".join(bad))
+    if "repeat" in a.phases:
+        a.lora_only = True  # repeat is LoRa only
+    if "guard" not in a.phases:
+        # every phase talks to the nodes: identity_guard and the gateway-off confirmation must never be skipped
+        a.phases = ["guard"] + a.phases
+        print("note: phase guard added (identity_guard + gateway-off confirmation are mandatory whenever a phase talks to the nodes)", flush=True)
+    if a.lora_only and "setup" in a.phases:
+        a.phases = [p for p in a.phases if p != "setup"]
+        print("note: LoRa only: phase setup (mock, --srvip, gateway on) skipped", flush=True)
     if a.dry_run:
-        print("DRY RUN (no I/O): phases", a.phases, "+ teardown; mock on", MOCK_SSH, "RAK host", a.rak_host)
-        print("rm:", RM_READ)
+        print_plan(a)
         return
     Run(a).run()
 

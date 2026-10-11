@@ -325,7 +325,8 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                         // PN-Wiederholung (pn_retry.h): ein :ackNNN ueber den Server stoppt auch
                         // den wartenden Ring-Slot -- das Echo gibt eine eigene PN nicht mehr frei.
-                        int ackSlot = findAndStopRingSlot(msg_counter);
+                        // Ein RM1-Kommando stoppt nur die RM-Schicht (verifizierte Antwort): NoRm1.
+                        int ackSlot = findAndStopRingSlotNoRm1(msg_counter);
                         if(ackSlot >= 0 && bDisplayRetx)
                             printfdeb("\n[RETX] server ACK for retid:%i stop retransmit msg-id:%08X\n",
                                       ackSlot, msg_counter);

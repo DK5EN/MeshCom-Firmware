@@ -1686,8 +1686,8 @@ function leaks(P, canary) {
     await P.setPoll({ targets: TF(0), sent: [ent('DK5EN-1', 'mh 0', 'ok 3 - ZZ1ZZ-1 1', { ago: 0, ctr: srv.lastCtr, ver: 0 })] });
     check('ADV e: an unverified entry ends the run with the no-answer sentence', P.w.rmMh.on === 0 && /no answer/.test(tx('rm_mh_prog')), tx('rm_mh_prog'));
     P.w.rmMhStart(); await flush();
-    for (let i = 0; i < 14; i++) await P.setPoll({ targets: TF(0), sent: [] });
-    check('ADV e: 120 s without a matching entry ends the run', P.w.rmMh.on === 0 && /no answer/.test(tx('rm_mh_prog')), tx('rm_mh_prog'));
+    for (let i = 0; i < 20; i++) await P.setPoll({ targets: TF(0), sent: [] });
+    check('ADV e: 180 s without a matching entry (no answer comes at 171 s) ends the run', P.w.rmMh.on === 0 && /no answer/.test(tx('rm_mh_prog')), tx('rm_mh_prog'));
     for (const tk of ['limit', 'locked', 'auth']) {
       await P.T.advance(12000); srv.sendReply = { ok: false, err: tk, retry: 5, canForce: 0 };
       const e0 = nS(); P.w.rmMhStart(); await flush(); await P.T.advance(30000);
