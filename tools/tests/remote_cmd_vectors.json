@@ -675,5 +675,56 @@
       "reply_tag": "845313fa59d76238",
       "reply_text": "RM1 96 err hidden 845313fa59d76238"
     }
+  ],
+  "refusals": [
+    {
+      "cmd": "txpower",
+      "args": "21",
+      "min": 0,
+      "max": 20,
+      "text": "err range 0..20"
+    },
+    {
+      "cmd": "txpower",
+      "args": "1",
+      "min": 2,
+      "max": 22,
+      "text": "err range 2..22"
+    },
+    {
+      "cmd": "txpower",
+      "args": "x",
+      "min": 0,
+      "max": 22,
+      "text": "err range 0..22"
+    },
+    {
+      "cmd": "txpower",
+      "args": "-1",
+      "min": 0,
+      "max": 22,
+      "text": "err range 0..22"
+    },
+    {
+      "cmd": "dfu",
+      "args": "",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "reboot",
+      "args": "now",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "gps",
+      "args": "on;x",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    }
   ]
 }

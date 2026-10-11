@@ -197,7 +197,9 @@ stage2() {
         uv run --quiet --with ruff ruff check --select E9,F63,F7,F82 --output-format concise \
         tools test/golden test/test_nbrlog
     run_step "pytest tools/bench tools/tests tools/mock" stage2-pytest \
-        uv run --quiet --with pytest pytest -q tools/bench tools/tests tools/mock
+        uv run --quiet --with pytest --with markdown-it-py==3.0.0 pytest -q tools/bench tools/tests tools/mock
+    run_step "wire doc HTML up to date" stage2-wire-doc-html \
+        uv run --quiet tools/wire_doc_html.py --check
     local f
     for f in test/test_nbrlog/test_*.py; do
         run_step "nbrlog $(basename "$f" .py)" "stage2-$(basename "$f" .py)" uv run --quiet "$f"
@@ -218,7 +220,7 @@ stage2() {
         node tools/webgui_rm_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_settings_test.js" stage2-webgui-settings \
         node tools/webgui_settings_test.js
-    for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py; do
+    for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py; do
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test
     done

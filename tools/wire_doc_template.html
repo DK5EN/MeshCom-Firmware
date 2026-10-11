@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@@TITLE@@</title>
+<meta name="source-sha256" content="@@SHA@@">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F7F8; --panel:#FFFFFF; --ink:#1A222B; --ink-2:#4B5762; --mute:#7C8791;
+  --rule:#D8DFE5; --accent:#1F6F86; --accent-ink:#155463; --code-bg:#EEF2F4; --hi:#FFF3D6; --mark:#B8611A;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10161B; --panel:#161E25; --ink:#E4EAEE; --ink-2:#B3BEC7; --mute:#7F8C97;
+  --rule:#26323B; --accent:#5FBFD6; --accent-ink:#8ED5E6; --code-bg:#1B252D; --hi:#3A2E12; --mark:#E0A15A;
+}}
+:root[data-theme="dark"]{
+  --bg:#10161B; --panel:#161E25; --ink:#E4EAEE; --ink-2:#B3BEC7; --mute:#7F8C97;
+  --rule:#26323B; --accent:#5FBFD6; --accent-ink:#8ED5E6; --code-bg:#1B252D; --hi:#3A2E12; --mark:#E0A15A;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.6;padding-inline:20px;padding-block:0 64px}
+a{color:var(--accent-ink);text-decoration-thickness:1px;text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mast{max-width:1180px;margin:0 auto;padding-block:36px 20px;border-bottom:1px solid var(--rule)}
+.mast .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.mast h1{font-size:clamp(26px,3.2vw,38px);line-height:1.15;margin:0 0 12px;font-weight:600;letter-spacing:-.01em;text-wrap:balance;max-width:26ch}
+.mast .sub{color:var(--ink-2);margin:0;max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--mute)}
+.meta b{color:var(--ink-2);font-weight:500}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:48px;padding-top:28px}
+nav.toc{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto;font-size:13.5px;line-height:1.45;padding-right:8px}
+nav.toc .toc-h{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+nav.toc a{display:block;color:var(--ink-2);text-decoration:none;padding:4px 0 4px 10px;border-left:2px solid transparent}
+nav.toc a.toc-3{padding-left:22px;font-size:13px;color:var(--mute)}
+nav.toc a:hover{color:var(--ink)}
+nav.toc a.on{color:var(--accent-ink);border-left-color:var(--accent)}
+main{min-width:0}
+main p,main li{max-width:72ch}
+main h2{font-size:23px;font-weight:600;letter-spacing:-.01em;margin:56px 0 14px;padding-top:18px;border-top:1px solid var(--rule);text-wrap:balance}
+main h2:first-child{margin-top:0;border-top:0;padding-top:0}
+main h3{font-size:17.5px;font-weight:600;margin:34px 0 10px;text-wrap:balance}
+main h4{font-size:15px;font-weight:600;margin:26px 0 8px;color:var(--ink-2);text-wrap:balance}
+main h2 code,main h3 code,main h4 code{font-size:.92em}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
+pre{background:var(--code-bg);border:1px solid var(--rule);border-radius:4px;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.5;margin:14px 0}
+pre code{background:none;padding:0;font-size:inherit}
+.tbl{overflow-x:auto;margin:14px 0;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:500;background:var(--code-bg);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+blockquote{margin:14px 0;padding:10px 16px;border-left:3px solid var(--mark);background:var(--hi);color:var(--ink);border-radius:0 4px 4px 0}
+blockquote p{margin:0}
+strong{font-weight:600}
+hr{border:0;border-top:1px solid var(--rule);margin:40px 0}
+ul,ol{padding-left:22px}
+li{margin:4px 0}
+.top{position:fixed;right:18px;bottom:18px;font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--rule);color:var(--ink-2);padding:6px 10px;border-radius:4px;text-decoration:none}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;gap:20px}
+  nav.toc{position:static;max-height:none;border:1px solid var(--rule);border-radius:4px;padding:12px 14px;background:var(--panel);columns:2;column-gap:20px}
+  nav.toc .toc-h{column-span:all}
+  nav.toc a{break-inside:avoid}
+}
+@media (max-width:520px){nav.toc{columns:1}}
+</style>
+</head>
+<body>
+<header class="mast">
+  <p class="eyebrow">MeshCom firmware · @@SOURCE@@</p>
+  <h1>@@H1@@</h1>
+  <p class="sub">@@SUB@@</p>
+  <div class="meta">@@META@@</div>
+</header>
+<div class="wrap">
+<nav class="toc" aria-label="Contents"><p class="toc-h">Contents</p>
+@@TOC@@
+</nav>
+<main>
+@@BODY@@
+</main>
+</div>
+<a class="top" href="#" aria-label="Back to top">↑ top</a>
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll("nav.toc a"));
+  var heads=links.map(function(a){return document.getElementById(a.getAttribute("href").slice(1));});
+  function upd(){var y=window.scrollY+90,i=0;for(var k=0;k<heads.length;k++){if(heads[k]&&heads[k].offsetTop<=y)i=k;}links.forEach(function(a,k){a.classList.toggle("on",k===i);});}
+  window.addEventListener("scroll",upd,{passive:true});upd();
+})();
+</script></body>
+</html>

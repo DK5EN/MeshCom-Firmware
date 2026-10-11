@@ -54,6 +54,15 @@ def test_vector_file_is_current() -> None:
     assert rc.generate_vectors() == VECTORS
 
 
+def test_refusal_text_receiver_model() -> None:
+    assert rc.refusal_text("txpower", "21", 0, 20) == "err range 0..20"
+    assert rc.refusal_text("txpower", "1", 2, 22) == "err range 2..22"
+    assert rc.refusal_text("txpower", "2", 2, 22) == "err blocked"  # in range is not a refusal reason
+    assert rc.refusal_text("txpower", "x", 0, 22) == "err range 0..22"
+    assert rc.refusal_text("dfu", "", 0, 22) == "err blocked"
+    assert [v["text"] for v in VECTORS["refusals"]][:2] == ["err range 0..20", "err range 2..22"]
+
+
 def test_allowlist_command_count() -> None:
     assert len(rc.ALLOWLIST) == 22
     assert rc.ALLOWLIST["led"] == ("on", "off")

@@ -381,6 +381,28 @@ def _status_expect(result: str) -> Optional[Dict[str, Any]]:
             "status_led": len(letters) == 6}
 
 
+def refusal_text(cmd: str, args: str, min_tx: int, max_tx: int) -> str:
+    """Receiver model of rmRefusalText (src/remote_cmd.cpp): the answer to a VALID-tag command that fails the
+    allowlist. The target checks the tag first, so this is an answer and never a strike. "err range <min>..<max>"
+    for a txpower whose args fail the shape or the range, "err blocked" for everything else."""
+    if cmd == "txpower":
+        if not (_INT_RE.fullmatch(args) and min_tx <= int(args) <= max_tx):
+            return "err range %d..%d" % (max(min_tx, 0), max(max_tx, 0))
+    return "err blocked"
+
+
+# (cmd, args, remote floor, remote max) -> refusal text; the C++ test checks rmRefusalText against these
+_VECTOR_REFUSALS = [
+    ("txpower", "21", 0, 20),
+    ("txpower", "1", 2, 22),
+    ("txpower", "x", 0, 22),
+    ("txpower", "-1", 0, 22),
+    ("dfu", "", 0, 22),
+    ("reboot", "now", 0, 22),
+    ("gps", "on;x", 0, 22),
+]
+
+
 def generate_vectors() -> Dict[str, Any]:
     cmds: List[Dict[str, Any]] = []
     for passwd, dst, src, ctr, cmd, args in _VECTOR_CMDS:
@@ -425,6 +447,10 @@ def generate_vectors() -> Dict[str, Any]:
         "proto": PROTO,
         "commands": cmds,
         "replies": replies,
+        "refusals": [
+            {"cmd": c, "args": a, "min": lo, "max": hi, "text": refusal_text(c, a, lo, hi)}
+            for c, a, lo, hi in _VECTOR_REFUSALS
+        ],
     }
 
 

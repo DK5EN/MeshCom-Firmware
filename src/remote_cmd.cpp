@@ -162,7 +162,7 @@ const RmAllowRow RM_ALLOWLIST[] = {
 #undef RM_ALLOW_ROW
 static_assert(sizeof(RM_ALLOWLIST) / sizeof(RM_ALLOWLIST[0]) == RM_COMMAND_COUNT, "allowlist = command list");
 
-bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
+bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
 {
     switch (shape)
     {
@@ -173,7 +173,7 @@ bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
     case RM_ARGS_TXPOWER:
     {
         int v = 0;
-        return parseSmallInt(a, 3, v) && v >= 0 && v <= maxTxPower;
+        return parseSmallInt(a, 3, v) && v >= minTxPower && v <= maxTxPower;
     }
     case RM_ARGS_SETOUT:
         return strlen(a) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
@@ -196,11 +196,11 @@ bool argsMatch(RmArgShape shape, const char *a, int maxTxPower)
     return false;
 }
 
-bool allowed(const RmCmd &c, int maxTxPower)
+bool allowed(const RmCmd &c, int minTxPower, int maxTxPower)
 {
     for (const RmAllowRow &r : RM_ALLOWLIST)
         if (strcmp(c.cmd, r.name) == 0)
-            return argsMatch(r.shape, c.args, maxTxPower);
+            return argsMatch(r.shape, c.args, minTxPower, maxTxPower);
     return false;
 }
 
@@ -333,6 +333,8 @@ const char *rmVerdictName(RmVerdict v)
         return "lockout";
     case RM_REJ_DISABLED:
         return "disabled";
+    case RM_REFUSED:
+        return "refused";
     }
     return "?";
 }
@@ -549,7 +551,7 @@ uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs)
 }
 
 RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
-                  int maxTxPower, uint32_t nowMs)
+                  int minTxPower, int maxTxPower, uint32_t nowMs)
 {
     if (strippedLen(passwd) == 0)
         return RM_REJ_DISABLED;
@@ -568,9 +570,6 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     const bool isSync = strcmp(c.cmd, "sync") == 0;
     if ((c.ctr == 0) != isSync)
         return reject(s, src, RM_REJ_FORMAT, nowMs);
-
-    if (isForbiddenText(c.cmd) || isForbiddenText(c.args) || !allowed(c, maxTxPower))
-        return reject(s, src, RM_REJ_BLOCKED, nowMs);
 
     char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
     if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
@@ -600,6 +599,10 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
     // BF-01 (D2): both limiters are active only with strict security on.
     if (isSync)
     {
+        // a sync carries no arguments; with a valid tag but args it is a malformed frame, not an answerable
+        // command (no counter to consume), so it stays a strike
+        if (!allowed(c, minTxPower, maxTxPower))
+            return reject(s, src, RM_REJ_BLOCKED, nowMs);
         if (s.strict && s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
             return RM_REJ_RATE;
         s.lastSyncMs = nowMs;
@@ -609,7 +612,30 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 
     if (s.strict && s.haveRate && (uint32_t)(nowMs - s.lastRateMs) < RM_RATE_MS)
         return RM_REJ_RATE;
+
+    // RM-STRIKE: the allowlist is decided last. The tag is valid here, so the sender is authenticated and a
+    // refusal is an answer (RM_REFUSED, no strike), not an attack signal. The caller consumes the counter.
+    if (isForbiddenText(c.cmd) || isForbiddenText(c.args) || !allowed(c, minTxPower, maxTxPower))
+        return RM_REFUSED;
     return RM_OK;
+}
+
+size_t rmRefusalText(const RmCmd &c, int minTxPower, int maxTxPower, char *out, size_t n)
+{
+    if (out == nullptr || n == 0)
+        return 0;
+    Out o;
+    outInit(o, out, n);
+    if (strcmp(c.cmd, "txpower") == 0 && !argsMatch(RM_ARGS_TXPOWER, c.args, minTxPower, maxTxPower))
+    {
+        outStr(o, "err range ");
+        outU32(o, minTxPower > 0 ? (uint32_t)minTxPower : 0u); // remote floor is >= 0 by contract
+        outStr(o, "..");
+        outU32(o, maxTxPower > 0 ? (uint32_t)maxTxPower : 0u);
+    }
+    else
+        outStr(o, "err blocked");
+    return outEnd(o);
 }
 
 uint32_t rmAccept(RmState &s, const RmCmd &c, const char *result, uint32_t nowMs)
@@ -673,7 +699,7 @@ bool rmIsReply(const char *text)
     return strncmp(p + 1, "ok ", 3) == 0 || strncmp(p + 1, "err ", 4) == 0;
 }
 
-bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower)
+bool rmCommandAllowed(const char *cmd, const char *args, int minTxPower, int maxTxPower)
 {
     if (cmd == nullptr)
         return false;
@@ -693,7 +719,7 @@ bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower)
     for (const char *p = args; *p; p++)
         if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e || (*p == ' ' && (p[1] == ' ' || p[1] == '\0' || p == args)))
             return false;
-    return !isForbiddenText(c.cmd) && !isForbiddenText(c.args) && allowed(c, maxTxPower);
+    return !isForbiddenText(c.cmd) && !isForbiddenText(c.args) && allowed(c, minTxPower, maxTxPower);
 }
 
 size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char *cmd, const char *args,

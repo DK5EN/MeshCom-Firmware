@@ -232,7 +232,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 
     if (strcmp(cmd, "txpower") == 0)
     {
-        const int v = atoi(a); // rmCheck() allowlisted: 1..3 digits, 0 <= v <= TX_POWER_MAX
+        const int v = atoi(a); // rmCheck() allowlisted: 1..3 digits, max(0, TX_POWER_MIN) <= v <= TX_POWER_MAX
         char line[24];
         snprintf(line, sizeof(line), "--txpower %d", v);
         runConsole(line);
@@ -556,8 +556,9 @@ void rmDrain(void)
     }
 
     const uint32_t now = millis();
+    const int rmMinTx = TX_POWER_MIN > 0 ? TX_POWER_MIN : 0; // remote floor: max(0, TX_POWER_MIN)
     const RmVerdict v = rmCheck(s_state, cmd, meshcom_settings.node_call, src, meshcom_settings.node_passwd,
-                                TX_POWER_MAX, now);
+                                rmMinTx, TX_POWER_MAX, now);
 
     switch (v)
     {
@@ -595,6 +596,33 @@ void rmDrain(void)
             s_rebootPending = true;
             s_rebootAtMs = millis() + kRebootDelayMs;
         }
+        break;
+    }
+    case RM_REFUSED:
+    {
+        // Valid tag, command outside the allowlist or range: answered like RM_OK minus execute(), no strike.
+        // The counter is consumed (hwm, reply cache), so a repeated copy is RM_CACHED, an older one RM_REJ_REPLAY.
+        g_rmStats.rej_blocked++;
+        const bool saved = rmHwmSave(cmd.ctr);
+
+        char result[RM_MAX_RESULT + 1];
+        if (saved)
+            rmRefusalText(cmd, rmMinTx, TX_POWER_MAX, result, sizeof(result));
+        else
+            snprintf(result, sizeof(result), "err storage"); // fail closed, same as RM_OK
+
+        rmSanitizeResult(result);
+        // CONTRACT (remote_cmd.h): rmAccept() for EVERY RM_OK and RM_REFUSED.
+        const uint32_t hwm = rmAccept(s_state, cmd, result, millis());
+        if (!saved || hwm != cmd.ctr)
+        {
+            if (!rmHwmSave(hwm))
+                Serial.printf("[RM];hwm_save;failed\n");
+        }
+
+        logExecuted(src, cmd, result, millis());
+        Serial.printf("[RM];refused;ctr;%lu\n", (unsigned long)cmd.ctr);
+        sendReply(cmd, result, src);
         break;
     }
     case RM_CACHED:
@@ -878,7 +906,7 @@ bool sendKeyImpl(const char *dst, const uint8_t key[32], const char *cmd, const 
         return false;
     }
 
-    if (cmd == nullptr || !rmCommandAllowed(cmd, args, TX_POWER_MAX) || strlen(cmd) >= sizeof(s_pend.cmd) ||
+    if (cmd == nullptr || !rmCommandAllowed(cmd, args, 0, TX_POWER_MAX) || strlen(cmd) >= sizeof(s_pend.cmd) ||
         strlen(args) >= sizeof(s_pend.args))
     {
         setErr(err, errN, "cmd");

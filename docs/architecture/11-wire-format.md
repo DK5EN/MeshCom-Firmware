@@ -421,22 +421,33 @@ sender), so the same pair of calls appears in the same order. `node_passwd` is a
 
 #### 1.9.3 Allowlist
 
-| Command                                      | Arguments                     | Reply status text                                                     |
-| -------------------------------------------- | ----------------------------- | --------------------------------------------------------------------- |
-| `reboot`                                     | none                          | `rebooting` (the node restarts 8 s after the reply)                   |
-| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>`        |
-| `sendpos`, `sendtrack`                       | none                          | `sent`                                                                |
-| `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                 | `<name>=<on/off>`                                                     |
-| `led`                                        | `on` or `off`                 | `led=<on/off>`; `err unsupported` on a board without a usable LED pin |
-| `txpower`                                    | `<n>`, 0 to the board maximum | `txpower=<n>`                                                         |
-| `setout`                                     | `<a0..a7\|b0..b7> <on\|off>`  | `<pin>=<on/off>`; `err not output` if the pin is not an output        |
-| `sync`                                       | none, ctr 0                   | `ctr=<hwm> v=<ver>`                                                   |
+| Command                                      | Arguments                    | Reply status text                                                     |
+| -------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `reboot`                                     | none                         | `rebooting` (the node restarts 8 s after the reply)                   |
+| `status`                                     | none                         | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>`        |
+| `sendpos`, `sendtrack`                       | none                         | `sent`                                                                |
+| `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                | `<name>=<on/off>`                                                     |
+| `led`                                        | `on` or `off`                | `led=<on/off>`; `err unsupported` on a board without a usable LED pin |
+| `txpower`                                    | `<n>`, remote floor to max   | `txpower=<n>`; `err range <min>..<max>` outside the range             |
+| `setout`                                     | `<a0..a7\|b0..b7> <on\|off>` | `<pin>=<on/off>`; `err not output` if the pin is not an output        |
+| `sync`                                       | none, ctr 0                  | `ctr=<hwm> v=<ver>`                                                   |
 
-Everything else is rejected, whatever the tag. Hard-blocked: `cleanflash`, `ota-update`, `dfu`,
+Everything else is refused. Hard-blocked: `cleanflash`, `ota-update`, `dfu`,
 `deepsleep`, `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`,
 `updchan`, `autoupdate`, `rm`, `stor`, and any argument containing `--`, `;`, `{` or `%`. Error
 reasons in a reply: `failed` (the setting did not take effect), `not output`, `unsupported`, `storage` (the
 high-water mark could not be persisted, the command was **not** executed).
+
+**Refused, not rejected (RM-STRIKE, 2026-10-11).** The target checks the tag before the allowlist. A
+command with a valid tag that fails the allowlist, has bad arguments, carries a forbidden character or
+asks for a `txpower` outside the range is answered and counts no strike: `err range <min>..<max>` for
+`txpower`, `err blocked` otherwise. `<min>` is the remote floor `max(0, TX_POWER_MIN)` (2 on RAK4631,
+Wireless Paper and Vision Master, 0 elsewhere), `<max>` is `TX_POWER_MAX`. The refusal consumes the
+counter like an executed command (mark persisted, reply cached), so a repeated copy gets the cached
+reply and an older counter is a replay. The node prints `[RM];refused;ctr;<n>` and counts it as
+`blocked` in its statistics. A `sync` with arguments stays a silent `blocked` strike (no counter to
+consume). Check order: disabled, lockout, frame format, canonical string and tag, then (not for
+`sync`) cache, replay, rate, allowlist.
 
 `status`: `s=` carries the switches as letters in the fixed order `G T D M W L` = gps, track,
 display, mesh, gateway, led; upper case = on, lower case = off. `L` is omitted on a board without an
@@ -471,18 +482,18 @@ RM1 0 ok ctr=42 v=4.40a c639dacb86c267de
 RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22 73baeaf0695e81ea
 ```
 
-(The `err range` vector exercises the reply grammar; the firmware itself refuses an out-of-range
-`txpower` silently as `blocked`.)
+(The `err range` vector exercises the reply grammar; the firmware sends `err range <min>..<max>`,
+see 1.9.3.)
 
 #### 1.9.5 Behaviour a mock or client must know
 
-- **Silent on failure.** A bad tag, a command off the allowlist or a counter at or below the
-  high-water mark gets no reply (no oracle). The node prints `[RM];reject;<verdict>`.
+- **Silent on failure.** A bad tag or a counter at or below the high-water mark gets no reply (no
+  oracle). A valid-tag command off the allowlist is answered (1.9.3, refused). The node prints `[RM];reject;<verdict>`.
 - **Lost-reply recovery.** The same `ctr` with the same valid tag within 10 min re-sends the cached
   reply and does not execute again; at most one cached reply per 10 s.
 - **Rate limit.** One accepted command (or `sync`) per 10 s. A rate reject needs a valid tag and
   does not count toward the lockout.
-- **Lockout.** Three counted rejects (`tag`, `replay`, `blocked`, in-check `format`) within 90 s lock
+- **Lockout.** Three counted rejects (`tag`, in-check `format`, `blocked` only for a malformed `sync`) within 90 s lock
   RM1 for 5 min. Reachable without the key, accepted by design (ADR).
 - **Counter.** The mark is persisted before execution. `sync` returns it; the client stores the
   counter per target.

@@ -81,7 +81,7 @@ struct Sim
         {
             Frame f = inflight.front();
             inflight.erase(inflight.begin());
-            const RmVerdict v = rmCheck(rs, f.cmd, DST, SRC, rightPw, 22, f.arriveMs);
+            const RmVerdict v = rmCheck(rs, f.cmd, DST, SRC, rightPw, 0, 22, f.arriveMs);
             if (v == RM_OK)
             {
                 rmAccept(rs, f.cmd, "ok", f.arriveMs);
@@ -314,7 +314,7 @@ static void run_right_key_reordered(bool randomDelay)
         {
             Frame f = s.inflight.front();
             s.inflight.erase(s.inflight.begin());
-            const RmVerdict v = rmCheck(s.rs, f.cmd, DST, SRC, PW, 22, f.arriveMs);
+            const RmVerdict v = rmCheck(s.rs, f.cmd, DST, SRC, PW, 0, 22, f.arriveMs);
             if (v == RM_OK)
             {
                 rmAccept(s.rs, f.cmd, "ok", f.arriveMs);
@@ -509,7 +509,7 @@ void test_junk_from_other_senders_never_locks_the_operator(void)
         RmCmd j;
         TEST_ASSERT_TRUE(rmBuildCommand(DST, call, 1000u + junk, "status", "", bad, wire, sizeof(wire)) > 0);
         TEST_ASSERT_TRUE(rmParse(wire, j));
-        const RmVerdict jv = rmCheck(rs, j, DST, call, PW, 22, now);
+        const RmVerdict jv = rmCheck(rs, j, DST, call, PW, 0, 22, now);
         TEST_ASSERT_TRUE(jv == RM_REJ_TAG || jv == RM_REJ_LOCKOUT);
         junk++;
         junkLocked += (jv == RM_REJ_LOCKOUT);
@@ -519,7 +519,7 @@ void test_junk_from_other_senders_never_locks_the_operator(void)
             RmCmd c;
             TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, ++ctr, "status", "", good, wire, sizeof(wire)) > 0);
             TEST_ASSERT_TRUE(rmParse(wire, c));
-            const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 22, now);
+            const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 0, 22, now);
             TEST_ASSERT_EQUAL_STRING_MESSAGE("ok", rmVerdictName(v), "the operator's command was not accepted");
             rmAccept(rs, c, "ok", now);
             accepted++;
@@ -570,7 +570,7 @@ static int flood_wrong_key(RmState &rs, uint32_t frames)
         RmCmd c;
         TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, i + 1, "status", "", bad, wire, sizeof(wire)) > 0);
         TEST_ASSERT_TRUE(rmParse(wire, c));
-        const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 22, 1000u + i * 1000u);
+        const RmVerdict v = rmCheck(rs, c, DST, SRC, PW, 0, 22, 1000u + i * 1000u);
         if (v == RM_REJ_LOCKOUT)
             return (int)i;
         TEST_ASSERT_EQUAL_STRING("tag", rmVerdictName(v));
@@ -624,7 +624,7 @@ static RmVerdict deliverFrame(RmState &rs, const char *from, const char *cmd, ui
     TEST_ASSERT_TRUE(rmBuildCommand(DST, from, ctr, cmd, "", key, wire, sizeof(wire)) > 0);
     RmCmd c;
     TEST_ASSERT_TRUE(rmParse(wire, c));
-    const RmVerdict v = rmCheck(rs, c, DST, from, PW, 22, now);
+    const RmVerdict v = rmCheck(rs, c, DST, from, PW, 0, 22, now);
     if (v == RM_OK)
         rmAccept(rs, c, "ok", now);
     return v;
@@ -751,7 +751,7 @@ static uint32_t drainVerdicts(RmState &rs, uint32_t now, RmVerdict *first)
     {
         RmCmd c;
         TEST_ASSERT_TRUE(rmParse(text, c));
-        const RmVerdict v = rmCheck(rs, c, DST, src, PW, 22, now);
+        const RmVerdict v = rmCheck(rs, c, DST, src, PW, 0, 22, now);
         if (verdicts == 0 && first != nullptr)
             *first = v;
         if (v == RM_OK)

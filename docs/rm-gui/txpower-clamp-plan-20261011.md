@@ -1,6 +1,18 @@
 # RM: TX power clamp, RM1 repeats, wire-format HTML: plan (2026-10-11)
 
-Status: planned, not started. Base: fork-dev 6bd41daa.
+Status: wave 1 done (1a + 1b, one commit), wave 2 next. Base: fork-dev 6bd41daa.
+
+## Progress
+
+| Wave | State                                                                                                                                                                                                                                                                                                                                   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1a   | Done 2026-10-11. `RM_REFUSED` (valid tag, allowlist decided last, answered, no strike, counter consumed); target txpower range `max(0, TX_POWER_MIN)..TX_POWER_MAX`; `rmRefusalText`; refusals counted in `rej_blocked`; a valid-tag `sync` with args stays a `blocked` strike. Sender still passes min 0. Advisor APPROVED.            |
+| 1b   | Done 2026-10-11. `tools/wire_doc_html.py` + `tools/wire_doc_template.html`; stage 2 runs `--check` and `--self-test`, pytest gets `--with markdown-it-py==3.0.0`.                                                                                                                                                                       |
+| 2a   | Next. Recon: `p=` built in `src/rm_format.h:319` (radio) and `src/rm_sender_policy.h:484` (status, parser `rmStatusParse` :491, `p=` :528); sender has no per-target range store yet (candidates `RmProof` `rm_sender_policy.h:583`, `PeerHwm` `rm_runtime.cpp:81`); local refusal token table `rmTokenTable` `rm_sender_policy.h:333`. |
+| 2b   | Next. Run again: button `web_rm_page.cpp:252`, `rmAgain` :360, confirm helpers :159/:209, dispatch :390; jsdom checks `tools/webgui_rm_test.js` :956, :1324-1389 and later hits. GUI words errors via the server's `msg` (`rmErrText` :168).                                                                                            |
+| 3    | Open. Settled: the reply-cache lookup in `rmCheck` precedes the rate check, so a later copy of the same `ctr` is `RM_CACHED`, never `RM_REJ_RATE`, never a strike.                                                                                                                                                                      |
+
+Bench to-do from wave 1: confirm `[RM];refused;ctr;<n>` and the `err range` reply on hardware (the `rmDrain` glue has no host test).
 
 ## Decisions (operator, 2026-10-11)
 

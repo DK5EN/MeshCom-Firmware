@@ -28,13 +28,14 @@ enum RmVerdict : uint8_t
     RM_REJ_FORMAT,    // silent
     RM_REJ_TAG,       // silent
     RM_REJ_REPLAY,    // silent
-    RM_REJ_BLOCKED,   // not on the allowlist, bad args or forbidden characters; silent
+    RM_REJ_BLOCKED,   // a valid-tag sync with arguments (everything else valid-tag is RM_REFUSED); silent
     RM_REJ_RATE,      // silent
     RM_REJ_LOCKOUT,   // silent
-    RM_REJ_DISABLED   // empty password; silent
+    RM_REJ_DISABLED,  // empty password; silent
+    RM_REFUSED        // valid tag, but not on the allowlist / bad args / range: answered (rmRefusalText), no strike
 };
 
-// "ok","cached","sync","format","tag","replay","blocked","rate","lockout","disabled"
+// "ok","cached","sync","format","tag","replay","blocked","rate","lockout","disabled","refused"
 const char *rmVerdictName(RmVerdict v);
 
 #define RM_RATE_MS 10000u        // minimum spacing of accepted commands
@@ -133,7 +134,9 @@ void rmRejSweep(RmState &s, uint32_t nowMs);
 // Full check incl. allowlist, counter, rate limit, lockout. Does NOT execute. Lockout and both rate
 // limits apply only while s.strict is set (BF-01); without it only format, allowlist, tag and the
 // replay counter can reject.
-// maxTxPower bounds "txpower <n>" (0 <= n <= maxTxPower). Every reject counts
+// minTxPower..maxTxPower bounds "txpower <n>". Order: disabled, lockout, format, canonical + tag, then (not for
+// sync) cache, replay, rate, and the allowlist LAST: a command that fails it with a valid tag is RM_REFUSED (answered,
+// no strike; the caller treats it like RM_OK without executing). Every reject counts
 // towards the lockout, except RM_REJ_DISABLED, RM_REJ_LOCKOUT, RM_REJ_RATE and
 // RM_REJ_REPLAY (each of the last two requires a VALID tag: the lockout answers wrong
 // keys, a valid tag is not one, and a replayed or overtaken frame reveals and
@@ -144,10 +147,15 @@ void rmRejSweep(RmState &s, uint32_t nowMs);
 // has its own limiter (RM_SYNC_RATE_MS, a second authenticated sync inside it is RM_REJ_RATE, silent):
 // it neither stamps nor obeys the command limiter, and it never moves hwm.
 RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
-                  int maxTxPower, uint32_t nowMs);
+                  int minTxPower, int maxTxPower, uint32_t nowMs);
 
-// After the caller executed an RM_OK command: records hwm, result, time.
-// CONTRACT: call it for EVERY RM_OK, also when execution failed (pass the
+// Reply text for an RM_REFUSED command: "err range <min>..<max>" for a txpower whose args fail the range or shape,
+// "err blocked" otherwise. Returns the length (0 if out is null or n is 0).
+size_t rmRefusalText(const RmCmd &c, int minTxPower, int maxTxPower, char *out, size_t n);
+
+// After the caller executed an RM_OK command (or answered an RM_REFUSED one without executing): records hwm,
+// result, time.
+// CONTRACT: call it for EVERY RM_OK and EVERY RM_REFUSED, also when execution failed (pass the
 // "err <reason>" result) -- otherwise the same ctr stays executable and the
 // rate limiter is not stamped.
 // Returns the new hwm to persist. result is truncated to RM_MAX_RESULT.
@@ -155,8 +163,8 @@ uint32_t rmAccept(RmState &s, const RmCmd &c, const char *result, uint32_t nowMs
 
 // RM-09 (sender side, web "remote management"): the allowlist of rmCheck() as a predicate on plain
 // strings (cmd and args as they appear on the wire, lower case; "" for no args). Includes the
-// forbidden-character rule; txpower is bounded by maxTxPower.
-bool rmCommandAllowed(const char *cmd, const char *args, int maxTxPower);
+// forbidden-character rule; txpower is bounded by minTxPower..maxTxPower.
+bool rmCommandAllowed(const char *cmd, const char *args, int minTxPower, int maxTxPower);
 
 // RM-09: builds "RM1 <ctr> <cmd>[ <args>] <tag>" (what rmParse() accepts) with the 16-hex tag of
 // HMAC-SHA256(key, canonical). dst = managed node, src = this node. key = rmDeriveKey() of the

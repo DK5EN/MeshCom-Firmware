@@ -195,10 +195,36 @@ static void test_vectors_commands_reproduced(void)
         // and end to end through rmCheck on a fresh state
         RmState s;
         strictInit(s, 0);
-        const RmVerdict v = rmCheck(s, c, dst.c_str(), src.c_str(), passwd.c_str(), 22, 1000000);
+        const RmVerdict v = rmCheck(s, c, dst.c_str(), src.c_str(), passwd.c_str(), 0, 22, 1000000);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
     }
     printf("[vectors] commands reproduced: %u/%u\n", (unsigned)n, (unsigned)n);
+}
+
+static void test_vectors_refusals_reproduced(void)
+{
+    std::string json;
+    if (!read_repo_file("tools/tests/remote_cmd_vectors.json", json))
+        TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
+
+    static std::string objs[32];
+    const size_t n = objectsOf(json, "refusals", objs, 32);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(7, n, "refusal vector count drifted from tools/remote_cmd.py");
+    for (size_t i = 0; i < n; i++)
+    {
+        std::string cmd, args, text;
+        uint32_t lo = 0, hi = 0;
+        TEST_ASSERT_TRUE(jsonString(objs[i], "cmd", cmd) && jsonString(objs[i], "args", args) &&
+                         jsonString(objs[i], "text", text) && jsonUint(objs[i], "min", lo) &&
+                         jsonUint(objs[i], "max", hi));
+        RmCmd c;
+        memset(&c, 0, sizeof(c));
+        snprintf(c.cmd, sizeof(c.cmd), "%s", cmd.c_str());
+        snprintf(c.args, sizeof(c.args), "%s", args.c_str());
+        char out[40];
+        rmRefusalText(c, (int)lo, (int)hi, out, sizeof(out));
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(text.c_str(), out, cmd.c_str());
+    }
 }
 
 static void test_vectors_replies_reproduced(void)
@@ -278,7 +304,7 @@ static RmCmd withBadTag(RmCmd c)
 
 static RmVerdict chk(RmState &s, const RmCmd &c, uint32_t now)
 {
-    return rmCheck(s, c, DST, SRC, PW, MAXTX, now);
+    return rmCheck(s, c, DST, SRC, PW, 0, MAXTX, now);
 }
 
 // The sender's entry in the reject table (a zeroed one if the sender has none). Read-only.
@@ -401,9 +427,9 @@ static void test_valid_tag_accepted_and_wrong_tag_rejected(void)
 
     // wrong password, wrong source, wrong ctr
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, SRC, "other", MAXTX, 1000));
+    ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, SRC, "other", 0, MAXTX, 1000));
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, "DK5EN-14", PW, MAXTX, 1000));
+    ASSERT_VERDICT(RM_REJ_TAG, rmCheck(s, mk(1, "status"), DST, "DK5EN-14", PW, 0, MAXTX, 1000));
     strictInit(s, 0);
     RmCmd d = mk(1, "status");
     d.ctr = 2;
@@ -453,9 +479,9 @@ static void test_blocked_commands_rejected_even_with_valid_tag(void)
     {
         RmState s;
         strictInit(s, 0);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, blocked[i]), 1000)), blocked[i]);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(chk(s, mk(1, blocked[i]), 1000)), blocked[i]);
         strictInit(s, 0);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, blocked[i], "x"), 1000)), blocked[i]);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(chk(s, mk(1, blocked[i], "x"), 1000)), blocked[i]);
     }
 }
 
@@ -479,7 +505,7 @@ static void test_bad_args_rejected(void)
         snprintf(msg, sizeof(msg), "%s [%s]", bad[i].cmd, bad[i].args);
         const bool isSync = strcmp(bad[i].cmd, "sync") == 0;
         const RmVerdict v = chk(s, mk(isSync ? 0 : 1, bad[i].cmd, bad[i].args), 1000);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(v), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(isSync ? "blocked" : "refused", rmVerdictName(v), msg);
     }
 }
 
@@ -487,15 +513,15 @@ static void test_txpower_above_max_rejected(void)
 {
     RmState s;
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 22, 1000));
+    ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 0, 22, 1000));
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "23"), DST, SRC, PW, 22, 1000));
+    ASSERT_VERDICT(RM_REFUSED, rmCheck(s, mk(1, "txpower", "23"), DST, SRC, PW, 0, 22, 1000));
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 20, 1000));
+    ASSERT_VERDICT(RM_REFUSED, rmCheck(s, mk(1, "txpower", "22"), DST, SRC, PW, 0, 20, 1000));
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "20"), DST, SRC, PW, 20, 1000));
+    ASSERT_VERDICT(RM_OK, rmCheck(s, mk(1, "txpower", "20"), DST, SRC, PW, 0, 20, 1000));
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_BLOCKED, rmCheck(s, mk(1, "txpower", "0"), DST, SRC, PW, -1, 1000));
+    ASSERT_VERDICT(RM_REFUSED, rmCheck(s, mk(1, "txpower", "0"), DST, SRC, PW, 0, -1, 1000));
 }
 
 static void test_chained_and_forbidden_payload_rejected(void)
@@ -515,7 +541,7 @@ static void test_chained_and_forbidden_payload_rejected(void)
         strictInit(s, 0);
         char msg[64];
         snprintf(msg, sizeof(msg), "[%s] [%s]", payloads[i].cmd, payloads[i].args);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("blocked", rmVerdictName(chk(s, mk(1, payloads[i].cmd, payloads[i].args), 1000)),
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(chk(s, mk(1, payloads[i].cmd, payloads[i].args), 1000)),
                                          msg);
     }
 }
@@ -818,12 +844,12 @@ static void test_lockout_counts_any_reject_reason(void)
     RmState s;
     strictInit(s, 9);
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 1000)); // replay no longer counts (valid tag), format does
-    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(10, "dfu"), 2000));
+    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(0, "sync", "x"), 2000));
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, mk(10, "status", "", "OTHER"), 3000));
     ASSERT_VERDICT(RM_REJ_LOCKOUT, chk(s, mk(10, "status"), 4000));
 
     strictInit(s, 0);
-    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(1, "cleanflash"), 1000));
+    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(0, "sync", "x"), 1000));
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "reboot"), 2000));
     RmCmd a = mk(1, "status");
     ASSERT_VERDICT(RM_OK, chk(s, a, 3000)); // two rejects only so far
@@ -873,12 +899,12 @@ static void test_empty_password_disables_rm(void)
     strictInit(s, 0);
     // a command "validly" tagged with the all-zero key must not pass either
     RmCmd c = mk(1, "status", "", DST, SRC, "");
-    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", MAXTX, 1000));
-    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "              ", MAXTX, 1000));
-    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, nullptr, MAXTX, 1000));
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", 0, MAXTX, 1000));
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "              ", 0, MAXTX, 1000));
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, nullptr, 0, MAXTX, 1000));
     // disabled is not a lockout trigger
     for (int i = 0; i < 10; i++)
-        ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", MAXTX, 1000 + (uint32_t)i));
+        ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", 0, MAXTX, 1000 + (uint32_t)i));
     TEST_ASSERT_FALSE(ent(s).lockActive);
     char out[64];
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, "ok", DST, SRC, "", out, sizeof(out)));
@@ -1056,7 +1082,7 @@ static void test_reply_is_recognised_and_never_parses_as_a_command(void)
     {
         RmState s;
         strictInit(s, 0);
-        TEST_ASSERT_NOT_EQUAL(RM_OK, rmCheck(s, c, "DK5EN-90", "DK5EN-1", "secret", 22, 1000));
+        TEST_ASSERT_NOT_EQUAL(RM_OK, rmCheck(s, c, "DK5EN-90", "DK5EN-1", "secret", 0, 22, 1000));
     }
 }
 
@@ -1097,11 +1123,11 @@ static void test_build_command_reproduces_every_vector(void)
         TEST_ASSERT_TRUE_MESSAGE(rmParse(out, c), msg);
         RmState st;
         strictInit(st, 0);
-        const RmVerdict v = rmCheck(st, c, dst.c_str(), src.c_str(), passwd.c_str(), 22, 1000000);
+        const RmVerdict v = rmCheck(st, c, dst.c_str(), src.c_str(), passwd.c_str(), 0, 22, 1000000);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
 
         // and every vector command passes the public allowlist predicate
-        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(cmd.c_str(), args.c_str(), 22), msg);
+        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(cmd.c_str(), args.c_str(), 0, 22), msg);
     }
     printf("[vectors] commands built: %u/%u\n", (unsigned)n, (unsigned)n);
 }
@@ -1124,33 +1150,33 @@ static void test_build_command_limits(void)
 
 static void test_command_allowed_predicate(void)
 {
-    TEST_ASSERT_TRUE(rmCommandAllowed("status", "", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("status", nullptr, 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("sync", "", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("gps", "on", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("led", "on", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("led", "off", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("led", "", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("led", "blink", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("led", "1", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 22));
-    TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "10", 5));
-    TEST_ASSERT_FALSE(rmCommandAllowed("status", "x", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "ON", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("GPS", "on", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "c1 on", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2  on", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2 on ", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("wifi", "on", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("setpasswd", "x", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("", "", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed(nullptr, "", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "on;reboot", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("reboot", "--now", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("averyveryverylongcmd", "", 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("status", "", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("status", nullptr, 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("sync", "", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("gps", "on", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("led", "on", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("led", "off", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "blink", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "1", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "10", 0, 5));
+    TEST_ASSERT_FALSE(rmCommandAllowed("status", "x", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "ON", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("GPS", "on", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "c1 on", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2  on", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", "a2 on ", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("wifi", "on", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setpasswd", "x", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("", "", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed(nullptr, "", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("gps", "on;reboot", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("reboot", "--now", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("averyveryverylongcmd", "", 0, 22));
 }
 
 // DRY-07: the allowlist is generated from rm_commands.h. The expected list is pinned LITERALLY here (comparing
@@ -1177,12 +1203,12 @@ static void test_allowlist_is_the_pinned_command_list(void)
                            : !strcmp(#shape, "SETOUT")  ? "a0 on"                                                \
                            : !strcmp(#shape, "MH")      ? "5"                                                    \
                                                         : "";                                                    \
-        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(#nm, good, 22), #nm);                                          \
+        TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(#nm, good, 0, 22), #nm);                                          \
         /* a stray argument never passes a no-argument shape, and a missing one never passes on/off */         \
         if (!strcmp(#shape, "NONE"))                                                                             \
-            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "x", 22), #nm);                                      \
+            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "x", 0, 22), #nm);                                      \
         if (!strcmp(#shape, "ONOFF"))                                                                            \
-            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "", 22), #nm);                                       \
+            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(#nm, "", 0, 22), #nm);                                       \
         i++;                                                                                                     \
     } while (0);
     RM_COMMAND_LIST(CHECK_ROW)
@@ -1202,7 +1228,7 @@ static void test_allowlist_is_the_pinned_command_list(void)
     const char *const kBlocked[] = {"rmstrictsecurity", "remotemgmt", "passwd", "setpasswd", "wifi", "rm", "stat",
                                     "namex", "rebootx", ""};
     for (const char *b : kBlocked)
-        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(b, "", 22), b);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(b, "", 0, 22), b);
 }
 
 // DRY-04: the free-text limits of the allowlist are RM_NAME_MAX / RM_ATXT_MAX (19 / 39 today)
@@ -1213,16 +1239,16 @@ static void test_allowlist_free_text_limits(void)
     char b[64];
     memset(b, 'a', sizeof b);
     b[19] = 0;
-    TEST_ASSERT_TRUE(rmCommandAllowed("name", b, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("name", b, 0, 22));
     b[19] = 'a';
     b[20] = 0;
-    TEST_ASSERT_FALSE(rmCommandAllowed("name", b, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", b, 0, 22));
     memset(b, 'a', sizeof b);
     b[39] = 0;
-    TEST_ASSERT_TRUE(rmCommandAllowed("atxt", b, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("atxt", b, 0, 22));
     b[39] = 'a';
     b[40] = 0;
-    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", b, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", b, 0, 22));
 }
 
 static void test_verify_reply_vectors_and_tampering(void)
@@ -1389,7 +1415,7 @@ static void test_args_39_roundtrip_and_40_refused(void)
     const std::string a39 = repeat('a', RM_MAX_ARGS), a40 = repeat('a', RM_MAX_ARGS + 1);
     char wire[160];
     // no allowlisted command takes this yet: the length gate is checked by the parser, the verdict stays "not allowed"
-    TEST_ASSERT_FALSE(rmCommandAllowed("setout", a39.c_str(), 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("setout", a39.c_str(), 0, 22));
     TEST_ASSERT_EQUAL_UINT(0, rmBuildCommand(DST, SRC, 9, "status", a40.c_str(), key, wire, sizeof(wire)));
     const size_t n = rmBuildCommand(DST, SRC, 9, "status", a39.c_str(), key, wire, sizeof(wire));
     TEST_ASSERT_TRUE(n > 0 && n <= 96);
@@ -1398,7 +1424,7 @@ static void test_args_39_roundtrip_and_40_refused(void)
     TEST_ASSERT_EQUAL_STRING(a39.c_str(), c.args);
     RmState s;
     strictInit(s, 0);
-    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000)); // args on a no-args command
+    TEST_ASSERT_EQUAL_INT(RM_REFUSED, rmCheck(s, c, DST, SRC, PW, 0, 22, 1000)); // args on a no-args command
     std::string frame = std::string("RM1 9 status ") + a40 + " 0123456789abcdef";
     TEST_ASSERT_FALSE(rmParse(frame.c_str(), c));
 }
@@ -1444,7 +1470,7 @@ static void test_allowlist_table_equivalence(void)
     {
         char msg[64];
         snprintf(msg, sizeof(msg), "%s '%s'", t.cmd, t.args);
-        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 22), msg);
+        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 0, 22), msg);
     }
 }
 
@@ -1477,7 +1503,7 @@ static void test_ext_allowlist_accepts_and_rejects(void)
     {
         char msg[96];
         snprintf(msg, sizeof(msg), "%s '%s'", t.cmd, t.args);
-        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 22), msg);
+        TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 0, 22), msg);
     }
 }
 
@@ -1497,7 +1523,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
         TEST_ASSERT_EQUAL_STRING(t[1], c.args); // capitals kept byte for byte
         RmState s;
         strictInit(s, 0);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(RM_OK, rmCheck(s, c, DST, SRC, PW, 22, 1000), t[0]);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(RM_OK, rmCheck(s, c, DST, SRC, PW, 0, 22, 1000), t[0]);
     }
     // a capital in the command name or in the tag region stays refused on the wire
     RmCmd c;
@@ -1513,7 +1539,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
     TEST_ASSERT_EQUAL_STRING("ON", c.args); // the parser keeps the bytes, the shape refuses them
     RmState s;
     strictInit(s, 0);
-    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(s, c, DST, SRC, PW, 22, 1000));
+    TEST_ASSERT_EQUAL_INT(RM_REFUSED, rmCheck(s, c, DST, SRC, PW, 0, 22, 1000));
 }
 
 // the canonical string joins fields with '|' and the (cmd, args) split is the first space: no args text can
@@ -1523,16 +1549,16 @@ static void test_ext_separator_cannot_be_injected_through_args(void)
     uint8_t key[32];
     rmDeriveKey(PW, key);
     char wire[160];
-    TEST_ASSERT_FALSE(rmCommandAllowed("name", "x|RM1|a|b|9|reboot", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("name", "Max|Muster", 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", "|", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", "x|RM1|a|b|9|reboot", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("name", "Max|Muster", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("atxt", "|", 0, 22));
     // a correctly tagged frame with a separator in the text is still a counted BLOCKED reject
     TEST_ASSERT_TRUE(rmBuildCommand(DST, SRC, 5, "name", "Max|Muster", key, wire, sizeof(wire)) > 0);
     RmCmd bad;
     TEST_ASSERT_TRUE(rmParse(wire, bad));
     RmState bs;
     strictInit(bs, 0);
-    TEST_ASSERT_EQUAL_INT(RM_REJ_BLOCKED, rmCheck(bs, bad, DST, SRC, PW, 22, 1000));
+    TEST_ASSERT_EQUAL_INT(RM_REFUSED, rmCheck(bs, bad, DST, SRC, PW, 0, 22, 1000));
     // a second command smuggled through the args of a free-text command is a different tag on a different
     // canonical: (name, "x reboot") and (name x, reboot) cannot collide because only ONE space-split exists
     RmCmd a, b;
@@ -1547,7 +1573,7 @@ static void test_ext_separator_cannot_be_injected_through_args(void)
     TEST_ASSERT_TRUE(rmCanonical(a, DST, SRC, ca, sizeof(ca)) > 0);
     TEST_ASSERT_TRUE(rmCanonical(b, DST, SRC, cb, sizeof(cb)) > 0);
     // identical canonical strings, but cmd "name x" is never allowlisted and rmParse never yields a cmd with a space
-    TEST_ASSERT_FALSE(rmCommandAllowed("name x", "reboot", 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("name x", "reboot", 0, 22));
     RmCmd p;
     TEST_ASSERT_TRUE(rmParse("RM1 5 name x reboot 0123456789abcdef", p));
     TEST_ASSERT_EQUAL_STRING("name", p.cmd);
@@ -1626,7 +1652,7 @@ static RmVerdict fromSender(RmState &s, const char *call, bool wrongTag, uint32_
     RmCmd c = mk(ctr, "status", "", DST, call);
     if (wrongTag)
         c = withBadTag(c);
-    return rmCheck(s, c, DST, call, PW, MAXTX, now);
+    return rmCheck(s, c, DST, call, PW, 0, MAXTX, now);
 }
 
 static void strikes3(RmState &s, const char *call, uint32_t t)
@@ -1758,7 +1784,7 @@ static void test_uncounted_verdicts_create_no_entry(void)
     ASSERT_VERDICT(RM_REJ_REPLAY, fromSender(s, "DK5EN-9", false, 1, 2000));
     ASSERT_VERDICT(RM_REJ_RATE, fromSender(s, "DK5EN-9", false, 2, 2000));
     ASSERT_VERDICT(RM_REJ_LOCKOUT, fromSender(s, "DK5EN-8", false, 3, 2000));
-    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, mk(4, "status", "", DST, "DK5EN-7"), DST, "DK5EN-7", "", MAXTX, 2000));
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, mk(4, "status", "", DST, "DK5EN-7"), DST, "DK5EN-7", "", 0, MAXTX, 2000));
     TEST_ASSERT_EQUAL_MEMORY(before, s.rej, sizeof(before));
     for (int i = 0; i < RM_REJ_SOURCES; i++)
         TEST_ASSERT_EQUAL(before[i].used, s.rej[i].used);
@@ -1863,15 +1889,15 @@ static void test_reject_table_odd_sender_strings(void)
     RmState s;
     strictInit(s, 0);
     RmCmd c = withBadTag(mk(1, "status"));
-    ASSERT_VERDICT(RM_REJ_FORMAT, rmCheck(s, c, DST, nullptr, PW, 22, 1000u));
+    ASSERT_VERDICT(RM_REJ_FORMAT, rmCheck(s, c, DST, nullptr, PW, 0, 22, 1000u));
     TEST_ASSERT_TRUE(ent(s, "").used);
     TEST_ASSERT_EQUAL_UINT8(1, ent(s, "").rejCount);
-    rmCheck(s, c, DST, "", PW, 22, 1100u);
+    rmCheck(s, c, DST, "", PW, 0, 22, 1100u);
     TEST_ASSERT_EQUAL_UINT8(2, ent(s, "").rejCount);
-    rmCheck(s, c, DST, "DL1ABC-12", PW, 22, 1200u);                   // 9 characters
+    rmCheck(s, c, DST, "DL1ABC-12", PW, 0, 22, 1200u);                   // 9 characters
     TEST_ASSERT_TRUE(ent(s, "DL1ABC-12").used);
     TEST_ASSERT_EQUAL_STRING("DL1ABC-12", ent(s, "DL1ABC-12").call);
-    rmCheck(s, c, DST, "DL1ABC-123456789", PW, 22, 1300u);            // too long: first 9 characters
+    rmCheck(s, c, DST, "DL1ABC-123456789", PW, 0, 22, 1300u);            // too long: first 9 characters
     TEST_ASSERT_EQUAL_UINT8(2, ent(s, "DL1ABC-12").rejCount);
     uint8_t used = 0;
     for (const RmRejSrc &r : s.rej)
@@ -2037,10 +2063,10 @@ static void test_off_replay_bad_tag_blocked_and_format_are_still_rejected(void)
     ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(4, "status"), 2000));                  // older counter
     ASSERT_VERDICT(RM_REJ_REPLAY, chk(s, mk(5, "reboot"), 3000));                  // same counter, other command
     ASSERT_VERDICT(RM_REJ_TAG, chk(s, withBadTag(mk(6, "status")), 4000));          // bad tag
-    ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(6, "factoryreset"), 5000));            // not on the allowlist
+    ASSERT_VERDICT(RM_REFUSED, chk(s, mk(6, "factoryreset"), 5000));            // not on the allowlist
     ASSERT_VERDICT(RM_REJ_FORMAT, chk(s, mk(0, "status"), 6000));                   // ctr 0 only with sync
     ASSERT_VERDICT(RM_CACHED, chk(s, c, 7000));                                     // lost-reply recovery stays
-    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", MAXTX, 8000));      // empty password
+    ASSERT_VERDICT(RM_REJ_DISABLED, rmCheck(s, c, DST, SRC, "", 0, MAXTX, 8000));      // empty password
     TEST_ASSERT_EQUAL_UINT8(0, rmLockedSenders(s, 9000, nullptr));
 }
 
@@ -2085,17 +2111,109 @@ static void test_rmstrictsecurity_is_not_allowlisted(void)
     static const char *const names[] = {"rmstrictsecurity", "rmstrict", "strict", "remotemgmt"};
     for (const char *n : names)
     {
-        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "on", MAXTX), n);
-        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "off", MAXTX), n);
-        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "", MAXTX), n);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "on", 0, MAXTX), n);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "off", 0, MAXTX), n);
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(n, "", 0, MAXTX), n);
         for (int strict = 0; strict < 2; strict++)
         {
             RmState s;
             rmStateInit(s, 0);
             s.strict = (strict != 0);
-            ASSERT_VERDICT(RM_REJ_BLOCKED, chk(s, mk(1, n, "on"), 1000));
+            ASSERT_VERDICT(RM_REFUSED, chk(s, mk(1, n, "on"), 1000));
         }
     }
+}
+
+
+// ---- RM-STRIKE: tag before allowlist; a valid-tag refusal is answered, never a strike -----------
+
+static RmVerdict chkR(RmState &s, const RmCmd &c, int minTx, int maxTx, uint32_t now)
+{
+    return rmCheck(s, c, DST, SRC, PW, minTx, maxTx, now);
+}
+
+static void test_refused_valid_tag_out_of_range_is_no_strike(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    char txt[40];
+    for (uint32_t i = 1; i <= 3; i++)
+    {
+        const RmCmd c = mk(i, "txpower", "21");
+        ASSERT_VERDICT(RM_REFUSED, chkR(s, c, 0, 20, i * 20000u));
+        TEST_ASSERT_GREATER_THAN_UINT(0, rmRefusalText(c, 0, 20, txt, sizeof(txt)));
+        TEST_ASSERT_EQUAL_STRING("err range 0..20", txt);
+        TEST_ASSERT_EQUAL_UINT8(0, ent(s).rejCount);
+        rmAccept(s, c, txt, i * 20000u);
+    }
+    TEST_ASSERT_FALSE(ent(s).lockActive);
+    ASSERT_VERDICT(RM_OK, chkR(s, mk(4, "txpower", "20"), 0, 20, 100000u)); // not locked
+}
+
+static void test_refused_below_floor_names_the_range(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    char txt[40];
+    const RmCmd c = mk(1, "txpower", "1");
+    ASSERT_VERDICT(RM_REFUSED, chkR(s, c, 2, 22, 1000));
+    rmRefusalText(c, 2, 22, txt, sizeof(txt));
+    TEST_ASSERT_EQUAL_STRING("err range 2..22", txt);
+    strictInit(s, 0);
+    ASSERT_VERDICT(RM_OK, chkR(s, mk(1, "txpower", "2"), 2, 22, 1000));
+    strictInit(s, 0);
+    ASSERT_VERDICT(RM_REFUSED, chkR(s, mk(1, "txpower", "0"), 2, 22, 1000));
+}
+
+static void test_refused_blocked_text(void)
+{
+    const CmdArgs bl[] = {{"dfu", ""}, {"cleanflash", ""}, {"reboot", "now"}, {"gps", "on;x"}, {"txpower", "2x"}};
+    for (size_t i = 0; i < sizeof(bl) / sizeof(bl[0]); i++)
+    {
+        RmState s;
+        strictInit(s, 0);
+        char txt[40];
+        const RmCmd c = mk(1, bl[i].cmd, bl[i].args);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(chkR(s, c, 0, 22, 1000)), bl[i].cmd);
+        rmRefusalText(c, 0, 22, txt, sizeof(txt));
+        // txpower with a malformed shape is a range answer too; everything else is "blocked"
+        TEST_ASSERT_EQUAL_STRING(strcmp(bl[i].cmd, "txpower") == 0 ? "err range 0..22" : "err blocked", txt);
+        TEST_ASSERT_EQUAL_UINT8(0, ent(s).rejCount);
+    }
+}
+
+static void test_bad_tag_out_of_range_still_a_strike(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    ASSERT_VERDICT(RM_REJ_TAG, chkR(s, withBadTag(mk(1, "txpower", "99")), 0, 20, 1000));
+    TEST_ASSERT_EQUAL_UINT8(1, ent(s).rejCount);
+    ASSERT_VERDICT(RM_REJ_TAG, chkR(s, withBadTag(mk(1, "dfu")), 0, 20, 2000));
+    TEST_ASSERT_EQUAL_UINT8(2, ent(s).rejCount);
+}
+
+static void test_refused_consumes_the_counter(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    const RmCmd c = mk(5, "txpower", "30");
+    ASSERT_VERDICT(RM_REFUSED, chkR(s, c, 0, 20, 1000));
+    rmAccept(s, c, "err range 0..20", 1000);
+    ASSERT_VERDICT(RM_CACHED, chkR(s, c, 0, 20, 2000));
+    ASSERT_VERDICT(RM_REJ_REPLAY, chkR(s, mk(4, "status"), 0, 20, 3000));
+    TEST_ASSERT_EQUAL_UINT32(5, s.hwm);
+}
+
+static void test_refused_is_rate_and_replay_gated(void)
+{
+    RmState s;
+    strictInit(s, 0);
+    const RmCmd a = mk(1, "status");
+    ASSERT_VERDICT(RM_OK, chkR(s, a, 0, 20, 1000));
+    rmAccept(s, a, "ok", 1000);
+    ASSERT_VERDICT(RM_REJ_RATE, chkR(s, mk(2, "txpower", "99"), 0, 20, 2000)); // rate first, no strike
+    ASSERT_VERDICT(RM_REJ_REPLAY, chkR(s, mk(1, "txpower", "99"), 0, 20, 30000));
+    TEST_ASSERT_EQUAL_UINT8(0, ent(s).rejCount);
 }
 
 int main(int, char **)
@@ -2110,6 +2228,7 @@ int main(int, char **)
     RUN_TEST(test_gate_second_copy_of_a_command_is_consumed_but_not_queued);
     RUN_TEST(test_gate_duplicates_do_not_touch_replies_or_disabled_nodes);
     RUN_TEST(test_vectors_replies_reproduced);
+    RUN_TEST(test_vectors_refusals_reproduced);
     RUN_TEST(test_parse_accepts_wellformed);
     RUN_TEST(test_parse_rejects_malformed);
     RUN_TEST(test_key_strips_trailing_spaces_only);
@@ -2185,5 +2304,11 @@ int main(int, char **)
     RUN_TEST(test_on_rotating_callsigns_each_lock_after_three_strikes);
     RUN_TEST(test_switching_off_releases_existing_locks);
     RUN_TEST(test_rmstrictsecurity_is_not_allowlisted);
+    RUN_TEST(test_refused_valid_tag_out_of_range_is_no_strike);
+    RUN_TEST(test_refused_below_floor_names_the_range);
+    RUN_TEST(test_refused_blocked_text);
+    RUN_TEST(test_bad_tag_out_of_range_still_a_strike);
+    RUN_TEST(test_refused_consumes_the_counter);
+    RUN_TEST(test_refused_is_rate_and_replay_gated);
     return UNITY_END();
 }
