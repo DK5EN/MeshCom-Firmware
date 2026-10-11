@@ -1,6 +1,24 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-07, branch `fork-dev` (unpushed: the RM extended-commands campaign, `cb7267bb`..`661aca73`), last release `v4.40a.10.06` (dated 10-06, published 10-05).
+**Stand:** 2026-10-11, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+
+## 2026-10-11 -- v4.40a.10.11 released (first CI-built fork release)
+
+**Shipped:** tag `v4.40a.10.11` on `fork-dev` (`77e12f4e`), built and published by the re-enabled `MeshCom CI`
+workflow (tags `v*` publish as Latest, `ci-proof-*` as draft); 66 assets (39 + 27 `.autoupdate`), all
+`.autoupdate` re-inflated byte-exact. Web flasher serves the release's app images (`pages_flasher.py
+--from-release`), live check 30 boards 0 mismatches, `v4.40a.10.06` pruned. Content: upstream fold-in, RM
+`led flash` / `chgled`, charge-LED fixes CHG-01..04, AU classic TLS heap gate (AU-D13), harness logs moved to
+`tools/bench/runs/harness/`. Campaign doc: `docs/campaign-upstream-fold-20261011.md`.
+
+**Verified after publishing:** DK5EN-92 (T-Beam classic) and DK5EN-1 (Heltec V3) installed the release through Auto
+Update on the dev channel (both nodes now `--updchan dev`, DK5EN-1 in mode `auto`). Classic download heap minimum
+13,952 B: only ~2.4 KB margin under the 76 KB gate -- watch for `lowheap` refusals on busier classic nodes.
+
+**Accepted by the operator 2026-10-11:** SNF-GW/STOR (#1188), NMTU leftovers (#1190), BLC B1 carry-over (#1191).
+**Still open:** RM items (sync limiter/RM-DUP on hardware, late echo after "No answer", RM1 uploads to the public
+server, RM-GWRELAY against a real server), Heltec V4 remote LED on hardware, upstream PRs (none opened; charge-LED
+fixes are the first candidate).
 
 ## 2026-10-07 -- RM extended commands campaign: where it stands, how to continue
 

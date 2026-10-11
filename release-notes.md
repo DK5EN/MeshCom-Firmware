@@ -60,6 +60,7 @@ With default settings, compared with the official `v4.40a`:
 - **Bench-tested for this release (2026-10-11):**
   - **T-Beam v1.2 classic (`DK5EN-92`):** charge LED follows charging after the update, `--charge led off|on` with reboots, RM `chgled on|off|auto` sent from `DK5EN-1`, `led` answers `err unsupported` (OneWire pin); Auto Update CHECK with and without a phone on Bluetooth (phone on: clean `lowheap` refusal, minimum heap 58 KB; phone off: CHECK ok).
   - **Heltec V3 (`DK5EN-1`):** RM `led on`, `led flash`, `led off` (steady, short flash every 2 s, dark), `chgled` answers `err unsupported`.
+  - **Auto Update of this very release** on both nodes (dev channel): CHECK, TLS download, staging, Safeboot apply and boot; `--info` reports `tag=v4.40a.10.11`.
 - **Bench-tested earlier, code paths unchanged in this release:** the RM extended commands and gateway path on Heltec V3, T-Beam and RAK4631 (2026-10-06/07, RM-DUP not part of it), the `v4.40a.10.05`/`10.06` features (MTU, BLE cycles, Auto Update end to end on Heltec V3, web cards).
 
 ### Built and shipped, not on our bench
@@ -68,7 +69,7 @@ Everything else, including the ETH-04 DHCP fix as shipped here (benched on `DK5E
 
 ## Known gaps, stated plainly
 
-- **Auto Update on classic ESP32: the download over TLS is not benched yet.** Only the CHECK (and the clean `lowheap` refusal) was verified. It will be checked right after publishing, through Auto Update on `DK5EN-92` and `DK5EN-1`; until then treat classic ESP32 as unproven.
+- **Auto Update on classic ESP32: thin heap margin for the download.** Verified after publishing (2026-10-11): `DK5EN-92` (T-Beam, classic) and `DK5EN-1` (Heltec V3) installed this release through Auto Update on the dev channel (TLS download 13 s / 43 s, Safeboot apply, boot). On the T-Beam the download dips to 13,952 B free (about 73.6 KB used), only about 2.4 KB below the 76 KB pre-TLS gate; a busier classic node may refuse with `lowheap` and retry later.
 - **Auto Update on the prod channel cannot install yet:** official icssw-org releases carry no `.autoupdate` assets, so a prod node reports "no installable image for this board". The dev channel (this fork) carries them.
 - **Auto Update and same-day releases:** the version guard understands `v<VER>.MM.DD` only; a `.N` suffix is invisible to it, so same-day re-releases are dated to the next day.
 - **Auto Update needs the new Safeboot**, delivered only by web flasher or USB. With an old Safeboot the first handover is wasted, then automatic handovers stop (`[AU];refuse;old_safeboot`). The classic Safeboot image has about 1.6 KB of headroom.

@@ -74,8 +74,10 @@ off|on` mit Neustarts, RM `chgled on|off|auto` von DK5EN-1 (`chgled on` danach N
 
 ### Was ausdruecklich NICHT geprueft wurde
 
-- Download ueber TLS per Auto Update auf dem klassischen ESP32 (wird direkt nach der
-  Veroeffentlichung auf DK5EN-92 und DK5EN-1 geprueft; bis dahin offen).
+- (Nachtrag 2026-10-11, nach der Veroeffentlichung geprueft: DK5EN-92 und DK5EN-1 haben dieses Release
+  per Auto Update im Dev-Kanal installiert -- TLS-Download, Safeboot-Apply, Boot, `tag=v4.40a.10.11`.
+  Auf dem T-Beam sinkt der freie Heap beim Download auf 13.952 B, also nur rund 2,4 KB Reserve unter
+  der 76-KB-Schwelle.)
 - Heltec V4 Fern-LED (gebaut, ungetestet); andere `BOARD_LED`-Boards nur gebaut.
 - RM: Sync-Limiter und RM-DUP nicht auf Hardware; RM-GWRELAY nur gegen einen Mock-Server; ein spaetes
   Echo kann nach "No answer" (171 s) noch ausgefuehrt werden; Gateways laden RM1-Befehle zum
