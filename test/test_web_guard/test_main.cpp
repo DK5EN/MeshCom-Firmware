@@ -649,6 +649,120 @@ void test_regression_curl_style_request_passes(void)
     expect(WG_OK, cfg, "/config.json", "header-less curl, read-only path");
 }
 
+// MC_WEB_GUARD: by default only the /rm* paths and the remote page are guarded.
+void test_guard_applies_default_only_rm_and_remote_page(void)
+{
+    const char *open_paths[] = {"/setparam/?onewire=on", "/callfunction/?x", "/", "/?sendmessage=hello",
+                                "/?page=settings", "/config.json", "/getparam/?x"};
+    for (size_t i = 0; i < sizeof(open_paths) / sizeof(open_paths[0]); i++)
+        TEST_ASSERT_FALSE_MESSAGE(webGuardAppliesTo(open_paths[i], false), open_paths[i]);
+    const char *rm_paths[] = {"/rmsend", "/rmsend?x=1", "/rmstatus", "/rmnodes", "/rmheard", "/rmpasswd",
+                              "/rmfuture", "/?page=remote"};
+    for (size_t i = 0; i < sizeof(rm_paths) / sizeof(rm_paths[0]); i++)
+        TEST_ASSERT_TRUE_MESSAGE(webGuardAppliesTo(rm_paths[i], false), rm_paths[i]);
+}
+
+void test_guard_applies_all_when_flag_set(void)
+{
+    const char *paths[] = {"/setparam/?onewire=on", "/callfunction/?x", "/", "/?sendmessage=hello", "/rmsend",
+                           "/?page=remote"};
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++)
+        TEST_ASSERT_TRUE_MESSAGE(webGuardAppliesTo(paths[i], true), paths[i]);
+}
+
+void test_guard_applies_null_path(void)
+{
+    TEST_ASSERT_FALSE(webGuardAppliesTo(NULL, false));
+    TEST_ASSERT_TRUE(webGuardAppliesTo(NULL, true));
+}
+
+void test_guard_applies_wrapper_follows_compile_flag(void)
+{
+    TEST_ASSERT_EQUAL(MC_WEB_GUARD != 0, webGuardApplies("/setparam/?x"));
+    TEST_ASSERT_TRUE(webGuardApplies("/rmsend"));
+}
+
+// Request-level decision: the router dispatches RM handlers on the HEADER (startsWith "GET /rm",
+// "POST /rm", indexOf "/?page=remote" over the whole header), not on the path alone.
+static bool reqApplies(const char *hdr, const char *path, bool all)
+{
+    return webGuardAppliesToRequest(hdr, strlen(hdr), path, all);
+}
+
+void test_request_applies_post_rm_without_second_space(void)
+{
+    TEST_ASSERT_TRUE(reqApplies("POST /rmpasswd\r\nContent-Length:10\r\n\r\n", "/", false));
+}
+
+void test_request_applies_get_rm_without_second_space(void)
+{
+    TEST_ASSERT_TRUE(reqApplies("GET /rmstatus\r\n\r\n", "/", false));
+}
+
+void test_request_applies_referer_remote_page(void)
+{
+    TEST_ASSERT_TRUE(reqApplies("GET /setparam/?x=1 HTTP/1.1\r\nHost: 1.2.3.4\r\nReferer: http://evil/?page=remote\r\n\r\n",
+                                "/setparam/?x=1", false));
+}
+
+void test_request_applies_plain_request_only_with_flag(void)
+{
+    const char *h = "GET /setparam/?x=1 HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    TEST_ASSERT_FALSE(reqApplies(h, "/setparam/?x=1", false));
+    TEST_ASSERT_TRUE(reqApplies(h, "/setparam/?x=1", true));
+    TEST_ASSERT_TRUE(reqApplies("GET /rmstatus HTTP/1.1\r\n\r\n", "/rmstatus", false));
+}
+
+void test_request_applies_respects_len(void)
+{
+    // "/?page=remote" beyond len is not part of the header
+    const char *h = "GET / HTTP/1.1\r\n\r\nGET /?page=remote";
+    TEST_ASSERT_FALSE(webGuardAppliesToRequest(h, 18, "/", false));
+}
+
+// /setparam/?rm= and ?rmstrict= switch RM and its brute-force protection: guarded with the flag
+// off too. setparam() percent-decodes and lower-cases the name, so the check must as well.
+void test_rm_route_covers_rm_setparam_keys(void)
+{
+    const char *on = "GET /setparam/?rm=on HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *strict = "GET /setparam/?rmstrict=off HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *upper = "GET /setparam/?RMSTRICT=off HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *pct = "GET /setparam/?%72m%53trict=off HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *other = "GET /setparam/?onewire=on HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *prefix = "GET /setparam/?rmx=1 HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    const char *noeq = "GET /setparam/?rm HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(on, strlen(on)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(strict, strlen(strict)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(upper, strlen(upper)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(pct, strlen(pct)));
+    TEST_ASSERT_FALSE(webGuardIsRmRoute(other, strlen(other)));
+    TEST_ASSERT_FALSE(webGuardIsRmRoute(prefix, strlen(prefix)));
+    TEST_ASSERT_FALSE(webGuardIsRmRoute(noeq, strlen(noeq)));
+    TEST_ASSERT_TRUE(webGuardAppliesToRequest(strict, strlen(strict), "/setparam/?rmstrict=off", false));
+}
+
+void test_rm_route_classifies_rewritten_header(void)
+{
+    const char *a = "GET /rmstatus";
+    const char *b = "POST /rmsend";
+    const char *c = "foo /?page=remote bar";
+    const char *d = "GET /rmstatus HTTP/1.1";
+    const char *e = "hunter2";
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(a, strlen(a)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(b, strlen(b)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(c, strlen(c)));
+    TEST_ASSERT_TRUE(webGuardIsRmRoute(d, strlen(d)));
+    TEST_ASSERT_FALSE(webGuardIsRmRoute(e, strlen(e)));
+    TEST_ASSERT_FALSE(webGuardIsRmRoute("", 0));
+}
+
+void test_request_applies_wrapper_follows_compile_flag(void)
+{
+    const char *h = "GET /setparam/?x=1 HTTP/1.1\r\nHost: 1.2.3.4\r\n\r\n";
+    TEST_ASSERT_EQUAL(MC_WEB_GUARD != 0, webGuardRequestApplies(h, strlen(h), "/setparam/?x=1"));
+    TEST_ASSERT_TRUE(webGuardRequestApplies("GET /rmstatus\r\n\r\n", 17, "/"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -688,5 +802,17 @@ int main(int, char **)
     RUN_TEST(test_regression_img_csrf_setparam_get_is_rejected);
     RUN_TEST(test_regression_dns_rebinding_host_is_rejected);
     RUN_TEST(test_regression_curl_style_request_passes);
+    RUN_TEST(test_guard_applies_default_only_rm_and_remote_page);
+    RUN_TEST(test_guard_applies_all_when_flag_set);
+    RUN_TEST(test_guard_applies_null_path);
+    RUN_TEST(test_guard_applies_wrapper_follows_compile_flag);
+    RUN_TEST(test_request_applies_post_rm_without_second_space);
+    RUN_TEST(test_request_applies_get_rm_without_second_space);
+    RUN_TEST(test_request_applies_referer_remote_page);
+    RUN_TEST(test_request_applies_plain_request_only_with_flag);
+    RUN_TEST(test_request_applies_respects_len);
+    RUN_TEST(test_rm_route_classifies_rewritten_header);
+    RUN_TEST(test_request_applies_wrapper_follows_compile_flag);
+    RUN_TEST(test_rm_route_covers_rm_setparam_keys);
     return UNITY_END();
 }

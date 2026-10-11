@@ -906,8 +906,12 @@ String work_webpage(bool bget_password, int webid)
                         if (wa >= 0 && wb > wa)
                             wg_path = web_header.substring(wa + 1, wb);
                     }
-                    const WebGuardVerdict wgv = webGuardCheck(web_header.c_str(), web_header.length(), wg_path.c_str());
-                    web_cors_ok = webGuardCorsAllowed(wg_path.c_str(), web_header.startsWith("POST"));
+                    // MC_WEB_GUARD=0 (default): only requests the router sends to an RM handler are
+                    // guarded; the rest behaves like upstream (no checks, CORS "*"). Decided on the
+                    // header, the way the router matches (web_guard.h).
+                    const bool wg_on = webGuardRequestApplies(web_header.c_str(), web_header.length(), wg_path.c_str());
+                    const WebGuardVerdict wgv = wg_on ? webGuardCheck(web_header.c_str(), web_header.length(), wg_path.c_str()) : WG_OK;
+                    web_cors_ok = wg_on ? webGuardCorsAllowed(wg_path.c_str(), web_header.startsWith("POST")) : true;
                     if (wgv != WG_OK)
                     {
                         if (bDEBUG)
@@ -926,6 +930,17 @@ String work_webpage(bool bget_password, int webid)
                     {
                         web_header = web_header.substring(web_header.indexOf("/?nodepassword=") + 15, web_header.indexOf("HTTP/1.1"));
                         web_header.trim();
+                        // the rewritten header must not route to RM unguarded (guard skipped above)
+                        if (!wg_on && webGuardIsRmRoute(web_header.c_str(), web_header.length()))
+                        {
+                            rm_wipe_string(web_header);
+                            rm_wipe_string(web_currentLine);
+                            web_cors_ok = false;
+                            send_http_header(403, RESPONSE_TYPE_JSON);
+                            web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+                            web_client.stop();
+                            continue;
+                        }
                         if (web_header.length() == 0)
                         {
                             web_ip_passwd_time[webid] = 0; // logging out

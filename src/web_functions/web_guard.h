@@ -5,6 +5,11 @@
 // lines, as the server accumulates it, CR bytes included) BEFORE any routing, and answers
 // 403 on anything but WG_OK. Host test: test/test_web_guard (env native_web_guard).
 //
+// Scope (compile flag MC_WEB_GUARD, default 0): by default the guard applies ONLY to the remote
+// management paths (/rm*, and the remote page /?page=remote); every other path passes unchecked,
+// like upstream (which also always sends Access-Control-Allow-Origin: *). Build with
+// -D MC_WEB_GUARD=1 to guard every path as described below. See webGuardApplies().
+//
 // What it stops (docs/rm-gui/verdict-security.md):
 //   - DNS rebinding: an attacker page whose name resolves to the node is "same-origin" for
 //     the browser and can send any header. The Host header still carries the attacker name.
@@ -75,6 +80,11 @@
 
 #ifndef WEB_GUARD_PAGE_ALLOW_EMPTY_DEST
 #define WEB_GUARD_PAGE_ALLOW_EMPTY_DEST 0
+#endif
+
+// 0 (default): guard only /rm* and the remote page. 1: guard all paths.
+#ifndef MC_WEB_GUARD
+#define MC_WEB_GUARD 0
 #endif
 
 enum WebGuardVerdict
@@ -413,6 +423,96 @@ inline bool webGuardCorsAllowed(const char *path, bool isPost = false)
             return false;
     }
     return !webGuardIsStateChanging(path, isPost);
+}
+
+// Does the guard apply to this request path? guardAll (MC_WEB_GUARD=1) -> always. Otherwise only
+// the remote-management paths: "/rm..." (rmsend, rmstatus, rmpasswd, rmnodes, rmheard, ...) and
+// the remote page "/?page=remote". NULL path: applies only with guardAll.
+inline bool webGuardAppliesTo(const char *path, bool guardAll)
+{
+    if (guardAll)
+        return true;
+    if (path == NULL)
+        return false;
+    if (strncmp(path, "/rm", 3) == 0)
+        return true;
+    return webguard_detail::contains(path, strlen(path), "?page=remote") ||
+           webguard_detail::contains(path, strlen(path), "&page=remote");
+}
+
+inline bool webGuardApplies(const char *path) { return webGuardAppliesTo(path, MC_WEB_GUARD != 0); }
+
+// Would the router dispatch this header to a remote-management handler? It matches on the HEADER,
+// not on a path: startsWith "GET /rm" / "POST /rm", and "/?page=remote" anywhere in the header
+// (a Referer routes to the remote page too). Also used on the header after the /?nodepassword
+// rewrite.
+namespace webguard_detail
+{
+// setparam() takes the name between the first "/setparam/?" in the header and the next '=',
+// percent-decoded and lower-cased. True if that name is "rm" or "rmstrict" (RM on/off and its
+// brute-force protection), decoded the same way.
+inline bool isRmSetparam(const char *h, size_t n)
+{
+    static const char key[] = "/setparam/?";
+    const size_t kl = sizeof(key) - 1;
+    size_t i = 0;
+    for (; i + kl <= n; i++)
+        if (strncmp(h + i, key, kl) == 0)
+            break;
+    if (i + kl > n)
+        return false;
+    char name[9]; // "rmstrict" + NUL; anything longer is not an RM key
+    size_t nl = 0;
+    for (size_t p = i + kl; p < n; p++)
+    {
+        char c = h[p];
+        if (c == '=')
+        {
+            name[nl] = '\0';
+            return strcmp(name, "rm") == 0 || strcmp(name, "rmstrict") == 0;
+        }
+        if (c == '%' && p + 2 < n && isHex(h[p + 1]) && isHex(h[p + 2]))
+        {
+            int v = 0;
+            for (int k = 1; k <= 2; k++)
+            {
+                char d = lc(h[p + k]);
+                v = v * 16 + ((d >= '0' && d <= '9') ? d - '0' : d - 'a' + 10);
+            }
+            c = (char)v;
+            p += 2;
+        }
+        if (nl >= sizeof(name) - 1)
+            return false;
+        name[nl++] = lc(c);
+    }
+    return false; // no '=': setparam() finds no value either
+}
+} // namespace webguard_detail
+
+inline bool webGuardIsRmRoute(const char *header, size_t len)
+{
+    if (header == NULL)
+        return false;
+    if (len >= 7 && strncmp(header, "GET /rm", 7) == 0)
+        return true;
+    if (len >= 8 && strncmp(header, "POST /rm", 8) == 0)
+        return true;
+    if (webguard_detail::isRmSetparam(header, len))
+        return true;
+    return webguard_detail::contains(header, len, "/?page=remote");
+}
+
+// Request-level decision, from the header the router sees (not from a path derived from the
+// first two spaces, which falls back to "/" for "GET /rmstatus\r\n\r\n" with no HTTP version).
+inline bool webGuardAppliesToRequest(const char *header, size_t len, const char *path, bool guardAll)
+{
+    return guardAll || webGuardIsRmRoute(header, len) || webGuardAppliesTo(path, false);
+}
+
+inline bool webGuardRequestApplies(const char *header, size_t len, const char *path)
+{
+    return webGuardAppliesToRequest(header, len, path, MC_WEB_GUARD != 0);
 }
 
 // Judge one request. `header` is the raw request text (request line + headers, `len` bytes),
