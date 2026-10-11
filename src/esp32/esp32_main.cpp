@@ -2446,7 +2446,16 @@ static void auTick(void)
     {
         s_auSawBusy = false;
         if(st.job == FWJ_DOWNLOAD && st.state == FWS_DONE_FAIL)
-            fwAttemptFailed(s_auTimer, st.availTag, now);
+        {
+            if(fwErrConsumesAttempt(st.lastErr))
+                fwAttemptFailed(s_auTimer, st.availTag, now);
+            else
+            {
+                // lowheap (classic ESP32 with a phone on BLE): transient, no attempt used; wait 10 min
+                auBackOff(now);
+                s_auNextTryMs = now + 600000u;
+            }
+        }
         if(st.job == FWJ_CHECK && st.state == FWS_DONE_OK && st.availNewer && in.mode == 1 &&
            !auTagSame(s_auNotifiedTag, st.availTag))
         {

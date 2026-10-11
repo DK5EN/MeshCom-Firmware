@@ -1008,6 +1008,39 @@ static void test_wrap_attempt_spacing(void)
     TEST_ASSERT_TRUE(now + H6 < now);                           // really wrapped
 }
 
+// #1187: pre-TLS heap gate. The old rule looked at the largest block only.
+static bool oldBlockOnlyRule(uint32_t largestBlk) { return largestBlk >= 17000u; }
+
+void test_heap_gate_total_free_classic(void)
+{
+    // failing T-Beam run (phone on BLE): block rule passes, TLS then failed with -10368
+    TEST_ASSERT_TRUE(oldBlockOnlyRule(57332));
+    TEST_ASSERT_FALSE(fwNetHeapOk(59832, 57332, 76000u, 17000u));
+    // good run (BLE paused)
+    TEST_ASSERT_TRUE(fwNetHeapOk(88180, 57332, 76000u, 17000u));
+    TEST_ASSERT_TRUE(fwNetHeapOk(76000, 17000, 76000u, 17000u));
+    TEST_ASSERT_FALSE(fwNetHeapOk(75999, 57332, 76000u, 17000u));
+    TEST_ASSERT_FALSE(fwNetHeapOk(88180, 16999, 76000u, 17000u));
+}
+
+void test_heap_gate_total_free_disabled(void)
+{
+    // non-classic: minFree 0 behaves exactly like the old block-only rule
+    TEST_ASSERT_TRUE(fwNetHeapOk(20000, 17000, 0u, 17000u));
+    TEST_ASSERT_FALSE(fwNetHeapOk(20000, 16999, 0u, 17000u));
+}
+
+void test_lowheap_does_not_consume_attempt(void)
+{
+    TEST_ASSERT_FALSE(fwErrConsumesAttempt("lowheap"));
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("lowheap_ble_off"));   // BLE paused, still too little heap: bounded
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("lowheapx"));          // exact match only
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("lowhea"));
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("tls"));
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("sha"));
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt(nullptr));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1073,5 +1106,8 @@ int main(int, char **)
     RUN_TEST(test_latch_does_not_pull_check_forward);
     RUN_TEST(test_latch_attempt_deadline_survives_25_days);
     RUN_TEST(test_latch_attempt_exhausted_stays_blocked);
+    RUN_TEST(test_heap_gate_total_free_classic);
+    RUN_TEST(test_heap_gate_total_free_disabled);
+    RUN_TEST(test_lowheap_does_not_consume_attempt);
     return UNITY_END();
 }

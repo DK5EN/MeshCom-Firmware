@@ -533,4 +533,21 @@ inline void fwAttemptFailed(FwTimer &t, const char *tag, uint32_t nowMs)
     t.nextAttemptMs = nowMs + FW_ATTEMPT_SPACING_MS;
 }
 
+// Pre-TLS heap gate (#1187, AU-D13/AU-D18/AU-D20). TLS needs the largest free block for the 16 KB
+// record buffers AND a lot of TOTAL free heap for the P-384 chain verify: the block rule alone
+// passed free 59832 / blk 57332 on a T-Beam with a phone on BLE, mbedtls then failed with -10368
+// and the heap minimum fell to 268 B. minFree 0 / minBlk 0 disable the respective check.
+inline bool fwNetHeapOk(uint32_t freeB, uint32_t largestBlk, uint32_t minFree, uint32_t minBlk)
+{
+    return freeB >= minFree && largestBlk >= minBlk;
+}
+
+// A lowheap refusal while a phone kept BLE up is transient: it must not consume one of the
+// FW_MAX_ATTEMPTS download attempts. With BLE paused the job reports "lowheap_ble_off" instead,
+// which does consume one (bounded retries, no endless NimBLE stop/start).
+inline bool fwErrConsumesAttempt(const char *err)
+{
+    return !(err != nullptr && fw_update_detail::strEqN(err, "lowheap", 8));
+}
+
 #endif // FW_UPDATE_H

@@ -69,6 +69,18 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #ifndef FWNET_MIN_BLOCK
 #define FWNET_MIN_BLOCK 17000u
 #endif
+// TOTAL free heap needed before a TLS session (#1187). The block rule alone is not enough: the
+// P-384 chain verify peaks at about 69 KB of total heap. Measured on DK5EN-92 (classic, BLE paused):
+// free 88180 -> min 18968 = 69.2 KB; with a phone on BLE (no pause) free 59832 -> min 268 and
+// mbedtls -10368. 76000 = 69.2 KB + margin. S3 has no NimBLE pause and runs with 119 KB free
+// (min 63 KB during TLS), so non-classic targets keep 0 = no total-free check.
+#ifndef FWNET_MIN_FREE
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#define FWNET_MIN_FREE 76000u
+#else
+#define FWNET_MIN_FREE 0u
+#endif
+#endif
 #define FWNET_BLK 4096u                  // staging block, heap-allocated per job
 #define FWNET_JSON_MAX (300u * 1024u)    // releases/latest is about 65 KB; hard cap
 #define FWNET_IDLE_MS 20000u             // no byte for this long = stall
@@ -459,6 +471,17 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
     return !k.z->err && !k.r->err;
 }
 
+// Pre-TLS gate shared by CHECK and DOWNLOAD; logs the numbers on refusal.
+bool heapGateOk()
+{
+    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    if (fwNetHeapOk(fr, bk, FWNET_MIN_FREE, FWNET_MIN_BLOCK))
+        return true;
+    auLog("[AU];refuse;lowheap;free;%u;blk;%u\n", (unsigned)fr, (unsigned)bk);
+    return false;
+}
+
 const char *runCheck(FwChannel ch)
 {
     char zname[48], rname[48];
@@ -470,11 +493,8 @@ const char *runCheck(FwChannel ch)
     if (!fwParseTag(runningVersion(), run))
         return "badver";
 
-    if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < FWNET_MIN_BLOCK)
-    {
-        auLog("[AU];refuse;lowheap\n");
+    if (!heapGateOk())
         return "lowheap";
-    }
 
     uint8_t *blk = (uint8_t *)heap_caps_malloc(FWNET_BLK, MALLOC_CAP_8BIT);
     FwJsonScan *sz = (FwJsonScan *)heap_caps_malloc(sizeof(FwJsonScan), MALLOC_CAP_8BIT);
@@ -711,7 +731,8 @@ struct Stage
 };
 
 // Returns nullptr, or the reason. On a reason nothing is left allocated and no record
-// survives; refusals before the first destructive step were printed by refuse().
+// survives; refusals before the first destructive step were printed by refuse(), the
+// lowheap refusal by heapGateOk(). minBlock != 0 only switches the pre-TLS heap gate on.
 const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBlock)
 {
     memset(&sg, 0, sizeof(sg));
@@ -737,10 +758,10 @@ const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBl
     if (!stageFlashArm(ota0, off))
         return refuse("noflash");
 
-    if (minBlock != 0 && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < minBlock)
+    if (minBlock != 0 && !heapGateOk())
     {
         stageFlashDisarm();
-        return refuse("lowheap");
+        return "lowheap";   // heapGateOk() already logged [AU];refuse;lowheap;free;..;blk;..
     }
     uint8_t *blk = (uint8_t *)heap_caps_malloc(FWNET_BLK, MALLOC_CAP_8BIT);
     if (blk == nullptr)
@@ -1019,6 +1040,12 @@ void fwNetTask(void *)
                                                    : runDownload();
     heapMark("end"); // after every client object is gone
     allocFailMark("end");
+#if AU_BLE_PAUSE
+    // lowheap with BLE already paused is not the transient phone case: it would recur on every
+    // retry and cycle NimBLE each time, so it gets its own token, which uses an AU-D5 attempt.
+    if (blePaused && err != nullptr && strcmp(err, "lowheap") == 0)
+        err = "lowheap_ble_off";
+#endif
     if (err != nullptr)
         auLog("[AU];fail;%s\n", err);
 
