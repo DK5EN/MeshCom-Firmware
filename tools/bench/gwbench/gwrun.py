@@ -90,11 +90,19 @@ def http(base: str, path: str, body: Optional[str] = None, timeout: int = 10) ->
     hd = {"X-MC": "1"}
     if body is not None:
         hd["Content-Type"] = "application/x-www-form-urlencoded"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(base + path, data=body.encode() if body is not None else None, headers=hd), timeout=timeout) as r:
-            t = r.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        t = e.read().decode("utf-8", "replace")
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(base + path, data=body.encode() if body is not None else None, headers=hd), timeout=timeout) as r:
+                t = r.read().decode("utf-8", "replace")
+            break
+        except urllib.error.HTTPError as e:
+            t = e.read().decode("utf-8", "replace")
+            break
+        except urllib.error.URLError as e:
+            # the RAK's W5100S briefly refuses connections when its few sockets are busy (run gwbench_20261011-132105)
+            if attempt == 2 or not isinstance(e.reason, ConnectionRefusedError):
+                raise
+            time.sleep(2)
     try:
         return json.loads(t)
     except ValueError:
@@ -303,12 +311,7 @@ class Run:
                     self.ev("verify_restore:" + cmd, d, result="same" if self.rm_case(src, dst, cmd)["reply"] == r["reply"] else "DIFFERENT")
                 else:
                     self.ev("rm:%s write" % cmd, d, result="skipped", reply="read format unknown: " + (r["reply"] or ""))
-            r = self.rm_case(src, dst, "maxhop"); m = re.search(r"(\d+)\s*$", r["reply"] or "")
-            if m:
-                old = int(m.group(1))
-                self.rm_case(src, dst, "maxhop", str(old - 1 if old > 1 else old + 1), tag=" (temp)")
-                self.rm_case(src, dst, "maxhop", str(old), tag=" (restore)")
-                self.ev("verify_restore:maxhop", d, result="same" if self.rm_case(src, dst, "maxhop")["reply"] == r["reply"] else "DIFFERENT")
+            # maxhop is read-only over RM1 since c3432031 (rm_commands.h: READ, NONE); the read is in RM_READ
 
     def p_refused(self) -> None:
         """RM-STRIKE / sender clamp (txpower-clamp plan, waves 1-2): DK5EN-1 manages the RAK (floor 2 dBm).
