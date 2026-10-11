@@ -9,7 +9,7 @@ has the same logic at shifted line numbers, so this is an upstream PR candidate.
 A gateway never uploads the signal reports that its neighbours append to its own HG HEY. The echo
 is recognised as an own frame and only feeds the "heard" status; the server upload sits in the
 other branch. Fix: in the own-echo branch, a gateway uploads every echo of its own HEY it hears,
-with its own signal-report group appended like every other gateway HEY upload. No new msg_id, no change to the relay or dedup logic,
+as received (no own signal-report group appended). No new msg_id, no change to the relay or dedup logic,
 no self-upload of the bare HG (GW-01 stays).
 
 ## 2. Current behaviour (verified by code reading, not on the bench)
@@ -55,20 +55,21 @@ In the `heardIcheck >= 0` branch (`src/lora_functions.cpp:1543`), add: when
 - the last hop is not the own call (`aprsmsg.msg_source_last` != `meshcom_settings.node_call`;
   defensive, an echo always carries a relay call)
 
-then, exactly like the existing gateway HEY upload (`HEY always send to Server` block): append the
-gateway's own group with `appendHeySignalReport()`, re-encode into `RcvBuffer`, log the
-`setlogFormatGwu()` line, `addNodeData(RcvBuffer, size, rssi, snr)`. No `max_hop` change.
+then log the `setlogFormatGwu()` line and call `addNodeData(RcvBuffer, size, rssi, snr)` with the
+frame as received. No append, no re-encode, no `max_hop` change.
 
-Two changes against the first draft of this concept, both from the wave-1 review:
+Two points settled during wave 1:
 
-- **Own report appended.** Not needed for the goal, kept for a uniform wire shape. Checked
+- **No own report appended** (operator decision 2026-10-11, after b243af16 had shipped it; removed
+  in the follow-up commit). Checked
   against mcmap and the live INTERLINK feed (2026-10-11): the hub no longer names the uploading
   gateway and no longer appends its header RSSI/SNR (since late Aug 2026), so the feed row of an
   echo is `"path":"G,N","rssi":"<N's group>;<G's group>;"`. mcmap builds edge `path[i] ->
 path[i+1]` from group `i` (`proxy/src/interlink/ingest.ts`, `wss/stateStore.ts`), so edge G->N
   gets N's report of hearing G either way; the trailing group belongs to the anonymous uploader
-  and is not used for an edge today. Every other gateway HEY upload has carried that trailing
-  group since 4.35t, so the echo keeps the same shape; mcmap's shape heuristics see no new class.
+  and is not used for an edge today. Without the append the row is
+  `"path":"G,N","rssi":"<N's group>;"` and yields the same edge G->N. (Other gateway HEY uploads
+  still end with the uploader's group since 4.35t; echo rows differ in that one trailing group.)
 - **Own-origin gate.** `heardIcheck >= 0` is not "own frame": a gateway that forwards a foreign HEY
   from the server to LoRa also calls `insertOwnTx()` (`src/esp32/udp_frame_esp32.cpp:550`,
   `src/nrf52/udp_frame_nrf52.cpp:544`), so neighbour relays of that foreign HEY land in the
@@ -162,4 +163,4 @@ Dropped (operator, 2026-10-11): fork only, no wave 3.
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0    | Done. No host harness drives `OnRxDone`; the test covers the predicate in `[env:native]`.                                                                                                                                                                          |
 | 1    | Done 2026-10-11. `src/hey_echo_upload.h`, call site in `OnRxDone` own-echo branch, `test_hey_echo_upload` (10 cases, fail-before shown). Advisor: pass 1 rework (own-origin gate), pass 2 APPROVED. Gate: stage 1,2 PASS (2320 cases), T-Beam/RAK/Heltec V3 build. |
-| 2    | Bench pending: DK5EN-1 gateway (server on), DK5EN-92 neighbour (mesh on), both 2 dBm. Expect a GWU line for the echo and an mcmap edge DK5EN-1 -> DK5EN-92.                                                                                                        |
+| 2    | Bench pending: DK5EN-1 gateway (server on), DK5EN-92 neighbour (mesh on), both 2 dBm. Expect a GWU line for the echo, a feed row `"path":"DK5EN-1,DK5EN-92"` with one group, and an mcmap edge DK5EN-1 -> DK5EN-92.                                                |

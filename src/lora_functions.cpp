@@ -1586,20 +1586,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 }
 
                 // Own HEY came back relayed (docs/hey-echo-upload-concept.md): a gateway
-                // uploads that echo like every other HEY. Same msg_id, no relay, no
-                // dedup/HEARD change. Mirrors the HEY upload in the relay block below,
-                // including our own signal report (path G,N).
+                // uploads that echo as received. Same msg_id, no relay, no dedup/HEARD
+                // change. No own signal report appended: the neighbour's group already
+                // gives the edge G->N, and the feed does not name the uploader.
                 if(heyEchoShouldUpload(bGATEWAY, msg_type_b_lora, MSG_TYPE_HEY, aprsmsg.payload_type,
                                        rx_pn_repeat, aprsmsg.msg_source_last,
                                        aprsmsg.msg_source_call, meshcom_settings.node_call))
                 {
-                    appendHeySignalReport(aprsmsg, rssi, snr, nbrNcntAir(nbrMatrix, uptimeMin16()));
-
-                    memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
-                    size = encodeAPRS(RcvBuffer, aprsmsg);
-                    if(size + 2 > UDP_TX_BUF_SIZE)
-                        size = UDP_TX_BUF_SIZE - 2;
-
                     if(bDisplayLog)
                     {
                         setlogFormatGwu(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
