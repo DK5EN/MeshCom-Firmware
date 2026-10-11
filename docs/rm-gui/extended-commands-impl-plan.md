@@ -95,7 +95,7 @@ W1c on the server side (`force=1` on `/rmsend`, `canForce` in the JSON); its but
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `-Os` on T-Echo and T114 without hardware on the bench                   | Same SoC, SoftDevice and SX1262 path as the RAK, which runs `-Os` since 09-29; field tester `[D3]` |
 | The RM core is not upstream (`upstream/dev` has no `src/remote_cmd.cpp`) | The `sync` fix cannot be a stand-alone upstream PR; it rides with the RM upstream PR `[D4]`        |
-| Version skew between old and new RM firmware                             | `rm=2` capability token; existing replies stay at 63 characters or less                            |
+| Version skew between old and new RM firmware                             | Removed 2026-10-11 (RM never shipped): no capability token, no 63-character limit                  |
 | Hotspot conflicts in W1                                                  | Writers own new files only; orchestrator integrates                                                |
 | E22_XML DRAM headroom (about 19 kB, estimate)                            | Measured in W0b and W3 with release flags                                                          |
 
@@ -123,7 +123,7 @@ Extern-UDP). All three are accepted.
 
 | Ask | Content                                                                                                                                                                                                                        | Wave                                                       |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1   | `rm=2` in the `sync` reply only (`ok ctr=<hwm> v=<ver> rm=2`); `status` never carries a capability token; rule stated in concept 2.1                                                                                           | W0b                                                        |
+| 1   | (Removed 2026-10-11: no capability token.) `rm=2` in the `sync` reply only (`ok ctr=<hwm> v=<ver> rm=2`); `status` never carries a capability token; rule stated in concept 2.1                                                | W0b                                                        |
 | 2   | No `{NNN` suffix and no retry ladder for any DM whose payload starts with `RM1 `, from the Remote page, BLE or Extern-UDP; native test                                                                                         | W0c (new, `loop_functions.cpp`)                            |
 | 3   | Vectors: compact `status` replies (6-letter with LED, 5-letter without, 62-character worst case) and the `sync` reply with the token, each with the fields `rmStatusParse` produces; native check that parses every JSON reply | W0b (items 1-4), W2 (one worst-case reply per new command) |
 | ref | Names for the `..` counters of `txq` and `mbox` are fixed by the W1a formatters; `busy` stays a refusal of the firmware's own sender only                                                                                      | W1a, concept                                               |
@@ -150,8 +150,8 @@ a target; `tools/webflash.py` without a host argument targets dk5en-98.local.
 
 | Check                        | Result                                                                                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sync`                       | `ok ctr=... v=4.40a rm=2`; the sender then reports `cap` 2 for the target                                                                                          |
-| `status`                     | `ok v=4.40a up=1 bat=100 heap=118 s=gtdMwl p=2/22 led=0` (54 characters, legacy form intact)                                                                       |
+| `sync`                       | `ok ctr=... v=4.40a` (the `rm=2` token was removed 2026-10-11)                                                                                                     |
+| `status`                     | `ok v=4.40a up=1 bat=100 heap=118 s=gtdMwl p=2/22` (2026-10-11: `led=` removed; the 2026-10-06 bench showed `... led=0` appended)                                  |
 | `radio`                      | `ok f=433.175 sf=11 cr=6 bw=250 p=2/22`                                                                                                                            |
 | `name`, `atxt`, `pos` (read) | `ok n=Martin`, `ok a=MeshCom Freising`, `ok 48.40760 11.73840 485 set`                                                                                             |
 | `sens`                       | `err unsupported` (no sensor on the Heltec)                                                                                                                        |
@@ -162,7 +162,7 @@ a target; `tools/webflash.py` without a host argument targets dk5en-98.local.
 | Persistence                  | `name Bench Node 2`, remote `reboot`, `name` after the reboot still `Bench Node 2`; restored to `Martin`                                                           |
 | `sync` limiter               | a second `sync` inside 60 s stayed unanswered                                                                                                                      |
 | Wrong password               | first wrong-key frame sent, second refused locally with `limit` and `canForce` 1 (an unanswered `sync` already counted); one wrong-key frame = one reject; no lock |
-| Right password afterwards    | works after the window; the target's capability is learned again by the next `sync`                                                                                |
+| Right password afterwards    | works after the window; (2026-10-11: no capability to learn; the next verified reply proves the key)                                                               |
 | `/rmstatus` depth            | 12 sent entries listed                                                                                                                                             |
 | Loss                         | 3 of about 40 frames stayed unanswered (2 dBm next to the 22 dBm production node); with no retry ladder a lost frame shows as "no answer" and is repeated by hand  |
 | Reply latency                | 9 to 39 s per command                                                                                                                                              |
@@ -181,8 +181,8 @@ guard on all three before and after. Remote management is back to its state from
 | Replay                       | accepted frame sent again with its counter equal to the mark: `[RM];cached`, the stored reply once per 10 s; with the counter below the mark: three times `[RM];reject;replay`, no lockout, the next command works |
 | `pos` with GPS on            | write `err gps`, read `ok 48.40760 11.73840 480 gps`; GPS off and the position restored                                                                                                                            |
 | Forced attempt               | after the slot was re-saved with the new password: plain send refused `limit` with `canForce` 1, `force=1` goes out once, `canForce` back to 0 (the frame itself met the lockout of finding 1)                     |
-| Reverse, DK5EN-1 to DK5EN-92 | `sync` `rm=2`, `status`, `radio` (`p=2/20`), `name`, `atxt`, `pos` (`gps`), `maxhop`, `txq`, `mh 0`, `mh DK5EN-1`; `mbox` and `sens` `err unsupported` on the T-Beam                                               |
-| RAK4631 as target            | `sync` `rm=2`, `status`, `name` and `atxt` empty as `-`, `pos`, `maxhop`, `txq`, `mbox` (`m=list u=0/50 ...`), `mh 0`, `mh <call>`, `sens` `err unsupported`, `atxt` write with read-back, restored                |
+| Reverse, DK5EN-1 to DK5EN-92 | `sync` (`rm=2` at the time), `status`, `radio` (`p=2/20`), `name`, `atxt`, `pos` (`gps`), `maxhop`, `txq`, `mh 0`, `mh DK5EN-1`; `mbox` and `sens` `err unsupported` on the T-Beam                                 |
+| RAK4631 as target            | `sync` (`rm=2` at the time), `status`, `name` and `atxt` empty as `-`, `pos`, `maxhop`, `txq`, `mbox` (`m=list u=0/50 ...`), `mh 0`, `mh <call>`, `sens` `err unsupported`, `atxt` write with read-back, restored  |
 | RAK4631 `radio`              | bug: `f=999.999 ... cr=2` (the nRF52 stores Hz and a coding-rate index); fixed (`rm_radio_in.h`, regression test in `test_radio_units`), reflashed: `ok f=433.175 sf=11 cr=6 bw=250 p=2/22`                        |
 | Remote page in Chrome        | DK5EN-1 managing DK5EN-92: cards filled from the sent book, a card read, Run again with its two-tap confirm, heard-list reader ("Read 4 of 4"), Details of one row; no console error                               |
 | Escaping of received text    | a DM `<b id=...><img src=x onerror=...>&amp;` shows literally on the Messages page of the receiver; no element created, no handler run                                                                             |

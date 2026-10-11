@@ -130,7 +130,7 @@ bool rmSendCommand(const char *dst, const char *passwd, const char *cmd, const c
 // 10 s have passed; then it goes out by itself from rmDrain(). The call then returns true with
 // *viaSync = true and *ctrOut = 0. A sync that stays unanswered drops the queued command.
 // false + short reason in err: "passwd", "cmd", "dst", "busy" (10 s spacing, or a command is already
-// queued behind a sync for dst), "limit" (2 unanswered sends inside 90 s: a third could lock the target),
+// queued behind a sync for dst), "limit" (the unanswered-send budget inside 90 s is used up: 2 while the key is unproven, 10 once proven),
 // "ctr" (counter exhausted), "store" (counter not persisted), "send" (sendMessage refused).
 // A refusal consumes no counter, so a double click never burns one.
 bool rmSendCommandKey(const char *dst, const uint8_t key[32], const char *cmd, const char *args, char *err,
@@ -147,10 +147,9 @@ uint8_t rmGetSent(RmSent *out, uint8_t max);
 struct RmTarget
 {
     char dst[10];
-    bool locked;           // 2 unanswered sends inside 90 s: sends are refused ("limit")
+    bool locked;           // unanswered-send budget used up (2 unproven, 10 proven): sends are refused ("limit")
     uint32_t retryS;       // seconds until a send is accepted again (spacing included), 0 = now
     bool canForce;         // refused with LIMIT and the one-shot after a re-key is armed: a send with force=1 may go once
-    uint8_t cap;           // capability level of the target (sync reply rm=<n>): >= 2 allows 10 unanswered sends while proven (rmPolicyLimit), 0 = unknown/old
     bool pending;          // a command waits behind an automatic sync for this node
     const char *chainErr;  // token (static) why the last chained command was NOT sent ("nosync", "lost",
                            // "limit", "busy", "send", ...), nullptr = none; cleared by the next accepted send

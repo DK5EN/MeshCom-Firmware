@@ -188,8 +188,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 
     if (strcmp(cmd, "status") == 0)
     {
-        // s=<letters> p=<cur>/<max> pmin=<min> replace gw= and mesh=; led= stays as the capability flag of
-        // older consumers. Worst case 70 of the 108 wire characters (61 without pmin=), see
+        // s=<letters> p=<cur>/<max>; the worst case stays well inside the 108 wire characters, see
         // rm_sender_policy.h and its native test.
         char ver[12];
         snprintf(ver, sizeof(ver), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
@@ -204,7 +203,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         sw.led = bRemoteLed;
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
-                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX, (int)TX_POWER_MIN);
+                       (int)meshcom_settings.node_power, (int)TX_POWER_MAX);
         return true;
     }
 
@@ -454,15 +453,6 @@ void handleReply(const char *src, const char *text)
             uint8_t fp[4];
             keyFp(e.key, fp); // the key of the MATCHED entry, before wipeKey()
             rmProofVerified(s_proof, e.pub.dst, fp);
-            if (strcmp(e.pub.cmd, "sync") == 0) // the sync reply advertises the receiver generation (rm=<n>)
-            {
-                int cap = rmCapLevel(result);
-                if (cap < 0)
-                    cap = 0;
-                if (cap > 9)
-                    cap = 9;
-                rmProofSetCap(s_proof, e.pub.dst, fp, (uint8_t)cap);
-            }
             snprintf(e.pub.reply, sizeof(e.pub.reply), "%s", result);
             wipeKey(e);
             uint32_t h = 0;
@@ -648,8 +638,8 @@ void rmDrain(void)
         s_haveSyncReply = true;
         s_lastSyncReplyMs = nowSync;
         char result[RM_MAX_RESULT + 1];
-        snprintf(result, sizeof(result), "ok ctr=%lu v=%s%s rm=%d", (unsigned long)s_state.hwm,
-                 SOURCE_VERSION, SOURCE_VERSION_SUB, RM_CAP_LEVEL);
+        snprintf(result, sizeof(result), "ok ctr=%lu v=%s%s", (unsigned long)s_state.hwm,
+                 SOURCE_VERSION, SOURCE_VERSION_SUB);
         rmSanitizeResult(result);
         Serial.printf("[RM];sync;ctr;%lu\n", (unsigned long)s_state.hwm);
         sendReply(cmd, result, src);
@@ -1153,8 +1143,6 @@ bool rmTargetAt(uint8_t i, RmTarget *out)
     t.locked = (d.reason == RM_POL_LIMIT);
     t.retryS = d.retryS;
     t.canForce = d.canForce;
-    const RmProof *pf = rmProofFind(s_proof, t.dst);
-    t.cap = (pf != nullptr) ? pf->cap : 0;
     t.pending = s_pend.used && strcmp(s_pend.dst, t.dst) == 0;
     if (s_chainErr.tok != nullptr && strcmp(s_chainErr.dst, t.dst) == 0)
     {

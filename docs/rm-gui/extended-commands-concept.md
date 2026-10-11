@@ -48,6 +48,8 @@ So `RM_MAX_RESULT = 108` and a formatter body gets 105 characters. The firmware 
 (result 117): 9 characters of margin. Tests assert `strlen(wire) <= 140` on the real wire with a
 10-digit counter and worst-case values.
 
+> 2026-10-11: compatibility layer removed (RM never shipped); no capability token, no 63-character reply limit; replies are limited only by the 108-character wire cap and the page enables the cards as soon as a node is chosen. The two paragraphs below are the original decision, kept as history.
+
 Version skew: replies of the existing commands stay at 63 characters or less, because older
 operator firmware rejects a longer reply as unverified. New commands are only sent to targets that
 report support (capability token `rm=2` in the `sync` reply only, see below); the page keeps the new cards disabled
@@ -231,7 +233,7 @@ older of two reordered frames counts as a replay strike). Final design:
    reordered frames (path delays alternating 30 s and 0 s) locked the target within 70 s, and anyone
    could lock a node by replaying one sniffed frame three times. Rejects before the tag check and
    wrong tags are counted as before.
-9. The budget of 10 applies only to a target that reported the new receiver: `rm=2` in a verified
+9. (Superseded 2026-10-11: compatibility layer removed (RM never shipped); the budget is 2 while the key is unproven and 10 once a reply under the current key verified; no `rm=2` gate.) The budget of 10 applies only to a target that reported the new receiver: `rm=2` in a verified
    `sync` reply under the current key (RAM only, cleared by a key change or a forget). Every other
    target keeps 2, which is safe against the old receiver that still counts replays. A cap on
    "overtaken" sends was tried first and dropped: simulation showed it does not protect an old
@@ -254,7 +256,7 @@ older of two reordered frames counts as a replay strike). Final design:
 | P8  | Sentences for the new error tokens: `range text unknown unsupported end busy`                                                                                                                                                                                                                                                                                      |
 | P9  | Retry countdown from the target, no fixed 10 s in sentences                                                                                                                                                                                                                                                                                                        |
 | P10 | Messages depth: stream `/rmstatus` entries (no 12-slot struct on the stack); list of targets beyond 4; deeper history client-side                                                                                                                                                                                                                                  |
-| P11 | Capability gate: new cards disabled until the target reports `rm=2`; "stored as typed" case note                                                                                                                                                                                                                                                                   |
+| P11 | Capability gate: new cards disabled until the target reports `rm=2` (removed 2026-10-11: no gating); "stored as typed" case note                                                                                                                                                                                                                                   |
 | P12 | `tools/webgui_rm_test.js` in `tools/regression.sh`, id regex `[a-z0-9_]+`, size budget, fake server mirrors G2, worst-case 108-character reply row                                                                                                                                                                                                                 |
 
 ## 7. Test plan
@@ -279,7 +281,7 @@ older of two reordered frames counts as a replay strike). Final design:
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | W-1  | Restore the T-Echo link (fails at HEAD by 9 344 B) and give heltec_t114 headroom: do not link the RM web layer on boards that cannot serve it, or trim; measure both with release flags (2.5) |
 | W0a  | `sync` replay fix (own limiter 60 s, never blocks commands) + test; separate commit, separate upstream PR                                                                                     |
-| W0b  | Buffers and `static_assert`s, `RM_MAX_RESULT 108`, table allowlist, reply sanitiser, `rm=2` token, Python twin, vectors, gate the jsdom suite                                                 |
+| W0b  | Buffers and `static_assert`s, `RM_MAX_RESULT 108`, table allowlist, reply sanitiser, `rm=2` token (removed 2026-10-11), Python twin, vectors, gate the jsdom suite                            |
 | W1a  | Pure formatters and `rmGather*` helpers with native tests (new files)                                                                                                                         |
 | W1b  | XSS escaping at the three sinks, text allowlist, `pos`/`name`/`atxt` write validation, `msgstoreBytes()`                                                                                      |
 | W1c  | Sender policy (book 12, proof, 120 s, no `{NNN`, per-target forget, receiver unlock) with the real-policy-vs-receiver test                                                                    |

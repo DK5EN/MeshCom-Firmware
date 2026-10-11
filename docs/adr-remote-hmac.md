@@ -189,7 +189,7 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   limiter (a captured `sync` verified forever and blocked commands for 10 s per replay).
 - **Sizes.** Result at most 108 characters (reply DM text at most 140), arguments at most 39;
   replies of the first 13 commands stay at 63 or less. Every reply passes `rmSanitizeResult()`.
-- **Capability.** The `sync` reply ends in `rm=2`; `status` never carries a capability token.
+- **Capability.** (Superseded 2026-10-11, see the update note at the end.) The `sync` reply ends in `rm=2`; `status` never carries a capability token.
   A sender uses its budget of 10 unanswered sends only for a target that reported `rm>=2`, and
   only while replies keep verifying (see Proof decay).
 - **Transport.** A DM whose text starts with `RM1 ` goes on air once: no `{NNN` suffix, no DM ACK,
@@ -259,10 +259,22 @@ DK5EN-1 (Heltec V3) to DK5EN-90 (RAK4631) and the reverse direction:
 
 DK5EN-92 (T-Beam, sender over USB serial) to DK5EN-1 (Heltec V3, OTA-flashed with `fbba3f46`):
 
-- `led on` (ctr 10) was answered `RM1 10 ok led=on`; the reply tag verified with `tools/remote_cmd.py --verify`.
-- `status` (ctr 14) after `led off` (ctr 13) reported `led=0`. The replies to ctr 12 and 13 were not
+- `led on` (ctr 10) was answered `RM1 10 ok led=on` (historic; the `led=` status token no longer exists); the reply tag verified with `tools/remote_cmd.py --verify`.
+- `status` (ctr 14) after `led off` (ctr 13) reported `led=0` (historic form, see the 2026-10-11 update). The replies to ctr 12 and 13 were not
   heard at the sender, the node state confirms ctr 13 executed.
 - `--remotemgmt` on DK5EN-1 was switched on for the test and restored to off afterwards.
 - Not done on hardware: the visible state of the white LED (not observed by the tester), the
   `err unsupported` path on a T-Beam (DK5EN-92 still runs the previous image), and any
   `BOARD_LED` board other than the V3 (compile-only).
+
+## Update 2026-10-11: compatibility layer removed
+
+RM never shipped, so the decisions above that existed for old receivers are gone from the code:
+
+- The `sync` reply is `ok ctr=<n> v=<ver>`; the `rm=<n>` capability token and any capability
+  level are removed. The sender budget is 2 unanswered sends while the key is unproven and 10 once
+  a reply under the current key verified (proven); nothing else gates it.
+- The `status` reply is `ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>`; `s=` is
+  6 letters (GTDMWL) on a board with an LED, 5 (GTDMW) without. The `gw=`/`mesh=`/`led=` form and
+  `pmin=` are gone and not accepted.
+- The 63-character reply limit is gone; replies are limited only by the 108-character wire cap.

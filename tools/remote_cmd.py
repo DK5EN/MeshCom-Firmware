@@ -49,8 +49,6 @@ CTR_MAX = 0xFFFFFFFF
 PASSWD_MAX = 14  # node_passwd is char[15]
 ARGS_MAX = 39  # RM_MAX_ARGS in src/remote_cmd.h (RmCmd::args[40])
 RESULT_MAX = 108  # RM_MAX_RESULT: "RM1 <10> <108> <16>" is 140 chars, the DM limit
-LEGACY_RESULT_MAX = 63  # replies of the first 13 commands stay within this (version skew)
-CAP_LEVEL = 2  # "rm=<n>" token of the sync reply
 TAG_HEX_LEN = 16  # 8 bytes
 
 # cmd -> argument shape. None = no args, tuple = fixed set of allowed arg strings,
@@ -343,12 +341,12 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 1, "ok rebooting"),
     ("secret", "DK5EN-90", "DK5EN-1", 44, "err range"),
     ("secret   ", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a"),
-    ("abcdefghijklmn", "DK5EN-92", "DK5EN-14", 2, "ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1"),
-    # McApp ask 3 (appended, existing entries above never change)
-    ("secret", "DK5EN-90", "DK5EN-1", 54, "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0"),
+    ("abcdefghijklmn", "DK5EN-92", "DK5EN-14", 2, "ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22"),
+    # McApp ask 3 (appended; entries change only with the wire format, e.g. the 2026-10-11 compat removal)
+    ("secret", "DK5EN-90", "DK5EN-1", 54, "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22"),
     ("secret", "DK5EN-90", "DK5EN-1", 55, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/22"),
-    ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22 led=1"),
-    ("secret", "DK5EN-90", "DK5EN-1", 0, "ok ctr=42 v=4.40a rm=%d" % CAP_LEVEL),
+    ("secret", "DK5EN-90", "DK5EN-1", 56, "ok v=4.40A up=71582000 bat=100 heap=199 s=GTDMWL p=22/22"),
+    ("secret", "DK5EN-90", "DK5EN-1", 0, "ok ctr=4294967295 v=4.40a"),  # sync reply at the counter ceiling
     # RM ext W2-A: worst-case result of every extended formatter (strings of test_rm_format) and the error tokens
     ("secret", "DK5EN-90", "DK5EN-1", 80, "ok f=999.999 sf=99 cr=99 bw=999.99 p=-99/-99"),
     ("secret", "DK5EN-90", "DK5EN-1", 81, "ok t=-99.9 h=100 p=1099.9 t2=-99.9"),
@@ -372,7 +370,7 @@ _VECTOR_REPLIES = [
 
 def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     """Fields the firmware's rmStatusParse() must produce (from the format itself)."""
-    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)( pmin=-?\d+)?( led=[01])?$", result)
+    m = re.search(r" s=([A-Za-z]{5,6}) p=(\d+)/(\d+)$", result)
     if not result.startswith("ok v=") or m is None:
         return None
     letters = m.group(1)
@@ -380,7 +378,7 @@ def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     # flat scalars (the native test's JSON reader has no nesting); sw: gps,track,display,mesh,gateway,led
     return {"status_sw": ",".join(("-" if v < 0 else str(v)) for v in sw),
             "status_p": "%s/%s" % (m.group(2), m.group(3)),
-            "status_led": len(letters) == 6 or m.group(5) is not None}
+            "status_led": len(letters) == 6}
 
 
 def generate_vectors() -> Dict[str, Any]:
@@ -409,8 +407,6 @@ def generate_vectors() -> Dict[str, Any]:
         st = _status_expect(result)
         if st is not None:
             extra.update(st)
-        if result.startswith("ok ctr=") and " rm=" in result:
-            extra["cap"] = CAP_LEVEL
         replies.append(
             {**extra,
                 "passwd": passwd,

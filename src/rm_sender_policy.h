@@ -5,14 +5,12 @@
 //
 //  1. Send policy per target: a rejected RM1 frame (wrong key, stale counter, even a wrong-key sync)
 //     is SILENT on air and counts toward the target's lockout of THIS sender's call (3 within 90 s =
-//     5 min locked; per sender since 2026-10-06, an older target locks itself for everybody; the
+//     5 min locked, per sender; the
 //     sender can not see any of it). So the sender allows at most N unanswered sends to one target
 //     inside RM_POLICY_WINDOW_MS (150 s = 90 s reject window + 30 s path delay + 30 s margin) and
 //     spaces sends to one target by 10 s (the target rate limits to one per 10 s). N is 2 until a
-//     reply under the current key verified AND the target's sync reply reported rm >= 2 (it does
-//     not count authenticated replays toward its lockout); then N is 10. A target of unknown or old
-//     firmware (cap 0) keeps 2 for good: an old receiver counts a reordered right-key frame as a
-//     strike. After a re-key (key fingerprint changed) the proof and the capability are gone and
+//     reply under the current key verified; then N is 10 (the target does not count authenticated
+//     replays toward its lockout). After a re-key (key fingerprint changed) the proof is gone and
 //     ONE forced attempt beyond the limit is allowed. Two sends in a row without a verified reply
 //     suspend the proof (rmPolicyLimit): the target may have been re-keyed.
 //     BF-01: this whole policy is active only with strict security on (node_rmstrict, default off):
@@ -36,8 +34,7 @@
                                        // jitter, verdict finding 4; a 120 s window still leaked at 30 s delay, D2)
 #define RM_POLICY_MAX_UNANSWERED 2u    // budget while the key is UNPROVEN: a 3rd unanswered send would be the target's 3rd strike
 #define RM_POLICY_LIMIT_UNPROVEN RM_POLICY_MAX_UNANSWERED
-#define RM_POLICY_LIMIT_PROVEN 10u     // budget once a reply under the current key fingerprint verified AND the target reports rm >= 2
-#define RM_POLICY_CAP_PROVEN 2u        // capability level (sync reply `rm=<n>`) from which the proven budget is safe
+#define RM_POLICY_LIMIT_PROVEN 10u     // budget once a reply under the current key fingerprint verified
 #define RM_NOANSWER_MS 75000u          // no reply for this long: "no answer"
 #define RM_QUEUED_MS 3000u             // first seconds after the send: still in the local TX queue
 #define RM_POLICY_MAX_ENTRIES 12u      // entries per target the policy looks at (= the sent book, kSentN)
@@ -430,24 +427,22 @@ inline const char *rmEntryMessage(RmEntryState s, const char *reply)
 // ---- compact status token ----------------------------------------------------------------------------
 // Fixed order, one letter per switch: upper case = on, lower case = off.
 //   G gps   T track   D display   M mesh   W gateway   L led (omitted on boards without an LED)
-// plus p=<cur>/<max> for the TX power in dBm and pmin=<min> for the lowest value the board accepts (a
-// separate token, so older parsers that match p=<cur>/<max> keep working). Example: "s=GtDMwL p=17/22 pmin=2".
+// plus p=<cur>/<max> for the TX power in dBm. Example: "s=GtDMwL p=17/22".
 #define RM_STATUS_SWITCHES 6u
 
 struct RmSwitches
 {
     bool gps, track, display, mesh, gateway, led;
-    bool ledSupported;  // false: the led letter and the led= field are left out
+    bool ledSupported;  // false: the led letter is left out (board without an LED)
 };
 
 struct RmStatusInfo
 {
     bool haveS;                 // s= token present
     int8_t sw[RM_STATUS_SWITCHES];  // gps, track, display, mesh, gateway, led: -1 unknown, 0 off, 1 on
-    bool ledSupported;          // led letter or led= present
+    bool ledSupported;          // led letter present
     bool haveP;
     int cur, max;
-    int min;                    // pmin= (TX power floor, dBm); 0 when the target does not send it
 };
 
 // "s=GtDMwL" into out. Returns the length, 0 if it does not fit.
@@ -474,36 +469,25 @@ inline int rmClampDbm(int v)
 }
 
 // The whole `status` result (without the "RM1 <ctr> " frame and tag):
-//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max> pmin=<min>[ led=<0/1>]
-// led= stays as the capability flag of older consumers (present only on boards with an LED). The old
-// gw= and mesh= fields are gone: gateway and mesh are the W and M letters. Fields are ordered by
-// value, so an (impossible) overflow would cut the redundant led= first. Returns the length written
-// (always NUL-terminated; truncated, never overrun, when it does not fit n).
-// Longest form: " pmin=-99" is 9 characters; with floor -20 the worst status is 70 characters (wire cap
-// RM_MAX_RESULT 108, but past the 63 older operators accept, see test_rm_sender_policy).
+//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>
+// s= carries the switches (gateway and mesh are the W and M letters; the L letter only on boards with
+// an LED). Returns the length written (always NUL-terminated; truncated, never overrun, when it does
+// not fit n). Worst case is far below the wire cap RM_MAX_RESULT, see test_rm_sender_policy.
 inline size_t rmFormatStatus(char *out, size_t n, const char *ver, uint32_t upMin, int bat, uint32_t heapKb,
-                             const RmSwitches &sw, int txCur, int txMax, int txMin)
+                             const RmSwitches &sw, int txCur, int txMax)
 {
     if (out == nullptr || n == 0)
         return 0;
     char tok[RM_STATUS_SWITCHES + 3];
     if (rmStatusToken(tok, sizeof(tok), sw) == 0)
         tok[0] = '\0';
-    int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d pmin=%d", ver != nullptr ? ver : "?",
-                     (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMax),
-                     rmClampDbm(txMin));
-    size_t len = w < 0 ? 0 : ((size_t)w >= n ? n - 1 : (size_t)w);
-    if (sw.ledSupported && len < n - 1)
-    {
-        w = snprintf(out + len, n - len, " led=%d", sw.led ? 1 : 0);
-        if (w > 0)
-            len = ((size_t)w >= n - len) ? n - 1 : len + (size_t)w;
-    }
-    return len;
+    const int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d", ver != nullptr ? ver : "?",
+                           (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMax));
+    return w < 0 ? 0 : ((size_t)w >= n ? n - 1 : (size_t)w);
 }
 
-// Parses a status result: the compact form, or the older gw=/mesh=/led= form (then only those
-// switches are known). Returns false when it is not a status result at all ("ok v=").
+// Parses a status result (the compact form only). Returns false when it is not a status result ("ok v="),
+// when s= is missing, or when its letter count is not 5/6 or a letter is wrong.
 inline bool rmStatusParse(const char *res, RmStatusInfo &o)
 {
     memset(&o, 0, sizeof(o));
@@ -551,30 +535,8 @@ inline bool rmStatusParse(const char *res, RmStatusInfo &o)
                 o.max = mx;
             }
         }
-        else if (l >= 6 && strncmp(t, "pmin=", 5) == 0)
-        {
-            int mn = 0, cn = 0;
-            if (sscanf(t, "pmin=%d%n", &mn, &cn) == 1 && (size_t)cn == l)
-                o.min = mn;
-        }
-        else if (l == 5 && strncmp(t, "led=", 4) == 0 && (t[4] == '0' || t[4] == '1'))
-        {
-            o.ledSupported = true;
-            if (o.sw[5] < 0)
-                o.sw[5] = (int8_t)(t[4] - '0');
-        }
-        else if (l == 4 && strncmp(t, "gw=", 3) == 0 && (t[3] == '0' || t[3] == '1'))
-        {
-            if (o.sw[4] < 0)
-                o.sw[4] = (int8_t)(t[3] - '0');
-        }
-        else if (l == 6 && strncmp(t, "mesh=", 5) == 0 && (t[5] == '0' || t[5] == '1'))
-        {
-            if (o.sw[3] < 0)
-                o.sw[3] = (int8_t)(t[5] - '0');
-        }
     }
-    return true;
+    return o.haveS;
 }
 
 
@@ -615,10 +577,8 @@ inline uint8_t rmBookRoom(const RmPolEntry *e, uint8_t n, uint8_t cap, uint32_t 
 // fp = first 4 bytes of a hash of the key (the caller derives it; never the key itself). proven: a reply
 // verified under exactly that fp. oneShot: armed by a CHANGE of fp for a known target, spent by the first
 // send that would be refused with LIMIT. A first key for a target arms nothing; the same fp never re-arms.
-// cap: the `rm=<n>` level of the target's verified sync reply. Rationale: 10 unanswered sends are only safe
-// against a receiver that does not count authenticated replays (valid tag, stale counter) toward its
-// lockout, which the target reports as rm >= 2. Every other target keeps the limit 2, which is safe
-// against the old receiver even with reordered right-key frames.
+// Rule: a proven key lifts the unanswered-send budget from 2 to 10 (the receiver does not count
+// authenticated replays, valid tag with stale counter, toward its lockout); an unproven key stays at 2.
 #define RM_PROOF_N 8
 struct RmProof
 {
@@ -627,7 +587,6 @@ struct RmProof
     bool used;
     bool proven;
     bool oneShot;
-    uint8_t cap;  // capability level the target reported in its sync reply (rm=<n>); 0 = unknown or old firmware
     uint32_t lastUse;  // LRU stamp (rmProofTouch): bigger = more recent; no clock, so no millis() wrap
 };
 
@@ -683,7 +642,6 @@ inline RmProof *rmProofSetKey(RmProof *b, const char *dst, const uint8_t fp[4])
     {
         memcpy(p->fp, fp, 4);
         p->proven = false;
-        p->cap = 0;
         p->oneShot = true;
     }
     return p;
@@ -700,17 +658,6 @@ inline void rmProofVerified(RmProof *b, const char *dst, const uint8_t fp[4])
     }
 }
 
-// the verified sync reply of dst (key fingerprint fp) reported capability level cap (same rule as above)
-inline void rmProofSetCap(RmProof *b, const char *dst, const uint8_t fp[4], uint8_t cap)
-{
-    RmProof *p = rmProofFind(b, dst);
-    if (p != nullptr && memcmp(p->fp, fp, 4) == 0)
-    {
-        p->cap = cap;
-        rmProofTouch(b, p);
-    }
-}
-
 // the target is forgotten/deleted: proof and one-shot go (a re-added node starts fresh, without one-shot)
 inline void rmProofForget(RmProof *b, const char *dst)
 {
@@ -721,7 +668,7 @@ inline void rmProofForget(RmProof *b, const char *dst)
 
 inline uint8_t rmProofLimit(const RmProof *p)
 {
-    return (p != nullptr && p->proven && p->cap >= RM_POLICY_CAP_PROVEN) ? (uint8_t)RM_POLICY_LIMIT_PROVEN : (uint8_t)RM_POLICY_LIMIT_UNPROVEN;
+    return (p != nullptr && p->proven) ? (uint8_t)RM_POLICY_LIMIT_PROVEN : (uint8_t)RM_POLICY_LIMIT_UNPROVEN;
 }
 
 // RM-PROOF (bench 2026-10-06): a proof is a statement about the past. When the TARGET gets a new password

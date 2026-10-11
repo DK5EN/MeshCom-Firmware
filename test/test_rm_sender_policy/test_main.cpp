@@ -17,7 +17,6 @@
 #include <rm_validate.h>
 
 #define RM_MAX_RESULT_REPLY 108  // remote_cmd.h RM_MAX_RESULT; kept literal: this env builds no src/
-#define RM_LEGACY_STATUS_MAX 63  // remote_cmd.h RM_LEGACY_RESULT_MAX: what older operators accept
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -581,16 +580,16 @@ static void test_status_token_round_trip_all_combinations(void)
             if (!led && (bits & 32))
                 continue;  // the led bit only exists on boards with an LED
             const int txCur = (int)(bits % 24) - 2;
-            const int txMin = (int)(bits % 7) - 4;  // -4..2: the floors real boards report
             char res[96];
-            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 22, txMin);
+            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 22);
             RmStatusInfo o;
             TEST_ASSERT_TRUE_MESSAGE(rmStatusParse(res, o), res);
             TEST_ASSERT_TRUE_MESSAGE(o.haveS, res);
             TEST_ASSERT_TRUE_MESSAGE(o.haveP, res);
             TEST_ASSERT_EQUAL_INT_MESSAGE(txCur, o.cur, res);
             TEST_ASSERT_EQUAL_INT_MESSAGE(22, o.max, res);
-            TEST_ASSERT_EQUAL_INT_MESSAGE(txMin, o.min, res);
+            TEST_ASSERT_NULL_MESSAGE(strstr(res, "pmin="), res);
+            TEST_ASSERT_NULL_MESSAGE(strstr(res, "led="), res);
             TEST_ASSERT_EQUAL_MESSAGE(led != 0, o.ledSupported, res);
             for (unsigned i = 0; i < 5; i++)
                 TEST_ASSERT_EQUAL_INT_MESSAGE((bits >> i) & 1, o.sw[i], res);
@@ -604,19 +603,22 @@ static void test_status_token_round_trip_all_combinations(void)
 static void test_status_format_shape(void)
 {
     char res[96];
-    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 22, 2);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/22 pmin=2 led=1", res);
+    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/22", res);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
-    // board without LED: no led= field, no L letter
-    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 22, -9);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/22 pmin=-9", res);
-    TEST_ASSERT_NULL(strstr(res, "led="));
-    // the old gw= / mesh= fields are gone from the new form
-    TEST_ASSERT_NULL(strstr(res, "gw="));
-    TEST_ASSERT_NULL(strstr(res, "mesh="));
-    // pmin= is its own space-separated token right after p=<cur>/<max>, never a third '/' field
-    TEST_ASSERT_NOT_NULL(strstr(res, " p=17/22 pmin=-9"));
-    TEST_ASSERT_NULL(strstr(res, "22/"));
+    // board without LED: no L letter
+    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/22", res);
+    // only the compact form: no led=, pmin=, gw= or mesh= field, with or without an LED
+    for (int led = 0; led < 2; led++)
+    {
+        rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(0x1F, led != 0), 17, 22);
+        TEST_ASSERT_NULL(strstr(res, " led="));
+        TEST_ASSERT_NULL(strstr(res, " pmin="));
+        TEST_ASSERT_NULL(strstr(res, "gw="));
+        TEST_ASSERT_NULL(strstr(res, "mesh="));
+        TEST_ASSERT_NULL(strstr(res, "22/"));
+    }
 }
 
 static void test_status_worst_case_length_fits_the_reply(void)
@@ -627,72 +629,66 @@ static void test_status_worst_case_length_fits_the_reply(void)
     size_t worst = 0;
     const int curs[] = {-99, -20, -9, 0, 9, 22, 99};
     const int maxs[] = {0, 9, 22, 99};
-    const int mins[] = {-99, -20, -9, 0, 2, 99};
     const uint32_t ups[] = {0, 71582u, 99999u};
     for (unsigned bits = 0; bits < 64; bits += 63)  // all on, all off
         for (size_t a = 0; a < sizeof(curs) / sizeof(curs[0]); a++)
             for (size_t b = 0; b < sizeof(maxs) / sizeof(maxs[0]); b++)
                 for (size_t c = 0; c < sizeof(ups) / sizeof(ups[0]); c++)
-                    for (size_t d = 0; d < sizeof(mins) / sizeof(mins[0]); d++)
-                    {
-                        const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", ups[c], 100, 9999, sw(bits, true),
-                                                        curs[a], maxs[b], mins[d]);
-                        TEST_ASSERT_EQUAL_UINT(strlen(res), n);
-                        if (n > worst)
-                            worst = n;
-                    }
-    printf("status worst case: %u of %d (legacy cap %d)\n", (unsigned)worst, RM_MAX_RESULT_REPLY,
-           RM_LEGACY_STATUS_MAX);
+                {
+                    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", ups[c], 100, 9999, sw(bits, true),
+                                                    curs[a], maxs[b]);
+                    TEST_ASSERT_EQUAL_UINT(strlen(res), n);
+                    if (n > worst)
+                        worst = n;
+                }
+    printf("status worst case: %u of %d\n", (unsigned)worst, RM_MAX_RESULT_REPLY);
     TEST_ASSERT_TRUE(worst <= RM_MAX_RESULT_REPLY);
     // the exact worst string, so a field change shows up here first
-    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, 99, -99);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/99 pmin=-99 led=0", res);
-    TEST_ASSERT_EQUAL_UINT(70, strlen(res));
-    TEST_ASSERT_EQUAL_UINT(70, worst);
+    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, 99);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/99", res);
+    TEST_ASSERT_EQUAL_UINT(55, strlen(res));
+    TEST_ASSERT_EQUAL_UINT(55, worst);
 
-    // the worst a real board can report: floor -20 (the schema default), TX power -20..22
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 22, -20);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/22 pmin=-20 led=0", res);
-    TEST_ASSERT_EQUAL_UINT(70, strlen(res));
-    // KNOWN: pmin= takes the status reply past the 63 characters older operators accept
-    // (RM_LEGACY_RESULT_MAX); the wire cap RM_MAX_RESULT is 108. 63 + the 9 of " pmin=-20" is what
-    // the plan accepted for D9; see the escalation in the commit that added pmin.
-    TEST_ASSERT_TRUE(strlen(res) > RM_LEGACY_STATUS_MAX);
+    // the worst a real board can report: TX power -20..22
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 22);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/22", res);
+    TEST_ASSERT_EQUAL_UINT(55, strlen(res));
 
     // out-of-range inputs are clamped, the length stays bounded
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, 1000, 1000);
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, 1000);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT_REPLY);
-    TEST_ASSERT_NOT_NULL(strstr(res, "p=-99/99 pmin=99"));
+    TEST_ASSERT_NOT_NULL(strstr(res, "p=-99/99"));
 }
 
 static void test_status_format_never_overruns_a_small_buffer(void)
 {
     char res[24];
     memset(res, 'x', sizeof(res));
-    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, 99, -99);
+    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, 99);
     TEST_ASSERT_TRUE(n <= 19);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
     TEST_ASSERT_EQUAL_CHAR('x', res[20]);  // nothing past n bytes
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0));
 }
 
-static void test_status_parse_old_form_and_rejects(void)
+static void test_status_parse_old_forms_are_rejected(void)
 {
     RmStatusInfo o;
-    // the pre-token reply of older targets: only gw, mesh and led are known
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1", o));
-    TEST_ASSERT_FALSE(o.haveS);
-    TEST_ASSERT_FALSE(o.haveP);
-    TEST_ASSERT_EQUAL_INT(0, o.min);  // no pmin= from an older target: floor 0, as before
+    // the retired gw=/mesh=/led= form carries no s= token: not a status result any more
+    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1", o));
+    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=1 mesh=1 led=0", o));
+    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 led=1", o));
+    TEST_ASSERT_FALSE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 p=17/22", o));  // no s=
+    // the compact form still parses; a stray old field next to s= is ignored, never read
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 s=GTDMWL p=17/22", o));
+    TEST_ASSERT_TRUE(o.haveS);
+    TEST_ASSERT_TRUE(o.ledSupported);
+    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=gtdmw gw=1 mesh=1 led=1 pmin=2", o));
     TEST_ASSERT_EQUAL_INT(0, o.sw[4]);
-    TEST_ASSERT_EQUAL_INT(1, o.sw[3]);
-    TEST_ASSERT_EQUAL_INT(-1, o.sw[0]);
+    TEST_ASSERT_EQUAL_INT(0, o.sw[3]);
     TEST_ASSERT_EQUAL_INT(-1, o.sw[5]);
     TEST_ASSERT_FALSE(o.ledSupported);
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=125 bat=87 heap=212 gw=1 mesh=1 led=0", o));
-    TEST_ASSERT_TRUE(o.ledSupported);
-    TEST_ASSERT_EQUAL_INT(0, o.sw[5]);
     // not a status result / malformed tokens
     TEST_ASSERT_FALSE(rmStatusParse("ok sent", o));
     TEST_ASSERT_FALSE(rmStatusParse("err failed", o));
@@ -707,46 +703,9 @@ static void test_status_parse_old_form_and_rejects(void)
     TEST_ASSERT_EQUAL_INT(-3, o.cur);
     TEST_ASSERT_EQUAL_INT(22, o.max);
     TEST_ASSERT_FALSE(o.ledSupported);  // 5 letters: no LED on that board
-    TEST_ASSERT_EQUAL_INT(0, o.min);    // p= without pmin=: default floor 0
-}
-
-static void test_status_parse_pmin(void)
-{
-    RmStatusInfo o;
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a up=5 bat=87 heap=212 s=gtdmwl p=2/22 pmin=2 led=0", o));
-    TEST_ASSERT_TRUE(o.haveP);
-    TEST_ASSERT_EQUAL_INT(2, o.cur);
-    TEST_ASSERT_EQUAL_INT(22, o.max);
-    TEST_ASSERT_EQUAL_INT(2, o.min);
-    TEST_ASSERT_TRUE(o.ledSupported);
-    TEST_ASSERT_EQUAL_INT(0, o.sw[5]);  // pmin= does not disturb the neighbouring tokens
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=-20/22 pmin=-20", o));
-    TEST_ASSERT_EQUAL_INT(-20, o.cur);
-    TEST_ASSERT_EQUAL_INT(-20, o.min);
-    TEST_ASSERT_EQUAL_INT(22, o.max);
-    // token order is free: pmin= before p= parses the same
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW pmin=-9 p=3/15", o));
-    TEST_ASSERT_EQUAL_INT(-9, o.min);
-    TEST_ASSERT_EQUAL_INT(3, o.cur);
-    TEST_ASSERT_EQUAL_INT(15, o.max);
-    // a pmin= without p= is still taken (the floor is independent of the current value)
-    TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW pmin=2", o));
-    TEST_ASSERT_FALSE(o.haveP);
-    TEST_ASSERT_EQUAL_INT(2, o.min);
-    // malformed pmin= is ignored (default 0), never fatal
-    const char *bad[] = {"pmin=", "pmin=x", "pmin=2x", "pmin=2/22", "pmin= 2"};
-    for (const char *t : bad)
-    {
-        char r[96];
-        snprintf(r, sizeof(r), "ok v=4.40a s=GTDMW p=2/22 %s", t);
-        TEST_ASSERT_TRUE_MESSAGE(rmStatusParse(r, o), r);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, o.min, r);
-        TEST_ASSERT_TRUE_MESSAGE(o.haveP, r);
-    }
-    // a third '/' field after p= is NOT a floor: the p= token is rejected as before, min stays 0
+    // a third '/' field after p= is rejected
     TEST_ASSERT_TRUE(rmStatusParse("ok v=4.40a s=GTDMW p=2/22/2", o));
     TEST_ASSERT_FALSE(o.haveP);
-    TEST_ASSERT_EQUAL_INT(0, o.min);
 }
 
 static void test_policy_proven_limit_10_and_11th_refused(void)
@@ -778,9 +737,7 @@ static void test_proof_cleared_by_key_change_and_one_shot_rules(void)
     rmProofVerified(b, "DK5EN-90", c);  // a reply under another key proves nothing
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
     rmProofVerified(b, "DK5EN-90", a);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven but cap unknown: still 2
-    rmProofSetCap(b, "DK5EN-90", a, 2);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));  // proven alone grants 10
     rmProofSetKey(b, "DK5EN-90", a);  // same key: proof stays, nothing armed
     TEST_ASSERT_TRUE(p->proven);
     TEST_ASSERT_FALSE(p->oneShot);
@@ -833,52 +790,34 @@ void test_book_room_counts_free_and_stale_slots(void)
     TEST_ASSERT_EQUAL_UINT8(12, rmBookRoom(e, 12, 12, 100000u + RM_POLICY_WINDOW_MS));  // all aged out
 }
 
-// Capability gate: the proven budget 10 needs proven AND cap >= 2 (the target's sync reply says rm=2, i.e. it does not
-// count authenticated replays); every other target keeps the unproven budget 2, which is safe against the old receiver.
-static void test_proof_cap_gates_the_proven_limit(void)
+// The proven budget 10 needs only a proven key; an unproven key (or no entry) stays at 2.
+static void test_proof_proven_key_grants_the_proven_limit(void)
 {
     RmProof b[RM_PROOF_N];
     memset(b, 0, sizeof(b));
     const uint8_t a[4] = {1, 2, 3, 4}, c[4] = {5, 6, 7, 8};
     RmProof *p = rmProofSetKey(b, "DK5EN-90", a);
-    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
-    rmProofVerified(b, "DK5EN-90", a);
-    TEST_ASSERT_TRUE(p->proven);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven + cap 0 (old or unknown): 2
-    rmProofSetCap(b, "DK5EN-90", a, 1);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven + cap 1: 2
-    rmProofSetCap(b, "DK5EN-90", c, 2);                                  // another fingerprint: ignored
-    TEST_ASSERT_EQUAL_UINT8(1, p->cap);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
-    rmProofSetCap(b, "DK5EN-91", a, 2);                                  // unknown target: nothing happens
-    TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-91"));
-    rmProofSetCap(b, "DK5EN-90", a, 2);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));    // proven + cap 2: 10
-    rmProofSetKey(b, "DK5EN-90", a);                                     // same key: cap stays
-    TEST_ASSERT_EQUAL_UINT8(2, p->cap);
-
-    // unproven + cap 2 stays at 2
-    rmProofForget(b, "DK5EN-90");
-    p = rmProofSetKey(b, "DK5EN-90", a);
-    rmProofSetCap(b, "DK5EN-90", a, 2);
     TEST_ASSERT_FALSE(p->proven);
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(nullptr));
-
-    // a key change resets cap together with proven
+    rmProofVerified(b, "DK5EN-90", c);  // a reply under another key proves nothing
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
     rmProofVerified(b, "DK5EN-90", a);
+    TEST_ASSERT_TRUE(p->proven);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));  // no sync capability needed
+    rmProofSetKey(b, "DK5EN-90", a);  // same key: stays proven
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));
+    // a key change drops the proof
     rmProofSetKey(b, "DK5EN-90", c);
     TEST_ASSERT_FALSE(p->proven);
-    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
     rmProofVerified(b, "DK5EN-90", c);
-    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));  // proven again, but the new key's cap is unknown
-
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(p));
     // forget clears it all
-    rmProofSetCap(b, "DK5EN-90", c, 2);
     rmProofForget(b, "DK5EN-90");
     p = rmProofSetKey(b, "DK5EN-90", c);
-    TEST_ASSERT_EQUAL_UINT8(0, p->cap);
+    TEST_ASSERT_FALSE(p->proven);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
 }
 
 // ---- CR-02: stale learnt counter mark ------------------------------------------------------------------------
@@ -1030,11 +969,10 @@ static void test_proof_book_evicts_least_recently_used(void)
         callOf(call, sizeof(call), i);
         TEST_ASSERT_NOT_NULL(rmProofFind(b, call));
     }
-    // the 9th target (it took the slot) gets the proven budget once a reply verified and the cap is known
+    // the 9th target (it took the slot) gets the proven budget once a reply verified
     RmProof *p = rmProofFind(b, "DK5EN-9");
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_UNPROVEN, rmProofLimit(p));
     rmProofVerified(b, "DK5EN-9", fp);
-    rmProofSetCap(b, "DK5EN-9", fp, 2);
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(rmProofFind(b, "DK5EN-9")));
 }
 
@@ -1051,14 +989,13 @@ static void test_proof_book_use_keeps_a_target_alive(void)
     }
     // the managed node DK5EN-1 is the oldest, but it is used again (a send) ...
     rmProofVerified(b, "DK5EN-1", fp);
-    rmProofSetCap(b, "DK5EN-1", fp, 2);
     rmProofSetKey(b, "DK5EN-1", fp);
     // ... so a ninth target pushes out DK5EN-2 instead, and DK5EN-1 keeps its proof
     rmProofSetKey(b, "DK5EN-90", fp);
     TEST_ASSERT_NULL(rmProofFind(b, "DK5EN-2"));
     TEST_ASSERT_NOT_NULL(rmProofFind(b, "DK5EN-90"));
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmProofLimit(rmProofFind(b, "DK5EN-1")));
-    // verification and cap are uses too: DK5EN-3 is now the oldest; touching it by a verified reply saves it
+    // verification is a use too: DK5EN-3 is now the oldest; touching it by a verified reply saves it
     rmProofVerified(b, "DK5EN-3", fp);
     rmProofSetKey(b, "DK5EN-91", fp);
     TEST_ASSERT_NOT_NULL(rmProofFind(b, "DK5EN-3"));
@@ -1132,7 +1069,7 @@ int main(int, char **)
     RUN_TEST(test_policy_across_millis_wrap);
     RUN_TEST(test_policy_entry_cap_is_safe);
     RUN_TEST(test_policy_proven_limit_10_and_11th_refused);
-    RUN_TEST(test_proof_cap_gates_the_proven_limit);
+    RUN_TEST(test_proof_proven_key_grants_the_proven_limit);
     RUN_TEST(test_proof_cleared_by_key_change_and_one_shot_rules);
     RUN_TEST(test_book_never_evicts_counted_entries_and_goes_busy);
     RUN_TEST(test_auto_sync_is_conditional);
@@ -1145,8 +1082,7 @@ int main(int, char **)
     RUN_TEST(test_status_format_shape);
     RUN_TEST(test_status_worst_case_length_fits_the_reply);
     RUN_TEST(test_status_format_never_overruns_a_small_buffer);
-    RUN_TEST(test_status_parse_old_form_and_rejects);
-    RUN_TEST(test_status_parse_pmin);
+    RUN_TEST(test_status_parse_old_forms_are_rejected);
     RUN_TEST(test_book_room_counts_free_and_stale_slots);
     RUN_TEST(test_peer_mark_stale_after_two_dead_commands);
     RUN_TEST(test_peer_mark_stale_ignores_syncs_and_replies);

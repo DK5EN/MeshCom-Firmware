@@ -901,7 +901,7 @@ static void test_reply_shape_and_limits(void)
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, "ok rebooting", DST, SRC, PW, out, 20)); // buffer too small
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, "ok rebooting", nullptr, SRC, PW, out, sizeof(out)));
 
-    char longResult[RM_MAX_RESULT + 2]; // one past the cap (was 100 when the cap was 63)
+    char longResult[RM_MAX_RESULT + 2]; // one past the cap
     memset(longResult, 'a', sizeof(longResult));
     longResult[sizeof(longResult) - 1] = '\0';
     TEST_ASSERT_EQUAL_UINT(0, rmReply(c, longResult, DST, SRC, PW, out, sizeof(out)));
@@ -1040,7 +1040,7 @@ static void test_millis_wrap_rate_cache_and_lockout(void)
 // locked itself out. Replies must be recognised and never treated as commands.
 static void test_reply_is_recognised_and_never_parses_as_a_command(void)
 {
-    TEST_ASSERT_TRUE(rmIsReply("RM1 4 ok v=4.40a up=0 bat=100 heap=126 gw=0 mesh=1 ca54fd46ae80638c"));
+    TEST_ASSERT_TRUE(rmIsReply("RM1 4 ok v=4.40a up=0 bat=100 heap=126 s=gtdMW p=2/22 ca54fd46ae80638c"));
     TEST_ASSERT_TRUE(rmIsReply("RM1 43 err range 0123456789abcdef"));
     TEST_ASSERT_TRUE(rmIsReply("RM1 0 ok ctr=4 v=4.40a 2488cf9479d2490d"));
     TEST_ASSERT_FALSE(rmIsReply("RM1 4 status 4939f03c4188e4e3"));
@@ -1560,33 +1560,24 @@ static void test_ext_separator_cannot_be_injected_through_args(void)
     TEST_ASSERT_EQUAL_INT(4, bars);
 }
 
-static void test_legacy_replies_stay_within_63_and_cap_token(void)
+static void test_replies_fit_the_cap_and_carry_no_retired_fields(void)
 {
-    // worst-case status and the sync reply of the existing commands stay readable by older operators
+    // worst-case status and the worst sync reply fit the wire cap RM_MAX_RESULT
     char res[RM_MAX_RESULT + 1];
     RmSwitches sw;
     memset(&sw, 1, sizeof(sw));
-    // D9: " pmin=<n>" (up to 9 chars) takes the worst status past the 63 older operators accept, but it
-    // stays inside the wire cap, so the reply is delivered and a current parser reads the floor.
-    // A typical status (first weeks of uptime, RAK-class floor 2) still fits 63:
-    rmFormatStatus(res, sizeof(res), "4.40a", 417u, 87, 212, sw, 17, 22, 2);
-    TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
-    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 22, -20);
+    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 22);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT);
-    printf("status worst case with pmin: %u of %d (legacy %d)\n", (unsigned)strlen(res), RM_MAX_RESULT,
-           RM_LEGACY_RESULT_MAX);
-    TEST_ASSERT_TRUE(strlen(res) > RM_LEGACY_RESULT_MAX); // KNOWN, escalated: 70 of 63 legacy
-    TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/22 pmin=-20"));
-    snprintf(res, sizeof(res), "ok ctr=%lu v=%s%s rm=%d", 4294967295ul, "4.40a", "", RM_CAP_LEVEL);
-    TEST_ASSERT_TRUE(strlen(res) <= RM_LEGACY_RESULT_MAX);
-    TEST_ASSERT_EQUAL_INT(2, rmCapLevel(res));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a"));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a rm="));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=42 v=4.40a rm=x"));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel(nullptr));
-    // every existing reply form passes the sanitiser unchanged
-    const char *ok[] = {"ok rebooting", "err range", "err storage", "ok ctr=42 v=4.40a rm=2",
-                        "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22 led=0", "ok gps=on", "ok setout a2 on"};
+    printf("status worst case: %u of %d\n", (unsigned)strlen(res), RM_MAX_RESULT);
+    TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/22"));
+    TEST_ASSERT_NULL(strstr(res, " pmin="));
+    TEST_ASSERT_NULL(strstr(res, " led="));
+    snprintf(res, sizeof(res), "ok ctr=%lu v=%s%s", 4294967295ul, "4.40a", "");
+    TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT);
+    TEST_ASSERT_NULL(strstr(res, " rm="));
+    // every reply form passes the sanitiser unchanged
+    const char *ok[] = {"ok rebooting", "err range", "err storage", "ok ctr=42 v=4.40a",
+                        "ok v=4.40a up=417 bat=0 heap=115 s=gtdMwl p=2/22", "ok gps=on", "ok setout a2 on"};
     for (const char *r : ok)
     {
         char b[RM_MAX_RESULT + 1];
@@ -1594,9 +1585,6 @@ static void test_legacy_replies_stay_within_63_and_cap_token(void)
         rmSanitizeResult(b);
         TEST_ASSERT_EQUAL_STRING(r, b);
     }
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=4.40a rm=12"));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=4.40a rm=2x"));
-    TEST_ASSERT_EQUAL_INT(0, rmCapLevel("ok ctr=1 v=rm=2a"));
 }
 
 static void test_status_vectors_parse(void)
@@ -1605,7 +1593,7 @@ static void test_status_vectors_parse(void)
     TEST_ASSERT_TRUE(read_repo_file("tools/tests/remote_cmd_vectors.json", json));
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 64);
-    int seen = 0, caps = 0;
+    int seen = 0;
     for (size_t i = 0; i < n; i++)
     {
         std::string res;
@@ -1625,14 +1613,9 @@ static void test_status_vectors_parse(void)
             TEST_ASSERT_TRUE(st.haveP);
             seen++;
         }
-        if (objs[i].find("\"cap\"") != std::string::npos)
-        {
-            TEST_ASSERT_EQUAL_INT(RM_CAP_LEVEL, rmCapLevel(res.c_str()));
-            caps++;
-        }
+        TEST_ASSERT_NULL_MESSAGE(strstr(res.c_str(), " rm="), res.c_str()); // no reply carries a capability level
     }
-    TEST_ASSERT_EQUAL_INT(3, seen);
-    TEST_ASSERT_EQUAL_INT(1, caps);
+    TEST_ASSERT_EQUAL_INT(4, seen); // ctr 2, 54, 55, 56: every status vector is the compact form now
 }
 
 // ---- per-sender reject counter and lockout ------------------------------------------------------
@@ -2180,7 +2163,7 @@ int main(int, char **)
     RUN_TEST(test_ext_allowlist_accepts_and_rejects);
     RUN_TEST(test_ext_args_survive_parse_build_and_check);
     RUN_TEST(test_ext_separator_cannot_be_injected_through_args);
-    RUN_TEST(test_legacy_replies_stay_within_63_and_cap_token);
+    RUN_TEST(test_replies_fit_the_cap_and_carry_no_retired_fields);
     RUN_TEST(test_status_vectors_parse);
     RUN_TEST(test_receiver_unlock_clears_lock_only);
     RUN_TEST(test_lockout_is_per_sender);

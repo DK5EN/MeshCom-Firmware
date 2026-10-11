@@ -279,24 +279,18 @@ void test_forget_does_not_refill_budget(void)
 // ---- reordering: the right key must never lock the target (advisor D1 / D2) -----------------------
 // Frames are sent as the policy allows (10 s apart); the path delay alternates 30 s / 0 s (or is drawn
 // from a seeded generator, 0..30 s) so slow frames are overtaken by faster ones. A reply travels back
-// with its frame's own delay. The sender limit is what the real proof book gives: 10 only when proven
-// AND the target reported cap >= 2 in its sync reply.
-// oldReceiverModel: the test itself counts a strike for every RM_REJ_REPLAY verdict and for every
-// counted reject (what a target that still runs the pre-fix receiver does) and asserts fewer than
-// RM_REJ_LIMIT inside any 90 s window. The real rmCheck stays the NEW receiver in both modes.
-static void run_right_key_reordered(bool oldReceiverModel, bool randomDelay, uint8_t cap)
+// with its frame's own delay. The sender limit is what the real proof book gives: 10 once proven.
+static void run_right_key_reordered(bool randomDelay)
 {
     RmProof pb[RM_PROOF_N];
     memset(pb, 0, sizeof(pb));
     const uint8_t fp[4] = {1, 2, 3, 4};
     RmProof *proof = rmProofSetKey(pb, DST, fp);
-    rmProofSetCap(pb, DST, fp, cap);
     uint32_t rnd = 20261006u;
     uint8_t maxLimit = 0;
     Sim s;
     struct Reply { uint32_t at; uint32_t sentMs; };
     std::vector<Reply> replies;
-    std::vector<uint32_t> strikes;
     uint32_t n = 0;
     uint32_t accepted = 0;
     for (uint32_t now = 0; now < 600000u; now += 1000u)
@@ -327,8 +321,6 @@ static void run_right_key_reordered(bool oldReceiverModel, bool randomDelay, uin
                 accepted++;
                 replies.push_back({f.arriveMs + (f.arriveMs - f.sentMs), f.sentMs});
             }
-            if (oldReceiverModel && (v == RM_REJ_REPLAY || v == RM_REJ_FORMAT || v == RM_REJ_TAG || v == RM_REJ_BLOCKED))
-                strikes.push_back(f.arriveMs);
             if (rmSenderLocked(s.rs, SRC, f.arriveMs))
                 s.locked = true;
         }
@@ -353,22 +345,16 @@ static void run_right_key_reordered(bool oldReceiverModel, bool randomDelay, uin
             s.send(PW, "status", now, delay);
         }
     }
-    TEST_ASSERT_EQUAL_UINT8(cap >= 2 ? RM_POLICY_LIMIT_PROVEN : RM_POLICY_LIMIT_UNPROVEN, maxLimit);
+    TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, maxLimit);
     TEST_ASSERT_FALSE(s.locked);
     TEST_ASSERT_TRUE(accepted > 0);
-    // old receiver: never RM_REJ_LIMIT strikes inside one 90 s window
-    for (size_t i = 0; i + RM_REJ_LIMIT - 1 < strikes.size(); i++)
-        TEST_ASSERT_TRUE(strikes[i + RM_REJ_LIMIT - 1] - strikes[i] >= RM_REJ_WINDOW_MS);
 }
 
 void test_right_key_reordered_frames_never_lock(void)
 {
-    // (i) NEW receiver (the real rmCheck: a valid-tag stale counter is no strike) + sender limit 10 (proven, cap 2)
-    run_right_key_reordered(false, false, 2);
-    run_right_key_reordered(false, true, 2);
-    // (ii) OLD receiver model (every REPLAY counts) + the limit the policy gives a cap-0 target: 2 although proven
-    run_right_key_reordered(true, false, 0);
-    run_right_key_reordered(true, true, 0);
+    // the real rmCheck (a valid-tag stale counter is no strike) + sender limit 10 (proven)
+    run_right_key_reordered(false);
+    run_right_key_reordered(true);
 }
 
 // D2: wrong key, the first frame is the slowest and the last the fastest; the sender frees an entry
@@ -427,13 +413,12 @@ static void run_target_rekeyed(uint32_t base, uint32_t jitter)
     memset(pb, 0, sizeof(pb));
     const uint8_t fp[4] = {7, 7, 7, 7};
     RmProof *p = rmProofSetKey(pb, DST, fp);
-    // phase 1: right key, replies arrive: proven, capability 2
+    // phase 1: right key, replies arrive: proven
     bool v = false;
     s.send(PW, "status", 0, 1000u);
     s.deliver(2000u, PW, 0, &v);
     TEST_ASSERT_TRUE(v);
     rmProofVerified(pb, DST, fp);
-    rmProofSetCap(pb, DST, fp, 2);
     TEST_ASSERT_EQUAL_UINT8(RM_POLICY_LIMIT_PROVEN, rmPolicyLimit(p, s.book.data(), (uint8_t)s.book.size(), 3000u));
     // phase 2: the target now has another password; the sender keeps signing with the old one
     uint32_t sent = 0;
@@ -470,7 +455,6 @@ void test_proof_streak_rule(void)
     const uint8_t fp[4] = {1, 1, 1, 1};
     RmProof *p = rmProofSetKey(pb, DST, fp);
     rmProofVerified(pb, DST, fp);
-    rmProofSetCap(pb, DST, fp, 2);
     RmPolEntry e[6];
     memset(e, 0, sizeof(e));
     const uint32_t now = 100000u;

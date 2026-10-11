@@ -533,6 +533,8 @@ OnRxDone own-call branch (:1604)            loop task (esp32loop / nrf52loop)
 
 ### 6.4 Command allowlist (D7)
 
+> 2026-10-11: compatibility layer removed (RM never shipped). The `status` reply below is the original concept form; the current form is `ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>` (no `gw=`/`mesh=`), see `docs/architecture/11-wire-format.md` section 1.9.3.
+
 | Command (remote form)                                                     | Mapped to                     | Reply status text                                        |
 | ------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------- |
 | `reboot`                                                                  | reboot flag after reply       | `rebooting`                                              |

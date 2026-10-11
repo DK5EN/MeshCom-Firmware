@@ -183,9 +183,7 @@ void rmScaffoldJs()
                        "else if(k.indexOf('up=')==0)o.up=k.substring(3);\n"
                        "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);");
     web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}");
-    web_client.println("else if(k=='led=0'||k=='led=1'){o.led=true;if(o.sw[5]<0)o.sw[5]=+k.charAt(4);}\n"
-                       "else if(k=='gw=0'||k=='gw=1'){if(o.sw[4]<0)o.sw[4]=+k.charAt(3);}\n"
-                       "else if(k=='mesh=0'||k=='mesh=1'){if(o.sw[3]<0)o.sw[3]=+k.charAt(5);}}\n"
+    web_client.println("}\n"
                        "return o;}\n"
                        "function rmApplyEntry(k,e){var c=e.cmd.split(' '),n=c[0],o,m,i;");
     web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
@@ -268,7 +266,7 @@ void rmScaffoldJs()
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
                        "if(k=='alt')return(/^\\d{1,5}$/.test(v)&&+v<=40000)?false:'Altitude must be a whole number from 0 to 40000.';\n"
                        "return v.length>rmLen[k=='name'?'name':'atxt']?'Too long.':false;}\n");
-    web_client.println("function rmWUpd(d){var c=rmSel.call,g=!rmValidCall(c)||rmLocked()||rmCapOf(c)<2,j,w,v,r,x,s,n,t,a=[],y;\n"
+    web_client.println("function rmWUpd(d){var c=rmSel.call,g=!rmValidCall(c)||rmLocked(),j,w,v,r,x,s,n,t,a=[],y;\n"
                        "for(j=0;j<d.w.length;j++)a.push(rmEl('rm_f_'+d.c+'_'+d.w[j][0]).getAttribute('data-r'));");
     web_client.println("for(j=0;j<d.w.length;j++){w=d.w[j];n='rm_f_'+d.c+'_'+w[0];x=rmEl(n);v=x.value;r=rmChk(w[2],v);t=rmEl(n+'_cnt');if(t)t.textContent=v.length+'/'+w[3];\n"
                        "y=a.slice();y[j]=v;s=rmEl(n+'_set');s.disabled=g||r!==false||(!!d.p&&(+v==a[j]||a.indexOf('')>=0));s.setAttribute('data-args',y.join(' '));s.setAttribute('data-cf',d.c+' '+y.join(' '));rmTxt(n+'_hint',r||'','font-small rmbad');}}\n"
@@ -286,8 +284,7 @@ void rmScaffoldJs()
                        "k=o&&o[w[4]||w[0]];k=k&&k!='-'?k:'';x.setAttribute('data-r',k);x.value=rmIn[n]!==undefined?rmIn[n]:k;r.appendChild(x);rmWire(x,d);");
     web_client.println("b=rmBtn(r,'','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c,'aria-label':'Set '+w[1]});b.id=n+'_set';b.appendChild(rmNew('i','btncheckmark'));r.appendChild(rmNew('div','font-small','',n+'_hint'));\n"
                        "if(!d.p)r.appendChild(rmNew('div','font-small rmc','',n+'_cnt'));}rmWUpd(d);}\n");
-    web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}\n"
-                       "function rmCapOf(c){var a=rmStat?rmStat.targets:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c)return a[i].cap||0;return 0;}");
+    web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}");
     web_client.println("var rmMh={on:0,job:'',args:'',fl:0,t:0,pre:'',rows:[],total:0,msg:'',det:null,gen:0,tm:0,ctr:-1};\nfunction rmUns(c,n,v){var a=rmStat?rmStat.sent:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd==n&&a[i].st=='err'&&a[i].reply=='err unsupported'&&(!v||a[i].ago<v.ago))return true;return false;}\n");
     web_client.println("function rmMhReset(){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.rows=[];rmMh.total=0;rmMh.msg='';rmMh.det=null;}\nfunction rmNodeChg(n){if(n!=rmSel.call){rmIn={};rmQClr();rmMhReset();rmForce=null;rmForceBtn();}}\n");
     web_client.println("function rmMhEnd(m){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.msg=m||'';rmRender();}\nfunction rmMhStop(){rmMhEnd('Stopped.');}\nfunction rmMhGo(job,args){var pr=rmPre();if(rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}\nif(!rmMh.pre){rmMh.pre=rmSel.slot>=0?'slot='+rmSel.slot+'&call='+rmEnc(rmSel.call):'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value);rmEl('rm_pw').value='';}\n");
@@ -319,20 +316,19 @@ void rmScaffoldJs()
     web_client.println("x=p.appendChild(rmNew('div','font-small',(m?o.q:'-')+' queued, state ','rm_v_txq_q'));s=x.appendChild(rmNew('span',['rmok','','rmbad'][v],v<0?o.bp||'-':['quiet','slow down','hold'][v],'rm_v_txq_bp'));if(v==1)s.style.color='#E07B39';\n"
                        "x=p.appendChild(rmNew('div','mcq-util-row'));x.appendChild(rmNew('span','mcq-util-label','use '+(isNaN(o.u)?'-':o.u+' %'),'rm_v_txq_u'));");
     web_client.println("x.appendChild(rmNew('div','mcq-util-track')).appendChild(rmNew('div')).style.cssText='height:100%;width:'+(parseInt(o.u,10)||0)+'%;background:#3B7DD8';}\n");
-    web_client.println("function rmRenderCards(){var c=rmSel.call,cap=rmCapOf(c),dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"
+    web_client.println("function rmRenderCards(){var c=rmSel.call,dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"
                        "if(fa&&fa.tagName=='INPUT'&&/^rm_f_/.test(fa.id)){rmIn[fa.id]=fa.value;fid=fa.id;}\n"
                        "for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}");
-    web_client.println("if(cap<2)B.radio.appendChild(rmNew('p','font-small rmcapnote',rmLast(c,'sync')?'This node runs older firmware: only the basic commands work.':'This node has not reported support for these commands yet. Press Re-sync counter under Actions.'));");
-    web_client.println("for(j=0;j<2;j++){rmCardHd(B[['ident','queues'][j]],c,[['name','atxt'],['txq','mbox','maxhop']][j],dis||cap<2||rmMh.on);if(!j)B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));}");
+    web_client.println("for(j=0;j<2;j++){rmCardHd(B[['ident','queues'][j]],c,[['name','atxt'],['txq','mbox','maxhop']][j],dis||rmMh.on);if(!j)B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));}");
     web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=d.card=='ident'?0:rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');if(h){p.appendChild(h);h.appendChild(rmNew('b','',d.p?'':d.l));}\n");
     web_client.println("v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
                        "if(h&&d.card!='queues'){h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
-                       "rmBtn(h,'Read','',dis||cap<2,{'data-cmd':d.c,'data-args':''});}");
+                       "rmBtn(h,'Read','',dis,{'data-cmd':d.c,'data-args':''});}");
     web_client.println("if(o&&d.v)d.v(p,o);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
                        "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
     web_client.println("rmWBuild(p,d,o);\n"
                        "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}\n"
-                       "y=B.pos.appendChild(rmNew('div','grid rmf'));z=rmKn();rmSwRow(y,'gps',z.sw[0],dis,'enable GPS');rmSwRow(y,'track',z.sw[1],dis,'enable display of SmartBeaconing');rmMhCard(B.mh,dis||cap<2);if(fid&&rmEl(fid))rmEl(fid).focus();}");
+                       "y=B.pos.appendChild(rmNew('div','grid rmf'));z=rmKn();rmSwRow(y,'gps',z.sw[0],dis,'enable GPS');rmSwRow(y,'track',z.sw[1],dis,'enable display of SmartBeaconing');rmMhCard(B.mh,dis);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"
 "function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;\n");
     web_client.println("b=rmEl('rm_log');b.textContent='';for(i=0;i<j.log.length;i++){r=j.log[i];tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}\n");

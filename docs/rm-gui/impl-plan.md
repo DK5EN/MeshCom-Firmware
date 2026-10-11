@@ -70,11 +70,10 @@ highest valid seq. A "no saved nodes" state must be safe and visible.
   unanswered inside 90 s, or inside the 10 s cooldown; `rmPolicyState(entry, nowMs)` returns one of
   queued, waiting, noanswer, ok, err, unverified; automatic sync only when the sender has no trusted
   clock and no learnt target mark.
-- `status` reply gains one compact token (63 char total reply limit, today's worst case 56):
+- (2026-10-11: compatibility layer removed, RM never shipped: no 63-character limit, only the 108-character wire cap; no `led=`, `pmin=` or `gw=`/`mesh=` form; `s=` is 6 letters with an LED, 5 without.) `status` reply gains one compact token (63 char total reply limit, today's worst case 56):
   `s=<letters>` carrying gps, track, display, mesh, gateway, led as upper-case = on, lower-case = off,
   letters in a fixed order documented in `docs/architecture/11-wire-format.md` section 1.9.3, plus
-  `p=<cur>/<max>` for txpower. Boards without an LED omit the led letter (`led=` stays the capability
-  flag). Worst-case length is asserted in the native test.
+  `p=<cur>/<max>` for txpower. Boards without an LED omit the led letter. Worst-case length is asserted in the native test.
 - `/rmstatus` JSON (read by W2) gains per sent entry `st` (state above) and `msg` (plain sentence),
   and per target `locked` / `retry_s`. The JSON writer stays in `web_functions.cpp`; W1b exposes plain
   getters in `rm_runtime.h`.
@@ -99,7 +98,7 @@ WebGuardVerdict webGuardCheck(const char *header, size_t len, const char *path /
 
 ### C4 web page (W2a handlers, W2b page and JS)
 
-Layout and the TX power range (`pmin=` token) were reworked on 2026-10-10: see `docs/rm-gui/ux-tidy-plan-20261010.md`.
+Layout and the TX power range (the `pmin=` token was removed 2026-10-11) were reworked on 2026-10-10: see `docs/rm-gui/ux-tidy-plan-20261010.md`.
 
 Same-origin only; every state-changing request is a POST body (never a URL), never echoed, buffers
 wiped with `rm_wipe`. Responses are JSON written with `rm_json_str`, each `print` at most 512 bytes
@@ -123,8 +122,8 @@ that prints the scaffold JS in chunks, ids and class names of the tiles) and `to
 (jsdom, scaffold JS extracted from the C++ string literals). Design as in `verdict-ux.md` wire-sketch:
 This node (RM switch, password set/clear with the console/KISS warning), Choose a node (heard chips
 from `/rmheard`, three saved-node chips from `/rmnodes`, one validated call field, "save this node" with
-password), Test connection, Info tiles, Switches with state or `?` from the verified `s=` token (old
-`gw=`/`mesh=`/`led=` form still parsed), Light only when the node reported `led`, TX power stepper
+password), Test connection, Info tiles, Switches with state or `?` from the verified `s=` token (the old
+`gw=`/`mesh=`/`led=` form is no longer parsed since 2026-10-11), Light only when the node reported `led`, TX power stepper
 capped by `p=cur/max` (15 when unknown), Restart; inline one-step confirm on Restart, Mesh off,
 Gateway off, lowering TX power (no `confirm()`); tiles locked 10 s after a send with a visible
 countdown; Activity list in plain sentences from `st`/`msg`; collapsed Advanced (outputs, re-sync,
@@ -158,7 +157,7 @@ W0) is orchestrator-owned. Every `pio` call goes through
 - `/rmpasswd`: leading space, 15+ characters and `none` refused (`pw`), a valid password accepted.
 - `/rmnodes`: save, duplicate (`dup`), bad slot (`slot`); the list never contains a key; the saved node
   survived a reboot of DK5EN-92.
-- Send by slot DK5EN-92 -> DK5EN-1: `status` (`s=gtdMwl p=2/22 led=0`), `led on`, `led off` confirmed; a lost
+- Send by slot DK5EN-92 -> DK5EN-1: `status` (`s=gtdMwl p=2/22`, plus `led=0` at the time of the bench), `led on`, `led off` confirmed; a lost
   command ended as "no answer after 75 s"; the sender policy locked the target after two unanswered sends.
   Replies can take longer than 14 s over LoRa.
 - Chrome (Remote page on DK5EN-92 via `dk5en-92.local`): sidebar intact (Setup icon + Remote mast), heard chips,

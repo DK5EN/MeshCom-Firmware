@@ -12,7 +12,6 @@
 static_assert(RM_MAX_ARGS == 39, "args cap is part of the wire contract (concept 2.2)");
 static_assert(RM_MAX_RESULT == 108, "4+10+1+108+1+16 = 140 = the DM text limit");
 static_assert(4 + 10 + 1 + RM_MAX_RESULT + 1 + 16 <= 140, "reply DM text must fit 140 chars");
-static_assert(RM_LEGACY_RESULT_MAX <= RM_MAX_RESULT, "legacy cap below the wire cap");
 
 namespace
 {
@@ -791,15 +790,3 @@ size_t rmSanitizeResult(char *result)
     return n;
 }
 
-int rmCapLevel(const char *syncResult)
-{
-    if (syncResult == nullptr)
-        return 0;
-    for (const char *p = strstr(syncResult, " rm="); p != nullptr; p = strstr(p + 1, " rm="))
-    {
-        p += 4;
-        if (*p >= '0' && *p <= '9' && (p[1] == '\0' || p[1] == ' '))
-            return *p - '0';
-    }
-    return 0;
-}

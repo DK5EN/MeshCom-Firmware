@@ -620,7 +620,7 @@ static void sub_rm_send(long content_length)
  *  {"on":0|1,"pw":0|1,"ok":N,"rej":N,"lock":0|1,"lockS":N,"hwm":N,
  *   "log":[{"ago":S,"src":"","ctr":N,"cmd":"","res":""},...],
  *   "sent":[{"dst":"","ctr":N,"cmd":"","ago":S,"rep":0|1,"ver":0|1,"reply":"","st":"queued|waiting|noanswer|ok|err|unverified","msg":""},...],
- *   "targets":[{"dst":"","locked":0|1,"retry":S,"canForce":0|1,"cap":N,"pending":0|1,"chainErr":null|"token","chainMsg":null|"sentence"},...]} */
+ *   "targets":[{"dst":"","locked":0|1,"retry":S,"canForce":0|1,"pending":0|1,"chainErr":null|"token","chainMsg":null|"sentence"},...]} */
 static void sub_rm_status(void)
 {
     const uint32_t now = (uint32_t)millis();
@@ -677,8 +677,8 @@ static void sub_rm_status(void)
         {
             web_client.printf("%s{\"dst\":", i ? "," : "");
             rm_json_str(tg.dst);
-            web_client.printf(",\"locked\":%d,\"retry\":%lu,\"canForce\":%d,\"cap\":%u,\"pending\":%d,\"chainErr\":", tg.locked ? 1 : 0,
-                              (unsigned long)tg.retryS, tg.canForce ? 1 : 0, (unsigned)tg.cap, tg.pending ? 1 : 0);
+            web_client.printf(",\"locked\":%d,\"retry\":%lu,\"canForce\":%d,\"pending\":%d,\"chainErr\":", tg.locked ? 1 : 0,
+                              (unsigned long)tg.retryS, tg.canForce ? 1 : 0, tg.pending ? 1 : 0);
             if (tg.chainErr != nullptr)
                 rm_json_str(tg.chainErr);
             else

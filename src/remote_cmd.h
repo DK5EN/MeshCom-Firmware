@@ -45,8 +45,6 @@ const char *rmVerdictName(RmVerdict v);
 #define RM_LOCKOUT_MS 300000u    // ... lock RM1 for 5 min
 #define RM_MAX_RESULT 108         // longest result text a reply can carry; "RM1 <10 digits> <108> <16 hex>" = 140 chars
 #define RM_MAX_ARGS 39            // longest args text of a command (RmCmd::args holds this + NUL)
-#define RM_LEGACY_RESULT_MAX 63   // replies of the first 13 commands stay within this (older operators reject longer)
-#define RM_CAP_LEVEL 2            // capability level advertised in the sync reply "rm=<n>"
 
 struct RmCmd
 {
@@ -182,7 +180,5 @@ size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *
 // Pure result sanitiser: allowed bytes are space, A-Z a-z 0-9 and "- . / = + _ @ ? ( ) , * #";
 // every other byte becomes '?'. In place, returns the length.
 size_t rmSanitizeResult(char *result);
-// Capability level of a sync result ("ok ctr=<n> v=<ver> rm=<k>"): k, or 0 when the token is absent/malformed.
-int rmCapLevel(const char *syncResult);
 
 #endif // REMOTE_CMD_H

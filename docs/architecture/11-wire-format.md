@@ -402,7 +402,7 @@ reply    RM1 <ctr> ok <status> <rtag>
   literal `RM1` is upper case), single spaces, no leading or trailing space.
 - `tag` / `rtag`: 16 lower-case hex characters, the **last** token.
 - `ok`/`err` as the third token identify a reply (`rmIsReply()`); no command is called `ok` or `err`.
-  A reply carries a result text of at most 63 characters.
+  A reply carries a result text of at most 108 characters (the wire cap; there is no shorter legacy limit).
 - A command that does not parse is dropped without a reply.
 
 #### 1.9.2 Canonical strings and tag
@@ -421,16 +421,16 @@ sender), so the same pair of calls appears in the same order. `node_passwd` is a
 
 #### 1.9.3 Allowlist
 
-| Command                                      | Arguments                     | Reply status text                                                          |
-| -------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
-| `reboot`                                     | none                          | `rebooting` (the node restarts 8 s after the reply)                        |
-| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max> pmin=<min> [led=<0/1>]` |
-| `sendpos`, `sendtrack`                       | none                          | `sent`                                                                     |
-| `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                 | `<name>=<on/off>`                                                          |
-| `led`                                        | `on` or `off`                 | `led=<on/off>`; `err unsupported` on a board without a usable LED pin      |
-| `txpower`                                    | `<n>`, 0 to the board maximum | `txpower=<n>`                                                              |
-| `setout`                                     | `<a0..a7\|b0..b7> <on\|off>`  | `<pin>=<on/off>`; `err not output` if the pin is not an output             |
-| `sync`                                       | none, ctr 0                   | `ctr=<hwm> v=<ver>`                                                        |
+| Command                                      | Arguments                     | Reply status text                                                     |
+| -------------------------------------------- | ----------------------------- | --------------------------------------------------------------------- |
+| `reboot`                                     | none                          | `rebooting` (the node restarts 8 s after the reply)                   |
+| `status`                                     | none                          | `v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<max>`        |
+| `sendpos`, `sendtrack`                       | none                          | `sent`                                                                |
+| `gps`, `track`, `display`, `gateway`, `mesh` | `on` or `off`                 | `<name>=<on/off>`                                                     |
+| `led`                                        | `on` or `off`                 | `led=<on/off>`; `err unsupported` on a board without a usable LED pin |
+| `txpower`                                    | `<n>`, 0 to the board maximum | `txpower=<n>`                                                         |
+| `setout`                                     | `<a0..a7\|b0..b7> <on\|off>`  | `<pin>=<on/off>`; `err not output` if the pin is not an output        |
+| `sync`                                       | none, ctr 0                   | `ctr=<hwm> v=<ver>`                                                   |
 
 Everything else is rejected, whatever the tag. Hard-blocked: `cleanflash`, `ota-update`, `dfu`,
 `deepsleep`, `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`,
@@ -438,11 +438,13 @@ Everything else is rejected, whatever the tag. Hard-blocked: `cleanflash`, `ota-
 reasons in a reply: `failed` (the setting did not take effect), `not output`, `unsupported`, `storage` (the
 high-water mark could not be persisted, the command was **not** executed).
 
-`status` since the Remote page (RM GUI W1b): `s=` carries six switches as letters in the fixed order
-`G T D M W L` = gps, track, display, mesh, gateway, led; upper case = on, lower case = off. `L` and
-`led=` are omitted on a board without an LED (`led=` stays the capability flag). `p=<cur>/<max>` is the
-TX power and the board maximum; `pmin=<min>` (own token) is the board minimum, 0 when absent. Worst case 70 of the 108 wire characters; past the 63 that operators before pmin accept (they reject the status of an updated target). The older form
-`... gw=<0/1> mesh=<0/1> [led=<0/1>]` is still accepted by `rmStatusParse()` (and must be by any UI).
+`status`: `s=` carries the switches as letters in the fixed order `G T D M W L` = gps, track,
+display, mesh, gateway, led; upper case = on, lower case = off. `L` is omitted on a board without an
+LED, so `s=` is 6 letters with an LED and 5 (`GTDMW`) without. `p=<cur>/<max>` is the TX power and
+the board maximum. There is no `led=` token, no `pmin=` token and no `gw=`/`mesh=` form; a parser
+does not accept them. Replies are limited only by the 108-character wire cap. The `sync` reply
+carries no capability token: the sender budget is 2 unanswered sends while the key is unproven and
+10 once a reply under the current key verified; two unverified sends in a row drop it back to 2 (streak rule). No capability level gates it.
 
 #### 1.9.4 Examples
 
@@ -466,7 +468,7 @@ password `secret` followed by trailing spaces, which are stripped before hashing
 RM1 1 ok rebooting facf04f881d89cde
 RM1 44 err range ade99d27f3001d3c
 RM1 0 ok ctr=42 v=4.40a c639dacb86c267de
-RM1 2 ok v=4.40a up=125 bat=87 heap=212 gw=0 mesh=1 6ba7ba274709c895
+RM1 2 ok v=4.40a up=125 bat=87 heap=212 s=gtdMW p=14/22 73baeaf0695e81ea
 ```
 
 (The `err range` vector exercises the reply grammar; the firmware itself refuses an out-of-range
