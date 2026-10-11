@@ -69,6 +69,9 @@ The run takes about 40 minutes (the default run; "No answer" now takes about 170
   Passwords come from `GWBENCH_PWFILE` (default: the bench backup file outside the repo).
 - Phase `repeat` and the INSTRUMENT image: `--airgap on|off` (RAM only, drops all RX and own TX). Put the
   stock image back on both nodes afterwards.
+- Phase `neg` switches `--rmstrictsecurity on` at the target for the strike/lock tests (strikes and the lock
+  exist only with strict security, BF-01) and restores the previous value afterwards and again in the teardown
+  (the setting is saved on the node).
 - Bench rules apply: DMs between the two nodes and group `TEST` only, never a broadcast, 2 dBm.
 
 ## Safety design

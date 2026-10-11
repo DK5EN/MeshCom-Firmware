@@ -132,6 +132,7 @@ class Run:
         self.udplog_on = False
         self.dbg_on = False
         self.airgap_used = False
+        self.strict_before: Dict[str, bool] = {}  # call -> --rmstrictsecurity before the neg phase switched it on (saved setting)
 
     def nap(self, sec: float) -> None:
         """sleep in slices; a boot-guard trip aborts the run into teardown."""
@@ -431,6 +432,19 @@ class Run:
         hwm = int(http(dst.base, "/rmstatus")["hwm"])
         http(src.base, "/?sendmessage&tocall=%s&message=%s" % (guard_call(dst.call), q("RM1 %d status 0123456789abcde%d" % (hwm + 50 + n, n))))
 
+    def strict_state(self, n: Node) -> Optional[bool]:
+        p = n.pos(); n.con("--rmstrictsecurity")
+        if not n.wait(r"\[RM\];strict=(on|off)", p, 8):
+            return None
+        return re.findall(r"\[RM\];strict=(on|off)", n.text(p))[-1] == "on"
+
+    def set_strict(self, n: Node, on: bool) -> bool:
+        for _ in range(3):
+            p = n.pos(); n.con("--rmstrictsecurity " + ("on" if on else "off"))
+            if n.wait(r"\[RM\];strict=%s" % ("on" if on else "off"), p, 8):
+                return True
+        return False
+
     def p_neg(self) -> None:
         """Wrong-tag RM1 frames as plain DMs. Since the RM1 repeat ladder every such DM goes out 4x (copy 1 + up to 3 repeats
         ~42 s apart) and nothing ever answers it, so the ladder runs to its end (LADDER_END, past 135 s). Expectations are on the
@@ -442,6 +456,15 @@ class Run:
               ladder after the last send, so no repeat is still pending when the lock is read, reset or tested (lock lasts 300 s)."""
         for src, dst in ((self.n1, self.n90), (self.n90, self.n1)):
             d = "%s>%s" % (src.call[6:], dst.call[6:])
+            # strikes and the lock exist only with strict security (BF-01); the setting is saved, so it is restored below
+            # and again in the teardown
+            before = self.strict_state(dst)
+            if before is None:
+                raise Abort(dst.call + ": --rmstrictsecurity state not answered")
+            self.strict_before.setdefault(dst.call, before)
+            if not self.set_strict(dst, True):
+                raise Abort(dst.call + ": --rmstrictsecurity on not confirmed")
+            self.ev("neg:strict on", dst.call, result="ok", before="on" if before else "off")
             http(dst.base, "/rmpasswd", "act=set&pw=" + q(dst.pw)); self.nap(2)  # clean reject table
             b = http(dst.base, "/rmstatus"); t0 = time.time(); self.junk(src, dst, 0); self.nap_until(t0 + LADDER_END); a = http(dst.base, "/rmstatus")
             rd = a["rej"] - b["rej"]
@@ -461,6 +484,10 @@ class Run:
             self.ev("neg:unlock", "local@" + dst.call[6:], result="ok" if not http(dst.base, "/rmstatus")["lock"] else "STILL locked")
             r = self.rm_send(src, dst, "sync")
             self.ev("neg:sync after unlock", d, result=r["result"], reply=r["reply"], t_send=r["t0"])
+            ok = self.set_strict(dst, self.strict_before[dst.call])
+            self.ev("neg:strict restore", dst.call, result="ok" if ok else "UNCONFIRMED", to="on" if self.strict_before[dst.call] else "off")
+            if ok:
+                del self.strict_before[dst.call]
         self.ev("neg:per-sender", "-", result="skipped: needs a third sender callsign (covered in the RF round)")
         self.ev("neg:replay", "-", result="covered by the double delivery: every command arrives twice with the same counter and tag")
 
@@ -498,6 +525,10 @@ class Run:
                             ok = True
                             break
                     print(("AIRGAP OFF CONFIRMED " if ok else "AIRGAP STATE UNCONFIRMED ") + n.call, flush=True)
+        for n in self.nodes:
+            if n.cmd and n.call in self.strict_before:
+                ok = self.set_strict(n, self.strict_before[n.call])
+                print(("STRICT RESTORED " if ok else "STRICT STATE UNCONFIRMED ") + "%s -> %s" % (n.call, "on" if self.strict_before[n.call] else "off"), flush=True)
         if self.dbg_on:
             for n in self.nodes:
                 if n.cmd:
