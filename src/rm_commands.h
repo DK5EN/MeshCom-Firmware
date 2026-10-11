@@ -15,7 +15,8 @@
 // KIND   what the runtime does with the command
 //   ACTION  no state flag: reboot status sendpos sendtrack sync
 //   TOGGLE  "<name> on|off" (gps track display led gateway mesh); the console-flag ones are kToggles, led is a pin
-//   PARAM   its own argument, handled in execute() (txpower setout)
+//           (led takes on|off|flash)
+//   PARAM   its own argument, handled in execute() (txpower setout chgled)
 //   READ    answered by the read executor (radio sens txq mbox maxhop, mh with an optional row/call)
 //   RW      read without args, write with args: name atxt pos
 // SHAPE  suffix of RM_ARGS_<SHAPE> in remote_cmd.cpp (the argument check of the allowlist)
@@ -38,11 +39,12 @@
     X(gps, TOGGLE, ONOFF)                                                                                        \
     X(track, TOGGLE, ONOFF)                                                                                      \
     X(display, TOGGLE, ONOFF)                                                                                    \
-    X(led, TOGGLE, ONOFF)                                                                                        \
+    X(led, TOGGLE, LED)                                                                                          \
     X(gateway, TOGGLE, ONOFF)                                                                                    \
     X(mesh, TOGGLE, ONOFF)                                                                                       \
     X(txpower, PARAM, TXPOWER)                                                                                   \
     X(setout, PARAM, SETOUT)                                                                                     \
+    X(chgled, PARAM, CHGLED)                                                                                     \
     X(radio, READ, NONE)                                                                                         \
     X(sens, READ, NONE)                                                                                          \
     X(txq, READ, NONE)                                                                                           \

@@ -17,6 +17,9 @@ void pmuSleepRails();
 // Function to enable and disable (0) Charging Led Auto Mode (e.g. T-BEAM AXP2101 v1.2)
 void setChargeLedOn(bool enableAutoMode);
 
+// Mode form (ChargeLedMode of charge_led_mode.h as int): auto = PMU follows charging, on = steady, off = dark.
+bool setChargeLedMode(int mode);   // false = no PMU, nothing changed
+
 #endif // defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 
 #endif

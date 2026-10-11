@@ -2219,7 +2219,7 @@ void esp32setup()
     #if defined(REMOTE_LED_PIN) && !defined(BOARD_LED)
         // RM "led on|off" on a board without the BOARD_LED blinker (Heltec V3): off after boot
         pinMode(REMOTE_LED_PIN, OUTPUT);
-        digitalWrite(REMOTE_LED_PIN, LOW);
+        digitalWrite(REMOTE_LED_PIN, REMOTE_LED_OFF_LEVEL);
     #endif
 
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
@@ -2672,6 +2672,10 @@ void esp32loop()
                 }
             }
         }
+    #endif
+
+    #if defined(REMOTE_LED_PIN)
+        remoteLedTick();   // RM "led flash": the pattern runs here, independent of --board led
     #endif
 
     #ifdef BOARD_LED

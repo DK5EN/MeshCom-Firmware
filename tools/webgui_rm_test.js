@@ -476,7 +476,7 @@ function leaks(P, canary) {
       JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v.state]))));
     check('Messages row shows the verified status (was: last status line)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(P.text('rm_msgs')), P.text('rm_msgs'));
     check('switch labels read Light, Gateway, GPS (enable GPS), Track (enable display of SmartBeaconing); Mesh and Gateway carry the off-confirm', t.gps.text === 'GPS (enable GPS)' && t.track.text === 'Track (enable display of SmartBeaconing)' && t.led.text === 'Light' && t.gateway.text === 'Gateway' && t.mesh.cf === 'mesh off' && t.gateway.cf === 'gateway off' && !t.gps.cf, JSON.stringify(Object.values(t).map((v) => v.text)));
-    check('switch order: Actions Display, Light, Mesh, Gateway, then Position GPS, Track', Object.keys(t).join(',') === 'display,led,mesh,gateway,gps,track', Object.keys(t).join(','));
+    check('switch order: Actions Display, Light, Light flash, Mesh, Gateway, then Position GPS, Track', Object.keys(t).join(',') === 'display,led,ledflash,mesh,gateway,gps,track', Object.keys(t).join(','));
     P.w.rmPageLeave();
   }
   {
@@ -523,11 +523,11 @@ function leaks(P, canary) {
     check('3.3 D1 stylesheet: .rmtiles is a fixed 3-column grid, no auto-fill anywhere, Restart goes to column 3', /\.rmtiles\{display:grid;grid-template-columns:repeat\(3,1fr\);/.test(css) && !/auto-fill|auto-fit/.test(css) && css.includes('.rmtile-end{grid-column:3;}'), css.match(/\.rmtiles\{[^}]*\}/)[0]);
     const sw = P.el('rm_sw'), ins = [...sw.querySelectorAll('input')];
     check('3.3 D2 switch container is a .grid.rmg with the 3-column set in the stylesheet', sw.classList.contains('grid') && sw.classList.contains('rmg') && css.includes('.rmg{grid-template-columns:minmax(7em,max-content) 1fr max-content;}'), sw.className);
-    check('3.3 D2 each switch row is label | input | empty cell, direct children of the grid', ins.length === 4 && sw.children.length === 12 && ins.every((i) => i.parentNode === sw && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id && i.nextElementSibling.tagName === 'SPAN' && i.nextElementSibling.textContent === '' && i.nextElementSibling.children.length === 0), sw.children.length + ' children');
+    check('3.3 D2 each switch row is label | input | empty cell, direct children of the grid', ins.length === 5 && sw.children.length === 18 && ins.every((i) => i.parentNode === sw && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id && i.nextElementSibling.tagName === 'SPAN' && i.nextElementSibling.textContent === '' && i.nextElementSibling.children.length === 0), sw.children.length + ' children');
     check('3.3 D2 switches start at the left of column 2 (one rule for all)', css.includes('.rmg .rmsw{justify-self:start;margin:0;}') && ins.every((i) => i.classList.contains('rmsw')));
-    check('3.3 D2 ids rm_sw_<n>, data-sw and data-cf kept', ins.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_display:display,rm_sw_led:led,rm_sw_mesh:mesh,rm_sw_gateway:gateway' && ins.filter((i) => i.getAttribute('data-cf')).map((i) => i.id + '=' + i.getAttribute('data-cf')).join() === 'rm_sw_mesh=mesh off,rm_sw_gateway=gateway off', ins.map((i) => i.id).join());
+    check('3.3 D2 ids rm_sw_<n>, data-sw and data-cf kept', ins.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_display:display,rm_sw_led:led,rm_sw_ledflash:ledflash,rm_sw_mesh:mesh,rm_sw_gateway:gateway' && ins.filter((i) => i.getAttribute('data-cf')).map((i) => i.id + '=' + i.getAttribute('data-cf')).join() === 'rm_sw_mesh=mesh off,rm_sw_gateway=gateway off', ins.map((i) => i.id).join());
     await P.tap(P.tiles().mesh.el);
-    check('3.3 D2 arming text stays in the label cell and the grid keeps 12 children', P.tiles().mesh.text === 'Mesh: Really? tap again' && P.el('rm_sw').children.length === 12, P.tiles().mesh.text);
+    check('3.3 D2 arming text stays in the label cell and the grid keeps 18 children', P.tiles().mesh.text === 'Mesh: Really? tap again' && P.el('rm_sw').children.length === 18, P.tiles().mesh.text);
     P.w.rmPageLeave();
   }
 
@@ -628,7 +628,7 @@ function leaks(P, canary) {
     await posIn('lat', '48.40812'); await posIn('lon', '11.73812');
     check('3.4b pos: after reverting every edit nothing is enabled and no message is left', dis() === '000' && ['lat', 'lon', 'alt'].every((k) => X('rm_f_pos_' + k + '_hint').textContent === ''), dis());
     const sw = [...X('rm_card_pos').querySelectorAll('input.rmsw')], ct = [...X('rm_sw').querySelectorAll('input.rmsw')];
-    check('3.4b GPS and Track switches live in the Position card (rows after the position rows), not in Actions; ids and data-sw kept', sw.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_gps:gps,rm_sw_track:track' && ct.map((i) => i.getAttribute('data-sw')).join() === 'display,led,mesh,gateway' && !X('rm_sw').querySelector('#rm_sw_gps,#rm_sw_track') && sw.every((i) => i.parentNode.classList.contains('rmf') && i.parentNode !== row('pos') && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id) && !!(X('rm_def_pos').compareDocumentPosition(sw[0]) & 4), sw.map((i) => i.id).join());
+    check('3.4b GPS and Track switches live in the Position card (rows after the position rows), not in Actions; ids and data-sw kept', sw.map((i) => i.id + ':' + i.getAttribute('data-sw')).join() === 'rm_sw_gps:gps,rm_sw_track:track' && ct.map((i) => i.getAttribute('data-sw')).join() === 'display,led,ledflash,mesh,gateway' && !X('rm_sw').querySelector('#rm_sw_gps,#rm_sw_track') && sw.every((i) => i.parentNode.classList.contains('rmf') && i.parentNode !== row('pos') && i.previousElementSibling.tagName === 'LABEL' && i.previousElementSibling.htmlFor === i.id) && !!(X('rm_def_pos').compareDocumentPosition(sw[0]) & 4), sw.map((i) => i.id).join());
     check('3.4b switch rows read "GPS (enable GPS)" and "Track (enable display of SmartBeaconing)", the switch sits in the action column (no filler cell)', sw.map((i) => i.previousElementSibling.textContent).join('|') === 'GPS (enable GPS)|Track (enable display of SmartBeaconing)' && sw.map((i) => i.previousElementSibling.querySelector('.font-small') !== null).join() === 'true,true' && sw.every((i) => i.parentNode.children.length === 4), sw.map((i) => i.parentNode.children.length).join());
     check('3.4b switch state comes from the s= letters (GtDMwL: GPS on, Track off)', sw[0].checked === true && sw[0].indeterminate === false && sw[1].checked === false && sw[1].indeterminate === false);
     {
@@ -1734,6 +1734,58 @@ function leaks(P, canary) {
     const n0 = P.sends().length;
     P.click(P.tiles().gps.el); await flush();
     check('UI-01 a switch is disabled and snaps back while the 10 s lock is on', P.sends().length === n0 && P.tiles().gps.el.disabled && P.tiles().gps.state === 'on', P.tiles().gps.state);
+    P.w.rmPageLeave();
+  }
+
+  // ---- LED wave W3: Light flash switch, Charge LED select, reply parsing -----------------------------
+  {
+    const P = await savedNodePage(STATUS_NEW);   // s=GtDMwL: L = RM holds the LED
+    const sel = () => P.el('rm_chgled');
+    const t0 = P.tiles();
+    check('W3 Light flash switch follows Light, starts off (status letters cannot tell flash from on)', !!t0.ledflash && t0.led.state === 'on' && t0.ledflash.state === 'off' && t0.ledflash.text === 'Light flash', Object.keys(t0).join());
+    check('W3 Charge LED is always shown: a select auto/on/off plus an unknown entry, starts unknown', !!sel() && sel().tagName === 'SELECT' && [...sel().options].map((o) => o.value).join() === ',auto,on,off' && sel().value === '' && P.d.querySelector('label[for="rm_chgled"]').textContent === 'Charge LED');
+    await P.tap(t0.ledflash.el);
+    check('W3 Light flash on sends led flash', P.sends().length === 1 && /cmd=led&args=flash/.test(P.sends()[0].body), P.sends().map((c) => c.body).join('|'));
+    await P.T.advance(10001);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'led flash', 'ok led=flash', { ctr: 2, ago: 1, st: 'ok' })] });
+    check('W3 reply ok led=flash: Light and Light flash both on, text sentence', P.tiles().led.state === 'on' && P.tiles().ledflash.state === 'on' && /flashing/.test(P.w.rmOkText({ cmd: 'led flash', reply: 'ok led=flash', msg: '' })), P.tiles().led.state + P.tiles().ledflash.state);
+    await P.T.advance(10001);
+    await P.tap(P.tiles().ledflash.el);
+    check('W3 Light flash off sends led off', /cmd=led&args=off/.test(P.sends()[P.sends().length - 1].body), P.sends().map((c) => c.body).join('|'));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'led flash', 'ok led=flash', { ctr: 2, ago: 5, st: 'ok' }), ent('DK5EN-1', 'led on', 'ok led=on', { ctr: 3, ago: 1, st: 'ok' })] });
+    check('W3 reply ok led=on after flash: Light on, Light flash off', P.tiles().led.state === 'on' && P.tiles().ledflash.state === 'off', P.tiles().led.state + P.tiles().ledflash.state);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'led off', 'ok led=off', { ctr: 4, ago: 1, st: 'ok' })] });
+    check('W3 reply ok led=off: both off', P.tiles().led.state === 'off' && P.tiles().ledflash.state === 'off');
+    await P.T.advance(10001);
+    for (const m of ['auto', 'on', 'off']) {
+      sel().value = m; sel().dispatchEvent(new P.w.Event('change', { bubbles: true })); await flush();
+      check('W3 Charge LED ' + m + ' sends chgled ' + m, new RegExp('cmd=chgled&args=' + m + '&').test(P.sends()[P.sends().length - 1].body), P.sends()[P.sends().length - 1].body);
+      await P.T.advance(10001);
+    }
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled on', 'ok chgled=on', { ctr: 6, ago: 1, st: 'ok' })] });
+    check('W3 reply ok chgled=on selects on; ok text names the mode', sel().value === 'on' && P.w.rmOkText({ cmd: 'chgled on', reply: 'ok chgled=on', msg: '' }) === 'Done. Charge LED is now on.', sel().value);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled on', 'ok chgled=on', { ctr: 6, ago: 5, st: 'ok' }), ent('DK5EN-1', 'chgled auto', 'ok chgled=auto', { ctr: 7, ago: 1, st: 'ok' })] });
+    check('W3 the newest chgled reply wins', sel().value === 'auto', sel().value);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled auto', 'err unsupported', { ctr: 8, ago: 1, st: 'err', msg: 'unsupported' })] });
+    check('W3 err unsupported to chgled: select stays, unknown, note says not supported', !!sel() && sel().value === '' && /not supported by this node/.test(P.el('rm_sw').textContent), P.el('rm_sw').textContent);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled on', 'ok chgled=on', { ctr: 10, ago: 5, st: 'ok' })] });
+    check('W3 setup for the pre-W3 case: a chgled ok selects on', sel().value === 'on', sel().value);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled auto', 'err blocked', { ctr: 11, ago: 1, st: 'err', msg: 'blocked' })] });
+    check('W3 pre-W3 node answers chgled with err blocked: also unknown + not supported', !!sel() && sel().value === '' && /not supported by this node/.test(P.el('rm_sw').textContent), sel().value + '|' + P.el('rm_sw').textContent);
+    check('W3 confirm label for chgled is a sentence part, not the raw command', P.w.rmLabel('chgled auto') === 'Charge LED auto', P.w.rmLabel('chgled auto'));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'led flash', 'err unsupported', { ctr: 9, ago: 1, st: 'err', msg: 'unsupported' })] });
+    check('W3 selecting the unknown entry sends nothing', (() => { const n = P.sends().length; sel().value = ''; sel().dispatchEvent(new P.w.Event('change', { bubbles: true })); return P.sends().length === n; })());
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage('ok v=4.40a up=130 bat=87 heap=123 s=GtDMw p=17/2/22');   // 5 letters: no RM LED
+    check('W3 no L letter: Light and Light flash hidden, Charge LED still shown', !P.tiles().led && !P.tiles().ledflash && !!P.el('rm_chgled'));
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW);
+    await P.tap(P.btn('Send position now', P.el('rm_info')));
+    check('W3 Light flash and Charge LED are locked with the other controls after a send', P.tiles().ledflash.el.disabled && P.el('rm_chgled').disabled);
     P.w.rmPageLeave();
   }
 

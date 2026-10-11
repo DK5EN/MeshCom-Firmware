@@ -26,6 +26,7 @@
 #include "extudp_functions.h"
 #include "kiss_functions.h"
 #include "configuration.h"
+#include "loop_functions_extern.h"   // REMOTE_LED_PIN rule + RM LED levels
 
 #include "TinyGPSPlus.h"
 
@@ -90,18 +91,29 @@ int ifalseping = 0;
 int BOARD_HARDWARE = MODUL_HARDWARE;
 bool bUSER_BOARD_LED = false;
 
-#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES) && \
-    !(defined(OneWire_GPIO) && (OneWire_GPIO == BOARD_LED))
-    #define REMOTE_LED_PIN BOARD_LED   // same rule as loop_functions_extern.h
-#endif
 #if defined(REMOTE_LED_PIN)
-bool bRemoteLed = false;   // RM "led on": never persisted, off after boot
+bool bRemoteLed = false;        // RM "led on|flash": never persisted, off after boot
+bool bRemoteLedFlash = false;
+
+void remoteLedSet(int mode)
+{
+    bRemoteLed = (mode == 1 || mode == 2);
+    bRemoteLedFlash = (mode == 2);
+    pinMode(REMOTE_LED_PIN, OUTPUT);
+    digitalWrite(REMOTE_LED_PIN, mode == 1 ? REMOTE_LED_ON_LEVEL : REMOTE_LED_OFF_LEVEL);
+}
+
+void remoteLedTick(void)
+{
+    if (!bRemoteLedFlash)
+        return;
+    const bool lit = (millis() % REMOTE_LED_FLASH_PERIOD_MS) < REMOTE_LED_FLASH_ON_MS;
+    digitalWrite(REMOTE_LED_PIN, lit ? REMOTE_LED_ON_LEVEL : REMOTE_LED_OFF_LEVEL);
+}
 
 void remoteLedForceOff(void)
 {
-    bRemoteLed = false;
-    pinMode(REMOTE_LED_PIN, OUTPUT);
-    digitalWrite(REMOTE_LED_PIN, LOW);
+    remoteLedSet(0);
 }
 #endif
 

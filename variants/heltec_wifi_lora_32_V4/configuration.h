@@ -92,6 +92,11 @@
 #define GPS_RX_PIN 38
 #define GPS_TX_PIN 39
 
+// RM "led on|flash|off": white user LED, GPIO35, active HIGH, as on V3 (same board definition, no other
+// use of GPIO35 in this variant). Deliberately not BOARD_LED: that would enable the 1 s blinker and
+// the `--board led` console command. Untested on V4 hardware until someone reports.
+#define REMOTE_LED_PIN 35
+
 // PA Control Pins (defined in platformio.ini build flags)
 // P_LORA_PA_POWER 7   - PA power enable
 // P_LORA_PA_EN    2   - PA enable

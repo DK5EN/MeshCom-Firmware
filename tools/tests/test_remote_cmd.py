@@ -64,8 +64,9 @@ def test_refusal_text_receiver_model() -> None:
 
 
 def test_allowlist_command_count() -> None:
-    assert len(rc.ALLOWLIST) == 22
-    assert rc.ALLOWLIST["led"] == ("on", "off")
+    assert len(rc.ALLOWLIST) == 23
+    assert rc.ALLOWLIST["led"] == ("on", "off", "flash")
+    assert rc.ALLOWLIST["chgled"] == ("auto", "on", "off")
 
 
 def test_vector_coverage() -> None:
@@ -78,6 +79,9 @@ def test_vector_coverage() -> None:
     assert any(v["cmd"] == "setout" and v["args"] == "b7 off" for v in cmds)
     assert any(v["cmd"] == "led" and v["args"] == "on" for v in cmds)
     assert any(v["cmd"] == "led" and v["args"] == "off" for v in cmds)
+    assert any(v["cmd"] == "led" and v["args"] == "flash" for v in cmds)
+    for mode in ("auto", "on", "off"):
+        assert any(v["cmd"] == "chgled" and v["args"] == mode for v in cmds)
     # trailing spaces do not change the key
     assert rc.derive_key("secret   ") == rc.derive_key("secret")
 
@@ -95,7 +99,8 @@ def test_dst_and_src_are_bound() -> None:
         ("gps", "on"), ("gps", "off"), ("track", "on"), ("display", "off"),
         ("gateway", "on"), ("mesh", "off"), ("txpower", "2"), ("txpower", "22"),
         ("setout", "a2 on"), ("setout", "a0 off"), ("setout", "b7 off"), ("setout", "b0 on"),
-        ("led", "on"), ("led", "off"),
+        ("led", "on"), ("led", "off"), ("led", "flash"),
+        ("chgled", "auto"), ("chgled", "on"), ("chgled", "off"),
     ],
 )
 def test_allowlisted_commands_build(cmd: str, args: str) -> None:
@@ -120,6 +125,9 @@ def test_allowlisted_commands_build(cmd: str, args: str) -> None:
         ("setout", "a2  on"), ("setout", "a22 on"), ("setout", "a2 onoff"), ("gps", " on"), ("gps", "on "), ("", ""),
         ("reboot", "ä"), ("status", "\t"),
         ("led", ""), ("led", "blink"), ("led", "1"), ("led", "ON"), ("led", "on off"), ("led", " on"),
+        ("led", "FLASH"), ("led", "flash "), ("led", "flash on"),
+        ("chgled", ""), ("chgled", "1"), ("chgled", "0"), ("chgled", "blink"), ("chgled", "AUTO"), ("chgled", "auto on"),
+        ("chgled", " on"), ("chgled", "flash"),
     ],
 )
 def test_blocked_or_malformed_refused(cmd: str, args: str) -> None:
@@ -249,3 +257,20 @@ def test_extended_shapes_match_the_firmware_table() -> None:
         except rc.RmError:
             got = False
         assert got is ok, (cmd, args)
+
+
+def test_led_wave_vectors() -> None:
+    by = {(v["cmd"], v["args"]): v for v in VECTORS["commands"]}
+    assert by[("led", "flash")]["canonical"] == rc.canonical(DST, SRC, 80, "led", "flash")
+    for ctr, mode in ((81, "auto"), (82, "on"), (83, "off")):
+        v = by[("chgled", mode)]
+        assert v["ctr"] == ctr
+        assert v["canonical"] == rc.canonical(DST, SRC, ctr, "chgled", mode)
+        assert v["dm_text"] == rc.build_command(DST, SRC, ctr, "chgled", mode, "secret")
+        assert v["dm_text"].rsplit(" ", 1)[1] == v["tag"] and len(v["tag"]) == rc.TAG_HEX_LEN
+    # stable reply tokens verify like any other result
+    for ctr, res in ((97, "ok led=flash"), (98, "ok chgled=auto")):
+        dm = rc.build_reply(DST, SRC, ctr, res, "secret")
+        assert res in dm
+        r = rc.verify_reply(dm, DST, SRC, "secret", ctr)
+        assert r is not None and r["result"] == res

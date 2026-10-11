@@ -549,7 +549,7 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
 
     // never over RM: the RM allowlist (a positive list) must not name it
     // RM_ALLOWLIST[] in remote_cmd.cpp is generated from the X(name, KIND, SHAPE) list of rm_commands.h
-    // (DRY-07), so that list is what gets scanned: all 22 pinned names present, the console-only ones absent.
+    // (DRY-07), so that list is what gets scanned: all 23 pinned names present, the console-only ones absent.
     const std::string rc = read_repo_file("src/remote_cmd.cpp");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("const RmAllowRow RM_ALLOWLIST[]") != std::string::npos, "RM_ALLOWLIST not found");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("RM_COMMAND_LIST(RM_ALLOW_ROW)") != std::string::npos,
@@ -557,14 +557,14 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
     const std::string names = rm_command_list_names();
     static const char *const pinned[] = {"reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track",
                                          "display", "led", "gateway", "mesh", "txpower", "setout", "radio", "sens",
-                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(22, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 22 names");
+                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled"};
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(23, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 23 names");
     for (const char *nm : pinned)
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + nm + ",") != std::string::npos, nm);
     size_t count = 0;
     for (char ch : names)
         count += (ch == ',') ? 1 : 0;
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(22 + 1, count, "rm_commands.h does not list exactly 22 commands");
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(23 + 1, count, "rm_commands.h does not list exactly 23 commands");
     for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd"})
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + bad + ",") == std::string::npos, bad);
 

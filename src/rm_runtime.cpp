@@ -19,6 +19,10 @@
 #include "rm_runtime.h"
 #include "rm_sender_policy.h"
 #include "rm_validate.h"
+#if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+#include "charge_led_mode.h"
+#include "esp32/esp32_pmu.h"
+#endif
 
 static_assert(RM_POLICY_COOLDOWN_MS == RM_RATE_MS, "sender spacing must equal the target's rate limit");
 static_assert(RM_POLICY_WINDOW_MS >= RM_REJ_WINDOW_MS + 60000u, "the sender budget window must exceed the target's reject window");
@@ -274,12 +278,30 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
     if (strcmp(cmd, "led") == 0)
     {
 #if defined(REMOTE_LED_PIN)
-        // a = "on" | "off" (allowlisted). Held until "led off" or the next boot, no timer.
-        const bool want = (strcmp(a, "on") == 0);
-        bRemoteLed = want;
-        pinMode(REMOTE_LED_PIN, OUTPUT);
-        digitalWrite(REMOTE_LED_PIN, want ? HIGH : LOW);
-        snprintf(res, n, "ok led=%s", want ? "on" : "off");
+        // a = "on" | "off" | "flash" (allowlisted). Held until "led off" or the next boot, no timer.
+        // flash: RM drives the 30 ms / 2 s pattern itself (remoteLedTick), independent of --board led.
+        const int mode = (strcmp(a, "on") == 0) ? 1 : (strcmp(a, "flash") == 0) ? 2 : 0;
+        remoteLedSet(mode);
+        snprintf(res, n, "ok led=%s", mode == 1 ? "on" : mode == 2 ? "flash" : "off");
+        return true;
+#else
+        snprintf(res, n, "err unsupported");
+        return false;
+#endif
+    }
+
+    if (strcmp(cmd, "chgled") == 0)
+    {
+#if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+        // a = "auto" | "on" | "off" (allowlisted). Runtime override of the PMU charge LED, not persisted:
+        // the next boot restores the console setting (--charge led on|off).
+        const ChargeLedMode mode = (strcmp(a, "on") == 0) ? CHGLED_ON : (strcmp(a, "off") == 0) ? CHGLED_OFF : CHGLED_AUTO;
+        if (!setChargeLedMode((int)mode))   // AXP chip configured but no PMU object (init failed)
+        {
+            snprintf(res, n, "err unsupported");
+            return false;
+        }
+        snprintf(res, n, "ok chgled=%s", mode == CHGLED_ON ? "on" : mode == CHGLED_OFF ? "off" : "auto");
         return true;
 #else
         snprintf(res, n, "err unsupported");

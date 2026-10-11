@@ -140,6 +140,8 @@ enum RmArgShape : uint8_t
     RM_ARGS_ONOFF,   // "on" | "off"
     RM_ARGS_TXPOWER, // 0..maxTxPower, at most 3 digits
     RM_ARGS_SETOUT,  // "<pin> <on|off>", pin a0..a7 or b0..b7 (the console's --setout MCP pins)
+    RM_ARGS_LED,     // "on" | "off" | "flash"
+    RM_ARGS_CHGLED,  // "auto" | "on" | "off"
     // extended commands (RM ext W2-A): SYNTAX only, ranges and the strict charset are the executor's
     // job (err range / err text). Capitals are allowed here and only here (concept 2.4).
     RM_ARGS_NAME,    // none (read) | free text 1..RM_NAME_MAX (write)
@@ -170,6 +172,10 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
         return a[0] == '\0';
     case RM_ARGS_ONOFF:
         return isOnOff(a);
+    case RM_ARGS_LED:
+        return isOnOff(a) || strcmp(a, "flash") == 0;
+    case RM_ARGS_CHGLED:
+        return isOnOff(a) || strcmp(a, "auto") == 0;
     case RM_ARGS_TXPOWER:
     {
         int v = 0;

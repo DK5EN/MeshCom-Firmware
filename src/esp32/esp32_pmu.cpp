@@ -391,4 +391,15 @@ void setChargeLedOn(bool enableAutoMode)
     PMU->setChargingLedMode(enableAutoMode ? XPOWERS_CHG_LED_CTRL_CHG : XPOWERS_CHG_LED_OFF);
 }
 
+bool setChargeLedMode(int mode)
+{
+    if (!PMU)
+    {
+        return false;
+    }
+    // 0 = auto (charger controls the LED), 1 = steady on, 2 = dark -- the values of ChargeLedMode
+    PMU->setChargingLedMode(mode == 1 ? XPOWERS_CHG_LED_ON : mode == 2 ? XPOWERS_CHG_LED_OFF : XPOWERS_CHG_LED_CTRL_CHG);
+    return true;
+}
+
 #endif

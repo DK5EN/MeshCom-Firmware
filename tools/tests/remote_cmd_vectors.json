@@ -234,6 +234,54 @@
       "passwd": "secret",
       "dst": "DK5EN-90",
       "src": "DK5EN-1",
+      "ctr": 80,
+      "cmd": "led",
+      "args": "flash",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|80|led flash",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "cc11e2fb3327fac6",
+      "dm_text": "RM1 80 led flash cc11e2fb3327fac6"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 81,
+      "cmd": "chgled",
+      "args": "auto",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|81|chgled auto",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "7ac2c69a0f52dad4",
+      "dm_text": "RM1 81 chgled auto 7ac2c69a0f52dad4"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 82,
+      "cmd": "chgled",
+      "args": "on",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|82|chgled on",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "9dab58296fb4ec05",
+      "dm_text": "RM1 82 chgled on 9dab58296fb4ec05"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 83,
+      "cmd": "chgled",
+      "args": "off",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|83|chgled off",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "b459f25cdc306db8",
+      "dm_text": "RM1 83 chgled off b459f25cdc306db8"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
       "ctr": 60,
       "cmd": "radio",
       "args": "",
@@ -674,6 +722,28 @@
       "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|96|err hidden",
       "reply_tag": "845313fa59d76238",
       "reply_text": "RM1 96 err hidden 845313fa59d76238"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 97,
+      "result": "ok led=flash",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|97|ok led=flash",
+      "reply_tag": "d86c0cdf5210aabd",
+      "reply_text": "RM1 97 ok led=flash d86c0cdf5210aabd"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 98,
+      "result": "ok chgled=auto",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|98|ok chgled=auto",
+      "reply_tag": "147e5a30071eceee",
+      "reply_text": "RM1 98 ok chgled=auto 147e5a30071eceee"
     }
   ],
   "refusals": [

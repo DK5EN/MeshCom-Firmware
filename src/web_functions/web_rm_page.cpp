@@ -158,7 +158,7 @@ void rmScaffoldJs()
     web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list'};");
     web_client.println("var rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
                        "function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.';}");
-    web_client.println("var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'};");
+    web_client.println("var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'},rmChgModes=['auto','on','off'];function rmSwLbl(n){return n=='ledflash'?'Light flash':rmTogName[n];}");
     web_client.println("var rmForce=null;\n"
                        "function rmNow(){return Date.now();}");
     web_client.println("function rmEl(i){return document.getElementById(i);}\n"
@@ -170,14 +170,14 @@ void rmScaffoldJs()
     web_client.println("function rmUp(m){m=parseInt(m,10);if(isNaN(m))return '';return 'up '+(m<120?m+' min':Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''));}\n"
                        "function rmValidCall(c){return typeof c=='string'&&c.length<=9&&/^[A-Z0-9]{2,}-[0-9]{1,2}$/.test(c);}");
     web_client.println("function rmPwProblem(p){return !p.length?'Enter a password.':p.length>14?'The password can be at most 14 characters.':'';}\n"
-                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
+                       "function rmKnFor(c){if(!rmKnown[c])rmKnown[c]={sw:[-1,-1,-1,-1,-1,-1],led:false,fl:false,chg:'',ver:'',up:'',bat:'',at:0};return rmKnown[c];}\n"
                        "function rmKn(){return rmKnFor(rmSel.call);}\n"
                        "function rmLockLeft(){var m=Math.max(rmLock,rmSrvLock)-rmNow();return m>0?Math.ceil(m/1000):0;}");
     web_client.println("function rmLocked(){return rmBusy||rmAuth||rmLockLeft()>0;}\n"
                        "function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}\n");
     web_client.println("var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}\n"
                        "function rmTxp(v){var m=/^(-?\\d+)\\/(-?\\d+)\\/(-?\\d+)$/.exec(String(v));return m?m[1]+' dBm ('+m[2]+'..'+m[3]+')':String(v)+' dBm';}\n"
-                       "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];return f;}");
+                       "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];if(n=='chgled')return 'Charge LED '+p[1];return f;}");
     web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
                        "for(i=1;i<t.length;i++){k=t[i];\n"
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
@@ -188,17 +188,21 @@ void rmScaffoldJs()
     web_client.println("}\n"
                        "return o;}\n"
                        "function rmApplyEntry(k,e){var c=e.cmd.split(' '),n=c[0],o,m,i;");
-    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n"
+    web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;if(o.sw[5]==0)k.fl=false;k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n");
+    web_client.println("else if(n=='led'&&(m=/^ok led=(on|off|flash)$/.exec(e.reply))){k.sw[5]=m[1]=='off'?0:1;k.fl=m[1]=='flash';k.led=true;}\n"
+                       "else if(n=='chgled'){m=/^ok chgled=(auto|on|off)$/.exec(e.reply);if(m)k.chg=m[1];}\n"
                        "else if(rmTog[n]!==undefined){m=/^ok (\\w+)=(on|off)$/.exec(e.reply);if(m&&m[1]==n){k.sw[rmTog[n]]=m[2]=='on'?1:0;if(n=='led')k.led=true;}}\n");
     web_client.println("}");
     web_client.println("function rmApplySent(list){var a=list.slice(0).sort(function(x,y){return y.ago-x.ago;}),i,e;\n"
-                       "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);}}\n");
+                       "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);else if(e.rep&&e.ver&&e.st=='err'&&e.cmd.indexOf('chgled ')==0&&(e.reply=='err unsupported'||e.reply=='err blocked'))rmKnFor(String(e.dst)).chg='unsupported';}}\n");
     web_client.println("function rmOkText(e){var c=e.cmd.split(' '),n=c[0],o;\n"
                        "if(n=='status'){o=rmParseStatus(e.reply);return o?'Connected. Version '+o.ver+(o.up!==''?', '+rmUp(o.up):'')+(o.bat!==''?', battery '+o.bat+' %':'')+'.':e.msg;}\n"
                        "if(n=='sendpos')return 'Done. The node sent its position.';");
     web_client.println("if(n=='sendtrack')return 'Done. The node sent its track.';\n"
                        "if(n=='reboot')return 'Done. The node is restarting, it is back in about 30 seconds.';\n"
-                       "if(n=='sync')return 'Connected. The counters are in step.';\n"
+                       "if(n=='sync')return 'Connected. The counters are in step.';\n");
+    web_client.println("if(n=='led'&&c[1]=='flash')return 'Done. The light is now flashing.';\n"
+                       "if(n=='chgled')return 'Done. Charge LED is now '+c[1]+'.';\n"
                        "if(rmTogName[n])return 'Done. '+rmTogName[n]+' is now '+c[1]+'.';\n"
                        "if(n=='txpower')return 'Done. TX power is now '+c[1]+' dBm.';\n"
                        "if(n=='setout')return 'Done. Pin '+c[1]+' is now '+c[2]+'.';\n"
@@ -214,12 +218,17 @@ void rmScaffoldJs()
     web_client.println("function rmTile(box,label,cmd,args,cf,cls,dis){var arm=cf&&rmArmId==cf,a={'data-cmd':cmd,'data-args':args};if(cf)a['data-cf']=cf;return rmBtn(box,arm?rmReally:label,'rmtile '+(cls||'')+(arm?' rmarmed':''),dis,a);}");
     web_client.println("function rmSwSet(i,st,dis,last,shown){i.disabled=!!dis;i.indeterminate=st<0&&!(shown&&last);i.checked=st<0?last=='on':st==1;}");
     web_client.println("function rmSwRow(box,n,st,dis,x){var l=document.createElement('label'),i=document.createElement('input'),a=rmArmId==n+' off';i.type='checkbox';i.id='rm_sw_'+n;i.className='rmsw';i.setAttribute('role','switch');i.setAttribute('data-sw',n);");
-    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmTogName[n]+': '+rmReally:rmTogName[n];if(x)l.appendChild(rmNew('span','font-small',' ('+x+')'));l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);box.appendChild(l);box.appendChild(i);if(!x)box.appendChild(document.createElement('span'));}");
-    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['display','led','mesh','gateway'],p=rmEl('rm_pin').value;\n"
+    web_client.println("if(n=='mesh'||n=='gateway')i.setAttribute('data-cf',n+' off');l.htmlFor=i.id;l.textContent=a?rmSwLbl(n)+': '+rmReally:rmSwLbl(n);if(x)l.appendChild(rmNew('span','font-small',' ('+x+')'));l.className=a?'rmarmed':'';rmSwSet(i,st,dis,rmSw[rmSel.call+' '+n]);box.appendChild(l);box.appendChild(i);if(!x)box.appendChild(document.createElement('span'));}");
+    web_client.println("function rmRenderTiles(k,dis){var b=rmEl('rm_info'),i,d=[['status','Refresh status'],['sendpos','Send position now'],['sendtrack','Send track now']],o=['display','led','ledflash','mesh','gateway'],p=rmEl('rm_pin').value;\n"
                        "b.textContent='';for(i=0;i<d.length;i++)rmTile(b,d[i][1],d[i][0],'','','',dis);");
     web_client.println("rmBtn(b,'Re-sync counter','rmtile',dis,{'data-act':'sync',title:'Use this if the node keeps answering that the counters are out of step.'});rmTile(b,'Restart','reboot','','reboot','rmwarn rmtile-end',dis);\n"
                        "b=rmEl('rm_sw');b.textContent='';\n"
-                       "for(i=0;i<o.length;i++){if(o[i]=='led'&&!k.led)continue;rmSwRow(b,o[i],k.sw[rmTog[o[i]]],dis);}");
+                       "for(i=0;i<o.length;i++){if((o[i]=='led'||o[i]=='ledflash')&&!k.led)continue;rmSwRow(b,o[i],o[i]=='ledflash'?(k.sw[5]<0?-1:k.sw[5]==1&&k.fl?1:0):k.sw[rmTog[o[i]]],dis);}\n"
+                       "rmChgRow(b,k,dis);");
+    web_client.println("function rmChgRow(box,k,dis){var l=document.createElement('label'),s=document.createElement('select'),o,i,v=rmChgModes.indexOf(k.chg)>=0?k.chg:k.chg=='unsupported'?'':rmSw[rmSel.call+' chgled']||'';\n");
+    web_client.println("s.id='rm_chgled';s.setAttribute('data-sel','chgled');l.htmlFor=s.id;l.textContent='Charge LED';o=document.createElement('option');o.value='';o.textContent='unknown';s.appendChild(o);\n"
+                       "for(i=0;i<3;i++){o=document.createElement('option');o.value=rmChgModes[i];o.textContent=rmChgModes[i];s.appendChild(o);}\n"
+                       "s.value=v;s.disabled=!!dis;box.appendChild(l);box.appendChild(s);box.appendChild(rmNew('span','font-small',k.chg=='unsupported'?'not supported by this node':''));}");
     web_client.println("rmTxt('rm_swnote',k.at?'State from the last answer of '+rmSel.call+', '+rmAgo(Math.round((rmNow()-k.at)/1000))+' ago.':'State unknown until the node answers a status request. Press Refresh status.','font-small');\n"
                        "rmSwSet(rmEl('rm_pinsw'),-1,dis,rmSw[rmSel.call+' '+p],1);}");
     web_client.println("function rmChip(box,call,hw,age,sv,stale){var b=rmBtn(box,'','rmchip'+(sv?' rmsaved':'')+(stale?' rmstale':'')+(rmSel.call==call?' rmsel':''),false,{'data-act':'pick','data-call':call}),s=document.createElement('b'),i,L=[hw,age];\n"
@@ -373,12 +382,13 @@ void rmScaffoldJs()
                        "function rmForget(){if(rmSel.slot<0)return;rmNodesPost('act=del&slot='+rmSel.slot,rmSel.call+' is forgotten.');}");
     web_client.println("function rmForgetAll(){if(!rmConfirm('forgetall','Tap Forget all again within 4 seconds to remove every saved node.'))return;rmNodesPost('act=forget','All saved nodes are forgotten.');}");
     web_client.println("function rmQRead(b){var pr=rmPre(),a=b.getAttribute('data-q').split(' '),i;if(rmLocked()||rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}for(i=0;i<a.length;i++)rmClrIn(a[i]);rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value):'';rmQq=a.slice(1);rmSendCmd(a[0],'');}");
-    web_client.println("function rmSwChg(i){var n=i.getAttribute('data-sw'),v=i.checked?'on':'off',cf=v=='off'?(i.getAttribute('data-cf')||''):'',pr=rmPre(),pin=n=='pin',c=pin?'setout':n,a=pin?rmEl('rm_pin').value+' '+v:v;");
+    web_client.println("function rmSwChg(i){var n=i.getAttribute('data-sw'),v=i.checked?'on':'off',cf=v=='off'?(i.getAttribute('data-cf')||''):'',pr=rmPre(),pin=n=='pin',c=pin?'setout':n=='ledflash'?'led':n,a=pin?rmEl('rm_pin').value+' '+v:n=='ledflash'?(i.checked?'flash':'off'):v;");
     web_client.println("if(rmLocked()||pr){if(pr&&!rmLocked())rmMsg(pr,'rmbad');rmRender();return;}\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel(c+' '+a),rmSel.call)))return;\n"
-                       "rmSw[rmSel.call+' '+(pin?rmEl('rm_pin').value:n)]=v;rmSendCmd(c,a);}\n"
-                       "function rmChange(e){var t=e.target;if(t.id=='rm_pin')rmRender();else if(t.getAttribute&&t.getAttribute('data-sw'))rmSwChg(t);}\n"
-                       "function rmClick(e){var b=e.target;while(b&&b.tagName!='BUTTON'){if(b.id=='rm_page')return;b=b.parentNode;}\n"
+                       "rmSw[rmSel.call+' '+(pin?rmEl('rm_pin').value:n)]=v;rmSendCmd(c,a);}\n");
+    web_client.println("function rmSelChg(s){var v=s.value,pr=rmPre();if(!v||rmLocked()||pr){if(pr&&!rmLocked())rmMsg(pr,'rmbad');rmRender();return;}rmSw[rmSel.call+' chgled']=v;rmSendCmd('chgled',v);}\n"
+                       "function rmChange(e){var t=e.target;if(t.id=='rm_pin')rmRender();else if(t.getAttribute&&t.getAttribute('data-sel'))rmSelChg(t);else if(t.getAttribute&&t.getAttribute('data-sw'))rmSwChg(t);}\n");
+    web_client.println("function rmClick(e){var b=e.target;while(b&&b.tagName!='BUTTON'){if(b.id=='rm_page')return;b=b.parentNode;}\n"
                        "if(!b||b.disabled)return;var a=b.getAttribute('data-act');");
     web_client.println("if(b.hasAttribute('data-cmd'))rmTap(b);\n"
                        "else if(a=='pick')rmPick(b.getAttribute('data-call'));else if(a=='mhgo')rmMhStart();");

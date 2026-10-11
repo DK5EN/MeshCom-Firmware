@@ -62,7 +62,8 @@ ALLOWLIST: Dict[str, Any] = {
     "gps": ("on", "off"),
     "track": ("on", "off"),
     "display": ("on", "off"),
-    "led": ("on", "off"),
+    "led": ("on", "off", "flash"),
+    "chgled": ("auto", "on", "off"),
     "gateway": ("on", "off"),
     "mesh": ("on", "off"),
     "txpower": "int",
@@ -320,6 +321,11 @@ _VECTOR_CMDS = [
     ("secret", "DK5EN-90", "DK5EN-14", 1, "reboot", ""),  # src binding vs vector 1
     ("secret", "DK5EN-90", "DK5EN-1", 52, "led", "on"),
     ("secret", "DK5EN-90", "DK5EN-1", 53, "led", "off"),
+    # LED wave W3: led flash and the charge-LED override (AXP boards)
+    ("secret", "DK5EN-90", "DK5EN-1", 80, "led", "flash"),
+    ("secret", "DK5EN-90", "DK5EN-1", 81, "chgled", "auto"),
+    ("secret", "DK5EN-90", "DK5EN-1", 82, "chgled", "on"),
+    ("secret", "DK5EN-90", "DK5EN-1", 83, "chgled", "off"),
     # RM ext W2-A: the nine extended names (read and write forms; mh row and call)
     ("secret", "DK5EN-90", "DK5EN-1", 60, "radio", ""),
     ("secret", "DK5EN-90", "DK5EN-1", 61, "sens", ""),
@@ -365,6 +371,8 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 94, "err end"),
     ("secret", "DK5EN-90", "DK5EN-1", 95, "err gps"),
     ("secret", "DK5EN-90", "DK5EN-1", 96, "err hidden"),
+    ("secret", "DK5EN-90", "DK5EN-1", 97, "ok led=flash"),  # LED wave W3
+    ("secret", "DK5EN-90", "DK5EN-1", 98, "ok chgled=auto"),
 ]
 
 

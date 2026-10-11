@@ -150,7 +150,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(32, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(36, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -235,7 +235,7 @@ static void test_vectors_replies_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(25, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(27, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -476,7 +476,8 @@ static void test_allowlist_accepts_every_command(void)
                           {"display", "on"}, {"display", "off"}, {"gateway", "on"}, {"gateway", "off"},
                           {"mesh", "on"},   {"mesh", "off"},   {"txpower", "0"},   {"txpower", "22"},
                           {"setout", "a0 on"}, {"setout", "b7 off"}, {"setout", "a7 off"}, {"setout", "b0 on"},
-                          {"led", "on"},    {"led", "off"}};
+                          {"led", "on"},    {"led", "off"},
+                          {"led", "flash"}, {"chgled", "auto"}, {"chgled", "on"}, {"chgled", "off"}};
     for (size_t i = 0; i < sizeof(ok) / sizeof(ok[0]); i++)
     {
         RmState s;
@@ -513,7 +514,10 @@ static void test_bad_args_rejected(void)
                            {"setout", "a2 1"}, {"setout", "a2"}, {"setout", "a2  on"}, {"setout", "a on"},
                            {"setout", "a12 on"}, {"setout", "a2 onn"}, {"sync", "x"},
                            {"led", ""},       {"led", "blink"}, {"led", "1"},       {"led", "ON"},
-                           {"led", "on off"}, {"led", " on"}};
+                           {"led", "on off"}, {"led", " on"},
+                           {"led", "auto"},   {"led", "FLASH"}, {"led", "flash "}, {"led", "flash on"},
+                           {"chgled", ""},    {"chgled", "flash"}, {"chgled", "AUTO"}, {"chgled", "auto "},
+                           {"chgled", "on off"}, {"chgled", "1"}};
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
     {
         RmState s;
@@ -1209,7 +1213,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(32, n);
+    TEST_ASSERT_EQUAL_INT(36, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1272,6 +1276,13 @@ static void test_command_allowed_predicate(void)
     TEST_ASSERT_FALSE(rmCommandAllowed("led", "", 0, 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("led", "blink", 0, 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("led", "1", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("led", "flash", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("led", "auto", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "auto", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "on", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "off", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("chgled", "flash", 0, 22));
+    TEST_ASSERT_FALSE(rmCommandAllowed("chgled", "", 0, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 0, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 0, 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 0, 22));
@@ -1299,10 +1310,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 {
     static const char *const kPinned[] = {
         "reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track", "display", "led", "gateway", "mesh",
-        "txpower", "setout", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
+        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
     const size_t n = sizeof(kPinned) / sizeof(kPinned[0]);
-    TEST_ASSERT_EQUAL_UINT(22, n);
-    TEST_ASSERT_EQUAL_UINT(22, RM_COMMAND_COUNT);
+    TEST_ASSERT_EQUAL_UINT(23, n);
+    TEST_ASSERT_EQUAL_UINT(23, RM_COMMAND_COUNT);
 
     // the list itself, name by name and in order, with a sample argument that fits the shape in column 3
     size_t i = 0;
@@ -1312,6 +1323,8 @@ static void test_allowlist_is_the_pinned_command_list(void)
         TEST_ASSERT_TRUE_MESSAGE(i < n, #nm);                                                                    \
         TEST_ASSERT_EQUAL_STRING(kPinned[i], #nm);                                                               \
         const char *good = !strcmp(#shape, "ONOFF")     ? "on"                                                  \
+                           : !strcmp(#shape, "LED")     ? "flash"                                                \
+                           : !strcmp(#shape, "CHGLED")  ? "auto"                                                 \
                            : !strcmp(#shape, "TXPOWER") ? "10"                                                   \
                            : !strcmp(#shape, "SETOUT")  ? "a0 on"                                                \
                            : !strcmp(#shape, "MH")      ? "5"                                                    \
@@ -1328,7 +1341,7 @@ static void test_allowlist_is_the_pinned_command_list(void)
 #undef CHECK_ROW
     TEST_ASSERT_EQUAL_UINT(n, i);
 
-    // by kind: 5 actions, 6 toggles, 2 parametrised, 6 reads, 3 read/write
+    // by kind: 5 actions, 6 toggles, 3 parametrised, 6 reads, 3 read/write
     TEST_ASSERT_EQUAL_UINT(6, rmCountWhere(rmKindIsToggle));
     TEST_ASSERT_EQUAL_UINT(9, rmCountWhere(rmKindIsRead));
     TEST_ASSERT_EQUAL_UINT(3, rmCountWhere(rmKindIsWrite));
@@ -1372,7 +1385,7 @@ static void test_verify_reply_vectors_and_tampering(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 64);
-    TEST_ASSERT_EQUAL_INT(25, n);
+    TEST_ASSERT_EQUAL_INT(27, n);
 
     for (size_t i = 0; i < n; i++)
     {

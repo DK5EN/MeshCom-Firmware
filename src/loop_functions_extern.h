@@ -37,8 +37,28 @@ extern bool bUSER_BOARD_LED;
     #define REMOTE_LED_PIN BOARD_LED
 #endif
 #if defined(REMOTE_LED_PIN)
-extern bool bRemoteLed;           // true while "led on" holds the pin; the BOARD_LED blinker yields
-void remoteLedForceOff(void);     // pin LOW + bRemoteLed=false; call before deep sleep
+// LED-POL: the RM levels follow the board LED polarity (BOARD_LED_ACTIVE_LOW 1 = common anode, LOW is lit),
+// so an active-low shared pad is not inverted by "led on".
+#if defined(BOARD_LED_ACTIVE_LOW) && BOARD_LED_ACTIVE_LOW != 0 && BOARD_LED_ACTIVE_LOW != 1
+    #error "BOARD_LED_ACTIVE_LOW must be 0 or 1"
+#endif
+#if defined(BOARD_LED_ACTIVE_LOW) && BOARD_LED_ACTIVE_LOW
+    #define REMOTE_LED_ON_LEVEL  LOW
+    #define REMOTE_LED_OFF_LEVEL HIGH
+#else
+    #define REMOTE_LED_ON_LEVEL  HIGH
+    #define REMOTE_LED_OFF_LEVEL LOW
+#endif
+static_assert((REMOTE_LED_ON_LEVEL) != (REMOTE_LED_OFF_LEVEL), "REMOTE_LED_ON_LEVEL must differ from OFF_LEVEL");
+
+#define REMOTE_LED_FLASH_ON_MS 30     // RM "led flash": same 30 ms / 2 s pattern as the board flasher
+#define REMOTE_LED_FLASH_PERIOD_MS 2000
+
+extern bool bRemoteLed;           // true while RM holds the pin ("led on" or "led flash"); the BOARD_LED blinker yields
+extern bool bRemoteLedFlash;      // true while the hold is the flash pattern (implies bRemoteLed)
+void remoteLedSet(int mode);      // 0 = release (pin dark), 1 = steady on, 2 = flash pattern
+void remoteLedTick(void);         // main loop: drives the flash pattern while bRemoteLedFlash
+void remoteLedForceOff(void);     // pin off + hold released; call before deep sleep
 #endif
 extern bool bCHARGE_LED;
 
