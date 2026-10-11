@@ -13,7 +13,7 @@ static State st;
 
 void setUp(void)
 {
-    // Default: DHCP lease held, link up, never flapped, no maintain event.
+    // Default: DHCP lease held, link up, no stalled reopen, no maintain event.
     in = Inputs{false, true, true, false, 0};
     st = State{0, false, 0};
 }
@@ -33,7 +33,7 @@ void test_fixed_ip_is_legacy_path(void)
 }
 
 // Core regression: today's firmware does a full DHCP here.
-void test_lease_held_link_up_no_flap_reopens_udp(void)
+void test_lease_held_link_up_reopens_udp(void)
 {
     expect(Action::ReopenUdp);
 }
@@ -50,10 +50,34 @@ void test_link_down_full_dhcp(void)
     expect(Action::FullDhcp);
 }
 
-void test_link_flapped_full_dhcp(void)
+// ETH-04 liveness: a reopen without UDP RX must escalate, not repeat forever.
+void test_reopen_stalled_full_dhcp(void)
 {
-    in.link_flapped = true;
+    in.reopen_stalled = true;
     expect(Action::FullDhcp);
+}
+
+void test_not_stalled_reopens_udp(void)
+{
+    in.reopen_stalled = false;
+    expect(Action::ReopenUdp);
+}
+
+void test_reopen_stalled_streak_link_up_hw_reset(void)
+{
+    in.reopen_stalled = true;
+    st.dhcp_fail_streak = 2;
+    expect(Action::HwResetThenDhcp);
+    st.dhcp_fail_streak = 5;
+    expect(Action::HwResetThenDhcp);
+}
+
+void test_reopen_stalled_link_down_full_dhcp(void)
+{
+    in.reopen_stalled = true;
+    in.link_up = false;
+    st.dhcp_fail_streak = 5;
+    expect(Action::FullDhcp);   // N-20: no hw reset with the link down
 }
 
 void test_maintain_renew_fail_full_dhcp(void)
@@ -182,10 +206,13 @@ int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_fixed_ip_is_legacy_path);
-    RUN_TEST(test_lease_held_link_up_no_flap_reopens_udp);
+    RUN_TEST(test_lease_held_link_up_reopens_udp);
     RUN_TEST(test_no_lease_full_dhcp);
     RUN_TEST(test_link_down_full_dhcp);
-    RUN_TEST(test_link_flapped_full_dhcp);
+    RUN_TEST(test_reopen_stalled_full_dhcp);
+    RUN_TEST(test_not_stalled_reopens_udp);
+    RUN_TEST(test_reopen_stalled_streak_link_up_hw_reset);
+    RUN_TEST(test_reopen_stalled_link_down_full_dhcp);
     RUN_TEST(test_maintain_renew_fail_full_dhcp);
     RUN_TEST(test_maintain_rebind_fail_full_dhcp);
     RUN_TEST(test_maintain_ok_still_reopens_udp);

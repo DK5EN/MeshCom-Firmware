@@ -9,8 +9,14 @@
 // MikroTik, 1 week lease) is then ignored by the W5100S (IP 0.0.0.0) and the
 // node stays offline for hours. See docs/issue-rak-dhcp-after-reboot-db0ais.md.
 //
-// F1 (ReopenUdp): lease held and the link never dropped -> keep the IP, only
-//     reopen the UDP socket. Ethernet.maintain() keeps owning renew/rebind.
+// F1 (ReopenUdp): lease held -> keep the IP, only reopen the UDP socket.
+//     Ethernet.maintain() keeps owning renew/rebind. A link flap does not
+//     invalidate the lease (a DISCOVER right after a flap is the observed
+//     failure). If a reopen got no UDP RX before the next trigger (reopen_stalled)
+//     the lease or the chip is suspect -> escalate to full DHCP, then F2.
+//     A link down edge disarms the stall check: time without link is no
+//     evidence, so a link that keeps flapping keeps reopening (F2 needs link up
+//     anyway).
 // F2 (HwResetThenDhcp): repeated DHCP failures with link up -> one W5100S
 //     hardware reset before the next attempt, rate-limited.
 #ifndef ETH_RECOVERY_H
@@ -30,7 +36,7 @@ struct Inputs {
     bool fixed_ip;          // static IP configured (node_ownip/ownms/owngw set)
     bool link_up;           // Ethernet.linkStatus() == LinkON right now
     bool lease_held;        // last address came from a successful DHCP, not invalidated since
-    bool link_flapped;      // a link down edge was seen since the lease was obtained
+    bool reopen_stalled;    // a previous ReopenUdp got no UDP RX since
     int  last_maintain_rc;  // Ethernet.maintain(): 0 none,1 renew fail,2 renew ok,3 rebind fail,4 rebind ok
 };
 
@@ -50,10 +56,11 @@ inline Action decide(const Inputs& in, const State& st, uint32_t now_ms)
     if (in.fixed_ip)
         return Action::FullDhcp;
 
-    // Rule 2 (F1): a held lease with an uninterrupted link is still valid on the
-    // router, so re-DISCOVERing only loses it. A link flap or a failed
-    // renew/rebind means the lease may be gone -> fall through to DHCP.
-    if (in.lease_held && in.link_up && !in.link_flapped &&
+    // Rule 2 (F1): a held lease is normally still valid on the router, so
+    // re-DISCOVERing only loses it. A failed renew/rebind means the lease may be
+    // gone; a stalled earlier reopen means reopening does not help (wedged chip,
+    // no ARP) -> fall through to DHCP and, after repeated failures, F2.
+    if (in.lease_held && in.link_up && !in.reopen_stalled &&
         in.last_maintain_rc != 1 && in.last_maintain_rc != 3)
         return Action::ReopenUdp;
 
