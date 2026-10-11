@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include <fstream>
+#include <regex>
 #include <sstream>
 #include <string>
 
@@ -1386,6 +1387,35 @@ static void test_safeboot_capability_gates_auto_update()
     TEST_ASSERT_TRUE_MESSAGE(t.substr(once, msg - once).find("ESP.restart") == std::string::npos, "the boot demotion must not reboot");
 }
 
+// CHG-01/02 (W3): the "charge LED configured" marker is node_sset2 bit 0x8000, set by the
+// charge rows' post hooks. Those hooks must run BEFORE save_settings() (TG_POST_FIRST), and no
+// node_sset2 writer may use a 16-bit AND mask, which would clear bit 15 and send a node whose
+// console said "--charge led off" back to auto after the next reboot.
+static void test_charge_led_marker_is_set_before_save_and_never_masked_away(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    for (const char *row : {"\"--charge led on\"", "\"--charge led off\""})
+    {
+        const size_t at = cmd.find(row);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, row);
+        const std::string line = cmd.substr(at, cmd.find('\n', at) - at);
+        TEST_ASSERT_TRUE_MESSAGE(line.find("TG_POST_FIRST") != std::string::npos, "charge row lacks TG_POST_FIRST: the marker would be set after the save");
+        TEST_ASSERT_TRUE_MESSAGE(line.find("&meshcom_settings.node_sset3") != std::string::npos, "charge row no longer writes node_sset3 bit 0x0001");
+    }
+    for (const char *hook : {"static void tg_post_charge_led_on()", "static void tg_post_charge_led_off()"})
+    {
+        const size_t at = cmd.find(hook);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, hook);
+        const std::string body = cmd.substr(at, cmd.find('}', at) - at);
+        TEST_ASSERT_TRUE_MESSAGE(body.find("node_sset2 |= SSET2_CHGLED_CFG") != std::string::npos, "charge hook does not set the sset2 marker");
+    }
+    // a hex AND mask of at most four digits on node_sset2 clears bit 15 (0x7EFF, 0x6FFF were the two)
+    const std::regex narrow("node_sset2[^;\\n]*&[ \\t]*0x[0-9A-Fa-f]{1,4}\\b");
+    std::smatch m;
+    const bool hit = std::regex_search(cmd, m, narrow);
+    TEST_ASSERT_FALSE_MESSAGE(hit, hit ? m.str().c_str() : "");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1427,5 +1457,6 @@ int main(int, char **)
     RUN_TEST(test_old_safeboot_guard_marks_gates_and_reports);
     RUN_TEST(test_safeboot_capability_gates_auto_update);
     RUN_TEST(test_safeboot_nocap_is_version_tagged_and_web_order);
+    RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
     return UNITY_END();
 }

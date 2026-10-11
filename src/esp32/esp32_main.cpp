@@ -32,6 +32,7 @@ SPIClass ethSPI(FSPI);
 #endif
 
 #include "esp32_pmu.h"
+#include "charge_led_mode.h"
 #include "esp32_flash.h"
 #include "fw_update.h"       // AU-05 (#1187): update policy (fwTick and friends)
 #include "fw_update_net.h"   // AU-05: CHECK / DOWNLOAD worker (own task)
@@ -1274,7 +1275,7 @@ void esp32setup()
     bVIA = meshcom_settings.node_sset2 & 0x4000;
 
     // nicht mehr notwendig bMHONLY =  bMHONLY =  meshcom_settings.node_sset3 & 0x0001;
-    bCHARGE_LED = meshcom_settings.node_sset3 & 0x0001;
+    bCHARGE_LED = chargeLedAutoFromSettings(meshcom_settings.node_sset2, meshcom_settings.node_sset3);   // CHG-01/02: sset3 0x0001 counts only with the sset2 0x8000 marker
     bNoMSGtoALL =  meshcom_settings.node_sset3 & 0x0002;
     bBLEDEBUG = meshcom_settings.node_sset3 & 0x0004;
     bAnalogCheck = meshcom_settings.node_sset3 & 0x0008;
