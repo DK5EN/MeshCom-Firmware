@@ -3,10 +3,25 @@ description: Cut and publish a complete MeshCom fork release - docs, gates, tag,
 allowed-tools: [Bash, Read, Edit, Write, Glob, Grep]
 ---
 
-Cut a full stability release of this fork and publish it on GitHub. Both
-GitHub Actions workflows are disabled — a tag push builds and publishes
-nothing; every step below is manual and this procedure is the only publishing
-path.
+Cut a full stability release of this fork and publish it on GitHub.
+
+**Since v4.40a.10.11 (2026-10-11) GitHub CI builds and publishes the release.**
+The `MeshCom CI` workflow is enabled again and fires on tags `v*` (release,
+becomes Latest, exports `MC_BUILD_TAG`) and `ci-proof-*` (draft, never Latest;
+delete draft + tag afterwards). It builds all default envs, writes the 27
+`.autoupdate` twins with `make_autoupdate.py --check` and attaches all 66 assets.
+So Steps 3 (build), 5 (assemble) and 6 (publish) below are done by CI; you still
+do Steps 1-2 (docs, gates), push `fork-dev`, push the tag, then watch the run
+(`gh run watch <id> -R DK5EN/MeshCom-Firmware --exit-status`) and verify the
+release (66 assets, `.autoupdate` count 27, `78 da` headers, re-inflate check on
+the downloaded assets, the tag string in one image). The web flasher (Step 5b)
+needs a local build of the same commit for bootloader/partitions/safeboot, and
+takes the app images from the release:
+`gh release download <tag> -R DK5EN/MeshCom-Firmware -D <dir>`, then
+`uv run tools/pages_flasher.py publish --version <tag> --keep 1 --from-release <dir> [--push]`
+and `uv run tools/pages_flasher.py check --version <tag> --from-release <dir>`.
+The `ci-build.yml` push workflow stays disabled. The manual steps below remain
+the fallback when CI is unavailable.
 
 ## Ground rules learned the hard way
 
