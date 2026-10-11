@@ -4071,14 +4071,8 @@ void tdeck_add_to_pos_view(String callsign, double u_dlat, char lat_c, double u_
     if (bDEBUG)
         Serial.printf("[POSVIEW]...add %s act posrow:%i\n", callsign.c_str(), posrow);
 
-    double dlat = u_dlat;
-    if(lat_c == 'W')
-        dlat = u_dlat * -1.0;
-
-    double dlon = u_dlon;
-    if(lon_c == 'S')
-        dlon = u_dlon * -1.0;
-
+    // The row prints the unsigned value plus its hemisphere letter, so no sign flip here
+    // (the old flip tested the swapped letters and never fired).
     bool bnotfound=true;
 
     snprintf(buf, 10, "%s", callsign.c_str());
@@ -4125,7 +4119,7 @@ void tdeck_add_to_pos_view(String callsign, double u_dlat, char lat_c, double u_
     snprintf(buf, 6, "%02i:%02i", meshcom_settings.node_date_hour, meshcom_settings.node_date_minute);
     lv_table_set_cell_value(position_ta, 1, 1, buf);
 
-    snprintf(buf, 24, "%.2lf%c/%.2lf%c/%i", dlat, lat_c, dlon, lon_c, alt);
+    snprintf(buf, 24, "%.2lf%c/%.2lf%c/%i", u_dlat, lat_c, u_dlon, lon_c, alt);
     lv_table_set_cell_value(position_ta, 1, 2, buf);
 
     if(bnotfound && posrow < MAX_POSROW)
