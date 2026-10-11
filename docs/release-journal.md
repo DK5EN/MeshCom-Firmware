@@ -1,11 +1,88 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261006`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261011`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.11 (Sonntag, 2026-10-11)
+
+Erstes Release, das von GitHub CI gebaut und veroeffentlicht wird: der Workflow `MeshCom CI` ist auf
+dem Fork wieder aktiv und startet auf Tag-Push. 66 Assets = 39 (27 ESP32-Anwendungsbilder inkl.
+`T-ETH-ELITE_1262`, 3 nRF52 als `.uf2` plus DFU-`.zip`, 6 Hilfsdateien) plus 27 `.autoupdate`
+(zlib-Zwillinge fuer Auto Update). Der Web-Flasher liefert die Anwendungsbilder dieses Releases.
+`FLASH_VERSION` 20261011, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben
+erhalten. Safeboot unveraendert gegenueber 10.05/10.06.
+
+Einordnung der Tags: `v4.40a.10.05` und `v4.40a.10.06` existieren als Tags, ihre Release-Objekte sind
+auf GitHub nicht mehr vorhanden (`gh release list` zeigt nur `v4.40a.10.02`; 10.05 und 10.06 waren am
+2026-10-05 veroeffentlicht, laut `docs/RESUME.md`). Dieses Release loest beide ab; `release-notes.md`
+beschreibt das gesamte Delta gegen das offizielle `v4.40a` und listet das Neue seit dem Tag
+`v4.40a.10.06` zuerst. Kanaele von Auto Update: `prod` liest die Releases von icssw-org, `dev`
+(`--updchan dev`) das Latest-Release dieses Forks.
+
+Inhalt seit `v4.40a.10.06` (71 Commits in `src variants platformio.ini`, alle in den Release-Notes
+untergebracht):
+
+- RM erweitert (#1189): neun neue Befehle (radio, name, atxt, pos, sens, mh, txq, mbox, maxhop), Ergebnis
+  108 / Argumente 39 Byte, Antwort-Sanitiser, `p=<cur>/<min>/<max>`, Sender begrenzt `txpower` pro Ziel,
+  gueltiger Tag + gesperrter Befehl wird beantwortet ohne Strike, `sync` mit eigenem 60-s-Limit,
+  RM-PROOF (Budget 2 / 10), RM1 als Send-once-Text mit PN-Leiter bis zur geprueften Antwort, RM-GWRELAY
+  (Befehle ueber den Serverpfad), Zaehler und Sperre pro Rufzeichen-SSID, RM-DUP (zweite Kopie eines
+  Rahmens wird vor der Pruefung verworfen), Kompatibilitaetsschicht entfernt, eine Befehls- und eine
+  Meldungstabelle (Review-Wellen 1-3). RAK-`radio` rechnet die Einheiten um.
+- Web-GUI: Remote-Seite (Knotenkacheln, Schluesselspeicher, drei Slots, Heard-Tabelle, TX-Queue- und
+  Mailbox-Balken, fuenf Karten, Aktionskacheln), Identity- und Position-Karte, TX-Leistung als
+  Zahlenfeld, Anfrage-Wache `MC_WEB_GUARD` (Standard aus, nur RM-Endpunkte an), Status-Token,
+  "Server:"-Zeile auf der Infoseite.
+- LEDs: Lade-LED folgt dem Laden (CHG-01..04, Marker `node_sset2` Bit 0x8000 statt `node_sset3`,
+  `--charge led on|off`, BLE-Export `CHGLED`, Init auch auf AXP2101), Board-LED-Blinken, Polaritaet
+  per Makro, RM `led on|off|flash` und `chgled auto|on|off`, Web-Schalter, Heltec V4 mit Fern-LED
+  (GPIO35, gebaut, ungetestet). `--gateway pos` und `--netconsole off` loeschen Bit 15 nicht mehr.
+- Upstream-Uebernahme: elf Cherry-Picks (#1193 RadioLib-Flags, #1195 LED-Makro, #1196 Lade-LED,
+  #1202 Board-LED-Blinken samt Folge-Commits); #1200/#1201 (Temperatur-Offset) waren schon im Fork.
+  Tote Hemisphaeren-Umkehr in `tdeck_add_to_pos_view` entfernt.
+- Sensoren/Eingaben: Temperatur-Offsets fuer AHT20, SHT21, BME680; Web-Offset akzeptiert fuehrende
+  Null und Dezimalkomma; `--bme|--bmp|--bmx off` loescht nur das BMP390-Bit in `node_sset3`.
+- HEY-Echo-Upload (eigene HEY-Echos, wie empfangen, ohne eigenen Rapport); S&F speichert keine DMs
+  von/an Dienstrufzeichen und erkennt die `WLNK-1`-Quittung.
+- ETH-04 (RAK4631, DB0AIS): Lease bleibt bei der Wiederherstellung, W5100S-Reset nach zwei
+  DHCP-Fehlern mit Link, RNG aus dem SoftDevice, Entscheidungslogik mit nativen Tests.
+- Auto Update: Asset heisst `<Board>.autoupdate` statt `.bin.zz`; versioniertes Safeboot sperrt Auto
+  Update, solange es zu alt ist (AU-12); Safeboot meldet den echten `Update.end()`-Fehler, prueft die
+  App nach dem Upload erneut, `/ota/state` mit Heap-Werten; AU-D13: Heap-Gate vor TLS auf dem
+  klassischen ESP32 (76 KB Gesamt-Frei), Telefon an BLE gibt sauber `lowheap` statt -9984/-10368 mit
+  Heap bis 268 B.
+- Bauen: `-Os` auf t_echo und heltec_t114, nRF52-Linkschritt im Gate.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Host: 2371 Testfaelle in 71 nativen Umgebungen gruen, Golden-Selftest, pytest- und
+  Tool-Suiten.
+- DK5EN-92 (T-Beam v1.2, klassisch, AXP192): Lade-LED folgt dem Laden nach dem Update, `--charge led
+off|on` mit Neustarts, RM `chgled on|off|auto` von DK5EN-1 (`chgled on` danach Neustart: Override
+  weg), `led` antwortet `err unsupported`; Auto-Update-CHECK mit und ohne Telefon an BLE (mit Telefon:
+  `lowheap`-Ablehnung, Minimum 58 KB; ohne: CHECK ok).
+- DK5EN-1 (Heltec V3): RM `led on`, `led flash`, `led off` (dauerhaft, kurzes Blitzen alle 2 s,
+  dunkel), `chgled` antwortet `err unsupported`.
+- Frueher gebencht, Codepfade unveraendert: RM-Erweiterung und Gateway-Pfad (06./07.10.), Features von
+  10.05/10.06.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Download ueber TLS per Auto Update auf dem klassischen ESP32 (wird direkt nach der
+  Veroeffentlichung auf DK5EN-92 und DK5EN-1 geprueft; bis dahin offen).
+- Heltec V4 Fern-LED (gebaut, ungetestet); andere `BOARD_LED`-Boards nur gebaut.
+- RM: Sync-Limiter und RM-DUP nicht auf Hardware; RM-GWRELAY nur gegen einen Mock-Server; ein spaetes
+  Echo kann nach "No answer" (171 s) noch ausgefuehrt werden; Gateways laden RM1-Befehle zum
+  oeffentlichen Server hoch; T-Echo und T114 als RM-Ziel ungetestet.
+- ETH-04 im Feld (DB0AIS); `always-broadcast=yes` offen. Auf der Bank nicht erneut gelaufen.
+- MTU im AP-Pfad, im klassischen Safeboot und auf T-ETH (akzeptiert).
+- Alle uebrigen Boards sind gebaut, nicht gebencht; `t5_epaper` ist nicht im Release.
 
 ---
 
