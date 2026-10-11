@@ -7223,6 +7223,7 @@ void sendNodeSetting()
     nsetdoc["NOALL"] = bNoMSGtoALL;
     nsetdoc["NOPMOTHER"] = (bool)(meshcom_settings.node_sset3 & 0x8000);
     nsetdoc["BLED"] = bUSER_BOARD_LED;
+    nsetdoc["CHGLED"] = bCHARGE_LED;   // CHG-04: true = follows charging, false = dark
     nsetdoc["GWS"] = meshcom_settings.node_gwsrv;
 
     sendBleJsonRegister(nsetdoc); // JSN-01
