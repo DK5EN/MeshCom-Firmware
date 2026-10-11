@@ -1,7 +1,8 @@
 # RAK4631 + W5100S: no DHCP lease after `--reboot` or a runtime IP loss (DB0AIS, MikroTik)
 
-- **Status:** open, root cause not isolated; the 2026-10-06 evidence favours H1 (router side).
-  Waiting for `/ip dhcp-server print detail` from the operator. Backlog row `ETH-04`.
+- **Status:** open. Router config received 2026-10-09: `lease-time=1w`, `always-broadcast=no`
+  (H1 precondition holds). `always-broadcast=yes` set as a test on 2026-10-09 19:02, result
+  pending. Backlog row `ETH-04`.
 - **Firmware:** V4.40a
 - **Hardware:** RAK4631 + RAK13800 (W5100S), DHCP from a MikroTik router
 - **Reported:** 2026-10-05 by the DB0AIS operator; second occurrence 2026-10-06 (runtime, no reboot)
@@ -215,6 +216,57 @@ change is also a link flap, so that case may have been this bug as well.
 Order: F1 + F2 together once the router answer (question 1) is in. If `always-broadcast=yes`
 removes the symptom, F1 is still worth doing because it removes the needless lease loss. F2 then
 becomes a safety net instead of the primary fix.
+
+## Update 2026-10-09: router configuration, `always-broadcast` test running
+
+The operator sent `/ip dhcp-server print detail` (chat 2026-10-09, 18:54):
+
+```
+name="DB0AIS Service" interface=Bridge_44_Service lease-time=1w
+  address-pool=Service DHCP Pool authoritative=yes use-radius=no lease-script=""
+```
+
+`always-broadcast` is not printed because it holds the default `no` (operator's confirmation,
+18:56). At 19:02 the operator set `always-broadcast=yes` and is watching for a recurrence.
+
+### What the answer settles
+
+1. **The H1 precondition holds.** With `always-broadcast=no` the server is free to unicast the
+   OFFER to the client's known IP. The W5100S then drops it, because its SIPR is 0.0.0.0 while
+   `Ethernet.begin()` runs, even though the client sets `DHCP_FLAGSBROADCAST` (`Dhcp.cpp:145`).
+   Many embedded DHCP clients need `always-broadcast=yes` on RouterOS for the same reason.
+2. **The lease was valid when the node threw it away.** `lease-time=1w`: on 2026-10-05 the node
+   had held 44.149.189.136 for well under a week, and on 2026-10-06 it had re-acquired it only
+   about 18 h earlier (`got_ip_n;2`). Every failure therefore starts from a lease the router still
+   considers bound. This makes F1 (renew instead of DISCOVER) the primary fix, not a refinement.
+3. **The 12.5 h self-repair is not lease expiry.** A one-week lease cannot age out in 12.5 h. What
+   the server keys "IP known" on and why it flipped at 17:48 stays unexplained (an ARP entry, the
+   `deassigned` event from 11:02:21 on 2026-10-05, or the bound lease being released by some other
+   path). This does not change the fix plan.
+
+### Reading the test
+
+The symptom showed on 2026-10-05 (after a reboot) and from 2026-10-06 05:10 (runtime). Two quiet
+days with `always-broadcast=yes` are weak evidence on their own. The operator can provoke it:
+before the change a `--reboot` failed often enough to need two or three tries.
+
+| Result with `always-broadcast=yes`                                      | Verdict                                                  |
+| ----------------------------------------------------------------------- | -------------------------------------------------------- |
+| 5 to 10 `--reboot` in a row, each gets a lease within one DISCOVER      | H1 confirmed (unicast OFFER). Router workaround in place |
+| Optional A/B: back to `no`, the failure reproduces within a few reboots | H1 proven beyond doubt                                   |
+| Failure still occurs                                                    | H1 refuted; H2 (chip) or OFFER parsing. Sniffer needed   |
+
+Even with H1 confirmed, the firmware fix stays necessary: other gateway operators run RouterOS
+with the default `always-broadcast=no`, and the node should not discard a valid lease.
+
+### Fix plan after the answer
+
+- **F1, primary:** on a `MAX_ERR_UDP_TX` run or a link flap with the lease still inside its
+  lifetime, keep the IP in the chip, re-open the UDP socket and renew through
+  `Ethernet.maintain()` (REQUEST to the bound IP). DISCOVER only after expiry or a NAK.
+- **F2, safety net:** after 2 DHCP failures with link up, one `initETH_HW()` before the next
+  `startETH()`.
+- **F3:** seed the RNG from the nRF52 hardware RNG.
 
 ## Code references
 
