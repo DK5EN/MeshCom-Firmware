@@ -323,6 +323,98 @@ def test_check_compares_the_dfu_package_by_sha(tmp_path, monkeypatch, capsys):
 
 
 # --------------------------------------------------------------------------
+# --from-release
+# --------------------------------------------------------------------------
+
+
+def fake_release(tmp_path: Path, assets: dict) -> Path:
+    d = tmp_path / "release"
+    d.mkdir()
+    for name, data in assets.items():
+        (d / name).write_bytes(data)
+    return d
+
+
+def test_release_app_comes_from_release_support_from_build(cfg, tmp_path):
+    build = fake_build(tmp_path, ["t_deck"])
+    rel = fake_release(tmp_path, {"t_deck.bin": b"\xe9CI-app"})
+    out = tmp_path / "out"
+    pf.stage_board(cfg, "t_deck", "v1", out, REPO, build, rel)
+    assert (out / "firmware.bin").read_bytes() == b"\xe9CI-app"
+    assert (out / "bootloader.bin").read_bytes() == b"t_deck/bootloader.bin"
+    assert (out / "partitions.bin").read_bytes() == b"t_deck/partitions.bin"
+
+
+@pytest.mark.parametrize(
+    "env,asset",
+    [("LilyGo_T-Beam-1W", "T-Beam-1W.bin"), ("LilyGo_T3_S3_V1_3", "T3_S3_V13.bin"),
+     ("LilyGo_T_Connect_Pro", "t_connect_pro.bin")],
+)
+def test_release_rename_map(cfg, tmp_path, env, asset):
+    build = fake_build(tmp_path, [env])
+    rel = fake_release(tmp_path, {asset: b"\xe9" + asset.encode()})
+    out = tmp_path / "out"
+    pf.stage_board(cfg, env, "v1", out, REPO, build, rel)
+    assert (out / "firmware.bin").read_bytes() == b"\xe9" + asset.encode()
+
+
+def test_release_missing_asset_refused(cfg, tmp_path):
+    build = fake_build(tmp_path, ["t_deck"])
+    rel = fake_release(tmp_path, {"other.bin": b"\xe9"})
+    with pytest.raises(SystemExit, match="release asset .* missing"):
+        pf.stage_board(cfg, "t_deck", "v1", tmp_path / "out", REPO, build, rel)
+
+
+def test_release_non_esp_image_refused(cfg, tmp_path):
+    build = fake_build(tmp_path, ["t_deck"])
+    rel = fake_release(tmp_path, {"t_deck.bin": b"\x00not-esp"})
+    with pytest.raises(SystemExit, match="0xE9"):
+        pf.stage_board(cfg, "t_deck", "v1", tmp_path / "out", REPO, build, rel)
+
+
+def test_release_nrf52_takes_uf2_and_zip_from_release(cfg, tmp_path):
+    env = "wiscore_rak4631"
+    build = fake_build(tmp_path, [env])  # no hex/zip locally
+    rel = fake_release(tmp_path, {f"{env}.uf2": b"UF2-ci", f"{env}.zip": b"PK-ci"})
+    out = tmp_path / "out"
+    pf.stage_board(cfg, env, "v1", out, REPO, build, rel)
+    assert (out / "firmware.uf2").read_bytes() == b"UF2-ci"
+    assert (out / "firmware.zip").read_bytes() == b"PK-ci"
+    (rel / f"{env}.zip").unlink()
+    with pytest.raises(SystemExit, match="missing"):
+        pf.stage_board(cfg, env, "v1", tmp_path / "out2", REPO, build, rel)
+
+
+def test_check_from_release_compares_against_release_bytes(tmp_path, monkeypatch, capsys):
+    env = "t_deck"
+    build = fake_build(tmp_path, [env])  # local firmware.bin differs on purpose
+    rel = fake_release(tmp_path, {f"{env}.bin": b"\xe9CI-app"})
+    served = {
+        "releases.json": json.dumps({"releases": [{"version": "v1", "boards": [{"env": env}]}]}),
+        f"v1/{env}/manifest.json": json.dumps(
+            {"builds": [{"chipFamily": "ESP32-S3",
+                         "parts": [{"path": "bootloader.bin"}, {"path": "firmware.bin"}]}]}
+        ),
+        f"v1/{env}/bootloader.bin": f"{env}/bootloader.bin".encode(),
+        f"v1/{env}/firmware.bin": b"\xe9CI-app",
+    }
+    monkeypatch.setattr(pf, "REPO", tmp_path)
+    (tmp_path / ".pio").mkdir()
+    build.rename(tmp_path / ".pio" / "build")
+    monkeypatch.setattr(pf, "load_config", lambda repo: None)
+    monkeypatch.setattr(pf, "_get", lambda url: served[url.removeprefix("http://x/")])
+    monkeypatch.setattr(pf, "esp_parts", lambda cfg, e, f, r, b: [
+        (0, b / e / "bootloader.bin", "bootloader.bin"),
+        (0xC0000, b / e / "firmware.bin", "firmware.bin")])
+    args = pf.argparse.Namespace(base_url="http://x", version="v1", from_release=str(rel))
+    assert pf.cmd_check(args) == 0
+
+    served[f"v1/{env}/firmware.bin"] = f"{env}/firmware.bin".encode()  # local-build bytes
+    assert pf.cmd_check(args) == 1
+    assert f"FAIL {env}/firmware.bin sha mismatch" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
 # releases.json and pruning
 # --------------------------------------------------------------------------
 

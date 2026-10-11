@@ -372,6 +372,37 @@ def esp_parts(cfg, env: str, family: str, repo: Path, build_dir: Path):
 
 
 # --------------------------------------------------------------------------
+# release assets (--from-release)
+# --------------------------------------------------------------------------
+
+# CI renames a few assets (.github/workflows/meshcom-ci.yml, "mv" step). Every
+# other env ships as <env>.<ext>. Single source for the flasher.
+RELEASE_ASSET_NAME = {
+    "LilyGo_T-Beam-1W": "T-Beam-1W",
+    "LilyGo_T3_S3_V1_3": "T3_S3_V13",
+    "LilyGo_T_Connect_Pro": "t_connect_pro",
+}
+
+
+def release_asset(release_dir: Path, env: str, ext: str) -> Path:
+    """The CI release asset of one board; refuses when it is missing."""
+    p = release_dir / f"{RELEASE_ASSET_NAME.get(env, env)}.{ext}"
+    if not p.is_file():
+        raise SystemExit(f"{env}: release asset {p} missing -- never ship a partial board")
+    return p
+
+
+def release_app_image(release_dir: Path, env: str) -> Path:
+    """The ESP32 app image of the release; must be an ESP image (magic 0xE9)."""
+    p = release_asset(release_dir, env, "bin")
+    with p.open("rb") as f:
+        first = f.read(1)
+    if first != b"\xe9":
+        raise SystemExit(f"{env}: release asset {p} is not an ESP32 app image (byte 0 != 0xE9)")
+    return p
+
+
+# --------------------------------------------------------------------------
 # staging
 # --------------------------------------------------------------------------
 
@@ -390,14 +421,30 @@ def uf2_from_hex(hex_path: Path, out: Path) -> None:
     )
 
 
-def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: Path) -> dict:
-    """Write one board folder. Returns its releases.json entry."""
+def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: Path,
+                release_dir: Path | None = None) -> dict:
+    """Write one board folder. Returns its releases.json entry.
+
+    With release_dir the app image (ESP32 firmware.bin, nRF52 uf2 and zip)
+    comes from the CI release assets; everything else from the local build.
+    """
     family = chip_family(cfg, env, repo)
     radio = CHIP_LABEL[radio_chip(env, family, repo)]
     group, name = DISPLAY[env]
     dest.mkdir(parents=True, exist_ok=True)
 
-    if family == "NRF52":
+    if family == "NRF52" and release_dir is not None:
+        uf2 = release_asset(release_dir, env, "uf2")
+        pkg = release_asset(release_dir, env, "zip")
+        shutil.copy2(uf2, dest / "firmware.uf2")
+        shutil.copy2(pkg, dest / "firmware.zip")
+        builds = [
+            {
+                "chipFamily": "NRF52",
+                "parts": [{"path": "firmware.uf2"}, {"path": "firmware.zip"}],
+            }
+        ]
+    elif family == "NRF52":
         hexf = build_dir / env / "firmware.hex"
         if not hexf.is_file():
             raise SystemExit(f"{env}: {hexf} missing -- build it, never ship a partial board")
@@ -417,6 +464,8 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
     else:
         parts = []
         for offset, src, name_out in esp_parts(cfg, env, family, repo, build_dir):
+            if release_dir is not None and name_out == "firmware.bin":
+                src = release_app_image(release_dir, env)
             if not src.is_file():
                 raise SystemExit(f"{env}: {src} missing -- build it, never ship a partial board")
             shutil.copy2(src, dest / name_out)
@@ -440,13 +489,15 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
     }
 
 
-def stage(version: str, out: Path, repo: Path = REPO, envs=None) -> list[dict]:
+def stage(version: str, out: Path, repo: Path = REPO, envs=None,
+          release_dir: Path | None = None) -> list[dict]:
     build_dir = repo / ".pio" / "build"
     envs = envs or RELEASE_ENVS
     cfg = load_config(repo)
     boards = []
     for env in envs:
-        boards.append(stage_board(cfg, env, version, out / version / env, repo, build_dir))
+        boards.append(stage_board(cfg, env, version, out / version / env, repo, build_dir,
+                                  release_dir))
     return boards
 
 
@@ -491,10 +542,20 @@ def du(path: Path) -> str:
 # --------------------------------------------------------------------------
 
 
+def _release_dir(args) -> Path | None:
+    d = getattr(args, "from_release", None)
+    if not d:
+        return None
+    p = Path(d).resolve()
+    if not p.is_dir():
+        raise SystemExit(f"--from-release {p} is not a directory")
+    return p
+
+
 def cmd_stage(args) -> int:
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    boards = stage(args.version, out, REPO, args.envs)
+    boards = stage(args.version, out, REPO, args.envs, _release_dir(args))
     copy_page(out)
     write_detect(out)
     info = update_releases(out, args.version, boards, args.keep, args.date)
@@ -518,7 +579,7 @@ def cmd_publish(args) -> int:
             target = root / args.version
             if target.exists():
                 shutil.rmtree(target)
-            boards = stage(args.version, root, REPO, args.envs)
+            boards = stage(args.version, root, REPO, args.envs, _release_dir(args))
             copy_page(root)
             write_detect(root)
             info = update_releases(root, args.version, boards, args.keep, args.date)
@@ -582,6 +643,7 @@ def cmd_check(args) -> int:
     base = args.base_url.rstrip("/")
     build_dir = REPO / ".pio" / "build"
     cfg = load_config(REPO)
+    release_dir = _release_dir(args)
     bad = 0
     releases = json.loads(_get(f"{base}/releases.json"))["releases"]
     rel = next((x for x in releases if x["version"] == args.version), None)
@@ -597,10 +659,18 @@ def cmd_check(args) -> int:
             if part["path"] == "firmware.uf2":
                 with tempfile.TemporaryDirectory() as t:
                     local_p = Path(t) / "firmware.uf2"
-                    uf2_from_hex(build_dir / env / "firmware.hex", local_p)
-                    local = local_p.read_bytes()
+                    if release_dir is not None:
+                        local = release_asset(release_dir, env, "uf2").read_bytes()
+                    else:
+                        uf2_from_hex(build_dir / env / "firmware.hex", local_p)
+                        local = local_p.read_bytes()
             elif part["path"] == "firmware.zip":
-                local = (build_dir / env / "firmware.zip").read_bytes()
+                if release_dir is not None:
+                    local = release_asset(release_dir, env, "zip").read_bytes()
+                else:
+                    local = (build_dir / env / "firmware.zip").read_bytes()
+            elif release_dir is not None and part["path"] == "firmware.bin":
+                local = release_app_image(release_dir, env).read_bytes()
             else:
                 fam = manifest["builds"][0]["chipFamily"]
                 srcs = {n: s for _, s, n in esp_parts(cfg, env, fam, REPO, build_dir)}
@@ -620,6 +690,10 @@ def main(argv=None) -> int:
     common.add_argument("--envs", nargs="*", default=None)
     common.add_argument("--date", type=lambda v: _dt.date.fromisoformat(v).isoformat(),
                         default=None, help="release date shown in the flasher (YYYY-MM-DD, default today)")
+
+    common.add_argument("--from-release", metavar="DIR", default=None,
+                        help="directory of downloaded CI release assets; app images come "
+                        "from there, bootloader/partitions/otadata/safeboot from the local build")
 
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
