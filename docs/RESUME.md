@@ -14,6 +14,9 @@ workflow (tags `v*` publish as Latest, `ci-proof-*` as draft); 66 assets (39 + 2
 **Verified after publishing:** DK5EN-92 (T-Beam classic) and DK5EN-1 (Heltec V3) installed the release through Auto
 Update on the dev channel (both nodes now `--updchan dev`, DK5EN-1 in mode `auto`). Classic download heap minimum
 13,952 B: only ~2.4 KB margin under the 76 KB gate -- watch for `lowheap` refusals on busier classic nodes.
+DK5EN-98 (production gateway) OTA'd to the release app with `tools/webflash.py` (back on the server); its
+Safeboot is still the old one, so AU stays locked there until one USB flash with the web flasher.
+DK5EN-90 (RAK4631) flashed over USB DFU with the release `wiscore_rak4631.zip`; identity guard ok.
 
 **Accepted by the operator 2026-10-11:** SNF-GW/STOR (#1188), NMTU leftovers (#1190), BLC B1 carry-over (#1191).
 **Still open:** RM items (sync limiter/RM-DUP on hardware, late echo after "No answer", RM1 uploads to the public
