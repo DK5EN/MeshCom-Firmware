@@ -70,6 +70,16 @@ TEST_GROUP = "TEST"
 # --------------------------------------------------------------------------
 
 
+def default_log_path(prefix: str) -> Path:
+    """Raw device log of one harness run: tools/bench/runs/harness/<prefix>_run_<ts>.log.
+
+    Anchored to this file, not the working directory, so runs never litter the repo root.
+    """
+    d = Path(__file__).resolve().parent / "runs" / "harness"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{prefix}_run_{time.strftime('%Y%m%d-%H%M%S')}.log"
+
+
 class TDeckSession:
     """One held-open serial session against the T-Deck Plus.
 
@@ -98,9 +108,7 @@ class TDeckSession:
         self.probe_cmd = "--uistat"
         self.probe_pattern = r"\[UISTAT\]"
         self.wake_cmd: Optional[str] = "--tft on"
-        self.log_path = log_path or Path(
-            f"tdeck_run_{time.strftime('%Y%m%d-%H%M%S')}.log"
-        )
+        self.log_path = log_path or default_log_path("tdeck")
         self.lines: List[Tuple[float, float, str]] = []
         self._lock = threading.Lock()
         self._log_lock = threading.Lock()
@@ -3243,8 +3251,8 @@ examples:
 Opening the serial port reboots the T-Deck; every run starts with a fresh
 boot, waits for CLIENT STARTED, then for [BOOT];ready (the network phase
 settled), switches the panel on and only then runs the scenarios. The raw
-device log of the run lands in tdeck_run_<timestamp>.log in the current
-directory (use tools/bench/runs/); the machine-readable verdicts in --out.
+device log of the run lands in tools/bench/runs/harness/tdeck_run_<timestamp>.log;
+the machine-readable verdicts in --out.
 """
 
 

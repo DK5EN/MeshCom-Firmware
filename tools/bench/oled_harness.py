@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tdeck_harness import TDeckSession  # noqa: E402
+from tdeck_harness import TDeckSession, default_log_path  # noqa: E402
 
 DEFAULT_PORT = "/dev/cu.usbserial-0001"      # Heltec V3 DK5EN-93
 CRASH = r"Guru Meditation|rst:0x|Backtrace:|abort\(\)|assert failed"
@@ -47,7 +47,7 @@ BURST_TRIES = 3
 class OledSession(TDeckSession):
     def __init__(self, port: str, boot_timeout: float, ready_timeout: float) -> None:
         super().__init__(port=port, boot_timeout=boot_timeout, ready_timeout=ready_timeout,
-                         log_path=Path(f"oled_run_{time.strftime('%Y%m%d-%H%M%S')}.log"))
+                         log_path=default_log_path("oled"))
         self.probe_cmd = "--oledstat"
         self.probe_pattern = r"\[OLEDSTAT\]"
         self.wake_cmd = None

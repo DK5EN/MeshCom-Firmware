@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extudp_peer as ep  # noqa: E402  (host end of the EXTUDP link, TM-43)
 from identity_guard import IdentityError, require  # noqa: E402
+from tdeck_harness import default_log_path  # noqa: E402  (tools/bench/runs/harness/)
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"   # DK5EN-90
 BAUD = 115200
@@ -82,7 +83,7 @@ class RakSession:
         self.ser: Optional[Any] = None
         self.lines: List[Tuple[float, str]] = []      # (host monotonic, line)
         self._partial = ""
-        self.log_path = log_path or Path(f"rak_run_{time.strftime('%Y%m%d-%H%M%S')}.log")
+        self.log_path = log_path or default_log_path("rak")
         self._logf = open(self.log_path, "a", buffering=1, encoding="utf-8")
 
     def open(self, wait_for_node: float = 20.0) -> None:
