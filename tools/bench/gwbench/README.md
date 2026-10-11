@@ -30,14 +30,17 @@ python3 tools/bench/gwbench/gwrun.py --phases guard,repeat --rak-host 192.168.68
 python3 tools/bench/gwbench/gwanalyze.py tools/bench/runs/gwbench_<timestamp>
 ```
 
-- (a) lost command: `--airgap on` at DK5EN-90, `status` from DK5EN-1, `--airgap off` at DK5EN-90 once copy 1
-  has left the sender (its `TX-LoRa` line; if none shows up within 10 s, 10 s after `/rmsend`
-  returned ok). Expected: copy 2 (about 42 s) executes (one `[RM];ok`), the reply verifies, no copy
+- (a) lost command: `--airgap on` at DK5EN-90, `status` from DK5EN-1, `--airgap off` at DK5EN-90 34 s
+  after copy 1 has left the sender (its `TX-LoRa` line; if none shows up within 20 s, 20 s after
+  `/rmsend` returned ok). Expected: copy 2 (about 42 s) executes (one `[RM];ok`), the reply verifies, no copy
   after the stop.
-- (b) lost reply: `status`, `--airgap on` at DK5EN-1 right after copy 1 left, `--airgap off` at +25 s.
+- (b) lost reply: `status`, `--airgap on` at DK5EN-1 right after copy 1 left, `--airgap off` 40 s after copy 1 (a copy 2 that falls into the gap is dropped; copy 3 then meets the cache).
   Expected: the target executed once, copy 2 is answered from its cache (`[RM];cached`, no second
   `[RM];ok`), verified. If the reply beat the airgap the event says `reply_beat_airgap` and the
   analyzer FAILs on the missing `[RM];cached`: rerun.
+- Why +34 s: neighbour nodes (DK5EN-92, -14, -98 on 2026-10-11) re-radiate copy 1 and the reply for
+  up to ~24 s, and TX backlog can hold copy 1 back by 9 s. With an earlier airgap end a relay delivers the frame and copy 2 is never needed (the
+  analyzer then FAILs "expected >= 1 repeat").
 - Takes about 6 minutes. Nothing is written to the nodes and no TX power is changed.
 
 `gwanalyze.py` exits 1 and prints `FAIL ...` lines on: second execution at the target, strike

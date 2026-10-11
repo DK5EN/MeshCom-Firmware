@@ -37,8 +37,12 @@ DEFAULT_PHASES = "guard,setup,rm,neg,plain"
 LORA_ONLY_PHASES = "guard,rm,neg,plain"
 RM_WAIT = 200          # s: "No answer" comes after the whole repeat ladder (~170 s)
 LADDER_END = 140       # s after /rmsend: copy 4 would be out by ~126 s; observe past it
-REPLY_GAP_OFF = 25     # s after /rmsend: airgap off at the sender (copy 2 is due at ~42 s)
-COPY1_WAIT = 10        # s after /rmsend ok when no TX-LoRa marker shows up
+GAP_OFF = 34           # s after copy 1 left the sender: airgap off (copy 2 is due ~42 s after copy 1). Neighbour relays
+                       # re-radiate copy 1 and the reply for up to ~24 s (bench 2026-10-11: DK5EN-92/-14/-98); an earlier
+                       # end lets a relay deliver them and copy 2 is never needed
+REPLY_GAP_OFF = 40     # s after copy 1, lost reply: relays of relays carried the reply to +35 s after copy 1; a copy 2 that
+                       # falls into the gap is dropped and copy 3 (~84 s) meets the cache instead
+COPY1_WAIT = 20        # s after /rmsend ok when no TX-LoRa marker shows up (TX backlog delayed copy 1 by 9 s)
 MOCK_IP = ""
 
 
@@ -370,14 +374,14 @@ class Run:
 
     def wait_copy1(self, src: Node, dst: Node, p: int, t0: float) -> Tuple[Optional[int], str]:
         """Return (ctr, marker) once copy 1 has left the sender. Marker `TX-LoRa` = the sender's own TX line (needs --setinfo on);
-        fallback `wait10s` = COPY1_WAIT seconds after /rmsend returned ok (no reliable marker seen)."""
+        fallback `waitNs` = COPY1_WAIT seconds after /rmsend returned ok (no reliable marker seen)."""
         if not src.wait(r"\[RM\];send;%s;ctr;\d+" % re.escape(dst.call), p, 15):
             return None, "no [RM];send"
         ctr = int(re.findall(r"\[RM\];send;%s;ctr;(\d+)" % re.escape(dst.call), src.text(p))[-1])
         if src.wait(r"TX-Lo[Rr]a[^\n]*RM1 %d " % ctr, p, COPY1_WAIT):
             return ctr, "TX-LoRa"
         self.nap_until(t0 + COPY1_WAIT)
-        return ctr, "wait10s"
+        return ctr, "wait%ds" % COPY1_WAIT
 
     def p_repeat(self) -> None:
         """RM1 repeat ladder (txpower-clamp plan, wave 3). LoRa only, `status` DK5EN-1 > DK5EN-90, nothing written, no TX power change.
@@ -396,6 +400,7 @@ class Run:
         if ref is not None:
             raise Abort("repeat a: /rmsend refused: %s" % ref["reply"])
         ctr, marker = self.wait_copy1(src, dst, p1, t0)
+        self.nap_until(time.time() + GAP_OFF)
         self.airgap(dst, "off") or self.fail_airgap(dst)
         t_off = time.time() - t0
         r = self.rm_wait(src, dst, "status", "", t0)
@@ -408,9 +413,10 @@ class Run:
         if ref is not None:
             raise Abort("repeat b: /rmsend refused: %s" % ref["reply"])
         ctr, marker = self.wait_copy1(src, dst, p1, t0)
+        t1 = time.time()
         self.airgap(src, "on") or self.fail_airgap(src)
         raced = ctr is not None and re.search(r"\[RM\];reply;%s;ctr;%d;verified;1" % (re.escape(dst.call), ctr), src.text(p1)) is not None
-        self.nap_until(t0 + REPLY_GAP_OFF)
+        self.nap_until(t1 + REPLY_GAP_OFF)
         self.airgap(src, "off") or self.fail_airgap(src)
         r = self.rm_wait(src, dst, "status", "", t0)
         self.nap_until(t0 + LADDER_END)
@@ -556,8 +562,8 @@ def print_plan(a: argparse.Namespace) -> None:
         print("  probe `--airgap` on both nodes; both must answer [AIRGAP];off")
         print("  a lost command : --airgap on at DK5EN-90; /rmsend status; wait for copy 1 on air (sender TX-LoRa line, else %d s after /rmsend);"
               % COPY1_WAIT)
-        print("                   --airgap off at DK5EN-90; expect copy 2 (~42 s) executes ([RM];ok once), reply verified, no copy after the stop; observe to %d s" % LADDER_END)
-        print("  b lost reply   : /rmsend status; wait for copy 1 on air; --airgap on at DK5EN-1; --airgap off at DK5EN-1 at +%d s;" % REPLY_GAP_OFF)
+        print("                   --airgap off at DK5EN-90 %d s after copy 1; expect copy 2 (~42 s) executes ([RM];ok once), reply verified, no copy after the stop; observe to %d s" % (GAP_OFF, LADDER_END))
+        print("  b lost reply   : /rmsend status; wait for copy 1 on air; --airgap on at DK5EN-1; --airgap off at DK5EN-1 %d s after copy 1;" % REPLY_GAP_OFF)
         print("                   expect copy 2 answered from the cache ([RM];cached, no second [RM];ok) and verified; observe to %d s" % LADDER_END)
         print("  teardown       : --airgap off on both nodes, wait for [AIRGAP];off (always), then --setretx off / --setinfo off")
         print("  analysis       : gwanalyze.py <run dir> (FAIL lines and exit 1 on second execution, strike, second verified row, stray repeat)")
