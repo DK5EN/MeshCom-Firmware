@@ -178,4 +178,5 @@ set by DK5EN-98 when it relayed) and none of them appears in the INTERLINK feed,
 uploads do. Inferred: the hub ignores `DATA` frames with the `msg_server` bit. Effect: the edge from
 our gateway to a neighbour that is itself a server gateway does not come from the echo; that
 neighbour's own direct upload (`"path":"DK5EN-1","rssi":"9,65,6;"`) names no receiver. Not changed
-in firmware; a hub-side question.
+in firmware; a hub-side question. Follow-up, deferred: `DEF-GWLINK`,
+[`hey-gateway-link-gaps.md`](hey-gateway-link-gaps.md).
