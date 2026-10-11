@@ -3,7 +3,7 @@
 //
 // Header-only, Arduino-free, no malloc, host-testable. Two parts:
 //
-//  1. fwAssetName(): PlatformIO env (MC_ENV_NAME) -> release asset name "<base>.bin.zz"
+//  1. fwAssetName(): PlatformIO env (MC_ENV_NAME) -> release asset name "<base>.autoupdate"
 //     (AU-D11, compressed staging). The base name is the env itself except for three renames
 //     (release-firmware.md step 5).
 //
@@ -49,7 +49,7 @@ inline const char *fwAssetBase(const char *env)
     return env;
 }
 
-// Writes "<base>.bin.zz" into out (n bytes incl. NUL). False on null/empty env or when the
+// Writes "<base>.autoupdate" into out (n bytes incl. NUL). False on null/empty env or when the
 // name does not fit; out is then left as an empty string (if n > 0).
 inline bool fwAssetName(const char *env, char *out, size_t n)
 {
@@ -59,7 +59,7 @@ inline bool fwAssetName(const char *env, char *out, size_t n)
     const char *base = fwAssetBase(env);
     if (base == nullptr || base[0] == '\0')
         return false;
-    static const char suffix[] = ".bin.zz";
+    static const char suffix[] = ".autoupdate";
     const size_t bl = strlen(base);
     const size_t sl = sizeof(suffix) - 1;
     if (bl + sl + 1 > n)
@@ -88,7 +88,7 @@ struct FwReleaseInfo
 struct FwJsonScan
 {
     // --- captured data ---
-    char want[40];  // wanted asset name (copied)
+    char want[48];  // wanted asset name (copied)
     char tag[24];   // tag_name of the release
     char url[256];  // candidate download url; becomes the result url once found
     char key[24];   // current object key (longer keys cannot match anything)

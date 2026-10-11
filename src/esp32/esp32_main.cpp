@@ -2500,7 +2500,7 @@ static void auTick(void)
         return;
     }
 
-    // mode 2: a CHECK found a newer, installable release (matching .bin.zz asset and digest) that is
+    // mode 2: a CHECK found a newer, installable release (matching .autoupdate asset and digest) that is
     // not staged yet -> DOWNLOAD (AU-D17: battery floor). A release without the asset must not
     // consume the 3 attempts of AU-D5. Mode 1 never gets here: it only prints the notify line.
     if(in.mode == 2 && st.availNewer && st.installable && st.availTag[0] && wifiUp && in.timeValid && !in.phoneConnected && battOk &&

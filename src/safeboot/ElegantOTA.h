@@ -163,7 +163,7 @@ class ElegantOTAClass{
     // otherwise untouched per the wave brief.
 
     // Dual-format upload (docs/safeboot-ota-contract.md): the first body byte
-    // decides between a raw image and a zlib stream (.bin.zz), which is
+    // decides between a raw image and a zlib stream (.autoupdate), which is
     // inflated on the fly into Update. All of this is touched only from the
     // AsyncTCP task (upload handler, /ota/start, disconnect closure).
     enum UploadFormat : uint8_t { FMT_UNDECIDED = 0, FMT_RAW, FMT_ZLIB };

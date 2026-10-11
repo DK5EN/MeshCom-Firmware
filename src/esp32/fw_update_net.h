@@ -5,11 +5,11 @@
 // starts a job and polls a status snapshot. At most one job runs at a time.
 //
 //   CHECK     GET api.github.com/repos/<repo>/releases/latest, whole body
-//             through two FwJsonScan (the .bin.zz asset and the raw .bin), then
+//             through two FwJsonScan (the .autoupdate asset and the raw .bin), then
 //             fwShouldInstall(). Never downloads. availNewer without an asset or
 //             digest stays true (notify), installable is then false and zlen 0.
 //   DOWNLOAD  needs the last CHECK (availNewer + digest). fwStageLayout(), erase
-//             the stage range at the END of ota_0, stream the .bin.zz into it
+//             the stage range at the END of ota_0, stream the .autoupdate into it
 //             in 4 KB blocks, SHA-256 against the API digest (mandatory), CRC32
 //             read-back, then the FWS2 record into NVS.
 //
@@ -153,8 +153,8 @@ struct FwNetStatus
     FwNetJob job;          // the running or last finished job
     char availTag[24];     // tag of the newest release seen by the last CHECK, "" if none
     bool availNewer;       // fwShouldInstall() said yes (and not draft/prerelease)
-    bool installable;      // the release carries the .bin.zz asset AND its sha256 digest
-    uint32_t zlen, ilen;   // .bin.zz size (0 = not installable), raw .bin size (0 = none)
+    bool installable;      // the release carries the .autoupdate asset AND its sha256 digest
+    uint32_t zlen, ilen;   // .autoupdate size (0 = not installable), raw .bin size (0 = none)
     char stagedTag[24];    // tag of the valid FWS2 record, "" if none
     bool staged;           // a valid FWS2 record exists in NVS
     char lastErr[48];      // short reason of the last failed job, "" otherwise

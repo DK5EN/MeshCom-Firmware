@@ -148,7 +148,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521567",
       "id": 605521567,
       "node_id": "RA_kwDORWIGR84kD-GX",
-      "name": "E22-DevKitC.bin.zz",
+      "name": "E22-DevKitC.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -178,7 +178,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:25Z",
       "updated_at": "2026-10-02T06:58:25Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22-DevKitC.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22-DevKitC.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020558",
@@ -220,7 +220,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521559",
       "id": 605521559,
       "node_id": "RA_kwDORWIGR84kD-GO",
-      "name": "E22_1262-DevKitC.bin.zz",
+      "name": "E22_1262-DevKitC.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -250,7 +250,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:24Z",
       "updated_at": "2026-10-02T06:58:25Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1262-DevKitC.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1262-DevKitC.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020556",
@@ -292,7 +292,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521558",
       "id": 605521558,
       "node_id": "RA_kwDORWIGR84kD-GM",
-      "name": "E22_1262_S3-DevKitC-1-N16R8.bin.zz",
+      "name": "E22_1262_S3-DevKitC-1-N16R8.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -322,7 +322,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:24Z",
       "updated_at": "2026-10-02T06:58:25Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1262_S3-DevKitC-1-N16R8.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1262_S3-DevKitC-1-N16R8.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020554",
@@ -364,7 +364,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521557",
       "id": 605521557,
       "node_id": "RA_kwDORWIGR84kD-GK",
-      "name": "E22_1268_S3-DevKitC-1-N16R8.bin.zz",
+      "name": "E22_1268_S3-DevKitC-1-N16R8.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -394,7 +394,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:24Z",
       "updated_at": "2026-10-02T06:58:25Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1268_S3-DevKitC-1-N16R8.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_1268_S3-DevKitC-1-N16R8.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020569",
@@ -436,7 +436,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521573",
       "id": 605521573,
       "node_id": "RA_kwDORWIGR84kD-GZ",
-      "name": "E22_XML-DevKitC.bin.zz",
+      "name": "E22_XML-DevKitC.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -466,7 +466,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:25Z",
       "updated_at": "2026-10-02T06:58:25Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_XML-DevKitC.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/E22_XML-DevKitC.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020583",
@@ -508,7 +508,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521588",
       "id": 605521588,
       "node_id": "RA_kwDORWIGR84kD-Gn",
-      "name": "esp32-loraprs-e22.bin.zz",
+      "name": "esp32-loraprs-e22.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -538,7 +538,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:26Z",
       "updated_at": "2026-10-02T06:58:26Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/esp32-loraprs-e22.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/esp32-loraprs-e22.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020587",
@@ -580,7 +580,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521593",
       "id": 605521593,
       "node_id": "RA_kwDORWIGR84kD-Gr",
-      "name": "esp32-loraprs-ra01.bin.zz",
+      "name": "esp32-loraprs-ra01.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -610,7 +610,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:26Z",
       "updated_at": "2026-10-02T06:58:26Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/esp32-loraprs-ra01.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/esp32-loraprs-ra01.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020592",
@@ -724,7 +724,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521608",
       "id": 605521608,
       "node_id": "RA_kwDORWIGR84kD-G5",
-      "name": "heltec_wifi_lora_32_V2.bin.zz",
+      "name": "heltec_wifi_lora_32_V2.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -754,7 +754,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:26Z",
       "updated_at": "2026-10-02T06:58:26Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V2.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V2.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020609",
@@ -796,7 +796,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521617",
       "id": 605521617,
       "node_id": "RA_kwDORWIGR84kD-HB",
-      "name": "heltec_wifi_lora_32_V3.bin.zz",
+      "name": "heltec_wifi_lora_32_V3.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -826,7 +826,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:26Z",
       "updated_at": "2026-10-02T06:58:27Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V3.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V3.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020616",
@@ -868,7 +868,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521625",
       "id": 605521625,
       "node_id": "RA_kwDORWIGR84kD-HI",
-      "name": "heltec_wifi_lora_32_V4.bin.zz",
+      "name": "heltec_wifi_lora_32_V4.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -898,7 +898,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:26Z",
       "updated_at": "2026-10-02T06:58:27Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V4.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wifi_lora_32_V4.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020618",
@@ -940,7 +940,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521628",
       "id": 605521628,
       "node_id": "RA_kwDORWIGR84kD-HK",
-      "name": "heltec_wireless_stick.bin.zz",
+      "name": "heltec_wireless_stick.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -970,7 +970,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:27Z",
       "updated_at": "2026-10-02T06:58:27Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wireless_stick.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wireless_stick.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020619",
@@ -1012,7 +1012,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521630",
       "id": 605521630,
       "node_id": "RA_kwDORWIGR84kD-HL",
-      "name": "heltec_wireless_tracker.bin.zz",
+      "name": "heltec_wireless_tracker.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1042,7 +1042,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:27Z",
       "updated_at": "2026-10-02T06:58:27Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wireless_tracker.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/heltec_wireless_tracker.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020623",
@@ -1257,8 +1257,8 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:28Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-Beam-1W.bin.zz",
-      "name": "T-Beam-1W.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-Beam-1W.autoupdate",
+      "name": "T-Beam-1W.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020674",
@@ -1300,7 +1300,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521687",
       "id": 605521687,
       "node_id": "RA_kwDORWIGR84kD-IC",
-      "name": "T-ETH-ELITE_1262.bin.zz",
+      "name": "T-ETH-ELITE_1262.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1330,7 +1330,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-ETH-ELITE_1262.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-ETH-ELITE_1262.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020678",
@@ -1372,7 +1372,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521692",
       "id": 605521692,
       "node_id": "RA_kwDORWIGR84kD-IG",
-      "name": "T3_S3_V13.bin.zz",
+      "name": "T3_S3_V13.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1402,7 +1402,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T3_S3_V13.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T3_S3_V13.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020689",
@@ -1444,7 +1444,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521704",
       "id": 605521704,
       "node_id": "RA_kwDORWIGR84kD-IR",
-      "name": "ttgo-lora32-v21.bin.zz",
+      "name": "ttgo-lora32-v21.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1474,7 +1474,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo-lora32-v21.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo-lora32-v21.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020688",
@@ -1516,7 +1516,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521704",
       "id": 605521704,
       "node_id": "RA_kwDORWIGR84kD-IQ",
-      "name": "ttgo_tbeam.bin.zz",
+      "name": "ttgo_tbeam.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1546,7 +1546,7 @@
       "download_count": 4,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020679",
@@ -1588,7 +1588,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521696",
       "id": 605521696,
       "node_id": "RA_kwDORWIGR84kD-IH",
-      "name": "ttgo_tbeam_supreme.bin.zz",
+      "name": "ttgo_tbeam_supreme.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1618,7 +1618,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_supreme.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_supreme.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020680",
@@ -1660,7 +1660,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521698",
       "id": 605521698,
       "node_id": "RA_kwDORWIGR84kD-II",
-      "name": "ttgo_tbeam_SX1262.bin.zz",
+      "name": "ttgo_tbeam_SX1262.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1690,7 +1690,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_SX1262.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_SX1262.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020685",
@@ -1732,7 +1732,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521704",
       "id": 605521704,
       "node_id": "RA_kwDORWIGR84kD-IN",
-      "name": "ttgo_tbeam_SX1268.bin.zz",
+      "name": "ttgo_tbeam_SX1268.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1762,7 +1762,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:29Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_SX1268.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/ttgo_tbeam_SX1268.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020639",
@@ -1804,7 +1804,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521659",
       "id": 605521659,
       "node_id": "RA_kwDORWIGR84kD-Hf",
-      "name": "t_connect_pro.bin.zz",
+      "name": "t_connect_pro.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1834,7 +1834,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:27Z",
       "updated_at": "2026-10-02T06:58:28Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_connect_pro.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_connect_pro.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020655",
@@ -1876,7 +1876,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521676",
       "id": 605521676,
       "node_id": "RA_kwDORWIGR84kD-Hv",
-      "name": "t_deck.bin.zz",
+      "name": "t_deck.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1906,7 +1906,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:28Z",
       "updated_at": "2026-10-02T06:58:29Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020644",
@@ -1948,7 +1948,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521666",
       "id": 605521666,
       "node_id": "RA_kwDORWIGR84kD-Hk",
-      "name": "t_deck_plus.bin.zz",
+      "name": "t_deck_plus.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -1978,7 +1978,7 @@
       "download_count": 2,
       "created_at": "2026-10-02T06:58:28Z",
       "updated_at": "2026-10-02T06:58:28Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck_plus.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck_plus.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020645",
@@ -2020,7 +2020,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521668",
       "id": 605521668,
       "node_id": "RA_kwDORWIGR84kD-Hl",
-      "name": "t_deck_pro.bin.zz",
+      "name": "t_deck_pro.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -2050,7 +2050,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:28Z",
       "updated_at": "2026-10-02T06:58:28Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck_pro.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/t_deck_pro.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020656",
@@ -2164,7 +2164,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521717",
       "id": 605521717,
       "node_id": "RA_kwDORWIGR84kD-IV",
-      "name": "vision-master-e213.bin.zz",
+      "name": "vision-master-e213.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -2194,7 +2194,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:30Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/vision-master-e213.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/vision-master-e213.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020695",
@@ -2236,7 +2236,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521720",
       "id": 605521720,
       "node_id": "RA_kwDORWIGR84kD-IX",
-      "name": "vision-master-e290.bin.zz",
+      "name": "vision-master-e290.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -2266,7 +2266,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:30Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/vision-master-e290.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/vision-master-e290.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020706",
@@ -2308,7 +2308,7 @@
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605521732",
       "id": 605521732,
       "node_id": "RA_kwDORWIGR84kD-Ii",
-      "name": "wireless-paper.bin.zz",
+      "name": "wireless-paper.autoupdate",
       "label": "",
       "uploader": {
         "login": "DK5EN",
@@ -2338,7 +2338,7 @@
       "download_count": 1,
       "created_at": "2026-10-02T06:58:30Z",
       "updated_at": "2026-10-02T06:58:30Z",
-      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/wireless-paper.bin.zz"
+      "browser_download_url": "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/wireless-paper.autoupdate"
     },
     {
       "url": "https://api.github.com/repos/DK5EN/MeshCom-Firmware/releases/assets/605020714",

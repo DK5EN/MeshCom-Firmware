@@ -253,7 +253,7 @@ struct FwStageRecord
     char tag[24];
     char env[32];
     uint32_t off;
-    uint32_t zlen;  // compressed asset length (.bin.zz)
+    uint32_t zlen;  // compressed asset length (.autoupdate)
     uint32_t ilen;  // expected inflated length (raw .bin asset size)
     uint32_t crc32;
     uint8_t sha256[32];

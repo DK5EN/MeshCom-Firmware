@@ -455,7 +455,7 @@ const STATE_ABORTED_APP_VALID = {
     dom.window.close();
   }
 
-  // ---------- dual-format upload: dropdown gone, .bin / .bin.zz handling ----------
+  // ---------- dual-format upload: dropdown gone, .bin / .autoupdate handling ----------
   {
     const dom = await loadPage();
     const win = dom.window;
@@ -463,17 +463,17 @@ const STATE_ABORTED_APP_VALID = {
     check('no <select> left on the page', win.document.querySelectorAll('select').length === 0);
     check('page no longer says "Select Upload Type"', !HTML.includes('Select Upload Type'));
     check('hashing typo "Genersting" is gone', !HTML.includes('Genersting'));
-    check('file input accepts .bin and .zz', /accept="\.bin,\.zz"/.test(HTML));
+    check('file input accepts .bin and .autoupdate', /accept="\.bin,\.autoupdate"/.test(HTML));
 
     win.__safeboot.renderState(Object.assign({}, STATE_ABORTED, { reason: 'inflate_failed' }));
     const t = q(win, 'stateReason').textContent;
     check('reason inflate_failed: own sentence with raw reason in parentheses',
-      t.includes('.zz') && t.includes('unpacked') && t.includes('(inflate_failed)'), t);
+      t.includes('.autoupdate') && t.includes('unpacked') && t.includes('(inflate_failed)'), t);
     dom.window.close();
   }
 
   {
-    // .zz in a browser without DecompressionStream (jsdom has none): clear
+    // .autoupdate in a browser without DecompressionStream (jsdom has none): clear
     // message, nothing is sent to the node, the page stays usable.
     let startCalls = 0;
     const fetchImpl = async (url) => {
@@ -483,20 +483,20 @@ const STATE_ABORTED_APP_VALID = {
     const dom = await loadPage(fetchImpl);
     const win = dom.window;
     check('jsdom has no DecompressionStream (test premise)', typeof win.DecompressionStream === 'undefined');
-    win.__safeboot._test.setSelectedFile(new win.File(['\x78x'], 'firmware.bin.zz'));
+    win.__safeboot._test.setSelectedFile(new win.File(['\x78x'], 'firmware.autoupdate'));
     await win.uploadFirmware();
     await sleep(10);
-    check('.zz without DecompressionStream: clear message',
-      q(win, 'status').textContent === 'This browser cannot unpack .zz -- use the .bin file', q(win, 'status').textContent);
-    check('.zz without DecompressionStream: /ota/start not called', startCalls === 0);
-    check('.zz without DecompressionStream: no upload in progress', win.__safeboot._test.uploadInProgress === false);
+    check('.autoupdate without DecompressionStream: clear message',
+      q(win, 'status').textContent === 'This browser cannot unpack .autoupdate -- use the .bin file', q(win, 'status').textContent);
+    check('.autoupdate without DecompressionStream: /ota/start not called', startCalls === 0);
+    check('.autoupdate without DecompressionStream: no upload in progress', win.__safeboot._test.uploadInProgress === false);
     dom.window.close();
   }
 
   // The format is decided by the first byte (0x78 = zlib), not by the file name.
-  for (const [name, isZz, body] of [['firmware.bin', false, 'a'], ['firmware.bin.zz', true, '\x78x'], ['renamed.bin', true, '\x78x']]) {
+  for (const [name, isZz, body] of [['firmware.bin', false, 'a'], ['firmware.autoupdate', true, '\x78x'], ['renamed.bin', true, '\x78x']]) {
     // /ota/start carries mode=fr and the MD5 of the image the node will see:
-    // the file itself for .bin, the inflated image (calculateInflatedMD5) for .zz.
+    // the file itself for .bin, the inflated image (calculateInflatedMD5) for .autoupdate.
     const startUrls = [];
     const fetchImpl = async (url) => {
       const u = String(url);
@@ -506,7 +506,7 @@ const STATE_ABORTED_APP_VALID = {
     const dom = await loadPage(fetchImpl);
     const win = dom.window;
     const calls = { plain: 0, inflated: 0 };
-    win.DecompressionStream = function () {}; // present, so the .zz path is taken
+    win.DecompressionStream = function () {}; // present, so the .autoupdate path is taken
     win.calculateMD5 = async () => { calls.plain++; return '11111111111111111111111111111111'; };
     win.calculateInflatedMD5 = async () => { calls.inflated++; return '22222222222222222222222222222222'; };
     win.__safeboot._test.setSelectedFile(new win.File([body], name));
@@ -523,7 +523,7 @@ const STATE_ABORTED_APP_VALID = {
   }
 
   {
-    // drop handler: .bin and .bin.zz accepted, anything else refused with the new text
+    // drop handler: .bin and .autoupdate accepted, anything else refused with the new text
     const dom = await loadPage();
     const win = dom.window;
     const drop = (name) => {
@@ -533,13 +533,13 @@ const STATE_ABORTED_APP_VALID = {
     };
     drop('firmware.bin');
     check('drop .bin: accepted', q(win, 'uploadButton').disabled === false && q(win, 'dropZone').textContent === 'firmware.bin');
-    drop('firmware.bin.zz');
-    check('drop .bin.zz: accepted', q(win, 'uploadButton').disabled === false && q(win, 'dropZone').textContent === 'firmware.bin.zz');
+    drop('firmware.autoupdate');
+    check('drop .autoupdate: accepted', q(win, 'uploadButton').disabled === false && q(win, 'dropZone').textContent === 'firmware.autoupdate');
     drop('notes.txt');
-    check('drop .txt: refused with the .bin / .bin.zz hint',
-      q(win, 'uploadButton').disabled === true && q(win, 'status').textContent === 'Please select a .bin or .bin.zz file!', q(win, 'status').textContent);
+    check('drop .txt: refused with the .bin / .autoupdate hint',
+      q(win, 'uploadButton').disabled === true && q(win, 'status').textContent === 'Please select a .bin or .autoupdate file!', q(win, 'status').textContent);
     drop('firmware.zz');
-    check('drop bare .zz (not .bin.zz): refused', q(win, 'uploadButton').disabled === true);
+    check('drop bare .zz (old suffix): refused', q(win, 'uploadButton').disabled === true);
     dom.window.close();
   }
 
@@ -558,7 +558,7 @@ const STATE_ABORTED_APP_VALID = {
     image[0] = 0xe9;
     const zz = zlib.deflateSync(image);
     check('test premise: zlib stream starts with 0x78', zz[0] === 0x78, zz[0]);
-    const fakeFile = { name: 'firmware.bin.zz', stream: () => new Blob([zz]).stream() };
+    const fakeFile = { name: 'firmware.autoupdate', stream: () => new Blob([zz]).stream() };
     const got = await win.calculateInflatedMD5(fakeFile);
     const want = crypto.createHash('md5').update(image).digest('hex');
     check('calculateInflatedMD5 = md5 of the inflated image', got === want, got + ' vs ' + want);

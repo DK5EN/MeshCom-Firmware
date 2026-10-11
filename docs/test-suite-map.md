@@ -66,7 +66,7 @@ policy timer, reinstall guard, millis-wrap latch) and `test_fw_update_assets`
 (AU-02: asset names and the streaming release-JSON scanner on live GitHub
 fixtures); `tools/tests/test_flash_map.py` (14 cases). `test_fw_update_http` (AU-04: chunked transfer
 decoder of the download, split at every byte, malformed sizes, sink refusal);
-`tools/tests/test_make_zz.py` (11 cases, release `.bin.zz` assets).
+`tools/tests/test_make_autoupdate.py` (13 cases, release `.autoupdate` assets incl. env name length).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the

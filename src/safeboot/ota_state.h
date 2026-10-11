@@ -66,7 +66,7 @@ public:
         NotBootable,
         ActivateFailed,
         UpdateError,
-        InflateFailed, // .bin.zz upload: bad zlib header/stream or adler32 (zstream.h)
+        InflateFailed, // .autoupdate upload: bad zlib header/stream or adler32 (zstream.h)
     };
 
     enum class ActionType : uint8_t {

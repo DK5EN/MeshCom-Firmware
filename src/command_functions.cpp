@@ -4888,7 +4888,7 @@ void commandAction(char *umsg_text, bool ble)
         const bool _auNewer = _au.availNewer && _au.availTag[0] != '\0';
 
 #if INSTRUMENT_ENABLED
-        // bench only: --update stagelan <http://ip:port/path.bin.zz> <ilen> <tag>. The URL must be
+        // bench only: --update stagelan <http://ip:port/path.autoupdate> <ilen> <tag>. The URL must be
         // plain http to a private IPv4 (fwLanUrlParse); not in a release build.
         if(strncmp(_owner_c, "stagelan ", 9) == 0)
         {
@@ -4899,7 +4899,7 @@ void commandAction(char *umsg_text, bool ble)
             if(_auBusy)
                 Serial.printf("[ERR];update;busy\n");
             else if(sscanf(_owner_c + 9, "%199s %lu %23s", _lurl, &_lilen, _ltag) != 3)
-                Serial.printf("[ERR];update;stagelan <http://ip:port/path.bin.zz> <ilen> <tag>\n");
+                Serial.printf("[ERR];update;stagelan <http://ip:port/path.autoupdate> <ilen> <tag>\n");
             else if(!fwNetStartLan(_lurl, (uint32_t)_lilen, _ltag))
                 Serial.printf("[ERR];update;stagelan not started (url not private http, bad ilen/tag, busy or no WiFi)\n");
             else
@@ -4928,7 +4928,7 @@ void commandAction(char *umsg_text, bool ble)
             }
             else if(_auNewer && !_au.installable)
             {
-                // newer release without a matching .bin.zz asset and digest: nothing to download
+                // newer release without a matching .autoupdate asset and digest: nothing to download
                 Serial.printf("[AU];install;no_asset;%s\n", _au.availTag);
             }
             else if(_auNewer)

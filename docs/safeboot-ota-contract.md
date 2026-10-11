@@ -95,23 +95,23 @@ against this document in parallel. Change it here first, then everywhere.
 ```
 
 - `state`: `idle` | `receiving` | `verifying` | `done` | `aborted` | `applying` (AU, 2026-10-05: Safeboot
-  inflates a staged `.bin.zz` from the end of `ota_0` at boot; while applying, `fallback_in_ms` is -1,
+  inflates a staged `.autoupdate` from the end of `ota_0` at boot; while applying, `fallback_in_ms` is -1,
   cancel and `/ota/start` are refused). A failed apply is reported afterwards as `aborted` with
   reason `apply_failed`.
 - `reason`: empty in `idle`/`receiving`/`done`; on `aborted` one of `stale_session`,
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
   `not_bootable` (Updater could not enable/boot-check the written image), `activate_failed`
   (the boot partition switch rejected the image), `update_error` (any other `Update.end()`
-  failure), `begin_failed`, `inflate_failed` (a `.bin.zz` upload whose zlib stream could not be
+  failure), `begin_failed`, `inflate_failed` (a `.autoupdate` upload whose zlib stream could not be
   unpacked: bad header, corrupt data or adler32 mismatch); `verifying` is the window between the last chunk and the `Update.end()` verdict.
-- `received`/`total`: bytes of the current or last session; `total` 0 when unknown. For a `.bin.zz`
+- `received`/`total`: bytes of the current or last session; `total` 0 when unknown. For a `.autoupdate`
   upload `received` counts the received (compressed) bytes.
 - `app_valid`: true when the app partition holds a complete, verified image (checked at boot and
   re-checked after every abort). False after an aborted upload has written into the single app
   slot: the node then stays in safeboot until a full upload succeeds. It becomes true again after a
   successful upload (state `done`) and is re-checked when the partition switch is applied.
 - `heap_free`, `heap_block`: free heap and largest free block in bytes, diagnostics only (bench: proves
-  the 44 KB inflate block of a `.bin.zz` upload is released again); may be absent on older Safeboot.
+  the 44 KB inflate block of a `.autoupdate` upload is released again); may be absent on older Safeboot.
 - `fallback_in_ms`: remaining time of the 180 s fallback-to-app window; `-1` while an upload is
   in progress (the window is suspended, the stall watchdog applies instead) and `-1` while
   `app_valid` is false (no fallback possible). `done` means the
@@ -130,10 +130,10 @@ scan is already running, `409 no_sta` when the STA is not configured. Results ap
 `GET /ota/cancel` (`409 app_invalid` when `app_valid` is false). `/ota/upload` answers `200 OK` only when the image was verified, otherwise
 `400` with the abort reason text; `/ota/cancel` answers `400` while an upload is in progress.
 
-## Upload formats: `.bin` and `.bin.zz` (since 2026-10-05)
+## Upload formats: `.bin` and `.autoupdate` (since 2026-10-05)
 
 `POST /ota/upload` takes either a raw ESP image (`.bin`) or the same image as a zlib stream
-(`.bin.zz`, what the Auto Update stages). No new endpoint, no change to `/ota/start`, no dependence on
+(`.autoupdate`, what the Auto Update stages). No new endpoint, no change to `/ota/start`, no dependence on
 the file name: the node decides from the **first byte of the upload body**.
 
 - `0x78` (zlib CMF byte) -> zlib path: the body is inflated on the fly (ROM `tinfl`, 32 KB circular
@@ -174,7 +174,7 @@ fallback 180 000 ms. Signed deltas everywhere (the TM-46 cross-task race).
 ## Staged apply (Auto Update, #1187, since 2026-10-05)
 
 Before WiFi starts, Safeboot reads NVS `fwstage`/`rec` (FWS2, 112 B, written by the app). If present:
-CRC32 of the staged `.bin.zz` at `ota_0 + off` (before any erase), erase `[0, roundup4K(ilen))`, inflate
+CRC32 of the staged `.autoupdate` at `ota_0 + off` (before any erase), erase `[0, roundup4K(ilen))`, inflate
 with the ROM `tinfl` into `ota_0`, `esp_image_verify`, set boot, drop the record (keep `last`), restart.
 Markers: `[SAFEBOOT];apply;start;tag;..;zlen;..;ilen;..;try;N`, `[SAFEBOOT];apply;ok;bytes;..;ms;..`,
 `[SAFEBOOT];apply;fail;<reason>`, `[SAFEBOOT];apply;retry;restart;try;N`. Power-type failures keep the

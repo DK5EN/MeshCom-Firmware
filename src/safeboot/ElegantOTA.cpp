@@ -18,7 +18,7 @@ static_assert(UPDATE_ERROR_MD5 == 7 && UPDATE_ERROR_READ == 3 && UPDATE_ERROR_AC
               "OtaSession::fromUpdaterError codes must mirror Update.h");
 
 // ---------------------------------------------------------------------------
-// .bin.zz upload: push-model inflate straight into Update (zstream.h).
+// .autoupdate upload: push-model inflate straight into Update (zstream.h).
 // ---------------------------------------------------------------------------
 static_assert(ZS_ST_DONE == TINFL_STATUS_DONE && ZS_ST_NEEDS_MORE_INPUT == TINFL_STATUS_NEEDS_MORE_INPUT &&
               ZS_ST_HAS_MORE_OUTPUT == TINFL_STATUS_HAS_MORE_OUTPUT,
@@ -425,7 +425,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         }
 
         // Format sniff on the first body byte of the request: 0x78 is the zlib
-        // CMF byte of a .bin.zz upload, anything else (0xE9 = ESP image magic)
+        // CMF byte of a .autoupdate upload, anything else (0xE9 = ESP image magic)
         // takes the raw path unchanged. Decided here, after the generation
         // guard, so a stale request can never reset a live upload's state.
         if (!index && len) {
@@ -523,7 +523,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           portEXIT_CRITICAL(&g_ota_mux);
 
             if (_upload_format == FMT_ZLIB && !_z_done) {
-                // The body ended before the zlib stream did (truncated .zz):
+                // The body ended before the zlib stream did (truncated .autoupdate):
                 // nothing complete to finalise -- do not call Update.end().
                 freeZ();
                 otaFail(safeboot::OtaSession::Reason::IncompleteUpload);
@@ -541,7 +541,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
                 portEXIT_CRITICAL(&g_ota_mux);
             } else {
                 // TM-49: end(true) succeeded -- length and the client-supplied
-                // MD5 (set in /ota/start; for a .zz upload the MD5 of the
+                // MD5 (set in /ota/start; for a .autoupdate upload the MD5 of the
                 // inflated image, which is what Update.write() saw) both check
                 // out. isFinished() is the last gate; onVerified() is the only
                 // place image_valid may become true.

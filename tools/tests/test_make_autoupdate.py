@@ -1,4 +1,4 @@
-"""Tests for tools/make_zz.py (AU-D11 compressed release assets)."""
+"""Tests for tools/make_autoupdate.py (AU-D11 compressed release assets)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import pytest
 TOOLS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(TOOLS))
 
-import make_zz as mz  # noqa: E402
+import make_autoupdate as mz  # noqa: E402
 
 
 def fake_image(n: int = 70_000, seed: int = 1) -> bytes:
@@ -38,7 +38,7 @@ def img(tmp_path: Path) -> Path:
 def test_round_trip_and_name(img: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     assert mz.main([str(img), "--out-dir", str(out), "--check"]) == 0
-    zz = out / "heltec.bin.zz"
+    zz = out / "heltec.autoupdate"
     assert zz.is_file()
     assert zlib.decompress(zz.read_bytes()) == img.read_bytes()
     assert len(zz.read_bytes()) < img.stat().st_size
@@ -46,12 +46,12 @@ def test_round_trip_and_name(img: Path, tmp_path: Path) -> None:
 
 def test_default_out_dir_is_next_to_input(img: Path) -> None:
     assert mz.main([str(img)]) == 0
-    assert (img.parent / "heltec.bin.zz").is_file()
+    assert (img.parent / "heltec.autoupdate").is_file()
 
 
 def test_zlib_header_and_window(img: Path, tmp_path: Path) -> None:
     mz.main([str(img), "--out-dir", str(tmp_path)])
-    z = (tmp_path / "heltec.bin.zz").read_bytes()
+    z = (tmp_path / "heltec.autoupdate").read_bytes()
     assert z[:2] == b"\x78\xda"
     # CINFL = 7 => 2^(7+8) = 32 KB window; header checksum valid.
     assert (z[0] >> 4) == 7 and z[0] & 0x0F == 8
@@ -72,14 +72,14 @@ def test_refuses_non_image_without_force(tmp_path: Path) -> None:
     bad = tmp_path / "notimg.bin"
     bad.write_bytes(b"\x00" + b"x" * 100)
     assert mz.main([str(bad), "--out-dir", str(tmp_path / "o")]) == 1
-    assert not (tmp_path / "o" / "notimg.bin.zz").exists()
+    assert not (tmp_path / "o" / "notimg.autoupdate").exists()
 
 
 def test_force_accepts_non_image(tmp_path: Path) -> None:
     bad = tmp_path / "raw.bin"
     bad.write_bytes(b"\x00" + b"x" * 100)
     assert mz.main([str(bad), "--out-dir", str(tmp_path), "--force", "--check"]) == 0
-    assert (tmp_path / "raw.bin.zz").is_file()
+    assert (tmp_path / "raw.autoupdate").is_file()
 
 
 def test_refuses_empty_and_missing(tmp_path: Path) -> None:
@@ -94,7 +94,7 @@ def test_one_bad_input_does_not_stop_the_rest(img: Path, tmp_path: Path) -> None
     bad.write_bytes(b"\x01abc")
     rc = mz.main([str(bad), str(img), "--out-dir", str(tmp_path / "o")])
     assert rc == 1
-    assert (tmp_path / "o" / "heltec.bin.zz").is_file()
+    assert (tmp_path / "o" / "heltec.autoupdate").is_file()
 
 
 def test_check_detects_corruption(
@@ -119,7 +119,7 @@ def test_manifest_content(img: Path, tmp_path: Path, capsys: pytest.CaptureFixtu
     rc = mz.main([str(img), str(second), "--out-dir", str(out), "--manifest", str(man), "--check"])
     assert rc == 0
     entries = json.loads(man.read_text())
-    assert [e["asset"] for e in entries] == ["heltec.bin.zz", "t_deck.bin.zz"]
+    assert [e["asset"] for e in entries] == ["heltec.autoupdate", "t_deck.autoupdate"]
     for e, src in zip(entries, (img, second), strict=True):
         raw = src.read_bytes()
         zz = (out / e["asset"]).read_bytes()
@@ -128,9 +128,48 @@ def test_manifest_content(img: Path, tmp_path: Path, capsys: pytest.CaptureFixtu
         assert e["sha256_bin"] == hashlib.sha256(raw).hexdigest()
         assert e["sha256_zz"] == hashlib.sha256(zz).hexdigest()
     line = capsys.readouterr().out.splitlines()[0].split()
-    assert line[0] == "heltec.bin.zz" and line[4] == entries[0]["sha256_zz"]
+    assert line[0] == "heltec.autoupdate" and line[4] == entries[0]["sha256_zz"]
 
 
 def test_deterministic(img: Path) -> None:
     raw = img.read_bytes()
     assert mz.compress(raw) == mz.compress(raw)
+
+
+def test_asset_name_drops_bin() -> None:
+    assert mz.asset_name(Path("x/heltec_wifi_lora_32_V3.bin")) == "heltec_wifi_lora_32_V3.autoupdate"
+    assert mz.asset_name(Path("raw")) == "raw.autoupdate"
+
+
+# --- asset-name length: fwAssetName() buffers are 48 bytes (incl. NUL) ---------------------
+
+REPO = TOOLS.parent
+AU_SUFFIX = ".autoupdate"
+AU_BUF = 48
+RENAMES = {
+    "LilyGo_T-Beam-1W": "T-Beam-1W",
+    "LilyGo_T3_S3_V1_3": "T3_S3_V13",
+    "LilyGo_T_Connect_Pro": "t_connect_pro",
+}
+
+
+def _envs() -> list[str]:
+    import re
+
+    files = [REPO / "platformio.ini", *sorted(REPO.glob("variants/*/platformio.ini"))]
+    names: list[str] = []
+    for f in files:
+        for m in re.finditer(r"^\[env:([^\]]+)\]", f.read_text(), re.M):
+            n = m.group(1)
+            if n.startswith("native") or "safeboot" in n:
+                continue
+            names.append(n)
+    return names
+
+
+def test_every_env_asset_name_fits_buffer() -> None:
+    envs = _envs()
+    assert len(envs) > 10
+    for env in envs:
+        base = RENAMES.get(env, env)
+        assert len(base + AU_SUFFIX) + 1 <= AU_BUF, env

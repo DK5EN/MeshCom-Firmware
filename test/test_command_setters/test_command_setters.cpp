@@ -855,7 +855,7 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwCheckDone(s_auTimer") != std::string::npos, "fwCheckDone is not called");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwAttemptAllowed(s_auTimer") != std::string::npos, "fwAttemptAllowed is not called");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwAttemptFailed(s_auTimer") != std::string::npos, "fwAttemptFailed is not called");
-    // the automatic DOWNLOAD needs an installable release (matching .bin.zz asset + digest), so a
+    // the automatic DOWNLOAD needs an installable release (matching .autoupdate asset + digest), so a
     // prod release without the asset does not burn the 3 attempts; mode 1 only notifies
     {
         const size_t dl = m.find("in.mode == 2 && st.availNewer && st.installable");
@@ -1085,10 +1085,10 @@ static void test_stagelan_is_instrument_only_everywhere()
 static void test_lan_url_accepts_only_plain_http_to_private_ipv4()
 {
     FwLanUrl u;
-    TEST_ASSERT_TRUE(fwLanUrlParse("http://192.168.68.10:8000/fw/heltec.bin.zz", u));
+    TEST_ASSERT_TRUE(fwLanUrlParse("http://192.168.68.10:8000/fw/heltec.autoupdate", u));
     TEST_ASSERT_EQUAL_STRING("192.168.68.10", u.host);
     TEST_ASSERT_EQUAL_UINT16(8000, u.port);
-    TEST_ASSERT_EQUAL_STRING("/fw/heltec.bin.zz", u.path);
+    TEST_ASSERT_EQUAL_STRING("/fw/heltec.autoupdate", u.path);
     TEST_ASSERT_TRUE(fwLanUrlParse("http://10.0.0.5/x.zz", u));
     TEST_ASSERT_EQUAL_UINT16(80, u.port);
     TEST_ASSERT_TRUE(fwLanUrlParse("http://172.16.0.1:1/a", u));

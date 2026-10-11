@@ -482,7 +482,7 @@ void wifiConnect() {
  // ---------------------------------------------------------------------
  // AU-07 (#1187): offline apply of a staged update.
  //
- // The app stores a compressed (.bin.zz, zlib) release at the END of ota_0
+ // The app stores a compressed (.autoupdate, zlib) release at the END of ota_0
  // and an FWS2 record in NVS "fwstage"/"rec" (src/fw_update.h). Here, before
  // WiFi and the web server exist:
  //   CRC32 of the staged bytes == rec.crc32   (else: drop the record)

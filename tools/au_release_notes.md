@@ -25,22 +25,22 @@ pio run -e ... (the full env list)
 
 **2. Compress the 27 ESP32 app images in Step 5.** Run it in the staging directory
 on the already renamed `.bin` files, so the `.zz` names follow the `.bin` names
-(`<env-or-renamed>.bin.zz`: `T-Beam-1W.bin.zz`, `T3_S3_V13.bin.zz`,
-`t_connect_pro.bin.zz`, ...). Only the 27 app images, never the support files
+(`<env-or-renamed>.autoupdate`: `T-Beam-1W.autoupdate`, `T3_S3_V13.autoupdate`,
+`t_connect_pro.autoupdate`, ...). Only the 27 app images, never the support files
 (`bootloader*.bin`, `partitions.bin`, `otadata.bin`, `safeboot*.bin`) and never the
 nRF52 outputs:
 
 ```
-python3 tools/make_zz.py --check --manifest au-zz-manifest.json \
+python3 tools/make_autoupdate.py --check --manifest au-autoupdate-manifest.json \
   $(ls <staging-dir>/*.bin | grep -v -E '/(bootloader|bootloader-s3|partitions|otadata|safeboot|safeboot-s3)\.bin$')
 ```
 
 The tool refuses any input whose first byte is not `0xE9`, so a support file in the
 list fails loudly instead of being compressed. `--check` re-inflates every output
-and compares it byte-exact with its input. Keep `au-zz-manifest.json` out of the
+and compares it byte-exact with its input. Keep `au-autoupdate-manifest.json` out of the
 upload; it is for the release notes (sizes, ratios, hashes).
 
-**3. Upload the `.bin.zz` assets next to the `.bin` ones.** Same `gh release
+**3. Upload the `.autoupdate` assets next to the `.bin` ones.** Same `gh release
 create` / `gh release upload` call as the other assets; the asset name is the
 `.bin` name plus `.zz`. The release now has 39 + 27 = 66 assets (update the count
 in the Step 7 verify).
@@ -48,11 +48,11 @@ in the Step 7 verify).
 **4. Verify before publishing.**
 
 ```
-ls <staging-dir>/*.bin.zz | wc -l          # must equal the number of ESP32 app .bin (27)
-python3 tools/make_zz.py --check <staging-dir>/<app>.bin ...   # again, exit status 0
+ls <staging-dir>/*.autoupdate | wc -l          # must equal the number of ESP32 app .bin (27)
+python3 tools/make_autoupdate.py --check <staging-dir>/<app>.bin ...   # again, exit status 0
 ```
 
-- The count of `.bin.zz` must equal the count of ESP32 app `.bin` files (27); the
+- The count of `.autoupdate` must equal the count of ESP32 app `.bin` files (27); the
   name list stays diff-identical to the previous release apart from the 27 new
   `.zz` names.
 - Every `.zz` begins with the bytes `78 da` (`xxd -l2 <file>.zz`).

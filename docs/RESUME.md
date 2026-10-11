@@ -77,14 +77,14 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 
 - Shipped (fork-dev, `c16a9d5f`..`bfe5310c`): MTU default 1280 on every board and Safeboot (#1190),
   BLE reconnect hardening (#1191), S&F for PMs from the server + `--stor` (off, #1188), RM1 remote
-  management with HMAC (off, #1189), Auto Update (off, #1187: `.bin.zz` staging in the end of
+  management with HMAC (off, #1189), Auto Update (off, #1187: `.autoupdate` staging in the end of
   `ota_0`, five GitHub roots, Safeboot ROM-tinfl apply, classic ESP32 pauses BLE, old-Safeboot
   detection). Plan and decisions: `docs/concept-open-issues-20261004.md` (status table, section 9).
-- Release `v4.40a.10.05`: 66 assets (39 + 27 `.bin.zz`), web flasher (keep 1, 30 boards verified),
+- Release `v4.40a.10.05`: 66 assets (39 + 27 `.autoupdate`), web flasher (keep 1, 30 boards verified),
   new Safeboot images. Dev-channel AU test on DK5EN-1 against this release: check, real GitHub
   download (1.10 MB in 10.8 s), Safeboot apply (1.73 MB in 10.5 s), boots `v4.40a.10.05`.
 - Open: STOR needs the server operator's approval; SNF M1-M4 against the real server; prod AU needs
-  icssw-org to publish `.bin.zz` assets; upstream PRs for the five features not opened; BLE backlog B1
+  icssw-org to publish `.autoupdate` assets; upstream PRs for the five features not opened; BLE backlog B1
   (bleQueue carry-over); classic Safeboot headroom 1.5 KB (drop ESPmDNS next time it grows).
 - AU-12 (Safeboot capability version): Safeboot carries `MCSB;ver;002`, the app scans the partition and
   locks auto update (command, boot demotion, handover, greyed web dropdown + footnote) below

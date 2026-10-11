@@ -1,8 +1,8 @@
 // AU W1 (#1187): src/fw_update_assets.h -- env to release-asset name, and the streaming
 // scanner over the GitHub releases/latest JSON. Fixtures are real API responses fetched
 // 2026-10-05 (dk5en-latest.json = DK5EN/MeshCom-Firmware v4.40a.10.02, icssw-latest.json =
-// icssw-org v4.40a) plus a synthetic fork release with .bin.zz assets inserted
-// (dk5en-zz-synthetic.json; the T-Beam-1W.bin.zz asset has its "name" key LAST).
+// icssw-org v4.40a) plus a synthetic fork release with .autoupdate assets inserted
+// (dk5en-autoupdate-synthetic.json; the T-Beam-1W.autoupdate asset has its "name" key LAST).
 #include <unity.h>
 #include <string.h>
 #include <stdio.h>
@@ -109,23 +109,43 @@ static void test_asset_name_plain_and_renames()
 {
     char b[64];
     TEST_ASSERT_TRUE(fwAssetName("heltec_wifi_lora_32_V3", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("heltec_wifi_lora_32_V3.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("heltec_wifi_lora_32_V3.autoupdate", b);
     TEST_ASSERT_TRUE(fwAssetName("ttgo_tbeam_SX1262", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("ttgo_tbeam_SX1262.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("ttgo_tbeam_SX1262.autoupdate", b);
     TEST_ASSERT_TRUE(fwAssetName("E22_1262_S3-DevKitC-1-N16R8", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("E22_1262_S3-DevKitC-1-N16R8.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("E22_1262_S3-DevKitC-1-N16R8.autoupdate", b);
     TEST_ASSERT_TRUE(fwAssetName("t_deck_plus", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("t_deck_plus.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("t_deck_plus.autoupdate", b);
 
     TEST_ASSERT_TRUE(fwAssetName("LilyGo_T-Beam-1W", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("T-Beam-1W.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("T-Beam-1W.autoupdate", b);
     TEST_ASSERT_TRUE(fwAssetName("LilyGo_T3_S3_V1_3", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("T3_S3_V13.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("T3_S3_V13.autoupdate", b);
     TEST_ASSERT_TRUE(fwAssetName("LilyGo_T_Connect_Pro", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("t_connect_pro.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("t_connect_pro.autoupdate", b);
     // The renamed targets themselves are not renamed again.
     TEST_ASSERT_TRUE(fwAssetName("T-Beam-1W", b, sizeof(b)));
-    TEST_ASSERT_EQUAL_STRING("T-Beam-1W.bin.zz", b);
+    TEST_ASSERT_EQUAL_STRING("T-Beam-1W.autoupdate", b);
+}
+
+static void test_asset_name_longest_env_fits_48_byte_buffer()
+{
+    // E22_1262_S3-DevKitC-1-N16R8 is the longest env: 27 + ".autoupdate" (11) = 38 chars.
+    char b[48];
+    TEST_ASSERT_TRUE(fwAssetName("E22_1262_S3-DevKitC-1-N16R8", b, sizeof(b)));
+    TEST_ASSERT_EQUAL_STRING("E22_1262_S3-DevKitC-1-N16R8.autoupdate", b);
+    TEST_ASSERT_EQUAL_UINT32(38u, (uint32_t)strlen(b));
+    // the scanner's "want" buffer takes it, and the 47-char maximum (48 bytes incl. NUL)
+    const std::string longest(47, 'n');
+    for (const std::string &nm : {std::string(b), longest})
+    {
+        const std::string j = "{\"tag_name\":\"v1\",\"assets\":[{\"name\":\"" + nm +
+                              "\",\"size\":7,\"browser_download_url\":\"https://ok/" + nm + "\"}]}";
+        FwReleaseInfo r;
+        TEST_ASSERT_TRUE(scan(j, nm.c_str(), 7, r));
+        TEST_ASSERT_TRUE(r.found);
+        TEST_ASSERT_EQUAL_UINT32(7u, r.size);
+    }
 }
 
 static void test_asset_name_bounds()
@@ -135,11 +155,11 @@ static void test_asset_name_bounds()
     TEST_ASSERT_FALSE(fwAssetName("", b, sizeof(b)));
     TEST_ASSERT_FALSE(fwAssetName("t_deck", nullptr, 10));
     TEST_ASSERT_FALSE(fwAssetName("t_deck", b, 0));
-    // "t_deck.bin.zz" is 13 chars + NUL = 14 bytes
-    char small[14];
+    // "t_deck.autoupdate" is 17 chars + NUL = 18 bytes
+    char small[18];
     TEST_ASSERT_TRUE(fwAssetName("t_deck", small, sizeof(small)));
-    TEST_ASSERT_EQUAL_STRING("t_deck.bin.zz", small);
-    char tiny[13];
+    TEST_ASSERT_EQUAL_STRING("t_deck.autoupdate", small);
+    char tiny[17];
     memset(tiny, 'x', sizeof(tiny));
     TEST_ASSERT_FALSE(fwAssetName("t_deck", tiny, sizeof(tiny)));
     TEST_ASSERT_EQUAL_CHAR('\0', tiny[0]);
@@ -234,8 +254,8 @@ static void test_missing_asset_is_not_found_but_release_is_read()
     for (size_t c : kChunks)
     {
         FwReleaseInfo r;
-        // the real release has no .zz yet (they are added by the release process)
-        TEST_ASSERT_TRUE(scan(j, "heltec_wifi_lora_32_V3.bin.zz", c, r));
+        // the real release has no .autoupdate yet (they are added by the release process)
+        TEST_ASSERT_TRUE(scan(j, "heltec_wifi_lora_32_V3.autoupdate", c, r));
         TEST_ASSERT_EQUAL_STRING("v4.40a.10.02", r.tag);
         TEST_ASSERT_FALSE(r.found);
         TEST_ASSERT_EQUAL_UINT32(0u, r.size);
@@ -258,9 +278,9 @@ static void test_missing_asset_is_not_found_but_release_is_read()
     TEST_ASSERT_FALSE(r.found);
 }
 
-static void test_synthetic_zz_assets_found()
+static void test_synthetic_autoupdate_assets_found()
 {
-    const std::string j = read_fixture("dk5en-zz-synthetic.json");
+    const std::string j = read_fixture("dk5en-autoupdate-synthetic.json");
     for (size_t c : kChunks)
     {
         char n[64];
@@ -275,7 +295,7 @@ static void test_synthetic_zz_assets_found()
                                  sha_hex(r.sha256).c_str());
         TEST_ASSERT_EQUAL_STRING(
             "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/"
-            "heltec_wifi_lora_32_V3.bin.zz",
+            "heltec_wifi_lora_32_V3.autoupdate",
             r.url);
         // the plain asset next to it is still its own asset
         TEST_ASSERT_TRUE(scan(j, "heltec_wifi_lora_32_V3.bin", c, r));
@@ -284,11 +304,11 @@ static void test_synthetic_zz_assets_found()
     }
 }
 
-static void test_synthetic_zz_name_key_last()
+static void test_synthetic_autoupdate_name_key_last()
 {
-    // T-Beam-1W.bin.zz carries its keys in the order url, ..., size, digest, ..., name.
-    const std::string j = read_fixture("dk5en-zz-synthetic.json");
-    const size_t at = j.find("\"name\": \"T-Beam-1W.bin.zz\"");
+    // T-Beam-1W.autoupdate carries its keys in the order url, ..., size, digest, ..., name.
+    const std::string j = read_fixture("dk5en-autoupdate-synthetic.json");
+    const size_t at = j.find("\"name\": \"T-Beam-1W.autoupdate\"");
     TEST_ASSERT_TRUE(at != std::string::npos);
     TEST_ASSERT_TRUE(j.find("\"size\": 811066") < at); // size precedes the name: premise
     char n[64];
@@ -303,7 +323,7 @@ static void test_synthetic_zz_name_key_last()
         TEST_ASSERT_EQUAL_STRING("2017ffa35bb8ed3cbe2b948da2a58c994edba40668564ee54b6b973217be9360",
                                  sha_hex(r.sha256).c_str());
         TEST_ASSERT_EQUAL_STRING(
-            "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-Beam-1W.bin.zz",
+            "https://github.com/DK5EN/MeshCom-Firmware/releases/download/v4.40a.10.02/T-Beam-1W.autoupdate",
             r.url);
     }
 }
@@ -322,30 +342,30 @@ static void test_toplevel_fields_not_overridden_by_subobjects()
     // author and uploader repeat tag_name/draft/prerelease/assets/name/size/url keys
     const std::string j =
         "{\"author\":{\"tag_name\":\"evil\",\"draft\":true,\"prerelease\":true,"
-        "\"assets\":[{\"name\":\"fw.bin.zz\",\"size\":1,\"browser_download_url\":\"http://evil\"}]},"
+        "\"assets\":[{\"name\":\"fw.autoupdate\",\"size\":1,\"browser_download_url\":\"http://evil\"}]},"
         "\"tag_name\":\"v1.2c\",\"draft\":false,\"prerelease\":false,"
-        "\"assets\":[{\"uploader\":{\"name\":\"fw.bin.zz\",\"size\":2,\"digest\":\"sha256:00\","
+        "\"assets\":[{\"uploader\":{\"name\":\"fw.autoupdate\",\"size\":2,\"digest\":\"sha256:00\","
         "\"browser_download_url\":\"http://evil2\",\"draft\":true},"
-        "\"name\":\"fw.bin.zz\",\"size\":42,\"digest\":\"sha256:" +
-        std::string(64, 'a') + "\",\"browser_download_url\":\"https://ok/fw.bin.zz\"}],"
+        "\"name\":\"fw.autoupdate\",\"size\":42,\"digest\":\"sha256:" +
+        std::string(64, 'a') + "\",\"browser_download_url\":\"https://ok/fw.autoupdate\"}],"
                                "\"author2\":{\"tag_name\":\"late-evil\",\"prerelease\":true}}";
     for (size_t c : kChunks)
     {
         FwReleaseInfo r;
-        TEST_ASSERT_TRUE(scan(j, "fw.bin.zz", c, r));
+        TEST_ASSERT_TRUE(scan(j, "fw.autoupdate", c, r));
         TEST_ASSERT_EQUAL_STRING("v1.2c", r.tag);
         TEST_ASSERT_FALSE(r.draft);
         TEST_ASSERT_FALSE(r.prerelease);
         TEST_ASSERT_TRUE(r.found);
         TEST_ASSERT_EQUAL_UINT32(42u, r.size);
-        TEST_ASSERT_EQUAL_STRING("https://ok/fw.bin.zz", r.url);
+        TEST_ASSERT_EQUAL_STRING("https://ok/fw.autoupdate", r.url);
         TEST_ASSERT_EQUAL_STRING(std::string(64, 'a').c_str(), sha_hex(r.sha256).c_str());
     }
 }
 
 static void test_draft_and_prerelease_flags()
 {
-    const std::string a = "{\"name\":\"fw.bin.zz\",\"size\":5,\"browser_download_url\":\"u\"}";
+    const std::string a = "{\"name\":\"fw.autoupdate\",\"size\":5,\"browser_download_url\":\"u\"}";
     struct Case
     {
         const char *head;
@@ -361,7 +381,7 @@ static void test_draft_and_prerelease_flags()
         for (size_t c : kChunks)
         {
             FwReleaseInfo r;
-            TEST_ASSERT_TRUE(scan(doc(a, cs.head), "fw.bin.zz", c, r));
+            TEST_ASSERT_TRUE(scan(doc(a, cs.head), "fw.autoupdate", c, r));
             TEST_ASSERT_EQUAL(cs.draft, r.draft);
             TEST_ASSERT_EQUAL(cs.pre, r.prerelease);
             TEST_ASSERT_TRUE(r.found);
@@ -446,16 +466,16 @@ static void test_string_escapes_whitespace_numbers_nesting()
         "\n {\n \"id\" : -12.5e+3 ,\n \"body\" : \"text with } ] { [ \\\" and \\\\ and \\u007d\",\n"
         " \"tag_name\" : \"v\\u0034.40a\\/x\" ,\n \"draft\" : false , \"prerelease\":false,\n"
         " \"extra\": [ [ 1 , 2.5 , [ ] ] , { } , { \"a\" : { \"b\" : [ null , true ] } } ] ,\n"
-        " \"assets\" : [\n  { \"x\" : [ { \"name\" : \"fw.bin.zz\" } ] , \"name\" : \"other\\\"s.bin\" ,"
+        " \"assets\" : [\n  { \"x\" : [ { \"name\" : \"fw.autoupdate\" } ] , \"name\" : \"other\\\"s.bin\" ,"
         " \"size\" : 3 , \"browser_download_url\" : \"u\" },\n"
         "  { \"label\" : \"\" , \"size\" : 1234567 ,\n"
-        "    \"name\" : \"f\\u0077.bin\\u002ezz\" ,\n"
+        "    \"name\" : \"f\\u0077.auto\\u0075pdate\" ,\n"
         "    \"browser_download_url\" : \"https://h/p?a=1\\u0026b=2\\/c\\\\d\" , \"download_count\" : 0 }\n"
         " ] ,\n \"tarball_url\" : \"x\" }\n";
     for (size_t c : kChunks)
     {
         FwReleaseInfo r;
-        TEST_ASSERT_TRUE(scan(j, "fw.bin.zz", c, r));
+        TEST_ASSERT_TRUE(scan(j, "fw.autoupdate", c, r));
         TEST_ASSERT_EQUAL_STRING("v4.40a/x", r.tag);
         TEST_ASSERT_TRUE(r.found);
         TEST_ASSERT_EQUAL_UINT32(1234567u, r.size);
@@ -647,6 +667,7 @@ int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_asset_name_plain_and_renames);
+    RUN_TEST(test_asset_name_longest_env_fits_48_byte_buffer);
     RUN_TEST(test_asset_name_bounds);
     RUN_TEST(test_state_is_bounded);
     RUN_TEST(test_dk5en_plain_bin_all_chunk_sizes);
@@ -654,8 +675,8 @@ int main(int, char **)
     RUN_TEST(test_icssw_every_asset_matches_independent_search);
     RUN_TEST(test_icssw_renamed_assets);
     RUN_TEST(test_missing_asset_is_not_found_but_release_is_read);
-    RUN_TEST(test_synthetic_zz_assets_found);
-    RUN_TEST(test_synthetic_zz_name_key_last);
+    RUN_TEST(test_synthetic_autoupdate_assets_found);
+    RUN_TEST(test_synthetic_autoupdate_name_key_last);
     RUN_TEST(test_toplevel_fields_not_overridden_by_subobjects);
     RUN_TEST(test_draft_and_prerelease_flags);
     RUN_TEST(test_asset_field_order_and_missing_digest);

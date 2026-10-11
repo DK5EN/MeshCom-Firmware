@@ -313,7 +313,7 @@
         <div class="drop-zone" id="dropZone">
             Drag and drop a file here or click to select
         </div>
-        <input type="file" id="firmware" accept=".bin,.zz" hidden />
+        <input type="file" id="firmware" accept=".bin,.autoupdate" hidden />
         <button onclick="uploadFirmware()" id="uploadButton">Upload</button>
         <progress id="progressBar" value="0" max="100"></progress>
         <div class="status" id="status"></div>
@@ -439,7 +439,7 @@
             not_bootable: 'The uploaded image was rejected as not bootable.',
             activate_failed: 'The device could not activate the new image.',
             update_error: 'The update failed during finalisation.',
-            inflate_failed: 'The compressed (.zz) image could not be unpacked.',
+            inflate_failed: 'The compressed (.autoupdate) image could not be unpacked.',
         };
 
         function reasonSentence(reason) {
@@ -706,11 +706,11 @@
             dropZone.classList.remove('dragover');
             if (event.dataTransfer.files.length > 0) {
                 selectedFile = event.dataTransfer.files[0];
-                // check if the file is .bin or .bin.zz otherwise reset
-                if (!/\.bin(\.zz)?$/.test(selectedFile.name)) {
+                // check if the file is .bin or .autoupdate otherwise reset
+                if (!/\.(bin|autoupdate)$/.test(selectedFile.name)) {
                     selectedFile = null;
                     dropZone.textContent = 'Drag and drop a file here or click to select';
-                    status.textContent = 'Please select a .bin or .bin.zz file!';
+                    status.textContent = 'Please select a .bin or .autoupdate file!';
                     uploadBtn.disabled = true;
                     uploadBtn.style.backgroundColor = '#444';
                 } else {
@@ -741,11 +741,11 @@
                 return;
             }
 
-            // .zz: the node inflates while receiving, so hash the INFLATED image
+            // .autoupdate: the node inflates while receiving, so hash the INFLATED image
             const head = new Uint8Array(await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsArrayBuffer(selectedFile.slice(0, 1)); }));
             const isZz = head.length === 1 && head[0] === 0x78;
             if (isZz && typeof DecompressionStream === 'undefined') {
-                status.textContent = 'This browser cannot unpack .zz -- use the .bin file';
+                status.textContent = 'This browser cannot unpack .autoupdate -- use the .bin file';
                 return;
             }
 
@@ -761,7 +761,7 @@
             try {
                 hash = await (isZz ? calculateInflatedMD5(selectedFile) : calculateMD5(selectedFile));
             } catch (error) {
-                status.textContent = 'Could not unpack the .zz file';
+                status.textContent = 'Could not unpack the .autoupdate file';
                 endUpload();
                 updateCancelButton();
                 return;

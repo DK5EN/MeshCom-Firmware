@@ -101,7 +101,7 @@ uint8_t s_argCh = 0;
 struct Avail
 {
     bool checked;    // a CHECK completed
-    bool found;      // the .bin.zz asset was found with a usable url
+    bool found;      // the .autoupdate asset was found with a usable url
     bool haveDigest; // ... and carries a well-formed sha256 digest
     uint8_t sha[32];
     char url[256]; // never printed: it is a plain download URL, the redirect carries the token
@@ -447,7 +447,7 @@ const char *httpGet(HTTPClient &http, WiFiClientSecure &c, const String &url, bo
 
 struct CheckCtx
 {
-    FwJsonScan *z; // the .bin.zz asset
+    FwJsonScan *z; // the .autoupdate asset
     FwJsonScan *r; // the raw .bin asset (its size = ilen)
 };
 
@@ -461,7 +461,7 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
 
 const char *runCheck(FwChannel ch)
 {
-    char zname[40], rname[40];
+    char zname[48], rname[48];
     if (!fwAssetName(MC_ENV_NAME, zname, sizeof(zname)) ||
         !joinName(rname, sizeof(rname), fwAssetBase(MC_ENV_NAME), ".bin"))
         return "noenv";

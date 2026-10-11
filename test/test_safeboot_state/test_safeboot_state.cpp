@@ -856,7 +856,7 @@ static void test_inflate_io_errors_and_params(void) {
 }
 
 // ---------------------------------------------------------------------
-// .bin.zz upload: reason string + abort path (docs/safeboot-ota-contract.md)
+// .autoupdate upload: reason string + abort path (docs/safeboot-ota-contract.md)
 // ---------------------------------------------------------------------
 static void test_inflate_failed_aborts_without_switch(void) {
     OtaSession s;
