@@ -1559,7 +1559,7 @@ void esp32setup()
 
     #endif
 
-    #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHOP_AXP2101)
+    #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
        setChargeLedOn(!!bCHARGE_LED); // Initialize the charge indicator LED after boot and setupPMU()
     #endif
 
