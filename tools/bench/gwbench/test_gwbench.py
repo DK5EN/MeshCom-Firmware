@@ -112,6 +112,17 @@ def test_audit_stray_repeat_after_stop_fails() -> None:
     assert r.returncode == 1 and "stray repeat after the stop" in r.stdout, r.stdout[-1500:]
 
 
+def test_audit_own_reply_with_same_ctr_is_not_a_repeat() -> None:
+    """Run gwbench_20261011-132633: both directions' sync use ctr 0; the sender's later REPLY to the peer's sync
+    (DK5EN-1>DK5EN-90:RM1 0 ok ...) was counted as a stray copy of its own sync command."""
+    h1, h90 = _base_logs()
+    rep = "%s 080 : x%s H04 S0 T0 M01 DK5EN-1>DK5EN-90:RM1 7 ok ctr=9 v=4.40a %s %s"
+    h1 += [_l(160, rep % ("NEW-TXT", "EA25A3AF", TAG2, TAIL)), _l(160, rep % ("TX-UDP  ", "EA25A3AF", TAG2, TAIL)),
+           _l(169, rep % ("TX-LoRa ", "EA25A3AF", TAG2, TAIL))]
+    r = _analyze(_make_run(h1, h90))
+    assert r.returncode == 0 and "stray repeat" not in r.stdout, r.stdout[-1500:]
+
+
 def test_audit_repeat_before_stop_is_not_stray() -> None:
     h1, h90 = _base_logs()
     # reply lost once: copy 2 at +52 s, verified at +55 s; the copy sits before the stop

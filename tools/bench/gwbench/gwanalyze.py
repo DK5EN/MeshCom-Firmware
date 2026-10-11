@@ -61,6 +61,12 @@ RM_REPLY = re.compile(r"^\[RM\];reply;(?P<dst>[^;]+);ctr;(?P<ctr>\d+);verified;(
 RM_SENDFAIL = re.compile(r"^\[RM\];reply;send_failed;(?P<rc>-?\d+)")
 BP = re.compile(r"^\[BP\];(?P<k>nack|refuse|notice);(?P<rest>.*)$")
 RMTEXT = re.compile(r"^RM1 (?P<ctr>\d+) (?P<rest>.*)$")
+
+
+def is_reply_rest(rest: str) -> bool:
+    """RM1 text after the counter: a reply starts with `ok ` or `err `, a command with its name. sync uses ctr 0 in both
+    directions, so a node's reply to the peer's sync carries the same ctr as its own sync command."""
+    return rest.startswith(("ok ", "err "))
 JUNK = re.compile(r"RM1 (?P<ctr>\d+) status 0123456789abcde(?P<n>\d)")
 ANOM = [
     ("boot", re.compile(r"\[BOOT\]")),
@@ -426,7 +432,7 @@ def frame_msgid(run: Run, node: str, ctr: int, reply: bool, t0: float, t1: float
         for e in run.logs[node]:
             if e.kind in kinds and t0 <= e.t <= t1 and e.typ == ":" and e.dest == dst:
                 m = RMTEXT.match(e.text)
-                if m and int(m.group("ctr")) == ctr and m.group("rest").startswith(("ok ", "err ")) == reply:
+                if m and int(m.group("ctr")) == ctr and is_reply_rest(m.group("rest")) == reply:
                     return e.msgid
     return ""
 
@@ -818,7 +824,7 @@ def audit_case(run: Run, idx: int, e: Dict[str, Any], tail: float) -> Optional[C
     for x in run.logs[src]:
         if x.kind in ("new", "udp_tx", "rf_tx") and x.dest == dst and x.typ == ":" and ts - 2 <= x.t <= ts + 12:
             m0 = RMTEXT.match(x.text)
-            if m0 and int(m0.group("ctr")) == r.ctr:
+            if m0 and int(m0.group("ctr")) == r.ctr and not is_reply_rest(m0.group("rest")):
                 ids.add(core_id(x.msgid))
     if v0 is not None:
         for c in run.copies[dst]:
@@ -831,7 +837,7 @@ def audit_case(run: Run, idx: int, e: Dict[str, Any], tail: float) -> Optional[C
             continue
         if x.kind in ("new", "udp_tx", "rf_tx"):
             m = RMTEXT.match(x.text)
-            if m and int(m.group("ctr")) == r.ctr and x.dest == dst:
+            if m and int(m.group("ctr")) == r.ctr and x.dest == dst and not is_reply_rest(m.group("rest")):
                 sent.setdefault(x.msgid, x.t)
         elif x.kind == "pnretry" and core_id(x.msgid) in ids:
             sent.setdefault(x.msgid, x.t)

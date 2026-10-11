@@ -750,6 +750,84 @@ void test_rm1_stopped_retry_copy_matches_original(void)
     TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, orig + 1));
 }
 
+// Bench 2026-10-11 run gwbench_20261011-132633 (RAK gateway): every stop misses (the server reply
+// beats copy 1 out of the TX ring), commands go out every ~9 s, and a slot's threshold can come
+// 80 s+ after its stop (TX backlog, echo restart). The old 8-entry ring overwrote round-robin, so
+// eight later stops evicted a live entry although most of them had been released (taken) already;
+// the ladder then sent copies 2-4 after the verified reply. A free entry must be used first.
+void test_rm1_stopped_released_entries_do_not_evict_live_one(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    const uint32_t live = 0x91A43000u | 0x5C9u;
+    pnRm1StoppedAdd(&s, live);
+    for (uint32_t i = 1; i <= 3u * PN_RM1_STOPPED_MAX; i++)
+    {
+        uint32_t other = (i + 0x100u) << 12;
+        pnRm1StoppedAdd(&s, other);
+        TEST_ASSERT_TRUE(pnRm1StoppedTake(&s, other)); // released at its own threshold
+    }
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, live));
+}
+
+// The set holds one entry per TX ring slot: every live entry belongs to an own RM1 command slot.
+void test_rm1_stopped_holds_a_full_ring(void)
+{
+    TEST_ASSERT_TRUE(PN_RM1_STOPPED_MAX >= 20); // largest MAX_RING (configuration_global.h)
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    for (uint32_t i = 1; i <= 20; i++)
+        pnRm1StoppedAdd(&s, i << 12);
+    for (uint32_t i = 1; i <= 20; i++)
+        TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, i << 12));
+}
+
+// Advisor (stray-repeat fix): a stop after the ladder ended (key expiry, forget, eviction) missed and
+// was recorded although no slot was left to release it; such ids piled up until they evicted live
+// ones. A miss records only a live slot's id and drops every entry whose slot is gone.
+void test_rm1_stopped_miss_records_only_live_slots(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    const uint32_t gone = 0x77000u, live = 0x91A435C9u;
+    const uint32_t ring[] = {live, 0x12345000u};
+    TEST_ASSERT_FALSE(pnRm1StoppedRecordMiss(&s, gone, ring, 2)); // ladder ended: nothing recorded
+    TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, gone));
+    TEST_ASSERT_TRUE(pnRm1StoppedRecordMiss(&s, live, ring, 2));
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, live));
+}
+
+void test_rm1_stopped_stale_entries_pruned_live_one_survives(void)
+{
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    for (uint32_t i = 1; i <= PN_RM1_STOPPED_MAX; i++) // a full set of entries whose slots are gone
+        pnRm1StoppedAdd(&s, (i + 0x200u) << 12);
+    const uint32_t live = 0x91A435C9u;
+    uint32_t ring[2] = {live, 0};
+    TEST_ASSERT_TRUE(pnRm1StoppedRecordMiss(&s, live, ring, 1));
+    for (uint32_t i = 1; i <= PN_RM1_STOPPED_MAX; i++)
+        TEST_ASSERT_FALSE(pnRm1StoppedHas(&s, (i + 0x200u) << 12));
+    for (uint32_t i = 1; i <= 3u * PN_RM1_STOPPED_MAX; i++) // the bench burst: miss, then release
+    {
+        ring[1] = (i + 0x100u) << 12;
+        TEST_ASSERT_TRUE(pnRm1StoppedRecordMiss(&s, ring[1], ring, 2));
+        TEST_ASSERT_TRUE(pnRm1StoppedTake(&s, ring[1]));
+    }
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, live));
+}
+
+void test_rm1_stopped_live_match_ignores_retry_bits(void)
+{
+    uint32_t gw_id = 0x00155122u;
+    uint32_t orig = (((gw_id >> 2) & 0xFFFFFu) << 12) | ((gw_id & 3u) << 10) | 0x07Bu;
+    Rm1StoppedSet s;
+    pnRm1StoppedInit(&s);
+    const uint32_t ring[] = {pnRetryId(orig, gw_id, 2)}; // the slot now holds retry copy 2
+    TEST_ASSERT_TRUE(pnRm1StoppedRecordMiss(&s, orig, ring, 1));
+    TEST_ASSERT_TRUE(pnRm1StoppedHas(&s, pnRetryId(orig, gw_id, 3)));
+}
+
 void test_rm1_stopped_ring_overwrites_oldest(void)
 {
     Rm1StoppedSet s;
@@ -833,6 +911,11 @@ int main(int, char **)
     RUN_TEST(test_rm1_stopped_id_zero_ignored);
     RUN_TEST(test_rm1_stopped_retry_copy_matches_original);
     RUN_TEST(test_rm1_stopped_ring_overwrites_oldest);
+    RUN_TEST(test_rm1_stopped_released_entries_do_not_evict_live_one);
+    RUN_TEST(test_rm1_stopped_holds_a_full_ring);
+    RUN_TEST(test_rm1_stopped_miss_records_only_live_slots);
+    RUN_TEST(test_rm1_stopped_stale_entries_pruned_live_one_survives);
+    RUN_TEST(test_rm1_stopped_live_match_ignores_retry_bits);
     RUN_TEST(test_rm1_stopped_duplicate_add_keeps_one_entry);
     RUN_TEST(test_rm1_stopped_stale_entry_purged_on_enqueue);
 

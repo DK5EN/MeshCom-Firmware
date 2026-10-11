@@ -359,9 +359,18 @@ static inline bool pnFrameIsOwnRm1Cmd(const uint8_t *frame, uint16_t len,
 // copy that is READY / on air; the 40 s ladder then looks the slot up here at
 // the threshold and releases it instead of producing another copy (same
 // effect as M1 for PNs, which use own_msg_id status 0x02 -- not usable for
-// RM1 commands, a gateway ACK sets it). Small ring, RAM only, id 0 = empty.
+// RM1 commands, a gateway ACK sets it). RAM only, id 0 = empty.
 // Entries are stored as pnRetryCore(), so any retry copy id matches.
-#define PN_RM1_STOPPED_MAX 8
+// Only ids whose slot is still live (status != DONE) are recorded, and every
+// recording first drops the entries whose slot is gone (pnRm1StoppedRecordMiss):
+// so each entry belongs to a live ring slot, and one entry per TX ring slot
+// (largest MAX_RING, configuration_global.h; static_assert in lora_functions.cpp)
+// always fits. As a gateway every stop misses (the server reply beats copy 1
+// out of the ring) and a threshold can come 80 s+ after its stop; the old
+// 8-entry round-robin ring evicted live entries there (bench 2026-10-11), and
+// stops after the ladder had ended (key expiry, forget, eviction) left entries
+// no threshold would ever take.
+#define PN_RM1_STOPPED_MAX 20
 
 struct Rm1StoppedSet
 {
@@ -387,13 +396,22 @@ static inline bool pnRm1StoppedHas(const Rm1StoppedSet *s, uint32_t id)
     return false;
 }
 
-// Id 0 is ignored; an id already present does not take a second entry;
-// otherwise the oldest entry is overwritten (ring).
+// Id 0 is ignored; an id already present does not take a second entry; a
+// free entry (taken by a release) is used first; only a full set overwrites,
+// round-robin (oldest first while nothing was taken).
 static inline void pnRm1StoppedAdd(Rm1StoppedSet *s, uint32_t id)
 {
     uint32_t core = pnRetryCore(id);
     if (core == 0 || pnRm1StoppedHas(s, id))
         return;
+    for (uint8_t i = 0; i < PN_RM1_STOPPED_MAX; i++)
+    {
+        if (s->id[i] == 0)
+        {
+            s->id[i] = core;
+            return;
+        }
+    }
     s->id[s->next] = core;
     s->next = (uint8_t)((s->next + 1) % PN_RM1_STOPPED_MAX);
 }
@@ -413,6 +431,33 @@ static inline bool pnRm1StoppedTake(Rm1StoppedSet *s, uint32_t id)
         }
     }
     return false;
+}
+
+static inline bool pnRm1CoreIn(const uint32_t *cores, uint8_t n, uint32_t id)
+{
+    uint32_t core = pnRetryCore(id);
+    if (core == 0)
+        return false;
+    for (uint8_t i = 0; i < n; i++)
+        if (pnRetryCore(cores[i]) == core)
+            return true;
+    return false;
+}
+
+// A stop missed its slot. liveIds: msg ids of the ring slots whose status is
+// not DONE (READY, CSMA, on air or waiting for the threshold). Drops every
+// entry whose slot is gone (overwritten, evicted, given up) and records id only
+// if its slot is still live: a stop after the ladder ended has nothing left to
+// release. Returns true if id is in the set afterwards.
+static inline bool pnRm1StoppedRecordMiss(Rm1StoppedSet *s, uint32_t id, const uint32_t *liveIds, uint8_t n)
+{
+    for (uint8_t i = 0; i < PN_RM1_STOPPED_MAX; i++)
+        if (s->id[i] != 0 && !pnRm1CoreIn(liveIds, n, s->id[i]))
+            s->id[i] = 0;
+    if (!pnRm1CoreIn(liveIds, n, id))
+        return false;
+    pnRm1StoppedAdd(s, id);
+    return true;
 }
 
 // Offset of the FCS field: the first 0x00 at index >= 6, plus 3 (skips

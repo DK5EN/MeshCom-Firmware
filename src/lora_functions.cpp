@@ -403,6 +403,7 @@ static int findAndStopRingSlotImpl(uint32_t msgId, bool skipRm1Cmd)
 // only, zero-initialised (= empty). Task scope as ringBuffer: guarded by the
 // RAK critical section like the ring itself.
 static Rm1StoppedSet rm1Stopped;
+static_assert(PN_RM1_STOPPED_MAX >= MAX_RING, "one RM1-stopped entry per TX ring slot");
 
 // Stops any matching pending slot, an own RM1 command slot included (the RM
 // layer calls this with the ORIGINAL msg_id when a reply verifies). On a miss
@@ -412,14 +413,21 @@ int findAndStopRingSlot(uint32_t msgId)
 {
     const int slot = findAndStopRingSlotImpl(msgId, false);
     // No waiting slot found: the copy is READY, in CSMA or on air. Remember the id so the ladder
-    // releases that slot at its next threshold instead of sending another copy (only on a miss, so
-    // a stopped id never lingers in the set).
+    // releases that slot at its next threshold instead of sending another copy -- only while that
+    // slot is still live (status != DONE; doTX clears the length, not the id bytes). A stop after
+    // the ladder ended (key expiry, forget, eviction) records nothing, and entries whose slot is
+    // gone are dropped here, so the set never fills with ids no threshold will take.
     if(slot < 0)
     {
+        uint32_t liveIds[MAX_RING];
+        uint8_t nLive = 0;
 #if defined(BOARD_RAK4630)
         taskENTER_CRITICAL();
 #endif
-        pnRm1StoppedAdd(&rm1Stopped, msgId);
+        for(int i = 0; i < MAX_RING; i++)
+            if(ringBuffer[i][1] != RING_STATUS_DONE)
+                liveIds[nLive++] = extractRingMsgId(i);
+        pnRm1StoppedRecordMiss(&rm1Stopped, msgId, liveIds, nLive);
 #if defined(BOARD_RAK4630)
         taskEXIT_CRITICAL();
 #endif
