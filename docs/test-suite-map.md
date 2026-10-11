@@ -188,6 +188,7 @@ flashes whatever is attached.
 | test_drift_dr16_gates        | Regression    |     7 | native                                                       |
 | test_esp32_flash_lifecycle   | Regression    |    13 | native_esp32_flash_lifecycle                                 |
 | test_esp32_settings_nvs      | Integration   |     6 | native_esp32_settings_nvs                                    |
+| test_eth_recovery            | Unit          |    22 | native_eth_recovery                                          |
 | test_extern_msg_json         | Contract      |     6 | native                                                       |
 | test_extern_notice_json      | Contract      |     7 | native                                                       |
 | test_extern_tele_json        | Contract      |     8 | native                                                       |

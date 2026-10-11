@@ -1,8 +1,8 @@
 # RAK4631 + W5100S: no DHCP lease after `--reboot` or a runtime IP loss (DB0AIS, MikroTik)
 
-- **Status:** open. Router config received 2026-10-09: `lease-time=1w`, `always-broadcast=no`
-  (H1 precondition holds). `always-broadcast=yes` set as a test on 2026-10-09 19:02, result
-  pending. Backlog row `ETH-04`.
+- **Status:** fixed on fork-dev 2026-10-11 (F1 + F2 + F3, `708b5091`), bench-verified on DK5EN-90,
+  not yet in the field and no upstream PR (held back). Router side: `always-broadcast=yes` test at
+  DB0AIS since 2026-10-09 19:02, result pending. Backlog row `ETH-04`.
 - **Firmware:** V4.40a
 - **Hardware:** RAK4631 + RAK13800 (W5100S), DHCP from a MikroTik router
 - **Reported:** 2026-10-05 by the DB0AIS operator; second occurrence 2026-10-06 (runtime, no reboot)
@@ -267,6 +267,57 @@ with the default `always-broadcast=no`, and the node should not discard a valid 
 - **F2, safety net:** after 2 DHCP failures with link up, one `initETH_HW()` before the next
   `startETH()`.
 - **F3:** seed the RNG from the nRF52 hardware RNG.
+
+## Implementation 2026-10-11 (`bdaf0093`, `708b5091`, fork-dev, no upstream PR yet)
+
+All recovery paths still call `NrfETH::resetDHCP()`. It now asks the pure decision function
+`eth_recovery::decide()` (`src/nrf52/eth_recovery.h`) what to do:
+
+| Situation                                                         | Action                                               |
+| ----------------------------------------------------------------- | ---------------------------------------------------- |
+| Fixed IP                                                          | unchanged legacy path                                |
+| DHCP lease held, link up, no maintain failure, last reopen got RX | **F1:** keep the chip IP, reopen the UDP socket only |
+| No lease, maintain rc 1/3, or a reopen with no UDP RX since       | full DHCP (`startETH()` → `Ethernet.begin()`)        |
+| Full DHCP failed twice in a row with link up                      | **F2:** `initETH_HW()` first, at most once per 5 min |
+
+- **F1** keeps the lease across link flaps too: the 2026-10-06 capture shows a link edge at the
+  outage start, and a DISCOVER right after a flap is the observed failure. `Ethernet.maintain()`
+  keeps owning renew, rebind and expiry. The library offers no forced renew, so there is no REQUEST
+  at reopen time.
+- **Escalation:** a reopen arms a check; if `s_ethUdpRx` has not moved by the next trigger, that
+  trigger does a full DHCP instead. A link down edge disarms the check (time without link is no
+  evidence). Without it, a wedged chip or a failing ARP would reopen forever.
+- **F2** never fires while the link is down (N-20).
+- **F3:** `seedRandomFromHw()` in `nrf52setup()`, after `init_ble()` and before the Ethernet init,
+  seeds `random()` from `sd_rand_application_vector_get()` (direct `NRF_RNG` if the SoftDevice is
+  off). Log line `[ETH];event;rng_seed;src;sd|hw|fallback`.
+- New log lines: `[ETH];event;reopen_udp;ip;...` and `[ETH];event;hw_reset;reason;dhcp_fail;n;...`.
+- `--ethdrop` (INSTRUMENT build) now runs the decision: on a healthy node it only reopens UDP; a
+  second one without UDP RX in between does a full DHCP. A webserver-only node never counts UDP RX.
+- Accepted side effect: with DHCP and a failed renew (maintain rc 1/3), a malformed UDP frame now
+  triggers a real DHCP; before ETH-04 that caller was a no-op.
+
+### Verification
+
+- `native_eth_recovery`: 22 cases (`test/test_eth_recovery`). The core cases fail against the old
+  rule (always full DHCP) and against Rule 2 without the stall check.
+- `tools/regression.sh --stage 1,2`: PASS, 70 envs, 2347 Unity cases. Builds: `wiscore_rak4631`,
+  `heltec_t114`, `t_echo`. RAK flash +920 B (668012 → 668932).
+- Bench DK5EN-90 (INSTRUMENT build), 2026-10-11:
+
+| Step                                       | Result                                                  |
+| ------------------------------------------ | ------------------------------------------------------- |
+| Boot                                       | `rng_seed;src;sd`, lease in 4.2 s                       |
+| `--ethdrop`, healthy                       | `reopen_udp`, 3 ms, IP kept, no DHCP                    |
+| second `--ethdrop`, `rx_n;0` (gateway off) | escalated to full DHCP, same IP in 125 ms               |
+| cable out 17 s, back in                    | `link;down;ip;1` → `link;up;ip;1`, IP kept, no DISCOVER |
+| `--ethdrop` after the flap                 | `reopen_udp`, 2 ms; web GUI HTTP 200                    |
+
+- Not exercised on hardware: F2 (needs a DHCP server that stops answering) and the MikroTik
+  unicast-OFFER case itself. F2 is covered by the unit tests only. Field confirmation needs a
+  DB0AIS image.
+- Observed on one bench boot, pre-existing: the PHY took longer than the 3 s LinkON wait, boot
+  DHCP was skipped, and the ETH-02 retry got the lease 30 s later.
 
 ## Code references
 
