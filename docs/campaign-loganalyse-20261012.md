@@ -28,7 +28,7 @@ form, so `tools/mock/test_loganalyse.py` stayed green.
 | W2a   | `--setlog` `[LOG]` lines as primary source (M-01): RX tail RSSI/SNR (nRF52 gets RSSI, F-13), DUP rate, own echo; RLY reason histogram; TX own/relay/gw split with wait stats; `[LOG] ERR` as RX-loss source (F-14) and no CRC_NRF52 label on ESP32; STAT section (util, sums, drops, heap, reboots); GWI/GWU; dedup balance (M-07) windowed to the STAT range, without HN reports and own/gw echoes, GWI-corrected, tolerance max(5, 1 %). Setlog-only captures (`--info off`) use the `[LOG]` RX lines as packet lines (no ACK/HN). `export LC_ALL=C` (de_DE awk parsed `1.5` as 1). Shared `PAYLOAD_LINE_RE` keeps chat text (MH/RX/TX-LoRa, RX/TX-UDP, `[EXT] Out`, `[LOG]`) out of WiFi/crash/UDP-reset counts. INTERFERER n/a without ferr. `docs/loradebug-serial-output.md` colon form fixed. 75 tests; two advisor rework rounds | done  |
 | W2b-1 | F-09 collision rewrite: path heads with path state (a callsign up to the next `>` after a head is a relay, whatever byte precedes it); 2+ distinct heads = COLLISION; pairs from heads; `COLLISION_ANALYSIS: unreliable` when all CRC dumps are size=255 (>= 3). dk5en-98 08-26: COLLISION 519 -> 3 (0.4 %; the 3 are single frames with a corrupted `>`). M-08 RX_OTHER_ERROR count + code histogram in CRC_ERRORS. Labels: `COLLISION (2+ path heads)`, `SINGLE_CORRUPT (1 path head)`. 86 tests; one advisor rework round                                                                                                                                                                                                                                                                                                             | done  |
 | W2b-2 | F-12 billing check in CHANNEL_UTIL: WARNING when the GCD of nonzero `rx=` is >= 500 ms over >= 20 samples (rx unit printed only then) or all CRC_ERROR size=255 (>= 3); util summary and CRC_VS_CHANNEL_UTIL flagged overstated; `BILLING_CHECK: ok` otherwise. Verified on all 19 pre-fix CHANNEL_UTIL files (dj8meh, dg0opk: 100 % on the 2476 ms grid) and every modern file (GCD 1). Heap `RATING: n/a (no periodic (mon) samples)`; untagged pre-43f66bfb `[HEAP];free` samples still rated. F-23: MC-STAT `tx:`/`drop:` continuations paired with their block and totalled (MC_STAT_TX_TOTAL / MC_STAT_DROP_TOTAL); MC-HWM n/a under setlog. CAD_STORM division by zero on timestamp-less logs fixed. 99 tests; advisor rework (2 items) applied by the orchestrator                                                               | done  |
-| W2b-3 | M-02..M-06, M-09, dedup-balance window re-anchored after a reboot (`up=` drop); timestamp-less captures (PuTTY: header `=~=~= PuTTY log YYYY.MM.DD hh:mm:ss` only): time-bucket tables (CHANNEL_UTIL BUCKETS_10MIN, CRC_VS_CHANNEL_UTIL) print n/a instead of junk buckets, PuTTY start time reported; rename/caveat `COLLISION (<1kHz)`; drop the duplicate `RX_OTHER_ERROR:` counter line                                                                                                                                                                                                                                                                                                                                                                                                                                              | open  |
+| W2b-3 | Counters: PNREPEAT (+distinct ids), ONRXDONE_HEALTH (STATS samples/max/warn sum, SLOW count/max, TX_WATCHDOG max), RING_DROP split STALE/PRIO/NEW, RX_PATH_LOSS (RX_BUF_OVERWRITE, CHECKRX zero_length), ACK_REJECT_B5 histogram; all event counters skip payload/chat lines (`lg`/`lgc` helpers). DEDUP_BALANCE summed per reboot segment (`DEDUP_WINDOWS`): dk5en-1 09-28 939/949 MISMATCH -> 923/923 OK; no-reboot logs byte-identical. Captures without line timestamps (PuTTY): `LINE_TIMESTAMPS: no`, `CAPTURE_START` from the PuTTY header, every time-derived table and verdict prints `n/a (no line timestamps)` (false CSMA CONGESTED gone). `COLLISION (<1kHz)` renamed `SAME_FREQ_PAIR (<1kHz)`; duplicate `RX_OTHER_ERROR:` line removed. 127 tests; one advisor rework round                                               | done  |
 
 ## W2b item spec
 
@@ -58,8 +58,23 @@ Fixtures: `logs/` is gitignored; tests use short committed excerpts, the full lo
 
 - Firmware: `src/esp32/udp_frame_esp32.cpp:268-272` calls `addLoraRxBuffer` and `stat_newid++` for every UDP position frame (0x21), also when `bUdpMsgIsNew` is false (ring slot plus inflated STAT newid on duplicates). Inferred by the W2a advisor, not verified on hardware.
 - DUP_STAT on `soak-20260929/98.log` sits at 0.86 % against the 1 % tolerance with no reboot: an unmodelled bias of about 0.9 % in dup. Look before relying on the tolerance for long captures.
+- Log-reading guide `~/Desktop/how-to-read-meshcom-logs.md` (2026-10-12, not in the repo) found errors in
+  `docs/loradebug-serial-output.md`: CHANNEL_UTIL is gated by bLORADEBUG (`esp32_main.cpp:2844`,
+  `nrf52_main.cpp:1539`), not independent of it; `CAD_SCAN 0` = free is the nRF52 synthetic value (ESP32
+  prints -15); the CSMA wait table is the old scheme; `ACK_FAST_QUEUED`, `ACK_FAST_TX`, `ACK_RX_CANCEL`,
+  `ACK_FWD_DEDUP`, `GW_ACK_DEDUP` have no emitter in `src/`; `RING_STATUS dedup=` form is wrong and
+  nRF52 omits it; RX_BUF_SWITCH/RX_BUF_OVERWRITE/CAD_ABORT_BY_RX/RX_RESTART_EARLY need `LORA_ISR_DEBUG`;
+  `[MC-HWM]` is ESP32-only and absent under `--setlog on`; "15 Abschnitte" is now about 38. Also
+  `docs/setlog-instrumentation-impl-plan-20260902.md`: `mh=` is `nbrNcnt()`, not `getMheardCount()`.
+- Webapp monitor (`../webapp/src/components/monitor/monitorFormat.ts`): tag recognised only at column 0
+  (:403), so timestamped packet and `[LOG]` lines are never tagged; token regex (:413-414) misses `x<8hex>`
+  ids, `SNR:-2`, `rssi=`/`snr=` and false-flags 8-digit decimals, `FCS:06DB`, `rx=`/`tx=`; no field
+  decoding; 500 DBG rows (~2 min). Full list in the guide, section 8.
 
 ## Out of scope
 
 - The logauswertung skill (`.claude/skills/logauswertung/`) carries caveats for the old script
-  behaviour; drop them once W1/W2 land.
+  behaviour; drop them now that W1/W2 have landed. `references/script-sections.md:27` lists the removed
+  `RX_OTHER_ERROR:` line; new keys to document: COLLISION_ANALYSIS, BILLING_CHECK, LINE_TIMESTAMPS,
+  CAPTURE_START, PNREPEAT, ONRXDONE_HEALTH, RX_PATH_LOSS, ACK_REJECT_B5, RING_DROP split, SAME_FREQ_PAIR,
+  DEDUP_WINDOWS, MC_STAT_TX_TOTAL.

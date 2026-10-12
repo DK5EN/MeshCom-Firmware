@@ -20,6 +20,11 @@ export LC_ALL=C
 # "Guru Meditation", ...): never evidence for a node event. Bracket classes
 # instead of backslashes, so the pattern survives `awk -v` escape processing.
 PAYLOAD_LINE_RE='(MH|RX|TX)-LoRa2? |RX-UDP |TX-UDP |[[]EXT[]] (Out|Inc):|NEW-TXT:? |[[]LOG[]] [0-9][0-9][0-9] '
+# lg PATTERN: log lines matching the (basic) regex, payload lines excluded.
+# lgc PATTERN: their count. Firmware event markers are never evidence when
+# they appear inside chat text.
+lg() { grep "$1" "$LOGFILE" | grep -vE "$PAYLOAD_LINE_RE"; }
+lgc() { lg "$1" | wc -l | tr -d ' '; }
 
 if [ $# -lt 1 ] || [ ! -f "$1" ]; then
     echo "Usage: $0 <logfile>" >&2
@@ -95,6 +100,21 @@ INPUT1="$1"   # names printed in CROSS_CORRELATION (LOGFILE is a temp copy)
 normalize_log "$1"
 LOGFILE="$NORM_RESULT"
 
+# Line timestamps (W2b-3): every time-bucketed table reads the time from $2
+# (meshlogger `YYYY-MM-DD hh:mm:ss.mmm`, console form `YYYY-MM-DD hh:mm:ss`,
+# raw `[DAY.HHh...]` captures are converted to the first form by
+# normalize_log). A PuTTY capture has only a session header and no per-line
+# time: NOTS=1 when fewer than half of the first 2000 non-empty lines (PuTTY
+# header excluded) start with a date + time. Time tables print n/a then.
+detect_nots() {
+    head -2000 "$1" | awk '
+    /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/ { ts++ }
+    NF > 0 && !/PuTTY log [0-9]/ { n++ }
+    END { print (n > 0 && ts * 2 < n) ? 1 : 0 }'
+}
+NOTS=$(detect_nots "$LOGFILE")
+NA_TS="n/a (no line timestamps)"
+
 # ─── Helper ───
 section() { echo ""; echo "=== $1 ==="; }
 
@@ -127,6 +147,11 @@ grep -iE '\[INIT\].*display|\[INIT\].*BME|INA226|SHT|BMP' "$LOGFILE" | head -5 |
 echo "FIRST_LINE: $(head -1 "$LOGFILE")"
 echo "LAST_LINE: $(tail -1 "$LOGFILE")"
 echo "TOTAL_LINES: $(wc -l < "$LOGFILE")"
+if [ "$NOTS" -eq 1 ]; then echo "LINE_TIMESTAMPS: no"; else echo "LINE_TIMESTAMPS: yes"; fi
+# PuTTY session start(s): `=~=~= PuTTY log YYYY.MM.DD hh:mm:ss =~=~=` headers
+grep -oE 'PuTTY log [0-9]{4}[.][0-9]{2}[.][0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' "$LOGFILE" \
+    | sed -E 's/^PuTTY log ([0-9]{4})[.]([0-9]{2})[.]([0-9]{2}) /\1-\2-\3 /' \
+    | while IFS= read -r _ps; do echo "CAPTURE_START: $_ps (PuTTY header)"; done
 
 # SETLOG presence (firmware `--setlog on`): "[LOG] " lines with the SL-01..06
 # bodies. SL_RX_N = RX lines carrying the RSSI/SNR/DUP/OWN tail.
@@ -166,7 +191,7 @@ section "NODES"
 
 # Single-pass awk: correlate "Received packet:" RSSI/SNR with subsequent MH-LoRa lines.
 # Extract callsign from route field (first callsign before comma or ">").
-awk -v sl="$SL_RX_N" '
+awk -v sl="$SL_RX_N" -v nots="$NOTS" '
 # SETLOG RX tail is the primary RSSI/SNR source (the only one on nRF52). When
 # the log has any, "Received packet:" is ignored so no frame is counted twice.
 sl > 0 && /\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:/ {
@@ -199,8 +224,8 @@ sl > 0 && /Received packet:/ { next }
 }
 
 /MH-LoRa:? / {
-    # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
-    ts = $2
+    # Serial monitor timestamp is $2 (HH:MM:SS.mmm); n/a without line timestamps
+    ts = nots ? "n/a" : $2
 
     # Find route field (contains ">")
     cs = ""
@@ -371,9 +396,9 @@ fi
 
 new_tmp
 CHANNEL_UTIL_TMP="$NEW_TMP"
-{ grep "CHANNEL_UTIL" "$LOGFILE" || true; } | awk '{
-    # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
-    ts = $2
+{ grep "CHANNEL_UTIL" "$LOGFILE" || true; } | awk -v nots="$NOTS" '{
+    # Serial monitor timestamp is $2 (HH:MM:SS.mmm); n/a without line timestamps
+    ts = nots ? "n/a" : $2
     for (i=1; i<=NF; i++) {
         if ($i ~ /^rx=/) {
             val = substr($i, 4) + 0.0
@@ -421,6 +446,7 @@ if [ -s "$CHANNEL_UTIL_TMP" ]; then
     # Per 10-minute buckets
     echo ""
     echo "--- BUCKETS_10MIN ---"
+    if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
     awk '{
         # Timestamp is HH:MM:SS.mmm — split by ":" for hour:minute
         split($1, t, ":")
@@ -435,6 +461,7 @@ if [ -s "$CHANNEL_UTIL_TMP" ]; then
             printf "%-8s %8.1f %8.1f %5d\n", b, sum[b]/cnt[b], mx[b], cnt[b]
         }
     }' "$CHANNEL_UTIL_TMP" | sort
+    fi
 else
     echo "NO_DATA"
 fi
@@ -447,10 +474,28 @@ section "ACK_ANALYSIS"
 # emitter any more and were removed.
 echo "ACK_RECEIVED: $(grep -c 'ACK_RECEIVED retid=' "$LOGFILE" 2>/dev/null; true)"
 echo "ACK_SKIP_READY: $(grep -c 'ACK_SKIP_READY slot=' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_REJECT: $(grep -c 'ACK_REJECT b5=' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_REJECT: $(lgc 'ACK_REJECT b5=')"
 echo "ACK_APPENDIX: $(grep -c 'ACK_APPENDIX hash=' "$LOGFILE" 2>/dev/null; true)"
 # ACK frames go out as "TX-Lora " (lowercase), not "TX-LoRa " -- counted apart.
 echo "TX_ACK_FRAMES (TX-Lora): $(grep -cE 'TX-Lora +[0-9]{3} ' "$LOGFILE" 2>/dev/null; true)"
+
+# M-09: byte 5 of the rejected frame (lora_functions.cpp `ACK_REJECT b5=%02X
+# len=%u`). A genuine ACK frame carries 0x80..0x84 there; anything else is a
+# corrupt or foreign frame that passed the ACK pre-check.
+echo ""
+echo "--- ACK_REJECT_B5 ---"
+lg 'ACK_REJECT b5=' | grep -oE 'b5=[0-9A-Fa-f]{2}' | awk -F= '
+{ v = toupper($2); c[v]++ }
+END {
+    bad = 0
+    for (v in c) {
+        ok = (v == "80" || v == "81" || v == "82" || v == "83" || v == "84")
+        printf("b5=0x%s: %d%s\n", v, c[v], (ok ? "" : " UNEXPECTED")) | "sort"
+        if (!ok) bad += c[v]
+    }
+    close("sort")
+    printf "ACK_REJECT_B5_UNEXPECTED: %d\n", bad
+}' || true
 
 # ─── 8. CRC ERRORS ───
 # Matches three log formats:
@@ -530,7 +575,7 @@ elif [ "$CRC_SRC" = "onrxerror" ] && [ "$CRC_NRF_OLD_COUNT" -gt 0 ]; then
 fi
 
 # Detail lines: structured [MC-DBG] lines, else SETLOG ERR, else bare OnRxError
-grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
+grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk -v nots="$NOTS" '{
     rssi="n/a"; snr="n/a"; ferr="n/a"; sz="n/a"
     for (i=1; i<=NF; i++) {
         if ($i ~ /^rssi=/) rssi = $i
@@ -538,7 +583,7 @@ grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
         if ($i ~ /^(freq_err|ferr)=/) ferr = $i
         if ($i ~ /^(size|len)=/) sz = $i
     }
-    print $2, rssi, snr, ferr, sz
+    print (nots ? "n/a" : $2), rssi, snr, ferr, sz
 }' | head -50 || true
 
 # Classify by freq error (only possible for ESP32 CRC_ERROR lines with freq_err)
@@ -548,12 +593,14 @@ grep "CRC_ERROR" "$LOGFILE" | grep -oE 'freq_err=[0-9.-]+' | awk -F= '{
     v = $2 + 0; if (v < 0) v = -v
     if (v > 3000) offfreq++
     else if (v > 1000) medium++
-    else collision++
+    else samefreq++
 }
 END {
     printf "OFF_FREQUENCY (>3kHz): %d\n", offfreq+0
     printf "MEDIUM (1-3kHz): %d\n", medium+0
-    printf "COLLISION (<1kHz): %d\n", collision+0
+    # A frequency-error class (two signals within 1 kHz of each other, or of our
+    # own frequency), NOT a collision count: see COLLISION_ANALYSIS for that.
+    printf "SAME_FREQ_PAIR (<1kHz): %d\n", samefreq+0
 }' || true
 NRF_UNCLASS=$CRC_NRF_COUNT
 # Also count OnRxError-only entries from old nRF52 FW
@@ -665,9 +712,10 @@ else
     }
     /\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:[nd] OWN:/ {
         rx_n++
-        # windowed tail (STAT comparison): after the first STAT line, no HN
-        # reports, no own/gateway-injected echoes (ids from `TX ... src=o|g`)
-        if (stat_n >= 1 && $0 !~ />HN@/ && !(msgid() in own_ids)) {
+        # windowed tail (STAT comparison): after the first STAT line of the
+        # segment (win_n), no HN reports, no own/gateway-injected echoes (ids
+        # from `TX ... src=o|g`)
+        if (win_n >= 1 && $0 !~ />HN@/ && !(msgid() in own_ids)) {
             if ($0 ~ / DUP:n /) w_new++
             else w_dup++
         }
@@ -708,23 +756,42 @@ else
 
     /\[LOG\] GWI x/ {
         gwi_n++
-        if (stat_n >= 1) w_gwi++
+        if (win_n >= 1) w_gwi++
         f = tok("from"); if (f == "") f = "?"
         gwi_from[f]++
         next
     }
     /\[LOG\] GWU x/ { gwu_n++; next }
 
+    # A reboot restarts the STAT counters (newid=, dup=): the window is
+    # re-anchored. The segment before the reboot is closed with its last
+    # STAT/tail snapshot (kept, summed per segment); the tail after that
+    # snapshot is dropped (the matching STAT counts died with the reboot), and
+    # the reboot STAT line itself is the new segment first line (excluded, as
+    # the first STAT of a capture is: its window predates the segment tail).
+    function reanchor() {
+        if (win_n >= 2) { seg_used++; seg_newid += sw_newid; seg_dup += sw_dup
+            seg_new += sn_new; seg_dupt += sn_dup; seg_gwi += sn_gwi }
+        sw_newid = 0; sw_dup = 0; w_new = 0; w_dup = 0; w_gwi = 0
+        sn_new = 0; sn_dup = 0; sn_gwi = 0; win_n = 0; nseg++
+    }
     /\[LOG\] STAT / {
         stat_n++
+        v = tok("up")
+        if (v ~ /^[0-9]+$/) {
+            v += 0
+            if (up_seen && v < up_prev) { reboots++; reanchor() }
+            up_prev = v; up_seen = 1
+        }
+        win_n++
         u = tok("util")
         if (u ~ /^[0-9]+$/) {
             u += 0; u_n++; u_sum += u; u_last = u
             if (u_n == 1 || u < u_min) u_min = u
             if (u_n == 1 || u > u_max) u_max = u
         }
-        v = tok("newid"); if (v ~ /^[0-9]+$/) { s_newid += v; if (stat_n > 1) sw_newid += v }
-        v = tok("dup");   if (v ~ /^[0-9]+$/) { s_dup += v; if (stat_n > 1) sw_dup += v }
+        v = tok("newid"); if (v ~ /^[0-9]+$/) { s_newid += v; if (win_n > 1) sw_newid += v }
+        v = tok("dup");   if (v ~ /^[0-9]+$/) { s_dup += v; if (win_n > 1) sw_dup += v }
         # window snapshot: the tail counted so far is what the STAT lines
         # up to this one can account for (the last snapshot wins)
         sn_new = w_new; sn_dup = w_dup; sn_gwi = w_gwi
@@ -752,12 +819,6 @@ else
         v = tok("trk"); if (v != "") trk_last = v
         v = tok("fw")
         if (v != "" && !(v in fw_seen)) { fw_seen[v] = 1; fw_list = fw_list (fw_list == "" ? "" : " ") v }
-        v = tok("up")
-        if (v ~ /^[0-9]+$/) {
-            v += 0
-            if (up_seen && v < up_prev) reboots++
-            up_prev = v; up_seen = 1
-        }
         next
     }
 
@@ -850,17 +911,22 @@ else
 
         print ""
         print "--- DEDUP_BALANCE ---"
-        hd = (dbg_new + dbg_dup > 0); ht = (rx_n > 0); hs = (stat_n >= 2)
+        hd = (dbg_new + dbg_dup > 0); ht = (rx_n > 0); hs = (seg_used + (win_n >= 2) > 0)
+        # totals = closed segments + the open one
+        t_sw_newid = seg_newid + sw_newid; t_sw_dup = seg_dup + sw_dup
+        t_sn_new = seg_new + sn_new; t_sn_dup = seg_dupt + sn_dup; t_sn_gwi = seg_gwi + sn_gwi
+        if (reboots > 0 && stat_n >= 2)
+            printf "DEDUP_WINDOWS: %d segments (re-anchored after %d reboot%s)\n", reboots + 1, reboots, (reboots == 1 ? "" : "s")
         # [MC-DBG] vs tail, whole file; NEW minus the UDP/GWI frames
         pair("NEW_DBG", dbg_new - gwi_n, tail_new, hd && ht, \
             sprintf("RX_DEDUP_NEW=%d - GWI=%d = %d, DUP:n=%d", dbg_new, gwi_n, dbg_new - gwi_n, tail_new))
         pair("DUP_DBG", dbg_dup, tail_dup, hd && ht, \
             sprintf("RX_DEDUP_DUP=%d, DUP:d=%d", dbg_dup, tail_dup))
         # STAT (2nd line on) vs windowed tail without HN / own / gw echoes
-        pair("NEW_STAT", sw_newid, sn_new + sn_gwi, hs && ht, \
-            sprintf("STAT_newid=%d, DUP:n=%d + GWI=%d = %d (STAT window, no HN/own/gw echoes)", sw_newid, sn_new, sn_gwi, sn_new + sn_gwi))
-        pair("DUP_STAT", sw_dup, sn_dup, hs && ht, \
-            sprintf("STAT_dup=%d, DUP:d=%d (STAT window, no HN/own/gw echoes)", sw_dup, sn_dup))
+        pair("NEW_STAT", t_sw_newid, t_sn_new + t_sn_gwi, hs && ht, \
+            sprintf("STAT_newid=%d, DUP:n=%d + GWI=%d = %d (STAT window, no HN/own/gw echoes)", t_sw_newid, t_sn_new, t_sn_gwi, t_sn_new + t_sn_gwi))
+        pair("DUP_STAT", t_sw_dup, t_sn_dup, hs && ht, \
+            sprintf("STAT_dup=%d, DUP:d=%d (STAT window, no HN/own/gw echoes)", t_sw_dup, t_sn_dup))
     }' "$LOGFILE"
 
     echo ""
@@ -926,7 +992,7 @@ fi
 echo "CRASH_COUNT: $({ grep -E "$CRASH_COUNT_RE" "$LOGFILE" | grep -vcE "$PAYLOAD_LINE_RE"; } 2>/dev/null; true)"
 echo "RESET_REASON histogram:"
 { grep -oE 'RESET_REASON=[0-9]+ [A-Z_]+' "$LOGFILE" | sort | uniq -c; } || true
-echo "TX_WATCHDOG_FIRED: $(grep -c '\[MC-WDT\] TX_WATCHDOG fired' "$LOGFILE" 2>/dev/null; true)"
+echo "TX_WATCHDOG_FIRED: $(lgc '\[MC-WDT\] TX_WATCHDOG fired')"
 
 echo ""
 echo "--- HEAP_TREND ---"
@@ -950,6 +1016,45 @@ END {
     else print "NO_DATA"
 }' || true
 
+# M-03/M-04 health counters (never crashes): ONRXDONE_STATS (esp32_main.cpp,
+# nrf52_main.cpp: `max=%lums warn=%u (>%dms)`), ONRXDONE_SLOW
+# (lora_functions.cpp: `ms=%lu threshold=%d`), TX_WATCHDOG fired (esp32_main.cpp,
+# `[MC-WDT]`, line count above in TX_WATCHDOG_FIRED).
+echo ""
+echo "--- ONRXDONE_HEALTH ---"
+lg 'ONRXDONE_STATS max=' | awk '
+{
+    n++
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ /^max=[0-9]+ms$/ && !gotm) { v = substr($i, 5) + 0; if (n == 1 || v > mx) mx = v; gotm = 1 }
+        if ($i ~ /^warn=[0-9]+$/ && !gotw) { w += substr($i, 6); gotw = 1 }
+    }
+    gotm = 0; gotw = 0
+}
+END {
+    printf "ONRXDONE_STATS_SAMPLES: %d\n", n + 0
+    if (n > 0) {
+        printf "ONRXDONE_STATS_MAX_MS: %d\n", mx
+        printf "ONRXDONE_STATS_WARN_SUM: %d\n", w
+    } else {
+        print "ONRXDONE_STATS_MAX_MS: n/a"
+        print "ONRXDONE_STATS_WARN_SUM: n/a"
+    }
+}' || true
+lg 'ONRXDONE_SLOW ms=' | grep -oE 'ms=[0-9]+' | awk -F= '
+{ n++; if (n == 1 || $2 + 0 > mx) mx = $2 + 0 }
+END {
+    printf "ONRXDONE_SLOW_COUNT: %d\n", n + 0
+    if (n > 0) printf "ONRXDONE_SLOW_MAX_MS: %d\n", mx
+    else print "ONRXDONE_SLOW_MAX_MS: n/a"
+}' || true
+lg '\[MC-WDT\] TX_WATCHDOG fired after' | grep -oE 'fired after [0-9]+' | awk '
+{ n++; if (n == 1 || $3 + 0 > mx) mx = $3 + 0 }
+END {
+    if (n > 0) printf "TX_WATCHDOG_MAX_MS: %d\n", mx
+    else print "TX_WATCHDOG_MAX_MS: n/a"
+}' || true
+
 echo ""
 echo "--- RX_TIMEOUT_FIRE ---"
 echo "RX_TIMEOUT_FIRE: $(grep -c 'RX_TIMEOUT_FIRE' "$LOGFILE" 2>/dev/null; true)"
@@ -966,8 +1071,15 @@ END {
 echo ""
 echo "--- BUFFER_DROPS ---"
 BUFDROP_RE='RING_DROP_|RING_REJECT|RX_BUF_OVERWRITE|CAPTURE_DROPPED'
-echo "BUFFER_DROPS: $(grep -cE "$BUFDROP_RE" "$LOGFILE" 2>/dev/null; true)"
-grep -E "$BUFDROP_RE" "$LOGFILE" | head -10 || true
+echo "BUFFER_DROPS: $({ grep -E "$BUFDROP_RE" "$LOGFILE" | grep -vcE "$PAYLOAD_LINE_RE"; } 2>/dev/null; true)"
+{ grep -E "$BUFDROP_RE" "$LOGFILE" | grep -vE "$PAYLOAD_LINE_RE"; } | head -10 || true
+
+# M-06: RX-path loss (lora_functions.cpp RX_BUF_OVERWRITE: a frame landed in a
+# buffer still in use; esp32_main.cpp CHECKRX zero_length: RX done, length 0).
+echo ""
+echo "--- RX_PATH_LOSS ---"
+echo "RX_BUF_OVERWRITE: $(lgc 'RX_BUF_OVERWRITE buf=')"
+echo "CHECKRX_ZERO_LENGTH: $(lgc 'CHECKRX zero_length')"
 
 echo ""
 echo "--- CAD_STATS ---"
@@ -985,6 +1097,7 @@ section "CRC_DETAIL"
 
 echo "--- CRC_10MIN_BUCKETS ---"
 # Use CRC_ERROR + RX_ERROR (structured detail lines), fall back to OnRxError (old nRF52)
+if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
 grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
     split($2, t, ":")
     bucket = t[1] ":" sprintf("%02d", int(t[2]/10)*10)
@@ -994,12 +1107,14 @@ END {
     printf "%-8s %6s\n", "TIME", "CRC"
     for (b in cnt) printf "%-8s %6d\n", b, cnt[b]
 }' | sort || true
+fi
 
 echo ""
 echo "--- CRC_HOURLY_RATE ---"
 # CRC errors per hour vs received packets per hour
 # Build CRC pattern to avoid double-counting OnRxError+CRC_ERROR/RX_ERROR pairs
 CRC_AWK_RE="$CRC_DETAIL_RE"
+if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
 awk -v crc_re="$CRC_AWK_RE" '
 $0 ~ crc_re {
     split($2, t, ":")
@@ -1018,10 +1133,12 @@ END {
         printf "%-6s %6d %6d %8.1f\n", h, crc[h], (h in rx ? rx[h] : 0), r
     }
 }' "$LOGFILE" | sort || true
+fi
 
 echo ""
 echo "--- CRC_CLUSTERS ---"
 # CRC errors within 2s of each other = collision bursts
+if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
 grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
     split($2, t, ":")
     split(t[3], s, ".")
@@ -1053,6 +1170,7 @@ END {
     printf "TOTAL_CRC_IN_CLUSTERS: %d\n", total_in_clusters+0
     printf "MAX_CLUSTER_SIZE: %d\n", max_cluster+0
 }' || true
+fi
 
 echo ""
 echo "--- CRC_VS_CHANNEL_UTIL ---"
@@ -1060,6 +1178,7 @@ if [ "$BILLING_OVERSTATED" -eq 1 ]; then
     echo "NOTE: UTIL% is overstated (ESP32 build < f2d6532f bills rx as 255 B per frame); CRC and util not comparable"
 fi
 # Correlate CRC buckets with channel utilization buckets
+if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
 awk -v crc_re="$CRC_AWK_RE" '
 $0 ~ crc_re {
     split($2, t, ":")
@@ -1086,6 +1205,7 @@ END {
             printf "%-8s %6d %8s\n", b, crc[b], "n/a"
     }
 }' "$LOGFILE" | sort || true
+fi
 
 # ─── 15. CAD ATTEMPT DISTRIBUTION ───
 section "CAD_ATTEMPT_DISTRIBUTION"
@@ -1122,12 +1242,15 @@ section "CAD_STORM"
 
 # Extract CAD storm episodes: sequences where cad_attempt >= 3
 # A storm starts at the first TX_GATE_ENTER with cad_attempt>=3 and ends at TX_DONE or cad_attempt=0
-awk '
+# Without line timestamps (nots) the storms are still counted, durations are n/a.
+awk -v nots="$NOTS" -v na_ts="$NA_TS" '
+function durs(d) { return nots ? "n/a" : sprintf("%.1fs", d) }
 /TX_GATE_ENTER/ {
     split($2, t, ":")
     split(t[3], s, ".")
     ts = t[1] * 3600 + t[2] * 60 + s[1] + (length(s) > 1 ? ("0." s[2]) + 0 : 0)
-    ts_str = $2
+    ts_str = nots ? "n/a" : $2
+    if (nots) ts = 0
 
     for (i=1; i<=NF; i++) {
         if ($i ~ /^cad_attempt=/) {
@@ -1164,7 +1287,7 @@ awk '
         else if (duration < 30) bucket_10_30++
         else bucket_gt30++
 
-        printf "STORM at %s dur=%.1fs max_attempt=%d scans=%d\n", storm_start_str, duration, storm_max, storm_scans
+        printf "STORM at %s dur=%s max_attempt=%d scans=%d\n", storm_start_str, durs(duration), storm_max, storm_scans
         in_storm = 0
     }
 }
@@ -1173,6 +1296,7 @@ awk '
         split($2, t, ":")
         split(t[3], s, ".")
         ts = t[1] * 3600 + t[2] * 60 + s[1] + (length(s) > 1 ? ("0." s[2]) + 0 : 0)
+        if (nots) ts = 0
         duration = ts - storm_start
         storms++
         dur_sum += duration
@@ -1187,7 +1311,7 @@ awk '
         else if (duration < 30) bucket_10_30++
         else bucket_gt30++
 
-        printf "STORM at %s dur=%.1fs max_attempt=%d scans=%d (ended by TX_DONE)\n", storm_start_str, duration, storm_max, storm_scans
+        printf "STORM at %s dur=%s max_attempt=%d scans=%d (ended by TX_DONE)\n", storm_start_str, durs(duration), storm_max, storm_scans
         in_storm = 0
     }
 }
@@ -1197,7 +1321,12 @@ END {
     }
     printf "\n--- STORM_SUMMARY ---\n"
     printf "TOTAL_STORMS: %d\n", storms+0
-    if (storms > 0) {
+    if (storms > 0 && nots) {
+        printf "DURATION_MIN: %s\n", na_ts
+        printf "DURATION_AVG: %s\n", na_ts
+        printf "DURATION_MAX: %s\n", na_ts
+        printf "DURATION_MEDIAN: %s\n", na_ts
+    } else if (storms > 0) {
         printf "DURATION_MIN: %.1fs\n", dur_min
         printf "DURATION_AVG: %.1fs\n", dur_sum / storms
         printf "DURATION_MAX: %.1fs\n", dur_max
@@ -1210,23 +1339,29 @@ END {
         printf "DURATION_MEDIAN: %.1fs\n", median
     }
     printf "\n--- STORM_DURATION_HISTOGRAM ---\n"
+    if (nots) print na_ts
+    else {
     printf "<1s:    %d\n", bucket_lt1+0
     printf "1-2s:   %d\n", bucket_1_2+0
     printf "2-5s:   %d\n", bucket_2_5+0
     printf "5-10s:  %d\n", bucket_5_10+0
     printf "10-30s: %d\n", bucket_10_30+0
     printf ">30s:   %d\n", bucket_gt30+0
+    }
 
     printf "\n--- 500ms_RX_LOOP_ANALYSIS ---\n"
     if (storms > 0) {
         cost_500ms = storms * 0.5
         printf "STORMS_COUNT: %d\n", storms
-        printf "TOTAL_STORM_TIME: %.1fs\n", dur_sum
+        if (nots) printf "TOTAL_STORM_TIME: %s\n", na_ts
+        else printf "TOTAL_STORM_TIME: %.1fs\n", dur_sum
         printf "COST_500ms_RX_LOOP: %.1fs (if added before each storm)\n", cost_500ms
         printf "NET_SAVINGS_IF_RX_LOOP_CATCHES_PKT: Depends on hit rate\n"
         printf "NOTE: A 500ms RX loop at storm start would detect preamble+header\n"
         printf "      and receive the packet (~2.5s), avoiding repeated CAD polls.\n"
-        if (dur_sum > 0)
+        if (nots)
+            printf "      Break-even: %s\n", na_ts
+        else if (dur_sum > 0)
             printf "      Break-even: if >%.0f%% of storms have a receivable packet.\n", cost_500ms * 100.0 / dur_sum
         else
             printf "      Break-even: n/a (total storm time is 0 s)\n"
@@ -1237,9 +1372,17 @@ END {
 section "RING_OVERFLOW"
 
 echo "--- RING_DROP_EVENTS ---"
-RING_DROPS=$(grep -c 'RING_DROP' "$LOGFILE" 2>/dev/null || true)
+RING_DROPS=$(lgc 'RING_DROP')
 echo "RING_DROP_COUNT: $RING_DROPS"
-grep "RING_DROP" "$LOGFILE" || true
+# M-05: split by cause (txring_functions.cpp). STALE = entry aged out of the
+# ring; PRIO = evicted by a higher priority; NEW = new entry refused, ring full.
+echo "RING_DROP_STALE: $(lgc 'RING_DROP_STALE ')"
+echo "RING_DROP_PRIO: $(lgc 'RING_DROP_PRIO ')"
+echo "RING_DROP_NEW: $(lgc 'RING_DROP_NEW ')"
+{ lg 'RING_DROP_STALE ' | grep -oE 'age_s=[0-9]+' | awk -F= '
+    $2 + 0 > m { m = $2 + 0 } n++ == 0 { m = $2 + 0 }
+    END { if (n > 0) printf "RING_DROP_STALE_AGE_MAX_S: %d\n", m }'; } || true
+lg "RING_DROP" || true
 
 echo ""
 echo "--- RING_OVERFLOW_BY_BUF ---"
@@ -1273,6 +1416,7 @@ END {
 
 echo ""
 echo "--- RING_WATERMARK_OVER_TIME ---"
+if [ "$NOTS" -eq 1 ]; then echo "$NA_TS"; else
 grep "RING_STATUS" "$LOGFILE" | awk '{
     split($2, t, ":")
     bucket = t[1] ":" sprintf("%02d", int(t[2]/10)*10)
@@ -1289,12 +1433,19 @@ END {
     printf "%-8s %8s %8s %5s\n", "TIME", "AVG_Q", "MAX_Q", "N"
     for (b in cnt) printf "%-8s %8.1f %8d %5d\n", b, sum[b]/cnt[b], mx[b], cnt[b]
 }' | sort || true
+fi
 
 # ─── 18. DROPPED PACKETS (comprehensive) ───
 section "DROPPED_PACKETS"
 
+# M-02: `[RX] PNREPEAT msg-id:%08X` (lora_functions.cpp): a PN already seen,
+# repeated by the sender. Count + distinct msg-ids.
+echo "--- PNREPEAT ---"
+echo "PNREPEAT: $(lgc 'PNREPEAT msg-id:')"
+echo "PNREPEAT_DISTINCT_MSGIDS: $(lg 'PNREPEAT msg-id:' | grep -oE 'PNREPEAT msg-id:[0-9A-Fa-f]+' | sort -u | wc -l | tr -d ' ')"
+echo ""
 echo "--- DROP_CATEGORIES ---"
-RING_DROP_N=$(grep -c 'RING_DROP' "$LOGFILE" 2>/dev/null || true); echo "RING_DROP: ${RING_DROP_N:-0}"
+RING_DROP_N=$(lgc 'RING_DROP'); echo "RING_DROP: ${RING_DROP_N:-0}"
 CRC_ERR_ESP2=$(grep -c 'CRC_ERROR' "$LOGFILE" 2>/dev/null || true)
 CRC_ERR_NRF_NEW2=$(grep -c 'RX_ERROR rssi' "$LOGFILE" 2>/dev/null || true)
 CRC_ERR_NRF_OLD2=$(grep -c 'OnRxError$' "$LOGFILE" 2>/dev/null || true)
@@ -1309,7 +1460,7 @@ if [ "$CRC_SRC" = "setlog" ]; then CRC_ERR_N=$SL_ERR_N; fi
 echo "CRC_ERROR: ${CRC_ERR_N:-0}"
 DEDUP_N=$(grep -c 'RX_DEDUP_DUP' "$LOGFILE" 2>/dev/null || true); echo "RX_DEDUP_DUP: ${DEDUP_N:-0}"
 LOOP_N=$(grep -c 'RELAY_LOOP_BLOCKED' "$LOGFILE" 2>/dev/null || true); echo "RELAY_LOOP_BLOCKED: ${LOOP_N:-0}"
-RXOE_N=$(grep -c 'RX_OTHER_ERROR' "$LOGFILE" 2>/dev/null || true); echo "RX_OTHER_ERROR: ${RXOE_N:-0}"
+# RX_OTHER_ERROR: counted once, in CRC_ERRORS (RX_OTHER_ERROR_COUNT + code histogram).
 RTGU_N=$(grep -c 'RETRANSMIT_GIVEUP retries=' "$LOGFILE" 2>/dev/null || true); echo "RETRANSMIT_GIVEUP: ${RTGU_N:-0}"
 # Three distinct events (an unanchored RX_IRQ_STALE counted all of them,
 # i.e. one stale IRQ twice: the rssi line plus its forced-restart line).
@@ -1359,7 +1510,7 @@ END {
 
 echo ""
 echo "--- ALL_DROPS_SAMPLES ---"
-grep -E 'RING_DROP|RX_OTHER_ERROR|RELAY_LOOP_BLOCKED|RX_IRQ_STALE( rssi=|_EARLY| forced)|RETRANSMIT_GIVEUP' "$LOGFILE" | head -30 || true
+{ grep -E 'RING_DROP|RX_OTHER_ERROR|RELAY_LOOP_BLOCKED|RX_IRQ_STALE( rssi=|_EARLY| forced)|RETRANSMIT_GIVEUP' "$LOGFILE" | grep -vE "$PAYLOAD_LINE_RE"; } | head -30 || true
 
 # ─── 19. HIGH HOP PACKETS ───
 section "HIGH_HOP_PACKETS"
@@ -1470,6 +1621,7 @@ if [ $# -ge 2 ] && [ -f "$2" ]; then
     echo ""
     echo "--- RELAY_DELAY ---"
     # For common msg_ids, compute time difference between first reception in each log
+    if [ "$NOTS" -eq 1 ] || [ "$(detect_nots "$LOGFILE2")" -eq 1 ]; then echo "$NA_TS"; else
     join -j 1 <(sort -k1,1 "$XLOG1") <(sort -k1,1 "$XLOG2") | awk '{
         # $1=msg_id, $2=ts_log1 (HH:MM:SS.mmm), $3=ts_log2 (HH:MM:SS.mmm)
         split($2, t1, ":")
@@ -1506,6 +1658,7 @@ if [ $# -ge 2 ] && [ -f "$2" ]; then
             print "NO_COMMON_PACKETS"
         }
     }' || true
+    fi
 
     echo ""
     echo "--- ONLY_IN_LOG1_SAMPLES ---"
@@ -1557,9 +1710,9 @@ if grep -q '\[MC-STAT\]' "$LOGFILE"; then
     grep '\[MC-PRIO\]' "$LOGFILE" | tail -20
     echo ""
     echo "--- Priority drops ---"
-    grep 'RING_DROP_PRIO\|RING_DROP_NEW' "$LOGFILE" | wc -l | awk '{printf "  Total priority drops: %d\n", $1}'
+    lg 'RING_DROP_PRIO\|RING_DROP_NEW' | wc -l | awk '{printf "  Total priority drops: %d\n", $1}'
     echo "--- Dropped packets by prio+type ---"
-    (grep -E 'RING_DROP_(PRIO|NEW)' "$LOGFILE" | grep -oE 'prio=[0-9]+ type=[0-9A-Fa-f]+' | sort | uniq -c | sort -rn) || true
+    (grep -E 'RING_DROP_(PRIO|NEW)' "$LOGFILE" | grep -vE "$PAYLOAD_LINE_RE" | grep -oE 'prio=[0-9]+ type=[0-9A-Fa-f]+' | sort | uniq -c | sort -rn) || true
 else
     echo "  No [MC-STAT] data found (priority queue not active or no data yet)"
 fi
@@ -1602,7 +1755,7 @@ fi
 # Single awk pass over entire log for: HEAP, Starvation, Server, NTP,
 # Signal Profiling, Frequency Drift, Interferers, Top Talkers,
 # Channel Util Diagram, CSMA Timing, ACK Storm, CAD enhancements
-awk -v have_rcv="$SL_HAVE_RCV" -v mh_synth="$MH_SYNTH" -v payload_re="$PAYLOAD_LINE_RE" '
+awk -v have_rcv="$SL_HAVE_RCV" -v mh_synth="$MH_SYNTH" -v payload_re="$PAYLOAD_LINE_RE" -v nots="$NOTS" -v na_ts="$NA_TS" '
 BEGIN {
     # HEAP
     heap_cnt = 0; heap_sum = 0; heap_sumsq = 0
@@ -1703,9 +1856,11 @@ function stddev(sum, sumsq, n) {
 
 # ── Parse serial-monitor timestamp from every line ──
 {
-    line_ts = $2  # HH:MM:SS.mmm
-    line_sec = parse_sec(line_ts)
-    line_hour = parse_hour(line_ts)
+    # HH:MM:SS.mmm; without line timestamps: label n/a, hour bucket -1 (never
+    # printed: the hourly tables print n/a)
+    line_ts = nots ? "n/a" : $2
+    line_sec = nots ? 0 : parse_sec(line_ts)
+    line_hour = nots ? -1 : parse_hour(line_ts)
     if (start_sec < 0) start_sec = line_sec
 }
 
@@ -2120,7 +2275,7 @@ function stddev(sum, sumsq, n) {
 # ── ACK events ──
 /ACK_RECEIVED retid=/ { ack_received++; ack_cnt++ }
 /ACK_SKIP_READY slot=/ { ack_skip++; ack_cnt++ }
-/ACK_REJECT b5=/ { ack_reject++; ack_cnt++ }
+/ACK_REJECT b5=/ && $0 !~ payload_re { ack_reject++; ack_cnt++ }
 /ACK_APPENDIX hash=/ { ack_appendix++; ack_cnt++ }
 
 # ── BLE TX Latency: track user_msg path ──
@@ -2203,7 +2358,8 @@ END {
 
         print ""
         print "--- HEAP_TREND_HOURLY ---"
-        printf "%-6s %10s %10s %8s\n", "HOUR", "AVG_FREE", "MIN_FREE", "SAMPLES"
+        if (nots) print na_ts
+        else printf "%-6s %10s %10s %8s\n", "HOUR", "AVG_FREE", "MIN_FREE", "SAMPLES"
         for (h = 0; h < 24; h++) {
             if (h in heap_hour_cnt) {
                 printf "%02d:00  %10.0f %10d %8d\n", h, heap_hour_sum[h]/heap_hour_cnt[h], heap_hour_min[h], heap_hour_cnt[h]
@@ -2256,7 +2412,9 @@ END {
     print ""
     print "=== STARVATION_EVENTS ==="
     print "--- RADIO_SILENT (gap > 20s between RX_TIMEOUT_FIRE) ---"
-    if (silent_cnt > 0) {
+    if (nots) {
+        print na_ts
+    } else if (silent_cnt > 0) {
         for (i = 1; i <= silent_cnt && i <= 20; i++)
             printf "  EVENT at %s  gap=%.1fs\n", silent_time[i], silent_gap[i]
         printf "TOTAL_SILENT_EVENTS: %d\n", silent_cnt
@@ -2266,7 +2424,9 @@ END {
 
     print ""
     print "--- STUCK_STATES (non-RX_LISTEN state > 30s) ---"
-    if (stuck_cnt > 0) {
+    if (nots) {
+        print na_ts
+    } else if (stuck_cnt > 0) {
         for (i = 1; i <= stuck_cnt && i <= 10; i++)
             printf "  STUCK %s at %s  duration=%.0fs\n", stuck_state[i], stuck_time[i], stuck_dur[i]
         printf "TOTAL_STUCK_EVENTS: %d\n", stuck_cnt
@@ -2300,7 +2460,8 @@ END {
     print ""
     print "=== SERVER_CONNECTION ==="
     printf "KEEP_HEARTBEATS: %d\n", keep_cnt
-    printf "KEEP_GAPS_GT_90S: %d\n", keep_gap_cnt
+    if (nots) printf "KEEP_GAPS_GT_90S: %s\n", na_ts
+    else printf "KEEP_GAPS_GT_90S: %d\n", keep_gap_cnt
     if (keep_gap_cnt > 0) {
         for (i = 1; i <= keep_gap_cnt && i <= 10; i++)
             printf "  GAP at %s  duration=%.0fs\n", keep_gap_time[i], keep_gap_dur[i]
@@ -2316,6 +2477,8 @@ END {
     print ""
     if (keep_cnt == 0) {
         print "SERVER_HEALTH: n/a (no [KEEP] heartbeats in log)"
+    } else if (nots) {
+        print "SERVER_HEALTH: " na_ts
     } else if (keep_gap_cnt == 0) {
         print "SERVER_HEALTH: HEALTHY (no heartbeat gaps detected)"
     } else if (keep_gap_cnt <= 2) {
@@ -2330,7 +2493,9 @@ END {
     print ""
     print "=== NTP_SYNC ==="
     printf "NTP_SYNCS: %d\n", ntp_cnt
-    if (ntp_interval_cnt > 0) {
+    if (nots && ntp_cnt > 0) {
+        print "AVG_SYNC_INTERVAL: " na_ts
+    } else if (ntp_interval_cnt > 0) {
         avg_int = ntp_interval_sum / ntp_interval_cnt
         printf "AVG_SYNC_INTERVAL: %.0fs (%.1f min)\n", avg_int, avg_int/60
     }
@@ -2338,7 +2503,9 @@ END {
         printf "FIRST_SYNC: %s\n", ntp_time[1]
         printf "LAST_SYNC: %s\n", ntp_time[ntp_cnt < 200 ? ntp_cnt : 200]
     }
-    if (ntp_cnt > 0 && ntp_interval_cnt > 0) {
+    if (nots && ntp_cnt > 0) {
+        print "NTP_HEALTH: " na_ts
+    } else if (ntp_cnt > 0 && ntp_interval_cnt > 0) {
         if (avg_int > 1200) {
             print "NTP_HEALTH: WARNING (sync interval > 20 min)"
         } else {
@@ -2405,6 +2572,9 @@ END {
     print "=== FREQUENCY_DRIFT ==="
     print "Day (06:00-17:59) vs Night (18:00-05:59) frequency error per node"
     print ""
+    if (nots) {
+        print na_ts
+    } else {
     printf "%-15s %5s  %10s %10s %9s %8s  %s\n", \
         "CALLSIGN", "PKTS", "DAY_AVG_Hz", "NIGHT_AVG", "SHIFT_Hz", "SLOPE", "ASSESSMENT"
     for (i = 1; i <= sig_n; i++) {
@@ -2442,6 +2612,7 @@ END {
     print ""
     print "NOTE: Shifts > 50 Hz between day/night suggest crystal thermal drift."
     print "      Slope = Hz/hour trend (positive = drifting up over time)."
+    }  # !nots
 
     # ════════════════════════════════════════════════════════
     # INTERFERER DETECTION
@@ -2536,6 +2707,7 @@ END {
     print ""
     print "=== CHANNEL_UTIL_DIAGRAM ==="
     print "Hourly average channel utilization (1-hour buckets)"
+    if (nots) print na_ts
     print ""
     # Find max for scaling
     ch_max = 1
@@ -2546,7 +2718,7 @@ END {
         }
     }
     bar_width = 60
-    printf "%-6s %6s  %s\n", "HOUR", "UTIL%", "BAR"
+    if (!nots) printf "%-6s %6s  %s\n", "HOUR", "UTIL%", "BAR"
     for (h = 0; h < 24; h++) {
         if (h in chutil_hour_cnt) {
             v = chutil_hour_sum[h] / chutil_hour_cnt[h]
@@ -2586,7 +2758,9 @@ END {
 
     print ""
     print "--- INTER_ARRIVAL_TIME (between consecutive Received packet:) ---"
-    if (ia_cnt > 0) {
+    if (nots) {
+        print na_ts
+    } else if (ia_cnt > 0) {
         printf "AVG: %.1fs\n", ia_sum / ia_cnt
         printf "MIN: %.1fs\n", ia_min
         printf "MAX: %.1fs\n", ia_max
@@ -2597,7 +2771,8 @@ END {
 
     print ""
     print "--- CAD_BUSY_VS_TRAFFIC (per hour) ---"
-    printf "%-6s %8s %10s %10s %8s %10s\n", "HOUR", "TX_GATE", "CAD_BUSY_1", "CAD_BUSY_C", "CAD_FP", "CHAN_UTIL"
+    if (nots) print na_ts
+    else printf "%-6s %8s %10s %10s %8s %10s\n", "HOUR", "TX_GATE", "CAD_BUSY_1", "CAD_BUSY_C", "CAD_FP", "CHAN_UTIL"
     for (h = 0; h < 24; h++) {
         if (h in chutil_hour_cnt || h in cad_busy1_hour || h in cad_busy_hour) {
             cu = (h in chutil_hour_cnt) ? chutil_hour_sum[h]/chutil_hour_cnt[h] : 0
@@ -2633,7 +2808,9 @@ END {
     printf "CAD safety timeout (forced TX, nRF52): %d\n", cad_safety_cnt
     print ""
 
-    if (ia_cnt > 0 && wait_cnt > 0) {
+    if (nots && ia_cnt > 0 && wait_cnt > 0) {
+        print "ASSESSMENT: " na_ts
+    } else if (ia_cnt > 0 && wait_cnt > 0) {
         ia_avg = ia_sum / ia_cnt
         w_avg_s = (wait_sum / wait_cnt) / 1000.0
         if (ia_avg > w_avg_s * 2) {
@@ -2701,7 +2878,9 @@ END {
 
             bq_wait = (bmid in ble_lat) ? ble_lat[bmid] : -1
             btotal = -1
-            if (bmid in ble_newtxt_sec && bmid in ble_tx_sec) {
+            if (nots) {
+                # no line timestamps: end-to-end latency is not derivable
+            } else if (bmid in ble_newtxt_sec && bmid in ble_tx_sec) {
                 btotal = (ble_tx_sec[bmid] - ble_newtxt_sec[bmid]) * 1000
                 if (btotal < 0) btotal += 86400000
             } else if (bmid in ble_rw_sec && bmid in ble_tx_sec) {
@@ -2709,6 +2888,13 @@ END {
                 if (btotal < 0) btotal += 86400000
             }
 
+            if (nots)
+                printf "%-10s %-14s %-35s %6d %8dms %10s\n", \
+                    bmid, (bmid in ble_rw_sec ? "" : "?"), \
+                    (bmid in ble_text ? ble_text[bmid] : "?"), \
+                    (bmid in ble_queued ? ble_queued[bmid] : -1), \
+                    bq_wait, "n/a"
+            else
             printf "%-10s %-14s %-35s %6d %8dms %8dms\n", \
                 bmid, (bmid in ble_rw_sec ? "" : "?"), \
                 (bmid in ble_text ? ble_text[bmid] : "?"), \
@@ -2743,7 +2929,9 @@ END {
 
         printf "\n--- STATISTICS (%d messages with TX) ---\n", bn
         if (bq_cnt > 0) printf "QUEUE_WAIT: AVG=%dms  MIN=%dms  MAX=%dms\n", bq_sum/bq_cnt, bq_min, bq_max
-        if (bn > 0) {
+        if (nots) {
+            printf "END_TO_END: %s\n", na_ts
+        } else if (bn > 0) {
             printf "END_TO_END: AVG=%dms  MIN=%dms  MAX=%dms\n", bt_sum/bn, bt_min, bt_max
             # Sort for median/p95
             for (bi = 2; bi <= bn; bi++) {
@@ -2761,11 +2949,14 @@ END {
         }
 
         printf "\n--- HISTOGRAM ---\n"
+        if (nots) print na_ts
+        else {
         printf "< 2s:   %3d  (%5.1f%%)\n", bh_lt2+0, (bn>0 ? (bh_lt2+0)*100.0/bn : 0)
         printf "2-5s:   %3d  (%5.1f%%)\n", bh_2_5+0, (bn>0 ? (bh_2_5+0)*100.0/bn : 0)
         printf "5-10s:  %3d  (%5.1f%%)\n", bh_5_10+0, (bn>0 ? (bh_5_10+0)*100.0/bn : 0)
         printf "10-20s: %3d  (%5.1f%%)\n", bh_10_20+0, (bn>0 ? (bh_10_20+0)*100.0/bn : 0)
         printf "> 20s:  %3d  (%5.1f%%)\n", bh_gt20+0, (bn>0 ? (bh_gt20+0)*100.0/bn : 0)
+        }
 
         printf "\n--- QUEUE_DEPTH vs LATENZ ---\n"
         printf "%-8s %10s %6s\n", "QUEUED", "AVG_WAIT", "COUNT"

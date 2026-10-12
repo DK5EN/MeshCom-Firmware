@@ -1,0 +1,29 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.08.23 13:12:52 =~=~=~=~=~=~=~=~=~=~=~=
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=66ms warn=1 (>50ms)
+[WIFI]...Wait connect .[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] ONRXDONE_STATS max=43ms warn=0 (>50ms)
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] ONRXDONE_STATS max=66ms warn=1 (>50ms)
+[MC-DBG] RING_STATUS queued=2 pending=0 retrying=0 done=2 iW=2 iR=0 dedup=3/100
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=55ms warn=1 (>50ms)
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=1486ms util=14%%
+[MC-DBG] RING_STATUS queued=2 pending=0 retrying=0 done=2 iW=3 iR=1 dedup=4/100
+[MC-DBG] RING_STATUS queued=5 pending=0 retrying=0 done=5 iW=6 iR=1 dedup=8/100
+[MC-DBG] CRC_ERROR rssi=-28 snr=2 freq_err=4724.6 size=255 ts=140663
+[MC-DBG] RING_DROP_PRIO slot=0 prio=5 type=40 msg_id=2F28B016 replaced_by_prio=3 src=rx_relay
+[MC-DBG] RING_DROP_PRIO slot=1 prio=5 type=40 msg_id=F83120AD replaced_by_prio=3 src=rx_relay
+[MC-DBG] CRC_ERROR rssi=-59 snr=-1 freq_err=-208.3 size=255 ts=891344
+[MC-DBG] RING_DROP_PRIO slot=2 prio=5 type=40 msg_id=F83120AF replaced_by_prio=3 src=rx_relay
+[MC-DBG] RING_DROP_PRIO slot=4 prio=5 type=40 msg_id=AF59C282 replaced_by_prio=3 src=rx_relay
+[MC-DBG] RING_DROP_PRIO slot=5 prio=5 type=40 msg_id=A5DAC082 replaced_by_prio=1 src=rx_ack_fwd
+[MC-DBG] RING_DROP_NEW slot=10 prio=3 type=3A msg_id=F83120BA (queue full, no lower prio to evict)
+[MC-DBG] RING_DROP_NEW slot=10 prio=3 type=3A msg_id=F83120BB (queue full, no lower prio to evict)
+[MC-DBG] RING_DROP_NEW slot=10 prio=3 type=3A msg_id=F83120BC (queue full, no lower prio to evict)
+[MC-DBG] RING_DROP_NEW slot=12 prio=3 type=3A msg_id=F83120BE (queue full, no lower prio to evict)
+[MC-DBG] CRC_ERROR rssi=-60 snr=-1 freq_err=-214.1 size=255 ts=1334709
+[MC-DBG] TX_GATE_ENTER qlen=13 cad_attempt=3
+[MC-DBG] TX_GATE_ENTER qlen=13 cad_attempt=4
+[MC-DBG] CRC_ERROR rssi=-65 snr=0 freq_err=5102.4 size=255 ts=1772101

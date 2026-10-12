@@ -1041,12 +1041,14 @@ class TestLoganalyseSetlog(unittest.TestCase):
 
     def test_dedup_balance_mismatch_on_fixture(self) -> None:
         # fixture STAT lines are not derived from the fixture traffic: STAT 2..6
-        # sum newid=46 dup=29; windowed tail has DUP:n 2 / DUP:d 3 and 3 GWI
+        # sum newid=46 dup=29, minus the reboot STAT (last line, up=60: W2b-3
+        # re-anchors the window there, so that line is excluded) = newid=39
+        # dup=27; windowed tail has DUP:n 2 / DUP:d 3 and 3 GWI
         sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "DEDUP_BALANCE")
         self.assertIn("NEW_DBG: RX_DEDUP_NEW=7 - GWI=4 = 3, DUP:n=6", sub)
         self.assertIn("DUP_DBG: RX_DEDUP_DUP=5, DUP:d=7", sub)
-        self.assertIn("NEW_STAT: STAT_newid=46, DUP:n=2 + GWI=3 = 5", sub)
-        self.assertIn("DUP_STAT: STAT_dup=29, DUP:d=3", sub)
+        self.assertIn("NEW_STAT: STAT_newid=39, DUP:n=2 + GWI=3 = 5", sub)
+        self.assertIn("DUP_STAT: STAT_dup=27, DUP:d=3", sub)
         self.assertIn("NEW_STAT_BALANCE: MISMATCH", sub)
         self.assertIn("DUP_STAT_BALANCE: MISMATCH", sub)
 
@@ -1544,6 +1546,440 @@ class TestLoganalyseW2b2(unittest.TestCase):
         out, err = self._analyse(text)
         self.assertEqual(err, "")
         self.assertIn("TOTAL_STORMS: 1", out)
+
+
+W2B3_DIR: Path = REPO_ROOT / "tools" / "testdata"
+
+
+class TestLoganalyseW2b3(unittest.TestCase):
+    """Wave 2b-3: M-02..M-06 and M-09 counters, DEDUP_BALANCE re-anchored
+    after a reboot, timestamp-less (PuTTY) captures, the freq-error class
+    rename and the removed duplicate RX_OTHER_ERROR line.
+
+    Fixtures (tools/testdata/loganalyse_w2b3_*.txt):
+      counters_real    real lines of soak-20260929/98.log: 7 PNREPEAT, 12
+                       ONRXDONE_SLOW, 8 ONRXDONE_STATS, 2 CHECKRX zero_length
+      putty            real excerpt of dj8meh PuTTY log (header only, no line
+                       timestamps), incl. RING_DROP_PRIO / RING_DROP_NEW
+      reboot_balance   real excerpt of dk5en-1 2026-09-28-u.log across the
+                       reboot (up=16500 -> 300): STAT lines plus RX tails
+      reboot_stat      real excerpt of soak-20261001-440a: STAT up=205503,
+                       205803, 300, 600 (one reboot)
+      synthetic        SYNTHETIC lines built from the src format strings
+                       (no real log contains them): RING_DROP_STALE,
+                       RX_BUF_OVERWRITE, ACK_REJECT b5=, TX_WATCHDOG fired,
+                       a repeated PNREPEAT msg-id
+    """
+
+    @staticmethod
+    def _run(path: Path) -> tuple[str, str]:
+        res = subprocess.run(
+            ["bash", str(SCRIPT), str(path)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=dict(os.environ, LC_ALL="C"),
+        )
+        assert res.returncode == 0, res.stderr
+        return res.stdout, res.stderr
+
+    @classmethod
+    def _analyse(cls, text: str) -> tuple[str, str]:
+        with tempfile.TemporaryDirectory() as td:
+            lf = Path(td) / "log.txt"
+            lf.write_text(text)
+            return cls._run(lf)
+
+    @staticmethod
+    def _sub(out: str, header: str) -> str:
+        """Text after `--- header ---` up to the next --- / === marker."""
+        lines: list[str] = []
+        capturing = False
+        for line in out.splitlines():
+            if capturing and (line.startswith("--- ") or line.startswith("=== ")):
+                break
+            if capturing:
+                lines.append(line)
+            elif line.strip() == f"--- {header} ---":
+                capturing = True
+        assert capturing, f"sub-block {header} missing"
+        return "\n".join(lines)
+
+    @staticmethod
+    def _fx(name: str) -> Path:
+        return W2B3_DIR / f"loganalyse_w2b3_{name}.txt"
+
+    # --- M-02 ---------------------------------------------------------
+    def test_m02_pnrepeat_real(self) -> None:
+        path = self._fx("counters_real")
+        ids = re.findall(r"PNREPEAT msg-id:([0-9A-F]+)", path.read_text())
+        self.assertEqual(len(ids), 7)
+        out, err = self._run(path)
+        self.assertEqual(err, "")
+        sub = self._sub(out, "PNREPEAT")
+        self.assertIn(f"PNREPEAT: {len(ids)}", sub)
+        self.assertIn(f"PNREPEAT_DISTINCT_MSGIDS: {len(set(ids))}", sub)
+
+    def test_m02_pnrepeat_distinct_synthetic(self) -> None:
+        out, _ = self._run(self._fx("synthetic"))
+        sub = self._sub(out, "PNREPEAT")
+        self.assertIn("PNREPEAT: 3", sub)
+        self.assertIn("PNREPEAT_DISTINCT_MSGIDS: 2", sub)
+
+    # --- M-03 / M-04 --------------------------------------------------
+    def test_m03_onrxdone_stats_real(self) -> None:
+        text = self._fx("counters_real").read_text()
+        stats = re.findall(r"ONRXDONE_STATS max=(\d+)ms warn=(\d+)", text)
+        self.assertEqual(len(stats), 8)
+        out, _ = self._run(self._fx("counters_real"))
+        sub = self._sub(out, "ONRXDONE_HEALTH")
+        self.assertIn(f"ONRXDONE_STATS_SAMPLES: {len(stats)}", sub)
+        self.assertIn(f"ONRXDONE_STATS_MAX_MS: {max(int(m) for m, _ in stats)}", sub)
+        self.assertIn(f"ONRXDONE_STATS_WARN_SUM: {sum(int(w) for _, w in stats)}", sub)
+
+    def test_m04_onrxdone_slow_real(self) -> None:
+        text = self._fx("counters_real").read_text()
+        slow = [int(v) for v in re.findall(r"ONRXDONE_SLOW ms=(\d+)", text)]
+        self.assertEqual(len(slow), 12)
+        out, _ = self._run(self._fx("counters_real"))
+        sub = self._sub(out, "ONRXDONE_HEALTH")
+        self.assertIn(f"ONRXDONE_SLOW_COUNT: {len(slow)}", sub)
+        self.assertIn(f"ONRXDONE_SLOW_MAX_MS: {max(slow)}", sub)
+
+    def test_m04_tx_watchdog_is_health_not_crash(self) -> None:
+        out, _ = self._run(self._fx("synthetic"))
+        self.assertIn("TX_WATCHDOG_FIRED: 2", out)
+        self.assertIn("TX_WATCHDOG_MAX_MS: 15230", self._sub(out, "ONRXDONE_HEALTH"))
+        self.assertIn("CRASH_COUNT: 0", out)
+        self.assertNotRegex(out, r"(?m)^CRASH_COUNT: [1-9]")
+
+    # --- M-05 ---------------------------------------------------------
+    def test_m05_ring_drop_split_synthetic_and_real(self) -> None:
+        out, _ = self._run(self._fx("synthetic"))
+        sub = self._sub(out, "RING_DROP_EVENTS")
+        self.assertIn("RING_DROP_STALE: 3", sub)
+        self.assertIn("RING_DROP_PRIO: 0", sub)
+        self.assertIn("RING_DROP_NEW: 0", sub)
+        self.assertIn("RING_DROP_COUNT: 3", sub)
+        self.assertIn("RING_DROP_STALE_AGE_MAX_S: 305", sub)
+        text = self._fx("putty").read_text()
+        out, _ = self._run(self._fx("putty"))
+        sub = self._sub(out, "RING_DROP_EVENTS")
+        self.assertIn(f"RING_DROP_PRIO: {text.count('RING_DROP_PRIO')}", sub)
+        self.assertIn(f"RING_DROP_NEW: {text.count('RING_DROP_NEW')}", sub)
+        self.assertIn("RING_DROP_STALE: 0", sub)
+
+    # --- M-06 ---------------------------------------------------------
+    def test_m06_rx_path_loss_counters(self) -> None:
+        out, _ = self._run(self._fx("synthetic"))
+        sub = self._sub(out, "RX_PATH_LOSS")
+        self.assertIn("RX_BUF_OVERWRITE: 2", sub)
+        self.assertIn("CHECKRX_ZERO_LENGTH: 0", sub)
+        out, _ = self._run(self._fx("counters_real"))
+        sub = self._sub(out, "RX_PATH_LOSS")
+        self.assertIn("CHECKRX_ZERO_LENGTH: 2", sub)
+        self.assertIn("RX_BUF_OVERWRITE: 0", sub)
+
+    # --- M-09 ---------------------------------------------------------
+    def test_m09_ack_reject_b5_histogram(self) -> None:
+        out, _ = self._run(self._fx("synthetic"))
+        sub = self._sub(out, "ACK_REJECT_B5")
+        self.assertIn("b5=0x80: 2", sub)
+        self.assertIn("b5=0x83: 1", sub)
+        self.assertIn("b5=0x00: 1 UNEXPECTED", sub)
+        self.assertIn("b5=0xFF: 1 UNEXPECTED", sub)
+        self.assertIn("b5=0x85: 1 UNEXPECTED", sub)
+        self.assertNotIn("b5=0x80: 2 UNEXPECTED", sub)
+        self.assertIn("ACK_REJECT_B5_UNEXPECTED: 3", sub)
+
+    def test_m09_ack_reject_none(self) -> None:
+        out, _ = self._analyse("2026-10-12 10:00:00.100  [MC-DBG] hello\n")
+        self.assertIn("ACK_REJECT_B5_UNEXPECTED: 0", self._sub(out, "ACK_REJECT_B5"))
+
+    # --- Dedup window after reboot ------------------------------------
+    def test_dedup_balance_reanchored_after_reboot(self) -> None:
+        out, _ = self._run(self._fx("reboot_balance"))
+        self.assertIn("REBOOTS (up= decreasing): 1", out)
+        sub = self._sub(out, "DEDUP_BALANCE")
+        self.assertIn("NEW_STAT_BALANCE: OK", sub)
+        self.assertIn("DUP_STAT_BALANCE: OK", sub)
+        self.assertIn("DEDUP_WINDOWS: 2 segments (re-anchored after 1 reboot)", sub)
+        # Not just OK: both sides must carry the post-reboot window values
+        # (10 DUP:n lines after the reboot STAT minus 2 HN = 8). A bug that
+        # zeroes both sides would still report a balanced 0 = 0.
+        self.assertIn(
+            "NEW_STAT: STAT_newid=8, DUP:n=8 + GWI=0 = 8 (STAT window, no HN/own/gw echoes)",
+            sub,
+        )
+        self.assertIn(
+            "DUP_STAT: STAT_dup=0, DUP:d=0 (STAT window, no HN/own/gw echoes)",
+            sub,
+        )
+        self.assertIn("NEW_STAT_BALANCE: OK (diff 0 <= tolerance 5)", sub)
+
+    def test_dedup_window_note_on_soak_reboot_excerpt(self) -> None:
+        out, _ = self._run(self._fx("reboot_stat"))
+        self.assertIn("REBOOTS (up= decreasing): 1", out)
+        self.assertIn(
+            "DEDUP_WINDOWS: 2 segments (re-anchored after 1 reboot)",
+            self._sub(out, "DEDUP_BALANCE"),
+        )
+
+    def test_dedup_no_window_note_without_reboot(self) -> None:
+        # the first two real STAT lines (up=205503 -> 205803): no up= drop
+        two = "".join(self._fx("reboot_stat").read_text().splitlines(keepends=True)[:2])
+        self.assertEqual(two.count("up=205"), 2)
+        out, _ = self._analyse(two)
+        self.assertIn("REBOOTS (up= decreasing): 0", out)
+        self.assertNotIn("DEDUP_WINDOWS:", out)
+
+    # --- Timestamp-less captures --------------------------------------
+    NA_TS = "n/a (no line timestamps)"
+
+    def test_putty_time_tables_are_na(self) -> None:
+        out, err = self._run(self._fx("putty"))
+        self.assertEqual(err, "")
+        for hdr in (
+            "BUCKETS_10MIN",
+            "CRC_10MIN_BUCKETS",
+            "CRC_HOURLY_RATE",
+            "CRC_CLUSTERS",
+            "CRC_VS_CHANNEL_UTIL",
+            "RING_WATERMARK_OVER_TIME",
+            "CAD_BUSY_VS_TRAFFIC (per hour)",
+        ):
+            self.assertIn(self.NA_TS, self._sub(out, hdr), hdr)
+        self.assertIn(self.NA_TS, self._sec_text(out, "CHANNEL_UTIL_DIAGRAM"))
+        # no junk bucket keyed on a payload token
+        self.assertNotRegex(out, r"(?m)^(CRC_ERROR|CHANNEL_UTIL|RING_STATUS|connect):00 ")
+
+    @staticmethod
+    def _sec_text(out: str, name: str) -> str:
+        lines: list[str] = []
+        capturing = False
+        for line in out.splitlines():
+            if capturing and line.startswith("=== "):
+                break
+            if capturing:
+                lines.append(line)
+            elif line.strip() == f"=== {name} ===":
+                capturing = True
+        return "\n".join(lines)
+
+    def test_nots_heap_hourly_and_labels_na(self) -> None:
+        text = "".join(f"[HEAP] 00:0{m}:00 {200000 - m * 1000} 190000 180000 (mon)\n" for m in range(5))
+        out, _ = self._analyse(text)
+        self.assertIn(self.NA_TS, self._sub(out, "HEAP_TREND_HOURLY"))
+        self.assertIn("INITIAL_FREE: 200000 (n/a)", out)
+        self.assertNotRegex(out, r"(?m)^00:00 +\d+ ")
+
+    def test_nots_cad_storm_counts_but_duration_na(self) -> None:
+        text = "[MC-DBG] TX_GATE_ENTER qlen=2 cad_attempt=3\n[MC-DBG] TX_DONE\n"
+        out, err = self._analyse(text)
+        self.assertEqual(err, "")
+        self.assertIn("TOTAL_STORMS: 1", out)
+        self.assertIn(f"DURATION_MAX: {self.NA_TS}", out)
+        self.assertIn("dur=n/a", out)
+
+    def test_putty_capture_start_and_flag(self) -> None:
+        out, _ = self._run(self._fx("putty"))
+        self.assertIn("CAPTURE_START: 2026-08-23 13:12:52 (PuTTY header)", out)
+        self.assertIn("LINE_TIMESTAMPS: no", out)
+
+    def test_stamped_capture_keeps_time_tables(self) -> None:
+        out, _ = self._run(W2B3_DIR / "loganalyse_w2b2_billing_dk5en98.txt")
+        self.assertIn("LINE_TIMESTAMPS: yes", out)
+        self.assertNotIn("CAPTURE_START:", out)
+        sub = self._sub(out, "BUCKETS_10MIN")
+        self.assertNotIn(self.NA_TS, sub)
+        self.assertRegex(sub, r"(?m)^00:00 ")
+
+    def test_console_form_timestamps_recognised(self) -> None:
+        text = "".join(
+            f"2026-08-31 15:{m:02d}:11 [MC-DBG] CHANNEL_UTIL rx=1000ms tx=0ms util=1{m % 10}%\n"
+            for m in range(10, 30)
+        )
+        out, _ = self._analyse(text)
+        self.assertIn("LINE_TIMESTAMPS: yes", out)
+        sub = self._sub(out, "BUCKETS_10MIN")
+        self.assertRegex(sub, r"(?m)^15:10 ")
+        self.assertRegex(sub, r"(?m)^15:20 ")
+
+    # --- Freq-error class label ---------------------------------------
+    def test_freq_class_renamed(self) -> None:
+        out, _ = self._run(W2B3_DIR / "loganalyse_collision_dk5en98.txt")
+        sub = self._sub(out, "CRC_FREQ_CLASSIFICATION")
+        self.assertIn("SAME_FREQ_PAIR (<1kHz):", sub)
+        self.assertNotIn("COLLISION (<1kHz)", out)
+
+    # --- RX_OTHER_ERROR duplicate -------------------------------------
+    def test_rx_other_error_single_counter(self) -> None:
+        text = (
+            "2026-10-12 10:00:00.100  [MC-DBG] RX_OTHER_ERROR code=1 rssi=-90 snr=2 size=10 ts=2\n"
+            "2026-10-12 10:00:01.100  [MC-DBG] RX_OTHER_ERROR code=4 rssi=-92 snr=2 size=10 ts=4\n"
+        )
+        out, _ = self._analyse(text)
+        self.assertIn("RX_OTHER_ERROR_COUNT: 2", out)
+        self.assertNotRegex(out, r"(?m)^RX_OTHER_ERROR: ")
+
+    # --- Rework: payload (chat) lines are never evidence -----------------
+    CHAT_LINE = (
+        "RX-LoRa 120 :{TEST}[RX] PNREPEAT msg-id:DEADBEEF ACK_REJECT b5=FF "
+        "ONRXDONE_STATS max=99999ms warn=50 ONRXDONE_SLOW ms=88888 "
+        "RX_BUF_OVERWRITE buf=1 CHECKRX zero_length RING_DROP_STALE slot=1 "
+        "age_s=99 msg_id=00000000 RING_DROP_PRIO prio=1 type=A0 RING_DROP_NEW "
+        "[MC-WDT] TX_WATCHDOG fired after 77777ms\n"
+    )
+    # Every W2b-3 counter / extract / histogram fed by a firmware marker.
+    CHAT_ZERO_LINES = (
+        "PNREPEAT: 0",
+        "PNREPEAT_DISTINCT_MSGIDS: 0",
+        "ONRXDONE_STATS_SAMPLES: 0",
+        "ONRXDONE_STATS_MAX_MS: n/a",
+        "ONRXDONE_STATS_WARN_SUM: n/a",
+        "ONRXDONE_SLOW_COUNT: 0",
+        "ONRXDONE_SLOW_MAX_MS: n/a",
+        "TX_WATCHDOG_FIRED: 0",
+        "TX_WATCHDOG_MAX_MS: n/a",
+        "RX_BUF_OVERWRITE: 0",
+        "CHECKRX_ZERO_LENGTH: 0",
+        "BUFFER_DROPS: 0",
+        "RING_DROP_COUNT: 0",
+        "RING_DROP_STALE: 0",
+        "RING_DROP_PRIO: 0",
+        "RING_DROP_NEW: 0",
+        "RING_DROP: 0",
+        "ACK_REJECT: 0",
+        "  ACK_REJECT: 0",
+        "TOTAL_ACK_EVENTS: 0",
+        "ACK_REJECT_B5_UNEXPECTED: 0",
+    )
+
+    def test_chat_line_feeds_no_w2b3_counter(self) -> None:
+        out, err = self._analyse(self.CHAT_LINE)
+        self.assertEqual(err, "")
+        for want in self.CHAT_ZERO_LINES:
+            self.assertRegex(out, r"(?m)^" + re.escape(want) + r"$", want)
+        self.assertNotIn("RING_DROP_STALE_AGE_MAX_S", out)
+        self.assertNotRegex(out, r"(?m)^b5=0x")
+        # extracted values must not surface (FIRST_LINE echoes the raw line,
+        # so look at the derived "KEY: value" lines only)
+        self.assertNotRegex(out, r"(?m)^[A-Z_]+_MS: (99999|88888|77777)\b")
+        self.assertNotRegex(out, r"(?m)^[A-Z_]+_S: 99$")
+
+    def test_chat_line_leaves_real_counters_unchanged(self) -> None:
+        # real + synthetic marker lines with and without one chat line
+        base = self._fx("counters_real").read_text() + self._fx("synthetic").read_text()
+        keys = [
+            r"PNREPEAT", r"PNREPEAT_DISTINCT_MSGIDS", r"ONRXDONE_STATS_\w+",
+            r"ONRXDONE_SLOW_\w+", r"TX_WATCHDOG_\w+", r"RX_BUF_OVERWRITE",
+            r"CHECKRX_ZERO_LENGTH", r"BUFFER_DROPS", r"RING_DROP\w*",
+            r"ACK_REJECT\w*", r"TOTAL_ACK_EVENTS", r"  ACK_REJECT", r"b5=0x\w+",
+        ]
+        pat = re.compile(r"(?m)^(?:" + "|".join(keys) + r"):? ?.*$")
+        plain, _ = self._analyse(base)
+        chat, _ = self._analyse(base + self.CHAT_LINE)
+        got_plain = [m.group(0) for m in pat.finditer(plain)]
+        got_chat = [m.group(0) for m in pat.finditer(chat)]
+        self.assertGreater(len(got_plain), 15)
+        self.assertEqual(got_plain, got_chat)
+        self.assertRegex(plain, r"(?m)^PNREPEAT: 10$")
+        self.assertRegex(plain, r"(?m)^RING_DROP_STALE: [1-9]")
+
+    # --- Rework: timestamp-less captures, time-derived verdicts ---------
+    def test_nots_inter_arrival_and_csma_assessment_na(self) -> None:
+        out, err = self._run(self._fx_r("putty_rx"))
+        self.assertEqual(err, "")
+        self.assertIn("LINE_TIMESTAMPS: no", out)
+        ia = self._sub(out, "INTER_ARRIVAL_TIME (between consecutive Received packet:)")
+        self.assertIn(self.NA_TS, ia)
+        self.assertNotRegex(ia, r"AVG: 0\.0s|MIN: 0\.0s|MAX: 0\.0s")
+        csma = self._sub(out, "CSMA_ASSESSMENT")
+        self.assertIn(f"ASSESSMENT: {self.NA_TS}", csma)
+        self.assertNotIn("CONGESTED", csma)
+        self.assertNotIn("Inter-arrival avg", csma)
+        # the genuine wait statistics stay
+        self.assertIn("Observed adaptive wait avg:", csma)
+
+    def test_nots_starvation_and_keep_gaps_na(self) -> None:
+        out, _ = self._run(self._fx_r("putty_rx"))
+        for hdr in (
+            "RADIO_SILENT (gap > 20s between RX_TIMEOUT_FIRE)",
+            "STUCK_STATES (non-RX_LISTEN state > 30s)",
+        ):
+            sub = self._sub(out, hdr)
+            self.assertIn(self.NA_TS, sub, hdr)
+            self.assertNotIn("NONE DETECTED", sub, hdr)
+        self.assertIn(f"KEEP_GAPS_GT_90S: {self.NA_TS}", out)
+        self.assertNotRegex(out, r"(?m)^KEEP_GAPS_GT_90S: 0")
+
+    def test_nots_keep_heartbeats_health_na(self) -> None:
+        text = "[KEEP] heartbeat\n" * 4
+        out, _ = self._analyse(text)
+        self.assertIn("KEEP_HEARTBEATS: 4", out)
+        self.assertIn(f"KEEP_GAPS_GT_90S: {self.NA_TS}", out)
+        self.assertIn(f"SERVER_HEALTH: {self.NA_TS}", out)
+        self.assertNotIn("HEALTHY", out.split("=== SERVER_CONNECTION ===")[1].split("=== NTP_SYNC ===")[0])
+
+    def test_nots_ntp_interval_and_health_na(self) -> None:
+        text = "TimeClient now 1\nTimeClient now 2\nTimeClient now 3\n"
+        out, _ = self._analyse(text)
+        self.assertIn("NTP_SYNCS: 3", out)
+        self.assertIn(f"AVG_SYNC_INTERVAL: {self.NA_TS}", out)
+        self.assertIn(f"NTP_HEALTH: {self.NA_TS}", out)
+        self.assertNotIn("NTP_HEALTH: HEALTHY", out)
+
+    def test_nots_frequency_drift_na(self) -> None:
+        rx = (
+            "[LoRa]...Received packet: RSSI:\t-60 dBm / SNR:\t7 dB / Frequency error:\t{f}.00 Hz\n"
+            "MH-LoRa 047 @ xAF25A1F{i:02d} H00 S0 T0 M01 DJ8MEH-43>*!4801.05N/01232.32E>x HW:10 MOD:8/8 FCS:0AC9 FW:35:p LH:8C\n"
+        )
+        text = "".join(rx.format(f=100 + 10 * i, i=i) for i in range(8))
+        out, _ = self._analyse(text)
+        sec = self._sec_text(out, "FREQUENCY_DRIFT")
+        self.assertIn(self.NA_TS, sec)
+        self.assertNotRegex(sec, r"DJ8MEH-43")
+        self.assertNotRegex(sec, r"STABLE|TEMP_DRIFT|TRENDING")
+        # with timestamps the same packets do produce a table row
+        stamped = "".join(
+            f"2026-10-12 10:0{i}:00.{j}00  {ln}\n"
+            for i in range(8)
+            for j, ln in enumerate(rx.format(f=100 + 10 * i, i=i).splitlines())
+        )
+        out_s, _ = self._analyse(stamped)
+        sec_s = self._sec_text(out_s, "FREQUENCY_DRIFT")
+        self.assertNotIn(self.NA_TS, sec_s)
+        self.assertRegex(sec_s, r"DJ8MEH-43 +8 ")
+
+    def test_nots_ble_latency_total_na(self) -> None:
+        text = (
+            "[MC-DBG] RING_WRITE src=user_msg msg_id=AABBCCDD queued=2\n"
+            "[MC-DBG] RING_TX_READ msg_id=AABBCCDD lat=1200\n"
+            "TX-LoRa 047 @ xAABBCCDD H00 S0 T0 M01 DJ8MEH-41>* :{TEST}hi HW:10 MOD:8/8 FCS:0AC9\n"
+        )
+        out, err = self._analyse(text)
+        self.assertEqual(err, "")
+        sec = self._sec_text(out, "BLE_TX_LATENCY")
+        self.assertIn(f"END_TO_END: {self.NA_TS}", sec)
+        self.assertNotRegex(sec, r"END_TO_END: AVG=0ms|MEDIAN:|P95:")
+        self.assertNotRegex(sec, r"< 2s: +1 ")
+        # queue wait comes from the lat= field of the log line: real
+        self.assertIn("QUEUE_WAIT: AVG=1200ms", sec)
+
+    def test_stamped_time_verdicts_unchanged(self) -> None:
+        out, _ = self._run(W2B3_DIR / "loganalyse_w2b2_billing_dk5en98.txt")
+        self.assertNotIn(f"KEEP_GAPS_GT_90S: {self.NA_TS}", out)
+        self.assertRegex(out, r"(?m)^KEEP_GAPS_GT_90S: \d+$")
+        ia = self._sub(out, "INTER_ARRIVAL_TIME (between consecutive Received packet:)")
+        self.assertNotIn(self.NA_TS, ia)
+        text = "".join(f"2026-10-12 10:00:{s:02d}.000  [KEEP] heartbeat\n" for s in range(0, 40, 10))
+        out_k, _ = self._analyse(text)
+        self.assertIn("KEEP_GAPS_GT_90S: 0", out_k)
+        self.assertIn("SERVER_HEALTH: HEALTHY", out_k)
+
+    @staticmethod
+    def _fx_r(name: str) -> Path:
+        return W2B3_DIR / f"loganalyse_w2b3r_{name}.txt"
 
 
 if __name__ == "__main__":

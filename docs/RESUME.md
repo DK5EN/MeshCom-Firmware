@@ -1,6 +1,15 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-11, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+**Stand:** 2026-10-13, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+
+## 2026-10-13 -- tools/loganalyse.sh campaign done (W0-W2b)
+
+`tools/loganalyse.sh` reads firmware 4.40a logs again (colon-less tags, `--setlog` `[LOG]` lines,
+path-head collision logic, pre-f2d6532f billing warning, reboot-aware dedup balance, n/a for
+captures without line timestamps); 127 tests in `tools/mock/test_loganalyse.py`. Campaign doc:
+`docs/campaign-loganalyse-20261012.md`. Left: logauswertung skill references (Out of scope there),
+the doc errors listed under Open leads. Net-console corpus pulled to `~/meshlog/rpizero/`; fresh
+dk5en-98 capture on rpizero `~/meshlog/dk5en-98/2026-10-1{2,3}.log` (ends 2026-10-13 08:00).
 
 ## 2026-10-11 -- v4.40a.10.11 released (first CI-built fork release)
 

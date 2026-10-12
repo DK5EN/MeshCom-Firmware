@@ -1,0 +1,600 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.08.23 13:12:52 =~=~=~=~=~=~=~=~=~=~=~=
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=66ms warn=1 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=43565 wait=5815 delta=5818
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-49 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=43950
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-49 dBm / SNR:		8 dB / Frequency error:	1343.66 Hz
+13:12:55 MH-LoRa 047 @ xAF25A1F1 H03 S0 T0 M01 DJ8MEH-43,DJ8MEH-1>H@R8;8,53,11; HW:10 MOD:8/8 FCS:0AC9 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_NEW msg_id=AF25A1F1
+13:12:55 RX-LoRa2 047 @ xAF25A1F1 H03 S0 T0 M01 DJ8MEH-43,DJ8MEH-1>H@R8;8,53,11; HW:10 MOD:8/8 FCS:0AC9 FW:35:p LH:8C
+[MC-DBG] RX_DEDUP_ADD msg_id=AF25A1F1 srv=0 slot=6/100
+13:12:55 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=AF25A1F1 type=40 len=64
+[MC-DBG] RING_WRITE slot=5 type=40 status=FF len=64 msg_id=AF25A1F1 queued=5/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=5 prio=5
+[MC-DBG] ONRXDONE_TIME ms=45
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[INIT]...Enabling Vext for OLED power
+[INIT]...Resetting OLED display
+
+
+============
+CLIENT SETUP
+============
+[HEAP] 00:00:00 249432 244284 212980 (init)
+[PSRM] 00:00:00 0
+[EFUS]...Two Point: NOT supported
+[EFUS]...Vref: NOT supported
+[INIT]...initMheard
+[INIT]...init_flash
+[INIT]...build Aug 22 2026 / 11:38:24
+[INIT]...FLASH version 20260821
+[TIME]...Loaded time persistence: saved_time=0, mheard_time=0, msg_time=0
+[INIT]...init_batt
+[ADC ]...Characterized using Default Vref
+[INIT]...MCP23017 not found
+[INIT]...RTC not found
+[OBUT]...One Button GPIO(0) not activated
+[INIT].._GW_ID: 433A80A8
+[INIT]...Initialize clock: ok
+[INIT]...Auto detecting display:
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 1
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 22 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[BLE ]...Device started with BLE-Name <MC-80a8-DJ8MEH-41>
+[BLE ]...Device-Address <48:ca:43:3a:80:a9>
+[BLE ]...Waiting a client connection to notify...
+==============
+CLIENT STARTED
+==============
+[WIFI]...SSID: fritzbox203 CHAN: 11 RSSI: -36 BSSID: 3C:A6:2F:81:C2:5C
+[WIFI]...SSID: fritzbox203 CHAN: 1 RSSI: -76 BSSID: DC:15:C8:3E:AD:86
+[WIFI]...SSID: fritzbox203 CHAN: 7 RSSI: -79 BSSID: 2C:91:AB:1B:DA:CE
+[WIFI]...SSID: fritzbox203 CHAN: 7 RSSI: -79 BSSID: B0:F2:08:20:A3:87
+[WIFI]...connecting to CHAN: 11 BSSID: 3C:A6:2F:81:C2:5C
+[WIFI]...power: 80 RSSI:-36
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=9418
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-77 dBm / SNR:		6 dB / Frequency error:	165.66 Hz
+00:00:00 MH-LoRa 079 @ xA5DAC07C H01 S1 T0 M01 DJ8MEH-1,DJ8MEH-82,DJ8MEH-41,DJ8MEH-8>H@R7;9,96,6;1,67,6;4,43,5; HW:12 MOD:8/8 FCS:12D5 FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_NEW msg_id=A5DAC07C
+00:00:00 RX-LoRa2 079 @ xA5DAC07C H01 S1 T0 M01 DJ8MEH-1,DJ8MEH-82,DJ8MEH-41,DJ8MEH-8>H@R7;9,96,6;1,67,6;4,43,5; HW:12 MOD:8/8 FCS:12D5 FW:35:p LH:AB
+[MC-DBG] RX_DEDUP_ADD msg_id=A5DAC07C srv=1 slot=0/100
+00:00:00 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path
+[MC-DBG] ONRXDONE_TIME ms=43
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[WIFI]...Wait connect .[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] ONRXDONE_STATS max=43ms warn=0 (>50ms)
+
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.0.112, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+TimeClient now (UTC): 11:13:09
+[MC-DBG] RX_TIMEOUT_FIRE ts=14015 wait=4535 delta=4535
+[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=-44 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=15367
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		7 dB / Frequency error:	-62.97 Hz
+13:13:13 MH-LoRa 137 ! x2F28B015 H02 S0 T0 M01 DJ8MEH-45>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:1E86 FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_NEW msg_id=2F28B015
+13:13:13 RX-LoRa2 137 ! x2F28B015 H02 S0 T0 M01 DJ8MEH-45>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:1E86 FW:35:p LH:A7
+[MC-DBG] RX_DEDUP_ADD msg_id=2F28B015 srv=0 slot=1/100
+13:13:13 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=2F28B015 type=21 len=147
+[MC-DBG] RING_WRITE slot=0 type=21 status=FF len=147 msg_id=2F28B015 queued=0/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=0 prio=4
+[MC-DBG] ONRXDONE_TIME ms=66
+[MC-WARN] ONRXDONE_SLOW ms=66 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] ONRXDONE_STATS max=66ms warn=1 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=20223
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-115 dBm / SNR:		-1 dB / Frequency error:	146.28 Hz
+13:13:18 MH-LoRa 127 ! xF600C2BF H01 S0 T0 M01 DJ8MEH-81,DJ8MEH-42>*!4801.06N/01232.31E>Meshcom Heltec-Tracker#Helmut/B=009/A=001683/N8/R=262;20;26386;26216;9; HW:41 MOD:8/8 FCS:202E FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_NEW msg_id=F600C2BF
+13:13:18 RX-LoRa2 127 ! xF600C2BF H01 S0 T0 M01 DJ8MEH-81,DJ8MEH-42>*!4801.06N/01232.31E>Meshcom Heltec-Tracker#Helmut/B=009/A=001683/N8/R=262;20;26386;26216;9; HW:41 MOD:8/8 FCS:202E FW:35:p LH:AB
+[MC-DBG] RX_DEDUP_ADD msg_id=F600C2BF srv=0 slot=2/100
+13:13:18 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=F600C2BF type=21 len=137
+[MC-DBG] RING_WRITE slot=1 type=21 status=FF len=137 msg_id=F600C2BF queued=1/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=1 prio=4
+[MC-DBG] ONRXDONE_TIME ms=55
+[MC-WARN] ONRXDONE_SLOW ms=55 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RX_TIMEOUT_FIRE ts=25811 wait=5500 delta=5504
+[MC-SM] IDLE -> RX_LISTEN rc=0
+[MC-DBG] RX_RESTART src=timeout state=0
+13:13:24 [LoRa]...Receive Timeout, startReceive again with sucess
+[MC-SM] IDLE -> TX_PREPARE rc=0
+[MC-DBG] TX_GATE_ENTER qlen=2 cad_attempt=0
+[CHECK] radio.scanChannel() / 1[MC-DBG] CAD_SCAN result=-702
+[MC-DBG] CAD_BUSY_1 attempt=0, double-check...
+[CHECK] radio.scanChannel() / 2[MC-DBG] CAD_SCAN result=-702
+[MC-SM] TX_PREPARE -> IDLE rc=-1
+[MC-DBG] CAD_BUSY attempt=1 next_timeout=4828
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=27434
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		6 dB / Frequency error:	1351.41 Hz
+13:13:25 MH-LoRa 146 ! x2F28B015 H01 S0 T0 M01 DJ8MEH-45,DJ8MEH-1>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:20AF FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_DUP msg_id=2F28B015 slot=1
+[MC-DBG] ONRXDONE_TIME ms=13
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RING_STATUS queued=2 pending=0 retrying=0 done=2 iW=2 iR=0 dedup=3/100
+[MC-TRICKLE] SEND consistent=1<k=2 interval=30000ms neighbors=3
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=55ms warn=1 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=32097
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-114 dBm / SNR:		0 dB / Frequency error:	148.22 Hz
+13:13:30 MH-LoRa 047 @ xF83120AE H03 S0 T0 M01 DJ8MEH-82,DJ8MEH-42>H@R9;5,77,6; HW:41 MOD:8/8 FCS:0A89 FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_NEW msg_id=F83120AE
+13:13:30 RX-LoRa2 047 @ xF83120AE H03 S0 T0 M01 DJ8MEH-82,DJ8MEH-42>H@R9;5,77,6; HW:41 MOD:8/8 FCS:0A89 FW:35:p LH:AB
+[MC-DBG] RX_DEDUP_ADD msg_id=F83120AE srv=0 slot=3/100
+13:13:30 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=F83120AE type=40 len=65
+[MC-DBG] RING_WRITE slot=2 type=40 status=FF len=65 msg_id=F83120AE queued=2/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=2 prio=5
+[MC-DBG] ONRXDONE_TIME ms=45
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RX_TIMEOUT_FIRE ts=36816 wait=4653 delta=4656
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-45 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=37567
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		6 dB / Frequency error:	-59.09 Hz
+13:13:36 MH-LoRa 127 ! xF600C2BF H01 S0 T0 M01 DJ8MEH-81,DJ8MEH-45>*!4801.06N/01232.31E>Meshcom Heltec-Tracker#Helmut/B=009/A=001683/N8/R=262;20;26386;26216;9; HW:41 MOD:8/8 FCS:2031 FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F600C2BF slot=2
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=45ms warn=0 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=42542 wait=4933 delta=4933
+[MC-SM] IDLE -> RX_LISTEN rc=0
+[MC-DBG] RX_RESTART src=timeout state=0
+13:13:41 [LoRa]...Receive Timeout, startReceive again with sucess
+[MC-SM] IDLE -> TX_PREPARE rc=0
+[MC-DBG] TX_GATE_ENTER qlen=3 cad_attempt=1
+[CHECK] radio.scanChannel() / 1[MC-DBG] CAD_SCAN result=-15
+[MC-DBG] CAD_FREE attempt=1
+[MC-DBG] RING_TX_READ slot=0 prio=4 type=21 status=FF len=147 msg_id=2F28B015 retry=0 queued=3/20 lat=27165ms
+[MC-DBG] RADIO_TX len=147
+13:13:41 TX-LoRa  147 ! x2F28B015 H01 S0 T0 M01 DJ8MEH-45,DJ8MEH-41>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:20E3 FW:35:p LH:AB
+[MC-SM] TX_PREPARE -> TX_ACTIVE rc=0
+[MC-DBG] TX_START qlen=2
+transmittedFlag
+[MC-SM] TX_ACTIVE -> TX_DONE rc=0
+[MC-DBG] TX_DONE state=0 ts=44111
+transmission finished!
+OnTXDone
+[MC-SM] TX_DONE -> RX_LISTEN rc=0
+[MC-DBG] RX_RESTARTED src=after_tx state=0
+--loradebug on+--loradebug on[MC-DBG] RX_TIMEOUT_FIRE ts=49968 wait=5850 delta=5851
+[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=-45 cnt=0
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=1486ms util=14%%
+[MC-DBG] ONRXDONE_STATS max=0ms warn=0 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=50629
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-47 dBm / SNR:		6 dB / Frequency error:	1364.97 Hz
+13:13:49 MH-LoRa 063 @ xF83120AE H02 S0 T0 M01 DJ8MEH-82,DJ8MEH-42,DJ8MEH-1>H@R9;5,77,6;8,87,7; HW:41 MOD:8/8 FCS:0E23 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F83120AE slot=3
+[MC-DBG] ONRXDONE_TIME ms=13
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+--loradebug onreceiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=56326
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-94 dBm / SNR:		5 dB / Frequency error:	-248.97 Hz
+13:13:54 MH-LoRa 147 ! x2F28B015 H01 S0 T0 M01 DJ8MEH-45,DJ8MEH-81>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:20E7 FW:35:p LH:A9
+
+[MC-DBG] RX_DEDUP_DUP msg_id=2F28B015 slot=1
+[MC-DBG] ONRXDONE_TIME ms=13
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RING_STATUS queued=2 pending=0 retrying=0 done=2 iW=3 iR=1 dedup=4/100
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=13ms warn=0 (>50ms)
+receiveflag
+[MC-DBG] RX_TIMEOUT_FIRE ts=62096 wait=5710 delta=5728
+[MC-DBG] RX_TIMEOUT_DEFERRED src=receiveFlag
+
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=62106
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		6 dB / Frequency error:	-51.34 Hz
+13:14:00 MH-LoRa 064 @ xAF59C27F H02 S0 T0 M01 DJ8MEH-46,DJ8MEH-43,DJ8MEH-45>H@R6;6,62,9;0,30,6; HW:03 MOD:8/8 FCS:0E6E FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_NEW msg_id=AF59C27F
+13:14:00 RX-LoRa2 064 @ xAF59C27F H02 S0 T0 M01 DJ8MEH-46,DJ8MEH-43,DJ8MEH-45>H@R6;6,62,9;0,30,6; HW:03 MOD:8/8 FCS:0E6E FW:35:p LH:A7
+[MC-DBG] RX_DEDUP_ADD msg_id=AF59C27F srv=0 slot=4/100
+13:14:00 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=AF59C27F type=40 len=81
+[MC-DBG] RING_WRITE slot=3 type=40 status=FF len=81 msg_id=AF59C27F queued=2/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=3 prio=5
+[MC-DBG] ONRXDONE_TIME ms=56
+[MC-WARN] ONRXDONE_SLOW ms=56 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+--wxdebug on[CMD] wxdebug onreceiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=67824
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		6 dB / Frequency error:	-55.22 Hz
+13:14:06 MH-LoRa 030 @ x2F28B013 H04 S0 T0 M01 DJ8MEH-45>H@R3; HW:39 MOD:8/8 FCS:05D9 FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_NEW msg_id=2F28B013
+13:14:06 RX-LoRa2 030 @ x2F28B013 H04 S0 T0 M01 DJ8MEH-45>H@R3; HW:39 MOD:8/8 FCS:05D9 FW:35:p LH:A7
+[MC-DBG] RX_DEDUP_ADD msg_id=2F28B013 srv=0 slot=5/100
+13:14:06 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=2F28B013 type=40 len=47
+[MC-DBG] RING_WRITE slot=4 type=40 status=FF len=47 msg_id=2F28B013 queued=3/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=4 prio=5
+[MC-DBG] ONRXDONE_TIME ms=55
+[MC-WARN] ONRXDONE_SLOW ms=55 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[HEAP] 13:14:07 139548 136100 131060 (mon)
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=56ms warn=2 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=73609 wait=5710 delta=5712
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-58 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=74126
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-58 dBm / SNR:		6 dB / Frequency error:	3932.16 Hz
+13:14:12 MH-LoRa 063 @ xF83120AE H02 S1 T0 M01 DJ8MEH-82,DJ8MEH-8,DJ8MEH-46>H@R9;1,48,6;8,65,9; HW:41 MOD:8/8 FCS:0EA6 FW:35:p LH:83
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F83120AE slot=3
+[MC-DBG] ONRXDONE_TIME ms=13
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=78576
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-93 dBm / SNR:		5 dB / Frequency error:	-250.91 Hz
+13:14:17 MH-LoRa 030 @ xF600C2BD H04 S0 T0 M01 DJ8MEH-81>H@R1; HW:41 MOD:8/8 FCS:0734 FW:35:p LH:A9
+
+[MC-DBG] RX_DEDUP_NEW msg_id=F600C2BD
+13:14:17 RX-LoRa2 030 @ xF600C2BD H04 S0 T0 M01 DJ8MEH-81>H@R1; HW:41 MOD:8/8 FCS:0734 FW:35:p LH:A9
+[MC-DBG] RX_DEDUP_ADD msg_id=F600C2BD srv=0 slot=6/100
+13:14:17 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=F600C2BD type=40 len=47
+[MC-DBG] RING_WRITE slot=5 type=40 status=FF len=47 msg_id=F600C2BD queued=4/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=5 prio=5
+[MC-DBG] ONRXDONE_TIME ms=45
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=45ms warn=0 (>50ms)
+--bledebug onreceiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=84311
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		6 dB / Frequency error:	-53.28 Hz
+13:14:22 MH-LoRa 064 @ xAF25A1EF H02 S0 T0 M01 DJ8MEH-43,DJ8MEH-41,DJ8MEH-45>H@R6;8,41,6;3,13,4; HW:10 MOD:8/8 FCS:0E89 FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_NEW msg_id=AF25A1EF
+13:14:22 RX-LoRa2 064 @ xAF25A1EF H02 S0 T0 M01 DJ8MEH-43,DJ8MEH-41,DJ8MEH-45>H@R6;8,41,6;3,13,4; HW:10 MOD:8/8 FCS:0E89 FW:35:p LH:A7
+[MC-DBG] RX_DEDUP_ADD msg_id=AF25A1EF srv=0 slot=7/100
+13:14:22 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path
+[MC-DBG] ONRXDONE_TIME ms=44
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=84944
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-59 dBm / SNR:		5 dB / Frequency error:	3928.28 Hz
+13:14:23 MH-LoRa 048 @ x2F28B013 H03 S0 T0 M01 DJ8MEH-45,DJ8MEH-46>H@R3;9,18,13; HW:39 MOD:8/8 FCS:09D4 FW:35:p LH:83
+
+[MC-DBG] RX_DEDUP_DUP msg_id=2F28B013 slot=5
+[MC-DBG] ONRXDONE_TIME ms=13
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RING_STATUS queued=5 pending=0 retrying=0 done=5 iW=6 iR=1 dedup=8/100
+[MC-TRICKLE] TOPO_CHANGE neighbors=3->5 interval_reset=30000ms
+[MC-TRICKLE] SEND consistent=0<k=2 interval=30000ms neighbors=5
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=44ms warn=0 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=90830 wait=5850 delta=5855
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-45 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=91131
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-46 dBm / SNR:		7 dB / Frequency error:	-55.22 Hz
+13:14:29 MH-LoRa 047 @ xAF25A1F0 H03 S0 T0 M01 DJ8MEH-43,DJ8MEH-45>H@R6;3,32,6; HW:10 MOD:8/8 FCS:0ACA FW:35:p LH:A7
+
+[MC-DBG] RX_DEDUP_NEW msg_id=AF25A1F0
+13:14:29 RX-LoRa2 047 @ xAF25A1F0 H03 S0 T0 M01 DJ8MEH-43,DJ8MEH-45>H@R6;3,32,6; HW:10 MOD:8/8 FCS:0ACA FW:35:p LH:A7
+[MC-DBG] RX_DEDUP_ADD msg_id=AF25A1F0 srv=0 slot=8/100
+13:14:29 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=AF25A1F0 type=40 len=64
+[MC-DBG] RING_WRITE slot=6 type=40 status=FF len=64 msg_id=AF25A1F0 queued=5/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=6 prio=5
+[MC-DBG] ONRXDONE_TIME ms=55
+[MC-WARN] ONRXDONE_SLOW ms=55 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+--setlog on
+setlog on
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=95952
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-47 dBm / SNR:		6 dB / Frequency error:	1370.78 Hz
+13:14:34 [LOG] 047 @ x2F28B013 H03 S0 T0 M01 DJ8MEH-45,DJ8MEH-1>H@R3;8,17,13; HW:39 MOD:8/8 FCS:0999 FW:35:p LH:8C
+13:14:34 MH-LoRa 047 @ x2F28B013 H03 S0 T0 M01 DJ8MEH-45,DJ8MEH-1>H@R3;8,17,13; HW:39 MOD:8/8 FCS:0999 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_DUP msg_id=2F28B013 slot=5
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=55ms warn=1 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=101634 wait=5640 delta=5640
+[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=-30 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=102145
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-29 dBm / SNR:		6 dB / Frequency error:	3930.22 Hz
+13:14:40 [LOG] 048 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-46>H@R1;9,67,12; HW:41 MOD:8/8 FCS:0B32 FW:35:p LH:83
+13:14:40 MH-LoRa 048 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-46>H@R1;9,67,12; HW:41 MOD:8/8 FCS:0B32 FW:35:p LH:83
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F600C2BD slot=6
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=107097
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-12 dBm / SNR:		6 dB / Frequency error:	1363.03 Hz
+13:14:45 [LOG] 047 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-1>H@R1;8,56,11; HW:41 MOD:8/8 FCS:0AF5 FW:35:p LH:8C
+13:14:45 MH-LoRa 047 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-1>H@R1;8,56,11; HW:41 MOD:8/8 FCS:0AF5 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F600C2BD slot=6
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=24ms warn=0 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=111825
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-51 dBm / SNR:		5 dB / Frequency error:	169.53 Hz
+13:14:50 [LOG] 146 ! x2F28B015 H01 S1 T0 M01 DJ8MEH-45,DJ8MEH-8>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:2136 FW:35:p LH:AB
+13:14:50 MH-LoRa 146 ! x2F28B015 H01 S1 T0 M01 DJ8MEH-45,DJ8MEH-8>*!4801.05N/01232.32E>Meshcom-E22#Helmut/B=100/A=001759/N7/P=966.1/H=42.7/T=25.3/Q=1027.4/R=262;20;26386;26216;9; HW:39 MOD:8/8 FCS:2136 FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_DUP msg_id=2F28B015 slot=1
+[MC-DBG] ONRXDONE_TIME ms=45
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RX_TIMEOUT_FIRE ts=117673 wait=5780 delta=5785
+[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=-25 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=118082
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-26 dBm / SNR:		5 dB / Frequency error:	3928.28 Hz
+13:14:56 [LOG] 030 @ xAF59C283 H04 S0 T0 M01 DJ8MEH-46>H@R9; HW:03 MOD:8/8 FCS:06EF FW:35:p LH:83
+13:14:56 MH-LoRa 030 @ xAF59C283 H04 S0 T0 M01 DJ8MEH-46>H@R9; HW:03 MOD:8/8 FCS:06EF FW:35:p LH:83
+
+[MC-DBG] RX_DEDUP_NEW msg_id=AF59C283
+13:14:56 RX-LoRa2 030 @ xAF59C283 H04 S0 T0 M01 DJ8MEH-46>H@R9; HW:03 MOD:8/8 FCS:06EF FW:35:p LH:83
+[MC-DBG] RX_DEDUP_ADD msg_id=AF59C283 srv=0 slot=9/100
+13:14:56 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=AF59C283 type=40 len=47
+[MC-DBG] RING_WRITE slot=7 type=40 status=FF len=47 msg_id=AF59C283 queued=6/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=7 prio=5
+[MC-DBG] ONRXDONE_TIME ms=46
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RING_STATUS queued=7 pending=0 retrying=0 done=7 iW=8 iR=1 dedup=10/100
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=46ms warn=0 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=123329
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-12 dBm / SNR:		6 dB / Frequency error:	1374.66 Hz
+13:15:01 [LOG] 049 @ x690F01A1 H03 S0 T0 M01 DJ8MEH-44,DJ8MEH-1>H@R8;9,113,-17; HW:43 MOD:8/8 FCS:0A00 FW:35:p LH:8C
+13:15:01 MH-LoRa 049 @ x690F01A1 H03 S0 T0 M01 DJ8MEH-44,DJ8MEH-1>H@R8;9,113,-17; HW:43 MOD:8/8 FCS:0A00 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_NEW msg_id=690F01A1
+13:15:01 RX-LoRa2 049 @ x690F01A1 H03 S0 T0 M01 DJ8MEH-44,DJ8MEH-1>H@R8;9,113,-17; HW:43 MOD:8/8 FCS:0A00 FW:35:p LH:8C
+[MC-DBG] RX_DEDUP_ADD msg_id=690F01A1 srv=0 slot=10/100
+13:15:01 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=690F01A1 type=40 len=66
+[MC-DBG] RING_WRITE slot=8 type=40 status=FF len=66 msg_id=690F01A1 queued=7/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=8 prio=5
+[MC-DBG] ONRXDONE_TIME ms=56
+[MC-WARN] ONRXDONE_SLOW ms=56 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RX_TIMEOUT_FIRE ts=128953 wait=5535 delta=5540
+[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=-71 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=129542
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-69 dBm / SNR:		6 dB / Frequency error:	-206.34 Hz
+13:15:08 [LOG] 046 @ xA5DAC07F H03 S0 T0 M01 DJ8MEH-1,DJ8MEH-82>H@R8;8,90,6; HW:12 MOD:8/8 FCS:0AFB FW:35:p LH:A9
+13:15:08 MH-LoRa 046 @ xA5DAC07F H03 S0 T0 M01 DJ8MEH-1,DJ8MEH-82>H@R8;8,90,6; HW:12 MOD:8/8 FCS:0AFB FW:35:p LH:A9
+
+[MC-DBG] RX_DEDUP_NEW msg_id=A5DAC07F
+13:15:08 RX-LoRa2 046 @ xA5DAC07F H03 S0 T0 M01 DJ8MEH-1,DJ8MEH-82>H@R8;8,90,6; HW:12 MOD:8/8 FCS:0AFB FW:35:p LH:A9
+[MC-DBG] RX_DEDUP_ADD msg_id=A5DAC07F srv=0 slot=11/100
+13:15:08 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=A5DAC07F type=40 len=63
+[MC-DBG] RING_WRITE slot=9 type=40 status=FF len=63 msg_id=A5DAC07F queued=8/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=9 prio=5
+[MC-DBG] ONRXDONE_TIME ms=56
+[MC-WARN] ONRXDONE_SLOW ms=56 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+13:15:08 [POS]...sendPostion initialized F:1 S:0
+13:15:08 NEW-POS 116 ! xEA02A065 H02 S0 T0 M00 DJ8MEH-41>*!4801.05N/01232.32E[Meshcom Heltec-V3#Helmut/B=019/A=001759/N7/R=262;20;26386;26216;9;232; HW:43 MOD:8/8 FCS:1BF8 FW:35:p LH:AB
+[MC-DBG] RING_WRITE slot=10 type=21 status=FF len=116 msg_id=EA02A065 queued=9/20 src=user_wx
+[MC-DBG] RING_PRIO slot=10 prio=4
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=56ms warn=2 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=134281
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-41 dBm / SNR:		6 dB / Frequency error:	4718.78 Hz
+13:15:12 [LOG] 048 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-43>H@R1;8,95,13; HW:41 MOD:8/8 FCS:0B30 FW:35:p LH:8A
+13:15:12 MH-LoRa 048 @ xF600C2BD H03 S0 T0 M01 DJ8MEH-81,DJ8MEH-43>H@R1;8,95,13; HW:41 MOD:8/8 FCS:0B30 FW:35:p LH:8A
+
+[MC-DBG] RX_DEDUP_DUP msg_id=F600C2BD slot=6
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] ONRXDONE_STATS max=24ms warn=0 (>50ms)
+[MC-DBG] RX_TIMEOUT_FIRE ts=140174 wait=5850 delta=5851
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-26 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=140655
+OnRxError
+[MC-DBG] RX_RESTARTED src=after_crc_error state=0
+[MC-DBG] CRC_ERROR rssi=-28 snr=2 freq_err=4724.6 size=255 ts=140663
+[MC-DBG] CRC_PAYLOAD[255]: 40 13 D8 1C 74 D0 75 5F 9A 4E D5 7A 5B 2A 6A 5F 0D B7 90 1B 5C F1 6C F8 BE 14 2B 49 8F 52 2D 70 BA 8E DF C6 58 2B 79 89 D2 61 D0 7C 64 27 E6 8B B0 1B A6 C7 4D B8 A5 9D A3 DA 97 F1 5D 04 14 D5 10 DB BF CE 3F B4 DA CA 3F CC E7 11 3C 48 9A 37 40 04 60 05 42 30 0B 06 00 12 45 01 82 8A 38 05 82 90 BF CE 3F 02 00 00 00 CC E7 11 3C 02 00 00 00 FF FF FF FF 00 00 00 00 00 00 00 00 54 39 05 82 B0 BF CE 3F 5C BF CA 3F CC E7 11 3C 02 00 00 00 00 FF 00 00 00 00 FF 00 00 00 00 FF 88 39 05 82 D0 BF CE 3F 5C BF CA 3F 68 57 10 3C 00 00 00 00 00 FF 00 00 00 00 FF 00 00 00 00 FF 78 69 02 82 F0 BF CE 3F 5C BF CA 3F 25 00 00 00 00 00 40 15 00 00 8E 24 00 00 FF 00 00 00 00 FF 64 4F 01 82 10 C0 CE 3F 68 57 10 3C 14 C2 12 3C 00 00 00 00 00 00 00 00 20 07 06 00 01 00 00 00 56 2B [MC-DBG] RX_TIMEOUT_FIRE ts=146560 wait=5815 delta=5820
+[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=-11 cnt=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=146801
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-12 dBm / SNR:		6 dB / Frequency error:	1382.41 Hz
+13:15:25 [LOG] 046 @ xAF59C283 H03 S0 T0 M01 DJ8MEH-46,DJ8MEH-1>H@R9;9,26,4; HW:03 MOD:8/8 FCS:0A80 FW:35:p LH:8C
+13:15:25 MH-LoRa 046 @ xAF59C283 H03 S0 T0 M01 DJ8MEH-46,DJ8MEH-1>H@R9;9,26,4; HW:03 MOD:8/8 FCS:0A80 FW:35:p LH:8C
+
+[MC-DBG] RX_DEDUP_DUP msg_id=AF59C283 slot=9
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] RING_STATUS queued=10 pending=0 retrying=0 done=10 iW=11 iR=1 dedup=12/100
+[MC-TRICKLE] TOPO_CHANGE neighbors=5->8 interval_reset=30000ms
+[MC-TRICKLE] SEND consistent=0<k=2 interval=30000ms neighbors=8
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=24ms warn=0 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=152093
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-43 dBm / SNR:		6 dB / Frequency error:	4747.84 Hz
+13:15:30 [LOG] 067 @ x690F01A1 H02 S0 T0 M01 DJ8MEH-44,DJ8MEH-1,DJ8MEH-43>H@R8;9,113,-17;8,62,11; HW:43 MOD:8/8 FCS:0DF4 FW:35:p LH:8A
+13:15:30 MH-LoRa 067 @ x690F01A1 H02 S0 T0 M01 DJ8MEH-44,DJ8MEH-1,DJ8MEH-43>H@R8;9,113,-17;8,62,11; HW:43 MOD:8/8 FCS:0DF4 FW:35:p LH:8A
+
+[MC-DBG] RX_DEDUP_DUP msg_id=690F01A1 slot=10
+[MC-DBG] ONRXDONE_TIME ms=24
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=157420
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-52 dBm / SNR:		6 dB / Frequency error:	165.66 Hz
+13:15:35 [LOG] 079 @ xA5DAC07D H01 S1 T0 M01 DJ8MEH-1,DJ8MEH-81,DJ8MEH-42,DJ8MEH-8>H@R9;9,77,6;0,10,6;5,65,7; HW:12 MOD:8/8 FCS:12D1 FW:35:p LH:AB
+13:15:35 MH-LoRa 079 @ xA5DAC07D H01 S1 T0 M01 DJ8MEH-1,DJ8MEH-81,DJ8MEH-42,DJ8MEH-8>H@R9;9,77,6;0,10,6;5,65,7; HW:12 MOD:8/8 FCS:12D1 FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_NEW msg_id=A5DAC07D
+13:15:35 RX-LoRa2 079 @ xA5DAC07D H01 S1 T0 M01 DJ8MEH-1,DJ8MEH-81,DJ8MEH-42,DJ8MEH-8>H@R9;9,77,6;0,10,6;5,65,7; HW:12 MOD:8/8 FCS:12D1 FW:35:p LH:AB
+[MC-DBG] RX_DEDUP_ADD msg_id=A5DAC07D srv=1 slot=12/100
+13:15:35 MESH    : <no via info>return MESH=true
+[MC-DBG] RELAY_QUEUED msg_id=A5DAC07D type=40 len=96
+[MC-DBG] RING_WRITE slot=11 type=40 status=FF len=96 msg_id=A5DAC07D queued=10/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=11 prio=5
+[MC-DBG] ONRXDONE_TIME ms=76
+[MC-WARN] ONRXDONE_SLOW ms=76 threshold=50
+OnRxDone
+[MC-SM] RX_PROCESS -> RX_LISTEN rc=0
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] ONRXDONE_STATS max=76ms warn=1 (>50ms)
+receiveflag
+[MC-SM] RX_LISTEN -> RX_PROCESS rc=0
+
+[MC-DBG] RX_FLAG_PROCESS ts=161571
+[MC-DBG] RX_RESTARTED src=after_readData state=0
+[LoRa]...Received packet: RSSI:		-60 dBm / SNR:		5 dB / Frequency error:	165.66 Hz
+13:15:40 [LOG] 071 : xE9ED0310 H04 S0 T0 M01 DJ8MEH-8>9:Test1 in die HF mit FW v4.35p.08.22-stability HW:43 MOD:8/8 FCS:1389 FW:35:p LH:AB
+13:15:40 MH-LoRa 071 : xE9ED0310 H04 S0 T0 M01 DJ8MEH-8>9:Test1 in die HF mit FW v4.35p.08.22-stability HW:43 MOD:8/8 FCS:1389 FW:35:p LH:AB
+
+[MC-DBG] RX_DEDUP_NEW msg_id=E9ED0310
