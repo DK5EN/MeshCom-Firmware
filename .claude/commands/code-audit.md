@@ -7,7 +7,8 @@ Run a two-phase code audit: mechanical grep scan first, then contextual analysis
 
 ## Arguments
 
-- No args → audit only files changed vs `upstream/dev` (PR scope)
+- No args → audit files changed vs `upstream/dev`. On a `pr/*` branch that is the PR scope; on
+  `fork-dev` it is the whole fork-only firmware delta (100+ files), so prefer `--only` there
 - `--full` → audit all of `src/`
 - `--only <file>[,<file>]` → audit specific files (relative to project root)
 - `--delta` → compare against most recent previous audit and highlight new/resolved findings
@@ -19,6 +20,7 @@ python3 tools/code_audit_scan.py [--full | --only <files>]
 ```
 
 The script runs regex checks for the most common rule violations and emits JSON:
+
 ```json
 {
   "mode": "changed|full|specific",
@@ -67,6 +69,7 @@ ls docs/code-audit-*.md 2>/dev/null | sort | tail -1
 ```
 
 Read the previous audit. Compare rule IDs + file + line range to classify each current finding as:
+
 - `NEW` — not in previous audit
 - `EXISTING` — was already flagged
 - `RESOLVED` — was in previous audit, no longer present
@@ -92,17 +95,17 @@ Write to `docs/code-audit-YYYYMMDD.md` (today's date).
 
 ## Audit Summary
 
-| Category | Rule IDs | Critical | High | Medium | Low |
-|----------|----------|----------|------|--------|-----|
-| Buffer Safety     | BND-01..05 | N | N | N | N |
-| Memory Safety     | MEM-01..05 | N | N | N | N |
-| Thread Safety     | RACE-01..08| N | N | N | N |
-| ISR Safety        | ISR-01..04 | N | N | N | N |
-| Stack Safety      | STK-01..04 | N | N | N | N |
-| Watchdog          | STAB-01..05| N | N | N | N |
-| Security          | SEC-01..   | N | N | N | N |
-| Protocol          | Section 15 | N | N | N | N |
-| Code Quality 2.0  | CQ2-C01..C28 | N | N | N | N |
+| Category         | Rule IDs     | Critical | High | Medium | Low |
+| ---------------- | ------------ | -------- | ---- | ------ | --- |
+| Buffer Safety    | BND-01..05   | N        | N    | N      | N   |
+| Memory Safety    | MEM-01..05   | N        | N    | N      | N   |
+| Thread Safety    | RACE-01..08  | N        | N    | N      | N   |
+| ISR Safety       | ISR-01..04   | N        | N    | N      | N   |
+| Stack Safety     | STK-01..04   | N        | N    | N      | N   |
+| Watchdog         | STAB-01..05  | N        | N    | N      | N   |
+| Security         | SEC-01..     | N        | N    | N      | N   |
+| Protocol         | Section 15   | N        | N    | N      | N   |
+| Code Quality 2.0 | CQ2-C01..C28 | N        | N    | N      | N   |
 
 **Total: N findings (N CRITICAL, N HIGH, N MEDIUM, N LOW)**
 
@@ -124,13 +127,13 @@ Write to `docs/code-audit-YYYYMMDD.md` (today's date).
 
 ---
 
-## Delta vs. Previous Audit  *(omit if no --delta)*
+## Delta vs. Previous Audit _(omit if no --delta)_
 
-| Status | Count | Notes |
-|--------|-------|-------|
-| New findings    | N | ... |
-| Resolved        | N | ... |
-| Existing (unchanged) | N | ... |
+| Status               | Count | Notes |
+| -------------------- | ----- | ----- |
+| New findings         | N     | ...   |
+| Resolved             | N     | ...   |
+| Existing (unchanged) | N     | ...   |
 
 ## Fazit
 

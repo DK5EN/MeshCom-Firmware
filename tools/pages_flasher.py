@@ -42,8 +42,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 # The 32 release environments, minus the two safeboot helper envs, which are
-# inputs rather than boards. Mirrors .claude/commands/release-firmware.md
-# step 4; t5_epaper and esp32-external-radio are deliberately absent.
+# inputs rather than boards. Mirrors the Fallback appendix of
+# .claude/commands/release-firmware.md; t5_epaper and esp32-external-radio are
+# deliberately absent.
 RELEASE_ENVS = [
     "E22-DevKitC",
     "E22_1262-DevKitC",

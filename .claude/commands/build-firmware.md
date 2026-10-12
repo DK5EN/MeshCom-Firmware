@@ -10,20 +10,22 @@ Build MeshCom firmware using PlatformIO from the project root directory.
 Before building, update `FLASH_VERSION` in `src/configuration_global.h` to today's date in `YYYYMMDD` format.
 The define looks like: `#define FLASH_VERSION 20260228`
 Update the date to the current day. Do NOT change SOURCE_VERSION or SOURCE_VERSION_SUB.
+`src/configuration_global.h` is tracked: outside `/release-firmware` (which commits the bump)
+leave the change uncommitted and name it in the report.
 
 ## Build targets
 
 The 7 standard targets and their PlatformIO environment names:
 
-| Target | Environment |
-|--------|-------------|
-| Heltec V3 | `heltec_wifi_lora_32_V3` |
-| E22 | `E22-DevKitC` |
-| T-Beam | `ttgo_tbeam` |
-| T-Beam Supreme | `ttgo_tbeam_supreme` |
-| T-Deck | `t_deck` |
-| T-Deck Plus | `t_deck_plus` |
-| WisBlock RAK4631 | `wiscore_rak4631` |
+| Target           | Environment              |
+| ---------------- | ------------------------ |
+| Heltec V3        | `heltec_wifi_lora_32_V3` |
+| E22              | `E22-DevKitC`            |
+| T-Beam           | `ttgo_tbeam`             |
+| T-Beam Supreme   | `ttgo_tbeam_supreme`     |
+| T-Deck           | `t_deck`                 |
+| T-Deck Plus      | `t_deck_plus`            |
+| WisBlock RAK4631 | `wiscore_rak4631`        |
 
 ## Build command
 
@@ -32,6 +34,7 @@ Use `pio run -e <environment>` from the project root. The root `platformio.ini` 
 Run the 7 targets **sequentially** (one `pio run` at a time). Parallel `pio run` invocations
 corrupt `.pio/build` archives and wipe each other's outputs (memory note `pio-build-cache-race`,
 docs/code-quality-2.0.md Part C). Check `pgrep -fl "pio run"` first; another session may be building.
+
 ```
 pio run -e heltec_wifi_lora_32_V3 2>&1 | tail -5
 pio run -e E22-DevKitC 2>&1 | tail -5
@@ -41,6 +44,8 @@ pio run -e t_deck 2>&1 | tail -5
 pio run -e t_deck_plus 2>&1 | tail -5
 pio run -e wiscore_rak4631 2>&1 | tail -5
 ```
+
+This is the quick 7-board build. A release builds every default env; use `/release-firmware`.
 
 ## User arguments
 

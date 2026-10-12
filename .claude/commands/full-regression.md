@@ -13,8 +13,9 @@ watches the run, and writes the verdict. Inventory and rationale:
 - No args: stages 1 and 2 (no hardware; ~5 min on a warm .pio build cache, 20-40 min after a clean build).
 - `all` or `--bench`: stages 1, 2 and 3 (bench fleet on USB).
 - `1`, `2`, `3`, or a comma list: only those stages.
-- `--flash`, `--extudp`, `--deepsleep`, `--soak-seconds N`: passed through to
-  stage 3 (`tools/bench/bench_suite.py`). `--flash` builds and reflashes every
+- `--flash`, `--extudp`, `--deepsleep`, `--soak-seconds N` and the other
+  `tools/bench/bench_suite.py` flags (`--no-ota`, `--no-mesh`, `--fleet`, ...; see `--help`):
+  passed through to stage 3. `--flash` builds and reflashes every
   attached node first.
 - `--list`: print the plan, run nothing.
 
@@ -43,8 +44,9 @@ ls /dev/cu.* 2>/dev/null
 tools/regression.sh --stage <stages> [-- <bench args>]
 ```
 
-Run it in the background with the output captured; stage 1 alone takes 5 minutes
-warm and up to 30 minutes cold. Poll the log every few minutes rather than waiting blind.
+Run it with `run_in_background: true` and the output captured; stage 1 alone takes 5 minutes
+warm and up to 30 minutes cold. Wait for the completion notification; do not `sleep`-poll the
+log. To watch for one marker, use a single `Monitor` until-loop that exits on `RESULT:`.
 The script writes every step's log plus `summary.log` to
 `tools/bench/runs/regression-<timestamp>/` (gitignored) and ends with
 `RESULT: PASS` or `RESULT: FAIL (n step(s))`.
