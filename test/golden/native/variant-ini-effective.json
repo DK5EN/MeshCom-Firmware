@@ -5396,7 +5396,7 @@
   "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e213/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e213/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e213/firmware.bin",
-  "upload_protocol": "custom"
+  "upload_protocol": "esptool"
  },
  "env:vision-master-e213-preview": {
   "board": "heltec_wifi_lora_32_V3",
@@ -5506,7 +5506,7 @@
   "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/firmware.bin",
-  "upload_protocol": "custom"
+  "upload_protocol": "esptool"
  },
  "env:vision-master-e290": {
   "board": "heltec_wifi_lora_32_V3",
@@ -5611,7 +5611,7 @@
   "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e290/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e290/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e290/firmware.bin",
-  "upload_protocol": "custom"
+  "upload_protocol": "esptool"
  },
  "env:wireless-paper": {
   "board": "heltec_wifi_lora_32_V3",
@@ -5716,7 +5716,7 @@
   "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/wireless-paper/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/wireless-paper/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/wireless-paper/firmware.bin",
-  "upload_protocol": "custom"
+  "upload_protocol": "esptool"
  },
  "env:wiscore_rak4631": {
   "board": "rak4630",
