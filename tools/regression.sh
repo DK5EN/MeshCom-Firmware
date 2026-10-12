@@ -16,8 +16,8 @@
 #                  Then one `pio run` per nRF52 board env (BOARD_LINK_ENVS):
 #                  the image must link and stay at or below
 #                  BOARD_FLASH_MAX_PCT of flash.
-# Stage 2  tools:  ruff syntax gate (E9/F63/F7/F82 over tools, test/golden,
-#                  test/test_nbrlog; config in ruff.toml); pytest over
+# Stage 2  tools:  ruff lint gate (rules in ruff.toml, over tools and test,
+#                  ruff pinned); pytest over
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
 #                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
 #                  the jsdom-based safeboot and Remote page tests; the four --self-test
@@ -193,9 +193,9 @@ stage1() {
 # ---------------------------------------------------------------- stage 2
 stage2() {
     echo "== Stage 2: host tools (pytest, nbrlog scripts, node, self-tests)"
-    run_step "ruff syntax gate" stage2-ruff \
-        uv run --quiet --with ruff ruff check --select E9,F63,F7,F82 --output-format concise \
-        tools test/golden test/test_nbrlog
+    run_step "ruff lint gate" stage2-ruff \
+        uv run --quiet --with ruff==0.17.0 ruff check --output-format concise \
+        tools test
     run_step "pytest tools/bench tools/tests tools/mock" stage2-pytest \
         uv run --quiet --with pytest --with markdown-it-py==3.0.0 pytest -q tools/bench tools/tests tools/mock
     run_step "wire doc HTML up to date" stage2-wire-doc-html \

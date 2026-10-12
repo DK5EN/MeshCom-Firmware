@@ -37,7 +37,7 @@ import sys
 import zlib
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
 

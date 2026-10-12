@@ -676,8 +676,6 @@ class Monitor:
             server_str = "ok" if hb_to == 0 else f"{hb_to} HB timeouts"
             ntp_str = "ok" if ntp_f == 0 else f"{ntp_f} failures"
 
-            alert_str = "none" if not self.alerts else f"{len(self.alerts)} (see above)"
-
             # channel utilization stats
             if self.channel_util_samples:
                 samples = self.channel_util_samples
@@ -938,7 +936,7 @@ def replay_file(path: str, interval: int, speed: float) -> None:
     prev_elapsed = 0.0
     line_count = 0
 
-    print(f"MeshCom Serial Monitor — Replay")
+    print("MeshCom Serial Monitor — Replay")
     print(f"File:    {path}")
     print(f"Speed:   {'fast-forward' if speed == 0 else f'{speed}x'}")
     print()

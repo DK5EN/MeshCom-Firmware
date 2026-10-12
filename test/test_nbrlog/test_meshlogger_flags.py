@@ -26,7 +26,6 @@ import importlib.util
 import socket as socket_module
 import sys
 import tempfile
-import time
 from pathlib import Path
 from unittest import mock
 

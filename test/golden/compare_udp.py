@@ -130,7 +130,7 @@ def compare(a_dir: Path, b_dir: Path, prefix: str = "udp") -> List[str]:
     print(f"server side  A {len(a_corpus)} corpus datagrams, "
           f"B {len(b_corpus)}")
     if not problems:
-        print(f"             identical")
+        print("             identical")
 
     # the half that is about the firmware
     a_node = a_dir / f"{prefix}-rx-log.txt"
@@ -158,7 +158,7 @@ def compare(a_dir: Path, b_dir: Path, prefix: str = "udp") -> List[str]:
                 break
     print(f"node side    A {len(an)} classified datagrams, B {len(bn)}")
     if not any("node" in p for p in problems):
-        print(f"             identical")
+        print("             identical")
     return problems
 
 

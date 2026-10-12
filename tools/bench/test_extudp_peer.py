@@ -18,7 +18,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import extudp_peer as ep  # noqa: E402

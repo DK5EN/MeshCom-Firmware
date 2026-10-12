@@ -14,7 +14,7 @@ operator rolls the trackball and taps the screen for --roll-seconds ->
 "PLUG BACK" -> the script waits for the port, reopens it, reads [INSTR-PREV].
 Verdict: gaps == 0 and loop_max_us below the gap threshold.
 """
-import argparse, os, re, sys, time
+import argparse, os, sys, time
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tdeck_harness import TDeckSession, DEFAULT_PORT

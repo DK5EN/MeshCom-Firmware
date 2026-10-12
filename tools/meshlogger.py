@@ -60,9 +60,8 @@ import re
 import shutil
 import signal
 import socket
-import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 CONNECT_TIMEOUT = 10.0
 READ_TIMEOUT = 5.0

@@ -81,7 +81,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "test/golden/native/variant-macros.txt"

@@ -148,7 +148,7 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
 - Stage 1: every `[env:native*]` (67 envs, 2203 Unity cases on 2026-10-07) plus `test/golden/selftest.sh`.
-- Stage 2: ruff syntax gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (823 cases), the
+- Stage 2: ruff lint gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (823 cases), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
 - Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,

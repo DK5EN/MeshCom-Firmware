@@ -22,7 +22,6 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ota_regression as otr  # noqa: E402
-import webflash  # noqa: E402  (path already added by ota_regression's own sys.path.insert)
 
 
 # --- canned firmware answers -------------------------------------------------

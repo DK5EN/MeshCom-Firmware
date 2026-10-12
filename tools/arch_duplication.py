@@ -63,7 +63,6 @@ def main():
                     pairs[(a[0], b[0] + " (self)")] += 1
         del seen
 
-    total_dup_lines = sum(len(v) - 1 for v in clones.values())
     print(f"window={WINDOW} files={len(files)}")
     print(f"duplicated {WINDOW}-line windows: {len(clones)}")
     print()

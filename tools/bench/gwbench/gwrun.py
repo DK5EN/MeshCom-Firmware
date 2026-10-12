@@ -19,7 +19,7 @@ Residual risk: gateway-on is persisted, srvip is RAM only: a reboot while gatewa
 gwguard.BootGuard watches both logs and sends `--gateway off` on a boot marker.
 Rules in code: destinations only DK5EN-1/DK5EN-90/TEST, only the two resolved node hosts, no radio/pos write, same-value write-back.
 """
-import argparse, json, os, re, signal, socket, subprocess, sys, threading, time, urllib.error, urllib.parse, urllib.request
+import argparse, json, os, re, signal, socket, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gwguard
 from typing import Any, Dict, List, Optional, Tuple

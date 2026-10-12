@@ -1,24 +1,27 @@
-# Python lint gate for tools/, test/golden and test/test_nbrlog.
+# Python lint gate for tools/ and test/. This file is the single source of the
+# rule set: tools/regression.sh stage 2 ("ruff lint gate") runs plain
+# `ruff check` without --select, so a rule added here reaches the gate.
 #
-# Deliberately narrow: syntax errors and undefined names only. This is a
-# "does it even parse and resolve" gate, not a style gate; adopting style
-# rules (and the reformatting they would force on thousands of lines in
-# tools/) is a separate decision, see docs/BACKLOG.md CQ-09.
+# Scope: correctness, not style. Formatting and style rules (UP, I, B, a
+# `ruff format --check` gate) would rewrite most of tools/ and stay out until
+# the operator decides on a style gate.
 #
-#   E9   syntax errors / IO errors while parsing
-#   F63  invalid comparisons and assertions (is-literal, assert on tuple, ...)
-#   F7   misplaced statements (return/yield/break/continue outside scope)
-#   F82  undefined names
+#   E9    syntax errors / IO errors while parsing
+#   F     pyflakes: undefined names, invalid comparisons, misplaced
+#         statements, unused imports and variables, f-strings without
+#         placeholders, star imports
+#   E722  bare `except:`
 #
-# Run: uv run --quiet --with ruff ruff check tools test/golden test/test_nbrlog
-# (wired into tools/regression.sh stage 2 as "ruff syntax gate").
+# Run: uv run --quiet --with ruff==0.17.0 ruff check tools test
+# Bump the pin in tools/regression.sh and here together; a newer ruff can add
+# syntax checks and turn the gate red without a code change.
 
 target-version = "py311"
 line-length = 100
-extend-exclude = [".pio", "node_modules", "lib", "docs"]
+extend-exclude = [".pio", "node_modules", "lib", "docs", "extras"]
 
 [lint]
-select = ["E9", "F63", "F7", "F82"]
+select = ["E9", "F", "E722"]
 
 [lint.per-file-ignores]
 # PlatformIO extra scripts: SCons injects Import() and env into the namespace.

@@ -109,7 +109,7 @@ def main():
             try:
                 s = open_port(args.port, args.baud)
                 log.marker(f"attached {args.port}")
-            except (serial.SerialException, OSError) as e:
+            except (serial.SerialException, OSError):
                 time.sleep(args.reopen_delay)
                 continue
         try:

@@ -1,4 +1,4 @@
-import sys, time, re
+import sys, time
 sys.path.insert(0, "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench")
 import tdeck_harness as h
 s = h.TDeckSession("/dev/cu.usbmodem1101", 115200, 40.0)

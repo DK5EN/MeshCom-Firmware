@@ -14,7 +14,6 @@ Stdlib only.
 from __future__ import annotations
 
 import argparse
-import bisect
 import collections
 import datetime as dt
 import json
@@ -24,7 +23,7 @@ import statistics
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 NODE_FILES = {"DK5EN-1": "DK5EN-1.log", "DK5EN-90": "DK5EN-90.log"}
 OWN_CALLS = ("DK5EN-1", "DK5EN-90")
@@ -593,7 +592,6 @@ def table_plain(run: Run, tail: float = 30.0) -> None:
         tok = e["token"]
         t0, t1 = e["t_send"] - 2, e.get("t_end", e["t_send"] + 25) + tail
         src, to = e["src"], e["to"]
-        rcv = None if to == "TEST" else to
         nn = re.search(re.escape(tok) + r"\{(\d+)", " ".join(x.raw for n in run.logs.values() for x in n if tok in x.raw) or "")
         nnn = int(nn.group(1)) if nn else None
         print("  #%d %s %s -> %s token %s nnn=%s" % (i, e["case"], src, to, tok, nnn))
@@ -609,7 +607,6 @@ def table_plain(run: Run, tail: float = 30.0) -> None:
                 print("     sender   %-8s NEW %d  TX-UDP %d  TX-LoRa %d  BP-nack %d %s" % (node, new, tx_udp, tx_rf, len(nack), ("(" + nack[0].text.split("txt;")[-1][:40] + ")") if nack else ""))
             else:
                 srv_dups = 0
-                dd = {x.msgid for x in ev}
                 for x in sv:
                     srv_dups += any(d.kind == "dedup" and d.k == "DUP" and d.msgid == x.msgid and abs(d.seq - x.seq) <= 12 for d in run.logs[node])
                 dmd = [x for x in run.logs[node] if x.kind == "dmdup" and nnn is not None and x.ctr == nnn and t0 <= x.t <= t1]
