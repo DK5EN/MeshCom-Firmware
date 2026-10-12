@@ -1397,5 +1397,154 @@ class TestLoganalyseCollision(unittest.TestCase):
         self.assertIn("RX_OTHER_ERROR_COUNT: 0", sec)
 
 
+W2B2_DIR: Path = REPO_ROOT / "tools" / "testdata"
+
+
+class TestLoganalyseW2b2(unittest.TestCase):
+    """Wave 2b-2: F-12 airtime billing check, heap rating without (mon)
+    samples, F-23 [MC-STAT] continuation lines / MC-HWM n/a, and the
+    CAD-storm division by zero.
+
+    Fixtures (excerpts of real logs):
+      loganalyse_w2b2_billing_dj8meh.txt   pre-f2d6532f build: every nonzero
+          rx= a multiple of 2476 ms (util=NN%%), CRC dumps all size=255
+      loganalyse_w2b2_billing_dk5en98.txt  post-f2d6532f build, no such grid
+      loganalyse_w2b2_heap_init_only.txt   dk5en-1: [HEAP] (init) lines only
+      loganalyse_w2b2_mcstat.txt           dk5en-98 [MC-STAT] blocks, stamped
+    """
+
+    @staticmethod
+    def _run(path: Path) -> tuple[str, str]:
+        res = subprocess.run(
+            ["bash", str(SCRIPT), str(path)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=dict(os.environ, LC_ALL="C"),
+        )
+        assert res.returncode == 0, res.stderr
+        return res.stdout, res.stderr
+
+    @classmethod
+    def _analyse(cls, text: str) -> tuple[str, str]:
+        with tempfile.TemporaryDirectory() as td:
+            lf = Path(td) / "log.txt"
+            lf.write_text(text)
+            return cls._run(lf)
+
+    @staticmethod
+    def _sec(out: str, name: str) -> str:
+        lines: list[str] = []
+        capturing = False
+        for line in out.splitlines():
+            if capturing and line.startswith("=== "):
+                break
+            if capturing:
+                lines.append(line)
+            elif line.strip() == f"=== {name} ===":
+                capturing = True
+        return "\n".join(lines)
+
+    # --- F-12 ---------------------------------------------------------
+    def test_billing_warns_on_gcd_grid(self) -> None:
+        out, _ = self._run(W2B2_DIR / "loganalyse_w2b2_billing_dj8meh.txt")
+        sec = self._sec(out, "CHANNEL_UTIL")
+        self.assertIn("WARNING: ESP32 build < f2d6532f: rx billed as 255 B per frame", sec)
+        self.assertIn("rx unit 2476 ms", sec)
+        self.assertIn("rx grid", sec)
+        self.assertNotIn("BILLING_CHECK: ok", sec)
+        self.assertIn("overstated", self._sec(out, "CHANNEL_UTIL"))
+        # util=49%% (doubled percent sign) must still parse
+        self.assertRegex(sec, r"MAX: 49\.0%")
+
+    def test_billing_crc_overstated_note(self) -> None:
+        out, _ = self._run(W2B2_DIR / "loganalyse_w2b2_billing_dj8meh.txt")
+        idx = out.index("--- CRC_VS_CHANNEL_UTIL ---")
+        self.assertIn("overstated", out[idx : idx + 400])
+
+    def test_billing_warns_on_crc_size_255_only(self) -> None:
+        lines = [
+            f"[MC-DBG] CRC_ERROR rssi=-60 snr=-1 freq_err=1.0 size=255 ts={i}" for i in range(3)
+        ]
+        out, _ = self._analyse("\n".join(lines) + "\n")
+        sec = self._sec(out, "CHANNEL_UTIL")
+        self.assertIn("WARNING: ESP32 build < f2d6532f", sec)
+        self.assertIn("CRC_ERROR size=255", sec)
+        # the rx-grid signal did not fire: no rx unit may be claimed
+        self.assertNotIn("rx unit", sec)
+
+    def test_billing_ok_on_modern_build(self) -> None:
+        out, _ = self._run(W2B2_DIR / "loganalyse_w2b2_billing_dk5en98.txt")
+        sec = self._sec(out, "CHANNEL_UTIL")
+        self.assertIn("BILLING_CHECK: ok", sec)
+        self.assertNotIn("WARNING: ESP32 build", sec)
+        idx = out.index("--- CRC_VS_CHANNEL_UTIL ---")
+        self.assertNotIn("overstated", out[idx : idx + 400])
+
+    def test_billing_ok_with_few_samples(self) -> None:
+        lines = ["[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%"] * 5
+        out, _ = self._analyse("\n".join(lines) + "\n")
+        self.assertIn("BILLING_CHECK: ok", self._sec(out, "CHANNEL_UTIL"))
+
+    # --- Heap ---------------------------------------------------------
+    def test_heap_rating_na_without_mon_samples(self) -> None:
+        out, _ = self._run(W2B2_DIR / "loganalyse_w2b2_heap_init_only.txt")
+        sec = self._sec(out, "HEAP_MONITORING")
+        self.assertIn("RATING: n/a (no periodic (mon) samples)", sec)
+        self.assertNotRegex(sec, r"RATING: (HEALTHY|STABLE|VOLATILE|MINOR_LEAK|MAJOR_LEAK)")
+
+    def test_heap_rating_given_with_mon_samples(self) -> None:
+        lines = [
+            f"2026-08-26 00:{m:02d}:01.132  [HEAP] 00:{m:02d}:00 133924 118556 122868 (mon)"
+            for m in range(10)
+        ]
+        out, _ = self._analyse("\n".join(lines) + "\n")
+        sec = self._sec(out, "HEAP_MONITORING")
+        self.assertRegex(sec, r"RATING: (HEALTHY|STABLE)")
+
+    # --- F-23 ---------------------------------------------------------
+    def test_mcstat_continuations_summed_timestamped(self) -> None:
+        out, _ = self._run(W2B2_DIR / "loganalyse_w2b2_mcstat.txt")
+        sec = self._sec(out, "PRIORITY_DISTRIBUTION")
+        # tx p3 = 2+2+1+1, p4 = 2+1+3+2, p5 = 6+4+2+9, preempt = 2+0+0+1
+        self.assertRegex(sec, r"MC_STAT_TX_TOTAL: p1=0 p2=0 p3=6 p4=8 p5=21 preempt=3")
+        self.assertRegex(sec, r"MC_STAT_DROP_TOTAL: p1=0 p2=0 p3=0 p4=0 p5=0")
+        self.assertIn("MC_STAT_BLOCKS: 4", sec)
+
+    def test_mcstat_continuations_raw_and_console_forms(self) -> None:
+        text = (
+            "[MC-STAT] t=300s qmax=4/20\n"
+            "  tx: p1=1 p2=0 p3=2 p4=0 p5=0 preempt=1\n"
+            "  drop: p1=0 p2=0 p3=0 p4=3 p5=1\n"
+            "2026-08-31 15:42:11 [MC-STAT] t=300s qmax=4/20\n"
+            "2026-08-31 15:42:11 tx: p1=1 p2=0 p3=0 p4=0 p5=0 preempt=0\n"
+            "2026-08-31 15:42:11 drop: p1=0 p2=0 p3=0 p4=1 p5=0\n"
+            # untagged tx: line NOT directly after a [MC-STAT] line: ignored
+            "  tx: p1=99 p2=99 p3=99 p4=99 p5=99 preempt=99\n"
+        )
+        out, _ = self._analyse(text)
+        sec = self._sec(out, "PRIORITY_DISTRIBUTION")
+        self.assertIn("MC_STAT_TX_TOTAL: p1=2 p2=0 p3=2 p4=0 p5=0 preempt=1", sec)
+        self.assertIn("MC_STAT_DROP_TOTAL: p1=0 p2=0 p3=0 p4=4 p5=1", sec)
+
+    def test_hwm_na_when_setlog_stat_present(self) -> None:
+        out, _ = self._run(SAMPLE_SETLOG)
+        sec = self._sec(out, "HIGH_WATER_MARKS")
+        self.assertIn("[MC-HWM] n/a (setlog on: see STAT section ringmax)", sec)
+        self.assertNotIn("No [MC-HWM] data found", sec)
+
+    def test_hwm_absent_without_any_source(self) -> None:
+        out, _ = self._analyse("[MC-DBG] hello\n")
+        sec = self._sec(out, "HIGH_WATER_MARKS")
+        self.assertIn("No [MC-HWM] data found", sec)
+
+    # --- division by zero ----------------------------------------------
+    def test_cad_storm_zero_duration_no_awk_error(self) -> None:
+        text = "[MC-DBG] TX_GATE_ENTER qlen=2 cad_attempt=3\n[MC-DBG] TX_DONE\n"
+        out, err = self._analyse(text)
+        self.assertEqual(err, "")
+        self.assertIn("TOTAL_STORMS: 1", out)
+
+
 if __name__ == "__main__":
     unittest.main()

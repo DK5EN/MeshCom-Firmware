@@ -1,0 +1,34 @@
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[WIFI]...Wait connect .[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=896ms util=33%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=799ms util=32%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=44%%
+[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+-[MC-DBG] CHANNEL_UTIL rx=2476ms tx=0ms util=24%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CHANNEL_UTIL rx=4952ms tx=0ms util=49%%
+[MC-DBG] CRC_ERROR rssi=-28 snr=2 freq_err=4724.6 size=255 ts=140663
+[MC-DBG] CRC_ERROR rssi=-59 snr=-1 freq_err=-208.3 size=255 ts=891344
+[MC-DBG] CRC_ERROR rssi=-60 snr=-1 freq_err=-214.1 size=255 ts=1334709
+[MC-DBG] CRC_ERROR rssi=-65 snr=0 freq_err=5102.4 size=255 ts=1772101

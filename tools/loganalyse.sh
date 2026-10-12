@@ -331,6 +331,44 @@ grep "RELAY_LOOP_BLOCKED" "$LOGFILE" | head -10 || true
 # ─── 6. CHANNEL UTILIZATION ───
 section "CHANNEL_UTIL"
 
+# F-12 billing check. ESP32 builds before f2d6532f billed every RX frame as
+# 255 B of airtime, so each rx= window is a multiple of one fixed frame time
+# (GCD of the nonzero rx= values), and every CRC dump is padded to size=255.
+# Either signal marks the util figures as overstated. CRC condition = same as
+# CRC_FORENSICS (>= 3 CRC_ERROR lines, all size=255).
+BILLING_OVERSTATED=0
+BILLING_LINE=$(awk '
+function gcd(a, b,    t) { while (b > 0) { t = a % b; a = b; b = t } return a }
+/CHANNEL_UTIL/ {
+    for (i = 1; i <= NF; i++) if ($i ~ /^rx=[0-9]+/) {
+        v = substr($i, 4) + 0
+        if (v > 0) { nz++; g = (nz == 1) ? v : gcd(g, v) }
+    }
+}
+/CRC_ERROR/ {
+    crc_n++
+    if (match($0, /size=[0-9]+/) && substr($0, RSTART+5, RLENGTH-5) + 0 == 255) crc_255++
+}
+END { printf "%d %d %d %d\n", g + 0, nz + 0, crc_n + 0, crc_255 + 0 }' "$LOGFILE")
+read -r BILL_GCD BILL_NZ BILL_CRC_N BILL_CRC_255 <<< "$BILLING_LINE"
+BILL_SIG=""
+BILL_UNIT=""
+if [ "$BILL_NZ" -ge 20 ] && [ "$BILL_GCD" -ge 500 ]; then
+    BILL_SIG="rx grid: GCD of $BILL_NZ nonzero rx= values is $BILL_GCD ms"
+    BILL_UNIT=" (rx unit ${BILL_GCD} ms)"
+fi
+if [ "$BILL_CRC_N" -ge 3 ] && [ "$BILL_CRC_N" -eq "$BILL_CRC_255" ]; then
+    BILL_SIG="${BILL_SIG:+$BILL_SIG; }every CRC_ERROR size=255 ($BILL_CRC_N lines)"
+fi
+if [ -n "$BILL_SIG" ]; then
+    BILLING_OVERSTATED=1
+    echo "WARNING: ESP32 build < f2d6532f: rx billed as 255 B per frame${BILL_UNIT}, util and CRC payloads not comparable"
+    echo "  signal: $BILL_SIG"
+    echo "  rx= and util= below are overstated (about 1.8-4.1x)"
+else
+    echo "BILLING_CHECK: ok"
+fi
+
 new_tmp
 CHANNEL_UTIL_TMP="$NEW_TMP"
 { grep "CHANNEL_UTIL" "$LOGFILE" || true; } | awk '{
@@ -349,7 +387,7 @@ CHANNEL_UTIL_TMP="$NEW_TMP"
 }' > "$CHANNEL_UTIL_TMP"
 
 if [ -s "$CHANNEL_UTIL_TMP" ]; then
-    awk '
+    awk -v overstated="$BILLING_OVERSTATED" '
     {
         val = $2 + 0.0
         sum += val
@@ -368,6 +406,7 @@ if [ -s "$CHANNEL_UTIL_TMP" ]; then
         for (i=half+1; i<=count; i++) sum2 += vals[i]
         avg1 = (half > 0) ? sum1 / half : 0
         avg2 = (count - half > 0) ? sum2 / (count - half) : 0
+        if (overstated) print "NOTE: util figures below are overstated (airtime billing, see WARNING above)"
         printf "SAMPLES: %d\n", count
         printf "AVG: %.1f%%\n", avg
         printf "MIN: %.1f%%\n", min
@@ -1017,6 +1056,9 @@ END {
 
 echo ""
 echo "--- CRC_VS_CHANNEL_UTIL ---"
+if [ "$BILLING_OVERSTATED" -eq 1 ]; then
+    echo "NOTE: UTIL% is overstated (ESP32 build < f2d6532f bills rx as 255 B per frame); CRC and util not comparable"
+fi
 # Correlate CRC buckets with channel utilization buckets
 awk -v crc_re="$CRC_AWK_RE" '
 $0 ~ crc_re {
@@ -1184,7 +1226,10 @@ END {
         printf "NET_SAVINGS_IF_RX_LOOP_CATCHES_PKT: Depends on hit rate\n"
         printf "NOTE: A 500ms RX loop at storm start would detect preamble+header\n"
         printf "      and receive the packet (~2.5s), avoiding repeated CAD polls.\n"
-        printf "      Break-even: if >%.0f%% of storms have a receivable packet.\n", cost_500ms * 100.0 / dur_sum
+        if (dur_sum > 0)
+            printf "      Break-even: if >%.0f%% of storms have a receivable packet.\n", cost_500ms * 100.0 / dur_sum
+        else
+            printf "      Break-even: n/a (total storm time is 0 s)\n"
     }
 }' "$LOGFILE" || true
 
@@ -1478,6 +1523,35 @@ section "PRIORITY_DISTRIBUTION"
 if grep -q '\[MC-STAT\]' "$LOGFILE"; then
     echo "--- TX counts per priority (from [MC-STAT] lines) ---"
     grep '\[MC-STAT\]' "$LOGFILE" | tail -20
+    # F-23: each [MC-STAT] line is followed by two untagged continuation
+    # lines ("tx: p1=.. preempt=", "drop: p1=.."), possibly behind a
+    # timestamp. Pair only the lines directly after the [MC-STAT] line.
+    awk '
+    function grab(line, key,    k, n, a, i) {
+        n = split(line, a, " ")
+        for (i = 1; i <= n; i++)
+            if (a[i] ~ /^(p[1-5]|preempt)=[0-9]+$/) {
+                k = a[i]; sub(/=.*/, "", k)
+                if (key == "tx") tx[k] += substr(a[i], length(k) + 2) + 0
+                else dr[k] += substr(a[i], length(k) + 2) + 0
+            }
+    }
+    /\[MC-STAT\]/ { if (cur != "") raw[++nblk] = cur; blocks++; want = 2; cur = $0; next }
+    want > 0 {
+        if ($0 ~ /(^|[ \t])tx: p1=/) { grab($0, "tx"); cur = cur "\n" $0; want--; next }
+        if ($0 ~ /(^|[ \t])drop: p1=/) { grab($0, "drop"); cur = cur "\n" $0; want--; next }
+        want = 0
+    }
+    { if (want == 0 && cur != "") { raw[++nblk] = cur; cur = "" } }
+    END {
+        if (cur != "") raw[++nblk] = cur
+        if (blocks == 0) exit
+        printf "MC_STAT_BLOCKS: %d\n", blocks
+        printf "MC_STAT_TX_TOTAL: p1=%d p2=%d p3=%d p4=%d p5=%d preempt=%d\n", tx["p1"], tx["p2"], tx["p3"], tx["p4"], tx["p5"], tx["preempt"]
+        printf "MC_STAT_DROP_TOTAL: p1=%d p2=%d p3=%d p4=%d p5=%d\n", dr["p1"], dr["p2"], dr["p3"], dr["p4"], dr["p5"]
+        print "--- last [MC-STAT] blocks (tx/drop continuation lines) ---"
+        for (i = (nblk > 3 ? nblk - 2 : 1); i <= nblk; i++) print raw[i]
+    }' "$LOGFILE"
     echo ""
     echo "--- Latency per priority (from [MC-PRIO] lines) ---"
     grep '\[MC-PRIO\]' "$LOGFILE" | tail -20
@@ -1518,6 +1592,8 @@ section "HIGH_WATER_MARKS"
 if grep -q '\[MC-HWM\]' "$LOGFILE"; then
     echo "--- High-Water Marks ---"
     grep '\[MC-HWM\]' "$LOGFILE" | tail -5
+elif grep -q '\[LOG\] STAT' "$LOGFILE"; then
+    echo "  [MC-HWM] n/a (setlog on: see STAT section ringmax)"
 else
     echo "  No [MC-HWM] data found"
 fi
@@ -2151,7 +2227,11 @@ END {
         # Distinguish init drop from real leak:
         # If max monotonic decrease is short (< 20) AND variance is low,
         # a large drop is just boot initialization, not a leak.
-        if (ss_var_pct > 15) {
+        # Periodic samples = tagged (mon) plus untagged simple ones; a log
+        # with only (init)/other tagged samples cannot be rated.
+        if (heap_mon_cnt == 0 && heap_cnt - heap_ext_cnt == 0) {
+            printf "RATING: n/a (no periodic (mon) samples)\n"
+        } else if (ss_var_pct > 15) {
             printf "RATING: VOLATILE\n"
         } else if (heap_mono_max >= 50) {
             printf "RATING: MAJOR_LEAK (sustained monotonic decrease)\n"
