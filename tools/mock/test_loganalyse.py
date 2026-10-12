@@ -27,11 +27,14 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
-SCRIPT: Path = REPO_ROOT / "tools" / "loganalyse.sh"
+# LOGANALYSE_SCRIPT lets a test run be pointed at another copy of the script
+# (used to prove that new tests fail against the previous version).
+SCRIPT: Path = Path(os.environ.get("LOGANALYSE_SCRIPT", str(REPO_ROOT / "tools" / "loganalyse.sh")))
 FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_sm_sample.txt"
 CORRUPT_FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_corrupt_byte.txt"
 RAW_FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_raw_sample.txt"
 SAMPLE_440A: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_440a_sample.txt"
+SAMPLE_SETLOG: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_setlog_sample.txt"
 
 
 class TestLoganalyse(unittest.TestCase):
@@ -715,6 +718,520 @@ class TestLoganalyseRework(unittest.TestCase):
         self.assertEqual(res.returncode, 0, msg=res.stderr)
         self.assertIn("LOG1: " + str(a), res.stdout)
         self.assertIn("LOG2: " + str(b), res.stdout)
+
+
+class TestLoganalyseSetlog(unittest.TestCase):
+    """Wave 2a: the firmware `--setlog` lines (`HH:MM:SS [LOG] ...`, formats
+    in src/setlog_lines.h) as a primary data source.
+
+    Fixture loganalyse_setlog_sample.txt: real lines from an ESP32 soak log
+    (98.log, 2026-09-29) and a RAK4631 serial log, plus synthetic lines in the
+    exact src format (RLY q=full / q=unconf, TX cad>0, a second ERR, GWI,
+    STAT with drop/txfail and an up= decrease). Expected literals were counted
+    on the fixture with `grep -cE` (pattern in the comment next to each).
+
+    Inline logs use the exact firmware line formats as well. LC_ALL=C pins the
+    decimal point of awk's printf.
+    """
+
+    _stdout: str = ""
+    _stderr: str = ""
+    _rc: int = 0
+
+    @staticmethod
+    def _run(path: Path) -> subprocess.CompletedProcess[str]:
+        env = dict(os.environ, LC_ALL="C")
+        return subprocess.run(
+            ["bash", str(SCRIPT), str(path)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+        )
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        res = cls._run(SAMPLE_SETLOG)
+        cls._stdout, cls._stderr, cls._rc = res.stdout, res.stderr, res.returncode
+
+    @classmethod
+    def _analyse(cls, text: str) -> str:
+        with tempfile.TemporaryDirectory() as td:
+            lf = Path(td) / "log.txt"
+            lf.write_text(text)
+            res = cls._run(lf)
+        assert res.returncode == 0, res.stderr
+        assert res.stderr == "", res.stderr
+        return res.stdout
+
+    @staticmethod
+    def _sec_of(out: str, name: str) -> str:
+        lines: list[str] = []
+        capturing = False
+        for line in out.splitlines():
+            if capturing and line.startswith("=== "):
+                break
+            if capturing:
+                lines.append(line)
+            elif line == f"=== {name} ===":
+                capturing = True
+        return "\n".join(lines)
+
+    @staticmethod
+    def _sub(sec: str, name: str) -> str:
+        """Block of `--- name ...` up to the next `--- ` marker."""
+        lines: list[str] = []
+        capturing = False
+        for line in sec.splitlines():
+            if capturing and line.startswith("--- "):
+                break
+            if capturing:
+                lines.append(line)
+            elif line.startswith(f"--- {name}"):
+                capturing = True
+        return "\n".join(lines)
+
+    @staticmethod
+    def _l(sec: int, body: str) -> str:
+        hh, mm, ss = 10, sec // 60, sec % 60
+        return f"2026-10-12 {hh:02d}:{mm:02d}:{ss:02d}.100  {hh:02d}:{mm:02d}:{ss:02d} {body}\n"
+
+    @classmethod
+    def _rx(cls, sec: int, i: int, rssi: int, snr: int, dup: str = "n", own: str = "-", hop: str = "H00") -> str:
+        return cls._l(
+            sec,
+            f"[LOG] 060 : xB{i:07X} {hop} S1 T0 M01 AA1AA-1>*:hi HW:43 MOD:8/8 FCS:11E7 FW:35:p LH:AA "
+            f"RSSI:{rssi} SNR:{snr} DUP:{dup} OWN:{own} t={sec * 1000}",
+        )
+
+    @classmethod
+    def _mh(cls, sec: int, i: int, hop: str = "H00") -> str:
+        return cls._l(
+            sec,
+            f"MH-LoRa 060 : xB{i:07X} {hop} S1 T0 M01 AA1AA-1>*:hi HW:43 MOD:8/8 FCS:11E7 FW:35:p LH:AA",
+        )
+
+    def _node_row(self, out: str, cs: str) -> str:
+        rows = [ln for ln in self._sec_of(out, "NODES").splitlines() if ln.startswith(cs + " ")]
+        self.assertEqual(len(rows), 1, msg=out)
+        return rows[0]
+
+    # --- harness ---
+    def test_fixture_run_clean(self) -> None:
+        self.assertEqual(self._rc, 0)
+        self.assertEqual(self._stderr, "")
+
+    # --- header ---
+    def test_header_setlog_presence(self) -> None:
+        # 13 RX tails + 8 RLY + 6 TX + 2 ERR + 6 STAT + 4 GWI + 2 GWU = 41
+        self.assertIn("SETLOG: on (41 lines)", self._stdout)
+        out = self._analyse(self._mh(1, 1))
+        self.assertIn("SETLOG: off", out)
+
+    def test_no_setlog_prints_na_not_healthy(self) -> None:
+        out = self._analyse(self._mh(1, 1))
+        sec = self._sec_of(out, "SETLOG")
+        self.assertIn("n/a", sec)
+        self.assertNotIn("STAT_LINES", sec)
+        self.assertNotIn("OK", sec)
+
+    # --- 1. RX tail ---
+    def test_rx_tail_counts(self) -> None:
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "RX_TAIL")
+        self.assertIn("RX_TAIL_LINES: 13", sub)  # grep -cE '\[LOG\] [0-9]{3} '
+        self.assertIn("RX_NEW (DUP:n): 6", sub)  # grep -c 'DUP:n'
+        self.assertIn("RX_DUP (DUP:d): 7", sub)  # grep -c 'DUP:d'
+        self.assertIn("OWN_ECHO (OWN:e): 5", sub)  # grep -c 'OWN:e'
+        self.assertIn("DUP_RATE: 53.8%", sub)  # 7 / 13
+        self.assertIn("RX_RSSI: -117..-32", sub)
+
+    def test_nrf52_rssi_snr_from_tail_without_received_packet(self) -> None:
+        log = (
+            self._rx(1, 1, -60, 5) + self._mh(1, 1)
+            + self._rx(2, 2, -80, 3) + self._mh(2, 2)
+        )
+        out = self._analyse(log)
+        row = self._node_row(out, "AA1AA-1")
+        self.assertRegex(row, r"-80\.\.\s*-60")
+        self.assertIn("4.0", row)  # SNR avg of 5 and 3
+        prof = self._sec_of(out, "SIGNAL_PROFILING")
+        m = re.search(r"(?m)^AA1AA-1\s+2\s+(-70\.0)", prof)
+        self.assertIsNotNone(m, msg=prof)
+        self.assertRegex(prof, r"(?m)^AA1AA-1.*n/a\s+n/a\s+n/a$")
+
+    def test_tail_wins_and_packet_not_counted_twice(self) -> None:
+        recv = self._l(1, "[LoRa]...Received packet: RSSI:\t\t-70 dBm / SNR:\t\t4 dB / Frequency error:\t61.03 Hz")
+        log = recv + self._rx(1, 1, -71, 5) + self._mh(1, 1)
+        out = self._analyse(log)
+        row = self._node_row(out, "AA1AA-1")
+        self.assertRegex(row, r"\s1\s+-71\.\.\s*-71\s+5\.0")
+
+    def test_fallback_to_received_packet_without_tail(self) -> None:
+        recv = self._l(1, "[LoRa]...Received packet: RSSI:\t\t-70 dBm / SNR:\t\t4 dB / Frequency error:\t61.03 Hz")
+        out = self._analyse(recv + self._mh(1, 1))
+        row = self._node_row(out, "AA1AA-1")
+        self.assertRegex(row, r"-70\.\.\s*-70\s+4\.0")
+
+    # --- 2. RLY ---
+    def test_rly_histogram_and_full_finding(self) -> None:
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "RLY_REASONS")
+        self.assertIn("RLY_TOTAL: 8", sub)  # grep -c 'RLY x'
+        self.assertIn("q=tx: 2", sub)
+        self.assertIn("q=nomesh: 3", sub)
+        self.assertIn("q=unconf: 1", sub)
+        self.assertIn("q=full: 2", sub)
+        self.assertIn("FINDING: RLY q=full 2", sub)
+
+    def test_rly_without_full_has_no_finding(self) -> None:
+        out = self._analyse(self._l(1, "[LOG] RLY x00000001 : H01 q=tx prio=5 slot=1"))
+        sub = self._sub(self._sec_of(out, "SETLOG"), "RLY_REASONS")
+        self.assertIn("q=full: 0", sub)
+        self.assertNotIn("FINDING", sub)
+
+    # --- 3. TX split ---
+    def test_tx_split_counts(self) -> None:
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "TX_SPLIT")
+        self.assertIn("TX_TOTAL: 6", sub)  # grep -c 'TX x'
+        self.assertIn("TX_OWN (src=o): 2", sub)
+        self.assertIn("TX_RELAY (src=r): 3", sub)
+        self.assertIn("TX_GW (src=g): 1", sub)
+        self.assertIn("TX_CAD_GT0: 2", sub)  # grep -cE 'cad=[1-9]'
+
+    def test_tx_wait_stats_per_class(self) -> None:
+        def tx(sec: int, src: str, wait: int, cad: int = 0) -> str:
+            return self._l(
+                sec,
+                f"[LOG] TX x{sec:08X} @ H01 prio=5 src={src} wait={wait} q=1 cad={cad} len=54 t={sec}",
+            )
+
+        log = (
+            tx(1, "o", 1000) + tx(2, "o", 2000) + tx(3, "o", 6000, cad=1)
+            + tx(4, "r", 4000) + tx(5, "r", 1000)
+        )
+        sub = self._sub(self._sec_of(self._analyse(log), "SETLOG"), "TX_WAIT")
+        self.assertIn("own (src=o): count 3 avg 3000 median 2000 max 6000", sub)
+        self.assertIn("relay (src=r): count 2 avg 2500 median 2500 max 4000", sub)
+        self.assertIn("gw (src=g): n/a", sub)
+
+    # --- 4. ERR as RX-loss source ---
+    def test_err_is_crc_source_when_no_mcdbg_lines(self) -> None:
+        sec = self._sec_of(self._stdout, "CRC_ERRORS")
+        self.assertIn("CRC_ERROR_COUNT: 2", sec)  # grep -c '\[LOG\] ERR '
+        self.assertIn("CRC_SOURCE: setlog ERR (2 lines", sec)
+        self.assertIn("ERR_RSSI_RANGE: -120..-103", sec)
+        self.assertIn("ERR_SNR_RANGE: -23..-18", sec)
+        self.assertIn("ERR_LEN0: 1", sec)
+        self.assertNotIn("CRC_NRF52", sec)
+
+    def test_esp32_bare_onrxerror_not_labelled_nrf52(self) -> None:
+        recv = self._l(1, "[LoRa]...Received packet: RSSI:\t\t-70 dBm / SNR:\t\t4 dB / Frequency error:\t61.03 Hz")
+        log = recv + self._l(2, "OnRxError") + self._l(3, "OnRxError")
+        sec = self._sec_of(self._analyse(log), "CRC_ERRORS")
+        self.assertNotIn("CRC_NRF52", sec)
+        self.assertIn("RXERROR_BARE (ESP32 OnRxError", sec)
+
+    def test_nrf52_bare_onrxerror_keeps_label(self) -> None:
+        sec = self._sec_of(self._analyse(self._l(2, "OnRxError")), "CRC_ERRORS")
+        self.assertIn("CRC_NRF52 (OnRxError, no details): 1", sec)
+
+    # --- 5. STAT ---
+    def test_stat_aggregates(self) -> None:
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "STAT")
+        self.assertIn("STAT_LINES: 6", sub)  # grep -c '\[LOG\] STAT '
+        self.assertIn("UTIL: min 4 avg 9.0 max 20 last 6", sub)
+        self.assertIn("SUM newid=55 dup=34 err=3 txn=29 txfail=1", sub)
+        self.assertIn("RINGMAX: 5/20", sub)
+        self.assertIn("DROP_TOTAL: p1=0 p2=0 p3=2 p4=0 p5=1", sub)
+        self.assertIn("FINDING: STAT drop p3 = 2", sub)
+        self.assertIn("FINDING: STAT drop p5 = 1", sub)
+        self.assertIn("HEAP: first 126188 min 90000 last 90000", sub)
+        self.assertIn("TRK_LAST: 240/0", sub)
+        self.assertIn("FW: 35v/20260928 35v/20260929", sub)
+        self.assertIn("REBOOTS (up= decreasing): 1", sub)
+
+    def test_stat_zero_drops_no_finding(self) -> None:
+        def stat(sec: int, up: int) -> str:
+            return self._l(
+                sec,
+                "[LOG] STAT util=5 rx=1 tx=0 newid=1 dup=0 err=0 txn=0 txfail=0 ringmax=0/20 "
+                f"drop=0/0/0/0/0 mh=1 heap=1000 trk=240/0 fw=35v/20260929 up={up} t={up * 1000}",
+            )
+
+        sub = self._sub(self._sec_of(self._analyse(stat(1, 300) + stat(2, 600)), "SETLOG"), "STAT")
+        self.assertIn("STAT_LINES: 2", sub)
+        self.assertIn("REBOOTS (up= decreasing): 0", sub)
+        self.assertNotIn("FINDING", sub)
+
+    # --- 6. GWI / GWU ---
+    def test_gwi_gwu_counts(self) -> None:
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "GATEWAY")
+        self.assertIn("GWI: 4", sub)  # grep -c 'GWI x'
+        self.assertIn("GWU: 2", sub)  # grep -c 'GWU x'
+        self.assertIn("GWI from=SQ9APP-1: 3", sub)
+        self.assertIn("GWI from=DK5TTB-10: 1", sub)
+
+    # --- 7. dedup balance ---
+    @classmethod
+    def _stat(cls, sec: int, newid: int, dup: int) -> str:
+        return cls._l(
+            sec,
+            f"[LOG] STAT util=5 rx=1 tx=0 newid={newid} dup={dup} err=0 txn=0 txfail=0 ringmax=0/20 "
+            f"drop=0/0/0/0/0 mh=1 heap=1000 trk=240/0 fw=35v/20260929 up={sec} t={sec * 1000}",
+        )
+
+    @classmethod
+    def _gateway_log(cls, stat_newid: int, stat_dup: int) -> str:
+        """An ESP32-gateway-style capture: 400 new frames, 50 HN reports, 100
+        UDP-injected frames (GWI, no RX tail), 300 duplicates and 40 echoes of
+        own TX frames. STAT 1 is the pre-capture window (must be ignored)."""
+        out: list[str] = [cls._stat(1, 999, 999)]
+        t = 1
+
+        def rx(i: int, typ: str, dup: str, route: str, pfx: str = "B") -> str:
+            return cls._l(
+                t,
+                f"[LOG] 060 {typ} x{pfx}{i:07X} H00 S1 T0 M01 {route} HW:43 MOD:8/8 FCS:11E7 FW:35:p LH:AA "
+                f"RSSI:-60 SNR:5 DUP:{dup} OWN:- t={t * 1000}",
+            )
+
+        for i in range(400):
+            t += 1
+            out.append(cls._l(t, f"[MC-DBG] RX_DEDUP_NEW msg_id=B{i:07X}") + rx(i, ":", "n", "AA1AA-1>*:hi"))
+        for i in range(50):
+            t += 1
+            out.append(cls._l(t, f"[MC-DBG] RX_DEDUP_NEW msg_id=D{i:07X}") + rx(i, "@", "n", "AA1AA-1>HN@R1;1,2,3;", "D"))
+        for i in range(100):
+            t += 1
+            out.append(
+                cls._l(t, f"[MC-DBG] RX_DEDUP_NEW msg_id=E{i:07X}")
+                + cls._l(t, f"[LOG] GWI xE{i:07X} : H03 from=SQ9APP-1 t={t * 1000}")
+            )
+        for i in range(300):
+            t += 1
+            out.append(cls._l(t, f"[MC-DBG] RX_DEDUP_DUP msg_id=B{i:07X} slot=1") + rx(i, ":", "d", "AA1AA-1>*:hi"))
+        for i in range(40):
+            t += 1
+            out.append(
+                cls._l(t, f"[LOG] TX xC{i:07X} : H00 prio=5 src=o wait=3000 q=1 cad=0 len=54 t={t * 1000}")
+                + cls._l(t, f"[MC-DBG] RX_DEDUP_DUP msg_id=C{i:07X} slot=1")
+                + rx(i, ":", "d", "AA1AA-1>*:own", "C")
+            )
+        out.append(cls._stat(t + 1, stat_newid, stat_dup))
+        return "".join(out)
+
+    def test_dedup_balance_ok_on_gateway_artefacts(self) -> None:
+        # STAT newid = 400 tail new + 100 GWI (HN and own echoes are skipped
+        # by setlogCountDedup); STAT dup = 300 (own-echo dups skipped)
+        out = self._analyse(self._gateway_log(500, 300))
+        sub = self._sub(self._sec_of(out, "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("NEW_DBG: RX_DEDUP_NEW=550 - GWI=100 = 450, DUP:n=450", sub)
+        self.assertIn("NEW_DBG_BALANCE: OK", sub)
+        self.assertIn("DUP_DBG: RX_DEDUP_DUP=340, DUP:d=340", sub)
+        self.assertIn("DUP_DBG_BALANCE: OK", sub)
+        self.assertIn("NEW_STAT: STAT_newid=500, DUP:n=400 + GWI=100 = 500", sub)
+        self.assertIn("NEW_STAT_BALANCE: OK", sub)
+        self.assertIn("DUP_STAT: STAT_dup=300, DUP:d=300", sub)
+        self.assertIn("DUP_STAT_BALANCE: OK", sub)
+        self.assertNotIn("MISMATCH", sub)
+
+    def test_dedup_balance_stat_mismatch_detected(self) -> None:
+        sub = self._sub(self._sec_of(self._analyse(self._gateway_log(700, 300)), "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("NEW_STAT_BALANCE: MISMATCH (diff 200 > tolerance 7)", sub)
+        self.assertIn("DUP_STAT_BALANCE: OK", sub)
+
+    def test_dedup_balance_mismatch_on_fixture(self) -> None:
+        # fixture STAT lines are not derived from the fixture traffic: STAT 2..6
+        # sum newid=46 dup=29; windowed tail has DUP:n 2 / DUP:d 3 and 3 GWI
+        sub = self._sub(self._sec_of(self._stdout, "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("NEW_DBG: RX_DEDUP_NEW=7 - GWI=4 = 3, DUP:n=6", sub)
+        self.assertIn("DUP_DBG: RX_DEDUP_DUP=5, DUP:d=7", sub)
+        self.assertIn("NEW_STAT: STAT_newid=46, DUP:n=2 + GWI=3 = 5", sub)
+        self.assertIn("DUP_STAT: STAT_dup=29, DUP:d=3", sub)
+        self.assertIn("NEW_STAT_BALANCE: MISMATCH", sub)
+        self.assertIn("DUP_STAT_BALANCE: MISMATCH", sub)
+
+    def test_dedup_balance_ok_within_tolerance(self) -> None:
+        log = (
+            self._l(1, "[MC-DBG] RX_DEDUP_NEW msg_id=B0000001") + self._rx(1, 1, -60, 5, "n")
+            + self._l(2, "[MC-DBG] RX_DEDUP_NEW msg_id=B0000002") + self._rx(2, 2, -60, 5, "n")
+            + self._l(3, "[MC-DBG] RX_DEDUP_DUP msg_id=B0000002 slot=1") + self._rx(3, 2, -60, 5, "d")
+        )
+        sub = self._sub(self._sec_of(self._analyse(log), "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("NEW_DBG: RX_DEDUP_NEW=2 - GWI=0 = 2, DUP:n=2", sub)
+        self.assertIn("NEW_DBG_BALANCE: OK", sub)
+        self.assertIn("DUP_DBG: RX_DEDUP_DUP=1, DUP:d=1", sub)
+        self.assertIn("DUP_DBG_BALANCE: OK", sub)
+        # a single STAT line is no window: STAT comparison stays n/a
+        self.assertIn("NEW_STAT_BALANCE: n/a", sub)
+
+    def test_dedup_balance_na_with_single_source(self) -> None:
+        log = self._rx(1, 1, -60, 5, "n")
+        sub = self._sub(self._sec_of(self._analyse(log), "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("NEW_DBG_BALANCE: n/a", sub)
+        self.assertIn("NEW_STAT_BALANCE: n/a", sub)
+        self.assertNotIn("OK", sub)
+        self.assertNotIn("MISMATCH", sub)
+
+    # --- 8. locale ---
+    def test_locale_decimal_point_under_de_de(self) -> None:
+        env = dict(os.environ, LC_ALL="de_DE.UTF-8")
+        res = subprocess.run(
+            ["bash", str(SCRIPT), str(SAMPLE_SETLOG)],
+            capture_output=True, text=True, cwd=str(REPO_ROOT), env=env,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(res.stderr, "")
+        # decimal point (BSD awk prints "9,0" under de_DE without the pin)
+        self.assertIn("UTIL: min 4 avg 9.0 max 20 last 6", res.stdout)
+        # fractional input parsed whole (de_DE awk reads "1.2"+0 as 1, "11.9" as 12)
+        self.assertIn("MIN: 1.2s", res.stdout)
+        self.assertIn("MAX: 11.9s", res.stdout)
+        self.assertEqual(res.stdout, self._stdout)
+
+    # --- 9. nRF52 [HEAP] is no ESP32 evidence ---
+    def test_nrf52_heap_line_does_not_make_bare_onrxerror_esp32(self) -> None:
+        log = (
+            self._l(1, "13:00:00;[HEAP];150000;140000;100000;(init)")
+            + self._l(2, "OnRxError")
+            + self._l(3, "OnRxError")
+        )
+        sec = self._sec_of(self._analyse(log), "CRC_ERRORS")
+        self.assertIn("CRC_NRF52 (OnRxError, no details): 2", sec)
+        self.assertNotIn("RXERROR_BARE", sec)
+
+    def test_esp32_heap_line_still_marks_bare_onrxerror_esp32(self) -> None:
+        log = self._l(1, "[HEAP] 13:00:00 150000 140000 100000 (init)") + self._l(2, "OnRxError")
+        sec = self._sec_of(self._analyse(log), "CRC_ERRORS")
+        self.assertIn("RXERROR_BARE (ESP32 OnRxError", sec)
+
+    # --- 10. setlog-only capture (--info off) ---
+    def test_setlog_only_capture_has_nodes_and_packets(self) -> None:
+        stripped = "".join(
+            ln for ln in SAMPLE_SETLOG.read_text().splitlines(keepends=True) if "MH-LoRa" not in ln
+        )
+        out = self._analyse(stripped)
+        self.assertIn("MH_LORA_SOURCE: [LOG] RX lines", out)
+        # 13 RX tails (grep -cE '\[LOG\] [0-9]{3} .* RSSI'), 8 distinct route sources
+        self.assertIn("UNIQUE_NODES: 8", out)
+        self.assertIn("TOTAL_MH_PACKETS: 13", out)
+        sec = self._sec_of(out, "NODES")
+        self.assertRegex(sec, r"DB0HOB-12\s+3\s+-115\.\.\s*-32\s+2\.7")
+        types = self._sec_of(out, "MESSAGE_TYPES")
+        self.assertIn("HEARTBEAT: 6", types)
+        self.assertIn("TOTAL: 13", types)
+        self.assertIn("n/a (no MH-LoRa lines, --info off)", self._sub(self._sec_of(out, "HOP_DISTRIBUTION"), "RX-LoRa2"))
+        self.assertIn("   4 H03", self._sec_of(out, "HOP_DISTRIBUTION"))
+
+    def test_setlog_only_skips_ack_and_hn_tails(self) -> None:
+        # The firmware prints no MH-LoRa for ACK frames (printBuffer_ack) and
+        # none for >HN@ reports, so their [LOG] tails must not become packets.
+        log = (
+            self._l(
+                1,
+                "[LOG] 060 : xB0000001 H00 S1 T0 M01 AA1AA-1>*:hello HW:43 MOD:8/8 FCS:11E7 "
+                "FW:35:p LH:AA RSSI:-60 SNR:5 DUP:n OWN:- t=1000",
+            )
+            + self._l(2, "[LOG] 012 A x3EC7AD7D H82 x0D1BA2AA 01 00 RSSI:-116 SNR:-5 DUP:n OWN:- t=2000")
+            + self._l(
+                3,
+                "[LOG] 054 @ x91A434D7 H00 S0 T0 M00 BB1BB-90>HN@R2;N2;AA1AA-1,6; HW:09 MOD:8/8 "
+                "FCS:0C70 FW:35:v LH:89 RSSI:-76 SNR:6 DUP:n OWN:- t=3000",
+            )
+        )
+        out = self._analyse(log)
+        self.assertIn("MH_LORA_SOURCE: [LOG] RX lines", out)
+        self.assertIn("TOTAL_MH_PACKETS: 1", out)
+        self.assertIn("UNIQUE_NODES: 1", out)
+
+    def test_setlog_only_tx_and_rx2_counts_are_na(self) -> None:
+        stripped = "".join(
+            ln for ln in SAMPLE_SETLOG.read_text().splitlines(keepends=True) if "MH-LoRa" not in ln
+        )
+        out = self._analyse(stripped)
+        self.assertIn("TOTAL_TX: n/a", out)
+        self.assertNotIn("TOTAL_TX: 0", out)
+        self.assertIn("RX_LORA_ACCEPTED: n/a", out)
+
+    def test_setlog_with_mh_lines_uses_mh_only(self) -> None:
+        self.assertNotIn("MH_LORA_SOURCE", self._stdout)
+        self.assertIn("TOTAL_MH_PACKETS: 9", self._stdout)
+
+    # --- 11. [LOG] RX copies of the payload are not event evidence ---
+    def test_log_rx_text_with_reconnect_is_not_a_wifi_issue(self) -> None:
+        log = self._l(
+            1,
+            "[LOG] 060 : xB0000001 H00 S1 T0 M01 AA1AA-1>*:please reconnect HW:43 MOD:8/8 FCS:11E7 "
+            "FW:35:p LH:AA RSSI:-60 SNR:5 DUP:n OWN:- t=1000",
+        )
+        out = self._analyse(log)
+        self.assertIn("WIFI_ISSUE_COUNT: 0", out)
+
+    def test_log_rx_text_with_crash_banner_is_not_a_crash(self) -> None:
+        log = self._l(
+            1,
+            "[LOG] 060 : xB0000001 H00 S1 T0 M01 AA1AA-1>*:Guru Meditation Error HW:43 MOD:8/8 FCS:11E7 "
+            "FW:35:p LH:AA RSSI:-60 SNR:5 DUP:n OWN:- t=1000",
+        )
+        out = self._analyse(log)
+        self.assertIn("CRASH_COUNT: 0", out)
+        self.assertNotIn("Guru Meditation", self._sub(self._sec_of(out, "ADDITIONAL"), "CRASHES"))
+
+    def test_log_rx_text_with_udp_reset_is_not_a_udp_reset(self) -> None:
+        log = self._l(
+            1,
+            "[LOG] 060 : xB0000001 H00 S1 T0 M01 AA1AA-1>*:resetMeshComUDP: HW:43 MOD:8/8 FCS:11E7 "
+            "FW:35:p LH:AA RSSI:-60 SNR:5 DUP:n OWN:- t=1000",
+        )
+        self.assertIn("UDP_RESET: 0", self._analyse(log))
+
+    def test_udp_and_ext_payload_text_is_not_event_evidence(self) -> None:
+        # RX-UDP/TX-UDP and [EXT] Out repeat free chat text as well.
+        log = (
+            self._l(
+                1,
+                "RX-UDP  045 : x4268B364 H04 S1 T0 M01 AA1AA-1>*:reconnect Guru Meditation Error "
+                "resetMeshComUDP: HW:03 MOD:F/8 FCS:0BFE FW:35:t LH:83",
+            )
+            + self._l(
+                2,
+                "TX-UDP  045 : x4268B365 H04 S1 T0 M01 AA1AA-1>*:reconnect Guru Meditation Error "
+                "resetMeshComUDP: HW:03 MOD:F/8 FCS:0BFE FW:35:t LH:83",
+            )
+            + self._l(
+                3,
+                '[EXT] Out: {"src_type":"lora","type":"msg","src":"AA1AA-1",'
+                '"msg":"reconnect Guru Meditation Error resetMeshComUDP:"}',
+            )
+            + self._l(
+                4,
+                '[EXT] Inc: {"type":"msg","src":"AA1AA-1",'
+                '"msg":"reconnect Guru Meditation Error resetMeshComUDP:"}',
+            )
+        )
+        out = self._analyse(log)
+        self.assertIn("WIFI_ISSUE_COUNT: 0", out)
+        self.assertIn("CRASH_COUNT: 0", out)
+        self.assertIn("UDP_RESET: 0", out)
+
+    # --- 12. interferer detection without ferr data ---
+    def test_interferer_na_without_ferr_data(self) -> None:
+        # RAK-style: RX tails only (no "Received packet:" -> no frequency error)
+        log = self._rx(1, 1, -60, 5, "n", hop="H00") + self._mh(1, 1)
+        sec = self._sec_of(self._analyse(log), "INTERFERER_DETECTION")
+        self.assertIn("PACKETS_WITH_FERR_GT_5KHZ: n/a (no frequency-error data)", sec)
+        self.assertIn("NODES_AVG_FERR_GT_3KHZ: n/a (no frequency-error data)", sec)
+        self.assertNotIn("FERR_GT_5KHZ: 0", sec)
+
+    def test_interferer_zero_with_ferr_data(self) -> None:
+        recv = self._l(1, "[LoRa]...Received packet: RSSI:\t\t-70 dBm / SNR:\t\t4 dB / Frequency error:\t61.03 Hz")
+        sec = self._sec_of(self._analyse(recv + self._mh(1, 1)), "INTERFERER_DETECTION")
+        self.assertIn("PACKETS_WITH_FERR_GT_5KHZ: 0", sec)
+        self.assertIn("NODES_AVG_FERR_GT_3KHZ: 0", sec)
+
+    def test_junk_prefix_before_time_is_matched(self) -> None:
+        line = "2026-10-12 10:00:01.100  --loradebu10:00:01 [LOG] ERR rssi=-90 snr=-5 len=0 ferr=0 t=1\n"
+        sec = self._sec_of(self._analyse(line), "CRC_ERRORS")
+        self.assertIn("CRC_ERROR_COUNT: 1", sec)
 
 
 if __name__ == "__main__":

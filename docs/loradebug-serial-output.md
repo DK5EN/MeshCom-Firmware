@@ -207,11 +207,21 @@ Nach jedem Fehler folgt bei Paketen < 255 Byte ein Hex-Dump (`printAsciiBuffer`)
 Diese Zeilen erscheinen **zusätzlich** wenn `bDisplayInfo` oder `bDisplayCont` gesetzt ist:
 
 ```
-MH-LoRa: DK7CH-1,DL7OSX-1>*! H01 HW:4 FW:47 ...   Alle gehörten Pakete
-RX-LoRa2: DK7CH-1>*! H01 ...                         Akzeptierte Pakete (nach Dedup)
-TX-LoRa: OE1ABC-7>*! H01 ...                          Gesendete Pakete
-RX-LoRa-All: ...                                       Rohempfang vor Filterung
+10:11:03 MH-LoRa 105 ! x4F74721F H00 S1 T0 M01 DB0ED-99,DK5EN-98>*!4817.16N/... HW:43 MOD:8/8 FCS:19C2 FW:35:t LH:AB
+10:11:22 RX-LoRa2 065 @ xDD3B004D H02 S1 T0 M01 DB0HOB-12,DO7GH>H@R20;... HW:12 MOD:8/8 FCS:0DE2 FW:35:p LH:AB
+10:10:49 TX-LoRa  097 ! x4F74721F H01 S1 T0 M01 DB0ED-99,DK5EN-98>*!4817.16N/... HW:43 MOD:8/8 FCS:17E2 FW:35:t LH:AB
 ```
+
+- `MH-LoRa`: alle gehörten Pakete. `RX-LoRa2`: akzeptierte Pakete (nach Dedup). `TX-LoRa`:
+  gesendete Pakete.
+- Format (`printBuffer_aprs`, `src/loop_functions.cpp`): Uhrzeit, Tag **ohne Doppelpunkt** (seit
+  `c78adcc5`, 2026-08-03; ältere Logs zeigen `MH-LoRa:`), Länge, Typzeichen (`!` Position, `@`
+  Heartbeat, `:` Text), Msg-ID, `H` Max-Hop-Byte (hex), `S` Server-Flag, `T` Track-Flag, `M` Mesh-Flag, Pfad
+  `Absender,Relay,...>Ziel`, Nutzdaten, Hardware, Modulation, Prüfsumme, Firmware.
+- `RX-LoRa-All` gibt es nicht mehr.
+- Mit `--setlog on` erscheinen dieselben Pakete zusätzlich als `[LOG]`-Zeilen mit
+  `RSSI:`/`SNR:`/`DUP:`/`OWN:` am Ende, dazu `[LOG] RLY`, `[LOG] TX`, `[LOG] ERR`, `[LOG] STAT`
+  (alle 300 s) und `[LOG] GWI`/`GWU` (`src/setlog_lines.cpp`).
 
 ---
 

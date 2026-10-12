@@ -12,6 +12,15 @@
 
 set +e  # Do not exit on errors; let sections fail visibly and continue
 
+# Pin the locale: under a decimal-comma locale (de_DE) BSD awk parses "1.5"+0
+# as 1 and prints decimal commas, which corrupts every fractional value
+# (CRC cluster gaps, break-even %, FERR averages). Also fixes sort order.
+export LC_ALL=C
+# Lines that carry free packet payload text (chat can contain "reconnect",
+# "Guru Meditation", ...): never evidence for a node event. Bracket classes
+# instead of backslashes, so the pattern survives `awk -v` escape processing.
+PAYLOAD_LINE_RE='(MH|RX|TX)-LoRa2? |RX-UDP |TX-UDP |[[]EXT[]] (Out|Inc):|NEW-TXT:? |[[]LOG[]] [0-9][0-9][0-9] '
+
 if [ $# -lt 1 ] || [ ! -f "$1" ]; then
     echo "Usage: $0 <logfile>" >&2
     exit 1
@@ -119,12 +128,59 @@ echo "FIRST_LINE: $(head -1 "$LOGFILE")"
 echo "LAST_LINE: $(tail -1 "$LOGFILE")"
 echo "TOTAL_LINES: $(wc -l < "$LOGFILE")"
 
+# SETLOG presence (firmware `--setlog on`): "[LOG] " lines with the SL-01..06
+# bodies. SL_RX_N = RX lines carrying the RSSI/SNR/DUP/OWN tail.
+SL_OTHER_N=$(grep -cE '\[LOG\] (RLY|TX|ERR|STAT|GWI|GWU) ' "$LOGFILE" 2>/dev/null; true)
+SL_RX_N=$(grep -cE '\[LOG\] [0-9]{3} .* RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:' "$LOGFILE" 2>/dev/null; true)
+SL_HAVE_RCV=$(grep -c 'Received packet:' "$LOGFILE" 2>/dev/null; true)
+SL_N=$((SL_RX_N + SL_OTHER_N))
+if [ "$SL_N" -gt 0 ]; then echo "SETLOG: on ($SL_N lines)"; else echo "SETLOG: off"; fi
+
+# Setlog-only capture (`--info off`: no MH-LoRa lines, src/lora_functions.cpp)
+# would give an empty node table and 0 packets. The `[LOG] NNN <typ> x<id> ...`
+# RX line carries the same body as MH-LoRa, so it serves as the packet line:
+# a synthetic `MH-LoRa NNN ...` line (tail RSSI.. stripped) is added right
+# after each RX tail line. Only done when the log has no MH-LoRa line at all,
+# so one source is ever used and nothing is counted twice. Sections that need
+# RX-LoRa2/TX-LoRa (not in this capture) print n/a.
+MH_SYNTH=0
+if [ "$SL_RX_N" -gt 0 ] && [ "$(grep -cE 'MH-LoRa:? ' "$LOGFILE")" -eq 0 ]; then
+    MH_SYNTH=1
+    new_tmp
+    awk '
+    { print }
+    # No MH-LoRa for ACK frames (printBuffer_ack: no ">" path) or >HN@
+    # reports (early return in src/lora_functions.cpp), so no synthetic one.
+    /\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:/ && />/ && !/>HN@/ {
+        l = $0
+        sub(/ \[LOG\] /, " MH-LoRa ", l)
+        sub(/ RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:.*$/, "", l)
+        print l
+    }' "$LOGFILE" > "$NEW_TMP"
+    LOGFILE="$NEW_TMP"
+    echo "MH_LORA_SOURCE: [LOG] RX lines (no MH-LoRa lines in log, --info off)"
+fi
+
 # ─── 2. ACTIVE NODES ───
 section "NODES"
 
 # Single-pass awk: correlate "Received packet:" RSSI/SNR with subsequent MH-LoRa lines.
 # Extract callsign from route field (first callsign before comma or ">").
-awk '
+awk -v sl="$SL_RX_N" '
+# SETLOG RX tail is the primary RSSI/SNR source (the only one on nRF52). When
+# the log has any, "Received packet:" is ignored so no frame is counted twice.
+sl > 0 && /\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:/ {
+    for (i=NF; i>=1; i--) {
+        if ($i ~ /^SNR:-?[0-9]+$/) { last_snr = substr($i, 5) + 0 }
+        if ($i ~ /^RSSI:-?[0-9]+$/) { last_rssi = substr($i, 6) + 0; break }
+    }
+    has_rssi = 1
+    next
+}
+# Note: with LogCallsign filtering active the firmware may print the tail for
+# only some frames, but tail presence (sl > 0) suppresses "Received packet:"
+# for ALL lines, including frames that have no tail.
+sl > 0 && /Received packet:/ { next }
 /Received packet:/ {
     for (i=1; i<=NF; i++) {
         if ($i == "RSSI:") {
@@ -247,6 +303,7 @@ END {
 # Notable text messages (extract up to 20)
 echo ""
 echo "--- NOTABLE_TEXTS ---"
+[ "$MH_SYNTH" -eq 1 ] && echo "n/a (no MH-LoRa lines, --info off)"
 # RX-LoRa-All: has no emitter in current firmware; derive from accepted text
 # frames (type char ":") instead, heartbeats excluded.
 grep -E 'RX-LoRa2:? +[0-9]{3} :' "$LOGFILE" | grep -vE 'H@R|HG@R' | head -20 || true
@@ -258,9 +315,11 @@ echo "--- MH-LoRa (Empfangen) ---"
 grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- RX-LoRa2 (Akzeptiert) ---"
+[ "$MH_SYNTH" -eq 1 ] && echo "n/a (no MH-LoRa lines, --info off)"
 grep -E 'RX-LoRa2:? ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- TX-LoRa (Gesendet) ---"
+[ "$MH_SYNTH" -eq 1 ] && echo "n/a (no MH-LoRa lines, --info off)"
 grep -E 'TX-LoRa:? +[0-9]{3} ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 # ─── 5. LOOPS ───
@@ -369,31 +428,68 @@ CRC_NRF_OLD_COUNT=$(grep -c 'OnRxError$' "$LOGFILE" 2>/dev/null || true)
 #   nRF52 new:  OnRxError -> RX_ERROR  (with rssi/snr)
 #   nRF52 old:  OnRxError alone        (no detail line)
 # Only count OnRxError if there are NO CRC_ERROR and NO RX_ERROR lines (old nRF52 FW)
+# SETLOG `[LOG] ERR rssi= snr= len= ferr= t=` (SL-04) is the RX-loss source
+# when none of the [MC-DBG] CRC_ERROR / RX_ERROR detail lines exist (audit
+# F-14): it works on ESP32 and nRF52 and also covers non-CRC RX errors.
+SL_ERR_N=$(grep -cE '\[LOG\] ERR ' "$LOGFILE" 2>/dev/null; true)
 if [ "$CRC_ESP_COUNT" -gt 0 ] || [ "$CRC_NRF_NEW_COUNT" -gt 0 ]; then
+    CRC_SRC="mcdbg"
+    CRC_DETAIL_RE='CRC_ERROR|RX_ERROR rssi'
     CRC_NRF_COUNT=$CRC_NRF_NEW_COUNT
+elif [ "$SL_ERR_N" -gt 0 ]; then
+    CRC_SRC="setlog"
+    CRC_DETAIL_RE='[[]LOG[]] ERR '
+    CRC_NRF_COUNT=0
 else
+    CRC_SRC="onrxerror"
+    CRC_DETAIL_RE='OnRxError$'
     CRC_NRF_COUNT=$CRC_NRF_OLD_COUNT
 fi
 CRC_TOTAL=$((CRC_ESP_COUNT + CRC_NRF_COUNT))
+if [ "$CRC_SRC" = "setlog" ]; then CRC_TOTAL=$SL_ERR_N; fi
 echo "CRC_ERROR_COUNT: $CRC_TOTAL"
 if [ "$CRC_ESP_COUNT" -gt 0 ]; then echo "CRC_ESP32 (CRC_ERROR): $CRC_ESP_COUNT"; fi
-if [ "$CRC_NRF_COUNT" -gt 0 ]; then echo "CRC_NRF52 (RX_ERROR): $CRC_NRF_COUNT"; fi
-if [ "$CRC_ESP_COUNT" -eq 0 ] && [ "$CRC_NRF_NEW_COUNT" -eq 0 ] && [ "$CRC_NRF_OLD_COUNT" -gt 0 ]; then
-    echo "CRC_NRF52 (OnRxError, no details): $CRC_NRF_OLD_COUNT"
+if [ "$CRC_NRF_COUNT" -gt 0 ] && [ "$CRC_SRC" = "mcdbg" ]; then echo "CRC_NRF52 (RX_ERROR): $CRC_NRF_COUNT"; fi
+if [ "$CRC_SRC" = "setlog" ]; then
+    echo "CRC_SOURCE: setlog ERR ($SL_ERR_N lines; any RX error, not CRC only)"
+    grep -E '\[LOG\] ERR ' "$LOGFILE" | awk '
+    {
+        r = ""; sn = ""; ln = ""
+        for (i=1; i<=NF; i++) {
+            if ($i ~ /^rssi=-?[0-9]+$/) r = substr($i, 6) + 0
+            if ($i ~ /^snr=-?[0-9]+$/) sn = substr($i, 5) + 0
+            if ($i ~ /^len=[0-9]+$/) ln = substr($i, 5) + 0
+        }
+        n++
+        if (r != "") { if (rn == 0 || r < rmin) rmin = r; if (rn == 0 || r > rmax) rmax = r; rn++ }
+        if (sn != "") { if (sc == 0 || sn < smin) smin = sn; if (sc == 0 || sn > smax) smax = sn; sc++ }
+        if (ln == 0 && ln != "") len0++
+    }
+    END {
+        if (rn > 0) printf "ERR_RSSI_RANGE: %d..%d\n", rmin, rmax; else print "ERR_RSSI_RANGE: n/a"
+        if (sc > 0) printf "ERR_SNR_RANGE: %d..%d\n", smin, smax; else print "ERR_SNR_RANGE: n/a"
+        printf "ERR_LEN0: %d\n", len0 + 0
+    }'
+elif [ "$CRC_SRC" = "onrxerror" ] && [ "$CRC_NRF_OLD_COUNT" -gt 0 ]; then
+    # Bare OnRxError has no cause. "Received packet:" only exists on ESP32,
+    # where bare OnRxError may be a non-CRC error -- never label that nRF52.
+    # ESP32 [HEAP] forms start the tag after whitespace/line start; nRF52 prints
+    # `HH:MM:SS;[HEAP];...` (tag after ";"), so that form is no ESP32 evidence.
+    if [ "${SL_HAVE_RCV:-0}" -gt 0 ] || grep -qE '(^|[[:space:]])\[HEAP\]' "$LOGFILE"; then
+        echo "RXERROR_BARE (ESP32 OnRxError, cause not logged, not necessarily CRC): $CRC_NRF_OLD_COUNT"
+    else
+        echo "CRC_NRF52 (OnRxError, no details): $CRC_NRF_OLD_COUNT"
+    fi
 fi
 
-# Detail lines: CRC_ERROR (ESP32) + RX_ERROR (nRF52 new), fall back to OnRxError (nRF52 old)
-if [ "$CRC_ESP_COUNT" -gt 0 ] || [ "$CRC_NRF_NEW_COUNT" -gt 0 ]; then
-    grep -E 'CRC_ERROR|RX_ERROR rssi' "$LOGFILE"
-else
-    grep -E 'OnRxError$' "$LOGFILE"
-fi | awk '{
+# Detail lines: structured [MC-DBG] lines, else SETLOG ERR, else bare OnRxError
+grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
     rssi="n/a"; snr="n/a"; ferr="n/a"; sz="n/a"
     for (i=1; i<=NF; i++) {
         if ($i ~ /^rssi=/) rssi = $i
         if ($i ~ /^snr=/) snr = $i
-        if ($i ~ /^freq_err=/) ferr = $i
-        if ($i ~ /^size=/) sz = $i
+        if ($i ~ /^(freq_err|ferr)=/) ferr = $i
+        if ($i ~ /^(size|len)=/) sz = $i
     }
     print $2, rssi, snr, ferr, sz
 }' | head -50 || true
@@ -458,8 +554,16 @@ echo "RX_DEDUP_NEW: $(grep -c 'RX_DEDUP_NEW' "$LOGFILE" 2>/dev/null; true)"
 MH_COUNT=$(grep -cE "MH-LoRa:? " "$LOGFILE" 2>/dev/null; true)
 RX_COUNT=$(grep -cE "RX-LoRa2:? " "$LOGFILE" 2>/dev/null; true)
 echo "MH_LORA_HEARD: $MH_COUNT"
-echo "RX_LORA_ACCEPTED: $RX_COUNT"
-echo "IMPLICIT_DEDUP: $((MH_COUNT - RX_COUNT))"
+if [ "$MH_SYNTH" -eq 1 ]; then
+    echo "RX_LORA_ACCEPTED: n/a (no RX-LoRa2 lines, --info off)"
+else
+    echo "RX_LORA_ACCEPTED: $RX_COUNT"
+fi
+if [ "$MH_SYNTH" -eq 1 ]; then
+    echo "IMPLICIT_DEDUP: n/a (no RX-LoRa2 lines, --info off)"
+else
+    echo "IMPLICIT_DEDUP: $((MH_COUNT - RX_COUNT))"
+fi
 
 # Top repeated msg_ids
 echo ""
@@ -470,6 +574,261 @@ grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | sor
 echo ""
 echo "--- DUPLICATION_DISTRIBUTION ---"
 grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{print $1}' | sort -n | uniq -c | sort -rn || true
+
+# ─── 11b. SETLOG (firmware `--setlog on` lines, src/setlog_lines.h) ───
+# `HH:MM:SS [LOG] <body>`: RX tail (SL-01), RLY (SL-02), TX (SL-03), ERR
+# (SL-04), STAT (SL-05, every 300 s, 5-min window), GWI/GWU (SL-06). The
+# marker is matched anywhere in the line (logger prefix, junk before the
+# time). Sections without data print n/a, never a healthy verdict.
+section "SETLOG"
+
+if [ "$SL_N" -eq 0 ]; then
+    echo "n/a (no [LOG] setlog lines; enable with --setlog on)"
+else
+    new_tmp
+    SL_TXW="$NEW_TMP"
+    # DEDUP_BALANCE: the three sources count different things, so they are
+    # compared pairwise with the matching correction (never all three raw):
+    #  - [MC-DBG] RX_DEDUP_NEW/DUP come from is_new_packet(), which on an
+    #    ESP32 gateway also fires for UDP frames (one GWI line each); NEW is
+    #    compared after subtracting the GWI count.
+    #  - STAT newid/dup come from setlogCountDedup(): it skips HN reports,
+    #    own and gateway-injected echoes (msg_id seen in `[LOG] TX ... src=o|g`)
+    #    and gains the S2 server-inject increments (= GWI). STAT counters are
+    #    per 300 s window and the first window predates the capture, so the
+    #    tail is counted strictly after the first STAT line up to the last
+    #    one and STAT is summed from the 2nd line on.
+    # Tolerance = max(5, 1% of the larger of the two compared values).
+    awk -v txw="$SL_TXW" '
+    function tok(k,   i, n, p) {
+        # value of "k=..." among the fields, "" when absent
+        for (i = NF; i >= 1; i--) {
+            n = length(k) + 1
+            if (substr($i, 1, n) == k "=") return substr($i, n + 1)
+        }
+        return ""
+    }
+    /RX_DEDUP_NEW msg_id=/ { dbg_new++ }
+    /RX_DEDUP_DUP msg_id=/ { dbg_dup++ }
+
+    function msgid(   i) {
+        for (i = 1; i <= NF; i++)
+            if (length($i) == 9 && $i ~ /^x[0-9A-F]+$/) return $i
+        return ""
+    }
+    /\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:[nd] OWN:/ {
+        rx_n++
+        # windowed tail (STAT comparison): after the first STAT line, no HN
+        # reports, no own/gateway-injected echoes (ids from `TX ... src=o|g`)
+        if (stat_n >= 1 && $0 !~ />HN@/ && !(msgid() in own_ids)) {
+            if ($0 ~ / DUP:n /) w_new++
+            else w_dup++
+        }
+        for (i = NF; i >= 1; i--) {
+            if ($i ~ /^SNR:-?[0-9]+$/) sn = substr($i, 5) + 0
+            if ($i == "DUP:d") tail_dup++
+            if ($i == "DUP:n") tail_new++
+            if ($i == "OWN:e") own_echo++
+            if ($i ~ /^RSSI:-?[0-9]+$/) { r = substr($i, 6) + 0; break }
+        }
+        if (rx_n == 1 || r < rssi_min) rssi_min = r
+        if (rx_n == 1 || r > rssi_max) rssi_max = r
+        rssi_sum += r
+        if (rx_n == 1 || sn < snr_min) snr_min = sn
+        if (rx_n == 1 || sn > snr_max) snr_max = sn
+        snr_sum += sn
+        next
+    }
+
+    /\[LOG\] RLY x/ {
+        rly_n++
+        q = tok("q")
+        if (q == "") q = "?"
+        rly[q]++
+        next
+    }
+
+    /\[LOG\] TX x/ {
+        tx_n++
+        src = tok("src"); w = tok("wait"); c = tok("cad")
+        if (src == "o" || src == "g") own_ids[msgid()] = 1
+        if (src !~ /^[org]$/) src = "?"
+        txc[src]++
+        if (c ~ /^[0-9]+$/ && c + 0 > 0) cad_gt0++
+        if (w ~ /^[0-9]+$/) print src, w > txw
+        next
+    }
+
+    /\[LOG\] GWI x/ {
+        gwi_n++
+        if (stat_n >= 1) w_gwi++
+        f = tok("from"); if (f == "") f = "?"
+        gwi_from[f]++
+        next
+    }
+    /\[LOG\] GWU x/ { gwu_n++; next }
+
+    /\[LOG\] STAT / {
+        stat_n++
+        u = tok("util")
+        if (u ~ /^[0-9]+$/) {
+            u += 0; u_n++; u_sum += u; u_last = u
+            if (u_n == 1 || u < u_min) u_min = u
+            if (u_n == 1 || u > u_max) u_max = u
+        }
+        v = tok("newid"); if (v ~ /^[0-9]+$/) { s_newid += v; if (stat_n > 1) sw_newid += v }
+        v = tok("dup");   if (v ~ /^[0-9]+$/) { s_dup += v; if (stat_n > 1) sw_dup += v }
+        # window snapshot: the tail counted so far is what the STAT lines
+        # up to this one can account for (the last snapshot wins)
+        sn_new = w_new; sn_dup = w_dup; sn_gwi = w_gwi
+        v = tok("err");   if (v ~ /^[0-9]+$/) s_err += v
+        v = tok("txn");   if (v ~ /^[0-9]+$/) s_txn += v
+        v = tok("txfail"); if (v ~ /^[0-9]+$/) s_txfail += v
+        v = tok("ringmax")
+        if (v ~ /^[0-9]+\/[0-9]+$/) {
+            split(v, rm, "/")
+            if (rm[1] + 0 > ringmax) ringmax = rm[1] + 0
+            ringsize = rm[2] + 0
+        }
+        v = tok("drop")
+        if (v ~ /^[0-9]+\/[0-9]+\/[0-9]+\/[0-9]+\/[0-9]+$/) {
+            split(v, dp, "/")
+            for (k = 1; k <= 5; k++) drop[k] += dp[k]
+            drop_n++
+        }
+        v = tok("heap")
+        if (v ~ /^[0-9]+$/) {
+            v += 0; h_n++; h_last = v
+            if (h_n == 1) h_first = v
+            if (h_n == 1 || v < h_min) h_min = v
+        }
+        v = tok("trk"); if (v != "") trk_last = v
+        v = tok("fw")
+        if (v != "" && !(v in fw_seen)) { fw_seen[v] = 1; fw_list = fw_list (fw_list == "" ? "" : " ") v }
+        v = tok("up")
+        if (v ~ /^[0-9]+$/) {
+            v += 0
+            if (up_seen && v < up_prev) reboots++
+            up_prev = v; up_seen = 1
+        }
+        next
+    }
+
+    function tol(a, b,   m) {
+        m = (a > b ? a : b) * 0.01
+        return (m < 5 ? 5 : m)
+    }
+    # label, left value + description, right value + description
+    function pair(label, a, b, ok, desc,   d, t) {
+        if (!ok) { printf "%s: n/a\n%s_BALANCE: n/a (needs both sources)\n", label, label; return }
+        printf "%s: %s\n", label, desc
+        d = a - b; if (d < 0) d = -d
+        t = tol(a, b)
+        if (d > t) printf "%s_BALANCE: MISMATCH (diff %d > tolerance %.0f)\n", label, d, t
+        else printf "%s_BALANCE: OK (diff %d <= tolerance %.0f)\n", label, d, t
+    }
+
+    END {
+        print "--- RX_TAIL ---"
+        if (rx_n > 0) {
+            printf "RX_TAIL_LINES: %d\n", rx_n
+            printf "RX_RSSI: %d..%d avg %.1f\n", rssi_min, rssi_max, rssi_sum / rx_n
+            printf "RX_SNR: %d..%d avg %.1f\n", snr_min, snr_max, snr_sum / rx_n
+            printf "RX_NEW (DUP:n): %d\n", tail_new
+            printf "RX_DUP (DUP:d): %d\n", tail_dup
+            printf "DUP_RATE: %.1f%%\n", tail_dup * 100.0 / rx_n
+            printf "OWN_ECHO (OWN:e): %d\n", own_echo
+        } else print "n/a (no RX lines with RSSI/SNR/DUP/OWN tail)"
+
+        print ""
+        print "--- RLY_REASONS ---"
+        if (rly_n > 0) {
+            printf "RLY_TOTAL: %d\n", rly_n
+            split("tx unconf self aprs nomesh gwfilter gwcap ping hop0 loop full", ord, " ")
+            for (k = 1; k <= 11; k++) printf "  q=%s: %d\n", ord[k], rly[ord[k]] + 0
+            for (q in rly) {
+                known = 0
+                for (k = 1; k <= 11; k++) if (ord[k] == q) known = 1
+                if (!known) printf "  q=%s: %d\n", q, rly[q]
+            }
+            if (rly["full"] > 0) printf "FINDING: RLY q=full %d (relay ring full, frames not relayed)\n", rly["full"]
+        } else print "n/a (no RLY lines)"
+
+        print ""
+        print "--- TX_SPLIT ---"
+        if (tx_n > 0) {
+            printf "TX_TOTAL: %d\n", tx_n
+            printf "TX_OWN (src=o): %d\n", txc["o"] + 0
+            printf "TX_RELAY (src=r): %d\n", txc["r"] + 0
+            printf "TX_GW (src=g): %d\n", txc["g"] + 0
+            if (txc["?"] > 0) printf "TX_OTHER (src unknown): %d\n", txc["?"]
+            printf "TX_CAD_GT0: %d\n", cad_gt0 + 0
+        } else print "n/a (no TX lines)"
+
+        print ""
+        print "--- STAT ---"
+        if (stat_n > 0) {
+            printf "STAT_LINES: %d\n", stat_n
+            if (u_n > 0) printf "UTIL: min %d avg %.1f max %d last %d (5-min windows, %%)\n", u_min, u_sum / u_n, u_max, u_last
+            else print "UTIL: n/a"
+            printf "SUM newid=%d dup=%d err=%d txn=%d txfail=%d\n", s_newid, s_dup, s_err, s_txn, s_txfail
+            if (ringsize > 0) printf "RINGMAX: %d/%d\n", ringmax, ringsize
+            else print "RINGMAX: n/a"
+            if (drop_n > 0) {
+                printf "DROP_TOTAL: p1=%d p2=%d p3=%d p4=%d p5=%d\n", drop[1], drop[2], drop[3], drop[4], drop[5]
+                for (k = 1; k <= 5; k++)
+                    if (drop[k] > 0) printf "FINDING: STAT drop p%d = %d (TX ring drops)\n", k, drop[k]
+            } else print "DROP_TOTAL: n/a"
+            if (h_n > 0) printf "HEAP: first %d min %d last %d\n", h_first, h_min, h_last
+            else print "HEAP: n/a"
+            printf "TRK_LAST: %s\n", (trk_last == "" ? "n/a" : trk_last)
+            printf "FW: %s\n", (fw_list == "" ? "n/a" : fw_list)
+            if (up_seen) printf "REBOOTS (up= decreasing): %d\n", reboots + 0
+            else print "REBOOTS: n/a"
+            if (s_txfail > 0) printf "FINDING: STAT txfail = %d (TX watchdog aborts)\n", s_txfail
+        } else print "n/a (no STAT lines)"
+
+        print ""
+        print "--- GATEWAY ---"
+        if (gwi_n + gwu_n > 0) {
+            printf "GWI: %d\n", gwi_n + 0
+            printf "GWU: %d\n", gwu_n + 0
+            nf = 0
+            for (f in gwi_from) nf++
+            printf "GWI_SENDERS: %d (top 10 by count)\n", nf
+            fflush()
+            for (f in gwi_from) printf "  GWI from=%s: %d\n", f, gwi_from[f] | "sort -t: -k2 -rn | head -10"
+            close("sort -t: -k2 -rn | head -10")
+        } else print "n/a (no GWI/GWU lines)"
+
+        print ""
+        print "--- DEDUP_BALANCE ---"
+        hd = (dbg_new + dbg_dup > 0); ht = (rx_n > 0); hs = (stat_n >= 2)
+        # [MC-DBG] vs tail, whole file; NEW minus the UDP/GWI frames
+        pair("NEW_DBG", dbg_new - gwi_n, tail_new, hd && ht, \
+            sprintf("RX_DEDUP_NEW=%d - GWI=%d = %d, DUP:n=%d", dbg_new, gwi_n, dbg_new - gwi_n, tail_new))
+        pair("DUP_DBG", dbg_dup, tail_dup, hd && ht, \
+            sprintf("RX_DEDUP_DUP=%d, DUP:d=%d", dbg_dup, tail_dup))
+        # STAT (2nd line on) vs windowed tail without HN / own / gw echoes
+        pair("NEW_STAT", sw_newid, sn_new + sn_gwi, hs && ht, \
+            sprintf("STAT_newid=%d, DUP:n=%d + GWI=%d = %d (STAT window, no HN/own/gw echoes)", sw_newid, sn_new, sn_gwi, sn_new + sn_gwi))
+        pair("DUP_STAT", sw_dup, sn_dup, hs && ht, \
+            sprintf("STAT_dup=%d, DUP:d=%d (STAT window, no HN/own/gw echoes)", sw_dup, sn_dup))
+    }' "$LOGFILE"
+
+    echo ""
+    echo "--- TX_WAIT (ms, per class) ---"
+    for _cls in o r g; do
+        case "$_cls" in o) _nm="own (src=o)";; r) _nm="relay (src=r)";; g) _nm="gw (src=g)";; esac
+        awk -v c="$_cls" '$1 == c { print $2 }' "$SL_TXW" | sort -n | awk -v nm="$_nm" '
+            { a[NR] = $1; s += $1 }
+            END {
+                if (NR == 0) { printf "%s: n/a\n", nm; exit }
+                med = (NR % 2) ? a[(NR + 1) / 2] : (a[NR / 2] + a[NR / 2 + 1]) / 2
+                printf "%s: count %d avg %.0f median %.0f max %d\n", nm, NR, s / NR, med, a[NR]
+            }'
+    done
+fi
 
 # ─── 12. STATE MACHINE ───
 section "STATE_MACHINE"
@@ -490,7 +849,8 @@ echo "--- WIFI_ISSUES ---"
 # The broad legacy pattern is used only when the log has no ";event;" lines;
 # packet lines (payload text) and the 2323/web "Client disconnected" never count.
 # meshlogger's own "[LOGGER] end ... reconnects=N" line is not a node event either.
-PKT_RE='(MH|RX|TX)-LoRa2? |NEW-TXT:? |\[LOGGER\]'
+# `[LOG] NNN ` RX lines (--setlog) carry the same payload text as MH-LoRa.
+PKT_RE="$PAYLOAD_LINE_RE"'|\[LOGGER\]'
 if grep -qE '\[WIFI\];event;' "$LOGFILE"; then
     WIFI_ISSUE_RE='\[WIFI\];event;disconnected|\[WIFI\];stall'
 else
@@ -515,8 +875,8 @@ else
     CRASH_COUNT_RE=$CRASH_BANNER_RE
 fi
 # Sample listing: the counted lines plus panic/backtrace detail.
-{ grep -E "$CRASH_RESET_RE|Guru Meditation|panic|[Bb]acktrace|abort\(\)|Task watchdog got triggered" "$LOGFILE" | grep -vE '(MH|RX|TX)-LoRa2? |NEW-TXT:? '; } | head -10 || true
-echo "CRASH_COUNT: $({ grep -E "$CRASH_COUNT_RE" "$LOGFILE" | grep -vcE '(MH|RX|TX)-LoRa2? |NEW-TXT:? '; } 2>/dev/null; true)"
+{ grep -E "$CRASH_RESET_RE|Guru Meditation|panic|[Bb]acktrace|abort\(\)|Task watchdog got triggered" "$LOGFILE" | grep -vE "$PAYLOAD_LINE_RE"; } | head -10 || true
+echo "CRASH_COUNT: $({ grep -E "$CRASH_COUNT_RE" "$LOGFILE" | grep -vcE "$PAYLOAD_LINE_RE"; } 2>/dev/null; true)"
 echo "RESET_REASON histogram:"
 { grep -oE 'RESET_REASON=[0-9]+ [A-Z_]+' "$LOGFILE" | sort | uniq -c; } || true
 echo "TX_WATCHDOG_FIRED: $(grep -c '\[MC-WDT\] TX_WATCHDOG fired' "$LOGFILE" 2>/dev/null; true)"
@@ -578,11 +938,7 @@ section "CRC_DETAIL"
 
 echo "--- CRC_10MIN_BUCKETS ---"
 # Use CRC_ERROR + RX_ERROR (structured detail lines), fall back to OnRxError (old nRF52)
-if [ "$CRC_ESP_COUNT" -gt 0 ] || [ "$CRC_NRF_NEW_COUNT" -gt 0 ]; then
-    grep -E 'CRC_ERROR|RX_ERROR rssi' "$LOGFILE"
-else
-    grep -E 'OnRxError$' "$LOGFILE"
-fi | awk '{
+grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
     split($2, t, ":")
     bucket = t[1] ":" sprintf("%02d", int(t[2]/10)*10)
     cnt[bucket]++
@@ -596,11 +952,7 @@ echo ""
 echo "--- CRC_HOURLY_RATE ---"
 # CRC errors per hour vs received packets per hour
 # Build CRC pattern to avoid double-counting OnRxError+CRC_ERROR/RX_ERROR pairs
-if [ "$CRC_ESP_COUNT" -gt 0 ] || [ "$CRC_NRF_NEW_COUNT" -gt 0 ]; then
-    CRC_AWK_RE='CRC_ERROR|RX_ERROR rssi'
-else
-    CRC_AWK_RE='OnRxError$'
-fi
+CRC_AWK_RE="$CRC_DETAIL_RE"
 awk -v crc_re="$CRC_AWK_RE" '
 $0 ~ crc_re {
     split($2, t, ":")
@@ -623,11 +975,7 @@ END {
 echo ""
 echo "--- CRC_CLUSTERS ---"
 # CRC errors within 2s of each other = collision bursts
-if [ "$CRC_ESP_COUNT" -gt 0 ] || [ "$CRC_NRF_NEW_COUNT" -gt 0 ]; then
-    grep -E 'CRC_ERROR|RX_ERROR rssi' "$LOGFILE"
-else
-    grep -E 'OnRxError$' "$LOGFILE"
-fi | awk '{
+grep -E "$CRC_DETAIL_RE" "$LOGFILE" | awk '{
     split($2, t, ":")
     split(t[3], s, ".")
     ts = t[1] * 3600 + t[2] * 60 + s[1] + (length(s) > 1 ? ("0." s[2]) + 0 : 0)
@@ -904,6 +1252,7 @@ else
     CRC_ERR_NRF2=$CRC_ERR_NRF_OLD2
 fi
 CRC_ERR_N=$((CRC_ERR_ESP2 + CRC_ERR_NRF2))
+if [ "$CRC_SRC" = "setlog" ]; then CRC_ERR_N=$SL_ERR_N; fi
 echo "CRC_ERROR: ${CRC_ERR_N:-0}"
 DEDUP_N=$(grep -c 'RX_DEDUP_DUP' "$LOGFILE" 2>/dev/null || true); echo "RX_DEDUP_DUP: ${DEDUP_N:-0}"
 LOOP_N=$(grep -c 'RELAY_LOOP_BLOCKED' "$LOGFILE" 2>/dev/null || true); echo "RELAY_LOOP_BLOCKED: ${LOOP_N:-0}"
@@ -1169,7 +1518,7 @@ fi
 # Single awk pass over entire log for: HEAP, Starvation, Server, NTP,
 # Signal Profiling, Frequency Drift, Interferers, Top Talkers,
 # Channel Util Diagram, CSMA Timing, ACK Storm, CAD enhancements
-awk '
+awk -v have_rcv="$SL_HAVE_RCV" -v mh_synth="$MH_SYNTH" -v payload_re="$PAYLOAD_LINE_RE" '
 BEGIN {
     # HEAP
     heap_cnt = 0; heap_sum = 0; heap_sumsq = 0
@@ -1208,6 +1557,7 @@ BEGIN {
 
     last_rx_rssi = 0; last_rx_snr = 0; last_rx_ferr = 0; has_rx = 0
     last_rx_hour = 0
+    rcv_pending = 0; ferr_ok = 1
 
     # Top talkers: heard[cs]; TX counters (tx_srv0/tx_srv1/tx_total) below
     # S0/S1 in a packet line is the msg_server (server) flag, NOT own-vs-relay.
@@ -1465,7 +1815,7 @@ function stddev(sum, sumsq, n) {
 # caller triggered it. The caller-side lines ("calling resetMeshComUDP",
 # "[UDP] ... resetting") describe the same reset and are not counted again.
 # Packet lines (payload text) never count.
-/resetMeshComUDP:/ && !/(MH|RX|TX)-LoRa2? / && !/NEW-TXT:? / { udp_reset++ }
+/resetMeshComUDP:/ && $0 !~ payload_re { udp_reset++ }
 
 # ── NTP ──
 /TimeClient now/ {
@@ -1515,6 +1865,39 @@ function stddev(sum, sumsq, n) {
         }
     }
     last_rx_sec = line_sec
+    rcv_pending = 1
+    ferr_ok = 1
+}
+
+# ── SETLOG RX tail (`[LOG] 082 @ xID ... RSSI:-54 SNR:5 DUP:d OWN:e t=N`) ──
+# Primary RSSI/SNR source whenever present (the only one on nRF52). It
+# overrides the values of a preceding "Received packet:" line of the same
+# frame, so a packet is never counted twice; ferr/inter-arrival keep coming
+# from "Received packet:" and are skipped (ferr_ok = 0) when it is absent.
+/\[LOG\] [0-9][0-9][0-9] / && / RSSI:-?[0-9]+ SNR:-?[0-9]+ DUP:/ {
+    for (i = NF; i >= 1; i--) {
+        if ($i ~ /^SNR:-?[0-9]+$/) { last_rx_snr = substr($i, 5) + 0 }
+        if ($i ~ /^RSSI:-?[0-9]+$/) { last_rx_rssi = substr($i, 6) + 0; break }
+    }
+    ferr_ok = rcv_pending
+    if (!rcv_pending) {
+        last_rx_ferr = 0
+        last_rx_hour = line_hour
+        if (!have_rcv) {
+            if (last_rx_sec >= 0) {
+                ia = line_sec - last_rx_sec
+                if (ia < 0) ia += 86400
+                if (ia < 300) {
+                    ia_cnt++; ia_sum += ia
+                    if (ia < ia_min) ia_min = ia
+                    if (ia > ia_max) ia_max = ia
+                }
+            }
+            last_rx_sec = line_sec
+        }
+    }
+    has_rx = 1
+    rcv_pending = 0
 }
 
 # ── MH-LoRa: per-node signal profiling + top talkers ──
@@ -1567,6 +1950,9 @@ function stddev(sum, sumsq, n) {
         if (!(cs in sig_snr_max) || last_rx_snr > sig_snr_max[cs])
             sig_snr_max[cs] = last_rx_snr
 
+        # SETLOG: [LOG] RX tails carry no frequency error; only count ferr
+        # when a "Received packet:" line fed this packet (ferr_ok).
+        if (ferr_ok) {
         sig_ferr_cnt[cs]++
         sig_ferr_sum[cs] += last_rx_ferr
         sig_ferr_sumsq[cs] += last_rx_ferr * last_rx_ferr
@@ -1602,6 +1988,7 @@ function stddev(sum, sumsq, n) {
                 interf_snr[interf_cnt] = last_rx_snr
             }
         }
+        }  # ferr_ok
 
         has_rx = 0
     }
@@ -1907,12 +2294,20 @@ END {
         r_sd = stddev(sig_rssi_sum[cs], sig_rssi_sumsq[cs], n)
         s_avg = sig_snr_sum[cs] / sig_snr_cnt[cs]
         s_sd = stddev(sig_snr_sum[cs], sig_snr_sumsq[cs], sig_snr_cnt[cs])
-        f_avg = sig_ferr_sum[cs] / sig_ferr_cnt[cs]
-        f_sd = stddev(sig_ferr_sum[cs], sig_ferr_sumsq[cs], sig_ferr_cnt[cs])
-        printf "%-15s %5d  %8.1f %7.1f %3d..%3d  %7.1f %6.1f %3d..%2d  %9.1f %8.1f %6.0f..%.0f\n", \
-            cs, n, r_avg, r_sd, sig_rssi_min[cs], sig_rssi_max[cs], \
-            s_avg, s_sd, sig_snr_min[cs], sig_snr_max[cs], \
-            f_avg, f_sd, sig_ferr_min[cs], sig_ferr_max[cs]
+        if (sig_ferr_cnt[cs] > 0) {
+            f_avg = sig_ferr_sum[cs] / sig_ferr_cnt[cs]
+            f_sd = stddev(sig_ferr_sum[cs], sig_ferr_sumsq[cs], sig_ferr_cnt[cs])
+            printf "%-15s %5d  %8.1f %7.1f %3d..%3d  %7.1f %6.1f %3d..%2d  %9.1f %8.1f %6.0f..%.0f\n", \
+                cs, n, r_avg, r_sd, sig_rssi_min[cs], sig_rssi_max[cs], \
+                s_avg, s_sd, sig_snr_min[cs], sig_snr_max[cs], \
+                f_avg, f_sd, sig_ferr_min[cs], sig_ferr_max[cs]
+        } else {
+            # SETLOG-only RX (nRF52): RSSI/SNR known, no frequency error
+            printf "%-15s %5d  %8.1f %7.1f %3d..%3d  %7.1f %6.1f %3d..%2d  %9s %8s %8s\n", \
+                cs, n, r_avg, r_sd, sig_rssi_min[cs], sig_rssi_max[cs], \
+                s_avg, s_sd, sig_snr_min[cs], sig_snr_max[cs], \
+                "n/a", "n/a", "n/a"
+        }
     }
 
     # ════════════════════════════════════════════════════════
@@ -1965,7 +2360,15 @@ END {
     # ════════════════════════════════════════════════════════
     print ""
     print "=== INTERFERER_DETECTION ==="
-    printf "PACKETS_WITH_FERR_GT_5KHZ: %d\n", interf_cnt
+    # No frequency-error samples at all (nRF52, SETLOG-only): a 0 here would
+    # read as "no interferer" although nothing was measured.
+    ferr_total = 0
+    for (cs in sig_ferr_cnt) ferr_total += sig_ferr_cnt[cs]
+    if (ferr_total == 0) {
+        print "PACKETS_WITH_FERR_GT_5KHZ: n/a (no frequency-error data)"
+        print "NODES_AVG_FERR_GT_3KHZ: n/a (no frequency-error data)"
+    } else
+        printf "PACKETS_WITH_FERR_GT_5KHZ: %d\n", interf_cnt
 
     # Check per-node averages > 3kHz
     off_freq_cnt = 0
@@ -1979,7 +2382,7 @@ END {
             }
         }
     }
-    if (off_freq_cnt == 0) print "NODES_AVG_FERR_GT_3KHZ: 0"
+    if (off_freq_cnt == 0 && ferr_total > 0) print "NODES_AVG_FERR_GT_3KHZ: 0"
 
     if (interf_cnt > 0) {
         print ""
@@ -2031,6 +2434,8 @@ END {
         printf "TX_SERVER_FLAG_S1: %d\n", tx_srv1
         printf "TOTAL_TX: %d\n", tx_total
         printf "EST_TX_AIRTIME: %.1fs\n", tx_total_size * 0.003
+    } else if (mh_synth == 1) {
+        print "TOTAL_TX: n/a (no TX-LoRa lines, --info off; see SETLOG TX_SPLIT)"
     } else {
         print "TOTAL_TX: 0"
     }
