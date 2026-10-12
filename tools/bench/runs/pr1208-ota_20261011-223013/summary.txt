@@ -1,0 +1,29 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-PR-next-gate/tools/bench/runs/ota_20261011-223013
+started            2026-10-11 22:30:13
+port               /dev/cu.usbmodem1101
+env                t_deck_plus  expect_hw TDECK+
+target             http://192.168.68.76/
+firmware           .pio/build/t_deck_plus/firmware.bin  md5 15e0c4eefd287ac63710e7d593c33776
+ota                ok
+  timings          precheck_s=1.7s  trigger_safeboot_s=10.1s  safeboot_wait_s=0.6s  ota_start_s=0.0s  upload_s=14.6s  reboot_wait_s=15.2s  total_s=42.2s
+field         before                    after
+build         Oct 11 2026 / 22:19:36    Oct 11 2026 / 22:19:36
+call          DK5EN-14                  DK5EN-14
+hardware      TDECK+                    TDECK+
+hw_idx        46                        46
+lora_bw       250                       250
+lora_cr       6                         6
+lora_freq     433.1750                  433.1750
+lora_power    2                         2
+lora_sf       11                        11
+maxhop_pos    2                         2
+maxhop_text   4                         4
+node_id       A1AD65E0                  A1AD65E0
+version       4.40a                     4.40a
+webserver     on                        on
+wifi_localip  192.168.68.76             192.168.68.76
+wifi_ssid     ORBI63                    ORBI63
+resets after OTA   2
+[BOOT];ready seen  True
+WLAN rejoined      True
+verdict            PASS

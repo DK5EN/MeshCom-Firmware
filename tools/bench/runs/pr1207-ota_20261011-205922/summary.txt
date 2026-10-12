@@ -1,0 +1,29 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-PR-gate/tools/bench/runs/ota_20261011-205922
+started            2026-10-11 20:59:22
+port               /dev/cu.usbserial-0001
+env                heltec_wifi_lora_32_V3  expect_hw HELTEC_V3
+target             http://192.168.68.63/
+firmware           .pio/build/heltec_wifi_lora_32_V3/firmware.bin  md5 960e4f6f339598823774e21b3c8087c0
+ota                ok
+  timings          precheck_s=0.8s  trigger_safeboot_s=10.0s  safeboot_wait_s=1.1s  ota_start_s=0.0s  upload_s=13.2s  reboot_wait_s=12.2s  total_s=37.4s
+field         before                    after
+build         Oct 11 2026 / 20:56:24    Oct 11 2026 / 20:56:24
+call          DK5EN-1                   DK5EN-1
+hardware      HELTEC_V3                 HELTEC_V3
+hw_idx        43                        43
+lora_bw       250                       250
+lora_cr       6                         6
+lora_freq     433.1750                  433.1750
+lora_power    2                         2
+lora_sf       11                        11
+maxhop_pos    2                         2
+maxhop_text   4                         4
+node_id       433A8968                  433A8968
+version       4.40a                     4.40a
+webserver     on                        on
+wifi_localip  192.168.68.63             192.168.68.63
+wifi_ssid     ORBI63                    ORBI63
+resets after OTA   0
+[BOOT];ready seen  True
+WLAN rejoined      True
+verdict            PASS

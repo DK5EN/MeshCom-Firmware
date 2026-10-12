@@ -1,0 +1,3125 @@
+{
+  "idle": {
+    "ok": true,
+    "pre_uistat": {
+      "kind": "UISTAT",
+      "tab": 0,
+      "drawer": 0,
+      "objs": 189,
+      "msg_list": 2,
+      "inv_total": 3885,
+      "refr_total": 1362,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 89052,
+      "heap_min": 84140,
+      "psram_free": 4876827,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 0,
+      "scroll_bottom": -49,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 60,
+      "last_y2": 139,
+      "scr_h": 240
+    },
+    "post_uistat": {
+      "kind": "UISTAT",
+      "tab": 0,
+      "drawer": 0,
+      "objs": 189,
+      "msg_list": 2,
+      "inv_total": 4046,
+      "refr_total": 1435,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 89036,
+      "heap_min": 84096,
+      "psram_free": 4876827,
+      "tft_sleeping": 1,
+      "bl": 0,
+      "scroll_y": 0,
+      "scroll_bottom": -49,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 60,
+      "last_y2": 139,
+      "scr_h": 240
+    },
+    "window_seconds": 60.0,
+    "redraw_total": 157,
+    "redraw_dropped": 0,
+    "invalidations_per_second": 2.6166666666666667,
+    "refr": {
+      "count": 71,
+      "sum_px": 138824,
+      "mean_t_ms": 6.28169014084507,
+      "max_t_ms": 17,
+      "refreshes_per_second": 1.1833333333333333,
+      "px_per_second": 2313.733333333333
+    },
+    "flush": {
+      "kind": "INSTR-FLUSH",
+      "n": 73,
+      "total_us": 75371,
+      "avg_us": 1032,
+      "max_us": 1147
+    },
+    "loop": {
+      "kind": "INSTR-LOOP",
+      "n": 9442,
+      "total_us": 60502957,
+      "avg_us": 6407,
+      "max_us": 27001
+    },
+    "top10_invalidators_by_class": [
+      {
+        "cls": "label",
+        "name": null,
+        "count": 157
+      }
+    ],
+    "top10_invalidators_by_ra": [
+      {
+        "ra": "0x4209a118",
+        "symbol": "lv_obj_invalidate at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:871",
+        "count": 157
+      }
+    ],
+    "top10_invalidators_by_backtrace": [
+      {
+        "count": 72,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2243",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3821 (discriminator 4)",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 72,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2244",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3821 (discriminator 4)",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 3,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2243",
+          "tdeck_update_batt_label(float, int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3784",
+          "loopAction_battCheck() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/loop_actions_esp32.cpp:326",
+          "loopSchedulerRun(unsigned int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_scheduler.cpp:76",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:2361",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 3,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2244",
+          "tdeck_update_batt_label(float, int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3784",
+          "loopAction_battCheck() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/loop_actions_esp32.cpp:326",
+          "loopSchedulerRun(unsigned int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_scheduler.cpp:76",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:2361",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_set_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:90",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2207",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_refr_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:1168",
+          "lv_label_set_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:144",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2207",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:169",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/lv_api_map.h:37"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_refr_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:1168",
+          "lv_label_event at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:763",
+          "lv_obj_event_base at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:98",
+          "event_send_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:458",
+          "lv_event_send at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:75",
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:195",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:201",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/lv_api_map.h:37"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_move_to at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:743",
+          "lv_obj_refr_pos at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:705",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1148",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313"
+        ]
+      }
+    ]
+  },
+  "tabs": {
+    "ok": true,
+    "tab_listing": [
+      "--tab list",
+      "[TAB];0;msg",
+      "[TAB];1;keyboard",
+      "[TAB];2;heart",
+      "[TAB];3;map",
+      "[TAB];4;gps",
+      "[TAB];5;list",
+      "[TAB];6;menu",
+      "[TAB];7;settings",
+      "[TAB];active;0"
+    ],
+    "per_tab": [
+      {
+        "idx": 1,
+        "tab_set_seen": true,
+        "inv_count": 41,
+        "refr_count": 7,
+        "px": 75124,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 1,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 4089,
+          "refr_total": 1454,
+          "last_refr_px": 464,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 89036,
+          "heap_min": 84096,
+          "psram_free": 4876827,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 2,
+        "tab_set_seen": true,
+        "inv_count": 22,
+        "refr_count": 3,
+        "px": 73268,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 2,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 4111,
+          "refr_total": 1467,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 89008,
+          "heap_min": 84096,
+          "psram_free": 4876827,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 3,
+        "tab_set_seen": true,
+        "inv_count": 215,
+        "refr_count": 3,
+        "px": 73268,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 3,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 4326,
+          "refr_total": 1475,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 88828,
+          "heap_min": 78924,
+          "psram_free": 4876799,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 4,
+        "tab_set_seen": true,
+        "inv_count": 697,
+        "refr_count": 4,
+        "px": 186108,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 4,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5023,
+          "refr_total": 1484,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 89036,
+          "heap_min": 77160,
+          "psram_free": 4876675,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 5,
+        "tab_set_seen": true,
+        "inv_count": 34,
+        "refr_count": 3,
+        "px": 73268,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 5,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5057,
+          "refr_total": 1491,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 88776,
+          "heap_min": 77160,
+          "psram_free": 4875899,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 6,
+        "tab_set_seen": true,
+        "inv_count": 32,
+        "refr_count": 3,
+        "px": 73268,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 6,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5089,
+          "refr_total": 1498,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 88984,
+          "heap_min": 77160,
+          "psram_free": 4874835,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 7,
+        "tab_set_seen": true,
+        "inv_count": 308,
+        "refr_count": 6,
+        "px": 134438,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 7,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5399,
+          "refr_total": 1509,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 88984,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 0,
+        "tab_set_seen": true,
+        "inv_count": 15,
+        "refr_count": 3,
+        "px": 73268,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5414,
+          "refr_total": 1516,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 88776,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      }
+    ]
+  },
+  "drawer": {
+    "ok": true,
+    "per_toggle": [
+      {
+        "rep": 0,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 27,
+        "refr_count": 3,
+        "px": 73443,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5443,
+          "refr_total": 1519,
+          "last_refr_px": 1924,
+          "last_refr_ms": 7,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 102,
+          "last_y2": 181,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 0,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 16,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5463,
+          "refr_total": 1523,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 1,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 27,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5490,
+          "refr_total": 1525,
+          "last_refr_px": 1924,
+          "last_refr_ms": 8,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 102,
+          "last_y2": 181,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 1,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 16,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5508,
+          "refr_total": 1528,
+          "last_refr_px": 1924,
+          "last_refr_ms": 6,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 2,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 27,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5537,
+          "refr_total": 1531,
+          "last_refr_px": 1924,
+          "last_refr_ms": 7,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 102,
+          "last_y2": 181,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 2,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 16,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 189,
+          "msg_list": 2,
+          "inv_total": 5557,
+          "refr_total": 1535,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 88976,
+          "heap_min": 77160,
+          "psram_free": 4874855,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 0,
+          "scroll_bottom": -49,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 60,
+          "last_y2": 139,
+          "scr_h": 240
+        }
+      }
+    ]
+  },
+  "inject": {
+    "ok": true,
+    "results": [
+      {
+        "i": 0,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 4,
+        "displayed": true,
+        "msg_list": 1,
+        "msg_list_growth": -1,
+        "inv_count": 81,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 7,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 5,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refr_size lv_obj_pos.c:195",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_align lv_obj_style_gen.c:72"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_x lv_obj_style_gen.c:56"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_y lv_obj_style_gen.c:64"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_width lv_obj_style_gen.c:8"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 1,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 4,
+        "displayed": true,
+        "msg_list": 2,
+        "msg_list_growth": 1,
+        "inv_count": 72,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 5,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 5,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 3,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refr_size lv_obj_pos.c:195",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_label_refr_text lv_label.c:1168",
+              "lv_label_event lv_label.c:763",
+              "lv_obj_event_base lv_event.c:98",
+              "event_send_core lv_event.c:458",
+              "lv_event_send lv_event.c:75",
+              "lv_obj_refresh_style lv_obj_style.c:187",
+              "lv_obj_set_local_style_prop lv_obj_style.c:275",
+              "lv_obj_set_style_width lv_obj_style_gen.c:8"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 2,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 3,
+        "displayed": true,
+        "msg_list": 3,
+        "msg_list_growth": 1,
+        "inv_count": 16,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 3,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 5,
+        "displayed": true,
+        "msg_list": 4,
+        "msg_list_growth": 1,
+        "inv_count": 18,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 4,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 4,
+        "displayed": true,
+        "msg_list": 5,
+        "msg_list_growth": 1,
+        "inv_count": 16,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "ok": true,
+    "results": [
+      {
+        "what": "start",
+        "expected_pattern": "\\[AUDIO\\];play",
+        "matched_line": "[AUDIO];play;start",
+        "passed": true
+      },
+      {
+        "what": "msg",
+        "expected_pattern": "\\[AUDIO\\];play",
+        "matched_line": "[AUDIO];play;msg",
+        "passed": true
+      },
+      {
+        "what": "/nonexistent.wav",
+        "expected_pattern": "\\[AUDIO\\];err;missing",
+        "matched_line": "[AUDIO];err;missing;/nonexistent.wav",
+        "passed": true
+      }
+    ]
+  },
+  "audio_stall": {
+    "ok": true,
+    "play_seen": true,
+    "loop_with_audio": {
+      "kind": "INSTR-LOOP",
+      "n": 441,
+      "total_us": 2842001,
+      "avg_us": 6444,
+      "max_us": 15000
+    },
+    "flush_with_audio": {
+      "kind": "INSTR-FLUSH",
+      "n": 4,
+      "total_us": 4197,
+      "avg_us": 1049,
+      "max_us": 1161
+    },
+    "loop_idle": {
+      "kind": "INSTR-LOOP",
+      "n": 411,
+      "total_us": 2621951,
+      "avg_us": 6379,
+      "max_us": 13003
+    },
+    "flush_idle": {
+      "kind": "INSTR-FLUSH",
+      "n": 2,
+      "total_us": 2027,
+      "avg_us": 1013,
+      "max_us": 1017
+    },
+    "loop_max_us_with_audio": 15000,
+    "loop_max_us_idle": 13003,
+    "ratio": 1.1535799430900562
+  },
+  "sleep": {
+    "ok": true,
+    "s0": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1247629,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "s1": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1252560,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "s2": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1254781,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "tft_off_acked": true,
+    "tft_on_acked": true,
+    "inject_ok": true,
+    "refr_px_while_asleep": [
+      76800,
+      1924
+    ],
+    "screen_changed_by_wake": false,
+    "wake_matches_forced_repaint": true,
+    "full_refresh_after_wake": false,
+    "max_px_after_wake": 1924,
+    "redraw_count_after_wake": 2,
+    "top_backtraces_after_wake": [
+      {
+        "count": 1,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2243",
+          "tdeck_update_time_label lv_obj_functions.cpp:3821",
+          "mainStartTimeLoop loop_functions.cpp:2346",
+          "esp32loop esp32_main.cpp:3838",
+          "loop main.cpp:101",
+          "loopTask main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2244",
+          "tdeck_update_time_label lv_obj_functions.cpp:3821",
+          "mainStartTimeLoop loop_functions.cpp:2346",
+          "esp32loop esp32_main.cpp:3838",
+          "loop main.cpp:101",
+          "loopTask main.cpp:50"
+        ]
+      }
+    ]
+  },
+  "screen": {
+    "ok": true,
+    "crc_a": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1255484,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 542,
+      "sleeping": null
+    },
+    "crc_b": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1257239,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "readback_stable": true,
+    "map_crc": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 1258674,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "map_has_content": true
+  },
+  "disptest": {
+    "ok": true,
+    "phase": "full",
+    "stride": 1,
+    "steps_expected": 516,
+    "steps_seen": 516,
+    "steps_ok": 516,
+    "mismatches": [],
+    "mismatch_count": 0,
+    "first_mismatch": null,
+    "begin": {
+      "kind": "DISPTEST",
+      "variant": "begin",
+      "phase": "full",
+      "stride": 1,
+      "w": 320,
+      "h": 240,
+      "steps": 516,
+      "ms": 1259520
+    },
+    "end": {
+      "kind": "DISPTEST",
+      "variant": "end",
+      "steps": 516,
+      "ms": 43010
+    },
+    "device_ms": 43010,
+    "wall_s": 43.4,
+    "fps": 12.0,
+    "step_ms_min": 64,
+    "step_ms_p50": 68,
+    "step_ms_max": 120,
+    "wrong_px": []
+  },
+  "map": {
+    "ok": true,
+    "home": {
+      "lat": 48.4076,
+      "lon": 11.7384
+    },
+    "stations": [
+      {
+        "call": "DK5EM-01",
+        "km": 0.3,
+        "bearing": 45,
+        "lat": 48.40951,
+        "lon": 11.74128,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-01;48.40951;11.74128"
+      },
+      {
+        "call": "DK5EM-02",
+        "km": 0.8,
+        "bearing": 135,
+        "lat": 48.4025,
+        "lon": 11.74608,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-02;48.40250;11.74608"
+      },
+      {
+        "call": "DK5EM-03",
+        "km": 1.5,
+        "bearing": 225,
+        "lat": 48.39804,
+        "lon": 11.72401,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-03;48.39804;11.72401"
+      },
+      {
+        "call": "DK5EM-04",
+        "km": 3.0,
+        "bearing": 315,
+        "lat": 48.42671,
+        "lon": 11.70961,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-04;48.42671;11.70961"
+      },
+      {
+        "call": "DK5EM-05",
+        "km": 6.0,
+        "bearing": 20,
+        "lat": 48.45839,
+        "lon": 11.76625,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-05;48.45839;11.76625"
+      },
+      {
+        "call": "DK5EM-06",
+        "km": 12.0,
+        "bearing": 110,
+        "lat": 48.37062,
+        "lon": 11.89143,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-06;48.37062;11.89143"
+      },
+      {
+        "call": "DK5EM-07",
+        "km": 25.0,
+        "bearing": 200,
+        "lat": 48.19596,
+        "lon": 11.62236,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-07;48.19596;11.62236"
+      },
+      {
+        "call": "DK5EM-08",
+        "km": 60.0,
+        "bearing": 290,
+        "lat": 48.59248,
+        "lon": 10.97323,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-08;48.59248;10.97323"
+      },
+      {
+        "call": "DK5EM-09",
+        "km": 150.0,
+        "bearing": 60,
+        "lat": 49.08328,
+        "lon": 13.50137,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-09;49.08328;13.50137"
+      },
+      {
+        "call": "DK5EM-10",
+        "km": 400.0,
+        "bearing": 240,
+        "lat": 46.6058,
+        "lon": 7.03716,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-10;46.60580;7.03716"
+      }
+    ],
+    "inject_loop_max_us": 70999,
+    "map_points_after": 18,
+    "zoom_min": 0,
+    "zoom_max": 9,
+    "steps": [
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 510,
+        "tiles": 3,
+        "tiles_missing": 0,
+        "decode_ms": 284,
+        "cache": [
+          2,
+          9
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 773,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 433,
+        "cache": [
+          2,
+          13
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 809,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 435,
+        "cache": [
+          2,
+          17
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 701,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 360,
+        "cache": [
+          2,
+          21
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 363,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 174,
+        "cache": [
+          2,
+          23
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 836,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 379,
+        "cache": [
+          2,
+          27
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 39,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          4,
+          27
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 42,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          8,
+          27
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 799,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 434,
+        "cache": [
+          8,
+          31
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 769,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 431,
+        "cache": [
+          8,
+          35
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 511,
+        "tiles": 3,
+        "tiles_missing": 0,
+        "decode_ms": 284,
+        "cache": [
+          8,
+          38
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 671,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 382,
+        "cache": [
+          8,
+          42
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 342,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 185,
+        "cache": [
+          8,
+          44
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 423,
+        "tiles": 4,
+        "tiles_missing": 1,
+        "decode_ms": 231,
+        "cache": [
+          8,
+          48
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 226,
+        "tiles": 6,
+        "tiles_missing": 5,
+        "decode_ms": 103,
+        "cache": [
+          8,
+          54
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 4,
+        "tiles_missing": 1,
+        "decode_ms": 0,
+        "cache": [
+          11,
+          55
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 34,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          13,
+          55
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 34,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          17,
+          55
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 509,
+        "tiles": 3,
+        "tiles_missing": 0,
+        "decode_ms": 283,
+        "cache": [
+          17,
+          58
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 768,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 433,
+        "cache": [
+          17,
+          62
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 800,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 435,
+        "cache": [
+          17,
+          66
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 694,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 361,
+        "cache": [
+          17,
+          70
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 361,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 174,
+        "cache": [
+          17,
+          72
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 836,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 377,
+        "cache": [
+          17,
+          76
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      }
+    ],
+    "steps_total": 27,
+    "steps_acked": 27,
+    "centring_lines": 27,
+    "off_centre_steps": [],
+    "compose_ms_max": 836,
+    "crashed": null,
+    "uistat_before": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 235,
+      "msg_list": 6,
+      "inv_total": 6273,
+      "refr_total": 1593,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 85096,
+      "heap_min": 50128,
+      "psram_free": 4842591,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 336,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    },
+    "uistat_after": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 243,
+      "msg_list": 6,
+      "inv_total": 19609,
+      "refr_total": 1722,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 84892,
+      "heap_min": 50128,
+      "psram_free": 4840571,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 336,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    }
+  },
+  "map_tab_pick": {
+    "ok": false,
+    "reason": "expected exactly one 'Karte zusammengesetzt' line since the click, got 0",
+    "cursor": {
+      "x": 150,
+      "y": 70
+    },
+    "tab_active": 3,
+    "sdmap_rebuilds": [],
+    "sdmap_skipped": 1,
+    "ref_h": null,
+    "loop_gaps_lvgl": []
+  },
+  "map_rebuild": {
+    "ok": true,
+    "reason": null,
+    "pre": {
+      "dir": "out",
+      "acked": true,
+      "zoom": 8,
+      "crash": null,
+      "center_err": [
+        0,
+        0
+      ],
+      "compose_ms": 40,
+      "tiles": 2,
+      "tiles_missing": 0,
+      "decode_ms": 0,
+      "cache": [
+        19,
+        76
+      ]
+    },
+    "steps": [
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 51,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          23,
+          76
+        ],
+        "cycle": 1
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 39,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          25,
+          76
+        ],
+        "cycle": 1
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 51,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          29,
+          76
+        ],
+        "cycle": 2
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          31,
+          76
+        ],
+        "cycle": 2
+      }
+    ],
+    "cycle1_compose_ms_max": 51,
+    "cycle2_compose_ms_max": 51,
+    "hits_end_cycle1": 25,
+    "hits_end_cycle2": 31,
+    "cycle2_tiles_drawn": 6,
+    "cache_last": [
+      31,
+      76
+    ]
+  },
+  "nav": {
+    "ok": false,
+    "steps_total": 34,
+    "steps_acked": 32,
+    "not_acked": [
+      "--tab 3",
+      "--tab 5"
+    ],
+    "not_repainted": [],
+    "settings_scroll_max": 415,
+    "settings_scroll_final": 0,
+    "crashed": null,
+    "steps": [
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 69595,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 0",
+        "acked": true,
+        "ack_line": "[TAB];set;0;inv_delta;14;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 1",
+        "acked": true,
+        "ack_line": "[TAB];set;1;inv_delta;16;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 2852,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70059,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 2",
+        "acked": true,
+        "ack_line": "[TAB];set;2;inv_delta;15;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70059,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 3",
+        "acked": false,
+        "ack_line": null,
+        "repainted": true,
+        "refr_count": 5,
+        "px": 77291,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 69595,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 4",
+        "acked": true,
+        "ack_line": "[REDRAW];ms;1414489;obj;0[TAB];set;4;inv_delta;696;",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 184359,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 69595,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 5",
+        "acked": false,
+        "ack_line": null,
+        "repainted": true,
+        "refr_count": 5,
+        "px": 179463,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 73813,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 6",
+        "acked": true,
+        "ack_line": "[TAB];set;6;inv_delta;47;",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 75367,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 7",
+        "acked": true,
+        "ack_line": "[REDRAW];ms;1426272;obj;0x3d82b310;cls;label;area;86;190;293;223;ra;0x4209a118;bt;0x420ab55d,0x420abb3d,0x420ae0ab,0x420",
+        "repainted": true,
+        "refr_count": 6,
+        "px": 136537,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;120;y;0;120;bottom;295",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 120
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;120;y;120;240;bottom;175",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 240
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;120;y;240;360;bottom;55",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 360
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;120;y;360;415;bottom;0",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 72008,
+        "crashed": false,
+        "scroll_y": 415
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;120;y;415;415;bottom;0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false,
+        "scroll_y": 415
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;415;295;bottom;120",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 295
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;295;175;bottom;240",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 175
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;175;55;bottom;360",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 55
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;55;0;bottom;415",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 68160,
+        "crashed": false,
+        "scroll_y": 0
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;0;0;bottom;415",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 5772,
+        "crashed": false,
+        "scroll_y": 0
+      }
+    ],
+    "uistat_after": {
+      "kind": "UISTAT",
+      "tab": 7,
+      "drawer": 0,
+      "objs": 253,
+      "msg_list": 6,
+      "inv_total": 25201,
+      "refr_total": 1870,
+      "last_refr_px": 1924,
+      "last_refr_ms": 6,
+      "redrawlog": 0,
+      "heap_free": 86480,
+      "heap_min": 50128,
+      "psram_free": 4838039,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 336,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    }
+  },
+  "input": {
+    "ok": true,
+    "keys_sent": 7,
+    "keys_consumed": 7,
+    "key_repaints": 2,
+    "key_latency_p50_ms": 101.3,
+    "key_latency_p95_ms": 201.3,
+    "ball_start": [
+      150,
+      70
+    ],
+    "ball": [
+      {
+        "dir": "right",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          180,
+          70
+        ],
+        "last": [
+          250,
+          70
+        ],
+        "latency_p50_ms": 6.8,
+        "latency_p95_ms": 9.4,
+        "refr_ms_p50": 12.0,
+        "refr_ms_max": 13.0,
+        "repaints": 4
+      },
+      {
+        "dir": "down",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          250,
+          100
+        ],
+        "last": [
+          250,
+          170
+        ],
+        "latency_p50_ms": 16.6,
+        "latency_p95_ms": 58.3,
+        "refr_ms_p50": 16.0,
+        "refr_ms_max": 17.0,
+        "repaints": 4
+      },
+      {
+        "dir": "left",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          220,
+          170
+        ],
+        "last": [
+          150,
+          170
+        ],
+        "latency_p50_ms": 7.1,
+        "latency_p95_ms": 9.7,
+        "refr_ms_p50": 12.0,
+        "refr_ms_max": 12.0,
+        "repaints": 4
+      },
+      {
+        "dir": "up",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          150,
+          140
+        ],
+        "last": [
+          150,
+          70
+        ],
+        "latency_p50_ms": 67.4,
+        "latency_p95_ms": 72.0,
+        "refr_ms_p50": 11.0,
+        "refr_ms_max": 13.0,
+        "repaints": 4
+      }
+    ]
+  },
+  "msg_roll": {
+    "ok": true,
+    "parked": true,
+    "control_clean": true,
+    "stalled_after": false,
+    "loop_slowdown_x": 1.0,
+    "loop_slowed": false,
+    "injected": 3,
+    "drawer_on": true,
+    "drawer_off": true,
+    "control": {
+      "park_start": [
+        90,
+        20
+      ],
+      "park_fits": true,
+      "park_clamped_leg": null,
+      "sent_cmds": 58,
+      "ball_reads": 58,
+      "ball_gap_max_ms": 292,
+      "ball_stalls": [],
+      "ball_stalls_explained_by_lora": [],
+      "lora_lines": 0,
+      "loop_gaps_lvgl": [],
+      "loop_gaps_other": [],
+      "refr_max_ms": 17,
+      "big_flushes": 0,
+      "sdmap_rebuilds_ms": [],
+      "serial_garbled_cmds": 0,
+      "loop_avg_us": 7625,
+      "loop_n": 1694,
+      "sect_avg_us": {
+        "display_rx": 3,
+        "gps_feed": 53,
+        "gps": 136,
+        "display_tick": 48,
+        "lvgl": 809,
+        "udp": 83,
+        "wifi_ping": 34
+      },
+      "sect_share_pct": {
+        "display_rx": 0.0,
+        "gps_feed": 0.7,
+        "gps": 0.0,
+        "display_tick": 0.6,
+        "lvgl": 10.6,
+        "udp": 1.1,
+        "wifi_ping": 0.0
+      }
+    },
+    "after": {
+      "park_start": [
+        90,
+        20
+      ],
+      "park_fits": true,
+      "park_clamped_leg": null,
+      "sent_cmds": 58,
+      "ball_reads": 58,
+      "ball_gap_max_ms": 303,
+      "ball_stalls": [],
+      "ball_stalls_explained_by_lora": [],
+      "lora_lines": 0,
+      "loop_gaps_lvgl": [],
+      "loop_gaps_other": [],
+      "refr_max_ms": 13,
+      "big_flushes": 0,
+      "sdmap_rebuilds_ms": [],
+      "serial_garbled_cmds": 0,
+      "loop_avg_us": 7614,
+      "loop_n": 1696,
+      "sect_avg_us": {
+        "display_rx": 3,
+        "gps_feed": 53,
+        "gps": 136,
+        "display_tick": 44,
+        "lvgl": 803,
+        "udp": 83
+      },
+      "sect_share_pct": {
+        "display_rx": 0.0,
+        "gps_feed": 0.7,
+        "gps": 0.0,
+        "display_tick": 0.6,
+        "lvgl": 10.6,
+        "udp": 1.1
+      }
+    },
+    "diag": null,
+    "sdmap_rebuilds_total_ms": [],
+    "msg_list_before": 6,
+    "msg_list_after": 9
+  },
+  "heap": {
+    "ok": true,
+    "h0": {
+      "kind": "INSTR-HEAP",
+      "tag": "h0",
+      "int_free": 82148,
+      "int_min": 50128,
+      "int_largest": 69620,
+      "psram_free": 4830455,
+      "psram_largest": 4718580
+    },
+    "h1": {
+      "kind": "INSTR-HEAP",
+      "tag": "h1",
+      "int_free": 72032,
+      "int_min": 50128,
+      "int_largest": 59380,
+      "psram_free": 4778471,
+      "psram_largest": 4718580
+    },
+    "delta": {
+      "psram_free": -51984,
+      "int_free": -10116,
+      "int_min": 0,
+      "int_largest": -10240,
+      "psram_largest": 0
+    }
+  },
+  "trim": {
+    "ok": true,
+    "count": 60,
+    "inject_fail": 0,
+    "probe_missed": 0,
+    "max_children": 50,
+    "final_children": 50,
+    "expected_final": 50,
+    "limit": 50,
+    "samples": [
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50
+    ],
+    "h0": {
+      "kind": "INSTR-HEAP",
+      "tag": "h0",
+      "int_free": 71824,
+      "int_min": 50128,
+      "int_largest": 59380,
+      "psram_free": 4778471,
+      "psram_largest": 4718580
+    },
+    "h1": {
+      "kind": "INSTR-HEAP",
+      "tag": "h1",
+      "int_free": 66712,
+      "int_min": 50128,
+      "int_largest": 51188,
+      "psram_free": 4705411,
+      "psram_largest": 4587508
+    },
+    "delta": {
+      "psram_free": -73060,
+      "int_free": -5112,
+      "int_min": 0,
+      "int_largest": -8192,
+      "psram_largest": -131072
+    }
+  },
+  "displaycmd": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      },
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      }
+    ]
+  },
+  "touch_inject": {
+    "ok": true,
+    "results": [
+      {
+        "label": "tap(160,120)",
+        "cmd": "--touch tap 160 120",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "tap(160,60)",
+        "cmd": "--touch tap 160 60",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;160;y;60",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "tap(80,180)",
+        "cmd": "--touch tap 80 180",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;80;y;180",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "down(160,120)",
+        "cmd": "--touch down 160 120",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;down;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "up",
+        "cmd": "--touch up",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;up;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      }
+    ]
+  },
+  "keylock": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--keylock on",
+        "marker": "KEYLOCK on",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock on",
+        "marker": "\\[TFT\\];off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--key x",
+        "marker": "\\[KEY\\];78;ms;\\d+;src;inject",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--key x",
+        "marker": "\\[TFT\\];on",
+        "seen": false,
+        "want": false,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock off",
+        "marker": "KEYLOCK off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock off",
+        "marker": "\\[TFT\\];on",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--info",
+        "marker": "KEYLOCK off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      }
+    ]
+  },
+  "keylock_kbl": {
+    "ok": true,
+    "key_acked": true,
+    "kbl_off_on_lock": false,
+    "locked": true,
+    "inject_ok": true,
+    "tft_on_seen": true,
+    "kbl_writes_after_msg": [],
+    "forced_150": false,
+    "unlocked": true
+  }
+}

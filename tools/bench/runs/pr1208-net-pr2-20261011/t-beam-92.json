@@ -1,0 +1,509 @@
+{
+  "pos": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--injectpos DK5EN-77 48.41 11.75",
+        "acked": true,
+        "ack_line": "[INJECTPOS];ok;DK5EN-77;48.41000;11.75000;4824.60N/01145.00E#",
+        "frames": 1,
+        "frame_us_max": 37242,
+        "page_after": 0,
+        "crashed": false,
+        "crc_after": 1841874354
+      },
+      {
+        "cmd": "--injectpos DK5EN-78 47.90 11.20",
+        "acked": true,
+        "ack_line": "[INJECTPOS];ok;DK5EN-78;47.90000;11.20000;4754.00N/01112.00E#",
+        "frames": 1,
+        "frame_us_max": 37418,
+        "page_after": 0,
+        "crashed": false,
+        "crc_after": 1060335141
+      }
+    ],
+    "hold_before": 0,
+    "offwait_before_ms": 0,
+    "posdisp_switched": false,
+    "display_was_off": false,
+    "display_still_off": false
+  },
+  "inject": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--injectmsg TEST oled bench 0",
+        "acked": true,
+        "ack_line": "[INJECT];ok;id;00D35DCC;dst;TEST;src;DK5EN-93;len;12",
+        "frames": 1,
+        "frame_us_max": 34814,
+        "page_after": 0,
+        "crashed": false,
+        "crc_after": 1952484045
+      },
+      {
+        "cmd": "--injectmsg TEST oled bench 1",
+        "acked": true,
+        "ack_line": "[INJECT];ok;id;00D35DCD;dst;TEST;src;DK5EN-93;len;12",
+        "frames": 1,
+        "frame_us_max": 34675,
+        "page_after": 1,
+        "crashed": false,
+        "crc_after": 2239723926
+      },
+      {
+        "cmd": "--injectmsg TEST oled bench 2",
+        "acked": true,
+        "ack_line": "[INJECT];ok;id;00D35DCE;dst;TEST;src;DK5EN-93;len;12",
+        "frames": 1,
+        "frame_us_max": 34698,
+        "page_after": 2,
+        "crashed": false,
+        "crc_after": 1708077372
+      },
+      {
+        "cmd": "--injectmsg TEST oled bench 3",
+        "acked": true,
+        "ack_line": "[INJECT];ok;id;00D35DCF;dst;TEST;src;DK5EN-93;len;12",
+        "frames": 1,
+        "frame_us_max": 35445,
+        "page_after": 3,
+        "crashed": false,
+        "crc_after": 2639723823
+      }
+    ],
+    "last_before": 1,
+    "last_after": 5
+  },
+  "pages": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 34887,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 280373215
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 35158,
+        "page_after": 3,
+        "crashed": false,
+        "crc_after": 870278766
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 35228,
+        "page_after": 2,
+        "crashed": false,
+        "crc_after": 2522882381
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 35699,
+        "page_after": 1,
+        "crashed": false,
+        "crc_after": 1225083356
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 35385,
+        "page_after": 0,
+        "crashed": false,
+        "crc_after": 2813393416
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 2,
+        "frame_us_max": 37723,
+        "page_after": 5,
+        "crashed": false,
+        "crc_after": 3067469580
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 0,
+        "frame_us_max": null,
+        "page_after": null,
+        "crashed": false,
+        "crc_after": null
+      }
+    ],
+    "pages_seen": [
+      4,
+      3,
+      2,
+      1,
+      0,
+      5
+    ],
+    "before": {
+      "page": 4,
+      "last": 5,
+      "hold": 0,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 0,
+      "frames": 90,
+      "last_us": 35445,
+      "posdisp": 1,
+      "offwait_ms": 27171,
+      "u8g2": 1,
+      "crc": 2639723823,
+      "skipped": 17
+    },
+    "after": {
+      "page": 5,
+      "last": 5,
+      "hold": 0,
+      "lines": 0,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 9,
+      "frames": 97,
+      "last_us": 37672,
+      "posdisp": 1,
+      "offwait_ms": 16207,
+      "u8g2": 1,
+      "crc": 3067469580,
+      "skipped": 18
+    }
+  },
+  "display": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;32990;n;98;page;5;last;5;lines;0;crc;efb5af2e;skipped;18",
+        "frames": 1,
+        "frame_us_max": 32990,
+        "page_after": 5,
+        "crashed": false,
+        "crc_after": 4021661486,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 9,
+          "frames": 98,
+          "last_us": 32990,
+          "posdisp": 1,
+          "offwait_ms": 13979,
+          "u8g2": 1,
+          "crc": 4021661486,
+          "skipped": 18
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;37845;n;99;page;4;last;5;lines;7;crc;62164adb;skipped;18",
+        "frames": 1,
+        "frame_us_max": 37845,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 1645628123,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 99,
+          "last_us": 37845,
+          "posdisp": 1,
+          "offwait_ms": 12031,
+          "u8g2": 1,
+          "crc": 1645628123,
+          "skipped": 18
+        }
+      },
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;32973;n;100;page;4;last;5;lines;0;crc;efb5af2e;skipped;18",
+        "frames": 1,
+        "frame_us_max": 32973,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 4021661486,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 9,
+          "frames": 100,
+          "last_us": 32973,
+          "posdisp": 1,
+          "offwait_ms": 10106,
+          "u8g2": 1,
+          "crc": 4021661486,
+          "skipped": 18
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;37735;n;101;page;4;last;5;lines;7;crc;7e924448;skipped;18",
+        "frames": 1,
+        "frame_us_max": 37735,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 2123514952,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 101,
+          "last_us": 37735,
+          "posdisp": 1,
+          "offwait_ms": 8042,
+          "u8g2": 1,
+          "crc": 2123514952,
+          "skipped": 18
+        }
+      },
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;33343;n;102;page;4;last;5;lines;0;crc;efb5af2e;skipped;18",
+        "frames": 1,
+        "frame_us_max": 33343,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 4021661486,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 9,
+          "frames": 102,
+          "last_us": 33343,
+          "posdisp": 1,
+          "offwait_ms": 6063,
+          "u8g2": 1,
+          "crc": 4021661486,
+          "skipped": 18
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "[OLED];frame;us;37788;n;103;page;4;last;5;lines;7;crc;705f9e19;skipped;18",
+        "frames": 1,
+        "frame_us_max": 37788,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 1885314585,
+        "oledstat": {
+          "page": 4,
+          "last": 5,
+          "hold": 0,
+          "lines": 2,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 103,
+          "last_us": 37788,
+          "posdisp": 1,
+          "offwait_ms": 4057,
+          "u8g2": 1,
+          "crc": 1885314585,
+          "skipped": 18
+        }
+      }
+    ],
+    "flags_ok": true,
+    "crc_seen": true,
+    "crc_ok": true,
+    "on_crcs": [
+      1645628123,
+      2123514952,
+      1885314585
+    ],
+    "off_crcs": [
+      4021661486,
+      4021661486,
+      4021661486
+    ]
+  },
+  "track": {
+    "ok": true,
+    "on": {
+      "cmd": "--btn triple",
+      "acked": true,
+      "ack_line": "[BTN];triple",
+      "frames": 1,
+      "frame_us_max": 38007,
+      "page_after": 4,
+      "crashed": false,
+      "crc_after": 2982045708,
+      "oledstat": {
+        "page": 4,
+        "last": 5,
+        "hold": 0,
+        "lines": 2,
+        "info": 0,
+        "track": 1,
+        "off": 0,
+        "isoff": 0,
+        "type": 9,
+        "frames": 104,
+        "last_us": 38007,
+        "posdisp": 1,
+        "offwait_ms": 1085,
+        "u8g2": 1,
+        "crc": 2982045708,
+        "skipped": 18
+      }
+    },
+    "off": {
+      "cmd": "--btn triple",
+      "acked": true,
+      "ack_line": "[BTN];triple",
+      "frames": 2,
+      "frame_us_max": 38257,
+      "page_after": 4,
+      "crashed": false,
+      "crc_after": 1720307800,
+      "oledstat": {
+        "page": 4,
+        "last": 5,
+        "hold": 0,
+        "lines": 2,
+        "info": 0,
+        "track": 0,
+        "off": 0,
+        "isoff": 0,
+        "type": 9,
+        "frames": 106,
+        "last_us": 37592,
+        "posdisp": 1,
+        "offwait_ms": 0,
+        "u8g2": 1,
+        "crc": 1720307800,
+        "skipped": 19
+      }
+    },
+    "gps_before": true
+  },
+  "timing": {
+    "ok": true,
+    "flush_n": 6,
+    "flush_avg_us": 34823,
+    "flush_max_us": 35070,
+    "loop_max_us": 45000,
+    "flush_line": "[INSTR-FLUSH] n 6 total_us 208942 avg_us 34823 max_us 35070",
+    "loop_line": "[INSTR-LOOP] n 4815 total_us 30054948 avg_us 6241 max_us 45000"
+  },
+  "dirty": {
+    "ok": true,
+    "seconds": 15.0,
+    "have_skipped": true,
+    "frames_delta": 0,
+    "skipped_delta": 0,
+    "idle_frames": 0,
+    "idle_frames_explained": 0,
+    "unexplained_idle_frames": 0,
+    "lora_lines_in_window": 1,
+    "explaining_lines": [],
+    "pairs": [
+      [
+        "skip",
+        "frame",
+        "skip"
+      ]
+    ],
+    "skip_seen": true,
+    "stat0": {
+      "page": 4,
+      "last": 5,
+      "hold": 0,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 0,
+      "frames": 112,
+      "last_us": 34566,
+      "posdisp": 1,
+      "offwait_ms": 23416,
+      "u8g2": 1,
+      "crc": 2957201825,
+      "skipped": 19
+    },
+    "stat1": {
+      "page": 4,
+      "last": 5,
+      "hold": 0,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 0,
+      "frames": 112,
+      "last_us": 34566,
+      "posdisp": 1,
+      "offwait_ms": 8214,
+      "u8g2": 1,
+      "crc": 2957201825,
+      "skipped": 19
+    }
+  }
+}

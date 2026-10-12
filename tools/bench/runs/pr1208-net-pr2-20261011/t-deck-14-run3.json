@@ -1,0 +1,3101 @@
+{
+  "idle": {
+    "ok": true,
+    "pre_uistat": {
+      "kind": "UISTAT",
+      "tab": 0,
+      "drawer": 0,
+      "objs": 665,
+      "msg_list": 50,
+      "inv_total": 95571,
+      "refr_total": 6857,
+      "last_refr_px": 1924,
+      "last_refr_ms": 3,
+      "redrawlog": 0,
+      "heap_free": 57788,
+      "heap_min": 29744,
+      "psram_free": 4691267,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 3856,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    },
+    "post_uistat": {
+      "kind": "UISTAT",
+      "tab": 0,
+      "drawer": 0,
+      "objs": 665,
+      "msg_list": 50,
+      "inv_total": 95790,
+      "refr_total": 6962,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 57820,
+      "heap_min": 29744,
+      "psram_free": 4691283,
+      "tft_sleeping": 1,
+      "bl": 0,
+      "scroll_y": 3856,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    },
+    "window_seconds": 60.0,
+    "redraw_total": 211,
+    "redraw_dropped": 0,
+    "invalidations_per_second": 3.5166666666666666,
+    "refr": {
+      "count": 102,
+      "sum_px": 198468,
+      "mean_t_ms": 6.294117647058823,
+      "max_t_ms": 19,
+      "refreshes_per_second": 1.7,
+      "px_per_second": 3307.8
+    },
+    "flush": {
+      "kind": "INSTR-FLUSH",
+      "n": 103,
+      "total_us": 105653,
+      "avg_us": 1025,
+      "max_us": 1162
+    },
+    "loop": {
+      "kind": "INSTR-LOOP",
+      "n": 9359,
+      "total_us": 60590001,
+      "avg_us": 6473,
+      "max_us": 58003
+    },
+    "top10_invalidators_by_class": [
+      {
+        "cls": "label",
+        "name": null,
+        "count": 211
+      }
+    ],
+    "top10_invalidators_by_ra": [
+      {
+        "ra": "0x4209a118",
+        "symbol": "lv_obj_invalidate at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:871",
+        "count": 211
+      }
+    ],
+    "top10_invalidators_by_backtrace": [
+      {
+        "count": 100,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2243",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3821 (discriminator 4)",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 100,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2244",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3821 (discriminator 4)",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 2,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2243",
+          "tdeck_update_batt_label(float, int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3784",
+          "loopAction_battCheck() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/loop_actions_esp32.cpp:326",
+          "loopSchedulerRun(unsigned int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_scheduler.cpp:76",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:2361",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 2,
+        "objects": 1,
+        "frames": [
+          "lv_obj_clear_flag at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj.c:281",
+          "update_header_sat_indicator at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2244",
+          "tdeck_update_batt_label(float, int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:3784",
+          "loopAction_battCheck() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/loop_actions_esp32.cpp:326",
+          "loopSchedulerRun(unsigned int) at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_scheduler.cpp:76",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:2361",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_set_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:90",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2207",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_refr_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:1168",
+          "lv_label_set_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:144",
+          "tdeck_update_time_label() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/t-deck/lv_obj_functions.cpp:2207",
+          "mainStartTimeLoop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/loop_functions.cpp:2346",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/esp32/esp32_main.cpp:3838",
+          "loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/src/main.cpp:101",
+          "loopTask(void*) at /Users/martinwerner/.platformio/packages/framework-arduinoespressif32@3.20014.231204/cores/esp32/main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:169",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/lv_api_map.h:37"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_label_refr_text at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:1168",
+          "lv_label_event at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/widgets/lv_label.c:763",
+          "lv_obj_event_base at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:98",
+          "event_send_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:458",
+          "lv_event_send at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_event.c:75",
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:195",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_refr_size at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:201",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1147",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313",
+          "esp32loop() at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/lv_api_map.h:37"
+        ]
+      },
+      {
+        "count": 1,
+        "objects": 1,
+        "frames": [
+          "lv_obj_move_to at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:743",
+          "lv_obj_refr_pos at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:705",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1148",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "layout_update_core at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:1142 (discriminator 3)",
+          "lv_obj_update_layout at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_obj_pos.c:316",
+          "_lv_disp_refr_timer at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/core/lv_refr.c:309",
+          "lv_timer_exec at /Users/martinwerner/WebDev/MeshCom-PR-next-gate/lib/lvgl/src/misc/lv_timer.c:313"
+        ]
+      }
+    ]
+  },
+  "tabs": {
+    "ok": true,
+    "tab_listing": [
+      "--tab list",
+      "[TAB];0;msg",
+      "[TAB];1;keyboard",
+      "[TAB];2;heart",
+      "[TAB];3;map",
+      "[TAB];4;gps",
+      "[TAB];5;list",
+      "[TAB];6;menu",
+      "[TAB];7;settings",
+      "[TAB];active;0"
+    ],
+    "per_tab": [
+      {
+        "idx": 1,
+        "tab_set_seen": true,
+        "inv_count": 34,
+        "refr_count": 6,
+        "px": 74660,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 1,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 95826,
+          "refr_total": 6984,
+          "last_refr_px": 464,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 58028,
+          "heap_min": 29744,
+          "psram_free": 4691283,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 2,
+        "tab_set_seen": true,
+        "inv_count": 32,
+        "refr_count": 2,
+        "px": 71344,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 2,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 95858,
+          "refr_total": 7002,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4691283,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 3,
+        "tab_set_seen": true,
+        "inv_count": 699,
+        "refr_count": 5,
+        "px": 77116,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 3,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 96557,
+          "refr_total": 7013,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4691259,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 4,
+        "tab_set_seen": true,
+        "inv_count": 1388,
+        "refr_count": 6,
+        "px": 355368,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 4,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 97945,
+          "refr_total": 7026,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4691167,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 5,
+        "tab_set_seen": true,
+        "inv_count": 69,
+        "refr_count": 5,
+        "px": 77116,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 5,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98016,
+          "refr_total": 7040,
+          "last_refr_px": 4144,
+          "last_refr_ms": 12,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4691167,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 6,
+        "tab_set_seen": true,
+        "inv_count": 78,
+        "refr_count": 5,
+        "px": 77116,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 6,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98094,
+          "refr_total": 7051,
+          "last_refr_px": 1924,
+          "last_refr_ms": 4,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 7,
+        "tab_set_seen": true,
+        "inv_count": 316,
+        "refr_count": 5,
+        "px": 134438,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 7,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98412,
+          "refr_total": 7065,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "idx": 0,
+        "tab_set_seen": true,
+        "inv_count": 25,
+        "refr_count": 2,
+        "px": 71344,
+        "repainted_within_500ms": true,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98437,
+          "refr_total": 7077,
+          "last_refr_px": 1924,
+          "last_refr_ms": 3,
+          "redrawlog": 0,
+          "heap_free": 58028,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      }
+    ]
+  },
+  "drawer": {
+    "ok": true,
+    "per_toggle": [
+      {
+        "rep": 0,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 31,
+        "refr_count": 4,
+        "px": 75367,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98470,
+          "refr_total": 7082,
+          "last_refr_px": 1924,
+          "last_refr_ms": 6,
+          "redrawlog": 0,
+          "heap_free": 58028,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 151,
+          "last_y2": 230,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 0,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 16,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98488,
+          "refr_total": 7085,
+          "last_refr_px": 1924,
+          "last_refr_ms": 6,
+          "redrawlog": 0,
+          "heap_free": 57820,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 1,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 27,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98521,
+          "refr_total": 7090,
+          "last_refr_px": 1924,
+          "last_refr_ms": 6,
+          "redrawlog": 0,
+          "heap_free": 58028,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 151,
+          "last_y2": 230,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 1,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 20,
+        "refr_count": 4,
+        "px": 75367,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98543,
+          "refr_total": 7095,
+          "last_refr_px": 1924,
+          "last_refr_ms": 8,
+          "redrawlog": 0,
+          "heap_free": 58028,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 2,
+        "state": 1,
+        "drawer_ack": true,
+        "inv_count": 27,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 1,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98572,
+          "refr_total": 7098,
+          "last_refr_px": 1924,
+          "last_refr_ms": 7,
+          "redrawlog": 0,
+          "heap_free": 57996,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 87,
+          "ml_y2": 230,
+          "last_y1": 151,
+          "last_y2": 230,
+          "scr_h": 240
+        }
+      },
+      {
+        "rep": 2,
+        "state": 0,
+        "drawer_ack": true,
+        "inv_count": 16,
+        "refr_count": 2,
+        "px": 71519,
+        "post_uistat": {
+          "kind": "UISTAT",
+          "tab": 0,
+          "drawer": 0,
+          "objs": 665,
+          "msg_list": 50,
+          "inv_total": 98594,
+          "refr_total": 7103,
+          "last_refr_px": 1924,
+          "last_refr_ms": 7,
+          "redrawlog": 0,
+          "heap_free": 59372,
+          "heap_min": 29744,
+          "psram_free": 4690559,
+          "tft_sleeping": 1,
+          "bl": 0,
+          "scroll_y": 3856,
+          "scroll_bottom": 0,
+          "ml_y1": 45,
+          "ml_y2": 188,
+          "last_y1": 109,
+          "last_y2": 188,
+          "scr_h": 240
+        }
+      }
+    ]
+  },
+  "inject": {
+    "ok": true,
+    "results": [
+      {
+        "i": 0,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 4,
+        "displayed": true,
+        "msg_list": 50,
+        "msg_list_growth": 0,
+        "inv_count": 20,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2243",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2244",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": []
+      },
+      {
+        "i": 1,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 5,
+        "displayed": true,
+        "msg_list": 50,
+        "msg_list_growth": 0,
+        "inv_count": 21,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2243",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2244",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 2,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 6,
+        "displayed": true,
+        "msg_list": 50,
+        "msg_list_growth": 0,
+        "inv_count": 21,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2243",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2244",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 3,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 8,
+        "displayed": true,
+        "msg_list": 50,
+        "msg_list_growth": 0,
+        "inv_count": 23,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2243",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2244",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      },
+      {
+        "i": 4,
+        "inject_ok": true,
+        "refr_seen": true,
+        "refr_delta": 6,
+        "displayed": true,
+        "msg_list": 50,
+        "msg_list_growth": 0,
+        "inv_count": 21,
+        "panel_updated": null,
+        "crc_after": null,
+        "crc_forced": null,
+        "top_backtraces": [
+          {
+            "count": 2,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:182",
+              "layout_update_core lv_obj_pos.c:1147",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:535",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 2,
+            "frames": [
+              "children_repos lv_flex.c:530",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "lv_obj_update_layout lv_obj_pos.c:316",
+              "lv_obj_scroll_to_view lv_obj_scroll.c:391"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2243",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_clear_flag lv_obj.c:281",
+              "update_header_sat_indicator lv_obj_functions.cpp:2244",
+              "tdeck_update_time_label lv_obj_functions.cpp:3821",
+              "mainStartTimeLoop loop_functions.cpp:2346",
+              "esp32loop esp32_main.cpp:3838",
+              "loop main.cpp:101",
+              "loopTask main.cpp:50"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_move_to lv_obj_pos.c:743",
+              "lv_obj_refr_pos lv_obj_pos.c:705",
+              "layout_update_core lv_obj_pos.c:1148",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:169",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          },
+          {
+            "count": 1,
+            "frames": [
+              "lv_obj_refr_size lv_obj_pos.c:201",
+              "flex_update lv_flex.c:307",
+              "layout_update_core lv_obj_pos.c:1154",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142",
+              "layout_update_core lv_obj_pos.c:1142"
+            ]
+          }
+        ],
+        "audio_lines": [
+          "[AUDIO]..muted"
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "ok": true,
+    "results": [
+      {
+        "what": "start",
+        "expected_pattern": "\\[AUDIO\\];play",
+        "matched_line": "[AUDIO];play;start",
+        "passed": true
+      },
+      {
+        "what": "msg",
+        "expected_pattern": "\\[AUDIO\\];play",
+        "matched_line": "[AUDIO];play;msg",
+        "passed": true
+      },
+      {
+        "what": "/nonexistent.wav",
+        "expected_pattern": "\\[AUDIO\\];err;missing",
+        "matched_line": "[AUDIO];err;missing;/nonexistent.wav",
+        "passed": true
+      }
+    ]
+  },
+  "audio_stall": {
+    "ok": true,
+    "play_seen": true,
+    "loop_with_audio": {
+      "kind": "INSTR-LOOP",
+      "n": 432,
+      "total_us": 2805992,
+      "avg_us": 6495,
+      "max_us": 11007
+    },
+    "flush_with_audio": {
+      "kind": "INSTR-FLUSH",
+      "n": 5,
+      "total_us": 5097,
+      "avg_us": 1019,
+      "max_us": 1028
+    },
+    "loop_idle": {
+      "kind": "INSTR-LOOP",
+      "n": 412,
+      "total_us": 2627994,
+      "avg_us": 6378,
+      "max_us": 11000
+    },
+    "flush_idle": {
+      "kind": "INSTR-FLUSH",
+      "n": 4,
+      "total_us": 4074,
+      "avg_us": 1018,
+      "max_us": 1032
+    },
+    "loop_max_us_with_audio": 11007,
+    "loop_max_us_idle": 11000,
+    "ratio": 1.0006363636363635
+  },
+  "sleep": {
+    "ok": true,
+    "s0": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3819712,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "s1": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3824448,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 542,
+      "sleeping": null
+    },
+    "s2": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3826569,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 541,
+      "sleeping": null
+    },
+    "tft_off_acked": true,
+    "tft_on_acked": true,
+    "inject_ok": true,
+    "refr_px_while_asleep": [
+      76800,
+      4218,
+      4218,
+      4218
+    ],
+    "screen_changed_by_wake": false,
+    "wake_matches_forced_repaint": true,
+    "full_refresh_after_wake": false,
+    "max_px_after_wake": 1924,
+    "redraw_count_after_wake": 2,
+    "top_backtraces_after_wake": [
+      {
+        "count": 1,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2243",
+          "tdeck_update_time_label lv_obj_functions.cpp:3821",
+          "mainStartTimeLoop loop_functions.cpp:2346",
+          "esp32loop esp32_main.cpp:3838",
+          "loop main.cpp:101",
+          "loopTask main.cpp:50"
+        ]
+      },
+      {
+        "count": 1,
+        "frames": [
+          "lv_obj_clear_flag lv_obj.c:281",
+          "update_header_sat_indicator lv_obj_functions.cpp:2244",
+          "tdeck_update_time_label lv_obj_functions.cpp:3821",
+          "mainStartTimeLoop loop_functions.cpp:2346",
+          "esp32loop esp32_main.cpp:3838",
+          "loop main.cpp:101",
+          "loopTask main.cpp:50"
+        ]
+      }
+    ]
+  },
+  "screen": {
+    "ok": true,
+    "crc_a": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3827301,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 542,
+      "sleeping": null
+    },
+    "crc_b": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3829120,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 542,
+      "sleeping": null
+    },
+    "readback_stable": true,
+    "map_crc": {
+      "kind": "SCREEN",
+      "variant": "crc",
+      "ms": 3830365,
+      "crc": [
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd",
+        "b68b55dd"
+      ],
+      "nonblack": 76800,
+      "total": 76800,
+      "t_ms": 542,
+      "sleeping": null
+    },
+    "map_has_content": true
+  },
+  "disptest": {
+    "ok": true,
+    "phase": "full",
+    "stride": 1,
+    "steps_expected": 516,
+    "steps_seen": 516,
+    "steps_ok": 516,
+    "mismatches": [],
+    "mismatch_count": 0,
+    "first_mismatch": null,
+    "begin": {
+      "kind": "DISPTEST",
+      "variant": "begin",
+      "phase": "full",
+      "stride": 1,
+      "w": 320,
+      "h": 240,
+      "steps": 516,
+      "ms": 3831229
+    },
+    "end": {
+      "kind": "DISPTEST",
+      "variant": "end",
+      "steps": 516,
+      "ms": 43015
+    },
+    "device_ms": 43015,
+    "wall_s": 43.3,
+    "fps": 12.0,
+    "step_ms_min": 64,
+    "step_ms_p50": 68,
+    "step_ms_max": 119,
+    "wrong_px": []
+  },
+  "map": {
+    "ok": true,
+    "home": {
+      "lat": 48.4076,
+      "lon": 11.7384
+    },
+    "stations": [
+      {
+        "call": "DK5EM-01",
+        "km": 0.3,
+        "bearing": 45,
+        "lat": 48.40951,
+        "lon": 11.74128,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-01;48.40951;11.74128"
+      },
+      {
+        "call": "DK5EM-02",
+        "km": 0.8,
+        "bearing": 135,
+        "lat": 48.4025,
+        "lon": 11.74608,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-02;48.40250;11.74608"
+      },
+      {
+        "call": "DK5EM-03",
+        "km": 1.5,
+        "bearing": 225,
+        "lat": 48.39804,
+        "lon": 11.72401,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-03;48.39804;11.72401"
+      },
+      {
+        "call": "DK5EM-04",
+        "km": 3.0,
+        "bearing": 315,
+        "lat": 48.42671,
+        "lon": 11.70961,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-04;48.42671;11.70961"
+      },
+      {
+        "call": "DK5EM-05",
+        "km": 6.0,
+        "bearing": 20,
+        "lat": 48.45839,
+        "lon": 11.76625,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-05;48.45839;11.76625"
+      },
+      {
+        "call": "DK5EM-06",
+        "km": 12.0,
+        "bearing": 110,
+        "lat": 48.37062,
+        "lon": 11.89143,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-06;48.37062;11.89143"
+      },
+      {
+        "call": "DK5EM-07",
+        "km": 25.0,
+        "bearing": 200,
+        "lat": 48.19596,
+        "lon": 11.62236,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-07;48.19596;11.62236"
+      },
+      {
+        "call": "DK5EM-08",
+        "km": 60.0,
+        "bearing": 290,
+        "lat": 48.59248,
+        "lon": 10.97323,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-08;48.59248;10.97323"
+      },
+      {
+        "call": "DK5EM-09",
+        "km": 150.0,
+        "bearing": 60,
+        "lat": 49.08328,
+        "lon": 13.50137,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-09;49.08328;13.50137"
+      },
+      {
+        "call": "DK5EM-10",
+        "km": 400.0,
+        "bearing": 240,
+        "lat": 46.6058,
+        "lon": 7.03716,
+        "ok": true,
+        "line": "[INJECTPOS];ok;DK5EM-10;46.60580;7.03716"
+      }
+    ],
+    "inject_loop_max_us": 67001,
+    "map_points_after": 27,
+    "zoom_min": 0,
+    "zoom_max": 9,
+    "steps": [
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 43,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          114,
+          125
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 51,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          118,
+          125
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          120,
+          125
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 43,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          124,
+          125
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 800,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 434,
+        "cache": [
+          124,
+          129
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 771,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 434,
+        "cache": [
+          124,
+          133
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 513,
+        "tiles": 3,
+        "tiles_missing": 0,
+        "decode_ms": 286,
+        "cache": [
+          124,
+          136
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 676,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 383,
+        "cache": [
+          124,
+          140
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 343,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 187,
+        "cache": [
+          124,
+          142
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 424,
+        "tiles": 4,
+        "tiles_missing": 1,
+        "decode_ms": 231,
+        "cache": [
+          124,
+          146
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 226,
+        "tiles": 6,
+        "tiles_missing": 5,
+        "decode_ms": 104,
+        "cache": [
+          124,
+          152
+        ]
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 4,
+        "tiles_missing": 1,
+        "decode_ms": 0,
+        "cache": [
+          127,
+          153
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 33,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          129,
+          153
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 36,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          133,
+          153
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 510,
+        "tiles": 3,
+        "tiles_missing": 0,
+        "decode_ms": 284,
+        "cache": [
+          133,
+          156
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 771,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 434,
+        "cache": [
+          133,
+          160
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 802,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 437,
+        "cache": [
+          133,
+          164
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 695,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 361,
+        "cache": [
+          133,
+          168
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 365,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 175,
+        "cache": [
+          133,
+          170
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 837,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 378,
+        "cache": [
+          133,
+          174
+        ]
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": null
+      }
+    ],
+    "steps_total": 23,
+    "steps_acked": 23,
+    "centring_lines": 23,
+    "off_centre_steps": [],
+    "compose_ms_max": 837,
+    "crashed": null,
+    "uistat_before": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 665,
+      "msg_list": 50,
+      "inv_total": 99584,
+      "refr_total": 7180,
+      "last_refr_px": 1924,
+      "last_refr_ms": 3,
+      "redrawlog": 0,
+      "heap_free": 57184,
+      "heap_min": 21940,
+      "psram_free": 4690527,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 3856,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    },
+    "uistat_after": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 647,
+      "msg_list": 50,
+      "inv_total": 115443,
+      "refr_total": 7285,
+      "last_refr_px": 1924,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 56976,
+      "heap_min": 21940,
+      "psram_free": 4694559,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 3856,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    }
+  },
+  "map_tab_pick": {
+    "ok": true,
+    "reason": null,
+    "cursor": {
+      "x": 150,
+      "y": 70
+    },
+    "tab_active": 3,
+    "sdmap_rebuilds": [
+      {
+        "w": 294,
+        "h": 182,
+        "ms": 53,
+        "from": "tab"
+      }
+    ],
+    "sdmap_skipped": 0,
+    "ref_h": null,
+    "loop_gaps_lvgl": [
+      319
+    ]
+  },
+  "map_rebuild": {
+    "ok": true,
+    "reason": null,
+    "pre": {
+      "dir": "out",
+      "acked": true,
+      "zoom": 7,
+      "crash": null,
+      "center_err": [
+        0,
+        0
+      ],
+      "compose_ms": 41,
+      "tiles": 4,
+      "tiles_missing": 0,
+      "decode_ms": 0,
+      "cache": [
+        145,
+        174
+      ]
+    },
+    "steps": [
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          147,
+          174
+        ],
+        "cycle": 1
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 41,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          151,
+          174
+        ],
+        "cycle": 1
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 40,
+        "tiles": 2,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          153,
+          174
+        ],
+        "cycle": 2
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 42,
+        "tiles": 4,
+        "tiles_missing": 0,
+        "decode_ms": 0,
+        "cache": [
+          157,
+          174
+        ],
+        "cycle": 2
+      }
+    ],
+    "cycle1_compose_ms_max": 41,
+    "cycle2_compose_ms_max": 42,
+    "hits_end_cycle1": 151,
+    "hits_end_cycle2": 157,
+    "cycle2_tiles_drawn": 6,
+    "cache_last": [
+      157,
+      174
+    ]
+  },
+  "nav": {
+    "ok": true,
+    "steps_total": 34,
+    "steps_acked": 34,
+    "not_acked": [],
+    "not_repainted": [],
+    "settings_scroll_max": 415,
+    "settings_scroll_final": 0,
+    "crashed": null,
+    "steps": [
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 73443,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 0",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;0;inv_delta;14;",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 69595,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 1",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;1;inv_delta;17;",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 71983,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 4776,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 72447,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 2",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;2;inv_delta;15;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 3848,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 3",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;3;inv_delta;458;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 4",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;4;inv_delta;689;",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 3,
+        "px": 171184,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 5",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;5;inv_delta;42;",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 75367,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 6",
+        "acked": true,
+        "acked_via": "uistat",
+        "ack_line": null,
+        "repainted": true,
+        "refr_count": 5,
+        "px": 77291,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer on",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];1",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 71519,
+        "crashed": false
+      },
+      {
+        "cmd": "--tab 7",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[TAB];set;7;inv_delta;235;",
+        "repainted": true,
+        "refr_count": 5,
+        "px": 134613,
+        "crashed": false
+      },
+      {
+        "cmd": "--drawer off",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[DRAWER];0",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 3848,
+        "crashed": false
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;120;y;0;120;bottom;295",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 120
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;120;y;120;240;bottom;175",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 240
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;120;y;240;360;bottom;55",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 360
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;120;y;360;415;bottom;0",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 415
+      },
+      {
+        "cmd": "--scroll 7 120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;120;y;415;415;bottom;0",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false,
+        "scroll_y": 415
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;415;295;bottom;120",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 295
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;295;175;bottom;240",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 175
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;175;55;bottom;360",
+        "repainted": true,
+        "refr_count": 4,
+        "px": 73932,
+        "crashed": false,
+        "scroll_y": 55
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;55;0;bottom;415",
+        "repainted": true,
+        "refr_count": 2,
+        "px": 70084,
+        "crashed": false,
+        "scroll_y": 0
+      },
+      {
+        "cmd": "--scroll 7 -120",
+        "acked": true,
+        "acked_via": "line",
+        "ack_line": "[SCROLL];tab;7;dy;-120;y;0;0;bottom;415",
+        "repainted": true,
+        "refr_count": 1,
+        "px": 1924,
+        "crashed": false,
+        "scroll_y": 0
+      }
+    ],
+    "uistat_after": {
+      "kind": "UISTAT",
+      "tab": 7,
+      "drawer": 0,
+      "objs": 665,
+      "msg_list": 50,
+      "inv_total": 124206,
+      "refr_total": 7450,
+      "last_refr_px": 1924,
+      "last_refr_ms": 7,
+      "redrawlog": 0,
+      "heap_free": 56968,
+      "heap_min": 21940,
+      "psram_free": 4690067,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 3856,
+      "scroll_bottom": 0,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 109,
+      "last_y2": 188,
+      "scr_h": 240
+    }
+  },
+  "input": {
+    "ok": true,
+    "keys_sent": 7,
+    "keys_consumed": 7,
+    "key_repaints": 2,
+    "key_latency_p50_ms": 180.0,
+    "key_latency_p95_ms": 202.2,
+    "ball_start": [
+      150,
+      70
+    ],
+    "ball": [
+      {
+        "dir": "right",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          180,
+          70
+        ],
+        "last": [
+          250,
+          70
+        ],
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4,
+        "repaints_via": "refr_total",
+        "refr_lines": 0,
+        "refr_total_delta": 5
+      },
+      {
+        "dir": "down",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          250,
+          100
+        ],
+        "last": [
+          250,
+          170
+        ],
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4,
+        "repaints_via": "refr_total",
+        "refr_lines": 0,
+        "refr_total_delta": 5
+      },
+      {
+        "dir": "left",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          220,
+          170
+        ],
+        "last": [
+          150,
+          170
+        ],
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4,
+        "repaints_via": "refr_total",
+        "refr_lines": 0,
+        "refr_total_delta": 5
+      },
+      {
+        "dir": "up",
+        "requested": 10,
+        "steps": 10,
+        "events": 4,
+        "moved_px": 70,
+        "moved_expected_px": 70,
+        "first": [
+          150,
+          140
+        ],
+        "last": [
+          150,
+          70
+        ],
+        "latency_p50_ms": null,
+        "latency_p95_ms": null,
+        "refr_ms_p50": null,
+        "refr_ms_max": null,
+        "repaints": 4,
+        "repaints_via": "refr_total",
+        "refr_lines": 0,
+        "refr_total_delta": 7
+      }
+    ]
+  },
+  "msg_roll": {
+    "ok": true,
+    "parked": true,
+    "control_clean": true,
+    "stalled_after": false,
+    "loop_slowdown_x": 1.0,
+    "loop_slowed": false,
+    "injected": 3,
+    "drawer_on": true,
+    "drawer_off": true,
+    "control": {
+      "park_start": [
+        90,
+        20
+      ],
+      "park_fits": true,
+      "park_clamped_leg": null,
+      "sent_cmds": 59,
+      "ball_reads": 59,
+      "ball_gap_max_ms": 327,
+      "ball_stalls": [],
+      "ball_stalls_explained_by_lora": [],
+      "lora_lines": 0,
+      "loop_gaps_lvgl": [],
+      "loop_gaps_other": [],
+      "refr_max_ms": 16,
+      "big_flushes": 0,
+      "sdmap_rebuilds_ms": [],
+      "serial_garbled_cmds": 0,
+      "loop_avg_us": 7643,
+      "loop_n": 1715,
+      "sect_avg_us": {
+        "display_rx": 3,
+        "gps_feed": 53,
+        "gps": 136,
+        "display_tick": 46,
+        "lvgl": 809,
+        "udp": 84,
+        "wifi_ping": 28
+      },
+      "sect_share_pct": {
+        "display_rx": 0.0,
+        "gps_feed": 0.7,
+        "gps": 0.0,
+        "display_tick": 0.6,
+        "lvgl": 10.6,
+        "udp": 1.1,
+        "wifi_ping": 0.0
+      }
+    },
+    "after": {
+      "park_start": [
+        90,
+        20
+      ],
+      "park_fits": true,
+      "park_clamped_leg": null,
+      "sent_cmds": 59,
+      "ball_reads": 59,
+      "ball_gap_max_ms": 332,
+      "ball_stalls": [],
+      "ball_stalls_explained_by_lora": [],
+      "lora_lines": 0,
+      "loop_gaps_lvgl": [],
+      "loop_gaps_other": [],
+      "refr_max_ms": 14,
+      "big_flushes": 0,
+      "sdmap_rebuilds_ms": [],
+      "serial_garbled_cmds": 0,
+      "loop_avg_us": 7673,
+      "loop_n": 1711,
+      "sect_avg_us": {
+        "display_rx": 3,
+        "gps_feed": 53,
+        "gps": 138,
+        "display_tick": 46,
+        "lvgl": 811,
+        "lora_rx": 10143,
+        "udp": 83,
+        "wifi_ping": 32
+      },
+      "sect_share_pct": {
+        "display_rx": 0.0,
+        "gps_feed": 0.7,
+        "gps": 0.0,
+        "display_tick": 0.6,
+        "lvgl": 10.6,
+        "lora_rx": 0.2,
+        "udp": 1.1,
+        "wifi_ping": 0.0
+      }
+    },
+    "diag": null,
+    "sdmap_rebuilds_total_ms": [],
+    "msg_list_before": 50,
+    "msg_list_after": 50
+  },
+  "heap": {
+    "ok": true,
+    "h0": {
+      "kind": "INSTR-HEAP",
+      "tag": "h0",
+      "int_free": 56704,
+      "int_min": 21940,
+      "int_largest": 40948,
+      "psram_free": 4690011,
+      "psram_largest": 4587508
+    },
+    "h1": {
+      "kind": "INSTR-HEAP",
+      "tag": "h1",
+      "int_free": 55236,
+      "int_min": 21940,
+      "int_largest": 40948,
+      "psram_free": 4689955,
+      "psram_largest": 4587508
+    },
+    "delta": {
+      "psram_free": -56,
+      "int_free": -1468,
+      "int_min": 0,
+      "int_largest": 0,
+      "psram_largest": 0
+    }
+  },
+  "trim": {
+    "ok": true,
+    "count": 60,
+    "inject_fail": 0,
+    "probe_missed": 0,
+    "max_children": 50,
+    "final_children": 50,
+    "expected_final": 50,
+    "limit": 50,
+    "samples": [
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50,
+      50
+    ],
+    "h0": {
+      "kind": "INSTR-HEAP",
+      "tag": "h0",
+      "int_free": 55236,
+      "int_min": 21940,
+      "int_largest": 40948,
+      "psram_free": 4689955,
+      "psram_largest": 4587508
+    },
+    "h1": {
+      "kind": "INSTR-HEAP",
+      "tag": "h1",
+      "int_free": 50844,
+      "int_min": 21940,
+      "int_largest": 21492,
+      "psram_free": 4664999,
+      "psram_largest": 4587508
+    },
+    "delta": {
+      "psram_free": -24956,
+      "int_free": -4392,
+      "int_min": 0,
+      "int_largest": -19456,
+      "psram_largest": 0
+    }
+  },
+  "displaycmd": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      },
+      {
+        "cmd": "--display off",
+        "marker_seen": true,
+        "sleeping": 1,
+        "want": 1,
+        "ok": true
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": true,
+        "sleeping": 0,
+        "want": 0,
+        "ok": true
+      }
+    ]
+  },
+  "touch_inject": {
+    "ok": true,
+    "results": [
+      {
+        "label": "tap(160,120)",
+        "cmd": "--touch tap 160 120",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "tap(160,60)",
+        "cmd": "--touch tap 160 60",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;160;y;60",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "tap(80,180)",
+        "cmd": "--touch tap 80 180",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;tap;x;80;y;180",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "down(160,120)",
+        "cmd": "--touch down 160 120",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;down;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      },
+      {
+        "label": "up",
+        "cmd": "--touch up",
+        "ack_seen": true,
+        "ack_line": "[TOUCH];inj;up;x;160;y;120",
+        "flush_seen": true,
+        "passed": true
+      }
+    ]
+  },
+  "keylock": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--keylock on",
+        "marker": "KEYLOCK on",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock on",
+        "marker": "\\[TFT\\];off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--key x",
+        "marker": "\\[KEY\\];78;ms;\\d+;src;inject",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--key x",
+        "marker": "\\[TFT\\];on",
+        "seen": false,
+        "want": false,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock off",
+        "marker": "KEYLOCK off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--keylock off",
+        "marker": "\\[TFT\\];on",
+        "seen": true,
+        "want": true,
+        "ok": true
+      },
+      {
+        "cmd": "--info",
+        "marker": "KEYLOCK off",
+        "seen": true,
+        "want": true,
+        "ok": true
+      }
+    ]
+  },
+  "keylock_kbl": {
+    "ok": true,
+    "key_acked": true,
+    "kbl_off_on_lock": false,
+    "locked": true,
+    "inject_ok": true,
+    "tft_on_seen": true,
+    "kbl_writes_after_msg": [],
+    "forced_150": false,
+    "unlocked": true
+  }
+}

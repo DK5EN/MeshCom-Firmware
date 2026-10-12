@@ -1,0 +1,25 @@
+{
+ "ok": false,
+ "missing": [
+  [
+   "DK5EN-1",
+   "DK5EN-92"
+  ]
+ ],
+ "heard": {
+  "DK5EN-1": [
+   "DK5EN-14",
+   "DK5EN-92",
+   "DK5EN-98"
+  ],
+  "DK5EN-92": [
+   "DK5EN-14",
+   "DK5EN-98"
+  ],
+  "DK5EN-14": [
+   "DK5EN-1",
+   "DK5EN-92",
+   "DK5EN-98"
+  ]
+ }
+}

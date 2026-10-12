@@ -1,0 +1,29 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-PR-gate/tools/bench/runs/ota_20261011-210857
+started            2026-10-11 21:08:57
+port               /dev/cu.usbserial-573C0005841
+env                ttgo_tbeam  expect_hw TBEAM
+target             http://192.168.68.69/
+firmware           .pio/build/ttgo_tbeam/firmware.bin  md5 7a12b258af2c807cca421a73f3c0d46a
+ota                ok
+  timings          precheck_s=1.4s  trigger_safeboot_s=10.0s  safeboot_wait_s=1.8s  ota_start_s=0.1s  upload_s=18.8s  reboot_wait_s=12.6s  total_s=44.7s
+field         before                    after
+build         Oct 11 2026 / 21:06:02    Oct 11 2026 / 21:06:02
+call          DK5EN-92                  DK5EN-92
+hardware      TBEAM_AXP2101             TBEAM_AXP2101
+hw_idx        12                        12
+lora_bw       250                       250
+lora_cr       6                         6
+lora_freq     433.1750                  433.1750
+lora_power    2                         2
+lora_sf       11                        11
+maxhop_pos    2                         2
+maxhop_text   4                         4
+node_id       E0D041B8                  E0D041B8
+version       4.40a                     4.40a
+webserver     on                        on
+wifi_localip  192.168.68.69             192.168.68.69
+wifi_ssid     ORBI63                    ORBI63
+resets after OTA   2
+[BOOT];ready seen  True
+WLAN rejoined      True
+verdict            PASS

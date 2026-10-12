@@ -1,0 +1,505 @@
+{
+  "summary": "26 ok, 2 failed, 0 skipped of 28 steps; nodes: heltec-1@/dev/cu.usbserial-0001, t-beam-92@/dev/cu.usbserial-573C0005841, t-deck-14@/dev/cu.usbmodem1101; not attached: rak-90",
+  "steps": [
+    {
+      "name": "build heltec_wifi_lora_32_V3",
+      "node": "heltec-1",
+      "argv": [
+        "pio",
+        "run",
+        "-e",
+        "heltec_wifi_lora_32_V3"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 44.6,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-01-build-heltec_wifi_lora_32_V3.log",
+      "detail": ""
+    },
+    {
+      "name": "verify instrument heltec_wifi_lora_32_V3",
+      "node": "heltec-1",
+      "argv": [
+        "sh",
+        "-c",
+        "strings .pio/build/heltec_wifi_lora_32_V3/firmware.elf | grep -q 'SRVIP\\];err'"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.0,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-02-verify-instrument-heltec_wifi_lora_32_V3.log",
+      "detail": ""
+    },
+    {
+      "name": "flash heltec_wifi_lora_32_V3",
+      "node": "heltec-1",
+      "argv": [
+        "pio",
+        "pkg",
+        "exec",
+        "-p",
+        "tool-esptoolpy",
+        "--",
+        "esptool",
+        "--port",
+        "/dev/cu.usbserial-0001",
+        "-b",
+        "460800",
+        "write_flash",
+        "0xC0000",
+        ".pio/build/heltec_wifi_lora_32_V3/firmware.bin"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 28.9,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-03-flash-heltec_wifi_lora_32_V3.log",
+      "detail": ""
+    },
+    {
+      "name": "prepare heltec-1",
+      "node": "heltec-1",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbserial-0001",
+        "--node",
+        "heltec-1"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 13.2,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-04-prepare-heltec-1.log",
+      "detail": ""
+    },
+    {
+      "name": "oled harness heltec-1",
+      "node": "heltec-1",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/oled_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbserial-0001",
+        "--out",
+        "tools/bench/runs/bench-pr2-20261011/heltec-1-harness.json"
+      ],
+      "status": "FAIL",
+      "rc": 1,
+      "seconds": 110.1,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-05-oled-harness-heltec-1.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web heltec-1",
+      "node": "heltec-1",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.63/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-06-wait-web-heltec-1.log",
+      "detail": ""
+    },
+    {
+      "name": "ota regression heltec-1",
+      "node": "heltec-1",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/ota_regression.py",
+        "--port",
+        "/dev/cu.usbserial-0001",
+        "--env",
+        "heltec_wifi_lora_32_V3",
+        "--ip",
+        "192.168.68.63",
+        "--settings-check",
+        "--node",
+        "heltec-1"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 55.9,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-07-ota-regression-heltec-1.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web heltec-1 (after ota)",
+      "node": "heltec-1",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.63/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-08-wait-web-heltec-1-(after-ota).log",
+      "detail": ""
+    },
+    {
+      "name": "webgui badge heltec-1",
+      "node": "heltec-1",
+      "argv": [
+        "node",
+        "--insecure-http-parser",
+        "tools/webgui_badge_test.js",
+        "http://192.168.68.63/"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 7.0,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-09-webgui-badge-heltec-1.log",
+      "detail": ""
+    },
+    {
+      "name": "build ttgo_tbeam",
+      "node": "t-beam-92",
+      "argv": [
+        "pio",
+        "run",
+        "-e",
+        "ttgo_tbeam"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 38.5,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-10-build-ttgo_tbeam.log",
+      "detail": ""
+    },
+    {
+      "name": "verify instrument ttgo_tbeam",
+      "node": "t-beam-92",
+      "argv": [
+        "sh",
+        "-c",
+        "strings .pio/build/ttgo_tbeam/firmware.elf | grep -q 'SRVIP\\];err'"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.0,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-11-verify-instrument-ttgo_tbeam.log",
+      "detail": ""
+    },
+    {
+      "name": "flash ttgo_tbeam",
+      "node": "t-beam-92",
+      "argv": [
+        "pio",
+        "pkg",
+        "exec",
+        "-p",
+        "tool-esptoolpy",
+        "--",
+        "esptool",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "-b",
+        "460800",
+        "write_flash",
+        "0xC0000",
+        ".pio/build/ttgo_tbeam/firmware.bin"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 31.2,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-12-flash-ttgo_tbeam.log",
+      "detail": ""
+    },
+    {
+      "name": "prepare t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--node",
+        "t-beam-92"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 13.4,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-13-prepare-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "oled harness t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/oled_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--out",
+        "tools/bench/runs/bench-pr2-20261011/t-beam-92-harness.json"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 108.3,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-14-oled-harness-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.69/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 3.1,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-15-wait-web-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "ota regression t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/ota_regression.py",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--env",
+        "ttgo_tbeam",
+        "--ip",
+        "192.168.68.69",
+        "--settings-check",
+        "--node",
+        "t-beam-92"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 64.8,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-16-ota-regression-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-beam-92 (after ota)",
+      "node": "t-beam-92",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.69/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-17-wait-web-t-beam-92-(after-ota).log",
+      "detail": ""
+    },
+    {
+      "name": "webgui badge t-beam-92",
+      "node": "t-beam-92",
+      "argv": [
+        "node",
+        "--insecure-http-parser",
+        "tools/webgui_badge_test.js",
+        "http://192.168.68.69/"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 8.7,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-18-webgui-badge-t-beam-92.log",
+      "detail": ""
+    },
+    {
+      "name": "build t_deck_plus",
+      "node": "t-deck-14",
+      "argv": [
+        "pio",
+        "run",
+        "-e",
+        "t_deck_plus"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 50.4,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-19-build-t_deck_plus.log",
+      "detail": ""
+    },
+    {
+      "name": "verify instrument t_deck_plus",
+      "node": "t-deck-14",
+      "argv": [
+        "sh",
+        "-c",
+        "strings .pio/build/t_deck_plus/firmware.elf | grep -q 'SRVIP\\];err'"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.0,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-20-verify-instrument-t_deck_plus.log",
+      "detail": ""
+    },
+    {
+      "name": "flash t_deck_plus",
+      "node": "t-deck-14",
+      "argv": [
+        "pio",
+        "pkg",
+        "exec",
+        "-p",
+        "tool-esptoolpy",
+        "--",
+        "esptool",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "-b",
+        "460800",
+        "write_flash",
+        "0xC0000",
+        ".pio/build/t_deck_plus/firmware.bin"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 17.1,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-21-flash-t_deck_plus.log",
+      "detail": ""
+    },
+    {
+      "name": "prepare t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/prepare_node.py",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 15.6,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-22-prepare-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "tdeck harness t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/tdeck_harness.py",
+        "--scenario",
+        "all",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--out",
+        "tools/bench/runs/bench-pr2-20261011/t-deck-14-harness.json",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "FAIL",
+      "rc": 1,
+      "seconds": 571.8,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-23-tdeck-harness-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.76/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.4,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-24-wait-web-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "ota regression t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/ota_regression.py",
+        "--port",
+        "/dev/cu.usbmodem1101",
+        "--env",
+        "t_deck_plus",
+        "--ip",
+        "192.168.68.76",
+        "--settings-check",
+        "--node",
+        "t-deck-14"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 61.7,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-25-ota-regression-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "wait web t-deck-14 (after ota)",
+      "node": "t-deck-14",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/wait_http.py",
+        "http://192.168.68.76/",
+        "--timeout",
+        "180"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 0.3,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-26-wait-web-t-deck-14-(after-ota).log",
+      "detail": ""
+    },
+    {
+      "name": "webgui badge t-deck-14",
+      "node": "t-deck-14",
+      "argv": [
+        "node",
+        "--insecure-http-parser",
+        "tools/webgui_badge_test.js",
+        "http://192.168.68.76/"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 7.7,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-27-webgui-badge-t-deck-14.log",
+      "detail": ""
+    },
+    {
+      "name": "mesh exchange",
+      "node": "fleet",
+      "argv": [
+        "/Users/martinwerner/.platformio/penv/bin/python3",
+        "tools/bench/mesh_exchange.py",
+        "--out",
+        "tools/bench/runs/bench-pr2-20261011/mesh-exchange.json",
+        "--port",
+        "/dev/cu.usbserial-0001",
+        "--port",
+        "/dev/cu.usbserial-573C0005841",
+        "--port",
+        "/dev/cu.usbmodem1101"
+      ],
+      "status": "OK",
+      "rc": 0,
+      "seconds": 141.8,
+      "log": "tools/bench/runs/bench-pr2-20261011/stage3-28-mesh-exchange.log",
+      "detail": ""
+    }
+  ]
+}
