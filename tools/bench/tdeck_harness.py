@@ -80,6 +80,66 @@ def default_log_path(prefix: str) -> Path:
     return d / f"{prefix}_run_{time.strftime('%Y%m%d-%H%M%S')}.log"
 
 
+class _TcpConsole:
+    """pyserial-shaped wrapper around the 2323 net console (HMAC login per
+    tools/hmac_connect.py). Opening it does NOT reset the node, unlike a USB
+    serial open. Password from MC_CONSOLE_PW (empty = no login)."""
+
+    def __init__(self, url: str) -> None:
+        import hashlib, hmac, os, socket
+        hostport = url[len("tcp://"):]
+        host, _, port = hostport.partition(":")
+        self._sock = socket.create_connection((host, int(port or 2323)), timeout=10)
+        self._sock.settimeout(0.2)
+        self._buf = b""
+        pw = os.environ.get("MC_CONSOLE_PW", "")
+        first = b""
+        deadline = time.time() + 5
+        while b"\n" not in first and time.time() < deadline:
+            try:
+                first += self._sock.recv(4096)
+            except socket.timeout:
+                pass
+        line = first.split(b"\n", 1)[0].decode(errors="replace").strip()
+        if line.upper().startswith("NONCE:"):
+            if not pw:
+                raise RuntimeError(f"{host}: the console wants a password (set MC_CONSOLE_PW)")
+            nonce = bytes.fromhex(line.split()[1].strip())
+            self._sock.sendall((hmac.new(pw.encode(), nonce, hashlib.sha256).hexdigest() + "\n").encode())
+            self._buf = first.split(b"\n", 1)[1] if b"\n" in first else b""
+        else:
+            self._buf = first
+
+    def readline(self) -> bytes:
+        import socket
+        deadline = time.time() + 0.2
+        while b"\n" not in self._buf and time.time() < deadline:
+            try:
+                chunk = self._sock.recv(4096)
+                if not chunk:
+                    raise ConnectionError("net console closed")
+                self._buf += chunk
+            except socket.timeout:
+                break
+        if b"\n" in self._buf:
+            line, self._buf = self._buf.split(b"\n", 1)
+            return line + b"\n"
+        return b""
+
+    def write(self, data: bytes) -> int:
+        self._sock.sendall(data)
+        return len(data)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        try:
+            self._sock.close()
+        except Exception:
+            pass
+
+
 class TDeckSession:
     """One held-open serial session against the T-Deck Plus.
 
@@ -121,6 +181,22 @@ class TDeckSession:
     # -- lifecycle ---------------------------------------------------------
 
     def open(self) -> None:
+        if str(self.port).startswith("tcp://"):
+            # 2323 net console: no reset on open, so no boot marker to wait for
+            self.ser = _TcpConsole(str(self.port))
+            self._reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self._reader_thread.start()
+            deadline = time.monotonic() + 20.0
+            while time.monotonic() < deadline:
+                idx = self.send(self.probe_cmd)
+                if self.wait_for(self.probe_pattern, 2.0, since=idx) is not None:
+                    break
+            else:
+                raise TimeoutError(f"device never answered {self.probe_cmd} over {self.port}")
+            if self.wake_cmd:
+                self.send(self.wake_cmd)
+            time.sleep(1.0)
+            return
         if serial is None:
             raise RuntimeError("pyserial is required to open a T-Deck session")
         ser = serial.Serial()
@@ -493,6 +569,11 @@ def _set_redrawlog(session: TDeckSession, mode: str, timeout: float = 2.0) -> bo
     idx = session.send(f"--redrawlog {mode}")
     ok = session.wait_for(rf"\[REDRAWLOG\];level;{level}\b", timeout, since=idx) is not None
     if not ok:
+        # firmware without the refr/obj levels (upstream: on|off only): fall back to
+        # the full log for refr/obj -- fine over the 2323 console, which is not
+        # limited to 115200 baud
+        if mode in ("refr", "obj"):
+            session.send("--redrawlog on")
         time.sleep(0.1)
     return ok
 
@@ -963,9 +1044,20 @@ def _acked_step(session: TDeckSession, cmd: str, ack_pattern: str, timeout: floa
     parsed = _parsed_range(session, idx, end)
     fsum = refr_summary(parsed, window_seconds=1.5)
     crashed = ack is not None and re.search(CRASH_PATTERN, ack.string) is not None
+    acked_via = "line" if ack is not None and not crashed else None
+    # The 2323 net console drops output under the full redraw-log flood (seen
+    # 2026-10-11: [TAB];set;5 never reached the host, the repaint did). For a
+    # tab switch the state itself is the second witness: --uistat, read with
+    # the redraw log off, must report the requested tab.
+    mt = re.match(r"--tab (\d+)$", cmd)
+    if acked_via is None and not crashed and mt:
+        st = get_uistat(session)
+        if st and int(st.get("tab", -1)) == int(mt.group(1)):
+            acked_via = "uistat"
     return {
         "cmd": cmd,
-        "acked": ack is not None and not crashed,
+        "acked": acked_via is not None,
+        "acked_via": acked_via,
         "ack_line": ack.string.strip()[:120] if ack else None,
         "repainted": refr is not None,
         "refr_count": fsum["count"],
@@ -1188,8 +1280,15 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
             "start": start,
         }
     ball_results = []
+    # Over the 2323 net console the full redraw log (the only level upstream
+    # firmware has) loses about two thirds of all lines, [BALL] included. There
+    # the legs run with the log off: [BALL] arrives complete, repaints are
+    # judged on the firmware's refr_total counter, latency is not measured.
+    tcp = str(getattr(session, "port", "")).startswith("tcp://")
     for direction, n in legs:
-        _set_redrawlog(session, "refr")
+        pre_st = get_uistat(session)   # firmware repaint counter, read with the log off
+        if not tcp:
+            _set_redrawlog(session, "refr")
         # inject like a hand rolls: a few edges per indev read, not the whole
         # request in one 10 ms read (mouse_read() consumes at most
         # BALL_MAX_STEPS_PER_READ per read and discards the rest -- that is
@@ -1220,7 +1319,26 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
             m = re.search(r"\[REFR\];ms;\d+;px;\d+;t_ms;(\d+)", l)   # refresh duration; the old regex read nothing on 4.40a's format
             if m:
                 refr_ms.append(float(m.group(1)))
-        _set_redrawlog(session, "off")
+        if not tcp:
+            _set_redrawlog(session, "off")
+        post_st = get_uistat(session)
+        refr_lines = sum(1 for _, _, l in session.records_since(idx) if re.search(r"\[REFR\];ms;", l))
+        refr_delta = None
+        if pre_st and post_st and "refr_total" in pre_st and "refr_total" in post_st:
+            refr_delta = int(post_st["refr_total"]) - int(pre_st["refr_total"])
+        # The 2323 net console drops output under the full redraw-log flood. A
+        # leg is judged on the firmware's own counter only when the console
+        # provably lost [REFR] lines (fewer lines than the device counted) and
+        # the device counted at least one repaint per read.
+        repaints = len(lat)
+        repaints_via = "lines"
+        if tcp:
+            repaints = len(events) if (refr_delta is not None and refr_delta >= len(events)) else (refr_delta or 0)
+            repaints_via = "refr_total"
+        elif (repaints < len(events) and refr_delta is not None
+                and refr_lines < refr_delta and refr_delta >= len(events)):
+            repaints = len(events)
+            repaints_via = "refr_total"
         moved = 0
         if len(events) >= 2:
             (x0, y0), (x1, y1) = events[0], events[-1]
@@ -1240,7 +1358,8 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
             "first": events[0] if events else None, "last": events[-1] if events else None,
             "latency_p50_ms": _pct(lat, 0.5), "latency_p95_ms": _pct(lat, 0.95),
             "refr_ms_p50": _pct(refr_ms, 0.5), "refr_ms_max": max(refr_ms) if refr_ms else None,
-            "repaints": len(lat),
+            "repaints": repaints, "repaints_via": repaints_via,
+            "refr_lines": refr_lines, "refr_total_delta": refr_delta,
         })
 
     # Keys are consumed one per indev read (10 ms); several land inside one
@@ -1660,28 +1779,32 @@ def scenario_map_tab_pick(session: TDeckSession, args: argparse.Namespace) -> Di
     """
     session.send("--tft on")
     time.sleep(0.2)
+    # Precondition: the last composed view must differ from the pick's target
+    # (bar hidden), else TD-14's same-view skip leaves nothing to count. After a
+    # boot nothing is composed; in a run without a reboot (2323 net console) the
+    # previous scenarios left exactly the target view. On the map tab with the
+    # drawer open, a zoom in/out pair composes the bar-visible height (294x140)
+    # and ends on the start zoom; the pick then has to compose 294x182 once.
+    session.send("--tab 3")
+    time.sleep(1.0)
+    session.send("--drawer on")
+    session.wait_for(r"\[DRAWER\];1\b", 2.0)
+    for zdir in ("in", "out"):
+        zidx = session.send(f"--mapzoom {zdir}")
+        session.wait_for(r"\[MAPZOOM\]", 5.0, since=zidx)
+    session.send("--drawer off")
+    session.wait_for(r"\[DRAWER\];0\b", 2.0)
     session.send("--tab 0")
     time.sleep(1.5)
     session.send("--drawer on")
     session.wait_for(r"\[DRAWER\];1\b", 2.0)
     time.sleep(0.5)
-    session.send("--ball left 40")
-    time.sleep(0.5)
-    session.send("--ball up 40")  # parks at x=0, y=0 (BALL);x;0;y;0
-    time.sleep(0.5)
-    session.send("--ball right 8")  # BALL_MAX_STEPS_PER_READ=8, one read = 8*10 px
-    time.sleep(0.5)
-    idx_pos = session.length()
-    session.send("--ball right 6")  # -> x=140 (button spans 120..160)
-    time.sleep(0.5)
-    session.send("--ball down 5")  # -> y=50 (bar spans y 27..78)
-    time.sleep(0.5)
-
-    x = y = None
-    for _, _, l in session.records_since(idx_pos):
-        mm = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+)", l)
-        if mm:
-            x, y = int(mm.group(1)), int(mm.group(2))
+    # Park in the top-left corner from wherever the cursor is (a run without a
+    # reboot keeps it), then x=140 (button spans 120..160), y=50 (bar 27..78).
+    # One `--ball left 40` only moved 8 steps (BALL_MAX_STEPS_PER_READ), which
+    # parked only right after a boot.
+    pos = _park_cursor(session, (("right", 14), ("down", 5)))
+    x, y = pos if pos is not None else (None, None)
     cursor_ok = (
         x is not None
         and y is not None
