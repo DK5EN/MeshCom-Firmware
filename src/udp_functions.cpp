@@ -1189,6 +1189,13 @@ void startMeshComUDP()
         else
         if(memcmp(meshcom_settings.node_gwsrv, "HB", 2) == 0)
         {
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.emcomm.ch");
+          srv_host = "meshcom.emcomm.ch";
+          srv_path = "inet";
+        }
+        else
+        {
+          // OE default (fork temp fix for upstream #1209)
           printlndeb("[WIFI]...Internet UDP-DEST meshcom.oevsv.at");
           srv_host = "meshcom.oevsv.at";
           srv_path = "inet";
