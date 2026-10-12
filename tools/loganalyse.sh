@@ -448,6 +448,14 @@ fi
 CRC_TOTAL=$((CRC_ESP_COUNT + CRC_NRF_COUNT))
 if [ "$CRC_SRC" = "setlog" ]; then CRC_TOTAL=$SL_ERR_N; fi
 echo "CRC_ERROR_COUNT: $CRC_TOTAL"
+# M-08: non-CRC radio errors (esp32_main.cpp: RX_OTHER_ERROR code= rssi= snr= size= ts=)
+RXOE_SEC_N=$(grep -c 'RX_OTHER_ERROR code=' "$LOGFILE" 2>/dev/null || true)
+echo "RX_OTHER_ERROR_COUNT: ${RXOE_SEC_N:-0}"
+if [ "${RXOE_SEC_N:-0}" -gt 0 ]; then
+    grep 'RX_OTHER_ERROR code=' "$LOGFILE" | awk '
+    { if (match($0, /code=-?[0-9]+/)) c[substr($0, RSTART+5, RLENGTH-5) + 0]++ }
+    END { for (k in c) printf "%d %d\n", k, c[k] }' | sort -n | awk '{ printf "RX_OTHER_ERROR code=%d: %d\n", $1, $2 }'
+fi
 if [ "$CRC_ESP_COUNT" -gt 0 ]; then echo "CRC_ESP32 (CRC_ERROR): $CRC_ESP_COUNT"; fi
 if [ "$CRC_NRF_COUNT" -gt 0 ] && [ "$CRC_SRC" = "mcdbg" ]; then echo "CRC_NRF52 (RX_ERROR): $CRC_NRF_COUNT"; fi
 if [ "$CRC_SRC" = "setlog" ]; then
@@ -2713,7 +2721,7 @@ function hex2ascii(hexstr,    result, bytes, n, i, hi, lo, val) {
     n = split(hexstr, bytes, " ")
     result = ""
     for (i = 1; i <= n; i++) {
-        if (length(bytes[i]) != 2) continue
+        if (bytes[i] !~ /^[0-9A-Fa-f][0-9A-Fa-f]$/) continue
         hi = h2d[substr(bytes[i], 1, 1)]
         lo = h2d[substr(bytes[i], 2, 1)]
         val = hi * 16 + lo
@@ -2725,50 +2733,48 @@ function hex2ascii(hexstr,    result, bytes, n, i, hi, lo, val) {
     return result
 }
 
-function extract_callsigns(ascii_str,    cs_list, cs_count, start, i, c, run, found) {
-    # Find patterns like XX0XX-NN (ham callsigns)
-    cs_count = 0
+# F-09: a sender is a PATH HEAD. decodeAPRS (aprs_functions.cpp) frames are
+# `SRC,REL1,REL2>DEST`: the originator comes first, relays follow after a
+# comma, the destination follows `>`. Path state decides, not the byte before
+# a callsign: once a head is seen, every callsign up to the next `>` is a relay
+# (corruption often eats the comma before a relay). A new head can only start
+# outside a path. Callsign shape: 1-2 alnum + digit + 1-4 letters + -SSID.
+function extract_heads(ascii_str, heads,    n, i, c, run, start, prev, k, dup, in_path) {
+    n = 0
     run = ""
-    for (i = 1; i <= length(ascii_str); i++) {
-        c = substr(ascii_str, i, 1)
+    start = 0
+    in_path = 0
+    for (i = 1; i <= length(ascii_str) + 1; i++) {
+        c = (i <= length(ascii_str)) ? substr(ascii_str, i, 1) : "."
         if (c ~ /[A-Z0-9-]/) {
+            if (run == "") start = i
             run = run c
         } else {
-            if (length(run) >= 4 && run ~ /[A-Z][A-Z0-9]+-[0-9]/) {
-                # Deduplicate
-                found = 0
-                for (j = 1; j <= cs_count; j++) {
-                    if (cs_list[j] == run) { found = 1; break }
-                }
-                if (!found) {
-                    cs_count++
-                    cs_list[cs_count] = run
+            if (run != "" && length(run) >= 4 && run ~ /^[A-Z0-9][A-Z0-9]?[0-9][A-Z][A-Z]?[A-Z]?[A-Z]?-[0-9]+$/) {
+                prev = (start > 1) ? substr(ascii_str, start - 1, 1) : ""
+                if (!in_path && (c == "," || c == ">") && prev != ",") {
+                    dup = 0
+                    for (k = 1; k <= n; k++) if (heads[k] == run) { dup = 1; break }
+                    if (!dup) heads[++n] = run
+                    if (c == ",") in_path = 1
                 }
             }
+            if (c == ">") in_path = 0
             run = ""
         }
     }
-    # Check last run
-    if (length(run) >= 4 && run ~ /[A-Z][A-Z0-9]+-[0-9]/) {
-        found = 0
-        for (j = 1; j <= cs_count; j++) {
-            if (cs_list[j] == run) { found = 1; break }
-        }
-        if (!found) {
-            cs_count++
-            cs_list[cs_count] = run
-        }
-    }
-    return cs_count
+    return n
 }
 
 /CRC_ERROR/ {
     pending = 1
     crc_rssi = 0; crc_snr = 0; crc_ferr = 0; crc_size = 0; crc_ts = $2
+    n_crc_lines++
     if (match($0, /rssi=-?[0-9]+/)) crc_rssi = substr($0, RSTART+5, RLENGTH-5) + 0
     if (match($0, /snr=-?[0-9]+/)) crc_snr = substr($0, RSTART+4, RLENGTH-4) + 0
     if (match($0, /freq_err=[-0-9.]+/)) crc_ferr = substr($0, RSTART+9, RLENGTH-9) + 0
     if (match($0, /size=[0-9]+/)) crc_size = substr($0, RSTART+5, RLENGTH-5) + 0
+    if (crc_size == 255) n_crc_255++
     next
 }
 
@@ -2784,11 +2790,11 @@ function extract_callsigns(ascii_str,    cs_list, cs_count, start, i, c, run, fo
 
     ascii = hex2ascii(hex_data)
 
-    # Extract callsigns
+    # Extract path heads (one sender per frame, relays excluded)
     delete found_cs
-    n_cs = extract_callsigns(ascii, found_cs)
+    n_cs = extract_heads(ascii, found_cs)
 
-    # Track callsign frequencies
+    # Track path-head frequencies
     for (k = 1; k <= n_cs; k++) {
         crc_cs_cnt[found_cs[k]]++
     }
@@ -2840,21 +2846,30 @@ function extract_callsigns(ascii_str,    cs_list, cs_count, start, i, c, run, fo
 
 END {
     print "TOTAL_CRC_WITH_PAYLOAD: " total
+    # ESP32 builds before f2d6532f pad every CRC dump to 255 B with stack garbage
+    unrel = (n_crc_lines >= 3 && n_crc_255 == n_crc_lines)
+    if (unrel) {
+        print "COLLISION_ANALYSIS: unreliable (all CRC dumps size=255, ESP32 build < f2d6532f)"
+        flag = " [unreliable]"
+    } else {
+        print "COLLISION_ANALYSIS: ok"
+        flag = ""
+    }
     print ""
     print "--- CALLSIGN_EXTRACTION ---"
-    printf "PAYLOADS_WITH_0_CALLSIGNS: %d (%.1f%%) -- noise/weak signal\n", cs0, (total>0 ? cs0*100.0/total : 0)
-    printf "PAYLOADS_WITH_1_CALLSIGN:  %d (%.1f%%) -- single packet corrupted\n", cs1, (total>0 ? cs1*100.0/total : 0)
-    printf "PAYLOADS_WITH_2+_CALLSIGNS: %d (%.1f%%) -- likely collisions\n", cs2plus, (total>0 ? cs2plus*100.0/total : 0)
+    printf "PAYLOADS_WITH_0_CALLSIGNS: %d (%.1f%%) -- noise/weak signal (0 path heads)\n", cs0, (total>0 ? cs0*100.0/total : 0)
+    printf "PAYLOADS_WITH_1_CALLSIGN:  %d (%.1f%%) -- single packet corrupted (1 path head)\n", cs1, (total>0 ? cs1*100.0/total : 0)
+    printf "PAYLOADS_WITH_2+_CALLSIGNS: %d (%.1f%%) -- 2+ distinct path heads (originators; relays not counted)%s\n", cs2plus, (total>0 ? cs2plus*100.0/total : 0), flag
     print ""
     print "--- CAUSE_CLASSIFICATION ---"
-    printf "COLLISION (2+ callsigns):     %d\n", collision_cnt
-    printf "SINGLE_CORRUPT (1 callsign):  %d\n", single_cnt
+    printf "COLLISION (2+ path heads):    %d%s\n", collision_cnt, flag
+    printf "SINGLE_CORRUPT (1 path head): %d\n", single_cnt
     printf "WEAK_SIGNAL (snr<-15, 0 cs):  %d\n", weak_cnt
     printf "NOISE (no callsign):          %d\n", noise_cnt
     print ""
 
     # Top colliding callsigns
-    print "--- TOP_CALLSIGNS_IN_CRC_ERRORS ---"
+    print "--- TOP_CALLSIGNS_IN_CRC_ERRORS --- (path heads = originators only)"
     # Sort by count
     tc_n = 0
     for (cs in crc_cs_cnt) {

@@ -1234,5 +1234,168 @@ class TestLoganalyseSetlog(unittest.TestCase):
         self.assertIn("CRC_ERROR_COUNT: 1", sec)
 
 
+COLLISION_DK5EN98: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_collision_dk5en98.txt"
+COLLISION_DJ8MEH255: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_collision_dj8meh255.txt"
+
+
+def _hexdump(frame: str) -> str:
+    return " ".join(f"{b:02X}" for b in frame.encode("latin-1"))
+
+
+def _crc_dump(ts: str, frame: str, size: int | None = None, snr: int = -5) -> str:
+    """One firmware CRC_ERROR + CRC_PAYLOAD line pair (esp32_main.cpp format)."""
+    n = len(frame) if size is None else size
+    return (
+        f"{ts}  [MC-DBG] CRC_ERROR rssi=-110 snr={snr} freq_err=100.0 size={n} ts=1000\n"
+        f"{ts}  [MC-DBG] CRC_PAYLOAD[{n}]: {_hexdump(frame)}\n"
+    )
+
+
+class TestLoganalyseCollision(unittest.TestCase):
+    """Wave 2b-1 (F-09, M-08): CRC forensics counts one sender per path head
+    (originator before the first comma), never the relays after it; a
+    collision needs two DISTINCT path heads in one dump. The rule is derived
+    from decodeAPRS (aprs_functions.cpp:225-255): `SRC,REL1,REL2>DEST`.
+
+    Fixture loganalyse_collision_dk5en98.txt: four real CRC_ERROR/CRC_PAYLOAD
+    pairs of dk5en-98 2026-08-26 (post-f2d6532f build):
+      1. OE1XAR-33,DG7RJ-8>*  one frame with a relay      -> SINGLE_CORRUPT
+      2. snr=-20, no callsign                              -> WEAK_SIGNAL
+      3. DM1CR-12,DB0HOB-12,DD6%D-99>HG@R22 (relay chain)  -> SINGLE_CORRUPT
+      4. DB4UW-1,DM6C..>.(F2SI-12>z! two path heads        -> COLLISION
+         (ambiguous: likely one frame DB4UW-1,DM6CS-12,DF2SI-12> whose
+         `>` was corrupted in; the genuine two-frame case is pinned by
+         the synthetic test_two_distinct_heads_with_relays_is_collision)
+    Fixture loganalyse_collision_dj8meh255.txt: four pairs of a pre-f2d6532f
+    build (dj8meh-41), every dump size=255.
+    """
+
+    @staticmethod
+    def _run(path: Path) -> str:
+        res = subprocess.run(
+            ["bash", str(SCRIPT), str(path)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=dict(os.environ, LC_ALL="C"),
+        )
+        assert res.returncode == 0, res.stderr
+        return res.stdout
+
+    @classmethod
+    def _analyse(cls, text: str) -> str:
+        with tempfile.TemporaryDirectory() as td:
+            lf = Path(td) / "log.txt"
+            lf.write_text(text)
+            return cls._run(lf)
+
+    @staticmethod
+    def _sec(out: str, name: str) -> str:
+        lines: list[str] = []
+        capturing = False
+        for line in out.splitlines():
+            if capturing and line.startswith("=== "):
+                break
+            if capturing:
+                lines.append(line)
+            elif line.startswith("=== ") and name in line:
+                capturing = True
+        return "\n".join(lines)
+
+    def test_real_fixture_counts_path_heads_not_relays(self) -> None:
+        sec = self._sec(self._run(COLLISION_DK5EN98), "CRC_FORENSICS")
+        self.assertIn("TOTAL_CRC_WITH_PAYLOAD: 4", sec)
+        self.assertRegex(sec, r"COLLISION \(2\+ path heads\):\s+1\n")
+        self.assertRegex(sec, r"SINGLE_CORRUPT \(1 path head\):\s+2\n")
+        self.assertRegex(sec, r"WEAK_SIGNAL \(snr<-15, 0 cs\):\s+1\n")
+        self.assertIn("COLLISION_ANALYSIS: ok", sec)
+
+    def test_pairs_use_the_two_distinct_heads_only(self) -> None:
+        sec = self._sec(self._run(COLLISION_DK5EN98), "CRC_FORENSICS")
+        pairs = sec.split("--- TOP_COLLISION_PAIRS ---")[1].split("---")[0]
+        self.assertRegex(pairs, r"DB4UW-1 \+ F2SI-12\s+1")
+        # originator and relay of ONE frame must not be paired
+        self.assertNotIn("DG7RJ-8", pairs)
+        self.assertNotIn("DB0HOB-12", pairs)
+
+    def test_relay_chain_is_one_sender(self) -> None:
+        frame = "@...." + "\x01" + "DL1AAA-1,DB0BBB-12,DB0CCC-12,DB0DDD-12>HG@R1;2,3,-4;"
+        out = self._analyse(_crc_dump("2026-08-26 10:00:00.000", frame))
+        sec = self._sec(out, "CRC_FORENSICS")
+        self.assertRegex(sec, r"SINGLE_CORRUPT \(1 path head\):\s+1\n")
+        self.assertRegex(sec, r"COLLISION \(2\+ path heads\):\s+0\n")
+        callsigns = sec.split("--- TOP_CALLSIGNS_IN_CRC_ERRORS ---")[1].split("---")[0]
+        self.assertIn("DL1AAA-1", callsigns)
+        self.assertNotIn("DB0BBB-12", callsigns)
+
+    def test_relay_with_corrupted_comma_stays_a_relay(self) -> None:
+        # Real dk5en-98 2026-08-26 dump: the byte before relay ...K5EN-98 is
+        # corrupted (not `,`). Path state, not the preceding byte, decides:
+        # everything between the head and the next `>` is a relay.
+        log = (
+            "2026-08-26 10:19:49.846  [MC-DBG] CRC_ERROR rssi=-127 snr=-22 freq_err=-250.9 size=105 ts=46199351\n"
+            "2026-08-26 10:19:51.398  [MC-DBG] CRC_PAYLOAD[105]: 40 18 D2 BD B3 90 44 4D 31 43 52 2D 31 32 2C "
+            "44 42 30 48 4F 42 2D 31 32 2C 44 42 30 45 94 2D 34 84 2A 99 4B 35 45 4E 2D 39 38 2C 44 47 37 52 "
+            "4A 2D 38 3E 48 47 40 52 32 32 2C 31 32 37 2C 2D 31 30 3B 39 2C 31 32 32 2C 2D 31 33 3B 35 2C 31 "
+            "32 30 2C 2D 31 30 3B 36 2C 31 32 3F AC A5 B1 B1 3B 00 0C 88 17 5D 23 A4 EE 7E "
+            "[MC-DBG] CHANNEL_UTIL rx=1148ms tx=945ms util=20%\n"
+        )
+        sec = self._sec(self._analyse(log), "CRC_FORENSICS")
+        self.assertRegex(sec, r"COLLISION \(2\+ path heads\):\s+0\n")
+        self.assertRegex(sec, r"SINGLE_CORRUPT \(1 path head\):\s+1\n")
+        self.assertNotIn("K5EN-98", sec.split("--- TOP_CALLSIGNS_IN_CRC_ERRORS ---")[1])
+
+    def test_same_head_twice_is_not_a_collision(self) -> None:
+        frame = "@..." + "\x01DL1AAA-1,DB0BBB-12>HG@R1;" + "\x02DL1AAA-1,DB0CCC-12>H"
+        sec = self._sec(self._analyse(_crc_dump("2026-08-26 10:00:00.000", frame)), "CRC_FORENSICS")
+        self.assertRegex(sec, r"COLLISION \(2\+ path heads\):\s+0\n")
+        self.assertRegex(sec, r"SINGLE_CORRUPT \(1 path head\):\s+1\n")
+
+    def test_two_distinct_heads_with_relays_is_collision(self) -> None:
+        frame = "\x01DL1AAA-1,DB0BBB-12>HG@R1;\x02DL2CCC-3,DB0DDD-12>HG@R2;"
+        sec = self._sec(self._analyse(_crc_dump("2026-08-26 10:00:00.000", frame)), "CRC_FORENSICS")
+        self.assertRegex(sec, r"COLLISION \(2\+ path heads\):\s+1\n")
+        self.assertRegex(sec, r"DL1AAA-1 \+ DL2CCC-3\s+1")
+
+    def test_all_size_255_is_flagged_unreliable(self) -> None:
+        sec = self._sec(self._run(COLLISION_DJ8MEH255), "CRC_FORENSICS")
+        self.assertIn(
+            "COLLISION_ANALYSIS: unreliable (all CRC dumps size=255, ESP32 build < f2d6532f)",
+            sec,
+        )
+        self.assertNotIn("COLLISION_ANALYSIS: ok", sec)
+
+    def test_two_size_255_dumps_are_not_enough_to_flag(self) -> None:
+        frame = "\x01DL1AAA-1,DB0BBB-12>HG@R1;"
+        text = _crc_dump("2026-08-26 10:00:00.000", frame, size=255) * 2
+        sec = self._sec(self._analyse(text), "CRC_FORENSICS")
+        self.assertIn("COLLISION_ANALYSIS: ok", sec)
+
+    def test_mixed_sizes_are_not_flagged(self) -> None:
+        frame = "\x01DL1AAA-1,DB0BBB-12>HG@R1;"
+        text = _crc_dump("2026-08-26 10:00:00.000", frame, size=255) * 3 + _crc_dump(
+            "2026-08-26 10:00:01.000", frame
+        )
+        sec = self._sec(self._analyse(text), "CRC_FORENSICS")
+        self.assertIn("COLLISION_ANALYSIS: ok", sec)
+
+    def test_rx_other_error_histogram_in_crc_errors(self) -> None:
+        lines = [
+            "[MC-DBG] CRC_ERROR rssi=-100 snr=-5 freq_err=10.0 size=30 ts=1",
+            "[MC-DBG] RX_OTHER_ERROR code=1 rssi=-90 snr=2 size=10 ts=2",
+            "[MC-DBG] RX_OTHER_ERROR code=1 rssi=-91 snr=2 size=10 ts=3",
+            "[MC-DBG] RX_OTHER_ERROR code=4 rssi=-92 snr=2 size=10 ts=4",
+        ]
+        sec = self._sec(self._analyse("\n".join(lines) + "\n"), "CRC_ERRORS")
+        self.assertIn("RX_OTHER_ERROR_COUNT: 3", sec)
+        self.assertRegex(sec, r"RX_OTHER_ERROR code=1: 2\n")
+        self.assertRegex(sec, r"RX_OTHER_ERROR code=4: 1\n")
+
+    def test_rx_other_error_absent_prints_zero(self) -> None:
+        line = "[MC-DBG] CRC_ERROR rssi=-100 snr=-5 freq_err=10.0 size=30 ts=1\n"
+        sec = self._sec(self._analyse(line), "CRC_ERRORS")
+        self.assertIn("RX_OTHER_ERROR_COUNT: 0", sec)
+
+
 if __name__ == "__main__":
     unittest.main()
