@@ -27,10 +27,20 @@ _NORMALIZED_TMPS=""
 cleanup_normalized_tmps() { [ -n "$_NORMALIZED_TMPS" ] && rm -f $_NORMALIZED_TMPS; }
 trap cleanup_normalized_tmps EXIT
 
+# new_tmp: create a temp file, register it for removal on exit and return the
+# path in NEW_TMP. Must be called WITHOUT command substitution: a subshell
+# would lose the registration (the trap would never see the file).
+new_tmp() {
+    NEW_TMP="$(mktemp "${TMPDIR:-/tmp}/loganalyse.XXXXXX")"
+    _NORMALIZED_TMPS="$_NORMALIZED_TMPS $NEW_TMP"
+}
+
+# normalize_log <file>: result path in NORM_RESULT (no command substitution,
+# see new_tmp).
 normalize_log() {
     _src="$1"
-    _tmp="$(mktemp "${TMPDIR:-/tmp}/loganalyse.XXXXXX")"
-    _NORMALIZED_TMPS="$_NORMALIZED_TMPS $_tmp"
+    new_tmp
+    _tmp="$NEW_TMP"
     # TOOL-05: detect the raw firmware timestamp format
     #   [EPOCHDAY.HHh.MMm.SSs.mmm]  and convert to serial_monitor format
     #   YYYY-MM-DD HH:MM:SS.mmm  (epoch day -> date via pure-awk Gregorian
@@ -69,10 +79,12 @@ normalize_log() {
     else
         LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" > "$_tmp"
     fi
-    echo "$_tmp"
+    NORM_RESULT="$_tmp"
 }
 
-LOGFILE="$(normalize_log "$1")"
+INPUT1="$1"   # names printed in CROSS_CORRELATION (LOGFILE is a temp copy)
+normalize_log "$1"
+LOGFILE="$NORM_RESULT"
 
 # ─── Helper ───
 section() { echo ""; echo "=== $1 ==="; }
@@ -92,11 +104,8 @@ grep -m1 '\[BLE \].*Device started with BLE-Name' "$LOGFILE" || true
 # LoRa config
 grep '\[LoRa\].*RF_' "$LOGFILE" || true
 
-# CSMA
-grep -m1 'CSMA_SLOT_TIME' "$LOGFILE" || true
-
 # Heap/PSRAM at boot
-grep -m1 '\[HEAP\]' "$LOGFILE" || true
+grep -m1 -E '\[HEAP\][; ]' "$LOGFILE" || true
 grep -m1 '\[PSRM\]' "$LOGFILE" || true
 
 # WiFi
@@ -133,7 +142,7 @@ awk '
     next
 }
 
-/MH-LoRa:/ {
+/MH-LoRa:? / {
     # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
     ts = $2
 
@@ -203,17 +212,27 @@ END {
 )
 
 echo ""
-echo "UNIQUE_NODES: $(grep "MH-LoRa:" "$LOGFILE" | awk '{for(i=1;i<=NF;i++){if($i~/>/){{split($i,r,/[,>]/);if(r[1]!=""&&r[1]!~/^[0-9]/)print r[1];break}}}}' | sort -u | wc -l | tr -d ' ')"
-echo "TOTAL_MH_PACKETS: $(grep -c 'MH-LoRa:' "$LOGFILE")"
+echo "UNIQUE_NODES: $(grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '{for(i=1;i<=NF;i++){if($i~/>/){{split($i,r,/[,>]/);if(r[1]!=""&&r[1]!~/^[0-9]/)print r[1];break}}}}' | sort -u | wc -l | tr -d ' ')"
+echo "TOTAL_MH_PACKETS: $(grep -cE 'MH-LoRa:? ' "$LOGFILE")"
 
 # ─── 3. MESSAGE TYPES ───
 section "MESSAGE_TYPES"
 
-grep "MH-LoRa:" "$LOGFILE" | awk '
+# Packet type char is the token two after the tag (`MH-LoRa 085 : x...`;
+# older firmware prints the tag with a colon): printBuffer_aprs' %c payload
+# type. `@` = heartbeat (HG@R / H@R / HN@ neighbour reports), `!` = position,
+# `:` = text, anything else = other. Never test the whole line: the timestamp
+# contains ":", `*` is the broadcast destination fused into the route token,
+# and "H@R" / "*!" can appear inside user text.
+grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '
 {
-    if (/H@R/ || /HG@R/) heartbeat++
-    else if (/\*!/) position++
-    else if (/:/) text++
+    ptype = ""
+    for (i=1; i<=NF; i++) {
+        if ($i ~ /^MH-LoRa:?$/) { ptype = $(i+2); break }
+    }
+    if (ptype == "@") heartbeat++
+    else if (ptype == "!") position++
+    else if (ptype == ":") text++
     else other++
     total++
 }
@@ -228,19 +247,21 @@ END {
 # Notable text messages (extract up to 20)
 echo ""
 echo "--- NOTABLE_TEXTS ---"
-grep "RX-LoRa-All:" "$LOGFILE" | grep -v 'H@R\|HG@R\|\*!' | head -20 || true
+# RX-LoRa-All: has no emitter in current firmware; derive from accepted text
+# frames (type char ":") instead, heartbeats excluded.
+grep -E 'RX-LoRa2:? +[0-9]{3} :' "$LOGFILE" | grep -vE 'H@R|HG@R' | head -20 || true
 
 # ─── 4. HOP DISTRIBUTION ───
 section "HOP_DISTRIBUTION"
 
 echo "--- MH-LoRa (Empfangen) ---"
-grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- RX-LoRa2 (Akzeptiert) ---"
-grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep -E 'RX-LoRa2:? ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- TX-LoRa (Gesendet) ---"
-grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep -E 'TX-LoRa:? +[0-9]{3} ' "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 # ─── 5. LOOPS ───
 section "LOOPS"
@@ -251,6 +272,8 @@ grep "RELAY_LOOP_BLOCKED" "$LOGFILE" | head -10 || true
 # ─── 6. CHANNEL UTILIZATION ───
 section "CHANNEL_UTIL"
 
+new_tmp
+CHANNEL_UTIL_TMP="$NEW_TMP"
 { grep "CHANNEL_UTIL" "$LOGFILE" || true; } | awk '{
     # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
     ts = $2
@@ -264,9 +287,9 @@ section "CHANNEL_UTIL"
     }
     # Use util% as the main metric
     if (util != "") print ts, util
-}' > /tmp/channel_util.txt
+}' > "$CHANNEL_UTIL_TMP"
 
-if [ -s /tmp/channel_util.txt ]; then
+if [ -s "$CHANNEL_UTIL_TMP" ]; then
     awk '
     {
         val = $2 + 0.0
@@ -295,7 +318,7 @@ if [ -s /tmp/channel_util.txt ]; then
         printf "TREND: %s\n", (avg2 > avg1 * 1.1) ? "STEIGEND" : (avg1 > avg2 * 1.1) ? "FALLEND" : "STABIL"
         printf "SAMPLES_GE_70: %d\n", high70
         printf "SAMPLES_GE_90: %d\n", high90
-    }' /tmp/channel_util.txt
+    }' "$CHANNEL_UTIL_TMP"
 
     # Per 10-minute buckets
     echo ""
@@ -313,7 +336,7 @@ if [ -s /tmp/channel_util.txt ]; then
         for (b in sum) {
             printf "%-8s %8.1f %8.1f %5d\n", b, sum[b]/cnt[b], mx[b], cnt[b]
         }
-    }' /tmp/channel_util.txt | sort
+    }' "$CHANNEL_UTIL_TMP" | sort
 else
     echo "NO_DATA"
 fi
@@ -321,22 +344,15 @@ fi
 # ─── 7. ACK ANALYSIS ───
 section "ACK_ANALYSIS"
 
-echo "ACK_FAST_QUEUED: $(grep -c 'ACK_FAST_QUEUED' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_FAST_TX: $(grep -c 'ACK_FAST_TX' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_RX_CANCEL: $(grep -c 'ACK_RX_CANCEL' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_FWD_DEDUP: $(grep -c 'ACK_FWD_DEDUP' "$LOGFILE" 2>/dev/null; true)"
-echo "GW_ACK_DEDUP: $(grep -c 'GW_ACK_DEDUP' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_SLOT_SKIP: $(grep -c 'ACK_SLOT_SKIP' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_FWD_DROPPED: $(grep -c 'ACK_FWD_DROPPED' "$LOGFILE" 2>/dev/null; true)"
-echo "GW_ACK_DROPPED: $(grep -c 'GW_ACK_DROPPED' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_CANCEL_RETRANSMIT: $(grep -c 'ACK_CANCEL_RETRANSMIT' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_RECEIVED: $(grep -c 'ACK_RECEIVED' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_FAST_CAD_BUSY: $(grep -c 'ACK_FAST_CAD_BUSY' "$LOGFILE" 2>/dev/null; true)"
-
-# ACK queue length distribution
-echo ""
-echo "--- ACK_QLEN ---"
-grep -oE 'ack_qlen=[0-9]+' "$LOGFILE" | sort | uniq -c | sort -rn || true
+# Live ACK markers only (see src/lora_functions.cpp). The pre-4.30 markers
+# (ACK_FAST_*, ACK_RX_CANCEL, *_DEDUP, *_DROPPED, ack_qlen, ...) have no
+# emitter any more and were removed.
+echo "ACK_RECEIVED: $(grep -c 'ACK_RECEIVED retid=' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_SKIP_READY: $(grep -c 'ACK_SKIP_READY slot=' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_REJECT: $(grep -c 'ACK_REJECT b5=' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_APPENDIX: $(grep -c 'ACK_APPENDIX hash=' "$LOGFILE" 2>/dev/null; true)"
+# ACK frames go out as "TX-Lora " (lowercase), not "TX-LoRa " -- counted apart.
+echo "TX_ACK_FRAMES (TX-Lora): $(grep -cE 'TX-Lora +[0-9]{3} ' "$LOGFILE" 2>/dev/null; true)"
 
 # ─── 8. CRC ERRORS ───
 # Matches three log formats:
@@ -422,19 +438,25 @@ grep "RING_STATUS" "$LOGFILE" | grep -oE 'queued=[0-9]+' | sort | uniq -c | sort
 # ─── 10. MISSING ACKS ───
 section "MISSING_ACKS"
 
-echo "ACK_TIMEOUT: $(grep -ci 'ACK_TIMEOUT' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_FAIL: $(grep -ci 'ACK_FAIL' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_MISS: $(grep -ci 'ACK_MISS' "$LOGFILE" 2>/dev/null; true)"
-echo "ACK_LOST: $(grep -ci 'ACK_LOST' "$LOGFILE" 2>/dev/null; true)"
-echo "RETRANSMIT_GIVEUP: $(grep -c 'RETRANSMIT_GIVEUP' "$LOGFILE" 2>/dev/null; true)"
+RETX_N=$(grep -c 'RETRANSMIT retry=' "$LOGFILE" 2>/dev/null; true)
+GIVEUP_N=$(grep -c 'RETRANSMIT_GIVEUP retries=' "$LOGFILE" 2>/dev/null; true)
+GIVEUP_DM_N=$(grep -c 'RETRANSMIT_GIVEUP_DM' "$LOGFILE" 2>/dev/null; true)
+ACKRX_N=$(grep -c 'ACK_RECEIVED retid=' "$LOGFILE" 2>/dev/null; true)
+echo "RETRANSMIT: ${RETX_N:-0}"
+echo "RETRANSMIT_GIVEUP: ${GIVEUP_N:-0}"
+echo "RETRANSMIT_GIVEUP_DM: ${GIVEUP_DM_N:-0}"
+if [ "${RETX_N:-0}" -eq 0 ] && [ "${GIVEUP_N:-0}" -eq 0 ] && [ "${GIVEUP_DM_N:-0}" -eq 0 ] && [ "${ACKRX_N:-0}" -eq 0 ]; then
+    echo "MISSING_ACKS_VERDICT: n/a (no RETRANSMIT/ACK_RECEIVED events in log)"
+fi
 
 # ─── 11. DEDUP ───
 section "DEDUP"
 
-echo "DEDUP_EXPLICIT: $(grep -ci 'dedup\|DEDUP' "$LOGFILE" 2>/dev/null; true)"
+echo "DEDUP_EXPLICIT: $(grep -c 'RX_DEDUP_DUP msg_id=' "$LOGFILE" 2>/dev/null; true)"
+echo "RX_DEDUP_NEW: $(grep -c 'RX_DEDUP_NEW' "$LOGFILE" 2>/dev/null; true)"
 
-MH_COUNT=$(grep -c "MH-LoRa:" "$LOGFILE" 2>/dev/null; true)
-RX_COUNT=$(grep -c "RX-LoRa2:" "$LOGFILE" 2>/dev/null; true)
+MH_COUNT=$(grep -cE "MH-LoRa:? " "$LOGFILE" 2>/dev/null; true)
+RX_COUNT=$(grep -cE "RX-LoRa2:? " "$LOGFILE" 2>/dev/null; true)
 echo "MH_LORA_HEARD: $MH_COUNT"
 echo "RX_LORA_ACCEPTED: $RX_COUNT"
 echo "IMPLICIT_DEDUP: $((MH_COUNT - RX_COUNT))"
@@ -442,12 +464,12 @@ echo "IMPLICIT_DEDUP: $((MH_COUNT - RX_COUNT))"
 # Top repeated msg_ids
 echo ""
 echo "--- TOP_REPEATED_MSGIDS ---"
-grep "MH-LoRa:" "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | sort -rn | head -10 || true
+grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | sort -rn | head -10 || true
 
 # Max duplication factor
 echo ""
 echo "--- DUPLICATION_DISTRIBUTION ---"
-grep "MH-LoRa:" "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{print $1}' | sort -n | uniq -c | sort -rn || true
+grep -E 'MH-LoRa:? ' "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{print $1}' | sort -n | uniq -c | sort -rn || true
 
 # ─── 12. STATE MACHINE ───
 section "STATE_MACHINE"
@@ -461,20 +483,52 @@ grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | grep -v 'TX_PREPARE -> IDLE rc=-1' | 
 section "ADDITIONAL"
 
 echo "--- WIFI_ISSUES ---"
-grep -iE 'disconnect|reconnect|WIFI.*fail' "$LOGFILE" | head -10 || true
-echo "WIFI_ISSUE_COUNT: $(grep -ciE 'disconnect|reconnect|WIFI.*fail' "$LOGFILE" 2>/dev/null; true)"
+# Current firmware: one "[WIFI];event;disconnected" per drop plus
+# "[WIFI];stall" (the same events as WIFI_DISCONNECT/WIFI_STALL below).
+# [WIFI];assoc;disconnected, [SAFEBOOT];wifi;event;disconnected and the
+# [WIFI-DBG] lines describe the same drop and would count it again.
+# The broad legacy pattern is used only when the log has no ";event;" lines;
+# packet lines (payload text) and the 2323/web "Client disconnected" never count.
+# meshlogger's own "[LOGGER] end ... reconnects=N" line is not a node event either.
+PKT_RE='(MH|RX|TX)-LoRa2? |NEW-TXT:? |\[LOGGER\]'
+if grep -qE '\[WIFI\];event;' "$LOGFILE"; then
+    WIFI_ISSUE_RE='\[WIFI\];event;disconnected|\[WIFI\];stall'
+else
+    WIFI_ISSUE_RE='disconnect|reconnect|WIFI.*fail'
+fi
+{ grep -iE "$WIFI_ISSUE_RE" "$LOGFILE" | grep -vE "$PKT_RE" | grep -v 'Client disconnected'; } | head -10 || true
+echo "WIFI_ISSUE_COUNT: $({ grep -iE "$WIFI_ISSUE_RE" "$LOGFILE" | grep -vE "$PKT_RE" | grep -vc 'Client disconnected'; } 2>/dev/null; true)"
 
 echo ""
 echo "--- CRASHES ---"
-grep -iE 'panic|abort|watchdog|wdt|backtrace|guru.meditation' "$LOGFILE" | head -10 || true
-echo "CRASH_COUNT: $(grep -ciE 'panic|abort|watchdog|wdt|backtrace|guru.meditation' "$LOGFILE" 2>/dev/null; true)"
+# One crash = one "[BOOT] RESET_REASON=<n> <NAME>" line with a crash reason
+# (src/esp32/esp32_main.cpp prints it once per boot). "Rebooting..." follows
+# every OTA, "rst:0x" is every ROM boot banner, and one panic prints several
+# lines (Guru Meditation, Backtrace, abort), so none of those are counted.
+# Only a log without any RESET_REASON line (older firmware, other captures)
+# falls back to counting the panic/abort/watchdog banners.
+CRASH_RESET_RE='RESET_REASON=[0-9]+ (PANIC|INT_WDT|TASK_WDT|WDT|BROWNOUT)'
+CRASH_BANNER_RE='Guru Meditation Error|abort\(\) was called|Task watchdog got triggered'
+if grep -qE 'RESET_REASON=' "$LOGFILE"; then
+    CRASH_COUNT_RE=$CRASH_RESET_RE
+else
+    CRASH_COUNT_RE=$CRASH_BANNER_RE
+fi
+# Sample listing: the counted lines plus panic/backtrace detail.
+{ grep -E "$CRASH_RESET_RE|Guru Meditation|panic|[Bb]acktrace|abort\(\)|Task watchdog got triggered" "$LOGFILE" | grep -vE '(MH|RX|TX)-LoRa2? |NEW-TXT:? '; } | head -10 || true
+echo "CRASH_COUNT: $({ grep -E "$CRASH_COUNT_RE" "$LOGFILE" | grep -vcE '(MH|RX|TX)-LoRa2? |NEW-TXT:? '; } 2>/dev/null; true)"
+echo "RESET_REASON histogram:"
+{ grep -oE 'RESET_REASON=[0-9]+ [A-Z_]+' "$LOGFILE" | sort | uniq -c; } || true
+echo "TX_WATCHDOG_FIRED: $(grep -c '\[MC-WDT\] TX_WATCHDOG fired' "$LOGFILE" 2>/dev/null; true)"
 
 echo ""
 echo "--- HEAP_TREND ---"
-{ grep '\[HEAP\]' "$LOGFILE" || true; } | head -5
+# "[HEAP]" followed by ";" (--debug csv, nRF52) or " " (default ESP32 form,
+# printfdeb strips ";"): "[HEAP]Cnew;" / "[HEAP]Cdis;" are web-client samples.
+{ grep -E '\[HEAP\][; ]' "$LOGFILE" || true; } | head -5
 echo "..."
-{ grep '\[HEAP\]' "$LOGFILE" || true; } | tail -5
-HEAP_SAMPLES=$(grep -c '\[HEAP\]' "$LOGFILE" 2>/dev/null; true)
+{ grep -E '\[HEAP\][; ]' "$LOGFILE" || true; } | tail -5
+HEAP_SAMPLES=$(grep -cE '\[HEAP\][; ]' "$LOGFILE" 2>/dev/null; true)
 echo "HEAP_SAMPLES: $HEAP_SAMPLES"
 
 echo ""
@@ -504,13 +558,19 @@ END {
 
 echo ""
 echo "--- BUFFER_DROPS ---"
-echo "BUFFER_DROPS: $(grep -c 'DROPPED.*buffer_full\|_DROPPED' "$LOGFILE" 2>/dev/null; true)"
-grep -E 'DROPPED|buffer_full' "$LOGFILE" | head -10 || true
+BUFDROP_RE='RING_DROP_|RING_REJECT|RX_BUF_OVERWRITE|CAPTURE_DROPPED'
+echo "BUFFER_DROPS: $(grep -cE "$BUFDROP_RE" "$LOGFILE" 2>/dev/null; true)"
+grep -E "$BUFDROP_RE" "$LOGFILE" | head -10 || true
 
 echo ""
 echo "--- CAD_STATS ---"
-echo "CAD_GIVEUP: $(grep -c 'CAD_GIVEUP' "$LOGFILE" 2>/dev/null; true)"
+# CAD_BUSY_1 = initial busy (double-check follows); "CAD_BUSY attempt=" =
+# confirmed busy. CAD false-positive rate = CAD_FALSE_POSITIVE / CAD_BUSY_1.
+echo "CAD_BUSY_1: $(grep -c 'CAD_BUSY_1' "$LOGFILE" 2>/dev/null; true)"
+echo "CAD_BUSY_CONFIRMED: $(grep -c 'CAD_BUSY attempt=' "$LOGFILE" 2>/dev/null; true)"
 echo "CAD_FALSE_POSITIVE: $(grep -c 'CAD_FALSE_POSITIVE' "$LOGFILE" 2>/dev/null; true)"
+echo "CAD_ABORT_BY_RX: $(grep -c 'CAD_ABORT_BY_RX' "$LOGFILE" 2>/dev/null; true)"
+echo "CAD_SAFETY_TIMEOUT: $(grep -c 'CAD_SAFETY_TIMEOUT' "$LOGFILE" 2>/dev/null; true)"
 echo "RX_TIMEOUT_DEFERRED: $(grep -c 'RX_TIMEOUT_DEFERRED' "$LOGFILE" 2>/dev/null; true)"
 
 # ─── 14. CRC DETAIL ───
@@ -547,7 +607,7 @@ $0 ~ crc_re {
     h = t[1]
     crc[h]++
 }
-/MH-LoRa:/ {
+/MH-LoRa:? / {
     split($2, t, ":")
     h = t[1]
     rx[h]++
@@ -637,16 +697,12 @@ grep "TX_GATE_ENTER" "$LOGFILE" | grep -oE 'cad_attempt=[0-9]+' | awk -F= '{
     total++
 }
 END {
-    printf "%-12s %8s %8s %12s\n", "ATTEMPT", "COUNT", "PCT%", "EST_WAIT_MS"
+    printf "%-12s %8s %8s\n", "ATTEMPT", "COUNT", "PCT%"
     max_a = 0
     for (a in cnt) { if (a+0 > max_a) max_a = a+0 }
     for (i = 0; i <= max_a; i++) {
         if (i in cnt) {
-            if (i == 0) wait = 4675
-            else if (i == 1) wait = 3087
-            else if (i == 2) wait = 2087
-            else wait = 35
-            printf "%-12d %8d %8.1f %12d\n", i, cnt[i], cnt[i] * 100.0 / total, wait
+            printf "%-12d %8d %8.1f\n", i, cnt[i], cnt[i] * 100.0 / total
         }
     }
     printf "\nTOTAL_TX_ATTEMPTS: %d\n", total
@@ -785,6 +841,11 @@ echo "RING_DROP_COUNT: $RING_DROPS"
 grep "RING_DROP" "$LOGFILE" || true
 
 echo ""
+echo "--- RING_OVERFLOW_BY_BUF ---"
+# buf=phone and buf=raw_rx are suppressed in firmware since 898ba570.
+grep -oE 'RING_OVERFLOW buf=[a-z_]+' "$LOGFILE" | sort | uniq -c | sort -rn || true
+
+echo ""
 echo "--- RING_WATERMARK ---"
 grep "RING_STATUS" "$LOGFILE" | grep -oE 'queued=[0-9]+' | awk -F= '{
     v = $2 + 0
@@ -846,28 +907,29 @@ CRC_ERR_N=$((CRC_ERR_ESP2 + CRC_ERR_NRF2))
 echo "CRC_ERROR: ${CRC_ERR_N:-0}"
 DEDUP_N=$(grep -c 'RX_DEDUP_DUP' "$LOGFILE" 2>/dev/null || true); echo "RX_DEDUP_DUP: ${DEDUP_N:-0}"
 LOOP_N=$(grep -c 'RELAY_LOOP_BLOCKED' "$LOGFILE" 2>/dev/null || true); echo "RELAY_LOOP_BLOCKED: ${LOOP_N:-0}"
-AFD_N=$(grep -c 'ACK_FWD_DROPPED' "$LOGFILE" 2>/dev/null || true); echo "ACK_FWD_DROPPED: ${AFD_N:-0}"
-GAD_N=$(grep -c 'GW_ACK_DROPPED' "$LOGFILE" 2>/dev/null || true); echo "GW_ACK_DROPPED: ${GAD_N:-0}"
-AFDD_N=$(grep -c 'ACK_FWD_DEDUP' "$LOGFILE" 2>/dev/null || true); echo "ACK_FWD_DEDUP: ${AFDD_N:-0}"
-GADD_N=$(grep -c 'GW_ACK_DEDUP' "$LOGFILE" 2>/dev/null || true); echo "GW_ACK_DEDUP: ${GADD_N:-0}"
 RXOE_N=$(grep -c 'RX_OTHER_ERROR' "$LOGFILE" 2>/dev/null || true); echo "RX_OTHER_ERROR: ${RXOE_N:-0}"
-RTGU_N=$(grep -c 'RETRANSMIT_GIVEUP' "$LOGFILE" 2>/dev/null || true); echo "RETRANSMIT_GIVEUP: ${RTGU_N:-0}"
-IRQS_N=$(grep -c 'RX_IRQ_STALE' "$LOGFILE" 2>/dev/null || true); echo "RX_IRQ_STALE: ${IRQS_N:-0}"
+RTGU_N=$(grep -c 'RETRANSMIT_GIVEUP retries=' "$LOGFILE" 2>/dev/null || true); echo "RETRANSMIT_GIVEUP: ${RTGU_N:-0}"
+# Three distinct events (an unanchored RX_IRQ_STALE counted all of them,
+# i.e. one stale IRQ twice: the rssi line plus its forced-restart line).
+IRQS_N=$(grep -c 'RX_IRQ_STALE rssi=' "$LOGFILE" 2>/dev/null || true); echo "RX_IRQ_STALE: ${IRQS_N:-0}"
+IRQE_N=$(grep -c 'RX_IRQ_STALE_EARLY' "$LOGFILE" 2>/dev/null || true); echo "RX_IRQ_STALE_EARLY: ${IRQE_N:-0}"
+IRQF_N=$(grep -c 'RX_IRQ_STALE forced restart' "$LOGFILE" 2>/dev/null || true); echo "RX_IRQ_STALE_FORCED_RESTART: ${IRQF_N:-0}"
 
 echo ""
 echo "--- HOP_LIMIT_DROPS ---"
 # Packets where relay was suppressed due to hop limit
 # These show up as MH-LoRa but NOT RX-LoRa2 (heard but not accepted)
-# We detect by counting path segments in MH-LoRa lines
-grep "MH-LoRa:" "$LOGFILE" | awk '{
+# We detect by counting relays in MH-LoRa lines. The route is
+# originator,relay1,relay2,...>dest, so relays = commas before ">"
+# (callsigns = relays + 1).
+grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '{
     for (i=1; i<=NF; i++) {
         if ($i ~ />/) {
             # Count commas in the path before ">"
             split($i, parts, ">")
             path = parts[1]
-            n = gsub(/,/, ",", path)
-            path_len = n + 1  # number of callsigns = relays
-            if (path_len > 4) {
+            relays = gsub(/,/, ",", path)
+            if (relays > 3) {
                 high_path++
                 # Extract msg_id (xHEXHEXHEX)
                 for (j=1; j<=NF; j++) {
@@ -876,40 +938,42 @@ grep "MH-LoRa:" "$LOGFILE" | awk '{
                 for (j=1; j<=NF; j++) {
                     if ($j ~ /^H[0-9A-F][0-9A-F]$/) { hop = $j; break }
                 }
-                # payload type
-                type = ""
-                if (/H@R/ || /HG@R/) type = "HB"
-                else if (/\*!/) type = "POS"
-                else type = "TXT"
             }
-            path_dist[path_len]++
+            path_dist[relays]++
+            if (relays > maxp) maxp = relays
             break
         }
     }
 }
+BEGIN { maxp = -1 }
 END {
+    # Rows in relay order (0..max) straight from awk: an outer `sort -n`
+    # interleaved the header and trailer lines with the relays=0 row.
     printf "--- PATH_LENGTH_DISTRIBUTION ---\n"
-    printf "%-8s %8s\n", "PATH_LEN", "COUNT"
-    for (p in path_dist) printf "%-8d %8d\n", p, path_dist[p]
-    printf "\nPATH_LENGTH_GT_4: %d\n", high_path+0
-}' | sort -t' ' -k1 -n || true
+    printf "%-8s %8s\n", "RELAYS", "COUNT"
+    for (p = 0; p <= maxp; p++) if (p in path_dist) printf "%-8d %8d\n", p, path_dist[p]
+    printf "\nRELAYS_GT_3: %d\n", high_path+0
+}' || true
 
 echo ""
 echo "--- ALL_DROPS_SAMPLES ---"
-grep -E 'RING_DROP|RX_OTHER_ERROR|RELAY_LOOP_BLOCKED|RX_IRQ_STALE|RETRANSMIT_GIVEUP' "$LOGFILE" | head -30 || true
+grep -E 'RING_DROP|RX_OTHER_ERROR|RELAY_LOOP_BLOCKED|RX_IRQ_STALE( rssi=|_EARLY| forced)|RETRANSMIT_GIVEUP' "$LOGFILE" | head -30 || true
 
 # ─── 19. HIGH HOP PACKETS ───
 section "HIGH_HOP_PACKETS"
 
-# List all packets with path length > 4 (more than 4 relay hops)
-grep "MH-LoRa:" "$LOGFILE" | awk '{
+# List all packets with more than 3 relays (originator + >3 relays in the route)
+grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '{
+    ptype = ""
+    for (i=1; i<=NF; i++) {
+        if ($i ~ /^MH-LoRa:?$/) { ptype = $(i+2); break }
+    }
     for (i=1; i<=NF; i++) {
         if ($i ~ />/) {
             split($i, parts, ">")
             path = parts[1]
-            n = gsub(/,/, ",", path)
-            path_len = n + 1
-            if (path_len > 4) {
+            relays = gsub(/,/, ",", path)
+            if (relays > 3) {
                 # Reconstruct key info
                 mid = "?"
                 hop = "?"
@@ -919,11 +983,12 @@ grep "MH-LoRa:" "$LOGFILE" | awk '{
                 for (j=1; j<=NF; j++) {
                     if ($j ~ /^H[0-9A-F][0-9A-F]$/) { hop = $j; break }
                 }
-                type = "?"
-                if (/H@R/ || /HG@R/) type = "HB"
-                else if (/\*!/) type = "POS"
-                else type = "TXT"
-                printf "%s %s path_len=%d hop_remain=%s type=%s path=%s\n", $2, mid, path_len, hop, type, $i
+                # payload type = field after the 3-digit length (printBuffer_aprs %c)
+                type = "OTHER"
+                if (ptype == "@") type = "HB"
+                else if (ptype == "!") type = "POS"
+                else if (ptype == ":") type = "TXT"
+                printf "%s %s relays=%d hop_remain=%s type=%s path=%s\n", $2, mid, relays, hop, type, $i
             }
             break
         }
@@ -932,53 +997,58 @@ grep "MH-LoRa:" "$LOGFILE" | awk '{
 
 echo ""
 echo "--- PATH_LENGTH_SUMMARY ---"
-grep "MH-LoRa:" "$LOGFILE" | awk '{
+grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '{
     for (i=1; i<=NF; i++) {
         if ($i ~ />/) {
             split($i, parts, ">")
             path = parts[1]
-            n = gsub(/,/, ",", path)
-            path_len = n + 1
-            dist[path_len]++
+            relays = gsub(/,/, ",", path)
+            dist[relays]++
             total++
+            if (relays > maxp) maxp = relays
             break
         }
     }
 }
+BEGIN { maxp = -1 }
 END {
-    printf "%-8s %8s %8s\n", "PATH_LEN", "COUNT", "PCT%"
-    for (p in dist) printf "%-8d %8d %8.1f\n", p, dist[p], dist[p] * 100.0 / total
+    printf "%-8s %8s %8s\n", "RELAYS", "COUNT", "PCT%"
+    for (p = 0; p <= maxp; p++) if (p in dist) printf "%-8d %8d %8.1f\n", p, dist[p], dist[p] * 100.0 / total
     printf "TOTAL: %d\n", total
-}' | sort -t' ' -k1 -n || true
+}' || true
 
 # ─── 20. CROSS-LOG CORRELATION ───
 if [ $# -ge 2 ] && [ -f "$2" ]; then
-    LOGFILE2="$(normalize_log "$2")"
+    INPUT2="$2"
+    normalize_log "$2"
+    LOGFILE2="$NORM_RESULT"
     section "CROSS_CORRELATION"
 
-    echo "LOG1: $LOGFILE"
-    echo "LOG2: $LOGFILE2"
+    echo "LOG1: $INPUT1"
+    echo "LOG2: $INPUT2"
 
     # Extract msg_ids and timestamps from MH-LoRa lines in both logs
-    grep "MH-LoRa:" "$LOGFILE" | awk '{
+    new_tmp; XLOG1="$NEW_TMP"
+    new_tmp; XLOG2="$NEW_TMP"
+    grep -E 'MH-LoRa:? ' "$LOGFILE" | awk '{
         for (i=1; i<=NF; i++) {
             if ($i ~ /^x[A-Fa-f0-9]{8}$/) { print $i, $2; break }
         }
-    }' | sort -u -k1,1 > /tmp/cross_log1_msgids.txt
+    }' | sort -u -k1,1 > "$XLOG1"
 
-    grep "MH-LoRa:" "$LOGFILE2" | awk '{
+    grep -E 'MH-LoRa:? ' "$LOGFILE2" | awk '{
         for (i=1; i<=NF; i++) {
             if ($i ~ /^x[A-Fa-f0-9]{8}$/) { print $i, $2; break }
         }
-    }' | sort -u -k1,1 > /tmp/cross_log2_msgids.txt
+    }' | sort -u -k1,1 > "$XLOG2"
 
-    LOG1_TOTAL=$(wc -l < /tmp/cross_log1_msgids.txt | tr -d ' ')
-    LOG2_TOTAL=$(wc -l < /tmp/cross_log2_msgids.txt | tr -d ' ')
+    LOG1_TOTAL=$(wc -l < "$XLOG1" | tr -d ' ')
+    LOG2_TOTAL=$(wc -l < "$XLOG2" | tr -d ' ')
 
     # Common msg_ids
-    COMMON=$(comm -12 <(awk '{print $1}' /tmp/cross_log1_msgids.txt | sort) <(awk '{print $1}' /tmp/cross_log2_msgids.txt | sort) | wc -l | tr -d ' ')
-    ONLY_LOG1=$(comm -23 <(awk '{print $1}' /tmp/cross_log1_msgids.txt | sort) <(awk '{print $1}' /tmp/cross_log2_msgids.txt | sort) | wc -l | tr -d ' ')
-    ONLY_LOG2=$(comm -13 <(awk '{print $1}' /tmp/cross_log1_msgids.txt | sort) <(awk '{print $1}' /tmp/cross_log2_msgids.txt | sort) | wc -l | tr -d ' ')
+    COMMON=$(comm -12 <(awk '{print $1}' "$XLOG1" | sort) <(awk '{print $1}' "$XLOG2" | sort) | wc -l | tr -d ' ')
+    ONLY_LOG1=$(comm -23 <(awk '{print $1}' "$XLOG1" | sort) <(awk '{print $1}' "$XLOG2" | sort) | wc -l | tr -d ' ')
+    ONLY_LOG2=$(comm -13 <(awk '{print $1}' "$XLOG1" | sort) <(awk '{print $1}' "$XLOG2" | sort) | wc -l | tr -d ' ')
 
     echo "LOG1_UNIQUE_MSGIDS: $LOG1_TOTAL"
     echo "LOG2_UNIQUE_MSGIDS: $LOG2_TOTAL"
@@ -998,7 +1068,7 @@ if [ $# -ge 2 ] && [ -f "$2" ]; then
     echo ""
     echo "--- RELAY_DELAY ---"
     # For common msg_ids, compute time difference between first reception in each log
-    join -j 1 <(sort -k1,1 /tmp/cross_log1_msgids.txt) <(sort -k1,1 /tmp/cross_log2_msgids.txt) | awk '{
+    join -j 1 <(sort -k1,1 "$XLOG1") <(sort -k1,1 "$XLOG2") | awk '{
         # $1=msg_id, $2=ts_log1 (HH:MM:SS.mmm), $3=ts_log2 (HH:MM:SS.mmm)
         split($2, t1, ":")
         split(t1[3], s1, ".")
@@ -1037,14 +1107,13 @@ if [ $# -ge 2 ] && [ -f "$2" ]; then
 
     echo ""
     echo "--- ONLY_IN_LOG1_SAMPLES ---"
-    comm -23 <(awk '{print $1}' /tmp/cross_log1_msgids.txt | sort) <(awk '{print $1}' /tmp/cross_log2_msgids.txt | sort) | head -20 || true
+    comm -23 <(awk '{print $1}' "$XLOG1" | sort) <(awk '{print $1}' "$XLOG2" | sort) | head -20 || true
 
     echo ""
     echo "--- ONLY_IN_LOG2_SAMPLES ---"
-    comm -13 <(awk '{print $1}' /tmp/cross_log1_msgids.txt | sort) <(awk '{print $1}' /tmp/cross_log2_msgids.txt | sort) | head -20 || true
+    comm -13 <(awk '{print $1}' "$XLOG1" | sort) <(awk '{print $1}' "$XLOG2" | sort) | head -20 || true
 
-    # Cleanup cross-correlation temp files
-    rm -f /tmp/cross_log1_msgids.txt /tmp/cross_log2_msgids.txt
+    # Temp files are removed by the EXIT trap.
 fi
 
 # ─── PRIORITY DISTRIBUTION ───
@@ -1105,7 +1174,7 @@ BEGIN {
     # HEAP
     heap_cnt = 0; heap_sum = 0; heap_sumsq = 0
     heap_min = 999999999; heap_max = 0
-    heap_mon_cnt = 0; heap_lwm = 999999999; heap_hwm = 0
+    heap_mon_cnt = 0; heap_ext_cnt = 0; heap_lwm = 999999999; heap_mab = 0; heap_mab_min = 999999999
     heap_prev = 0; heap_mono_dec = 0; heap_mono_max = 0
     heap_first = 0; heap_first_ts = ""
     psrm_val = ""
@@ -1118,8 +1187,9 @@ BEGIN {
 
     # Server
     keep_cnt = 0; last_keep_sec = -1; keep_gap_cnt = 0
-    wifi_connect = 0; wifi_disconnect = 0; udp_reset = 0
-    client_disconnect = 0
+    wifi_gotip = 0; wifi_connect_legacy = 0
+    wifi_disc_event = 0; wifi_disc_legacy = 0
+    wifi_stall = 0; udp_reset = 0
 
     # NTP
     ntp_cnt = 0; ntp_prev_sec = -1
@@ -1139,8 +1209,9 @@ BEGIN {
     last_rx_rssi = 0; last_rx_snr = 0; last_rx_ferr = 0; has_rx = 0
     last_rx_hour = 0
 
-    # Top talkers: heard[cs], tx_own = 0, tx_relay = 0
-    tx_own = 0; tx_relay = 0; relay_q_cnt = 0
+    # Top talkers: heard[cs]; TX counters (tx_srv0/tx_srv1/tx_total) below
+    # S0/S1 in a packet line is the msg_server (server) flag, NOT own-vs-relay.
+    tx_srv0 = 0; tx_srv1 = 0; tx_total = 0; tx_ack_frames = 0; relay_q_cnt = 0
 
     # Channel util diagram: chutil_hour_sum[hh], chutil_hour_cnt[hh]
     # CSMA timing: wait histogram
@@ -1154,16 +1225,15 @@ BEGIN {
     tx_gate_cnt = 0
 
     # CAD enhanced
-    cad_busy_cnt = 0; cad_fp_cnt = 0; cad_giveup_cnt = 0
+    # cad_busy1_cnt = CAD_BUSY_1 (initial busy), cad_busy_cnt = "CAD_BUSY attempt="
+    # (confirmed busy after the double-check)
+    cad_busy1_cnt = 0; cad_busy_cnt = 0; cad_fp_cnt = 0; cad_abort_rx = 0
+    cad_safety_cnt = 0
     # CAD per hour: cad_busy_hour[hh], cad_fp_hour[hh]
 
     # ACK
-    ack_cnt = 0; ack_rx_cancel = 0; ack_fwd_dedup = 0
-    ack_gw_dedup = 0; ack_skip = 0; ack_tx = 0
-    ack_cancel_retx = 0; ack_fwd_drop = 0; ack_gw_drop = 0
-    ack_cad_busy = 0
-    # ACK burst detection: last 10 ack timestamps
-    ack_burst_cnt = 0
+    ack_cnt = 0; ack_received = 0; ack_skip = 0; ack_reject = 0
+    ack_appendix = 0
 
     # Interferer
     interf_cnt = 0
@@ -1206,10 +1276,19 @@ function stddev(sum, sumsq, n) {
 }
 
 # ── HEAP ──
-/\[HEAP\]/ {
-    n = split($0, parts, ";")
-    if (n >= 3) {
-        val = parts[3] + 0
+# Three forms (all: free, min_free, max_alloc, tag after the "[HEAP]" tag):
+#   csv   [HEAP];HH:MM:SS;free;min;maxalloc;(mon|init)   (--debug csv)
+#   space [HEAP] HH:MM:SS free min maxalloc (mon|init)   (default ESP32)
+#   nRF52 HH:MM:SS;[HEAP];free;min;maxalloc;(mon)        (Serial.printf)
+# "[HEAP]Cnew" / "[HEAP]Cdis" (web clients) have no separator and are skipped.
+/\[HEAP\][; ]/ {
+    hrest = $0
+    sub(/^.*\[HEAP\][; ]+/, "", hrest)
+    n = split(hrest, parts, /[; ]+/)
+    hk = 1
+    if (parts[1] ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/) hk = 2
+    if (n >= hk) {
+        val = parts[hk] + 0
         if (val > 0) {
             heap_cnt++
             heap_sum += val
@@ -1236,14 +1315,18 @@ function stddev(sum, sumsq, n) {
             }
             heap_prev = val
 
-            # Extended format: HH:MM:SS;[HEAP];current;low;high;(mon)
-            # parts[6] = "(mon)", parts[4] = low_watermark, parts[5] = high_watermark
-            if (n >= 6 && parts[6] ~ /mon/) {
-                heap_mon_cnt++
-                lwm = parts[4] + 0
-                hwm_val = parts[5] + 0
+            # parts[hk+1] = min_free (low watermark), parts[hk+2] = largest
+            # allocatable block (NOT a high watermark), parts[hk+3] = tag.
+            if (n >= hk + 3) {
+                heap_ext_cnt++
+                if (parts[hk+3] ~ /mon/) heap_mon_cnt++
+                lwm = parts[hk+1] + 0
+                mab_val = parts[hk+2] + 0
                 if (lwm > 0 && lwm < heap_lwm) heap_lwm = lwm
-                if (hwm_val > 0 && hwm_val > heap_hwm) heap_hwm = hwm_val
+                if (mab_val > 0) {
+                    if (mab_val > heap_mab) heap_mab = mab_val
+                    if (mab_val < heap_mab_min) heap_mab_min = mab_val
+                }
             }
         }
     }
@@ -1368,10 +1451,21 @@ function stddev(sum, sumsq, n) {
 }
 
 # ── Server: WiFi events ──
-/\[WIFI\].*connect OK/ { wifi_connect++ }
-/\[WIFI\].*disconnect/ { wifi_disconnect++ }
-/Client disconnected/ { client_disconnect++ }
-/UDP.*reset\|UDP.*Reset/ { udp_reset++ }
+# Current firmware: [WIFI];event;got_ip / [WIFI];event;disconnected /
+# [WIFI];stall (src/udp_functions.cpp). "connect OK" and "[WIFI]...disconnect"
+# are the legacy human-readable forms (used only when no event lines exist).
+# "Client disconnected" is the web/2323 client and is not a WiFi event.
+/\[WIFI\];event;got_ip/ { wifi_gotip++ }
+/\[WIFI\].*connect OK/ { wifi_connect_legacy++ }
+/\[WIFI\];event;disconnected/ { wifi_disc_event++ }
+/\[WIFI\]\.\.\..*disconnect/ { wifi_disc_legacy++ }
+/\[WIFI\];stall/ { wifi_stall++ }
+# UDP resets: resetMeshComUDP() (src/udp_functions.cpp) prints exactly one
+# "[WIFI-DBG] resetMeshComUDP: WiFi disconnected, ..." line per call, whichever
+# caller triggered it. The caller-side lines ("calling resetMeshComUDP",
+# "[UDP] ... resetting") describe the same reset and are not counted again.
+# Packet lines (payload text) never count.
+/resetMeshComUDP:/ && !/(MH|RX|TX)-LoRa2? / && !/NEW-TXT:? / { udp_reset++ }
 
 # ── NTP ──
 /TimeClient now/ {
@@ -1424,7 +1518,8 @@ function stddev(sum, sumsq, n) {
 }
 
 # ── MH-LoRa: per-node signal profiling + top talkers ──
-/MH-LoRa:/ {
+# Tag is "MH-LoRa " (since c78adcc5) or legacy "MH-LoRa:".
+/MH-LoRa:? / {
     cs = ""
     is_direct = 0
     pkt_size = 0
@@ -1445,7 +1540,7 @@ function stddev(sum, sumsq, n) {
         }
     }
 
-    # Packet size (3-digit number after "MH-LoRa:")
+    # Packet size (first 3-digit field: the one after the tag)
     for (i = 1; i <= NF; i++) {
         if ($i ~ /^[0-9][0-9][0-9]$/) { pkt_size = $i + 0; break }
     }
@@ -1512,12 +1607,15 @@ function stddev(sum, sumsq, n) {
     }
 }
 
-# ── TX-LoRa: own TX tracking ──
-/TX-LoRa:/ {
+# ── TX-LoRa: TX tracking ("TX-LoRa  075 ..."; legacy "TX-LoRa: 075 ...") ──
+# ACK frames are "TX-Lora " (lowercase) and counted separately.
+/TX-Lora +[0-9][0-9][0-9] / { tx_ack_frames++ }
+/TX-LoRa:? +[0-9][0-9][0-9] / {
+    tx_total++
     for (i = 1; i <= NF; i++) {
         if ($i ~ /^S[01]$/) {
-            if ($i == "S0") tx_own++
-            else tx_relay++
+            if ($i == "S0") tx_srv0++
+            else tx_srv1++
             break
         }
     }
@@ -1539,23 +1637,20 @@ function stddev(sum, sumsq, n) {
 }
 
 # ── CAD enhanced ──
-/CAD_BUSY/ { cad_busy_cnt++; cad_busy_hour[line_hour]++ }
+/CAD_BUSY_1/ { cad_busy1_cnt++; cad_busy1_hour[line_hour]++ }
+/CAD_BUSY attempt=/ { cad_busy_cnt++; cad_busy_hour[line_hour]++ }
 /CAD_FALSE_POSITIVE/ { cad_fp_cnt++; cad_fp_hour[line_hour]++ }
-/CAD_GIVEUP/ { cad_giveup_cnt++ }
+/CAD_ABORT_BY_RX/ { cad_abort_rx++ }
+/CAD_SAFETY_TIMEOUT/ { cad_safety_cnt++ }
 
 # ── TX gate ──
 /TX_GATE_ENTER/ { tx_gate_cnt++; tx_gate_hour[line_hour]++ }
 
 # ── ACK events ──
-/ACK_RX_CANCEL/ { ack_rx_cancel++; ack_cnt++ }
-/ACK_FWD_DEDUP/ { ack_fwd_dedup++; ack_cnt++ }
-/ACK_GW_DEDUP/ { ack_gw_dedup++; ack_cnt++ }
-/ACK_SKIP/ { ack_skip++; ack_cnt++ }
-/ACK_FAST_TX/ { ack_tx++; ack_cnt++ }
-/ACK_CANCEL_RETRANSMIT/ { ack_cancel_retx++; ack_cnt++ }
-/ACK_FWD_DROPPED/ { ack_fwd_drop++; ack_cnt++ }
-/ACK_GW_DROPPED/ { ack_gw_drop++; ack_cnt++ }
-/ACK_CAD_BUSY/ { ack_cad_busy++; ack_cnt++ }
+/ACK_RECEIVED retid=/ { ack_received++; ack_cnt++ }
+/ACK_SKIP_READY slot=/ { ack_skip++; ack_cnt++ }
+/ACK_REJECT b5=/ { ack_reject++; ack_cnt++ }
+/ACK_APPENDIX hash=/ { ack_appendix++; ack_cnt++ }
 
 # ── BLE TX Latency: track user_msg path ──
 /RING_WRITE.*src=user_msg/ {
@@ -1570,7 +1665,9 @@ function stddev(sum, sumsq, n) {
         ble_queued[bmid] = substr($0, RSTART+7, RLENGTH-7) + 0
 }
 
-/NEW-TXT:/ {
+/NEW-TXT:? / {
+    # Fields after the msg_id: Hxx Sx Tx Mxx route -> text starts at bi+5
+    # (same offsets with or without the colon: the tag is one token).
     for (bi = 1; bi <= NF; bi++) {
         if ($bi ~ /^x[0-9A-Fa-f]{8}$/) {
             bmid = substr($bi, 2)
@@ -1602,11 +1699,14 @@ function stddev(sum, sumsq, n) {
     }
 }
 
-/TX-LoRa:.*S0/ {
+/TX-LoRa:? +[0-9][0-9][0-9] / {
+    # msg_id must be one of our user_msg ids (RING_WRITE src=user_msg), which
+    # replaces the former "S0" test (S0 is the server flag, not "own").
     for (bi = 1; bi <= NF; bi++) {
         if ($bi ~ /^x[0-9A-Fa-f]{8}$/) {
             bmid = substr($bi, 2)
-            if (bmid in ble_is_user)
+            # first TX only: a retransmission would stretch the latency
+            if ((bmid in ble_is_user) && !(bmid in ble_tx_sec))
                 ble_tx_sec[bmid] = line_sec
             break
         }
@@ -1622,11 +1722,11 @@ END {
     if (heap_cnt > 0) {
         avg = heap_sum / heap_cnt
         sd = stddev(heap_sum, heap_sumsq, heap_cnt)
-        printf "SAMPLES: %d (simple: %d, extended/mon: %d)\n", heap_cnt, heap_cnt - heap_mon_cnt, heap_mon_cnt
+        printf "SAMPLES: %d (simple: %d, extended: %d, of which mon: %d)\n", heap_cnt, heap_cnt - heap_ext_cnt, heap_ext_cnt, heap_mon_cnt
         printf "FREE_HEAP: MIN=%d  MAX=%d  AVG=%.0f  STDDEV=%.0f\n", heap_min, heap_max, avg, sd
-        if (heap_mon_cnt > 0) {
+        if (heap_ext_cnt > 0) {
             if (heap_lwm < 999999999) printf "LOW_WATERMARK: %d (from extended monitoring)\n", heap_lwm
-            if (heap_hwm > 0) printf "HIGH_WATERMARK: %d (from extended monitoring)\n", heap_hwm
+            if (heap_mab > 0) printf "MAX_ALLOC_BLOCK: MIN=%d  MAX=%d (largest allocatable block; MIN = worst fragmentation)\n", heap_mab_min, heap_mab
         }
         if (psrm_val != "") printf "PSRAM: %s\n", psrm_val
 
@@ -1732,12 +1832,16 @@ END {
     }
     print ""
     print "--- WIFI_EVENTS ---"
+    wifi_connect = (wifi_gotip > 0) ? wifi_gotip : wifi_connect_legacy
+    wifi_disconnect = (wifi_disc_event > 0) ? wifi_disc_event : wifi_disc_legacy
     printf "  WIFI_CONNECT: %d\n", wifi_connect
     printf "  WIFI_DISCONNECT: %d\n", wifi_disconnect
-    printf "  CLIENT_DISCONNECT: %d\n", client_disconnect
+    printf "  WIFI_STALL: %d\n", wifi_stall
     printf "  UDP_RESET: %d\n", udp_reset
     print ""
-    if (keep_gap_cnt == 0) {
+    if (keep_cnt == 0) {
+        print "SERVER_HEALTH: n/a (no [KEEP] heartbeats in log)"
+    } else if (keep_gap_cnt == 0) {
         print "SERVER_HEALTH: HEALTHY (no heartbeat gaps detected)"
     } else if (keep_gap_cnt <= 2) {
         print "SERVER_HEALTH: MINOR_ISSUES (occasional gaps)"
@@ -1920,14 +2024,17 @@ END {
     }
     print ""
     print "--- OWN TX BREAKDOWN ---"
-    tx_total = tx_own + tx_relay
     if (tx_total > 0) {
-        printf "OWN_ORIGIN (S0): %d packets\n", tx_own
-        printf "OWN_RELAY (S1): %d packets\n", tx_relay
-        printf "RELAY_RATIO: %.1f%%\n", tx_relay * 100.0 / tx_total
+        # S0/S1 = msg_server flag of the frame; the own-vs-relay split is not
+        # derivable from this field.
+        printf "TX_SERVER_FLAG_S0: %d\n", tx_srv0
+        printf "TX_SERVER_FLAG_S1: %d\n", tx_srv1
         printf "TOTAL_TX: %d\n", tx_total
-        printf "EST_OWN_AIRTIME: %.1fs\n", tx_total_size * 0.003
+        printf "EST_TX_AIRTIME: %.1fs\n", tx_total_size * 0.003
+    } else {
+        print "TOTAL_TX: 0"
     }
+    printf "TX_ACK_FRAMES (TX-Lora): %d\n", tx_ack_frames
     printf "RELAY_QUEUED: %d\n", relay_q_cnt
 
     # ════════════════════════════════════════════════════════
@@ -1997,12 +2104,13 @@ END {
 
     print ""
     print "--- CAD_BUSY_VS_TRAFFIC (per hour) ---"
-    printf "%-6s %8s %10s %8s %10s\n", "HOUR", "TX_GATE", "CAD_BUSY", "CAD_FP", "CHAN_UTIL"
+    printf "%-6s %8s %10s %10s %8s %10s\n", "HOUR", "TX_GATE", "CAD_BUSY_1", "CAD_BUSY_C", "CAD_FP", "CHAN_UTIL"
     for (h = 0; h < 24; h++) {
-        if (h in chutil_hour_cnt || h in cad_busy_hour) {
+        if (h in chutil_hour_cnt || h in cad_busy1_hour || h in cad_busy_hour) {
             cu = (h in chutil_hour_cnt) ? chutil_hour_sum[h]/chutil_hour_cnt[h] : 0
-            printf "%02d:00  %8d %10d %8d %9.1f%%\n", h, \
+            printf "%02d:00  %8d %10d %10d %8d %9.1f%%\n", h, \
                 (h in tx_gate_hour ? tx_gate_hour[h] : 0), \
+                (h in cad_busy1_hour ? cad_busy1_hour[h] : 0), \
                 (h in cad_busy_hour ? cad_busy_hour[h] : 0), \
                 (h in cad_fp_hour ? cad_fp_hour[h] : 0), cu
         }
@@ -2020,15 +2128,16 @@ END {
         printf "Observed adaptive wait avg: %.0f ms\n", w_avg
         printf "Observed wait range: %d - %d ms\n", wait_min, wait_max
     }
-    if (cad_busy_cnt > 0 && tx_gate_cnt > 0) {
-        printf "CAD busy rate: %.1f%% (%d busy / %d scans)\n", \
-            cad_busy_cnt * 100.0 / (cad_busy_cnt + tx_gate_cnt), cad_busy_cnt, cad_busy_cnt + tx_gate_cnt
+    if (cad_busy1_cnt > 0 && tx_gate_cnt > 0) {
+        printf "CAD initial-busy rate: %.1f%% (%d CAD_BUSY_1 / %d scans)\n", \
+            cad_busy1_cnt * 100.0 / (cad_busy1_cnt + tx_gate_cnt), cad_busy1_cnt, cad_busy1_cnt + tx_gate_cnt
     }
-    if (cad_fp_cnt > 0 && cad_busy_cnt > 0) {
+    if (cad_busy1_cnt > 0) {
         printf "CAD false positive rate: %.1f%% (%d / %d initial busy)\n", \
-            cad_fp_cnt * 100.0 / cad_busy_cnt, cad_fp_cnt, cad_busy_cnt
+            cad_fp_cnt * 100.0 / cad_busy1_cnt, cad_fp_cnt, cad_busy1_cnt
     }
-    printf "CAD giveup (forced TX): %d\n", cad_giveup_cnt
+    printf "CAD confirmed busy (CAD_BUSY attempt=): %d\n", cad_busy_cnt
+    printf "CAD safety timeout (forced TX, nRF52): %d\n", cad_safety_cnt
     print ""
 
     if (ia_cnt > 0 && wait_cnt > 0) {
@@ -2051,24 +2160,17 @@ END {
     print ""
     print "=== ACK_STORM ==="
     printf "TOTAL_ACK_EVENTS: %d\n", ack_cnt
+    printf "TX_ACK_FRAMES (TX-Lora): %d\n", tx_ack_frames
     print ""
     print "--- ACK_BREAKDOWN ---"
-    printf "  ACK_RX_CANCEL: %d\n", ack_rx_cancel
-    printf "  ACK_FWD_DEDUP: %d\n", ack_fwd_dedup
-    printf "  ACK_GW_DEDUP: %d\n", ack_gw_dedup
-    printf "  ACK_SKIP: %d\n", ack_skip
-    printf "  ACK_FAST_TX: %d\n", ack_tx
-    printf "  ACK_CANCEL_RETRANSMIT: %d\n", ack_cancel_retx
-    printf "  ACK_FWD_DROPPED: %d\n", ack_fwd_drop
-    printf "  ACK_GW_DROPPED: %d\n", ack_gw_drop
-    printf "  ACK_CAD_BUSY: %d\n", ack_cad_busy
+    printf "  ACK_RECEIVED: %d\n", ack_received
+    printf "  ACK_SKIP_READY: %d\n", ack_skip
+    printf "  ACK_REJECT: %d\n", ack_reject
+    printf "  ACK_APPENDIX: %d\n", ack_appendix
     print ""
-    saved = ack_rx_cancel + ack_fwd_dedup + ack_gw_dedup + ack_skip
-    if (saved + ack_tx > 0) {
-        printf "ACK_EFFICIENCY: %.1f%% saved (%d saved / %d total)\n", \
-            saved * 100.0 / (saved + ack_tx), saved, saved + ack_tx
-    }
-    if (ack_cnt < 10) {
+    if (ack_cnt == 0 && tx_ack_frames == 0) {
+        print "ACK_STORM_VERDICT: n/a (no ACK markers in log)"
+    } else if (ack_cnt < 10 && tx_ack_frames < 10) {
         print "NOTE: Very low ACK activity in this log."
     }
 
@@ -2077,13 +2179,14 @@ END {
     # ════════════════════════════════════════════════════════
     print ""
     print "=== CAD_ENHANCED ==="
-    printf "CAD_BUSY_TOTAL: %d\n", cad_busy_cnt
+    printf "CAD_BUSY_1: %d\n", cad_busy1_cnt
+    printf "CAD_BUSY_CONFIRMED: %d\n", cad_busy_cnt
     printf "CAD_FALSE_POSITIVE: %d", cad_fp_cnt
-    if (cad_busy_cnt > 0)
-        printf " (%.1f%% of initial busy)", cad_fp_cnt * 100.0 / cad_busy_cnt
+    if (cad_busy1_cnt > 0)
+        printf " (%.1f%% of CAD_BUSY_1)", cad_fp_cnt * 100.0 / cad_busy1_cnt
     printf "\n"
-    printf "CAD_CONFIRMED_BUSY: %d\n", cad_busy_cnt - cad_fp_cnt
-    printf "CAD_GIVEUP: %d\n", cad_giveup_cnt
+    printf "CAD_ABORT_BY_RX: %d\n", cad_abort_rx
+    printf "CAD_SAFETY_TIMEOUT: %d\n", cad_safety_cnt
 
     # ════════════════════════════════════════════════════════
     # BLE TX LATENCY
@@ -2421,5 +2524,4 @@ END {
 section "END"
 echo "Analysis complete."
 
-# Cleanup
-rm -f /tmp/channel_util.txt
+# Cleanup: temp files are removed by the EXIT trap (cleanup_normalized_tmps).
