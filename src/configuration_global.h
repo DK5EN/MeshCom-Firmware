@@ -399,7 +399,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define EXT_BUSY_MAX_ATTEMPTS 8
 
 // TX-IRQ Watchdog: Maximale Zeit (ms) fuer einen LoRa-TX-Vorgang bevor Zwangs-Recovery
-// SF11 BW250 CR6 255 Bytes ToA ~6s -> 15s gibt ausreichend Sicherheitsabstand
+// SF11 BW250 CR6 255 Bytes, Preamble 32: ToA ~2,7s -> 15s gibt ausreichend Sicherheitsabstand
 #define TX_WATCHDOG_MS      15000
 
 // OnRxDone processing time monitoring
@@ -432,7 +432,7 @@ static inline bool flashLayoutCompatible(int stored)
 // BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): max age (ms) a BACKGROUND (HEY,
 // prio 5) ring entry may sit unsent before txRingAgeBackground()
 // (txring_functions.cpp) drops it. Tradeoff accepted: a node's OWN HEY
-// beacon ages out the same way, and at trickle intervals up to 480 s the
+// beacon ages out the same way, and at trickle intervals up to 900 s the
 // next copy may follow minutes later -- but a neighbourhood report that
 // cannot be transmitted for 3 minutes is worthless on air, and the
 // DJ8MEH blocker that motivated this sat unsent for 10 minutes.
