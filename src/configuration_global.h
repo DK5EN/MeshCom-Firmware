@@ -596,11 +596,10 @@ extern int g_dispRotOffset;
 // -DCONSOLE_UART_TXBUF=n. Native-USB / CDC_ON_BOOT boards are not covered.
 #if defined(ESP32) && !ARDUINO_USB_CDC_ON_BOOT
  #ifndef CONSOLE_UART_TXBUF
-  #if defined(CONFIG_IDF_TARGET_ESP32S3)
-   #define CONSOLE_UART_TXBUF 2048
-  #else
-   #define CONSOLE_UART_TXBUF 1024
-  #endif
+  // 2048 B on every UART console board (bench 2026-10-13: with all debug streams on a
+  // frame prints up to ~1.2 kB; 1024 B still blocked on T-Beam, 2048 B did not;
+  // the ring costs ~2.4 kB of the ~65 kB free heap there)
+  #define CONSOLE_UART_TXBUF 2048
  #endif
 #else
  #undef CONSOLE_UART_TXBUF

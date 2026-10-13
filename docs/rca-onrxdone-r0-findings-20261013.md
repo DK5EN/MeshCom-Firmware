@@ -353,6 +353,29 @@ Image: INSTRUMENT plus the production `CONSOLE_UART_TXBUF` default (2048 B on S3
 7.1 ms, max 7.2 ms, none over 50 ms; print time p50 1.8 ms; non-print p50 2.5 ms; IRQ-to-`readData` p50
 5.3 ms. Equal to the 4096 B experiment of arm F within noise, so 2048 B is enough on this node.
 
+## R2 bench results, T-Beam v1.2 (DK5EN-92, classic ESP32, UART console) and the final DK5EN-1 build
+
+Same flags as arm A (loradebug + setlog + nbrdebug), live traffic, 20 minutes per image, INSTRUMENT images,
+free heap via `--heap` (internal heap, no PSRAM). Per-image JSON in `tools/bench/runs/harness/onrx_*.json`.
+
+| Image                | n   | mean    | p50     | p95     | p99     | max      | over 50 ms | print share | free heap at start |
+| -------------------- | --- | ------- | ------- | ------- | ------- | -------- | ---------- | ----------- | ------------------ |
+| T-Beam, no ring      | 40  | 60.6 ms | 59.7 ms | 93.6 ms | 98.9 ms | 101.7 ms | 24 of 40   | 0.92        | 67,140 B           |
+| T-Beam, 1024 B ring  | 50  | 17.5 ms | 18.0 ms | 48.4 ms | 54.7 ms | 58.4 ms  | 2 of 50    | 0.70        | 65,820 B           |
+| T-Beam, 2048 B ring  | 42  | -       | 9.6 ms  | -       | 18.0 ms | 18.2 ms  | 0 of 42    | 0.38        | 64,740 B           |
+| DK5EN-1, 2048 B ring | 69  | -       | 4.2 ms  | -       | 6.3 ms  | 7.5 ms   | 0 of 69    | 0.39        | -                  |
+
+- **Sizing (Fact):** with all three debug streams on, a frame prints 769 B at the median and up to
+  1159 B (T-Beam) on the bench and 1561 B on the gateway capture, so a 1024 B ring still blocks on the larger
+  frames. 2048 B covers it. The ring costs about 2.4 kB of roughly 65 kB free internal heap on the T-Beam
+  (minimum seen during the run 57.8 kB, 58.6 kB without ring).
+- **Decision:** `CONSOLE_UART_TXBUF` defaults to 2048 B on every UART console board.
+- **Non-print work is slower on the classic ESP32:** 5 to 7 ms p50 against 2.5 ms on the S3, so the
+  T-Beam does not reach the 4 ms of the V3 even with a ring that fits.
+- **STAT line on hardware (DK5EN-1, final build):** four 5-minute STAT lines showed `onrx_p95=5..7`,
+  `onrx_warn=0`; summed `onrx_n=65` against 69 per-frame records (last partial window), STAT max 7 ms
+  against 7.5 ms per frame (STAT counts whole milliseconds).
+
 ## Pre-registered predictions for the DK5EN-98 byte-model nights (written 2026-10-13, before the runs)
 
 Method: for each of the 2652 handlers in `run-20261012-2310.log`, subtract 0.0868 ms per printed byte

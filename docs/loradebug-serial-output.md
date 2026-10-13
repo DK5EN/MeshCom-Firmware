@@ -335,7 +335,8 @@ Auf ESP32-Boards mit UART-Konsole (S3 mit UART-Bridge, klassischer ESP32) blocki
 `Serial.write` ohne TX-Puffer mit 87 us/Byte bei 115200 Baud; die Debug-Ausgabe
 verlaengert dann `OnRxDone` auf zig ms. Das Makro `CONSOLE_UART_TXBUF` (Bytes,
 `src/configuration_global.h`) legt vor dem ersten `begin()` einen TX-Ring an.
-Default: ESP32-S3 2048, klassischer ESP32 1024; per Env `-DCONSOLE_UART_TXBUF=n`
+Default: 2048 B fuer alle UART-Konsolen-Boards (T-Beam-Bench 2026-10-13: 1024 B
+blockierte bei voller Debug-Ausgabe noch, 2048 B nicht; Kosten ca. 2,4 kB Heap); per Env `-DCONSOLE_UART_TXBUF=n`
 aenderbar, `0` schaltet ab. Nicht betroffen: Boards mit `ARDUINO_USB_CDC_ON_BOOT`
 (Native-USB; dort gilt der HWCDC-Ring). Sichtbar im Bootlog als
 `[MC-INFO] CONSOLE_TXBUF bytes=<n> ok=<0|1>` und in `--info` als Token

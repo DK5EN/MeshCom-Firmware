@@ -175,7 +175,7 @@ Advisor gate (Opus medium) after R0 and after every behavioural wave.
   Real captures: overnight 10-12 STAT dup 1178 vs DUP:d 1182 (diff 4, was 43); soak 09-29 6069 vs 6069
   (was diff 52). Seven new tests with mutation proof. Firmware counting unchanged.
 - **Issue B (operator decision R2-b: console TX ring).** `CONSOLE_UART_TXBUF` (`configuration_global.h`):
-  2048 B on ESP32-S3 UART consoles, 1024 B on classic ESP32, 0 disables, out for every
+  2048 B on every UART console board (S3 and classic ESP32; 1024 B on classic was benched and was too small), 0 disables, out for every
   `ARDUINO_USB_CDC_ON_BOOT` board. Applied once before the real `begin()` by `console_txbuf_apply()`
   (`esp32_main.cpp`; from `MeshSerialClass::begin()` when the net console is compiled in). Visible as
   boot line `[MC-INFO] CONSOLE_TXBUF` and `--info` token `...CONSOLE_TXBUF n/ok`. A shutdown handler and a
