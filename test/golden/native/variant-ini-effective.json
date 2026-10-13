@@ -2375,6 +2375,7 @@
    "test_extern_msg_json",
    "test_mcp17_bits",
    "test_setlog_lines",
+   "test_onrx_stats",
    "test_gps_filter",
    "test_alt_fusion",
    "test_kbd_repeat",

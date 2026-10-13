@@ -231,6 +231,7 @@ flashes whatever is attached.
 | test_nrf52_settings_paths    | Integration   |    26 | native_nrf52_settings_paths                                  |
 | test_ntp_async               | Regression    |    10 | native                                                       |
 | test_ntp_harvest             | Regression    |     4 | native                                                       |
+| test_onrx_stats              | Unit          |    12 | native                                                       |
 | test_own_msg_status          | Regression    |    13 | native                                                       |
 | test_pn_retry                | Unit          |    34 | native_pnretry                                               |
 | test_pos_persist             | Unit          |     9 | native                                                       |

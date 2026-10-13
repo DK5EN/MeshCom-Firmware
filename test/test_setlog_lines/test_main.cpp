@@ -230,6 +230,12 @@ static void fuelleStat(struct setlogStatFields *f)
     f->flash = 20260901u;
     f->up_s = 86400;
     f->t_ms = 86400000u;
+    f->onrx_n = 1200;
+    f->onrx_avg_ms = 3;
+    f->onrx_p95_ms = 9;
+    f->onrx_p99_ms = 21;
+    f->onrx_max_ms = 47;
+    f->onrx_warn = 0;
 }
 
 static void test_stat_typischer_fall(void)
@@ -243,7 +249,8 @@ static void test_stat_typischer_fall(void)
     TEST_ASSERT_EQUAL_STRING(
         "STAT util=17 rx=51000 tx=2400 newid=812 dup=1943 err=27 txn=96 txfail=1 "
         "ringmax=7/20 drop=0/0/3/0/12 mh=34 heap=148320 trk=600/4 "
-        "fw=35p/20260901 up=86400 t=86400000",
+        "fw=35p/20260901 up=86400 t=86400000"
+        " onrx_n=1200 onrx_avg=3 onrx_p95=9 onrx_p99=21 onrx_max=47 onrx_warn=0",
         buf);
     TEST_ASSERT_EQUAL_INT((int)strlen(buf), len);
     // Gemessen 164 Byte. Die 160-Byte-Schranke aus Rahmenbedingung 4 des
@@ -252,7 +259,7 @@ static void test_stat_typischer_fall(void)
     // loc_buf[600] in printfdeb_functions.cpp. Siehe Eskalation im
     // Wellenbericht. Diese Schranke nagelt fest, dass die Zeile nicht
     // unbemerkt weiter waechst.
-    TEST_ASSERT_TRUE(len < 200);
+    TEST_ASSERT_TRUE(len < 240);
 }
 
 static void test_stat_maximalfall(void)
@@ -277,6 +284,8 @@ static void test_stat_maximalfall(void)
     f.flash = 4294967295u;
     f.up_s = 4294967295u;
     f.t_ms = 4294967295u;
+    f.onrx_n = f.onrx_avg_ms = f.onrx_p95_ms = f.onrx_p99_ms = 4294967295u;
+    f.onrx_max_ms = f.onrx_warn = 4294967295u;
 
     int len = setlogFormatStat(buf, sizeof(buf), &f);
 
@@ -285,13 +294,19 @@ static void test_stat_maximalfall(void)
         "STAT util=100 rx=300000 tx=300000 newid=4294967295 dup=4294967295 "
         "err=4294967295 txn=4294967295 txfail=4294967295 ringmax=20/20 "
         "drop=65535/65535/65535/65535/65535 mh=65535 heap=4294967295 "
-        "trk=4294967295/65535 fw=255z/4294967295 up=4294967295 t=4294967295",
+        "trk=4294967295/65535 fw=255z/4294967295 up=4294967295 t=4294967295"
+        " onrx_n=4294967295 onrx_avg=4294967295 onrx_p95=4294967295 "
+        "onrx_p99=4294967295 onrx_max=4294967295 onrx_warn=4294967295",
         buf);
+    // Absolute worst case must fit the 400-byte buffers at the call sites
+    // (esp32_main.cpp, nrf52_main.cpp) without truncation.
+    TEST_ASSERT_TRUE(len < 400);
+    TEST_ASSERT_EQUAL_INT((int)strlen(buf), len);
     // Gemessen 254 Byte: der arithmetische Extremfall (alle Zaehler am
     // uint32-Anschlag, den ein 5-Minuten-Fenster nie erreicht) bleibt weit
     // unter loc_buf[600] -- die STAT-Zeile loest also niemals ein malloc in
     // printfdeb() aus.
-    TEST_ASSERT_TRUE(len < 300);
+    TEST_ASSERT_TRUE(len < 400);
 }
 
 static void test_stat_ohne_struct_schreibt_nichts(void)
@@ -431,6 +446,10 @@ static void test_alle_formatstrings_unter_300_zeichen(void)
     char buf[400];
     fuelleStat(&f);
     TEST_ASSERT_TRUE(setlogFormatStat(buf, sizeof(buf), &f) < 300);
+    // onrx_* sits at the very end so older regex consumers keep matching.
+    const char *t = strstr(buf, " onrx_n=");
+    TEST_ASSERT_NOT_NULL(t);
+    TEST_ASSERT_EQUAL_STRING(" onrx_n=1200 onrx_avg=3 onrx_p95=9 onrx_p99=21 onrx_max=47 onrx_warn=0", t);
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +509,8 @@ static void test_grenzen_stat(void)
 
     PRUEFE_GRENZEN("STAT util=17 rx=51000 tx=2400 newid=812 dup=1943 err=27 txn=96 txfail=1 "
                    "ringmax=7/20 drop=0/0/3/0/12 mh=34 heap=148320 trk=600/4 "
-                   "fw=35p/20260901 up=86400 t=86400000",
+                   "fw=35p/20260901 up=86400 t=86400000"
+                   " onrx_n=1200 onrx_avg=3 onrx_p95=9 onrx_p99=21 onrx_max=47 onrx_warn=0",
                    setlogFormatStat(buf, n, &f));
 }
 

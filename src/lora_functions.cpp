@@ -26,6 +26,7 @@
 #include "remote_cmd.h"     // RM: rmIsReply() -- replies are shown, never queued as commands
 #include "rm_rx_gate.h"     // RM: the one receive hook, shared with the server ingress
 #include "hey_echo_upload.h"  // gateway upload of own HEY echoes
+#include "onrx_stats.h"     // OR-STAT: OnRxDone time histogram for the STAT line
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
@@ -144,6 +145,25 @@ bool bNewLine = false;
 // ONRXDONE_TIME monitoring (always active, not behind bLORADEBUG)
 unsigned long onrxdone_max_ms = 0;
 unsigned int  onrxdone_warn_count = 0;
+
+// Called at every processing exit of OnRxDone (ACK, HN report, main; the INSTRUMENT
+// --airgap drop is not a processed frame and is not recorded). Feeds the STAT histogram (unconditional)
+// and the pre-existing max/warn counters (read and reset by the bLORADEBUG
+// ONRXDONE_STATS print, separate from the histogram).
+static void onrxDoneRecord(unsigned long elapsed)
+{
+    onrxStatsAdd((uint32_t)elapsed);
+    if(bLORADEBUG)
+        printfdeb("[MC-DBG] ONRXDONE_TIME ms=%lu\n", elapsed);
+    if(elapsed > onrxdone_max_ms)
+        onrxdone_max_ms = elapsed;
+    if(elapsed > ONRXDONE_WARN_MS)
+    {
+        onrxdone_warn_count++;
+        if(bLORADEBUG)
+            printfdeb("[MC-WARN] ONRXDONE_SLOW ms=%lu threshold=%d\n", elapsed, ONRXDONE_WARN_MS);
+    }
+}
 
 // Deferred display update — avoid I2C transfer inside OnRxDone
 volatile bool bPendingDisplayText = false;
@@ -953,8 +973,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         is_receiving = false;
 
         // Debug I: ONRXDONE_TIME
-        if(bLORADEBUG)
-            printfdeb("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+        onrxDoneRecord(millis() - _onrxdone_start);
 
         iReceiveTimeOutTime = millis();
         csma_timeout = csma_compute_timeout(cad_attempt);
@@ -1183,8 +1202,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 #endif
             is_receiving = false;
 
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+            onrxDoneRecord(millis() - _onrxdone_start);
 
             iReceiveTimeOutTime = millis();
             csma_timeout = csma_compute_timeout(cad_attempt);
@@ -2616,19 +2634,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     // to minimize the RX blind window (BUG #2 fix).
 
     // Debug I: ONRXDONE_TIME — measure processing duration
-    {
-        unsigned long _onrxdone_elapsed = millis() - _onrxdone_start;
-        if(bLORADEBUG)
-            printfdeb("[MC-DBG] ONRXDONE_TIME ms=%lu\n", _onrxdone_elapsed);
-        if(_onrxdone_elapsed > onrxdone_max_ms)
-            onrxdone_max_ms = _onrxdone_elapsed;
-        if(_onrxdone_elapsed > ONRXDONE_WARN_MS)
-        {
-            onrxdone_warn_count++;
-            if(bLORADEBUG)
-                printfdeb("[MC-WARN] ONRXDONE_SLOW ms=%lu threshold=%d\n", _onrxdone_elapsed, ONRXDONE_WARN_MS);
-        }
-    }
+    onrxDoneRecord(millis() - _onrxdone_start);
 
     if(bLORADEBUG)
         printfdeb("OnRxDone\n");

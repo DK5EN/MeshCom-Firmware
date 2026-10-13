@@ -920,6 +920,17 @@ class TestBerglogSetlog(unittest.TestCase):
     # no RLY/TX/ERR/STAT/GWI/GWU lines at all).
     # ------------------------------------------------------------------
 
+    def test_stat_line_with_onrx_tail_still_parses(self) -> None:
+        """The STAT line gained appended `onrx_*` fields (OnRxDone distribution); the
+        parser must accept both the old and the new line."""
+        old = ("12:00:00 [LOG] STAT util=3 rx=900 tx=100 newid=40 dup=9 err=1 txn=2 txfail=0 "
+               "ringmax=5/20 drop=0/0/0/0/0 mh=7 heap=152000 trk=0/0 fw=35p/20260201 up=600 t=123456")
+        new = old + " onrx_n=40 onrx_avg=4 onrx_p95=7 onrx_p99=9 onrx_max=12 onrx_warn=0"
+        self.assertIsNotNone(berglog.RE_STAT.match(old))
+        m = berglog.RE_STAT.match(new)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group("t"), "123456")
+
     def test_pre_setlog_firmware_reports_not_in_firmware(self) -> None:
         old_nodes = berglog.parse_logs([FIXTURE_A, FIXTURE_B])
         res = berglog.a25_setlog(old_nodes, dedup_ring=100)

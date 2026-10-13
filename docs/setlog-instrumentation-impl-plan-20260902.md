@@ -268,7 +268,18 @@ Zeile:
 [LOG] STAT util=<pct> rx=<ms> tx=<ms> newid=<n> dup=<n> err=<n> txn=<n> txfail=<n>
       ringmax=<n>/<MAX_RING> drop=<p1>/<p2>/<p3>/<p4>/<p5> mh=<n> heap=<bytes>
       trk=<interval_s>/<consistent> fw=<major><sub>/<flash> up=<s> t=<millis>
+      onrx_n=<n> onrx_avg=<ms> onrx_p95=<ms> onrx_p99=<ms> onrx_max=<ms> onrx_warn=<n>
 ```
+
+- `onrx_*` (OR-STAT, 2026-10-13, appended at the very end): OnRxDone
+  processing time over the 5-min window, recorded at every processing exit
+  (ACK, HN report, main; not the INSTRUMENT `--airgap` drop), independent of
+  `--loradebug`. Under `--loradebug on` the values include the debug print time
+  and read high. `onrx_n` calls, `onrx_avg` integer mean, `onrx_warn` calls
+  strictly above `ONRXDONE_WARN_MS` (50). Percentiles from a 1-ms histogram
+  (0..63, overflow >= 64): smallest ms value b with cumulative count >=
+  ceil(p * n); in the overflow bucket the window max is reported. n = 0 gives
+  all zeros. `src/onrx_stats.h`. `tools/berglog.py` RE_STAT accepts the optional tail.
 
 - `util=` wie `CHANNEL_UTIL`, aber über das 5-min-Fenster (eigene Akkumulation
   aus `ch_util_rx_accum`/`tx_accum`, die 10-s-Logik nicht anfassen).

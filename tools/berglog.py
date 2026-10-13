@@ -267,7 +267,8 @@ RE_STAT = re.compile(
     r"ringmax=(?P<ringmax>\d+)/(?P<ringsize>\d+) "
     r"drop=(?P<d1>\d+)/(?P<d2>\d+)/(?P<d3>\d+)/(?P<d4>\d+)/(?P<d5>\d+) "
     r"mh=(?P<mh>\d+) heap=(?P<heap>\d+) trk=(?P<trk>\d+)/(?P<trkc>\d+) "
-    r"fw=(?P<fwmaj>\d+)(?P<fwsub>\D)/(?P<flash>\d+) up=(?P<up>\d+) t=(?P<t>\d+)$"
+    r"fw=(?P<fwmaj>\d+)(?P<fwsub>\D)/(?P<flash>\d+) up=(?P<up>\d+) t=(?P<t>\d+)"
+    r"(?: onrx_n=\d+ onrx_avg=\d+ onrx_p95=\d+ onrx_p99=\d+ onrx_max=\d+ onrx_warn=\d+)?$"
 )
 RE_GWI = re.compile(
     r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] GWI x(?P<msgid>[0-9A-Fa-f]{8}) (?P<type>\S) "
