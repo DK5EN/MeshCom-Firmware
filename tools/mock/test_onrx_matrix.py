@@ -355,6 +355,16 @@ class TestSession(unittest.TestCase):
         self.assertEqual(om.missing_pre_state(om.parse_state("...LORADEBUG on")), ["nbrdebug", "displaylog"])
 
 
+class TestNodeSelection(unittest.TestCase):
+    def test_node_argument_is_accepted_and_defaults_to_heltec(self) -> None:
+        import inspect
+
+        sig = inspect.signature(om.drive)
+        self.assertEqual(sig.parameters["node"].default, om.NODE)
+        fleet = json.loads((Path(__file__).resolve().parents[1] / "bench" / "fleet.json").read_text())
+        self.assertIn("t-beam-92", fleet["nodes"])
+
+
 class TestFleetRegistration(unittest.TestCase):
     def test_node_is_a_fleet_json_key_with_the_expected_callsign(self) -> None:
         fleet = json.loads((Path(__file__).resolve().parents[1] / "bench" / "fleet.json").read_text())

@@ -452,7 +452,7 @@ def write_report(log: Path, arm: str) -> dict[str, Any]:
     return res
 
 
-def drive(host: str, arm: str, minutes: float, out: Path) -> int:
+def drive(host: str, arm: str, minutes: float, out: Path, node: str = NODE) -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import identity_guard as ig
 
@@ -464,15 +464,16 @@ def drive(host: str, arm: str, minutes: float, out: Path) -> int:
         return 1
     try:
         text = ig.read_info_net(host, password=pw)
-        info = ig.require(text, NODE, fleet)
+        info = ig.require(text, node, fleet)
     except ig.IdentityError as exc:
         print(exc)
         return 1
-    if info.call != CALL or info.txpower_dbm is None or info.txpower_dbm > 2:
-        print(f"refused: need {CALL} at <= 2 dBm, got {info.call} {info.txpower_dbm} dBm")
+    call = fleet["nodes"][node]["call"]
+    if info.call != call or info.txpower_dbm is None or info.txpower_dbm > 2:
+        print(f"refused: need {call} at <= 2 dBm, got {info.call} {info.txpower_dbm} dBm")
         return 1
     pre = parse_state(text)
-    print(f"{NODE} ok ({info.call}, {info.txpower_dbm} dBm); pre-run state {pre}")
+    print(f"{node} ok ({info.call}, {info.txpower_dbm} dBm); pre-run state {pre}")
     return run_session(lambda: NetConsole(host, pw), arm, pre, minutes, out)
 
 
@@ -544,6 +545,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--host")
     ap.add_argument("--arm", default="?", help="A|B|C|D|F (label only when --analyse)")
     ap.add_argument("--minutes", type=float)
+    ap.add_argument("--node", default=NODE, help="fleet.json node key (default heltec-1)")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--analyse", type=Path, help="analyse an existing log offline and exit")
     a = ap.parse_args(argv)
@@ -554,7 +556,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not a.host or a.arm not in ARM_COMMANDS or not a.minutes or a.minutes <= 0:
         ap.error("--host, --arm A|B|C|D|F and --minutes > 0 are required")
-    return drive(a.host, a.arm, a.minutes, a.out)
+    return drive(a.host, a.arm, a.minutes, a.out, a.node)
 
 
 if __name__ == "__main__":
