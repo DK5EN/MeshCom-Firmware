@@ -11,6 +11,9 @@ captures without line timestamps); 127 tests in `tools/mock/test_loganalyse.py`.
 the doc errors listed under Open leads. Net-console corpus pulled to `~/meshlog/rpizero/`; fresh
 dk5en-98 capture on rpizero `~/meshlog/dk5en-98/2026-10-1{2,3}.log` (ends 2026-10-13 08:00).
 
+Next: RCA for the DUP counter gap and slow OnRxDone, brief in
+`docs/rca-brief-dup-onrxdone-20261013.md` (DK5EN-1 Heltec V3 is the flashable bench node).
+
 ## 2026-10-11 -- v4.40a.10.11 released (first CI-built fork release)
 
 **Shipped:** tag `v4.40a.10.11` on `fork-dev` (`77e12f4e`), built and published by the re-enabled `MeshCom CI`
