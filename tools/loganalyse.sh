@@ -687,11 +687,18 @@ else
     #    ESP32 gateway also fires for UDP frames (one GWI line each); NEW is
     #    compared after subtracting the GWI count.
     #  - STAT newid/dup come from setlogCountDedup(): it skips HN reports,
-    #    own and gateway-injected echoes (msg_id seen in `[LOG] TX ... src=o|g`)
-    #    and gains the S2 server-inject increments (= GWI). STAT counters are
-    #    per 300 s window and the first window predates the capture, so the
-    #    tail is counted strictly after the first STAT line up to the last
-    #    one and STAT is summed from the 2nd line on.
+    #    own and gateway-injected echoes. Rule: an echo is skipped while its
+    #    msg_id is among the last MAX_RING ids inserted (`[LOG] GWI` and
+    #    `[LOG] TX ... src=o|g`, FIFO; MAX_RING = STAT ringmax=n/<MAX_RING>,
+    #    default 20), like the firmware own-TX table (insertOwnTx).
+    #    Caveat: the firmware inserts at enqueue, the log shows TX at transmit
+    #    time; the emulation matched two real captures exactly. A `TX src=g`
+    #    line never inserts (the GWI line is the insertion), so ids seen on a
+    #    GWI line are not re-added from it; a reboot empties the table.
+    #    STAT newid also gains the S2 server-inject increments (= GWI). STAT
+    #    counters are per 300 s window and the first window predates the
+    #    capture, so the tail is counted strictly after the first STAT line up
+    #    to the last one and STAT is summed from the 2nd line on.
     # Tolerance = max(5, 1% of the larger of the two compared values).
     awk -v txw="$SL_TXW" '
     function tok(k,   i, n, p) {
@@ -705,6 +712,21 @@ else
     /RX_DEDUP_NEW msg_id=/ { dbg_new++ }
     /RX_DEDUP_DUP msg_id=/ { dbg_dup++ }
 
+    BEGIN { oq_h = 0; oq_t = 0 }  # numeric keys: uninitialised would index ""
+    # FIFO of the last MAX_RING inserted ids; own_ids is the set of held ids
+    function own_trim(   mx) {
+        mx = (ringsize > 0 ? ringsize : 20)
+        while (oq_t - oq_h > mx) {
+            delete own_ids[oq[oq_h]]
+            delete oq[oq_h++]
+        }
+    }
+    function own_ins(id) {
+        # a held id is not re-added (one TX line per insertion, repeats are not one)
+        if (id == "" || (id in own_ids)) return
+        oq[oq_t++] = id; own_ids[id] = 1
+        own_trim()
+    }
     function msgid(   i) {
         for (i = 1; i <= NF; i++)
             if (length($i) == 9 && $i ~ /^x[0-9A-F]+$/) return $i
@@ -746,7 +768,8 @@ else
     /\[LOG\] TX x/ {
         tx_n++
         src = tok("src"); w = tok("wait"); c = tok("cad")
-        if (src == "o" || src == "g") own_ids[msgid()] = 1
+        # TX src=g never inserts in the firmware: its GWI line already did
+        if (src == "o" || (src == "g" && !(msgid() in gwi_seen))) own_ins(msgid())
         if (src !~ /^[org]$/) src = "?"
         txc[src]++
         if (c ~ /^[0-9]+$/ && c + 0 > 0) cad_gt0++
@@ -756,6 +779,8 @@ else
 
     /\[LOG\] GWI x/ {
         gwi_n++
+        gwi_seen[msgid()] = 1
+        own_ins(msgid())
         if (win_n >= 1) w_gwi++
         f = tok("from"); if (f == "") f = "?"
         gwi_from[f]++
@@ -774,6 +799,8 @@ else
             seg_new += sn_new; seg_dupt += sn_dup; seg_gwi += sn_gwi }
         sw_newid = 0; sw_dup = 0; w_new = 0; w_dup = 0; w_gwi = 0
         sn_new = 0; sn_dup = 0; sn_gwi = 0; win_n = 0; nseg++
+        # the firmware own-TX table starts empty after a reboot
+        delete own_ids; delete oq; delete gwi_seen; oq_h = 0; oq_t = 0
     }
     /\[LOG\] STAT / {
         stat_n++
@@ -803,6 +830,7 @@ else
             split(v, rm, "/")
             if (rm[1] + 0 > ringmax) ringmax = rm[1] + 0
             ringsize = rm[2] + 0
+            own_trim()  # a smaller true ring drops the surplus ids at once
         }
         v = tok("drop")
         if (v ~ /^[0-9]+\/[0-9]+\/[0-9]+\/[0-9]+\/[0-9]+$/) {

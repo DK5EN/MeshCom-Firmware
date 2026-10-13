@@ -346,6 +346,13 @@ Arm F is the same image plus `-DINSTR_UART_TXBUF=4096` (firmware confirmed `txbu
   ring refills in about 56 ms per frame, a burst of more than 6 frames within 0.4 s would block again;
   the S3 HWCDC boards already size their ring (`esp32_main.cpp:990`, `net_console.cpp:247`).
 
+## R2 bench result (DK5EN-1, production ring)
+
+Image: INSTRUMENT plus the production `CONSOLE_UART_TXBUF` default (2048 B on S3, `--info` shows
+`CONSOLE_TXBUF 2048/1`), same flags as arm A, 48 frames, 20 minutes: total p50 4.4 ms, p90 6.3 ms, p99
+7.1 ms, max 7.2 ms, none over 50 ms; print time p50 1.8 ms; non-print p50 2.5 ms; IRQ-to-`readData` p50
+5.3 ms. Equal to the 4096 B experiment of arm F within noise, so 2048 B is enough on this node.
+
 ## Pre-registered predictions for the DK5EN-98 byte-model nights (written 2026-10-13, before the runs)
 
 Method: for each of the 2652 handlers in `run-20261012-2310.log`, subtract 0.0868 ms per printed byte

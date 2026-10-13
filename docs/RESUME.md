@@ -18,7 +18,7 @@ RCA for the DUP counter gap and slow OnRxDone, brief in
 (own-msg_id branch, `lora_functions.cpp:1552`) plus 4 lost-STAT lines; operator decision script fix vs firmware fix
 pending. Issue B: handler time tracks bytes printed over UART (R2 0.985), reception loss not shown; R1 flags matrix
 on DK5EN-1 next. Resume from the brief's "R0 status" section.
-**Wave R1 built and gated** (INSTRUMENT firmware + `tools/bench/onrx_matrix.py`); bench run on DK5EN-1 pending, see the brief's "R1 status".
+**Wave R1 built and gated** (INSTRUMENT firmware + `tools/bench/onrx_matrix.py`); bench run done (print time explains the slow handler). **Wave R2 built and gated:** `loganalyse.sh` DUP fix, console TX ring `CONSOLE_UART_TXBUF`; DK5EN-1 benched; T-Beam bench, DK5EN-98 byte-model nights and the upstream PR are open, see the brief's "R2 status".
 
 ## 2026-10-11 -- v4.40a.10.11 released (first CI-built fork release)
 

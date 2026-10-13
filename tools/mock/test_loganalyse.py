@@ -1034,6 +1034,165 @@ class TestLoganalyseSetlog(unittest.TestCase):
         self.assertIn("DUP_STAT_BALANCE: OK", sub)
         self.assertNotIn("MISMATCH", sub)
 
+    @classmethod
+    def _echo(cls, sec: int, msg_id: str) -> str:
+        return cls._l(
+            sec,
+            f"[LOG] 060 : {msg_id} H00 S1 T0 M01 AA1AA-1>*:hi HW:43 MOD:8/8 FCS:11E7 FW:35:p LH:AA "
+            f"RSSI:-60 SNR:5 DUP:d OWN:- t={sec * 1000}",
+        )
+
+    @classmethod
+    def _gwi(cls, sec: int, msg_id: str) -> str:
+        return cls._l(sec, f"[LOG] GWI {msg_id} : H03 from=SQ9APP-1 t={sec * 1000}")
+
+    def test_dedup_balance_gwi_echo_before_tx_not_counted(self) -> None:
+        # server-injected frame: the firmware inserts the id at GWI time, an
+        # early relay echo (DUP:d) is not counted in STAT dup; the TX src=g
+        # line only follows later. 12 ids exceed the tolerance of 5.
+        ids = [f"xF{i:07X}" for i in range(12)]
+        out_l: list[str] = [self._stat(1, 999, 999)]
+        t = 1
+        for mid in ids:
+            t += 1
+            out_l.append(self._gwi(t, mid))
+            t += 1
+            out_l.append(self._echo(t, mid))
+        for mid in ids:
+            t += 1
+            out_l.append(self._l(t, f"[LOG] TX {mid} : H00 prio=5 src=g wait=3000 q=1 cad=0 len=54 t={t * 1000}"))
+        out_l.append(self._stat(t + 1, 12, 0))
+        sub = self._sub(self._sec_of(self._analyse("".join(out_l)), "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("DUP_STAT: STAT_dup=0, DUP:d=0", sub)
+        self.assertIn("DUP_STAT_BALANCE: OK", sub)
+
+    def test_dedup_balance_gwi_id_ages_out_of_ring(self) -> None:
+        # MAX_RING (20, from ringmax=n/20) bounds the id set: a late echo of an
+        # id with more than 20 later insertions is counted, one inside is not
+        ids = [f"xF{i:07X}" for i in range(22)]
+        out_l: list[str] = [self._stat(1, 999, 999)]
+        t = 1
+        for mid in ids:
+            t += 1
+            out_l.append(self._gwi(t, mid))
+        t += 1
+        out_l.append(self._echo(t, ids[0]))  # aged out: counted
+        t += 1
+        out_l.append(self._echo(t, ids[-1]))  # still in the ring: skipped
+        out_l.append(self._stat(t + 1, 22, 1))
+        sub = self._sub(self._sec_of(self._analyse("".join(out_l)), "SETLOG"), "DEDUP_BALANCE")
+        self.assertIn("DUP_STAT: STAT_dup=1, DUP:d=1", sub)
+        self.assertIn("DUP_STAT_BALANCE: OK", sub)
+
+    @classmethod
+    def _txo(cls, sec: int, msg_id: str, src: str = "o") -> str:
+        return cls._l(sec, f"[LOG] TX {msg_id} : H00 prio=5 src={src} wait=3000 q=1 cad=0 len=54 t={sec * 1000}")
+
+    @classmethod
+    def _stat_ring(cls, sec: int, ring: int, up: int | None = None, dup: int = 0) -> str:
+        return cls._l(
+            sec,
+            f"[LOG] STAT util=5 rx=1 tx=0 newid=0 dup={dup} err=0 txn=0 txfail=0 ringmax=0/{ring} "
+            f"drop=0/0/0/0/0 mh=1 heap=1000 trk=240/0 fw=35v/20260929 up={sec if up is None else up} t={sec * 1000}",
+        )
+
+    def _dup_stat_line(self, log: str) -> str:
+        sub = self._sub(self._sec_of(self._analyse(log), "SETLOG"), "DEDUP_BALANCE")
+        return next(ln for ln in sub.splitlines() if ln.startswith("DUP_STAT:"))
+
+    def test_dedup_balance_ring_boundary_is_max_ring(self) -> None:
+        # MAX_RING=20: after 21 insertions the first id is evicted (its echo is
+        # counted), the second is still held (its echo is skipped)
+        ids = [f"xF{i:07X}" for i in range(21)]
+        out_l: list[str] = [self._stat(1, 0, 0)]
+        t = 1
+        for mid in ids:
+            t += 1
+            out_l.append(self._gwi(t, mid))
+        t += 1
+        out_l.append(self._echo(t, ids[0]))  # counted
+        for _ in range(3):
+            t += 1
+            out_l.append(self._echo(t, ids[1]))  # skipped
+        out_l.append(self._stat(t + 1, 0, 1))
+        line = self._dup_stat_line("".join(out_l))
+        self.assertIn("DUP_STAT: STAT_dup=1, DUP:d=1", line)
+
+    def test_dedup_balance_repeated_tx_line_takes_one_slot(self) -> None:
+        # re-add guard: a repeated `TX x src=o` line is no second insertion.
+        # x0 repeated mid-ring must not push x1..x9 out one insertion early,
+        # and x0 itself ages out with the 21st distinct id.
+        ids = [f"xF{i:07X}" for i in range(21)]
+        out_l: list[str] = [self._stat(1, 0, 0)]
+        t = 1
+        for i, mid in enumerate(ids):
+            t += 1
+            out_l.append(self._txo(t, mid))
+            if i == 9:
+                t += 1
+                out_l.append(self._txo(t, ids[0]))  # repeat, no new slot
+        t += 1
+        out_l.append(self._echo(t, ids[0]))  # evicted by the 21st distinct id: counted
+        for _ in range(3):
+            t += 1
+            out_l.append(self._echo(t, ids[1]))  # still held: skipped
+        out_l.append(self._stat(t + 1, 0, 1))
+        line = self._dup_stat_line("".join(out_l))
+        self.assertIn("DUP_STAT: STAT_dup=1, DUP:d=1", line)
+
+    def test_dedup_balance_tx_g_does_not_readd_evicted_gwi_id(self) -> None:
+        # a TX src=g line never inserts in the firmware: x was evicted by 20
+        # later GWIs, the late TX line must not bring it back
+        x = "xF0000000"
+        out_l: list[str] = [self._stat(1, 0, 0), self._gwi(2, x)]
+        t = 2
+        for i in range(1, 21):
+            t += 1
+            out_l.append(self._gwi(t, f"xF{i:07X}"))
+        t += 1
+        out_l.append(self._txo(t, x, "g"))
+        t += 1
+        out_l.append(self._echo(t, x))  # not held any more: counted
+        out_l.append(self._stat(t + 1, 0, 1))
+        line = self._dup_stat_line("".join(out_l))
+        self.assertIn("DUP_STAT: STAT_dup=1, DUP:d=1", line)
+
+    def test_dedup_balance_reboot_empties_own_tx_table(self) -> None:
+        # after a reboot (up= decreasing) the firmware table is empty: an echo
+        # of a pre-reboot GWI id is counted
+        x = "xF0000000"
+        out_l: list[str] = [
+            self._stat_ring(1000, 20, up=1000),
+            self._stat_ring(1300, 20, up=1300),
+            self._gwi(1301, x),
+            self._stat_ring(1600, 20, up=1600),
+            self._stat_ring(1700, 20, up=300),  # reboot
+            self._stat_ring(2000, 20, up=600),
+            self._echo(2001, x),
+            self._stat_ring(2300, 20, up=900, dup=1),
+        ]
+        out = self._analyse("".join(out_l))
+        self.assertIn("REBOOTS (up= decreasing): 1", out)
+        line = self._dup_stat_line("".join(out_l))
+        self.assertIn("DUP:d=1", line)
+
+    def test_dedup_balance_smaller_ring_trims_at_stat_line(self) -> None:
+        # ids inserted before the first STAT line (ring size still the
+        # default 20) are trimmed to the true ring (10) when it is parsed
+        ids = [f"xF{i:07X}" for i in range(15)]
+        out_l: list[str] = []
+        t = 0
+        for mid in ids:
+            t += 1
+            out_l.append(self._gwi(t, mid))
+        out_l.append(self._stat_ring(t + 1, 10))
+        out_l.append(self._stat_ring(t + 2, 10))
+        out_l.append(self._echo(t + 3, ids[0]))  # beyond the 10-slot ring: counted
+        out_l.append(self._echo(t + 4, ids[-1]))  # held: skipped
+        out_l.append(self._stat_ring(t + 5, 10, dup=1))
+        line = self._dup_stat_line("".join(out_l))
+        self.assertIn("DUP_STAT: STAT_dup=1, DUP:d=1", line)
+
     def test_dedup_balance_stat_mismatch_detected(self) -> None:
         sub = self._sub(self._sec_of(self._analyse(self._gateway_log(700, 300)), "SETLOG"), "DEDUP_BALANCE")
         self.assertIn("NEW_STAT_BALANCE: MISMATCH (diff 200 > tolerance 7)", sub)

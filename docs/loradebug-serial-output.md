@@ -328,3 +328,18 @@ pio test -e native_dedup
 pio test -e native_aprs -f test_txprio_replay
 pio test -e native -f test_ack_replay
 ```
+
+## Konsolen-TX-Ring (UART-Boards)
+
+Auf ESP32-Boards mit UART-Konsole (S3 mit UART-Bridge, klassischer ESP32) blockiert
+`Serial.write` ohne TX-Puffer mit 87 us/Byte bei 115200 Baud; die Debug-Ausgabe
+verlaengert dann `OnRxDone` auf zig ms. Das Makro `CONSOLE_UART_TXBUF` (Bytes,
+`src/configuration_global.h`) legt vor dem ersten `begin()` einen TX-Ring an.
+Default: ESP32-S3 2048, klassischer ESP32 1024; per Env `-DCONSOLE_UART_TXBUF=n`
+aenderbar, `0` schaltet ab. Nicht betroffen: Boards mit `ARDUINO_USB_CDC_ON_BOOT`
+(Native-USB; dort gilt der HWCDC-Ring). Sichtbar im Bootlog als
+`[MC-INFO] CONSOLE_TXBUF bytes=<n> ok=<0|1>` und in `--info` als Token
+`...CONSOLE_TXBUF <n>/<ok>` (Zeile mit WXDEBUG/BLEDEBUG).
+Bei gewolltem Neustart (`esp_restart`, `--reboot`) und vor Deep Sleep wird der Ring
+bis zu 100 ms geleert (Shutdown-Handler bzw. `uart_wait_tx_done`); bei Panic- oder
+Watchdog-Reset gehen die noch im Ring liegenden Bytes verloren.

@@ -167,6 +167,31 @@ Advisor gate (Opus medium) after R0 and after every behavioural wave.
   recorded for 3 minutes, no setting changed.
 - DK5EN-1 now runs the arm F image (INSTRUMENT + 4096 B TX ring); settings restored.
 
+## R2 status (2026-10-13, built, gated, DK5EN-1 benched; T-Beam bench pending)
+
+- **Issue A (operator decision: script fix).** `tools/loganalyse.sh` registers ids at the GWI handler and
+  keeps a FIFO of the last `MAX_RING` ids (from STAT `ringmax`), ids seen on a GWI line are never
+  re-inserted from `TX src=g`, the table is cleared on reboot and trimmed when `ringmax` is parsed.
+  Real captures: overnight 10-12 STAT dup 1178 vs DUP:d 1182 (diff 4, was 43); soak 09-29 6069 vs 6069
+  (was diff 52). Seven new tests with mutation proof. Firmware counting unchanged.
+- **Issue B (operator decision R2-b: console TX ring).** `CONSOLE_UART_TXBUF` (`configuration_global.h`):
+  2048 B on ESP32-S3 UART consoles, 1024 B on classic ESP32, 0 disables, out for every
+  `ARDUINO_USB_CDC_ON_BOOT` board. Applied once before the real `begin()` by `console_txbuf_apply()`
+  (`esp32_main.cpp`; from `MeshSerialClass::begin()` when the net console is compiled in). Visible as
+  boot line `[MC-INFO] CONSOLE_TXBUF` and `--info` token `...CONSOLE_TXBUF n/ok`. A shutdown handler and a
+  wait before deep sleep drain the ring (bounded 100 ms); a panic/WDT reset still loses it.
+  Boards in scope beyond the list: `heltec_wireless_stick`, `wireless-paper`.
+- **Bench, DK5EN-1 (Heltec V3, production ring 2048/1, all three debug streams on, 48 frames):** total p50
+  4.4 ms, p99 7.1 ms, max 7.2 ms, none over 50 ms (arm A without ring: p50 77.9 ms, p99 89.9 ms).
+- **Advisor (Opus)** approved with rework (restart/deep-sleep flush, `ok` for sizes <= 128 B, dead
+  INSTRUMENT code, six loganalyse test/edge items); applied by two fresh Sonnet-high agents; gate green
+  (Unity 2371/2371, pytest 1044).
+- **Open:** T-Beam (DK5EN-92) before/after bench and heap read (needs its console password); DK5EN-98
+  byte-model nights (chain `~/meshlog/nights98.sh` on rpizero: night 1 loradebug only from 17:09, night 2
+  loradebug + setlog; an EXIT trap restores `--setlog on` and `--nbrdebug on`; predictions are in the
+  findings doc); `ONRXDONE_WARN_MS` stays 50 ms pending the operator; upstream PR for the TX ring
+  (cut from `upstream/dev`, German description) not started.
+
 ## Open questions for the operator
 
 - R2 touches the RX hot path. Should the fixes go upstream as a PR afterwards, or stay fork-only?
