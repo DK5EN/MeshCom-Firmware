@@ -58,6 +58,16 @@ Fixtures: `logs/` is gitignored; tests use short committed excerpts, the full lo
 
 - Firmware: `src/esp32/udp_frame_esp32.cpp:268-272` calls `addLoraRxBuffer` and `stat_newid++` for every UDP position frame (0x21), also when `bUdpMsgIsNew` is false (ring slot plus inflated STAT newid on duplicates). Inferred by the W2a advisor, not verified on hardware.
 - DUP_STAT on `soak-20260929/98.log` sits at 0.86 % against the 1 % tolerance with no reboot: an unmodelled bias of about 0.9 % in dup. Look before relying on the tolerance for long captures.
+- Confirmed on the fresh dk5en-98 capture 2026-10-12 23:10 to 2026-10-13 08:00
+  (`~/meshlog/rpizero/dk5en-98/run-20261012-2310.log`, FW 40a/20261011, no reboot):
+  `DUP_STAT_BALANCE: MISMATCH (diff 43 > tolerance 12)`, STAT_dup=1178 vs DUP:d=1221, NEW balance OK
+  (diff 3). The excess is per window, not a gap artefact: one logger outage (05:36:17-05:38:52, node
+  closed the socket and mDNS failed for 2.5 min, `up=` continuous) lost one STAT line and explains only 7. Raw per-window DUP:d minus STAT dup is a steady 3-5 overnight and rises to 11-14 between 07:15 and
+  07:50 as traffic rises: some RX path logs `DUP:d` without incrementing the STAT dup counter. Firmware
+  question (setlog emitter vs `stat_dup++` sites), not a script defect.
+- Script gap: a capture gap (missing STAT line, `[LOGGER] connection lost`) is not modelled; the
+  orphaned partial window feeds the log side only. Re-anchor at a STAT gap > 1.5 intervals like at a
+  reboot.
 - Log-reading guide `~/Desktop/how-to-read-meshcom-logs.md` (2026-10-12, not in the repo) found errors in
   `docs/loradebug-serial-output.md`: CHANNEL_UTIL is gated by bLORADEBUG (`esp32_main.cpp:2844`,
   `nrf52_main.cpp:1539`), not independent of it; `CAD_SCAN 0` = free is the nRF52 synthetic value (ESP32
