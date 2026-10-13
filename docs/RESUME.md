@@ -11,8 +11,13 @@ captures without line timestamps); 127 tests in `tools/mock/test_loganalyse.py`.
 the doc errors listed under Open leads. Net-console corpus pulled to `~/meshlog/rpizero/`; fresh
 dk5en-98 capture on rpizero `~/meshlog/dk5en-98/2026-10-1{2,3}.log` (ends 2026-10-13 08:00).
 
-Next: RCA for the DUP counter gap and slow OnRxDone, brief in
+RCA for the DUP counter gap and slow OnRxDone, brief in
 `docs/rca-brief-dup-onrxdone-20261013.md` (DK5EN-1 Heltec V3 is the flashable bench node).
+**Wave R0 done (read-only, advisor-gated):** findings in `docs/rca-dup-r0-findings-20261013.md` and
+`docs/rca-onrxdone-r0-findings-20261013.md`. Issue A: the 43-line gap is 39 GWI echoes the firmware does not count
+(own-msg_id branch, `lora_functions.cpp:1552`) plus 4 lost-STAT lines; operator decision script fix vs firmware fix
+pending. Issue B: handler time tracks bytes printed over UART (R2 0.985), reception loss not shown; R1 flags matrix
+on DK5EN-1 next. Resume from the brief's "R0 status" section.
 
 ## 2026-10-11 -- v4.40a.10.11 released (first CI-built fork release)
 

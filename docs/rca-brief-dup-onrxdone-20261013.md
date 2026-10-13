@@ -116,7 +116,28 @@ exit at `:2583-2594`; per-10-s summary `[MC-DBG] ONRXDONE_STATS` `src/esp32/esp3
 
 Advisor gate (Opus medium) after R0 and after every behavioural wave.
 
+## R0 status (2026-10-13, done)
+
+- Findings: `docs/rca-dup-r0-findings-20261013.md` (Issue A), `docs/rca-onrxdone-r0-findings-20261013.md`
+  (Issue B). Analysis writers Sonnet high; advisor gate Opus medium returned a rework list of 9 wording
+  and evidence-labelling items, applied by the orchestrator (docs only, no re-gate).
+- **Issue A:** hypotheses A1 and A3 refuted, A2 confirmed for one path (own-msg_id branch
+  `lora_functions.cpp:1552`), A4 confirmed. 39 of the 43 lines are GWI echoes heard before the node's
+  own `TX src=g` line, 4 are the lost STAT window. Fix options: (a) `tools/loganalyse.sh`
+  registers ids at the GWI handler and bounds the set to `MAX_RING`; (b) firmware counts in the
+  `heardIcheck >= 0` branch so `dup=` equals `RX_DEDUP_DUP`. Needs the operator's call.
+- **Issue B:** handler time is about 91 % serial printing (UART-bridge boards block at baud rate);
+  `RX_IRQ_STALE` is 234 events, not 468; no reception loss shown, but no loss measurement exists.
+  R1 plan: flags matrix A-D plus arm F (UART TX buffer), `micros()` accumulator in
+  `MeshSerialClass::write`, IRQ-to-`readData` latency, reference receiver.
+- Side findings, not yet in BACKLOG: gateway transmits server-injected frames after hearing a relay
+  (39 per night, overhear-cancel unverified); ESP32 `udp_frame_esp32.cpp:268-272` over-counts
+  `newid`; early exits skip the `onrxdone` counters; `--loradebug on` persists `bDisplayInfo` and
+  `bDisplayRetx`.
+- Next: R1 (instrumented DK5EN-1 build and bench) in a fresh session.
+
 ## Open questions for the operator
 
 - R2 touches the RX hot path. Should the fixes go upstream as a PR afterwards, or stay fork-only?
+- Issue A: script fix (a) or firmware fix (b)? See R0 status.
 - Threshold: if 50 ms is wrong, should `ONRXDONE_WARN_MS` change per platform or per role (gateway)?
