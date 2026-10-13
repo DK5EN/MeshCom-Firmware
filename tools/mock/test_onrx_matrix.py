@@ -355,5 +355,12 @@ class TestSession(unittest.TestCase):
         self.assertEqual(om.missing_pre_state(om.parse_state("...LORADEBUG on")), ["nbrdebug", "displaylog"])
 
 
+class TestFleetRegistration(unittest.TestCase):
+    def test_node_is_a_fleet_json_key_with_the_expected_callsign(self) -> None:
+        fleet = json.loads((Path(__file__).resolve().parents[1] / "bench" / "fleet.json").read_text())
+        self.assertIn(om.NODE, fleet["nodes"])
+        self.assertEqual(fleet["nodes"][om.NODE]["call"], om.CALL)
+
+
 if __name__ == "__main__":
     unittest.main()

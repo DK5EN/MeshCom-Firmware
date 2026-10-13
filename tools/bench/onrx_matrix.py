@@ -62,7 +62,7 @@ from typing import Any, Callable, Iterable, Protocol
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO / "tools" / "bench" / "runs" / "harness"
-NODE = "dk5en-1"
+NODE = "heltec-1"   # fleet.json key (callsign is CALL)
 CALL = "DK5EN-1"
 OVER_US = 50_000
 

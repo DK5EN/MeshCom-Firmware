@@ -307,6 +307,45 @@ Outside the handler (to size the metric gap):
 - `src/printfdeb_functions.cpp:151` (ESP32 `Serial.write`) and `:126-143` (nRF52 write loop) for
   the print accumulator; `src/net_console.cpp:291` (UART) and `:296` (TCP).
 
+## R1 bench results (DK5EN-1 Heltec V3, 2026-10-13)
+
+Setup: INSTRUMENT image from `2a1dcdf3`, DK5EN-1 as a node (not a gateway), 20 minutes per arm on live
+mesh traffic, driver `tools/bench/onrx_matrix.py`, per-arm JSON in `tools/bench/runs/harness/onrx_*.json`.
+Arm F is the same image plus `-DINSTR_UART_TXBUF=4096` (firmware confirmed `txbuf=4096/1`).
+
+| Arm | Flags                         | n   | total p50 | total p99 | total max | over 50 ms | print share | non-print p50 |
+| --- | ----------------------------- | --- | --------- | --------- | --------- | ---------- | ----------- | ------------- |
+| A   | loradebug + setlog + nbrdebug | 40  | 77.9 ms   | 89.9 ms   | 90.2 ms   | 37         | 0.96        | 3.2 ms        |
+| B   | setlog + nbrdebug             | 25  | 25.1 ms   | 36.3 ms   | 36.5 ms   | 0          | 0.90        | 2.5 ms        |
+| C   | setlog only                   | 34  | 13.5 ms   | 24.6 ms   | 24.7 ms   | 0          | 0.86        | 1.9 ms        |
+| D   | all three off                 | 43  | 1.5 ms    | 2.3 ms    | 2.4 ms    | 0          | 0           | 1.5 ms        |
+| F   | as A, UART TX buffer 4096     | 56  | 4.4 ms    | 8.4 ms    | 9.0 ms    | 0          | 0.43        | 2.6 ms        |
+
+- **Confirmed on the bench (Fact):** the handler time is serial print time. Non-print work is 1.5 to
+  3.2 ms in every arm; each added debug stream adds roughly its byte count times 87 us/B (fit slope
+  86 to 107 us/B, 115200 baud = 87 us/B).
+- **Production-like cost (arm B):** the `[LOG]` RX line costs about 11 ms and the `nbrdebug` output
+  about 12 ms per frame (phases `log`, `nbr`). With loradebug on (arm A) the dedup lookup print alone
+  adds about 10.6 ms (phase `ded`) and the relay decision about 32 ms (phase `rly0`).
+- **Fix candidate confirmed (Fact on this node):** a 4096 B UART TX ring (`Serial.setTxBufferSize()`
+  before `begin`, arduino-esp32 2.0.17) takes arm A from p50 77.9 ms to 4.4 ms and the maximum from
+  90.2 ms to 9.0 ms, with identical log content. Print time inside the handler drops from 74.6 ms to
+  1.6 ms (the write only copies into the ring).
+- **IRQ to `readData` latency:** p50 4.2 to 6.0 ms, p99 6.9 to 8.9 ms, max 9.2 ms in all five arms,
+  independent of the arm. It is loop latency, not handler time of the previous frame (frames were
+  sparse; the closest pair here was far apart). The 50 ms threshold has no relation to it.
+- **Not shown:** reception loss. The arms never produced overlapping frames, so no loss test was
+  possible; the code argument (radio back in RX before OnRxDone) and the 90 ms worst case against
+  frame gaps of 600 ms or more stand.
+- **Limits:** n is 25 to 56 per arm, each arm saw different traffic, the node is not a gateway (no UDP
+  path in the measurement), and the model prediction of R0 (B about 40 ms, C about 25 ms, D about
+  5 ms) over-estimated: measured 25, 13.5 and 1.5 ms on smaller frames. The gateway's relay path
+  (R0 residual of about 11 ms) was not reproduced: `rly0` costs 0.3 ms without prints.
+- **R2 considerations:** the ring is heap-allocated at `Serial.begin` (4096 B); size per board
+  (classic ESP32 boards have 26 kB DRAM headroom, MEM-04); at 640 B per frame and 11.5 kB/s drain the
+  ring refills in about 56 ms per frame, a burst of more than 6 frames within 0.4 s would block again;
+  the S3 HWCDC boards already size their ring (`esp32_main.cpp:990`, `net_console.cpp:247`).
+
 ## Open items and unverified
 
 - Whether the relay path really costs about 11 ms of non-print time (Estimate from the residual

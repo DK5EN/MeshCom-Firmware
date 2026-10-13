@@ -154,6 +154,19 @@ Advisor gate (Opus medium) after R0 and after every behavioural wave.
 - Next: flash DK5EN-1 (INSTRUMENT image), run arms A, B, C, D, then the arm F image; write the numbers into
   `docs/rca-onrxdone-r0-findings-20261013.md` (R1 section) and decide R2.
 
+## R1 bench result (2026-10-13, DK5EN-1)
+
+- Arms A-D and F ran, numbers in `docs/rca-onrxdone-r0-findings-20261013.md` ("R1 bench results").
+  Handler time is print time: arm A p50 77.9 ms, B 25.1, C 13.5, D 1.5; arm F (A plus a 4096 B UART TX
+  ring) p50 4.4 ms, max 9.0 ms, none over 50 ms.
+- Driver bug found on first contact and fixed: the node key was `dk5en-1`, the fleet key is `heltec-1`
+  (test pins it to `fleet.json`).
+- Open: R2 (production fix: UART TX buffer per board, regression check, threshold decision), the DK5EN-98
+  field check. On stock firmware DK5EN-98 prints `ONRXDONE_TIME` only with `--loradebug on`, so a
+  production-normal measurement needs a lean image (R3); DK5EN-98 itself was only read (`--info`) and
+  recorded for 3 minutes, no setting changed.
+- DK5EN-1 now runs the arm F image (INSTRUMENT + 4096 B TX ring); settings restored.
+
 ## Open questions for the operator
 
 - R2 touches the RX hot path. Should the fixes go upstream as a PR afterwards, or stay fork-only?

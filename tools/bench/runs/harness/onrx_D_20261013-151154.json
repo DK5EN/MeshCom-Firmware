@@ -1,0 +1,95 @@
+{
+  "arm": "D",
+  "source": "ONRX",
+  "n": 43,
+  "malformed": 0,
+  "ready_marker": false,
+  "uarttxbuf": null,
+  "total_us": {
+    "p50": 1479.0,
+    "p90": 2133.8,
+    "p99": 2301.2,
+    "max": 2360.0
+  },
+  "over_50ms_total": 0,
+  "onrxdone_time_cross": {
+    "n": 0,
+    "p50_ms": null
+  },
+  "print_us": {
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "total_minus_print_us": {
+    "p50": 1479.0,
+    "p90": 2133.8,
+    "p99": 2301.2,
+    "max": 2360.0
+  },
+  "print_share": 0.0,
+  "over_50ms_total_minus_print": 0,
+  "fit_total_vs_bytes": {
+    "slope": null,
+    "intercept": null,
+    "r2": null
+  },
+  "fit_n": 43,
+  "irq_n": 43,
+  "irq_no_stamp": 0,
+  "irq_to_read_us": {
+    "p50": 4246.0,
+    "p99": 6883.599999999999,
+    "max": 6913.0
+  },
+  "txbuf": [
+    "0/0"
+  ],
+  "txbuf_applied": false,
+  "phases": {
+    "ack": {
+      "n": 43,
+      "p50": 15.0,
+      "p99": 19.89999999999999,
+      "max": 22.0
+    },
+    "dec": {
+      "n": 43,
+      "p50": 479.0,
+      "p99": 542.86,
+      "max": 550.0
+    },
+    "ded": {
+      "n": 43,
+      "p50": 47.0,
+      "p99": 62.31999999999999,
+      "max": 64.0
+    },
+    "log": {
+      "n": 43,
+      "p50": 5.0,
+      "p99": 65.23999999999987,
+      "max": 98.0
+    },
+    "nbr": {
+      "n": 43,
+      "p50": 521.0,
+      "p99": 1368.62,
+      "max": 1406.0
+    },
+    "rly0": {
+      "n": 41,
+      "p50": 328.0,
+      "p99": 577.2,
+      "max": 584.0
+    },
+    "exit": {
+      "n": 43,
+      "p50": 77.0,
+      "p99": 225.35999999999967,
+      "max": 306.0
+    }
+  },
+  "lost_max": 0
+}
