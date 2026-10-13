@@ -346,6 +346,28 @@ Arm F is the same image plus `-DINSTR_UART_TXBUF=4096` (firmware confirmed `txbu
   ring refills in about 56 ms per frame, a burst of more than 6 frames within 0.4 s would block again;
   the S3 HWCDC boards already size their ring (`esp32_main.cpp:990`, `net_console.cpp:247`).
 
+## Pre-registered predictions for the DK5EN-98 byte-model nights (written 2026-10-13, before the runs)
+
+Method: for each of the 2652 handlers in `run-20261012-2310.log`, subtract 0.0868 ms per printed byte
+of the streams that a night no longer prints (`[LOG]` = setlog, `[NBR]` = nbrdebug, everything else
+between `RX_FLAG_PROCESS` and `ONRXDONE_TIME` = loradebug/displayinfo/retx). Script:
+`tools/bench/onrx_predict98.py`. The observed night had all four streams on.
+
+```text
+events 2652 avg bytes/event {'setlog': 236, 'nbr': 164, 'other': 515}
+observed (all four streams on)                 n=2652 mean= 71.1 p50= 59.0 p95=114.0 p99=123.0 max=133.0 >50=70.0%
+PREDICT night1 loradebug only (drop setlog+nbr) n=2652 mean= 36.3 p50= 27.7 p95= 63.7 p99= 71.0 max= 89.6 >50=32.2%
+PREDICT night2 loradebug+setlog (drop nbr)     n=2652 mean= 56.8 p50= 45.9 p95= 91.0 p99= 98.2 max=118.3 >50=42.3%
+PREDICT reference loradebug off (drop other)   n=2652 mean= 26.4 p50= 26.7 p95= 43.1 p99= 45.9 max= 52.8 >50= 0.2%
+```
+
+- Night 1 on DK5EN-98: `loradebug` only (setlog and nbrdebug off). Night 2: `loradebug` + `setlog`
+  (nbrdebug off). Both record `ONRXDONE_TIME` via meshlogger on rpizero; settings are restored by the
+  same chain afterwards. The model is confirmed if the measured p50 and p95 land within 20 % of the
+  predicted values; a clear miss means the byte model does not carry over to the gateway.
+- The `loradebug off` reference row (p50 26.7 ms, p99 45.9 ms) cannot be measured on stock firmware
+  (no timing line is printed) but agrees with DK5EN-1 arm B (setlog + nbrdebug, p50 25.1 ms).
+
 ## Open items and unverified
 
 - Whether the relay path really costs about 11 ms of non-print time (Estimate from the residual
