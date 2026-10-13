@@ -823,6 +823,9 @@ void setFlagReceive(void)
     if(bEnableInterruptReceive)
     {
         receiveFlag = true;
+#if INSTRUMENT_ENABLED
+        INSTR_IRQ_STAMP();      // R1-F: DIO1 -> readData latency
+#endif
     }
 
     if(bEnableInterruptTransmit)
@@ -989,6 +992,9 @@ void esp32setup()
     // MeshSerialClass::begin() (src/net_console.cpp).
     Serial.setTxBufferSize(4096);
 #endif
+#if INSTRUMENT_ENABLED
+    instrument_uarttx_set();   // R1-F Arm F: UART TX ring, before Serial.begin
+#endif
     Serial.begin(MONITOR_SPEED);
     Serial.setTimeout(50);
 
@@ -1130,6 +1136,7 @@ void esp32setup()
     }
 #if INSTRUMENT_ENABLED
     instrument_report_prev_boot();   // CDC-01: loop gaps of the previous boot, from RTC memory
+    instrument_onrx_boot();          // R1-F: [INS] UARTTXBUF / ONRX_READY
 #endif
 
     lFreeHeap =  ESP.getFreeHeap();
@@ -2577,6 +2584,9 @@ void esp32loop()
     // TEMPORARY -- measures the period between successive loop entries, so a
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();
+#if INSTRUMENT_ENABLED
+    INSTR_ONRX_DRAIN();      // R1-F: emit queued [INS] ONRX records
+#endif
 
     // BP-01/BP-04: close a back-pressure episode with QRV once the TX ring
     // has drained, even when no further user message arrives to observe it.
@@ -4740,6 +4750,9 @@ int checkRX(bool bRadio)
         ibytes = UDP_TX_BUF_SIZE;
 
     state = radio.readData(payload, ibytes);
+#if INSTRUMENT_ENABLED
+    INSTR_IRQ_READ();        // R1-F: irq_to_read_us, consumed by OnRxDone
+#endif
 
     if (state == RADIOLIB_ERR_LORA_HEADER_DAMAGED || state == RADIOLIB_ERR_NONE)
     {
@@ -4807,7 +4820,12 @@ int checkRX(bool bRadio)
             OnRxDone(payload, (uint16_t)ibytes, saved_rssi, saved_snr);
         }
         else
-        if(bLORADEBUG)
+        {
+#if INSTRUMENT_ENABLED
+            INSTR_IRQ_DROP();   // R1-F: frame read, OnRxDone not reached
+#endif
+        }
+        if(ibytes == 0 && bLORADEBUG)
         {
             // Laenge 0 heisst: der Chip hat nichts im Puffer. Frueher lief das
             // als 255-Byte-Frame aus uninitialisiertem Stack weiter.
@@ -4817,6 +4835,9 @@ int checkRX(bool bRadio)
     else
     if (state == RADIOLIB_ERR_CRC_MISMATCH)
     {
+#if INSTRUMENT_ENABLED
+        INSTR_IRQ_DROP();       // R1-F: frame read, OnRxDone not reached
+#endif
         if(bLORADEBUG)
             printfdeb("OnRxError\n");
 
@@ -4873,6 +4894,9 @@ int checkRX(bool bRadio)
     }
     else
     {
+#if INSTRUMENT_ENABLED
+        INSTR_IRQ_DROP();       // R1-F: read error, OnRxDone not reached
+#endif
         if(bLORADEBUG)
             printfdeb("OnRxError\n");
 

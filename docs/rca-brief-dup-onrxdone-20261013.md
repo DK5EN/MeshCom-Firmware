@@ -136,6 +136,24 @@ Advisor gate (Opus medium) after R0 and after every behavioural wave.
   `bDisplayRetx`.
 - Next: R1 (instrumented DK5EN-1 build and bench) in a fresh session.
 
+## R1 status (2026-10-13, built and gated, bench run pending)
+
+- Firmware (INSTRUMENT only, compiled out otherwise): `[INS] ONRX seq= total_us= print_us= bytes= len= irq_to_read_us= ph= uart_us= tcp_us= lost= txbuf=<bytes>/<ok>` from the loop
+  (`instrument_onrx_drain()`), print time accumulated in `MeshSerialClass::write`, IRQ stamp consumed once
+  (`-1` = no stamp), `INSTR_UART_TXBUF` compile-time switch for arm F. Files: `src/instrument.{h,cpp}`,
+  `src/net_console.cpp`, `src/lora_functions.cpp`, `src/esp32/esp32_main.cpp`.
+- Driver and analyser: `tools/bench/onrx_matrix.py --host <ip> --arm A|B|C|D|F --minutes N` (offline:
+  `--analyse <log>`), tests in `tools/mock/test_onrx_matrix.py` (unittest). Sends only settings commands,
+  restores them in a `finally` with one reconnect retry; password only from `MC_CONSOLE_PW`.
+- Advisor (Opus) returned rework S1-S4 plus nits; the host gate caught a pytest import under the golden
+  selftest. All applied by two fresh Sonnet-high implementers; second gate green (Unity 2371/2371,
+  pytest 1036, board links ok). Rework diff read by the orchestrator, not re-gated by an advisor.
+- Images: plain and INSTRUMENT build green; INSTRUMENT image carries `ONRX_READY`, `txbuf=`,
+  `irq_to_read_us=%ld` (string scan); arm F image carries `UARTTXBUF`. Plain image has none of them.
+  Nothing has run on hardware yet.
+- Next: flash DK5EN-1 (INSTRUMENT image), run arms A, B, C, D, then the arm F image; write the numbers into
+  `docs/rca-onrxdone-r0-findings-20261013.md` (R1 section) and decide R2.
+
 ## Open questions for the operator
 
 - R2 touches the RX hot path. Should the fixes go upstream as a PR afterwards, or stay fork-only?
