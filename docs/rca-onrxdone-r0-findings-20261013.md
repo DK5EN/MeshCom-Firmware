@@ -398,6 +398,21 @@ PREDICT reference loradebug off (drop other)   n=2652 mean= 26.4 p50= 26.7 p95= 
 - The `loradebug off` reference row (p50 26.7 ms, p99 45.9 ms) cannot be measured on stock firmware
   (no timing line is printed) but agrees with DK5EN-1 arm B (setlog + nbrdebug, p50 25.1 ms).
 
+## DK5EN-98 byte-model night 1 (production gateway, stock 10-11 firmware, loradebug only)
+
+Night 1 of the pre-registered check ran from 17:09 to 19:50 (2.7 h, `~/meshlog/dk5en-98-s1-N1/2026-10-13.log`
+on rpizero; `setlog` and `nbrdebug` off, `loradebug` on). Night 2 was cancelled when the gateway was
+flashed over the air (see the brief, "R3 status"). Result against the predictions written down before the run:
+
+| n    | mean    | p50     | p95     | p99     | max      | over 50 ms |
+| ---- | ------- | ------- | ------- | ------- | -------- | ---------- |
+| 1094 | 31.7 ms | 24.0 ms | 67.0 ms | 70.0 ms | 113.0 ms | 20.7 %     |
+| pred | 36.3 ms | 27.7 ms | 63.7 ms | 71.0 ms | 89.6 ms  | 32.2 %     |
+
+p50 is 13 % below and p95 5 % above the prediction, both inside the 20 % band set beforehand: the byte model
+(0.0868 ms per printed byte) carries over from the DK5EN-1 bench to the production gateway. The share over
+50 ms is lower than predicted (20.7 % against 32.2 %); the maximum is higher (113 ms against 89.6 ms).
+
 ## Open items and unverified
 
 - Whether the relay path really costs about 11 ms of non-print time (Estimate from the residual

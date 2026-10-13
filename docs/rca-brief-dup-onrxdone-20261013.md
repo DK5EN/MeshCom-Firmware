@@ -192,6 +192,22 @@ Advisor gate (Opus medium) after R0 and after every behavioural wave.
   findings doc); `ONRXDONE_WARN_MS` stays 50 ms pending the operator; upstream PR for the TX ring
   (cut from `upstream/dev`, German description) not started.
 
+## R3 status (2026-10-13 evening, DK5EN-98 flashed over the air)
+
+- **OTA done** with `tools/webflash.py` (74 s total): `4.40a build Oct 11 2026 17:26:21` ->
+  `build Oct 13 2026 19:46:55`, image = `fork-dev` 8a1b2564 plain (not a tagged release). It brings the console TX
+  ring (`CONSOLE_TXBUF 2048/1`), the STAT `onrx_*` fields, and everything on `fork-dev` since v4.40a.10.11:
+  upstream #1208 (web escaping), #1209 (HB/HC server selection) with the fork's temporary OE fix `389ace0d`.
+- **Checked after the flash:** settings kept (`loradebug` off, `nbrdebug` on, `setlog` on, gateway on),
+  `Server: Internet meshcom.oevsv.at, connected`.
+- Byte-model night 1 stopped before the flash (n = 1094, within the 20 % band, see the findings doc); night 2
+  cancelled. `setlog` / `nbrdebug` restored by the chain's exit trap before the OTA.
+- **First production STAT after the flash (up=300 s, loradebug off, setlog + nbrdebug on):** `onrx_n=41 onrx_avg=3
+onrx_p95=6 onrx_p99=7 onrx_max=7 onrx_warn=0`, `heap=115500`, `util=12`. Before the flash, with loradebug on:
+  mean 71 ms, p95 114 ms (overnight 10-12).
+- Post-OTA record-only capture: rpizero `~/meshlog/dk5en-98-post-ota/` (3 h from 19:55); look for `STAT ... onrx_p95`
+  and reboots.
+
 ## Open questions for the operator
 
 - R2 touches the RX hot path. Should the fixes go upstream as a PR afterwards, or stay fork-only?
