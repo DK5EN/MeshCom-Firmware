@@ -398,6 +398,27 @@ PREDICT reference loradebug off (drop other)   n=2652 mean= 26.4 p50= 26.7 p95= 
 - The `loradebug off` reference row (p50 26.7 ms, p99 45.9 ms) cannot be measured on stock firmware
   (no timing line is printed) but agrees with DK5EN-1 arm B (setlog + nbrdebug, p50 25.1 ms).
 
+## T-Deck Plus (DK5EN-14, ESP32-S3 native USB console), INSTRUMENT image, 2026-10-13
+
+`t_deck_plus` sets `ARDUINO_USB_CDC_ON_BOOT=1` in the env and `ARDUINO_USB_MODE=1` in its board file
+(`boards/T-Deck.json`), so it uses the 4096 B HWCDC ring (`net_console.cpp:248`) and not the UART ring.
+(Every other CDC env in the repo gets `MODE=1` from its board file as well; an earlier claim that some of
+them miss the 4096 B guard was wrong, it came from reading `platformio.ini` without the board files.)
+
+| Arm                      | n   | p50    | p90     | p99     | max     | over 50 ms | print p50 | non-print p50 / p99 |
+| ------------------------ | --- | ------ | ------- | ------- | ------- | ---------- | --------- | ------------------- |
+| A (loradebug+setlog+nbr) | 50  | 6.1 ms | 11.6 ms | 19.6 ms | 21.3 ms | 0          | 2.4 ms    | 3.7 / 14.0 ms       |
+| D (all three off)        | 35  | 1.9 ms | 10.5 ms | 19.5 ms | 20.2 ms | 0          | 0         | 1.9 / 15.7 ms       |
+
+- **No print problem on the T-Deck (Fact):** the HWCDC ring absorbs the debug output (print p50 2.4 ms with all
+  streams on). The 43 ms p95 in the 2026-10-02 capture does not reproduce on this build.
+- **Residual tail (Fact for the location, Hypothesis for the cause):** with all debug output off the p99 stays at
+  19.5 ms; the time sits in the `rly0` stamp (p99 17.3 ms in arm D), which also covers the text, position,
+  display and BLE handling between the NBR feed and the relay decision. The T-Deck's UI work on some
+  frames is the likely cause. All frames stay well under the 50 ms warn level.
+- Free internal heap 77.0 kB at start (72.1 kB minimum), PSRAM 4.9 MB free. The node was restored to a plain
+  build afterwards; its settings are unchanged.
+
 ## DK5EN-98 byte-model night 1 (production gateway, stock 10-11 firmware, loradebug only)
 
 Night 1 of the pre-registered check ran from 17:09 to 19:50 (2.7 h, `~/meshlog/dk5en-98-s1-N1/2026-10-13.log`
