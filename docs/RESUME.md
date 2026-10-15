@@ -2,7 +2,7 @@
 
 **Stand:** 2026-10-15, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
 
-## 2026-10-15 -- gateway server table (gw_servers): concept done, implementation next
+## 2026-10-15 -- gateway server table (gw_servers): implemented on fork-dev, upstream PR next
 
 Upstream #1209-#1212 (Kurt) moved DL/HC/HB around for five days; the fork temp fix `389ace0d` is reverted and
 `upstream/dev` is merged (`39642f0a`). Concept, reviewed by an independent fable pass:
@@ -12,6 +12,13 @@ out). Decisions are in section 7, the upstream history of DL/HC/HB in Appendix A
 (static nRF52 must stay static, section 3.7) + `node_ownntp` on DHCP nodes; PR 2 = auto mode and `--setnet`;
 PR 3 = FR/US when the operators name servers. Open: FR/US addresses; the sysadmin wish (DL Internet only,
 Hamnet via HC) is second-hand via Kurt. Backlog row ETH-05.
+**Implemented** (commits `29c09ac8`, `cf66ad18` and the bench follow-up): `src/gw_servers.{h,cpp}` +
+`native_gw_servers`, ESP32 / nRF52 callers on `gwResolveNode`, legacy golden
+(`test/golden/gw_servers_legacy.json`, produced by running the old code) with a named-delta diff test, ETH-05 fix
+(bench-verified on DK5EN-90, see BACKLOG), network mode 0/1/2/3 (`--setnet auto|inet|hamnet`, no flash migration,
+factory default 2 only for new/wiped nodes). Gate: `tools/regression.sh --stage 1,2` PASS (Unity 2419, pytest 1062).
+Left: upstream PR (draft, German description, port onto `upstream/dev`), regenerate the stale
+`test/golden/corpus/commands` separately, FR/US rows when addresses exist.
 
 ## 2026-10-13 -- tools/loganalyse.sh campaign done (W0-W2b)
 

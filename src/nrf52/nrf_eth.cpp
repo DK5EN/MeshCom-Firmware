@@ -624,11 +624,17 @@ void NrfETH::getMyMac()
   DEBUG_MSG("Radio", "GW-ID: 0x%04X", _GW_ID);
 }
 
-/**@brief Static re-apply WITHOUT the W5100S hardware reset (same parameters as
- * initethfixIP(), same up-to-3-s link wait as startETH()). cfg = configured node_ownip.
+// ETH-05: link wait of the static re-apply. 3 s like startETH() when the PHY was not
+// touched; after an initETH_HW() hardware reset the PHY needs ~4 s to report LinkON
+// (bench DK5EN-90: link up 4.1 s after the reset), so that caller waits up to 8 s.
+static constexpr uint32_t kStaticLinkWaitMs        = 3000UL;
+static constexpr uint32_t kStaticLinkWaitAfterHwMs = 8000UL;
+
+/**@brief Static re-apply WITHOUT a W5100S hardware reset of its own (same parameters as
+ * initethfixIP()). cfg = configured node_ownip; link_wait_ms = how long to wait for LinkON.
  * Returns true when the chip is on the link and holds cfg afterwards.
  */
-static bool nrfStaticReapplyNoReset(const IPAddress &cfg)
+static bool nrfStaticReapplyNoReset(const IPAddress &cfg, uint32_t link_wait_ms)
 {
   snprintf(meshcom_settings.node_ip, sizeof(meshcom_settings.node_ip), "%s", meshcom_settings.node_ownip);
   snprintf(meshcom_settings.node_gw, sizeof(meshcom_settings.node_gw), "%s", meshcom_settings.node_owngw);
@@ -650,7 +656,7 @@ static bool nrfStaticReapplyNoReset(const IPAddress &cfg)
 
   EthernetLinkStatus elink = Ethernet.linkStatus();
   uint32_t linkWait = millis();
-  while (elink == LinkOFF && (uint32_t)(millis() - linkWait) < 3000)
+  while (elink == LinkOFF && (uint32_t)(millis() - linkWait) < link_wait_ms)
   {
     delay(100);
     elink = Ethernet.linkStatus();
@@ -687,7 +693,7 @@ int NrfETH::resetDHCP()
   if(act == eth_recovery::Action::ReapplyStatic)
   {
     // ETH-05: a static node stays static -- no DHCP exchange. Static analogue of ETH-04 F1:
-    // a hardware reset (initethfixIP -> initETH_HW, ~2.5 s PHY bring-up) only when the link
+    // a hardware reset (initETH_HW, ~4 s PHY bring-up) only when the link
     // is down or a plain re-apply failed; otherwise reopen UDP / re-apply without it.
     IPAddress cfg(0, 0, 0, 0);
     cfg.fromString(meshcom_settings.node_ownip);
@@ -712,7 +718,7 @@ int NrfETH::resetDHCP()
 
     if(sa == eth_recovery::StaticAction::Reapply)
     {
-      if(nrfStaticReapplyNoReset(cfg))
+      if(nrfStaticReapplyNoReset(cfg, kStaticLinkWaitMs))
       {
         hasIPaddress = true;
         s_leaseHeld = false;
@@ -724,16 +730,26 @@ int NrfETH::resetDHCP()
     }
 
     // link down, a stalled reopen with the right address (wedged sockets), or the
-    // re-apply without reset failed: full static init incl. hardware reset -- at most once per
+    // re-apply without reset failed: hardware reset, then the static re-apply -- at most once per
     // kHwResetMinGapMs (a long stall must not reset the chip on every trigger).
+    // Not initethfixIP(): its link wait (~2.5 s) ends before the PHY is back after the reset
+    // (~4 s, bench DK5EN-90), it then returns with hasIPaddress=false and no static-node path
+    // retried. initethfixIP() stays as is for boot and the gateway watchdog.
     if(!si.hw_reset_allowed)
     {
       Serial.printf("[ETH];event;reapply_static;mode;begin;stalled;%d;gap;1;ip;0;ms;%lu\n", si.reopen_stalled ? 1 : 0, (unsigned long)millis());
       return 1;   // Reapply failed or the chip does not answer yet; the next trigger retries
     }
     eth_recovery::onHwReset(s_recov, millis());
-    hasIPaddress = false;   // initethfixIP() returns early otherwise
-    initethfixIP();
+    hasIPaddress = false;
+    initETH_HW();
+    if(nrfStaticReapplyNoReset(cfg, kStaticLinkWaitAfterHwMs))
+    {
+      hasIPaddress = true;
+      s_leaseHeld = false;
+      last_upd_timer = millis();
+      startServerLink();
+    }
     Serial.printf("[ETH];event;reapply_static;mode;hw_reset;stalled;%d;ip;%d;ms;%lu\n", si.reopen_stalled ? 1 : 0, hasIPaddress ? 1 : 0, (unsigned long)millis());
     return hasIPaddress ? 0 : 1;
   }
