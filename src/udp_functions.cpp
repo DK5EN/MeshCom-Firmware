@@ -1106,7 +1106,7 @@ void startMeshComUDP()
       const char *ntp_host = NULL;
       IPAddress ntp_literal(0,0,0,0);
 
-      if ((node_ip[0] == 44 && meshcom_settings.node_hamnet_only != 0) || meshcom_settings.node_hamnet_only == 1)
+      if ((node_ip[0] == 44 && meshcom_settings.node_hamnet_only == 1) || meshcom_settings.node_hamnet_only == 1)
       {
         // Hamnet only not available for IT-Server, so we use Internet for IT-Server
         if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
@@ -1132,8 +1132,8 @@ void startMeshComUDP()
         else
         if(memcmp(meshcom_settings.node_gwsrv, "HB", 2) == 0)
         {
-          printlndeb("[WIFI]...Hamnet UDP-DEST meshcom.emcomm.ch");
-          srv_host = "meshcom.emcomm.ch";
+          printlndeb("[WIFI]...Hamnet UDP-DEST 44.142.42.59");
+          srv_host = "44.142.42.59";
           srv_path = "hamnet";
         }
         else
@@ -1182,12 +1182,18 @@ void startMeshComUDP()
         else
         if(memcmp(meshcom_settings.node_gwsrv, "HC", 2) == 0)
         {
-          printlndeb("[WIFI]...Hamnet UDP-DEST 44.148.230.197");
-          srv_host = "44.148.230.197";
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.hamnet.network");
+          srv_host = "meshcom.hamnet.network";
           srv_path = "inet";
         }
         else
         if(memcmp(meshcom_settings.node_gwsrv, "HB", 2) == 0)
+        {
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.emcomm.ch");
+          srv_host = "meshcom.emcomm.ch";
+          srv_path = "inet";
+        }
+        else
         {
           printlndeb("[WIFI]...Internet UDP-DEST meshcom.oevsv.at");
           srv_host = "meshcom.oevsv.at";
