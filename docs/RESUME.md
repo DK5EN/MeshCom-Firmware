@@ -1,6 +1,17 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-13, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+**Stand:** 2026-10-15, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+
+## 2026-10-15 -- gateway server table (gw_servers): concept done, implementation next
+
+Upstream #1209-#1212 (Kurt) moved DL/HC/HB around for five days; the fork temp fix `389ace0d` is reverted and
+`upstream/dev` is merged (`39642f0a`). Concept, reviewed by an independent fable pass:
+`docs/gw-servers-unification.md` (one table `GW_SERVERS[]` in `src/gw_servers.{h,cpp}`, per-side modes
+DIRECT / OTHER_NET / VIA, `--setnet auto|inet|hamnet`, value 2 = auto and factory default, FR/US rows commented
+out). Decisions are in section 7, the upstream history of DL/HC/HB in Appendix A. Plan: PR 1 = table + ETH-05 fix
+(static nRF52 must stay static, section 3.7) + `node_ownntp` on DHCP nodes; PR 2 = auto mode and `--setnet`;
+PR 3 = FR/US when the operators name servers. Open: FR/US addresses; the sysadmin wish (DL Internet only,
+Hamnet via HC) is second-hand via Kurt. Backlog row ETH-05.
 
 ## 2026-10-13 -- tools/loganalyse.sh campaign done (W0-W2b)
 

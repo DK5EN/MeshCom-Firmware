@@ -895,6 +895,9 @@ void NrfETH::startUDP()
       {
         // DL and HC (Hamcloud, Hamnet only) share the Hamnet server, as on ESP32
         // (DL: meshcom.hamnet.cloud = 44.148.230.197)
+        // For DL this is legacy: the German sysadmin wants DL as the Internet server (relayed by Kurt,
+        // 2026-10-15), Hamnet users select HC. With src/gw_servers DL leaves this block (or is served
+        // via HC), HC keeps it (docs/gw-servers-unification.md, finding D9, section 3.6).
         printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
         udp_dest_addr = IPAddress(44, 148, 230, 197);
         srv_path = "hamnet";
@@ -1085,6 +1088,9 @@ void NrfETH::startFIXUDP()
     else
     if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
     {
+      // DL is meant to be reachable over the Internet only (wish of the German sysadmin, relayed by
+      // Kurt, 2026-10-15); Hamnet users select HC. This Hamnet target is legacy and goes away
+      // with src/gw_servers (docs/gw-servers-unification.md, finding D9).
       if(bDisplayCont)
         printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
 
