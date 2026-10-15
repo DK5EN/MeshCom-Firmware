@@ -182,7 +182,9 @@ const GwServer *gwFind(const char *code);                            // unknown/
 struct GwTarget { const char *srv_host; uint8_t srv_ip[4];
                   const char *ntp_host; uint8_t ntp_ip[4];
                   const char *path; /* "inet" | "hamnet": the network really used (TM-39 [GW];srv) */ };
-bool            gwResolve(const char *code, GwNet net, const char *ownNtp, GwTarget *out);
+bool            gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver, GwTarget *out);
+bool            gwResolveNode(const char *code, uint8_t mode, const uint8_t ownIp[4],
+                              const char *ownNtp, bool hasResolver, GwTarget *out);  // = gwResolve(gwSelectNet(mode, ownIp), ...)
 int             gwCodes(char out[][3], int max);    // validation, --help, web page, BLE list
 ```
 
@@ -327,9 +329,16 @@ reboot), and it selects its server with the dynamic chain instead of `startFIXUD
 
 Fix, part of PR 1 (a separate commit, so it can be cherry-picked as a bug fix on its own):
 
-1. One predicate `NrfETH::isStaticConfigured()` replaces the five spellings.
-2. `resetDHCP()`: when the node is static, call `initethfixIP()` (the gateway watchdog's action) and
-   return; never `startETH()`. The `ReopenUdp` branch stays DHCP-only.
+1. One predicate, the free inline function `ethIsStaticConfigured()` in `nrf_eth.h`, replaces the five spellings.
+2. `resetDHCP()` for a static node never starts a DHCP exchange. `eth_recovery::decideStatic()` chooses:
+   **Reopen** (link up and the chip still holds the configured address: only the UDP socket is reopened, no
+   hardware reset), **Reapply** (link up, address differs or the reopen got no UDP RX: `Ethernet.begin` with the
+   static parameters, no hardware reset, same link wait as `startETH`), or **HwReset** (link down, or a stalled
+   reopen with a matching address: the full `initethfixIP()` including the W5100S hardware reset). A hardware
+   reset is allowed at most once per 5 minutes (`hwResetAllowed`, shared bookkeeping with the DHCP F2 reset);
+   inside the gap HwReset degrades to Reapply and, if that fails, the call returns 1 without a reset. Log
+   lines: `[ETH];event;reapply_static;mode;reopen|begin|hw_reset;...` (with `stalled` and `gap` fields). The
+   boot path and the gateway watchdog stage 2 keep calling `initethfixIP()` unchanged.
 3. The two UDP start calls go through one function `startServerLink()` which picks the path by
    `isStaticConfigured()`. Every other remaining difference between `startUDP` and `startFIXUDP`
    disappears with the table (section 3.2), because both call `gwResolve`.
@@ -338,112 +347,118 @@ Fix, part of PR 1 (a separate commit, so it can be cherry-picked as a bug fix on
    with a static address, a forced `--ethdrop` and the check that `[ETH]` shows no DHCP exchange and the
    address is unchanged (extends the ETH-04 bench).
 
-## 4. `--setinet auto`
+## 4. Network mode: `--setnet auto|inet|hamnet`
 
-`node_hamnet_only` becomes a three-state mode. The field stays an `int` (offset 200 in the BLE v1 struct,
-no layout change). The encoding keeps today's values and adds one:
+`node_hamnet_only` (JSON `node_honly`) becomes a four-valued **network mode**. The field stays an `int`
+(offset 200 in the BLE v1 struct, no layout change). The encoding keeps every stored value meaning what it
+meant, so **no flash migration is needed**:
 
-| Value | Meaning                       | Command                            | Note                                  |
-| ----- | ----------------------------- | ---------------------------------- | ------------------------------------- |
-| 0     | Internet forced               | `--setinet on` / `--sethamnet off` | unchanged: writes 0 as today          |
-| 1     | Hamnet forced                 | `--sethamnet on` / `--setinet off` | unchanged: writes 1 as today          |
-| 2     | auto: the own address decides | `--setnet auto`                    | **factory default** (new/wiped nodes) |
+| Value | Meaning                                                              | Typed                                                |
+| ----- | -------------------------------------------------------------------- | ---------------------------------------------------- |
+| 0     | not set / legacy: behaves exactly as before on each path (see below) | (default of nodes that never set it)                 |
+| 1     | Hamnet forced                                                        | `--setnet hamnet`, `--sethamnet on`, `--setinet off` |
+| 2     | auto: own address 44.x -> Hamnet, otherwise Internet                 | `--setnet auto`, `--setinet auto`                    |
+| 3     | Internet forced (explicit)                                           | `--setnet inet`, `--setinet on`, `--sethamnet off`   |
 
-Why not "0 = auto": a stored 0 today means "Internet", and `--setinet on` writes 0, so an explicit Internet
-choice on a 44er node is indistinguishable from the default. With 0 kept as Internet, **no existing node
-changes behavior on update**; only new or wiped nodes start in auto (value 2). Nodes that should switch to
-auto write `--setinet auto` once.
+Any other stored value (corrupt flash) is treated as auto. **Value 2 is the factory default**, set only for
+nodes with no stored settings (see "Factory default" below).
 
-`gwSelectNet(mode, ownIp)`: 1 -> Hamnet; 0 -> Internet; 2 or any unknown value (a stored 7 is not
-range-checked on load: `esp32_flash.cpp:221`, `nrf52_flash.cpp:370`) -> Hamnet when `ownIp[0] == 44`,
-otherwise Internet. For a static address `ownIp` is the configured address.
+Legacy meaning of 0, per path (this is what makes a migration unnecessary):
+
+| Path                        | Value 0                                                   |
+| --------------------------- | --------------------------------------------------------- |
+| ESP32, nRF52 dynamic (DHCP) | Internet (as before)                                      |
+| nRF52 static IP             | Hamnet when the configured address is 44.x, else Internet |
+
+Value 3 is new and fixes finding D2: before, a static nRF52 node on a 44er address could not choose the
+Internet at all (`--setinet on` wrote 0, which the static path read as Hamnet). The old aliases
+`--setinet on` and `--sethamnet off` now write 3 instead of 0 for that reason.
+
+`gwSelectNet(mode, ownIp)`: 1 -> Hamnet; 0 and 3 -> Internet; 2 or any other value -> Hamnet when
+`ownIp[0] == 44`, otherwise Internet. The nRF52 static caller applies the legacy rule for value 0 itself
+before calling (`mode = (honly == 0) ? (ownIp[0] == 44 ? 1 : 0) : honly`); ESP32 and nRF52 DHCP pass the
+stored value.
 
 ### 4.1 One command instead of four spellings
 
-Today two commands with two polarities write the same field (`command_functions.cpp:4048` and `:4068`):
+Before, two commands with two polarities wrote the same field (`--sethamnet on` = `--setinet off` = Hamnet;
+`--setinet on` = `--sethamnet off` = Internet). There is no contradictory state (one `int`, the last command
+wins), but "both off" reads like "neither" and there was no spelling for auto.
 
-| Typed             | Stored | Meaning  |
-| ----------------- | ------ | -------- |
-| `--sethamnet on`  | 1      | Hamnet   |
-| `--setinet off`   | 1      | Hamnet   |
-| `--setinet on`    | 0      | Internet |
-| `--sethamnet off` | 0      | Internet |
+| Typed                             | Stores | Notes                                             |
+| --------------------------------- | ------ | ------------------------------------------------- |
+| `--setnet auto`                   | 2      | new                                               |
+| `--setnet inet`                   | 3      | new                                               |
+| `--setnet hamnet`                 | 1      | new                                               |
+| `--setnet`                        | -      | prints the mode and the network in use            |
+| `--setnet <anything else>`        | -      | prints the usage line `--setnet auto/inet/hamnet` |
+| `--setinet on`, `--sethamnet off` | 3      | deprecated aliases (explicit Internet)            |
+| `--sethamnet on`, `--setinet off` | 1      | deprecated aliases                                |
+| `--setinet auto`                  | 2      | alias for Kurt's wording                          |
 
-There is no contradictory state: it is one `int`, the last command wins, and `--sethamnet on` followed by
-`--setinet on` simply ends at Internet. The confusion is in the wording: `--setinet off` means Hamnet and
-`--sethamnet off` means Internet, so "both off" reads like "neither" and "both on" like "both". There is
-also no spelling for auto.
+The old spellings stay (BLE apps, scripts). `--help` shows `--setnet` and marks them deprecated. The info
+line prints `NET MODE: <mode> (in use: <hamnet|inet>)`. `--gateway srv` validation and its help text come
+from `gwCodes()`.
 
-Proposal: **one command `--setnet auto|inet|hamnet`** (same `--set...` naming as `--setname`, `--setctry`).
+### 4.2 Factory default 2 for new or wiped nodes only
 
-| Typed                                    | Stored | Notes                                                             |
-| ---------------------------------------- | ------ | ----------------------------------------------------------------- |
-| `--setnet auto`                          | 2      | new                                                               |
-| `--setnet inet`                          | 0      |                                                                   |
-| `--setnet hamnet`                        | 1      |                                                                   |
-| `--setnet` (no argument)                 | -      | prints the mode and the network actually in use                   |
-| `--setinet on/off`, `--sethamnet on/off` | 0 / 1  | **deprecated aliases**, behave as today, removed from `--help`    |
-| `--setinet auto`                         | 2      | alias for Kurt's wording; the only new spelling of the old family |
+The struct initializer stays 0, so a node whose key is missing keeps its old behaviour:
 
-The old spellings stay because BLE apps, scripts and the golden corpus (`script.txt:225-228`,
-`ladder-order.txt:195-198`) use them. The info line prints the mode (Internet / Hamnet / auto) and the
-network in use, instead of "HAMNET ONLY" / "I-NET ONLY" from `> 0`. New rungs change the ladder-order
-golden; regenerate it in PR 2.
+- ESP32 (`esp32_flash.cpp`, before the load): if neither `node_honly` nor `node_call` is stored in NVS, the
+  value is seeded to 2. Every installed node has `node_call`, so an OTA never changes it.
+- nRF52 (`nrf52_flash.cpp`): `flash_reset()` writes 2 into the default settings. It runs only for real wipes
+  (missing legacy file, bad marker or size, the explicit clear). A loaded keyed store or a legacy blob is
+  never touched. A plain flash layout/version bump keeps the loaded mode (the RAM copy is written back); ESP32
+  behaves the same.
 
-Sites to change in PR 2 (all verified):
+Native tests pin all of this (`test_esp32_settings_nvs`, `test_nrf52_settings_paths`).
 
-| Site                                                 | Today                      | Change                                                         |
-| ---------------------------------------------------- | -------------------------- | -------------------------------------------------------------- |
-| `nrf_eth.cpp:1076` (static)                          | `44` prefix or `!= 0`      | `gwSelectNet`; **also removes D2**                             |
-| `udp_functions.cpp:1109`, `nrf_eth.cpp:881` (dyn)    | `== 1` with dead 44er term | `gwSelectNet` (D3 gone)                                        |
-| `command_functions.cpp:6972` (info line)             | `> 0` -> "HAMNET ONLY"     | print the mode: Internet / Hamnet / auto                       |
-| `web_functions.cpp:1728`                             | `ip44 \|\| == 1`           | via `gwResolve` (3.2)                                          |
-| `command_functions.cpp:4048-4072`                    | writes 1 / 0               | keep as aliases; add the `--setnet` handler (reboot, BLE echo) |
-| `command_functions.cpp:1361` (`--help`)              | no `auto`, `OE/DL/IT`      | text from `gwCodes()`, add `auto`                              |
-| `config_json.h:259`, `docs/settings-registers.md:63` | range 0..1                 | 0..2; add 2/rejection of 3 to `test_config_json.cpp:72`        |
-| `test_ble_settings_v1.cpp:140`                       | 0/1                        | add 2                                                          |
+### 4.3 What a user sees, and what to know when downgrading
 
-**Static nRF52 on a 44er address (decided 2026-10-15: migrate).** The static path sends every 44er
-address to the Hamnet whatever the mode (D2), so a static nRF52 Hamnet node with a stored 0 works today.
-Once the static path uses `gwSelectNet`, 0 would mean Internet and that node would lose its server if it
-has no Internet route. PR 2 therefore migrates once at load: static IP configured with a 44er address and
-mode 0 -> mode 1 (Hamnet). The migration is keyed to the flash struct version and needs its own test.
-
-Further consequences:
-
-- **Downgrade with 2 stored:** ESP32 and nRF52 DHCP read it as Internet (`== 1` is false); nRF52 static
-  reads it as Hamnet (non-zero); the old info line shows "HAMNET ONLY".
-- **Config export/import:** `config_json.cpp:508-513` rejects the whole import when `node_honly` is out of
-  range. A config exported from new firmware with value 2 cannot be restored on older firmware.
-- The golden command corpus (`script.txt:225-228`) does not change: `--sethamnet off` still writes 0.
-- No tool or web page writes `node_honly` directly. The phone app's reading of the int cannot be checked
-  from this repo.
+- Existing nodes: no change on update (0 keeps its legacy meaning on every path).
+- `--setnet auto` is the way for a node to switch to automatic routing; new nodes start in auto.
+- Downgrade: an older firmware that knows only the range 0..1 may clamp a stored 2 or 3 to 1 (the nRF52
+  keyed store clamps on load: `settings_store.cpp`), which means Hamnet, on DHCP nodes too. An old nRF52
+  static reads any non-zero value as Hamnet. Whether upstream's store clamps the same way is unverified.
+  So `--setnet auto` and `--setnet inet` should not be set on a node that may be downgraded.
+- Config export/import: `config_json.cpp` rejects the whole import when `node_honly` is out of range
+  (now 0..3). A config exported with 2 or 3 cannot be restored on older firmware.
+- The golden command corpus (`test/golden/corpus/commands`) was already stale against HEAD before this
+  change; it is not regenerated here (a regeneration would mix 380 unrelated lines into this change).
+  A separate regeneration is a follow-up.
 
 ## 5. Plan
 
-| PR  | Content                                                                                                                                                             | Behavior change         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| 1   | `gw_servers.{h,cpp}`, three callers plus the web NTP display, `gwCodes()` for validation and help, native tests, legacy golden, ETH-05 fix (3.7) as its own commit. | Only the deltas of 5.1. |
-| 2   | `gwSelectNet`, value 2 = auto, `--setnet auto                                                                                                                       | inet                    | hamnet` (old spellings stay as aliases), the sites of section 4, static-path migration, config range, docs. | Auto routing; D2/D3 gone. |
-| 3   | Enable the FR and US rows when the operators supply server and NTP.                                                                                                 | New codes only.         |
+| PR  | Content                                                                                                                                                                        | Behavior change         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| 1   | `gw_servers.{h,cpp}`, three callers plus the web NTP display, `gwCodes()` for validation and help, native tests, legacy golden, ETH-05 fix (3.7) as its own commit.            | Only the deltas of 5.1. |
+| 2   | `gwSelectNet` modes, `--setnet auto\|inet\|hamnet` (old spellings as aliases), info/help/`--gateway srv` from `gwCodes()`, config range 0..3, factory default 2 for new nodes. | Section 4.              |
+| 3   | Enable the FR and US rows when the operators supply server and NTP.                                                                                                            | New codes only.         |
 
 Gate per PR: build every nRF52 and ESP32 board env (nRF52 `wiscore_rak4631` flash is the tightest, 82.5 %
 at baseline), compare flash deltas, `tools/regression.sh --stage 1,2`.
 
-### 5.1 PR 1 delta list (before / after)
+### 5.1 Delta list (before / after)
 
-D7 (literal can go stale) and D8 (code list in two places) are not behavior changes. D2 and D3 belong to
-PR 2. The behavior deltas of PR 1 are:
+D7 (literal can go stale) and D8 (code list in two places) are not behavior changes. The behavior deltas
+are below; the golden test (3.5) names every one of them and fails on anything unlisted. Existing stored
+values 0 and 1 keep their behaviour on every path except as listed.
 
-| #   | Path                    | Case                         | Before                                  | After                                |
-| --- | ----------------------- | ---------------------------- | --------------------------------------- | ------------------------------------ |
-| D1  | nRF52 static            | HC, HB (Hamnet and Internet) | OE server (44.143.8.143 / 89.185.97.38) | the row's own server and NTP         |
-| D9  | all                     | DL on the Hamnet, option (a) | 44.148.230.197                          | same host, via HC (no change on air) |
-| D4  | ESP32                   | Hamnet NTP                   | by own second octet                     | by server, table in 3.3              |
-| D5  | nRF52 (static, dynamic) | node_ownntp                  | ignored                                 | used when it is an IPv4 literal      |
-| D5  | ESP32 DHCP              | node_ownntp                  | ignored (only filled with a static IP)  | used (decided 2026-10-15)            |
-| D6  | ESP32                   | IT with Hamnet forced, NTP   | Hamnet NTP by octet                     | 162.159.200.1                        |
-| --  | ESP32                   | `path` of IT/DL-via-HC       | `"inet"` / `"hamnet"`                   | unchanged (`path` = network used)    |
+| #   | Path                    | Case                                      | Before                                  | After                                           |
+| --- | ----------------------- | ----------------------------------------- | --------------------------------------- | ----------------------------------------------- |
+| D1  | nRF52 static            | HC, HB (Hamnet and Internet)              | OE server (44.143.8.143 / 89.185.97.38) | the row's own server and NTP                    |
+| D9  | all                     | DL on the Hamnet                          | 44.148.230.197 (name on ESP32)          | same host via HC; ESP32 name becomes literal    |
+| D4  | ESP32                   | Hamnet NTP                                | by own second octet                     | by server, table in 3.3                         |
+| D5  | nRF52 (static, dynamic) | node_ownntp                               | ignored                                 | used when it is an IPv4 literal                 |
+| D5  | ESP32 DHCP              | node_ownntp                               | ignored (only filled with a static IP)  | used                                            |
+| D6  | ESP32                   | IT with Hamnet forced, NTP                | Hamnet NTP by octet                     | `pool.ntp.org` (the Internet NTP)               |
+| D3  | ESP32, nRF52 dynamic    | stored value 2 or any value > 3           | Internet (only `== 1` meant Hamnet)     | auto by own address                             |
+| D3  | nRF52 static            | stored value 2 or any value > 3           | Hamnet (any non-zero)                   | auto by own address                             |
+| D2  | all                     | value 3 (new), explicit Internet          | not expressible on a static 44er node   | Internet on every path                          |
+| --  | all                     | stored 0 and 1                            | -                                       | unchanged (0 keeps its per-path legacy meaning) |
+| --  | nRF52 static            | UDP TX error streak, `--ethdrop`          | leaves the static path (DHCP exchange)  | stays static (ETH-05, 3.7)                      |
+| --  | nRF52 static            | `--srvip` bench override, `[GW];srv` line | not applied / not printed               | applied / printed (shared tail)                 |
+| --  | all new/wiped nodes     | factory default of the mode               | 0                                       | 2 (auto)                                        |
 
 ## 6. Out of scope
 
@@ -465,7 +480,7 @@ Decided 2026-10-15:
    (relayed by Kurt). DL on the Hamnet goes via HC, i.e. to the 44er address of the German Hamcloud: no
    change on air (3.6, option a). The idea of DL pointing to OE was the state before v4.35v (Appendix A)
    and is withdrawn.
-6. Static nRF52 nodes on a 44er address with a stored 0 are migrated once to mode 1 (4).
+6. No flash migration: the mode keeps 0 = legacy per path and gets new values 2 (auto) and 3 (Internet forced) (4). Replaces the earlier plan to migrate static 44er nodes.
 7. `--setnet auto|inet|hamnet` replaces the four `--setinet` / `--sethamnet` spellings; the old ones stay
    as deprecated aliases (4.1).
 8. A static nRF52 node stays static: ETH-05 is fixed with the table, as its own commit (3.7).

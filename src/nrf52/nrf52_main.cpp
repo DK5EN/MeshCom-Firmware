@@ -1228,7 +1228,7 @@ void nrf52setup()
         //////////////////////////////////////////////////////
         // ETHERNET INIT
    
-        if(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6)
+        if(ethIsStaticConfigured())
         {
             if(bDEBUG)
                 Serial.println("[init] ETH FIX-IP init");
@@ -2273,7 +2273,7 @@ void nrf52loop()
     if(neth.hasETHHardware && (uint32_t)(millis() - dhcp_timer) >= (uint32_t)(DHCP_REFRESH * 60000))
     {
         // no need on static IPs
-        if(!(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6))
+        if(!ethIsStaticConfigured())
         {
             if(bDEBUG)
             {
@@ -2314,7 +2314,7 @@ void nrf52loop()
     // in it, and on a 30 s interval so a genuinely absent DHCP server costs
     // one attempt per half minute rather than one per loop pass.
     if(neth.hasETHHardware && !neth.hasIPaddress
-       && !(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6))
+       && !ethIsStaticConfigured())
     {
         static uint32_t eth_acquire_timer = 0;
         if(eth_acquire_timer == 0 || (uint32_t)(millis() - eth_acquire_timer) >= 30000)

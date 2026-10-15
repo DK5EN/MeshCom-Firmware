@@ -505,6 +505,32 @@ static void test_ethmtu_out_of_range_is_refused(void)
     TEST_ASSERT_EQUAL_INT(1400, meshcom_settings.node_ethmtu);
 }
 
+/* GWU-04: node_honly (node_hamnet_only) is the 3-state network mode 0..3
+ * (0 legacy, 1 Hamnet, 2 auto, 3 Internet) -- 3 is accepted and round-trips, 4 refuses
+ * the whole file. */
+static void test_honly_mode_range(void)
+{
+    /* export with the value set, so the CRC matches the document */
+    fill_settings();
+    meshcom_settings.node_hamnet_only = 3;
+    std::string ok = do_export();
+    TEST_ASSERT_TRUE_MESSAGE(ok.find("\"node_honly\":\"3\"") != std::string::npos,
+                             "node_honly 3 is not exported");
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(ok));
+    TEST_ASSERT_EQUAL_INT(3, meshcom_settings.node_hamnet_only);
+
+    fill_settings();
+    meshcom_settings.node_hamnet_only = 4;
+    std::string bad = do_export();
+    wipe_settings();
+    s_meshcom_settings before;
+    memcpy(&before, &meshcom_settings, sizeof(before));
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
+    TEST_ASSERT_NOT_NULL(strstr(g_err, "node_honly"));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
+}
+
 /* SNF-D7 (#1188): node_stor has the schema bounds 0..1 -- an import outside
  * (2 and -1) refuses the whole file and leaves the value untouched. */
 static void test_stor_out_of_range_is_refused(void)
@@ -855,6 +881,7 @@ int main(int, char **)
     RUN_TEST(test_unknown_key_is_ignored_and_counted);
     RUN_TEST(test_out_of_range_value_is_refused);
     RUN_TEST(test_ethmtu_out_of_range_is_refused);
+    RUN_TEST(test_honly_mode_range);
     RUN_TEST(test_stor_out_of_range_is_refused);
     RUN_TEST(test_import_without_node_stor_keeps_current_value);
     RUN_TEST(test_rm_out_of_range_is_refused);

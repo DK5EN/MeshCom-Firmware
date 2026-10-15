@@ -157,6 +157,51 @@ void test_missing_key_takes_default_on_first_boot(void)
 }
 
 // ---------------------------------------------------------------------------
+// Network-mode default (node_hamnet_only / key node_honly): 2 = auto only for a node with NO
+// stored settings. An installed node without the key (older firmware) keeps the struct value 0.
+// ---------------------------------------------------------------------------
+void test_net_mode_default_auto_on_empty_nvs(void)
+{
+    init_flash();
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_hamnet_only);
+}
+
+void test_net_mode_missing_key_on_installed_node_stays_unset(void)
+{
+    // Installed node after an OTA: node_call is stored, the key node_honly never was.
+    FakeNvs::instance().seedString("node_call", "DK5EN-9");
+    init_flash();
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_hamnet_only);
+}
+
+void test_net_mode_stored_value_wins(void)
+{
+    for (int v : {0, 1, 2, 3})
+    {
+        FakeNvs::instance().reset();
+        meshcom_settings = s_meshcom_settings();
+        strncpy(meshcom_settings.node_call, "DK5EN-9", sizeof(meshcom_settings.node_call) - 1);
+        meshcom_settings.node_hamnet_only = v;
+        save_settings();
+        meshcom_settings = s_meshcom_settings();
+        init_flash();
+        TEST_ASSERT_EQUAL_INT(v, meshcom_settings.node_hamnet_only);
+    }
+}
+
+void test_net_mode_auto_again_after_clear_flash(void)
+{
+    strncpy(meshcom_settings.node_call, "DK5EN-9", sizeof(meshcom_settings.node_call) - 1);
+    meshcom_settings.node_hamnet_only = 3;
+    save_settings();
+    clear_flash();
+    meshcom_settings = s_meshcom_settings();
+    init_flash();
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_hamnet_only);
+}
+
+// ---------------------------------------------------------------------------
 // 4. Downgrade path: an unknown NVS key present in the store is ignored and
 //    does not corrupt anything else. The ESP32 walk never enumerates NVS
 //    (it only requests specific known keys by name), so an unrecognised key
@@ -274,6 +319,10 @@ int main(int, char **)
     RUN_TEST(test_round_trip_restores_every_persisted_field);
     RUN_TEST(test_dropped_sensor_fields_produce_no_nvs_key);
     RUN_TEST(test_missing_key_takes_default_on_first_boot);
+    RUN_TEST(test_net_mode_default_auto_on_empty_nvs);
+    RUN_TEST(test_net_mode_missing_key_on_installed_node_stays_unset);
+    RUN_TEST(test_net_mode_stored_value_wins);
+    RUN_TEST(test_net_mode_auto_again_after_clear_flash);
     RUN_TEST(test_unknown_key_ignored_real_fields_unaffected);
     RUN_TEST(test_every_emitted_nvs_key_is_at_most_15_chars);
     RUN_TEST(test_audio_fields_roundtrip_and_truncate_safely);

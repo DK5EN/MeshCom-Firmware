@@ -24,12 +24,30 @@ static void expect(Action a, uint32_t now = 1000)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)a, (uint8_t)decide(in, st, now));
 }
 
-void test_fixed_ip_is_legacy_path(void)
+// ETH-05: a static node must stay static, whatever the other inputs say.
+void test_fixed_ip_reapplies_static(void)
 {
     in.fixed_ip = true;
-    expect(Action::FullDhcp);
+    expect(Action::ReapplyStatic);
     st.dhcp_fail_streak = 5;  // even with F2 conditions
-    expect(Action::FullDhcp);
+    expect(Action::ReapplyStatic);
+}
+
+void test_fixed_ip_ignores_other_inputs(void)
+{
+    in.fixed_ip = true;
+    in.lease_held = true;
+    expect(Action::ReapplyStatic);
+    in.link_up = false;
+    expect(Action::ReapplyStatic);
+    in.link_up = true;
+    in.reopen_stalled = true;
+    expect(Action::ReapplyStatic);
+    in.reopen_stalled = false;
+    in.last_maintain_rc = 1;
+    expect(Action::ReapplyStatic);
+    in.last_maintain_rc = 3;
+    expect(Action::ReapplyStatic);
 }
 
 // Core regression: today's firmware does a full DHCP here.
@@ -202,10 +220,88 @@ void test_on_hw_reset_keeps_streak(void)
     TEST_ASSERT_EQUAL_UINT8(2, st.dhcp_fail_streak);
 }
 
+// ETH-05 follow-up: static recovery without a hardware reset when possible.
+static StaticInputs si(bool link_up, bool ip_matches, bool reopen_stalled, bool hw_reset_allowed = true)
+{
+    StaticInputs in;
+    in.hw_reset_allowed = hw_reset_allowed;
+    in.link_up = link_up;
+    in.ip_matches = ip_matches;
+    in.reopen_stalled = reopen_stalled;
+    return in;
+}
+
+void test_static_link_up_ip_matches_reopens(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::Reopen, decideStatic(si(true, true, false)));
+}
+
+void test_static_link_up_ip_differs_reapplies(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(true, false, false)));
+}
+
+void test_static_link_down_hw_reset(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(false, true, false)));
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(false, false, false)));
+}
+
+// Wedged sockets with the correct SIPR: a stalled earlier Reopen must escalate to
+// the hardware reset, not reopen forever.
+void test_static_stalled_ip_matches_hw_reset(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(true, true, true)));
+}
+
+void test_static_stalled_ip_differs_reapplies(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(true, false, true)));
+}
+
+void test_static_stalled_link_down_hw_reset(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(false, true, true)));
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(false, false, true)));
+}
+
+// Rate limit of the static hardware reset (same kHwResetMinGapMs as F2): while it is not
+// allowed, every case that would reset falls back to Reapply; the other outcomes are unchanged.
+void test_static_hw_reset_not_allowed_falls_back_to_reapply(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(false, true, false, false)));   // link down
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(false, false, true, false)));
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(true, true, true, false)));     // wedged sockets
+}
+
+void test_static_hw_reset_not_allowed_leaves_other_outcomes(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::Reopen, decideStatic(si(true, true, false, false)));
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(true, false, false, false)));
+    TEST_ASSERT_EQUAL(StaticAction::Reapply, decideStatic(si(true, false, true, false)));
+}
+
+void test_static_hw_reset_allowed_still_resets(void)
+{
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(false, true, false, true)));
+    TEST_ASSERT_EQUAL(StaticAction::HwReset, decideStatic(si(true, true, true, true)));
+}
+
+// The input is derived from the F2 state with the same gap.
+void test_hw_reset_allowed_follows_gap(void)
+{
+    State st{};
+    TEST_ASSERT_TRUE(hwResetAllowed(st, 1000));                       // never reset yet
+    onHwReset(st, 1000);
+    TEST_ASSERT_FALSE(hwResetAllowed(st, 1000 + kHwResetMinGapMs - 1));
+    TEST_ASSERT_TRUE(hwResetAllowed(st, 1000 + kHwResetMinGapMs));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_fixed_ip_is_legacy_path);
+    RUN_TEST(test_fixed_ip_reapplies_static);
+    RUN_TEST(test_fixed_ip_ignores_other_inputs);
     RUN_TEST(test_lease_held_link_up_reopens_udp);
     RUN_TEST(test_no_lease_full_dhcp);
     RUN_TEST(test_link_down_full_dhcp);
@@ -227,5 +323,15 @@ int main(int, char **)
     RUN_TEST(test_on_dhcp_result_link_down_no_change);
     RUN_TEST(test_on_dhcp_result_saturates);
     RUN_TEST(test_on_hw_reset_keeps_streak);
+    RUN_TEST(test_static_link_up_ip_matches_reopens);
+    RUN_TEST(test_static_link_up_ip_differs_reapplies);
+    RUN_TEST(test_static_link_down_hw_reset);
+    RUN_TEST(test_static_stalled_ip_matches_hw_reset);
+    RUN_TEST(test_static_stalled_ip_differs_reapplies);
+    RUN_TEST(test_static_stalled_link_down_hw_reset);
+    RUN_TEST(test_static_hw_reset_not_allowed_falls_back_to_reapply);
+    RUN_TEST(test_static_hw_reset_not_allowed_leaves_other_outcomes);
+    RUN_TEST(test_static_hw_reset_allowed_still_resets);
+    RUN_TEST(test_hw_reset_allowed_follows_gap);
     return UNITY_END();
 }

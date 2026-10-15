@@ -934,10 +934,75 @@ static void test_unchanged_legacy_blob_does_not_override_keyed_store(void)
 // kSettingsBufferCap (product-code change, out of scope for a test suite) --
 // so it is reported here rather than weakened into a synthetic pass.
 // ---------------------------------------------------------------------------
+// Network-mode default (node_hamnet_only, gw-servers-unification section 4): 2 = auto ONLY for a
+// node with no stored settings (fresh flash / wipe); an installed node keeps what it stored.
+// ---------------------------------------------------------------------------
+
+static void test_net_mode_default_is_auto_on_fresh_flash(void)
+{
+    init_flash(); // no legacy blob, no keyed store: flash_reset() writes the defaults
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_hamnet_only);
+}
+
+static void test_net_mode_default_is_auto_after_flash_reset(void)
+{
+    auto legacy = make_legacy_blob("PRE-RESET");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    flash_reset();
+    const auto *after = g_fake_fs.peek(kLegacyPath);
+    TEST_ASSERT_NOT_NULL(after);
+    s_ble_settings_v1 img{};
+    memcpy(&img, after->data(), sizeof(img));
+    TEST_ASSERT_EQUAL_INT(2, img.node_hamnet_only);
+}
+
+static void test_net_mode_existing_legacy_blob_keeps_its_value(void)
+{
+    for (int v : {0, 1, 3})
+    {
+        g_fake_fs.reset();
+        meshcom_settings = s_meshcom_settings();
+        init_flash_done = false;
+        s_meshcom_settings s;
+        strncpy(s.node_call, "KEEP-1", sizeof(s.node_call) - 1);
+        s.node_hamnet_only = v;
+        auto legacy = make_legacy_blob_from(s);
+        g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+        init_flash();
+        TEST_ASSERT_EQUAL_INT(v, meshcom_settings.node_hamnet_only);
+    }
+}
+
+static void test_net_mode_existing_keyed_store_keeps_its_value(void)
+{
+    for (int v : {0, 1, 3})
+    {
+        g_fake_fs.reset();
+        meshcom_settings = s_meshcom_settings();
+        init_flash_done = false;
+        auto legacy = make_legacy_blob("KEEP-2");
+        g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+        seed_legacy_blob_crc(legacy);
+        s_meshcom_settings s;
+        strncpy(s.node_call, "KEEP-2", sizeof(s.node_call) - 1);
+        s.node_hamnet_only = v;
+        auto keyed = make_keyed_store(s);
+        g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+        init_flash();
+        TEST_ASSERT_EQUAL_INT(v, meshcom_settings.node_hamnet_only);
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 int main(void)
 {
     UNITY_BEGIN();
+
+    RUN_TEST(test_net_mode_default_is_auto_on_fresh_flash);
+    RUN_TEST(test_net_mode_default_is_auto_after_flash_reset);
+    RUN_TEST(test_net_mode_existing_legacy_blob_keeps_its_value);
+    RUN_TEST(test_net_mode_existing_keyed_store_keeps_its_value);
 
     RUN_TEST(test_keyed_fast_path_wins_and_leaves_legacy_untouched);
 

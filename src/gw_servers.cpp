@@ -43,9 +43,16 @@ static const int GW_COUNT = (int)(sizeof(GW_SERVERS) / sizeof(GW_SERVERS[0]));
 
 GwNet gwSelectNet(uint8_t mode, const uint8_t ownIp[4])
 {
-    if (mode == 0) return GW_NET_INET;
+    if (mode == 0 || mode == 3) return GW_NET_INET;
     if (mode == 1) return GW_NET_HAMNET;
     return (ownIp != nullptr && ownIp[0] == 44) ? GW_NET_HAMNET : GW_NET_INET;
+}
+
+uint8_t gwEffectiveMode(uint8_t stored, const uint8_t ownIp[4], bool staticLegacy)
+{
+    if (staticLegacy && stored == 0)
+        return (ownIp != nullptr && ownIp[0] == 44) ? 1 : 0;
+    return stored;
 }
 
 const GwServer *gwFind(const char *code)

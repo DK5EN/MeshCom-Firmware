@@ -28,6 +28,15 @@
 
 #include <Arduino.h>
 #include <configuration.h>
+#include <string.h>
+// meshcom_settings comes from the suite's settings shim (test/support/nrf52/WisBlock-API.h), included before this header
+
+// ETH-05: verbatim copy of the predicate in src/nrf52/nrf_eth.h, so the twin
+// still exercises both recovery branches (static -> initethfixIP, DHCP -> resetDHCP).
+inline bool ethIsStaticConfigured()
+{
+  return strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6;
+}
 
 class NrfETH
 {

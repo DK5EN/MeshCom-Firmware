@@ -60,7 +60,7 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 | ------------ | ------------------ | ----------- | -------------- | --------------------------------------------------------- |
 | `node_ssid`  | `node_ossid`       | string (40) | —              | **Mismatch** (§4): Server-/MeshCom-WLAN-SSID              |
 | `node_pwd`   | `node_opwd`        | string (40) | —              | **Mismatch** (§4), **Secret** (§5): Staging-WLAN-Passwort |
-| `node_honly` | `node_hamnet_only` | int         | 0..1           |                                                           |
+| `node_honly` | `node_hamnet_only` | int         | 0..3           | Netz: 0 unset/legacy, 1 Hamnet, 2 auto, 3 Internet        |
 | `node_sset`  | `node_sset`        | int         | 0..65535       | Bitmaske                                                  |
 | `node_maxv`  | `node_maxv`        | float       | 0..20          |                                                           |
 

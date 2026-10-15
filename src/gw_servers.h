@@ -59,8 +59,10 @@ struct GwTarget {
     bool        ownntp_ignored; // ownNtp was set but unusable (no resolver, not an IPv4 literal)
 };
 
-// mode 0 = Internet forced, 1 = Hamnet forced, 2 or any other value = auto
-// (Hamnet when ownIp[0] == 44, else Internet).
+// mode (node_hamnet_only): 0 = unset/legacy -> Internet (the nRF52 static
+// caller applies its own legacy rule before calling), 1 = Hamnet forced,
+// 2 = auto, 3 = Internet forced, ANY other value (4..255, wrapped values) =
+// auto (Hamnet when ownIp[0] == 44, else Internet).
 GwNet gwSelectNet(uint8_t mode, const uint8_t ownIp[4]);
 
 // Compares 2 chars. nullptr, empty or unknown -> row 0 (OE).
@@ -76,10 +78,17 @@ bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver
 // Codes of all enabled rows in table order. Returns the count (<= max).
 int gwCodes(char out[][3], int max);
 
+// Effective node_hamnet_only: the nRF52 STATIC-IP legacy rule in ONE place. staticLegacy (nRF52 with
+// a static configuration) maps the stored 0 (unset/legacy) to 1 (Hamnet) for a 44.x own address and
+// leaves it 0 (Internet) otherwise; every other stored value, and every non-static caller, is
+// returned unchanged. The path (startFIXUDP) and all status output (--info, --setnet, web NTP) call
+// this, so status can never differ from the path used. docs/gw-servers-unification.md section 4.
+uint8_t gwEffectiveMode(uint8_t stored, const uint8_t ownIp[4], bool staticLegacy);
+
 // One call for the platform callers: net choice plus resolution, equal to
 // gwResolve(code, gwSelectNet(mode, ownIp), ownNtp, hasResolver, out).
-// mode is the node_hamnet_only setting (0 Internet, 1 Hamnet, 2 or any other
-// value auto). Callers pass their own address: ESP32 node_ip, nRF52 dynamic
+// mode is the node_hamnet_only setting (0 Internet/legacy, 1 Hamnet, 2 auto,
+// 3 Internet forced, any other value auto). Callers pass their own address: ESP32 node_ip, nRF52 dynamic
 // Ethernet.localIP(), nRF52 static the configured node_ownip.
 bool gwResolveNode(const char *code, uint8_t mode, const uint8_t ownIp[4], const char *ownNtp,
                    bool hasResolver, GwTarget *out);

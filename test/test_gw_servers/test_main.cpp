@@ -219,6 +219,29 @@ static void test_resolve_null_out(void)
     TEST_ASSERT_FALSE(gwResolve("OE", GW_NET_INET, nullptr, true, nullptr));
 }
 
+static void test_effective_mode(void)
+{
+    const uint8_t ham[4] = {44, 143, 1, 1}, inet[4] = {10, 0, 0, 5};
+    // static nRF52 legacy rule: stored 0 follows the own address (44er -> 1, else 0)
+    TEST_ASSERT_EQUAL_UINT8(1, gwEffectiveMode(0, ham, true));
+    TEST_ASSERT_EQUAL_UINT8(0, gwEffectiveMode(0, inet, true));
+    // no static legacy: unchanged
+    TEST_ASSERT_EQUAL_UINT8(0, gwEffectiveMode(0, ham, false));
+    TEST_ASSERT_EQUAL_UINT8(0, gwEffectiveMode(0, inet, false));
+    // non-zero stored values are never touched
+    for (uint8_t m = 1; m <= 3; m++) {
+        TEST_ASSERT_EQUAL_UINT8(m, gwEffectiveMode(m, ham, true));
+        TEST_ASSERT_EQUAL_UINT8(m, gwEffectiveMode(m, inet, true));
+        TEST_ASSERT_EQUAL_UINT8(m, gwEffectiveMode(m, ham, false));
+        TEST_ASSERT_EQUAL_UINT8(m, gwEffectiveMode(m, inet, false));
+    }
+    TEST_ASSERT_EQUAL_UINT8(7, gwEffectiveMode(7, ham, true));
+    // status and path agree: the mode fed to gwSelectNet picks the Hamnet for static 0 + 44er
+    TEST_ASSERT_EQUAL(GW_NET_HAMNET, gwSelectNet(gwEffectiveMode(0, ham, true), ham));
+    TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(gwEffectiveMode(0, inet, true), inet));
+    TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(gwEffectiveMode(0, ham, false), ham));
+}
+
 static void test_select_net(void)
 {
     const uint8_t ham[4] = {44, 143, 1, 1}, inet[4] = {192, 168, 1, 5}, none[4] = {0, 0, 0, 0};
@@ -229,6 +252,10 @@ static void test_select_net(void)
     TEST_ASSERT_EQUAL(GW_NET_HAMNET, gwSelectNet(2, ham));
     TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(2, inet));
     TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(2, none));
+    TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(3, ham));
+    TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(3, inet));
+    TEST_ASSERT_EQUAL(GW_NET_HAMNET, gwSelectNet(4, ham));
+    TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(4, inet));
     TEST_ASSERT_EQUAL(GW_NET_HAMNET, gwSelectNet(7, ham));
     TEST_ASSERT_EQUAL(GW_NET_INET, gwSelectNet(7, inet));
     TEST_ASSERT_EQUAL(GW_NET_HAMNET, gwSelectNet(255, ham));
@@ -303,6 +330,7 @@ int main(int, char **)
     RUN_TEST(test_ownntp_too_short_ignored);
     RUN_TEST(test_resolve_null_out);
     RUN_TEST(test_select_net);
+    RUN_TEST(test_effective_mode);
     RUN_TEST(test_resolve_node_mode_and_address);
     RUN_TEST(test_resolve_node_end_to_end);
     return UNITY_END();
