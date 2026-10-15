@@ -891,8 +891,10 @@ void NrfETH::startUDP()
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
       else
-      if(memcmp(meshcom_settings.node_gwsrv, "HC", 2) == 0)
+      if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0 || memcmp(meshcom_settings.node_gwsrv, "HC", 2) == 0)
       {
+        // DL and HC (Hamcloud, Hamnet only) share the Hamnet server, as on ESP32
+        // (DL: meshcom.hamnet.cloud = 44.148.230.197)
         printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
         udp_dest_addr = IPAddress(44, 148, 230, 197);
         srv_path = "hamnet";
@@ -935,8 +937,10 @@ void NrfETH::startUDP()
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
       else
-      if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+      if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0 || memcmp(meshcom_settings.node_gwsrv, "HC", 2) == 0)
       {
+        // HC (Hamcloud) is reachable from the Hamnet only: on the Internet it
+        // uses the DL Internet server, as on ESP32.
         // v4.35v: MeshCom-DL internet server meshcom.hamnet.network (the ESP32
         // path resolves the name; nRF52 keeps fixed IPs like OE/IT above).
         printlndeb("[UDP-DEST] Internet UDP-DEST DL 192.68.17.26");
@@ -945,17 +949,6 @@ void NrfETH::startUDP()
 
         printlndeb("[UDP-DEST]...NTP-DEST 162.159.200.1");
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
-      }
-      else
-      if(memcmp(meshcom_settings.node_gwsrv, "HC", 2) == 0)
-      {
-        // HC Server ist immer nur aus dem HAMNET erreichbar
-        printlndeb("[UDP-DEST] Internet UDP-DEST HC 44.148.230.197");
-        udp_dest_addr = IPAddress(44, 148, 230, 197);
-        srv_path = "inet";
-
-        printlndeb("[UDP-DEST]...Hamnet NTP-DEST 44.148.224.123");
-        timeClient.setPoolServerIP(IPAddress(44, 148, 224, 123));
       }
       else
       if(memcmp(meshcom_settings.node_gwsrv, "HB", 2) == 0)
