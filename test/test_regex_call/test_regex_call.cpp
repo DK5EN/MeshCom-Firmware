@@ -194,6 +194,17 @@ static void test_via_lehnt_sondermarken_und_ueberlaenge_ab(void)
     TEST_ASSERT_FALSE(checkViaList(String("OE1KBC-24,OE1KFR-12,OE1ABC-1,OE1DEF-2,OE1GHI-3")));
 }
 
+// Die Web-GUI ("setvia") vergleicht gegen diese Form; ohne sie meldete sie
+// bei "dk8vw-99" oder "none" FAIL, obwohl --via den Wert uebernommen hatte.
+static void test_via_kanonische_form(void)
+{
+    TEST_ASSERT_EQUAL_STRING("DK8VW-99", viaCanonical(String(" dk8vw-99 ")).c_str());
+    TEST_ASSERT_EQUAL_STRING("OE1KBC-24,OE1KFR-12", viaCanonical(String("oe1kbc-24,oe1kfr-12")).c_str());
+    TEST_ASSERT_EQUAL_STRING("", viaCanonical(String("none")).c_str());
+    TEST_ASSERT_EQUAL_STRING("", viaCanonical(String("NONE")).c_str());
+    TEST_ASSERT_EQUAL_STRING("", viaCanonical(String("  ")).c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -217,6 +228,7 @@ int main(int, char **)
     RUN_TEST(test_via_lehnt_ungueltige_ssid_ab);
     RUN_TEST(test_via_lehnt_leere_eintraege_ab);
     RUN_TEST(test_via_lehnt_sondermarken_und_ueberlaenge_ab);
+    RUN_TEST(test_via_kanonische_form);
 
     return UNITY_END();
 }

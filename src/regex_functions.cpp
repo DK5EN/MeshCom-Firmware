@@ -122,6 +122,18 @@ bool checkViaList(const String &list)
 	return true;
 }
 
+String viaCanonical(const String &value)
+{
+	String sVia = value;
+	sVia.trim();
+	sVia.toUpperCase();
+
+	if(sVia.compareTo("NONE") == 0)
+		sVia = "";
+
+	return sVia;
+}
+
 bool normalizeOwnCall(String &callsign)
 {
 	int iDash = callsign.indexOf('-');

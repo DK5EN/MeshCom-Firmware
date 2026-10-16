@@ -13,6 +13,11 @@ bool checkRegexCall(String strCallSign);
 // Sondermarken "*", "H", "HG" werden abgelehnt.
 bool checkViaList(const String &list);
 
+// Die Form, in der --via die Liste ablegt: getrimmt, Grossbuchstaben, "NONE"
+// wird zur leeren Liste. Die Web-GUI (setvia) vergleicht dagegen, ob der Wert
+// uebernommen wurde.
+String viaCanonical(const String &value);
+
 // Bringt das EIGENE Rufzeichen des Knotens auf die kanonische Form.
 // Ausdruecklich nicht fuer empfangene Rufzeichen: checkRegexCall() prueft auch
 // die Absender fremder Frames, und wuerde deren Call hier umgeschrieben, waeren

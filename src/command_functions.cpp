@@ -3031,15 +3031,13 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"via ") == 0)
     {
-        sVar = msg_text+6;
-        sVar.trim();
-        sVar.toUpperCase();
+        sVar = viaCanonical(String(msg_text+6));
 
         // max 39 chars
         // OE1KBC-24,OE1KFR-12
 
-        // leerer Wert loescht wie NONE (Web-GUI "setvia" mit geleertem Feld)
-        if(sVar.length() == 0 || sVar.compareTo("NONE") == 0)
+        // leer (auch "NONE") loescht (Web-GUI "setvia" mit geleertem Feld)
+        if(sVar.length() == 0)
         {
             memset(meshcom_settings.node_via, 0x00, sizeof(meshcom_settings.node_via));
         }

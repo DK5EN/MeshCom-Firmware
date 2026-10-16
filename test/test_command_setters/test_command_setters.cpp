@@ -1015,6 +1015,24 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
     TEST_ASSERT_EQUAL_INT(2, (int)n);
 }
 
+// Web "setvia": the OK/FAIL check must compare against the form --via stores
+// (viaCanonical), not the raw field -- "dk8vw-99" and "none" reported FAIL.
+static void test_web_setvia_compares_canonical_form()
+{
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    const size_t at = web.find("paramName.equals(\"setvia\")");
+    TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, "setvia handler missing");
+    const std::string body = web.substr(at, web.find("} else", at) - at);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("viaCanonical(") != std::string::npos, "setvia does not compare against viaCanonical()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("strcmp(meshcom_settings.node_via, setupData->paramValue.c_str())") == std::string::npos,
+                             "setvia still compares the raw field value");
+
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t via = cmd.find("commandCheck(msg_text+2, (char*)\"via \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(via != std::string::npos, "--via rung missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("viaCanonical(", via) - via < 400, "--via does not canonicalise with viaCanonical()");
+}
+
 static void test_stagelan_is_instrument_only_everywhere()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
@@ -1458,5 +1476,6 @@ int main(int, char **)
     RUN_TEST(test_safeboot_capability_gates_auto_update);
     RUN_TEST(test_safeboot_nocap_is_version_tagged_and_web_order);
     RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
+    RUN_TEST(test_web_setvia_compares_canonical_form);
     return UNITY_END();
 }
