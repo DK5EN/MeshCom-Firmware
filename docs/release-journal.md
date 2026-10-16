@@ -1,11 +1,58 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261011`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261016`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.16 (Freitag, 2026-10-16)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei
+10.11. Basis ist jetzt das offizielle `v4.40a.hbserver` (icssw-org, 2026-10-13, upstream #1209-#1212),
+vollstaendig in `fork-dev` enthalten. `FLASH_VERSION` 20261016, `FLASH_STRUCT_VERSION` 20260724
+unveraendert -- die Einstellungen bleiben erhalten. Safeboot unveraendert seit 10.05.
+
+Inhalt seit `v4.40a.10.11` (Firmware-Commits der ersten Elternlinie, alle in den Release-Notes
+untergebracht; die uebrigen Commits im Bereich sind die upstream-Seite unserer bereits enthaltenen
+PRs #1207/#1208):
+
+- Zentrale Server-Tabelle `src/gw_servers.{h,cpp}` (`29c09ac8`, `cf66ad18`): ESP32, nRF52 dynamisch und
+  nRF52 statisch waehlen Server und Zeitserver aus `GW_SERVERS[]` (OE, DL, IT, HC, HB; FR/US
+  auskommentiert). DL im Internet nur `meshcom.hamnet.network`, DL im Hamnet ueber HC; HC im Internet
+  ueber DL; IT im Hamnet bleibt auf dem Internet-Server. nRF52 waehlt DL/HC wie ESP32 (`8d232bde`),
+  statische nRF52 bekommen HC und HB. Golden-Vergleich alt gegen neu ueber 700 Rasterzeilen.
+- Netzmodus `node_honly` 0/1/2/3 und `--setnet auto|inet|hamnet`; auto nur fuer neue oder geloeschte
+  Knoten; Aliase `--setinet`/`--sethamnet` bleiben; JSON-Bereich 0..3.
+- ETH-05 (`cf66ad18`, `70f2c476`): statische RAK4631 bleiben bei der Ethernet-Wiederherstellung
+  statisch; Hardware-Reset wartet auf den PHY, Wiederholung auch fuer statische Knoten.
+- Konsole: UART-TX-Ring 2048 B auf allen ESP32-Boards mit UART-Konsole (`e0d5b1c9`, `8a1b2564`);
+  STAT-Zeile mit OnRxDone avg/p95/p99/max (`c7cb2c1d`); INSTRUMENT-Treiber (`2a1dcdf3`, nicht in
+  Release-Bildern aktiv).
+- Upstream: Merge `v4.40a.hbserver` (`a880a029`, `39642f0a`); temporaerer OE-Fix `389ace0d`
+  zurueckgenommen (`a748948d`).
+- Upstream-PR #1213 (Server-Tabelle, Netzmodus, ETH-05) offen, ready for review.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Netzmatrix (`tools/bench/gw_net_matrix.py`, `docs/campaign-gw-net-matrix.md`) auf `DK5EN-90`
+  (RAK4631, Ethernet) und `DK5EN-1` (Heltec V3, WLAN), je 45 Faelle: 3 Netze x 3 Modi x 5 Server.
+  Serverwahl in allen 90 Faellen richtig; KEEP, BEAT vom Server und NTP in allen Faellen mit
+  Rueckweg. Mit rpizero als Gateway zaehlt nur Hamnet (rpizero macht NAT nur zum ppp0).
+- ETH-05 auf `DK5EN-90` mit INSTRUMENT-Build: `--ethdrop` setzt die statische Konfiguration ohne
+  DHCP neu, zweiter Abbruch mit Hardware-Reset in 1,9 s zurueck, innerhalb 5 min kein zweiter Reset.
+- Nach dem Lauf: `DK5EN-1` als Gateway (OE, BEAT) und `DK5EN-90` ohne Gateway auf diesem Stand mit DHCP.
+- Gate: `tools/regression.sh --stage 1,2` PASS: Unity 72 Envs, 2419/2419, Golden-Selftest 48 Befehle, pytest 1080.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Kabelziehen und ein echter UDP-Sendefehler-Streak auf dem RAK4631 (ETH-05).
+- ESP32-Boards mit Ethernet (T-ETH-Elite), T114, T-Echo mit der neuen Tabelle.
+- Gateway-Betrieb ueber Wochen; Downgrade mit gespeichertem Modus 2/3.
+- Internet-Server ueber rpizero als Gateway (kein Rueckweg, Aufbau-bedingt).
 
 ---
 
