@@ -2,10 +2,12 @@
 
 **Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
 
-## 2026-10-16 -- gw_servers bench matrix on real nodes; PR draft ready, not submitted
+## 2026-10-16 -- gw_servers: upstream draft PR #1213 open; bench matrix on real nodes
 
-- PR branch `pr/gw-servers` (worktree `../MeshCom-PR-next`, `cd911c6e` + `87f2f583`), body
-  `../pr-gw-servers-body.md` incl. bench results. Not pushed; waits for the operator's `yes` (draft PR).
+- Upstream **draft** PR [#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213) against `dev`:
+  branch `pr/gw-servers` (worktree `../MeshCom-PR-next`, `cd911c6e` + `87f2f583`, 13 files, +774/-357).
+  Kurt reviews and merges. After the merge: `/sync-upstream` (merge, not rebase), then remove the
+  worktree and the branch.
 - Bench driver `tools/bench/gw_net_matrix.py` (oracle = `tools/gw_servers_dump.cpp`), 45 cases per node.
   Results and open items: `docs/campaign-gw-net-matrix.md`. Server choice right in all 90 cases.
 - N3 (gateway rpizero) Internet cases fail by design: rpizero NATs only to ppp0 (Hamnet). Only N3
