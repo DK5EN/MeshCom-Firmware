@@ -23,8 +23,8 @@
       "board": "ttgo_tbeam",
       "family": "esp32",
       "usb_serial": "573C000584",
-      "host": null,
-      "last_ip_verified": "2026-10-16: 192.168.68.69 unreachable, address unknown"
+      "host": "192.168.68.70",
+      "last_ip_verified": "2026-10-16 (USB --info)"
     },
     "rak-90": {
       "call": "DK5EN-90",

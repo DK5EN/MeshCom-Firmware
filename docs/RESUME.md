@@ -2,11 +2,24 @@
 
 **Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
 
-## 2026-10-16 -- gw_servers: upstream draft PR #1213 open; bench matrix on real nodes
+## 2026-10-16 -- release v4.40a.10.16 published (CI), web flasher, fleet flashed
 
-- Upstream **draft** PR [#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213) against `dev`:
+- Release [v4.40a.10.16](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.16) (tag on
+  `27ce9d3c`, CI run 38879957594): Latest, 66 assets, 27 `.autoupdate` re-inflate ok, tag string in the
+  image, T-Deck field commands `mute=2 stat=1 udplog=1 injectraw=0`. Base: official `v4.40a.hbserver`.
+- Web flasher: only v4.40a.10.16 (30 boards, HTTPS check 0 mismatches), v4.40a.10.11 folder pruned
+  (release object kept); presentation index card updated (PR history page: BACKLOG PAGES-01).
+- Root `safeboot.bin`/`safeboot-s3.bin` replaced by the release assets: the Safeboot env compiles
+  `esp32_flash.cpp`, which changed with the network mode.
+- Fleet on v4.40a.10.16: DK5EN-1 (USB, gateway OE, BEAT), DK5EN-92 (USB 460800, gateway OE, BEAT),
+  DK5EN-90 (DFU, DHCP .62), DK5EN-98 (OTA webflash, gateway OE, server connected).
+- Gate for the release: Unity 72 envs 2419/2419, golden 48, pytest 1080.
+
+## 2026-10-16 -- gw_servers: upstream PR #1213 open (ready for review); bench matrix on real nodes
+
+- Upstream PR [#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213) against `dev`:
   branch `pr/gw-servers` (worktree `../MeshCom-PR-next`, `cd911c6e` + `87f2f583`, 13 files, +774/-357).
-  Kurt reviews and merges. After the merge: `/sync-upstream` (merge, not rebase), then remove the
+  Opened as draft, marked ready for review on 2026-10-16. Kurt reviews and merges. After the merge: `/sync-upstream` (merge, not rebase), then remove the
   worktree and the branch.
 - Bench driver `tools/bench/gw_net_matrix.py` (oracle = `tools/gw_servers_dump.cpp`), 45 cases per node.
   Results and open items: `docs/campaign-gw-net-matrix.md`. Server choice right in all 90 cases.
