@@ -1,6 +1,19 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
+**Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.16` (CI-built, Latest).
+
+## 2026-10-16 (evening) -- VIA-01 fixed on fork-dev, RX-01 closed, REBOOT-98 opened
+
+- **VIA-01** (`be7c3c7f`, `9b96d884`): `--via` was stored unchecked; field case DK8VW-44 set `DK8VW-P`, so
+  nothing was meshed. `checkViaList()` now rejects non-numeric or out-of-range SSIDs, a leading zero, empty
+  tokens, `*`/`H`/`HG` and lists over 39 chars; `NONE` and empty clear. Web `setvia` no longer reports FAIL for
+  lowercase or `none`. Host gate green; **bench test and the upstream PR are open** (checks in the BACKLOG row).
+  Won't fix (operator): a bad value already in flash survives the update; JSON import stays unvalidated.
+- **RX-01 closed** (`7f4818c4`, `docs/rx01-soak-evaluation-20261005.md`): the SX1262 soak shows no evidence of a
+  leak in the RX-timeout defer logic (a leak below ~1 % per day is beyond this data). The SX127x T-Beam would
+  need its own run with ground-truth TX times; not scheduled.
+- **REBOOT-98** (new, watch): DK5EN-98 rebooted once on 2026-10-04 20:38:59 with no panic text. Single event, cause
+  unknown, compare BL-04. If it repeats: read the reset reason after boot.
 
 ## 2026-10-16 -- T-Deck DM reply (TD-21) + web firmware column: upstream PR #1214 open
 
@@ -193,24 +206,32 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 
 ## Branch model
 
-- `fork-dev` is the only working branch: `upstream/dev` (icssw-org/MeshCom-Firmware) plus ONE
-  port commit that carries the fork-only docs, tests, tools and GitHub Pages.
+- `fork-dev` is the only working branch: `upstream/dev` (icssw-org/MeshCom-Firmware) plus the fork's docs,
+  tests, tools, GitHub Pages **and fork-only firmware** (`src/`, `platformio.ini`, `variants/`) that is not
+  upstream yet. New firmware lands on `fork-dev` first; upstream PRs are cut from `upstream/dev` later.
 - Retired 2026-10-02: `fork-main`, `fork-neo`, `fork-neo-test`, `master` (tag
   `archive/fork-neo-test-20261002`). Nothing is developed there any more.
 - Upstream sync: cherry-pick, never merge the fork history in. After icssw-org squash-merges a PR
-  of ours, **merge** (not rebase) to re-sync.
+  of ours, **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (Kurt reviews and merges).
-- Upstream state: PR #1186 (4.40a: Store-and-Forward, Nachbarschaftsmatrix, serial config)
-  merged 2026-10-02 as `e1e2acea`. No open upstream PR by dk5en today (checked via `gh`).
-  The N-36 fix (`42dbf03a`) is not yet offered upstream.
+- Open upstream PRs by dk5en (checked via `gh` 2026-10-16): #1213 (`gw_servers`, ready for review) and
+  #1214 (T-Deck DM reply TD-21 + web firmware column). Merged since 4.40a: #1200, #1201, #1207, #1208.
+  Fixes of the 10-04 campaign (N-36, WEB-04, TD-09/11/15, T5-01) are in `upstream/dev` too.
+- The temporary OE Internet server fix `389ace0d` (lost in upstream #1209) is reverted (`a748948d`,
+  2026-10-15); `upstream/dev` was merged with Kurt's #1210-#1212. Nothing temporary remains in `src/`.
+- Worktrees for the open PRs: `../MeshCom-PR-next` (#1213), `../MeshCom-PR-tdeck` (#1214). Remove them
+  and their branches after the merge and `/sync-upstream`.
 
 ## Last release and flasher policy
 
-- `v4.40a.10.02`, cut from `fork-dev` `08b7dd8b`; firmware is byte-identical to the official
-  `v4.40a`.
-- The web flasher on gh-pages offers only the latest release (`--keep 1`).
-- Both GitHub Actions workflows are disabled; releases are manual via `/release-firmware`.
+- `v4.40a.10.16` (tag on `27ce9d3c`, CI run 38879957594), base official `v4.40a.hbserver`; 66 assets.
+- CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
+  `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards).
+  `ci-build.yml` stays disabled. Recipe: `/release-firmware`.
+- The web flasher on gh-pages offers only the latest release (`--keep 1`); root `safeboot*.bin` are the
+  release assets.
+- Never cut a same-day `.N` release (the AU tag parser rejects it): date it the next day.
 - Release history: [docs/release-journal.md](release-journal.md); user-facing delta:
   [release-notes.md](../release-notes.md).
 
@@ -218,8 +239,8 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it (local only, `.claude/commands/` is gitignored).
-- Stage 1: every `[env:native*]` (67 envs, 2203 Unity cases on 2026-10-07) plus `test/golden/selftest.sh`.
-- Stage 2: ruff lint gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (823 cases), the
+- Stage 1: every `[env:native*]` (72 envs, 2437 Unity cases on 2026-10-16) plus `test/golden/selftest.sh`.
+- Stage 2: ruff lint gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (1080 cases on 2026-10-16), the
   `test/test_nbrlog` scripts, node tests, the jsdom safeboot page test and four `--self-test`
   tools.
 - Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,
@@ -236,23 +257,24 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 
 ## Bench fleet
 
-State of `tools/bench/fleet.json`, 2026-10-04. RAK, T-Beam and T-Deck are on USB; the RAK runs an
-instrument image (`INSTRUMENT_ENABLED=1`) of `fork-dev`, T-Beam and T-Deck run the plain WEB-04
-image (17:52 build, OTA 2026-10-04 evening); the Heltec is unplugged.
+State 2026-10-16. All four nodes run `v4.40a.10.16` except DK5EN-14 (T-Deck Plus) and the production
+DK5EN-98, which run `fork-dev` `0146fa0b` (TD-21). Registry: `tools/bench/fleet.json`.
 
-| Node     | Board           | USB serial              | Port last seen                | IP            |
-| -------- | --------------- | ----------------------- | ----------------------------- | ------------- |
-| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E        | /dev/cu.usbmodem1101          | 192.168.68.77 |
-| DK5EN-14 | T-Deck Plus     | E0:72:A1:AD:65:E0 (MAC) | /dev/cu.usbmodem101           | 192.168.68.70 |
-| DK5EN-92 | T-Beam v1.2     | 573C000584              | /dev/cu.usbserial-573C0005841 | 192.168.68.75 |
-| DK5EN-1  | Heltec V3       | 0001                    | /dev/cu.usbserial-0001        | 192.168.68.76 |
+| Node     | Board           | USB serial              | Host (2026-10-16)    | Role / state                             |
+| -------- | --------------- | ----------------------- | -------------------- | ---------------------------------------- |
+| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E        | 192.168.68.62 (DHCP) | DFU-flashed, no 2323 console, no mDNS    |
+| DK5EN-14 | T-Deck Plus     | E0:72:A1:AD:65:E0 (MAC) | `dk5en-14.local`     | `0146fa0b`, TD-21 hand-tested            |
+| DK5EN-92 | T-Beam v1.2     | 573C000584              | 192.168.68.70        | USB 460800, gateway OE                   |
+| DK5EN-1  | Heltec V3       | 0001                    | 192.168.68.71        | USB, gateway OE, net console off default |
 
-DK5EN-98 is the production Heltec V3 (logger on rpizero), not a bench node.
+DK5EN-98 is the production Heltec V3 (gateway, logger on rpizero), not a bench node; it is flashed over
+the air with `tools/webflash.py` (allow more than its 120 s wait for the node to return).
 
 Handling:
 
-- Ports move and DHCP moves the IPs per reboot; the driver reads the live IP from `--info` and
-  writes it back to `fleet.json`. Resolve ports by USB serial (ioreg or pyserial), never by name.
+- Ports move and DHCP moves the IPs between sessions (short leases: on 10-16 a listed address had become
+  DK5EN-98). Confirm the callsign on the start page or via `identity_guard.py --port` before any flash or
+  test. Resolve ports by USB serial (ioreg or pyserial), never by name.
 - Harness `--node` takes the fleet key (`t-deck-14`), not the callsign.
 - Heltec V3 on CP2102: DTR is the PRG button, a held DTR is a long press (deep sleep). The guard
   asserts DTR only on native-USB ports.
@@ -260,6 +282,7 @@ Handling:
   fails).
 - The RAK web GUI has no mDNS (the Ethernet path ships no responder): reach it by IP from the
   boot log (`Ethernet.localIP():`).
+- rpizero NATs only Hamnet: Internet cases on a gateway behind it fail by design. Never capture on it.
 
 Hard bench rules:
 
@@ -282,40 +305,25 @@ Hard bench rules:
 
 ## Hottest first (details in BACKLOG)
 
-- WEB-04 (web GUI delivery ticks vanish, DK1TCP-77): fixed and bench-verified on `fork-dev`
-  2026-10-04, fork only. MCApp's own ack-matcher bugs went to the webapp agent
-  (`~/Desktop/webapp-ack-matcher-issue.md`). Verdict and log:
-  `docs/webgui-ack-ticks-verdict-20261004.md`, `docs/webgui-ack-ticks-impl-plan.md`.
-- T-Deck campaign (`docs/campaign-tdeck-w02-20261004.md`): both waves done on 2026-10-04 (TD-15
-  map restore + hemisphere fix, TD-09 tile cache, TD-11 ACK glyph, W0.2 warning flags on the five
-  envs and on `nrf52_base`), nothing offered upstream yet: one German PR for TD-09/TD-11/TD-15
-  and one for W0.2 + T5-01 + EXT-01 are the next step. All three bench nodes run instrument images of
-  this tree since 2026-10-04 16:45 (RAK DFU, T-Beam and T-Deck OTA); `--stage all` green apart
-  from a fixed harness false positive.
-- N-36 (softAP on a fresh ESP32) is fixed on `fork-dev`; the upstream PR text is drafted
-  (`docs/pr-draft-n36-20261003.md`), not filed.
-- RX-01: the SX127x T-Beam missed a direct beacon during its `RX_TIMEOUT` receive restart (one
-  observation, run 9); measure over a soak before touching upstream's defer logic.
-- `--mesh off` still transmits on two RF paths (gateway DM-ACK, DM-store custody); operator
-  decision pending.
-- GPS: altitude Kalman re-seed length and baro fusion tau (both measured, neither changed).
-- One unexplained TASK_WDT on DK5EN-1 (2026-09-28), web send path the only candidate.
+- Upstream: #1213 and #1214 wait for Kurt's review. Next PR candidate: VIA-01 after its bench test.
+- VIA-01 bench test (`--via dk8vw-p` rejected, `none`/empty clear, `on`/`off` still toggle, web `setvia`).
+- GWRX-01: the gateway re-transmits server-injected frames after hearing another node relay them (39 times in
+  one night on DK5EN-98). Operator decision open, with the DUP script-vs-firmware choice and whether the
+  OnRxDone/console-TX-ring fixes go upstream (`docs/rca-brief-dup-onrxdone-20261013.md`, "Open questions").
+- RM items: sync limiter/RM-DUP on hardware, late echo after "No answer", RM1 uploads to the public server,
+  RM-GWRELAY against a real server; command unification parked (Q1-Q5).
+- Gateway server table follow-ups: FR/US rows when operators name servers; regenerate the stale
+  `test/golden/corpus/commands`.
+- `--mesh off` still transmits on two RF paths (gateway DM-ACK, DM-store custody; BL-01): operator decision.
+- GPS: altitude Kalman re-seed length (BL-03) and baro fusion tau (GPS-05b), both measured, neither changed.
+- Stability, both single events: TASK_WDT on DK5EN-1 (2026-09-28, BL-04) and REBOOT-98 (2026-10-04).
 
 ## Last three sessions
 
-- **2026-10-04:** bench campaign (prepare step, RAK under the driver, TD-20 = trackball clamp,
-  stage 3 green on three nodes); RX-01 24 h soak on DK5EN-98 started (console on rpizero,
-  passive Extern-UDP sniffer on mcapp, evaluate 2026-10-05 after 11:17); T-Deck campaign wave 1:
-  TD-15 map restore after reboot, TD-09 PSRAM tile cache, MEM-04 re-measured and closed, W0.2
-  warning inventory; three new harness scenarios (`map_rebuild`, `map_persist_seed/check`).
-  Afternoon: DR-16 re-decided (both-valid, `test_drift_dr16_gates`, `--phase` gone from the
-  selftest), TM-43 Extern-UDP soak on the RAK run for the first time, the regression open-points
-  paper closed and archived (`docs/archive/regression-offene-punkte-20261003.md`).
-  Evening: T-Deck campaign wave 2 (TD-11 ACK glyph in the bubble, W0.2 flags on five envs +
-  nrf52_base, `msg_ack` harness scenario), then T5-01 and EXT-01 fixed blind (five of five envs
-  with `-Werror`), and EXT-03: Extern-UDP refuses broadcast/multicast targets. Evening: WEB-04 web GUI ticks (verdict via fable-review, one
-  orchestrated wave, advisor must-fix for late ACKs, before/after bench on DK5EN-92/-14).
-- **2026-10-03:** end-to-end regression runner (`tools/regression.sh`, `/full-regression`), suite
-  inventory `docs/test-suite-map.md`, stub move (`cfcfcb3c`); docs consolidated for re-entry.
-- **2026-10-02:** 4.40a port (PR #1186 merged), release `v4.40a.10.02`, and the N-36 softAP fix
-  (`42dbf03a`).
+- **2026-10-16:** release `v4.40a.10.16` (CI) and fleet flash; gw_servers bench matrix on real nodes and
+  upstream PR #1213; TD-21 plus web firmware column as PR #1214; VIA-01 fix; RX-01 soak evaluated and closed,
+  REBOOT-98 opened; presentation/PR-history pages refreshed (PAGES-01 closed).
+- **2026-10-15:** gateway server table `gw_servers` (concept, implementation, ETH-05 fix, network mode
+  auto/inet/hamnet); `389ace0d` reverted and `upstream/dev` merged (#1210-#1212).
+- **2026-10-13:** DUP counter gap and slow OnRxDone RCA (R0-R3: console TX ring `CONSOLE_UART_TXBUF` 2048,
+  `onrx_*` in the STAT line, DK5EN-98 OTA); `tools/loganalyse.sh` campaign W0-W2b done.
