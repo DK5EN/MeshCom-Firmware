@@ -153,6 +153,47 @@ static void test_board_profil_ist_gepinnt(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(100, MAX_DEDUP_RING, "MAX_DEDUP_RING");
 }
 
+// ------------------------------------------------------------ Via-Liste
+static void test_via_akzeptiert_gueltige_listen(void)
+{
+    TEST_ASSERT_TRUE(checkViaList(String("DK8VW-99")));
+    TEST_ASSERT_TRUE(checkViaList(String("DK8VW")));
+    TEST_ASSERT_TRUE(checkViaList(String("DK8VW-0")));
+    TEST_ASSERT_TRUE(checkViaList(String("OE1KBC-24,OE1KFR-12")));
+}
+
+static void test_via_lehnt_ungueltige_ssid_ab(void)
+{
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-P")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-100")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-P,10")));
+    // Das eigene Rufzeichen eines Relais ist kanonisch "-5" (normalizeOwnCall),
+    // checkMesh() vergleicht exakt: "-05" traefe nie
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-05")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-00")));
+}
+
+static void test_via_lehnt_leere_eintraege_ab(void)
+{
+    TEST_ASSERT_FALSE(checkViaList(String("")));
+    TEST_ASSERT_FALSE(checkViaList(String(",DK8VW-99")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-99,")));
+    TEST_ASSERT_FALSE(checkViaList(String("DK8VW-99,,OE1KBC-1")));
+}
+
+static void test_via_lehnt_sondermarken_und_ueberlaenge_ab(void)
+{
+    TEST_ASSERT_FALSE(checkViaList(String("*")));
+    TEST_ASSERT_FALSE(checkViaList(String("H")));
+    TEST_ASSERT_FALSE(checkViaList(String("HG")));
+    TEST_ASSERT_FALSE(checkViaList(String("OE1KBC-24,H")));
+    // 39 Zeichen gehen, 40 nicht
+    TEST_ASSERT_TRUE(checkViaList(String("OE1KBC-24,OE1KFR-12,OE1ABC-12,OE1DEF-22")));
+    TEST_ASSERT_FALSE(checkViaList(String("OE1KBC-24,OE1KFR-12,OE1ABC-12,DL10DEF-22")));
+    TEST_ASSERT_FALSE(checkViaList(String("OE1KBC-24,OE1KFR-12,OE1ABC-1,OE1DEF-2,OE1GHI-3")));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -171,6 +212,11 @@ int main(int, char **)
     RUN_TEST(test_lehnt_leeres_rufzeichen_ab);
     RUN_TEST(test_lehnt_offensichtlichen_unsinn_ab);
     RUN_TEST(test_ueberlanges_rufzeichen_stuerzt_nicht_ab);
+
+    RUN_TEST(test_via_akzeptiert_gueltige_listen);
+    RUN_TEST(test_via_lehnt_ungueltige_ssid_ab);
+    RUN_TEST(test_via_lehnt_leere_eintraege_ab);
+    RUN_TEST(test_via_lehnt_sondermarken_und_ueberlaenge_ab);
 
     return UNITY_END();
 }
