@@ -2379,6 +2379,7 @@
    "test_gps_filter",
    "test_alt_fusion",
    "test_kbd_repeat",
+   "test_dm_prefill",
    "test_radio_units",
    "test_msgid_counter",
    "test_dm_stats",
