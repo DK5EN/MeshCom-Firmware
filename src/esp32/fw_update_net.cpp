@@ -18,6 +18,7 @@
 #include <esp_partition.h>
 #include <esp_rom_crc.h>
 #include <esp_system.h>
+#include <mbedtls/platform.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -81,6 +82,12 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #define FWNET_MIN_FREE 0u
 #endif
 #endif
+// Internal free heap still needed when mbedTLS runs on PSRAM (AU-13). Measured on DK5EN-14 (T-Deck
+// Plus, 10 checks right after boot): ifree 71.4 KB at job start, minimum 55.7 KB = about 16 KB
+// internal peak (WiFi/lwIP and small mbedTLS fallbacks). 24000 = that peak + 8 KB margin.
+#ifndef FWNET_MIN_IFREE_PSRAM
+#define FWNET_MIN_IFREE_PSRAM 24000u
+#endif
 #define FWNET_BLK 4096u                  // staging block, heap-allocated per job
 #define FWNET_JSON_MAX (300u * 1024u)    // releases/latest is about 65 KB; hard cap
 #define FWNET_IDLE_MS 20000u             // no byte for this long = stall
@@ -141,7 +148,7 @@ LanArg s_lan;
 void auLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void auLog(const char *fmt, ...)
 {
-    char b[128];
+    char b[192];
     va_list ap;
     va_start(ap, fmt);
     int n = vsnprintf(b, sizeof(b), fmt, ap);
@@ -155,10 +162,48 @@ void auLog(const char *fmt, ...)
 
 void heapMark(const char *when)
 {
-    auLog("[AU];heap;%s;free;%u;min;%u;blk;%u;stk;%u\n", when,
+    auLog("[AU];heap;%s;free;%u;min;%u;blk;%u;stk;%u;ifree;%u;imin;%u;iblk;%u\n", when,
           (unsigned)esp_get_free_heap_size(), (unsigned)esp_get_minimum_free_heap_size(),
           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
-          (unsigned)uxTaskGetStackHighWaterMark(nullptr)); // bytes of stack never used
+          (unsigned)uxTaskGetStackHighWaterMark(nullptr), // bytes of stack never used
+          (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+}
+
+// AU-13: the prebuilt arduino-esp32 2.0.14 mbedTLS is built with CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC
+// (caps 0x804), so a handshake needs about 56 KB of INTERNAL RAM. With PSRAM present mbedTLS gets
+// a PSRAM-first calloc with internal fallback (same policy as CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC).
+// NOTE: the hook is global, every mbedTLS user (net_console, ...) allocates from PSRAM afterwards.
+// The AU task stack and the FWNET_BLK staging block stay internal (flash writes disable the cache).
+bool s_tlsPsram = false;
+
+void *tlsCalloc(size_t n, size_t size)
+{
+    size_t total;
+    if (!fwCallocSizeOk(n, size, &total))
+        return nullptr;
+    void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p == nullptr)
+        p = heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    return p;
+}
+
+void tlsFree(void *p) { heap_caps_free(p); }
+
+// Install once, before the first TLS session of a job; true = mbedTLS runs on PSRAM.
+bool tlsAllocInstall()
+{
+// Only BOARD_HAS_PSRAM builds have PSRAM in the heap: without it esp32-hal-psram.h undefines
+// CONFIG_SPIRAM and Arduino never runs psramInit() (T-Beam Supreme, every ttgo_tbeam env).
+#if defined(BOARD_HAS_PSRAM)
+    if (!s_tlsPsram && psramFound() && mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree) == 0)
+    {
+        s_tlsPsram = true;
+        auLog("[AU];tlsalloc;psram\n");
+    }
+#endif
+    return s_tlsPsram;
 }
 
 // Failed heap allocations while a job runs (heap_caps failed-alloc hook). mbedtls maps an
@@ -474,11 +519,14 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
 // Pre-TLS gate shared by CHECK and DOWNLOAD; logs the numbers on refusal.
 bool heapGateOk()
 {
-    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (fwNetHeapOk(fr, bk, FWNET_MIN_FREE, FWNET_MIN_BLOCK))
+    const bool ps = tlsAllocInstall();
+    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const uint32_t pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
+    if (fwNetHeapGate(ps, fr, bk, pb, FWNET_MIN_FREE, FWNET_MIN_BLOCK, FWNET_MIN_IFREE_PSRAM))
         return true;
-    auLog("[AU];refuse;lowheap;free;%u;blk;%u\n", (unsigned)fr, (unsigned)bk);
+    auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u\n", (unsigned)fr, (unsigned)bk,
+          (unsigned)pb, (unsigned)ps);
     return false;
 }
 
@@ -761,7 +809,7 @@ const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBl
     if (minBlock != 0 && !heapGateOk())
     {
         stageFlashDisarm();
-        return "lowheap";   // heapGateOk() already logged [AU];refuse;lowheap;free;..;blk;..
+        return "lowheap";   // heapGateOk() already logged [AU];refuse;lowheap;ifree;..;iblk;..
     }
     uint8_t *blk = (uint8_t *)heap_caps_malloc(FWNET_BLK, MALLOC_CAP_8BIT);
     if (blk == nullptr)

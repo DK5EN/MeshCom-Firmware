@@ -1023,6 +1023,41 @@ void test_heap_gate_total_free_classic(void)
     TEST_ASSERT_FALSE(fwNetHeapOk(88180, 16999, 76000u, 17000u));
 }
 
+void test_heap_gate_internal_tdeck_refuses(void)
+{
+    // AU-13 field case: 8BIT block 4456436 (PSRAM) passed the old rule, internal numbers must refuse
+    TEST_ASSERT_TRUE(oldBlockOnlyRule(4456436));
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 20000, 15000, 0, 0u, 17000u, 24000u));
+    // without the allocator a large PSRAM block must not count
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 20000, 15000, 4456436, 0u, 17000u, 24000u));
+    // S3 without PSRAM keeps 0/17000 on internal numbers
+    TEST_ASSERT_TRUE(fwNetHeapGate(false, 20000, 17000, 0, 0u, 17000u, 24000u));
+    // classic without PSRAM keeps 76000/17000
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 75999, 57332, 0, 76000u, 17000u, 24000u));
+    TEST_ASSERT_TRUE(fwNetHeapGate(false, 88180, 57332, 0, 76000u, 17000u, 24000u));
+}
+
+void test_heap_gate_psram_tls(void)
+{
+    TEST_ASSERT_TRUE(fwNetHeapGate(true, 24000, 15000, 4456436, 76000u, 17000u, 24000u));
+    TEST_ASSERT_FALSE(fwNetHeapGate(true, 23999, 15000, 4456436, 76000u, 17000u, 24000u));
+    TEST_ASSERT_FALSE(fwNetHeapGate(true, 60000, 15000, 16999, 76000u, 17000u, 24000u));
+    TEST_ASSERT_TRUE(fwNetHeapGate(true, 60000, 0, 17000, 76000u, 17000u, 24000u));
+}
+
+void test_calloc_size_overflow(void)
+{
+    size_t t = 0;
+    TEST_ASSERT_TRUE(fwCallocSizeOk(4, 16384, &t));
+    TEST_ASSERT_EQUAL_UINT32(65536u, (uint32_t)t);
+    TEST_ASSERT_TRUE(fwCallocSizeOk(0, 16, &t));
+    TEST_ASSERT_TRUE(fwCallocSizeOk(16, 0, &t));
+    TEST_ASSERT_EQUAL_UINT32(0u, (uint32_t)t);
+    TEST_ASSERT_FALSE(fwCallocSizeOk((size_t)-1, 2, &t));
+    TEST_ASSERT_FALSE(fwCallocSizeOk((size_t)-1 / 2 + 1, 2, nullptr));
+    TEST_ASSERT_TRUE(fwCallocSizeOk((size_t)-1 / 2, 2, nullptr));
+}
+
 void test_heap_gate_total_free_disabled(void)
 {
     // non-classic: minFree 0 behaves exactly like the old block-only rule
@@ -1108,6 +1143,9 @@ int main(int, char **)
     RUN_TEST(test_latch_attempt_exhausted_stays_blocked);
     RUN_TEST(test_heap_gate_total_free_classic);
     RUN_TEST(test_heap_gate_total_free_disabled);
+    RUN_TEST(test_heap_gate_internal_tdeck_refuses);
+    RUN_TEST(test_heap_gate_psram_tls);
+    RUN_TEST(test_calloc_size_overflow);
     RUN_TEST(test_lowheap_does_not_consume_attempt);
     return UNITY_END();
 }

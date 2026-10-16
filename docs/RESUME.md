@@ -2,6 +2,18 @@
 
 **Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.16` (CI-built, Latest).
 
+## 2026-10-17 -- AU-13 fixed on fork-dev: auto-update TLS on PSRAM boards
+
+- **AU-13**: the auto-update check failed on T-Deck Plus (field OE5HWN-16 `[AU];tls;-32512`; bench
+  DK5EN-14 `tls -1` right after boot, internal min 2.7 KB). The prebuilt mbedTLS allocates internal RAM
+  only; PSRAM was never used. `src/esp32/fw_update_net.cpp` now installs a PSRAM-first mbedTLS allocator
+  on `BOARD_HAS_PSRAM` builds and gates/logs on internal RAM (`[AU];heap;..;ifree;..;imin;..;iblk;..`).
+  Bench DK5EN-14: 10/10 checks after reboot, internal min 55.7 KB; one download staged (1.57 MB, 22 s).
+- **Left on DK5EN-14:** a staged `v4.40a.10.16` record (mode `off`, so no handover). Setting `--autoupdate
+auto` would install that release over the fix build.
+- **Open:** DK5EN-1/DK5EN-92 control runs (nodes were offline), release, upstream PR, T-Beam Supreme PSRAM
+  never initialised (no `BOARD_HAS_PSRAM`). Campaign: [`campaign-au-psram-tls-20261016.md`](campaign-au-psram-tls-20261016.md).
+
 ## 2026-10-16 (evening) -- VIA-01 fixed on fork-dev, RX-01 closed, REBOOT-98 opened
 
 - **VIA-01** (`be7c3c7f`, `9b96d884`): `--via` was stored unchecked; field case DK8VW-44 set `DK8VW-P`, so

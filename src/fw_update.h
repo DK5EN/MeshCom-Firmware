@@ -542,6 +542,30 @@ inline bool fwNetHeapOk(uint32_t freeB, uint32_t largestBlk, uint32_t minFree, u
     return freeB >= minFree && largestBlk >= minBlk;
 }
 
+// AU-13: heap gate for boards whose mbedTLS runs on the PSRAM-first allocator. The handshake
+// buffers then live in PSRAM (needs a block for the 16 KB records), but mbedTLS and WiFi still
+// take small internal allocations, so a floor of INTERNAL free heap stays. Without the allocator
+// the decision is the classic one, fed with INTERNAL numbers (8BIT also counts PSRAM and made the
+// T-Deck look healthy at 4.4 MB while 57-84 KB internal were left).
+inline bool fwNetHeapGate(bool psramTls, uint32_t internalFree, uint32_t internalBlk,
+                          uint32_t psramLargestBlk, uint32_t minFree, uint32_t minBlk,
+                          uint32_t minIFree)
+{
+    if (!psramTls)
+        return fwNetHeapOk(internalFree, internalBlk, minFree, minBlk);
+    return psramLargestBlk >= minBlk && internalFree >= minIFree;
+}
+
+// n * size without wrap-around (calloc contract): false = the product does not fit in size_t.
+inline bool fwCallocSizeOk(size_t n, size_t size, size_t *total)
+{
+    if (size != 0 && n > ((size_t)-1) / size)
+        return false;
+    if (total != nullptr)
+        *total = n * size;
+    return true;
+}
+
 // A lowheap refusal while a phone kept BLE up is transient: it must not consume one of the
 // FW_MAX_ATTEMPTS download attempts. With BLE paused the job reports "lowheap_ble_off" instead,
 // which does consume one (bounded retries, no endless NimBLE stop/start).
