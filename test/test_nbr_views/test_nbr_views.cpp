@@ -633,6 +633,78 @@ void test_note_ncnt_writes_row_core_direct_or_indirect(void)
     free(mp);
 }
 
+void test_note_fw_writes_row_direct_or_relayed(void)
+{
+    NbrMatrix *mp = mk();
+    NbrMatrix &m = *mp;
+    nbrNoteFrame(m, "OE1AAA-1,DL1BBB-1", '!', NULL, false, -90, 0, 5); // OE1AAA-1: Zeile, nicht direkt
+    NbrRowView v;
+    nbrRowGet(m, nbrFind(m, "OE1AAA-1"), &v);
+    TEST_ASSERT_EQUAL_UINT8(0, v.fw_ver); // noch kein Stand: unbekannt
+    TEST_ASSERT_EQUAL_INT8(0, v.fw_sub);
+
+    nbrNoteFw(m, "OE1AAA-1", 40, 'a'); // relayt: der Absender setzt das Feld
+    nbrNoteFw(m, "DL1BBB-1", 35, '#'); // aelterer Absender: Buchstabe unbekannt
+    nbrNoteFw(m, "DL9ZZZ-9", 40, 'a'); // ohne Zeile: folgenlos
+    nbrNoteFw(m, OWN, 12, 'z');        // Zeile 0 bleibt unberuehrt
+    nbrRowGet(m, nbrFind(m, "OE1AAA-1"), &v);
+    TEST_ASSERT_EQUAL_UINT8(40, v.fw_ver);
+    TEST_ASSERT_EQUAL_INT8('a', v.fw_sub);
+    nbrRowGet(m, nbrFind(m, "DL1BBB-1"), &v);
+    TEST_ASSERT_EQUAL_UINT8(35, v.fw_ver);
+    TEST_ASSERT_EQUAL_INT8(0, v.fw_sub);
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "DL9ZZZ-9"));
+    nbrRowGet(m, 0, &v);
+    TEST_ASSERT_EQUAL_UINT8(0, v.fw_ver);
+
+    nbrNoteFw(m, "OE1AAA-1", 0, 'b'); // ver 0: Eintrag bleibt
+    nbrNoteFw(m, "OE1AAA-1", 41, 'c'); // neuerer Stand ueberschreibt
+    nbrRowGet(m, nbrFind(m, "OE1AAA-1"), &v);
+    TEST_ASSERT_EQUAL_UINT8(41, v.fw_ver);
+    TEST_ASSERT_EQUAL_INT8('c', v.fw_sub);
+
+    // MH-Sicht traegt denselben Stand, aus derselben Klammer wie das Rufzeichen.
+    NbrMhView mv;
+    TEST_ASSERT_TRUE(nbrMhGet(m, nbrFind(m, "DL1BBB-1"), 5, &mv));
+    TEST_ASSERT_EQUAL_UINT8(35, mv.fw_ver);
+    TEST_ASSERT_EQUAL_INT8(0, mv.fw_sub);
+    nbrNoteFw(m, "DL1BBB-1", 40, 'a');
+    TEST_ASSERT_TRUE(nbrMhGet(m, nbrFind(m, "DL1BBB-1"), 5, &mv));
+    TEST_ASSERT_EQUAL_UINT8(40, mv.fw_ver);
+    TEST_ASSERT_EQUAL_INT8('a', mv.fw_sub);
+
+    nbrReset(m, 6); // Zeile weg, ihr Stand mit ihr
+    nbrNoteFrame(m, "DL1BBB-1", ':', NULL, false, -90, 0, 6);
+    nbrRowGet(m, nbrFind(m, "DL1BBB-1"), &v);
+    TEST_ASSERT_EQUAL_UINT8(0, v.fw_ver);
+    free(mp);
+}
+
+// Volle Tabelle: die verdraengte Zeile gibt ihren Stand nicht an das neue
+// Rufzeichen weiter (EVICT -> nbrIRowClear() -> nbrIRowBlank()).
+void test_note_fw_cleared_when_row_is_evicted(void)
+{
+    NbrMatrix *mp = mk();
+    NbrMatrix &m = *mp;
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        heard(m, nm(i), (uint16_t)i);
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        nbrNoteFw(m, nm(i), 40, 'a');
+    int old = nbrFind(m, nm(1)); // aelteste Zeile
+    TEST_ASSERT_TRUE(old > 0);
+    heard(m, "DL9NEW-1", (uint16_t)(NBR_MAX_ROWS + 5));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, nm(1)));
+    int now = nbrFind(m, "DL9NEW-1");
+    TEST_ASSERT_EQUAL_INT(old, now); // dieselbe Zeile, neu vergeben
+    NbrRowView v;
+    TEST_ASSERT_TRUE(nbrRowGet(m, now, &v));
+    TEST_ASSERT_EQUAL_UINT8(0, v.fw_ver);
+    TEST_ASSERT_EQUAL_INT8(0, v.fw_sub);
+    nbrRowGet(m, nbrFind(m, nm(2)), &v); // die uebrigen behalten ihren
+    TEST_ASSERT_EQUAL_UINT8(40, v.fw_ver);
+    free(mp);
+}
+
 // --- 6: Horizont (Konzept 4.7) --------------------------------------------------------------------
 
 void test_horizon_rules_positive_and_negative(void)
@@ -1227,9 +1299,12 @@ void test_load_clears_foreign_gateway_flag_keeps_row_zero_and_the_rest(void)
     NbrMatrix *bp = (NbrMatrix *)calloc(1, sizeof(NbrMatrix));
     NbrMatrix &b = *bp;
     memset(b.gw_min, 0xA5, sizeof(b.gw_min));
+    memset(b.fw, 0xA5, sizeof(b.fw)); // Firmware-Stand ist nicht im Abbild: Reste duerfen nicht fremden Zeilen bleiben
     TEST_ASSERT_TRUE(nbrLoad(b, buf, nbrSaveSize(), E + 600u, 15));
     int gb = nbrFind(b, "DL1GWY-1");
     TEST_ASSERT_TRUE(gb > 0);                                   // Zeile selbst ist zurueck
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+        TEST_ASSERT_EQUAL_UINT16(0, b.fw[i]);
     TEST_ASSERT_FALSE(nbrRowHasFlag(b, gb, NBR_FLAG_GW));       // Flag nicht
     TEST_ASSERT_TRUE(nbrRowHasFlag(b, gb, NBR_FLAG_USED));
     TEST_ASSERT_EQUAL_UINT8(0, b.gw_min[gb]);
@@ -1294,6 +1369,7 @@ void test_zero_initialised_matrix_is_safe_for_every_new_function(void)
     uint8_t out[4];
     nbrNoteDirect(m, "DL1AAA-1", info('!', -90, 1, true), 1);
     nbrNoteNcnt(m, "DL1AAA-1", 3, 1);
+    nbrNoteFw(m, "DL1AAA-1", 40, 'a');
     nbrNoteOwnTx(m, 1, '!', 1);
     nbrNoteFrame(m, "AB,DL1AAA-1", '!', NULL, false, -90, 0, 1); // TOK: ME-Schritt nur nach nbrInit()
     nbrNoteFrame(m, "S1AAA,A1AAA,B1AAA", '!', NULL, false, -90, 0, 1);
@@ -1392,6 +1468,8 @@ void test_size_table_per_part(void)
          4u * (4u + 8u * W + 8u * W + 2u)},
         // Gateway-Zeitgeber (F6): ein Byte je Zeile, nicht im Abbild (nbrSave()).
         {"gw", sizeof(NbrMatrix::gw_min), 1u * NBR_MAX_ROWS},
+        // Firmware-Stand (nbrNoteFw()): zwei Byte je Zeile, nicht im Abbild.
+        {"fw", sizeof(NbrMatrix::fw), 2u * NBR_MAX_ROWS},
     };
     size_t sum = 0, msum = 0;
     printf("\n[nbr_views] size table R=%d E=%d X=%d H=%d W=%d (ours / build.py)\n", NBR_MAX_ROWS, NBR_MAX_EDGES,
@@ -1472,5 +1550,7 @@ int main(int, char **)
     RUN_TEST(test_zero_initialised_matrix_is_safe_for_every_new_function);
     RUN_TEST(test_private_xcounts_equal_row_mesh_need_count);
     RUN_TEST(test_size_table_per_part);
+    RUN_TEST(test_note_fw_writes_row_direct_or_relayed);
+    RUN_TEST(test_note_fw_cleared_when_row_is_evicted);
     return UNITY_END();
 }

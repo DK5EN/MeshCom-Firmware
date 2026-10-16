@@ -55,6 +55,8 @@
 #include <aprs_functions.h>
 #include <nrf52/WisBlock-API.h>   // stub from test/support: s_meshcom_settings
 
+extern uint8_t shortVERSION(void); // aprs_functions.cpp, declared in loop_functions.h
+
 // ---- Link-dependency stubs for aprs_functions.cpp, same as the sibling
 // suites in this env (test_aprs_decode.cpp / test_aprs_spec.cpp). ----------
 s_meshcom_settings meshcom_settings;
@@ -342,6 +344,32 @@ static void test_epilogue_fw_version_grenzen(void)
     }
 }
 
+// msg_source_fw_on_air: set only when the FW byte was on the wire. Without
+// it msg_source_fw_version keeps initAPRS()'s OWN version, which must not be
+// filed as the sender's (nbrNoteFw() in lora_functions.cpp). The second
+// decode reuses rx: initAPRS() inside decodeAPRS() must reset the flag.
+static void test_epilogue_fw_on_air_flag(void)
+{
+    struct aprsMessage tx;
+    buildMessage(tx, ':', 0x77UL, "FW-Flag", 9, 0x88, 41, 0x80 | 9, 'q');
+
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = encodeAPRS(buf, tx);
+    TEST_ASSERT_TRUE(len > 4);
+
+    struct aprsMessage rx;
+    initAPRS(rx, 0x00);
+    TEST_ASSERT_FALSE(rx.msg_source_fw_on_air);
+    TEST_ASSERT_EQUAL_HEX16(0x3A, decodeAPRS(buf, len, rx));
+    TEST_ASSERT_TRUE(rx.msg_source_fw_on_air);
+    TEST_ASSERT_EQUAL_UINT8(41, rx.msg_source_fw_version);
+
+    // FW LASTHW SUB 0x7E cut off: still a valid frame (FCS covers through MOD).
+    TEST_ASSERT_EQUAL_HEX16(0x3A, decodeAPRS(buf, (uint16_t)(len - 4), rx));
+    TEST_ASSERT_FALSE(rx.msg_source_fw_on_air);
+    TEST_ASSERT_EQUAL_UINT8(shortVERSION(), rx.msg_source_fw_version); // own preset, not the sender's
+}
+
 // Shortest legal frame this encoder produces: a 1-byte payload (an empty
 // payload makes encodePayloadAPRS() return 0 and encodeAPRS() bails out with
 // 0 -- that boundary is noted here, not exercised, since a zero-length
@@ -423,6 +451,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_epilogue_sub_substitution);
     RUN_TEST(test_epilogue_sub_0x7e_collision);
     RUN_TEST(test_epilogue_fw_version_grenzen);
+    RUN_TEST(test_epilogue_fw_on_air_flag);
     RUN_TEST(test_epilogue_kuerzester_frame);
     RUN_TEST(test_epilogue_max_laenge_trunkierung);
     return UNITY_END();
