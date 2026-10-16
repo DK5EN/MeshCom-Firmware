@@ -2,6 +2,16 @@
 
 **Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.11` (CI-built, Latest).
 
+## 2026-10-16 -- T-Deck DM reply (TD-21) + web firmware column: upstream PR #1214 open
+
+- Upstream PR [#1214](https://github.com/icssw-org/MeshCom-Firmware/pull/1214) against `dev`:
+  branch `pr/tdeck-dm-reply-web-fwversion` (worktree `../MeshCom-PR-tdeck`, `7010c12f` + `2a7842a6`,
+  13 files, +259/-32), firmware only. Ports `c7fe948c` (web firmware column) and `0146fa0b` (TD-21).
+  The PR copy drops the duplicated `if(aprsmsg.msg_source_fw_on_air)` in `lora_functions.cpp` that
+  `fork-dev` still has. After the merge: `/sync-upstream` (merge), then remove worktree and branch.
+- Both on hardware: DK5EN-14 (T-Deck Plus, `0146fa0b`, operator hand test) and DK5EN-98 (`0146fa0b`,
+  OTA 18:13; it needed more than webflash's 120 s to come back).
+
 ## 2026-10-16 -- release v4.40a.10.16 published (CI), web flasher, fleet flashed
 
 - Release [v4.40a.10.16](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.16) (tag on
