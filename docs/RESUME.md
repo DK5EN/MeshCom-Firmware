@@ -8,9 +8,8 @@
   `../pr-gw-servers-body.md` incl. bench results. Not pushed; waits for the operator's `yes` (draft PR).
 - Bench driver `tools/bench/gw_net_matrix.py` (oracle = `tools/gw_servers_dump.cpp`), 45 cases per node.
   Results and open items: `docs/campaign-gw-net-matrix.md`. Server choice right in all 90 cases.
-- Open (not PR-caused, identical on upstream/dev f2b3a349): Heltec WiFi + static gateway rpizero +
-  Internet gets no BEAT/NTP; RAK through the same rpizero passes. Root cause unknown; rpizero has no
-  forward counters and must not be captured on (it died from promiscuous tcpdump on 10-16).
+- N3 (gateway rpizero) Internet cases fail by design: rpizero NATs only to ppp0 (Hamnet). Only N3
+  Hamnet counts. Never capture on rpizero (it died from promiscuous tcpdump on 10-16).
 - `tools/bench/fleet.json` hosts refreshed; hosts go stale with the short DHCP leases.
 
 ## 2026-10-15 -- gateway server table (gw_servers): implemented on fork-dev, upstream PR next

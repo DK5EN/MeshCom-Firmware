@@ -82,3 +82,10 @@ Logs: `tools/bench/runs/harness/gwnet_{rak,heltec}_20261016-*.{log,jsonl}`.
   `--gps off`: N2 15/15 (IT display only), NTP in every case.
 - Still open for F2: WiFi client -> rpizero (wlan0 in, wlan0 out, no NAT) -> Orbi for Internet
   traffic; replies return asymmetrically. Network-side test proposed (Mac route via rpizero).
+
+### F2 resolved (operator, 2026-10-16)
+
+Expected: rpizero NATs only to ppp0 (Hamnet). Internet traffic of a node with gateway rpizero has
+no return path, so N3 Internet cases are not meaningful; only N3 Hamnet counts. Not a firmware
+fault. Unexplained detail, not followed up: the RAK passed N3 Internet 10/10 (two runs) through
+the same configuration; possibly its traffic did not actually take rpizero.
