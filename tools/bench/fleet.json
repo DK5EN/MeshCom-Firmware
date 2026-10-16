@@ -1,5 +1,5 @@
 {
-  "_comment": "Bench fleet registry for tools/bench/identity_guard.py. Operator rules 2026-09-26: no test on a node without its own callsign (never XX0XXX), every callsign SSID unique, bench TX power at most 2 dBm, ESP32 nodes need WiFi, a set clock and the web server. No secrets in this file; WiFi credentials live in ~/MeshCom-bench-backups/. Hosts are the last seen 2323 net-console addresses (DHCP, they move; confirm the callsign on the start page, and 192.168.68.62 was the production node DK5EN-98): a node without a host (RAK = nRF52, T-Deck native USB reports its MAC as the serial number) is checked with --port. DK5EN-1 has its net console off by default (web /setparam/?netconsole=on) and its USB port is held by the soak capture.",
+  "_comment": "Bench fleet registry for tools/bench/identity_guard.py. Operator rules 2026-09-26: no test on a node without its own callsign (never XX0XXX), every callsign SSID unique, bench TX power at most 2 dBm, ESP32 nodes need WiFi, a set clock and the web server. No secrets in this file; WiFi credentials live in ~/MeshCom-bench-backups/. Hosts are the last seen 2323 net-console addresses. REFRESH BEFORE USE: the LAN hands out DHCP leases with a short lease time, so these addresses go stale within hours and get reused by other nodes (2026-10-16: 192.168.68.63, listed for DK5EN-1, had become the production node DK5EN-98). Before any test, find the node by USB serial (identity_guard.py --port) or confirm the callsign on its start page, then update host and last_ip_verified here. A host of null means not known; use --port: a node without a host (RAK = nRF52, T-Deck native USB reports its MAC as the serial number) is checked with --port. DK5EN-1 has its net console off by default (web /setparam/?netconsole=on) and its USB port is held by the soak capture.",
   "max_txpower_dbm": 2,
   "nodes": {
     "heltec-1": {
@@ -7,28 +7,33 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.63"
+      "host": "192.168.68.71",
+      "last_ip_verified": "2026-10-16 (USB --info)"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
       "board": "t_deck_plus",
       "family": "esp32",
       "usb_serial": "E0:72:A1:AD:65:E0",
-      "host": "dk5en-14.local"
+      "host": "dk5en-14.local",
+      "last_ip_verified": "mDNS name; not reachable 2026-10-16"
     },
     "t-beam-92": {
       "call": "DK5EN-92",
       "board": "ttgo_tbeam",
       "family": "esp32",
       "usb_serial": "573C000584",
-      "host": "192.168.68.69"
+      "host": null,
+      "last_ip_verified": "2026-10-16: 192.168.68.69 unreachable, address unknown"
     },
     "rak-90": {
       "call": "DK5EN-90",
       "board": "wiscore_rak4631",
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
-      "host": "192.168.68.71"
+      "host": null,
+      "last_ip": "192.168.68.62",
+      "last_ip_verified": "2026-10-16 (USB --info; nRF52 has no 2323 console, so no host)"
     }
   },
   "taken_ssids": {
