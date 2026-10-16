@@ -53,6 +53,8 @@ W6 = (
     "th:nth-child(1){width:8%}th:nth-child(2){width:11%}th:nth-child(3){width:44%}"
     "th:nth-child(4){width:17%}th:nth-child(5){width:9%}th:nth-child(6){width:11%}"
 )
+# "Zeilen" cell of a PR without merge: closed ones say "nicht gemerged", open ones "offen"
+NOT_MERGED = ("nicht gemerged", "offen")
 ROW = re.compile(
     r'(<tr[^>]*><td><a href="[^"]*/pull/(\d+)">#\d+</a></td><td>[\d-]+</td><td>.*?</td>'
     r'<td class="num">(.*?)</td><td class="num">[^<]*</td>)(<td class="num">[^<]*</td>)?</tr>'
@@ -86,7 +88,7 @@ def main():
     page = page.replace(f"<th>Dateien</th><th>In {ver}</th>", "<th>Dateien</th>")
 
     def addcol(m):
-        pr, merged = int(m.group(2)), m.group(3) != "nicht gemerged"
+        pr, merged = int(m.group(2)), m.group(3) not in NOT_MERGED
         v = de(surv[pr]["lines"]) if merged and pr in surv else ("0" if merged else "–")
         return m.group(1) + f'<td class="num">{v}</td></tr>'
 
@@ -109,7 +111,7 @@ def main():
             r'(?:<div class="note">.*?</div>)?</td><td class="num">(.*?)</td>',
             s,
         )
-        mr = [int(r[0]) for r in rows if r[3] != "nicht gemerged"]
+        mr = [int(r[0]) for r in rows if r[3] not in NOT_MERGED]
         for r in rows:
             titles[int(r[0])] = (r[1], re.sub("<[^>]+>", "", r[2]))
         if mr:
