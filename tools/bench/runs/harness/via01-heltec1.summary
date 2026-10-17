@@ -1,0 +1,8 @@
+VIA-01 bench, DK5EN-1 (Heltec V3, build Oct 17 2026 15:00, identity guard ok, 2 dBm), 2026-10-17
+USB console (serial_session.py), then web setvia over HTTP (192.168.68.65), all PASS.
+reject, value unchanged: dk8vw-p, 05, 1,,2, *, H, 1,2,3, 7, DK8VW-100, 4 hops with DL10DEF-22 -> [ERR]..Via <..> not valid
+accept: dk8vw-99 -> DK8VW-99 (canonical upper case), OE1KBC-24,OE1KFR-12
+clear: none / NONE -> empty (--via on then shows "VIA on <>")
+toggle: --via on / --via off still toggle bVIA (not stored as via call)
+web setvia: dk8vw-99 rc0 DK8VW-99; list rc0; dk8vw-p rc1 (value kept); DK8VW-05 rc1; none/NONE rc0 ""
+end state: --via off, via empty

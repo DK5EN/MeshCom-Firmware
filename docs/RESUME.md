@@ -2,6 +2,16 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
+## 2026-10-17 -- backlog cleanup, VIA-01 benched
+
+- VIA-01 bench-verified on DK5EN-1 (USB console + web `setvia`, all cases pass;
+  `tools/bench/runs/harness/via01-heltec1.summary`). Closed by the operator: no separate PR, it goes upstream
+  with a larger PR later.
+- Closed by the operator: GPS-11 (W2b dropped, no RAK with GPS; G3 and multipath tuning not pursued), AU-13 (no
+  separate PR, goes with the larger AU PR later), AU-16 (reopen if it returns), SB-07 (no separate Safeboot PR).
+- Net console P-0111/0168/0169: AP-mode bench and the `wifiTrulyOffline()` AP re-creation in pure AP mode are
+  will-not-do.
+
 ## 2026-10-17 -- net console fixes P-0111, P-0168, P-0169 (fork-dev only, no upstream PR)
 
 - P-0111: the console now also starts in pure AP mode (`netConsoleNetworkReady()`, `src/net_console_gate.h`,
@@ -13,8 +23,8 @@
   mutex created once; reads take the mutex (takeover fd race).
 - Bench DK5EN-1, before/after: `tools/bench/runs/harness/p0168-*.summary`, `p0169-*.summary`. Keepalive
   (half-open peer) not benched.
-- Open: in pure AP mode the 5-min `wifiTrulyOffline()` path re-runs `startNetwork()` and recreates the AP,
-  dropping AP clients and the console session.
+- Will not do (operator 2026-10-17): in pure AP mode the 5-min `wifiTrulyOffline()` path re-runs `startNetwork()`
+  and recreates the AP, dropping AP clients and the console session.
 
 ## 2026-10-17 -- GPS-11 position Kalman filter: W2 integrated (ESP32 GPS boards), W3 bench next
 

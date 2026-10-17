@@ -3,6 +3,9 @@
 Resume point for the multi-wave GPS-11 work. Spec: [`gps-11-position-kalman-filter.md`](gps-11-position-kalman-filter.md)
 (written 2026-10-17). Branch `fork-dev`; the upstream PR follows only after the bench wave (spec 6.3).
 
+**CLOSED 2026-10-17 (operator).** W1, W2 and W3 bench 1 passed. W2b (RAK4631, T-Deck Pro) is dropped: there is no
+RAK with a GPS on the bench, so it cannot be tested. The G3 drive test and multipath tuning are not pursued.
+
 ## Operator decisions (2026-10-17)
 
 | Topic          | Decision                                                                                                                                               |
