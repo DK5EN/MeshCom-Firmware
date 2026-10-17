@@ -1,6 +1,21 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-16, branch `fork-dev`, last release `v4.40a.10.16` (CI-built, Latest).
+**Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
+
+## 2026-10-17 -- release v4.40a.10.17 published (CI), web flasher
+
+- Release [v4.40a.10.17](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.17) (tag on
+  `1a4a5c09`, CI run 39010666034): Latest, 66 assets (names as 10.16), 27 `.autoupdate` with `78 da`,
+  re-inflate ok and byte-identical to a local regeneration, tag string in the image, T-Deck field commands
+  `mute=2 stat=1 udplog=1 injectraw=0`, `tlsalloc` in the T-Deck Plus image. `FLASH_VERSION` 20261017.
+- Content since 10.16: AU-13 (`c9e64344`), VIA-01 (`be7c3c7f`, `9b96d884`), TD-21 (`0146fa0b`), web firmware
+  column (`c7fe948c`), `6d833289`. Gate before the tag: 72 envs, 2440/2440, golden 48, pytest 1080.
+- Web flasher: only v4.40a.10.17 (30 boards, HTTPS check 0 mismatches); v4.40a.10.16 folder pruned (release
+  object kept). Presentation index card and PR-history lead name 10.17 (pages-sync `b0ad04e7`).
+- Not flashed to the fleet (operator choice). DK5EN-14, -92, -1 still hold a staged `v4.40a.10.16` AU record
+  (mode `off`).
+- **Still open:** VIA-01 bench test; AU-13 field confirmation (OE5HWN-16) and upstream PR; T-Beam Supreme
+  PSRAM; PR history page does not list #1214 yet.
 
 ## 2026-10-17 -- AU-13 fixed on fork-dev: auto-update TLS on PSRAM boards
 
@@ -14,7 +29,7 @@ auto` would install that release over the fix build.
 - **Control runs 2026-10-17 on c9e64344:** DK5EN-92 (T-Beam classic) and DK5EN-1 (Heltec V3) pass check and
   download/stage; T-Beam internal min 11.6 KB during the download (tight, as designed). Both now AU `off`/`prod`
   with a staged `v4.40a.10.16` record, like DK5EN-14.
-- **Open:** release, upstream PR, T-Beam Supreme PSRAM
+- **Open:** upstream PR, T-Beam Supreme PSRAM (released in v4.40a.10.17)
   never initialised (no `BOARD_HAS_PSRAM`). Campaign: [`campaign-au-psram-tls-20261016.md`](campaign-au-psram-tls-20261016.md).
 
 ## 2026-10-16 (evening) -- VIA-01 fixed on fork-dev, RX-01 closed, REBOOT-98 opened
