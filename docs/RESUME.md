@@ -2,6 +2,13 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
+## 2026-10-17 -- AU-16 opened: T-Beam 1W stuck in Safeboot after Auto Update (field, OE5HWN-17)
+
+- After "Check" the 1W stages, hands over and stays in Safeboot AP mode: no `apply` line, empty settings,
+  ota_0 `ESP_ERR_IMAGE_INVALID`. Download and asset ruled out; cause open.
+- Guide and debug plan: [`troubleshooting-tbeam-1w-autoupdate.md`](troubleshooting-tbeam-1w-autoupdate.md).
+  Next: operator flash dump, Safeboot heartbeat + diagnostic build.
+
 ## 2026-10-17 -- AU bench run to v4.40a.10.17: 3 of 4 ESP32 nodes pass, AU-14 and AU-15 opened
 
 - Dev-channel Auto Update (`--update check/install/apply`) to the published v4.40a.10.17: DK5EN-14 (T-Deck
