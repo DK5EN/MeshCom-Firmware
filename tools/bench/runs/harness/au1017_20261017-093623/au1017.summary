@@ -5,4 +5,5 @@ DK5EN-92 ttgo_tbeam   2323  PASS try2: staged 20 s, running v4.40a.10.17 34 s af
 DK5EN-1  heltec V3    2323  PASS  staged 19 s, running v4.40a.10.17 24 s after apply
 DK5EN-90 rak4631      USB   n/a   no AU on nRF52; release wiscore_rak4631.zip via adafruit-nrfutil DFU (1200 touch), "Device programmed.", build Oct 17 2026 07:07:39
 DK5EN-98 heltec V3    web   FAIL  check + stage ok (22 s); apply rebooted, back after ~3 min on the old app: Safeboot "none (old)", required v1 -> needs one web-flasher (USB) flash
+DK5EN-98 heltec V3    USB   FIXED web-flasher parts via esptool, no erase: Safeboot ver 2, tag v4.40a.10.17, settings kept, GW KEEP+BEAT ok, AU off/prod
 Logs: dk5en14.log dk5en92.log dk5en92_try2.log dk5en1.log dk5en98_web.log (raw, gitignored)

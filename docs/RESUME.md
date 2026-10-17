@@ -9,7 +9,8 @@
 - **AU-14:** DK5EN-92 rebooted on the first try, 13 s into the download, `TASK_WDT` with the loop in
   `lora_rx`; the retry passed. Single event, open.
 - **AU-15:** DK5EN-98 staged 10.17 but has no AU Safeboot (`none (old)`), so `apply` fell back to the old app.
-  It needs one web-flasher USB flash, or an app OTA with `tools/webflash.py` (operator).
+  Fixed the same day: USB flash with the web-flasher parts (no erase). DK5EN-98 runs v4.40a.10.17 with
+  Safeboot ver 2, settings kept (22 dBm, gateway on), KEEP and BEAT with the OE server, AU `off`/`prod`.
 - DK5EN-90 (RAK4631, no AU) flashed with the release DFU zip over USB.
 - Summary: `tools/bench/runs/harness/au1017_20261017-093623/au1017.summary`.
 
