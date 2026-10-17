@@ -155,3 +155,12 @@ Resume point for the multi-wave GPS-11 work. Spec: [`gps-11-position-kalman-filt
 - Gap found: RAK4631 and T-Deck Pro do not run WZ_GPS_Loop, so they get no filter yet -> W2b.
 - Open (W3): if the phone app pushes its position (BLE 0x70/0x80) periodically while the node has GPS, every changed
   push resets the filter. Check on the bench.
+
+## W3 bench 1: DK5EN-1 stationary (2026-10-17)
+
+Report: `docs/bench-gps11-dk5en1-20261017.md`. Bench node DK5EN-1 (Heltec V3 + u-blox) instead of DK5EN-14 (operator).
+2 h FIXED + 2 h TRACK, both stationary. Speed noise is small (FIXED max 0.44 m/s; TRACK 1 Hz max 0.87, 0.26 % >= 0.5).
+One false still -> moving from a slow 36 m multipath drift (displacement path) cost the held output G1: 51 % in the
+modal cell, 11 changes (raw 119); without it 2 changes. Offline replay (scratch tool, reproduces the device exactly):
+radius floor 50 m removes the trigger, keeps 30/30 host tests, static-hold walker 83-90 s (was 70-77). Speed rule 5 s
+fails T5 at sd 0.3 and gains 6 s only. Decision pending with the operator.

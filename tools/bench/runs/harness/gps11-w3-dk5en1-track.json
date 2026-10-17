@@ -1,0 +1,51 @@
+{
+  "samples": 7202,
+  "duration_s": 7297.5759999752045,
+  "rejected": 0,
+  "g1_raw": {
+    "n": 7202,
+    "distinct_cells": 17,
+    "modal_cell": {
+      "lat": "4824.46N",
+      "lon": "01144.30E"
+    },
+    "modal_share": 0.30560955290197167,
+    "cell_changes": 198,
+    "std_m": 15.852500261469551,
+    "std_east_m": 10.741966098139667,
+    "std_north_m": 11.65812716032512,
+    "p95_dist_to_median_m": 30.736940360260157
+  },
+  "g1_kf": {
+    "n": 7202,
+    "distinct_cells": 16,
+    "modal_cell": {
+      "lat": "4824.46N",
+      "lon": "01144.30E"
+    },
+    "modal_share": 0.3140794223826715,
+    "cell_changes": 109,
+    "std_m": 15.451123064294586,
+    "std_east_m": 10.391462347278516,
+    "std_north_m": 11.434802763190495,
+    "p95_dist_to_median_m": 30.255978967098258
+  },
+  "g4": {
+    "shots_total": 0,
+    "shots_stationary": 0
+  },
+  "g1_held": {
+    "n": 7202,
+    "distinct_cells": 16,
+    "modal_cell": {
+      "lat": "4824.46N",
+      "lon": "01144.30E"
+    },
+    "modal_share": 0.3140794223826715,
+    "cell_changes": 109,
+    "std_m": 15.451123064294586,
+    "std_east_m": 10.391462347278516,
+    "std_north_m": 11.434802763190495,
+    "p95_dist_to_median_m": 30.255978967098258
+  }
+}
