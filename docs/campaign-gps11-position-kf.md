@@ -16,14 +16,15 @@ Resume point for the multi-wave GPS-11 work. Spec: [`gps-11-position-kalman-filt
 
 ## Waves
 
-| Wave | Content                                                                                                         | Owner files                                                                          | State   |
-| ---- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------- |
-| W1a  | DONE: `pos_filter` module + host tests (rework rounds below)                                                    | `src/pos_filter.{h,cpp}`, `test/test_pos_filter/test_main.cpp`                       | running |
-| W1b  | DONE (not committed): offline evaluation script for bench captures (G1 cells after `DDMM.MM`, G3 lag, G4 shots) | `tools/gps/pos_kf_eval.py`, `tools/gps/test_pos_kf_eval.py`                          | running |
-| W1 G | Orchestrator: register suite, test-suite map, BACKLOG; stage 1,2; advisor                                       | `platformio.ini`, `docs/test-suite-map.md`, `docs/BACKLOG.md`, this file             | open    |
-| W2   | Integration in `gps_functions.cpp`, setter resets, `--gpsfilter`, debug line                                    | `src/gps_functions.{h,cpp}`, setter files from the W2 recon, `command_functions.cpp` | open    |
-| W2 G | Stage 1,2; t_deck_plus, wiscore_rak4631, ttgo_tbeam builds; image string scan; advisor                          | n/a                                                                                  | open    |
-| W3   | Bench on DK5EN-14, evaluation, constant tuning, bench report in `docs/`                                         | `docs/bench-gps11-*.md`, constants in `src/pos_filter.h`                             | open    |
+| Wave | Content                                                                                                         | Owner files                                                                                                                 | State |
+| ---- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----- |
+| W1a  | DONE: `pos_filter` module + host tests (rework rounds below)                                                    | `src/pos_filter.{h,cpp}`, `test/test_pos_filter/test_main.cpp`                                                              | done  |
+| W1b  | DONE (not committed): offline evaluation script for bench captures (G1 cells after `DDMM.MM`, G3 lag, G4 shots) | `tools/gps/pos_kf_eval.py`, `tools/gps/test_pos_kf_eval.py`                                                                 | done  |
+| W1 G | Orchestrator: register suite, test-suite map, BACKLOG; stage 1,2; advisor                                       | `platformio.ini`, `docs/test-suite-map.md`, `docs/BACKLOG.md`, this file                                                    | done  |
+| W2   | Integration in `gps_functions.cpp`, setter resets, `--gpsfilter`, debug line                                    | `src/gps_functions.{h,cpp}`, setter files from the W2 recon, new `src/pos_pipeline.{h,cpp}` + test, `command_functions.cpp` | done  |
+| W2 G | Stage 1,2; t_deck_plus, wiscore_rak4631, ttgo_tbeam builds; image string scan; advisor                          | n/a                                                                                                                         | done  |
+| W2b  | RAK4631 (`getGPS`, `ENABLE_RAK_GPS`) and T-Deck Pro (`tdeck_get_gps`) feed the same pipeline                    | `src/nrf52/nrf52_main.cpp`, `src/t-deck-pro/tdeck_pro.cpp`                                                                  | open  |
+| W3   | Bench on DK5EN-14, evaluation, constant tuning, bench report in `docs/`                                         | `docs/bench-gps11-*.md`, constants in `src/pos_filter.h`                                                                    | open  |
 
 ## W2 recon (2026-10-17, scout)
 
@@ -133,3 +134,24 @@ Resume point for the multi-wave GPS-11 work. Spec: [`gps-11-position-kalman-filt
 - Cost of the 10 s speed rule (operator decision): at 3 s cadence with speed noise sd 0.3 about 0.7 false
   triggers per day; at sigma 10 m that raises grid-cell changes from ~3 to ~8.5 per day.
 - Final suite: test_pos_filter 30 cases, test_pos_grid_hold 10 cases, all green.
+
+## W2 result (2026-10-17)
+
+- `src/pos_pipeline.{h,cpp}` (new, host-built): filter + grid hold + dt timestamp + runtime switch; `posPipelineStore()`
+  derives node_lat/lon and N/S/E/W exactly as the old inline code; `posPipelineManualSet()` resets only on a change.
+- `src/gps_functions.cpp` WZ_GPS_Loop: `location.isUpdated()` read before lat()/lng(), one `posPipelineFix()` per new
+  fix, node_* from the (held) output, `setSMartBeaconing()` gets the stored (filtered) magnitudes. Reset in
+  `WZ_GPS_Init`. Debug line at `--gpsdebug on`: `[GPS ]pos raw: kf: held: hdop: sig: rej: spd: crs: st: nm:`;
+  `pos_kf_eval.py` parses it (old form still accepted).
+- Manual sets (`nodeSetLat/Lon`, T-Deck and T-Deck Pro Setup save) call `gpsPosFilterManualSet()` with the old position.
+- `--gpsfilter on|off`, runtime only; prints "no position filter on this board" where `ENABLE_GPS` is off.
+- `test_pos_pipeline` (13 cases): characterization of the stored values and the APRS `DDMM.MM` text against a verbatim
+  copy of the old code plus literal strings, disabled pass-through bit-identical, dt/SKIP/REJECT/rollover, hold.
+- Advisor: REWORK, one item: every Setup save reset the filter even with the position unchanged (a callsign change
+  threw away the 30 min average). Fixed by the orchestrator with compare-before-reset (test
+  `test_manual_set_resets_only_on_change`, before-run failed at the unchanged-save assert). Notes taken: velValid is
+  `isValid()` (sticky over a cycle, documented); the hold-reset branches overlap and no test separates them
+  (documented in pos_pipeline.cpp).
+- Gap found: RAK4631 and T-Deck Pro do not run WZ_GPS_Loop, so they get no filter yet -> W2b.
+- Open (W3): if the phone app pushes its position (BLE 0x70/0x80) periodically while the node has GPS, every changed
+  push resets the filter. Check on the bench.

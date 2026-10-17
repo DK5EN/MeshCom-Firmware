@@ -38,6 +38,24 @@ def test_parse_pos_and_shot_lines() -> None:
     assert math.isclose(shots[0] - s.t, 3.0)
 
 
+def test_parse_w2_debug_line() -> None:
+    line = (
+        "2026-10-17 10:00:00.250  [GPS ]pos raw:48.123456,11.567890 kf:48.123400,11.567800"
+        " held:48.123300,11.567700 hdop:1.4 sig:4.2 rej:1 spd:0.35 crs:181.5 st:still nm:2"
+    )
+    samples, _ = ev.parse_lines([line])
+    assert len(samples) == 1
+    s = samples[0]
+    assert s.held == (48.1233, 11.5677)
+    assert s.spd == 0.35 and s.crs == 181.5 and s.st == "still" and s.nm == 2
+    assert s.sig == 4.2 and s.rej == 1
+    res = ev.evaluate(samples, [], False)
+    assert "g1_held" in res
+    # old format has no extras
+    old, _ = ev.parse_lines([pos_line("2026-10-17 10:00:00.250", (1.0, 2.0), (1.0, 2.0))])
+    assert old[0].held is None and old[0].nm is None
+
+
 def test_aprs_cell_northeast() -> None:
     # 48.1234: 48 deg + 0.1234*60 = 7.404 min -> 4807.40N
     # 11.5678: 11 deg + 0.5678*60 = 34.068 min -> 01134.07E

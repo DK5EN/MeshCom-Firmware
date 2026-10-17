@@ -30,8 +30,10 @@ from datetime import datetime
 
 TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(.*)$")
 POS_RE = re.compile(
-    r"\[GPS \]\.\.\.pos raw:(-?[\d.]+),(-?[\d.]+) kf:(-?[\d.]+),(-?[\d.]+)"
-    r" hdop:(-?[\d.]+) sig:(-?[\d.]+)m rej:(\d+)"
+    r"\[GPS \](?:\.\.\.)?pos raw:(-?[\d.]+),(-?[\d.]+) kf:(-?[\d.]+),(-?[\d.]+)"
+    r"(?: held:(-?[\d.]+),(-?[\d.]+))?"
+    r" hdop:(-?[\d.]+) sig:(-?[\d.]+)m? rej:(\d+)"
+    r"(?: spd:(-?[\d.]+) crs:(-?[\d.]+) st:(still|moving|off) nm:(\d+))?"
 )
 SHOT_RE = re.compile(r"\[POSINFO\]\.\.\.one-shot set - distance > ")
 
@@ -46,6 +48,12 @@ class Sample:
     hdop: float
     sig: float
     rej: int
+    # W2 debug line extras; None when the capture predates them
+    held: tuple[float, float] | None = None
+    spd: float | None = None
+    crs: float | None = None
+    st: str | None = None
+    nm: int | None = None
 
 
 def parse_ts(text: str) -> float:
@@ -71,9 +79,14 @@ def parse_lines(lines: list[str]) -> tuple[list[Sample], list[float]]:
                     t,
                     (float(v[0]), float(v[1])),
                     (float(v[2]), float(v[3])),
-                    float(v[4]),
-                    float(v[5]),
-                    int(v[6]),
+                    float(v[6]),
+                    float(v[7]),
+                    int(v[8]),
+                    (float(v[4]), float(v[5])) if v[4] is not None else None,
+                    float(v[9]) if v[9] is not None else None,
+                    float(v[10]) if v[10] is not None else None,
+                    v[11],
+                    int(v[12]) if v[12] is not None else None,
                 )
             )
         elif SHOT_RE.search(body):
@@ -272,6 +285,9 @@ def evaluate(
         "g1_kf": series_stats([s.kf for s in samples]),
         "g4": stationary_shots(samples, shots),
     }
+    held = [s.held for s in samples if s.held is not None]
+    if held and len(held) == len(samples):
+        res["g1_held"] = series_stats(held)
     if track:
         res["g3"] = track_lag(samples, **track_kw)
     return res

@@ -2,7 +2,14 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
-## 2026-10-17 -- GPS-11 position Kalman filter: W1 committed (host only), W2 integration next
+## 2026-10-17 -- GPS-11 position Kalman filter: W2 integrated (ESP32 GPS boards), W3 bench next
+
+W2: `src/pos_pipeline.{h,cpp}` wires the filter into `WZ_GPS_Loop()`; `--gpsfilter on|off` (runtime), debug line at
+`--gpsdebug on` with spd/crs, manual position sets reset the filter only on a change. With the filter off the stored
+position and the APRS text are byte-identical (`test_pos_pipeline`). Not covered yet: RAK4631 and T-Deck Pro (own GPS
+paths, W2b). Next: W3 bench on DK5EN-14 (operator flashes).
+
+### W1
 
 Spec: `docs/gps-11-position-kalman-filter.md` (section 1a lists the W1 revisions). Campaign and resume point:
 `docs/campaign-gps11-position-kf.md`. W1 (`4221b16c`): `src/pos_filter.{h,cpp}` (CV+ZUPT with `--track on`; 30 min
