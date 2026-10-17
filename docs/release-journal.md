@@ -1,11 +1,54 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261016`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261017`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.17 (Samstag, 2026-10-17)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei
+10.16. Basis unveraendert das offizielle `v4.40a.hbserver`; `upstream/dev` ist vollstaendig in
+`fork-dev` enthalten. `FLASH_VERSION` 20261017, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die
+Einstellungen bleiben erhalten. Safeboot unveraendert seit 10.05.
+
+Inhalt seit `v4.40a.10.16` (alle sechs Firmware-Commits, in den Release-Notes untergebracht):
+
+- AU-13 (`c9e64344`): mbedTLS holt Speicher zuerst aus dem PSRAM (`mbedtls_platform_set_calloc_free()`,
+  nur `BOARD_HAS_PSRAM` mit `psramFound()`), interner Rueckfall. `heapGateOk()` und `[AU];heap` messen
+  internes RAM; PSRAM-Boards brauchen 17000 B PSRAM-Block und 24000 B intern frei. Ursache des
+  Feldfehlers OE5HWN-16 (`[AU];tls;-32512`) und des Bench-Fehlers auf DK5EN-14 (`tls -1`, WLAN-Abbruch).
+- VIA-01 (`be7c3c7f`, `9b96d884`): `--via` prueft die Liste mit `checkViaList()` vor dem Speichern
+  (Rufzeichen, SSID 0..99 ohne fuehrende Null, keine leeren Token, kein `*`/`H`/`HG`, max. 39 Zeichen);
+  `viaCanonical()` definiert die gespeicherte Form, Web-`setvia` meldet bei Kleinschreibung und `none`
+  kein FAIL mehr.
+- TD-21 (`0146fa0b`): Antwort-Knopf auf jeder eingehenden Blase der T-Deck, "To" wird aus dem
+  Konversations-Tab vorbelegt. Verhaltensaenderung: aus einem Rufzeichen- oder Gruppen-Tab geht die
+  Nachricht an diesen Tab statt an `*`.
+- Web-Firmware-Spalte (`c7fe948c`): Firmware je Station auf der Path- und MHeard-Seite aus jedem
+  dekodierten Frame; +2 B RAM je Zeile.
+- `6d833289`: doppelte Pruefung von `msg_source_fw_on_air` vor `nbrNoteFw()` entfernt (gleiches Verhalten).
+- Upstream-PRs: #1213 und #1214 (TD-21 + Firmware-Spalte) offen; AU-13 und VIA-01 nur im Fork.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- AU-13 auf `DK5EN-14` (T-Deck Plus): 10/10 Dev-Checks direkt nach dem Neustart, keine
+  Allokationsfehler, kein WLAN-Abbruch, internes Minimum 55,7 KB (vorher 2,7 KB); `--update install`
+  hat 1,57 MB in 22 s geladen und bereitgestellt. Kontrolllaeufe `DK5EN-92` (T-Beam v1.2, klassisch,
+  internes Minimum 11,6 KB beim Download) und `DK5EN-1` (Heltec V3, 25,3 KB) bestanden.
+- TD-21 auf `DK5EN-14`: Antwort-Knopf und Vorbelegung vom Operator von Hand geprueft.
+- Gate: `tools/regression.sh --stage 1,2` PASS: Unity 72 Envs, 2440/2440, Golden-Selftest 48 Befehle, pytest 1080, nRF52-Board-Links.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- VIA-01 auf Hardware (`--via dk8vw-p` gibt `[ERR]`, `--via none`, leer, `on`/`off`, Web-`setvia`).
+- Web-Firmware-Spalte auf Hardware (nur Host-Tests).
+- AU-13 im Feld beim meldenden T-Deck Plus (OE5HWN-16); T-Beam Supreme (PSRAM vom Build nicht aktiviert).
+- Ein Auto-Update-Install mit anschliessendem Safeboot-Apply auf diesem Stand.
 
 ---
 
