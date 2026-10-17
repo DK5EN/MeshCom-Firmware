@@ -35,13 +35,13 @@ refuses.
 
 ## Waves
 
-| Wave    | Owner                     | Files / resource                                                                          | Status                                                         |
-| ------- | ------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| W1      | implementer, Sonnet med   | `src/fw_update.h`, `test/test_fw_update/test_main.cpp`, `src/esp32/fw_update_net.cpp`     | done                                                           |
-| Gate    | orchestrator              | `tools/regression.sh --stage 1,2`; builds t_deck_plus, heltec_wifi_lora_32_V3, ttgo_tbeam | PASS                                                           |
-| Advisor | general-purpose, Opus med | read-only diff review                                                                     | APPROVED; test case + doc applied, Supreme item refuted        |
-| W2      | orchestrator              | DK5EN-14 USB, DK5EN-1, DK5EN-92                                                           | DK5EN-14 PASS 10/10 + stage run; DK5EN-1/-92 not run (offline) |
-| Docs    | orchestrator              | BACKLOG, RESUME; commit on fork-dev                                                       | done                                                           |
+| Wave    | Owner                     | Files / resource                                                                          | Status                                                          |
+| ------- | ------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| W1      | implementer, Sonnet med   | `src/fw_update.h`, `test/test_fw_update/test_main.cpp`, `src/esp32/fw_update_net.cpp`     | done                                                            |
+| Gate    | orchestrator              | `tools/regression.sh --stage 1,2`; builds t_deck_plus, heltec_wifi_lora_32_V3, ttgo_tbeam | PASS                                                            |
+| Advisor | general-purpose, Opus med | read-only diff review                                                                     | APPROVED; test case + doc applied, Supreme item refuted         |
+| W2      | orchestrator              | DK5EN-14 USB, DK5EN-1, DK5EN-92                                                           | DK5EN-14 PASS 10/10 + stage run; DK5EN-1/-92 PASS (10-17 08:00) |
+| Docs    | orchestrator              | BACKLOG, RESUME; commit on fork-dev                                                       | done                                                            |
 
 ## W2 bench protocol
 
@@ -61,6 +61,15 @@ refuses.
   Logs: `tools/bench/runs/harness/au13_dk5en14_20261017-001728/`.
 - DK5EN-14 `--update install` (mode off): v4.40a.10.16 staged, 1568419 B in 22.3 s, imin 54.9 KB,
   alloc fails 0 (`au13_dk5en14_install_20261017-003008.log`). The staged record stays on the node.
-- DK5EN-1 and DK5EN-92: offline, not run. Advisor item "T-Beam Supreme" refuted: without
+- DK5EN-92 (T-Beam v1.2, classic) on c9e64344, USB flash: 2 x (reboot, dev check) PASS, then check
+  plus `--update install` (mode off) in one session: 1221908 B staged in 13.8 s. Alloc fails 0, no
+  WiFi drop. Internal: about 84 KB free with BLE paused, imin 14.3-16.6 KB in the check and 11.6 KB in the
+  download (about 70 KB peak, as the `FWNET_MIN_FREE` 76000 comment predicts). Logs:
+  `au13_tbeam92_20261017-075802/` (`download3.log`).
+- DK5EN-1 (Heltec V3, no PSRAM) on c9e64344: 2 x check PASS, imin 32.6-34.6 KB; download 1158197 B
+  staged in 10.9 s, imin 25.3 KB, alloc fails 0, no WiFi drop. Logs: `au13_heltec1_20261017-081042/`.
+  DK5EN-1 was `--autoupdate auto` on dev; now `off` and `prod`, like DK5EN-92.
+- Both nodes keep a staged `v4.40a.10.16` record (mode off, no handover).
+- Advisor item "T-Beam Supreme" refuted: without
   `BOARD_HAS_PSRAM`, `esp32-hal-psram.h:24-31` undefines `CONFIG_SPIRAM`, so PSRAM is never
   initialised there.

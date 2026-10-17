@@ -11,7 +11,10 @@
   Bench DK5EN-14: 10/10 checks after reboot, internal min 55.7 KB; one download staged (1.57 MB, 22 s).
 - **Left on DK5EN-14:** a staged `v4.40a.10.16` record (mode `off`, so no handover). Setting `--autoupdate
 auto` would install that release over the fix build.
-- **Open:** DK5EN-1/DK5EN-92 control runs (nodes were offline), release, upstream PR, T-Beam Supreme PSRAM
+- **Control runs 2026-10-17 on c9e64344:** DK5EN-92 (T-Beam classic) and DK5EN-1 (Heltec V3) pass check and
+  download/stage; T-Beam internal min 11.6 KB during the download (tight, as designed). Both now AU `off`/`prod`
+  with a staged `v4.40a.10.16` record, like DK5EN-14.
+- **Open:** release, upstream PR, T-Beam Supreme PSRAM
   never initialised (no `BOARD_HAS_PSRAM`). Campaign: [`campaign-au-psram-tls-20261016.md`](campaign-au-psram-tls-20261016.md).
 
 ## 2026-10-16 (evening) -- VIA-01 fixed on fork-dev, RX-01 closed, REBOOT-98 opened
