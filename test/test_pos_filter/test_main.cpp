@@ -18,6 +18,8 @@
 
 #include <pos_filter.h>
 
+#include "bench_dk5en1_20261017.h"
+
 void setUp(void)    {}
 void tearDown(void) {}
 
@@ -989,6 +991,9 @@ void test_fixed_stehen_zurueck_auf_still(void)
 // transitions, the time spent moving and the longest moving episode (a false
 // trigger that never returns costs the grid hold for good).
 struct FtRes { int nMoving; double movingShare; double longestS; };
+#define T5B_MAX_PER_DAY 10    /* T5b, 24 bursts per day: measured max 9 (3 s), 8 (1 s) */
+#define T9_MAX_STEP_M   15.0  /* T9: measured 8.8 m */
+#define T5B_MAX_SHARE   0.02  /* T5b: measured 0.0143 */
 
 static FtRes falseTriggerRun(double sigma, double spdSd, uint32_t dt, uint32_t seed)
 {
@@ -1053,6 +1058,131 @@ void test_fixed_keine_falschen_bewegungen(void)
             TEST_ASSERT_TRUE_MESSAGE(maxShare < 0.01, "a stationary node spent >= 1 % of the day moving");
             TEST_ASSERT_TRUE_MESSAGE(maxLong < 600.0, "a false moving episode lasted >= 10 min");
         }
+}
+
+// T5b: as T5, with the multipath of the W3 bench (docs/bench-gps11-dk5en1-20261017.md):
+// calm for most of an hour, then within ~30 s the raw fix stepped from ~12 m to
+// ~40 m off the average (a constellation change) and stayed there for minutes, a
+// burst the stationary 90 s model of T5 never produces. Model per hour: at minute
+// 40 a 30 s ramp to D = 25..45 m in a random direction, 4 min hold, 2 min ramp
+// back; under it AR(1) tau 900 s 3 m + tau 90 s 4 m per axis + 2 m white; speed
+// |N(0, 0.15)| (measured p99 0.26-0.40).
+// Accepted by the operator (2026-10-17): the 40 m radius floor lets such a burst
+// set off a false still -> moving (one jump of the on-air position); pinned here
+// is that the rate stays bounded and every episode returns to still.
+static FtRes falseTriggerRunLong(uint32_t dt, uint32_t seed)
+{
+    struct Rng r; rngInit(&r, seed);
+    struct PosFilter f; posFilterReset(&f);
+    const double aL = exp(-(double)dt / 900000.0), aS = exp(-(double)dt / 90000.0);
+    const double sdL = 3.0 * sqrt(1.0 - aL * aL), sdS = 4.0 * sqrt(1.0 - aS * aS);
+    double lx = rngGauss(&r, 3.0), ly = rngGauss(&r, 3.0);
+    double sx = rngGauss(&r, 4.0), sy = rngGauss(&r, 4.0);
+    double movingMs = 0, episode = 0, longest = 0;
+    double exD = 0, exC = 1, exS = 0;
+
+    for (uint32_t t = 0; t <= 86400000u; t += dt)
+    {
+        uint32_t inHour = t % 3600000u;
+        if (inHour < dt)
+        {
+            exD = 25.0 + 20.0 * rngUniform(&r);
+            double phi = rngUniform(&r) * 2.0 * M_PI;
+            exC = cos(phi); exS = sin(phi);
+        }
+        double ex = 0;
+        if (inHour >= 2400000u)
+        {
+            double u = (inHour - 2400000u) / 60000.0;   /* minutes into the burst */
+            ex = u < 0.5 ? u / 0.5 : (u < 4.5 ? 1.0 : (u < 6.5 ? (6.5 - u) / 2.0 : 0.0));
+            ex *= exD;
+        }
+        lx = aL * lx + rngGauss(&r, sdL);
+        ly = aL * ly + rngGauss(&r, sdL);
+        sx = aS * sx + rngGauss(&r, sdS);
+        sy = aS * sy + rngGauss(&r, sdS);
+        upd(&f, ex * exC + lx + sx + rngGauss(&r, 2.0), ex * exS + ly + sy + rngGauss(&r, 2.0), 1.0f, true,
+            (float)fabs(rngGauss(&r, 0.15)), (float)(rngUniform(&r) * 360.0), POS_KF_MODE_FIXED,
+            t == 0 ? 0 : dt);
+        if (!posFilterIsStill(&f))
+        {
+            movingMs += dt;
+            episode  += dt;
+            if (episode > longest) longest = episode;
+        }
+        else
+            episode = 0;
+    }
+    FtRes o = { f.n_moving, movingMs / 86400000.0, longest / 1000.0 };
+    return o;
+}
+
+void test_fixed_mehrweg_spruenge(void)
+{
+    uint32_t dts[2] = { DT1, DT3 };
+    int seeds[2] = { 5, 10 };
+    for (int k = 0; k < 2; k++)
+    {
+        int sum = 0, maxN = 0;
+        double maxShare = 0, maxLong = 0;
+        for (int s = 0; s < seeds[k]; s++)
+        {
+            FtRes o = falseTriggerRunLong(dts[k], 2000u + 7919u * (uint32_t)s);
+            sum += o.nMoving;
+            if (o.nMoving > maxN) maxN = o.nMoving;
+            if (o.movingShare > maxShare) maxShare = o.movingShare;
+            if (o.longestS > maxLong) maxLong = o.longestS;
+        }
+        printf("T5b dt=%u multipath bursts: still -> moving %d over %d days (max %d/day), "
+               "max moving share %.4f, longest episode %.0f s\n",
+               (unsigned)dts[k], sum, seeds[k], maxN, maxShare, maxLong);
+        TEST_ASSERT_TRUE_MESSAGE(maxN <= T5B_MAX_PER_DAY, "multipath bursts: too many false still -> moving per 24 h");
+        TEST_ASSERT_TRUE_MESSAGE(maxShare < T5B_MAX_SHARE, "multipath bursts: moving share of the day too high");
+        TEST_ASSERT_TRUE_MESSAGE(maxLong < 600.0, "multipath bursts: a false moving episode lasted >= 10 min");
+    }
+}
+
+// T9: the real capture (bench_dk5en1_20261017.h) replayed in FIXED mode. On the
+// node the drift set off one false still -> moving; accepted, so pinned is: at
+// most one, it returns to still within a few minutes, nothing is rejected or
+// re-seeded, and the output does not jump by more than the drift itself.
+void test_fixed_bench_dk5en1_mehrweg(void)
+{
+    struct PosFilter f; posFilterReset(&f);
+    uint32_t last = 0;
+    int reseeds = 0, rejects = 0;
+    double episode = 0, longest = 0, maxStep = 0, plat = 0, plon = 0;
+    for (size_t i = 0; i < BENCH_DK5EN1_N; i++)
+    {
+        const struct BenchFix *b = &BENCH_DK5EN1[i];
+        uint32_t dt = i ? b->t_ms - last : 0;
+        enum PosFilterResult res = posFilterUpdate(&f, b->lat_u * 1e-6, b->lon_u * 1e-6, b->hdop10 / 10.0f,
+                                                   true, b->spd100 / 100.0f, b->crs10 / 10.0f,
+                                                   POS_KF_MODE_FIXED, dt);
+        last = b->t_ms;
+        if (i && res == POS_KF_RESEED) reseeds++;
+        if (res == POS_KF_REJECT) rejects++;
+        double lat, lon;
+        posFilterGet(&f, &lat, &lon);
+        if (i)
+        {
+            double step = hypot((lat - plat) * 111320.0, (lon - plon) * 111320.0 * cos(lat * M_PI / 180.0));
+            if (step > maxStep) maxStep = step;
+        }
+        plat = lat; plon = lon;
+        if (!posFilterIsStill(&f)) { episode += dt; if (episode > longest) longest = episode; }
+        else episode = 0;
+    }
+    printf("T9 bench DK5EN-1: %u fixes, still -> moving %u, longest episode %.0f s, reseeds %d, rejects %d, "
+           "max output step %.1f m, still at end %d\n",
+           (unsigned)BENCH_DK5EN1_N, (unsigned)f.n_moving, longest / 1000.0, reseeds, rejects, maxStep,
+           (int)posFilterIsStill(&f));
+    TEST_ASSERT_TRUE_MESSAGE(f.n_moving <= 1, "real multipath: more than one false still -> moving");
+    TEST_ASSERT_TRUE_MESSAGE(longest < 300000.0, "real multipath: false moving episode >= 5 min");
+    TEST_ASSERT_EQUAL_INT(0, reseeds);
+    TEST_ASSERT_EQUAL_INT(0, rejects);
+    TEST_ASSERT_TRUE_MESSAGE(maxStep < T9_MAX_STEP_M, "real multipath: output step too large");
+    TEST_ASSERT_TRUE(posFilterIsStill(&f));
 }
 
 // T7: a standing node with a speed-noise burst (0.6 m/s, the node does not
@@ -1278,6 +1408,8 @@ int main(int, char **)
     RUN_TEST(test_fixed_hundespaziergang_bleibt_moving);
     RUN_TEST(test_fixed_stehen_zurueck_auf_still);
     RUN_TEST(test_fixed_keine_falschen_bewegungen);
+    RUN_TEST(test_fixed_mehrweg_spruenge);
+    RUN_TEST(test_fixed_bench_dk5en1_mehrweg);
     RUN_TEST(test_fixed_ausreisser_beim_moving);
     RUN_TEST(test_fixed_kaltstart_keine_bewegung);
     RUN_TEST(test_fixed_ausreisser_nach_luecke);

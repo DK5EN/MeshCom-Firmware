@@ -164,3 +164,7 @@ One false still -> moving from a slow 36 m multipath drift (displacement path) c
 modal cell, 11 changes (raw 119); without it 2 changes. Offline replay (scratch tool, reproduces the device exactly):
 radius floor 50 m removes the trigger, keeps 30/30 host tests, static-hold walker 83-90 s (was 70-77). Speed rule 5 s
 fails T5 at sd 0.3 and gains 6 s only. Decision pending with the operator.
+
+Decision (operator, 2026-10-17): keep the 40 m floor ("one jump is acceptable"). Tests added: T9 (real-capture replay,
+`bench_dk5en1_20261017.h`) and T5b (hourly 25-45 m multipath bursts), pinning the accepted rate; the real event was a
+~30 s step to ~40 m, not a slow drift. Projected at this site: ~1-2 false triggers per day.
