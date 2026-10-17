@@ -197,7 +197,7 @@ stage2() {
         uv run --quiet --with ruff==0.17.0 ruff check --output-format concise \
         tools test
     run_step "pytest tools/bench tools/tests tools/mock" stage2-pytest \
-        uv run --quiet --with pytest --with markdown-it-py==3.0.0 pytest -q tools/bench tools/tests tools/mock
+        uv run --quiet --with pytest --with markdown-it-py==3.0.0 pytest -q tools/bench tools/tests tools/mock tools/gps
     run_step "wire doc HTML up to date" stage2-wire-doc-html \
         uv run --quiet tools/wire_doc_html.py --check
     local f
