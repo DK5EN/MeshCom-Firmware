@@ -84,13 +84,7 @@ void rmAuGetState(RmAuState &out)
         snprintf(out.staged, sizeof(out.staged), "%s", st.stagedTag);
     out.busy = (st.state == FWS_BUSY);
     out.goPending = s_goArmed;
-    out.ckMin = -1;
-    if(st.lastCheckEpoch != 0)
-    {
-        const time_t now = time(nullptr);
-        if(now > 1700000000 && (uint32_t)now >= st.lastCheckEpoch)
-            out.ckMin = (int32_t)(((uint32_t)now - st.lastCheckEpoch) / 60u);
-    }
+    out.ckMin = fwCheckAgeMin(st.lastCheckEpoch, (int64_t)time(nullptr));
     snprintf(out.err, sizeof(out.err), "%s", st.lastErr);
 }
 

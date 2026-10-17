@@ -42,7 +42,7 @@ Deviations from the draft, and why:
 | ---- | ----------------------------------------------------------------------------------------------- | ----- |
 | 1    | A1 wire + `rs=`, A2 executors, B AU bridge, C web page (contract `src/rm_au.h` by orchestrator) | done  |
 | 2    | Gate: regression stage 1,2; clean builds heltec_v3, ttgo_tbeam, wiscore_rak4631; advisor        | done  |
-| 3    | Bench DK5EN-1: RM1 over LoRa (own DM, <= 2 dBm), real `upd go` from an older-labelled build     | open  |
+| 3    | Bench DK5EN-1: RM1 over LoRa (own DM, <= 2 dBm), real `upd go` from an older-labelled build     | done  |
 | 4    | Docs: RM1 spec, RESUME, BACKLOG; reply to McApp                                                 | open  |
 
 ### Wave 1 file ownership
@@ -76,3 +76,21 @@ Deviations from the draft, and why:
   `mtu=%`, `upd go` present in the Heltec V3 image.
 - Next: wave 3 bench on DK5EN-1 (sender DK5EN-92, needs the new build for the web page; ask before
   flashing DK5EN-92).
+
+### Wave 3 bench (2026-10-17 22:00-22:20)
+
+- Operator: OTA flash DK5EN-98 (production gateway, sender) and DK5EN-1 (target) with `5c1d12b5`;
+  test over LoRa between the two. RM1 driven through DK5EN-98's `POST /rmsend` (dst + pw form).
+- Verified over LoRa: `status` `rs=0` / `rs=1`, `net`, `upd`, `upd check`, `upd go` stale and current.
+- Real remote install: INSTRUMENT build on DK5EN-1, `--update stagelan` of the v4.40a.10.17 release
+  asset from the Mac, `upd go v4.40a.10.17` -> `ok applying` -> Safeboot -> release build 07:00:19
+  up 31 s after the reply. DK5EN-1's reinstall guard (`last` = v4.40a.10.17) blocked `n=1` on a
+  normal check, so the `installing` (download) path is host-tested only.
+- Bench finding fixed: `ck=-` whenever the system clock is not set (DK5EN-1 has a GPS clock;
+  `time()` counts uptime). `fwCheckAgeMin` in `fw_update.h` keeps both stamps in one clock domain;
+  test fails before, passes after; on air `ck=0` after a check.
+- Not a firmware bug: `/rmsend` decodes `%20` only, not `+` (Python `urlencode` default). The page
+  and McApp send `%20`.
+- End state: DK5EN-98 on `5c1d12b5` (21:51:17); DK5EN-1 on the dev build with the `ck` fix
+  (22:14:44), `--updchan prod`, `--rmstrictsecurity off`, autoupdate off as before.
+- Reply to McApp: `docs/mcapp-rm1-net-update-reply-20261017.md`.

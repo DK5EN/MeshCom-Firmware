@@ -1192,6 +1192,16 @@ static void test_go_decide_current_noasset_safeboot_order(void)
     TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r)); // R3: attempted this boot
 }
 
+static void test_check_age_min(void)
+{
+    // the clock domain of time(): an epoch once NTP/GPS set the system clock, seconds since boot before
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(0u, 5000));                     // no check this boot
+    TEST_ASSERT_EQUAL_INT32(2, fwCheckAgeMin(100u, 100 + 150));               // unset clock: uptime seconds
+    TEST_ASSERT_EQUAL_INT32(37, fwCheckAgeMin(1792260000u, 1792260000 + 37 * 60 + 59)); // set clock
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(100u, 1792260000));            // clock set after the check
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(1792260000u, 1792250000));     // clock went back
+}
+
 static void test_go_decide_notready_low_battery(void)
 {
     FwGoReq r = goReq("v4.40a.10.20");
@@ -1397,6 +1407,7 @@ int main(int, char **)
     RUN_TEST(test_go_decide_staged_flag_without_tag_is_not_a_match);
     RUN_TEST(test_go_decide_stale);
     RUN_TEST(test_go_decide_current_noasset_safeboot_order);
+    RUN_TEST(test_check_age_min);
     RUN_TEST(test_go_decide_notready_low_battery);
     RUN_TEST(test_go_decide_notready_before_nowifi);
     RUN_TEST(test_go_tick_handover_when_everything_passes);

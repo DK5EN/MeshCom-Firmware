@@ -492,6 +492,19 @@ inline FwAction fwTick(FwTimer &t, const FwPolicyIn &in, bool stagedPending, uin
 // by hand. No update window and no mode requirement (works with auto-update off); a connected phone
 // and a battery below the floor (AU-D17) still hold it back. Safeboot capability and the 8 s reply
 // delay are checked by the caller.
+// Minutes since the last successful check ("upd" ck=), -1 when unknown. lastCheckEpoch and now are
+// both time(): seconds since boot until NTP/GPS set the system clock, an epoch afterwards. A pair from
+// different domains (clock set in between) or a clock that went back is unknown.
+inline int32_t fwCheckAgeMin(uint32_t lastCheckEpoch, int64_t now)
+{
+    const int64_t kEpochMin = 1700000000; // below: seconds since boot (system clock not set)
+    if (lastCheckEpoch == 0 || now < (int64_t)lastCheckEpoch)
+        return -1;
+    if (((int64_t)lastCheckEpoch >= kEpochMin) != (now >= kEpochMin))
+        return -1;
+    return (int32_t)((now - (int64_t)lastCheckEpoch) / 60);
+}
+
 inline bool fwGoHandoverReady(const FwPolicyIn &in)
 {
     return !in.phoneConnected && (!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV);
