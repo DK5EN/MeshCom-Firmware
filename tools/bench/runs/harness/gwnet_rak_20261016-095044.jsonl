@@ -1,0 +1,1 @@
+{"net": "N3", "mode": "inet", "server": "OE", "expected": {"srv": "89.185.97.38", "path": "inet", "error": null}, "observed": {"srv": "OE", "host": "89.185.97.38", "path": "inet", "keep": true, "answer": true, "ntp": true, "ntp_fail": null, "netmode": "Internet", "in_use": "inet"}, "checks": [], "verdict": "PASS", "seconds": 42.1}

@@ -48,6 +48,8 @@ The `/submit-pr` command walks this flow; `/sync-upstream` brings upstream into 
 
 - nRF52 builds fail with make "Error 126" / "Bad CPU type": the pinned gcc-arm is x86_64 and Rosetta is missing. Run `softwareupdate --install-rosetta --agree-to-license`; do not bump the toolchain.
 - Harness and bench logs go to `tools/bench/runs/harness/`, never the repo root.
+- Raw `*.log` there is gitignored; the summaries (`.json`, `.jsonl`, `.summary`) are not. A wave's commit includes the
+  summaries its docs cite and deletes the rest, so `git status` is clean after every wave.
 - ESP32 app builds are not byte-reproducible; compare RAM/flash regions, not image hashes.
 
 ## Hardware and Flashing

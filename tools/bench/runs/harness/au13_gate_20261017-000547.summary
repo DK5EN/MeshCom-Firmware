@@ -1,0 +1,7 @@
+regr rc=0
+t_deck_plus rc=0
+heltec_wifi_lora_32_V3 rc=0
+ttgo_tbeam rc=0
+t_deck_plus ifree=2 tlsalloc=1
+heltec_wifi_lora_32_V3 ifree=2 tlsalloc=0
+ttgo_tbeam ifree=2 tlsalloc=0
