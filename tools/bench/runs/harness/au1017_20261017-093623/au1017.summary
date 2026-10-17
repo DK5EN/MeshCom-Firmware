@@ -1,0 +1,8 @@
+AU bench run 2026-10-17, target v4.40a.10.17 (dev channel, --update check/install/apply, then --updchan prod)
+DK5EN-14 t_deck_plus  2323  PASS  check 6 s, staged 30 s, running v4.40a.10.17 34 s after apply
+DK5EN-92 ttgo_tbeam   2323  FAIL try1: reboot 13 s into the download, RESET_REASON=6 TASK_WDT LAST_LOOP_SECTION=lora_rx (LoRa frame from DK5EN-1 received at download start); staged 10.16 record lost
+DK5EN-92 ttgo_tbeam   2323  PASS try2: staged 20 s, running v4.40a.10.17 34 s after apply
+DK5EN-1  heltec V3    2323  PASS  staged 19 s, running v4.40a.10.17 24 s after apply
+DK5EN-90 rak4631      USB   n/a   no AU on nRF52; release wiscore_rak4631.zip via adafruit-nrfutil DFU (1200 touch), "Device programmed.", build Oct 17 2026 07:07:39
+DK5EN-98 heltec V3    web   FAIL  check + stage ok (22 s); apply rebooted, back after ~3 min on the old app: Safeboot "none (old)", required v1 -> needs one web-flasher (USB) flash
+Logs: dk5en14.log dk5en92.log dk5en92_try2.log dk5en1.log dk5en98_web.log (raw, gitignored)

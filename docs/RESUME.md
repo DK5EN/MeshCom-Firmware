@@ -2,6 +2,17 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
+## 2026-10-17 -- AU bench run to v4.40a.10.17: 3 of 4 ESP32 nodes pass, AU-14 and AU-15 opened
+
+- Dev-channel Auto Update (`--update check/install/apply`) to the published v4.40a.10.17: DK5EN-14 (T-Deck
+  Plus), DK5EN-1 (Heltec V3) and DK5EN-92 (T-Beam) now run it, channel back on `prod`, mode `off`.
+- **AU-14:** DK5EN-92 rebooted on the first try, 13 s into the download, `TASK_WDT` with the loop in
+  `lora_rx`; the retry passed. Single event, open.
+- **AU-15:** DK5EN-98 staged 10.17 but has no AU Safeboot (`none (old)`), so `apply` fell back to the old app.
+  It needs one web-flasher USB flash, or an app OTA with `tools/webflash.py` (operator).
+- DK5EN-90 (RAK4631, no AU) flashed with the release DFU zip over USB.
+- Summary: `tools/bench/runs/harness/au1017_20261017-093623/au1017.summary`.
+
 ## 2026-10-17 -- release v4.40a.10.17 published (CI), web flasher
 
 - Release [v4.40a.10.17](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.17) (tag on
