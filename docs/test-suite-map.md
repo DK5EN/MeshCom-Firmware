@@ -98,7 +98,7 @@ received the same fix but has no host test.
 
 | Gate                                 | What it runs                                                                                                                  |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| CI `ci-build.yml`                    | `pio test -e native` and `native_aprs` only (2 of 51 envs), board builds, resource delta                                      |
+| CI `meshcom-ci.yml`                  | tags only: full `pio run`, UF2/.autoupdate packaging, release publish; no tests (`ci-build.yml` removed 2026-10-17)           |
 | Release (`/release-firmware` step 2) | every `[env:native*]` sequentially plus `selftest.sh`; step 5 adds the pages/flasher tests                                    |
 | `tools/regression.sh` stage 1        | same as the release gate; also fetches the topo_shadow raw window from rpizero when absent                                    |
 | `tools/regression.sh` stage 2        | pytest over tools/, nbrlog scripts, node tests, jsdom page tests (safeboot, Remote page, Settings), the four stray self-tests |

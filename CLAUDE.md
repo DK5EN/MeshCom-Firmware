@@ -21,7 +21,7 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 ## Releases
 
-- `/release-firmware` is the recipe. CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). `ci-build.yml` stays disabled.
+- `/release-firmware` is the recipe. CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). `ci-build.yml` was removed 2026-10-17 (disabled since 09-20; history in git).
 - Every `gh` call needs `-R DK5EN/MeshCom-Firmware` (no `gh` default repo is set; with two remotes it may pick upstream).
 
 ## PR Workflow

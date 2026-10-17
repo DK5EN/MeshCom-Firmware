@@ -270,7 +270,7 @@ number? unknown); the forced attempt after a re-key; hostile name/APRS text on a
 - `v4.40a.10.16` (tag on `27ce9d3c`, CI run 38879957594), base official `v4.40a.hbserver`; 66 assets.
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards).
-  `ci-build.yml` stays disabled. Recipe: `/release-firmware`.
+  `ci-build.yml` was removed 2026-10-17. Recipe: `/release-firmware`.
 - The web flasher on gh-pages offers only the latest release (`--keep 1`); root `safeboot*.bin` are the
   release assets.
 - Never cut a same-day `.N` release (the AU tag parser rejects it): date it the next day.
