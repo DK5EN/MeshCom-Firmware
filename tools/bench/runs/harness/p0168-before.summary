@@ -1,0 +1,3 @@
+A login: b'OK'
+B first line: b''
+STUCK (B got no NONCE while A is logged in)

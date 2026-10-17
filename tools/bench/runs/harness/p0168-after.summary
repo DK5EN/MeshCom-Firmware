@@ -1,0 +1,5 @@
+A login: b'OK'
+B first line: b'NONCE: 920fb5797522a41bac720a5ae0371868\r\n'
+B login: b'OK'
+A closed by node: True
+TAKEOVER

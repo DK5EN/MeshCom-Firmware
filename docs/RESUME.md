@@ -2,6 +2,20 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
+## 2026-10-17 -- net console fixes P-0111, P-0168, P-0169 (fork-dev only, no upstream PR)
+
+- P-0111: the console now also starts in pure AP mode (`netConsoleNetworkReady()`, `src/net_console_gate.h`,
+  host test `test_net_console_gate`). Not benched in AP mode; field testing.
+- P-0169: `--netconsole off` closes the listener even when the console is the only service (stop moved out of
+  the service block in `esp32_main.cpp`, like KISS).
+- P-0168: `accept()` keeps running while a session is up; a successful HMAC login takes over the old session,
+  a failed one leaves it alone. TCP keepalive 60/10/3 drops vanished clients; no session install after a stop;
+  mutex created once; reads take the mutex (takeover fd race).
+- Bench DK5EN-1, before/after: `tools/bench/runs/harness/p0168-*.summary`, `p0169-*.summary`. Keepalive
+  (half-open peer) not benched.
+- Open: in pure AP mode the 5-min `wifiTrulyOffline()` path re-runs `startNetwork()` and recreates the AP,
+  dropping AP clients and the console session.
+
 ## 2026-10-17 -- GPS-11 position Kalman filter: W2 integrated (ESP32 GPS boards), W3 bench next
 
 W2: `src/pos_pipeline.{h,cpp}` wires the filter into `WZ_GPS_Loop()`; `--gpsfilter on|off` (runtime), debug line at

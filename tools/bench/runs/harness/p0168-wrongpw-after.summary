@@ -1,0 +1,3 @@
+A: b'OK'
+B wrong pw: b'FAIL'
+A still alive: True

@@ -1,0 +1,4 @@
+console up after boot: NONCE
+only console left: NONCE
+after --netconsole off: REFUSED
+restored: NONCE
