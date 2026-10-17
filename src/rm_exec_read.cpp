@@ -9,18 +9,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include "configuration.h"
+#include "gw_servers.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "nbr_matrix.h"
 #include "nbr_views.h"
 #include "node_position.h"
 #include "radio_units.h"
+#include "rm_au.h"
 #include "rm_commands.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
 #include "rm_radio_in.h"
 #include "txring_functions.h"
 #include "uptime_min.h"
+#if defined(NRF52_SERIES)
+#include <RAK13800_W5100S.h> // IPAddress for nrf_eth.h
+#include <nrf_eth.h>         // ethIsStaticConfigured()
+#endif
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #endif
@@ -380,6 +386,67 @@ static int rdMaxhop(const RmCmd &, char *res, size_t n)
     return done(res, n, body, rmFmtMaxhop(body, sizeof(body), meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos));
 }
 
+// net: same address/mode rule as the --setnet status (command_functions.cpp gwStatusMode): nRF52 static
+// node = configured node_ownip + legacy rule, everything else = node_ip, mode as stored.
+static uint8_t rdNetMode(uint8_t ip[4])
+{
+    unsigned int a[4] = {0, 0, 0, 0};
+    for (int i = 0; i < 4; i++)
+        ip[i] = 0;
+    bool staticLegacy = false;
+    const char *ipText = meshcom_settings.node_ip;
+#if defined(NRF52_SERIES)
+    if (ethIsStaticConfigured())
+    {
+        staticLegacy = true;
+        ipText = meshcom_settings.node_ownip;
+    }
+#endif
+    if (sscanf(ipText, "%u.%u.%u.%u", &a[0], &a[1], &a[2], &a[3]) == 4)
+        for (int i = 0; i < 4; i++)
+            ip[i] = (uint8_t)a[i];
+    return gwEffectiveMode((uint8_t)meshcom_settings.node_hamnet_only, ip, staticLegacy);
+}
+
+static int rdNet(const RmCmd &, char *res, size_t n)
+{
+    // eff: the path gwResolveNode() picks for the effective mode; "-" without IP uplink.
+    uint8_t ip[4];
+    const uint8_t mode = rdNetMode(ip);
+    const char *eff = "-";
+    if (meshcom_settings.node_hasIPaddress)
+    {
+        GwTarget t;
+        if (gwResolveNode(meshcom_settings.node_gwsrv, mode, ip, meshcom_settings.node_ownntp, true, &t))
+            eff = t.path;
+    }
+    // configured mode as --setnet prints it: 1 hamnet, 3 inet, 0 legacy (static 44er nRF52 -> hamnet), else auto
+    const char *net = "auto";
+    switch (meshcom_settings.node_hamnet_only)
+    {
+    case 0: net = (mode == 1) ? "hamnet" : "inet"; break;
+    case 1: net = "hamnet"; break;
+    case 3: net = "inet"; break;
+    default: break;
+    }
+    const GwServer *g = gwFind(meshcom_settings.node_gwsrv);
+    char body[RM_FMT_BODY_MAX + 1];
+    return done(res, n, body, rmFmtNet(body, sizeof(body), meshcom_settings.node_ethmtu, g->code, net, eff));
+}
+
+static int rdUpd(const RmCmd &c, char *res, size_t n)
+{
+    if (c.args[0] != '\0')
+        return 0; // write executor
+    RmAuState st;
+    memset(&st, 0, sizeof(st));
+    rmAuGetState(st);
+    if (!st.supported)
+        return fail(res, n, "unsupported");
+    char body[RM_MAX_RESULT + 1];
+    return done(res, n, body, rmFmtUpd(body, sizeof(body), st));
+}
+
 struct ReadRow
 {
     const char *name;
@@ -389,6 +456,7 @@ struct ReadRow
 static constexpr ReadRow kReadRows[] = {
     {"radio", rdRadio}, {"name", rdName}, {"atxt", rdAtxt}, {"pos", rdPos},     {"sens", rdSens},
     {"mh", rdMh},       {"txq", rdTxq},   {"mbox", rdMbox}, {"maxhop", rdMaxhop},
+    {"net", rdNet},     {"upd", rdUpd},
 };
 static_assert(rmRowsMatchList(kReadRows, rmKindIsRead), "kReadRows = READ and RW rows of rm_commands.h");
 

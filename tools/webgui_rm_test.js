@@ -1113,7 +1113,7 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     await P.setPoll({ sent: [], targets: tg });
     const hs = ['rm_card_radio', 'rm_card_ident', 'rm_card_pos', 'rm_card_queues'].map((i) => [...P.el(i).lastElementChild.querySelectorAll('.rmh')]).reduce((a, b) => a.concat(b), []);
-    check('RS-03 headers of Radio (2), Identity (1), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 5 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
+    check('RS-03 headers of Radio (4: radio, sens, net, upd), Identity (1), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 7 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
     P.w.rmPageLeave();
   }
 
@@ -1786,6 +1786,85 @@ function leaks(P, canary) {
     const P = await savedNodePage(STATUS_NEW);
     await P.tap(P.btn('Send position now', P.el('rm_info')));
     check('W3 Light flash and Charge LED are locked with the other controls after a send', P.tiles().ledflash.el.disabled && P.el('rm_chgled').disabled);
+    P.w.rmPageLeave();
+  }
+
+  // ---- RM1 net / upd: Network and Software update rows in the Radio card, strict-security token in status ------
+  {
+    const srv = mkServer();
+    srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0 }];
+    srv.status = srv.mkStatus({ targets: tg });
+    const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+    const X = (id) => P.el(id), go = () => X('rm_upd_go'), chk = () => X('rm_upd_check');
+    const E = (cmd, rep, ago, o) => ent('DK5EN-1', cmd, rep, Object.assign({ ctr: 40, ago: ago === undefined ? 1 : ago, st: 'ok' }, o || {}));
+    const poll = (l) => P.setPoll({ sent: l, targets: tg });
+    const U = (kv, ago) => poll([E('upd', 'ok ' + kv, ago)]);
+    const sendsUpd = () => P.sends().filter((x) => /cmd=upd/.test(x.body));
+    await poll([]);
+    check('NU-01 upd card is in the Radio card; Check is enabled, Update now is disabled before any read', X('rm_def_upd') && X('rm_card_radio').contains(X('rm_def_upd')) && go() && go().disabled && chk() && !chk().disabled && go().textContent === 'Update now', go() && go().disabled);
+    check('NU-02 net card is in the Radio card, own Read button (data-cmd net)', X('rm_def_net') && X('rm_card_radio').contains(X('rm_def_net')) && !!X('rm_def_net').querySelector('[data-cmd="net"][data-args=""]'));
+    await poll([E('net', 'ok mtu=1500 srv=OE net=hamnet eff=hamnet')]);
+    check('NU-03 net card renders the four values', X('rm_v_net_mtu').textContent === '1500 bytes' && X('rm_v_net_srv').textContent === 'OE' && X('rm_v_net_net').textContent === 'HAMNET' && X('rm_v_net_eff').textContent === 'HAMNET', ['mtu', 'srv', 'net', 'eff'].map((k) => X('rm_v_net_' + k).textContent).join('|'));
+    await poll([E('net', 'ok mtu=1280 srv=DE net=auto eff=-')]);
+    check('NU-04 net eff "-" reads "no IP uplink"; auto reads automatic', X('rm_v_net_eff').textContent === 'no IP uplink' && X('rm_v_net_net').textContent === 'automatic' && X('rm_v_net_mtu').textContent === '1280 bytes');
+    await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-');
+    const rows = ['m', 'c', 'a', 'n', 'st', 'b', 'g', 'ck', 'e'].map((k) => X('rm_v_upd_' + k).textContent).join('|');
+    check('NU-05 upd card renders mode, channel, available, newer, staged, busy, go pending, last check, last error', rows === 'notify only|production|v4.41a|yes|none|no|no|12 min ago|none', rows);
+    check('NU-06 n=1 a=v4.41a b=0 g=0: Update now enabled', !go().disabled);
+    await U('m=off c=dev n=0 a=v4.41a st=- b=0 g=0 ck=- e=nowifi');
+    check('NU-07 n=0, st=-: Update now disabled; ck=- reads "not yet", error shown', go().disabled && X('rm_v_upd_ck').textContent === 'not yet' && X('rm_v_upd_e').textContent === 'nowifi' && X('rm_v_upd_c').textContent === 'development');
+    await U('m=off c=prod n=1 a=- st=- b=0 g=0 ck=3 e=-');
+    check('NU-08 n=1 but a=-: Update now disabled', go().disabled);
+    await U('m=auto c=prod n=0 a=- st=v4.41a b=0 g=0 ck=3 e=-');
+    check('NU-09 st=v4.41a with n=0: Update now enabled', !go().disabled);
+    await U('m=auto c=prod n=1 a=v4.41a st=- b=1 g=0 ck=3 e=-');
+    check('NU-10 b=1: disabled', go().disabled);
+    await U('m=auto c=prod n=1 a=v4.41a st=- b=0 g=1 ck=3 e=-');
+    check('NU-11 g=1: disabled', go().disabled);
+    await U('m=auto c=prod n=1 a=v4.41a st=v4.41a b=1 g=0 ck=3 e=-');
+    check('NU-12 st set but b=1: disabled', go().disabled);
+    await U('m=notify c=prod n=1 a=v4.41a<b st=- b=0 g=0 ck=1 e=-');
+    check('NU-13 a tag outside [A-Za-z0-9._-]: disabled', go().disabled);
+    await poll([E('upd check', 'ok checking'), E('net', 'ok mtu=1500 srv=OE net=auto eff=inet', 3)]);
+    check('NU-14 a later "ok checking" reply is no upd read: no fake read, button stays disabled, no blank grid', go().disabled && !X('rm_v_upd_m'), '');
+    await U('m=notify c=prod n=1 a=v4.41b st=v4.41a b=0 g=0 ck=1 e=-');
+    check('NU-15 enabled; st preferred over a in the button args', !go().disabled && go().getAttribute('data-args') === 'go v4.41a' && go().getAttribute('data-cf') === 'upd go v4.41a', go().getAttribute('data-args'));
+    // Check button
+    const n0 = sendsUpd().length;
+    await P.tap(chk());
+    check('NU-16 Check sends "upd check" at once, no confirm', sendsUpd().length === n0 + 1 && /args=check/.test(sendsUpd()[n0].body) && !/args=check%20/.test(sendsUpd()[n0].body), (sendsUpd()[n0] || {}).body);
+    check('NU-17 ok checking tells the user to read again in about 30 seconds', /about 30 seconds/.test(P.w.rmOkText({ cmd: 'upd check', reply: 'ok checking', msg: 'x' })));
+    await P.T.advance(10001);
+    await U('m=notify c=prod n=1 a=v4.41b st=v4.41a b=0 g=0 ck=1 e=-');
+    // Update now: confirm
+    const s0 = sendsUpd().length;
+    await P.tap(go());
+    check('NU-18 first tap on Update now arms, nothing sent', go().textContent === 'Really? tap again' && sendsUpd().length === s0 && /Tap again within 4 seconds to confirm: Update on DK5EN-1/.test(P.text('rm_msg')), go().textContent + '|' + P.text('rm_msg'));
+    await P.T.advance(4100);
+    await P.tap(go());
+    check('NU-19 tap after the confirm timeout only arms again, nothing sent', sendsUpd().length === s0 && go().textContent === 'Really? tap again');
+    await P.tap(go());
+    check('NU-20 second tap sends exactly "upd go v4.41a" once', sendsUpd().length === s0 + 1 && /cmd=upd&args=go%20v4\.41a/.test(sendsUpd()[s0].body), (sendsUpd()[s0] || {}).body);
+    const Ts = P.T.now;
+    check('NU-21 after sending, Update now is disabled', go().disabled);
+    await P.T.advance(10001);
+    await poll([E('upd', 'ok m=notify c=prod n=1 a=v4.41b st=v4.41a b=0 g=0 ck=1 e=-', Math.ceil((P.T.now - Ts) / 1000) + 5)]);
+    check('NU-22 no new read since the send (the old read predates it): stays disabled, never re-sent', go().disabled && sendsUpd().length === s0 + 1, sendsUpd().length);
+    await poll([E('upd', 'ok m=notify c=prod n=1 a=v4.41b st=v4.41a b=0 g=0 ck=1 e=-', 1)]);
+    check('NU-23 a new verified read re-enables it, still nothing re-sent', !go().disabled && sendsUpd().length === s0 + 1);
+    await poll([E('upd', 'ok m=notify c=prod n=1 a=v4.41b st=v4.41a b=0 g=0 ck=1 e=-', 1, { ver: 0 })]);
+    check('NU-24 an unverified upd reply is no read: no card values, disabled', go().disabled && !X('rm_v_upd_m'));
+    await poll([E('upd', 'err unsupported', 1, { st: 'err' })]);
+    check('NU-25 err unsupported on upd: sentence shown, button disabled, no values', go().disabled && /cannot update itself/.test(X('rm_def_upd').textContent) && !X('rm_v_upd_m'));
+    check('NU-26 reply texts for go', /installing v4\.41a/.test(P.w.rmOkText({ cmd: 'upd go v4.41a', reply: 'ok installing v4.41a', msg: 'x' })) && /applying v4\.41a/.test(P.w.rmOkText({ cmd: 'upd go v4.41a', reply: 'ok applying v4.41a', msg: 'x' })));
+    check('NU-27 err tokens are not mapped to texts in the page JS (they come from the server message)', !/aubusy|nowifi|noasset|safeboot|err stale/.test(JS.replace(/e=nowifi/g, '')));
+    P.w.rmPageLeave();
+  }
+  {
+    const P = await savedNodePage(STATUS_NEW + ' rs=1');
+    const o = P.w.rmParseStatus(STATUS_NEW + ' rs=1');
+    check('NU-28 status with the trailing rs=1 token parses, tiles still render, text shows strict security', !!o && o.ver === '4.40a' && !!P.tiles().led && /strict security on/.test(P.w.rmOkText({ cmd: 'status', reply: STATUS_NEW + ' rs=1', msg: '' })) && !/strict security/.test(P.w.rmOkText({ cmd: 'status', reply: STATUS_NEW + ' rs=0', msg: '' })));
     P.w.rmPageLeave();
   }
 

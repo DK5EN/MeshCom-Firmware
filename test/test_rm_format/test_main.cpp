@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <rm_format.h>
+#include <rm_exec_ext.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -484,6 +485,88 @@ static void test_small_buffer(void)
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtMaxhop(b, 0, 1, 1));
 }
 
+// ---- net / upd (rm_exec_ext.h) ----
+static void test_net_upd()
+{
+    expectStr("mtu=1280 srv=OE net=auto eff=-", rmFmtNet(g_buf, sizeof(g_buf), 1280, "OE", "auto", "-"));
+    expectStr("mtu=1500 srv=DL net=hamnet eff=hamnet", rmFmtNet(g_buf, sizeof(g_buf), 1500, "DL", "hamnet", "hamnet"));
+    expectStr("mtu=1400 srv=HB net=inet eff=inet", rmFmtNet(g_buf, sizeof(g_buf), 1400, "HB", "inet", "inet"));
+    expectStr("mtu=1500 srv=OE net=auto eff=-", rmFmtNet(g_buf, sizeof(g_buf), 9000, "", "auto", nullptr));
+    expectStr("mtu=1280 srv=OE net=auto eff=-", rmFmtNet(g_buf, sizeof(g_buf), 0, nullptr, "auto", ""));
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtNet(g_buf, 10, 1280, "OE", "auto", "-"));
+
+    RmAuState st;
+    memset(&st, 0, sizeof(st));
+    st.supported = true;
+    st.ckMin = -1;
+    expectStr("m=off c=prod n=0 a=- st=- b=0 g=0 ck=- e=-", rmFmtUpd(g_buf, sizeof(g_buf), st));
+    st.mode = 2;
+    st.chan = 1;
+    st.newer = true;
+    st.busy = true;
+    st.goPending = true;
+    st.ckMin = 42;
+    strcpy(st.avail, "v4.40a.10.20");
+    strcpy(st.staged, "v4.40a.10.19");
+    strcpy(st.err, "http 404: not=found");
+    expectStr("m=auto c=dev n=1 a=v4.40a.10.20 st=v4.40a.10.19 b=1 g=1 ck=42 e=http_404:_not_found",
+              rmFmtUpd(g_buf, sizeof(g_buf), st));
+    st.mode = 1;
+    expectStr("m=notify c=dev n=1 a=v4.40a.10.20 st=v4.40a.10.19 b=1 g=1 ck=42 e=http_404:_not_found",
+              rmFmtUpd(g_buf, sizeof(g_buf), st));
+
+    // long e= : "ok " + body must stay <= RM_MAX_RESULT, e is cut
+    memset(st.err, 'x', sizeof(st.err) - 1);
+    st.err[sizeof(st.err) - 1] = '\0';
+    strcpy(st.avail, "abcdefghijklmnopqrstuvw"); // 23 chars
+    strcpy(st.staged, "abcdefghijklmnopqrstuvw");
+    st.ckMin = 2000000000;
+    size_t len = rmFmtUpd(g_buf, sizeof(g_buf), st);
+    TEST_ASSERT_TRUE(len > 0);
+    TEST_ASSERT_EQUAL_UINT32(strlen(g_buf), len);
+    TEST_ASSERT_TRUE(3 + len <= RM_MAX_RESULT);
+    TEST_ASSERT_NOT_NULL(strstr(g_buf, " e=x"));
+    TEST_ASSERT_TRUE(strlen(strstr(g_buf, " e=") + 3) < 47);
+    // exactly at the limit: cut to fit (here the 47 x need 3 + 107 = too long)
+    TEST_ASSERT_EQUAL_UINT32(RM_MAX_RESULT, 3 + len);
+
+    st.supported = false;
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtUpd(g_buf, sizeof(g_buf), st));
+    TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
+}
+
+static void expectRes(const char *want, bool isGo, RmAuResult r, const char *tag, const char *avail, bool ok)
+{
+    size_t n = rmFmtUpdResult(g_buf, sizeof(g_buf), isGo, r, tag, avail);
+    expectStr(want, n);
+    TEST_ASSERT_EQUAL(ok, rmUpdResultOk(r, isGo));
+}
+
+static void test_upd_result()
+{
+    expectRes("ok checking", false, RM_AU_STARTED, "", "", true);
+    expectRes("err aubusy", false, RM_AU_BUSY, "", "", false);
+    expectRes("err nowifi", false, RM_AU_NOWIFI, "", "", false);
+    expectRes("err unsupported", false, RM_AU_UNSUPPORTED, "", "", false);
+    expectRes("ok installing v1.2", true, RM_AU_STARTED, "v1.2", "", true);
+    expectRes("ok applying v1.2", true, RM_AU_APPLYING, "v1.2", "", true);
+    expectRes("err stale v1.3", true, RM_AU_STALE, "v1.2", "v1.3", false);
+    expectRes("err stale -", true, RM_AU_STALE, "v1.2", "", false);
+    expectRes("err stale -", true, RM_AU_STALE, "v1.2", nullptr, false);
+    expectRes("err current", true, RM_AU_CURRENT, "v1.2", "", false);
+    expectRes("err noasset", true, RM_AU_NOASSET, "v1.2", "", false);
+    expectRes("err aubusy", true, RM_AU_BUSY, "v1.2", "", false);
+    expectRes("err nowifi", true, RM_AU_NOWIFI, "v1.2", "", false);
+    expectRes("err safeboot", true, RM_AU_SAFEBOOT, "v1.2", "", false);
+    expectRes("err notready", true, RM_AU_NOTREADY, "v1.2", "", false);
+    expectRes("err unsupported", true, RM_AU_UNSUPPORTED, "v1.2", "", false);
+    // go-only codes on check never become ok
+    expectRes("err failed", false, RM_AU_APPLYING, "", "", false);
+    expectRes("err failed", false, RM_AU_STALE, "", "x", false);
+    expectRes("err failed", false, RM_AU_NOTREADY, "", "", false);
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtUpdResult(g_buf, 5, true, RM_AU_STARTED, "v1.2.3", ""));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -505,5 +588,7 @@ int main(int, char **)
     RUN_TEST(test_maxhop);
     RUN_TEST(test_worst_cases_rest);
     RUN_TEST(test_small_buffer);
+    RUN_TEST(test_net_upd);
+    RUN_TEST(test_upd_result);
     return UNITY_END();
 }

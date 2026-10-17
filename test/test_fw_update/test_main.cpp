@@ -1076,6 +1076,249 @@ void test_lowheap_does_not_consume_attempt(void)
     TEST_ASSERT_TRUE(fwErrConsumesAttempt(nullptr));
 }
 
+static void test_go_handover_ready(void)
+{
+    // remote go (RM1 "upd go"): no update window, no mode requirement; phone and battery still count
+    FwPolicyIn in = okIn(0); // mode off must not matter
+    in.localMinuteOfDay = 12 * 60; // outside the window
+    TEST_ASSERT_TRUE(fwGoHandoverReady(in));                    // mains
+    in.phoneConnected = true;
+    TEST_ASSERT_FALSE(fwGoHandoverReady(in));                   // phone
+    in.phoneConnected = false;
+    in.onBattery = true;
+    in.battMv = FW_BATT_FLOOR_MV - 1;
+    TEST_ASSERT_FALSE(fwGoHandoverReady(in));                   // battery below floor
+    in.battMv = FW_BATT_FLOOR_MV;
+    TEST_ASSERT_TRUE(fwGoHandoverReady(in));                    // battery at floor
+    in.battMv = 4100;
+    TEST_ASSERT_TRUE(fwGoHandoverReady(in));
+    in.onBattery = false;
+    in.battMv = 0;
+    TEST_ASSERT_TRUE(fwGoHandoverReady(in));                    // mains reads 0 mV
+}
+
+// ---- remote go: request decision (rm_au_esp32.cpp rmAuGo) ----
+
+static FwGoReq goReq(const char *tag)
+{
+    // a newer, installable release "v4.40a.10.20" is available, nothing staged, all gates open
+    FwGoReq r;
+    memset(&r, 0, sizeof(r));
+    r.stagedTag = "";
+    r.availTag = "v4.40a.10.20";
+    r.availNewer = true;
+    r.installable = true;
+    r.safebootCapable = true;
+    r.timeValid = true;
+    r.battOk = true;
+    r.wifiUp = true;
+    r.tag = tag;
+    return r;
+}
+
+static void test_go_decide_started(void)
+{
+    FwGoReq r = goReq("v4.40a.10.20");
+    TEST_ASSERT_EQUAL_INT(FWGO_STARTED, fwGoDecide(r));
+}
+
+static void test_go_decide_busy_wins_over_everything(void)
+{
+    FwGoReq r = goReq("v4.99z"); // stale as well
+    r.busy = true;
+    r.wifiUp = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_BUSY, fwGoDecide(r));
+}
+
+static void test_go_decide_staged_tag_wins(void)
+{
+    // the staged tag is applied even if avail says "no newer", no asset, no wifi, no clock, a phone
+    FwGoReq r = goReq("v4.40a.10.19");
+    r.staged = true;
+    r.stagedTag = "v4.40a.10.19";
+    r.availNewer = false;
+    r.installable = false;
+    r.wifiUp = false;
+    r.timeValid = false;
+    r.phoneConnected = true;
+    TEST_ASSERT_EQUAL_INT(FWGO_APPLYING, fwGoDecide(r));
+    r.safebootCapable = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r));
+    r.safebootCapable = true;
+    r.handoverAttempted = true; // R3: a handover for this tag was already tried this boot
+    TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r));
+}
+
+static void test_go_decide_staged_flag_without_tag_is_not_a_match(void)
+{
+    FwGoReq r = goReq("v4.40a.10.19");
+    r.staged = true;
+    r.stagedTag = ""; // flag set but no tag: nothing to apply
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+    r.staged = false;
+    r.stagedTag = "v4.40a.10.19"; // tag text without the valid flag
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+}
+
+static void test_go_decide_stale(void)
+{
+    FwGoReq r = goReq("v4.40a.10.19"); // not the available tag
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+    r = goReq(nullptr);
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+    r = goReq("");
+    r.availTag = ""; // no check yet: empty avail never matches, not even an empty tag
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+    r = goReq("v4.40a.10.20");
+    r.availTag = "";
+    TEST_ASSERT_EQUAL_INT(FWGO_STALE, fwGoDecide(r));
+}
+
+static void test_go_decide_current_noasset_safeboot_order(void)
+{
+    FwGoReq r = goReq("v4.40a.10.20");
+    r.availNewer = false;
+    r.installable = false;
+    r.safebootCapable = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_CURRENT, fwGoDecide(r)); // CURRENT before NOASSET
+    r.availNewer = true;
+    TEST_ASSERT_EQUAL_INT(FWGO_NOASSET, fwGoDecide(r)); // NOASSET before SAFEBOOT
+    r.installable = true;
+    r.wifiUp = false;
+    r.timeValid = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r)); // SAFEBOOT before NOTREADY / NOWIFI
+    r.safebootCapable = true;
+    r.handoverAttempted = true;
+    TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r)); // R3: attempted this boot
+}
+
+static void test_go_decide_notready_low_battery(void)
+{
+    FwGoReq r = goReq("v4.40a.10.20");
+    r.battOk = false; // AU-D17: the auto path starts no download below the battery floor either
+    TEST_ASSERT_EQUAL_INT(FWGO_NOTREADY, fwGoDecide(r));
+    r.wifiUp = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_NOTREADY, fwGoDecide(r)); // before NOWIFI
+    r.staged = true;
+    r.stagedTag = "v4.40a.10.20";
+    TEST_ASSERT_EQUAL_INT(FWGO_APPLYING, fwGoDecide(r)); // no download: the tick waits for the battery
+}
+
+static void test_go_decide_notready_before_nowifi(void)
+{
+    FwGoReq r = goReq("v4.40a.10.20");
+    r.timeValid = false; // R5: no valid clock for TLS
+    TEST_ASSERT_EQUAL_INT(FWGO_NOTREADY, fwGoDecide(r));
+    r.wifiUp = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_NOTREADY, fwGoDecide(r)); // before NOWIFI
+    r.timeValid = true;
+    r.phoneConnected = true; // R5: a phone is connected
+    TEST_ASSERT_EQUAL_INT(FWGO_NOTREADY, fwGoDecide(r));
+    r.phoneConnected = false;
+    TEST_ASSERT_EQUAL_INT(FWGO_NOWIFI, fwGoDecide(r));
+    r.wifiUp = true;
+    TEST_ASSERT_EQUAL_INT(FWGO_STARTED, fwGoDecide(r));
+}
+
+// ---- remote go: tick step (auTick) ----
+
+static FwGoTickIn goTick(void)
+{
+    // armed go, tag staged, 8 s passed, phone off, mains, Safeboot capable, record matches
+    FwGoTickIn t;
+    memset(&t, 0, sizeof(t));
+    t.stagedMatch = true;
+    t.delayPassed = true;
+    t.ready = true;
+    t.safebootCapable = true;
+    t.recordState = FWGO_REC_OK;
+    return t;
+}
+
+static void test_go_tick_handover_when_everything_passes(void)
+{
+    FwGoTickIn t = goTick();
+    TEST_ASSERT_EQUAL_INT(FWGOS_HANDOVER, fwGoTickStep(t));
+    t.recordState = FWGO_REC_UNCHECKED; // the record is read last, only when all gates passed
+    TEST_ASSERT_EQUAL_INT(FWGOS_NEED_RECORD, fwGoTickStep(t));
+}
+
+static void test_go_tick_busy_waits_for_download(void)
+{
+    FwGoTickIn t = goTick();
+    t.busy = true;
+    t.stagedMatch = false;
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_DOWNLOAD, fwGoTickStep(t));
+}
+
+static void test_go_tick_download_failure_disarms(void)
+{
+    FwGoTickIn t = goTick();
+    t.stagedMatch = false;
+    t.downloadFailed = true;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_DOWNLOAD, fwGoTickStep(t));
+    t.downloadFailed = true;
+    t.stagedMatch = true; // a stale failure does not matter once the tag is staged
+    TEST_ASSERT_EQUAL_INT(FWGOS_HANDOVER, fwGoTickStep(t));
+}
+
+static void test_go_tick_no_stage_disarms_instead_of_waiting_forever(void)
+{
+    // R2: not busy, no staged tag that matches: never wait, disarm
+    FwGoTickIn t = goTick();
+    t.stagedMatch = false;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_NOSTAGE, fwGoTickStep(t));
+    // the loaded record carries another tag than the go
+    t = goTick();
+    t.recordState = FWGO_REC_TAG_DIFFERS;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_NOSTAGE, fwGoTickStep(t));
+    t.recordState = FWGO_REC_MISSING;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_NORECORD, fwGoTickStep(t));
+}
+
+static void test_go_tick_attempted_disarms_without_go(void)
+{
+    // R3: the handover for this tag was already tried this boot: no "go", no silent no-op
+    FwGoTickIn t = goTick();
+    t.attempted = true;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_ATTEMPTED, fwGoTickStep(t));
+    t.recordState = FWGO_REC_UNCHECKED;
+    t.delayPassed = false; // fails at once, it does not wait for the reply delay
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_ATTEMPTED, fwGoTickStep(t));
+}
+
+static void test_go_tick_waits_8s_after_the_reply(void)
+{
+    FwGoTickIn t = goTick();
+    t.delayPassed = false;
+    t.recordState = FWGO_REC_UNCHECKED;
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_REPLY, fwGoTickStep(t));
+    t.phoneConnected = true; // the reply delay is reported first
+    t.ready = false;
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_REPLY, fwGoTickStep(t));
+}
+
+static void test_go_tick_phone_and_battery_wait_reasons(void)
+{
+    FwGoTickIn t = goTick();
+    t.recordState = FWGO_REC_UNCHECKED;
+    t.ready = false;
+    t.phoneConnected = true;
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_PHONE, fwGoTickStep(t));
+    t.phoneConnected = false;
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_BATTERY, fwGoTickStep(t));
+}
+
+static void test_go_tick_old_safeboot_disarms(void)
+{
+    FwGoTickIn t = goTick();
+    t.recordState = FWGO_REC_UNCHECKED;
+    t.safebootCapable = false;
+    TEST_ASSERT_EQUAL_INT(FWGOS_FAIL_SAFEBOOT, fwGoTickStep(t));
+    t.ready = false; // not ready is reported before the Safeboot check
+    TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_BATTERY, fwGoTickStep(t));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1138,6 +1381,7 @@ int main(int, char **)
     RUN_TEST(test_should_install_reinstall_loop_untagged_release);
     RUN_TEST(test_latch_check_survives_25_days_without_wifi);
     RUN_TEST(test_latch_check_survives_for_every_blocker);
+    RUN_TEST(test_go_handover_ready);
     RUN_TEST(test_latch_does_not_pull_check_forward);
     RUN_TEST(test_latch_attempt_deadline_survives_25_days);
     RUN_TEST(test_latch_attempt_exhausted_stays_blocked);
@@ -1147,5 +1391,21 @@ int main(int, char **)
     RUN_TEST(test_heap_gate_psram_tls);
     RUN_TEST(test_calloc_size_overflow);
     RUN_TEST(test_lowheap_does_not_consume_attempt);
+    RUN_TEST(test_go_decide_started);
+    RUN_TEST(test_go_decide_busy_wins_over_everything);
+    RUN_TEST(test_go_decide_staged_tag_wins);
+    RUN_TEST(test_go_decide_staged_flag_without_tag_is_not_a_match);
+    RUN_TEST(test_go_decide_stale);
+    RUN_TEST(test_go_decide_current_noasset_safeboot_order);
+    RUN_TEST(test_go_decide_notready_low_battery);
+    RUN_TEST(test_go_decide_notready_before_nowifi);
+    RUN_TEST(test_go_tick_handover_when_everything_passes);
+    RUN_TEST(test_go_tick_busy_waits_for_download);
+    RUN_TEST(test_go_tick_download_failure_disarms);
+    RUN_TEST(test_go_tick_no_stage_disarms_instead_of_waiting_forever);
+    RUN_TEST(test_go_tick_attempted_disarms_without_go);
+    RUN_TEST(test_go_tick_waits_8s_after_the_reply);
+    RUN_TEST(test_go_tick_phone_and_battery_wait_reasons);
+    RUN_TEST(test_go_tick_old_safeboot_disarms);
     return UNITY_END();
 }

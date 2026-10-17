@@ -150,7 +150,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(36, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(40, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -209,7 +209,7 @@ static void test_vectors_refusals_reproduced(void)
 
     static std::string objs[32];
     const size_t n = objectsOf(json, "refusals", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(7, n, "refusal vector count drifted from tools/remote_cmd.py");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(13, n, "refusal vector count drifted from tools/remote_cmd.py");
     for (size_t i = 0; i < n; i++)
     {
         std::string cmd, args, text;
@@ -234,8 +234,8 @@ static void test_vectors_replies_reproduced(void)
         TEST_FAIL_MESSAGE("tools/tests/remote_cmd_vectors.json not found");
 
     static std::string objs[64];
-    const size_t n = objectsOf(json, "replies", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(27, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
+    const size_t n = objectsOf(json, "replies", objs, 64);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(35, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1213,7 +1213,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(36, n);
+    TEST_ASSERT_EQUAL_INT(40, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1310,10 +1310,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 {
     static const char *const kPinned[] = {
         "reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track", "display", "led", "gateway", "mesh",
-        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh"};
+        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "net", "upd"};
     const size_t n = sizeof(kPinned) / sizeof(kPinned[0]);
-    TEST_ASSERT_EQUAL_UINT(23, n);
-    TEST_ASSERT_EQUAL_UINT(23, RM_COMMAND_COUNT);
+    TEST_ASSERT_EQUAL_UINT(25, n);
+    TEST_ASSERT_EQUAL_UINT(25, RM_COMMAND_COUNT);
 
     // the list itself, name by name and in order, with a sample argument that fits the shape in column 3
     size_t i = 0;
@@ -1341,10 +1341,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 #undef CHECK_ROW
     TEST_ASSERT_EQUAL_UINT(n, i);
 
-    // by kind: 5 actions, 6 toggles, 3 parametrised, 6 reads, 3 read/write
+    // by kind: 5 actions, 6 toggles, 3 parametrised, 7 reads, 4 read/write
     TEST_ASSERT_EQUAL_UINT(6, rmCountWhere(rmKindIsToggle));
-    TEST_ASSERT_EQUAL_UINT(9, rmCountWhere(rmKindIsRead));
-    TEST_ASSERT_EQUAL_UINT(3, rmCountWhere(rmKindIsWrite));
+    TEST_ASSERT_EQUAL_UINT(11, rmCountWhere(rmKindIsRead));
+    TEST_ASSERT_EQUAL_UINT(4, rmCountWhere(rmKindIsWrite));
     TEST_ASSERT_EQUAL_INT(RM_CK_TOGGLE, rmCommandKind("led"));
     TEST_ASSERT_EQUAL_INT(RM_CK_RW, rmCommandKind("pos"));
     TEST_ASSERT_EQUAL_INT(RM_CK_READ, rmCommandKind("mh"));
@@ -1385,7 +1385,7 @@ static void test_verify_reply_vectors_and_tampering(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 64);
-    TEST_ASSERT_EQUAL_INT(27, n);
+    TEST_ASSERT_EQUAL_INT(35, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1621,6 +1621,12 @@ static void test_ext_allowlist_accepts_and_rejects(void)
         {"mh", "0", true}, {"mh", "999", true}, {"mh", "1000", false}, {"mh", "", false},
         {"mh", "DK5EN-98", true}, {"mh", "dk5en-98", true}, {"mh", "DK5EN", true}, {"mh", "DK5EN-98 x", false},
         {"mh", "DK5EN-", false}, {"mh", "DK5EN-123", false}, {"mh", "DK5|EN", false},
+        {"net", "", true}, {"net", "x", false},
+        {"upd", "", true}, {"upd", "check", true}, {"upd", "go v4.41a", true}, {"upd", "go V4.41A_x-1", true},
+        {"upd", "go 12345678901234567890123", true},   // 23
+        {"upd", "go 123456789012345678901234", false}, // 24
+        {"upd", "foo", false}, {"upd", "go", false}, {"upd", "go ", false}, {"upd", "go a b", false},
+        {"upd", "go v4/41", false}, {"upd", "check now", false}, {"upd", "Check", false}, {"upd", " check", false},
         // the old shapes keep their exact lower-case grammar
         {"gps", "ON", false}, {"txpower", "1O", false}, {"setout", "A0 on", false}, {"setout", "a0 ON", false},
         {"Radio", "", false}, {"RADIO", "", false},
@@ -1637,7 +1643,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
 {
     uint8_t key[32];
     rmDeriveKey(PW, key);
-    const char *cases[][2] = {{"name", "Martin"}, {"atxt", "MeshCom Garten"}, {"mh", "DK5EN-98"}, {"pos", "48.40812 11.73812 492"}};
+    const char *cases[][2] = {{"name", "Martin"}, {"atxt", "MeshCom Garten"}, {"mh", "DK5EN-98"}, {"pos", "48.40812 11.73812 492"}, {"upd", "go V4.41A"}};
     for (auto &t : cases)
     {
         char wire[160];
@@ -1718,7 +1724,7 @@ static void test_replies_fit_the_cap_and_carry_no_retired_fields(void)
     char res[RM_MAX_RESULT + 1];
     RmSwitches sw;
     memset(&sw, 1, sizeof(sw));
-    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 2, 22);
+    rmFormatStatus(res, sizeof(res), "4.40A", 71582u, 100, 9999, sw, -20, 2, 22, true);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT);
     printf("status worst case: %u of %d\n", (unsigned)strlen(res), RM_MAX_RESULT);
     TEST_ASSERT_NOT_NULL(strstr(res, " p=-20/2/22"));
@@ -1772,7 +1778,7 @@ static void test_status_vectors_parse(void)
         }
         TEST_ASSERT_NULL_MESSAGE(strstr(res.c_str(), " rm="), res.c_str()); // no reply carries a capability level
     }
-    TEST_ASSERT_EQUAL_INT(4, seen); // ctr 2, 54, 55, 56: every status vector is the compact form now
+    TEST_ASSERT_EQUAL_INT(5, seen); // ctr 2, 54, 55, 56, 107 (rs=1): every status vector is the compact form now
 }
 
 // ---- per-sender reject counter and lockout ------------------------------------------------------

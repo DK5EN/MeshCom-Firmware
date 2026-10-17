@@ -549,7 +549,7 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
 
     // never over RM: the RM allowlist (a positive list) must not name it
     // RM_ALLOWLIST[] in remote_cmd.cpp is generated from the X(name, KIND, SHAPE) list of rm_commands.h
-    // (DRY-07), so that list is what gets scanned: all 23 pinned names present, the console-only ones absent.
+    // (DRY-07), so that list is what gets scanned: all 25 pinned names present, the console-only ones absent.
     const std::string rc = read_repo_file("src/remote_cmd.cpp");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("const RmAllowRow RM_ALLOWLIST[]") != std::string::npos, "RM_ALLOWLIST not found");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("RM_COMMAND_LIST(RM_ALLOW_ROW)") != std::string::npos,
@@ -557,14 +557,14 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
     const std::string names = rm_command_list_names();
     static const char *const pinned[] = {"reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track",
                                          "display", "led", "gateway", "mesh", "txpower", "setout", "radio", "sens",
-                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled"};
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(23, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 23 names");
+                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled", "net", "upd"};
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(25, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 25 names");
     for (const char *nm : pinned)
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + nm + ",") != std::string::npos, nm);
     size_t count = 0;
     for (char ch : names)
         count += (ch == ',') ? 1 : 0;
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(23 + 1, count, "rm_commands.h does not list exactly 23 commands");
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(25 + 1, count, "rm_commands.h does not list exactly 25 commands");
     for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd"})
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + bad + ",") == std::string::npos, bad);
 
@@ -876,29 +876,49 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     const size_t loop = m.find("void esp32loop()");
     TEST_ASSERT_TRUE_MESSAGE(tick != std::string::npos && loop != std::string::npos && tick < loop, "auTick is not defined before esp32loop");
     const std::string body = m.substr(tick, loop - tick);
-    TEST_ASSERT_TRUE_MESSAGE(body.find("esp_restart") == std::string::npos && body.find("ESP.restart") == std::string::npos &&
-                                 body.find("esp32_reboot") == std::string::npos,
-                             "auTick restarts on its own (it must go through auRebootToSafeboot)");
+    // the handover sequence lives in auHandoverRecord() (shared by the auto path and the remote go), which
+    // sits right before auTick(); neither the helper nor the tick restarts on its own
+    const size_t helper = m.find("static bool auHandoverRecord(const FwStageRecord &rec)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(helper != std::string::npos && helper < tick, "auHandoverRecord() is not defined before auTick");
+    const std::string hr = m.substr(helper, tick - helper);
+    const std::string both = hr + body;
+    TEST_ASSERT_TRUE_MESSAGE(both.find("esp_restart") == std::string::npos && both.find("ESP.restart") == std::string::npos &&
+                                 both.find("esp32_reboot") == std::string::npos,
+                             "auTick or auHandoverRecord restarts on its own (it must go through auRebootToSafeboot)");
     {
+        // helper: one attempt per tag and boot, hand marker, [AU];handover;<tag>, then the shared reboot
+        const size_t once = hr.find("auTagSame(s_auHandoverTag, rec.tag)");
+        const size_t set = hr.find("snprintf(s_auHandoverTag");
+        const size_t mark = hr.find("fwNetMarkHandover(rec.tag)");
+        const size_t print = hr.find("[AU];handover;%s");
+        const size_t reboot = hr.find("auRebootToSafeboot()");
+        TEST_ASSERT_TRUE_MESSAGE(once != std::string::npos && set != std::string::npos && mark != std::string::npos &&
+                                     print != std::string::npos && reboot != std::string::npos,
+                                 "handover must validate the record, print [AU];handover;<tag> and call auRebootToSafeboot()");
+        TEST_ASSERT_TRUE_MESSAGE(once < set && set < mark && mark < print && print < reboot,
+                                 "handover order must be: once per tag, hand marker, [AU];handover;<tag>, reboot");
+        // R1/R5: a handover that returns (no Safeboot / boot partition not settable) drops the record
+        const size_t fail = hr.find("[AU];fail;nosafeboot");
+        const size_t clr = hr.find("fwNetClearRecord()");
+        TEST_ASSERT_TRUE_MESSAGE(reboot < fail && fail < clr, "a failed handover must print nosafeboot and then fwNetClearRecord()");
+        // the tick: the FW_HANDOVER branch re-reads and re-validates the record and hands it to the helper
         const size_t ho = body.find("if(act == FW_HANDOVER)");
         TEST_ASSERT_TRUE_MESSAGE(ho != std::string::npos, "FW_HANDOVER branch missing in auTick");
         const size_t hoEnd = body.find("if(act == FW_CHECK", ho);
         TEST_ASSERT_TRUE_MESSAGE(hoEnd != std::string::npos, "FW_CHECK branch does not follow the FW_HANDOVER branch");
         const std::string h = body.substr(ho, hoEnd - ho);
         const size_t load = h.find("fwNetLoadRecord(rec)");
-        const size_t mark = h.find("[AU];handover;%s");
-        const size_t reboot = h.find("auRebootToSafeboot()");
-        TEST_ASSERT_TRUE_MESSAGE(load != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
-                                 "handover must validate the record, print [AU];handover;<tag> and call auRebootToSafeboot()");
-        TEST_ASSERT_TRUE_MESSAGE(load < mark && mark < reboot, "handover order must be: load record, marker, reboot");
-        TEST_ASSERT_TRUE_MESSAGE(h.find("s_auHandoverTag") != std::string::npos, "handover is not limited to one attempt per tag");
-        // R1/R5: a handover that returns (no Safeboot / boot partition not settable) drops the record, and an
-        // attempted tag is not re-read from NVS every second
-        const size_t fail = h.find("[AU];fail;nosafeboot");
-        const size_t clr = h.find("fwNetClearRecord()");
-        TEST_ASSERT_TRUE_MESSAGE(reboot < fail && fail < clr, "a failed handover must print nosafeboot and then fwNetClearRecord()");
+        const size_t call = h.find("auHandoverRecord(rec)");
+        TEST_ASSERT_TRUE_MESSAGE(load != std::string::npos && call != std::string::npos && load < call,
+                                 "the FW_HANDOVER branch must load the record and then call auHandoverRecord(rec)");
+        // an attempted tag is not re-read from NVS every second
         const size_t cached = h.find("auTagSame(s_auHandoverTag, st.stagedTag)");
         TEST_ASSERT_TRUE_MESSAGE(cached != std::string::npos && cached < load, "the attempted-tag cache check must come before fwNetLoadRecord()");
+        // R3: the remote go refuses/disarms a tag whose handover was already attempted (no silent no-op)
+        TEST_ASSERT_TRUE_MESSAGE(m.find("bool auHandoverAttempted(const char *tag)") != std::string::npos &&
+                                     body.find("auHandoverAttempted(goTag)") != std::string::npos &&
+                                     body.find("FWGOS_FAIL_ATTEMPTED") != std::string::npos,
+                                 "the remote go does not detect an already attempted handover");
     }
     // the call sits inside esp32loop()
     const size_t call = m.find("    auTick();\n", loop);
@@ -1286,12 +1306,19 @@ static void test_old_safeboot_guard_marks_gates_and_reports()
     const size_t ho = t.find("if(act == FW_HANDOVER)");
     const size_t blocked = t.find("[AU];handover;blocked;old_safeboot", ho);
     const size_t gate = t.find("if(!fwNetSafebootCapable())", ho);   // AU-12: capability, not only the nocap flag
-    const size_t mark = t.find("fwNetMarkHandover(rec.tag)", ho);
-    const size_t reboot = t.find("auRebootToSafeboot()", ho);
-    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && blocked != std::string::npos && mark != std::string::npos && reboot != std::string::npos,
+    // the FW_HANDOVER block hands the record to auHandoverRecord(), which holds the hand marker and the reboot
+    const size_t call = t.find("auHandoverRecord(rec)", ho);
+    const size_t hfn = m.find("static bool auHandoverRecord(const FwStageRecord &rec)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(hfn != std::string::npos && hfn < tick, "auHandoverRecord() is not defined before auTick");
+    const std::string hr = m.substr(hfn, tick - hfn);
+    const size_t mark = hr.find("fwNetMarkHandover(rec.tag)");
+    const size_t reboot = hr.find("auRebootToSafeboot()");
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && blocked != std::string::npos && call != std::string::npos &&
+                                 mark != std::string::npos && reboot != std::string::npos,
                              "auto handover lacks the old-Safeboot gate, the blocked marker or the hand marker");
-    TEST_ASSERT_TRUE_MESSAGE(gate < blocked && blocked < mark && mark < reboot, "auto path order must be: nocap gate, blocked marker, hand marker, reboot");
-    TEST_ASSERT_TRUE_MESSAGE(t.find("return;", blocked) < mark, "the blocked branch does not return before the handover");
+    TEST_ASSERT_TRUE_MESSAGE(gate < blocked && blocked < call && mark < reboot,
+                             "auto path order must be: nocap gate, blocked marker, handover helper (hand marker, reboot)");
+    TEST_ASSERT_TRUE_MESSAGE(t.find("return;", blocked) < call, "the blocked branch does not return before the handover");
     TEST_ASSERT_TRUE_MESSAGE(t.find("s_auBlockedPrinted") != std::string::npos, "the blocked marker is not once per boot");
 
     // --update apply: note when flagged, still tries, marker before the reboot, unmarked if the reboot returns

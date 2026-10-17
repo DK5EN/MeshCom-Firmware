@@ -15,6 +15,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "node_position.h"
+#include "rm_au.h"
 #include "rm_commands.h"
 #include "rm_exec_ext.h"
 #include "rm_format.h"
@@ -119,6 +120,32 @@ int writeAtxt(const RmCmd &c, char *res, size_t n)
     return writeText(c, res, n, false);
 }
 
+// upd check | upd go <tag>: the shape is validated upstream; the AU bridge (rm_au.h) does the work.
+int writeUpd(const RmCmd &c, char *res, size_t n)
+{
+    RmAuState st;
+    memset(&st, 0, sizeof(st));
+    rmAuGetState(st);
+    if (!st.supported)
+        return fail(res, n, "err unsupported");
+
+    bool isGo = false;
+    RmAuResult r;
+    if (strcmp(c.args, "check") == 0)
+        r = rmAuCheck();
+    else if (strncmp(c.args, "go ", 3) == 0 && c.args[3] != '\0')
+    {
+        isGo = true;
+        r = rmAuGo(c.args + 3);
+    }
+    else
+        return fail(res, n, "err failed");
+
+    if (rmFmtUpdResult(res, n, isGo, r, isGo ? c.args + 3 : "", st.avail) == 0)
+        return fail(res, n, "err failed");
+    return rmUpdResultOk(r, isGo) ? 1 : -1;
+}
+
 // One row per RW command of rm_commands.h; the static_assert fails the build when the lists drift.
 struct WriteRow
 {
@@ -130,6 +157,7 @@ constexpr WriteRow kWriteRows[] = {
     {"name", writeName},
     {"atxt", writeAtxt},
     {"pos", writePos},
+    {"upd", writeUpd},
 };
 static_assert(rmRowsMatchList(kWriteRows, rmKindIsWrite), "kWriteRows = RW rows of rm_commands.h");
 

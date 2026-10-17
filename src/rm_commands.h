@@ -17,8 +17,8 @@
 //   TOGGLE  "<name> on|off" (gps track display led gateway mesh); the console-flag ones are kToggles, led is a pin
 //           (led takes on|off|flash)
 //   PARAM   its own argument, handled in execute() (txpower setout chgled)
-//   READ    answered by the read executor (radio sens txq mbox maxhop, mh with an optional row/call)
-//   RW      read without args, write with args: name atxt pos
+//   READ    answered by the read executor (radio sens txq mbox maxhop net, mh with an optional row/call)
+//   RW      read without args, write with args: name atxt pos; upd ("" read, "check" / "go <tag>" act)
 // SHAPE  suffix of RM_ARGS_<SHAPE> in remote_cmd.cpp (the argument check of the allowlist)
 //
 // Adding a command: one line here. The build then fails until the allowlist shape exists and every
@@ -53,7 +53,9 @@
     X(name, RW, NAME)                                                                                            \
     X(atxt, RW, ATXT)                                                                                            \
     X(pos, RW, POS)                                                                                              \
-    X(mh, READ, MH)
+    X(mh, READ, MH)                                                                                              \
+    X(net, READ, NONE)                                                                                           \
+    X(upd, RW, UPD)
 
 enum RmCommandKind
 {

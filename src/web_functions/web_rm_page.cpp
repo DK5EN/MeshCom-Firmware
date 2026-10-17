@@ -155,8 +155,8 @@ void rmScaffoldJs()
 {
     web_client.printf("var rmLen={name:%u,atxt:%u};\n", (unsigned)RM_NAME_MAX, (unsigned)RM_ATXT_MAX);
     web_client.println("var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmQq=[],rmQp='',rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);");
-    web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list'};");
-    web_client.println("var rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
+    web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list',net:'Network',upd:'Update'};");
+    web_client.println("var rmUpdT0=0,rmUpdGone=Object.create(null),rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
                        "function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.';}");
     web_client.println("var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'},rmChgModes=['auto','on','off'];function rmSwLbl(n){return n=='ledflash'?'Light flash':rmTogName[n];}");
     web_client.println("var rmForce=null;\n"
@@ -183,7 +183,8 @@ void rmScaffoldJs()
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
                        "else if(k.indexOf('up=')==0)o.up=k.substring(3);\n"
                        "else if(k.indexOf('bat=')==0)o.bat=k.substring(4);\n"
-                       "else if(k.indexOf('p=')==0)o.p=rmTxp(k.substring(2));");
+                       "else if(k.indexOf('p=')==0)o.p=rmTxp(k.substring(2));\n"
+                       "else if(k.indexOf('rs=')==0)o.rs=k.substring(3);");
     web_client.println("else if(k.indexOf('s=')==0){s=k.substring(2);if(s.length!=6&&s.length!=5)return null;ok=true;m=[-1,-1,-1,-1,-1,-1];for(j=0;j<s.length;j++){if(s.charAt(j)==U.charAt(j))m[j]=1;else if(s.charAt(j)==U.charAt(j).toLowerCase())m[j]=0;else ok=false;}if(!ok)return null;for(j=0;j<6;j++)if(m[j]>=0)o.sw[j]=m[j];if(s.length==6)o.led=true;}");
     web_client.println("}\n"
                        "return o;}\n"
@@ -196,7 +197,7 @@ void rmScaffoldJs()
     web_client.println("function rmApplySent(list){var a=list.slice(0).sort(function(x,y){return y.ago-x.ago;}),i,e;\n"
                        "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);else if(e.rep&&e.ver&&e.st=='err'&&e.cmd.indexOf('chgled ')==0&&(e.reply=='err unsupported'||e.reply=='err blocked'))rmKnFor(String(e.dst)).chg='unsupported';}}\n");
     web_client.println("function rmOkText(e){var c=e.cmd.split(' '),n=c[0],o;\n"
-                       "if(n=='status'){o=rmParseStatus(e.reply);return o?'Connected. Version '+o.ver+(o.up!==''?', '+rmUp(o.up):'')+(o.bat!==''?', battery '+o.bat+' %':'')+'.':e.msg;}\n"
+                       "if(n=='status'){o=rmParseStatus(e.reply);return o?'Connected. Version '+o.ver+(o.up!==''?', '+rmUp(o.up):'')+(o.bat!==''?', battery '+o.bat+' %':'')+(o.rs=='1'?', strict security on':'')+'.':e.msg;}\n"
                        "if(n=='sendpos')return 'Done. The node sent its position.';");
     web_client.println("if(n=='sendtrack')return 'Done. The node sent its track.';\n"
                        "if(n=='reboot')return 'Done. The node is restarting, it is back in about 30 seconds.';\n"
@@ -270,7 +271,8 @@ void rmScaffoldJs()
                        "w:[['lat','Latitude (+/-)','lat',11],['lon','Longitude (+/-)','lon',11],['alt','Altitude (meter)','alt',5]]},\n");
     web_client.println("{c:'txq',card:'queues',l:'TX queue',k:1,v:rmTxqView,t:['tx','Sent','rt','Retransmitted','dr','Dropped']},\n"
                        "{c:'mbox',card:'queues',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Slots used',''],['b','Bytes',''],['a','Actions this hour','']],t:['st','Stored','dl','Delivered','ak','Acknowledged','dr','Dropped','bl','Blocked','nt','Notified']},\n");
-    web_client.println("{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]}];\n"
+    web_client.println("{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]},\n"
+                       "{c:'net',card:'radio',l:'Network',k:1,x:1,v:rmNetView,u:'This node has no network settings.'},{c:'upd',card:'radio',l:'Software update',k:1,x:1,a:1,v:rmUpdView,u:'This node cannot update itself.'}];\n"
                        "function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}\n");
     web_client.println("function rmChk(k,v){var m;if(v==='')return '';\n"
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
@@ -287,14 +289,26 @@ void rmScaffoldJs()
     web_client.println("function rmOkNew(e,c,n){var o=rmKv(e.reply),q=rmPosKv(rmPK,e.reply),t=c.slice(1).join(' '),w=n=='name'?'name':'APRS text';\n"
                        "if(n=='radio'&&o&&o.f)return 'Radio: '+o.f+' MHz, SF '+o.sf+', '+o.bw+' kHz, TX power '+rmTxp(o.p)+'.';\n"
                        "if(n=='sens')return 'Sensors read.';\n"
+                       "if(n=='net')return o&&o.mtu?'Network read.':'';if(n=='upd')return rmUpdOk(c,e.reply);\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
+    web_client.println("function rmKvRows(p,r){var y=p.appendChild(rmNew('div','rmkv')),i;for(i=0;i<r.length;i++){y.appendChild(rmNew('span','font-small',r[i][0]));y.appendChild(rmNew('span','',r[i][1],r[i][2]));}}");
+    web_client.println("function rmNetView(p,o){var w={auto:'automatic',inet:'Internet',hamnet:'HAMNET'},e=o.eff;rmKvRows(p,[['MTU',o.mtu?o.mtu+' bytes':'-','rm_v_net_mtu'],['Server',o.srv||'-','rm_v_net_srv'],['Network',Object.prototype.hasOwnProperty.call(w,o.net)?w[o.net]:o.net||'-','rm_v_net_net'],['Effective uplink',e=='-'?'no IP uplink':e?(w[e]||e):'-','rm_v_net_eff']]);}");
+    web_client.println("function rmUpdOk(c,r){var m;if(c[1]=='check')return r=='ok checking'?'The node is checking for a new version. Read again in about 30 seconds.':'';\n"
+                       "if(c[1]=='go'){m=/^ok (installing|applying) (\\S+)$/.exec(r);return m?'The node is '+m[1]+' '+m[2]+' and will restart. Read again in a few minutes.':'';}\n"
+                       "return /^ok m=/.test(r)?'Update status read.':'';}");
+    web_client.println("function rmUpdView(p,o,v){var c=rmSel.call,z=function(k){return o[k]===undefined||o[k]=='-'?'':o[k];},tag=z('st')||(o.n=='1'?z('a'):''),g=rmUpdGone[c],t=v&&rmStat?rmStat.t-v.ago*1000-1000:0,dis=!rmValidCall(c)||rmLocked();");
+    web_client.println("var m={off:'off',notify:'notify only',auto:'automatic'},ch={prod:'production',dev:'development'},y=function(k){return o[k]=='1'?'yes':'no';},r,ok;\n"
+                       "ok=!!v&&!dis&&/^[A-Za-z0-9._-]{1,23}$/.test(tag)&&o.b=='0'&&o.g=='0'&&t>=rmUpdT0&&!(g&&t<=g);");
+    web_client.println("if(v)rmKvRows(p,[['Mode',m[o.m]||o.m||'-','rm_v_upd_m'],['Channel',ch[o.c]||o.c||'-','rm_v_upd_c'],['Available version',z('a')||'none','rm_v_upd_a'],['Newer than installed',y('n'),'rm_v_upd_n'],['Staged version',z('st')||'none','rm_v_upd_st'],");
+    web_client.println("['Busy',y('b'),'rm_v_upd_b'],['Go pending',y('g'),'rm_v_upd_g'],['Last check',z('ck')?z('ck')+' min ago':'not yet','rm_v_upd_ck'],['Last error',z('e')||'none','rm_v_upd_e']]);\n"
+                       "r=p.appendChild(rmNew('div','rmrow rmsplit'));rmBtn(r,'Check','',dis,{'data-cmd':'upd','data-args':'check','id':'rm_upd_check'});rmTile(r,'Update now','upd','go '+tag,'upd go '+tag,'rmwarn rmtile-end',!ok).id='rm_upd_go';}\n");
     web_client.println("function rmWBuild(p,d,o){var j,w,x,k,r,n,b;if(!d.w)return;r=rmNew('div','grid rmf');p.appendChild(r);\n"
                        "for(j=0;j<d.w.length;j++){w=d.w[j];n='rm_f_'+d.c+'_'+w[0];k=rmNew('label','',w[1]+' :');k.htmlFor=n;r.appendChild(k);x=rmNew('input','','',n);x.type='text';x.autocomplete='off';if(d.w.length>1)x.placeholder=w[1];\n"
                        "k=o&&o[w[4]||w[0]];k=k&&k!='-'?k:'';x.setAttribute('data-r',k);x.value=rmIn[n]!==undefined?rmIn[n]:k;r.appendChild(x);rmWire(x,d);");
     web_client.println("b=rmBtn(r,'','',true,{'data-cmd':d.c,'data-args':'','data-cf':d.c,'aria-label':'Set '+w[1]});b.id=n+'_set';b.appendChild(rmNew('i','btncheckmark'));r.appendChild(rmNew('div','font-small','',n+'_hint'));\n"
                        "if(!d.p)r.appendChild(rmNew('div','font-small rmc','',n+'_cnt'));}rmWUpd(d);}\n");
-    web_client.println("function rmLast(c,n){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd.split(' ')[0]==n&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}");
+    web_client.println("function rmLast(c,n,x){var a=rmStat?rmStat.sent:[],i,b=null;for(i=0;i<a.length;i++)if(a[i].dst==c&&(x?a[i].cmd==n:a[i].cmd.split(' ')[0]==n)&&(!b||a[i].ago<b.ago)&&a[i].st=='ok'&&a[i].ver)b=a[i];return b;}");
     web_client.println("var rmMh={on:0,job:'',args:'',fl:0,t:0,pre:'',rows:[],total:0,msg:'',det:null,gen:0,tm:0,ctr:-1};\nfunction rmUns(c,n,v){var a=rmStat?rmStat.sent:[],i;for(i=0;i<a.length;i++)if(a[i].dst==c&&a[i].cmd==n&&a[i].st=='err'&&a[i].reply=='err unsupported'&&(!v||a[i].ago<v.ago))return true;return false;}\n");
     web_client.println("function rmMhReset(){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.rows=[];rmMh.total=0;rmMh.msg='';rmMh.det=null;}\nfunction rmNodeChg(n){if(n!=rmSel.call){rmIn={};rmQClr();rmMhReset();rmForce=null;rmForceBtn();}}\n");
     web_client.println("function rmMhEnd(m){clearTimeout(rmMh.tm);rmMh.gen++;rmMh.on=0;rmMh.fl=0;rmMh.job='';rmMh.pre='';rmMh.msg=m||'';rmRender();}\nfunction rmMhStop(){rmMhEnd('Stopped.');}\nfunction rmMhGo(job,args){var pr=rmPre();if(rmMh.on)return;if(pr){rmMsg(pr,'rmbad');return;}\nif(!rmMh.pre){rmMh.pre=rmSel.slot>=0?'slot='+rmSel.slot+'&call='+rmEnc(rmSel.call):'dst='+rmEnc(rmSel.call)+'&pw='+rmEnc(rmEl('rm_pw').value);rmEl('rm_pw').value='';}\n");
@@ -331,10 +345,10 @@ void rmScaffoldJs()
                        "for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}");
     web_client.println("for(j=0;j<2;j++){rmCardHd(B[['ident','queues'][j]],c,[['name','atxt'],['txq','mbox','maxhop']][j],dis||rmMh.on);if(!j)B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));}");
     web_client.println("for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=d.card=='ident'?0:rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');if(h){p.appendChild(h);h.appendChild(rmNew('b','',d.p?'':d.l));}\n");
-    web_client.println("v=rmLast(c,d.c);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
+    web_client.println("v=rmLast(c,d.c,d.x);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;\n"
                        "if(h&&d.card!='queues'){h.appendChild(d.p&&o?rmNew('span','font-small',d.f[0][1]+': '+d.f[0][3](o[d.f[0][0]]),'rm_v_'+d.c+'_'+d.f[0][0]):rmNew('span','font-small',v?'last read '+rmAgo(v.ago)+' ago':'not read yet'));\n"
                        "rmBtn(h,'Read','',dis,{'data-cmd':d.c,'data-args':''});}");
-    web_client.println("if(o&&d.v)d.v(p,o);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
+    web_client.println("if(d.v&&(o||d.a))d.v(p,o||{},v);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
                        "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
     web_client.println("rmWBuild(p,d,o);\n"
                        "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}\n"
@@ -366,6 +380,7 @@ void rmScaffoldJs()
     web_client.println("if(rmLocked())return;\n"
                        "if(pr){rmMsg(pr,'rmbad');return;}\n"
                        "if(cf&&!rmConfirm(cf,rmCf(rmLabel((cmd+' '+args).trim()),rmSel.call)))return;\n"
+                       "if(cmd=='upd'&&args.indexOf('go ')==0)rmUpdGone[rmSel.call]=rmNow();\n"
                        "rmSendCmd(cmd,args);}\n");
     web_client.println("function rmPick(c){rmNodeChg(c);rmDisarmQuiet();rmSel.call=c;rmSel.slot=rmSlotOf(c);rmEl('rm_call').value=c;rmRender();}\n"
                        "function rmDisarmQuiet(){clearTimeout(rmT.arm);rmT.arm=0;rmArmId='';}\n"
@@ -400,7 +415,7 @@ void rmScaffoldJs()
                        "else if(a=='forget')rmForget();");
     web_client.println("else if(a=='forgetall')rmForgetAll();\n"
                        "else if(a=='heard')rmLoadHeard();}\n"
-                       "function rmGot(j){var i,t,c=rmSel.call;j.sent=j.sent||[];j.log=j.log||[];j.targets=j.targets||[];rmStat=j;rmApplySent(j.sent);\n"
+                       "function rmGot(j){var i,t,c=rmSel.call;j.sent=j.sent||[];j.log=j.log||[];j.targets=j.targets||[];j.t=rmNow();rmStat=j;rmApplySent(j.sent);\n"
                        "rmOut=false;rmSrvLock=0;rmSrvMsg='';rmTL=Object.create(null);\n"
                        "for(i=0;i<j.sent.length;i++)if(j.sent[i].st=='queued'||j.sent[i].st=='waiting')rmOut=true;");
     web_client.println("for(i=0;i<j.targets.length;i++){t=j.targets[i];if(t.pending)rmOut=true;rmTL[t.dst]=t.locked?1e15:t.retry>0?rmNow()+t.retry*1000:0;if(t.dst==c){if(t.retry>0)rmSrvLock=rmNow()+t.retry*1000;if(t.locked)rmSrvMsg='Two tries to '+c+' are still unanswered.';}}\n"
@@ -412,7 +427,7 @@ void rmScaffoldJs()
     web_client.println("function rmTick(){if((typeof cpage!='undefined'&&cpage!='remote')||!rmEl('rm_page')){rmPageLeave();return;}\n"
                        "var l=rmLocked();if(!l&&rmQq.length){if(!rmQp&&rmPre())rmQClr();else rmSendCmd(rmQq.shift(),'');}if(l||rmWasLocked)rmRender();rmWasLocked=l;}");
     web_client.println("function rmPageLeave(){clearInterval(rmT.tick);clearTimeout(rmT.poll);clearTimeout(rmT.arm);rmT.tick=0;rmT.poll=0;rmT.arm=0;rmShown=false;rmArmId='';rmMhReset();rmQClr();}\n"
-                       "function rmPageInit(){var i,p,o;rmPageLeave();if(!rmEl('rm_page'))return;rmShown=true;rmRows=Object.create(null);rmAuth=false;rmBusy=false;rmArmId='';\n"
+                       "function rmPageInit(){var i,p,o;rmPageLeave();if(!rmEl('rm_page'))return;rmShown=true;rmUpdT0=rmNow();rmRows=Object.create(null);rmAuth=false;rmBusy=false;rmArmId='';\n"
                        "p=rmEl('rm_pin');for(i=0;i<16;i++){o=document.createElement('option');o.value=(i<8?'a':'b')+(i%8);o.textContent=o.value;p.appendChild(o);}");
     web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_page').onchange=rmChange;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_call').value=rmSel.call;\n"
                        "rmT.tick=setInterval(rmTick,1000);rmRender();rmPoll();rmLoadNodes();rmLoadHeard();}");

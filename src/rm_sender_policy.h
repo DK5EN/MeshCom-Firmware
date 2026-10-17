@@ -18,7 +18,7 @@
 //  2. Entry state: queued / waiting / noanswer / ok / err / unverified as a function of timestamps.
 //  3. Plain sentences for every state and every RM error token.
 //  4. The compact `status` reply: `s=<letters> p=<cur>/<min>/<max>` encode/decode and the whole formatter,
-//     so the 63-char reply limit (RM_MAX_RESULT) is asserted on the real code in a native test.
+//     so the 108-char reply limit (RM_MAX_RESULT) is asserted on the real code in a native test.
 #ifndef RM_SENDER_POLICY_H
 #define RM_SENDER_POLICY_H
 
@@ -395,6 +395,14 @@ inline const RmTokenMsg *rmTokenTable(size_t *n)
         {"end", "There are no more rows."},
         {"gps", "The position is controlled by GPS on that node."},
         {"hidden", "That node does not send its position, so it is not shown."},
+        // reply tokens of upd (rm_exec_write.cpp)
+        {"aubusy", "The node is busy with an update. Try again in a moment."},
+        {"nowifi", "The node has no WiFi connection, so it cannot reach the update server."},
+        {"stale", "The update offered on the node has changed. Read the update state again."},
+        {"current", "The node knows no newer release. Check for updates first."},
+        {"noasset", "The update server has no firmware file for this node."},
+        {"safeboot", "The node cannot apply an update: its Safeboot is missing or too old, or it already tried this one."},
+        {"notready", "The node is not ready to download: its clock is not set, a phone is connected, or its battery is too low."},
         // sender-side refusals
         {"limit", "Two tries to this node are still unanswered. Wait before trying again, a third "
                   "wrong try could lock you out for 5 minutes."},
@@ -511,20 +519,21 @@ inline int rmClampDbm(int v)
 }
 
 // The whole `status` result (without the "RM1 <ctr> " frame and tag):
-//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<min>/<max>
+//   ok v=<ver> up=<min> bat=<%> heap=<kB> s=<letters> p=<cur>/<min>/<max> rs=<0|1>
+// rs= is node_rmstrict (strict RM security); the parser ignores it, the s= letters are unchanged.
 // s= carries the switches (gateway and mesh are the W and M letters; the L letter only on boards with
 // an LED). Returns the length written (always NUL-terminated; truncated, never overrun, when it does
 // not fit n). Worst case is far below the wire cap RM_MAX_RESULT, see test_rm_sender_policy.
 inline size_t rmFormatStatus(char *out, size_t n, const char *ver, uint32_t upMin, int bat, uint32_t heapKb,
-                             const RmSwitches &sw, int txCur, int txMin, int txMax)
+                             const RmSwitches &sw, int txCur, int txMin, int txMax, bool strict)
 {
     if (out == nullptr || n == 0)
         return 0;
     char tok[RM_STATUS_SWITCHES + 3];
     if (rmStatusToken(tok, sizeof(tok), sw) == 0)
         tok[0] = '\0';
-    const int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d/%d", ver != nullptr ? ver : "?",
-                           (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMin), rmClampDbm(txMax));
+    const int w = snprintf(out, n, "ok v=%s up=%lu bat=%d heap=%lu %s p=%d/%d/%d rs=%d", ver != nullptr ? ver : "?",
+                           (unsigned long)upMin, bat, (unsigned long)heapKb, tok, rmClampDbm(txCur), rmClampDbm(txMin), rmClampDbm(txMax), strict ? 1 : 0);
     return w < 0 ? 0 : ((size_t)w >= n ? n - 1 : (size_t)w);
 }
 

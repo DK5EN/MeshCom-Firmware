@@ -253,7 +253,7 @@ static void test_every_error_token_has_a_sentence(void)
     // token cannot appear or vanish unnoticed (the page and the JSON `msg` of every endpoint use it)
     static const char *const pinned[] = {
         "failed", "not output", "unsupported", "storage", "blocked", "rate", "lockout", "replay", "tag", "sync",
-        "format", "disabled", "cached", "range", "text", "unknown", "end", "gps", "hidden", "limit", "busy",
+        "format", "disabled", "cached", "range", "text", "unknown", "end", "gps", "hidden", "aubusy", "nowifi", "stale", "current", "noasset", "safeboot", "notready", "limit", "busy",
         "passwd", "dst", "cmd", "ctr", "store", "send", "size", "short", "form", "pw", "call", "act", "slot",
         "dup", "nosync", "lost"};
     TEST_ASSERT_EQUAL_UINT(sizeof(pinned) / sizeof(pinned[0]), n);
@@ -581,7 +581,7 @@ static void test_status_token_round_trip_all_combinations(void)
                 continue;  // the led bit only exists on boards with an LED
             const int txCur = (int)(bits % 24) - 2;
             char res[96];
-            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 2, 22);
+            rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(bits, led), txCur, 2, 22, false);
             RmStatusInfo o;
             TEST_ASSERT_TRUE_MESSAGE(rmStatusParse(res, o), res);
             TEST_ASSERT_TRUE_MESSAGE(o.haveS, res);
@@ -604,16 +604,16 @@ static void test_status_token_round_trip_all_combinations(void)
 static void test_status_format_shape(void)
 {
     char res[96];
-    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 2, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/2/22", res);
+    const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 2, 22, false);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/2/22 rs=0", res);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
     // board without LED: no L letter
-    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 2, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/2/22", res);
+    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4, false), 17, 2, 22, false);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmw p=17/2/22 rs=0", res);
     // only the compact form: no led=, pmin=, gw= or mesh= field, with or without an LED
     for (int led = 0; led < 2; led++)
     {
-        rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(0x1F, led != 0), 17, 2, 22);
+        rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(0x1F, led != 0), 17, 2, 22, false);
         TEST_ASSERT_NULL(strstr(res, " led="));
         TEST_ASSERT_NULL(strstr(res, " pmin="));
         TEST_ASSERT_NULL(strstr(res, "gw="));
@@ -639,7 +639,7 @@ static void test_status_worst_case_length_fits_the_reply(void)
                     for (size_t c = 0; c < sizeof(ups) / sizeof(ups[0]); c++)
                     {
                         const size_t n = rmFormatStatus(res, sizeof(res), "4.40a", ups[c], 100, 9999, sw(bits, true),
-                                                        curs[a], mins[m], maxs[b]);
+                                                        curs[a], mins[m], maxs[b], false);
                         TEST_ASSERT_EQUAL_UINT(strlen(res), n);
                         if (n > worst)
                             worst = n;
@@ -647,33 +647,54 @@ static void test_status_worst_case_length_fits_the_reply(void)
     printf("status worst case: %u of %d\n", (unsigned)worst, RM_MAX_RESULT_REPLY);
     TEST_ASSERT_TRUE(worst <= RM_MAX_RESULT_REPLY);
     // the exact worst string, so a field change shows up here first
-    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, -99, 99);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/-99/99", res);
-    TEST_ASSERT_EQUAL_UINT(59, strlen(res));
-    TEST_ASSERT_EQUAL_UINT(59, worst);
+    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, -99, 99, false);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/-99/99 rs=0", res);
+    TEST_ASSERT_EQUAL_UINT(64, strlen(res));
+    TEST_ASSERT_EQUAL_UINT(64, worst);
     TEST_ASSERT_TRUE(worst <= RM_MAX_RESULT_REPLY);
 
     // the worst a real board can report: TX power -20..22
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 2, 22);
-    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/2/22", res);
-    TEST_ASSERT_EQUAL_UINT(57, strlen(res));
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(0, true), -20, 2, 22, false);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=71582 bat=100 heap=9999 s=gtdmwl p=-20/2/22 rs=0", res);
+    TEST_ASSERT_EQUAL_UINT(62, strlen(res));
 
     // out-of-range inputs are clamped, the length stays bounded
-    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, -1000, 1000);
+    rmFormatStatus(res, sizeof(res), "4.40a", 71582u, 100, 9999, sw(63, true), -1000, -1000, 1000, false);
     TEST_ASSERT_TRUE(strlen(res) <= RM_MAX_RESULT_REPLY);
     TEST_ASSERT_NOT_NULL(strstr(res, "p=-99/-99/99"));
+}
+
+static void test_status_rs_token(void)
+{
+    char res[96];
+    rmFormatStatus(res, sizeof(res), "4.40a", 125, 87, 212, sw(1 | 4 | 32, true), 17, 2, 22, true);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=125 bat=87 heap=212 s=GtDmwL p=17/2/22 rs=1", res);
+    RmStatusInfo o;
+    TEST_ASSERT_TRUE(rmStatusParse(res, o));  // the parser ignores rs=, s= and p= still read
+    TEST_ASSERT_EQUAL_INT(17, o.cur);
+    TEST_ASSERT_EQUAL_INT(22, o.max);
+    TEST_ASSERT_EQUAL_INT(1, o.sw[0]);
+    // worst case with rs=1 is as long as with rs=0 and far below the cap
+    rmFormatStatus(res, sizeof(res), "4.40a", 99999u, 100, 9999, sw(0, true), -99, -99, 99, true);
+    TEST_ASSERT_EQUAL_STRING("ok v=4.40a up=99999 bat=100 heap=9999 s=gtdmwl p=-99/-99/99 rs=1", res);
+    TEST_ASSERT_EQUAL_UINT(64, strlen(res));
+    // a truncating buffer still never overruns
+    memset(res, 'x', sizeof(res));
+    const size_t n = rmFormatStatus(res, 60, "4.40a", 99999u, 100, 9999, sw(0, true), -99, -99, 99, true);
+    TEST_ASSERT_TRUE(n <= 59);
+    TEST_ASSERT_EQUAL_CHAR('x', res[60]);
 }
 
 static void test_status_format_never_overruns_a_small_buffer(void)
 {
     char res[24];
     memset(res, 'x', sizeof(res));
-    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, -99, 99);
+    const size_t n = rmFormatStatus(res, 20, "4.40a", 71582u, 100, 9999, sw(63, true), -99, -99, 99, false);
     TEST_ASSERT_TRUE(n <= 19);
     TEST_ASSERT_EQUAL_UINT(strlen(res), n);
     TEST_ASSERT_EQUAL_CHAR('x', res[20]);  // nothing past n bytes
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
-    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(res, 0, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0, false));
+    TEST_ASSERT_EQUAL_UINT(0, rmFormatStatus(nullptr, 10, "4.40a", 1, 1, 1, sw(0, true), 0, 0, 0, false));
 }
 
 static void test_status_parse_old_forms_are_rejected(void)
@@ -1257,6 +1278,7 @@ int main(int, char **)
     RUN_TEST(test_status_token_round_trip_all_combinations);
     RUN_TEST(test_status_format_shape);
     RUN_TEST(test_status_worst_case_length_fits_the_reply);
+    RUN_TEST(test_status_rs_token);
     RUN_TEST(test_status_format_never_overruns_a_small_buffer);
     RUN_TEST(test_status_parse_old_forms_are_rejected);
     RUN_TEST(test_book_room_counts_free_and_stale_slots);

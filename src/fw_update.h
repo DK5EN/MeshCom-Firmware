@@ -488,6 +488,141 @@ inline FwAction fwTick(FwTimer &t, const FwPolicyIn &in, bool stagedPending, uin
     return FW_NONE;
 }
 
+// Remote go (RM1 "upd go"): the handover checks that remain when the operator asks for the update
+// by hand. No update window and no mode requirement (works with auto-update off); a connected phone
+// and a battery below the floor (AU-D17) still hold it back. Safeboot capability and the 8 s reply
+// delay are checked by the caller.
+inline bool fwGoHandoverReady(const FwPolicyIn &in)
+{
+    return !in.phoneConnected && (!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV);
+}
+
+// Remote go, request side ("upd go <tag>", rmAuGo in src/esp32/rm_au_esp32.cpp). Pure decision over a
+// snapshot; the caller maps the result to its reply and, for STARTED / APPLYING, starts the download
+// resp. arms the go. Order: busy, staged tag wins (apply, no download), stale, current, no asset,
+// Safeboot (too old, or a handover for this tag was already attempted this boot), not ready (the
+// auto path would not download now: no valid clock for TLS, a phone connected, or battery below
+// FW_BATT_FLOOR_MV), no WiFi.
+enum FwGoResult : uint8_t
+{
+    FWGO_STARTED = 0, // download starts
+    FWGO_APPLYING,    // tag already staged, the handover follows
+    FWGO_BUSY,
+    FWGO_NOWIFI,
+    FWGO_STALE,
+    FWGO_CURRENT,
+    FWGO_NOASSET,
+    FWGO_SAFEBOOT,
+    FWGO_NOTREADY
+};
+
+struct FwGoReq
+{
+    bool busy;               // a check or download job runs
+    bool staged;             // a valid staged record exists
+    const char *stagedTag;   // its tag (char[24] or "")
+    const char *availTag;    // the last check's tag ("" if none)
+    bool availNewer;
+    bool installable;        // the release carries the .autoupdate asset with digest
+    bool safebootCapable;
+    bool handoverAttempted;  // a handover for `tag` was already attempted this boot
+    bool timeValid;          // auto path definition (in.timeValid)
+    bool phoneConnected;     // auto path definition (in.phoneConnected)
+    bool battOk;             // AU-D17 battery floor (the auto path starts no download below it)
+    bool wifiUp;
+    const char *tag;         // the requested tag
+};
+
+inline FwGoResult fwGoDecide(const FwGoReq &r)
+{
+    using fw_update_detail::strEqN;
+    if (r.busy)
+        return FWGO_BUSY;
+    if (r.tag == nullptr)
+        return FWGO_STALE;
+    if (r.staged && r.stagedTag != nullptr && r.stagedTag[0] && strEqN(r.tag, r.stagedTag, 23))
+        return (r.safebootCapable && !r.handoverAttempted) ? FWGO_APPLYING : FWGO_SAFEBOOT;
+    if (r.availTag == nullptr || !r.availTag[0] || !strEqN(r.tag, r.availTag, 23))
+        return FWGO_STALE;
+    if (!r.availNewer)
+        return FWGO_CURRENT;
+    if (!r.installable)
+        return FWGO_NOASSET;
+    if (!r.safebootCapable || r.handoverAttempted)
+        return FWGO_SAFEBOOT;
+    if (!r.timeValid || r.phoneConnected || !r.battOk)
+        return FWGO_NOTREADY;
+    if (!r.wifiUp)
+        return FWGO_NOWIFI;
+    return FWGO_STARTED;
+}
+
+// Remote go, tick side (auTick): what to do with an armed go this second. The record is read last, so
+// the caller asks twice: with FWGO_REC_UNCHECKED the answer FWGOS_NEED_RECORD means "load it and ask
+// again with the outcome".
+enum FwGoRecord : uint8_t
+{
+    FWGO_REC_UNCHECKED = 0,
+    FWGO_REC_MISSING,     // fwNetLoadRecord failed
+    FWGO_REC_TAG_DIFFERS, // loaded, but another tag than the go
+    FWGO_REC_OK
+};
+
+enum FwGoStep : uint8_t
+{
+    FWGOS_WAIT_DOWNLOAD = 0, // a job runs
+    FWGOS_WAIT_REPLY,        // the 8 s after the reply have not passed
+    FWGOS_WAIT_PHONE,
+    FWGOS_WAIT_BATTERY,
+    FWGOS_NEED_RECORD,
+    FWGOS_HANDOVER,
+    FWGOS_FAIL_DOWNLOAD,     // the download failed
+    FWGOS_FAIL_NOSTAGE,      // not busy, and the go tag is not staged (or the record is another tag)
+    FWGOS_FAIL_ATTEMPTED,    // the handover for this tag was already attempted this boot
+    FWGOS_FAIL_SAFEBOOT,
+    FWGOS_FAIL_NORECORD
+};
+
+struct FwGoTickIn
+{
+    bool busy;
+    bool downloadFailed;  // last job was a DOWNLOAD that failed
+    bool stagedMatch;     // a valid staged record carries the go tag
+    bool attempted;       // a handover for the go tag was already attempted this boot
+    bool delayPassed;     // 8 s after the reply
+    bool ready;           // fwGoHandoverReady()
+    bool phoneConnected;  // reason for !ready
+    bool safebootCapable;
+    FwGoRecord recordState;
+};
+
+inline FwGoStep fwGoTickStep(const FwGoTickIn &in)
+{
+    if (in.busy)
+        return FWGOS_WAIT_DOWNLOAD;
+    if (!in.stagedMatch)
+        return in.downloadFailed ? FWGOS_FAIL_DOWNLOAD : FWGOS_FAIL_NOSTAGE;
+    if (in.attempted)
+        return FWGOS_FAIL_ATTEMPTED;
+    if (!in.delayPassed)
+        return FWGOS_WAIT_REPLY;
+    if (!in.ready)
+        return in.phoneConnected ? FWGOS_WAIT_PHONE : FWGOS_WAIT_BATTERY;
+    if (!in.safebootCapable)
+        return FWGOS_FAIL_SAFEBOOT;
+    switch (in.recordState)
+    {
+    case FWGO_REC_UNCHECKED:
+        return FWGOS_NEED_RECORD;
+    case FWGO_REC_MISSING:
+        return FWGOS_FAIL_NORECORD;
+    case FWGO_REC_TAG_DIFFERS:
+        return FWGOS_FAIL_NOSTAGE;
+    default:
+        return FWGOS_HANDOVER;
+    }
+}
+
 // Schedules the next check: 24 h +- 2 h (22..26 h, inclusive), the jitter
 // advances with every call.
 inline void fwCheckDone(FwTimer &t, uint32_t nowMs)

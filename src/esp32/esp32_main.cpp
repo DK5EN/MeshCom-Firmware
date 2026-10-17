@@ -37,6 +37,7 @@ SPIClass ethSPI(FSPI);
 #include "esp32_flash.h"
 #include "fw_update.h"       // AU-05 (#1187): update policy (fwTick and friends)
 #include "fw_update_net.h"   // AU-05: CHECK / DOWNLOAD worker (own task)
+#include "rm_au_go.h"        // remote "upd go" state (rm_au_esp32.cpp)
 #include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the boot demotion
 #include <esp_adc_cal.h>
 #include "esp_system.h"
@@ -2432,6 +2433,37 @@ static void auBackOff(uint32_t now)
     s_auBackoff = true;
 }
 
+// True if a handover for `tag` was already attempted this boot (auHandoverRecord is a no-op then).
+bool auHandoverAttempted(const char *tag)
+{
+    return tag != nullptr && tag[0] != '\0' && s_auHandoverTag[0] != '\0' && auTagSame(s_auHandoverTag, tag);
+}
+
+// The handover sequence, shared by the auto path (FW_HANDOVER) and the remote go. One attempt per tag
+// and boot (s_auHandoverTag); does not return on success. Returns false if the attempt failed (nvs).
+static bool auHandoverRecord(const FwStageRecord &rec)
+{
+    if(auTagSame(s_auHandoverTag, rec.tag))
+        return true;
+    snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", rec.tag);
+    // the "hand" marker goes in BEFORE the reboot: it is how the next boot tells an old
+    // Safeboot (record untouched) from a new one (marker consumed)
+    if(!fwNetMarkHandover(rec.tag))
+    {
+        Serial.printf("[AU];fail;nvs\n");
+        return false;
+    }
+    Serial.printf("[AU];handover;%s\n", rec.tag);
+    if(!auRebootToSafeboot())
+    {
+        // hopeless (no Safeboot partition, or it cannot be set as boot partition): drop the
+        // record so the next boot does not try again, and the staged flag no longer fires
+        Serial.printf("[AU];fail;nosafeboot\n");
+        fwNetClearRecord();
+    }
+    return true;
+}
+
 static void auTick(void)
 {
     const uint32_t now = millis();
@@ -2464,18 +2496,14 @@ static void auTick(void)
         fwTimerInit(s_auTimer, now, (uint32_t)ESP.getEfuseMac());
         s_auTimerInit = true;
     }
-    if(!s_auTimerInit)
+    if(!s_auTimerInit && !rmAuGoArmed())   // a remote go needs no timer (works with auto-update off)
         return;
 
     FwPolicyIn in;
     in.mode = (uint8_t)(meshcom_settings.node_autoupd < 0 ? 0 : (meshcom_settings.node_autoupd > 2 ? 2 : meshcom_settings.node_autoupd));
     in.wifiUp = wifiUp;
-    // TLS needs a real clock: NTP (bNTPDateTimeValid is cleared every 5 min while a phone is
-    // ready, which AU skips anyway) or a clock that GPS / RTC / NTP has set since boot.
-    in.timeValid = bNTPDateTimeValid ||
-                   (meshcom_settings.node_date_year > 2023 &&
-                    (memcmp(cTimeSource, "GPS", 3) == 0 || memcmp(cTimeSource, "RTC", 3) == 0 || memcmp(cTimeSource, "NTP", 3) == 0));
-    in.phoneConnected = (isPhoneReady == 1);
+    // clock valid for TLS and phone state: one definition, shared with rmAuGo (rm_au_esp32.cpp)
+    rmAuAutoGates(&in.timeValid, &in.phoneConnected);
     // global_batt is the filtered pack voltage in mV; "no reading" = 0 mV = mains / USB. The same
     // fail-safe as the /B= tag: battHardwarePresent() is false without a battery reading.
     in.onBattery = battHardwarePresent();
@@ -2519,6 +2547,74 @@ static void auTick(void)
     if(st.state == FWS_BUSY)
         return;
 
+    // ---- remote go (RM1 "upd go"): independent of node_autoupd, the update window and the check timer ----
+    {
+        char goTag[24];
+        bool goDelayPassed = false;
+        static char s_goWaitReason[16] = "";
+        if(rmAuGoGet(goTag, &goDelayPassed, now))
+        {
+            const bool stagedMatch = st.staged && auTagSame(st.stagedTag, goTag);
+            FwGoTickIn gt;
+            memset(&gt, 0, sizeof(gt));
+            gt.busy = (st.state == FWS_BUSY);
+            gt.downloadFailed = (st.job == FWJ_DOWNLOAD && st.state == FWS_DONE_FAIL);
+            gt.stagedMatch = stagedMatch;
+            gt.attempted = auHandoverAttempted(goTag);
+            gt.delayPassed = goDelayPassed;
+            gt.ready = fwGoHandoverReady(in);
+            gt.phoneConnected = in.phoneConnected;
+            gt.safebootCapable = fwNetSafebootCapable();
+            gt.recordState = FWGO_REC_UNCHECKED;
+            FwStageRecord grec;
+            FwGoStep step = fwGoTickStep(gt);
+            if(step == FWGOS_NEED_RECORD)
+            {
+                // the record is read last: re-validated here, and it must carry the go tag
+                gt.recordState = !fwNetLoadRecord(grec) ? FWGO_REC_MISSING : (auTagSame(grec.tag, goTag) ? FWGO_REC_OK : FWGO_REC_TAG_DIFFERS);
+                step = fwGoTickStep(gt);
+            }
+            const char *wait = nullptr;
+            bool failed = true;   // literal format strings: the log lines stay greppable
+            switch(step)
+            {
+            case FWGOS_WAIT_DOWNLOAD:   wait = "download"; failed = false; break;
+            case FWGOS_WAIT_REPLY:      wait = "reply"; failed = false; break;
+            case FWGOS_WAIT_PHONE:      wait = "phone"; failed = false; break;
+            case FWGOS_WAIT_BATTERY:    wait = "battery"; failed = false; break;
+            case FWGOS_FAIL_DOWNLOAD:   Serial.printf("[AU];remote;fail;download\n"); break;
+            case FWGOS_FAIL_NOSTAGE:    Serial.printf("[AU];remote;fail;nostage\n"); break;
+            case FWGOS_FAIL_ATTEMPTED:  Serial.printf("[AU];remote;fail;attempted\n"); break;
+            case FWGOS_FAIL_SAFEBOOT:   Serial.printf("[AU];remote;fail;safeboot\n"); break;
+            case FWGOS_FAIL_NORECORD:   Serial.printf("[AU];remote;fail;norecord\n"); break;
+            case FWGOS_HANDOVER:
+                Serial.printf("[AU];remote;go;%s\n", goTag);
+                rmAuGoDisarm();
+                if(!auHandoverRecord(grec))
+                    Serial.printf("[AU];remote;fail;nvs\n");
+                return;
+            default: failed = false; break;
+            }
+            if(failed)
+                rmAuGoDisarm();
+            else
+            {
+                if(wait != nullptr && strcmp(wait, s_goWaitReason) != 0)
+                {
+                    snprintf(s_goWaitReason, sizeof(s_goWaitReason), "%s", wait);
+                    Serial.printf("[AU];remote;wait;%s\n", wait);
+                }
+                else if(wait == nullptr)
+                    s_goWaitReason[0] = '\0';
+            }
+        }
+        else
+            s_goWaitReason[0] = '\0';
+    }
+
+    if(!s_auTimerInit)
+        return;
+
     FwAction act = fwTick(s_auTimer, in, fwNetStagedPending(), now);
 
     if(act == FW_HANDOVER)
@@ -2543,25 +2639,7 @@ static void auTick(void)
         FwStageRecord rec;
         if(!fwNetLoadRecord(rec))
             return;
-        if(!auTagSame(s_auHandoverTag, rec.tag))
-        {
-            snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", rec.tag);
-            // the "hand" marker goes in BEFORE the reboot: it is how the next boot tells an old
-            // Safeboot (record untouched) from a new one (marker consumed)
-            if(!fwNetMarkHandover(rec.tag))
-            {
-                Serial.printf("[AU];fail;nvs\n");
-                return;
-            }
-            Serial.printf("[AU];handover;%s\n", rec.tag);
-            if(!auRebootToSafeboot())
-            {
-                // hopeless (no Safeboot partition, or it cannot be set as boot partition): drop the
-                // record so the next boot does not try again, and the staged flag no longer fires
-                Serial.printf("[AU];fail;nosafeboot\n");
-                fwNetClearRecord();
-            }
-        }
+        auHandoverRecord(rec);
         return;
     }
 

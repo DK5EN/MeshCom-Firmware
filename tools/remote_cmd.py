@@ -80,6 +80,8 @@ ALLOWLIST: Dict[str, Any] = {
     "atxt": "atxt",  # none (read) | free text 1..39 (write)
     "pos": "pos",    # none (read) | "<lat> <lon> <alt>" (write)
     "mh": "mh",      # row index 0..999 | callsign with optional SSID
+    "net": None,
+    "upd": "upd",    # none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23
 }
 
 # Hard-blocked whatever the tag (6.4). Checked before the allowlist so the
@@ -103,6 +105,7 @@ _POS_RE = re.compile(_COORD + " " + _COORD + " [0-9]{1,5}")
 _MHCALL_RE = re.compile(r"[A-Z0-9]{3,9}|[A-Z0-9]{2,8}-[0-9]{1,2}")  # 3..9 chars total, either case on the wire
 _TEXT_BAD = set("{}|:")  # wire-level: '|' is the canonical separator
 _TAG_RE = re.compile(r"^[0-9a-f]{16}$")
+_UPD_GO_RE = re.compile(r"go [A-Za-z0-9._-]{1,23}")
 
 
 class RmError(ValueError):
@@ -150,17 +153,20 @@ def _check_ctr(ctr: int) -> None:
         raise RmError("ctr out of range 0..%d" % CTR_MAX)
 
 
-_MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh")
+_MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh", "upd")
 
 
 def _check_ext_args(cmd: str, shape: str, args: str) -> None:
     """Syntax of the extended shapes (mirrors argsMatch in src/remote_cmd.cpp)."""
-    if shape in ("name", "atxt", "pos") and args == "":
+    if shape in ("name", "atxt", "pos", "upd") and args == "":
         return  # read form
     if shape in ("name", "atxt"):
         limit = 19 if shape == "name" else 39
         if not 1 <= len(args) <= limit or any(c in _TEXT_BAD for c in args):
             raise RmError("%s needs free text of 1..%d characters without { } | :" % (cmd, limit))
+    elif shape == "upd":
+        if args != "check" and not _UPD_GO_RE.fullmatch(args):
+            raise RmError("upd needs nothing, 'check' or 'go <tag>' (tag [A-Za-z0-9._-], 1..23)")
     elif shape == "pos":
         if not _POS_RE.fullmatch(args):
             raise RmError("pos needs '<lat> <lon> <alt>'")
@@ -340,6 +346,11 @@ _VECTOR_CMDS = [
     ("secret", "DK5EN-90", "DK5EN-1", 70, "pos", "48.40812 11.73812 492"),
     ("secret", "DK5EN-90", "DK5EN-1", 71, "mh", "0"),
     ("secret", "DK5EN-90", "DK5EN-1", 72, "mh", "DK5EN-98"),
+    # RM1 net / upd (McApp handover 2026-10-17)
+    ("secret", "DK5EN-90", "DK5EN-1", 100, "net", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 101, "upd", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 102, "upd", "check"),
+    ("secret", "DK5EN-90", "DK5EN-1", 103, "upd", "go v4.41a"),
 ]
 
 _VECTOR_REPLIES = [
@@ -373,12 +384,21 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 96, "err hidden"),
     ("secret", "DK5EN-90", "DK5EN-1", 97, "ok led=flash"),  # LED wave W3
     ("secret", "DK5EN-90", "DK5EN-1", 98, "ok chgled=auto"),
+    # RM1 net / upd grammar examples and the status rs= token
+    ("secret", "DK5EN-90", "DK5EN-1", 100, "ok mtu=1280 srv=OE net=auto eff=hamnet"),
+    ("secret", "DK5EN-90", "DK5EN-1", 101, "ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=37 e=-"),
+    ("secret", "DK5EN-90", "DK5EN-1", 102, "ok checking"),
+    ("secret", "DK5EN-90", "DK5EN-1", 103, "ok installing v4.41a"),
+    ("secret", "DK5EN-90", "DK5EN-1", 104, "err stale v4.41b"),
+    ("secret", "DK5EN-90", "DK5EN-1", 105, "err stale -"),
+    ("secret", "DK5EN-90", "DK5EN-1", 106, "err aubusy"),
+    ("secret", "DK5EN-90", "DK5EN-1", 107, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1"),
 ]
 
 
 def _status_expect(result: str) -> Optional[Dict[str, Any]]:
     """Fields the firmware's rmStatusParse() must produce (from the format itself)."""
-    m = re.search(r" s=([A-Za-z]{5,6}) p=(-?\d+)/(-?\d+)/(-?\d+)$", result)
+    m = re.search(r" s=([A-Za-z]{5,6}) p=(-?\d+)/(-?\d+)/(-?\d+)( rs=[01])?$", result)
     if not result.startswith("ok v=") or m is None:
         return None
     letters = m.group(1)
@@ -408,6 +428,12 @@ _VECTOR_REFUSALS = [
     ("dfu", "", 0, 22),
     ("reboot", "now", 0, 22),
     ("gps", "on;x", 0, 22),
+    ("upd", "foo", 0, 22),
+    ("upd", "go", 0, 22),
+    ("upd", "go a b", 0, 22),
+    ("upd", "go v4/41", 0, 22),
+    ("upd", "go " + "a" * 24, 0, 22),
+    ("net", "x", 0, 22),
 ]
 
 

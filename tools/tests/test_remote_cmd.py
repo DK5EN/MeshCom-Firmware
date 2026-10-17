@@ -64,7 +64,7 @@ def test_refusal_text_receiver_model() -> None:
 
 
 def test_allowlist_command_count() -> None:
-    assert len(rc.ALLOWLIST) == 23
+    assert len(rc.ALLOWLIST) == 25
     assert rc.ALLOWLIST["led"] == ("on", "off", "flash")
     assert rc.ALLOWLIST["chgled"] == ("auto", "on", "off")
 
@@ -245,6 +245,10 @@ EXT_CASES = [
     ("pos", "", True), ("pos", "48.40812 11.73812 492", True), ("pos", "1 2", False), ("pos", "a b c", False),
     ("mh", "0", True), ("mh", "999", True), ("mh", "1000", False), ("mh", "DK5EN-98", True),
     ("mh", "dk5en-98", True), ("mh", "DK5EN-98 x", False), ("mh", "", False),
+    ("net", "", True), ("net", "x", False), ("upd", "", True), ("upd", "check", True), ("upd", "go v4.41a", True),
+    ("upd", "go V4.41A_x-1", True), ("upd", "go " + "a" * 23, True), ("upd", "go " + "a" * 24, False),
+    ("upd", "foo", False), ("upd", "go", False), ("upd", "go ", False), ("upd", "go a b", False),
+    ("upd", "go v4/41", False), ("upd", "check now", False), ("upd", "Check", False),
     ("gps", "ON", False), ("setout", "A0 on", False), ("Radio", "", False),
 ]
 

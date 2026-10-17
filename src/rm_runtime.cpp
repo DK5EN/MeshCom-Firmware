@@ -210,7 +210,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         sw.led = bRemoteLed;
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
-                       (int)meshcom_settings.node_power, TX_POWER_MIN > 0 ? (int)TX_POWER_MIN : 0, (int)TX_POWER_MAX);
+                       (int)meshcom_settings.node_power, TX_POWER_MIN > 0 ? (int)TX_POWER_MIN : 0, (int)TX_POWER_MAX, meshcom_settings.node_rmstrict != 0);
         return true;
     }
 

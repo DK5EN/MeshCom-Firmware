@@ -433,6 +433,54 @@
       "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
       "tag": "34473705d698527f",
       "dm_text": "RM1 72 mh DK5EN-98 34473705d698527f"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 100,
+      "cmd": "net",
+      "args": "",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|100|net",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "37733da663e29ef6",
+      "dm_text": "RM1 100 net 37733da663e29ef6"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 101,
+      "cmd": "upd",
+      "args": "",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|101|upd",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "435d53eaa7122df7",
+      "dm_text": "RM1 101 upd 435d53eaa7122df7"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 102,
+      "cmd": "upd",
+      "args": "check",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|102|upd check",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "49f189041c894d9b",
+      "dm_text": "RM1 102 upd check 49f189041c894d9b"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 103,
+      "cmd": "upd",
+      "args": "go v4.41a",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|103|upd go v4.41a",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "5d1659ea985e0f60",
+      "dm_text": "RM1 103 upd go v4.41a 5d1659ea985e0f60"
     }
   ],
   "replies": [
@@ -744,6 +792,97 @@
       "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|98|ok chgled=auto",
       "reply_tag": "147e5a30071eceee",
       "reply_text": "RM1 98 ok chgled=auto 147e5a30071eceee"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 100,
+      "result": "ok mtu=1280 srv=OE net=auto eff=hamnet",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|100|ok mtu=1280 srv=OE net=auto eff=hamnet",
+      "reply_tag": "48514094cd60af52",
+      "reply_text": "RM1 100 ok mtu=1280 srv=OE net=auto eff=hamnet 48514094cd60af52"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 101,
+      "result": "ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=37 e=-",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|101|ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=37 e=-",
+      "reply_tag": "0ea968568a588f22",
+      "reply_text": "RM1 101 ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=37 e=- 0ea968568a588f22"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 102,
+      "result": "ok checking",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|102|ok checking",
+      "reply_tag": "af8349282ec62cad",
+      "reply_text": "RM1 102 ok checking af8349282ec62cad"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 103,
+      "result": "ok installing v4.41a",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|103|ok installing v4.41a",
+      "reply_tag": "f869c6efaf0fc759",
+      "reply_text": "RM1 103 ok installing v4.41a f869c6efaf0fc759"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 104,
+      "result": "err stale v4.41b",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|104|err stale v4.41b",
+      "reply_tag": "a5ac0f3b00a5330f",
+      "reply_text": "RM1 104 err stale v4.41b a5ac0f3b00a5330f"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 105,
+      "result": "err stale -",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|105|err stale -",
+      "reply_tag": "711bdf9169a8ef35",
+      "reply_text": "RM1 105 err stale - 711bdf9169a8ef35"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 106,
+      "result": "err aubusy",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|106|err aubusy",
+      "reply_tag": "3f9c8e8368adc124",
+      "reply_text": "RM1 106 err aubusy 3f9c8e8368adc124"
+    },
+    {
+      "status_sw": "1,0,0,0,1,-",
+      "status_p": "14/2/22",
+      "status_led": false,
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 107,
+      "result": "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|107|ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1",
+      "reply_tag": "fc3f06ff3be1922e",
+      "reply_text": "RM1 107 ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1 fc3f06ff3be1922e"
     }
   ],
   "refusals": [
@@ -792,6 +931,48 @@
     {
       "cmd": "gps",
       "args": "on;x",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "foo",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "go",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "go a b",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "go v4/41",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "go aaaaaaaaaaaaaaaaaaaaaaaa",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "net",
+      "args": "x",
       "min": 0,
       "max": 22,
       "text": "err blocked"
