@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261017`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261018`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,53 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.10.18 (Sonntag, 2026-10-18)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`, Actions auf Node-24-Majors,
+seit `ci-proof-node24-20261017` bewiesen), 66 Assets wie bei 10.17. Getaggt am 2026-10-17 abends mit
+dem Datum des Folgetags (gleicher Tag wie 10.17, `.N`-Suffix ist fuer Auto Update unsichtbar).
+`FLASH_VERSION` 20261018, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben
+erhalten. Safeboot unveraendert seit 10.05.
+
+Inhalt seit `v4.40a.10.17` (alle fuenf Firmware-Commits, in den Release-Notes untergebracht):
+
+- GPS-11 W1 (`4221b16c`): `src/pos_filter.{h,cpp}` (HDOP-gewichtetes Positionsfilter, CV+ZUPT bei
+  `--track on`, 30-min-Mittel mit Bewegungserkennung bei `--track off`), `src/pos_grid_hold.{h,cpp}`
+  (0,3-Zellen-Hysterese im Stillstand).
+- GPS-11 W2 (`a2381b97`): `src/pos_pipeline.{h,cpp}` in `WZ_GPS_Loop()`; `--gpsfilter on|off` (nur zur
+  Laufzeit, Standard an), Debug-Zeile bei `--gpsdebug on`. Verhaltensaenderung auf der Luft: GPS-Boards
+  (ESP32, ausser T-Deck Pro) senden die gefilterte Position. RAK4631 ohne Filter (W2b gestrichen).
+- Net-Konsole (`b06a6907`): P-0111 Start im reinen AP-Modus, P-0169 `--netconsole off` schliesst den
+  Listener, P-0168 `accept()` auch bei laufender Sitzung, Uebernahme nur nach gueltigem HMAC-Login,
+  TCP-Keepalive 60/10/3.
+- RM1 `net`/`upd` (`5c1d12b5`): `net` (MTU, Server, Netz), `upd`, `upd check`, `upd go <tag>`; `rs=` in
+  `status`; Remote-Webseite mit Check und Update.
+- `4d0d1756`: `ck=` bei nicht gestellter Systemuhr (GPS-Uhr) richtig, `fwCheckAgeMin()`.
+- Nicht-Firmware: `fac759ed` (CI-Actions Node 24, `ci-build.yml` entfernt).
+- Upstream-PRs: #1213 und #1214 weiter offen; GPS-11, Net-Konsole, RM1 `net`/`upd` nur im Fork.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- GPS-11 auf `DK5EN-1` (Heltec V3, externer u-blox, Innenraum mit starkem Mehrwege-Empfang, Build
+  `a2381b97`): 2 h `--track off` und 2 h `--track on` stationaer, kein Neustart, kein verworfener Wert.
+  Gesendete Zelle 11 Wechsel in 2 h statt 119 roh; ein Fehlalarm Stillstand -> Bewegung durch einen
+  30-s-Mehrwegesprung (40-m-Radius bleibt, Entscheidung des Operators).
+- Net-Konsole auf `DK5EN-1`: P-0168 und P-0169 vorher/nachher
+  (`tools/bench/runs/harness/p0168-*.summary`, `p0169-*.summary`).
+- RM1 ueber LoRa `DK5EN-98` -> `DK5EN-1` (2 dBm): `status` `rs=0/1`, `net`, `upd`, `upd check`, `upd go`
+  veraltet und aktuell; echtes `upd go v4.40a.10.17` aus bereitgestelltem Image -> Safeboot -> Release.
+- VIA-01 auf `DK5EN-1`: USB-Konsole und Web-`setvia`, alle Faelle bestanden
+  (`tools/bench/runs/harness/via01-heltec1.summary`).
+- Gate: `tools/regression.sh --stage 1,2` PASS: Unity 72 Envs, 2521/2521, Golden-Selftest 48 Befehle, pytest 1100, nRF52-Board-Links.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- GPS-11 in Fahrt (G3, Smart-Beacon-Schuesse), auf T-Beam, T-Beam Supreme, T-Deck und den anderen
+  GPS-Boards.
+- Net-Konsole im reinen AP-Modus (P-0111) und Keepalive gegen halb offene Gegenstelle.
+- RM1 `upd go` mit Download (`installing`), nur Host-Tests.
+- Diese CI-Images selbst auf der Bench-Flotte (nicht geflasht).
 
 ## Release v4.40a.10.17 (Samstag, 2026-10-17)
 
