@@ -2,6 +2,15 @@
 
 **Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
 
+## 2026-10-17 -- GPS-11 position Kalman filter: W1 committed (host only), W2 integration next
+
+Spec: `docs/gps-11-position-kalman-filter.md` (section 1a lists the W1 revisions). Campaign and resume point:
+`docs/campaign-gps11-position-kf.md`. W1 (`4221b16c`): `src/pos_filter.{h,cpp}` (CV+ZUPT with `--track on`; 30 min
+average plus motion detection with `--track off`), `src/pos_grid_hold.{h,cpp}` (0.3-cell hysteresis while still),
+`tools/gps/pos_kf_eval.py`. Not wired into the firmware yet. Next: W2 integration in `gps_functions.cpp` per the
+"W2 contract (current)" section, then W3 bench on DK5EN-14 (measure stationary speed noise, retune
+`POS_KF_MOVE_SPEED_MS`).
+
 ## 2026-10-17 -- AU-16 opened: T-Beam 1W stuck in Safeboot after Auto Update (field, OE5HWN-17)
 
 - After "Check" the 1W stages, hands over and stays in Safeboot AP mode: no `apply` line, empty settings,
