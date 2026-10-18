@@ -1,0 +1,8 @@
+AU bench run to the published v4.40a.10.18 (CI), 2026-10-18 07:00-08:30, driven by real clicks in the web GUI (Chrome)
+Setup: Auto update select "dev" -> Info "Check now" -> banner "Install" (where shown) -> "Apply now"; settings diffed before/after from /?page=info
+DK5EN-1  Heltec V3   local -> v4.40a.10.18 (build 21:29:39)  check staged by itself; apply, back in ~17 s; settings unchanged
+DK5EN-92 T-Beam      10.17 -> v4.40a.10.18 (build 21:27:58)  phone on BLE: check refused err=lowheap (status sbver 2, ok); after BLE disconnect the 10-min auto retry staged it; apply, back in ~33 s
+DK5EN-14 T-Deck Plus 10.17 -> v4.40a.10.18 (build 21:55:09)  check staged in ~16 s (AU-13 PSRAM TLS); apply, back in ~32 s
+DK5EN-98 Heltec V3   local -> v4.40a.10.18 (build 21:29:39)  check found the release but did NOT start the download (others did); "Install" staged in 18 s; apply, back in ~25 s; gateway on, 22 dBm, server connected
+DK5EN-90 RAK4631     10.17 -> v4.40a.10.18 (build 21:39:08)  DFU zip over USB (adafruit-nrfutil --touch 1200, 41 s); RM1 "upd" from DK5EN-1 over LoRa -> verified reply "err unsupported"; RM1 back off
+End state: four ESP32 nodes Auto update mode notify, channel dev (Web API autoupdate=notify, updchan=dev); DK5EN-92 RM1 still on (operator listed it as off; not changed)
