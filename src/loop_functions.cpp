@@ -28,6 +28,9 @@
 #include "configuration.h"
 #include "loop_functions_extern.h"   // REMOTE_LED_PIN rule + RM LED levels
 #include "board_led.h"
+#if defined(ESP32)
+#include "esp32/esp32_pmu.h"   // chargeLedFitted()
+#endif
 
 #include "TinyGPSPlus.h"
 
@@ -92,20 +95,63 @@ int ifalseping = 0;
 int BOARD_HARDWARE = MODUL_HARDWARE;
 bool bUSER_BOARD_LED = false;
 
+// LED-08/09/10 (design 6.1): which LEDs exist on this build/node, the one source for --info, BLE SN/SN1 and the web
+// GUI. Board LED = BOARD_LED pin or a NeoPixel-only heartbeat (LED_PIN with pixels, no BOARD_LED); charge LED =
+// AXP compiled in AND a PMU answered (chargeLedFitted(): false without AXP). ledFitted() of board_led.h decides.
+LedFitted ledFittedNow(void)
+{
+#if defined(BOARD_LED)
+    const bool boardPin = true;
+#else
+    const bool boardPin = false;
+#endif
+#if defined(LED_PIN) && defined(LED_PIXEL) && (LED_PIXEL > 0) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+    const bool neo = true;
+#else
+    const bool neo = false;
+#endif
+#if defined(ESP32)
+    return ledFitted(boardPin, neo, true, chargeLedFitted());
+#else
+    return ledFitted(boardPin, neo, false, false);   // nRF52: no PMU charge LED
+#endif
+}
+
 #if defined(REMOTE_LED_PIN)
 bool bRemoteLed = false;        // RM "led on|flash": never persisted, off after boot
 bool bRemoteLedFlash = false;
+
+bool remoteLedPinUsable(void)
+{
+#if defined(BOARD_LED) && (REMOTE_LED_PIN == BOARD_LED)
+    return boardLedPinUsable();   // the board LED pad: OneWire may own it (T-Beam GPIO4)
+#else
+    return true;                  // own pad (Heltec V3/V4 GPIO35)
+#endif
+}
 
 void remoteLedSet(int mode)
 {
     bRemoteLed = (mode == 1 || mode == 2);
     bRemoteLedFlash = (mode == 2);
+    if (!remoteLedPinUsable())   // pad shared with OneWire (T-Beam GPIO4): never drive it
+    {
+        bRemoteLed = false;
+        bRemoteLedFlash = false;
+        return;
+    }
     pinMode(REMOTE_LED_PIN, OUTPUT);
     digitalWrite(REMOTE_LED_PIN, mode == 1 ? REMOTE_LED_ON_LEVEL : REMOTE_LED_OFF_LEVEL);
 }
 
 void remoteLedTick(void)
 {
+    if (!remoteLedPinUsable())   // OneWire took the pad (steady hold or flashing): release without writing the pin
+    {
+        bRemoteLed = false;
+        bRemoteLedFlash = false;
+        return;
+    }
     if (!bRemoteLedFlash)
         return;
     const bool lit = (millis() % REMOTE_LED_FLASH_PERIOD_MS) < REMOTE_LED_FLASH_ON_MS;
@@ -171,6 +217,10 @@ static void boardLedWhitePulse(void)
 }
 #endif
 
+#if defined(BOARD_LED)
+static bool boardLedOutput = false;   // pinMode(OUTPUT) done since the pad was last given up
+#endif
+
 static void boardLedWrite(bool lit)
 {
     #if defined(BOARD_LED)
@@ -183,6 +233,11 @@ static void boardLedWrite(bool lit)
         if (bRemoteLed)
             return;
         #endif
+        if (!boardLedOutput)   // pad may come back from OneWire at run time
+        {
+            pinMode(BOARD_LED, OUTPUT);
+            boardLedOutput = true;
+        }
         digitalWrite(BOARD_LED, boardLedLevel(lit, BOARD_LED_ACTIVE_LOW));
     #else
         if (lit)
@@ -200,6 +255,10 @@ void boardLedTick(void)
             if (boardLedPinUsable())   // OneWire owns the pad: clear the state, never write the pin
                 boardLedWrite(false);
         }
+        #if defined(BOARD_LED)
+        if (!boardLedPinUsable())
+            boardLedOutput = false;
+        #endif
         return;
     }
     const BoardLedStep st = boardLedPhase(millis(), boardLedTimer, boardLedLit);

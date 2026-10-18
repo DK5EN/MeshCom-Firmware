@@ -23,6 +23,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <algorithm>
 #include <unistd.h>
 
 #include "command_toggles.h"
@@ -895,6 +896,97 @@ static void test_real_bmx_off_rung_clears_only_the_bmp390_bit_of_sset3()
     TEST_ASSERT_BITS_HIGH_MESSAGE(0x10000u, after, "'--bme off' cleared a bit above 16");
 }
 
+// LED-03: the charge-LED console rows must resend SN (TG_DIRTY_NODE), else the phone's CHGLED stays stale.
+static void test_real_charge_led_rows_mark_node_dirty()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+    std::string on = real_row(src, "\"--charge led on\"");
+    std::string off = real_row(src, "\"--charge led off\"");
+    TEST_ASSERT_FALSE_MESSAGE(on.empty() || off.empty(), "one of the two '--charge led' rows is missing");
+    TEST_ASSERT_TRUE_MESSAGE(on.find("TG_DIRTY_NODE") != std::string::npos, "'--charge led on' must be TG_DIRTY_NODE (LED-03)");
+    TEST_ASSERT_TRUE_MESSAGE(off.find("TG_DIRTY_NODE") != std::string::npos, "'--charge led off' must be TG_DIRTY_NODE (LED-03)");
+}
+
+// LED-04/09/10/12 source pins (command_functions.cpp is not host-compilable).
+static void test_real_led_surfaces_are_wired()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+    auto has = [&](const char *n) { return src.find(n) != std::string::npos; };
+    TEST_ASSERT_TRUE_MESSAGE(has("commandMatches(msg_text+2, \"board led on\") && !boardLedPinUsable()"), "LED-04: --board led on refusal missing or not case-insensitive like toggleApply");
+    TEST_ASSERT_TRUE_MESSAGE(has("...BOARD LED: %s") && has("...CHARGE LED: "), "LED-09: --info LED lines missing");
+    TEST_ASSERT_TRUE_MESSAGE(has("nsetdoc1[\"LEDNF\"]") && has("ledNotFittedList("), "LED-10: SN1 LEDNF missing");
+    TEST_ASSERT_TRUE_MESSAGE(has("if(ledfit.board)") && has("if(ledfit.charge)"), "LED-10: SN keys must be conditional");
+    size_t w = src.find("remoteLedForceOff();   // RM `led on` must not outlive the node");
+    TEST_ASSERT_TRUE_MESSAGE(w != std::string::npos && src.find("boardLedForceOff();", w) < w + 400, "LED-12: WP_DISP sleep path must call boardLedForceOff()");
+}
+
+// The text of `src` from the first `marker` to the next `end` (or +limit chars); npos markers fail the test.
+static std::string led_span(const std::string &src, const char *marker, const char *end, size_t limit = 2500)
+{
+    size_t a = src.find(marker);
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, marker);
+    size_t b = src.find(end, a + 1);
+    if (b == std::string::npos || b - a > limit)
+        b = std::min(src.size(), a + limit);
+    return src.substr(a, b - a);
+}
+
+// true when `first` appears in `span` and `second` appears after it
+static bool led_order(const std::string &span, const char *first, const char *second)
+{
+    size_t a = span.find(first);
+    return a != std::string::npos && span.find(second, a) != std::string::npos;
+}
+
+// W2 review pins: the guards that keep LED surfaces off a pad OneWire owns, and the deep-sleep / boot paths
+static void test_real_led_guards_are_wired()
+{
+    const std::string cmd = read_whole_file(repo_root() + "/src/command_functions.cpp");
+    const std::string loop = read_whole_file(repo_root() + "/src/loop_functions.cpp");
+    const std::string rm = read_whole_file(repo_root() + "/src/rm_runtime.cpp");
+    const std::string mainsrc = read_whole_file(repo_root() + "/src/esp32/esp32_main.cpp");
+    const std::string sleepsrc = read_whole_file(repo_root() + "/src/esp32/esp32_sleep.cpp");
+    const std::string web = read_whole_file(repo_root() + "/src/web_functions/web_functions.cpp");
+
+    // LED-01/12: deep sleep drops the RM chgled override and darkens the heartbeat before esp_deep_sleep_start()
+    std::string sl = led_span(sleepsrc, "void esp32EnterDeepSleep()", "\nvoid ", 20000);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(sl, "boardLedForceOff();", "esp_deep_sleep_start"), "esp32EnterDeepSleep: boardLedForceOff() before sleep missing");
+    TEST_ASSERT_TRUE_MESSAGE(led_order(sl, "chargeLedOverrideClear();", "esp_deep_sleep_start"), "esp32EnterDeepSleep: chargeLedOverrideClear() before sleep missing");
+
+    // RM led: err pinbusy while OneWire owns the pad, and the status tile follows the same predicate
+    std::string led = led_span(rm, "strcmp(cmd, \"led\") == 0", "strcmp(cmd, \"chgled\") == 0", 3000);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(led, "if (!remoteLedPinUsable())", "err pinbusy") && led_order(led, "err pinbusy", "remoteLedSet(mode)"),
+                             "rm_runtime led: err pinbusy gate on remoteLedPinUsable() must precede remoteLedSet()");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("sw.ledSupported = remoteLedPinUsable();") != std::string::npos, "rm_runtime status: ledSupported must follow remoteLedPinUsable()");
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("#elif defined(BOARD_LED) && !defined(NRF52_SERIES)") == std::string::npos, "rm_runtime: dead BOARD_LED led branch is back");
+
+    // boot: the pin init is gated by the OneWire state, and an early pull-up covers active-low pads
+    std::string boot = led_span(mainsrc, "if (boardLedPinUsable())", "bSOFTSERDEBUG", 800);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(boot, "digitalWrite(BOARD_LED", "pinMode(BOARD_LED, OUTPUT)"), "esp32_main boot: BOARD_LED init must sit behind if (boardLedPinUsable())");
+    TEST_ASSERT_TRUE_MESSAGE(mainsrc.find("pinMode(BOARD_LED, INPUT_PULLUP)") != std::string::npos, "esp32_main: early INPUT_PULLUP for active-low BOARD_LED missing");
+
+    // remoteLedSet / remoteLedTick: never write a pad OneWire owns; Tick checks it before the flash early-out
+    std::string set = led_span(loop, "void remoteLedSet(int mode)", "\nvoid remoteLedTick", 800);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(set, "if (!remoteLedPinUsable())", "pinMode(REMOTE_LED_PIN, OUTPUT)"), "remoteLedSet: pin guard before the pin write missing");
+    std::string tick = led_span(loop, "void remoteLedTick(void)", "\nvoid remoteLedForceOff", 800);
+    size_t tg = tick.find("if (!remoteLedPinUsable())"), tf = tick.find("if (!bRemoteLedFlash)");
+    TEST_ASSERT_TRUE_MESSAGE(tg != std::string::npos && tf != std::string::npos && tg < tf && led_order(tick, "if (!bRemoteLedFlash)", "digitalWrite(REMOTE_LED_PIN"),
+                             "remoteLedTick: guard must precede the flash early-out and the pin write");
+
+    // --board led off post hook: no pin write while OneWire owns the pad
+    std::string hook = led_span(cmd, "static void tg_post_board_led_off()", "\n}\n", 600);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(hook, "if(!boardLedPinUsable()) return;", "digitalWrite(BOARD_LED"), "tg_post_board_led_off: boardLedPinUsable() guard before digitalWrite missing");
+
+    // one LED-fitted helper (loop_functions.cpp) fed by chargeLedFitted(); no private copies
+    TEST_ASSERT_TRUE_MESSAGE(loop.find("LedFitted ledFittedNow(void)") != std::string::npos && loop.find("chargeLedFitted()") != std::string::npos, "ledFittedNow() in loop_functions.cpp missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("static LedFitted") == std::string::npos && web.find("static LedFitted") == std::string::npos, "private LedFitted helper copy is back");
+
+    // --info marks a busy pad; the web GUI switch uses the same BOARD_LED guard as the handler
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("on (pin busy)") != std::string::npos, "--info BOARD LED: on (pin busy) missing");
+    std::string sw = led_span(web, "const LedFitted ledHw = ledFittedNow();", "chargeled", 600);
+    TEST_ASSERT_TRUE_MESSAGE(led_order(sw, "#if defined(BOARD_LED)", "\"boardled\""), "web GUI boardled element must be gated by #if defined(BOARD_LED)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -932,5 +1024,8 @@ int main(int, char **)
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
     RUN_TEST(test_real_bmx_off_rung_clears_only_the_bmp390_bit_of_sset3);
+    RUN_TEST(test_real_charge_led_rows_mark_node_dirty);
+    RUN_TEST(test_real_led_surfaces_are_wired);
+    RUN_TEST(test_real_led_guards_are_wired);
     return UNITY_END();
 }

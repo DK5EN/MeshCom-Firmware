@@ -1773,6 +1773,15 @@ function leaks(P, canary) {
     await P.setPoll({ sent: [ent('DK5EN-1', 'chgled auto', 'err blocked', { ctr: 11, ago: 1, st: 'err', msg: 'blocked' })] });
     check('W3 pre-W3 node answers chgled with err blocked: also unknown + not supported', !!sel() && sel().value === '' && /not supported by this node/.test(P.el('rm_sw').textContent), sel().value + '|' + P.el('rm_sw').textContent);
     check('W3 confirm label for chgled is a sentence part, not the raw command', P.w.rmLabel('chgled auto') === 'Charge LED auto', P.w.rmLabel('chgled auto'));
+    check('LED-08 bare chgled entry labels as "Charge LED", not "Charge LED undefined"', P.w.rmLabel('chgled') === 'Charge LED', P.w.rmLabel('chgled'));
+    // LED-08 / Q2: the bare read form `chgled` answers `ok chgled=<effective mode>[ rm]`
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled', 'ok chgled=on rm', { ctr: 12, ago: 1, st: 'ok' })] });
+    check('LED-08 bare chgled reply "ok chgled=on rm" selects on', sel().value === 'on', sel().value);
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled', 'ok chgled=off', { ctr: 13, ago: 1, st: 'ok' })] });
+    check('LED-08 bare chgled reply "ok chgled=off" selects off', sel().value === 'off', sel().value);
+    check('LED-08 bare chgled ok text reads the mode, marks the RM override', P.w.rmOkText({ cmd: 'chgled', reply: 'ok chgled=on rm', msg: '' }) === 'Charge LED is on (set by remote management).' && P.w.rmOkText({ cmd: 'chgled', reply: 'ok chgled=auto', msg: '' }) === 'Charge LED is auto.', P.w.rmOkText({ cmd: 'chgled', reply: 'ok chgled=on rm', msg: '' }));
+    await P.setPoll({ sent: [ent('DK5EN-1', 'chgled', 'err unsupported', { ctr: 14, ago: 1, st: 'err', msg: 'unsupported' })] });
+    check('LED-08 bare chgled err unsupported: unknown + not supported', sel().value === '' && /not supported by this node/.test(P.el('rm_sw').textContent), sel().value + '|' + P.el('rm_sw').textContent);
     await P.setPoll({ sent: [ent('DK5EN-1', 'led flash', 'err unsupported', { ctr: 9, ago: 1, st: 'err', msg: 'unsupported' })] });
     check('W3 selecting the unknown entry sends nothing', (() => { const n = P.sends().length; sel().value = ''; sel().dispatchEvent(new P.w.Event('change', { bubbles: true })); return P.sends().length === n; })());
     P.w.rmPageLeave();

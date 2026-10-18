@@ -27,13 +27,16 @@ extern int ifalseping;
 extern int BOARD_HARDWARE;
 extern bool bUSER_BOARD_LED;
 
+// Which LEDs this build/node has (board LED / charge LED), shared by --info, BLE SN/SN1 and the web GUI.
+#include "board_led.h"
+LedFitted ledFittedNow(void);
+
 // RM "led on|off": steady LED held on by the remote command (rm_runtime.cpp), never persisted.
 // REMOTE_LED_PIN is the pad it drives: BOARD_LED where the variant has one (all active HIGH), or
 // set by the variant itself (Heltec V3: white LED GPIO35, no BOARD_LED so no blinker). Not defined
-// on nRF52, on boards without an LED, nor where BOARD_LED shares its GPIO with OneWire_GPIO
-// (ttgo_tbeam: both are GPIO4). Needs configuration.h included before this header.
-#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES) && \
-    !(defined(OneWire_GPIO) && (OneWire_GPIO == BOARD_LED))
+// on nRF52 nor on boards without an LED. A pad shared with OneWire (ttgo_tbeam: GPIO4) is checked at
+// run time (boardLedPinUsable()). Needs configuration.h included before this header.
+#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES)
     #define REMOTE_LED_PIN BOARD_LED
 #endif
 #if defined(REMOTE_LED_PIN)
@@ -56,6 +59,7 @@ static_assert((REMOTE_LED_ON_LEVEL) != (REMOTE_LED_OFF_LEVEL), "REMOTE_LED_ON_LE
 
 extern bool bRemoteLed;           // true while RM holds the pin ("led on" or "led flash"); the BOARD_LED blinker yields
 extern bool bRemoteLedFlash;      // true while the hold is the flash pattern (implies bRemoteLed)
+bool remoteLedPinUsable(void);   // false while OneWire owns a pad shared with BOARD_LED
 void remoteLedSet(int mode);      // 0 = release (pin dark), 1 = steady on, 2 = flash pattern
 void remoteLedTick(void);         // main loop: drives the flash pattern while bRemoteLedFlash
 void remoteLedForceOff(void);     // pin off + hold released; call before deep sleep

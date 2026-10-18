@@ -27,6 +27,7 @@
 #include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
 #include "ble_session.h"       // BLC-03: BleStats, g_bleStats, bleStatsFormat()
 #include "rm_runtime.h"       // RM-06: RmStats, g_rmStats for the --info RM line
+#include "board_led.h"       // LED-04/09/10: boardLedPinFree, ledFitted, ledNotFittedList
 #include "charge_led_mode.h"  // CHG-01/02: SSET2_CHGLED_CFG marker for the charge LED rows
 #include "rm_commands.h"      // RM_NAME_MAX / RM_ATXT_MAX: the --setname / --atxt clip lengths
 #include "rm_validate.h"      // RM GUI W1b: one password validator for --passwd, the web field and the sender
@@ -443,6 +444,9 @@ static void tg_post_charge_led_off() { meshcom_settings.node_sset2 |= SSET2_CHGL
 #endif
 static void tg_post_board_led_off()
 {
+#if !defined(NRF52_SERIES)
+    if(!boardLedPinUsable()) return;   // OneWire/DHT owns the pad (T-Beam GPIO4): never write it
+#endif
 #if defined(REMOTE_LED_PIN)
     if(bRemoteLed) return;   // keep an RM `led on` lit
 #endif
@@ -582,8 +586,8 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--ina226 off",         &bINA226ON,            &meshcom_settings.node_sset3,    0xFFFFF7FF,   0x00000000,   tg_post_ina226_off,            TG_DIRTY_SENS,   TG_SAVE | TG_BRETURN },
 #endif
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
-    { "--charge led on",      &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0001,       tg_post_charge_led_on,         TG_DIRTY_NONE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE | TG_POST_FIRST },
-    { "--charge led off",     &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFE,   0x00000000,   tg_post_charge_led_off,        TG_DIRTY_NONE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
+    { "--charge led on",      &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0001,       tg_post_charge_led_on,         TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE | TG_POST_FIRST },
+    { "--charge led off",     &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFE,   0x00000000,   tg_post_charge_led_off,        TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
 #endif
 #ifdef BOARD_LED
     { "--board led on",       &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
@@ -876,6 +880,14 @@ void commandAction(char *umsg_text, bool ble)
     // the ladder. Hoisting them is only safe because D2-10 made matching
     // exact-token; it was then checked mechanically in both directions (no row
     // is intercepted by an earlier rung, no row steals a later rung's input).
+#if defined(BOARD_LED) && !defined(NRF52_SERIES)
+    // LED-04: the heartbeat must not take a pad OneWire/DHT owns (T-Beam: both GPIO4). Refuse before the row saves.
+    if(commandMatches(msg_text+2, "board led on") && !boardLedPinUsable())
+    {
+        printfdeb("\n--board led refused: LED pin is used by OneWire/DHT (see --info, --owgpio)\n");
+        return;
+    }
+#endif
     ToggleAction tgact = toggleApply(COMMAND_TOGGLES, COMMAND_TOGGLES_N, msg_text+2);
 
     if(tgact.matched)
@@ -1733,6 +1745,7 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(REMOTE_LED_PIN)
             remoteLedForceOff();   // RM `led on` must not outlive the node
             #endif
+            boardLedForceOff();    // LED-12: the heartbeat flasher goes dark too
             loopCrumbClear();   // INS-05: deliberate sleep, RTC memory survives it -- cleared last,
                                 // after the button wait and e-ink refresh that could still trip the WDT
             esp_deep_sleep_start();
@@ -6981,6 +6994,24 @@ void commandAction(char *umsg_text, bool ble)
 
             printfdeb("...DEBUG %s ...DEBUG %s\n", (bDEBUGCSV?"csv":"man"), (bDEBUGEN?"en":"de"));
 
+            // LED-09: LED readback (charge LED shows the effective mode, "(RM x)" while an RM override is active)
+            {
+                const LedFitted lf = ledFittedNow();
+                const char *bledTxt = !lf.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? "on" : "on (pin busy)";   // OneWire/DHT holds the pad
+                printfdeb("...BOARD LED: %s\n", bledTxt);
+                if(!lf.charge)
+                    printfdeb("...CHARGE LED: not fitted\n");
+                else
+                {
+                #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+                    if(chargeLedOverrideActive())
+                        printfdeb("...CHARGE LED: %s (RM %s)\n", bCHARGE_LED ? "auto" : "off", chargeLedModeName(chargeLedEffective()));
+                    else
+                #endif
+                        printfdeb("...CHARGE LED: %s\n", bCHARGE_LED ? "auto" : "off");
+                }
+            }
+
             // TXCAPTURE steht hier, seit tools/meshlogger.py den Vorzustand jedes
             // Flags aus dieser Antwort liest und ein Flag, das er nicht findet,
             // beim Beenden unangetastet laesst. Vorher schaltete er --txcapture
@@ -7467,8 +7498,12 @@ void sendNodeSetting()
     nsetdoc["GWNPOS"] = bGATEWAY_NOPOS;
     nsetdoc["NOALL"] = bNoMSGtoALL;
     nsetdoc["NOPMOTHER"] = (bool)(meshcom_settings.node_sset3 & 0x8000);
-    nsetdoc["BLED"] = bUSER_BOARD_LED;
-    nsetdoc["CHGLED"] = bCHARGE_LED;   // CHG-04: true = follows charging, false = dark
+    // LED-10 (design 6.1): a key is left out of SN when that LED is not fitted (listed in SN1 "LEDNF")
+    const LedFitted ledfit = ledFittedNow();
+    if(ledfit.board)
+        nsetdoc["BLED"] = bUSER_BOARD_LED;
+    if(ledfit.charge)
+        nsetdoc["CHGLED"] = bCHARGE_LED;   // CHG-04: true = follows charging, false = dark
     nsetdoc["GWS"] = meshcom_settings.node_gwsrv;
 
     sendBleJsonRegister(nsetdoc); // JSN-01
@@ -7486,6 +7521,9 @@ void sendNodeSetting()
     nsetdoc1["WSPWD"] = meshcom_settings.node_webpwd;
     nsetdoc1["ASYM"] = bGPSAutosymbol;
     nsetdoc1["TZ"] = meshcom_settings.node_tz;
+    char ledNf[16];   // "BLED,CHGLED" = 11 chars + NUL
+    if(ledNotFittedList(ledfit, ledNf, sizeof(ledNf)) > 0)
+        nsetdoc1["LEDNF"] = ledNf;   // LED-10: worst case SN1 167 + 22 = 189 < BLE_JSON_PAYLOAD_MAX 244
 
     sendBleJsonRegister(nsetdoc1); // JSN-01
 }

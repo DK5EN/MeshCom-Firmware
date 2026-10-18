@@ -63,7 +63,7 @@ ALLOWLIST: Dict[str, Any] = {
     "track": ("on", "off"),
     "display": ("on", "off"),
     "led": ("on", "off", "flash"),
-    "chgled": ("auto", "on", "off"),
+    "chgled": ("", "auto", "on", "off"),   # "" = bare read form: ok chgled=<effective mode>[ rm] (LED-02)
     "gateway": ("on", "off"),
     "mesh": ("on", "off"),
     "txpower": "int",
@@ -215,7 +215,7 @@ def validate_command(cmd: str, args: str, ctr: int) -> None:
     elif shape in _MIXED_CASE_SHAPES:
         _check_ext_args(cmd, shape, args)
     elif args not in shape:
-        raise RmError("%s needs one of %s" % (cmd, "|".join(shape)))
+        raise RmError("%s needs one of %s" % (cmd, "|".join(a for a in shape if a)))
 
     if cmd == "sync":
         if ctr != 0:

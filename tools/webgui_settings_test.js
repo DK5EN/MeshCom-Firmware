@@ -251,6 +251,24 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
     check('error paths leave no timers', timers.length === 0, String(timers.length));
   }
 
+  { // LED-08: setup controls, setparam handlers and info rows (source level; the markup comes from C++ printf calls)
+    const wf = fs.readFileSync(SRC, 'utf8');
+    const ws = fs.readFileSync(process.env.SETUP_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_setup.cpp'), 'utf8');
+    const fn = (name) => { const a = wf.indexOf('\n' + name); const b = wf.indexOf('\n}\n', a); return a < 0 ? '' : wf.slice(a, b); };
+    const setup = fn('void sub_page_setup()'), info = fn('void sub_page_info()');
+    check('LED-08 setup page has a Board LED switch id boardled, only when the board LED is fitted', /if \(ledHw\.board\)\s*_create_setup_switch_element\("boardled", "Board LED"/.test(setup));
+    check('LED-08 setup page has a Charge LED switch id chargeled, only when fitted', /if \(ledHw\.charge\)\s*_create_setup_switch_element\("chargeled", "Charge LED"/.test(setup));
+    check('LED-08 info page: both status rows exist with "not fitted"', /"Board LED: %s<br>"[^;]*"not fitted"/.test(info) && /"Charge LED: %s<br>"[^;]*"not fitted"/.test(info));
+    const bat = info.slice(info.indexOf('global_batt == 0.0'), info.indexOf('#if defined(ESP32)'));
+    check('LED-08 charge LED status is no longer inside the battery branch', !/Charge/.test(bat) && /USB \(no battery\)/.test(bat), bat.length);
+    const lf = fs.readFileSync(path.join(__dirname, '..', 'src', 'loop_functions.cpp'), 'utf8');
+    check('LED-08 fitted decision is the shared ledFittedNow() = ledFitted() of board_led.h, charge LED from chargeLedFitted()', /#include "board_led\.h"/.test(wf) && /ledFittedNow\(\)/.test(wf) && !/static LedFitted/.test(wf) && /return ledFitted\(boardPin, neo, true, chargeLedFitted\(\)\)/.test(lf));
+    check('LED-08 boardled GUI element is gated by the same #if defined(BOARD_LED) as the setparam handler', /#if defined\(BOARD_LED\)[^\n]*\n\s*if \(ledHw\.board\)\s*_create_setup_switch_element\("boardled"/.test(setup) && /#if defined\(BOARD_LED\)\s*\n\s*if\(setupData->paramName\.equals\("boardled"\)\) \{   \/\/ LED-08/.test(ws));
+    check('LED-08 setparam boardled issues --board led on|off through commandAction', /paramName\.equals\("boardled"\)[\s\S]{0,260}"--board led %s"[\s\S]{0,200}commandAction\(message_text/.test(ws));
+    check('LED-08 setparam chargeled issues --charge led on|off through commandAction', /paramName\.equals\("chargeled"\)[\s\S]{0,260}"--charge led %s"[\s\S]{0,200}commandAction\(message_text/.test(ws));
+    check('LED-08 both parameters can be read back (getparam)', (ws.match(/paramName\.equals\("boardled"\)/g) || []).length === 2 && (ws.match(/paramName\.equals\("chargeled"\)/g) || []).length === 2);
+  }
+
   console.log(failures ? 'FAILED: ' + failures : 'ALL PASS');
   process.exit(failures ? 1 : 0);
 })();

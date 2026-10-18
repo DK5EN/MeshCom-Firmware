@@ -31,6 +31,11 @@
 #include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
+#include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
+#include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
+#if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+#include "esp32/esp32_pmu.h"    // LED-02: effective charge-LED mode (RM override)
+#endif
 #include "web_guard.h"          // RM GUI W1c: Host allowlist (DNS rebinding) and Sec-Fetch-Site (CSRF), header-only
 #include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_form_decode / rm_json_str shared with web_rm_page.cpp
 #include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
@@ -3344,6 +3349,22 @@ void sub_page_mailbox()
 }
 #endif // ENABLE_MSGSTORE
 
+// LED-08: charge LED text for the info page: the stored console value, plus the RM override while one
+// is active ("auto (RM on)"), as in --info.
+static const char *webChargeLedText()
+{
+#if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+    const char *stored = bCHARGE_LED ? "auto" : "off";
+    if (!chargeLedOverrideActive())
+        return stored;
+    static char txt[24];
+    snprintf(txt, sizeof(txt), "%s (RM %s)", stored, chargeLedModeName(chargeLedEffective()));
+    return txt;
+#else
+    return "off";
+#endif
+}
+
 /**
  * ###########################################################################################################################
  * delivers the setup-page to be injected into the scaffold
@@ -3421,6 +3442,15 @@ void sub_page_setup()
     _create_setup_switch_element("volt", "Voltage", "show batt. voltage, not percent", bDisplayVolt);           // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("mesh", "Mesh", "enable mesh/forwarding of received LoRa messages", bMESH);    // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("via", "Via", "enable via", bVIA);    // create Switch-Element inclucing Label and Description
+    { // LED-08: only on a node that has the LED (the info page says "not fitted" otherwise); same console rows as --board led / --charge led
+        const LedFitted ledHw = ledFittedNow();
+#if defined(BOARD_LED)   // same guard as the webSetup_setParam handler and the --board led console row
+        if (ledHw.board)
+            _create_setup_switch_element("boardled", "Board LED", "short heartbeat flash every 2 s", bUSER_BOARD_LED);
+#endif
+        if (ledHw.charge)
+            _create_setup_switch_element("chargeled", "Charge LED", "on = follows charging, off = dark", bCHARGE_LED);
+    }
 
 // We support OTA only for ESP based devices, not RAK
 #ifdef ESP32
@@ -4060,7 +4090,6 @@ void sub_page_info()
     } else {
         web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
         #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
-            web_client.printf("<br>Charge Indicator LED: %s", bCHARGE_LED ? "auto (follows charging)" : "off");
         #endif
         web_client.print("</td></tr>\n");
     }
@@ -4089,6 +4118,11 @@ void sub_page_info()
     }
     web_client.printf("Via: %s<br>", (bVIA ? "on" : "off"));
     web_client.printf("Userbutton: %s<br>", (bButtonCheck ? "on" : "off"));
+    { // LED-08: outside the battery branch (USB-powered nodes too); labels equal the setup switch labels (info_switch_lint)
+        const LedFitted ledHw = ledFittedNow();
+        web_client.printf("Board LED: %s<br>", !ledHw.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? "on" : "on (pin busy)");   // as --info
+        web_client.printf("Charge LED: %s<br>", ledHw.charge ? webChargeLedText() : "not fitted");
+    }
     #if defined(ANALOG_PIN)
     if (!bAnalogCheck)
         web_client.printf("Analog: off<br>");

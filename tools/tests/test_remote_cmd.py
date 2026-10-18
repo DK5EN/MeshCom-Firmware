@@ -66,7 +66,7 @@ def test_refusal_text_receiver_model() -> None:
 def test_allowlist_command_count() -> None:
     assert len(rc.ALLOWLIST) == 25
     assert rc.ALLOWLIST["led"] == ("on", "off", "flash")
-    assert rc.ALLOWLIST["chgled"] == ("auto", "on", "off")
+    assert rc.ALLOWLIST["chgled"] == ("", "auto", "on", "off")  # "" = bare read form (LED-02)
 
 
 def test_vector_coverage() -> None:
@@ -126,13 +126,28 @@ def test_allowlisted_commands_build(cmd: str, args: str) -> None:
         ("reboot", "ä"), ("status", "\t"),
         ("led", ""), ("led", "blink"), ("led", "1"), ("led", "ON"), ("led", "on off"), ("led", " on"),
         ("led", "FLASH"), ("led", "flash "), ("led", "flash on"),
-        ("chgled", ""), ("chgled", "1"), ("chgled", "0"), ("chgled", "blink"), ("chgled", "AUTO"), ("chgled", "auto on"),
+        ("chgled", "1"), ("chgled", "0"), ("chgled", "blink"), ("chgled", "AUTO"), ("chgled", "auto on"),
         ("chgled", " on"), ("chgled", "flash"),
     ],
 )
 def test_blocked_or_malformed_refused(cmd: str, args: str) -> None:
     with pytest.raises(rc.RmError):
         rc.build_command(DST, SRC, 5, cmd, args, PW)
+
+
+def test_bare_chgled_read_form_accepted() -> None:
+    """LED-08/Q2: `chgled` without argument reads the effective mode; the reply is `ok chgled=<mode>[ rm]`."""
+    text = rc.build_command(DST, SRC, 7, "chgled", "", PW)
+    assert text.startswith("RM1 7 chgled ")
+    assert text.count(" ") == 3  # RM1 <ctr> chgled <tag>: no argument slot
+    rc.validate_command("chgled", "", 7)
+    for args in ("auto on", " ", "status"):
+        with pytest.raises(rc.RmError):
+            rc.build_command(DST, SRC, 7, "chgled", args, PW)
+    for ctr, res in ((90, "ok chgled=on rm"), (91, "ok chgled=auto")):
+        dm = rc.build_reply(DST, SRC, ctr, res, "secret")
+        r = rc.verify_reply(dm, DST, SRC, "secret", ctr)
+        assert r is not None and r["result"] == res
 
 
 @pytest.mark.parametrize("ctr", [-1, 4294967296, 2**40, True, 1.5, "1"])

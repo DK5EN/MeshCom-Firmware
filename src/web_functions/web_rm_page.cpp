@@ -177,7 +177,7 @@ void rmScaffoldJs()
                        "function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}\n");
     web_client.println("var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}\n"
                        "function rmTxp(v){var m=/^(-?\\d+)\\/(-?\\d+)\\/(-?\\d+)$/.exec(String(v));return m?m[1]+' dBm ('+m[2]+'..'+m[3]+')':String(v)+' dBm';}\n"
-                       "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];if(n=='chgled')return 'Charge LED '+p[1];return f;}");
+                       "function rmLabel(f){var p=f.split(' '),n=p[0];if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];if(n=='chgled')return 'Charge LED'+f.slice(6);return f;}");
     web_client.println("function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;\n"
                        "for(i=1;i<t.length;i++){k=t[i];\n"
                        "if(k.indexOf('v=')==0)o.ver=k.substring(2);\n"
@@ -191,19 +191,19 @@ void rmScaffoldJs()
                        "function rmApplyEntry(k,e){var c=e.cmd.split(' '),n=c[0],o,m,i;");
     web_client.println("if(n=='status'){o=rmParseStatus(e.reply);if(!o)return;for(i=0;i<6;i++)if(o.sw[i]>=0)k.sw[i]=o.sw[i];if(o.led)k.led=true;if(o.sw[5]==0)k.fl=false;k.ver=o.ver;k.up=o.up;k.bat=o.bat;k.at=rmNow()-e.ago*1000;}\n");
     web_client.println("else if(n=='led'&&(m=/^ok led=(on|off|flash)$/.exec(e.reply))){k.sw[5]=m[1]=='off'?0:1;k.fl=m[1]=='flash';k.led=true;}\n"
-                       "else if(n=='chgled'){m=/^ok chgled=(auto|on|off)$/.exec(e.reply);if(m)k.chg=m[1];}\n"
+                       "else if(n=='chgled'){m=/^ok chgled=(auto|on|off)( rm)?$/.exec(e.reply);if(m)k.chg=m[1];}\n"
                        "else if(rmTog[n]!==undefined){m=/^ok (\\w+)=(on|off)$/.exec(e.reply);if(m&&m[1]==n){k.sw[rmTog[n]]=m[2]=='on'?1:0;if(n=='led')k.led=true;}}\n");
     web_client.println("}");
     web_client.println("function rmApplySent(list){var a=list.slice(0).sort(function(x,y){return y.ago-x.ago;}),i,e;\n"
-                       "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);else if(e.rep&&e.ver&&e.st=='err'&&e.cmd.indexOf('chgled ')==0&&(e.reply=='err unsupported'||e.reply=='err blocked'))rmKnFor(String(e.dst)).chg='unsupported';}}\n");
-    web_client.println("function rmOkText(e){var c=e.cmd.split(' '),n=c[0],o;\n"
+                       "for(i=0;i<a.length;i++){e=a[i];if(e.rep&&e.ver&&e.st=='ok')rmApplyEntry(rmKnFor(String(e.dst)),e);else if(e.rep&&e.ver&&e.st=='err'&&/^chgled\\b/.test(e.cmd)&&(e.reply=='err unsupported'||e.reply=='err blocked'))rmKnFor(String(e.dst)).chg='unsupported';}}\n");
+    web_client.println("function rmOkText(e){var c=e.cmd.split(' '),n=c[0],o,m;\n"
                        "if(n=='status'){o=rmParseStatus(e.reply);return o?'Connected. Version '+o.ver+(o.up!==''?', '+rmUp(o.up):'')+(o.bat!==''?', battery '+o.bat+' %':'')+(o.rs=='1'?', strict security on':'')+'.':e.msg;}\n"
                        "if(n=='sendpos')return 'Done. The node sent its position.';");
     web_client.println("if(n=='sendtrack')return 'Done. The node sent its track.';\n"
                        "if(n=='reboot')return 'Done. The node is restarting, it is back in about 30 seconds.';\n"
                        "if(n=='sync')return 'Connected. The counters are in step.';\n");
-    web_client.println("if(n=='led'&&c[1]=='flash')return 'Done. The light is now flashing.';\n"
-                       "if(n=='chgled')return 'Done. Charge LED is now '+c[1]+'.';\n"
+    web_client.println("if(n=='led'&&c[1]=='flash')return 'Done. The light is now flashing.';\n");
+    web_client.println("if(n=='chgled'){m=/^ok chgled=(auto|on|off)( rm)?$/.exec(e.reply);return c[1]?'Done. Charge LED is now '+c[1]+'.':m?'Charge LED is '+m[1]+(m[2]?' (set by remote management)':'')+'.':e.msg||'Done.';}\n"
                        "if(rmTogName[n])return 'Done. '+rmTogName[n]+' is now '+c[1]+'.';\n"
                        "if(n=='txpower')return 'Done. TX power is now '+c[1]+' dBm.';\n"
                        "if(n=='setout')return 'Done. Pin '+c[1]+' is now '+c[2]+'.';\n"

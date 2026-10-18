@@ -235,6 +235,8 @@ void esp32EnterDeepSleep()
     #if defined(REMOTE_LED_PIN)
     remoteLedForceOff();   // RM `led on` must not outlive the node: pin is not held during sleep
     #endif
+    boardLedForceOff();        // LED-12: the --board led heartbeat is dark too (no-op without an LED pin)
+    chargeLedOverrideClear();  // LED-01: an RM `chgled` override does not outlive the node; stored mode is re-applied
     loopCrumbClear();   // INS-05: deliberate sleep, RTC memory survives it -- cleared last, after the
                         // bounded button wait above that could still trip the task WDT
 #if !ARDUINO_USB_CDC_ON_BOOT

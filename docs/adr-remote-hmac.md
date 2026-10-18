@@ -73,9 +73,11 @@ vectors are in `docs/architecture/11-wire-format.md` and `tools/tests/remote_cmd
 ### Allowlist
 
 `reboot`, `status`, `sendpos`, `sendtrack`, `sync` (no arguments); `gps`, `track`, `display`,
-`led`, `gateway`, `mesh` (`on|off`; `led` on a board without a usable LED pin replies `err unsupported`, its state is
-never persisted and is off after boot); `txpower <n>` (0 to the board maximum); `setout <a0..a7|b0..b7>
-<on|off>`; `chgled <auto|on|off>` (PMU charge LED, `err unsupported` without an AXP chip, not persisted);
+`led`, `gateway`, `mesh` (`on|off`; `led` on a board without an LED pin replies `err unsupported`, and `err pinbusy` while OneWire/DHT
+owns the shared pad (T-Beam GPIO4), `off` included; its state is never persisted and is off after boot); `txpower <n>` (0 to the board maximum); `setout <a0..a7|b0..b7>
+<on|off>`; `chgled [auto|on|off]` (PMU charge LED, `err unsupported` without an AXP chip; the bare form reads the effective
+mode as `ok chgled=<mode>[ rm]`, `rm` marking an active override; an override is not persisted, deep sleep and the next console
+write restore the stored mode, and the BLE `CHGLED` key keeps reporting the stored value during an override);
 `net` (no arguments, read-only network summary); `upd` (read) / `upd check` / `upd go <tag>` (auto-update, `err unsupported`
 without it). The extended read and write commands (`radio`, `sens`, `txq`, `mbox`, `maxhop`, `mh`, `name`, `atxt`, `pos`)
 are listed in the amendments below; the full reference of all 25 commands is `docs/rm1-commands.md`. Never reachable, whatever the tag: `cleanflash`, `ota-update`, `dfu`, `deepsleep`,

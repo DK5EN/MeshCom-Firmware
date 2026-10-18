@@ -19,6 +19,10 @@
 #include "rm_runtime.h"
 #include "rm_sender_policy.h"
 #include "rm_validate.h"
+#if defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+#include <Adafruit_NeoPixel.h>
+extern Adafruit_NeoPixel pixels;   // esp32_main.cpp
+#endif
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 #include "charge_led_mode.h"
 #include "esp32/esp32_pmu.h"
@@ -206,7 +210,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         sw.mesh = stMesh();
         sw.gateway = stGateway();
 #if defined(REMOTE_LED_PIN)
-        sw.ledSupported = true;
+        sw.ledSupported = remoteLedPinUsable();   // pad held by OneWire: no tile that could only answer err pinbusy
         sw.led = bRemoteLed;
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
@@ -280,9 +284,30 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 #if defined(REMOTE_LED_PIN)
         // a = "on" | "off" | "flash" (allowlisted). Held until "led off" or the next boot, no timer.
         // flash: RM drives the 30 ms / 2 s pattern itself (remoteLedTick), independent of --board led.
+        // LED-04: refused while OneWire/DHT owns the pad (T-Beam: GPIO4), "off" included - nothing to release.
+        if (!remoteLedPinUsable())
+        {
+            snprintf(res, n, "err pinbusy");
+            return false;
+        }
         const int mode = (strcmp(a, "on") == 0) ? 1 : (strcmp(a, "flash") == 0) ? 2 : 0;
         remoteLedSet(mode);
         snprintf(res, n, "ok led=%s", mode == 1 ? "on" : mode == 2 ? "flash" : "off");
+        return true;
+#elif defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+        // NeoPixel-only board (S3 DevKitC): steady white / dark; the flash pattern needs a plain GPIO pad
+        if (strcmp(a, "flash") == 0)
+        {
+            snprintf(res, n, "err unsupported");
+            return false;
+        }
+        const bool on = strcmp(a, "on") == 0;
+        pixels.clear();
+        if (on)
+            for (int i = 0; i < LED_PIXEL; i++)
+                pixels.setPixelColor(i, pixels.Color(50, 50, 50));
+        pixels.show();
+        snprintf(res, n, "ok led=%s", on ? "on" : "off");
         return true;
 #else
         snprintf(res, n, "err unsupported");
@@ -293,15 +318,22 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
     if (strcmp(cmd, "chgled") == 0)
     {
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
-        // a = "auto" | "on" | "off" (allowlisted). Runtime override of the PMU charge LED, not persisted:
-        // the next boot restores the console setting (--charge led on|off).
-        const ChargeLedMode mode = (strcmp(a, "on") == 0) ? CHGLED_ON : (strcmp(a, "off") == 0) ? CHGLED_OFF : CHGLED_AUTO;
-        if (!setChargeLedMode((int)mode))   // AXP chip configured but no PMU object (init failed)
+        // a = "" | "auto" | "on" | "off" (allowlisted). "" reads the effective mode (Q2): ok chgled=<mode>[ rm].
+        // A mode is a runtime override of the PMU charge LED, recorded in esp32_pmu.cpp and not persisted: deep
+        // sleep and the next console write/boot restore the console setting (--charge led on|off).
+        if (!chargeLedFitted())   // AXP chip configured but no PMU object (init failed)
         {
             snprintf(res, n, "err unsupported");
             return false;
         }
-        snprintf(res, n, "ok chgled=%s", mode == CHGLED_ON ? "on" : mode == CHGLED_OFF ? "off" : "auto");
+        if (a[0] == '\0')
+        {
+            snprintf(res, n, "ok chgled=%s%s", chargeLedModeName(chargeLedEffective()), chargeLedOverrideActive() ? " rm" : "");
+            return true;
+        }
+        const ChargeLedMode mode = (strcmp(a, "on") == 0) ? CHGLED_ON : (strcmp(a, "off") == 0) ? CHGLED_OFF : CHGLED_AUTO;
+        chargeLedOverrideSet(mode);
+        snprintf(res, n, "ok chgled=%s", chargeLedModeName(mode));
         return true;
 #else
         snprintf(res, n, "err unsupported");

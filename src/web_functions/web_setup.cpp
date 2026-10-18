@@ -231,6 +231,26 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
+    #if defined(BOARD_LED)
+    if(setupData->paramName.equals("boardled")) {   // LED-08: same toggle row as the console
+        snprintf(message_text, sizeof(message_text), "--board led %s", setupData->paramValue.equals("on") ? "on" : "off");
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bUSER_BOARD_LED == setupData->paramValue.equals("on"))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bUSER_BOARD_LED?"on":"off";
+        return;
+    } else
+    #endif
+
+    #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+    if(setupData->paramName.equals("chargeled")) {  // LED-08: on = auto (follows charging), off = dark
+        snprintf(message_text, sizeof(message_text), "--charge led %s", setupData->paramValue.equals("on") ? "on" : "off");
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bCHARGE_LED == setupData->paramValue.equals("on"))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bCHARGE_LED?"on":"off";
+        return;
+    } else
+    #endif
+
     if(setupData->paramName.equals("via")) {
         snprintf(message_text, sizeof(message_text), "--via %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
@@ -963,6 +983,20 @@ void webSetup_getParam(setupStruct *setupData){
         setupData->returnValue = bDisplayVolt?"on":"off";
         return;
     } else
+
+    #if defined(BOARD_LED)
+    if(setupData->paramName.equals("boardled")) {
+        setupData->returnValue = bUSER_BOARD_LED?"on":"off";
+        return;
+    } else
+    #endif
+
+    #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+    if(setupData->paramName.equals("chargeled")) {
+        setupData->returnValue = bCHARGE_LED?"on":"off";
+        return;
+    } else
+    #endif
 
     if(setupData->paramName.equals("via")) {
         setupData->returnValue = bVIA?"on":"off";

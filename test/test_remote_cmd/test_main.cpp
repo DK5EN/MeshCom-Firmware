@@ -477,7 +477,7 @@ static void test_allowlist_accepts_every_command(void)
                           {"mesh", "on"},   {"mesh", "off"},   {"txpower", "0"},   {"txpower", "22"},
                           {"setout", "a0 on"}, {"setout", "b7 off"}, {"setout", "a7 off"}, {"setout", "b0 on"},
                           {"led", "on"},    {"led", "off"},
-                          {"led", "flash"}, {"chgled", "auto"}, {"chgled", "on"}, {"chgled", "off"}};
+                          {"led", "flash"}, {"chgled", "auto"}, {"chgled", "on"}, {"chgled", "off"}, {"chgled", ""}};
     for (size_t i = 0; i < sizeof(ok) / sizeof(ok[0]); i++)
     {
         RmState s;
@@ -516,7 +516,7 @@ static void test_bad_args_rejected(void)
                            {"led", ""},       {"led", "blink"}, {"led", "1"},       {"led", "ON"},
                            {"led", "on off"}, {"led", " on"},
                            {"led", "auto"},   {"led", "FLASH"}, {"led", "flash "}, {"led", "flash on"},
-                           {"chgled", ""},    {"chgled", "flash"}, {"chgled", "AUTO"}, {"chgled", "auto "},
+                           {"chgled", "flash"}, {"chgled", "AUTO"}, {"chgled", "auto "},
                            {"chgled", "on off"}, {"chgled", "1"}};
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
     {
@@ -1282,7 +1282,8 @@ static void test_command_allowed_predicate(void)
     TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "on", 0, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "off", 0, 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("chgled", "flash", 0, 22));
-    TEST_ASSERT_FALSE(rmCommandAllowed("chgled", "", 0, 22));
+    TEST_ASSERT_TRUE(rmCommandAllowed("chgled", "", 0, 22));   // Q2: bare read form
+    TEST_ASSERT_TRUE(rmCommandAllowed("chgled", nullptr, 0, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("setout", "b7 off", 0, 22));
     TEST_ASSERT_TRUE(rmCommandAllowed("txpower", "22", 0, 22));
     TEST_ASSERT_FALSE(rmCommandAllowed("txpower", "23", 0, 22));
