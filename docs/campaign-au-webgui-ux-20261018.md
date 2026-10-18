@@ -405,7 +405,7 @@ plain struct fields. Estimate W1 with advisor about 40 min and about $10; W2 abo
 ## 11. Review record
 
 32 confirmed findings, all built in above; 6 refuted claims. Full verdict with evidence:
-`au-webgui-ux-review-verdict-20261018.md` (next to this file). The main corrections:
+`campaign-au-webgui-ux-20261018-review-verdict.md` (next to this file). The main corrections:
 
 | Finding                                                                                           | Where now     |
 | ------------------------------------------------------------------------------------------------- | ------------- |
@@ -495,7 +495,7 @@ Net console (2323) as the log channel; `[AU];heap;<where>;free;..;iblk;..;min;..
 
 Code: guard state machine as pure functions in `src/fw_update.h` (`fwGuardStep` and friends, host-tested), force pause,
 chain CHECK -> DOWNLOAD under one guard, watchdog 40 min, D16 guarded check, shedding (KISS first, net console only
-when the 4 KB estimate can close the gap), `updcheck?ble`, INSTRUMENT `--update bleguardcycle <n>`. Two advisor passes.
+when the 4 KB estimate can close the gap), `updcheck?ble`, INSTRUMENT `--update bleguardcycle <n>`. One advisor pass (5 items).
 
 | Run | Node                        | Result                                                                                                                                                                                                |
 | --- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
