@@ -457,8 +457,8 @@ W1 deviations from sections 5-10:
 Findings, all from hardware:
 
 1. F flow hung at 95 % when the node came back on a firmware without `/austatus` (Latest 10.18 predates this GUI): fixed (HTML scaffold answer counts as "node is back").
-2. A stale remembered click for another tag overlaid "Install failed" on a freshly staged image: fix in flight.
-3. Safeboot `apply_failed` with `app_valid:false` and `fallback_in_ms:-1` stays in Safeboot; the page claimed "returns in 0 s": fix in flight. A failed inflate after the erase destroys the single app slot (no fallback); only failures before the write fall back.
+2. A stale remembered click for another tag overlaid "Install failed" on a freshly staged image: fixed in `5a5fc7f7` (`auFStale()`/`auFInit()`: a remembered click counts only for the tag the node still has staged or runs). Host-tested (`tools/webgui_au_test.js` F2); not re-benched on hardware.
+3. Safeboot `apply_failed` with `app_valid:false` and `fallback_in_ms:-1` stays in Safeboot; the page claimed "returns in 0 s": fixed in `5a5fc7f7` (`auFOta()`: `app_valid:false` or a negative `fallback_in_ms` shows "the node stays in Safeboot" with the upload link and a disabled button). Host-tested (`tools/webgui_au_test.js` F3); not re-benched on hardware (the W2d run predates the fix). A failed inflate after the erase destroys the single app slot (no fallback); only failures before the write fall back.
 4. T-Beam: the gate refuses with BLE paused, no phone, console off, on the previous commit too (pause leaves 67-72 KB, gate wants 76000 B). The concept's "80-85 KB paused" does not hold on this build; "Reboot the node and try again" does not help there. W3 measures, W4 shedding addresses it.
 5. Manual check cooldown (60 s) shows "The node did not start the job, try again in a minute" after a second click: works as designed.
 
