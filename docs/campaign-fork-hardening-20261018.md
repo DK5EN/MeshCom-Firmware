@@ -9,12 +9,12 @@ DK5EN-90, DK5EN-14 (DK5EN-98 untouched), the heap bisect. BMx280 is field tested
 | Wave | Content                                                                                        | Status          |
 | ---- | ---------------------------------------------------------------------------------------------- | --------------- |
 | W0   | Docs: fork vs upstream, locked settings spec, time zones (+ test), RM1 signature, RM1 cmds     | done            |
-| W0h  | T-Beam heap bisect c9e64344..85b0c457, idle-heap method                                        | pending         |
+| W0h  | T-Beam heap bisect c9e64344..85b0c457, idle-heap method                                        | done            |
 | W1   | BMx280 presence helper, LED core helper, server reply core, heap gate tool + mock option       | done `b8aa4354` |
-| W2   | LED surfaces (console, ESP32 main/sleep/PMU/RM, web)                                           | pending         |
-| W3   | Server reply integration (UDP frames, LoRa gates, settings); heap levers (stack, rings, marks) | pending         |
-| W4   | LED nRF52 + variants; production lock incl. `--stor` and `--autoupdate auto`                   | pending         |
-| W5   | Bench: T-Beam heap, LED, server reply on DK5EN-1 and DK5EN-90; docs; restore                   | pending         |
+| W2   | LED surfaces (console, ESP32 main/sleep/PMU/RM, web)                                           | done `55ad3b42` |
+| W3   | Server reply integration (UDP frames, LoRa gates, settings); heap levers (stack, rings, marks) | done `73c0bd04` |
+| W4   | LED nRF52 + variants; production lock incl. `--stor` and `--autoupdate auto`                   | done `e4edffc8` |
+| W5   | Bench: T-Beam heap, LED, server reply on DK5EN-1 and DK5EN-90; docs; restore                   | done            |
 
 ## Decisions carried into the waves
 
@@ -110,7 +110,34 @@ DK5EN-90, DK5EN-14 (DK5EN-98 untouched), the heap bisect. BMx280 is field tested
 - Advisors: three rounds (import refused old backups, untested call sites, stale golden, autoupd range).
 - Gate PASS 75 envs; 14 board builds incl. heltec V3 INSTRUMENT.
 
-## Resume point: W5 (not started, operator stop 2026-10-18 evening)
+## W5 result (2026-10-18 evening)
+
+Bench on the campaign head (`e4edffc8` source), 2 dBm, identity guard first, DK5EN-98 untouched.
+
+| Node              | Check                                                                  | Result                                                                          |
+| ----------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| DK5EN-92          | idle STAT heap, release image, BLE up                                  | 68036 B (300 s), 69332 B (600 s); bisect 70100 / 68336 B: unchanged             |
+| DK5EN-92          | `[AU];ble;pause;heap` at `--update check`, release, 3 checks           | 86576 / 86528 / 86276 B (was 76.3-81.5 KB); gate 76000 passed                   |
+| DK5EN-92          | AU task stack, INSTRUMENT, 3 gate-passing TLS checks                   | `stk` 3740-3748 B unused of 10240; heap lowest 28476 B during TLS               |
+| DK5EN-92          | `--board led on` with OneWire on GPIO4 / off                           | refused (`LED pin is used by OneWire/DHT`), `--info` "on (pin busy)" / accepted |
+| DK5EN-1           | `--board led on`, `--info`; lock `nbrrelay`, `autoupdate auto`, `stor` | `BOARD LED: on`, `CHARGE LED: not fitted`; `[ERR];locked;<name>` x3             |
+| DK5EN-90          | `--board led on`, `--info`; lock `nbrrelay`, `autoupdate auto`         | `BOARD LED: on`, `CHARGE LED: not fitted`; `[ERR];locked;<name>` x2             |
+| DK5EN-14          | web start page, image string scan                                      | Board LED and Charge LED "not fitted"; `LEDNF` in the image                     |
+| DK5EN-1, DK5EN-90 | gateway registration state (internal note)                             | passed on ESP32 and nRF52 (enter, persist over reboot, clear)                   |
+
+- Idle heap is unchanged because the phone rings live on the heap while BLE runs; the W3 gain shows only
+  in the BLE pause of the update check (+5..10 KB).
+- Release gate: `.claude/commands/release-firmware.md` step 2 has the idle-heap step;
+  `tools/heap_baseline.json` holds `ttgo_tbeam` 69332 B (net2323, 2026-10-18).
+- Docs: `rm1-commands.md`, `fork-dev-vs-upstream-20261018.md`, defect catalogue section 2c (LED-01..17,
+  BMx280 entry without separate SENS IDs), BACKLOG (SENS-03, LED-TRACKER, LED-V4R8, LED-FIELD),
+  `production-locked-settings.md` (decisions recorded).
+- Restore: all four nodes on release images of the campaign head; DK5EN-1 gateway on (as found) and net
+  console on; DK5EN-90 gateway off (as found), board LED left on for the visual check.
+- Not done on the bench: visual LED blink, phone app SN on DK5EN-14, RM `chgled`/`led` over the air (only
+  DK5EN-1 has RM on), deep-sleep LED (LED-01), stack on an install (download) job.
+
+## Former resume point: W5 (done)
 
 1. Bench, serialized, `identity_guard.py` first, 2 dBm, test traffic only to TEST or own DMs, DK5EN-98
    untouched. Flash permission: DK5EN-92, -1, -90, -14.
@@ -128,6 +155,11 @@ tools/heap_baseline.json --board ttgo_tbeam`) to `.claude/commands/release-firmw
 3. Docs: `docs/rm1-commands.md` (sens now from detected sensors, bare `chgled`, `err pinbusy`),
    `docs/fork-dev-vs-upstream-20261018.md` rows for W1-W4 (LED parity, sens fix, setting lock, heap levers),
    defect catalogue (SENS-01/02, LED-01..17), BACKLOG (SENS-03 DHT, Tracker LED, V4R8 env), RESUME.
-4. Open operator decisions: web message history empty after each update check on classic ESP32 (accepted
+4. Operator decisions 2026-10-18 late: web message history cleared by each update check on classic ESP32
+   accepted; server reply code comments stay as they are; spectrum import keeps refusing out-of-range
+   backups as a whole (approved); `{SET}` over LoRa without password approved as a security exception.
+   Flash permission for W5 confirmed (DK5EN-1, -92, -90, -14). Still open: field confirmation of T-Echo,
+   T114, T-ETH-Elite, DevKitC LED pins.
+5. Superseded open list (kept for history): web message history empty after each update check on classic ESP32 (accepted
    or keep the history ring static); spectrum import ranges still refuse out-of-range backups; `{SET}`
    password question (spec open point); field confirmation of T-Echo, T114, T-ETH-Elite, DevKitC LED pins.

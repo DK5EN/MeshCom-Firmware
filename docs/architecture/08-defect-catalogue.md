@@ -1557,6 +1557,34 @@ Strings der Messages-Seite, inklusive des `aprs.fi`-Attributs; dazu
 und fuer `setvalue`-Werte. Backlog WEB-03; Punkte (c)-(e) dort (Passwort in
 GET-URL, XHR-Races, `alert()`) bleiben offene Abwaegungen.
 
+## 2c. LED and sensor-presence findings (campaign fork-hardening, 2026-10-18)
+
+Core helpers landed in W1 (`b8aa4354`), the surfaces in W2 (`55ad3b42`), the nRF52 LED and the variant pins in W4 (`e4edffc8`). Severity column as in the LED fix plan: M medium, L low.
+
+| ID     | Kind   | Sev | Finding                                                                                            | Status                                                                                                        |
+| ------ | ------ | --- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| LED-01 | bug    | M   | RM `chgled on` survived `--deepsleep` (steady LED for the whole sleep, battery drain)              | **FIXED** `b8aa4354` (override state), `55ad3b42` (deep sleep reverts it)                                     |
+| LED-02 | bug    | L-M | Effective charge-LED mode invisible on web/BLE/console; RM had no read                             | **FIXED** `b8aa4354`, `55ad3b42` (bare `chgled` reads `ok chgled=<mode>[ rm]`)                                |
+| LED-03 | bug    | L   | `--charge led` from the phone did not resend SN; app `CHGLED` stale                                | **FIXED** `55ad3b42`                                                                                          |
+| LED-04 | bug    | M   | T-Beam: heartbeat and boot init drove GPIO4 while OneWire/DHT used it                              | **FIXED** `55ad3b42` (run-time guard; `--board led on` refused, RM `led` answers `err pinbusy`)               |
+| LED-05 | parity | L   | `ttgo_tbeam_SX1268` lacked `BOARD_LED 4` / active low                                              | **FIXED** `e4edffc8`                                                                                          |
+| LED-06 | parity | L   | Heltec V3/V4: RM `led` only, no `--board led` heartbeat                                            | **FIXED** `e4edffc8` (`BOARD_LED 35`)                                                                         |
+| LED-07 | parity | M   | nRF52 (RAK4631, T114, T-Echo): no `--board led`, no RM `led`                                       | **FIXED** `e4edffc8`                                                                                          |
+| LED-08 | parity | L   | Web GUI: no setup control, charge LED status hidden on USB power, board LED state never shown      | **FIXED** `55ad3b42`                                                                                          |
+| LED-09 | parity | L   | Console: no LED readback in `--info`                                                               | **FIXED** `55ad3b42`                                                                                          |
+| LED-10 | gap    | L   | BLE SN sent `BLED`/`CHGLED` false on boards without the hardware ("off" = "not fitted")            | **FIXED** `55ad3b42` (key left out of SN, listed in SN1 `LEDNF`)                                              |
+| LED-11 | defect | L   | `bool bLED = BOARD_LED_ACTIVE_LOW;` mixed "lit" state with pin level                               | **FIXED** `b8aa4354` (`boardLedPhase`), `55ad3b42` (flasher switched over)                                    |
+| LED-12 | defect | L   | Flasher not forced dark before ESP32 deep sleep on boards without `REMOTE_LED_PIN`                 | **FIXED** `55ad3b42` (`boardLedForceOff()`)                                                                   |
+| LED-13 | bug    | M   | S3 DevKitC-1 `BOARD_LED 38` bit-banged the WS2812 line; T-ETH-Elite `BOARD_LED 1` drove `MODEM_RI` | **FIXED** `e4edffc8` (DevKitC NeoPixel 38, T-ETH-Elite `BOARD_LED 38`); field confirmation open (BACKLOG)     |
+| LED-14 | parity | L   | Heltec V2.1 (GPIO25) and WSL V3 (GPIO35) lacked the macro; Wireless Tracker unresolved             | **PARTLY FIXED** `e4edffc8` (V2, WSL V3); Tracker open (BACKLOG)                                              |
+| LED-15 | bug    | M   | T-Echo variant: LED macros on touch pin and power enable, wrong polarity, LEDs lit at boot         | **FIXED** `e4edffc8` (pins 33/35/14 active low, off level written at init); field confirmation open (BACKLOG) |
+| LED-16 | bug    | L   | T114: `LED_STATE_ON 1` likely inverted, `LED_BLUE 36` does not exist                               | **FIXED** `e4edffc8` (active low, fake pin dropped); field confirmation open (BACKLOG)                        |
+| LED-17 | risk   | L   | Heltec V4R8: GPIO35 is octal PSRAM, LED on GPIO46; the fork's V4 env uses the V3 board definition  | **OPEN** (BACKLOG: V4R8 env)                                                                                  |
+
+**BMx280 sens presence (W1, `b8aa4354`) — FIXED.** RM `sens` claims a field only when its sensor is enabled and detected; BMx280 humidity follows the chip ID (BME280 at either address), BMP3 claims `t`. Field bug: a BME280 enabled via `--bmp` reported humidity as not fitted. The SENS-01/SENS-02 split could not be taken from any document; the entry is recorded here without assigning the two IDs. SENS-03 (DHT sensor not claimed by `sens`) is open, see BACKLOG.
+
+---
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |

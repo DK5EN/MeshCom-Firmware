@@ -2,7 +2,16 @@
 
 **Stand:** 2026-10-18 evening, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
 
-## 2026-10-18 -- campaign fork hardening W0-W4 done, W5 (bench) open (resume point: docs/campaign-fork-hardening-20261018.md)
+## 2026-10-18 -- campaign fork hardening W0-W5 done (resume point: docs/campaign-fork-hardening-20261018.md)
+
+- W5 bench on the campaign head: T-Beam DK5EN-92 idle STAT heap 69332 B (unchanged), update check with BLE
+  paused 86.3-86.6 KB (was 76.3-81.5 KB), AU task stack 3740 B unused of 10240 on a gate-passing TLS check;
+  production lock and LED console checks on DK5EN-1, -90, -92; T-Deck reports both LEDs "not fitted".
+- Release gate: `/release-firmware` step 2 runs `tools/bench/heap_idle.py` against `tools/heap_baseline.json`.
+- Open: visual LED confirmation, phone-app SN check on DK5EN-14, RM `chgled`/`led` over the air, deep-sleep
+  LED test, field confirmation of T-Echo, T114, T-ETH-Elite, DevKitC LED pins. Nothing pushed, no release.
+
+### Earlier state (W0-W4)
 
 - W0 `c68d482e` docs (fork vs upstream, locked settings spec, time zones, RM1 signature and commands);
   W1 `b8aa4354` sens presence, LED helpers, heap tool; W2 `55ad3b42` LED surfaces; W3 `73c0bd04` heap

@@ -139,6 +139,21 @@ process at a time.
 Copy the total case count this run actually reports into release-notes.md —
 never a count remembered from an earlier release.
 
+Idle-heap step (bench, T-Beam DK5EN-92 on the release image of the tag; skip
+only if the T-Beam is unreachable, and say so in the release notes):
+
+```
+MC_CONSOLE_PW=<console password> python3 tools/bench/heap_idle.py \
+  --host <T-Beam IP> --baseline tools/heap_baseline.json --board ttgo_tbeam
+```
+
+Exit 1 means idle free heap fell more than 3072 B below the baseline: stop
+and find the cause before tagging. The idle figure is the 600 s STAT heap
+with BLE up (baseline 69332 B, 2026-10-18; it moves about ±1.3 KB between
+the 300 s and 600 s samples). Release images only — INSTRUMENT builds sit
+about 3.5 KB lower. Run `--update-baseline` only after a deliberate RAM
+change, and commit `tools/heap_baseline.json` with it.
+
 ## Step 3 — Commit and push `fork-dev`
 
 Commit the Step 1 documents (`release-notes.md` must be in the tagged commit:

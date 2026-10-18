@@ -7,24 +7,24 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.72",
-      "last_ip_verified": "2026-10-17 (USB --info)"
+      "host": "192.168.68.71",
+      "last_ip_verified": "2026-10-18 (start page + USB --info)"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
       "board": "t_deck_plus",
       "family": "esp32",
       "usb_serial": "E0:72:A1:AD:65:E0",
-      "host": "dk5en-14.local",
-      "last_ip_verified": "mDNS name; not reachable 2026-10-16"
+      "host": "192.168.68.72",
+      "last_ip_verified": "2026-10-18 (start page)"
     },
     "t-beam-92": {
       "call": "DK5EN-92",
       "board": "ttgo_tbeam",
       "family": "esp32",
       "usb_serial": "573C000584",
-      "host": "192.168.68.69",
-      "last_ip_verified": "2026-10-17 (USB --info)"
+      "host": "192.168.68.66",
+      "last_ip_verified": "2026-10-18 (start page + 2323 --info)"
     },
     "rak-90": {
       "call": "DK5EN-90",
@@ -32,8 +32,8 @@
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
       "host": null,
-      "last_ip": "192.168.68.62",
-      "last_ip_verified": "2026-10-16 (USB --info; nRF52 has no 2323 console, so no host)"
+      "last_ip": "192.168.68.75",
+      "last_ip_verified": "2026-10-18 (start page + USB --info)"
     }
   },
   "taken_ssids": {

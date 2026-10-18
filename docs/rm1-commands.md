@@ -171,7 +171,8 @@ Ausführung nicht dem gewünschten entspricht.
 
 **`led on|off|flash`** - Fern-LED. Gilt bis zum nächsten `led off` oder Neustart (kein Timer, nicht gespeichert);
 `flash` blinkt kurz (30 ms) alle 2 s. Antwort: `ok led=on|off|flash`. Auf Platinen ohne nutzbare LED:
-`err unsupported`.
+`err unsupported`. Hält OneWire den LED-Pin (T-Beam: GPIO4), antwortet der Knoten `err pinbusy` (auch bei `off`). Auch die
+nRF52-Platinen RAK4631, T114 und T-Echo unterstützen `led`.
 
 ### 3.3 Parameter
 
@@ -189,8 +190,9 @@ gespeichert. Antwort: `ok <pin>=on|off`, z.B. `ok a2=on`. Falsche Form: `err blo
 
 **`chgled auto|on|off`** - Ladeleuchte des Power-Management-Chips (AXP192/AXP2101, z.B. T-Beam) übersteuern:
 `auto` = Chip steuert, `on`/`off` erzwingen. Nicht gespeichert; der nächste Start nimmt wieder die lokale
-Einstellung. Antwort: `ok chgled=auto|on|off`. Platine ohne diesen Chip (oder Chip nicht initialisiert):
-`err unsupported`.
+Einstellung. Antwort: `ok chgled=auto|on|off`. Ohne Argument (`chgled`) liest der Befehl den wirksamen Modus:
+`ok chgled=<modus>`, mit angehängtem ` rm`, solange eine Fernwartungs-Übersteuerung aktiv ist (z.B. `ok chgled=on rm`).
+Platine ohne diesen Chip (oder Chip nicht initialisiert): `err unsupported`.
 
 ### 3.4 Lesebefehle
 
@@ -210,9 +212,9 @@ Beispiel: `ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22`.
 Prozent, Druck 1 Nachkommastelle, `t2` zweite Temperatur (1-Wire/SHT21). `-` = dieser Wert ist nicht bestückt.
 Ist gar kein Sensor aktiv: `err unsupported`. Welcher Wert vorhanden ist, richtet sich nach den eingeschalteten
 Sensortreibern: `t` bei BMP280/BME280/BME680/AHT20, `h` bei BME280/BME680/AHT20/SHT21, `p` bei
-BMP280/BME280/BME680/BMP390, `t2` bei SHT21/1-Wire. Beim aktuellen Stand hängt `h=` davon ab, ob der Sensor als
-BME280 (nicht als BMP280) eingeschaltet wurde; eine geplante Änderung soll BME280 an beiden I2C-Adressen
-erkennen (`h=` vorhanden) und beim BMP280 `h=-` liefern; im Code ist das noch nicht enthalten.
+BMP280/BME280/BME680/BMP390, `t2` bei SHT21/1-Wire. Die Anwesenheit der Werte folgt den
+tatsächlich erkannten Sensoren: ein BME280 wird an beiden I2C-Adressen erkannt (`h=` vorhanden), bei einem BMP280
+bleibt `h=-`.
 Beispiel: `ok t=21.4 h=45 p=1013.2 t2=-`.
 
 **`txq`** - Sendewarteschlange. Antwort: `ok q=<belegt>/<kapazität> bp=<quiet|qrs|qrt> tx=<z> rt=<z> dr=<z> u=<%>`.
@@ -472,7 +474,9 @@ Reply: `ok <name>=on|off`, e.g. `RM1 45 ok gps=on <rtag>`. Error: `err failed` w
 not the requested one.
 
 **`led on|off|flash`** - remote LED. Held until the next `led off` or reboot (no timer, not stored); `flash` blinks
-briefly (30 ms) every 2 s. Reply: `ok led=on|off|flash`. On boards without a usable LED: `err unsupported`.
+briefly (30 ms) every 2 s. Reply: `ok led=on|off|flash`. On boards without a usable LED: `err unsupported`. While
+OneWire owns the LED pad (T-Beam: GPIO4) the node answers `err pinbusy` (`off` included). The nRF52 boards RAK4631,
+T114 and T-Echo support `led` as well.
 
 ### 3.3 Parameters
 
@@ -488,7 +492,9 @@ or `b0`..`b7`. The pin must be configured locally as an output, otherwise `err n
 
 **`chgled auto|on|off`** - override the charge LED of the power-management chip (AXP192/AXP2101, e.g. T-Beam):
 `auto` = chip decides, `on`/`off` force it. Not stored; the next boot returns to the local setting. Reply:
-`ok chgled=auto|on|off`. Board without that chip (or chip not initialised): `err unsupported`.
+`ok chgled=auto|on|off`. Without an argument (`chgled`) the command reads the effective mode: `ok chgled=<mode>`,
+with ` rm` appended while a remote-management override is active (e.g. `ok chgled=on rm`). Board without that chip
+(or chip not initialised): `err unsupported`.
 
 ### 3.4 Read commands
 
@@ -508,9 +514,8 @@ Example: `ok f=433.175 sf=11 cr=5 bw=250 p=10/2/22`.
 percent, pressure 1 decimal, `t2` second temperature (1-Wire/SHT21). `-` = this value is not fitted. If no sensor
 is active at all: `err unsupported`. Which value exists follows the enabled sensor drivers: `t` with
 BMP280/BME280/BME680/AHT20, `h` with BME280/BME680/AHT20/SHT21, `p` with BMP280/BME280/BME680/BMP390, `t2` with
-SHT21/1-Wire. At the current state `h=` depends on whether the sensor was enabled as a BME280 (not as a BMP280);
-a planned change will recognise a BME280 at either I2C address (`h=` present) and keep `h=-` for a BMP280; this
-is not in the code yet.
+SHT21/1-Wire. Presence of the values follows the sensors actually detected: a BME280 is recognised at either I2C
+address (`h=` present), a BMP280 keeps `h=-`.
 Example: `ok t=21.4 h=45 p=1013.2 t2=-`.
 
 **`txq`** - transmit queue. Reply: `ok q=<used>/<capacity> bp=<quiet|qrs|qrt> tx=<c> rt=<c> dr=<c> u=<pct>`.
