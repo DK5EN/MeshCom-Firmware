@@ -520,6 +520,15 @@ def load_corpus(path: Path) -> list[bytes]:
 # ---------------------------------------------------------------------------
 
 
+def _ascii_text(value: str, exc: type[Exception]) -> str:
+    """--keep-reply goes out as raw ASCII: reject anything else up front."""
+    try:
+        value.encode("ascii")
+    except UnicodeEncodeError:
+        raise exc(f"keep-reply must be ASCII, got {value!r}") from None
+    return value
+
+
 class MockMeshComServer:
     """A minimal, in-process-testable stand-in for the MeshCom server."""
 
@@ -536,7 +545,12 @@ class MockMeshComServer:
         redistribute: bool = True,
         stor_routing: bool = False,
         stor_ttl: float = STOR_TTL,
+        keep_reply: str | None = None,
+        keep_reply_delay_ms: int = 0,
+        keep_reply_once: bool = False,
     ) -> None:
+        if keep_reply is not None:
+            keep_reply = _ascii_text(keep_reply, ValueError)
         self.host = host
         self.callsign = callsign
         self.beat_status = beat_status
@@ -551,6 +565,12 @@ class MockMeshComServer:
         # reaction to STOR is unknown, so it is off unless asked for.
         self.stor_routing = stor_routing
         self.stor_ttl = stor_ttl
+        # Optional extra datagram (raw ASCII) sent after the BEAT of a KEEP.
+        self.keep_reply = keep_reply
+        self.keep_reply_delay_ms = keep_reply_delay_ms
+        self.keep_reply_once = keep_reply_once
+        self._keep_reply_sent: set[tuple[str, int]] = set()
+        self._keep_reply_timers: list[threading.Timer] = []
 
         self.clients: dict[tuple[str, int], ClientInfo] = {}
         # gateway call -> {"calls", "hold_h", "t" (monotonic), "addr"}
@@ -581,6 +601,10 @@ class MockMeshComServer:
 
     def stop(self) -> None:
         self._stop.set()
+        with self._lock:
+            timers, self._keep_reply_timers = self._keep_reply_timers, []
+        for timer in timers:   # a delayed reply must not fire into the closed socket
+            timer.cancel()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         self.sock.close()
@@ -758,6 +782,30 @@ class MockMeshComServer:
             fields["version"], fields["sub"], fields["groups"],
         )
         self._send_beat(addr)
+        self._maybe_send_keep_reply(addr)
+
+    def _maybe_send_keep_reply(self, addr: tuple[str, int]) -> None:
+        if self.keep_reply is None:
+            return
+        if self.keep_reply_once:
+            with self._lock:
+                if addr in self._keep_reply_sent:
+                    return
+                self._keep_reply_sent.add(addr)
+        payload = self.keep_reply.encode("ascii")
+        if self.keep_reply_delay_ms > 0:
+            timer = threading.Timer(
+                self.keep_reply_delay_ms / 1000.0, self._sendto, (payload, addr)
+            )
+            timer.daemon = True
+            with self._lock:
+                if self._stop.is_set():
+                    return
+                self._keep_reply_timers = [t for t in self._keep_reply_timers if t.is_alive()]
+                self._keep_reply_timers.append(timer)
+                timer.start()
+        else:
+            self._sendto(payload, addr)
 
     def _send_beat(self, addr: tuple[str, int]) -> None:
         datagram = build_beat_datagram(self.callsign, self.beat_status)
@@ -945,6 +993,20 @@ def main(argv: list[str] | None = None) -> int:
         help="MOCK ASSUMPTION: also forward a DATA text frame as GATE to the "
              "gateway whose live STOR snapshot lists its destination call",
     )
+    parser.add_argument(
+        "--keep-reply", metavar="TEXT", default=None,
+        type=lambda v: _ascii_text(v, argparse.ArgumentTypeError),
+        help="after the BEAT, send one extra UDP datagram with the raw ASCII "
+             "payload TEXT to the KEEP's source address (default: off)",
+    )
+    parser.add_argument(
+        "--keep-reply-delay-ms", type=int, default=0,
+        help="delay of the --keep-reply datagram in ms (default: 0)",
+    )
+    parser.add_argument(
+        "--keep-reply-once", action="store_true",
+        help="send the --keep-reply datagram only for the first KEEP per source",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -963,6 +1025,9 @@ def main(argv: list[str] | None = None) -> int:
         recorder=recorder,
         redistribute=not args.no_redistribute,
         stor_routing=args.stor_routing,
+        keep_reply=args.keep_reply,
+        keep_reply_delay_ms=args.keep_reply_delay_ms,
+        keep_reply_once=args.keep_reply_once,
     )
     logger.info(
         "event=listen host=%s port=%d callsign=%s", args.host, server.port, args.callsign

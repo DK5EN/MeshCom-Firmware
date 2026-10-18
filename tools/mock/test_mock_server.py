@@ -837,6 +837,83 @@ class TestStorRouting(unittest.TestCase):
             server.send_gate(text_frame("DK5EN-92", src="DL2JA-1"), s["store"].getsockname())
 
 
+class TestKeepReply(unittest.TestCase):
+    def _server(self, **kw) -> tuple[srv.MockMeshComServer, tuple[str, int]]:
+        server = srv.MockMeshComServer("127.0.0.1", 0, registry_ttl=120.0, **kw)
+        server.start()
+        self.addCleanup(server.stop)
+        return server, ("127.0.0.1", server.port)
+
+    def _keep(self, sock: socket.socket, addr: tuple[str, int]) -> None:
+        sock.sendto(cli.build_keep(0x11111111, "NODE-A"), addr)
+
+    def test_default_sends_only_beat(self) -> None:
+        _server, addr = self._server()
+        sock = free_udp_socket(0.3)
+        self.addCleanup(sock.close)
+        self._keep(sock, addr)
+        self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
+        with self.assertRaises(socket.timeout):
+            sock.recvfrom(4096)
+
+    def test_extra_datagram_after_beat(self) -> None:
+        _server, addr = self._server(keep_reply="PING-TEXT")
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self._keep(sock, addr)
+        self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
+        self.assertEqual(sock.recvfrom(4096)[0], b"PING-TEXT")
+
+    def test_delay(self) -> None:
+        _server, addr = self._server(keep_reply="LATE", keep_reply_delay_ms=200)
+        sock = free_udp_socket()
+        self.addCleanup(sock.close)
+        self._keep(sock, addr)
+        sock.recvfrom(4096)
+        t0 = time.monotonic()
+        self.assertEqual(sock.recvfrom(4096)[0], b"LATE")
+        self.assertGreaterEqual(time.monotonic() - t0, 0.1)
+
+    def test_once(self) -> None:
+        _server, addr = self._server(keep_reply="ONE", keep_reply_once=True)
+        sock = free_udp_socket(0.3)
+        self.addCleanup(sock.close)
+        self._keep(sock, addr)
+        self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
+        self.assertEqual(sock.recvfrom(4096)[0], b"ONE")
+        self._keep(sock, addr)
+        self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
+        with self.assertRaises(socket.timeout):
+            sock.recvfrom(4096)
+
+    def test_non_ascii_rejected_at_init(self) -> None:
+        with self.assertRaises(ValueError) as cm:
+            srv.MockMeshComServer("127.0.0.1", 0, keep_reply="caf\u00e9")
+        self.assertIn("ASCII", str(cm.exception))
+
+    def test_non_ascii_rejected_at_argparse(self) -> None:
+        with self.assertRaises(SystemExit) as cm:
+            srv.main(["--keep-reply", "caf\u00e9"])
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_stop_cancels_pending_delayed_reply(self) -> None:
+        server, addr = self._server(keep_reply="LATE", keep_reply_delay_ms=5000)
+        sock = free_udp_socket(0.3)
+        self.addCleanup(sock.close)
+        self._keep(sock, addr)
+        self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
+        deadline = time.monotonic() + 2.0   # the BEAT leaves before the timer is registered
+        while not server._keep_reply_timers and time.monotonic() < deadline:
+            time.sleep(0.01)
+        timers = list(server._keep_reply_timers)
+        self.assertEqual(len(timers), 1)
+        self.assertTrue(timers[0].is_alive())
+        server.stop()
+        timers[0].join(timeout=1.0)
+        self.assertFalse(timers[0].is_alive())
+        self.assertEqual(server._keep_reply_timers, [])
+
+
 if __name__ == "__main__":
     unittest.main()
 

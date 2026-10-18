@@ -92,6 +92,49 @@ static void test_marker_survives_the_load_clamp(void)
     TEST_ASSERT_EQUAL_INT(CHGLED_OFF, chargeLedModeFromSettings(clamped, 0));
 }
 
+// LED-02: RM "chgled auto|on|off" is an override on top of the stored mode. Before the fix nothing recorded it,
+// so every surface kept showing the stored console value while the AXP register held the RM mode.
+static void test_override_wins_over_stored_mode(void)
+{
+    ChargeLedOverride ov;   // boot state: no override
+    TEST_ASSERT_FALSE(ov.active());
+    TEST_ASSERT_EQUAL_INT(CHGLED_OFF, effectiveChargeLedMode(CHGLED_OFF, ov));
+    TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, effectiveChargeLedMode(CHGLED_AUTO, ov));
+    ov.set(CHGLED_ON);
+    TEST_ASSERT_TRUE(ov.active());
+    TEST_ASSERT_EQUAL_INT(CHGLED_ON, effectiveChargeLedMode(CHGLED_OFF, ov));
+    TEST_ASSERT_EQUAL_INT(CHGLED_ON, effectiveChargeLedMode(CHGLED_AUTO, ov));
+    ov.set(CHGLED_AUTO);   // RM "chgled auto" over a stored "off" is still an override
+    TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, effectiveChargeLedMode(CHGLED_OFF, ov));
+}
+
+// LED-01: before deep sleep the override is cleared and the stored mode applies again
+static void test_clear_reverts_to_stored_mode(void)
+{
+    ChargeLedOverride ov;
+    ov.set(CHGLED_ON);
+    ov.clear();
+    TEST_ASSERT_FALSE(ov.active());
+    TEST_ASSERT_EQUAL_INT(CHGLED_OFF, effectiveChargeLedMode(CHGLED_OFF, ov));
+    TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, effectiveChargeLedMode(CHGLED_AUTO, ov));
+}
+
+// an override value outside auto/on/off is ignored, the stored mode stays
+static void test_invalid_override_is_ignored(void)
+{
+    ChargeLedOverride ov;
+    ov.set((ChargeLedMode)7);
+    TEST_ASSERT_FALSE(ov.active());
+    TEST_ASSERT_EQUAL_INT(CHGLED_OFF, effectiveChargeLedMode(CHGLED_OFF, ov));
+}
+
+static void test_override_text(void)
+{
+    TEST_ASSERT_EQUAL_STRING("auto", chargeLedModeName(CHGLED_AUTO));
+    TEST_ASSERT_EQUAL_STRING("on", chargeLedModeName(CHGLED_ON));
+    TEST_ASSERT_EQUAL_STRING("off", chargeLedModeName(CHGLED_OFF));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -102,5 +145,9 @@ int main(int, char **)
     RUN_TEST(test_console_rows_round_trip);
     RUN_TEST(test_marker_bit_is_free_and_inside_the_16_bit_range);
     RUN_TEST(test_marker_survives_the_load_clamp);
+    RUN_TEST(test_override_wins_over_stored_mode);
+    RUN_TEST(test_clear_reverts_to_stored_mode);
+    RUN_TEST(test_invalid_override_is_ignored);
+    RUN_TEST(test_override_text);
     return UNITY_END();
 }

@@ -567,6 +567,135 @@ static void test_upd_result()
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtUpdResult(g_buf, 5, true, RM_AU_STARTED, "v1.2.3", ""));
 }
 
+// rmSensPresence: flags x detection (regression for "Humidity: not fitted" on a BME280 run with --bmp on)
+static RmSensFlags sf()
+{
+    RmSensFlags f;
+    memset(&f, 0, sizeof(f));
+    return f;
+}
+
+static RmSensIn sp(const RmSensFlags &f)
+{
+    RmSensIn in;
+    memset(&in, 0, sizeof(in));
+    rmSensPresence(f, in);
+    return in;
+}
+
+static void expectSens(const RmSensIn &in, bool t, bool h, bool p, bool t2)
+{
+    TEST_ASSERT_EQUAL(t, in.hasT);
+    TEST_ASSERT_EQUAL(h, in.hasH);
+    TEST_ASSERT_EQUAL(p, in.hasP);
+    TEST_ASSERT_EQUAL(t2, in.hasT2);
+}
+
+void test_sens_bmpflag_bme280()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxFound = f.bmxIsBme = true;
+    RmSensIn in = sp(f);
+    expectSens(in, true, true, true, false);
+    in.t = 20.5f; in.h = 49.8f; in.p = 989.4f;
+    rmFmtSens(g_buf, sizeof(g_buf), in);
+    TEST_ASSERT_EQUAL_STRING("t=20.5 h=50 p=989.4 t2=-", g_buf);
+}
+
+void test_sens_bmeflag_bmp280()
+{
+    RmSensFlags f = sf();
+    f.bmeOn = f.bmxFound = true;
+    expectSens(sp(f), true, false, true, false);
+}
+
+void test_sens_bmpflag_bmp280()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxFound = true;
+    RmSensIn in = sp(f);
+    expectSens(in, true, false, true, false);
+    in.t = 20.5f; in.p = 989.4f;
+    rmFmtSens(g_buf, sizeof(g_buf), in);
+    TEST_ASSERT_EQUAL_STRING("t=20.5 h=- p=989.4 t2=-", g_buf);
+}
+
+void test_sens_bmx_not_found()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = true;
+    expectSens(sp(f), false, false, false, false);
+    f.bmpOn = false; f.bmeOn = true; f.bmxIsBme = true;
+    expectSens(sp(f), false, false, false, false);
+}
+
+void test_sens_flags_off_stale_found()
+{
+    RmSensFlags f = sf();
+    f.bmxFound = f.bmxIsBme = true;
+    expectSens(sp(f), false, false, false, false);
+}
+
+void test_sens_is_bme_not_found()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxIsBme = true;
+    expectSens(sp(f), false, false, false, false);
+}
+
+void test_sens_bmp280_plus_aht20()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxFound = true;
+    f.aht20On = f.aht20Found = true;
+    expectSens(sp(f), true, true, true, false);
+}
+
+void test_sens_bmp3_plus_bmp280()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxFound = true;
+    f.bmp3On = f.bmp3Found = true;
+    expectSens(sp(f), true, false, true, false);
+}
+
+void test_sens_bmp3_alone()
+{
+    RmSensFlags f = sf();
+    f.bmp3On = f.bmp3Found = true;
+    expectSens(sp(f), true, false, true, false);
+}
+
+void test_sens_enabled_not_found()
+{
+    RmSensFlags f = sf();
+    f.aht20On = true;
+    expectSens(sp(f), false, false, false, false);
+    f = sf();
+    f.sht21On = true;
+    expectSens(sp(f), false, false, false, false);
+    f = sf();
+    f.bme680On = true;
+    expectSens(sp(f), false, false, false, false);
+    f = sf();
+    f.bmp3On = true;
+    expectSens(sp(f), false, false, false, false);
+}
+
+void test_sens_bme680_only()
+{
+    RmSensFlags f = sf();
+    f.bme680On = f.bme680Found = true;
+    expectSens(sp(f), true, true, true, false);
+}
+
+void test_sens_onewire_only()
+{
+    RmSensFlags f = sf();
+    f.oneWireOn = true;
+    expectSens(sp(f), false, false, false, true);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -590,5 +719,17 @@ int main(int, char **)
     RUN_TEST(test_small_buffer);
     RUN_TEST(test_net_upd);
     RUN_TEST(test_upd_result);
+    RUN_TEST(test_sens_bmpflag_bme280);
+    RUN_TEST(test_sens_bmeflag_bmp280);
+    RUN_TEST(test_sens_bmpflag_bmp280);
+    RUN_TEST(test_sens_bmx_not_found);
+    RUN_TEST(test_sens_flags_off_stale_found);
+    RUN_TEST(test_sens_is_bme_not_found);
+    RUN_TEST(test_sens_bmp280_plus_aht20);
+    RUN_TEST(test_sens_bmp3_plus_bmp280);
+    RUN_TEST(test_sens_bmp3_alone);
+    RUN_TEST(test_sens_enabled_not_found);
+    RUN_TEST(test_sens_bme680_only);
+    RUN_TEST(test_sens_onewire_only);
     return UNITY_END();
 }

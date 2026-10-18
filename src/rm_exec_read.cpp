@@ -96,17 +96,29 @@ static int execPos(char *res, size_t n)
 
 static int execSens(char *res, size_t n)
 {
-    // Presence comes from the driver flags, never from value != 0. Mapping follows the writers in
-    // src/esp32/esp32_main.cpp:4362-4407 (BMX280/AHT20/SHT21), src/bme680.cpp:156 (BME680).
-    // bBMP3ON: pressure only (the BMX280 path skips pressure when a BMP3 is found); its temperature
-    // writer is not part of this mapping, so T is not claimed for it. bONEWIRE is claimed as T2 only
-    // (a DHT on that path writes node_temp, a DS18B20 writes node_temp2: not distinguishable by flag).
+    // Presence = config flag AND driver detection (rmSensPresence, src/rm_format.h); never value != 0.
+    // The BMP/BME flags only pick the I2C address, the chip (humidity only on a BME280) comes from
+    // bmx_is_bme. Writers: src/esp32/esp32_main.cpp:4362-4407 (BMX280/AHT20/SHT21), src/bme680.cpp:156,
+    // BMP3 temperature src/esp32/loop_actions_esp32.cpp:131-135. bONEWIRE is claimed as T2 only
+    // (a DHT on that path writes node_temp/node_hum, a DS18B20 node_temp2: not distinguishable by flag, SENS-03).
+    RmSensFlags f;
+    memset(&f, 0, sizeof(f));
+    f.bmpOn = bBMPON;
+    f.bmeOn = bBMEON;
+    f.bmxFound = bmx_found;
+    f.bmxIsBme = bmx_is_bme;
+    f.bme680On = bBME680ON;
+    f.bme680Found = bme680_found;
+    f.aht20On = bAHT20ON;
+    f.aht20Found = aht20_found;
+    f.sht21On = bSHT21ON;
+    f.sht21Found = sht21_found;
+    f.bmp3On = bBMP3ON;
+    f.bmp3Found = bmp3_found;
+    f.oneWireOn = bONEWIRE;
     RmSensIn in;
     memset(&in, 0, sizeof(in));
-    in.hasT = bBMPON || bBMEON || bBME680ON || bAHT20ON;
-    in.hasH = bBMEON || bBME680ON || bAHT20ON || bSHT21ON;
-    in.hasP = bBMPON || bBMEON || bBME680ON || bBMP3ON;
-    in.hasT2 = bSHT21ON || bONEWIRE;
+    rmSensPresence(f, in);
     if (!in.hasT && !in.hasH && !in.hasP && !in.hasT2)
         return fail(res, n, "unsupported");
     in.t = meshcom_settings.node_temp;

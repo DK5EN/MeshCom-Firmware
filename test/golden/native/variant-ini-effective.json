@@ -2626,6 +2626,25 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_board_led": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_board_led"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_byte_fifo": {
   "build_flags": [
    "-std=gnu++17",
@@ -3110,6 +3129,25 @@
   "test_build_src": "True",
   "test_filter": [
    "test_gateway_service_twin"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_gw_reg_state": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_gw_reg_state"
   ],
   "test_framework": "unity"
  },

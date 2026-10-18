@@ -27,6 +27,7 @@
 #include "kiss_functions.h"
 #include "configuration.h"
 #include "loop_functions_extern.h"   // REMOTE_LED_PIN rule + RM LED levels
+#include "board_led.h"
 
 #include "TinyGPSPlus.h"
 
@@ -115,6 +116,117 @@ void remoteLedForceOff(void)
 {
     remoteLedSet(0);
 }
+#endif
+
+// Board LED heartbeat ("--board led on": 30 ms every 2 s), W1 helpers. The decision logic is in board_led.h
+// (native test); this is the pin side. BOARD_LED = plain GPIO LED; LED_PIN without BOARD_LED = NeoPixel only
+// (S3 DevKitC): the pulse goes through the status-colour path of esp32_main.cpp (bLED_WEISS). nRF52 keeps
+// the exclusion until W3: no-op bodies there. Callers still use the inline flasher in esp32loop until W2.
+#if (defined(BOARD_LED) || defined(LED_PIN)) && !defined(NRF52_SERIES)
+    #ifndef BOARD_LED_ACTIVE_LOW
+        #define BOARD_LED_ACTIVE_LOW 0
+    #endif
+    #if defined(BOARD_LED)
+        #define BOARD_LED_DRIVE_PIN BOARD_LED
+    #else
+        #define BOARD_LED_DRIVE_PIN LED_PIN
+        #include <Adafruit_NeoPixel.h>
+        extern Adafruit_NeoPixel pixels;   // esp32_main.cpp
+    #endif
+    #if defined(LED_PIN)
+        // NeoPixel status path of esp32_main.cpp; BOARD_LED boards that also define LED_PIN (S3 DevKitC-1,
+        // T-ETH-Elite) pulse it white with every flash, as the inline flasher does today
+        extern bool bLED_WEISS;
+        extern unsigned long pixels_delay;
+    #endif
+    #if defined(BOARD_TBEAM)
+        #define BOARD_LED_OW_TBEAM_REMAP true    // onewire_functions.cpp: stored 16 -> 0 -> OneWire_GPIO
+    #else
+        #define BOARD_LED_OW_TBEAM_REMAP false
+    #endif
+    #if defined(OneWire_GPIO)
+        #define BOARD_LED_OW_COMPILE (OneWire_GPIO)
+    #else
+        #define BOARD_LED_OW_COMPILE (-1)
+    #endif
+
+static bool boardLedLit = false;       // logical flasher state (starts dark, LED-11)
+static uint32_t boardLedTimer = 0;
+
+bool boardLedPinUsable(void)
+{
+    return boardLedPinFree(bONEWIRE, boardLedOwPin(meshcom_settings.node_owgpio, BOARD_LED_OW_COMPILE, BOARD_LED_OW_TBEAM_REMAP),
+                           BOARD_LED_DRIVE_PIN);
+}
+
+#if defined(LED_PIN)
+// Same guards as the inline flasher in esp32_main.cpp: no status colour running or pending
+static void boardLedWhitePulse(void)
+{
+    if (pixels_delay == 0 && !bLED_CLEAR)
+    {
+        if (!bLED_RED && !bLED_GREEN && !bLED_ORANGE && !bLED_BLUE)
+            bLED_WEISS = true;   // lit edge only; the NeoPixel handler shows it and clears it again
+    }
+}
+#endif
+
+static void boardLedWrite(bool lit)
+{
+    #if defined(BOARD_LED)
+        #if defined(LED_PIN)
+        if (lit)
+            boardLedWhitePulse();
+        #endif
+        // RM "led on|flash" holds the same pad: the flasher only keeps its phase
+        #if defined(REMOTE_LED_PIN) && (REMOTE_LED_PIN == BOARD_LED)
+        if (bRemoteLed)
+            return;
+        #endif
+        digitalWrite(BOARD_LED, boardLedLevel(lit, BOARD_LED_ACTIVE_LOW));
+    #else
+        if (lit)
+            boardLedWhitePulse();
+    #endif
+}
+
+void boardLedTick(void)
+{
+    if (!bUSER_BOARD_LED || !boardLedPinUsable())
+    {
+        if (boardLedLit)   // switched off (or OneWire took the pin) mid-flash: leave dark
+        {
+            boardLedLit = false;
+            if (boardLedPinUsable())   // OneWire owns the pad: clear the state, never write the pin
+                boardLedWrite(false);
+        }
+        return;
+    }
+    const BoardLedStep st = boardLedPhase(millis(), boardLedTimer, boardLedLit);
+    boardLedTimer = st.timer;
+    boardLedLit = st.lit;
+    if (st.changed)
+        boardLedWrite(st.lit);
+}
+
+void boardLedForceOff(void)   // before deep sleep: LED dark, flasher phase reset
+{
+    boardLedLit = false;
+    if (!boardLedPinUsable())
+        return;   // the pad belongs to OneWire: not ours to drive
+    #if defined(BOARD_LED)
+        pinMode(BOARD_LED, OUTPUT);
+        digitalWrite(BOARD_LED, boardLedLevel(false, BOARD_LED_ACTIVE_LOW));
+    #else
+        bLED_WEISS = false;
+        pixels.clear();
+        pixels.show();
+    #endif
+}
+#else
+bool boardLedPinUsable(void) { return false; }
+void boardLedTick(void) {}
+void boardLedForceOff(void) {}
 #endif
 
 bool bRadio=false;
@@ -220,6 +332,7 @@ bool bLPS33 = false;
 
 bool bme680_found = false;
 bool bmx_found = false;
+bool bmx_is_bme = false;   // chip ID 0x60 (BME280) detected; read only together with bmx_found
 int bmx_start = 0;
 bool bmp3_found = false;
 bool aht20_found =false;

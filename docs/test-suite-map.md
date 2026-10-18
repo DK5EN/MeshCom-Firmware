@@ -248,8 +248,10 @@ flashes whatever is attached.
 | test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
 | test_rm_sender_policy        | Unit          |    43 | native_rm_sender_policy                                      |
 | test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
-| test_rm_format               | Unit          |    18 | native_rm_format                                             |
-| test_charge_led_mode         | Regression    |     7 | native_charge_led_mode                                       |
+| test_rm_format               | Unit          |    32 | native_rm_format                                             |
+| test_charge_led_mode         | Regression    |    11 | native_charge_led_mode                                       |
+| test_board_led               | Unit          |    13 | native_board_led                                             |
+| test_gw_reg_state            | Unit          |    30 | native_gw_reg_state                                          |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
@@ -272,7 +274,7 @@ flashes whatever is attached.
 | test_txring                  | Unit          |    43 | native_aprs                                                  |
 | test_txring_flood            | Regression    |    11 | native_aprs                                                  |
 | test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
-| test_tz_rule                 | Unit          |    11 | native_tz_rule                                               |
+| test_tz_rule                 | Unit          |    12 | native_tz_rule                                               |
 | test_udp_frame_twin          | Twin          |    42 | native_udp_frame_twin                                        |
 | test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
 | test_unconfigured            | Unit          |    14 | native_aprs                                                  |

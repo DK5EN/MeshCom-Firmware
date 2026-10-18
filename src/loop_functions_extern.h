@@ -62,6 +62,12 @@ void remoteLedForceOff(void);     // pin off + hold released; call before deep s
 #endif
 extern bool bCHARGE_LED;
 
+// Board LED helpers (loop_functions.cpp, decision logic in board_led.h). No-op bodies on boards without
+// BOARD_LED / LED_PIN and on nRF52 (excluded until W3), so callers need no guard.
+bool boardLedPinUsable(void);   // false while OneWire owns the LED pin (LED-04) or no LED pin exists
+void boardLedTick(void);        // main loop: the 30 ms / 2 s heartbeat while bUSER_BOARD_LED
+void boardLedForceOff(void);    // LED dark + flasher phase reset; call before deep sleep (LED-12)
+
 extern unsigned long rebootAuto;
 
 extern bool bRadio;
@@ -163,6 +169,7 @@ extern bool bLPS33;
 
 extern bool bme680_found;
 extern bool bmx_found;
+extern bool bmx_is_bme;
 extern int bmx_start;
 extern bool bmp3_found;
 extern bool aht20_found;

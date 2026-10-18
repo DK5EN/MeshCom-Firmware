@@ -393,6 +393,33 @@ struct RmSensIn
     float t, h, p, t2; // t, t2 degC (-999.9..999.9); h percent (0..999); p hPa (0..9999.9)
 };
 
+// Presence inputs of the sens reply, taken from the driver globals by the executor. *On is the
+// config flag, *Found the driver's detection result. The BMP/BME flags only pick the I2C address;
+// the chip (bmxIsBme: ID 0x60 = BME280, has humidity) comes from the driver.
+struct RmSensFlags
+{
+    bool bmpOn, bmeOn, bmxFound, bmxIsBme;
+    bool bme680On, bme680Found;
+    bool aht20On, aht20Found;
+    bool sht21On, sht21Found;
+    bool bmp3On, bmp3Found;
+    bool oneWireOn; // t2 only (a DHT on that path is not claimed, SENS-03)
+};
+
+// Fixed rule: a field is claimed only when its sensor is enabled AND detected.
+inline void rmSensPresence(const RmSensFlags &f, RmSensIn &in)
+{
+    const bool bmx = (f.bmpOn || f.bmeOn) && f.bmxFound;
+    const bool b680 = f.bme680On && f.bme680Found;
+    const bool aht = f.aht20On && f.aht20Found;
+    const bool sht = f.sht21On && f.sht21Found;
+    const bool bmp3 = f.bmp3On && f.bmp3Found;
+    in.hasT = bmx || b680 || aht || bmp3;
+    in.hasH = (bmx && f.bmxIsBme) || b680 || aht || sht;
+    in.hasP = bmx || b680 || bmp3;
+    in.hasT2 = sht || f.oneWireOn;
+}
+
 inline size_t rmFmtSens(char *out, size_t n, const RmSensIn &in)
 {
     RmFmtBuf b;
