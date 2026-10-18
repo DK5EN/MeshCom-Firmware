@@ -207,7 +207,10 @@
     /* mapped to 1 by sanitize_loaded_settings(). Default notify on ESP32, 0 on nRF52 (no AU there). Persisted; console rung ESP32 only. */ \
     M(int, node_autoupd, MC_PLATFORM_DEFAULT(1, 0))                                                      \
     /* AU-03 (#1187): update channel, 0 prod (icssw-org) / 1 dev (DK5EN); default 0. Persisted. */           \
-    M(int, node_updchan, 0)
+    M(int, node_updchan, 0)                                                                              \
+    /* gateway registration state (src/gw_reg_runtime.cpp): flag + callsign at entry. Persisted, not exported. */ \
+    M(int, node_gwrf, 0)                                                                                 \
+    A(char, node_gwrc, [10], {0})
 
 /* ESP32-only members (every ESP32 board). */
 #ifdef ESP32

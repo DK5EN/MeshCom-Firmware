@@ -1,14 +1,12 @@
-// gw_reg_state.h -- gateway registration state decision logic. Arduino-free, header-only (native test).
-//
-// A KEEP datagram goes to the MeshCom server (IP D). A reply from D within GW_REG_WINDOW_MS after the last
-// KEEP whose payload contains "BLOCK" sets the registration-failed state. The state is stored as a flag plus
-// the callsign at that moment; it is cleared when the callsign changes.
+// gw_reg_state.h -- gateway registration state logic. Arduino-free, header-only (native test).
 #ifndef GW_REG_STATE_H
 #define GW_REG_STATE_H
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "configuration_global.h"   // isUnconfiguredCall()
 
 #define GW_REG_WINDOW_MS 10000u   // reply window after the last KEEP
 #define GW_REG_CALL_LEN  10       // char[10] incl. NUL, same size as the callsign setting
@@ -19,17 +17,31 @@ struct GwRegState
     char call[GW_REG_CALL_LEN];  // canonical callsign (with SSID) when the flag was set
 };
 
+// reply token the server sends when the node is not registered
+static const char kGwRegToken[] = "BLOCK";
+
 // payload is binary-safe: length based, may contain NUL
 inline bool gwRegIsBlockReply(const uint8_t *payload, size_t len)
 {
-    static const char key[] = "BLOCK";
-    const size_t klen = sizeof(key) - 1;
+    const size_t klen = sizeof(kGwRegToken) - 1;
     if (payload == NULL || len < klen)
         return false;
     for (size_t i = 0; i + klen <= len; i++)
-        if (memcmp(payload + i, key, klen) == 0)
+    {
+        if (memcmp(payload + i, kGwRegToken, klen) == 0)
             return true;
+    }
     return false;
+}
+
+// true if the 4-byte frame indicator is none of the server frame types handled by the frame handlers
+inline bool gwRegFrameIsOther(const uint8_t *payload, size_t len)
+{
+    if (payload == NULL || len == 0)
+        return false;
+    if (len < 4)
+        return true;
+    return memcmp(payload, "GATE", 4) != 0 && memcmp(payload, "CONF", 4) != 0 && memcmp(payload, "BEAT", 4) != 0;
 }
 
 // both IPs as uint32 in the same byte order; zero never matches
@@ -71,20 +83,27 @@ inline void gwRegCanon(const char *in, char *out)
     out[n] = 0;
 }
 
-// fail-closed on both sides: an empty stored call (corrupted record) or an empty current call (not set yet)
-// counts as "not changed", the state stays
+// empty, default or unset callsigns on either side count as "not changed"
 inline bool gwRegCallChanged(const char *storedCall, const char *currentCall)
 {
     char a[GW_REG_CALL_LEN], b[GW_REG_CALL_LEN];
     gwRegCanon(storedCall, a);
     gwRegCanon(currentCall, b);
-    if (a[0] == 0 || b[0] == 0)
+    if (a[0] == 0 || b[0] == 0 || isUnconfiguredCall(a) || isUnconfiguredCall(b))
         return false;
     return strcmp(a, b) != 0;
 }
 
+// No entry while the node has no callsign of its own (empty or default): a callsign set later
+// could not clear a state stored under the default call.
 inline void gwRegEnter(GwRegState &s, const char *currentCall)
 {
+    if (currentCall == NULL || currentCall[0] == 0 || isUnconfiguredCall(currentCall))
+    {
+        s.flag = 0;
+        s.call[0] = 0;
+        return;
+    }
     s.flag = 1;
     gwRegCanon(currentCall, s.call);
 }

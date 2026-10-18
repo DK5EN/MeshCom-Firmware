@@ -338,6 +338,26 @@ extern byte_fifo_t udpOutRing;    // UDP-Ausgang (LoRa -> Gateway)
 extern byte_fifo_t phoneRing;     // BLE-Daten zum Telefon (+4 Byte Zeit je Frame ausser 'D')
 extern byte_fifo_t phoneComRing;  // BLE-Kommandos zum Telefon
 
+// Classic ESP32 with the AU BLE pause: the two phone rings live on the heap, only while BLE is
+// up (heap verdict 2026-10-18, lever 3: 5 KB back at the AU gate). Everywhere else the storage
+// stays static and attach/detach are no-ops that report success.
+#if defined(ESP32)
+#include "sdkconfig.h" // CONFIG_IDF_TARGET_ESP32
+#endif
+#if defined(AU_BLE_PAUSE)
+#define PHONE_RINGS_DYNAMIC (AU_BLE_PAUSE)
+#elif defined(ESP32) && defined(CONFIG_IDF_TARGET_ESP32)
+#define PHONE_RINGS_DYNAMIC 1
+#else
+#define PHONE_RINGS_DYNAMIC 0
+#endif
+bool phoneRingsAttach(void);   // allocate both rings (idempotent); false = no memory, rings stay empty/drop
+void phoneRingsDetach(void);   // drop queued frames, free both rings; producers then drop
+
+// ESP32 [HEAP] boot marks (loop_actions_esp32.cpp)
+void heapMarkBle(void);
+void heapMarksPoll(void);
+
 extern bool hasMsgFromPhone;
 
 // ringBufferLoraRX/loraWrite werden jetzt in dedup_functions.h deklariert.

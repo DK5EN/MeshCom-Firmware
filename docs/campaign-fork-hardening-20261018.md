@@ -68,6 +68,25 @@ DK5EN-90, DK5EN-14 (DK5EN-98 untouched), the heap bisect. BMx280 is field tested
 | `c9e64344` | 70356 / 68524 B            |
 | `85b0c457` | 70100 / 68336 B            |
 
-- Idle free heap is unchanged (about 200 B) between the 10-17 and 10-18 builds. The 8-13 KB loss of the
-  heap verdict was measured at the update check (BLE paused). Next: `[AU];ble;pause;heap` at
-  `--update check` on both builds.
+- Idle free heap is unchanged (about 200 B) between the 10-17 and 10-18 builds.
+- Update check, BLE paused (`[AU];ble;pause;heap`, three checks each): `c9e64344` 76.8-81.5 KB,
+  `85b0c457` 77.1-81.0 KB, `e31940e8` 76.3-80.0 KB (release images); `85b0c457` INSTRUMENT 73.6-77.8 KB
+  (idle 66.6 KB).
+- Verdict: no firmware regression between 10-17 and 10-18. The 66-72 KB of the heap verdict came from
+  INSTRUMENT builds (about 3.5 KB) plus the matrix conditions (net console session, logging sampler).
+  The release T-Beam is already near the 76000 B gate; the W3 levers add about 7 KB on top.
+
+## W3 result
+
+- Heap: phone rings (5 KB) leave static RAM on classic ESP32 and live only while BLE runs (T-Beam
+  static RAM 107688 -> 102584 B); byte_fifo is now locked (portMUX) on ESP32; update task stack
+  12288 -> 10240 B, not 8192: real TLS jobs leave 5692-5800 B free of 12288 (the 9.5 KB-free figures
+  came from jobs refused at the gate); `[HEAP]` boot marks for ble, wifi, udp, web, mdns, kiss,
+  netconsole, also under `--setlog`.
+- Gateway server reply handling (W3 F): implemented on ESP32 and nRF52 (details off the public docs).
+- Advisors: heap two rounds (stack too small, ring free raced the producers, BLE mutex ordering);
+  server reply three rounds (twin link, frame filter, unconfigured callsign). All fixed.
+- Gate PASS 74 envs / 2647 cases; builds heltec V3, ttgo_tbeam, RAK4631, T-Deck Plus, E22 S3 DevKitC,
+  T5 ePaper, T114, T-Echo, heltec V3 INSTRUMENT.
+- Open, operator: on classic ESP32 every update check now clears the web message history (it reads the
+  phone ring). Accept, or keep the history ring static (about 2 KB less gain).

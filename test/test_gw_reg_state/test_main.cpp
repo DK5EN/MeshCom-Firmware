@@ -140,6 +140,67 @@ static void test_evaluate_empty_record_keeps_state(void)
     TEST_ASSERT_EQUAL_INT(1, s.flag);
 }
 
+static bool oth(const char *s) { return gwRegFrameIsOther((const uint8_t *)s, strlen(s)); }
+
+static void test_frame_known_indicators_not_other(void)
+{
+    TEST_ASSERT_FALSE(oth("GATE....BLOCK"));
+    TEST_ASSERT_FALSE(oth("CONFDK5EN-1 BLOCK"));
+    TEST_ASSERT_FALSE(oth("BEATBLOCK server"));
+    TEST_ASSERT_FALSE(oth("GATE"));
+}
+
+static void test_frame_unknown_indicator_is_other(void)
+{
+    TEST_ASSERT_TRUE(oth("BLOCK"));
+    TEST_ASSERT_TRUE(oth("xxxxBLOCK"));
+    TEST_ASSERT_TRUE(oth("gate BLOCK"));   // case matters
+    TEST_ASSERT_TRUE(oth("ABC"));          // shorter than the indicator
+    TEST_ASSERT_FALSE(gwRegFrameIsOther(NULL, 8));
+    TEST_ASSERT_FALSE(gwRegFrameIsOther((const uint8_t *)"BLOCK", 0));
+}
+
+static void test_frame_entry_decision_by_indicator(void)
+{
+    // the combination the frame handlers use: bucket check, then the full entry decision
+    const char *known[] = {"GATE..BLOCK..", "CONFDK5EN-1 BLOCK", "BEATBLOCK"};
+    for (size_t i = 0; i < 3; i++)
+    {
+        const uint8_t *p = (const uint8_t *)known[i];
+        bool enter = gwRegFrameIsOther(p, strlen(known[i])) &&
+                     gwRegShouldEnter(7, 7, 2000, 1000, true, p, strlen(known[i]));
+        TEST_ASSERT_FALSE(enter);
+    }
+    const char *unk = "ERR BLOCK";
+    TEST_ASSERT_TRUE(gwRegFrameIsOther((const uint8_t *)unk, strlen(unk)) &&
+                     gwRegShouldEnter(7, 7, 2000, 1000, true, (const uint8_t *)unk, strlen(unk)));
+}
+
+static void test_call_default_fail_closed(void)
+{
+    TEST_ASSERT_FALSE(gwRegCallChanged("DK5EN-1", "XX0XXX-00"));
+    TEST_ASSERT_FALSE(gwRegCallChanged("XX0XXX-00", "DK5EN-1"));
+    TEST_ASSERT_FALSE(gwRegCallChanged("xx0xxx-00", "DK5EN-1"));
+    GwRegState s = {0, {0}};
+    gwRegEnter(s, "DK5EN-1");
+    TEST_ASSERT_FALSE(gwRegEvaluate(s, "XX0XXX-00"));
+    TEST_ASSERT_EQUAL_INT(1, s.flag);
+}
+
+// An unconfigured node (default or empty callsign) never enters: a callsign set later could not
+// clear a state stored under the default call.
+static void test_enter_refused_without_callsign(void)
+{
+    GwRegState s = {0, {0}};
+    gwRegEnter(s, "XX0XXX-00");
+    TEST_ASSERT_EQUAL_INT(0, s.flag);
+    TEST_ASSERT_EQUAL_STRING("", s.call);
+    gwRegEnter(s, "");
+    TEST_ASSERT_EQUAL_INT(0, s.flag);
+    gwRegEnter(s, "DK5EN-1");
+    TEST_ASSERT_EQUAL_INT(1, s.flag);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -173,5 +234,10 @@ int main(int, char **)
     RUN_TEST(test_enter_truncates_long_call);
     RUN_TEST(test_evaluate_clears_on_change);
     RUN_TEST(test_evaluate_empty_record_keeps_state);
+    RUN_TEST(test_frame_known_indicators_not_other);
+    RUN_TEST(test_frame_unknown_indicator_is_other);
+    RUN_TEST(test_frame_entry_decision_by_indicator);
+    RUN_TEST(test_call_default_fail_closed);
+    RUN_TEST(test_enter_refused_without_callsign);
     return UNITY_END();
 }

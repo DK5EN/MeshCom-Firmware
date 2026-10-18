@@ -77,6 +77,7 @@ static void sub_au_status(); // GET /austatus (defined next to call_function)
 #include "web_nodefunctioncalls.h"
 #include "web_commonServer.h"
 #include "gw_link_status.h"
+#include "gw_reg_runtime.h"
 #include "gw_servers.h"
 #if defined(NRF52_SERIES)
 #include <RAK13800_W5100S.h> // IPAddress for nrf_eth.h
@@ -1764,6 +1765,8 @@ void deliver_scaffold(bool bget_password)
         web_client.println("<Button class=\"nav_button\" onclick=\"if(confirm('Logging out, are you sure?')){login('')};\"><svg fill=\"#ffffff\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path d=\"M7.707,8.707,5.414,11H17a1,1,0,0,1,0,2H5.414l2.293,2.293a1,1,0,1,1-1.414,1.414l-4-4a1,1,0,0,1,0-1.414l4-4A1,1,0,1,1,7.707,8.707ZM21,1H13a1,1,0,0,0,0,2h7V21H13a1,1,0,0,0,0,2h8a1,1,0,0,0,1-1V2A1,1,0,0,0,21,1Z\"></path></g></svg></Button>\n");
     }
     web_client.printf("</div>\n<div id=\"head_layer\"><p class=\"font-small\">Meshcom %s%s</p><p class=\"font-bold\">%s</p></div>\n</div>\n", SOURCE_VERSION, SOURCE_VERSION_WEB_SUB, meshcom_settings.node_call);
+    if(gwRegBlocked())
+        web_client.println("<div class=\"mbx-warn\">! node registration failed, please check support</div>");
     web_client.println("<div id=\"content_layer\">\n");
 
     // initial content

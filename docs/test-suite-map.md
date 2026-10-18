@@ -167,7 +167,7 @@ flashes whatever is attached.
 | test_bp_echo_guard           | Regression    |    10 | native                                                       |
 | test_bp_notice_frame         | Contract      |    18 | native_aprs                                                  |
 | test_bp_regression           | Regression    |     4 | native_aprs                                                  |
-| test_byte_fifo               | Unit          |    19 | native_byte_fifo                                             |
+| test_byte_fifo               | Unit          |    27 | native_byte_fifo                                             |
 | test_capture_ring            | Unit          |    10 | native_capture                                               |
 | test_charset_filter          | Unit          |    29 | native                                                       |
 | test_checkvia                | Unit          |    13 | native_parsers                                               |
@@ -251,7 +251,7 @@ flashes whatever is attached.
 | test_rm_format               | Unit          |    32 | native_rm_format                                             |
 | test_charge_led_mode         | Regression    |    11 | native_charge_led_mode                                       |
 | test_board_led               | Unit          |    13 | native_board_led                                             |
-| test_gw_reg_state            | Unit          |    30 | native_gw_reg_state                                          |
+| test_gw_reg_state            | Unit          |    35 | native_gw_reg_state                                          |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |

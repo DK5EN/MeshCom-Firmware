@@ -413,6 +413,7 @@ void blinkLED2();                                    // blink RED
 #include "serial_command.h"
 // gatewayService_*() likewise (C4 carve-out)
 #include "gateway_service.h"
+#include "gw_reg_runtime.h"
 
 
 #if defined(ENABLE_RTC)
@@ -631,6 +632,7 @@ void nrf52setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+    gwRegBoot();
 
 #if defined(ENABLE_MSGSTORE)
     // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
@@ -1283,6 +1285,8 @@ void nrf52setup()
 void nrf52loop()
 {
     INSTR_LOOPTICK();
+
+    gwRegTick();
 
     // BP-01/BP-04: close a back-pressure episode with QRV once the TX ring
     // has drained, even when no further user message arrives to observe it.

@@ -70,6 +70,7 @@
 #include <dm_stats.h>        // F1 hookup under test: dmstat_peer_ack / dmstat_rtt
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 #include <gw_link_status.h>  // GW-LINK hookup under test: gwLinkNoteRx() on server frames only
+#include <gw_reg_runtime.h> // registration state hooks both handlers call (stubbed below)
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 #include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
 #include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
@@ -181,6 +182,16 @@ static std::vector<KissCall> g_kiss;
 void queueKiss(uint8_t *buffer, uint16_t buflen, int16_t rssi, int8_t snr)
 {
     g_kiss.push_back(KissCall{std::vector<uint8_t>(buffer, buffer + buflen), rssi, snr});
+}
+
+// gw_reg_runtime.cpp drags Arduino/save_settings; its hooks are stubbed to "not a
+// registration reply" / no-op, so the frame handlers run their normal path here.
+bool gwRegOnDatagram(uint32_t, const uint8_t *, size_t, uint32_t)
+{
+    return false;
+}
+void gwRegOnServerRename(const char *)
+{
 }
 
 struct ExternCall

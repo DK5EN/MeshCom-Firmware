@@ -18,6 +18,7 @@
 #include "dm_stats.h"       // stage 0/2.1 DM outcome counters (dmstat_*)
 #include "reack_limiter.h"  // stage 0.2: rate-limited re-ACK for duplicate DMs
 #include "dm_dedup.h"       // stage 2.1: second dedup layer, keyed on (source call, NNN)
+#include "gw_reg_runtime.h"
 #include "instrument.h"     // stage 0.5: --airgap (bAirgap), INSTRUMENT_ENABLED
 #include "pn_retry.h"       // PN retry (XOR form): pnRetryCore/pnRetryId/pnFrameIsOwnPn etc.
 #include "own_msg_status.h"  // late ACK -> durable web GUI status (ring slot may be gone)
@@ -939,6 +940,20 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     bNewLine=false;
 
     bLED_GREEN = true;
+
+    if(gwRegBlocked())
+    {
+#if defined BOARD_RAK4630
+        taskENTER_CRITICAL();
+        rxBufInUse[rxBufIndex] = false;
+        taskEXIT_CRITICAL();
+#endif
+        is_receiving = false;
+        iReceiveTimeOutTime = millis();
+        csma_timeout = csma_compute_timeout(cad_attempt);
+        INSTR_ONRX_END();
+        return;
+    }
 
 #if INSTRUMENT_ENABLED
     // 0.5 --airgap: drop the frame here, after the platform RX plumbing has
@@ -2917,9 +2932,9 @@ bool doTX()
 #if INSTRUMENT_ENABLED
         // 0.5 --airgap: treat like TX disabled, same drop semantics (slot
         // already marked consumed above -- non-rollback).
-        if (TX_ENABLE == 1 && !bAirgap)
+        if (TX_ENABLE == 1 && !bAirgap && !gwRegBlocked())
 #else
-        if (TX_ENABLE == 1)
+        if (TX_ENABLE == 1 && !gwRegBlocked())
 #endif
         {
             // TX-01 (BACKLOG 3.8k): hard backstop -- an unconfigured node

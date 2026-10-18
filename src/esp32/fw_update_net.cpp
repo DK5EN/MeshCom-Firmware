@@ -107,7 +107,20 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #define FWNET_HANDSHAKE_S 20u            // WiFiClientSecure::setHandshakeTimeout() takes SECONDS
 #define FWNET_CHECK_DEADLINE_MS (5u * 60u * 1000u)     // whole CHECK body
 #define FWNET_DL_DEADLINE_MS (30u * 60u * 1000u)       // whole DOWNLOAD body
+// Job task stack in BYTES (ESP-IDF xTaskCreate takes bytes, StackType_t is uint8_t;
+// uxTaskGetStackHighWaterMark() in the [AU];heap line "stk;" is the minimum FREE bytes, never
+// used). Real TLS check + download runs on the T-Beam (tools/bench/runs/harness/
+// au13_tbeam92_20261017-075802/{run1,run2,download,download3}.log): stk;5692-5800 free of 12288,
+// i.e. about 6.5 KB peak use. Earlier 9.5 KB free values came from jobs refused at the gate that
+// never ran TLS and must not size the stack. Classic ESP32 (pause gate tight on internal RAM):
+// 10240 gives 2 KB back and leaves about 3.6 KB margin. ESP32-S3 and other targets are not
+// measured and keep 12288. Re-measure stk on a job that passes the gate after any change here
+// or in the TLS path; keep stk above about 3 KB.
+#if AU_BLE_PAUSE
+#define FWNET_TASK_STACK 10240u
+#else
 #define FWNET_TASK_STACK 12288u
+#endif
 
 #if CONFIG_FREERTOS_UNICORE
 #define FWNET_CORE 0

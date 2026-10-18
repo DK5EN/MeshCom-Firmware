@@ -131,6 +131,7 @@ extern TinyGPSPlus gps;
 #include "test_inject.h"
 #include "loop_breadcrumb.h"   // F3: --info ...BOOT line
 #include "gw_link_status.h"   // --info ...Server line
+#include "gw_reg_runtime.h"   // --info ...REGISTRATION line
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -5640,6 +5641,8 @@ void commandAction(char *umsg_text, bool ble)
                       meshcom_settings.node_cleanflash,
                       meshcom_settings.node_fwversion);
 
+        Serial.printf("[PERSIST];gw;gwrf;%d;gwrc;%s\n", meshcom_settings.node_gwrf, meshcom_settings.node_gwrc);
+
         #if defined(ESP32) && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO))
         Serial.printf("[PERSIST];stat;flash;%d;sd;%d;immediate;%d;mute;%d\n",
                       meshcom_settings.node_persist_to_flash ? 1 : 0,
@@ -7258,6 +7261,8 @@ void commandAction(char *umsg_text, bool ble)
                 gwLinkFormat(gwl, sizeof(gwl), bGATEWAY, meshcom_settings.node_hasIPaddress, millis());
                 printfdeb("...Server       : %s\n", gwl);
             }
+            if(gwRegBlocked())
+                printfdeb("...REGISTRATION: failed\n");
             #endif
     
             sendDisplayHead(true);

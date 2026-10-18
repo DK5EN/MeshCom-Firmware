@@ -63,6 +63,8 @@ ALIASES = {
     "fwversion": "node_fwversion",
     "start": "node_audstart",
     "msg": "node_audmsg",
+    "gwrf": "node_gwrf",
+    "gwrc": "node_gwrc",
 }
 
 

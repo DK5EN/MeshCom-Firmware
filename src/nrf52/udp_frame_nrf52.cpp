@@ -25,6 +25,8 @@
 #include "conf_frame.h"
 #include "setlog_lines.h"
 #include "gw_link_status.h"
+#include "gw_reg_runtime.h"
+#include "gw_reg_state.h"
 #include "udp_frame.h"
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
@@ -64,6 +66,11 @@ void logRxDropUnconfigured(const char *call);
  */
 int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip)
 {
+  // registration reply from the server: consumed here, it must not count as link-alive (no last_upd_timer)
+  if (packetSize > 0 && gwRegFrameIsOther(inc_udp_buffer, (size_t)packetSize) &&
+      gwRegOnDatagram((uint32_t)remote_ip, inc_udp_buffer, (size_t)packetSize, millis()))
+    return 0;
+
   char source_call[MC_CALL_LEN_Z] = {0};
   char destination_call[MC_CALL_LEN_Z] = {0};
 
@@ -651,6 +658,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
           else
           {
             snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", sCall.c_str());
+            gwRegOnServerRename(meshcom_settings.node_call);
 
             if(cf.hasShort)
               snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", cf.shortname);

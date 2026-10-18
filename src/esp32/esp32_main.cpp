@@ -665,6 +665,8 @@ bool esp32BlePause(void)
     const bool stopped = NimBLEDevice::deinit(true);
     deviceConnected = false;
     g_ble_conn_handle = 0xFFFF;
+    phoneRingsDetach();   // 5 KB back for the job; frames for the phone are dropped until the resume.
+                          // Inside s_bleLife, so a concurrent resume cannot bring BLE back without rings.
     xSemaphoreGive(s_bleLife);
 
     if(!stopped)
@@ -705,6 +707,7 @@ bool esp32BleForcePause(void)
     deviceConnected = false;
     g_ble_conn_handle = 0xFFFF;
     bleSessionResetAll();
+    phoneRingsDetach();   // same as esp32BlePause(), inside s_bleLife
     xSemaphoreGive(s_bleLife);
 
     if(!stopped)
@@ -736,7 +739,28 @@ bool esp32BleResume(void)
     }
 
     xSemaphoreTake(s_bleLife, portMAX_DELAY);
-    const bool ok = s_bleDown ? bleStackStart(true) : true;   // a concurrent resume may have won
+    if(!s_bleDown)
+    {
+        xSemaphoreGive(s_bleLife);
+        return true;   // a concurrent resume has won
+    }
+    // The phone rings come back before the stack, inside s_bleLife (two resumes must not both
+    // allocate). No memory: BLE stays off (the loop retries a few times; the next boot is the sure
+    // retry), logged once.
+    if(!phoneRingsAttach())
+    {
+        static bool s_ringsFailLogged = false;
+        if(!s_ringsFailLogged)
+        {
+            s_ringsFailLogged = true;
+            Serial.print("[AU];ble;resume;fail;rings\n");
+        }
+        s_bleResumeFailed = true;
+        xSemaphoreGive(s_bleLife);
+        return false;
+    }
+
+    const bool ok = bleStackStart(true);
     if(ok)
     {
         s_bleDown = false;
@@ -935,6 +959,7 @@ bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet rec
 #include "serial_command.h"
 // gatewayService_*() likewise (C4 carve-out)
 #include "gateway_service.h"
+#include "gw_reg_runtime.h"
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -1290,6 +1315,7 @@ void esp32setup()
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+    gwRegBoot();   // gateway registration state from settings (after the settings load)
 
 #if defined(ENABLE_MSGSTORE)
     // S3: store node -- glue first (installs the MsgStoreEnv), then the persisted
@@ -2271,6 +2297,12 @@ void esp32setup()
 
     bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
 
+    // Phone rings on the heap (classic ESP32 with the AU BLE pause only; no-op elsewhere). Allocated
+    // with BLE start, released by esp32BlePause(). A failure here leaves the rings empty (frames for
+    // the phone are dropped); BLE itself still starts.
+    if(!phoneRingsAttach())
+        printfdeb("[BLE ]...phone rings: no memory, phone data dropped until next boot\n");
+
     #if !defined(DISABLE_BLE)   // opt-out -D DISABLE_BLE: board without a usable BLE controller
     s_bleLife = xSemaphoreCreateMutex();   // AU-10: guards the BLE objects against pause / resume
     #if defined(BENCH_BLE_ADV_LATE)
@@ -2279,6 +2311,7 @@ void esp32setup()
     const bool bleAdvNow = true;
     #endif
     bleStackStart(bleAdvNow);   // the same function the AU-10 resume uses
+    heapMarkBle();
     #else
     printfdeb("[BLE ]...disabled (DISABLE_BLE)\n");
     #endif
@@ -3062,6 +3095,7 @@ void esp32loop()
     // TEMPORARY -- measures the period between successive loop entries, so a
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();
+    gwRegTick();   // gateway registration state: call-change check (rate-limited to 1 s)
 #if INSTRUMENT_ENABLED
     INSTR_ONRX_DRAIN();      // R1-F: emit queued [INS] ONRX records
 #endif
@@ -5069,6 +5103,8 @@ void esp32loop()
             startExternUDP();
         }
     }
+
+    heapMarksPoll();   // [HEAP] boot marks, each once per boot
 
     if (resendPing == 0)
         resendPing = millis();

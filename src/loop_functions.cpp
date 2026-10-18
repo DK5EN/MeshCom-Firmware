@@ -741,10 +741,18 @@ bool ble_disconnect_requested = false;
 static uint8_t udpOutStore[RING_BYTES_UDP];
 byte_fifo_t udpOutRing = BYTE_FIFO_INIT(udpOutStore);
 
+// phoneRing / phoneComRing: static storage everywhere, except on the classic ESP32 with the AU BLE
+// pause (PHONE_RINGS_DYNAMIC): there they start without storage (cap 0 = empty, push drops),
+// phoneRingsAttach() allocates 2 + 3 KB at BLE start and esp32BlePause() releases them, so the
+// TLS job gets the 5 KB (heap verdict 2026-10-18, lever 3).
+#if PHONE_RINGS_DYNAMIC
+byte_fifo_t phoneRing = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#else
 static uint8_t phoneStore[RING_BYTES_PHONE];
 byte_fifo_t phoneRing = BYTE_FIFO_INIT(phoneStore);
 
 static uint8_t phoneComStore[RING_BYTES_PHONECOM];
+#endif
 // Der BLE-Config-Burst nach dem Verbinden (config_cmds[] in esp32_main.cpp /
 // nrf52_main.cpp, --nodeset liefert SN und SN1) geht in EINEM
 // Schleifendurchlauf in diesen Ring und wird mit einem Frame je 300 ms
@@ -753,7 +761,30 @@ static uint8_t phoneComStore[RING_BYTES_PHONECOM];
 // Node-Settings. Obergrenze: 12 Frames zu je 245 Byte plus Laengenbyte.
 static_assert(RING_BYTES_PHONECOM >= 12 * (245 + 1),
               "phoneComRing must hold the whole BLE config burst (12 x 246 B)");
+#if PHONE_RINGS_DYNAMIC
+byte_fifo_t phoneComRing = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+bool phoneRingsAttach(void)
+{
+    // all or nothing (bf_attach_all): never one ring up and the other without storage
+    byte_fifo_t *const rings[2] = {&phoneRing, &phoneComRing};
+    static const uint16_t caps[2] = {RING_BYTES_PHONE, RING_BYTES_PHONECOM};
+    return bf_attach_all(rings, caps, 2, malloc, free);
+}
+
+void phoneRingsDetach(void)
+{
+    // bf_detach() sets cap/buf under the ring lock (byte_fifo.cpp, portMUX on ESP32), so no
+    // producer or reader on the loop/LoRa/web tasks can still be inside a ring afterwards:
+    // the memory is freed right away.
+    byte_fifo_t *const rings[2] = {&phoneRing, &phoneComRing};
+    bf_detach_free(rings, 2, free);
+}
+#else
 byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStore);
+bool phoneRingsAttach(void) { return true; }
+void phoneRingsDetach(void) {}
+#endif
 
 // BLE-N1/N2: counters of the node->phone path (sent, retried, dropped,
 // truncated, evicted, last MTU). Written by the producers below and by the

@@ -255,6 +255,8 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_gpsbaud": PERSIST,
     "node_gpsdebug": PERSIST,
     "node_gw": RUNTIME,
+    "node_gwrc": PERSIST,
+    "node_gwrf": PERSIST,
     "node_gwsrv": PERSIST,
     "node_hamnet_only": PERSIST,
     "node_hasIPaddress": RUNTIME,
@@ -359,14 +361,14 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 151, (
+assert len(FIELD_CLASSIFICATION) == 153, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"151 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"153 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "
     f"node_stor (2026-10-04, SNF-D7 / #1188) and node_rm (2026-10-05, RM-06 / #1189) and node_autoupd/node_updchan "
-    f"(2026-10-05, AU-03 / #1187) and node_rmstrict (2026-10-10, BF-01)")
+    f"(2026-10-05, AU-03 / #1187) and node_rmstrict (2026-10-10, BF-01) and node_gwrf/node_gwrc (gateway registration)")
 
 # ---------------------------------------------------------------------------
 # EXCLUDED_FROM_SCHEMA -- see the module docstring's "EXCLUDED_FROM_SCHEMA"

@@ -101,6 +101,8 @@ static uint32_t s_ethUdpRxMaxMs = 0;
 static uint32_t s_ethUdpTxMaxMs = 0;
 extern NrfETH neth;
 
+#include "gw_reg_runtime.h"
+
 // ETH-04: Zustand fuer eth_recovery::decide(). s_leaseHeld = aktuelle Adresse kommt
 // aus einem erfolgreichen DHCP; s_lastMaintainRc = letzter Ethernet.maintain()-Code
 // != 0. s_reopenArmed/s_rxAtReopen: ein ReopenUdp lief und s_ethUdpRx zu diesem
@@ -399,6 +401,10 @@ bool udpBeginRaw_nrf52()
 
 bool udpWriteRaw_nrf52(const uint8_t *buf, uint16_t len)
 {
+  // gateway registration state: destination and time of the KEEP actually sent
+  if (len >= 4 && memcmp(buf, "KEEP", 4) == 0)
+    gwRegNoteKeep((uint32_t)neth.udp_dest_addr, millis());
+
   for (int i=0; i<len; i++)
   {
     Udp.write(buf[i]);

@@ -27,6 +27,8 @@
 #include "setlog_lines.h"
 #include "udp_frame.h"
 #include "gw_link_status.h"
+#include "gw_reg_runtime.h"
+#include "gw_reg_state.h"
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // SNF-GW-03: store node hook on the server ingress
@@ -72,6 +74,11 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
     // mit, statt die Warnung stummzuschalten.
     char source_call[MC_CALL_LEN_Z] = {0};
     char destination_call[MC_CALL_LEN_Z] = {0};
+
+    // registration reply from the server: consumed here, it must not count as link-alive (no last_upd_timer)
+    if (packetSize > 0 && gwRegFrameIsOther(inc_udp_buffer, (size_t)packetSize) &&
+        gwRegOnDatagram((uint32_t)src_ip, inc_udp_buffer, (size_t)packetSize, millis()))
+        return 0;
 
     udp_is_busy = true;
     // if more than n values are 00 we might have received a faulty message
@@ -656,6 +663,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             else
             {
               snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", sCall.c_str());
+              gwRegOnServerRename(meshcom_settings.node_call);
 
               if(cf.hasShort)
                 snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", cf.shortname);

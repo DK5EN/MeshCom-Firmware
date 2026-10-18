@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <byte_fifo.h>
@@ -420,6 +421,250 @@ static void test_config_burst_fits_3072_not_2048(void)
     TEST_ASSERT_TRUE_MESSAGE(push_burst(&ro) > 0, "2048 B cannot hold the worst-case burst");
 }
 
+// --- Speicher loesen / anbinden (BLE-Pause, AU-17) ---------------------------
+
+static void test_detached_ring_is_empty_and_drops(void)
+{
+    uint8_t a[10], out[16];
+    fill(a, 10, 1);
+    TEST_ASSERT_EQUAL_INT(0, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_INT(0, bf_push(&f, a, 10));
+    bf_pop(&f);
+
+    uint8_t *old = bf_detach(&f);
+    TEST_ASSERT_TRUE(old == store);
+    TEST_ASSERT_FALSE(bf_has_storage(&f));
+    TEST_ASSERT_TRUE(bf_empty(&f));
+    TEST_ASSERT_EQUAL_UINT16(0, bf_frames(&f));
+    TEST_ASSERT_EQUAL_UINT16(0, bf_used(&f));
+
+    // drop, never a write: the old storage must stay untouched
+    memset(store, 0xEE, sizeof(store));
+    TEST_ASSERT_EQUAL_INT(-1, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_INT(-1, bf_push2(&f, a, 5, a, 5));
+    for (size_t i = 0; i < sizeof(store); i++)
+        TEST_ASSERT_EQUAL_UINT8(0xEE, store[i]);
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek(&f, out, sizeof(out)));
+    uint16_t gen = 0;
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek_gen(&f, out, sizeof(out), &gen));
+    bf_pop(&f); // darf nichts tun
+    TEST_ASSERT_EQUAL_UINT16(0, bf_unread(&f));
+    bf_iter_t it;
+    bf_iter_begin(&f, &it);
+    TEST_ASSERT_EQUAL_UINT8(0, bf_iter_next(&f, &it, out, sizeof(out)));
+    TEST_ASSERT_TRUE_MESSAGE(f.buf == NULL, "detached ring holds no pointer (freed memory is never reachable)");
+    // the frame queued before the detach must be gone after the re-attach
+    bf_attach(&f, store, sizeof(store)); // restore for the other tests
+    TEST_ASSERT_TRUE_MESSAGE(bf_empty(&f), "no frame survives detach + attach");
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek(&f, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT16(0, bf_frames(&f));
+    TEST_ASSERT_EQUAL_UINT16(0, bf_used(&f));
+    bf_iter_begin(&f, &it);
+    TEST_ASSERT_EQUAL_UINT8(0, bf_iter_next(&f, &it, out, sizeof(out)));
+}
+
+static void test_reattach_works_again(void)
+{
+    uint8_t a[10], out[16];
+    fill(a, 10, 7);
+    bf_detach(&f);
+    TEST_ASSERT_EQUAL_INT(-1, bf_push(&f, a, 10));
+
+    uint8_t other[32];
+    bf_attach(&f, other, sizeof(other));
+    TEST_ASSERT_TRUE(bf_has_storage(&f));
+    TEST_ASSERT_EQUAL_UINT16(32, f.cap);
+    TEST_ASSERT_TRUE(bf_empty(&f));
+    TEST_ASSERT_EQUAL_INT(0, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_UINT8(10, bf_peek(&f, out, sizeof(out)));
+    expect_frame(out, 10, 7, "frame after re-attach");
+    bf_pop(&f);
+    TEST_ASSERT_TRUE(bf_empty(&f));
+    bf_attach(&f, store, sizeof(store)); // restore for the other tests
+}
+
+// --- Detach / attach under the ring lock (AU job task vs loop task race) ------
+
+// The AU job task detaches while producers on the loop task push. Every ring access must be
+// inside the lock: a rejected push (cap checked against a detached ring) included.
+static void test_detach_and_attach_take_the_lock(void)
+{
+    lock_calls = 0;
+    uint8_t *old = bf_detach(&f);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "bf_detach takes the ring lock once");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "and releases it");
+    TEST_ASSERT_TRUE(old == store);
+
+    lock_calls = 0;
+    bf_attach(&f, store, sizeof(store));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "bf_attach takes the ring lock once");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "and releases it");
+}
+
+static void test_push_cap_check_is_under_lock(void)
+{
+    uint8_t a[10];
+    fill(a, 10, 3);
+    lock_calls = 0;
+    TEST_ASSERT_EQUAL_INT(0, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "accepted push: one lock");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "released");
+
+    bf_detach(&f);
+    lock_calls = 0;
+    TEST_ASSERT_EQUAL_INT(-1, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, lock_calls, "push on a detached ring checks cap under the lock");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, lock_depth, "and releases it on the reject path");
+
+    // oversize / empty are rejected without touching the ring: no lock needed
+    bf_attach(&f, store, sizeof(store));
+    lock_calls = 0;
+    TEST_ASSERT_EQUAL_INT(-1, bf_push2(&f, a, 0, NULL, 0));
+    TEST_ASSERT_EQUAL_INT(0, lock_depth);
+}
+
+static void test_detach_is_idempotent(void)
+{
+    uint8_t a[10];
+    fill(a, 10, 9);
+    bf_push(&f, a, 10);
+    uint8_t *first = bf_detach(&f);
+    TEST_ASSERT_TRUE(first == store);
+    uint8_t *second = bf_detach(&f);
+    TEST_ASSERT_TRUE_MESSAGE(second == NULL, "second detach returns NULL: no double free");
+    TEST_ASSERT_FALSE(bf_has_storage(&f));
+    TEST_ASSERT_TRUE(bf_empty(&f));
+    TEST_ASSERT_EQUAL_INT(-1, bf_push(&f, a, 10));
+    bf_attach(&f, store, sizeof(store));
+}
+
+static void test_attach_twice_resets_and_keeps_last_storage(void)
+{
+    uint8_t a[10], out[16];
+    fill(a, 10, 5);
+    uint8_t other[32];
+    bf_detach(&f);
+    bf_attach(&f, other, sizeof(other));
+    bf_push(&f, a, 10);
+    bf_attach(&f, store, sizeof(store)); // second attach: empty again, new storage wins
+    TEST_ASSERT_TRUE(f.buf == store);
+    TEST_ASSERT_EQUAL_UINT16(sizeof(store), f.cap);
+    TEST_ASSERT_TRUE_MESSAGE(bf_empty(&f), "queued frame dropped by the second attach");
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek(&f, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_INT(0, bf_push(&f, a, 10));
+    TEST_ASSERT_EQUAL_UINT8(10, bf_peek(&f, out, sizeof(out)));
+    expect_frame(out, 10, 5, "ring works on the second storage");
+}
+
+static void test_readers_and_stale_gen_on_detached_ring(void)
+{
+    uint8_t a[10], out[16];
+    fill(a, 10, 1);
+    bf_push(&f, a, 10);
+    bf_iter_t it;
+    bf_iter_begin(&f, &it); // iterator taken BEFORE the detach
+    uint16_t gen = 0;
+    bf_peek_gen(&f, out, sizeof(out), &gen);
+
+    bf_detach(&f);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, bf_iter_next(&f, &it, out, sizeof(out)), "stale iterator ends");
+    TEST_ASSERT_FALSE_MESSAGE(bf_pop_if(&f, gen), "stale pop_if does nothing");
+    TEST_ASSERT_FALSE_MESSAGE(bf_pop_if(&f, bf_tail_gen(&f)), "pop_if on a detached ring does nothing");
+
+    // forged state: unread counter non-zero but no storage (must never dereference buf)
+    f.unread = 1;
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek(&f, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT8(0, bf_peek_gen(&f, out, sizeof(out), &gen));
+    bf_pop(&f);
+    f.unread = 0;
+    bf_attach(&f, store, sizeof(store));
+}
+
+// --- All-or-nothing attach (phoneRingsAttach) ---------------------------------
+
+static int g_alloc_calls, g_alloc_fail_at, g_live, g_frees;
+static void *test_alloc(size_t n)
+{
+    g_alloc_calls++;
+    if (g_alloc_calls == g_alloc_fail_at)
+        return NULL;
+    g_live++;
+    return malloc(n);
+}
+static void test_release(void *p)
+{
+    g_frees++;
+    g_live--;
+    free(p);
+}
+static void alloc_reset(int fail_at)
+{
+    g_alloc_calls = 0;
+    g_alloc_fail_at = fail_at;
+    g_live = 0;
+    g_frees = 0;
+}
+
+static void test_attach_all_or_nothing(void)
+{
+    byte_fifo_t ra = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    byte_fifo_t rb = {NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    byte_fifo_t *const rings[2] = {&ra, &rb};
+    const uint16_t caps[2] = {100, 300};
+
+    // second allocation fails: first is returned, neither ring is touched
+    alloc_reset(2);
+    TEST_ASSERT_FALSE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_live, "nothing leaked");
+    TEST_ASSERT_FALSE(bf_has_storage(&ra));
+    TEST_ASSERT_FALSE(bf_has_storage(&rb));
+    TEST_ASSERT_TRUE(ra.buf == NULL && rb.buf == NULL);
+
+    // first allocation fails
+    alloc_reset(1);
+    TEST_ASSERT_FALSE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    TEST_ASSERT_EQUAL_INT(0, g_live);
+    TEST_ASSERT_FALSE(bf_has_storage(&ra));
+    TEST_ASSERT_FALSE(bf_has_storage(&rb));
+
+    // all succeed
+    alloc_reset(0);
+    TEST_ASSERT_TRUE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    TEST_ASSERT_EQUAL_INT(2, g_live);
+    TEST_ASSERT_EQUAL_UINT16(100, ra.cap);
+    TEST_ASSERT_EQUAL_UINT16(300, rb.cap);
+
+    // idempotent: attached rings are skipped, no further allocation
+    int calls = g_alloc_calls;
+    TEST_ASSERT_TRUE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    TEST_ASSERT_EQUAL_INT(calls, g_alloc_calls);
+    TEST_ASSERT_EQUAL_INT(2, g_live);
+
+    // only the missing one is allocated; failure leaves the attached one untouched
+    uint8_t x[10];
+    fill(x, 10, 2);
+    bf_push(&ra, x, 10);
+    uint8_t *oldb = bf_detach(&rb);
+    test_release(oldb);
+    alloc_reset(1);
+    g_live = 1; // ra's block still live
+    TEST_ASSERT_FALSE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    TEST_ASSERT_EQUAL_INT(1, g_live);
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(1, bf_unread(&ra), "attached ring keeps its frame on failure");
+    TEST_ASSERT_FALSE(bf_has_storage(&rb));
+
+    // detach_free releases both, idempotently
+    alloc_reset(0);
+    TEST_ASSERT_TRUE(bf_attach_all(rings, caps, 2, test_alloc, test_release));
+    g_live = 2;
+    bf_detach_free(rings, 2, test_release);
+    TEST_ASSERT_EQUAL_INT(0, g_live);
+    TEST_ASSERT_EQUAL_INT(2, g_frees);
+    TEST_ASSERT_TRUE(ra.buf == NULL && rb.buf == NULL);
+    bf_detach_free(rings, 2, test_release); // second call: no double free
+    TEST_ASSERT_EQUAL_INT(2, g_frees);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -442,5 +687,13 @@ int main(int, char **)
     RUN_TEST(test_reset_clears_everything);
     RUN_TEST(test_iter_begin_reads_under_lock);
     RUN_TEST(test_config_burst_fits_3072_not_2048);
+    RUN_TEST(test_detached_ring_is_empty_and_drops);
+    RUN_TEST(test_reattach_works_again);
+    RUN_TEST(test_detach_and_attach_take_the_lock);
+    RUN_TEST(test_push_cap_check_is_under_lock);
+    RUN_TEST(test_detach_is_idempotent);
+    RUN_TEST(test_attach_twice_resets_and_keeps_last_storage);
+    RUN_TEST(test_readers_and_stale_gen_on_detached_ring);
+    RUN_TEST(test_attach_all_or_nothing);
     return UNITY_END();
 }

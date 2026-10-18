@@ -109,6 +109,9 @@ size_t fieldCount();
     /* one-shot "wipe at next boot" trigger (config_json.h:131-132); NVS key  \
      * is "node_cflash", member is node_cleanflash. */                       \
     X("node_cflash",    CFG_INT, node_cleanflash, CFG_NORANGE, CFG_NOESC)                        \
+    /* gateway registration state (gw_reg_runtime.cpp): persisted, never exported/imported. */   \
+    X("node_gwrf",      CFG_INT, node_gwrf,       CFG_NORANGE, CFG_NOESC)                        \
+    X("node_gwrc",      CFG_STR, node_gwrc,       CFG_NORANGE, CFG_NOESC)                        \
     SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)
 
 /* Platform-only persisted-but-not-exported fields: the 13 T-Deck device

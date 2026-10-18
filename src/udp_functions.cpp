@@ -5,6 +5,7 @@
 #include <Arduino.h>
 
 #include <udp_functions.h>
+#include "gw_reg_runtime.h"
 #include <extudp_functions.h>
 #include <debugconf.h>
 #include <batt_functions.h>
@@ -268,6 +269,9 @@ bool udpBeginRaw_esp32()
 
 bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len)
 {
+    // gateway registration state: destination and time of the KEEP actually sent
+    if (len >= 4 && memcmp(buf, "KEEP", 4) == 0)
+        gwRegNoteKeep((uint32_t)node_hostip, millis());
     return Udp.write(buf, len) != 0;
 }
 
