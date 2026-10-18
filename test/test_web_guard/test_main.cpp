@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <fstream>
+#include <sstream>
 
 #include <web_functions/web_guard.h>
 
@@ -787,6 +789,28 @@ void test_upd_actions_need_xmc(void)
     TEST_ASSERT_FALSE(webGuardCallAllowed("updcheck", NULL, 0));
 }
 
+// "Pause Bluetooth and check": updcheck?ble needs X-MC like every upd* action; the handler pins (source scan,
+// the ESP32-only code cannot be host compiled): own 5 min cooldown, the guard request, the phone/token preconditions.
+void test_updcheck_ble_needs_xmc_and_source_pins(void)
+{
+    std::string with = req("GET /callfunction/?updcheck=ble HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /callfunction/?updcheck=ble HTTP/1.1", {"Host: 192.168.68.71"});
+    TEST_ASSERT_TRUE(webGuardCallAllowed("updcheck", with.c_str(), with.size()));
+    TEST_ASSERT_FALSE(webGuardCallAllowed("updcheck", without.c_str(), without.size()));
+
+    std::ifstream f("src/web_functions/web_nodefunctioncalls.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(f.good(), "run from the project root");
+    std::stringstream ss;
+    ss << f.rdbuf();
+    const std::string src = ss.str();
+    TEST_ASSERT_TRUE_MESSAGE(src.find("#define AU_BLE_COOLDOWN_MS 300000u") != std::string::npos, "5 min cooldown constant");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("< AU_BLE_COOLDOWN_MS") != std::string::npos, "cooldown used");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("auBleGuardRequest(chain)") != std::string::npos, "guard request");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("fwNetPhoneHeld()") != std::string::npos, "phone precondition");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("\"lowheap_phone\"") != std::string::npos, "token precondition");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("not yet") == std::string::npos, "the hook is gone");
+}
+
 // /austatus is read-only and must not be readable cross-origin: no CORS header for it
 // (web_functions.cpp sets web_cors_ok = false for the route; this pins that the helper agrees for a guarded path).
 void test_austatus_has_no_cors(void)
@@ -912,6 +936,7 @@ int main(int, char **)
     RUN_TEST(test_request_applies_wrapper_follows_compile_flag);
     RUN_TEST(test_rm_route_covers_rm_setparam_keys);
     RUN_TEST(test_upd_actions_need_xmc);
+    RUN_TEST(test_updcheck_ble_needs_xmc_and_source_pins);
     RUN_TEST(test_austatus_has_no_cors);
     RUN_TEST(test_setparam_manualcommand_update_needs_xmc);
     RUN_TEST(test_setparam_any_name_update_value_needs_xmc);

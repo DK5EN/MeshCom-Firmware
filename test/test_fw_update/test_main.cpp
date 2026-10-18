@@ -1533,6 +1533,138 @@ static void test_apply_reboot_aborts_when_a_job_is_busy(void)
     TEST_ASSERT_EQUAL_INT(FWAPPLY_ABORT_BUSY, fwApplyRebootAct(true, true));
 }
 
+// ---- W4a: BLE guard state machine (spec 7), pure decisions ----
+static void test_bleguard_idle_never_acts(void)
+{
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(false, false, true, true, true, true, true, 1000000u, 0u));
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(false, false, false, false, false, false, false, 99999999u, 0u));
+}
+
+static void test_bleguard_busy_holds_even_past_the_cap(void)
+{
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(true, true, false, false, false, false, false, 100u, 0u));
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(true, true, false, false, false, false, false, FW_BLEGUARD_CAP_MS + 5u, 0u));
+    // a stale "ended" flag does not release a guard while a job runs
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(true, true, true, false, false, false, false, 100u, 0u));
+}
+
+static void test_bleguard_releases_on_the_last_edge(void)
+{
+    TEST_ASSERT_EQUAL(FWG_REL_DONE, fwGuardStep(true, false, true, false, false, false, false, 5000u, 1000u));
+    TEST_ASSERT_EQUAL(FWG_REL_FAIL, fwGuardStep(true, false, true, true, false, false, false, 5000u, 1000u));
+    TEST_ASSERT_EQUAL(FWG_REL_REFUSED, fwGuardStep(true, false, true, true, true, false, false, 5000u, 1000u));
+}
+
+static void test_bleguard_chain_only_when_requested_and_check_result_installable(void)
+{
+    // chain requested + newer installable result: the loop starts the DOWNLOAD under the same guard
+    TEST_ASSERT_EQUAL(FWG_CHAIN_DOWNLOAD, fwGuardStep(true, false, true, false, false, true, true, 5000u, 1000u));
+    // chain not requested: done, even when a newer release is there
+    TEST_ASSERT_EQUAL(FWG_REL_DONE, fwGuardStep(true, false, true, false, false, false, true, 5000u, 1000u));
+    // chain requested, result not newer / not installable / already staged: done
+    TEST_ASSERT_EQUAL(FWG_REL_DONE, fwGuardStep(true, false, true, false, false, true, false, 5000u, 1000u));
+    // a failed CHECK never chains
+    TEST_ASSERT_EQUAL(FWG_REL_FAIL, fwGuardStep(true, false, true, true, false, true, true, 5000u, 1000u));
+    TEST_ASSERT_EQUAL(FWG_REL_REFUSED, fwGuardStep(true, false, true, true, true, true, true, 5000u, 1000u));
+}
+
+static void test_bleguard_chain_ok_needs_newer_installable_unstaged(void)
+{
+    TEST_ASSERT_TRUE(fwGuardChainOk(true, true, true, false));
+    TEST_ASSERT_FALSE(fwGuardChainOk(false, true, true, false));
+    TEST_ASSERT_FALSE(fwGuardChainOk(true, false, true, false));
+    TEST_ASSERT_FALSE(fwGuardChainOk(true, true, false, false)); // no tag
+    TEST_ASSERT_FALSE(fwGuardChainOk(true, true, true, true));   // already staged
+}
+
+static void test_bleguard_watchdog_cap_and_wrap(void)
+{
+    // no job, nothing ended: hold below the cap, watchdog at the cap
+    TEST_ASSERT_EQUAL(FWG_HOLD, fwGuardStep(true, false, false, false, false, false, false, FW_BLEGUARD_CAP_MS - 1u, 0u));
+    TEST_ASSERT_EQUAL(FWG_REL_WATCHDOG, fwGuardStep(true, false, false, false, false, false, false, FW_BLEGUARD_CAP_MS, 0u));
+    TEST_ASSERT_EQUAL_UINT32(40u * 60u * 1000u, FW_BLEGUARD_CAP_MS);
+    // millis() wrap: guard set 1000 ms before the wrap
+    const uint32_t set = 0xFFFFFFFFu - 1000u;
+    TEST_ASSERT_FALSE(fwGuardCapReached(set + 60000u, set));
+    TEST_ASSERT_TRUE(fwGuardCapReached(set + FW_BLEGUARD_CAP_MS, set));
+    TEST_ASSERT_TRUE(fwGuardCapReached(set + FW_BLEGUARD_CAP_MS + 7u, set));
+    TEST_ASSERT_EQUAL(FWG_REL_WATCHDOG, fwGuardStep(true, false, false, false, false, false, false, set + FW_BLEGUARD_CAP_MS, set));
+}
+
+static void test_bleguard_release_words_and_phone_rule(void)
+{
+    TEST_ASSERT_EQUAL_STRING("done", fwGuardReleaseWord(FWG_REL_DONE));
+    TEST_ASSERT_EQUAL_STRING("fail", fwGuardReleaseWord(FWG_REL_FAIL));
+    TEST_ASSERT_EQUAL_STRING("refused", fwGuardReleaseWord(FWG_REL_REFUSED));
+    TEST_ASSERT_EQUAL_STRING("watchdog", fwGuardReleaseWord(FWG_REL_WATCHDOG));
+    TEST_ASSERT_EQUAL_STRING("", fwGuardReleaseWord(FWG_HOLD));
+    TEST_ASSERT_EQUAL_STRING("", fwGuardReleaseWord(FWG_CHAIN_DOWNLOAD));
+    TEST_ASSERT_TRUE(fwGuardRefusedErr("lowheap"));
+    TEST_ASSERT_TRUE(fwGuardRefusedErr("lowheap_ble_off"));
+    TEST_ASSERT_TRUE(fwGuardRefusedErr("lowheap_phone"));
+    TEST_ASSERT_FALSE(fwGuardRefusedErr("tls"));
+    TEST_ASSERT_FALSE(fwGuardRefusedErr(nullptr));
+    // while the guard is set the phone counts as connected for the handover decisions
+    TEST_ASSERT_TRUE(fwGuardPhoneConnected(false, true));
+    TEST_ASSERT_TRUE(fwGuardPhoneConnected(true, false));
+    TEST_ASSERT_FALSE(fwGuardPhoneConnected(false, false));
+}
+
+// W4 rework: service shedding (spec 8.1 step 3) and the notify decision of a finished CHECK.
+static void test_shed_allowed_not_while_a_phone_holds_ble(void)
+{
+    // phone kept BLE up: the pause did not happen, shedding the operator's console would not change the verdict
+    TEST_ASSERT_FALSE(fwShedAllowed(false, false, true));
+    // paused / guarded / no phone (BLE absent or already down)
+    TEST_ASSERT_TRUE(fwShedAllowed(true, false, false));
+    TEST_ASSERT_TRUE(fwShedAllowed(false, true, true));
+    TEST_ASSERT_TRUE(fwShedAllowed(false, false, false));
+}
+
+static void test_shed_first_stage_is_kiss_only(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(FW_SHED_KISS, fwShedFirst(true, FW_SHED_KISS | FW_SHED_CONSOLE));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedFirst(true, FW_SHED_CONSOLE));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedFirst(true, 0));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedFirst(false, FW_SHED_KISS | FW_SHED_CONSOLE));
+}
+
+static void test_shed_second_stage_console_only_when_the_estimate_closes_the_gap(void)
+{
+    // T-Beam W3: 66-70 KB free against 76000 B: a 4 KB estimate does not close a 6-10 KB gap, the session stays
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedSecond(true, FW_SHED_CONSOLE, 68000u, 76000u));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedSecond(true, FW_SHED_CONSOLE, 66000u, 76000u));
+    // a gap the estimate covers: shed (free + estimate >= need, boundary inclusive)
+    TEST_ASSERT_EQUAL_UINT8(FW_SHED_CONSOLE, fwShedSecond(true, FW_SHED_CONSOLE, 76000u - FW_SHED_EST_CONSOLE, 76000u));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedSecond(true, FW_SHED_CONSOLE, 76000u - FW_SHED_EST_CONSOLE - 1u, 76000u));
+    // no session to drop, or not allowed
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedSecond(true, FW_SHED_KISS, 75000u, 76000u));
+    TEST_ASSERT_EQUAL_UINT8(0, fwShedSecond(false, FW_SHED_CONSOLE, 75000u, 76000u));
+}
+
+static void test_shed_settled_waits_only_for_what_was_shed(void)
+{
+    TEST_ASSERT_FALSE(fwShedSettled(FW_SHED_CONSOLE, true, false));
+    TEST_ASSERT_TRUE(fwShedSettled(FW_SHED_CONSOLE, false, true));  // KISS still up but not requested
+    TEST_ASSERT_FALSE(fwShedSettled(FW_SHED_KISS, false, true));
+    TEST_ASSERT_TRUE(fwShedSettled(FW_SHED_KISS, true, false));
+    TEST_ASSERT_FALSE(fwShedSettled(FW_SHED_KISS | FW_SHED_CONSOLE, false, true));
+    TEST_ASSERT_TRUE(fwShedSettled(FW_SHED_KISS | FW_SHED_CONSOLE, false, false));
+    TEST_ASSERT_TRUE(fwShedSettled(0, true, true));
+    TEST_ASSERT_TRUE(FW_SHED_MIN_MS < FW_SHED_MAX_MS && FW_SHED_POLL_MS <= FW_SHED_MIN_MS);
+}
+
+static void test_notify_due_for_a_finished_newer_check_once(void)
+{
+    TEST_ASSERT_TRUE(fwNotifyDue(true, true, 1, false));
+    TEST_ASSERT_FALSE(fwNotifyDue(true, true, 1, true));   // announced already
+    TEST_ASSERT_FALSE(fwNotifyDue(true, true, 0, false));  // off
+    TEST_ASSERT_FALSE(fwNotifyDue(true, true, 2, false));  // 2 acts as 1 only via fwEffectiveMode()
+    TEST_ASSERT_FALSE(fwNotifyDue(true, false, 1, false)); // nothing newer
+    TEST_ASSERT_FALSE(fwNotifyDue(false, true, 1, false)); // job not a finished OK check
+    TEST_ASSERT_TRUE(fwNotifyDue(true, true, fwEffectiveMode(2), false));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1633,5 +1765,17 @@ int main(int, char **)
     RUN_TEST(test_go_tick_waits_8s_after_the_reply);
     RUN_TEST(test_go_tick_phone_and_battery_wait_reasons);
     RUN_TEST(test_go_tick_old_safeboot_disarms);
+    RUN_TEST(test_bleguard_idle_never_acts);
+    RUN_TEST(test_bleguard_busy_holds_even_past_the_cap);
+    RUN_TEST(test_bleguard_releases_on_the_last_edge);
+    RUN_TEST(test_bleguard_chain_only_when_requested_and_check_result_installable);
+    RUN_TEST(test_bleguard_chain_ok_needs_newer_installable_unstaged);
+    RUN_TEST(test_bleguard_watchdog_cap_and_wrap);
+    RUN_TEST(test_bleguard_release_words_and_phone_rule);
+    RUN_TEST(test_shed_allowed_not_while_a_phone_holds_ble);
+    RUN_TEST(test_shed_first_stage_is_kiss_only);
+    RUN_TEST(test_shed_second_stage_console_only_when_the_estimate_closes_the_gap);
+    RUN_TEST(test_shed_settled_waits_only_for_what_was_shed);
+    RUN_TEST(test_notify_due_for_a_finished_newer_check_once);
     return UNITY_END();
 }

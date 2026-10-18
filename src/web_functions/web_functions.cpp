@@ -1256,6 +1256,8 @@ static void auScaffoldJs()
     web_client.println("else{m=s.newer&&!s.inst?'Firmware '+s.avail+' exists, but has no image for this board':(s.avail?'up to date':'available none');}");
     web_client.println("if((L=='A'||L=='C'||L=='E')&&(auLoc||(s.err&&!auLowHeap(s.err))))e=auLoc||auErrText(s.job,s.err)+' ['+s.err+']';");
     web_client.println("var r=auEl('au_row');if(s.phone&&(L=='A'||L=='C')&&!e&&r&&r.getAttribute('data-blepause')=='1')h='(i) A connected phone may block the update on this board';");
+    // BLE guard (section 7): the phone link is dropped for the job; the row says so until the guard is released
+    web_client.println("if(s.guard&&L!='S'&&L!='E'){m='Bluetooth paused for the update';e='';h='';dis=1;act='none';if(L!='B'&&L!='D'&&L!='d')lab='Checking now ...';}");
     web_client.println("auDraw(g,m,e,h,lab,act,dis,red);}");
     web_client.println("function auSched(){clearTimeout(auT.poll);auT.poll=0;if(!auShown||!auS||auF)return;var L=auState(auS,0),ms=0;");
     web_client.println("if(auS.st=='busy'||auS.guard)ms=1000;else if(L=='G')ms=10000;");
@@ -4639,7 +4641,7 @@ static void sub_au_status()
     if (dl)
         in.pct = fwProgressPct(au.bytesDone, au.progLen);
     in.phone = fwNetPhoneHeld() ? 1 : 0; // same expression as the lowheap_phone token
-    in.guard = 0; // BLE guard: W4 (campaign-au-webgui-ux section 7)
+    in.guard = auBleGuardActive() ? 1 : 0; // BLE guard (campaign-au-webgui-ux section 7)
     in.sbok = fwNetSafebootCapable() ? 1 : 0;
     in.etaS = auEtaS(au.stagedIlen);
     fwNetHeapNow(&in.ifree, &in.iblk);

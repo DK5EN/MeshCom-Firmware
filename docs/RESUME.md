@@ -2,12 +2,14 @@
 
 **Stand:** 2026-10-18, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
 
-## 2026-10-18 -- AU web GUI campaign: W1 done (resume point: docs/campaign-au-webgui-ux-20261018.md, section 12)
+## 2026-10-18 -- AU web GUI campaign: W1-W4 done (resume point: docs/campaign-au-webgui-ux-20261018.md, section 12)
 
-- W1 (host code, tests, gates) committed on `fork-dev`: state-driven Auto update row on the Info page, `GET /austatus`, `notify`
-  default with `auto` compiled out (D14), X-MC gate for update actions. Gate: 72 envs / 2554 cases, 4 board builds + image
-  scan, INSTRUMENT build. Not yet on hardware: W2 (bench, Chrome only), W3 (heap), W4 (BLE guard) follow.
-- Flash permission for this campaign: every node except DK5EN-98 (operator 2026-10-18).
+- Committed on `fork-dev`: state-driven Auto update row, `GET /austatus`, `notify` default with `auto` compiled out (D14),
+  X-MC gate, F flow hardened on hardware, W3 heap logging, BLE guard (classic ESP32 only) and shedding. Gate: 72 envs,
+  2572 cases, 5 board builds + image scan. Bench on DK5EN-1/-14/-92/-90, never DK5EN-98.
+- Open: AU-17 (T-Beam misses the TLS heap gate, `docs/BACKLOG.md`), S3 BLE force deinit crashes (guard restricted to
+  classic), no upstream PR yet (AU is fork-only).
+- Bench nodes are on INSTRUMENT/test builds until the restore step in the campaign doc is done.
 
 ## 2026-10-18 -- upstream merged #1213 and #1214, merged back into fork-dev
 

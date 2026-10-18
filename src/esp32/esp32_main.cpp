@@ -498,6 +498,7 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 static SemaphoreHandle_t s_bleLife = NULL;         // created in esp32setup(); NULL = no guarding (DISABLE_BLE)
 static volatile bool s_bleDown = false;            // BLE stack stopped by esp32BlePause() (or a failed resume)
 static volatile bool s_bleResumeFailed = false;    // the last esp32BleResume() failed; the loop retries
+static volatile bool s_bleGuard = false;           // BLE guard (spec 7): set/cleared by the loop task only; esp32BleResume() refuses while set
 static char s_bleManuf[60] = {0};                  // manufacturer data string, built once at boot
 
 // Loop-task side. True: the BLE objects may be used now, the caller MUST bleLifeUnlock().
@@ -675,6 +676,53 @@ bool esp32BlePause(void)
 #endif
 }
 
+// BLE guard force pause (spec 7): like esp32BlePause(), but a phone may be linked. Order: no re-advertising
+// after the disconnect, advertising off, deinit(true) with the link up (NimBLE terminates the link while
+// stopping), then the session flags are cleared by hand (the terminate may time out and skip onDisconnect).
+// Job task only. True if the stack was stopped; esp32BleResume() brings it back after the guard release.
+// Classic ESP32 only (AU_BLE_PAUSE): on the ESP32-S3 the forced deinit/reinit panics in the NimBLE host task (bench).
+#if AU_BLE_PAUSE
+bool esp32BleForcePause(void)
+{
+#if defined(DISABLE_BLE)
+    return false;
+#else
+    if(s_bleLife == NULL || s_bleDown || pServer == NULL)
+        return false;
+    const bool phone = deviceConnected || isPhoneReady != 0;
+
+    xSemaphoreTake(s_bleLife, portMAX_DELAY);
+    NimBLEServer *srv = pServer;
+    if(srv != NULL)
+        srv->advertiseOnDisconnect(false);
+    NimBLEDevice::stopAdvertising();
+
+    s_bleDown = true;
+    pTxCharacteristic = nullptr;
+    pService = NULL;
+    pServer = NULL;
+
+    const bool stopped = NimBLEDevice::deinit(true);
+    deviceConnected = false;
+    g_ble_conn_handle = 0xFFFF;
+    bleSessionResetAll();
+    xSemaphoreGive(s_bleLife);
+
+    if(!stopped)
+        Serial.print("[AU];ble;pause;deinit;fail\n");
+    Serial.printf("[AU];ble;pause;force;phone;%u;heap;%u;blk;%u\n", (unsigned)phone, (unsigned)esp_get_free_heap_size(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    return true;
+#endif
+}
+#endif   // AU_BLE_PAUSE
+
+// True while the BLE stack is stopped (paused by an update job or a failed resume).
+bool esp32BleDown(void)
+{
+    return s_bleDown;
+}
+
 bool esp32BleResume(void)
 {
 #if defined(DISABLE_BLE)
@@ -682,6 +730,11 @@ bool esp32BleResume(void)
 #else
     if(s_bleLife == NULL || !s_bleDown)
         return true;   // never paused (or already back)
+    if(s_bleGuard)
+    {
+        Serial.print("[AU];ble;resume;refused;guard\n");   // only the guard release brings BLE back
+        return false;
+    }
 
     xSemaphoreTake(s_bleLife, portMAX_DELAY);
     const bool ok = s_bleDown ? bleStackStart(true) : true;   // a concurrent resume may have won
@@ -2418,7 +2471,6 @@ static char s_auHandoverTag[24] = "";   // [AU];handover printed for this tag
 static bool s_auBlockedPrinted = false; // [AU];handover;blocked;old_safeboot printed this boot
 #endif
 static bool s_auSkipLogged = false;     // D9: [AU];auto;skip / blocked printed for this check
-static bool s_auGuardLogged = false;    // D16: [AU];bleguard;pending printed for this check
 #if INSTRUMENT_ENABLED
 // bench only (--update checknow): make the automatic check due now; the usual gates (WiFi, clock, phone) still apply
 void auInstrCheckNow(void)
@@ -2445,6 +2497,213 @@ bool auApplyRebootPending(void)
 static bool auTagSame(const char *a, const char *b)
 {
     return strncmp(a, b, 23) == 0;
+}
+
+// ---------------------------------------------------------------------------
+// BLE guard (spec 7) and service shedding (spec 8.1). Loop task only, except the reads noted.
+// ---------------------------------------------------------------------------
+static uint32_t s_guardSetMs = 0;
+static bool s_guardChain = false;       // the CHECK was requested with a chain and no DOWNLOAD started yet
+static bool s_guardSawBusy = false;     // a job of this guard was started (BUSY is set synchronously by fwNetStart)
+static volatile uint8_t s_auShedMask = 0;   // spec 8.1 step 3: FW_SHED_* bits the loop keeps stopped (KISS TCP, net console)
+
+bool auBleGuardActive(void)
+{
+#if AU_BLE_PAUSE
+    return s_bleGuard;
+#else
+    return false;   // no guard off the classic ESP32 (forced NimBLE deinit is not safe on the S3)
+#endif
+}
+
+// Spec 8.1 step 3 (job task). The services the node could stop now (FW_SHED_* bits): a connected net console
+// session, KISS TCP when on. Read only.
+uint8_t auShedAvail(void)
+{
+    uint8_t mask = 0;
+    #ifndef DISABLE_NET_CONSOLE
+    if(isNetConsoleConnected())
+        mask |= FW_SHED_CONSOLE;
+    #endif
+    #ifndef DISABLE_KISS_TCP
+    if(bKISS)
+        mask |= FW_SHED_KISS;
+    #endif
+    return mask;
+}
+
+// Keep the services of mask stopped through the same off paths as `--netconsole off` and `--kiss off` (the loop does
+// the stopping: sockets are only touched by the loop task). mask 0 restores both (the loop reopens them).
+void auShedHold(uint8_t mask)
+{
+    s_auShedMask = mask;
+}
+
+// True once the sockets of mask are closed (the loop has run the off paths).
+bool auShedSettled(uint8_t mask)
+{
+    bool consoleUp = false;
+    bool kissUp = false;
+    #ifndef DISABLE_NET_CONSOLE
+    consoleUp = isNetConsoleConnected();
+    #endif
+    #ifndef DISABLE_KISS_TCP
+    kissUp = isKissClientConnected();
+    #endif
+    return fwShedSettled(mask, consoleUp, kissUp);
+}
+
+#if INSTRUMENT_ENABLED
+// bench only (--update bleguardcycle <n>): n forced BLE deinit/reinit cycles, one per update tick (1 Hz). Each cycle
+// sets the guard, force-pauses, clears the guard and resumes; the heap readings show whether the stack leaks.
+static uint16_t s_cycleLeft = 0;
+static uint16_t s_cycleNo = 0;
+
+bool auInstrBleGuardCycle(uint16_t n)
+{
+    if(s_bleGuard || s_cycleLeft != 0 || n == 0)
+        return false;
+    s_cycleNo = 0;
+    s_cycleLeft = n;
+    return true;
+}
+
+static void auInstrCycleTick(void)
+{
+    if(s_cycleLeft == 0)
+        return;
+    FwNetStatus st;
+    fwNetGetStatus(st);
+    if(st.state == FWS_BUSY || s_bleGuard)
+    {
+        s_cycleLeft = 0;   // a job or a real guard took over: stop the run
+        return;
+    }
+    s_cycleLeft--;
+    s_cycleNo++;
+    s_bleGuard = true;
+#if AU_BLE_PAUSE
+    esp32BleForcePause();
+#endif
+    s_bleGuard = false;
+    const bool up = esp32BleResume();
+    Serial.printf("[AU];bleguard;cycle;%u;heap;%u;blk;%u;resume;%u\n", (unsigned)s_cycleNo, (unsigned)esp_get_free_heap_size(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), (unsigned)up);
+}
+#endif
+
+#if AU_BLE_PAUSE
+static bool auBleGuardStart(bool chainDownload, bool dueReason)
+{
+    if(s_bleGuard)
+        return false;
+    FwNetStatus st;
+    fwNetGetStatus(st);
+    if(st.state == FWS_BUSY)
+        return false;
+    const unsigned phone = (deviceConnected || isPhoneReady != 0) ? 1u : 0u;
+    // set before the job starts: the job task reads the flag when it begins
+    s_bleGuard = true;
+    s_guardSetMs = millis();
+    s_guardChain = chainDownload;
+    s_guardSawBusy = false;
+    if(dueReason)
+        Serial.printf("[AU];bleguard;on;phone;%u;reason;due\n", phone);
+    else
+        Serial.printf("[AU];bleguard;on;phone;%u\n", phone);
+    if(!fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
+    {
+        s_bleGuard = false;
+        s_guardChain = false;
+        Serial.printf("[AU];bleguard;off;refused\n");
+        return false;
+    }
+    s_guardSawBusy = true;
+    s_auSawBusy = true;
+    return true;
+}
+#endif   // AU_BLE_PAUSE
+
+bool auBleGuardRequest(bool chainDownload)
+{
+#if AU_BLE_PAUSE
+    return auBleGuardStart(chainDownload, false);
+#else
+    (void)chainDownload;
+    return false;
+#endif
+}
+
+static void auBleGuardRelease(FwGuardAct act)
+{
+    s_bleGuard = false;
+    s_guardChain = false;
+    s_guardSawBusy = false;
+    switch(act)
+    {
+    case FWG_REL_DONE:      Serial.printf("[AU];bleguard;off;done\n"); break;
+    case FWG_REL_FAIL:      Serial.printf("[AU];bleguard;off;fail\n"); break;
+    case FWG_REL_REFUSED:   Serial.printf("[AU];bleguard;off;refused\n"); break;
+    default:                Serial.printf("[AU];bleguard;off;watchdog\n"); break;
+    }
+    // the job task left BLE down while the guard was set; a failed resume is retried by the loop
+    if(esp32BleDown())
+        esp32BleResume();
+}
+
+// Effective update mode (D14: a stored 2 acts as 1).
+static int auEffectiveMode(void)
+{
+    const int storedMode = meshcom_settings.node_autoupd < 0 ? 0 : (meshcom_settings.node_autoupd > 2 ? 2 : meshcom_settings.node_autoupd);
+    return fwEffectiveMode(storedMode);
+}
+
+// "[AU];notify;<tag>" for a finished CHECK that found a newer release, once per tag. Called by the result block of
+// auTick and by the guard chain before it starts the DOWNLOAD (that DOWNLOAD hides the CHECK result in the same tick).
+static void auNotifyCheck(const FwNetStatus &st)
+{
+    if(!fwNotifyDue(st.job == FWJ_CHECK && st.state == FWS_DONE_OK, st.availNewer, auEffectiveMode(),
+                    auTagSame(s_auNotifiedTag, st.availTag)))
+        return;
+    snprintf(s_auNotifiedTag, sizeof(s_auNotifiedTag), "%s", st.availTag);
+    // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
+    Serial.printf("[AU];notify;%s\n", st.availTag);
+}
+
+// 1 Hz, before every early return of auTick: chain / release the guard, drop a shed hold nobody owns.
+static void auGuardTick(uint32_t now)
+{
+    FwNetStatus st;
+    fwNetGetStatus(st);
+    const bool busy = (st.state == FWS_BUSY);
+    if(s_auShedMask != 0 && !busy)
+        s_auShedMask = 0;   // the job task restores at its end; this is the backstop
+    if(!s_bleGuard)
+        return;
+
+    const bool ended = !busy && s_guardSawBusy && (st.state == FWS_DONE_OK || st.state == FWS_DONE_FAIL);
+    const bool failed = (st.state == FWS_DONE_FAIL);
+    const bool chainPending = s_guardChain && st.job == FWJ_CHECK;
+    const bool stagedSame = st.staged && st.stagedTag[0] != '\0' && strncmp(st.stagedTag, st.availTag, 23) == 0;
+    const bool chainOk = fwGuardChainOk(st.availNewer, st.installable, st.availTag[0] != '\0', stagedSame);
+    const FwGuardAct act = fwGuardStep(true, busy, ended, failed, failed && fwGuardRefusedErr(st.lastErr),
+                                       chainPending, chainOk, now, s_guardSetMs);
+    if(act == FWG_HOLD)
+        return;
+    if(act == FWG_CHAIN_DOWNLOAD)
+    {
+        s_guardChain = false;
+        auNotifyCheck(st);   // the DOWNLOAD below turns BUSY before auTick reads the CHECK result
+        if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
+        {
+            s_guardSawBusy = true;
+            s_auSawBusy = true;
+        }
+        else
+            auBleGuardRelease(FWG_REL_FAIL);
+        return;
+    }
+    auBleGuardRelease(act);
 }
 
 // 30 s pause after fwNetStart() said no, so a refused start is not retried every second.
@@ -2522,6 +2781,10 @@ static void auTick(void)
     if((uint32_t)(now - s_auLastTickMs) < 1000u)
         return;
     s_auLastTickMs = now;
+    auGuardTick(now);
+#if INSTRUMENT_ENABLED
+    auInstrCycleTick();
+#endif
 
     // AU-12: boot demotion, once per boot at the first tick (settings are loaded long before). A node
     // that was in auto mode with a Safeboot too old to apply updates drops to notify and says so. Only
@@ -2557,6 +2820,7 @@ static void auTick(void)
     in.wifiUp = wifiUp;
     // clock valid for TLS and phone state: one definition, shared with rmAuGo (rm_au_esp32.cpp)
     rmAuAutoGates(&in.timeValid, &in.phoneConnected);
+    in.phoneConnected = fwGuardPhoneConnected(in.phoneConnected, s_bleGuard);   // spec 7.5
     // global_batt is the filtered pack voltage in mV; "no reading" = 0 mV = mains / USB. The same
     // fail-safe as the /B= tag: battHardwarePresent() is false without a battery reading.
     in.onBattery = battHardwarePresent();
@@ -2589,13 +2853,7 @@ static void auTick(void)
                 s_auNextTryMs = now + 600000u;
             }
         }
-        if(st.job == FWJ_CHECK && st.state == FWS_DONE_OK && st.availNewer && in.mode == 1 &&
-           !auTagSame(s_auNotifiedTag, st.availTag))
-        {
-            snprintf(s_auNotifiedTag, sizeof(s_auNotifiedTag), "%s", st.availTag);
-            // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
-            Serial.printf("[AU];notify;%s\n", st.availTag);
-        }
+        auNotifyCheck(st);
     }
     if(st.state == FWS_BUSY)
         return;
@@ -2700,19 +2958,27 @@ static void auTick(void)
 
     if((act == FW_CHECK || act == FW_CHECK_GUARDED) && !auBackedOff(now))
     {
-        // D16: the phone stayed connected 30 min past the due time. TODO(W4): force the BLE pause
-        // (BLE guard) here before the job starts; until then the check runs as it always did.
-        if(act == FW_CHECK_GUARDED && !s_auGuardLogged)
+        // D16: the phone stayed connected 30 min past the due time: run this period's check under the BLE guard
+        // (the job force-pauses BLE, the guard is released when the check is done). No automatic download (D14).
+        // Without AU_BLE_PAUSE (ESP32-S3 etc.) there is no guard: the plain check below runs, as before W4.
+        #if AU_BLE_PAUSE
+        if(act == FW_CHECK_GUARDED)
         {
-            s_auGuardLogged = true;
-            Serial.printf("[AU];bleguard;pending\n");
+            if(auBleGuardStart(false, true))
+            {
+                fwCheckDone(s_auTimer, now);
+                s_auSkipLogged = false;
+            }
+            else
+                auBackOff(now);
+            return;
         }
+        #endif
         if(fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
         {
             fwCheckDone(s_auTimer, now);
             s_auSawBusy = true;
             s_auSkipLogged = false;
-            s_auGuardLogged = false;
         }
         else
             auBackOff(now);
@@ -3981,7 +4247,7 @@ void esp32loop()
             // it retries itself three times.
             static uint32_t s_bleRetryMs = 0;
             static uint8_t s_bleRetries = 0;
-            if(s_bleDown && s_bleResumeFailed && s_bleRetries < 5 &&
+            if(s_bleDown && s_bleResumeFailed && !s_bleGuard && s_bleRetries < 5 &&
                (uint32_t)(millis() - s_bleRetryMs) >= 30000UL)
             {
                 FwNetStatus _fst;
@@ -4730,7 +4996,7 @@ void esp32loop()
     // others off that block is never entered, so kissStop() would be unreachable
     // and "--kiss off" could not close the (unauthenticated) listener.
     #ifndef DISABLE_KISS_TCP
-    if(bKISS)
+    if(bKISS && (s_auShedMask & FW_SHED_KISS) == 0)   // s_auShedMask: update job shedding (spec 8.1), restored by clearing it
     {
         flushKissQueue();
         kissLoop();   // self-guarding on WiFi.status(); opens the socket once WiFi is up
@@ -4746,7 +5012,7 @@ void esp32loop()
     // listener stayed open (P-0169). Stopping needs no network, so no
     // iWlanWait gate either.
     #ifndef DISABLE_NET_CONSOLE
-    if(!bNETCONSOLE)
+    if(!bNETCONSOLE || (s_auShedMask & FW_SHED_CONSOLE) != 0)
         stopNetConsole();   // no-op unless started
     #endif
 
@@ -4815,7 +5081,7 @@ void esp32loop()
         }
 
         #ifndef DISABLE_NET_CONSOLE
-        if(bNETCONSOLE && iWlanWait == 0)
+        if(bNETCONSOLE && iWlanWait == 0 && (s_auShedMask & FW_SHED_CONSOLE) == 0)
         {
             startNetConsole();
             loopNetConsole();

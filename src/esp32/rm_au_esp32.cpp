@@ -58,7 +58,7 @@ void rmAuAutoGates(bool *timeValid, bool *phoneConnected)
     *timeValid = bNTPDateTimeValid ||
                  (meshcom_settings.node_date_year > 2023 &&
                   (memcmp(cTimeSource, "GPS", 3) == 0 || memcmp(cTimeSource, "RTC", 3) == 0 || memcmp(cTimeSource, "NTP", 3) == 0));
-    *phoneConnected = (isPhoneReady == 1);
+    *phoneConnected = (isPhoneReady == 1) || auBleGuardActive(); // spec 7.5: an active BLE guard counts as a phone
 }
 
 #if !defined(FWNET_STUB)

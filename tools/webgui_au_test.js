@@ -330,6 +330,27 @@ async function mkPage(node, opts) {
     await Q.click();
     check('G: "Pause Bluetooth and check" sends updcheck=ble; a FAIL answer shows a hint and re-enables the button', node2.fnCalls()[0] === '/callfunction/?updcheck=ble' && !Q.view().dis, JSON.stringify(Q.view()));
     Q.w.auPageLeave();
+    // BLE guard (section 7): the guard line, one request, 1 s polling, return to the base state after the release
+    const node3 = mkNode(J('G'));
+    const R = await mkPage(node3);
+    await R.init();
+    node3.status = J('G').replace('"guard":0', '"guard":1').replace('"st":"idle"', '"st":"busy"').replace('"job":"none"', '"job":"check"').replace(/"err":"[^"]*"/, '"err":""');
+    const b = R.el('au_btn');
+    b.dispatchEvent(new R.w.MouseEvent('click', { bubbles: true }));
+    b.dispatchEvent(new R.w.MouseEvent('click', { bubbles: true }));
+    await flush();
+    check('G: a double click sends exactly one updcheck=ble', node3.fnCalls().filter((c) => c === '/callfunction/?updcheck=ble').length === 1, node3.fnCalls().join());
+    check('guard on: the row says "Bluetooth paused for the update", button disabled, no hint', /Bluetooth paused for the update/.test(R.view().msg) && R.view().dis && R.view().hint === '' && R.view().act === 'none', JSON.stringify(R.view()));
+    const n3 = node3.statusCalls;
+    await R.T.advance(3000);
+    check('guard on: polling every 1 s', node3.statusCalls - n3 === 3, String(node3.statusCalls - n3));
+    node3.status = J('G').replace('"guard":0', '"guard":1');
+    await R.T.advance(1500);
+    check('guard on between check and download (idle): the line stays', /Bluetooth paused for the update/.test(R.view().msg) && R.view().dis, JSON.stringify(R.view()));
+    node3.status = J('A').replace('"phone":0', '"phone":1');
+    await R.T.advance(1500);
+    check('guard released, phone back: the row is in its base state again', R.view().msg !== '' && !/Bluetooth paused/.test(R.view().msg) && R.view().btn === 'Check now' && !R.view().dis, JSON.stringify(R.view()));
+    R.w.auPageLeave();
   }
 
   // ---- double click, FAIL answers -----------------------------------------------------------------------------

@@ -41,8 +41,32 @@ def test_automatic_handover_branch_is_fenced():
     )
 
 
+def _fenced_lines(lines):
+    """Indexes of lines that sit inside an open `#if AU_AUTO_INSTALL` block."""
+    stack, out = [], set()
+    for n, line in enumerate(lines):
+        m = re.match(r"\s*#\s*(if|ifdef|ifndef)\b(.*)", line)
+        if m:
+            stack.append(m.group(1) == "if" and m.group(2).strip().startswith("AU_AUTO_INSTALL"))
+        elif re.match(r"\s*#\s*(else|elif)\b", line) and stack:
+            stack[-1] = False
+        elif re.match(r"\s*#\s*endif", line) and stack:
+            stack.pop()
+        elif any(stack):
+            out.add(n)
+    return out
+
+
 def test_automatic_download_start_is_fenced():
-    assert _fenced(MAIN.read_text().splitlines(), "fwNetStart(FWJ_DOWNLOAD")
+    lines = MAIN.read_text().splitlines()
+    needle = "fwNetStart(FWJ_DOWNLOAD"
+    fenced = _fenced_lines(lines)
+    hits = [i for i, l in enumerate(lines) if needle in l and not l.lstrip().startswith("//")]
+    assert any(i in fenced for i in hits), "the automatic download start must sit inside #if AU_AUTO_INSTALL"
+    # the only start outside the fence is the user-initiated BLE-guard chain (FWG_CHAIN_DOWNLOAD)
+    for i in hits:
+        if i not in fenced:
+            assert any("FWG_CHAIN_DOWNLOAD" in x for x in lines[max(0, i - 8) : i]), f"unfenced download start at line {i + 1}"
 
 
 @pytest.mark.skipif(shutil.which("g++") is None, reason="needs a host compiler")

@@ -579,14 +579,13 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
     return !k.z->err && !k.r->err;
 }
 
-// Pre-TLS gate shared by CHECK and DOWNLOAD; logs the numbers on refusal.
-bool heapGateOk()
+// One evaluation of the pre-TLS gate; fr / bk / pb / ps / need receive the numbers it used.
+bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &need)
 {
-    auHeapLine("pregate", "", false);
-    const bool ps = tlsAllocInstall();
-    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    const uint32_t pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
+    ps = tlsAllocInstall();
+    fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
     uint32_t minFree = FWNET_MIN_FREE;
     uint32_t minIFree = FWNET_MIN_IFREE_PSRAM;
 #if INSTRUMENT_ENABLED
@@ -596,14 +595,91 @@ bool heapGateOk()
         minIFree = s_gateOver;
     }
 #endif
-    if (fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree))
+    need = ps ? minIFree : minFree; // the free-heap floor that applies (the shedding estimate is measured against it)
+    return fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree);
+}
+
+// Spec 8.1 step 3: services that cost heap and have a clean off / on path in the loop (net console session, KISS TCP).
+// Shed only after the gate refused and only when fwShedAllowed() (not while a phone holds BLE: step 2 did not happen
+// and dropping the operator's console would not change the verdict); restored by shedRestore() at the end of the job on
+// every exit. KISS first and the gate is read again; the console session only if its estimate closes the gap.
+bool s_shedDone = false;
+bool s_shedAllowed = true; // set by fwNetTask before the job body
+uint8_t s_shedMask = 0;    // FW_SHED_* bits held now
+
+// Stops the services of `add`, then polls (not a fixed delay) until the loop task has closed the sockets.
+bool shedHold(uint8_t add)
+{
+    if (add == 0)
+        return false;
+    s_shedMask |= add;
+    s_shedDone = true;
+    auShedHold(s_shedMask);
+    auLog("[AU];shed;services;console;%u;kiss;%u\n", (unsigned)(add & FW_SHED_CONSOLE), (unsigned)((add & FW_SHED_KISS) >> 1));
+    uint32_t waited = 0;
+    while (waited < FW_SHED_MAX_MS && (waited < FW_SHED_MIN_MS || !auShedSettled(s_shedMask)))
+    {
+        vTaskDelay(pdMS_TO_TICKS(FW_SHED_POLL_MS));
+        waited += FW_SHED_POLL_MS;
+    }
+    return true;
+}
+
+void shedRestore()
+{
+    if (!s_shedDone)
+        return;
+    s_shedDone = false;
+    s_shedMask = 0;
+    auShedHold(0);
+    auLog("[AU];shed;restore\n");
+}
+
+// Pre-TLS gate shared by CHECK and DOWNLOAD; logs the numbers on refusal. Shedding order (8.1): BLE pause and the
+// guard happen before the job body, here step 3 follows a refusal and the gate is read again after each stage.
+bool heapGateOk()
+{
+    auHeapLine("pregate", "", false);
+    uint32_t fr, bk, pb, need;
+    bool ps;
+    if (heapGateEval(fr, bk, pb, ps, need))
     {
         auHeapLine("gate", ";ok", false);
         return true;
     }
+    if (s_shedAllowed)
+    {
+        const uint8_t avail = auShedAvail();
+        if (shedHold(fwShedFirst(s_shedAllowed, avail)))
+        {
+            auHeapLine("pregate", ";shed", false);
+            if (heapGateEval(fr, bk, pb, ps, need))
+            {
+                auHeapLine("gate", ";ok", false);
+                return true;
+            }
+        }
+        if (shedHold(fwShedSecond(s_shedAllowed, avail, fr, need)))
+        {
+            auHeapLine("pregate", ";shed", false);
+            if (heapGateEval(fr, bk, pb, ps, need))
+            {
+                auHeapLine("gate", ";ok", false);
+                return true;
+            }
+        }
+    }
     auHeapLine("gate", ";refuse", false);
     auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u\n", (unsigned)fr, (unsigned)bk,
           (unsigned)pb, (unsigned)ps);
+#if INSTRUMENT_ENABLED
+    if (s_shedDone) // only when something was shed and the gate still refuses
+    {
+        uint32_t f4, b4;
+        fwNetHeapNow(&f4, &b4);
+        auLog("[AU];shed;fail;free;%u;iblk;%u\n", (unsigned)f4, (unsigned)b4);
+    }
+#endif
     return false;
 }
 
@@ -1161,14 +1237,32 @@ void fwNetTask(void *)
     auHeapLine("start", "", false);
     heapMark("start");
     allocFailArm();
+    // Spec 7 / 8.1: under the BLE guard the pause is forced (a phone may be linked), on every board; without it the
+    // classic ESP32 pauses BLE only when no phone is connected.
+    const bool tlsJob = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD);
+    const bool guarded = tlsJob && auBleGuardActive();
+    bool blePaused = false;
+    bool phoneHeld = false;
 #if AU_BLE_PAUSE
-    // AU-D18: free the NimBLE stack's heap for the TLS handshake. Only CHECK and DOWNLOAD talk
-    // TLS; esp32BlePause() declines (false) while a phone is connected or ready.
-    const bool blePaused = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD) && esp32BlePause();
-    // The pause was skipped for a phone (sampled right after the call; both are the flags
-    // esp32BlePause() tests): a lowheap below is then transient, not the node's own shortfall.
-    const bool phoneHeld = !blePaused && fwNetPhoneHeld();
+    if (guarded)
+    {
+        // a chained DOWNLOAD finds BLE already down (the pause is kept for the whole guard)
+        blePaused = esp32BleForcePause();
+        auLog("[AU];shed;guard\n");
+    }
+    else if (tlsJob)
+    {
+        // AU-D18: free the NimBLE stack's heap for the TLS handshake. Only CHECK and DOWNLOAD talk
+        // TLS; esp32BlePause() declines (false) while a phone is connected or ready.
+        blePaused = esp32BlePause();
+        // The pause was skipped for a phone (sampled right after the call; both are the flags
+        // esp32BlePause() tests): a lowheap below is then transient, not the node's own shortfall.
+        phoneHeld = !blePaused && fwNetPhoneHeld();
+        if (blePaused)
+            auLog("[AU];shed;ble\n");
+    }
 #endif
+    s_shedAllowed = fwShedAllowed(blePaused, guarded, phoneHeld);
     const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
 #if INSTRUMENT_ENABLED
                       : (s_argJob == FWJ_STAGELAN) ? runStageLan()
@@ -1177,24 +1271,24 @@ void fwNetTask(void *)
     auHeapLine("peak", "", true);
     heapMark("end"); // after every client object is gone
     allocFailMark("end");
-#if AU_BLE_PAUSE
+    shedRestore(); // all exits of the job body end here
     // lowheap with BLE already paused is not the transient phone case: it would recur on every
     // retry and cycle NimBLE each time, so it gets its own token, which uses an AU-D5 attempt.
-    if (blePaused && err != nullptr && strcmp(err, "lowheap") == 0)
+    // Under the guard BLE is off by definition (also for a chained DOWNLOAD that paused nothing itself).
+    if ((blePaused || (guarded && esp32BleDown())) && err != nullptr && strcmp(err, "lowheap") == 0)
         err = "lowheap_ble_off";
     // The gate failed and the BLE pause was skipped because of a phone: token lowheap_phone, which
     // fwErrConsumesAttempt() (fw_update.h) does not count as an attempt. Without a phone and without
     // a pause (BLE already down / absent) the plain "lowheap" stays.
     else if (phoneHeld && err != nullptr && strcmp(err, "lowheap") == 0)
         err = "lowheap_phone";
-#endif
     if (err != nullptr)
         auLog("[AU];fail;%s\n", err);
 
-#if AU_BLE_PAUSE
     // BLE comes back BEFORE the status leaves BUSY: nothing else starts a job meanwhile, and the
     // loop treats BLE as down for the whole pause (esp32_main.cpp guards every BLE path).
-    if (blePaused)
+    // Under the guard the loop resumes BLE when it releases the guard (esp32BleResume() refuses until then).
+    if (blePaused && !guarded)
     {
         bool up = false;
         for (int i = 0; i < 3 && !up; i++)
@@ -1205,7 +1299,6 @@ void fwNetTask(void *)
         }
         heapMark("resumed"); // a failed resume is retried by the loop (esp32_main.cpp)
     }
-#endif
 
     portENTER_CRITICAL(&s_mux);
     if (err != nullptr)

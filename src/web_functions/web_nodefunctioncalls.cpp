@@ -13,6 +13,10 @@ This file contains all web-based remotely callable functions
 
 
 
+#ifdef ESP32
+#define AU_BLE_COOLDOWN_MS 300000u // "Pause Bluetooth and check": 5 min between guarded checks
+#endif
+
 void webFunctionCall(funCallStruct* functionData) {
     bool bPhoneReady = (isPhoneReady == 1);
 
@@ -42,11 +46,29 @@ void webFunctionCall(funCallStruct* functionData) {
     // The caller (web_functions.cpp call_function) has already required the request header X-MC: 1 for every upd*.
     // OKAY when the job started (or the image is already staged), FAIL otherwise.
     if(functionData->functionName.compareTo("updcheck")==0) {
-        // the BLE guard ("Pause Bluetooth and check") is campaign section 7 / W4: answer FAIL until it exists
+        // "Pause Bluetooth and check" (state G, campaign section 7): only right after a lowheap_phone result and while
+        // a phone still holds the link. The cooldown is its own (5 min), apart from the 60 s of the manual check.
         if(functionData->functionParameter.equals("ble")) {
-            // TODO(W4): accept only after lowheap_phone with a phone connected, set the BLE guard, 5 min cooldown
-            Serial.printf("[AU];web;ble;not yet\n");
-            functionData->returnCode = WF_RETURNCODE_FAIL;
+            static uint32_t s_lastBleMs = 0;
+            static bool s_bleDone = false;
+            const uint32_t bleNowMs = millis();
+            FwNetStatus bs;
+            fwNetGetStatus(bs);
+            if(bs.state == FWS_BUSY || auBleGuardActive() || !fwNetPhoneHeld() ||
+               strncmp(bs.lastErr, "lowheap_phone", 13) != 0 || (bs.lastErr[13] != '\0' && bs.lastErr[13] != ' ') ||
+               (s_bleDone && (uint32_t)(bleNowMs - s_lastBleMs) < AU_BLE_COOLDOWN_MS)) {
+                functionData->returnCode = WF_RETURNCODE_FAIL;
+                return;
+            }
+            // state C (a newer installable release is known, nothing staged): check and download under one guard
+            const bool chain = bs.availNewer && bs.availTag[0] != '\0' && bs.installable && !bs.staged;
+            const bool ok = auBleGuardRequest(chain);
+            if(ok) {
+                s_lastBleMs = bleNowMs;
+                s_bleDone = true;
+            }
+            Serial.printf("[AU];web;ble;%s;chain;%d\n", ok ? "ok" : "refused", chain ? 1 : 0);
+            functionData->returnCode = ok ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
             return;
         }
         // GitHub allows 60 unauthenticated API calls per hour per public IP: 60 s between manual checks

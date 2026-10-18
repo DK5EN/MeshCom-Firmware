@@ -423,12 +423,12 @@ plain struct fields. Estimate W1 with advisor about 40 min and about $10; W2 abo
 
 ## 12. Campaign status (orchestrator, updated per wave)
 
-| Wave | State                                                                                                 | Commit |
-| ---- | ----------------------------------------------------------------------------------------------------- | ------ |
-| W1   | done: host gate 72 envs / 2554 cases, 4 board builds + image scan, INSTRUMENT build, 2 advisor passes | W1     |
-| W2   | open (bench, Chrome only)                                                                             | --     |
-| W3   | open (heap measurements, DK5EN-92)                                                                    | --     |
-| W4   | open (BLE guard, shedding)                                                                            | --     |
+| Wave | State                                                                                          | Commit     |
+| ---- | ---------------------------------------------------------------------------------------------- | ---------- |
+| W1   | done: host gate, 5 board builds + image scan, INSTRUMENT build, 2 advisor passes               | `581f8a0a` |
+| W2   | done: bench DK5EN-1/-14/-92 (Chrome), findings fixed                                           | `5a5fc7f7` |
+| W3   | done: T-Beam heap matrix, AU-17 opened                                                         | `5a5fc7f7` |
+| W4   | done: BLE guard (classic ESP32 only), shedding, benches W4a-c; restore of the bench nodes open | W4         |
 
 W1 deviations from sections 5-10:
 
@@ -490,3 +490,25 @@ Net console (2323) as the log channel; `[AU];heap;<where>;free;..;iblk;..;min;..
 - Consequence: T-Beam (classic ESP32, no PSRAM) cannot run the TLS update at this RAM level; BACKLOG AU-17. W4 still
   builds the BLE guard for phones and the shedding steps, which help boards that miss the gate by a few KB.
 - INSTRUMENT `--update heapgate <bytes>` now sets (not only raises) the threshold, for such measurements.
+
+### W4 result (BLE guard, shedding; 2026-10-18)
+
+Code: guard state machine as pure functions in `src/fw_update.h` (`fwGuardStep` and friends, host-tested), force pause,
+chain CHECK -> DOWNLOAD under one guard, watchdog 40 min, D16 guarded check, shedding (KISS first, net console only
+when the 4 KB estimate can close the gap), `updcheck?ble`, INSTRUMENT `--update bleguardcycle <n>`. Two advisor passes.
+
+| Run | Node                        | Result                                                                                                                                                                                                |
+| --- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W4b | DK5EN-92 (classic ESP32)    | 20 forced guard cycles: every `resume;1`, no reset, free heap 60428 -> 59448 (about 50 B per cycle)                                                                                                   |
+| W4b | DK5EN-1 (ESP32-S3)          | **panic** on the 2nd forced NimBLE deinit/reinit (`InstrFetchProhibited`, PC 0, in `NimBLEDevice::host_task` -> `nimble_port_run()`), no phone linked                                                 |
+| W4a | DK5EN-92 + BLE client (Mac) | `phone:1` -> D13 hint on page open -> Check now -> G -> "Pause Bluetooth and check" -> row "Bluetooth paused for the update" -> link dropped, check passed the gate (C), BLE back, client reconnected |
+| W4c | DK5EN-90 (RAK4631)          | flashed by serial DFU; Info page unchanged, no AU row, no `austatus` string in the page                                                                                                               |
+
+- Decision: spec 7.8 held. The force pause is compiled only where `AU_BLE_PAUSE` is 1 (classic ESP32). On the S3 boards
+  `auBleGuardRequest()` answers false, D16 runs the plain check (S3 boards have the heap), `bleguardcycle` answers
+  "classic ESP32 only". Verified on DK5EN-1 after the change: no panic, `updcheck=ble` refused, `guard` 0.
+- The guard gave the T-Beam more headroom than the normal pause: with the phone link released the check passed the
+  76000 B gate there, where every phone-less check of W3 refused. AU-17 stays open for phone-less nodes.
+- Not benched: McApp itself (`mcapp.local` not reachable from the bench host); a BLE client script
+  (`tools/bench/ble_cycle.py`) stood in for the phone. Reconnect attempts during the guard were not exercised (the
+  client was holding its link when the guard dropped it).

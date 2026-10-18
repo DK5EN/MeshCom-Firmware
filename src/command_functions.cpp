@@ -5132,6 +5132,24 @@ void commandAction(char *umsg_text, bool ble)
             fwNetSetHeapGateOverride((uint32_t)_hg);
             Serial.printf("[AU];heapgate;set;%lu\n", _hg);
         }
+        // bench only: --update bleguardcycle <n> runs n forced BLE stack deinit/reinit cycles (guard set and cleared),
+        // one per second, from the update tick; prints [AU];bleguard;cycle;<i>;heap;<free>;blk;<largest> per cycle
+        else
+        if(strncmp(_owner_c, "bleguardcycle ", 14) == 0)
+        {
+            const unsigned long _bn = strtoul(_owner_c + 14, NULL, 10);
+            #if !AU_BLE_PAUSE
+            (void)_bn;
+            Serial.printf("[ERR];update;bleguardcycle: classic ESP32 only\n");
+            #else
+            if(_auBusy)
+                Serial.printf("[ERR];update;busy\n");
+            else if(_bn < 1 || _bn > 100 || !auInstrBleGuardCycle((uint16_t)_bn))
+                Serial.printf("[ERR];update;bleguardcycle <1..100> (not while a guard or a cycle run is active)\n");
+            else
+                Serial.printf("[AU];bleguard;cycle;start;%lu\n", _bn);
+            #endif
+        }
         // bench only: --update forget clears fwstage/last, so the tag can be offered again
         else
         if(casecmp(_owner_c, (char*)"forget") == 0)

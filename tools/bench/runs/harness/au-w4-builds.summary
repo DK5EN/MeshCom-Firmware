@@ -1,0 +1,13 @@
+BUILD heltec_wifi_lora_32_V3 exit 0
+BUILD ttgo_tbeam exit 0
+BUILD t_deck_plus exit 0
+BUILD E22_XML-DevKitC exit 0
+BUILD wiscore_rak4631 exit 0
+ok   heltec_wifi_lora_32_V3
+ok   ttgo_tbeam
+ok   t_deck_plus
+ok   E22_XML-DevKitC
+ok   wiscore_rak4631
+BUILD instr exit 0
+ok   heltec_wifi_lora_32_V3
+ALLDONE

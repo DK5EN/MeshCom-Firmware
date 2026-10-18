@@ -248,6 +248,25 @@ bool esp32BlePause(void);
 // [AU];ble;resume;ok|fail. Safe to call again after a failure.
 bool esp32BleResume(void);
 
+// BLE guard (spec 7, src/fw_update.h auBleGuardRequest): the pause with a phone linked. Stops advertising,
+// disables advertiseOnDisconnect, NimBLEDevice::deinit(true) with the link up, then bleSessionResetAll().
+// True if the stack was stopped. esp32BleResume() refuses while the guard is set; the loop resumes BLE when it
+// releases the guard. Prints [AU];ble;pause;force;phone;<0|1>;heap;..;blk;... Job task only.
+#if AU_BLE_PAUSE
+bool esp32BleForcePause(void);
+#endif
+
+// True while the BLE stack is stopped (pause, force pause or a failed resume).
+bool esp32BleDown(void);
+
+// Spec 8.1 step 3 (job task). auShedAvail: what the node could stop now (FW_SHED_* bits of fw_update.h: bit 0 a net
+// console session, bit 1 KISS TCP), read only. auShedHold: keep the services of mask stopped through the loop's own
+// off paths (the loop does the stopping); mask 0 restores both. auShedSettled: the sockets of mask are closed
+// (poll after auShedHold, cap FW_SHED_MAX_MS).
+uint8_t auShedAvail(void);
+void auShedHold(uint8_t mask);
+bool auShedSettled(uint8_t mask);
+
 // Reads and decodes the record from NVS. False if there is none or it is invalid.
 // A record for another env, or whose tag is not newer than the running version, is
 // stale: it is removed from NVS and false is returned.

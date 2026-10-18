@@ -883,7 +883,137 @@ inline FwApplyAct fwApplyRebootAct(bool due, bool jobBusy)
     return jobBusy ? FWAPPLY_ABORT_BUSY : FWAPPLY_GO;
 }
 
+// ---- BLE guard (spec 7): the pure decisions; the flag and the BLE calls live in esp32_main.cpp ----
+// The loop task owns the guard. It is set before a CHECK starts and released on the last non-busy edge
+// (done / failed / refused). The watchdog releases only when no job is busy; hard cap 40 min (CHECK 5 min +
+// DOWNLOAD 30 min + handshake and verify).
+#define FW_BLEGUARD_CAP_MS (40u * 60u * 1000u)
+
+enum FwGuardAct : uint8_t
+{
+    FWG_HOLD = 0,        // nothing to do
+    FWG_CHAIN_DOWNLOAD,  // the CHECK found an installable newer release and a chain was requested: start the DOWNLOAD
+    FWG_REL_DONE,        // release: [AU];bleguard;off;done
+    FWG_REL_FAIL,        // release: failed
+    FWG_REL_REFUSED,     // release: refused (lowheap token)
+    FWG_REL_WATCHDOG     // release: cap reached without a job
+};
+
+// Wrap-safe: the guard was set at setMs.
+inline bool fwGuardCapReached(uint32_t nowMs, uint32_t setMs)
+{
+    return (uint32_t)(nowMs - setMs) >= FW_BLEGUARD_CAP_MS;
+}
+
+// CHAIN only for a newer, installable release with a tag that is not staged yet.
+inline bool fwGuardChainOk(bool availNewer, bool installable, bool tagKnown, bool alreadyStaged)
+{
+    return availNewer && installable && tagKnown && !alreadyStaged;
+}
+
+// A lowheap token (lowheap, lowheap_ble_off, lowheap_phone) is a refusal, any other error a failure.
+inline bool fwGuardRefusedErr(const char *err)
+{
+    return err != nullptr && fw_update_detail::strEqN(err, "lowheap", 7) && (err[7] == '\0' || err[7] == '_');
+}
+
+// One loop step. busy = a job runs now; jobEnded = a job of this guard finished since the last step
+// (jobFailed / jobRefused describe it); chainPending = the CHECK was requested with a chain and no DOWNLOAD
+// started yet; chainOk = fwGuardChainOk() of the CHECK result. A busy job never lets the guard go.
+inline FwGuardAct fwGuardStep(bool guardSet, bool busy, bool jobEnded, bool jobFailed, bool jobRefused,
+                              bool chainPending, bool chainOk, uint32_t nowMs, uint32_t setMs)
+{
+    if (!guardSet || busy)
+        return FWG_HOLD;
+    if (jobEnded)
+    {
+        if (jobFailed)
+            return jobRefused ? FWG_REL_REFUSED : FWG_REL_FAIL;
+        return (chainPending && chainOk) ? FWG_CHAIN_DOWNLOAD : FWG_REL_DONE;
+    }
+    return fwGuardCapReached(nowMs, setMs) ? FWG_REL_WATCHDOG : FWG_HOLD;
+}
+
+inline const char *fwGuardReleaseWord(FwGuardAct a)
+{
+    switch (a)
+    {
+    case FWG_REL_DONE:
+        return "done";
+    case FWG_REL_FAIL:
+        return "fail";
+    case FWG_REL_REFUSED:
+        return "refused";
+    case FWG_REL_WATCHDOG:
+        return "watchdog";
+    default:
+        return "";
+    }
+}
+
+// While the guard is set the phone counts as connected for the handover decisions (RM1 "upd go", automatic path).
+inline bool fwGuardPhoneConnected(bool phone, bool guardSet)
+{
+    return phone || guardSet;
+}
+
+// ---- service shedding (spec 8.1 step 3) ----
+// Services a heap refusal may stop: bit 0 = a net console session, bit 1 = KISS TCP.
+#define FW_SHED_CONSOLE 1u
+#define FW_SHED_KISS 2u
+// Heap a service gives back (W3, DK5EN-92: KISS TCP 1-2 KB, one console session 1-8 KB); the console figure is the
+// middle of the range so a board that is far short of the gate does not lose its session for nothing.
+#define FW_SHED_EST_CONSOLE 4096u
+// Wait for the loop task to close the sockets: it polls every FW_SHED_POLL_MS, at least FW_SHED_MIN_MS (one loop
+// pass), at most FW_SHED_MAX_MS.
+#define FW_SHED_POLL_MS 50u
+#define FW_SHED_MIN_MS 250u
+#define FW_SHED_MAX_MS 3000u
+
+// Step 3 follows step 2 (BLE pause / guard): shedding is allowed once the pause happened, under the guard, or when
+// no phone holds BLE (BLE absent, already down). A phone that kept BLE up means the refusal is the phone's, and
+// dropping the operator's console or KISS would not change the verdict.
+inline bool fwShedAllowed(bool blePaused, bool guarded, bool phoneHeld)
+{
+    return blePaused || guarded || !phoneHeld;
+}
+
+// First stage: KISS TCP only (cheap, nobody is typing into it). avail = what the node could stop (FW_SHED_* bits).
+inline uint8_t fwShedFirst(bool allowed, uint8_t avail)
+{
+    return allowed ? (uint8_t)(avail & FW_SHED_KISS) : (uint8_t)0;
+}
+
+// Second stage, after KISS was shed and the gate read again (freeNow, need = the free-heap floor in use): the net
+// console session only if its estimate closes the gap. Otherwise it stays (the operator keeps the refuse line).
+inline uint8_t fwShedSecond(bool allowed, uint8_t avail, uint32_t freeNow, uint32_t need)
+{
+    if (!allowed || (avail & FW_SHED_CONSOLE) == 0)
+        return 0;
+    return (freeNow + FW_SHED_EST_CONSOLE >= need) ? (uint8_t)FW_SHED_CONSOLE : (uint8_t)0;
+}
+
+// The sockets of mask are closed (consoleUp / kissUp = still connected).
+inline bool fwShedSettled(uint8_t mask, bool consoleUp, bool kissUp)
+{
+    return !((mask & FW_SHED_CONSOLE) && consoleUp) && !((mask & FW_SHED_KISS) && kissUp);
+}
+
+// "[AU];notify;<tag>" for a finished CHECK: notify mode (effective 1), a newer release, not announced before.
+inline bool fwNotifyDue(bool checkDoneOk, bool availNewer, int effMode, bool alreadyNotified)
+{
+    return checkDoneOk && availNewer && effMode == 1 && !alreadyNotified;
+}
+
 #if defined(ESP32)
+// BLE guard (spec 7). The flag s_bleGuard is owned by the loop task (esp32_main.cpp); call these from the loop
+// task (the web handler runs there) or from the job task (read only).
+// auBleGuardRequest: sets the guard and starts a CHECK (job FWJ_CHECK, the configured channel). False if busy,
+// the guard is already set, or the start was refused (the guard is not left set then). chainDownload: after the
+// CHECK finished with an installable newer release the loop starts a DOWNLOAD under the same guard.
+// While the guard is set the job task force-pauses BLE (also with a phone linked) and esp32BleResume() refuses.
+bool auBleGuardRequest(bool chainDownload);
+bool auBleGuardActive(void);
 // True from auRequestApplyReboot() until the loop has acted on it. fwNetStart() refuses new jobs meanwhile.
 bool auApplyRebootPending(void);
 // Web "Install now": asks the main loop (esp32_main.cpp auTick) to call auRebootToSafeboot() >= 500 ms
@@ -891,6 +1021,7 @@ bool auApplyRebootPending(void);
 void auRequestApplyReboot(void);
 #if INSTRUMENT_ENABLED
 void auInstrCheckNow(void); // bench: --update checknow
+bool auInstrBleGuardCycle(uint16_t n); // bench: --update bleguardcycle <n>; false while a guard or a cycle run is active
 #endif
 #endif
 

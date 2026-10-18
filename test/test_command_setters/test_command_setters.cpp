@@ -16,6 +16,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "command_setters.h"
 #include "command_match.h"
@@ -1528,6 +1529,194 @@ static void test_charge_led_marker_is_set_before_save_and_never_masked_away(void
     TEST_ASSERT_FALSE_MESSAGE(hit, hit ? m.str().c_str() : "");
 }
 
+// W4a: BLE guard and shedding strings. Walks the preprocessor lines up to `at` and reports whether the position sits
+// inside an "#if INSTRUMENT_ENABLED" region (an #else leaves it).
+static bool atInInstrumentRegion(const std::string &src, size_t at)
+{
+    std::vector<bool> stack;
+    size_t pos = 0;
+    while (pos < at)
+    {
+        size_t eol = src.find('\n', pos);
+        if (eol == std::string::npos)
+            eol = src.size();
+        size_t i = pos;
+        while (i < eol && (src[i] == ' ' || src[i] == '\t'))
+            i++;
+        if (i < eol && src[i] == '#')
+        {
+            const std::string line = src.substr(i, eol - i);
+            if (line.rfind("#if", 0) == 0)
+                stack.push_back(line.find("INSTRUMENT_ENABLED") != std::string::npos && line.rfind("#ifndef", 0) != 0 &&
+                                line.find("!") == std::string::npos);
+            else if (line.rfind("#else", 0) == 0 || line.rfind("#elif", 0) == 0)
+            {
+                if (!stack.empty())
+                    stack.back() = false;
+            }
+            else if (line.rfind("#endif", 0) == 0 && !stack.empty())
+                stack.pop_back();
+        }
+        pos = eol + 1;
+    }
+    for (bool b : stack)
+        if (b)
+            return true;
+    return false;
+}
+
+static void test_bleguard_cycle_and_shed_fail_are_instrument_only(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string rm = read_repo_file("src/remote_cmd.cpp");
+
+    // the verb: present, only inside an INSTRUMENT_ENABLED region, not on the RM allowlist
+    const size_t verb = cmd.find("\"bleguardcycle ");
+    TEST_ASSERT_TRUE_MESSAGE(verb != std::string::npos, "bleguardcycle verb missing");
+    for (size_t at = 0; (at = cmd.find("bleguardcycle", at)) != std::string::npos; at += 13)
+    {
+        const size_t ls = cmd.rfind('\n', at) + 1;
+        const std::string line = cmd.substr(ls, cmd.find('\n', at) - ls);
+        if (line.find("//") != std::string::npos && line.find("//") < at - ls)
+            continue;
+        TEST_ASSERT_TRUE_MESSAGE(atInInstrumentRegion(cmd, at), "bleguardcycle outside an INSTRUMENT_ENABLED region");
+    }
+    TEST_ASSERT_TRUE_MESSAGE(rm.find("bleguardcycle") == std::string::npos, "bleguardcycle is on the RM allowlist");
+
+    // the cycle line and the shed failure line: only in INSTRUMENT regions; the guard / shed lines of the spec are field strings
+    const char *instrOnly[] = {"[AU];bleguard;cycle;"};
+    for (const char *lit : instrOnly)
+    {
+        const size_t at = mainSrc.find(lit);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, lit);
+        TEST_ASSERT_TRUE_MESSAGE(atInInstrumentRegion(mainSrc, at), lit);
+        TEST_ASSERT_TRUE_MESSAGE(mainSrc.find(lit, at + 1) == std::string::npos ||
+                                     atInInstrumentRegion(mainSrc, mainSrc.find(lit, at + 1)), lit);
+    }
+    const size_t sf = net.find("[AU];shed;fail;");
+    TEST_ASSERT_TRUE_MESSAGE(sf != std::string::npos, "shed;fail line missing");
+    TEST_ASSERT_TRUE_MESSAGE(atInInstrumentRegion(net, sf), "[AU];shed;fail outside an INSTRUMENT_ENABLED region");
+    const char *field[] = {"[AU];bleguard;on;phone;", "[AU];bleguard;off;done", "[AU];bleguard;off;fail", "[AU];bleguard;off;refused",
+                           "[AU];bleguard;off;watchdog"};
+    for (const char *lit : field)
+    {
+        const size_t at = mainSrc.find(lit);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, lit);
+        TEST_ASSERT_FALSE_MESSAGE(atInInstrumentRegion(mainSrc, at), lit);
+    }
+    const size_t sv = net.find("[AU];shed;services;");
+    TEST_ASSERT_TRUE_MESSAGE(sv != std::string::npos, "shed;services line missing");
+    TEST_ASSERT_FALSE_MESSAGE(atInInstrumentRegion(net, sv), "shed;services must be a field string");
+}
+
+static void test_bleguard_wiring_pins(void)
+{
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    // esp32BleResume refuses while the guard is set
+    const size_t rs = mainSrc.find("bool esp32BleResume(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(rs != std::string::npos, "esp32BleResume missing");
+    const size_t gd = mainSrc.find("if(s_bleGuard)", rs);
+    const size_t st = mainSrc.find("bleStackStart(true)", rs);
+    TEST_ASSERT_TRUE_MESSAGE(gd != std::string::npos && st != std::string::npos && gd < st, "esp32BleResume does not refuse under the guard before it starts the stack");
+    // D16: the guarded check starts the guard with the due reason, the TODO is gone, no unguarded path remains
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("TODO(W4)") == std::string::npos, "TODO(W4) left in esp32_main.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("auBleGuardStart(false, true)") != std::string::npos, "D16 does not set the guard with reason due");
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("[AU];bleguard;pending") == std::string::npos, "the pending placeholder is still there");
+    // the guard makes the phone count as connected
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("fwGuardPhoneConnected(in.phoneConnected, s_bleGuard)") != std::string::npos, "guard does not count as a phone");
+    // token rule and the force pause in the job task
+    TEST_ASSERT_TRUE_MESSAGE(net.find("esp32BleForcePause()") != std::string::npos && net.find("lowheap_ble_off") != std::string::npos, "job task force pause / token missing");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("if (blePaused && !guarded)") != std::string::npos, "the job task resumes BLE under the guard");
+}
+
+// W4 S3 rework: the BLE guard (forced NimBLE deinit/reinit) exists only where the BLE pause does (AU_BLE_PAUSE, classic
+// ESP32). Bench evidence: bleguardcycle panics on the 2nd cycle on ESP32-S3 (host task, PC 0). Source pins.
+static void test_bleguard_is_classic_esp32_only(void)
+{
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string hdr = read_repo_file("src/esp32/fw_update_net.h");
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const std::string web = read_repo_file("src/web_functions/web_nodefunctioncalls.cpp");
+
+    // esp32BleForcePause: defined and declared only under AU_BLE_PAUSE
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("#if AU_BLE_PAUSE\nbool esp32BleForcePause(void)") != std::string::npos, "esp32BleForcePause definition not under AU_BLE_PAUSE");
+    const size_t hd = hdr.find("bool esp32BleForcePause(void);");
+    TEST_ASSERT_TRUE_MESSAGE(hd != std::string::npos && hdr.rfind("#if AU_BLE_PAUSE", hd) != std::string::npos &&
+                                 hdr.rfind("#endif", hd) < hdr.rfind("#if AU_BLE_PAUSE", hd), "esp32BleForcePause declaration not under AU_BLE_PAUSE");
+    // the guard entry points are inert elsewhere
+    const size_t ga = mainSrc.find("bool auBleGuardActive(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(ga != std::string::npos && mainSrc.substr(ga, 200).find("AU_BLE_PAUSE") != std::string::npos, "auBleGuardActive not gated");
+    const size_t gr = mainSrc.find("bool auBleGuardRequest(bool chainDownload)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(gr != std::string::npos && mainSrc.substr(gr, 250).find("AU_BLE_PAUSE") != std::string::npos, "auBleGuardRequest not gated");
+    // D16 on a board without the pause: the plain unguarded check, no guard
+    const size_t d16 = mainSrc.find("if(act == FW_CHECK_GUARDED)");
+    TEST_ASSERT_TRUE_MESSAGE(d16 != std::string::npos && mainSrc.substr(d16 - 40, 40).find("AU_BLE_PAUSE") != std::string::npos, "D16 guarded check not gated");
+    // the job task: the force pause is inside the AU_BLE_PAUSE region
+    const size_t fp = net.find("esp32BleForcePause()");
+    const size_t reg = net.find("#if AU_BLE_PAUSE");
+    TEST_ASSERT_TRUE_MESSAGE(fp != std::string::npos && reg != std::string::npos && reg < fp, "job task force pause outside AU_BLE_PAUSE");
+    // the bench verb answers on other boards
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("bleguardcycle: classic ESP32 only") != std::string::npos, "bleguardcycle has no refusal on non-classic boards");
+    // the cycle helper's force pause is gated too
+    const size_t cy = mainSrc.find("static void auInstrCycleTick(void)");
+    TEST_ASSERT_TRUE_MESSAGE(cy != std::string::npos && mainSrc.substr(cy, 900).find("AU_BLE_PAUSE") != std::string::npos, "cycle tick not gated");
+    // web: "check with BLE paused" needs a phone held (set only in the AU_BLE_PAUSE job branch) and the guard request
+    const size_t wb = web.find("equals(\"ble\")");
+    TEST_ASSERT_TRUE_MESSAGE(wb != std::string::npos && web.substr(wb, 900).find("!fwNetPhoneHeld()") != std::string::npos &&
+                                 web.substr(wb, 900).find("lowheap_phone") != std::string::npos, "updcheck?ble guard conditions missing");
+    const size_t ph = net.find("phoneHeld = !blePaused");
+    TEST_ASSERT_TRUE_MESSAGE(ph != std::string::npos && reg < ph, "phoneHeld is set outside AU_BLE_PAUSE");
+}
+
+// W4 rework: shedding gate/order and the guard-chain notify (ESP32-only code, pinned by source).
+static void test_shed_is_gated_staged_and_polled(void)
+{
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    // the job task decides once whether shedding is allowed (not while a phone holds BLE)
+    TEST_ASSERT_TRUE_MESSAGE(net.find("fwShedAllowed(blePaused, guarded, phoneHeld)") != std::string::npos, "job task does not derive shed permission");
+    const size_t sd = net.find("bool shedHold(");
+    const size_t sdEnd = net.find("void shedRestore()", sd);
+    TEST_ASSERT_TRUE_MESSAGE(sd != std::string::npos && sdEnd != std::string::npos, "shedHold missing");
+    const std::string body = net.substr(sd, sdEnd - sd);
+    TEST_ASSERT_TRUE_MESSAGE(net.find("fwShedFirst(s_shedAllowed") != std::string::npos, "KISS-first stage missing or ignores the permission");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("fwShedSecond(") != std::string::npos, "console stage missing");
+    // no blind fixed delay: poll until the sockets are closed, capped
+    TEST_ASSERT_TRUE_MESSAGE(body.find("pdMS_TO_TICKS(1500)") == std::string::npos, "fixed 1.5 s delay is back");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("auShedSettled(") != std::string::npos && body.find("FW_SHED_MAX_MS") != std::string::npos, "no capped poll for the sockets");
+    // the gate path: KISS first and re-gate, console only when it can close the gap
+    const size_t g = net.find("bool heapGateOk()");
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos, "heapGateOk missing");
+    const std::string gate = net.substr(g, net.find("const char *runCheck(", g) - g);
+    TEST_ASSERT_TRUE_MESSAGE(gate.find("if (s_shedAllowed)") != std::string::npos && gate.find("shedHold(") != std::string::npos, "heapGateOk does not shed behind the permission");
+    TEST_ASSERT_TRUE_MESSAGE(gate.find("fwShedFirst(") < gate.find("fwShedSecond("), "console stage before the KISS stage");
+    // [AU];shed;fail only when something was shed (s_shedDone), else the plain refuse line stands alone
+    const size_t sf = net.find("[AU];shed;fail;");
+    TEST_ASSERT_TRUE_MESSAGE(sf != std::string::npos, "shed;fail missing");
+    const std::string before = net.substr(sf > 160 ? sf - 160 : 0, sf > 160 ? 160 : sf);
+    TEST_ASSERT_TRUE_MESSAGE(before.find("s_shedDone") != std::string::npos, "shed;fail is printed although nothing was shed");
+    // the loop side: a mask, not a boolean hold
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("bool auShedSettled(uint8_t mask)") != std::string::npos, "auShedSettled missing");
+}
+
+static void test_guard_chain_announces_the_check_result_before_the_download(void)
+{
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t gt = mainSrc.find("static void auGuardTick(");
+    TEST_ASSERT_TRUE_MESSAGE(gt != std::string::npos, "auGuardTick missing");
+    const size_t ch = mainSrc.find("if(act == FWG_CHAIN_DOWNLOAD)", gt);
+    const size_t start = mainSrc.find("fwNetStart(FWJ_DOWNLOAD", ch);
+    TEST_ASSERT_TRUE_MESSAGE(ch != std::string::npos && start != std::string::npos, "chain branch missing");
+    const size_t nt = mainSrc.find("auNotifyCheck(st)", ch);
+    TEST_ASSERT_TRUE_MESSAGE(nt != std::string::npos && nt < start, "the chain branch starts the DOWNLOAD before it announces the CHECK result");
+    // one definition of the decision for both sites
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("fwNotifyDue(") != std::string::npos, "fwNotifyDue not used");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1572,5 +1761,10 @@ int main(int, char **)
     RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
     RUN_TEST(test_web_setvia_compares_canonical_form);
     RUN_TEST(test_au_web_gate_and_status_wiring_pins);
+    RUN_TEST(test_bleguard_cycle_and_shed_fail_are_instrument_only);
+    RUN_TEST(test_bleguard_wiring_pins);
+    RUN_TEST(test_bleguard_is_classic_esp32_only);
+    RUN_TEST(test_shed_is_gated_staged_and_polled);
+    RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     return UNITY_END();
 }
