@@ -33,6 +33,7 @@
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #include <prod_lock.h>      // prodLockNormalise(): an imported file may hold values the setters now refuse
 #include <instrument.h>     // INSTRUMENT_ENABLED
+#include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
@@ -2887,6 +2888,7 @@ void sub_page_neighbours()
 
     for (uint8_t i = 0; i < n; i++)
     {
+        meshcom_wdt_feed(); // one feed per row; n <= NBR_MAX_ROWS keeps the loop bounded
         uint8_t X = idx[i];
         bool rowESelf = false;
         for (uint8_t e = 0; e < neself_shown; e++)
