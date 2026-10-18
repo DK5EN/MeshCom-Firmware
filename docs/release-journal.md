@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261018`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261019`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,68 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.10.19 (Montag, 2026-10-19)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.18.
+Begonnen am 2026-10-18 abends, mit dem Datum des Folgetags getaggt, weil das Release bis dahin dauert.
+`FLASH_VERSION` 20261019, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben
+erhalten, ausser den zehn gesperrten Protokoll-Einstellungen, die ein Release-Build beim Boot auf den festen
+Wert setzt. Safeboot unveraendert seit 10.05.
+
+Inhalt seit `v4.40a.10.18` (alle zehn Firmware-Commits, in den Release-Notes untergebracht):
+
+- AU-Web-GUI W1 (`581f8a0a`): Zustandsknopf in der Auto-update-Zeile, `GET /austatus`, `notify` als
+  Standard, automatische Installation nicht kompiliert (D14), X-MC-Gate fuer Update-Kommandos.
+- AU-Web-GUI W2/W3 (`5a5fc7f7`): F-Ablauf gehaertet (Knoten ohne `/austatus`, veralteter Klick, Safeboot
+  ohne Rueckfall), INSTRUMENT-Heap-Logging.
+- AU-Web-GUI W4 (`64cd365d`): BLE-Guard (nur klassischer ESP32), Abwurf von KISS/Net-Konsole bei knappem Heap,
+  `updcheck?ble`.
+- Haertung W1 (`b8aa4354`): RM `sens` meldet nur erkannte Sensoren (BME280-Feuchte), LED-Helfer,
+  `tools/bench/heap_idle.py`.
+- Haertung W2 (`55ad3b42`): LED-Zeilen in `--info`, `boardLedTick()`, RM `chgled` lesen, `err pinbusy`,
+  OneWire-Pruefung zur Laufzeit, Web-Schalter.
+- Haertung W3 (`73c0bd04`): Telefon-Ringe nur bei laufendem BLE (T-Beam statisch 107688 -> 102584 B),
+  `byte_fifo` mit portMUX, Update-Task-Stack 10240 B, `[HEAP]`-Bootmarken; dazu interner Gateway-Zustand.
+- Haertung W4 (`e4edffc8`): Produktionssperre (`src/prod_lock.h`), `--autoupdate auto` in allen Builds
+  abgelehnt, Setter-Fehler (`--postime`, `--ptime`, `--pingtime`, `--pingmax`), LED auf nRF52 und
+  Varianten-Pins.
+- LoRa-QRT W1 (`fe3f01e2`): `--nbrrelay on` fest, Echo gibt eigenen Gruppentext frei, kein Retry in QRT,
+  vom Server gespiegelte eigene Frames nicht erneut auf LoRa, Ring voll -> QTA in jeder Tiefe, QRT-Ende unter
+  16 mit einem QRV, Queue-Karte im Web.
+- LoRa-QRT W2 (`1a6a3704`): altersabhaengige Haltezeit nach empfangenen Frames (20 s kurz, 60 s schnell),
+  `cad=` ehrlich, `[MC-HWM]` mit `aged1`/`aged2`/`wait_hwm`.
+- `cc48f720`: Watchdog wird beim Rendern der Nachbarmatrix je Zeile gefuettert (Feld-Neustarts DB0TAW-14).
+- Nicht-Firmware: Doku der drei Kampagnen, Fork-vs-Upstream-Matrix, Spezifikation der gesperrten
+  Einstellungen, `tools/heap_baseline.json` und der Idle-Heap-Schritt im Release-Rezept.
+- Upstream: #1213 und #1214 am 2026-10-18 gemergt und zurueckgefuehrt (`e87e8a5e`); alles Neue dieses
+  Releases nur im Fork.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Haertung W5 auf `DK5EN-92` (T-Beam v1.2, Release-Image): Idle-STAT-Heap 69332 B (unveraendert), Heap beim
+  Update-Check mit pausiertem BLE 86276-86576 B (vorher 76,3-81,5 KB), Gate bestanden; AU-Task-Stack
+  3740 B frei von 10240.
+- Sperre: `[ERR];locked;<name>` auf `DK5EN-1` (nbrrelay, autoupdate auto, stor) und `DK5EN-90` (nbrrelay,
+  autoupdate auto); `DK5EN-98` nach dem Flash: `--nbrrelay off` abgelehnt, NBRRELAY an, Gateway verbunden.
+- LED: `--board led on` und `--info`-Zeilen auf `DK5EN-1`, `DK5EN-90`, `DK5EN-92` (OneWire auf GPIO4 sperrt);
+  `DK5EN-14` zeigt beide LEDs "not fitted".
+- AU-Web-Zeile in Chrome auf `DK5EN-1`, `DK5EN-14`, `DK5EN-92`: alle Zustaende, Install now -> Safeboot ->
+  neuer Tag; BLE-Guard auf `DK5EN-92` mit BLE-Client-Skript, 20 Guard-Zyklen ohne Reset; `DK5EN-90` ohne
+  AU-Zeile.
+- Idle-Heap-Gate: `DK5EN-92` (T-Beam v1.2) auf lokalem Release-Build dieses Commits (`MC_BUILD_TAG` gesetzt), BLE an, kein Telefon, 2323: Idle-STAT-Heap 67304 B nach 600 s, Basis 69332 B, -2028 B, innerhalb 3072 B (Proben 69724 / 68128 / 67304 B; `tools/bench/runs/harness/heap-idle-v4.40a.10.19.json`).
+- Gate: `tools/regression.sh --stage 1,2` PASS auf `cc48f720` + FLASH_VERSION: Unity 75 Envs, 2693/2693, Golden-Selftest 48 Befehle, pytest 1136, nRF52-Board-Links, Web-GUI-Suiten.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- LoRa-QRT W1/W2 auf der Bench (vom Operator gestrichen); Differential-Bench nicht gelaufen. Flotte und
+  `DK5EN-98` laufen seit 2026-10-18 23:25 auf dem QRT-Stand, keine Aufzeichnung ausgewertet.
+- `cc48f720` (Watchdog Nachbarmatrix) nur Host und Build.
+- LED sichtbar blinken, Deep-Sleep-LED, RM `led`/`chgled` ueber LoRa, Telefon-App-SN auf `DK5EN-14`;
+  LED-Pins T-Echo, T114, T-ETH-Elite, Heltec V4, S3 DevKitC im Feld.
+- BLE-Guard mit McApp selbst; AU-Download auf dem T-Beam nach der Heap-Arbeit; Web-Fixes 2 und 3 der
+  AU-Kampagne (nur Host).
+- Diese CI-Images selbst auf der Bench-Flotte (der Idle-Heap-Schritt lief auf einem lokalen Build desselben Commits).
 
 ## Release v4.40a.10.18 (Sonntag, 2026-10-18)
 
