@@ -1707,6 +1707,7 @@ void nrf52loop()
                     if(bLORADEBUG)
                         Serial.printf("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
 
+                    tx_cad_attempt = cad_attempt; // honest cad= in the TX log (csma_reset zeroes it)
                     csma_reset();
                     bool _tx_ok;
                     { INSTR_SECTION("lora_tx"); _tx_ok = doTX(); }
@@ -1754,7 +1755,7 @@ void nrf52loop()
                 {
                     // Double-check confirmed busy — backoff
                     cad_attempt++;
-                    csma_timeout = csma_compute_timeout(cad_attempt);
+                    csma_timeout = csma_compute_timeout_nofloor(cad_attempt); // CAD_BUSY: no age floor
 
                     if(bLORADEBUG)
                     {

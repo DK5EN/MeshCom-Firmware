@@ -33,6 +33,14 @@
 #include "msgstore_api.h"   // stage 3: store node (last-hop mailbox) receive-path hooks
 #endif
 
+// MC_HAS_RADIOLIB_RADIO: exactly the macros below that declare `extern ... radio`.
+// Keep this list and the extern blocks in sync (lora_time_on_air_ms() uses it).
+#if defined(SX127X) || defined(BOARD_E220) || defined(SX1262X) || defined(SX126X) || \
+    defined(SX1262_E22) || defined(USING_SX1262) || defined(SX1268_E22) || \
+    defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
+    #define MC_HAS_RADIOLIB_RADIO 1
+#endif
+
 #ifdef SX127X
     #include <RadioLib.h>
     extern SX1278 radio;
@@ -2862,6 +2870,13 @@ bool doTX()
         // Track latency
         uint8_t prio = ringPriority[txSlot];
         uint32_t latency = millis() - ringEnqueueTime[txSlot];
+        if(latency > stat_wait_hwm_ms)
+            stat_wait_hwm_ms = latency;
+        {
+            int _as = csmaAgeStage(latency);
+            if(prio < 1 || prio > MSG_PRIO_NORMAL) _as = 0; // Boden gilt nur Prio 1-3
+            stat_csma_aged_boot[_as]++;
+        }
         if(prio >= 1 && prio <= 5)
         {
             stat_tx_count[prio]++;
@@ -2923,7 +2938,7 @@ bool doTX()
                            (char)ringBuffer[txSlot][2],
                            (uint8_t)(ringBuffer[txSlot][7] & 0x0F),
                            prio, (char)ringSource[txSlot], latency, txRingDepth(),
-                           cad_attempt, (uint16_t)sendlng, (uint32_t)millis());
+                           tx_cad_attempt, (uint16_t)sendlng, (uint32_t)millis());
         }
 
         if(ringBuffer[txSlot][1] == RING_STATUS_READY) // mark open to send
@@ -3780,7 +3795,8 @@ unsigned long externalTxBusyBackoffMs(void)
     // Reuse the existing CSMA backoff timing (priority-aware, bounded). attempt 0
     // gives a normal base+jitter delay; this is a true delay before the next
     // external submission, not a same-pass reselect.
-    return csma_compute_timeout(0);
+    // No age floor: an aged head frame must not burn its busy retries in ~2 s.
+    return csma_compute_timeout_nofloor(0);
 }
 #endif  // EXTERNAL_RADIO
 
@@ -3917,7 +3933,7 @@ void OnHeaderDetect(void)
 // 5.1 -- Menschen warten darauf) sowie der generische Fallback rufen
 // csma_compute_timeout_prio() direkt; alles andere delegiert an
 // txringCaseBackoffSlot().
-unsigned long csma_compute_timeout_slot(int attempt, int slot) {
+static unsigned long csma_compute_timeout_slot_nofloor(int attempt, int slot) {
     if(attempt >= CSMA_MAX_ATTEMPTS)
         return CSMA_RAPID_RX_MS; // rapid-fire with preamble check, wie csma_compute_timeout_prio()
 
@@ -3936,10 +3952,50 @@ unsigned long csma_compute_timeout_slot(int attempt, int slot) {
     return csma_compute_timeout_prio(attempt, prio);
 }
 
+// Own time on air in ms for a frame of len bytes. ESP32: RadioLib radio.getTimeOnAir()
+// returns microseconds; nRF52: Radio.TimeOnAir() returns ms. 0 if no radio object.
+unsigned long lora_time_on_air_ms(int len) {
+#if defined(BOARD_RAK4630)
+    return (unsigned long)Radio.TimeOnAir(MODEM_LORA, len);
+#elif defined(MC_HAS_RADIOLIB_RADIO)
+    return (unsigned long)(radio.getTimeOnAir(len) / 1000);
+#else
+#if defined(ARDUINO) && !defined(EXTERNAL_RADIO)
+    // #pragma message, not #warning: build_src_flags use -Werror=cpp on some envs.
+    #pragma message("lora_time_on_air_ms(): no radio object for this board, airtime 0 (age floor stage 1 degrades to its 1500 ms constant)")
+#endif
+    (void)len;
+    return 0;
+#endif
+}
+
+// Entry for re-arms after a RECEIVED frame: today's result, then the age floor
+// (Brief G; priorities 1-3 only, min() keeps the case-A escape).
+unsigned long csma_compute_timeout_slot(int attempt, int slot) {
+    unsigned long today = csma_compute_timeout_slot_nofloor(attempt, slot);
+    if(slot < 0 || attempt >= CSMA_MAX_ATTEMPTS)
+        return today;
+    uint32_t age = millis() - ringEnqueueTime[slot];
+    if(csmaAgeStage(age) == 0)
+        return today;
+    uint8_t prio = ringPriority[slot];
+    long jit = random(0, CSMA_AGE_SLOTS + 1);
+    unsigned long res = csmaApplyAgeFloor(today, age, prio, lora_time_on_air_ms(ringBuffer[slot][0]), jit);
+    if(bLORADEBUG && prio >= 1 && prio <= MSG_PRIO_NORMAL)
+        printfdeb("[MC-DBG] CSMA_AGED slot=%d age=%lu stage=%d hold=%lu\n", slot, (unsigned long)age, csmaAgeStage(age), res);
+    return res;
+}
+
 unsigned long csma_compute_timeout(int attempt) {
     // Default (no priority context): use priority of next queued packet
     int txSlot = getNextTxSlot();
     return csma_compute_timeout_slot(attempt, txSlot);
+}
+
+// Re-arms that are NOT after a received frame (CAD_BUSY back-off ladder, external
+// TX busy retry): never the age floor.
+unsigned long csma_compute_timeout_nofloor(int attempt) {
+    return csma_compute_timeout_slot_nofloor(attempt, getNextTxSlot());
 }
 
 // Arithmetik (Basis/Slots je Prioritaet, 5/6- und 2/3-Skalierung) liegt in
@@ -3957,5 +4013,7 @@ void csma_reset(void) {
         stat_csma_hwm_attempts = cad_attempt;
 
     cad_attempt = 0;
-    csma_timeout = csma_compute_timeout(0);
+    // Post-TX (and CAD_FREE): never the age floor, neighbours must get the full hold
+    // after our own frame. Structurally: this calls the nofloor variant only.
+    csma_timeout = csma_compute_timeout_slot_nofloor(0, getNextTxSlot());
 }

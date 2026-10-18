@@ -136,6 +136,59 @@ static void test_wiederholung_wird_nie_laenger(void)
                              csmaTimeoutPrio(attempt - 1, ROWS[i].prio, 0));
 }
 
+// ---- Brief G: Alters-Boden ----
+static void test_age_stage_grenzen(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, csmaAgeStage(0));
+    TEST_ASSERT_EQUAL_INT(0, csmaAgeStage(CSMA_AGE_STAGE1_MS - 1));
+    TEST_ASSERT_EQUAL_INT(1, csmaAgeStage(CSMA_AGE_STAGE1_MS));
+    TEST_ASSERT_EQUAL_INT(1, csmaAgeStage(CSMA_AGE_STAGE2_MS - 1));
+    TEST_ASSERT_EQUAL_INT(2, csmaAgeStage(CSMA_AGE_STAGE2_MS));
+    TEST_ASSERT_EQUAL_INT(2, csmaAgeStage(1000000UL));
+}
+
+static void test_age_stage2_null_heisst_nie(void)
+{
+    TEST_ASSERT_EQUAL_INT(1, csmaAgeStageEx(1000000UL, 20000UL, 0UL));
+    TEST_ASSERT_EQUAL_INT(0, csmaAgeStageEx(19999UL, 20000UL, 0UL));
+    TEST_ASSERT_EQUAL_INT(2, csmaAgeStageEx(60000UL, 20000UL, 60000UL));
+}
+
+static void test_age_stage1_clamp(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaAgedHoldMs(1, 710, 0));  // 1965 -> Max
+    TEST_ASSERT_EQUAL_UINT32(1425, csmaAgedHoldMs(1, 1250, 0)); // 2850-1250-175
+    TEST_ASSERT_EQUAL_UINT32(500, csmaAgedHoldMs(1, 5000, 0));  // Min
+    TEST_ASSERT_EQUAL_UINT32(1425 + 5 * CSMA_SLOT_SIZE, csmaAgedHoldMs(1, 1250, 5));
+}
+
+static void test_age_stage2_wert(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(CSMA_RAPID_RX_MS, csmaAgedHoldMs(2, 710, 0));
+    TEST_ASSERT_EQUAL_UINT32(CSMA_RAPID_RX_MS + 3 * CSMA_SLOT_SIZE, csmaAgedHoldMs(2, 710, 3));
+}
+
+static void test_age_floor_min_mit_case_a(void)
+{
+    // heutiges Ergebnis 150 ms (Fall A) bleibt bei Stufe 1 (Floor 1500 > 150); bei Stufe 2 greift min() mit 100 ms
+    TEST_ASSERT_EQUAL_UINT32(100, csmaApplyAgeFloor(150, 70000UL, MSG_PRIO_NORMAL, 710, 0)); // Stufe 2 (100) < 150
+    TEST_ASSERT_EQUAL_UINT32(150, csmaApplyAgeFloor(150, 25000UL, MSG_PRIO_NORMAL, 710, 0)); // Stufe 1 (1500): Fall A bleibt
+    // heutiges Ergebnis 4500 -> Stufe 1: 1500
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaApplyAgeFloor(4500, 25000UL, MSG_PRIO_NORMAL, 710, 0));
+    // Stufe 0: unveraendert
+    TEST_ASSERT_EQUAL_UINT32(4500, csmaApplyAgeFloor(4500, 5000UL, MSG_PRIO_NORMAL, 710, 0));
+    // Stufe 2
+    TEST_ASSERT_EQUAL_UINT32(CSMA_RAPID_RX_MS, csmaApplyAgeFloor(4500, 61000UL, MSG_PRIO_CRITICAL, 710, 0));
+}
+
+static void test_age_floor_prio_4_5_ausgeschlossen(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(5500, csmaApplyAgeFloor(5500, 90000UL, MSG_PRIO_LOW, 710, 0));
+    TEST_ASSERT_EQUAL_UINT32(5500, csmaApplyAgeFloor(5500, 90000UL, MSG_PRIO_BACKGROUND, 710, 0));
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaApplyAgeFloor(5500, 30000UL, MSG_PRIO_HIGH, 710, 0));
+}
+
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -149,5 +202,11 @@ int main(int, char **)
     RUN_TEST(test_rapid_fire_ab_max_attempts_ignoriert_prio_und_jitter);
     RUN_TEST(test_prioritaetsreihenfolge_bei_versuch_0);
     RUN_TEST(test_wiederholung_wird_nie_laenger);
+    RUN_TEST(test_age_stage_grenzen);
+    RUN_TEST(test_age_stage2_null_heisst_nie);
+    RUN_TEST(test_age_stage1_clamp);
+    RUN_TEST(test_age_stage2_wert);
+    RUN_TEST(test_age_floor_min_mit_case_a);
+    RUN_TEST(test_age_floor_prio_4_5_ausgeschlossen);
     return UNITY_END();
 }

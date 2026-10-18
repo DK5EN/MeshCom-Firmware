@@ -3394,9 +3394,11 @@ void esp32loop()
             stat_hwm_timer = millis();
             if(!bDisplayLog)
             {
-                printfdeb("[MC-HWM] uptime=%lus queue_hwm=%d/%d csma_hwm=%d trickle=%lums\n",
+                printfdeb("[MC-HWM] uptime=%lus queue_hwm=%d/%d csma_hwm=%d trickle=%lums aged1=%lu aged2=%lu wait_hwm=%lu\n",
                     millis() / 1000, stat_queue_hwm, MAX_RING,
-                    stat_csma_hwm_attempts, trickle_interval_ms);
+                    stat_csma_hwm_attempts, trickle_interval_ms,
+                    (unsigned long)stat_csma_aged_boot[1], (unsigned long)stat_csma_aged_boot[2],
+                    (unsigned long)stat_wait_hwm_ms);
             }
         }
 
@@ -3794,6 +3796,7 @@ void esp32loop()
                     if(bLORADEBUG)
                         printfdeb("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
 
+                    tx_cad_attempt = cad_attempt; // honest cad= in the TX log (csma_reset zeroes it)
                     csma_reset();
 
                     // set Transmit Interrupt
@@ -3844,7 +3847,7 @@ void esp32loop()
                 {
                     // Channel busy confirmed — backoff
                     cad_attempt++;
-                    csma_timeout = csma_compute_timeout(cad_attempt);
+                    csma_timeout = csma_compute_timeout_nofloor(cad_attempt); // CAD_BUSY: no age floor
 
                     if(bLORADEBUG)
                     {

@@ -51,8 +51,11 @@ int findAndStopRingSlotNoRm1(uint32_t msgId);
 void rm1StoppedForget(uint32_t origMsgId);
 
 unsigned long csma_compute_timeout(int attempt);
+// Same without the age floor (CAD_BUSY ladder, external TX busy retry).
+unsigned long csma_compute_timeout_nofloor(int attempt);
 unsigned long csma_compute_timeout_prio(int attempt, uint8_t priority);
 void csma_reset(void);
+unsigned long lora_time_on_air_ms(int len);
 
 // getMessagePriority/getNextTxSlot: siehe txring_functions.h (verschoben,
 // QA-Welle 2026-08-22, N-14).

@@ -391,6 +391,16 @@ static inline bool flashLayoutCompatible(int stored)
 #define CSMA_MAX_ATTEMPTS   3       // Ab hier: Rapid-fire CAD bis Kanal frei
 #define CSMA_RAPID_RX_MS    100     // Preamble-Check Fenster im Rapid-fire Modus (ms)
 
+// Alters-Boden (Brief G): Kopf-Frame so lange in der Queue -> kuerzere Haltezeit nach Fremdframe.
+// Nur Prio 1-3, nie nach eigenem TX. CSMA_AGE_STAGE2_MS 0 = Stufe 2 nie.
+#define CSMA_AGE_STAGE1_MS      20000UL
+#define CSMA_AGE_STAGE2_MS      60000UL
+#define CSMA_AGE_ACK_WINDOW_MS  2850    // Empfaenger des Vorframes halten 3.0 s; davor enden
+#define CSMA_AGE_GUARD_MS       175
+#define CSMA_AGE_SHORT_MIN_MS   500
+#define CSMA_AGE_SHORT_MAX_MS   1500
+#define CSMA_AGE_SLOTS          5       // Jitter 0..5 Slots (0-175 ms)
+
 // EXTERNAL_RADIO only: bounded channel-access (bridge CHANNEL_BUSY) attempts per
 // message, counted SEPARATELY from the MeshCom delivery retransmission budget
 // (MAX_RETRANSMIT). A bridge CHANNEL_BUSY = channel access denied, not a consumed

@@ -471,6 +471,9 @@ extern uint32_t stat_latency_sum[6];            // Sum of queue-to-TX latency pe
 extern uint16_t stat_latency_max[6];            // Max latency per prio (ms)
 extern uint8_t  stat_queue_hwm;                 // Queue high-water mark since boot
 extern uint16_t stat_csma_hwm_attempts;         // Max CAD attempts since boot
+extern uint32_t stat_csma_aged_boot[3];         // Sends per age stage since boot
+extern uint32_t stat_wait_hwm_ms;               // Max queue latency since boot
+extern int      tx_cad_attempt;                 // cad_attempt at CAD_FREE (for the TX log)
 extern unsigned long stat_prio_timer;           // Timer for periodic stat output
 extern unsigned long stat_hwm_timer;            // Timer for HWM output
 

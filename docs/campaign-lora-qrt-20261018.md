@@ -15,12 +15,12 @@ resume point; update it after every wave (orchestrate-waves section 6), then `do
 
 ## Status (resume point)
 
-| Step               | State                                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------------ |
-| Wave 1, briefs A-F | done, commit 1 on `fork-dev` (message "feat: LoRa QRT campaign wave 1")                                |
-| Wave 2, brief G    | open, next                                                                                             |
-| Bench (gate 1/2)   | dropped by the operator for this run (2026-10-18): host gate, board builds and advisor only            |
-| Flash              | after commit 2: DK5EN-1, -92, -90 (and -14 if confirmed), DK5EN-98 last; open questions in the session |
+| Step               | State                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
+| Wave 1, briefs A-F | done, commit `fe3f01e2`                                                                           |
+| Wave 2, brief G    | done, commit 2 ("feat: LoRa QRT campaign wave 2")                                                 |
+| Bench (gate 1/2)   | dropped by the operator for this run (2026-10-18): host gate, board builds and advisor only       |
+| Flash              | INSTRUMENT on DK5EN-1, -92, -90, -14 (then `--nbrrelay on` by hand), production on DK5EN-98, last |
 
 Wave 1 result (gate 1): `tools/regression.sh --stage 1,2` PASS (75 envs, 2686 cases), board builds
 `heltec_wifi_lora_32_V3` 38.5 % RAM / 55.0 % flash, `ttgo_tbeam` 7.8 / 58.4, `wiscore_rak4631` 39.0 / 84.4,
@@ -41,6 +41,21 @@ Deviations from the briefs, as shipped:
   one duplicate send or a dropped stale copy (advisor ruling).
 - A: a fresh store saves once on the first production boot (bits 0x1800), later boots are idempotent.
 - F: the ring line shows drops only after the first completed 5-min window.
+
+Wave 2 result (gate 2): `tools/regression.sh --stage 1,2` PASS (75 envs, 2693 cases), board builds
+`heltec_wifi_lora_32_V3` 38.6 / 55.0, `ttgo_tbeam` 7.8 / 58.4, `wiscore_rak4631` 39.1 / 84.5, `E22_XML-DevKitC`
+19.6 / 58.3, `t_deck_plus` 44.6 / 19.7; image scan `CSMA_AGED` = 1. Advisor: REWORK, then APPROVED.
+
+Brief G as shipped, deviations:
+
+- The age floor applies only to re-arms after a received frame (`lora_functions.cpp` OnRxDone sites, `esp32_main.cpp`
+  checkRX and IRQ_POLL abort). CAD_BUSY re-arms, the external-radio busy back-off and `csma_reset()` (post-TX,
+  CAD_FREE) use `csma_compute_timeout_nofloor()` / the no-floor slot variant.
+- `lora_time_on_air_ms()` covers every RadioLib radio macro via `MC_HAS_RADIOLIB_RADIO`; without it Heltec V3 got
+  airtime 0. Boards without a radio object (t5_epaper, external radio) fall back to 0 with a `#pragma message`.
+- `[MC-HWM]` (ESP32 only, nRF52 has none) gains `aged1= aged2= wait_hwm=` since boot. No 5-min window counter:
+  printing it would change the golden STAT line.
+- `cad=` comes from the global `tx_cad_attempt`, set at CAD_FREE before `csma_reset()`.
 
 Brief G code anchors (scout, 2026-10-18): no nRF52 `[MC-HWM]` line exists (extend ESP32 only);
 `ringEnqueueTime`, `getNextTxSlot()` are readable from `lora_functions.cpp`, no `txring_functions.cpp` edit
