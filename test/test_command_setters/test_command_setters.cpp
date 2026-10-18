@@ -652,7 +652,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
     TEST_ASSERT_TRUE_MESSAGE(after != std::string::npos && after - guardClose < 40, "ladder chain after the ESP32 block is broken");
 
-    const std::string bodyAu = cmd.substr(rungAu, 1400);
+    const std::string bodyAu = cmd.substr(rungAu, 1700);
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("msg_text+13") != std::string::npos, "--autoupdate argument offset is not +13");
     // D1: off is removed; it refuses with an error and never writes 0
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 0") == std::string::npos, "--autoupdate off must not set 0 (D1)");
@@ -674,7 +674,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[ERR];updchan;") != std::string::npos, "--updchan has no error line");
 
     // help lines (ESP32 guard) and the --info line (ESP32 guard)
-    const size_t help = cmd.find("--autoupdate notify/auto  firmware auto update (ESP32; auto only notifies for now)");
+    const size_t help = cmd.find("--autoupdate notify      firmware update mode (ESP32)");
     TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--autoupdate help line missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("--updchan prod/dev       update source: prod icssw-org, dev DK5EN") != std::string::npos,
                              "--updchan help line missing");
@@ -693,7 +693,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(rowAu != std::string::npos, "no node_autoupd schema row");
     const std::string rowAuTxt = cfg.substr(rowAu, 100);
     TEST_ASSERT_TRUE_MESSAGE(rowAuTxt.find("CFG_INT") != std::string::npos, "node_autoupd is not CFG_INT");
-    TEST_ASSERT_TRUE_MESSAGE(rowAuTxt.find("0.0, 2.0") != std::string::npos, "node_autoupd schema range is not 0..2");
+    TEST_ASSERT_TRUE_MESSAGE(rowAuTxt.find("0.0, 2.0") != std::string::npos, "node_autoupd schema range is not 0..2 (imported 2 is normalised to 1)");
     const size_t rowCh = cfg.find("X(\"node_updchan\"");
     TEST_ASSERT_TRUE_MESSAGE(rowCh != std::string::npos, "no node_updchan schema row");
     const std::string rowChTxt = cfg.substr(rowCh, 100);

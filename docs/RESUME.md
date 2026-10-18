@@ -1,6 +1,16 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-18, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
+**Stand:** 2026-10-18 evening, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
+
+## 2026-10-18 -- campaign fork hardening W0-W4 done, W5 (bench) open (resume point: docs/campaign-fork-hardening-20261018.md)
+
+- W0 `c68d482e` docs (fork vs upstream, locked settings spec, time zones, RM1 signature and commands);
+  W1 `b8aa4354` sens presence, LED helpers, heap tool; W2 `55ad3b42` LED surfaces; W3 `73c0bd04` heap
+  levers (phone rings in the BLE pause, fifo lock, AU stack 10240, `[HEAP]` boot marks), gateway
+  registration state; W4 production setting lock, LED nRF52 and variants.
+- Heap bisect on DK5EN-92: no firmware regression 10-17 -> 10-18 (release images 76-81 KB at the update
+  check); the verdict's low figures were INSTRUMENT builds.
+- Not on hardware yet; nothing pushed, no release.
 
 ## 2026-10-18 -- AU web GUI campaign: W1-W4 done (resume point: docs/campaign-au-webgui-ux-20261018.md, section 12)
 

@@ -32,11 +32,19 @@ extern bool bUSER_BOARD_LED;
 LedFitted ledFittedNow(void);
 
 // RM "led on|off": steady LED held on by the remote command (rm_runtime.cpp), never persisted.
-// REMOTE_LED_PIN is the pad it drives: BOARD_LED where the variant has one (all active HIGH), or
-// set by the variant itself (Heltec V3: white LED GPIO35, no BOARD_LED so no blinker). Not defined
-// on nRF52 nor on boards without an LED. A pad shared with OneWire (ttgo_tbeam: GPIO4) is checked at
-// run time (boardLedPinUsable()). Needs configuration.h included before this header.
-#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED) && !defined(NRF52_SERIES)
+// REMOTE_LED_PIN is the pad it drives: always BOARD_LED (every board with an LED defines it, the
+// Heltec V2/V3/V4 white LED included). Not defined on boards without an LED. A pad shared with
+// OneWire (ttgo_tbeam: GPIO4) is checked at run time (boardLedPinUsable()). Needs configuration.h
+// included before this header.
+// LED-07: nRF52 variants state the polarity as LED_STATE_ON (1 = active high); BOARD_LED_ACTIVE_LOW follows it.
+#if defined(NRF52_SERIES) && defined(BOARD_LED) && !defined(BOARD_LED_ACTIVE_LOW) && defined(LED_STATE_ON)
+    #if LED_STATE_ON
+        #define BOARD_LED_ACTIVE_LOW 0
+    #else
+        #define BOARD_LED_ACTIVE_LOW 1
+    #endif
+#endif
+#if !defined(REMOTE_LED_PIN) && defined(BOARD_LED)
     #define REMOTE_LED_PIN BOARD_LED
 #endif
 #if defined(REMOTE_LED_PIN)
@@ -67,7 +75,7 @@ void remoteLedForceOff(void);     // pin off + hold released; call before deep s
 extern bool bCHARGE_LED;
 
 // Board LED helpers (loop_functions.cpp, decision logic in board_led.h). No-op bodies on boards without
-// BOARD_LED / LED_PIN and on nRF52 (excluded until W3), so callers need no guard.
+// BOARD_LED / LED_PIN, so callers need no guard.
 bool boardLedPinUsable(void);   // false while OneWire owns the LED pin (LED-04) or no LED pin exists
 void boardLedTick(void);        // main loop: the 30 ms / 2 s heartbeat while bUSER_BOARD_LED
 void boardLedForceOff(void);    // LED dark + flasher phase reset; call before deep sleep (LED-12)

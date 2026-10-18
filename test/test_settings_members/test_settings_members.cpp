@@ -383,7 +383,7 @@ const SetterCase kSetterCases[] = {
     {"node_alt", 40000.0, true, "--setalt 40000 (setter ceiling)"},
     {"node_alt", -400.0, true, "GPS fix below sea level"},
     // Sweep: the rest of the rows with a numeric range, at the setter's limits.
-    {"node_ptime", 1800.0, true, "--ptime out of 5..120 stores TELEMETRY_INTERVAL (30*60)"},
+    // W4 production lock: --ptime outside 5..120 is no longer accepted by the setter, so the 1800 row is gone (the 120 row below stays).
     {"node_ptime", 120.0, true, "--ptime 120"},
     {"node_pingtime", 300.0, true, "--pingtime 300 (PING_INTERVAL*5)"},
     {"node_pingmax", 5.0, true, "--pingmax 5 (PING_MAX)"},

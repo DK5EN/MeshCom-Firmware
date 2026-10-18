@@ -47,6 +47,8 @@
 #endif
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
+#include "prod_lock.h"   // production lock: {SET} hop range
+#include "instrument.h"   // INSTRUMENT_ENABLED
 #include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
 #include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
 #include "own_msg_status.h"   // durable delivery state of own text messages (web GUI ticks)
@@ -105,7 +107,7 @@ LedFitted ledFittedNow(void)
 #else
     const bool boardPin = false;
 #endif
-#if defined(LED_PIN) && defined(LED_PIXEL) && (LED_PIXEL > 0) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+#if defined(LED_PIN) && defined(LED_PIXEL) && (LED_PIXEL > 0) && !defined(BOARD_LED)
     const bool neo = true;
 #else
     const bool neo = false;
@@ -166,9 +168,9 @@ void remoteLedForceOff(void)
 
 // Board LED heartbeat ("--board led on": 30 ms every 2 s), W1 helpers. The decision logic is in board_led.h
 // (native test); this is the pin side. BOARD_LED = plain GPIO LED; LED_PIN without BOARD_LED = NeoPixel only
-// (S3 DevKitC): the pulse goes through the status-colour path of esp32_main.cpp (bLED_WEISS). nRF52 keeps
-// the exclusion until W3: no-op bodies there. Callers still use the inline flasher in esp32loop until W2.
-#if (defined(BOARD_LED) || defined(LED_PIN)) && !defined(NRF52_SERIES)
+// (S3 DevKitC): the pulse goes through the status-colour path of esp32_main.cpp (bLED_WEISS). Boards with
+// nRF52 (RAK4631, T114, T-Echo) use the same code through BOARD_LED / LED_STATE_ON (LED-07).
+#if defined(BOARD_LED) || defined(LED_PIN)
     #ifndef BOARD_LED_ACTIVE_LOW
         #define BOARD_LED_ACTIVE_LOW 0
     #endif
@@ -180,8 +182,8 @@ void remoteLedForceOff(void)
         extern Adafruit_NeoPixel pixels;   // esp32_main.cpp
     #endif
     #if defined(LED_PIN)
-        // NeoPixel status path of esp32_main.cpp; BOARD_LED boards that also define LED_PIN (S3 DevKitC-1,
-        // T-ETH-Elite) pulse it white with every flash, as the inline flasher does today
+        // NeoPixel status path of esp32_main.cpp. No variant defines both BOARD_LED and LED_PIN after W4;
+        // the branch is kept for a board that does, which then pulses the pixel white with every flash
         extern bool bLED_WEISS;
         extern unsigned long pixels_delay;
     #endif
@@ -2732,21 +2734,27 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         // die 44 statt 4 Relaissprunge weit laufen.
         //
         // Wie bisher wird jedes Feld einzeln uebernommen, sobald sscanf es
-        // gelesen hat ({SET}4; setzt weiterhin nur max_hop_text). Neu ist
-        // ausschliesslich, dass Werte ausserhalb 0..MAX_HOP_LIMIT den
-        // bisherigen Wert stehen lassen, statt ihn zu ueberschreiben.
+        // gelesen hat ({SET}4; setzt weiterhin nur max_hop_text). Den erlaubten
+        // Bereich liefert prod_lock.h: Produktion max_hop_text 1..6 und kein
+        // max_hop_pos; INSTRUMENT-Builds 0..MAX_HOP_LIMIT fuer beide Felder.
+        // Ausserhalb bleibt der bisherige Wert stehen.
         int iHopText = meshcom_settings.max_hop_text;
         int iHopPos  = meshcom_settings.max_hop_pos;
 
         int iParsed = sscanf(cset+5, "%d;%d;", &iHopText, &iHopPos);
+        const bool bInstr = (INSTRUMENT_ENABLED != 0);
 
-        if(iParsed >= 1 && iHopText >= 0 && iHopText <= MAX_HOP_LIMIT && iHopText != meshcom_settings.max_hop_text)
+        if(iParsed >= 1)
         {
-            meshcom_settings.max_hop_text = iHopText;
-            save_settings();    // max_hop_text is persistent (max_hop_pos is not)
+            const int iNewText = prodLockSetHop(iHopText, meshcom_settings.max_hop_text, bInstr);
+            if(iNewText != meshcom_settings.max_hop_text)
+            {
+                meshcom_settings.max_hop_text = iNewText;
+                save_settings();    // max_hop_text is persistent (max_hop_pos is not)
+            }
         }
 
-        if(iParsed >= 2 && iHopPos >= 0 && iHopPos <= MAX_HOP_LIMIT)
+        if(iParsed >= 2 && prodLockSetPosAllowed(bInstr) && iHopPos >= 0 && iHopPos <= MAX_HOP_LIMIT)
             meshcom_settings.max_hop_pos = iHopPos;
 
         return;

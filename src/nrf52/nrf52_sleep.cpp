@@ -23,6 +23,13 @@
 // for e.g. `extern bool bDEEP_SLEEP;`.
 extern void stop_advertising();
 
+// LED-07 (loop_functions.cpp); forward-declared because loop_functions_extern.h is far too heavy for this TU.
+// remoteLedForceOff() exists wherever REMOTE_LED_PIN is defined, which on nRF52 is BOARD_LED.
+extern void boardLedForceOff(void);
+#if defined(BOARD_LED)
+extern void remoteLedForceOff(void);
+#endif
+
 #if defined(BOARD_T_ECHO)
 // Battery-empty e-ink screen (nrf52_functions.cpp) -- not declared in
 // nrf52_functions.h, same forward-declare approach as stop_advertising() above.
@@ -57,6 +64,12 @@ void nrf52EnterDeepSleep()
     // link regardless, so this is enough.
     stop_advertising();
 
+    // LED-07: RM `led` hold and the --board led heartbeat end dark (no-ops without BOARD_LED)
+    #if defined(BOARD_LED)
+    remoteLedForceOff();
+    #endif
+    boardLedForceOff();
+
     // (c) Display off. RAK4631 has none.
     #if defined(BOARD_HELTEC_T114)
     digitalWrite(PIN_TFT_LEDA_CTL, HIGH);   // TFT backlight off
@@ -85,8 +98,8 @@ void nrf52EnterDeepSleep()
     digitalWrite(Power_On_Pin, LOW);   // peripheral rail off
     #elif defined(BOARD_RAK4630)
     // Power down the green and blue LEDs on the RAK4630 board
-    digitalWrite(LED_GREEN, LOW);   // green LED off
-    digitalWrite(LED_BLUE, LOW);    // blue LED off
+    digitalWrite(LED_GREEN, !LED_STATE_ON);   // green LED off
+    digitalWrite(LED_BLUE, !LED_STATE_ON);    // blue LED off
     digitalWrite(WB_IO2, 0);   // 3V3_S off: W5100S, RAK12500 GPS, every WisBlock slot
     #endif
 

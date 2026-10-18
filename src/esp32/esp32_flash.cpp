@@ -8,6 +8,8 @@
 #include <settings_sanitize.h>
 #include <msgid_counter.h>
 #include <lora_setchip.h>
+#include <prod_lock.h>   // prodLockNormalise(): production-locked settings, dependency-free
+#include <instrument.h>  // INSTRUMENT_ENABLED
 #else
 #include <maxhop.h>   // MAXHOP_TEXT_FALLBACK, dependency-frei (siehe unten)
 #endif
@@ -238,6 +240,18 @@ bool sanitize_loaded_settings(void)
     if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
         fixed++;
 
+    // Production lock (docs/production-locked-settings.md): fixed values for the locked settings,
+    // range repair for postime/ptime/ping*, node_autoupd 2 (auto) -> 1, mailbox announcement off.
+    // Idempotent; INSTRUMENT builds keep the tuning values. Runs before the runtime flags are derived.
+    {
+        const int locked = prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, true);
+        if(locked > 0)
+        {
+            Serial.printf("[FLASH]...%d locked/range setting(s) normalised\n", locked);
+            fixed += locked;
+        }
+    }
+
     // Akku-Maximalspannung muss ueber der Board-Leerspannung liegen (2S TBEAM_1W: nach
     // Wipe 4.2 V < 6.5 V -> BAT-01 meldet "kein Akku", Anzeige bleibt auf USB)
     #if defined(BAT_MIN_VOLTAGE) && defined(BAT_MAX_VOLTAGE)
@@ -249,7 +263,7 @@ bool sanitize_loaded_settings(void)
         Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
 
     // D1: "off" no longer exists; a stored 0 becomes notify (idempotent, no marker needed). A stored 2
-    // stays 2 (D14: no migration of auto; the code path that would act on it is not compiled).
+    // (auto) was already mapped to 1 by prodLockNormalise() above: auto is never settable or importable.
     if(meshcom_settings.node_autoupd == 0)
     {
         meshcom_settings.node_autoupd = 1;

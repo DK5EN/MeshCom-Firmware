@@ -749,7 +749,8 @@ static void test_legacy_blob_reads_through_frozen_v1_layout(void)
     TEST_ASSERT_EQUAL_INT32(222, meshcom_settings.node_mcp17in);
     TEST_ASSERT_EQUAL_INT32(555, meshcom_settings.node_msgid - kMsgIdPersistStep); // countersLoad() advances it
     TEST_ASSERT_EQUAL_INT32(88, meshcom_settings.node_wifi_power);
-    TEST_ASSERT_EQUAL_FLOAT(440.5f, meshcom_settings.node_specstart);
+    // W4 production lock: the legacy blob's specstart 440.5 is outside the locked 432..434 window and loads as 432.0.
+    TEST_ASSERT_EQUAL_FLOAT(432.0f, meshcom_settings.node_specstart);
 
     const std::string &log = Serial.captured();
     TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];path;legacy_migrated"));

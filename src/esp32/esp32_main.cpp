@@ -2367,12 +2367,6 @@ void esp32setup()
     ///////////////////////////////////////////////////////
 
 
-    #if defined(REMOTE_LED_PIN) && !defined(BOARD_LED)
-        // RM "led on|off" on a board without the BOARD_LED blinker (Heltec V3): off after boot
-        pinMode(REMOTE_LED_PIN, OUTPUT);
-        digitalWrite(REMOTE_LED_PIN, REMOTE_LED_OFF_LEVEL);
-    #endif
-
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
         tdeck_clear_text_ta();
     #endif
@@ -4725,7 +4719,7 @@ void esp32loop()
     unsigned long akt_timer = meshcom_settings.node_parm_time;
     if(akt_timer < 5 || akt_timer > 120)
     {
-        akt_timer = TELEMETRY_INTERVAL;
+        akt_timer = 15;   // default 15 minutes (TELEMETRY_INTERVAL is 30*60 and read as minutes = 30 h)
     }
     
     akt_timer = akt_timer * 1000 * 60; // convert to minutes

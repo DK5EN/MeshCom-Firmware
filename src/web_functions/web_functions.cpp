@@ -31,6 +31,8 @@
 #include "sto_notice.h"        // stage 4: stoHolder() for the messages-page held mark, all boards
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
+#include <prod_lock.h>      // prodLockNormalise(): an imported file may hold values the setters now refuse
+#include <instrument.h>     // INSTRUMENT_ENABLED
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
@@ -825,6 +827,19 @@ static void sub_config_upload(long content_length)
         send_http_header(400, RESPONSE_TYPE_TEXT);
         web_client.printf("<p>config import failed: %s</p>", err);
         return;
+    }
+
+    // Production lock: a file from an earlier build may hold values the setters refuse now (ptime 1800,
+    // pingmax 100, locked spectrum/NBR values). The import accepts them; repair before they are persisted.
+    {
+#if defined(NRF52_SERIES)
+        const bool hasAu = false;
+#else
+        const bool hasAu = true;
+#endif
+        const int locked = prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, hasAu);
+        if(locked > 0)
+            Serial.printf("[CONFIG];import;normalised;%d\n", locked);
     }
 
     save_settings();
@@ -3447,7 +3462,7 @@ void sub_page_setup()
     _create_setup_switch_element("via", "Via", "enable via", bVIA);    // create Switch-Element inclucing Label and Description
     { // LED-08: only on a node that has the LED (the info page says "not fitted" otherwise); same console rows as --board led / --charge led
         const LedFitted ledHw = ledFittedNow();
-#if defined(BOARD_LED)   // same guard as the webSetup_setParam handler and the --board led console row
+#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)   // same guard as the webSetup_setParam handler and the --board led console row
         if (ledHw.board)
             _create_setup_switch_element("boardled", "Board LED", "short heartbeat flash every 2 s", bUSER_BOARD_LED);
 #endif
@@ -3957,25 +3972,27 @@ void sub_page_spectrum()
     web_client.println("<div id=\"content_inner\">");
 #if defined(SX1262X) || defined(SX126X) || defined(SX1262_V3) || defined(SX1262_E290) || defined(USING_SX1262)
 
-    meshcom_settings.node_specstart = 432.0;
-    meshcom_settings.node_specend = 434.0;
-    meshcom_settings.node_specstep = 0.025;
-    meshcom_settings.node_specsamples = 2048;
+    // Local values only: the page used to overwrite (and persist) the node_spec* settings, which
+    // broke the production-locked 432/434/0.025/2048 (docs/production-locked-settings.md).
+    float spec_start = 432.0;
+    float spec_end = 434.0;
+    float spec_step = 0.025;
+    int spec_samples = 2048;
 
     if(getFreq() > 860)
     {
-        meshcom_settings.node_specstart = 863.0;
-        meshcom_settings.node_specend = 870.0;
-        meshcom_settings.node_specstep = 0.100;
-        meshcom_settings.node_specsamples = 2048;
+        spec_start = 863.0;
+        spec_end = 870.0;
+        spec_step = 0.100;
+        spec_samples = 2048;
     }
 
-    float spec_curr_freq = meshcom_settings.node_specstart; // scan start frequency
+    float spec_curr_freq = spec_start; // scan start frequency
 
     uint16_t step_pixel_width = 10;  // the amout of pixel we use for a single frequency step
     uint16_t step_pixel_height = 10; // the amout of pixel we use for a single frequency step
 
-    uint16_t num_fsteps = roundf((meshcom_settings.node_specend - spec_curr_freq) / meshcom_settings.node_specstep);
+    uint16_t num_fsteps = roundf((spec_end - spec_curr_freq) / spec_step);
     #if not defined(BOARD_T_DECK_PRO)
     uint16_t current_fStep = 0;                                       // current iteration  counter
     #endif
@@ -3984,8 +4001,8 @@ void sub_page_spectrum()
     uint16_t end_x = start_x + ((num_fsteps + 1) * step_pixel_width); // calculate the end. Use one more fstep as the last frequency step also starts a scan and giving a result
     uint16_t end_y = start_y + (RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE * step_pixel_height);
 
-    uint16_t own_freq_marker_width = round(((meshcom_settings.node_bw / 1000) / meshcom_settings.node_specstep) * step_pixel_width);
-    uint16_t own_freq_marker_center = start_x + (((meshcom_settings.node_freq - spec_curr_freq) / meshcom_settings.node_specstep) * step_pixel_width);
+    uint16_t own_freq_marker_width = round(((meshcom_settings.node_bw / 1000) / spec_step) * step_pixel_width);
+    uint16_t own_freq_marker_center = start_x + (((meshcom_settings.node_freq - spec_curr_freq) / spec_step) * step_pixel_width);
     uint16_t own_freq_marker_start = own_freq_marker_center - (own_freq_marker_width / 2);
 
 
@@ -4021,14 +4038,14 @@ void sub_page_spectrum()
         }
 
         #if not defined(BOARD_T_DECK_PRO)
-        while (spec_curr_freq < meshcom_settings.node_specend)
+        while (spec_curr_freq < spec_end)
         {                                                                                                 // loop through the frequency range
-            uint16_t *res = sx126x_spectral_scan_freq(spec_curr_freq, meshcom_settings.node_specsamples); // get spectrum analysis for this given frequency
+            uint16_t *res = sx126x_spectral_scan_freq(spec_curr_freq, spec_samples); // get spectrum analysis for this given frequency
             for (uint8_t i = 0; i < RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE; i++)
             { // loop through the power bins (usually 33)
                 if (res[i] > 0)
                 {                                                               // did the scan found anything above zero?
-                    float alpha = (res[i] / meshcom_settings.node_specsamples); // calculate the alpha-value (transperancy) ranging 0.0 - 1.0
+                    float alpha = (res[i] / spec_samples); // calculate the alpha-value (transperancy) ranging 0.0 - 1.0
                     if (alpha < 0.2)
                         alpha = 0.2; // use a minimum of alpha. Smaller values might be hard to see
                     web_client.printf("<rect width=\"%d\" height=\"%d\" x=\"%d\" y=\"%d\" fill=\"rgba(0,0,0,%0.3f)\"/>", step_pixel_width, step_pixel_height, start_x + (current_fStep * step_pixel_width), start_y + (i * step_pixel_height), alpha);
@@ -4044,7 +4061,7 @@ void sub_page_spectrum()
             delay(50); // lets wait for a moment (the example code used 100ms but 50ms seems to work, too)
             yield();   // this loop runs for a long time, pet the watchdog and give other tasks a chance to operate
             current_fStep++;
-            spec_curr_freq += meshcom_settings.node_specstep;
+            spec_curr_freq += spec_step;
         }
         #endif
 
@@ -4055,8 +4072,8 @@ void sub_page_spectrum()
         #endif
     }
 
-    web_client.printf("<p>The Node scans the frequency range (%.3fMHz - %.3fMHz) in small steps using a given scan bandwith (%.3fMHz).</p>\n", meshcom_settings.node_specstart, meshcom_settings.node_specend, meshcom_settings.node_specstep);
-    web_client.printf("<p>It performs %i measurements each step and puts them into %i power-bins. That is why you will see several measurement-dots for each step. The darker the dot, the more measurements have been put into that certain power bin.</p>", meshcom_settings.node_specsamples, RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE);
+    web_client.printf("<p>The Node scans the frequency range (%.3fMHz - %.3fMHz) in small steps using a given scan bandwith (%.3fMHz).</p>\n", spec_start, spec_end, spec_step);
+    web_client.printf("<p>It performs %i measurements each step and puts them into %i power-bins. That is why you will see several measurement-dots for each step. The darker the dot, the more measurements have been put into that certain power bin.</p>", spec_samples, RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE);
 #else
     web_client.println("<p>Spectrum scan is not supported on this device.</p>");
 #endif

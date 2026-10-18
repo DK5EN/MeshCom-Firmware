@@ -231,7 +231,7 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
-    #if defined(BOARD_LED)
+    #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     if(setupData->paramName.equals("boardled")) {   // LED-08: same toggle row as the console
         snprintf(message_text, sizeof(message_text), "--board led %s", setupData->paramValue.equals("on") ? "on" : "off");
         commandAction(message_text, bPhoneReady);
@@ -984,7 +984,7 @@ void webSetup_getParam(setupStruct *setupData){
         return;
     } else
 
-    #if defined(BOARD_LED)
+    #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     if(setupData->paramName.equals("boardled")) {
         setupData->returnValue = bUSER_BOARD_LED?"on":"off";
         return;

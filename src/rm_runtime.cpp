@@ -19,7 +19,7 @@
 #include "rm_runtime.h"
 #include "rm_sender_policy.h"
 #include "rm_validate.h"
-#if defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+#if defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES) && defined(LED_PIXEL) && LED_PIXEL > 0
 #include <Adafruit_NeoPixel.h>
 extern Adafruit_NeoPixel pixels;   // esp32_main.cpp
 #endif
@@ -212,6 +212,8 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
 #if defined(REMOTE_LED_PIN)
         sw.ledSupported = remoteLedPinUsable();   // pad held by OneWire: no tile that could only answer err pinbusy
         sw.led = bRemoteLed;
+#elif defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES) && defined(LED_PIXEL) && LED_PIXEL > 0
+        sw.ledSupported = true;   // NeoPixel-only board (S3 DevKitC): "led on|off" drives the pixels; no state is kept
 #endif
         rmFormatStatus(res, n, ver, (uint32_t)(millis() / 60000UL), (int)global_proz, freeHeapKb(), sw,
                        (int)meshcom_settings.node_power, TX_POWER_MIN > 0 ? (int)TX_POWER_MIN : 0, (int)TX_POWER_MAX, meshcom_settings.node_rmstrict != 0);
@@ -294,7 +296,7 @@ bool execute(const RmCmd &c, char *res, size_t n, bool *reboot)
         remoteLedSet(mode);
         snprintf(res, n, "ok led=%s", mode == 1 ? "on" : mode == 2 ? "flash" : "off");
         return true;
-#elif defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES)
+#elif defined(LED_PIN) && !defined(BOARD_LED) && !defined(NRF52_SERIES) && defined(LED_PIXEL) && LED_PIXEL > 0
         // NeoPixel-only board (S3 DevKitC): steady white / dark; the flash pattern needs a plain GPIO pad
         if (strcmp(a, "flash") == 0)
         {

@@ -21,6 +21,9 @@
 #include <debugconf.h>
 #include <configuration.h>
 #include <command_functions.h>
+#include <prod_lock.h>      // prodLockNormalise(): the blob is copied unchecked
+#include <maxhop.h>        // maxHopTextSanitize()
+#include <instrument.h>     // INSTRUMENT_ENABLED
 
 extern int isPhoneReady;
 extern bool bAckInfo;
@@ -121,7 +124,7 @@ void init_ble(void)
 
 #if NO_BLE_LED > 0
 	Bluefruit.autoConnLed(false);
-	digitalWrite(LED_BLUE, LOW);
+	digitalWrite(LED_BLUE, !LED_STATE_ON);
 #endif
 
 #ifdef _VARIANT_ISP4520_
@@ -544,6 +547,11 @@ void applyPendingBleSettings(void)
 
 	if (result != BleSettingsV1ApplyResult::Applied)
 		return; // None: nothing staged since the last apply
+
+	// The blob copies every field unchecked: bring the locked settings (production) and the
+	// ranges back before anything is saved or reported to the app (docs/production-locked-settings.md).
+	meshcom_settings.max_hop_text = maxHopTextSanitize(meshcom_settings.max_hop_text);
+	prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false);
 
 	// Save new settings
 	save_settings();

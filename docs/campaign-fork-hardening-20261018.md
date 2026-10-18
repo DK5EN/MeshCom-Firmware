@@ -90,3 +90,44 @@ DK5EN-90, DK5EN-14 (DK5EN-98 untouched), the heap bisect. BMx280 is field tested
   T5 ePaper, T114, T-Echo, heltec V3 INSTRUMENT.
 - Open, operator: on classic ESP32 every update check now clears the web message history (it reads the
   phone ring). Accept, or keep the history ring static (about 2 KB less gain).
+
+## W4 result
+
+- Production setting lock (`src/prod_lock.h`, spec `docs/production-locked-settings.md`, status implemented):
+  one gate in the inner `commandAction` (console, 2323, web manualcommand and setup, BLE, T-Deck text, RM),
+  normaliser on config import, boot load (ESP32, nRF52) and the nRF52 BLE blob; `{SET}` over LoRa accepts
+  text hop 1..6 and ignores the position hop in release builds; refusal `[ERR];locked;<name>`.
+- All builds: `--autoupdate auto` refused; import accepts 0..2 and normalises 2 -> 1 (old backups stay
+  importable). Release builds: `--stor on` refused, node_stor forced 0.
+- Setter bugs fixed: `--postime` dead branch and bare sscanf, `--ptime` fallback (runtime fallback now 15,
+  was 30 h), `--pingtime` floor 30, `--pingmax max` = 5; the web spectrum page no longer persists node_spec*.
+- LED platform: nRF52 board LED heartbeat and RM `led` (RAK4631, T114, T-Echo), off level at init and
+  BLE-off, sleep forces dark; variants per the LED plan (T-Echo pins 33/35/14 active low, T114 active low,
+  Heltec V3/V4 BOARD_LED 35, V2 25, WSL V3 35, SX1268 4, DevKitC NeoPixel 38, T-ETH-Elite 38).
+- Goldens: `variant-macros.txt`, `variant-macros-effective.txt` (also catches up unrelated drift since
+  10-02: version, ring sizes, CONSOLE_UART_TXBUF, MC_ENV_NAME, ENABLE_MSGSTORE), `variant-ini-effective.json`;
+  `variant_macros_lint.py` now pins the nRF52 variant.h LED macros.
+- Advisors: three rounds (import refused old backups, untested call sites, stale golden, autoupd range).
+- Gate PASS 75 envs; 14 board builds incl. heltec V3 INSTRUMENT.
+
+## Resume point: W5 (not started, operator stop 2026-10-18 evening)
+
+1. Bench, serialized, `identity_guard.py` first, 2 dBm, test traffic only to TEST or own DMs, DK5EN-98
+   untouched. Flash permission: DK5EN-92, -1, -90, -14.
+   - DK5EN-92 (T-Beam, OTA via `tools/webflash.py`, console 2323 with HMAC login): release image of the
+     campaign head: idle `STAT heap=` and `[AU];ble;pause;heap` at `--update check` (expected about 7 KB above
+     the 76-81 KB measured on c9e64344/85b0c457/e31940e8), `stk` on a check that passes the gate (keep above
+     3 KB with the 10240 B stack), `[HEAP]` boot marks; LED tests of the LED plan W4.
+   - DK5EN-1 (Heltec V3, USB serial 0001): LED (`--board led`, RM led), gateway server reply test (internal
+     note), production lock spot checks (`--nbrrelay on` refused, `--autoupdate auto` refused).
+   - DK5EN-90 (RAK4631, USB 230D6EBB3266D20E): LED heartbeat, server reply test on the nRF52 path.
+   - DK5EN-14 (T-Deck Plus): LED not fitted in the phone app (SN without BLED/CHGLED, SN1 LEDNF).
+2. Release gate: add the idle-heap step (`tools/bench/heap_idle.py --host <T-Beam> --baseline
+tools/heap_baseline.json --board ttgo_tbeam`) to `.claude/commands/release-firmware.md`, create the
+   baseline from the W5 measurement.
+3. Docs: `docs/rm1-commands.md` (sens now from detected sensors, bare `chgled`, `err pinbusy`),
+   `docs/fork-dev-vs-upstream-20261018.md` rows for W1-W4 (LED parity, sens fix, setting lock, heap levers),
+   defect catalogue (SENS-01/02, LED-01..17), BACKLOG (SENS-03 DHT, Tracker LED, V4R8 env), RESUME.
+4. Open operator decisions: web message history empty after each update check on classic ESP32 (accepted
+   or keep the history ring static); spectrum import ranges still refuse out-of-range backups; `{SET}`
+   password question (spec open point); field confirmation of T-Echo, T114, T-ETH-Elite, DevKitC LED pins.

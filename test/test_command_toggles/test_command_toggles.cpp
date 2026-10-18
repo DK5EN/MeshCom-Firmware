@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "command_toggles.h"
+#include "prod_lock.h"
 
 static bool  flagA, flagB;
 static int   ssetA;
@@ -987,9 +988,109 @@ static void test_real_led_guards_are_wired()
     TEST_ASSERT_TRUE_MESSAGE(led_order(sw, "#if defined(BOARD_LED)", "\"boardled\""), "web GUI boardled element must be gated by #if defined(BOARD_LED)");
 }
 
+// Production lock (docs/production-locked-settings.md): every toggle row the nbr*/shortpath
+// commands own must be caught by the gate, and the gate must sit in the inner commandAction()
+// BEFORE toggleApply(), otherwise the table applies the row first. A new row variant such as
+// "--nbrrelay shadow" goes red here instead of slipping past the name list.
+static void test_prod_lock_gate_covers_toggle_rows_and_precedes_toggle_apply()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    size_t gate = src.find("prodLockRefuses(msg_text+2, INSTRUMENT_ENABLED != 0)");
+    size_t apply = src.find("toggleApply(COMMAND_TOGGLES, COMMAND_TOGGLES_N, msg_text+2)");
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos, "prod-lock gate call not found in commandAction()");
+    TEST_ASSERT_TRUE_MESSAGE(apply != std::string::npos, "toggleApply call not found in commandAction()");
+    TEST_ASSERT_TRUE_MESSAGE(gate < apply, "prod-lock gate must come before toggleApply()");
+
+    std::istringstream lines(src);
+    std::string line;
+    int checked = 0;
+    while (std::getline(lines, line))
+    {
+        size_t q = line.find("{ \"--");
+        if (q == std::string::npos)
+            continue;
+        size_t e = line.find('"', q + 5);
+        std::string name = line.substr(q + 5, e - (q + 5));   // without the leading "--"
+        if (name.compare(0, 3, "nbr") == 0 && name.compare(0, 8, "nbrdebug") != 0 && name.compare(0, 8, "nbrreset") != 0
+            && name.compare(0, 8, "nbrcheck") != 0)
+        {
+            TEST_ASSERT_NOT_NULL_MESSAGE(prodLockRefuses(name.c_str(), false), name.c_str());
+            TEST_ASSERT_NULL_MESSAGE(prodLockRefuses(name.c_str(), true), name.c_str());
+            checked++;
+        }
+        if (name.compare(0, 9, "shortpath") == 0)
+        {
+            TEST_ASSERT_NOT_NULL_MESSAGE(prodLockRefuses(name.c_str(), false), name.c_str());
+            checked++;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(checked >= 7, "fewer nbr*/shortpath toggle rows found than expected");
+}
+
+// Production lock call sites that no host harness reaches (nrf52_ble.cpp, web_functions.cpp and
+// loop_functions.cpp are not host-compilable): each pin goes red when the call is removed.
+
+// nRF52 BLE settings blob: the blob is copied over meshcom_settings unchecked, so the normaliser must run
+// after the Applied check and before save_settings().
+static void test_real_nrf52_ble_blob_is_normalised_before_save()
+{
+    const std::string src = read_whole_file(repo_root() + "/src/nrf52/nrf52_ble.cpp");
+    const size_t applied = src.find("result != BleSettingsV1ApplyResult::Applied");
+    TEST_ASSERT_TRUE_MESSAGE(applied != std::string::npos, "BLE blob Applied check not found");
+    const size_t norm = src.find("prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false)", applied);
+    const size_t save = src.find("save_settings();", applied);
+    TEST_ASSERT_TRUE_MESSAGE(norm != std::string::npos, "nRF52 BLE blob apply must call prodLockNormalise()");
+    TEST_ASSERT_TRUE_MESSAGE(norm < save, "prodLockNormalise() must run before save_settings() in the BLE blob apply");
+}
+
+// The web spectrum page must not write the node_spec* settings (it used to overwrite and persist them,
+// which broke the locked 432/434/0.025/2048). Any assignment to them in web_functions.cpp is a failure.
+static void test_real_web_spectrum_page_writes_no_spec_settings()
+{
+    const std::string src = read_whole_file(repo_root() + "/src/web_functions/web_functions.cpp");
+    const size_t page = src.find("void sub_page_spectrum()");
+    TEST_ASSERT_TRUE_MESSAGE(page != std::string::npos, "sub_page_spectrum() not found");
+    size_t pos = 0;
+    int writes = 0;
+    while ((pos = src.find("meshcom_settings.node_spec", pos)) != std::string::npos)
+    {
+        size_t e = src.find_first_not_of("abcdefghijklmnopqrstuvwxyz_0123456789", pos + 18);
+        e = src.find_first_not_of(" \t", e);
+        if (e != std::string::npos && src[e] == '=' && src[e + 1] != '=')
+            writes++;
+        pos += 18;
+    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, writes, "web_functions.cpp assigns meshcom_settings.node_spec*: the spectrum page must use locals");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("float spec_start", page) != std::string::npos, "spectrum page lost its local scan window");
+}
+
+// LoRa {SET}: both fields go through prod_lock.h, and the position field is applied only behind
+// prodLockSetPosAllowed().
+static void test_real_lora_set_block_uses_prod_lock()
+{
+    const std::string src = read_whole_file(repo_root() + "/src/loop_functions.cpp");
+    const size_t a = src.find("mcStartsWith(aprsmsg.msg_payload, \"{SET}\")");
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, "{SET} block not found");
+    const size_t b = src.find("\"{CET}\"", a);
+    TEST_ASSERT_TRUE_MESSAGE(b != std::string::npos, "{CET} block not found");
+    const std::string blk = src.substr(a, b - a);
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("prodLockSetHop(iHopText, meshcom_settings.max_hop_text, bInstr)") != std::string::npos,
+                             "{SET} must take max_hop_text through prodLockSetHop()");
+    const size_t pos = blk.find("prodLockSetPosAllowed(bInstr)");
+    TEST_ASSERT_TRUE_MESSAGE(pos != std::string::npos, "{SET} must gate max_hop_pos with prodLockSetPosAllowed()");
+    const size_t asg = blk.find("meshcom_settings.max_hop_pos = ");
+    TEST_ASSERT_TRUE_MESSAGE(asg != std::string::npos && pos < asg, "max_hop_pos is assigned before/without the prodLockSetPosAllowed() gate");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("meshcom_settings.max_hop_text = iHop") == std::string::npos, "{SET} assigns max_hop_text from the raw field");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_real_nrf52_ble_blob_is_normalised_before_save);
+    RUN_TEST(test_real_web_spectrum_page_writes_no_spec_settings);
+    RUN_TEST(test_real_lora_set_block_uses_prod_lock);
+    RUN_TEST(test_prod_lock_gate_covers_toggle_rows_and_precedes_toggle_apply);
     RUN_TEST(test_unknown_command_is_not_matched_and_changes_nothing);
     RUN_TEST(test_on_row_sets_flag_and_ors_its_bit);
     RUN_TEST(test_off_row_clears_flag_and_its_bit);

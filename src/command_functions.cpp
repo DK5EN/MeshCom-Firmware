@@ -41,6 +41,7 @@
 #include "rtc_functions.h"
 #include "time_functions.h" // W4b: convertUNIXtoString() fuer --mheard
 #include "maxhop.h"
+#include "prod_lock.h"     // production-locked settings: gate + clamps, docs/production-locked-settings.md
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
 #include "msgstore_settings.h" // store node settings persistence (stage 3, owner C)
 #if defined(ENABLE_MSGSTORE)
@@ -207,6 +208,9 @@ static void getBuildDate(char *buf, size_t len)
 
 // CS-01: maxhop.h is Arduino-free (native test), configuration_global.h is not --
 // so the default is written down twice. It must not drift.
+static_assert(PRODLOCK_PING_INTERVAL == PING_INTERVAL && PRODLOCK_PING_MAX == PING_MAX &&
+              PRODLOCK_MAX_HOP_POS == MAX_HOP_POS_DEFAULT && PRODLOCK_HOP_LIMIT == MAX_HOP_LIMIT,
+              "prod_lock.h constants must mirror configuration_global.h");
 static_assert(MAXHOP_TEXT_FALLBACK == MAX_HOP_TEXT_DEFAULT,
               "maxhop.h MAXHOP_TEXT_FALLBACK and configuration_global.h MAX_HOP_TEXT_DEFAULT differ");
 static_assert(MAXHOP_TEXT_MAX < MAX_HOP_LIMIT,
@@ -439,19 +443,19 @@ static void tg_post_ina226_off() { ina226_found = false; }
 static void tg_post_charge_led_on() { meshcom_settings.node_sset2 |= SSET2_CHGLED_CFG; setChargeLedOn(true); }
 static void tg_post_charge_led_off() { meshcom_settings.node_sset2 |= SSET2_CHGLED_CFG; setChargeLedOn(false); }
 #endif
-#ifdef BOARD_LED
+#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
 #ifndef BOARD_LED_ACTIVE_LOW
     #define BOARD_LED_ACTIVE_LOW 0
 #endif
 static void tg_post_board_led_off()
 {
-#if !defined(NRF52_SERIES)
+#if defined(BOARD_LED)   // a NeoPixel-only board (LED_PIN/LED_PIXEL) has no plain pad to drive low
     if(!boardLedPinUsable()) return;   // OneWire/DHT owns the pad (T-Beam GPIO4): never write it
-#endif
 #if defined(REMOTE_LED_PIN)
     if(bRemoteLed) return;   // keep an RM `led on` lit
 #endif
     digitalWrite(BOARD_LED, BOARD_LED_ACTIVE_LOW);
+#endif
 }
 #endif
 #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -590,7 +594,7 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--charge led on",      &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0001,       tg_post_charge_led_on,         TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE | TG_POST_FIRST },
     { "--charge led off",     &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFE,   0x00000000,   tg_post_charge_led_off,        TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
 #endif
-#ifdef BOARD_LED
+#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     { "--board led on",       &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
     { "--board led off",      &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFF7F,   0x00000000,   tg_post_board_led_off,         TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
 #endif
@@ -881,7 +885,7 @@ void commandAction(char *umsg_text, bool ble)
     // the ladder. Hoisting them is only safe because D2-10 made matching
     // exact-token; it was then checked mechanically in both directions (no row
     // is intercepted by an earlier rung, no row steals a later rung's input).
-#if defined(BOARD_LED) && !defined(NRF52_SERIES)
+#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     // LED-04: the heartbeat must not take a pad OneWire/DHT owns (T-Beam: both GPIO4). Refuse before the row saves.
     if(commandMatches(msg_text+2, "board led on") && !boardLedPinUsable())
     {
@@ -889,6 +893,20 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
 #endif
+    // Production lock: locked settings and the never-settable auto update mode are refused here,
+    // in the inner function, so console, web, BLE and every chained sub-command pass the gate.
+    {
+        const char *lockedName = prodLockRefuses(msg_text+2, INSTRUMENT_ENABLED != 0);
+        if(lockedName != NULL)
+        {
+            snprintf(print_buff, sizeof(print_buff), "[ERR];locked;%s\n", lockedName);
+            Serial.print(print_buff);
+            if(ble)
+                addBLECommandBack(print_buff);
+            return;
+        }
+    }
+
     ToggleAction tgact = toggleApply(COMMAND_TOGGLES, COMMAND_TOGGLES_N, msg_text+2);
 
     if(tgact.matched)
@@ -1131,16 +1149,14 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"postime ") == 0)    // sec
     {
-        sscanf(msg_text+10, "%d", &meshcom_settings.node_postime);
+        bArgOk = cmdArgInt(msg_text+10, &iVar);
 
-        // minimum 3 Minuten
-        if(meshcom_settings.node_postime < (5 * 60))
-            meshcom_settings.node_postime = (5 * 60);
+        if(!bArgOk) { cmdArgNotNumber("postime", msg_text+10); return; }
 
-        // one day at most: the settings schema row (config_json.h) ends there, a
-        // larger value would be clamped to it silently on the next boot
-        if(meshcom_settings.node_postime > (24 * 60 * 60))
-            meshcom_settings.node_postime = (24 * 60 * 60);
+        // 0 = default interval (POSINFO_INTERVAL), 1..299 -> 300 (5 minutes), > 86400 -> one day:
+        // the settings schema row (config_json.h) ends there, a larger value would be clamped
+        // to it silently on the next boot. One source for the bounds: prod_lock.h.
+        meshcom_settings.node_postime = prodClampPostime(iVar);
 
         if(meshcom_settings.node_postime > 0)
             posinfo_interval = meshcom_settings.node_postime;
@@ -1386,7 +1402,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate notify/auto  firmware auto update (ESP32; auto only notifies for now)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
+            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
@@ -1421,7 +1437,7 @@ void commandAction(char *umsg_text, bool ble)
                 defined(SX1262_V3) || defined(USING_SX1262) || defined(BOARD_RAK4630)
             printdeb("--setboostedgain on/off boosted RX gain\n");
             #endif
-            printdeb("--sendpos               send position now\n--sendtrack             send track/APRS beacon now\n--sendhey               send HEY beacon now\n--sendtele              send telemetry now\n--posshot               one-shot position now\n--postime 99            position interval s\n");
+            printdeb("--sendpos               send position now\n--sendtrack             send track/APRS beacon now\n--sendhey               send HEY beacon now\n--sendtele              send telemetry now\n--posshot               one-shot position now\n--postime 300..86400    position interval s (0 = default)\n");
             delay(100);
 
             printdeb("\n== Neighbour matrix ==\n--nbrreset              clear matrix\n--nbrcheck              consistency check\n--nbrrelay off/count/on relay decision: off / log only / active\n--nbrsym on/off         assume symmetric links\n--nbrreport off/auto/on HN neighbour report\n");
@@ -1504,7 +1520,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--setio a0-b7 in/out    MCP IO pin mode\n--setio clear           clear MCP IO config\n--setout a0-b7 on/off   MCP output\n");
             delay(100);
 
-            printdeb("\n== Telemetry ==\n--parm tm1,..,tm5       value names (unused: blank)\n--unit tm1,..,tm5       units (unused: blank)\n--format 1,1,1,1,1      decimals (unused: 0)\n--eqns 0,1,0,...        equations, 15 values\n--values press,hum,temp,onewire,co2  value sources\n--ptime 99              interval min\n");
+            printdeb("\n== Telemetry ==\n--parm tm1,..,tm5       value names (unused: blank)\n--unit tm1,..,tm5       units (unused: blank)\n--format 1,1,1,1,1      decimals (unused: 0)\n--eqns 0,1,0,...        equations, 15 values\n--values press,hum,temp,onewire,co2  value sources\n--ptime 5..120          telemetry interval min\n");
             delay(100);
 
             printdeb("\n== Display ==\n--display on/off        display\n--nomsgall on/off       hide '*' messages\n--contrast 1-255        OLED contrast\n");
@@ -1521,7 +1537,7 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             printdeb("--keylock on/off        SYM+K lock\n");
             #endif
-            #ifdef BOARD_LED
+            #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
             printdeb("--board led on/off      board LED\n");
             #endif
             #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
@@ -1533,12 +1549,12 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(ENABLE_SOFTSER)
             printdeb("--softser on/off        soft serial\n--softser send          soft serial send\n--softser app/app0      soft serial app\n--softser baud 9600     soft serial baud\n--softser rxpin 99      soft serial RX pin\n--softser txpin 99      soft serial TX pin\n--softser fixpegel 9.9  fixed level\n--softser fixpegel2 9.9 fixed level 2\n--softser fixtemp 9.9   fixed temperature\n--softserdebug on/off   soft serial debug\n--softserread on/off    show soft serial RX\n");
             #endif
-            printdeb("--pingcall <call>       ping target\n--pingtime 99           ping interval s\n--pingmax 99/max        ping count limit\n--ping start/stop       start/stop pinging\n--spectrum              spectral scan\n");
+            printdeb("--pingcall <call>       ping target\n--pingtime 99           ping interval s (fixed in release builds)\n--pingmax 99/max        ping count limit (fixed in release builds)\n--ping start/stop       start/stop pinging\n--spectrum              spectral scan\n");
             #ifdef HEAP_TEST
             printdeb("--spiffs reset          format SPIFFS\n");
             #endif
             #if MC_DIAG
-            printdeb("--specstart 999.9       scan start MHz\n--specend 999.9         scan end MHz\n--specstep 9.9          scan step MHz\n--specsamples 500-2048  scan samples\n");
+            printdeb("--specstart 999.9       scan start MHz (fixed in release builds)\n--specend 999.9         scan end MHz (fixed in release builds)\n--specstep 9.9          scan step MHz (fixed in release builds)\n--specsamples 500-2048  scan samples (fixed in release builds)\n");
             #endif
             delay(100);
 
@@ -3773,12 +3789,12 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"pingtime ") == 0)
     {
-        sscanf(msg_text+11, "%d", &meshcom_settings.node_pingtime);
+        bArgOk = cmdArgInt(msg_text+11, &iVar);
 
-        if(meshcom_settings.node_pingtime < 15 || meshcom_settings.node_pingtime > PING_INTERVAL * 5)
-        {
-            meshcom_settings.node_pingtime = PING_INTERVAL;
-        }
+        if(!bArgOk) { cmdArgNotNumber("pingtime", msg_text+11); return; }
+
+        // The main loop pings only at node_pingtime > 29, so 15..29 would be stored but never sent.
+        meshcom_settings.node_pingtime = prodLockPingtimeValid(iVar) ? iVar : PING_INTERVAL;
 
         bReturn = true;
 
@@ -3813,7 +3829,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"pingmax max") == 0)
     {
-        meshcom_settings.node_pingmax = 100;
+        meshcom_settings.node_pingmax = PING_MAX;   // was 100, above the PING_MAX upper bound of the setter
 
         bReturn = true;
 
@@ -3822,12 +3838,11 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"pingmax ") == 0)
     {
-        sscanf(msg_text+10, "%d", &meshcom_settings.node_pingmax);
+        bArgOk = cmdArgInt(msg_text+10, &iVar);
 
-        if(meshcom_settings.node_pingmax < 1 || meshcom_settings.node_pingmax > PING_MAX)
-        {
-            meshcom_settings.node_pingmax = PING_MAX;
-        }
+        if(!bArgOk) { cmdArgNotNumber("pingmax", msg_text+10); return; }
+
+        meshcom_settings.node_pingmax = (iVar < 1 || iVar > PING_MAX) ? PING_MAX : iVar;
 
         bReturn = true;
 
@@ -5040,6 +5055,8 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"auto") == 0)
         {
+            // Unreachable in every build: the prodLockRefuses() gate in commandAction() answers
+            // "--autoupdate auto" first. Kept as defence in depth (AU-12).
             // AU-12: auto may only be switched on while Safeboot can apply a staged update. Refuse
             // BEFORE the setting is touched or saved; off and notify never need Safeboot.
             if(!fwNetSafebootCapable())
@@ -6717,12 +6734,13 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"ptime ") == 0)
     {
-        sscanf(msg_text+8, "%d", &meshcom_settings.node_parm_time);
+        bArgOk = cmdArgInt(msg_text+8, &iVar);
 
-        if(meshcom_settings.node_parm_time < 5 || meshcom_settings.node_parm_time > 120)
-        {
-            meshcom_settings.node_parm_time = TELEMETRY_INTERVAL;
-        }
+        if(!bArgOk) { cmdArgNotNumber("ptime", msg_text+8); return; }
+
+        // nearest bound of 5..120 minutes; the old fallback TELEMETRY_INTERVAL is 30*60 and landed
+        // at 1800 minutes (30 hours)
+        meshcom_settings.node_parm_time = prodClampPtime(iVar);
 
         bReturn = true;
 

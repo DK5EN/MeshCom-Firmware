@@ -12,6 +12,8 @@
 
 #include <debugconf.h>
 #include <settings_sanitize.h>
+#include <prod_lock.h>   // prodLockNormalise(): production-locked settings
+#include <instrument.h>  // INSTRUMENT_ENABLED
 #include <msgid_counter.h>
 #include <lora_setchip.h>
 #include <counters_store.h> // countersLoad()/countersSave() -- node_msgid's own file (D1-04 W3 step 4)
@@ -389,6 +391,17 @@ void sanitize_loaded_settings(void)
 	// ESP32; max_hop_pos bleibt bewusst beim Compile-Default (nrf52_main.cpp).
 	if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
 		fixed++;
+
+	// Production lock (docs/production-locked-settings.md): fixed values for the locked settings and
+	// range repair. nRF52 has no auto update, node_autoupd stays as stored (hasAutoUpdate = false).
+	{
+		const int locked = prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false);
+		if(locked > 0)
+		{
+			Serial.printf("[FLASH]...%d locked/range setting(s) normalised\n", locked);
+			fixed += locked;
+		}
+	}
 
 	// Die Struktur wird roh aus der Datei gelesen -- ein fehlender Terminator
 	// laesst strlen()/printf ueber das Feld hinauslesen.

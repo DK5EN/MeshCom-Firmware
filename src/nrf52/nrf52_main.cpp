@@ -544,11 +544,20 @@ void nrf52setup()
 
      // LEDs
     #if not defined(BOARD_HELTEC_T114)
+        // LED-15: pinMode(OUTPUT) latches LOW, which lights an active-low LED: write the off level at once
         pinMode(LED_GREEN, OUTPUT);
+        digitalWrite(LED_GREEN, !LED_STATE_ON);
         #ifndef BOARD_RAK4630
         pinMode(LED_RED, OUTPUT);
+        digitalWrite(LED_RED, !LED_STATE_ON);
         #endif
         pinMode(LED_BLUE, OUTPUT);
+        digitalWrite(LED_BLUE, !LED_STATE_ON);
+    #endif
+    #if defined(BOARD_LED) && defined(BOARD_HELTEC_T114)
+        // T114 skips the block above; its BOARD_LED pad is set up here (LED-07/15)
+        pinMode(BOARD_LED, OUTPUT);
+        digitalWrite(BOARD_LED, boardLedLevel(false, BOARD_LED_ACTIVE_LOW));
     #endif
 
     //  Initialize the Serial Port for debug output
@@ -716,6 +725,7 @@ void nrf52setup()
     bAnalogCheck = meshcom_settings.node_sset3 & 0x0008;
     bBMP3ON = meshcom_settings.node_sset3 & 0x0010;
     bAHT20ON = meshcom_settings.node_sset3 & 0x0020;
+    bUSER_BOARD_LED = meshcom_settings.node_sset3 & 0x0080;   // LED-07: --board led
 
     bDEBUGCSV = meshcom_settings.node_sset4 & 0x0001;
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
@@ -1015,7 +1025,7 @@ void nrf52setup()
 	{
 		// BLE is not activated, switch off blue LED
         #if not defined(BOARD_HELTEC_T114)
-		digitalWrite(LED_BLUE, LOW);
+		digitalWrite(LED_BLUE, !LED_STATE_ON);   // LED-15: off level, not LOW
         #endif
 	}
 
@@ -1025,7 +1035,7 @@ void nrf52setup()
 
 #ifdef ARDUINO_ARCH_RP2040
 	// RAK11310 does not have BLE, switch off blue LED
-	digitalWrite(LED_BLUE, LOW);
+	digitalWrite(LED_BLUE, !LED_STATE_ON);
 #endif
 
     // I2C init
@@ -1287,6 +1297,11 @@ void nrf52loop()
     INSTR_LOOPTICK();
 
     gwRegTick();
+
+    #if defined(REMOTE_LED_PIN)
+    remoteLedTick();   // RM "led flash" pattern (LED-07)
+    #endif
+    boardLedTick();    // --board led heartbeat; no-op without BOARD_LED
 
     // BP-01/BP-04: close a back-pressure episode with QRV once the TX ring
     // has drained, even when no further user message arrives to observe it.
@@ -2242,7 +2257,7 @@ void nrf52loop()
     if(akt_timer < 5 || akt_timer > 120)
     {
         INSTR_SECTION("akt_timer");
-        akt_timer = TELEMETRY_INTERVAL;
+        akt_timer = 15;   // default 15 minutes (TELEMETRY_INTERVAL is 30*60 and read as minutes = 30 h)
     }
     
     akt_timer = akt_timer * 1000 * 60; // in minutes
@@ -2719,18 +2734,18 @@ void nrf52loop()
 void blinkLED()
 {
     #if not defined(BOARD_HELTEC_T114)
-    digitalWrite(LED_GREEN, HIGH);
+    digitalWrite(LED_GREEN, LED_STATE_ON);
     delay(20);
-    digitalWrite(LED_GREEN, LOW);
+    digitalWrite(LED_GREEN, !LED_STATE_ON);
     #endif
 }
 
 void blinkLED2()
 {
     #if not defined(BOARD_HELTEC_T114)
-    digitalWrite(LED_BLUE, HIGH);
+    digitalWrite(LED_BLUE, LED_STATE_ON);
     delay(20);
-    digitalWrite(LED_BLUE, LOW);
+    digitalWrite(LED_BLUE, !LED_STATE_ON);
     #endif
 }
 

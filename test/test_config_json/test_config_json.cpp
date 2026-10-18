@@ -18,12 +18,16 @@
 
 #include <string>
 #include <cstring>
+#include <cctype>
+#include <fstream>
+#include <sstream>
 
 #include <Arduino.h>
 #include <configuration.h>
 #include <nrf52/WisBlock-API.h>   // Shim aus test/test_config_json/stubs
 #include <config_json.h>
 #include <crc32_util.h>
+#include <prod_lock.h>   // prodLockNormalise(): what the import path runs after configImportJson
 
 #include <ArduinoJson.h>
 
@@ -165,7 +169,8 @@ static void fill_settings(void)
     meshcom_settings.node_stor = 1; /* SNF-D7: default is 0, so 1 proves the round trip */
     meshcom_settings.node_rm = 1;   /* RM-06: default is 0, so 1 proves the round trip */
     meshcom_settings.node_rmstrict = 1; /* BF-01: default is 0, so 1 proves the round trip */
-    meshcom_settings.node_autoupd = 2; /* AU-03: default is 0, so 2 proves the round trip */
+    meshcom_settings.node_autoupd = 1; /* AU-03: default is 0, so 1 proves the round trip (2 = auto is refused) */
+
     meshcom_settings.node_updchan = 1; /* AU-03: default is 0, so 1 proves the round trip */
 }
 
@@ -239,7 +244,7 @@ static void test_roundtrip_restores_every_field(void)
     /* BF-01: RM strict security switch, default 0 -- the fill value 1 must survive */
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_rmstrict);
     /* AU-03 (#1187): auto update mode and channel, defaults 0 -- the fill values 2 / 1 must survive */
-    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_updchan);
     TEST_ASSERT_EQUAL_FLOAT(4.24f, meshcom_settings.node_maxv);
     TEST_ASSERT_EQUAL_FLOAT(0.002f, meshcom_settings.node_shunt);
@@ -731,20 +736,20 @@ static void test_import_without_node_rmstrict_keeps_current_value(void)
     }
 }
 
-/* AU-03 (#1187): node_autoupd has the schema bounds 0..2, node_updchan 0..1 --
+/* AU-03 (#1187): node_autoupd has the schema bounds 0..2 (an imported 2 is normalised to 1 by prodLockNormalise), node_updchan 0..1 --
  * an import outside refuses the whole file and leaves the value untouched. */
 static void test_autoupd_updchan_out_of_range_is_refused(void)
 {
     fill_settings();
     std::string doc = do_export();
-    TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_autoupd\":\"2\"") != std::string::npos,
+    TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_autoupd\":\"1\"") != std::string::npos,
                              "node_autoupd is not exported");
     TEST_ASSERT_TRUE_MESSAGE(doc.find("\"node_updchan\":\"1\"") != std::string::npos,
                              "node_updchan is not exported");
 
     struct Case { const char *key; const char *good; const char *bad[2]; };
     const Case cases[] = {
-        {"node_autoupd", "2", {"3", "-1"}},
+        {"node_autoupd", "1", {"3", "-1"}},   /* 2 is accepted, see test_import_autoupd_two_is_normalised_to_one */
         {"node_updchan", "1", {"2", "-1"}},
     };
     for (const Case &c : cases)
@@ -766,7 +771,7 @@ static void test_autoupd_updchan_out_of_range_is_refused(void)
 
     wipe_settings();
     TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(doc));
-    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_updchan);
 }
 
@@ -795,7 +800,7 @@ static void test_import_without_autoupd_updchan_keeps_current_values(void)
              "\"crc32\":\"%s\"}}",
              (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
 
-    for (int keep = 0; keep <= 2; keep++)
+    for (int keep = 0; keep <= 1; keep++)
     {
         wipe_settings();
         meshcom_settings.max_hop_text = 4;
@@ -808,6 +813,104 @@ static void test_import_without_autoupd_updchan_keeps_current_values(void)
         TEST_ASSERT_EQUAL_INT(keep, meshcom_settings.node_autoupd);
         TEST_ASSERT_EQUAL_INT(keep & 1, meshcom_settings.node_updchan);
     }
+}
+
+/* Source text of a repo file; pio runs native tests from the project root, a few "../" are tolerated. */
+static std::string read_file(const char *rel)
+{
+    std::string prefix;
+    for (int up = 0; up < 5; up++, prefix += "../")
+    {
+        std::ifstream in(prefix + rel, std::ios::binary);
+        if (in)
+        {
+            std::ostringstream ss;
+            ss << in.rdbuf();
+            return ss.str();
+        }
+    }
+    TEST_FAIL_MESSAGE("repo file not found");
+    return std::string();
+}
+
+/* Production lock: node_ptime / node_pingtime / node_pingmax keep their OLD wide import ranges
+ * (0..1800, 0..86400, 0..100) so a backup written by an earlier build is not refused as a whole;
+ * a value just outside those old ranges is still refused (whole file). The values inside are
+ * repaired by prodLockNormalise (test_prod_lock_import_old_values_are_repaired). Edges cannot be
+ * imported here: the CRC covers the value. */
+static void test_prod_lock_import_ranges(void)
+{
+    fill_settings();
+    std::string doc = do_export();
+
+    struct Case { const char *key; const char *good; const char *bad[2]; };
+    const Case cases[] = {
+        {"node_ptime",    "15",    {"1801", "-1"}},
+        {"node_pingtime", "60",    {"86401", "-1"}},
+        {"node_pingmax",  "5",     {"101", "-1"}},
+    };
+    for (const Case &c : cases)
+    {
+        const std::string from = std::string("\"") + c.key + "\":\"" + c.good + "\"";
+        TEST_ASSERT_TRUE_MESSAGE(doc.find(from) != std::string::npos, c.key);
+
+        for (const char *v : c.bad)
+        {
+            wipe_settings();
+            TEST_ASSERT_EQUAL_INT_MESSAGE(CFG_IMP_EVALUE,
+                do_import(replace_once(doc, from, std::string("\"") + c.key + "\":\"" + v + "\"")), c.key);
+            TEST_ASSERT_NOT_NULL(strstr(g_err, c.key));
+        }
+    }
+}
+
+/* A config file from a build before the production lock holds ptime 1800 / pingtime 5000 / pingmax 100
+ * (the old setter ceilings). The import must succeed (not lock the operator out of a restore), and the
+ * normaliser that sub_config_upload and the boot load run afterwards must end at legal values. */
+static void test_prod_lock_import_old_values_are_repaired(void)
+{
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\nnode_ptime=1800\nnode_pingtime=5000\nnode_pingmax=100\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[640];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\",\"node_ptime\":\"1800\","
+             "\"node_pingtime\":\"5000\",\"node_pingmax\":\"100\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(CFG_IMP_OK, do_import(std::string(doc)), g_err);
+    TEST_ASSERT_EQUAL_INT(1800, meshcom_settings.node_parm_time);
+    TEST_ASSERT_EQUAL_INT(5000, meshcom_settings.node_pingtime);
+    TEST_ASSERT_EQUAL_INT(100, meshcom_settings.node_pingmax);
+
+    TEST_ASSERT_TRUE(prodLockNormalise(meshcom_settings, false, true) > 0);
+    TEST_ASSERT_EQUAL_INT(120, meshcom_settings.node_parm_time);
+    TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_pingtime);   /* production: no ping call -> 0 */
+    TEST_ASSERT_EQUAL_INT(5, meshcom_settings.node_pingmax);
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(meshcom_settings, false, true));   /* idempotent */
+
+    /* the import path calls the normaliser before it persists */
+    const std::string web = read_file("src/web_functions/web_functions.cpp");
+    const size_t up = web.find("static void sub_config_upload(");
+    TEST_ASSERT_TRUE(up != std::string::npos);
+    const size_t imp = web.find("configImportJson(", up);
+    const size_t norm = web.find("prodLockNormalise(", imp);
+    const size_t save = web.find("save_settings();", imp);
+    TEST_ASSERT_TRUE_MESSAGE(norm != std::string::npos && save != std::string::npos && norm < save,
+                             "sub_config_upload must run prodLockNormalise between the import and save_settings");
 }
 
 /* D1: an imported node_autoupd of 0 (export of an older firmware, "off") is still inside the schema
@@ -840,6 +943,37 @@ static void test_import_autoupd_zero_is_accepted(void)
     TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
     TEST_ASSERT_EQUAL_STRING("TEST-1", meshcom_settings.node_call);
     TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_autoupd);
+}
+
+/* An imported node_autoupd of 2 passes the schema (0..2) and ends at 1 after prodLockNormalise, the call
+ * sub_config_upload() makes between configImportJson() and save_settings(). */
+static void test_import_autoupd_two_is_normalised_to_one(void)
+{
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\nnode_autoupd=2\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[512];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\",\"node_autoupd\":\"2\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_TRUE(prodLockNormalise(meshcom_settings, true, true) > 0);
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
 }
 
 /* Zu langer String fuer sein Zielfeld: dieselbe Abweisung, kein Ueberlauf. */
@@ -923,6 +1057,9 @@ int main(int, char **)
     RUN_TEST(test_autoupd_updchan_out_of_range_is_refused);
     RUN_TEST(test_import_without_autoupd_updchan_keeps_current_values);
     RUN_TEST(test_import_autoupd_zero_is_accepted);
+    RUN_TEST(test_import_autoupd_two_is_normalised_to_one);
+    RUN_TEST(test_prod_lock_import_ranges);
+    RUN_TEST(test_prod_lock_import_old_values_are_repaired);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);
     RUN_TEST(test_empty_and_oversized_input_is_refused);

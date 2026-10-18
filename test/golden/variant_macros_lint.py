@@ -69,6 +69,13 @@ CLASSIFICATION, printed and checked against the baseline:
     characterization, not a judgement call about which values "should"
     agree.
 
+NRF52 LED PINS. The three nRF52 variants state their LEDs in `variant.h`, not in
+configuration.h, so the table above cannot see them. A second, small check pins
+the LED macros there (LED pad numbers, `LED_STATE_ON` polarity, `BOARD_LED`): a
+wrong pad drives the wrong pin (T-Echo 33/35/14 are the real LEDs, P0.11 is the
+touch pad and P0.13 the power enable), a wrong `LED_STATE_ON` inverts the LED,
+and a missing `BOARD_LED` silently turns off the heartbeat and the RM "led" command.
+
   python3 test/golden/variant_macros_lint.py [--self-test]
 
 Exit 0 when the table matches the committed baseline, 1 on any drift
@@ -212,6 +219,36 @@ def check(root: Path = ROOT,
     return 0, f"variant macro table matches {baseline}\n\n{summary}"
 
 
+# nRF52 variant.h LED macros: variant -> {macro: value as written}. Pad numbers carry the parentheses
+# the header writes; BOARD_LED must stay the alias of the green LED pad.
+NRF52_LED_EXPECT: Dict[str, Dict[str, str]] = {
+    "wiscore_rak4631": {"PIN_LED1": "(35)", "PIN_LED2": "(36)", "LED_STATE_ON": "1", "BOARD_LED": "PIN_LED1"},
+    "heltec_t114": {"PIN_LED1": "(35)", "LED_STATE_ON": "0", "BOARD_LED": "PIN_LED1"},
+    "t_echo": {"PIN_LED1": "(33)", "PIN_LED2": "(35)", "PIN_LED3": "(14)", "LED_STATE_ON": "0", "BOARD_LED": "PIN_LED1"},
+}
+
+
+def check_nrf52_led_macros(root: Path = ROOT,
+                           expect: Dict[str, Dict[str, str]] = NRF52_LED_EXPECT) -> Tuple[int, str]:
+    """Exit code and message for the nRF52 variant.h LED macros (see module docstring)."""
+    problems: List[str] = []
+    for name, macros in sorted(expect.items()):
+        path = root / "variants" / name / "variant.h"
+        if not path.exists():
+            problems.append(f"{name}: {path} does not exist")
+            continue
+        found = parse_configuration_h(path)
+        for macro, want in sorted(macros.items()):
+            got = found.get(macro)
+            if got is None:
+                problems.append(f"{name}: {macro} is not defined (expected {want})")
+            elif got != want:
+                problems.append(f"{name}: {macro} is {got} (expected {want})")
+    if problems:
+        return 1, "nRF52 variant.h LED macros drifted:\n  " + "\n  ".join(problems)
+    return 0, f"nRF52 variant.h LED macros match ({len(expect)} variants)"
+
+
 def self_test() -> int:
     import shutil
     import tempfile
@@ -335,6 +372,31 @@ def self_test() -> int:
         report("a macro removed from one real variant -> drift, exit 1",
                code == 1 and "DRIFT" in msg)
 
+    # --- nRF52 variant.h LED macros: the real tree passes, each kind of drift fails ---
+    code, msg = check_nrf52_led_macros()
+    report("real nRF52 variant.h LED macros match the pinned values", code == 0)
+    for variant, macro, bad, label in (
+        ("t_echo", "PIN_LED1", "(34)", "T-Echo green LED pad changed"),
+        ("t_echo", "LED_STATE_ON", "1", "T-Echo polarity flipped"),
+        ("heltec_t114", "LED_STATE_ON", "1", "T114 polarity flipped"),
+        ("wiscore_rak4631", "BOARD_LED", None, "RAK4631 BOARD_LED removed"),
+    ):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            shutil.copytree(ROOT / "variants", root / "variants")
+            vh = root / "variants" / variant / "variant.h"
+            lines = []
+            for ln in vh.read_text().splitlines():
+                m = DEFINE.match(ln.split("//", 1)[0])
+                if m and m.group(1) == macro:
+                    if bad is None:
+                        continue
+                    ln = f"#define {macro} {bad}"
+                lines.append(ln)
+            vh.write_text("\n".join(lines) + "\n")
+            code, msg = check_nrf52_led_macros(root)
+            report(f"{label} -> exit 1 naming {variant}", code == 1 and variant in msg and macro in msg)
+
     return 0 if ok else 1
 
 
@@ -350,7 +412,9 @@ def main() -> int:
 
     code, msg = check()
     print(msg)
-    return code
+    led_code, led_msg = check_nrf52_led_macros()
+    print(led_msg)
+    return code or led_code
 
 
 if __name__ == "__main__":

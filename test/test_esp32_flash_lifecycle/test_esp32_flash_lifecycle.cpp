@@ -533,8 +533,9 @@ void test_autoupd_stored_auto_and_notify_stay(void)
 {
     FakeNvs::instance().seedInt("node_autoupd", 2);
     init_flash();
-    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
-    TEST_ASSERT_EQUAL_INT(2, (int)FakeNvs::instance().entries().at("node_autoupd").i);
+    // W4 production lock: a stored autoupd 2 (auto) is never kept; it loads as 1 (notify).
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(1, (int)FakeNvs::instance().entries().at("node_autoupd").i);   // and the normalised value is written back
 
     setUp(); // second boot with a stored 1
     FakeNvs::instance().seedInt("node_autoupd", 1);
