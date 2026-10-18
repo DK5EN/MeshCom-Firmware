@@ -203,8 +203,9 @@
     M(int, node_rm, 0)                                                                                   \
     /* BF-01: 1 = RM brute-force protection (per-sender lockout, receiver rate limits, sender policy); default 0 = off. Persisted. */ \
     M(int, node_rmstrict, 0)                                                                             \
-    /* AU-03 (#1187): firmware auto update, 0 off / 1 notify / 2 auto; default 0. Persisted; the console rung is ESP32 only. */ \
-    M(int, node_autoupd, 0)                                                                              \
+    /* AU-03 (#1187): firmware auto update, 1 notify / 2 auto (blocked, acts as notify: D14); 0 (off) was removed in D1 and is */ \
+    /* mapped to 1 by sanitize_loaded_settings(). Default notify on ESP32, 0 on nRF52 (no AU there). Persisted; console rung ESP32 only. */ \
+    M(int, node_autoupd, MC_PLATFORM_DEFAULT(1, 0))                                                      \
     /* AU-03 (#1187): update channel, 0 prod (icssw-org) / 1 dev (DK5EN); default 0. Persisted. */           \
     M(int, node_updchan, 0)
 

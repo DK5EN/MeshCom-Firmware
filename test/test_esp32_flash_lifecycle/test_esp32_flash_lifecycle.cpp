@@ -514,6 +514,40 @@ void test_guard_refuses_position_save_during_load(void)
     TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_lat"));
 }
 
+// ---------------------------------------------------------------------------
+// 7. D1/D14 (AU web GUI): "off" (0) no longer exists. A stored node_autoupd 0 becomes 1 (RAM and flash);
+//    a stored 2 stays 2 (no migration of auto); a stored 1 stays 1; a wiped node starts at 1.
+// ---------------------------------------------------------------------------
+void test_autoupd_stored_off_becomes_notify(void)
+{
+    FakeNvs::instance().seedInt("node_autoupd", 0);
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
+    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_autoupd"));
+    TEST_ASSERT_EQUAL_INT(1, (int)FakeNvs::instance().entries().at("node_autoupd").i); // persisted
+}
+
+void test_autoupd_stored_auto_and_notify_stay(void)
+{
+    FakeNvs::instance().seedInt("node_autoupd", 2);
+    init_flash();
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_autoupd);
+    TEST_ASSERT_EQUAL_INT(2, (int)FakeNvs::instance().entries().at("node_autoupd").i);
+
+    setUp(); // second boot with a stored 1
+    FakeNvs::instance().seedInt("node_autoupd", 1);
+    init_flash();
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
+}
+
+void test_autoupd_default_on_wiped_node_is_notify(void)
+{
+    init_flash(); // empty NVS
+    TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_autoupd);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -530,5 +564,8 @@ int main(int, char **)
     RUN_TEST(test_init_flash_writes_no_msgid_into_credentials);
     RUN_TEST(test_guard_refuses_save_during_load_and_logs);
     RUN_TEST(test_guard_refuses_position_save_during_load);
+    RUN_TEST(test_autoupd_stored_off_becomes_notify);
+    RUN_TEST(test_autoupd_stored_auto_and_notify_stay);
+    RUN_TEST(test_autoupd_default_on_wiped_node_is_notify);
     return UNITY_END();
 }

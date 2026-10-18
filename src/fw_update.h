@@ -24,6 +24,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// D14 (AU web GUI campaign): the automatic apply is physically impossible in this firmware line.
+// AU_AUTO_INSTALL is fixed 0; the automatic download start and the automatic handover in
+// esp32_main.cpp sit inside #if AU_AUTO_INSTALL and are not compiled. No flag or env can switch it on.
+#if defined(AU_AUTO_INSTALL) && (AU_AUTO_INSTALL + 0) != 0
+#error "AU_AUTO_INSTALL must stay 0: automatic firmware install is not available in this firmware line"
+#endif
+#undef AU_AUTO_INSTALL
+#define AU_AUTO_INSTALL 0
+
 // ---------------------------------------------------------------------------
 // version / tag
 // ---------------------------------------------------------------------------
@@ -388,6 +397,8 @@ inline bool fwShouldInstall(const FwVersion &running, const FwVersion &cand, con
 #define FW_BATT_FLOOR_MV 3600u
 #define FW_MAX_ATTEMPTS 3u
 #define FW_ATTEMPT_SPACING_MS (6u * 3600u * 1000u)
+#define FW_PHONE_GUARD_MS (30u * 60u * 1000u) // D16: phone connected this long past the due time
+#define FW_APPLY_REBOOT_DELAY_MS 500u         // auRequestApplyReboot(): the HTTP answer leaves first
 
 struct FwPolicyIn
 {
@@ -404,8 +415,44 @@ enum FwAction : uint8_t
 {
     FW_NONE = 0,
     FW_CHECK,
-    FW_HANDOVER
+    FW_HANDOVER,
+    FW_CHECK_GUARDED // D16: due, phone connected for FW_PHONE_GUARD_MS past due -> check under the BLE guard
 };
+
+// D14: the node never runs the automatic install, so a stored mode 2 (auto) acts as 1 (notify).
+// Applied where FwPolicyIn::mode is set; fwTick itself stays a pure function of its input.
+inline int fwEffectiveMode(int mode)
+{
+    return (mode == 2 && !AU_AUTO_INSTALL) ? 1 : mode;
+}
+
+// D9: why an automatic download that is due does not start; nullptr = nothing in the way.
+// autoCompiled is AU_AUTO_INSTALL. Order of the reasons as listed.
+inline const char *fwAutoSkipReason(bool autoCompiled, bool timeValid, bool phoneConnected, bool battOk,
+                                    bool backedOff, bool attemptAllowed, bool alreadyStaged)
+{
+    if (!autoCompiled)
+        return "blocked";
+    if (!timeValid)
+        return "clock";
+    if (phoneConnected)
+        return "phone";
+    if (!battOk)
+        return "battery";
+    if (backedOff)
+        return "backoff";
+    if (!attemptAllowed)
+        return "attempts";
+    if (alreadyStaged)
+        return "staged";
+    return nullptr;
+}
+
+// auRequestApplyReboot(): true once the requested reboot into Safeboot is >= 500 ms old (wrap-safe).
+inline bool fwApplyRebootDue(bool requested, uint32_t requestMs, uint32_t nowMs)
+{
+    return requested && (int32_t)(nowMs - requestMs) >= (int32_t)FW_APPLY_REBOOT_DELAY_MS;
+}
 
 struct FwTimer
 {
@@ -415,6 +462,8 @@ struct FwTimer
     uint8_t attempts;
     char attemptTag[24];
     uint32_t nextAttemptMs;
+    bool phoneDue;             // D16: due and blocked only by a connected phone since phoneDueSinceMs
+    uint32_t phoneDueSinceMs;
 };
 
 namespace fw_update_detail
@@ -452,6 +501,8 @@ inline void fwTimerInit(FwTimer &t, uint32_t nowMs, uint32_t seed)
     for (size_t i = 0; i < sizeof(t.attemptTag); i++)
         t.attemptTag[i] = 0;
     t.nextAttemptMs = 0;
+    t.phoneDue = false;
+    t.phoneDueSinceMs = 0;
 }
 
 // CHECK  : mode > 0, wifiUp, timeValid, due; never while a phone is connected.
@@ -473,6 +524,21 @@ inline FwAction fwTick(FwTimer &t, const FwPolicyIn &in, bool stagedPending, uin
     if (reached(nowMs, t.nextCheckMs) &&
         !(in.mode > 0 && in.wifiUp && in.timeValid && !in.phoneConnected))
         t.nextCheckMs = nowMs;
+
+    // D16: a check that only the phone holds back. After FW_PHONE_GUARD_MS of that, the caller runs
+    // the check under the BLE guard (one per period: fwCheckDone() clears the state).
+    if (in.mode > 0 && in.wifiUp && in.timeValid && in.phoneConnected && reached(nowMs, t.nextCheckMs))
+    {
+        if (!t.phoneDue)
+        {
+            t.phoneDue = true;
+            t.phoneDueSinceMs = nowMs;
+        }
+        else if ((uint32_t)(nowMs - t.phoneDueSinceMs) >= FW_PHONE_GUARD_MS)
+            return FW_CHECK_GUARDED;
+    }
+    else
+        t.phoneDue = false;
 
     if (in.mode == 0 || in.phoneConnected)
         return FW_NONE;
@@ -641,6 +707,7 @@ inline FwGoStep fwGoTickStep(const FwGoTickIn &in)
 inline void fwCheckDone(FwTimer &t, uint32_t nowMs)
 {
     t.firstDone = true;
+    t.phoneDue = false;
     t.jitterSeed = fw_update_detail::nextSeed(t.jitterSeed);
     uint32_t jitterS = t.jitterSeed % (FW_CHECK_SPREAD_S + 1u);
     t.nextCheckMs = nowMs + (FW_CHECK_BASE_S + jitterS) * 1000u;
@@ -716,10 +783,115 @@ inline bool fwCallocSizeOk(size_t n, size_t size, size_t *total)
 
 // A lowheap refusal while a phone kept BLE up is transient: it must not consume one of the
 // FW_MAX_ATTEMPTS download attempts. With BLE paused the job reports "lowheap_ble_off" instead,
-// which does consume one (bounded retries, no endless NimBLE stop/start).
+// which does consume one (bounded retries, no endless NimBLE stop/start). "lowheap_phone" (gate
+// failed and the BLE pause was skipped because of a phone) is the transient case, too.
 inline bool fwErrConsumesAttempt(const char *err)
 {
-    return !(err != nullptr && fw_update_detail::strEqN(err, "lowheap", 8));
+    return !(err != nullptr && (fw_update_detail::strEqN(err, "lowheap", 8) ||
+                                fw_update_detail::strEqN(err, "lowheap_phone", 14)));
 }
+
+// /austatus pct: bytes written of the running job / the length that job stages (FwNetStatus::progLen). 0 while
+// the length is unknown. 64-bit intermediate, clamped to 100.
+inline int fwProgressPct(uint32_t done, uint32_t len)
+{
+    if (len == 0)
+        return 0;
+    const uint64_t p = (uint64_t)done * 100u / len;
+    return p > 100u ? 100 : (int)p;
+}
+
+// /austatus: appends `"up":<seconds since boot>` to the JSON object auStatusJson() wrote (n chars, closing '}').
+// The page compares it across a restart where the build tag cannot (an image built without MC_BUILD_TAG
+// reports "local"). Returns the new length; body is left as it was if it is not an object or has no room.
+inline size_t fwJsonAppendUp(char *body, size_t cap, size_t n, uint32_t up)
+{
+    if (body == 0 || n < 2 || body[n - 1] != '}' || n >= cap)
+        return n;
+    char dig[10];
+    int nd = 0;
+    uint32_t v = up;
+    do
+    {
+        dig[nd++] = (char)('0' + v % 10u);
+        v /= 10u;
+    } while (v != 0);
+    const bool comma = body[n - 2] != '{';
+    const size_t add = (comma ? 1u : 0u) + 6u /* "up": */ + (size_t)nd + 1u /* } */;
+    if (n - 1 + add + 1 > cap) // keep the terminating NUL
+        return n;
+    size_t o = n - 1;
+    if (comma)
+        body[o++] = ',';
+    body[o++] = '"';
+    body[o++] = 'u';
+    body[o++] = 'p';
+    body[o++] = '"';
+    body[o++] = ':';
+    while (nd > 0)
+        body[o++] = dig[--nd];
+    body[o++] = '}';
+    body[o] = '\0';
+    return o;
+}
+
+// /austatus: appends `"img":"<8 hex>"` (the first 4 bytes of the running image's ELF SHA-256, esp_app_desc_t
+// app_elf_sha256) to the JSON object in body (n chars, closing '}'). With run "local" the page counts an install as
+// done only when this id changed: a Safeboot fallback also restarts the node (uptime drops) but keeps the old image.
+// No id (sha NULL, shorter than 4 bytes or the 4 bytes all zero) or no room: the key is omitted, body unchanged.
+// Returns the new length.
+inline size_t fwJsonAppendImg(char *body, size_t cap, size_t n, const uint8_t *sha, size_t shaLen)
+{
+    if (body == 0 || n < 2 || body[n - 1] != '}' || n >= cap || sha == 0 || shaLen < 4)
+        return n;
+    if ((sha[0] | sha[1] | sha[2] | sha[3]) == 0)
+        return n;
+    static const char hx[] = "0123456789abcdef";
+    const bool comma = body[n - 2] != '{';
+    const size_t add = (comma ? 1u : 0u) + 6u /* "img": */ + 10u /* "8 hex" */ + 1u /* } */;
+    if (n - 1 + add + 1 > cap) // keep the terminating NUL
+        return n;
+    size_t o = n - 1;
+    if (comma)
+        body[o++] = ',';
+    const char key[] = "\"img\":\"";
+    for (size_t i = 0; key[i] != 0; i++)
+        body[o++] = key[i];
+    for (size_t i = 0; i < 4; i++)
+    {
+        body[o++] = hx[sha[i] >> 4];
+        body[o++] = hx[sha[i] & 0x0f];
+    }
+    body[o++] = '"';
+    body[o++] = '}';
+    body[o] = '\0';
+    return o;
+}
+
+// The apply reboot (auRequestApplyReboot) fires 500 ms after the answer; a console/RM job may have started in
+// that window. At the moment it is due: WAIT = not due yet, GO = reboot, ABORT_BUSY = a job runs, do not reboot.
+enum FwApplyAct
+{
+    FWAPPLY_WAIT = 0,
+    FWAPPLY_GO,
+    FWAPPLY_ABORT_BUSY
+};
+inline FwApplyAct fwApplyRebootAct(bool due, bool jobBusy)
+{
+    if (!due)
+        return FWAPPLY_WAIT;
+    return jobBusy ? FWAPPLY_ABORT_BUSY : FWAPPLY_GO;
+}
+
+#if defined(ESP32)
+// True from auRequestApplyReboot() until the loop has acted on it. fwNetStart() refuses new jobs meanwhile.
+bool auApplyRebootPending(void);
+// Web "Install now": asks the main loop (esp32_main.cpp auTick) to call auRebootToSafeboot() >= 500 ms
+// later (fwApplyRebootDue), so the HTTP answer leaves first. Sets a flag only; returns at once.
+void auRequestApplyReboot(void);
+#if INSTRUMENT_ENABLED
+void auInstrCheckNow(void); // bench: --update checknow
+#endif
+#endif
 
 #endif // FW_UPDATE_H

@@ -61,7 +61,7 @@ inline size_t rmFmtUpd(char *out, size_t n, const RmAuState &st)
     out[0] = '\0';
     if (!st.supported)
         return 0;
-    const char *m = st.mode == 1 ? "notify" : (st.mode == 2 ? "auto" : "off");
+    const char *m = st.mode == 2 ? "auto" : "notify"; // D1: never "off" (a stored 0 reads as notify)
     char ck[12];
     if (st.ckMin < 0)
         snprintf(ck, sizeof(ck), "-");

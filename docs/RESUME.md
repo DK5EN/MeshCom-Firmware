@@ -2,6 +2,13 @@
 
 **Stand:** 2026-10-18, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
 
+## 2026-10-18 -- AU web GUI campaign: W1 done (resume point: docs/campaign-au-webgui-ux-20261018.md, section 12)
+
+- W1 (host code, tests, gates) committed on `fork-dev`: state-driven Auto update row on the Info page, `GET /austatus`, `notify`
+  default with `auto` compiled out (D14), X-MC gate for update actions. Gate: 72 envs / 2554 cases, 4 board builds + image
+  scan, INSTRUMENT build. Not yet on hardware: W2 (bench, Chrome only), W3 (heap), W4 (BLE guard) follow.
+- Flash permission for this campaign: every node except DK5EN-98 (operator 2026-10-18).
+
 ## 2026-10-18 -- upstream merged #1213 and #1214, merged back into fork-dev
 
 - icssw-org merged #1213 (gw_servers, `--setnet`, ETH-05) and #1214 (T-Deck reply, web firmware column) into `dev`

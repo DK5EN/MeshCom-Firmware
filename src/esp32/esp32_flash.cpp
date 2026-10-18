@@ -248,6 +248,15 @@ bool sanitize_loaded_settings(void)
     if(fixed > 0)
         Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
 
+    // D1: "off" no longer exists; a stored 0 becomes notify (idempotent, no marker needed). A stored 2
+    // stays 2 (D14: no migration of auto; the code path that would act on it is not compiled).
+    if(meshcom_settings.node_autoupd == 0)
+    {
+        meshcom_settings.node_autoupd = 1;
+        Serial.printf("[AU];migrate;off;notify\n");
+        return true;
+    }
+
     return fixed > 0;
 }
 

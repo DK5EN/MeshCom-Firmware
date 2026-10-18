@@ -653,7 +653,9 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
 
     const std::string bodyAu = cmd.substr(rungAu, 1400);
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("msg_text+13") != std::string::npos, "--autoupdate argument offset is not +13");
-    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 0") != std::string::npos, "--autoupdate off does not set 0");
+    // D1: off is removed; it refuses with an error and never writes 0
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 0") == std::string::npos, "--autoupdate off must not set 0 (D1)");
+    TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("[ERR];autoupdate;off removed, use notify") != std::string::npos, "--autoupdate off error text missing (D1)");
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 1") != std::string::npos, "--autoupdate notify does not set 1");
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 2") != std::string::npos, "--autoupdate auto does not set 2");
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("save_settings()") != std::string::npos, "--autoupdate rung does not save");
@@ -671,7 +673,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[ERR];updchan;") != std::string::npos, "--updchan has no error line");
 
     // help lines (ESP32 guard) and the --info line (ESP32 guard)
-    const size_t help = cmd.find("--autoupdate off/notify/auto  firmware auto update (ESP32)");
+    const size_t help = cmd.find("--autoupdate notify/auto  firmware auto update (ESP32; auto only notifies for now)");
     TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--autoupdate help line missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("--updchan prod/dev       update source: prod icssw-org, dev DK5EN") != std::string::npos,
                              "--updchan help line missing");
@@ -699,8 +701,8 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     TEST_ASSERT_TRUE_MESSAGE(cfg.find("X(\"node_updrepo\"") == std::string::npos, "node_updrepo must not exist (AU-D2)");
 
     const std::string set = read_repo_file("src/meshcom_settings.h");
-    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_autoupd, 0)") != std::string::npos,
-                             "node_autoupd default is not 0 (AU-D1: off)");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_autoupd, MC_PLATFORM_DEFAULT(1, 0))") != std::string::npos,
+                             "node_autoupd default is not MC_PLATFORM_DEFAULT(1, 0) (D1: notify on ESP32, 0 on nRF52)");
     TEST_ASSERT_TRUE_MESSAGE(set.find("M(int, node_updchan, 0)") != std::string::npos,
                              "node_updchan default is not 0 (AU-D2: prod)");
 }
@@ -847,8 +849,9 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
 {
     const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
 
-    const size_t gate = m.find("if(bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE || meshcom_settings.node_autoupd > 0)");
-    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos, "WiFi STA gate does not include node_autoupd > 0");
+    // D15: AU starts WiFi only with an SSID set and not in AP mode (wifi_start_gate.h, truth-table test)
+    const size_t gate = m.find("if(wifiStartWanted(bGATEWAY, bEXTUDP, bWEBSERVER, bNETCONSOLE, meshcom_settings.node_autoupd, bWIFIAP, meshcom_settings.node_ssid))");
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos, "WiFi STA gate does not include the D15 AU rule (wifiStartWanted)");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwTimerInit(s_auTimer") != std::string::npos, "fwTimerInit is not called");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwTick(s_auTimer") != std::string::npos, "fwTick is not called");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwNetStart(FWJ_CHECK") != std::string::npos, "the tick never starts a CHECK");
@@ -859,12 +862,15 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     // the automatic DOWNLOAD needs an installable release (matching .autoupdate asset + digest), so a
     // prod release without the asset does not burn the 3 attempts; mode 1 only notifies
     {
-        const size_t dl = m.find("in.mode == 2 && st.availNewer && st.installable");
+        const size_t dl = m.find("storedMode == 2 && st.availNewer && st.installable");
         TEST_ASSERT_TRUE_MESSAGE(dl != std::string::npos, "the automatic DOWNLOAD is not gated on st.installable");
         const size_t start = m.find("fwNetStart(FWJ_DOWNLOAD", dl);
         const size_t attempt = m.find("fwAttemptAllowed(s_auTimer", dl);
         TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos && attempt != std::string::npos && attempt < start,
                                  "fwAttemptAllowed must be evaluated inside the installable gate");
+        // D14: the start itself is not compiled (the pytest source pin checks the fences as well)
+        TEST_ASSERT_TRUE_MESSAGE(m.rfind("#if AU_AUTO_INSTALL", start) > m.rfind("#endif", start),
+                                 "the automatic DOWNLOAD start is not inside #if AU_AUTO_INSTALL");
     }
     TEST_ASSERT_TRUE_MESSAGE(m.find("!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV") != std::string::npos,
                              "AU-D17: the download is not gated on the battery floor");
@@ -1037,6 +1043,63 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
 
 // Web "setvia": the OK/FAIL check must compare against the form --via stores
 // (viaCanonical), not the raw field -- "dk8vw-99" and "none" reported FAIL.
+// AU web GUI W1 rework: source pins for the wiring that has no host harness (ESP32-only code).
+static size_t pin_find(const std::string &t, const char *needle, size_t from, const char *what)
+{
+    const size_t at = t.find(needle, from);
+    TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, what);
+    return at;
+}
+
+static void test_au_web_gate_and_status_wiring_pins()
+{
+    const std::string wf = read_repo_file("src/web_functions/web_functions.cpp");
+    // /austatus: no CORS (node-local), set inside the route itself
+    const size_t route = pin_find(wf, "web_header.startsWith(\"GET /austatus\")", 0, "no GET /austatus route");
+    const size_t route_end = pin_find(wf, "sub_au_status();", route, "the route does not call sub_au_status()");
+    const size_t cors = pin_find(wf, "web_cors_ok = false;", route, "no web_cors_ok = false in the /austatus route");
+    TEST_ASSERT_TRUE_MESSAGE(cors < route_end, "web_cors_ok = false is not set inside the /austatus route");
+    // call_function: upd* goes through webGuardCallAllowed before anything runs
+    const size_t cf = pin_find(wf, "void call_function(String web_header)", 0, "no call_function");
+    const size_t gate = pin_find(wf, "!webGuardCallAllowed(functionData.functionName.c_str()", cf, "call_function does not use webGuardCallAllowed");
+    TEST_ASSERT_TRUE_MESSAGE(gate < pin_find(wf, "webFunctionCall(&functionData)", cf, "no webFunctionCall"), "the upd* gate must run before the function call");
+    // setparam: manualcommand with an update command goes through webGuardSetparamAllowed before webSetup_setParam
+    const size_t sp = pin_find(wf, "void setparam(String web_header)", 0, "no setparam()");
+    const size_t spg = pin_find(wf, "!webGuardSetparamAllowed(param_name.c_str(), param_value.c_str(), full_header.c_str()", sp, "setparam does not use webGuardSetparamAllowed");
+    TEST_ASSERT_TRUE_MESSAGE(spg < pin_find(wf, "webSetup_setParam(&setupData)", sp, "no webSetup_setParam call"), "the manualcommand gate must run before the setter");
+    // /austatus phone flag and pct come from the shared sources, not from a private copy of the expression
+    const size_t st = pin_find(wf, "static void sub_au_status()\n{", 0, "no sub_au_status body");
+    const size_t st_end = pin_find(wf, "\n}\n", st, "sub_au_status has no end");
+    const std::string body = wf.substr(st, st_end - st);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("in.phone = fwNetPhoneHeld()") != std::string::npos, "/austatus phone is not fwNetPhoneHeld()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("isPhoneReady") == std::string::npos, "/austatus reads isPhoneReady directly again");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwProgressPct(au.bytesDone, au.progLen)") != std::string::npos, "/austatus pct does not use progLen");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwJsonAppendUp(") != std::string::npos, "/austatus carries no up key");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwJsonAppendImg(body, sizeof(body), n, d->app_elf_sha256") != std::string::npos, "/austatus carries no img key from the app ELF SHA-256");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("const esp_app_desc_t *d = MC_RUNNING_APP_DESC();") != std::string::npos, "/austatus img does not read the running image description");
+    TEST_ASSERT_TRUE_MESSAGE(wf.find("#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()") != std::string::npos, "IDF 4.4 (Arduino 2.x) has no esp_app_get_description()");
+
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    // STAGELAN must not overwrite the CHECK's zlen (runDownload reads it as the expected asset size)
+    size_t writes = 0;
+    for (size_t at = 0; (at = net.find("s_st.zlen =", at)) != std::string::npos; at += 11)
+        writes++;
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, (uint32_t)writes, "s_st.zlen is assigned outside the CHECK result (STAGELAN must use progLen)");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("s_st.progLen = zlen;") != std::string::npos, "stagePrepare does not set progLen");
+    TEST_ASSERT_TRUE_MESSAGE(net.find("!blePaused && fwNetPhoneHeld()") != std::string::npos, "lowheap_phone does not use fwNetPhoneHeld()");
+    // no new job inside the apply reboot window
+    const size_t sj = pin_find(net, "bool startJob(FwNetJob job, uint8_t channel)", 0, "no startJob");
+    const size_t pend = pin_find(net, "auApplyRebootPending()", sj, "startJob does not refuse during the apply reboot window");
+    TEST_ASSERT_TRUE_MESSAGE(pend < pin_find(net, "s_busy = true;", sj, "no s_busy = true"), "the apply window check must come before the job is marked running");
+
+    // the reboot re-checks busy right before auRebootToSafeboot, and unmarks the handover when it aborts
+    const std::string mn = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t at = pin_find(mn, "static void auTick(void)", 0, "no auTick");
+    const size_t act = pin_find(mn, "fwApplyRebootAct(true, auNow.state == FWS_BUSY)", at, "auTick does not re-check busy before the apply reboot");
+    const size_t unmark = pin_find(mn, "fwNetUnmarkHandover();", act, "the busy abort does not unmark the handover");
+    TEST_ASSERT_TRUE_MESSAGE(unmark < pin_find(mn, "auRebootToSafeboot()", act, "no reboot call"), "the busy abort must come before the reboot call");
+}
+
 static void test_web_setvia_compares_canonical_form()
 {
     const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
@@ -1361,10 +1424,14 @@ static void test_safeboot_nocap_is_version_tagged_and_web_order()
     TEST_ASSERT_TRUE_MESSAGE(clr != std::string::npos && net.find("[AU];safeboot;nocap;cleared", clr) != std::string::npos, "a stale nocap is not cleared and logged");
 
     const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
-    const size_t au = web.find("\"--autoupdate auto\");", web.find("AU-12: auto first"));
+    // D3: aumode prod|dev sets notify first (auto is console-only), then the channel, and only when notify took
+    const size_t aumode = web.find("paramName.equals(\"aumode\")");
+    TEST_ASSERT_TRUE_MESSAGE(aumode != std::string::npos, "aumode setter missing");
+    const size_t au = web.find("\"--autoupdate notify\");", aumode);
     const size_t ch = web.find("\"--updchan %s\", auDev", au);
-    TEST_ASSERT_TRUE_MESSAGE(au != std::string::npos && ch != std::string::npos && au < ch, "aumode must run --autoupdate auto before --updchan");
-    TEST_ASSERT_TRUE_MESSAGE(web.find("if(meshcom_settings.node_autoupd == 2) {", au) < ch, "--updchan must run only when auto took");
+    TEST_ASSERT_TRUE_MESSAGE(au != std::string::npos && ch != std::string::npos && au < ch, "aumode must run --autoupdate notify before --updchan");
+    TEST_ASSERT_TRUE_MESSAGE(web.find("if(meshcom_settings.node_autoupd == 1) {", au) < ch, "--updchan must run only when notify took");
+    TEST_ASSERT_TRUE_MESSAGE(web.substr(aumode, ch - aumode).find("--autoupdate auto") == std::string::npos, "aumode must not run --autoupdate auto (D14)");
 
     const std::string cmd = read_repo_file("src/command_functions.cpp");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("[AU];apply;note;safeboot_too_old;ver;%d;trying_anyway") != std::string::npos, "--update apply is silent on a too-old Safeboot");
@@ -1393,7 +1460,7 @@ static void test_safeboot_capability_gates_auto_update()
     const size_t bOff = body.find("casecmp(_owner_c, (char*)\"off\") == 0");
     const size_t bNotify = body.find("casecmp(_owner_c, (char*)\"notify\") == 0");
     const size_t bAuto = body.find("casecmp(_owner_c, (char*)\"auto\") == 0");
-    const size_t bElse = body.find("must be off, notify or auto");
+    const size_t bElse = body.find("must be notify or auto");
     TEST_ASSERT_TRUE_MESSAGE(bOff != std::string::npos && bNotify != std::string::npos && bAuto != std::string::npos && bElse != std::string::npos &&
                                  bOff < bNotify && bNotify < bAuto && bAuto < bElse,
                              "--autoupdate off/notify/auto branch order changed");
@@ -1504,5 +1571,6 @@ int main(int, char **)
     RUN_TEST(test_safeboot_nocap_is_version_tagged_and_web_order);
     RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
     RUN_TEST(test_web_setvia_compares_canonical_form);
+    RUN_TEST(test_au_web_gate_and_status_wiring_pins);
     return UNITY_END();
 }

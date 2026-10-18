@@ -42,6 +42,18 @@ bool fwNetStart(FwNetJob, uint8_t) { return false; }
 bool fwNetStartLan(const char *, uint32_t, const char *) { return false; }
 #endif
 void fwNetGetStatus(FwNetStatus &out) { memset(&out, 0, sizeof(out)); }
+bool fwNetPhoneHeld(void) { return false; }
+void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
+{
+    if (ifree != nullptr)
+        *ifree = 0;
+    if (iblk != nullptr)
+        *iblk = 0;
+}
+#if INSTRUMENT_ENABLED
+void fwNetSetHeapGateOverride(uint32_t) {}
+bool fwNetForgetLast(void) { return false; }
+#endif
 bool fwNetStagedPending(void) { return false; }
 bool fwNetLoadRecord(FwStageRecord &) { return false; }
 void fwNetClearRecord(void) {}
@@ -102,6 +114,11 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #define FWNET_CORE 1
 #endif
 
+// The phone flags esp32BlePause() tests (file scope: inside the anonymous namespace an extern
+// would declare a different, internal entity).
+extern volatile bool deviceConnected; // esp32_main.cpp
+extern int isPhoneReady;              // loop_functions.cpp
+
 namespace
 {
 
@@ -128,6 +145,10 @@ struct Avail
 Avail s_av;
 
 char s_err[48]; // dynamic error text of the running job (one job at a time)
+
+#if INSTRUMENT_ENABLED
+uint32_t s_gateOver = 0; // bench: `--update heapgate <bytes>`, RAM only, 0 = off (fwNetSetHeapGateOverride)
+#endif
 
 #if INSTRUMENT_ENABLED
 // Arguments of the running STAGELAN job, copied in under s_mux by startJob().
@@ -523,7 +544,15 @@ bool heapGateOk()
     const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     const uint32_t pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
-    if (fwNetHeapGate(ps, fr, bk, pb, FWNET_MIN_FREE, FWNET_MIN_BLOCK, FWNET_MIN_IFREE_PSRAM))
+    uint32_t minFree = FWNET_MIN_FREE;
+    uint32_t minIFree = FWNET_MIN_IFREE_PSRAM;
+#if INSTRUMENT_ENABLED
+    if (s_gateOver > minFree)
+        minFree = s_gateOver;
+    if (s_gateOver > minIFree)
+        minIFree = s_gateOver;
+#endif
+    if (fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree))
         return true;
     auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u\n", (unsigned)fr, (unsigned)bk,
           (unsigned)pb, (unsigned)ps);
@@ -828,7 +857,9 @@ const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBl
     portENTER_CRITICAL(&s_mux);
     s_st.staged = false;
     s_st.stagedTag[0] = '\0';
+    s_st.stagedIlen = 0;
     s_st.bytesDone = 0;
+    s_st.progLen = zlen; // progress denominator of both jobs; s_st.zlen stays the CHECK's asset size (runDownload reads it)
     portEXIT_CRITICAL(&s_mux);
 
     sg.ota0 = ota0;
@@ -943,6 +974,7 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
     portENTER_CRITICAL(&s_mux);
     s_st.staged = true;
     copyStr(s_st.stagedTag, sizeof(s_st.stagedTag), tag);
+    s_st.stagedIlen = ilen;
     s_stagedKnown = true;
     portEXIT_CRITICAL(&s_mux);
     auLog("[AU];stage;ok;tag;%s;zlen;%u\n", tag, (unsigned)zlen);
@@ -1049,7 +1081,6 @@ const char *runStageLan()
         return "size";
     }
     const uint32_t zlen = (uint32_t)clen;
-
     Stage sg;
     const char *err = stagePrepare(sg, zlen, a.ilen, 0);
     if (err != nullptr)
@@ -1080,6 +1111,9 @@ void fwNetTask(void *)
     // AU-D18: free the NimBLE stack's heap for the TLS handshake. Only CHECK and DOWNLOAD talk
     // TLS; esp32BlePause() declines (false) while a phone is connected or ready.
     const bool blePaused = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD) && esp32BlePause();
+    // The pause was skipped for a phone (sampled right after the call; both are the flags
+    // esp32BlePause() tests): a lowheap below is then transient, not the node's own shortfall.
+    const bool phoneHeld = !blePaused && fwNetPhoneHeld();
 #endif
     const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
 #if INSTRUMENT_ENABLED
@@ -1093,6 +1127,11 @@ void fwNetTask(void *)
     // retry and cycle NimBLE each time, so it gets its own token, which uses an AU-D5 attempt.
     if (blePaused && err != nullptr && strcmp(err, "lowheap") == 0)
         err = "lowheap_ble_off";
+    // The gate failed and the BLE pause was skipped because of a phone: token lowheap_phone, which
+    // fwErrConsumesAttempt() (fw_update.h) does not count as an attempt. Without a phone and without
+    // a pause (BLE already down / absent) the plain "lowheap" stays.
+    else if (phoneHeld && err != nullptr && strcmp(err, "lowheap") == 0)
+        err = "lowheap_phone";
 #endif
     if (err != nullptr)
         auLog("[AU];fail;%s\n", err);
@@ -1218,6 +1257,7 @@ void ensureStagedLoaded()
     {
         s_st.staged = ok;
         copyStr(s_st.stagedTag, sizeof(s_st.stagedTag), ok ? r.tag : "");
+        s_st.stagedIlen = ok ? r.ilen : 0;
         s_stagedKnown = true;
     }
     portEXIT_CRITICAL(&s_mux);
@@ -1241,6 +1281,8 @@ bool startJob(FwNetJob job, uint8_t channel)
 {
     if (WiFi.status() != WL_CONNECTED)
         return false;
+    if (auApplyRebootPending()) // Install now was accepted: the node reboots into Safeboot within 500 ms
+        return false;
 
     FwNetStatus prev;
     memset(&prev, 0, sizeof(prev));
@@ -1252,7 +1294,8 @@ bool startJob(FwNetJob job, uint8_t channel)
         prev = s_st;
         s_st.state = FWS_BUSY;
         s_st.job = job;
-        s_st.bytesDone = 0;
+        s_st.bytesDone = 0; // see FwNetStatus::bytesDone: pct only while BUSY
+        s_st.progLen = 0;
         s_st.lastErr[0] = '\0';
         s_argJob = job;
         s_argCh = channel;
@@ -1307,6 +1350,44 @@ bool fwNetStartLan(const char *url, uint32_t ilen, const char *tag)
 }
 #endif
 
+void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
+{
+    // Same sources as heapGateOk(). The PSRAM-TLS decision is made statically (what
+    // tlsAllocInstall() would pick) so that no allocator is installed from here.
+    uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint32_t bk;
+#if defined(BOARD_HAS_PSRAM)
+    if (psramFound())
+        bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    else
+#endif
+        bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (ifree != nullptr)
+        *ifree = fr;
+    if (iblk != nullptr)
+        *iblk = bk;
+}
+
+#if INSTRUMENT_ENABLED
+void fwNetSetHeapGateOverride(uint32_t bytes)
+{
+    s_gateOver = bytes; // plain word store, read by the job task; bench use only
+}
+
+bool fwNetForgetLast(void)
+{
+    Preferences p;
+    if (!p.begin(FWNET_NS, false))
+        return false;
+    if (p.isKey(FWNET_KEY_LAST))
+        p.remove(FWNET_KEY_LAST);
+    p.end();
+    return true;
+}
+#endif
+
+bool fwNetPhoneHeld(void) { return deviceConnected || isPhoneReady != 0; }
+
 void fwNetGetStatus(FwNetStatus &out)
 {
     ensureStagedLoaded();
@@ -1360,9 +1441,16 @@ bool fwNetLoadRecord(FwStageRecord &out)
         portENTER_CRITICAL(&s_mux);
         s_st.staged = false;
         s_st.stagedTag[0] = '\0';
+        s_st.stagedIlen = 0;
         portEXIT_CRITICAL(&s_mux);
     }
     p.end();
+    if (ok)
+    {
+        portENTER_CRITICAL(&s_mux);
+        s_st.stagedIlen = out.ilen;
+        portEXIT_CRITICAL(&s_mux);
+    }
     return ok;
 }
 
@@ -1468,6 +1556,7 @@ void fwNetClearRecord(void)
     portENTER_CRITICAL(&s_mux);
     s_st.staged = false;
     s_st.stagedTag[0] = '\0';
+    s_st.stagedIlen = 0;
     s_stagedKnown = true;
     portEXIT_CRITICAL(&s_mux);
 }

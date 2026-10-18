@@ -7,6 +7,7 @@ This file contains all web-based remotely callable functions
 #include <loop_functions_extern.h>
 #include <string> 
 #ifdef ESP32
+#include <esp_partition.h> // updapply: Safeboot partition present
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus for the update callfunctions
 #endif
 
@@ -37,14 +38,34 @@ void webFunctionCall(funCallStruct* functionData) {
     }
     #endif
     #ifdef ESP32
-    // AU-09 (#1187): firmware update actions of the info page banner, routed through "--update <verb>".
-    // Return OKAY when the job started (or the image is already staged), FAIL otherwise. "updapply"
-    // reboots into Safeboot on success, so its answer is never read; with nothing staged it fails.
+    // AU-09 (#1187) / AU web GUI: firmware update actions of the Info page row, routed through "--update <verb>".
+    // The caller (web_functions.cpp call_function) has already required the request header X-MC: 1 for every upd*.
+    // OKAY when the job started (or the image is already staged), FAIL otherwise.
     if(functionData->functionName.compareTo("updcheck")==0) {
+        // the BLE guard ("Pause Bluetooth and check") is campaign section 7 / W4: answer FAIL until it exists
+        if(functionData->functionParameter.equals("ble")) {
+            // TODO(W4): accept only after lowheap_phone with a phone connected, set the BLE guard, 5 min cooldown
+            Serial.printf("[AU];web;ble;not yet\n");
+            functionData->returnCode = WF_RETURNCODE_FAIL;
+            return;
+        }
+        // GitHub allows 60 unauthenticated API calls per hour per public IP: 60 s between manual checks
+        static uint32_t s_lastCheckMs = 0;
+        static bool s_checked = false;
+        const uint32_t nowMs = millis();
+        if(s_checked && (uint32_t)(nowMs - s_lastCheckMs) < 60000u) {
+            functionData->returnCode = WF_RETURNCODE_FAIL;
+            return;
+        }
         commandAction((char*)"--update check", bPhoneReady);
         FwNetStatus au;
         fwNetGetStatus(au);
-        functionData->returnCode = (au.state == FWS_BUSY) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        const bool started = (au.state == FWS_BUSY);
+        if(started) {
+            s_lastCheckMs = nowMs;
+            s_checked = true;
+        }
+        functionData->returnCode = started ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
         return;
     } else
     if(functionData->functionName.compareTo("updinstall")==0) {
@@ -56,13 +77,21 @@ void webFunctionCall(funCallStruct* functionData) {
         return;
     } else
     if(functionData->functionName.compareTo("updapply")==0) {
+        // validate first, answer the real result, reboot after the answer left (auRequestApplyReboot, 500 ms)
         FwNetStatus au;
         fwNetGetStatus(au);
-        if(!au.staged || au.state == FWS_BUSY) {
+        FwStageRecord rec;
+        if(au.state == FWS_BUSY || !fwNetLoadRecord(rec) || !fwNetSafebootCapable() ||
+           esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "safeboot") == nullptr) {
             functionData->returnCode = WF_RETURNCODE_FAIL;
             return;
         }
-        commandAction((char*)"--update apply", bPhoneReady);
+        if(!fwNetMarkHandover(rec.tag)) {   // before the reboot, as in --update apply
+            functionData->returnCode = WF_RETURNCODE_FAIL;
+            return;
+        }
+        Serial.printf("[AU];handover;%s\n", rec.tag);
+        auRequestApplyReboot();
         functionData->returnCode = WF_RETURNCODE_OKAY;
         return;
     }

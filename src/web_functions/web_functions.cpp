@@ -41,10 +41,21 @@
 static bool web_cors_ok = true;
 #if defined(ESP32)
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
+#include <esp_timer.h>    // AU web GUI: /austatus "up" (seconds since boot)
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION_MAJOR >= 5
+#include <esp_app_desc.h> // AU web GUI: /austatus "img" (running image ELF SHA-256)
+#define MC_RUNNING_APP_DESC() esp_app_get_description()
+#else
+#include <esp_ota_ops.h>  // AU web GUI: /austatus "img" (running image ELF SHA-256); IDF 4.4 name
+#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()
+#endif
+#include "au_ui_state.h"  // AU web GUI: AuUiIn/auStatusJson for GET /austatus, auEtaS
 #include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the Firmware Update card footnote (header-only)
 #ifndef MC_ENV_NAME
 #define MC_ENV_NAME ""
 #endif
+static void sub_au_status(); // GET /austatus (defined next to call_function)
 #ifndef MC_BUILD_TAG
 #define MC_BUILD_TAG ""
 #endif
@@ -1018,6 +1029,13 @@ String work_webpage(bool bget_password, int webid)
                             send_http_header(200, RESPONSE_TYPE_TEXT);
                             sub_page_remote();
                         }
+#if defined(ESP32)
+                        else if (web_header.startsWith("GET /austatus"))
+                        { // AU web GUI: read-only update state for the Info page row, no CORS (node-local)
+                            web_cors_ok = false;
+                            sub_au_status();
+                        }
+#endif
                         else if (web_header.indexOf("/callfunction/") >= 0)
                         { // user requested to invoke a function
                             // ### !!function will generate a HTML header itself
@@ -1180,6 +1198,104 @@ String decodeURLPercentCoding(String input)
     return String(buf.data());
 }
 
+#if defined(ESP32)
+// AU web GUI: hooks of the shared loadPage() string; empty on the RAK so nRF52 gains no AU bytes.
+#define AU_LP_LEAVE "if(typeof auPageLeave=='function')auPageLeave();"
+#define AU_LP_INIT "if(page=='info'&&cpage=='info'&&typeof auPageInit=='function')auPageInit();"
+#else
+#define AU_LP_LEAVE ""
+#define AU_LP_INIT ""
+#endif
+
+#if defined(ESP32)
+/**
+ * Scaffold JS of the Info page "Auto update" row (campaign-au-webgui-ux): one renderer driven by GET /austatus.
+ * Lives in the scaffold because the sub-pages are injected with innerHTML (a <script> inside never runs);
+ * loadPage() calls auPageLeave() / auPageInit(). The state selector and the error table mirror
+ * au_ui_state.h (auUiState, auErrText); tools/webgui_au_test.js runs this code against its golden strings.
+ */
+static void auScaffoldJs()
+{
+    web_client.println("var auS=null,auF=null,auBusy=false,auLoc='',auShown=false,auInfl=false,auFInfl=false,auFPct=0,auFMsg='',auUpAt=0,auT={poll:0,tick:0};");
+    web_client.println("function auEl(i){return document.getElementById(i);}");
+    web_client.println("function auKey(){return 'auF:'+location.host;}");
+    web_client.println("function auFGet(){try{var v=sessionStorage.getItem(auKey());return v?JSON.parse(v):null;}catch(e){return null;}}");
+    web_client.println("function auFSet(o){try{if(o)sessionStorage.setItem(auKey(),JSON.stringify(o));else sessionStorage.removeItem(auKey());}catch(e){}}");
+    web_client.println("function auReload(){location.reload();}");
+    web_client.println("function auWord(e){return String(e||'').split(' ')[0];}");
+    web_client.println("function auIn(w,l){return l.indexOf(w)>=0;}");
+    web_client.println("function auErrText(job,err){var w=auWord(err),c=job=='check',d=job=='download'||job=='stagelan';");
+    web_client.println("if(auIn(w,['tls','conn','http','begin','timeout']))return 'No connection to GitHub';");
+    web_client.println("if(c&&auIn(w,['short','stall','toobig','chunk','feed','enc','json','noenv','badver']))return 'The release list could not be read';");
+    web_client.println("if(d&&auIn(w,['short','stall','digest','readback','crc','write','enc','feed','chunk']))return 'Download damaged, it was discarded -- try again';");
+    web_client.println("if(d&&auIn(w,['noasset','nodigest']))return 'This release has no image for this board';");
+    web_client.println("if(d&&auIn(w,['notota0','imglen','size','overlap','small','inflate','layout']))return 'This node'+String.fromCharCode(39)+'s partition layout cannot take the image -- use the Webflasher';");
+    web_client.println("if(d&&auIn(w,['erase','noflash','nvs']))return 'Could not write the image to flash';");
+    web_client.println("if(w=='nomem')return 'Not enough free memory for the update';");
+    web_client.println("return 'Update failed';}");
+    web_client.println("function auLowHeap(e){var w=auWord(e);return w=='lowheap'||w=='lowheap_phone'||w=='lowheap_ble_off';}");
+    web_client.println("function auState(s,f){if(!s.sbok)return 'S';if(f)return 'F';");
+    web_client.println("if(s.st=='busy'){if(s.job=='check')return 'B';return s.pct>=100?'d':'D';}");
+    web_client.println("if(s.staged)return 'E';var w=auWord(s.err);");
+    web_client.println("if(w=='lowheap_phone')return s.phone?'G':'g';");
+    web_client.println("if(w=='lowheap_ble_off'||w=='lowheap')return 'H';");
+    web_client.println("if(s.newer&&s.inst)return 'C';return 'A';}");
+    web_client.println("function auDraw(g,m,e,h,lab,act,dis,red){var t=auEl('au_tr'),b=auEl('au_btn');if(!t||!b)return;");
+    web_client.println("t.className=g?'au-green':'';auEl('au_msg').textContent=m;auEl('au_err').textContent=e;auEl('au_hint').textContent=h;");
+    web_client.println("b.textContent=lab;b.className=red?'au-red':'';b.disabled=!!(dis||auBusy);b.setAttribute('data-act',act);}");
+    web_client.println("function auRender(){var s=auS;if(!s)return;var L=auState(s,0),g=0,m='',lab='Check now',act='check',dis=0,red=0,e='',h='';");
+    web_client.println("if(L=='S'){m='! Use Webflasher to renew Auto Update aware Safeboot';dis=s.st=='busy';}");
+    web_client.println("else if(L=='B'){lab='Checking now ...';dis=1;}");
+    web_client.println("else if(L=='D'){g=1;m='Firmware '+s.avail+' available';lab='Downloading now ... '+s.pct+' %';dis=1;}");
+    web_client.println("else if(L=='d'){g=1;lab='Verifying download ...';dis=1;}");
+    web_client.println("else if(L=='E'){g=1;m='Firmware '+s.staged+' downloaded and verified';lab='Install now';act='apply';red=1;}");
+    web_client.println("else if(L=='G'){m='! A connected phone uses the memory the update needs';lab='Pause Bluetooth and check';act='ble';}");
+    web_client.println("else if(L=='g'){m='The phone has disconnected -- check again';}");
+    web_client.println("else if(L=='H'){m='! Not enough free memory for the update. Reboot the node and try again.';}");
+    web_client.println("else if(L=='C'){g=1;m='Firmware '+s.avail+' available';lab='Install';act='install';}");
+    web_client.println("else{m=s.newer&&!s.inst?'Firmware '+s.avail+' exists, but has no image for this board':(s.avail?'up to date':'available none');}");
+    web_client.println("if((L=='A'||L=='C'||L=='E')&&(auLoc||(s.err&&!auLowHeap(s.err))))e=auLoc||auErrText(s.job,s.err)+' ['+s.err+']';");
+    web_client.println("var r=auEl('au_row');if(s.phone&&(L=='A'||L=='C')&&!e&&r&&r.getAttribute('data-blepause')=='1')h='(i) A connected phone may block the update on this board';");
+    web_client.println("auDraw(g,m,e,h,lab,act,dis,red);}");
+    web_client.println("function auSched(){clearTimeout(auT.poll);auT.poll=0;if(!auShown||!auS||auF)return;var L=auState(auS,0),ms=0;");
+    web_client.println("if(auS.st=='busy'||auS.guard)ms=1000;else if(L=='G')ms=10000;");
+    web_client.println("if(ms)auT.poll=setTimeout(auFetch,ms);}");
+    web_client.println("function auFetch(){if(!auShown)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}if(auInfl)return;auInfl=true;");
+    web_client.println("fetch('/austatus').then(function(r){if(r.status==404){var t=auEl('au_tr');if(t)t.style.display='none';return null;}if(!r.ok)throw 0;return r.json();}).then(function(j){auInfl=false;");
+    web_client.println("if(!auShown||!j)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}auApply(j);}).catch(function(){auInfl=false;auBusy=false;auRender();auSched();if(auShown&&!auF&&!auT.poll)auT.poll=setTimeout(auFetch,5000);});}");
+    web_client.println("function auApply(s){auS=s;auUpAt=Date.now();auBusy=false;auRender();auSched();}");
+    web_client.println("function auClick(){if(auBusy||auF||!auS)return;var b=auEl('au_btn'),a=b?b.getAttribute('data-act'):'';if(!a||b.disabled)return;");
+    web_client.println("auBusy=true;b.disabled=true;auLoc='';var fn=a=='apply'?'updapply':(a=='install'?'updinstall':'updcheck'),p=a=='ble'?'ble':'',tag=auS.staged;");
+    web_client.println("fetch('/callfunction/?'+fn+'='+p).then(function(r){return r.json();}).then(function(j){");
+    web_client.println("if(a=='apply'&&j[fn]=='ok'){auFBegin({tag:tag,t0:Date.now(),etaS:auS.etaS||35,upBase:typeof auS.up=='number'?auS.up:undefined,upAt:auUpAt,img:typeof auS.img=='string'?auS.img:undefined});return;}");
+    web_client.println("if(j[fn]!='ok')auLoc=a=='apply'?'Install of '+tag+' failed':'The node did not start the job, try again in a minute';");
+    web_client.println("auInfl=false;auFetch();}).catch(function(){auBusy=false;auLoc='No answer from the node';auRender();});}");
+    web_client.println("function auFBegin(o){auF=o;auFSet(o);auBusy=false;clearTimeout(auT.poll);clearInterval(auT.tick);auFPct=0;auFMsg='';auFDraw();auT.tick=setInterval(auFTick,1000);}");
+    web_client.println("function auFDraw(){if(!auF)return;var el=(Date.now()-auF.t0)/1000,m=auFMsg||('Installing '+auF.tag+', the node restarts ...');");
+    web_client.println("if(!auFMsg&&el>180+auF.etaS)m='The node is not back yet. Check its display and power; reload this page when it is up.';");
+    web_client.println("auDraw(1,m,'','','Installing now ... '+auFPct+' %','none',1,0);}");
+    web_client.println("function auFTick(){if(!auF)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}");
+    web_client.println("var el=(Date.now()-auF.t0)/1000,p=Math.min(95,Math.floor(el/auF.etaS*100));if(p>auFPct)auFPct=p;auFDraw();");
+    web_client.println("if(el>=Math.max(auF.etaS-10,8)&&Math.floor(el)%2==0)auFProbe();}");
+    web_client.println("function auFProbe(){if(auFInfl)return;auFInfl=true;");
+    web_client.println("fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){if(!j||typeof j.run!='string')throw 0;auFInfl=false;auFJson(j);}).catch(function(){");
+    web_client.println("fetch('/ota/state').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(o){auFInfl=false;auFOta(o);}).catch(function(){auFInfl=false;});});}");
+    web_client.println("function auFRestarted(j){return typeof j.up=='number'&&typeof auF.upBase=='number'&&j.up+10<auF.upBase+(Date.now()-auF.upAt)/1000;}");
+    // run "local": a Safeboot fallback also restarts the node, so with "img" on both sides only a changed image id is success
+    web_client.println("function auFNewImg(j){if(typeof j.img=='string'&&typeof auF.img=='string')return j.img!=auF.img;return auFRestarted(j);}");
+    web_client.println("function auFJson(j){if(!auF)return;if(j.run==auF.tag||(j.run=='local'&&auFNewImg(j))){auFPct=100;auFDraw();auFSet(null);clearInterval(auT.tick);auF=null;auReload();return;}");
+    web_client.println("auFSet(null);clearInterval(auT.tick);auT.tick=0;auF=null;auFMsg='';");
+    web_client.println("if(j.sbok){auLoc='Install failed, the old firmware is running';}");
+    web_client.println("auApply(j);}");
+    web_client.println("function auFOta(o){if(!auF||!o)return;if(o.reason=='apply_failed'){auFMsg='Install failed -- the node returns to the old firmware in '+Math.ceil((o.fallback_in_ms||0)/1000)+' s';}");
+    web_client.println("else if(o.state=='applying'&&o.total>0){var p=Math.min(99,Math.floor(o.received*100/o.total));if(p>auFPct)auFPct=p;}");
+    web_client.println("auFDraw();}");
+    web_client.println("function auPageLeave(){clearTimeout(auT.poll);clearInterval(auT.tick);auT.poll=0;auT.tick=0;auShown=false;auInfl=false;auFInfl=false;auBusy=false;auS=null;auF=null;auLoc='';auFMsg='';auFPct=0;}");
+    web_client.println("function auPageInit(){auPageLeave();var b=auEl('au_btn');if(!b)return;auShown=true;b.onclick=auClick;");
+    web_client.println("var f=auFGet();if(f&&f.tag&&f.t0){auFBegin(f);return;}auFetch();}");
+}
+#endif
+
 /**
  * ###########################################################################################################################
  * delivers the WebUI scaffold including the info page
@@ -1211,7 +1327,7 @@ void deliver_scaffold(bool bget_password)
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='setup'&&typeof raSt=='function')raSt();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
     //
     // BP-09: the input fields used to be cleared unconditionally, right after
@@ -1304,6 +1420,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']==0){var w=document.getElementById(param+\"_warn\");if(w)w.style.display=(value==\"on\")?\"\":\"none\";}if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
     // this function invokes a function call to the backend passing the function name and an optional parameter (e.g. sendpos)
     web_client.println("function callfunction(functionname,functionparameter){fetch(\"/callfunction/?\"+functionname+\"=\"+functionparameter).then(function(response){return response.json();}).then(function (jsonResponse) {/*Nothing todo yet.*/})}\n");
+#if defined(ESP32)
+    auScaffoldJs(); // AU web GUI: Info page Auto update row
+#endif
     // CS-03: config restore. Lives here and not in the setup page, because the
     // sub-pages are injected with innerHTML -- a <script> inside them never runs.
     web_client.println("function uploadconfig(){var e=document.getElementById(\"cfgfile\");if(!e||e.files.length==0){alert(\"choose a config file first\");return;}if(!confirm(\"Restore this configuration and reboot the node?\"))return;var r=new FileReader();r.onload=function(){fetch(\"/config\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:r.result}).then(function(x){return x.text().then(function(t){var m=t.replace(/<[^>]*>/g,\" \").trim();if(x.ok){alert(\"config imported: \"+m);}else{alert(\"import failed: \"+m);}});}).catch(function(err){alert(\"upload failed: \"+err);});};r.readAsText(e.files[0]);}\n");
@@ -1538,9 +1657,13 @@ void deliver_scaffold(bool bget_password)
     // stage 3 mailbox card below: "before you switch this on" warning box.
     web_client.println(".cardbody>.grid,.cardbody>.mbx-warn {margin:0 0 7px 0;}\n"); // Store node card: sub-grids inside the single collapsible body
     web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
-    // AU-09 (#1187): firmware-update banner at the top of the info (home) page.
-    web_client.println(".au-banner {background:var(--mclightgreen);border:solid 1px var(--mcgray);border-radius:5px;padding:6px 8px;margin:7px;}\n");
-    web_client.println(".au-banner button {margin:4px 6px 0 0;}\n");
+#if defined(ESP32)
+    // AU web GUI: Auto update row of the info page: green row, disabled and red (Install now) buttons.
+    web_client.println("#content_inner tr.au-green td {background-color:var(--mclightgreen);}\n");
+    web_client.println("#content_inner button:disabled {opacity:.45;cursor:not-allowed;}\n");
+    web_client.println("#content_inner button.au-red {background-color:var(--mcred);color:#fff;}\n");
+    web_client.println("#au_msg,#au_err {margin:4px 0;}\n#au_hint {color:var(--mcgray);font-size:var(--fs-s);}\n");
+#endif
 
     // content definitions -> mailbox page (stage 3, docs/design/mailbox-page-mockup.html).
     // Kept unconditional (not #if ENABLE_MSGSTORE) because this is a string literal inside
@@ -1627,6 +1750,9 @@ void deliver_scaffold(bool bget_password)
     else
     {
         sub_page_info();
+#if defined(ESP32)
+        web_client.println("<script type=\"text/javascript\">if(typeof auPageInit=='function')auPageInit();</script>"); // the row is filled from /austatus
+#endif
     }
 
     web_client.println("</div>\n</body>\n</html>");
@@ -3293,29 +3419,25 @@ void sub_page_setup()
     // setparam aumode (web_setup.cpp runs --updchan + --autoupdate, read-back is the stored state).
     // The old params autoupdate / updchan stay valid for the Web API but have no select any more.
     {
-        const int au_mode = meshcom_settings.node_autoupd;                 // 0 off, 1 notify (console only), 2 auto
+        const int au_mode = meshcom_settings.node_autoupd;                 // 1 notify (default), 2 auto (console only, blocked)
         const int au_chan = meshcom_settings.node_updchan ? 1 : 0;         // 0 prod, 1 dev
         const bool au_sb_ok = fwNetSafebootCapable();                      // AU-12: Safeboot new enough for staged updates
         web_client.println("<div class=\"cardlayout collapsablecard\">");
         web_client.println("<label class=\"cardlabel\">Firmware Update</label>");
-        web_client.println("<span>Open this for the firmware auto update.</span>\n");
+        web_client.println("<span>Open this for the firmware update settings.</span>\n");
         web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
         web_client.println("<div class=\"grid grid2\">");
         web_client.println("<label for=\"aumode\">Auto update</label>");
         web_client.printf("<select id=\"aumode\" name=\"aumode\"%s onchange=\"setvalue('aumode',this.value,true);\">\r\n", au_sb_ok ? "" : " disabled");
-        // notify (console only): a selected, disabled placeholder, so choosing prod or dev always fires onchange
-        if (au_mode == 1)
-            web_client.printf("\t<option value=\"\" selected disabled>notify (%s, set on the console)</option>\n", au_chan ? "dev" : "prod");
-        web_client.printf("\t<option value=\"off\" %s>off</option>\n", (au_mode == 0) ? "selected" : "");
-        web_client.printf("\t<option value=\"prod\" %s>prod (icssw-org releases)</option>\n", (au_mode == 2 && au_chan == 0) ? "selected" : "");
-        web_client.printf("\t<option value=\"dev\" %s>dev (DK5EN releases)</option>\n", (au_mode == 2 && au_chan == 1) ? "selected" : "");
+        // D3: notify (prod), notify (dev), auto greyed. A console-set auto shows greyed and selected.
+        web_client.printf("\t<option value=\"prod\" %s>notify (prod, icssw-org releases)</option>\n", (au_mode != 2 && au_chan == 0) ? "selected" : "");
+        web_client.printf("\t<option value=\"dev\" %s>notify (dev, DK5EN releases)</option>\n", (au_mode != 2 && au_chan == 1) ? "selected" : "");
+        web_client.printf("\t<option value=\"auto\" disabled %s>auto (coming soon)</option>\n", (au_mode == 2) ? "selected" : "");
         web_client.println("</select>");
-        if (au_mode == 1)
-            web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">(notify mode set on the console -- choosing prod/dev switches to automatic install)</p>");
-        web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">prod/dev install automatically at 03:00-05:00 local; WiFi starts after a reboot if no other network service is on</p>");
+        web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");
         if (!au_sb_ok)
         {
-            // AU-12: auto update is locked until Safeboot is new enough; OTA and auto update never replace Safeboot
+            // AU-12: update is locked until Safeboot is new enough; OTA and auto update never replace Safeboot
             const int au_sb_ver = fwNetSafebootVersion();
             char au_sb_found[16];
             if (au_sb_ver >= 1)
@@ -3898,36 +4020,6 @@ void sub_page_info()
     _create_meshcom_subheader("Node Information");
     web_client.println("<div id=\"content_inner\">");
 
-#if defined(ESP32)
-    // AU-09 (#1187): banner while a newer release is known or an image is staged. "Install" starts the
-    // download (--update install), "Apply now" hands over to Safeboot at once (--update apply, reboots).
-    {
-        FwNetStatus au;
-        fwNetGetStatus(au);
-        const bool auNewer = au.availNewer && au.availTag[0] != '\0';
-        const bool auStaged = au.staged && au.stagedTag[0] != '\0';
-        if (auNewer || auStaged)
-        {
-            const char *auTag = auNewer ? au.availTag : au.stagedTag;
-            const bool auSame = auNewer && auStaged && strcmp(au.availTag, au.stagedTag) == 0;
-            web_client.printf("<div class=\"au-banner\" id=\"au_banner\"><b>Firmware %s available</b>", htmlEscape(String(auTag)).c_str());
-            if (auStaged)
-                web_client.printf(" (staged: %s)", htmlEscape(String(au.stagedTag)).c_str());
-            else if (auNewer && !au.installable)
-                web_client.print(" (no installable image for this board)");
-            if (!fwNetSafebootCapable())
-                web_client.print(" -- Safeboot on this node is too old to install updates: update it once via the web flasher");
-            web_client.print("<br>");
-            if (auNewer && au.installable && !auSame && au.state != FWS_BUSY)
-                web_client.println("<button type=\"button\" onclick=\"callfunction('updinstall','');setTimeout(function(){loadPage(cpage,csender,false);},3000);\">Install</button>");
-            if (auStaged)
-                web_client.println("<button type=\"button\" onclick=\"if(confirm('Node will reboot to apply the staged update, are you sure?')){callfunction('updapply','');setTimeout(function(){window.location.reload();},15000);}\">Apply now</button>");
-            if (au.state == FWS_BUSY)
-                web_client.print("update job running ...");
-            web_client.println("</div>");
-        }
-    }
-#endif
 
     web_client.println("<table class=\"table mw-600\">");
     web_client.println("<thead><tr class=\"font-bold\"><td>Item</td><td>Value</td></tr></thead>");
@@ -3954,21 +4046,12 @@ void sub_page_info()
         web_client.print("</td></tr>\n");
     }
 #if defined(ESP32)
-    { // AU-09 (#1187): auto update state; "Check now" runs --update check, the result shows on the next reload
-        FwNetStatus au;
-        fwNetGetStatus(au);
-        // combined mode as on the setup page: off / prod / dev (automatic install); notify (console only) + channel
+    { // AU web GUI: the fixed lines come from here, the message and the action button are filled by the page JS from GET /austatus
         const char *auChan = meshcom_settings.node_updchan ? "dev" : "prod";
-        web_client.printf("<tr><td>Auto update</td><td>mode %s%s%s<br>env %s, running %s<br>",
-            meshcom_settings.node_autoupd == 0 ? "off" : (meshcom_settings.node_autoupd == 1 ? "notify" : auChan),
-            meshcom_settings.node_autoupd == 1 ? ", channel " : "", meshcom_settings.node_autoupd == 1 ? auChan : "",
+        web_client.printf("<tr id=\"au_tr\"><td>Auto update</td><td id=\"au_row\" data-blepause=\"%d\">mode %s, channel %s<br>env %s, running %s",
+            AU_BLE_PAUSE, meshcom_settings.node_autoupd == 2 ? "auto (notify only)" : "notify", auChan,
             MC_ENV_NAME[0] ? MC_ENV_NAME : "(unknown)", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
-        web_client.printf("available %s (newer %s, installable %s)<br>", au.availTag[0] ? htmlEscape(String(au.availTag)).c_str() : "none",
-            au.availNewer ? "yes" : "no", au.installable ? "yes" : "no");
-        web_client.printf("staged %s<br>last error %s<br>", (au.staged && au.stagedTag[0]) ? htmlEscape(String(au.stagedTag)).c_str() : "none",
-            au.lastErr[0] ? htmlEscape(String(au.lastErr)).c_str() : "none");
-        web_client.printf("%s<button type=\"button\" onclick=\"callfunction('updcheck','');setTimeout(function(){loadPage(cpage,csender,false);},4000);\">Check now</button></td></tr>\n",
-            au.state == FWS_BUSY ? "job running ...<br>" : "");
+        web_client.print("<div id=\"au_msg\"></div><div id=\"au_err\"></div><div id=\"au_hint\"></div><button type=\"button\" id=\"au_btn\" disabled>Check now</button></td></tr>\n");
     }
 #endif
     // WEB-SW: grouped switch overview, one <tr> per group, labels matching
@@ -4499,6 +4582,69 @@ void send_message(String web_header)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
+#if defined(ESP32)
+/**
+ * ###########################################################################################################################
+ * GET /austatus -- state of the firmware update for the Info page row (spec 5.1). Read-only.
+ */
+static void sub_au_status()
+{
+    FwNetStatus au;
+    fwNetGetStatus(au);
+    AuUiIn in;
+    memset(&in, 0, sizeof(in));
+    const char *stn = "idle";
+    if (au.state == FWS_BUSY)
+        stn = "busy";
+    else if (au.state == FWS_DONE_OK)
+        stn = "ok";
+    else if (au.state == FWS_DONE_FAIL)
+        stn = "fail";
+    const char *jobn = "none";
+    if (au.job == FWJ_CHECK)
+        jobn = "check";
+    else if (au.job == FWJ_DOWNLOAD)
+        jobn = "download";
+    else if (au.job == FWJ_STAGELAN)
+        jobn = "stagelan";
+    snprintf(in.st, sizeof(in.st), "%s", stn);
+    snprintf(in.job, sizeof(in.job), "%s", jobn);
+    snprintf(in.run, sizeof(in.run), "%.23s", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
+    snprintf(in.avail, sizeof(in.avail), "%.23s", au.availTag);
+    snprintf(in.staged, sizeof(in.staged), "%.23s", au.staged ? au.stagedTag : "");
+    snprintf(in.err, sizeof(in.err), "%.23s", au.state == FWS_BUSY ? "" : au.lastErr);
+    snprintf(in.mode, sizeof(in.mode), "%s", meshcom_settings.node_autoupd == 2 ? "auto" : "notify"); // never "off" (D1)
+    snprintf(in.chan, sizeof(in.chan), "%s", meshcom_settings.node_updchan ? "dev" : "prod");
+    in.newer = (au.availNewer && au.availTag[0]) ? 1 : 0;
+    in.inst = au.installable ? 1 : 0;
+    // pct: compressed bytes written / the length the running job stages (progLen), only while a download runs
+    const bool dl = au.state == FWS_BUSY && (au.job == FWJ_DOWNLOAD || au.job == FWJ_STAGELAN);
+    if (dl)
+        in.pct = fwProgressPct(au.bytesDone, au.progLen);
+    in.phone = fwNetPhoneHeld() ? 1 : 0; // same expression as the lowheap_phone token
+    in.guard = 0; // BLE guard: W4 (campaign-au-webgui-ux section 7)
+    in.sbok = fwNetSafebootCapable() ? 1 : 0;
+    in.etaS = auEtaS(au.stagedIlen);
+    fwNetHeapNow(&in.ifree, &in.iblk);
+
+    char body[640];
+    size_t n = auStatusJson(in, body, sizeof(body));
+    // "up": seconds since boot, appended outside auStatusJson. The page compares it across the install restart
+    // when the build tag cannot be compared (an image built without MC_BUILD_TAG reports run "local").
+    n = fwJsonAppendUp(body, sizeof(body), n, (uint32_t)(esp_timer_get_time() / 1000000));
+    // "img": first 8 hex of the running image's ELF SHA-256. With run "local" the page counts the install as done
+    // only when it changed: a Safeboot fallback restarts the node too (uptime drops) but keeps the old image.
+    const esp_app_desc_t *d = MC_RUNNING_APP_DESC();
+    if (d != NULL)
+        n = fwJsonAppendImg(body, sizeof(body), n, d->app_elf_sha256, sizeof(d->app_elf_sha256));
+    send_http_header(n ? 200 : 500, RESPONSE_TYPE_JSON);
+    if (n)
+        web_client.println(body);
+    else
+        web_client.println("{\"ok\":false}");
+}
+#endif
+
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -4506,6 +4652,7 @@ void send_message(String web_header)
  */
 void call_function(String web_header)
 {
+    const String full_header = web_header; // the X-MC check below needs the header lines
     web_header = web_header.substring(web_header.indexOf("/callfunction/?") + 15, web_header.indexOf("HTTP/1.1"));
     web_header.trim();
     funCallStruct functionData;
@@ -4519,6 +4666,18 @@ void call_function(String web_header)
     {
         functionData.functionName = decodeURLPercentCoding(web_header);
         functionData.functionParameter = "";
+    }
+
+    // AU web GUI: the update actions need the page's own `X-MC: 1` request header (people yes, foreign web pages no).
+    // Checked on the full header, before anything runs; independent of MC_WEB_GUARD.
+    if (!webGuardCallAllowed(functionData.functionName.c_str(), full_header.c_str(), full_header.length()))
+    {
+        if (bDEBUG)
+            Serial.println("[WEB];guard;upd_no_xmc");
+        web_cors_ok = false;
+        send_http_header(403, RESPONSE_TYPE_JSON);
+        web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+        return;
     }
 
 #if defined(ENABLE_MSGSTORE)
@@ -4567,11 +4726,26 @@ void call_function(String web_header)
  */
 void setparam(String web_header)
 {
+    const String full_header = web_header; // the X-MC check below needs the header lines
 
     web_header = web_header.substring(web_header.indexOf("/setparam/?") + 11, web_header.indexOf(" HTTP/1.1"));
     String param_name = decodeURLPercentCoding(web_header.substring(0, web_header.indexOf("=")));
     String param_value = decodeURLPercentCoding(web_header.substring(web_header.indexOf("=") + 1));
     param_name.toLowerCase();
+
+    // AU web GUI: no setparam name may run an update command for a foreign page (every value lands in a
+    // "--<cmd> %s" line that commandAction() splits on "--"), and aumode/autoupdate/updchan change the update
+    // mode or channel: the upd* gate of call_function() would be a bypass otherwise. Same X-MC proof,
+    // independent of MC_WEB_GUARD.
+    if (!webGuardSetparamAllowed(param_name.c_str(), param_value.c_str(), full_header.c_str(), full_header.length()))
+    {
+        if (bDEBUG)
+            Serial.println("[WEB];guard;setparam_upd_no_xmc");
+        web_cors_ok = false;
+        send_http_header(403, RESPONSE_TYPE_JSON);
+        web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+        return;
+    }
 
     setupStruct setupData;
     setupData.paramName = param_name;

@@ -1373,7 +1373,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate off/notify/auto  firmware auto update (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
+            printdeb("--autoupdate notify/auto  firmware auto update (ESP32; auto only notifies for now)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
@@ -5015,7 +5015,10 @@ void commandAction(char *umsg_text, bool ble)
 
         if(casecmp(_owner_c, (char*)"off") == 0)
         {
-            meshcom_settings.node_autoupd = 0;
+            // D1: off no longer exists; notify is the lowest mode. Nothing is changed or saved.
+            Serial.printf("[ERR];autoupdate;off removed, use notify\n");
+
+            return;
         }
         else if(casecmp(_owner_c, (char*)"notify") == 0)
         {
@@ -5036,13 +5039,13 @@ void commandAction(char *umsg_text, bool ble)
         }
         else
         {
-            Serial.printf("[ERR];autoupdate;must be off, notify or auto\n");
+            Serial.printf("[ERR];autoupdate;must be notify or auto\n");
 
             return;
         }
 
         save_settings();
-        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
+        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : "notify");
         // WiFi STA is started at boot only (esp32_main.cpp gate); AU on a node without
         // any other network service needs one reboot to bring WiFi up.
         if(meshcom_settings.node_autoupd > 0 && !meshcom_settings.node_hasIPaddress)
@@ -5053,7 +5056,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"autoupdate") == 0)
     {
-        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"));
+        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : "notify");
 
         return;
     }
@@ -5121,6 +5124,25 @@ void commandAction(char *umsg_text, bool ble)
             else
                 Serial.printf("[AU];stagelan;started;%s\n", _ltag);
         }
+        // bench only: --update heapgate <bytes> raises the free-heap threshold of the TLS gate (0 = off), RAM only
+        else
+        if(strncmp(_owner_c, "heapgate ", 9) == 0)
+        {
+            const unsigned long _hg = strtoul(_owner_c + 9, NULL, 10);
+            fwNetSetHeapGateOverride((uint32_t)_hg);
+            Serial.printf("[AU];heapgate;set;%lu\n", _hg);
+        }
+        // bench only: --update forget clears fwstage/last, so the tag can be offered again
+        else
+        if(casecmp(_owner_c, (char*)"forget") == 0)
+            Serial.printf("[AU];forget;%s\n", fwNetForgetLast() ? "ok" : "failed");
+        // bench only: --update checknow makes the automatic check path due now
+        else
+        if(casecmp(_owner_c, (char*)"checknow") == 0)
+        {
+            auInstrCheckNow();
+            Serial.printf("[AU];checknow;armed\n");
+        }
         else
 #endif
         if(casecmp(_owner_c, (char*)"check") == 0)
@@ -5150,7 +5172,7 @@ void commandAction(char *umsg_text, bool ble)
             else if(_auNewer)
             {
                 if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
-                    Serial.printf("[AU];install;started;%s;handover;%s\n", _au.availTag, meshcom_settings.node_autoupd == 2 ? "in_window" : "needs_mode_auto");
+                    Serial.printf("[AU];install;started;%s;handover;%s\n", _au.availTag, "manual");
                 else
                     Serial.printf("[ERR];update;install not started (busy or no WiFi)\n");
             }
@@ -5201,7 +5223,7 @@ void commandAction(char *umsg_text, bool ble)
         else if(casecmp(_owner_c, (char*)"status") == 0)
         {
             Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d\n",
-                meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
+                meshcom_settings.node_autoupd == 2 ? "auto" : "notify",
                 meshcom_settings.node_updchan ? "dev" : "prod",
                 _au.availTag[0] ? _au.availTag : "none",
                 _au.availNewer ? 1 : 0,
@@ -7011,7 +7033,7 @@ void commandAction(char *umsg_text, bool ble)
 
             #if defined(ESP32)
             // AU-03 (#1187): firmware auto update mode and channel.
-            printfdeb("...AU: %s chan=%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : (meshcom_settings.node_autoupd == 1 ? "notify" : "off"),
+            printfdeb("...AU: %s chan=%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : "notify",
                 meshcom_settings.node_updchan ? "dev" : "prod");
             #ifndef MC_ENV_NAME
             #define MC_ENV_NAME ""

@@ -9,6 +9,7 @@
 #include <unity.h>
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <fw_update.h>
@@ -906,7 +907,9 @@ static void test_latch_check_survives_for_every_blocker(void)
         for (int h = 0; h < 26 * 24; h++)
         {
             now += HOUR;
-            TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, now));
+            // D16: a phone that stays connected 30 min past the due time asks for a guarded check
+            // (never a plain CHECK); every other blocker stays silent.
+            TEST_ASSERT_EQUAL_UINT8(blocker == 3 && h > 0 ? FW_CHECK_GUARDED : FW_NONE, fwTick(t, in, false, now));
         }
         in = okIn(1);
         TEST_ASSERT_EQUAL_UINT8(FW_CHECK, fwTick(t, in, false, now));
@@ -1074,6 +1077,126 @@ void test_lowheap_does_not_consume_attempt(void)
     TEST_ASSERT_TRUE(fwErrConsumesAttempt("tls"));
     TEST_ASSERT_TRUE(fwErrConsumesAttempt("sha"));
     TEST_ASSERT_TRUE(fwErrConsumesAttempt(nullptr));
+}
+
+// ---- AU web GUI campaign: modes (D1/D2/D14), skip reasons (D9), guarded check (D16), apply reboot
+
+static void test_effective_mode_maps_auto_to_notify(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, fwEffectiveMode(0));
+    TEST_ASSERT_EQUAL_INT(1, fwEffectiveMode(1));
+    TEST_ASSERT_EQUAL_INT(1, fwEffectiveMode(2)); // D14: auto behaves like notify in this build
+    TEST_ASSERT_EQUAL_INT(0, AU_AUTO_INSTALL);    // fixed, #error otherwise
+}
+
+// D14: with the mode the node actually feeds the policy (fwEffectiveMode), a staged image inside the
+// window with every gate open never yields FW_HANDOVER, at any time of the day and any clock value.
+static void test_auto_never_hands_over_through_effective_mode(void)
+{
+    for (uint32_t k = 0; k < 3; k++)
+    {
+        FwTimer t;
+        fwTimerInit(t, 0, 5 + k);
+        fwCheckDone(t, 0);
+        FwPolicyIn in = okIn((uint8_t)fwEffectiveMode(2));
+        in.onBattery = false;
+        for (uint16_t m = 0; m < 1440; m += 7)
+        {
+            in.localMinuteOfDay = m;
+            TEST_ASSERT_TRUE(fwTick(t, in, true, 1000u + k) != FW_HANDOVER);
+        }
+        in.localMinuteOfDay = 4 * 60; // inside the 03:00-05:00 window
+        TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, true, 1000));
+    }
+}
+
+static void test_auto_skip_reason_order_and_none(void)
+{
+    // (autoCompiled, timeValid, phone, battOk, backedOff, attemptAllowed, staged)
+    TEST_ASSERT_EQUAL_STRING("blocked", fwAutoSkipReason(false, true, false, true, false, true, false));
+    TEST_ASSERT_EQUAL_STRING("blocked", fwAutoSkipReason(false, false, true, false, true, false, true)); // blocked wins
+    TEST_ASSERT_NULL(fwAutoSkipReason(true, true, false, true, false, true, false));
+    TEST_ASSERT_EQUAL_STRING("clock", fwAutoSkipReason(true, false, true, false, true, false, true));
+    TEST_ASSERT_EQUAL_STRING("phone", fwAutoSkipReason(true, true, true, false, true, false, true));
+    TEST_ASSERT_EQUAL_STRING("battery", fwAutoSkipReason(true, true, false, false, true, false, true));
+    TEST_ASSERT_EQUAL_STRING("backoff", fwAutoSkipReason(true, true, false, true, true, false, true));
+    TEST_ASSERT_EQUAL_STRING("attempts", fwAutoSkipReason(true, true, false, true, false, false, true));
+    TEST_ASSERT_EQUAL_STRING("staged", fwAutoSkipReason(true, true, false, true, false, true, true));
+}
+
+static void test_lowheap_phone_does_not_consume_attempt(void)
+{
+    TEST_ASSERT_FALSE(fwErrConsumesAttempt("lowheap_phone"));
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("lowheap_phonex")); // exact match only
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt("lowheap_ble_off"));
+}
+
+static void test_guarded_check_after_30min_with_phone(void)
+{
+    FwTimer t;
+    fwTimerInit(t, 0, 7);
+    const uint32_t due = FW_FIRST_CHECK_MS;
+    const uint32_t G = FW_PHONE_GUARD_MS;
+    TEST_ASSERT_EQUAL_UINT32(30u * 60u * 1000u, G);
+    FwPolicyIn in = okIn(1);
+    in.phoneConnected = true;
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due - 1u));
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due));
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due + G - 1u));
+    TEST_ASSERT_EQUAL_UINT8(FW_CHECK_GUARDED, fwTick(t, in, false, due + G));
+    TEST_ASSERT_EQUAL_UINT8(FW_CHECK_GUARDED, fwTick(t, in, false, due + G + 5000u)); // until the check starts
+    // the check started: schedule moves on, the guard state is gone
+    fwCheckDone(t, due + G + 5000u);
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due + G + 6000u));
+    // next period: the 30 minutes count again from the new due time
+    const uint32_t due2 = t.nextCheckMs;
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due2));
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due2 + G - 1u));
+    TEST_ASSERT_EQUAL_UINT8(FW_CHECK_GUARDED, fwTick(t, in, false, due2 + G));
+}
+
+static void test_guarded_check_phone_drop_restarts_and_other_blockers_stay_blocked(void)
+{
+    const uint32_t G = FW_PHONE_GUARD_MS;
+    FwTimer t;
+    fwTimerInit(t, 0, 7);
+    const uint32_t due = FW_FIRST_CHECK_MS;
+    FwPolicyIn in = okIn(1);
+    in.phoneConnected = true;
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due));
+    // phone leaves for one tick: plain CHECK; the guard timer restarts
+    in.phoneConnected = false;
+    TEST_ASSERT_EQUAL_UINT8(FW_CHECK, fwTick(t, in, false, due + G - 1u));
+    in.phoneConnected = true;
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due + G));
+    TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, false, due + 2u * G - 1u));
+    TEST_ASSERT_EQUAL_UINT8(FW_CHECK_GUARDED, fwTick(t, in, false, due + 2u * G));
+    // no WiFi, no clock, mode off: never guarded
+    for (int b = 0; b < 3; b++)
+    {
+        FwTimer u;
+        fwTimerInit(u, 0, 9);
+        FwPolicyIn x = okIn(1);
+        x.phoneConnected = true;
+        if (b == 0)
+            x.wifiUp = false;
+        if (b == 1)
+            x.timeValid = false;
+        if (b == 2)
+            x.mode = 0;
+        for (uint32_t n = 0; n < 6; n++)
+            TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(u, x, false, due + n * G));
+    }
+}
+
+static void test_apply_reboot_due_delay(void)
+{
+    TEST_ASSERT_FALSE(fwApplyRebootDue(false, 1000, 99999));
+    TEST_ASSERT_FALSE(fwApplyRebootDue(true, 1000, 1000));
+    TEST_ASSERT_FALSE(fwApplyRebootDue(true, 1000, 1000 + FW_APPLY_REBOOT_DELAY_MS - 1u));
+    TEST_ASSERT_TRUE(fwApplyRebootDue(true, 1000, 1000 + FW_APPLY_REBOOT_DELAY_MS));
+    TEST_ASSERT_TRUE(fwApplyRebootDue(true, 0xFFFFFF00u, 0xFFFFFF00u + FW_APPLY_REBOOT_DELAY_MS)); // wrap
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(500u, FW_APPLY_REBOOT_DELAY_MS);
 }
 
 static void test_go_handover_ready(void)
@@ -1329,6 +1452,87 @@ static void test_go_tick_old_safeboot_disarms(void)
     TEST_ASSERT_EQUAL_INT(FWGOS_WAIT_BATTERY, fwGoTickStep(t));
 }
 
+// W1 rework items 2/3/6: pure helpers behind the progress percentage, the /austatus uptime key and the
+// busy re-check right before the apply reboot.
+static void test_progress_pct_uses_its_own_length(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, fwProgressPct(0, 0));      // no length yet: never divide
+    TEST_ASSERT_EQUAL_INT(0, fwProgressPct(500, 0));
+    TEST_ASSERT_EQUAL_INT(42, fwProgressPct(420, 1000));
+    TEST_ASSERT_EQUAL_INT(100, fwProgressPct(1000, 1000));
+    TEST_ASSERT_EQUAL_INT(100, fwProgressPct(2000, 1000)); // clamped
+    TEST_ASSERT_EQUAL_INT(99, fwProgressPct(0xFFFFFFFFu - 1u, 0xFFFFFFFFu) );  // 64-bit math, no overflow
+}
+
+static void test_json_append_up(void)
+{
+    char b[64];
+    snprintf(b, sizeof(b), "%s", "{\"st\":\"idle\"}");
+    size_t n = fwJsonAppendUp(b, sizeof(b), strlen(b), 4711u);
+    TEST_ASSERT_EQUAL_STRING("{\"st\":\"idle\",\"up\":4711}", b);
+    TEST_ASSERT_EQUAL_UINT32(strlen(b), n);
+    snprintf(b, sizeof(b), "%s", "{}");
+    n = fwJsonAppendUp(b, sizeof(b), 2, 0u);
+    TEST_ASSERT_EQUAL_STRING("{\"up\":0}", b); // empty object: no leading comma
+    // no room: unchanged, still valid
+    char t[16];
+    snprintf(t, sizeof(t), "%s", "{\"st\":\"idle\"}");
+    n = fwJsonAppendUp(t, sizeof(t), strlen(t), 4711u);
+    TEST_ASSERT_EQUAL_STRING("{\"st\":\"idle\"}", t);
+    TEST_ASSERT_EQUAL_UINT32(strlen(t), n);
+    // not an object / empty: untouched
+    char e[16] = "";
+    TEST_ASSERT_EQUAL_UINT32(0, fwJsonAppendUp(e, sizeof(e), 0, 1u));
+    snprintf(e, sizeof(e), "%s", "abc");
+    TEST_ASSERT_EQUAL_UINT32(3, fwJsonAppendUp(e, sizeof(e), 3, 1u));
+    TEST_ASSERT_EQUAL_STRING("abc", e);
+    snprintf(b, sizeof(b), "%s", "{\"a\":1}");
+    fwJsonAppendUp(b, sizeof(b), strlen(b), 4294967295u);
+    TEST_ASSERT_EQUAL_STRING("{\"a\":1,\"up\":4294967295}", b);
+}
+
+// /austatus "img": first 8 hex of the running image's ELF SHA-256. The page tells a Safeboot fallback (same image,
+// run stays "local", uptime drops) from a new untagged image only by it.
+static void test_json_append_img(void)
+{
+    const uint8_t sha[32] = {0xa1, 0xb2, 0x0c, 0xd4, 0xff, 0xee};
+    char b[64];
+    snprintf(b, sizeof(b), "%s", "{\"st\":\"idle\",\"up\":5}");
+    size_t n = fwJsonAppendImg(b, sizeof(b), strlen(b), sha, sizeof(sha));
+    TEST_ASSERT_EQUAL_STRING("{\"st\":\"idle\",\"up\":5,\"img\":\"a1b20cd4\"}", b);
+    TEST_ASSERT_EQUAL_UINT32(strlen(b), n);
+    snprintf(b, sizeof(b), "%s", "{}");
+    n = fwJsonAppendImg(b, sizeof(b), 2, sha, 4);
+    TEST_ASSERT_EQUAL_STRING("{\"img\":\"a1b20cd4\"}", b); // empty object: no leading comma
+    TEST_ASSERT_EQUAL_UINT32(strlen(b), n);
+    // no id (no description, short or blank hash): key omitted, body untouched
+    const uint8_t zero[32] = {0};
+    snprintf(b, sizeof(b), "%s", "{\"a\":1}");
+    TEST_ASSERT_EQUAL_UINT32(7, fwJsonAppendImg(b, sizeof(b), 7, NULL, 32));
+    TEST_ASSERT_EQUAL_UINT32(7, fwJsonAppendImg(b, sizeof(b), 7, sha, 3));
+    TEST_ASSERT_EQUAL_UINT32(7, fwJsonAppendImg(b, sizeof(b), 7, zero, sizeof(zero)));
+    TEST_ASSERT_EQUAL_STRING("{\"a\":1}", b);
+    // no room: unchanged, still valid (exactly fitting works)
+    char t[25];
+    snprintf(t, sizeof(t), "%s", "{\"a\":1}");
+    TEST_ASSERT_EQUAL_UINT32(7, fwJsonAppendImg(t, 24, 7, sha, 4));
+    TEST_ASSERT_EQUAL_STRING("{\"a\":1}", t);
+    TEST_ASSERT_EQUAL_UINT32(24, fwJsonAppendImg(t, 25, 7, sha, 4));
+    TEST_ASSERT_EQUAL_STRING("{\"a\":1,\"img\":\"a1b20cd4\"}", t);
+    // not an object: untouched
+    char e[16] = "abc";
+    TEST_ASSERT_EQUAL_UINT32(3, fwJsonAppendImg(e, sizeof(e), 3, sha, 4));
+    TEST_ASSERT_EQUAL_UINT32(0, fwJsonAppendImg(NULL, 16, 0, sha, 4));
+}
+
+static void test_apply_reboot_aborts_when_a_job_is_busy(void)
+{
+    TEST_ASSERT_EQUAL_INT(FWAPPLY_WAIT, fwApplyRebootAct(false, false));
+    TEST_ASSERT_EQUAL_INT(FWAPPLY_WAIT, fwApplyRebootAct(false, true));
+    TEST_ASSERT_EQUAL_INT(FWAPPLY_GO, fwApplyRebootAct(true, false));
+    TEST_ASSERT_EQUAL_INT(FWAPPLY_ABORT_BUSY, fwApplyRebootAct(true, true));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1401,6 +1605,17 @@ int main(int, char **)
     RUN_TEST(test_heap_gate_psram_tls);
     RUN_TEST(test_calloc_size_overflow);
     RUN_TEST(test_lowheap_does_not_consume_attempt);
+    RUN_TEST(test_effective_mode_maps_auto_to_notify);
+    RUN_TEST(test_auto_never_hands_over_through_effective_mode);
+    RUN_TEST(test_auto_skip_reason_order_and_none);
+    RUN_TEST(test_lowheap_phone_does_not_consume_attempt);
+    RUN_TEST(test_guarded_check_after_30min_with_phone);
+    RUN_TEST(test_guarded_check_phone_drop_restarts_and_other_blockers_stay_blocked);
+    RUN_TEST(test_apply_reboot_due_delay);
+    RUN_TEST(test_progress_pct_uses_its_own_length);
+    RUN_TEST(test_json_append_up);
+    RUN_TEST(test_json_append_img);
+    RUN_TEST(test_apply_reboot_aborts_when_a_job_is_busy);
     RUN_TEST(test_go_decide_started);
     RUN_TEST(test_go_decide_busy_wins_over_everything);
     RUN_TEST(test_go_decide_staged_tag_wins);

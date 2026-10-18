@@ -810,6 +810,38 @@ static void test_import_without_autoupd_updchan_keeps_current_values(void)
     }
 }
 
+/* D1: an imported node_autoupd of 0 (export of an older firmware, "off") is still inside the schema
+ * range 0..2 (it doubles as the nRF52 load clamp) and imports as 0; on ESP32 the next boot maps it to
+ * notify in sanitize_loaded_settings() (test_esp32_flash_lifecycle). */
+static void test_import_autoupd_zero_is_accepted(void)
+{
+    char fw[24];
+    snprintf(fw, sizeof(fw), "%s%s", SOURCE_VERSION, SOURCE_VERSION_SUB);
+
+    char head[128];
+    snprintf(head, sizeof(head), "MC-CFG-1\nlayout=%d\nfw=%s\nhw=%d\n",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE);
+    std::string canonical = head;
+    canonical += "node_call=TEST-1\nnode_autoupd=0\n";
+
+    char crc[16];
+    snprintf(crc, sizeof(crc), "%08x",
+             (unsigned int)crc32_buf(canonical.data(), canonical.size()));
+
+    char doc[512];
+    snprintf(doc, sizeof(doc),
+             "{\"meshcom_config\":{\"layout\":%d,\"fw\":\"%s\",\"hw\":%d,"
+             "\"settings\":{\"node_call\":\"TEST-1\",\"node_autoupd\":\"0\"},"
+             "\"crc32\":\"%s\"}}",
+             (int)FLASH_STRUCT_VERSION, fw, BOARD_HARDWARE, crc);
+
+    wipe_settings();
+    meshcom_settings.node_autoupd = 2;
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(std::string(doc)));
+    TEST_ASSERT_EQUAL_STRING("TEST-1", meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_autoupd);
+}
+
 /* Zu langer String fuer sein Zielfeld: dieselbe Abweisung, kein Ueberlauf. */
 static void test_oversized_string_is_refused(void)
 {
@@ -890,6 +922,7 @@ int main(int, char **)
     RUN_TEST(test_import_without_node_rmstrict_keeps_current_value);
     RUN_TEST(test_autoupd_updchan_out_of_range_is_refused);
     RUN_TEST(test_import_without_autoupd_updchan_keeps_current_values);
+    RUN_TEST(test_import_autoupd_zero_is_accepted);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);
     RUN_TEST(test_empty_and_oversized_input_is_refused);

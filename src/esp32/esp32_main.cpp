@@ -36,6 +36,7 @@ SPIClass ethSPI(FSPI);
 #include "charge_led_mode.h"
 #include "esp32_flash.h"
 #include "fw_update.h"       // AU-05 (#1187): update policy (fwTick and friends)
+#include "wifi_start_gate.h" // D15: WiFi start rule for the auto update
 #include "fw_update_net.h"   // AU-05: CHECK / DOWNLOAD worker (own task)
 #include "rm_au_go.h"        // remote "upd go" state (rm_au_esp32.cpp)
 #include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the boot demotion
@@ -2240,8 +2241,9 @@ void esp32setup()
 
     ///////////////////////////////////////////////////////
     // WIFI
-    // AU-05 (#1187): the firmware auto update needs the STA link on its own, independent of the gateway flag
-    if(bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE || meshcom_settings.node_autoupd > 0)
+    // AU-05 (#1187): the firmware auto update needs the STA link on its own, independent of the gateway flag.
+    // D15: for AU alone only with an SSID set and not in AP mode (wifi_start_gate.h)
+    if(wifiStartWanted(bGATEWAY, bEXTUDP, bWEBSERVER, bNETCONSOLE, meshcom_settings.node_autoupd, bWIFIAP, meshcom_settings.node_ssid))
     {
         bAllStarted=false;
 
@@ -2412,7 +2414,33 @@ static bool s_auBackoff = false;
 static bool s_auSawBusy = false;        // a job was observed running and its result is not consumed yet
 static char s_auNotifiedTag[24] = "";   // [AU];notify printed for this tag
 static char s_auHandoverTag[24] = "";   // [AU];handover printed for this tag
+#if AU_AUTO_INSTALL
 static bool s_auBlockedPrinted = false; // [AU];handover;blocked;old_safeboot printed this boot
+#endif
+static bool s_auSkipLogged = false;     // D9: [AU];auto;skip / blocked printed for this check
+static bool s_auGuardLogged = false;    // D16: [AU];bleguard;pending printed for this check
+#if INSTRUMENT_ENABLED
+// bench only (--update checknow): make the automatic check due now; the usual gates (WiFi, clock, phone) still apply
+void auInstrCheckNow(void)
+{
+    s_auTimer.nextCheckMs = millis();
+}
+#endif
+// auRequestApplyReboot(): flag + request time; auTick performs the reboot >= 500 ms later
+static volatile bool s_auApplyRebootReq = false;
+static volatile uint32_t s_auApplyRebootAtMs = 0;
+
+void auRequestApplyReboot(void)
+{
+    s_auApplyRebootAtMs = millis();   // time first, flag second: the loop reads them in the other order
+    s_auApplyRebootReq = true;
+}
+
+// fwNetStart() refuses new jobs while the requested reboot is still waiting for its 500 ms.
+bool auApplyRebootPending(void)
+{
+    return s_auApplyRebootReq;
+}
 
 static bool auTagSame(const char *a, const char *b)
 {
@@ -2467,6 +2495,30 @@ static bool auHandoverRecord(const FwStageRecord &rec)
 static void auTick(void)
 {
     const uint32_t now = millis();
+
+    // web "Install now": the answer is out, the node reboots into Safeboot (not throttled to 1 Hz)
+    if(fwApplyRebootDue(s_auApplyRebootReq, s_auApplyRebootAtMs, now))
+    {
+        s_auApplyRebootReq = false;
+        // a console / RM job may have started inside the 500 ms window (fwNetStart refuses new ones since the
+        // request, this catches one that slipped in before it): do not reboot under a running job
+        FwNetStatus auNow;
+        fwNetGetStatus(auNow);
+        if(fwApplyRebootAct(true, auNow.state == FWS_BUSY) == FWAPPLY_ABORT_BUSY)
+        {
+            fwNetUnmarkHandover();
+            Serial.printf("[AU];apply;abort;busy\n");
+            return;
+        }
+        Serial.printf("[AU];apply;reboot\n");
+        if(!auRebootToSafeboot())   // returns only without a usable Safeboot partition
+        {
+            fwNetUnmarkHandover();
+            Serial.printf("[ERR];update;no safeboot partition\n");
+        }
+        return;
+    }
+
     if((uint32_t)(now - s_auLastTickMs) < 1000u)
         return;
     s_auLastTickMs = now;
@@ -2500,7 +2552,8 @@ static void auTick(void)
         return;
 
     FwPolicyIn in;
-    in.mode = (uint8_t)(meshcom_settings.node_autoupd < 0 ? 0 : (meshcom_settings.node_autoupd > 2 ? 2 : meshcom_settings.node_autoupd));
+    const int storedMode = meshcom_settings.node_autoupd < 0 ? 0 : (meshcom_settings.node_autoupd > 2 ? 2 : meshcom_settings.node_autoupd);
+    in.mode = (uint8_t)fwEffectiveMode(storedMode);   // D14: a stored 2 (auto) acts as 1 (notify)
     in.wifiUp = wifiUp;
     // clock valid for TLS and phone state: one definition, shared with rmAuGo (rm_au_esp32.cpp)
     rmAuAutoGates(&in.timeValid, &in.phoneConnected);
@@ -2617,6 +2670,7 @@ static void auTick(void)
 
     FwAction act = fwTick(s_auTimer, in, fwNetStagedPending(), now);
 
+#if AU_AUTO_INSTALL
     if(act == FW_HANDOVER)
     {
         // AU-08: reboot into Safeboot, which applies the staged image. The record is re-read and
@@ -2642,31 +2696,56 @@ static void auTick(void)
         auHandoverRecord(rec);
         return;
     }
+#endif   // AU_AUTO_INSTALL
 
-    if(act == FW_CHECK && !auBackedOff(now))
+    if((act == FW_CHECK || act == FW_CHECK_GUARDED) && !auBackedOff(now))
     {
+        // D16: the phone stayed connected 30 min past the due time. TODO(W4): force the BLE pause
+        // (BLE guard) here before the job starts; until then the check runs as it always did.
+        if(act == FW_CHECK_GUARDED && !s_auGuardLogged)
+        {
+            s_auGuardLogged = true;
+            Serial.printf("[AU];bleguard;pending\n");
+        }
         if(fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
         {
             fwCheckDone(s_auTimer, now);
             s_auSawBusy = true;
+            s_auSkipLogged = false;
+            s_auGuardLogged = false;
         }
         else
             auBackOff(now);
         return;
     }
 
-    // mode 2: a CHECK found a newer, installable release (matching .autoupdate asset and digest) that is
-    // not staged yet -> DOWNLOAD (AU-D17: battery floor). A release without the asset must not
+    // stored mode 2 (auto): a CHECK found a newer, installable release (matching .autoupdate asset and digest)
+    // that is not staged yet -> DOWNLOAD (AU-D17: battery floor). A release without the asset must not
     // consume the 3 attempts of AU-D5. Mode 1 never gets here: it only prints the notify line.
-    if(in.mode == 2 && st.availNewer && st.installable && st.availTag[0] && wifiUp && in.timeValid && !in.phoneConnected && battOk &&
-       !(st.staged && auTagSame(st.stagedTag, st.availTag)) &&
-       !auBackedOff(now) &&
-       fwAttemptAllowed(s_auTimer, st.availTag, now))
+    // D14: the automatic download is not compiled (AU_AUTO_INSTALL 0); where it would be due, the node says
+    // why it does not start (D9), once per check.
+    if(storedMode == 2 && st.availNewer && st.installable && st.availTag[0] && wifiUp)
     {
-        if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
-            s_auSawBusy = true;
-        else
-            auBackOff(now);
+        const bool alreadyStaged = st.staged && auTagSame(st.stagedTag, st.availTag);
+        const char *skip = fwAutoSkipReason(AU_AUTO_INSTALL != 0, in.timeValid, in.phoneConnected, battOk,
+                                            auBackedOff(now), fwAttemptAllowed(s_auTimer, st.availTag, now), alreadyStaged);
+        if(skip == nullptr)
+        {
+#if AU_AUTO_INSTALL
+            if(fwNetStart(FWJ_DOWNLOAD, (uint8_t)meshcom_settings.node_updchan))
+                s_auSawBusy = true;
+            else
+                auBackOff(now);
+#endif   // AU_AUTO_INSTALL
+        }
+        else if(!s_auSkipLogged)
+        {
+            s_auSkipLogged = true;
+            // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
+            Serial.printf("[AU];auto;skip;%s\n", skip);
+            if(!AU_AUTO_INSTALL)
+                Serial.printf("[AU];auto;blocked;notify only\n");
+        }
     }
 }
 

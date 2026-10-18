@@ -56,6 +56,38 @@ static void test_sta_modus_none_gross_geschrieben_ist_eine_ssid(void)
     TEST_ASSERT_FALSE(wifiSsidMissingBlocksStart(false, "None"));
 }
 
+// D15 (AU web GUI): Wahrheitstabelle autoupd x AP-Modus x SSID.
+static void test_au_wahrheitstabelle(void)
+{
+    const char *ssids[] = {NULL, "", "none", "MyWLAN"};
+    const bool ssidSet[] = {false, false, false, true};
+    for(int au = 0; au <= 2; au++)
+        for(int ap = 0; ap <= 1; ap++)
+            for(int i = 0; i < 4; i++)
+            {
+                const bool want = au > 0 && !ap && ssidSet[i];
+                TEST_ASSERT_EQUAL_MESSAGE(want, wifiAutoUpdateWantsStart(au, ap != 0, ssids[i]),
+                                          ssids[i] ? ssids[i] : "(null)");
+                // AU allein entscheidet, wenn kein anderer Dienst WiFi will
+                TEST_ASSERT_EQUAL(want, wifiStartWanted(false, false, false, false, au, ap != 0, ssids[i]));
+            }
+}
+
+static void test_au_negative_autoupd_startet_nicht(void)
+{
+    TEST_ASSERT_FALSE(wifiAutoUpdateWantsStart(-1, false, "MyWLAN"));
+}
+
+static void test_andere_dienste_starten_wifi_unabhaengig_von_au(void)
+{
+    // Gateway, Ext-UDP, Web, Net-Konsole: wie bisher, auch ohne SSID / im AP-Modus / mit AU 0
+    TEST_ASSERT_TRUE(wifiStartWanted(true, false, false, false, 0, false, NULL));
+    TEST_ASSERT_TRUE(wifiStartWanted(false, true, false, false, 0, true, "none"));
+    TEST_ASSERT_TRUE(wifiStartWanted(false, false, true, false, 1, true, ""));
+    TEST_ASSERT_TRUE(wifiStartWanted(false, false, false, true, 0, false, "MyWLAN"));
+    TEST_ASSERT_FALSE(wifiStartWanted(false, false, false, false, 0, false, "MyWLAN"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -68,6 +100,9 @@ int main(int, char **)
     RUN_TEST(test_sta_modus_null_ssid_blockiert);
     RUN_TEST(test_sta_modus_gesetzte_ssid_blockiert_nicht);
     RUN_TEST(test_sta_modus_none_gross_geschrieben_ist_eine_ssid);
+    RUN_TEST(test_au_wahrheitstabelle);
+    RUN_TEST(test_au_negative_autoupd_startet_nicht);
+    RUN_TEST(test_andere_dienste_starten_wifi_unabhaengig_von_au);
 
     return UNITY_END();
 }

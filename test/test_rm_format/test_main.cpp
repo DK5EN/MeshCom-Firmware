@@ -499,7 +499,7 @@ static void test_net_upd()
     memset(&st, 0, sizeof(st));
     st.supported = true;
     st.ckMin = -1;
-    expectStr("m=off c=prod n=0 a=- st=- b=0 g=0 ck=- e=-", rmFmtUpd(g_buf, sizeof(g_buf), st));
+    expectStr("m=notify c=prod n=0 a=- st=- b=0 g=0 ck=- e=-", rmFmtUpd(g_buf, sizeof(g_buf), st));
     st.mode = 2;
     st.chan = 1;
     st.newer = true;

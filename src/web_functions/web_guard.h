@@ -421,6 +421,10 @@ inline bool webGuardCorsAllowed(const char *path, bool isPost = false)
         size_t n = strlen(path);
         if (webguard_detail::contains(path, n, "/config") || webguard_detail::contains(path, n, "/rm"))
             return false;
+#if defined(ESP32) || defined(NATIVE_BUILD) // AU status exists on ESP32 only (keeps the string out of the RAK image)
+        if (webguard_detail::contains(path, n, "/austatus")) // node-local, never readable cross-origin
+            return false;
+#endif
     }
     return !webGuardIsStateChanging(path, isPost);
 }
@@ -715,6 +719,121 @@ inline WebGuardVerdict webGuardCheck(const char *header, size_t len, const char 
             return WG_CROSS_SITE;
     }
     return WG_OK;
+}
+
+// AU web GUI: every /callfunction "upd*" action (updcheck, updinstall, updapply) needs the request header
+// `X-MC: 1` that the node's own page adds to every fetch. A foreign page cannot set it without a CORS
+// preflight the node does not grant, so the install stays open to people (D4) and closed to CSRF.
+// This is independent of MC_WEB_GUARD. True if the header block carries exactly-valid X-MC lines only
+// (at least one, every one with the value "1", none folded). The request line is never read as a header.
+inline bool webGuardHasXmc(const char *header, size_t len)
+{
+    using namespace webguard_detail;
+    if (header == NULL)
+        return false;
+    size_t pos = 0;
+    while (pos < len && header[pos] != '\n')
+        pos++;
+    pos = pos < len ? pos + 1 : len;
+    int count = 0;
+    bool bad = false;
+    int last = 0; // 1 = previous line was X-MC
+    while (pos < len)
+    {
+        size_t e = pos;
+        while (e < len && header[e] != '\n')
+            e++;
+        bool terminated = e < len;
+        if (!terminated && len >= (size_t)WEB_GUARD_HEADER_MAX)
+            break; // cut mid-line by the server's window: judge nothing from it
+        size_t lineEnd = e;
+        if (lineEnd > pos && header[lineEnd - 1] == '\r')
+            lineEnd--;
+        Span line = mk(header + pos, lineEnd - pos);
+        pos = terminated ? e + 1 : len;
+        if (line.n == 0)
+            break;
+        if (isWs(line.p[0]))
+        {
+            if (last == 1)
+                bad = true;
+            continue;
+        }
+        size_t colon = line.n;
+        for (size_t i = 0; i < line.n; i++)
+            if (line.p[i] == ':')
+            {
+                colon = i;
+                break;
+            }
+        last = 0;
+        if (colon == line.n)
+            continue;
+        if (ieq(mk(line.p, colon), "x-mc"))
+        {
+            Span val = trim(mk(line.p + colon + 1, line.n - colon - 1));
+            count++;
+            if (!(val.n == 1 && val.p[0] == '1'))
+                bad = true;
+            last = 1;
+        }
+    }
+    return count > 0 && !bad;
+}
+
+// True for the update actions of /callfunction (name already percent-decoded).
+inline bool webGuardIsUpdAction(const char *fn) { return fn != NULL && strncmp(fn, "upd", 3) == 0; }
+
+// The decision call_function() makes: update actions need X-MC, everything else is unchanged.
+inline bool webGuardCallAllowed(const char *fn, const char *header, size_t len)
+{
+    return !webGuardIsUpdAction(fn) || webGuardHasXmc(header, len);
+}
+
+// /setparam manualcommand runs a whole command line through commandAction(), which also chains several
+// "--x --y" commands. The update commands (--update, --updchan, --autoupdate, --ota-update) inside it need X-MC
+// exactly like the /callfunction upd* actions, or a foreign page could fire --update install/apply through
+// the unguarded /setparam. True if the text carries such a command anywhere (case-insensitive; "&&" is the
+// web alias of "--").
+inline bool webGuardHasUpdCommand(const char *text)
+{
+    using namespace webguard_detail;
+    if (text == NULL)
+        return false;
+    static const char *const kTok[] = {"upd", "autoupd", "ota-update"};
+    for (size_t i = 0; text[i] != 0; i++)
+    {
+        if (!((text[i] == '-' && text[i + 1] == '-') || (text[i] == '&' && text[i + 1] == '&')))
+            continue;
+        for (size_t t = 0; t < sizeof(kTok) / sizeof(kTok[0]); t++)
+        {
+            size_t k = 0;
+            while (kTok[t][k] != 0 && text[i + 2 + k] != 0 && lc(text[i + 2 + k]) == kTok[t][k])
+                k++;
+            if (kTok[t][k] == 0)
+                return true;
+        }
+    }
+    return false;
+}
+
+// The /setparam names that set the update mode or channel (aumode, autoupdate, updchan): they do what the
+// X-MC-gated console commands --autoupdate / --updchan do (name already lower-cased, exact match).
+inline bool webGuardIsUpdParam(const char *name)
+{
+    return name != NULL && (strcmp(name, "aumode") == 0 || strcmp(name, "autoupdate") == 0 || strcmp(name, "updchan") == 0);
+}
+
+// The decision setparam() makes (name already lower-cased, value percent-decoded). X-MC is needed for
+// - the update names (webGuardIsUpdParam), and
+// - an update command in the value of ANY name: every setparam branch pastes the value into "--<cmd> %s" and
+//   commandAction() splits on each "--", so setcall=X%20--update%20install runs --update install too.
+// Everything else is unchanged.
+inline bool webGuardSetparamAllowed(const char *name, const char *value, const char *header, size_t len)
+{
+    if (!webGuardIsUpdParam(name) && !webGuardHasUpdCommand(value))
+        return true;
+    return webGuardHasXmc(header, len);
 }
 
 #endif // WEB_GUARD_H

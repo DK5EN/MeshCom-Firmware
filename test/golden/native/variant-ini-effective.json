@@ -2359,6 +2359,7 @@
    "test_printfdeb_format",
    "test_mask_secret",
    "test_wifi_start_gate",
+   "test_au_ui_state",
    "test_net_console_gate",
    "test_ble_json_frame",
    "test_settings_sanitize",

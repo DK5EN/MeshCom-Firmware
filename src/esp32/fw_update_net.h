@@ -159,7 +159,16 @@ struct FwNetStatus
     bool staged;           // a valid FWS2 record exists in NVS
     char lastErr[48];      // short reason of the last failed job, "" otherwise
     uint32_t lastCheckEpoch; // time() at the last successful CHECK, 0 if none this boot
-    uint32_t bytesDone;    // DOWNLOAD progress (compressed bytes written)
+    uint32_t bytesDone;    // DOWNLOAD / STAGELAN progress (compressed bytes written); reset to 0 when a
+                           // job starts and NOT cleared at its end (it then equals progLen on success). Only
+                           // meaningful together with state == FWS_BUSY and job DOWNLOAD / STAGELAN: the
+                           // caller derives pct from busy-only (progLen > 0), never from a finished job.
+    uint32_t progLen;      // DOWNLOAD / STAGELAN progress denominator: the compressed length the running job
+                           // stages (CHECK's zlen for DOWNLOAD, Content-Length for STAGELAN). 0 until the
+                           // job has prepared the stage. Separate from zlen, which DOWNLOAD reads as the
+                           // expected asset size. pct = fwProgressPct(bytesDone, progLen), busy-only.
+    uint32_t stagedIlen;   // inflated image length of the staged FWS2 record (set at staging and when the
+                           // record is loaded from NVS), 0 if nothing is staged. Not the last CHECK's ilen.
 };
 
 // False if a job runs, WiFi is not connected, or the task could not be created.
@@ -182,6 +191,29 @@ bool auRebootToSafeboot(void);
 
 // Thread-safe snapshot (portMUX). Never blocks on the network.
 void fwNetGetStatus(FwNetStatus &out);
+
+// True while a phone holds the BLE link (connected or app ready): the same expression esp32BlePause()
+// declines on and the lowheap_phone token keys on, so /austatus "phone" and the job agree.
+bool fwNetPhoneHeld(void);
+
+// Diagnostic heap numbers for /austatus (never a gate). Read-only, non-logging, takes no lock and
+// does not install the TLS allocator. Same sources as the pre-TLS gate: *ifree = free internal
+// 8-bit heap, *iblk = its largest free block. On a PSRAM-TLS build (BOARD_HAS_PSRAM and PSRAM
+// found: mbedTLS runs on PSRAM) *iblk is instead the largest free PSRAM block, because that is
+// the block the gate checks there. Either pointer may be null.
+void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk);
+
+// INSTRUMENT_ENABLED builds only (bench hooks of `--update heapgate|forget|checknow`; declared
+// unconditionally, defined only with INSTRUMENT_ENABLED, no symbol and no string in a release image).
+//   fwNetSetHeapGateOverride  RAM only: raises the free-heap threshold of the pre-TLS gate to at
+//                             least `bytes` (classic: total free; PSRAM-TLS: internal free), so a
+//                             CHECK / DOWNLOAD is refused with lowheap. 0 = back to the build value.
+//   fwNetForgetLast           removes NVS "fwstage"/"last" (the reinstall guard), so the tag can
+//                             be offered again. True if the namespace opened.
+// `--update checknow` needs no function here: the automatic check path is the FwTimer in
+// esp32_main.cpp (fwTick), so the console hook sets that timer's nextCheckMs to "now".
+void fwNetSetHeapGateOverride(uint32_t bytes);
+bool fwNetForgetLast(void);
 
 // A valid FWS2 record exists in NVS. Cached (read once, refreshed by DOWNLOAD),
 // cheap enough for every loop pass.

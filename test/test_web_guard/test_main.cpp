@@ -763,6 +763,103 @@ void test_request_applies_wrapper_follows_compile_flag(void)
     TEST_ASSERT_TRUE(webGuardRequestApplies("GET /rmstatus\r\n\r\n", 17, "/"));
 }
 
+// AU web GUI: upd* actions of /callfunction need `X-MC: 1`; other functions are unchanged.
+void test_upd_actions_need_xmc(void)
+{
+    std::string with = req("GET /callfunction/?updapply= HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /callfunction/?updapply= HTTP/1.1", {"Host: 192.168.68.71", "Accept: */*"});
+    std::string badval = req("GET /callfunction/?updapply= HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 0"});
+    std::string folded = req("GET /callfunction/?updapply= HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1", " 2"});
+    std::string lower = req("GET /callfunction/?updcheck= HTTP/1.1", {"Host: 192.168.68.71", "x-mc:1"});
+    std::string intext = req("GET /callfunction/?updcheck=%0d%0aX-MC:%201 HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *fns[] = {"updcheck", "updinstall", "updapply"};
+    for (size_t i = 0; i < 3; i++)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(webGuardCallAllowed(fns[i], with.c_str(), with.size()), fns[i]);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed(fns[i], without.c_str(), without.size()), fns[i]);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed(fns[i], badval.c_str(), badval.size()), fns[i]);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed(fns[i], folded.c_str(), folded.size()), fns[i]);
+    }
+    TEST_ASSERT_TRUE(webGuardCallAllowed("updcheck", lower.c_str(), lower.size()));
+    TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed("updcheck", intext.c_str(), intext.size()), "X-MC text in the query is inert");
+    TEST_ASSERT_TRUE(webGuardCallAllowed("sendpos", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardCallAllowed("reboot", without.c_str(), without.size()));
+    TEST_ASSERT_FALSE(webGuardCallAllowed("updcheck", NULL, 0));
+}
+
+// /austatus is read-only and must not be readable cross-origin: no CORS header for it
+// (web_functions.cpp sets web_cors_ok = false for the route; this pins that the helper agrees for a guarded path).
+void test_austatus_has_no_cors(void)
+{
+    TEST_ASSERT_FALSE(webGuardCorsAllowed("/austatus", false));
+}
+
+// /setparam manualcommand must not bypass the upd* gate: update commands (also chained, any case, "&&" alias)
+// need X-MC; other manualcommand values and other params are untouched.
+void test_setparam_manualcommand_update_needs_xmc(void)
+{
+    std::string with = req("GET /setparam/?manualcommand=--update%20install HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?manualcommand=--update%20install HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *bad[] = {"--update install", "--update apply", "--autoupdate auto", "--ota-update", "&&update install",
+                         "--UPDATE install", "--info --update install", "--updchan dev", "  --update check"};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", bad[i], without.c_str(), without.size()), bad[i]);
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed("manualcommand", bad[i], with.c_str(), with.size()), bad[i]);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", bad[i], NULL, 0), bad[i]);
+    }
+    const char *fine[] = {"--info", "--setcall DK5EN-1", "--sendpos", "--reboot", "", "--mheard"};
+    for (size_t i = 0; i < sizeof(fine) / sizeof(fine[0]); i++)
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed("manualcommand", fine[i], without.c_str(), without.size()), fine[i]);
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("manualcommand", NULL, without.c_str(), without.size()));
+}
+
+// Every /setparam name pastes its value into "--<cmd> %s" and commandAction() splits on each "--": a chained
+// update command in ANY value is the same bypass as in manualcommand (advisor pass 2, finding 1).
+void test_setparam_any_name_update_value_needs_xmc(void)
+{
+    std::string with = req("GET /setparam/?setcall=X%20--update%20install HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?setcall=X%20--update%20install HTTP/1.1", {"Host: 192.168.68.71"});
+    struct NV
+    {
+        const char *name;
+        const char *value;
+    } bad[] = {{"setcall", "X --update install"}, {"atxt", "a --ota-update"}, {"setname", "Max --update apply"},
+               {"txpower", "2 --autoupdate auto"}, {"setvia", "DK5EN-1 &&update install"}, {"tz", "CET-1 --UPDCHAN dev"}};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, without.c_str(), without.size()), bad[i].value);
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, with.c_str(), with.size()), bad[i].value);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, NULL, 0), bad[i].value);
+    }
+    // ordinary values stay open without X-MC (the guard of MC_WEB_GUARD is a separate decision)
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("setcall", "DK5EN-1", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("atxt", "update -- later", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("txpower", "2", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("setcall", NULL, without.c_str(), without.size()));
+}
+
+// aumode / autoupdate / updchan change the update mode and source like the X-MC-gated console commands
+// (advisor pass 2, finding 2). The page's fetch/XHR wrapper adds X-MC to every request.
+void test_setparam_update_names_need_xmc(void)
+{
+    std::string with = req("GET /setparam/?updchan=dev HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?updchan=dev HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *names[] = {"aumode", "autoupdate", "updchan"};
+    const char *values[] = {"dev", "auto", "notify", "prod", ""};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+        for (size_t v = 0; v < sizeof(values) / sizeof(values[0]); v++)
+        {
+            TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], without.c_str(), without.size()), names[i]);
+            TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], with.c_str(), with.size()), names[i]);
+            TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], NULL, 0), names[i]);
+        }
+    TEST_ASSERT_FALSE(webGuardSetparamAllowed("updchan", NULL, without.c_str(), without.size()));
+    // look-alike names are not update names
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("rmstrict", "on", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("updchanx", "dev", without.c_str(), without.size()));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -814,5 +911,10 @@ int main(int, char **)
     RUN_TEST(test_rm_route_classifies_rewritten_header);
     RUN_TEST(test_request_applies_wrapper_follows_compile_flag);
     RUN_TEST(test_rm_route_covers_rm_setparam_keys);
+    RUN_TEST(test_upd_actions_need_xmc);
+    RUN_TEST(test_austatus_has_no_cors);
+    RUN_TEST(test_setparam_manualcommand_update_needs_xmc);
+    RUN_TEST(test_setparam_any_name_update_value_needs_xmc);
+    RUN_TEST(test_setparam_update_names_need_xmc);
     return UNITY_END();
 }
