@@ -443,3 +443,50 @@ W1 deviations from sections 5-10:
 - Image scan needles are the log tags (`[AU];heapgate;`, ...), not bare words (`forget` is an RM page string).
 - Known flake, not ours: `tools/bench/test_ota_abort.py::StallScenarioTest` fails 1 in ~5 runs alone (timing, no safeboot change).
 - Bench recipe: export `MC_BUILD_TAG` in the INSTRUMENT build, otherwise `run` reads `local`.
+
+### W2 bench result (2026-10-18, Chrome only, INSTRUMENT builds of 581f8a0a, tag v4.40a.10.17/.19 via `MC_BUILD_TAG`)
+
+| Run | Node     | Result                                                                                                                                                                                     |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| W2a | DK5EN-1  | A, C (real GitHub check), D (0/10/44 %), D2, E, F (14/50/89 %) all render; staged v4.40a.10.19 via `--update stagelan` -> E -> F -> reload on the new tag with `/austatus` answering       |
+| W2b | DK5EN-1  | select offers notify (prod), notify (dev), `auto (coming soon)` disabled; console `auto` shows greyed + selected, row says "mode auto (notify only)"; web `autoupdate=auto` refused (rc 1) |
+| W2c | DK5EN-14 | C, D 17 %, E, F, then back on the release v4.40a.10.18 (no `/austatus`): page reloaded by itself (after the F-flow fix below)                                                              |
+| W2c | DK5EN-92 | H on every real check (`lowheap_ble_off`, also with net console off, also on the previous commit: pre-existing); stagelan path F -> A works                                                |
+| W2d | DK5EN-1  | corrupt stream: F follows `/ota/state` ("Install failed ..."); the node stays in Safeboot (app invalid, `fallback_in_ms` -1) and needs a Webflasher upload                                 |
+
+Findings, all from hardware:
+
+1. F flow hung at 95 % when the node came back on a firmware without `/austatus` (Latest 10.18 predates this GUI): fixed (HTML scaffold answer counts as "node is back").
+2. A stale remembered click for another tag overlaid "Install failed" on a freshly staged image: fix in flight.
+3. Safeboot `apply_failed` with `app_valid:false` and `fallback_in_ms:-1` stays in Safeboot; the page claimed "returns in 0 s": fix in flight. A failed inflate after the erase destroys the single app slot (no fallback); only failures before the write fall back.
+4. T-Beam: the gate refuses with BLE paused, no phone, console off, on the previous commit too (pause leaves 67-72 KB, gate wants 76000 B). The concept's "80-85 KB paused" does not hold on this build; "Reboot the node and try again" does not help there. W3 measures, W4 shedding addresses it.
+5. Manual check cooldown (60 s) shows "The node did not start the job, try again in a minute" after a second click: works as designed.
+
+### W3 heap measurements (DK5EN-92, T-Beam v1.2, `ttgo_tbeam` INSTRUMENT, 2026-10-18)
+
+Net console (2323) as the log channel; `[AU];heap;<where>;free;..;iblk;..;min;..` lines from the new INSTRUMENT logging
+(`auHeapLine`, sampler in `pumpBody`). Free = internal 8-bit heap at the gate, BLE already paused, no phone. Raw data:
+`tools/bench/runs/harness/au-w3-tbeam-matrix.txt`.
+
+| Config                                  | Gate free (3 runs) | Largest block  | Verdict |
+| --------------------------------------- | ------------------ | -------------- | ------- |
+| M0 base (WiFi, web, gateway, 1 console) | 67.9 / 69.0 / 70.6 | 24.6 - 38.9 KB | refuse  |
+| M3 KISS TCP on                          | 67.6 / 68.5 / 68.5 | 25.6 - 28.7 KB | refuse  |
+| M3b KISS TCP + TX on                    | 66.7 / 67.1 / 68.2 | 32.8 - 34.8 KB | refuse  |
+| M6 gateway off                          | 66.8 / 68.0 / 69.7 | 20.5 - 38.9 KB | refuse  |
+| M5 page polling `/austatus` 1 s         | 66.0 / 66.8 / 66.8 | 21.5 - 31.7 KB | refuse  |
+| M4 two console sessions                 | 59.8 / 66.1 / 66.6 | 28.7 - 34.8 KB | refuse  |
+
+- The gate wants 76000 B free and a 17000 B block: the block is fine, the free heap is 5-10 KB short in every
+  configuration, and it drifts down about 0.1-0.3 KB per check.
+- Cost per service (vs M0): KISS TCP 1-2 KB, KISS TX about 1 KB, page polling 1-2 KB, one extra console session up to
+  8 KB, gateway off no measurable gain. Shedding services cannot close the gap on this board.
+- BLE: up, idle free is about 60 KB; paused 67-72 KB (the pause frees 7-12 KB, not the 23 KB of the concept);
+  after the resume 41-46 KB.
+- TLS peak (gate lowered to 30000 B with `--update heapgate`): the check dips to **9.4-10.1 KB** free (sampler
+  `lowest` 21 KB; the sampler is coarse); the DOWNLOAD (second TLS connection to the asset host) **reboots the node**
+  right after the gate (heap exhaustion). The 76000 B gate is therefore justified; the concept's "80-85 KB paused" and
+  "every update passes" for the T-Beam do not hold on this build. A previous commit (85b0c457) shows the same refusal.
+- Consequence: T-Beam (classic ESP32, no PSRAM) cannot run the TLS update at this RAM level; BACKLOG AU-17. W4 still
+  builds the BLE guard for phones and the shedding steps, which help boards that miss the gate by a few KB.
+- INSTRUMENT `--update heapgate <bytes>` now sets (not only raises) the threshold, for such measurements.

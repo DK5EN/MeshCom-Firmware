@@ -31,6 +31,7 @@
 #include "../fw_update_roots.h"
 #include "../hmac_sha256.h"
 #include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
+#include "../net_console.h"  // Serial -> MSerial: the AU log lines reach the net console too
 #include "../safeboot/safeboot_ver.h" // SafebootVerScan, AU_SAFEBOOT_MIN
 #include "fw_update_net.h"
 
@@ -178,9 +179,11 @@ void auLog(const char *fmt, ...)
         return;
     if ((size_t)n >= sizeof(b))
         n = (int)sizeof(b) - 1;
-    Serial.write((const uint8_t *)b, (size_t)n);
+    b[n] = '\0';
+    Serial.printf("%s", b); // printf, not write(): only printf is mirrored to the net console
 }
 
+#if INSTRUMENT_ENABLED
 void heapMark(const char *when)
 {
     auLog("[AU];heap;%s;free;%u;min;%u;blk;%u;stk;%u;ifree;%u;imin;%u;iblk;%u\n", when,
@@ -191,6 +194,44 @@ void heapMark(const char *when)
           (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 }
+
+// W3 heap measurement (bench only): fixed-format lines, iblk from the same source as fwNetHeapNow().
+uint32_t s_lowFree = 0xFFFFFFFFu; // lowest internal free sampled since the job started
+uint32_t s_sampMs = 0;
+uint32_t s_sampBytes = 0;
+
+void auHeapLine(const char *where, const char *tail, bool withLowest)
+{
+    uint32_t fr = 0, bk = 0;
+    fwNetHeapNow(&fr, &bk);
+    if (fr < s_lowFree)
+        s_lowFree = fr;
+    if (withLowest)
+        auLog("[AU];heap;%s;free;%u;iblk;%u;min;%u;lowest;%u\n", where, (unsigned)fr, (unsigned)bk,
+              (unsigned)esp_get_minimum_free_heap_size(), (unsigned)s_lowFree);
+    else
+        auLog("[AU];heap;%s;free;%u;iblk;%u;min;%u%s\n", where, (unsigned)fr, (unsigned)bk,
+              (unsigned)esp_get_minimum_free_heap_size(), tail);
+}
+
+// Called per received chunk of CHECK and DOWNLOAD: sample every ~1 KB or 250 ms.
+void auHeapSample(uint32_t n)
+{
+    s_sampBytes += n;
+    const uint32_t now = millis();
+    if (s_sampBytes < 1024u && (uint32_t)(now - s_sampMs) < 250u)
+        return;
+    s_sampBytes = 0;
+    s_sampMs = now;
+    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (fr < s_lowFree)
+        s_lowFree = fr;
+}
+#else
+inline void heapMark(const char *) {}
+inline void auHeapLine(const char *, const char *, bool) {}
+inline void auHeapSample(uint32_t) {}
+#endif
 
 // AU-13: the prebuilt arduino-esp32 2.0.14 mbedTLS is built with CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC
 // (caps 0x804), so a handshake needs about 56 KB of INTERNAL RAM. With PSRAM present mbedTLS gets
@@ -443,6 +484,7 @@ const char *pumpBody(WiFiClient &c, Pump &p, bool chunked, int32_t clen, uint32_
             continue;
         }
         last = millis();
+        auHeapSample((uint32_t)n);
         if (!chunked)
         {
             rawTotal += (uint32_t)n;
@@ -540,6 +582,7 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
 // Pre-TLS gate shared by CHECK and DOWNLOAD; logs the numbers on refusal.
 bool heapGateOk()
 {
+    auHeapLine("pregate", "", false);
     const bool ps = tlsAllocInstall();
     const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -547,13 +590,18 @@ bool heapGateOk()
     uint32_t minFree = FWNET_MIN_FREE;
     uint32_t minIFree = FWNET_MIN_IFREE_PSRAM;
 #if INSTRUMENT_ENABLED
-    if (s_gateOver > minFree)
+    if (s_gateOver > 0) // bench: replaces the free-heap thresholds (up or down), so the TLS peak can be measured below the gate
+    {
         minFree = s_gateOver;
-    if (s_gateOver > minIFree)
         minIFree = s_gateOver;
+    }
 #endif
     if (fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree))
+    {
+        auHeapLine("gate", ";ok", false);
         return true;
+    }
+    auHeapLine("gate", ";refuse", false);
     auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u\n", (unsigned)fr, (unsigned)bk,
           (unsigned)pb, (unsigned)ps);
     return false;
@@ -1105,6 +1153,12 @@ const char *runStageLan()
 void fwNetTask(void *)
 {
     s_err[0] = '\0';
+#if INSTRUMENT_ENABLED
+    s_lowFree = 0xFFFFFFFFu;
+    s_sampMs = millis();
+    s_sampBytes = 0;
+#endif
+    auHeapLine("start", "", false);
     heapMark("start");
     allocFailArm();
 #if AU_BLE_PAUSE
@@ -1120,6 +1174,7 @@ void fwNetTask(void *)
                       : (s_argJob == FWJ_STAGELAN) ? runStageLan()
 #endif
                                                    : runDownload();
+    auHeapLine("peak", "", true);
     heapMark("end"); // after every client object is gone
     allocFailMark("end");
 #if AU_BLE_PAUSE

@@ -20,9 +20,9 @@ for env in "$@"; do
         check 1 "off removed, use notify"
         check 0 ">off</option>"
         if [ "$INSTR" = 1 ]; then
-            check 1 "[AU];heapgate;set"; check 1 "[AU];checknow;armed"; check 1 "[AU];forget;"
+            check 1 "[AU];heap;"; check 1 "[AU];heapgate;set"; check 1 "[AU];checknow;armed"; check 1 "[AU];forget;"
         else
-            check 0 "[AU];stagelan;started"; check 0 "[AU];heapgate;"; check 0 "[AU];checknow;"; check 0 "[AU];forget;"
+            check 0 "[AU];heap;"; check 0 "[AU];stagelan;started"; check 0 "[AU];heapgate;"; check 0 "[AU];checknow;"; check 0 "[AU];forget;"
         fi
     fi
     [ "$fail" = 0 ] && echo "ok   $env"

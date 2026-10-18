@@ -1,0 +1,239 @@
+M0 base (console session only, gateway on)|[CONFIG];M0 base (console session only, gateway on)
+M0 base (console session only, gateway on)|[AU];check;started;chan;dev
+M0 base (console session only, gateway on)|[AU];ble;pause;heap;72764;blk;38900
+M0 base (console session only, gateway on)|[AU];heap;pregate;free;70620;iblk;38900;min;39208
+M0 base (console session only, gateway on)|[AU];heap;gate;free;69164;iblk;38900;min;39208;refuse
+M0 base (console session only, gateway on)|[AU];refuse;lowheap;ifree;69164;iblk;38900;pblk;0;psram;0
+M0 base (console session only, gateway on)|[AU];heap;peak;free;69164;iblk;38900;min;39208;lowest;47816
+M0 base (console session only, gateway on)|[AU];heap;end;free;69164;min;39208;blk;38900;stk;9516;ifree;69164;imin;39208;iblk;38900
+M0 base (console session only, gateway on)|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M0 base (console session only, gateway on)|[AU];fail;lowheap_ble_off
+M0 base (console session only, gateway on)|[AU];ble;resume;ok
+M0 base (console session only, gateway on)|[AU];heap;resumed;free;42416;min;36712;blk;36852;stk;9516;ifree;42416;imin;36712;iblk;36852
+M0 base (console session only, gateway on)|[AU];safeboot;ver;2;need;1
+M0 base (console session only, gateway on)|[RESULT];lowheap_ble_off;st;fail;ifree;58700;iblk;36852
+M0 base (console session only, gateway on)|[AU];check;started;chan;dev
+M0 base (console session only, gateway on)|[AU];ble;pause;heap;70924;blk;38900
+M0 base (console session only, gateway on)|[AU];heap;pregate;free;68980;iblk;38900;min;36712
+M0 base (console session only, gateway on)|[AU];heap;gate;free;68972;iblk;38900;min;36712;refuse
+M0 base (console session only, gateway on)|[AU];refuse;lowheap;ifree;67420;iblk;38900;pblk;0;psram;0
+M0 base (console session only, gateway on)|[AU];heap;peak;free;67412;iblk;38900;min;36712;lowest;45748
+M0 base (console session only, gateway on)|[AU];heap;end;free;67412;min;36712;blk;38900;stk;9644;ifree;67412;imin;36712;iblk;38900
+M0 base (console session only, gateway on)|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M0 base (console session only, gateway on)|[AU];fail;lowheap_ble_off
+M0 base (console session only, gateway on)|[AU];ble;resume;ok
+M0 base (console session only, gateway on)|[AU];heap;resumed;free;38516;min;35588;blk;32756;stk;9644;ifree;38516;imin;35588;iblk;32756
+M0 base (console session only, gateway on)|[RESULT];lowheap_ble_off;st;fail;ifree;58700;iblk;36852
+M0 base (console session only, gateway on)|[AU];check;started;chan;dev
+M0 base (console session only, gateway on)|[AU];ble;pause;heap;69492;blk;24564
+M0 base (console session only, gateway on)|[AU];heap;pregate;free;67932;iblk;24564;min;35588
+M0 base (console session only, gateway on)|[AU];heap;gate;free;67932;iblk;24564;min;35588;refuse
+M0 base (console session only, gateway on)|[AU];refuse;lowheap;ifree;67932;iblk;24564;pblk;0;psram;0
+M0 base (console session only, gateway on)|[AU];heap;peak;free;67932;iblk;24564;min;35588;lowest;45688
+M0 base (console session only, gateway on)|[AU];heap;end;free;67932;min;35588;blk;24564;stk;9636;ifree;67932;imin;35588;iblk;24564
+M0 base (console session only, gateway on)|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M0 base (console session only, gateway on)|[AU];fail;lowheap_ble_off
+M0 base (console session only, gateway on)|[AU];ble;resume;ok
+M0 base (console session only, gateway on)|[AU];heap;resumed;free;38008;min;35588;blk;24564;stk;9636;ifree;38008;imin;35588;iblk;24564
+M0 base (console session only, gateway on)|[RESULT];lowheap_ble_off;st;fail;ifree;58668;iblk;36852
+M3 KISS TCP on|[CONFIG];M3 KISS TCP on
+M3 KISS TCP on|[AU];heap;start;free;45544;iblk;25588;min;35588
+M3 KISS TCP on|[AU];heap;start;free;44008;min;35588;blk;25588;stk;10632;ifree;42620;imin;35588;iblk;25588
+M3 KISS TCP on|[AU];ble;pause;heap;69032;blk;25588
+M3 KISS TCP on|[AU];heap;pregate;free;67644;iblk;25588;min;35588
+M3 KISS TCP on|[AU];heap;gate;free;67644;iblk;25588;min;35588;refuse
+M3 KISS TCP on|[AU];refuse;lowheap;ifree;67644;iblk;25588;pblk;0;psram;0
+M3 KISS TCP on|[AU];heap;peak;free;67644;iblk;25588;min;35588;lowest;45544
+M3 KISS TCP on|[AU];heap;end;free;67644;min;35588;blk;25588;stk;9576;ifree;67644;imin;35588;iblk;25588
+M3 KISS TCP on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3 KISS TCP on|[AU];fail;lowheap_ble_off
+M3 KISS TCP on|[AU];ble;resume;ok
+M3 KISS TCP on|[AU];heap;resumed;free;38260;min;33616;blk;25588;stk;9576;ifree;38260;imin;33616;iblk;25588
+M3 KISS TCP on|[RESULT];lowheap_ble_off;st;fail;ifree;58520;iblk;38900
+M3 KISS TCP on|[AU];check;started;chan;dev
+M3 KISS TCP on|[AU];ble;pause;heap;70668;blk;27636
+M3 KISS TCP on|[AU];heap;pregate;free;68548;iblk;27636;min;33616
+M3 KISS TCP on|[AU];heap;gate;free;67004;iblk;27636;min;33616;refuse
+M3 KISS TCP on|[AU];refuse;lowheap;ifree;68592;iblk;27636;pblk;0;psram;0
+M3 KISS TCP on|[AU];heap;peak;free;67004;iblk;27636;min;33616;lowest;45492
+M3 KISS TCP on|[AU];heap;end;free;67004;min;33616;blk;27636;stk;9636;ifree;67004;imin;33616;iblk;27636
+M3 KISS TCP on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3 KISS TCP on|[AU];fail;lowheap_ble_off
+M3 KISS TCP on|[AU];ble;resume;ok
+M3 KISS TCP on|[AU];heap;resumed;free;37804;min;33616;blk;27636;stk;9636;ifree;37804;imin;33616;iblk;27636
+M3 KISS TCP on|[RESULT];lowheap_ble_off;st;fail;ifree;58476;iblk;40948
+M3 KISS TCP on|[AU];check;started;chan;dev
+M3 KISS TCP on|[AU];ble;pause;heap;65928;blk;28660
+M3 KISS TCP on|[AU];heap;pregate;free;68464;iblk;28660;min;33616
+M3 KISS TCP on|[AU];heap;gate;free;67212;iblk;28660;min;33616;refuse
+M3 KISS TCP on|[AU];refuse;lowheap;ifree;67212;iblk;28660;pblk;0;psram;0
+M3 KISS TCP on|[AU];heap;peak;free;67212;iblk;28660;min;33616;lowest;45432
+M3 KISS TCP on|[AU];heap;end;free;67212;min;33616;blk;28660;stk;9644;ifree;67212;imin;33616;iblk;28660
+M3 KISS TCP on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3 KISS TCP on|[AU];fail;lowheap_ble_off
+M3 KISS TCP on|[AU];ble;resume;ok
+M3 KISS TCP on|[AU];heap;resumed;free;37744;min;33616;blk;28660;stk;9644;ifree;37744;imin;33616;iblk;28660
+M3 KISS TCP on|[RESULT];lowheap_ble_off;st;fail;ifree;58396;iblk;45044
+M3b KISS TCP + TX on|[CONFIG];M3b KISS TCP + TX on
+M3b KISS TCP + TX on|[AU];check;started;chan;dev
+M3b KISS TCP + TX on|[AU];ble;pause;heap;70356;blk;32756
+M3b KISS TCP + TX on|[AU];heap;pregate;free;68200;iblk;32756;min;33616
+M3b KISS TCP + TX on|[AU];heap;gate;free;66752;iblk;32756;min;33616;refuse
+M3b KISS TCP + TX on|[AU];refuse;lowheap;ifree;66752;iblk;32756;pblk;0;psram;0
+M3b KISS TCP + TX on|[AU];heap;peak;free;66752;iblk;32756;min;33616;lowest;45360
+M3b KISS TCP + TX on|[AU];heap;end;free;66752;min;33616;blk;32756;stk;9636;ifree;66752;imin;33616;iblk;32756
+M3b KISS TCP + TX on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3b KISS TCP + TX on|[AU];fail;lowheap_ble_off
+M3b KISS TCP + TX on|[AU];ble;resume;ok
+M3b KISS TCP + TX on|[AU];heap;resumed;free;37480;min;33616;blk;31732;stk;9636;ifree;37512;imin;33616;iblk;31732
+M3b KISS TCP + TX on|[RESULT];lowheap_ble_off;st;fail;ifree;58332;iblk;45044
+M3b KISS TCP + TX on|[AU];check;started;chan;dev
+M3b KISS TCP + TX on|[AU];ble;pause;heap;62224;blk;32756
+M3b KISS TCP + TX on|[AU];heap;pregate;free;67116;iblk;32756;min;33616
+M3b KISS TCP + TX on|[AU];heap;gate;free;67116;iblk;32756;min;33616;refuse
+M3b KISS TCP + TX on|[AU];refuse;lowheap;ifree;67116;iblk;32756;pblk;0;psram;0
+M3b KISS TCP + TX on|[AU];heap;peak;free;67116;iblk;32756;min;33616;lowest;45300
+M3b KISS TCP + TX on|[AU];heap;end;free;67116;min;33616;blk;32756;stk;9576;ifree;67116;imin;33616;iblk;32756
+M3b KISS TCP + TX on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3b KISS TCP + TX on|[AU];fail;lowheap_ble_off
+M3b KISS TCP + TX on|[AU];ble;resume;ok
+M3b KISS TCP + TX on|[AU];heap;resumed;free;41376;min;33616;blk;29684;stk;9576;ifree;41376;imin;33616;iblk;29684
+M3b KISS TCP + TX on|[RESULT];lowheap_ble_off;st;fail;ifree;58180;iblk;29684
+M3b KISS TCP + TX on|[AU];heap;start;free;45116;iblk;29684;min;33616
+M3b KISS TCP + TX on|[AU];heap;start;free;41756;min;33616;blk;29684;stk;10632;ifree;41724;imin;33616;iblk;29684
+M3b KISS TCP + TX on|[AU];ble;pause;heap;62208;blk;34804
+M3b KISS TCP + TX on|[AU];heap;pregate;free;66680;iblk;34804;min;33616
+M3b KISS TCP + TX on|[AU];heap;gate;free;66680;iblk;34804;min;33616;refuse
+M3b KISS TCP + TX on|[AU];refuse;lowheap;ifree;66680;iblk;34804;pblk;0;psram;0
+M3b KISS TCP + TX on|[AU];heap;peak;free;66680;iblk;34804;min;33616;lowest;45116
+M3b KISS TCP + TX on|[AU];heap;end;free;66680;min;33616;blk;34804;stk;9640;ifree;66680;imin;33616;iblk;34804
+M3b KISS TCP + TX on|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M3b KISS TCP + TX on|[AU];fail;lowheap_ble_off
+M3b KISS TCP + TX on|[AU];ble;resume;ok
+M3b KISS TCP + TX on|[AU];heap;resumed;free;37224;min;32752;blk;26612;stk;9640;ifree;37224;imin;32752;iblk;26612
+M3b KISS TCP + TX on|[RESULT];lowheap_ble_off;st;fail;ifree;58284;iblk;28660
+M6 gateway off|[CONFIG];M6 gateway off
+M6 gateway off|[AU];heap;start;free;47420;iblk;28660;min;32752
+M6 gateway off|[AU];heap;start;free;45412;min;32752;blk;28660;stk;10624;ifree;45664;imin;32752;iblk;28660
+M6 gateway off|[AU];ble;pause;heap;73996;blk;38900
+M6 gateway off|[AU];heap;pregate;free;72412;iblk;38900;min;32752
+M6 gateway off|[AU];heap;gate;free;72412;iblk;38900;min;32752;refuse
+M6 gateway off|[AU];refuse;lowheap;ifree;72412;iblk;38900;pblk;0;psram;0
+M6 gateway off|[AU];heap;peak;free;72412;iblk;38900;min;32752;lowest;47420
+M6 gateway off|[AU];heap;end;free;72412;min;32752;blk;38900;stk;9632;ifree;72412;imin;32752;iblk;38900
+M6 gateway off|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M6 gateway off|[AU];fail;lowheap_ble_off
+M6 gateway off|[AU];ble;resume;ok
+M6 gateway off|[AU];heap;resumed;free;44004;min;32752;blk;36852;stk;9632;ifree;43768;imin;32752;iblk;36852
+M6 gateway off|[AU];check;started;chan;dev
+M6 gateway off|[AU];ble;pause;heap;63548;blk;36852
+M6 gateway off|[AU];heap;pregate;free;69744;iblk;36852;min;32752
+M6 gateway off|[AU];heap;gate;free;66896;iblk;36852;min;32752;refuse
+M6 gateway off|[AU];refuse;lowheap;ifree;66896;iblk;36852;pblk;0;psram;0
+M6 gateway off|[AU];heap;peak;free;66896;iblk;36852;min;32752;lowest;45128
+M6 gateway off|[AU];heap;end;free;66896;min;32752;blk;36852;stk;9572;ifree;66896;imin;32752;iblk;36852
+M6 gateway off|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M6 gateway off|[AU];fail;lowheap_ble_off
+M6 gateway off|[AU];ble;resume;ok
+M6 gateway off|[AU];heap;resumed;free;37672;min;32752;blk;29684;stk;9572;ifree;37672;imin;32752;iblk;29684
+M6 gateway off|[RESULT];lowheap_ble_off;st;fail;ifree;58132;iblk;30708
+M6 gateway off|[AU];heap;start;free;45112;iblk;30708;min;32752
+M6 gateway off|[AU];heap;start;free;43316;min;32752;blk;30708;stk;10636;ifree;41992;imin;32752;iblk;30708
+M6 gateway off|[AU];ble;pause;heap;61892;blk;29684
+M6 gateway off|[AU];heap;pregate;free;68040;iblk;29684;min;32752
+M6 gateway off|[AU];heap;gate;free;66780;iblk;29684;min;32752;refuse
+M6 gateway off|[AU];refuse;lowheap;ifree;66780;iblk;29684;pblk;0;psram;0
+M6 gateway off|[AU];heap;peak;free;66780;iblk;29684;min;32752;lowest;45112
+M6 gateway off|[AU];heap;end;free;66780;min;32752;blk;29684;stk;9644;ifree;66780;imin;32752;iblk;29684
+M6 gateway off|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M6 gateway off|[AU];fail;lowheap_ble_off
+M6 gateway off|[AU];ble;resume;ok
+M6 gateway off|[AU];heap;resumed;free;37384;min;31328;blk;28660;stk;9644;ifree;37384;imin;31328;iblk;28660
+M6 gateway off|[RESULT];lowheap_ble_off;st;fail;ifree;58016;iblk;32756
+M6 gateway off|[AU];check;started;chan;dev
+M6 gateway off|[AU];ble;pause;heap;68384;blk;20468
+M6 gateway off|[AU];heap;pregate;free;66816;iblk;20468;min;31328
+M6 gateway off|[AU];heap;gate;free;66816;iblk;20468;min;31328;refuse
+M6 gateway off|[AU];refuse;lowheap;ifree;66816;iblk;20468;pblk;0;psram;0
+M6 gateway off|[AU];heap;peak;free;66816;iblk;20468;min;31328;lowest;44988
+M6 gateway off|[AU];heap;end;free;66816;min;31328;blk;20468;stk;9636;ifree;66816;imin;31328;iblk;20468
+M6 gateway off|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M6 gateway off|[AU];fail;lowheap_ble_off
+M6 gateway off|[AU];ble;resume;ok
+M6 gateway off|[AU];heap;resumed;free;37804;min;31328;blk;20468;stk;9636;ifree;37804;imin;31328;iblk;20468
+M6 gateway off|[RESULT];lowheap_ble_off;st;fail;ifree;57984;iblk;32756
+M5 page polling /austatus 1 s|[CONFIG];M5 page polling /austatus 1 s
+M5 page polling /austatus 1 s|[AU];check;started;chan;dev
+M5 page polling /austatus 1 s|[AU];ble;pause;heap;68248;blk;21492
+M5 page polling /austatus 1 s|[AU];heap;pregate;free;66784;iblk;21492;min;31328
+M5 page polling /austatus 1 s|[AU];heap;gate;free;66784;iblk;21492;min;31328;refuse
+M5 page polling /austatus 1 s|[AU];refuse;lowheap;ifree;66784;iblk;21492;pblk;0;psram;0
+M5 page polling /austatus 1 s|[AU];heap;peak;free;66784;iblk;21492;min;31328;lowest;44984
+M5 page polling /austatus 1 s|[AU];heap;end;free;66784;min;31328;blk;21492;stk;9644;ifree;66784;imin;31328;iblk;21492
+M5 page polling /austatus 1 s|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M5 page polling /austatus 1 s|[AU];fail;lowheap_ble_off
+M5 page polling /austatus 1 s|[AU];ble;resume;ok
+M5 page polling /austatus 1 s|[AU];heap;resumed;free;38772;min;31328;blk;21492;stk;9644;ifree;38564;imin;31328;iblk;21492
+M5 page polling /austatus 1 s|[RESULT];lowheap_ble_off;st;fail;ifree;57996;iblk;42996
+M5 page polling /austatus 1 s|[AU];check;started;chan;dev
+M5 page polling /austatus 1 s|[AU];ble;pause;heap;68344;blk;30708
+M5 page polling /austatus 1 s|[AU];heap;pregate;free;66776;iblk;30708;min;31328
+M5 page polling /austatus 1 s|[AU];heap;gate;free;66776;iblk;30708;min;31328;refuse
+M5 page polling /austatus 1 s|[AU];refuse;lowheap;ifree;66776;iblk;30708;pblk;0;psram;0
+M5 page polling /austatus 1 s|[AU];heap;peak;free;66776;iblk;30708;min;31328;lowest;44996
+M5 page polling /austatus 1 s|[AU];heap;end;free;66776;min;31328;blk;30708;stk;9644;ifree;66776;imin;31328;iblk;30708
+M5 page polling /austatus 1 s|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M5 page polling /austatus 1 s|[AU];fail;lowheap_ble_off
+M5 page polling /austatus 1 s|[AU];ble;resume;ok
+M5 page polling /austatus 1 s|[AU];heap;resumed;free;43888;min;31328;blk;27636;stk;9644;ifree;43888;imin;31328;iblk;27636
+M5 page polling /austatus 1 s|[RESULT];lowheap_ble_off;st;fail;ifree;57884;iblk;27636
+M5 page polling /austatus 1 s|[AU];check;started;chan;dev
+M5 page polling /austatus 1 s|[AU];ble;pause;heap;67620;blk;31732
+M5 page polling /austatus 1 s|[AU];heap;pregate;free;66036;iblk;31732;min;31328
+M5 page polling /austatus 1 s|[AU];heap;gate;free;66036;iblk;31732;min;31328;refuse
+M5 page polling /austatus 1 s|[AU];refuse;lowheap;ifree;66036;iblk;31732;pblk;0;psram;0
+M5 page polling /austatus 1 s|[AU];heap;peak;free;66036;iblk;31732;min;31328;lowest;44220
+M5 page polling /austatus 1 s|[AU];heap;end;free;66036;min;31328;blk;31732;stk;9584;ifree;66036;imin;31328;iblk;31732
+M5 page polling /austatus 1 s|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M5 page polling /austatus 1 s|[AU];fail;lowheap_ble_off
+M5 page polling /austatus 1 s|[AU];ble;resume;ok
+M5 page polling /austatus 1 s|[AU];heap;resumed;free;36472;min;31328;blk;28660;stk;9584;ifree;36472;imin;31328;iblk;28660
+M5 page polling /austatus 1 s|[RESULT];lowheap_ble_off;st;fail;ifree;57788;iblk;28660
+M4 second console session|[CONFIG];M4
+M4 second console session|[AU];heap;start;free;44748;iblk;28660;min;31328
+M4 second console session|[AU];heap;start;free;42972;min;31328;blk;28660;stk;10636;ifree;41388;imin;31328;iblk;28660
+M4 second console session|[AU];ble;pause;heap;62144;blk;31732
+M4 second console session|[AU];heap;pregate;free;66616;iblk;31732;min;31328
+M4 second console session|[AU];heap;gate;free;66616;iblk;31732;min;31328;refuse
+M4 second console session|[AU];refuse;lowheap;ifree;66616;iblk;31732;pblk;0;psram;0
+M4 second console session|[AU];heap;peak;free;66616;iblk;31732;min;31328;lowest;44748
+M4 second console session|[AU];heap;end;free;66616;min;31328;blk;31732;stk;9644;ifree;66616;imin;31328;iblk;31732
+M4 second console session|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M4 second console session|[AU];fail;lowheap_ble_off
+M4 second console session|[AU];ble;resume;ok
+M4 second console session|[AU];heap;resumed;free;40816;min;31328;blk;28660;stk;9644;ifree;40816;imin;31328;iblk;28660
+M4 second console session|[RESULT];lowheap_ble_off;st;fail;ifree;57780;iblk;28660
+M4 second console session|[AU];check;started;chan;dev
+M4 second console session|[AU];ble;pause;heap;62996;blk;28660
+M4 second console session|[AU];heap;pregate;free;59760;iblk;28660;min;31328
+M4 second console session|[AU];heap;gate;free;60004;iblk;28660;min;31328;refuse
+M4 second console session|[AU];refuse;lowheap;ifree;60004;iblk;28660;pblk;0;psram;0
+M4 second console session|[AU];heap;peak;free;60004;iblk;28660;min;31328;lowest;44760
+M4 second console session|[AU];heap;end;free;58428;min;31328;blk;28660;stk;9644;ifree;60012;imin;31328;iblk;28660
+M4 second console session|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M4 second console session|[AU];fail;lowheap_ble_off
+M4 second console session|[AU];ble;resume;ok
+M4 second console session|[AU];heap;resumed;free;36708;min;31200;blk;26612;stk;9644;ifree;36708;imin;31200;iblk;26612
+M4 second console session|[RESULT];lowheap_ble_off;st;fail;ifree;57744;iblk;29684
+M4 second console session|[AU];check;started;chan;dev
+M4 second console session|[AU];ble;pause;heap;63420;blk;34804
+M4 second console session|[AU];heap;pregate;free;66116;iblk;34804;min;31200
+M4 second console session|[AU];heap;gate;free;66116;iblk;34804;min;31200;refuse
+M4 second console session|[AU];refuse;lowheap;ifree;66116;iblk;34804;pblk;0;psram;0
+M4 second console session|[AU];heap;peak;free;66116;iblk;34804;min;31200;lowest;44576
+M4 second console session|[AU];heap;end;free;66116;min;31200;blk;34804;stk;9640;ifree;66116;imin;31200;iblk;34804
+M4 second console session|[AU];alloc;end;fails;0;first;0;caps;0;max;0;fn;-
+M4 second console session|[AU];fail;lowheap_ble_off
+M4 second console session|[AU];ble;resume;ok
+M4 second console session|[AU];heap;resumed;free;40380;min;31200;blk;29684;stk;9640;ifree;40380;imin;31200;iblk;29684
+M4 second console session|[RESULT];lowheap_ble_off;st;fail;ifree;57732;iblk;29684

@@ -108,6 +108,7 @@ function mkClock() {
   return T;
 }
 
+const SCAFFOLD = '<html><script>var cpage="info";</script><div id="content_layer">Info</div></html>';
 function mkNode(status) {
   const n = {
     status, ota: null, down: false, notJson: false, st404: false, st500: false, apply: 'ok', check: 'ok', calls: [], statusCalls: 0,
@@ -119,10 +120,11 @@ function mkNode(status) {
         if (n.down) return { reject: true };
         if (n.st404) return { status: 404, text: true };
         if (n.st500) return { status: 500, body: '{"ok":false}' };
-        if (n.notJson) return { text: true };
+        if (n.scaffold) return { html: SCAFFOLD };
+        if (n.notJson) return { text: true, html: '<html>Safeboot</html>' };
         return { body: n.status };
       }
-      if (u === '/ota/state') return n.ota ? { body: JSON.stringify(n.ota) } : { reject: true };
+      if (u === '/ota/state') return n.otaScaffold ? { html: SCAFFOLD } : n.ota ? { body: JSON.stringify(n.ota) } : { reject: true };
       if (u.indexOf('/callfunction/?updapply') === 0) return { body: JSON.stringify({ updapply: n.apply }), status: n.apply === 'ok' ? 200 : 422 };
       if (u.indexOf('/callfunction/?updcheck') === 0) return { body: JSON.stringify({ updcheck: n.check }) };
       if (u.indexOf('/callfunction/?updinstall') === 0) return { body: JSON.stringify({ updinstall: 'ok' }) };
@@ -156,7 +158,7 @@ async function mkPage(node, opts) {
         const r = node.handle(String(url));
         if (r.reject) return Promise.reject(new TypeError('Failed to fetch'));
         const status = r.status || 200;
-        return Promise.resolve({ status, ok: status < 400, json: () => (r.body !== undefined ? Promise.resolve(JSON.parse(r.body)) : Promise.reject(new SyntaxError('Unexpected token <'))) });
+        return Promise.resolve({ status, ok: status < 400, text: () => Promise.resolve(r.html !== undefined ? r.html : (r.body || '')), json: () => (r.body !== undefined ? Promise.resolve(JSON.parse(r.body)) : Promise.reject(new SyntaxError('Unexpected token <'))) });
       };
       w.confirm = () => { st.confirm++; throw new Error('confirm() must not be used'); };
       w.alert = () => { throw new Error('alert() must not be used'); };
@@ -363,7 +365,7 @@ async function mkPage(node, opts) {
     const P = await mkPage(node);
     P.w.sessionStorage.setItem('auF:dk5en-1.local', JSON.stringify({ tag: NEWTAG, t0: P.w.Date.now() - 20000, etaS: 35 }));
     await P.init();
-    check('reload during F: sessionStorage restores F in the same tab (no /austatus, no callfunction)', /Installing v4.40a.10.18/.test(P.view().msg) && P.view().dis && node.fnCalls().length === 0 && node.statusCalls === 0, JSON.stringify(P.view()));
+    check('reload during F: sessionStorage restores F in the same tab (one validating /austatus, no callfunction)', /Installing v4.40a.10.18/.test(P.view().msg) && P.view().dis && node.fnCalls().length === 0 && node.statusCalls === 1, JSON.stringify(P.view()));
     await P.T.advance(1000);
     check('restored F: elapsed time continues from t0 (about 21 s -> 60 %)', /Installing now \.\.\. 60 %/.test(P.view().btn), P.view().btn);
     // Safeboot: /austatus is not JSON (redirect to /update), /ota/state answers
@@ -375,6 +377,37 @@ async function mkPage(node, opts) {
     await P.T.advance(4000);
     check('/ota/state apply_failed: "returns to the old firmware in N s"', /Install failed -- the node returns to the old firmware in 12 s/.test(P.view().msg), P.view().msg);
     P.w.auPageLeave();
+
+    // old firmware after the update (no /austatus route): both paths answer the Info scaffold as 2xx HTML
+    const n4 = mkNode(J('E'));
+    const O = await mkPage(n4);
+    O.w.sessionStorage.setItem('auF:dk5en-1.local', JSON.stringify({ tag: NEWTAG, t0: O.w.Date.now() - 20000, etaS: 35 }));
+    await O.init();
+    n4.scaffold = true; n4.otaScaffold = true;
+    await O.T.advance(8000);
+    check('HTML scaffold from /austatus and /ota/state (firmware without the route): node is back, storage cleared, page reloads', O.st.reload === 1 && O.w.sessionStorage.getItem('auF:dk5en-1.local') === null, JSON.stringify([O.st.reload, O.view()]));
+    O.w.auPageLeave();
+
+    // Safeboot-like: /austatus HTML without cpage=, /ota/state JSON applying -> keeps following /ota/state
+    const n5 = mkNode(J('E'));
+    const SB = await mkPage(n5);
+    SB.w.sessionStorage.setItem('auF:dk5en-1.local', JSON.stringify({ tag: NEWTAG, t0: SB.w.Date.now() - 20000, etaS: 35 }));
+    await SB.init();
+    n5.notJson = true;
+    n5.ota = { state: 'applying', reason: 'none', received: 500000, total: 1000000, fallback_in_ms: 0 };
+    await SB.T.advance(8000);
+    check('Safeboot-like (HTML without cpage=, /ota/state JSON): no reload, storage kept, progress from /ota/state', SB.st.reload === 0 && SB.w.sessionStorage.getItem('auF:dk5en-1.local') !== null && /Installing now \.\.\. (6[0-9]|7[0-9]|[89][0-9]) %/.test(SB.view().btn), JSON.stringify([SB.st.reload, SB.view()]));
+    SB.w.auPageLeave();
+
+    // fetch failure on both paths -> keeps waiting
+    const n6 = mkNode(J('E'));
+    const FF = await mkPage(n6);
+    FF.w.sessionStorage.setItem('auF:dk5en-1.local', JSON.stringify({ tag: NEWTAG, t0: FF.w.Date.now() - 20000, etaS: 35 }));
+    await FF.init();
+    n6.down = true;
+    await FF.T.advance(8000);
+    check('fetch failure: keeps waiting (no reload, storage kept, F still shown)', FF.st.reload === 0 && FF.w.sessionStorage.getItem('auF:dk5en-1.local') !== null && /Installing now/.test(FF.view().btn), JSON.stringify([FF.st.reload, FF.view()]));
+    FF.w.auPageLeave();
 
     // no answer at all for 180 s + etaS
     const n2 = mkNode(J('E'));
@@ -532,6 +565,74 @@ async function mkPage(node, opts) {
     F2.w.eval("cpage='setup';");
     await F2.T.advance(3000);
     check('F tick stops when the page leaves Info; the remembered click stays for the way back', F2.T.list.size === 0 && F2.w.sessionStorage.getItem('auF:dk5en-1.local') !== null);
+  }
+
+  // ---- F2: a remembered click counts only for the tag the node has staged ----------------------------------------------
+  {
+    const K = 'auF:dk5en-1.local';
+    const OLD = 'v4.40a.10.19';
+    // staged tag differs from the remembered one (earlier attempt for 10.18, node now holds 10.19): record dropped, plain E
+    const node = mkNode(mk({ st: 'ok', job: 'download', avail: OLD, newer: 1, inst: 1, staged: OLD }));
+    const P = await mkPage(node);
+    P.w.sessionStorage.setItem(K, JSON.stringify({ tag: NEWTAG, t0: P.w.Date.now() - 20000, etaS: 35 }));
+    await P.init();
+    await P.T.advance(3000);
+    const v = P.view();
+    check('F2: stale tag record dropped (storage cleared, plain E for the staged tag, no failure overlay)', P.w.sessionStorage.getItem(K) === null && v.btn === 'Install now' && !v.dis && v.err === '' && /v4.40a.10.19 downloaded/.test(v.msg), JSON.stringify(v));
+    P.w.auPageLeave();
+    // matching staged tag: record kept, F shown
+    const n2 = mkNode(mk({ st: 'ok', job: 'download', avail: NEWTAG, newer: 1, inst: 1, staged: NEWTAG }));
+    const Q = await mkPage(n2);
+    Q.w.sessionStorage.setItem(K, JSON.stringify({ tag: NEWTAG, t0: Q.w.Date.now() - 20000, etaS: 35 }));
+    await Q.init();
+    check('F2: record for the staged tag kept, F shown', Q.w.sessionStorage.getItem(K) !== null && /Installing v4.40a.10.18/.test(Q.view().msg) && Q.view().dis, JSON.stringify(Q.view()));
+    Q.w.auPageLeave();
+    // older than 180 s + etaS + 60 s and the node answers idle: dropped even for the same tag
+    const n3 = mkNode(mk({ st: 'ok', job: 'download', avail: NEWTAG, newer: 1, inst: 1, staged: NEWTAG }));
+    const R = await mkPage(n3);
+    R.w.sessionStorage.setItem(K, JSON.stringify({ tag: NEWTAG, t0: R.w.Date.now() - 400000, etaS: 35 }));
+    await R.init();
+    check('F2: record older than 180 s + etaS + 60 s dropped once the node answers idle', R.w.sessionStorage.getItem(K) === null && R.view().btn === 'Install now' && !R.view().dis, JSON.stringify(R.view()));
+    R.w.auPageLeave();
+  }
+
+  // ---- F3: Safeboot apply failure without a valid app ---------------------------------------------------------------
+  {
+    const K = 'auF:dk5en-1.local';
+    const DEAD = /Install failed -- the node stays in Safeboot\. Upload a firmware at http:\/\/dk5en-1\.local\/update or use the Webflasher/;
+    for (const [nm, ota] of [['app_valid false', { state: 'aborted', reason: 'apply_failed', app_valid: false, fallback_in_ms: -1, received: 0, total: 0 }],
+      ['fallback_in_ms -1', { state: 'aborted', reason: 'apply_failed', app_valid: true, fallback_in_ms: -1, received: 0, total: 0 }]]) {
+      const node = mkNode(J('E'));
+      const P = await mkPage(node);
+      P.w.sessionStorage.setItem(K, JSON.stringify({ tag: NEWTAG, t0: P.w.Date.now() - 20000, etaS: 35 }));
+      await P.init();
+      node.notJson = true;
+      node.ota = ota;
+      await P.T.advance(30000);
+      let v = P.view();
+      check('F3 (' + nm + '): "stays in Safeboot" with the upload link, button disabled and relabelled', DEAD.test(v.msg) && v.btn === 'Install failed' && v.dis && !/ s$/.test(v.msg), JSON.stringify(v));
+      const m0 = v.msg;
+      await P.T.advance(6000);
+      check('F3 (' + nm + '): the line is stable, storage kept while the node is in Safeboot', P.view().msg === m0 && P.w.sessionStorage.getItem(K) !== null);
+      // the node comes back on the old tag: the page recovers on its own
+      node.notJson = false; node.ota = null; node.status = J('A');
+      await P.T.advance(4000);
+      check('F3 (' + nm + '): old tag answers again -> storage cleared, base state', P.w.sessionStorage.getItem(K) === null && P.view().btn === 'Check now' && !P.view().dis, JSON.stringify(P.view()));
+      P.w.auPageLeave();
+    }
+    // countdown shape: never negative, 0 stays "in 0 s" and polling continues
+    const n2 = mkNode(J('E'));
+    const Q = await mkPage(n2);
+    Q.w.sessionStorage.setItem(K, JSON.stringify({ tag: NEWTAG, t0: Q.w.Date.now() - 20000, etaS: 35 }));
+    await Q.init();
+    n2.notJson = true;
+    n2.ota = { state: 'aborted', reason: 'apply_failed', app_valid: true, fallback_in_ms: 0, received: 0, total: 0 };
+    await Q.T.advance(8000);
+    const c0 = n2.calls.length;
+    check('F3: fallback_in_ms 0 keeps "returns ... in 0 s" and keeps polling', /returns to the old firmware in 0 s/.test(Q.view().msg), Q.view().msg);
+    await Q.T.advance(6000);
+    check('F3: polling goes on at fallback 0', n2.calls.length > c0);
+    Q.w.auPageLeave();
   }
 
   // ---- error table mirror (spec 4.3) --------------------------------------------------------------------------------

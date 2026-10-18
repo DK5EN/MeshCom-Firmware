@@ -205,7 +205,7 @@ void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk);
 
 // INSTRUMENT_ENABLED builds only (bench hooks of `--update heapgate|forget|checknow`; declared
 // unconditionally, defined only with INSTRUMENT_ENABLED, no symbol and no string in a release image).
-//   fwNetSetHeapGateOverride  RAM only: raises the free-heap threshold of the pre-TLS gate to at
+//   fwNetSetHeapGateOverride  RAM only: sets the free-heap threshold of the pre-TLS gate (0 = default) to at
 //                             least `bytes` (classic: total free; PSRAM-TLS: internal free), so a
 //                             CHECK / DOWNLOAD is refused with lowheap. 0 = back to the build value.
 //   fwNetForgetLast           removes NVS "fwstage"/"last" (the reinstall guard), so the tag can

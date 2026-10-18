@@ -1216,7 +1216,7 @@ String decodeURLPercentCoding(String input)
  */
 static void auScaffoldJs()
 {
-    web_client.println("var auS=null,auF=null,auBusy=false,auLoc='',auShown=false,auInfl=false,auFInfl=false,auFPct=0,auFMsg='',auUpAt=0,auT={poll:0,tick:0};");
+    web_client.println("var auS=null,auF=null,auBusy=false,auLoc='',auShown=false,auInfl=false,auFInfl=false,auFPct=0,auFMsg='',auFDead=false,auUpAt=0,auT={poll:0,tick:0};");
     web_client.println("function auEl(i){return document.getElementById(i);}");
     web_client.println("function auKey(){return 'auF:'+location.host;}");
     web_client.println("function auFGet(){try{var v=sessionStorage.getItem(auKey());return v?JSON.parse(v):null;}catch(e){return null;}}");
@@ -1270,29 +1270,46 @@ static void auScaffoldJs()
     web_client.println("if(a=='apply'&&j[fn]=='ok'){auFBegin({tag:tag,t0:Date.now(),etaS:auS.etaS||35,upBase:typeof auS.up=='number'?auS.up:undefined,upAt:auUpAt,img:typeof auS.img=='string'?auS.img:undefined});return;}");
     web_client.println("if(j[fn]!='ok')auLoc=a=='apply'?'Install of '+tag+' failed':'The node did not start the job, try again in a minute';");
     web_client.println("auInfl=false;auFetch();}).catch(function(){auBusy=false;auLoc='No answer from the node';auRender();});}");
-    web_client.println("function auFBegin(o){auF=o;auFSet(o);auBusy=false;clearTimeout(auT.poll);clearInterval(auT.tick);auFPct=0;auFMsg='';auFDraw();auT.tick=setInterval(auFTick,1000);}");
+    web_client.println("function auFBegin(o){auF=o;auFDead=false;auFSet(o);auBusy=false;clearTimeout(auT.poll);clearInterval(auT.tick);auFPct=0;auFMsg='';auFDraw();auT.tick=setInterval(auFTick,1000);}");
     web_client.println("function auFDraw(){if(!auF)return;var el=(Date.now()-auF.t0)/1000,m=auFMsg||('Installing '+auF.tag+', the node restarts ...');");
     web_client.println("if(!auFMsg&&el>180+auF.etaS)m='The node is not back yet. Check its display and power; reload this page when it is up.';");
-    web_client.println("auDraw(1,m,'','','Installing now ... '+auFPct+' %','none',1,0);}");
+    web_client.println("auDraw(1,m,'','',auFDead?'Install failed':'Installing now ... '+auFPct+' %','none',1,0);}");
     web_client.println("function auFTick(){if(!auF)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}");
     web_client.println("var el=(Date.now()-auF.t0)/1000,p=Math.min(95,Math.floor(el/auF.etaS*100));if(p>auFPct)auFPct=p;auFDraw();");
     web_client.println("if(el>=Math.max(auF.etaS-10,8)&&Math.floor(el)%2==0)auFProbe();}");
     web_client.println("function auFProbe(){if(auFInfl)return;auFInfl=true;");
-    web_client.println("fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){if(!j||typeof j.run!='string')throw 0;auFInfl=false;auFJson(j);}).catch(function(){");
-    web_client.println("fetch('/ota/state').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(o){auFInfl=false;auFOta(o);}).catch(function(){auFInfl=false;});});}");
+    // a firmware without the /austatus route answers the Info scaffold (2xx HTML with "cpage=") on /austatus and /ota/state:
+    // the node is demonstrably up, so that counts as back. Safeboot answers /ota/state with JSON; a redirect page has no "cpage=".
+    web_client.println("var auSc=false;");
+    web_client.println("fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}");
+    web_client.println("if(j&&typeof j.run=='string'){auFInfl=false;auFJson(j);return;}auSc=t.indexOf('cpage=')>=0;throw 0;}).catch(function(){");
+    web_client.println("fetch('/ota/state').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var o=null;try{o=JSON.parse(t);}catch(e){}");
+    web_client.println("auFInfl=false;if(o){auFOta(o);return;}if(auSc&&auF){auFDone();return;}throw 0;}).catch(function(){auFInfl=false;});});}");
+    web_client.println("function auFDone(){auFPct=100;auFDraw();auFSet(null);clearInterval(auT.tick);auF=null;auReload();}");
     web_client.println("function auFRestarted(j){return typeof j.up=='number'&&typeof auF.upBase=='number'&&j.up+10<auF.upBase+(Date.now()-auF.upAt)/1000;}");
     // run "local": a Safeboot fallback also restarts the node, so with "img" on both sides only a changed image id is success
     web_client.println("function auFNewImg(j){if(typeof j.img=='string'&&typeof auF.img=='string')return j.img!=auF.img;return auFRestarted(j);}");
-    web_client.println("function auFJson(j){if(!auF)return;if(j.run==auF.tag||(j.run=='local'&&auFNewImg(j))){auFPct=100;auFDraw();auFSet(null);clearInterval(auT.tick);auF=null;auReload();return;}");
+    web_client.println("function auFJson(j){if(!auF)return;if(j.run==auF.tag||(j.run=='local'&&auFNewImg(j))){auFDone();return;}");
     web_client.println("auFSet(null);clearInterval(auT.tick);auT.tick=0;auF=null;auFMsg='';");
     web_client.println("if(j.sbok){auLoc='Install failed, the old firmware is running';}");
     web_client.println("auApply(j);}");
-    web_client.println("function auFOta(o){if(!auF||!o)return;if(o.reason=='apply_failed'){auFMsg='Install failed -- the node returns to the old firmware in '+Math.ceil((o.fallback_in_ms||0)/1000)+' s';}");
+    // apply_failed: with fallback_in_ms >= 0 Safeboot counts down to the old firmware; with a negative value or app_valid false it has
+    // no app to fall back to and waits for an upload (dead end, the line stays; probing goes on so the page recovers by itself)
+    web_client.println("function auFOta(o){if(!auF||!o)return;auFMsg='';auFDead=false;if(o.reason=='apply_failed'||o.state=='aborted'){");
+    web_client.println("var fb=typeof o.fallback_in_ms=='number'?o.fallback_in_ms:-1;");
+    web_client.println("if(o.app_valid===false||fb<0){auFDead=true;auFMsg='Install failed -- the node stays in Safeboot. Upload a firmware at http://'+location.host+'/update or use the Webflasher';}");
+    web_client.println("else auFMsg='Install failed -- the node returns to the old firmware in '+Math.max(0,Math.ceil(fb/1000))+' s';}");
     web_client.println("else if(o.state=='applying'&&o.total>0){var p=Math.min(99,Math.floor(o.received*100/o.total));if(p>auFPct)auFPct=p;}");
     web_client.println("auFDraw();}");
-    web_client.println("function auPageLeave(){clearTimeout(auT.poll);clearInterval(auT.tick);auT.poll=0;auT.tick=0;auShown=false;auInfl=false;auFInfl=false;auBusy=false;auS=null;auF=null;auLoc='';auFMsg='';auFPct=0;}");
+    // a remembered click counts only for the tag the node still has staged (or already runs); anything else, or a record past its
+    // time budget while the node answers idle, is dropped and the plain base state is drawn
+    web_client.println("function auFStale(f,j){if(j.run==f.tag)return false;if(j.staged!=f.tag)return true;");
+    web_client.println("return j.st!='busy'&&(Date.now()-f.t0)/1000>180+(f.etaS||35)+60;}");
+    web_client.println("function auFInit(f){fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}");
+    web_client.println("if(!auShown||auF)return;if(j&&typeof j.run=='string'&&auFStale(f,j)){auFSet(null);auApply(j);return;}auFBegin(f);}).catch(function(){if(auShown&&!auF)auFBegin(f);});}");
+    web_client.println("function auPageLeave(){clearTimeout(auT.poll);clearInterval(auT.tick);auT.poll=0;auT.tick=0;auShown=false;auInfl=false;auFInfl=false;auBusy=false;auS=null;auF=null;auLoc='';auFMsg='';auFDead=false;auFPct=0;}");
     web_client.println("function auPageInit(){auPageLeave();var b=auEl('au_btn');if(!b)return;auShown=true;b.onclick=auClick;");
-    web_client.println("var f=auFGet();if(f&&f.tag&&f.t0){auFBegin(f);return;}auFetch();}");
+    web_client.println("var f=auFGet();if(f&&f.tag&&f.t0){auFInit(f);return;}auFetch();}");
 }
 #endif
 

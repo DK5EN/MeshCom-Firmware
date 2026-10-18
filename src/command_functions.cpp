@@ -5124,7 +5124,7 @@ void commandAction(char *umsg_text, bool ble)
             else
                 Serial.printf("[AU];stagelan;started;%s\n", _ltag);
         }
-        // bench only: --update heapgate <bytes> raises the free-heap threshold of the TLS gate (0 = off), RAM only
+        // bench only: --update heapgate <bytes> sets the free-heap threshold of the TLS gate (0 = default), RAM only
         else
         if(strncmp(_owner_c, "heapgate ", 9) == 0)
         {
