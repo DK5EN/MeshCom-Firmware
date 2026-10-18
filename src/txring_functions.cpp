@@ -820,7 +820,9 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
     }
 
     int resultSlot = -1;
-    if(!droppedNew)
+    if(droppedNew)
+        resultSlot = RING_ENQUEUE_FULL;   // QRT Finding 5: no-evict overflow, distinct from -1 (invalid)
+    else
     {
         // advance tx ring write pointer — inlined addRingPointer (C1): the helper
         // takes volatile int& and cannot bind to the now-atomic iWrite/iRead.

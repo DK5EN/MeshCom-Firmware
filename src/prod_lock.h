@@ -45,7 +45,9 @@
 
 /* node_sset / node_sset4 bits owned by locked settings. */
 #define PRODLOCK_SSET_MASK_SHORTPATH  0x0400
-#define PRODLOCK_SSET4_MASK_NBR       0x3B00   /* 0x0100 0x0200 0x0800 0x1000 0x2000 */
+#define PRODLOCK_SSET4_CLEAR_NBR      0x2300   /* 0x0100 0x0200 0x2000: report auto, symmetry on */
+#define PRODLOCK_SSET4_SET_NBR        0x1800   /* 0x0800 0x1000: --nbrrelay on (count + cancel) */
+#define PRODLOCK_SSET4_MASK_NBR       (PRODLOCK_SSET4_CLEAR_NBR | PRODLOCK_SSET4_SET_NBR)
 
 /* --postime: 0 means "default interval" and is kept, 1..299 -> 300, > 86400 -> 86400. */
 inline int prodClampPostime(int v)
@@ -172,7 +174,7 @@ inline int prodLockNormalise(S &s, bool instrument, bool hasAutoUpdate = true)
         return n;
 
     setI(s.node_sset, s.node_sset & ~PRODLOCK_SSET_MASK_SHORTPATH);
-    setI(s.node_sset4, s.node_sset4 & ~PRODLOCK_SSET4_MASK_NBR);
+    setI(s.node_sset4, (s.node_sset4 & ~PRODLOCK_SSET4_MASK_NBR) | PRODLOCK_SSET4_SET_NBR);
     /* node_pingmax: 0 and 5 are equivalent (effective fallback PING_MAX), 0 stays, > 5 was repaired above */
     setI(s.node_pingtime, s.node_pingcall[0] ? PRODLOCK_PING_INTERVAL : 0);
     setF(s.node_specstart, PRODLOCK_SPEC_START);

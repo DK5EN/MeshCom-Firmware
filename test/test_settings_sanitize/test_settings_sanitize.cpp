@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #include <settings_sanitize.h>
+#include <prod_lock.h>
 
 static const RadioLimits ESP32_LIMITS = { -9, 22, 400.0f, 960.0f, 0, 0, 17 };
 static const RadioLimits NRF52_LIMITS = { 2, 22, 400.0e6f, 960.0e6f, 1, 1, 17 };
@@ -232,6 +233,70 @@ static void test_maxv_grenze_null_und_nan(void)
     TEST_ASSERT_EQUAL_FLOAT(4.1f, v);
 }
 
+/* Boot path (esp32_flash.cpp sanitize_loaded_settings()): sanitize_radio_params(),
+ * sanitize_max_hop_text(), then prodLockNormalise(), in that order, the fixed
+ * counts summed. sanitize_loaded_settings() itself is not linkable in this env
+ * (it reads the global meshcom_settings, Serial and the board's TX_POWER_*), so
+ * bootSanitize() below replays its sequence over a stand-in struct. The three
+ * calls are the real ones; only the glue is mirrored. The production default is
+ * --nbrrelay on: node_sset4 bits 0x1800. */
+struct BootSettings {
+    int node_sset, node_sset4, node_pingtime, node_pingmax, node_specsamples, max_hop_pos;
+    int node_postime, node_parm_time, node_stor, node_autoupd;
+    float node_specstart, node_specend, node_specstep;
+    char node_pingcall[20];
+    int node_power, node_sf, node_cr, node_country, max_hop_text;
+    float node_freq, node_bw;
+};
+
+static int bootSanitize(BootSettings &s, bool instrument)
+{
+    RadioParams p = { s.node_power, s.node_freq, s.node_bw, s.node_sf, s.node_cr, s.node_country };
+    int fixed = sanitize_radio_params(p, ESP32_LIMITS, capture_log);
+    if(fixed > 0)
+    {
+        s.node_power = p.power; s.node_freq = p.freq; s.node_bw = p.bw;
+        s.node_sf = p.sf; s.node_cr = p.cr; s.node_country = p.country;
+    }
+    if(sanitize_max_hop_text(s.max_hop_text, capture_log))
+        fixed++;
+    return fixed + prodLockNormalise(s, instrument, true);
+}
+
+static void test_boot_nbrrelay_on_in_production(void)
+{
+    BootSettings s;
+    memset(&s, 0, sizeof(s));
+    s.node_parm_time = 15; s.node_autoupd = 1; s.node_pingmax = 5;
+    s.node_specstart = 432.0f; s.node_specend = 434.0f; s.node_specstep = 0.025f;
+    s.node_specsamples = 2048; s.max_hop_pos = 2;
+    s.node_power = 20; s.node_freq = 433.175f; s.node_bw = 250.0f; s.node_sf = 11; s.node_cr = 6;
+    s.node_country = 8; s.max_hop_text = 4;
+
+    TEST_ASSERT_EQUAL_INT(1, bootSanitize(s, false));        /* fresh struct: only sset4 0 -> 0x1800 */
+    TEST_ASSERT_EQUAL_HEX(0x1800, s.node_sset4);
+    TEST_ASSERT_EQUAL_INT(0, bootSanitize(s, false));        /* second boot: idempotent */
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+
+    /* a corrupt radio field and the foreign sset4 bits are repaired in one boot, counts add up */
+    s.node_power = 99;
+    s.node_sset4 = 0x3B00;
+    TEST_ASSERT_EQUAL_INT(2, bootSanitize(s, false));
+    TEST_ASSERT_EQUAL_INT(-20, s.node_power);
+    TEST_ASSERT_EQUAL_HEX(0x1800, s.node_sset4);
+
+    s.node_sset4 = 0x0400 | 0x0002;
+    bootSanitize(s, false);
+    TEST_ASSERT_EQUAL_HEX(0x1C02, s.node_sset4);             /* --nbrdebug + foreign bit survive */
+
+    s.node_sset4 = 0;
+    TEST_ASSERT_EQUAL_INT(0, bootSanitize(s, true));         /* INSTRUMENT: as stored */
+    TEST_ASSERT_EQUAL_HEX(0, s.node_sset4);
+    s.node_sset4 = 0x3B00;
+    bootSanitize(s, true);
+    TEST_ASSERT_EQUAL_HEX(0x3B00, s.node_sset4);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -250,5 +315,6 @@ int main(int, char **)
     RUN_TEST(test_maxv_2s_nach_wipe_auf_boardwert);
     RUN_TEST(test_maxv_plausible_werte_bleiben);
     RUN_TEST(test_maxv_grenze_null_und_nan);
+    RUN_TEST(test_boot_nbrrelay_on_in_production);
     return UNITY_END();
 }

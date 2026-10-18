@@ -547,6 +547,21 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             int icheck = checkOwnTx(pnOwnTxLookupId(aprsmsg.msg_id, _GW_ID));
             if(icheck < 0)
             {
+              // Finding 7: the own-tx ring wraps in ~10 min on a busy gateway; a server
+              // copy of OUR message (source = own call) coming back later would be queued
+              // as server traffic. Keep the dedup entry, skip enqueue and own-tx bookkeeping.
+              if(strcasecmp(aprsmsg.msg_source_call, meshcom_settings.node_call) == 0)
+              {
+                // 0x21 already entered the ring (and stat_newid) in its branch above
+                if(msg_type_b != 0x21)
+                {
+                    addLoraRxBuffer(aprsmsg.msg_id, true);
+                    stat_newid.fetch_add(1); // S2: same slot accounting as the relay path
+                }
+                if(bDisplayLog)
+                    Serial.println("[GW] own msg reflected, not queued");
+              }
+              else
               if(bUDPtoLoraSend)
               {
                 // first byte is always the len of the msg

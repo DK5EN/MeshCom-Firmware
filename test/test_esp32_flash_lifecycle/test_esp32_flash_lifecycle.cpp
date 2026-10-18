@@ -304,8 +304,11 @@ void test_handle_opens_and_closes_exactly_twice(void)
     init_flash();
 
     TEST_ASSERT_FALSE(preferences.isStarted()); // not leaked open
-    TEST_ASSERT_EQUAL_INT(4, FakeNvs::instance().openCount());
-    TEST_ASSERT_EQUAL_INT(4, FakeNvs::instance().closeCount());
+    // 4 + 1: a fresh store has node_sset4 0, the production lock now sets the
+    // nbrrelay bits 0x1800 (QRT analysis 2026-10-18), so this first boot saves
+    // once. Later boots find the bits set and prodLockNormalise() returns 0.
+    TEST_ASSERT_EQUAL_INT(5, FakeNvs::instance().openCount());
+    TEST_ASSERT_EQUAL_INT(5, FakeNvs::instance().closeCount());
 }
 
 // ---------------------------------------------------------------------------

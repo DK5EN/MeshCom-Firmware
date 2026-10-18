@@ -2,6 +2,14 @@
 
 **Stand:** 2026-10-18 evening, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
 
+## 2026-10-18 -- LoRa QRT campaign: wave 1 committed (resume point: docs/campaign-lora-qrt-20261018.md, Status)
+
+- Briefs A-F committed: `--nbrrelay on` locked in production, echo releases a READY own group text, no retry
+  while QRT, own message reflected by the server not re-sent, ring-full code -2 with QTA at any depth, QRT
+  released below 16 with one QRV, queue card labels and ring line. Gate PASS, 5 board builds, advisor approved.
+- Next: brief G (age-escalated hold, honest `cad=`), then flash DK5EN-1, -92, -90, DK5EN-98 last. No bench runs
+  this time (operator), no release.
+
 ## 2026-10-18 -- campaign fork hardening W0-W5 done (resume point: docs/campaign-fork-hardening-20261018.md)
 
 - W5 bench on the campaign head: T-Beam DK5EN-92 idle STAT heap 69332 B (unchanged), update check with BLE

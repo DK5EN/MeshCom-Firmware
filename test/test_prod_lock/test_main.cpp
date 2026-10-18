@@ -97,7 +97,7 @@ static void test_normalise_repairs_stored_garbage_in_production(void)
     int n = prodLockNormalise(s, false);
     TEST_ASSERT_GREATER_THAN(0, n);
     TEST_ASSERT_EQUAL_HEX(0x8004, s.node_sset);            /* shortpath bit gone, foreign bits kept */
-    TEST_ASSERT_EQUAL_HEX(0x0402, s.node_sset4);           /* nbr bits gone, --nbrdebug kept */
+    TEST_ASSERT_EQUAL_HEX(0x1C02, s.node_sset4);           /* nbrrelay on (0x1800), report/sym bits gone, --nbrdebug kept */
     TEST_ASSERT_EQUAL_INT(0, s.node_pingtime);             /* no pingcall -> 0 */
     TEST_ASSERT_EQUAL_INT(5, s.node_pingmax);              /* > 5 repaired; a stored 0 stays (equivalent) */
     TEST_ASSERT_EQUAL_FLOAT(432.0f, s.node_specstart);
@@ -141,6 +141,31 @@ static void test_normalise_instrument_keeps_tuning_but_repairs_ranges(void)
     TEST_ASSERT_EQUAL_INT(60, s.node_pingtime);            /* 20 is below the loop threshold */
 }
 
+static void test_normalise_nbrrelay_on_is_locked_default(void)
+{
+    FakeSettings s;
+    memset(&s, 0, sizeof(s));
+    s.node_parm_time = 15; s.node_autoupd = 1; s.node_pingmax = 5;
+    s.node_specstart = 432.0f; s.node_specend = 434.0f; s.node_specstep = 0.025f;
+    s.node_specsamples = 2048; s.max_hop_pos = 2;
+    TEST_ASSERT_EQUAL_INT(1, prodLockNormalise(s, false));  /* only the sset4 field changes */
+    TEST_ASSERT_EQUAL_HEX(0x1800, s.node_sset4);
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, false));  /* idempotent */
+    s.node_sset4 = 0x3B00;
+    TEST_ASSERT_EQUAL_INT(1, prodLockNormalise(s, false));
+    TEST_ASSERT_EQUAL_HEX(0x1800, s.node_sset4);
+    s.node_sset4 = 0x0400 | 0x0002;                         /* --nbrdebug and a foreign bit survive */
+    prodLockNormalise(s, false);
+    TEST_ASSERT_EQUAL_HEX(0x1C02, s.node_sset4);
+    /* INSTRUMENT: bits as stored */
+    s.node_sset4 = 0;
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, true));
+    TEST_ASSERT_EQUAL_HEX(0, s.node_sset4);
+    s.node_sset4 = 0x3B00;
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, true));
+    TEST_ASSERT_EQUAL_HEX(0x3B00, s.node_sset4);
+}
+
 static void test_normalise_nrf52_leaves_autoupd(void)
 {
     FakeSettings s = broken();
@@ -161,6 +186,7 @@ static void test_normalise_keeps_valid_values(void)
     s.node_autoupd = 1;
     s.node_specstart = 432.0f; s.node_specend = 434.0f; s.node_specstep = 0.025f;
     s.node_specsamples = 2048; s.max_hop_pos = 2; s.node_pingmax = 5;
+    s.node_sset4 = 0x1800;         /* locked production default: --nbrrelay on */
     TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, false));
     TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, true));
     s.node_postime = 86400;
@@ -213,6 +239,7 @@ int main(int, char **)
     RUN_TEST(test_normalise_repairs_stored_garbage_in_production);
     RUN_TEST(test_normalise_pingtime_follows_pingcall);
     RUN_TEST(test_normalise_instrument_keeps_tuning_but_repairs_ranges);
+    RUN_TEST(test_normalise_nbrrelay_on_is_locked_default);
     RUN_TEST(test_normalise_nrf52_leaves_autoupd);
     RUN_TEST(test_normalise_keeps_valid_values);
     RUN_TEST(test_set_hop_clamp);

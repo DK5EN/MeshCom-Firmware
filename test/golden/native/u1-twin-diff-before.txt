@@ -5,7 +5,7 @@
 # catches drift that CHANGES (a block flipping agree<->differ).
 # 37 block(s): 37 agree, 0 differ
 
-=== 01-gate-f001.hex: identical (3 sink call(s))
+=== 01-gate-f001.hex: identical (1 sink call(s))
 === 02-gate-f002.hex: identical (3 sink call(s))
 === 03-gate-f003.hex: identical (3 sink call(s))
 === 04-gate-f004.hex: identical (3 sink call(s))

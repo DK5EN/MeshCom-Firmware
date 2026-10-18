@@ -545,6 +545,17 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
             if(icheck < 0)
             {
               // resend only Packet
+              // Finding 7: the own-tx ring wraps in ~10 min on a busy gateway; a server
+              // copy of OUR message (source = own call) coming back later would be queued
+              // as server traffic. Keep the dedup entry, skip enqueue and own-tx bookkeeping.
+              if(strcasecmp(aprsmsg.msg_source_call, meshcom_settings.node_call) == 0)
+              {
+                addLoraRxBuffer(aprsmsg.msg_id, true);
+                stat_newid.fetch_add(1); // S2: same slot accounting as the relay path
+                if(bDisplayLog)
+                    Serial.println("[GW] own msg reflected, not queued");
+              }
+              else
               if(bUDPtoLoraSend)
               {
                 // store last message to compare later on

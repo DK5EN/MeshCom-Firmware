@@ -213,7 +213,8 @@ right after them (`lora_functions.cpp:1100-1135`; observed 71 `[LOG]` and 0 `MH-
 
 `[LOG] RLY x3BAC51B8 ! H00 q=gwcap prio=0 slot=-1` (`setlog_lines.cpp:46`, call sites `lora_functions.cpp:1358,2519`).
 One line per **new** frame. `H` is the hop nibble as received, `prio` the TX-ring priority (0 = not queued), `slot` the TX-ring slot
-(-1 = not queued).
+(-1 = not queued; since the QRT campaign 2026-10-18 a `q=full` line shows `slot=-2`, the ring-full return code
+`RING_ENQUEUE_FULL`).
 
 | `q=`       | Meaning                                                                                   | Source                    |
 | ---------- | ----------------------------------------------------------------------------------------- | ------------------------- |

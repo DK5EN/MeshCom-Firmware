@@ -796,6 +796,99 @@ static void test_regression_server_echo_of_own_pn_retry_copy_not_relayed_on_both
     }
 }
 
+// Finding 7: the server reflects a message with OUR source call after the
+// own-tx ring wrapped (checkOwnTx() no longer knows the id). It must not be
+// queued as server traffic nor entered as foreign own-tx. A foreign source
+// with the same shape still relays.
+static void test_regression_server_reflection_of_own_source_not_queued_on_both(void)
+{
+    const char *srcs[] = {"DK5EN-1", "dk5en-1"};   // case-insensitive
+    for (int variant = 0; variant < 2; variant++)
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, srcs[variant], "9", ':', "reflected", 0x3003);
+
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        int depth0 = txRingDepth();
+        if (side)
+            handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else
+            handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: own-source reflection reached the TX ring", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+        snprintf(msg, sizeof(msg), "%s: own-source reflection called insertOwnTx", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_insert_calls.size(), msg);
+    }
+
+    // Dedup-ring slot accounting: a reflected own-source frame keeps exactly
+    // ONE ring entry for its id (and one S2 stat_newid count) on both
+    // platforms -- text and position alike. The esp32 0x21 branch already
+    // inserts early; the own-source branch must not insert a second slot.
+    {
+        const char types[2] = {':', '!'};
+        const char *payloads[2] = {"reflected", "4700.00N/01300.00E-test"};
+        for (int t = 0; t < 2; t++)
+        for (int side = 0; side < 2; side++)
+        {
+            const char *name = side ? "nrf52" : "esp32";
+            const uint32_t id = 0x3010 + (uint32_t)t;
+            uint8_t tmpl[BUF_CAP];
+            memset(tmpl, 0, sizeof(tmpl));
+            uint16_t len = build_gate_datagram(tmpl, "DK5EN-1", "9", types[t], payloads[t], id);
+
+            recorder_reset();
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpl, len);
+            if (side)
+                handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else
+                handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+            int entries = 0;
+            for (int i = 0; i < MAX_DEDUP_RING; i++)
+            {
+                uint32_t rid = (uint32_t)ringBufferLoraRX[i][0] | ((uint32_t)ringBufferLoraRX[i][1] << 8) |
+                               ((uint32_t)ringBufferLoraRX[i][2] << 16) | ((uint32_t)ringBufferLoraRX[i][3] << 24);
+                if (rid == id) entries++;
+            }
+            char msg[96];
+            snprintf(msg, sizeof(msg), "%s %c: own-source reflection dedup-ring entries for its id", name, types[t]);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, entries, msg);
+            snprintf(msg, sizeof(msg), "%s %c: own-source reflection stat_newid", name, types[t]);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), msg);
+        }
+    }
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", ':', "foreign", 0x3004);
+
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        int depth0 = txRingDepth();
+        if (side)
+            handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else
+            handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: foreign source must still relay", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_insert_calls.size(), msg);
+    }
+}
+
 static void test_agreement_dedup_blocks_repeat_relay_on_both(void)
 {
     uint8_t tmpl[BUF_CAP];
@@ -3026,6 +3119,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);
     RUN_TEST(test_regression_zero_scan_oob_byte_flips_verdict_before_fix);
     RUN_TEST(test_regression_server_echo_of_own_pn_retry_copy_not_relayed_on_both);
+    RUN_TEST(test_regression_server_reflection_of_own_source_not_queued_on_both);
 
     // DR-01/DR-02/DR-04/DR-05/DR-06/DR-07/DR-08/DR-09/DR-18/DR-19 (all
     // 2026-09-12 decided, implemented this wave): former DRIFT cases,

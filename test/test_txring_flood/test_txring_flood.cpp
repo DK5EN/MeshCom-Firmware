@@ -155,7 +155,7 @@ static void test_gleiche_prio_voller_ring_verwirft_den_neuen(void)
     BuiltFrame neu = buildPositionFrame(0xDEAD0001UL);
     int slot = addTxRingEntry(neu.bytes, neu.len, RING_STATUS_READY, "udp_rx");
 
-    TEST_ASSERT_EQUAL_INT(-1, slot);                        // abgewiesen
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, slot);         // abgewiesen (F5: -2)
     TEST_ASSERT_EQUAL_UINT8(iWriteBefore, (uint8_t)iWrite); // Bestand unangetastet
     TEST_ASSERT_EQUAL_UINT8(iReadBefore, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
@@ -292,7 +292,7 @@ static void test_text_kommt_durch_wo_position_faellt(void)
 {
     fillWithPositions(0xA000);
     BuiltFrame pos = buildPositionFrame(0xA0FF0001UL);
-    TEST_ASSERT_EQUAL_INT(-1, addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "udp_rx"));
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "udp_rx"));
 
     resetRing();
 
@@ -429,7 +429,7 @@ static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
     BuiltFrame neu = buildPositionFrame(0xE0FF0001UL);
     int slot = addTxRingEntry(neu.bytes, neu.len, RING_STATUS_READY, "user_msg");
 
-    TEST_ASSERT_EQUAL_INT(-1, slot);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, slot);
     TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_RING - 1, txRingDepth(), "ein verworfener Frame veraendert die Tiefe nicht");
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(txRingDepth(), slot < 0, millis()));
 

@@ -353,6 +353,30 @@ static inline bool pnFrameIsOwnRm1Cmd(const uint8_t *frame, uint16_t len,
            pnFrameSourceIs(frame, len, own_call);
 }
 
+// QRT campaign Brief B, Finding 1: a received echo may release a READY slot
+// (copy not yet on air) iff both the received frame and the slot are TEXT
+// frames (type byte 0x3A) and the slot is neither an own PN nor an own RM1
+// command (those repeat on the 40 s ladder and need their own stop rule).
+// An own group text qualifies; so does a PN sent for a KISS client (foreign
+// source call), which has always been released at the first echo.
+static inline bool pnFrameIsReleasableGroupText(uint8_t rx_type, const uint8_t *slot_frame,
+                                                uint16_t len, uint32_t gw_id,
+                                                const char *own_call)
+{
+    return rx_type == 0x3A && slot_frame != NULL && len > 0 && slot_frame[0] == 0x3A &&
+           !pnFrameIsOwnPn(slot_frame, len, gw_id, own_call) &&
+           !pnFrameIsOwnRm1Cmd(slot_frame, len, gw_id, own_call);
+}
+
+// QRT campaign Brief B, Finding 1: at the 40 s threshold a slot that is a
+// TEXT frame, not an own PN and not an own RM1 command is checked against
+// own_msg_id; heard (0x01) or acked (0x02) releases it instead of a retry.
+static inline bool pnFrameIsRetryEligibleGroupText(const uint8_t *slot_frame, uint16_t len,
+                                                   uint32_t gw_id, const char *own_call)
+{
+    return pnFrameIsReleasableGroupText(0x3A, slot_frame, len, gw_id, own_call);
+}
+
 // "RM1 stopped" set: ORIGINAL msg_ids of own RM1 commands whose reply verified
 // (the RM layer called findAndStopRingSlot()). findAndStopRingSlot() skips
 // READY slots and slots doTX() has cleared to len 0, so the stop can miss the

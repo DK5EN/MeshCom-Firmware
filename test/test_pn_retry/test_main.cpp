@@ -858,6 +858,56 @@ void test_rm1_stopped_duplicate_add_keeps_one_entry(void)
 void setUp(void) {}
 void tearDown(void) {}
 
+// ===========================================================================
+// QRT campaign Brief B: releasable / retry-eligible group text
+// ===========================================================================
+
+static const uint32_t QGW = 0x00155120u;
+static uint32_t qOwnId(void) { return ((QGW & 0x3FFFFFu) << 10) | 0x07Bu; }
+
+void test_releasable_own_group_text(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "9", "hello group", 0x04, 0x03);
+    TEST_ASSERT_TRUE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+void test_releasable_own_pn_not(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "DK5EN-90", "Test{042", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_FALSE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+void test_releasable_own_rm1_cmd_not(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "DK5EN-90",
+                            "RM1 7 status 0123456789abcdef", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_FALSE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+void test_releasable_kiss_client_pn_foreign_source(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DL1ABC-7", "DK5EN-90", "Test{042", 0x04, 0x03);
+    TEST_ASSERT_TRUE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+void test_releasable_requires_text_rx_and_slot(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "9", "hello group", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x21, frame, n, QGW, "DK5EN-1")); // rx not text
+    frame[0] = 0x21;                                                                  // slot not text
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_FALSE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -918,6 +968,12 @@ int main(int, char **)
     RUN_TEST(test_rm1_stopped_live_match_ignores_retry_bits);
     RUN_TEST(test_rm1_stopped_duplicate_add_keeps_one_entry);
     RUN_TEST(test_rm1_stopped_stale_entry_purged_on_enqueue);
+
+    RUN_TEST(test_releasable_own_group_text);
+    RUN_TEST(test_releasable_own_pn_not);
+    RUN_TEST(test_releasable_own_rm1_cmd_not);
+    RUN_TEST(test_releasable_kiss_client_pn_foreign_source);
+    RUN_TEST(test_releasable_requires_text_rx_and_slot);
 
     return UNITY_END();
 }

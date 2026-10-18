@@ -164,6 +164,21 @@ def build_conf_datagram() -> bytes:
     return mock.build_conf_datagram(BENCH_DM, "BNCH", 481234567, 117654321, 520)
 
 
+def foreign_source_frame(good_frame: bytes) -> bytes:
+    """The same frame with a foreign (but bench) source call, FCS recomputed.
+
+    The harness node_call is DK5EN-1, which is also the source of the first
+    corpus frame. Since Brief C a server frame whose source equals node_call is
+    not queued for LoRa, so the size-edge variants must carry another source or
+    they lose their TXRING/BLE lines -- the only witness of convBuffer length
+    handling. Swapping the two path calls keeps the length byte-identical.
+    """
+    frame = mc_frame.parse(good_frame)
+    assert frame is not None and frame.path[0] == "DK5EN-1"
+    frame.path = ["DK5EN-2"] + [c if c != "DK5EN-2" else "DK5EN-1" for c in frame.path[1:]]
+    return frame.encode()
+
+
 def malformed_datagrams(good_frame: bytes) -> List[Tuple[str, bytes, str | None]]:
     """The rejection cases the receive path is supposed to survive.
 
@@ -171,7 +186,9 @@ def malformed_datagrams(good_frame: bytes) -> List[Tuple[str, bytes, str | None]
     well-formed GATE the callsign lint can and must read.
     """
     base = b"GATE" + good_frame
-    odd = base if len(base) % 2 else base + b"\x5a"
+    # size-edge variants (m04/m05/m07) must reach the TX ring: foreign source
+    fbase = b"GATE" + foreign_source_frame(good_frame)
+    odd = fbase if len(fbase) % 2 else fbase + b"\x5a"
     return [
         # Shorter than the 4-byte indicator.
         ("m01-short-indicator", b"GA", "no indicator, nothing to parse"),
@@ -186,14 +203,14 @@ def malformed_datagrams(good_frame: bytes) -> List[Tuple[str, bytes, str | None]
         # after the frame, never spliced into it: splicing them into the source
         # path corrupts a callsign and the entry then trips the callsign lint
         # for a reason that has nothing to do with what it is testing.
-        ("m04-zeros-then-nonzero", base + b"\x00" * 12 + b"\x5a\x5a", None),
+        ("m04-zeros-then-nonzero", fbase + b"\x00" * 12 + b"\x5a\x5a", None),
         # Odd total length: the nRF52 zero-scan reads buf[i+1] past the
         # datagram here (audit defect 7 / OPT-D7).
         ("m05-odd-length", odd, None),
         # GATE with no frame behind the indicator.
         ("m06-gate-empty", b"GATE", "no frame, nothing to radiate"),
         # Over the node's 255-byte read cap.
-        ("m07-oversize", base + b"\x41" * max(0, 300 - len(base)), None),
+        ("m07-oversize", fbase + b"\x41" * max(0, 300 - len(fbase)), None),
     ]
 
 

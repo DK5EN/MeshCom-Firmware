@@ -1552,7 +1552,11 @@ void deliver_scaffold(bool bget_password)
     web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
     web_client.println("html+='</div>';");
     web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
-    web_client.println("html+='<div class=font-bold>Back-pressure: <span style=color:'+bpcolor+'>'+bpname+'</span></div>';");
+    web_client.println("var bptxt=(bp==0)?'accepted':((bp==1)?'slow down':'refused');");
+    web_client.println("html+='<div class=font-bold>Your messages: <span style=color:'+bpcolor+'>'+bptxt+'</span></div>';");
+    web_client.println("var drop=parseInt(d.getAttribute('data-drop'))||0;");
+    web_client.println("var iv=intv*1000;");
+    web_client.println("html+='<div class=font-bold>Ring: '+used+'/'+ring+' queued'+(win?', '+drop+' dropped in the last '+Math.round(intv/60)+' min, TX '+(tx/iv*100).toFixed(1)+' % / RX '+(rx/iv*100).toFixed(1)+' %':'')+'</div>';");
     web_client.println("html+='<div class=font-small>(QRS forecast at&nbsp;'+qrsf+' for your next msgs, line&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
     web_client.println("if(win==0){");
     web_client.println("html+='<div class=font-bold>Dedup window: n/a (no completed 5-min window yet)</div>';");
@@ -1965,6 +1969,11 @@ void sub_page_rxlog()
     uint8_t mcqPrio[6] = {0};
     txRingPrioCounts(mcqPrio);
     uint32_t mcqDedupWin = setlogDedupWindowMin(stat_last_window.newid, PRIO_STAT_INTERVAL_S, MAX_DEDUP_RING);
+    uint32_t mcqDrop = 0;
+    for (int i = 0; i < 5; i++)
+    {
+        mcqDrop += stat_last_window.drop[i];
+    }
     uint32_t mcqAgeS = 0;
     if (stat_last_window_ms != 0)
     {
@@ -1985,8 +1994,8 @@ void sub_page_rxlog()
     web_client.printf(" data-win=\"%d\" data-rx=\"%lu\" data-tx=\"%lu\" data-int=\"%d\" data-newid=\"%lu\"\n",
                        (stat_last_window_ms != 0) ? 1 : 0, (unsigned long)stat_last_window.rx_ms, (unsigned long)stat_last_window.tx_ms,
                        (int)PRIO_STAT_INTERVAL_S, (unsigned long)stat_last_window.newid);
-    web_client.printf(" data-dup=\"%lu\" data-dedup=\"%u\" data-dwin=\"%lu\" data-age=\"%lu\"></div>\n",
-                       (unsigned long)stat_last_window.dup, (unsigned int)MAX_DEDUP_RING, (unsigned long)mcqDedupWin, (unsigned long)mcqAgeS);
+    web_client.printf(" data-dup=\"%lu\" data-dedup=\"%u\" data-dwin=\"%lu\" data-age=\"%lu\" data-drop=\"%lu\"></div>\n",
+                       (unsigned long)stat_last_window.dup, (unsigned int)MAX_DEDUP_RING, (unsigned long)mcqDedupWin, (unsigned long)mcqAgeS, (unsigned long)mcqDrop);
     web_client.println("</div>");
 
     web_client.println("<div style=\"overflow:scroll;\">");

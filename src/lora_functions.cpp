@@ -1028,7 +1028,35 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 if(memcmp(ringBuffer[i]+3, RcvBuffer+1, 4) == 0)
                 {
-                    if(bLORADEBUG)
+                    // QRT Finding 1: an echo of our own group text while the copy
+                    // still waits READY (typically a gateway's server copy) means
+                    // the message is on air -- release the slot instead of sending
+                    // a duplicate. Own PN / own RM1 command keep the old skip.
+                    // RAK4630: same ring lock as doTX()'s slot scan (getNextTxSlot()
+                    // runs under taskENTER_CRITICAL()) and findAndStopRingSlotImpl();
+                    // doTX() itself writes the READY->SENT takeover unlocked.
+                    bool readyReleased = false;
+#if defined(BOARD_RAK4630)
+                    taskENTER_CRITICAL();
+#endif
+                    if(ringBuffer[i][0] > 0 && ringBuffer[i][1] == RING_STATUS_READY &&
+                       pnFrameIsReleasableGroupText(RcvBuffer[0], ringBuffer[i] + 2, (uint16_t)ringBuffer[i][0],
+                                                    _GW_ID, meshcom_settings.node_call))
+                    {
+                        ringBuffer[i][1] = RING_STATUS_DONE;
+                        ringBuffer[i][0] = 0;
+                        retryCount[i] = 0;
+                        readyReleased = true;
+                    }
+#if defined(BOARD_RAK4630)
+                    taskEXIT_CRITICAL();
+#endif
+                    if(readyReleased)
+                    {
+                        if(bDisplayRetx)
+                            printfdeb("\n[RETX] echo on READY slot, released retid:%i\n", i);
+                    }
+                    else if(bLORADEBUG)
                         printfdeb("[MC-DBG] ACK_SKIP_READY slot=%d msg_id=%08X\n", i, extractRingMsgId(i));
                 }
             }
@@ -2521,7 +2549,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 INSTR_PH("rly1");
 #endif
 
-                                // SL-02: Rueckgabe ist der belegte Slot bzw. -1,
+                                // SL-02: Rueckgabe ist der belegte Slot bzw. < 0 (-1 ungueltig, -2 voll),
                                 // wenn der Ring den Eintrag verworfen hat.
                                 if(rly_slot >= 0)
                                 {
@@ -3180,6 +3208,10 @@ bool doTX()
 // k=4 wuerde die Retry-Variante auf die urspruengliche id zurueckdrehen.
 static_assert(MAX_RETRANSMIT <= 3, "MAX_RETRANSMIT must stay <=3: pnRetryId's k=retryCount+1 wraps onto the original id at k=4");
 
+// QRT Finding 2: one bit per ring slot, set once the "retry deferred" line was
+// printed for the slot's current wait. Only the loop() task touches it.
+static uint32_t retxDeferLogged = 0;
+
 bool updateRetransmissionStatus()
 {
     for(int ircheck = 0; ircheck < MAX_RING; ircheck++)
@@ -3208,6 +3240,19 @@ bool updateRetransmissionStatus()
             // Fixed-interval retransmit: 40s per retry (20 ticks × 2s)
             //   Retry 1-3: each waits 40s → total max 120s (2 min)
             uint8_t threshold = 0x15;
+
+            // QRT Finding 2 (log-once bit): a deferred slot is pinned at the
+            // threshold (decremented back below, see the BP_QRT branch), so
+            // it sits exactly at `threshold` after every tick. A freshly
+            // armed slot needs 20 ticks to get there and passes values
+            // below it first. Clearing the bit on every other value (and
+            // for empty/READY/DONE slots, else branch below) therefore
+            // resets it on every release path -- PN-acked, RM1, give-up,
+            // READY-echo (other task), eviction, findAndStopRingSlot() --
+            // without each site having to know about it, and without a
+            // write from the LORA task.
+            if(ringBuffer[ircheck][1] != threshold)
+                retxDeferLogged &= ~(1UL << (ircheck & 31));
 
             if(ringBuffer[ircheck][1] == threshold)
             {
@@ -3264,6 +3309,26 @@ bool updateRetransmissionStatus()
                         if(bDisplayRetx)
                             printfdeb("\n[RETX] RM1 stopped, release retid:%i msg-id:%08X\n",
                                           ircheck, rm1SlotOrigId);
+
+                        continue;
+                    }
+                }
+
+                // QRT Finding 1: an own group text that was heard (0x01) or
+                // acked (0x02) meanwhile needs no further copy.
+                if(pnFrameIsRetryEligibleGroupText(&ringBuffer[ircheck][2], (uint16_t)size, _GW_ID, meshcom_settings.node_call))
+                {
+                    int heardIdx = checkOwnTx(extractRingMsgId(ircheck));
+                    if(heardIdx >= 0 && (own_msg_id[heardIdx][4] == 0x01 || own_msg_id[heardIdx][4] == 0x02))
+                    {
+                        ringBuffer[ircheck][1] = RING_STATUS_DONE;
+                        ringBuffer[ircheck][0] = 0;
+                        retryCount[ircheck] = 0;
+                        retxDeferLogged &= ~(1UL << (ircheck & 31));
+
+                        if(bDisplayRetx)
+                            printfdeb("\n[RETX] already heard, stop retid:%i msg-id:%08X\n",
+                                          ircheck, (unsigned int)extractRingMsgId(ircheck));
 
                         continue;
                     }
@@ -3366,6 +3431,21 @@ bool updateRetransmissionStatus()
 
                     continue;
                 }
+
+                // QRT Finding 2: no retry copy while this node refuses user
+                // messages (BP_QRT) -- the copy would evict queued entries.
+                // Stay at the threshold, re-check next tick. Logged once per slot.
+                if(bpCurrentState() == (int)BP_QRT)
+                {
+                    ringBuffer[ircheck][1]--;
+                    if(!(retxDeferLogged & (1UL << (ircheck & 31))))
+                    {
+                        retxDeferLogged |= (1UL << (ircheck & 31));
+                        printfdeb("\n[RETX] QRT, retry deferred retid:%i\n", ircheck);
+                    }
+                    continue;
+                }
+                retxDeferLogged &= ~(1UL << (ircheck & 31));
 
                 if(bLORADEBUG)
                 {
@@ -3484,6 +3564,11 @@ bool updateRetransmissionStatus()
 
                 return true;
             }
+        }
+        else
+        {
+            // empty, READY or DONE slot: no deferral can be pending (see above)
+            retxDeferLogged &= ~(1UL << (ircheck & 31));
         }
     }
 

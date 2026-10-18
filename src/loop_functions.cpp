@@ -4680,7 +4680,10 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
         // bp_state.refuseThreshold() (the same threshold onSend() itself
         // gates its QRT/QRS decision on); (1) and (2) fire regardless of
         // depth and typically on an empty or low ring.
-        if(txRingDepth() >= bp_state.refuseThreshold())
+        // QRT Finding 5: RING_ENQUEUE_FULL (-2) is the no-evict overflow and
+        // always gets the QTA nack, also below the threshold (index-span
+        // "full" with holes: 11 of 19 drops in the capture at depth <= 11).
+        if(sendMessageNeedsQtaNack(w, txRingDepth(), bp_state.refuseThreshold()))
         {
             // Symmetrie (Operatorentscheidung 2026-09-01, E4): was nicht auf HF geht,
             // geht auch nicht ins Backbone. Kein Echo, kein UDP-Uplink, kein

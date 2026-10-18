@@ -786,13 +786,37 @@ static void test_overflow_drop(void)
     BuiltFrame pos = buildPositionFrame(0x9999UL);
     int slot = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "t5drop");
 
-    TEST_ASSERT_EQUAL_INT(-1, slot);
+    TEST_ASSERT_EQUAL_INT(-2, slot);   // RING_ENQUEUE_FULL (QRT Finding 5)
     TEST_ASSERT_EQUAL_UINT8(iWriteBefore, (uint8_t)iWrite); // unveraendert
     TEST_ASSERT_EQUAL_UINT8(iReadBefore, (uint8_t)iRead);   // unveraendert
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
     // Der Slot, in den der verworfene Eintrag geschrieben worden waere, ist
     // wieder auf [0]==0 zurueckgesetzt ("Don't enqueue").
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[MAX_RING - 1][0]);
+}
+
+// ------------------------------------------- QRT Finding 5: eigener Code -2
+// Ring voll mit Prio-1 (ACK), eigener Gruppentext (Prio 2) kann nichts
+// verdraengen: Rueckgabe -2 (RING_ENQUEUE_FULL), nicht -1. Die beiden
+// Validitaetsfehler (len == 0, nicht konfiguriertes Rufzeichen) bleiben -1.
+static void test_qrt_f5_voll_ohne_eviction_liefert_minus2(void)
+{
+    for (int i = 0; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildAckFrame((uint32_t)(0x6000 + i));
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "f5fill"));
+    }
+    BuiltFrame t = buildTextFrame("9", "own text", 0x7777UL);
+    int slot = addTxRingEntry(t.bytes, t.len, 0x00, "user_msg", 0);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(-2, slot, "ring full, nothing evictable -> RING_ENQUEUE_FULL");
+    int slot2 = addTxRingEntryOnce(t.bytes, t.len, "user_msg", 0);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(-2, slot2, "Once variant maps the same way");
+}
+
+static void test_qrt_f5_laenge_null_bleibt_minus1(void)
+{
+    BuiltFrame f = buildAckFrame();
+    TEST_ASSERT_EQUAL_INT(-1, addTxRingEntry(f.bytes, 0, RING_STATUS_READY, "f5len"));
 }
 
 // ----------------------------------------------------- Test 5b: Laengen-Klammer
@@ -1584,6 +1608,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
     RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
     RUN_TEST(test_stufe2_maskenbit_ueber_32_ueberlebt_case_b);
+    RUN_TEST(test_qrt_f5_voll_ohne_eviction_liefert_minus2);
+    RUN_TEST(test_qrt_f5_laenge_null_bleibt_minus1);
     RUN_TEST(test_len_null_wird_abgewiesen);
     RUN_TEST(test_len_ueber_max_wird_abgewiesen);
     RUN_TEST(test_len_exakt_max_wird_enqueued);

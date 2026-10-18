@@ -182,15 +182,17 @@ static void test_dj8meh_episode_endet_nach_realem_drain(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, txRingDepth(),
         "BP-02: ehrliche Tiefe 1 (alte Indexdistanz haette 17+ gemeldet)");
 
-    // bpPollDrain()-Verdrahtung: Wasserband armiert, Halt 10 s, dann QRV.
+    // bpPollDrain()-Verdrahtung, M1 (QRT-Analyse 2026-10-18): unter der
+    // Linie gibt poll() QRT sofort frei -- ein QRV, kein 10-s-Halt mehr.
+    // Der Wasserband-Abschluss danach bleibt still.
     uint32_t t0 = millis();
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), t0));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), t0 + 5000));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRV,
-        bp.poll(txRingDepth(), t0 + BackPressure::QRV_HOLD_MS),
-        "BP-04: QRV nach 10 s Wasserband (alt: nie, ausser Tiefe 0)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRV, bp.poll(txRingDepth(), t0),
+        "M1: QRV beim ersten poll() unter der Linie (alt: nach 10 s Wasserband)");
     TEST_ASSERT_FALSE_MESSAGE(bp.refusing(),
         "Node nimmt nach der Episode wieder an -- im Feld dauerte das 8 min");
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), t0 + 5000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE,
+        bp.poll(txRingDepth(), t0 + BackPressure::QRV_HOLD_MS));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE,
         bp.poll(txRingDepth(), t0 + BackPressure::QRV_HOLD_MS + 1000));
 }
@@ -341,6 +343,34 @@ static void test_flood_13_into_10_yields_five_nacks(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(8, txRingDepth(), "kein Abfluss in diesem Test -- 8 bleiben im Ring stehen");
 }
 
+// QRT Finding 5: ein eigener Text, den der Ring ohne Eviction ablehnt (-2),
+// bekommt den QTA-Nack auch bei Tiefe 5 (< refuseThreshold). -1 (Validitaet)
+// bleibt unter der Schwelle ohne Nack.
+static void test_f5_overflow_code_nackt_bei_tiefe_5(void)
+{
+    BackPressure bp(MAX_RING);
+    // Index-Spanne voll, aber nur 5 belegte Slots: Slot 0 (iRead) und 4 weitere
+    // Prio-1-Eintraege, der Rest sind Loecher hinter dem Lesezeiger.
+    uint8_t f[300];
+    for (int i = 0; i < MAX_RING - 1; i++)
+    {
+        uint16_t len = buildRawFrame(f, 0x41, 0xB0000000u + i, nullptr, nullptr, "ack!");
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f, len, 0xFF, "fill"));
+    }
+    for (int i = 5; i < MAX_RING - 1; i++)
+        ringBuffer[i][0] = 0;
+    TEST_ASSERT_EQUAL_INT(5, txRingDepth());
+
+    int rc = enqueueUserText(0xB1000000u);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(RING_ENQUEUE_FULL, rc, "no-evict overflow code");
+    TEST_ASSERT_TRUE_MESSAGE(txRingDepth() < bp.refuseThreshold(), "depth below QRT line");
+    TEST_ASSERT_TRUE_MESSAGE(sendMessageNeedsQtaNack(rc, txRingDepth(), bp.refuseThreshold()),
+                             "QTA nack on -2 regardless of depth");
+    TEST_ASSERT_FALSE_MESSAGE(sendMessageNeedsQtaNack(-1, txRingDepth(), bp.refuseThreshold()),
+                              "-1 below threshold stays [BP];invalid");
+    TEST_ASSERT_TRUE(sendMessageNeedsQtaNack(-1, bp.refuseThreshold(), bp.refuseThreshold()));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -349,5 +379,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort);
     RUN_TEST(test_qrt_ausloesung_bleibt_intakt);
     RUN_TEST(test_flood_13_into_10_yields_five_nacks);
+    RUN_TEST(test_f5_overflow_code_nackt_bei_tiefe_5);
     return UNITY_END();
 }

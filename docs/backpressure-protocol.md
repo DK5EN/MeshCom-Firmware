@@ -76,12 +76,34 @@ aus. Wer es nicht weiss, verlaesst sich auf eine Zustellung, die nie stattgefund
 
 Zustandsmeldungen ueber den Puffer, gelatcht: **eine pro Episode**, nicht eine pro Nachricht.
 
-| Code    | Ausloeser                                                                 | Nimmt der Node an?             | Text                                                    |
-| ------- | ------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
-| **QRS** | Ringtiefe >= 5 **und** dritte eigene Nachricht in Folge auf so einem Ring | ja                             | `QRS - slow down, TX buffer is filling`                 |
-| **QRT** | Ringtiefe erreicht 80 % von `MAX_RING` (16/20)                            | **nein**, lokal erzeugte Texte | `QRT - stopping to accept new messages, TX buffer full` |
-| **QTA** | Der Ring hat einen Frame verworfen                                        | nein                           | `QTA - message discarded, TX buffer full`               |
-| **QRV** | Tiefe 0, oder Tiefe 1 fuer 10 s ununterbrochen                            | ja                             | `QRV - ready again, TX buffer clear`                    |
+| Code    | Ausloeser                                                                                                          | Nimmt der Node an?             | Text                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------- |
+| **QRS** | Ringtiefe >= 5 **und** dritte eigene Nachricht in Folge auf so einem Ring                                          | ja                             | `QRS - slow down, TX buffer is filling`                 |
+| **QRT** | Ringtiefe erreicht 80 % von `MAX_RING` (16/20)                                                                     | **nein**, lokal erzeugte Texte | `QRT - stopping to accept new messages, TX buffer full` |
+| **QTA** | Der Ring hat einen Frame verworfen                                                                                 | nein                           | `QTA - message discarded, TX buffer full`               |
+| **QRV** | QRT wird unter 80 % von `MAX_RING` freigegeben (M1), oder Tiefe 0 / Tiefe 1 fuer 10 s ohne vorheriges Freigabe-QRV | ja                             | `QRV - ready again, TX buffer clear`                    |
+
+### QRT-Freigabe unter der Linie (M1, 2026-10-18)
+
+QRT endet nicht mehr erst im ruhigen Band, sondern sobald die Ringtiefe wieder **unter 80 % von
+`MAX_RING`** liegt (15 von 20). Anlass: DK5EN-98 stand 7 min 57 s im QRT, davon 6 min 57 s mit
+15 freien Plaetzen, weil der Serverzufluss den Ring bei Tiefe 4-6 hielt und er nie 0 erreichte.
+
+Meldungsfolge einer Episode:
+
+1. QRT einmal beim Erreichen von 80 %. Lokale Texte werden abgewiesen (Quittung `QRT NOT SENT`).
+2. Freigabe bei Tiefe < 80 % (in `onSend()` und im Drain-`poll()`): der Node nimmt wieder an,
+   dazu **ein** QRV. Gibt es in dieser Episode schon ein Freigabe-QRV, folgt das naechste
+   fruehestens nach 60 s (`QRV_RELEASE_REPEAT_MS`), sonst bleibt die Freigabe still.
+3. Wiedereintritt bei Tiefe >= 80 % innerhalb derselben Episode: der Node weist wieder ab, aber
+   **ohne** neues QRT (der Latch steht noch auf QRT); die Quittung pro Nachricht informiert.
+4. Verwirft der Ring einen Frame (auch ab Tiefe >= 80 %), gibt es weiter einmal QTA und die
+   Abweisung bleibt.
+5. Das Schliessen im ruhigen Band (Tiefe 0, oder 1 fuer 10 s) sendet nur dann ein QRV, wenn die
+   Episode QRT/QTA erreichte und noch **kein** Freigabe-QRV ausgegeben wurde. Es loescht Latch und
+   Freigabe-Merker.
+
+Der Wortlaut der Meldungen bleibt unveraendert.
 
 QRS liegt bewusst bei festen 5 und nicht bei einem Anteil von `MAX_RING`: eine
 5,5-Minuten-Messung auf einem Gateway zeigte im Normalbetrieb eine Grundlast von Tiefe 1-4.
