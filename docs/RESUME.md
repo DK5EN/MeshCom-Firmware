@@ -8,7 +8,8 @@
   while QRT, own message reflected by the server not re-sent, ring-full code -2 with QTA at any depth, QRT
   released below 16 with one QRV, queue card labels and ring line. Gate PASS, 5 board builds, advisor approved.
 - Brief G committed: age floor after received frames (20 s short hold, 60 s rapid), prio 1-3, never after own
-  TX or CAD_BUSY; honest `cad=`. Next: flash DK5EN-1, -92, -90, -14 (INSTRUMENT), DK5EN-98 last (production). No bench runs
+  TX or CAD_BUSY; honest `cad=`. Flashed 23:17-23:25: INSTRUMENT on DK5EN-1, -92, -90, -14
+  (`--nbrrelay on` by hand), production on DK5EN-98 (lock verified). Next: DK5EN-98 night capture, release decision. No bench runs
   this time (operator), no release.
 
 ## 2026-10-18 -- campaign fork hardening W0-W5 done (resume point: docs/campaign-fork-hardening-20261018.md)

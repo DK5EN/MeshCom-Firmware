@@ -15,12 +15,12 @@ resume point; update it after every wave (orchestrate-waves section 6), then `do
 
 ## Status (resume point)
 
-| Step               | State                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------- |
-| Wave 1, briefs A-F | done, commit `fe3f01e2`                                                                           |
-| Wave 2, brief G    | done, commit 2 ("feat: LoRa QRT campaign wave 2")                                                 |
-| Bench (gate 1/2)   | dropped by the operator for this run (2026-10-18): host gate, board builds and advisor only       |
-| Flash              | INSTRUMENT on DK5EN-1, -92, -90, -14 (then `--nbrrelay on` by hand), production on DK5EN-98, last |
+| Step               | State                                                                                                                                                                                                                                                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wave 1, briefs A-F | done, commit `fe3f01e2`                                                                                                                                                                                                                                                                                               |
+| Wave 2, brief G    | done, commit 2 ("feat: LoRa QRT campaign wave 2")                                                                                                                                                                                                                                                                     |
+| Bench (gate 1/2)   | dropped by the operator for this run (2026-10-18): host gate, board builds and advisor only                                                                                                                                                                                                                           |
+| Flash              | done 2026-10-18 23:17-23:25 from `1a6a3704`: INSTRUMENT on DK5EN-1, -92, -14 (OTA), -90 (USB), `--nbrrelay on` set by hand; production on DK5EN-98 (OTA), `--nbrrelay off` refused `[ERR];locked;nbrrelay`, NBRRELAY on, gateway connected. RM: on DK5EN-1, off on -92 (reset by hand after the flash), -90, -14, -98 |
 
 Wave 1 result (gate 1): `tools/regression.sh --stage 1,2` PASS (75 envs, 2686 cases), board builds
 `heltec_wifi_lora_32_V3` 38.5 % RAM / 55.0 % flash, `ttgo_tbeam` 7.8 / 58.4, `wiscore_rak4631` 39.0 / 84.4,
@@ -60,6 +60,8 @@ Brief G as shipped, deviations:
 Brief G code anchors (scout, 2026-10-18): no nRF52 `[MC-HWM]` line exists (extend ESP32 only);
 `ringEnqueueTime`, `getNextTxSlot()` are readable from `lora_functions.cpp`, no `txring_functions.cpp` edit
 needed; env `native` builds `test_csma_timing`; board env is `heltec_wifi_lora_32_V3`, not `heltec_v3`.
+
+Next: one night on DK5EN-98 (section 6, step 2) and the release decision (section 8, point 4).
 
 ## 0. Execution change (2026-10-18, operator)
 
