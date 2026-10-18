@@ -2,6 +2,16 @@
 
 **Stand:** 2026-10-18, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
 
+## 2026-10-18 -- upstream merged #1213 and #1214, merged back into fork-dev
+
+- icssw-org merged #1213 (gw_servers, `--setnet`, ETH-05) and #1214 (T-Deck reply, web firmware column) into `dev`
+  as merge commits (4f9f17eb, 9669ec99); no upstream tag yet. Merged back with `e87e8a5e`: comment-only conflicts kept
+  fork-dev, merge tree equals the pre-merge tree. `fork-dev..upstream/dev` is empty; no upstream PR is open.
+- Pages: PR history 57 merged PRs, round 7 with six PRs, code share re-measured on upstream/dev 9669ec99 (39.8 %
+  original, 74.8 % of the February lines kept); index cards updated.
+- PR branches `pr/gw-servers`, `pr/tdeck-dm-reply-web-fwversion` and their worktrees removed (local and origin).
+- The v4.40a.10.18 release notes still call #1213/#1214 open (release body not edited).
+
 ## 2026-10-18 -- release v4.40a.10.18 published (CI), web flasher
 
 - Release [v4.40a.10.18](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.18) (tag on
