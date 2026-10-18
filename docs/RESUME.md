@@ -1,6 +1,19 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-17, branch `fork-dev`, last release `v4.40a.10.17` (CI-built, Latest).
+**Stand:** 2026-10-18, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
+
+## 2026-10-18 -- release v4.40a.10.18 published (CI), web flasher
+
+- Release [v4.40a.10.18](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.18) (tag on
+  `7e6ca80c`, tagged 2026-10-17 evening, CI run 39069180970): Latest, 66 assets (names as 10.17), 27 `.autoupdate`
+  with `78 da`, re-inflate ok and byte-identical to a local regeneration, tag string in the image, T-Deck field
+  commands `mute=2 stat=1 udplog=1 injectraw=0`. `FLASH_VERSION` 20261018, Safeboot unchanged.
+- Content since 10.17: GPS-11 W1/W2 (`4221b16c`, `a2381b97`; filter on by default on ESP32 GPS boards), net
+  console P-0111/0168/0169 (`b06a6907`), RM1 `net`/`upd` (`5c1d12b5`, `4d0d1756`). Gate before the tag: 72 envs,
+  2521/2521, golden 48, pytest 1100.
+- Web flasher: only v4.40a.10.18 (30 boards, HTTPS check 0 mismatches); v4.40a.10.17 folder pruned (release object
+  kept). Presentation index card and PR-history lead name 10.18 (pages-sync `0368b2b5`).
+- Not flashed to the fleet. Open: GPS filter drive test and other GPS boards, AU-14, AU-16, #1213/#1214 review.
 
 ## 2026-10-17 -- backlog cleanup, VIA-01 benched
 
