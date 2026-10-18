@@ -1,6 +1,6 @@
 # RM1 command inventory (audit, 2026-10-12, fork-dev working tree)
 
-Source of truth: `src/rm_commands.h:33-57` (RM_COMMAND_LIST, 23 commands). Firmware line refs below are `src/...`.
+Source of truth: `src/rm_commands.h:33-58` (RM_COMMAND_LIST, 25 commands). Firmware line refs below are `src/...`.
 Abbreviations: CO = `src/command_functions.cpp`, RT = `src/rm_runtime.cpp`, RD = `src/rm_exec_read.cpp`, WR = `src/rm_exec_write.cpp`, RS = `src/remote_cmd.cpp`, TX = `src/configuration_default.h`.
 
 ## 1. Command table (wire verb as sent; `<ctr>` and `<tag>` omitted)

@@ -68,14 +68,17 @@ canonical (reply)   = "RM1R|" dst "|" src "|" ctr "|" result
 `dst` stops replay against a sibling node that shares the password; binding `src` ties the reply
 address. The reply tag lets the operator's client verify that the node answered. Examples and test
 vectors are in `docs/architecture/11-wire-format.md` and `tools/tests/remote_cmd_vectors.json`
-(23 shared vectors, reproduced by the C++ host test).
+(40 command, 35 reply and 13 refusal vectors, reproduced by the C++ host test).
 
 ### Allowlist
 
 `reboot`, `status`, `sendpos`, `sendtrack`, `sync` (no arguments); `gps`, `track`, `display`,
 `led`, `gateway`, `mesh` (`on|off`; `led` on a board without a usable LED pin replies `err unsupported`, its state is
 never persisted and is off after boot); `txpower <n>` (0 to the board maximum); `setout <a0..a7|b0..b7>
-<on|off>`. Never reachable, whatever the tag: `cleanflash`, `ota-update`, `dfu`, `deepsleep`,
+<on|off>`; `chgled <auto|on|off>` (PMU charge LED, `err unsupported` without an AXP chip, not persisted);
+`net` (no arguments, read-only network summary); `upd` (read) / `upd check` / `upd go <tag>` (auto-update, `err unsupported`
+without it). The extended read and write commands (`radio`, `sens`, `txq`, `mbox`, `maxhop`, `mh`, `name`, `atxt`, `pos`)
+are listed in the amendments below; the full reference of all 25 commands is `docs/rm1-commands.md`. Never reachable, whatever the tag: `cleanflash`, `ota-update`, `dfu`, `deepsleep`,
 `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`, `updchan`,
 `autoupdate`, `rm`, `stor`, and any argument containing `--`, `;`, `{` or `%`.
 
@@ -186,7 +189,10 @@ a settings restore, a config import or a BLE settings write can never rewind it.
   and let anyone lock a node by replaying one sniffed frame three times. Rejects before the tag
   check and wrong tags are counted as before; the reject window boundary is `>=`.
 - **`sync` limiter.** `sync` has its own 60 s limiter and neither stamps nor obeys the command
-  limiter (a captured `sync` verified forever and blocked commands for 10 s per replay).
+  limiter (a captured `sync` verified forever and blocked commands for 10 s per replay). Both
+  receiver limiters are active only with strict security on (`node_rmstrict`, default 0); without
+  it the node still answers at most one `sync` and one cached reply per 10 s (`RM_RATE_MS`,
+  `src/rm_runtime.cpp`), as an airtime guard.
 - **Sizes.** Result at most 108 characters (reply DM text at most 140), arguments at most 39;
   replies of the first 13 commands stay at 63 or less. Every reply passes `rmSanitizeResult()`.
 - **Capability.** (Superseded 2026-10-11, see the update note at the end.) The `sync` reply ends in `rm=2`; `status` never carries a capability token.

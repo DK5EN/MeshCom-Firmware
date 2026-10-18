@@ -207,6 +207,83 @@ static void test_reject_reason(void)
     TEST_ASSERT_FALSE(tzParse("CET-1CEST,J60,J300", &r));
 }
 
+// Every TZ string of docs/timezones.md must parse; keep this list identical to the table.
+static void test_doc_table(void)
+{
+    static const char *const doc[] = {
+    "UTC0",
+    "GMT0BST,M3.5.0/1,M10.5.0",
+    "GMT0IST,M3.5.0/1,M10.5.0",
+    "WET0WEST,M3.5.0/1,M10.5.0",
+    "CET-1CEST,M3.5.0,M10.5.0/3",
+    "EET-2EEST,M3.5.0/3,M10.5.0/4",
+    "MSK-3",
+    "<+03>-3",
+    "GMT0",
+    "EST5EDT,M3.2.0,M11.1.0",
+    "CST6CDT,M3.2.0,M11.1.0",
+    "MST7MDT,M3.2.0,M11.1.0",
+    "MST7",
+    "PST8PDT,M3.2.0,M11.1.0",
+    "AKST9AKDT,M3.2.0,M11.1.0",
+    "HST10",
+    "AST4ADT,M3.2.0,M11.1.0",
+    "NST3:30NDT,M3.2.0,M11.1.0",
+    "CST6",
+    "<-03>3",
+    "<-03>3",
+    "<-05>5",
+    "<-04>4<-03>,M9.1.6/24,M4.1.6/24",
+    "SAST-2",
+    "WAT-1",
+    "EET-2EEST,M4.5.5/0,M10.5.4/24",
+    "<+0530>-5:30",
+    "<+0545>-5:45",
+    "<+04>-4",
+    "<+0330>-3:30",
+    "IST-2IDT,M3.4.4/26,M10.5.0",
+    "CST-8",
+    "HKT-8",
+    "<+08>-8",
+    "JST-9",
+    "KST-9",
+    "AEST-10AEDT,M10.1.0,M4.1.0/3",
+    "AEST-10",
+    "ACST-9:30ACDT,M10.1.0,M4.1.0/3",
+    "ACST-9:30",
+    "AWST-8",
+    "NZST-12NZDT,M9.5.0,M4.1.0/3",
+    };
+    for (size_t i = 0; i < sizeof doc / sizeof doc[0]; i++)
+    {
+        TzRule r;
+        TEST_ASSERT_TRUE_MESSAGE(strlen(doc[i]) <= TZ_MAX_LEN, doc[i]);
+        TEST_ASSERT_TRUE_MESSAGE(tzParse(doc[i], &r), doc[i]);
+    }
+
+    // representative zones: offset at a winter and a summer UTC instant (2026)
+    static const struct
+    {
+        const char *tz;
+        int32_t winter, summer;
+    } z[] = {
+        {"CET-1CEST,M3.5.0,M10.5.0/3", 3600, 7200},
+        {"EST5EDT,M3.2.0,M11.1.0", -18000, -14400},
+        {"AEST-10AEDT,M10.1.0,M4.1.0/3", 39600, 36000},   // southern: DST in January
+        {"ACST-9:30ACDT,M10.1.0,M4.1.0/3", 37800, 34200},
+        {"<-04>4<-03>,M9.1.6/24,M4.1.6/24", -10800, -14400},
+        {"EET-2EEST,M4.5.5/0,M10.5.4/24", 7200, 10800},
+        {"<+0530>-5:30", 19800, 19800},
+    };
+    for (size_t i = 0; i < sizeof z / sizeof z[0]; i++)
+    {
+        TzRule r;
+        TEST_ASSERT_TRUE_MESSAGE(tzParse(z[i].tz, &r), z[i].tz);
+        TEST_ASSERT_EQUAL_INT32_MESSAGE(z[i].winter, tzOffsetSec(&r, (uint32_t)utcAt(2026, 1, 15, 12, 0, 0)), z[i].tz);
+        TEST_ASSERT_EQUAL_INT32_MESSAGE(z[i].summer, tzOffsetSec(&r, (uint32_t)utcAt(2026, 7, 15, 12, 0, 0)), z[i].tz);
+    }
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -223,5 +300,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_rejects);
     RUN_TEST(test_length_limit);
     RUN_TEST(test_reject_reason);
+    RUN_TEST(test_doc_table);
     return UNITY_END();
 }
