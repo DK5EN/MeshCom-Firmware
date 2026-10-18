@@ -423,12 +423,12 @@ plain struct fields. Estimate W1 with advisor about 40 min and about $10; W2 abo
 
 ## 12. Campaign status (orchestrator, updated per wave)
 
-| Wave | State                                                                                          | Commit     |
-| ---- | ---------------------------------------------------------------------------------------------- | ---------- |
-| W1   | done: host gate, 5 board builds + image scan, INSTRUMENT build, 2 advisor passes               | `581f8a0a` |
-| W2   | done: bench DK5EN-1/-14/-92 (Chrome), findings fixed                                           | `5a5fc7f7` |
-| W3   | done: T-Beam heap matrix, AU-17 opened                                                         | `5a5fc7f7` |
-| W4   | done: BLE guard (classic ESP32 only), shedding, benches W4a-c; restore of the bench nodes open | W4         |
+| Wave | State                                                                                              | Commit     |
+| ---- | -------------------------------------------------------------------------------------------------- | ---------- |
+| W1   | done: host gate, 5 board builds + image scan, INSTRUMENT build, 2 advisor passes                   | `581f8a0a` |
+| W2   | done: bench DK5EN-1/-14/-92 (Chrome), findings fixed                                               | `5a5fc7f7` |
+| W3   | done: T-Beam heap matrix, AU-17 opened                                                             | `5a5fc7f7` |
+| W4   | done: BLE guard (classic ESP32 only), shedding, benches W4a-c; bench nodes restored to the release | `64cd365d` |
 
 W1 deviations from sections 5-10:
 
@@ -512,3 +512,9 @@ when the 4 KB estimate can close the gap), `updcheck?ble`, INSTRUMENT `--update 
 - Not benched: McApp itself (`mcapp.local` not reachable from the bench host); a BLE client script
   (`tools/bench/ble_cycle.py`) stood in for the phone. Reconnect attempts during the guard were not exercised (the
   client was holding its link when the guard dropped it).
+
+### Bench restore (2026-10-18)
+
+DK5EN-1 (real AU path to the release), DK5EN-14 (already), DK5EN-92 (Webflasher, `ttgo_tbeam` built from tag v4.40a.10.18:
+the node cannot take the update itself, AU-17) and DK5EN-90 (serial DFU from the tag build) run v4.40a.10.18 with mode
+`notify`, channel `dev`; DK5EN-1 net console back off. DK5EN-98 was never touched.
