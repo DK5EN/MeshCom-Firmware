@@ -557,9 +557,10 @@ async function listen(port, kind, onTick) {
       await sleep(120);
       await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     } else {
-      // Native USB: DTR high is what makes the node talk. No RTS pulse here: on
-      // the Espressif USB-JTAG it resets the chip and can take the USB link, and
-      // with it this port, down mid-read.
+      // Native USB: the nRF52 core stays mute until DTR is high; the ESP32-S3
+      // USB-JTAG ignores DTR for output. No RTS pulse here: with DTR low it
+      // resets the S3 and can take the USB link, and with it this port, down
+      // mid-read.
       await port.setSignals({ dataTerminalReady: true, requestToSend: false });
     }
 
@@ -574,6 +575,21 @@ async function listen(port, kind, onTick) {
     // The radio line comes out during setup(), long before --info can answer;
     // give a rebooted node's log a moment to drain anyway.
     if (info) await sleep(300);
+    // The loop stops at the NODE line; "...AU env=" comes later in the same
+    // --info answer. Wait for it briefly (only fork ESP32 builds print it).
+    const envUntil = Date.now() + 1000;
+    while (info && !info.env && !lost && Date.now() < envUntil) {
+      info = parseInfo(text) || info;
+      if (!info.env) await sleep(100);
+    }
+    if (kind === 'esp-native' && !lost) {
+      // On the S3 USB-JTAG, DTR high with RTS low arms "download mode at the
+      // next reset". The port stays held for the flash dialog, so a reset in
+      // the meantime (RST button, brownout, watchdog) would boot the ROM
+      // instead of the app. Both low clears the flag; RTS stays low, so this
+      // is no reset. The flash dialog runs its own reset sequence.
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    }
   } catch (err) {
     lost = lost || err;
   } finally {
@@ -608,7 +624,12 @@ function showResult(result, info, facts, usbFamily) {
   detectResult.replaceChildren();
   if (info) {
     detectResult.append(
-      line('Knoten', `${info.call || '?'}, MeshCom ${info.version || '?'}, Hardware-ID ${info.hwid} <${info.hwname}>`),
+      line(
+        'Knoten',
+        `${info.call || '?'}, MeshCom ${info.version || '?'}` +
+          (info.hwid !== null ? `, Hardware-ID ${info.hwid} <${info.hwname}>` : '') +
+          (info.env ? `, Build-Env ${info.env}` : ''),
+      ),
     );
   } else {
     detectResult.append(line('Knoten', 'keine MeshCom-Antwort auf --info'));

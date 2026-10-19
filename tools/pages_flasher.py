@@ -349,6 +349,84 @@ def resolve_token(token: str, env: str, repo: Path, build_dir: Path) -> Path:
     return p if p.is_absolute() else repo / p
 
 
+def _size(tok: str) -> int:
+    tok = tok.strip().lower()
+    mult = 1
+    if tok.endswith("k"):
+        mult, tok = 1024, tok[:-1]
+    elif tok.endswith("m"):
+        mult, tok = 1024 * 1024, tok[:-1]
+    return int(tok, 0) * mult
+
+
+def parse_partition_csv(text: str) -> list[dict]:
+    """Rows of an ESP-IDF partition CSV: name, type, subtype, offset, size."""
+    rows = []
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        f = [c.strip() for c in line.split(",")]
+        if len(f) < 5 or not f[3]:
+            raise ValueError(f"unusable partition row: {line!r}")
+        rows.append(
+            {
+                "name": f[0],
+                "type": f[1].lower(),
+                "subtype": f[2].lower(),
+                "offset": _size(f[3]),
+                "size": _size(f[4]),
+            }
+        )
+    return rows
+
+
+def partition_table(cfg, env: str, repo: Path = REPO) -> tuple[str, list[dict]]:
+    """(csv name, rows) the env builds with: board_build.partitions, else the
+    board JSON default. Unknown file is an error, never a silent pass."""
+    name = resolve(cfg, env, "board_build.partitions")
+    if not name:
+        board = resolve(cfg, env, "board")
+        bj = board_json(board.strip(), repo) if board else {}
+        b = bj.get("build", {})
+        name = b.get("partitions") or b.get("arduino", {}).get("partitions")
+    if not name:
+        raise SystemExit(f"{env}: no partition table (board_build.partitions or board JSON)")
+    name = name.split(";", 1)[0].strip()
+    cands = [repo / name]
+    home = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio"))
+    cands += sorted(home.glob(f"packages/framework-arduinoespressif32*/tools/partitions/{name}"))
+    for c in cands:
+        if c.is_file():
+            try:
+                return name, parse_partition_csv(c.read_text())
+            except ValueError as e:
+                raise SystemExit(f"{env}: {c}: {e}") from None
+    raise SystemExit(f"{env}: partition table {name!r} not found")
+
+
+def check_partition_layout(cfg, env: str, parts, repo: Path = REPO) -> None:
+    """Fail when the manifest writes an app image where the env's partition
+    table has no matching app partition (Safeboot booting as app0, ...)."""
+    name, rows = partition_table(cfg, env, repo)
+    apps = {r["offset"]: r for r in rows if r["type"] == "app"}
+    for offset, _src, out_name in parts:
+        if out_name.startswith("safeboot"):
+            want = "factory"
+        elif out_name == "firmware.bin":
+            want = "ota_0"
+        else:
+            continue
+        row = apps.get(offset)
+        if row is None or row["subtype"] != want:
+            have = f"{row['name']}/{row['subtype']}" if row else "no app partition"
+            raise SystemExit(
+                f"{env}: manifest writes {out_name} at {offset:#x}, but {name} has "
+                f"{have} there (needs an app/{want} partition) -- "
+                f"fix board_build.partitions or the upload_command"
+            )
+
+
 def esp_parts(cfg, env: str, family: str, repo: Path, build_dir: Path):
     """Ordered (offset, source path, published name) for one ESP32 board."""
     cmd = resolve(cfg, env, "upload_command")
@@ -369,6 +447,7 @@ def esp_parts(cfg, env: str, family: str, repo: Path, build_dir: Path):
     # esptool takes the pairs in any order; the manifest lists them the way the
     # image is laid out, so a reader can check it against the partition table.
     out.sort(key=lambda t: t[0])
+    check_partition_layout(cfg, env, out, repo)
     return out
 
 

@@ -1162,6 +1162,8 @@
  },
  "env:esp32-external-radio": {
   "board": "T-Deck-Pro",
+  "board_build.app_partition_name": "app",
+  "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DBOARD_HAS_PSRAM",
@@ -4584,6 +4586,8 @@
  },
  "env:t_deck_pro": {
   "board": "T-Deck-Pro",
+  "board_build.app_partition_name": "app",
+  "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DBOARD_HAS_PSRAM",

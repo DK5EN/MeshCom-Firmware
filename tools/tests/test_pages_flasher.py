@@ -452,3 +452,73 @@ def test_republishing_a_version_does_not_duplicate_it(tmp_path):
     pf.update_releases(tmp_path, "v1", [], keep=3)
     info = pf.update_releases(tmp_path, "v1", [], keep=3)
     assert info["kept"] == ["v1"]
+
+
+# --------------------------------------------------------------------------
+# partition table cross-check
+# --------------------------------------------------------------------------
+
+SAFEBOOT_CSV = """\
+# Name, Type, SubType, Offset, Size
+nvs      ,data ,nvs      ,36K     ,20K    ,
+otadata  ,data ,ota      ,56K     ,8K     ,
+safeboot ,app  ,factory  ,64K     ,704K   ,
+app      ,app  ,ota_0    ,768K    ,12288K ,
+"""
+DEFAULT16_CSV = """\
+nvs,data,nvs,0x9000,0x5000,
+otadata,data,ota,0xe000,0x2000,
+app0,app,ota_0,0x10000,0x640000,
+app1,app,ota_1,0x650000,0x640000,
+"""
+PARTS = [
+    (0x10000, Path("safeboot-s3.bin"), "safeboot-s3.bin"),
+    (0xC0000, Path("firmware.bin"), "firmware.bin"),
+]
+
+
+def test_parse_partition_csv_suffixes_and_hex():
+    rows = pf.parse_partition_csv(DEFAULT16_CSV + SAFEBOOT_CSV)
+    assert rows[0]["offset"] == 0x9000 and rows[2]["size"] == 0x640000
+    assert [r["offset"] for r in rows[-2:]] == [0x10000, 0xC0000]
+    assert rows[-1]["size"] == 12288 * 1024
+
+
+def _cfg_with(tmp_path, csv_text):
+    (tmp_path / "t.csv").write_text(csv_text)
+    c = pf.load_config(REPO)
+    c.add_section("env:fake")
+    c.set("env:fake", "board_build.partitions", "t.csv")
+    return c
+
+
+def test_layout_check_passes_for_safeboot_table(tmp_path):
+    pf.check_partition_layout(_cfg_with(tmp_path, SAFEBOOT_CSV), "fake", PARTS, tmp_path)
+
+
+def test_layout_check_refuses_default_table(tmp_path):
+    with pytest.raises(SystemExit, match="safeboot-s3.bin at 0x10000"):
+        pf.check_partition_layout(_cfg_with(tmp_path, DEFAULT16_CSV), "fake", PARTS, tmp_path)
+
+
+def test_layout_check_refuses_missing_table(tmp_path):
+    c = _cfg_with(tmp_path, SAFEBOOT_CSV)
+    c.set("env:fake", "board_build.partitions", "nope.csv")
+    with pytest.raises(SystemExit, match="not found"):
+        pf.check_partition_layout(c, "fake", PARTS, tmp_path)
+
+
+def test_t_deck_pro_partition_table_matches_manifest(cfg, tmp_path):
+    # Regression: default_16MB.csv put app0 at 0x10000 where the manifest
+    # writes Safeboot, so the published image never booted MeshCom.
+    parts = pf.esp_parts(cfg, "t_deck_pro", "ESP32-S3", REPO, tmp_path)
+    pf.check_partition_layout(cfg, "t_deck_pro", parts, REPO)
+    name, _ = pf.partition_table(cfg, "t_deck_pro", REPO)
+    assert name == "partitions-16MB-safeboot.csv"
+
+
+def test_every_release_env_layout_matches_manifest(cfg, tmp_path):
+    for env in pf.RELEASE_ENVS:
+        fam = pf.chip_family(cfg, env, REPO)
+        if fam != "NRF52":
+            pf.esp_parts(cfg, env, fam, REPO, tmp_path)

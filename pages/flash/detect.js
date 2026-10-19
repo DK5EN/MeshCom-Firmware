@@ -12,9 +12,10 @@
 //   * ROM banner right after a reset: the chip family, even with no MeshCom
 //     on the board.
 
-// USB vendor IDs. Native USB (Espressif USB-JTAG, Adafruit nRF52 core) stays
-// mute until DTR is asserted. A USB-UART bridge (CP210x, CH34x, FTDI) wires
-// DTR/RTS to EN/IO0 instead, so there the same signals reset the chip.
+// USB vendor IDs. Native USB on nRF52 (Adafruit core) stays mute until DTR is
+// asserted; the ESP32-S3 USB-Serial/JTAG (HWCDC) ignores DTR. A USB-UART
+// bridge (CP210x, CH34x, FTDI) wires DTR/RTS to EN/IO0 instead, so there the
+// same signals reset the chip.
 export const USB_ESPRESSIF = 0x303a;
 export const USB_ADAFRUIT = 0x239a;
 
@@ -35,16 +36,25 @@ export function familyFromUsb(kind) {
 
 // "--MeshCom 4.35t (build: ...)\n...Call: <DK5EN-93> ...ID 0A1B2C3D ...NODE 43 <HELTEC_V3>"
 // -- the same format in upstream and fork (command_functions.cpp, --info).
+// The fork adds "...AU env=<pio env> tag=<tag>" (ESP32 only), which names the
+// exact image; that line comes after the NODE line, so a read that stops at
+// NODE may not have it yet.
+//
+// Either line alone is enough: with env= but no NODE line (hwid-less answer or
+// a read cut off) the result has hwid null and hwname '', and candidates()
+// works from the env. With neither line this is not a MeshCom answer: null.
 export function parseInfo(text) {
   const node = text.match(/\.\.\.NODE (\d+) <([^>\r\n]*)>/);
-  if (!node) return null;
+  const envm = text.match(/\.\.\.AU env=(\S+) tag=/);
+  if (!node && !envm) return null;
   const ver = text.match(/--MeshCom (\S+) \(build/);
   const call = text.match(/\.\.\.Call: <([^>\r\n]*)>/);
   return {
-    hwid: Number(node[1]),
-    hwname: node[2].trim(),
+    hwid: node ? Number(node[1]) : null,
+    hwname: node ? node[2].trim() : '',
     version: ver ? ver[1] : '',
     call: call ? call[1].trim() : '',
+    env: envm ? envm[1] : null,
   };
 }
 
@@ -97,7 +107,7 @@ export function parseBoot(text) {
 //
 //   detect      detect.json: { boards: {env: {hwid, radio, chipFamily}}, aliases: {hwid: [env]} }
 //   releaseEnvs env names the selected release actually ships
-//   info        parseInfo() result or null
+//   info        parseInfo() result or null (info.env, when set, is the exact image)
 //   facts       parseBoot() result
 //   usbFamily   familyFromUsb() result or null
 //
@@ -111,7 +121,33 @@ export function candidates(detect, releaseEnvs, info, facts, usbFamily) {
   const basis = [];
   const warnings = [];
 
-  if (info) {
+  // The env the running image reports is the strongest evidence there is. Trust
+  // it only if it is a board this release ships and its chip family does not
+  // contradict what the USB connection or ROM banner says; otherwise fall back
+  // to the hardware ID chain and say why.
+  if (info && info.env) {
+    const family = facts.family || usbFamily;
+    if (!pool.includes(info.env)) {
+      warnings.push(
+        `Das laufende Abbild meldet Build-Env ${info.env}; dieses Release baut es nicht.`,
+      );
+    } else if (family && boards[info.env].chipFamily !== family) {
+      warnings.push(
+        `Das laufende Abbild meldet Build-Env ${info.env} (${boards[info.env].chipFamily}), ` +
+          `der Chip ist aber ${family}; die Meldung wird nicht verwendet.`,
+      );
+    } else if (facts.radio && !facts.radio.ok && boards[info.env].radio === facts.radio.chip) {
+      // The running image is the one whose radio driver just failed: it is
+      // the wrong image for this board. The radio filter below rules it out.
+      warnings.push(
+        `Das laufende Abbild ${info.env} findet seinen Funkchip nicht; die Meldung wird nicht verwendet.`,
+      );
+    } else {
+      return { envs: [info.env], basis: [`Build-Env ${info.env}`], warnings };
+    }
+  }
+
+  if (info && info.hwid !== null) {
     const byId = new Set(pool.filter((env) => boards[env].hwid === info.hwid));
     for (const env of aliases[String(info.hwid)] || []) {
       if (pool.includes(env)) byId.add(env);

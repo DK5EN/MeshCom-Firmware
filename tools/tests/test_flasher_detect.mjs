@@ -57,6 +57,7 @@ test('parseInfo reads the heltec --info capture', () => {
     hwname: 'HELTEC_V3',
     version: '4.35t',
     call: 'DK5EN-93',
+    env: null,
   });
 });
 
@@ -74,7 +75,12 @@ test('parseBoot reads family, pmu and radio from the t-beam boot log', () => {
   const facts = parseBoot(TBEAM_V12);
   assert.equal(facts.family, 'ESP32');
   assert.equal(facts.pmu, 'AXP2101');
-  assert.deepEqual(facts.radio, { printed: 'SX1276', chip: 'SX1278', ok: true, code: null });
+  assert.deepEqual(facts.radio, {
+    printed: 'SX1276',
+    chip: 'SX1278',
+    ok: true,
+    code: null,
+  });
 });
 
 test('parseBoot reads the S3 ROM banner and a failed radio', () => {
@@ -83,7 +89,12 @@ test('parseBoot reads the S3 ROM banner and a failed radio', () => {
       '[LoRa]...SX1262 chip Initializing ... failed, code -2\r\n',
   );
   assert.equal(facts.family, 'ESP32-S3');
-  assert.deepEqual(facts.radio, { printed: 'SX1262', chip: 'SX1262', ok: false, code: -2 });
+  assert.deepEqual(facts.radio, {
+    printed: 'SX1262',
+    chip: 'SX1262',
+    ok: false,
+    code: -2,
+  });
 });
 
 test('parseBoot names the Supreme PMU line AXP2101', () => {
@@ -153,4 +164,102 @@ test('no evidence at all: no candidates instead of the whole list', () => {
   const r = candidates(DETECT, ALL, null, {}, null);
   assert.deepEqual(r.envs, []);
   assert.deepEqual(r.basis, []);
+});
+
+// --info as the fork firmware prints it (command_functions.cpp): the NODE line,
+// later the "...AU env=<pio env> tag=<tag>" line (ESP32 only). Synthesized.
+const infoText = (hwid, hwname, envLine) =>
+  `--MeshCom 4.40a (build: Oct 19 2026 / 10:00:00)\r\n...UPDATE: 0\r\n` +
+  (hwid === null
+    ? ''
+    : `...Call: <DK5EN-92> ...ID E0D041B8 ...NODE ${hwid} <${hwname}> ...UTC-OFF 1.000000 [NTP]\r\n`) +
+  `...TIME 12345 ms\r\n` +
+  (envLine ? `...AU env=${envLine} tag=(local)\r\n` : '');
+
+test('WF-01: an env whose own radio failed is not trusted; the radio filter rules it out', () => {
+  // A T-Beam v1.2 reports TBEAM_AXP2101 (12, the alias of all three images).
+  const env = 'ttgo_tbeam_SX1262';
+  const log =
+    '[LoRa]...SX1262 chip Initializing ... failed, code -2\n' + infoText(12, 'TBEAM_AXP2101', env);
+  const r = candidates(DETECT, ALL, parseInfo(log), parseBoot(log), null);
+  assert.deepEqual(r.envs.sort(), ['ttgo_tbeam', 'ttgo_tbeam_SX1268']);
+  assert.match(r.warnings.join(' '), /SX1262/);
+});
+
+const S3_ENVS = ALL.filter((e) => DETECT.boards[e].chipFamily === 'ESP32-S3');
+
+test('WF-01: the env the firmware reports names the image on its own', () => {
+  const env = 'LilyGo_T-Beam-1W';
+  const hwid = DETECT.boards[env].hwid;
+  const info = parseInfo(infoText(hwid, 'TBEAM_1W', env));
+  assert.equal(info.env, env);
+  const r = candidates(DETECT, ALL, info, {}, 'ESP32-S3');
+  assert.deepEqual(r.envs, [env]);
+  assert.match(r.basis.join(' '), /Build-Env LilyGo_T-Beam-1W/);
+  assert.deepEqual(r.warnings, []);
+});
+
+test('WF-01: an env line without a NODE line still yields usable info', () => {
+  const info = parseInfo(infoText(null, '', 't_deck_plus'));
+  assert.equal(info.hwid, null);
+  assert.equal(info.env, 't_deck_plus');
+  assert.deepEqual(candidates(DETECT, ALL, info, {}, 'ESP32-S3').envs, ['t_deck_plus']);
+});
+
+test('WF-01: tag "(local)" and a release tag both parse', () => {
+  assert.equal(parseInfo('...AU env=t_deck_plus tag=v4.40a.10.20\n').env, 't_deck_plus');
+  assert.equal(parseInfo('...NODE 43 <HELTEC_V3>\n').env, null);
+});
+
+test('WF-01: env not in this release falls back to the hardware id, with a warning', () => {
+  const info = parseInfo(infoText(43, 'HELTEC_V3', 'some_upstream_env'));
+  const r = candidates(DETECT, ALL, info, {}, null);
+  assert.deepEqual(r.envs, ['heltec_wifi_lora_32_V3']);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /some_upstream_env/);
+});
+
+test('WF-01: an env contradicting the USB family is not trusted', () => {
+  // ttgo_tbeam is a classic ESP32; a native-USB (S3) connection cannot be it.
+  const hwid = DETECT.boards['LilyGo_T-Beam-1W'].hwid;
+  const info = parseInfo(infoText(hwid, 'TBEAM_1W', 'ttgo_tbeam'));
+  const r = candidates(DETECT, ALL, info, {}, 'ESP32-S3');
+  assert.ok(!r.envs.includes('ttgo_tbeam'));
+  assert.deepEqual(r.envs, ['LilyGo_T-Beam-1W']);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /ttgo_tbeam/);
+});
+
+test('WF-01: an env contradicting the ROM family is not trusted', () => {
+  const info = parseInfo(infoText(null, '', 'ttgo_tbeam'));
+  const r = candidates(DETECT, ALL, info, parseBoot('ESP-ROM:esp32s3-20210327\n'), null);
+  assert.ok(!r.envs.includes('ttgo_tbeam'));
+  assert.ok(r.warnings.length >= 1);
+});
+
+test('native S3 USB alone: every S3 board remains (the 17-board case)', () => {
+  const r = candidates(DETECT, ALL, null, {}, 'ESP32-S3');
+  assert.ok(S3_ENVS.length > 1);
+  assert.equal(r.envs.length, S3_ENVS.length);
+  assert.deepEqual([...r.envs].sort(), [...S3_ENVS].sort());
+});
+
+test('current behaviour: single candidate whose radio reports failed is dropped, with a warning', () => {
+  // Heltec V3 is the only board for id 43; its SX1262 failing removes it.
+  const info = parseInfo(HELTEC_INFO);
+  const facts = parseBoot('[LoRa]...SX1262 chip Initializing ... failed, code -2\n');
+  const r = candidates(DETECT, ALL, info, facts, null);
+  assert.deepEqual(r.envs, []);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /SX1262/);
+});
+
+test('current behaviour: a working LLCC68 with no matching board leaves the pool unfiltered', () => {
+  const info = parseInfo(HELTEC_INFO);
+  const facts = parseBoot('[LoRa]...LLCC68 chip Initializing ... success\n');
+  assert.equal(facts.radio.chip, 'LLCC68');
+  const r = candidates(DETECT, ALL, info, facts, null);
+  assert.deepEqual(r.envs, ['heltec_wifi_lora_32_V3']);
+  assert.ok(!r.basis.some((b) => /LLCC68/.test(b)));
+  assert.deepEqual(r.warnings, []);
 });
