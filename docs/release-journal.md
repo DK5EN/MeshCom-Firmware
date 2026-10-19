@@ -16,7 +16,7 @@ Getaggt am 2026-10-19 mit dem Datum des Folgetags (gleicher Tag wie 10.19, `.N`-
 unsichtbar). `FLASH_VERSION` 20261020, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen
 bleiben erhalten. Safeboot unveraendert seit 10.05.
 
-Inhalt seit `v4.40a.10.19` (alle drei Firmware-Commits, in den Release-Notes untergebracht):
+Inhalt seit `v4.40a.10.19` (alle vier Firmware-Commits, in den Release-Notes untergebracht):
 
 - WEB-WDT-01 W1 (`3b54c452`): `web_txbuf.h` mit begrenzter Sendeschleife (Abbruch nach 2 s ohne Fortschritt,
   15 s Seitenbudget, Sendefehler), 20 Host-Tests, Watchdog-Fuetterung je Datensatz in Path, MHeard und
@@ -27,8 +27,15 @@ Inhalt seit `v4.40a.10.19` (alle drei Firmware-Commits, in den Release-Notes unt
 - WEB-STOP-01 + RM-NVS-01 (`1cfa8ca2`): `stopWebserver()` nur bei laufendem Server (Log-Flut "WEBServer
   stopped" ohne IP, T-Deck-Feldmeldung); NVS-Zeile in `--info` und Logzeilen bei fehlgeschlagenem Speichern
   der RM-Knotenliste (E22-Feldmeldung, nur Diagnose).
+- AU-16 (`22b13194`): T-Beam 1W baut mit `qio` statt `dio` (Board-JSON `esp32-s3-wroom-1-n16r8.json`,
+  Bootloader jetzt 15104 B wie bei den anderen S3-Boards); Laufzeit-Sperre auf jedem ESP32-S3 per
+  `SPI_MEM_CTRL_REG(0)`: Uebergabe an Safeboot, `--update install/apply`, Auto-Handover und `--ota-update`
+  verweigert mit `bootloader_dio`, kein Override; `--update status` mit `boot;qio|dio;spi0`; Web-GUI-Hinweis
+  mit gesperrtem Knopf (`/austatus` Schluessel `sbwhy`). 1W-Besitzer muessen einmal den Webflasher laufen
+  lassen (Anleitung `docs/troubleshooting-tbeam-1w-autoupdate.md`).
 - Nicht-Firmware: Bench-Laeufe A-F und Kampagnendoku (`8a86f55a`, `docs/campaign-web-wdt-20261019.md`),
   Defektkatalog Abschnitte 2d/2e.
+- Nicht-Firmware: AU-16-Kampagne und Anleitung (`c2a6d533`, `docs/campaign-au16-dio-bootloader.md`).
 - Upstream: nichts Neues; alles dieses Releases nur im Fork (WEB-STOP-01 ist PR-Kandidat, der Fehler steckt
   auch in upstream/dev).
 
@@ -42,13 +49,21 @@ Inhalt seit `v4.40a.10.19` (alle drei Firmware-Commits, in den Release-Notes unt
 - Idle-Heap-Gate (Operator-Entscheidung: Lauf D statt eigenem Flash): `DK5EN-92` (T-Beam v1.2), Build von
   `34974374` ohne Tag-String, BLE an, 2323, 620 s: 67748 B gegen Basis 69332 B, -1584 B, innerhalb 3072 B
   (`tools/bench/runs/harness/webwdt_heap_dk5en92.json`).
-- Gate: `tools/regression.sh --stage 1,2` PASS auf `1cfa8ca2` + FLASH_VERSION: Unity 76 Envs, 2720/2720, Golden-Selftest 48 Befehle, pytest 1157, nRF52-Board-Links, Web-GUI-Suiten.
+- AU-16 auf `DK5EN-14` (T-Deck Plus, gleiche S3-N16R8-Familie wie der 1W), nur der Bootloader getauscht: DIO
+  (1W-Bootloader 10.19) zeigt das Feldbild von OE5HWN-17 Zeile fuer Zeile; QIO: Safeboot nach 7 s im LAN,
+  nach 198 s zurueck in der App. Guard-Build: QIO uebergibt unveraendert (`spi0 0x012c2008`), DIO ueberall
+  gesperrt (`spi0 0x00ac2008`), NVS intakt.
+- Gate: `tools/regression.sh --stage 1,2` PASS auf dem Release-Commit: Unity 76 Envs, 2723/2723,
+  Golden-Selftest 48 Befehle, pytest 1157, nRF52-Board-Links, Web-GUI-Suiten.
 
 ### Was ausdruecklich NICHT geprueft wurde
 
 - `1cfa8ca2` (WEB-STOP-01, NVS-Diagnose) auf Hardware: nur Host-Tests und Builds; kein Heap-Wert fuer diesen
   Commit.
 - Chrome-Durchgang von Lauf F (nur Skript-Client).
+- AU-16 auf einem echten T-Beam 1W: kein 1W auf der Bench; ob er den QIO-Bootloader aus dem Webflasher
+  bootet, soll der erste Webflasher-Lauf bei OE5HWN oder DD7MH bestaetigen.
+- `22b13194` (AU-16) nicht heap-gemessen.
 - Diese CI-Images selbst auf der Bench-Flotte; der Operator flasht die Knoten spaeter selbst.
 - Weiter offen aus 10.19: LoRa-QRT auf der Bench und `DK5EN-98`-Nachtaufzeichnung, LED-Feldpruefung, AU-14,
   AU-17-Downloadpfad.
