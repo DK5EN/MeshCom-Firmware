@@ -1083,10 +1083,10 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 <p class="lead" style="margin-top:1rem">Ein LoRa-Mesh im ISM-Band kann keine stabilen Routen lernen. MeshCom flutet — und lässt die Statistik gewinnen. Dieser Vortrag zeigt, warum das die richtige Wahl ist, wo es noch hakt, und warum MeshCom genau das Werkzeug ist, das EMCOMM braucht.</p>
 <div class="grid g3" style="margin-top:1.05rem">
 <div class="card cold"><h3>1 · Für das Dev-Team</h3><p>Probabilistisches Routing ist im ISM-Band die richtige Wahl. Nicht routen — <b>fluten, und netzbildenden Knoten Vorrang geben</b>.</p></div>
-<div class="card"><h3>2 · Für das Dev-Team</h3><p>Persönliche Nachrichten brauchen eine echte <b>Transportsicherung</b> — heute gibt es keine Zustellgarantie.</p></div>
+<div class="card"><h3>2 · Für das Dev-Team</h3><p>Persönliche Nachrichten brauchen eine echte <b>Transportsicherung</b> — seit 4.40a werden sie wiederholt, bis die Quittung kommt, und ein Store-Knoten hebt sie auf.</p></div>
 <div class="card good"><h3>3 · Für EMCOMM</h3><p>Robust, einfach, off-grid auf reinem LoRa. Der Backbone (Internet/HamNet) ist Brücke, nicht Träger: <b>LoRa is all you need.</b></p></div>
 </div>
-<div class="note" style="margin-top:.9rem"><b>Datenstand:</b> Firmware <code>v4.35s</code> (Release <code>v4.35s.09.03-stability</code>, Branch <code>fork-main</code>), Live-Netzdaten <a href="https://meshmap.oevsv.at">meshmap.oevsv.at</a> vom 24.08.2026. Jede Verhaltensaussage ist gegen den Quellcode geprüft. Die Zeilenangaben in den <span class="mono">▸ Für Entwickler</span>-Blöcken beziehen sich auf den Stand vom 23.08.2026, festgehalten im Tag <code>archive/v4.35p_prio-20260903</code>.</div>
+<div class="note" style="margin-top:.9rem"><b>Datenstand:</b> erstellt im August mit Firmware <code>v4.35s</code>, nachgeführt am 19.10.2026 auf <code>v4.40a</code> (Release <code>v4.40a.10.21</code> dieses Forks, der die Funktionen bis zum offiziellen Release vorwegnimmt). Live-Netzdaten <a href="https://meshmap.oevsv.at">meshmap.oevsv.at</a> vom 19.10.2026, wo nicht anders vermerkt. Jede Verhaltensaussage ist gegen den Quellcode geprüft. Die Zeilenangaben in den <span class="mono">▸ Für Entwickler</span>-Blöcken der unveränderten Folien beziehen sich auf den Stand vom 23.08.2026 (Tag <code>archive/v4.35p_prio-20260903</code>); die nachgeführten Folien nennen Funktionsnamen statt Zeilen.</div>
 </div></section>
 
 <section class="slide"><span class="num">02</span><div class="inner">
@@ -1730,38 +1730,40 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 </div></section>
 
 <section class="slide" id="s7"><span class="num">08</span><div class="inner">
-  <div class="eyebrow">Ein Missverständnis</div>
-  <h2>Der Source-Path ist eine Spur, keine gelernte Route — so gewollt</h2>
+  <div class="eyebrow">Ein Missverständnis, aufgelöst</div>
+  <h2>Der Pfad kommt jetzt aus der Nachbarschaftsmatrix — und die Weiterleitung fragt sie</h2>
 
   <div class="grid g2" style="align-items:start;gap:1.6rem">
     <figure>
-      <img src="assets/node-path.webp" alt="Path Information im WebGUI von DK5EN-98 mit Source-Path-Einträgen">
-      <figcaption><b>Live vom Knoten DK5EN-98</b>, 23.08.2026 18:18 — Menüpunkt „Path“ im WebGUI.</figcaption>
+      <img src="assets/node-path.webp" alt="Path Information im WebGUI von DK5EN-98: Tabelle mit Call, Hops, GW, Mesh, Firmware, Hears me, Via / Covered by, Reach und Age">
+      <figcaption><b>Live vom Knoten DK5EN-98</b>, 19.10.2026 18:09, Firmware 4.40a — Menüpunkt „Path“ im WebGUI.</figcaption>
     </figure>
 
     <div>
-      <p>Die Anzeige sieht aus wie eine Routing-Tabelle. Sie ist keine. Was dort steht, ist das <b>Protokoll einer bereits erfolgten Reise</b>:
-      Wie ein einzelnes HEY-Bakenpaket dieses Absenders zufällig zu mir gefunden hat.</p>
+      <p>Bis 4.35 stand hier das Protokoll einer einzelnen HEY-Reise, und keine Zeile der Sende- oder Weiterleitungslogik las es.
+      Seit 4.40a baut der Knoten die Seite aus der <b>Nachbarschaftsmatrix</b>: Jeder gehörte Frame trägt im Pfad einen Hörbeweis —
+      wer ihn wiederholt hat, hat den Vorgänger gehört. Daraus entsteht über 12 Stunden eine Kreuztabelle „wer hört wen“.</p>
 
       <div class="card" style="margin-top:.85rem">
-        <h3>Was <code>3G/DB0HOB-12,DB0ED-99</code> bedeutet</h3>
+        <h3>Was die Spalten bedeuten</h3>
         <table><tbody>
-          <tr><td class="m" style="color:var(--acc)">3</td><td>Anzahl Rufzeichen im Pfad des zuletzt gehörten HEY — also die zurückgelegte Hop-Zahl</td></tr>
-          <tr><td class="m" style="color:var(--acc)">G</td><td><b>Der Ursprungsknoten dieses HEY ist ein Gateway.</b> Kein Hinweis darauf, dass der Weg über ein Gateway lief. Leerzeichen statt G heißt: kein Gateway.</td></tr>
-          <tr><td class="m" style="color:var(--acc)">DB0…</td><td>die Rufzeichen, die das Paket angehängt haben</td></tr>
+          <tr><td class="m" style="color:var(--acc)">Hops</td><td>0 der eigene Knoten, 1 direkt gehört, 2 und mehr über die Matrix erschlossen</td></tr>
+          <tr><td class="m" style="color:var(--acc)">Hears me</td><td>der Nachbar meldet in seinen eigenen Berichten, dass er mich hört, mit diesem SNR</td></tr>
+          <tr><td class="m" style="color:var(--acc)">Via / Covered by</td><td>bei Hop 1: wer diesen Nachbarn sonst noch versorgt; ab Hop 2: über wen der Weg läuft</td></tr>
+          <tr><td class="m" style="color:var(--acc)">Reach</td><td>größte Entfernung zu einem frisch gehörten Partner</td></tr>
         </tbody></table>
-        <div class="cite">Format: <b>web_functions.cpp:993</b> · Gateway-Bit gesetzt in <b>mheard_functions.cpp:542-543</b></div>
+        <div class="cite">Seite <b>web_functions.cpp</b> <code>sub_page_path()</code> · Matrix <code>nbrDirectMask()</code>, <code>nbrRouteGet()</code></div>
       </div>
 
-      <div class="note bad" style="margin-top:.85rem">
-        <b>Entscheidend:</b> Diese Tabelle wird <b>ausschließlich aus HEY-Baken</b> gefüllt, altert nach 12 Stunden — und
-        <b>keine einzige Stelle der Sende- oder Weiterleitungslogik liest sie jemals</b>. Alle Zugriffe im gesamten Baum sind
-        Anzeige: Konsole, T-Deck-Display, WebGUI, SD-Persistenz. Für die nächste Nachricht ändert sie exakt nichts.
-        <div class="cite">Struktur <b>mheard_functions.cpp:32-38</b>, gefüllt nur von <b>updateHeyPath()</b> (<b>:382-554</b>), aufgerufen nur bei HEY (<b>lora_functions.cpp:698</b>)</div>
+      <div class="note ok" style="margin-top:.85rem">
+        <b>Entscheidend:</b> Die Matrix ist keine Anzeige mehr. Bevor ein Knoten ein fremdes Paket wiederholt, fragt er sie, welche
+        seiner Nachbarn es brauchen. Hört er die Kopie eines anderen Relais, dessen Hörer diese Nachbarn alle abdecken,
+        <b>streicht er die eigene Wiederholung</b>. Ist er für einen Nachbarn der einzige Versorger, sendet er in jedem Fall.
+        <div class="cite">Bedarf <code>nbrRelayNeed()</code> vor dem Relay, Abbruch bei gehörter Kopie <b>lora_functions.cpp</b> (<code>--nbrrelay on</code>, in Release-Builds fest)</div>
       </div>
 
-      <p style="margin-top:1rem;font-size:.92rem;color:var(--fg2)">Und selbst wenn man sie läse: Ein Pfad, den ein Paket <em>gestern</em> genommen hat,
-      ist keine Zusage, dass er <em>morgen</em> noch existiert. Genau deshalb halten wir es für den falschen Ansatzpunkt. Der bessere kommt auf Folie 15, „Der Vorschlag · Routing“.</p>
+      <p style="margin-top:1rem;font-size:.92rem;color:var(--fg2)">Routing ist es trotzdem nicht. Die Matrix weiß, wer in den letzten Stunden wen gehört hat,
+      nicht, ob der Weg morgen noch da ist. Sie entscheidet deshalb nur, <em>ob</em> eine Wiederholung gebraucht wird, nicht <em>wohin</em> ein Paket geht.</p>
     </div>
   </div>
 </div></section>
@@ -1818,7 +1820,7 @@ Quittung: <b>{987</b> angehängt</pre>
 
 <section class="slide" id="s8"><span class="num">10</span><div class="inner">
   <div class="eyebrow">Zwei Schalter</div>
-  <h2>Mesh an, Gateway optional — der Normalfall funkt ganz ohne Internet</h2>
+  <h2>Mesh nur, wo es ein Gebiet versorgt — Gateway optional, der Normalfall funkt ohne Internet</h2>
 
   <div class="grid g2">
     <div class="card cold"><h3>Gateway — die Brücke ins Internet</h3>
@@ -1838,6 +1840,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <li>Wiederholt fremde Pakete einmal, solange Hop-Budget übrig ist</li>
         <li><b>Betrifft nur das Weiterleiten.</b> Empfangen, Anzeigen und eigenes Senden laufen unverändert weiter</li>
         <li>Mesh=AUS macht aus dem Knoten einen Endpunkt, keinen tauben Knoten</li>
+        <li><b>Jede Wiederholung kostet Sendezeit bei allen in Reichweite.</b> Mesh lohnt sich nur, wo der Knoten Stationen erreicht, die sonst niemand versorgt</li>
       </ul>
       <div class="kv" style="margin-top:.8rem"><span>Werkszustand</span><span style="color:var(--ok)">AN</span></div>
       <div class="kv"><span>Kommando</span><span>--mesh on / off</span></div>
@@ -1850,10 +1853,18 @@ Quittung: <b>{987</b> angehängt</pre>
     <tbody>
       <tr><td class="m" style="color:var(--ok)">AN</td><td class="m" style="color:var(--ok)">AN</td><td>Volle Brücke Funk ↔ Internet <b>und</b> Funk-Relay</td><td>Klassischer Standort-Knoten auf dem Berg</td></tr>
       <tr><td class="m" style="color:var(--ok)">AN</td><td class="m" style="color:var(--bad)">AUS</td><td>Speist ein und aus, <b>verlängert die Funkstrecke aber nicht</b></td><td>iGate im dichten Stadtgebiet</td></tr>
-      <tr><td class="m" style="color:var(--bad)">AUS</td><td class="m" style="color:var(--ok)">AN</td><td>Reines Funk-Relay ohne Internet — <b>Werkszustand</b></td><td>Der Normalfall zu Hause</td></tr>
+      <tr><td class="m" style="color:var(--bad)">AUS</td><td class="m" style="color:var(--ok)">AN</td><td>Reines Funk-Relay ohne Internet — <b>Werkszustand</b></td><td>Exponierter Standort, der ein Gebiet versorgt</td></tr>
       <tr><td class="m" style="color:var(--bad)">AUS</td><td class="m" style="color:var(--bad)">AUS</td><td>Empfängt und sendet nur für sich selbst</td><td>Insel · Handgerät · Testaufbau</td></tr>
     </tbody>
   </table>
+
+  <div class="note bad" style="margin-top:.9rem">
+    <b>Mesh muss in großen Gebieten geplant sein.</b> Wiederholen viele Knoten dasselbe Paket, wird jeder Frame schnell mehr als
+    zehnmal ausgesendet: das Netz wird langsam und kann zum Erliegen kommen. Messung am 18.10.2026: Bei DK5EN-98 ging jede
+    Server-Nachricht im Schnitt <b>3,8-mal</b> in die Luft (bis 6), jede eigene <b>6,4-mal</b> (bis 9); das Relais DB0TAW-14 in der Rhön
+    hatte 16–19 von 20 Sendeplätzen belegt, 41–43&nbsp;% Empfangslast und kaum noch Sendezeit.
+    <div class="cite"><b>docs/lora-qrt-dk5en98-db0taw14-20261018.md</b> · Mesh-Schalter <b>nrf52_main.cpp:711</b> (Bit gelöscht = an)</div>
+  </div>
 
   <div class="note warn" style="margin-top:.9rem">
     <b>Woher weiß ein Knoten, dass er selbst Internet hat?</b> Aus dem WLAN-Status und einer gültigen IP — plus einer Fehlerzählung beim UDP-Senden.
@@ -1864,28 +1875,28 @@ Quittung: <b>{987</b> angehängt</pre>
 </div></section>
 
 <section class="slide"><span class="num">11</span><div class="inner">
-<div class="eyebrow">Baustelle 1 · Overhead</div><h2>Heute erdrückt der Status-Verkehr die Nutzlast</h2>
+<div class="eyebrow">Baustelle 1 · Overhead</div><h2>Heute überwiegt der Status-Verkehr — aber es wird mehr geschrieben</h2>
 <div class="cmp-mount" data-cmp="overhead">
 <div class="cmp-overhead" id="cmp-overhead">
 
   <div class="cmp-overhead__header">
     <div class="cmp-overhead__title">Overhead-Aufschlüsselung — Frame-Typen im MeshCom-Netz</div>
-    <div class="cmp-overhead__subtitle">Dashboard-Aggregat · meshmap.oevsv.at/admin · 24.08.2026 · 1392 Knoten</div>
+    <div class="cmp-overhead__subtitle">Aktivitätsreihe meshmap.oevsv.at · Mittel über 168 h, 12.–19.10.2026 · rund 1.635 aktive Stationen</div>
   </div>
 
   <div class="cmp-overhead__callout">
-    <div class="cmp-overhead__callout-main">Das Netz beschäftigt sich vor allem mit sich selbst — Chat ist winzig.</div>
-    <div class="cmp-overhead__callout-sub">HEY alle 15 min (Trickle, Boden 30 s) · POS alle 30 min · MSG ereignisgetrieben · 1392 Knoten</div>
+    <div class="cmp-overhead__callout-main">Status-Meldungen überwiegen, weil der Nutzerverkehr noch klein ist — aber er wächst: 2,4-mal so viele Nachrichten pro Stunde wie im August.</div>
+    <div class="cmp-overhead__callout-sub">HEY 6.634/h · POS 4.256/h · TLM 20/h · MSG 24/h (24.08.2026: 10/h) · 30 Tage: 28.818 Nachrichten, 961 pro Tag, 1.252 Absender</div>
   </div>
 
   <div class="cmp-overhead__ratio-callout" id="cmp-overhead-ratio-callout" role="status" aria-live="polite">
-    <div class="cmp-overhead__ratio-big">~920 : 1</div>
-    <div class="cmp-overhead__ratio-label">Status-Frames (HEY + POS + TLM = <strong>9208/h</strong>)<br>vs. Nutzlast/Chat (MSG = <strong>10/h</strong>)</div>
+    <div class="cmp-overhead__ratio-big">~450 : 1</div>
+    <div class="cmp-overhead__ratio-label">Status-Frames (HEY + POS + TLM = <strong>10.910/h</strong>)<br>vs. Nutzlast/Chat (MSG = <strong>24/h</strong>; im August ~920 : 1)</div>
   </div>
 
   <div class="cmp-overhead__sat-callout" id="cmp-overhead-sat-callout" role="status" aria-live="polite">
     <strong>66 % der Sendeversuche fanden den Kanal belegt</strong> (BergLog, 5 Knoten, 16 h). Die Luft ist schon ohne Chat eng.<br>
-    Wenn MSG-Traffic wächst: schon bei ×100 (1.000/h) wird Chat spürbar; bei ×500 (5.000/h) konkurriert Chat direkt mit dem Status-Overhead.
+    Wenn MSG-Traffic weiter wächst: bei ×100 (2.400/h) wird Chat spürbar; bei ×500 (12.000/h) übersteigt Chat den Status-Verkehr.
   </div>
 
   <div class="cmp-overhead__controls">
@@ -1913,7 +1924,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 
   <div class="cmp-overhead__legend" id="cmp-overhead-legend" aria-label="Legende"></div>
-  <div class="cmp-overhead__source">Quelle: Dashboard-Aggregat meshmap.oevsv.at/admin, 24.08.2026</div>
+  <div class="cmp-overhead__source">Quelle: meshmap.oevsv.at, Aktivitätsreihe (Frames je Typ und Stunde, 168 h bis 19.10.2026 17:00) und Nachrichtenstatistik 30 Tage; Vergleichswert August: Dashboard-Aggregat 24.08.2026</div>
 
   <div class="cmp-overhead__tooltip" id="cmp-overhead-tooltip" role="tooltip" aria-live="polite"></div>
 
@@ -1928,9 +1939,10 @@ Quittung: <b>{987</b> angehängt</pre>
 
   <div class="grid g2" style="align-items:start;gap:1.6rem">
     <figure>
-      <img src="assets/node-mheard.webp" alt="MHeard-Liste im WebGUI von DK5EN-98">
-      <figcaption><b>DK5EN-98, 23.08.2026 18:18.</b> Pro Nachbar: Typ, Hardware, Modulation, RSSI, SNR, Entfernung,
-      <b>NCNT</b> und Position. Angezeigt werden Nachbarn der letzten 3 Stunden.</figcaption>
+      <img src="assets/node-mheard.webp" alt="MHeard-Seite im WebGUI von DK5EN-98 mit Relay-Rolle je Nachbar">
+      <figcaption><b>DK5EN-98, 19.10.2026 18:09, Firmware 4.40a.</b> Pro direkt gehörtem Nachbarn der letzten 3 Stunden: letzter Frame,
+      Hardware, Firmware, RSSI, SNR, Entfernung, Position — und aus der Nachbarschaftsmatrix: <b>Hears me</b>, <b>Relay role</b>
+      (Super node · Needed · Redundant), <b>Only it hears</b>, <b>It hears</b> und die gemeldete Nachbarzahl (<b>NCNT</b>).</figcaption>
     </figure>
 
     <div>
@@ -1952,10 +1964,10 @@ Quittung: <b>{987</b> angehängt</pre>
       </div>
 
       <div class="note warn" style="margin-top:1rem">
-        <b>NCNT hat eine Decke.</b> Gezählt werden Nachbarn der letzten Stunde, höchstens aber so viele, wie die Board-Klasse Plätze hat:
-        <b>80</b> auf ESP32-S3 und RAK4631, <b>30</b> auf klassischem ESP32, <b>50</b> auf T-Deck. In der Produktion melden Spitzenknoten
-        wie DK7WK-12 und DB0KH-11 exakt den Maximalwert — ihr wahrer Wert liegt höher.
-        <div class="cite"><b>mheard_functions.cpp:556-572</b> · <b>configuration_global.h:172-201</b></div>
+        <b>NCNT zählt seit 4.40a nur noch, wer mich auch hört.</b> Gezählt wird ein Nachbar, den ich in der letzten Stunde direkt gehört habe
+        und der mich laut eigener Meldung hört oder stabil über der SNR-Schwelle liegt. Auf der Luft ist der Wert zweistellig, höchstens <b>99</b>;
+        die Matrix hält <b>128</b> Nachbarn auf ESP32-S3 und RAK4631 und <b>64</b> auf klassischem ESP32 und T-Deck.
+        <div class="cite"><code>nbrNcnt()</code> / <code>nbrNcntAir()</code> <b>nbr_views.h</b> · <code>NBR_NCNT_AIR_MAX</code> <b>nbr_matrix.h</b> · <code>NBR_MAX_ROWS</code> <b>configuration_global.h</b></div>
       </div>
     </div>
   </div>
@@ -2095,7 +2107,7 @@ Quittung: <b>{987</b> angehängt</pre>
 
 <section class="slide" id="s9"><span class="num">14</span><div class="inner">
   <div class="eyebrow">Wer darf zuerst?</div>
-  <h2>Heute würfeln alle gleich — der Zufall entscheidet, nicht die Wichtigkeit</h2>
+  <h2>Seit 4.40a wird jedes Paket geprüft — redundantes Meshing wird aktiv verhindert</h2>
 
   <div class="grid g2" style="align-items:start">
     <div>
@@ -2116,6 +2128,16 @@ Quittung: <b>{987</b> angehängt</pre>
         <code>Basis + Zufall(0…10) × 35 ms</code><br>
         Ab dem 2. Versuch <code>Basis × 5/6</code>, ab dem 3. <code>Basis × 2/3</code>, ab dem 4. nur noch <b>100 ms Rapid-Fire</b> ohne Jitter, bis der Kanal frei ist. Der Backoff wird also unter Last <b>aggressiver, nicht defensiver</b>. Ein Jitter auf den Rapid-Fire (<code>100 ms + Zufall(0…3) × 35 ms</code>) ist Teil von Stufe S.
         <div class="cite"><b>lora_functions.cpp:2153-2174</b></div>
+      </div>
+      <div class="note warn" style="margin-top:.85rem">
+        <b>Die Wartezeit würfelt weiter.</b> Ein Blattknoten mit einem einzigen Nachbarn und ein Bergknoten mit 26 Nachbarn
+        bekommen für ihr Relay dieselbe Verteilung: 4500 ms plus Würfel. Wer <em>zuerst</em> sendet, entscheidet der Zufall.
+      </div>
+      <div class="note ok" style="margin-top:.85rem">
+        <b>Neu in 4.40a: wer <em>überhaupt</em> sendet, entscheidet die Matrix.</b> Jedes fremde Paket wird vor dem Relay geprüft: Welche
+        meiner Nachbarn brauchen es? Hört der Knoten in der Wartezeit eine Kopie, die diese Nachbarn schon versorgt, streicht er seine
+        eigene. Der einzige Versorger eines Nachbarn sendet immer. Das setzt die neue Firmware voraus: Knoten mit 4.35 wiederholen weiter alles.
+        <div class="cite"><code>nbrRelayNeed()</code>, Abbruch bei gehörter Kopie <b>lora_functions.cpp</b> · <code>--nbrrelay on</code> fest in Release-Builds</div>
       </div>
     </div>
 
@@ -2140,12 +2162,6 @@ Quittung: <b>{987</b> angehängt</pre>
         <div class="cite">Felddaten „BergLog“ 2026-03-13/14, 856.000 Logzeilen · <b>docs/adr-nc-importance-backoff.md</b> (Risiko-Kapitel, „Rapid-Fire ist ein Konvoi“) · Code: <b>esp32_main.cpp</b> TX-Gate (<code>cad_attempt++</code> nur bei bestätigtem Busy), <b>lora_functions.cpp</b> <code>csma_compute_timeout_prio()</code>, <b>configuration_global.h</b> <code>CSMA_MAX_ATTEMPTS 3</code>, <code>CSMA_RAPID_RX_MS 100</code></div>
       </div>
     </div>
-  </div>
-
-  <div class="note warn" style="margin-top:.9rem">
-    <b>Das eigentliche Problem steckt in Prio 3.</b> Ein Blattknoten mit einem einzigen Nachbarn und ein Bergknoten mit 26 Nachbarn
-    bekommen für ihr Relay <b>exakt dieselbe Verteilung</b>: 4500 ms plus Würfel. Wer zuerst sendet, entscheidet der Zufall — nicht,
-    wie viele Stationen von dieser Sendung profitieren würden.
   </div>
 </div></section>
 
@@ -2263,7 +2279,7 @@ Quittung: <b>{987</b> angehängt</pre>
 
 <section class="slide" id="s11"><span class="num">17</span><div class="inner">
   <div class="eyebrow">Baustelle 3 · Zustellung</div>
-  <h2>Persönliche Nachrichten haben heute keine Zustellgarantie</h2>
+  <h2>Persönliche Nachrichten werden wiederholt, bis die Quittung kommt</h2>
 
   <div class="grid g2" style="align-items:start">
     <div>
@@ -2283,107 +2299,106 @@ Quittung: <b>{987</b> angehängt</pre>
           <li>Ein ganz normales Text-Frame, Priorität 1</li>
           <li>Ziel auf exakt 9 Zeichen aufgefüllt, dann <code>:ackNNN</code></li>
           <li><b>Wird durch das Mesh geflutet</b> wie jede andere Nachricht — erreicht den Absender also auch über mehrere Hops</li>
+          <li>Kommt dieselbe PN noch einmal an (Wiederholung, Relais- oder Server-Kopie), <b>quittiert der Empfänger erneut</b>, höchstens einmal je 30&nbsp;s, und zeigt sie nicht doppelt an</li>
         </ul>
         <div class="cite"><b>loop_functions.cpp:4164-4245</b>, Format <code>%-9.9s:ack%03i</code></div>
       </div>
     </div>
 
     <div>
-      <div class="note bad">
-        <b>Hier bricht es.</b> Der Empfänger sendet seine Quittung <b>genau einmal</b> und wiederholt sie nie
-        (Status <code>DONE</code>, kein Timer). Geht dieses eine Paket auf dem Rückweg verloren — Kollision, ein Zwischenknoten mit
-        Mesh=AUS, Hop-Budget knapp, asymmetrische Reichweite —, dann erfährt der Absender <b>nie</b>, dass seine Nachricht
-        angekommen ist. Obwohl sie ankam.
-        <div class="cite"><b>loop_functions.cpp:4226-4229</b></div>
+      <div class="note ok">
+        <b>Die Wiederholung.</b> Hört der Absender kein <code>:ackNNN</code>, sendet er die PN bis zu <b>dreimal im 40-Sekunden-Abstand</b>
+        erneut, mit zwei gekippten msg_id-Bits (Folie 21). Nur die Quittung des Empfängers stoppt die Leiter, ein bloßes Echo nicht.
+        Geht eine Quittung verloren, löst die nächste Wiederholung eine neue aus. Bleibt alles aus, meldet der Knoten das Scheitern an App und WebGUI.
+        <div class="cite">Takt <b>lora_functions.cpp</b> <code>updateRetransmissionStatus()</code> (20 × 2 s) · <b>pn_retry.h</b> · erneute Quittung <b>dm_dedup.h</b></div>
       </div>
 
-      <p style="margin:1.1rem 0 .6rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)">Wo eine DM heute verschwinden kann</p>
+      <p style="margin:1.1rem 0 .6rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)">Wo eine DM heute noch verschwinden kann</p>
       <ul class="plain">
-        <li class="no">TX-Ring voll: verdrängt nach Priorität. Seit 09/2026 meldet der Knoten das dem Absender („QTA NOT SENT“), wiederholt aber nicht.</li>
+        <li class="no">TX-Ring voll: verdrängt nach Priorität; der Absender sieht „gescheitert“ statt Funkstille</li>
         <li class="no">Hop-Budget aufgebraucht, bevor das Ziel erreicht ist</li>
-        <li class="no">Die Quittung geht auf dem Rückweg verloren (kein Retry)</li>
+        <li class="no">Alle vier Aussendungen oder alle Quittungen gehen verloren; nach rund 2 Minuten gibt der Absender auf und sagt es</li>
         <li class="no"><code>own_msg_id[]</code> überläuft — eine spät eintreffende Quittung findet ihren Eintrag nicht mehr</li>
-        <li class="no">Empfänger ausgeschaltet — <b>niemand hebt die Nachricht auf</b></li>
         <li class="no">Der Schleifenschutz kappt in ungünstiger Topologie den einzigen Rückweg</li>
       </ul>
-      <div class="cite">Reihenfolge der Belege: txring_functions.cpp:284-354 · lora_functions.cpp:1209 · loop_functions.cpp:4226 · :755-757 · — · lora_functions.cpp:1220-1229</div>
     </div>
   </div>
 
-  <div class="note warn" style="margin-top:.9rem">
-    <b>Und nirgends wird etwas aufgehoben.</b> Weder im Knoten noch auf dem Server gibt es eine Warteschlange für Nachrichten an
-    abwesende Empfänger. Es existieren nur zwei kurze Ringe im Arbeitsspeicher — Sendepuffer und Duplikatspeicher.
-    Verpasst der Empfänger das Zeitfenster von zwei Minuten, ist die Nachricht endgültig weg.
+  <div class="note ok" style="margin-top:.9rem">
+    <b>Und jetzt wird aufgehoben.</b> Ist der Empfänger aus, hält ein <b>Store-Knoten</b> in seiner Nähe die PN — standardmäßig 24 Stunden,
+    50 Plätze — und stellt sie zu, sobald er das Ziel wieder direkt hört. Den Absender informiert er mit <code>:stoNNN</code>; eine App,
+    die den Status kennt, zeigt „gehalten bei …“, bis die echte Quittung kommt. Mehr auf Folie 19.
+    <div class="cite">Mailbox <b>msgstore</b> · <code>--store own|list|heard</code> (ESP32-S3, RAK4631) · Hinweis <code>--storenotice</code></div>
   </div>
 </div></section>
 
 <section class="slide"><span class="num">18</span><div class="inner">
 <div class="eyebrow">Baustelle 3 · Sicherheit</div>
-<h2>Und niemand prüft, wer da sendet</h2>
+<h2>Die Fernsteuerung ist signiert, die Nachrichten noch nicht</h2>
 <div class="grid g2" style="margin-top:1rem;align-items:start">
-<div class="card hot"><h3>Was heute fehlt</h3><ul class="plain"><li class="no">Keine Verschlüsselung der Nutzlast, und das bleibt so: § 16 Abs. 8 AFuV verbietet sie im Amateurfunk</li><li class="no">Keine Authentifizierung — das Rufzeichen ist frei behauptbar</li><li class="no">Die FCS ist eine additive Prüfsumme, <b>kein CRC und kein MAC</b></li><li class="no">Gefälschte Rufzeichen und gefälschte Quittungen sind in Funkreichweite möglich</li></ul><div class="cite">Beleg: docs/review/2026-07-31/f5-security.md · aprs_functions.cpp:417-428 (FCS)</div></div>
-<div class="card"><h3>Warum das für EMCOMM zählt</h3><p>Solange niemand die Herkunft einer Nachricht prüfen kann, taugt das Netz nicht für verlässliche Lagemeldungen. <b>Integrität und Authentizität</b> sind eine der drei roten Zellen im EMCOMM-Abgleich (Akt V).</p><p style="margin-top:.6rem">Gleiche Baustelle wie die Zustellsicherung: beides betrifft die persönliche, verlässliche Nachricht — nicht die Bake.</p></div>
+<div class="card hot"><h3>Was für Nachrichten weiter fehlt</h3><ul class="plain"><li class="no">Keine Verschlüsselung der Nutzlast, und das bleibt so: § 16 Abs. 8 AFuV verbietet sie im Amateurfunk</li><li class="no">Keine Authentifizierung normaler Nachrichten — das Rufzeichen ist frei behauptbar</li><li class="no">Die FCS ist eine additive Prüfsumme, <b>kein CRC und kein MAC</b></li><li class="no">Gefälschte Rufzeichen und gefälschte Quittungen sind in Funkreichweite möglich</li></ul><div class="cite">Beleg: docs/review/2026-07-31/f5-security.md · aprs_functions.cpp:417-428 (FCS)</div></div>
+<div class="card good"><h3>Neu: RM1 prüft bei jeder Aussendung den Absender</h3><p>Jeder Fernsteuerbefehl trägt ein <b>HMAC-SHA256-Tag</b> (64 Bit) über Ziel, Absender, Zähler und Befehl, geschlüsselt mit dem Knotenpasswort. Der Knoten rechnet nach, bevor er etwas ausführt; ein streng steigender Zähler macht mitgeschnittene Befehle wertlos, und auch die Antwort ist signiert. Alles bleibt im Klartext lesbar.</p><p style="margin-top:.6rem">Damit ist bewiesen, dass Authentizität ohne Verschlüsselung geht. Für normale Nachrichten fehlt sie noch: das wäre der nächste Schritt, gleiche Baustelle wie die Zustellsicherung. <a href="rm1-protokoll.html">RM1-Protokoll im Detail</a></p><div class="cite"><b>docs/rm1-hmac.md</b> · <b>docs/rm1-commands.md</b> · Referenz <b>tools/remote_cmd.py</b></div></div>
 </div>
-<div class="note warn" style="margin-top:.9rem"><b>Rechtsrahmen:</b> Verschlüsselung ist im Amateurfunk nicht zulässig. § 16 Abs. 8 der Amateurfunkverordnung (AFuV) verlangt, dass Übertragungsverfahren eine Wiederherstellung der Inhalte mit allgemein verfügbarer Technik zulassen, und verbietet Kodierung oder Verschlüsselung zur Verschleierung des Inhalts. Erlaubt und heute komplett fehlend sind <b>Integrität und Authentizität</b>: signieren, nicht verschlüsseln. Eine Signatur verschleiert nichts, jeder kann mitlesen, aber niemand kann sich als ein anderes Rufzeichen ausgeben. Wortlaut der Vorschrift auf der Folie „Das Medium“.<div class="cite">AFuV § 16 Abs. 8, gesetze-im-internet.de/afuv_2005/__16.html</div></div>
+<div class="note warn" style="margin-top:.9rem"><b>Rechtsrahmen:</b> Verschlüsselung ist im Amateurfunk nicht zulässig. § 16 Abs. 8 der Amateurfunkverordnung (AFuV) verlangt, dass Übertragungsverfahren eine Wiederherstellung der Inhalte mit allgemein verfügbarer Technik zulassen, und verbietet Kodierung oder Verschlüsselung zur Verschleierung des Inhalts. Erlaubt sind <b>Integrität und Authentizität</b>: signieren, nicht verschlüsseln — RM1 tut genau das. Eine Signatur verschleiert nichts, jeder kann mitlesen, aber niemand kann sich als ein anderes Rufzeichen ausgeben. Wortlaut der Vorschrift auf der Folie „Das Medium“.<div class="cite">AFuV § 16 Abs. 8, gesetze-im-internet.de/afuv_2005/__16.html</div></div>
 </div></section>
 
 <section class="slide" id="s17"><span class="num">19</span><div class="inner">
-  <div class="eyebrow">Der Vorschlag · Transport</div>
-  <h2>Persönliche Nachrichten brauchen eine echte Transportsicherung</h2>
+  <div class="eyebrow">Umgesetzt · Transport · Stand 19.10.2026</div>
+  <h2>Persönliche Nachrichten haben jetzt eine Transportsicherung — und eine Ablage</h2>
 
   <p class="lead">Baken dürfen verloren gehen — die nächste kommt in 15 Minuten. Eine persönliche Nachricht darf das nicht.
-  Heute kann der Absender nicht unterscheiden, ob sie nie ankam oder ob nur die Quittung verloren ging.</p>
+  Was dieser Vortrag im August als Lösungsrichtung vorgeschlagen hat, steckt heute in der Firmware, bis auf zwei Punkte.</p>
 
   <div class="grid g3" style="margin-top:1.05rem">
-    <div class="card hot"><h3>Was heute fehlt</h3>
+    <div class="card"><h3>Was gefehlt hat</h3>
       <ul class="plain">
-        <li class="no">Die Quittung wird <b>nie wiederholt</b> — ein verlorenes Paket, und der Nachweis ist weg</li>
-        <li class="no">Das Scheitern nach 3 Versuchen wird <b>nicht gemeldet</b></li>
+        <li class="yes">Die Quittung wurde <b>nie wiederholt</b> — jetzt quittiert der Empfänger jede Wiederholung erneut</li>
+        <li class="yes">Das Scheitern wurde <b>nicht gemeldet</b> — jetzt sehen App und WebGUI „gescheitert“</li>
         <li class="no">Späte Quittungen finden ihren Eintrag nicht mehr, wenn <code>own_msg_id[]</code> übergelaufen ist</li>
-        <li class="no"><b>Niemand hebt etwas auf</b> — weder Knoten noch Server</li>
+        <li class="yes"><b>Niemand hob etwas auf</b> — jetzt hält ein Store-Knoten die PN</li>
       </ul>
     </div>
     <div class="card"><h3>Was eine Sicherung leisten muss</h3>
       <ul class="plain">
         <li>Zustellnachweis, der <b>einen einzelnen Paketverlust übersteht</b></li>
-        <li>Drei klar unterscheidbare Zustände für den Nutzer: <b>zugestellt · gescheitert · noch offen</b></li>
+        <li>Klar unterscheidbare Zustände für den Nutzer: <b>zugestellt · gescheitert · gehalten · noch offen</b></li>
         <li>Duplikaterkennung beim Empfänger, damit Wiederholungen nicht doppelt erscheinen</li>
         <li>Eine Chance für Empfänger, die gerade aus sind</li>
       </ul>
     </div>
-    <div class="card good"><h3>Lösungsrichtung — in dieser Reihenfolge</h3>
+    <div class="card good"><h3>Was davon umgesetzt ist</h3>
       <ul class="plain">
-        <li><b>1.</b> Die Quittung selbst wiederholen, wie das Original: 3 × 40 s statt einmal</li>
-        <li><b>2.</b> Endzustand an App und Display melden, auch das Scheitern</li>
-        <li><b>3.</b> Den Nachweis-Speicher von Baken und Positionen entkoppeln, damit er nicht überläuft</li>
-        <li><b>4.</b> Ablage am Gateway für abwesende Empfänger — der Server sieht ohnehin schon alles</li>
-        <li><b>5.</b> Erst danach über Sequenznummern und Fenster reden</li>
+        <li class="yes"><b>1.</b> Wiederholung bis zur Quittung: 3 × 40 s, nur <code>:ackNNN</code> stoppt sie (Folie 21)</li>
+        <li class="yes"><b>2.</b> Endzustand an App und Display, auch Scheitern und „gehalten“</li>
+        <li class="no"><b>3.</b> Nachweis-Speicher von Baken und Positionen entkoppeln — offen</li>
+        <li class="yes"><b>4.</b> Ablage für abwesende Empfänger: <b>Store-Knoten</b> mit Mailbox</li>
+        <li class="no"><b>5.</b> Sequenznummern und Fenster — offen, vorerst nicht nötig</li>
       </ul>
     </div>
   </div>
 
   <div class="grid g2" style="margin-top:1rem">
     <div class="note ok">
-      <b>Die ersten drei Schritte sind billig.</b> Sie brauchen kein neues Wire-Format, keine Flag-Bits, keine Abstimmung mit anderen
-      Implementierungen — sie ändern nur, wie lange die Firmware an einer bereits definierten Quittung festhält und was sie dem
-      Nutzer darüber sagt. Abwärtskompatibel in beide Richtungen.
+      <b>Ohne neues Wire-Format.</b> Wiederholung, erneute Quittung und Statusmeldung nutzen die bereits definierte Quittung;
+      alte Firmware im Pfad relayt alles wie gewohnt. Die Wiederholung ist mit
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a> auch im offiziellen <code>dev</code>.
     </div>
     <div class="note warn">
-      <b>Schritt 4 ist eine Grundsatzentscheidung.</b> Eine Ablage am Gateway macht MeshCom teilweise vom Server abhängig — genau das,
-      was ein Funknetz eigentlich vermeiden will. Sie gehört diskutiert, nicht nebenbei eingebaut.
-      Und sie hilft nur dort, wo Gateways stehen.
+      <b>Schritt 4 anders gelöst als vorgeschlagen.</b> Die Ablage sitzt nicht am Gateway, sondern auf einem <b>Store-Knoten im
+      Funknetz</b> (ESP32-S3, RAK4631): kein Server nötig, das Netz bleibt unabhängig. Der Store-Knoten stellt einen Hop weit zu, sobald
+      er das Ziel direkt hört, in einer Leiter aus 9 Aussendungen über 9 Minuten; danach 1 Stunde Pause, höchstens 20 Aktionen je Stunde.
     </div>
   </div>
 
   <div class="note" style="margin-top:.85rem">
-    <b>Zurück zum Anfang:</b> Sendefolgenummer, Quittung mit Wiederholung und ein Timer, der aufgibt und es sagt — das ist genau das,
-    was AX.25 im verbindungsorientierten Modus seit 1984 mitbringt. Wir müssen es nicht erfinden. Wir müssen nur entscheiden,
-    dass persönliche Nachrichten es verdienen.
+    <b>Zurück zum Anfang:</b> Quittung mit Wiederholung und ein Timer, der aufgibt und es sagt — das bringt AX.25 im
+    verbindungsorientierten Modus seit 1984 mit. Wir mussten es nicht erfinden, nur entscheiden, dass persönliche Nachrichten es verdienen.
+    <div class="cite">Mailbox-Seite im WebGUI · <code>--store</code>, <code>--storetime 1-168</code>, <code>--storeslots 1-50</code>, <code>--storenotice</code> · <b>docs/CHANGELOG-snf.md</b></div>
   </div>
 </div></section>
 
 <section class="slide"><span class="num">20</span><div class="inner">
-  <div class="eyebrow">Der Vorschlag · Store-and-Forward</div>
+  <div class="eyebrow">Der Vorschlag vom August · so nicht gebaut</div>
   <h2>Der Absender hebt auf — eine Outbox, die 24 Stunden nicht lockerlässt</h2>
 
   <p class="lead">Kein Speichern im Mesh, kein Server-Postfach: Die Nachricht wartet beim <b>Absender</b>, bis der Empfänger
@@ -2431,15 +2446,17 @@ Quittung: <b>{987</b> angehängt</pre>
       <b>Was das Konzept bewusst offen lässt.</b> Die Outbox lebt in Version 1 nur im RAM: ein Neustart verliert sie und meldet das. Die Einstellungen der Flotte bleiben unangetastet, das Konzept kommt ohne Änderung am Speicherlayout aus. Vertraulichkeit gibt es auf Amateurfunk-Frequenzen nicht, Integrität und Zustellnachweis schon.</div>
   </div>
 
-  <div class="note" style="margin-top:.85rem;font-size:.82rem">
-    <b>Weiterlesen:</b>
-    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/archive/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a>
-    <span class="cite" style="margin-left:.6rem">Stand 30.08.2026, Entwurf v2.</span>
+  <div class="note warn" style="margin-top:.85rem;font-size:.86rem">
+    <b>Was stattdessen gebaut wurde (Stand 19.10.2026):</b> Die Outbox beim Absender lief eine Zeit als <code>--dmretry</code> und wurde wieder
+    entfernt. Geblieben sind die Wiederholung 3 × 40 s mit gekippter msg_id (Folie 21), die erneute Quittung jeder Kopie beim Empfänger und
+    — statt der Absender-Outbox — der <b>Store-Knoten</b> im Funknetz, der für abwesende Empfänger aufhebt (Folie 19). Die Quittung v2 mit
+    Inhalts-Hash und „HF only“-Badge ist nicht umgesetzt.
+    <div class="cite">Konzept: <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/archive/concept-dm-store-and-forward.md">Store-and-Forward-Outbox</a>, Stand 30.08.2026 · Umsetzung: <b>docs/CHANGELOG-snf.md</b></div>
   </div>
 </div></section>
 
 <section class="slide"><span class="num">21</span><div class="inner">
-  <div class="eyebrow">Umgesetzt · Stand 28.09.2026</div>
+  <div class="eyebrow">Umgesetzt · seit 4.40a im offiziellen Release</div>
   <h2>Wiederholung mit gekippter msg_id: zwei Bits, die alte Relais mitnehmen</h2>
 
   <p class="lead">Vorschlag Schritt 1 von zuvor ist Code: eine persönliche Nachricht (PN), die kein Echo hört,
@@ -2479,14 +2496,14 @@ Quittung: <b>{987</b> angehängt</pre>
 
   <div class="grid g2" style="margin-top:1rem">
     <div class="note warn">
-      <b>Der Server muss zuerst umstellen.</b> Er speist Wiederholungen unverändert in jedes Gateway ein; ohne
-      eigenen Dedup-Schlüssel <code>msg_id &amp; 0xFFFFF3FF</code> strahlt sonst jede Region jede Wiederholung
-      erneut aus. Diese Server-Änderung ist noch nicht bestätigt (<code>docs/pn-retry-server.md</code>).
+      <b>Der Server sollte mitziehen.</b> Ohne eigenen Dedup-Schlüssel <code>msg_id &amp; 0xFFFFF3FF</code> speist er jede
+      Wiederholung als neue Nachricht in die Gateways ein. Ob er das inzwischen tut, ist von außen nicht bestätigt
+      (<code>docs/pn-retry-server.md</code>). Messung am 18.10.2026 bei DK5EN-98: jede Server-Nachricht ging im Schnitt 3,8-mal in die Luft.
     </div>
     <div class="note ok">
       <b>Upstream gemergt.</b> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">PR #1168</a>
-      wurde am 27.09.2026 von OE1KBC (Kurt) nach <code>dev</code> gemergt (Merge-Commit <code>36fa70bb</code>). Auf der
-      Bank offen bleibt der Nachweis, dass eine Wiederholung einen alten Relais-Knoten tatsächlich passiert.
+      wurde am 27.09.2026 von OE1KBC (Kurt) nach <code>dev</code> gemergt (Merge-Commit <code>36fa70bb</code>) und ist seit
+      dem offiziellen 4.40a vom 02.10.2026 im Feld. Im Fork stoppt dieselbe Leiter auch RM1-Befehle, sobald eine geprüfte Antwort kommt.
     </div>
   </div>
 
@@ -2495,44 +2512,42 @@ Quittung: <b>{987</b> angehängt</pre>
     <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/docs/pn-zustellung-dedup.md">Konzeptpapier — Zustellung und Dedup</a> ·
     <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/docs/pn-retry-xor-impl-plan.md">Umsetzungsplan Firmware</a> ·
     <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/docs/pn-retry-server.md">Änderungen am Server</a>
-    <span class="cite" style="margin-left:.6rem">Stand 28.09.2026, PR #1168.</span>
+    <span class="cite" style="margin-left:.6rem">Stand 19.10.2026, PR #1168.</span>
   </div>
 </div></section>
 
 <section class="slide" id="s18"><span class="num">22</span><div class="inner">
-  <div class="eyebrow">Der Plan</div>
+  <div class="eyebrow">Der Plan vom August · Stand 19.10.2026</div>
   <h2>Die Statistik gewinnen lassen — die Transportsicherung macht den Rest</h2>
 
   <div class="grid g2" style="align-items:start">
     <div>
       <table>
-        <thead><tr><th>Stufe</th><th>Inhalt</th><th>Ändert Verhalten?</th></tr></thead>
+        <thead><tr><th>Stufe</th><th>Inhalt</th><th>Stand</th></tr></thead>
         <tbody>
-          <tr><td class="m">0</td><td><b>Beobachten:</b> Wichtigkeit rechnen und loggen, nichts ändern</td><td><span class="tag t-ok">nein</span></td></tr>
-          <tr><td class="m">0.5</td><td><b>Duplikatspeicher:</b> bleibt bei 100 Einträgen, das reicht (gemessen über 48 Knotenstunden). Stattdessen nach Zeit altern lassen statt nach Anzahl.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
-          <tr><td class="m">S</td><td><b>Sturmschutz:</b> Rate-Limit je Quelle. Der Rückstau zum eigenen Absender (QRS/QRT/QTA, Quittung je verlorener Nachricht) ist seit v4.35p.09.02 ausgeliefert; das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
-          <tr><td class="m">1a</td><td><b>Vorrang:</b> Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
-          <tr><td class="m">1b</td><td><b>Vorrang:</b> Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
-          <tr><td class="m">1c</td><td><b>Vorrang:</b> optional auch für Positions-Relays</td><td><span class="tag t-warn">ja</span></td></tr>
-          <tr><td class="m">2</td><td><b>Unterdrückung:</b> Relays weglassen, erst nach vermessenen Stufen 1a bis 1c</td><td><span class="tag t-bad">ja, heikel</span></td></tr>
+          <tr><td class="m">0</td><td><b>Beobachten:</b> wer hört wen — heute die Nachbarschaftsmatrix, sichtbar auf den Seiten Path, MHeard und Nachbarn</td><td><span class="tag t-ok">umgesetzt</span></td></tr>
+          <tr><td class="m">0.5</td><td><b>Duplikatspeicher:</b> bleibt bei 100 Einträgen, das reicht (gemessen über 48 Knotenstunden). Altern nach Zeit statt nach Anzahl steht noch aus.</td><td><span class="tag t-warn">teilweise</span></td></tr>
+          <tr><td class="m">S</td><td><b>Sturmschutz:</b> Rückstau zum eigenen Absender (QRS/QRT/QTA) seit v4.35p.09.02; seit 4.40a endet QRT früher und eine volle Warteschlange lehnt ab. Das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
+          <tr><td class="m">1</td><td><b>Vorrang:</b> statt Wichtigkeits-Slots fragt jeder Knoten die Matrix, ob ein Nachbar ihn braucht — für Text, Position und HEY</td><td><span class="tag t-ok">anders gelöst</span></td></tr>
+          <tr><td class="m">2</td><td><b>Unterdrückung:</b> eine gehörte Kopie, die alle Bedürftigen versorgt, streicht das eigene Relay; der einzige Versorger eines Nachbarn sendet immer</td><td><span class="tag t-ok">umgesetzt</span></td></tr>
         </tbody>
       </table>
       <div class="note ok" style="margin-top:1rem;font-size:.86rem">
-        <b>Notausschalter:</b> <code>--impslot off</code> schaltet die Differenzierung jederzeit ab, unabhängig vom Qualitäts-Gate.
-        <code>auto</code> überlässt die Entscheidung dem Gate: mindestens 60 % der Nachbarn mit bekannter Nachbarzahl,
-        eigene Tabelle nicht übergelaufen, Knoten mindestens eine Stunde in Betrieb.
+        <b>Schalter:</b> <code>--nbrrelay on</code> ist in Release-Builds fest eingeschaltet. In Bench-Builds lässt es sich auf
+        <code>count</code> (nur rechnen und zählen) oder <code>off</code> stellen; die Zähler „cancelled“ und „refused“ in <code>--info</code>
+        zeigen, wie oft eine Wiederholung gestrichen oder als einziger Versorger behalten wurde.
       </div>
     </div>
 
     <div>
       <p style="font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-bottom:.7rem">Was wir dazusagen müssen</p>
       <ul class="plain">
-        <li class="no"><b>Der Hebel ist kleiner als er klingt.</b> Die Differenzierung wirkt zunächst nur auf Text-Relays — 3 bis 41 pro Stunde
-          gegenüber rund 3.800 Baken und 3.800 Positionen. Das sind unter 1 % des Relay-Volumens, bis Stufe 1c (Vorrang auch für Positionen) kommt.</li>
+        <li class="no"><b>Der Hebel wirkt nur, wo die neue Firmware läuft.</b> Die Matrix-Entscheidung gilt für Text, Position und HEY — aber
+          jeder Knoten mit 4.35 im Gebiet wiederholt weiter alles, was er hört.</li>
         <li class="no"><b>Ein einzelner Knoten kann alles überfahren.</b> Am 22.08.2026 sendete IU4KCH-26 in einer Stunde <b>5.912</b> Baken,
           in der Stunde davor waren es 9. Gegen so etwas hilft keine Backoff-Reihenfolge, sondern nur Stufe S, der Sturmschutz in der Tabelle links.</li>
         <li class="no"><b>Unterdrückung ist schon einmal schiefgegangen.</b> <code>commit 60ea7d8</code> lief produktiv, hungerte Blattknoten aus
-          und wurde zurückgenommen. Deshalb steht sie als Stufe 2 ganz hinten und bekommt eigene Schutzregeln.</li>
+          und wurde zurückgenommen. Die heutige Unterdrückung hat deshalb ein Veto: wer für einen Nachbarn der einzige Versorger ist, sendet immer.</li>
         <li class="no"><b>„Wenige Segmente tragen das Netz“ stimmt nur halb.</b> Über 7 Tage entfallen auf die lastreichsten 10 % der
           Abschnitte rund <b>25 %</b> des beobachteten Verkehrs — deutlich, aber keine Handvoll Flaschenhälse.</li>
       </ul>
@@ -2560,7 +2575,7 @@ Quittung: <b>{987</b> angehängt</pre>
       <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/prio-talk-flood-networking.md">Flood-Networking-Analyse</a> ·
       <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/hey-supp.md">Trickle-HEY-Suppression</a> ·
       <a href="https://meshmap.oevsv.at">MeshCom Map</a>
-      <div class="cite" style="margin-top:.6rem">Alle Code-Belege gegen den Stand vom 23.08.2026 (Tag <b>archive/v4.35p_prio-20260903</b>). Firmware-Stand des Vortrags: <b>v4.35s</b>, Release v4.35s.09.03-stability.</div>
+      <div class="cite" style="margin-top:.6rem">Alle Code-Belege gegen den Stand vom 23.08.2026 (Tag <b>archive/v4.35p_prio-20260903</b>). Erstellt mit <b>v4.35s</b> (Release v4.35s.09.03-stability), nachgeführt am 19.10.2026 auf <b>v4.40a</b>.</div>
     </div>
   </div>
 </div></section>
@@ -2766,18 +2781,18 @@ Quittung: <b>{987</b> angehängt</pre>
       </tr>
       <tr>
         <td>Store-and-Forward</td>
-        <td><span class="tag t-warn">&#126;&nbsp;teilweise</span></td>
-        <td>Duplikatspeicher bewusst bei 100 Einträgen (~38 min, gemessen); keine Ablage für abwesende Empfänger</td>
+        <td><span class="tag t-ok">&#10003;&nbsp;erfüllt</span></td>
+        <td>Store-Knoten (ESP32-S3, RAK4631) halten PNs an abwesende Empfänger, standardmäßig 24&nbsp;h, und stellen beim Wiederhören zu; der Absender erfährt es per <code>:stoNNN</code></td>
       </tr>
       <tr>
         <td>Wide-Area ohne Backbone</td>
         <td><span class="tag t-warn">&#126;&nbsp;teilweise</span></td>
-        <td>Nur über Multi-Hop-Reichweite; kein garantiertes Routing</td>
+        <td>Nur über Multi-Hop-Reichweite; kein garantiertes Routing. Die Nachbarschaftsmatrix streicht redundante Relays und schont so die Strecke</td>
       </tr>
       <tr>
-        <td>Bestätigte Zustellung (Gruppe / Broadcast)</td>
-        <td><span class="tag t-bad">&#10007;&nbsp;fehlt</span></td>
-        <td>Kein ACK für Gruppe und Broadcast; das DM-ACK existiert, wird aber nie wiederholt</td>
+        <td>Bestätigte Zustellung</td>
+        <td><span class="tag t-warn">&#126;&nbsp;teilweise</span></td>
+        <td>Persönliche Nachrichten: Wiederholung bis zur Quittung, erneute Quittung, Status zugestellt / gescheitert / gehalten. Gruppe und Broadcast: weiterhin ohne ACK</td>
       </tr>
       <tr>
         <td>Dringlichkeitsstufen / Precedence</td>
@@ -2786,8 +2801,8 @@ Quittung: <b>{987</b> angehängt</pre>
       </tr>
       <tr>
         <td>Integrität / Authentizität</td>
-        <td><span class="tag t-bad">&#10007;&nbsp;fehlt</span></td>
-        <td>FCS = additive Prüfsumme (kein MAC); Rufzeichen frei behauptbar</td>
+        <td><span class="tag t-warn">&#126;&nbsp;teilweise</span></td>
+        <td>Fernsteuerung RM1 mit HMAC-SHA256 und Zähler gegen Wiederholung; das Protokoll ist definiert, die App des Nutzers muss es unterstützen. Normale Nachrichten: FCS ist eine additive Prüfsumme, Rufzeichen frei behauptbar</td>
       </tr>
     </tbody>
   </table>
@@ -2828,22 +2843,24 @@ Quittung: <b>{987</b> angehängt</pre>
 </div></section>
 
 <section class="slide"><span class="num">26</span><div class="inner">
-<div class="eyebrow">EMCOMM · Delta</div><h2>Das Delta zur EMCOMM-Reife ist genau unser Vorschlag</h2>
+<div class="eyebrow">EMCOMM · Delta</div><h2>Das Delta zur EMCOMM-Reife: zwei Lücken geschlossen, zwei offen</h2>
 <div class="cmp-mount">
 <div class="cmp-emcomm-section">
   
-  <p>Der aktuelle Entwicklungsvorschlag schließt exakt die verbleibenden
-     Lücken:</p>
+  <p>Der Entwicklungsvorschlag vom August benannte vier Lücken. Stand 19.10.2026:</p>
   <ol class="cmp-emcomm-delta-list">
-    <li>Transportsicherung / bestätigte Zustellung für persönliche Nachrichten</li>
+    <li>Transportsicherung / bestätigte Zustellung für persönliche Nachrichten —
+        <span class="tag t-ok">&#10003;&nbsp;umgesetzt</span> Wiederholung bis zur Quittung, Store-Knoten für abwesende Empfänger</li>
     <li>Vorrang für netzbildende Knoten —
-        probabilistisches Routing sauber gewichtet</li>
-    <li>Precedence-Stufen: Emergency, Priority, Welfare, Routine</li>
-    <li>Integrität und Authentizität der Nachrichten</li>
+        <span class="tag t-ok">&#10003;&nbsp;umgesetzt</span> die Nachbarschaftsmatrix entscheidet, wer wiederholen muss, und streicht redundante Relays</li>
+    <li>Precedence-Stufen: Emergency, Priority, Welfare, Routine —
+        <span class="tag t-bad">&#10007;&nbsp;offen</span></li>
+    <li>Integrität und Authentizität der Nachrichten —
+        <span class="tag t-warn">&#126;&nbsp;teilweise</span> RM1 ist signiert; für Nachrichten muss die App mitziehen</li>
   </ol>
   <div class="note ok" style="margin-top:1rem">
-    <strong>Fazit:</strong> Wenn wir das bauen, ist MeshCom EMCOMM-reif —
-    und bleibt LoRa-only.
+    <strong>Fazit:</strong> Zwei der vier Lücken sind zu, eine ist zur Hälfte zu. Was bleibt: Precedence und signierte Nachrichten.
+    Dann ist MeshCom EMCOMM-reif — und bleibt LoRa-only.
   </div>
 </div>
 </div>
@@ -2877,7 +2894,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <tr><td class="m">Bit 6</td><td>Tracking</td></tr>
         <tr><td class="m">Bit 5</td><td>App offline</td></tr>
         <tr><td class="m">Bit 4</td><td>Sender hat Mesh aktiv</td></tr>
-        <tr><td class="m">Bit 0–3</td><td><b>verbleibendes Hop-Budget</b>: Text 4 (seit v4.35p.09.02 per <code>--maxhop 1…6</code> einstellbar), Position 2</td></tr>
+        <tr><td class="m">Bit 0–3</td><td><b>verbleibendes Hop-Budget</b>: Text 4 (per <code>--maxhop 1…6</code> einstellbar, <code>{SET}</code> setzt nur diesen Wert), Position fest 2 (in Release-Builds nicht änderbar)</td></tr>
       </tbody></table>
       <div class="cite"><b>aprs_functions.cpp:1025-1037</b> / <b>:160-172</b> · Defaults <b>configuration_global.h:209-210</b></div>
     </div>
@@ -2894,13 +2911,22 @@ AB 13 F1 E9            msg_id 0xE9F113AB
 88                     MOD 8, Land 8
 13 2F                  FCS (Bytesumme, kein CRC)
 23 AB 70 7E            FW 4.35, LASTHW, 'p', Ende</pre>
-      <div class="cite">433,175 MHz, SF11/BW250/CR4-6, RSSI −109 dBm · <b>docs/architecture/11-wire-format.md §1.6</b></div>
+      <div class="cite">433,175 MHz, SF11/BW250/CR4-6, RSSI −109 dBm · <b>docs/architecture/11-wire-format.md §1.6</b> · ein 4.40a-Knoten schreibt am Ende <code>28 … 61</code> (FW 40, Sub-Version 'a')</div>
     </div>
+  </div>
+
+  <div class="note ok" style="margin-top:.9rem">
+    <b>Seit 4.35 ist der Rahmen unverändert — alles Neue reist in der Nutzlast oder der msg_id.</b>
+    PN-Wiederholungen kippen die msg_id-Bits 10–11; jeder Hop hängt an eine HEY-Bake seinen Signalbericht an (<code>R21;9,71,-7;</code>);
+    die Fernsteuerung ist eine DM <code>RM1 &lt;Zähler&gt; &lt;Befehl&gt; &lt;Tag&gt;</code>; ein Store-Knoten meldet sich mit <code>:stoNNN</code>;
+    Positionen tragen im Kommentar bis zu 17 <code>/X=</code>-Schlüssel. Deshalb relayt auch alte Firmware jedes dieser Pakete.
+    <div class="cite"><b>docs/architecture/11-wire-format.md</b> §1.4 (Signalbericht), §1.8 (<code>/X=</code>), §1.9 (RM1), §2.3 (<code>:sto</code>) · <b>pn_retry.h</b></div>
   </div>
 
   <details class="deep"><summary>Für Entwickler — msg_id, FCS und die 999er-Grenze</summary><div class="body">
     <p>Die <b>msg_id</b> ist nicht undurchsichtig, sondern zusammengesetzt:
-    <code>((gw_id &amp; 0x3FFFFF) &lt;&lt; 10) | (counter &amp; 0x3FF)</code> — 22 Bit aus der MAC abgeleitete Geräte-ID, 10 Bit Zähler.</p>
+    <code>((gw_id &amp; 0x3FFFFF) &lt;&lt; 10) | (counter &amp; 0x3FF)</code> — 22 Bit aus der MAC abgeleitete Geräte-ID, 10 Bit Zähler.
+    Eine PN-Wiederholung k (1–3) kippt die Bits 10–11 per XOR mit k; die Maske <code>0xFFFFF3FF</code> liefert für Original und Kopien denselben Kern.</p>
     <p>Der Zähler läuft aber nur bis <b>999</b>, nicht bis 1023, obwohl das Feld 10 Bit breit ist. Grund: Die Quittungsanforderung
     <code>{NNN</code> wird mit <code>%03i</code> formatiert und hätte für 1000–1023 keine dreistellige Darstellung.
     Nebenwirkung: nach 1000 eigenen Sendungen wiederholen sich die msg_ids eines Knotens — bei der Zombie-Analyse muss man das herausrechnen.</p>
@@ -4012,10 +4038,10 @@ function initCmpOverhead(root) {
 
   // ---- data ----
   const RAW = [
-    { id: 'hey', label: 'HEY',  val: 5449, colorVar: '--info' },
-    { id: 'pos', label: 'POS',  val: 3749, colorVar: '--ok'   },
-    { id: 'tlm', label: 'TLM',  val:   10, colorVar: '--mag'  },
-    { id: 'msg', label: 'MSG',  val:   10, colorVar: '--warn'  },
+    { id: 'hey', label: 'HEY',  val: 6634, colorVar: '--info' },
+    { id: 'pos', label: 'POS',  val: 4256, colorVar: '--ok'   },
+    { id: 'tlm', label: 'TLM',  val:   20, colorVar: '--mag'  },
+    { id: 'msg', label: 'MSG',  val:   24, colorVar: '--warn'  },
   ];
 
   // modes: 'detail' | 'grouped' | 'growth'
@@ -4086,16 +4112,16 @@ function initCmpOverhead(root) {
     }
     if (mode === 'grouped') {
       return [
-        { id:'status',   label:'Status (HEY+POS+TLM)', val: 9208, color: cv('--info') },
-        { id:'nutzlast', label:'Nutzlast / Chat (MSG)', val:   10, color: cv('--warn') },
+        { id:'status',   label:'Status (HEY+POS+TLM)', val: 10910, color: cv('--info') },
+        { id:'nutzlast', label:'Nutzlast / Chat (MSG)', val:    24, color: cv('--warn') },
       ];
     }
     // growth
-    const msgVal = 10 * growthFactor;
+    const msgVal = 24 * growthFactor;
     return [
-      { id: 'hey', label: 'HEY',  val: 5449,    color: cv('--info') },
-      { id: 'pos', label: 'POS',  val: 3749,    color: cv('--ok')   },
-      { id: 'tlm', label: 'TLM',  val:   10,    color: cv('--mag')  },
+      { id: 'hey', label: 'HEY',  val: 6634,    color: cv('--info') },
+      { id: 'pos', label: 'POS',  val: 4256,    color: cv('--ok')   },
+      { id: 'tlm', label: 'TLM',  val:   20,    color: cv('--mag')  },
       { id: 'msg', label: `MSG (×${growthFactor})`, val: msgVal, color: cv('--warn') },
     ];
   }

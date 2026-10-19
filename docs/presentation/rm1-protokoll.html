@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RM1: Fernsteuerung per LoRa mit HMAC</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .chk { fill: #eaf7ef; stroke: var(--ok); }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  @media (max-width: 720px) { .toc { columns: 1; } main { padding: 24px 16px 60px; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>RM1: Fernsteuerung per LoRa mit HMAC</h1>
+<ul class="meta">
+<li>Stand: 2026-10-19, Firmware <code>v4.40a.10.21</code> (DK5EN-Fork, Branch <code>fork-dev</code>)</li>
+<li>Autor: DK5EN, mit Claude</li>
+<li>Signatur und Testvektoren: <code>docs/rm1-hmac.md</code>, <code>tools/tests/remote_cmd_vectors.json</code></li>
+<li>Befehlsreferenz: <code>docs/rm1-commands.md</code> (25 Befehle, jede Antwortform)</li>
+<li>Wire-Format: <code>docs/architecture/11-wire-format.md</code> Abschnitt 1.9; Referenz-Client in Python: <code>tools/remote_cmd.py</code></li>
+<li>Rufzeichen im Text: DK5EN-1 und DK5EN-90 sind Bench-Knoten des Autors</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>RM1 („Remote Management 1“) steuert einen MeshCom-Knoten aus der Ferne, über eine ganz normale Direktnachricht im LoRa-Netz.
+Jeder Befehl trägt ein <b>64-Bit-Tag aus HMAC-SHA256</b> über Ziel, Absender, Zähler und Befehl, geschlüsselt mit dem Passwort des Knotens.
+Der Knoten rechnet das Tag nach, bevor er irgendetwas ausführt, und antwortet ebenfalls signiert. Ein streng steigender Zähler macht
+mitgeschnittene Befehle wertlos.</p>
+<ol>
+<li><b>Authentisch, nicht geheim.</b> Befehl und Antwort bleiben im Klartext lesbar, wie § 16 Abs. 8 AFuV es verlangt. Geschützt ist nur, <em>wer</em> etwas befiehlt.</li>
+<li><b>Geschlossene Liste.</b> Genau 25 Befehle sind aus der Ferne erreichbar. Rufzeichen, Passwörter, WLAN, Flash-Löschen und Firmware-Wechsel außerhalb des Auto-Updates gehören nicht dazu.</li>
+<li><b>Aus im Werkszustand.</b> RM1 läuft nur mit <code>--remotemgmt on</code> und gesetztem Knotenpasswort. Ein leeres Passwort schaltet RM1 ab.</li>
+</ol>
+<p class="reco">Was fehlt: Das Protokoll ist definiert und auf der Bench geprüft. Damit Nutzer es verwenden können, muss ihre App es unterstützen;
+heute können es das WebGUI eines Fork-Knotens („Remote“) und der Python-Client.</p>
+</div>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+<li><a href="#s1">Ergebnis</a></li>
+<li><a href="#s2">Ablauf</a></li>
+<li><a href="#s3">Rahmen und Signatur</a></li>
+<li><a href="#s4">Rechenbeispiel</a></li>
+<li><a href="#s5">Zähler, Wiederholung, verlorene Antworten</a></li>
+<li><a href="#s6">Wann der Knoten antwortet</a></li>
+<li><a href="#s7">Die 25 Befehle</a></li>
+<li><a href="#s8">Sicherheit und Grenzen</a></li>
+<li><a href="#s9">Einschalten</a></li>
+</ol>
+
+<h2 id="s2">2. Ablauf</h2>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 900 300" role="img" aria-label="Ablauf eines RM1-Befehls zwischen Absender und Zielknoten">
+  <rect class="node" x="20" y="16" width="220" height="44" rx="6"/>
+  <text x="130" y="36" text-anchor="middle" class="b">Absender (Client)</text>
+  <text x="130" y="52" text-anchor="middle" class="t11">z. B. DK5EN-1, WebGUI oder App</text>
+  <rect class="node" x="660" y="16" width="220" height="44" rx="6"/>
+  <text x="770" y="36" text-anchor="middle" class="b">Zielknoten</text>
+  <text x="770" y="52" text-anchor="middle" class="t11">z. B. DK5EN-90, RM1 an</text>
+  <line class="lnd" x1="130" y1="60" x2="130" y2="290"/>
+  <line class="lnd" x1="770" y1="60" x2="770" y2="290"/>
+
+  <line class="lnh" x1="130" y1="96" x2="764" y2="96" marker-end="url(#ah)"/>
+  <text x="450" y="88" text-anchor="middle" class="mono">RM1 0 sync &lt;tag&gt;</text>
+  <line class="lnh" x1="770" y1="126" x2="136" y2="126" marker-end="url(#ah)"/>
+  <text x="450" y="118" text-anchor="middle" class="mono">RM1 0 ok ctr=41 v=4.40a &lt;rtag&gt;</text>
+
+  <line class="lnh" x1="130" y1="176" x2="764" y2="176" marker-end="url(#ah)"/>
+  <text x="450" y="168" text-anchor="middle" class="mono">RM1 42 txpower 2 &lt;tag&gt;</text>
+  <rect class="chk" x="676" y="186" width="188" height="44" rx="5"/>
+  <text x="770" y="204" text-anchor="middle" class="t11">Tag nachrechnen, Zähler &gt; 41,</text>
+  <text x="770" y="219" text-anchor="middle" class="t11">Zähler speichern, ausführen</text>
+  <line class="lnh" x1="770" y1="256" x2="136" y2="256" marker-end="url(#ah)"/>
+  <text x="450" y="248" text-anchor="middle" class="mono">RM1 42 ok txpower=2 &lt;rtag&gt;</text>
+  <rect class="chk" x="36" y="266" width="188" height="24" rx="5"/>
+  <text x="130" y="282" text-anchor="middle" class="t11">Antwort-Tag prüfen</text>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7b4fbf"/></marker></defs>
+</svg>
+</div>
+<figcaption>Jede Zeile ist eine Direktnachricht im LoRa-Netz und läuft wie jede andere durch das Mesh. <code>sync</code> fragt den höchsten angenommenen Zähler ab; der nächste Befehl nimmt einen größeren.</figcaption>
+</figure>
+
+<h2 id="s3">3. Rahmen und Signatur</h2>
+<table>
+<tr><th>Teil</th><th>Form</th><th>Regel</th></tr>
+<tr><td>Befehl (DM-Text)</td><td><code>RM1 &lt;ctr&gt; &lt;befehl&gt;[ &lt;argumente&gt;] &lt;tag&gt;</code></td><td>DM an das Rufzeichen des Zielknotens, ohne <code>{NNN</code>; Befehl klein, höchstens 15 Zeichen; Argumente höchstens 39 Zeichen, druckbares ASCII</td></tr>
+<tr><td>Schlüssel</td><td><code>K = SHA-256(passwort)</code></td><td>Knotenpasswort <code>node_passwd</code>, höchstens 14 Zeichen, Leerzeichen am Ende entfernt</td></tr>
+<tr><td>Kanonischer String</td><td><code>RM1|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;befehl&gt;[ &lt;argumente&gt;]</code></td><td>Rufzeichen in Großbuchstaben, genau wie konfiguriert bzw. empfangen; der Knoten normalisiert nichts</td></tr>
+<tr><td>Tag</td><td>erste 8 Byte von <code>HMAC-SHA256(K, kanonisch)</code></td><td>16 kleine Hex-Zeichen</td></tr>
+<tr><td>Antwort</td><td><code>RM1 &lt;ctr&gt; ok|err &lt;ergebnis&gt; &lt;rtag&gt;</code></td><td>Ergebnis höchstens 108 Zeichen, ganze Zeile höchstens 140</td></tr>
+<tr><td>Antwort-Tag</td><td>über <code>RM1R|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;ergebnis&gt;</code></td><td>gleiche Reihenfolge wie im Befehl: <code>dst</code> ist der antwortende Knoten, <code>src</code> der ursprüngliche Absender; in konstanter Zeit vergleichen</td></tr>
+</table>
+<p>Ziel und Absender stehen im signierten String. Ein Befehl an DK5EN-90 gilt deshalb nicht für einen anderen Knoten, und eine Antwort
+lässt sich nicht als Antwort auf einen anderen Befehl ausgeben.</p>
+
+<h2 id="s4">4. Rechenbeispiel</h2>
+<p>Aus den gemeinsamen Testvektoren: Passwort <code>secret</code>, Ziel <code>DK5EN-90</code>, Absender <code>DK5EN-1</code>, Zähler 1, Befehl <code>reboot</code>.</p>
+<pre>Schlüssel (hex)    2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b
+Kanonisch          RM1|DK5EN-90|DK5EN-1|1|reboot
+Tag                18f287b79c551022
+DM-Text            RM1 1 reboot 18f287b79c551022
+
+Antwort kanonisch  RM1R|DK5EN-90|DK5EN-1|1|ok rebooting
+Antwort-Tag        facf04f881d89cde
+Antwort-DM         RM1 1 ok rebooting facf04f881d89cde</pre>
+<p class="small">Weitere Vektoren (mit Argumenten, <code>sync</code>, größter Zähler) in <code>tools/tests/remote_cmd_vectors.json</code>. Ein eigener Client sollte gegen alle Vektoren testen, bevor er auf die Luft geht.</p>
+
+<h2 id="s5">5. Zähler, Wiederholung, verlorene Antworten</h2>
+<ul>
+<li><b>Zähler:</b> 1 bis 4294967295, bei jedem Befehl größer als alles bisher Angenommene. Der Knoten speichert den neuen Höchstwert <em>vor</em> der Ausführung, er überlebt Neustarts. Der Client speichert seinen Zähler ebenfalls vor dem Senden und verwendet ihn nie für einen zweiten Befehl.</li>
+<li><b><code>sync</code></b> (Zähler 0) liefert <code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code> und ändert nichts. Höchstens eine <code>sync</code>-Antwort je 10&nbsp;s.</li>
+<li><b>Wiederholung beim Absender:</b> Ein Befehl läuft wie eine persönliche Nachricht auf der Wiederholungsleiter: Original plus drei Wiederholungen im 40-Sekunden-Abstand, mit gekippten msg_id-Bits 10–11 und byte-gleichem Text. Nur eine <b>geprüfte</b> Antwort stoppt die Leiter; eine normale Quittung oder ein Echo nicht. Die Antwort selbst geht genau einmal in die Luft.</li>
+<li><b>Antwort verloren:</b> Denselben Befehl mit demselben Zähler und Tag noch einmal senden. Innerhalb von 10 Minuten liefert der Knoten die gespeicherte Antwort erneut, ohne den Befehl noch einmal auszuführen.</li>
+</ul>
+
+<h2 id="s6">6. Wann der Knoten antwortet</h2>
+<table>
+<tr><th>Fall</th><th>Antwort</th><th>Zähler verbraucht</th></tr>
+<tr><td>Gültiges Tag, Befehl erlaubt</td><td><code>ok …</code> oder <code>err …</code> des Befehls</td><td>ja</td></tr>
+<tr><td>Gültiges Tag, Befehl nicht erlaubt oder Argument ungültig</td><td><code>err blocked</code> bzw. <code>err range a..b</code></td><td>ja</td></tr>
+<tr><td>Gleicher Zähler und Tag wie zuletzt (10 min)</td><td>letzte Antwort noch einmal</td><td>nein</td></tr>
+<tr><td><code>sync</code></td><td><code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code></td><td>nein</td></tr>
+<tr><td>Falsches Tag, Formatfehler, Zähler zu klein, leeres Passwort</td><td><b>keine</b> (stumm)</td><td>nein</td></tr>
+<tr><td>Zu schnell oder gesperrt (nur mit strenger Sicherheit)</td><td><b>keine</b> (stumm)</td><td>nein</td></tr>
+</table>
+<p>Ein Angreifer ohne Passwort bekommt also nie eine Antwort, an der er etwas lernen könnte. Für den Client heißt das umgekehrt:
+Keine Antwort bedeutet nicht automatisch Funkverlust.</p>
+
+<h2 id="s7">7. Die 25 Befehle</h2>
+<table>
+<tr><th>Art</th><th>Befehle</th><th>Gespeichert</th></tr>
+<tr><td>Aktion</td><td><code>reboot</code>, <code>status</code>, <code>sendpos</code>, <code>sendtrack</code>, <code>sync</code></td><td>nein</td></tr>
+<tr><td>Schalter <code>on|off</code></td><td><code>gps</code>, <code>track</code>, <code>display</code>, <code>gateway</code>, <code>mesh</code></td><td>ja</td></tr>
+<tr><td>Schalter</td><td><code>led on|off|flash</code></td><td>nein (aus nach Neustart)</td></tr>
+<tr><td>Parameter</td><td><code>txpower &lt;dBm&gt;</code> (im Bereich der Platine), <code>setout &lt;pin&gt; on|off</code></td><td>ja</td></tr>
+<tr><td>Parameter</td><td><code>chgled auto|on|off</code></td><td>nein</td></tr>
+<tr><td>Lesen</td><td><code>radio</code>, <code>sens</code>, <code>txq</code>, <code>mbox</code>, <code>maxhop</code>, <code>net</code>, <code>mh &lt;zeile|rufzeichen&gt;</code></td><td>nein</td></tr>
+<tr><td>Lesen / Schreiben</td><td><code>name</code>, <code>atxt</code>, <code>pos</code></td><td>Schreiben: ja</td></tr>
+<tr><td>Auto-Update</td><td><code>upd</code>, <code>upd check</code>, <code>upd go &lt;tag&gt;</code> (nur ESP32 mit Auto-Update)</td><td>nein</td></tr>
+</table>
+<p>Beispiele: <code>status</code> → <code>ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=0</code>;
+<code>mh DL2JA-2</code> → <code>ok d g=1 m=1 r=-95 s=8 … n=15 x=14 h=18 t=0</code> (direkt gehört, mit den Werten aus der Nachbarschaftsmatrix);
+<code>txq</code> → <code>ok q=3/20 bp=quiet tx=17 rt=0 dr=0 u=0</code>.</p>
+<p><b>Nie erreichbar</b>, auch mit gültigem Tag (<code>err blocked</code>): <code>cleanflash</code>, <code>ota-update</code>, <code>dfu</code>, <code>deepsleep</code>,
+<code>setcall</code>, <code>passwd</code>, <code>webpwd</code>, <code>btcode</code>, <code>setssid</code>, <code>setpwd</code>, <code>wifiset</code>, <code>updrepo</code>,
+<code>updchan</code>, <code>autoupdate</code>, <code>rm</code>, <code>stor</code>. Jedes Argument mit <code>;</code>, <code>{</code>, <code>%</code> oder <code>--</code> wird abgelehnt.</p>
+
+<h2 id="s8">8. Sicherheit und Grenzen</h2>
+<table>
+<tr><th>Eigenschaft</th><th>Stand</th><th>Bemerkung</th></tr>
+<tr><td>Absender echt</td><td><span class="tag ok">gegeben</span></td><td>Ohne Passwort kein gültiges Tag; Ziel und Absender sind mitsigniert</td></tr>
+<tr><td>Antwort echt</td><td><span class="tag ok">gegeben</span></td><td>Antwort-Tag bindet Ergebnis an Befehlszähler und Absender</td></tr>
+<tr><td>Schutz gegen Wiedereinspielen</td><td><span class="tag ok">gegeben</span></td><td>Streng steigender Zähler, überlebt Neustarts</td></tr>
+<tr><td>Vertraulichkeit</td><td><span class="tag info">bewusst nicht</span></td><td>Klartext auf Funk (AFuV); keine Geheimnisse in Argumente oder Antworten</td></tr>
+<tr><td>Passwort-Raten</td><td><span class="tag warn">Grenze</span></td><td>Ein mitgeschnittenes Tag erlaubt Offline-Raten. Langes, zufälliges Passwort (bis 14 Zeichen) wählen; 64 Bit Tag schützen gegen Fälschen im Funk, ersetzen aber kein starkes Passwort</td></tr>
+<tr><td>Brute Force im Funk</td><td><span class="tag warn">optional</span></td><td><code>--rmstrictsecurity on</code>: höchstens ein Befehl je 10&nbsp;s, ein <code>sync</code> je 60&nbsp;s, nach drei Fehlversuchen in 90&nbsp;s 5 Minuten Sperre für diesen Absender. Standard: aus</td></tr>
+<tr><td>Normale Nachrichten</td><td><span class="tag bad">nicht signiert</span></td><td>RM1 signiert nur Fernsteuerbefehle. Chat und Positionen bleiben unsigniert; das Rufzeichen dort ist frei behauptbar</td></tr>
+</table>
+
+<h2 id="s9">9. Einschalten</h2>
+<pre>--passwd &lt;passwort&gt;          Knotenpasswort setzen (Schlüssel für RM1)
+--remotemgmt on              RM1 einschalten (Standard: aus)
+--rmstrictsecurity on        optional: Ratenbegrenzung und Sperre</pre>
+<p>Der steuernde Knoten braucht dasselbe Passwort in seinem Client. Im WebGUI eines Fork-Knotens steht dafür die Seite
+<b>Remote</b> bereit: Zielknoten wählen, Befehl absetzen, Antwort geprüft anzeigen. Wer eine eigene App baut, findet in
+<code>docs/rm1-hmac.md</code> die Schritt-für-Schritt-Anleitung und in <code>docs/rm1-commands.md</code> jede Antwortform.</p>
+<p class="small">Zurück zur <a href="index.html">Übersicht</a> · zum Vortrag <a href="meshcom-protocol.html">Kein Routing, und warum das richtig ist</a></p>
+</main>
+</body>
+</html>
