@@ -8,6 +8,7 @@
 #include "tft_display_functions.h"   // #1182: tftBacklight()
 #endif
 #include "printfdeb_functions.h"
+#include "mc_board_id.h" // F4-1a: --id board marker
 #include "command_match.h" // D2-10: commandMatches(), the ladder's matching rule
 #include "command_toggles.h" // D2-06: the table-driven on/off toggles
 #include "command_setters.h" // D2-07: numeric argument parse/range/store
@@ -1386,7 +1387,7 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("MeshCom %-4.4s%-1.1s commands   (a/b = pick one, <x> = value)\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
             delay(100);
 
-            printdeb("\n== Show ==\n--info                  node info\n--pos                   lat/lon/alt/time\n--weather               temp/hum/press (alias --wx)\n--lora                  LoRa settings\n--mheard                heard stations, 12 h (alias --mh)\n--path                  routes per sender (alias --hey)\n--neighbours            neighbour matrix (alias --nbr)\n--msgid                 message-id counter\n--io                    IO config\n--showI2C               scan I2C bus\n--seset                 show sensor settings\n--wifiset               show WiFi settings\n--nodeset               show node settings\n--analogset             show analog settings\n--tel                   show telemetry settings\n--aprsset               show APRS settings\n--regex <call>          test callsign against the validator\n");
+            printdeb("\n== Show ==\n--info                  node info\n--id                    board identity (env, hwid, build tag)\n--pos                   lat/lon/alt/time\n--weather               temp/hum/press (alias --wx)\n--lora                  LoRa settings\n--mheard                heard stations, 12 h (alias --mh)\n--path                  routes per sender (alias --hey)\n--neighbours            neighbour matrix (alias --nbr)\n--msgid                 message-id counter\n--io                    IO config\n--showI2C               scan I2C bus\n--seset                 show sensor settings\n--wifiset               show WiFi settings\n--nodeset               show node settings\n--analogset             show analog settings\n--tel                   show telemetry settings\n--aprsset               show APRS settings\n--regex <call>          test callsign against the validator\n");
             #ifndef DISABLE_NET_CONSOLE
             printdeb("--netconsole            net console status\n");
             #endif
@@ -1586,6 +1587,17 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"info") == 0)
     {
         bInfo=true;
+    }
+    else
+    // F4-1a: board identity marker (web flasher autodetect). Reading
+    // mc_board_id here also keeps the object alive through --gc-sections.
+    if(commandCheck(msg_text+2, (char*)"id") == 0)
+    {
+        char idline[128];
+        mcBoardIdLine(idline, sizeof(idline), BOARD_HARDWARE, &mc_board_id);
+        printlndeb(idline);
+
+        return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"all") == 0)

@@ -483,6 +483,60 @@ def release_app_image(release_dir: Path, env: str) -> Path:
 
 
 # --------------------------------------------------------------------------
+# board marker (WF-05): mc_board_id_t at 0x120 of every ESP32 app image
+# --------------------------------------------------------------------------
+
+MARKER_OFFSET = 0x120
+MARKER_SIZE = 128
+MARKER_MAGIC = b"MCBOARD1"
+MARKER_FORMAT = 1
+APP_DESC_OFFSET = 0x20
+APP_DESC_MAGIC = 0xABCD5432
+
+
+def read_board_marker(path: Path) -> dict | None:
+    """Parse the marker of an ESP32 app image.
+
+    Returns None when the image carries no valid magic at the fixed offset.
+    Raises SystemExit when the file is not an ESP32 app image at all.
+    """
+    data = Path(path).read_bytes()[: MARKER_OFFSET + MARKER_SIZE]
+    if data[:1] != b"\xe9":
+        raise SystemExit(f"{path}: not an ESP32 app image (byte 0 != 0xE9)")
+    desc = data[APP_DESC_OFFSET : APP_DESC_OFFSET + 4]
+    if int.from_bytes(desc, "little") != APP_DESC_MAGIC or len(desc) < 4:
+        raise SystemExit(f"{path}: no esp_app_desc_t magic 0xABCD5432 at 0x20 (not an app image)")
+    blob = data[MARKER_OFFSET : MARKER_OFFSET + MARKER_SIZE]
+    if len(blob) < MARKER_SIZE or blob[:8] != MARKER_MAGIC:
+        return None
+    return {
+        "format": int.from_bytes(blob[8:10], "little"),
+        "hwid": int.from_bytes(blob[10:12], "little"),
+        "env": blob[12:44].split(b"\0", 1)[0].decode("ascii", "replace"),
+        "tag": blob[44:68].split(b"\0", 1)[0].decode("ascii", "replace"),
+    }
+
+
+def check_board_marker(env: str, fw_path: Path) -> dict:
+    """Refuse an ESP32 app image whose marker is absent, foreign or for another env."""
+    m = read_board_marker(fw_path)
+    if m is None:
+        raise SystemExit(
+            f"{env}: {fw_path} carries no MCBOARD1 marker at 0x120 -- "
+            f"rebuild with the board-id marker, never ship an unidentifiable image"
+        )
+    if m["format"] != MARKER_FORMAT:
+        raise SystemExit(
+            f"{env}: {fw_path} marker format {m['format']} unsupported (want {MARKER_FORMAT})"
+        )
+    if m["env"] != env:
+        raise SystemExit(
+            f"{env}: {fw_path} marker names env '{m['env']}', not '{env}' -- wrong image staged"
+        )
+    return m
+
+
+# --------------------------------------------------------------------------
 # staging
 # --------------------------------------------------------------------------
 
@@ -548,6 +602,8 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
                 src = release_app_image(release_dir, env)
             if not src.is_file():
                 raise SystemExit(f"{env}: {src} missing -- build it, never ship a partial board")
+            if name_out == "firmware.bin":
+                check_board_marker(env, src)
             shutil.copy2(src, dest / name_out)
             parts.append({"path": name_out, "offset": offset})
         builds = [{"chipFamily": family, "parts": parts}]
@@ -603,7 +659,8 @@ def update_releases(pages_root: Path, version: str, boards: list[dict], keep: in
 
 def copy_page(pages_root: Path, repo: Path = REPO) -> None:
     src = repo / "pages" / "flash"
-    for item in ("index.html", "flasher.js", "detect.js", "VERSION"):
+    for item in ("index.html", "flasher.js", "detect.js", "identity.js", "romread.js",
+                 "VERSION"):
         if (src / item).is_file():
             shutil.copy2(src / item, pages_root / item)
     ewt = pages_root / "esp-web-tools"

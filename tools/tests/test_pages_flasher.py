@@ -20,6 +20,20 @@ def cfg():
     return pf.load_config(REPO)
 
 
+def marker_image(env: str, payload: bytes = b"", *, magic: bytes = b"MCBOARD1", fmt: int = 1,
+                 first: int = 0xE9, desc: bool = True, marker: bool = True) -> bytes:
+    """A synthetic ESP32 app image: 0xE9, esp_app_desc_t magic at 0x20, marker at 0x120."""
+    img = bytearray(0x120 + 128)
+    img[0] = first
+    if desc:
+        img[0x20:0x24] = (0xABCD5432).to_bytes(4, "little")
+    if marker:
+        blob = (magic + fmt.to_bytes(2, "little") + (7).to_bytes(2, "little")
+                + env.encode().ljust(32, b"\0") + b"v4.40a.10.20".ljust(24, b"\0"))
+        img[0x120:0x120 + len(blob)] = blob
+    return bytes(img) + payload
+
+
 def fake_build(tmp_path: Path, envs) -> Path:
     """A .pio/build stand-in whose every file carries its own identity."""
     build = tmp_path / "build"
@@ -27,7 +41,8 @@ def fake_build(tmp_path: Path, envs) -> Path:
         d = build / env
         d.mkdir(parents=True)
         for name in ("bootloader.bin", "partitions.bin", "firmware.bin"):
-            (d / name).write_bytes(f"{env}/{name}".encode())
+            data = f"{env}/{name}".encode()
+            (d / name).write_bytes(marker_image(env, data) if name == "firmware.bin" else data)
     return build
 
 
@@ -270,7 +285,9 @@ def test_board_folder_is_self_contained_per_env(cfg, tmp_path):
         pf.stage_board(cfg, env, "v1", out / "v1" / env, REPO, build)
     for env in envs:
         for name in ("bootloader.bin", "partitions.bin", "firmware.bin"):
-            assert (out / "v1" / env / name).read_bytes() == f"{env}/{name}".encode()
+            data = f"{env}/{name}".encode()
+            want = marker_image(env, data) if name == "firmware.bin" else data
+            assert (out / "v1" / env / name).read_bytes() == want
 
 
 def test_missing_artifact_refuses_to_ship_a_partial_board(cfg, tmp_path):
@@ -337,10 +354,10 @@ def fake_release(tmp_path: Path, assets: dict) -> Path:
 
 def test_release_app_comes_from_release_support_from_build(cfg, tmp_path):
     build = fake_build(tmp_path, ["t_deck"])
-    rel = fake_release(tmp_path, {"t_deck.bin": b"\xe9CI-app"})
+    rel = fake_release(tmp_path, {"t_deck.bin": marker_image("t_deck", b"CI-app")})
     out = tmp_path / "out"
     pf.stage_board(cfg, "t_deck", "v1", out, REPO, build, rel)
-    assert (out / "firmware.bin").read_bytes() == b"\xe9CI-app"
+    assert (out / "firmware.bin").read_bytes() == marker_image("t_deck", b"CI-app")
     assert (out / "bootloader.bin").read_bytes() == b"t_deck/bootloader.bin"
     assert (out / "partitions.bin").read_bytes() == b"t_deck/partitions.bin"
 
@@ -352,10 +369,10 @@ def test_release_app_comes_from_release_support_from_build(cfg, tmp_path):
 )
 def test_release_rename_map(cfg, tmp_path, env, asset):
     build = fake_build(tmp_path, [env])
-    rel = fake_release(tmp_path, {asset: b"\xe9" + asset.encode()})
+    rel = fake_release(tmp_path, {asset: marker_image(env, asset.encode())})
     out = tmp_path / "out"
     pf.stage_board(cfg, env, "v1", out, REPO, build, rel)
-    assert (out / "firmware.bin").read_bytes() == b"\xe9" + asset.encode()
+    assert (out / "firmware.bin").read_bytes() == marker_image(env, asset.encode())
 
 
 def test_release_missing_asset_refused(cfg, tmp_path):
@@ -522,3 +539,78 @@ def test_every_release_env_layout_matches_manifest(cfg, tmp_path):
         fam = pf.chip_family(cfg, env, REPO)
         if fam != "NRF52":
             pf.esp_parts(cfg, env, fam, REPO, tmp_path)
+
+
+# --------------------------------------------------------------------------
+# board marker (WF-05): every ESP32 firmware.bin names the env it is staged for
+# --------------------------------------------------------------------------
+
+
+def _stage_with_app(cfg, tmp_path, env, image):
+    build = fake_build(tmp_path, [env])
+    (build / env / "firmware.bin").write_bytes(image)
+    pf.stage_board(cfg, env, "v1", tmp_path / "out", REPO, build)
+
+
+def test_marker_correct_passes(cfg, tmp_path):
+    _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck"))
+    p = tmp_path / "ok.bin"
+    p.write_bytes(marker_image("t_deck"))
+    m = pf.read_board_marker(p)
+    assert m["env"] == "t_deck" and m["format"] == 1 and m["hwid"] == 7
+    assert m["tag"] == "v4.40a.10.20"
+
+
+def test_marker_missing_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="MCBOARD1"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck", marker=False))
+
+
+def test_marker_wrong_magic_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="MCBOARD1"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck", magic=b"MCBOARD2"))
+
+
+def test_marker_env_mismatch_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="heltec_wifi_lora_32_V3"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("heltec_wifi_lora_32_V3"))
+
+
+def test_marker_wrong_format_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="format"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck", fmt=2))
+
+
+def test_marker_non_image_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="0xE9"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck", first=0x00))
+
+
+def test_marker_truncated_image_fails(cfg, tmp_path):
+    with pytest.raises(SystemExit, match="MCBOARD1"):
+        _stage_with_app(cfg, tmp_path, "t_deck", marker_image("t_deck")[:0x80])
+
+
+def test_marker_checked_on_release_image_too(cfg, tmp_path):
+    build = fake_build(tmp_path, ["t_deck"])
+    rel = fake_release(tmp_path, {"t_deck.bin": marker_image("other_env")})
+    with pytest.raises(SystemExit, match="other_env"):
+        pf.stage_board(cfg, "t_deck", "v1", tmp_path / "out", REPO, build, rel)
+
+
+def test_copy_page_publishes_identity_and_romread(tmp_path):
+    repo = tmp_path / "repo"
+    src = repo / "pages" / "flash"
+    (src / "esp-web-tools").mkdir(parents=True)
+    for n in ("index.html", "flasher.js", "detect.js", "identity.js", "romread.js", "VERSION"):
+        (src / n).write_text(n)
+    root = tmp_path / "root"
+    root.mkdir()
+    pf.copy_page(root, repo)
+    assert (root / "identity.js").read_text() == "identity.js"
+    assert (root / "romread.js").read_text() == "romread.js"
+    (src / "romread.js").unlink()
+    root2 = tmp_path / "root2"
+    root2.mkdir()
+    pf.copy_page(root2, repo)
+    assert not (root2 / "romread.js").exists()

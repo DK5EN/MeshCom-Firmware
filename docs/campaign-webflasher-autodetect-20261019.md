@@ -126,3 +126,54 @@ Findings:
   sits in either state is "silent" on the first listen; only the reset path can show which.
 
 Not covered: Windows (`usbser.sys` signal handling), a real T-Beam 1W, a bridge board (CP210x).
+
+## F4 / WF-05: board identity without a running app (planned 2026-10-19)
+
+Operator decisions: Safeboot reads the marker from the ota_0 image (no NVS handoff); Safeboot v3
+reaches boards only by a USB web flash, the app keeps requiring v2; ROM read only behind an
+"Aus dem Flash lesen" button; no vendored library: own ROM client `pages/flash/romread.js`
+(SLIP, SYNC, SPI_ATTACH, READ_FLASH_SLOW); fork-only, the later upstream PR carries the marker,
+`--id`, Safeboot v3 and `mc_build_defines.py`; nRF52 gets `--id` only. Full flash permission on
+DK5EN-14, DK5EN-1, DK5EN-92 (all on USB).
+
+Marker: `mc_board_id_t` in `.rodata_custom_desc` (ESP32; fixed offset after `esp_app_desc_t`),
+plain kept constant on nRF52: magic `MCBOARD1`, format 1, hwid at compile time, `env[32]`,
+`tag[24]`. Serial line: `MCBOARD:v1:<hwid runtime>:<hwid compile>:<env>:<tag>`.
+
+| Wave  | Content                                                                                    | Owner                | State   |
+| ----- | ------------------------------------------------------------------------------------------ | -------------------- | ------- |
+| F4-0  | Recon + `esptool --no-stub read_flash` on the three ESP32 nodes                            | scout + orchestrator | running |
+| F4-1a | Marker `src/mc_board_id.{h,cpp}`, `--id`, host test, offset proof in 3 builds              | implementer          | done    |
+| F4-1b | `pages_flasher.py`: release stage fails without the marker at the fixed offset             | implementer          | done    |
+| F4-1c | `pages/flash/identity.js` parsers (partition table, marker bytes, `MCBOARD:` line) + tests | implementer          | done    |
+| F4-2a | Safeboot v3: read ota_0 marker, print it, answer `--id` / `--info`                         | implementer          | open    |
+| F4-2b | `romread.js` + "Aus dem Flash lesen", `--id` with `--info`, `MCBOARD:` parsing             | implementer          | open    |
+| F4-3  | Bench DK5EN-14, DK5EN-1, DK5EN-92, DK5EN-90                                                | orchestrator         | open    |
+| F4-4  | Docs                                                                                       | orchestrator         | open    |
+
+### F4-0 result
+
+- ROM-only `READ_FLASH_SLOW` (esptool `--no-stub`) works on DK5EN-14 (S3 native USB), DK5EN-1 (S3,
+  CP2102) and DK5EN-92 (classic ESP32, CH9102): 3 KB partition table + 4 KB of ota_0 in about 1 s,
+  boards back in the app after the RTS hard reset. No stub needed in `romread.js`.
+- All three images: `esp_app_desc_t` magic 0xABCD5432 at 0x20, so `.rodata_custom_desc` starts at
+  0x120; ota_0 at 0xC0000 on every board.
+- Every release env gets `MC_ENV_NAME` (nRF52 included); the two Safeboot envs do not use
+  `mc_build_defines.py`. `copy_page()` (`pages_flasher.py:604`) publishes a fixed file list: new
+  page modules must be added there. Safeboot version: change `SAFEBOOT_VERSION` and the scan literal
+  `MCSB;ver;002` (`safeboot_ver.h:29`); the app only checks `AU_SAFEBOOT_MIN` (2).
+
+### F4-1 result (2026-10-19)
+
+- Marker `mc_board_id` (`src/mc_board_id.{h,cpp}`) at image offset 0x120 in heltec_wifi_lora_32_V3,
+  t_deck_plus, ttgo_tbeam (map: +0x100 after `esp_app_desc_t`, size 0x80); kept alive by `--id`, field
+  offsets pinned by `static_assert`. nRF52: `MCBOARD1` once in the RAK elf; t114 and t_echo build.
+- `--id` prints `MCBOARD:v1:<hwid runtime>:<hwid compile>:<env>:<tag|(local)>` (ESP32 + nRF52), help line.
+- `pages_flasher.py` `stage_board()` refuses an ESP32 firmware.bin without a matching marker (local
+  and `--from-release`): releases up to v4.40a.10.20 can no longer be re-published through it; the
+  new page modules go live with the first release that carries the marker.
+- `pages/flash/identity.js`: partition table, board image and `MCBOARD:` line parsers, fixtures from
+  the bench dumps.
+- Gate: Unity 77 envs 2728/2728, golden selftest green (baseline regenerated for the new native env),
+  stage 2 PASS, advisor APPROVED (follow-ups applied: offset asserts, tag regex, keep-alive comment).
+  Open for F4-4: CI marker check before the GitHub release goes public (later wave).
