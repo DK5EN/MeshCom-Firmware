@@ -1,6 +1,6 @@
 # T-Beam 1W: node stuck in Safeboot after Auto Update (AU-16)
 
-**Status 2026-10-19:** root cause found and fixed (`22b13194`). Opened 2026-10-17. Backlog row `AU-16` in [`BACKLOG.md`](BACKLOG.md) section 3.2.
+**Status 2026-10-19:** root cause found and fixed (`22b13194`, released in v4.40a.10.20). Field-verified the same day: a real T-Beam 1W passed Auto Update (operator report). Opened 2026-10-17. Backlog row `AU-16` in [`BACKLOG.md`](BACKLOG.md) section 3.2.
 Field node OE5HWN-17 (LilyGo T-Beam 1W, env `LilyGo_T-Beam-1W`, ESP32-S3 N16R8), dev channel, 10.16 -> 10.17.
 
 ## Root cause

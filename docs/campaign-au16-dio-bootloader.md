@@ -64,4 +64,4 @@ register does not discriminate: classify the bootloader image at flash 0x0.
 
 - W2 docs done (BACKLOG AU-16, troubleshooting guide for 1W owners, md5 issue, RESUME, test-suite-map; the defect
   catalogue has no AU section).
-- Field: first Webflasher run on a real 1W (QIO bootloader boots?), then release notes for 10.20.
+- Field: done. 2026-10-19 the operator reported a real T-Beam 1W passing Auto Update (QIO bootloader, v4.40a.10.20).

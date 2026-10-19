@@ -2,6 +2,11 @@
 
 **Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.20` (CI-built, Latest).
 
+## 2026-10-19 -- AU-16 field-verified: real T-Beam 1W passes Auto Update
+
+- Operator report: a real T-Beam 1W (QIO bootloader from v4.40a.10.20) completed Auto Update. AU-16 is closed in
+  the field; BACKLOG, `troubleshooting-tbeam-1w-autoupdate.md` and `campaign-au16-dio-bootloader.md` updated.
+
 ## 2026-10-19 -- web flasher autodetect WF-01..WF-04 fixed (resume point: docs/campaign-webflasher-autodetect-20261019.md)
 
 - `3f446720` (WF-01 env= detection, WF-02 DTR0/RTS0, WF-04 T-Deck Pro safeboot table + manifest check),
