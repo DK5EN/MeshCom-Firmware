@@ -20,7 +20,11 @@ main{max-width:860px;margin:0 auto}
 .eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg3)}
 h1{font-size:clamp(1.7rem,4vw,2.5rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:.4rem 0 .8rem;
   background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.lead{color:var(--fg2);max-width:62ch;margin-bottom:2.2rem}
+.lead{color:var(--fg2);max-width:62ch;margin-bottom:.9rem}
+.toc{color:var(--fg2);max-width:70ch;padding-left:1.1rem;margin-bottom:2.2rem}
+.toc li{margin:.25rem 0}
+.toc strong{color:var(--fg)}
+.toc a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--acc)}
 .cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .card{display:block;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
 a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
@@ -49,7 +53,14 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
 <main>
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
-  <p class="lead">Alle Seiten sind aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, die Historie aller Pull Requests nach upstream und das Protokoll der signierten Fernsteuerung RM1. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.21: das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</p>
+  <p class="lead">Wie die MeshCom-Firmware funktioniert, was der Fork verbessert hat und wie man das aktuelle
+  Release v4.40a.10.21 flasht. Jede Aussage ist aus dem Quellcode oder aus GitHub belegt.</p>
+  <ul class="toc">
+    <li><strong>Firmware flashen:</strong> <a href="flash/">Web-Flasher</a> für 30 Boards, direkt aus dem Browser.</li>
+    <li><strong>Verstehen:</strong> <a href="meshcom-protocol.html">Vortrag zum Protokoll</a>, <a href="Nachbarschaftsmatrix.html">Nachbarschaftsmatrix</a>, <a href="rm1-protokoll.html">Fernsteuerung RM1</a>.</li>
+    <li><strong>Nachvollziehen:</strong> <a href="main-loop-timing.html">gemessene Verbesserungen der Hauptschleife</a>, <a href="pr-history.html">alle Pull Requests nach upstream</a>.</li>
+    <li><strong>Basis:</strong> offizielles 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</li>
+  </ul>
 
   <div class="cards">
     <div class="card wide">
