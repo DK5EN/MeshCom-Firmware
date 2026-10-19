@@ -639,7 +639,9 @@ function showResult(result, info, facts, usbFamily, ctx) {
   };
 
   detectResult.replaceChildren();
-  if (info) {
+  // An info built only from the flash marker (no serial answer) has no call,
+  // version or name; the "Aus dem Flash" line below carries it then.
+  if (info && (info.call || info.version || info.hwname)) {
     detectResult.append(
       line(
         'Knoten',

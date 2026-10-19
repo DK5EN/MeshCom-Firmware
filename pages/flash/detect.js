@@ -140,8 +140,10 @@ export function parseBoot(text) {
 // Codes: ok, safeboot, rom-download, silent-native (offer the reset),
 // silent-after-reset (give up and say so), no-answer (non-native, no MeshCom reply).
 export function diagnose({ info, facts, kind, bytes, afterReset }) {
-  // Safeboot v3 answers --info too; its banner still decides.
-  if (facts && facts.safeboot) return 'safeboot';
+  // Safeboot v3 answers --info too (NODE <SAFEBOOT>); its banner then decides.
+  // A "[SAFEBOOT];" line next to an app answer is stale output from before a
+  // reset (bench DK5EN-92: a bridge port kept the tail of a Safeboot session).
+  if (facts && facts.safeboot && (!info || info.hwname === 'SAFEBOOT')) return 'safeboot';
   if (info) return 'ok';
   if (facts && facts.bootMode === 'download') return 'rom-download';
   if (kind === 'esp-native') return afterReset ? 'silent-after-reset' : 'silent-native';

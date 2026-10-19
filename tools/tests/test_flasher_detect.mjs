@@ -381,3 +381,20 @@ test('WF-05: Safeboot v3 answering --info is still diagnosed as Safeboot', () =>
     'safeboot',
   );
 });
+
+// Bench DK5EN-92 2026-10-19: a bridge port still held the tail of an earlier
+// Safeboot session; the board then booted the app, which answered --info. The
+// stale "[SAFEBOOT];" line must not turn a running app into a Safeboot hint.
+test('WF-05: stale Safeboot output before an app answer is not Safeboot', () => {
+  const text =
+    '[SAFEBOOT];fallback;result;ok;rc;0\r\n' +
+    'ets Jul 29 2019 12:21:46\r\n\r\nrst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\r\n' +
+    '--MeshCom 4.40a (build: Oct 19 2026 / 16:01:12)\r\n' +
+    '...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 2.000000 [GPS]\r\n' +
+    '...AU env=ttgo_tbeam tag=(local)\r\nMCBOARD:v1:12:4:ttgo_tbeam:(local)\r\n';
+  const info = parseInfo(text);
+  assert.equal(
+    diagnose({ info, facts: parseBoot(text), kind: 'bridge', bytes: text.length }),
+    'ok',
+  );
+});
