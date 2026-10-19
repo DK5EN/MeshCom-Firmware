@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261019`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261020`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,50 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.10.20 (Dienstag, 2026-10-20)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.19.
+Getaggt am 2026-10-19 mit dem Datum des Folgetags (gleicher Tag wie 10.19, `.N`-Suffix ist fuer Auto Update
+unsichtbar). `FLASH_VERSION` 20261020, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen
+bleiben erhalten. Safeboot unveraendert seit 10.05.
+
+Inhalt seit `v4.40a.10.19` (alle drei Firmware-Commits, in den Release-Notes untergebracht):
+
+- WEB-WDT-01 W1 (`3b54c452`): `web_txbuf.h` mit begrenzter Sendeschleife (Abbruch nach 2 s ohne Fortschritt,
+  15 s Seitenbudget, Sendefehler), 20 Host-Tests, Watchdog-Fuetterung je Datensatz in Path, MHeard und
+  Nachbarmatrix, `tools/bench/web_stall_client.py`.
+- WEB-WDT-01 W2 (`34974374`): gesamte Web-Ausgabe ueber den Sendepuffer (`CommonWebClient`-Overrides,
+  `web_txbuf.cpp`); ESP32 sendet nicht blockierend, nRF52 hoechstens `availableForWrite()`;
+  `[WEB];tx;abort;<grund>`; `tools/bench/web_throttle.sh`.
+- WEB-STOP-01 + RM-NVS-01 (`1cfa8ca2`): `stopWebserver()` nur bei laufendem Server (Log-Flut "WEBServer
+  stopped" ohne IP, T-Deck-Feldmeldung); NVS-Zeile in `--info` und Logzeilen bei fehlgeschlagenem Speichern
+  der RM-Knotenliste (E22-Feldmeldung, nur Diagnose).
+- Nicht-Firmware: Bench-Laeufe A-F und Kampagnendoku (`8a86f55a`, `docs/campaign-web-wdt-20261019.md`),
+  Defektkatalog Abschnitte 2d/2e.
+- Upstream: nichts Neues; alles dieses Releases nur im Fork (WEB-STOP-01 ist PR-Kandidat, der Fehler steckt
+  auch in upstream/dev).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- WEB-WDT-01 Lauf A: TASK_WDT ohne Fix auf `DK5EN-1` reproduziert (`LAST_LOOP_SECTION=web`, 2,5 s
+  Antwortverzoegerung).
+- Laeufe B-E mit Fix (Build von `34974374`): kein Neustart auf `DK5EN-1`, `DK5EN-92`, `DK5EN-14`, `DK5EN-90`
+  bei 2,5 s und 1,2 s Verzoegerung; Abbruch `stall`/`budget` wie vorgesehen; RAK endet nach 2048 B ohne Haenger.
+  Lauf F: alle 14 Seiten auf `DK5EN-1` vollstaendig, `/` 94 kB in 501 ms.
+- Idle-Heap-Gate (Operator-Entscheidung: Lauf D statt eigenem Flash): `DK5EN-92` (T-Beam v1.2), Build von
+  `34974374` ohne Tag-String, BLE an, 2323, 620 s: 67748 B gegen Basis 69332 B, -1584 B, innerhalb 3072 B
+  (`tools/bench/runs/harness/webwdt_heap_dk5en92.json`).
+- Gate: `tools/regression.sh --stage 1,2` PASS auf `1cfa8ca2` + FLASH_VERSION: Unity 76 Envs, 2720/2720, Golden-Selftest 48 Befehle, pytest 1157, nRF52-Board-Links, Web-GUI-Suiten.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- `1cfa8ca2` (WEB-STOP-01, NVS-Diagnose) auf Hardware: nur Host-Tests und Builds; kein Heap-Wert fuer diesen
+  Commit.
+- Chrome-Durchgang von Lauf F (nur Skript-Client).
+- Diese CI-Images selbst auf der Bench-Flotte; der Operator flasht die Knoten spaeter selbst.
+- Weiter offen aus 10.19: LoRa-QRT auf der Bench und `DK5EN-98`-Nachtaufzeichnung, LED-Feldpruefung, AU-14,
+  AU-17-Downloadpfad.
 
 ## Release v4.40a.10.19 (Montag, 2026-10-19)
 
