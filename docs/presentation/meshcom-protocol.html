@@ -2935,6 +2935,53 @@ AB 13 F1 E9            msg_id 0xE9F113AB
     <p class="cite">Belege: <b>loop_functions.cpp:3119</b> ff. (Komposition), <b>:3449-3451</b> (Wrap bei 999), <b>aprs_functions.cpp:1094-1097</b> (FCS)</p>
   </div></details>
 </div></section>
+
+<section class="slide" id="rm1"><span class="num">29</span><div class="inner">
+  <div class="eyebrow">Anhang · Referenz</div>
+  <h2>RM1 — Fernsteuerung per LoRa, signiert statt verschlüsselt</h2>
+
+  <div class="grid g2" style="margin-top:1.05rem">
+    <div class="card">
+      <h3>Rahmen und Signatur</h3>
+      <table><tbody>
+        <tr><td class="m">Befehl</td><td>DM an den Zielknoten: <code>RM1 &lt;ctr&gt; &lt;befehl&gt;[ &lt;arg&gt;] &lt;tag&gt;</code>, ohne <code>{NNN</code></td></tr>
+        <tr><td class="m">Schlüssel</td><td><code>K = SHA-256(Knotenpasswort)</code>, Passwort höchstens 14 Zeichen</td></tr>
+        <tr><td class="m">Signiert</td><td><code>RM1|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;befehl&gt;</code> — Ziel und Absender sind mitsigniert</td></tr>
+        <tr><td class="m">Tag</td><td>erste 8 Byte von HMAC-SHA256, 16 Hex-Zeichen</td></tr>
+        <tr><td class="m">Antwort</td><td><code>RM1 &lt;ctr&gt; ok|err &lt;ergebnis&gt; &lt;rtag&gt;</code>, Tag über <code>RM1R|…</code>, genau eine Aussendung</td></tr>
+        <tr><td class="m">Zähler</td><td>streng steigend, überlebt Neustarts; <code>sync</code> (Zähler 0) fragt den Höchstwert ab</td></tr>
+      </tbody></table>
+      <div class="cite"><b>docs/rm1-hmac.md</b> · <b>docs/architecture/11-wire-format.md §1.9</b> · Referenz <b>tools/remote_cmd.py</b></div>
+    </div>
+
+    <div class="card">
+      <h3>Rechenbeispiel aus den Testvektoren</h3>
+      <pre style="font-size:.72rem">Passwort     secret
+Kanonisch    RM1|DK5EN-90|DK5EN-1|1|reboot
+Tag          18f287b79c551022
+DM-Text      RM1 1 reboot 18f287b79c551022
+Antwort      RM1R|DK5EN-90|DK5EN-1|1|ok rebooting
+Antwort-DM   RM1 1 ok rebooting facf04f881d89cde</pre>
+      <div class="cite"><b>tools/tests/remote_cmd_vectors.json</b> — ein eigener Client testet gegen alle Vektoren, bevor er auf die Luft geht</div>
+      <h3 style="margin-top:.9rem">25 Befehle, geschlossene Liste</h3>
+      <p>Aktion (<code>reboot</code>, <code>status</code>, <code>sendpos</code> …), Schalter (<code>gps</code>, <code>mesh</code>, <code>gateway</code> …), Parameter (<code>txpower</code>, <code>setout</code>), Lesen (<code>radio</code>, <code>txq</code>, <code>mh</code>, <code>net</code> …) und Auto-Update (<code>upd go</code>).
+      <b>Nie erreichbar</b>, auch mit gültigem Tag: Rufzeichen, Passwörter, WLAN, Flash löschen, OTA, Deep-Sleep.</p>
+      <div class="cite"><b>docs/rm1-commands.md</b> (jede Antwortform)</div>
+    </div>
+  </div>
+
+  <div class="note ok" style="margin-top:.9rem">
+    <b>Authentisch, nicht geheim.</b> Befehl und Antwort bleiben Klartext (AFuV § 16 Abs. 8); geschützt ist nur, <em>wer</em> befiehlt.
+    Falsches Tag, zu kleiner Zähler oder leeres Passwort: der Knoten schweigt — ein Angreifer lernt nichts. Wiederholung wie eine PN (Original plus drei im 40-s-Abstand); nur eine geprüfte Antwort stoppt die Leiter.
+    Aus im Werkszustand: <code>--passwd</code> plus <code>--remotemgmt on</code>, optional <code style="white-space:nowrap">--rmstrictsecurity on</code> (Rate und Sperre je Absender).
+    <a href="rm1-protokoll.html">RM1-Protokoll im Detail</a>
+  </div>
+
+  <div class="note warn" style="margin-top:.9rem">
+    <b>Grenzen:</b> Ein mitgeschnittenes Tag erlaubt Offline-Raten des Passworts — lang und zufällig wählen. Chat und Positionen bleiben unsigniert.
+    Nutzbar heute über das WebGUI eines Fork-Knotens („Remote“) und den Python-Client; die Apps müssen nachziehen.
+  </div>
+</div></section>
 </main>
 
 
