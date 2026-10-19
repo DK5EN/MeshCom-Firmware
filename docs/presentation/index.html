@@ -29,6 +29,17 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
 .card .meta{font-family:var(--mono);font-size:.74rem;color:var(--fg3);margin-top:.8rem}
 .card.wide{grid-column:1/-1;border-color:var(--acc)}
 .card p a,.card .meta a{color:var(--acc);text-decoration:underline;text-decoration-color:var(--acc)}
+.card .bluf{color:var(--fg);font-size:1rem;margin-bottom:1rem}
+.card .cols{display:grid;gap:1rem 1.6rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card h3{font-family:var(--mono);font-size:.72rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);margin:0 0 .4rem}
+.card ul{color:var(--fg2);font-size:.95rem;padding-left:1.1rem}
+.card li{margin:.2rem 0}
+.card li ul{margin-top:.15rem}
+.card li strong{color:var(--fg)}
+.card .todo{border-left:3px solid var(--acc);padding-left:.9rem}
+.card details{margin-top:1rem;border-top:1px solid var(--line);padding-top:.7rem}
+.card summary{cursor:pointer;color:var(--fg2);font-size:.92rem}
+.card details h3{margin-top:.9rem}
 .foot{margin-top:2.6rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--fg2);font-size:.9rem}
 .foot a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--acc)}
 .foot .note{margin-top:.6rem;color:var(--fg3);font-size:.82rem;max-width:70ch}
@@ -44,30 +55,64 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <div class="card wide">
       <div class="eyebrow">Neu · Release v4.40a.10.21</div>
       <h2>Der Web-Flasher erkennt jedes Board, auch ein stummes</h2>
-      <p>Jedes Image trägt jetzt eine Board-Kennung (Hardware-ID, Build-Umgebung, Release), die der neue Befehl
-      <code>--id</code> ausgibt. Der <a href="flash/">Web-Flasher</a> wählt damit genau ein Board, auch bei
-      geteilter Hardware-ID, und liest sie mit „Aus dem Flash lesen“ über das ROM des ESP32 direkt aus dem
-      Flash, wenn die Firmware nicht läuft. Safeboot v3 nennt das Board ebenfalls. Ein stummes Board zeigt,
-      was empfangen wurde, und lässt sich per Knopf in die App neu starten. <strong>T-Deck Pro:</strong> bekommt
-      endlich eine Partitionstabelle mit Safeboot und muss einmal per Web-Flasher geflasht werden.
-      Der AU-16-Fix für den T-Beam 1W ist im Feld bestätigt.
-      Aus v4.40a.10.20: Jede Web-Seite läuft jetzt über einen begrenzten Sendepuffer: ein langsamer oder hängender Browser
-      bekommt eine abgebrochene Seite, statt den Knoten per Watchdog neu zu starten. Ohne IP-Adresse flutet
-      „WEBServer stopped“ nicht mehr das Log, und <code>--info</code> zeigt die NVS-Belegung.
-      <strong>T-Beam 1W:</strong> blieb nach einem Auto Update im Safeboot hängen (AU-16, falscher DIO-Bootloader);
-      1W-Besitzer lassen einmal den <a href="flash/">Web-Flasher</a> laufen, bis dahin ist das Update über die Luft gesperrt.
-      Aus v4.40a.10.19: Ein Knoten mit voller LoRa-Warteschlange blockiert nicht mehr minutenlang hinter seinen Nachbarn: lange
-      wartende Frames bekommen nach einem Empfang eine kurze Haltezeit, ein Echo des eigenen Gruppentexts
-      gibt dessen Kopie frei, vom Server gespiegelte eigene Frames gehen nicht noch einmal auf LoRa, und QRT endet,
-      sobald weniger als 16 Frames warten. Release-Builds halten zehn Protokoll-Einstellungen fest, darunter
-      <code>--nbrrelay on</code>. Auto Update kennt nur noch <code>notify</code> und hat auf der Info-Seite einen
-      Knopf, der vom Prüfen bis zum Neustart mitläuft; klassische ESP32 haben beim Update-Check mehr Heap,
-      nRF52-Boards bekommen die Board-LED, und die Nachbarseite löst den Watchdog nicht mehr aus.
-      Aus v4.40a.10.18: GPS-Positionsfilter auf ESP32-GPS-Boards, Netzkonsole-Fixes, <code>net</code> und
-      <code>upd</code> per Fernsteuerung. Aus v4.40a.10.16/17: zentrale Server-Tabelle und <code>--setnet</code>
-      (#1213) und Antwort-Knopf auf der T-Deck (#1214), beide seit 18.10. upstream gemerged.
-      Dazu die Fork-Funktionen für #1187–#1189 (Auto Update über GitHub, Speichern-und-Weiterleiten,
-      HMAC-gesicherte Fernsteuerung per LoRa). Basis ist das offizielle v4.40a.hbserver.</p>
+      <p class="bluf">Jedes Image weiß jetzt, für welches Board es gebaut ist, und der
+      <a href="flash/">Web-Flasher</a> liest das auch bei einem Board, dessen Firmware nicht läuft.
+      Wer ein T-Deck Pro oder einen T-Beam 1W hat, flasht einmal per Web-Flasher.</p>
+      <div class="cols">
+        <div>
+          <h3>Neu in v4.40a.10.21</h3>
+          <ul>
+            <li><strong>Board-Kennung</strong> in jedem Image: Hardware-ID, Build-Umgebung, Release. Ausgabe mit <code>--id</code>.</li>
+            <li><strong>Eindeutige Auswahl:</strong> der Web-Flasher findet genau ein Board, auch bei geteilter Hardware-ID.</li>
+            <li><strong>Stummes Board:</strong> „Aus dem Flash lesen“ holt die Kennung über das ESP32-ROM; ein Knopf startet das Board zurück in die App.</li>
+            <li><strong>Safeboot v3</strong> nennt das Board ebenfalls.</li>
+          </ul>
+        </div>
+        <div class="todo">
+          <h3>Einmal per Web-Flasher flashen</h3>
+          <ul>
+            <li><strong>T-Deck Pro:</strong> bekommt erstmals eine Partitionstabelle mit Safeboot.</li>
+            <li><strong>T-Beam 1W:</strong> behebt den Safeboot-Hänger nach Auto Update (falscher DIO-Bootloader). Fix im Feld bestätigt. Bis dahin bleibt das Update über die Luft gesperrt.</li>
+          </ul>
+        </div>
+      </div>
+      <details>
+        <summary>Was seit v4.40a.10.16 dazukam</summary>
+        <h3>v4.40a.10.20</h3>
+        <ul>
+          <li><strong>Kein Watchdog-Neustart durch langsame Browser:</strong> Web-Seiten laufen über einen begrenzten Sendepuffer; ein hängender Browser bekommt eine abgebrochene Seite.</li>
+          <li>Ohne IP-Adresse flutet „WEBServer stopped“ nicht mehr das Log.</li>
+          <li><code>--info</code> zeigt die NVS-Belegung.</li>
+        </ul>
+        <h3>v4.40a.10.19</h3>
+        <ul>
+          <li><strong>Volle LoRa-Warteschlange blockiert nicht mehr minutenlang:</strong>
+            <ul>
+              <li>lange wartende Frames bekommen nach einem Empfang eine kurze Haltezeit</li>
+              <li>das Echo des eigenen Gruppentexts gibt dessen Kopie frei</li>
+              <li>vom Server gespiegelte eigene Frames gehen nicht noch einmal auf LoRa</li>
+              <li>QRT endet, sobald weniger als 16 Frames warten</li>
+            </ul>
+          </li>
+          <li><strong>Release-Builds halten zehn Protokoll-Einstellungen fest</strong>, darunter <code>--nbrrelay on</code>.</li>
+          <li><strong>Auto Update</strong> kennt nur noch <code>notify</code>; ein Knopf auf der Info-Seite läuft vom Prüfen bis zum Neustart mit.</li>
+          <li>Klassische ESP32: mehr Heap beim Update-Check. nRF52: Board-LED. Die Nachbarseite löst den Watchdog nicht mehr aus.</li>
+        </ul>
+        <h3>v4.40a.10.18</h3>
+        <ul>
+          <li>GPS-Positionsfilter auf ESP32-GPS-Boards.</li>
+          <li>Fixes an der Netzkonsole.</li>
+          <li><code>net</code> und <code>upd</code> per Fernsteuerung.</li>
+        </ul>
+        <h3>v4.40a.10.16 / .17</h3>
+        <ul>
+          <li>Zentrale Server-Tabelle und <code>--setnet</code> (#1213), Antwort-Knopf auf der T-Deck (#1214). Beide seit 18.10. upstream gemerged.</li>
+        </ul>
+        <h3>Basis</h3>
+        <ul>
+          <li>Offizielles v4.40a.hbserver plus die Fork-Funktionen aus #1187–#1189: Auto Update über GitHub, Speichern-und-Weiterleiten, HMAC-gesicherte Fernsteuerung per LoRa.</li>
+        </ul>
+      </details>
       <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">Release v4.40a.10.21</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
