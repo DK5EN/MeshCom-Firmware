@@ -100,7 +100,38 @@ export function parseBoot(text) {
   // esp32_pmu.cpp: "[INIT]...AXP2101 chip" / "AXP2101 SUPREME chip" / "AXP192 chip".
   const pmu = text.match(/\[INIT\]\.\.\.(AXP2101|AXP192)(?: SUPREME)? chip/);
   if (pmu) facts.pmu = pmu[1];
+
+  // src/safeboot/main.cpp prints "[SAFEBOOT];ver;<n>" once at boot, then other
+  // "[SAFEBOOT];..." lines. Safeboot has no command parser, so this is all it says.
+  const sbVer = text.match(/\[SAFEBOOT\];ver;(\d+)/);
+  if (sbVer) facts.safeboot = Number(sbVer[1]);
+  else if (/\[SAFEBOOT\];/.test(text)) facts.safeboot = true;
+
+  // ROM banner "rst:0x1 (POWERON),boot:0x0 (DOWNLOAD(USB/UART0))" then
+  // "waiting for download"; a normal boot shows boot:0x8 (SPI_FAST_FLASH_BOOT).
+  const bootLine = text.match(/\bboot:0x[0-9a-fA-F]+ \(([^\r\n]*)/);
+  if (/waiting for download/.test(text) || (bootLine && /^DOWNLOAD\(/.test(bootLine[1]))) {
+    facts.bootMode = 'download';
+  } else if (bootLine) {
+    facts.bootMode = 'flash';
+  }
   return facts;
+}
+
+// Decide which hint the page shows for one listen() result. Pure.
+//   info        parseInfo() result or null
+//   facts       parseBoot() result
+//   kind        usbKind() result
+//   bytes       number of bytes received
+//   afterReset  true when this listen followed "Neustart in die App"
+// Codes: ok, safeboot, rom-download, silent-native (offer the reset),
+// silent-after-reset (give up and say so), no-answer (non-native, no MeshCom reply).
+export function diagnose({ info, facts, kind, bytes, afterReset }) {
+  if (info) return 'ok';
+  if (facts && facts.safeboot) return 'safeboot';
+  if (facts && facts.bootMode === 'download') return 'rom-download';
+  if (kind === 'esp-native') return afterReset ? 'silent-after-reset' : 'silent-native';
+  return 'no-answer';
 }
 
 // Narrow the selected release's boards down to the ones this node can be.

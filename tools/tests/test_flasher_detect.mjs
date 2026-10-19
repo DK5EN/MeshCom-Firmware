@@ -18,6 +18,7 @@ import {
   parseInfo,
   parseBoot,
   candidates,
+  diagnose,
 } from '../../pages/flash/detect.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -262,4 +263,60 @@ test('current behaviour: a working LLCC68 with no matching board leaves the pool
   assert.deepEqual(r.envs, ['heltec_wifi_lora_32_V3']);
   assert.ok(!r.basis.some((b) => /LLCC68/.test(b)));
   assert.deepEqual(r.warnings, []);
+});
+
+const SAFEBOOT_CAPTURE = [
+  'OTA UDATE started',
+  '[SAFEBOOT];ver;2',
+  '',
+  'Starting Wifi AP',
+  '[SAFEBOOT];app;image;invalid;rc;8194',
+  '',
+].join('\n');
+const ROM_FLASH =
+  'ESP-ROM:esp32s3-20210327\nBuild:Mar 27 2021\nrst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)\n';
+const ROM_DOWNLOAD =
+  'ESP-ROM:esp32s3-20210327\nBuild:Mar 27 2021\nrst:0x1 (POWERON),boot:0x0 (DOWNLOAD(USB/UART0))\nwaiting for download\n';
+
+test('parseBoot: Safeboot ver line gives the version', () => {
+  assert.equal(parseBoot(SAFEBOOT_CAPTURE).safeboot, 2);
+});
+
+test('parseBoot: any [SAFEBOOT]; line without ver gives true', () => {
+  assert.equal(parseBoot('[SAFEBOOT];app;image;invalid;rc;8194\n').safeboot, true);
+  assert.equal(parseBoot('hello\n').safeboot, undefined);
+});
+
+test('parseBoot: ROM download banner gives bootMode download', () => {
+  assert.equal(parseBoot(ROM_DOWNLOAD).bootMode, 'download');
+  assert.equal(parseBoot('waiting for download\n').bootMode, 'download');
+});
+
+test('parseBoot: normal ROM banner gives bootMode flash', () => {
+  assert.equal(parseBoot(ROM_FLASH).bootMode, 'flash');
+  assert.equal(parseBoot('hello\n').bootMode, undefined);
+});
+
+test('diagnose: one code per branch', () => {
+  const info = { hwid: 43 };
+  assert.equal(diagnose({ info, facts: {}, kind: 'esp-native', bytes: 5 }), 'ok');
+  assert.equal(
+    diagnose({ info: null, facts: { safeboot: 2 }, kind: 'esp-native', bytes: 50 }),
+    'safeboot',
+  );
+  assert.equal(
+    diagnose({ info: null, facts: { bootMode: 'download' }, kind: 'esp-native', bytes: 50 }),
+    'rom-download',
+  );
+  assert.equal(diagnose({ info: null, facts: {}, kind: 'esp-native', bytes: 0 }), 'silent-native');
+  assert.equal(
+    diagnose({ info: null, facts: {}, kind: 'esp-native', bytes: 0, afterReset: true }),
+    'silent-after-reset',
+  );
+  assert.equal(
+    diagnose({ info: null, facts: {}, kind: 'esp-native', bytes: 30, afterReset: true }),
+    'silent-after-reset',
+  );
+  assert.equal(diagnose({ info: null, facts: {}, kind: 'esp-bridge', bytes: 0 }), 'no-answer');
+  assert.equal(diagnose({ info: null, facts: {}, kind: 'esp-native', bytes: 30 }), 'silent-native');
 });

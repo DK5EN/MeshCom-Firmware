@@ -4,7 +4,7 @@
 // per-board manifest.json that tools/pages_flasher.py generates. Nothing about
 // boards, chip families or flash offsets is hard-coded here.
 
-import { usbKind, familyFromUsb, parseInfo, parseBoot, candidates } from './detect.js';
+import { usbKind, familyFromUsb, parseInfo, parseBoot, candidates, diagnose } from './detect.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -613,7 +613,7 @@ function line(label, value) {
   return div;
 }
 
-function showResult(result, info, facts, usbFamily) {
+function showResult(result, info, facts, usbFamily, ctx) {
   const rel = currentRelease();
   const names = new Map(rel.boards.map((b) => [b.env, b]));
   const label = (env) => {
@@ -667,6 +667,32 @@ function showResult(result, info, facts, usbFamily) {
   }
   detectResult.append(verdict);
 
+  // What the board actually printed, so a silent or foreign board can be judged by eye.
+  const raw = ctx.heard.text;
+  const rawBytes = new TextEncoder().encode(raw).length;
+  const det = document.createElement('details');
+  const sum = document.createElement('summary');
+  sum.textContent = `Empfangene Daten (${rawBytes} Bytes)`;
+  const pre = document.createElement('pre');
+  pre.textContent = raw.length > 2048 ? raw.slice(-2048) : raw || '(nichts empfangen)';
+  det.append(sum, pre);
+  detectResult.append(det);
+
+  if (ctx.offerReset) {
+    const again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'copy';
+    again.textContent = 'Neustart in die App';
+    again.addEventListener('click', () => {
+      again.disabled = true;
+      restartIntoApp(ctx.port).catch((err) => {
+        detectBtn.disabled = false;
+        detectStatus.textContent = `Neustart fehlgeschlagen: ${err.message}`;
+      });
+    });
+    detectResult.append(again);
+  }
+
   if (onlyEnvs) {
     const clear = document.createElement('button');
     clear.type = 'button';
@@ -702,6 +728,13 @@ async function detect() {
     return;
   }
 
+  await processPort(port, false);
+}
+
+// Listen on an open port and turn what it said into the result display. Used by
+// the first detection and by "Neustart in die App" (afterReset), so both end
+// the same way: port held for the flash dialog, closed, or kept for nRF52.
+async function processPort(port, afterReset) {
   detectBtn.disabled = true;
   detectResult.hidden = true;
   const kind = usbKind(port.getInfo());
@@ -717,12 +750,14 @@ async function detect() {
   } finally {
     detectBtn.disabled = false;
   }
+  console.log(`[flasher] empfangen (${kind}${afterReset ? ', nach Neustart' : ''}):\n${heard.text}`);
 
   const info = heard.info;
   const facts = parseBoot(heard.text);
   const usbFamily = familyFromUsb(kind);
   const rel = currentRelease();
   const result = candidates(detectData, rel.boards.map((b) => b.env), info, facts, usbFamily);
+  const diag = diagnose({ info, facts, kind, bytes: heard.text.length, afterReset });
 
   if (heard.lost) {
     try {
@@ -735,6 +770,18 @@ async function detect() {
       : 'Die Verbindung ist abgerissen (Board neu gestartet oder abgezogen). Bitte noch einmal erkennen.';
   } else if (usbFamily === 'NRF52') {
     detectStatus.textContent = 'nRF52 erkannt. Flashen: Knopf "Per USB flashen (nRF52)" unten (alternativ UF2-Datei).';
+  } else if (diag === 'safeboot') {
+    detectStatus.textContent =
+      `Board steht in Safeboot${typeof facts.safeboot === 'number' ? ` (Version ${facts.safeboot})` : ''}: ` +
+      'die App startet nicht. Neu flashen behebt das.';
+  } else if (diag === 'rom-download') {
+    detectStatus.textContent = 'Board steht im ROM-Download-Modus (BOOT-Taste?).';
+  } else if (diag === 'silent-native') {
+    detectStatus.textContent =
+      'Keine Antwort von der App. "Neustart in die App" versucht einen Reset des Boards.';
+  } else if (diag === 'silent-after-reset') {
+    detectStatus.textContent =
+      'Keine Antwort nach Neustart: keine MeshCom-App (fremde Firmware), haengende App oder Safeboot. Board von Hand waehlen.';
   } else if (info || facts.family) {
     detectStatus.textContent = '';
   } else {
@@ -759,8 +806,66 @@ async function detect() {
 
   onlyEnvs = result.envs.length > 0 ? new Set(result.envs) : null;
   fillBoards(result.envs.length === 1 ? result.envs[0] : null);
-  showResult(result, info, facts, usbFamily);
+  const offerReset =
+    kind === 'esp-native' &&
+    !afterReset &&
+    (diag === 'silent-native' || diag === 'rom-download' || diag === 'safeboot');
+  showResult(result, info, facts, usbFamily, { heard, port, offerReset });
   await select();
+}
+
+// Reset an ESP32-S3 USB-JTAG board into its app (esptool HardReset for USB:
+// DTR low, RTS pulse), which makes the USB device re-enumerate. The open port
+// dies with it; the same device is found again through getPorts() (already
+// granted, no gesture needed) and listened to once more.
+async function restartIntoApp(oldPort) {
+  const { usbVendorId, usbProductId } = oldPort.getInfo();
+  // A second granted board with the same VID/PID (another S3) must not be
+  // picked up: after re-enumeration only the old object or a port that was
+  // not granted before the reset can be this board.
+  const before = new Set(await navigator.serial.getPorts());
+  if (heldPort === oldPort) {
+    heldPort = null;
+    await select();
+  }
+  detectBtn.disabled = true;
+  detectStatus.textContent = 'Board wird neu gestartet ...';
+  try {
+    if (!oldPort.readable) await oldPort.open({ baudRate: 115200, bufferSize: 8192 });
+    await oldPort.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await sleep(200);
+    await oldPort.setSignals({ dataTerminalReady: false, requestToSend: false });
+  } catch {
+    // The device may already be gone from the reset or never have been there;
+    // the re-acquire below decides.
+  }
+  await oldPort.close().catch(() => {});
+
+  let port = null;
+  const until = Date.now() + 5000;
+  await sleep(500);
+  while (!port && Date.now() < until) {
+    for (const p of await navigator.serial.getPorts()) {
+      const i = p.getInfo();
+      if (i.usbVendorId !== usbVendorId || i.usbProductId !== usbProductId) continue;
+      if (p !== oldPort && before.has(p)) continue;
+      try {
+        await p.open({ baudRate: 115200, bufferSize: 8192 });
+        port = p;
+        break;
+      } catch {
+        // Not enumerated yet, or still closing; try again.
+      }
+    }
+    if (!port) await sleep(250);
+  }
+  if (!port) {
+    detectBtn.disabled = false;
+    detectStatus.textContent =
+      'Das Board ist nach dem Neustart nicht wieder aufgetaucht. Bitte "Board erkennen" noch einmal klicken.';
+    return;
+  }
+  await processPort(port, true);
 }
 
 async function initDetect() {

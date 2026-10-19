@@ -84,3 +84,15 @@ Safeboot is one image per chip family and has no command parser, so it cannot na
 Option: the app writes hwid/env to NVS at boot, Safeboot reads it and answers `--info` with the
 NODE and `...AU env=` lines plus `[SAFEBOOT];ver;N`. Safeboot v3, reaches boards only by a USB web
 flash. Operator decision.
+
+## W2 result (2026-10-19)
+
+- WF-03: `parseBoot()` reports `safeboot` and `bootMode`; pure `diagnose()` picks ok / safeboot /
+  rom-download / silent-native / silent-after-reset / no-answer. The result shows the last 2 KB
+  received (`<details>`, textContent) and logs the full text to the console. On esp-native, when
+  silent, in ROM download mode or in Safeboot, a "Neustart in die App" button resets the board
+  (DTR0, RTS1 200 ms, RTS0), re-acquires it through `getPorts()` (only the old object or a port not
+  granted before the reset, so a second S3 is never picked) and runs the same result handling once.
+- Advisor rework applied: same-VID/PID guard, rejection handler on the button, `select()` after
+  dropping the held port, Safeboot offered the reset too.
+- Tests: `test_flasher_detect.mjs` 32/32. Browser and hardware behaviour: W3.
