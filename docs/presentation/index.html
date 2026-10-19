@@ -39,13 +39,20 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
   <p class="lead">Drei Seiten, alle aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und einen
-  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.20: das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</p>
+  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.21: das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</p>
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.40a.10.20</div>
-      <h2>Web-Seiten ohne Watchdog-Neustart</h2>
-      <p>Jede Web-Seite läuft jetzt über einen begrenzten Sendepuffer: ein langsamer oder hängender Browser
+      <div class="eyebrow">Neu · Release v4.40a.10.21</div>
+      <h2>Der Web-Flasher erkennt jedes Board, auch ein stummes</h2>
+      <p>Jedes Image trägt jetzt eine Board-Kennung (Hardware-ID, Build-Umgebung, Release), die der neue Befehl
+      <code>--id</code> ausgibt. Der <a href="flash/">Web-Flasher</a> wählt damit genau ein Board, auch bei
+      geteilter Hardware-ID, und liest sie mit „Aus dem Flash lesen“ über das ROM des ESP32 direkt aus dem
+      Flash, wenn die Firmware nicht läuft. Safeboot v3 nennt das Board ebenfalls. Ein stummes Board zeigt,
+      was empfangen wurde, und lässt sich per Knopf in die App neu starten. <strong>T-Deck Pro:</strong> bekommt
+      endlich eine Partitionstabelle mit Safeboot und muss einmal per Web-Flasher geflasht werden.
+      Der AU-16-Fix für den T-Beam 1W ist im Feld bestätigt.
+      Aus v4.40a.10.20: Jede Web-Seite läuft jetzt über einen begrenzten Sendepuffer: ein langsamer oder hängender Browser
       bekommt eine abgebrochene Seite, statt den Knoten per Watchdog neu zu starten. Ohne IP-Adresse flutet
       „WEBServer stopped“ nicht mehr das Log, und <code>--info</code> zeigt die NVS-Belegung.
       <strong>T-Beam 1W:</strong> blieb nach einem Auto Update im Safeboot hängen (AU-16, falscher DIO-Bootloader);
@@ -62,7 +69,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
       (#1213) und Antwort-Knopf auf der T-Deck (#1214), beide seit 18.10. upstream gemerged.
       Dazu die Fork-Funktionen für #1187–#1189 (Auto Update über GitHub, Speichern-und-Weiterleiten,
       HMAC-gesicherte Fernsteuerung per LoRa). Basis ist das offizielle v4.40a.hbserver.</p>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">Release v4.40a.10.20</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
+      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">Release v4.40a.10.21</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
@@ -100,18 +107,18 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
       <h2>Web-Flasher: 4.40a direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.20 mit Server-Tabelle, Auto Update,
+      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.21 mit Server-Tabelle, Auto Update,
       Fernsteuerung per LoRa und dem Safeboot – ohne Installation und ohne esptool:
       Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
-      am Knoten erkannt. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
+      am Knoten erkannt oder aus dem Flash gelesen. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
       und Opera auf dem Desktop.</p>
-      <div class="meta">v4.40a.10.20 · Web Serial</div>
+      <div class="meta">v4.40a.10.21 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">v4.40a.10.20</a> (20.10.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">v4.40a.10.21</a> (21.10.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>

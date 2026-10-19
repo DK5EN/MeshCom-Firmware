@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261020`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261021`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,58 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.10.21 (Mittwoch, 2026-10-21)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.20.
+Getaggt am 2026-10-19 mit dem Datum 10.21: 10.20 traegt schon das Datum des Folgetags, und Auto Update
+vergleicht MM.DD, ein Tag 10.19 waere aelter. `FLASH_VERSION` 20261021, `FLASH_STRUCT_VERSION` 20260724
+unveraendert -- die Einstellungen bleiben erhalten. Neu: Safeboot v3 (nur per USB-Webflasher; die App
+verlangt weiter v2).
+
+Inhalt seit `v4.40a.10.20` (alle drei Firmware-Commits, in den Release-Notes untergebracht):
+
+- WF-01/02/04 (`3f446720`): `t_deck_pro` (und `esp32-external-radio`) baut mit
+  `partitions-16MB-safeboot.csv` statt `default_16MB.csv`; `pages_flasher.py` `check_partition_layout()`
+  verweigert ein Manifest, das Safeboot oder App ausserhalb der Partitionstabelle schreibt. Webflasher:
+  `...AU env=` aus `--info` waehlt genau ein Board, DTR0/RTS0 nach dem Lauschen auf nativem S3.
+- WF-03 (`5b606a44`, `e0cc524a`): empfangene Bytes sichtbar, Safeboot-/ROM-Erkennung, "Neustart in die App"
+  mit Wiederaufnahme des Ports; ROM per BOOT-Taste braucht die RST-Taste (nur Seite, keine Firmware).
+- WF-05 F4-1 (`f33ca458`): Marker `mc_board_id_t` (`src/mc_board_id.{h,cpp}`, "MCBOARD1", hwid, env, tag) in
+  `.rodata_custom_desc` = Image-Offset 0x120 (ESP32), Konstante auf nRF52; `--id` gibt
+  `MCBOARD:v1:<hwid lauf>:<hwid bau>:<env>:<tag>` aus; `MC_ENV_NAME` fuer jedes Release-Env;
+  `pages_flasher.py` verweigert ESP32-Images ohne passenden Marker; `pages/flash/identity.js`.
+- WF-05 F4-2 (`2e7960ff`): Safeboot v3 (`src/safeboot/safeboot_id.h`) liest beim Start den Marker aus ota_0,
+  gibt ihn aus und beantwortet `--id`/`--info`; `SAFEBOOT_VERSION 3`. Webflasher: `romread.js` (ROM-Client
+  ohne Stub: SYNC, SPI_ATTACH, READ_FLASH_SLOW), Knopf "Aus dem Flash lesen", `--id` mit `--info`.
+- Bench-Fixes (`f56b1f80`): alter Safeboot-Rest auf Bridge-Ports, Knotenzeile bei reiner Flash-Identitaet.
+- Nicht-Firmware: AU-16 im Feld bestaetigt (`058e6dc3`), Kampagnendoku
+  `docs/campaign-webflasher-autodetect-20261019.md`, Defektkatalog, Rezept `/release-firmware`.
+- Upstream: nichts Neues; Marker und `--id` sind als spaeterer PR geplant.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- `--id` auf `DK5EN-14` (`46:46:t_deck_plus`), `DK5EN-1` (`43:43:heltec_wifi_lora_32_V3`), `DK5EN-92`
+  (`12:4:ttgo_tbeam`) und `DK5EN-90` (`9:9:wiscore_rak4631`), Bench-Builds des Release-Codes ohne Tag-String.
+- Safeboot v3 auf `DK5EN-92` (UART) und `DK5EN-14` (natives USB): Marker beim Start, `--id` und `--info`
+  beantwortet, Einstellungen erhalten.
+- Webflasher (lokale Kopie, Chrome auf macOS): Erkennung nennt das Build-Env auf allen vier Knoten, Alias 12
+  wird `ttgo_tbeam`; "Aus dem Flash lesen" auf `DK5EN-14` und `DK5EN-92`, auch mit stummem Board im
+  ROM-Download-Modus, Neustart bringt die App zurueck; Node-Harness 1,0-1,3 s auf drei ESP32. RAK: Erkennung
+  ueber `--id`, kein Flash-Lesen. `DK5EN-14` ueber den gehaltenen Port geflasht (33 s, Einstellungen erhalten).
+- Gate: `tools/regression.sh --stage 1,2` PASS auf dem Release-Commit: Unity 77 Envs, 2740/2740,
+  Golden-Selftest 48 Befehle, pytest 1172, nRF52-Board-Links, Web-GUI- und Webflasher-Suiten (detect 39,
+  identity 9, romread 12).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Idle-Heap-Gate: `DK5EN-92` nicht erreichbar (nicht am USB, Konsolenpasswort fehlte im Release-Lauf). Die
+  Aenderung legt 128 B Konstante ins Flash und ein Kommando an, keine Heap-Allokation.
+- Windows (usbser.sys), Bridge-Board CP210x beim Neustart-Pfad, Safeboot-v3-Hinweis im Browser (nur Unit-Test
+  und Harness), T-Deck Pro auf Hardware (nur Build der neuen Tabelle), Marker und Flash-Lesen auf einem 1W.
+- Diese CI-Images selbst auf der Bench-Flotte.
+- Kein Marker-Check in CI (nur `pages_flasher.py` prueft beim Veroeffentlichen).
+- Weiter offen aus 10.20: RM-NVS-01-Daten, AU-14, LoRa-QRT auf der Bench.
 
 ## Release v4.40a.10.20 (Dienstag, 2026-10-20)
 
