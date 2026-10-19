@@ -2405,7 +2405,7 @@ void sub_page_path()
         rec[nrec].idx = (uint16_t)i;
         nrec++;
     }
-    meshcom_wdt_feed(); // once after collecting routes; route_total loop bounded by maxrec
+    meshcom_wdt_feed(); // once after collecting routes; loop bounded by route_total and maxrec
 
     // Einfuegesortieren nach Hops, dann Alter (beide aufsteigend) -- rec[0]
     // (eigene Zeile, Hops 0) bleibt dabei an erster Stelle.
