@@ -1,6 +1,21 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.20` (CI-built, Latest).
+**Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
+
+## 2026-10-19 -- release v4.40a.10.21 (board identity, Safeboot v3, web flasher, T-Deck Pro table)
+
+- Tag on `fab3c38b`. CI run 39272252353 failed twice in package install (PlatformIO registry 502), before any
+  compile; operator decision: no CI this time. Local `pio run` with `MC_BUILD_TAG=v4.40a.10.21` (32 envs),
+  assets staged under CI's names, `gh release create` by hand: 66 assets, Latest; round trip (download ==
+  staged), 27 `.autoupdate` `78 da` + re-inflate ok, tag string in Heltec V3, T-Deck field-command scan ok,
+  marker + tag in all 27 ESP32 images, `MCSB;ver;003` in both Safeboot images.
+- Release notes say "built locally" (fork-dev commit after the tag; the tagged `release-notes.md` still says CI).
+- Web flasher `flash/v4.40a.10.21/` (30 boards) with `identity.js`, `romread.js`; 10.20 pruned; live check 0 mismatches
+  (Pages deploy held about 45 min by a GitHub Actions/Pages incident). Presentation
+  synced (10.21 card).
+- Gate stage 1+2 PASS (Unity 77 envs 2740/2740, golden 48, pytest 1172). Idle heap gate not run (DK5EN-92 not
+  on USB, console password not available to the run).
+- Not flashed to the fleet. Open: CI marker check, Windows, RM-NVS-01, AU-14.
 
 ## 2026-10-19 -- WF-05 board identity without a running app (resume point: docs/campaign-webflasher-autodetect-20261019.md)
 
