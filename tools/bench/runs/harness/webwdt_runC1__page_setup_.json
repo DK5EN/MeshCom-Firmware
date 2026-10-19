@@ -1,0 +1,24 @@
+{
+  "host": "192.168.68.71",
+  "mode": "normal",
+  "path": "/?page=setup",
+  "rebooted": false,
+  "abort": null,
+  "bytes": 24527,
+  "ms": 5070,
+  "http_alive": true,
+  "request_error": null,
+  "evidence": [],
+  "web_lines": [],
+  "console_dropped": true,
+  "uptime_before_ms": 1193634,
+  "uptime_after_ms": 1211047,
+  "elapsed_ms": 17431,
+  "uptime_reset": false,
+  "after_boot": {
+    "reset_reason": 1,
+    "reset_name": "POWERON",
+    "last_loop_section": null,
+    "entered_ms": null
+  }
+}

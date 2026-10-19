@@ -1,0 +1,31 @@
+{
+  "host": "192.168.68.66",
+  "mode": "normal",
+  "path": "/",
+  "rebooted": false,
+  "abort": "stall",
+  "bytes": 15776,
+  "ms": 7209,
+  "http_alive": true,
+  "request_error": null,
+  "evidence": [],
+  "web_lines": [
+    {
+      "kind": "abort",
+      "reason": "stall",
+      "sent": 15776,
+      "ms": 2111
+    }
+  ],
+  "console_dropped": true,
+  "uptime_before_ms": 279484,
+  "uptime_after_ms": 301279,
+  "elapsed_ms": 21917,
+  "uptime_reset": false,
+  "after_boot": {
+    "reset_reason": 3,
+    "reset_name": "SW",
+    "last_loop_section": null,
+    "entered_ms": null
+  }
+}

@@ -2,6 +2,17 @@
 
 **Stand:** 2026-10-19 night, branch `fork-dev`, last release `v4.40a.10.19` (CI-built, Latest).
 
+## 2026-10-19 -- WEB-WDT-01: web send buffer and page feeds (resume point: docs/campaign-web-wdt-20261019.md)
+
+- Committed on fork-dev, not released, not upstream: W1 `3b54c452` (`web_txbuf.h`, 20 host tests, feeds in
+  Path/MHeard/matrix, `web_stall_client.py`), W2 `34974374` (`CommonWebClient` write/stop overrides, bounded
+  send loop on ESP32 and nRF52, `web_throttle.sh`). Gate green, Opus advisor APPROVED.
+- Bench: the pre-fix TASK_WDT reproduced on DK5EN-1 (`LAST_LOOP_SECTION=web`); with the fix no reboot on
+  DK5EN-1/-92/-14/-90 under 2.5 s and 1.2 s reply delays; the 94 kB scaffold is cut by the 15 s budget at 1.2 s.
+- Fleet: DK5EN-1 (USB), -92 and -14 (OTA), -90 (USB DFU) run the plain build of `34974374`, so the QRT
+  INSTRUMENT builds of `1a6a3704` are gone from the bench. DK5EN-98 untouched.
+- Open: Chrome pass of run F, upstream PR (separate), release.
+
 ## 2026-10-19 -- release v4.40a.10.19 published (CI), web flasher
 
 - Release [v4.40a.10.19](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19) (tag on

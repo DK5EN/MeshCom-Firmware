@@ -30,12 +30,19 @@ Detection (console TCP 2323, ESP32 only; --no-console to skip)
       we can reconnect, so a drop alone counts as "rebooted" (evidence lists it).
   Firmware fix log lines are collected: "[WEB];tx;abort;<stall|budget|error>;
   sent;<n>;ms;<n>" and "[WEB];tx;done;sent;<n>;ms;<n>;flushes;<n>".
-  Afterwards: HTTP GET / must answer within --probe-timeout; if it does not
-  answer at all the node is gone and the tool exits 2 unless boot evidence exists.
-  No cheap uptime source exists in the web endpoints, so none is used.
+  A dropped console is only secondary evidence (after an ESP32 reboot the old
+  connection is often never reset), so it does not decide the verdict.
+  Positive reboot detection: `--info` over a FRESH console connection (reuses
+  identity_guard.read_info_net) BEFORE the request and AFTER the settle phase
+  (retried up to --probe-timeout). It carries "TIME <ms> ms" (uptime) and
+  "BOOT RESET_REASON=<n> <NAME> LAST_LOOP_SECTION=<sec>". Rule: rebooted when
+  after_uptime < before_uptime + elapsed - 5000 ms (uptime went backwards).
+  A failed HTTP probe with a valid non-reset --info = survived (a pf/dummynet
+  delay on port 80 can fail the probe, see web_throttle.sh). With --no-console
+  only the HTTP liveness probe is used; no answer at all -> exit 2.
 
-Output: `VERDICT;<rebooted|survived>;abort=<reason|none>;bytes=<n>;ms=<n>`,
-optional --json summary. Exit 0 survived, 1 rebooted, 2 tool/network error.
+Output: `VERDICT;<rebooted|survived>;abort=<reason|none>;bytes=<n>;ms=<n>` and
+`UPTIME;before=<ms>;after=<ms>;reset=<NAME or ->`, optional --json summary. Exit 0 survived, 1 rebooted, 2 tool/network error.
 """
 
 from __future__ import annotations
@@ -53,13 +60,22 @@ import time
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from identity_guard import read_info_net  # noqa: E402  (does the HMAC login)
+
 EXIT_SURVIVED, EXIT_REBOOTED, EXIT_ERROR = 0, 1, 2
+UPTIME_TOLERANCE_MS = 5000
 
 PAGES = {"neighbours", "path", "mheard"}
 
 BOOT_RE = re.compile(
     r"\[BOOT\][; ]RESET_REASON=|\[BOOT\][; ]LAST_LOOP_SECTION=|\[BOOT\];ready|\[BOOT\] ready|"
     r"\brst:0x[0-9a-fA-F]+|Task watchdog|TASK_WDT"
+)
+TIME_RE = re.compile(r"TIME\s+(\d+)\s*ms")
+INFO_BOOT_RE = re.compile(
+    r"BOOT\s+RESET_REASON=(\d+)\s+(\S+)(?:\s+LAST_LOOP_SECTION=(\S+))?(?:\s+entered_ms=(\d+))?"
 )
 WEB_RE = re.compile(r"\[WEB\];tx;(abort|done);(.*)$")
 
@@ -102,6 +118,40 @@ def parse_web_line(line: str) -> dict[str, Any] | None:
             return None
         out[k] = int(v)
     return out
+
+
+def parse_info(text: str) -> dict[str, Any]:
+    """Extract uptime_ms and the boot summary from --info text (last match wins)."""
+    out: dict[str, Any] = {"uptime_ms": None, "reset_reason": None, "reset_name": None,
+                           "last_loop_section": None, "entered_ms": None}
+    for m in TIME_RE.finditer(text):
+        out["uptime_ms"] = int(m.group(1))
+    for m in INFO_BOOT_RE.finditer(text):
+        out["reset_reason"] = int(m.group(1))
+        out["reset_name"] = m.group(2)
+        out["last_loop_section"] = m.group(3)
+        out["entered_ms"] = int(m.group(4)) if m.group(4) else None
+    return out
+
+
+def uptime_rebooted(before_ms: int, after_ms: int, elapsed_ms: int, tolerance: int = UPTIME_TOLERANCE_MS) -> bool:
+    """True when the uptime went backwards relative to the wall clock."""
+    return after_ms < before_ms + elapsed_ms - tolerance
+
+
+def fetch_info(host: str, password: str, port: int, timeout: float = 0.0) -> dict[str, Any] | None:
+    """Read --info over a fresh console connection; retry for `timeout` seconds. None if unreadable."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            info = parse_info(read_info_net(host, password=password, port=port))
+            if info["uptime_ms"] is not None:
+                return info
+        except (OSError, Exception):  # noqa: BLE001 - node down / login refused: retry
+            pass
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(1.0)
 
 
 def make_verdict(rebooted: bool, abort: str | None, nbytes: int, ms: int) -> str:
@@ -272,8 +322,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def run(args: argparse.Namespace) -> int:
     console: Console | None = None
+    password = os.environ.get("MC_CONSOLE_PW", "")
+    before: dict[str, Any] | None = None
+    t_before = 0.0
     if not args.no_console:
-        console = Console(args.host, os.environ.get("MC_CONSOLE_PW", ""), args.console_port)
+        before = fetch_info(args.host, password, args.console_port)
+        t_before = time.monotonic()
+        if before is None:
+            print("ERROR;console;cannot read --info before the request", file=sys.stderr)
+            return EXIT_ERROR
+        console = Console(args.host, password, args.console_port)
         try:
             console.connect()
         except (OSError, StallError) as e:
@@ -284,7 +342,12 @@ def run(args: argparse.Namespace) -> int:
         args.host, args.http_port, path, args.mode, args.hold, args.rate, args.rcvbuf, args.timeout
     )
     time.sleep(args.settle if console else 0)
-    alive = probe_http(args.host, args.http_port, args.probe_timeout)
+    after: dict[str, Any] | None = None
+    elapsed_ms = 0
+    if console:
+        after = fetch_info(args.host, password, args.console_port, args.probe_timeout)
+        elapsed_ms = int((time.monotonic() - t_before) * 1000)
+    alive = probe_http(args.host, args.http_port, args.probe_timeout if after is None else 3.0)
     lines: list[str] = []
     dropped = False
     if console:
@@ -293,23 +356,44 @@ def run(args: argparse.Namespace) -> int:
         console.close()
     info = summarize(lines)
     evidence = list(info["boot_lines"])
-    if dropped:
-        evidence.append("console_dropped")
-    rebooted = bool(evidence)
+    uptime_reset = False
+    if before and after:
+        uptime_reset = uptime_rebooted(before["uptime_ms"], after["uptime_ms"], elapsed_ms)
+        if uptime_reset:
+            evidence.append("uptime_reset")
+            if after["reset_name"]:
+                evidence.append(f"reset_reason={after['reset_name']}")
+            if after["last_loop_section"]:
+                evidence.append(f"last_loop_section={after['last_loop_section']}")
+    # Boot lines on the live console are positive; with a readable --info it is authoritative.
+    rebooted = uptime_reset if (before and after) else bool(evidence)
     done = next((w for w in info["web_lines"] if w["kind"] == "done"), None)
     if done and not nbytes:
         nbytes = done.get("sent", 0)
+    reset_name = after["reset_name"] if (after and uptime_reset) else None
     summary = {
         "host": args.host, "mode": args.mode, "path": path, "rebooted": rebooted,
         "abort": info["abort"], "bytes": nbytes, "ms": ms, "http_alive": alive,
         "request_error": req_err, "evidence": evidence, "web_lines": info["web_lines"],
+        "console_dropped": dropped,
+        "uptime_before_ms": before["uptime_ms"] if before else None,
+        "uptime_after_ms": after["uptime_ms"] if after else None,
+        "elapsed_ms": elapsed_ms,
+        "uptime_reset": uptime_reset,
+        "after_boot": ({k: after[k] for k in ("reset_reason", "reset_name", "last_loop_section", "entered_ms")}
+                       if after else None),
     }
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(summary, indent=2) + "\n")
     print(make_verdict(rebooted, info["abort"], nbytes, ms))
-    if not alive and not rebooted:
-        print("ERROR;node does not answer HTTP and no boot evidence", file=sys.stderr)
+    if console:
+        print(f"UPTIME;before={summary['uptime_before_ms']};after={summary['uptime_after_ms']};reset={reset_name or '-'}")
+    if console and after is None and not rebooted:
+        print("ERROR;--info unreadable after the run and no boot evidence", file=sys.stderr)
+        return EXIT_ERROR
+    if not console and not alive:
+        print("ERROR;node does not answer HTTP", file=sys.stderr)
         return EXIT_ERROR
     return EXIT_REBOOTED if rebooted else EXIT_SURVIVED
 

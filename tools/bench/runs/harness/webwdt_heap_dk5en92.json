@@ -1,0 +1,34 @@
+{
+  "init_free": null,
+  "boot_marks": [
+    {
+      "label": "stat",
+      "free": 67996
+    },
+    {
+      "label": "stat",
+      "free": 67516
+    },
+    {
+      "label": "stat",
+      "free": 67748
+    }
+  ],
+  "last_mon_free": null,
+  "last_stat_free": 67748,
+  "idle_free": 67748,
+  "min_free": null,
+  "min_free_seen": 67516,
+  "largest_block": null,
+  "psram_last_free": null,
+  "samples": 3,
+  "firmware_version": "40a/20261019",
+  "channel": "net2323",
+  "raw_log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/harness/heap_idle_20261019_095522.log",
+  "baseline": {
+    "idle_free": 69332,
+    "delta": -1584,
+    "tolerance": 3072,
+    "result": "pass"
+  }
+}

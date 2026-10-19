@@ -140,3 +140,63 @@ def test_main_no_console_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert capsys.readouterr().out.startswith("VERDICT;survived;abort=none;bytes=")
     data = json.loads(out.read_text())
     assert data["rebooted"] is False and data["http_alive"] is True
+
+
+INFO = """[INFO] MeshCom
+...TIME 305852 ms
+...BOOT RESET_REASON=7 TASK_WDT LAST_LOOP_SECTION=web entered_ms=300123
+"""
+
+
+def test_parse_info() -> None:
+    i = wsc.parse_info(INFO)
+    assert i == {"uptime_ms": 305852, "reset_reason": 7, "reset_name": "TASK_WDT",
+                 "last_loop_section": "web", "entered_ms": 300123}
+    assert wsc.parse_info("nothing")["uptime_ms"] is None
+
+
+@pytest.mark.parametrize(
+    "before,after,elapsed,expected",
+    [(100000, 5000, 30000, True), (100000, 130000, 30000, False), (100000, 126000, 30000, False),
+     (100000, 124000, 30000, True)],
+)
+def test_uptime_rebooted(before: int, after: int, elapsed: int, expected: bool) -> None:
+    assert wsc.uptime_rebooted(before, after, elapsed) is expected
+
+
+def _run_with_infos(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, infos: list[str]) -> tuple[int, dict]:
+    it = iter(infos)
+    monkeypatch.setattr(wsc, "read_info_net", lambda host, **kw: next(it))
+
+    class FakeConsole:
+        dropped = False
+
+        def __init__(self, *a: object, **k: object) -> None: ...
+        def connect(self) -> None: ...
+        def snapshot(self) -> list[str]:
+            return []
+        def close(self) -> None: ...
+
+    monkeypatch.setattr(wsc, "Console", FakeConsole)
+    monkeypatch.setattr(wsc, "run_request", lambda *a, **k: (0, 10, None))
+    monkeypatch.setattr(wsc, "probe_http", lambda *a, **k: False)  # delayed port 80
+    out = tmp_path / "s.json"
+    rc = wsc.main(["h", "--settle", "0", "--probe-timeout", "1", "--json", str(out)])
+    return rc, json.loads(out.read_text())
+
+
+def test_run_reboot_detected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rc, data = _run_with_infos(monkeypatch, tmp_path, ["...TIME 300000 ms\n", INFO.replace("305852", "4000")])
+    assert rc == wsc.EXIT_REBOOTED
+    o = capsys.readouterr().out
+    assert "VERDICT;rebooted;" in o and "UPTIME;before=300000;after=4000;reset=TASK_WDT" in o
+    assert data["rebooted"] and data["uptime_before_ms"] == 300000 and data["uptime_after_ms"] == 4000
+    assert {"uptime_reset", "reset_reason=TASK_WDT", "last_loop_section=web"} <= set(data["evidence"])
+
+
+def test_run_survived_despite_failed_http(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+                                          capsys: pytest.CaptureFixture[str]) -> None:
+    rc, data = _run_with_infos(monkeypatch, tmp_path, ["...TIME 300000 ms\n", "...TIME 300500 ms\n"])
+    assert rc == wsc.EXIT_SURVIVED
+    assert "UPTIME;before=300000;after=300500;reset=-" in capsys.readouterr().out
+    assert data["rebooted"] is False and data["http_alive"] is False and data["uptime_reset"] is False

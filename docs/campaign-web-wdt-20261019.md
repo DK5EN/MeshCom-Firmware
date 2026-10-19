@@ -21,11 +21,11 @@ feeds in the Path, MHeard and neighbour-matrix builders.
 
 ## Waves
 
-| Wave | Content                                                               | Files                                                                                                                     | State     |
-| ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------- |
-| W1   | `web_txbuf.h` + 20 host tests; feeds Path/MHeard/matrix; stall client | `web_txbuf.h`, `test/test_web_txbuf/`, `platformio.ini`, `web_functions.cpp` (3 pages), `tools/bench/web_stall_client.py` | committed |
-| W2   | Wiring: `CommonWebClient` overrides, `web_txbuf.cpp`, request end     | `web_commonServer.h`, `web_txbuf.cpp`, `web_functions.cpp` (request path)                                                 | open      |
-| W3   | Gate, advisor, bench runs B-F, docs                                   | hardware, `docs/`                                                                                                         | open      |
+| Wave | Content                                                               | Files                                                                                                                     | State                    |
+| ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| W1   | `web_txbuf.h` + 20 host tests; feeds Path/MHeard/matrix; stall client | `web_txbuf.h`, `test/test_web_txbuf/`, `platformio.ini`, `web_functions.cpp` (3 pages), `tools/bench/web_stall_client.py` | committed `3b54c452`     |
+| W2   | Wiring: `CommonWebClient` overrides, `web_txbuf.cpp`, request end     | `web_commonServer.h`, `web_txbuf.cpp`, `web_functions.cpp` (request path)                                                 | committed `34974374`     |
+| W3   | Gate, advisor, bench runs A-F, docs                                   | hardware, `docs/`, `tools/bench/`                                                                                         | done (Chrome check open) |
 
 W1 notes:
 
@@ -35,16 +35,34 @@ W1 notes:
 - Orchestrator fix in `webTxSendLoop()`: the stall window starts at loop entry, so page compute time between
   two flushes no longer counts as a client stall (test `test_compute_gap_is_not_stall`, red before, green after).
 
-## Run A (pre-fix reproduction) -- not reproduced from macOS
+## Gate and advisor
 
-DK5EN-1 (QRT INSTRUMENT build of `1a6a3704`), pages are 8-14 kB (neighbours 8093 B / path 14071 B / mheard
-7925 B, normal reads 0.3-0.8 s). `--stall` from the Mac with SO_RCVBUF 1024 and 64: node survived 20-25 s, no
-abort. macOS does not shrink the advertised window to SO_RCVBUF; node lwIP send buffer is 5760 B, so the Mac
-absorbs the whole page and `write()` never blocks. A Linux container (honours SO_RCVBUF, 2304 B) cannot reach
-the LAN (OrbStack, also with `--network host`). Options for a real "before": pf blackhole on the Mac (sudo,
-operator), a Linux host on the LAN, or an INSTRUMENT matrix fill to pages > ~150 kB.
+- Gate on W2: `tools/regression.sh --stage 1,2` (Unity 76 envs 2713/2713, jsdom, pytest; golden
+  `variant-ini-effective` updated for the new env), builds `heltec_wifi_lora_32_V3`, `ttgo_tbeam`,
+  `wiscore_rak4631`, `t_deck_plus`, `E22_XML-DevKitC` all pass, `[WEB];tx;` strings x3 in every image.
+- Advisor (Opus) on W1+W2: APPROVED. Applied: nRF52 closed socket -> `error` abort instead of a 2 s stall;
+  comment fixes. Noted, not changed: RAK lib `socketSend` still waits for `SEND_OK` without timeout (bench E
+  showed no hang); lwIP ENOMEM aborts the page like the core's own `write()`.
 
-## Gate (planned)
+## Bench (2026-10-19)
 
-`tools/regression.sh --stage 1,2`; builds `heltec_wifi_lora_32_V3`, `ttgo_tbeam`, `wiscore_rak4631`,
-`t_deck_plus`, `E22_XML-DevKitC`; jsdom `webgui_*`.
+Tools: `tools/bench/web_stall_client.py` (reboot = uptime from `--info` going backwards, plus
+`RESET_REASON`), `tools/bench/web_throttle.sh` (sudo, pf/dummynet delay on the nodes' port-80 replies).
+macOS ignores a small `SO_RCVBUF`, so a non-reading client alone never blocks the node; a pure bandwidth
+limit came out bursty; a reply delay pins the node's 5760 B lwIP send window.
+
+| Run | Node / build                       | Load                         | Result                                                                                        |
+| --- | ---------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------- |
+| A   | DK5EN-1, QRT INSTRUMENT `1a6a3704` | path page, 2.5 s reply delay | **TASK_WDT**: `RESET_REASON=6 TASK_WDT LAST_LOOP_SECTION=web` (uptime 10.2 h -> reboot 09:33) |
+| B   | DK5EN-1, fix                       | `/`, setup, 2.5 s delay      | survived, `abort=stall` after 14340 / 15776 B, uptime continuous                              |
+| C   | DK5EN-1, -14, -90, fix             | `/`, setup, 1.2 s delay      | survived; setup complete (24527 / 24106 / 21550 B); `/` cut by `budget` at 15 s (87 / 73 kB)  |
+| D   | DK5EN-92 (T-Beam), fix             | `/`, setup, 2.5 s delay      | survived, `abort=stall`; idle heap 67748 B vs baseline 69332 B (-1584, tolerance 3072): pass  |
+| -   | DK5EN-14 (T-Deck), fix             | `/`, setup, 2.5 s delay      | survived, `abort=stall` after 5744 B                                                          |
+| E   | DK5EN-90 (RAK4631), fix            | `/`, setup, 2.5 s delay      | answer ends after 2048 B (one W5100S buffer), node answers right after, no hang               |
+| F   | DK5EN-1, fix, no delay             | all 14 pages                 | complete, `[WEB];tx;done`: `/` 94193 B in 501 ms (68 flushes), setup 106 ms, spectrum 4312 ms |
+
+Pages end with `</html>` on DK5EN-1, -14, -90; sizes stable over two reads. The path page was only 3 kB
+right after a reboot (matrix refilling) and does not block then; B-E therefore use `/` and setup. The Chrome
+pass of run F is open (extension not connected).
+
+T-Beam idle heap (`heap_idle.py --host`, STAT samples, 620 s): 67748 B, pass; release 10.19 measured 67304 B.

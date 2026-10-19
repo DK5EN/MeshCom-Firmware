@@ -1,0 +1,19 @@
+{
+  "host": "192.168.68.75",
+  "mode": "normal",
+  "path": "/",
+  "rebooted": false,
+  "abort": null,
+  "bytes": 26624,
+  "ms": 17491,
+  "http_alive": true,
+  "request_error": null,
+  "evidence": [],
+  "web_lines": [],
+  "console_dropped": false,
+  "uptime_before_ms": null,
+  "uptime_after_ms": null,
+  "elapsed_ms": 0,
+  "uptime_reset": false,
+  "after_boot": null
+}

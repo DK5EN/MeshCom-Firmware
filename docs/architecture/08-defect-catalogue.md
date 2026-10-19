@@ -1583,6 +1583,26 @@ Core helpers landed in W1 (`b8aa4354`), the surfaces in W2 (`55ad3b42`), the nRF
 
 **BMx280 sens presence (W1, `b8aa4354`) — FIXED.** RM `sens` claims a field only when its sensor is enabled and detected; BMx280 humidity follows the chip ID (BME280 at either address), BMP3 claims `t`. Field bug: a BME280 enabled via `--bmp` reported humidity as not fitted. The SENS-01/SENS-02 split could not be taken from any document; the entry is recorded here without assigning the two IDs. SENS-03 (DHT sensor not claimed by `sens`) is open, see BACKLOG.
 
+## 2d. WEB-WDT-01 — web page build held the loop task past the task WDT (2026-10-19)
+
+**FIXED** on fork-dev (`3b54c452`, `34974374`), not released, not upstream. Medium, LAN-reachable (any browser).
+
+- **Mechanism:** the web server runs in the loop task and wrote each page with ~1000 small `print()`
+  calls. On ESP32 every one went through `WiFiClient::write()`, which waits up to 10 x 1 s `select()` on a
+  full TCP window and restarts the count on partial progress. A slow or vanished browser kept the loop
+  task inside one page for more than the 5 s task WDT. On nRF52 `RAK13800_W5100S` `socketSend()` waits for
+  free TX space without any timeout.
+- **Evidence:** field resets DB0TAW-14 (TASK_WDT while a page was built); BL-04 (DK5EN-1, 2026-09-28).
+  Bench 2026-10-19: DK5EN-1 on the unfixed build, path page read through a 2.5 s reply delay
+  (`tools/bench/web_throttle.sh`): `RESET_REASON=6 TASK_WDT LAST_LOOP_SECTION=web`.
+- **Fix:** `CommonWebClient` overrides `write()`/`stop()` and buffers output (1400 B, heap per response) into a
+  bounded send loop (`web_txbuf.h`/`.cpp`): feed while bytes flow, abort on 2 s without progress (`stall`),
+  15 s per response (`budget`) or a send error, close the socket, log `[WEB];tx;abort;<reason>` once. nRF52
+  sends at most `availableForWrite()` per call. Feeds added in the Path, MHeard and matrix builders.
+- **Tests:** `native_web_txbuf` (20 cases); bench runs A-F in
+  [`campaign-web-wdt-20261019.md`](../campaign-web-wdt-20261019.md).
+- **Trade-off:** a response that needs more than 15 s is cut (seen: the 94 kB scaffold at 1.2 s RTT).
+
 ---
 
 ## 3. Refuted claims — do not re-investigate

@@ -1,0 +1,31 @@
+{
+  "host": "192.168.68.66",
+  "mode": "normal",
+  "path": "/?page=setup",
+  "rebooted": false,
+  "abort": "stall",
+  "bytes": 17068,
+  "ms": 5749,
+  "http_alive": true,
+  "request_error": null,
+  "evidence": [],
+  "web_lines": [
+    {
+      "kind": "abort",
+      "reason": "stall",
+      "sent": 17068,
+      "ms": 2632
+    }
+  ],
+  "console_dropped": true,
+  "uptime_before_ms": 356672,
+  "uptime_after_ms": 377085,
+  "elapsed_ms": 20321,
+  "uptime_reset": false,
+  "after_boot": {
+    "reset_reason": 3,
+    "reset_name": "SW",
+    "last_loop_section": null,
+    "entered_ms": null
+  }
+}
