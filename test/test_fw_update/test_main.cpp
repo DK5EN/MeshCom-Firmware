@@ -1315,6 +1315,17 @@ static void test_go_decide_current_noasset_safeboot_order(void)
     TEST_ASSERT_EQUAL_INT(FWGO_SAFEBOOT, fwGoDecide(r)); // R3: attempted this boot
 }
 
+static void test_safeboot_why_dio_wins_over_old(void)
+{
+    // AU-16: a bootloader in DIO mode cannot run the IDF 5 Safeboot at all; it outranks "old"
+    TEST_ASSERT_EQUAL_STRING("ok", fwSafebootWhy(true, false, true));
+    TEST_ASSERT_EQUAL_STRING("old", fwSafebootWhy(false, false, true));
+    TEST_ASSERT_EQUAL_STRING("old", fwSafebootWhy(true, true, true));
+    TEST_ASSERT_EQUAL_STRING("dio", fwSafebootWhy(true, false, false));
+    TEST_ASSERT_EQUAL_STRING("dio", fwSafebootWhy(false, false, false));
+    TEST_ASSERT_EQUAL_STRING("dio", fwSafebootWhy(true, true, false));
+}
+
 static void test_check_age_min(void)
 {
     // the clock domain of time(): an epoch once NTP/GPS set the system clock, seconds since boot before
@@ -1755,6 +1766,7 @@ int main(int, char **)
     RUN_TEST(test_go_decide_stale);
     RUN_TEST(test_go_decide_current_noasset_safeboot_order);
     RUN_TEST(test_check_age_min);
+    RUN_TEST(test_safeboot_why_dio_wins_over_old);
     RUN_TEST(test_go_decide_notready_low_battery);
     RUN_TEST(test_go_decide_notready_before_nowifi);
     RUN_TEST(test_go_tick_handover_when_everything_passes);

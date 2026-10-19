@@ -1271,7 +1271,7 @@ static void auScaffoldJs()
     web_client.println("t.className=g?'au-green':'';auEl('au_msg').textContent=m;auEl('au_err').textContent=e;auEl('au_hint').textContent=h;");
     web_client.println("b.textContent=lab;b.className=red?'au-red':'';b.disabled=!!(dis||auBusy);b.setAttribute('data-act',act);}");
     web_client.println("function auRender(){var s=auS;if(!s)return;var L=auState(s,0),g=0,m='',lab='Check now',act='check',dis=0,red=0,e='',h='';");
-    web_client.println("if(L=='S'){m='! Use Webflasher to renew Auto Update aware Safeboot';dis=s.st=='busy';}");
+    web_client.println("if(L=='S'){m=s.sbwhy=='dio'?'! Bootloader (DIO) cannot start the Safeboot: renew bootloader and Safeboot with the Webflasher':'! Use Webflasher to renew Auto Update aware Safeboot';dis=1;}");
     web_client.println("else if(L=='B'){lab='Checking now ...';dis=1;}");
     web_client.println("else if(L=='D'){g=1;m='Firmware '+s.avail+' available';lab='Downloading now ... '+s.pct+' %';dis=1;}");
     web_client.println("else if(L=='d'){g=1;lab='Verifying download ...';dis=1;}");
@@ -3525,7 +3525,12 @@ void sub_page_setup()
         web_client.printf("\t<option value=\"auto\" disabled %s>auto (coming soon)</option>\n", (au_mode == 2) ? "selected" : "");
         web_client.println("</select>");
         web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");
-        if (!au_sb_ok)
+        if (!au_sb_ok && !fwNetBootloaderQio())
+        {
+            // AU-16: a DIO bootloader cannot start the Safeboot; the web flasher renews both
+            web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">Auto update is locked: the bootloader (DIO) cannot start the Safeboot. Flash this node once with the web flasher to renew bootloader and Safeboot; OTA and auto update never replace them.</p>");
+        }
+        else if (!au_sb_ok)
         {
             // AU-12: update is locked until Safeboot is new enough; OTA and auto update never replace Safeboot
             const int au_sb_ver = fwNetSafebootVersion();
@@ -4720,6 +4725,7 @@ static void sub_au_status()
     in.phone = fwNetPhoneHeld() ? 1 : 0; // same expression as the lowheap_phone token
     in.guard = auBleGuardActive() ? 1 : 0; // BLE guard (campaign-au-webgui-ux section 7)
     in.sbok = fwNetSafebootCapable() ? 1 : 0;
+    snprintf(in.sbwhy, sizeof(in.sbwhy), "%s", fwNetSafebootWhy()); // ok|old|dio, tells the page why the install is blocked
     in.etaS = auEtaS(au.stagedIlen);
     fwNetHeapNow(&in.ifree, &in.iblk);
 

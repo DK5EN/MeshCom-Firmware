@@ -2770,6 +2770,12 @@ static bool auHandoverRecord(const FwStageRecord &rec)
     if(auTagSame(s_auHandoverTag, rec.tag))
         return true;
     snprintf(s_auHandoverTag, sizeof(s_auHandoverTag), "%s", rec.tag);
+    // AU-16: a DIO bootloader never reaches the Safeboot; refuse before the marker is written
+    if(!fwNetBootloaderQio())
+    {
+        Serial.printf("[AU];handover;blocked;bootloader_dio\n");
+        return false;
+    }
     // the "hand" marker goes in BEFORE the reboot: it is how the next boot tells an old
     // Safeboot (record untouched) from a new one (marker consumed)
     if(!fwNetMarkHandover(rec.tag))
@@ -2781,8 +2787,10 @@ static bool auHandoverRecord(const FwStageRecord &rec)
     if(!auRebootToSafeboot())
     {
         // hopeless (no Safeboot partition, or it cannot be set as boot partition): drop the
-        // record so the next boot does not try again, and the staged flag no longer fires
-        Serial.printf("[AU];fail;nosafeboot\n");
+        // record so the next boot does not try again, and the staged flag no longer fires.
+        // AU-16: a DIO bootloader was already reported by the guard; the record is dropped the same way
+        if(fwNetBootloaderQio())
+            Serial.printf("[AU];fail;nosafeboot\n");
         fwNetClearRecord();
     }
     return true;
@@ -2810,7 +2818,8 @@ static void auTick(void)
         if(!auRebootToSafeboot())   // returns only without a usable Safeboot partition
         {
             fwNetUnmarkHandover();
-            Serial.printf("[ERR];update;no safeboot partition\n");
+            if(fwNetBootloaderQio())   // AU-16: the DIO guard has reported itself
+                Serial.printf("[ERR];update;no safeboot partition\n");
         }
         return;
     }
@@ -2836,7 +2845,10 @@ static void auTick(void)
             meshcom_settings.node_autoupd = 1;
             save_settings();
             // Serial.printf, not printfdeb: the latter strips ';' outside --debug csv
-            Serial.printf("[AU];refuse;safeboot_too_old;mode;notify;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
+            if(!fwNetBootloaderQio())
+                Serial.printf("[AU];refuse;bootloader_dio;mode;notify;renew with the web flasher\n");
+            else
+                Serial.printf("[AU];refuse;safeboot_too_old;mode;notify;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
         }
     }
 
@@ -2979,7 +2991,10 @@ static void auTick(void)
             if(!s_auBlockedPrinted)
             {
                 s_auBlockedPrinted = true;
-                Serial.printf("[AU];handover;blocked;old_safeboot\n");
+                if(fwNetBootloaderQio())
+                    Serial.printf("[AU];handover;blocked;old_safeboot\n");
+                else
+                    Serial.printf("[AU];handover;blocked;bootloader_dio\n");
             }
             return;
         }

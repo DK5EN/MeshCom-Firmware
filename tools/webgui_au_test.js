@@ -195,7 +195,7 @@ async function mkPage(node, opts) {
 
   // ---- every golden body maps to the C++ state letter and renders -----------------------------------------
   const exp = {
-    S: { msg: /Use Webflasher to renew Auto Update aware Safeboot/, btn: 'Check now', dis: false },
+    S: { msg: /Use Webflasher to renew Auto Update aware Safeboot/, btn: 'Check now', dis: true },
     B: { btn: 'Checking now ...', dis: true },
     D: { green: true, msg: /Firmware v4.40a.10.18 available/, btn: 'Downloading now ... 42 %', dis: true },
     D2: { green: true, btn: 'Verifying download ...', dis: true },

@@ -49,6 +49,7 @@ struct AuUiIn
     char err[24];    // last error token, "" if none
     char mode[8];    // off|notify|auto ...
     char chan[8];    // prod|dev
+    char sbwhy[4];   // Safeboot reason when sbok==0: ok|old|dio (fwNetSafebootWhy)
     int newer, inst, pct, phone, guard, sbok;
     uint32_t etaS, ifree, iblk;
 };
@@ -251,6 +252,7 @@ static inline size_t auStatusJson(const AuUiIn &in, char *out, size_t cap)
     w.key("etaS"); w.num(in.etaS);
     w.key("ifree"); w.num(in.ifree);
     w.key("iblk"); w.num(in.iblk);
+    w.key("sbwhy"); w.str(in.sbwhy);
     w.put('}');
     if (w.bad)
     {

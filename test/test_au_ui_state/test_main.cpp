@@ -19,29 +19,29 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static const char *const AU_GOLDEN_S_JSON = "{\"st\":\"idle\",\"job\":\"none\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":0,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_S_JSON = "{\"st\":\"idle\",\"job\":\"none\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":0,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"old\"}";
 static const char *const AU_GOLDEN_S_STATE = "S";
-static const char *const AU_GOLDEN_F_JSON = "{\"st\":\"idle\",\"job\":\"none\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"v4.40a.10.18\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_F_JSON = "{\"st\":\"idle\",\"job\":\"none\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"v4.40a.10.18\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_F_STATE = "F";
-static const char *const AU_GOLDEN_B_JSON = "{\"st\":\"busy\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_B_JSON = "{\"st\":\"busy\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_B_STATE = "B";
-static const char *const AU_GOLDEN_D_JSON = "{\"st\":\"busy\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":42,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_D_JSON = "{\"st\":\"busy\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":42,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_D_STATE = "D";
-static const char *const AU_GOLDEN_D2_JSON = "{\"st\":\"busy\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":100,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_D2_JSON = "{\"st\":\"busy\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":100,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_D2_STATE = "d";
-static const char *const AU_GOLDEN_E_JSON = "{\"st\":\"ok\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"v4.40a.10.18\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_E_JSON = "{\"st\":\"ok\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"v4.40a.10.18\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_E_STATE = "E";
-static const char *const AU_GOLDEN_G_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_phone\",\"pct\":0,\"phone\":1,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_G_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_phone\",\"pct\":0,\"phone\":1,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_G_STATE = "G";
-static const char *const AU_GOLDEN_G2_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_phone\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_G2_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_phone\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_G2_STATE = "g";
-static const char *const AU_GOLDEN_H_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_ble_off\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_H_JSON = "{\"st\":\"fail\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"lowheap_ble_off\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_H_STATE = "H";
-static const char *const AU_GOLDEN_C_JSON = "{\"st\":\"ok\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_C_JSON = "{\"st\":\"ok\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_C_STATE = "C";
-static const char *const AU_GOLDEN_A_JSON = "{\"st\":\"ok\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.17\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_A_JSON = "{\"st\":\"ok\",\"job\":\"check\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.17\",\"newer\":0,\"inst\":0,\"staged\":\"\",\"err\":\"\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_A_STATE = "A";
-static const char *const AU_GOLDEN_I_JSON = "{\"st\":\"fail\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"digest\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000}";
+static const char *const AU_GOLDEN_I_JSON = "{\"st\":\"fail\",\"job\":\"download\",\"run\":\"v4.40a.10.17\",\"avail\":\"v4.40a.10.18\",\"newer\":1,\"inst\":1,\"staged\":\"\",\"err\":\"digest\",\"pct\":0,\"phone\":0,\"guard\":0,\"sbok\":1,\"mode\":\"notify\",\"chan\":\"dev\",\"etaS\":35,\"ifree\":57000,\"iblk\":31000,\"sbwhy\":\"ok\"}";
 static const char *const AU_GOLDEN_I_STATE = "C";
 
 static void cp(char *d, size_t n, const char *s)
@@ -61,6 +61,7 @@ static AuUiIn base(void)
     cp(in.mode, sizeof(in.mode), "notify");
     cp(in.chan, sizeof(in.chan), "dev");
     in.sbok = 1;
+    cp(in.sbwhy, sizeof(in.sbwhy), "ok");
     in.etaS = 35;
     in.ifree = 57000;
     in.iblk = 31000;
@@ -84,7 +85,8 @@ static AuUiIn mk(const char *st, const char *job, const char *avail, int newer, 
 
 static const char *T18 = "v4.40a.10.18";
 
-static AuUiIn inS(void) { AuUiIn i = base(); i.sbok = 0; return i; }
+static AuUiIn inS(void) { AuUiIn i = base(); i.sbok = 0; cp(i.sbwhy, sizeof(i.sbwhy), "old"); return i; }
+static AuUiIn inSdio(void) { AuUiIn i = inS(); cp(i.sbwhy, sizeof(i.sbwhy), "dio"); return i; }
 static AuUiIn inF(void) { return mk("idle", "none", T18, 1, 1, T18, "", 0, 0); }
 static AuUiIn inB(void) { return mk("busy", "check", "", 0, 0, "", "", 0, 0); }
 static AuUiIn inD(void) { return mk("busy", "download", T18, 1, 1, "", "", 42, 0); }
@@ -326,6 +328,27 @@ void test_overflow_and_truncation(void)
     TEST_ASSERT_NOT_NULL(strstr(o2, "\"pct\":0,"));
 }
 
+void test_sbwhy_key(void)
+{
+    char out[512];
+    // reason is the last key; state stays S for both reasons
+    AuUiIn in = inSdio();
+    TEST_ASSERT_TRUE(auStatusJson(in, out, sizeof(out)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"sbok\":0,"));
+    size_t n = strlen(out);
+    TEST_ASSERT_EQUAL_STRING(",\"sbwhy\":\"dio\"}", out + n - strlen(",\"sbwhy\":\"dio\"}"));
+    TEST_ASSERT_EQUAL_CHAR('S', auUiState(in, false));
+    TEST_ASSERT_EQUAL_CHAR('S', auUiState(in, true));
+    in = inS();
+    TEST_ASSERT_TRUE(auStatusJson(in, out, sizeof(out)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"sbok\":0,"));
+    TEST_ASSERT_NOT_NULL(strstr(out, ",\"sbwhy\":\"old\"}"));
+    TEST_ASSERT_EQUAL_CHAR('S', auUiState(in, false));
+    in = base();
+    TEST_ASSERT_TRUE(auStatusJson(in, out, sizeof(out)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(out, ",\"sbwhy\":\"ok\"}"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -338,5 +361,6 @@ int main(int, char **)
     RUN_TEST(test_eta);
     RUN_TEST(test_escaping);
     RUN_TEST(test_overflow_and_truncation);
+    RUN_TEST(test_sbwhy_key);
     return UNITY_END();
 }

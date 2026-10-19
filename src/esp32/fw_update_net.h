@@ -296,6 +296,16 @@ bool fwNetSafebootOld(void);
 int fwNetSafebootVersion(void);
 bool fwNetSafebootCapable(void);
 
+// AU-16: the Safeboot cannot run behind a 2nd-stage bootloader that configured the flash cache in DIO mode
+// (ESP32-S3 only; it reads NVS and ota_0 wrongly and destroys the settings).
+//   fwNetBootloaderQio  true when SPI0 (flash cache) runs a quad read mode, or the target is not an ESP32-S3.
+//                       Read once, cached. fwNetSafebootCapable() is false while this is false.
+//   fwNetSpi0Ctrl       raw SPI_MEM_CTRL_REG(0) (0 on other targets), printed by --update status.
+//   fwNetSafebootWhy    "ok", "old" (version / nocap) or "dio" (bootloader, wins over "old").
+bool fwNetBootloaderQio(void);
+uint32_t fwNetSpi0Ctrl(void);
+const char *fwNetSafebootWhy(void);
+
 // Removes the record and Safeboot's "tries" counter and clears the cached staged flag. Used
 // when a handover cannot succeed (no Safeboot partition, boot partition not settable), so
 // it is not retried at every boot (also removes "hand"). The "last" tag (reinstall guard) stays.

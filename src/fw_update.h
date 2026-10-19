@@ -595,6 +595,16 @@ enum FwGoResult : uint8_t
     FWGO_NOTREADY
 };
 
+// AU-16: why the Safeboot handover is (not) possible. "dio" = the 2nd-stage bootloader left the flash cache
+// in DIO mode; the IDF 5 Safeboot then misreads NVS and ota_0 and wipes the settings, so it outranks "old"
+// (version too low or nocap flag set). bootQio is true on every target that cannot be affected.
+static inline const char *fwSafebootWhy(bool versionOk, bool nocap, bool bootQio)
+{
+    if (!bootQio)
+        return "dio";
+    return (versionOk && !nocap) ? "ok" : "old";
+}
+
 struct FwGoReq
 {
     bool busy;               // a check or download job runs

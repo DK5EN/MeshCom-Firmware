@@ -18,6 +18,10 @@
 #include <esp_partition.h>
 #include <esp_rom_crc.h>
 #include <esp_system.h>
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#include <soc/soc.h>
+#include <soc/spi_mem_reg.h>
+#endif
 #include <mbedtls/platform.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -63,6 +67,9 @@ void fwNetUnmarkHandover(void) {}
 bool fwNetSafebootOld(void) { return false; }
 int fwNetSafebootVersion(void) { return -1; }
 bool fwNetSafebootCapable(void) { return false; }
+bool fwNetBootloaderQio(void) { return true; }
+uint32_t fwNetSpi0Ctrl(void) { return 0; }
+const char *fwNetSafebootWhy(void) { return "old"; }
 void fwNetLastInstalledTag(char *out, size_t n)
 {
     if (out != nullptr && n > 0)
@@ -1705,10 +1712,38 @@ int fwNetSafebootVersion(void)
     return ver;
 }
 
+// AU-16: SPI0 is the flash cache; the 2nd-stage bootloader sets its read mode and the app never changes it.
+uint32_t fwNetSpi0Ctrl(void)
+{
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+    return (uint32_t)REG_READ(SPI_MEM_CTRL_REG(0));
+#else
+    return 0;
+#endif
+}
+
+bool fwNetBootloaderQio(void)
+{
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+    static int s_qio = -1;   // read once
+    if (s_qio < 0)
+        s_qio = (fwNetSpi0Ctrl() & (SPI_MEM_FREAD_QIO | SPI_MEM_FREAD_QUAD)) ? 1 : 0;
+    return s_qio == 1;
+#else
+    return true;   // classic ESP32 is never blocked
+#endif
+}
+
 bool fwNetSafebootCapable(void)
 {
     const int v = fwNetSafebootVersion();
-    return v >= AU_SAFEBOOT_MIN && !fwNetSafebootOld();
+    return fwNetBootloaderQio() && v >= AU_SAFEBOOT_MIN && !fwNetSafebootOld();
+}
+
+const char *fwNetSafebootWhy(void)
+{
+    const int v = fwNetSafebootVersion();
+    return fwSafebootWhy(v >= AU_SAFEBOOT_MIN, fwNetSafebootOld(), fwNetBootloaderQio());
 }
 
 void fwNetClearRecord(void)

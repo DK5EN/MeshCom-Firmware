@@ -222,6 +222,8 @@ stage2() {
         node tools/webgui_settings_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_test.js" stage2-webgui-au \
         node tools/webgui_au_test.js
+    NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_sbwhy_test.js" stage2-webgui-au-sbwhy \
+        node tools/webgui_au_sbwhy_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_queue_test.js" stage2-webgui-queue \
         node tools/webgui_queue_test.js
     for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py; do

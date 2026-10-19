@@ -652,7 +652,7 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     const size_t after = cmd.find("else\n    if(commandCheck(msg_text+2, (char*)\"txpower \") == 0)", guardClose);
     TEST_ASSERT_TRUE_MESSAGE(after != std::string::npos && after - guardClose < 40, "ladder chain after the ESP32 block is broken");
 
-    const std::string bodyAu = cmd.substr(rungAu, 1700);
+    const std::string bodyAu = cmd.substr(rungAu, 2000); // AU-16 dio refuse line grew the auto branch
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("msg_text+13") != std::string::npos, "--autoupdate argument offset is not +13");
     // D1: off is removed; it refuses with an error and never writes 0
     TEST_ASSERT_TRUE_MESSAGE(bodyAu.find("meshcom_settings.node_autoupd = 0") == std::string::npos, "--autoupdate off must not set 0 (D1)");
@@ -1400,11 +1400,12 @@ static void test_old_safeboot_guard_marks_gates_and_reports()
     // apply is not gated on the flag (no return/else on fwNetSafebootOld)
     TEST_ASSERT_TRUE_MESSAGE(a.find("if(fwNetSafebootOld())\n                    Serial.printf") != std::string::npos, "--update apply gates on the flag instead of only noting it");
 
-    // status: ;safeboot;old|ok (old whenever the Safeboot is not capable), existing prefix unchanged, AU-12 version fields appended last
-    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d\\n") != std::string::npos,
-                             "--update status lacks the safeboot / sbver / sbneed fields");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("!fwNetSafebootCapable() ? \"old\" : \"ok\"") != std::string::npos, "--update status does not derive old|ok from the capability");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootVersion(), AU_SAFEBOOT_MIN);") != std::string::npos, "--update status does not pass the version and AU_SAFEBOOT_MIN last");
+    // status: ;safeboot;ok|old|dio (fwNetSafebootWhy), existing prefix unchanged, AU-12 version fields, then AU-16 boot/spi0 appended last
+    TEST_ASSERT_TRUE_MESSAGE(body.find("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d;boot;%s;spi0;0x%08x\\n") != std::string::npos,
+                             "--update status lacks the safeboot / sbver / sbneed / boot / spi0 fields");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootWhy(),") != std::string::npos, "--update status does not derive ok|old|dio from fwNetSafebootWhy()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwNetSafebootVersion(), AU_SAFEBOOT_MIN,\n                fwNetBootloaderQio() ? \"qio\" : \"dio\", (unsigned)fwNetSpi0Ctrl());") != std::string::npos,
+                             "--update status does not pass version, AU_SAFEBOOT_MIN, then boot and spi0 last");
 
     // clearing the record also clears the marker (a hopeless handover must not leave one behind)
     const size_t clr = net.find("bool nvsClearRecord()\n{");
@@ -1436,6 +1437,52 @@ static void test_safeboot_nocap_is_version_tagged_and_web_order()
 
     const std::string cmd = read_repo_file("src/command_functions.cpp");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("[AU];apply;note;safeboot_too_old;ver;%d;trying_anyway") != std::string::npos, "--update apply is silent on a too-old Safeboot");
+}
+
+// AU-16: a DIO bootloader must never reach the Safeboot. auRebootToSafeboot() refuses before the display,
+// the boot partition or NVS are touched, and --update install (also web "Install") does not download.
+static void test_dio_bootloader_blocks_safeboot()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t fn = cmd.find("bool auRebootToSafeboot(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "auRebootToSafeboot() not found");
+    const size_t g = cmd.find("if(!fwNetBootloaderQio())", fn);
+    const size_t e = cmd.find("[ERR];safeboot;bootloader_dio;renew with the web flasher", fn);
+    const size_t r = cmd.find("return false;", g);
+    const size_t disp = cmd.find("startDisplay(", fn);
+    const size_t boot = cmd.find("esp_ota_set_boot_partition(", fn);
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos && e != std::string::npos && r != std::string::npos && disp != std::string::npos && boot != std::string::npos,
+                             "auRebootToSafeboot() lacks the DIO guard, its error line or the return");
+    TEST_ASSERT_TRUE_MESSAGE(g < e && e < r && r < disp && r < boot, "the DIO guard must return before the display and the boot partition are touched");
+
+    const size_t inst = cmd.find("casecmp(_owner_c, (char*)\"install\") == 0");
+    const size_t start = cmd.find("fwNetStart(FWJ_DOWNLOAD", inst);
+    const size_t ig = cmd.find("else if(!fwNetBootloaderQio())", inst);
+    TEST_ASSERT_TRUE_MESSAGE(inst != std::string::npos && start != std::string::npos && ig != std::string::npos && ig < start,
+                             "--update install must refuse a DIO bootloader before the download starts");
+
+    // the capability (web updapply, RM upd go, remote go, auto handover) includes the bootloader check
+    const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
+    const size_t cap = net.find("bool fwNetSafebootCapable(void)\n{");
+    const size_t capEnd = net.find("\n}", cap);
+    TEST_ASSERT_TRUE_MESSAGE(cap != std::string::npos && capEnd != std::string::npos &&
+                                 net.substr(cap, capEnd - cap).find("fwNetBootloaderQio() &&") != std::string::npos,
+                             "fwNetSafebootCapable() does not include fwNetBootloaderQio()");
+
+    // --update apply refuses before the NVS hand marker
+    const size_t ap = cmd.find("casecmp(_owner_c, (char*)\"apply\") == 0");
+    const size_t apg = cmd.find("if(!fwNetBootloaderQio())", ap);
+    const size_t apm = cmd.find("fwNetMarkHandover(_rec.tag)", ap);
+    TEST_ASSERT_TRUE_MESSAGE(ap != std::string::npos && apg != std::string::npos && apm != std::string::npos && apg < apm,
+                             "--update apply must refuse a DIO bootloader before the hand marker");
+
+    // the auto handover refuses before the hand marker as well
+    const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t hr = m.find("static bool auHandoverRecord(const FwStageRecord &rec)");
+    const size_t hg = m.find("if(!fwNetBootloaderQio())", hr);
+    const size_t hm = m.find("fwNetMarkHandover(rec.tag)", hr);
+    TEST_ASSERT_TRUE_MESSAGE(hr != std::string::npos && hg != std::string::npos && hm != std::string::npos && hg < hm,
+                             "auHandoverRecord() must refuse a DIO bootloader before the hand marker");
 }
 
 static void test_safeboot_capability_gates_auto_update()
@@ -1757,6 +1804,7 @@ int main(int, char **)
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);
     RUN_TEST(test_old_safeboot_guard_marks_gates_and_reports);
     RUN_TEST(test_safeboot_capability_gates_auto_update);
+    RUN_TEST(test_dio_bootloader_blocks_safeboot);
     RUN_TEST(test_safeboot_nocap_is_version_tagged_and_web_order);
     RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
     RUN_TEST(test_web_setvia_compares_canonical_form);

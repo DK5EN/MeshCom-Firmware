@@ -225,6 +225,13 @@ static_assert(MAXHOP_TEXT_MAX < MAX_HOP_LIMIT,
 // restarting, if there is no Safeboot partition or it cannot be made the boot partition.
 bool auRebootToSafeboot(void)
 {
+    // AU-16: refuse before any display, otadata or NVS write; callers check fwNetBootloaderQio() to
+    // tell this from "no safeboot partition". No override.
+    if(!fwNetBootloaderQio())
+    {
+        Serial.printf("[ERR];safeboot;bootloader_dio;renew with the web flasher\n");
+        return false;
+    }
     if((bWEBSERVER || bGATEWAY) && meshcom_settings.node_hasIPaddress)
         startDisplay((char*)"OTA using WiFi", meshcom_settings.node_ip, meshcom_settings.node_gw);
     else
@@ -1356,7 +1363,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"ota-update") == 0)
     {
-        auRebootToSafeboot();   // returns only without a safeboot partition
+        auRebootToSafeboot();   // returns only without a safeboot partition (or AU-16: DIO bootloader, already reported)
 
         return;
     }
@@ -5062,8 +5069,13 @@ void commandAction(char *umsg_text, bool ble)
             // BEFORE the setting is touched or saved; off and notify never need Safeboot.
             if(!fwNetSafebootCapable())
             {
-                Serial.printf("[ERR];autoupdate;safeboot_too_old;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
-                Serial.printf("[AU];note;flash once with the web flasher to install the new Safeboot\n");
+                if(!fwNetBootloaderQio())
+                    Serial.printf("[ERR];autoupdate;bootloader_dio;renew with the web flasher\n");
+                else
+                {
+                    Serial.printf("[ERR];autoupdate;safeboot_too_old;ver;%d;need;%d\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
+                    Serial.printf("[AU];note;flash once with the web flasher to install the new Safeboot\n");
+                }
 
                 return;
             }
@@ -5208,6 +5220,11 @@ void commandAction(char *umsg_text, bool ble)
             {
                 Serial.printf("[ERR];update;busy\n");
             }
+            else if(!fwNetBootloaderQio())
+            {
+                // AU-16: the handover is blocked anyway, so do not download (web "Install" lands here too)
+                Serial.printf("[ERR];update;bootloader_dio;renew with the web flasher\n");
+            }
             else if(_au.staged && _au.availTag[0] != '\0' && strcmp(_au.stagedTag, _au.availTag) == 0)
             {
                 // before the availNewer test: staging records the tag as installed, so the
@@ -5251,6 +5268,12 @@ void commandAction(char *umsg_text, bool ble)
             else
             {
                 // the operator may have updated Safeboot meanwhile: try even with the old-Safeboot flag
+                if(!fwNetBootloaderQio())
+                {
+                    // AU-16: the Safeboot handover guard would refuse anyway; stop before the NVS marker
+                    Serial.printf("[ERR];safeboot;bootloader_dio;renew with the web flasher\n");
+                    return;
+                }
                 if(fwNetSafebootOld())
                     Serial.printf("[AU];apply;note;old_safeboot_flag_set_trying_anyway\n");
                 else if(!fwNetSafebootCapable())
@@ -5265,14 +5288,15 @@ void commandAction(char *umsg_text, bool ble)
                     if(!auRebootToSafeboot())
                     {
                         fwNetUnmarkHandover();
-                        Serial.printf("[ERR];update;no safeboot partition\n");
+                        if(fwNetBootloaderQio())   // AU-16: the DIO guard has reported itself
+                            Serial.printf("[ERR];update;no safeboot partition\n");
                     }
                 }
             }
         }
         else if(casecmp(_owner_c, (char*)"status") == 0)
         {
-            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d\n",
+            Serial.printf("[AU];status;mode;%s;chan;%s;avail;%s;newer;%d;staged;%s;busy;%d;err;%s;safeboot;%s;sbver;%d;sbneed;%d;boot;%s;spi0;0x%08x\n",
                 meshcom_settings.node_autoupd == 2 ? "auto" : "notify",
                 meshcom_settings.node_updchan ? "dev" : "prod",
                 _au.availTag[0] ? _au.availTag : "none",
@@ -5280,8 +5304,9 @@ void commandAction(char *umsg_text, bool ble)
                 (_au.staged && _au.stagedTag[0]) ? _au.stagedTag : "none",
                 _auBusy ? 1 : 0,
                 _au.lastErr[0] ? _au.lastErr : "none",
-                !fwNetSafebootCapable() ? "old" : "ok",
-                fwNetSafebootVersion(), AU_SAFEBOOT_MIN);
+                fwNetSafebootWhy(),
+                fwNetSafebootVersion(), AU_SAFEBOOT_MIN,
+                fwNetBootloaderQio() ? "qio" : "dio", (unsigned)fwNetSpi0Ctrl());
         }
         else
         {
