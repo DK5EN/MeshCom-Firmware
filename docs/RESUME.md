@@ -1,6 +1,25 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-18 evening, branch `fork-dev`, last release `v4.40a.10.18` (CI-built, Latest).
+**Stand:** 2026-10-19 night, branch `fork-dev`, last release `v4.40a.10.19` (CI-built, Latest).
+
+## 2026-10-19 -- release v4.40a.10.19 published (CI), web flasher
+
+- Release [v4.40a.10.19](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19) (tag on
+  `5994db46`, cut 2026-10-18 late with the next day's date, CI run 39171372027): Latest, 66 assets (names as
+  10.18), 27 `.autoupdate` with `78 da`, re-inflate ok and byte-identical to a local regeneration, tag string in
+  the image, T-Deck field commands `mute=2 stat=1 udplog=1 injectraw=0`. `FLASH_VERSION` 20261019 (golden
+  `variant-macros-effective` follows), Safeboot version unchanged.
+- Content since 10.18: AU web GUI W1-W4, fork hardening W1-W4 (sens, LED, heap levers, production lock),
+  LoRa QRT W1/W2, `cc48f720` neighbour-page WDT feed. Gate before the tag: 75 envs, 2693/2693, golden 48,
+  pytest 1136. Idle heap DK5EN-92 (local release build of the commit): 67304 B vs 69332 B baseline, pass
+  (samples 69724/68128/67304 B, falling; watch on the next release).
+- `safeboot.bin`/`safeboot-s3.bin` replaced by the CI build (`1aeda609`): +112/+128 B from two settings schema
+  keys of 73c0bd04, read-only in Safeboot.
+- Web flasher: only v4.40a.10.19 (30 boards, HTTPS check 0 mismatches); v4.40a.10.18 folder pruned (release
+  object kept). Presentation index card and PR-history lead name 10.19 (pages-sync `9e36c59c`).
+- Fleet: DK5EN-92 runs a local release build of the commit (heap step); DK5EN-1, -90, -14 stay on the QRT
+  INSTRUMENT build of `1a6a3704`, DK5EN-98 on its production build of `1a6a3704`. Open: DK5EN-98 night capture
+  for the QRT waves, LED field checks, AU-14, AU-17 download path.
 
 ## 2026-10-18 -- LoRa QRT campaign: waves 1 and 2 committed (resume point: docs/campaign-lora-qrt-20261018.md, Status)
 

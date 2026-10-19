@@ -4,26 +4,25 @@ Working document for picking the campaign back up: what we set out to do, how we
 there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29) lives in
 [`archive/backlog-journal-20260818-20260929.md`](archive/backlog-journal-20260818-20260929.md).
 
-## Stand 2026-10-16
+## Stand 2026-10-19
 
 - **Branch model:** `fork-dev` is the only working branch: `upstream/dev` (icssw-org) plus the
   fork's docs, tests, tools, GitHub Pages and fork-only firmware not upstream yet. `fork-main`,
   `fork-neo`, `fork-neo-test` and `master` are retired (tag `archive/fork-neo-test-20261002`).
-- **Upstream:** open PRs by dk5en: #1213 (central server table `gw_servers`, static nRF52 stays
-  static, network mode auto/inet/hamnet) and #1214 (T-Deck DM reply TD-21, web firmware column).
-  Merged since 4.40a: #1200, #1201, #1207, #1208. The temporary fork commit `389ace0d` (OE
-  internet server lost in upstream #1209) is reverted (`a748948d`, 2026-10-15) after Kurt's
-  #1210-#1212. DK5EN never merges upstream himself.
-- **Last release:** `v4.40a.10.17` (2026-10-17, CI-built since `v4.40a.10.11`: `v*` tags publish, `ci-proof-*`
-  tags draft), base official `v4.40a.hbserver`; web flasher offers only the latest release.
-- **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-17: 72
-  native envs, 2440 Unity cases, 1080 pytest, golden selftest. Stage 3 has run against the bench
+- **Upstream:** no PR by dk5en open. #1213 (central server table `gw_servers`, `--setnet`, ETH-05)
+  and #1214 (T-Deck DM reply TD-21, web firmware column) merged into upstream `dev` on 2026-10-18,
+  merged back with `e87e8a5e`; no upstream tag carries them yet. Merged before: #1200, #1201, #1207,
+  #1208. DK5EN never merges upstream himself.
+- **Last release:** `v4.40a.10.19` (2026-10-19, CI-built since `v4.40a.10.11`: `v*` tags publish,
+  `ci-proof-*` tags draft), base official `v4.40a.hbserver`; web flasher offers only the latest
+  release. Release gate now includes the T-Beam idle-heap step (`tools/heap_baseline.json`).
+- **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-18: 75
+  native envs, 2693 Unity cases, 1136 pytest, golden selftest 48. Stage 3 has run against the bench
   fleet (REG-01). Inventory: [`test-suite-map.md`](test-suite-map.md).
-- **Since 2026-10-15 on `fork-dev`, not upstream yet:** `VIA-01` (`--via` list validated, web
-  `setvia` OK/FAIL fixed; bench test pending, then PR). `RX-01` closed by the soak evaluation
-  [`rx01-soak-evaluation-20261005.md`](rx01-soak-evaluation-20261005.md); its side finding is
-  `REBOOT-98` in 3.2. `AU-13` (2026-10-17): auto-update TLS on PSRAM boards, mbedTLS on a
-  PSRAM-first allocator; bench DK5EN-14 10/10.
+- **Fork-only firmware since 2026-10-15** (in `v4.40a.10.19`): VIA-01, AU-13, GPS-11, net console
+  P-0111/0168/0169, RM1 `net`/`upd`, the AU web GUI row, the production setting lock, heap levers,
+  LED parity, the LoRa QRT waves 1-2 and the neighbour-page watchdog feed. Matrix:
+  [`fork-dev-vs-upstream-20261018.md`](fork-dev-vs-upstream-20261018.md).
 - **Open work:** section 3.2, one table. Rows carry their own dated status; rows marked Done or
   Closed stay until their upstream PR or follow-up is through.
 - **Journal:** the 7000-line campaign log (sections 3.8a to 3.8bb, 3.9, the Durchgang entries,
