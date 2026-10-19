@@ -7,8 +7,8 @@
 - `upstream/dev` 06a4fd9a (#1215, 18.10.): `a89a06da` OE server label "MeshCom OE (Austria/WW)" in
   `src/gw_servers.cpp` taken; `ff0794ae` upstream Safeboot rebuild: `safeboot.bin` / `safeboot-s3.bin` kept
   `--ours` (fork Safeboot v3 with board identity), stray `src/idf_component.yml.orig` taken as upstream has it.
-- Upstream moved tag `v4.40a.hbserver` from 8770f9b5 (#1211) to f2b3a349 (#1212); the local tag still points
-  at 8770f9b5 (fetch refuses to move it). No new upstream tag after it.
+- Upstream moved tag `v4.40a.hbserver` from 8770f9b5 (#1211) to f2b3a349 (#1212); local tag moved to match
+  (`git fetch upstream --force` for that tag). origin does not carry it. No new upstream tag after it.
 - Pages: deck slide 29 (RM1), PR history to 19.10. with #1215 and releases 10.19-10.21 (`febb6f56`).
 
 ## 2026-10-19 -- release v4.40a.10.21 (board identity, Safeboot v3, web flasher, T-Deck Pro table)
