@@ -216,10 +216,16 @@ App (`f33ca458` + `2e7960ff` + `f56b1f80`) and Safeboot v3 flashed by esptool (n
 
 Bench findings fixed in `f56b1f80`: a bridge port kept the tail of an earlier Safeboot session, the page
 said "Safeboot" for a running app (now needs Safeboot's own answer or silence); flash-only identity showed
-"?, MeshCom ?". Not covered in the browser: the Safeboot v3 hint (harness + unit test only), DK5EN-90 RAK
-(not on USB; marker in the elf only), Windows. Harness note: node-serialport data events stall on macOS
+"?, MeshCom ?". Not covered in the browser: the Safeboot v3 hint (harness + unit test only), Windows. Harness note: node-serialport data events stall on macOS
 for short ROM replies, poll `read()` instead. DK5EN-1 and DK5EN-92 consoles have a password (2323 needs
 the HMAC login), `--id` was checked over USB there.
+
+DK5EN-90 (RAK4631, USB 230D6EBB3266D20E), 2026-10-19: fork-dev `17a93d02` flashed by `pio ... -t upload`
+(serial DFU, "Device programmed."). `--id` over USB: `MCBOARD:v1:9:9:wiscore_rak4631:(local)`. Browser detect
+(local flasher, fork-dev page modules): "nRF52 erkannt", node line `DK5EN-90, MeshCom 4.40a, Hardware-ID 9
+<RAK4631>, Build-Env wiscore_rak4631`, board preselected WisBlock RAK4631 -- SX1262, no "Aus dem Flash lesen"
+for nRF52, port held for "Per USB flashen". No `...AU env=` line on nRF52 (no AU); the env comes from the
+`MCBOARD:` line. Identity guard ok before and after (2 dBm, same IP, NTP). Flashing from the page not run.
 
 Open: CI marker check before the GitHub release goes public (pages_flasher only checks at publish time);
 release notes for the next release (new web flasher button, Safeboot v3 only by USB web flash, T-Deck Pro

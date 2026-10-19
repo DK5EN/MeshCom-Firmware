@@ -9,7 +9,7 @@
 - Bench: DK5EN-14, DK5EN-1, DK5EN-92 run the fork-dev build + Safeboot v3 (settings kept); `--id`, ROM read
   (browser and Node harness) and Safeboot v3 answers all pass; T-Beam alias 12 resolves to `ttgo_tbeam`.
 - Not published: goes out with the next release; releases up to 10.20 can no longer be re-staged by
-  `pages_flasher.py`. Open: CI marker check, DK5EN-90 on hardware, Windows.
+  `pages_flasher.py`. Open: CI marker check, Windows (DK5EN-90 RAK benched 10-19).
 
 ## 2026-10-19 -- AU-16 field-verified: real T-Beam 1W passes Auto Update
 
