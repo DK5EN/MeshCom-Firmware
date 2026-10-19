@@ -1,6 +1,18 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-19 night, branch `fork-dev`, last release `v4.40a.10.19` (CI-built, Latest).
+**Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.20` (CI-built, Latest).
+
+## 2026-10-19 -- release v4.40a.10.20 (web send buffer, WEB-STOP-01, NVS diagnostics, AU-16)
+
+- Tag on `a80f194d`, CI run 39242933936 green: 66 assets, Latest, 27 `.autoupdate` re-inflate ok, tag string in
+  the Heltec V3 image, T-Deck field-command scan ok, `bootloader_dio` guard strings in the 1W image.
+- Release notes: AU-16 item 4 and a warning box asking 1W owners to run the web flasher once.
+- Web flasher `flash/v4.40a.10.20/` (30 boards, check 0 mismatches), 10.19 pruned; 1W ships the QIO bootloader
+  (15104 B, byte-identical to the framework `bootloader_qio_80m`). Presentation synced (10.20 card with 1W note).
+- Gate stage 1+2 PASS (Unity 76 envs 2723/2723, golden 48, pytest 1157). No new heap value: AU-16 commit and
+  `1cfa8ca2` not heap-measured.
+- Not flashed to the fleet. Open: first web-flasher run on a real 1W (OE5HWN or DD7MH), RM-NVS-01 reporter data,
+  AU-14.
 
 ## 2026-10-19 -- AU-16 root cause: DIO bootloader breaks the S3 Safeboot (resume point: docs/campaign-au16-dio-bootloader.md)
 
