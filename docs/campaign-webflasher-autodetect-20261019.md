@@ -96,3 +96,33 @@ flash. Operator decision.
 - Advisor rework applied: same-VID/PID guard, rejection handler on the button, `select()` after
   dropping the held port, Safeboot offered the reset too.
 - Tests: `test_flasher_detect.mjs` 32/32. Browser and hardware behaviour: W3.
+
+## W3 result: bench DK5EN-14 (2026-10-19)
+
+T-Deck Plus, native USB 303a:1001, local flasher at `127.0.0.1:8700` (`before` = published gh-pages
+10.20, `after` = fork-dev). Node checked by `identity_guard.py` before and after (2 dBm).
+
+| Scenario                       | Before (published)               | After (fork-dev)                                                                 |
+| ------------------------------ | -------------------------------- | -------------------------------------------------------------------------------- |
+| A app running                  | T-Deck Plus via hwid 46          | T-Deck Plus, node line shows `Build-Env t_deck_plus`, 5984 B shown               |
+| B reset while the port is held | `--reboot` and 3x RST: app boots | not repeated: nothing to fix                                                     |
+| C Safeboot (`--ota-update`)    | (not run; report screen)         | 0 B, button offered; after reset 449 B, "Board steht in Safeboot (Version 2)"    |
+| D ROM via BOOT strap           | -                                | 0 B, button offered; USB reset lands in the ROM again; RST key brings the app    |
+| E detect, flash via held port  | -                                | dialog takes the held port, no chooser; 33 s, app boots by itself, settings kept |
+
+Findings:
+
+- **F3 / WF-02 not reproduced.** With the published flasher holding the port at DTR1/RTS0, a
+  software reboot and three RST presses all booted the app. The armed download flag does not
+  survive an EN/RST reset on this board. WF-02 stays as hygiene, it fixes no observed failure.
+- **ROM entered through the BOOT strap is sticky against a USB-JTAG reset.** DTR0 + RTS pulse from
+  the ROM booted the ROM again (no app, no Safeboot after 40 s); only the RST key left it. From a
+  normal boot (scenario C) the same reset works. The page now says so and no longer offers the
+  reset button for a ROM banner; "silent after reset" names the RST key first.
+- **Re-acquire timing.** The first run of D ended in "Verbindung abgerissen": the page reopened the
+  old USB device just before it re-enumerated. `restartIntoApp()` now waits up to 1.5 s for the
+  `disconnect` event and re-acquires once more on a lost port; the repeat of D re-acquired cleanly.
+- The ROM banner and Safeboot output are printed before the page opens the port, so a board that
+  sits in either state is "silent" on the first listen; only the reset path can show which.
+
+Not covered: Windows (`usbser.sys` signal handling), a real T-Beam 1W, a bridge board (CP210x).

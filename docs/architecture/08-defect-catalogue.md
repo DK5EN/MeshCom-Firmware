@@ -1656,6 +1656,21 @@ Core helpers landed in W1 (`b8aa4354`), the surfaces in W2 (`55ad3b42`), the nRF
 
 ---
 
+## 2f. Web flasher autodetect (WF-01..WF-04), field report 2026-10-18
+
+Field report: T-Beam 1W showed "keine MeshCom-Antwort auf --info" and 17 candidate boards. Campaign
+`docs/campaign-webflasher-autodetect-20261019.md`.
+
+| ID    | Defect                                                                                   | Fix                                                                                                             | Verified                                      |
+| ----- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| WF-01 | `parseInfo()` ignored `...AU env=<env>`; shared hwids left several candidates            | env is the only candidate when the release ships it, the family matches and its radio did not fail (`3f446720`) | host tests; DK5EN-14 shows `Build-Env`        |
+| WF-02 | Native S3 left at DTR1/RTS0 while the port is held (download flag armed)                 | DTR0/RTS0 after listening (`3f446720`)                                                                          | not reproducible on DK5EN-14: hygiene only    |
+| WF-03 | Silent native board undiagnosable: received bytes hidden, no Safeboot/ROM hint, no reset | received bytes shown, Safeboot/ROM recognised, "Neustart in die App" with re-acquire (`5b606a44` + bench fix)   | DK5EN-14 scenarios C, D                       |
+| WF-04 | `t_deck_pro` shipped `default_16MB`; the manifest wrote Safeboot into app0               | `partitions-16MB-safeboot.csv`; `pages_flasher.py` fails on manifest/partition mismatch (`3f446720`)            | build + partition dump; no T-Deck Pro on hand |
+
+Out of scope: F4 (board identity read from flash). Proposal on file: Safeboot reads hwid/env from NVS
+and answers `--info` (Safeboot v3), operator decision.
+
 ### Refuted 2026-08-29 (upstream sync review)
 
 - "UP-01 overflows `bleBuffer` today" — worst case 284 <= 299 bytes with the current 13 keys

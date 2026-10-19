@@ -2,6 +2,17 @@
 
 **Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.20` (CI-built, Latest).
 
+## 2026-10-19 -- web flasher autodetect WF-01..WF-04 fixed (resume point: docs/campaign-webflasher-autodetect-20261019.md)
+
+- `3f446720` (WF-01 env= detection, WF-02 DTR0/RTS0, WF-04 T-Deck Pro safeboot table + manifest check),
+  `5b606a44` (WF-03 received bytes, Safeboot/ROM hints, "Neustart in die App"), bench fix commit (re-acquire
+  waits for the USB disconnect; ROM hint names the RST key).
+- Bench DK5EN-14 (local flasher): A/C/D/E pass; F3 from the report not reproducible (RST boots the app); a USB
+  reset does not leave a strap-entered ROM. DK5EN-14 now runs the published v4.40a.10.20 (web-flashed, settings
+  kept).
+- Not published: web flasher and T-Deck Pro table go out with the next release. Open: Windows, real 1W,
+  Safeboot identity (W5 proposal).
+
 ## 2026-10-19 -- release v4.40a.10.20 (web send buffer, WEB-STOP-01, NVS diagnostics, AU-16)
 
 - Tag on `a80f194d`, CI run 39242933936 green: 66 assets, Latest, 27 `.autoupdate` re-inflate ok, tag string in
