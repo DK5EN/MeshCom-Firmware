@@ -38,8 +38,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
 <main>
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
-  <p class="lead">Drei Seiten, alle aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und einen
-  Vorschlag für seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, und die Historie aller Pull Requests nach upstream. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.21: das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</p>
+  <p class="lead">Alle Seiten sind aus dem Quellcode und aus GitHub belegt: ein Vortrag über das Protokoll und seine Weiterentwicklung, eine Zeitleiste der Hauptschleife mit den gemessenen Verbesserungen, die Historie aller Pull Requests nach upstream und das Protokoll der signierten Fernsteuerung RM1. Dazu der Web-Flasher für das aktuelle Release v4.40a.10.21: das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</p>
 
   <div class="cards">
     <div class="card wide">
@@ -74,10 +73,11 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
       <h2>Kein Routing, und genau das ist richtig</h2>
-      <p>Warum MeshCom flutet statt zu routen, wo es heute hakt (Overhead, Stau, Zustellung) und was
-      wir vorschlagen: Vorrang für netzbildende Knoten, eine echte Transportsicherung für persönliche
-      Nachrichten und der Abgleich mit den Anforderungen aus EMCOMM.</p>
-      <div class="meta">Firmware 4.35s · Netzdaten 24.08.2026 · Tasten: → ← U</div>
+      <p>Warum MeshCom flutet statt zu routen, wo es hakt (Overhead, Stau, Zustellung) und was seit 4.40a
+      gelöst ist: die Nachbarschaftsmatrix streicht redundante Relays, persönliche Nachrichten werden bis zur
+      Quittung wiederholt und von Store-Knoten aufgehoben, die Fernsteuerung ist signiert. Mit dem Abgleich
+      gegen die Anforderungen aus EMCOMM.</p>
+      <div class="meta">Firmware 4.40a · nachgeführt 19.10.2026 · Tasten: → ← U</div>
     </a>
     <a class="card" href="main-loop-timing.html">
       <div class="eyebrow">Analyse · interaktiv</div>
@@ -103,6 +103,14 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
       Knoten meshen soll. Mit den Entscheidungen zu den Anforderungen, der Web-Seite und dem
       Serienkommando; Stufe 2 (Gateway-ACK-Zuordnung) zurückgestellt.</p>
       <div class="meta">Stand 20.09.2026 · in 4.40a über PR #1186</div>
+    </a>
+    <a class="card" href="rm1-protokoll.html">
+      <div class="eyebrow">Protokoll · Fernsteuerung</div>
+      <h2>RM1: Fernsteuerung per LoRa mit HMAC</h2>
+      <p>Wie ein Knoten aus der Ferne Befehle annimmt, ohne dass sich jemand als ein anderes Rufzeichen ausgeben
+      kann: HMAC-SHA256 über Ziel, Absender, Zähler und Befehl, signierte Antworten, Schutz gegen Wiedereinspielen,
+      alles im Klartext. Mit Rechenbeispiel und den 25 erlaubten Befehlen.</p>
+      <div class="meta">Firmware 4.40a · für App-Entwickler</div>
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
