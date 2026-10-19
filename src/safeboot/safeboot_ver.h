@@ -10,6 +10,8 @@
 //   1        no marker, but the strings "FWS2", "fwstage" and "nocap" are all present: the first
 //            AU-aware image (4d449147), recognised without a rebuild
 //   N >= 2   marker "MCSB;ver;NNN" found, N is the capability version of that Safeboot
+//            2: staged updates; 3: names the installed app image (MCBOARD marker in ota_0) and answers
+//            "--id" / "--info" over serial (safeboot_id.h, web flasher autodetect)
 //
 // Raise SAFEBOOT_VERSION whenever Safeboot gains behaviour the app depends on, and raise
 // AU_SAFEBOOT_MIN in the same change if the app needs it. The app treats version < AU_SAFEBOOT_MIN as
@@ -21,12 +23,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SAFEBOOT_VERSION 2
+#define SAFEBOOT_VERSION 3
 #define SAFEBOOT_MARKER_PREFIX "MCSB;ver;"
 #define SAFEBOOT_MARKER_PREFIX_LEN 9 // strlen(SAFEBOOT_MARKER_PREFIX)
 #define SAFEBOOT_MARKER_DIGITS 3     // zero padded, 001..999
 // The literal Safeboot embeds: prefix + 3 digits. Keep it a single literal so it appears once in the image.
-#define SAFEBOOT_MARKER "MCSB;ver;002"
+#define SAFEBOOT_MARKER "MCSB;ver;003"
 // Lowest Safeboot version the app lets auto update run on (1 = the first AU-aware image).
 #define AU_SAFEBOOT_MIN 1
 

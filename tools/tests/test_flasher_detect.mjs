@@ -19,7 +19,9 @@ import {
   parseBoot,
   candidates,
   diagnose,
+  applyIdentity,
 } from '../../pages/flash/detect.js';
+import { parseIdLine } from '../../pages/flash/identity.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
@@ -319,4 +321,63 @@ test('diagnose: one code per branch', () => {
   );
   assert.equal(diagnose({ info: null, facts: {}, kind: 'esp-bridge', bytes: 0 }), 'no-answer');
   assert.equal(diagnose({ info: null, facts: {}, kind: 'esp-native', bytes: 30 }), 'silent-native');
+});
+
+// WF-05: Safeboot (and any app without --info) answers only with the MCBOARD line.
+const MCBOARD_LINE = (env, hwid = 46) => `MCBOARD:v1:${hwid}:${hwid}:${env}:v4.40a.10.21\r\n`;
+
+test('WF-05: MCBOARD-only answer builds info with the compile-time hwid and the env', () => {
+  const text = '[SAFEBOOT];ver;3\r\n' + MCBOARD_LINE('t_deck_plus');
+  assert.equal(parseInfo(text), null);
+  const info = applyIdentity(parseInfo(text), parseIdLine(text));
+  assert.equal(info.env, 't_deck_plus');
+  assert.equal(info.hwid, 46);
+  assert.equal(info.hwname, '');
+  const r = candidates(DETECT, ALL, info, parseBoot(text), 'ESP32-S3');
+  assert.deepEqual(r.envs, ['t_deck_plus']);
+  assert.match(r.basis.join(' '), /Build-Env t_deck_plus/);
+});
+
+test('WF-05: MCBOARD line fills a missing env but never overrides the --info env', () => {
+  const noEnv = parseInfo(infoText(46, 'T_DECK_PLUS', null));
+  assert.equal(noEnv.env, null);
+  const filled = applyIdentity(noEnv, parseIdLine(MCBOARD_LINE('t_deck_plus')));
+  assert.equal(filled.env, 't_deck_plus');
+  assert.equal(filled.hwid, 46);
+  const have = parseInfo(infoText(46, 'T_DECK_PLUS', 't_deck_plus'));
+  assert.equal(applyIdentity(have, parseIdLine(MCBOARD_LINE('other_env'))).env, 't_deck_plus');
+});
+
+test('WF-05: no MCBOARD line or an empty env leaves info alone', () => {
+  assert.equal(applyIdentity(null, null), null);
+  assert.equal(applyIdentity(null, parseIdLine('MCBOARD:v1:0:0::(local)\n')), null);
+  const info = parseInfo(infoText(46, 'T_DECK_PLUS', null));
+  assert.equal(applyIdentity(info, null), info);
+});
+
+test('WF-05: an MCBOARD env whose family contradicts the ROM is not trusted', () => {
+  const info = applyIdentity(null, parseIdLine(MCBOARD_LINE('t_deck_plus', 0)));
+  const r = candidates(DETECT, ALL, info, { family: 'ESP32' }, null);
+  assert.ok(!r.envs.includes('t_deck_plus'));
+  assert.match(r.warnings.join(' '), /nicht verwendet/);
+});
+
+test('WF-05: hwid 0 in the MCBOARD line is no hardware id', () => {
+  const info = applyIdentity(null, parseIdLine(MCBOARD_LINE('t_deck_plus', 0)));
+  assert.equal(info.hwid, null);
+  assert.deepEqual(candidates(DETECT, ALL, info, {}, 'ESP32-S3').envs, ['t_deck_plus']);
+});
+
+// Safeboot v3 answers --info (src/safeboot/safeboot_id.h): the Safeboot hint must
+// still win over the plain "answered" case.
+test('WF-05: Safeboot v3 answering --info is still diagnosed as Safeboot', () => {
+  const text =
+    '--MeshCom Safeboot 3\r\n...Call: <DK5EN-14> ...NODE 46 <SAFEBOOT>\r\n' +
+    '...AU env=t_deck_plus tag=(local)\r\n[SAFEBOOT];ver;3\r\n';
+  const info = parseInfo(text);
+  assert.equal(info.env, 't_deck_plus');
+  assert.equal(
+    diagnose({ info, facts: parseBoot(text), kind: 'esp-native', bytes: text.length }),
+    'safeboot',
+  );
 });

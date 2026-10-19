@@ -4,7 +4,17 @@
 // per-board manifest.json that tools/pages_flasher.py generates. Nothing about
 // boards, chip families or flash offsets is hard-coded here.
 
-import { usbKind, familyFromUsb, parseInfo, parseBoot, candidates, diagnose } from './detect.js';
+import {
+  usbKind,
+  familyFromUsb,
+  parseInfo,
+  parseBoot,
+  candidates,
+  diagnose,
+  applyIdentity,
+} from './detect.js';
+import { parseIdLine } from './identity.js';
+import { readBoardIdentity } from './romread.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -466,6 +476,10 @@ async function select() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// What the node said about itself: the --info answer, completed by the
+// MCBOARD line of --id. Safeboot answers only the MCBOARD line.
+const readInfo = (text) => applyIdentity(parseInfo(text), parseIdLine(text));
+
 // How long a node gets to answer --info. A node rebooted by the port open has
 // to finish setup() first; with a WiFi join that takes several seconds.
 const INFO_TIMEOUT_MS = 20000;
@@ -565,10 +579,13 @@ async function listen(port, kind, onTick) {
     }
 
     while (!lost && Date.now() - start < INFO_TIMEOUT_MS) {
-      // The command parser splits on LF.
-      await writer.write(encoder.encode('--info\n'));
+      // The command parser splits on LF; the leading LF flushes line noise left
+      // in the board's buffer by a reset (Safeboot drops a line it cannot match).
+      await writer.write(encoder.encode('\n--info\n'));
+      // --id answers with the MCBOARD line (fork firmware, Safeboot v3); older builds ignore it.
+      await writer.write(encoder.encode('--id\n'));
       const until = Date.now() + INFO_RETRY_MS;
-      while (!lost && Date.now() < until && !(info = parseInfo(text))) await sleep(100);
+      while (!lost && Date.now() < until && !(info = readInfo(text))) await sleep(100);
       if (info) break;
       onTick(Math.round((Date.now() - start) / 1000));
     }
@@ -579,7 +596,7 @@ async function listen(port, kind, onTick) {
     // --info answer. Wait for it briefly (only fork ESP32 builds print it).
     const envUntil = Date.now() + 1000;
     while (info && !info.env && !lost && Date.now() < envUntil) {
-      info = parseInfo(text) || info;
+      info = readInfo(text) || info;
       if (!info.env) await sleep(100);
     }
     if (kind === 'esp-native' && !lost) {
@@ -634,6 +651,7 @@ function showResult(result, info, facts, usbFamily, ctx) {
   } else {
     detectResult.append(line('Knoten', 'keine MeshCom-Antwort auf --info'));
   }
+  if (ctx.flash) detectResult.append(line('Aus dem Flash', ctx.flash));
   const chip = facts.family || usbFamily;
   if (chip) detectResult.append(line('Chip', chip));
   if (facts.pmu) detectResult.append(line('Power-Chip', facts.pmu));
@@ -678,19 +696,42 @@ function showResult(result, info, facts, usbFamily, ctx) {
   det.append(sum, pre);
   detectResult.append(det);
 
-  if (ctx.offerReset) {
+  if (ctx.download) {
+    const p = document.createElement('p');
+    p.textContent =
+      'Board wartet im Download-Modus: Flashen geht direkt, sonst "Neustart in die App".';
+    detectResult.append(p);
+  }
+  if (ctx.offerReset || ctx.download) {
     const again = document.createElement('button');
     again.type = 'button';
     again.className = 'copy';
     again.textContent = 'Neustart in die App';
     again.addEventListener('click', () => {
       again.disabled = true;
-      restartIntoApp(ctx.port).catch((err) => {
+      restartBoard(ctx.port, ctx.kind).catch((err) => {
         detectBtn.disabled = false;
+        again.disabled = false;
         detectStatus.textContent = `Neustart fehlgeschlagen: ${err.message}`;
       });
     });
     detectResult.append(again);
+  }
+
+  // Cross-check, or the only identification of a board whose app is silent:
+  // read the MeshCom marker out of the flash through the chip's ROM loader.
+  const nrfOnly =
+    usbFamily === 'NRF52' ||
+    (result.envs.length > 0 && result.envs.every((env) => detectData.boards[env].chipFamily === 'NRF52'));
+  if ((ctx.kind === 'esp-native' || ctx.kind === 'bridge') && !ctx.download && !nrfOnly) {
+    const rd = document.createElement('button');
+    rd.type = 'button';
+    rd.className = 'copy';
+    rd.textContent = 'Aus dem Flash lesen';
+    rd.addEventListener('click', () => {
+      readFromFlash({ rd, port: ctx.port, kind: ctx.kind, info, facts, usbFamily, heard: ctx.heard });
+    });
+    detectResult.append(rd);
   }
 
   if (onlyEnvs) {
@@ -752,7 +793,7 @@ async function processPort(port, afterReset) {
   }
   console.log(`[flasher] empfangen (${kind}${afterReset ? ', nach Neustart' : ''}):\n${heard.text}`);
 
-  const info = heard.info;
+  const info = applyIdentity(heard.info, parseIdLine(heard.text));
   const facts = parseBoot(heard.text);
   const usbFamily = familyFromUsb(kind);
   const rel = currentRelease();
@@ -815,9 +856,112 @@ async function processPort(port, afterReset) {
     kind === 'esp-native' &&
     !afterReset &&
     (diag === 'silent-native' || diag === 'safeboot');
-  showResult(result, info, facts, usbFamily, { heard, port, offerReset });
+  showResult(result, info, facts, usbFamily, { heard, port, kind, offerReset });
   await select();
   return heard;
+}
+
+const FLASH_REASON = {
+  'erased': 'Kein Abbild im App-Bereich (geloescht)',
+  'no-marker': 'Abbild ohne Kennung (aelter als WF-05 oder fremde Firmware)',
+  'no-image': 'Kein Abbild im App-Bereich (kein ESP32-Abbild)',
+  'no-app-desc': 'Abbild ohne App-Beschreibung (fremde Firmware)',
+  'bad-format': 'Kennung in unbekanntem Format (neuere Firmware?)',
+};
+
+// "Aus dem Flash lesen": ROM loader read of the board marker. The port ends up
+// held, the board stays in download mode (the flash dialog runs its own reset).
+async function readFromFlash({ rd, port, kind, info, facts, usbFamily, heard }) {
+  const wasOpen = Boolean(port.readable);
+  rd.disabled = true;
+  detectBtn.disabled = true;
+  espSlot.querySelectorAll('button').forEach((b) => {
+    b.disabled = true;
+  });
+  detectStatus.textContent = 'Lese Kennung aus dem Flash ...';
+  let ident;
+  try {
+    if (!wasOpen) await port.open({ baudRate: 115200, bufferSize: 8192 });
+    ident = await readBoardIdentity(port, {
+      kind,
+      log: (t) => {
+        detectStatus.textContent = `Lese Kennung aus dem Flash: ${t}`;
+        console.log(`[flasher] romread: ${t}`);
+      },
+    });
+  } catch (err) {
+    if (!wasOpen) await port.close().catch(() => {});
+    detectBtn.disabled = false;
+    rd.disabled = false;
+    detectStatus.textContent = `Lesen aus dem Flash fehlgeschlagen: ${err.message}`;
+    // A failure after SYNC leaves the board in the ROM: offer the way back,
+    // also on bridge boards, which have no "Neustart in die App" otherwise.
+    if (port.readable) {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'copy';
+      back.textContent = 'Neustart in die App';
+      back.addEventListener('click', () => {
+        back.disabled = true;
+        restartBoard(port, kind).catch((e) => {
+          detectBtn.disabled = false;
+          detectStatus.textContent = `Neustart fehlgeschlagen: ${e.message}`;
+        });
+      });
+      detectResult.append(back);
+    }
+    await select();
+    return;
+  }
+
+  try {
+    const img = ident.image;
+    let info2 = info;
+    let flash;
+    if (img.ok) {
+      const tag = !img.tag || img.tag === '(local)' ? 'lokal' : img.tag;
+      flash = `${img.env} (Build ${tag})`;
+      info2 = info ? { ...info, env: img.env } : applyIdentity(null, { env: img.env, hwid: img.hwid });
+    } else {
+      flash = FLASH_REASON[img.reason] || `nicht lesbar (${img.reason})`;
+    }
+    // The ROM's chip family is hard evidence, same as the banner of a reset.
+    const facts2 = ident.family ? { ...facts, family: ident.family } : facts;
+    const rel = currentRelease();
+    const result = candidates(detectData, rel.boards.map((b) => b.env), info2, facts2, usbFamily);
+    heldPort = port;
+    onlyEnvs = result.envs.length > 0 ? new Set(result.envs) : null;
+    fillBoards(result.envs.length === 1 ? result.envs[0] : null);
+    detectStatus.textContent = '';
+    showResult(result, info2, facts2, usbFamily, { heard, port, kind, flash, download: true });
+    await select();
+  } catch (err) {
+    detectBtn.disabled = false;
+    rd.disabled = false;
+    detectStatus.textContent = `Auswertung fehlgeschlagen: ${err.message}`;
+    await select();
+    return;
+  }
+  detectBtn.disabled = false;
+}
+
+// Leave the download mode / restart the board and listen once more. Native
+// USB: HardReset + re-enumeration (restartIntoApp). Bridge: listen() already
+// does the classic DTR0/RTS pulse into the app, so it is enough to run it on
+// the open port.
+async function restartBoard(port, kind) {
+  if (kind === 'esp-native') {
+    await restartIntoApp(port);
+    return;
+  }
+  if (heldPort === port) {
+    heldPort = null;
+    await select();
+  }
+  detectBtn.disabled = true;
+  detectStatus.textContent = 'Board wird neu gestartet ...';
+  if (!port.readable) await port.open({ baudRate: 115200, bufferSize: 8192 });
+  await processPort(port, true);
 }
 
 // Resolves true once `port` is unplugged (the USB device of a reset S3 drops

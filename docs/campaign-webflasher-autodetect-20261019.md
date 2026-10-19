@@ -146,8 +146,8 @@ plain kept constant on nRF52: magic `MCBOARD1`, format 1, hwid at compile time, 
 | F4-1a | Marker `src/mc_board_id.{h,cpp}`, `--id`, host test, offset proof in 3 builds              | implementer          | done    |
 | F4-1b | `pages_flasher.py`: release stage fails without the marker at the fixed offset             | implementer          | done    |
 | F4-1c | `pages/flash/identity.js` parsers (partition table, marker bytes, `MCBOARD:` line) + tests | implementer          | done    |
-| F4-2a | Safeboot v3: read ota_0 marker, print it, answer `--id` / `--info`                         | implementer          | open    |
-| F4-2b | `romread.js` + "Aus dem Flash lesen", `--id` with `--info`, `MCBOARD:` parsing             | implementer          | open    |
+| F4-2a | Safeboot v3: read ota_0 marker, print it, answer `--id` / `--info`                         | implementer          | done    |
+| F4-2b | `romread.js` + "Aus dem Flash lesen", `--id` with `--info`, `MCBOARD:` parsing             | implementer          | done    |
 | F4-3  | Bench DK5EN-14, DK5EN-1, DK5EN-92, DK5EN-90                                                | orchestrator         | open    |
 | F4-4  | Docs                                                                                       | orchestrator         | open    |
 
@@ -177,3 +177,24 @@ plain kept constant on nRF52: magic `MCBOARD1`, format 1, hwid at compile time, 
 - Gate: Unity 77 envs 2728/2728, golden selftest green (baseline regenerated for the new native env),
   stage 2 PASS, advisor APPROVED (follow-ups applied: offset asserts, tag regex, keep-alive comment).
   Open for F4-4: CI marker check before the GitHub release goes public (later wave).
+
+### F4-2 result (2026-10-19)
+
+- Safeboot v3 (`src/safeboot/safeboot_id.h`, `main.cpp`, `safeboot_log.h` `SafebootTee::read()`): one
+  416 B read of ota_0 at boot, prints `MCBOARD:v1:...` + `[SAFEBOOT];id;<env>` (or `id;none;<reason>`),
+  a bounded non-blocking line reader answers `--id` and `--info` (`...NODE <hwid> <SAFEBOOT>`,
+  `...AU env=`, `[SAFEBOOT];ver;3`). `SAFEBOOT_VERSION 3`, scan literal `MCSB;ver;003`; the app still
+  requires `AU_SAFEBOOT_MIN`. Images: classic 713776 B (+1888, 7120 B free of 720896), S3 674672 B
+  (+1808). Root `safeboot*.bin` rebuilt. `native_safeboot` 82/82.
+- `pages/flash/romread.js` (ROM-only client: SLIP, SYNC, READ_REG, SPI_ATTACH, READ_FLASH_SLOW; resets
+  as esptool ClassicReset / USBJTAGSerialReset), "Aus dem Flash lesen" for ESP boards (not nRF52), board
+  left in download mode with the port held; `--id` sent with `--info` (leading LF), `MCBOARD:` merged
+  into the detection (`applyIdentity`). Safeboot v3 answering `--info` is still diagnosed as Safeboot.
+- Advisors: Safeboot APPROVED; flasher rework R1-R4 applied by the orchestrator (Safeboot hint order
+  with a fail-before test, restart path after a failed read, link-closed fails fast, no flash read for
+  nRF52). Tests: detect 38, romread 12, identity 9.
+- Hardware pre-check (Node harness `romread.js` over node-serialport, polling reads: data events stall
+  on macOS for short ROM replies): DK5EN-14 S3 native 1.0 s, DK5EN-1 S3/CP2102 1.3 s, DK5EN-92
+  ESP32/CH9102 1.3 s; family, app partition right, `no-marker` on the old firmware; boards back in app.
+- Gate: Unity 77 envs 2740/2740, golden green after baseline regen (native_safeboot test_filter),
+  stage 2 PASS.

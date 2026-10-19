@@ -58,6 +58,19 @@ export function parseInfo(text) {
   };
 }
 
+// Merge what the identity sources say into the --info result: an MCBOARD line
+// (`--id`, Safeboot) or the marker read out of the flash, both
+// { env, hwidCompile } / { env, hwid }. It fills a missing env and never
+// overrides one the running image reported. Without a parseInfo() result
+// (Safeboot answers only the MCBOARD line) an info object is built around the
+// env, so candidates() takes the env path. Hardware ID 0 means "none".
+export function applyIdentity(info, id) {
+  if (!id || !id.env) return info;
+  if (info) return info.env ? info : { ...info, env: id.env };
+  const hwid = id.hwidCompile !== undefined ? id.hwidCompile : id.hwid;
+  return { hwid: hwid ? hwid : null, hwname: '', version: '', call: '', env: id.env };
+}
+
 const ROM_FAMILY = {
   esp32s2: 'ESP32-S2',
   esp32s3: 'ESP32-S3',
@@ -127,8 +140,9 @@ export function parseBoot(text) {
 // Codes: ok, safeboot, rom-download, silent-native (offer the reset),
 // silent-after-reset (give up and say so), no-answer (non-native, no MeshCom reply).
 export function diagnose({ info, facts, kind, bytes, afterReset }) {
-  if (info) return 'ok';
+  // Safeboot v3 answers --info too; its banner still decides.
   if (facts && facts.safeboot) return 'safeboot';
+  if (info) return 'ok';
   if (facts && facts.bootMode === 'download') return 'rom-download';
   if (kind === 'esp-native') return afterReset ? 'silent-after-reset' : 'silent-native';
   return 'no-answer';

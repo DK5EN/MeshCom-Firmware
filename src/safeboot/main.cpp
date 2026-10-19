@@ -27,6 +27,7 @@
 #include "../esp32/esp32_flash.h"
 #include "../esp32/netif_mtu.h"
 #include "safeboot_ver.h"
+#include "safeboot_id.h"
 #include "safeboot_log.h" // keep last: renames Serial on the S3
 
 // AU-12: capability version marker. The image's esp_app_desc_t is blank, so the app finds the version by
@@ -691,6 +692,43 @@ void wifiConnect() {
  }
 
 
+// F4-2a: name the app image in ota_0 (marker at image offset 0x120). Printed once at boot and
+// answered on request by the serial reader in loop() ("--id" / "--info").
+static SbIdentity g_app_id;
+static SbLineReader g_line_reader;
+
+static void readAppIdentity() {
+   const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+   uint8_t head[SB_ID_HEAD_LEN];
+   if (!p || esp_partition_read(p, 0, head, sizeof(head)) != ESP_OK)
+      sbIdFail(&g_app_id, SB_ID_NO_PARTITION);
+   else
+      sbIdParse(head, sizeof(head), &g_app_id);
+   char out[96];
+   if (g_app_id.reason == SB_ID_OK) {
+      sbIdLine(out, sizeof(out), g_app_id);
+      Serial.println(out);
+      Serial.printf("[SAFEBOOT];id;%s\n", g_app_id.env);
+   } else
+      Serial.printf("[SAFEBOOT];id;none;%s\n", sbIdReasonName(g_app_id.reason));
+}
+
+// Non-blocking: drains whatever the UART/USB holds, answers a complete "--id" / "--info" line.
+static void serialCommands() {
+   int guard = 64;
+   while (guard-- > 0 && Serial.available() > 0) {
+      int c = Serial.read();
+      if (c < 0)
+         break;
+      SbCmd cmd = g_line_reader.feed((char)c);
+      if (cmd != SB_CMD_NONE) {
+         char out[256];
+         sbRespond(cmd, g_app_id, meshcom_settings.node_call, out, sizeof(out));
+         Serial.print(out);
+      }
+   }
+}
+
  void setup() {
 
    // AU-07: tell the app this Safeboot understands staged records. The app
@@ -711,6 +749,7 @@ void wifiConnect() {
    Serial.println("\n-----------------------------");
    Serial.println("OTA UDATE started");
    Serial.printf("[SAFEBOOT];ver;%d\n", SAFEBOOT_VERSION);
+   readAppIdentity();
 
    // AU-07: apply a staged update (offline, before any network). Returns
    // only if there is nothing staged or the apply failed; on success it
@@ -901,6 +940,7 @@ void wifiConnect() {
 
  void loop() {
    unsigned long now = millis();
+   serialCommands();
 
    // -- Non-blocking STA join follow-up: 12 s retry, 25 s ap_sta fallback,
    // periodic reconnect while that AP is up, mDNS + a scan once GOT_IP
