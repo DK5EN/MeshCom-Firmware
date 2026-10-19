@@ -1,7 +1,29 @@
 # T-Beam 1W: node stuck in Safeboot after Auto Update (AU-16)
 
-**Status 2026-10-17:** open, cause unknown. Backlog row `AU-16` in [`BACKLOG.md`](BACKLOG.md) section 3.2.
+**Status 2026-10-19:** root cause found and fixed (`22b13194`). Opened 2026-10-17. Backlog row `AU-16` in [`BACKLOG.md`](BACKLOG.md) section 3.2.
 Field node OE5HWN-17 (LilyGo T-Beam 1W, env `LilyGo_T-Beam-1W`, ESP32-S3 N16R8), dev channel, 10.16 -> 10.17.
+
+## Root cause
+
+The `LilyGo_T-Beam-1W` board json (`boards/esp32-s3-wroom-1-n16r8.json`) had `"flash_mode": "dio"`, so the 1W
+shipped `bootloader_dio_80m` (14032 B). The other 16 S3 release boards ship the QIO bootloader (15104 B). The
+IDF 5 Safeboot misreads NVS and ota_0 behind a DIO bootloader. The IDF 4.4 app runs fine on it; only Safeboot is
+affected. The partition table is not involved (1W table is byte-identical to the Heltec V3, where AU passes).
+
+Bench A/B on DK5EN-14 (2026-10-19), release `safeboot-s3.bin` 10.19, only the bootloader at 0x0 swapped:
+
+| Bootloader                | Result                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| QIO                       | Safeboot on the LAN after 7 s, `app_valid:true`, back in the app after 198 s.                                                 |
+| DIO (1W `bootloader.bin`) | `Callsign:` empty, `Wifi SSID: none`, AP 192.168.4.1, `[SAFEBOOT];app;image;invalid;rc;8194`, no fallback. Same as OE5HWN-17. |
+
+The flash stays intact (`verify_flash` ok on ota_0 and Safeboot). Safeboot finds no valid NVS page, writes a fresh
+seq-0 page with empty `Credentials`, and the app then boots on defaults (XX0XXX): the node loses its settings.
+
+**Fix (`22b13194`):** board json `qio` (1W bootloader now 15104 B); runtime guard on every ESP32-S3 (reads
+`SPI_MEM_CTRL_REG(0)`), refusing handover, `--update install/apply`, auto handover and `--autoupdate auto` with
+`bootloader_dio`, no override; web GUI shows a notice and disables the button. Details:
+[`campaign-au16-dio-bootloader.md`](campaign-au16-dio-bootloader.md).
 
 ## Symptom
 
@@ -61,7 +83,10 @@ would only loop, so Safeboot waits for an upload. The otadata points to Safeboot
   same flash mode (DIO), frequency (80 MHz) and chip ID. DK5EN-14 (T-Deck Plus, also N16R8) passed the same
   update on 2026-10-17.
 
-## Hypotheses
+## Hypotheses (superseded)
+
+Superseded by the root cause above: hypothesis 1 (Safeboot misreads the flash) was right; the cause is the DIO
+bootloader. Hypotheses 2 and 3 were not needed.
 
 1. **Safeboot misreads the flash on this board.** If the paste is the first Safeboot boot, no apply ran, yet
    both NVS and ota_0 look wrong. One cause for all three symptoms.
@@ -76,19 +101,23 @@ would only loop, so Safeboot waits for an upload. The otadata points to Safeboot
 The 1W had never run Safeboot before: the web flasher writes otadata pointing at ota_0, so the app boots
 directly. No 1W is in the bench fleet.
 
-## Immediate actions for the operator
+## Immediate actions for 1W owners
 
-1. **Auto Update off** on the 1W (mode `off`, not just channel `prod`): every check stages and hands over
-   again.
-2. **Before recovering, dump the flash** (download mode: hold BOOT during reset):
-   ```
-   esptool -p COMx read_flash 0x9000 0x5000 nvs.bin
-   esptool -p COMx read_flash 0xC0000 0x340000 ota0.bin
-   ```
-   Send both files.
-3. **Recover:** join WiFi `MeshCom-OTA`, open http://192.168.4.1, upload `T-Beam-1W.bin`. Or use the web
-   flasher and answer **no** to erase.
-4. **Report:** did the callsign survive the recovery? Was erase chosen in the web flasher on 2026-10-16?
+1. **Run the Webflasher once** with v4.40a.10.20 or newer. It installs the QIO bootloader. Erase is not needed.
+2. **Until then do not use** Auto Update, `--ota-update` or the Safeboot update page. The new firmware refuses
+   them with `bootloader_dio`; older firmware hands over and loses the settings.
+3. **Check:** `--update status` shows `boot;qio` (ok) or `boot;dio` (blocked, `safeboot;dio`).
+4. **Stuck in Safeboot** (AP `MeshCom-OTA`, 192.168.4.1): recover with the Webflasher. Erase is not needed;
+   the settings may be lost already.
+
+## Flash dump (no longer needed for diagnosis)
+
+Kept for reference; the root cause is known. Dump (download mode: hold BOOT during reset):
+
+```
+esptool -p COMx read_flash 0x9000 0x5000 nvs.bin
+esptool -p COMx read_flash 0xC0000 0x340000 ota0.bin
+```
 
 ## Reading the dump
 

@@ -32,7 +32,7 @@ Resume point for this campaign. Release target: v4.40a.10.20 (old tag on `da59c5
 | W1-B  | implementer Sonnet medium | `src/web_functions/web_functions.cpp`, `src/web_functions/au_ui_state.h`, `test/test_au_ui_state/`, `tools/webgui_au_sbwhy_test.js` (new)                          | done  |
 | Gate  | orchestrator              | regression stage 1,2; builds 1W/t_deck_plus/Heltec V3/ttgo_tbeam/RAK; 1W bootloader = 15104 B qio                                                                  | done  |
 | Bench | orchestrator              | DK5EN-14 QIO vs DIO with the guard build                                                                                                                           | done  |
-| W2    | implementer Sonnet medium | BACKLOG AU-16, troubleshooting + md5 issue docs, RESUME, defect catalogue                                                                                          | open  |
+| W2    | implementer Sonnet medium | BACKLOG AU-16, troubleshooting + md5 issue docs, RESUME, defect catalogue                                                                                          | done  |
 
 ## Detection (to prove on the bench)
 
@@ -62,5 +62,6 @@ register does not discriminate: classify the bootloader image at flash 0x0.
 
 ## Open
 
-- W2 docs (BACKLOG AU-16, troubleshooting, md5 issue, RESUME, defect catalogue, test-suite-map).
+- W2 docs done (BACKLOG AU-16, troubleshooting guide for 1W owners, md5 issue, RESUME, test-suite-map; the defect
+  catalogue has no AU section).
 - Field: first Webflasher run on a real 1W (QIO bootloader boots?), then release notes for 10.20.

@@ -1,6 +1,12 @@
 # T-Beam 1W: web OTA to v4.40a.10.06 fails with `md5_mismatch`
 
-- **Status:** open, not reproduced on the bench
+- **Status:** explained by AU-16 (DIO bootloader, see `troubleshooting-tbeam-1w-autoupdate.md`); fixed `22b13194`
+
+The 1W shipped a DIO bootloader; behind it the IDF 5 Safeboot reads the uploaded image back wrong (NVS and ota_0 are
+misread), so the checksum check fails although the upload is intact. With the QIO bootloader (10.20 and newer,
+after one Webflasher run) the Safeboot update path works as on the other S3 boards. The bench history below is
+unchanged.
+
 - **Reported:** 2026-10-05 by DD7MH (node DD7MH-66, LilyGo T-Beam 1W, ESP32-S3, WiFi client)
 - **Firmware path in the field:** v4.40a.10.02 (installed by USB / web flasher) → web OTA with the
   release asset `T-Beam-1W.bin` from v4.40a.10.06

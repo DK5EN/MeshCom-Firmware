@@ -2,6 +2,21 @@
 
 **Stand:** 2026-10-19 night, branch `fork-dev`, last release `v4.40a.10.19` (CI-built, Latest).
 
+## 2026-10-19 -- AU-16 root cause: DIO bootloader breaks the S3 Safeboot (resume point: docs/campaign-au16-dio-bootloader.md)
+
+- Cause: the T-Beam 1W board json had `flash_mode` dio, so the 1W shipped the DIO bootloader; the IDF 5 Safeboot
+  misreads NVS and ota_0 behind it (empty settings, `app;image;invalid;rc;8194`, no fallback).
+- Fix `22b13194` on fork-dev: `qio` board json, runtime guard on every ESP32-S3 (`bootloader_dio`, no override),
+  web notice with disabled button. Gate stage 1+2 green; new tests `test_dio_bootloader_blocks_safeboot` and
+  `webgui_au_sbwhy_test.js` (17 checks).
+- Bench DK5EN-14: QIO bootloader hands over fine (Safeboot after 7 s, app back after 198 s); DIO bootloader
+  reproduces the OE5HWN-17 log and the guard refuses with `bootloader_dio`; NVS untouched.
+- DK5EN-14 state: QIO bootloader, guard build; the release Safeboot 10.19 replaced a stale local one.
+- Tag `v4.40a.10.20` (old, on `da59c5b8`) deleted local + origin with operator OK; `/release-firmware` re-tags later.
+- Open: first Webflasher run on a real 1W (QIO bootloader boots?); release 10.20 with a notice asking 1W owners
+  to run the Webflasher once.
+- Behaviour change: in web state S the AU button is now disabled for an old Safeboot too (was clickable).
+
 ## 2026-10-19 -- field reports: WEB-STOP-01 fixed, RM-NVS-01 diagnostics (catalogue section 2e)
 
 - WEB-STOP-01 (T-Deck Plus, log flood "WEBServer stopped" without IP): `stopWebserver()` acts only on a
