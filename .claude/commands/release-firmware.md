@@ -20,6 +20,9 @@ takes the app images from the release:
 `gh release download <tag> -R DK5EN/MeshCom-Firmware -D <dir>`, then
 `uv run tools/pages_flasher.py publish --version <tag> --keep 1 --from-release <dir> [--push]`
 and `uv run tools/pages_flasher.py check --version <tag> --from-release <dir>`.
+Since WF-05 (2026-10-19) `publish`/`stage` refuse an ESP32 `firmware.bin` without the `MCBOARD1`
+board marker at 0x120 (`src/mc_board_id.h`): releases up to v4.40a.10.20 can no longer be re-published,
+and the first release after `f33ca458` is the one that ships `identity.js`, `romread.js` and Safeboot v3.
 The `ci-build.yml` push workflow stays disabled. The Fallback appendix below
 covers a local build when CI is unavailable.
 

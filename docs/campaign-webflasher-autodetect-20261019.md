@@ -148,8 +148,8 @@ plain kept constant on nRF52: magic `MCBOARD1`, format 1, hwid at compile time, 
 | F4-1c | `pages/flash/identity.js` parsers (partition table, marker bytes, `MCBOARD:` line) + tests | implementer          | done    |
 | F4-2a | Safeboot v3: read ota_0 marker, print it, answer `--id` / `--info`                         | implementer          | done    |
 | F4-2b | `romread.js` + "Aus dem Flash lesen", `--id` with `--info`, `MCBOARD:` parsing             | implementer          | done    |
-| F4-3  | Bench DK5EN-14, DK5EN-1, DK5EN-92, DK5EN-90                                                | orchestrator         | open    |
-| F4-4  | Docs                                                                                       | orchestrator         | open    |
+| F4-3  | Bench DK5EN-14, DK5EN-1, DK5EN-92, DK5EN-90                                                | orchestrator         | done    |
+| F4-4  | Docs                                                                                       | orchestrator         | done    |
 
 ### F4-0 result
 
@@ -198,3 +198,29 @@ plain kept constant on nRF52: magic `MCBOARD1`, format 1, hwid at compile time, 
   ESP32/CH9102 1.3 s; family, app partition right, `no-marker` on the old firmware; boards back in app.
 - Gate: Unity 77 envs 2740/2740, golden green after baseline regen (native_safeboot test_filter),
   stage 2 PASS.
+
+### F4-3 result: bench (2026-10-19)
+
+App (`f33ca458` + `2e7960ff` + `f56b1f80`) and Safeboot v3 flashed by esptool (no erase, T-Beam at 460800) to DK5EN-14 (t_deck_plus), DK5EN-1 (heltec_wifi_lora_32_V3), DK5EN-92 (ttgo_tbeam).
+
+| Check                                  | Result                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `--id` (app)                           | 14: `MCBOARD:v1:46:46:t_deck_plus`; 1: `43:43:heltec_wifi_lora_32_V3`; 92: `12:4:ttgo_tbeam`   |
+| ROM read, Node harness (`romread.js`)  | all three `ok`, right env and family, 1.0-1.3 s, boards back in the app                        |
+| Safeboot v3, classic (DK5EN-92, UART)  | boot `MCBOARD:v1:4:4:ttgo_tbeam` + `[SAFEBOOT];id;ttgo_tbeam`; `--id`, `--info` answered       |
+| Safeboot v3, S3 (DK5EN-14, native USB) | `--id`, `--info` answered through `SafebootTee::read()`                                        |
+| Browser detect (all three)             | env from the node, one board each; T-Beam alias 12 resolved to `ttgo_tbeam`                    |
+| Browser "Aus dem Flash lesen"          | DK5EN-14 (native) and DK5EN-92 (CH9102): marker read, board waits in download mode; the page's |
+|                                        | restart (USB-JTAG and bridge) brings the app back and re-detects                               |
+| Browser, board silent in download mode | DK5EN-14 identified from flash alone                                                           |
+
+Bench findings fixed in `f56b1f80`: a bridge port kept the tail of an earlier Safeboot session, the page
+said "Safeboot" for a running app (now needs Safeboot's own answer or silence); flash-only identity showed
+"?, MeshCom ?". Not covered in the browser: the Safeboot v3 hint (harness + unit test only), DK5EN-90 RAK
+(not on USB; marker in the elf only), Windows. Harness note: node-serialport data events stall on macOS
+for short ROM replies, poll `read()` instead. DK5EN-1 and DK5EN-92 consoles have a password (2323 needs
+the HMAC login), `--id` was checked over USB there.
+
+Open: CI marker check before the GitHub release goes public (pages_flasher only checks at publish time);
+release notes for the next release (new web flasher button, Safeboot v3 only by USB web flash, T-Deck Pro
+owners need one full web flash).

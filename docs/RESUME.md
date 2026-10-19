@@ -2,6 +2,15 @@
 
 **Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.20` (CI-built, Latest).
 
+## 2026-10-19 -- WF-05 board identity without a running app (resume point: docs/campaign-webflasher-autodetect-20261019.md)
+
+- `f33ca458` marker `MCBOARD1` at image 0x120 + `--id` + release check + `identity.js`; `2e7960ff` Safeboot v3
+  (reads ota_0, answers `--id`/`--info`) + `romread.js` ("Aus dem Flash lesen"); `f56b1f80` bench fixes.
+- Bench: DK5EN-14, DK5EN-1, DK5EN-92 run the fork-dev build + Safeboot v3 (settings kept); `--id`, ROM read
+  (browser and Node harness) and Safeboot v3 answers all pass; T-Beam alias 12 resolves to `ttgo_tbeam`.
+- Not published: goes out with the next release; releases up to 10.20 can no longer be re-staged by
+  `pages_flasher.py`. Open: CI marker check, DK5EN-90 on hardware, Windows.
+
 ## 2026-10-19 -- AU-16 field-verified: real T-Beam 1W passes Auto Update
 
 - Operator report: a real T-Beam 1W (QIO bootloader from v4.40a.10.20) completed Auto Update. AU-16 is closed in
