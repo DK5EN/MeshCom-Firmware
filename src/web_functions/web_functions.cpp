@@ -2175,6 +2175,7 @@ void sub_page_mheard()
 
     for (int k = 0; k < shown; k++)
     {
+        meshcom_wdt_feed(); // one feed per card; shown <= NBR_MAX_ROWS keeps the loop bounded
         NbrMhView v;
         if (!nbrMhGet(nbrMatrix, idx[k], now_min, &v))
             continue;
@@ -2404,6 +2405,7 @@ void sub_page_path()
         rec[nrec].idx = (uint16_t)i;
         nrec++;
     }
+    meshcom_wdt_feed(); // once after collecting routes; route_total loop bounded by maxrec
 
     // Einfuegesortieren nach Hops, dann Alter (beide aufsteigend) -- rec[0]
     // (eigene Zeile, Hops 0) bleibt dabei an erster Stelle.
@@ -2418,6 +2420,7 @@ void sub_page_path()
         }
         rec[b + 1] = key;
     }
+    meshcom_wdt_feed(); // once after the sort; nrec <= maxrec
 
     // Tabelle DIREKT unter #content_inner, keine Wrapper-div: das Tabellen-
     // CSS des Scaffolds greift nur auf "#content_inner > table" (siehe
@@ -2428,6 +2431,7 @@ void sub_page_path()
 
     for (size_t k = 0; k < nrec; k++)
     {
+        meshcom_wdt_feed(); // one feed per record; nrec <= maxrec keeps the loop bounded
         PathRec &pr = rec[k];
 
         if (pr.kind == 0)
@@ -2766,6 +2770,7 @@ void sub_page_neighbours()
     // wird hier nicht nachgebaut) je sichtbarer Zeile.
     for (uint8_t i = 0; i < n; i++)
     {
+        meshcom_wdt_feed(); // one feed per row; n <= NBR_MAX_ROWS keeps the loop bounded
         uint8_t X = idx[i];
         // -1 ("NA") ist moeglich, wenn der LORA-Task (nRF52) die Kante (X, 0)
         // zwischen nbrDirectMask() oben und diesem Aufruf freigibt -- als 0
@@ -2789,6 +2794,7 @@ void sub_page_neighbours()
     nCount[0] = (uint8_t)((nbrMaskCount(directMaskGlobal) > 255) ? 255 : nbrMaskCount(directMaskGlobal));
     for (uint8_t frm = 0; frm < NBR_MAX_ROWS; frm++)
     {
+        meshcom_wdt_feed(); // one feed per row; frm < NBR_MAX_ROWS keeps the loop bounded
         NbrMask hm = nbrHearersMask(nbrMatrix, frm, now_min);
         for (int y = nbrMaskNext(hm, -1); y >= 0; y = nbrMaskNext(hm, y))
         {
@@ -2880,6 +2886,7 @@ void sub_page_neighbours()
     web_client.print("<td title=\"Super: largest exclusive share. Needed: has exclusive nodes. Redundant: everything it hears is heard by others.\">Role</td>");
     for (uint8_t j = colStart; j < colEnd; j++)
     {
+        meshcom_wdt_feed(); // one feed per header column; colEnd - colStart <= 64 keeps the loop bounded
         web_client.printf("<td>%u<br><span style=\"writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;\">", (unsigned)(j + 1));
         nbrPrintCall(idx[j]);
         web_client.print("</span></td>");

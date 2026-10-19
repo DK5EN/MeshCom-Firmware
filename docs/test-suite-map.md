@@ -252,6 +252,7 @@ flashes whatever is attached.
 | test_charge_led_mode         | Regression    |    11 | native_charge_led_mode                                       |
 | test_board_led               | Unit          |    13 | native_board_led                                             |
 | test_gw_reg_state            | Unit          |    35 | native_gw_reg_state                                          |
+| test_web_txbuf               | Unit          |    20 | native_web_txbuf                                             |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
