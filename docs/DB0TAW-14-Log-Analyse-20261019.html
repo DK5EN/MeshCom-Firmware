@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DB0TAW-14 Log-Analyse</title>
+<style>
+/* Layout: eine Lesespalte, Antwortindex oben, danach je Frage ein Abschnitt, Referenztabellen scrollen in eigenem Container */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --fg:#1b2330; --muted:#5a6475; --line:#d9dde4;
+  --accent:#b8620a; --ok:#1f7a45; --okbg:#e3f3e9; --warn:#8a6100; --warnbg:#fbf0d2; --bad:#a3241b; --badbg:#f8e1de;
+  --code:#eef0f4;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a2029; --fg:#e4e8ee; --muted:#9aa4b4; --line:#2e3644;
+  --accent:#f0a24a; --ok:#6fd39a; --okbg:#173325; --warn:#f2c95b; --warnbg:#3a2f12; --bad:#ff8a7e; --badbg:#3d1c19;
+  --code:#232a35; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a2029; --fg:#e4e8ee; --muted:#9aa4b4; --line:#2e3644;
+  --accent:#f0a24a; --ok:#6fd39a; --okbg:#173325; --warn:#f2c95b; --warnbg:#3a2f12; --bad:#ff8a7e; --badbg:#3d1c19;
+  --code:#232a35; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15.5px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{text-wrap:balance;line-height:1.25;margin:0}
+h1{font-size:1.9rem}
+h2{font-size:1.35rem;padding-top:6px;border-top:2px solid var(--accent);margin-top:8px}
+h3{font-size:1.06rem;margin-top:6px}
+p,ul,ol{margin:0;max-width:72ch}
+section{display:flex;flex-direction:column;gap:12px;min-width:0}
+ul,ol{padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.meta{color:var(--muted);font-size:.92rem;display:flex;flex-wrap:wrap;gap:4px 18px}
+.eyebrow{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.88em;background:var(--code);padding:1px 4px;border-radius:3px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.n{text-align:right;white-space:nowrap}
+.chip{display:inline-block;font-size:.74rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.ok{color:var(--ok);background:var(--okbg)} .warn{color:var(--warn);background:var(--warnbg)} .bad{color:var(--bad);background:var(--badbg)}
+.callout{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.bluf{font-size:1.05rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.kpi b{display:block;font-family:var(--f-mono);font-size:1.35rem;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:.84rem}
+.small{font-size:.86rem;color:var(--muted)}
+pre{font-family:var(--f-mono);font-size:.8rem;background:var(--code);padding:10px 12px;border-radius:6px;overflow-x:auto;margin:0;line-height:1.45}
+</style>
+</head>
+<body>
+
+<main>
+<header style="display:flex;flex-direction:column;gap:8px">
+  <div class="eyebrow">MeshCom Log-Analyse · 19.10.2026</div>
+  <h1>DB0TAW-14 (Rhön, JO50AN): Reboots und volle Sendewarteschlange</h1>
+  <div class="meta">
+    <span>Node: DB0TAW-14, Heltec Wireless Stick V3 (HW 42), 835 m</span>
+    <span>Firmware: offizielle 4.40a, Build 02.10.2026 03:02</span>
+    <span>LoRa: 433,175 MHz, EU8 (SF11, BW 250 kHz, CR 4/6), 20 dBm</span>
+    <span>Logs: <code>db0taw-14.log</code> 11:03-11:55, <code>db0taw-14_2.log</code> 11:58-16:12 (zusammen ~5 h, 4 658 empfangene Frames)</span>
+  </div>
+</header>
+
+<section>
+  <div class="callout bluf">
+    <p><strong>Kurzfassung.</strong> Die Reboots kommen vom Task-Watchdog in der Web-Oberfläche, nicht vom Funkverkehr und nicht vom Speicher. Beide Logs brechen direkt nach einem Aufruf der Seite <em>Neighbours</em> ab. Diese Ursache ist in v4.40a.10.21 behoben. Das Sendeproblem ist ebenfalls bestätigt und massiv: Der Node sendet 0,8 Frames pro Minute, ihm werden aber 4,8 pro Minute zum Weiterleiten übergeben, und Texte warten bis zu 63 Minuten. v4.40a.10.21 enthält dafür zwei wirksame Hebel (kürzere Sendesperre für lange wartende Frames, Relay-Klassifizierung über die Nachbarmatrix). Im Feld nachgewiesen sind sie noch nicht. Was bleibt, kommt von außen: alte Firmware im Netz lässt Pakete kreisen, und zu viele Nodes meshen bei zu wenigen Gateways.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Frage</th><th>Kurzantwort</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Warum rebootet der Node?</td><td>Task-Watchdog (5 s) während die Web-Seite <em>Neighbours</em> aufgebaut wird. Belegt durch <code>RESET_REASON=6 TASK_WDT LAST_LOOP_SECTION=web</code> und das Log-Ende nach <code>GET /?page=neighbours</code>, zweimal.</td><td><span class="chip bad">Handlungsbedarf</span></td></tr>
+      <tr><td>Werden die Pakete nicht mehr los, weil der Node zu viel hört?</td><td>Ja. Nach jedem empfangenen Frame wartet er 4,5-5,5 s, der Median-Abstand zwischen zwei Frames liegt aber bei 1,6 s. Nur 3 % der Lücken reichen zum Senden.</td><td><span class="chip bad">Handlungsbedarf</span></td></tr>
+      <tr><td>Sind mit v4.40a.10.21 alle Probleme der Thüringer gefixt?</td><td>Nein. Die Reboots sind behoben. Gegen den Sendestau enthält 10.21 die zwei wichtigsten Hebel, ungetestet am Standort. Offen bleibt, was alte Firmware im Netz verursacht: Pakete kreisen, weil deren Dedup-Puffer überlaufen, Zeitsignale kommen verspätet an, und Nodes vor 4.35p senden ohne Kanalprüfung.</td><td><span class="chip warn">Beobachten</span></td></tr>
+      <tr><td>Was muss man noch anpassen?</td><td>Betrieb: Meshen abstimmen und planen (wer einen Berg-Node gut hört, braucht nicht zu meshen), alte Firmware ablösen, 10.21 flashen, DB0TAW-13 und -14 abstimmen, danach mitschneiden. Firmware: Höchstalter in der eigenen Warteschlange, bei gleicher Priorität den ältesten Frame verdrängen.</td><td><span class="chip warn">Beobachten</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="reboot">
+  <h2>1. Reboots: Watchdog in der Web-Oberfläche</h2>
+  <p><strong>Befund.</strong> Das <code>--info</code> zu Beginn des ersten Logs meldet für den vorherigen Neustart <code>BOOT RESET_REASON=6 TASK_WDT LAST_LOOP_SECTION=web</code>. Das ist der Task-Watchdog, und der zuletzt betretene Abschnitt der Hauptschleife war der Webserver. Beide Logs enden mit derselben Folge: Browser lädt <code>/</code>, <code>/favicon.ico</code> und dann <code>/?page=neighbours</code>, danach kommt nichts mehr. Das zweite Log beginnt um 11:58:28 mit einer Laufzeit von 146 s. Der Node ist also gegen 11:56 neu gestartet, wenige Sekunden nach dem Aufruf. Der Browser greift über HAMNET zu, also über eine Strecke mit hoher Laufzeit.</p>
+  <p><strong>Mechanismus.</strong> Der Webserver läuft in derselben Hauptschleife wie Funkempfang und Relay. Die Seite <em>Neighbours</em> schreibt die Nachbarmatrix (hier 47 Zeilen) Zelle für Zelle in die TCP-Verbindung. Jeder Schreibaufruf darf in der ESP32-Bibliothek bis zu 10 × 1 s warten, wenn das TCP-Fenster voll ist. Bei einem langsamen Browser-Link hängt die Schleife deshalb länger als 5 s in der Seite fest. Der Watchdog wertet das als Aufhänger und startet den Node neu. Der starke Empfang verschärft das, weil jeder empfangene Frame 23-97 ms Rechenzeit in derselben Schleife kostet.</p>
+  <p><strong>Nicht die Ursache.</strong> Speicher: Kein Speicher wächst mit gehörten Frames. TX-Ring, Dedup-Ring, BLE-Puffer und Nachbarmatrix sind fest angelegt und laufen über, statt zu wachsen. Die Prüfung dazu steht im Bericht vom 18.10. Eine volle Warteschlange löst ebenfalls keinen Neustart aus.</p>
+  <p><strong>Stand in v4.40a.10.21.</strong> Behoben durch zwei Änderungen. Erstens geht die gesamte Web-Ausgabe durch einen begrenzten Sendepuffer: Die Seite wird nach 2 s ohne Fortschritt oder nach 15 s Gesamtzeit abgebrochen, und der Node bleibt am Leben (WEB-WDT-01, auf Heltec V3, T-Beam, T-Deck Plus und RAK4631 mit künstlich verzögertem Browser getestet). Zweitens füttert die Matrix-Seite den Watchdog pro Zeile (nur im Host-Test geprüft). Auf einer langsamen Strecke sieht der Nutzer dann eine abgeschnittene Seite statt eines Neustarts.</p>
+  <p><strong>Bis zum Update:</strong> die Seiten <em>Neighbours</em>, <em>Path</em> und <em>MHeard</em> nicht über HAMNET oder einen schwachen WLAN-Link öffnen und keine solchen Tabs offen lassen. MHeard und Path laden sich alle 30 s neu.</p>
+</section>
+
+<section id="stau">
+  <h2>2. "Der Node wird seine Pakete nicht los"</h2>
+  <div class="kpis">
+    <div class="kpi"><b>0,8 /min</b><span>gesendete Frames</span></div>
+    <div class="kpi"><b>4,8 /min</b><span>zum Weiterleiten eingereiht</span></div>
+    <div class="kpi"><b>79 %</b><span>der eingereihten Frames verworfen</span></div>
+    <div class="kpi"><b>63 min</b><span>längste Wartezeit eines Textes</span></div>
+    <div class="kpi"><b>30 %</b><span>Kanal belegt (Mittel, Spitze 66 %)</span></div>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Messgröße</th><th>Log 1 (52 min)</th><th>Log 2 (254 min)</th></tr></thead>
+    <tbody>
+      <tr><td>Empfangene Frames (gültig / CRC-Fehler)</td><td class="n">722 / 240</td><td class="n">3 936 / 1 108</td></tr>
+      <tr><td>Kanalbelegung laut Node (Mittel / 90 % / Max)</td><td class="n">31 / 46 / 63 %</td><td class="n">30 / 44 / 66 %</td></tr>
+      <tr><td>Gesendete Frames</td><td class="n">40 (0,77 /min)</td><td class="n">219 (0,86 /min)</td></tr>
+      <tr><td>In den TX-Ring eingereiht</td><td class="n">248 (4,7 /min)</td><td class="n">1 213 (4,8 /min)</td></tr>
+      <tr><td>Verworfen beim Einreihen / durch höhere Priorität verdrängt</td><td class="n">173 / 38 (85 %)</td><td class="n">747 / 204 (78 %)</td></tr>
+      <tr><td>Füllstand TX-Ring (Median, von 20)</td><td class="n">17</td><td class="n">13</td></tr>
+      <tr><td>Wartezeit Text, Median / Max</td><td class="n">20 min / 63 min</td><td class="n">5,6 min / 37 min</td></tr>
+      <tr><td>Wartezeit weitergeleitetes ACK, Median / Max</td><td class="n">16 s / 34 s</td><td class="n">1,8 min / 17 min</td></tr>
+      <tr><td>Wartezeit Position, Median / Max</td><td class="n">keine gesendet</td><td class="n">15 min / 53 min</td></tr>
+      <tr><td>Gesendete HEY-Frames</td><td class="n">0</td><td class="n">0</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">Eigene Pakete von DB0TAW-14: 21 automatische Baken und 10 Wetter-Positionen. Eine eigene Wetter-Position wartete 24 min.</p>
+
+  <h3>Warum er nicht zum Senden kommt</h3>
+  <p>MeshCom sendet nur, wenn der Kanal frei ist (CSMA). Nach jedem empfangenen Frame startet eine feste Sperrzeit neu: 3,0 s für ACKs und eigene Texte, 4,5 s für Relays, 5,5 s für Positionen und HEY. Erst danach prüft der Node mit CAD (Channel Activity Detection, eine kurze Präambel-Suche), ob der Kanal frei ist, und sendet. Kommt vorher ein neuer Frame, beginnt die Sperre von vorn. CAD ist hier nicht das Problem: In 86 % der Sendeversuche war der Kanal schon beim ersten Prüfen frei. Der Node kommt einfach selten bis zum Prüfen.</p>
+  <p>Aus den Zeitstempeln aller Empfänge lassen sich die Lücken im Kanal nachrechnen. Damit ein Frame von 120 Byte (1,25 s Sendezeit) in eine Lücke passt, braucht er Sperrzeit plus 1,25 s Stille:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Sperrzeit nach fremdem Frame</th><th>passende Lücken</th><th>Sendegelegenheiten pro Minute</th><th>gilt für</th></tr></thead>
+    <tbody>
+      <tr><td>5,5 s</td><td class="n">1 %</td><td class="n">0,2-0,3</td><td>Position, HEY (heute und in 10.21)</td></tr>
+      <tr><td>4,5 s</td><td class="n">3 %</td><td class="n">0,5-0,6</td><td>Relay, Stand 02.10. (gemessen: 0,8 /min)</td></tr>
+      <tr><td>3,0 s</td><td class="n">12-14 %</td><td class="n">2,5-2,6</td><td>ACK, eigene Texte</td></tr>
+      <tr><td>1,5 s</td><td class="n">27-34 %</td><td class="n">5,6-6,3</td><td>10.21, Prio 1-3 nach 20 s Wartezeit</td></tr>
+      <tr><td>0,1-0,3 s</td><td class="n">fast alle</td><td class="n">&gt; 7</td><td>10.21, Prio 1-3 nach 60 s Wartezeit</td></tr>
+    </tbody>
+  </table></div>
+  <p>Die Rechnung passt zur Messung: Bei 4,5 s Sperre ergeben sich 0,5-0,6 Gelegenheiten pro Minute, gesendet hat der Node 0,8 pro Minute (eigene Sendungen erzeugen selbst Lücken). Zum Vergleich DK5EN-98 am 18.10.: 26 % Belegung, Median-Lücke 2,7 s, 3,2 Sendungen pro Minute. Bei DB0TAW-14 liegt die Median-Lücke bei 1,6-1,8 s.</p>
+
+  <h3>Warum er so viel hört</h3>
+  <ul>
+    <li><strong>29 direkte Nachbarn bis 260 km.</strong> Am Standort in 835 m Höhe kommen Frames aus dem Taunus, vom Donnersberg, aus dem Harz und vereinzelt aus dem Ruhrgebiet und der Eifel an. Median-RSSI −113 dBm, Median-SNR −8 dB. Die meisten Frames liegen an der Empfindlichkeitsgrenze.</li>
+    <li><strong>22-25 % CRC-Fehler.</strong> Ein Viertel aller Empfänge ist kaputt: Überlagerungen und Frames knapp über dem Rauschen. Sie belegen den Kanal trotzdem und lösen die Sperre ebenfalls aus.</li>
+    <li><strong>Rauschboden −105 dBm</strong> (aus RSSI − SNR von 2 886 Frames, sehr eng um −105). Das ist 9 dB über dem thermischen Wert von −114 dBm bei 250 kHz. Die 22 <code>RX_IRQ_STALE</code>-Ereignisse (der Empfänger rastet auf eine vermeintliche Präambel ein, es folgt aber kein Paket) liegen genau bei −105 dBm. Dort triggert der Präambeldetektor auf das Rauschen. Pakete gehen dadurch nicht verloren.</li>
+    <li><strong>59 % der gültigen Empfänge sind Duplikate.</strong> Sie belegen Sendezeit im Kanal, erzeugen aber keine neue Information.</li>
+    <li><strong>Zeitsignal ≈ 15 % der Last.</strong> Die Server speisen über drei Kennungen (OE1XAR-33, -62, -63) jeweils alle ~10 min ein Zeittelegramm <code>{CET}…</code> ein. Jedes Gateway mit MESH ON strahlt es aus, und am Standort kommt jedes 5-7-mal an: 585 von 3 933 auswertbaren Frames. OE1XAR-33 und -62 stehen für den OE- und den DL-Server, -63 taucht in dieser Auswertung zum ersten Mal auf (Zuordnung offen). Es sind keine Knoten.</li>
+    <li><strong>DB0TAW-13 am selben Mast (−39 dBm).</strong> Das Gateway nebenan leitet dieselben Frames weiter. −39 dBm übersteuert den Empfänger nicht (das beginnt bei etwa −20 dBm), aber beide Nodes stellen dieselben Relays in die Warteschlange.</li>
+    <li><strong>DG0OPK-11/-12/-13/-14:</strong> vier Testknoten am selben Ort (38 km) leiten ebenfalls weiter.</li>
+  </ul>
+
+  <h3>Was in den Ring kommt</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Frame-Art (beide Logs)</th><th>Priorität</th><th>eingereiht</th><th>Anteil</th></tr></thead>
+    <tbody>
+      <tr><td>HEY (Nachbarschafts-Bake)</td><td>5</td><td class="n">839</td><td class="n">57,4 %</td></tr>
+      <tr><td>Position</td><td>4</td><td class="n">306</td><td class="n">20,9 %</td></tr>
+      <tr><td>Text (Gruppen, Broadcast, DM, Zeitsignal)</td><td>3</td><td class="n">237</td><td class="n">16,2 %</td></tr>
+      <tr><td>ACK</td><td>1</td><td class="n">79</td><td class="n">5,4 %</td></tr>
+      <tr><td><strong>Summe</strong></td><td></td><td class="n"><strong>1 461</strong></td><td class="n"><strong>99,9 %</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>Dass HEY-Frames verworfen oder von höherer Priorität verdrängt werden, ist so gewollt. Das ist das Prioritätensystem, kein Fehler. HEY-Frames werden zusätzlich nach 3 min aus dem Ring gefegt. Ein echter Befund sind die 78 verworfenen oder verdrängten Texte und die ACKs und Texte, die so spät gesendet werden, dass sie wertlos sind. Ein ACK nach 17 Minuten erreicht einen Absender, der längst aufgegeben hat. Texte, die länger als 5 Minuten unterwegs sind, kreisen meist wegen alter Firmware im Netz (siehe 4.3).</p>
+</section>
+
+<section id="mesh">
+  <h2>3. Viele Nodes meshen, wenige Gateways</h2>
+  <p>Die Seite <em>Path</em> von DB0TAW-14 (gespeichert am 18.10. um 21:04) zeigt 148 Stationen bis 6 Hops. In der Spalte <em>Mesh</em> steht, ob eine Station weiterleitet. Bekannt ist das nur für direkte Nachbarn und die zweite Ebene.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Ebene</th><th>Stationen</th><th>meshen (Mesh = Y)</th><th>unbekannt</th><th>Internet-Gateway</th></tr></thead>
+    <tbody>
+      <tr><td>Direkte Nachbarn (1 Hop)</td><td class="n">25</td><td class="n">22</td><td class="n">3</td><td class="n">7</td></tr>
+      <tr><td>Zweite Ebene (2 Hops)</td><td class="n">67</td><td class="n">38</td><td class="n">29</td><td class="n">25</td></tr>
+      <tr><td>3 Hops und weiter</td><td class="n">55</td><td class="n">-</td><td class="n">55</td><td class="n">21</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>Fast jeder direkte Nachbar meshed.</strong> 22 von 25 leiten weiter, die übrigen 3 sind unbekannt. Was einer von ihnen sendet, senden bis zu 22 andere im Hörbereich von DB0TAW-14 noch einmal. Daher kommen die 59 % Duplikate und die 30 % Kanalbelegung.</li>
+    <li><strong>Nur 7 der 25 direkten Nachbarn sind Gateways.</strong> Mit wenigen Gateways laufen Nachrichten weite Strecken über Funk, statt am nächsten Gateway ins Internet zu gehen. Jeder Funk-Hop kostet Sendezeit im ganzen Hörbereich, und auf einem Berg mit 150 km Reichweite ist dieser Hörbereich riesig.</li>
+    <li><strong>Berg-Nodes überlappen sich.</strong> DB0TAW-14 reicht bis 149 km (DM9PT-20). DB0HRF-12, DB0KH-11, DL9GX-12, DB0RVB-99 und DB0IBH-90 decken jeweils eigene große Gebiete ab und leiten dieselben Frames weiter.</li>
+  </ul>
+  <div class="callout">
+    <p><strong>Meshen in großen Umgebungen erfordert Absprache zwischen den Node-Betreibern und muss sorgfältig geplant werden.</strong> Wer einen Berg-Node gut hört, braucht nicht zu meshen. Heim- und Mobilnodes in Reichweite eines Berg-Nodes gehören auf <code>--mesh off</code>. Die Berg-Nodes sprechen ab, wer in welches Gebiet weiterleitet. Mehr Gateways in den Tälern, die selbst nicht meshen, verkürzen die Funkwege.</p>
+  </div>
+</section>
+
+<section id="fix1021">
+  <h2>4. Ist mit v4.40a.10.21 alles gefixt?</h2>
+  <p><strong>Nein, aber das Wichtigste ist drin.</strong> Wichtig für die Einordnung: v4.40a.10.21 ist die Fork-Firmware von DK5EN (offizielle 4.40a plus Erweiterungen), nicht die offizielle Firmware. Die Korrekturen fließen in die neue offizielle Software ein, die ab November erscheint. Derzeit läuft der Test.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Problem bei DB0TAW-14</th><th>Beleg in diesen Logs</th><th>Stand in 10.21</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Watchdog-Reboot beim Aufbau von Web-Seiten</td><td>2 × Log-Ende nach <code>/?page=neighbours</code>, <code>TASK_WDT … web</code></td><td>Begrenzter Sendepuffer plus Watchdog-Fütterung in Matrix-, Path- und MHeard-Seite (Puffer auf vier Boardtypen am Bench getestet)</td><td><span class="chip ok">behoben</span></td></tr>
+      <tr><td>Sendesperre nach jedem fremden Frame zu lang</td><td>3 % passende Lücken, 0,8 Sendungen/min</td><td>Für ACK, Texte und Relays (Prio 1-3): nach 20 s Wartezeit 0,5-1,5 s Sperre, nach 60 s 0,1-0,3 s. Rechnerisch 5,6+ Gelegenheiten/min bei ~1,1/min Bedarf. Positionen und HEY bleiben bei 5,5 s.</td><td><span class="chip warn">verbessert, ungetestet</span></td></tr>
+      <tr><td>Doppelte Relays (DB0TAW-13 am selben Mast, Testknoten)</td><td>59 % Duplikate</td><td><code>--nbrrelay</code> fest an: Ein Relay für einen Nachbarn, den nur DB0TAW-14 erreicht, geht nach 8 s Wartezeit mit 150 ms Sperre raus. Ist der Frame schon von einem anderen Node gesendet worden, der alle Betroffenen abdeckt, wird die eigene Kopie gestrichen.</td><td><span class="chip warn">verbessert, ungetestet</span></td></tr>
+      <tr><td>Bei gleicher Priorität fliegt der neue Frame, der alte bleibt</td><td>Ein frischer Text wird verworfen, ein 60 min alter bleibt liegen</td><td>Unverändert</td><td><span class="chip bad">offen</span></td></tr>
+      <tr><td>Kreisende Pakete</td><td>Texte bis 63 min, ACKs bis 17 min, Positionen bis 53 min unterwegs</td><td>Texte, die länger als 5 Minuten unterwegs sind, kreisen wegen veralteter Software, deren Dedup-Puffer überlaufen. Diese Nachrichten verschwinden nicht mehr aus dem Netz. Dazu kam bis vor Kurzem ein Bug, der den Hop-Zähler überschrieb und damit 999 Hops zuließ. Behebbar nur durch das Update der alten Nodes.</td><td><span class="chip bad">alte Firmware</span></td></tr>
+      <tr><td>Verspätetes Zeitsignal verstellt fremde Uhren</td><td>Zeitsignal bis 63 min (Log 1) bzw. 37 min (Log 2) nach Empfang gesendet</td><td>Gleiche Ursache: alte Nodes, kaputte Firmware, kreisende Pakete (siehe 4.2)</td><td><span class="chip bad">alte Firmware</span></td></tr>
+      <tr><td>Dedup-Fenster</td><td>12-16 min Fenster; 42 Kennungen erneut als neu akzeptiert, 8 davon nochmals eingereiht</td><td>Mit aktueller Firmware kein Problem. Zum Problem wird es durch die alten Nodes, die Pakete lange kreisen lassen (siehe 4.3).</td><td><span class="chip warn">alte Firmware</span></td></tr>
+      <tr><td>Nachbarn mit alter Firmware (4.35)</td><td>DB0HRF-12 (4.35k) ist der aktivste direkte Nachbar; 10 direkte Nachbarn laufen auf 4.35</td><td>Vor 4.35p kein CAD, dazu zu kleine Dedup-Puffer und das Überschreiben des Hop-Zählers. Liegt bei den Betreibern dieser Nodes.</td><td><span class="chip warn">Betrieb</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>4.1 Was 10.21 an diesem Standort voraussichtlich bewirkt</h3>
+  <p>Texte und ACKs sollten durchkommen. Nach 20 s Wartezeit reicht eine Lücke von etwa 2,8 s, und davon gibt es hier 5-6 pro Minute, bei rund 1,1 Texten und ACKs pro Minute. Nach 60 s geht der Node praktisch nach dem nächsten fremden Frame auf Sendung. Positionen und HEY dritter Stationen wird DB0TAW-14 dagegen weiterhin fast nie weiterleiten, sie laufen ab oder werden verdrängt. Das ist gewollt, sollte aber bekannt sein: Positionen über diesen Knoten kommen weiter kaum an.</p>
+  <p><strong>Zu beobachten:</strong> Die Stufe ab 60 s (0,1-0,3 s Sperre) hält die übliche 3-s-Wartezeit der anderen Empfänger nicht mehr ein. Bei einem einzelnen Node ist das harmlos, weil die anderen ohnehin 3-5,5 s warten. Laufen aber mehrere Nachbarn mit 10.21 gleichzeitig im Stau, können sie nach demselben fremden Frame fast gleichzeitig starten. Der Zufallsversatz beträgt nur 0-175 ms. Nach dem Update gezielt auf mehr CRC-Fehler achten.</p>
+
+  <h3>4.2 Verspätetes Zeitsignal</h3>
+  <p>Ein Node ohne GPS, RTC und NTP stellt seine Uhr nach jedem empfangenen <code>{CET}</code>-Telegramm, ohne dessen Alter zu prüfen (<code>loop_functions.cpp</code>, Abschnitt <code>{CET}</code>). DB0TAW-14 hat 65 Zeittelegramme weitergeleitet, mit einer Verzögerung von bis zu 63 min (Log 1) bzw. 37 min (Log 2, Median 3,5 min). Jeder Empfänger ohne eigene Zeitquelle geht danach um diese Spanne falsch, bis das nächste frische Telegramm kommt. Ursache ist alte Software, die Pakete kreisen lässt: Ihr überlaufender Dedup-Puffer hat das Telegramm vergessen, sie leitet es erneut weiter, und es bleibt im Netz.</p>
+
+  <h3>4.3 Dedup-Fenster</h3>
+  <p>Jeder Node merkt sich die Kennungen (Message-IDs) der zuletzt gesehenen Frames, hier 100 Stück, damit er nichts doppelt weiterleitet. Bei dieser Last ist die Liste nach 12-16 min durchgetauscht. Kommt ein Frame später noch einmal an, gilt er als neu. Das ist hier 42-mal passiert, 14-47 min nach dem ersten Empfang, und 8 davon wurden erneut eingereiht. Mit aktueller Firmware ist das kein Problem. Zum Problem wird es durch die alten Nodes: Sie lassen Pakete kreisen und senden sie noch, wenn die anderen sie längst vergessen haben.</p>
+</section>
+
+<section id="todo">
+  <h2>5. Was muss man noch anpassen?</h2>
+  <h3>Firmware</h3>
+  <ol>
+    <li><strong>Höchstalter je Frame-Art beim Senden.</strong> Ein weitergeleitetes ACK, das älter als die Wiederholzeit des Absenders ist, wird verworfen statt gesendet. Für Positionen, Texte und das Zeitsignal gibt es jeweils eigene Grenzen. Werte zur Entscheidung: ACK 30 s, Zeitsignal 30 s, Position 5 min, Text 10 min. So gibt wenigstens der eigene Node keine veralteten Frames mehr weiter.</li>
+    <li><strong>Bei gleicher Priorität den ältesten Frame verdrängen</strong> statt den neuen zu verwerfen. Für Relays ist der frischere Frame fast immer der wertvollere.</li>
+    <li><strong>Feldnachweis der 10.21-Hebel</strong> an genau diesem Standort, mit Blick auf die 60-s-Stufe (siehe 4.1).</li>
+    <li><strong>Offizielle Software ab November.</strong> Die neue Software erscheint ab November offiziell, derzeit läuft der Test. Bis dahin ist v4.40a.10.21 der Stand für Nodes, die vorab testen.</li>
+  </ol>
+  <h3>Betrieb</h3>
+  <ol>
+    <li><strong>Meshen absprechen und planen</strong> (siehe 3): Wer einen Berg-Node gut hört, braucht nicht zu meshen.</li>
+    <li><strong>Alte Firmware ablösen.</strong> Alle Nodes auf 4.35 sind zu alt, nicht nur die ohne CAD.</li>
+    <li><strong>DB0TAW-14 und DB0TAW-13 auf v4.40a.10.21 aktualisieren</strong> (Web-Flasher oder OTA). In Produktions-Builds ist <code>--nbrrelay</code> fest an.</li>
+    <li><strong>Rollen am Mast klären.</strong> DB0TAW-13 (Gateway) und DB0TAW-14 (Relay) hören dasselbe und leiten dasselbe weiter. Zeigen die Antennen in dieselbe Richtung, reicht ein Relay.</li>
+    <li><strong>DB0HRF-12 (Großer Feldberg, 121 km, 4.35k) aktualisieren.</strong> Er ist der aktivste direkte Nachbar (525 Frames), sendet ohne Kanalprüfung (vor 4.35p gibt es kein CAD) und hat die zu kleinen Puffer und den Hop-Zähler-Fehler der alten Firmware.</li>
+    <li><strong>Testknoten DG0OPK-11 bis -14</strong> während Messungen auf einen Relay-Knoten beschränken.</li>
+    <li><strong>Nach dem Update 1-2 h mitschneiden</strong> mit <code>--loradebug on</code>, Beginn mit <code>--info</code>. Dann lässt sich vorher und nachher direkt vergleichen.</li>
+  </ol>
+</section>
+
+<section id="inventar">
+  <h2>6. Direkte Nachbarn von DB0TAW-14</h2>
+  <p class="small">Letzter Pfadeintrag eines Frames, beide Logs. RSSI und SNR gemessen an DB0TAW-14. Firmware aus dem Log (eigene Frames des Nachbarn), Stammdaten aus mcmap. Gateway = Internet-Gateway laut Karte. Als Relay arbeiten alle, sonst stünden sie nicht als letzter Hop im Pfad. Firmware im Log und auf der Karte stimmen bei allen 25 Nachbarn mit beiden Angaben überein.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Rufzeichen</th><th>Hardware</th><th>FW</th><th>Standort</th><th>Höhe</th><th>Entf.</th><th>GW</th><th>Frames</th><th>RSSI</th><th>SNR</th></tr></thead>
+    <tbody>
+<tr><td>DB0HRF-12</td><td>T-Beam V1.2</td><td><span class="chip bad">4.35k</span></td><td>Großer Feldberg, 50,23 N 8,46 E</td><td class="n">832 m</td><td class="n">121 km</td><td>nein</td><td class="n">525</td><td class="n">−102</td><td class="n">1</td></tr>
+<tr><td>DB0KH-11</td><td>TTGO LoRa32 V2.1.6</td><td>4.40a</td><td>F34/AVSK, 50,91 N 9,42 E</td><td class="n">608 m</td><td class="n">61 km</td><td>nein</td><td class="n">485</td><td class="n">−92</td><td class="n">6</td></tr>
+<tr><td>DL9GX-12</td><td>T-Beam V1.2</td><td>4.40a</td><td>DL9GX, 50,62 N 8,90 E</td><td class="n">466 m</td><td class="n">83 km</td><td>nein</td><td class="n">458</td><td class="n">−104</td><td class="n">0</td></tr>
+<tr><td>DM9PT-20</td><td>EBYTE E22</td><td>4.40a</td><td>Torsten, 49,80 N 8,35 E</td><td class="n">88 m</td><td class="n">149 km</td><td>nein</td><td class="n">272</td><td class="n">−120</td><td class="n">−15</td></tr>
+<tr><td>DB0NH-3</td><td>RAK4631</td><td><span class="chip warn">4.35p</span></td><td>www.bravo37.de, 50,08 N 10,67 E</td><td class="n">484 m</td><td class="n">68 km</td><td>ja</td><td class="n">258</td><td class="n">−118</td><td class="n">−13</td></tr>
+<tr><td>DG0OPK-14</td><td>Heltec Wireless Stick V3</td><td>4.40a</td><td>DG0OPK, Test</td><td class="n">515 m</td><td class="n">38 km</td><td>nein</td><td class="n">221</td><td class="n">−116</td><td class="n">−12</td></tr>
+<tr><td>DB0TAW-13</td><td>Heltec Wireless Stick V3</td><td>4.40a</td><td>gleicher Mast, JO50AN</td><td class="n">835 m</td><td class="n">0 km</td><td>ja</td><td class="n">217</td><td class="n">−39</td><td class="n">6</td></tr>
+<tr><td>DK3RW-12</td><td>TTGO LoRa32 V2.1.6</td><td>4.40a</td><td>DK3RW-12, 50,78 N 9,26 E</td><td class="n">315 m</td><td class="n">63 km</td><td>ja</td><td class="n">213</td><td class="n">−106</td><td class="n">−2</td></tr>
+<tr><td>DB0RVB-99</td><td>Heltec V3</td><td>4.40a</td><td>Ravensberg (Harz)</td><td class="n">660 m</td><td class="n">122 km</td><td>nein</td><td class="n">187</td><td class="n">−120</td><td class="n">−15</td></tr>
+<tr><td>DB0DOL-1</td><td>Heltec Wireless Stick V3</td><td><span class="chip warn">4.35p</span></td><td>JO50FN</td><td class="n">785 m</td><td class="n">29 km</td><td>nein</td><td class="n">154</td><td class="n">−113</td><td class="n">−9</td></tr>
+<tr><td>DB0PET-15</td><td>RAK4631</td><td>4.40a</td><td>Petersberg (Fulda)</td><td class="n">369 m</td><td class="n">26 km</td><td>ja</td><td class="n">142</td><td class="n">−113</td><td class="n">−9</td></tr>
+<tr><td>DL0VBK-12</td><td>TTGO LoRa32 V2.1.6</td><td>4.40a</td><td>50,68 N 9,23 E</td><td class="n">439 m</td><td class="n">62 km</td><td>ja</td><td class="n">134</td><td class="n">−119</td><td class="n">−14</td></tr>
+<tr><td>DG0OPK-12</td><td>Heltec V3</td><td>4.40a</td><td>DG0OPK, Test</td><td class="n">515 m</td><td class="n">38 km</td><td>nein</td><td class="n">126</td><td class="n">−121</td><td class="n">−17</td></tr>
+<tr><td>DB0FTS-1</td><td>Heltec Wireless Stick V3</td><td><span class="chip warn">4.35p</span></td><td>Suhl</td><td class="n">887 m</td><td class="n">47 km</td><td>nein</td><td class="n">86</td><td class="n">−116</td><td class="n">−12</td></tr>
+<tr><td>DB0ND-22</td><td>Heltec V3</td><td>4.40a</td><td>Donnersberg</td><td class="n">734 m</td><td class="n">186 km</td><td>nein</td><td class="n">78</td><td class="n">−123</td><td class="n">−18</td></tr>
+<tr><td>DG7FDL-12</td><td>TTGO LoRa32 V2.1.6</td><td>4.40a</td><td>Bad Hersfeld</td><td class="n">256 m</td><td class="n">44 km</td><td>ja</td><td class="n">78</td><td class="n">−117</td><td class="n">−12</td></tr>
+<tr><td>DL0BOD-20</td><td>EBYTE E22</td><td><span class="chip warn">4.35p</span></td><td>OV K56</td><td class="n">89 m</td><td class="n">144 km</td><td>ja</td><td class="n">63</td><td class="n">−122</td><td class="n">−17</td></tr>
+<tr><td>DL2IAS-10</td><td>EBYTE E22</td><td>4.40a</td><td>OV K07</td><td class="n">151 m</td><td class="n">143 km</td><td>nein</td><td class="n">57</td><td class="n">−124</td><td class="n">−19</td></tr>
+<tr><td>DK9MS-12</td><td>TTGO LoRa32 V2.1.6</td><td><span class="chip warn">4.35p</span></td><td>50,52 N 9,61 E</td><td class="n">318 m</td><td class="n">34 km</td><td>nein</td><td class="n">49</td><td class="n">−122</td><td class="n">−17</td></tr>
+<tr><td>DB8ZP-99</td><td>Heltec Wireless Stick V3</td><td>4.40a</td><td>50,64 N 10,02 E</td><td class="n">400 m</td><td class="n">10 km</td><td>nein</td><td class="n">39</td><td class="n">−110</td><td class="n">−6</td></tr>
+<tr><td>DB0IBH-90</td><td>TTGO LoRa32 V2.1.6</td><td><span class="chip warn">4.35p</span></td><td>OV H19, 51,82 N 10,25 E</td><td class="n">603 m</td><td class="n">141 km</td><td>nein</td><td class="n">34</td><td class="n">−121</td><td class="n">−17</td></tr>
+<tr><td>DL1ALP-1</td><td>T-Beam Supreme</td><td><span class="chip warn">4.35p</span></td><td>Patrick, 51,10 N 9,34 E</td><td class="n">173 m</td><td class="n">80 km</td><td>nein</td><td class="n">23</td><td class="n">−124</td><td class="n">−19</td></tr>
+<tr><td>DO1HWM-1</td><td>T-Beam V1.2</td><td><span class="chip warn">4.35p</span></td><td>Harald, 50,96 N 9,48 E</td><td class="n">929 m</td><td class="n">61 km</td><td>ja</td><td class="n">12</td><td class="n">−120</td><td class="n">−15</td></tr>
+<tr><td>DB0OHL-12</td><td>Heltec V3</td><td>4.40a</td><td>Halde Scholven, Gelsenkirchen</td><td class="n">210 m</td><td class="n">244 km</td><td>ja</td><td class="n">7</td><td class="n">−124</td><td class="n">−19</td></tr>
+<tr><td>DG0OPK-13</td><td>Heltec Wireless Stick V3</td><td>4.40a</td><td>DG0OPK, Test</td><td class="n">515 m</td><td class="n">38 km</td><td>nein</td><td class="n">5</td><td class="n">−118</td><td class="n">−13</td></tr>
+<tr><td>DG0OPK-11</td><td>Heltec Wireless Stick V3</td><td>4.40a</td><td>DG0OPK, Test</td><td class="n">515 m</td><td class="n">38 km</td><td>nein</td><td class="n">5</td><td class="n">−123</td><td class="n">−18</td></tr>
+<tr><td>DB0TVI-1</td><td>EBYTE E22</td><td>4.40a</td><td>Großer Inselsberg</td><td class="n">916 m</td><td class="n">42 km</td><td>nein</td><td class="n">3</td><td class="n">−124</td><td class="n">−19</td></tr>
+<tr><td>DB0AIS-12</td><td>RAK4631</td><td>4.40a</td><td>Sysop DG3FBL, 50,00 N 8,59 E</td><td class="n">148 m</td><td class="n">123 km</td><td>ja</td><td class="n">1</td><td class="n">−126</td><td class="n">−21</td></tr>
+<tr><td>DL2KBX-11</td><td>TTGO LoRa32 V2.1.6</td><td><span class="chip bad">4.35h</span></td><td>Schöneseiffen (Eifel)</td><td class="n">557 m</td><td class="n">260 km</td><td>ja</td><td class="n">1</td><td class="n">−124</td><td class="n">−20</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">Standort: Name aus der Karte, dazu die Koordinaten, wo der Name den Ort nicht verrät. Entfernungen vom Standort DB0TAW-13/-14 (50,558 N, 10,081 E). Rot: 4.35 ohne CAD. Gelb: 4.35p, hat CAD, ist aber zu alt (zu kleine Puffer, Hop-Zähler-Fehler). Nodes mit 4.35p vor dem 09.06.2026 lesen außerdem den ersten Via-Eintrag als Ziel. Das lässt sich am Versionsfeld nicht erkennen.</p>
+
+  <h3>Firmware ohne Kanalprüfung (vor 4.35p)</h3>
+  <p>Firmware 4.35 mit Buchstaben a bis o sendet ohne CAD, also ohne vorher zu hören. Das Versionsfeld im Frame gehört dem Absender, nicht dem letzten Relay.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Firmware des Absenders</th><th>Frames</th><th>Anteil</th></tr></thead>
+    <tbody>
+      <tr><td>4.40a</td><td class="n">2 433</td><td class="n">73,0 %</td></tr>
+      <tr><td>4.35p (mit CAD, zu alt)</td><td class="n">346</td><td class="n">10,4 %</td></tr>
+      <tr><td>4.35 s/t/u (mit CAD, zu alt)</td><td class="n">71</td><td class="n">2,1 %</td></tr>
+      <tr><td>4.35 c-o (ohne CAD)</td><td class="n">482</td><td class="n">14,5 %</td></tr>
+      <tr><td><strong>Summe</strong> (ohne Zeitsignal und 12 unlesbare Versionsfelder)</td><td class="n"><strong>3 332</strong></td><td class="n"><strong>100,0 %</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>30 von 219 Absendern (13,7 %) laufen ohne CAD. Am stärksten fällt DB0HRF-12 ins Gewicht: Als letzter Hop liefert er 13 % aller Empfänge an DB0TAW-14, und als Relay sendet er ohne Hinhören in einen Kanal, der hier zu 30 % belegt ist.</p>
+</section>
+
+<section id="offen">
+  <h2>7. Offene Fragen an DG0OPK</h2>
+  <ol>
+    <li>Ist DB0TAW-14 nach 16:12 (Ende von Log 2, wieder direkt nach <code>/?page=neighbours</code>) erneut neu gestartet? Bitte <code>--info</code> schicken, die Zeile <code>BOOT RESET_REASON</code> reicht.</li>
+    <li>Wie ist der Browser angebunden (HAMNET-Strecke, Laufzeit)? Sind dauerhaft Tabs mit MHeard, Path oder Neighbours offen?</li>
+    <li>Welche Rolle haben DB0TAW-13 und -14 am Mast? Gleiche Antenne oder Richtung? Muss -14 überhaupt weiterleiten, wenn -13 es schon tut?</li>
+    <li>Sollen beide vorab auf v4.40a.10.21 (Testversion bis zur offiziellen Software im November) gehen? Danach bitte 1-2 h Mitschnitt mit <code>--loradebug on</code>.</li>
+    <li>Gibt es Kontakt zu den Betreibern von DB0HRF-12 und der übrigen 4.35-Nodes für ein Update?</li>
+    <li>Lässt sich unter den Betreibern der Berg-Nodes absprechen, wer in welches Gebiet meshen soll und welche Heim- und Mobilnodes auf <code>--mesh off</code> gehen?</li>
+  </ol>
+</section>
+
+<section id="methode">
+  <h2>8. Methodik und Grenzen</h2>
+  <ul>
+    <li>Identität aus dem Log: <code>--info</code> nennt <code>Call: &lt;DB0TAW-14&gt;</code> und <code>NODE 42 &lt;STICK_V3&gt;</code>. DB0TAW-14 erscheint nie als letzter Hop.</li>
+    <li>Kanalbelegung: Der Fingerabdruck der bekannten Überhöhung (jeder RX als 255 Byte gebucht) fehlt, die <code>CHANNEL_UTIL</code>-Werte sind also verwendbar. Die Lücken-Rechnung nutzt die Semtech-Sendezeitformel für SF11/BW250/CR4:6 (60 B = 0,71 s, 120 B = 1,25 s).</li>
+    <li>Wartezeiten aus <code>RING_TX_READ … lat=</code>, Füllstand aus <code>RING_STATUS</code> und <code>RING_WRITE queued=</code>. Für Verwerfungen gilt der zuletzt gemeldete Füllstand.</li>
+    <li>Duplikate und Dedup-Fenster aus <code>RX_DEDUP_NEW/DUP/ADD</code>. Erneute Annahmen nur innerhalb des 4-h-Gültigkeitsbereichs einer Message-ID gezählt.</li>
+    <li>Die Kollisionszahlen von <code>loganalyse.sh</code> werden nicht verwendet, weil sie Relay-Pfade als mehrere Sender zählen.</li>
+    <li>Die Wirkung von 10.21 ist hier aus diesem Log hochgerechnet, nicht gemessen. Der Nachweis braucht einen Mitschnitt nach dem Update.</li>
+    <li>Mesh- und Gateway-Angaben in Abschnitt 3 stammen aus der gespeicherten Path-Seite von DB0TAW-14 vom 18.10.2026, 21:04 (Momentaufnahme).</li>
+    <li>IP-Adressen aus den Logs sind in diesem Bericht bewusst weggelassen.</li>
+  </ul>
+</section>
+</main>
+</body>
+</html>
