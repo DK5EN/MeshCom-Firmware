@@ -2,6 +2,15 @@
 
 **Stand:** 2026-10-19 night, branch `fork-dev`, last release `v4.40a.10.19` (CI-built, Latest).
 
+## 2026-10-19 -- field reports: WEB-STOP-01 fixed, RM-NVS-01 diagnostics (catalogue section 2e)
+
+- WEB-STOP-01 (T-Deck Plus, log flood "WEBServer stopped" without IP): `stopWebserver()` acts only on a
+  running server; test `test_web_stop_gate`. Cause of the missing IP on the reporter's T-Deck is most likely
+  `node_wifion=false`; answer: WLAN button or `--wifi on`. Bug also in upstream/dev: upstream PR candidate.
+- RM-NVS-01 (E22, RM "remember password" -> `store`): open, NVS-full hypothesis. `--info` NVS line and
+  `[RMNODES];...` save-failure lines added; waiting for the reporter's `--info` and log.
+- Committed on fork-dev, not released. Gate stage 1+2 green, Opus advisor APPROVED.
+
 ## 2026-10-19 -- WEB-WDT-01: web send buffer and page feeds (resume point: docs/campaign-web-wdt-20261019.md)
 
 - Committed on fork-dev, not released, not upstream: W1 `3b54c452` (`web_txbuf.h`, 20 host tests, feeds in

@@ -27,6 +27,7 @@
 #include "../nbr_matrix.h"        // nbrMatrix
 #include "../nbr_views.h"         // nbrMhRows(), nbrMhGet(), nbrHardwareName()
 #include "../uptime_min.h"        // uptimeMin16()
+#include "../nvs_diag.h"         // RM-NVS-01: NVS stats on a failed save
 
 static_assert(RM_FORM_SLOTS == RM_NODES_SLOTS, "parser and store disagree on the slot count");
 
@@ -62,6 +63,24 @@ const char *rmReadBody(char *buf, size_t cap, long content_length)
     }
     buf[got] = '\0';
     return got == content_length ? nullptr : "short";
+}
+
+// RM-NVS-01: a failed rmNodesSave() logs the NVS fill level (ESP32 only; nRF52 has no nvs_get_stats)
+static void rmNodesStoreFailLog(void)
+{
+#ifdef ESP32
+    NvsDiagStats st;
+    char line[96];
+    if (nvsDiagRead(st))
+    {
+        nvsDiagFormat(line, sizeof(line), st);
+        Serial.printf("[RMNODES];save_failed;%s\n", line);
+    }
+    else
+        Serial.printf("[RMNODES];save_failed;nvs_stats_unavailable\n");
+#else
+    Serial.printf("[RMNODES];save_failed\n");
+#endif
 }
 
 /** 200 {"ok":true} or 422 {"ok":false,"err":"<token>","msg":"<sentence>"}; err is a static token, never input,
@@ -155,7 +174,10 @@ void sub_rm_nodes_post(long content_length)
                     rmForgetTarget(ns.slot[req.slot].call);
                     rmNodesScrubBuf(&ns.slot[req.slot], sizeof(ns.slot[req.slot]));
                     if (!rmNodesSave(ns))
+                    {
                         err = "store";
+                        rmNodesStoreFailLog();
+                    }
                 }
             }
             else // RMN_SAVE
@@ -176,7 +198,10 @@ void sub_rm_nodes_post(long content_length)
                     rmDeriveKey(req.pw, s.key);                    // K = SHA-256(password), straight from the body
                     s.used = true;
                     if (!rmNodesSave(ns))
+                    {
                         err = "store";
+                        rmNodesStoreFailLog();
+                    }
                 }
             }
             rmNodesScrub(ns);

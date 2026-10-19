@@ -33,6 +33,7 @@
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #include <prod_lock.h>      // prodLockNormalise(): an imported file may hold values the setters now refuse
 #include <instrument.h>     // INSTRUMENT_ENABLED
+#include "web_server_gate.h" // WEB-STOP-01: stopWebserver() acts on a running server only
 #include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
@@ -327,6 +328,10 @@ void startWebserver()
  */
 void stopWebserver()
 {
+    // startWebserver() calls this every loop pass without an IP (WEB-STOP-01)
+    if (!webStopShouldAct(bweb_server_running))
+        return;
+
 #ifdef ESP32
     MDNS.end();
     web_server.stop();

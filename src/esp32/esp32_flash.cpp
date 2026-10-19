@@ -18,6 +18,7 @@
 #include <settings_store.h>
 #include <counters_store.h>
 #include <rm_nodes_store.h>
+#include <nvs_diag.h>
 
 #include <cstring>
 
@@ -379,6 +380,8 @@ bool rmSndSave(uint32_t ctr)
     return ok;
 }
 #if !defined(NATIVE_BUILD)
+#include <nvs.h> // nvs_get_stats(), RM-NVS-01
+
 // RM GUI (contract C1, rm_nodes_store.h): the three known-node slots, ONE blob in its own namespace
 // "RmNodes", key "nodes". Own short-lived handle per call (begin()/end() inside), like rmHwm above.
 // The record carries magic, version, length and CRC, so a missing, short, long or damaged blob
@@ -413,10 +416,15 @@ struct RmNodesNvs
     {
         Preferences p;
         if (!p.begin("RmNodes", false))
+        {
+            Serial.printf("[RMNODES];write;begin_failed\n");
             return false;
-        bool ok = p.putBytes("nodes", buf, len) == len;
+        }
+        size_t wrote = p.putBytes("nodes", buf, len);
         p.end();
-        return ok;
+        if (wrote != len)
+            Serial.printf("[RMNODES];write;short;requested;%u;written;%u\n", (unsigned)len, (unsigned)wrote);
+        return wrote == len;
     }
 };
 } // namespace
@@ -432,6 +440,19 @@ bool rmNodesSave(const RmNodes &n)
     RmNodesNvs s;
     return rmNodesBlobSave(s, n);
 }
+
+// RM-NVS-01: default NVS partition usage (nvs_get_stats), for --info and the RM "store" failure log.
+bool nvsDiagRead(NvsDiagStats &out)
+{
+    nvs_stats_t st;
+    if (nvs_get_stats(NULL, &st) != ESP_OK)
+        return false;
+    out.used = (uint32_t)st.used_entries;
+    out.free = (uint32_t)st.free_entries;
+    out.total = (uint32_t)st.total_entries;
+    out.ns = (uint32_t)st.namespace_count;
+    return true;
+}
 #else
 bool rmNodesLoad(RmNodes &n)
 {
@@ -440,6 +461,8 @@ bool rmNodesLoad(RmNodes &n)
 }
 
 bool rmNodesSave(const RmNodes &) { return false; }
+
+bool nvsDiagRead(NvsDiagStats &) { return false; }
 #endif // !NATIVE_BUILD
 #endif // !MC_SAFEBOOT
 

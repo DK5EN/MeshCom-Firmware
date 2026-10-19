@@ -1603,6 +1603,42 @@ Core helpers landed in W1 (`b8aa4354`), the surfaces in W2 (`55ad3b42`), the nRF
   [`campaign-web-wdt-20261019.md`](../campaign-web-wdt-20261019.md).
 - **Trade-off:** a response that needs more than 15 s is cut (seen: the 94 kB scaffold at 1.2 s RTT).
 
+## 2e. Field reports 2026-10-19: T-Deck web log flood, E22 RM save (WEB-STOP-01, RM-NVS-01)
+
+### WEB-STOP-01 — "WEBServer stopped" floods the log while the node has no IP
+
+**FIXED** on fork-dev (2026-10-19), not released, not upstream (bug is in upstream/dev too). Low.
+
+- **Report:** T-Deck Plus on v4.40a: web server does not start, "WEBServer stopped" scrolls through the log.
+- **Mechanism:** `esp32loop()` calls `startWebserver()` every pass while `bWEBSERVER` is set. Without an IP
+  (`node_ip` < 7 chars, not AP) it calls `stopWebserver()`, which ran `MDNS.end()`, `web_server.stop()` and
+  printed the debug line every pass. TM-21 had rate-limited only the "no ip set" line. The missing IP is the
+  real reason the server does not start; on the T-Deck the usual cause is `node_wifion=false` (WLAN button off):
+  `startNetwork()` returns early, while `--webserver on` / the web button set only `bWEBSERVER`.
+- **Fix:** `stopWebserver()` acts only on a running server (`webStopShouldAct()`, `src/web_server_gate.h`).
+  All callers checked (advisor): the flag is set only right after `web_server.begin()`; the MDNS-failure path
+  has already stopped the server.
+- **Test:** `test_web_stop_gate` (env `native`): 1000 no-IP passes act 0 times; failed with the old behaviour.
+- **Operator answer:** switch WLAN on (T-Deck setup button or `--wifi on`); boot log shows
+  `[WIFI]...disabled by Settings (node_wifion=false)` when it is off.
+
+### RM-NVS-01 — E22: RM "remember password" answers `store`
+
+**OPEN**, diagnostics added on fork-dev (2026-10-19); root cause not confirmed.
+
+- **Report:** E22 web GUI, Remote Control, remember password: "This node could not save that. Try again."
+  Commands from the RAK to the E22 work.
+- **Mechanism (known part):** token `store` = `rmNodesSave()` false in `sub_rm_nodes_post()`: `begin("RmNodes")`,
+  `putBytes("nodes")` (~150 B blob) or the read-back failed. As a receiver the E22 only rewrites the 4-byte
+  `rm_hwm` key, which needs far fewer free NVS entries.
+- **Hypothesis:** NVS full. The partition is 20 KB (~500 entries) on every safeboot layout; settings alone use
+  ~120 keys plus leftovers from old firmware. Unproven: the firmware could not report NVS usage.
+- **Diagnostics:** `--info` prints `...NVS          : used N free N total N ns N` (ESP32); a failed save logs
+  `[RMNODES];write;begin_failed` or `[RMNODES];write;short;requested;N;written;N`, then
+  `[RMNODES];save_failed;[NVS];used;..;free;..;total;..;ns;..`. No step line plus `save_failed` = read-back
+  mismatch or sequence wrap.
+- **Next:** reporter runs the build, sends `--info` and the save log; ask whether normal settings survive a reboot.
+
 ---
 
 ## 3. Refuted claims — do not re-investigate

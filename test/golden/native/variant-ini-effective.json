@@ -2361,6 +2361,8 @@
    "test_wifi_start_gate",
    "test_au_ui_state",
    "test_net_console_gate",
+   "test_web_stop_gate",
+   "test_nvs_diag",
    "test_ble_json_frame",
    "test_settings_sanitize",
    "test_ntp_async",

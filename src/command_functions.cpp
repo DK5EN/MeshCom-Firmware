@@ -133,6 +133,7 @@ extern TinyGPSPlus gps;
 #include "loop_breadcrumb.h"   // F3: --info ...BOOT line
 #include "gw_link_status.h"   // --info ...Server line
 #include "gw_reg_runtime.h"   // --info ...REGISTRATION line
+#include "nvs_diag.h"         // --info ...NVS line
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -7281,6 +7282,19 @@ void commandAction(char *umsg_text, bool ble)
             }
             if(gwRegBlocked())
                 printfdeb("...REGISTRATION: failed\n");
+            #ifdef ESP32
+            { // RM-NVS-01: NVS fill level (RM "remember password" fails when the 20 KB partition is full)
+                NvsDiagStats nst;
+                if(nvsDiagRead(nst))
+                {
+                    char nvl[64];
+                    nvsDiagFormatInfo(nvl, sizeof(nvl), nst);
+                    printfdeb("...NVS          : %s\n", nvl);
+                }
+                else
+                    printfdeb("...NVS          : n/a\n");
+            }
+            #endif
             #endif
     
             sendDisplayHead(true);
