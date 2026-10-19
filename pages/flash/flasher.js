@@ -773,15 +773,20 @@ async function processPort(port, afterReset) {
   } else if (diag === 'safeboot') {
     detectStatus.textContent =
       `Board steht in Safeboot${typeof facts.safeboot === 'number' ? ` (Version ${facts.safeboot})` : ''}: ` +
-      'die App startet nicht. Neu flashen behebt das.';
+      'kehrt es nach rund 3 Minuten nicht von selbst in die App zurueck, behebt Neu flashen das.';
   } else if (diag === 'rom-download') {
-    detectStatus.textContent = 'Board steht im ROM-Download-Modus (BOOT-Taste?).';
+    // Entered through the BOOT strap, a USB reset lands in the ROM again
+    // (bench DK5EN-14); only the RST key or a power cycle leaves it.
+    detectStatus.textContent =
+      'Board steht im ROM-Download-Modus (BOOT-Taste). Flashen geht so; fuer die App die RST-Taste ' +
+      'ohne BOOT druecken.';
   } else if (diag === 'silent-native') {
     detectStatus.textContent =
       'Keine Antwort von der App. "Neustart in die App" versucht einen Reset des Boards.';
   } else if (diag === 'silent-after-reset') {
     detectStatus.textContent =
-      'Keine Antwort nach Neustart: keine MeshCom-App (fremde Firmware), haengende App oder Safeboot. Board von Hand waehlen.';
+      'Keine Antwort nach Neustart: Board im ROM-Download-Modus (dann RST-Taste ohne BOOT druecken und ' +
+      'noch einmal erkennen), keine MeshCom-App (fremde Firmware) oder haengende App. Sonst Board von Hand waehlen.';
   } else if (info || facts.family) {
     detectStatus.textContent = '';
   } else {
@@ -809,9 +814,50 @@ async function processPort(port, afterReset) {
   const offerReset =
     kind === 'esp-native' &&
     !afterReset &&
-    (diag === 'silent-native' || diag === 'rom-download' || diag === 'safeboot');
+    (diag === 'silent-native' || diag === 'safeboot');
   showResult(result, info, facts, usbFamily, { heard, port, offerReset });
   await select();
+  return heard;
+}
+
+// Resolves true once `port` is unplugged (the USB device of a reset S3 drops
+// off and re-enumerates), false after `ms`.
+function waitDisconnect(port, ms) {
+  return new Promise((resolve) => {
+    const done = (gone) => {
+      navigator.serial.removeEventListener('disconnect', onGone);
+      clearTimeout(timer);
+      resolve(gone);
+    };
+    const onGone = (e) => {
+      if (e.target === port) done(true);
+    };
+    const timer = setTimeout(() => done(false), ms);
+    navigator.serial.addEventListener('disconnect', onGone);
+  });
+}
+
+// The board's port after a reset: the old object, if the link never dropped,
+// or a port that was not granted before (`before`), so a second board with the
+// same VID/PID is never picked up. Null after `ms`.
+async function reacquire(oldPort, before, ms) {
+  const { usbVendorId, usbProductId } = oldPort.getInfo();
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    for (const p of await navigator.serial.getPorts()) {
+      const i = p.getInfo();
+      if (i.usbVendorId !== usbVendorId || i.usbProductId !== usbProductId) continue;
+      if (p !== oldPort && before.has(p)) continue;
+      try {
+        await p.open({ baudRate: 115200, bufferSize: 8192 });
+        return p;
+      } catch {
+        // Not enumerated yet, or still closing; try again.
+      }
+    }
+    await sleep(250);
+  }
+  return null;
 }
 
 // Reset an ESP32-S3 USB-JTAG board into its app (esptool HardReset for USB:
@@ -819,7 +865,6 @@ async function processPort(port, afterReset) {
 // dies with it; the same device is found again through getPorts() (already
 // granted, no gesture needed) and listened to once more.
 async function restartIntoApp(oldPort) {
-  const { usbVendorId, usbProductId } = oldPort.getInfo();
   // A second granted board with the same VID/PID (another S3) must not be
   // picked up: after re-enumeration only the old object or a port that was
   // not granted before the reset can be this board.
@@ -830,6 +875,9 @@ async function restartIntoApp(oldPort) {
   }
   detectBtn.disabled = true;
   detectStatus.textContent = 'Board wird neu gestartet ...';
+  // Armed before the reset: the USB device can drop off while the RTS pulse
+  // is still being sent.
+  const gone = waitDisconnect(oldPort, 1500);
   try {
     if (!oldPort.readable) await oldPort.open({ baudRate: 115200, bufferSize: 8192 });
     await oldPort.setSignals({ dataTerminalReady: false, requestToSend: true });
@@ -839,33 +887,23 @@ async function restartIntoApp(oldPort) {
     // The device may already be gone from the reset or never have been there;
     // the re-acquire below decides.
   }
+  // Reopening before the old device has dropped off grabs it just before the
+  // re-enumeration takes it away, and the listen then breaks off.
+  await gone;
   await oldPort.close().catch(() => {});
 
-  let port = null;
-  const until = Date.now() + 5000;
-  await sleep(500);
-  while (!port && Date.now() < until) {
-    for (const p of await navigator.serial.getPorts()) {
-      const i = p.getInfo();
-      if (i.usbVendorId !== usbVendorId || i.usbProductId !== usbProductId) continue;
-      if (p !== oldPort && before.has(p)) continue;
-      try {
-        await p.open({ baudRate: 115200, bufferSize: 8192 });
-        port = p;
-        break;
-      } catch {
-        // Not enumerated yet, or still closing; try again.
-      }
-    }
-    if (!port) await sleep(250);
+  // One more re-acquire if the first reopened port is still lost that way.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const port = await reacquire(oldPort, before, 5000);
+    if (!port) break;
+    const heard = await processPort(port, true);
+    if (!heard.lost || heard.text) return;
+    detectStatus.textContent = 'Board wird nach dem Neustart erneut gesucht ...';
+    await sleep(500);
   }
-  if (!port) {
-    detectBtn.disabled = false;
-    detectStatus.textContent =
-      'Das Board ist nach dem Neustart nicht wieder aufgetaucht. Bitte "Board erkennen" noch einmal klicken.';
-    return;
-  }
-  await processPort(port, true);
+  detectBtn.disabled = false;
+  detectStatus.textContent =
+    'Das Board ist nach dem Neustart nicht wieder aufgetaucht. Bitte "Board erkennen" noch einmal klicken.';
 }
 
 async function initDetect() {
