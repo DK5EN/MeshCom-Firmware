@@ -48,6 +48,8 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
       <p>Jede Web-Seite läuft jetzt über einen begrenzten Sendepuffer: ein langsamer oder hängender Browser
       bekommt eine abgebrochene Seite, statt den Knoten per Watchdog neu zu starten. Ohne IP-Adresse flutet
       „WEBServer stopped“ nicht mehr das Log, und <code>--info</code> zeigt die NVS-Belegung.
+      <strong>T-Beam 1W:</strong> blieb nach einem Auto Update im Safeboot hängen (AU-16, falscher DIO-Bootloader);
+      1W-Besitzer lassen einmal den <a href="flash/">Web-Flasher</a> laufen, bis dahin ist das Update über die Luft gesperrt.
       Aus v4.40a.10.19: Ein Knoten mit voller LoRa-Warteschlange blockiert nicht mehr minutenlang hinter seinen Nachbarn: lange
       wartende Frames bekommen nach einem Empfang eine kurze Haltezeit, ein Echo des eigenen Gruppentexts
       gibt dessen Kopie frei, vom Server gespiegelte eigene Frames gehen nicht noch einmal auf LoRa, und QRT endet,
