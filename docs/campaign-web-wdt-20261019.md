@@ -17,7 +17,7 @@ feeds in the Path, MHeard and neighbour-matrix builders.
 - The buffer begins lazily on the first `write()` (covers the config export, which sends its own header);
   `txEnd()` at request end and in `stop()`.
 - Flash approval for all bench nodes (USB and OTA). DK5EN-98 is not touched. DK5EN-14 has no console password.
-- Upstream PR later, separately.
+- Upstream PR later, separately. Done 2026-10-20: #1224 (`pr/web-wdt-1217`, `204bb7ad`, Fixes #1217).
 
 ## Waves
 

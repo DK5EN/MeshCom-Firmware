@@ -1,6 +1,15 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-19, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
+**Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
+
+## 2026-10-20 -- upstream PR #1224 (#1217, web send buffer and watchdog feeds)
+
+- PR #1224 against `upstream/dev` 7bcccb23: branch `pr/web-wdt-1217`, one commit `204bb7ad` = `src/` and
+  `test/` of `3b54c452`, `34974374`, `cc48f720` plus `[env:native_web_txbuf]`; "Fixes #1217". Bench tools,
+  WEB-STOP-01 and RM-NVS-01 not included (WEB-STOP-01 comes later as its own PR).
+- Gate: 4 native envs green (web_txbuf 20/20); 35 firmware envs: 32 boards + 2 Safeboot green,
+  `esp32-external-radio` red on plain `upstream/dev` too (needs the build overlay).
+- Open: maintainer review; after the squash-merge, merge `upstream/dev` into fork-dev.
 
 ## 2026-10-19 -- upstream #1215 (OE1KBC) merged into fork-dev
 
@@ -89,14 +98,14 @@
 
 ## 2026-10-19 -- WEB-WDT-01: web send buffer and page feeds (resume point: docs/campaign-web-wdt-20261019.md)
 
-- Committed on fork-dev, not released, not upstream: W1 `3b54c452` (`web_txbuf.h`, 20 host tests, feeds in
+- Committed on fork-dev, released with v4.40a.10.20: W1 `3b54c452` (`web_txbuf.h`, 20 host tests, feeds in
   Path/MHeard/matrix, `web_stall_client.py`), W2 `34974374` (`CommonWebClient` write/stop overrides, bounded
   send loop on ESP32 and nRF52, `web_throttle.sh`). Gate green, Opus advisor APPROVED.
 - Bench: the pre-fix TASK_WDT reproduced on DK5EN-1 (`LAST_LOOP_SECTION=web`); with the fix no reboot on
   DK5EN-1/-92/-14/-90 under 2.5 s and 1.2 s reply delays; the 94 kB scaffold is cut by the 15 s budget at 1.2 s.
 - Fleet: DK5EN-1 (USB), -92 and -14 (OTA), -90 (USB DFU) run the plain build of `34974374`, so the QRT
   INSTRUMENT builds of `1a6a3704` are gone from the bench. DK5EN-98 untouched.
-- Open: Chrome pass of run F, upstream PR (separate), release.
+- Open: Chrome pass of run F. Upstream PR: #1224 (2026-10-20).
 
 ## 2026-10-19 -- release v4.40a.10.19 published (CI), web flasher
 
