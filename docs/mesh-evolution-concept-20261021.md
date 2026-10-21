@@ -265,7 +265,53 @@ Assessment: P-A4 plus P-A3 as the first wave step (ACKs first, DMs in band 2 wit
 per-source limit), P-A5 after the slot pool. P-A1 only with authentication (EMCOMM
 class, 4.8).
 
-### 4.4 Multi-line APRS and track mode without switching the QRG
+### 4.4 Multi-line position (APRS weather companion) and track mode
+
+#### 4.4.1 Multi-line POS: upstream #1219, reverted by #1223
+
+**What it was.** Upstream PR #1219 (Mateusz-Krajewski, 2026-10-19,
+<https://github.com/icssw-org/MeshCom-Firmware/pull/1219>) added `--aprswx on|off`
+(`node_sset2` 0x2000, default off): after every own MeshCom position a **second `!`
+frame** with an APRS 1.0.1 weather block (`/_` symbol,
+`.../...g...tTTTr...p...P...hHHbBBBBB`), so that aprs.fi shows the node as a weather
+station. MeshCom carries WX today as MeshCom-specific tags in the position comment,
+which aprs.fi does not treat as a weather station. Code: `PositionToAprsWx()` and
+`sendAprsWxCompanion()` in `src/loop_functions.cpp` (diff `06a4fd9..05b842a`); the frame
+is relayed like any position (`max_hop_pos`, `DONE`, priority 4) and uploaded by gateways.
+
+**Why it was reverted.** oe1kbc merged the revert #1223 on 2026-10-20 ("please check
+notes from DK5EN .. in the moment we will revert"). The review points in #1219: every own
+position becomes two frames, both relayed ("will overflow the LoRa network"); the `/_`
+symbol overwrites the station symbol in clients that keep the latest one; MeshCom
+decoders do not read `t/h/b`, so the block lands in the comment; bit 0x2000 was
+`--checkmesh` until June, so old settings could switch it on by themselves; format edge
+cases (a fake `t032` without temperature, `temp2`-only nodes without a frame, minutes
+rounding to `xx60.00`); `sendAprsWxCompanion()` duplicates part of `sendPosition()` and
+skips some of its steps. No measurement or rebuttal is in the thread.
+
+**Airtime of the companion (COMPUTED, SF11/BW250/CR4/6).** The WX payload is 55
+characters; with header, path and trailer the frame is about 75 to 85 B: 1.05 to 1.15 s
+with preamble 32, 0.85 to 0.95 s with preamble 8. At the default 30 min interval
+(`POSINFO_INTERVAL`) that is 2 extra frames per hour per WX node, each relayed; with two
+rings of three relays 14 extra transmissions, about 15 s per hour, 0.4 % of the channel
+per WX node. It scales with the number of WX nodes in range (50 WX nodes: about 20 %),
+and it doubles whatever the position rate is.
+
+| Option                                                                                                     | Pro                                                           | Contra                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| X0 status quo (WX tags in the MeshCom position comment)                                                    | one frame; MeshCom clients decode it                          | aprs.fi shows no weather station                                                                                             |
+| X1 #1219 as it was (second `!` frame on RF, relayed)                                                       | aprs.fi weather station without a server change               | doubles position airtime; symbol overwrite; settings-bit collision; reverted                                                 |
+| X2 conversion at the gateway or the server: MeshCom position with WX tags in, APRS WX frame out to APRS-IS | **no extra RF airtime**; one place; no symbol overwrite on RF | only stations heard by a gateway; the gateway (fork firmware) or the server (outside the fork) must know the MeshCom WX tags |
+| X3 one frame in APRS WX position format instead of the normal position, for WX nodes only                  | no extra frame; standard APRS on RF                           | MeshCom decoders must learn `t/h/b` (old ones show it as comment); the weather symbol replaces the node symbol               |
+| X4 companion with hop 0 at a lower rate (for example every 6th position), gateway uploads                  | RF cost one transmission per few hours                        | only gateways in direct range see it; still a second frame                                                                   |
+| X5 companion only on gateways for their own sensor                                                         | gateways send it straight to APRS-IS without RF               | covers only gateway-attached sensors                                                                                         |
+
+Assessment (proposal, not decided): X2 meets the goal (aprs.fi weather station) without
+RF cost and cannot overflow the channel; X3 if a standard APRS frame on RF is wanted.
+Both need a native test for the WX formatter (the edge cases above) and a settings bit
+that was never used before.
+
+#### 4.4.2 Track mode and the QRG switch
 
 **What track mode does today** (2.1): with `--track on` and a GPS fix each position
 goes out as a LoRa-APRS frame on 433.775 MHz, SF12/BW125; the node switches its radio
@@ -279,25 +325,23 @@ An 80-byte frame takes 1100 ms at SF11/BW250 (preamble 32); every 30 s with
 `max_hop_pos` 2 and three relays in each of two rings it goes out 7 times: 26 % of the
 channel for one moving station.
 
-**Open input:** the "new multi-line APRS format" was not found (APRS 1.2, aprs.org,
-aprs.fi, icssw.org; NO SOURCE). The format must come from the operator. Airtime for
-any multi-line form (COMPUTED, SF11/BW250/CR4/6/preamble 32): one 120-byte frame costs
+**Multi-part text, for comparison.** Airtime for any multi-part form (COMPUTED, SF11/BW250/CR4/6/preamble 32): one 120-byte frame costs
 1444 ms, two 60-byte frames 1806 ms; each frame pays preamble plus fixed header symbols
 (362 ms). One long frame is cheaper but loses all lines on one error.
 
-| Option                                                                      | Pro                                                             | Contra                                                                                               |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| K0 status quo (APRS QRG, MeshCom copy every 5 min)                          | MeshCom channel stays free; APRS-IS and APRS maps get the track | node deaf on MeshCom during each switch; track invisible on MeshCom between copies; SF12 costs 2.3 s |
-| K1 track on the MeshCom QRG, hop 0 or 1, every Nth with full hop            | no switch, no deafness; near nodes see the live track           | MeshCom airtime per tracker 3.7 % (own) plus relays; needs a per-frame hop for positions             |
-| K2 track on MeshCom with hop 0, gateway uploads to APRS-IS                  | one RF transmission per position; maps fed by the gateway       | no RF track beyond one hop; needs a gateway in range                                                 |
-| K3 airtime budget per source on MeshCom (for example 5 % per tracker)       | bounds the worst case whichever QRG is used                     | per-source airtime state in relays; tuning                                                           |
-| K4 compact track frames (delta position, no path, short trailer)            | 30 to 40 B instead of 80 B, about half the airtime (INFERRED)   | new frame type; app and server must decode                                                           |
-| K5 multi-line APRS as one MeshCom frame with line separators, length capped | cheapest per line; no QRG switch                                | one loss loses all lines; display support needed; format source missing                              |
-| K6 a second radio for APRS (dual-radio boards)                              | no deafness, both QRGs live                                     | hardware                                                                                             |
+| Option                                                                | Pro                                                             | Contra                                                                                               |
+| --------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| K0 status quo (APRS QRG, MeshCom copy every 5 min)                    | MeshCom channel stays free; APRS-IS and APRS maps get the track | node deaf on MeshCom during each switch; track invisible on MeshCom between copies; SF12 costs 2.3 s |
+| K1 track on the MeshCom QRG, hop 0 or 1, every Nth with full hop      | no switch, no deafness; near nodes see the live track           | MeshCom airtime per tracker 3.7 % (own) plus relays; needs a per-frame hop for positions             |
+| K2 track on MeshCom with hop 0, gateway uploads to APRS-IS            | one RF transmission per position; maps fed by the gateway       | no RF track beyond one hop; needs a gateway in range                                                 |
+| K3 airtime budget per source on MeshCom (for example 5 % per tracker) | bounds the worst case whichever QRG is used                     | per-source airtime state in relays; tuning                                                           |
+| K4 compact track frames (delta position, no path, short trailer)      | 30 to 40 B instead of 80 B, about half the airtime (INFERRED)   | new frame type; app and server must decode                                                           |
+| K5 text with line separators as one MeshCom frame, length capped      | cheapest per line; no QRG switch                                | one loss loses all lines; display support needed                                                     |
+| K6 a second radio for APRS (dual-radio boards)                        | no deafness, both QRGs live                                     | hardware                                                                                             |
 
 Assessment (proposal, not decided): if the goal is "APRS content without leaving the
 MeshCom QRG", K2 plus K4 keep the RF cost low and let gateways feed APRS-IS; K1 with K3
-if a live RF track is wanted. K5 once the multi-line format is known. Measure the
+if a live RF track is wanted. Measure the
 deafness of K0 first (missed relays during switches), since it is the cost K1 to K5 are
 compared against.
 
@@ -561,8 +605,8 @@ bench suite stage 3, DK5EN-98 soaks. Each wave adds its golden set to that list.
 
 ## 7. Open questions for the operator
 
-1. Source of the "new multi-line APRS format" (4.4), and whether "without the QRG going
-   over" means: no switch to the LoRa-APRS QRG in track mode (2.1).
+1. Multi-line POS (4.4.1): X2 (gateway or server conversion, no RF cost) or X3 (one APRS
+   WX frame instead of the position); who implements the conversion if it is the server.
 2. Whether forced `--nbrrelay on` should become RM1-switchable (section 3).
 3. EMCOMM trust root: manual pinning only, or a directory, and who runs it (4.9).
 4. EOL threshold and date (4.10).

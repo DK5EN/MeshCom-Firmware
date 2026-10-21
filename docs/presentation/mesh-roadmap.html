@@ -270,7 +270,7 @@ svg text{font-family:var(--mono)}
 
 <!-- 03 -->
 <section class="slide" id="track"><span class="num">03</span><div class="inner">
-<div class="eyebrow">Teil B · 4.4 · Track-Modus und Mehrzeilen-APRS</div>
+<div class="eyebrow">Teil B · 4.4 · Multi-Line POS und Track-Modus</div>
 <h2>Track = On wechselt pro Paket die QRG</h2>
 <div class="grid g2">
 <div>
@@ -283,17 +283,16 @@ svg text{font-family:var(--mono)}
   <div class="note mt"><b>Frage:</b> ein APRS-Format auf der MeshCom-QRG ohne QRG-Wechsel? Der Wechsel je Paket ist schon heute ein messbarer Fall von Rendezvous- und Taubheitskosten (siehe Multi-SF, M1/M2).</div>
 </div>
 <div>
-  <h3>Mehrzeilen-APRS</h3>
-  <div class="grid g2">
-    <div class="card stat"><div class="k">1 × 120 B</div><div class="big">1444 ms</div><div class="s">SF11 <span class="calc">berechnet</span></div></div>
-    <div class="card stat"><div class="k">2 × 60 B</div><div class="big">1806 ms</div><div class="s">je Frame 297 ms Präambel + Header</div></div>
+  <h3>Multi-Line POS: #1219, zurückgenommen mit #1223</h3>
+  <p style="font-size:.86rem;color:var(--fg2)"><code>--aprswx on</code> schickte nach jeder eigenen Position einen <b>zweiten <code>!</code>-Frame</b> mit APRS-1.0.1-Wetterblock (<code>/_</code>, t/h/b), damit aprs.fi den Knoten als Wetterstation zeigt. oe1kbc hat am 20.10. zurückgenommen („please check notes from DK5EN“): jede Position wird zu zwei Frames, beide werden weitergeleitet, das Symbol wird überschrieben, MeshCom dekodiert t/h/b nicht, Bit 0x2000 war bis Juni <code>--checkmesh</code>.</p>
+  <div class="grid g2 mt">
+    <div class="card stat"><div class="k">WX-Frame 75–85 B</div><div class="big">1,05–1,15 s</div><div class="s">SF11, Präambel 32 <span class="calc">berechnet</span></div></div>
+    <div class="card stat"><div class="k">je WX-Knoten</div><div class="big">0,4 %</div><div class="s">2 Frames/h × 7 Kopien; 50 WX-Knoten ≈ 20 % <span class="calc">berechnet</span></div></div>
   </div>
-  <p class="mt" style="font-size:.86rem;color:var(--fg2)">Aufteilen kostet etwa 25 % mehr je Zeilenpaar; ein langer Frame ist billiger, geht aber mit höherer Wahrscheinlichkeit verloren.</p>
-  <div class="note warn mt"><b>Offener Input:</b> das „neue Mehrzeilen-APRS-Format“ wurde in keiner Websuche gefunden (APRS 1.2, aprs.org, aprs.fi, icssw.org). Das Format muss vom Operator kommen.</div>
   <div class="optgrid mt" id="opt-k"></div>
   <div class="panel mt" id="opt-k-p"></div>
-  <p class="cite">Die Optionen K0–K4 aus Teil B 4.4 setzen Positionen auf der MeshCom-QRG voraus; nach der Korrektur gelten sie für Positionsframes allgemein, nicht für den Track-Modus.</p>
-  <p class="mt" style="font-size:.84rem"><span class="prop">Vorschlag, nicht entschieden</span>Für Mehrzeilen: K5, sobald das Format bekannt ist.</p>
+  <p class="cite">Track-Optionen K0–K6 (Track auf MeshCom-QRG, Hop 0/1, Budget je Quelle, kompakte Frames, zweites Radio) stehen in Teil B 4.4.2.</p>
+  <p class="mt" style="font-size:.84rem"><span class="prop">Vorschlag, nicht entschieden</span>X2 erreicht das Ziel (aprs.fi-Wetterstation) ohne RF-Kosten und kann den Kanal nicht überlaufen lassen; X3, wenn ein Standard-APRS-Frame auf RF gewünscht ist.</p>
 </div>
 </div>
 </div></section>
@@ -647,7 +646,7 @@ svg text{font-family:var(--mono)}
 <div class="eyebrow">Teil A · 9 und Teil B · 7 · Offen</div>
 <h2>Offene Fragen an den Operator</h2>
 <ol class="qlist">
-<li><div>Quelle des „neuen Mehrzeilen-APRS-Formats“.</div><span class="tag t-dim">B 4.4</span></li>
+<li><div>Multi-Line POS: X2 (Umwandlung am Gateway oder Server, keine RF-Kosten) oder X3 (ein APRS-WX-Frame statt der Position)?</div><span class="tag t-dim">B 4.4.1</span></li>
 <li><div>Soll das erzwungene <code>--nbrrelay on</code> per RM1 schaltbar werden?</div><span class="tag t-dim">B 3</span></li>
 <li><div>EMCOMM-Vertrauensanker: nur manuelles Pinning oder ein Verzeichnis, und wer betreibt es (DARC? ÖVSV? icssw?)?</div><span class="tag t-dim">B 4.9</span></li>
 <li><div>EOL-Schwelle und Datum.</div><span class="tag t-dim">B 4.10</span></li>
@@ -814,12 +813,12 @@ function initToa(){
 /* ================= 03 track options ================= */
 function initTrack(){
   optset('opt-k', [
-    { k: 'K0', n: 'Status quo', p: 'volle Auflösung an jedem Knoten innerhalb von 2 Hops', c: 'eine häufig sendende Positionsquelle auf der MeshCom-QRG kann viel Kanal nehmen (Rechenbeispiel Folie 2)' },
-    { k: 'K1', n: 'Track-Positionen mit Hop 0 oder 1, jede N-te mit vollem Hop', p: 'die Karte nahe der Station bleibt live; ferne Knoten bekommen eine grobe Spur', c: 'braucht einen Hop je Frame für Positionen (heute <code>max_hop_pos</code> fest 2); alte Relays folgen dem niedrigeren Nibble ohnehin' },
-    { k: 'K2', n: 'Track nur über Gateway und Server (Hop 0 auf RF)', p: 'RF-Kosten eine Sendung; die Internetkarte hat volle Auflösung', c: 'keine RF-Spur für Knoten ohne Internet' },
-    { k: 'K3', n: 'Sendezeitbudget je Quelle, von Relays durchgesetzt', p: 'begrenzt den schlimmsten Fall (z. B. 5 % je Tracker in einer Zelle); gleiche Regel für jeden Typ', c: 'Relays brauchen Sendezeitzustand je Quelle; Tuning' },
-    { k: 'K4', n: 'kompakte Track-Frames (Delta-Position, kein Pfad, kurzer Trailer)', p: '30 bis 40 B statt 80 B halbiert die Kosten (INFERRED)', c: 'neuer Frametyp; App und Server müssen dekodieren' },
-    { k: 'K5', n: 'Mehrzeilen als ein Frame mit Zeilentrennern, Länge gedeckelt', p: 'am billigsten je Zeile', c: 'ein Verlust verliert alle Zeilen; die Anzeige muss es können' }
+    { k: 'X0', n: 'Status quo: WX-Tags im Kommentar der MeshCom-Position', p: 'ein Frame; MeshCom-Clients dekodieren es', c: 'aprs.fi zeigt keine Wetterstation' },
+    { k: 'X1', n: '#1219 wie gebaut: zweiter <code>!</code>-Frame auf RF, weitergeleitet', p: 'aprs.fi-Wetterstation ohne Serveränderung', c: 'verdoppelt die Positions-Sendezeit; Symbol überschrieben; Bit-Kollision; zurückgenommen' },
+    { k: 'X2', n: 'Umwandlung am Gateway oder Server zu APRS-IS', p: '<b>keine zusätzliche RF-Sendezeit</b>; eine Stelle; kein Symbolwechsel auf RF', c: 'nur Stationen, die ein Gateway hört; Gateway oder Server muss die MeshCom-WX-Tags kennen' },
+    { k: 'X3', n: 'ein Frame im APRS-WX-Positionsformat statt der normalen Position (nur WX-Knoten)', p: 'kein Zusatzframe; Standard-APRS auf RF', c: 'MeshCom-Decoder müssen t/h/b lernen; das Wettersymbol ersetzt das Knotensymbol' },
+    { k: 'X4', n: 'Zusatzframe mit Hop 0, seltener (z. B. jede 6. Position)', p: 'RF-Kosten eine Sendung je paar Stunden', c: 'nur Gateways in direkter Reichweite; weiterhin ein zweiter Frame' },
+    { k: 'X5', n: 'Zusatzframe nur auf Gateways für den eigenen Sensor', p: 'direkt zu APRS-IS ohne RF', c: 'nur Sensoren am Gateway' }
   ]);
 }
 
