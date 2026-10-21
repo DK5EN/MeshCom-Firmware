@@ -38,6 +38,7 @@ Recommendation, in order:
 | Stage | Change                                                         | RAM delta classic | Fixes                      |
 | ----- | -------------------------------------------------------------- | ----------------- | -------------------------- |
 | 1     | Per-priority TTL in the existing age sweep                     | +0 B              | Problem 2 (stale low prio) |
+| 1b    | SNR-weighted relay delay (section 10.2), default off           | +0 B              | Airtime, reach per TX      |
 | 2     | Slot pool replaces ring (free = any empty slot, order by time) | +0 B              | Problem 1 (gaps)           |
 | 3     | Time-aged dedup table, 45 min window, sized per board class    | +847 B / +697 B   | Problems 3 and 4 (dedup)   |
 | 4     | Supersede-in-place for own and relayed HEY/POS                 | +0 B              | Airtime, queue depth       |
@@ -324,37 +325,87 @@ The three `#if` branches in `configuration_global.h` shrink to one number per cl
 unconditional. The dead `ENABLE_TBEAM` branch (10/10/10, no variant defines it) is
 deleted in the same commit.
 
-Not in scope but the same disease: `MAX_MHEARD` 30 on classic against 121 distinct
-callsigns measured on one gateway in 12 hours. That needs its own RAM answer
-(the mheard tables are small, the four frame-holding queues are the cost).
+Not in scope but the same disease: the neighbour matrix row count. `MAX_MHEARD` no
+longer exists; MeshCom-5 wave 4 replaced MHeard and the path table by the neighbour
+matrix (`src/nbr_matrix.h`, `docs/meshcom5-campaign.md`). The binding limit is now
+`NBR_MAX_ROWS`: 64 classic, 128 S3/nRF52, against 121 distinct callsigns measured on
+one gateway in 12 hours, which is exactly the matrix window (`NBR_WINDOW_MIN` 720).
+Section 10.7 has the effect.
 
 ## 7. Decision matrix (campaign shape)
 
-Scores 1 (poor) to 5 (good).
+Revised 2026-10-21. The first version weighted only cost and risk; option A won on
+paper (51) while D was recommended. The matrix now runs in two steps: knock-out
+criteria first, then weighted scores among the options that pass.
 
-| Criterion                         | Weight | A: TTL only | B: TTL + pool | C: TTL + pool + dedup | D: C + supersede |
-| --------------------------------- | ------ | ----------- | ------------- | --------------------- | ---------------- |
-| Airtime saved per packet decision | 3      | 2           | 3             | 4                     | 5                |
-| RAM on classic ESP32              | 2      | 5           | 5             | 4                     | 4                |
-| Code risk (nRF52 lock, EXT_RADIO) | 3      | 5           | 3             | 3                     | 3                |
-| Native testability                | 2      | 5           | 5             | 5                     | 4                |
-| Upstream mergeability (small PRs) | 2      | 5           | 3             | 3                     | 3                |
-| Weighted total                    |        | 51          | 44            | 45                    | 46               |
+**Options.**
 
-A scores highest on paper because it is tiny, but it leaves problem A in place and
-makes the gaps worse (more drops create more holes). The recommendation is **D as
-four sequential commits**, so each stage is reviewable and revertible on its own
-and the upstream PRs stay small. Stage 1 can ship alone if the campaign stalls.
+| Option | Scope                                                                                                     |
+| ------ | --------------------------------------------------------------------------------------------------------- |
+| A      | Stage 1: TTL per priority                                                                                 |
+| B      | A + stage 2: slot pool                                                                                    |
+| C      | B + stage 3: time-aged dedup                                                                              |
+| D      | C + stage 4: supersede HEY/POS                                                                            |
+| E      | D + stage 1b: SNR-weighted relay delay (10.2), `INSTRUMENT`-switchable, default off until the field proof |
+
+The hop clamp (10.1) is not an option here: it trades reach for airtime and so
+conflicts with the goal "reach a wide field of nodes"; it stays a discussion point
+until the stage-0 hop histogram exists.
+
+**Step 1, knock-out.** An option must solve all four structural problems of section 4.
+
+| Knock-out criterion          | A   | B   | C   | D   | E   |
+| ---------------------------- | --- | --- | --- | --- | --- |
+| K1 problem A (gaps)          | no  | yes | yes | yes | yes |
+| K2 problem B (stale entries) | yes | yes | yes | yes | yes |
+| K3 problem C (dedup window)  | no  | no  | yes | yes | yes |
+| K4 problem D (board parity)  | no  | no  | yes | yes | yes |
+| Passes                       | no  | no  | yes | yes | yes |
+
+A stays the fallback: it ships alone if the campaign stalls. B is an intermediate
+state, not a target.
+
+**Step 2, weighted.** Scores 1 (poor) to 5 (good), maximum 75.
+
+| Criterion                                         | Weight | C   | D   | E   |
+| ------------------------------------------------- | ------ | --- | --- | --- |
+| Airtime saved per packet decision                 | 3      | 3   | 4   | 5   |
+| Reach per transmission (hop progress, wide field) | 3      | 3   | 3   | 4   |
+| Code and field risk (nRF52 lock, EXT_RADIO)       | 3      | 3   | 3   | 3   |
+| RAM on classic ESP32                              | 2      | 4   | 4   | 4   |
+| Native testability                                | 2      | 5   | 4   | 3   |
+| Upstream mergeability (hardest single PR)         | 2      | 3   | 3   | 3   |
+| Weighted total                                    |        | 51  | 52  | 56  |
+
+Score rationale:
+
+- Airtime: C stops second floods of live ids; D also stops obsolete HEY/POS copies;
+  E lets the farthest receiver relay first, so nearer relays cancel on overhear
+  instead of transmitting.
+- Reach: TTL, pool, dedup and supersede do not change which node relays; E does,
+  and favours the relay with the largest new coverage.
+- Risk: E equals D only because it ships default off behind `INSTRUMENT`, like
+  `--nbrrelay`. Default on before the field proof would score 2 (E = 53).
+- Testability: the delay function is native-testable; its benefit needs a bench or
+  field proof (two receivers at different SNR, count the cancelled copy).
+- RAM: C to E all cost the dedup table only; with the 5 B entry of 10.4 the classic
+  delta drops from +847 B to +505 B.
+
+**Recommendation: E as six sequential commits** (stages 0, 1, 1b, 2, 3, 4), each
+reviewable and revertible on its own, one upstream PR per stage. The hard
+prerequisite is stage 0: without the hop and age histograms the TTL values, the
+dedup size and the 1b delay curve are guesses.
 
 ## 8. Campaign plan
 
-| Stage | Commit scope                                                                                           | Gate                                                                                            | Bench proof                                                                             |
-| ----- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 0     | Instrumentation: age-at-TX histogram per prio, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=` | `tools/regression.sh --stage 1,2`                                                               | 24 h on DK5EN-98 (read-only, explicit OK needed)                                        |
-| 1     | TTL table + sweep for all priorities                                                                   | new `test_txring` cases                                                                         | DK5EN-1 with `--txttl` short, injected relay flood                                      |
-| 2     | Slot pool, `INFLIGHT` status, delete ring indices                                                      | `test_txring` (hole reuse behind parked SENT), `test_txring_flood` unchanged, `test_nbr_replay` | DK5EN-1/-92/-90: 1 h gwflood replay, `drop=0` with holes present; RAK for the lock path |
-| 3     | Time-aged dedup table, per-class size, remove `ENABLE_TBEAM` branch                                    | `test_dedup_replay` with clock, two overflows become DUP                                        | DK5EN-98 soak: `RX_DEDUP_NEW` for an id older than 39 min must not occur                |
-| 4     | Supersede-in-place for HEY/POS                                                                         | new native cases (own HEY refresh, relayed POS replaced, text never)                            | DK5EN-1 trickle at Imin, pool depth stays 1 for HEY                                     |
+| Stage | Commit scope                                                                                                                                                                                | Gate                                                                                            | Bench proof                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 0     | Instrumentation: age-at-TX histogram per prio, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=`; hop histogram of relays (10.1); callsigns per 90 min / 12 h and `EVICT` rate (10.7) | `tools/regression.sh --stage 1,2`                                                               | 24 h on DK5EN-98 (read-only, explicit OK needed)                                        |
+| 1     | TTL table + sweep for all priorities                                                                                                                                                        | new `test_txring` cases                                                                         | DK5EN-1 with `--txttl` short, injected relay flood                                      |
+| 1b    | SNR-weighted relay delay, `INSTRUMENT`-switchable, default off                                                                                                                              | native cases for the delay curve                                                                | DK5EN-1/-92 at different SNR to a sender: the far node relays, the near one cancels     |
+| 2     | Slot pool, `INFLIGHT` status, delete ring indices                                                                                                                                           | `test_txring` (hole reuse behind parked SENT), `test_txring_flood` unchanged, `test_nbr_replay` | DK5EN-1/-92/-90: 1 h gwflood replay, `drop=0` with holes present; RAK for the lock path |
+| 3     | Time-aged dedup table, per-class size, remove `ENABLE_TBEAM` branch                                                                                                                         | `test_dedup_replay` with clock, two overflows become DUP                                        | DK5EN-98 soak: `RX_DEDUP_NEW` for an id older than 39 min must not occur                |
+| 4     | Supersede-in-place for HEY/POS                                                                                                                                                              | new native cases (own HEY refresh, relayed POS replaced, text never)                            | DK5EN-1 trickle at Imin, pool depth stays 1 for HEY                                     |
 
 Each stage: docs (`RESUME.md`, defect catalogue), full host gate, then commit on
 `fork-dev`. Upstream PRs are cut from `upstream/dev` afterwards, one per stage,
@@ -451,13 +502,54 @@ under 60 min) plus the server flag as one bit = 5 B per entry instead of 7 B; 17
 
 ### 10.5 Decision matrix vs. recommendation
 
-Option A scores highest (51) while D is recommended. The matrix lacks a criterion
-"problems A to D fixed". Add it, or drop the matrix, before this goes to the maintainers.
+Resolved 2026-10-21: section 7 now filters on the four problems first (knock-out),
+then weights; reach per transmission is a criterion of its own.
 
 ### 10.6 Supersede of relayed HEY
 
 Replacing a queued relayed HEY with a newer one drops the older frame's signal-report
 chain. Accept it deliberately and document it in stage 4.
+
+### 10.7 Neighbour matrix row limit (formerly `MAX_MHEARD`)
+
+MHeard is gone; the neighbour matrix holds every callsign heard in the last 12 hours
+(`NBR_WINDOW_MIN` 720). Rows: 64 classic, 128 S3/nRF52 (`configuration_global.h`,
+`NBR_FAMILY_*`). A gateway that hears 121 callsigns in 12 hours overflows on classic,
+not on S3/nRF52. On overflow `nbrIPlanRow()` (`src/nbr_matrix.cpp`) evicts the row with
+the oldest `last_min`, first among rows not freshly heard direct, only then among all;
+each eviction logs `[NBR]|EVICT`.
+
+Effects of the overflow on classic boards:
+
+| Consumer                                   | Effect of an evicted row                                                                                                                                                                                                                             | Direction                              |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Relay need (`nbrIRelayNeed()`), remote row | A path token without a row contributes no coverage, "has the frame" shrinks, the need set grows: the node relays where it could have cancelled.                                                                                                      | Conservative: costs airtime, not reach |
+| Relay need, direct neighbour row           | A direct neighbour without a row is not a dependant; the cancel can conclude "everyone covered" while it is not. Protected by the first eviction pass as long as fewer than 63 neighbours are fresh direct, so in practice only on hilltop gateways. | Aggressive: costs reach                |
+| Edge pool (`NBR_MAX_EDGES` 256 classic)    | Oldest edges go first; coverage knowledge thins out.                                                                                                                                                                                                 | Conservative                           |
+| MH list (web, app, T-Deck), horizon        | Shows at most 63 other stations on classic; horizon 48 entries classic vs. 112.                                                                                                                                                                      | Display only                           |
+| Parity                                     | Same site, same traffic: a classic and an S3 node decide relay cancels differently once more than 63 callsigns fall into the 12-hour window. With `--nbrrelay` off (default) only the display differs.                                               | Parity gap, grows with network size    |
+
+**The 12-hour window is the lever, not the row count.** Freshness for relay coverage
+(`nbrIFresh()`) is the same 720 minutes as for the list. A relay decision about the next
+seconds does not need 11-hour-old edges; the HN report already uses 60 minutes
+(`NBR_REPORT_FRESH_MIN`) and 45 minutes (`NBR_REPORT_VALID_MIN`). Same principle as the
+dedup (section 6): parity by time, not by count.
+
+| Option                                                      | RAM classic                  | Effect                                                                                   |
+| ----------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| N1 classic to 128 rows                                      | about +6 kB (estimate below) | Parity by count; eats most of the 10.2 kB T-Beam headroom, dedup stage on top gets tight |
+| **N2 short coverage window (e.g. 90 min), list stays 12 h** | 0 B                          | Relay decisions use only fresh edges on every board; list overflow stays cosmetic        |
+| N3 two-tier eviction: remote rows age out after 90 min      | 0 B                          | Rows needed = callsigns per 90 min, not per 12 h; frees rows for direct neighbours       |
+
+Estimate for N1 from the per-row formula (`configuration_global.h`, MeshCom-5 block):
+masks widen from 8 to 16 B, so 128 rows x 2 masks x 16 B = 4096 B instead of 1024 B
+(+3072), 64 more rows x 20 B call and core (+1280), 256 more edges x 6 B (+1536),
+`ringNeed`/`ringAlone` 2 x 20 x 8 B (+320): about +6.2 kB. Rough; a link map decides.
+
+**Evidence needed (stage 0).** From the DK5EN-98 and DG0OPK logs: distinct callsigns per
+90 minutes and per 12 hours, `EVICT` count per hour, and how often a relay cancel used an
+edge older than 90 minutes. If the 90-minute count stays well under 64, N2 plus N3 give
+parity at 0 B.
 
 ## Appendix A: RAM arithmetic
 
