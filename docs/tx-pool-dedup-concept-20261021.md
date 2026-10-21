@@ -215,13 +215,14 @@ exactly the age information that B needs.
 
 Extend `txRingAgeBackground()` to every priority with a per-class limit:
 
-| Prio | Class          | Proposed TTL                                                      | Rationale                                                                                                                                              |
-| ---- | -------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1    | ACK, own DM    | 90 s for both ACK types (0x41 and own `:ackNNN`); none for own DM | Retry ladder (3 × 40 s) governs own DMs. An ACK older than two ladder steps stops nothing. A relayed `:ackNNN` sits in prio 3 and takes the relay TTL. |
-| 2    | own group text | none                                                              | User intent; the ladder and the "already heard" check release it.                                                                                      |
-| 3    | relay text     | 300 s                                                             | DG0OPK p99 relay latency 286 s under pathological deferral; humans wait for text.                                                                      |
-| 4    | position       | 120 s                                                             | Next beacon is 30 min away, but a 2-minute-old position still has map value; beyond that the relay chain has moved on.                                 |
-| 5    | HEY            | 180 s                                                             | Keep BP-03.                                                                                                                                            |
+| Prio | Class               | Proposed TTL                                                      | Rationale                                                                                                                                              |
+| ---- | ------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | ACK, own DM         | 90 s for both ACK types (0x41 and own `:ackNNN`); none for own DM | Retry ladder (3 × 40 s) governs own DMs. An ACK older than two ladder steps stops nothing. A relayed `:ackNNN` sits in prio 3 and takes the relay TTL. |
+| 2    | own group text      | none                                                              | User intent; the ladder and the "already heard" check release it.                                                                                      |
+| 3    | relay text          | 300 s                                                             | DG0OPK p99 relay latency 286 s under pathological deferral; humans wait for text.                                                                      |
+| 3    | `{CET}` time beacon | 30 s                                                              | Injected by gateways as a relay (prio 3); a time that arrives minutes late sets a wrong clock. Own class by payload, see 10.8.                         |
+| 4    | position            | 120 s                                                             | Next beacon is 30 min away, but a 2-minute-old position still has map value; beyond that the relay chain has moved on.                                 |
+| 5    | HEY                 | 180 s                                                             | Keep BP-03.                                                                                                                                            |
 
 Cost: 0 B RAM (table in flash, `ringEnqueueTime[]` exists), 0 extra CPU (sweep
 already walks all slots). Make the values `INSTRUMENT`-tunable (`--txttl`) and log
@@ -298,7 +299,7 @@ D3 design:
    relayed), look for a queued entry of the same type and source call that is not in
    flight and not `SENT`; overwrite it instead of adding. A node's own HEY then never
    ages out silently, a stale relayed position never burns airtime after a fresher one
-   arrived. Never for text or ACK. The superseded msg_id is already in the dedup table,
+   arrived. Never for text or ACK, with one exception: a newer `{CET}` time beacon replaces a queued older one (10.8). The superseded msg_id is already in the dedup table,
    so neighbours lose nothing.
 2. **Coverage-gated relay cancel.** Exists (`--nbrrelay`, neighbour matrix stage 2,
    case A/B). It is the largest airtime lever and is gated because its field proof is
@@ -559,6 +560,58 @@ masks widen from 8 to 16 B, so 128 rows x 2 masks x 16 B = 4096 B instead of 102
 90 minutes and per 12 hours, `EVICT` count per hour, and how often a relay cancel used an
 edge older than 90 minutes. If the 90-minute count stays well under 64, N2 plus N3 give
 parity at 0 B.
+
+### 10.8 `{CET}` time beacons: two hops, short life
+
+**Current path, from the code.**
+
+- The MeshCom server sends `{CET}YYYY-MM-DD hh:mm:ss` (despite the name UTC,
+  `src/loop_functions.cpp`) over UDP to every gateway. The gateway queues it with
+  `addTxRingEntry(..., 0xFF, "udp_rx")` (`src/esp32/udp_frame_esp32.cpp`, nRF52 twin):
+  status `DONE`, so `getMessagePriority()` treats it as a **text relay, priority 3**.
+  The hop nibble is the server's; the gateway does not touch it.
+- Nodes relay it like any text (prio 3, CSMA base 4500 ms plus jitter, in the same
+  queue as all relays). Only `{CET}<` (marked wrong time) is not relayed
+  (`src/lora_functions.cpp`, `bMeshDestination = false`).
+- A receiver sets its clock from it only without RTC, GPS fix and NTP, and takes the
+  payload time as it is: **no correction for queue wait or airtime.**
+
+**Problems.**
+
+1. Reach: a clock beacon only needs to reach the nodes without their own time source
+   near a gateway. Every gateway injects it, so after two hops nearly every node is in
+   range of some gateway's copy. Further hops cost airtime and deliver ever older times.
+2. Age: in prio 3 it waits behind every relay; under load (DG0OPK p99 relay latency
+   286 s) it arrives minutes late, and each hop adds its own wait. Today no TTL applies
+   (only prio 5 ages), so a several-minute-old time is still sent and accepted.
+
+**Proposal (0 B RAM).**
+
+| Measure                   | Where                                    | Rule                                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1 hop clamp at injection | gateway, UDP to LoRa                     | `max_hop = min(max_hop, CET_MAX_HOP)` before `addTxRingEntry()`. First concrete case of 10.1, without its risks: `{CET}` has no ACK and no retry ladder (Once path, `dm_text_escape.h`).                             |
+| T2 hop clamp on relay     | every node                               | Same rule with `msg_last_path_cnt`, so old gateways that still inject the server's value are bounded too.                                                                                                            |
+| T3 TTL                    | age sweep                                | Drop a queued `{CET}` older than 30 s (`RING_DROP_STALE`). Own class by payload prefix; the TTL table of 5.1 gets the row.                                                                                           |
+| T4 age correction         | `doTX()`, just before the frame goes out | Add the queue age (`now - ringEnqueueTime[slot]`, exists) to the payload time. The receiver then sees the time of the transmission, not of the injection; error left = airtime plus RX processing, about one second. |
+| T5 supersede              | enqueue                                  | A newer `{CET}` replaces a queued older one (5.4, item 1).                                                                                                                                                           |
+| T6 receiver plausibility  | `{CET}` handler in `loop_functions.cpp`  | Optional: subtract the frame's own airtime (known from SF/BW/length) before `setCurrentTime()`.                                                                                                                      |
+
+With T4 the TTL is no longer about accuracy but about airtime: a corrected time is
+still right after 60 s, but a node that waited that long had a busy channel and
+probably heard another gateway's copy. T3 stays as the airtime limit.
+
+**Open for the operator.**
+
+- Counting convention for "two hops": gateway transmission plus one relay (nibble 1)
+  or plus two relays (nibble 2). The hop nibble counts remaining relays.
+- Whether T4 is acceptable: it rewrites the payload of a server frame on relay. The
+  msg_id stays, so dedup is unaffected; old firmware just relays what it received.
+- Priority: with T3 and T4 a prio raise (to 2) is not needed; it would let a time
+  beacon push group text back, for little gain.
+
+**Evidence (stage 0).** `[GW];rx;type;CET` already logs the injection (TM-39). Add the
+age at TX (`RING_TX_READ lat=`) for `{CET}` frames and their hop count at reception, from
+DK5EN-98 and one non-gateway node.
 
 ## Appendix A: RAM arithmetic
 
