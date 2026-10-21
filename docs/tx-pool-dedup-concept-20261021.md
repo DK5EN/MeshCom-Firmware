@@ -1,15 +1,16 @@
 # MeshCom TX Buffer and Dedup: From Ring to Priority Pool
 
-| Item           | Value                                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| Type           | Concept paper                                                                                                 |
-| Date           | 2026-10-21                                                                                                    |
-| Code baseline  | `fork-dev` at `bd49c742`                                                                                      |
-| Files examined | `src/txring_functions.cpp`, `src/lora_functions.cpp`, `src/dedup_functions.cpp`, `src/configuration_global.h` |
-| Field evidence | DG0OPK campaign (Aug 2026, 47.6 h, five nodes), DK5EN-98 neo soak (12 h, gateway)                             |
-| Goal           | High LoRa channel utilisation through per-packet mesh decisions                                               |
-| Status         | Draft; open discussion points in section 10                                                                   |
-| Evidence rule  | Every number is read from the code or cited from a logged measurement                                         |
+| Item           | Value                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| Type           | Concept paper                                                                                                   |
+| Date           | 2026-10-21                                                                                                      |
+| Code baseline  | `fork-dev` at `bd49c742`                                                                                        |
+| Files examined | `src/txring_functions.cpp`, `src/lora_functions.cpp`, `src/dedup_functions.cpp`, `src/configuration_global.h`   |
+| Field evidence | DG0OPK campaign (Aug 2026, 47.6 h, five nodes), DK5EN-98 neo soak (12 h, gateway)                               |
+| Goal           | High LoRa channel utilisation through per-packet mesh decisions                                                 |
+| Status         | Draft; open discussion points in section 10                                                                     |
+| Part B         | [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md): review since v4.40a, ideas, roadmap |
+| Evidence rule  | Every number is read from the code or cited from a logged measurement                                           |
 
 ## 1. BLUF
 

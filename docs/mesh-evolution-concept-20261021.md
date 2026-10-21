@@ -8,6 +8,7 @@
 | Code baseline | `fork-dev` at `7fe790f`; "since v4.40a" means since `f2b3a349` (#1212, `RESUME.md`; the tag `v4.40a.hbserver` is not in the clone), 65 commits         |
 | Presentation  | [`presentation/mesh-roadmap.html`](presentation/mesh-roadmap.html) (GitHub Pages, German, interactive)                                                 |
 | Evidence rule | Every number is read from the code, cited from a doc or a web source, or marked COMPUTED / INFERRED / NO SOURCE                                        |
+| Review        | Adversarial review (28 findings) and verification pass applied 2026-10-21                                                                              |
 
 ## 1. BLUF
 
@@ -16,22 +17,25 @@ the channel at all, at which rate, from whom, and how far. Five findings shape t
 roadmap:
 
 1. **The October QRT measures were shipped without on-air proof.** Both waves are in
-   `v4.40a.10.19`; the planned night capture between them did not happen. Several
-   measures help hilltop nodes and can hurt dense city clusters (section 3). They need a
-   measurement wave before anything is built on top.
-2. **The channel is the bottleneck, not RAM.** At SF11/BW250 an 80-byte position frame
-   takes 1.1 s (COMPUTED). A tracker at the 30 s floor with two relay rings of three
-   nodes each fills 26 % of the channel alone (section 4.4). Rate, relay count and
-   reach decide utilisation; queue tuning only decides who loses.
+   `v4.40a.10.19`; the planned night capture between them and the bench run did not
+   happen. Most measures remove waste; three have a plausible downside in dense clusters
+   or for priority order (section 3). DK5EN-98 has run the fixed build since 10-18, so
+   its logger may already hold the first post-fix data.
+2. **The channel is the bottleneck, not RAM.** At SF11/BW250 an 80-byte frame takes
+   1.1 s (COMPUTED). A frame every 30 s, relayed by two rings of three nodes, fills 26 %
+   of the channel. Rate, relay count and reach decide utilisation; queue tuning only
+   decides who loses. The cheapest single lever is the preamble: 32 symbols in the EU
+   default, 8 in most other country profiles; 8 saves 197 ms per frame (COMPUTED).
 3. **Personal messages lose their priority at the first relay** (Part A 10.10). An
    absolute PM priority is cheap in code; making it safe against abuse is the hard part.
 4. **Multi-SF is the only lever that multiplies capacity.** SF9 carries 3.4 times SF11
    for 5 dB less margin (section 4.5). Every chip in the shipped envs supports SF7 to
-   SF12; the constraint is that a single-radio node listens on one SF at a time.
+   SF12; a single-radio node listens on one SF at a time. A per-packet profile switch
+   already ships (track mode to the LoRa-APRS QRG), so its deafness cost can be measured.
 5. **EMCOMM needs a priority flag and sender authentication together.** A priority flag
-   without authentication is an invitation to flood the channel. RM1's HMAC is
-   symmetric and does not scale to "many receivers verify one sender"; a signature with
-   pinned keys does, at 64 bytes per frame (section 4.9).
+   without authentication invites flooding. RM1's HMAC is symmetric and does not scale
+   to "many receivers verify one sender"; a signature with pinned keys does, at 88 bytes
+   Base64 in a text payload (section 4.9).
 
 Order of the roadmap (section 6): measurement, TX buffer, buffer parity, hop clamp
 cleanup, PM priority, end of life for old firmware, EMCOMM authentication, tag
@@ -42,15 +46,23 @@ groups, multi-SF; then the speculative block (link stretches, cells, source rout
 ### 2.1 Radio parameters
 
 - Default EU profile: 433.175 MHz, BW 250 kHz, SF11, CR 4/6, preamble 32
-  (`src/configuration_default.h`; icssw.org installation guide,
-  <https://icssw.org/en/meshcom-4-0-installation/>). Belgium and UK profiles use
-  BW 125 / SF10 (`src/country_profile.cpp:84-97`). LoRa-APRS is a separate service on
-  433.775 MHz, BW 125, SF12, CR 4/5 (<https://icssw.org/en/2026/06/10/meshcom-lora-aprs/>).
-- One node-wide SF/BW/CR; no per-packet SF (`src/lora_setchip.cpp:528-546`). The mod
-  code is sent in `msg_source_mod` (`getMOD()`, `src/lora_setchip.cpp:181-203`).
-- `LORA_SNR_STABLE_MIN_DB` -16 dB is already the fleet constant for "stable link" in the
-  neighbour matrix (`src/configuration_default.h`, `src/nbr_matrix.h:110`). It matches
-  the field experience "links work well down to -16 dB".
+  (`src/configuration_default.h`; <https://icssw.org/en/meshcom-4-0-installation/>).
+  UK, ON, LA and UK8 use BW 125 / SF10; every country row in the table uses preamble 8,
+  only the default row (codes 0, 3, 16) uses `LORA_PREAMBLE_LENGTH` (32)
+  (`src/country_profile.cpp:84-109`). LoRa-APRS is a separate service on 433.775 MHz,
+  BW 125, SF12, CR 4/5 (<https://icssw.org/en/2026/06/10/meshcom-lora-aprs/>).
+- One SF/BW/CR for MeshCom traffic, but **a per-packet profile switch exists**: with
+  `--track on` and a GPS fix the position goes out as a LoRa-APRS `<` frame
+  (`src/loop_functions.cpp:5191-5201`, `:5272`); `lora_setchip_aprs()` switches to
+  433.775/SF12/BW125 for that frame and `lora_setchip_meshcom()` back
+  (`src/lora_functions.cpp:2998-3094`, `src/esp32/esp32_main.cpp:3663-3668`; nRF52 branch
+  `src/lora_setchip.cpp:387`; not on `BOARD_TLORA_OLV216`). While switched the node does
+  not relay (`rly_reason "aprs"`, `src/lora_functions.cpp:2425-2431`); the deaf time is
+  about the SF12 airtime plus re-init (unmeasured). The MeshCom QRG gets a copy every
+  5 min (`track_to_meshcom_timer`, `:3005`).
+- `LORA_SNR_STABLE_MIN_DB` -16 dB is the fleet constant for "stable link" in the
+  neighbour matrix (`src/nbr_matrix.h:110`). It matches the field experience "links work
+  well down to -16 dB".
 
 ### 2.2 Chips per env (`variants/*/platformio.ini`, `src/esp32/esp32_main.cpp:781-870`)
 
@@ -58,7 +70,7 @@ groups, multi-SF; then the speculative block (link stretches, cells, source rout
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | SX1262 | Heltec V3/V4, Wireless Stick/Tracker, T-Deck (all), T-Beam SX1262/Supreme/1W, T3-S3, T-Connect Pro, T-ETH-Elite, Vision Master, Wireless Paper, T5 e-paper, E22 1262 (classic, S3), RAK4631, T-Echo, T114 | SF5-SF12, BW 7.8-500 kHz (Wio-SX1262 module datasheet via R3)                                         |
 | SX1268 | E22-DevKitC, E22_XML, E22 1268 S3, esp32-loraprs-e22, T-Beam SX1268                                                                                                                                       | SF5-SF12, 410-810 MHz variant (no per-SF source found)                                                |
-| SX1276 | Heltec V2, TTGO T-Beam (SX127x), esp32-loraprs-ra01                                                                                                                                                       | SF6-SF12 (NO SOURCE in this run; SF6 needs implicit header)                                           |
+| SX127x | Heltec V2, TTGO T-Beam (433 MHz: SX1278), esp32-loraprs-ra01 (SX1278), ttgo-lora32-v21 (no track/APRS switching)                                                                                          | SF6-SF12 (NO SOURCE in this run; SF6 needs implicit header)                                           |
 | LLCC68 | none shipped (`BOARD_E220` path exists, no env)                                                                                                                                                           | SF5-SF9 @125, SF5-SF10 @250, SF5-SF11 @500; **cannot run SF11/BW250** (Semtech forum, Zephyr binding) |
 
 Every shipped env can run SF7 to SF12 at BW 250. Only concentrators (SX1302/SX1303)
@@ -68,24 +80,38 @@ single SX126x/SX127x listens on one configured SF/BW. CAD is configured per SF
 
 ### 2.3 Frame and protocol facts used below
 
-- Message types on air: 0x3A text, 0x21 position, 0x40 HEY, 0x41 binary ACK, 0x3C
-  LoRa-APRS/track (`src/configuration_global.h:419-422`). The valid-type set is
-  {0x21, 0x3A, 0x40, 0x41} (`src/loop_functions.cpp:3533`). Free type bytes exist
-  (INFERRED by grep; external-radio framing to check before reuse).
+- Message types on air: 0x3A text, 0x21 position, 0x40 HEY, 0x41 binary ACK
+  (`src/configuration_global.h:419-422`); 0x3C `<` is the LoRa-APRS frame
+  (`src/aprs_functions.cpp:154`). Free type bytes exist (INFERRED by grep;
+  external-radio framing to check before reuse).
 - Byte 5 has no free bit: nibble plus 0x10/0x20/0x40/0x80 (Part A 10.0 item 1).
-- Firmware trailer after the FCS: fw version byte, last-hardware byte, sub-version
-  char, 0x7E (`src/aprs_functions.cpp:1117-1134`). **A version filter already exists:**
-  decode drops frames with `0 < fw_version < 35` (`:533-537`, "4.35a").
+- Firmware trailer after the FCS, **not covered by it**: fw version byte, last-hardware
+  byte, sub-version char, 0x7E (`src/aprs_functions.cpp:1110-1134`). The fw byte and
+  sub-version are the **originator's**; a relay rewrites only `msg_last_hw` and
+  `msg_source_mod` (`src/lora_functions.cpp:2463-2464`). Trailer parsing is optional:
+  trailerless frames pass with `fw_on_air=false`, bytes after the sub-version are
+  ignored (`src/aprs_functions.cpp:492-531`, `src/aprs_structures.h:84-87`). **A version
+  filter exists:** decode drops frames whose originator runs `0 < fw_version < 35`
+  (`:533-537`, "4.35a").
+- Text payload: ends at 0x00 and passes a charset filter (C0/C1 controls, invalid UTF-8,
+  bidi and zero-width characters stripped, `src/aprs_functions.cpp:405-425`). Binary
+  data cannot ride in a text payload.
 - Groups: numeric 1..99999, at most 6 per node (`node_gcb[6]`,
   `src/aprs_functions.cpp:39-100`); no group-specific relay rule. A `#TAG` user story
   exists as a discussion draft for 4.36 (`docs/userstory-hashtag-filter.md`).
-- Track: `--track on` switches SmartBeaconing; moving rates 20/15/12/10 s by speed,
-  stationary 1800 s, a 30 s floor between sends (`src/loop_functions.cpp:6193-6341`,
-  `src/esp32/esp32_main.cpp:4579`, `beacon_rate.h`). The 0x40 track bit marks a
-  non-default cadence (`src/loop_functions.cpp:5350`, `:5408`).
-- RM1: HMAC-SHA256 truncated to 8 bytes (16 hex), key SHA-256 of the console password,
-  counter-based replay protection, closed command allowlist, plaintext on air
+- Track: SmartBeaconing; moving rates 20/15/12/10 s by speed, stationary 1800 s, a 30 s
+  floor between sends (`src/loop_functions.cpp:6193-6341`, `src/esp32/esp32_main.cpp:4578`,
+  `beacon_rate.h`); sent on the LoRa-APRS QRG (2.1).
+- RM1: HMAC-SHA256 truncated to 8 bytes, sent as 16 hex characters, key SHA-256 of the
+  console password, counter-based replay protection, closed allowlist, plaintext on air
   (`docs/adr-remote-hmac.md`, `src/remote_cmd.cpp:232-250`, `:515-523`).
+- Via field: the destination path `VIA,DEST` lets only the named via relay
+  (`checkMesh()`, `src/via_functions.cpp:88-140`); each relay resets the destination path
+  unless it has its own `--via` (`src/lora_functions.cpp:2486`), so it acts for one hop.
+- HN reports: at most 8 entries ('+' when truncated), links at or above the stable SNR,
+  fresh within 60 min, every 15 min (`src/nbr_matrix.h:192-211`, `:628-632`); under the
+  default `auto` only nodes with mesh and gateway off send them
+  (`src/loop_functions.cpp:5815-5835`).
 - No multi-part text: a LoRa frame is at most 255 bytes (`UDP_TX_BUF_SIZE`); longer text
   is truncated or rejected (INFERRED).
 - No EMCOMM code in `src/` (only the `meshcom.emcomm.ch` server entry,
@@ -106,6 +132,15 @@ extrapolated. Bit rate, time on air and sensitivity (NF 6 dB) are COMPUTED.
 | 11  | -17.5          | 0.90              | 903           | 1100          | 1444           | -131.5            | 1.0x               | 0              |
 | 12  | -20            | 0.49              | 1905          | 2298          | 3084           | -134.0            | 0.47x              | +2.5 dB        |
 
+**Preamble.** The table uses preamble 32 (EU default). With preamble 8 every frame is
+197 ms shorter at SF11 (24 symbols of 8.192 ms, COMPUTED): 80 B take 903 ms instead of
+1100 ms, about 18 % less. Most country rows already use 8 (2.1); the QRT stage-1 figures
+0.71 s / 1.25 s are preamble-8 airtimes (`docs/campaign-lora-qrt-20261018.md:419-420`).
+A shorter preamble lowers the detection margin for receivers that wake late or run CAD
+(Contra), and nodes with different preamble settings still decode each other only if the
+receiver's preamble setting is not longer than the sender's (INFERRED, to verify on the
+bench).
+
 **The -24 dB observation.** -24 dB at SF11 is 6.5 dB below the typical demodulation
 limit; the PER transition is a few dB wide (Simulink study, error-free to about -18 dB
 at SF12, <https://journals.vilniustech.lt/index.php/NTCS/article/view/25705>). A true
@@ -124,33 +159,43 @@ right, why it may be wrong, and what it does to **hilltop nodes** (wide coverage
 neighbours heard, often the only bridge) and to **dense city clusters** (many neighbours
 in short range, all meshing, little coverage gain per transmission).
 
-**Process finding first.** The plan recommended release after wave 1, one night capture,
-then wave 2. Both waves are in `v4.40a.10.19`; no post-fix on-air result exists
-(`release-journal.md` 10.19 "offen", `RESUME.md` "Open: DK5EN-98 night capture").
-Evidence for the fixes is pre-fix captures and replays. That is the main risk of the
-whole block.
+**Process findings first.**
 
-| Measure                                                                                                            | Why it was right                                                                                                                    | Why it may be wrong                                                                                                                                                                                                                                                | Hilltop                                                                                                                                             | City cluster                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--nbrrelay on` forced in production (`prod_lock.h:177`)                                                           | 3.8 to 6.4 copies per message measured; coverage-based cancel is the largest airtime lever; case A gives a sole bridge a short path | decisions rest on a 12 h matrix and a symmetry assumption (`nbrsym`); classic boards hold 64 rows (Part A 10.7); the bench day still showed only `CANCEL?` candidates; no post-fix proof; locked, so a bad field result cannot be switched off without a new build | good: case A (alone covers someone) gets the 150 ms escape after 8 s                                                                                | risk: every node cancels because "the others cover"; with overlapping masks several can cancel at once (mutual cancel) and a frame dies in the cluster's shadow side |
-| CSMA age floor (Brief G: 20 s stage 1, 60 s stage 2 at 100 ms + jitter, prio 1-3)                                  | send starvation measured (4.0 sends/min, 316 interruptions); replay 11.2 sends/min                                                  | compile-time, on by default, replay only; stage 2 removes CSMA's spreading for aged frames: nodes that aged together escalate together (synchronisation); boards without a radio object compute airtime 0 and use the 1500 ms cap                                  | helps the hilltop get out of a full queue; but its aggressive TX collides at distant receivers with valley traffic it cannot hear (hidden terminal) | in a congested cluster many frames age at once; stage 2 turns that into near-simultaneous bursts, more collisions, more retries                                      |
-| Echo releases own queued group text; retry stops if already heard                                                  | 20 ignored echoes and 5 messages with 3 retries measured                                                                            | an echo from a neighbour proves only that the neighbour has it, not that the far side does                                                                                                                                                                         | neutral to good: the hilltop's echo usually comes from a far relay                                                                                  | risk: an echo from a node 50 m away stops the retry although the message never left the cluster                                                                      |
-| No retry while QRT                                                                                                 | 7 evictions, 4 server texts lost to own retries                                                                                     | DM reliability under load drops exactly when it matters; the user sees no retry                                                                                                                                                                                    | rarely in QRT unless backlog                                                                                                                        | often in QRT under load: DMs lose their ladder                                                                                                                       |
-| Own message reflected by the server not queued                                                                     | own message re-sent 311 s later                                                                                                     | none found                                                                                                                                                                                                                                                         | good                                                                                                                                                | good                                                                                                                                                                 |
-| Ring full returns -2, QTA at any depth; QRT release below 16, 60 s repeat                                          | 11 of 19 drops at 11 or fewer occupied slots; 6 min 57 s refused with 15 free slots                                                 | treats the symptom of the ring's gaps (Part A problem A); the thresholds were tuned on one replay                                                                                                                                                                  | good                                                                                                                                                | good                                                                                                                                                                 |
-| shortpath forced off (`prod_lock.h:176`)                                                                           | the full path feeds the neighbour matrix, loop check and gwcap                                                                      | longer frames: 40 to 80 B costs 756 to 1100 ms at SF11 (+344 ms, COMPUTED) per transmission and relay; gwcap trips on long injected paths (Part A 10.1)                                                                                                            | more airtime per relay on the busiest node                                                                                                          | more airtime per copy, multiplied by many copies                                                                                                                     |
-| HN report forced `auto`, `nbrsym` forced on, pingtime/pingmax locks, postime clamp 300 s                           | stops misconfiguration (pingtime without target silenced HEY/HN)                                                                    | locks remove field tuning; postime 300 s does not limit track mode                                                                                                                                                                                                 | neutral                                                                                                                                             | neutral                                                                                                                                                              |
-| Not done: Finding 3 (gateway cancels already-heard server frames), Finding 6 (90 s server max age), Finding 9 rest | -                                                                                                                                   | Finding 3 is the gateway-side analogue of cancel-on-overhear and attacks the 3.8 copies directly                                                                                                                                                                   | -                                                                                                                                                   | -                                                                                                                                                                    |
+- The plan recommended release after wave 1, one night capture, then wave 2. Both waves
+  are in `v4.40a.10.19`; no post-fix on-air result and no bench run exist
+  (`release-journal.md` 10.19 "offen", including "LoRa-QRT auf der Bench"). Evidence for
+  the fixes is pre-fix captures and replays. DK5EN-98 runs the fixed build since 10-18
+  (`RESUME.md`), so its logger may already hold post-fix data for W0.
+- The production locks have two origins: campaign W4 (`e4edffc`) locked `--nbrrelay`
+  **off**, `--nbrsym` on, `--nbrreport` auto, `--shortpath` off, pingtime, pingmax and
+  spec\*; QRT wave 1 (`fe3f01e`) flipped `--nbrrelay` to locked **on**.
+- Every measure here is fork-only (`docs/fork-dev-vs-upstream-20261018.md`). In a mixed
+  cluster upstream nodes keep flooding, so every cluster effect below scales with the
+  fork's share of the nodes.
 
-**Assessment (proposal, not decided).** Keep the measures that remove pure waste (server
-reflection, echo release for the own node, ring -2). Put the three with a plausible
-negative effect on dense clusters under measurement first: forced `--nbrrelay on`
-(mutual cancel), age floor stage 2 (synchronised bursts) and the echo-based retry stop
-(local echo). For each, wave 0 needs a metric: frames that died in a cluster (heard by
-nobody beyond it), burst collisions after a stage-2 escalation (`aged2` counter plus
-CRC errors in the following second), retries stopped by an echo with RSSI above, say,
--80 dBm. Reconsider making `--nbrrelay` switchable by RM1 instead of compile-locked, so
-a bad field result can be reverted without a release.
+| Measure                                                                                                            | Why it was right                                                                                                                      | Why it may be wrong                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Hilltop                                                                                                            | City cluster                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--nbrrelay on` forced in production (`prod_lock.h:177`)                                                           | 3.8 to 6.4 copies per message measured; coverage-based cancel is the largest airtime lever; case A (sole provider) is never cancelled | a cancel follows an overheard foreign repetition whose coverage the matrix believes to remove the remaining need (`src/lora_functions.cpp:1299-1386`); that belief rests on a 12 h matrix, `nbrsym`-inferred bits (logged as `removed_inferred`) and 64 rows on classic boards (Part A 10.7); locked, so a bad field result needs a new build                                                                                                                                | good: case A gets 3500 ms, then 150 ms after 8 s                                                                   | at least one node always sends (an uncancelled relay goes out, `:2553`), but a **false cover** (stale or asymmetric edge) can cancel the copy that would have reached a shadow node behind the cluster                           |
+| CSMA age floor (Brief G: stage 1 at 20 s, stage 2 at 60 s: 100 to 275 ms, prio 1-3)                                | send starvation measured (4.0 sends/min, 316 interruptions); replay 11.2 sends/min; never applied after own TX, so no channel capture | compile-time, on by default, replay only. Not a new synchronisation: same-priority nodes already shared base 4500 + 11 slot choices, and rapid fire at 100 ms existed after 3 CAD attempts (`src/lora_functions.cpp:3938`); stage 2 cuts the choices to 6 and merges prio 1-3. **Priority inversion across nodes:** an aged prio-3 relay at 100 to 275 ms beats another node's fresh prio-1 DM or ACK waiting 3000 ms (within one node the lower priority number still wins) | helps the hilltop out of a full queue; as a receiver it suffers when mutually hidden valley nodes escalate at once | stage 2 fires only after stage 1 failed for 40 s, i.e. in saturation; then many aged frames compete in a 175 ms window; CAD separates nodes in mutual range, hidden pairs collide. The campaign doc names this risk (`:413-416`) |
+| Echo release of own group text (SENT on first echo: older; READY release: QRT `fe3f01e`)                           | 20 ignored echoes and 5 messages with 3 retries measured                                                                              | an echo from a neighbour proves only that the neighbour has it. On a gateway the first echo is usually another gateway's server copy, so the gateway may never put its own group message on its own RF island (`docs/campaign-lora-qrt-20261018.md:181`). DMs are exempt (`pnFrameIsReleasableGroupText`, `src/pn_retry.h:362-378`)                                                                                                                                          | neutral to good: the hilltop's echo usually comes from a far relay                                                 | an echo from a node 50 m away releases the group text although it never left the cluster                                                                                                                                         |
+| No retry while QRT                                                                                                 | 7 evictions, 4 server texts lost to own retries                                                                                       | the retry is deferred, not dropped: re-checked every tick, fired after the QRT release below 16/20 (`src/lora_functions.cpp:3446-3459`, `backpressure.h:256-262`); a slot already at the retry cap still gives up during QRT                                                                                                                                                                                                                                                 | rarely in QRT unless backlog                                                                                       | DMs wait out the QRT, latency rises, delivery stays                                                                                                                                                                              |
+| Own message reflected by the server not queued                                                                     | own message re-sent 311 s later                                                                                                       | deviation C as shipped skips own-source server frames of every type; the phone copy is lost for positions and for texts to groups the node does not follow (`docs/campaign-lora-qrt-20261018.md:32-34`)                                                                                                                                                                                                                                                                      | good                                                                                                               | good                                                                                                                                                                                                                             |
+| Ring full returns -2, QTA at any depth; QRT release below 16, 60 s repeat                                          | 11 of 19 drops at 11 or fewer occupied slots; 6 min 57 s refused with 15 free slots                                                   | treats a symptom of the ring's gaps (Part A problem A); thresholds tuned on one replay                                                                                                                                                                                                                                                                                                                                                                                       | good                                                                                                               | good                                                                                                                                                                                                                             |
+| shortpath locked off (`prod_lock.h:176`)                                                                           | the full path feeds the neighbour matrix, loop check and gwcap                                                                        | `bSHORTPATH` defaulted to false already (`src/loop_functions.cpp:421`), so the lock changes nothing for default nodes. The full path costs about 10 B, +98 ms at SF11, per extra hop (COMPUTED); gwcap trips on long injected paths (Part A 10.1)                                                                                                                                                                                                                            | more airtime per relay on the busiest node                                                                         | more airtime per copy, multiplied by many copies                                                                                                                                                                                 |
+| HN report locked `auto`, `nbrsym` on, pingtime/pingmax locks, postime clamp 300 s                                  | stops misconfiguration (pingtime without target silenced HEY/HN)                                                                      | locks remove field tuning; under `auto` relays and gateways send no HN report (2.3), so the two-hop picture comes only from end nodes                                                                                                                                                                                                                                                                                                                                        | the hilltop's own view stays one-sided                                                                             | neutral                                                                                                                                                                                                                          |
+| Not done: Finding 3 (gateway cancels already-heard server frames), Finding 6 (90 s server max age), Finding 9 rest | -                                                                                                                                     | Finding 3 is the gateway-side analogue of cancel-on-overhear and attacks the 3.8 copies directly                                                                                                                                                                                                                                                                                                                                                                             | -                                                                                                                  | -                                                                                                                                                                                                                                |
+
+**Assessment (proposal, not decided).** Keep the measures that remove pure waste
+(server reflection, with the phone-copy gap fixed; ring -2; deferred retry). Put three
+under measurement first: forced `--nbrrelay on` (false cover), age floor stage 2
+(priority inversion and hidden-pair collisions), and the READY echo release on gateways
+(own RF island never served). W0 metrics: cancels whose `removed_inferred` was
+non-empty; frames from inside the cluster heard by an observer outside it; prio-1
+frames from other nodes delayed by a stage-2 burst (`aged2` counter against prio-1 wait);
+gateway group texts released by a server copy before any own RF transmission. Frames
+that "died in a cluster" need observer nodes outside the cluster; a 2 dBm bench in one
+room cannot show it. Consider making `--nbrrelay` switchable by RM1 instead of
+compile-locked, so a bad field result can be reverted without a release.
 
 ## 4. Ideas, one by one
 
@@ -220,33 +265,41 @@ Assessment: P-A4 plus P-A3 as the first wave step (ACKs first, DMs in band 2 wit
 per-source limit), P-A5 after the slot pool. P-A1 only with authentication (EMCOMM
 class, 4.8).
 
-### 4.4 Multi-line APRS and track mode without flooding the channel
+### 4.4 Multi-line APRS and track mode without switching the QRG
 
-**Open input:** the "new multi-line APRS format" was not found in a web search (APRS
-1.2, aprs.org, aprs.fi, icssw.org; NO SOURCE). The format must come from the operator.
-What follows holds for any multi-line form.
+**What track mode does today** (2.1): with `--track on` and a GPS fix each position
+goes out as a LoRa-APRS frame on 433.775 MHz, SF12/BW125; the node switches its radio
+for that frame and back. During the switch it does not relay MeshCom traffic. The
+MeshCom QRG gets one copy every 5 minutes. At the 30 s floor a 50-byte LoRa-APRS frame
+costs about 2.3 s every 30 s on the APRS QRG (about 7.7 %, COMPUTED), plus WIDE1-1
+digipeaters there.
 
-Airtime arithmetic (COMPUTED, SF11/BW250/CR4/6): one 120-byte frame costs 1444 ms, two
-60-byte frames 1806 ms, because each frame pays preamble and header (297 ms). Splitting
-costs about 25 % more per line pair; one long frame is cheaper but has a higher loss
-probability per frame.
+**Why the switch exists (INFERRED):** a track on the MeshCom QRG would be expensive.
+An 80-byte frame takes 1100 ms at SF11/BW250 (preamble 32); every 30 s with
+`max_hop_pos` 2 and three relays in each of two rings it goes out 7 times: 26 % of the
+channel for one moving station.
 
-Track mode is the bigger load. An 80-byte frame (a position with path; size INFERRED) takes 1100 ms. At the 30 s floor a
-tracker transmits 3.7 % of the time. With `max_hop_pos` 2 and three relays in each of
-two rings, every position goes out 7 times: 26 % of the channel for one moving station;
-at the 10 s SmartBeaconing rate (if the floor were lifted) 77 %.
+**Open input:** the "new multi-line APRS format" was not found (APRS 1.2, aprs.org,
+aprs.fi, icssw.org; NO SOURCE). The format must come from the operator. Airtime for
+any multi-line form (COMPUTED, SF11/BW250/CR4/6/preamble 32): one 120-byte frame costs
+1444 ms, two 60-byte frames 1806 ms; each frame pays preamble plus fixed header symbols
+(362 ms). One long frame is cheaper but loses all lines on one error.
 
-| Option                                                                                   | Pro                                                            | Contra                                                                                                     |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| K0 status quo                                                                            | full track resolution at every node within 2 hops              | one tracker can take a quarter of the channel                                                              |
-| K1 track positions with hop 0 or 1 (local only), every Nth with full hop                 | map near the station stays live; far nodes get a coarse track  | needs a per-frame hop for positions (today `max_hop_pos` fixed 2); old relays obey the lower nibble anyway |
-| K2 track via gateway and server only (hop 0 on RF, gateway uploads)                      | RF cost one transmission; the internet map has full resolution | no RF track for nodes without internet                                                                     |
-| K3 airtime budget per source (for example 5 % per tracker in a cell), enforced by relays | bounds the worst case; same rule for every type                | relays need per-source airtime state; tuning                                                               |
-| K4 compact track frames (delta position, no path, short trailer)                         | 30 to 40 B instead of 80 B halves the cost (INFERRED)          | new frame type; app and server must decode                                                                 |
-| K5 multi-line as one frame with line separators, length capped                           | cheapest per line                                              | one loss loses all lines; display support needed                                                           |
+| Option                                                                      | Pro                                                             | Contra                                                                                               |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| K0 status quo (APRS QRG, MeshCom copy every 5 min)                          | MeshCom channel stays free; APRS-IS and APRS maps get the track | node deaf on MeshCom during each switch; track invisible on MeshCom between copies; SF12 costs 2.3 s |
+| K1 track on the MeshCom QRG, hop 0 or 1, every Nth with full hop            | no switch, no deafness; near nodes see the live track           | MeshCom airtime per tracker 3.7 % (own) plus relays; needs a per-frame hop for positions             |
+| K2 track on MeshCom with hop 0, gateway uploads to APRS-IS                  | one RF transmission per position; maps fed by the gateway       | no RF track beyond one hop; needs a gateway in range                                                 |
+| K3 airtime budget per source on MeshCom (for example 5 % per tracker)       | bounds the worst case whichever QRG is used                     | per-source airtime state in relays; tuning                                                           |
+| K4 compact track frames (delta position, no path, short trailer)            | 30 to 40 B instead of 80 B, about half the airtime (INFERRED)   | new frame type; app and server must decode                                                           |
+| K5 multi-line APRS as one MeshCom frame with line separators, length capped | cheapest per line; no QRG switch                                | one loss loses all lines; display support needed; format source missing                              |
+| K6 a second radio for APRS (dual-radio boards)                              | no deafness, both QRGs live                                     | hardware                                                                                             |
 
-Assessment: K1 plus K3 address "track on overruns the frequency" directly and need no new
-frame type. K4 is the larger, later win. For multi-line: K5 once the format is known.
+Assessment (proposal, not decided): if the goal is "APRS content without leaving the
+MeshCom QRG", K2 plus K4 keep the RF cost low and let gateways feed APRS-IS; K1 with K3
+if a live RF track is wanted. K5 once the multi-line format is known. Measure the
+deafness of K0 first (missed relays during switches), since it is the cost K1 to K5 are
+compared against.
 
 ### 4.5 Multi-SF: more capacity, compatible like Wi-Fi rate adaptation
 
@@ -255,21 +308,21 @@ where they can, everything stays compatible.
 
 The Wi-Fi pattern: beacons and broadcast at the base rate, unicast per link at the
 fastest rate the link margin allows, fallback on missed ACKs. LoRaWAN ADR does the same
-centrally (best SNR of 20 uplinks minus required SNR minus 15 dB margin,
+centrally (best SNR of the last 20 uplinks minus the required SNR minus a safety margin,
 <https://www.thethingsnetwork.org/docs/lorawan/adaptive-data-rate/>). Meshtastic has no
 per-link adaptation; all nodes share one preset (<https://meshtastic.org/docs/overview/radio-settings/>).
 
 The constraint: a single SX126x/SX127x receives one SF at a time. A node at SF9 is deaf
 to SF11 floods while it listens at SF9.
 
-| Option                                                                   | Pro                                                                                                                                                                                     | Contra                                                                                                                                       |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0 status quo, one SF for all                                            | simple, everyone hears everything                                                                                                                                                       | capacity fixed at SF11                                                                                                                       |
-| M1 per-link upgrade for unicast with rendezvous                          | base SF for floods, HEY, positions; a DM between two neighbours with margin uses SF9 or SF10 after an SF11 "switch" handshake; both listen at the fast SF for one exchange, then return | both nodes are deaf to the base channel during the exchange (missed floods); needs a handshake frame and timing; only for DM, not for floods |
-| M2 CAD scanning: listen on SF11, CAD for SF9 between                     | a node can detect a fast-rate preamble                                                                                                                                                  | CAD per SF is sequential, short preambles may be missed; more RX power; PER on the base channel rises                                        |
-| M3 second channel for a fast backbone (different frequency, SF9)         | no deafness on the base channel; hilltop and gateway nodes form a fast layer                                                                                                            | needs a second radio (dual-radio boards are rare) or a dedicated node per site; frequency plan (4.14)                                        |
-| M4 regional SF choice (SF10 in dense city cells, SF11/12 in the country) | city capacity x1.8 at 2.5 dB less margin, where margins are large                                                                                                                       | cells must agree; a node at the border between SF regions cannot hear both; bridges needed                                                   |
-| M5 concentrator gateways (SX1302/1303)                                   | a gateway hears 8 to 16 packets on several SFs at once                                                                                                                                  | gateway hardware only; nodes still send on one SF                                                                                            |
+| Option                                                                                                                                                     | Pro                                                                                                                                                                                     | Contra                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0 status quo, one SF for all                                                                                                                              | simple, everyone hears everything                                                                                                                                                       | capacity fixed at SF11                                                                                                                       |
+| M1 per-link upgrade for unicast with rendezvous                                                                                                            | base SF for floods, HEY, positions; a DM between two neighbours with margin uses SF9 or SF10 after an SF11 "switch" handshake; both listen at the fast SF for one exchange, then return | both nodes are deaf to the base channel during the exchange (missed floods); needs a handshake frame and timing; only for DM, not for floods |
+| M2 CAD scanning: listen on SF11, CAD for SF9 between; or the reverse: listen on SF9 and CAD for the long SF11 preamble (32 symbols, 262 ms, easy to catch) | a node can detect the other rate's preamble; the reverse form is the easier one                                                                                                         | CAD per SF is sequential; short preambles may be missed; more RX power; PER on the listened channel rises                                    |
+| M3 second channel for a fast backbone (different frequency, SF9)                                                                                           | no deafness on the base channel; hilltop and gateway nodes form a fast layer                                                                                                            | needs a second radio (dual-radio boards are rare) or a dedicated node per site; frequency plan (4.14)                                        |
+| M4 regional SF choice (SF10 in dense city cells, SF11/12 in the country)                                                                                   | city capacity x1.8 at 2.5 dB less margin, where margins are large                                                                                                                       | cells must agree; a node at the border between SF regions cannot hear both; bridges needed                                                   |
+| M5 concentrator gateways (SX1302/1303)                                                                                                                     | a gateway hears 8 to 16 packets on several SFs at once                                                                                                                                  | gateway hardware only; nodes still send on one SF                                                                                            |
 
 SNR threshold (operator's question). The fleet already defines -16 dB as "stable"
 (`LORA_SNR_STABLE_MIN_DB`). An upgrade to SF9 needs the link SNR at least 5 dB above
@@ -283,7 +336,9 @@ would cut them. Assessment: use the floor for path choice and coverage, never fo
 reception, and measure PER per SNR bin from the bench fleet before choosing the value.
 
 Assessment for multi-SF: M4 (regional SF) and M3 (fast backbone layer) are the realistic
-first steps; M1 is elegant but the deafness problem makes it a research item.
+first steps; M1 is elegant but the deafness problem makes it a research item. The track
+mode's per-packet switch (2.1) is a working rendezvous today: measuring its deafness is
+the cheapest first experiment for M1.
 
 ### 4.6 Hop clamp cleanup for circling messages (masking bug)
 
@@ -300,31 +355,33 @@ The path is already in the frame: with shortpath off (production) the source pat
 every relay. The recipient therefore knows a working path at the moment it sends the
 `:ackNNN`.
 
-| Option                                                  | Discovery                                                      | Routing                                                                                                                           | Pro                                                                                                                                | Contra                                                                                      |
-| ------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| S0 status quo                                           | none                                                           | flood                                                                                                                             | robust, stateless                                                                                                                  | N copies per DM and per ACK                                                                 |
-| S1 next-hop learning (Meshtastic 2.6 style)             | the first DM floods; the reply shows which relay carried it    | each node remembers "for destination X, relay Y worked"; a DM is relayed only by the remembered next hop, flood on the last retry | backward compatible; state per destination, not per path; proven elsewhere (<https://meshtastic.org/blog/meshtastic-2-6-preview/>) | needs a "next hop" field in the frame (no free bit in byte 5; trailer or payload)           |
-| S2 full source route (MeshCore style)                   | flood with path record (exists), the ACK carries the path back | the DM lists the relays; only listed relays forward; flood again on missing ACK (<https://wiki.eastmesh.au/meshcore/routing/>)    | fewest copies; deterministic                                                                                                       | header grows per hop (about 10 B per call); old firmware ignores the list and floods anyway |
-| S3 hybrid: S2 with a hop-limited flood around the route | as S2                                                          | listed relays plus their direct neighbours may forward                                                                            | survives one moved node                                                                                                            | more copies than S2                                                                         |
+| Option                                                  | Discovery                                                      | Routing                                                                                                                           | Pro                                                                                                                                                                      | Contra                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S0 status quo                                           | none                                                           | flood                                                                                                                             | robust, stateless                                                                                                                                                        | N copies per DM and per ACK                                                                                                                            |
+| S1 next-hop learning (Meshtastic 2.6 style)             | the first DM floods; the reply shows which relay carried it    | each node remembers "for destination X, relay Y worked"; a DM is relayed only by the remembered next hop, flood on the last retry | backward compatible; state per destination, not per path; proven elsewhere (<https://meshtastic.org/blog/meshtastic-2-6-preview/>); a via field exists (`VIA,DEST`, 2.3) | the via field acts for one hop today (each relay resets it); old relays without a matching via drop a frame addressed via someone else (`checkMesh()`) |
+| S2 full source route (MeshCore style)                   | flood with path record (exists), the ACK carries the path back | the DM lists the relays; only listed relays forward; flood again on missing ACK (<https://wiki.eastmesh.au/meshcore/routing/>)    | fewest copies; deterministic                                                                                                                                             | header grows per hop (about 10 B per call); old firmware ignores the list and floods anyway                                                            |
+| S3 hybrid: S2 with a hop-limited flood around the route | as S2                                                          | listed relays plus their direct neighbours may forward                                                                            | survives one moved node                                                                                                                                                  | more copies than S2                                                                                                                                    |
 
 Where to put the route: a payload prefix (`{R:CALL1,CALL2}`) is readable and old nodes
 treat it as text; a new message type hex ID is cleaner but invisible to old firmware.
 Interop: as long as old firmware floods, the copies do not drop until most relays run the
 new firmware; the saving grows with the fleet share.
 
-Assessment: S1 first (smallest change, compatible, no route header), S2 later for
-store-and-forward nodes and fixed sites.
+Assessment: S1 first (smallest change; it can build on the existing via field if relays
+rewrite the via to their own learnt next hop instead of resetting it), S2 later for
+store-and-forward nodes and fixed sites. Check how old relays treat a via they are not
+named in before choosing the field.
 
 ### 4.8 EMCOMM priority flag: where to put it
 
 Byte 5 has no free bit. Options:
 
-| Place                                             | Pro                                               | Contra                                                                   |
-| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
-| E1 payload prefix (`{EMC}` or `#EMCOMM` tag)      | old firmware shows it as text; no protocol change | trivial to fake; parse cost                                              |
-| E2 new message type (hex ID)                      | unambiguous; room for a signature field           | invisible to old firmware (not shown, not relayed)                       |
-| E3 trailer extension (byte after the sub-version) | out of the text                                   | the trailer format is fixed (3 bytes + 0x7E); old decoders may reject it |
-| E4 destination convention (`>EMCOMM`, group)      | uses the existing group mechanism                 | no priority semantics in old firmware; fakeable                          |
+| Place                                             | Pro                                               | Contra                                               |
+| ------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| E1 payload prefix (`{EMC}` or `#EMCOMM` tag)      | old firmware shows it as text; no protocol change | trivial to fake; parse cost                          |
+| E2 new message type (hex ID)                      | unambiguous; room for a signature field           | invisible to old firmware (not shown, not relayed)   |
+| E3 trailer extension (byte after the sub-version) | out of the text; old decoders ignore extra bytes  | every relay re-encodes and drops it; outside the FCS |
+| E4 destination convention (`>EMCOMM`, group)      | uses the existing group mechanism                 | no priority semantics in old firmware; fakeable      |
 
 Any of these is fakeable without authentication. Assessment: E1 or E4 for visibility in
 the old fleet, and priority only when the frame also carries a valid signature (4.9);
@@ -333,17 +390,20 @@ an unsigned EMCOMM frame is shown, relayed normally, not prioritised.
 ### 4.9 Sender authentication for EMCOMM
 
 RM1's HMAC authenticates a command to one node with that node's password. For EMCOMM many
-receivers must verify one sender. Legal frame: authentication without encryption keeps
+receivers must verify one sender. Sizes on air: the payload is filtered text (2.3), so a
+tag or signature travels as text: RM1 tag 16 hex characters (about +147 ms at SF11),
+Ed25519 64 B as Base64 88 characters (about +786 ms), as hex 128 (about +1130 ms); all
+COMPUTED. Raw binary would need a new frame type. Legal frame: authentication without encryption keeps
 content readable and is argued to be allowed (<https://rietta.com/blog/authentication-without-encryption-for/>);
 no ruling for DL/OE found (NO SOURCE): **regulatory check needed (DARC/BNetzA, ÖVSV)**.
 
-| Option                                                    | Size per frame                         | Trust                                    | Pro                                                            | Contra                                                                                       |
-| --------------------------------------------------------- | -------------------------------------- | ---------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| A1 RM1 HMAC with a shared EMCOMM net key                  | 8 B (16 hex)                           | everyone with the key                    | code exists; small                                             | anyone with the key can sign as anyone; one leak breaks all; key distribution out of band    |
-| A2 per-sender HMAC keys in a receiver trust store         | 8 B                                    | receiver holds each sender's secret      | small frames                                                   | every receiver holds every secret; a compromised receiver can forge; does not scale          |
-| A3 Ed25519 signature, public keys pinned in a trust store | 64 B (about +500 ms at SF11, COMPUTED) | pinned public keys (32 B each)           | forging needs the private key; receivers hold only public keys | 64 B per frame; signature verify about ms on ESP32 (INFERRED); key management in the web GUI |
-| A4 A3 with keys from a server directory                   | 64 B                                   | the directory's signing key, pinned once | onboarding without manual pinning; revocation                  | needs internet once; who runs the directory (DARC? ÖVSV? icssw?)                             |
-| A5 key announce on air (new hex ID), TOFU plus manual pin | 64 B + announce                        | first contact, then pinned               | works offline                                                  | first contact can be spoofed; announces cost airtime                                         |
+| Option                                                    | Size per frame                 | Trust                                    | Pro                                                            | Contra                                                                                      |
+| --------------------------------------------------------- | ------------------------------ | ---------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| A1 RM1 HMAC with a shared EMCOMM net key                  | 16 characters (+147 ms)        | everyone with the key                    | code exists; small                                             | anyone with the key can sign as anyone; one leak breaks all; key distribution out of band   |
+| A2 per-sender HMAC keys in a receiver trust store         | 16 characters                  | receiver holds each sender's secret      | small frames                                                   | every receiver holds every secret; a compromised receiver can forge; does not scale         |
+| A3 Ed25519 signature, public keys pinned in a trust store | 88 characters Base64 (+786 ms) | pinned public keys (32 B each)           | forging needs the private key; receivers hold only public keys | 64 B per frame; verify cost on ESP32 and nRF52840 to measure; key management in the web GUI |
+| A4 A3 with keys from a server directory                   | 88 characters                  | the directory's signing key, pinned once | onboarding without manual pinning; revocation                  | needs internet once; who runs the directory (DARC? ÖVSV? icssw?)                            |
+| A5 key announce on air (new hex ID), TOFU plus manual pin | 88 characters + announce       | first contact, then pinned               | works offline                                                  | first contact can be spoofed; announces cost airtime                                        |
 
 Trust store (operator): per entry callsign (10 B) + public key (32 B) + flags (1 B), about
 43 B; 100 entries 4.3 kB, fits flash (LittleFS), RAM only for a cache. "Who do you trust":
@@ -352,25 +412,28 @@ optionally a pinned directory key for A4. The web GUI checkmark "sign EMCOMM mes
 sets the flag per message or per session.
 
 Assessment: A3 with manual pinning plus A4 as optional directory is the scalable design;
-A1 is a quick bench prototype with known weaknesses. 64 B per frame restricts it to
-EMCOMM traffic, not every message.
+A1 is a quick bench prototype with known weaknesses. About 0.8 s extra per frame
+restricts signatures to EMCOMM traffic, not every message.
 
 ### 4.10 End of life for old firmware
 
-A filter exists: frames from firmware below 4.35 are dropped at decode
-(`src/aprs_functions.cpp:533-537`).
+A filter exists: frames **originated** by firmware below 4.35 are dropped at decode
+(`src/aprs_functions.cpp:533-537`). The trailer carries the originator's version; a
+relay rewrites only the hardware byte (2.3), so no last-hop firmware is on air. The
+neighbour matrix learns a call's firmware from frames that call originated
+(`nbrNoteFw`, `src/lora_functions.cpp:1233-1235`).
 
-| Option                                         | Pro                                                                           | Contra                                                                                                    |
-| ---------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| L0 status quo (drop < 4.35)                    | exists                                                                        | 4.35x wrapping nodes still relayed                                                                        |
-| L1 do not relay frames whose last hop runs < N | the mesh stops amplifying old relays' behaviour; their own frames still shown | the last hop is `msg_last_hw`/trailer of the relay, not the origin: check which fields describe the relay |
-| L2 do not relay frames originated by < N       | stops old originators' load                                                   | users who did not update lose reach without notice                                                        |
-| L3 drop entirely (as today for < 4.35)         | simplest                                                                      | splits the mesh; frames without trailer (very old) are invisible                                          |
-| L4 server-announced minimum version            | one switch for all; can be raised step by step                                | needs the directory (4.1) or `{SET}`-like frame; unauthenticated today                                    |
+| Option                                         | Pro                                                  | Contra                                                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| L0 status quo (drop originators < 4.35)        | exists                                               | 4.35x wrapping relays still relay; trailerless frames pass unchecked                                                 |
+| L1 do not relay frames whose last hop runs < N | targets the masking bug's carriers (wrapping relays) | the last hop's firmware must be looked up in the matrix by its call; unknown when the relay never originated a frame |
+| L2 do not relay frames originated by < N       | stops old originators' load; the field exists today  | users who did not update lose reach without notice                                                                   |
+| L3 drop entirely (as today for < 4.35)         | simplest                                             | splits the mesh                                                                                                      |
+| L4 server-announced minimum version            | one switch for all; can be raised step by step       | needs the directory (4.1) or a `{SET}`-like frame; unauthenticated today                                             |
 
-Assessment: L1 for the nibble-wrapping builds (targets the masking bug's carriers), with a
-notice frame to the affected node (DM "please update") before the block, and a published
-date. L4 once a signed directory exists.
+Assessment: L1 via the matrix lookup for the wrapping builds, together with the hop cap
+(4.6) which stops their wrapped frames anyway; a notice DM ("please update") and a
+published date before any block. L4 once a signed directory exists.
 
 ### 4.11 Buffer parity and consolidation
 
@@ -392,9 +455,9 @@ over the internet (Part A 10.0 item 8). Contra: sites, licences, hardware. Fits 
 ### 4.13 Cell architecture and colouring
 
 Idea: hexagonal cells, neighbouring cells on different frequencies, a bridge node per
-cell border. Classic reuse needs 3 colours for adjacent cells on a hexagonal lattice, 7
-for a reuse distance of two cells (graph colouring,
-<https://arxiv.org/pdf/1711.03096>). Channels: at 70 cm in practice 433.175 (MeshCom),
+cell border. Three colours suffice for adjacent hexagonal cells to differ; classic
+cellular reuse patterns use clusters of N = 3, 4 or 7 cells (textbook cellular
+planning; no LoRa-specific study found). Channels: at 70 cm in practice 433.175 (MeshCom),
 433.775 (LoRa-APRS, taken) and 433.900 MHz; the IARU R1 plan for LoRa segments was not
 found (NO SOURCE); the 433.05 to 434.79 MHz range is shared with ISM/LPD. With at most 2
 to 3 free 250 kHz channels a frequency colouring is thin.
@@ -415,14 +478,18 @@ regions (M4) are the reachable forms of the idea.
 
 Not yet named: the OLSR idea of multipoint relays. Each node picks the smallest set of
 direct neighbours that covers all its two-hop neighbours; only those relay its floods.
-The neighbour matrix and HN reports hold the two-hop data already. The case A/B logic is a
-reactive form of this (decide per frame); an MPR set is proactive (decide per topology
-change) and deterministic, which avoids the mutual-cancel risk of section 3. Pro: the
-structural fix for "many neighbours, little coverage". Contra: depends on matrix quality
-(Part A 10.7), larger change, needs a fallback when the MPR set is stale.
+The case A/B logic is a reactive form of this (decide per frame on an overheard copy);
+an MPR set is proactive (decide per topology change) and deterministic. Pro: the
+structural fix for "many neighbours, little coverage", and the decision no longer
+depends on which copy a node happens to overhear. Contra: the two-hop data is thin today:
+HN reports list at most 8 links, and under `auto` relays and gateways send none (2.3);
+the matrix has the classic row limit (Part A 10.7); a stale MPR set needs a flood
+fallback. MPR would need relays to report their neighbours, which costs HN airtime.
 
 ### 4.15 Further candidates
 
+- Preamble 32 to 8 for the EU default (2.4): 197 ms per frame, no protocol change; needs a
+  compatibility test across the fleet (mixed preamble settings).
 - Adaptive TX power for city nodes (less power, smaller interference footprint, same
   coverage when neighbours are close). Bench rule stays 2 dBm.
 - Role flags announced in HEY (gateway, high site, mobile, client-only) as in Meshtastic's
@@ -435,17 +502,24 @@ structural fix for "many neighbours, little coverage". Contra: depends on matrix
 Today (code, Part A 3.1) and two discussion variants. Lower is earlier. CSMA base in
 brackets (ms).
 
-| Frame kind                         | Today own  | Today relayed | Variant V1 (PM first) | Variant V2 (EMCOMM + PM)          |
-| ---------------------------------- | ---------- | ------------- | --------------------- | --------------------------------- |
-| EMCOMM, signed                     | -          | -             | -                     | 0 own and relayed (new band)      |
-| Binary ACK 0x41                    | 1 (3000)   | 1 (3000)      | 1                     | 1                                 |
-| DM ACK `:ackNNN`                   | 1 (3000)   | 3 (4500)      | 1                     | 1                                 |
-| DM                                 | 1 (3000)   | 3 (4500)      | 1 own, 2 relayed      | 1 own, 2 relayed, rate-limited    |
-| Group/broadcast text               | 2 (3000)   | 3 (4500)      | 2 own, 3 relayed      | 2 own, 3 relayed                  |
-| `{CET}`, `{SET}`, server injection | 1/2 (once) | 3 (4500)      | 3                     | 3, `{CET}` with TTL (Part A 10.8) |
-| EMCOMM, unsigned                   | -          | -             | -                     | as text, shown with a warning     |
-| Position                           | 4 (5500)   | 4 (5500)      | 4                     | 4, track budget (4.4 K3)          |
-| HEY (`H`, `HG`)                    | 5 (5500)   | 5 (5500)      | 5                     | 5                                 |
+| Frame kind                                                       | Today own                        | Today relayed | Variant V1 (PM first) | Variant V2 (EMCOMM + PM)          |
+| ---------------------------------------------------------------- | -------------------------------- | ------------- | --------------------- | --------------------------------- |
+| EMCOMM, signed                                                   | -                                | -             | -                     | 0 own and relayed (new band)      |
+| Binary ACK 0x41                                                  | 1 (3000)                         | 1 (3000)      | 1                     | 1                                 |
+| DM ACK `:ackNNN`                                                 | 1 (3000)                         | 3 (4500)      | 1                     | 1                                 |
+| DM                                                               | 1 (3000)                         | 3 (4500)      | 1 own, 2 relayed      | 1 own, 2 relayed, rate-limited    |
+| Group/broadcast text                                             | 2 (3000)                         | 3 (4500)      | 2 own, 3 relayed      | 2 own, 3 relayed                  |
+| Server injection (`{CET}`, `{SET}`, foreign text) at the gateway | 3 (`DONE`)                       | 3 (4500)      | 3                     | 3, `{CET}` with TTL (Part A 10.8) |
+| Locally typed `{SET}`, `{ping}`                                  | 1 to a call, 2 to a group (once) | 3             | as today              | as today                          |
+| EMCOMM, unsigned                                                 | -                                | -             | -                     | as text, shown with a warning     |
+| Position                                                         | 4 (5500)                         | 4 (5500)      | 4                     | 4, track budget (4.4 K3)          |
+| HEY (`H`, `HG`)                                                  | 5 (5500)                         | 5 (5500)      | 5                     | 5                                 |
+
+Relayed CSMA in practice: with `--nbrrelay` forced on, relay slots of case A start at
+3500 ms and drop to 150 ms after 8 s; case B positions and HEY take a one-time 20 s hold,
+then slots 7 to 9 and a short search after 60 s; case B text keeps the normal base
+(`src/configuration_global.h:548-554`, `src/txring_functions.cpp:331-380`). On top, the
+age floor (section 3) applies to priorities 1 to 3.
 
 The presentation shows these matrices interactively per scenario.
 
@@ -458,24 +532,28 @@ field capture, evaluate, learn, adjust. Each wave ends with an upstream PR cut f
 Estimates are calendar time for one operator with agent support, based on the 4.40a and
 QRT campaigns (QRT: 15 to 25 min per brief, about 60 min gate and bench per wave,
 `docs/campaign-lora-qrt-20261018.md`), plus the field nights the QRT campaign skipped.
-They are estimates, not commitments.
+They are estimates, not commitments. The QRT pace (briefs of 15 to 25 min) is a weak
+basis on its own: it produced the untested release criticised in section 3, so the
+estimates below add field nights explicitly. W6 (regulatory check) and W8 (other operators
+changing SF) depend on outside parties, and every wave waits for upstream review; neither
+is in the estimates.
 
-| Wave | Content                                                                                                                                           | Gate and golden sets                                                                                                                        | Field proof                                                                      | Estimate     |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------ |
-| W0   | Measurement: Part A stage 0 plus section 3 metrics (cluster death, stage-2 bursts, echo-stopped retries), hop/`{SET}`/`{CET}`/HG/DM-band counters | host gate; new golden: hop-nibble corpus, CET-age replay                                                                                    | 24 to 48 h DK5EN-98 (explicit OK) plus one bench night                           | 1 week       |
-| W1   | TX buffer: TTL per priority, slot pool, supersede (Part A stages 1, 2, 4)                                                                         | `test_txring`, `test_txring_flood`, `test_txprio_replay`, `test_nbr_replay`                                                                 | DK5EN-1/-92/-90 gwflood replay, 1 night                                          | 2 weeks      |
-| W2   | Buffer parity and consolidation: time-aged dedup, neighbour coverage window, buffer inventory, byte-pool study                                    | `test_dedup_replay` with clock (8813 verdicts, two overflows become DUP), `test_topo_shadow`, RAM baseline (`tools/resource_baseline.json`) | DK5EN-98 soak: no `RX_DEDUP_NEW` for ids older than 39 min                       | 2 weeks      |
-| W3   | Hop clamp cleanup: nibble cap on relay (H1), gwcap review                                                                                         | new nibble corpus with wrapped frames; `test_aprs_corpus`                                                                                   | count of nibble > L before/after                                                 | 3 to 5 days  |
-| W4   | PM priority, reliability, speed: ACK first, DM band 2 with per-source limit, DM retries in QRT after the pool; S1 next-hop study                  | `test_ack_replay`, new DM-latency replay (golden: DG0OPK DM round trips, 1 min quiet / 4 min loaded)                                        | DM round-trip median and p95 on the bench fleet, group `TEST` and own nodes only | 2 weeks      |
-| W5   | End of life: relay filter for wrapping builds, notice DM, published date                                                                          | trailer corpus per firmware version                                                                                                         | count of blocked frames, no loss of current-firmware frames                      | 1 week       |
-| W6   | EMCOMM: priority flag (E1/E4), Ed25519 signatures (A3), trust store with pinning in the web GUI; regulatory check first                           | signature vectors (golden), trust-store persistence lint                                                                                    | bench: signed frame verified on all four boards, unsigned shown with warning     | 3 to 4 weeks |
-| W7   | Tag groups: T2 display filter, then T1 with app and server                                                                                        | settings schema lint, group corpus                                                                                                          | bench and one user group                                                         | 1 to 2 weeks |
-| W8   | Multi-SF: regional SF (M4) and backbone layer (M3) as experiments; PER per SNR bin first                                                          | PER/SNR measurement set (golden for the threshold)                                                                                          | attenuator bench, then one city cell                                             | 4 to 6 weeks |
-| W9+  | Speculative: source routing S2, link stretches, cell/role colouring, MPR election (4.14), adaptive power                                          | per item                                                                                                                                    | per item                                                                         | open         |
+| Wave | Content                                                                                                                                                                                                          | Gate and golden sets                                                                                                                        | Field proof                                                                                       | Estimate     |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------ |
+| W0   | Measurement: Part A stage 0 plus section 3 metrics (false cover via `removed_inferred`, stage-2 priority inversion, gateway echo release), hop/`{SET}`/`{CET}`/HG/DM-band counters, K0 deafness, PER per SNR bin | host gate; new golden: hop-nibble corpus, CET-age replay                                                                                    | DK5EN-98 logger data since 10-18 (explicit OK), observer nodes outside a cluster, one bench night | 1 to 2 weeks |
+| W1   | TX buffer: TTL per priority, slot pool, supersede (Part A stages 1, 2, 4)                                                                                                                                        | `test_txring`, `test_txring_flood`, `test_txprio_replay`, `test_nbr_replay`                                                                 | DK5EN-1/-92/-90 gwflood replay, 1 night                                                           | 2 weeks      |
+| W2   | Buffer parity and consolidation: time-aged dedup, neighbour coverage window, buffer inventory, byte-pool study                                                                                                   | `test_dedup_replay` with clock (8813 verdicts, two overflows become DUP), `test_topo_shadow`, RAM baseline (`tools/resource_baseline.json`) | DK5EN-98 soak: no `RX_DEDUP_NEW` for ids older than 39 min                                        | 2 weeks      |
+| W3   | Hop clamp cleanup: nibble cap on relay (H1), gwcap review                                                                                                                                                        | new nibble corpus with wrapped frames; `test_aprs_corpus`                                                                                   | count of nibble > L before/after                                                                  | 3 to 5 days  |
+| W4   | PM priority, reliability, speed: ACK first, DM band 2 with per-source limit, DM retries in QRT after the pool; S1 next-hop study                                                                                 | `test_ack_replay`, new DM-latency replay (golden: DG0OPK DM round trips, 1 min quiet / 4 min loaded)                                        | DM round-trip median and p95 on the bench fleet, group `TEST` and own nodes only                  | 2 weeks      |
+| W5   | End of life: relay filter for wrapping builds, notice DM, published date                                                                                                                                         | trailer corpus per firmware version                                                                                                         | count of blocked frames, no loss of current-firmware frames                                       | 1 week       |
+| W6   | EMCOMM: priority flag (E1/E4), Ed25519 signatures (A3), trust store with pinning in the web GUI; regulatory check first                                                                                          | signature vectors (golden), trust-store persistence lint                                                                                    | bench: signed frame verified on all four boards, unsigned shown with warning                      | 3 to 4 weeks |
+| W7   | Tag groups: T2 display filter, then T1 with app and server                                                                                                                                                       | settings schema lint, group corpus                                                                                                          | bench and one user group                                                                          | 1 to 2 weeks |
+| W8   | Multi-SF: regional SF (M4) and backbone layer (M3) as experiments; PER per SNR bin first                                                                                                                         | PER/SNR measurement set (golden for the threshold)                                                                                          | attenuator bench, then one city cell                                                              | 4 to 6 weeks |
+| W9+  | Speculative: source routing S2, link stretches, cell/role colouring, MPR election (4.14), adaptive power                                                                                                         | per item                                                                                                                                    | per item                                                                                          | open         |
 
 Dependencies: W0 before everything that changes relay behaviour; W1 before W4 (retries
-need the pool); W2 before W5 and W6 (RAM for trust store); W6 before any absolute priority
-for foreign traffic; W8 after W0's PER data.
+need the pool); W3 before W5 (the hop cap already neutralises wrapped frames); W6 before
+any absolute priority for foreign traffic; W8 after W0's PER data.
 
 Recurring verifications (already in use): host gate `tools/regression.sh --stage 1,2`,
 golden selftest (48), dedup replay, nbr replay, gwflood replay, APRS corpus and fuzz,
@@ -483,7 +561,8 @@ bench suite stage 3, DK5EN-98 soaks. Each wave adds its golden set to that list.
 
 ## 7. Open questions for the operator
 
-1. Source of the "new multi-line APRS format" (4.4).
+1. Source of the "new multi-line APRS format" (4.4), and whether "without the QRG going
+   over" means: no switch to the LoRa-APRS QRG in track mode (2.1).
 2. Whether forced `--nbrrelay on` should become RM1-switchable (section 3).
 3. EMCOMM trust root: manual pinning only, or a directory, and who runs it (4.9).
 4. EOL threshold and date (4.10).
