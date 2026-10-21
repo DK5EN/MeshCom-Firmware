@@ -106,7 +106,7 @@ back-pressure state machine; the write path still uses index distance.
 ### 3.2 HEY lifetime and ageing
 
 - Own HEY: `sendHey()`, destination `H`/`HG`, payload `R<n>;` (about 30 B on air),
-  `max_hop_pos` (default 2), enqueued `DONE`, priority 5. Trickle timer: Imin 30 s,
+  `max_hop_text` (default 4; `initAPRS()` gives `@` the text budget), enqueued `DONE`, priority 5. Trickle timer: Imin 30 s,
   Imax 15 min, k = 2; a gateway sends at least one HG per Imax.
 - Relayed HEY: same priority 5, same `DONE`, plus the signal-report chain appended
   per hop.
@@ -358,9 +358,10 @@ criteria first, then weighted scores among the options that pass.
 | D      | C + stage 4: supersede HEY/POS                                                                            |
 | E      | D + stage 1b: SNR-weighted relay delay (10.2), `INSTRUMENT`-switchable, default off until the field proof |
 
-The hop clamp (10.1) is not an option here: it trades reach for airtime and so
-conflicts with the goal "reach a wide field of nodes"; it stays a discussion point
-until the stage-0 hop histogram exists.
+The hop cap (10.1) is not an option here. Its variants are open: H1 is an outlier
+guard that leaves normal frames unchanged, while the locality variants (H2, H3, H5)
+trade reach for airtime and so touch the goal "reach a wide field of nodes". It stays
+a discussion point until the stage-0 hop data exists.
 
 **Step 1, knock-out.** An option must solve all four structural problems of section 4.
 
@@ -435,56 +436,98 @@ in German.
 Not yet decided, not yet part of the stage plan. Each point names what it would
 change in sections 5 to 8 if adopted.
 
-### 10.1 Local hop clamp: rewrite `max_hop` down to the node's own limit
+### 10.0 Hop model, from the code (fact base for 10.1 and 10.8)
 
-**Idea (operator).** A relay that receives a packet whose remaining hops would carry
-it beyond the relay's own hop limit rewrites `max_hop` down instead of passing the
-originator's value on. Long chains stop, packets stay regional and no longer cross
-mountain ridges for several hundred kilometres.
+Rewritten 2026-10-21 after a code scouting; the first version of 10.1 rested on a
+wrong model (path count as RF hop count). Claims carry `file:line`; INFERRED marks
+what is derived, not read.
 
-**Rule sketch.** On relay, with `travelled = msg_last_path_cnt` and the node's own
-limit `L` (`max_hop_text` / `max_hop_pos`, per payload type):
+1. **Byte 5 of a frame.** Bits 0 to 3 are the remaining hops; 0x80 server flag,
+   0x40 track, 0x20 app offline, 0x10 mesh (decode `src/aprs_functions.cpp:181-193`,
+   encode `:1033-1045`, `docs/architecture/11-wire-format.md`). The binary ACK 0x41
+   uses byte 5 with a 7-bit hop field, plausibility bound `MAX_HOP_LIMIT` 7
+   (`src/ack_functions.h`, `src/lora_functions.cpp:537`).
+2. **The originator sets the budget.** `initAPRS()` gives text (`:`) and HEY (`@`)
+   `max_hop_text`, every other type `max_hop_pos` (`src/aprs_functions.cpp:105-112`).
+   Defaults 4 and 2, `MAX_HOP_LIMIT` 7 (`src/configuration_global.h:363-365`).
+   `max_hop_text` is 1 to 6 (`src/maxhop.h`); `max_hop_pos` is pinned to 2 at boot
+   (`src/esp32/esp32_main.cpp:1567`, `src/nrf52/nrf52_main.cpp:756`) and by the
+   production lock. HN report and msgstore delivery frames send 0.
+3. **The server steers the node settings.** Besides the local `--maxhop`, the server
+   command `{SET}N;M;` sets `max_hop_text` (and in `INSTRUMENT` builds `max_hop_pos`)
+   (`src/loop_functions.cpp:2744-2761`, bounded by `prodLockSetHop()`). Gateways put
+   `{SET}` on LoRa like any server frame, and every node that hears it applies it;
+   no authentication (N-02, accepted 2026-08-18). INFERRED: in a region served this
+   way `max_hop_text` is largely uniform, not an individual per-node choice.
+4. **Relay gate.** The only hop gate on a relay is `nibble > 0`
+   (`src/lora_functions.cpp:2455`), then `max_hop--` (`:2461`) and the loop check
+   (own call in the path, `:2466-2477`). **No node compares the received nibble with
+   its own setting.**
+5. **`msg_last_path_cnt` is not an RF hop counter.** It is the number of calls in the
+   source path (`src/aprs_functions.cpp:203-233`). Two reasons it differs from RF
+   hops in the local island: a gateway that injects a server frame appends its call
+   to the path that already carries the foreign island's chain
+   (`src/esp32/udp_frame_esp32.cpp:323-324`); and with `bSHORTPATH` (`node_sset`
+   0x0400) a relay rewrites the path to "source, own call"
+   (`src/lora_functions.cpp:2507-2519`), so the count stays at 2. Its only use is the
+   gateway gwcap filter (`:2349`, `:2355`).
+6. **Server leg.** A gateway uploads a LoRa frame before its own relay decrement
+   (upload block `src/lora_functions.cpp:2377`, decrement `:2461`). It injects server
+   frames on LoRa **without decrementing** and sets the server flag
+   (`src/esp32/udp_frame_esp32.cpp:326`, enqueue `:574`; deliberate,
+   `docs/archive/befund-maxhop-unterlauf.md` section 4): every radio island behind a
+   gateway starts with the nibble the server sends. What the server does with the
+   nibble between upload and fan-out is not in this repository (open question).
+7. **Consequence for distance.** A frame uploaded in one region is injected by every
+   connected gateway under the same msg_id. INFERRED: the several-hundred-kilometre
+   reach runs mainly over this fan-out, not over long RF chains; RF chains are bounded
+   by the nibble per island.
+8. **Outliers in the field.** Older firmware (4.35x) wraps the nibble from 0 to 15 on
+   relay when it ORs 0x20 into `max_hop` (17 wraps in 10 days,
+   `docs/archive/befund-maxhop-unterlauf.md`); the fork's LoRa path no longer does
+   (`src/lora_functions.cpp:2170-2180`). A `{SET}` once wrote 44 (C18,
+   `docs/code-quality-2.0.md`). Nothing bounds a received nibble except its 4 bits.
 
-```
-remaining_new = min(max_hop & 0x0F, max(0, L - travelled))
-remaining_new == 0  -> deliver locally, do not relay (counted as rly_reason "hopclamp")
-```
+### 10.1 Hop clamp: cap the remaining hops at the node's own limit
 
-Flag bits in the upper nibble stay untouched. Cost: 0 B RAM, a few lines in the relay
-block of `src/lora_functions.cpp` (`max_hop--` near line 2461).
+**Idea (operator), stated in the terms of 10.0.** A relay receives a frame whose
+remaining hops have not run out but exceed the relay's own limit `L` (`max_hop_text`
+for text and HEY, `max_hop_pos` otherwise). It rewrites the nibble down instead of
+passing the originator's or the server's value on. Goal: frames stay regional
+instead of running on across ridges.
 
-**What exists today.** Gateways already _drop_ (not rewrite) text and position relays
-whose `msg_last_path_cnt >= max_hop_text+1` / `max_hop_pos+1` (`rly_reason "gwcap"`,
-SL-02, `src/lora_functions.cpp:2349` and `:2355`). That is the same policy, gateway-only,
-text and position only, and without effect on what downstream nodes do.
+Status: open, nothing decided. The variants differ in where the cap applies and
+what it is measured against.
 
-| Aspect               | Assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Airtime              | Strong lever. Flood cost grows with the number of nodes inside the hop radius, roughly quadratically with hops in an area mesh. Cutting the tail hops removes the relays that reach the fewest new nodes per transmission.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Clamp vs. drop       | Clamping is stronger than the existing gwcap drop: it also binds every node downstream of us, not only our own relay.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Locality             | Hop count is a poor proxy for distance. One summit digipeater spans 150 to 200 km in a single hop; ten valley hops may cover 20 km. The clamp cuts the valley chain, not the ridge crossing. Locality by geography needs a different signal (see below).                                                                                                                                                                                                                                                                                                                                                                                   |
-| Originator intent    | The originator's `max_hop` is overridden by any node on the path. One conservative node can split a region that depends on it as the only bridge. Behaviour becomes path-dependent: the same message reaches different areas depending on which relay wins CSMA.                                                                                                                                                                                                                                                                                                                                                                           |
-| ACK return paths     | Both ACK types close a retry ladder, so a clamped return path costs more airtime than it saves. **DM ACK** `:ackNNN` is a text frame with a path: a text clamp hits it unless it is exempt by payload (`:ack`), and a DM that arrived over a long path loses its ACK on the way back; the sender repeats the DM (3 x 40 s). **Binary ACK** 0x41 (gateway confirmation of a group/broadcast text) has no path, only the hop nibble in byte 5; a path-count clamp cannot apply to it, only a clamp on the nibble, and a too-short nibble lets the sender's group-text ladder run. Exempt both, plus the DM itself, or require path symmetry. |
-| HEY / neighbour data | HEY already uses `max_hop_pos` (default 2). The clamp matters for text and position, where originators set high values.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Interop              | Old firmware ignores it and keeps relaying with the original value; the clamp only takes effect where new firmware sits on the path. Safe in mixed nets, gradual effect.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Dedup coupling       | Shorter chains shorten the maximum packet life, which widens the dedup corridor of section 5.3 (fewer entries needed, see 10.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Variant                             | Rule                                                                        | Pro                                                                                                                                                        | Contra                                                                                                                                                                                                                   | Risk                                                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| H0 status quo                       | relay with `nibble - 1`                                                     | no change, originator and server keep control                                                                                                              | outliers (wrapped 15, bogus `{SET}` values) run on unbounded until dedup or loop check stop them                                                                                                                         | known                                                                                                                    |
+| H1 nibble cap on relay              | `nibble_new = min(nibble - 1, L)`                                           | needs no path, so immune to the server leg and `bSHORTPATH`; bounds the outliers of 10.0 item 8; 0 B; old firmware downstream obeys it, it only decrements | with a uniform `L` (10.0 item 3) normal frames are unchanged: no locality gain in the homogeneous case; where `L` differs between nodes, reach becomes path-dependent and a low-`L` node can cut off a region it bridges | low for the outlier bound; for locality it depends on lowering `L`, which also lowers the node's own reach as originator |
+| H2 nibble cap at gateway injection  | `nibble_new = min(nibble, L_inject)` before `addTxRingEntry(..., "udp_rx")` | acts on the server fan-out, the carrier of long distance (10.0 item 7); one place per island; downstream relays need no update                             | overrides the server's per-frame choice (for example `{CET}`, 10.8); gateways with different `L_inject` give islands different behaviour                                                                                 | medium: changes what a whole island receives from the server                                                             |
+| H3 server-side policy               | the server sets the nibble per frame type or region before the fan-out      | one place, consistent across all islands, no firmware change                                                                                               | outside this repository and outside the fork's control; the server has no RF topology knowledge                                                                                                                          | organisational, not technical                                                                                            |
+| H4 path-count clamp (first version) | `nibble_new = min(nibble - 1, L - msg_last_path_cnt)`                       | intuitive "total hop budget"                                                                                                                               | wrong metric (10.0 item 5): counts the foreign island and the gateway after a server leg, stops counting with `bSHORTPATH`; would kill re-injected frames in the local island                                            | high; not recommended                                                                                                    |
+| H5 geographic radius                | drop a relay when the originator's known position is farther than R km      | addresses the ridge case directly; hops are a poor distance proxy (one summit digipeater spans 150 to 200 km)                                              | needs a known originator position (neighbour matrix), costs a lookup per relay, fails for originators without position                                                                                                   | medium                                                                                                                   |
 
-**Variants to weigh.**
+**Exemptions, for every variant that rewrites.** DMs, DM ACKs (`:ackNNN`, `:rejNNN`),
+the binary ACK 0x41 (own 7-bit field) and `{ping}`. Both ACK types close a retry
+ladder (section 3.1); a cut return path costs more airtime than the cap saves.
 
-1. Clamp group/broadcast text and position only; exempt DMs, DM ACKs (`:ackNNN`, `:rejNNN`), the binary ACK 0x41 and `{ping}`. Smallest risk.
-2. Clamp only on gateways (extends gwcap from drop to rewrite). Gateways sit at the
-   points where regional meshes meet; that is where cross-region floods start.
-3. Mesh-wide ceiling instead of per-node `L`: a fixed `MESH_HOP_CEILING` in
-   `configuration_global.h`, same on every board. Keeps behaviour path-independent and
-   matches the parity goal of section 6.
-4. Geographic locality instead of hops: drop a relay when the originator position (from
-   the node's mheard/position table) is farther than R km. Addresses the ridge case
-   directly, but needs a known position and costs a lookup per relay.
+**Side observation, to verify.** gwcap (`src/lora_functions.cpp:2349`, `:2355`)
+compares the path count with `L + 1`. By 10.0 item 5, a frame injected by another
+gateway of the same island arrives with the foreign chain in its path and may trip
+gwcap although it made one RF hop. The field counts (text 56, position 259 gwcap
+rejections, `docs/nbr-wichtigkeit-konzept.md`) do not separate this case.
 
-**Evidence needed before deciding.** Hop-count distribution of relayed packets per payload
-type (`msg_last_path_cnt` at relay time, already in the `info.pl` field of the RX log,
-`src/lora_functions.cpp:701`) from the DG0OPK logs and the DK5EN-98 soak: what share of
-relay airtime goes to packets at hop 3 and beyond. Add it to stage 0.
+**Evidence needed (stage 0).** Per payload type: distribution of the received nibble
+against the node's own `L`; share of frames with nibble > `L` and with nibble 15; for
+gateways the nibble of server frames at injection; for gwcap rejections, whether the
+path contains a gateway injection.
+
+**Recommendation (proposal, not decided).** H4 is out on the evidence of 10.0. H1 is a
+cheap robustness guard against outliers and can stand on its own if stage 0 shows
+frames with nibble > `L`; it does not deliver locality on its own. For locality the
+lever is the server fan-out: H3 if the server operators agree, otherwise H2. H5 only
+if the hop-based variants leave the ridge case unsolved.
 
 ### 10.2 SNR-weighted relay delay (0 B RAM)
 
@@ -498,8 +541,9 @@ board. Candidate stage 1b, `INSTRUMENT`-switchable, ahead of stage 4.
 ### 10.3 Stage coupling: size dedup after stage 1
 
 The 39.6-minute packet life that sets the lower corridor bound is a symptom of relays
-waiting without a deadline. With per-priority TTL (stage 1) and optionally the hop clamp
-(10.1), maximum packet life is bounded by roughly hops x relay TTL. Re-measure packet life
+waiting without a deadline. With per-priority TTL (stage 1), the life of a frame within one
+island is bounded by roughly hops x relay TTL; a server leg (10.0 item 6) starts a new
+island with a new budget, so the bound holds per island, not end to end. Re-measure packet life
 after stage 1, then fix `DEDUP_ENTRIES` (section 9, decision 2); 128 entries may suffice.
 
 ### 10.4 Dedup entry format and scaling with network size
@@ -561,57 +605,68 @@ masks widen from 8 to 16 B, so 128 rows x 2 masks x 16 B = 4096 B instead of 102
 edge older than 90 minutes. If the 90-minute count stays well under 64, N2 plus N3 give
 parity at 0 B.
 
-### 10.8 `{CET}` time beacons: two hops, short life
+### 10.8 `{CET}` time beacons: reach and age
 
-**Current path, from the code.**
+Rewritten 2026-10-21; the first version claimed the server's hop value was unknown
+and proposed a clamp the server already applies in practice.
 
-- The MeshCom server sends `{CET}YYYY-MM-DD hh:mm:ss` (despite the name UTC,
-  `src/loop_functions.cpp`) over UDP to every gateway. The gateway queues it with
-  `addTxRingEntry(..., 0xFF, "udp_rx")` (`src/esp32/udp_frame_esp32.cpp`, nRF52 twin):
-  status `DONE`, so `getMessagePriority()` treats it as a **text relay, priority 3**.
-  The hop nibble is the server's; the gateway does not touch it.
-- Nodes relay it like any text (prio 3, CSMA base 4500 ms plus jitter, in the same
-  queue as all relays). Only `{CET}<` (marked wrong time) is not relayed
-  (`src/lora_functions.cpp`, `bMeshDestination = false`).
-- A receiver sets its clock from it only without RTC, GPS fix and NTP, and takes the
-  payload time as it is: **no correction for queue wait or airtime.**
+**Current path, from the code and the field log.**
 
-**Problems.**
+- The server sends `{CET}YYYY-MM-DD hh:mm:ss` (despite the name UTC,
+  `src/loop_functions.cpp:2778-2788`) to every gateway, with a server pseudo-call as
+  source (field log: `OE1XAR-33`, `OE1XAR-62`).
+- The gateway shows it (`sendDisplayText()`, `src/esp32/udp_frame_esp32.cpp:347-350`)
+  and also queues it on LoRa: the enqueue (`:565-574`, status `DONE`, "udp_rx") sits
+  after the `0x3A` branch, so it applies to `{CET}` and `{SET}` too. `DONE` text means
+  **priority 3 (relay)** in `getMessagePriority()`. No decrement at injection (10.0
+  item 6).
+- Every gateway injects the same msg_id; dedup stops second copies inside an island.
+- Nodes relay it like any text (prio 3), except `{CET}<` (marked wrong time,
+  `src/lora_functions.cpp:2144-2147`).
+- A receiver sets its clock only without RTC, GPS fix and NTP, and takes the payload
+  time as is (`src/loop_functions.cpp:2766-2795`): no correction for queue or air time.
 
-1. Reach: a clock beacon only needs to reach the nodes without their own time source
-   near a gateway. Every gateway injects it, so after two hops nearly every node is in
-   range of some gateway's copy. Further hops cost airtime and deliver ever older times.
-2. Age: in prio 3 it waits behind every relay; under load (DG0OPK p99 relay latency
-   286 s) it arrives minutes late, and each hop adds its own wait. Today no TTL applies
-   (only prio 5 ages), so a several-minute-old time is still sent and accepted.
+**Field evidence** (`docs/bench/snf-20260926/tbeam.txt`, log time MESZ, payload UTC):
 
-**Proposal (0 B RAM).**
+| Line | Path                                                        | Nibble at RX | Payload time | RX time (UTC) | Age  |
+| ---- | ----------------------------------------------------------- | ------------ | ------------ | ------------- | ---- |
+| 458  | `OE1XAR-33,DK5EN-98` (gateway direct)                       | H02          | 17:54:59     | 17:55:54      | 55 s |
+| 57   | `OE1XAR-62,DM5HR-12,DB0MMR-12,DL2JA-2` (gateway + 2 relays) | H00          | 17:48:27     | 17:49:58      | 91 s |
 
-| Measure                   | Where                                    | Rule                                                                                                                                                                                                                 |
-| ------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1 hop clamp at injection | gateway, UDP to LoRa                     | `max_hop = min(max_hop, CET_MAX_HOP)` before `addTxRingEntry()`. First concrete case of 10.1, without its risks: `{CET}` has no ACK and no retry ladder (Once path, `dm_text_escape.h`).                             |
-| T2 hop clamp on relay     | every node                               | Same rule with `msg_last_path_cnt`, so old gateways that still inject the server's value are bounded too.                                                                                                            |
-| T3 TTL                    | age sweep                                | Drop a queued `{CET}` older than 30 s (`RING_DROP_STALE`). Own class by payload prefix; the TTL table of 5.1 gets the row.                                                                                           |
-| T4 age correction         | `doTX()`, just before the frame goes out | Add the queue age (`now - ringEnqueueTime[slot]`, exists) to the payload time. The receiver then sees the time of the transmission, not of the injection; error left = airtime plus RX processing, about one second. |
-| T5 supersede              | enqueue                                  | A newer `{CET}` replaces a queued older one (5.4, item 1).                                                                                                                                                           |
-| T6 receiver plausibility  | `{CET}` handler in `loop_functions.cpp`  | Optional: subtract the frame's own airtime (known from SF/BW/length) before `setCurrentTime()`.                                                                                                                      |
+Read: the server sends nibble 2, the gateway passes it on, two relays use it up. Reach
+today is the gateway transmission plus two relays. The age splits into server-to-gateway
+latency, gateway queue wait and relay waits; two samples do not separate them (the
+gateway log line `[GW];rx;type;CET;...;ms` from TM-39 does).
 
-With T4 the TTL is no longer about accuracy but about airtime: a corrected time is
-still right after 60 s, but a node that waited that long had a busy channel and
-probably heard another gateway's copy. T3 stays as the airtime limit.
+**Open: what "two hops" means.** Two RF transmissions (gateway plus one relay, nibble 1)
+or gateway plus two relays (nibble 2, today's server value). The options below hold for
+both; only the target value differs.
 
-**Open for the operator.**
+**Reach options.**
 
-- Counting convention for "two hops": gateway transmission plus one relay (nibble 1)
-  or plus two relays (nibble 2). The hop nibble counts remaining relays.
-- Whether T4 is acceptable: it rewrites the payload of a server frame on relay. The
-  msg_id stays, so dedup is unaffected; old firmware just relays what it received.
-- Priority: with T3 and T4 a prio raise (to 2) is not needed; it would let a time
-  beacon push group text back, for little gain.
+| Option                                | Pro                                                            | Contra                                                                                   |
+| ------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| R0 status quo (server: 2)             | already bounded, no change                                     | gateway plus two relays; each relay adds wait and so error                               |
+| R1 server sends 1                     | one place, no firmware change, takes effect everywhere         | outside the fork's control (10.1 H3)                                                     |
+| R2 gateway caps at `CET_MAX_HOP`      | in the fork's control; downstream relays need no update        | overrides the server; only on gateways with new firmware                                 |
+| R3 receiver prefers the freshest copy | accept `{CET}` only with nibble >= 1, i.e. near a gateway; 0 B | nodes beyond one relay get no time from `{CET}`; the beacon still costs the same airtime |
 
-**Evidence (stage 0).** `[GW];rx;type;CET` already logs the injection (TM-39). Add the
-age at TX (`RING_TX_READ lat=`) for `{CET}` frames and their hop count at reception, from
-DK5EN-98 and one non-gateway node.
+**Age options.**
+
+| Option                                 | Pro                                                                                                  | Contra                                                                                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| A0 status quo                          | none                                                                                                 | ages of a minute and more are set as current time                                                                                       |
+| A1 TTL in the queue (for example 30 s) | 0 B, fits stage 1; stops sending stale time                                                          | under load no `{CET}` gets through at all; the value needs the stage-0 age histogram                                                    |
+| A2 age correction at TX                | adds the queue wait (`now - ringEnqueueTime[slot]`, exists) to the payload; error left about airtime | rewrites the payload of a server frame on every relay; the server-to-gateway latency stays uncorrected; old firmware relays uncorrected |
+| A3 supersede in the queue              | a newer `{CET}` replaces a queued older one (5.4 item 1)                                             | helps only when two beacons meet in one queue                                                                                           |
+| A4 priority raise (to 2)               | shorter wait                                                                                         | pushes group text back; does not fix the server-to-gateway part                                                                         |
+
+**Recommendation (proposal, not decided).** First measure (stage 0): `{CET}` age at TX
+and at reception per hop, and the gateway's receive time. If the queue wait dominates:
+A1 plus A3, both small and in line with stages 1 and 4. A2 is the most accurate but
+changes server content on air; decide it with the maintainers. For reach: R1 if the
+server operators agree, otherwise R2; R3 as a receiver-side alternative with no airtime
+gain.
 
 ## Appendix A: RAM arithmetic
 
