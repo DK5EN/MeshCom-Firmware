@@ -73,16 +73,37 @@ usual flow.
   2-second ticks, retry at 0x15 = 40 s, three retries), `DONE 0xFF` (one shot: every
   relay, HEY, position, ACK, `addTxRingEntryOnce()` texts), `EXT_PENDING 0x80`.
 - Priority classes: 1 ACK/DM, 2 group/broadcast text, 3 relay, 4 position, 5 HEY.
+  CSMA base 3000/3000/4500/5500/5500 ms plus slot jitter
+  (`src/configuration_global.h:436-456`).
 - Two different ACKs, both close a retry ladder:
-  - **Binary frame ACK** `MSG_TYPE_ACK` 0x41, 12 B (`src/ack_functions.h`). A gateway
-    sends it for a group/broadcast text (`*`, `WLNK-1`, `APRS2SOTA`, groups); it quotes
-    the text's msg_id and stops the sender's ladder. No source path, only the hop
-    nibble in byte 5 (`0x80 | max_hop_text`), decremented per relay. Own and relayed:
-    priority 1 (`getMessagePriority()` maps 0x41 to `MSG_PRIO_CRITICAL`).
+  - **Binary frame ACK** `MSG_TYPE_ACK` 0x41, 12 B (`src/ack_functions.h`). Only a
+    gateway (`bGATEWAY`) sends it, and only for a group/broadcast text (`*`, `WLNK-1`,
+    `APRS2SOTA`, groups) that is not its own TX (`src/lora_functions.cpp:2218-2240`).
+    It quotes the text's msg_id and stops the sender's ladder. It is **enqueued twice**,
+    both `DONE`, tags `rx_dm_ack_gw` and `rx_dm_ack_new` (`:2270`, `:2294`), the second
+    with a fresh own id; the code gives no reason for the second copy. Not sent when
+    `bSendAckGateway` is cleared: `{ping}`, `{pong}`, `{MCP}`, `{SET}`, `{CET}`,
+    `msg_server` frames, destination `100001` (`:2111-2203`). No source path; byte 5
+    holds a **7-bit** hop field (`0x80 | max_hop_text`), decremented per relay,
+    plausibility bound `MAX_HOP_LIMIT` 7 (`:537`).
   - **DM ACK** `:ackNNN`, an APRS text frame (payload type `:`) from the DM recipient
-    back to the sender (`src/loop_functions.cpp`, `%-9.9s:ack%03i`). It carries a path
-    like any text. Own: priority 1 (P15); relayed: priority 3 like every text relay.
-    CSMA base 3000/3000/4500/5500/5500 ms plus slot jitter.
+    back to the sender (`src/loop_functions.cpp:5570`, `%-9.9s:ack%03i`). It carries a
+    path and the 4-bit nibble like any text.
+- Priority per frame kind (`getMessagePriority()`, `src/txring_functions.cpp:114-177`).
+  The type check comes first; for text, status `DONE` returns 3 **before** the
+  destination is parsed, so every relayed text is 3 whatever its destination.
+
+  | Frame kind                         | Own                                            | Relayed |
+  | ---------------------------------- | ---------------------------------------------- | ------- |
+  | DM (text to one call)              | 1, `READY`, ladder 40 s, `MAX_RETRANSMIT` 3    | 3       |
+  | DM ACK `:ackNNN`                   | 1, once (`addTxRingEntryOnce`, P15)            | 3       |
+  | Group/broadcast text               | 2, `READY`, ladder                             | 3       |
+  | `{ping}`, `{SET}`, RM1 reply       | 1 to a call, 2 to a group; once                | 3       |
+  | Server frame injected by a gateway | 3 (`DONE`, "udp_rx"), whatever its destination | 3       |
+  | Binary ACK 0x41                    | 1 (gateway only), twice                        | 1       |
+  | Position                           | 4                                              | 4       |
+  | HEY (`H`, `HG`)                    | 5                                              | 5       |
+
 - Selection `getNextTxSlot()`: scans `iRead..iWrite`, lowest priority value wins, ties
   go to scan order (oldest by position, not by time).
 - Enqueue `addTxRingEntryCore()`: always writes at `iWrite`. Full means
@@ -302,8 +323,11 @@ D3 design:
    arrived. Never for text or ACK, with one exception: a newer `{CET}` time beacon replaces a queued older one (10.8). The superseded msg_id is already in the dedup table,
    so neighbours lose nothing.
 2. **Coverage-gated relay cancel.** Exists (`--nbrrelay`, neighbour matrix stage 2,
-   case A/B). It is the largest airtime lever and is gated because its field proof is
-   pending. The pool and TTL make it safer: a cancelled relay frees real capacity
+   case A/B). Fork production builds force it on (`prodLockNormalise()`,
+   `src/prod_lock.h:177`, QRT wave 1, `docs/campaign-lora-qrt-20261018.md`); only
+   `INSTRUMENT` builds can switch it; upstream status not checked. The bench log of
+   2026-09-26 still shows only `CANCEL?` (count mode) and no executed cancel
+   (`docs/bench/snf-20260926/dk1.txt:556`). The pool and TTL make it safer: a cancelled relay frees real capacity
    immediately instead of leaving a hole.
 3. **Airtime-aware admission.** Refuse to enqueue a priority 4/5 relay when the pool is
    above 70 % (mirrors BP-01's 80 % gateway back-pressure). Cheap, but it decides at
@@ -359,7 +383,8 @@ criteria first, then weighted scores among the options that pass.
 | E      | D + stage 1b: SNR-weighted relay delay (10.2), `INSTRUMENT`-switchable, default off until the field proof |
 
 The hop cap (10.1) is not an option here. Its variants are open: H1 is an outlier
-guard that leaves normal frames unchanged, while the locality variants (H2, H3, H5)
+guard that leaves normal frames unchanged only if `L` is uniform (unverified, 10.0
+item 3), while the locality variants (H2, H3, H5)
 trade reach for airtime and so touch the goal "reach a wide field of nodes". It stays
 a discussion point until the stage-0 hop data exists.
 
@@ -395,8 +420,9 @@ Score rationale:
   instead of transmitting.
 - Reach: TTL, pool, dedup and supersede do not change which node relays; E does,
   and favours the relay with the largest new coverage.
-- Risk: E equals D only because it ships default off behind `INSTRUMENT`, like
-  `--nbrrelay`. Default on before the field proof would score 2 (E = 53).
+- Risk: E equals D only because it ships default off behind `INSTRUMENT`. Default on
+  before the field proof would score 2 (E = 53). Note that `--nbrrelay` itself is
+  forced on in fork production builds (5.4 item 2).
 - Testability: the delay function is native-testable; its benefit needs a bench or
   field proof (two receivers at different SNR, count the cancelled copy).
 - RAM: C to E all cost the dedup table only; with the 5 B entry of 10.4 the classic
@@ -409,14 +435,14 @@ dedup size and the 1b delay curve are guesses.
 
 ## 8. Campaign plan
 
-| Stage | Commit scope                                                                                                                                                                                | Gate                                                                                            | Bench proof                                                                             |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 0     | Instrumentation: age-at-TX histogram per prio, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=`; hop histogram of relays (10.1); callsigns per 90 min / 12 h and `EVICT` rate (10.7) | `tools/regression.sh --stage 1,2`                                                               | 24 h on DK5EN-98 (read-only, explicit OK needed)                                        |
-| 1     | TTL table + sweep for all priorities                                                                                                                                                        | new `test_txring` cases                                                                         | DK5EN-1 with `--txttl` short, injected relay flood                                      |
-| 1b    | SNR-weighted relay delay, `INSTRUMENT`-switchable, default off                                                                                                                              | native cases for the delay curve                                                                | DK5EN-1/-92 at different SNR to a sender: the far node relays, the near one cancels     |
-| 2     | Slot pool, `INFLIGHT` status, delete ring indices                                                                                                                                           | `test_txring` (hole reuse behind parked SENT), `test_txring_flood` unchanged, `test_nbr_replay` | DK5EN-1/-92/-90: 1 h gwflood replay, `drop=0` with holes present; RAK for the lock path |
-| 3     | Time-aged dedup table, per-class size, remove `ENABLE_TBEAM` branch                                                                                                                         | `test_dedup_replay` with clock, two overflows become DUP                                        | DK5EN-98 soak: `RX_DEDUP_NEW` for an id older than 39 min must not occur                |
-| 4     | Supersede-in-place for HEY/POS                                                                                                                                                              | new native cases (own HEY refresh, relayed POS replaced, text never)                            | DK5EN-1 trickle at Imin, pool depth stays 1 for HEY                                     |
+| Stage | Commit scope                                                                                                                                                                                                                                                                                                                                                                                      | Gate                                                                                            | Bench proof                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 0     | Instrumentation: age-at-TX histogram per prio, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=`; hop histogram of relays (10.1); callsigns per 90 min / 12 h and `EVICT` rate (10.7); received nibble vs. own `L`, `{SET}` frames heard, gwcap with injected path (10.1); `{CET}` age per hop (10.8); HG relays per ring (10.9); relayed DM/ACK share, evictions and age in band 3 (10.10) | `tools/regression.sh --stage 1,2`                                                               | 24 h on DK5EN-98 (read-only, explicit OK needed)                                        |
+| 1     | TTL table + sweep for all priorities                                                                                                                                                                                                                                                                                                                                                              | new `test_txring` cases                                                                         | DK5EN-1 with `--txttl` short, injected relay flood                                      |
+| 1b    | SNR-weighted relay delay, `INSTRUMENT`-switchable, default off                                                                                                                                                                                                                                                                                                                                    | native cases for the delay curve                                                                | DK5EN-1/-92 at different SNR to a sender: the far node relays, the near one cancels     |
+| 2     | Slot pool, `INFLIGHT` status, delete ring indices                                                                                                                                                                                                                                                                                                                                                 | `test_txring` (hole reuse behind parked SENT), `test_txring_flood` unchanged, `test_nbr_replay` | DK5EN-1/-92/-90: 1 h gwflood replay, `drop=0` with holes present; RAK for the lock path |
+| 3     | Time-aged dedup table, per-class size, remove `ENABLE_TBEAM` branch                                                                                                                                                                                                                                                                                                                               | `test_dedup_replay` with clock, two overflows become DUP                                        | DK5EN-98 soak: `RX_DEDUP_NEW` for an id older than 39 min must not occur                |
+| 4     | Supersede-in-place for HEY/POS                                                                                                                                                                                                                                                                                                                                                                    | new native cases (own HEY refresh, relayed POS replaced, text never)                            | DK5EN-1 trickle at Imin, pool depth stays 1 for HEY                                     |
 
 Each stage: docs (`RESUME.md`, defect catalogue), full host gate, then commit on
 `fork-dev`. Upstream PRs are cut from `upstream/dev` afterwards, one per stage,
@@ -430,65 +456,89 @@ in German.
 3. Whether `E22_XML-DevKitC` keeps a shorter dedup window or gets its buffers cut.
 4. Whether stage 0 may run on DK5EN-98 (production gateway, read-only, needs the
    usual explicit OK).
+5. Discussion points of section 10, all open: hop cap variant (10.1), `{CET}` reach
+   and age (10.8, including what "two hops" means), HG budget (10.9), priority of
+   relayed DMs and `:ackNNN` (10.10). Each needs its stage-0 data first.
 
 ## 10. Open discussion points (review 2026-10-21)
 
 Not yet decided, not yet part of the stage plan. Each point names what it would
 change in sections 5 to 8 if adopted.
 
-### 10.0 Hop model, from the code (fact base for 10.1 and 10.8)
+### 10.0 Hop model, from the code (fact base for 10.1, 10.8 to 10.10)
 
-Rewritten 2026-10-21 after a code scouting; the first version of 10.1 rested on a
-wrong model (path count as RF hop count). Claims carry `file:line`; INFERRED marks
-what is derived, not read.
+Rewritten 2026-10-21 after code scouting, an adversarial review and a verification
+pass; the first version of 10.1 rested on a wrong model (path count as RF hop count).
+Claims carry `file:line`; INFERRED marks what is derived, not read.
 
 1. **Byte 5 of a frame.** Bits 0 to 3 are the remaining hops; 0x80 server flag,
    0x40 track, 0x20 app offline, 0x10 mesh (decode `src/aprs_functions.cpp:181-193`,
-   encode `:1033-1045`, `docs/architecture/11-wire-format.md`). The binary ACK 0x41
-   uses byte 5 with a 7-bit hop field, plausibility bound `MAX_HOP_LIMIT` 7
-   (`src/ack_functions.h`, `src/lora_functions.cpp:537`).
-2. **The originator sets the budget.** `initAPRS()` gives text (`:`) and HEY (`@`)
+   encode `:1033-1045`, the 0x10 bit from the global `bMESH`). The binary ACK 0x41 uses
+   byte 5 with a 7-bit hop field (3.1).
+2. **The hop count is set per frame by its originator, once.** Every own frame takes
+   its nibble from `initAPRS()`: text (`:`) and HEY (`@`, both `H` and `HG`) get
    `max_hop_text`, every other type `max_hop_pos` (`src/aprs_functions.cpp:105-112`).
-   Defaults 4 and 2, `MAX_HOP_LIMIT` 7 (`src/configuration_global.h:363-365`).
-   `max_hop_text` is 1 to 6 (`src/maxhop.h`); `max_hop_pos` is pinned to 2 at boot
-   (`src/esp32/esp32_main.cpp:1567`, `src/nrf52/nrf52_main.cpp:756`) and by the
-   production lock. HN report and msgstore delivery frames send 0.
-3. **The server steers the node settings.** Besides the local `--maxhop`, the server
-   command `{SET}N;M;` sets `max_hop_text` (and in `INSTRUMENT` builds `max_hop_pos`)
-   (`src/loop_functions.cpp:2744-2761`, bounded by `prodLockSetHop()`). Gateways put
-   `{SET}` on LoRa like any server frame, and every node that hears it applies it;
-   no authentication (N-02, accepted 2026-08-18). INFERRED: in a region served this
-   way `max_hop_text` is largely uniform, not an individual per-node choice.
-4. **Relay gate.** The only hop gate on a relay is `nibble > 0`
-   (`src/lora_functions.cpp:2455`), then `max_hop--` (`:2461`) and the loop check
-   (own call in the path, `:2466-2477`). **No node compares the received nibble with
-   its own setting.**
+   Fixed exceptions: HN report and msgstore delivery send 0
+   (`src/loop_functions.cpp:5779`, `src/msgstore_glue.cpp:117`); the 0x41 ACK carries
+   `max_hop_text` in its own field. No user, app, web, KISS or serial path chooses a
+   hop per message. Defaults 4 and 2, `MAX_HOP_LIMIT` 7
+   (`src/configuration_global.h:363-365`). `max_hop_text` is 1 to 6 in production,
+   0 to 7 via `{SET}` in `INSTRUMENT` builds (`src/maxhop.h`, `src/prod_lock.h:196-200`);
+   `max_hop_pos` is pinned to 2 (`src/esp32/esp32_main.cpp:1567`,
+   `src/nrf52/nrf52_main.cpp:756`, `src/prod_lock.h:184`).
+3. **Who sets the node's budget.** Locally `--maxhop`, remotely the server command
+   `{SET}N;M;` (`src/loop_functions.cpp:2744-2761`, bounded by `prodLockSetHop()`).
+   Gateways put `{SET}` on LoRa like any server frame (the enqueue at
+   `src/esp32/udp_frame_esp32.cpp:565-574` sits after the `0x3A` branch); nodes relay it
+   (`bMeshDestination` is not cleared for it) and every receiver applies it with no
+   source, server-flag or destination check (`src/lora_functions.cpp:2134`,
+   `src/loop_functions.cpp:2723`); no authentication (N-02, accepted 2026-08-18).
+   **Unverified:** whether `max_hop_text` is uniform in a region. No field log in the
+   repository shows a server `{SET}`; stage 0 counts them.
+4. **Relay gates.** On every node: `nibble > 0` (`src/lora_functions.cpp:2455`), then
+   `max_hop--` (`:2461`) and the loop check (own call in the path, `:2466-2477`). On
+   gateways in addition **gwcap**: no relay when `msg_last_path_cnt >= max_hop_text + 1`
+   (text) or `>= max_hop_pos + 1` (position) (`:2349-2358`, sets `bMeshDestination =
+false`, which the decision chain at `:2442-2450` treats as no relay). gwcap is a
+   path-count cap against the gateway's own setting, i.e. an H4-type rule (10.1) that is
+   live today. No node compares the received **nibble** with its own setting, and no
+   received nibble is clamped anywhere except by its 4 bits.
 5. **`msg_last_path_cnt` is not an RF hop counter.** It is the number of calls in the
-   source path (`src/aprs_functions.cpp:203-233`). Two reasons it differs from RF
-   hops in the local island: a gateway that injects a server frame appends its call
-   to the path that already carries the foreign island's chain
-   (`src/esp32/udp_frame_esp32.cpp:323-324`); and with `bSHORTPATH` (`node_sset`
-   0x0400) a relay rewrites the path to "source, own call"
-   (`src/lora_functions.cpp:2507-2519`), so the count stays at 2. Its only use is the
-   gateway gwcap filter (`:2349`, `:2355`).
+   source path (`src/aprs_functions.cpp:203-233`). It differs from RF hops in the local
+   island because a gateway that injects a server frame appends its call to the path
+   that already carries the foreign island's chain
+   (`src/esp32/udp_frame_esp32.cpp:323-324`). A third path form exists: with
+   `bSHORTPATH` a relay rewrites the path to "source, own call"
+   (`src/lora_functions.cpp:2507-2519`); fork production builds force shortpath off
+   (`src/prod_lock.h:176`), so this applies to `INSTRUMENT` builds and to other
+   firmware in the field. Its only decision use is gwcap; it is also stored in the
+   neighbour matrix for display (`:701`).
 6. **Server leg.** A gateway uploads a LoRa frame before its own relay decrement
-   (upload block `src/lora_functions.cpp:2377`, decrement `:2461`). It injects server
-   frames on LoRa **without decrementing** and sets the server flag
-   (`src/esp32/udp_frame_esp32.cpp:326`, enqueue `:574`; deliberate,
+   (`addNodeData` `src/lora_functions.cpp:2409`, decrement `:2461`). It injects server
+   frames **without decrementing**, appends its call and sets the server flag
+   (`src/esp32/udp_frame_esp32.cpp:323-326`, nRF52 `:209-212`; deliberate,
    `docs/archive/befund-maxhop-unterlauf.md` section 4): every radio island behind a
    gateway starts with the nibble the server sends. What the server does with the
-   nibble between upload and fan-out is not in this repository (open question).
-7. **Consequence for distance.** A frame uploaded in one region is injected by every
-   connected gateway under the same msg_id. INFERRED: the several-hundred-kilometre
-   reach runs mainly over this fan-out, not over long RF chains; RF chains are bounded
-   by the nibble per island.
-8. **Outliers in the field.** Older firmware (4.35x) wraps the nibble from 0 to 15 on
-   relay when it ORs 0x20 into `max_hop` (17 wraps in 10 days,
-   `docs/archive/befund-maxhop-unterlauf.md`); the fork's LoRa path no longer does
-   (`src/lora_functions.cpp:2170-2180`). A `{SET}` once wrote 44 (C18,
-   `docs/code-quality-2.0.md`). Nothing bounds a received nibble except its 4 bits.
+   nibble between upload and fan-out is not in this repository (open).
+7. **Several gateways per island.** Each gateway dedups the UDP copy on its own
+   (`is_new_packet()`, `src/esp32/udp_frame_esp32.cpp:220`), so two gateways that get it
+   before hearing each other both inject. Inside the island dedup is per node too: a
+   copy each node has not seen yet is relayed once by it.
+8. **Consequence for distance (INFERRED).** A frame uploaded in one region is injected
+   by every connected gateway under the same msg_id. The several-hundred-kilometre reach
+   therefore plausibly runs over the server fan-out more than over long RF chains; RF
+   chains are bounded by the nibble per island. Not measured.
+9. **Outliers in the field.** Builds without the fix wrap the nibble from 0 to 15 on
+   relay of a broadcast or group text on a node without a connected app, by ORing 0x20
+   into `max_hop` (field: 4.35p, 4.35c, 4.35s; 17 wraps in 10 days, DMs not affected;
+   `docs/archive/befund-maxhop-unterlauf.md`). The fork carries two fixes: the flag is
+   no longer ORed into `max_hop` (`src/lora_functions.cpp:2170-2180`) and the relay guard
+   masks the nibble (`:2455`). The UDP paths still OR 0x20
+   (`src/esp32/udp_frame_esp32.cpp:494`, `src/nrf52/udp_frame_nrf52.cpp:455`); this is
+   harmless on LoRa (the frame is already encoded, encode masks `& 0x0F`) and dead for
+   the BLE copy. A `{SET}` once wrote 44 (C18, `docs/code-quality-2.0.md`).
 
-### 10.1 Hop clamp: cap the remaining hops at the node's own limit
+### 10.1 Hop cap: limit the remaining hops by the node's own setting
 
 **Idea (operator), stated in the terms of 10.0.** A relay receives a frame whose
 remaining hops have not run out but exceed the relay's own limit `L` (`max_hop_text`
@@ -496,38 +546,41 @@ for text and HEY, `max_hop_pos` otherwise). It rewrites the nibble down instead 
 passing the originator's or the server's value on. Goal: frames stay regional
 instead of running on across ridges.
 
-Status: open, nothing decided. The variants differ in where the cap applies and
-what it is measured against.
+Status: open, nothing decided. The variants differ in where the cap applies and what
+it is measured against. H0 includes gwcap, which already exists on gateways.
 
-| Variant                             | Rule                                                                        | Pro                                                                                                                                                        | Contra                                                                                                                                                                                                                   | Risk                                                                                                                     |
-| ----------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| H0 status quo                       | relay with `nibble - 1`                                                     | no change, originator and server keep control                                                                                                              | outliers (wrapped 15, bogus `{SET}` values) run on unbounded until dedup or loop check stop them                                                                                                                         | known                                                                                                                    |
-| H1 nibble cap on relay              | `nibble_new = min(nibble - 1, L)`                                           | needs no path, so immune to the server leg and `bSHORTPATH`; bounds the outliers of 10.0 item 8; 0 B; old firmware downstream obeys it, it only decrements | with a uniform `L` (10.0 item 3) normal frames are unchanged: no locality gain in the homogeneous case; where `L` differs between nodes, reach becomes path-dependent and a low-`L` node can cut off a region it bridges | low for the outlier bound; for locality it depends on lowering `L`, which also lowers the node's own reach as originator |
-| H2 nibble cap at gateway injection  | `nibble_new = min(nibble, L_inject)` before `addTxRingEntry(..., "udp_rx")` | acts on the server fan-out, the carrier of long distance (10.0 item 7); one place per island; downstream relays need no update                             | overrides the server's per-frame choice (for example `{CET}`, 10.8); gateways with different `L_inject` give islands different behaviour                                                                                 | medium: changes what a whole island receives from the server                                                             |
-| H3 server-side policy               | the server sets the nibble per frame type or region before the fan-out      | one place, consistent across all islands, no firmware change                                                                                               | outside this repository and outside the fork's control; the server has no RF topology knowledge                                                                                                                          | organisational, not technical                                                                                            |
-| H4 path-count clamp (first version) | `nibble_new = min(nibble - 1, L - msg_last_path_cnt)`                       | intuitive "total hop budget"                                                                                                                               | wrong metric (10.0 item 5): counts the foreign island and the gateway after a server leg, stops counting with `bSHORTPATH`; would kill re-injected frames in the local island                                            | high; not recommended                                                                                                    |
-| H5 geographic radius                | drop a relay when the originator's known position is farther than R km      | addresses the ridge case directly; hops are a poor distance proxy (one summit digipeater spans 150 to 200 km)                                              | needs a known originator position (neighbour matrix), costs a lookup per relay, fails for originators without position                                                                                                   | medium                                                                                                                   |
+| Variant                            | Rule                                                                                                                                     | Pro                                                                                                                                                                                                                  | Contra                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H0 status quo                      | relay with `nibble - 1`; gateways also apply gwcap                                                                                       | no change; originator and server keep per-frame control; works with the whole fleet                                                                                                                                  | an outlier (wrapped 15, bogus `{SET}` value) runs up to 15 relays per island before dedup and loop check stop it; gwcap counts the wrong metric (10.0 item 5) and may block frames re-injected by another gateway of the same island                                                                                                                  |
+| H1 nibble cap on relay             | `nibble_new = min(nibble - 1, L)`                                                                                                        | needs no path, so `bSHORTPATH` and the server leg do not distort it; bounds outliers from the first fixed relay on; 0 B; unfixed downstream nodes keep decrementing the capped value                                 | removes the per-frame control of originator and server (the pro of H0); the first transmission after injection or origination is uncapped; unfixed downstream nodes can still wrap; with a uniform `L` normal frames are unchanged (no locality gain), with mixed `L` reach becomes path-dependent and a low-`L` node can cut off a region it bridges |
+| H2 nibble cap at gateway injection | `nibble_new = min(nibble, L_inject)`, set on `aprsmsg` before `encodeAPRS()` (`udp_frame_esp32.cpp:335`) or patched into `convBuffer[5]` | acts on the server fan-out, plausibly the carrier of long distance (10.0 item 8, INFERRED); downstream relays need no update                                                                                         | overrides the server's per-frame choice (for example `{CET}`, 10.8); only on gateways with new firmware; an island with several gateways (10.0 item 7) behaves by whichever copy arrives first, nondeterministic with mixed `L_inject` or mixed firmware                                                                                              |
+| H3 server-side policy              | the server sets the nibble per frame type or region before the fan-out                                                                   | one place, consistent across all islands, no firmware change; the server gets HEY signal-report chains, paths and positions from every gateway (`src/lora_functions.cpp:2377-2390`), so it has partial topology data | outside this repository and outside the fork's control; what the server knows and does today is unknown                                                                                                                                                                                                                                               |
+| H4 path-count cap                  | `nibble_new = min(nibble - 1, L - msg_last_path_cnt)`                                                                                    | intuitive "total hop budget"; gwcap already does this on gateways as a drop                                                                                                                                          | wrong metric (10.0 item 5): counts the foreign island and the gateway after a server leg; would kill re-injected frames in the local island; extending it to every node spreads gwcap's flaw                                                                                                                                                          |
+| H5 geographic radius               | drop a relay when the originator's known position is farther than R km                                                                   | addresses the ridge case directly; hop count is a poor distance proxy (summit digipeaters bridge long distances in one hop; no measured figure in this repository)                                                   | a server-injected frame's originator is usually far away, so H5 would stop local relaying of the whole fan-out unless it exempts `msg_server` frames or measures from the injecting gateway; needs originator positions from the neighbour matrix, whose rows are capped (10.7); a lookup per relay                                                   |
 
 **Exemptions, for every variant that rewrites.** DMs, DM ACKs (`:ackNNN`, `:rejNNN`),
-the binary ACK 0x41 (own 7-bit field) and `{ping}`. Both ACK types close a retry
-ladder (section 3.1); a cut return path costs more airtime than the cap saves.
+the binary ACK 0x41 (own 7-bit field; sent twice per text by the gateway, 3.1) and
+`{ping}`. Both ACK types close a retry ladder; a cut return path costs more airtime
+than the cap saves.
 
-**Side observation, to verify.** gwcap (`src/lora_functions.cpp:2349`, `:2355`)
-compares the path count with `L + 1`. By 10.0 item 5, a frame injected by another
-gateway of the same island arrives with the foreign chain in its path and may trip
-gwcap although it made one RF hop. The field counts (text 56, position 259 gwcap
-rejections, `docs/nbr-wichtigkeit-konzept.md`) do not separate this case.
+**gwcap, to verify.** By 10.0 items 5 and 7, a frame injected by another gateway of the
+same island arrives with the foreign chain in its path and may trip gwcap after one RF
+hop. The field counts (text 56, position 259 gwcap rejections,
+`docs/nbr-wichtigkeit-konzept.md`) do not separate this case.
 
 **Evidence needed (stage 0).** Per payload type: distribution of the received nibble
-against the node's own `L`; share of frames with nibble > `L` and with nibble 15; for
-gateways the nibble of server frames at injection; for gwcap rejections, whether the
-path contains a gateway injection.
+against the node's own `L`; share of frames with nibble > `L` and with nibble 15; the
+`{SET}` frames heard and their values (uniformity of `L`); for gateways the nibble of
+server frames at injection; for gwcap rejections, whether the path contains a gateway
+injection.
 
-**Recommendation (proposal, not decided).** H4 is out on the evidence of 10.0. H1 is a
-cheap robustness guard against outliers and can stand on its own if stage 0 shows
-frames with nibble > `L`; it does not deliver locality on its own. For locality the
-lever is the server fan-out: H3 if the server operators agree, otherwise H2. H5 only
-if the hop-based variants leave the ridge case unsolved.
+**Assessment (proposal, not decided).** H4 conflicts with 10.0 item 5; whether gwcap
+itself should change is a separate question that the stage-0 gwcap data answers. H1 is
+a cheap guard against outliers if stage 0 shows frames with nibble > `L`; on its own it
+gives locality only where `L` is lowered. If locality is the goal, H3 or H2 act where
+the long distance plausibly arises, but that rests on the unmeasured inference of
+10.0 item 8; measure it first. H5 only if the hop-based variants leave the ridge case
+unsolved.
 
 ### 10.2 SNR-weighted relay delay (0 B RAM)
 
@@ -540,11 +593,16 @@ board. Candidate stage 1b, `INSTRUMENT`-switchable, ahead of stage 4.
 
 ### 10.3 Stage coupling: size dedup after stage 1
 
-The 39.6-minute packet life that sets the lower corridor bound is a symptom of relays
-waiting without a deadline. With per-priority TTL (stage 1), the life of a frame within one
-island is bounded by roughly hops x relay TTL; a server leg (10.0 item 6) starts a new
-island with a new budget, so the bound holds per island, not end to end. Re-measure packet life
-after stage 1, then fix `DEDUP_ENTRIES` (section 9, decision 2); 128 entries may suffice.
+The cause of the 39.6-minute packet life that sets the lower corridor bound is not
+established in this paper: relays waiting without a deadline is one candidate, a late
+copy over a second gateway or the server leg is another. With per-priority TTL
+(stage 1), the life of a frame within one island is bounded by roughly hops x relay TTL,
+but only where every relay runs stage 1 and no node wraps the nibble; most of the
+field runs 4.35x without either. The dedup window must cover the end-to-end life
+(copies via another gateway or the server leg), which the per-island bound does not
+limit. Re-measure packet life
+after stage 1, then fix `DEDUP_ENTRIES` (section 9, decision 2). Whether fewer entries
+suffice follows only from that measurement, not from the bound.
 
 ### 10.4 Dedup entry format and scaling with network size
 
@@ -575,13 +633,13 @@ each eviction logs `[NBR]|EVICT`.
 
 Effects of the overflow on classic boards:
 
-| Consumer                                   | Effect of an evicted row                                                                                                                                                                                                                             | Direction                              |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Relay need (`nbrIRelayNeed()`), remote row | A path token without a row contributes no coverage, "has the frame" shrinks, the need set grows: the node relays where it could have cancelled.                                                                                                      | Conservative: costs airtime, not reach |
-| Relay need, direct neighbour row           | A direct neighbour without a row is not a dependant; the cancel can conclude "everyone covered" while it is not. Protected by the first eviction pass as long as fewer than 63 neighbours are fresh direct, so in practice only on hilltop gateways. | Aggressive: costs reach                |
-| Edge pool (`NBR_MAX_EDGES` 256 classic)    | Oldest edges go first; coverage knowledge thins out.                                                                                                                                                                                                 | Conservative                           |
-| MH list (web, app, T-Deck), horizon        | Shows at most 63 other stations on classic; horizon 48 entries classic vs. 112.                                                                                                                                                                      | Display only                           |
-| Parity                                     | Same site, same traffic: a classic and an S3 node decide relay cancels differently once more than 63 callsigns fall into the 12-hour window. With `--nbrrelay` off (default) only the display differs.                                               | Parity gap, grows with network size    |
+| Consumer                                   | Effect of an evicted row                                                                                                                                                                                                                                 | Direction                              |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Relay need (`nbrIRelayNeed()`), remote row | A path token without a row contributes no coverage, "has the frame" shrinks, the need set grows: the node relays where it could have cancelled.                                                                                                          | Conservative: costs airtime, not reach |
+| Relay need, direct neighbour row           | A direct neighbour without a row is not a dependant; the cancel can conclude "everyone covered" while it is not. Protected by the first eviction pass as long as fewer than 63 neighbours are fresh direct, so in practice only on hilltop gateways.     | Aggressive: costs reach                |
+| Edge pool (`NBR_MAX_EDGES` 256 classic)    | Oldest edges go first; coverage knowledge thins out.                                                                                                                                                                                                     | Conservative                           |
+| MH list (web, app, T-Deck), horizon        | Shows at most 63 other stations on classic; horizon 48 entries classic vs. 112.                                                                                                                                                                          | Display only                           |
+| Parity                                     | Same site, same traffic: a classic and an S3 node decide relay cancels differently once more than 63 callsigns fall into the 12-hour window. Fork production builds force `--nbrrelay on` (5.4 item 2), so the difference reaches relay decisions there. | Parity gap, grows with network size    |
 
 **The 12-hour window is the lever, not the row count.** Freshness for relay coverage
 (`nbrIFresh()`) is the same 720 minutes as for the list. A relay decision about the next
@@ -618,55 +676,187 @@ and proposed a clamp the server already applies in practice.
 - The gateway shows it (`sendDisplayText()`, `src/esp32/udp_frame_esp32.cpp:347-350`)
   and also queues it on LoRa: the enqueue (`:565-574`, status `DONE`, "udp_rx") sits
   after the `0x3A` branch, so it applies to `{CET}` and `{SET}` too. `DONE` text means
-  **priority 3 (relay)** in `getMessagePriority()`. No decrement at injection (10.0
-  item 6).
-- Every gateway injects the same msg_id; dedup stops second copies inside an island.
+  **priority 3 (relay)**. No decrement at injection (10.0 item 6). It triggers no 0x41
+  ACK (`bSendAckGateway` cleared, 3.1).
+- Every gateway injects it under the same msg_id. Dedup is per node: each node that has
+  not seen the beacon yet relays it once while the nibble allows (10.0 item 7).
 - Nodes relay it like any text (prio 3), except `{CET}<` (marked wrong time,
   `src/lora_functions.cpp:2144-2147`).
-- A receiver sets its clock only without RTC, GPS fix and NTP, and takes the payload
-  time as is (`src/loop_functions.cpp:2766-2795`): no correction for queue or air time.
+- A receiver sets its clock only without RTC, GPS fix and NTP and only for a year
+  after 2023; phone time does **not** protect it (`bPhoneTimeValid` is commented out,
+  `src/loop_functions.cpp:2769`). It takes the payload time as is
+  (`:2766-2795`): no correction for queue or air time.
 
-**Field evidence** (`docs/bench/snf-20260926/tbeam.txt`, log time MESZ, payload UTC):
+**Field evidence** (`docs/bench/snf-20260926/`, log time MESZ, payload UTC).
+
+Ages at reception (`tbeam.txt`, the DK5EN-91 log):
 
 | Line | Path                                                        | Nibble at RX | Payload time | RX time (UTC) | Age  |
 | ---- | ----------------------------------------------------------- | ------------ | ------------ | ------------- | ---- |
 | 458  | `OE1XAR-33,DK5EN-98` (gateway direct)                       | H02          | 17:54:59     | 17:55:54      | 55 s |
 | 57   | `OE1XAR-62,DM5HR-12,DB0MMR-12,DL2JA-2` (gateway + 2 relays) | H00          | 17:48:27     | 17:49:58      | 91 s |
 
-Read: the server sends nibble 2, the gateway passes it on, two relays use it up. Reach
-today is the gateway transmission plus two relays. The age splits into server-to-gateway
-latency, gateway queue wait and relay waits; two samples do not separate them (the
-gateway log line `[GW];rx;type;CET;...;ms` from TM-39 does).
+Relays of one beacon, `x6AAA3153` from gateway DK5EN-98 (received with H02, relayed
+with H01, all `prio=3`):
+
+| Node     | Log                 | Queue wait (`wait=`) |
+| -------- | ------------------- | -------------------- |
+| DK5EN-90 | `rak.txt:354-355`   | 17.0 s               |
+| DK5EN-91 | `tbeam.txt:495-496` | 20.3 s               |
+| DK5EN-1  | `dk1.txt:566-567`   | 31.7 s               |
+
+Read: in these samples the beacons arrive with nibble 2 from the gateway (INFERRED that
+the server sends 2: two beacons, two pseudo-calls); the gateway passes it on and two
+relay levels use it up. Airtime per beacon is therefore 1 + N1 + N2 transmissions per
+gateway (N1, N2: nodes in the first and second relay ring), not three. In this sample
+three first-ring nodes relayed; DK5EN-1 logged a cancel candidate after hearing
+DK5EN-90 (`[NBR]|CANCEL?`, `dk1.txt:556`, count mode on that bench day) and still sent.
+Relay queue waits are 17 to 32 s per hop; the gateway's own share of the 55 s (server
+latency plus queue) needs the gateway log line `[GW];rx;type;CET;...;ms` (TM-39).
 
 **Open: what "two hops" means.** Two RF transmissions (gateway plus one relay, nibble 1)
-or gateway plus two relays (nibble 2, today's server value). The options below hold for
+or gateway plus two relays (nibble 2, the value seen today). The options below hold for
 both; only the target value differs.
 
 **Reach options.**
 
-| Option                                | Pro                                                            | Contra                                                                                   |
-| ------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| R0 status quo (server: 2)             | already bounded, no change                                     | gateway plus two relays; each relay adds wait and so error                               |
-| R1 server sends 1                     | one place, no firmware change, takes effect everywhere         | outside the fork's control (10.1 H3)                                                     |
-| R2 gateway caps at `CET_MAX_HOP`      | in the fork's control; downstream relays need no update        | overrides the server; only on gateways with new firmware                                 |
-| R3 receiver prefers the freshest copy | accept `{CET}` only with nibble >= 1, i.e. near a gateway; 0 B | nodes beyond one relay get no time from `{CET}`; the beacon still costs the same airtime |
+| Option                                | Pro                                                            | Contra                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| R0 status quo (2 seen in the field)   | already bounded; no change; works with the whole fleet         | gateway plus two relay rings, each ring adds wait (17 to 32 s measured) and so error, and N transmissions |
+| R1 server sends 1                     | one place, no firmware change, takes effect everywhere         | outside the fork's control (10.1 H3)                                                                      |
+| R2 gateway caps at `CET_MAX_HOP`      | in the fork's control; downstream relays need no update        | overrides the server; only on gateways with new firmware; several gateways per island (10.0 item 7)       |
+| R3 receiver prefers the freshest copy | accept `{CET}` only with nibble >= 1, i.e. near a gateway; 0 B | nodes beyond one relay get no time from `{CET}`; the beacon still costs the same airtime                  |
 
 **Age options.**
 
 | Option                                 | Pro                                                                                                  | Contra                                                                                                                                  |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| A0 status quo                          | none                                                                                                 | ages of a minute and more are set as current time                                                                                       |
-| A1 TTL in the queue (for example 30 s) | 0 B, fits stage 1; stops sending stale time                                                          | under load no `{CET}` gets through at all; the value needs the stage-0 age histogram                                                    |
+| A0 status quo                          | no change; no rewriting of server content; works with the whole fleet                                | ages of a minute and more are set as current time, also over a phone-synced clock                                                       |
+| A1 TTL in the queue (for example 30 s) | 0 B, fits stage 1; stops sending stale time                                                          | with relay waits of 17 to 32 s measured, 30 s would already drop part of the second ring; the value needs the stage-0 age histogram     |
 | A2 age correction at TX                | adds the queue wait (`now - ringEnqueueTime[slot]`, exists) to the payload; error left about airtime | rewrites the payload of a server frame on every relay; the server-to-gateway latency stays uncorrected; old firmware relays uncorrected |
 | A3 supersede in the queue              | a newer `{CET}` replaces a queued older one (5.4 item 1)                                             | helps only when two beacons meet in one queue                                                                                           |
 | A4 priority raise (to 2)               | shorter wait                                                                                         | pushes group text back; does not fix the server-to-gateway part                                                                         |
+| A5 phone time protects the clock       | re-enable `bPhoneTimeValid` in the `{CET}` gate                                                      | needs regular phone time (the code comment says so); does not help nodes without a phone                                                |
 
-**Recommendation (proposal, not decided).** First measure (stage 0): `{CET}` age at TX
-and at reception per hop, and the gateway's receive time. If the queue wait dominates:
-A1 plus A3, both small and in line with stages 1 and 4. A2 is the most accurate but
-changes server content on air; decide it with the maintainers. For reach: R1 if the
-server operators agree, otherwise R2; R3 as a receiver-side alternative with no airtime
-gain.
+**Assessment (proposal, not decided).** Measure first (stage 0): `{CET}` age at TX and
+at reception per hop, and the gateway's receive time. If queue waits dominate, A1
+(value from the histogram) plus A3 are small and in line with stages 1 and 4. A2 is the
+most accurate but changes server content on air; a maintainer decision. For reach: R1
+if the server operators agree, otherwise R2; R3 as a receiver-side alternative without
+airtime gain.
+
+### 10.9 HG (gateway HEY)
+
+**From the code.**
+
+- `sendHey()` sends destination `HG` when the node is a gateway, `H` otherwise
+  (`src/loop_functions.cpp:5677-5680`), payload `R<n>;`. Hop from `initAPRS('@')`:
+  `max_hop_text`, default 4, **not** `max_hop_pos`. Priority 5 for own and relayed,
+  set by type in `getMessagePriority()`. No back-pressure check (BP-01 sits only in
+  the user-message path, `:4497`). The gateway does not upload its own bare HG (GW-01).
+- Trickle counts `H` and `HG` alike (`src/lora_functions.cpp:1739-1741`). A gateway is
+  exempt from suppression once its last own HEY is at least Imax (15 min) old
+  (`src/hey_policy.h`), so every gateway sends at least one HG per Imax.
+- Receivers: `HG` sets `NBR_FLAG_GW` on the sender's row, `H` clears it, held 45 min
+  (`NBR_GW_HOLD_MIN`, `src/lora_functions.cpp:793-802`, `src/nbr_matrix.cpp:1216-1228`).
+  Gateway-held rows are removed from the relay dependant set
+  (`src/nbr_matrix.cpp:1770-1774`): a node does not count on a gateway to relay for it.
+- The HG frame itself has no relay rule of its own: hop, cancel and case A/B are the
+  same as for `H`. Gateways upload every received HEY (`H` and `HG`) with their own
+  signal report appended, even with the server flag set
+  (`src/lora_functions.cpp:2377-2390`).
+
+**What this means for the hop discussion.** A relayed HG carries the gateway's
+existence up to `max_hop_text` (4) hops into the mesh, at priority 5 and with a growing
+signal-report chain (capped at 106 B, `HEY_PATH_PAYLOAD_MAX`). The receivers' only use
+of the HG flag is local (need set, display); the server gets the chain through the
+upload of any gateway.
+
+| Option                           | Pro                                                                               | Contra                                                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| G0 status quo                    | gateway visible across the whole hop radius; signal-report chain for the server   | HG airtime grows with every relay ring; nodes several hops away gain a GW flag they cannot use for the need set          |
+| G1 HG with a lower nibble        | HG mainly informs direct and two-hop neighbours (need set, display); less airtime | the server's signal-report chains from far rings shrink; changes `initAPRS()` semantics for one destination; mixed fleet |
+| G2 HG as `max_hop_pos` (2)       | aligns HG with the position budget, which is pinned and uniform                   | same as G1; HEY of normal nodes would differ from HG unless `H` follows                                                  |
+| G3 leave HG, cap all HEY (H, HG) | one rule for neighbour discovery; trickle already limits own HEY                  | larger change; HEY is the neighbour matrix's main input beyond one hop                                                   |
+
+**Assessment (proposal, not decided).** Stage 0 should count HG relays per ring and how
+often a far-ring GW flag is used. Without that data G0 stays; G1 or G2 are cheap if the
+data shows far-ring HG airtime without use.
+
+### 10.10 Priorities of personal messages and their `:ackNNN`
+
+**From the code** (table in 3.1). Own DM and own `:ackNNN` are priority 1. Once relayed,
+both are priority 3, the same band as every relayed group text and every
+server frame: `getMessagePriority()` returns 3 for a `DONE` text before it parses the
+destination. A server frame injected by a gateway is 3 even when it is a DM to a node
+of the island. Field note, `docs/lora-qrt-dk5en98-db0taw14-20261018-verdict.md`
+finding 8: "server DMs for other nodes get 3 instead of 1 and are the first evicted",
+with the caution that "foreign server DMs at priority 1 would compete with own ACKs".
+
+Effect: a DM and its `:ackNNN` lose their priority at the first relay. Each relay ring
+waits in the 4500 ms CSMA band, and in a full queue they compete with group-text relays
+on equal terms. The sender's ladder (3 x 40 s)
+fires when the ACK is late; every late ACK costs up to three extra DM transmissions.
+
+| Option                                         | Pro                                                                                 | Contra                                                                                                               |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| P0 status quo                                  | simple; relays cannot starve own traffic; no class for foreign traffic above 3      | DM and ACK compete with group relays; late ACKs trigger the ladder                                                   |
+| P1 relayed DM and `:ackNNN` to priority 2      | ahead of group relays, behind own DMs and ACKs (1); parse cost only for `DONE` text | needs destination parsing for `DONE` text (it exists for `READY`); a relayed DM flood would push own group text back |
+| P2 relayed `:ackNNN` only to priority 2        | the ACK stops the ladder, so it saves the most airtime per byte; small change       | DM itself still in 3; needs payload parse (`:ack` after the addressee)                                               |
+| P3 server-injected DM to a local node to 2     | addresses finding 8 directly; the gateway knows the destination                     | only gateways; foreign DMs above group relays; the verdict's caution applies if it went to 1                         |
+| P4 keep 3, but exempt DM and ACK from eviction | no ordering change; protects against the "first evicted" case                       | does not shorten the wait; adds a rule to the eviction policy (5.2)                                                  |
+
+Interplay with the other stages: with the slot pool (stage 2) the eviction order is by
+priority and age; with TTL (stage 1) a relayed DM in band 3 gets the relay TTL (300 s
+proposed), longer than the sender's ladder of 3 x 40 s. Each retry carries its own id
+(`pnRetryId()`, k = retry count + 1, `src/lora_functions.cpp:3221-3224`), so dedup does
+not merge them: a stale relayed copy and the retry are both relayed.
+
+**Assessment (proposal, not decided).** P2 has the best ratio of airtime saved to change
+size, followed by P4 for the eviction case. P1 and P3 change the fairness between
+foreign and own traffic and need the stage-0 queue data (share of relayed DMs and ACKs
+in band 3, their evictions and their age at TX).
+
+### 10.11 Docs inventory for this concept
+
+What the existing docs say about hops, HEY/HG, priorities and `{CET}`/`{SET}`, from a
+sweep over `docs/**/*.md` (tags: F fact, M measurement, C concept, A archived).
+
+| Topic             | Doc                                                         | Statement                                                                                                  | Tag                            |
+| ----------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------ | --- |
+| Hop model         | `architecture/11-wire-format.md` (byte 5, `{SET}`, `{CET}`) | byte 5 layout, defaults 4/2, `{SET}N;M;`, `{CET}` gate                                                     | F                              |
+| Hop model         | `archive/befund-maxhop-unterlauf.md`                        | wrap 0 to 15, broadcast/group only, nodes without app; gateways do not decrement on injection (deliberate) | A                              |
+| Hop model         | `architecture/08-defect-catalogue.md` N-02                  | `{SET}` unauthenticated; accepted/WONTFIX                                                                  | A                              |
+| Hop model         | `how-to-read-meshcom-logs.md`                               | `hop0`, `gwcap` relay reasons                                                                              | F                              |
+| Hop model         | `nbr-wichtigkeit-konzept.md`                                | gwcap rejections text 56, position 259                                                                     | M                              |
+| HEY / HG / HN     | `hey-supp.md`                                               | trickle 30 s / 15 min; own HEY -53 % (87 vs 186), steady state > 90 %                                      | M                              |
+| HEY / HG / HN     | `soak-20261001-440a-verdict.md`, `soak-20260928-verdict.md` | gateway HEY median 15.0 min; HG sets the GW flag; 1/146 HN lost to prio-5 starvation                       | M                              |
+| HEY / HG / HN     | `hey-storm-2026-10-17.md`                                   | one node sent 14,557 HEYs in an hour                                                                       | M                              |
+| HEY / HG / HN     | `nbr-logformat.md`                                          | `[NBR]                                                                                                     | GW` rules, HN report max_hop 0 | F   |
+| Priorities        | `how-to-read-meshcom-logs.md`                               | prio 1 ACK+DM, 2 group, 3 relay, 4 position, 5 HEY; CSMA 3000/4500/5500                                    | F                              |
+| Priorities        | `lora-qrt-dk5en98-db0taw14-20261018-verdict.md` finding 8   | server text is relay prio 3; server DMs first evicted                                                      | M                              |
+| Priorities        | `adr-nc-importance-backoff.md`                              | no differentiation inside the relay band; importance-based slots (not in code)                             | C                              |
+| Priorities        | `BACKLOG.md` CSMA-01                                        | a reply never gets its own priority on the first CSMA attempt                                              | C                              |
+| Relay suppression | `nbr-wichtigkeit-konzept.md`, `nbr-stage2-campaign.md`      | 350 ms slot order ineffective at 40 neighbours; wait grows about 6 s per heard frame; case A/B             | M/C                            |
+| Relay suppression | `campaign-lora-qrt-20261018.md`                             | `--nbrrelay on` locked as production default (fork)                                                        | F                              |
+| Field             | `soak-20261001-440a-verdict.md`                             | own relay wait median 3.7 s, p95 10.1 s; foreign copy heard before own TX in 3 to 5 %                      | M                              |
+
+Contradictions and stale points found in the sweep:
+
+1. `prio-talk-flood-networking.md` (2024-06-15) calls the 350 ms slot order reliable;
+   `nbr-wichtigkeit-konzept.md` measures it as ineffective at 40 neighbours. The older
+   doc predates 4.35.
+2. N-02: `architecture/08-defect-catalogue.md` proposes an auth gate;
+   `rm-gui/extended-commands-concept.md` records it as accepted WONTFIX.
+3. `max_hop_text` persistence: `d1-04-settings-field-triage-20260912.md` says persisted;
+   `code-quality-2.0.md` says overwritten by compile defaults after `init_flash()`. To
+   check, it decides whether a `{SET}` survives a reboot.
+4. `d1-04-settings-field-triage-20260912.md` says `max_hop_pos` is overwritten from a
+   received position frame at `loop_functions.cpp:2349`; the code there is only a
+   comparison. Likely stale.
+5. Stale line references: `hey-echo-upload-concept.md` (`sendHey()` at `:5420`, now
+   `:5651`), `adr-nc-importance-backoff.md` (`getMessagePriority()` at `:46-73`, now
+   `:114-177`), `soak-20260928-verdict.md` (`nbr_matrix.cpp:1273-1277`).
 
 ## Appendix A: RAM arithmetic
 
