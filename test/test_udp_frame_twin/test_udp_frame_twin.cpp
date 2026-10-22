@@ -1104,8 +1104,9 @@ static void test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines(v
     }
 }
 
-// DR-03 / F3: die vier Latch-Loeschungen sind sonst durch KEINEN Test
-// gedeckt -- man kann jede einzelne entfernen und 961 Faelle bleiben gruen.
+// DR-03 / F3: die drei Latch-Loeschungen (GATE, CONF, BEAT; OTHER seit UDP-03
+// nicht mehr) sind sonst durch KEINEN Test gedeckt -- man kann jede einzelne
+// entfernen und 961 Faelle bleiben gruen.
 //
 // Der Latch hb_warn_logged macht aus der Heartbeat-Warnung einen Einmalruf pro
 // Episode. Wer Serververkehr sieht, muss ihn zusammen mit der Alterung
@@ -1113,14 +1114,12 @@ static void test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines(v
 // ein Defekt, den man nur daran merkt, dass eine Logzeile FEHLT. Genau die
 // Sorte, die jahrelang unbemerkt bleibt.
 //
-// Beide Plattformen, alle drei erreichbaren Zweige (GATE braucht einen
-// vollstaendigen LoRa-Frame und ist durch die Faelle oben abgedeckt; BEAT,
-// CONF und OTHER sind hier die drei, die ein Datagramm allein ausloest).
+// Beide Plattformen, BEAT und CONF (GATE braucht einen vollstaendigen
+// LoRa-Frame und ist durch die Faelle oben abgedeckt). OTHER loescht den
+// Latch seit UDP-03 (#1231) bewusst NICHT mehr, siehe den Test darunter.
 static void test_agreement_live_traffic_clears_the_heartbeat_warn_latch(void)
 {
     uint8_t tmpl[BUF_CAP];
-
-    struct { const char *name; uint16_t len; } kinds[3];
 
     memset(tmpl, 0, sizeof(tmpl));
     uint16_t beat_len = build_beat_datagram(tmpl);
@@ -1132,19 +1131,11 @@ static void test_agreement_live_traffic_clears_the_heartbeat_warn_latch(void)
     uint8_t conf_tmpl[BUF_CAP];
     memcpy(conf_tmpl, tmpl, sizeof(conf_tmpl));
 
-    uint8_t other_tmpl[BUF_CAP];
-    memset(other_tmpl, 0, sizeof(other_tmpl));
-    memcpy(other_tmpl, "ZZZZ", 4);
-    memset(other_tmpl + 4, 0xAB, 8);
-    uint16_t other_len = 12;
+    const uint8_t *tmpls[2] = { beat_tmpl, conf_tmpl };
+    const uint16_t lens[2]  = { beat_len,  conf_len  };
+    const char *names[2]    = { "BEAT",    "CONF"    };
 
-    (void)kinds;
-
-    const uint8_t *tmpls[3] = { beat_tmpl, conf_tmpl, other_tmpl };
-    const uint16_t lens[3]  = { beat_len,  conf_len,  other_len };
-    const char *names[3]    = { "BEAT",    "CONF",    "OTHER"   };
-
-    for (int k = 0; k < 3; k++)
+    for (int k = 0; k < 2; k++)
     {
         for (int side = 0; side < 2; side++)
         {
@@ -1163,6 +1154,60 @@ static void test_agreement_live_traffic_clears_the_heartbeat_warn_latch(void)
                      "bis die handelnde Stufe den Latch faellt",
                      names[k], side ? "nrf52" : "esp32");
             TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged, msg);
+        }
+    }
+}
+
+// UDP-03 (#1231): a datagram without a GATE/CONF/BEAT indicator (the OTHER
+// branch; no source filter, any LAN sender reaches it) is not a server answer.
+// It must neither refresh the HB watchdog timer nor clear the warn latch,
+// otherwise LAN noise suppresses "[UDP] Server not responding" while the
+// "Server:" line (gwLinkNoteRx, test below) already says no response.
+// BEAT and CONF are the control: they still refresh both.
+static void test_regression_other_frame_does_not_refresh_hb_watchdog_on_both(void)
+{
+    uint8_t beat_tmpl[BUF_CAP];
+    memset(beat_tmpl, 0, sizeof(beat_tmpl));
+    uint16_t beat_len = build_beat_datagram(beat_tmpl);
+
+    uint8_t conf_tmpl[BUF_CAP];
+    memset(conf_tmpl, 0, sizeof(conf_tmpl));
+    uint16_t conf_len = build_conf_datagram(conf_tmpl, "DK5EN-9");
+
+    uint8_t other_tmpl[BUF_CAP];
+    memset(other_tmpl, 0, sizeof(other_tmpl));
+    memcpy(other_tmpl, "ZZZZ", 4);
+    memset(other_tmpl + 4, 0xAB, 8);
+    uint16_t other_len = 12;
+
+    const uint8_t *tmpls[3] = { beat_tmpl, conf_tmpl, other_tmpl };
+    const uint16_t lens[3]  = { beat_len,  conf_len,  other_len };
+    const char *names[3]    = { "BEAT",    "CONF",    "OTHER"   };
+    const bool refreshes[3] = { true,      true,      false     };
+
+    const unsigned long stale = 1000;    // last server frame, 64 s ago
+    const unsigned long now   = 65000;
+
+    for (int k = 0; k < 3; k++)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            recorder_reset();
+            mc_test_set_millis(now);
+            last_upd_timer = stale;
+            neth.last_upd_timer = stale;
+            hb_warn_logged = true;          // Stage 1 has already warned
+
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpls[k], lens[k]);
+            if (side) handleUdpFrame_nrf52(buf, lens[k], IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, lens[k], IPAddress(1, 2, 3, 4));
+
+            unsigned long timer = side ? neth.last_upd_timer : last_upd_timer;
+            char msg[96];
+            snprintf(msg, sizeof(msg), "UDP-03: %s on %s", names[k], side ? "nrf52" : "esp32");
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(refreshes[k] ? now : stale, timer, msg);
+            TEST_ASSERT_EQUAL_MESSAGE(!refreshes[k], hb_warn_logged, msg);
         }
     }
 }
@@ -3114,6 +3159,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);
+    RUN_TEST(test_regression_other_frame_does_not_refresh_hb_watchdog_on_both);
     RUN_TEST(test_agreement_server_frames_stamp_gw_link_other_does_not);
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
     RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);

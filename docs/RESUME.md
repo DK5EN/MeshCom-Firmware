@@ -2,6 +2,15 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-22 -- UDP-03 (upstream issue #1231): OTHER datagrams no longer refresh the gateway HB watchdog
+
+- Fix on fork-dev: the OTHER branch of `handleUdpFrame_esp32`/`_nrf52` leaves `last_upd_timer` and `hb_warn_logged`
+  alone (catalogue section 2g, BACKLOG UDP-03, DR-03 amended). Host gate 77 envs / 2741 cases green; heltec_V3 and
+  rak4631 build; advisor APPROVED.
+- Bench DK5EN-1: unfixed image silent for 130 s under OTHER traffic, fixed image logs Stage 1 at 59 s and Stage 2 at
+  89 s (`tools/bench/runs/harness/udp03-bench-20261022.json`). DK5EN-1 runs the normal fixed build (Oct 22 21:36).
+- Open: upstream PR (firmware-only, two `src/` files); `/sync-upstream` for #1224 (merged) and #1225.
+
 ## 2026-10-20 -- upstream PR #1224 (#1217, web send buffer and watchdog feeds)
 
 - PR #1224 against `upstream/dev` 7bcccb23: branch `pr/web-wdt-1217`, one commit `204bb7ad` = `src/` and

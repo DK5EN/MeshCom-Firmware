@@ -1641,6 +1641,27 @@ Core helpers landed in W1 (`b8aa4354`), the surfaces in W2 (`55ad3b42`), the nRF
 
 ---
 
+## 2g. UDP-03 — OTHER datagrams refreshed the gateway HB watchdog (upstream #1231, 2026-10-22)
+
+**FIXED** on fork-dev, not released; upstream PR pending. Low, LAN-reachable (any sender to the gateway UDP port),
+diagnostics only.
+
+- **Mechanism:** `handleUdpFrame_esp32()` and `handleUdpFrame_nrf52()` dispatch on the 4-byte indicator. The
+  fallback branch (`[GW];rx;type;OTHER`) set `last_upd_timer` / `neth.last_upd_timer = millis()` and cleared
+  `hb_warn_logged`, like GATE/CONF/BEAT, but did not call `gwLinkNoteRx()`. The port has no source filter, so any
+  datagram kept the HB watchdog young while the "Server:" line already said "no response".
+- **Impact:** the Stage 1 "[UDP] Server not responding" and Stage 2 "[UDP] Heartbeat timeout" lines stayed silent.
+  Recovery actions were not delayed: ESP32 resets UDP only with WiFi down, nRF52 re-inits ETH only without an IP,
+  and neither state delivers datagrams. The issue's "prevents recovery" claim is refuted. On ESP32 noise could also
+  arm the watchdog (`last_upd_timer > 0`) before any server answer; that accidental arming is gone too.
+- **Evidence:** 0 OTHER against 102,394 BEAT frames in all `~/meshlog` field captures (no real server frame lands in
+  OTHER). Bench DK5EN-1 2026-10-22 (`tools/bench/runs/harness/udp03-bench-20261022.json`): unfixed, 13 OTHER
+  datagrams over 130 s of server silence, no Stage 1/2 line; fixed, same traffic, Stage 1 at 59 s, Stage 2 at 89 s.
+- **Fix:** the OTHER branch keeps its log lines and no longer touches the timer or the latch, on both platforms.
+  DR-03 in `docs/testplan/drift-matrix.csv` amended (latch now cleared in three branches).
+- **Tests:** `native_udp_frame_twin` `test_regression_other_frame_does_not_refresh_hb_watchdog_on_both` (failed on
+  ESP32, then on nRF52, before the respective fix); DR-03 latch test narrowed to BEAT/CONF.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |

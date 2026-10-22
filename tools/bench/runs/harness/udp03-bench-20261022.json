@@ -1,0 +1,13 @@
+{
+  "id": "UDP-03",
+  "issue": "icssw-org/MeshCom-Firmware#1231",
+  "date": "2026-10-22",
+  "node": "DK5EN-1 (Heltec V3, 192.168.68.71, 2323 console, --airgap on, 2 dBm)",
+  "procedure": "INSTRUMENT image; --srvip to tools/mock/meshcom_server.py on the Mac; first BEAT arms the HB watchdog; mock stopped; 12-byte 'ZZZZ'+0xAB datagram to node:1990 every 10 s for 130 s; restore --gateway on, --srvip 0.0.0.0, --airgap off",
+  "runs": [
+    {"label": "before", "base": "589aa87f (unfixed)", "junk_sent": 13, "other_rx": 13, "server_not_responding": 0, "heartbeat_timeout": 0},
+    {"label": "after", "base": "589aa87f + UDP-03 fix", "junk_sent": 13, "other_rx": 13, "server_not_responding": 1, "heartbeat_timeout": 1,
+     "lines": ["[UDP] Server not responding for 59s — WiFi CONNECTED", "[UDP] Heartbeat timeout 89s — WiFi CONNECTED, server unresponsive, waiting"]}
+  ],
+  "verdict": "unfixed: OTHER datagrams hide 130 s of server silence (no Stage 1/2 line); fixed: Stage 1 at 59 s, Stage 2 at 89 s despite the same OTHER traffic"
+}
