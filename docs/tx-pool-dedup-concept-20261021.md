@@ -823,24 +823,24 @@ in band 3, their evictions and their age at TX).
 What the existing docs say about hops, HEY/HG, priorities and `{CET}`/`{SET}`, from a
 sweep over `docs/**/*.md` (tags: F fact, M measurement, C concept, A archived).
 
-| Topic             | Doc                                                         | Statement                                                                                                  | Tag                            |
+| Topic | Doc | Statement | Tag |
 | ----------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------ | --- |
-| Hop model         | `architecture/11-wire-format.md` (byte 5, `{SET}`, `{CET}`) | byte 5 layout, defaults 4/2, `{SET}N;M;`, `{CET}` gate                                                     | F                              |
-| Hop model         | `archive/befund-maxhop-unterlauf.md`                        | wrap 0 to 15, broadcast/group only, nodes without app; gateways do not decrement on injection (deliberate) | A                              |
-| Hop model         | `architecture/08-defect-catalogue.md` N-02                  | `{SET}` unauthenticated; accepted/WONTFIX                                                                  | A                              |
-| Hop model         | `how-to-read-meshcom-logs.md`                               | `hop0`, `gwcap` relay reasons                                                                              | F                              |
-| Hop model         | `nbr-wichtigkeit-konzept.md`                                | gwcap rejections text 56, position 259                                                                     | M                              |
-| HEY / HG / HN     | `hey-supp.md`                                               | trickle 30 s / 15 min; own HEY -53 % (87 vs 186), steady state > 90 %                                      | M                              |
-| HEY / HG / HN     | `soak-20261001-440a-verdict.md`, `soak-20260928-verdict.md` | gateway HEY median 15.0 min; HG sets the GW flag; 1/146 HN lost to prio-5 starvation                       | M                              |
-| HEY / HG / HN     | `hey-storm-2026-10-17.md`                                   | one node sent 14,557 HEYs in an hour                                                                       | M                              |
-| HEY / HG / HN     | `nbr-logformat.md`                                          | `[NBR]                                                                                                     | GW` rules, HN report max_hop 0 | F   |
-| Priorities        | `how-to-read-meshcom-logs.md`                               | prio 1 ACK+DM, 2 group, 3 relay, 4 position, 5 HEY; CSMA 3000/4500/5500                                    | F                              |
-| Priorities        | `lora-qrt-dk5en98-db0taw14-20261018-verdict.md` finding 8   | server text is relay prio 3; server DMs first evicted                                                      | M                              |
-| Priorities        | `adr-nc-importance-backoff.md`                              | no differentiation inside the relay band; importance-based slots (not in code)                             | C                              |
-| Priorities        | `BACKLOG.md` CSMA-01                                        | a reply never gets its own priority on the first CSMA attempt                                              | C                              |
-| Relay suppression | `nbr-wichtigkeit-konzept.md`, `nbr-stage2-campaign.md`      | 350 ms slot order ineffective at 40 neighbours; wait grows about 6 s per heard frame; case A/B             | M/C                            |
-| Relay suppression | `campaign-lora-qrt-20261018.md`                             | `--nbrrelay on` locked as production default (fork)                                                        | F                              |
-| Field             | `soak-20261001-440a-verdict.md`                             | own relay wait median 3.7 s, p95 10.1 s; foreign copy heard before own TX in 3 to 5 %                      | M                              |
+| Hop model | `architecture/11-wire-format.md` (byte 5, `{SET}`, `{CET}`) | byte 5 layout, defaults 4/2, `{SET}N;M;`, `{CET}` gate | F |
+| Hop model | `archive/befund-maxhop-unterlauf.md` | wrap 0 to 15, broadcast/group only, nodes without app; gateways do not decrement on injection (deliberate) | A |
+| Hop model | `architecture/08-defect-catalogue.md` N-02 | `{SET}` unauthenticated; accepted/WONTFIX | A |
+| Hop model | `how-to-read-meshcom-logs.md` | `hop0`, `gwcap` relay reasons | F |
+| Hop model | `nbr-wichtigkeit-konzept.md` | gwcap rejections text 56, position 259 | M |
+| HEY / HG / HN | `hey-supp.md` | trickle 30 s / 15 min; own HEY -53 % (87 vs 186), steady state > 90 % | M |
+| HEY / HG / HN | `soak-20261001-440a-verdict.md`, `soak-20260928-verdict.md` | gateway HEY median 15.0 min; HG sets the GW flag; 1/146 HN lost to prio-5 starvation | M |
+| HEY / HG / HN | `hey-storm-2026-10-17.md` | one node sent 14,557 HEYs in an hour | M |
+| HEY / HG / HN | `nbr-logformat.md` | `[NBR]                                                                                                     | GW` rules, HN report max_hop 0 | F |
+| Priorities | `how-to-read-meshcom-logs.md` | prio 1 ACK+DM, 2 group, 3 relay, 4 position, 5 HEY; CSMA 3000/4500/5500 | F |
+| Priorities | `lora-qrt-dk5en98-db0taw14-20261018-verdict.md` finding 8 | server text is relay prio 3; server DMs first evicted | M |
+| Priorities | `adr-nc-importance-backoff.md` | no differentiation inside the relay band; importance-based slots (not in code) | C |
+| Priorities | `BACKLOG.md` CSMA-01 | a reply never gets its own priority on the first CSMA attempt | C |
+| Relay suppression | `nbr-wichtigkeit-konzept.md`, `nbr-stage2-campaign.md` | 350 ms slot order ineffective at 40 neighbours; wait grows about 6 s per heard frame; case A/B | M/C |
+| Relay suppression | `campaign-lora-qrt-20261018.md` | `--nbrrelay on` locked as production default (fork) | F |
+| Field | `soak-20261001-440a-verdict.md` | own relay wait median 3.7 s, p95 10.1 s; foreign copy heard before own TX in 3 to 5 % | M |
 
 Contradictions and stale points found in the sweep:
 
