@@ -2,6 +2,12 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-22 -- upstream sync: #1224 merged, #1225 taken (merge `414a328c`)
+
+- `upstream/dev` 6b2fdfac merged into fork-dev. #1224 (ours, real merge) was already in the fork; #1225 reorders
+  three LilyGo entries in `default_envs`, the only tree change; #1219 + #1223 net zero. Gate 77 envs / 2741 cases
+  green, heltec_V3 and rak4631 build. Local branch `pr/web-wdt-1217` deleted.
+
 ## 2026-10-22 -- UDP-03 (upstream issue #1231): OTHER datagrams no longer refresh the gateway HB watchdog
 
 - Fix on fork-dev: the OTHER branch of `handleUdpFrame_esp32`/`_nrf52` leaves `last_upd_timer` and `hb_warn_logged`
@@ -10,7 +16,7 @@
 - Bench DK5EN-1: unfixed image silent for 130 s under OTHER traffic, fixed image logs Stage 1 at 59 s and Stage 2 at
   89 s (`tools/bench/runs/harness/udp03-bench-20261022.json`). DK5EN-1 runs the normal fixed build (Oct 22 21:36).
 - Upstream PR #1233 (branch `pr/hb-other-1231`, commit `90ae172a` on `upstream/dev` 6b2fdfac, two `src/` files,
-  "Fixes #1231"), open for maintainer review. Open: `/sync-upstream` for #1224 (merged) and #1225.
+  "Fixes #1231"), open for maintainer review. `/sync-upstream` done (`414a328c`).
 
 ## 2026-10-20 -- upstream PR #1224 (#1217, web send buffer and watchdog feeds)
 
