@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeshCom Mesh-Roadmap</title>
+<meta name="description" content="Interaktiver Vortrag zu Teil A (TX-Pool, TTL, Dedup, Hop-Modell) und Teil B (Review der QRT-Maßnahmen, Ideen, Prioritäten, Wellenplan) der MeshCom-Mesh-Evolution. Diskussionsstand, nichts entschieden.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0f172a; --bg2:#1a2436; --bg3:#243046; --line:#334155; --line2:#3f4d66;
+  --fg:#e6ecff; --fg2:#9fb0cc; --fg3:#7488a8;
+  --acc:#818cf8; --acc2:#6366f1; --acc-dim:#312e81;
+  --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa; --mag:#e879f9; --cyan:#22d3ee; --orange:#fb923c; --grey:#94a3b8;
+  --p0:#e879f9; --p1:#f87171; --p2:#fbbf24; --p3:#60a5fa; --p4:#34d399; --p5:#94a3b8;
+  --on-acc:#0b1020;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
+    --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
+    --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
+    --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c; --grey:#64748b;
+    --p0:#a21caf; --p1:#dc2626; --p2:#b45309; --p3:#2563eb; --p4:#059669; --p5:#64748b;
+    --on-acc:#ffffff;
+    --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
+  --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
+  --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
+  --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c; --grey:#64748b;
+  --p0:#a21caf; --p1:#dc2626; --p2:#b45309; --p3:#2563eb; --p4:#059669; --p5:#64748b;
+  --on-acc:#ffffff;
+  --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* chrome */
+#bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:60}
+#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc2),var(--mag));transition:width .25s ease}
+#hud{position:fixed;bottom:1rem;right:1rem;z-index:60;display:flex;gap:.35rem;align-items:center;
+  font-family:var(--mono);font-size:.75rem;color:var(--fg2);background:color-mix(in srgb,var(--bg2) 90%,transparent);
+  border:1px solid var(--line);border-radius:999px;padding:.3rem .45rem;backdrop-filter:blur(8px);box-shadow:var(--sh)}
+#hud button{font:inherit;color:var(--fg2);background:transparent;border:0;cursor:pointer;padding:.25rem .5rem;border-radius:999px;line-height:1}
+#hud button:hover,#hud button:focus-visible{color:var(--fg);background:var(--bg3)}
+#hud #pos{min-width:3.6em;text-align:center;letter-spacing:.04em}
+#toc{position:fixed;inset:0;z-index:70;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(10px);display:none;padding:3rem 16px;overflow:auto}
+#toc.on{display:block}
+#toc ol{max-width:760px;margin:0 auto;list-style:none;counter-reset:t}
+#toc li{counter-increment:t}
+#toc a{display:flex;gap:1rem;align-items:baseline;padding:.55rem .8rem;border-radius:8px;color:var(--fg);text-decoration:none;border:1px solid transparent}
+#toc a:hover{background:var(--bg2);border-color:var(--line)}
+#toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);color:var(--acc);font-size:.8rem;min-width:2em}
+#toc a small{color:var(--fg3);font-weight:400}
+#toc h2{max-width:760px;margin:0 auto 1.2rem;font-family:var(--mono);font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc)}
+
+/* slides */
+.deck{scroll-snap-type:y proximity}
+.slide{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3.6rem 1.75rem 3.6rem;scroll-snap-align:start;position:relative;border-bottom:1px solid var(--line)}
+.slide:nth-child(even){background:var(--bg2)}
+.inner{width:100%;max-width:1100px;min-width:0}
+.num{position:absolute;top:1.4rem;right:1.6rem;font-family:var(--mono);font-size:.72rem;color:var(--fg3);letter-spacing:.1em}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:.5rem}
+h1{font-family:var(--mono);font-size:clamp(2rem,5.4vw,3.6rem);font-weight:700;letter-spacing:-.03em;line-height:1.05;text-wrap:balance}
+h2{font-family:var(--mono);font-size:clamp(1.3rem,2.8vw,1.85rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin-bottom:.8rem;text-wrap:balance}
+h3{font-size:1rem;font-weight:600;margin-bottom:.5rem}
+.lead{font-size:clamp(.95rem,1.4vw,1.06rem);color:var(--fg2);max-width:70ch;text-wrap:pretty}
+p+p{margin-top:.7rem}
+strong,b{color:var(--fg);font-weight:600}
+a{color:var(--acc)}
+
+/* primitives */
+.grid{display:grid;gap:.8rem}
+.grid>*{min-width:0}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.g64{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.mt{margin-top:.9rem}.mt2{margin-top:1.3rem}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem}
+.slide:nth-child(even) .card{background:var(--bg)}
+.card h3{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:.5rem}
+.card p,.card li{font-size:.85rem;color:var(--fg2);line-height:1.55}
+.card ul{margin:.35rem 0 0 1.05rem}
+.card li{margin:.2rem 0}
+.card.hot{border-color:var(--warn)} .card.hot h3{color:var(--warn)}
+.card.good{border-color:var(--ok)} .card.good h3{color:var(--ok)}
+.card.cold{border-color:var(--info)} .card.cold h3{color:var(--info)}
+.card.badc{border-color:var(--bad)} .card.badc h3{color:var(--bad)}
+.mono,code{font-family:var(--mono);font-size:.86em}
+code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;padding:.08em .35em;color:var(--fg);overflow-wrap:anywhere}
+.big{font-family:var(--mono);font-size:clamp(1.3rem,2.8vw,1.9rem);font-weight:700;color:var(--acc);line-height:1.05;letter-spacing:-.02em}
+.stat{text-align:center;padding:.6rem .5rem}
+.stat .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);margin-bottom:.35rem}
+.stat .s{font-size:.72rem;color:var(--fg3);margin-top:.35rem}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);padding:.35rem .5rem;border-bottom:1px solid var(--line2);vertical-align:bottom}
+td{padding:.32rem .5rem;border-bottom:1px solid var(--line);color:var(--fg2);vertical-align:top;line-height:1.45}
+tbody tr:last-child td{border-bottom:0}
+td.m,th.m{font-family:var(--mono)} td.r,th.r{text-align:right}
+.note{border-left:3px solid var(--acc);background:var(--bg3);border-radius:0 8px 8px 0;padding:.6rem .9rem;font-size:.84rem;color:var(--fg2);line-height:1.55}
+.note.warn{border-color:var(--warn)} .note.bad{border-color:var(--bad)} .note.ok{border-color:var(--ok)}
+.tag{display:inline-block;font-family:var(--mono);font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;padding:.15em .55em;border-radius:999px;border:1px solid currentColor;font-weight:600;vertical-align:middle;white-space:nowrap}
+.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)} .t-info{color:var(--info)} .t-acc{color:var(--acc)} .t-mag{color:var(--mag)} .t-dim{color:var(--fg3)}
+.prop{display:inline-block;font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px dashed var(--warn);border-radius:6px;padding:.1em .5em;margin-right:.35rem;white-space:nowrap}
+.calc{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--info);border:1px solid var(--info);border-radius:4px;padding:0 .35em;margin-left:.25rem;white-space:nowrap;vertical-align:middle}
+.cite,.card p.cite,.panel p.cite{font-family:var(--mono);font-size:.66rem;color:var(--fg3);margin-top:.45rem;line-height:1.45}
+details.deep{margin-top:.8rem;border:1px solid var(--line);border-radius:8px;background:var(--bg3);overflow:hidden}
+details.deep>summary{cursor:pointer;padding:.6rem 1rem;font-family:var(--mono);font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--fg2);list-style:none;user-select:none}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:'▸ ';color:var(--acc)}
+details.deep[open]>summary::before{content:'▾ '}
+details.deep .body{padding:0 1rem 1rem;font-size:.85rem;color:var(--fg2)}
+details.deep .body>*+*{margin-top:.6rem}
+ul.plain{list-style:none;margin:0}
+ul.plain li{position:relative;padding-left:1.3rem;margin:.28rem 0;font-size:.85rem;color:var(--fg2);line-height:1.55}
+ul.plain li::before{content:'—';position:absolute;left:0;color:var(--acc)}
+ul.plain li.no::before{content:'✕';color:var(--bad);font-size:.8em}
+ul.plain li.yes::before{content:'✓';color:var(--ok)}
+
+/* controls */
+.ctl{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.btn,.seg button{font-family:var(--mono);font-size:.74rem;color:var(--fg2);background:var(--bg3);border:1px solid var(--line2);border-radius:7px;padding:.38rem .65rem;cursor:pointer;line-height:1.2}
+.btn:hover,.seg button:hover{color:var(--fg);border-color:var(--acc)}
+.btn:focus-visible,.seg button:focus-visible,.opt:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btn.pri{background:var(--acc2);color:#fff;border-color:var(--acc2)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:0;border-radius:8px}
+.seg button{border-radius:0;margin-left:-1px}
+.seg button:first-child{border-radius:7px 0 0 7px;margin-left:0}
+.seg button:last-child{border-radius:0 7px 7px 0}
+.seg button[aria-pressed="true"],.btn[aria-pressed="true"]{background:var(--acc-dim);color:var(--acc);border-color:var(--acc);position:relative;z-index:1}
+.lbl{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-right:.2rem}
+.rng{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(0,1fr) 4.2rem;gap:.5rem;align-items:center;font-size:.8rem;color:var(--fg2);margin:.25rem 0}
+.rng output{font-family:var(--mono);text-align:right;color:var(--fg)}
+input[type=range]{width:100%;accent-color:var(--acc2)}
+.opt{display:block;text-align:left;width:100%;font:inherit;color:inherit;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:.55rem .7rem;cursor:pointer}
+.slide:nth-child(even) .opt{background:var(--bg)}
+.opt:hover{border-color:var(--acc)}
+.opt[aria-pressed="true"]{border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+.opt .k{font-family:var(--mono);font-weight:700;color:var(--acc);font-size:.8rem}
+.opt .t{display:block;font-size:.8rem;color:var(--fg2);line-height:1.4;margin-top:.15rem}
+.optgrid{display:grid;gap:.45rem;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.panel{background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:.8rem .95rem;font-size:.85rem;color:var(--fg2)}
+.panel h4{font-family:var(--mono);font-size:.78rem;color:var(--fg);margin-bottom:.4rem}
+.pc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.45rem}
+.pc>div{min-width:0}
+.pc .p::before{content:'Pro';display:block;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ok);margin-bottom:.15rem}
+.pc .c::before{content:'Contra';display:block;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-bottom:.15rem}
+.viz{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.slide:nth-child(even) .viz{background:var(--bg)}
+.slide:nth-child(odd) .viz{background:var(--bg2)}
+.viz svg{display:block;width:100%;height:auto}
+.cap{font-size:.8rem;color:var(--fg2);min-height:2.6em;margin-top:.45rem;line-height:1.45}
+.legend{display:flex;flex-wrap:wrap;gap:.35rem .9rem;font-size:.72rem;color:var(--fg3);margin-top:.4rem;font-family:var(--mono)}
+.legend i{display:inline-block;width:.75em;height:.75em;border-radius:3px;margin-right:.35em;vertical-align:-.05em}
+svg text{font-family:var(--mono)}
+.log{font-family:var(--mono);font-size:.7rem;color:var(--fg2);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.45rem .6rem;height:8.5rem;overflow:auto;line-height:1.5}
+.log div{white-space:pre-wrap}
+.bluf{counter-reset:b;display:grid;gap:.55rem}
+.bluf li{list-style:none;counter-increment:b;display:grid;grid-template-columns:2rem minmax(0,1fr);gap:.6rem;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.6rem .8rem;font-size:.88rem;color:var(--fg2)}
+.bluf li::before{content:counter(b);font-family:var(--mono);font-weight:700;color:var(--acc);font-size:1.15rem;line-height:1.3}
+.share{height:14px;background:var(--bg3);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:.35rem}
+.share i{display:block;height:100%;width:0;background:var(--ok);transition:width .35s ease,background .35s}
+.qlist{counter-reset:q;display:grid;gap:.5rem}
+.qlist li{list-style:none;counter-increment:q;display:grid;grid-template-columns:2.2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.55rem .8rem;font-size:.86rem;color:var(--fg2)}
+.slide:nth-child(even) .qlist li{background:var(--bg)}
+.qlist li::before{content:'Q' counter(q);font-family:var(--mono);font-weight:700;color:var(--acc)}
+.hide{display:none!important}
+
+@media (max-width:900px){
+  .g2,.g3,.g4,.g5,.g64{grid-template-columns:minmax(0,1fr)}
+  .slide{padding:4.2rem 16px 4.6rem}
+  .num{top:1rem;right:16px}
+  .pc{grid-template-columns:minmax(0,1fr)}
+  .rng{grid-template-columns:minmax(0,7rem) minmax(0,1fr) 3.6rem}
+  .qlist li{grid-template-columns:2.2rem minmax(0,1fr)}
+  .qlist li .tag{grid-column:2}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+@media print{
+  #bar,#hud,#toc{display:none}
+  .slide{min-height:auto;page-break-after:always;border:0;padding:1.5rem}
+}
+</style>
+</head>
+<body>
+<div id="bar"><i></i></div>
+<nav id="hud" aria-label="Foliennavigation">
+  <button id="btoc" title="Übersicht (Taste U)" aria-label="Übersicht">☰</button>
+  <button id="bprev" title="Zurück (←)" aria-label="Zurück">←</button>
+  <span id="pos" aria-live="polite">1/18</span>
+  <button id="bnext" title="Weiter (→)" aria-label="Weiter">→</button>
+  <button id="btheme" title="Hell/Dunkel (T)" aria-label="Farbschema wechseln">◐</button>
+</nav>
+<div id="toc" role="dialog" aria-label="Übersicht"><h2>Übersicht — Taste U oder Esc schließt</h2><ol id="toclist"></ol></div>
+<main class="deck">
+
+<!-- 01 -->
+<section class="slide" id="titel"><span class="num">01</span><div class="inner">
+<div class="eyebrow">MeshCom · Fork DK5EN · Diskussionsstand 21.10.2026</div>
+<h1>Mesh-Roadmap: welche Frames gehören auf den Kanal?</h1>
+<p class="lead" style="margin-top:.9rem">Teil A klärt, wie ein Knoten Frames hält und altern lässt (TX-Pool, TTL, Dedup, Hop-Modell). Teil B fragt, welche Frames überhaupt auf den Kanal gehören, in welcher Rate, von wem und wie weit. <b>Nichts davon ist entschieden.</b> Bewertungen sind als <span class="prop">Vorschlag, nicht entschieden</span> markiert, gerechnete Werte als <span class="calc">berechnet</span>.</p>
+<ol class="bluf mt">
+<li><div><b>Die QRT-Maßnahmen vom Oktober gingen ohne Nachweis über die Luft raus.</b> Beide Wellen stecken in <code>v4.40a.10.19</code>, die geplante Nachtmessung dazwischen fand nicht statt. Mehrere Maßnahmen helfen Berg-Knoten und können dichten Stadt-Clustern schaden. Vor allem Weiteren braucht es eine Messwelle.</div></li>
+<li><div><b>Der Kanal ist der Engpass, nicht der RAM.</b> Bei SF11/BW250 braucht ein 80-Byte-Positionsframe 1,1 s <span class="calc">berechnet</span>. Ein Positionsframe alle 30 s mit zwei Relay-Ringen zu je drei Knoten belegt allein 26 % des Kanals (Rechenbeispiel). Rate, Relay-Zahl und Reichweite bestimmen die Auslastung; Queue-Tuning entscheidet nur, wer verliert.</div></li>
+<li><div><b>Persönliche Nachrichten verlieren ihre Priorität beim ersten Relay</b> (Teil A 10.10). Eine absolute PN-Priorität ist im Code billig; sie gegen Missbrauch abzusichern ist der schwere Teil.</div></li>
+<li><div><b>Multi-SF ist der einzige Hebel, der Kapazität vervielfacht.</b> SF9 trägt das 3,4-Fache von SF11 bei 5 dB weniger Reserve. Jeder Chip der ausgelieferten Envs kann SF7 bis SF12; die Grenze: ein Knoten mit einem Funkmodul hört immer nur ein SF.</div></li>
+<li><div><b>EMCOMM braucht Prioritätsflag und Absender-Authentifizierung zusammen.</b> Ein Flag ohne Authentifizierung lädt zum Fluten ein. Das HMAC von RM1 ist symmetrisch und skaliert nicht auf „viele Empfänger prüfen einen Absender“; eine Signatur mit gepinnten Schlüsseln schon, für 64 Byte pro Frame (als Base64-Text 88 Byte).</div></li>
+</ol>
+<p class="cite">Quellen: <code>docs/tx-pool-dedup-concept-20261021.md</code> (Teil A, Basis <code>bd49c742</code>), <code>docs/mesh-evolution-concept-20261021.md</code> (Teil B, Basis <code>7fe790f</code>). Tasten: → ← · U Übersicht · T Hell/Dunkel.</p>
+</div></section>
+
+<!-- 02 -->
+<section class="slide" id="kanal"><span class="num">02</span><div class="inner">
+<div class="eyebrow">Teil B · 2.4 und 4.4 · Kanal</div>
+<h2>Der Kanal ist der Engpass: Sendezeit mal Kopien durch Intervall</h2>
+<div class="grid g64">
+<div>
+  <div class="ctl"><span class="lbl">Vorgabe</span>
+    <button class="btn" data-preset="t30">Position 30 s (Beispiel)</button>
+    <button class="btn" data-preset="t10">Position 10 s (Beispiel)</button>
+    <button class="btn" data-preset="hey">HEY</button>
+    <button class="btn" data-preset="dm">DM</button>
+  </div>
+  <div class="ctl mt"><span class="lbl">SF</span><div class="seg" id="toa-sf"></div><span class="lbl" style="margin-left:.4rem">Präambel</span><div class="seg" id="toa-pre"><button data-v="8" aria-pressed="false">8</button><button data-v="32" aria-pressed="true">32</button></div></div>
+  <div class="mt">
+    <div class="rng"><label for="toa-pl">Nutzlast (Byte)</label><input type="range" id="toa-pl" min="10" max="255" value="80"><output id="toa-pl-o">80</output></div>
+    <div class="rng"><label for="toa-ring">Hop-Ringe</label><input type="range" id="toa-ring" min="0" max="7" value="2"><output id="toa-ring-o">2</output></div>
+    <div class="rng"><label for="toa-rel">Relays je Ring</label><input type="range" id="toa-rel" min="1" max="12" value="3"><output id="toa-rel-o">3</output></div>
+    <div class="rng"><label for="toa-int">Intervall</label><input type="range" id="toa-int" min="0" max="13" value="4"><output id="toa-int-o">30 s</output></div>
+  </div>
+  <div class="viz mt"><svg id="toa-svg" viewBox="0 0 640 120" role="img" aria-label="Sendezeit der Kopien im Intervall"></svg></div>
+  <p class="cap" id="toa-note"></p>
+</div>
+<div>
+  <div class="grid g2">
+    <div class="card stat"><div class="k">Time on Air <span class="calc">berechnet</span></div><div class="big" id="toa-ms">–</div><div class="s" id="toa-sym"></div></div>
+    <div class="card stat"><div class="k">Kopien je Frame</div><div class="big" id="toa-cp">–</div><div class="s">1 + Ringe × Relays</div></div>
+  </div>
+  <div class="card mt"><h3>Kanalanteil <span class="calc">berechnet</span></h3>
+    <div class="big" id="toa-share">–</div>
+    <div class="share"><i id="toa-bar"></i></div>
+    <p class="mt" id="toa-share-t" style="font-size:.8rem"></p>
+  </div>
+  <div class="card mt"><h3>Formel</h3>
+    <p style="font-size:.78rem">Semtech-Formel, BW 250 kHz, CR 4/6, Präambel P (EU-Vorgabe 32), expliziter Header, CRC an, LDRO wenn Symbolzeit &gt; 16 ms. T<sub>sym</sub> = 2<sup>SF</sup>/BW; n = 8 + max(⌈(8·PL − 4·SF + 28 + 16)/(4·(SF − 2·DE))⌉·6, 0); ToA = (P + 4,25 + n)·T<sub>sym</sub>.</p>
+    <p class="cite">Abgleich mit Teil B 2.4: SF11 60/80/120 B = 903/1100/1444 ms, SF12 80 B = 2298 ms. Position alle 30 s mit 2 Ringen à 3 = 26 %, alle 10 s 77 % (Rechenbeispiel). Präambel 32 → 8 spart bei SF11 197 ms je Frame (etwa 18 % eines 80-B-Frames) <span class="calc">berechnet</span>; mehrere Länderprofile nutzen schon 8.</p>
+  </div>
+</div>
+</div>
+</div></section>
+
+<!-- 03 -->
+<section class="slide" id="track"><span class="num">03</span><div class="inner">
+<div class="eyebrow">Teil B · 4.4 · Multi-Line POS und Track-Modus</div>
+<h2>Track = On wechselt pro Paket die QRG</h2>
+<div class="grid g2">
+<div>
+  <div class="note warn"><b>Korrektur nach Review:</b> Mit <code>--track on</code> und GPS-Fix geht die Position als LoRa-APRS-Frame (<code>&lt;</code>) auf 433,775 MHz, SF12/BW125: Profilwechsel je Paket <code>lora_setchip_aprs</code> → TX → <code>lora_setchip_meshcom</code>. Die MeshCom-QRG bekommt nur alle 5 min eine Kopie. Ein Tracker belegt den MeshCom-Kanal also <b>nicht</b> zu 26 %; die Zahlen auf Folie 2 sind ein allgemeines Rechenbeispiel für Positionsframes.</div>
+  <div class="grid g3 mt">
+    <div class="card stat"><div class="k">QRG-Wechsel</div><div class="big">433,775</div><div class="s">SF12 / BW125, je Paket</div></div>
+    <div class="card stat"><div class="k">Kopie MeshCom</div><div class="big">5 min</div><div class="s">auf der MeshCom-QRG</div></div>
+    <div class="card stat"><div class="k">Nebenwirkung</div><div class="big">taub</div><div class="s">während des Wechsels auf der MeshCom-QRG</div></div>
+  </div>
+  <div class="note mt"><b>Frage:</b> ein APRS-Format auf der MeshCom-QRG ohne QRG-Wechsel? Der Wechsel je Paket ist schon heute ein messbarer Fall von Rendezvous- und Taubheitskosten (siehe Multi-SF, M1/M2).</div>
+</div>
+<div>
+  <h3>Multi-Line POS: #1219, zurückgenommen mit #1223</h3>
+  <p style="font-size:.86rem;color:var(--fg2)"><code>--aprswx on</code> schickte nach jeder eigenen Position einen <b>zweiten <code>!</code>-Frame</b> mit APRS-1.0.1-Wetterblock (<code>/_</code>, t/h/b), damit aprs.fi den Knoten als Wetterstation zeigt. oe1kbc hat am 20.10. zurückgenommen („please check notes from DK5EN“): jede Position wird zu zwei Frames, beide werden weitergeleitet, das Symbol wird überschrieben, MeshCom dekodiert t/h/b nicht, Bit 0x2000 war bis Juni <code>--checkmesh</code>.</p>
+  <div class="grid g2 mt">
+    <div class="card stat"><div class="k">WX-Frame 75–85 B</div><div class="big">1,05–1,15 s</div><div class="s">SF11, Präambel 32 <span class="calc">berechnet</span></div></div>
+    <div class="card stat"><div class="k">je WX-Knoten</div><div class="big">0,4 %</div><div class="s">2 Frames/h × 7 Kopien; 50 WX-Knoten ≈ 20 % <span class="calc">berechnet</span></div></div>
+  </div>
+  <div class="optgrid mt" id="opt-k"></div>
+  <div class="panel mt" id="opt-k-p"></div>
+  <p class="cite">Track-Optionen K0–K6 (Track auf MeshCom-QRG, Hop 0/1, Budget je Quelle, kompakte Frames, zweites Radio) stehen in Teil B 4.4.2.</p>
+  <p class="mt" style="font-size:.84rem"><span class="prop">Vorschlag, nicht entschieden</span>X2 erreicht das Ziel (aprs.fi-Wetterstation) ohne RF-Kosten und kann den Kanal nicht überlaufen lassen; X3, wenn ein Standard-APRS-Frame auf RF gewünscht ist.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 04 -->
+<section class="slide" id="hop"><span class="num">04</span><div class="inner">
+<div class="eyebrow">Teil A · 10.0 · Hop-Modell aus dem Code</div>
+<h2>Byte 5: der Nibble zählt herunter, je Insel neu</h2>
+<div class="ctl"><button class="btn pri" id="hop-play">▶ Abspielen</button>
+  <button class="btn" id="hop-srv" aria-pressed="false">Server-Einspeisung</button>
+  <button class="btn" id="hop-wrap" aria-pressed="false">Wrap-Bug 4.35x</button>
+</div>
+<div class="grid g64 mt">
+<div><div class="viz"><svg id="hop-svg" viewBox="0 0 720 340" role="img" aria-label="Frame läuft durch Relays, Nibble zählt herunter"></svg></div>
+<p class="cap" id="hop-cap"></p></div>
+<div>
+  <div class="log" id="hop-log" aria-live="polite"></div>
+  <ul class="plain mt">
+    <li>Bits 0 bis 3 von Byte 5 sind die Rest-Hops; 0x80 Server, 0x40 Track, 0x20 App offline, 0x10 Mesh. Kein freies Bit.</li>
+    <li>Der Urheber setzt den Nibble einmal: Text und HEY <code>max_hop_text</code> (Vorgabe 4), alles andere <code>max_hop_pos</code> (2). <code>MAX_HOP_LIMIT</code> 7.</li>
+    <li>Relay-Gate: <code>nibble &gt; 0</code>, dann <code>max_hop--</code>, dann Loop-Check. Kein Knoten vergleicht den empfangenen Nibble mit seiner eigenen Einstellung.</li>
+    <li>Ein Gateway lädt vor dem eigenen Dekrement hoch und speist Server-Frames <b>ohne Dekrement</b> ein. Was der Server mit dem Nibble tut, steht nicht im Repository (offen).</li>
+    <li>Ohne Fix wickelt 4.35x den Nibble von 0 auf 15 (4.35p, 4.35c, 4.35s; 17 Wraps in 10 Tagen; DMs nicht betroffen).</li>
+  </ul>
+</div>
+</div>
+</div></section>
+
+<!-- 05 -->
+<section class="slide" id="hopcap"><span class="num">05</span><div class="inner">
+<div class="eyebrow">Teil A · 10.1 · Hop-Cap</div>
+<h2>Den Nibble durch die eigene Grenze L kappen? Sechs Varianten</h2>
+<p class="lead">Idee des Operators: Ein Relay empfängt einen Frame, dessen Rest-Hops die eigene Grenze <code>L</code> überschreiten, und schreibt den Nibble herunter. Ziel: Frames bleiben regional. Status: offen.</p>
+<div class="optgrid mt" id="opt-h" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
+<div class="panel mt" id="opt-h-p"></div>
+<div class="grid g2 mt">
+  <div class="note"><b>Ausnahmen für jede umschreibende Variante:</b> DMs, DM-ACKs (<code>:ackNNN</code>, <code>:rejNNN</code>), das binäre ACK 0x41 und <code>{ping}</code>. Beide ACK-Typen schließen eine Wiederholungsleiter; ein abgeschnittener Rückweg kostet mehr Sendezeit, als der Cap spart.</div>
+  <div class="note warn"><span class="prop">Vorschlag, nicht entschieden</span>H4 widerspricht 10.0 Punkt 5. H1 ist ein billiger Schutz gegen Ausreißer, falls Stufe 0 Frames mit Nibble &gt; L zeigt. Ist Lokalität das Ziel, wirken H3 oder H2 dort, wo die Weite plausibel entsteht; das ruht auf einer ungemessenen Annahme. H5 nur, wenn der Grat-Fall sonst ungelöst bleibt.</div>
+</div>
+</div></section>
+
+<!-- 06 -->
+<section class="slide" id="qrt"><span class="num">06</span><div class="inner">
+<div class="eyebrow">Teil B · 3 · Review der Maßnahmen seit v4.40a</div>
+<h2>QRT-Maßnahmen: Berg-Knoten gegen Stadt-Cluster</h2>
+<p class="lead">Geschrieben und ausgeliefert in zwei Tagen unter dem Druck zweier Feldvorfälle: DB0TAW-14 (Berg, 24 direkte Nachbarn, 41 bis 43 % RX, 16 bis 19 Relays in der Queue, 0,0 % TX) und DK5EN-98 (Gateway, 3,8 Kopien je Servernachricht, 6,4 je eigener Nachricht). <b>Prozessbefund zuerst:</b> nach Welle 1 war eine Nachtmessung geplant; beide Wellen stecken in <code>v4.40a.10.19</code>, ein Ergebnis über die Luft danach gibt es nicht.</p>
+<div class="grid g2 mt">
+<div>
+  <div class="ctl"><span class="lbl">Sicht</span><div class="seg" id="qrt-mode"><button data-v="berg" aria-pressed="true">Berg-Node</button><button data-v="stadt" aria-pressed="false">Stadt-Cluster</button></div></div>
+  <div class="viz mt"><svg id="qrt-svg" viewBox="0 0 600 280" role="img" aria-label="Szenario Berg-Knoten oder Stadt-Cluster"></svg></div>
+  <div class="ctl mt"><span class="lbl">Szenario</span>
+    <button class="btn" data-sc="cancel">Falsche Abdeckung (veraltete Matrix)</button>
+    <button class="btn" data-sc="burst">Age floor Stufe 2</button>
+    <button class="btn" data-sc="echo">Echo stoppt Retry</button>
+  </div>
+  <p class="cap" id="qrt-cap">Szenario wählen. Die Bilder veranschaulichen die Risiken aus der Tabelle; gemessen ist keines davon.</p>
+</div>
+<div>
+  <div class="optgrid" id="qrt-list" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))"></div>
+  <div class="panel mt" id="qrt-p"></div>
+</div>
+</div>
+<div class="note warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Behalten, was reine Verschwendung entfernt (Server-Spiegelung mit geschlossener Lücke bei der Telefonkopie, Ring −2, verschobener Retry). Drei Maßnahmen zuerst messen: erzwungenes <code>--nbrrelay on</code> (falsche Abdeckung), Age floor Stufe 2 (Prioritätsinversion zwischen Knoten, Kollisionen versteckter Paare) und die READY-Echo-Freigabe am Gateway (eigene Funkinsel bekommt den Gruppentext nie). Erwägen, <code>--nbrrelay</code> per RM1 schaltbar statt fest einkompiliert zu machen.</div>
+</div></section>
+
+<!-- 07 -->
+<section class="slide" id="pool"><span class="num">07</span><div class="inner">
+<div class="eyebrow">Teil A · 3.1, 5.1, 5.2 · TX-Puffer</div>
+<h2>Vom Ring zum Slot-Pool: Lücken füllen, alles altert</h2>
+<div class="ctl">
+  <button class="btn" id="rp-add">+3 Frames</button>
+  <button class="btn" id="rp-send">Senden</button>
+  <button class="btn" id="rp-cancel">Cancel</button>
+  <button class="btn" id="rp-park">Parked SENT</button>
+  <button class="btn" id="rp-ttl">TTL (+120 s)</button>
+  <button class="btn" id="rp-reset">Zurücksetzen</button>
+  <button class="btn pri" id="rp-demo">▶ Demo</button>
+</div>
+<div class="grid g2 mt">
+  <div class="card"><h3>Heute: Ring mit iRead / iWrite</h3><svg id="rp-ring" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="TX-Ring"></svg><p class="cap" id="rp-ring-t"></p></div>
+  <div class="card"><h3>Vorschlag O2: Slot-Pool, Priorität + Einreihzeit</h3><svg id="rp-pool" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="Slot-Pool"></svg><p class="cap" id="rp-pool-t"></p></div>
+</div>
+<div class="legend"><span><i style="background:var(--p1)"></i>1 ACK/DM</span><span><i style="background:var(--p2)"></i>2 Gruppe</span><span><i style="background:var(--p3)"></i>3 Relay</span><span><i style="background:var(--p4)"></i>4 Position</span><span><i style="background:var(--p5)"></i>5 HEY</span><span><i style="background:none;border:1px dashed var(--bad)"></i>Loch: frei, aber tot</span><span>▣ SENT geparkt</span></div>
+<div class="grid g2 mt">
+<div class="tw"><table><thead><tr><th>Prio</th><th>Klasse</th><th>TTL heute</th><th>TTL-Vorschlag</th></tr></thead><tbody>
+<tr><td class="m">1</td><td>ACK (0x41, eigenes <code>:ackNNN</code>), eigener DM</td><td>keine</td><td>90 s für ACKs; eigener DM keine (Leiter 3 × 40 s)</td></tr>
+<tr><td class="m">2</td><td>eigener Gruppentext</td><td>keine</td><td>keine</td></tr>
+<tr><td class="m">3</td><td>Relay-Text / <code>{CET}</code></td><td>keine</td><td>300 s / 30 s</td></tr>
+<tr><td class="m">4</td><td>Position</td><td>keine</td><td>120 s</td></tr>
+<tr><td class="m">5</td><td>HEY</td><td>180 s (BP-03)</td><td>180 s</td></tr>
+</tbody></table><p class="cite">Kosten 0 B RAM: <code>ringEnqueueTime[]</code> existiert, die Tabelle liegt im Flash. Werte erst nach dem Alters-Histogramm aus Stufe 0 festschreiben.</p></div>
+<div><p style="font-size:.85rem;color:var(--fg2)">Seit es Prioritätsauswahl gibt, liest niemand den Ring mehr der Reihe nach. <code>iRead</code>/<code>iWrite</code> überleben nur als Kapazitätsbuchhaltung, die genau beim Cancel oder Parken falsch wird: Löcher zwischen <code>iRead</code> und <code>iWrite</code> sind tot, bis <code>iRead</code> vorbeiläuft, und <code>iRead</code> steht bis zu 120 s auf einem geparkten <code>SENT</code>-Text. Der Pool kostet <b>0 Byte</b> und lässt die N-24-Umlagerung entfallen.</p>
+<details class="deep"><summary>Stufenplan und Entscheidungsmatrix (Teil A 1, 7, 8)</summary><div class="body">
+<div class="tw"><table><thead><tr><th>Stufe</th><th>Änderung</th><th class="r">RAM klassisch</th></tr></thead><tbody>
+<tr><td class="m">0</td><td>Instrumentierung (Alters- und Hop-Histogramme, <code>{CET}</code>-Alter, HG je Ring, DM/ACK-Anteil)</td><td class="r m">–</td></tr>
+<tr><td class="m">1</td><td>TTL je Priorität im bestehenden Sweep</td><td class="r m">+0 B</td></tr>
+<tr><td class="m">1b</td><td>SNR-gewichtete Relay-Verzögerung, Vorgabe aus</td><td class="r m">+0 B</td></tr>
+<tr><td class="m">2</td><td>Slot-Pool ersetzt den Ring</td><td class="r m">+0 B</td></tr>
+<tr><td class="m">3</td><td>Zeitgealterte Dedup-Tabelle, 45 min</td><td class="r m">+847 B / +697 B</td></tr>
+<tr><td class="m">4</td><td>Supersede-in-place für HEY/POS</td><td class="r m">+0 B</td></tr>
+<tr><td class="m">später</td><td>Deskriptortabelle + Byte-Pool</td><td class="r m">−2 kB oder +Slots</td></tr>
+</tbody></table></div>
+<p>Knock-out: nur C, D, E lösen alle vier Strukturprobleme (Lücken, veraltete Einträge, Dedup-Fenster, Board-Parität). Gewichtet (max. 75): C 51, D 52, E 56. Empfehlung des Papiers: E als sechs aufeinanderfolgende Commits, harte Voraussetzung Stufe 0.</p>
+</div></details>
+</div>
+</div>
+</div></section>
+
+<!-- 08 -->
+<section class="slide" id="dedup"><span class="num">08</span><div class="inner">
+<div class="eyebrow">Teil A · 3.3, 5.3, 10.4 · Dedup</div>
+<h2>Dedup nach Anzahl oder nach Zeit: das Fenster hängt an der Last</h2>
+<div class="grid g64">
+<div>
+  <div class="rng"><label for="dd-rate">Neue IDs je Minute</label><input type="range" id="dd-rate" min="5" max="60" value="22"><output id="dd-rate-o">2,2</output></div>
+  <div class="ctl"><button class="btn" data-dd="2.2">Median 2,2</button><button class="btn" data-dd="3.8">Spitze 3,8</button><button class="btn pri" id="dd-play">▶ Last durchfahren</button></div>
+  <div class="viz mt"><svg id="dd-svg" viewBox="0 0 640 300" role="img" aria-label="Dedup-Fenster gegen Last"></svg></div>
+  <div class="legend"><span><i style="background:var(--bad)"></i>Ring 70 (klassisch)</span><span><i style="background:var(--warn)"></i>Ring 100 (S3/nRF52)</span><span><i style="background:var(--orange)"></i>Ring 60 (E22_XML)</span><span><i style="background:var(--ok)"></i>D3: 171 Einträge, 45 min</span><span><i style="background:var(--info)"></i>128 Einträge, 45 min</span></div>
+</div>
+<div>
+  <div class="card"><h3>Fenster bei dieser Last <span class="calc">berechnet</span></h3><div id="dd-vals"></div></div>
+  <p class="mt" style="font-size:.84rem;color:var(--fg2)">Gefordert (DG0OPK): länger als <b>39,6 min</b> (längstes gemessenes Paketleben), kürzer als <b>48,5 min</b> (kürzeste msg_id-Wiederverwendung). Zwei nachgewiesene Überläufe (<code>5D01F26F</code>, <code>BC98723D</code>): Heartbeats wurden ein zweites Mal angenommen.</p>
+  <div class="tw mt"><table><thead><tr><th>Option</th><th class="r">RAM klass.</th><th>Urteil</th></tr></thead><tbody>
+  <tr><td>D1 Zählring heute</td><td class="r m">350 B</td><td>verwerfen</td></tr>
+  <tr><td>D2 Zählring + 2-B-Minutenstempel, 45-min-Deckel</td><td class="r m">+140 B</td><td>teilweise</td></tr>
+  <tr><td><b>D3 zeitgealterte Tabelle für 45 min Spitze</b></td><td class="r m">+847 B</td><td>empfohlen</td></tr>
+  <tr><td>D4 gehashte 3-B-IDs</td><td class="r m">+513 B</td><td>verwerfen</td></tr>
+  </tbody></table></div>
+  <p class="cite">10.4: mit 5-B-Eintrag (1-B-Minutenstempel mod 256, Serverbit) kosten 171 Einträge 855 B, +505 B statt +847 B. 128 Einträge: +546 B, 33,7 min bei Spitze.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 09 -->
+<section class="slide" id="prio"><span class="num">09</span><div class="inner">
+<div class="eyebrow">Teil B · 5 · Prioritätsmatrizen je Nachrichtentyp</div>
+<h2>Wer kommt zuerst dran: heute, V1 und V2</h2>
+<div class="ctl"><span class="lbl">Matrix</span><div class="seg" id="pm-var"><button data-v="heute" aria-pressed="true">Heute</button><button data-v="v1" aria-pressed="false">V1 PN zuerst</button><button data-v="v2" aria-pressed="false">V2 EMCOMM + PN</button></div></div>
+<div class="grid g2 mt">
+<div class="tw"><table id="pm-table"><thead><tr><th>Frame-Art</th><th class="r">eigen</th><th class="r">weitergeleitet</th></tr></thead><tbody></tbody></table>
+<p class="cite">Kleiner ist früher. CSMA-Basis heute: 3000 ms (Prio 1, 2), 4500 ms (3), 5500 ms (4, 5) plus Slot-Jitter. Weitergeleitet mit <code>--nbrrelay on</code>: Fall A 3500 ms, nach 8 s 150 ms; Fall B für POS/HEY einmalig 20 s Halt; dazu der Age floor. <code>{CET}</code> und Server-Einspeisung sind heute 3 (<code>DONE</code>); 1/2 gilt nur für lokal getipptes <code>{SET}</code>/<code>{ping}</code>.</p></div>
+<div>
+  <div class="ctl"><button class="btn pri" id="pm-play">▶ Queue abspielen</button><button class="btn" id="pm-burst">+ Burst Gruppen-Relays</button><button class="btn" id="pm-reset">Neu starten</button></div>
+  <div class="viz mt"><svg id="pm-svg" viewBox="0 0 520 300" role="img" aria-label="Queue nach Priorität"></svg></div>
+  <div class="tw"><table id="pm-stats" style="font-size:.74rem"><thead><tr><th>Typ</th><th class="r">bedient</th><th class="r">Ø Warten (Ticks)</th></tr></thead><tbody></tbody></table></div>
+  <p class="cite">Modell: ein Frame je Tick, kleinste Priorität zuerst, bei Gleichstand der älteste. CSMA, TTL und Ratenlimits sind nicht modelliert (außer dem V2-Limit 1 DM je Quelle und 10 Ticks im hohen Band). Gleiche Zufallsfolge für alle drei Matrizen.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 10 -->
+<section class="slide" id="cet"><span class="num">10</span><div class="inner">
+<div class="eyebrow">Teil A · 10.8 · Zeitbaken</div>
+<h2><code>{CET}</code>: Reichweite und Alter</h2>
+<div class="grid g64">
+<div>
+  <div class="ctl"><button class="btn pri" id="cet-play">▶ Bake abspielen</button><span class="lbl">„zwei Hops“ heißt</span><div class="seg" id="cet-target"><button data-v="2" aria-pressed="true">Nibble 2 (heute)</button><button data-v="1" aria-pressed="false">Nibble 1</button></div></div>
+  <div class="viz mt"><svg id="cet-svg" viewBox="0 0 640 300" role="img" aria-label="Zeitbake vom Server über Gateway und Relay-Ringe"></svg></div>
+  <p class="cap" id="cet-cap"></p>
+  <div class="ctl"><span class="lbl">Reichweite</span><div class="seg" id="cet-r"><button data-v="R0" aria-pressed="true">R0</button><button data-v="R1" aria-pressed="false">R1</button><button data-v="R2" aria-pressed="false">R2</button><button data-v="R3" aria-pressed="false">R3</button></div>
+  <span class="lbl" style="margin-left:.5rem">Alter</span><div class="seg" id="cet-a"><button data-v="A0" aria-pressed="true">A0</button><button data-v="A1" aria-pressed="false">A1</button><button data-v="A2" aria-pressed="false">A2</button><button data-v="A3" aria-pressed="false">A3</button><button data-v="A4" aria-pressed="false">A4</button><button data-v="A5" aria-pressed="false">A5</button></div></div>
+</div>
+<div>
+  <div class="panel" id="cet-p"></div>
+  <div class="tw mt"><table><thead><tr><th>Pfad</th><th>Nibble</th><th class="r">Alter</th></tr></thead><tbody>
+  <tr><td>Gateway direkt</td><td class="m">H02</td><td class="r m">55 s</td></tr>
+  <tr><td>Gateway + 2 Relays</td><td class="m">H00</td><td class="r m">91 s</td></tr>
+  </tbody></table><p class="cite">Feldlog <code>docs/bench/snf-20260926/</code>, zwei verschiedene Baken. Wartezeiten der Relays einer Bake (prio 3): 17,0 s, 20,3 s, 31,7 s.</p></div>
+  <div class="note warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Zuerst messen (Stufe 0). Dominieren Queue-Wartezeiten, sind A1 (Wert aus dem Histogramm) plus A3 klein. A2 ist am genauesten, ändert aber Serverinhalt auf der Luft: Entscheidung der Maintainer. Reichweite: R1, wenn die Serverbetreiber zustimmen, sonst R2; R3 als Empfängerseite ohne Sendezeitgewinn.</div>
+</div>
+</div>
+</div></section>
+
+<!-- 11 -->
+<section class="slide" id="hgdm"><span class="num">11</span><div class="inner">
+<div class="eyebrow">Teil A · 10.9, 10.10 · HG und persönliche Nachrichten</div>
+<h2>HG-Reichweite und die Priorität von DM und <code>:ackNNN</code></h2>
+<div class="grid g2">
+<div>
+  <h3>HG: Gateway-HEY</h3>
+  <p style="font-size:.85rem;color:var(--fg2)"><code>sendHey()</code> sendet <code>HG</code> auf Gateways, sonst <code>H</code>; Hop <code>max_hop_text</code> (Vorgabe 4), Priorität 5, mindestens ein HG je Imax (15 min). Empfänger setzen <code>NBR_FLAG_GW</code> für 45 min und nehmen Gateways aus der Relay-Abhängigenmenge. Die Signalbericht-Kette wächst je Hop (gedeckelt bei 106 B).</p>
+  <div class="ctl mt"><span class="lbl">Nibble des HG</span><div class="seg" id="hg-n"><button data-v="4" aria-pressed="true">4 (G0)</button><button data-v="2" aria-pressed="false">2 (G1/G2)</button></div><span class="lbl" style="margin-left:.4rem">Relays je Ring</span><div class="seg" id="hg-r"><button data-v="2" aria-pressed="false">2</button><button data-v="3" aria-pressed="true">3</button><button data-v="5" aria-pressed="false">5</button></div></div>
+  <div class="viz mt"><svg id="hg-svg" viewBox="0 0 520 200" role="img" aria-label="HG-Reichweite in Ringen"></svg></div>
+  <p class="cap" id="hg-cap"></p>
+  <div class="optgrid" id="opt-g"></div>
+  <div class="panel mt" id="opt-g-p"></div>
+</div>
+<div>
+  <h3>DM und ACK fallen beim ersten Relay auf 3</h3>
+  <p style="font-size:.85rem;color:var(--fg2)"><code>getMessagePriority()</code> gibt für <code>DONE</code>-Text 3 zurück, bevor das Ziel geparst wird. Jeder Relay-Ring wartet im 4500-ms-Band und konkurriert in voller Queue mit Gruppen-Relays. Kommt das ACK zu spät, feuert die Leiter des Absenders (3 × 40 s).</p>
+  <div class="rng mt"><label for="lad-d">ACK kommt nach</label><input type="range" id="lad-d" min="0" max="160" value="55"><output id="lad-d-o">55 s</output></div>
+  <div class="viz"><svg id="lad-svg" viewBox="0 0 520 120" role="img" aria-label="Wiederholungsleiter gegen ACK-Ankunft"></svg></div>
+  <p class="cap" id="lad-cap"></p>
+  <div class="optgrid" id="opt-p"></div>
+  <div class="panel mt" id="opt-p-p"></div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>P2 hat das beste Verhältnis von gesparter Sendezeit zu Änderungsgröße, danach P4. P1 und P3 verschieben die Fairness zwischen fremdem und eigenem Verkehr und brauchen Stufe-0-Daten. Teil B 4.3 ergänzt: P-A4 (ACK zuerst) plus P-A3 (Band 2 mit Limit je Quelle) als erster Schritt, P-A5 (DM-Retries in QRT) nach dem Slot-Pool, P-A1 nur mit Authentifizierung.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 12 -->
+<section class="slide" id="msf"><span class="num">12</span><div class="inner">
+<div class="eyebrow">Teil B · 2.4, 4.5 · Multi-SF</div>
+<h2>Mehr Kapazität wie bei Wi-Fi: Links steigen auf, wo sie können</h2>
+<div class="grid g2">
+<div>
+  <div class="ctl"><span class="lbl">SF</span><div class="seg" id="sf-sel"></div></div>
+  <div class="viz mt"><svg id="sf-svg" viewBox="0 0 560 300" role="img" aria-label="SNR-Grenze und Durchsatz je SF"></svg></div>
+  <div class="rng mt"><label for="sf-snr">Link-SNR</label><input type="range" id="sf-snr" min="-26" max="0" step="0.5" value="-7"><output id="sf-snr-o">−7 dB</output></div>
+  <p class="cap" id="sf-cap"></p>
+  <div class="card mt" id="sf-row"></div>
+</div>
+<div>
+  <div class="ctl"><button class="btn pri" id="wf-play">▶ Link-Upgrade abspielen</button></div>
+  <div class="viz mt"><svg id="wf-svg" viewBox="0 0 520 250" role="img" aria-label="Basis-SF flutet, Unicast steigt auf, Taubheitsproblem"></svg></div>
+  <p class="cap" id="wf-cap">Muster aus Wi-Fi: Beacons und Broadcast mit Basisrate, Unicast je Link mit der schnellsten Rate, die die Reserve erlaubt.</p>
+  <div class="optgrid" id="opt-m"></div>
+  <div class="panel mt" id="opt-m-p"></div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>M4 (regionales SF) und M3 (schnelle Backbone-Schicht) sind die realistischen ersten Schritte; M1 ist elegant, wegen der Taubheit aber ein Forschungsthema. Die −16-dB-Schwelle für Pfadwahl und Abdeckung nutzen, nie für den Empfang; vorher PER je SNR-Klasse messen.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 13 -->
+<section class="slide" id="route"><span class="num">13</span><div class="inner">
+<div class="eyebrow">Teil B · 4.7 · Source Routing für persönliche Nachrichten</div>
+<h2>Fluten, Next-Hop oder Quellroute: wie viele Kopien je DM?</h2>
+<div class="grid g64">
+<div>
+  <div class="ctl"><span class="lbl">Verfahren</span><div class="seg" id="sr-mode"><button data-v="S0" aria-pressed="true">S0 Flut</button><button data-v="S1" aria-pressed="false">S1 Next-Hop</button><button data-v="S2" aria-pressed="false">S2 Quellroute</button><button data-v="S3" aria-pressed="false">S3 Hybrid</button></div><button class="btn pri" id="sr-play">▶ DM senden</button></div>
+  <div class="rng mt"><label for="sr-old">Anteil alte FW</label><input type="range" id="sr-old" min="0" max="100" step="10" value="0"><output id="sr-old-o">0 %</output></div>
+  <div class="viz"><svg id="sr-svg" viewBox="0 0 640 300" role="img" aria-label="Beispielgraph mit Kopienzahl"></svg></div>
+  <p class="cap" id="sr-cap"></p>
+</div>
+<div>
+  <div class="grid g2"><div class="card stat"><div class="k">Sendungen <span class="calc">berechnet</span></div><div class="big" id="sr-n">–</div><div class="s">Beispielgraph, Hop 4</div></div><div class="card stat"><div class="k">Zusatz-Header</div><div class="big" id="sr-h">–</div><div class="s">S2: etwa 10 B je Rufzeichen</div></div></div>
+  <div class="panel mt" id="sr-p"></div>
+  <p class="mt" style="font-size:.84rem;color:var(--fg2)">Der Pfad steht schon im Frame: mit shortpath aus (Produktion) listet der Quellpfad jedes Relay. Der Empfänger kennt beim Senden von <code>:ackNNN</code> einen funktionierenden Pfad. Solange alte Firmware flutet, sinken die Kopien erst, wenn die meisten Relays neu sind.</p>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>S1 zuerst (kleinste Änderung, kompatibel, kein Routen-Header), S2 später für Store-and-Forward-Knoten und feste Standorte.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 14 -->
+<section class="slide" id="emcomm"><span class="num">14</span><div class="inner">
+<div class="eyebrow">Teil B · 4.8, 4.9 · EMCOMM</div>
+<h2>EMCOMM-Flag nur mit Absender-Authentifizierung</h2>
+<div class="grid g2">
+<div>
+  <h3>Wo das Flag hin kann (Byte 5 hat kein freies Bit)</h3>
+  <div class="optgrid" id="opt-e"></div>
+  <div class="panel mt" id="opt-e-p"></div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>E1 oder E4 für die Sichtbarkeit in der alten Flotte; Priorität nur, wenn der Frame auch eine gültige Signatur trägt. Ein unsignierter EMCOMM-Frame wird angezeigt, normal weitergeleitet, nicht bevorzugt.</p>
+  <h3 class="mt2">Authentifizierung A1 bis A5</h3>
+  <div class="optgrid" id="opt-a"></div>
+  <div class="panel mt" id="opt-a-p"></div>
+</div>
+<div>
+  <div class="ctl"><span class="lbl">Bild</span><div class="seg" id="ts-mode"><button data-v="A1" aria-pressed="false">A1 Netzschlüssel</button><button data-v="A3" aria-pressed="true">A3 Pinning</button><button data-v="A4" aria-pressed="false">A4 Verzeichnis</button></div></div>
+  <div class="ctl mt"><span class="lbl">Frame</span><button class="btn" data-ts="ok">signiert, gepinnt</button><button class="btn" data-ts="uns">unsigniert</button><button class="btn" data-ts="bad">fremder Schlüssel</button></div>
+  <div class="viz mt"><svg id="ts-svg" viewBox="0 0 520 300" role="img" aria-label="Trust-Store und Pinning"></svg></div>
+  <p class="cap" id="ts-cap"></p>
+  <div class="note mt"><b>Größe auf der Luft:</b> die Payload ist Text mit Zeichensatzfilter; 64 B Ed25519 brauchen Base64 = 88 B ≈ +786 ms bei SF11, das RM1-Tag 16 B hex ≈ +147 ms <span class="calc">berechnet</span>.</div>
+  <div class="note mt"><b>Trust-Store:</b> je Eintrag Rufzeichen (10 B) + öffentlicher Schlüssel (32 B) + Flags (1 B) = etwa 43 B; 100 Einträge 4,3 kB, passt in den Flash (LittleFS), RAM nur als Cache. In der Web-GUI: Fingerabdruck je Rufzeichen anzeigen, Operator bestätigt; Haken „EMCOMM-Nachrichten signieren“ je Nachricht oder Sitzung.</div>
+  <div class="note warn mt"><b>Regulatorik offen:</b> Authentifizierung ohne Verschlüsselung hält den Inhalt lesbar; für DL/OE wurde keine Regelung gefunden. Prüfung nötig (DARC/BNetzA, ÖVSV). <span class="prop">Vorschlag, nicht entschieden</span>A3 mit manuellem Pinning plus A4 als optionales Verzeichnis; A1 als schneller Bench-Prototyp mit bekannten Schwächen.</div>
+  <details class="deep"><summary>Was Onion-Routing einem Amateurfunk-Mesh beibringt (4.1)</summary><div class="body">
+  <p>Schichtverschlüsselung ist auf Amateurfunkbändern nicht erlaubt, Anonymität kein Ziel. Übertragbar ist die Infrastruktur drumherum:</p>
+  <div class="tw"><table><thead><tr><th>Tor</th><th>Mesh-Gegenstück</th><th>Nutzung</th></tr></thead><tbody>
+  <tr><td>Directory Authorities</td><td>Server veröffentlicht Knotenliste, Rollen, FW-Stand, Schlüssel; signiert</td><td>EOL, Trust-Store</td></tr>
+  <tr><td>Relay-Flags</td><td>„Hochstandort“, „stabil“, „Gateway“ aus Uptime, SNR, ACK-Erfolg</td><td>Relay-Wahl, Source Routing</td></tr>
+  <tr><td>Guard Nodes</td><td>ein bis zwei bevorzugte erste Relays pinnen</td><td>Source Routing, Stadt-Cluster</td></tr>
+  <tr><td>Circuit Reuse</td><td>entdeckten Pfad cachen, bis er ausfällt</td><td>Source Routing</td></tr>
+  <tr><td>Bandbreiten-Gewichtung</td><td>Relays mit freier Sendezeit bevorzugen</td><td>Relay-Wahl, Multi-SF</td></tr>
+  <tr><td>Rendezvous Points</td><td>bekanntes Gateway oder Store-Knoten als Treffpunkt</td><td>PN-Zuverlässigkeit</td></tr>
+  <tr><td>Key Pinning</td><td>Schlüssel beim ersten geprüften Kontakt oder aus dem Verzeichnis pinnen</td><td>Trust-Store</td></tr>
+  </tbody></table></div></div></details>
+</div>
+</div>
+</div></section>
+
+<!-- 15 -->
+<section class="slide" id="eol"><span class="num">15</span><div class="inner">
+<div class="eyebrow">Teil B · 4.10, 4.2 · Lebensende alter Firmware und Tag-Gruppen</div>
+<h2>Alte Firmware leiser stellen, Gruppen mit Namen</h2>
+<div class="grid g2">
+<div>
+  <h3>End of Life L0 bis L4</h3>
+  <div class="bytes-strip viz" style="padding:.6rem"><svg id="eol-svg" viewBox="0 0 520 110" role="img" aria-label="Firmware-Trailer nach der FCS"></svg></div>
+  <p class="cite">Trailer nach der FCS: FW-Versionsbyte, Last-Hardware-Byte, Subversion-Zeichen, 0x7E. Das FW-Versionsbyte ist die Version des <b>Urhebers</b>; Relays schreiben nur <code>msg_last_hw</code> neu. Der Filter <code>0 &lt; fw_version &lt; 35</code> („4.35a“) wirkt also auf Urheber; die Firmware des letzten Hops muss aus der Nachbarschaftsmatrix kommen.</p>
+  <div class="optgrid mt" id="opt-l"></div>
+  <div class="panel mt" id="opt-l-p"></div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>L1 für die Nibble-wickelnden Builds, mit vorheriger Hinweis-DM („bitte aktualisieren“) und veröffentlichtem Datum; L4, sobald ein signiertes Verzeichnis existiert.</p>
+</div>
+<div>
+  <h3>Tag-Gruppen T0 bis T3</h3>
+  <p style="font-size:.85rem;color:var(--fg2)">Gruppen heute: numerisch 1..99999, höchstens 6 je Knoten, keine gruppenspezifische Relay-Regel. Tags ändern daher die Bedienbarkeit, nicht die Kanallast.</p>
+  <div class="optgrid mt" id="opt-t"></div>
+  <div class="panel mt" id="opt-t-p"></div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>T2 als kompatibler erster Schritt (Anzeigefilter, unbegrenzte Abos, keine Protokolländerung), T1 für Firmware der 4.36-Klasse, sobald Server und App es können. Relay-Scoping nach Abo ist eine spätere, eigene Idee (braucht Abo-Daten im HEY oder HN-Bericht).</p>
+</div>
+</div>
+</div></section>
+
+<!-- 16 -->
+<section class="slide" id="zellen"><span class="num">16</span><div class="inner">
+<div class="eyebrow">Teil B · 4.13, 4.14 · Zellen, Färbung, Relay-Wahl</div>
+<h2>Zellen färben, Relays wählen statt alle meshen</h2>
+<div class="grid g2">
+<div>
+  <div class="ctl"><span class="lbl">Farben</span><div class="seg" id="hx-n"><button data-v="3" aria-pressed="true">3</button><button data-v="7" aria-pressed="false">7</button></div>
+  <span class="lbl" style="margin-left:.4rem">Dimension</span><div class="seg" id="hx-dim"><button data-v="f" aria-pressed="true">Frequenz</button><button data-v="sf" aria-pressed="false">SF</button><button data-v="t" aria-pressed="false">Zeit</button><button data-v="r" aria-pressed="false">Rolle</button></div></div>
+  <div class="viz mt"><svg id="hx-svg" viewBox="0 0 520 330" role="img" aria-label="Hexagonales Zellraster"></svg></div>
+  <p class="cap" id="hx-cap"></p>
+  <div class="panel" id="hx-p"></div>
+</div>
+<div>
+  <div class="ctl"><button class="btn" id="mpr-new">Neuer Graph</button><span class="lbl">Knoten anklicken</span></div>
+  <div class="viz mt"><svg id="mpr-svg" viewBox="0 0 520 330" role="img" aria-label="MPR-Wahl auf einem Zufallsgraphen"></svg></div>
+  <div class="legend"><span><i style="background:var(--acc)"></i>gewählt</span><span><i style="background:var(--mag)"></i>MPR-Relay</span><span><i style="background:var(--info)"></i>1-Hop, kein MPR</span><span><i style="background:var(--ok)"></i>2-Hop</span></div>
+  <p class="cap" id="mpr-cap">OLSR-Idee: jeder Knoten wählt die kleinste Menge direkter Nachbarn, die alle Zwei-Hop-Nachbarn abdeckt; nur diese leiten seine Fluten weiter.</p>
+  <div class="note mt">Die Nachbarschaftsmatrix und die HN-Berichte halten Zwei-Hop-Daten, aber nur teilweise: ein HN-Bericht trägt höchstens 8 Einträge, nur Links ≥ −16 dB, 60 min frisch. Eine MPR-Wahl daraus arbeitet mit Teildaten. Fall A/B ist eine reaktive Form davon (je Frame), eine MPR-Menge ist proaktiv (je Topologieänderung) und deterministisch, statt je Frame auf eine gehörte Wiederholung zu reagieren. Contra: hängt an der Matrixqualität (Teil A 10.7), größere Änderung, braucht einen Fallback bei veralteter MPR-Menge.</div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>Frequenzzellen sind auf 70 cm spekulativ; Rollenfärbung (wer relayt) und SF-Regionen (M4) sind die erreichbaren Formen der Idee.</p>
+</div>
+</div>
+</div></section>
+
+<!-- 17 -->
+<section class="slide" id="roadmap"><span class="num">17</span><div class="inner">
+<div class="eyebrow">Teil B · 6 · Roadmap und Wellenplan</div>
+<h2>Wellen W0 bis W9+: messen, puffern, priorisieren, absichern</h2>
+<p class="lead">Gleiche Schleife wie die v4.40a-Kampagne: planen, umsetzen, testen (Host-Gate, Golden Sets), Bench, Feldmitschnitt, auswerten, lernen, anpassen. Jede Welle endet mit einem Upstream-PR aus <code>upstream/dev</code> (deutsch). Schätzungen sind Kalenderzeit für einen Operator mit Agent, keine Zusagen.</p>
+<div class="ctl mt"><button class="btn pri" id="rm-play">▶ Zeitachse abspielen</button><button class="btn" id="rm-dep" aria-pressed="true">Abhängigkeiten</button></div>
+<div class="viz mt"><svg id="rm-svg" viewBox="0 0 900 330" role="img" aria-label="Wellenplan als Zeitachse"></svg></div>
+<p class="cite">Lage auf der Achse: Annahme streng nacheinander in Plan-Reihenfolge, Balken = obere Schätzung, heller Teil = Spanne <span class="calc">berechnet</span>. Das Papier legt keine Parallelisierung fest.</p>
+<div class="grid g2 mt">
+  <div class="panel" id="rm-p"></div>
+  <div>
+    <div class="card"><h3>Abhängigkeiten</h3><ul class="plain">
+      <li>W0 vor allem, was das Relay-Verhalten ändert</li>
+      <li>W1 vor W4 (Retries brauchen den Pool)</li>
+      <li>W3 vor W5 (die Hop-Klemme neutralisiert gewickelte Frames schon)</li>
+      <li>W6 vor jeder absoluten Priorität für fremden Verkehr</li>
+      <li>W8 nach den PER-Daten aus W0</li></ul><p class="cite">W0 braucht Beobachter-Knoten außerhalb des Clusters. W6 und W8 hängen an Dritten (Regulierer, andere Betreiber).</p></div>
+    <div class="card mt"><h3>Wiederkehrende Prüfungen</h3><p>Host-Gate <code>tools/regression.sh --stage 1,2</code>, Golden-Selftest (48), Dedup-Replay, NBR-Replay, gwflood-Replay, APRS-Korpus und Fuzz, Bench-Suite Stufe 3, DK5EN-98-Soaks. Jede Welle fügt ihr Golden Set hinzu.</p></div>
+  </div>
+</div>
+</div></section>
+
+<!-- 18 -->
+<section class="slide" id="fragen"><span class="num">18</span><div class="inner">
+<div class="eyebrow">Teil A · 9 und Teil B · 7 · Offen</div>
+<h2>Offene Fragen an den Operator</h2>
+<ol class="qlist">
+<li><div>Multi-Line POS: X2 (Umwandlung am Gateway oder Server, keine RF-Kosten) oder X3 (ein APRS-WX-Frame statt der Position)?</div><span class="tag t-dim">B 4.4.1</span></li>
+<li><div>Soll das erzwungene <code>--nbrrelay on</code> per RM1 schaltbar werden?</div><span class="tag t-dim">B 3</span></li>
+<li><div>EMCOMM-Vertrauensanker: nur manuelles Pinning oder ein Verzeichnis, und wer betreibt es (DARC? ÖVSV? icssw?)?</div><span class="tag t-dim">B 4.9</span></li>
+<li><div>EOL-Schwelle und Datum.</div><span class="tag t-dim">B 4.10</span></li>
+<li><div>Regulatorische Prüfung von Signaturen auf 70 cm in DL und OE.</div><span class="tag t-dim">B 4.9</span></li>
+<li><div>Darf W0 / Stufe 0 auf DK5EN-98 laufen (Produktions-Gateway, nur lesend, ausdrückliches OK nötig)?</div><span class="tag t-dim">A 9 · B 7</span></li>
+<li><div>TTL-Werte für Priorität 3 und 4 (Vorschlag 300 s / 120 s) nach dem Stufe-0-Histogramm.</div><span class="tag t-dim">A 9</span></li>
+<li><div><code>DEDUP_ENTRIES</code> klassisch: 171 (+847 B, deckt die DK5EN-98-Spitze) oder 128 (+546 B, 33,7 min bei Spitze). Vorschlag des Papiers: 171.</div><span class="tag t-dim">A 9</span></li>
+<li><div>Behält <code>E22_XML-DevKitC</code> ein kürzeres Dedup-Fenster oder werden seine Puffer gekürzt?</div><span class="tag t-dim">A 9</span></li>
+<li><div>Diskussionspunkte, alle offen und erst nach Stufe-0-Daten: Hop-Cap-Variante (10.1), <code>{CET}</code>-Reichweite und -Alter samt Bedeutung von „zwei Hops“ (10.8), HG-Budget (10.9), Priorität weitergeleiteter DMs und <code>:ackNNN</code> (10.10).</div><span class="tag t-dim">A 9, 10</span></li>
+</ol>
+<div class="note mt">Alles auf diesen Folien ist Diskussionsstand vom 21.10.2026. Zahlen stammen aus den beiden Konzeptpapieren; gerechnete Werte sind als <span class="calc">berechnet</span> markiert, Bewertungen als <span class="prop">Vorschlag, nicht entschieden</span>. <a href="index.html">Zur Übersicht aller Vorträge</a>.</div>
+</div></section>
+
+</main>
+<script>
+(function(){
+'use strict';
+var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+var NS = 'http://www.w3.org/2000/svg';
+function $(s, r){ return (r || document).querySelector(s); }
+function $$(s, r){ return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+function S(tag, a, p){ var e = document.createElementNS(NS, tag); if (a) for (var k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function T(a, txt, p){ var e = S('text', a, p); e.textContent = txt; return e; }
+function clear(e){ while (e.firstChild) e.removeChild(e.firstChild); }
+function de(n, d){ return Number(n).toLocaleString('de-DE', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+function v(name){ return 'var(--' + name + ')'; }
+function wait(ms){ return new Promise(function(r){ setTimeout(r, RM ? 0 : ms); }); }
+function Run(){ var id = 0; return { start: function(){ return ++id; }, ok: function(t){ return t === id; } }; }
+function tween(dur, fn){
+  return new Promise(function(res){
+    if (RM || dur <= 0){ fn(1); res(); return; }
+    var t0 = performance.now();
+    function f(now){ var t = Math.min(1, (now - t0) / dur); fn(t); if (t < 1) requestAnimationFrame(f); else res(); }
+    requestAnimationFrame(f);
+  });
+}
+function pulse(svg, x, y, R, color, dur){
+  if (RM) return Promise.resolve();
+  var c = S('circle', { cx: x, cy: y, r: 4, fill: 'none', stroke: color, 'stroke-width': 2 }, svg);
+  return tween(dur || 700, function(t){ c.setAttribute('r', 4 + t * R); c.setAttribute('opacity', String(1 - t)); }).then(function(){ c.remove(); });
+}
+function seg(el, cb){
+  if (!el) return;
+  var bs = $$('button', el);
+  bs.forEach(function(b){ b.addEventListener('click', function(){
+    bs.forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    cb(b.getAttribute('data-v'), b);
+  }); });
+}
+function segVal(el){ var b = $('button[aria-pressed="true"]', el); return b ? b.getAttribute('data-v') : null; }
+function toggle(b, cb){ b.addEventListener('click', function(){ var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); cb(on); }); }
+function rng(seed){ var s = seed >>> 0; return function(){ s = (s + 0x6D2B79F5) >>> 0; var t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function esc(s){ return String(s); }
+
+/* generic option set: cards + panel with Pro / Contra */
+function optset(id, items, opts){
+  var g = document.getElementById(id), p = document.getElementById(id + '-p');
+  if (!g || !p) return;
+  opts = opts || {};
+  var sel = opts.sel || 0;
+  function show(it){
+    p.innerHTML = '<h4>' + it.k + ' · ' + it.n + '</h4>' + (it.r ? '<p>' + it.r + '</p>' : '') +
+      '<div class="pc"><div class="p">' + it.p + '</div><div class="c">' + it.c + '</div></div>' + (it.x ? '<p class="cite">' + it.x + '</p>' : '');
+  }
+  items.forEach(function(it, i){
+    var b = document.createElement('button');
+    b.className = 'opt'; b.type = 'button';
+    b.setAttribute('aria-pressed', i === sel ? 'true' : 'false');
+    b.innerHTML = '<span class="k">' + it.k + '</span><span class="t">' + it.n + '</span>';
+    b.addEventListener('click', function(){
+      $$('.opt', g).forEach(function(x){ x.setAttribute('aria-pressed', 'false'); });
+      b.setAttribute('aria-pressed', 'true'); show(it); if (opts.on) opts.on(it, i);
+    });
+    g.appendChild(b);
+  });
+  show(items[sel]);
+}
+
+/* ================= 02 airtime calculator ================= */
+function toa(sf, pl, pre){
+  var bw = 250000, cr = 2; pre = pre || 32;
+  var ts = Math.pow(2, sf) / bw * 1000;
+  var deFlag = ts > 16 ? 1 : 0;
+  var num = 8 * pl - 4 * sf + 28 + 16;
+  var den = 4 * (sf - 2 * deFlag);
+  var nP = 8 + Math.max(Math.ceil(num / den) * (cr + 4), 0);
+  var tpre = (pre + 4.25) * ts;
+  return { ts: ts, de: deFlag, nP: nP, tpre: tpre, total: tpre + nP * ts };
+}
+var INTS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800];
+function initToa(){
+  var sfBox = $('#toa-sf'); if (!sfBox) return;
+  [7, 8, 9, 10, 11, 12].forEach(function(sf){ var b = document.createElement('button'); b.setAttribute('data-v', sf); b.textContent = 'SF' + sf; b.setAttribute('aria-pressed', sf === 11 ? 'true' : 'false'); sfBox.appendChild(b); });
+  var pl = $('#toa-pl'), ring = $('#toa-ring'), rel = $('#toa-rel'), itv = $('#toa-int');
+  var svg = $('#toa-svg');
+  var state = { sf: 11, pre: 32 };
+  seg($('#toa-pre'), function(v){ state.pre = +v; note = ''; upd(); });
+  var note = '';
+  seg(sfBox, function(v){ state.sf = +v; note = ''; upd(); });
+  [pl, ring, rel, itv].forEach(function(e){ e.addEventListener('input', function(){ note = ''; upd(); }); });
+  var presets = {
+    t30: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 30, n: 'Rechenbeispiel: ein 80-B-Positionsframe (Größe INFERRED) alle 30 s auf der MeshCom-QRG, <code>max_hop_pos</code> 2, drei Relays je Ring: 26 %. Das ist <b>nicht</b> der Track-Modus: der sendet auf 433,775 MHz und nur alle 5 min eine Kopie auf die MeshCom-QRG (Folie 3).' },
+    t10: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 10, n: 'Rechenbeispiel: derselbe Positionsframe alle 10 s auf der MeshCom-QRG: 77 %. Kein Track-Modus-Szenario (Folie 3).' },
+    hey: { sf: 11, pl: 30, ring: 4, rel: 3, itv: 900, n: 'HEY: etwa 30 B auf der Luft, <code>max_hop_text</code> 4, ein HEY je Imax (15 min). Drei Relays je Ring sind eine Annahme für dieses Bild.' },
+    dm:  { sf: 11, pl: 77, ring: 4, rel: 3, itv: 40, n: 'DM: 77 B ist die mittlere Framelänge auf der Luft (Teil A 5.4), Hop 4, ein DM je 40-s-Leiterstufe. Relays je Ring und Länge sind Annahmen für dieses Bild.' }
+  };
+  $$('[data-preset]').forEach(function(b){ b.addEventListener('click', function(){
+    var p = presets[b.getAttribute('data-preset')];
+    state.sf = p.sf; pl.value = p.pl; ring.value = p.ring; rel.value = p.rel; itv.value = INTS.indexOf(p.itv);
+    $$('button', sfBox).forEach(function(x){ x.setAttribute('aria-pressed', +x.getAttribute('data-v') === p.sf ? 'true' : 'false'); });
+    note = p.n; upd(); sweep();
+  }); });
+  var blocks = [], cur = null;
+  function upd(){
+    var P = +pl.value, R = +ring.value, N = +rel.value, I = INTS[+itv.value];
+    $('#toa-pl-o').textContent = P; $('#toa-ring-o').textContent = R; $('#toa-rel-o').textContent = N;
+    $('#toa-int-o').textContent = I >= 60 ? de(I / 60, I % 60 ? 1 : 0) + ' min' : I + ' s';
+    var t = toa(state.sf, P, state.pre), copies = 1 + R * N, share = copies * t.total / (I * 1000);
+    $('#toa-ms').textContent = de(t.total, 0) + ' ms';
+    var t32 = toa(state.sf, P, 32), t8 = toa(state.sf, P, 8);
+    $('#toa-sym').textContent = 'Tsym ' + de(t.ts, 3) + ' ms · ' + t.nP + ' Nutzsymbole · LDRO ' + (t.de ? 'an' : 'aus') + ' · Präambel 8 statt 32: −' + de(t32.total - t8.total, 0) + ' ms';
+    $('#toa-cp').textContent = copies;
+    $('#toa-share').textContent = de(share * 100, share < 0.1 ? 1 : 0) + ' %';
+    var bar = $('#toa-bar'); bar.style.width = Math.min(100, share * 100) + '%';
+    bar.style.background = share < 0.1 ? v('ok') : share < 0.3 ? v('warn') : v('bad');
+    $('#toa-share-t').textContent = (share > 1 ? 'Überbucht: die Kopien brauchen mehr Zeit, als das Intervall hat. ' : '') +
+      'Eine Quelle allein. ' + copies + ' × ' + de(t.total, 0) + ' ms = ' + de(copies * t.total / 1000, 1) + ' s Sendezeit je ' + (I >= 60 ? de(I / 60, 1) + ' min' : I + ' s') + '.';
+    $('#toa-note').innerHTML = note || 'Balken: ein Intervall. Jedes Kästchen ist eine Kopie (Urheber, dann Relays Ring für Ring). Rot: über das Intervall hinaus.';
+    draw(t.total, copies, I * 1000, R, N);
+  }
+  function draw(ms, copies, Ims, R, N){
+    clear(svg); blocks = [];
+    var x0 = 10, W = 620, y = 34, h = 40;
+    S('rect', { x: x0, y: y, width: W, height: h, rx: 6, fill: v('bg3'), stroke: v('line') }, svg);
+    var px = W / Ims, x = x0, colors = [v('acc'), v('info'), v('cyan'), v('ok'), v('warn'), v('orange'), v('mag'), v('p5')];
+    for (var i = 0; i < copies; i++){
+      var ringIdx = i === 0 ? 0 : 1 + Math.floor((i - 1) / N);
+      var w = Math.max(1.2, ms * px), over = x + w > x0 + W + 0.5;
+      if (x > x0 + W + 40) break;
+      var r = S('rect', { x: x, y: y + 4, width: Math.max(0.8, Math.min(w, x0 + W + 40 - x)), height: h - 8, rx: 2, fill: over ? v('bad') : colors[ringIdx % colors.length], opacity: 0.85 }, svg);
+      blocks.push({ r: r, x: x, w: w });
+      x += w + (w > 6 ? 1 : 0);
+    }
+    T({ x: x0, y: 24, fill: v('fg3'), 'font-size': 11 }, '0 s', svg);
+    T({ x: x0 + W, y: 24, fill: v('fg3'), 'font-size': 11, 'text-anchor': 'end' }, 'Intervall ' + de(Ims / 1000, 0) + ' s', svg);
+    T({ x: x0, y: 98, fill: v('fg2'), 'font-size': 11 }, 'Urheber + ' + R + ' Ring' + (R === 1 ? '' : 'e') + ' × ' + N + ' Relays', svg);
+    cur = S('rect', { x: x0, y: y - 4, width: 2, height: h + 8, fill: v('fg') }, svg);
+    if (RM) cur.setAttribute('opacity', 0);
+  }
+  var sw = Run();
+  function sweep(){
+    if (RM) return;
+    var tk = sw.start(), x0 = 10, W = 620;
+    (function loop(){
+      if (!sw.ok(tk)) return;
+      tween(3800, function(t){ if (!sw.ok(tk) || !cur) return; var x = x0 + t * W; cur.setAttribute('x', x);
+        blocks.forEach(function(b){ b.r.setAttribute('opacity', x >= b.x && x <= b.x + b.w + 1 ? 1 : 0.6); }); }).then(function(){ if (sw.ok(tk)) setTimeout(loop, 400); });
+    })();
+  }
+  upd();
+  return { play: sweep };
+}
+
+/* ================= 03 track options ================= */
+function initTrack(){
+  optset('opt-k', [
+    { k: 'X0', n: 'Status quo: WX-Tags im Kommentar der MeshCom-Position', p: 'ein Frame; MeshCom-Clients dekodieren es', c: 'aprs.fi zeigt keine Wetterstation' },
+    { k: 'X1', n: '#1219 wie gebaut: zweiter <code>!</code>-Frame auf RF, weitergeleitet', p: 'aprs.fi-Wetterstation ohne Serveränderung', c: 'verdoppelt die Positions-Sendezeit; Symbol überschrieben; Bit-Kollision; zurückgenommen' },
+    { k: 'X2', n: 'Umwandlung am Gateway oder Server zu APRS-IS', p: '<b>keine zusätzliche RF-Sendezeit</b>; eine Stelle; kein Symbolwechsel auf RF', c: 'nur Stationen, die ein Gateway hört; Gateway oder Server muss die MeshCom-WX-Tags kennen' },
+    { k: 'X3', n: 'ein Frame im APRS-WX-Positionsformat statt der normalen Position (nur WX-Knoten)', p: 'kein Zusatzframe; Standard-APRS auf RF', c: 'MeshCom-Decoder müssen t/h/b lernen; das Wettersymbol ersetzt das Knotensymbol' },
+    { k: 'X4', n: 'Zusatzframe mit Hop 0, seltener (z. B. jede 6. Position)', p: 'RF-Kosten eine Sendung je paar Stunden', c: 'nur Gateways in direkter Reichweite; weiterhin ein zweiter Frame' },
+    { k: 'X5', n: 'Zusatzframe nur auf Gateways für den eigenen Sensor', p: 'direkt zu APRS-IS ohne RF', c: 'nur Sensoren am Gateway' }
+  ]);
+}
+
+/* ================= 04 hop model ================= */
+function initHop(){
+  var svg = $('#hop-svg'); if (!svg) return;
+  var log = $('#hop-log'), cap = $('#hop-cap');
+  var bSrv = $('#hop-srv'), bWrap = $('#hop-wrap');
+  var A = [], B = [];
+  var namesA = ['Quelle', 'R1', 'GW-A', 'R3', 'R4', 'R5', 'R6', 'R7'];
+  for (var i = 0; i < 8; i++) A.push({ x: 50 + 90 * i, y: 80, n: namesA[i] });
+  var namesB = ['GW-B', 'B1', 'B2', 'B3'];
+  for (var j = 0; j < 4; j++) B.push({ x: 230 + 90 * j, y: 280, n: namesB[j] });
+  var SRV = { x: 100, y: 185, n: 'Server' };
+  var run = Run();
+  var layer;
+  function base(){
+    clear(svg);
+    var wrap = bWrap.getAttribute('aria-pressed') === 'true', srv = bSrv.getAttribute('aria-pressed') === 'true';
+    T({ x: 12, y: 22, fill: v('fg3'), 'font-size': 11 }, 'Funkinsel A', svg);
+    for (var i = 0; i < A.length - 1; i++){
+      var dim = i >= 5 && !wrap;
+      S('line', { x1: A[i].x, y1: A[i].y, x2: A[i + 1].x, y2: A[i + 1].y, stroke: v('line2'), 'stroke-width': 2, opacity: dim ? 0.25 : 1 }, svg);
+    }
+    if (srv){
+      T({ x: 12, y: 330, fill: v('fg3'), 'font-size': 11 }, 'Funkinsel B', svg);
+      S('path', { d: 'M' + A[2].x + ',' + (A[2].y + 12) + ' Q 150,140 ' + (SRV.x + 30) + ',' + (SRV.y - 10), fill: 'none', stroke: v('mag'), 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, svg);
+      S('path', { d: 'M' + (SRV.x + 30) + ',' + (SRV.y + 12) + ' Q 160,250 ' + (B[0].x - 12) + ',' + B[0].y, fill: 'none', stroke: v('mag'), 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, svg);
+      S('ellipse', { cx: SRV.x, cy: SRV.y, rx: 52, ry: 24, fill: v('bg3'), stroke: v('mag') }, svg);
+      T({ x: SRV.x, y: SRV.y + 4, 'text-anchor': 'middle', fill: v('mag'), 'font-size': 12 }, 'Server', svg);
+      for (var k = 0; k < B.length - 1; k++) S('line', { x1: B[k].x, y1: B[k].y, x2: B[k + 1].x, y2: B[k + 1].y, stroke: v('line2'), 'stroke-width': 2 }, svg);
+      B.forEach(function(n, k){ node(n, k === 0 ? v('mag') : v('fg3')); });
+    }
+    A.forEach(function(n, i){
+      var col = i === 0 ? v('acc') : i === 2 ? v('mag') : (i === 5 && wrap) ? v('warn') : v('fg3');
+      var g = node(n, col); if (i >= 6 && !wrap) g.setAttribute('opacity', 0.25);
+    });
+    if (wrap) T({ x: A[5].x, y: A[5].y + 34, 'text-anchor': 'middle', fill: v('warn'), 'font-size': 10 }, '4.35x, ohne App', svg);
+    layer = S('g', {}, svg);
+  }
+  function node(n, col){
+    var g = S('g', {}, svg);
+    S('circle', { cx: n.x, cy: n.y, r: 12, fill: v('bg3'), stroke: col, 'stroke-width': 2 }, g);
+    T({ x: n.x, y: n.y - 20, 'text-anchor': 'middle', fill: v('fg2'), 'font-size': 11 }, n.n, g);
+    return g;
+  }
+  function badge(x, y, txt, col){
+    var g = S('g', {}, layer);
+    S('rect', { x: x - 18, y: y - 9, width: 36, height: 18, rx: 4, fill: col }, g);
+    T({ x: x, y: y + 4, 'text-anchor': 'middle', fill: v('on-acc'), 'font-size': 11, 'font-weight': 700 }, txt, g);
+    return g;
+  }
+  function hx(n){ return 'H' + (n < 10 ? '0' : '') + n; }
+  function line(t){ var d = document.createElement('div'); d.textContent = t; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+  async function hopTo(tk, a, b, nib, col, viaNet){
+    var dot = S('circle', { r: 7, fill: col }, layer);
+    var lab = badge(a.x, a.y, hx(nib), col);
+    await tween(viaNet ? 900 : 650, function(t){
+      var x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if (viaNet){ y -= Math.sin(t * Math.PI) * 30; }
+      dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+      lab.setAttribute('transform', 'translate(' + (x - a.x) + ',' + (y - a.y + 26) + ')');
+    });
+    dot.remove();
+    if (!run.ok(tk)) return false;
+    lab.setAttribute('opacity', 0.55);
+    return true;
+  }
+  async function play(){
+    var tk = run.start();
+    base(); log.innerHTML = '';
+    var wrap = bWrap.getAttribute('aria-pressed') === 'true', srv = bSrv.getAttribute('aria-pressed') === 'true';
+    var nib = 4;
+    cap.textContent = 'Die Quelle setzt den Nibble einmal: Text und HEY bekommen max_hop_text (Vorgabe 4).';
+    line('Quelle sendet Text mit ' + hx(nib) + ' (max_hop_text 4)');
+    for (var i = 0; i < 7; i++){
+      var a = A[i], b = A[i + 1];
+      if (!(await hopTo(tk, a, b, nib, v('acc')))) return;
+      // b receives nib
+      if (i + 1 === 2 && srv){ line('GW-A empfängt ' + hx(nib) + ', lädt hoch (vor dem eigenen Dekrement)'); }
+      if (nib === 0){
+        if (i + 1 === 5 && wrap){
+          line('R5 (4.35x, ohne App) empfängt H00: 0x20 in max_hop geodert, Gate passiert, Dekrement → H15');
+          cap.textContent = 'Wrap-Bug: ein Build ohne Fix macht aus 0 eine 15. Der Frame läuft weiter, bis Dedup und Loop-Check ihn stoppen.';
+          nib = 15; await pulse(svg, b.x, b.y, 30, v('warn'), 600); if (!run.ok(tk)) return;
+          continue;
+        }
+        line(b.n + ' empfängt H00: Gate nibble > 0 schlägt fehl, kein Relay');
+        badge(b.x, b.y + 26, 'H00', v('fg3'));
+        if (!wrap) cap.textContent = 'Nibble 0: kein Relay. In Insel A senden Quelle und vier Relays.';
+        break;
+      }
+      nib = nib - 1;
+      line(b.n + ' empfängt ' + hx(nib + 1) + ' → Relay mit ' + hx(nib));
+      if (i + 1 >= 7){ line('… weiter, bis Dedup und Loop-Check (eigenes Rufzeichen im Pfad) ihn stoppen'); badge(b.x, b.y + 26, hx(nib), v('warn')); }
+      await wait(120); if (!run.ok(tk)) return;
+    }
+    if (srv){
+      await wait(300); if (!run.ok(tk)) return;
+      cap.textContent = 'Server-Strecke: was der Server mit dem Nibble macht, steht nicht im Repository. Im Feld kamen {CET}-Baken mit H02 vom Gateway.';
+      line('Upload GW-A → Server, Fan-out an jedes verbundene Gateway (gleiche msg_id)');
+      if (!(await hopTo(tk, A[2], SRV, 3, v('mag'), true))) return;
+      if (!(await hopTo(tk, SRV, B[0], 2, v('mag'), true))) return;
+      line('GW-B speist ohne Dekrement ein, hängt sein Rufzeichen an, setzt das Serverbit: sendet H02 (Beispiel)');
+      var nb = 2;
+      for (var k = 0; k < 3; k++){
+        if (!(await hopTo(tk, B[k], B[k + 1], nb, v('mag')))) return;
+        if (nb === 0){ line(B[k + 1].n + ' empfängt H00: kein Relay'); badge(B[k + 1].x, B[k + 1].y + 26, 'H00', v('fg3')); break; }
+        nb--; line(B[k + 1].n + ' empfängt ' + hx(nb + 1) + ' → Relay mit ' + hx(nb));
+      }
+      cap.textContent = 'Jede Funkinsel hinter einem Gateway startet mit dem Nibble, den der Server schickt. Die große Reichweite läuft plausibel über die Server-Verteilung, nicht über lange Funkketten (INFERRED, nicht gemessen).';
+    }
+  }
+  toggle(bSrv, function(){ play(); });
+  toggle(bWrap, function(){ play(); });
+  $('#hop-play').addEventListener('click', play);
+  base();
+  cap.textContent = 'Abspielen zeigt einen Gruppentext mit Nibble 4. Schalter fügen die Server-Strecke und den Wrap-Bug hinzu.';
+  return { play: play };
+}
+
+/* ================= 05 hop cap ================= */
+function initHopCap(){
+  optset('opt-h', [
+    { k: 'H0', n: 'Status quo', r: 'Relay mit <code>nibble − 1</code>; Gateways wenden zusätzlich gwcap an (kein Relay bei <code>msg_last_path_cnt ≥ max_hop + 1</code>).', p: 'keine Änderung; Urheber und Server behalten die Kontrolle je Frame; funktioniert mit der ganzen Flotte', c: 'ein Ausreißer (gewickelte 15, falscher <code>{SET}</code>-Wert) läuft bis zu 15 Relays je Insel, bevor Dedup und Loop-Check ihn stoppen; gwcap zählt die falsche Metrik (10.0 Punkt 5) und kann Frames blockieren, die ein anderes Gateway derselben Insel wieder einspeist' },
+    { k: 'H1', n: 'Nibble-Cap beim Relay', r: '<code>nibble_new = min(nibble − 1, L)</code>', p: 'braucht keinen Pfad, also verfälschen <code>bSHORTPATH</code> und die Server-Strecke nichts; begrenzt Ausreißer ab dem ersten reparierten Relay; 0 B; nicht reparierte Knoten dahinter dekrementieren den gekappten Wert weiter', c: 'nimmt Urheber und Server die Kontrolle je Frame; die erste Sendung nach Einspeisung oder Ursprung bleibt ungekappt; nicht reparierte Knoten können weiter wickeln; bei einheitlichem L ändern sich normale Frames nicht (kein Lokalitätsgewinn), bei gemischtem L wird die Reichweite pfadabhängig und ein Knoten mit kleinem L kann eine Region abschneiden, die er überbrückt' },
+    { k: 'H2', n: 'Nibble-Cap bei der Gateway-Einspeisung', r: '<code>nibble_new = min(nibble, L_inject)</code>, gesetzt vor <code>encodeAPRS()</code> oder in <code>convBuffer[5]</code>', p: 'wirkt auf die Server-Verteilung, plausibel der Träger großer Distanz (10.0 Punkt 8, INFERRED); Relays dahinter brauchen kein Update', c: 'übergeht die Wahl des Servers je Frame (z. B. <code>{CET}</code>); nur auf Gateways mit neuer Firmware; eine Insel mit mehreren Gateways verhält sich nach der zuerst ankommenden Kopie, nichtdeterministisch bei gemischtem <code>L_inject</code> oder gemischter Firmware' },
+    { k: 'H3', n: 'Server-seitige Politik', r: 'Der Server setzt den Nibble je Frametyp oder Region vor der Verteilung.', p: 'ein Ort, konsistent über alle Inseln, keine Firmware-Änderung; der Server bekommt HEY-Signalketten, Pfade und Positionen von jedem Gateway, hat also teilweise Topologiedaten', c: 'außerhalb dieses Repositorys und außerhalb der Kontrolle des Forks; was der Server heute weiß und tut, ist unbekannt' },
+    { k: 'H4', n: 'Pfadzähl-Cap', r: '<code>nibble_new = min(nibble − 1, L − msg_last_path_cnt)</code>', p: 'intuitives „Gesamt-Hop-Budget“; gwcap macht das auf Gateways schon als Drop', c: 'falsche Metrik (10.0 Punkt 5): zählt die fremde Insel und das Gateway nach einer Server-Strecke; würde wieder eingespeiste Frames in der lokalen Insel töten; auf jeden Knoten ausgeweitet verbreitet es den Fehler von gwcap' },
+    { k: 'H5', n: 'Geografischer Radius', r: 'Relay verwerfen, wenn die bekannte Position des Urhebers weiter als R km entfernt ist.', p: 'trifft den Grat-Fall direkt; die Hop-Zahl ist ein schlechter Distanz-Ersatz (Gipfel-Digis überbrücken weite Strecken in einem Hop; kein Messwert im Repository)', c: 'der Urheber eines eingespeisten Server-Frames ist meist weit weg: H5 würde das lokale Weiterleiten der ganzen Verteilung stoppen, außer es nimmt <code>msg_server</code>-Frames aus oder misst vom einspeisenden Gateway; braucht Urheberpositionen aus der Nachbarschaftsmatrix (Zeilen gedeckelt, 10.7); ein Lookup je Relay' }
+  ]);
+}
+
+/* ================= 06 QRT review ================= */
+function initQrt(){
+  var svg = $('#qrt-svg'); if (!svg) return;
+  var M = [
+    { k: '--nbrrelay on', n: 'erzwungen in Produktion (prod_lock.h:177)', ok: '3,8 bis 6,4 Kopien je Nachricht gemessen; Cancel nach Abdeckung ist der größte Sendezeit-Hebel; Fall A gibt einer einzigen Brücke einen kurzen Weg', bad: 'Entscheidungen ruhen auf einer 12-h-Matrix und einer Symmetrie-Annahme (<code>nbrsym</code>); klassische Boards halten 64 Zeilen (Teil A 10.7); der Bench-Tag zeigte nur <code>CANCEL?</code>-Kandidaten; kein Nachweis nach dem Fix; gesperrt: ein schlechtes Feldergebnis lässt sich ohne neuen Build nicht abschalten', berg: 'gut: Fall A (allein deckt jemanden ab) bekommt nach 8 s den 150-ms-Ausweg', stadt: 'Risiko falsche Abdeckung: ein Cancel folgt nur auf eine gehörte fremde Wiederholung, Fall A wird nie gecancelt, und ein Relay mit leerer Need-Menge sendet trotzdem, wenn niemand wiederholt; mindestens einer sendet also immer. Behauptet aber eine veraltete oder asymmetrische Matrix (oder per <code>nbrsym</code> erschlossene Bits), das gehörte Relay decke einen Schattenknoten ab, canceln die anderen und der Schattenknoten bleibt leer', w0: 'Frames, die im Cluster starben (von niemandem jenseits gehört); Beobachter-Knoten außerhalb des Clusters nötig', sc: 'cancel' },
+    { k: 'CSMA Age floor', n: 'Brief G: 20 s Stufe 1, 60 s Stufe 2 mit 100 ms + Jitter, Prio 1–3', ok: 'Sende-Aushungern gemessen (4,0 Sendungen/min, 316 Unterbrechungen); Replay 11,2 Sendungen/min', bad: 'Compile-Zeit, standardmäßig an, nur Replay. Keine neue Synchronisation: Prio 3 hatte schon vorher Basis 4500 ms und 11 Slot-Wahlen; Stufe 2 verkürzt auf 6 Wahlen (100 bis 275 ms) und fasst Prio 1 bis 3 zusammen. Haupt-Contra: <b>Prioritätsinversion</b>, ein gealtertes Prio-3-Relay kommt vor ein frisches Prio-1-ACK oder -DM. Boards ohne Radio-Objekt rechnen Sendezeit 0 und nutzen den 1500-ms-Deckel. Pro: greift nie direkt nach eigenem TX', berg: 'hilft dem Berg aus einer vollen Queue. Beim Hidden Terminal ist der Berg Opfer, nicht Täter: als Empfänger hört er Talknoten links und rechts, die sich gegenseitig nicht hören, und deren Frames kollidieren bei ihm', stadt: 'in einem verstopften Cluster wählen gealterte Frames aus nur 6 statt 11 Slots; gealterte Relays überholen frische ACKs und DMs', w0: 'Kollisionen nach einer Stufe-2-Eskalation (<code>aged2</code>-Zähler plus CRC-Fehler in der folgenden Sekunde) und Wartezeit frischer Prio-1-Frames hinter gealterten Relays', sc: 'burst' },
+    { k: 'Echo-Freigabe', n: 'Echo gibt eigenen Gruppentext frei; Retry stoppt, wenn schon gehört', ok: '20 ignorierte Echos und 5 Nachrichten mit 3 Retries gemessen', bad: 'der Echo-Stopp für <code>SENT</code>-Gruppentext gab es schon vor QRT; DMs sind ausgenommen. Ein Echo eines Nachbarn beweist nur, dass der Nachbar ihn hat, nicht die ferne Seite. Echtes Contra: auf einem Gateway ist das erste Echo oft die Serverkopie eines anderen Gateways, sodass die eigene Funkinsel den Gruppentext eventuell nie bekommt', berg: 'neutral bis gut: das Echo des Bergs kommt meist von einem fernen Relay', stadt: 'Risiko: ein Echo von einem Knoten 50 m weiter stoppt den Retry, obwohl die Nachricht den Cluster nie verlassen hat', w0: 'durch ein Echo gestoppte Retries mit RSSI über z. B. −80 dBm', sc: 'echo' },
+    { k: 'Retry in QRT verschoben', n: 'Retry wartet bis zur QRT-Freigabe (unter 16/20)', ok: '7 Verdrängungen, 4 Servertexte durch eigene Retries verloren', bad: 'der Retry wird bis zur QRT-Freigabe verschoben; nur ein Slot, der schon am Retry-Limit steht, gibt auf. Unter Last kommt die Wiederholung später, genau wenn es zählt', berg: 'selten in QRT, außer bei Rückstau', stadt: 'oft in QRT unter Last: Retries kommen erst nach der Freigabe' },
+    { k: 'Server-Spiegelung', n: 'vom Server gespiegelte eigene Nachricht nicht eingereiht', ok: 'eigene Nachricht 311 s später erneut gesendet', bad: 'Positionen und Texte an nicht abonnierte Gruppen verlieren die Kopie fürs Telefon (Abweichung C)', berg: 'gut für die Sendezeit; Telefonkopie fehlt', stadt: 'gut für die Sendezeit; Telefonkopie fehlt' },
+    { k: 'Ring voll −2', n: 'Ring voll gibt −2, QTA bei jeder Tiefe; QRT-Freigabe unter 16, 60-s-Wiederholung', ok: '11 von 19 Drops bei 11 oder weniger belegten Slots; 6 min 57 s abgewiesen bei 15 freien Slots', bad: 'behandelt das Symptom der Ringlücken (Teil A Problem A); die Schwellen sind an einem Replay getunt', berg: 'gut', stadt: 'gut' },
+    { k: 'shortpath aus', n: 'erzwungen aus (prod_lock.h:176)', ok: 'der volle Pfad speist Nachbarschaftsmatrix, Loop-Check und gwcap; die Vorgabe war schon vorher aus', bad: 'längere Frames, aber nur etwa +98 ms je zusätzlichem Hop im Pfad (SF11, berechnet); gwcap schlägt bei langen eingespeisten Pfaden an (Teil A 10.1)', berg: 'etwas mehr Sendezeit je Relay auf dem belebtesten Knoten', stadt: 'etwas mehr Sendezeit je Kopie, mal viele Kopien' },
+    { k: 'Sperren', n: 'HN-Bericht auto, nbrsym an, pingtime/pingmax gesperrt, postime-Klemme 300 s', ok: 'stoppt Fehlkonfiguration (pingtime ohne Ziel brachte HEY/HN zum Schweigen)', bad: 'Sperren nehmen das Tuning im Feld; postime 300 s begrenzt den Track-Modus nicht', berg: 'neutral', stadt: 'neutral' },
+    { k: 'Nicht gemacht', n: 'Finding 3 (Gateway cancelt schon gehörte Server-Frames), Finding 6 (90 s Server-Höchstalter), Rest von Finding 9', ok: '–', bad: 'Finding 3 ist das Gateway-Gegenstück zu Cancel-on-Overhear und greift die 3,8 Kopien direkt an', berg: '–', stadt: '–' }
+  ];
+  var list = $('#qrt-list'), panel = $('#qrt-p'), cap = $('#qrt-cap');
+  var mode = 'berg', selIdx = 0;
+  M.forEach(function(m, i){
+    var b = document.createElement('button'); b.className = 'opt'; b.type = 'button';
+    b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    b.innerHTML = '<span class="k">' + m.k + '</span>';
+    b.addEventListener('click', function(){ $$('.opt', list).forEach(function(x){ x.setAttribute('aria-pressed', 'false'); }); b.setAttribute('aria-pressed', 'true'); selIdx = i; show(); });
+    list.appendChild(b);
+  });
+  function show(){
+    var m = M[selIdx];
+    panel.innerHTML = '<h4>' + m.k + ' · ' + m.n + '</h4><div class="pc"><div><span class="tag t-ok">warum richtig</span><p style="margin-top:.3rem">' + m.ok + '</p></div><div><span class="tag t-bad">warum evtl. falsch</span><p style="margin-top:.3rem">' + m.bad + '</p></div></div>' +
+      '<div class="note mt ' + (/Risiko/.test(m[mode]) ? 'warn' : '') + '"><b>' + (mode === 'berg' ? 'Berg-Knoten' : 'Stadt-Cluster') + ':</b> ' + m[mode] + '</div>' +
+      (m.w0 ? '<p class="cite">W0-Metrik: ' + m.w0 + '</p>' : '');
+  }
+  seg($('#qrt-mode'), function(val){ mode = val; show(); scene(); cap.textContent = 'Szenario wählen. Die Bilder veranschaulichen die Risiken aus der Tabelle; gemessen ist keines davon.'; });
+  var N = {}, run = Run(), fx;
+  function addNode(id, x, y, lab){ N[id] = { x: x, y: y }; var g = S('g', {}, svg); N[id].c = S('circle', { cx: x, cy: y, r: 7, fill: v('bg3'), stroke: v('fg3'), 'stroke-width': 1.5 }, g); if (lab) T({ x: x, y: y - 12, 'text-anchor': 'middle', fill: v('fg2'), 'font-size': 10 }, lab, g); }
+  function scene(){
+    run.start(); clear(svg); N = {};
+    if (mode === 'berg'){
+      S('path', { d: 'M0,280 L0,252 L170,244 L300,74 L430,244 L600,252 L600,280 Z', fill: v('bg3'), stroke: v('line2') }, svg);
+      addNode('H', 300, 64, 'Berg');
+      var lx = [30, 60, 95, 125, 150], rx = [450, 480, 510, 545, 575];
+      lx.forEach(function(x, i){ addNode('L' + i, x, 228 + (i % 2) * 14); });
+      rx.forEach(function(x, i){ addNode('R' + i, x, 228 + (i % 2) * 14); });
+      T({ x: 90, y: 272, 'text-anchor': 'middle', fill: v('fg3'), 'font-size': 10 }, 'Tal links', svg);
+      T({ x: 510, y: 272, 'text-anchor': 'middle', fill: v('fg3'), 'font-size': 10 }, 'Tal rechts', svg);
+    } else {
+      var cx = 340, cy = 150, pts = [[0, 0], [30, -22], [-28, -26], [-40, 14], [22, 30], [48, 6], [-8, 42], [-50, -6], [8, -44], [40, -40]];
+      pts.forEach(function(p, i){ addNode('C' + i, cx + p[0], cy + p[1]); });
+      S('circle', { cx: cx, cy: cy, r: 78, fill: 'none', stroke: v('line2'), 'stroke-dasharray': '4 4' }, svg);
+      T({ x: cx, y: cy + 96, 'text-anchor': 'middle', fill: v('fg3'), 'font-size': 10 }, 'Stadt-Cluster, kurze Distanzen', svg);
+      addNode('S', 540, 150, 'Quelle');
+      addNode('F0', 70, 110, 'Schatten'); addNode('F1', 100, 200, 'Schatten');
+    }
+    fx = S('g', {}, svg);
+  }
+  function col(id, c){ if (N[id]) N[id].c.setAttribute('fill', c); }
+  function mark(id, s, c){ var n = N[id]; if (!n) return; T({ x: n.x + 9, y: n.y - 6, fill: c, 'font-size': 13, 'font-weight': 700 }, s, fx); }
+  function lab(x, y, s, c){ T({ x: x, y: y, fill: c || v('fg2'), 'font-size': 11, 'text-anchor': 'middle' }, s, fx); }
+  async function sc(name){
+    scene(); var tk = run.start();
+    var ok = function(){ return run.ok(tk); };
+    if (mode === 'stadt'){
+      if (name === 'cancel'){
+        cap.textContent = 'Die Quelle rechts sendet; alle Cluster-Knoten hören den Frame.';
+        await pulse(svg, N.S.x, N.S.y, 260, v('acc'), 900); if (!ok()) return;
+        for (var i = 0; i < 10; i++) col('C' + i, v('info'));
+        await wait(500); if (!ok()) return;
+        cap.textContent = 'C5 wiederholt zuerst. Mindestens einer sendet immer: ein Relay mit leerer Need-Menge sendet trotzdem, wenn niemand wiederholt.';
+        col('C5', v('ok')); await pulse(svg, N.C5.x, N.C5.y, 90, v('ok'), 800); if (!ok()) return;
+        lab(200, 40, 'Matrix (veraltet): „C5 deckt F0, F1 ab“', v('warn'));
+        cap.textContent = 'Die anderen hören die Wiederholung von C5. Ihre veraltete oder asymmetrische Matrix (oder per nbrsym erschlossene Bits) behauptet, C5 decke die Schattenknoten ab: sie canceln.';
+        for (var j = 0; j < 10; j++){ if (j === 5) continue; mark('C' + j, '✕', v('bad')); await wait(70); if (!ok()) return; }
+        await wait(500); if (!ok()) return;
+        col('F0', v('bad')); col('F1', v('bad')); mark('F0', '✕', v('bad')); mark('F1', '✕', v('bad'));
+        cap.textContent = 'C5 erreicht F0 und F1 tatsächlich nicht: falsche Abdeckung. W0-Metrik: Frames, die von niemandem jenseits des Clusters gehört wurden (Beobachter außerhalb nötig).';
+      } else if (name === 'burst'){
+        cap.textContent = 'Verstopfter Cluster: mehrere Relay-Frames (Prio 3) sind 60 s alt und erreichen Stufe 2.';
+        [0, 2, 3, 6, 7].forEach(function(a){ col('C' + a, v('warn')); });
+        lab(340, 40, 'Stufe 2: 6 Slot-Wahlen (100–275 ms) statt 11', v('warn'));
+        col('C1', v('p1')); mark('C1', 'ACK', v('p1'));
+        await wait(900); if (!ok()) return;
+        var ps = []; [0, 2, 3, 6, 7].forEach(function(b){ ps.push(pulse(svg, N['C' + b].x, N['C' + b].y, 70, v('warn'), 800)); });
+        await Promise.all(ps); if (!ok()) return;
+        T({ x: 300, y: 150, fill: v('bad'), 'font-size': 18 }, '✸', fx);
+        cap.textContent = 'Prio 1 bis 3 sind zusammengelegt: die gealterten Relays gehen vor das frische Prio-1-ACK von C1 (Prioritätsinversion). Mit weniger Slot-Wahlen treffen sich Frames eher. W0-Metrik: aged2-Zähler plus CRC-Fehler in der folgenden Sekunde.';
+      } else {
+        cap.textContent = 'C5 sendet einen Gruppentext und wartet auf ein Echo.';
+        await pulse(svg, N.C5.x, N.C5.y, 60, v('acc'), 700); if (!ok()) return;
+        col('C1', v('info')); col('C4', v('info'));
+        await pulse(svg, N.C4.x, N.C4.y, 50, v('info'), 600); if (!ok()) return;
+        mark('C5', '■', v('warn'));
+        cap.textContent = 'Das Echo kommt von C4, 50 m weiter. C5 stoppt den Retry …';
+        await wait(800); if (!ok()) return;
+        col('F0', v('bad')); col('F1', v('bad')); mark('F0', '✕', v('bad')); mark('F1', '✕', v('bad'));
+        cap.textContent = '… obwohl die Nachricht den Cluster nie verlassen hat. Auf einem Gateway kommt das erste Echo oft als Serverkopie eines anderen Gateways: dann bekommt die eigene Funkinsel den Text eventuell nie. W0-Metrik: gestoppte Retries mit Echo-RSSI über z. B. −80 dBm.';
+      }
+    } else {
+      if (name === 'cancel'){
+        cap.textContent = 'Ein Knoten im linken Tal sendet; der Berg hört ihn, das rechte Tal nicht.';
+        await pulse(svg, N.L2.x, N.L2.y, 240, v('acc'), 900); if (!ok()) return;
+        for (var l = 0; l < 5; l++) col('L' + l, v('info')); col('H', v('info'));
+        await wait(500); if (!ok()) return;
+        lab(300, 30, 'Fall A: deckt als Einziger das rechte Tal ab', v('ok'));
+        cap.textContent = 'Fall A: der Berg deckt als Einziger jemanden ab. Fall A wird nie gecancelt; nach 8 s gilt der 150-ms-Ausweg.';
+        await wait(700); if (!ok()) return;
+        await pulse(svg, N.H.x, N.H.y, 320, v('ok'), 1000); if (!ok()) return;
+        for (var r = 0; r < 5; r++){ col('R' + r, v('ok')); mark('R' + r, '✓', v('ok')); }
+        cap.textContent = 'Für den Berg-Knoten wirkt die Maßnahme wie gedacht: das rechte Tal bekommt den Frame über den Berg.';
+      } else if (name === 'burst'){
+        cap.textContent = 'Der Berg ist Empfänger: links und rechts im Tal haben Knoten gealterte Frames und senden mit 100 bis 275 ms.';
+        col('L1', v('warn')); col('R3', v('warn'));
+        await wait(600); if (!ok()) return;
+        var p1 = pulse(svg, N.L1.x, N.L1.y, 300, v('warn'), 1000);
+        var p2 = pulse(svg, N.R3.x, N.R3.y, 300, v('warn'), 1000);
+        await Promise.all([p1, p2]); if (!ok()) return;
+        T({ x: N.H.x - 6, y: N.H.y - 14, fill: v('bad'), 'font-size': 18 }, '✸', fx); col('H', v('bad'));
+        cap.textContent = 'Hidden Terminal: die beiden Talknoten hören sich gegenseitig nicht, ihre Frames kollidieren beim Berg. Der Berg ist Opfer, nicht Täter. Hilfreich bleibt: der Age floor holt den Berg aus seiner vollen Queue.';
+      } else {
+        cap.textContent = 'Der Berg sendet einen Gruppentext.';
+        await pulse(svg, N.H.x, N.H.y, 320, v('acc'), 1000); if (!ok()) return;
+        for (var q = 0; q < 5; q++){ col('L' + q, v('info')); col('R' + q, v('info')); }
+        await pulse(svg, N.R3.x, N.R3.y, 70, v('info'), 600); if (!ok()) return;
+        mark('H', '■', v('ok'));
+        cap.textContent = 'Das Echo kommt von einem fernen Relay im Tal: die ferne Seite hat die Nachricht wirklich. Der Retry-Stopp ist hier richtig.';
+      }
+    }
+  }
+  $$('[data-sc]').forEach(function(b){ b.addEventListener('click', function(){ sc(b.getAttribute('data-sc')); }); });
+  show(); scene();
+  return { play: function(){ sc('cancel'); } };
+}
+
+/* ================= 07 ring vs pool ================= */
+function initPool(){
+  var svR = $('#rp-ring'), svP = $('#rp-pool'); if (!svR) return;
+  var NSL = 20, TTL = { 1: 90, 3: 300, 4: 120, 5: 180 };
+  var st;
+  var R = rng(7);
+  var seq = [3, 4, 5, 3, 3, 5, 4, 3, 5, 4, 3, 3, 4, 5, 3, 4];
+  function reset(){ st = { ring: new Array(NSL).fill(null), iR: 0, iW: 0, pool: new Array(NSL).fill(null), id: 1, k: 0, t: 0, rd: 0, pd: 0, rs: 0, ps: 0, pc: 0, msgR: '', msgP: '' }; }
+  function ringFull(){ return ((st.iW + 1) % NSL === st.iR) && st.ring[st.iR] !== null; }
+  function adv(){ while (st.iR !== st.iW && st.ring[st.iR] === null) st.iR = (st.iR + 1) % NSL; }
+  function inRange(i){ var a = st.iR, b = st.iW; return a <= b ? (i >= a && i < b) : (i >= a || i < b); }
+  function add(n){
+    var dr = 0, dp = 0;
+    for (var j = 0; j < n; j++){
+      var f = { id: st.id++, p: seq[st.k++ % seq.length], age: 0, s: 'R', t: st.t + j * 0.01 };
+      if (ringFull()) { st.rd++; dr++; } else { st.ring[st.iW] = Object.assign({}, f); st.iW = (st.iW + 1) % NSL; }
+      var fi = st.pool.indexOf(null);
+      if (fi < 0) { st.pd++; dp++; } else st.pool[fi] = Object.assign({}, f);
+    }
+    st.msgR = dr ? dr + '× RING_DROP_NEW' : ''; st.msgP = dp ? dp + '× voll' : '';
+  }
+  function pick(arr, order){
+    var best = -1;
+    order.forEach(function(i){ var e = arr[i]; if (!e || e.s === 'S') return; if (best < 0 || e.p < arr[best].p || (e.p === arr[best].p && e.t < arr[best].t && arr === st.pool)) best = i; });
+    return best;
+  }
+  function send(){
+    var ord = []; for (var i = 0; i < NSL; i++) if (inRange((st.iR + i) % NSL)) ord.push((st.iR + i) % NSL);
+    var b = pick(st.ring, ord); if (b >= 0){ st.ring[b] = null; adv(); }
+    var all = []; for (var k = 0; k < NSL; k++) all.push(k);
+    var c = pick(st.pool, all); if (c >= 0) st.pool[c] = null;
+    st.msgR = st.msgP = 'gesendet';
+  }
+  function cancel(){
+    var ids = [];
+    for (var i = 1; i < NSL && ids.length < 3; i++){ var idx = (st.iR + i * 2) % NSL; var e = st.ring[idx]; if (e && e.s !== 'S' && inRange(idx)) ids.push(e.id); }
+    for (var j = 1; j < NSL && ids.length < 3; j++){ var e2 = st.ring[(st.iR + j) % NSL]; if (e2 && e2.s !== 'S' && ids.indexOf(e2.id) < 0) ids.push(e2.id); }
+    ids.forEach(function(id){
+      for (var a = 0; a < NSL; a++){ if (st.ring[a] && st.ring[a].id === id) st.ring[a] = null; if (st.pool[a] && st.pool[a].id === id) st.pool[a] = null; }
+    });
+    adv(); st.msgR = ids.length + '× Cancel → Löcher'; st.msgP = ids.length + '× Cancel → sofort frei';
+  }
+  function park(){
+    if (st.ring[st.iR] === null) add(1);
+    var h = st.ring[st.iR]; if (!h) return;
+    h.s = 'S'; h.p = 2;
+    st.pool.forEach(function(e){ if (e && e.id === h.id){ e.s = 'S'; e.p = 2; } });
+    st.msgR = 'Kopf geparkt: iRead steht bis zu 120 s'; st.msgP = 'geparkt: belegt nur seinen Slot';
+  }
+  function ttl(){
+    st.t += 120; var rr = 0, pp = 0;
+    for (var i = 0; i < NSL; i++){
+      var e = st.ring[i]; if (e){ e.age += 120; if ((e.p === 5 && e.age >= 180) || (e.s === 'S' && e.age >= 120)){ st.ring[i] = null; rr++; } }
+      var f = st.pool[i]; if (f){ f.age += 120; if ((f.s === 'S' && f.age >= 120) || (f.s !== 'S' && TTL[f.p] && f.age >= TTL[f.p])){ st.pool[i] = null; pp++; } }
+    }
+    adv(); st.msgR = rr + '× entfernt (nur HEY altert, 180 s)'; st.msgP = pp + '× entfernt (TTL je Priorität)';
+  }
+  function colr(e){ return v('p' + e.p); }
+  function draw(){
+    clear(svR); clear(svP);
+    var cx = 150, cy = 150, r1 = 125, r0 = 84, occ = 0, holes = 0;
+    for (var i = 0; i < NSL; i++){
+      var a0 = (i / NSL) * Math.PI * 2 - Math.PI / 2 + 0.012, a1 = ((i + 1) / NSL) * Math.PI * 2 - Math.PI / 2 - 0.012;
+      var p = 'M' + (cx + r1 * Math.cos(a0)) + ',' + (cy + r1 * Math.sin(a0)) + ' A' + r1 + ',' + r1 + ' 0 0 1 ' + (cx + r1 * Math.cos(a1)) + ',' + (cy + r1 * Math.sin(a1)) +
+        ' L' + (cx + r0 * Math.cos(a1)) + ',' + (cy + r0 * Math.sin(a1)) + ' A' + r0 + ',' + r0 + ' 0 0 0 ' + (cx + r0 * Math.cos(a0)) + ',' + (cy + r0 * Math.sin(a0)) + ' Z';
+      var e = st.ring[i], hole = !e && inRange(i);
+      if (e) occ++; if (hole) holes++;
+      S('path', { d: p, fill: e ? colr(e) : v('bg3'), stroke: hole ? v('bad') : v('line'), 'stroke-width': hole ? 2 : 1, 'stroke-dasharray': hole ? '4 3' : 'none', opacity: e ? 0.9 : 1 }, svR);
+      var am = (a0 + a1) / 2;
+      if (e) T({ x: cx + 104 * Math.cos(am), y: cy + 104 * Math.sin(am) + 4, 'text-anchor': 'middle', 'font-size': 11, fill: v('on-acc'), 'font-weight': 700 }, e.s === 'S' ? 'S' : String(e.p), svR);
+    }
+    function ptr(idx, lab, col, rr){
+      var am = ((idx + 0.5) / NSL) * Math.PI * 2 - Math.PI / 2;
+      var x = cx + rr * Math.cos(am), y = cy + rr * Math.sin(am);
+      S('circle', { cx: x, cy: y, r: 4, fill: col }, svR);
+      T({ x: cx + (rr - 22) * Math.cos(am), y: cy + (rr - 22) * Math.sin(am) + 4, 'text-anchor': 'middle', 'font-size': 10, fill: col }, lab, svR);
+    }
+    ptr(st.iR, 'iR', v('ok'), 78); ptr(st.iW, 'iW', v('acc'), 78);
+    var full = ringFull();
+    T({ x: cx, y: cy - 4, 'text-anchor': 'middle', 'font-size': 14, fill: v('fg'), 'font-weight': 700 }, occ + '/20', svR);
+    T({ x: cx, y: cy + 14, 'text-anchor': 'middle', 'font-size': 11, fill: full ? v('bad') : v('fg3') }, full ? 'meldet VOLL' : 'belegt', svR);
+    $('#rp-ring-t').innerHTML = 'belegt ' + occ + ' · Löcher ' + holes + ' · ' + (full ? '<b style="color:var(--bad)">meldet voll</b>' : 'nimmt an') + ' · Drops ' + st.rd + (st.msgR ? ' · ' + st.msgR : '');
+    var pocc = 0;
+    for (var k = 0; k < NSL; k++){
+      var c = k % 5, rr2 = Math.floor(k / 5), x = 22 + c * 52, y = 40 + rr2 * 54, f = st.pool[k];
+      if (f) pocc++;
+      S('rect', { x: x, y: y, width: 46, height: 46, rx: 6, fill: f ? colr(f) : v('bg3'), stroke: v('line'), opacity: f ? 0.9 : 1 }, svP);
+      if (f) T({ x: x + 23, y: y + 28, 'text-anchor': 'middle', 'font-size': 13, fill: v('on-acc'), 'font-weight': 700 }, f.s === 'S' ? 'S' : String(f.p), svP);
+      if (f) T({ x: x + 23, y: y + 41, 'text-anchor': 'middle', 'font-size': 8, fill: v('on-acc') }, f.age + ' s', svP);
+    }
+    T({ x: 150, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: v('fg'), 'font-weight': 700 }, pocc + '/20 belegt', svP);
+    T({ x: 150, y: 272, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'frei = jeder leere Slot', svP);
+    T({ x: 150, y: 287, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'Auswahl: Prio, dann Einreihzeit', svP);
+    $('#rp-pool-t').innerHTML = 'belegt ' + pocc + ' · frei ' + (NSL - pocc) + ' · Drops ' + st.pd + (st.msgP ? ' · ' + st.msgP : '');
+  }
+  function act(fn){ return function(){ fn(); draw(); }; }
+  $('#rp-add').addEventListener('click', act(function(){ add(3); }));
+  $('#rp-send').addEventListener('click', act(send));
+  $('#rp-cancel').addEventListener('click', act(cancel));
+  $('#rp-park').addEventListener('click', act(park));
+  $('#rp-ttl').addEventListener('click', act(ttl));
+  $('#rp-reset').addEventListener('click', act(function(){ reset(); add(3); add(3); }));
+  var run = Run();
+  async function demo(){
+    var tk = run.start(); reset(); add(3); add(3); draw();
+    var steps = [function(){ add(3); }, send, cancel, park, function(){ add(3); }, function(){ add(3); }, cancel, function(){ add(3); }, function(){ add(3); }, function(){ add(3); }, ttl, send];
+    for (var i = 0; i < steps.length; i++){ await wait(800); if (!run.ok(tk)) return; steps[i](); draw(); }
+  }
+  $('#rp-demo').addEventListener('click', demo);
+  reset(); add(3); add(3); draw();
+  return { play: demo };
+}
+
+/* ================= 08 dedup ================= */
+function initDedup(){
+  var svg = $('#dd-svg'); if (!svg) return;
+  var rate = $('#dd-rate');
+  var L = [
+    { n: 'Ring 70 (klassisch)', N: 70, time: false, c: 'bad' },
+    { n: 'Ring 100 (S3/nRF52)', N: 100, time: false, c: 'warn' },
+    { n: 'Ring 60 (E22_XML)', N: 60, time: false, c: 'orange' },
+    { n: 'D3 171 Einträge', N: 171, time: true, c: 'ok' },
+    { n: '128 Einträge, 45 min', N: 128, time: true, c: 'info' }
+  ];
+  var x0 = 52, x1 = 620, y0 = 260, y1 = 20, rmin = 0.5, rmax = 6, wmax = 70;
+  function X(r){ return x0 + (r - rmin) / (rmax - rmin) * (x1 - x0); }
+  function Y(w){ return y0 - Math.min(w, wmax) / wmax * (y0 - y1); }
+  function win(l, r){ var w = l.N / r; return l.time ? Math.min(45, w) : w; }
+  var marker, mlab;
+  function axes(){
+    clear(svg);
+    S('rect', { x: x0, y: Y(48.5), width: x1 - x0, height: Y(39.6) - Y(48.5), fill: v('ok'), opacity: 0.12 }, svg);
+    T({ x: x1 - 4, y: Y(48.5) - 4, 'text-anchor': 'end', 'font-size': 10, fill: v('ok') }, 'Korridor 39,6 bis 48,5 min', svg);
+    for (var w = 0; w <= 70; w += 10){ S('line', { x1: x0, x2: x1, y1: Y(w), y2: Y(w), stroke: v('line'), 'stroke-width': 0.6 }, svg); T({ x: x0 - 6, y: Y(w) + 4, 'text-anchor': 'end', 'font-size': 10, fill: v('fg3') }, String(w), svg); }
+    for (var r = 1; r <= 6; r++){ T({ x: X(r), y: y0 + 16, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, String(r), svg); }
+    T({ x: (x0 + x1) / 2, y: y0 + 34, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg2') }, 'neue IDs je Minute', svg);
+    T({ x: 12, y: 14, 'font-size': 11, fill: v('fg2') }, 'Fenster (min)', svg);
+    L.forEach(function(l){
+      var d = '';
+      for (var r = rmin; r <= rmax + 1e-9; r += 0.05){ d += (d ? 'L' : 'M') + X(r).toFixed(1) + ',' + Y(win(l, r)).toFixed(1); }
+      S('path', { d: d, fill: 'none', stroke: v(l.c), 'stroke-width': 2.2, 'stroke-dasharray': l.time ? 'none' : '6 3' }, svg);
+    });
+    [2.2, 3.8].forEach(function(r){ S('line', { x1: X(r), x2: X(r), y1: y1, y2: y0, stroke: v('fg3'), 'stroke-dasharray': '2 4' }, svg); T({ x: X(r) + 3, y: y1 + 10, 'font-size': 9, fill: v('fg3') }, r === 2.2 ? 'Median' : 'Spitze', svg); });
+    marker = S('line', { x1: 0, x2: 0, y1: y1, y2: y0, stroke: v('acc'), 'stroke-width': 2 }, svg);
+    mlab = T({ x: 0, y: y0 - 6, 'font-size': 10, fill: v('acc') }, '', svg);
+  }
+  function upd(r){
+    $('#dd-rate-o').textContent = de(r, 1);
+    marker.setAttribute('x1', X(r)); marker.setAttribute('x2', X(r));
+    mlab.setAttribute('x', X(r) + 4); mlab.textContent = de(r, 1) + '/min';
+    var h = '';
+    L.forEach(function(l){
+      var w = win(l, r), inC = w > 39.6 && w < 48.5;
+      h += '<div style="margin:.25rem 0"><div style="display:flex;justify-content:space-between;font-size:.78rem"><span>' + l.n + '</span><span class="mono">' + de(w, 1) + ' min ' + (inC ? '<span class="t-ok">✓</span>' : '<span class="t-bad">✕</span>') + '</span></div>' +
+        '<div class="share" style="height:8px;margin-top:.15rem"><i style="width:' + Math.min(100, w / 70 * 100) + '%;background:var(--' + l.c + ')"></i></div></div>';
+    });
+    h += '<p class="cite">Zählring: N / Rate. Zeittabelle: min(45 min, N / Rate); über der Auslegungslast fällt sie auf Zählverhalten zurück. Teil A: 70 Slots 31,8 / 18,4 min, 100 Slots 45,5 / 26,3 min bei Median / Spitze.</p>';
+    $('#dd-vals').innerHTML = h;
+  }
+  rate.addEventListener('input', function(){ run.start(); upd(rate.value / 10); });
+  $$('[data-dd]').forEach(function(b){ b.addEventListener('click', function(){ run.start(); rate.value = Math.round(+b.getAttribute('data-dd') * 10); upd(+b.getAttribute('data-dd')); }); });
+  var run = Run();
+  function play(){
+    var tk = run.start();
+    tween(7000, function(t){ if (!run.ok(tk)) return; var r = 0.5 + (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2 * 5.5; rate.value = Math.round(r * 10); upd(Math.round(r * 10) / 10); })
+      .then(function(){ if (run.ok(tk)){ rate.value = 22; upd(2.2); } });
+  }
+  $('#dd-play').addEventListener('click', play);
+  axes(); upd(2.2);
+  return { play: play };
+}
+
+/* ================= 09 priority matrices + queue ================= */
+function initPrio(){
+  var svg = $('#pm-svg'); if (!svg) return;
+  var ROWS = [
+    { n: 'EMCOMM, signiert', heute: ['–', '–'], v1: ['–'], v2: ['0 eigen und weitergeleitet (neues Band)'] },
+    { n: 'Binär-ACK 0x41', heute: ['1 (3000)', '1 (3000)'], v1: ['1'], v2: ['1'] },
+    { n: 'DM-ACK <code>:ackNNN</code>', heute: ['1 (3000)', '3 (4500)'], v1: ['1'], v2: ['1'] },
+    { n: 'DM', heute: ['1 (3000)', '3 (4500)'], v1: ['1', '2'], v2: ['1', '2, ratenbegrenzt'] },
+    { n: 'Gruppen-/Broadcast-Text', heute: ['2 (3000)', '3 (4500)'], v1: ['2', '3'], v2: ['2', '3'] },
+    { n: '<code>{CET}</code>, <code>{SET}</code>, Server-Einspeisung', heute: ['3 (DONE)', '3 (4500)'], v1: ['3'], v2: ['3, <code>{CET}</code> mit TTL (Teil A 10.8)'] },
+    { n: 'lokal getipptes <code>{SET}</code>, <code>{ping}</code>', heute: ['1/2 (einmal)', '3 (4500)'], v1: ['nicht festgelegt'], v2: ['nicht festgelegt'] },
+    { n: 'EMCOMM, unsigniert', heute: ['–', '–'], v1: ['–'], v2: ['als Text, mit Warnung angezeigt'] },
+    { n: 'Position', heute: ['4 (5500)', '4 (5500)'], v1: ['4'], v2: ['4, Track-Budget (4.4 K3)'] },
+    { n: 'HEY (<code>H</code>, <code>HG</code>)', heute: ['5 (5500)', '5 (5500)'], v1: ['5'], v2: ['5'] }
+  ];
+  var TYPES = {
+    emc: { n: 'EMCOMM sig.', c: 'mag' }, a41: { n: 'ACK 0x41', c: 'bad' }, ack: { n: ':ackNNN', c: 'orange' }, dm: { n: 'DM', c: 'warn' },
+    grp: { n: 'Gruppe', c: 'info' }, cet: { n: '{CET}', c: 'cyan' }, pos: { n: 'Position', c: 'ok' }, hey: { n: 'HEY', c: 'p5' }
+  };
+  var variant = 'heute';
+  function chip(s){ var m = String(s).match(/^(\d)/); return m ? '<span class="tag" style="color:var(--p' + m[1] + ')">' + s + '</span>' : '<span class="t-dim">' + s + '</span>'; }
+  function table(){
+    var tb = $('#pm-table tbody'); var h = '';
+    ROWS.forEach(function(r){
+      var c = r[variant];
+      h += '<tr><td>' + r.n + '</td>' + (c.length === 1 ? '<td colspan="2" class="r">' + chip(c[0]) + '</td>' : '<td class="r">' + chip(c[0]) + '</td><td class="r">' + chip(c[1]) + '</td>') + '</tr>';
+    });
+    tb.innerHTML = h;
+  }
+  function prio(f, t){
+    var own = f.own, ty = f.ty;
+    if (ty === 'emc' && variant !== 'v2') ty = 'grp';
+    switch (ty){
+      case 'emc': return 0;
+      case 'a41': return 1;
+      case 'ack': return variant === 'heute' ? (own ? 1 : 3) : 1;
+      case 'dm':
+        if (own) return 1;
+        if (variant === 'heute') return 3;
+        if (variant === 'v2'){ var last = lastHi[f.src]; if (last !== undefined && t - last < 10) return 3; lastHi[f.src] = t; }
+        return 2;
+      case 'grp': return own ? 2 : 3;
+      case 'cet': return 3;
+      case 'pos': return 4;
+      default: return 5;
+    }
+  }
+  var KEYS = ['hey', 'pos', 'grp', 'dm', 'ack', 'a41', 'cet', 'emc'], W = [0.18, 0.2, 0.25, 0.1, 0.08, 0.04, 0.05, 0.05];
+  function genStream(){
+    var R = rng(4242), out = [];
+    for (var t = 0; t < 80; t++){
+      var u = R(), n = u < 0.35 ? 2 : u < 0.85 ? 1 : 0, arr = [];
+      for (var i = 0; i < n; i++){
+        var x = R(), acc = 0, ty = 'hey';
+        for (var k = 0; k < KEYS.length; k++){ acc += W[k]; if (x < acc){ ty = KEYS[k]; break; } }
+        var own = ty === 'cet' ? false : R() < 0.25;
+        arr.push({ ty: ty, own: own, src: ty === 'dm' ? (R() < 0.6 ? 'X' : 'Y') : '' });
+      }
+      out.push(arr);
+    }
+    return out;
+  }
+  var STREAM = genStream();
+  var q, t, served, stats, lastHi, extra, run = Run(), cur;
+  function reset(){ q = []; t = 0; served = []; stats = {}; lastHi = {}; extra = []; cur = null; }
+  function step(){
+    (STREAM[t] || []).concat(extra.splice(0)).forEach(function(f){ var g = Object.assign({}, f); g.t = t; g.p = prio(g, t); q.push(g); });
+    q.sort(function(a, b){ return a.p - b.p || a.t - b.t; });
+    cur = q.shift() || null;
+    if (cur){ var s = stats[cur.ty] || (stats[cur.ty] = { n: 0, w: 0 }); s.n++; s.w += t - cur.t; served.unshift(cur); if (served.length > 6) served.pop(); }
+    t++;
+  }
+  function draw(){
+    clear(svg);
+    T({ x: 10, y: 18, 'font-size': 11, fill: v('fg3') }, 'Queue (sortiert)', svg);
+    T({ x: 360, y: 18, 'font-size': 11, fill: v('fg3') }, 'Funk: zuletzt bedient', svg);
+    T({ x: 340, y: 218, 'font-size': 10, fill: v('fg3') }, 'Tick ' + t + '/80', svg);
+    var shown = q.slice(0, 12);
+    shown.forEach(function(f, i){
+      var y = 28 + i * 21, ty = TYPES[f.ty];
+      S('rect', { x: 10, y: y, width: 300, height: 18, rx: 4, fill: v(ty.c), opacity: 0.85 }, svg);
+      T({ x: 18, y: y + 13, 'font-size': 11, fill: v('on-acc'), 'font-weight': 600 }, (f.own ? '● ' : '↻ ') + (f.ty === 'emc' && variant !== 'v2' ? 'EMCOMM (als Text)' : ty.n), svg);
+      T({ x: 302, y: y + 13, 'font-size': 11, fill: v('on-acc'), 'text-anchor': 'end' }, 'P' + f.p + ' · ' + (t - f.t) + ' T', svg);
+    });
+    if (q.length > 12) T({ x: 160, y: 28 + 12 * 21 + 12, 'font-size': 11, fill: v('fg2'), 'text-anchor': 'middle' }, '+ ' + (q.length - 12) + ' weitere', svg);
+    S('rect', { x: 340, y: 26, width: 170, height: 136, rx: 8, fill: 'none', stroke: v('line2') }, svg);
+    served.forEach(function(f, i){
+      var y = 32 + i * 21, ty = TYPES[f.ty];
+      S('rect', { x: 348, y: y, width: 154, height: 18, rx: 4, fill: v(ty.c), opacity: i ? 0.5 : 1 }, svg);
+      T({ x: 354, y: y + 13, 'font-size': 10, fill: v('on-acc'), 'font-weight': 600 }, (f.own ? '● ' : '↻ ') + ty.n + ' P' + f.p, svg);
+    });
+    T({ x: 340, y: 186, 'font-size': 10, fill: v('fg3') }, '● eigen   ↻ weitergeleitet', svg);
+    T({ x: 340, y: 202, 'font-size': 10, fill: v('fg3') }, 'Queue-Länge ' + q.length, svg);
+    var tb = $('#pm-stats tbody'), h = '';
+    ['emc', 'a41', 'ack', 'dm', 'grp', 'cet', 'pos', 'hey'].forEach(function(k){ var s = stats[k]; if (!s) return; h += '<tr><td><span class="tag" style="color:var(--' + TYPES[k].c + ')">' + TYPES[k].n + '</span></td><td class="r m">' + s.n + '</td><td class="r m">' + de(s.w / s.n, 1) + '</td></tr>'; });
+    tb.innerHTML = h || '<tr><td colspan="3">noch nichts bedient</td></tr>';
+  }
+  async function play(){
+    var tk = run.start(); reset(); draw();
+    while (t < 80){ step(); if (!RM){ draw(); await wait(260); if (!run.ok(tk)) return; } }
+    draw();
+  }
+  seg($('#pm-var'), function(val){ variant = val; table(); play(); });
+  $('#pm-play').addEventListener('click', play);
+  $('#pm-reset').addEventListener('click', function(){ run.start(); reset(); draw(); });
+  $('#pm-burst').addEventListener('click', function(){ for (var i = 0; i < 8; i++) extra.push({ ty: 'grp', own: false, src: '' }); if (!q.length && t === 0) play(); });
+  table(); reset(); draw();
+  return { play: play };
+}
+
+/* ================= 10 {CET} ================= */
+function initCet(){
+  var svg = $('#cet-svg'); if (!svg) return;
+  var cap = $('#cet-cap'), panel = $('#cet-p');
+  var R = {
+    R0: { n: 'Status quo (2 im Feld gesehen)', p: 'schon begrenzt; keine Änderung; funktioniert mit der ganzen Flotte', c: 'Gateway plus zwei Relay-Ringe, jeder Ring fügt Wartezeit (17 bis 32 s gemessen) und damit Fehler hinzu, und N Sendungen' },
+    R1: { n: 'Server sendet 1', p: 'ein Ort, keine Firmware-Änderung, wirkt überall', c: 'außerhalb der Kontrolle des Forks (10.1 H3)' },
+    R2: { n: 'Gateway kappt auf <code>CET_MAX_HOP</code>', p: 'in der Kontrolle des Forks; Relays dahinter brauchen kein Update', c: 'übergeht den Server; nur auf Gateways mit neuer Firmware; mehrere Gateways je Insel (10.0 Punkt 7)' },
+    R3: { n: 'Empfänger nimmt die frischeste Kopie', p: '<code>{CET}</code> nur mit Nibble ≥ 1 annehmen, also nahe einem Gateway; 0 B', c: 'Knoten jenseits eines Relays bekommen keine Zeit aus <code>{CET}</code>; die Bake kostet dieselbe Sendezeit' }
+  };
+  var A = {
+    A0: { n: 'Status quo', p: 'keine Änderung; kein Umschreiben von Serverinhalt; funktioniert mit der ganzen Flotte', c: 'Alter von einer Minute und mehr wird als aktuelle Zeit gesetzt, auch über eine Telefon-synchronisierte Uhr' },
+    A1: { n: 'TTL in der Queue (z. B. 30 s)', p: '0 B, passt zu Stufe 1; stoppt das Senden veralteter Zeit', c: 'bei gemessenen Relay-Wartezeiten von 17 bis 32 s würden 30 s schon einen Teil des zweiten Rings verwerfen; der Wert braucht das Stufe-0-Altershistogramm' },
+    A2: { n: 'Alterskorrektur beim Senden', p: 'addiert die Queue-Wartezeit (<code>now − ringEnqueueTime[slot]</code>, existiert) zur Payload; Restfehler etwa die Sendezeit', c: 'schreibt die Payload eines Server-Frames bei jedem Relay um; die Latenz Server → Gateway bleibt unkorrigiert; alte Firmware leitet unkorrigiert weiter' },
+    A3: { n: 'Supersede in der Queue', p: 'eine neuere <code>{CET}</code> ersetzt eine eingereihte ältere (5.4 Punkt 1)', c: 'hilft nur, wenn sich zwei Baken in einer Queue treffen' },
+    A4: { n: 'Priorität anheben (auf 2)', p: 'kürzere Wartezeit', c: 'drängt Gruppentext zurück; behebt den Teil Server → Gateway nicht' },
+    A5: { n: 'Telefonzeit schützt die Uhr', p: '<code>bPhoneTimeValid</code> im <code>{CET}</code>-Gate wieder aktivieren', c: 'braucht regelmäßige Telefonzeit (sagt der Code-Kommentar); hilft Knoten ohne Telefon nicht' }
+  };
+  var target = '2', rOpt = 'R0', aOpt = 'A0';
+  function showPanel(){
+    var r = R[rOpt], a = A[aOpt];
+    panel.innerHTML = '<h4>' + rOpt + ' · ' + r.n + '</h4><div class="pc"><div class="p">' + r.p + '</div><div class="c">' + r.c + '</div></div>' +
+      '<h4 class="mt">' + aOpt + ' · ' + a.n + '</h4><div class="pc"><div class="p">' + a.p + '</div><div class="c">' + a.c + '</div></div>';
+  }
+  var SRV = { x: 48, y: 150 }, GW = { x: 150, y: 150 };
+  var rings = [[], [], []];
+  var waits = ['17,0 s', '20,3 s', '31,7 s'], waitsN = [17.0, 20.3, 31.7];
+  for (var k = 0; k < 3; k++) for (var i = 0; i < 3; i++) rings[k].push({ x: 290 + k * 140, y: 62 + i * 88 });
+  var run = Run(), fx;
+  function startNib(){ if (rOpt === 'R1' || rOpt === 'R2') return +target; return 2; }
+  function base(){
+    clear(svg);
+    S('ellipse', { cx: SRV.x, cy: SRV.y, rx: 38, ry: 20, fill: v('bg3'), stroke: v('mag') }, svg);
+    T({ x: SRV.x, y: SRV.y + 4, 'text-anchor': 'middle', 'font-size': 11, fill: v('mag') }, 'Server', svg);
+    S('line', { x1: SRV.x + 38, y1: SRV.y, x2: GW.x - 13, y2: GW.y, stroke: v('mag'), 'stroke-dasharray': '5 4' }, svg);
+    rings[0].forEach(function(n){ S('line', { x1: GW.x, y1: GW.y, x2: n.x, y2: n.y, stroke: v('line2') }, svg); });
+    for (var k = 0; k < 2; k++) for (var i = 0; i < 3; i++) S('line', { x1: rings[k][i].x, y1: rings[k][i].y, x2: rings[k + 1][i].x, y2: rings[k + 1][i].y, stroke: v('line2') }, svg);
+    S('circle', { cx: GW.x, cy: GW.y, r: 13, fill: v('bg3'), stroke: v('mag'), 'stroke-width': 2 }, svg);
+    T({ x: GW.x, y: GW.y - 20, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg2') }, 'Gateway', svg);
+    rings.forEach(function(r, k){
+      T({ x: r[0].x, y: 22, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'Ring ' + (k + 1), svg);
+      r.forEach(function(n, i){ n.c = S('circle', { cx: n.x, cy: n.y, r: 11, fill: v('bg3'), stroke: v('fg3'), 'stroke-width': 1.5 }, svg); });
+    });
+    if (aOpt === 'A5'){ T({ x: rings[2][2].x + 16, y: rings[2][2].y + 4, 'font-size': 10, fill: v('info') }, '☎ Telefonzeit', svg); }
+    fx = S('g', {}, svg);
+  }
+  function note(n, s, c, dy){ T({ x: n.x, y: n.y + (dy || 26), 'text-anchor': 'middle', 'font-size': 10, fill: c || v('fg2') }, s, fx); }
+  async function move(tk, a, b, col, dur){
+    var d = S('circle', { r: 6, fill: col }, fx);
+    await tween(dur || 600, function(t){ d.setAttribute('cx', a.x + (b.x - a.x) * t); d.setAttribute('cy', a.y + (b.y - a.y) * t); });
+    d.remove(); return run.ok(tk);
+  }
+  async function play(){
+    var tk = run.start(); base(); showPanel();
+    var n0 = startNib(), tx = 1;
+    var ages = ['55 s', '72–87 s', '91 s'];
+    cap.textContent = 'Server → Gateway: Payload ist die Server-Zeit. Das Gateway reiht die Bake als Relay ein (prio 3), ohne Dekrement.';
+    if (!(await move(tk, SRV, GW, v('mag'), 700))) return;
+    note(GW, 'sendet H0' + n0, v('mag'), 30);
+    var alive = [true, true, true];
+    for (var k = 0; k < 3; k++){
+      var nib = n0 - k;
+      if (nib < 0){ rings[k].forEach(function(n){ n.c.setAttribute('opacity', 0.3); }); continue; }
+      var ps = [];
+      for (var i = 0; i < 3; i++){
+        if (!alive[i]) { rings[k][i].c.setAttribute('opacity', 0.3); continue; }
+        var from = k === 0 ? GW : rings[k - 1][i];
+        ps.push(move(tk, from, rings[k][i], v('cyan'), 600));
+      }
+      await Promise.all(ps); if (!run.ok(tk)) return;
+      for (var j = 0; j < 3; j++){
+        var n = rings[k][j]; if (!alive[j]) continue;
+        var accept = !(rOpt === 'R3' && nib < 1) && !(aOpt === 'A5' && k === 2 && j === 2);
+        n.c.setAttribute('fill', accept ? v('cyan') : v('bg3'));
+        n.c.setAttribute('stroke', accept ? v('cyan') : v('bad'));
+        var ageTxt = aOpt === 'A2' && k > 0 ? 'Fehler ≈ Rest' : ages[k];
+        note(n, 'RX H0' + nib + (j === 1 ? ' · ' + ageTxt : ''), accept ? v('fg2') : v('bad'));
+        if (!accept) note(n, 'Uhr nicht gesetzt', v('bad'), 38);
+      }
+      if (k === 0) cap.textContent = 'Ring 1 empfängt direkt vom Gateway: 55 s alt (gemessen). Die Relays warten 17,0 / 20,3 / 31,7 s in der Queue.';
+      if (k === 1) cap.textContent = 'Ring 2: 72 bis 87 s ' + '(berechnet: 55 s plus gemessene Wartezeit; zwei Messungen gemischt).';
+      if (k === 2) cap.textContent = 'Ring 3 hört Gateway + 2 Relays: 91 s alt (gemessen, anderer Beacon). Dieser Ring empfängt H00 und leitet nicht weiter.';
+      await wait(700); if (!run.ok(tk)) return;
+      if (nib > 0 && k < 2){
+        for (var m = 0; m < 3; m++){
+          if (!alive[m]) continue;
+          if (k === 0){
+            note(rings[0][m], 'wartet ' + waits[m], v('fg3'), -18);
+            if (aOpt === 'A1' && waitsN[m] > 30){ alive[m] = false; note(rings[0][m], 'TTL 30 s: verworfen', v('bad'), 38); continue; }
+          }
+          tx++;
+        }
+        await wait(500); if (!run.ok(tk)) return;
+      }
+    }
+    var extra = '';
+    if (aOpt === 'A1') extra = ' A1: der Relay mit 31,7 s Wartezeit verwirft seine Kopie; Ring-2-Wartezeiten sind nicht gemessen.';
+    if (aOpt === 'A2') extra = ' A2: die Relays addieren ihre Queue-Wartezeit; übrig bleibt die Latenz Server → Gateway (Teil der 55 s, Anteil unbekannt, TM-39) plus Sendezeit.';
+    if (aOpt === 'A3') extra = ' A3 wirkt nur, wenn sich zwei Baken in einer Queue treffen; in diesem Bild nicht.';
+    if (aOpt === 'A4') extra = ' A4: Prio 2 kürzt die Wartezeit, drängt aber Gruppentext zurück.';
+    if (aOpt === 'A5') extra = ' A5: der Knoten mit Telefonzeit übernimmt die Bake nicht.';
+    if (rOpt === 'R3') extra += ' R3: Empfänger mit H00 setzen ihre Uhr nicht, die Sendezeit bleibt gleich.';
+    cap.textContent = 'Sendungen dieser Bake: ' + tx + ' (Gateway + Relays, je 3 Knoten je Ring; berechnet für dieses Bild, allgemein 1 + N1 + N2).' + extra;
+  }
+  seg($('#cet-target'), function(val){ target = val; play(); });
+  seg($('#cet-r'), function(val){ rOpt = val; play(); });
+  seg($('#cet-a'), function(val){ aOpt = val; play(); });
+  $('#cet-play').addEventListener('click', play);
+  base(); showPanel();
+  cap.textContent = 'Abspielen zeigt eine Bake mit Nibble 2 vom Gateway, wie im Feldlog vom 26.09.2026.';
+  return { play: play };
+}
+
+/* ================= 11 HG + DM ladder ================= */
+function initHg(){
+  var svg = $('#hg-svg'); if (!svg) return;
+  var nSel = '4', rSel = '3';
+  function draw(){
+    clear(svg);
+    var n = +nSel, r = +rSel, x0 = 40, dx = 92;
+    S('circle', { cx: x0, cy: 100, r: 13, fill: v('bg3'), stroke: v('mag'), 'stroke-width': 2 }, svg);
+    T({ x: x0, y: 78, 'text-anchor': 'middle', 'font-size': 10, fill: v('mag') }, 'GW', svg);
+    for (var k = 1; k <= 5; k++){
+      var rx = n - (k - 1), relays = rx > 0, recv = k <= n + 1;
+      for (var i = 0; i < r; i++){
+        var y = 100 + (i - (r - 1) / 2) * 30;
+        S('circle', { cx: x0 + k * dx, cy: y, r: 9, fill: recv ? (relays ? v('acc') : v('info')) : v('bg3'), stroke: recv ? v('fg3') : v('line'), opacity: recv ? 1 : 0.35 }, svg);
+      }
+      T({ x: x0 + k * dx, y: 186, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, recv ? 'RX H0' + Math.max(0, rx) : '—', svg);
+      T({ x: x0 + k * dx, y: 22, 'text-anchor': 'middle', 'font-size': 10, fill: relays ? v('acc') : v('fg3') }, relays ? 'relayt' : (recv ? 'hört' : ''), svg);
+    }
+    var tx = 1 + n * r;
+    $('#hg-cap').innerHTML = 'Ein HG mit Nibble ' + n + ': ' + n + ' Relay-Ringe, Empfänger bis Ring ' + (n + 1) + '. Sendungen 1 + ' + n + ' × ' + r + ' = <b>' + tx + '</b> <span class="calc">berechnet</span>, Relays je Ring angenommen. Jeder Hop verlängert die Signalbericht-Kette.';
+  }
+  seg($('#hg-n'), function(val){ nSel = val; draw(); });
+  seg($('#hg-r'), function(val){ rSel = val; draw(); });
+  draw();
+  optset('opt-g', [
+    { k: 'G0', n: 'Status quo', p: 'Gateway im ganzen Hop-Radius sichtbar; Signalbericht-Kette für den Server', c: 'HG-Sendezeit wächst mit jedem Relay-Ring; Knoten mehrere Hops entfernt bekommen ein GW-Flag, das sie für die Abhängigenmenge nicht nutzen können' },
+    { k: 'G1', n: 'HG mit kleinerem Nibble', p: 'HG informiert vor allem direkte und Zwei-Hop-Nachbarn (Abhängigenmenge, Anzeige); weniger Sendezeit', c: 'die Signalketten des Servers aus fernen Ringen schrumpfen; ändert die <code>initAPRS()</code>-Semantik für ein Ziel; gemischte Flotte' },
+    { k: 'G2', n: 'HG wie <code>max_hop_pos</code> (2)', p: 'gleicht HG an das Positionsbudget an, das festgenagelt und einheitlich ist', c: 'wie G1; HEY normaler Knoten würde sich von HG unterscheiden, außer <code>H</code> folgt' },
+    { k: 'G3', n: 'HG lassen, alle HEY kappen (H, HG)', p: 'eine Regel für Nachbarentdeckung; Trickle begrenzt eigene HEY schon', c: 'größere Änderung; HEY ist der Haupteingang der Nachbarschaftsmatrix jenseits eines Hops' }
+  ], { on: function(it){ if (it.k === 'G0'){ $$('#hg-n button')[0].click(); } else if (it.k !== 'G3'){ $$('#hg-n button')[1].click(); } } });
+  $('#opt-g-p').insertAdjacentHTML('beforeend', '');
+  var lad = $('#lad-svg'), d = $('#lad-d');
+  function ladder(){
+    var ack = +d.value; $('#lad-d-o').textContent = ack + ' s';
+    clear(lad);
+    var x0 = 20, x1 = 500, X = function(s){ return x0 + s / 160 * (x1 - x0); };
+    S('line', { x1: x0, x2: x1, y1: 70, y2: 70, stroke: v('line2'), 'stroke-width': 2 }, lad);
+    [0, 40, 80, 120, 160].forEach(function(s){ T({ x: X(s), y: 104, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, s + ' s', lad); });
+    var extra = 0;
+    [0, 40, 80, 120].forEach(function(s, i){
+      var fires = i === 0 || s < ack;
+      if (i > 0 && fires) extra++;
+      S('rect', { x: X(s) - 6, y: 48, width: 12, height: 22, rx: 2, fill: fires ? (i ? v('warn') : v('acc')) : v('bg3'), stroke: v('line2'), opacity: fires ? 1 : 0.5 }, lad);
+      T({ x: X(s), y: 40, 'text-anchor': 'middle', 'font-size': 10, fill: fires ? v('fg2') : v('fg3') }, i === 0 ? 'DM' : 'Retry ' + i, lad);
+    });
+    S('line', { x1: X(Math.min(ack, 160)), x2: X(Math.min(ack, 160)), y1: 30, y2: 84, stroke: v('ok'), 'stroke-width': 2 }, lad);
+    T({ x: X(Math.min(ack, 160)) + 4, y: 92, 'font-size': 10, fill: v('ok') }, 'ACK', lad);
+    $('#lad-cap').innerHTML = 'Leiter: Retry nach 40, 80, 120 s (<code>MAX_RETRANSMIT</code> 3). ACK nach ' + ack + ' s → <b>' + extra + '</b> zusätzliche DM-Sendung' + (extra === 1 ? '' : 'en') + ' <span class="calc">berechnet</span>, jede wieder geflutet. Jeder Retry trägt eine eigene ID; Dedup fasst sie nicht zusammen.';
+  }
+  d.addEventListener('input', ladder); ladder();
+  optset('opt-p', [
+    { k: 'P0', n: 'Status quo', p: 'einfach; Relays können eigenen Verkehr nicht aushungern; keine Klasse für fremden Verkehr über 3', c: 'DM und ACK konkurrieren mit Gruppen-Relays; späte ACKs lösen die Leiter aus' },
+    { k: 'P1', n: 'weitergeleitete DM und <code>:ackNNN</code> auf 2', p: 'vor Gruppen-Relays, hinter eigenen DMs und ACKs (1); Parse-Kosten nur für <code>DONE</code>-Text', c: 'braucht Ziel-Parsing für <code>DONE</code>-Text (existiert für <code>READY</code>); eine weitergeleitete DM-Flut würde eigenen Gruppentext zurückdrängen' },
+    { k: 'P2', n: 'nur weitergeleitetes <code>:ackNNN</code> auf 2', p: 'das ACK stoppt die Leiter, spart also die meiste Sendezeit je Byte; kleine Änderung', c: 'der DM selbst bleibt in 3; braucht Payload-Parse (<code>:ack</code> nach dem Adressaten)' },
+    { k: 'P3', n: 'vom Server eingespeiste DM an lokalen Knoten auf 2', p: 'adressiert Finding 8 direkt; das Gateway kennt das Ziel', c: 'nur Gateways; fremde DMs über Gruppen-Relays; die Vorsicht des Verdicts gilt, wenn es 1 würde' },
+    { k: 'P4', n: '3 behalten, DM und ACK von Verdrängung ausnehmen', p: 'keine Änderung der Reihenfolge; schützt gegen den Fall „zuerst verdrängt“', c: 'verkürzt die Wartezeit nicht; fügt der Verdrängungsregel (5.2) eine Regel hinzu' }
+  ]);
+}
+
+/* ================= 12 multi-SF ================= */
+function initSf(){
+  var svg = $('#sf-svg'); if (!svg) return;
+  var SF = [
+    { sf: 7, snr: -7.5, br: '9,1', t60: 78, t80: 96, t120: 130, sens: '−121,5', thr: '11,6x', thrN: 11.6, mar: '−10 dB' },
+    { sf: 8, snr: -10, br: '5,2', t60: 144, t80: 174, t120: 236, sens: '−124,0', thr: '6,3x', thrN: 6.3, mar: '−7,5 dB' },
+    { sf: 9, snr: -12.5, br: '2,9', t60: 263, t80: 312, t120: 422, sens: '−126,5', thr: '3,4x', thrN: 3.4, mar: '−5 dB' },
+    { sf: 10, snr: -15, br: '1,6', t60: 501, t80: 599, t120: 796, sens: '−129,0', thr: '1,8x', thrN: 1.8, mar: '−2,5 dB' },
+    { sf: 11, snr: -17.5, br: '0,90', t60: 903, t80: 1100, t120: 1444, sens: '−131,5', thr: '1,0x', thrN: 1.0, mar: '0' },
+    { sf: 12, snr: -20, br: '0,49', t60: 1905, t80: 2298, t120: 3084, sens: '−134,0', thr: '0,47x', thrN: 0.47, mar: '+2,5 dB' }
+  ];
+  var box = $('#sf-sel'), sel = 11, snrIn = $('#sf-snr');
+  SF.forEach(function(s){ var b = document.createElement('button'); b.setAttribute('data-v', s.sf); b.textContent = 'SF' + s.sf; b.setAttribute('aria-pressed', s.sf === 11 ? 'true' : 'false'); box.appendChild(b); });
+  seg(box, function(val){ sel = +val; draw(); });
+  snrIn.addEventListener('input', draw);
+  var x0 = 60, y0 = 40, yb = 270;
+  function Y(db){ return y0 + (-db) / 26 * (yb - y0); }
+  function draw(){
+    clear(svg);
+    var link = +snrIn.value; $('#sf-snr-o').textContent = (link < 0 ? '−' : '') + de(Math.abs(link), 1) + ' dB';
+    for (var d = 0; d >= -26; d -= 4){ S('line', { x1: x0, x2: 550, y1: Y(d), y2: Y(d), stroke: v('line'), 'stroke-width': 0.6 }, svg); T({ x: x0 - 6, y: Y(d) + 4, 'text-anchor': 'end', 'font-size': 10, fill: v('fg3') }, (d < 0 ? '−' : '') + Math.abs(d), svg); }
+    T({ x: 8, y: 22, 'font-size': 10, fill: v('fg2') }, 'SNR-Grenze (dB) · Balkenkopf: Durchsatz gegen SF11', svg);
+    var best = null;
+    SF.forEach(function(s, i){
+      var x = x0 + 20 + i * 80, w = 46, usable = link >= s.snr + 5.5;
+      if (usable && !best) best = s;
+      S('rect', { x: x, y: Y(0), width: w, height: Y(s.snr) - Y(0), rx: 4, fill: s.sf === sel ? v('acc') : (usable ? v('ok') : v('line2')), opacity: s.sf === sel ? 0.95 : 0.6, style: 'cursor:pointer' }, svg)
+        .addEventListener('click', function(){ $$('button', box)[i].click(); });
+      T({ x: x + w / 2, y: Y(s.snr) + 14, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg') }, (s.snr < 0 ? '−' : '') + de(Math.abs(s.snr), 1), svg);
+      T({ x: x + w / 2, y: Y(0) - 6, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg'), 'font-weight': 700 }, s.thr, svg);
+      T({ x: x + w / 2, y: yb + 18, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg2') }, 'SF' + s.sf, svg);
+    });
+    S('line', { x1: x0, x2: 550, y1: Y(-16), y2: Y(-16), stroke: v('warn'), 'stroke-width': 1.5, 'stroke-dasharray': '6 3' }, svg);
+    T({ x: x0 + 4, y: Y(-16) - 4, 'text-anchor': 'start', 'font-size': 10, fill: v('warn') }, '−16 dB stabil (LORA_SNR_STABLE_MIN_DB)', svg);
+    S('line', { x1: x0, x2: 550, y1: Y(-24), y2: Y(-24), stroke: v('bad'), 'stroke-width': 1.5, 'stroke-dasharray': '2 3' }, svg);
+    T({ x: x0 + 4, y: Y(-24) - 4, 'text-anchor': 'start', 'font-size': 10, fill: v('bad') }, '−24 dB Beobachtung bei SF11', svg);
+    S('line', { x1: x0, x2: 550, y1: Y(link), y2: Y(link), stroke: v('info'), 'stroke-width': 2 }, svg);
+    T({ x: 548, y: Y(link) - 4, 'text-anchor': 'end', 'font-size': 10, fill: v('info') }, 'Link', svg);
+    $('#sf-cap').innerHTML = best ? 'Bei ' + $('#sf-snr-o').textContent + ' ist SF' + best.sf + ' das schnellste SF mit 5,5 dB Reserve über der Grenze (' + best.thr + ' gegen SF11) <span class="calc">berechnet</span>. Teil B: Upgrade auf SF9 ab etwa −7 dB.' :
+      'Bei ' + $('#sf-snr-o').textContent + ' hat kein SF 5,5 dB Reserve. Unter etwa −18 dB ist ein gemeldeter SNR „am Rand“, keine gemessene Reserve; −24 dB bei SF11 liegt 6,5 dB unter der typischen Grenze, eine echte Dekodierung ist unwahrscheinlich (INFERRED, Bench mit kalibriertem Dämpfungsglied entscheidet).';
+    var s = SF.filter(function(x){ return x.sf === sel; })[0];
+    $('#sf-row').innerHTML = '<h3>SF' + s.sf + ' · BW 250 kHz, CR 4/6, Präambel 32</h3><div class="tw"><table><tbody>' +
+      '<tr><td>SNR-Grenze (Semtech typisch)</td><td class="r m">' + (s.snr < 0 ? '−' : '') + de(Math.abs(s.snr), 1) + ' dB</td></tr>' +
+      '<tr><td>Bitrate <span class="calc">berechnet</span></td><td class="r m">' + s.br + ' kbit/s</td></tr>' +
+      '<tr><td>ToA 60 / 80 / 120 B <span class="calc">berechnet</span></td><td class="r m">' + s.t60 + ' / ' + s.t80 + ' / ' + s.t120 + ' ms</td></tr>' +
+      '<tr><td>Empfindlichkeit (NF 6 dB) <span class="calc">berechnet</span></td><td class="r m">' + s.sens + ' dBm</td></tr>' +
+      '<tr><td>Durchsatz / Reserve gegen SF11</td><td class="r m">' + s.thr + ' / ' + s.mar + '</td></tr></tbody></table></div>';
+  }
+  draw();
+  // Wi-Fi-like upgrade animation
+  var wf = $('#wf-svg'), cap = $('#wf-cap'), run = Run();
+  var Nn = { A: { x: 110, y: 140, n: 'A' }, B: { x: 260, y: 140, n: 'B' }, C: { x: 420, y: 60, n: 'C' }, D: { x: 420, y: 210, n: 'D' }, E: { x: 60, y: 50, n: 'E' } };
+  var fx;
+  function wbase(){
+    clear(wf);
+    [['A', 'B'], ['B', 'C'], ['B', 'D'], ['A', 'E'], ['C', 'D'], ['A', 'C']].forEach(function(p){ S('line', { x1: Nn[p[0]].x, y1: Nn[p[0]].y, x2: Nn[p[1]].x, y2: Nn[p[1]].y, stroke: v('line2') }, wf); });
+    Object.keys(Nn).forEach(function(k){ var n = Nn[k]; n.c = S('circle', { cx: n.x, cy: n.y, r: 14, fill: v('bg3'), stroke: v('fg3'), 'stroke-width': 2 }, wf); T({ x: n.x, y: n.y + 4, 'text-anchor': 'middle', 'font-size': 12, fill: v('fg') }, n.n, wf); n.sf = T({ x: n.x, y: n.y - 20, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'SF11', wf); });
+    fx = S('g', {}, wf);
+  }
+  function setSf(k, s, c){ Nn[k].sf.textContent = s; Nn[k].sf.setAttribute('fill', c); Nn[k].c.setAttribute('stroke', c); }
+  async function wplay(){
+    var tk = run.start(); wbase(); var ok = function(){ return run.ok(tk); };
+    cap.textContent = '1 · Basis-SF11: C flutet (HEY, Position, Gruppe). Alle hören es.';
+    await pulse(wf, Nn.C.x, Nn.C.y, 380, v('acc'), 1000); if (!ok()) return;
+    ['A', 'B', 'D', 'E'].forEach(function(k){ Nn[k].c.setAttribute('fill', v('acc-dim')); });
+    await wait(600); if (!ok()) return;
+    cap.textContent = '2 · A und B haben Reserve (Link besser als etwa −7 dB): Umschalt-Handshake auf SF11.';
+    await pulse(wf, Nn.A.x, Nn.A.y, 160, v('info'), 700); if (!ok()) return;
+    await pulse(wf, Nn.B.x, Nn.B.y, 160, v('info'), 700); if (!ok()) return;
+    setSf('A', 'SF9', v('ok')); setSf('B', 'SF9', v('ok'));
+    cap.textContent = '3 · Beide hören jetzt auf SF9: der DM geht 3,4-mal schneller (60 B: 263 statt 903 ms).';
+    for (var i = 0; i < 3; i++){ await pulse(wf, (i % 2 ? Nn.B : Nn.A).x, (i % 2 ? Nn.B : Nn.A).y, 160, v('ok'), 380); if (!ok()) return; }
+    cap.textContent = '4 · Währenddessen flutet D auf SF11. A und B hören nur SF9: sie sind taub für die Basis.';
+    var p = pulse(wf, Nn.D.x, Nn.D.y, 380, v('acc'), 1000);
+    Nn.C.c.setAttribute('fill', v('acc-dim')); Nn.E.c.setAttribute('fill', v('acc-dim'));
+    await p; if (!ok()) return;
+    T({ x: Nn.A.x + 16, y: Nn.A.y + 26, 'font-size': 12, fill: v('bad'), 'font-weight': 700 }, '✕ taub', fx);
+    T({ x: Nn.B.x + 16, y: Nn.B.y + 26, 'font-size': 12, fill: v('bad'), 'font-weight': 700 }, '✕ taub', fx);
+    await wait(900); if (!ok()) return;
+    setSf('A', 'SF11', v('fg3')); setSf('B', 'SF11', v('fg3'));
+    cap.textContent = '5 · Zurück auf SF11: der Flut-Frame von D ist für A und B verloren. Das ist das Taubheitsproblem von M1: ein Modul hört ein SF zur Zeit.';
+  }
+  $('#wf-play').addEventListener('click', wplay);
+  wbase();
+  optset('opt-m', [
+    { k: 'M0', n: 'Status quo, ein SF für alle', p: 'einfach, jeder hört alles', c: 'Kapazität bei SF11 festgelegt' },
+    { k: 'M1', n: 'Upgrade je Link für Unicast mit Rendezvous', p: 'Basis-SF für Fluten, HEY, Positionen; ein DM zwischen zwei Nachbarn mit Reserve nutzt SF9 oder SF10 nach einem SF11-Umschalt-Handshake; beide hören für einen Austausch auf dem schnellen SF und kehren dann zurück', c: 'beide Knoten sind während des Austauschs taub für den Basiskanal (verpasste Fluten); braucht Handshake-Frame und Timing; nur für DM, nicht für Fluten', x: 'Messbar heute: der Profilwechsel je Paket für LoRa-APRS im Track-Modus hat dieselbe Taubheit.' },
+    { k: 'M2', n: 'CAD-Scan zwischen zwei SF', p: 'ein Knoten kann eine Präambel der anderen Rate erkennen. Leichter als umgekehrt: auf dem schnellen SF hören und periodisch per CAD die lange SF11-Präambel suchen', c: 'CAD je SF ist sequenziell, kurze Präambeln können verpasst werden; mehr RX-Strom; PER auf dem Basiskanal steigt', x: 'Der Profilwechsel je Paket für LoRa-APRS (Track-Modus) existiert schon: dort sind Rendezvous- und Taubheitskosten messbar.' },
+    { k: 'M3', n: 'zweiter Kanal für ein schnelles Backbone (andere Frequenz, SF9)', p: 'keine Taubheit auf dem Basiskanal; Berg- und Gateway-Knoten bilden eine schnelle Schicht', c: 'braucht ein zweites Funkmodul (Dual-Radio-Boards sind selten) oder einen eigenen Knoten je Standort; Frequenzplan (4.13)' },
+    { k: 'M4', n: 'regionales SF (SF10 in dichten Stadtzellen, SF11/12 auf dem Land)', p: 'Stadtkapazität ×1,8 bei 2,5 dB weniger Reserve, dort wo die Reserven groß sind', c: 'Zellen müssen sich einigen; ein Knoten an der Grenze zwischen SF-Regionen hört nicht beide; Brücken nötig' },
+    { k: 'M5', n: 'Konzentrator-Gateways (SX1302/1303)', p: 'ein Gateway hört 8 bis 16 Pakete auf mehreren SF zugleich', c: 'nur Gateway-Hardware; Knoten senden weiter auf einem SF' }
+  ], { sel: 1 });
+}
+
+/* ================= 13 source routing ================= */
+function initRoute(){
+  var svg = $('#sr-svg'); if (!svg) return;
+  var R = rng(99), nodes = [];
+  for (var r = 0; r < 4; r++) for (var c = 0; c < 6; c++) nodes.push({ x: 50 + c * 108 + (R() - 0.5) * 40, y: 45 + r * 72 + (R() - 0.5) * 30 });
+  var Sx = 6, Dx = 17;
+  nodes[Sx] = { x: 40, y: 125 }; nodes[Dx] = { x: 600, y: 190 };
+  var adj = nodes.map(function(){ return []; });
+  for (var i = 0; i < nodes.length; i++) for (var j = i + 1; j < nodes.length; j++){
+    var d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+    if (d < 135){ adj[i].push(j); adj[j].push(i); }
+  }
+  function bfs(s){ var dist = nodes.map(function(){ return Infinity; }), prev = nodes.map(function(){ return -1; }); dist[s] = 0; var q = [s]; while (q.length){ var u = q.shift(); adj[u].forEach(function(w){ if (dist[w] === Infinity){ dist[w] = dist[u] + 1; prev[w] = u; q.push(w); } }); } return { dist: dist, prev: prev }; }
+  var b = bfs(Sx), path = [], u = Dx; while (u !== -1){ path.unshift(u); u = b.prev[u]; }
+  var relayPath = path.slice(1, -1);
+  var oldOrder = nodes.map(function(_, i){ return i; }).filter(function(i){ return i !== Sx && i !== Dx; }).sort(function(){ return 0; });
+  var R2 = rng(5); oldOrder.sort(function(a, b){ return ((a * 7919 + 13) % 23) - ((b * 7919 + 13) % 23); });
+  var mode = 'S0', run = Run();
+  var oldIn = $('#sr-old');
+  function oldSet(){ var n = Math.round(oldOrder.length * (+oldIn.value) / 100); return oldOrder.slice(0, n); }
+  function allowed(i, old){
+    if (i === Dx) return false;
+    if (old.indexOf(i) >= 0) return true;
+    if (mode === 'S0') return true;
+    if (mode === 'S1' || mode === 'S2') return relayPath.indexOf(i) >= 0;
+    if (mode === 'S3'){ if (relayPath.indexOf(i) >= 0) return true; return relayPath.some(function(p){ return adj[p].indexOf(i) >= 0; }); }
+    return false;
+  }
+  function simulate(){
+    var old = oldSet(), got = {}, sent = [Sx], waves = [[Sx]], nib = {}; got[Sx] = 1; nib[Sx] = 4;
+    var frontier = [Sx];
+    while (frontier.length){
+      var next = [];
+      frontier.forEach(function(t){ adj[t].forEach(function(w){ if (!got[w]){ got[w] = 1; nib[w] = nib[t]; if (nib[t] > 0 && allowed(w, old)){ nib[w] = nib[t] - 1; next.push(w); } } }); });
+      next = next.filter(function(x, i){ return next.indexOf(x) === i; });
+      if (next.length){ waves.push(next); sent = sent.concat(next); }
+      frontier = next;
+    }
+    return { waves: waves, sent: sent, got: got, old: old };
+  }
+  var circ = [];
+  function base(sim){
+    clear(svg); circ = [];
+    for (var i = 0; i < nodes.length; i++) adj[i].forEach(function(j){ if (j > i) S('line', { x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, stroke: v('line'), 'stroke-width': 1 }, svg); });
+    for (var k = 0; k < path.length - 1; k++) S('line', { x1: nodes[path[k]].x, y1: nodes[path[k]].y, x2: nodes[path[k + 1]].x, y2: nodes[path[k + 1]].y, stroke: v('mag'), 'stroke-width': mode === 'S0' ? 1 : 3, opacity: mode === 'S0' ? 0.4 : 0.8 }, svg);
+    nodes.forEach(function(n, i){
+      var isOld = sim.old.indexOf(i) >= 0;
+      circ[i] = S('circle', { cx: n.x, cy: n.y, r: 9, fill: v('bg3'), stroke: isOld ? v('warn') : v('fg3'), 'stroke-width': isOld ? 2.5 : 1.5 }, svg);
+    });
+    T({ x: nodes[Sx].x, y: nodes[Sx].y - 14, 'text-anchor': 'middle', 'font-size': 11, fill: v('acc'), 'font-weight': 700 }, 'Quelle', svg);
+    T({ x: nodes[Dx].x, y: nodes[Dx].y - 14, 'text-anchor': 'middle', 'font-size': 11, fill: v('ok'), 'font-weight': 700 }, 'Ziel', svg);
+    T({ x: 10, y: 292, 'font-size': 10, fill: v('fg3') }, 'orange Rand = alte Firmware (flutet immer)   magenta = bekannter Pfad', svg);
+  }
+  var INFO = {
+    S0: { n: 'Status quo: Flut', d: 'keine', r: 'Flut', p: 'robust, zustandslos', c: 'N Kopien je DM und je ACK' },
+    S1: { n: 'Next-Hop-Lernen (Meshtastic-2.6-Stil)', d: 'der erste DM flutet; die Antwort zeigt, welches Relay ihn trug', r: 'jeder Knoten merkt sich „für Ziel X hat Relay Y funktioniert“; ein DM wird nur vom gemerkten Next Hop weitergeleitet, Flut beim letzten Retry', p: 'rückwärtskompatibel; Zustand je Ziel, nicht je Pfad; anderswo erprobt', c: 'braucht ein „Next Hop“-Feld im Frame (kein freies Bit in Byte 5; Trailer oder Payload). Ein via-Feld gibt es schon (Zielpfad <code>VIA,DEST</code>, <code>checkMesh</code>), aber jedes Relay setzt es zurück: heute wirkt es nur für einen Hop' },
+    S2: { n: 'Volle Quellroute (MeshCore-Stil)', d: 'Flut mit Pfad-Aufzeichnung (existiert), das ACK trägt den Pfad zurück', r: 'der DM listet die Relays; nur gelistete Relays leiten weiter; bei fehlendem ACK wieder Flut', p: 'wenigste Kopien; deterministisch', c: 'Header wächst je Hop (etwa 10 B je Rufzeichen); alte Firmware ignoriert die Liste und flutet trotzdem' },
+    S3: { n: 'Hybrid: S2 mit hop-begrenzter Flut um die Route', d: 'wie S2', r: 'gelistete Relays plus deren direkte Nachbarn dürfen weiterleiten', p: 'überlebt einen umgezogenen Knoten', c: 'mehr Kopien als S2' }
+  };
+  function panel(){
+    var it = INFO[mode];
+    $('#sr-p').innerHTML = '<h4>' + mode + ' · ' + it.n + '</h4><p><b>Entdeckung:</b> ' + it.d + '. <b>Routing:</b> ' + it.r + '.</p><div class="pc"><div class="p">' + it.p + '</div><div class="c">' + it.c + '</div></div><p class="cite">Ort der Route: ein Payload-Präfix (<code>{R:CALL1,CALL2}</code>) ist lesbar, alte Knoten sehen Text; eine neue Typ-ID ist sauberer, aber für alte Firmware unsichtbar.</p>';
+    $('#sr-h').textContent = mode === 'S2' || mode === 'S3' ? '≈ ' + relayPath.length * 10 + ' B' : mode === 'S1' ? 'Feld' : '0 B';
+  }
+  async function play(){
+    var tk = run.start(), sim = simulate(); base(sim); panel();
+    $('#sr-oldo') ;
+    var count = 0;
+    for (var w = 0; w < sim.waves.length; w++){
+      var ps = [];
+      sim.waves[w].forEach(function(i){ count++; circ[i].setAttribute('fill', i === Sx ? v('acc') : v('info')); ps.push(pulse(svg, nodes[i].x, nodes[i].y, 120, i === Sx ? v('acc') : v('info'), 650)); });
+      $('#sr-n').textContent = count;
+      await Promise.all(ps); if (!run.ok(tk)) return;
+      await wait(120);
+    }
+    if (sim.got[Dx]) circ[Dx].setAttribute('fill', v('ok'));
+    $('#sr-n').textContent = sim.sent.length;
+    $('#sr-cap').innerHTML = mode + ': <b>' + sim.sent.length + '</b> Sendungen bis Ruhe, Ziel ' + (sim.got[Dx] ? 'erreicht' : '<b style="color:var(--bad)">nicht erreicht</b>') + ', ' + sim.old.length + ' Knoten mit alter Firmware <span class="calc">berechnet</span>. Modell: jeder Knoten sendet einmal, solange der Nibble reicht (Hop 4); das Ziel sendet nicht weiter.';
+  }
+  function quick(){ var sim = simulate(); base(sim); panel(); sim.sent.forEach(function(i){ circ[i].setAttribute('fill', i === Sx ? v('acc') : v('info')); }); if (sim.got[Dx]) circ[Dx].setAttribute('fill', v('ok')); $('#sr-n').textContent = sim.sent.length;
+    $('#sr-cap').innerHTML = mode + ': <b>' + sim.sent.length + '</b> Sendungen, ' + sim.old.length + ' Knoten mit alter Firmware <span class="calc">berechnet</span>. Modell: jeder Knoten sendet einmal, solange der Nibble reicht (Hop 4); das Ziel sendet nicht weiter.'; }
+  seg($('#sr-mode'), function(val){ mode = val; play(); });
+  oldIn.addEventListener('input', function(){ $('#sr-old-o').textContent = oldIn.value + ' %'; run.start(); quick(); });
+  $('#sr-play').addEventListener('click', play);
+  quick();
+  return { play: play };
+}
+
+/* ================= 14 EMCOMM ================= */
+function initEmcomm(){
+  optset('opt-e', [
+    { k: 'E1', n: 'Payload-Präfix (<code>{EMC}</code> oder <code>#EMCOMM</code>)', p: 'alte Firmware zeigt es als Text; keine Protokolländerung', c: 'trivial zu fälschen; Parse-Kosten' },
+    { k: 'E2', n: 'neuer Nachrichtentyp (Hex-ID)', p: 'eindeutig; Platz für ein Signaturfeld', c: 'für alte Firmware unsichtbar (nicht angezeigt, nicht weitergeleitet)' },
+    { k: 'E3', n: 'Trailer-Erweiterung (Byte nach der Subversion)', p: 'raus aus dem Text', c: 'das Trailer-Format ist fest (3 Byte + 0x7E); alte Decoder könnten es ablehnen' },
+    { k: 'E4', n: 'Ziel-Konvention (<code>&gt;EMCOMM</code>, Gruppe)', p: 'nutzt den bestehenden Gruppenmechanismus', c: 'keine Prioritätssemantik in alter Firmware; fälschbar' }
+  ]);
+  optset('opt-a', [
+    { k: 'A1', n: 'RM1-HMAC mit gemeinsamem EMCOMM-Netzschlüssel', r: 'Tag 8 B, als 16 hex-Zeichen = 16 B auf der Luft (≈ +147 ms bei SF11, berechnet); Vertrauen: jeder mit dem Schlüssel.', p: 'Code existiert; klein', c: 'jeder mit dem Schlüssel kann als jeder signieren; ein Leck bricht alles; Schlüsselverteilung außerhalb des Bands' },
+    { k: 'A2', n: 'HMAC-Schlüssel je Absender im Trust-Store des Empfängers', r: '8 B Tag (16 B hex); der Empfänger hält das Geheimnis jedes Absenders.', p: 'kleine Frames', c: 'jeder Empfänger hält jedes Geheimnis; ein kompromittierter Empfänger kann fälschen; skaliert nicht' },
+    { k: 'A3', n: 'Ed25519-Signatur, öffentliche Schlüssel gepinnt', r: '64 B Signatur; die Payload ist Text mit Zeichensatzfilter, also Base64 = 88 B (≈ +786 ms bei SF11, berechnet); gepinnte öffentliche Schlüssel (je 32 B).', p: 'Fälschen braucht den privaten Schlüssel; Empfänger halten nur öffentliche Schlüssel', c: '88 B Base64 je Frame; Prüfung etwa ms auf ESP32 (INFERRED); Schlüsselverwaltung in der Web-GUI' },
+    { k: 'A4', n: 'A3 mit Schlüsseln aus einem Server-Verzeichnis', r: '64 B (88 B Base64); Vertrauen: Signierschlüssel des Verzeichnisses, einmal gepinnt.', p: 'Onboarding ohne manuelles Pinning; Widerruf', c: 'braucht einmal Internet; wer betreibt das Verzeichnis (DARC? ÖVSV? icssw?)' },
+    { k: 'A5', n: 'Schlüssel-Ankündigung auf der Luft (neue Hex-ID), TOFU plus manuelles Pinning', r: '64 B (88 B Base64) + Ankündigung; Vertrauen: erster Kontakt, dann gepinnt.', p: 'funktioniert offline', c: 'der erste Kontakt kann gefälscht werden; Ankündigungen kosten Sendezeit' }
+  ], { sel: 2 });
+  var svg = $('#ts-svg'); if (!svg) return;
+  var cap = $('#ts-cap'), mode = 'A3', run = Run(), fx;
+  var SND = { x: 70, y: 150 }, RX = [{ x: 430, y: 60 }, { x: 430, y: 150 }, { x: 430, y: 240 }];
+  function base(){
+    clear(svg);
+    S('rect', { x: 18, y: 112, width: 104, height: 76, rx: 8, fill: v('bg3'), stroke: v('acc') }, svg);
+    T({ x: 70, y: 132, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg') }, 'Absender A', svg);
+    T({ x: 70, y: 152, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg2') }, mode === 'A1' ? '🔑 Netzschlüssel' : '🔑 privat', svg);
+    T({ x: 70, y: 170, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, mode === 'A1' ? 'HMAC 16 B hex' : 'Ed25519 88 B b64', svg);
+    if (mode === 'A4'){
+      S('rect', { x: 190, y: 6, width: 150, height: 44, rx: 8, fill: v('bg3'), stroke: v('mag') }, svg);
+      T({ x: 265, y: 24, 'text-anchor': 'middle', 'font-size': 11, fill: v('mag') }, 'Verzeichnis (signiert)', svg);
+      T({ x: 265, y: 40, 'text-anchor': 'middle', 'font-size': 9, fill: v('fg3') }, 'Schlüssel einmal gepinnt', svg);
+      RX.forEach(function(r){ S('line', { x1: 340, y1: 30, x2: r.x - 60, y2: r.y - 12, stroke: v('mag'), 'stroke-dasharray': '3 3' }, svg); });
+    }
+    RX.forEach(function(r, i){
+      S('rect', { x: r.x - 60, y: r.y - 30, width: 150, height: 60, rx: 8, fill: v('bg3'), stroke: v('line2') }, svg);
+      T({ x: r.x - 52, y: r.y - 14, 'font-size': 10, fill: v('fg') }, 'Empfänger ' + (i + 1), svg);
+      T({ x: r.x - 52, y: r.y + 2, 'font-size': 9, fill: v('fg3') }, mode === 'A1' ? 'Netzschlüssel (gleich)' : 'Trust-Store: A → 3F9C…', svg);
+      T({ x: r.x - 52, y: r.y + 16, 'font-size': 9, fill: v('fg3') }, mode === 'A1' ? 'jeder Halter = jeder' : (mode === 'A4' ? 'aus Verzeichnis' : 'gepinnt per Web-GUI'), svg);
+    });
+    fx = S('g', {}, svg);
+  }
+  async function send(kind){
+    var tk = run.start(); base();
+    var lab = kind === 'uns' ? 'Text, ohne Sig.' : (mode === 'A1' ? 'Text + HMAC 16 B' : 'Text + Sig 88 B');
+    var res, col, txt;
+    if (kind === 'ok'){ res = '✓ geprüft'; col = v('ok'); txt = 'Gültige Signatur zum gepinnten Schlüssel: Priorität (in V2 Band 0), normal weitergeleitet.'; }
+    else if (kind === 'uns'){ res = '! Warnung'; col = v('warn'); txt = 'Unsigniert: angezeigt mit Warnung, normal weitergeleitet, nicht bevorzugt.'; }
+    else if (mode === 'A1'){ res = '✓ ununterscheidbar'; col = v('bad'); txt = 'A1: wer den Netzschlüssel hat, kann als jeder signieren. Die Fälschung besteht die Prüfung; ein Leck bricht alles.'; }
+    else { res = '✕ keine Prio'; col = v('bad'); txt = 'Signatur passt nicht zum gepinnten Schlüssel von A: keine Priorität. Fälschen bräuchte den privaten Schlüssel.'; }
+    var g = S('g', {}, fx);
+    S('rect', { x: -56, y: -11, width: 112, height: 22, rx: 5, fill: kind === 'uns' ? v('warn') : (kind === 'bad' ? v('bad') : v('acc')) }, g);
+    T({ x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 10, fill: v('on-acc'), 'font-weight': 600 }, lab, g);
+    if (kind === 'bad') T({ x: 0, y: -16, 'text-anchor': 'middle', 'font-size': 9, fill: v('bad') }, mode === 'A1' ? 'Fälscher mit Netzschlüssel' : 'fremder Schlüssel', g);
+    await tween(900, function(t){ g.setAttribute('transform', 'translate(' + (130 + t * 130) + ',150)'); });
+    if (!run.ok(tk)) return;
+    g.remove();
+    var ps = RX.map(function(r){ var d = S('circle', { r: 5, fill: col }, fx); return tween(500, function(t){ d.setAttribute('cx', 260 + (r.x - 70 - 260) * t); d.setAttribute('cy', 150 + (r.y - 150) * t); }).then(function(){ d.remove(); }); });
+    await Promise.all(ps); if (!run.ok(tk)) return;
+    RX.forEach(function(r){ T({ x: r.x + 84, y: r.y + 4, 'text-anchor': 'end', 'font-size': 10, fill: col, 'font-weight': 700 }, res, fx); });
+    cap.textContent = txt;
+  }
+  seg($('#ts-mode'), function(val){ mode = val; base(); cap.textContent = mode === 'A1' ? 'A1: ein gemeinsamer Schlüssel für alle; 16 B hex je Frame.' : mode === 'A3' ? 'A3: Empfänger pinnen den öffentlichen Schlüssel von A (Fingerabdruck in der Web-GUI bestätigen).' : 'A4: Empfänger pinnen einmal den Verzeichnisschlüssel und holen die Schlüssel der Absender von dort.'; });
+  $$('[data-ts]').forEach(function(b){ b.addEventListener('click', function(){ send(b.getAttribute('data-ts')); }); });
+  base(); cap.textContent = 'Frame wählen. A3: Empfänger halten nur öffentliche Schlüssel.';
+  return { play: function(){ send('ok'); } };
+}
+
+/* ================= 15 EOL + tags ================= */
+function initEol(){
+  var svg = $('#eol-svg'); if (!svg) return;
+  var hl = 'fw';
+  function draw(){
+    clear(svg);
+    var cells = [['…Frame', 'frame', 150], ['FCS', 'fcs', 60], ['FW-Version', 'fw', 90], ['Last HW', 'hw', 80], ['Subversion', 'sub', 80], ['0x7E', 'end', 50]];
+    var x = 5;
+    cells.forEach(function(c){
+      var on = c[1] === hl || (hl === 'trailer' && ['fw', 'hw', 'sub', 'end'].indexOf(c[1]) >= 0);
+      S('rect', { x: x, y: 20, width: c[2] - 4, height: 44, rx: 5, fill: on ? v('acc-dim') : v('bg3'), stroke: on ? v('acc') : v('line2'), 'stroke-dasharray': c[1] === 'frame' ? '4 3' : 'none' }, svg);
+      T({ x: x + (c[2] - 4) / 2, y: 47, 'text-anchor': 'middle', 'font-size': 11, fill: on ? v('acc') : v('fg2') }, c[0], svg);
+      x += c[2];
+    });
+    T({ x: 5, y: 84, 'font-size': 10, fill: v('fg3') }, hl === 'hw' ? 'L1: Relays schreiben nur Last HW neu; ihre FW-Version steht nicht im Frame.' : 'FW-Version = Urheber; heute 0 < fw_version < 35 → verworfen', svg);
+    T({ x: 5, y: 100, 'font-size': 10, fill: v('fg3') }, hl === 'hw' ? 'Die Firmware des letzten Hops muss aus der Nachbarschaftsmatrix kommen.' : 'der Filter wirkt also auf Urheber, nicht auf Relays', svg);
+  }
+  draw();
+  optset('opt-l', [
+    { k: 'L0', n: 'Status quo (verwerfen < 4.35)', p: 'existiert', c: 'nibble-wickelnde 4.35x-Knoten werden weiter weitergeleitet' },
+    { k: 'L1', n: 'nicht weiterleiten, wenn der letzte Hop < N läuft', p: 'das Mesh verstärkt das Verhalten alter Relays nicht mehr; deren eigene Frames werden noch angezeigt', c: 'das FW-Versionsbyte im Trailer ist die Version des Urhebers; Relays schreiben nur <code>msg_last_hw</code> neu. Die Firmware des letzten Hops steht nicht im Frame und muss aus der Nachbarschaftsmatrix kommen' },
+    { k: 'L2', n: 'nicht weiterleiten, wenn der Urheber < N läuft', p: 'stoppt die Last alter Urheber; das Trailer-Byte liefert genau die Urheberversion', c: 'Nutzer ohne Update verlieren ohne Hinweis Reichweite' },
+    { k: 'L3', n: 'ganz verwerfen (wie heute für < 4.35)', p: 'am einfachsten', c: 'spaltet das Mesh; Frames ohne Trailer (sehr alt) sind unsichtbar' },
+    { k: 'L4', n: 'vom Server angekündigte Mindestversion', p: 'ein Schalter für alle; schrittweise anhebbar', c: 'braucht das Verzeichnis (4.1) oder einen <code>{SET}</code>-artigen Frame; heute nicht authentifiziert' }
+  ], { on: function(it){ hl = it.k === 'L1' ? 'hw' : 'fw'; draw(); } });
+  optset('opt-t', [
+    { k: 'T0', n: 'Status quo, Nummern', r: 'Ziel <code>&gt;20</code> · alte Firmware: wie heute.', p: 'kompakt (bis 5 Ziffern), funktioniert mit jeder Firmware und App', c: '6 Gruppen, keine Bedeutung, keine Hierarchie' },
+    { k: 'T1', n: 'Tag im Zielfeld', r: 'Ziel <code>&gt;#OE1-SOTA</code> · alte Firmware: hält es für ein Rufzeichen oder verwirft es (<code>checkRegexCall</code>).', p: 'klare Adressierung; Filter nach Präfix ergibt Hierarchie', c: 'alte Firmware behandelt es als Rufzeichen oder verwirft es; Längengrenze des Ziels; Server und App müssen folgen' },
+    { k: 'T2', n: 'Tag in der Payload, Ziel <code>*</code>', r: 'Ziel <code>*</code>, Text „#OE1-SOTA …“ · alte Firmware: zeigt Broadcast-Text.', p: 'alte Firmware zeigt Broadcast-Text, nichts bricht; Filter nur lokal', c: 'jeder Knoten empfängt und leitet jede getaggte Nachricht weiter: kein Sendezeitgewinn, nur Anzeigefilter' },
+    { k: 'T3', n: 'Tag-Hash im Ziel, Tag-Text in der Payload', r: 'Ziel <code>&gt;G1A2B3</code> · alte Firmware: unbekannte Gruppe, als Text weitergeleitet.', p: 'kurz auf der Luft; alte Knoten sehen eine unbekannte Gruppe und leiten als Text weiter', c: 'Kollisionen kurzer Hashes; braucht eine Zuordnung in App und Server' }
+  ], { sel: 2 });
+}
+
+/* ================= 16 hex cells + MPR ================= */
+function initCells(){
+  var svg = $('#hx-svg'); if (!svg) return;
+  var nC = 3, dim = 'f', selCell = null;
+  var COLS = ['acc', 'ok', 'warn', 'info', 'mag', 'orange', 'cyan'];
+  var LAB = {
+    f: { 3: ['K1', 'K2', 'K3'], 7: ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7'] },
+    sf: { 3: ['SF a', 'SF b', 'SF c'], 7: ['SF7', 'SF8', 'SF9', 'SF10', 'SF11', 'SF12', '?'] },
+    t: { 3: ['T1', 'T2', 'T3'], 7: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] }
+  };
+  var DIMS = {
+    f: { n: 'Frequenz', p: 'echte Trennung', c: 'wenige Kanäle; Brücken brauchen zwei Funkmodule oder Zeitteilung' },
+    sf: { n: 'SF', p: 'gleiche Frequenz; SFs sind quasi-orthogonal', c: 'Inter-SF-Störung ist real, am stärksten bei SF10–12' },
+    t: { n: 'Zeit (Slots)', p: 'ein Funkmodul; TDMA-Färbung der Nachbarmengen', c: 'braucht synchronisierte Uhren (GPS/NTP/<code>{CET}</code>, Teil A 10.8) und einen Slot-Plan' },
+    r: { n: 'Rolle', p: 'nicht jeder Knoten relayt (4.14)', c: 'Wahl-Logik' }
+  };
+  var cells = [], rH = 28, w = Math.sqrt(3) * rH;
+  for (var row = 0; row < 7; row++) for (var col = 0; col < 9; col++){
+    var q = col - (row - (row & 1)) / 2, r = row;
+    cells.push({ q: q, r: r, x: 34 + col * w + (row & 1) * w / 2, y: 36 + row * rH * 1.5 });
+  }
+  function colorOf(c){ return nC === 3 ? (((c.q - c.r) % 3) + 3) % 3 : (((c.q + 3 * c.r) % 7) + 7) % 7; }
+  function hexPath(x, y){ var p = ''; for (var i = 0; i < 6; i++){ var a = Math.PI / 180 * (60 * i - 30); p += (i ? 'L' : 'M') + (x + rH * Math.cos(a)).toFixed(1) + ',' + (y + rH * Math.sin(a)).toFixed(1); } return p + 'Z'; }
+  function draw(){
+    clear(svg);
+    cells.forEach(function(c, i){
+      var k = colorOf(c), same = selCell !== null && colorOf(cells[selCell]) === k, me = selCell === i;
+      var fill = dim === 'r' ? v('bg3') : v(COLS[k]);
+      var p = S('path', { d: hexPath(c.x, c.y), fill: fill, 'fill-opacity': dim === 'r' ? 1 : (selCell === null ? 0.45 : (same ? 0.75 : 0.18)), stroke: me ? v('fg') : v('bg'), 'stroke-width': me ? 3 : 1.5, style: 'cursor:pointer' }, svg);
+      p.addEventListener('click', function(){ selCell = selCell === i ? null : i; draw(); });
+      if (dim !== 'r') T({ x: c.x, y: c.y + 4, 'text-anchor': 'middle', 'font-size': 9, fill: v('fg'), 'pointer-events': 'none' }, LAB[dim][nC][k], svg);
+    });
+    var d = DIMS[dim];
+    $('#hx-p').innerHTML = '<h4>Farbdimension: ' + d.n + '</h4><div class="pc"><div class="p">' + d.p + '</div><div class="c">' + d.c + '</div></div>';
+    var t = nC === 3 ? '3 Farben für benachbarte Zellen: Nachbarn auf dem Hexraster unterscheiden sich.' : 'Klassisches Reuse-Muster N = 7 (N = 3 oder 4 ist ebenfalls möglich).';
+    if (dim === 'f') t += nC === 7 ? ' <b style="color:var(--bad)">7 Kanäle gibt es auf 70 cm nicht:</b> 433,175 (MeshCom), 433,775 (LoRa-APRS, belegt), 433,900 MHz; höchstens 2 bis 3 freie 250-kHz-Kanäle, das Band 433,05–434,79 MHz teilt sich mit ISM/LPD.' : ' In der Praxis: 433,175 (MeshCom), 433,775 (LoRa-APRS, belegt), 433,900 MHz; mit höchstens 2 bis 3 freien 250-kHz-Kanälen ist eine Frequenzfärbung dünn.';
+    if (dim === 'sf') t += nC === 7 ? ' Bei BW 250 gibt es nur sechs SF (7–12).' : ' Ein Knoten an der Grenze zwischen SF-Regionen hört nicht beide (M4).';
+    if (dim === 't') t += ' Zeitfärbung braucht synchronisierte Uhren.';
+    if (dim === 'r') t = 'Rolle ist keine Zellfarbe, sondern eine Wahl je Knoten: wer relayt. Siehe MPR rechts.';
+    $('#hx-cap').innerHTML = t + (selCell !== null && dim !== 'r' ? ' Hervorgehoben: Zellen mit derselben Farbe wie die gewählte.' : ' Zelle anklicken: gleiche Farbe hervorheben.');
+  }
+  seg($('#hx-n'), function(val){ nC = +val; draw(); });
+  seg($('#hx-dim'), function(val){ dim = val; draw(); });
+  draw();
+  // MPR
+  var ms = $('#mpr-svg'), seed = 11, G;
+  function gen(){
+    for (var tries = 0; tries < 50; tries++){
+      var R = rng(seed + tries * 101), n = 17, pts = [];
+      for (var i = 0; i < n; i++){
+        var p, ok = false, guard = 0;
+        while (!ok && guard++ < 200){ p = { x: 30 + R() * 460, y: 30 + R() * 270 }; ok = pts.every(function(o){ return Math.hypot(o.x - p.x, o.y - p.y) > 48; }); }
+        pts.push(p);
+      }
+      var adj = pts.map(function(){ return []; });
+      for (var a = 0; a < n; a++) for (var b = a + 1; b < n; b++) if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) < 125){ adj[a].push(b); adj[b].push(a); }
+      var seen = [0], q = [0]; while (q.length){ var u = q.shift(); adj[u].forEach(function(w){ if (seen.indexOf(w) < 0){ seen.push(w); q.push(w); } }); }
+      if (seen.length === n) return { pts: pts, adj: adj };
+    }
+    return { pts: pts, adj: adj };
+  }
+  function mpr(s){
+    var N1 = G.adj[s].slice(), N2 = [];
+    N1.forEach(function(n){ G.adj[n].forEach(function(w){ if (w !== s && N1.indexOf(w) < 0 && N2.indexOf(w) < 0) N2.push(w); }); });
+    var sel = [], unc = N2.slice();
+    N2.forEach(function(t){ var cov = N1.filter(function(n){ return G.adj[n].indexOf(t) >= 0; }); if (cov.length === 1 && sel.indexOf(cov[0]) < 0) sel.push(cov[0]); });
+    function prune(){ unc = unc.filter(function(t){ return !sel.some(function(m){ return G.adj[m].indexOf(t) >= 0; }); }); }
+    prune();
+    while (unc.length){
+      var best = -1, bc = -1;
+      N1.forEach(function(n){ if (sel.indexOf(n) >= 0) return; var c = unc.filter(function(t){ return G.adj[n].indexOf(t) >= 0; }).length; if (c > bc){ bc = c; best = n; } });
+      if (best < 0 || bc <= 0) break; sel.push(best); prune();
+    }
+    return { N1: N1, N2: N2, M: sel };
+  }
+  var cur = null;
+  function mdraw(){
+    clear(ms);
+    var res = cur !== null ? mpr(cur) : null;
+    for (var i = 0; i < G.pts.length; i++) G.adj[i].forEach(function(j){ if (j > i){
+      var hot = res && ((i === cur && res.M.indexOf(j) >= 0) || (j === cur && res.M.indexOf(i) >= 0));
+      S('line', { x1: G.pts[i].x, y1: G.pts[i].y, x2: G.pts[j].x, y2: G.pts[j].y, stroke: hot ? v('mag') : v('line'), 'stroke-width': hot ? 3 : 1 }, ms); } });
+    G.pts.forEach(function(p, i){
+      var f = v('bg3'), st = v('fg3');
+      if (res){ if (i === cur) f = v('acc'); else if (res.M.indexOf(i) >= 0) f = v('mag'); else if (res.N1.indexOf(i) >= 0) f = v('info'); else if (res.N2.indexOf(i) >= 0) f = v('ok'); }
+      var c = S('circle', { cx: p.x, cy: p.y, r: 11, fill: f, stroke: st, 'stroke-width': 1.5, style: 'cursor:pointer' }, ms);
+      c.addEventListener('click', function(){ cur = i; mdraw(); });
+      T({ x: p.x, y: p.y + 4, 'text-anchor': 'middle', 'font-size': 9, fill: v('fg'), 'pointer-events': 'none' }, String(i + 1), ms);
+    });
+    if (res) $('#mpr-cap').innerHTML = 'Knoten ' + (cur + 1) + ': ' + res.N1.length + ' direkte Nachbarn, ' + res.N2.length + ' Zwei-Hop-Nachbarn. MPR-Menge: <b>' + res.M.length + '</b> Relay' + (res.M.length === 1 ? '' : 's') + ' statt ' + res.N1.length + ' <span class="calc">berechnet</span>, Greedy-Heuristik.';
+  }
+  $('#mpr-new').addEventListener('click', function(){ seed += 7; G = gen(); cur = 0; mdraw(); });
+  G = gen(); cur = 0; mdraw();
+}
+
+/* ================= 17 roadmap ================= */
+function initRoadmap(){
+  var svg = $('#rm-svg'); if (!svg) return;
+  var W = [
+    { k: 'W0', n: 'Messung', lo: 1, hi: 2, est: '1 bis 2 Wochen', c: 'Teil A Stufe 0 plus Metriken aus Abschnitt 3 (falsche Abdeckung über <code>removed_inferred</code>, Prioritätsinversion durch Stufe 2, Echo-Freigabe am Gateway), Zähler für Hop, <code>{SET}</code>, <code>{CET}</code>, HG, DM-Band, Taubheit beim Track-QRG-Wechsel (K0), PER je SNR-Klasse', g: 'Host-Gate; neue Golden Sets: Hop-Nibble-Korpus, CET-Alters-Replay', f: 'Logger-Daten DK5EN-98 seit 18.10. (ausdrückliches OK), Beobachter-Knoten außerhalb eines Clusters, eine Bench-Nacht' },
+    { k: 'W1', n: 'TX-Puffer', lo: 2, hi: 2, est: '2 Wochen', c: 'TTL je Priorität, Slot-Pool, Supersede (Teil A Stufen 1, 2, 4)', g: '<code>test_txring</code>, <code>test_txring_flood</code>, <code>test_txprio_replay</code>, <code>test_nbr_replay</code>', f: 'gwflood-Replay auf DK5EN-1/-92/-90, 1 Nacht' },
+    { k: 'W2', n: 'Pufferparität', lo: 2, hi: 2, est: '2 Wochen', c: 'zeitgealterte Dedup, Abdeckungsfenster der Nachbarn, Puffer-Inventur, Byte-Pool-Studie', g: '<code>test_dedup_replay</code> mit Uhr (8813 Urteile, zwei Überläufe werden DUP), <code>test_topo_shadow</code>, RAM-Baseline (<code>tools/resource_baseline.json</code>)', f: 'DK5EN-98-Soak: kein <code>RX_DEDUP_NEW</code> für IDs älter als 39 min' },
+    { k: 'W3', n: 'Hop-Klemme', lo: 0.6, hi: 1, est: '3 bis 5 Tage', c: 'Nibble-Cap beim Relay (H1), gwcap-Review', g: 'neuer Nibble-Korpus mit gewickelten Frames; <code>test_aprs_corpus</code>', f: 'Anzahl Nibble > L vorher/nachher' },
+    { k: 'W4', n: 'PN-Priorität', lo: 2, hi: 2, est: '2 Wochen', c: 'ACK zuerst, DM-Band 2 mit Limit je Quelle, DM-Retries in QRT nach dem Pool; Studie S1 Next-Hop', g: '<code>test_ack_replay</code>, neues DM-Latenz-Replay (Golden: DG0OPK-DM-Rundläufe, 1 min ruhig / 4 min belastet)', f: 'Median und p95 der DM-Rundlaufzeit auf der Bench-Flotte, nur Gruppe <code>TEST</code> und eigene Knoten' },
+    { k: 'W5', n: 'End of Life', lo: 1, hi: 1, est: '1 Woche', c: 'Relay-Filter für wickelnde Builds, Hinweis-DM, veröffentlichtes Datum', g: 'Trailer-Korpus je Firmware-Version', f: 'Anzahl blockierter Frames, kein Verlust von Frames aktueller Firmware' },
+    { k: 'W6', n: 'EMCOMM', lo: 3, hi: 4, est: '3 bis 4 Wochen', c: 'Prioritätsflag (E1/E4), Ed25519-Signaturen (A3), Trust-Store mit Pinning in der Web-GUI; zuerst die regulatorische Prüfung', g: 'Signatur-Vektoren (Golden), Lint für die Persistenz des Trust-Stores', f: 'Bench: signierter Frame auf allen vier Boards geprüft, unsignierter mit Warnung angezeigt. Hängt an Dritten (Regulierer, Verzeichnisbetreiber)' },
+    { k: 'W7', n: 'Tag-Gruppen', lo: 1, hi: 2, est: '1 bis 2 Wochen', c: 'T2-Anzeigefilter, dann T1 mit App und Server', g: 'Lint des Settings-Schemas, Gruppen-Korpus', f: 'Bench und eine Nutzergruppe' },
+    { k: 'W8', n: 'Multi-SF', lo: 4, hi: 6, est: '4 bis 6 Wochen', c: 'regionales SF (M4) und Backbone-Schicht (M3) als Experimente; zuerst PER je SNR-Klasse', g: 'PER/SNR-Messsatz (Golden für die Schwelle)', f: 'Dämpfungsglied-Bench, dann eine Stadtzelle. Hängt an Dritten (andere Betreiber der Zelle)' },
+    { k: 'W9+', n: 'Spekulativ', lo: 0, hi: 0, est: 'offen', c: 'Source Routing S2, Link-Strecken, Zell- und Rollenfärbung, MPR-Wahl (4.14), adaptive Sendeleistung', g: 'je Thema', f: 'je Thema' }
+  ];
+  var DEP = [[0, 1], [0, 3], [0, 4], [1, 4], [3, 5], [0, 8]];
+  var x0 = 150, x1 = 880, wk = (x1 - x0) / 26, rowH = 29, y0 = 30;
+  var start = [], acc = 0;
+  W.forEach(function(w){ start.push(acc); acc += w.hi; });
+  var sel = 0, bars = [], showDep = true, run = Run();
+  function X(w){ return x0 + w * wk; }
+  function draw(progress){
+    clear(svg); bars = [];
+    for (var t = 0; t <= 24; t += 2){ S('line', { x1: X(t), x2: X(t), y1: y0 - 8, y2: y0 + rowH * W.length, stroke: v('line'), 'stroke-width': 0.6 }, svg); T({ x: X(t), y: y0 - 12, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, t + ' Wo', svg); }
+    W.forEach(function(w, i){
+      var y = y0 + i * rowH, on = i === sel;
+      var g = S('g', { style: 'cursor:pointer' }, svg);
+      S('rect', { x: 0, y: y, width: 900, height: rowH - 2, fill: on ? v('acc-dim') : 'transparent', opacity: on ? 0.6 : 1 }, g);
+      T({ x: 10, y: y + 18, 'font-size': 12, fill: on ? v('acc') : v('fg'), 'font-weight': 700 }, w.k, g);
+      T({ x: 48, y: y + 18, 'font-size': 11, fill: v('fg2') }, w.n, g);
+      var p = progress === undefined ? 1 : Math.max(0, Math.min(1, progress * W.length - i));
+      if (w.hi > 0){
+        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, w.lo * wk * p), height: rowH - 12, rx: 4, fill: v('acc'), opacity: 0.9 }, g);
+        if (w.hi > w.lo) S('rect', { x: X(start[i] + w.lo), y: y + 5, width: Math.max(0, (w.hi - w.lo) * wk * p), height: rowH - 12, rx: 4, fill: v('acc'), opacity: 0.35 }, g);
+        if (p >= 1) T({ x: X(start[i] + w.hi) + 6, y: y + 18, 'font-size': 10, fill: v('fg3') }, w.est, g);
+      } else {
+        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, (x1 - X(start[i])) * p), height: rowH - 12, rx: 4, fill: 'none', stroke: v('acc'), 'stroke-dasharray': '4 3' }, g);
+        if (p >= 1) T({ x: X(start[i]) + 8, y: y + 18, 'font-size': 10, fill: v('fg3') }, 'offen', g);
+      }
+      g.addEventListener('click', function(){ sel = i; draw(); panel(); });
+      bars.push(g);
+    });
+    if (showDep && (progress === undefined || progress >= 1)){
+      DEP.forEach(function(d){
+        var a = d[0], b = d[1], ya = y0 + a * rowH + rowH / 2, yb = y0 + b * rowH + rowH / 2;
+        var xa = X(start[a] + (W[a].hi || 0)), xb = X(start[b]);
+        S('path', { d: 'M' + xa + ',' + ya + ' C' + (xa + 18) + ',' + ya + ' ' + (xb - 18) + ',' + yb + ' ' + xb + ',' + yb, fill: 'none', stroke: v('mag'), 'stroke-width': 1.3, opacity: (a === sel || b === sel) ? 1 : 0.35 }, svg);
+        S('circle', { cx: xb, cy: yb, r: 2.5, fill: v('mag') }, svg);
+      });
+    }
+    T({ x: x1, y: y0 + rowH * W.length + 18, 'text-anchor': 'end', 'font-size': 10, fill: v('fg3') }, 'Summe W0–W8 streng nacheinander: etwa 17 bis 21 Wochen (berechnet, 3–5 Tage als 0,6–1 Woche)', svg);
+  }
+  function panel(){
+    var w = W[sel];
+    var deps = DEP.filter(function(d){ return d[1] === sel; }).map(function(d){ return W[d[0]].k; });
+    var feeds = DEP.filter(function(d){ return d[0] === sel; }).map(function(d){ return W[d[1]].k; });
+    $('#rm-p').innerHTML = '<h4>' + w.k + ' · ' + w.n + ' · Schätzung ' + w.est + '</h4><p><b>Inhalt:</b> ' + w.c + '</p><p class="mt"><b>Gate und Golden Sets:</b> ' + w.g + '</p><p class="mt"><b>Feldnachweis:</b> ' + w.f + '</p>' +
+      ((deps.length || feeds.length) ? '<p class="cite">' + (deps.length ? 'braucht vorher: ' + deps.join(', ') : '') + (deps.length && feeds.length ? ' · ' : '') + (feeds.length ? 'Voraussetzung für: ' + feeds.join(', ') : '') + (sel === 6 ? ' (W6 vor absoluter Priorität für fremden Verkehr)' : '') + '</p>' : '');
+  }
+  function play(){ var tk = run.start(); tween(2600, function(t){ if (run.ok(tk)) draw(t); }).then(function(){ if (run.ok(tk)) draw(); }); }
+  $('#rm-play').addEventListener('click', play);
+  toggle($('#rm-dep'), function(on){ showDep = on; draw(); });
+  draw(); panel();
+  return { play: play };
+}
+
+/* ================= init all ================= */
+var players = {};
+var inits = { kanal: initToa, track: initTrack, hop: initHop, hopcap: initHopCap, qrt: initQrt, pool: initPool, dedup: initDedup, prio: initPrio, cet: initCet, hgdm: initHg, msf: initSf, route: initRoute, emcomm: initEmcomm, eol: initEol, zellen: initCells, roadmap: initRoadmap };
+Object.keys(inits).forEach(function(k){ try { var r = inits[k](); if (r && r.play) players[k] = r.play; } catch (e){ console.error('init ' + k, e); } });
+
+/* ================= deck navigation ================= */
+var slides = $$('.slide'), bar = $('#bar i'), pos = $('#pos'), toc = $('#toc'), list = $('#toclist'), cur = 0;
+slides.forEach(function(s, i){
+  var n = s.querySelector('.num'); if (n) n.textContent = (i + 1 < 10 ? '0' : '') + (i + 1);
+  var t = s.querySelector('h1, h2'), e = s.querySelector('.eyebrow');
+  var li = document.createElement('li'), a = document.createElement('a');
+  a.href = '#' + s.id;
+  a.innerHTML = '<span>' + (t ? t.textContent.trim() : 'Folie ' + (i + 1)) + (e ? ' <small>· ' + e.textContent.trim() + '</small>' : '') + '</span>';
+  a.addEventListener('click', function(){ toc.classList.remove('on'); });
+  li.appendChild(a); list.appendChild(li);
+});
+var played = {};
+function fire(i){
+  var id = slides[i] && slides[i].id;
+  if (!id || played[id] || RM) return;
+  played[id] = true;
+  if (players[id]) setTimeout(function(){ try { players[id](); } catch (e){ console.error(e); } }, 350);
+}
+function render(){
+  pos.textContent = (cur + 1) + '/' + slides.length;
+  bar.style.width = (slides.length < 2 ? 100 : (cur / (slides.length - 1)) * 100) + '%';
+  fire(cur);
+}
+function sync(){
+  var best = 0, bestArea = -1;
+  for (var i = 0; i < slides.length; i++){
+    var r = slides[i].getBoundingClientRect();
+    var ar = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+    if (ar > bestArea){ bestArea = ar; best = i; }
+  }
+  if (best !== cur){ cur = best; render(); }
+}
+var ticking = false;
+addEventListener('scroll', function(){ if (ticking) return; ticking = true; requestAnimationFrame(function(){ sync(); ticking = false; }); }, { passive: true });
+function go(i){
+  cur = Math.max(0, Math.min(slides.length - 1, i));
+  slides[cur].scrollIntoView({ behavior: RM ? 'auto' : 'smooth', block: 'start' });
+  render();
+}
+$('#bnext').addEventListener('click', function(){ go(cur + 1); });
+$('#bprev').addEventListener('click', function(){ go(cur - 1); });
+$('#btoc').addEventListener('click', function(){ toc.classList.toggle('on'); });
+var root = document.documentElement;
+function readTheme(){ try { return localStorage.getItem('mc-theme'); } catch (e){ return null; } }
+function writeTheme(val){ try { if (val) localStorage.setItem('mc-theme', val); else localStorage.removeItem('mc-theme'); } catch (e){} }
+var t0 = readTheme();
+if (t0 === 'dark' || t0 === 'light') root.setAttribute('data-theme', t0);
+$('#btheme').addEventListener('click', function(){
+  var c = root.getAttribute('data-theme');
+  var n = c === 'dark' ? 'light' : (c === 'light' ? null : 'dark');
+  if (n) root.setAttribute('data-theme', n); else root.removeAttribute('data-theme');
+  writeTheme(n);
+});
+addEventListener('keydown', function(ev){
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  var tag = (ev.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  switch (ev.key){
+    case 'ArrowRight': case 'PageDown': ev.preventDefault(); go(cur + 1); break;
+    case 'ArrowLeft': case 'PageUp': ev.preventDefault(); go(cur - 1); break;
+    case 'Home': ev.preventDefault(); go(0); break;
+    case 'End': ev.preventDefault(); go(slides.length - 1); break;
+    case 'u': case 'U': toc.classList.toggle('on'); break;
+    case 't': case 'T': $('#btheme').click(); break;
+    case 'Escape': toc.classList.remove('on'); break;
+  }
+});
+if (location.hash){ var hi = slides.findIndex(function(s){ return '#' + s.id === location.hash; }); if (hi >= 0) cur = hi; }
+render(); sync();
+window.__deck = { go: go, count: slides.length, cur: function(){ return cur; } };
+})();
+</script>
+</body>
+</html>
