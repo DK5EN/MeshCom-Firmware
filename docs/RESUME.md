@@ -9,7 +9,8 @@
   rak4631 build; advisor APPROVED.
 - Bench DK5EN-1: unfixed image silent for 130 s under OTHER traffic, fixed image logs Stage 1 at 59 s and Stage 2 at
   89 s (`tools/bench/runs/harness/udp03-bench-20261022.json`). DK5EN-1 runs the normal fixed build (Oct 22 21:36).
-- Open: upstream PR (firmware-only, two `src/` files); `/sync-upstream` for #1224 (merged) and #1225.
+- Upstream PR #1233 (branch `pr/hb-other-1231`, commit `90ae172a` on `upstream/dev` 6b2fdfac, two `src/` files,
+  "Fixes #1231"), open for maintainer review. Open: `/sync-upstream` for #1224 (merged) and #1225.
 
 ## 2026-10-20 -- upstream PR #1224 (#1217, web send buffer and watchdog feeds)
 
