@@ -37,7 +37,12 @@ Volume is roughly 200 B/s with both debug flags on, so about 36 MB for 48 h.
 Usage::
 
     uv run tools/meshlogger.py dk5en-98.local --hours 48
-    uv run tools/meshlogger.py dk5en-98.local --password geheim --hours 24
+    uv run tools/meshlogger.py 192.168.68.66 --call DK5EN-92 --hours 24   # MC_PW_DK5EN_92 from .env
+
+Short passive captures (send nothing but ``--cmd``, one file)::
+
+    uv run tools/meshlogger.py dk5en-14.local --no-debug-flags --seconds 75 --out /tmp/con.log
+    uv run tools/meshlogger.py dk5en-14.local --no-debug-flags --seconds 12 --out /tmp/info.log --cmd=--info
 
 Unattended, on a machine that stays up (screen survives the SSH session, but
 not a reboot -- use a systemd unit if the run has to outlive one)::
@@ -49,19 +54,24 @@ not a reboot -- use a systemd unit if the run has to outlive one)::
     rm ~/meshlog/dk5en-98/PAUSE        # hand it back
 
 Only the standard library is used, so it runs on a Raspberry Pi Zero with the
-system Python and no virtualenv.
+system Python and no virtualenv. Deploy it together with ``mc_console.py``
+(login and password lookup); on the Pi the password comes from the
+environment or ``MC_ENV_FILE``, as there is no repo ``.env``.
 """
 
 import argparse
-import hashlib
-import hmac
 import os
 import re
 import shutil
 import signal
 import socket
+import sys
 import time
 from datetime import datetime
+
+# mc_console.py sits next to this file, in the repo and on the rpizero alike.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mc_console  # noqa: E402
 
 CONNECT_TIMEOUT = 10.0
 READ_TIMEOUT = 5.0
@@ -106,75 +116,12 @@ def stamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
 
-class Console:
-    """One connection to the node console, including the HMAC handshake."""
-
-    def __init__(self, host, port, password):
-        self.host = host
-        self.port = port
-        self.password = password.encode() if password else b""
-        self.sock = None
-
-    def connect(self):
-        self.sock = socket.create_connection((self.host, self.port), timeout=CONNECT_TIMEOUT)
-        self.sock.settimeout(CONNECT_TIMEOUT)
-
-        # TM-50: belt and braces underneath the read-silence watchdog in
-        # main(). Keepalive probes make the kernel notice a peer that
-        # vanished without a FIN (WLAN outage) and turn later recv() calls
-        # into a hard error instead of endless timeouts. The tunables differ
-        # per platform (macOS: TCP_KEEPALIVE = idle; Linux: TCP_KEEPIDLE/
-        # KEEPINTVL/KEEPCNT), so each is set only where it exists.
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        for opt, val in (("TCP_KEEPIDLE", 30), ("TCP_KEEPINTVL", 10),
-                         ("TCP_KEEPCNT", 3), ("TCP_KEEPALIVE", 30)):
-            if hasattr(socket, opt):
-                try:
-                    self.sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, opt), val)
-                except OSError:
-                    pass
-
-        # The server sends either "NONCE: <hex>" (password set) or "OK"
-        # followed by the banner (no password).
-        head = b""
-        while b"\n" not in head:
-            chunk = self.sock.recv(256)
-            if not chunk:
-                raise ConnectionError("closed before the banner arrived")
-            head += chunk
-
-        line, _, rest = head.partition(b"\n")
-        text = line.decode(errors="replace").strip()
-
-        if text.startswith("NONCE:"):
-            nonce = text.split(":", 1)[1].strip()
-            digest = hmac.new(self.password, bytes.fromhex(nonce), hashlib.sha256).hexdigest()
-            self.sock.sendall((digest + "\n").encode())
-            resp = self.sock.recv(256).decode(errors="replace")
-            if not resp.startswith("OK"):
-                raise ConnectionError("authentication rejected: %r" % resp[:40])
-            rest = b""
-
-        self.sock.settimeout(READ_TIMEOUT)
-        return rest
-
-    def send(self, command):
-        self.sock.sendall((command + "\n").encode())
-
-    def close(self):
-        if self.sock:
-            try:
-                self.sock.close()
-            except OSError:
-                pass
-            self.sock = None
-
-
 class Sink:
-    """One log file per day, one timestamped line per console line."""
+    """One log file per day (or the one ``outfile``), one timestamped line per console line."""
 
-    def __init__(self, outdir):
+    def __init__(self, outdir, outfile=None):
         self.outdir = outdir
+        self.outfile = outfile
         self.day = None
         self.fh = None
         self.lines = 0
@@ -182,6 +129,10 @@ class Sink:
         os.makedirs(outdir, exist_ok=True)
 
     def _rotate(self):
+        if self.outfile:
+            if not self.fh:
+                self.fh = open(self.outfile, "a", buffering=1, errors="replace")
+            return
         day = datetime.now().strftime("%Y-%m-%d")
         if day != self.day:
             if self.fh:
@@ -212,9 +163,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("host")
     ap.add_argument("--port", type=int, default=2323)
-    ap.add_argument("--password", default="")
+    ap.add_argument("--call", default=None,
+                    help="callsign at host for the password lookup (MC_PW_<CALL> in "
+                         ".env or the environment); default: taken from a host name "
+                         "like dk5en-14.local")
     ap.add_argument("--hours", type=float, default=48.0)
+    ap.add_argument("--seconds", type=float, default=None,
+                    help="run length in seconds, replaces --hours")
     ap.add_argument("--outdir", default=None)
+    ap.add_argument("--out", default=None,
+                    help="write everything into this one file instead of "
+                         "<outdir>/YYYY-MM-DD.log (status.txt and PAUSE live next to it)")
+    ap.add_argument("--cmd", action="append", default=[],
+                    help="console command to send once after the first connect "
+                         "(repeatable), e.g. --cmd=--info")
     ap.add_argument("--minfree", type=int, default=500, help="stop below N MB free")
     ap.add_argument("--no-debug-flags", action="store_true",
                     help="do not switch the node, only record what it emits")
@@ -229,8 +191,11 @@ def main():
                          % STALL_TIMEOUT)
     args = ap.parse_args()
 
-    outdir = args.outdir or os.path.expanduser("~/meshlog/" + args.host.split(".")[0])
-    sink = Sink(outdir)
+    if args.out:
+        outdir = os.path.dirname(os.path.abspath(args.out))
+    else:
+        outdir = args.outdir or os.path.expanduser("~/meshlog/" + args.host.split(".")[0])
+    sink = Sink(outdir, args.out)
     status_path = os.path.join(outdir, "status.txt")
     pause_path = os.path.join(outdir, "PAUSE")
 
@@ -238,8 +203,10 @@ def main():
     signal.signal(signal.SIGINT, on_signal)
 
     started = time.time()
-    deadline = started + args.hours * 3600.0
-    console = Console(args.host, args.port, args.password)
+    run_s = args.seconds if args.seconds is not None else args.hours * 3600.0
+    deadline = started + run_s
+    console = mc_console.Console(args.host, args.port, call=args.call,
+                                 connect_timeout=CONNECT_TIMEOUT)
 
     flag_names = [f.strip() for f in args.flags.split(",") if f.strip()]
     flags_set = False
@@ -249,11 +216,13 @@ def main():
     backoff = BACKOFF_MIN
     reason = "running"
 
-    sink.write("[LOGGER] start host=%s hours=%.1f outdir=%s" % (args.host, args.hours, outdir))
+    sink.write("[LOGGER] start host=%s hours=%.1f outdir=%s" % (args.host, run_s / 3600.0, outdir))
+    cmds_sent = False
 
     while not stop_requested and time.time() < deadline:
         try:
             rest = console.connect()
+            console.sock.settimeout(READ_TIMEOUT)
             backoff = BACKOFF_MIN
             sink.write("[LOGGER] connected to %s:%d" % (args.host, args.port))
 
@@ -299,6 +268,14 @@ def main():
                     if i < len(flag_names) - 1:
                         time.sleep(1.0)
                 sink.write("[LOGGER] flags re-applied after reconnect")
+
+            if not cmds_sent:
+                for i, cmd in enumerate(args.cmd):
+                    if i:
+                        time.sleep(1.0)
+                    console.send(cmd)
+                    sink.write("[LOGGER] >> %s" % cmd)
+                cmds_sent = True
 
             buf = rest
             last_data = time.time()
@@ -369,6 +346,10 @@ def main():
 
         except SystemExit:
             raise
+        except (mc_console.LoginError, mc_console.EnvFileError) as exc:
+            sink.write("[LOGGER] stopping: %s" % exc)
+            reason = "stopped: login refused"
+            break
         except (OSError, ConnectionError) as exc:
             console.close()
             if stop_requested or time.time() >= deadline:

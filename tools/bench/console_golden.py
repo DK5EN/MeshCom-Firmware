@@ -12,7 +12,7 @@ capture of every branch can show that the 309 commands still answer the same.
 
     python3 tools/bench/console_golden.py --port /dev/cu.usbserial-0001 \\
         --script test/golden/corpus/commands/script.txt --out G0/heltec-93/
-    python3 tools/bench/console_golden.py --host 192.168.68.69 --password '' ...
+    python3 tools/bench/console_golden.py --host 192.168.68.69 --node heltec-1 ...
     python3 tools/bench/console_golden.py --compare a/cmd-usb.txt b/cmd-usb.txt
     python3 tools/bench/console_golden.py --self-test
 
@@ -38,8 +38,6 @@ No third-party dependencies beyond pyserial (already a PlatformIO dependency).
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import re
 import signal
 import socket
@@ -49,7 +47,10 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "golden"))
-from identity_guard import IdentityError, require  # noqa: E402
+from identity_guard import IdentityError, load_fleet, require  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import mc_console  # noqa: E402
 
 # Line prefixes the node emits without being asked. Kept explicit rather than
 # clever: every one of these was seen interleaving a command answer during the
@@ -139,29 +140,16 @@ class TcpTransport(Transport):
     single-client, so a reconnect is only safe because nothing else is using it.
     """
 
-    def __init__(self, host: str, port: int, password: str) -> None:
-        self.host, self.port, self.password = host, port, password
+    def __init__(self, host: str, port: int, call: Optional[str]) -> None:
+        self.console = mc_console.Console(host, port, call=call)
         self.resets = 0
         self._connect()
 
     def _connect(self) -> None:
-        host, port, password = self.host, self.port, self.password
-        self.sock = socket.create_connection((host, port), timeout=10)
+        self._pending = self.console.connect()
+        assert self.console.sock is not None
+        self.sock = self.console.sock
         self.sock.settimeout(0.2)
-        first = b""
-        deadline = time.time() + 5
-        while b"\n" not in first and time.time() < deadline:
-            try:
-                first += self.sock.recv(4096)
-            except socket.timeout:
-                pass
-        line = first.split(b"\n", 1)[0].decode(errors="replace").strip()
-        if password:
-            if not line.upper().startswith("NONCE:"):
-                raise RuntimeError(f"expected a NONCE challenge, got {line!r}")
-            nonce = bytes.fromhex(line.split()[1].strip())
-            digest = hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest()
-            self.sock.sendall((digest + "\n").encode())
 
     def _reconnect(self) -> None:
         """Reconnect, but give up fast once the console is simply gone.
@@ -181,6 +169,8 @@ class TcpTransport(Transport):
             try:
                 self._connect()
                 return
+            except mc_console.LoginError:
+                raise  # a refused login does not heal by retrying
             except Exception:
                 time.sleep(1.0)
         raise KeyboardInterrupt(
@@ -198,6 +188,9 @@ class TcpTransport(Transport):
                 pass
 
     def read(self, timeout: float) -> bytes:
+        if self._pending:
+            out, self._pending = self._pending, b""
+            return out
         try:
             return self.sock.recv(4096)
         except socket.timeout:
@@ -636,7 +629,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--dtr", action="store_true", help="assert DTR (RAK4631 needs it)")
     ap.add_argument("--host", help="node IP for the TCP 2323 net console")
     ap.add_argument("--tcp-port", type=int, default=2323)
-    ap.add_argument("--password", default="", help="net-console HMAC password")
+    ap.add_argument("--call", default=None,
+                    help="callsign at --host for the MC_PW_<CALL> lookup in .env "
+                         "(default: the --node entry in fleet.json)")
     ap.add_argument("--script", type=Path,
                     default=Path("test/golden/corpus/commands/script.txt"))
     ap.add_argument("--out", type=Path, help="capture directory")
@@ -688,7 +683,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         transport, name = SerialTransport(args.port, args.dtr), "usb"
         default_quiet, default_cap = 0.35, 4.0
     elif args.host:
-        transport, name = TcpTransport(args.host, args.tcp_port, args.password), "2323"
+        call = args.call or (load_fleet()["nodes"].get(args.node, {}).get("call") if args.node else None)
+        transport, name = TcpTransport(args.host, args.tcp_port, call), "2323"
         default_quiet, default_cap = 1.2, 8.0
     else:
         ap.error("pass --port or --host")

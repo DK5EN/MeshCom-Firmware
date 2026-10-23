@@ -146,8 +146,8 @@ Idle-heap step (bench, T-Beam DK5EN-92 on the release image of the tag; skip
 only if the T-Beam is unreachable, and say so in the release notes):
 
 ```
-MC_CONSOLE_PW=<console password> python3 tools/bench/heap_idle.py \
-  --host <T-Beam IP> --baseline tools/heap_baseline.json --board ttgo_tbeam
+python3 tools/bench/heap_idle.py --host <T-Beam IP> --call DK5EN-92 \
+  --baseline tools/heap_baseline.json --board ttgo_tbeam      # password: MC_PW_DK5EN_92 in .env
 ```
 
 Exit 1 means idle free heap fell more than 3072 B below the baseline: stop

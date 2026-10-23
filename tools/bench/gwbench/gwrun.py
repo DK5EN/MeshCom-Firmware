@@ -26,7 +26,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-PWFILE = os.environ.get("GWBENCH_PWFILE", os.path.expanduser("~/MeshCom-bench-backups/bench-node-passwords-20261006.txt"))
+sys.path.insert(0, os.path.join(REPO, "tools"))
+import mc_console  # noqa: E402
 MOCK_SSH = "rpizero.local"
 MOCK_DIR = "gwmock"          # ~/gwmock on the pi
 ALLOWED_HOSTS: set = set()   # filled from the resolved node addresses
@@ -158,12 +159,12 @@ class Run:
         print("%-24s %-8s %s" % (case, d, kw), flush=True)
 
     def start_loggers(self) -> None:
-        pws = {m.group(1): m.group(2) for m in (re.match(r"^(DK5EN-\d+)\s{2,}.+?\s{2,}(\S+)\s{2,}", l) for l in open(PWFILE)) if m}
         for n in self.nodes:
-            n.log, n.cmd, n.pw = os.path.join(self.dir, n.call + ".log"), os.path.join(self.dir, n.call + ".cmd"), pws[n.call]
+            n.log, n.cmd, n.pw = os.path.join(self.dir, n.call + ".log"), os.path.join(self.dir, n.call + ".cmd"), mc_console.password_for(n.call)
+            if not n.pw:
+                raise Abort("no password for %s: set %s in .env" % (n.call, mc_console.pw_key(n.call)))
             open(n.cmd, "a").close()
-        pf = os.path.join(self.dir, "pw1"); open(pf, "w").write(self.n1.pw); os.chmod(pf, 0o600)
-        self.n1.proc = subprocess.Popen([sys.executable, os.path.join(HERE, "conlog.py"), self.n1.host, pf, self.n1.log, self.n1.cmd])
+        self.n1.proc = subprocess.Popen([sys.executable, os.path.join(HERE, "conlog.py"), self.n1.host, self.n1.call, self.n1.log, self.n1.cmd])
         self.n90.proc = subprocess.Popen([sys.executable, os.path.join(HERE, "gwseriallog.py"), self.a.rak_port, self.n90.log, self.n90.cmd])
         time.sleep(4)
 

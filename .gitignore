@@ -487,3 +487,7 @@ build/CMakeFiles/8f0553efd519cbcc5a9eb64f52102f56/INSTALL_force.rule
 
 # Compiler dependency files from ad-hoc preprocessor runs in the repo root
 /*.d
+
+# Bench node console passwords, read by tools/mc_console.py (template: .env.example)
+/.env
+!/.env.example

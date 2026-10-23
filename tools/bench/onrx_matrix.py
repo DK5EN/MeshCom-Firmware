@@ -47,11 +47,8 @@ an applied txbuf.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import json
 import math
-import os
 import re
 import socket
 import sys
@@ -59,6 +56,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import mc_console  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO / "tools" / "bench" / "runs" / "harness"
@@ -301,33 +301,14 @@ class ConsoleLike(Protocol):
 
 
 class NetConsole:
-    """2323 net console with the HMAC login (same protocol as identity_guard.read_info_net)."""
+    """2323 net console; login and password lookup in tools/mc_console.py."""
 
-    def __init__(self, host: str, password: str, port: int = 2323) -> None:
-        self.sock = socket.create_connection((host, port), timeout=10)
+    def __init__(self, host: str, call: str | None = None, port: int = 2323) -> None:
+        self._con = mc_console.Console(host, port, call=call)
+        self._pending = self._con.connect()
+        assert self._con.sock is not None
+        self.sock = self._con.sock
         self.sock.settimeout(0.3)
-        self._pending = b""
-        out = b""
-        end = time.time() + 1.5
-        while time.time() < end:
-            try:
-                out += self.sock.recv(4096)
-            except socket.timeout:
-                pass
-            if out.startswith(b"NONCE:") and b"\n" in out:
-                break
-        if out.startswith(b"NONCE:"):
-            if not password:
-                raise RuntimeError("console wants a password (set MC_CONSOLE_PW)")
-            nonce = bytes.fromhex(out.split(b"\n", 1)[0].split()[1].decode())
-            self.sock.sendall(hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest().encode() + b"\n")
-            self.sock.settimeout(3)
-            reply = self.sock.recv(64)
-            if not reply.startswith(b"OK"):
-                raise RuntimeError("console login refused")
-            self.sock.settimeout(0.3)
-        else:
-            self._pending = out
 
     def send(self, cmd: str) -> None:
         self.sock.sendall(cmd.encode() + b"\r\n")
@@ -456,14 +437,13 @@ def drive(host: str, arm: str, minutes: float, out: Path, node: str = NODE) -> i
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import identity_guard as ig
 
-    pw = os.environ.get("MC_CONSOLE_PW", "")
     fleet = ig.load_fleet()
     problems = ig.fleet_problems(fleet)
     if problems:
         print("fleet.json inconsistent: " + "; ".join(problems))
         return 1
     try:
-        text = ig.read_info_net(host, password=pw)
+        text = ig.read_info_net(host, call=fleet["nodes"].get(node, {}).get("call"))
         info = ig.require(text, node, fleet)
     except ig.IdentityError as exc:
         print(exc)
@@ -474,7 +454,7 @@ def drive(host: str, arm: str, minutes: float, out: Path, node: str = NODE) -> i
         return 1
     pre = parse_state(text)
     print(f"{node} ok ({info.call}, {info.txpower_dbm} dBm); pre-run state {pre}")
-    return run_session(lambda: NetConsole(host, pw), arm, pre, minutes, out)
+    return run_session(lambda: NetConsole(host, call), arm, pre, minutes, out)
 
 
 def missing_pre_state(pre: dict[str, bool | None]) -> list[str]:

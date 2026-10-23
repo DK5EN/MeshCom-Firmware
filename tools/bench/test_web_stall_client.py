@@ -117,7 +117,7 @@ def test_console_hmac_login_and_capture() -> None:
         c.close()  # peer close -> dropped
 
     port, _ = _serve(handler)
-    con = wsc.Console("127.0.0.1", "pw", port)
+    con = wsc.Console("127.0.0.1", port=port, password="pw")
     con.connect()
     import time
 
@@ -129,7 +129,7 @@ def test_console_hmac_login_and_capture() -> None:
     assert any("[WEB];tx;done" in ln for ln in con.snapshot())
     con.close()
     with pytest.raises(wsc.StallError):
-        wsc.Console("127.0.0.1", "wrong", _serve(handler)[0]).connect()
+        wsc.Console("127.0.0.1", port=_serve(handler)[0], password="wrong").connect()
 
 
 def test_main_no_console_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

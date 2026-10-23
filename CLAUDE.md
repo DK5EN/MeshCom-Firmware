@@ -69,8 +69,10 @@ DK5EN-98 is the production Heltec V3 (gateway, logger on rpizero); it is not a b
 
 **All addresses come from DHCP and change between sessions.** Never trust `fleet.json` hosts blindly:
 confirm the callsign on the node's start page before any flash or test (or sweep the /24 for start
-pages). Consoles with a password need the HMAC login; `identity_guard.py` reads it from
-`MC_CONSOLE_PW`. Bench tests run over the 2323 console, not USB (opening USB resets an ESP32).
+pages). Every 2323 client logs in through `tools/mc_console.py`: the password is `MC_PW_<CALL>` in the
+gitignored, mode-600 `.env` at the repo root (template `.env.example`), picked by callsign (`--call`, a fleet.json
+node, or a `dk5en-NN.local` host). Never put a password on a command line. Bench tests run over the 2323 console,
+not USB (opening USB resets an ESP32).
 
 ### RAK4631 (nRF52840)
 

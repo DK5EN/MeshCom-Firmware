@@ -23,8 +23,8 @@ whichever came later. The default --idle-s 600 therefore yields two STAT samples
 
 Channel A (default): USB serial (--port or --usb-serial <serial number>).
   Opening the port resets an ESP32 -- wanted, the boot is captured.
-Channel B: --host <ip>, net console 2323 with HMAC login (password from env
-  MC_CONSOLE_PW; protocol as in tools/hmac_connect.py).
+Channel B: --host <ip> [--call DK5EN-92], net console 2323; login and the
+  password (MC_PW_<CALL> in .env) via tools/mc_console.py.
 
 Baseline: --baseline tools/heap_baseline.json --board ttgo_tbeam
   [--tolerance 3072] compares the idle free; exit 1 if lower by more than the
@@ -37,10 +37,7 @@ Requires: Python 3.9+, pyserial for channel A only.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import json
-import os
 import re
 import socket
 import sys
@@ -49,6 +46,9 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Iterator
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import mc_console  # noqa: E402
 
 HARNESS_DIR = Path(__file__).resolve().parent / "runs" / "harness"
 
@@ -209,42 +209,23 @@ def serial_lines(
         yield from _read_lines(ser.read, deadline_s, stop_after_first_s, boot_timeout_s)
 
 
-def hmac_login(sock: socket.socket, password: str) -> None:
-    """Challenge/response as tools/hmac_connect.py: NONCE -> HMAC-SHA256 -> OK."""
-    buf = b""
-    while b"\n" not in buf:
-        chunk = sock.recv(256)
-        if not chunk:
-            raise HeapError("connection closed before NONCE challenge")
-        buf += chunk
-    line, _, rest = buf.partition(b"\n")
-    text = line.decode(errors="replace").strip()
-    if not text.upper().startswith("NONCE:"):
-        raise HeapError(f"unexpected console greeting: {text!r}")
-    nonce = bytes.fromhex(text.split()[1])
-    sock.sendall((hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest() + "\n").encode())
-    buf = rest
-    while b"\n" not in buf:
-        chunk = sock.recv(256)
-        if not chunk:
-            raise HeapError("connection closed during login")
-        buf += chunk
-    result = buf.split(b"\n", 1)[0].decode(errors="replace").strip()
-    if result != "OK":
-        raise HeapError(f"console login failed: {result!r}")
-
-
 def net_lines(
-    host: str, deadline_s: float, stop_after_first_s: float, boot_timeout_s: float | None = None
+    host: str, deadline_s: float, stop_after_first_s: float, boot_timeout_s: float | None = None,
+    call: str | None = None,
 ) -> Iterator[str]:
-    password = os.environ.get("MC_CONSOLE_PW", "")
-    sock = socket.create_connection((host, 2323), timeout=10)
+    console = mc_console.Console(host, call=call)
     try:
-        if password:
-            hmac_login(sock, password)
+        pending = [console.connect()]
+    except mc_console.LoginError as exc:
+        raise HeapError(f"{host}: {exc}") from None
+    try:
+        assert console.sock is not None
+        sock = console.sock
         sock.settimeout(0.5)
 
         def read(n: int) -> bytes:
+            if pending:
+                return pending.pop()
             try:
                 return sock.recv(n)
             except socket.timeout:
@@ -252,7 +233,7 @@ def net_lines(
 
         yield from _read_lines(read, deadline_s, stop_after_first_s, boot_timeout_s)
     finally:
-        sock.close()
+        console.close()
 
 
 def _read_lines(
@@ -308,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("--port", help="serial device (channel A)")
     ch.add_argument("--usb-serial", help="USB serial number, resolved via pyserial (channel A)")
     ch.add_argument("--host", help="node IP, net console 2323 (channel B)")
+    ap.add_argument("--call", help="callsign at --host, selects MC_PW_<CALL> from .env")
     ap.add_argument("--idle-s", type=float, default=600, help="seconds to wait after the first [HEAP] line")
     ap.add_argument("--boot-timeout-s", type=float, default=60, help="max wait for the first [HEAP] line")
     ap.add_argument("--out", type=Path, help="write JSON figures here")
@@ -323,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         deadline = args.boot_timeout_s + args.idle_s + 30
         if args.host:
-            channel, lines = "net2323", net_lines(args.host, deadline, args.idle_s, args.boot_timeout_s)
+            channel, lines = "net2323", net_lines(args.host, deadline, args.idle_s, args.boot_timeout_s, args.call)
         else:
             port = args.port or resolve_usb_serial(args.usb_serial)
             channel, lines = "usb", serial_lines(port, deadline, args.idle_s, args.boot_timeout_s)

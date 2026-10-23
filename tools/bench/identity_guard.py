@@ -20,7 +20,7 @@ Library use (harnesses call this before the first test step)::
 
 CLI::
 
-    identity_guard.py --node t-beam-92 --host 192.168.68.73   # 2323 net console
+    identity_guard.py --node t-beam-92 --host 192.168.68.73   # 2323, password MC_PW_DK5EN_92 from .env
     identity_guard.py --node rak-90 --port /dev/cu.usbmodem1101
     identity_guard.py --node t-beam-92 --info-file info.txt
     identity_guard.py --self-test
@@ -35,7 +35,6 @@ import argparse
 import hashlib
 import hmac
 import json
-import os
 import re
 import socket
 import sys
@@ -45,6 +44,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+import mc_console  # noqa: E402
 FLEET_FILE = HERE / "fleet.json"
 TESTDATA = HERE / "testdata" / "identity"
 
@@ -149,7 +150,7 @@ def require_node(node: str, port: str | None = None, fleet: dict | None = None) 
     if port:
         text = read_info_serial(port)
     elif entry.get("host"):
-        text = read_info_net(entry["host"])
+        text = read_info_net(entry["host"], call=entry.get("call"))
     else:
         raise IdentityError(f"{node}: refused -- no console path: pass --guard-port (fleet.json has no host)")
     return require(text, node, fleet)
@@ -193,45 +194,16 @@ def fleet_problems(fleet: dict) -> list[str]:
     return problems
 
 
-def read_info_net(host: str, timeout: float = 4.0, password: str = "", port: int = 2323) -> str:
-    """--info over the net console. A node with a password answers the connect with
-    "NONCE: <hex>" and wants HMAC-SHA256(password, nonce) back (tools/hmac_connect.py)."""
-    s = socket.create_connection((host, port), timeout=10)
-    s.settimeout(0.3)
-    out = b""
-    end = time.time() + 1.5
-    while time.time() < end:
-        try:
-            out += s.recv(4096)
-        except socket.timeout:
-            pass
-        if out.startswith(b"NONCE:") and b"\n" in out:
-            break
-    if out.startswith(b"NONCE:"):
-        if not password:
-            s.close()
-            raise IdentityError(f"{host}: the console wants a password (set MC_CONSOLE_PW)")
-        nonce = bytes.fromhex(out.split(b"\n", 1)[0].split()[1].decode())
-        s.sendall(hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest().encode() + b"\n")
-        s.settimeout(3)
-        reply = s.recv(64)
-        if not reply.startswith(b"OK"):
-            s.close()
-            raise IdentityError(f"{host}: console login refused ({reply.strip()!r})")
-        out = reply
-        s.settimeout(0.3)
-    s.sendall(b"--info\r\n")
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            d = s.recv(4096)
-            if not d:
-                break
-            out += d
-        except socket.timeout:
-            pass
-    s.close()
-    return out.decode(errors="replace")
+def read_info_net(host: str, timeout: float = 4.0, password: str | None = None, port: int = 2323,
+                  call: str | None = None) -> str:
+    """--info over the net console (login and password lookup: tools/mc_console.py).
+
+    `call` is the callsign the caller expects at `host`; its password comes from
+    .env. A wrong password usually means another node now holds the address."""
+    try:
+        return mc_console.read_info(host, call=call, port=port, timeout=timeout, password=password)
+    except mc_console.LoginError as exc:
+        raise IdentityError(f"{host}: {exc}" + (f" (or {host} is no longer {call})" if call else "")) from None
 
 
 def serial_dtr_for(port: str) -> bool:
@@ -389,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if a.host:
         try:
-            text = read_info_net(a.host, password=os.environ.get("MC_CONSOLE_PW", ""))
+            text = read_info_net(a.host, call=fleet["nodes"].get(a.node, {}).get("call"))
         except IdentityError as exc:
             print(exc)
             return 1

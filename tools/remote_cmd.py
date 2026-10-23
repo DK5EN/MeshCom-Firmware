@@ -18,6 +18,7 @@ Wire format:
                 (dst = managed node, src = sender, as in the command)
 
 Usage:
+    remote_cmd.py --dst DK5EN-90 --src DK5EN-1 --ctr 42 reboot        # MC_PW_DK5EN_90 from .env
     remote_cmd.py --dst DK5EN-90 --src DK5EN-1 --passwd SECRET --ctr 42 reboot
     remote_cmd.py --dst DK5EN-90 --src DK5EN-1 --passwd SECRET --ctr 43 txpower 2
     remote_cmd.py --dst DK5EN-90 --src DK5EN-1 --passwd SECRET sync
@@ -26,7 +27,8 @@ Usage:
 Default is print-only. With --send-host <ip> the DM text is sent through the net
 console (TCP 2323) of the SENDER node, as the direct message
 `::{<DST>}<dm text>` (the console's user-message form; see
-tools/bench/tdeck_harness.py). Never a group, never a broadcast.
+tools/bench/tdeck_harness.py). Never a group, never a broadcast. The sender's
+console password is MC_PW_<SRC> in .env (tools/mc_console.py).
 
 Requires: Python 3.8+, stdlib only.
 """
@@ -43,6 +45,9 @@ import socket
 import sys
 import time
 from typing import Any, Dict, List, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mc_console  # noqa: E402
 
 PROTO = "RM1"
 CTR_MAX = 0xFFFFFFFF
@@ -489,43 +494,42 @@ def generate_vectors() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# net console send (sender node, TCP 2323, HMAC login like hmac_connect.py)
+# net console send (sender node, TCP 2323, login via tools/mc_console.py)
 # ---------------------------------------------------------------------------
 
 def send_via_console(
-    host: str, dst: str, dm_text: str, console_passwd: str, port: int = 2323,
+    host: str, dst: str, dm_text: str, src: Optional[str], port: int = 2323,
     listen_s: float = 3.0,
 ) -> str:
     """Send `dm_text` as a DM to `dst` through the net console of `host`.
 
-    Uses the console's user-message form `::{CALL}text`. Returns the console
-    output seen for `listen_s` seconds after the send.
+    `src` is the sender node's call; its console password is MC_PW_<SRC> in
+    .env. Uses the console's user-message form `::{CALL}text`. Returns the
+    console output seen for `listen_s` seconds after the send.
     """
     if not _SEND_CALL_RE.fullmatch(dst):
         raise RmError("refusing to send: dst %r is not a call with SSID" % dst)
     if "\n" in dm_text or "\r" in dm_text:
         raise RmError("refusing to send: line break in text")
-    s = socket.create_connection((host, port), timeout=10)
+    con = mc_console.Console(host, port, call=src or None)
     try:
-        s.settimeout(5)
-        f = s.makefile("r", newline="\n")
-        line = f.readline().strip()
-        if console_passwd:
-            if not line.upper().startswith("NONCE:"):
-                raise RmError("unexpected console greeting %r" % line)
-            nonce = bytes.fromhex(line.split()[1].strip())
-            resp = hmac_sha256(console_passwd.encode(), nonce).hex()
-            s.sendall((resp + "\n").encode())
-            if f.readline().strip() != "OK":
-                raise RmError("console authentication failed")
-        out: List[str] = []
-        # drain banner
-        s.settimeout(1.0)
-        try:
-            while f.readline():
+        con.connect()
+    except mc_console.LoginError as e:
+        raise RmError("console login on %s: %s" % (host, e)) from None
+    s = con.sock
+    assert s is not None
+    try:
+        # Drain the banner for at most 1 s: a node with debug output on never
+        # goes quiet, so "until silence" could wait forever.
+        s.settimeout(0.2)
+        end = time.monotonic() + 1.0
+        while time.monotonic() < end:
+            try:
+                if not s.recv(4096):
+                    raise RmError("console closed the connection")
+            except socket.timeout:
                 pass
-        except socket.timeout:
-            pass
+        out: List[str] = []
         s.sendall(("::{%s}%s\r\n" % (dst, dm_text)).encode())
         end = time.monotonic() + listen_s
         s.settimeout(0.5)
@@ -539,7 +543,7 @@ def send_via_console(
             out.append(data.decode(errors="replace"))
         return "".join(out)
     finally:
-        s.close()
+        con.close()
 
 
 # ---------------------------------------------------------------------------
@@ -552,13 +556,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     ap.add_argument("--dst", help="managed node call incl. SSID, e.g. DK5EN-90")
     ap.add_argument("--src", help="sender call incl. SSID, e.g. DK5EN-1")
-    ap.add_argument("--passwd", default=os.environ.get("RM_PASSWD"),
-                    help="managed node's node_passwd (or env RM_PASSWD)")
+    ap.add_argument("--passwd", default=None,
+                    help="managed node's node_passwd (default: env RM_PASSWD, else "
+                         "MC_PW_<DST> from .env; prefer .env, argv shows in ps)")
     ap.add_argument("--ctr", type=int, help="counter 1..4294967295 (sync: 0, default)")
     ap.add_argument("--send-host", metavar="IP",
                     help="send as a DM via the net console (2323) of the SENDER node")
-    ap.add_argument("--console-passwd", default=None,
-                    help="net console password of the sender node (default: --passwd)")
     ap.add_argument("--console-port", type=int, default=2323)
     ap.add_argument("--verify", metavar="TEXT", help="verify a reply DM text and print the result")
     ap.add_argument("--gen-vectors", metavar="PATH",
@@ -575,8 +578,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("wrote %s" % a.gen_vectors)
             return 0
 
+        if a.passwd is None and a.dst:
+            a.passwd = os.environ.get("RM_PASSWD") or mc_console.password_for(a.dst) or None
         if not (a.dst and a.src and a.passwd):
-            ap.error("--dst, --src and --passwd are required")
+            ap.error("--dst, --src and a password (--passwd, RM_PASSWD or MC_PW_<DST> in .env) are required")
 
         if a.verify is not None:
             r = verify_reply(a.verify, a.dst, a.src, a.passwd, a.ctr)
@@ -595,9 +600,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         text = build_command(a.dst, a.src, ctr, a.cmd, cmd_args, a.passwd)
         print(text)
         if a.send_host:
-            out = send_via_console(a.send_host, a.dst, text,
-                                   a.console_passwd if a.console_passwd is not None else a.passwd,
-                                   a.console_port)
+            out = send_via_console(a.send_host, a.dst, text, a.src, a.console_port)
             print("--- console output ---")
             print(out)
         return 0

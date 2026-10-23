@@ -49,7 +49,10 @@ from tdeck_parse import (
     redraw_summary,
     refr_summary,
 )
-from identity_guard import IdentityError, require
+from identity_guard import IdentityError, load_fleet, require
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import mc_console  # noqa: E402
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"
 DEFAULT_BAUD = 115200
@@ -81,34 +84,19 @@ def default_log_path(prefix: str) -> Path:
 
 
 class _TcpConsole:
-    """pyserial-shaped wrapper around the 2323 net console (HMAC login per
-    tools/hmac_connect.py). Opening it does NOT reset the node, unlike a USB
-    serial open. Password from MC_CONSOLE_PW (empty = no login)."""
+    """pyserial-shaped wrapper around the 2323 net console. Opening it does NOT
+    reset the node, unlike a USB serial open. Login and password lookup
+    (MC_PW_<CALL> in .env; `call` or a host name like dk5en-14.local) in
+    tools/mc_console.py."""
 
-    def __init__(self, url: str) -> None:
-        import hashlib, hmac, os, socket
+    def __init__(self, url: str, call: Optional[str] = None) -> None:
         hostport = url[len("tcp://"):]
         host, _, port = hostport.partition(":")
-        self._sock = socket.create_connection((host, int(port or 2323)), timeout=10)
+        con = mc_console.Console(host, int(port or 2323), call=call)
+        self._buf = con.connect()
+        assert con.sock is not None
+        self._sock = con.sock
         self._sock.settimeout(0.2)
-        self._buf = b""
-        pw = os.environ.get("MC_CONSOLE_PW", "")
-        first = b""
-        deadline = time.time() + 5
-        while b"\n" not in first and time.time() < deadline:
-            try:
-                first += self._sock.recv(4096)
-            except socket.timeout:
-                pass
-        line = first.split(b"\n", 1)[0].decode(errors="replace").strip()
-        if line.upper().startswith("NONCE:"):
-            if not pw:
-                raise RuntimeError(f"{host}: the console wants a password (set MC_CONSOLE_PW)")
-            nonce = bytes.fromhex(line.split()[1].strip())
-            self._sock.sendall((hmac.new(pw.encode(), nonce, hashlib.sha256).hexdigest() + "\n").encode())
-            self._buf = first.split(b"\n", 1)[1] if b"\n" in first else b""
-        else:
-            self._buf = first
 
     def readline(self) -> bytes:
         import socket
@@ -157,8 +145,10 @@ class TDeckSession:
         boot_timeout: float = 40.0,
         log_path: Optional[Path] = None,
         ready_timeout: float = 60.0,
+        call: Optional[str] = None,
     ) -> None:
         self.port = port
+        self.call = call  # callsign for the 2323 password lookup (tcp:// ports)
         self.baud = baud
         self.boot_timeout = boot_timeout
         self.ready_timeout = ready_timeout
@@ -183,7 +173,7 @@ class TDeckSession:
     def open(self) -> None:
         if str(self.port).startswith("tcp://"):
             # 2323 net console: no reset on open, so no boot marker to wait for
-            self.ser = _TcpConsole(str(self.port))
+            self.ser = _TcpConsole(str(self.port), self.call)
             self._reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
             self._reader_thread.start()
             deadline = time.monotonic() + 20.0
@@ -3506,7 +3496,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
 
-    session = TDeckSession(port=args.port, boot_timeout=args.boot_timeout, ready_timeout=args.ready_timeout)
+    call = load_fleet()["nodes"].get(args.node, {}).get("call") if args.node else None
+    session = TDeckSession(port=args.port, boot_timeout=args.boot_timeout, ready_timeout=args.ready_timeout,
+                           call=call)
     try:
         session.open()
     except TimeoutError as e:

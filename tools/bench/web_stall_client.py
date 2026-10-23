@@ -20,8 +20,7 @@ Modes
   --normal   read everything, report bytes and duration
 
 Detection (console TCP 2323, ESP32 only; --no-console to skip)
-  Login as tools/bench/identity_guard.py read_info_net: "NONCE: <hex>" ->
-  HMAC-SHA256(password, nonce); password from env MC_CONSOLE_PW only.
+  Login and password (MC_PW_<CALL> in .env, --call) via tools/mc_console.py.
   A background thread records the console for the whole run. Reboot evidence:
     - boot lines: "[BOOT] RESET_REASON=<n> <NAME>" (esp32_main.cpp), "[BOOT] LAST_LOOP_SECTION=",
       "[BOOT];ready", ROM "rst:0x", "Task watchdog"
@@ -48,10 +47,7 @@ Output: `VERDICT;<rebooted|survived>;abort=<reason|none>;bytes=<n>;ms=<n>` and
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import json
-import os
 import re
 import socket
 import sys
@@ -61,8 +57,10 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from identity_guard import read_info_net  # noqa: E402  (does the HMAC login)
+from identity_guard import read_info_net  # noqa: E402
+import mc_console  # noqa: E402
 
 EXIT_SURVIVED, EXIT_REBOOTED, EXIT_ERROR = 0, 1, 2
 UPTIME_TOLERANCE_MS = 5000
@@ -139,12 +137,12 @@ def uptime_rebooted(before_ms: int, after_ms: int, elapsed_ms: int, tolerance: i
     return after_ms < before_ms + elapsed_ms - tolerance
 
 
-def fetch_info(host: str, password: str, port: int, timeout: float = 0.0) -> dict[str, Any] | None:
+def fetch_info(host: str, call: str | None, port: int, timeout: float = 0.0) -> dict[str, Any] | None:
     """Read --info over a fresh console connection; retry for `timeout` seconds. None if unreadable."""
     deadline = time.monotonic() + timeout
     while True:
         try:
-            info = parse_info(read_info_net(host, password=password, port=port))
+            info = parse_info(read_info_net(host, port=port, call=call))
             if info["uptime_ms"] is not None:
                 return info
         except (OSError, Exception):  # noqa: BLE001 - node down / login refused: retry
@@ -161,8 +159,9 @@ def make_verdict(rebooted: bool, abort: str | None, nbytes: int, ms: int) -> str
 class Console:
     """Net console (2323) capture in a background thread."""
 
-    def __init__(self, host: str, password: str = "", port: int = 2323) -> None:
-        self.host, self.password, self.port = host, password, port
+    def __init__(self, host: str, call: str | None = None, port: int = 2323,
+                 password: str | None = None) -> None:
+        self.host, self.call, self.port, self.password = host, call, port, password
         self.lines: list[str] = []
         self.dropped = False
         self._stop = threading.Event()
@@ -171,36 +170,14 @@ class Console:
         self._lock = threading.Lock()
 
     def connect(self) -> None:
-        s = socket.create_connection((self.host, self.port), timeout=10)
+        con = mc_console.Console(self.host, self.port, call=self.call, password=self.password)
+        try:
+            pending = con.connect()
+        except mc_console.LoginError as e:
+            raise StallError(str(e)) from None
+        assert con.sock is not None
+        s = con.sock
         s.settimeout(0.3)
-        out = b""
-        end = time.time() + 1.5
-        while time.time() < end:
-            try:
-                d = s.recv(4096)
-                if not d:
-                    break
-                out += d
-            except socket.timeout:
-                pass
-            if out.startswith(b"NONCE:") and b"\n" in out:
-                break
-        pending = b""
-        if out.startswith(b"NONCE:"):
-            if not self.password:
-                s.close()
-                raise StallError("console wants a password (set MC_CONSOLE_PW)")
-            nonce = bytes.fromhex(out.split(b"\n", 1)[0].split()[1].decode())
-            s.sendall(hmac.new(self.password.encode(), nonce, hashlib.sha256).hexdigest().encode() + b"\n")
-            s.settimeout(3)
-            reply = s.recv(64)
-            if not reply.startswith(b"OK"):
-                s.close()
-                raise StallError(f"console login refused ({reply.strip()!r})")
-            s.settimeout(0.3)
-            pending = reply.split(b"\n", 1)[1] if b"\n" in reply else b""
-        else:
-            pending = out
         self._sock = s
         self._thread = threading.Thread(target=self._rx, args=(pending,), daemon=True)
         self._thread.start()
@@ -312,6 +289,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--rcvbuf", type=int, default=1024, help="--stall: SO_RCVBUF before connect")
     ap.add_argument("--http-port", type=int, default=80)
     ap.add_argument("--console-port", type=int, default=2323)
+    ap.add_argument("--call", help="callsign at host, selects MC_PW_<CALL> from .env")
     ap.add_argument("--no-console", action="store_true", help="HTTP liveness only (RAK4631)")
     ap.add_argument("--probe-timeout", type=float, default=30.0)
     ap.add_argument("--timeout", type=float, default=30.0, help="socket timeout of the request")
@@ -322,16 +300,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def run(args: argparse.Namespace) -> int:
     console: Console | None = None
-    password = os.environ.get("MC_CONSOLE_PW", "")
     before: dict[str, Any] | None = None
     t_before = 0.0
     if not args.no_console:
-        before = fetch_info(args.host, password, args.console_port)
+        before = fetch_info(args.host, args.call, args.console_port)
         t_before = time.monotonic()
         if before is None:
             print("ERROR;console;cannot read --info before the request", file=sys.stderr)
             return EXIT_ERROR
-        console = Console(args.host, password, args.console_port)
+        console = Console(args.host, args.call, args.console_port)
         try:
             console.connect()
         except (OSError, StallError) as e:
@@ -345,7 +322,7 @@ def run(args: argparse.Namespace) -> int:
     after: dict[str, Any] | None = None
     elapsed_ms = 0
     if console:
-        after = fetch_info(args.host, password, args.console_port, args.probe_timeout)
+        after = fetch_info(args.host, args.call, args.console_port, args.probe_timeout)
         elapsed_ms = int((time.monotonic() - t_before) * 1000)
     alive = probe_http(args.host, args.http_port, args.probe_timeout if after is None else 3.0)
     lines: list[str] = []

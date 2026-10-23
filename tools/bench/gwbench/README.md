@@ -66,7 +66,7 @@ The run takes about 40 minutes (the default run; "No answer" now takes about 170
 - The mock server runs on `rpizero.local` (ssh, directory `~/gwmock`, UDP 1990). A mock on a
   Wi-Fi host could not be reached by the RAK's wired Ethernet in the first attempt.
 - The RAK is read over USB serial (`--rak-port`), the Heltec over the net console 2323.
-  Passwords come from `GWBENCH_PWFILE` (default: the bench backup file outside the repo).
+  Passwords come from `MC_PW_<CALL>` in the repo's gitignored `.env` (`tools/mc_console.py`).
 - Phase `repeat` and the INSTRUMENT image: `--airgap on|off` (RAM only, drops all RX and own TX). Put the
   stock image back on both nodes afterwards.
 - Phase `neg` switches `--rmstrictsecurity on` at the target for the strike/lock tests (strikes and the lock

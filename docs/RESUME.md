@@ -2,6 +2,20 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-23 -- net console clients consolidated, passwords from `.env`
+
+- `tools/mc_console.py` (stdlib) is the one 2323 login: NONCE/HMAC/OK, a refused login raises `LoginError`, a
+  dropped one stays a transient `ConnectionError`. Password per callsign: `MC_CONSOLE_PW` override, else
+  `MC_PW_<CALL>` from the environment or the repo `.env` (gitignored, must be mode 600; template `.env.example`).
+- On it: `meshlogger.py`, `remote_cmd.py`, `identity_guard.py`, `heap_idle.py`, `onrx_matrix.py`,
+  `console_golden.py`, `web_stall_client.py`, `tdeck_harness.py`, `gwbench/conlog.py` + `gwrun.py`. `--password`
+  (meshlogger, console_golden) and `--console-passwd` (remote_cmd) are gone; `--call` selects the key.
+- `netlurk.py` and `netconsole_log.py` deleted: `meshlogger.py --no-debug-flags --out FILE --seconds N [--cmd=...]`
+  replaces both. `conlog.py` stays (its `HH:MM:SS` format is what `gwanalyze.py` parses). `hmac_connect.py/.ps1`
+  are upstream files, untouched.
+- rpizero: deploy `meshlogger.py` together with `mc_console.py`.
+- Tests: `tools/tests/test_mc_console.py` (16, byte-exact fake of `authTask`).
+
 ## 2026-10-22 -- upstream sync: #1224 merged, #1225 taken (merge `414a328c`)
 
 - `upstream/dev` 6b2fdfac merged into fork-dev. #1224 (ours, real merge) was already in the fork; #1225 reorders
@@ -417,8 +431,8 @@ over RF alone. Finding RM-DUP (RF copy of a rejected frame counted again) is fix
   image of `8b24d0ac` WITHOUT the RM-DUP fix; gateway off and confirmed on both, RM on at DK5EN-1 only. Addresses are DHCP
   and moved overnight once: resolve before every run (`tools/bench/fleet.json` still lists old hosts).
 - The RAK's name and APRS text were cleared again after a driver bug wrote a literal `-` (restore was done by hand).
-- DK5EN-92 T-Beam (`192.168.68.57`) was not part of the gateway round. Bench passwords:
-  `~/MeshCom-bench-backups/bench-node-passwords-20261006.txt`. DK5EN-98 (`192.168.68.62`) is production, never a target.
+- DK5EN-92 T-Beam (`192.168.68.57`) was not part of the gateway round. Bench passwords: `MC_PW_<CALL>` in the
+  repo's gitignored `.env` (since 2026-10-23; source `~/MeshCom-bench-backups/bench-node-passwords-20261006.txt`). DK5EN-98 (`192.168.68.62`) is production, never a target.
 - The permission classifier denies OTA flashing of bench nodes ("Production Deploy") and name/text changes; the operator
   runs those commands with `!` or grants them with `/permissions`.
 
