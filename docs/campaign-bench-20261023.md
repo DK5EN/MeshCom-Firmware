@@ -86,3 +86,31 @@ process at a time; harness logs under `tools/bench/runs/harness/`.
   `*`, `WLNK-1`, `APRS2SOTA` or a numeric group (`CheckGroup() > 0`, `lora_functions.cpp` ~2250), and bench
   traffic may only go to `TEST` or an own DM, so the path cannot be provoked. BL-01 stays a code-level finding and
   an operator decision; the DM-custody path needs a store node and was not tried.
+- **#1235 merged upstream** (merge commit `112e4e5b`, tree equal to the PR head `098c2cfd`). Synced into `fork-dev`
+  as `4898cada` (fork-dev side kept on every PR path, merge tree equals the pre-merge tree); worktree
+  `../MeshCom-PR-next` and branch `pr/console-gps-led-small-features` (local + origin) removed. The Heltec V3 and
+  T-Beam checks now run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
+
+## 6. AU-19 fix plan (approved 2026-10-23)
+
+Lead (to confirm in W1): in the pinned NimBLE-Arduino 2.2.3, `nimble_port_run()` (`nimble_port.c`) is an endless
+loop and does not return on the stop event, so `NimBLEDevice::deinit()` runs `nimble_port_deinit()` (which
+deletes `g_eventq_dflt`) while the `nimble_host` task may still block on that queue. A wake on the freed queue runs
+an event with a NULL callback: `PC 0x00000000` in `host_task`. Same family as the S3 force-pause panic
+(`esp32_main.cpp`, AU_BLE_PAUSE comment). Possible side effect: one leaked host task per pause.
+
+| Wave | Content                                                                                                            | Who                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| W0   | Recon: compiled `nimble_port*.c` branches on the classic ESP32, who deletes the host task, heap trend per pause;   | 2 scouts (Haiku), orch.     |
+|      | fast pause/resume driver on the bench; addr2line on the kept ELF; NimBLE-Arduino changelog after 2.2.3             |                             |
+| B1   | Heltec V3 (DK5EN-1) and T-Beam (DK5EN-92) checks of the #1235 content on `fork-dev`: `--board led on`, `--info`    | orchestrator                |
+|      | BOARD/CHARGE LED, `[HEAP]` boot marks, NVS line, LED blink by eye (operator)                                       |                             |
+| W1   | RCA: confirm or reject the lead, fix route                                                                         | orchestrator                |
+| W2   | Fix: build-time patch of the pinned NimBLE-Arduino (route a), INSTRUMENT pause/resume cycle driver if W0 needs it  | 1 implementer (Sonnet)      |
+| W3   | Bench DK5EN-92: cycle test before the fix (panics expected) and after (0 panics in >= 300 pauses), BLE resume,     | orchestrator                |
+|      | no heap drift, 3 real checks                                                                                       |                             |
+| W4   | Gate (`regression.sh --stage 1,2`, all board envs, string scan of the patch in the image), advisor, commit         | orchestrator + Opus advisor |
+| W5   | `/release-firmware` v4.40a.10.23 (10.24 if it slips past the date), nodes back on the release, BACKLOG AU-19/AU-14 | orchestrator                |
+
+Decisions: route (a) patch the pinned library now, a library bump later as a separate topic; no upstream PR (AU is
+fork-only); the S3 force-pause exclusion is only noted in BACKLOG.

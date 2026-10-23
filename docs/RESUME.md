@@ -1,7 +1,7 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-23, branch `fork-dev` (in sync with `upstream/dev` d47c34c1), last release `v4.40a.10.22`
-(CI, Latest, published 2026-10-23 with the 10-22 date). One upstream PR of ours is open: #1235. Bench session
+**Stand:** 2026-10-23, branch `fork-dev` (in sync with `upstream/dev` 112e4e5b), last release `v4.40a.10.22`
+(CI, Latest, published 2026-10-23 with the 10-22 date). No upstream PR of ours is open (#1235 merged 2026-10-23). Bench session
 running: [campaign-bench-20261023.md](campaign-bench-20261023.md).
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
@@ -9,14 +9,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **Upstream PR [#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235)** (console, GPS filter, board
-  LED, via check, build cleanup): branch `pr/console-gps-led-small-features`, worktree `../MeshCom-PR-next`, 12
-  commits on `upstream/dev` d47c34c1, body `../pr-console-gps-led-small-features-body.md`. Contents: VIA-01, UART TX
-  ring, net console P-0111/0168/0169, GPS-11, OR-STAT, INSTRUMENT R1, `[HEAP]` boot marks + NVS `--info` line,
-  board LED without RM, warning flags on the standalone envs (+ T5 `LORA_DIO1` mapping), `-Os` t_echo/t114,
-  `csma_timing.h`, dead `lv_conf.h`. Gate: 33/34 board envs (esp32-external-radio red on `dev` too), fork host
-  suites for every ported item pass on the PR tree; branch not flashed. App impact flagged: BLE `SN` drops
-  BLED/CHGLED when not fitted (`SN1` `LEDNF`). After the merge: `/sync-upstream`, remove worktree and branch.
+- **AU-19 fix (candidate `v4.40a.10.23`):** NimBLE host-task panic in the BLE pause of `--update check` on
+  the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
+  remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
@@ -40,7 +35,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Hottest first (details in BACKLOG)
 
-- #1235 review by the maintainers.
+- AU-19: NimBLE panic in the BLE pause of the update check (2 in ~35), every classic ESP32 checking daily.
 - AU-17: T-Beam v1.2 misses the TLS heap gate on every check. AU-14: single TASK_WDT during an AU download.
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01: gateway re-transmits server-injected frames after hearing a relay (operator decision open).
@@ -145,7 +140,7 @@ Hard bench rules:
 
 ## Last three sessions
 
-- **2026-10-23:** upstream PR #1235 cut and opened; upstream sync (#1233 merged, #1234 SP server taken); net
+- **2026-10-23:** upstream PR #1235 cut, opened and merged (synced 4898cada, worktree and branch removed); upstream sync (#1233 merged, #1234 SP server taken); net
   console clients consolidated on `mc_console.py` with `.env` passwords; mock keep-reply timer race fixed.
 - **2026-10-22:** UDP-03 fixed and benched (upstream issue #1231), PR #1233 opened and merged; upstream sync
   (#1224 merged, #1225 taken).
