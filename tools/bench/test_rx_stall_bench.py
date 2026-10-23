@@ -125,3 +125,27 @@ def test_resolve_fleet_and_host_override():
         rb.resolve("b", None, fleet)
     with pytest.raises(rb.RuleViolation):
         rb.resolve("zz", None, fleet)
+
+
+def test_sender_counts_only_transmitted_frames():
+    # queued 3, only 2 went on air (TX ring lag under a busy channel): the third must not count as lost
+    lines = [
+        "[INJ];loratx;q;1;id;00C20C7A",
+        "[INJ];loratx;q;2;id;00C20C7B",
+        "[INJ];loratx;q;3;id;00C20C7C",
+        "16:56:55 [LOG] TX x00C20C7A : H04 prio=3 src=o wait=3381 q=2 cad=0 len=37 t=245206",
+        "16:57:00 [LOG] TX x00C20C7B : H04 prio=3 src=o wait=5497 q=2 cad=0 len=37 t=250320",
+    ]
+    assert set(rb.parse_sender(lines)) == {"00C20C7A", "00C20C7B"}
+
+
+def test_sender_without_tx_lines_keeps_queued_set():
+    lines = ["[INJ];loratx;q;1;id;00C20C7A", "[INJ];loratx;q;2;id;00C20C7B"]
+    assert set(rb.parse_sender(lines)) == {"00C20C7A", "00C20C7B"}
+
+
+def test_loop_gap_with_space_separators():
+    # printfdeb() prints ';' as ' ' on the console
+    lines = ["17:17:29.563 [INSTR-LOOP] gap ms 2047 in udp section_ms 0 sections_ms 0"]
+    g = rb.parse_loop_gaps(lines)
+    assert g["udp"]["count"] == 1 and g["udp"]["max_ms"] == 2047

@@ -229,3 +229,20 @@ Sonnet-high implementer, about $5.
   from `onrx_matrix.py`) and `tools/bench/test_rx_stall_bench.py` (14 tests, offline analyser on fixtures under
   `tools/bench/fixtures/rx_stall/`). Tools-only wave, advisor skipped. Open before W1b: check the real DUT `[LOG]`
   line of a received `LORATX` text against the parser regex; the live path is untested.
+- **2026-10-23 W1b (bench):** DUT DK5EN-1 (INSTRUMENT build of fork-dev `552077aa`), sender DK5EN-92
+  (`--loratx 20 8000` x 3, INSTRUMENT build), reference DK5EN-14 (`--setlog on` for the run); 45 frames per arm at
+  8 s (3 s overran the sender's TX ring: the ring lags under DK5EN-98's relays, so `sent` counts `[LOG] TX` lines).
+  Harness fixes found on the bench: sent = transmitted ids, `[INSTR-LOOP]` regex accepts the space form of
+  printfdeb (17 tests).
+
+  | Arm                    | Sent | DUT | Ref | Lost at DUT, seen at ref | irq_to_read p50 / max | Loop gaps (max / total) |
+  | ---------------------- | ---- | --- | --- | ------------------------ | --------------------- | ----------------------- |
+  | A no client            | 45   | 44  | 44  | 0                        | 3.8 ms / 7.6 ms       | none                    |
+  | B stall (delay 2500)   | 45   | 44  | 45  | 1 (2.2 pp)               | 5.0 ms / 2.07 s       | 54, 2.5 s / 112 s       |
+  | C trickle (delay 1200) | 45   | 28  | 44  | 16 (35.6 pp)             | 10.0 s / 14.8 s       | 24, 15.0 s / 328 s      |
+
+  H1 holds (A: DUT = ref). H2 holds: B bounded by the 2 s stall abort of #1224, C by the 15 s page budget (a
+  trickling client never trips the stall abort). H3: B 2.2 pp (below the pre-registered 5 pp line, which named
+  arm B), **C 35.6 pp**. The loop gaps are attributed to `udp` with `section_ms 0`: the web call is not an
+  `INSTR_SECTION`, the blocker sits outside every measured section. Summaries:
+  `tools/bench/runs/harness/rx_stall_{A_20261023-170154,B_20261023-171724,C_20261023-172652}.json`.

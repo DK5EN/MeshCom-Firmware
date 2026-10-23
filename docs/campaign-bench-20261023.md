@@ -48,3 +48,36 @@ process at a time; harness logs under `tools/bench/runs/harness/`.
 
 - **2026-10-23:** campaign set up, operator answers recorded (campaign-rx-stall-1229.md, header). Release gate
   green (77 envs, 2741 Unity, pytest 1190).
+- **2026-10-23 release:** `v4.40a.10.22` published (CI run 39954657798, 66 assets, re-inflate 27/27, flasher 30
+  boards 0 mismatches). Idle heap DK5EN-92 69068 B vs 69332 B baseline, pass
+  (`tools/bench/runs/harness/heap-idle-v4.40a.10.22.json`). Note: on DK5EN-92 the USB port open resets the
+  node (CH9102), and with `--setlog on` the only heap sample is the 300 s STAT line, so `heap_idle.py` needs
+  `--host` and `--boot-timeout-s 330`.
+- **AU-17 not reproduced on 10.22:** three dev-channel checks on DK5EN-92 (release build), free heap with BLE
+  paused 82204 / 87956 B, gate (76000 B) passed, `alloc fails 0`, check reached GitHub every time
+  (`tools/bench/runs/harness/au17-check-20261023.log`); a further eight checks on the INSTRUMENT build 80-90 KB.
+  Fixed since the 10.19 heap levers.
+- **RM-NVS-01 data:** NVS on the bench nodes is about half full (`--info`): DK5EN-1 used 299 / free 331 / total
+  630 / ns 10, DK5EN-14 304 / 326 / 630 / 9, DK5EN-92 297 / 333 / 630 / 10. The RM node blob needs about 5
+  entries; the NVS-full hypothesis needs a node with many leftover keys.
+- **AU-14 (running):** download of `v4.40a.10.22` (1249156 B, 13.4-13.9 s) on DK5EN-92 twice (release build
+  10.21, INSTRUMENT build tagged 10.21) with three to four `TEST` texts from DK5EN-1 arriving during the
+  download: no reboot. A release build has no `--update forget`, and a staged record survives `forget`, so each
+  further download needs apply + reflash; automated cycles 11-14 running.
+- **#1235 on RAK4631 (DK5EN-90):** PR build `098c2cfd` flashed (DFU over USB); `--board led on` accepted,
+  `--info` `BOARD LED: on`, `CHARGE LED: not fitted`; operator confirmed the green LED flashes every 2 s.
+- **New AU-18 (cycle 11, INSTRUMENT build):** gate passed (free 83816 B, block 32756 B >= 17000), mbedTLS failed
+  `-32512` on the second 16717 B record buffer; the block rule covers one buffer, mbedTLS needs two. Clean failure,
+  no reboot (`tools/bench/runs/harness/au14-loop-20261023.log`, cycle 11). BACKLOG AU-18.
+- **AU-14 cycles 11-14 (INSTRUMENT build tagged 10.21, apply + reflash per cycle):** cycle 11 AU-18; cycles 12
+  and 13 downloaded (14.0 / 14.6 s) with 3-4 `TEST` texts arriving, no reboot; cycle 14: **DK5EN-92 rebooted with
+  `RESET_REASON=4 PANIC`** during or right after `--update check`, before the install (2323 socket broke). No USB
+  capture was running (the CH9102 port open resets the node), so the backtrace is lost; the cycle log was not
+  written. Follow-up: check-only loop with a continuous USB capture (`au14-checks-usb-20261023.log`), ELF of the
+  build kept for addr2line.
+- **AU-19 found (check-only loop with USB capture):** checks 1-7 fine (BLE-paused heap 80-85 KB, block 34-47 KB);
+  check 8 panicked: `InstrFetchProhibited`, `PC 0x00000000`, backtrace `NimBLEDevice::host_task()`
+  (`NimBLEDevice.cpp:835`), right after `[AU];heap;start` = inside `esp32BlePause()` (`NimBLEDevice::deinit(true)`).
+  With cycle 14: 2 panics in about 35 BLE pauses. Every classic-ESP32 check pauses BLE and 10.19+ checks daily, so
+  field nodes are exposed. AU-14 (TASK_WDT once on 10-17) not reproduced in 4 downloads; AU-19 is the likelier
+  real defect. BACKLOG AU-19.

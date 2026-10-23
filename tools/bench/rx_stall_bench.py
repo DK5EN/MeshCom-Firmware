@@ -114,7 +114,8 @@ _RX_FRAME = re.compile(
 _RX_ID = re.compile(r"\bx([0-9A-Fa-f]{8})\b")
 _SND_Q = re.compile(r"\[INJ\];loratx;q;(\d+);id;([0-9A-Fa-f]{8})")
 _SND_DONE = re.compile(r"\[INJ\];loratx;done;(\d+)/(\d+)")
-_LOOP = re.compile(r"\[INSTR-LOOP\];gap;ms;(\d+);in;(\S+?);section_ms;(\d+);sections_ms;(\d+)")
+# printfdeb() turns every ';' into a space on the console, so both separators occur
+_LOOP = re.compile(r"\[INSTR-LOOP\][; ]gap[; ]ms[; ](\d+)[; ]in[; ](\S+?)[; ]section_ms[; ](\d+)[; ]sections_ms[; ](\d+)")
 
 
 def parse_frames(lines, sender_call: str | None = None) -> dict[str, dict]:
@@ -139,14 +140,29 @@ def parse_frames(lines, sender_call: str | None = None) -> dict[str, dict]:
     return out
 
 
+_SND_TX = re.compile(r"\[LOG\] TX x([0-9A-Fa-f]{8})\b")
+
+
 def parse_sender(lines) -> dict[str, int]:
-    """Queued burst frames from the sender console: {msgid: burst index}."""
-    out: dict[str, int] = {}
+    """Burst frames the sender actually transmitted: {msgid: burst index}.
+
+    `[INJ];loratx;q` only says the frame entered the TX ring; under a busy channel the ring
+    lags behind the burst interval and frames still queued at the end of the capture never went
+    on air. When the sender log carries `[LOG] TX x<id>` lines, only those ids count.
+    """
+    lines = list(lines)
+    queued: dict[str, int] = {}
+    sent_ids: set[str] = set()
     for line in lines:
         m = _SND_Q.search(line)
         if m:
-            out[m.group(2).upper()] = int(m.group(1))
-    return out
+            queued[m.group(2).upper()] = int(m.group(1))
+        t = _SND_TX.search(line)
+        if t:
+            sent_ids.add(t.group(1).upper())
+    if sent_ids:
+        return {k: v for k, v in queued.items() if k in sent_ids}
+    return queued
 
 
 def parse_loop_gaps(lines) -> dict[str, dict]:
