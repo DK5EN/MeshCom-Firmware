@@ -1040,6 +1040,20 @@ void test_heap_gate_internal_tdeck_refuses(void)
     TEST_ASSERT_TRUE(fwNetHeapGate(false, 88180, 57332, 0, 76000u, 17000u, 24000u));
 }
 
+void test_heap_gate_two_record_buffers(void)
+{
+    // AU-18: DK5EN-92 free 83816 / blk 32756 passed, the second 16717 B record buffer failed
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 83816, 32756, 0, 76000u, 17000u, 24000u, false));
+    TEST_ASSERT_TRUE(fwNetHeapGate(false, 83816, 32756, 0, 76000u, 17000u, 24000u, true));
+    // cheap checks fail: refused regardless of the probe
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 75999, 32756, 0, 76000u, 17000u, 24000u, true));
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 83816, 16999, 0, 76000u, 17000u, 24000u, true));
+    // PSRAM path: records live in PSRAM, the probe does not matter
+    TEST_ASSERT_TRUE(fwNetHeapGate(true, 60000, 0, 17000, 76000u, 17000u, 24000u, false));
+    TEST_ASSERT_FALSE(fwNetHeapGate(true, 23999, 0, 17000, 76000u, 17000u, 24000u, true));
+    TEST_ASSERT_EQUAL_UINT32(16717u, FWNET_TLS_REC_BUF);
+}
+
 void test_heap_gate_psram_tls(void)
 {
     TEST_ASSERT_TRUE(fwNetHeapGate(true, 24000, 15000, 4456436, 76000u, 17000u, 24000u));
@@ -1746,6 +1760,7 @@ int main(int, char **)
     RUN_TEST(test_heap_gate_total_free_disabled);
     RUN_TEST(test_heap_gate_internal_tdeck_refuses);
     RUN_TEST(test_heap_gate_psram_tls);
+    RUN_TEST(test_heap_gate_two_record_buffers);
     RUN_TEST(test_calloc_size_overflow);
     RUN_TEST(test_lowheap_does_not_consume_attempt);
     RUN_TEST(test_effective_mode_maps_auto_to_notify);

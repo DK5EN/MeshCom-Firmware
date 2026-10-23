@@ -772,12 +772,19 @@ inline bool fwNetHeapOk(uint32_t freeB, uint32_t largestBlk, uint32_t minFree, u
 // take small internal allocations, so a floor of INTERNAL free heap stays. Without the allocator
 // the decision is the classic one, fed with INTERNAL numbers (8BIT also counts PSRAM and made the
 // T-Deck look healthy at 4.4 MB while 57-84 KB internal were left).
+// AU-18: mbedTLS in/out record buffer (16384 + overhead), as measured `[AU];alloc;tls;fails;1;first;16717`.
+// It allocates TWO of them; a single big block passes the block rule but fails the second calloc.
+#ifndef FWNET_TLS_REC_BUF
+#define FWNET_TLS_REC_BUF 16717u
+#endif
+// twoBufOk: result of the caller's probe (two FWNET_TLS_REC_BUF internal allocations held at once);
+// only consulted on the classic (non-PSRAM) path.
 inline bool fwNetHeapGate(bool psramTls, uint32_t internalFree, uint32_t internalBlk,
                           uint32_t psramLargestBlk, uint32_t minFree, uint32_t minBlk,
-                          uint32_t minIFree)
+                          uint32_t minIFree, bool twoBufOk = true)
 {
     if (!psramTls)
-        return fwNetHeapOk(internalFree, internalBlk, minFree, minBlk);
+        return fwNetHeapOk(internalFree, internalBlk, minFree, minBlk) && twoBufOk;
     return psramLargestBlk >= minBlk && internalFree >= minIFree;
 }
 

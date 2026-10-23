@@ -599,6 +599,39 @@ bool checkFeed(void *v, const uint8_t *d, size_t n)
     return !k.z->err && !k.r->err;
 }
 
+// AU-18: result of the last two-record-buffer probe (1 = both fit, 0 = failed, 2 = not probed).
+static uint8_t s_twoBuf = 2;
+
+// The job's own allocations between the gate and the TLS setup (staging block FWNET_BLK, two
+// FwJsonScan, ~1 KB slack): held during the probe so they cannot take the second record hole.
+// The client context and the CA chain parse are not modelled (many small pieces).
+#define FWNET_PROBE_JOB (FWNET_BLK + 2048u)
+
+// Allocates the job block and two FWNET_TLS_REC_BUF internal blocks at once (what the job and
+// mbedTLS then do), frees all three. The probe's own failed malloc must not count as the job's
+// first alloc failure (allocFailArm() is armed before the gate): the counters are put back.
+static bool twoRecBufProbe()
+{
+    const uint32_t afN = s_afN, afSize = s_afFirstSize, afCaps = s_afFirstCaps, afMax = s_afMaxSize;
+    const char *afFn = s_afFirstFn;
+    void *j = heap_caps_malloc(FWNET_PROBE_JOB, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    void *a = j ? heap_caps_malloc(FWNET_TLS_REC_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
+    void *b = a ? heap_caps_malloc(FWNET_TLS_REC_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
+    const bool ok = (b != nullptr);
+    if (b)
+        heap_caps_free(b);
+    if (a)
+        heap_caps_free(a);
+    if (j)
+        heap_caps_free(j);
+    s_afN = afN;
+    s_afFirstSize = afSize;
+    s_afFirstCaps = afCaps;
+    s_afMaxSize = afMax;
+    s_afFirstFn = afFn;
+    return ok;
+}
+
 // One evaluation of the pre-TLS gate; fr / bk / pb / ps / need receive the numbers it used.
 bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &need)
 {
@@ -616,7 +649,13 @@ bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &
     }
 #endif
     need = ps ? minIFree : minFree; // the free-heap floor that applies (the shedding estimate is measured against it)
-    return fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree);
+    s_twoBuf = 2;
+    if (!fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree, true))
+        return false; // cheap checks refuse: no probe allocation
+    if (ps)
+        return true; // record buffers live in PSRAM
+    s_twoBuf = twoRecBufProbe() ? 1 : 0;
+    return fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree, s_twoBuf == 1);
 }
 
 // Spec 8.1 step 3: services that cost heap and have a clean off / on path in the loop (net console session, KISS TCP).
@@ -690,8 +729,8 @@ bool heapGateOk()
         }
     }
     auHeapLine("gate", ";refuse", false);
-    auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u\n", (unsigned)fr, (unsigned)bk,
-          (unsigned)pb, (unsigned)ps);
+    auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u;twobuf;%u\n", (unsigned)fr, (unsigned)bk,
+          (unsigned)pb, (unsigned)ps, (unsigned)s_twoBuf);
 #if INSTRUMENT_ENABLED
     if (s_shedDone) // only when something was shed and the gate still refuses
     {
