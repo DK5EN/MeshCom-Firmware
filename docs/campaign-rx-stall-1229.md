@@ -1,6 +1,6 @@
 # Campaign: RX loss during web stalls (upstream issue #1229)
 
-Status: **approved 2026-10-23, W0 done, W1a next.** Defect ID **WEB-RX-01**. Written 2026-10-22 on `fork-dev`
+Status: **done 2026-10-23: fix `5fdd4b8d`, W3 bench 0 frames lost; ships with the next release, upstream PR for #1229 not cut.** Defect ID **WEB-RX-01**. Written 2026-10-22 on `fork-dev`
 at `92d3adbf`. All line numbers below refer to that commit unless marked `upstream/dev`.
 
 A later agent picks up here: read this file (section 10 is the progress log), then `docs/RESUME.md`.

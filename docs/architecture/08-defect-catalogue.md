@@ -1664,7 +1664,7 @@ diagnostics only.
 
 ## 2h. WEB-RX-01 — LoRa RX during web stalls (upstream #1229, 2026-10-23)
 
-**OPEN**, measurement pending. ESP32 only (nRF52 runs `OnRxDone()` in its own LORA task).
+**FIXED** on fork-dev 2026-10-23 (`5fdd4b8d`, not released yet), W3 bench 0 frames lost (was 16 of 44 in arm C). ESP32 only (nRF52 runs `OnRxDone()` in its own LORA task). Side finding RX-DEAF-01 stays open (BACKLOG).
 
 - **Mechanism (code, not measured):** the web server runs in `esp32loop()`; the DIO1 ISR `setFlagReceive()` only
   sets `receiveFlag`, and `checkRX()` reads the packet in the loop. The send buffer of #1224 bounds a stalled

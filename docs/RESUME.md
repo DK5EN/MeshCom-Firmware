@@ -27,7 +27,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   of the tag commit; the other nodes not yet flashed.
 - **Bench session 2026-10-23** ([campaign-bench-20261023.md](campaign-bench-20261023.md)): AU-17/AU-14, #1235 on
   hardware, RM-NVS-01, BL-01, RX stall #1229 = WEB-RX-01 ([campaign-rx-stall-1229.md](campaign-rx-stall-1229.md),
-  W0 + W1a done, W1b next).
+  fixed `5fdd4b8d`, W3 bench 0 frames lost, not released).
 - **Campaign resume points with open steps:**
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
