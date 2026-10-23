@@ -14,8 +14,10 @@ import re
 import socket
 import struct
 import sys
+import threading
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -896,16 +898,33 @@ class TestKeepReply(unittest.TestCase):
             srv.main(["--keep-reply", "caf\u00e9"])
         self.assertEqual(cm.exception.code, 2)
 
+    def test_stop_cancels_pending_delayed_reply_slow_timer_start(self) -> None:
+        real_start = threading.Thread.start
+
+        def slow_start(timer: threading.Timer) -> None:
+            time.sleep(0.2)
+            real_start(timer)
+
+        with mock.patch.object(threading.Timer, "start", slow_start):
+            self._check_stop_cancels_pending_delayed_reply()
+
     def test_stop_cancels_pending_delayed_reply(self) -> None:
+        self._check_stop_cancels_pending_delayed_reply()
+
+    def _check_stop_cancels_pending_delayed_reply(self) -> None:
         server, addr = self._server(keep_reply="LATE", keep_reply_delay_ms=5000)
         sock = free_udp_socket(0.3)
         self.addCleanup(sock.close)
         self._keep(sock, addr)
         self.assertTrue(sock.recvfrom(4096)[0].startswith(b"BEAT"))
         deadline = time.monotonic() + 2.0   # the BEAT leaves before the timer is registered
-        while not server._keep_reply_timers and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            with server._lock:
+                if server._keep_reply_timers:
+                    break
             time.sleep(0.01)
-        timers = list(server._keep_reply_timers)
+        with server._lock:
+            timers = list(server._keep_reply_timers)
         self.assertEqual(len(timers), 1)
         self.assertTrue(timers[0].is_alive())
         server.stop()

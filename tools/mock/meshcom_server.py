@@ -802,8 +802,10 @@ class MockMeshComServer:
                 if self._stop.is_set():
                     return
                 self._keep_reply_timers = [t for t in self._keep_reply_timers if t.is_alive()]
-                self._keep_reply_timers.append(timer)
+                # start before listing: a listed timer is always started, even
+                # for a reader that does not take the lock
                 timer.start()
+                self._keep_reply_timers.append(timer)
         else:
             self._sendto(payload, addr)
 

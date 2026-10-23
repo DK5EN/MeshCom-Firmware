@@ -2,6 +2,15 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-23 -- mock server keep-reply timer race (flaky `test_stop_cancels_pending_delayed_reply`)
+
+- RCA: `_maybe_send_keep_reply` listed the delayed-reply `Timer` before `start()`; the test read
+  `_keep_reply_timers` without `server._lock` and could see an unstarted timer (one gate failure 10-23, reproduced
+  3/3 with a 0.2 s `Timer.start` delay). `stop()` holds the lock, so no runtime effect.
+- Fix: the server starts the timer before listing it; the test reads under the lock. Regression test
+  `test_stop_cancels_pending_delayed_reply_slow_timer_start` fails with both fixes reverted, passes with either.
+  Gate stages 1,2 PASS (2741/2741, 1190 pytest); advisor APPROVED.
+
 ## 2026-10-23 -- net console clients consolidated, passwords from `.env`
 
 - `tools/mc_console.py` (stdlib) is the one 2323 login: NONCE/HMAC/OK, a refused login raises `LoginError`, a
