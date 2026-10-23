@@ -1,0 +1,23 @@
+GWRX-01 W3 bench, 2026-10-23/24. Gateways DK5EN-1 (Heltec V3) and DK5EN-92 (T-Beam v1.2), INSTRUMENT
+builds, --srvip to the mock server (tools/mock/meshcom_server.py, redistribution), --nbrrelay count,
+--nbrdebug on, 2 dBm. Listeners DK5EN-90 (RAK), DK5EN-98/-14 in range. Frames: group 9999, source
+DK5EN-97 (mock client), flags 0xA0 (server bit, hop 0), one every 45 s. Driver and frame builder were
+scratch scripts (gwrx_bench.py, gwrx_frame.py; builder self-checked against corpus f004).
+
+Run A, build 257e5e2b (nbrRelayNeed), 2 + 10 frames: every server slot NEED case A, alone == need
+before the HN edges were known, alone = DK5EN-90 only after 10 min; overheard copies -> REFUSE only.
+Finding: a server path names only the off-air originator, so no neighbour "has the frame" and the
+sole-provider veto never lifts. Fixed in 0281dce4 (nbrServerNeed: GW-held rows count as providers).
+
+Run B, build 0281dce4, 10 frames, 10 min warm-up: alone shrank to DK5EN-90 (non-relaying RAK, no
+observed edge to the other gateway) on both gateways; REFUSE on overheard copies. Correct veto.
+
+Run C, build 0281dce4, DK5EN-90 --nbrreport on (HN reports), 20 min warm-up, 10 frames:
+  DK5EN-1:  10/10 NEED case B, 4/10 CANCEL? (DK5EN-92 copy heard before own TX, need fully covered),
+            6/10 copy heard after own TX or not at all.
+  DK5EN-92: 10/10 NEED case B, 0 CANCEL? (it transmitted first: wait 440-615 ms vs 5.8 s on DK5EN-1).
+Verdict: the overhear scan counts server slots end to end on ESP32 hardware. nRF52 gateway path not
+benched (no RAK gateway with Ethernet in the mock setup).
+
+Restore: --gateway on (original), --nbrrelay on (original), --nbrdebug off, --srvip 0.0.0.0, normal
+images flashed (build Oct 24 00:28), DK5EN-90 --nbrreport auto. Raw logs: gwrx01-w3-*.log (gitignored).
