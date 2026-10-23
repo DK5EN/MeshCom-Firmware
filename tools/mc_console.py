@@ -17,8 +17,9 @@ session, so two tools on one node kick each other off.
 1. ``MC_CONSOLE_PW`` in the environment -- explicit override for one run
    (set but empty forces "no password").
 2. ``MC_PW_<CALL>`` (``DK5EN-92`` -> ``MC_PW_DK5EN_92``) in the environment,
-   then in the repo's gitignored ``.env`` (``MC_ENV_FILE`` points elsewhere,
-   e.g. on the rpizero where no repo exists).
+   then in the repo's gitignored ``.env``. Outside a git checkout (the
+   rpizero copy in ~/meshlog) it is the ``.env`` next to this file;
+   ``MC_ENV_FILE`` points anywhere else.
 
 The callsign comes from the caller (``--call``, a fleet.json entry) or from a
 host name like ``dk5en-14.local``. Without one, a node that asks for a
@@ -63,21 +64,23 @@ class EnvFileError(RuntimeError):
     """The .env file exists but must not be used (permissions, syntax)."""
 
 
-def env_file() -> Optional[Path]:
-    """``MC_ENV_FILE`` if set, else ``.env`` in the git checkout holding this file."""
+def env_file() -> Path:
+    """``MC_ENV_FILE`` if set, else ``.env`` in the git checkout holding this
+    file, else ``.env`` next to this file (a standalone deploy)."""
     explicit = os.environ.get(ENV_FILE_VAR)
     if explicit:
         return Path(explicit).expanduser()
-    for d in Path(__file__).resolve().parents:
+    here = Path(__file__).resolve()
+    for d in here.parents:
         if (d / ".git").exists():
             return d / ".env"
-    return None
+    return here.parent / ".env"
 
 
 def load_env(path: Optional[Path] = None) -> Dict[str, str]:
     """Parse KEY=VALUE lines (``#`` comments, optional quotes). Missing file = {}."""
     path = path if path is not None else env_file()
-    if path is None or not path.exists():
+    if not path.exists():
         return {}
     mode = path.stat().st_mode
     if mode & (stat.S_IRWXG | stat.S_IRWXO):

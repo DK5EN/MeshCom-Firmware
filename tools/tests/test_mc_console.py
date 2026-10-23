@@ -212,6 +212,23 @@ def test_env_syntax_error_does_not_leak_the_line(no_env) -> None:
     assert "secret" not in str(e.value) and ":1:" in str(e.value)
 
 
+def test_standalone_deploy_reads_env_next_to_module(no_env, tmp_path: Path) -> None:
+    """The rpizero copy: mc_console.py in a plain directory, .env beside it."""
+    deploy = tmp_path / "meshlog"
+    deploy.mkdir()
+    (deploy / "mc_console.py").write_bytes((TOOLS / "mc_console.py").read_bytes())
+    env = deploy / ".env"
+    env.write_text("MC_PW_DK5EN_92=beside\n")
+    env.chmod(0o600)
+    clean = {k: v for k, v in os.environ.items() if k != mc_console.ENV_FILE_VAR}
+    r = subprocess.run([sys.executable, "-I", "-c",
+                        "import sys; sys.path.insert(0, %r); import mc_console as m; "
+                        "print(m.password_for('DK5EN-92'))" % str(deploy)],
+                       env=clean, capture_output=True, text=True, timeout=10)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "beside"
+
+
 def test_repo_env_is_gitignored() -> None:
     repo = TOOLS.parent
     r = subprocess.run(["git", "check-ignore", "-q", ".env"], cwd=repo)
