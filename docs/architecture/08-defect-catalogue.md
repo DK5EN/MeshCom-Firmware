@@ -1662,6 +1662,19 @@ diagnostics only.
 - **Tests:** `native_udp_frame_twin` `test_regression_other_frame_does_not_refresh_hb_watchdog_on_both` (failed on
   ESP32, then on nRF52, before the respective fix); DR-03 latch test narrowed to BEAT/CONF.
 
+## 2h. WEB-RX-01 — LoRa RX during web stalls (upstream #1229, 2026-10-23)
+
+**OPEN**, measurement pending. ESP32 only (nRF52 runs `OnRxDone()` in its own LORA task).
+
+- **Mechanism (code, not measured):** the web server runs in `esp32loop()`; the DIO1 ISR `setFlagReceive()` only
+  sets `receiveFlag`, and `checkRX()` reads the packet in the loop. The send buffer of #1224 bounds a stalled
+  client to 2 s without progress and 15 s per page, but inside that window the loop does not read the radio. The
+  SX126x keeps one packet in continuous RX, so a second frame arriving during the stall would be lost.
+- **Impact (hypothesis):** lost frames at a node whose web GUI is open on a slow or stalled link, on a busy channel.
+- **Plan:** `docs/campaign-rx-stall-1229.md` -- W1 bench (DUT DK5EN-1, sender DK5EN-92 `txburst`, reference
+  DK5EN-14; arms no client / stalled client / trickle), go/no-go 5 percentage points extra loss; W2 parks the
+  packet into a small ring from the web feed path `txFeed()`.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |

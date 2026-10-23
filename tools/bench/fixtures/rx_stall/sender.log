@@ -1,0 +1,12 @@
+14:20:00 [INJ];loratx;start;n;10;ms;3000
+14:20:03 [INJ];loratx;q;1;id;A1000111
+14:20:06 [INJ];loratx;q;2;id;A1000222
+14:20:09 [INJ];loratx;q;3;id;A1000333
+14:20:12 [INJ];loratx;q;4;id;A1000444
+14:20:15 [INJ];loratx;q;5;id;A1000555
+14:20:18 [INJ];loratx;q;6;id;A1000666
+14:20:21 [INJ];loratx;q;7;id;A1000777
+14:20:24 [INJ];loratx;q;8;id;A1000888
+14:20:27 [INJ];loratx;q;9;id;A1000999
+14:20:30 [INJ];loratx;q;10;id;A1000AAA
+14:20:33 [INJ];loratx;done;10/10
