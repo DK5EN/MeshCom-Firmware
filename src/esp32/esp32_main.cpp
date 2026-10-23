@@ -867,6 +867,10 @@ LLCC68 radio = new Module(LORA_CS, LORA_DIO0, LORA_RST, LORA_DIO1);
 
 // Lora callback Function declarations
 int checkRX(bool bRadio);
+#include "lora_rx_park.h"
+#if !defined(BOARD_T5_EPAPER)
+static void loraRxParkDrain(void);
+#endif
 
 // save transmission state between loops
 volatile int transmissionState = RADIOLIB_ERR_UNKNOWN;
@@ -3237,6 +3241,18 @@ void esp32loop()
 
     loopSchedulerRun(millis());
 
+    // WEB-RX-01: park counters, once per 5 minutes, only if the park was ever used
+    {
+        static uint32_t rxparkStatTimer = 0;
+        if((uint32_t)(millis() - rxparkStatTimer) >= (5 * 60 * 1000))
+        {
+            rxparkStatTimer = millis();
+            if(rxParkParked() > 0)
+                printfdeb("[RXPARK];parked;%lu;overflow;%lu;clamped;%lu\n", (unsigned long)rxParkParked(),
+                    (unsigned long)rxParkOverflow(), (unsigned long)rxParkClamped());
+        }
+    }
+
     // LoRa-Chip found
     #if defined(BOARD_T5_EPAPER)
         idf_loop();
@@ -3590,6 +3606,11 @@ void esp32loop()
                 }
             }
         }
+
+        // WEB-RX-01: packets parked while the web send buffer blocked the loop go first (oldest first),
+        // also when receiveFlag is not set.
+        if(rxParkCount() > 0)
+        { INSTR_SECTION("lora_rx"); LOOP_SECTION(LSEC_LORA_RX); loraRxParkDrain(); }
 
         if(receiveFlag || transmittedFlag)
         {
@@ -5200,26 +5221,32 @@ void esp32loop()
 }
 
 
-int checkRX(bool bRadio)
+// WEB-RX-01 (#1229): checkRX() is split in a READ half (chip -> RxCtx, RX restart) and a PROCESS
+// half (accounting, logs, OnRxDone). The web send buffer's wait path may run the READ half via
+// loraRxParkService() and park the packet; the loop drains it through the PROCESS half.
+struct RxCtx
 {
-    int state = -1;
+    uint8_t payload[UDP_TX_BUF_SIZE+10];
+    size_t  ibytes;
+    int     state;
+    int     rssi;       // saved before the RX restart
+    int     snr;
+    float   ferr;       // not carried through the park (0.0 for parked packets)
+};
 
-    //#if not defined(BOARD_T_DECK_PRO)
-    // extra source
-    // you can receive data as an Arduino String
-    // NOTE: receive() is a blocking method!
-    //       See example ReceiveInterrupt for details
-    //       on non-blocking reception method.
-
-    if(!bRadio)
-        return -1;
-        
+// READ half. Returns false when a read is already in action (is_receiving). On true the caller owns
+// is_receiving and must clear it after the process half / park push.
+static bool checkRXRead(RxCtx &c)
+{
     if(is_receiving)    // receive in action
-        return -1;
+        return false;
 
     is_receiving=true;
 
-    uint8_t payload[UDP_TX_BUF_SIZE+10];
+    c.ibytes = 0;
+    c.rssi = 0;
+    c.snr = 0;
+    c.ferr = 0.0f;
 
     // Die echte Paketlaenge muss VOR readData() vom Chip gelesen werden.
     // RadioLib nimmt `len` per WERT und schreibt die tatsaechliche Laenge NICHT
@@ -5242,7 +5269,10 @@ int checkRX(bool bRadio)
     if(ibytes > UDP_TX_BUF_SIZE)
         ibytes = UDP_TX_BUF_SIZE;
 
-    state = radio.readData(payload, ibytes);
+    c.ibytes = ibytes;
+
+    int state = radio.readData(c.payload, ibytes);
+    c.state = state;
 #if INSTRUMENT_ENABLED
     INSTR_IRQ_READ();        // R1-F: irq_to_read_us, consumed by OnRxDone
 #endif
@@ -5252,9 +5282,9 @@ int checkRX(bool bRadio)
         // FIX BUG #2: Save RSSI/SNR/FreqError BEFORE restarting RX.
         // These read from SX1262 hardware registers via SPI and would be
         // invalidated once startReceive() transitions the radio to standby+RX.
-        int saved_rssi = (int)radio.getRSSI();
-        int saved_snr  = (int)radio.getSNR();
-        float   saved_ferr = radio.getFrequencyError();
+        c.rssi = (int)radio.getRSSI();
+        c.snr  = (int)radio.getSNR();
+        c.ferr = radio.getFrequencyError();
 
         // FIX BUG #2: Restart RX immediately after reading FIFO, BEFORE processing.
         // The packet data is already in our local payload buffer.
@@ -5282,6 +5312,69 @@ int checkRX(bool bRadio)
             if(bLORADEBUG)
                 printfdeb("[MC-DBG] RX_RESTARTED src=after_readData state=%d\n", rxstate);
         }
+    }
+    else
+    if (state == RADIOLIB_ERR_CRC_MISMATCH)
+    {
+        // RSSI/SNR/FreqError VOR RX-Restart sichern (Register werden ungueltig)
+        c.rssi = (int16_t)radio.getRSSI();
+        c.snr  = (int8_t)radio.getSNR();
+        c.ferr = radio.getFrequencyError();
+
+        // RX sofort wieder starten
+        {
+            radio.clearPacketReceivedAction();
+            radio.clearPacketSentAction();
+            bEnableInterruptReceive = true;
+            radio.setPacketReceivedAction(setFlagReceive);
+            #ifdef RADIO_CTRL
+                digitalWrite(RADIO_CTRL, HIGH);  // RX Mode [OE1KBC]
+                delay(2);
+            #endif
+            int rxstate = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
+
+            if(bLORADEBUG)
+                printfdeb("[MC-DBG] RX_RESTARTED src=after_crc_error state=%d\n", rxstate);
+        }
+    }
+    else
+    {
+        // RX-Restart auch bei unbekannten Fehlern -- ohne dies bleibt
+        // das Radio im Standby (BLINDSPOT fuer Empfang!)
+        c.rssi = (int16_t)radio.getRSSI();
+        c.snr  = (int8_t)radio.getSNR();
+
+        {
+            radio.clearPacketReceivedAction();
+            radio.clearPacketSentAction();
+            bEnableInterruptReceive = true;
+            radio.setPacketReceivedAction(setFlagReceive);
+            #ifdef RADIO_CTRL
+                digitalWrite(RADIO_CTRL, HIGH);  // RX Mode [OE1KBC]
+                delay(2);
+            #endif
+            int rxstate = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
+
+            if(bLORADEBUG)
+                printfdeb("[MC-DBG] RX_RESTARTED src=after_other_error state=%d\n", rxstate);
+        }
+    }
+
+    return true;
+}
+
+// PROCESS half: everything after the RX restart. Runs in the loop task only (direct or drained).
+static void checkRXProcess(RxCtx &c)
+{
+    uint8_t *payload = c.payload;
+    size_t ibytes = c.ibytes;
+    int state = c.state;
+
+    if (state == RADIOLIB_ERR_LORA_HEADER_DAMAGED || state == RADIOLIB_ERR_NONE)
+    {
+        int saved_rssi = c.rssi;
+        int saved_snr  = c.snr;
+        float saved_ferr = c.ferr;
 
         if(bLORADEBUG)
         {
@@ -5334,26 +5427,9 @@ int checkRX(bool bRadio)
         if(bLORADEBUG)
             printfdeb("OnRxError\n");
 
-        // RSSI/SNR/FreqError VOR RX-Restart sichern (Register werden ungueltig)
-        int16_t saved_crc_rssi = (int16_t)radio.getRSSI();
-        int8_t  saved_crc_snr  = (int8_t)radio.getSNR();
-        float   saved_crc_ferr = radio.getFrequencyError();
-
-        // RX sofort wieder starten
-        {
-            radio.clearPacketReceivedAction();
-            radio.clearPacketSentAction();
-            bEnableInterruptReceive = true;
-            radio.setPacketReceivedAction(setFlagReceive);
-            #ifdef RADIO_CTRL
-                digitalWrite(RADIO_CTRL, HIGH);  // RX Mode [OE1KBC]
-                delay(2);
-            #endif
-            int rxstate = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
-
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] RX_RESTARTED src=after_crc_error state=%d\n", rxstate);
-        }
+        int16_t saved_crc_rssi = (int16_t)c.rssi;
+        int8_t  saved_crc_snr  = (int8_t)c.snr;
+        float   saved_crc_ferr = c.ferr;
 
         // RX channel utilization: CRC-failed packet still occupied the channel
         ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
@@ -5393,25 +5469,8 @@ int checkRX(bool bRadio)
         if(bLORADEBUG)
             printfdeb("OnRxError\n");
 
-        // RX-Restart auch bei unbekannten Fehlern -- ohne dies bleibt
-        // das Radio im Standby (BLINDSPOT fuer Empfang!)
-        int16_t saved_err_rssi = (int16_t)radio.getRSSI();
-        int8_t  saved_err_snr  = (int8_t)radio.getSNR();
-
-        {
-            radio.clearPacketReceivedAction();
-            radio.clearPacketSentAction();
-            bEnableInterruptReceive = true;
-            radio.setPacketReceivedAction(setFlagReceive);
-            #ifdef RADIO_CTRL
-                digitalWrite(RADIO_CTRL, HIGH);  // RX Mode [OE1KBC]
-                delay(2);
-            #endif
-            int rxstate = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
-
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] RX_RESTARTED src=after_other_error state=%d\n", rxstate);
-        }
+        int16_t saved_err_rssi = (int16_t)c.rssi;
+        int8_t  saved_err_snr  = (int8_t)c.snr;
 
         // Immer loggen (nicht nur bLORADEBUG) -- unbekannte Fehler sind kritisch
         printfdeb("[MC-DBG] RX_OTHER_ERROR code=%d rssi=%d snr=%d size=%d ts=%lu\n",
@@ -5427,12 +5486,94 @@ int checkRX(bool bRadio)
             printfdeb("\n");   // F2: printfdeb appends no line end
         }
     }
+}
+
+int checkRX(bool bRadio)
+{
+    //#if not defined(BOARD_T_DECK_PRO)
+    // extra source
+    // you can receive data as an Arduino String
+    // NOTE: receive() is a blocking method!
+    //       See example ReceiveInterrupt for details
+    //       on non-blocking reception method.
+
+    if(!bRadio)
+        return -1;
+
+    RxCtx c;
+    if(!checkRXRead(c))
+        return -1;
+
+    checkRXProcess(c);
 
     //#endif
 
     is_receiving=false;
 
-    return state;
+    return c.state;
+}
+
+#if !defined(BOARD_T5_EPAPER)
+// WEB-RX-01: drain parked packets (oldest first) through the PROCESS half. Loop task only.
+// noinline: keeps the RxCtx payload (~265 B) out of the esp32loop() frame, the root of the deepest
+// loop-task call chains (advisor note, WEB-RX-01 W2)
+__attribute__((noinline)) static void loraRxParkDrain(void)
+{
+    while(rxParkCount() > 0)
+    {
+        RxCtx c;
+        size_t len = 0;
+        int16_t rssi = 0;
+        int8_t snr = 0;
+        int st = 0;
+        if(!rxParkPop(c.payload, &len, &rssi, &snr, &st))
+            break;
+        c.ibytes = len;
+        c.state = st;
+        c.rssi = rssi;
+        c.snr = snr;
+        c.ferr = 0.0f;
+
+        // same exclusion as the flag path: no hook read while a packet is being processed
+        is_receiving = true;
+        checkRXProcess(c);
+        is_receiving = false;
+
+        inoReceiveTimeOutTime = millis();
+        iReceiveTimeOutTime = millis();
+        csma_timeout = csma_compute_timeout(cad_attempt);
+    }
+}
+#endif
+
+// WEB-RX-01: called from the web send buffer's wait path (txFeed). Reads a pending packet off the
+// chip and parks it; never processes (no OnRxDone). CRC/header-error/other branches are counted
+// and logged exactly once, in checkRXProcess() when the packet is drained.
+void loraRxParkService(void)
+{
+#if !defined(BOARD_T5_EPAPER)
+    if(!bRadio)
+        return;
+
+    // TX running: bEnableInterruptTransmit is set before doTX() until TX done (or TX watchdog),
+    // tx_is_active covers the lora_functions TX path, transmittedFlag a finished-but-unhandled TX.
+    bool txBusy = bEnableInterruptTransmit || tx_is_active || transmittedFlag;
+
+    if(!rxParkShouldService(receiveFlag, is_receiving, txBusy, rxParkCount() >= RX_PARK_SLOTS))
+        return;
+
+    // clear flags the same way the loop does before checkRX()
+    bEnableInterruptReceive = false;
+    receiveFlag = false;
+    rx_irq_defer_count = 0;
+
+    RxCtx c;
+    if(!checkRXRead(c))     // sets is_receiving
+        return;
+
+    rxParkPush(c.payload, c.ibytes, (int16_t)c.rssi, (int8_t)c.snr, c.state);
+    is_receiving = false;
+#endif
 }
 
 

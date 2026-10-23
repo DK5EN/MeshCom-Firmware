@@ -246,3 +246,14 @@ Sonnet-high implementer, about $5.
   arm B), **C 35.6 pp**. The loop gaps are attributed to `udp` with `section_ms 0`: the web call is not an
   `INSTR_SECTION`, the blocker sits outside every measured section. Summaries:
   `tools/bench/runs/harness/rx_stall_{A_20261023-170154,B_20261023-171724,C_20261023-172652}.json`.
+
+- **2026-10-23 W2:** interface `src/lora_rx_park.h` (orchestrator), I1 ring `src/lora_rx_park.cpp` + 11 host tests,
+  I2 `checkRX()` split into `checkRXRead()` / `checkRXProcess()`, `loraRxParkService()` (hook from `txFeed()`,
+  ESP32 only, T5 compiled out), `loraRxParkDrain()` before the flag path, `[RXPARK]` 5-minute line. Advisor (Opus,
+  independent): CHANGES REQUIRED -- applied: a full ring now leaves the packet on the chip (gate input
+  `ringFull`, was read-and-drop uncounted), drain `noinline` (keeps the 265 B payload out of the `esp32loop()`
+  frame) and inside `INSTR_SECTION("lora_rx")`/`LOOP_SECTION`, the trivially passing truth-table test replaced by
+  explicit cases and a full-ring case (12 tests). Regression test of the fix is the W3 bench (arm C 35.6 pp
+  before); the glue is one call in `txFeed()`. Not done: `-fstack-usage` measurement. Advisor side finding
+  logged as RX-DEAF-01. Note for W3: with two or more parked frames `irq_to_read_us` is not per frame (one
+  global INSTR stamp); W3 uses "lost at DUT" as the metric.

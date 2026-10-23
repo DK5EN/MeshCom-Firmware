@@ -81,3 +81,8 @@ process at a time; harness logs under `tools/bench/runs/harness/`.
   With cycle 14: 2 panics in about 35 BLE pauses. Every classic-ESP32 check pauses BLE and 10.19+ checks daily, so
   field nodes are exposed. AU-14 (TASK_WDT once on 10-17) not reproduced in 4 downloads; AU-19 is the likelier
   real defect. BACKLOG AU-19.
+- **BL-01 not measurable within the bench rules:** DK5EN-1 (gateway, `--mesh off`) received three `TEST` group
+  texts from DK5EN-90: `GWU` (upload), `RLY q=nomesh`, no transmission in 75 s. The gateway DM-ACK fires only for
+  `*`, `WLNK-1`, `APRS2SOTA` or a numeric group (`CheckGroup() > 0`, `lora_functions.cpp` ~2250), and bench
+  traffic may only go to `TEST` or an own DM, so the path cannot be provoked. BL-01 stays a code-level finding and
+  an operator decision; the DM-custody path needs a store node and was not tried.

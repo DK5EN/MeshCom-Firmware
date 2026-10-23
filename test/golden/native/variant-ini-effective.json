@@ -3251,6 +3251,29 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_lora_rx_park": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<lora_rx_park.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_lora_rx_park"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_mc_board_id": {
   "build_flags": [
    "-std=gnu++17",
