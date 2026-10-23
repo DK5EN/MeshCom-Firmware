@@ -12,6 +12,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - **AU-19 fix (candidate `v4.40a.10.23`):** NimBLE host-task panic in the BLE pause of `--update check` on
   the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
   remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
+- **AU-20 (BLE pause heap leak):** root cause confirmed on DK5EN-92 and DK5EN-1 (orphaned NimBLE flow-control
+  esp_timer per init, about 50 B per pause); fix route waits for the operator, see
+  [campaign-au20-ble-pause-heap.md](campaign-au20-ble-pause-heap.md) section 7. Side result: the AU-19 patch
+  survives 100 forced pauses on the S3.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
