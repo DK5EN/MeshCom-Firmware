@@ -44,9 +44,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 ## Hottest first (details in BACKLOG)
 
 - AU-19: NimBLE panic in the BLE pause of the update check (2 in ~35), every classic ESP32 checking daily.
-- AU-17: T-Beam v1.2 misses the TLS heap gate on every check. AU-14: single TASK_WDT during an AU download.
+- AU-14: single TASK_WDT during an AU download. (AU-17 closed 2026-10-23: not reproduced on 10.22.)
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
-- GWRX-01: gateway re-transmits server-injected frames after hearing a relay (operator decision open).
+- GWRX-01: RCA done 2026-10-23 ([rca-gwrx01-20261023.md](rca-gwrx01-20261023.md)): heard copy is another gateway's server copy, gain ~0.08 % airtime; operator decision fix (b) vs close.
 - `--mesh off` still transmits on two RF paths (BL-01): operator decision.
 - GPS: altitude Kalman re-seed length (BL-03) and baro fusion tau (GPS-05b), measured, unchanged.
 - Stability, single events: TASK_WDT on DK5EN-1 (BL-04), REBOOT-98.
