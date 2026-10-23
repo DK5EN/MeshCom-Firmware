@@ -930,7 +930,8 @@ class TestKeepReply(unittest.TestCase):
         server.stop()
         timers[0].join(timeout=1.0)
         self.assertFalse(timers[0].is_alive())
-        self.assertEqual(server._keep_reply_timers, [])
+        with server._lock:
+            self.assertEqual(server._keep_reply_timers, [])
 
 
 if __name__ == "__main__":
