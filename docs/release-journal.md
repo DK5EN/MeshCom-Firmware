@@ -1,11 +1,50 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261021`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261022`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.22 (Donnerstag, 2026-10-22)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.21.
+Getaggt am 2026-10-23 mit dem Datum 10.22 (Operator-Entscheidung): so bleibt `v4.40a.10.23` fuer einen
+Fix-Release am selben Tag frei; Auto Update vergleicht MM.DD, 10.22 ist neuer als 10.21. `FLASH_VERSION`
+20261022, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3
+unveraendert.
+
+Inhalt seit `v4.40a.10.21` (Firmware: 5 Dateien, +12/-9):
+
+- UDP-03 (`92d3adbf`, upstream #1233, Issue #1231): der OTHER-Zweig von `handleUdpFrame_esp32`/`_nrf52`
+  laesst `last_upd_timer` und `hb_warn_logged` in Ruhe; ein beliebiges Datagramm am Gateway-Port haelt die
+  Server-Warnung nicht mehr stumm (nur Diagnose, Recovery war nie verzoegert).
+- Upstream #1234 (`f1d09f5d`): Zeile SP (Polen) in `GW_SERVERS`, INET `spmeshcom.dynalias.com`
+  146.59.232.234, Hamnet-Seite OTHER_NET.
+- Upstream #1215 (`a89a06da`): OE-Bezeichnung "MeshCom OE (Austria/WW)"; die dort neu gebauten
+  Safeboot-Images wurden nicht uebernommen (`--ours`, Safeboot v3 bleibt). Mitgekommen:
+  `src/idf_component.yml.orig` (ohne Wirkung).
+- Upstream #1225: Reihenfolge von drei LilyGo-Eintraegen in `default_envs`; #1219 + #1223 netto null;
+  #1224 = der Sendepuffer, den der Fork schon hatte.
+- Nicht-Firmware: `tools/mc_console.py` (ein 2323-Login, Passwoerter aus `.env`), Mock-Timer-Fix,
+  `test_gw_servers` pinnt SP, Konzeptpapiere (TX-Pool, Mesh-Evolution), `REVIEW.md`, PuTTY-Anleitung.
+- Upstream: #1235 (Konsole, GPS-Filter, Board-LED, Via-Pruefung, Build-Aufraeumen) offen.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Idle-Heap-Gate auf T-Beam v1.2 (`DK5EN-92`, lokaler Release-Build des Tag-Commits, BLE an, Gateway an):
+  STAT-Heap 69712 / 69568 / 69068 B, Idle 69068 B gegen Baseline 69332 B (-264 B), bestanden
+  (`tools/bench/runs/harness/heap-idle-v4.40a.10.22.json`).
+- UDP-03 auf Heltec V3 (`DK5EN-1`, 2026-10-22): 13 OTHER-Datagramme in 130 s Server-Stille: ohne Fix keine Warnung,
+  mit Fix Stufe 1 nach 59 s, Stufe 2 nach 89 s (`tools/bench/runs/harness/udp03-bench-20261022.json`).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die neue SP-Zeile gegen den echten polnischen Server (nur Host-Test `test_gw_servers`).
+- Das Release-Image selbst auf der Bench-Flotte (Stand bei Tag-Push; siehe RESUME).
 
 ---
 
