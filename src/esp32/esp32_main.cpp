@@ -3611,6 +3611,11 @@ void esp32loop()
                         rx_irq_defer_count = 0;
                         iReceiveTimeOutTime=0;
 
+                        // RX-DEAF-01: no read is in flight here (the read path runs in this loop task
+                        // and clears the flag itself), so a set is_receiving is stale: clear it with
+                        // the radio restart, or the node stays deaf.
+                        is_receiving = false;
+
                         // FIX BUG #1: Call startReceive FIRST, then re-wire interrupts.
                         // Disable interrupt gating while we reconfigure
                         bEnableInterruptReceive = false;
@@ -3827,7 +3832,9 @@ void esp32loop()
                     if(irqStatus & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
                                     RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED))
                     {
-                        is_receiving = true;
+                        // RX-DEAF-01: the receive flag is not set here. irq_rx_active aborts the TX;
+                        // the flag is owned by the read path (checkRXRead() returns while it is set),
+                        // so setting it here kept every later read out until reboot.
                         irq_rx_active = true;
                         if(bLORADEBUG)
                             printfdeb("[MC-DBG] IRQ_POLL hdr/pre=0x%04X -> TX_ABORT\n",

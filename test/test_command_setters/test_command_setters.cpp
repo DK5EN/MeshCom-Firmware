@@ -1681,6 +1681,28 @@ static void test_bleguard_wiring_pins(void)
 
 // W4 S3 rework: the BLE guard (forced NimBLE deinit/reinit) exists only where the BLE pause does (AU_BLE_PAUSE, classic
 // ESP32). Bench evidence: bleguardcycle panics on the 2nd cycle on ESP32-S3 (host task, PC 0). Source pins.
+// RX-DEAF-01: the TX-gate IRQ poll must not set is_receiving (one hit latched it and kept checkRXRead() out until
+// reboot, bench 2026-10-23), and the RX-timeout radio restart clears a stale flag. Source pins.
+static void test_rx_deaf01_is_receiving_latch(void)
+{
+    const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t gate = mainSrc.find("[MC-DBG] TX_GATE_ENTER");
+    const size_t abort = mainSrc.find("-> TX_ABORT", gate);
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && abort != std::string::npos, "TX gate poll not found");
+    const std::string poll = mainSrc.substr(gate, abort - gate);
+    TEST_ASSERT_TRUE_MESSAGE(poll.find("irq_rx_active = true;") != std::string::npos, "TX gate abort flag missing");
+    TEST_ASSERT_FALSE_MESSAGE(std::regex_search(poll, std::regex("is_receiving\\s*=\\s*true")),
+                              "RX-DEAF-01: the TX-gate poll sets is_receiving");
+    const size_t restart = mainSrc.find("// FIX BUG #1: Call startReceive FIRST, then re-wire interrupts.");
+    TEST_ASSERT_TRUE_MESSAGE(restart != std::string::npos, "RX-timeout restart not found");
+    const size_t from = mainSrc.rfind("iReceiveTimeOutTime=0;", restart);
+    // a real statement at the start of a line, not a commented-out one
+    TEST_ASSERT_TRUE_MESSAGE(from != std::string::npos &&
+                                 std::regex_search(mainSrc.substr(from, restart - from),
+                                                   std::regex("\\n[ \\t]*is_receiving\\s*=\\s*false\\s*;")),
+                             "RX-DEAF-01: the RX-timeout restart does not clear is_receiving");
+}
+
 static void test_bleguard_is_classic_esp32_only(void)
 {
     const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
@@ -1813,6 +1835,7 @@ int main(int, char **)
     RUN_TEST(test_bleguard_cycle_and_shed_fail_are_instrument_only);
     RUN_TEST(test_bleguard_wiring_pins);
     RUN_TEST(test_bleguard_is_classic_esp32_only);
+    RUN_TEST(test_rx_deaf01_is_receiving_latch);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     return UNITY_END();

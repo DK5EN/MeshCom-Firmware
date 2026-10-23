@@ -1,7 +1,7 @@
 # Campaign: AU-18 heap gate, UDP-02 dedup slot, RX-DEAF-01 latch
 
-Status: **W1-W4 done 2026-10-23.** AU-18 `9b43b4f0`, UDP-04 `6e6e7e40` fixed on fork-dev (not released). RX-DEAF-01
-confirmed by the forced-latch bench; fix waits for the operator (section 7).
+Status: **closed 2026-10-23.** AU-18 `9b43b4f0`, UDP-04 `6e6e7e40`, RX-DEAF-01 A+B fixed on fork-dev (not released).
+Sibling RX-DEAF-02 (nRF52, TX side) logged in BACKLOG.
 
 ## 1. Goal
 
@@ -101,3 +101,12 @@ confirmed by the forced-latch bench; fix waits for the operator (section 7).
 | A      | Drop `is_receiving = true;` from the TX-gate poll (`esp32_main.cpp` ~3830): the local `irq_rx_active` already aborts the TX, and no TX path reads `is_receiving` (only `checkRXRead()` and the park service do) | source pin test; the natural hit cannot be benched                           |
 | B      | Clear `is_receiving` in the RX-timeout radio reset (`esp32_main.cpp` ~3534-3625) as a recovery path for any stale latch                                                                                         | forced-latch bench before/after: RX must resume after the next timeout reset |
 | A + B  | Both (recommended): A removes the cause, B makes any other stale latch self-heal                                                                                                                                | pin test for A, forced-latch bench for B                                     |
+
+- W5 RX-DEAF-01 fix A+B (operator choice): `esp32_main.cpp` TX-gate poll no longer sets `is_receiving` (A); the
+  RX-timeout radio restart clears it (B). Source pin `test_rx_deaf01_is_receiving_latch` (test_command_setters, regex,
+  ignores comments): fails before ("the TX-gate poll sets is_receiving"), passes after. Advisor (Opus) APPROVED: the
+  line came from the nRF52 `OnHeaderDetect()` and was wrong on ESP32 from the start; nothing that now runs during an
+  incoming packet touches the radio SPI; TX abort and CSMA backoff unchanged; B is safe (all readers/writers in the
+  loop task) and reached after the next RX or own TX. Bench after the fix (DK5EN-92 DUT, same forced-latch driver):
+  `--rxlatch` at 21:49:40, `state;0` at 21:49:41, frames received in every later phase (10 / 5 / 1 / 4; before the fix
+  0 in all) (`rxlatch-dut.log`; before: `rxlatch-before-dut.log`). Advisor side finding RX-DEAF-02 (nRF52 TX block).
