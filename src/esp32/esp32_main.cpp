@@ -308,6 +308,7 @@ extern bool hb_warn_logged;
 #include "freertos/queue.h"
 #include "freertos/semphr.h"   // AU-10: BLE pause guard
 #include "esp_heap_caps.h"
+#include "esp_timer.h"       // AU-20: esp_timer_dump for the bleguardcycle counters
 
 struct BleQueueItem {
     uint8_t data[MAX_MSG_LEN_PHONE];
@@ -681,8 +682,9 @@ bool esp32BlePause(void)
 // after the disconnect, advertising off, deinit(true) with the link up (NimBLE terminates the link while
 // stopping), then the session flags are cleared by hand (the terminate may time out and skip onDisconnect).
 // Job task only. True if the stack was stopped; esp32BleResume() brings it back after the guard release.
-// Classic ESP32 only (AU_BLE_PAUSE): on the ESP32-S3 the forced deinit/reinit panics in the NimBLE host task (bench).
-#if AU_BLE_PAUSE
+// Auto-update uses it on classic ESP32 only (AU_BLE_PAUSE): on the ESP32-S3 the forced deinit/reinit panics in the
+// NimBLE host task (bench). INSTRUMENT builds also compile it on other targets for the bleguardcycle bench (AU-20).
+#if AU_BLE_PAUSE || INSTRUMENT_ENABLED
 bool esp32BleForcePause(void)
 {
 #if defined(DISABLE_BLE)
@@ -717,7 +719,7 @@ bool esp32BleForcePause(void)
     return true;
 #endif
 }
-#endif   // AU_BLE_PAUSE
+#endif   // AU_BLE_PAUSE || INSTRUMENT_ENABLED
 
 // True while the BLE stack is stopped (paused by an update job or a failed resume).
 bool esp32BleDown(void)
@@ -2597,16 +2599,62 @@ bool auShedSettled(uint8_t mask)
 #if INSTRUMENT_ENABLED
 // bench only (--update bleguardcycle <n>): n forced BLE deinit/reinit cycles, one per update tick (1 Hz). Each cycle
 // sets the guard, force-pauses, clears the guard and resumes; the heap readings show whether the stack leaks.
+// --update bleguardcycle0 <n> is the control run: same tick, same counters, guard set/cleared, but no pause and no
+// resume (resume field 2). A baseline line with cycle number 0 is printed on the first tick of a run.
 static uint16_t s_cycleLeft = 0;
 static uint16_t s_cycleNo = 0;
+static bool s_cycleCtl = false;
+static bool s_cycleBase = false;
 
-bool auInstrBleGuardCycle(uint16_t n)
+static bool auInstrCycleArm(uint16_t n, bool ctl)
 {
     if(s_bleGuard || s_cycleLeft != 0 || n == 0)
         return false;
     s_cycleNo = 0;
     s_cycleLeft = n;
+    s_cycleCtl = ctl;
+    s_cycleBase = true;
     return true;
+}
+
+bool auInstrBleGuardCycle(uint16_t n)
+{
+    return auInstrCycleArm(n, false);
+}
+
+bool auInstrBleGuardCycleCtl(uint16_t n)
+{
+    return auInstrCycleArm(n, true);
+}
+
+// Count of lines esp_timer_dump() writes. CONFIG_ESP_TIMER_PROFILING is off in this framework, so the dump lists only
+// armed timers (plus possibly a header line): the field is tmr_armed, a relative leak indicator, not an exact count.
+static unsigned auInstrTimerLines(void)
+{
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&buf, &len);
+    if(f == NULL)
+        return 0;
+    esp_timer_dump(f);
+    fclose(f);
+    unsigned n = 0;
+    for(size_t i = 0; buf != NULL && i < len; i++)
+        if(buf[i] == '\n')
+            n++;
+    free(buf);
+    return n;
+}
+
+static void auInstrCyclePrint(unsigned no, unsigned resume)
+{
+    multi_heap_info_t info;
+    heap_caps_get_info(&info, MALLOC_CAP_8BIT);
+    Serial.printf("[AU];bleguard;cycle;%u;heap;%u;blk;%u;resume;%u;int;%u;min;%u;ablk;%u;abytes;%u;tasks;%u;tmr_armed;%u\n",
+                  no, (unsigned)esp_get_free_heap_size(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), resume,
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)esp_get_minimum_free_heap_size(),
+                  (unsigned)info.allocated_blocks, (unsigned)info.total_allocated_bytes,
+                  (unsigned)uxTaskGetNumberOfTasks(), auInstrTimerLines());
 }
 
 static void auInstrCycleTick(void)
@@ -2620,16 +2668,23 @@ static void auInstrCycleTick(void)
         s_cycleLeft = 0;   // a job or a real guard took over: stop the run
         return;
     }
+    if(s_cycleBase)
+    {
+        s_cycleBase = false;
+        auInstrCyclePrint(0, 2);   // baseline before the first cycle
+    }
     s_cycleLeft--;
     s_cycleNo++;
     s_bleGuard = true;
-#if AU_BLE_PAUSE
-    esp32BleForcePause();
+    if(!s_cycleCtl)
+    {
+#if AU_BLE_PAUSE || INSTRUMENT_ENABLED
+        esp32BleForcePause();
 #endif
+    }
     s_bleGuard = false;
-    const bool up = esp32BleResume();
-    Serial.printf("[AU];bleguard;cycle;%u;heap;%u;blk;%u;resume;%u\n", (unsigned)s_cycleNo, (unsigned)esp_get_free_heap_size(),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), (unsigned)up);
+    const unsigned up = s_cycleCtl ? 2u : (esp32BleResume() ? 1u : 0u);
+    auInstrCyclePrint(s_cycleNo, up);
 }
 #endif
 

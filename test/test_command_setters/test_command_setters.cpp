@@ -1689,8 +1689,9 @@ static void test_bleguard_is_classic_esp32_only(void)
     const std::string cmd = read_repo_file("src/command_functions.cpp");
     const std::string web = read_repo_file("src/web_functions/web_nodefunctioncalls.cpp");
 
-    // esp32BleForcePause: defined and declared only under AU_BLE_PAUSE
-    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("#if AU_BLE_PAUSE\nbool esp32BleForcePause(void)") != std::string::npos, "esp32BleForcePause definition not under AU_BLE_PAUSE");
+    // esp32BleForcePause: declared only under AU_BLE_PAUSE; defined under AU_BLE_PAUSE or, for the bleguardcycle
+    // bench on other targets, INSTRUMENT_ENABLED (AU-20). The job task below stays AU_BLE_PAUSE only.
+    TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("#if AU_BLE_PAUSE || INSTRUMENT_ENABLED\nbool esp32BleForcePause(void)") != std::string::npos, "esp32BleForcePause definition not under AU_BLE_PAUSE || INSTRUMENT_ENABLED");
     const size_t hd = hdr.find("bool esp32BleForcePause(void);");
     TEST_ASSERT_TRUE_MESSAGE(hd != std::string::npos && hdr.rfind("#if AU_BLE_PAUSE", hd) != std::string::npos &&
                                  hdr.rfind("#endif", hd) < hdr.rfind("#if AU_BLE_PAUSE", hd), "esp32BleForcePause declaration not under AU_BLE_PAUSE");

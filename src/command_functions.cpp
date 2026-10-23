@@ -5189,21 +5189,26 @@ void commandAction(char *umsg_text, bool ble)
             Serial.printf("[AU];heapgate;set;%lu\n", _hg);
         }
         // bench only: --update bleguardcycle <n> runs n forced BLE stack deinit/reinit cycles (guard set and cleared),
-        // one per second, from the update tick; prints [AU];bleguard;cycle;<i>;heap;<free>;blk;<largest> per cycle
+        // one per second, from the update tick; prints [AU];bleguard;cycle;<i>;heap;<free>;blk;<largest>;resume;<0|1>
+        // plus int/min/ablk/abytes/tasks/tmr_armed counters per cycle, and a baseline line with i=0 at the start.
+        // --update bleguardcycle0 <n> is the control run: same tick and counters, no pause and no resume (resume;2).
+        // Works on any ESP32 in an INSTRUMENT build (AU-20); otherwise classic ESP32 only.
         else
-        if(strncmp(_owner_c, "bleguardcycle ", 14) == 0)
+        if(strncmp(_owner_c, "bleguardcycle ", 14) == 0 || strncmp(_owner_c, "bleguardcycle0 ", 15) == 0)
         {
-            const unsigned long _bn = strtoul(_owner_c + 14, NULL, 10);
-            #if !AU_BLE_PAUSE
-            (void)_bn;
+            const bool _bctl = _owner_c[13] == '0';
+            const unsigned long _bn = strtoul(_owner_c + (_bctl ? 15 : 14), NULL, 10);
+            #if !(AU_BLE_PAUSE || INSTRUMENT_ENABLED)
+            (void)_bn; (void)_bctl;
             Serial.printf("[ERR];update;bleguardcycle: classic ESP32 only\n");
             #else
+            extern bool auInstrBleGuardCycleCtl(uint16_t n);
             if(_auBusy)
                 Serial.printf("[ERR];update;busy\n");
-            else if(_bn < 1 || _bn > 100 || !auInstrBleGuardCycle((uint16_t)_bn))
+            else if(_bn < 1 || _bn > 100 || !(_bctl ? auInstrBleGuardCycleCtl((uint16_t)_bn) : auInstrBleGuardCycle((uint16_t)_bn)))
                 Serial.printf("[ERR];update;bleguardcycle <1..100> (not while a guard or a cycle run is active)\n");
             else
-                Serial.printf("[AU];bleguard;cycle;start;%lu\n", _bn);
+                Serial.printf("[AU];bleguard;cycle;start;%lu%s\n", _bn, _bctl ? ";ctl" : "");
             #endif
         }
         // bench only: --update forget clears fwstage/last, so the tag can be offered again
