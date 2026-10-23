@@ -1,0 +1,50 @@
+{
+  "arm": "C",
+  "frames_sent": 45,
+  "seen_dut": 45,
+  "seen_ref": 45,
+  "lost_dut_seen_ref": 0,
+  "seen_dut_not_ref": 0,
+  "lost_both": 0,
+  "dut_loss_pct": 0.0,
+  "ref_loss_pct": 0.0,
+  "onrx_dut": {
+    "n": 92,
+    "irq_to_read_us_p50": -1.0,
+    "irq_to_read_us_max": 1972194.0
+  },
+  "instr_loop_dut": {
+    "udp": {
+      "count": 20,
+      "max_ms": 15100,
+      "total_ms": 290745
+    },
+    "gps_feed": {
+      "count": 2,
+      "max_ms": 15019,
+      "total_ms": 15309
+    },
+    "lora_rx": {
+      "count": 1,
+      "max_ms": 15034,
+      "total_ms": 15034
+    },
+    "gps": {
+      "count": 1,
+      "max_ms": 15020,
+      "total_ms": 15020
+    }
+  },
+  "nodes": {
+    "dut": "DK5EN-1",
+    "sender": "DK5EN-92",
+    "ref": "DK5EN-14"
+  },
+  "interval_ms": 8000,
+  "web_load": {
+    "requests_ok": 23,
+    "requests_err": 0,
+    "max_latency_s": 19.73
+  },
+  "stamp": "20261023-182059"
+}

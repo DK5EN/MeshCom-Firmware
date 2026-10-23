@@ -257,3 +257,9 @@ Sonnet-high implementer, about $5.
   before); the glue is one call in `txFeed()`. Not done: `-fstack-usage` measurement. Advisor side finding
   logged as RX-DEAF-01. Note for W3: with two or more parked frames `irq_to_read_us` is not per frame (one
   global INSTR stamp); W3 uses "lost at DUT" as the metric.
+- **2026-10-23 W3 (bench, fix `5fdd4b8d` on DK5EN-1, same harness):** A 44/44 (one frame lost on air at both),
+  B 45/45, C 45/45 -- 0 frames lost only at the node in every arm (before: 0 / 1 / 16). `[RXPARK] parked 97
+overflow 0 clamped 0` after the three arms. Arm C still shows loop gaps of up to 15.1 s (the web block is
+  unchanged); arm B after the fix 0 of 86 reads > 100 ms (before 22 of 100). Report:
+  [rx-stall-1229-measurements.md](rx-stall-1229-measurements.md). Open: overnight soak on DK5EN-1 with normal
+  traffic, then W5 upstream PR.
