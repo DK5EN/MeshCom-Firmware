@@ -117,8 +117,8 @@ scan: `esp32BleForcePause` present in the INSTRUMENT V3 ELF, absent from the rel
   RAK has no NimBLE (no-op). Bench DK5EN-92, production patch, 100 pause cycles: `ablk` slope 0.00 (was 1.00), free
   heap -1.5 B/cycle (was -51), 0 panics, all resumes ok (`au20-92-fix-pause.log`). Gate `tools/regression.sh --stage
 1,2` PASS (2753/2753 Unity, 1220 pytest).
-- Open, not in this campaign: report the double init upstream (h2zero/NimBLE-Arduino, esp-nimble); S3 auto update BLE
-  pause (the AU-19 patch survived 100 forced S3 pauses) is a separate decision.
+- Operator 2026-10-23: no upstream report (the pinned NimBLE-Arduino 2.2.3 is old, upstream has a newer version);
+  no BLE pause for the S3 auto update (not needed).
 
 ## 7. RCA (W3)
 

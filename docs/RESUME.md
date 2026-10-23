@@ -13,7 +13,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
   remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
 - **AU-20 fixed (candidate next release):** `tools/nimble_patch.py` deinits the NimBLE flow timer before its
-  second init (about 50 B per BLE pause gone, benched on DK5EN-92); upstream report open. See
+  second init (about 50 B per BLE pause gone, benched on DK5EN-92); no upstream report (old pinned version). See
   [campaign-au20-ble-pause-heap.md](campaign-au20-ble-pause-heap.md). Side result: the AU-19 patch survives 100 forced
   pauses on the S3.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
