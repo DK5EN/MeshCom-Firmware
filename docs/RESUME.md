@@ -17,7 +17,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   [campaign-au20-ble-pause-heap.md](campaign-au20-ble-pause-heap.md). Side result: the AU-19 patch survives 100 forced
   pauses on the S3.
 - **AU-18 and UDP-04 fixed (next release):** heap gate probes both TLS record buffers (`9b43b4f0`), duplicate server
-  positions no longer take a dedup slot (`6e6e7e40`); RX-DEAF-01 not reproduced on the bench, forced-latch test open.
+  positions no longer take a dedup slot (`6e6e7e40`); RX-DEAF-01 confirmed by a forced-latch bench (one TX-gate poll hit leaves an ESP32 node deaf until reboot), fix
+  route waits for the operator.
   See [campaign-au18-udp02-rxdeaf.md](campaign-au18-udp02-rxdeaf.md).
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
