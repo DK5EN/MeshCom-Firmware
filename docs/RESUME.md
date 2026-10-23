@@ -1,7 +1,8 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-23, branch `fork-dev` (in sync with `upstream/dev` d47c34c1), last release `v4.40a.10.21`
-(built locally, Latest). One upstream PR of ours is open: #1235.
+**Stand:** 2026-10-23, branch `fork-dev` (in sync with `upstream/dev` d47c34c1), last release `v4.40a.10.22`
+(CI, Latest, published 2026-10-23 with the 10-22 date). One upstream PR of ours is open: #1235. Bench session
+running: [campaign-bench-20261023.md](campaign-bench-20261023.md).
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -20,8 +21,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
-- **On fork-dev since v4.40a.10.21, not released:** UDP-03 (also upstream as #1233), upstream #1215/#1225/#1234,
-  net console clients on `tools/mc_console.py` with passwords from `.env`, mock keep-reply timer fix.
+- **Release `v4.40a.10.22`** (tag on `8a329702`, CI run 39954657798): UDP-03, upstream #1215/#1225/#1234. 66
+  assets, 27 `.autoupdate` re-inflate ok, tag string and T-Deck field-command scan ok; idle heap DK5EN-92 69068 B
+  (baseline 69332 B, pass); web flasher v4.40a.10.22 (30 boards, 0 mismatches), 10.21 folder pruned; presentation
+  synced. Tagged with the 10-22 date so a same-day fix can be `v4.40a.10.23`. DK5EN-92 runs a local release build
+  of the tag commit; the other nodes not yet flashed.
+- **Bench session 2026-10-23** ([campaign-bench-20261023.md](campaign-bench-20261023.md)): AU-17/AU-14, #1235 on
+  hardware, RM-NVS-01, BL-01, RX stall #1229 = WEB-RX-01 ([campaign-rx-stall-1229.md](campaign-rx-stall-1229.md),
+  W0 + W1a done, W1b next).
 - **Campaign resume points with open steps:**
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
@@ -58,8 +65,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Last release and flasher policy
 
-- `v4.40a.10.21` (tag on `fab3c38b`), built locally after CI failed twice in package install (PlatformIO
-  registry 502); 66 assets, Latest. Base official `v4.40a.hbserver`.
+- `v4.40a.10.22` (tag on `8a329702`, CI-built), 66 assets, Latest. Base official `v4.40a.hbserver`. The previous
+  `v4.40a.10.21` was built locally (CI package install failed).
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). Recipe:
   `/release-firmware` (includes the T-Beam idle-heap step against `tools/heap_baseline.json`).

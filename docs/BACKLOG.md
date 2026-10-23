@@ -4,7 +4,7 @@ Working document for picking the campaign back up: what we set out to do, how we
 there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29) lives in
 [`archive/backlog-journal-20260818-20260929.md`](archive/backlog-journal-20260818-20260929.md).
 
-## Stand 2026-10-19
+## Stand 2026-10-23
 
 - **Branch model:** `fork-dev` is the only working branch: `upstream/dev` (icssw-org) plus the
   fork's docs, tests, tools, GitHub Pages and fork-only firmware not upstream yet. `fork-main`,
@@ -13,9 +13,9 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
   and #1214 (T-Deck DM reply TD-21, web firmware column) merged into upstream `dev` on 2026-10-18,
   merged back with `e87e8a5e`; no upstream tag carries them yet. Merged before: #1200, #1201, #1207,
   #1208. DK5EN never merges upstream himself.
-- **Last release:** `v4.40a.10.19` (2026-10-19, CI-built since `v4.40a.10.11`: `v*` tags publish,
-  `ci-proof-*` tags draft), base official `v4.40a.hbserver`; web flasher offers only the latest
-  release. Release gate now includes the T-Beam idle-heap step (`tools/heap_baseline.json`).
+- **Last release:** `v4.40a.10.22` (2026-10-23, CI-built; `v*` tags publish, `ci-proof-*` tags draft),
+  base official `v4.40a.hbserver`; web flasher offers only the latest release. Release gate includes the
+  T-Beam idle-heap step (`tools/heap_baseline.json`); 10.22: 69068 B vs 69332 B, pass.
 - **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-18: 75
   native envs, 2693 Unity cases, 1136 pytest, golden selftest 48. Stage 3 has run against the bench
   fleet (REG-01). Inventory: [`test-suite-map.md`](test-suite-map.md).
