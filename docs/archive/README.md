@@ -43,4 +43,5 @@ Rules of the directory:
 ## Journals (archived 2026-10-03)
 
 - [backlog-journal-20260818-20260929.md](backlog-journal-20260818-20260929.md): BACKLOG.md campaign journal (former document head, old steps 3.1-3.8, intake and campaign sections 3.8a-3.8bb, 3.9, Durchgang entries, old branch chapter 4.1-4.2b); headings unchanged because other documents cite "BACKLOG.md 3.8x".
+- [resume-journal-20261005-20261023.md](resume-journal-20261005-20261023.md): session journal of docs/RESUME.md, 2026-10-05 to 2026-10-23, verbatim (releases v4.40a.10.05-10.21, campaigns #1187-#1191, RM ext, gw_servers, AU, QRT, fork hardening, WF, upstream PRs #1213/#1214/#1224/#1233).
 - [resume-journal-20260903-20261001.md](resume-journal-20260903-20261001.md): session journal of docs/RESUME.md, 2026-09-03 to 2026-10-01, verbatim; predates the fork-dev branch model.
