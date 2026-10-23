@@ -1,7 +1,7 @@
 # Campaign: AU-18 heap gate, UDP-02 dedup slot, RX-DEAF-01 latch
 
-Status: **W1-W3 done 2026-10-23** (AU-18 `9b43b4f0`, UDP-04 `6e6e7e40` on fork-dev, not released). Open: RX-DEAF-01
-forced-latch test (W4, operator decision). Resume point for this campaign. Section 6 is the progress log.
+Status: **W1-W4 done 2026-10-23.** AU-18 `9b43b4f0`, UDP-04 `6e6e7e40` fixed on fork-dev (not released). RX-DEAF-01
+confirmed by the forced-latch bench; fix waits for the operator (section 7).
 
 ## 1. Goal
 
@@ -84,3 +84,20 @@ forced-latch test (W4, operator decision). Resume point for this campaign. Secti
 - Next (W4, needs operator OK): forced-latch test for RX-DEAF-01: an INSTRUMENT-only command sets `is_receiving = true`
   once (what a poll hit does), then the bench checks whether the DUT still receives. About 10 lines of bench code plus a
   10-minute run.
+- W4 RX-DEAF-01 forced latch (operator go): INSTRUMENT + ESP32-only `--rxlatch` (sets `is_receiving = true` once, as
+  a TX-gate poll hit does) and `--rxlatch state` (`src/command_functions.cpp`, next to `--loratx`; release image has no
+  `rxlatch` string). Bench DK5EN-92 DUT, DK5EN-1 sender (`--loratx 10 1500` bursts to `TEST`, 2 dBm):
+  before the latch the DUT received LORATX 1 (direct and via DK5EN-98) and 2; after `--rxlatch` (21:24:06) the sender
+  put about 20 more frames on air (LORATX 4-10 and two further bursts, plus DK5EN-98 relays) and the DUT received
+  **none**; `state` stayed 1 for 2.5 min, through RX-timeout radio resets and the DUT's own TX (3 TX lines: the node
+  still transmits). Only a reboot cleared it (`state;0` after `--reboot`). Logs `rxlatch-dut.log`, `rxlatch-snd.log`.
+  Verdict: **one TX-gate IRQ-poll hit leaves an ESP32 node deaf until reboot**; the hit itself is rare (W1c: 0 in
+  69 gate entries).
+
+## 7. RX-DEAF-01 fix options (operator decision)
+
+| Option | Change                                                                                                                                                                                                          | Proof                                                                        |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| A      | Drop `is_receiving = true;` from the TX-gate poll (`esp32_main.cpp` ~3830): the local `irq_rx_active` already aborts the TX, and no TX path reads `is_receiving` (only `checkRXRead()` and the park service do) | source pin test; the natural hit cannot be benched                           |
+| B      | Clear `is_receiving` in the RX-timeout radio reset (`esp32_main.cpp` ~3534-3625) as a recovery path for any stale latch                                                                                         | forced-latch bench before/after: RX must resume after the next timeout reset |
+| A + B  | Both (recommended): A removes the cause, B makes any other stale latch self-heal                                                                                                                                | pin test for A, forced-latch bench for B                                     |

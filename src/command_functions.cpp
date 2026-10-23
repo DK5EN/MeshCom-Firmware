@@ -5981,6 +5981,24 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+#if defined(ESP32)
+    // RX-DEAF-01 bench: --rxlatch sets is_receiving once, as a TX-gate IRQ-poll hit does
+    // (esp32_main.cpp TX gate); --rxlatch state only reads it. Both run in the loop task, like checkRX().
+    if(commandCheck(msg_text+2, (char*)"rxlatch state") == 0)
+    {
+        Serial.printf("[INJ];rxlatch;state;%u\n", (unsigned)(bool)is_receiving);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"rxlatch") == 0)
+    {
+        const bool was = is_receiving;
+        is_receiving = true;
+        Serial.printf("[INJ];rxlatch;set;was;%u\n", (unsigned)was);
+        return;
+    }
+    else
+#endif
     if(commandCheck(msg_text+2, (char*)"loratx ") == 0)
     {
         // TM-06(b): non-blocking TX burst -- n frames (cap 20) at ms intervals
