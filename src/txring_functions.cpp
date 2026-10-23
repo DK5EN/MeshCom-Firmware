@@ -51,6 +51,8 @@ std::atomic<uint8_t> stat_ring_max;
 // txringCaseBackoffSlot() unten lesen bNBRCANCEL, darum hier derselbe
 // NATIVE_BUILD-Definitionszweig wie fuer ringBuffer/iWrite/iRead usw.
 bool bNBRCANCEL;
+// GWRX-01: addUdpRxRingEntry() liest bNBRRELAY, gleiche Begruendung.
+bool bNBRRELAY;
 #endif
 
 // SL-03/SL-06 (siehe txring_functions.h): Herkunft je Ring-Slot. Anders als
@@ -898,6 +900,17 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     return addTxRingEntryCore(frame, len, ring_status, ring_status,
                                source, retryCountIn, clearSlotFirst,
                                kind, need, alone);
+}
+
+// GWRX-01: siehe txring_functions.h. Status 0xFF, Label "udp_rx", retryCount 0
+// und clearSlotFirst false wie die beiden bisherigen Direktaufrufe.
+int addUdpRxRingEntry(const uint8_t* frame, uint16_t len, char payload_type,
+                      bool nbrKnown, const NbrMask *need, const NbrMask *alone)
+{
+    if(bNBRRELAY && nbrKnown && payload_type == ':')
+        return addTxRingEntry(frame, len, RING_STATUS_DONE, "udp_rx", 0, false,
+                               RING_KIND_RELAY, need, alone);
+    return addTxRingEntry(frame, len, RING_STATUS_DONE, "udp_rx", 0);
 }
 
 /**

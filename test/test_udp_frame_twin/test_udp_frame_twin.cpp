@@ -61,6 +61,7 @@
 #include <ack_attribution.h>
 #include <conf_frame.h>
 #include <txring_functions.h>
+#include <nbr_matrix.h>        // GWRX-01: NbrNeed/NbrMatrix for the nbrRelayNeed() fake
 
 #include <udp_functions.h>   // stub: bUDPLOG, resetMeshComUDP, handleUdpFrame_esp32
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
@@ -128,6 +129,30 @@ bool bMESH = true;
 int BOARD_HARDWARE = 9;   // RAK4631, the bench board
 int getMOD(void) { return 3; }
 void printAsciiBuffer(unsigned char *buf, int len) { (void)buf; (void)len; }
+
+// GWRX-01: gw_udp_ring.h asks the neighbour matrix for a server text frame's
+// need when --nbrrelay is on. nbr_matrix.cpp is not in this env; the fake
+// records the path it was asked about and answers with g_nbr_need.
+NbrMatrix nbrMatrix;
+bool bNBRSYM = true;
+NbrLogFn nbrLog = NULL;
+static int g_nbr_need_calls = 0;
+static std::string g_nbr_need_path;
+static NbrNeed g_nbr_need;
+static std::vector<std::string> g_nbr_lines;
+static void nbr_log_capture(const char *line) { g_nbr_lines.push_back(line); }
+NbrNeed nbrRelayNeed(const NbrMatrix &, const char *path, uint16_t, bool, uint32_t)
+{
+    g_nbr_need_calls++;
+    g_nbr_need_path = path ? path : "";
+    return g_nbr_need;
+}
+int nbrMaskHex(const NbrMask &, char *out, size_t outlen)
+{
+    if(outlen > 0)
+        out[0] = '\0';
+    return 0;
+}
 
 // via_functions.cpp's checkMesh() is compiled (checkVia()'s neighbour in the
 // same TU) but never called by either handler; is_equ() (loop_functions.h)
@@ -757,6 +782,91 @@ static void test_agreement_gate_text_message_decodes_and_relays_on_both(void)
 
         // setlogFormatGwi() is REAL and shared -- byte-identical formatted
         // text on both sides is itself an agreement worth pinning.
+    }
+}
+
+// GWRX-01: with --nbrrelay on, a server text frame is queued as an NBR relay
+// slot (kind RELAY, need from the matrix) so the overhear scan in OnRxDone can
+// release it. The matrix must see the path AS RECEIVED, without the own call
+// both handlers append; with --nbrrelay off it is never asked.
+static int find_udp_rx_slot(void)
+{
+    for (int i = 0; i < MAX_RING; i++)
+        if (ringBuffer[i][0] > 0 && ringSource[i] == 'g')
+            return i;
+    return -1;
+}
+
+static void test_gwrx01_server_text_queues_as_nbr_relay_on_both(void)
+{
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", ':', "hallo gwrx", 0x1003);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            recorder_reset();
+            bNBRRELAY = (pass == 1);
+            g_nbr_need_calls = 0;
+            g_nbr_need_path.clear();
+            g_nbr_need = NbrNeed();
+            g_nbr_need.need = nbrMaskNone();
+            g_nbr_need.alone = nbrMaskNone();
+            g_nbr_need.inferred = nbrMaskNone();
+            nbrMaskSet(g_nbr_need.need, 3);
+            g_nbr_need.known = true;
+            g_nbr_lines.clear();
+            nbrLog = (pass == 1) ? nbr_log_capture : NULL;
+
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpl, len);
+            if (side)
+                handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else
+                handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+            int slot = find_udp_rx_slot();
+            snprintf(msg, sizeof(msg), "%s pass %d: no udp_rx slot queued", name, pass);
+            TEST_ASSERT_TRUE_MESSAGE(slot >= 0, msg);
+            snprintf(msg, sizeof(msg), "%s pass %d: status must stay DONE", name, pass);
+            TEST_ASSERT_EQUAL_HEX8_MESSAGE(RING_STATUS_DONE, ringBuffer[slot][1], msg);
+
+            if (pass == 0)
+            {
+                snprintf(msg, sizeof(msg), "%s: --nbrrelay off must not ask the matrix", name);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_nbr_need_calls, msg);
+                snprintf(msg, sizeof(msg), "%s: --nbrrelay off must keep kind OTHER", name);
+                TEST_ASSERT_EQUAL_UINT8_MESSAGE(RING_KIND_OTHER, ringKind[slot] & 0x7F, msg);
+            }
+            else
+            {
+                snprintf(msg, sizeof(msg), "%s: matrix not asked once", name);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_nbr_need_calls, msg);
+                snprintf(msg, sizeof(msg), "%s: matrix must get the path without the own call", name);
+                TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-2", g_nbr_need_path.c_str(), msg);
+                snprintf(msg, sizeof(msg), "%s: server text must queue as RELAY", name);
+                TEST_ASSERT_EQUAL_UINT8_MESSAGE(RING_KIND_RELAY, ringKind[slot] & 0x7F, msg);
+                snprintf(msg, sizeof(msg), "%s: need not carried into the slot", name);
+                TEST_ASSERT_TRUE_MESSAGE(nbrMaskEqual(ringNeed[slot], g_nbr_need.need), msg);
+                // Same NEED line as rx_relay, keyed by msg_id, slot = the queued slot.
+                snprintf(msg, sizeof(msg), "%s: exactly one NEED line expected", name);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_nbr_lines.size(), msg);
+                char want[48];
+                snprintf(want, sizeof(want), "|00001003|T|B|");
+                snprintf(msg, sizeof(msg), "%s: NEED line lacks id/typ/case", name);
+                TEST_ASSERT_TRUE_MESSAGE(g_nbr_lines[0].rfind("[NBR]|NEED|", 0) == 0 &&
+                                         g_nbr_lines[0].find(want) != std::string::npos, msg);
+                snprintf(want, sizeof(want), "|%d|", slot);
+                snprintf(msg, sizeof(msg), "%s: NEED line slot differs from the queued slot", name);
+                TEST_ASSERT_TRUE_MESSAGE(g_nbr_lines[0].find(want) != std::string::npos, msg);
+            }
+        }
+        bNBRRELAY = false;
+        nbrLog = NULL;
     }
 }
 
@@ -3181,6 +3291,7 @@ int main(int, char **argv)
     UNITY_BEGIN();
 
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
+    RUN_TEST(test_gwrx01_server_text_queues_as_nbr_relay_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
     RUN_TEST(test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);

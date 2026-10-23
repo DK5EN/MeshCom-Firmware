@@ -137,4 +137,13 @@ void txRingAgeBackground(uint32_t now_ms);
 extern uint32_t stat_tx_refuse_unconfigured;
 void logTxRefuseUnconfigured(void);
 
+// GWRX-01 (docs/rca-gwrx01-20261023.md, Option b): Server-Frame ("udp_rx",
+// ringSource 'g', Status 0xFF) einreihen. Nur TEXT (payload_type ':') bei
+// --nbrrelay und nbrKnown wird RING_KIND_RELAY mit need/alone, damit der
+// Mithoer-Scan in OnRxDone ihn wie ein rx_relay-Slot findet; alles andere
+// bleibt RING_KIND_OTHER wie bisher. Entscheidung hier (host-testbar), die
+// Bedarfsrechnung steht in gw_udp_ring.h.
+int addUdpRxRingEntry(const uint8_t* frame, uint16_t len, char payload_type,
+                      bool nbrKnown, const NbrMask *need, const NbrMask *alone);
+
 #endif // _TXRING_FUNCTIONS_H_

@@ -163,6 +163,12 @@ beruht statt auf einer beobachteten Kante. Mitschnitte aelterer Firmware haben d
 Zaehler dazu stehen in `--info` (`...NBRRELAY <off|count|on> ...relays A <n> B <n> ...cancelled
 <n> ...possible <n> ...refused <n>`).
 
+GWRX-01 (2026-10-23): ein Gateway reiht einen vom Server eingespeisten TEXT-Frame (`udp_rx`, ringSource
+`g`) bei `--nbrrelay count|on` ebenfalls mit Bedarf ein und schreibt dafuer dieselbe `NEED`-Zeile (Typ
+immer `T`). Sie zaehlt nicht in `relays A/B` und ist von einer Relay-`NEED`-Zeile nur ueber die
+`msg_id` (gleiche ID in der `GWI`-Zeile davor) zu unterscheiden; `CANCEL?`/`CANCEL`/`REFUSE` und ihre
+Zaehler gelten fuer beide Slot-Arten.
+
 ### `[NBR]|SYM` -- protokollierte Symmetrie-Annahme
 
 ```

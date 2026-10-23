@@ -28,6 +28,7 @@
 #include "gw_reg_runtime.h"
 #include "gw_reg_state.h"
 #include "udp_frame.h"
+#include "gw_udp_ring.h"   // GWRX-01: udp_rx enqueue (text -> RING_KIND_RELAY)
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"        // F1/stage 4: :sto custody notice on server ingress
@@ -205,6 +206,10 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
           // the own call and the guard would always fire.
           bool bSrcPathHadOwnCall = mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call);
 #endif
+
+          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrRelayNeed() (gw_udp_ring.h)
+          char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
+          mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
 
           mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
           mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -561,7 +566,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 // store last message to compare later on
                 insertOwnTx(aprsmsg.msg_id);
 
-                addTxRingEntry(convBuffer, size, RING_STATUS_DONE, "udp_rx", 0); // fire-and-forget, no retransmission for UDP relay
+                gwUdpRxEnqueue(convBuffer, size, aprsmsg.payload_type, srcPathAsRx, aprsmsg.msg_id); // fire-and-forget, no retransmission for UDP relay (GWRX-01: text may become RING_KIND_RELAY)
 
                 if(bDisplayLog)
                 {

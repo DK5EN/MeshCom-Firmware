@@ -26,6 +26,7 @@
 #include "conf_frame.h"
 #include "setlog_lines.h"
 #include "udp_frame.h"
+#include "gw_udp_ring.h"   // GWRX-01: udp_rx enqueue (text -> RING_KIND_RELAY)
 #include "gw_link_status.h"
 #include "gw_reg_runtime.h"
 #include "gw_reg_state.h"
@@ -325,6 +326,10 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           }
 #endif
 
+          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrRelayNeed() (gw_udp_ring.h)
+          char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
+          mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
+
           mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
           mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
 
@@ -576,7 +581,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 // store last message to compare later on
                 insertOwnTx(aprsmsg.msg_id);
 
-                addTxRingEntry(convBuffer, (uint16_t)size, 0xFF, "udp_rx", 0); // 0xFF no retransmission for UDP relay messages
+                gwUdpRxEnqueue(convBuffer, (uint16_t)size, aprsmsg.payload_type, srcPathAsRx, aprsmsg.msg_id); // 0xFF no retransmission for UDP relay messages (GWRX-01: text may become RING_KIND_RELAY)
 
                 if(bDisplayLog)
                 {

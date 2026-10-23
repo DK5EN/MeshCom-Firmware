@@ -46,7 +46,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - AU-19: NimBLE panic in the BLE pause of the update check (2 in ~35), every classic ESP32 checking daily.
 - AU-14: single TASK_WDT during an AU download. (AU-17 closed 2026-10-23: not reproduced on 10.22.)
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
-- GWRX-01: RCA done 2026-10-23 ([rca-gwrx01-20261023.md](rca-gwrx01-20261023.md)): heard copy is another gateway's server copy, gain ~0.08 % airtime; operator decision fix (b) vs close.
+- GWRX-01: fixed on fork-dev 2026-10-23 (option b, NBR relay cancel for server text slots, [rca-gwrx01-20261023.md](rca-gwrx01-20261023.md)); bench W3 on DK5EN-1 open, then a count-mode night on DK5EN-98 (operator OK).
 - `--mesh off` still transmits on two RF paths (BL-01): operator decision.
 - GPS: altitude Kalman re-seed length (BL-03) and baro fusion tau (GPS-05b), measured, unchanged.
 - Stability, single events: TASK_WDT on DK5EN-1 (BL-04), REBOOT-98.

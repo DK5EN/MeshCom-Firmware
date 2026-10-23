@@ -76,6 +76,7 @@ static void resetRing(void)
     // --nbrrelay aus, sonst wuerde ein liegen gebliebenes bNBRCANCEL=true aus
     // einem frueheren Test den naechsten unbemerkt mitfaerben.
     bNBRCANCEL = false;
+    bNBRRELAY = false;
     // M0-1 (0.4): reset between tests, same as every other stat_* counter above.
     ringstat_enqueue.store(0);
     ringstat_parked_overwrite.store(0);
@@ -687,6 +688,71 @@ static void test_stufe2_kind_need_alone_werden_gesetzt(void)
     TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[slot]);
     TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[slot]));
     TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[slot]));
+}
+
+// GWRX-01 (docs/rca-gwrx01-20261023.md, Option b): ein vom Server eingespeister
+// TEXT-Frame ("udp_rx", ringSource 'g') wird wie rx_relay als RING_KIND_RELAY
+// mit need/alone eingereiht, damit der Mithoer-Scan in OnRxDone ihn findet.
+
+static void test_gwrx01_server_text_mit_bekanntem_bedarf_wird_relay(void)
+{
+    NbrMask needMask  = maskFromU32(0x0000000CUL);
+    NbrMask aloneMask = maskFromU32(0x00000004UL);
+    bNBRRELAY = true;
+
+    BuiltFrame f = buildTextFrame("*", "hallo", 0x7001UL);
+    int slot = addUdpRxRingEntry(f.bytes, f.len, ':', true, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+
+    TEST_ASSERT_EQUAL_UINT8('g', ringSource[slot]);
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[slot]));
+    // Status bleibt DONE (0xFF): keine Wiederholung wie bisher.
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+}
+
+static void test_gwrx01_server_nichttext_bleibt_other(void)
+{
+    NbrMask needMask  = maskFromU32(0x0000000CUL);
+    NbrMask aloneMask = maskFromU32(0x00000004UL);
+    bNBRRELAY = true;
+
+    BuiltFrame pos = buildPositionFrame(0x7002UL);
+    int slot = addUdpRxRingEntry(pos.bytes, pos.len, '!', true, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT8('g', ringSource[slot]);
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[slot]));
+
+    BuiltFrame hey = buildHeyFrame(0x7003UL);
+    int slot2 = addUdpRxRingEntry(hey.bytes, hey.len, '@', true, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_INT(1, slot2);
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[slot2]);
+}
+
+static void test_gwrx01_ohne_nbrrelay_oder_unbekannt_wie_heute(void)
+{
+    NbrMask needMask  = maskFromU32(0x0000000CUL);
+    NbrMask aloneMask = maskFromU32(0x00000004UL);
+
+    // --nbrrelay aus
+    bNBRRELAY = false;
+    BuiltFrame a = buildTextFrame("*", "aus", 0x7004UL);
+    int s0 = addUdpRxRingEntry(a.bytes, a.len, ':', true, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[s0]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[s0]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[s0]));
+    TEST_ASSERT_EQUAL_UINT8('g', ringSource[s0]);
+
+    // --nbrrelay an, aber known == false ("kein Wissen")
+    bNBRRELAY = true;
+    BuiltFrame b = buildTextFrame("*", "unbekannt", 0x7005UL);
+    int s1 = addUdpRxRingEntry(b.bytes, b.len, ':', false, &needMask, &aloneMask);
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[s1]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[s1]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[s1]));
 }
 
 // (c) N-24-Umzug (siehe test_n24_indirekte_eviction_verwaist_keinen_slot
@@ -1606,6 +1672,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert);
     RUN_TEST(test_stufe2_default_ueberschreibt_alte_maske);
     RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
+    RUN_TEST(test_gwrx01_server_text_mit_bekanntem_bedarf_wird_relay);
+    RUN_TEST(test_gwrx01_server_nichttext_bleibt_other);
+    RUN_TEST(test_gwrx01_ohne_nbrrelay_oder_unbekannt_wie_heute);
     RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
     RUN_TEST(test_stufe2_maskenbit_ueber_32_ueberlebt_case_b);
     RUN_TEST(test_qrt_f5_voll_ohne_eviction_liefert_minus2);
