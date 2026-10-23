@@ -1631,6 +1631,15 @@ void nrf52loop()
                 iReceiveTimeOutTime = 0;
                 taskENTER_CRITICAL();
                 startRadioReceive();
+                // RX-DEAF-02: startRadioReceive() aborted any reception, so a header latched by OnHeaderDetect()
+                // without a following OnRxDone/OnRxError/OnRxTimeout must not keep the TX gate shut. Cleared
+                // inside the critical section: a header callback cannot slip in between restart and clear.
+                {
+                    unsigned long _rx_s = ch_util_rx_start.exchange(0);
+                    if(_rx_s > 0)
+                        ch_util_rx_accum.fetch_add(millis() - _rx_s);
+                }
+                is_receiving = false;
                 taskEXIT_CRITICAL();
                 if(bLORADEBUG)
                 {
@@ -1639,6 +1648,12 @@ void nrf52loop()
                 }
             }
         }
+    }
+    else if(iReceiveTimeOutTime == 0 && is_receiving && tx_is_active == false)
+    {
+        // RX-DEAF-02: latch without an armed timer; arm it so the branch above (3 deferrals protect a real
+        // reception) eventually restarts RX and clears the flag.
+        iReceiveTimeOutTime = millis();
     }
 
     if(iReceiveTimeOutTime == 0 && is_receiving == false && tx_is_active == false)

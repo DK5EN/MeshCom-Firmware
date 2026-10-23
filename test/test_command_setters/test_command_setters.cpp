@@ -1703,6 +1703,30 @@ static void test_rx_deaf01_is_receiving_latch(void)
                              "RX-DEAF-01: the RX-timeout restart does not clear is_receiving");
 }
 
+// RX-DEAF-02: nRF52 OnHeaderDetect() latches is_receiving; the RX-timeout restart must clear it, and a latch with no
+// armed timer must arm one, else the TX gate stays shut until the next received packet. Source pins.
+static void test_rx_deaf02_nrf52_tx_unblock(void)
+{
+    const std::string src = read_repo_file("src/nrf52/nrf52_main.cpp");
+    const size_t from = src.find("RX_IRQ_STALE forced restart");
+    const size_t to = src.find("RX_RESTART src=timeout", from);
+    TEST_ASSERT_TRUE_MESSAGE(from != std::string::npos && to != std::string::npos, "nRF52 RX-timeout restart not found");
+    TEST_ASSERT_TRUE_MESSAGE(std::regex_search(src.substr(from, to - from),
+                                               std::regex("\\n[ \\t]*is_receiving\\s*=\\s*false\\s*;")),
+                             "RX-DEAF-02: the nRF52 RX-timeout restart does not clear is_receiving");
+    TEST_ASSERT_TRUE_MESSAGE(
+        std::regex_search(src, std::regex("\\n[ \\t]*else if\\s*\\(\\s*iReceiveTimeOutTime\\s*==\\s*0\\s*&&\\s*is_receiving"
+                                          "\\s*&&\\s*tx_is_active\\s*==\\s*false\\s*\\)\\s*\\{\\s*(//[^\\n]*\\n\\s*)*iReceiveTimeOutTime\\s*=\\s*millis\\(\\)\\s*;")),
+        "RX-DEAF-02: no arm-on-latch for is_receiving with iReceiveTimeOutTime == 0");
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t rl = cmd.find("\"rxlatch state\"");
+    TEST_ASSERT_TRUE_MESSAGE(rl != std::string::npos, "rxlatch command not found");
+    const size_t g = cmd.rfind("\n#if ", rl);
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos &&
+                                 cmd.substr(g, cmd.find('\n', g + 1) - g).find("BOARD_RAK4630") != std::string::npos,
+                             "RX-DEAF-02: the rxlatch bench command is not compiled for BOARD_RAK4630");
+}
+
 static void test_bleguard_is_classic_esp32_only(void)
 {
     const std::string mainSrc = read_repo_file("src/esp32/esp32_main.cpp");
@@ -1836,6 +1860,7 @@ int main(int, char **)
     RUN_TEST(test_bleguard_wiring_pins);
     RUN_TEST(test_bleguard_is_classic_esp32_only);
     RUN_TEST(test_rx_deaf01_is_receiving_latch);
+    RUN_TEST(test_rx_deaf02_nrf52_tx_unblock);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     return UNITY_END();

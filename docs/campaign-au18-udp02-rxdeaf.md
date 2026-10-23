@@ -1,7 +1,7 @@
 # Campaign: AU-18 heap gate, UDP-02 dedup slot, RX-DEAF-01 latch
 
 Status: **closed 2026-10-23.** AU-18 `9b43b4f0`, UDP-04 `6e6e7e40`, RX-DEAF-01 A+B fixed on fork-dev (not released).
-Sibling RX-DEAF-02 (nRF52, TX side) logged in BACKLOG.
+Sibling RX-DEAF-02 (nRF52, TX side) fixed defensively (W6).
 
 ## 1. Goal
 
@@ -110,3 +110,15 @@ Sibling RX-DEAF-02 (nRF52, TX side) logged in BACKLOG.
   loop task) and reached after the next RX or own TX. Bench after the fix (DK5EN-92 DUT, same forced-latch driver):
   `--rxlatch` at 21:49:40, `state;0` at 21:49:41, frames received in every later phase (10 / 5 / 1 / 4; before the fix
   0 in all) (`rxlatch-dut.log`; before: `rxlatch-before-dut.log`). Advisor side finding RX-DEAF-02 (nRF52 TX block).
+
+- W6 RX-DEAF-02 (nRF52 TX block, operator go, A+B): `src/nrf52/nrf52_main.cpp` RX-timeout restart clears
+  `is_receiving` and settles channel-util RX time inside the critical section (A); a latch with
+  `iReceiveTimeOutTime == 0` and no TX arms the timer (B). `--rxlatch` also compiled for `BOARD_RAK4630` (INSTRUMENT
+  only; release image has no `rxlatch` string). Source pin `test_rx_deaf02_nrf52_tx_unblock`: fails before ("restart
+  does not clear is_receiving"), passes after. Advisor (Opus) APPROVED; its note to move the clear into the critical
+  section was applied. Reachability: `OnHeaderDetect()` hangs on `PreAmpDetect`, and SX126x-Arduino 2.0.32
+  `RadioRx()`/`RadioRxBoosted()` mask `IRQ_PREAMBLE_DETECTED` out, so the latch cannot happen in RX today (no
+  `HDR_DETECT` in any log): a defensive fix. Bench DK5EN-90 (INSTRUMENT, `--loradebug on`, `--rxlatch`, `--loratx 1 100`
+  to `TEST`, 2 dBm): before, 3 deferrals, forced restart at 49.96 s, then 16.6 s with no timer fire and no TX until an
+  ambient OnRxDone cleared the flag (`rxdeaf02-before.log`); after, TX_START right after the forced restart at 47.2 s,
+  timer cycles normal (`rxdeaf02-after.log`). Gate stage 1,2 PASS (Unity 2757/2757).

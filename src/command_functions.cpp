@@ -5981,9 +5981,9 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-#if defined(ESP32)
-    // RX-DEAF-01 bench: --rxlatch sets is_receiving once, as a TX-gate IRQ-poll hit does
-    // (esp32_main.cpp TX gate); --rxlatch state only reads it. Both run in the loop task, like checkRX().
+#if defined(ESP32) || defined(BOARD_RAK4630)
+    // RX-DEAF-01/02 bench: --rxlatch sets is_receiving once, as a TX-gate IRQ-poll hit does
+    // (esp32_main.cpp TX gate) or the nRF52 OnHeaderDetect() ISR latch (RX-DEAF-02); --rxlatch state only reads it. Both run in the loop task, like checkRX().
     if(commandCheck(msg_text+2, (char*)"rxlatch state") == 0)
     {
         Serial.printf("[INJ];rxlatch;state;%u\n", (unsigned)(bool)is_receiving);

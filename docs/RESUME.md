@@ -18,7 +18,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   pauses on the S3.
 - **AU-18 and UDP-04 fixed (next release):** heap gate probes both TLS record buffers (`9b43b4f0`), duplicate server
   positions no longer take a dedup slot (`6e6e7e40`); RX-DEAF-01 fixed (one TX-gate poll hit left an ESP32 node deaf until reboot; A+B fix benched); nRF52 sibling
-  RX-DEAF-02 open.
+  RX-DEAF-02 fixed defensively (latent: PREAMBLE IRQ masked in RX; forced-latch bench on DK5EN-90).
   See [campaign-au18-udp02-rxdeaf.md](campaign-au18-udp02-rxdeaf.md).
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
