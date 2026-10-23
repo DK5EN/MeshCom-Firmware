@@ -2,6 +2,20 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-23 -- upstream PR #1235 open: console, GPS filter, board LED, via check, build cleanup
+
+- [#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235), branch `pr/console-gps-led-small-features`
+  (worktree `../MeshCom-PR-next`), 12 commits on `upstream/dev` d47c34c1: VIA-01, UART TX ring, net console
+  P-0111/0168/0169, GPS-11, OR-STAT, INSTRUMENT R1, `[HEAP]` boot marks + NVS `--info` line, board LED without
+  RM, warning flags on the standalone envs (+ T5 `LORA_DIO1` mapping), `-Os` t_echo/t114, `csma_timing.h`, dead
+  `lv_conf.h`. Body: `../pr-console-gps-led-small-features-body.md`.
+- Left out on purpose: heap levers tied to the AU BLE pause, RM LED/`chgled` override, everything RM/AU/SNF/QRT/
+  prod lock. Already upstream before the cut: temp offset, TX power input, HEY echo, ETH-04, `--airgap`.
+- Gate: 33/34 board envs (esp32-external-radio red on `dev` too); fork host suites for every ported item pass on
+  the PR tree. Branch not flashed; LED and heap/NVS never on hardware. BLE `SN` drops BLED/CHGLED when not fitted
+  (`SN1` `LEDNF`): app impact flagged in the body.
+- After the merge: `/sync-upstream`, then remove the worktree and the branch.
+
 ## 2026-10-23 -- upstream sync: #1233 merged, #1234 SP server taken
 
 - `upstream/dev` d47c34c1 merged into fork-dev. #1233 (ours, UDP-03) was already in the fork; #1234 (Kurt,
