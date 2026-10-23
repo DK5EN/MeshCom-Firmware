@@ -2,6 +2,14 @@
 
 **Stand:** 2026-10-20, branch `fork-dev`, last release `v4.40a.10.21` (built locally, Latest).
 
+## 2026-10-23 -- upstream sync: #1233 merged, #1234 SP server taken
+
+- `upstream/dev` d47c34c1 merged into fork-dev. #1233 (ours, UDP-03) was already in the fork; #1234 (Kurt,
+  f1d09f5d) adds the SP (Poland) row to `GW_SERVERS` (INET `spmeshcom.dynalias.com` 146.59.232.234, Hamnet side
+  OTHER_NET), the only tree change. `test/test_gw_servers` pins the table, so SP joins its literal cell checks.
+- PR branch `pr/hb-other-1231` deleted locally and on origin, worktree `MeshCom-PR-next` removed. No open
+  upstream PRs of ours.
+
 ## 2026-10-23 -- mock server keep-reply timer race (flaky `test_stop_cancels_pending_delayed_reply`)
 
 - RCA: `_maybe_send_keep_reply` listed the delayed-reply `Timer` before `start()`; the test read
@@ -39,7 +47,7 @@
 - Bench DK5EN-1: unfixed image silent for 130 s under OTHER traffic, fixed image logs Stage 1 at 59 s and Stage 2 at
   89 s (`tools/bench/runs/harness/udp03-bench-20261022.json`). DK5EN-1 runs the normal fixed build (Oct 22 21:36).
 - Upstream PR #1233 (branch `pr/hb-other-1231`, commit `90ae172a` on `upstream/dev` 6b2fdfac, two `src/` files,
-  "Fixes #1231"), open for maintainer review. `/sync-upstream` done (`414a328c`).
+  "Fixes #1231"), merged 2026-10-22, synced 2026-10-23.
 
 ## 2026-10-20 -- upstream PR #1224 (#1217, web send buffer and watchdog feeds)
 

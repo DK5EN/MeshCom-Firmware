@@ -10,8 +10,8 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static const char *ALL[] = {"OE", "DL", "IT", "HC", "HB"};
-static const int NALL = 5;
+static const char *ALL[] = {"OE", "DL", "IT", "HC", "HB", "SP"};
+static const int NALL = 6;
 
 static void eqIp(const uint8_t *exp, const uint8_t *got)
 {
@@ -141,6 +141,7 @@ static void test_table_values_every_cell(void)
     static const uint8_t itI[4] = {145, 239, 75, 155};
     static const uint8_t hcH[4] = {44, 148, 230, 197}, hcN[4] = {44, 148, 224, 123};
     static const uint8_t hbI[4] = {157, 143, 4, 44}, hbH[4] = {44, 142, 42, 59}, hbN[4] = {44, 142, 163, 2};
+    static const uint8_t spI[4] = {146, 59, 232, 234};
 
     expectTarget("OE", GW_NET_INET, "meshcom.oevsv.at", oeI, "pool.ntp.org", pool);
     expectTarget("OE", GW_NET_HAMNET, nullptr, oeH, nullptr, oeN);
@@ -152,6 +153,8 @@ static void test_table_values_every_cell(void)
     expectTarget("HC", GW_NET_HAMNET, nullptr, hcH, nullptr, hcN);
     expectTarget("HB", GW_NET_INET, "meshcom.emcomm.ch", hbI, "pool.ntp.org", pool);
     expectTarget("HB", GW_NET_HAMNET, nullptr, hbH, nullptr, hbN);
+    expectTarget("SP", GW_NET_INET, "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool);
+    expectTarget("SP", GW_NET_HAMNET, "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool);
 
     // table structure
     TEST_ASSERT_EQUAL(GWM_VIA, gwFind("DL")->side[GW_NET_HAMNET].mode);
@@ -159,6 +162,7 @@ static void test_table_values_every_cell(void)
     TEST_ASSERT_EQUAL(GWM_VIA, gwFind("HC")->side[GW_NET_INET].mode);
     TEST_ASSERT_EQUAL_STRING("DL", gwFind("HC")->side[GW_NET_INET].via);
     TEST_ASSERT_EQUAL(GWM_OTHER_NET, gwFind("IT")->side[GW_NET_HAMNET].mode);
+    TEST_ASSERT_EQUAL(GWM_OTHER_NET, gwFind("SP")->side[GW_NET_HAMNET].mode);
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("OE")->side[GW_NET_INET].mode);
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("OE")->side[GW_NET_HAMNET].mode);
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("HB")->side[GW_NET_HAMNET].mode);
@@ -289,6 +293,7 @@ static void test_resolve_node_end_to_end(void)
     static const uint8_t itI[4] = {145, 239, 75, 155};
     static const uint8_t hcH[4] = {44, 148, 230, 197}, hcN[4] = {44, 148, 224, 123};
     static const uint8_t hbI[4] = {157, 143, 4, 44}, hbH[4] = {44, 142, 42, 59}, hbN[4] = {44, 142, 163, 2};
+    static const uint8_t spI[4] = {146, 59, 232, 234};
     const uint8_t ip[4] = {10, 0, 0, 1};
     struct C { const char *code; uint8_t mode; const char *path, *sh; const uint8_t *sip; const char *nh; const uint8_t *nip; };
     const C cs[] = {
@@ -302,6 +307,8 @@ static void test_resolve_node_end_to_end(void)
         {"HC", 1, "hamnet", nullptr, hcH, nullptr, hcN},
         {"HB", 0, "inet", "meshcom.emcomm.ch", hbI, "pool.ntp.org", pool},
         {"HB", 1, "hamnet", nullptr, hbH, nullptr, hbN},
+        {"SP", 0, "inet", "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool},
+        {"SP", 1, "inet", "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool},
     };
     for (const C &c : cs) {
         GwTarget t;
