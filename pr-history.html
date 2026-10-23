@@ -245,20 +245,21 @@ table.sh th{width:auto}
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a></td><td>2026-10-18</td><td>T-Deck: auf DMs antworten; Web-GUI: Firmware-Stand auf Path- und MHeard-Seite</td><td class="num"><span class="plus">+259</span> <span class="minus">−32</span></td><td class="num">13</td><td class="num">257</td></tr>
 </tbody></table></div>
 <h3>Release und Web-Flasher</h3>
-<p class="lead">Upstream hat 4.40a am 02.10.2026 veröffentlicht und 4.40a.hbserver am 13.10.2026. Der Fork stellte aus demselben Quelltext das Release v4.40a.10.02 bereit; seit 19.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">v4.40a.10.21</a>: das offizielle 4.40a.hbserver plus die Server-Tabelle aus #1213 und den Antwort-Knopf aus #1214 (beide seit 18.10. auch in upstream <code>dev</code>) sowie die Fork-Funktionen für #1187–#1189.</p>
-<p>Nach dem letzten Merge kamen im Fork drei Releases mit wichtigen Fehlerkorrekturen. Sie sind noch nicht in upstream.</p>
+<p class="lead">Upstream hat 4.40a am 02.10.2026 veröffentlicht und 4.40a.hbserver am 13.10.2026. Der Fork stellte aus demselben Quelltext das Release v4.40a.10.02 bereit; seit 19.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a>: das offizielle 4.40a.hbserver plus die Server-Tabelle aus #1213 und den Antwort-Knopf aus #1214 (beide seit 18.10. auch in upstream <code>dev</code>) sowie die Fork-Funktionen für #1187–#1189.</p>
+<p>Nach dem letzten Merge kamen im Fork vier Releases mit wichtigen Fehlerkorrekturen. Sie sind noch nicht in upstream.</p>
 <div class="tocwrap"><table>
 <thead><tr><th>Release</th><th>Datum</th><th>Was es behebt oder bringt</th></tr></thead>
 <tbody>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19">v4.40a.10.19</a></td><td>2026-10-19</td><td><b>Volle LoRa-Sendewarteschlange:</b> ein Knoten mit eigenen und weitergeleiteten Paketen hängt nicht mehr minutenlang hinter seinen Nachbarn. Dazu feste Werte für zehn Protokoll-Einstellungen in Release-Builds, Auto Update im Web-GUI nur noch als Hinweis, mehr freier Heap für die Update-Prüfung auf klassischen ESP32, die Board-LED auf nRF52 und ein Watchdog-Fix für die Nachbarseite.</td></tr>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">v4.40a.10.20</a></td><td>2026-10-19</td><td><b>Webserver startet den Knoten nicht mehr über den Watchdog neu:</b> jede Seite läuft durch einen begrenzten Sendepuffer, ein langsamer oder hängender Browser beendet nur die Seite. Dazu Ende der „WEBServer stopped“-Logflut ohne IP-Adresse, NVS-Diagnose für die Fernsteuerung und der Fix für die T-Beam 1W, die nach einem Auto Update im Safeboot blieb (AU-16).</td></tr>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">v4.40a.10.21</a></td><td>2026-10-19</td><td><b>Board-Erkennung im Web-Flasher, auch wenn die Firmware nicht läuft:</b> Kennung in jedem Image, neues Kommando <code>--id</code>, Safeboot v3 nennt das Board, und „Aus dem Flash lesen“ liest die Kennung über das ESP32-ROM. Dazu eine funktionierende Partitionstabelle für die T-Deck Pro.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a></td><td>2026-10-22</td><td><b>Gateway-Diagnose:</b> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, als #1233 auch in upstream). Dazu die Server-Zeile SP (Polen) aus upstream #1234.</td></tr>
 </tbody></table></div>
 </section>
 
 <section>
 <div class="eyebrow">Quelle</div>
-<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 18.10.2026; Fork-Releases Stand 19.10.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
+<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 18.10.2026; Fork-Releases Stand 23.10.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
 </section>
 </div>
 </body>
