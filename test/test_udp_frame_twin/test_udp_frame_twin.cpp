@@ -889,6 +889,34 @@ static void test_regression_server_reflection_of_own_source_not_queued_on_both(v
     }
 }
 
+static void test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32(void)
+{
+    // UDP-04: a repeated server position (0x21) must not write a second dedup-ring
+    // slot nor count stat_newid again (the early insert is gated on bUdpMsgIsNew).
+    const uint32_t id = 0x3A04;
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", '!', "4700.00N/01300.00E-test", id);
+
+    recorder_reset();
+    uint8_t buf[BUF_CAP];
+    for (int k = 0; k < 2; k++)
+    {
+        copy_into(buf, tmpl, len);
+        handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    }
+
+    int entries = 0;
+    for (int i = 0; i < MAX_DEDUP_RING; i++)
+    {
+        uint32_t rid = (uint32_t)ringBufferLoraRX[i][0] | ((uint32_t)ringBufferLoraRX[i][1] << 8) |
+                       ((uint32_t)ringBufferLoraRX[i][2] << 16) | ((uint32_t)ringBufferLoraRX[i][3] << 24);
+        if (rid == id) entries++;
+    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, entries, "UDP-04: duplicate 0x21 dedup-ring entries for its id");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), "UDP-04: duplicate 0x21 stat_newid");
+}
+
 static void test_agreement_dedup_blocks_repeat_relay_on_both(void)
 {
     uint8_t tmpl[BUF_CAP];
@@ -3154,6 +3182,7 @@ int main(int, char **argv)
 
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
+    RUN_TEST(test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
     RUN_TEST(test_regression_dm_dedup_reacks_without_redisplay_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);

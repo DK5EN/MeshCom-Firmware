@@ -275,8 +275,13 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             sendDisplayPosition(aprsmsg, 99, 0);
 
             // add rcvMsg to forward to LoRa TX
-            addLoraRxBuffer(aprsmsg.msg_id, true);
-            stat_newid.fetch_add(1); // S2: server-injected ids occupy dedup-ring slots too
+            // UDP-04: only a NEW id enters the ring / stat_newid; a duplicate server
+            // position must not write a second slot (older ids would fall out sooner).
+            if(bUdpMsgIsNew)
+            {
+                addLoraRxBuffer(aprsmsg.msg_id, true);
+                stat_newid.fetch_add(1); // S2: server-injected ids occupy dedup-ring slots too
+            }
 
             if(bGATEWAY_NOPOS)
               bUDPtoLoraSend=false;
@@ -552,7 +557,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
               // as server traffic. Keep the dedup entry, skip enqueue and own-tx bookkeeping.
               if(strcasecmp(aprsmsg.msg_source_call, meshcom_settings.node_call) == 0)
               {
-                // 0x21 already entered the ring (and stat_newid) in its branch above
+                // a new 0x21 already entered the ring (and stat_newid) once in its branch above (UDP-04)
                 if(msg_type_b != 0x21)
                 {
                     addLoraRxBuffer(aprsmsg.msg_id, true);
