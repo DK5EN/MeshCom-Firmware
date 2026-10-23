@@ -14,7 +14,13 @@ Aktivierung via seriellem Kommando oder BLE:
 - `bDisplayInfo = true` — MH-LoRa / RX-LoRa2 / TX-LoRa Pakete werden ausgegeben
 - `bDisplayRetx = true` — Retransmission-Statuszeilen werden ausgegeben
 
-Die Einstellung wird im Flash gespeichert und überlebt einen Reboot.
+Gespeichert wird nur das Loradebug-Bit (`node_sset` 0x0200). Beim Booten wird `bDisplayInfo` daraus
+wieder gesetzt, `bDisplayRetx` nicht: nach einem Reboot fehlen die Retransmission-Zeilen, bis
+`--loradebug on` erneut gesendet wird.
+
+**Messhinweis (LDBG-01):** die drei Ausgaben kosten Druckzeit auf der Konsole (Serial und 2323) und
+verschieben damit Zeitmessungen wie `ONRXDONE_TIME`. Für Timing-Messungen die Laufzeit mit und ohne
+`--loradebug` vergleichen oder die Messwerte als Obergrenze lesen.
 
 ---
 

@@ -16,6 +16,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   second init (about 50 B per BLE pause gone, benched on DK5EN-92); no upstream report (old pinned version). See
   [campaign-au20-ble-pause-heap.md](campaign-au20-ble-pause-heap.md). Side result: the AU-19 patch survives 100 forced
   pauses on the S3.
+- **AU-18 and UDP-04 fixed (next release):** heap gate probes both TLS record buffers (`9b43b4f0`), duplicate server
+  positions no longer take a dedup slot (`6e6e7e40`); RX-DEAF-01 not reproduced on the bench, forced-latch test open.
+  See [campaign-au18-udp02-rxdeaf.md](campaign-au18-udp02-rxdeaf.md).
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
