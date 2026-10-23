@@ -3,188 +3,326 @@
 
 ## What this release is
 
-**`v4.40a.10.22`: `v4.40a.10.21` plus one gateway diagnostics fix and the server-table updates from upstream.** Stray datagrams on the gateway port no longer silence the server-link warning (UDP-03, upstream issue [#1231](https://github.com/icssw-org/MeshCom-Firmware/issues/1231)), and the server table gains the Polish server SP and the new OE label. Nothing else in the firmware changed; everything of `v4.40a.10.21` and earlier is listed below. `v4.40a.10.21` brought a board identity that the web flasher can read even when the application does not run (marker, `--id`, Safeboot v3, "Aus dem Flash lesen"), better board detection in the web flasher and a working partition table for the T-Deck Pro; the web flasher work is described in [`docs/campaign-webflasher-autodetect-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-webflasher-autodetect-20261019.md). `v4.40a.10.20` brought a web server that can no longer reboot the node through the watchdog, the fix for the "WEBServer stopped" log flood, NVS diagnostics for remote management and the fix for the T-Beam 1W that stayed in Safeboot after an Auto Update (AU-16, now confirmed on a real 1W in the field); that list is kept below. The web send-buffer work is described in [`docs/campaign-web-wdt-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-web-wdt-20261019.md). `v4.40a.10.19` brought relief for a full LoRa transmit queue, fixed values for ten protocol-tuning settings in release builds, a reworked Auto Update row in the web GUI with `notify` as the only mode, more free heap for the update check on classic ESP32 boards and the board LED on nRF52; that list is kept below. Like the releases before it, it is the official `v4.40a.hbserver` plus everything the fork has built on top (gateway server table, `--setnet`, GPS position filter, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release. The queue work is analysed in [`docs/lora-qrt-dk5en98-db0taw14-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/lora-qrt-dk5en98-db0taw14-20261018.md) and planned in [`docs/campaign-lora-qrt-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-lora-qrt-20261018.md); the setting lock is specified in [`docs/production-locked-settings.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/production-locked-settings.md); the Auto Update GUI in [`docs/campaign-au-webgui-ux-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-au-webgui-ux-20261018.md); heap and LED work in [`docs/campaign-fork-hardening-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-fork-hardening-20261018.md). A full list of what differs from upstream is in [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/fork-dev-vs-upstream-20261018.md).
+**`v4.40a.10.22` is `v4.40a.10.21` plus one gateway diagnostics fix and the server-table update from upstream.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
 
-**Built by GitHub CI.** The workflow `MeshCom CI` built the images from the tagged commit and published them (`v4.40a.10.21` had to be built locally because the PlatformIO registry was down). 66 assets: 27 ESP32 application `.bin`, the three nRF52 boards as `.uf2` and DFU `.zip`, six support files, and 27 `.autoupdate` files (the zlib twin of each ESP32 image, used by Auto Update). The [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) serves this release.
-
-**How to tell builds apart:** the version field on the air still reads `4.40a`. `--info` prints `...AU env=<board> tag=v4.40a.10.22` and the flash stamp `FLASH_VERSION 20261022`; `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.10.22`. `FLASH_STRUCT_VERSION` stays at `20260724`, **your configuration survives the update from `4.40a`/`4.35v`** -- except the ten locked settings below, which a release build sets to their fixed value at boot.
-
-**Safeboot:** this release ships **Safeboot v3**, unchanged since `v4.40a.10.21` (item 1 there). It reaches a node only through the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/), because the firmware's own update path writes the application alone. It is optional: the application still works with Safeboot v2 (`v4.40a.10.05` and later), so a node that runs v2 can take this release over the air, including through Auto Update on the dev channel. v3 only adds that Safeboot names the board (`--id`, `--info`).
+### Action needed
 
 > [!WARNING]
-> **T-Beam 1W owners: run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once with this release** if you did not do it with `v4.40a.10.20` (no erase needed). It writes the QIO bootloader the 1W has been missing; Auto Update, `--ota-update` and the Safeboot update page stay blocked until then (item 4 of `v4.40a.10.20`). Do not update a 1W over the air before that: older firmware hands over to Safeboot and the node loses its settings.
+> **T-Beam 1W: run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once** if you did not with `v4.40a.10.20` (no erase needed).
+>
+> - It writes the QIO bootloader the 1W has been missing.
+> - Until then Auto Update, `--ota-update` and the Safeboot update page stay blocked.
+> - Do not update a 1W over the air before that: older firmware hands over to Safeboot and **the node loses its settings**.
 
 > [!WARNING]
-> **T-Deck Pro owners: run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once with this release** if you did not do it with `v4.40a.10.21` (no erase needed). Until now the T-Deck Pro was built with a partition table that has no Safeboot partition, so the web flasher wrote Safeboot over the application and the board never started the firmware (item 3 of `v4.40a.10.21`). The new table keeps the settings (NVS stays at the same address); the SPIFFS area moves and is formatted once on the first boot.
+> **T-Deck Pro: run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once** if you did not with `v4.40a.10.21` (no erase needed).
+>
+> - The old partition table had no Safeboot slot, so the web flasher overwrote the application and the board never started.
+> - The new table keeps your settings; the SPIFFS area moves and is formatted once on first boot.
 
-**Auto Update channels:** the `prod` channel reads the latest icssw-org release, the `dev` channel (`--updchan dev`) reads the **Latest** release of this fork, which is this one. Since `v4.40a.10.19` the mode is always `notify` (see item 3 of that release below).
+**Everyone else:** update as usual (web flasher, `.bin` over USB, `tools/webflash.py`, or Auto Update on the `dev` channel).
 
-## New since `v4.40a.10.21`
+### Key facts
 
-1. **Gateway: stray datagrams no longer silence the server-link warning (UDP-03, upstream issue #1231).** A gateway counts the time since the last packet from its MeshCom server and logs two warnings when the server falls silent ("[UDP] Server not responding", "[UDP] Heartbeat timeout"). Any other datagram that reached the gateway port (no server indicator, no source check) also reset that clock, so a gateway with a dead server link but some stray traffic on its LAN never logged the warnings. Only server packets reset it now (ESP32 and nRF52). Diagnostics only: the recovery actions were never delayed, and no real server frame was found in this branch (0 of 102,394 in our field captures). Bench, Heltec V3 (`DK5EN-1`) with 13 stray datagrams during 130 s of server silence: without the fix no warning, with it the first after 59 s and the second after 89 s. Merged upstream as [#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233).
-2. **Server table from upstream:** new row SP (Poland: Internet `spmeshcom.dynalias.com` 146.59.232.234, Hamnet side via the Internet server) from upstream [#1234](https://github.com/icssw-org/MeshCom-Firmware/pull/1234); the OE server is now labelled "MeshCom OE (Austria/WW)" (upstream #1215). Only gateways with server code SP or OE see a difference (SP was unknown before).
-3. **Upstream merged:** `upstream/dev` up to `d47c34c1` (#1215, #1219/#1223 net zero, #1224 = the web send buffer the fork already had, #1225 `default_envs` order, #1233, #1234). The Safeboot images rebuilt upstream in #1215 are not taken; the fork keeps Safeboot v3.
+- **Base:** official `v4.40a.hbserver` plus the fork's own work (gateway server table, `--setnet`, GPS position filter, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. **Exception:** ten locked protocol settings are reset to their fixed value at first boot (since `v4.40a.10.19`, see below).
+- **How to tell builds apart:** the version on the air still reads `4.40a`.
+  - `--info` prints `...AU env=<board> tag=v4.40a.10.22` and `FLASH_VERSION 20261022`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.10.22`.
+- **Safeboot v3** ships unchanged since `v4.40a.10.21`.
+  - It reaches a node only through the web flasher; over-the-air updates write the application alone.
+  - Optional: the application still works with Safeboot v2 (`v4.40a.10.05` and later). v3 only adds that Safeboot names the board.
+- **Auto Update channels:** `prod` reads the latest icssw-org release; `dev` (`--updchan dev`) reads the **Latest** release of this fork, which is this one. The mode is always `notify`: the node reports a new release, nothing installs by itself.
+- **Built by GitHub CI** (`MeshCom CI`) from the tagged commit, 66 assets:
+  - 27 ESP32 application `.bin` plus 27 `.autoupdate` files (zlib twin of each image, for Auto Update)
+  - the three nRF52 boards as `.uf2` and DFU `.zip`
+  - six support files
 
-## Already in `v4.40a.10.21` (new since `v4.40a.10.20`)
+## New in `v4.40a.10.22`
 
-1. **Board identity without a running application (WF-05).** Several boards share a hardware ID (the three T-Beam v1.x images all report 12), and a board in Safeboot, in ROM download mode or with a hung application could not tell the web flasher which image it needs. Every image now carries a 128-byte marker (`MCBOARD1`, hardware ID, build environment, release tag) at a fixed place: offset 0x120 of every ESP32 application image, next to the ESP-IDF app descriptor; on nRF52 a constant in the image. The new serial command `--id` prints it as `MCBOARD:v1:<hwid at runtime>:<hwid at build>:<env>:<tag>` (ESP32 and nRF52). **Safeboot v3** reads the marker of the installed application once at boot, prints it, and answers `--id` and `--info` with the board name (Safeboot v2 answered nothing). The web flasher sends `--id` together with `--info`, takes the build environment from the answer, and offers a new button **"Aus dem Flash lesen"** for ESP32 boards: it puts the board into ROM download mode, reads the partition table and the start of the application (about 7 KB, 1-1.3 s) and names the board from the marker, also when the board is silent. Afterwards the board is reset into the application. Images built before this release carry no marker, so the button reports "no marker" for them. `tools/pages_flasher.py` refuses to publish an ESP32 image without a matching marker.
-2. **Web flasher board detection (WF-01..WF-03).** The detection reads `...AU env=<board>` from `--info` and picks exactly that image when the release ships it (before, boards with a shared hardware ID left several candidates). After listening, an ESP32-S3 with native USB is left with both control lines low instead of the "download" state. A board that does not answer now shows what it received (the last 2 KB, folded), recognises Safeboot and the ROM download banner, and offers **"Neustart in die App"**, which resets the board and detects it again; a board put into ROM mode with its BOOT button needs its RST key, and the page says so.
-3. **T-Deck Pro partition table (WF-04).** `t_deck_pro` was built with `default_16MB.csv`, which has no Safeboot partition, while the web flasher wrote Safeboot to 0x10000 and the application to 0xC0000 as on every other 16 MB board: Safeboot landed in the application slot and the firmware never ran. The T-Deck Pro now builds with the 16 MB Safeboot table like the other boards, and `pages_flasher.py` refuses a release whose flasher manifest writes outside the board's partition table (all 27 ESP32 release boards pass). See the warning box above.
+- **Gateway server-link warning works again with stray LAN traffic.** A gateway now resets its "server silent" clock only on packets from its MeshCom server (ESP32 and nRF52).
+  - Before, any datagram on the gateway port reset it, so a gateway with a dead server link but some LAN noise never logged "[UDP] Server not responding" or "[UDP] Heartbeat timeout".
+  - Diagnostics only: recovery was never delayed, and no real server frame took this branch (0 of 102,394 in our field captures).
+  - Merged upstream as [#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233) (issue [#1231](https://github.com/icssw-org/MeshCom-Firmware/issues/1231), fork ID UDP-03).
+- **Polish server in the table.** New row SP (Internet `spmeshcom.dynalias.com` 146.59.232.234; Hamnet side via the Internet server) from upstream [#1234](https://github.com/icssw-org/MeshCom-Firmware/pull/1234). OE is now labelled "MeshCom OE (Austria/WW)" (#1215). Only gateways with server code SP or OE see a difference.
+- **Upstream merged:** `upstream/dev` up to `d47c34c1` (#1215, #1219/#1223 net zero, #1224 = the web send buffer the fork already had, #1225 `default_envs` order, #1233, #1234). The Safeboot images rebuilt upstream in #1215 are not taken; the fork keeps Safeboot v3.
 
-## Already in `v4.40a.10.20` (new since `v4.40a.10.19`)
+## Earlier fork releases
 
-1. **Web pages can no longer trip the watchdog (WEB-WDT-01).** The web server wrote straight into the TCP socket inside the watchdog-guarded loop; with a slow browser link the core's write retried for up to 10 s per call and the node rebooted with `TASK_WDT` (reproduced on the bench: `LAST_LOOP_SECTION=web`). All web output now goes through one 1400 B send buffer with a bounded send loop: the page is aborted and the socket closed after 2 s without progress, after 15 s for the whole page, or on a send error, and `[WEB];tx;abort;<stall|budget|error>` is logged once. ESP32 sends without blocking; nRF52 (RAK13800 W5100S) sends at most what the chip buffer takes, because its library waits without a timeout. The Path, MHeard and neighbour-matrix pages feed the watchdog per record. On a normal LAN nothing changes: the main page (94 kB) is sent in about 0.5 s. A browser on a very slow link now sees a truncated page instead of a rebooting node.
-2. **No more "WEBServer stopped" flood without an IP address (WEB-STOP-01).** With the web server enabled but no IP (on the T-Deck usually because WiFi is switched off with the WLAN button), every loop pass stopped the not-running server again and logged the line. The stop now acts only on a running server. The fix for the missing server itself is to switch WiFi on (`--wifi on` or the WLAN button).
-3. **NVS diagnostics for remote management (RM-NVS-01).** A field report has the web GUI's "remember password" on an E22 failing with `store`. Suspected cause: the 20 KB NVS partition is full. `--info` now prints an `NVS` line with used/free/total entries (ESP32), and a failed save of the remote-node list logs why (`[RMNODES];write;...`) and the NVS fill level. Diagnostics only; the cause is not fixed yet.
-4. **T-Beam 1W stays in Safeboot after an Auto Update (AU-16).** The 1W board definition had flash mode `dio`, so the 1W shipped the DIO bootloader; every other ESP32-S3 release board ships QIO. The application runs fine behind it, but Safeboot (built on IDF 5) misreads the flash: it sees no settings (empty callsign, no WiFi, so it opens the `MeshCom-OTA` access point at 192.168.4.1), finds no staged update and rejects the application (`[SAFEBOOT];app;image;invalid;rc;8194`), and it writes a fresh empty settings page, so **the node loses its settings**. A bootloader swap on the bench (T-Deck Plus `DK5EN-14`) reproduced the field log line by line. The 1W now builds with `qio` (its `bootloader.bin` is byte-identical to the QIO bootloader of the other S3 boards). Because the firmware's own update path writes only the application, the bootloader on a 1W in the field changes only through the web flasher; until then a guard on every ESP32-S3 reads the boot mode and refuses the handover to Safeboot (Auto Update install, `--update install|apply`, `--ota-update`) with `[ERR];safeboot;bootloader_dio;renew with the web flasher`. There is no override. `--update status` adds `boot;qio|dio;spi0;0x...` and reports `safeboot;dio` when blocked; the web GUI's Auto Update row disables its button and asks for the web flasher. Guide: [`docs/troubleshooting-tbeam-1w-autoupdate.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/troubleshooting-tbeam-1w-autoupdate.md).
+Everything below is already in `v4.40a.10.21` and older, and therefore in this release too. Open a section for details.
 
-## Already in `v4.40a.10.19` (new since `v4.40a.10.18`)
+<details>
+<summary><strong><code>v4.40a.10.21</code></strong> — board identity for the web flasher, T-Deck Pro partition table</summary>
 
-1. **LoRa transmit queue: less inflow, earlier release, no starvation (LoRa QRT campaign).** Field captures of `DK5EN-98` and `DB0TAW-14` showed a full queue refusing the user's messages (QRT) for up to 8 minutes while the channel was idle three quarters of the time: every received frame re-armed the full transmit hold, and the queue filled with redundant copies.
-   - **`--nbrrelay on` is the fixed value in release builds** (see item 2): a relay is cancelled when every neighbour that needs the frame is already served, and a relay waiting 8 s gets a 150 ms hold.
-   - An echo of an own group text releases its queued copy; a text that was heard or acknowledged stops retrying; no retry copy is queued while the node is in QRT.
-   - A frame from the server that carries the node's own call as source is not queued for LoRa again.
-   - A full queue answers the sender with a refusal (QTA) at any depth; a drop below the refusal line does not enter QRT. QRT is released once the queue falls below 16 entries, with one QRV, repeated at most every 60 s.
-   - **Age-escalated hold:** a frame of priority 1-3 that has waited 20 s gets a short hold after a received frame (ends before the previous frame's receivers finish their own hold), after 60 s the rapid hold. Never after own TX or a busy CAD.
-   - The TX log `cad=` now shows the real CAD attempt (was always 0); `[MC-HWM]` gains `aged1`/`aged2`/`wait_hwm` (ESP32).
-   - The web queue card says "Your messages: accepted / slow down / refused" and adds a ring line with drops and TX/RX share.
-2. **Fixed values for protocol-tuning settings in release builds.** Release builds refuse to change `--nbrrelay` (on), `--nbrsym` (on), `--nbrreport` (auto), `--shortpath` (off), `--pingtime`/`--pingmax` and the four `--spec*` parameters, and `--stor on`, with `[ERR];locked;<name>`. The gate sits in the shared command path (USB and 2323 console, web, BLE, T-Deck, remote management); config import, boot load and the nRF52 BLE settings blob normalise stored values, so **a node that had any of these changed is set to the fixed value at its first boot on this release**. `{SET}` over LoRa accepts a text hop of 1..6 and ignores the position hop. Range limits: text hop 1..6, `--postime` 300..86400 s, `--ptime` 5..120 min. Setter fixes found on the way: `--postime` dead branch, `--ptime` fallback (was 30 h, now 15 min), `--pingtime` floor 30 s, `--pingmax max` is 5 (was 100); the web spectrum page no longer stores its parameters. SF, bandwidth, coding rate, TX power, gateway, mesh, via and the network mode stay free.
-3. **Auto Update: `notify` only, new web GUI row.** `off` is gone: a stored `off` loads as `notify`, so **every ESP32 node with WiFi now checks for a new release about once a day and reports it; nothing installs by itself**. `auto` is refused in every build (the automatic install is not compiled in); a stored or imported `auto` becomes `notify`. The Info page has one state-driven button in the Auto update row (Check now, Install, Downloading %, Install now, Installing %), fed by a new `GET /austatus` and, while the node is in Safeboot, by Safeboot's `/ota/state`; it follows the node through the restart without a reload and says plainly when the node stays in Safeboot and needs the web flasher. Classic ESP32 with a phone connected: a "Pause Bluetooth and check" button drops the phone link for the job and keeps it off until the job ends (BLE guard, classic ESP32 only), and an automatic check that found the phone connected for 30 min past its due time does the same once per period. Before giving up on low heap the check sheds KISS TCP and, if that can close the gap, the net console. The web call `updcheck?ble` starts a guarded check.
-4. **More heap for the update check on classic ESP32.** The 5 KB of phone byte rings are allocated only while BLE runs and freed in the update check's BLE pause (T-Beam static RAM 107688 B to 102584 B; the check now starts with 86 KB free instead of 76-81 KB). The update task stack shrinks from 12288 to 10240 B. `[HEAP]` boot marks after each service start. Side effect: the web message history is empty after an update check on these boards.
-5. **Board LED and charge LED.** RAK4631, T114 and T-Echo get the board LED heartbeat and remote `led`; LEDs go dark in sleep and with BLE off. Variant pins per the LED plan (T-Echo, T114 active low, Heltec V2/V3/V4, Wireless Stick Lite V3, T-Beam SX1268, S3 DevKitC NeoPixel, T-ETH-Elite). `--info` prints `BOARD LED` and `CHARGE LED` lines; a board without an LED says "not fitted" (phone app: `SN` omits the fields, `SN1` carries `LEDNF`). `--board led on` is refused while OneWire owns the pad (T-Beam GPIO4), checked at run time instead of compile time. Remote `chgled` without argument reads the effective mode; `led` answers `err pinbusy` on a busy pad. Web setup switches and Info rows for both LEDs.
-6. **Remote `sens` reports only detected sensors.** A field is claimed only when its sensor is enabled and detected; BME280 humidity follows the chip ID at either address (field bug: a BME280 enabled with `--bmp` reported humidity as not fitted).
-7. **Neighbour page no longer trips the watchdog.** The neighbour matrix page wrote one TCP packet per cell in the watchdog-guarded loop; a full 128-row table needs about 5.2 s on a good LAN and a slow browser link sooner (field reboots on `DB0TAW-14`, 47 rows). The watchdog is now fed per row.
+- **Every image names its board, even when the application does not run** (WF-05).
+  - Why: several boards share a hardware ID (all three T-Beam v1.x images report 12), and a board in Safeboot, ROM download mode or with a hung application could not tell the web flasher which image it needs.
+  - A 128-byte marker (`MCBOARD1`, hardware ID, build environment, release tag) sits at offset 0x120 of every ESP32 image; on nRF52 it is a constant in the image.
+  - New command `--id` prints `MCBOARD:v1:<hwid at runtime>:<hwid at build>:<env>:<tag>` (ESP32 and nRF52).
+  - **Safeboot v3** reads the marker at boot and answers `--id` and `--info` with the board name (v2 answered nothing).
+  - Web flasher button **"Aus dem Flash lesen"** (ESP32): enters ROM download mode, reads about 7 KB in 1-1.3 s, names the board from the marker, then resets it into the application. Images older than this release carry no marker ("no marker").
+  - `tools/pages_flasher.py` refuses to publish an ESP32 image without a matching marker.
+- **Web flasher picks exactly one image** (WF-01..WF-03).
+  - It reads `...AU env=<board>` from `--info`; boards with a shared hardware ID no longer leave several candidates.
+  - An ESP32-S3 with native USB is left with both control lines low after listening, not in the "download" state.
+  - A silent board shows what it received (last 2 KB, folded), Safeboot and the ROM banner are recognised, and **"Neustart in die App"** resets and re-detects it. A board put into ROM mode with its BOOT button needs its RST key; the page says so.
+- **T-Deck Pro starts again after web flashing** (WF-04).
+  - It was built with `default_16MB.csv` (no Safeboot partition), while the web flasher wrote Safeboot to 0x10000 and the application to 0xC0000 like on every other 16 MB board.
+  - It now uses the 16 MB Safeboot table, and `pages_flasher.py` refuses a manifest that writes outside a board's partition table (all 27 ESP32 boards pass).
+- Background: [`docs/campaign-webflasher-autodetect-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-webflasher-autodetect-20261019.md).
 
-## Already in `v4.40a.10.18` (new since `v4.40a.10.17`)
+</details>
 
-1. **GPS position filter (GPS-11), on by default on ESP32 GPS boards.** A still node used to send the raw GPS fix, so multipath noise of 10-40 m moved its on-air position between `DDMM.MM` grid cells many times an hour. The fix now goes through an HDOP-weighted filter before it is stored and sent: with `--track off` a 30-minute average while the node is still, with automatic motion detection (10 s of speed evidence or a displacement beyond a 40-60 m radius) that switches to a constant-velocity model; with `--track on` a constant-velocity model fed by the GPS Doppler speed, with a zero-velocity update. While still, a 0.3-cell hysteresis holds the on-air grid cell. A manual position set resets the filter only when it changes the position. `--gpsfilter off` restores the old path exactly (stored position and APRS text are bit-identical, host-tested); the switch is runtime only and not saved, so the filter is on again after a reboot. `--gpsdebug on` prints one line per fix with raw, filtered and held position, speed and course. RAK4631 and T-Deck Pro read GPS on their own paths and are not filtered.
-2. **Network debug console (port 2323) fixes.** The console now also starts in pure WiFi AP mode (P-0111). `--netconsole off` closes the listener even when the console is the only network service (P-0169). A client that vanished without closing its connection no longer blocks every new login until a power cycle: new connections are accepted while a session is up, a successful HMAC login takes over the old session, a failed one leaves it alone, and TCP keepalive (60/10/3 s) drops dead peers (P-0168).
-3. **Remote management: `net` and `upd` (RM1).** `net` answers MTU, MeshCom server, configured and effective network (Internet or Hamnet), on ESP32 and nRF52. `upd` reads the Auto Update state; `upd check` starts a check and `upd go <tag>` installs the reported or staged release and hands over to Safeboot (at least 8 s after the reply). `upd` works whatever `--autoupdate` is set to, and keeps every Auto Update gate except the night window (valid clock, no phone connected, battery floor, Safeboot able to apply). Boards without Auto Update answer `err unsupported`. `status` gains `rs=0|1` (strict 10 s spacing enforced or not). The remote web page shows `net` and `upd` in the Radio card, with Check and a two-tap Update button. The age of the last check (`ck=`) is now right on nodes whose system clock was never set (GPS clock), which the bench run found.
+<details>
+<summary><strong><code>v4.40a.10.20</code></strong> — no watchdog reboot from slow browsers, T-Beam 1W Safeboot fix</summary>
 
-## Already in `v4.40a.10.17` (new since `v4.40a.10.16`)
+- **Web pages can no longer reboot the node through the watchdog** (WEB-WDT-01).
+  - Before: the web server wrote straight into the TCP socket; with a slow browser one write could retry for 10 s and the node rebooted with `TASK_WDT` (reproduced on the bench).
+  - Now: one 1400 B send buffer with a bounded send loop. The page is aborted after 2 s without progress, 15 s in total, or a send error; `[WEB];tx;abort;<stall|budget|error>` is logged once.
+  - ESP32 sends without blocking; nRF52 (W5100S) sends at most what the chip buffer takes. Path, MHeard and neighbour pages feed the watchdog per record.
+  - Normal LAN: no change (94 kB main page in about 0.5 s). Very slow link: a truncated page instead of a reboot.
+- **No more "WEBServer stopped" log flood without an IP address** (WEB-STOP-01). Typical on the T-Deck with WiFi switched off. To get the web server back, switch WiFi on (`--wifi on` or the WLAN button).
+- **NVS fill level in `--info`** (RM-NVS-01). Diagnostics for a field report where "remember password" failed on an E22; suspected full 20 KB NVS partition. A failed save logs `[RMNODES];write;...`. The cause is not fixed yet.
+- **T-Beam 1W no longer gets stuck in Safeboot after an Auto Update** (AU-16).
+  - Cause: the 1W board definition had flash mode `dio`, so it shipped the DIO bootloader. Safeboot (IDF 5) then misreads the flash, sees no settings, opens the `MeshCom-OTA` access point at 192.168.4.1, rejects the application, and writes an empty settings page: **the node loses its settings**.
+  - Fix: the 1W builds with `qio` (bootloader byte-identical to the other S3 boards). Confirmed on a real 1W in the field on 2026-10-19.
+  - The bootloader changes only through the web flasher. Until then every ESP32-S3 with a DIO bootloader refuses the handover to Safeboot with `[ERR];safeboot;bootloader_dio;renew with the web flasher` (no override). `--update status` and the web GUI say so.
+  - Guide: [`docs/troubleshooting-tbeam-1w-autoupdate.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/troubleshooting-tbeam-1w-autoupdate.md).
+- Background: [`docs/campaign-web-wdt-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-web-wdt-20261019.md).
 
-1. **Auto Update works on PSRAM boards (AU-13).** The prebuilt mbedTLS allocated internal RAM only; on the T-Deck Plus a TLS handshake took about 56 KB of the 57-84 KB internal heap while 4.6 MB PSRAM sat unused, so the update check failed (`[AU];tls;-32512` in the field, `tls -1` and a WiFi drop on our bench) right after boot. mbedTLS now allocates from PSRAM first (internal fallback) on boards built with `BOARD_HAS_PSRAM`; `[AU];tlsalloc;psram` marks it. The heap gate and the `[AU];heap` line now measure internal RAM, which they did not before (PSRAM was counted, so logs looked healthy).
-2. **`--via` validates the list before storing it (VIA-01).** Any string used to be accepted; a field node set `DK8VW-P`, no relay matched the resulting path and nothing was meshed. Each comma token must now be a valid callsign with a numeric SSID 0..99 without a leading zero; empty tokens, `*`, `H`, `HG` and lists over 39 characters are rejected with `[ERR]..Via <...> not valid`, and the stored value stays unchanged. `NONE` or an empty value still clear it. The web `setvia` field no longer reports FAIL for lowercase input or `none`.
-3. **T-Deck: DM reply button (TD-21).** Every incoming bubble gets a reply button that puts the sender into "To" and opens the compose tab. Opening compose from a conversation tab prefills "To" with that callsign or group; a typed value is never overwritten.
-4. **Web GUI: firmware version per station.** The Path Information table gets a Firmware column and every MHeard card a Firmware field (for example `v4.40a`), learned from every decoded frame, direct or relayed. Costs 2 B RAM per neighbour row.
-5. **Clean-up:** a duplicated flag check before the firmware note in `OnRxDone` is gone (no behaviour change).
+</details>
 
-## Already in `v4.40a.10.16` (new since `v4.40a.10.11`)
+<details>
+<summary><strong><code>v4.40a.10.19</code></strong> — LoRa queue relief, locked protocol settings, Auto Update web row</summary>
 
-1. **One central gateway server table (`src/gw_servers.cpp`).** ESP32 and nRF52 (dynamic and static IP) now pick the MeshCom server and the time server from the same table `GW_SERVERS[]`, one row per country code, with an Internet and a Hamnet side each. Before, the choice was spread over three hand-written copies that had drifted apart. Rows: OE, DL, IT, HC (Hamcloud), HB (Switzerland, new upstream in #1209-#1212, now also on nRF52); France and USA are prepared as commented rows (no addresses yet). Named behaviour changes:
-   - DL is served on the Internet by `meshcom.hamnet.network` only; DL on the Hamnet goes to the Hamcloud host (`44.148.230.197`), as the DL server operator asked for Internet-only.
-   - HC on the Internet goes to the DL server; IT with Hamnet forced keeps the Italian Internet server (Italy has no Hamnet server).
-   - nRF52 now selects DL and HC like the ESP32 does, and a static nRF52 node gets HC and HB as well (before only OE, DL, IT).
-   - The Hamnet time server is taken per server row; `--setownntp` now applies to DHCP nodes too.
-2. **Network mode `--setnet auto|inet|hamnet`.** `node_honly` becomes a 4-state value: 0 unset (old behaviour per path), 1 Hamnet forced, 2 auto (own address `44.x` → Hamnet, otherwise Internet), 3 Internet forced. **Auto is the factory default for new or wiped nodes only**; existing nodes keep their stored value and behave as before. Bare `--setnet` prints the mode and the network in use. `--setinet on|off|auto` and `--sethamnet on|off` stay as aliases. `--gateway srv` validates against the table and its help lists the table's codes. The `NET MODE` line in `--info` (gateway mode only) shows the same, and the time server on the web info page follows the same selection.
-3. **Static IP on the RAK4631 stays static (ETH-05).** A RAK4631 with a configured static address used to fall back to DHCP during Ethernet recovery. Recovery now re-applies the static configuration (reopen UDP, re-apply without reset, or a hardware reset with a 5-minute gap), and after a W5100S hardware reset it waits for the PHY before it reconfigures.
-4. **Console and logs.** ESP32 boards with a UART console (USB-UART bridge; native-USB CDC boards excluded) get a 2048 B serial transmit ring, so debug prints no longer block the receive path at 115200 baud (Heltec V3 with all debug streams on: OnRxDone p50 77.9 ms → 4.4 ms; costs about 2.4 kB heap). The `--setlog` STAT line reports OnRxDone timing (avg/p95/p99/max) and counts every exit.
-5. **Upstream merged:** official `v4.40a.hbserver` (#1209-#1212: HB and HC servers, HB server for nRF52, esptool upload for E213/E290/Wireless Paper). The fork's temporary OE Internet fix is reverted; the table carries OE.
+- **A full LoRa transmit queue no longer blocks for minutes.** Field captures showed QRT for up to 8 minutes while the channel was idle three quarters of the time: every received frame re-armed the full hold, and the queue filled with redundant copies.
+  - **`--nbrrelay on` is fixed in release builds:** a relay is cancelled when every neighbour that needs the frame is served; a relay waiting 8 s gets a 150 ms hold.
+  - An echo of an own group text releases its queued copy; a heard or acknowledged text stops retrying; no retries during QRT.
+  - A server frame carrying the node's own call as source is not queued for LoRa again.
+  - A full queue answers with a refusal (QTA) at any depth. QRT ends below 16 entries with one QRV, at most every 60 s.
+  - **Age-escalated hold:** a priority 1-3 frame waiting 20 s gets a short hold after a received frame, after 60 s the rapid hold. Never after own TX or a busy CAD.
+  - Logs: the TX log `cad=` shows the real CAD attempt; `[MC-HWM]` gains `aged1`/`aged2`/`wait_hwm` (ESP32). The web queue card says "Your messages: accepted / slow down / refused".
+  - Background: [analysis](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/lora-qrt-dk5en98-db0taw14-20261018.md), [plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-lora-qrt-20261018.md).
+- **Ten protocol-tuning settings are fixed in release builds.**
+  - Locked: `--nbrrelay` (on), `--nbrsym` (on), `--nbrreport` (auto), `--shortpath` (off), `--pingtime`/`--pingmax`, the four `--spec*` parameters, and `--stor on`. A change is refused with `[ERR];locked;<name>` on every path (USB, 2323 console, web, BLE, T-Deck, remote management).
+  - **A node that had any of these changed is set to the fixed value at first boot.**
+  - `{SET}` over LoRa accepts a text hop of 1..6 and ignores the position hop.
+  - New range limits: `--postime` 300..86400 s, `--ptime` 5..120 min. Setter fixes: `--ptime` fallback 15 min (was 30 h), `--pingtime` floor 30 s, `--pingmax max` is 5 (was 100).
+  - SF, bandwidth, coding rate, TX power, gateway, mesh, via and network mode stay free.
+  - Spec: [`docs/production-locked-settings.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/production-locked-settings.md).
+- **Auto Update: `notify` only, one button in the web GUI.**
+  - `off` is gone and loads as `notify`: **every ESP32 node with WiFi checks for a new release about once a day and reports it; nothing installs by itself.** `auto` is refused in every build.
+  - The Info page's Auto update row runs one button through every state (Check now, Install, Downloading %, Install now, Installing %) and follows the node through Safeboot and back without a reload.
+  - Classic ESP32 with a phone connected: "Pause Bluetooth and check" drops the phone link for the job. Before giving up on low heap the check sheds KISS TCP and, if that is enough, the net console.
+  - Background: [`docs/campaign-au-webgui-ux-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-au-webgui-ux-20261018.md).
+- **More heap for the update check on classic ESP32.** The 5 KB phone byte rings exist only while BLE runs; the check now starts with 86 KB free instead of 76-81 KB. Side effect: the web message history is empty after an update check on these boards.
+- **Board LED and charge LED.** RAK4631, T114 and T-Echo get the LED heartbeat and remote `led`; LEDs go dark in sleep and with BLE off. More variant pins; `--info` prints `BOARD LED` and `CHARGE LED`. `--board led on` is refused while OneWire owns the pad (T-Beam GPIO4).
+- **Remote `sens` reports only detected sensors** (BME280 humidity was reported as not fitted).
+- **The neighbour page no longer trips the watchdog** (field reboots on a 47-row table).
+- Background: [`docs/campaign-fork-hardening-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/campaign-fork-hardening-20261018.md).
 
-## Already in `v4.40a.10.11` (compared with the official firmware)
+</details>
 
-1. **Firmware Auto Update (#1187), ESP32 only, off by default.** `--autoupdate off|notify|auto`, `--updchan prod|dev`, `--update check|install|status|apply`. Daily TLS check against GitHub, compressed `<board>.autoupdate` image, SHA-256 and CRC verified, applied by the versioned Safeboot between 03:00 and 05:00. Classic ESP32 TLS heap gate (`lowheap`).
-2. **Store-and-forward for PMs from the central server (#1188).** `--stor on|off`, **off by default**.
-3. **Authenticated remote management over LoRa (#1189), off by default.** `--remotemgmt on` plus `--passwd`; `RM1` DMs with a 64-bit HMAC-SHA256 tag run allowlisted commands (extended set incl. `radio`, `name`, `pos`, `mh`, `txq`, `led`, `chgled`), gateway relay through the server, lockout per sender callsign. Remote page and settings cards in the web GUI, request guard `MC_WEB_GUARD`.
-4. **Auto Update asset and Safeboot:** `<board>.autoupdate`, versioned Safeboot, AU locked while Safeboot is too old.
+<details>
+<summary><strong><code>v4.40a.10.18</code></strong> — GPS position filter, net console fixes, remote <code>net</code>/<code>upd</code></summary>
 
-Everything else of `v4.40a.10.11` (MTU, time zones, BLE reconnect hardening, ETH-04, LED work, HTML escaping, small web features) is in the official firmware since #1207/#1208.
+- **GPS position filter, on by default on ESP32 GPS boards** (GPS-11).
+  - Before: a still node sent the raw fix, and 10-40 m of multipath noise moved its on-air `DDMM.MM` cell many times an hour.
+  - Now: still nodes average over 30 minutes and hold their grid cell; motion is detected automatically and switches to a smoothed track. With `--track on` the filter uses the GPS Doppler speed.
+  - `--gpsfilter off` restores the old path exactly until the next reboot. `--gpsdebug on` prints raw, filtered and held position per fix.
+  - Not on RAK4631 and T-Deck Pro (own GPS paths).
+- **Network debug console (port 2323):** starts in pure WiFi AP mode too; `--netconsole off` really closes the listener; a vanished client no longer blocks every new login until a power cycle (TCP keepalive drops dead peers, a valid login takes over).
+- **Remote management gains `net` and `upd`.**
+  - `net`: MTU, MeshCom server, configured and effective network.
+  - `upd`: Auto Update state; `upd check` starts a check; `upd go <tag>` installs and hands over to Safeboot. Keeps every Auto Update gate except the night window.
+  - `status` gains `rs=0|1`; the remote web page shows `net` and `upd` with a two-tap Update button.
+
+</details>
+
+<details>
+<summary><strong><code>v4.40a.10.17</code></strong> — Auto Update on PSRAM boards, <code>--via</code> validation, T-Deck reply button</summary>
+
+- **Auto Update works on PSRAM boards** (AU-13). The TLS handshake took about 56 KB of the T-Deck Plus' internal heap while 4.6 MB PSRAM sat unused, so the check failed. mbedTLS now allocates from PSRAM first; the heap gate measures internal RAM only.
+- **`--via` validates before storing** (VIA-01). Each token must be a valid callsign with SSID 0..99; bad lists are rejected and the stored value stays. `NONE` or empty still clears it.
+- **T-Deck: reply button on every incoming message** (TD-21). Opening compose from a conversation tab prefills "To".
+- **Web GUI: firmware version per station** in the Path table and on every MHeard card (2 B RAM per neighbour).
+- Clean-up: a duplicated flag check in `OnRxDone` removed (no behaviour change).
+
+</details>
+
+<details>
+<summary><strong><code>v4.40a.10.16</code></strong> — one gateway server table, <code>--setnet</code>, RAK4631 static IP</summary>
+
+- **One central gateway server table** (`src/gw_servers.cpp`). ESP32 and nRF52 pick server and time server from the same table, one row per country code (OE, DL, IT, HC, HB), Internet and Hamnet side each. Before, three hand-written copies had drifted apart. Named changes:
+  - DL on the Internet: `meshcom.hamnet.network` only; DL on the Hamnet: the Hamcloud host `44.148.230.197` (server operator's request).
+  - HC on the Internet goes to the DL server; IT with Hamnet forced keeps the Italian Internet server (no Italian Hamnet server).
+  - nRF52 selects DL and HC like ESP32; static nRF52 nodes also get HC and HB.
+  - The Hamnet time server follows the server row; `--setownntp` now applies to DHCP nodes too.
+- **Network mode `--setnet auto|inet|hamnet`.** `auto` (own address `44.x` means Hamnet) is the default **for new or wiped nodes only**; existing nodes keep their setting. Bare `--setnet` prints mode and network in use; `--setinet`/`--sethamnet` stay as aliases.
+- **RAK4631 with a static IP stays static** during Ethernet recovery (ETH-05); after a W5100S hardware reset it waits for the PHY.
+- **Console and logs:** ESP32 boards with a USB-UART bridge get a 2048 B serial transmit ring, so debug output no longer stalls receiving (OnRxDone p50 77.9 ms to 4.4 ms; about 2.4 kB heap). `--setlog` STAT reports OnRxDone timing.
+- **Upstream merged:** official `v4.40a.hbserver` (#1209-#1212: HB and HC servers, HB for nRF52, esptool upload for E213/E290/Wireless Paper).
+
+</details>
+
+<details>
+<summary><strong><code>v4.40a.10.11</code></strong> — fork features compared with the official firmware</summary>
+
+- **Firmware Auto Update** (#1187), ESP32 only. Daily TLS check against GitHub, compressed `<board>.autoupdate` image, SHA-256 and CRC verified, applied by the versioned Safeboot between 03:00 and 05:00. Mode is `notify` since `v4.40a.10.19`.
+- **Store-and-forward for PMs from the central server** (#1188), `--stor on|off`. Locked off in release builds since `v4.40a.10.19`.
+- **Authenticated remote management over LoRa** (#1189), off by default. `--remotemgmt on` plus `--passwd`; `RM1` DMs with a 64-bit HMAC-SHA256 tag run allowlisted commands; lockout per sender callsign; web GUI remote page.
+- Everything else of `v4.40a.10.11` (MTU, time zones, BLE reconnect hardening, ETH-04, LED work, HTML escaping, small web features) is in the official firmware since #1207/#1208.
+
+</details>
+
+Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.22/docs/fork-dev-vs-upstream-20261018.md).
 
 ## What changes on the air
 
 With default settings, compared with the official `v4.40a.hbserver`:
 
-1. Nothing new is transmitted on LoRa by default: STOR and remote management are off. Auto Update (`notify`) is an Internet check of GitHub over WiFi, about once a day, never on LoRa.
-2. **Every release node relays with `--nbrrelay on`** and cannot switch it off: relays are cancelled when the neighbour matrix says every neighbour is served, and a long-waiting relay goes out after a 150 ms hold. Expect fewer redundant copies and shorter queues; the field evidence for the locked default is one gateway (`DK5EN-98`) so far.
-3. **Fewer own retries and copies:** an echo of an own group text cancels its queued copy, heard or acknowledged texts stop retrying, no retries during QRT, and a gateway no longer sends its own message back onto LoRa when the server reflects it.
-4. **Shorter hold for old frames:** a frame queued for 20 s (60 s) of priority 1-3 is sent after a short (rapid) hold after a received frame instead of the full hold, so a busy node no longer stalls for minutes.
-5. **QRT ends earlier** (queue below 16, one QRV) and a full queue answers with a refusal at any depth.
-6. `{SET}` over LoRa sets the text hop only (1..6); the position hop it carries is ignored. Nodes whose `--pingtime`/`--pingmax`, `--nbrreport` or `--shortpath` were changed go back to the fixed value.
-7. A **gateway** with server code DL or HC, or an nRF52 gateway with a static address, may talk to a different server host than before (see the server table item above). Non-gateway nodes are not affected.
-8. **T-Deck:** composing a message while a callsign or group conversation tab is open now sends a DM or group message to that tab; before, the empty "To" field sent it to `*`.
-9. **ESP32 boards with GPS** send a filtered position: a still node stays on one `DDMM.MM` grid cell instead of following the multipath noise, and a moving node follows a smoothed track. `--gpsfilter off` gives the old raw position until the next reboot.
-10. A node with `--remotemgmt on` and a password treats a LoRa DM to its own call that starts with `RM1 ` as a command; a gateway uploads its own HEY echoes and RM1 command messages to the server (as in `v4.40a.10.11`).
+- **Nothing new on LoRa by default.** STOR and remote management are off. Auto Update is a daily Internet check over WiFi, never on LoRa.
+- **Every release node relays with `--nbrrelay on`** and cannot switch it off. Relays are cancelled when every neighbour is served; expect fewer redundant copies and shorter queues. Field evidence so far: one gateway (`DK5EN-98`).
+- **Fewer own retries and copies:** echoed group texts cancel their queued copy, heard or acknowledged texts stop retrying, no retries during QRT, and a gateway no longer re-sends its own message when the server reflects it.
+- **Old frames wait less:** a priority 1-3 frame queued for 20 s (60 s) goes out after a short (rapid) hold, so a busy node no longer stalls for minutes.
+- **QRT ends earlier** (queue below 16, one QRV); a full queue answers with a refusal at any depth.
+- **`{SET}` over LoRa sets the text hop only** (1..6). Changed `--pingtime`/`--pingmax`, `--nbrreport` or `--shortpath` go back to the fixed value.
+- **Gateways with server code DL or HC**, and nRF52 gateways with a static address, may talk to a different server host than before. Non-gateway nodes are not affected.
+- **T-Deck:** composing while a conversation tab is open sends to that callsign or group; before, the empty "To" field sent it to `*`.
+- **ESP32 boards with GPS send a filtered position:** a still node stays on one grid cell; a moving node follows a smoothed track.
+- **Remote management** (if enabled with a password): a LoRa DM to the own call starting with `RM1 ` is a command; a gateway uploads its own HEY echoes and RM1 messages to the server.
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **Host suite:** 2741 host test cases in 77 native environments, all green, plus the golden selftest (48 commands), the nRF52 board links and the host tool suites (pytest 1190, web GUI and web flasher suites). New since `v4.40a.10.21`: the SP row in `test_gw_servers`, the net console client `tools/tests/test_mc_console.py` (16), the mock server timer race regression test.
-- **Server selection:** a golden comparison of the old and the new code over 700 grid rows (code × own address × mode × platform × own NTP); every differing row is a named, intended change.
-- **Build:** the release environments are built by CI (27 ESP32 images, 3 nRF52 images, Safeboot).
-- **Idle heap gate:** passed. T-Beam v1.2 (`DK5EN-92`) on a local release build of the tagged commit (`MC_BUILD_TAG=v4.40a.10.22`), BLE up, gateway on: STAT heap 69712 / 69568 / 69068 B over three 300 s windows, idle figure 69068 B against the 69332 B baseline (-264 B, tolerance 3072 B).
-- **Bench-tested for this release:** UDP-03 on Heltec V3 (`DK5EN-1`, 2026-10-22), 13 stray datagrams during 130 s of server silence: without the fix no warning, with it the first after 59 s and the second after 89 s. The SP server row is host-tested only (no gateway was pointed at the Polish server).
-- **Bench-tested for `v4.40a.10.21` (2026-10-19), unchanged since:**
-  - **`--id` and the marker** on T-Deck Plus (`DK5EN-14`): `MCBOARD:v1:46:46:t_deck_plus`; Heltec V3 (`DK5EN-1`): `43:43:heltec_wifi_lora_32_V3`; T-Beam v1.2 (`DK5EN-92`): `12:4:ttgo_tbeam`; RAK4631 (`DK5EN-90`): `9:9:wiscore_rak4631`. Bench builds of the release code, no tag string.
-  - **Safeboot v3** on T-Beam v1.2 (`DK5EN-92`, UART) and T-Deck Plus (`DK5EN-14`, native USB): marker printed at boot, `--id` and `--info` answered; settings kept.
-  - **Web flasher** (local copy of the new page, Chrome on macOS): detection names the build environment on all four boards, the T-Beam alias 12 resolves to `ttgo_tbeam`; "Aus dem Flash lesen" names the board on T-Deck Plus (native USB) and T-Beam (CH9102), also with the board silent in ROM download mode, and the page's restart brings the application back; a script harness read the flash of Heltec V3, T-Deck Plus and T-Beam in 1.0-1.3 s. On the RAK4631 the page detects the board from `--id` and offers no flash read (nRF52). The T-Deck Plus was flashed through a port the detection already held (33 s, settings kept); Safeboot and ROM download mode are recognised and explained.
-- **Bench-tested for `v4.40a.10.20` (2026-10-19), unchanged since:**
-  - **Web send buffer:** the `TASK_WDT` reboot reproduced on Heltec V3 (`DK5EN-1`) without the fix (path page, browser replies delayed 2.5 s). With the fix no reboot on Heltec V3 (`DK5EN-1`), T-Beam v1.2 (`DK5EN-92`), T-Deck Plus (`DK5EN-14`) and RAK4631 (`DK5EN-90`) with 2.5 s and 1.2 s reply delays; the pages are cut with `stall` or `budget` as designed, the setup page completes at 1.2 s. RAK4631: under delay the answer ends after one W5100S buffer (2048 B), no hang. Without delay all 14 pages of `DK5EN-1` complete (main page 94 kB in 501 ms).
-  - **WEB-STOP-01 and the NVS line:** host tests and board builds only.
-  - **AU-16 on T-Deck Plus (`DK5EN-14`, same chip and module family as the 1W), only the bootloader swapped:** with the 1W's old DIO bootloader Safeboot showed exactly the field symptoms; with the QIO bootloader it came up on the LAN after 7 s and returned to the application after 198 s. With the guard build: QIO hands over unchanged (`boot;qio`), DIO is refused on every path (`boot;dio`), settings intact.
-- **Bench-tested for `v4.40a.10.19` (2026-10-18), unchanged since:**
-  - **Heap on T-Beam v1.2 (`DK5EN-92`, release image of the heap work):** idle STAT heap 69332 B with BLE up (unchanged); free heap at the update check with BLE paused 86276-86576 B in 3 checks (was 76.3-81.5 KB), gate passed; update task stack 3740 B unused of 10240 on a gate-passing TLS check.
-  - **Setting lock:** `--nbrrelay`, `--autoupdate auto` and `--stor on` refused with `[ERR];locked;<name>` on Heltec V3 (`DK5EN-1`) and RAK4631 (`DK5EN-90`); on the production gateway `DK5EN-98` `--nbrrelay off` is refused and NBRRELAY is on after the flash.
-  - **LEDs:** `--board led on` and the `--info` LED lines on `DK5EN-1`, `DK5EN-90`, `DK5EN-92` (OneWire on GPIO4 refuses the LED, off accepts it); T-Deck Plus (`DK5EN-14`) shows both LEDs "not fitted".
-  - **Auto Update web row** in Chrome on Heltec V3 (`DK5EN-1`), T-Deck Plus (`DK5EN-14`) and T-Beam (`DK5EN-92`): every state renders, a staged release went through Install now, Safeboot and back on the new tag with the page following by itself; a corrupt stream shows "Install failed"; the mode select offers notify only. BLE guard on `DK5EN-92` with a BLE client standing in for the phone: link dropped, check passed the gate, client reconnected; 20 forced guard cycles without a reset (about 50 B heap per cycle). RAK4631 (`DK5EN-90`): no Auto Update row, as intended.
-  - **Queue work (LoRa QRT):** host tests and board builds only, no bench run (operator decision). The bench fleet and the production gateway `DK5EN-98` were flashed with the queue code on 2026-10-18 at 23:25; no capture from them has been evaluated for this release. The neighbour-page watchdog fix is newer and host-tested only.
-- **Bench-tested for `v4.40a.10.18` (2026-10-17), unchanged since:**
-  - **GPS filter on Heltec V3 (`DK5EN-1`, external u-blox, indoor with strong multipath):** 2 h stationary with `--track off` and 2 h with `--track on`, no reboot, no rejected sample. The held on-air position changed cell 11 times in 2 h against 119 for the raw fix (51 % of the time on the modal cell, 85 % before one false motion trigger caused by a 30 s multipath step of about 30 m, which the filter followed). Stationary speed noise max 0.44 m/s at 3 s fixes. No drive test.
-  - **Net console on Heltec V3 (`DK5EN-1`):** before/after runs for P-0168 (dead session blocks new logins) and P-0169 (`--netconsole off` leaves the listener open); both fixed on the bench.
-  - **RM1 `net` / `upd` over LoRa** (`DK5EN-98` sending to `DK5EN-1`, 2 dBm): `status` with `rs=0`/`rs=1`, `net`, `upd`, `upd check`, `upd go` with a stale and with the current tag; a real `upd go v4.40a.10.17` of a staged release handed over to Safeboot and came back on the release.
-  - **`--via` validation on Heltec V3 (`DK5EN-1`):** USB console and web `setvia`, every reject, accept and clear case passes.
-- **Bench-tested for `v4.40a.10.17` (2026-10-16/17), unchanged since:**
-  - **AU-13 on T-Deck Plus (`DK5EN-14`):** 10 of 10 dev-channel checks right after reboot pass (no allocation failure, no WiFi drop, internal heap minimum 55.7 KB, was 2.7 KB); `--update install` downloaded and staged a 1.57 MB image in 22 s. Control runs on T-Beam v1.2 (`DK5EN-92`, classic ESP32: check and download pass, internal minimum 11.6 KB during the download) and Heltec V3 (`DK5EN-1`, minimum 25.3 KB).
-  - **TD-21 on T-Deck Plus (`DK5EN-14`):** reply button and "To" prefill checked by hand.
-- **Bench-tested for `v4.40a.10.16` (2026-10-15/16), unchanged since:**
-  - **Network matrix on RAK4631 (`DK5EN-90`, Ethernet) and Heltec V3 (`DK5EN-1`, WiFi):** 45 cases per node, 3 networks (DHCP; static via the home router; static via a Linux router that carries the Hamnet VPN) × `auto`/`inet`/`hamnet` × OE/DL/IT/HC/HB. Server choice right in all 90 cases; KEEP, server BEAT and NTP in every case that has a return path (the Linux router NATs only into the Hamnet, so only its Hamnet cases count).
-  - **ETH-05 on `DK5EN-90`** (static address, INSTRUMENT build): link drop re-applies the static configuration without DHCP; a stalled second drop escalates to a W5100S hardware reset and comes back with the static address in 1.9 s; inside 5 minutes no second reset.
-  - After the run both nodes were left on this firmware as gateway (`DK5EN-1`, OE, BEAT) and non-gateway (`DK5EN-90`) with DHCP.
-- **Bench-tested earlier, code paths unchanged in this release:** remote management (2026-10-06/07), Auto Update end to end (2026-10-11), the `v4.40a.10.05`/`10.06` features.
+- **Host suite:** 2741 test cases in 77 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1190, web GUI, web flasher). New: the SP row in `test_gw_servers`, `tools/tests/test_mc_console.py` (16), a mock-server timer race regression test.
+- **Server selection:** golden comparison of old and new code over 700 grid rows; every differing row is a named, intended change.
+- **Build:** all release images built by CI (27 ESP32, 3 nRF52, Safeboot).
+- **Idle heap gate passed:** T-Beam v1.2 (`DK5EN-92`), BLE up, gateway on: 69068 B idle against the 69332 B baseline (-264 B, tolerance 3072 B).
+- **Benched for this release:** the server-link warning fix on Heltec V3 (`DK5EN-1`, 2026-10-22). With 13 stray datagrams during 130 s of server silence: no warning without the fix; with it the first after 59 s, the second after 89 s.
+- **Host-tested only:** the SP server row (no gateway was pointed at the Polish server).
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+- **`v4.40a.10.21` (2026-10-19):**
+  - `--id` and the marker on T-Deck Plus (`DK5EN-14`), Heltec V3 (`DK5EN-1`), T-Beam v1.2 (`DK5EN-92`, alias 12 resolves to `ttgo_tbeam`) and RAK4631 (`DK5EN-90`). Bench builds of the release code.
+  - Safeboot v3 on T-Beam v1.2 (UART) and T-Deck Plus (native USB): marker at boot, `--id` and `--info` answered, settings kept.
+  - Web flasher (local copy, Chrome on macOS): detection right on all four boards. "Aus dem Flash lesen" names T-Deck Plus and T-Beam, also silent in ROM mode, and the restart returns to the application. Flash read in 1.0-1.3 s. RAK4631 detected via `--id` (no flash read on nRF52).
+- **`v4.40a.10.20` (2026-10-19):**
+  - Web send buffer: the `TASK_WDT` reboot reproduced on Heltec V3 without the fix. With it no reboot on Heltec V3, T-Beam v1.2, T-Deck Plus and RAK4631 at 2.5 s and 1.2 s reply delays; pages cut by `stall`/`budget` as designed. Without delay all 14 pages complete (main page 94 kB in 501 ms).
+  - "WEBServer stopped" fix and NVS line: host tests and board builds only.
+  - T-Beam 1W Safeboot fix reproduced on T-Deck Plus (same chip family, bootloader swapped): DIO showed the field symptoms; QIO came up and returned to the application; the guard refused DIO on every path, settings intact.
+- **`v4.40a.10.19` (2026-10-18):**
+  - Heap on T-Beam v1.2: idle 69332 B with BLE up; free heap at the update check 86276-86576 B (was 76.3-81.5 KB).
+  - Setting lock refused on Heltec V3 and RAK4631; on `DK5EN-98` NBRRELAY is on after the flash.
+  - LEDs and `--info` LED lines on `DK5EN-1`, `DK5EN-90`, `DK5EN-92`; T-Deck Plus shows "not fitted".
+  - Auto Update web row in Chrome on Heltec V3, T-Deck Plus and T-Beam: every state, a full install through Safeboot and back, a corrupt stream shows "Install failed". BLE guard: 20 forced cycles without a reset.
+  - Queue work: host tests and board builds only (operator decision); no field capture evaluated yet. Neighbour-page fix: host-tested only.
+- **`v4.40a.10.18` (2026-10-17):**
+  - GPS filter on Heltec V3 (indoor, strong multipath): 2 h each with `--track off` and `on`, no reboot. The held cell changed 11 times in 2 h against 119 for the raw fix. No drive test.
+  - Net console fixes before/after on Heltec V3.
+  - RM1 `net`/`upd` over LoRa at 2 dBm, including a real `upd go` through Safeboot and back.
+  - `--via` validation: every reject, accept and clear case.
+- **`v4.40a.10.17` (2026-10-16/17):**
+  - Auto Update on T-Deck Plus: 10 of 10 checks right after reboot pass (internal heap minimum 55.7 KB, was 2.7 KB); a 1.57 MB image staged in 22 s. Control runs on T-Beam v1.2 and Heltec V3.
+  - T-Deck reply button checked by hand.
+- **`v4.40a.10.16` (2026-10-15/16):**
+  - Network matrix on RAK4631 (Ethernet) and Heltec V3 (WiFi): 45 cases per node (3 networks × `auto`/`inet`/`hamnet` × OE/DL/IT/HC/HB). Server choice right in all 90; KEEP, BEAT and NTP in every case with a return path.
+  - RAK4631 static IP: a link drop re-applies the static configuration; a stalled second drop escalates to a W5100S reset and recovers in 1.9 s.
+- **Earlier:** remote management (2026-10-06/07), Auto Update end to end (2026-10-11), the `v4.40a.10.05`/`10.06` features.
+
+</details>
 
 ### Built and shipped, not on our bench
 
-**T-Beam 1W:** no 1W is on our bench. An operator in the field confirmed on 2026-10-19 that a real 1W with the QIO bootloader from the `v4.40a.10.20` web flasher completed an Auto Update (AU-16). The marker and the flash read of this release were not tried on a 1W.
-
-**T-Deck Pro:** not on our bench. The new partition table was checked by the build (Safeboot and factory at 0x10000, application at 0xC0000, NVS unchanged at 0x9000), not on a board.
-
-The new LED pins on T-Echo, T114, T-ETH-Elite, Heltec V4 and the S3 DevKitC are taken from the board documentation and not confirmed on hardware; no LED was watched blinking. The web firmware column is covered by host tests only. The GPS filter was benched stationary on one board only; T-Beam, T-Beam Supreme, T-Deck and the other GPS boards run the same code untested. Everything else, including the network mode and the server table on every other board, ESP32 boards with Ethernet (T-ETH-Elite), the nRF52 boards T114 and T-Echo, and all other boards: E22 family, Heltec V2/V4/Wireless Stick/Tracker, T-Beam Supreme and SX1262/SX1268 variants, T-Deck, T-Deck Plus and Pro, T3-S3, T-Connect Pro, lora32 v2.1, E213, E290, Wireless Paper, LoRa-APRS boards. `t5_epaper` is not shipped.
+- **T-Beam 1W:** none on our bench. A field operator confirmed on 2026-10-19 that a 1W with the QIO bootloader completed an Auto Update. Marker and flash read not tried on a 1W.
+- **T-Deck Pro:** none on our bench. The new partition table is checked by the build only (Safeboot at 0x10000, application at 0xC0000, NVS unchanged at 0x9000).
+- **New LED pins** on T-Echo, T114, T-ETH-Elite, Heltec V4 and the S3 DevKitC come from board documentation; no LED was watched blinking.
+- **GPS filter:** benched stationary on one board only; T-Beam, T-Beam Supreme, T-Deck and other GPS boards run the same code untested.
+- **Web firmware column:** host tests only.
+- **All other boards:** E22 family, Heltec V2/V4/Wireless Stick/Tracker, T-Beam Supreme and SX1262/SX1268 variants, T-Deck, T-Deck Plus and Pro, T3-S3, T-Connect Pro, lora32 v2.1, E213, E290, Wireless Paper, LoRa-APRS boards, T-ETH-Elite (Ethernet), T114 and T-Echo, including network mode and server table.
+- `t5_epaper` is not shipped.
 
 ## Known gaps, stated plainly
 
-- **Web pages on a slow link are cut, not completed:** a browser that does not take data for 2 s, or a page that needs more than 15 s, gets a truncated page (at a 1.2 s reply delay the 94 kB main page is cut at about 73-87 kB). The page was not checked in Chrome on the bench (only with a script client). On the RAK4631 the send library itself can still wait without a timeout for a chip acknowledgement; the bench showed no hang.
-- **RM-NVS-01 open:** the "remember password" failure on the E22 is only instrumented; the NVS-full hypothesis waits for the reporter's `--info` and log.
-- **Queue work not benched:** the changes of `v4.40a.10.19` item 1 ran through host tests (including the golden corpus) and board builds only; the differential bench was dropped. The locked `--nbrrelay on` rests on one gateway's field data. The age-escalated hold is not counted per 5-minute window (only since boot in `[MC-HWM]`).
-- **Server frames with the own call:** they are no longer queued for LoRa, and the phone copy of such a frame is lost too when the node does not follow its group (own positions, texts to groups the node does not follow).
-- **Locked settings are reset at boot:** a release build overwrites stored values of the ten locked settings without asking; INSTRUMENT bench builds keep them changeable. `--stor on` is refused in release builds, so store-and-forward announcement (#1188) is effectively off in this release.
-- **Auto Update:** the BLE guard runs on classic ESP32 only (a forced NimBLE stop and restart crashed an ESP32-S3 on the second cycle), and was tested with a BLE client script, not the McApp phone app. The web row's handling of a stale install click and of a node stuck in Safeboot was fixed after the bench and is host-tested only. An image that fails after the flash erase leaves the node in Safeboot until a web-flasher upload (single app slot). The download on the T-Beam after the heap work was not re-run.
-- **Web message history** is empty after each update check on classic ESP32 boards (the phone rings are freed during the BLE pause); accepted.
-- **LEDs:** deep-sleep LED, remote `led`/`chgled` over the air and the phone app view on the T-Deck Plus are not benched.
-- **Network mode and older firmware:** a configuration exported with `node_honly` 2 or 3 cannot be imported into older firmware (it accepts 0..1 only), and a downgrade with 2 stored behaves like Internet on ESP32/nRF52 DHCP and like Hamnet on a static nRF52.
-- **Status line for IT with Hamnet forced:** `--setnet` and `--info` say `in use: hamnet` (the selected network) while the Italian server is reached over the Internet; the `[GW];srv` line shows the real path. Intended.
-- **nRF52 uses literal server addresses** (no DNS resolver); the HB address follows a dynamic-DNS name upstream and can go stale.
-- **ETH-05 not benched:** cable pull and a real UDP transmit error streak; ESP32 Ethernet boards not benched with the new table.
-- **NTP on a node with a GPS fix:** the ESP32 asks NTP only without a GPS fix (GPS time has priority, unchanged behaviour).
-- **`--via`:** a bad value already stored before the update survives it (re-enter it), and a JSON configuration import does not validate `node_via`.
-- **Firmware column after store-and-forward:** a message delivered from the server's store is re-encoded with the store node's version, so the column can show that version for the sender until the sender's next own frame.
-- **T-Beam Supreme:** its 8 MB PSRAM is not enabled by the build, so Auto Update there still uses internal RAM only (as before).
-- **AU-13 field confirmation** on the reporting T-Deck Plus is pending.
-- **GPS filter:** not drive-tested (lag at the start of a drive, smart-beacon shots while moving are unmeasured); a multipath step of 30-45 m held for 15 s can still be taken for motion and move the on-air position by one cell (accepted rate in the host tests: at most 9 per day). Not on RAK4631 and T-Deck Pro. Smart beaconing with `--track on` still calls a still node stationary on speed alone.
-- **Net console:** the AP-mode start (P-0111) and the keepalive drop of a half-open peer are not benched. In pure AP mode the 5-minute offline recovery recreates the AP and drops the console session (will not be fixed).
-- **RM1 `upd go`:** the download path (`installing`) is host-tested only; on the bench the reinstall guard already knew the release, so only the staged path ran. `upd go` installs even with `--autoupdate off`; remote management itself stays off by default and needs the password.
-- **AU-14:** a classic-ESP32 T-Beam rebooted once (`TASK_WDT`) 13 s into an Auto Update download; the retry passed. Open. **AU-16:** fixed in `v4.40a.10.20` and confirmed on a real 1W, but a 1W in the field keeps its DIO bootloader and its blocked Auto Update until its owner runs the web flasher once; a 1W already stuck in Safeboot needs the web flasher too, and its settings may be gone.
-- **Carried over from `v4.40a.10.11`:** Auto Update on classic ESP32 has a thin heap margin; the prod channel cannot install yet (official releases carry no `.autoupdate`); Auto Update needs the new Safeboot; RM sync limiter and duplicate ring not benched on hardware; gateways upload RM1 command messages to the public server; BLE queued messages go to the next phone; ETH-04 field confirmation pending; relays on older firmware strip the ZWJ in compound emoji.
-- **Web flasher:** not tested on Windows (the serial driver handles the control lines differently), and not with a CP210x bridge board for the restart path. The flash read and the restart were benched on macOS in Chrome on T-Deck Plus (native USB) and T-Beam v1.2 (CH9102); the Safeboot v3 hint in the page is covered by unit tests and a script harness only. The flasher offers only this release: images up to `v4.40a.10.20` carry no marker and can no longer be published there.
-- **No marker check in CI:** the CI build does not check the marker yet; only the web flasher publish step refuses an image without it.
-- **Safeboot v3 needs the web flasher:** nodes updated over the air keep Safeboot v2 and stay unnamed while in Safeboot; that is harmless, Auto Update works with both.
-- **Not in this release:** `t5_epaper`, France and USA servers (no addresses yet).
+**Could cost you settings or a working node**
+
+- **T-Beam 1W in the field** keeps its DIO bootloader and blocked Auto Update until its owner runs the web flasher once. A 1W already stuck in Safeboot needs the web flasher too, and its settings may be gone.
+- **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
+- **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
+
+**Not benched (host tests or builds only)**
+
+- **Queue work of `v4.40a.10.19`:** host tests (including the golden corpus) and builds only. The locked `--nbrrelay on` rests on one gateway's field data. The age-escalated hold is counted only since boot (`[MC-HWM]`), not per 5-minute window.
+- **Auto Update:** the BLE guard runs on classic ESP32 only (a forced NimBLE restart crashed an ESP32-S3) and was tested with a BLE client script, not the McApp phone app. Stale-click and stuck-in-Safeboot handling in the web row is host-tested only. The T-Beam download after the heap work was not re-run.
+- **RM1 `upd go`:** the download path is host-tested only. `upd go` installs even with `--autoupdate off`; remote management itself stays off by default and needs the password.
+- **RAK4631 static IP:** cable pull and a real UDP error streak not benched; ESP32 Ethernet boards not benched with the new table.
+- **LEDs:** deep-sleep LED, remote `led`/`chgled` over the air and the phone app view not benched.
+- **Net console:** the AP-mode start and the keepalive drop of a half-open peer not benched. In pure AP mode the 5-minute offline recovery drops the console session (will not be fixed).
+- **GPS filter:** no drive test. A 30-45 m multipath step held for 15 s can still look like motion and move the position by one cell (at most 9 per day in host tests). Smart beaconing with `--track on` still calls a still node stationary on speed alone.
+- **Web flasher:** not tested on Windows, nor with a CP210x bridge for the restart path. The Safeboot v3 hint is covered by unit tests and a script harness only.
+
+**Open defects**
+
+- **Remember-password failure on an E22** (RM-NVS-01): only instrumented; waits for the reporter's `--info` and log.
+- **One T-Beam reboot during an Auto Update download** (AU-14, `TASK_WDT` 13 s in, classic ESP32); the retry passed. Open.
+- **Auto Update fix on the reporting T-Deck Plus** (AU-13): field confirmation pending.
+- **No marker check in CI:** only the web flasher publish step refuses an image without a marker.
+
+**Accepted behaviour**
+
+- **Slow browser links get truncated pages** (2 s without progress or 15 s total; at 1.2 s reply delay the 94 kB main page is cut at about 73-87 kB). Not checked in Chrome on the bench. On the RAK4631 the send library can still wait without a timeout for a chip acknowledgement; no hang seen.
+- **Web message history is empty** after each update check on classic ESP32 (phone rings freed during the BLE pause).
+- **Server frames with the own call** are no longer queued for LoRa; the phone copy is lost too when the node does not follow that group.
+- **Status line for IT with Hamnet forced** says `in use: hamnet` while the Italian server is reached over the Internet; `[GW];srv` shows the real path.
+- **nRF52 uses literal server addresses** (no DNS); the HB address follows a dynamic-DNS name upstream and can go stale.
+- **NTP with a GPS fix:** ESP32 asks NTP only without a GPS fix (unchanged).
+- **Firmware column after store-and-forward** can show the store node's version until the sender's next own frame.
+- **T-Beam Supreme:** its 8 MB PSRAM is not enabled by the build, so Auto Update uses internal RAM only (as before).
+- **Safeboot v3 only via web flasher:** nodes updated over the air keep v2 and stay unnamed in Safeboot; harmless.
+- **Web flasher offers only this release:** images up to `v4.40a.10.20` carry no marker and cannot be published there.
+
+**Downgrade and migration**
+
+- A configuration exported with network mode 2 or 3 cannot be imported into older firmware; a downgrade with mode 2 stored behaves like Internet (ESP32, nRF52 DHCP) or Hamnet (static nRF52).
+- A bad `--via` value stored before the update survives it (re-enter it); a JSON import does not validate `node_via`.
+
+<details>
+<summary>Carried over from <code>v4.40a.10.11</code></summary>
+
+- Auto Update on classic ESP32 has a thin heap margin.
+- The `prod` channel cannot install yet (official releases carry no `.autoupdate`).
+- Auto Update needs the new Safeboot.
+- RM sync limiter and duplicate ring not benched on hardware; gateways upload RM1 command messages to the public server.
+- BLE queued messages go to the next phone.
+- ETH-04 field confirmation pending.
+- Relays on older firmware strip the ZWJ in compound emoji.
+
+</details>
+
+**Not in this release:** `t5_epaper`, France and USA servers (no addresses yet).
 
 ## Installing
 
-**[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** — flash over USB from the browser, board detection built in (for a silent ESP32 board: "Aus dem Flash lesen"), includes Safeboot v3 and the bootloader. **T-Beam 1W: required once** if it was not web-flashed with `v4.40a.10.20` (AU-16). **T-Deck Pro: required once** (item 3). Only the images of the latest release are offered there.
-
-Otherwise pick the asset for your board below. ESP32 boards take the `.bin` over USB or, if the node is already reachable, over WiFi with `tools/webflash.py` (application only, Safeboot unchanged). The `<board>.autoupdate` files are for Auto Update and need no manual handling. The three nRF52 boards (`wiscore_rak4631`, `heltec_t114`, `t_echo`) ship both a `.uf2` — double-tap reset, copy the file to the volume that appears — and a DFU `.zip` for `adafruit-nrfutil` over serial.
+- **[Web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/)** (recommended): flash over USB from the browser, board detection built in, includes Safeboot v3 and the bootloader. For a silent ESP32 board use "Aus dem Flash lesen". Only the latest release is offered.
+  - **Required once for T-Beam 1W** (if not web-flashed with `v4.40a.10.20`) and **T-Deck Pro** (if not web-flashed with `v4.40a.10.21`).
+- **ESP32, manual:** the `.bin` for your board over USB, or over WiFi with `tools/webflash.py` (application only, Safeboot unchanged).
+- **nRF52** (`wiscore_rak4631`, `heltec_t114`, `t_echo`): `.uf2` (double-tap reset, copy the file to the volume that appears) or the DFU `.zip` with `adafruit-nrfutil` over serial.
+- **`<board>.autoupdate`** files are for Auto Update; no manual handling.
 
 ## Upstream
 
-The gateway server table, the network mode and ETH-05 ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)) and the T-Deck reply button and web firmware column ([#1214](https://github.com/icssw-org/MeshCom-Firmware/pull/1214)) are merged into upstream `dev` since 2026-10-18 (not in an official release yet). This release carries the same code. The web send buffer ([#1224](https://github.com/icssw-org/MeshCom-Firmware/pull/1224)) and UDP-03 ([#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233)) are merged into upstream `dev` too. Open upstream: [#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235) with `--via` validation, the GPS filter, the net console fixes, the console transmit ring, the OnRxDone STAT figures, `[HEAP]` boot marks, the NVS line and the board LED work (without remote management). WEB-STOP-01 (the bug is in upstream `dev` too) and the NVS diagnostics in remote management, and the queue work, the setting lock, the Auto Update web row, the heap and LED work, the `sens` fix and the neighbour-page watchdog fix of `v4.40a.10.19`, are fork-only so far. AU-13 and the RM1 `net`/`upd` commands belong to the Auto Update and remote-management code (#1187, #1189); The board marker, `--id`, Safeboot v3 and the web flasher changes of this release are fork-only so far (the marker and `--id` are planned as an upstream PR). AU-16 belongs to the fork's Auto Update and is fork-only; the 1W board definition with `dio` comes from upstream. #1187-#1189 (Auto Update, STOR, remote management) remain fork features. Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.
+- **Merged into upstream `dev`** (not in an official release yet; this release carries the same code):
+  - gateway server table, network mode, RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213))
+  - T-Deck reply button, web firmware column ([#1214](https://github.com/icssw-org/MeshCom-Firmware/pull/1214))
+  - web send buffer ([#1224](https://github.com/icssw-org/MeshCom-Firmware/pull/1224))
+  - gateway server-link warning fix ([#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233))
+- **Open upstream:** [#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235) with `--via` validation, the GPS filter, net console fixes, the console transmit ring, OnRxDone STAT figures, `[HEAP]` boot marks, the NVS line and the board LED work (without remote management). The board marker and `--id` are planned as a PR.
+- **Fork-only so far:**
+  - the "WEBServer stopped" fix (the bug is in upstream `dev` too) and the NVS diagnostics in remote management
+  - everything of `v4.40a.10.19`: queue work, setting lock, Auto Update web row, heap and LED work, `sens` fix, neighbour-page fix
+  - Safeboot v3 and the web flasher changes
+  - the T-Beam 1W Safeboot fix (part of the fork's Auto Update; the `dio` board definition comes from upstream)
+  - Auto Update, store-and-forward and remote management (#1187-#1189), including AU-13 and RM1 `net`/`upd`
+- Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.

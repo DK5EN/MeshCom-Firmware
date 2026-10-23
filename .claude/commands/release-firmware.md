@@ -95,6 +95,24 @@ content fits one:
   "Supported Hardware" split _bench-tested_ vs _built and shipped, not on
   our bench_, "Known gaps, stated plainly" (list every open defect honestly,
   e.g. TM-49), "Installing", "Upstream". The README link also embeds the tag.
+
+  **Tone and format (hard rule, same as the gh-pages card):** Minto/BLUF,
+  exec bullets, never a text blob. Model: the `v4.40a.10.22` body.
+  - "What this release is" opens with at most two sentences: what changed and
+    who must act. Then "Action needed" (`[!WARNING]` boxes, bulleted), then
+    "Key facts" as bullets. No release history in this section.
+  - One fact per bullet, bold lead-in, sub-bullets for detail. No paragraph
+    over about 300 characters; split it.
+  - Plain words first, internal IDs (UDP-03, AU-16, WF-05) in parentheses
+    after them, never as the only label.
+  - Only the current release's changes are open. Every earlier fork release
+    is one `<details>` block with a one-line `<summary>` naming its theme;
+    the full-delta history stays, folded. On each cut, fold the previous
+    "New in" section into a new `<details>` block; do not append prose.
+  - Bench results of earlier releases go into one `<details>` block. "Known
+    gaps" is grouped under bold headings (could cost settings or a working
+    node / not benched / open defects / accepted behaviour / downgrade).
+  - Doc links go at the end of their item ("Background: ..."), not mid-sentence.
 - `docs/release-journal.md` (**German, no umlauts** — write `ae/oe/ue`, `--`
   for em dashes) — running journal; moved here on 2026-10-02 because the root
   `release.md` is upstream's own file again and must stay untouched. New section at the TOP, below the header
