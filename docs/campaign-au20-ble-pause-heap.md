@@ -33,8 +33,8 @@ any reboot. Not a 10.23 blocker.
   `CONFIG_IDF_TARGET_ESP32` only. On the S3 the AU job never calls `esp32BlePause()` or
   `esp32BleForcePause()` (`fw_update_net.cpp` ~1266 is inside `#if AU_BLE_PAUSE`), and
   `bleguardcycle` answers `classic ESP32 only`. The S3 forced deinit panicked in the NimBLE host task
-  on the 2nd cycle (64cd365d bench, `PC 0` in `nimble_port_run`), the same signature as AU-19; whether
-  the AU-19 patch also cures the S3 is open and is a side result of W2.
+  on the 2nd cycle (64cd365d bench, `PC 0` in `nimble_port_run`), the same signature as AU-19; W2 answered it: 100 forced S3
+  pauses without a panic with the AU-19 patch; no S3 auto-update pause wanted (operator).
 
 ## 3. Scope rules
 
@@ -53,7 +53,7 @@ any reboot. Not a 10.23 blocker.
 | W1   | **Instrument + S3 test path:** per-cycle `[AU];bleguard;cycle` line gains internal and 8BIT free, minimum free, task count (`uxTaskGetNumberOfTasks()`), esp_timer count; control mode `bleguardcycle0 <n>` (same tick, no pause); S3 test-only force pause (see section 3).                                                                                                    | 1 implementer      | Sonnet medium             | ~$2, 25 min        |
 | W2   | **Bench**, serialized: DK5EN-92 (`ttgo_tbeam` INSTRUMENT) and DK5EN-1 (`heltec_wifi_lora_32_V3` INSTRUMENT). Per node 100 control cycles, then 100 pause cycles (S3: first 20, stop on panic). If the loss is real, layer split guided by the counters and W0-B.                                                                                                                | orchestrator       | Opus medium               | ~$3, 60-90 min     |
 | W3   | **RCA:** confirm or reject the mechanism with file:line, per platform; list the fix routes with cost. Operator decides.                                                                                                                                                                                                                                                         | orchestrator       | Opus high                 | ~$2, 20 min        |
-| W4+  | Fix, gate, bench before/after, advisor: planned after the W3 decision.                                                                                                                                                                                                                                                                                                          | -                  | -                         | -                  |
+| W4+  | Done: route A (W4 patch hunk, W5 gate, builds, bench, advisor), see section 6.                                                                                                                                                                                                                                                                                                  | -                  | -                         | -                  |
 
 Each wave is committed on `fork-dev` before the next starts.
 
