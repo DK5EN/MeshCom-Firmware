@@ -53,7 +53,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -170,7 +171,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -291,7 +293,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -414,7 +417,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -536,7 +540,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -655,7 +660,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -773,7 +779,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -920,7 +927,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1043,7 +1051,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1211,7 +1220,8 @@
    "env:t_deck_pro"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1311,7 +1321,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1428,7 +1439,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1660,7 +1672,8 @@
    "nrf52_base"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1762,7 +1775,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1877,7 +1891,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1997,7 +2012,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2111,7 +2127,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2249,7 +2266,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2343,7 +2361,8 @@
    "+<gw_link_status.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2431,7 +2450,8 @@
    "+<reack_limiter.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2473,7 +2493,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2504,7 +2525,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2527,7 +2549,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2546,7 +2569,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2574,7 +2598,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2593,7 +2618,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2640,7 +2666,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2664,7 +2691,8 @@
    "+<byte_fifo.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2692,7 +2720,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2711,7 +2740,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2730,7 +2760,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2750,7 +2781,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2769,7 +2801,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2793,7 +2826,8 @@
    "+<conf_frame.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2818,7 +2852,8 @@
    "+<config_json.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2845,7 +2880,8 @@
    "+<country_profile.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2870,7 +2906,8 @@
    "+<country_profile.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2898,7 +2935,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2937,7 +2975,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2972,7 +3011,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2995,7 +3035,8 @@
    "-<*>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3024,7 +3065,8 @@
    "+<extudp_functions.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3042,7 +3084,8 @@
    "-std=c++17"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3063,7 +3106,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3082,7 +3126,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3101,7 +3146,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3127,7 +3173,8 @@
    "+<nrf52/gateway_service_nrf52.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3146,7 +3193,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3170,7 +3218,8 @@
    "+<gw_servers.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3193,7 +3242,8 @@
    "+<hmac_sha256.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3217,7 +3267,8 @@
    "+<kiss_frame.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3242,7 +3293,8 @@
    "+<loop_scheduler.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3265,7 +3317,8 @@
    "+<lora_rx_park.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3289,7 +3342,8 @@
    "+<mc_board_id.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3308,7 +3362,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3332,7 +3387,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3354,7 +3410,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3374,7 +3431,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3398,7 +3456,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3420,7 +3479,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3442,7 +3502,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3462,7 +3523,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3485,7 +3547,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3510,7 +3573,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3529,7 +3593,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3548,7 +3613,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3611,7 +3677,8 @@
    "+<via_functions.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3636,7 +3703,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3655,7 +3723,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3679,7 +3748,8 @@
    "+<hmac_sha256.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3698,7 +3768,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3717,7 +3788,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3741,7 +3813,8 @@
    "+<hmac_sha256.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3760,7 +3833,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3779,7 +3853,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3798,7 +3873,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3817,7 +3893,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3836,7 +3913,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_ldf_mode": "chain+",
   "platform": "native",
@@ -3864,7 +3942,8 @@
    "+<esp32/serial_command_esp32.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3890,7 +3969,8 @@
    "+<nrf52/serial_command_nrf52.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3921,7 +4001,8 @@
    "+<settings_schema.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3951,7 +4032,8 @@
    "+<settings_schema.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3974,7 +4056,8 @@
    "+<settings_store.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3999,7 +4082,8 @@
    "+<settings_store.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4018,7 +4102,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4050,7 +4135,8 @@
   ],
   "build_type": "debug",
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4085,7 +4171,8 @@
    "+<nbr_views.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -4112,7 +4199,8 @@
    "+<tz_rule.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4135,7 +4223,8 @@
    "+<tz_rule.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4178,7 +4267,8 @@
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4209,7 +4299,8 @@
    "+<nrf52/udp_drain_nrf52.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4228,7 +4319,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4247,7 +4339,8 @@
    "-Wextra"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4273,7 +4366,8 @@
    "+<tinyxml_functions.cpp>"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "lib_deps": [
    "https://github.com/leethomason/tinyxml2"
@@ -4321,7 +4415,8 @@
    "-Werror"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -4438,7 +4533,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -4573,7 +4669,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -4680,7 +4777,8 @@
    "-Werror"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -4820,7 +4918,8 @@
    "nrf52_base"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -4922,7 +5021,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5040,7 +5140,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5158,7 +5259,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5276,7 +5378,8 @@
    "esp32_classic"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5393,7 +5496,8 @@
    "esp32_s3"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5511,7 +5615,8 @@
    "-Werror"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5621,7 +5726,8 @@
    "env:vision-master-e213"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5727,7 +5833,8 @@
    "-Werror"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5831,7 +5938,8 @@
    "-Werror"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5947,7 +6055,8 @@
    "nrf52_base"
   ],
   "extra_scripts": [
-   "pre:tools/mc_build_defines.py"
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
   ],
   "framework": [
    "arduino"

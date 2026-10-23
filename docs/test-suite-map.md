@@ -69,6 +69,8 @@ decoder of the download, split at every byte, malformed sizes, sink refusal);
 `tools/tests/test_make_autoupdate.py` (13 cases, release `.autoupdate` assets incl. env name length).
 `test_command_setters` also holds `test_dio_bootloader_blocks_safeboot` (AU-16: source pin, DIO bootloader
 refuses the Safeboot handover with `bootloader_dio`; fails on the pre-fix `command_functions.cpp`).
+`tools/tests/test_nimble_patch.py` (5 cases, AU-19: the build-time NimBLE `ble_hs_timer_reset()` patch of
+`tools/nimble_patch.py` -- original to stop-only, idempotent, unknown or doubled text raises, path and `lib_deps` check).
 
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the

@@ -91,6 +91,35 @@ process at a time; harness logs under `tools/bench/runs/harness/`.
   `../MeshCom-PR-next` and branch `pr/console-gps-led-small-features` (local + origin) removed. The Heltec V3 and
   T-Beam checks now run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
 
+- **AU-19 root cause (W0/W1):** not the host-task exit (the compiled ESP branch of `nimble_port_run()` breaks on the
+  stop event). `ble_hs_timer_reset()` (`ble_hs.c` ~453) calls `ble_npl_callout_deinit(&ble_hs_timer)` as soon as the
+  host leaves the ON state; the deinit memsets the callout, zeroing the callback of its event, while the esp_timer may
+  already have queued that event. The host task dequeues it and calls NULL: panic register `A2 = 0x3ffd0470` =
+  `ble_hs_timer` + 8 (the embedded event), `A8` = return into `nimble_port_run` (addr2line + nm on the 10.21
+  INSTRUMENT ELF). `ble_hs_deinit()` deinits the timer again after the host is gone, so the early deinit is
+  redundant. h2zero master has the same code. No heap drift per pause (scout, 23 pauses).
+- **AU-19 fail-before (W3a):** `--update bleguardcycle` on DK5EN-92 (INSTRUMENT build tagged 10.21) panicked at
+  cycle 36 with the same signature (`PC 0`, `A2 0x3ffd0470`, same ELF hash `eaa4e8449d5b0667`)
+  (`tools/bench/runs/harness/au19-before-cycles.log`, `au19-before-usb.log`). The existing INSTRUMENT command is the
+  cycle driver; no new command needed.
+- **#1235 on Heltec V3 (DK5EN-1, `fork-dev` 0598b90e):** `--board led on` accepted, `--info` `BOARD LED: on`,
+  `CHARGE LED: not fitted`, NVS line `used 299 free 331 total 630 ns 10`, seven `[HEAP]` boot marks (init to
+  netconsole). Blink confirmed (see below).
+
+- **AU-19 fix (W2-W4):** `tools/nimble_patch.py` (`pre:` in `[env]`) patches the pinned `ble_hs.c` at build time:
+  `ble_hs_timer_reset()` only stops the timer when the host is not ON (no deinit, no `eventq_remove`: its
+  drain-and-requeue uses a function-local portMUX). Matches Apache mynewt-nimble; the deinit is an esp-nimble
+  addition. Advisor (Opus) APPROVED; hardening taken (build fails if NimBLE is in `lib_deps` but `ble_hs.c` is
+  missing; 5 pytest cases). Artifact: `npl_freertos_callout_deinit` call sites 5 -> 4, the dropped one is
+  `ble_hs_timer_reset`. Golden `variant-ini-effective.json` regenerated (109 `extra_scripts` lines, nothing else).
+- **AU-19 pass-after (W3b):** patched INSTRUMENT `ttgo_tbeam` on DK5EN-92: 412 `bleguardcycle` cycles, 0 panics, every
+  resume ok (operator stopped the run before 500) (`au19-after-cycles.log`, `au19-after-usb.log`).
+- **AU-20 found:** free heap falls about 50 B per pause/resume (60948 -> 40968 B over 400 cycles); the unpatched run has
+  the same slope. Lead: NimBLE flow-control esp_timer re-created per sync. BACKLOG AU-20, not a 10.23 blocker.
+- **#1235 on T-Beam (DK5EN-92, `fork-dev`):** `BOARD LED: on`, `CHARGE LED: auto` (AXP fitted), NVS line `used 297
+free 333 total 630 ns 10`, seven `[HEAP]` boot marks. Operator confirmed the 2 s blink on DK5EN-1 and DK5EN-92: #1235 hardware check done on all three boards.
+  `--info` shows `MESH off` on DK5EN-92 (bench leftover).
+
 ## 6. AU-19 fix plan (approved 2026-10-23)
 
 Lead (to confirm in W1): in the pinned NimBLE-Arduino 2.2.3, `nimble_port_run()` (`nimble_port.c`) is an endless
