@@ -598,14 +598,14 @@ void txRingAgeBackground(uint32_t now_ms)
  *                        der rx_relay-Aufruf tat das bisher selbst)
  * @param kind           Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): RING_KIND_*
  *                        (txring_functions.h), Default RING_KIND_OTHER. Nur
- *                        der rx_relay-Aufruf setzt RING_KIND_RELAY.
+ *                        rx_relay und der udp_rx-Text (GWRX-01) setzen RING_KIND_RELAY.
  * @param need           Stufe 2 (Welle 2: NbrMask*, nbr_mask.h): Bedarfsmaske
- *                        aus nbrRelayNeed(), Default nullptr = leere Maske.
+ *                        aus nbrRelayNeed()/nbrServerNeed(), Default nullptr = leere Maske.
  *                        Wird JEDEM Slot zugewiesen, auch wenn leer -- so
  *                        behaelt ein wiederverwendeter Slot nie die Maske
  *                        seines Vorbesitzers.
  * @param alone          Stufe 2 (Welle 2: NbrMask*): Allein-Maske aus
- *                        nbrRelayNeed(), Default nullptr = leere Maske.
+ *                        nbrRelayNeed()/nbrServerNeed(), Default nullptr = leere Maske.
  * @return Slot-Index (>=0) oder -1, wenn die Overflow-Logik den neuen
  *         Eintrag verworfen hat (Ring voll, keine niedrigere Prio zum
  *         Verdraengen vorhanden)

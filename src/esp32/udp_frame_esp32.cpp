@@ -326,7 +326,7 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           }
 #endif
 
-          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrRelayNeed() (gw_udp_ring.h)
+          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrServerNeed() (gw_udp_ring.h)
           char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
           mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
 

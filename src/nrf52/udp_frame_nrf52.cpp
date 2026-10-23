@@ -207,7 +207,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
           bool bSrcPathHadOwnCall = mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call);
 #endif
 
-          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrRelayNeed() (gw_udp_ring.h)
+          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrServerNeed() (gw_udp_ring.h)
           char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
           mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
 

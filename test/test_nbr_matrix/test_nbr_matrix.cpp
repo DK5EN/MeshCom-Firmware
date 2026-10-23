@@ -2477,6 +2477,77 @@ void test_gw_lapse_reaches_relay_need_without_a_sweep(void)
     TEST_ASSERT_TRUE(gw_of(m, ig));   // das Zeilenflag steht noch, erst der Sweep loescht es
 }
 
+// GWRX-01: ein Server-Frame hat als Pfad nur den Urheber (keine Matrixzeile),
+// HatF ist leer. Andere Gateways haben ihn trotzdem vom Server: nbrServerNeed()
+// zaehlt jede GW-gehaltene Zeile zu HatF (ohne deren Hoerer), nbrRelayNeed()
+// bleibt unveraendert.
+static void gwrx01_setup(NbrMatrix &m, int &ig, int &ix, bool xheardg, uint16_t now)
+{
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, now);
+    nbrNoteFrame(m, "OE1XXX-2", ':', NULL, false, -80, 5, now);
+    ig = nbrFind(m, "OE1GGG-1");
+    ix = nbrFind(m, "OE1XXX-2");
+    TEST_ASSERT_TRUE(ig > 0 && ix > 0);
+    if (xheardg)
+        eset(m, ig, ix, 1, now); // X hat G gehoert
+}
+
+void test_gwrx01_server_need_gw_provider_makes_dependent_not_alone(void)
+{
+    NbrMatrix m;
+    int ig, ix;
+    const uint16_t now = 10;
+    gwrx01_setup(m, ig, ix, true, now);
+    NbrNeed s = nbrServerNeed(m, "OE1XAR-33", now, false, 0);
+    TEST_ASSERT_TRUE(s.known);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ix), s.need);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(s.alone)); // Fall B: X hoert das Gateway G
+    // Relay-Sicht unveraendert: HatF leer, X allein (Fall A).
+    NbrNeed r = nbrRelayNeed(m, "OE1XAR-33", now, false, 0);
+    TEST_ASSERT_TRUE(r.known);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ix), r.need);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ix), r.alone);
+}
+
+void test_gwrx01_server_need_without_edge_stays_alone(void)
+{
+    NbrMatrix m;
+    int ig, ix;
+    const uint16_t now = 10;
+    gwrx01_setup(m, ig, ix, false, now);
+    NbrNeed s = nbrServerNeed(m, "OE1XAR-33", now, false, 0);
+    TEST_ASSERT_TRUE(s.known);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ix), s.need);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ix), s.alone);
+}
+
+void test_gwrx01_server_need_expired_gw_flag_is_no_provider(void)
+{
+    NbrMatrix m;
+    int ig, ix;
+    const uint16_t now = 10;
+    gwrx01_setup(m, ig, ix, true, now);
+    // Ohne Sweep: nach NBR_GW_HOLD_MIN zaehlt G nicht mehr (und ist wieder Abhaengiger).
+    NbrNeed s = nbrServerNeed(m, "OE1XAR-33", now + NBR_GW_HOLD_MIN, false, 0);
+    TEST_ASSERT_TRUE(s.known);
+    TEST_ASSERT_TRUE(nbrMaskTest(s.need, ix));
+    TEST_ASSERT_TRUE(nbrMaskTest(s.alone, ix));
+}
+
+void test_gwrx01_server_need_without_dependents_is_unknown(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    NbrNeed s = nbrServerNeed(m, "OE1XAR-33", 10, false, 0);
+    TEST_ASSERT_FALSE(s.known);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(s.need));
+    // Nur ein GW-Nachbar: kein Abhaengiger, kein Wissen.
+    nbrNoteFrameGw(m, "OE1GGG-1", '@', "R0;", NBR_GW_YES, -80, 5, 10);
+    s = nbrServerNeed(m, "OE1XAR-33", 10, false, 0);
+    TEST_ASSERT_FALSE(s.known);
+}
+
 // Zeile 0 verfaellt nie; nbrRowClearFlag() ist der Weg fuer "--gateway off".
 void test_gw_row_zero_never_lapses_and_can_be_cleared_by_the_caller(void)
 {
@@ -2790,6 +2861,10 @@ int main(int, char **)
     RUN_TEST(test_mesh_need_count_is_the_number_behind_the_word);
     RUN_TEST(test_relay_need_masks_follow_concept_section_5);
     RUN_TEST(test_relay_need_on_empty_matrix_is_no_knowledge_not_case_b);
+    RUN_TEST(test_gwrx01_server_need_gw_provider_makes_dependent_not_alone);
+    RUN_TEST(test_gwrx01_server_need_without_edge_stays_alone);
+    RUN_TEST(test_gwrx01_server_need_expired_gw_flag_is_no_provider);
+    RUN_TEST(test_gwrx01_server_need_without_dependents_is_unknown);
     RUN_TEST(test_exclusive_direct_ignores_two_hop_hearers);
     RUN_TEST(test_sym_alt_fallback_makes_lone_dependent_not_alone);
     RUN_TEST(test_sym_threshold_is_inclusive_at_minus_16);

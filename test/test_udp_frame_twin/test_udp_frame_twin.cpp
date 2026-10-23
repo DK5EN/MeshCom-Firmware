@@ -61,7 +61,7 @@
 #include <ack_attribution.h>
 #include <conf_frame.h>
 #include <txring_functions.h>
-#include <nbr_matrix.h>        // GWRX-01: NbrNeed/NbrMatrix for the nbrRelayNeed() fake
+#include <nbr_matrix.h>        // GWRX-01: NbrNeed/NbrMatrix for the nbrServerNeed() fake
 
 #include <udp_functions.h>   // stub: bUDPLOG, resetMeshComUDP, handleUdpFrame_esp32
 #include <nrf_eth.h>         // stub: NrfETH + handleUdpFrame_nrf52
@@ -141,7 +141,7 @@ static std::string g_nbr_need_path;
 static NbrNeed g_nbr_need;
 static std::vector<std::string> g_nbr_lines;
 static void nbr_log_capture(const char *line) { g_nbr_lines.push_back(line); }
-NbrNeed nbrRelayNeed(const NbrMatrix &, const char *path, uint16_t, bool, uint32_t)
+NbrNeed nbrServerNeed(const NbrMatrix &, const char *path, uint16_t, bool, uint32_t)
 {
     g_nbr_need_calls++;
     g_nbr_need_path = path ? path : "";

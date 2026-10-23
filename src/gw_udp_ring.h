@@ -6,6 +6,8 @@
 // auseinanderlaufen. `path_as_rx` ist der Pfad WIE VOM SERVER EMPFANGEN, also
 // VOR dem Anhaengen des eigenen Rufzeichens (danach waere es schon die eigene
 // Aussendung, vgl. rx_relay in lora_functions.cpp).
+// Bedarf/allein kommen aus nbrServerNeed() (nicht nbrRelayNeed): andere Gateways
+// haben den Frame vom Server, der Pfad (nur der Urheber) liefert sonst kein HatF.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -17,7 +19,7 @@
 
 // nbr_matrix.h deklariert die Instanz nur ausserhalb von NATIVE_BUILD; der
 // Host-Zwilling (native_udp_frame_twin) baut beide udp_frame-Dateien und legt
-// nbrMatrix/nbrRelayNeed als Stubs an.
+// nbrMatrix/nbrServerNeed als Stubs an.
 extern NbrMatrix nbrMatrix;
 
 static inline int gwUdpRxEnqueue(const uint8_t *frame, uint16_t len, char payload_type,
@@ -27,7 +29,7 @@ static inline int gwUdpRxEnqueue(const uint8_t *frame, uint16_t len, char payloa
         return addUdpRxRingEntry(frame, len, payload_type, false, nullptr, nullptr);
 
     uint16_t now_min = uptimeMin16();
-    NbrNeed nn = nbrRelayNeed(nbrMatrix, path_as_rx, now_min, bNBRSYM, msg_id);
+    NbrNeed nn = nbrServerNeed(nbrMatrix, path_as_rx, now_min, bNBRSYM, msg_id);
     int slot = addUdpRxRingEntry(frame, len, payload_type, nn.known, &nn.need, &nn.alone);
 
     // Dieselbe NEED-Zeile wie beim rx_relay (lora_functions.cpp), damit ein
