@@ -1,7 +1,7 @@
 # Campaign: AU-20 BLE pause heap loss
 
-Status: **W3 done, root cause confirmed on hardware; fix route waits for the operator** (2026-10-23). Resume
-point for AU-20. Section 7 is the RCA, section 6 the progress log.
+Status: **closed 2026-10-23: fixed (route A), benched, gate green.** Resume point for AU-20. Section 7 is the
+RCA, section 6 the progress log.
 
 ## 1. Goal
 
@@ -105,6 +105,20 @@ scan: `esp32BleForcePause` present in the INSTRUMENT V3 ELF, absent from the rel
 - S3 side result: 100 forced pauses on DK5EN-1 without a panic, where the 64cd365d bench panicked on cycle
   2 with the AU-19 signature. The AU-19 patch (`be1589e0`) most likely cures the S3 as well. Not acted on:
   the S3 auto update still has no BLE pause (scope rule, section 3).
+- Operator chose route A (2026-10-23).
+- W4 (Sonnet implementer): `tools/nimble_patch.py` second hunk, marker `/* MESHCOM-PATCH AU-20 */` on the inserted
+  `ble_npl_callout_deinit(&ble_hs_flow_timer)` in `ble_hs_flow_startup()`; same guards as AU-19 (idempotent, unknown
+  text fails, file missing with NimBLE in lib_deps fails). 8 new pytest cases, failing on the pre-fix script (10 failed,
+  2 passed, 1 skipped), 13/13 after; the real-library case checks every installed copy.
+- W5: advisor (Opus) APPROVED; taken: stronger real-library test, docstring note on the host-reset path (timer may be
+  armed, deinit stops it; a queued event gets its callback back in the same host task). Safety basis: host task and
+  esp_timer task both on core 0, esp_timer at higher priority. Release builds of the 7 targets plus INSTRUMENT
+  `ttgo_tbeam`: all ESP32 images carry both markers and exactly one `callout_deinit` call in `ble_hs_flow_startup`;
+  RAK has no NimBLE (no-op). Bench DK5EN-92, production patch, 100 pause cycles: `ablk` slope 0.00 (was 1.00), free
+  heap -1.5 B/cycle (was -51), 0 panics, all resumes ok (`au20-92-fix-pause.log`). Gate `tools/regression.sh --stage
+1,2` PASS (2753/2753 Unity, 1220 pytest).
+- Open, not in this campaign: report the double init upstream (h2zero/NimBLE-Arduino, esp-nimble); S3 auto update BLE
+  pause (the AU-19 patch survived 100 forced S3 pauses) is a separate decision.
 
 ## 7. RCA (W3)
 
