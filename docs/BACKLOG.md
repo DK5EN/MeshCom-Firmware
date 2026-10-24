@@ -10,7 +10,7 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
   fork's docs, tests, tools, GitHub Pages and fork-only firmware not upstream yet. `fork-main`,
   `fork-neo`, `fork-neo-test` and `master` are retired (tag `archive/fork-neo-test-20261002`).
 - **Upstream:** no PR by dk5en open. Merged since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224,
-  #1233, #1235 (last on 2026-10-23, synced `4898cada`). DK5EN never merges upstream himself.
+  #1233, #1235, #1236 (last on 2026-10-24, synced `ff67ecd5`). DK5EN never merges upstream himself.
 - **Last release:** `v4.40a.10.23` (2026-10-24, CI-built, Latest; `v*` tags publish, `ci-proof-*` tags draft),
   base official `v4.40a.hbserver`; web flasher offers only the latest release. Release gate includes the
   T-Beam idle-heap step (`tools/heap_baseline.json`; last recorded figure 10.22: 69068 B vs 69332 B, pass).
@@ -352,8 +352,8 @@ status carries its own date. Anything not listed here is closed and lives in the
 - **PRs** are built from `upstream/dev` plus firmware files only, target upstream `dev`, text in
   German, one squashed commit. Debug code goes into the dedicated instrumentation files
   (`src/instrument.*`, `src/test_inject.*`, `src/t-deck/tdeck_debug.*`) with one-line hooks.
-- **Upstream state (2026-10-24):** PR #1186 (4.40a) merged as `e1e2acea`; #1200, #1201, #1207, #1208,
-  #1213, #1214, #1224, #1233, #1235 merged since. No PR open, no PR worktree left.
+- **Upstream state (2026-10-24, synced `ff67ecd5`):** PR #1186 (4.40a) merged as `e1e2acea`; #1200, #1201, #1207, #1208,
+  #1213, #1214, #1224, #1233, #1235, #1236 merged since. No PR open, no PR worktree left.
 - Historical branch tables (to 2026-09-18) and the old branch model are in the archive journal.
 
 ### 4.2 Bench fleet
