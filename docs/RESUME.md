@@ -1,7 +1,7 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
-`v4.40a.10.23` (CI, Latest, tagged 2026-10-24, 66 assets; web flasher on 10.23). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
+`v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
 Next step: evaluate the TXP logger night (until 2026-10-25 16:21), then TTL decision.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
@@ -9,12 +9,15 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **`v4.40a.10.24` released 2026-10-24** (CI, Latest, tag on `c8f0be5b`): SP server host `sp.meshcom.pl` (#1236), AU-21
+  tracker TFT sprite, TRK-03 T-Beam first boot GPS, client RM1 command stops its repeats on the reply (`56519299`, not
+  benched). Gate 81 Unity envs 2891/2891, pytest 1352, golden 48; idle-heap step skipped (operator decision). Web flasher
+  `check`: 30 boards, 0 mismatches. The first tag on `755a4dec` was moved before CI published (run cancelled for the RM fix).
+  The five nodes still run the `3e07f894` gate build for the TXP logger night.
 - **`v4.40a.10.23` released 2026-10-24** (operator chose the 10.23 date): TX pool W0-W1c, BLK-01 `--blockcall`,
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
-  `check`: 30 boards, 0 mismatches. Unreleased on `fork-dev`: SP gateway server host renamed to
-  `sp.meshcom.pl` (same IP 146.59.232.234, operator request 2026-10-24); upstream with #1236 (merged 2026-10-24). The five nodes run the gate build of
-  `3e07f894` (functionally identical; `FLASH_VERSION` 20261022, no tag string), left in place for the logger night.
+  `check`: 30 boards, 0 mismatches. The SP host change shipped in 10.24.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
@@ -36,11 +39,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - AU-14: single TASK_WDT during an AU download, cause unknown.
 - TRK-02/03: "TRACK on after web flash" (Heltec V3) not reproduced, the flasher cannot click GPIO0 while the
-  app runs; TRK-03 found on the way: T-Beam first boot set TRACK instead of GPS since V4.21, fixed on fork-dev
-  (`TBEAM_FIRST_BOOT_SSET`), not released, upstream PR candidate
+  app runs; TRK-03 found on the way: T-Beam first boot set TRACK instead of GPS since V4.21, fixed
+  (`TBEAM_FIRST_BOOT_SSET`), released in v4.40a.10.24, upstream PR candidate
   ([campaign-trk02-webflash-track-20261024.md](campaign-trk02-webflash-track-20261024.md)).
 - AU-21: Wireless Tracker AU check failed (`tls -9984`, heap at 0): TFT sprite 25.6 KB fixed on fork-dev (`e6e74bc6`,
-  `c100451a`), not released; open: S3 TLS heap floor and BLE pause after a DK5EN-1 measurement
+  `c100451a`), released in v4.40a.10.24; open: S3 TLS heap floor and BLE pause after a DK5EN-1 measurement
   ([campaign-au21-tft-heap-20261024.md](campaign-au21-tft-heap-20261024.md)).
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
@@ -69,8 +72,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Last release and flasher policy
 
-- `v4.40a.10.22` (tag on `8a329702`, CI-built), 66 assets, Latest. Base official `v4.40a.hbserver`. The previous
-  `v4.40a.10.21` was built locally (CI package install failed).
+- `v4.40a.10.24` (tag on `c8f0be5b`, CI-built), 66 assets, Latest. Base official `v4.40a.hbserver`.
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). Recipe:
   `/release-firmware` (includes the T-Beam idle-heap step against `tools/heap_baseline.json`).
