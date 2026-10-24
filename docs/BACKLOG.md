@@ -14,15 +14,15 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
 - **Last release:** `v4.40a.10.22` (2026-10-23, CI-built; `v*` tags publish, `ci-proof-*` tags draft),
   base official `v4.40a.hbserver`; web flasher offers only the latest release. Release gate includes the
   T-Beam idle-heap step (`tools/heap_baseline.json`); 10.22: 69068 B vs 69332 B, pass.
-- **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-18: 75
-  native envs, 2693 Unity cases, 1136 pytest, golden selftest 48. Stage 3 has run against the bench
+- **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-24: 80
+  native envs, 2861 Unity cases, 1323 pytest, golden selftest 48. Stage 3 has run against the bench
   fleet (REG-01). Inventory: [`test-suite-map.md`](test-suite-map.md).
 - **Fork-only firmware since 2026-10-15** (in `v4.40a.10.19`): VIA-01, AU-13, GPS-11, net console
   P-0111/0168/0169, RM1 `net`/`upd`, the AU web GUI row, the production setting lock, heap levers,
   LED parity, the LoRa QRT waves 1-2 and the neighbour-page watchdog feed. Matrix:
   [`fork-dev-vs-upstream-20261018.md`](fork-dev-vs-upstream-20261018.md).
 - **Unreleased on fork-dev** (since `v4.40a.10.22`): AU-18, AU-19, AU-20, UDP-04, RX-DEAF-01/02, WEB-RX-01,
-  GWRX-01, BL-01 tests, upstream #1235.
+  GWRX-01, BL-01 tests, upstream #1235, GWACK-01, TX pool W0-W1c, BLK-01 (`--blockcall`, fork only).
 - **Open work:** section 3.2, one table. Rows carry their own dated status; rows marked Done or
   Closed stay until their upstream PR or follow-up is through, then move to
   [`archive/backlog-closed-20261024.md`](archive/backlog-closed-20261024.md).

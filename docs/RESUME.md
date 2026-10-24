@@ -11,7 +11,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - **Next release (`v4.40a.10.24`, the 10-23 date is past):** W5 of [campaign-bench-20261023.md](campaign-bench-20261023.md)
   via `/release-firmware`, then nodes back on the release. Unreleased on `fork-dev`: AU-19 (NimBLE panic in the
   update-check BLE pause), AU-20 (flow-timer leak), AU-18 (TLS heap gate), UDP-04, RX-DEAF-01/02, WEB-RX-01
-  (#1229), GWRX-01 (benched ESP32 + nRF52), BL-01 tests, upstream #1235.
+  (#1229), GWRX-01 (benched ESP32 + nRF52), BL-01 tests, upstream #1235, GWACK-01, TX pool W0-W1c, BLK-01
+  call blocklist `--blockcall` (fork only; retires the DM3KS build, see below).
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
@@ -35,7 +36,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
 - GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
-- BLK-01 call blocklist `--blockcall`: on fork-dev 2026-10-24 (`ecf00df0`, `1635ba56`), benched DK5EN-1/-90/-92, running on DK5EN-98; not released. Goes into the next release so the DM3KS fork build can retire ([campaign-blockcall.md](campaign-blockcall.md)).
+- BLK-01 call blocklist `--blockcall`: on fork-dev 2026-10-24 (`ecf00df0`, `1635ba56`, `986aa573`), benched
+  DK5EN-1/-90/-92, DK5EN-98 runs the build (list empty). Not released; ships with the next release so the third-party
+  DM3KS build (sku2atsc/MeshCom-Firmware, DB0SD area) can retire. Open: flash DK5EN-14 (offline on 10-24), fork-key
+  migration not benched ([campaign-blockcall.md](campaign-blockcall.md)).
 - GPS: baro fusion tau (GPS-05b), operator decision.
 - Stability: REBOOT-98 (single event, watch); BL-04 closed with WEB-WDT-01.
 - Gateway server table: FR/US rows when operators name servers; stale `test/golden/corpus/commands`.
