@@ -43,5 +43,7 @@ Rules of the directory:
 ## Journals (archived 2026-10-03)
 
 - [backlog-journal-20260818-20260929.md](backlog-journal-20260818-20260929.md): BACKLOG.md campaign journal (former document head, old steps 3.1-3.8, intake and campaign sections 3.8a-3.8bb, 3.9, Durchgang entries, old branch chapter 4.1-4.2b); headings unchanged because other documents cite "BACKLOG.md 3.8x".
+- [backlog-closed-20261024.md](backlog-closed-20261024.md): 48 closed BACKLOG.md rows (section 3.2) moved verbatim on 2026-10-24: done or closed, no upstream PR, release or field check pending.
+- [resume-journal-20261024.md](resume-journal-20261024.md): "Open now" bullets and a session line moved out of docs/RESUME.md on 2026-10-24, verbatim (BL-01/GWRX-01 campaign, AU-18/19/20, UDP-04, RX-DEAF, release v4.40a.10.22, bench session 10-23).
 - [resume-journal-20261005-20261023.md](resume-journal-20261005-20261023.md): session journal of docs/RESUME.md, 2026-10-05 to 2026-10-23, verbatim (releases v4.40a.10.05-10.21, campaigns #1187-#1191, RM ext, gw_servers, AU, QRT, fork hardening, WF, upstream PRs #1213/#1214/#1224/#1233).
 - [resume-journal-20260903-20261001.md](resume-journal-20260903-20261001.md): session journal of docs/RESUME.md, 2026-09-03 to 2026-10-01, verbatim; predates the fork-dev branch model.

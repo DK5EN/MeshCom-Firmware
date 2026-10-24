@@ -1,57 +1,39 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-23, branch `fork-dev` (in sync with `upstream/dev` 112e4e5b), last release `v4.40a.10.22`
-(CI, Latest, published 2026-10-23 with the 10-22 date). No upstream PR of ours is open (#1235 merged 2026-10-23). Bench session
-running: [campaign-bench-20261023.md](campaign-bench-20261023.md).
+**Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
+`v4.40a.10.22` (CI, Latest, 2026-10-23). No upstream PR of ours is open. Next step: release `v4.40a.10.24`.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **Campaign BL-01 + GWRX-01 nRF52 (2026-10-24): closed.** BL-01 `--mesh off` decided and pinned (`deea597f`),
-  GWRX-01 benched on nRF52 (DK5EN-90) and ESP32, bench driver `tools/bench/gwrx_bench.py`. New: GWACK-01 (gateway
-  ACK pair can share one msg id). Record: [campaign-bl01-gwrx01-nrf52-20261024.md](campaign-bl01-gwrx01-nrf52-20261024.md).
-- **AU-19 fix (candidate `v4.40a.10.23`):** NimBLE host-task panic in the BLE pause of `--update check` on
-  the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
-  remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
-- **AU-20 fixed (candidate next release):** `tools/nimble_patch.py` deinits the NimBLE flow timer before its
-  second init (about 50 B per BLE pause gone, benched on DK5EN-92); no upstream report (old pinned version). See
-  [campaign-au20-ble-pause-heap.md](campaign-au20-ble-pause-heap.md). Side result: the AU-19 patch survives 100 forced
-  pauses on the S3.
-- **AU-18 and UDP-04 fixed (next release):** heap gate probes both TLS record buffers (`9b43b4f0`), duplicate server
-  positions no longer take a dedup slot (`6e6e7e40`); RX-DEAF-01 fixed (one TX-gate poll hit left an ESP32 node deaf until reboot; A+B fix benched); nRF52 sibling
-  RX-DEAF-02 fixed defensively (latent: PREAMBLE IRQ masked in RX; forced-latch bench on DK5EN-90).
-  See [campaign-au18-udp02-rxdeaf.md](campaign-au18-udp02-rxdeaf.md).
+- **Next release (`v4.40a.10.24`, the 10-23 date is past):** W5 of [campaign-bench-20261023.md](campaign-bench-20261023.md)
+  via `/release-firmware`, then nodes back on the release. Unreleased on `fork-dev`: AU-19 (NimBLE panic in the
+  update-check BLE pause), AU-20 (flow-timer leak), AU-18 (TLS heap gate), UDP-04, RX-DEAF-01/02, WEB-RX-01
+  (#1229), GWRX-01 (benched ESP32 + nRF52), BL-01 tests, upstream #1235.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
-- **Release `v4.40a.10.22`** (tag on `8a329702`, CI run 39954657798): UDP-03, upstream #1215/#1225/#1234. 66
-  assets, 27 `.autoupdate` re-inflate ok, tag string and T-Deck field-command scan ok; idle heap DK5EN-92 69068 B
-  (baseline 69332 B, pass); web flasher v4.40a.10.22 (30 boards, 0 mismatches), 10.21 folder pruned; presentation
-  synced. Tagged with the 10-22 date so a same-day fix can be `v4.40a.10.23`. DK5EN-92 runs a local release build
-  of the tag commit; the other nodes not yet flashed.
-- **Bench session 2026-10-23** ([campaign-bench-20261023.md](campaign-bench-20261023.md)): AU-17/AU-14, #1235 on
-  hardware, RM-NVS-01, BL-01, RX stall #1229 = WEB-RX-01 ([campaign-rx-stall-1229.md](campaign-rx-stall-1229.md),
-  fixed `5fdd4b8d`, W3 bench 0 frames lost, not released).
 - **Campaign resume points with open steps:**
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
   - Fork hardening: visual LED confirmation, phone-app SN check, deep-sleep LED test, LED pins on T-Echo, T114,
     T-ETH-Elite, DevKitC in the field ([campaign-fork-hardening-20261018.md](campaign-fork-hardening-20261018.md)).
-  - DUP/OnRxDone RCA: GWRX-01 decision, DK5EN-98 byte-model nights ([rca-brief-dup-onrxdone-20261013.md](rca-brief-dup-onrxdone-20261013.md)).
+  - DUP/OnRxDone RCA: DK5EN-98 byte-model nights; GWRX-01 count-mode night on DK5EN-98 (operator OK) ([rca-brief-dup-onrxdone-20261013.md](rca-brief-dup-onrxdone-20261013.md)).
   - RM extended commands: RM-DUP on hardware, gwbench driver gaps, page check
     ([rm-gui/extended-commands-impl-plan.md](rm-gui/extended-commands-impl-plan.md) sections 6, 9, 10).
 
 ## Hottest first (details in BACKLOG)
 
-- AU-19: NimBLE panic in the BLE pause of the update check (2 in ~35), every classic ESP32 checking daily.
-- AU-14: single TASK_WDT during an AU download. (AU-17 closed 2026-10-23: not reproduced on 10.22.)
+- Release the fixes above: AU-19 hits every classic ESP32 on its daily update check (2 panics in ~35 pauses).
+- AU-14: single TASK_WDT during an AU download, cause unknown.
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
-- GWRX-01: fixed on fork-dev (`257e5e2b`, `0281dce4`, [rca-gwrx01-20261023.md](rca-gwrx01-20261023.md)), bench W3 passed (4/10 `CANCEL?` on DK5EN-1); nRF52 gateway path passed W2 on DK5EN-90 (5 of 7 server slots released by `CANCEL`); open: count-mode night on DK5EN-98 (operator OK).
-- GPS: altitude Kalman re-seed length (BL-03) and baro fusion tau (GPS-05b), measured, unchanged.
-- Stability, single events: TASK_WDT on DK5EN-1 (BL-04), REBOOT-98.
+- GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
+- GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
+- GPS: baro fusion tau (GPS-05b), operator decision.
+- Stability: REBOOT-98 (single event, watch); BL-04 closed with WEB-WDT-01.
 - Gateway server table: FR/US rows when operators name servers; stale `test/golden/corpus/commands`.
 
 ## Branch model
@@ -65,7 +47,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (the maintainers review and merge).
-- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233.
+- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235.
 - Nothing temporary remains in `src/` (`389ace0d` reverted 2026-10-15).
 
 ## Last release and flasher policy
@@ -104,12 +86,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 Registry: `tools/bench/fleet.json`. Addresses come from DHCP and move between sessions: resolve the port by
 USB serial and confirm the callsign before any flash or test. Last known firmware per node:
 
-| Node     | Board           | USB serial              | Last known firmware (date)                                |
-| -------- | --------------- | ----------------------- | --------------------------------------------------------- |
-| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E        | plain build of `34974374` (10-19); no 2323, no mDNS       |
-| DK5EN-14 | T-Deck Plus     | E0:72:A1:AD:65:E0 (MAC) | fork-dev build + Safeboot v3 (10-19, WF-05 bench)         |
-| DK5EN-92 | T-Beam v1.2     | 573C000584              | fork-dev build + Safeboot v3 (10-19, WF-05 bench)         |
-| DK5EN-1  | Heltec V3       | 0001                    | fixed UDP-03 build (10-22 21:36); net console off default |
+| Node     | Board           | USB serial              | Last known firmware (date)                                      |
+| -------- | --------------- | ----------------------- | --------------------------------------------------------------- |
+| DK5EN-90 | RAK4631 (nRF52) | 230D6EBB3266D20E        | normal `fork-dev` `a7b21de5` (10-24); ETH .75, no 2323, no mDNS |
+| DK5EN-14 | T-Deck Plus     | E0:72:A1:AD:65:E0 (MAC) | fork-dev build + Safeboot v3 (10-19); .66 (10-24)               |
+| DK5EN-92 | T-Beam v1.2     | 573C000584              | normal `fork-dev` `a7b21de5` (10-24); .71                       |
+| DK5EN-1  | Heltec V3       | 0001                    | normal `fork-dev` `a7b21de5` (10-24); .73, net console on       |
+
+DK5EN-1, -90 and -92 run gateway on (real server), `--mesh off`, `--nbrrelay on`, 2 dBm.
 
 DK5EN-98 is the production Heltec V3 (gateway, logger on rpizero), not a bench node; last known on its
 production build of `1a6a3704` (QRT waves). Any work on it needs an explicit OK; it is flashed over the air
@@ -139,20 +123,24 @@ Hard bench rules:
 
 ## Where things are
 
-- Open work: [docs/BACKLOG.md](BACKLOG.md) is the single list. Do not copy items here.
+- Open work: [docs/BACKLOG.md](BACKLOG.md) is the single list. Do not copy items here. Closed rows:
+  [archive/backlog-closed-20261024.md](archive/backlog-closed-20261024.md).
 - Defect IDs: [docs/architecture/08-defect-catalogue.md](architecture/08-defect-catalogue.md).
 - Tests: [docs/test-suite-map.md](test-suite-map.md); runner:
   [docs/automation-runner-runbook.md](automation-runner-runbook.md).
 - Releases: [docs/release-journal.md](release-journal.md), [release-notes.md](../release-notes.md).
 - History: [docs/archive/](archive/README.md). Session journals that used to live in this file:
+  [2026-10-23 .. 2026-10-24](archive/resume-journal-20261024.md),
   [2026-10-05 .. 2026-10-23](archive/resume-journal-20261005-20261023.md),
   [2026-09-03 .. 2026-10-01](archive/resume-journal-20260903-20261001.md).
 
 ## Last three sessions
 
-- **2026-10-23:** upstream PR #1235 cut, opened and merged (synced 4898cada, worktree and branch removed); upstream sync (#1233 merged, #1234 SP server taken); net
-  console clients consolidated on `mc_console.py` with `.env` passwords; mock keep-reply timer race fixed.
+- **2026-10-24:** campaign BL-01 + GWRX-01 nRF52 closed: `--mesh off` meaning decided and pinned by tests,
+  GWRX-01 benched on the RAK gateway (5 of 7 server slots released), bench driver `gwrx_bench.py`; GWACK-01
+  found; RESUME and BACKLOG cleaned up (48 closed rows archived).
+- **2026-10-23:** bench session: AU-17 closed, AU-18/19/20, UDP-04, RX-DEAF-01/02, WEB-RX-01 fixed (not released);
+  upstream PR #1235 cut, opened and merged (synced 4898cada); upstream sync (#1233 merged, #1234 SP server taken);
+  net console clients on `mc_console.py` with `.env` passwords; mock keep-reply timer race fixed.
 - **2026-10-22:** UDP-03 fixed and benched (upstream issue #1231), PR #1233 opened and merged; upstream sync
-  (#1224 merged, #1225 taken).
-- **2026-10-19/20:** releases v4.40a.10.20 and v4.40a.10.21; AU-16 root cause and fix (field-verified);
-  WEB-WDT-01, WEB-STOP-01, RM-NVS-01 diagnostics; web flasher WF-01..WF-05; upstream PR #1224.
+  (#1224 merged, #1225 taken); release `v4.40a.10.22`.
