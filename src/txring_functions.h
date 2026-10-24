@@ -175,6 +175,20 @@ void txRingDropStaleCet(const CetClock &clk);
 // in lora_functions.cpp (the only caller of Radio.Send()/startTransmit())
 // is the other and shares this counter/marker via these declarations.
 extern uint32_t stat_tx_refuse_unconfigured;
+
+// TXP W1c (D3, Konzept 5.4.1): Eintraege, die ein neuer HEY/Position/{CET}-Frame
+// in place ueberschrieben hat (addTxRingEntryCore()). Noch in keiner STAT-Zeile.
+extern uint32_t stat_supersede_count;
+
+// TXP W1c: Retry in place. updateRetransmissionStatus() legt die Wiederholung
+// nicht mehr als Kopie in einen anderen Slot, sondern schreibt sie in den
+// geparkten Original-Slot zurueck. Unter dem nRF52-Lock wird neu geprueft, dass
+// `slot` noch belegt ist (Laenge == len, Status == expectStatus, die Leiter-
+// Schwelle 0x15); sonst false und der Slot bleibt unberuehrt (ein ACK war
+// schneller). Bei Erfolg: Frame (neue msg-id) in den Slot, retryCount++,
+// ringEnqueueTime = jetzt, Status READY; Prio/Quelle/Kind/Need/Alone bleiben.
+// `frame` darf auf den Slot selbst zeigen (ringBuffer[slot]+2, 1:1-Wiederholung).
+bool txRingRearmRetry(int slot, const uint8_t *frame, uint16_t len, uint8_t expectStatus);
 void logTxRefuseUnconfigured(void);
 
 // GWRX-01 (docs/rca-gwrx01-20261023.md, Option b): Server-Frame ("udp_rx",

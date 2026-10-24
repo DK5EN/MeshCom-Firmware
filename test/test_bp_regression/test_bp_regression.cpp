@@ -360,6 +360,8 @@ static void test_f5_overflow_code_nackt_bei_vollem_pool(void)
                              "QTA nack on -2");
     TEST_ASSERT_FALSE_MESSAGE(sendMessageNeedsQtaNack(-1, 5, bp.refuseThreshold()),
                               "-1 below threshold stays [BP];invalid");
+    // TXP W1c: -2 (Pool voll, nichts zu verdraengen) braucht das QTA-Nack auch bei kleiner Tiefe
+    TEST_ASSERT_TRUE(sendMessageNeedsQtaNack(RING_ENQUEUE_FULL, 5, bp.refuseThreshold()));
     TEST_ASSERT_TRUE(sendMessageNeedsQtaNack(-1, bp.refuseThreshold(), bp.refuseThreshold()));
 }
 

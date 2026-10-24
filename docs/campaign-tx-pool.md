@@ -6,7 +6,7 @@
 | Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                         |
 | Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md) |
 | Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                       |
-| Status    | W0 done (`cee174b7`, logger night running), W1a `05a18b36`, W1b committed; W1c next                                                                                              |
+| Status    | W0 `cee174b7` (logger night running), W1a `05a18b36`, W1b `2ce8872e`, W1c committed; open: W0 night evaluation, bench of W1a-W1c                                                 |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -35,7 +35,7 @@
 | W0   | Measurement: `{CET}` age helper + log lines, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=`; flash DK5EN-1, then DK5EN-98; logger night | done   |
 | W1a  | TTL table for all priorities, `{CET}` age gate (D1, D2)                                                                                          | done   |
 | W1b  | Slot pool: `INFLIGHT` status, delete `iRead`/`iWrite`; gauge G3 (D5); RM1 `txq` fix (D6)                                                         | done   |
-| W1c  | Supersede in place: HEY, position, `{CET}` (D3)                                                                                                  | open   |
+| W1c  | Supersede in place: HEY, position, `{CET}` (D3)                                                                                                  | done   |
 | W2   | Time-aged dedup (concept stage 3), dedup line of the gauge: later campaign                                                                       | parked |
 
 ## 4. Wave log
@@ -116,3 +116,18 @@ dominates the age. Without a gate a beacon can sit 5 to 7 minutes and still go o
   `cad_done_flag` is set, so a stale CAD result is consumed, never reused), fixed as proposed.
 - Open, next wave: a retry in a full pool can still lose the message (`updateRetransmissionStatus()`
   enqueues the copy before freeing the original; pre-existing). Fix: rearm the parked slot in place.
+
+### W1c
+
+- Supersede in place (D3): a new HEY or position replaces a queued READY/DONE slot with the same
+  type, priority, originator (first path token) and destination (`H`, `HG`, `HN` stay apart); a
+  relayed `{CET}` (DONE, prio 3) replaces a queued one when its payload time is newer or equal,
+  else the new one is dropped (`RING_SUPERSEDE_KEEP`, RLY reason `full`). A user text that begins
+  with `{CET}` is never treated as a beacon. `stat_supersede_count` counts replacements (not yet in
+  STAT or the web page). Trade-off (concept 10.6): a replaced relayed HEY loses its report chain.
+- Retry rearm: `updateRetransmissionStatus()` rewrites the parked slot in place
+  (`txRingRearmRetry()`, re-check status 0x15 and length under the lock), so a full pool no longer
+  loses the message; `RING_WRITE src=retransmit` became `RING_REARM`.
+- Tests: 11 W1c cases (8 failed before) plus 2 advisor regressions (HEY vs HN, user `{CET}` text;
+  both failed before). Advisor (Opus): REWORK (destination match, CET relay-only), applied by the
+  orchestrator.

@@ -3553,46 +3553,32 @@ bool updateRetransmissionStatus()
                     // else: kein FCS-Feld gefunden -- 1:1-Pfad unten greift
                 }
 
-                // ready for doTX (text messages) or fire-and-forget, wie zuvor
-                uint8_t retransmitStatus = (ringBuffer[ircheck][2] == MSG_TYPE_TEXT)
-                                            ? RING_STATUS_READY : RING_STATUS_DONE;
+                // TXP W1c: die Wiederholung wird in den geparkten Original-Slot
+                // zurueckgeschrieben (kein Kopieren in einen anderen Slot, kein
+                // Freigeben danach): in einem vollen Pool ging die Kopie sonst
+                // verloren, und ein ACK konnte das Original zwischen Kopie und
+                // Freigabe loeschen. Prio/Quelle/Kind/Need/Alone bleiben im Slot.
+                // Der Status wird unter Lock neu geprueft (Schwelle 0x15); hat ein
+                // ACK/RM1-Stopp den Slot inzwischen freigegeben, passiert nichts.
+                if(!txRingRearmRetry(ircheck, pnRewritten ? pnLocalFrame : &ringBuffer[ircheck][2],
+                                     (uint16_t)size, threshold))
+                    continue;
 
-                // Quelle ist ircheck (belegt), Ziel wird erst innerhalb der Funktion
-                // (unter Lock) gewaehlt: ein freier Slot (also != ircheck) oder ein
-                // verdraengter niedrigerer Prio -- ircheck selbst ist nie freier Slot
-                // und bei gleicher Prio nie Verdraengungsziel.
-                // Original erst NACH dem Kopieren freigeben, damit die Payload beim
-                // Kopiervorgang garantiert noch gueltig ist.
-                int retxSlot = addTxRingEntry(pnRewritten ? pnLocalFrame : &ringBuffer[ircheck][2],
-                                (uint16_t)size, retransmitStatus,
-                                "retransmit", retryCount[ircheck] + 1);
-
-                // SL-03: "retransmit" bildet auf 'o' ab -- die Kennung des
-                // Quellslots wird deshalb mitgenommen (wie bei der Prio-Verdraengung).
-                if(retxSlot >= 0)
+                if(pnRewritten)
                 {
-                    ringSource[retxSlot] = ringSource[ircheck];
+                    // Eigene Retry-id registrieren wie sendMessage() (sonst
+                    // faelschlich als fremdes eigenes Echo erkannt).
+                    if(bGATEWAY && meshcom_settings.node_hasIPaddress)
+                        addLoraRxBuffer(pnNewId, true);
+                    else
+                        addLoraRxBuffer(pnNewId, false);
 
-                    if(pnRewritten)
-                    {
-                        // Eigene Retry-id registrieren wie sendMessage() (sonst
-                        // faelschlich als fremdes eigenes Echo erkannt).
-                        if(bGATEWAY && meshcom_settings.node_hasIPaddress)
-                            addLoraRxBuffer(pnNewId, true);
-                        else
-                            addLoraRxBuffer(pnNewId, false);
-
-                        if(bDisplayRetx)
-                            printfdeb("\n[RETX] %s k=%u msg-id:%08X\n",
-                                          pnFrameIsOwnRm1Cmd(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call)
-                                              ? "RM1RETRY" : "PNRETRY",
-                                          (unsigned)(retryCount[ircheck] + 1), pnNewId);
-                    }
+                    if(bDisplayRetx)
+                        printfdeb("\n[RETX] %s k=%u msg-id:%08X\n",
+                                      pnFrameIsOwnRm1Cmd(pnLocalFrame, (uint16_t)size, _GW_ID, meshcom_settings.node_call)
+                                          ? "RM1RETRY" : "PNRETRY",
+                                      (unsigned)retryCount[ircheck], pnNewId);
                 }
-
-                // Mark original as done and free slot (after copy, so len is correct in new slot)
-                ringBuffer[ircheck][1] = RING_STATUS_DONE;
-                ringBuffer[ircheck][0] = 0;  // free slot so getNextTxSlot skips it
 
                 return true;
             }

@@ -81,6 +81,7 @@ uint8_t  ringKind[MAX_RING]  = {0};
 // at most one line per 10 s, folding any elided refusals into the
 // "refused" count on the next line that does print (TM-21's lesson).
 uint32_t stat_tx_refuse_unconfigured = 0;
+uint32_t stat_supersede_count = 0;   // TXP W1c (D3)
 
 void logTxRefuseUnconfigured(void)
 {
@@ -653,6 +654,68 @@ void txRingDropStaleCet(const CetClock &clk)
     txRingSweep(0, clk, true);
 }
 
+// ---- TXP W1c (D3, Konzept 5.4.1): Supersede in place -----------------------
+//
+// Ein neuer HEY (Prio 5), eine neue Position (Prio 4) oder ein neues {CET}
+// ersetzt einen gleichartigen, noch nicht gesendeten Eintrag im selben Slot,
+// statt einen zweiten zu belegen. Reine Frame-Helfer, kein Ring-Zugriff.
+// frame = ringBuffer[slot]+2 (Typ bei [0], ab [6] Pfad "ORIG[,via..]>DEST").
+
+// Laenge des Urhebers (erstes Pfad-Token: ab Offset 6 bis zum ersten ',' oder
+// '>'). 0 = kein Urheber erkennbar (pfadloser Frame) -> kein Supersede.
+static uint8_t supersedeOriginatorLen(const uint8_t *frame, int len)
+{
+    for(int i = 6; i < len && i < 6 + 12; i++)
+    {
+        if(frame[i] == ',' || frame[i] == '>')
+            return (uint8_t)(i - 6);
+    }
+    return 0;
+}
+
+// Gleiches Ziel (Token nach dem ersten '>' bis zum Typ-Terminator == frame[0],
+// hoechstens 12 Byte): HEY "H"/"HG" und NBR-Bericht "HN" sind alle '@' mit
+// prio 5 vom selben Urheber und duerfen einander nicht ersetzen (W1c-Advisor).
+static bool supersedeSameDest(const uint8_t *a, int alen, const uint8_t *b, int blen)
+{
+    int ia = 6, ib = 6;
+    while(ia < alen && a[ia] != '>') ia++;
+    while(ib < blen && b[ib] != '>') ib++;
+    if(ia >= alen || ib >= blen)
+        return false;
+    ia++; ib++;
+    for(int k = 0; k < 13; k++)
+    {
+        bool ea = (ia + k >= alen) || a[ia + k] == a[0];
+        bool eb = (ib + k >= blen) || b[ib + k] == b[0];
+        if(ea || eb)
+            return ea && eb && k > 0;
+        if(a[ia + k] != b[ib + k])
+            return false;
+    }
+    return false;   // Ziel laenger als 12 Byte: kein Supersede
+}
+
+// {CET}-Text: Praefix "{CET}" direkt nach dem ersten ':' ab Offset 6.
+static bool supersedeIsCetText(const uint8_t *frame, int len)
+{
+    if(len < 8 || frame[0] != MSG_TYPE_TEXT)
+        return false;
+    for(int i = 6; i < len; i++)
+    {
+        if(frame[i] == ':')
+            return (len - i - 1) >= 5 && memcmp(frame + i + 1, "{CET}", 5) == 0;
+    }
+    return false;
+}
+
+// Nur Slots, die weder in der Luft (INFLIGHT) noch extern gehalten (EXT_PENDING)
+// noch auf der SENT-Leiter (0x01..0x14, wartet auf ACK) sind.
+static inline bool supersedeStatusOk(uint8_t st)
+{
+    return st == RING_STATUS_READY || st == RING_STATUS_DONE;
+}
+
 /**
  * TX-Ring: kompletter Enqueue-Vorgang (Slot-Wahl, Payload-Kopie, Prio/Overflow,
  * Eviction) in EINER Funktion unter EINEM Lock.
@@ -787,7 +850,78 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
     }
     int depthAfter = queued + 1;
 
-    if(w < 0)
+    // TXP W1c (D3, Konzept 5.4.1): Supersede VOR der Freislot-Wahl. Ein HEY/
+    // eine Position desselben Urhebers bzw. ein {CET} ersetzt einen noch nicht
+    // gesendeten Eintrag in place (kein Eviction, kein Drop-Zaehler), auch bei
+    // vollem Pool. Akzeptierter Kompromiss (Konzept 10.6): ein ersetztes
+    // weitergeleitetes HEY verliert seine Signalberichts-Kette.
+    int supSlot = -1;
+    bool supKeepNew = false;
+    uint32_t supOldId = 0;
+    if(msgType == MSG_TYPE_HEY || msgType == MSG_TYPE_POSITION)
+    {
+        uint8_t ol = supersedeOriginatorLen(frame, len);
+        if(ol > 0)
+        {
+            for(int i = 0; i < MAX_RING; i++)
+            {
+                if(ringBuffer[i][0] == 0 || ringBuffer[i][2] != msgType ||
+                   ringPriority[i] != prio || !supersedeStatusOk(ringBuffer[i][1]))
+                    continue;
+                const uint8_t *qf = ringBuffer[i] + 2;
+                if(supersedeOriginatorLen(qf, ringBuffer[i][0]) == ol &&
+                   memcmp(qf + 6, frame + 6, ol) == 0 &&
+                   supersedeSameDest(qf, ringBuffer[i][0], frame, len))
+                {
+                    supSlot = i;
+                    break;
+                }
+            }
+        }
+    }
+    // Nur Server-/Relay-Beacons (als Relay DONE eingestuft, prio 3), nie ein
+    // eigener Text, der zufaellig mit "{CET}" beginnt (W1c-Advisor).
+    else if(classify_status == RING_STATUS_DONE && prio == MSG_PRIO_NORMAL &&
+            supersedeIsCetText(frame, len))
+    {
+        uint32_t newT = 0;
+        bool newOk = cetFindInFrame(frame, len, &newT);
+        for(int i = 0; i < MAX_RING; i++)
+        {
+            if(ringBuffer[i][0] == 0 || ringBuffer[i][1] != RING_STATUS_DONE ||
+               ringPriority[i] != MSG_PRIO_NORMAL ||
+               !supersedeIsCetText(ringBuffer[i] + 2, ringBuffer[i][0]))
+                continue;
+            uint32_t oldT = 0;
+            bool oldOk = cetFindInFrame(ringBuffer[i] + 2, ringBuffer[i][0], &oldT);
+            // unparsbar = aelter: ein unparsbarer Neuer gewinnt nur gegen einen
+            // ebenfalls unparsbaren; ein parsbarer Neuer gewinnt bei >= (Gleichstand).
+            bool newer = newOk ? (!oldOk || (int32_t)(newT - oldT) >= 0) : !oldOk;
+            supOldId = ((uint32_t)ringBuffer[i][6] << 24) | ((uint32_t)ringBuffer[i][5] << 16) |
+                       ((uint32_t)ringBuffer[i][4] << 8)  |  (uint32_t)ringBuffer[i][3];
+            if(newer)
+                supSlot = i;
+            else
+                supKeepNew = true;
+            break;
+        }
+    }
+    if(supSlot >= 0 && !supKeepNew)
+    {
+        supOldId = ((uint32_t)ringBuffer[supSlot][6] << 24) | ((uint32_t)ringBuffer[supSlot][5] << 16) |
+                   ((uint32_t)ringBuffer[supSlot][4] << 8)  |  (uint32_t)ringBuffer[supSlot][3];
+        w = supSlot;
+        depthAfter = queued;   // alter Eintrag raus, neuer rein
+        stat_supersede_count++;
+    }
+
+    if(supKeepNew)
+    {
+        // das Queued-{CET} ist neuer: den Neuen verwerfen (kein Drop-Zaehler)
+        w = -1;
+        depthAfter = queued;
+    }
+    else if(w < 0)
     {
         // Pool full. Priority-aware eviction: a strictly higher-priority
         // newcomer evicts the OLDEST entry (ringEnqueueTime, wrap-safe) of the
@@ -850,7 +984,9 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
         stat_queue_hwm = depthAfter;
 
     int resultSlot = -1;
-    if(droppedNew)
+    if(supKeepNew)
+        resultSlot = -1;
+    else if(droppedNew)
         resultSlot = RING_ENQUEUE_FULL;   // QRT Finding 5: no-evict overflow, distinct from -1 (invalid)
     else
     {
@@ -891,6 +1027,14 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
 
     // ---- Ab hier ausserhalb des Locks ----
 
+    if(supKeepNew)
+    {
+        if(bLORADEBUG)
+            printfdeb("[MC-DBG] RING_SUPERSEDE_KEEP prio=%d old_id=%08X new_id=%08X\n",
+                      prio, supOldId, mid);
+        return -1;
+    }
+
     // M0-1 (0.4): ring enqueues per window and parked-slot overwrites.
     ringstat_enqueue.fetch_add(1);
     if(parkedOverwrite)
@@ -919,6 +1063,10 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
                   "len=%d msg_id=%08X queued=%d/%d src=%s\n",
                   w, msgType, store_status, (int)len, mid, queued, MAX_RING, source);
         printfdeb("[MC-DBG] RING_PRIO slot=%d prio=%d\n", w, prio);
+
+        if(supSlot >= 0)
+            printfdeb("[MC-DBG] RING_SUPERSEDE slot=%d prio=%d old_id=%08X new_id=%08X\n",
+                      supSlot, prio, supOldId, mid);
 
         if(droppedOld)
             printfdeb("[MC-DBG] RING_DROP_PRIO slot=%d prio=%d type=%02X "
@@ -977,4 +1125,44 @@ int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
     return addTxRingEntryCore(frame, len, RING_STATUS_READY, RING_STATUS_DONE,
                                source, retryCountIn, clearSlotFirst,
                                kind, need, alone);
+}
+
+// TXP W1c: Retry in place (Doku: txring_functions.h). Reihenfolge im Slot:
+// erst Nutzlast, Status zuletzt -- der Slot steht bis dahin auf der SENT-Leiter
+// und ist fuer getNextTxSlot() unsichtbar.
+bool txRingRearmRetry(int slot, const uint8_t *frame, uint16_t len, uint8_t expectStatus)
+{
+    if(slot < 0 || slot >= MAX_RING || frame == nullptr || len == 0 || len > UDP_TX_BUF_SIZE)
+        return false;
+
+    bool ok = false;
+    int retry = 0;
+    uint32_t mid = 0;
+
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
+    if(ringBuffer[slot][0] == len && ringBuffer[slot][1] == expectStatus)
+    {
+        if(frame != ringBuffer[slot] + 2)
+            memmove(ringBuffer[slot] + 2, frame, len);
+        retryCount[slot]++;
+        retry = retryCount[slot];
+        ringEnqueueTime[slot] = millis();
+        ringBuffer[slot][1] = RING_STATUS_READY;
+        mid = ((uint32_t)ringBuffer[slot][6] << 24) | ((uint32_t)ringBuffer[slot][5] << 16) |
+              ((uint32_t)ringBuffer[slot][4] << 8)  |  (uint32_t)ringBuffer[slot][3];
+        ok = true;
+    }
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
+
+    if(ok)
+    {
+        ringstat_enqueue.fetch_add(1);
+        if(bLORADEBUG)
+            printfdeb("[MC-DBG] RING_REARM slot=%d msg_id=%08X retry=%d\n", slot, mid, retry);
+    }
+    return ok;
 }

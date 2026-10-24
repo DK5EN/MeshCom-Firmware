@@ -70,6 +70,7 @@ static void resetRing(void)
     memset(ringKind, 0, sizeof(ringKind));
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
+    stat_supersede_count = 0;
     mc_test_set_millis(0);
     // Nachbarschaftsmatrix Stufe 2 (Feldlauf 23.09.): jeder Test startet mit
     // --nbrrelay aus, sonst wuerde ein liegen gebliebenes bNBRCANCEL=true aus
@@ -2209,6 +2210,245 @@ static void test_pool_claim_scheitert_an_neu_belegtem_slot(void)
     TEST_ASSERT_TRUE(txRingBeginTx(0, &prev, &snap));
 }
 
+// ------------------------------------------------- TXP W1c: supersede + rearm
+
+static BuiltFrame heyFrom(uint32_t id, const char *src)
+{
+    static const uint8_t payload[] = "R0;";
+    return buildFrame(MSG_TYPE_HEY, id, 0x92, src, "*", payload, sizeof(payload) - 1);
+}
+
+static BuiltFrame posFrom(uint32_t id, const char *src)
+{
+    static const uint8_t payload[] = "4825.35N\\01147.19E-Test";
+    return buildFrame(MSG_TYPE_POSITION, id, 0x12, src, "*", payload, sizeof(payload) - 1);
+}
+
+static uint32_t slotMsgId(int slot)
+{
+    return ((uint32_t)ringBuffer[slot][6] << 24) | ((uint32_t)ringBuffer[slot][5] << 16) |
+           ((uint32_t)ringBuffer[slot][4] << 8) | (uint32_t)ringBuffer[slot][3];
+}
+
+static void test_w1c_eigenes_hey_wird_in_place_ersetzt(void)
+{
+    BuiltFrame a = heyFrom(0xA0000001UL, "DK5EN-90");
+    BuiltFrame b = heyFrom(0xA0000002UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_READY, "hey"));
+    mc_test_set_millis(5000);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(b.bytes, b.len, RING_STATUS_READY, "hey"));
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0xA0000002UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_UINT32(5000, ringEnqueueTime[0]);
+    TEST_ASSERT_EQUAL_UINT32(1, stat_supersede_count);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[5]);
+}
+
+static void test_w1c_relay_hey_zwei_urheber_zwei_slots(void)
+{
+    BuiltFrame a = heyFrom(0xA0000011UL, "OE1AAA-1,DK5EN-90");
+    BuiltFrame b = heyFrom(0xA0000012UL, "OE1BBB-1,DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(b.bytes, b.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+    // derselbe Urheber ueber einen anderen Relay-Pfad ersetzt
+    BuiltFrame c = heyFrom(0xA0000013UL, "OE1AAA-1,OE9ZZZ-1");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(c.bytes, c.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0xA0000013UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_HEX32(0xA0000012UL, slotMsgId(1));
+}
+
+static void test_w1c_position_gleicher_urheber_ersetzt_hey_nicht(void)
+{
+    BuiltFrame p1 = posFrom(0xB0000001UL, "DK5EN-90");
+    BuiltFrame p2 = posFrom(0xB0000002UL, "DK5EN-90");
+    BuiltFrame h  = heyFrom(0xB0000003UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p1.bytes, p1.len, RING_STATUS_READY, "pos"));
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(h.bytes, h.len, RING_STATUS_READY, "hey"));   // andere Prio/Typ
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p2.bytes, p2.len, RING_STATUS_READY, "pos"));
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0xB0000002UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_HEX32(0xB0000003UL, slotMsgId(1));
+}
+
+static void test_w1c_sent_und_inflight_werden_nie_ersetzt(void)
+{
+    BuiltFrame a = posFrom(0xC0000001UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_READY, "pos"));
+    ringBuffer[0][1] = 0x05;   // SENT-Leiter
+    BuiltFrame b = posFrom(0xC0000002UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(b.bytes, b.len, RING_STATUS_READY, "pos"));
+    ringBuffer[1][1] = RING_STATUS_INFLIGHT;
+    BuiltFrame c = posFrom(0xC0000003UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(2, addTxRingEntry(c.bytes, c.len, RING_STATUS_READY, "pos"));
+    ringBuffer[2][1] = RING_STATUS_EXT_PENDING;
+    BuiltFrame d = posFrom(0xC0000004UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(3, addTxRingEntry(d.bytes, d.len, RING_STATUS_READY, "pos"));
+    TEST_ASSERT_EQUAL_INT(4, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0xC0000001UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_UINT32(0, stat_supersede_count);
+}
+
+static void test_w1c_text_dm_ack_werden_nie_ersetzt(void)
+{
+    BuiltFrame t1 = buildTextFrame("*", "hallo", 0xD0000001UL);
+    BuiltFrame t2 = buildTextFrame("*", "hallo", 0xD0000002UL);
+    BuiltFrame d1 = buildTextFrame("DK5EN-92", "dm", 0xD0000003UL);
+    BuiltFrame d2 = buildTextFrame("DK5EN-92", "dm", 0xD0000004UL);
+    BuiltFrame k1 = buildAckFrame(0xD0000005UL);
+    BuiltFrame k2 = buildAckFrame(0xD0000006UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(t1.bytes, t1.len, RING_STATUS_READY, "t"));
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(t2.bytes, t2.len, RING_STATUS_READY, "t"));
+    TEST_ASSERT_EQUAL_INT(2, addTxRingEntry(d1.bytes, d1.len, RING_STATUS_READY, "t"));
+    TEST_ASSERT_EQUAL_INT(3, addTxRingEntry(d2.bytes, d2.len, RING_STATUS_READY, "t"));
+    TEST_ASSERT_EQUAL_INT(4, addTxRingEntry(k1.bytes, k1.len, RING_STATUS_DONE, "a"));
+    TEST_ASSERT_EQUAL_INT(5, addTxRingEntry(k2.bytes, k2.len, RING_STATUS_DONE, "a"));
+    TEST_ASSERT_EQUAL_INT(6, txRingDepth());
+    TEST_ASSERT_EQUAL_UINT32(0, stat_supersede_count);
+}
+
+static void test_w1c_cet_neuer_ersetzt_aelteren_anderer_quelle(void)
+{
+    BuiltFrame o = buildCetFrame(kCetNow - 60);
+    BuiltFrame n = buildCetFrame(kCetNow);
+    // andere Quelle: Rufzeichen im Pfad tauschen (gleiche Laenge)
+    memcpy(n.bytes + 6, "OE2YYY-1", 8);
+    n.bytes[1] = 0x99;
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(o.bytes, o.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(n.bytes, n.len, RING_STATUS_DONE, "udp_rx"));
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
+    TEST_ASSERT_EQUAL_UINT8(0x99, ringBuffer[0][3]);
+    TEST_ASSERT_EQUAL_UINT32(1, stat_supersede_count);
+}
+
+static void test_w1c_cet_aelterer_neuer_frame_wird_verworfen(void)
+{
+    BuiltFrame q = buildCetFrame(kCetNow);
+    BuiltFrame o = buildCetFrame(kCetNow - 60);
+    o.bytes[1] = 0x77;
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(q.bytes, q.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(-1, addTxRingEntry(o.bytes, o.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
+    TEST_ASSERT_EQUAL_UINT8(0x01, ringBuffer[0][3]);   // der Gleiche bleibt (id 0xCE700001)
+    TEST_ASSERT_EQUAL_UINT32(0, stat_supersede_count);
+}
+
+static void test_w1c_cet_ersetzt_keinen_anderen_text(void)
+{
+    BuiltFrame t = buildTextFrame("*", "kein cet", 0xE0000001UL, "OE1XXX-1");
+    BuiltFrame n = buildCetFrame(kCetNow);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(t.bytes, t.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(n.bytes, n.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+}
+
+static void test_w1c_voller_pool_hey_wird_ersetzt_statt_verworfen(void)
+{
+    BuiltFrame h = heyFrom(0xF0000001UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(h.bytes, h.len, RING_STATUS_READY, "hey"));
+    for (int i = 1; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildTextFrame("DK5EN-92", "x", 0xF1000000UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
+    }
+    BuiltFrame n = heyFrom(0xF0000002UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(n.bytes, n.len, RING_STATUS_READY, "hey"));
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0xF0000002UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[5]);
+}
+
+static void test_w1c_rearm_im_vollen_pool(void)
+{
+    BuiltFrame p = buildTextFrame("DK5EN-92", "geparkt", 0x71000000UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p.bytes, p.len, RING_STATUS_READY, "msg"));
+    ringBuffer[0][1] = 0x15;
+    ringSource[0] = 'm';
+    for (int i = 1; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildTextFrame("DK5EN-92", "fill", 0x72000000UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
+    }
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+
+    BuiltFrame r = p;
+    r.bytes[1] = 0x42; r.bytes[2] = 0x43; r.bytes[3] = 0x44; r.bytes[4] = 0x45;   // neue msg-id 0x45444342
+    mc_test_set_millis(9000);
+    TEST_ASSERT_TRUE(txRingRearmRetry(0, r.bytes, r.len, 0x15));
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+    TEST_ASSERT_EQUAL_HEX32(0x45444342UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_READY, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8(1, retryCount[0]);
+    TEST_ASSERT_EQUAL_UINT32(9000, ringEnqueueTime[0]);
+    TEST_ASSERT_EQUAL_UINT8('m', ringSource[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, ringPriority[0]);
+    for (int i = 1; i < MAX_RING; i++)
+        TEST_ASSERT_EQUAL_HEX32(0x72000000UL + (uint32_t)i, slotMsgId(i));
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[1]);
+
+    // 1:1-Wiederholung: frame zeigt auf den Slot selbst
+    ringBuffer[0][1] = 0x15;
+    TEST_ASSERT_TRUE(txRingRearmRetry(0, &ringBuffer[0][2], ringBuffer[0][0], 0x15));
+    TEST_ASSERT_EQUAL_UINT8(2, retryCount[0]);
+    TEST_ASSERT_EQUAL_HEX32(0x45444342UL, slotMsgId(0));
+}
+
+static void test_w1c_rearm_verliert_gegen_ack_oder_laenge(void)
+{
+    BuiltFrame p = buildTextFrame("DK5EN-92", "geparkt", 0x71000000UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p.bytes, p.len, RING_STATUS_READY, "msg"));
+    ringBuffer[0][1] = 0x15;
+    BuiltFrame r = p;
+    r.bytes[1] = 0x42;
+    TEST_ASSERT_FALSE(txRingRearmRetry(0, r.bytes, r.len, 0x14));        // Status passt nicht
+    TEST_ASSERT_FALSE(txRingRearmRetry(0, r.bytes, (uint16_t)(r.len - 1), 0x15));   // Laenge passt nicht
+    TEST_ASSERT_EQUAL_HEX32(0x71000000UL, slotMsgId(0));
+    TEST_ASSERT_EQUAL_UINT8(0x15, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8(0, retryCount[0]);
+    ringBuffer[0][1] = RING_STATUS_DONE;                                  // ACK gewann
+    TEST_ASSERT_FALSE(txRingRearmRetry(0, r.bytes, r.len, 0x15));
+    ringBuffer[0][0] = 0;                                                 // Slot frei
+    TEST_ASSERT_FALSE(txRingRearmRetry(0, r.bytes, r.len, 0x15));
+    TEST_ASSERT_FALSE(txRingRearmRetry(-1, r.bytes, r.len, 0x15));
+    TEST_ASSERT_FALSE(txRingRearmRetry(MAX_RING, r.bytes, r.len, 0x15));
+}
+
+// W1c-Advisor 1: eigenes HEY ("H") und eigener NBR-Bericht ("HN") sind beide
+// '@' mit prio 5 vom selben Urheber -- verschiedene Ziele, kein Supersede.
+static void test_w1c_hey_und_hn_bericht_verschiedene_ziele(void)
+{
+    static const uint8_t pl[] = "R0;";
+    BuiltFrame h  = buildFrame(MSG_TYPE_HEY, 0xA1000001UL, 0x92, "DK5EN-90", "H", pl, sizeof(pl) - 1);
+    BuiltFrame hn = buildFrame(MSG_TYPE_HEY, 0xA1000002UL, 0x90, "DK5EN-90", "HN", pl, sizeof(pl) - 1);
+    BuiltFrame h2 = buildFrame(MSG_TYPE_HEY, 0xA1000003UL, 0x92, "DK5EN-90", "H", pl, sizeof(pl) - 1);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(h.bytes, h.len, RING_STATUS_READY, "hey"));
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(hn.bytes, hn.len, RING_STATUS_READY, "hn"));
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+    TEST_ASSERT_EQUAL_UINT32(0, stat_supersede_count);
+    // ein neueres "H" ersetzt nur das alte "H"
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(h2.bytes, h2.len, RING_STATUS_READY, "hey"));
+    TEST_ASSERT_EQUAL_HEX32(0xA1000002UL, slotMsgId(1));
+    TEST_ASSERT_EQUAL_UINT32(1, stat_supersede_count);
+}
+
+// W1c-Advisor 2: ein vom Nutzer getippter Text, der mit "{CET}" beginnt, ist
+// kein Server-Beacon: weder ersetzt er einen gerelayten CET noch umgekehrt.
+static void test_w1c_nutzertext_mit_cet_praefix_bleibt_text(void)
+{
+    BuiltFrame relay = buildTextFrame("*", "{CET}2026-10-24 12:00:10", 0xA2000001UL, "OE1XAR-33,DK5EN-98");
+    BuiltFrame user  = buildTextFrame("*", "{CET}2026-10-24 12:00:00", 0xA2000002UL, "DK5EN-90");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(relay.bytes, relay.len, RING_STATUS_DONE, "rx_relay"));
+    int u = addTxRingEntry(user.bytes, user.len, RING_STATUS_READY, "user_msg");
+    TEST_ASSERT_EQUAL_INT(1, u);
+    TEST_ASSERT_EQUAL_INT(2, txRingDepth());
+    // und ein neuerer gerelayter CET ersetzt den Nutzertext nicht
+    BuiltFrame relay2 = buildTextFrame("*", "{CET}2026-10-24 12:05:10", 0xA2000003UL, "OE1XAR-62,DK5EN-98");
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(relay2.bytes, relay2.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_HEX32(0xA2000002UL, slotMsgId(1));
+    TEST_ASSERT_EQUAL_UINT32(1, stat_supersede_count);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -2298,5 +2538,18 @@ int main(int argc, char **argv)
     RUN_TEST(test_pool_is_preempt_aeltester_belegter_slot);
     RUN_TEST(test_pool_depth_und_ackwait_counts);
     RUN_TEST(test_pool_sweep_ueberspringt_inflight);
+    RUN_TEST(test_w1c_eigenes_hey_wird_in_place_ersetzt);
+    RUN_TEST(test_w1c_hey_und_hn_bericht_verschiedene_ziele);
+    RUN_TEST(test_w1c_nutzertext_mit_cet_praefix_bleibt_text);
+    RUN_TEST(test_w1c_relay_hey_zwei_urheber_zwei_slots);
+    RUN_TEST(test_w1c_position_gleicher_urheber_ersetzt_hey_nicht);
+    RUN_TEST(test_w1c_sent_und_inflight_werden_nie_ersetzt);
+    RUN_TEST(test_w1c_text_dm_ack_werden_nie_ersetzt);
+    RUN_TEST(test_w1c_cet_neuer_ersetzt_aelteren_anderer_quelle);
+    RUN_TEST(test_w1c_cet_aelterer_neuer_frame_wird_verworfen);
+    RUN_TEST(test_w1c_cet_ersetzt_keinen_anderen_text);
+    RUN_TEST(test_w1c_voller_pool_hey_wird_ersetzt_statt_verworfen);
+    RUN_TEST(test_w1c_rearm_im_vollen_pool);
+    RUN_TEST(test_w1c_rearm_verliert_gegen_ack_oder_laenge);
     return UNITY_END();
 }
