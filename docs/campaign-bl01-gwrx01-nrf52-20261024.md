@@ -1,6 +1,6 @@
 # Campaign BL-01 + GWRX-01 nRF52 (2026-10-24)
 
-Status: **W1 gate** (I1-I3 landed; advisor rework on the bench driver running; two rows in section 1 marked _new_ await the operator's confirmation).
+Status: **W1 done** (BL-01 + mock `deea597f`, bench driver next commit after three advisor rounds). Next: W2 nRF52 bench.
 Run with `/orchestrate-waves`. Resume point for this campaign.
 
 ## 1. BL-01: `--mesh off` semantics (operator decision 2026-10-24)
@@ -21,8 +21,10 @@ participation. A mesh-off node repeats no frame of another node, and stays a ful
 | _new_ Own frames: header bit 0x10 ("mesh on") set                        | not set      | `aprs_functions.cpp` encode, `if(bMESH)` 0x10        |
 | _new_ NBR report, `--nbrreport auto`: sent when mesh off and gateway off | sent (more)  | `loop_functions.cpp` `bSend = (!bMESH && !bGATEWAY)` |
 
-The two _new_ rows were found by the W1 advisor (2026-10-24): own traffic that `--mesh` changes. Pinned as they are
-(bMESH read allowlist); operator confirmation pending.
+The two _new_ rows were found by the W1 advisor (2026-10-24). Operator 2026-10-24: header bit 0x10 stays as it is;
+`--nbrreport` pinned to `auto`. Production builds already enforce that (`src/prod_lock.h` LOCKED list and
+`PRODLOCK_SSET4_CLEAR_NBR`, `docs/production-locked-settings.md`); only INSTRUMENT builds can still change it. Open:
+whether INSTRUMENT builds lose the switch too (the switch also exists on upstream/dev).
 
 Rationale (operator): an ACK is not repeated because the forward frame was not repeated either; a foreign HEY is
 not repeated because the node is no valid RF path; with gateway on, the node answers every heard HEY through the
