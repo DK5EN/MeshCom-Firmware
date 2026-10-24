@@ -87,6 +87,7 @@ ALLOWLIST: Dict[str, Any] = {
     "mh": "mh",      # row index 0..999 | callsign with optional SSID
     "net": None,
     "upd": "upd",    # none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23
+    "blockcall": "calls",  # none (read) | "none" | comma list [A-Za-z0-9,-] (BLK-01, full write)
 }
 
 # Hard-blocked whatever the tag (6.4). Checked before the allowlist so the
@@ -158,13 +159,19 @@ def _check_ctr(ctr: int) -> None:
         raise RmError("ctr out of range 0..%d" % CTR_MAX)
 
 
-_MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh", "upd")
+_CALLS_RE = re.compile(r"[A-Za-z0-9,-]+")
+_MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh", "upd", "calls")
 
 
 def _check_ext_args(cmd: str, shape: str, args: str) -> None:
     """Syntax of the extended shapes (mirrors argsMatch in src/remote_cmd.cpp)."""
-    if shape in ("name", "atxt", "pos", "upd") and args == "":
+    if shape in ("name", "atxt", "pos", "upd", "calls") and args == "":
         return  # read form
+    if shape == "calls":
+        # syntax only (argsMatch RM_ARGS_CALLS); the node validates each call (err text)
+        if not _CALLS_RE.fullmatch(args):
+            raise RmError("blockcall needs nothing, 'none' or a comma list of calls")
+        return
     if shape in ("name", "atxt"):
         limit = 19 if shape == "name" else 39
         if not 1 <= len(args) <= limit or any(c in _TEXT_BAD for c in args):

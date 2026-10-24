@@ -35,6 +35,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
 - GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
+- BLK-01 call blocklist `--blockcall`: on fork-dev 2026-10-24 (`ecf00df0`, `1635ba56`), benched DK5EN-1/-90/-92, running on DK5EN-98; not released. Goes into the next release so the DM3KS fork build can retire ([campaign-blockcall.md](campaign-blockcall.md)).
 - GPS: baro fusion tau (GPS-05b), operator decision.
 - Stability: REBOOT-98 (single event, watch); BL-04 closed with WEB-WDT-01.
 - Gateway server table: FR/US rows when operators name servers; stale `test/golden/corpus/commands`.

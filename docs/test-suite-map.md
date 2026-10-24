@@ -169,6 +169,7 @@ flashes whatever is attached.
 | test_ble_session             | Regression    |    14 | native_ble_session                                           |
 | test_ble_phone_harness       | Integration   |    25 | native_ble_phone_harness                                     |
 | test_ble_settings_v1         | Contract      |    10 | native_ble_settings_v1                                       |
+| test_blocked_calls           | Unit          |    31 | native_blocked_calls                                         |
 | test_bp_echo_guard           | Regression    |    10 | native                                                       |
 | test_bp_notice_frame         | Contract      |    18 | native_aprs                                                  |
 | test_bp_regression           | Regression    |     4 | native_aprs                                                  |

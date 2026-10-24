@@ -64,7 +64,7 @@ def test_refusal_text_receiver_model() -> None:
 
 
 def test_allowlist_command_count() -> None:
-    assert len(rc.ALLOWLIST) == 25
+    assert len(rc.ALLOWLIST) == 26
     assert rc.ALLOWLIST["led"] == ("on", "off", "flash")
     assert rc.ALLOWLIST["chgled"] == ("", "auto", "on", "off")  # "" = bare read form (LED-02)
 
@@ -293,3 +293,16 @@ def test_led_wave_vectors() -> None:
         assert res in dm
         r = rc.verify_reply(dm, DST, SRC, "secret", ctr)
         assert r is not None and r["result"] == res
+
+
+# BLK-01: blockcall read and full write; capitals allowed, syntax only
+@pytest.mark.parametrize("args", ["", "none", "DL1ABC", "DL1ABC,DK5EN-1", "dl1abc-01,DK5EN"])
+def test_blockcall_builds(args: str) -> None:
+    text = rc.build_command(DST, SRC, 5, "blockcall", args, PW)
+    assert text.startswith("RM1 5 blockcall")
+
+
+@pytest.mark.parametrize("args", ["DL1ABC;X", "DL1ABC X", "DL1ABC*", "A" * 40])
+def test_blockcall_refused(args: str) -> None:
+    with pytest.raises(rc.RmError):
+        rc.build_command(DST, SRC, 5, "blockcall", args, PW)
