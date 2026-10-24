@@ -16,6 +16,7 @@
 #include <Arduino.h>
 #include <configuration.h>
 #include "nbr_mask.h"
+#include "cet_age.h"   // CetClock (rein)
 
 // SL-03/SL-06: Herkunft je Ring-Slot, 'o' eigene Nachricht, 'r' Relay eines
 // Empfangs, 'g' vom Server eingespeist. Gesetzt in addTxRingEntry() aus dem
@@ -128,7 +129,17 @@ void txRingPrioCounts(uint8_t out[6]);
 // updateRetransmissionStatus() -- never the timer-task path. See the
 // doc comment above the definition (txring_functions.cpp) for the nRF52
 // locking rationale.
-void txRingAgeBackground(uint32_t now_ms);
+//
+// TXP W1a: generalised from prio 5 to every slot -- age limit per priority
+// from txRingTtlMs() (txring_ttl.h, only DONE entries, HEY any status), plus
+// {CET} frames that cetFrameStale() rejects with the given clock inputs
+// (fill with cetDeviceClock()). Drops count in stat_drop_count[prio].
+void txRingAgeBackground(uint32_t now_ms, const CetClock &clk);
+
+// TXP W1a: same sweep, {CET} gate only (no TTL). doTX() runs it right before
+// slot selection so a beacon that crossed CET_MAX_AGE_S between two 2-s
+// ticks is never sent. Main-loop context only (writes the ring).
+void txRingDropStaleCet(const CetClock &clk);
 
 // TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
 // transmit. addTxRingEntry() below is one of the two choke points; doTX()

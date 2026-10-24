@@ -12,6 +12,8 @@
 #include "batt_functions.h"
 #include "batt_pipeline.h"
 #include "lora_functions.h"
+#define CET_AGE_WITH_CLOCK
+#include "cet_age.h"
 #include "txring_functions.h"
 #include "command_functions.h"
 #if defined(ENABLE_MSGSTORE)
@@ -69,7 +71,7 @@ void loopAction_retransmit(void)
     // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring
     // entries here, in the main-loop tick -- NOT in getNextTxSlot(),
     // which also runs on the nRF52 timer task (Advisor F1).
-    txRingAgeBackground(millis());
+    txRingAgeBackground(millis(), cetDeviceClock());
 }
 
 // ---- mcp_refresh_timer -------------------------------------------------

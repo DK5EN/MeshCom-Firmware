@@ -1,4 +1,5 @@
 #include "txring_functions.h"
+#include "txring_ttl.h"
 
 // Spitze Klammern (nicht Anfuehrungszeichen) fuer printfdeb_functions.h:
 // Anfuehrungszeichen-Includes suchen zuerst im Verzeichnis der einschliessenden
@@ -466,7 +467,8 @@ void txRingPrioCounts(uint8_t out[6])
 }
 
 /**
- * BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): sweep the whole ring and drop every
+ * BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2; TXP W1a: now every priority via
+ * txRingTtlMs(), plus the {CET} age gate): sweep the whole ring and drop every
  * BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
  * (configuration_global.h). A priority-starved HEY parked at iRead behind a
  * run of higher-priority traffic can sit for many minutes -- the DJ8MEH
@@ -500,12 +502,13 @@ void txRingPrioCounts(uint8_t out[6])
  * placement as its call inside addTxRingEntry() above), so the read pointer
  * clears any run of newly-freed slots at the front in the same atomic step.
  */
-void txRingAgeBackground(uint32_t now_ms)
+static void txRingSweep(uint32_t now_ms, const CetClock &clk, bool cet_only)
 {
     int dropSlot[MAX_RING];
     uint32_t dropAgeS[MAX_RING];
     uint32_t dropMsgId[MAX_RING];
     uint8_t dropPrio[MAX_RING];
+    bool dropCet[MAX_RING];
     int dropCount = 0;
 
 #if defined(NRF52_SERIES)
@@ -515,12 +518,6 @@ void txRingAgeBackground(uint32_t now_ms)
     for(int i = 0; i < MAX_RING; i++)
     {
         if(ringBuffer[i][0] == 0)
-            continue;
-        if(ringPriority[i] != MSG_PRIO_BACKGROUND)
-            continue;
-
-        uint32_t age_ms = (uint32_t)(now_ms - ringEnqueueTime[i]); // F8: rollover-safe cast
-        if(age_ms <= RING_BG_MAX_AGE_MS)
             continue;
 
 #if defined(EXTERNAL_RADIO)
@@ -532,12 +529,28 @@ void txRingAgeBackground(uint32_t now_ms)
             continue;
 #endif
 
+        uint32_t age_ms = (uint32_t)(now_ms - ringEnqueueTime[i]); // F8: rollover-safe cast
+
+        // TXP W1a: TTL je Prioritaet (txRingTtlMs(); 0 = keine TTL) ...
+        bool ttl_hit = false;
+        if(!cet_only)
+        {
+            uint32_t ttl = txRingTtlMs(ringPriority[i], ringBuffer[i][1],
+                                       txRingFrameIsAck(ringBuffer[i] + 2, ringBuffer[i][0]));
+            ttl_hit = (ttl != 0 && age_ms > ttl);
+        }
+        // ... und {CET}-Altersgate (D1/D2): zu alte/ungeprueft datierte Beacon weg.
+        bool cet_hit = !ttl_hit && cetFrameStale(ringBuffer[i] + 2, ringBuffer[i][0], clk);
+        if(!ttl_hit && !cet_hit)
+            continue;
+
         uint32_t mid = ((uint32_t)ringBuffer[i][6] << 24) | ((uint32_t)ringBuffer[i][5] << 16) |
                        ((uint32_t)ringBuffer[i][4] << 8)  |  (uint32_t)ringBuffer[i][3];
 
         ringBuffer[i][0] = 0; // free the slot
         retryCount[i] = 0;
-        stat_drop_count[MSG_PRIO_BACKGROUND]++;
+        if(ringPriority[i] >= 1 && ringPriority[i] <= 5)
+            stat_drop_count[ringPriority[i]]++;
 
         if(dropCount < MAX_RING)
         {
@@ -545,6 +558,7 @@ void txRingAgeBackground(uint32_t now_ms)
             dropAgeS[dropCount] = age_ms / 1000UL;
             dropMsgId[dropCount] = mid;
             dropPrio[dropCount] = ringPriority[i];
+            dropCet[dropCount] = cet_hit;
             dropCount++;
         }
     }
@@ -559,9 +573,22 @@ void txRingAgeBackground(uint32_t now_ms)
     if(bLORADEBUG)
     {
         for(int k = 0; k < dropCount; k++)
-            printfdeb("[MC-DBG] RING_DROP_STALE slot=%d prio=%d age_s=%lu msg_id=%08X\n",
-                      dropSlot[k], (int)dropPrio[k], (unsigned long)dropAgeS[k], dropMsgId[k]);
+            printfdeb("[MC-DBG] RING_DROP_STALE slot=%d prio=%d age_s=%lu msg_id=%08X reason=%s\n",
+                      dropSlot[k], (int)dropPrio[k], (unsigned long)dropAgeS[k], dropMsgId[k],
+                      dropCet[k] ? "cet" : "ttl");
     }
+}
+
+// TTL je Prioritaet + {CET}-Gate (Hauptschleife, 2-s-Tick).
+void txRingAgeBackground(uint32_t now_ms, const CetClock &clk)
+{
+    txRingSweep(now_ms, clk, false);
+}
+
+// Nur das {CET}-Gate, direkt vor dem Senden (doTX()).
+void txRingDropStaleCet(const CetClock &clk)
+{
+    txRingSweep(0, clk, true);
 }
 
 /**

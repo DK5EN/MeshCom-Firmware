@@ -2154,15 +2154,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(memcmp(aprsmsg.msg_payload, "{CET}", 5) == 0)
                                 {
                                     // TXP W0: {CET}-Alter beim LoRa-Empfang (Messung, kein Verhalten)
-                                    {
-                                        uint32_t cetUtc = 0;
-                                        char cetAge[16];
-                                        bool cetOk = cetParsePayload(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload), &cetUtc);
-                                        int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
-                                        Serial.printf("[CET];rx;src;%s;age_s;%s;trusted;%d;hop;%d;path;%d;ms;%lu\n",
-                                                      aprsmsg.msg_source_call, cetAge, cetTr, (int)(aprsmsg.max_hop & 0x0F),
-                                                      (int)aprsmsg.msg_last_path_cnt, (unsigned long)millis());
-                                    }
+                                    cetLogRx(aprsmsg.msg_payload, aprsmsg.msg_source_call,
+                                             aprsmsg.max_hop & 0x0F, aprsmsg.msg_last_path_cnt);
 
                                     if(memcmp(aprsmsg.msg_payload, "{CET}<", 6) == 0)
                                         bMeshDestination = false;   // falsche Zeit nicht weiter geben
@@ -2545,6 +2538,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // Pfad) bleibt RING_KIND_OTHER -- heutiges Fluten, nie Fall B
                                 // (Advisor-Fund 2026-09-22, Konzept 1: nichts unterdrueckt auf
                                 // Verdacht).
+                                // TXP W1a D1/D2: altes {CET} nicht weiterleiten (rly_slot -1)
+                                bool rly_cet_stale = cetFrameStale(RcvBuffer, (uint16_t)size, cetDeviceClock());
+                                if(rly_cet_stale) cetLogDrop("relay", RcvBuffer, (uint16_t)size);
+                                if(!rly_cet_stale)
                                 rly_slot = addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true,
                                                            (bNBRRELAY && nn_relay.known) ? RING_KIND_RELAY : RING_KIND_OTHER,
                                                            &nn_relay.need, &nn_relay.alone);
@@ -2596,7 +2593,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     }
                                 }
                                 else
-                                    rly_reason = "full";
+                                    rly_reason = rly_cet_stale ? "cet" : "full";
 
                                 /*
                                 if(bDisplayInfo)
@@ -2857,6 +2854,10 @@ static inline void logRadioTx(int len, const char *kind)
 bool doTX()
 {
     //#if not defined(BOARD_T_DECK_PRO)
+
+    // TXP W1a: {CET}-Beacon, die seit dem letzten 2-s-Sweep die Altersgrenze
+    // ueberschritten hat, nie senden (nur Gate, keine TTL).
+    txRingDropStaleCet(cetDeviceClock());
 
     // Priority-based slot selection instead of plain FIFO
     int txSlot = getNextTxSlot();

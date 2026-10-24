@@ -12,6 +12,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef UNIT_TEST
+#ifndef CET_AGE_WITH_CLOCK
+#define CET_AGE_WITH_CLOCK   // cetDeviceClock()/cetAgeText() fuer das Gate unten
+#endif
+#endif
+#include "cet_age.h"
 #include "txring_functions.h"
 #include "nbr_matrix.h"
 #include "uptime_min.h"
@@ -25,6 +31,18 @@ extern NbrMatrix nbrMatrix;
 static inline int gwUdpRxEnqueue(const uint8_t *frame, uint16_t len, char payload_type,
                                  const char *path_as_rx, uint32_t msg_id)
 {
+#ifndef UNIT_TEST   // Gate braucht die echte Uhr, nicht die Twin-Stubs
+    // TXP W1a (D1/D2): zu alte / ungeprueft datierte {CET}-Beacon kommt gar nicht erst
+    // in den Ring (-1 wie ein verworfener Eintrag; die Aufrufer werten den Wert nicht aus).
+    if(payload_type == ':')
+    {
+        if(cetFrameStale(frame, len, cetDeviceClock()))
+        {
+            cetLogDrop("gw", frame, len);
+            return -1;
+        }
+    }
+#endif
     if(!bNBRRELAY || payload_type != ':')
         return addUdpRxRingEntry(frame, len, payload_type, false, nullptr, nullptr);
 

@@ -86,6 +86,44 @@ void test_find_in_frame(void)
     TEST_ASSERT_FALSE(cetFindInFrame(b, 5, &e));
 }
 
+
+// W1a: Wahrheitstabelle cetFrameStale()
+static void test_frame_stale_truth_table(void)
+{
+    uint8_t b[96];
+    uint32_t pl;
+    TEST_ASSERT_TRUE(cetParsePayload(P, strlen(P), &pl));
+    uint16_t n = buildText(b, "OE1XXX-1", "*", P);
+    // frisch / Grenze / zu alt
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, true, true, pl + 60));
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, true, true, pl + 150));
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, true, pl + 151));
+    // Zukunft: ebenfalls falsche Zeit
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, true, true, pl - 150));
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, true, pl - 151));
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, true, pl - 200));
+    // Uhr nicht vertrauenswuerdig / nicht gestellt
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, false, true, pl));
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, false, 0));
+    // {CET}< und unparsbar
+    n = buildText(b, "OE1XXX-1", "*", "{CET}<2026-10-24 12:00:00");
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, true, pl));
+    n = buildText(b, "OE1XXX-1", "*", "{CET}kaputt");
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, true, true, pl));
+    // Kein {CET}: behalten, egal welche Uhr
+    n = buildText(b, "DK5EN-90", "*", "Hallo");
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, false, false, 0));
+    n = buildText(b, "DK5EN-90", "*", P, 0x21);   // kein Text-Frame
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, false, false, 0));
+    TEST_ASSERT_FALSE(cetFrameStale(NULL, 0, false, false, 0));
+    // CetClock-Variante
+    n = buildText(b, "OE1XXX-1", "*", P);
+    CetClock c = {true, true, pl + 10};
+    TEST_ASSERT_FALSE(cetFrameStale(b, n, c));
+    c.trusted = false;
+    TEST_ASSERT_TRUE(cetFrameStale(b, n, c));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -95,5 +133,6 @@ int main(int, char **)
     RUN_TEST(test_age_sign);
     RUN_TEST(test_trusted_truth_table);
     RUN_TEST(test_find_in_frame);
+    RUN_TEST(test_frame_stale_truth_table);
     return UNITY_END();
 }

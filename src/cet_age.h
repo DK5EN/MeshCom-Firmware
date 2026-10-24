@@ -2,7 +2,11 @@
 //
 // W0 (Kampagne TXP, docs/campaign-tx-pool.md): nur Messung. W1a nutzt dieselben
 // Helfer, um zu alte {CET}-Frames zu verwerfen (D1: > CET_MAX_AGE_S).
-#pragma once
+// Kein #pragma once: der reine Teil hat einen eigenen Guard, damit der Uhr-Teil
+// (CET_AGE_WITH_CLOCK) auch nach einem frueheren Include ohne das Makro (z. B. ueber
+// txring_functions.h) noch eingebunden werden kann.
+#ifndef CET_AGE_PURE_H
+#define CET_AGE_PURE_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -100,10 +104,50 @@ static inline bool cetFindInFrame(const uint8_t *frame, uint16_t len, uint32_t *
     return false;
 }
 
-#if defined(CET_AGE_WITH_CLOCK) && !defined(UNIT_TEST)   // Native-Stubs haben kein node_date_*
+// Uhr-Eingaenge fuer die {CET}-Entscheidung (Geraet fuellt sie mit cetDeviceClock()).
+struct CetClock
+{
+    bool trusted;       // RTC / GPS-Fix / NTP
+    bool now_ok;        // node_date_* gestellt
+    uint32_t now_utc;
+};
+
+// D1/D2 (W1a): true = {CET}-Frame ist zu alt und wird weder weitergeleitet noch
+// gesendet. Kein {CET}-Text -> false (behalten). Bei einem {CET}-Frame (auch
+// "{CET}<" und unparsbare) gilt: Uhr nicht vertrauenswuerdig, Uhr ungestellt,
+// Nutzlast unparsbar oder |Alter| > CET_MAX_AGE_S (Zukunft = falsche Zeit) -> stale.
+// `frame` wie bei cetFindInFrame(): Typ-Byte bei [0], ab [6] "SRC>DEST:" + Nutzlast.
+static inline bool cetFrameStale(const uint8_t *frame, uint16_t len, bool trusted,
+                                 bool now_ok, uint32_t now_utc)
+{
+    if(frame == NULL || len < 8 || frame[0] != 0x3A) return false;
+    for(uint16_t i = 6; i < len; i++)
+    {
+        if(frame[i] != ':') continue;
+        const uint16_t rest = (uint16_t)(len - i - 1);
+        if(rest < 5 || memcmp(frame + i + 1, "{CET}", 5) != 0) return false;
+        if(!trusted || !now_ok) return true;
+        uint32_t pl;
+        if(!cetParsePayload((const char *)frame + i + 1, (size_t)rest, &pl)) return true;
+        const int32_t age = cetAgeS(now_utc, pl);
+        return age > (int32_t)CET_MAX_AGE_S || age < -(int32_t)CET_MAX_AGE_S;
+    }
+    return false;
+}
+
+static inline bool cetFrameStale(const uint8_t *frame, uint16_t len, const CetClock &c)
+{
+    return cetFrameStale(frame, len, c.trusted, c.now_ok, c.now_utc);
+}
+
+#endif // CET_AGE_PURE_H
+
+#if defined(CET_AGE_WITH_CLOCK) && !defined(UNIT_TEST) && !defined(CET_AGE_CLOCK_H)
+#define CET_AGE_CLOCK_H   // Native-Stubs haben kein node_date_*
 // ---- Uhrseite: Includer definiert CET_AGE_WITH_CLOCK vor dem Include (die Firmware-
 // Dateien; der reine Test test_cet_age nicht, er braucht keine Globals). ----
 #include <stdio.h>
+#include <Arduino.h>                 // Serial, millis() fuer cetLogDrop()
 #include "loop_functions_extern.h"   // bRTCON, posinfo_fix, bNTPDateTimeValid, meshcom_settings
 
 static inline bool cetDeviceTrusted(void)
@@ -130,6 +174,16 @@ static inline bool cetNowUtc(uint32_t *now_utc)
     return true;
 }
 
+// W1a: Uhr-Eingaenge fuer cetFrameStale() / die Sweeps.
+static inline CetClock cetDeviceClock(void)
+{
+    CetClock c;
+    c.now_utc = 0;
+    c.trusted = cetDeviceTrusted();
+    c.now_ok = c.trusted && cetNowUtc(&c.now_utc);
+    return c;
+}
+
 // Fuer die [CET]-Logzeilen: schreibt Alter ("na" wenn Uhr nicht vertrauenswuerdig,
 // Nutzlast nicht parsbar oder Uhr ungestellt) und liefert trusted (0/1).
 static inline int cetAgeText(char *buf, size_t n, bool payload_ok, uint32_t payload_utc)
@@ -141,5 +195,27 @@ static inline int cetAgeText(char *buf, size_t n, bool payload_ok, uint32_t payl
     else
         snprintf(buf, n, "na");
     return trusted ? 1 : 0;
+}
+
+// TXP W0: [CET];rx-Zeile beim LoRa-Empfang eines {CET}-Beacons.
+static inline void cetLogRx(const char *payload, const char *src, int hop, int path_cnt)
+{
+    uint32_t cetUtc = 0;
+    char cetAge[16];
+    bool cetOk = cetParsePayload(payload, strlen(payload), &cetUtc);
+    int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
+    Serial.printf("[CET];rx;src;%s;age_s;%s;trusted;%d;hop;%d;path;%d;ms;%lu\n",
+                  src, cetAge, cetTr, hop, path_cnt, (unsigned long)millis());
+}
+
+// TXP W1a: eine [CET];drop-Zeile fuer ein verworfenes Beacon (where: "relay", "gw").
+static inline void cetLogDrop(const char *where, const uint8_t *frame, uint16_t len)
+{
+    char cetAge[16];
+    uint32_t cetUtc = 0;
+    bool cetOk = cetFindInFrame(frame, len, &cetUtc);
+    int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
+    Serial.printf("[CET];drop;where;%s;age_s;%s;trusted;%d;ms;%lu\n",
+                  where, cetAge, cetTr, (unsigned long)millis());
 }
 #endif

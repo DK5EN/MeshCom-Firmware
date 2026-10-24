@@ -225,13 +225,13 @@ static void test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort(void)
 
     // 2-s-Tick-Sweep VOR der Altersgrenze: Blocker bleibt.
     mc_test_set_millis(enq_t + RING_BG_MAX_AGE_MS);
-    txRingAgeBackground(millis());
+    txRingAgeBackground(millis(), CetClock{false, false, 0});
     TEST_ASSERT_NOT_EQUAL(0, ringBuffer[blocker][0]);
 
     // Naechster Tick NACH der Grenze: Blocker faellt, Lesezeiger rueckt vor,
     // Ring ist wirklich leer -> poll() schliesst ohne Wasserband-Halt.
     mc_test_set_millis(enq_t + RING_BG_MAX_AGE_MS + 2000);
-    txRingAgeBackground(millis());
+    txRingAgeBackground(millis(), CetClock{false, false, 0});
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBuffer[blocker][0],
         "BP-03: Stale-HEY nach 3 min freigegeben (alt: sass 10 min)");
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);

@@ -216,19 +216,20 @@ One line per **new** frame. `H` is the hop nibble as received, `prio` the TX-rin
 (-1 = not queued; since the QRT campaign 2026-10-18 a `q=full` line shows `slot=-2`, the ring-full return code
 `RING_ENQUEUE_FULL`).
 
-| `q=`       | Meaning                                                                                   | Source                    |
-| ---------- | ----------------------------------------------------------------------------------------- | ------------------------- |
-| `tx`       | queued for relay                                                                          | `lora_functions.cpp:2454` |
-| `hop0`     | hop budget exhausted, not relayed                                                         | `:2505`                   |
-| `full`     | relay wanted but TX ring full; alarming if frequent (observed 13 per hour at a busy site) | `:2494`                   |
-| `loop`     | own call already in the path                                                              | `:2367`                   |
-| `nomesh`   | mesh relay switched off (`--mesh off`) or `checkMesh()` refused                           | `:2332`                   |
-| `gwcap`    | gateway does not put frames beyond the text/position hop cap back on air                  | `:2248,2254`              |
-| `gwfilter` | destination never goes to mesh on a gateway (for example `APRS2SOTA`, `100001`)           | `:2243,2340`              |
-| `self`     | addressed to this node                                                                    | `:2320`                   |
-| `aprs`     | node runs in LoRa-APRS mode                                                               | `:2326`                   |
-| `ping`     | `{ping}` to `100001`, never relayed                                                       | `:2266`                   |
-| `unconf`   | source still has the factory callsign, dropped before any processing                      | `:1355`                   |
+| `q=`       | Meaning                                                                                                                                           | Source                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `tx`       | queued for relay                                                                                                                                  | `lora_functions.cpp:2454` |
+| `hop0`     | hop budget exhausted, not relayed                                                                                                                 | `:2505`                   |
+| `full`     | relay wanted but TX ring full; alarming if frequent (observed 13 per hour at a busy site)                                                         | `:2494`                   |
+| `cet`      | `{CET}` beacon older than 150 s, or the node has no trusted clock (GPS, NTP, RTC): not relayed (TXP W1a); a `[CET];drop;where;relay` line follows | `cetFrameStale()`         |
+| `loop`     | own call already in the path                                                                                                                      | `:2367`                   |
+| `nomesh`   | mesh relay switched off (`--mesh off`) or `checkMesh()` refused                                                                                   | `:2332`                   |
+| `gwcap`    | gateway does not put frames beyond the text/position hop cap back on air                                                                          | `:2248,2254`              |
+| `gwfilter` | destination never goes to mesh on a gateway (for example `APRS2SOTA`, `100001`)                                                                   | `:2243,2340`              |
+| `self`     | addressed to this node                                                                                                                            | `:2320`                   |
+| `aprs`     | node runs in LoRa-APRS mode                                                                                                                       | `:2326`                   |
+| `ping`     | `{ping}` to `100001`, never relayed                                                                                                               | `:2266`                   |
+| `unconf`   | source still has the factory callsign, dropped before any processing                                                                              | `:1355`                   |
 
 ### 3.3 `TX`
 

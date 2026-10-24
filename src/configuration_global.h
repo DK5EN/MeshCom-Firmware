@@ -448,6 +448,21 @@ static inline bool flashLayoutCompatible(int stored)
 // DJ8MEH blocker that motivated this sat unsent for 10 minutes.
 #define RING_BG_MAX_AGE_MS 180000UL   // 3 min
 
+// TXP W1a (docs/campaign-tx-pool.md, D4): Lebensdauer je Prioritaet fuer
+// abschliessende (RING_STATUS_DONE) Eintraege, geprueft von txRingAgeBackground()
+// ueber txRingTtlMs() (txring_ttl.h). Eigene, wiederholbare Texte (READY/SENT)
+// altern nie, dort regelt die Retry-Leiter; prio 2 (Gruppe/Broadcast) hat keine
+// TTL. Mit -D ueberschreibbar (INSTRUMENT-Tuning); 0 schaltet die Klasse ab.
+#ifndef RING_TTL_ACK_MS
+#define RING_TTL_ACK_MS   90000UL    // prio 1, nur ACK-Frames (0x41, :ackNNN), DONE: 1.5 min
+#endif
+#ifndef RING_TTL_RELAY_MS
+#define RING_TTL_RELAY_MS 300000UL   // prio 3 (Relay): 5 min
+#endif
+#ifndef RING_TTL_POS_MS
+#define RING_TTL_POS_MS   120000UL   // prio 4 (Position): 2 min
+#endif
+
 // Priority-dependent CSMA base timeouts (ms)
 #define CSMA_PRIO_BASE_1    3000   // ACK/DM
 #define CSMA_PRIO_BASE_2    3000   // Gruppen/Broadcast

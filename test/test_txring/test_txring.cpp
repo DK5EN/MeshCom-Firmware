@@ -22,6 +22,7 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
+#include <txring_ttl.h>
 #include <aprs_functions.h>
 #include <dm_stats.h>             // M0-1: ringstat_enqueue/ringstat_parked_overwrite
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
@@ -82,6 +83,7 @@ static void resetRing(void)
     ringstat_parked_overwrite.store(0);
 }
 
+static const CetClock kNoClock = {false, false, 0};
 void setUp(void) { resetRing(); }
 void tearDown(void) {}
 
@@ -1242,7 +1244,7 @@ static void test_bp03_stale_drop_und_lesezeiger_vorruecken(void)
 
     // Genau ueber der Grenze (Grenze selbst ist noch KEIN Drop, siehe ">").
     mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS + 1UL);
-    txRingAgeBackground((uint32_t)millis());
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
 
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT8(0, retryCount[slot]);
@@ -1263,7 +1265,7 @@ static void test_bp03_frischer_bg_bleibt(void)
     // Exakt auf der Grenze (nicht darueber) -- Bedingung ist "> Grenze", also
     // bleibt der Eintrag hier noch stehen.
     mc_test_set_millis(5000UL + RING_BG_MAX_AGE_MS);
-    txRingAgeBackground((uint32_t)millis());
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
 
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
@@ -1280,7 +1282,7 @@ static void test_bp03_nicht_bg_altert_nie(void)
     // Weit jenseits der BACKGROUND-Alterungsgrenze -- ein Nicht-BG-Eintrag
     // darf trotzdem nie altern.
     mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS * 100UL);
-    txRingAgeBackground((uint32_t)millis());
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
 
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
@@ -1303,15 +1305,257 @@ static void test_bp03_rollover_sicher(void)
 
     // now=50 (nach dem Wrap) -> Alter = 151 ms, weit unter der Grenze: bleibt.
     mc_test_set_millis(50);
-    txRingAgeBackground((uint32_t)millis());
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
 
     // now=179900 (weiter nach dem Wrap) -> Alter = 180001 ms > Grenze: faellt.
     mc_test_set_millis(179900);
-    txRingAgeBackground((uint32_t)millis());
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
+}
+
+
+// --------------------------------------------------------------- TXP W1a
+//
+// TTL je Prioritaet (txring_ttl.h) und {CET}-Altersgate im Sweep.
+
+static const uint32_t kCetNow = 1792843200UL; // 2026-10-24 12:00:00 UTC
+
+static BuiltFrame buildCetFrame(uint32_t payload_utc)
+{
+    // UTC-Epoche -> "{CET}YYYY-MM-DD hh:mm:ss" ueber dieselbe Tageszahl-Rechnung
+    uint32_t d = payload_utc / 86400UL, r = payload_utc % 86400UL;
+    // civil_from_days (Hinnant)
+    int32_t z = (int32_t)d + 719468;
+    int32_t era = z / 146097;
+    uint32_t doe = (uint32_t)(z - era * 146097);
+    uint32_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    int32_t y = (int32_t)yoe + era * 400;
+    uint32_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    uint32_t mp = (5 * doy + 2) / 153;
+    uint32_t dd = doy - (153 * mp + 2) / 5 + 1;
+    uint32_t mm = mp < 10 ? mp + 3 : mp - 9;
+    if(mm <= 2) y++;
+    char pl[40];
+    snprintf(pl, sizeof(pl), "{CET}%04d-%02u-%02u %02u:%02u:%02u", (int)y, (unsigned)mm, (unsigned)dd,
+             (unsigned)(r / 3600), (unsigned)(r % 3600 / 60), (unsigned)(r % 60));
+    return buildTextFrame("*", pl, 0xCE700001UL, "OE1XXX-1");
+}
+
+static CetClock clk(bool trusted, bool ok, uint32_t now)
+{
+    CetClock c;
+    c.trusted = trusted; c.now_ok = ok; c.now_utc = now;
+    return c;
+}
+
+static void sweepAt(uint32_t t_ms) { mc_test_set_millis(t_ms); txRingAgeBackground((uint32_t)millis(), kNoClock); }
+
+static void test_ttl_table(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(RING_TTL_ACK_MS, txRingTtlMs(1, RING_STATUS_DONE, true));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(1, RING_STATUS_DONE, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(2, RING_STATUS_DONE, false));
+    TEST_ASSERT_EQUAL_UINT32(RING_TTL_RELAY_MS, txRingTtlMs(3, RING_STATUS_DONE, false));
+    TEST_ASSERT_EQUAL_UINT32(RING_TTL_POS_MS, txRingTtlMs(4, RING_STATUS_DONE, false));
+    TEST_ASSERT_EQUAL_UINT32(RING_BG_MAX_AGE_MS, txRingTtlMs(5, RING_STATUS_DONE, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(1, RING_STATUS_READY, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(3, RING_STATUS_SENT, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(3, 0x14, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(3, RING_STATUS_EXT_PENDING, false));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(5, RING_STATUS_EXT_PENDING, false));
+}
+
+static void test_ttl_relay_300s(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildTextFrame("DK5EN-91", "relay");
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "ttl3");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);
+    sweepAt(1000UL + RING_TTL_RELAY_MS);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_NORMAL]);
+    sweepAt(1000UL + RING_TTL_RELAY_MS + 1);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_NORMAL]);
+}
+
+static void test_ttl_pos_120s(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildPositionFrame();
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "ttl4");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[slot]);
+    sweepAt(1000UL + RING_TTL_POS_MS);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+    sweepAt(1000UL + RING_TTL_POS_MS + 1);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
+}
+
+static void test_ttl_ack_90s(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildAckFrame();
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "ttl1");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+    sweepAt(1000UL + RING_TTL_ACK_MS);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+    sweepAt(1000UL + RING_TTL_ACK_MS + 1);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_CRITICAL]);
+}
+
+static void test_ttl_prio5_180s(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildHeyFrame();
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "ttl5");
+    sweepAt(1000UL + 180000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+    sweepAt(1000UL + 180001UL);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
+}
+
+static void test_ttl_own_text_never_ages(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame a = buildTextFrame("DK5EN-91", "dm", 0x1001UL);
+    BuiltFrame b = buildTextFrame("*", "bc", 0x1002UL);
+    int sa = addTxRingEntry(a.bytes, a.len, RING_STATUS_READY, "ownR");
+    int sb = addTxRingEntry(b.bytes, b.len, RING_STATUS_SENT, "ownS");
+    sweepAt(1000UL + 3600000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sa][0]);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sb][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_HIGH]);
+}
+
+static void test_ttl_prio2_done_never_ages(void)
+{
+    mc_test_set_millis(1000);
+    // Gruppe/Broadcast mit Status DONE gilt als Relay (prio 3); prio 2 haengt an READY/SENT
+    BuiltFrame b = buildTextFrame("*", "bc", 0x1003UL);
+    int sb = addTxRingEntry(b.bytes, b.len, RING_STATUS_READY, "p2");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[sb]);
+    sweepAt(1000UL + 3600000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sb][0]);
+}
+
+// W1a-Advisor: eigene Einmal-Texte (addTxRingEntryOnce: {ping}, RM1-Antwort,
+// Mailbox-Zustellung) landen als prio 1/2 mit Status DONE. D4: nur ACKs haben
+// 90 s, eigene DMs und Gruppentexte keine TTL.
+static void test_ttl_own_once_dm_never_ages(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame b = buildTextFrame("DK5EN-1", "{ping}", 0x1004UL);
+    int s = addTxRingEntryOnce(b.bytes, b.len, "ping");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[s]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, (uint8_t)ringBuffer[s][1]);
+    sweepAt(1000UL + 3600000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[s][0]);
+}
+
+static void test_ttl_own_once_group_never_ages(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame b = buildTextFrame("*", "{MCP}x", 0x1005UL);
+    int s = addTxRingEntryOnce(b.bytes, b.len, "mcp");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[s]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, (uint8_t)ringBuffer[s][1]);
+    sweepAt(1000UL + 3600000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[s][0]);
+}
+
+static void test_ttl_own_text_ack_ages_90s(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame b = buildTextFrame("DK5EN-1", "DK5EN-1  :ack123", 0x1006UL);
+    int s = addTxRingEntryOnce(b.bytes, b.len, "ack");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[s]);
+    sweepAt(1000UL + RING_TTL_ACK_MS - 1000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[s][0]);
+    sweepAt(1000UL + RING_TTL_ACK_MS + 1000UL);
+    TEST_ASSERT_EQUAL(0, ringBuffer[s][0]);
+}
+
+static void test_ttl_ack_detection(void)
+{
+    BuiltFrame a = buildTextFrame("DK5EN-1", "DK5EN-1  :ack123");
+    BuiltFrame w = buildTextFrame("WLNK-1", "ack0042");
+    BuiltFrame d = buildTextFrame("DK5EN-1", "ackermann");
+    BuiltFrame g = buildTextFrame("DK5EN-1", "hallo");
+    BuiltFrame b = buildAckFrame();
+    TEST_ASSERT_TRUE(txRingFrameIsAck(a.bytes, a.len));
+    TEST_ASSERT_TRUE(txRingFrameIsAck(w.bytes, w.len));
+    TEST_ASSERT_TRUE(txRingFrameIsAck(b.bytes, b.len));
+    TEST_ASSERT_FALSE(txRingFrameIsAck(d.bytes, d.len));
+    TEST_ASSERT_FALSE(txRingFrameIsAck(g.bytes, g.len));
+}
+
+#if defined(EXTERNAL_RADIO)
+static void test_ttl_ext_pending_never_ages(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildHeyFrame();
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "ext");
+    ringBuffer[slot][1] = RING_STATUS_EXT_PENDING;
+    sweepAt(1000UL + 3600000UL);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+}
+#endif
+
+static void cetSweepCase(uint32_t payload_off_back, bool trusted, bool ok, bool expect_dropped, int32_t shift = 0)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildCetFrame((uint32_t)((int32_t)kCetNow - (int32_t)payload_off_back + shift));
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "cet");
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(0, slot);
+    mc_test_set_millis(2000); // weit unter jeder ms-TTL
+    txRingAgeBackground((uint32_t)millis(), clk(trusted, ok, kCetNow));
+    if(expect_dropped)
+    {
+        TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+        TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_NORMAL]);
+    }
+    else
+    {
+        TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+        TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_NORMAL]);
+    }
+}
+
+static void test_cet_fresh_kept(void)      { cetSweepCase(60, true, true, false); }
+static void test_cet_151s_dropped(void)    { cetSweepCase(151, true, true, true); }
+static void test_cet_150s_kept(void)       { cetSweepCase(150, true, true, false); }
+static void test_cet_untrusted_dropped(void) { cetSweepCase(10, false, true, true); }
+static void test_cet_no_now_dropped(void)  { cetSweepCase(10, true, false, true); }
+static void test_cet_future_dropped(void)  { cetSweepCase(0, true, true, true, 200); }
+
+static void test_cet_drop_only_sweep(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildCetFrame(kCetNow - 400);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "cetonly");
+    BuiltFrame g = buildTextFrame("DK5EN-91", "r", 0x2001UL);
+    int s2 = addTxRingEntry(g.bytes, g.len, RING_STATUS_DONE, "keep");
+    txRingDropStaleCet(clk(true, true, kCetNow));
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[s2][0]);
+}
+
+static void test_cet_non_cet_text_untrusted_kept(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildTextFrame("DK5EN-91", "hallo CET egal", 0x3001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "noncet");
+    mc_test_set_millis(2000);
+    txRingAgeBackground((uint32_t)millis(), clk(false, false, 0));
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_NORMAL]);
 }
 
 // --------------------------------------------------------------- WQ-01
@@ -1694,6 +1938,28 @@ int main(int argc, char **argv)
     RUN_TEST(test_bp03_frischer_bg_bleibt);
     RUN_TEST(test_bp03_nicht_bg_altert_nie);
     RUN_TEST(test_bp03_rollover_sicher);
+    RUN_TEST(test_ttl_table);
+    RUN_TEST(test_ttl_relay_300s);
+    RUN_TEST(test_ttl_pos_120s);
+    RUN_TEST(test_ttl_ack_90s);
+    RUN_TEST(test_ttl_prio5_180s);
+    RUN_TEST(test_ttl_own_text_never_ages);
+    RUN_TEST(test_ttl_prio2_done_never_ages);
+    RUN_TEST(test_ttl_own_once_dm_never_ages);
+    RUN_TEST(test_ttl_own_once_group_never_ages);
+    RUN_TEST(test_ttl_own_text_ack_ages_90s);
+    RUN_TEST(test_ttl_ack_detection);
+#if defined(EXTERNAL_RADIO)
+    RUN_TEST(test_ttl_ext_pending_never_ages);
+#endif
+    RUN_TEST(test_cet_fresh_kept);
+    RUN_TEST(test_cet_150s_kept);
+    RUN_TEST(test_cet_151s_dropped);
+    RUN_TEST(test_cet_untrusted_dropped);
+    RUN_TEST(test_cet_no_now_dropped);
+    RUN_TEST(test_cet_future_dropped);
+    RUN_TEST(test_cet_drop_only_sweep);
+    RUN_TEST(test_cet_non_cet_text_untrusted_kept);
     RUN_TEST(test_wq01_leerer_ring_liefert_nur_nullen);
     RUN_TEST(test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein);
     RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
