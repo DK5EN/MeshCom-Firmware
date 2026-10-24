@@ -57,6 +57,7 @@ t = render(0, 'QUIET', ' data-p1="3" data-w0="2" data-w1="2" data-w2="0"');
 check('prio-1: 1 solid + 2 outlined', lastDoc.querySelectorAll('.mcq-cell').length === 1 + 5 + 10 + 4 &&
   lastDoc.querySelectorAll('.mcq-cell-wait').length === 2);
 check('legend "2 waiting for ACK"', t.includes('2 waiting for ACK'));
+check('no space before the waiting-for-ACK comma', !t.includes(' , '), t.slice(0, 200));
 
 t = render(1, 'QRS');
 check('QRS -> "slow down"', t.includes('Your messages: slow down'));

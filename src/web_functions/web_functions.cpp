@@ -1558,7 +1558,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
     web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
-    web_client.println("if(w0>0){html+=', '+w0+' waiting for ACK';}");
+    web_client.println("if(w0>0){html=html.replace(/ +$/,'')+', '+w0+' waiting for ACK';}");
     web_client.println("html+='</div>';");
     web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
     web_client.println("var bptxt=(bp==0)?'accepted':((bp==1)?'slow down':'refused');");
