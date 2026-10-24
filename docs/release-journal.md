@@ -1,11 +1,49 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261023`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261024`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.24 (Samstag, 2026-10-24)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.23.
+`FLASH_VERSION` 20261024, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten.
+Safeboot v3 unveraendert.
+
+Inhalt seit `v4.40a.10.23` (Firmware: 4 Commits, 13 Dateien, +199/-14, dazu der `FLASH_VERSION`-Stempel):
+
+- SP-Server-Host `sp.meshcom.pl` statt `spmeshcom.dynalias.com` (`62782dd5`, Wunsch des Server-Betreibers;
+  gleiche IP 146.59.232.234, nRF52-Literal unveraendert). Upstream als #1236 am 2026-10-24 gemergt, per Merge
+  `ff67ecd5` synchronisiert.
+- AU-21 (`e6e74bc6`, `c100451a`): Heltec Wireless Tracker (S3 ohne PSRAM) belegte 25,6 KB internen Heap fuer
+  den TFT-Sprite ab Boot, auch bei gespeichertem Display aus; der AU-TLS-Handshake lief leer (`tls -9984`).
+  Sprite nur bei Display an, fuer jeden AU-Check/Download freigegeben (`FW_SHED_TFT`, "Update..." direkt
+  gezeichnet), danach neu belegt; Token `lowheap_tls` (GUI-Zustand H, verbraucht einen Download-Versuch);
+  `--info` mit `HEAP free/min/blk` (alle ESP32) und TFT-Sprite-Bytes.
+- TRK-03 (`37d7e3ac`): T-Beam-Erststart setzte seit V4.21 `0x0035` (TRACK statt GPS); jetzt
+  `TBEAM_FIRST_BOOT_SSET 0x0055` (Volt, Pos, Button, GPS), GPS startet ohne Reboot. Keine Migration.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (80 Unity-Envs, 2876/2876, Golden 48, pytest 1352).
+- AU-21 auf DK5EN-1 (Heltec V3, `c100451a`): AU-Check findet v4.40a.10.23 mit `[AU];alloc;end;fails;0`,
+  `--info` zeigt die HEAP-Zeile, keine `[TFT]`-Zeilen (kein `HAS_TFT`).
+- TRK-03 auf DK5EN-92 (T-Beam v1.2): nach `erase_flash` mit dem Image vor dem Fix bestaetigt (TRACK an,
+  GPS aus); Konfiguration danach wiederhergestellt (111 von 114 Feldern gleich, nur GPS-Position abweichend).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Idle-Heap-Schritt auf DK5EN-92 ausgelassen (Operator-Entscheidung); es gilt der Wert von 10.23 (70296 B).
+- AU-21 nicht auf einem Wireless Tracker (keiner auf dem Bench): Sprite-Freigabe und Neubelegung nur
+  Host-Tests und Build. Offen: S3-Heap-Untergrenze fuer TLS, BLE-Pause auf S3.
+- TRK-03-Fix nicht mit einem zweiten Erase auf Hardware geprueft (Regressionstest rot auf 0x0035, gruen auf 0x0055).
+- Die 24-h-Nacht mit TXP (seit 10.23) auf DK5EN-98 und DK5EN-14 ist beim Release noch nicht ausgewertet.
+- Alle Boards ausser Heltec V3 und T-Beam v1.2 fuer die Aenderungen dieses Releases nur gebaut.
 
 ---
 

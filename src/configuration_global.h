@@ -134,7 +134,7 @@ inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 // kamen hinzu. Alles seither (auch die neuen Features wie max_hop_text) nutzt
 // auf ESP32 eigene NVS-Keys bzw. freie Bits bestehender Felder und aendert
 // das Struct-Layout nicht.
-#define FLASH_VERSION 20261023
+#define FLASH_VERSION 20261024
 #define FLASH_STRUCT_VERSION 20260724
 
 // Bestandsschutz. Diese Staende tragen dasselbe Layout wie
