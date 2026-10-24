@@ -2377,6 +2377,7 @@
    "test_ack_validate",
    "test_ack_replay",
    "test_ack_phone_frame",
+   "test_gw_ack_frame",
    "test_printfdeb_format",
    "test_mask_secret",
    "test_wifi_start_gate",

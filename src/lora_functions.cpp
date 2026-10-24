@@ -9,6 +9,7 @@
 #include "txring_functions.h"
 #include "ack_functions.h"
 #include "ack_attribution.h"
+#include "gw_ack_frame.h"   // GWACK-01: the gateway's double ACK, one id for both copies
 #include "capture_functions.h"
 #include "dedup_functions.h"
 #include "setlog_lines.h"
@@ -517,6 +518,12 @@ static bool setlogPathHasCall(const char *path, const char *call)
     }
 
     return false;
+}
+
+// Clock for gwAckBuildPair() (src/gw_ack_frame.h): ACK frame ids are uptime ms.
+static uint32_t gwAckMillis(void)
+{
+    return (uint32_t)millis();
 }
 
 /**
@@ -2250,53 +2257,27 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             //Check DM Message nicht vom GW ACK nur wenn "*" (an alle), "WLNK-1", "APRS2SOTA" und Group-Message
                                             if(strcmp(destination_call, "*") == 0 || strcmp(destination_call, "WLNK-1") == 0 || strcmp(destination_call, "APRS2SOTA") == 0 || CheckGroup(destination_call) > 0)
                                             {
-                                                // ACK MSG 0x41 | 0x01020111 | max_hop | 0x01020304 | 1/0 ack from GW or Node 0x00 = Node, 0x01 = GW
-                                                msg_counter=millis();   // ACK mit neuer msg_id versenden
+                                                // ACK MSG 0x41 | ack id | 0x80 server + max hop | acked msg id | 0x01 = GW | 0x00
+                                                // GWACK-01: two copies with ONE id, the clock is read once. The second copy is a
+                                                // repeat for listeners that missed the first; relays forward an id once. Two reads
+                                                // gave two ids whenever the millisecond ticked in between (DisplayInfo on), and every
+                                                // relay forwarded both (src/gw_ack_frame.h, docs/campaign-gwack01-20261024.md).
+                                                GwAckPair gwAck;
+                                                gwAckBuildPair(&gwAck, gwAckMillis, aprsmsg.msg_id, meshcom_settings.max_hop_text);
+                                                msg_counter = gwAck.firstId;
 
-                                                print_buff[0]=MSG_TYPE_ACK;
-                                                print_buff[1]=msg_counter & 0xFF;
-                                                print_buff[2]=(msg_counter >> 8) & 0xFF;
-                                                print_buff[3]=(msg_counter >> 16) & 0xFF;
-                                                print_buff[4]=(msg_counter >> 24) & 0xFF;
-                                                print_buff[5]=0x80;      // server & max hop
-                                                print_buff[5] = print_buff[5] | meshcom_settings.max_hop_text;
-                                                // FIX BUG #6: Include original msg_id so sender can match ACK and stop retransmitting
-                                                print_buff[6]=aprsmsg.msg_id & 0xFF;
-                                                print_buff[7]=(aprsmsg.msg_id >> 8) & 0xFF;
-                                                print_buff[8]=(aprsmsg.msg_id >> 16) & 0xFF;
-                                                print_buff[9]=(aprsmsg.msg_id >> 24) & 0xFF;
-                                                print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
-                                                print_buff[11]=0x00;     // msg always 0x00 at the end
-                                                
-                                                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_dm_ack_gw");
+                                                addTxRingEntry(gwAck.first, GW_ACK_FRAME_LEN, RING_STATUS_DONE, "rx_dm_ack_gw");
 
                                                 if(bDisplayInfo)
                                                 {
                                                     printfdeb("%s", getTimeString().c_str());
-                                                    printfdeb(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
+                                                    printfdeb(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", gwAck.first[5], gwAck.first[9], gwAck.first[8], gwAck.first[7], gwAck.first[6], gwAck.first[10], gwAck.first[11]);
                                                     bNewLine=true;
                                                 }
-                                                                                            
-                                                unsigned long mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
 
-                                                bool bServerFlag = false;
-                                                if((print_buff[5] & 0x80) == 0x80)
-                                                    bServerFlag=true;
+                                                addLoraRxBuffer(gwAck.firstId, (gwAck.first[5] & 0x80) == 0x80);
 
-                                                addLoraRxBuffer(mid, bServerFlag);
-
-                                                msg_counter=millis();   // ACK mit neuer msg_id versenden
-
-                                                print_buff[1]=msg_counter & 0xFF;
-                                                print_buff[2]=(msg_counter >> 8) & 0xFF;
-                                                print_buff[3]=(msg_counter >> 16) & 0xFF;
-                                                print_buff[4]=(msg_counter >> 24) & 0xFF;
-
-                                                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_dm_ack_new");
-
-                                                mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
-                                                
-                                                addLoraRxBuffer(mid, bServerFlag);
+                                                addTxRingEntry(gwAck.second, GW_ACK_FRAME_LEN, RING_STATUS_DONE, "rx_dm_ack_new");
                                             }
                                         }
                                     }
