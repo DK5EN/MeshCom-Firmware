@@ -28,6 +28,7 @@
 #include <nrf52/WisBlock-API.h>
 #include <parser_link_stubs.h>
 #include <via_functions.h>
+#include <mesh_policy.h>
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp/via_functions.cpp
 // (env:native_parsers linkt beide Parser in jedes Testprogramm der Env,
@@ -274,6 +275,34 @@ static void test_trailing_komma_im_pfad(void)
     TEST_ASSERT_TRUE(checkMesh(m));
 }
 
+// ------------------------------------------------- meshTxAllowed(): BL-01
+// "--mesh off" stoppt nur das Repeat fremder Frames; alles andere wird immer
+// gesendet. Tabelle: docs/campaign-bl01-gwrx01-nrf52-20261024.md, Abschnitt 1.
+
+static void test_policy_foreign_relay_folgt_mesh(void)
+{
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_FOREIGN_RELAY, true));
+    TEST_ASSERT_FALSE(meshTxAllowed(MESH_TX_FOREIGN_RELAY, false));
+}
+
+static void test_policy_own_immer(void)
+{
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_OWN, true));
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_OWN, false));
+}
+
+static void test_policy_gw_service_immer(void)
+{
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_GW_SERVICE, true));
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_GW_SERVICE, false));
+}
+
+static void test_policy_store_service_immer(void)
+{
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_STORE_SERVICE, true));
+    TEST_ASSERT_TRUE(meshTxAllowed(MESH_TX_STORE_SERVICE, false));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -291,5 +320,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_basisrufzeichen_matcht_nicht_auf_ssid);
     RUN_TEST(test_ohne_via_info_folgt_bmesh);
     RUN_TEST(test_trailing_komma_im_pfad);
+    RUN_TEST(test_policy_foreign_relay_folgt_mesh);
+    RUN_TEST(test_policy_own_immer);
+    RUN_TEST(test_policy_gw_service_immer);
+    RUN_TEST(test_policy_store_service_immer);
     return UNITY_END();
 }

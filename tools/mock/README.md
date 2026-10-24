@@ -38,6 +38,15 @@ idle client is expired, default 120), `--stor-routing` (see below),
 `--verbose` (debug log, includes one `event=stor_snapshot` line with the full
 call list per applied `STOR` snapshot).
 
+## Per-client delivery delay (`--delay-client`)
+
+`--delay-client CALL=SECONDS` (repeatable, SECONDS 0..60) delays only the
+redistributed GATE copies (including STOR targets) sent to the client
+registered as CALL (exact incl. SSID, case-insensitive). BEAT, keep replies
+and injected frames are not delayed. Use it to let one gateway hear another
+gateway's LoRa copy before the server frame arrives. Pending delays are
+cancelled on shutdown.
+
 ## STOR (store-node announce set, SNF-GW-08, issue #1188)
 
 The mock understands the `STOR` datagram proposed in

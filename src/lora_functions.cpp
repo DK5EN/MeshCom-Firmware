@@ -1,6 +1,7 @@
 #include "mc_text.h"
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "csma_timing.h"   // W0.6: CSMA back-off arithmetic, native-tested
+#include "mesh_policy.h"   // BL-01: meshTxAllowed(), --mesh off = nur kein Repeat fremder Frames
 #include "Arduino.h"
 #include "configuration.h"
 
@@ -621,7 +622,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
         else
         {
             // ACK nur weitersenden wenn es eine neue MSG-ID ist && MESH = on && nicht eine MSG-ID ist welche nicht selbst ausgesendet wurde
-            if((print_buff[5] & 0x7F) > 0x00 && bMESH && itxcheck < 0 && !checkServerRx(print_buff+6))
+            if((print_buff[5] & 0x7F) > 0x00 && meshTxAllowed(MESH_TX_FOREIGN_RELAY, bMESH) && itxcheck < 0 && !checkServerRx(print_buff+6))
             {
                 print_buff[5]--;
 

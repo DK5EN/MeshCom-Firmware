@@ -168,6 +168,79 @@ class TestDataRedistribution(ServerTestCase):
             sock_a.recvfrom(4096)
 
 
+class TestDelayClient(ServerTestCase):
+    """--delay-client: per-target delay of redistributed frames only."""
+
+    def _start(self, delays: dict[str, float] | None) -> None:
+        self.server.stop()
+        self.server = srv.MockMeshComServer(
+            "127.0.0.1", 0, callsign="MOCK-SRV", verbose=False,
+            registry_ttl=120.0, client_delays=delays,
+        )
+        self.server.start()
+        self.addCleanup(self.server.stop)
+        self.sock_a = free_udp_socket(timeout=3.0)
+        self.sock_b = free_udp_socket(timeout=3.0)
+        self.sock_c = free_udp_socket(timeout=3.0)
+        for s in (self.sock_a, self.sock_b, self.sock_c):
+            self.addCleanup(s.close)
+        self.register(self.sock_a, 0x11111111, "NODE-A")
+        self.register(self.sock_b, 0x22222222, "NODE-B")
+        self.register(self.sock_c, 0x33333333, "NODE-C")
+        wait_until(lambda: len(self.server.clients) == 3)
+
+    def _send_a(self) -> bytes:
+        frame = load_corpus_frame("f001")
+        self.sock_a.sendto(cli.build_data(0x11111111, "NODE-A", frame), self.server_addr)
+        return frame
+
+    def _recv_timed(self, sock: socket.socket, t0: float) -> tuple[bytes, float]:
+        data, _ = sock.recvfrom(4096)
+        return data, time.monotonic() - t0
+
+    def test_delayed_client_receives_later_identical_frame(self) -> None:
+        self._start({"NODE-B": 0.5})
+        t0 = time.monotonic()
+        frame = self._send_a()
+        data_c, dt_c = self._recv_timed(self.sock_c, t0)
+        data_b, dt_b = self._recv_timed(self.sock_b, t0)
+        self.assertEqual(data_c, b"GATE" + frame)
+        self.assertEqual(data_b, data_c)
+        self.assertLess(dt_c, 0.4)
+        self.assertGreaterEqual(dt_b, 0.45)
+
+    def test_no_flag_is_immediate(self) -> None:
+        self._start(None)
+        t0 = time.monotonic()
+        self._send_a()
+        _, dt_b = self._recv_timed(self.sock_b, t0)
+        _, dt_c = self._recv_timed(self.sock_c, t0)
+        self.assertLess(dt_b, 0.4)
+        self.assertLess(dt_c, 0.4)
+
+    def test_match_is_case_insensitive(self) -> None:
+        self._start(srv.parse_delay_client("node-b=0.5"))
+        t0 = time.monotonic()
+        self._send_a()
+        _, dt_b = self._recv_timed(self.sock_b, t0)
+        self.assertGreaterEqual(dt_b, 0.45)
+
+    def test_bad_specs_rejected(self) -> None:
+        for spec in ("NODE-B", "=1", "NODE-B=abc", "NODE-B=-1", "NODE-B=60.1", "NODE-B=nan"):
+            with self.subTest(spec=spec), mock.patch("sys.stderr"):
+                with self.assertRaises(SystemExit):
+                    srv.main(["--port", "0", "--delay-client", spec])
+
+    def test_stop_cancels_pending_timer(self) -> None:
+        self._start({"NODE-B": 0.5})
+        self._send_a()
+        self.sock_c.recvfrom(4096)
+        self.server.stop()
+        self.sock_b.settimeout(0.8)
+        with self.assertRaises(socket.timeout):
+            self.sock_b.recvfrom(4096)
+
+
 # ---------------------------------------------------------------------------
 # 3. DATA header validation, using real corpus frames
 # ---------------------------------------------------------------------------
