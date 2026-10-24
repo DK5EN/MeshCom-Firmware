@@ -361,7 +361,7 @@ gh pr list -R icssw-org/MeshCom-Firmware --state open
 - `docs/architecture/08-defect-catalogue.md`: Defect-IDs
 - `docs/archive/pr1114-kiss-review-20260901.md`: Muster eines internen PR-Reviews
 - `docs/archive/2026-08-29-upstream-sync-verdict.md`: Muster eines Upstream-Sync-Verdicts
-- `.claude/commands/code-audit.md`, `.claude/commands/release-firmware.md`
+- `.claude/commands/code-audit.md`, `.claude/commands/release-firmware.md` (lokal, nicht versioniert)
 
 ## Anhang C: PR-Body-Vorlage (deutsch)
 

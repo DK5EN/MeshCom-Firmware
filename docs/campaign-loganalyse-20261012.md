@@ -83,7 +83,7 @@ Fixtures: `logs/` is gitignored; tests use short committed excerpts, the full lo
 
 ## Out of scope
 
-- The logauswertung skill (`.claude/skills/logauswertung/`) carries caveats for the old script
+- The logauswertung skill (`~/.claude/skills/logauswertung/`, user-level, not in the repo) carries caveats for the old script
   behaviour; drop them now that W1/W2 have landed. `references/script-sections.md:27` lists the removed
   `RX_OTHER_ERROR:` line; new keys to document: COLLISION_ANALYSIS, BILLING_CHECK, LINE_TIMESTAMPS,
   CAPTURE_START, PNREPEAT, ONRXDONE_HEALTH, RX_PATH_LOSS, ACK_REJECT_B5, RING_DROP split, SAME_FREQ_PAIR,

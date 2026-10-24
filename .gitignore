@@ -444,13 +444,9 @@ compile_commands.json
 # sie sind Testdaten und kein Mitschnitt.
 !tools/testdata/nbr/*.log
 
-# REG-06 / CQ-11 (2026-10-03): the regression skill is part of the gate and travels
-# with the repo; the blanket .* rule above hides the rest of .claude/ on purpose.
-!.claude/
-.claude/*
-!.claude/commands/
-.claude/commands/*
-!.claude/commands/full-regression.md
+# .claude/ (settings, commands, skills) is private and stays local; the blanket .*
+# rule above already hides it, this line makes that explicit.
+.claude/
 build/ALL_BUILD.vcxproj
 build/ALL_BUILD.vcxproj.filters
 build/cmake_install.cmake

@@ -39,7 +39,7 @@ The `/submit-pr` command walks this flow; `/sync-upstream` brings upstream into 
 
 - Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs, golden selftest, pytest and tool suites).
 - With bench hardware: `tools/regression.sh --stage all` (adds stage 3, `tools/bench/bench_suite.py`; `--flash`, `--extudp`, `--deepsleep` are opt-in, passed after `--`).
-- The `/full-regression` skill wraps the runner (`.claude/commands/full-regression.md`, tracked).
+- The `/full-regression` skill wraps the runner (`.claude/commands/full-regression.md`, local and gitignored).
 - **Never run bare `pio test`**: it walks the board envs and flashes attached hardware.
 - **One `pio` process at a time** (shared build cache and global package store; `selftest.sh` shells out to `pio project config`). Parallel writers route every `pio` call through a mkdir-lock wrapper (`piolock.sh` in the scratchpad).
 - Suite inventory: `docs/test-suite-map.md`.
