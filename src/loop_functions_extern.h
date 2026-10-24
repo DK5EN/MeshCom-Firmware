@@ -468,7 +468,7 @@ extern uint16_t stat_tx_count[6];               // Index 1-5 = Prio 1-5
 extern uint16_t stat_drop_count[6];             // Drops per priority
 extern uint16_t stat_preempt_count;             // Priority preemptions (out-of-order sends)
 extern uint32_t stat_latency_sum[6];            // Sum of queue-to-TX latency per prio (ms)
-extern uint16_t stat_latency_max[6];            // Max latency per prio (ms)
+extern uint32_t stat_latency_max[6];            // Max latency per prio (ms)
 extern uint8_t  stat_queue_hwm;                 // Queue high-water mark since boot
 extern uint16_t stat_csma_hwm_attempts;         // Max CAD attempts since boot
 extern uint32_t stat_csma_aged_boot[3];         // Sends per age stage since boot

@@ -7,6 +7,8 @@
 #include <command_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#define CET_AGE_WITH_CLOCK
+#include "cet_age.h"
 #include <dedup_functions.h>
 #include "ack_attribution.h"
 #include "dm_dedup.h"
@@ -258,6 +260,19 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             // DATA (a relayed mesh frame) is high-rate on a busy gateway: only with --udplog
             if(gwRxType[0] != 'D' || bUDPLOG)
               Serial.printf("[GW];rx;type;%s;len;%d;ms;%lu\n", gwRxType, packetSize, (unsigned long)millis());
+
+#ifndef UNIT_TEST   // Messzeile braucht die echte Uhr, nicht die Twin-Stubs
+            // TXP W0: {CET}-Alter am Gateway-Eingang (Messung, kein Verhalten)
+            if(gwRxType[0] == 'C')
+            {
+              uint32_t cetUtc = 0;
+              char cetAge[16];
+              bool cetOk = cetParsePayload(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload), &cetUtc);
+              int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
+              Serial.printf("[CET];gw_rx;src;%s;age_s;%s;trusted;%d;hop;%d;ms;%lu\n",
+                            aprsmsg.msg_source_call, cetAge, cetTr, (int)(aprsmsg.max_hop & 0x0F), (unsigned long)millis());
+            }
+#endif
           }
 
           // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):

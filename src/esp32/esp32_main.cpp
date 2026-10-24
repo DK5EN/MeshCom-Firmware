@@ -3462,8 +3462,8 @@ void esp32loop()
                 {
                     uint32_t avg = stat_latency_sum[p] / stat_tx_count[p];
                     if(bLORADEBUG)
-                        printfdeb("[MC-PRIO] p%d_lat_avg=%ums p%d_lat_max=%dms p%d_cnt=%d\n",
-                            p, avg, p, stat_latency_max[p], p, stat_tx_count[p]);
+                        printfdeb("[MC-PRIO] p%d_lat_avg=%ums p%d_lat_max=%lums p%d_cnt=%d\n",
+                            p, avg, p, (unsigned long)stat_latency_max[p], p, stat_tx_count[p]);
                 }
             }
             // Reset window counters

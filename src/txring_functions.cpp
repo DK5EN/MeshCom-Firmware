@@ -505,6 +505,7 @@ void txRingAgeBackground(uint32_t now_ms)
     int dropSlot[MAX_RING];
     uint32_t dropAgeS[MAX_RING];
     uint32_t dropMsgId[MAX_RING];
+    uint8_t dropPrio[MAX_RING];
     int dropCount = 0;
 
 #if defined(NRF52_SERIES)
@@ -543,6 +544,7 @@ void txRingAgeBackground(uint32_t now_ms)
             dropSlot[dropCount] = i;
             dropAgeS[dropCount] = age_ms / 1000UL;
             dropMsgId[dropCount] = mid;
+            dropPrio[dropCount] = ringPriority[i];
             dropCount++;
         }
     }
@@ -557,8 +559,8 @@ void txRingAgeBackground(uint32_t now_ms)
     if(bLORADEBUG)
     {
         for(int k = 0; k < dropCount; k++)
-            printfdeb("[MC-DBG] RING_DROP_STALE slot=%d age_s=%lu msg_id=%08X\n",
-                      dropSlot[k], (unsigned long)dropAgeS[k], dropMsgId[k]);
+            printfdeb("[MC-DBG] RING_DROP_STALE slot=%d prio=%d age_s=%lu msg_id=%08X\n",
+                      dropSlot[k], (int)dropPrio[k], (unsigned long)dropAgeS[k], dropMsgId[k]);
     }
 }
 

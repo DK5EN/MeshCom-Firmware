@@ -105,6 +105,8 @@
 #endif
 #include "loop_functions.h"
 #include <loop_functions_extern.h>
+#define CET_AGE_WITH_CLOCK
+#include "cet_age.h"
 #include "aprs_functions.h"
 #include <batt_functions.h>
 #include <udp_functions.h>
@@ -2151,6 +2153,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 else
                                 if(memcmp(aprsmsg.msg_payload, "{CET}", 5) == 0)
                                 {
+                                    // TXP W0: {CET}-Alter beim LoRa-Empfang (Messung, kein Verhalten)
+                                    {
+                                        uint32_t cetUtc = 0;
+                                        char cetAge[16];
+                                        bool cetOk = cetParsePayload(aprsmsg.msg_payload, strlen(aprsmsg.msg_payload), &cetUtc);
+                                        int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
+                                        Serial.printf("[CET];rx;src;%s;age_s;%s;trusted;%d;hop;%d;path;%d;ms;%lu\n",
+                                                      aprsmsg.msg_source_call, cetAge, cetTr, (int)(aprsmsg.max_hop & 0x0F),
+                                                      (int)aprsmsg.msg_last_path_cnt, (unsigned long)millis());
+                                    }
+
                                     if(memcmp(aprsmsg.msg_payload, "{CET}<", 6) == 0)
                                         bMeshDestination = false;   // falsche Zeit nicht weiter geben
                                     else
@@ -2864,7 +2877,7 @@ bool doTX()
             stat_tx_count[prio]++;
             stat_latency_sum[prio] += latency;
             if(latency > stat_latency_max[prio])
-                stat_latency_max[prio] = (uint16_t)min(latency, (uint32_t)65535);
+                stat_latency_max[prio] = latency;
         }
 
         // Track preemption (out-of-order send)
@@ -2879,6 +2892,34 @@ bool doTX()
         memcpy(lora_tx_buffer, ringBuffer[txSlot] + 2, sendlng);
 
         lora_tx_buffer[sendlng]=0x00;
+
+        // TXP W0: {CET}-Alter beim Senden (Messung, kein Verhalten). Frame = ringBuffer[slot]+2.
+        {
+            uint32_t cetUtc = 0;
+            if(ringBuffer[txSlot][2] == MSG_TYPE_TEXT && sendlng > 0 &&
+               memchr(lora_tx_buffer, '{', sendlng) != NULL)
+            {
+                bool cetOk = cetFindInFrame(lora_tx_buffer, (uint16_t)sendlng, &cetUtc);
+                bool cetIs = cetOk;
+                if(!cetIs)
+                {
+                    // {CET}< (falsche Zeit) oder unparsbar: trotzdem als CET messen
+                    for(int ci = 6; ci < sendlng && !cetIs; ci++)
+                        if(lora_tx_buffer[ci] == ':')
+                        {
+                            cetIs = (ci + 5 < sendlng) && memcmp(lora_tx_buffer + ci + 1, "{CET}", 5) == 0;
+                            break;
+                        }
+                }
+                if(cetIs)
+                {
+                    char cetAge[16];
+                    int cetTr = cetAgeText(cetAge, sizeof(cetAge), cetOk, cetUtc);
+                    Serial.printf("[CET];tx;age_s;%s;trusted;%d;wait_ms;%lu;prio;%d;ms;%lu\n",
+                                  cetAge, cetTr, (unsigned long)latency, (int)prio, (unsigned long)millis());
+                }
+            }
+        }
 
         int save_read = txSlot;
 

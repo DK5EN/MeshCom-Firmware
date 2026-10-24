@@ -2731,6 +2731,26 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_cet_age": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_cet_age"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_charge_led_mode": {
   "build_flags": [
    "-std=gnu++17",
