@@ -1,7 +1,7 @@
 # Campaign GWACK-01: the gateway's double ACK (2026-10-24)
 
-Status: **W1 measurement done; fix waits on the operator's A / B / C decision.** Stays on `fork-dev`
-(goes up later inside the larger PR). Bench driver `tools/bench/gwack_bench.py`, test
+Status: **closed on fork-dev 2026-10-24.** Operator chose C; fix `c462d018`, benched (W3). Not released;
+goes upstream later inside the larger PR. Bench driver `tools/bench/gwack_bench.py`, test
 `tools/bench/test_gwack_bench.py`.
 
 ## 1. Bottom line
@@ -90,16 +90,18 @@ plus (p - p^2) x one retry (0.90 text + 0.90 R relays + one more C-type ACK even
 relay in range (R < 1); A is the most expensive from the first relay on. B's retry term disappears when a second
 gateway in range acks the same text.
 
-## 5. Recommendation and next waves
+## 5. Decision and fix
 
-- **C.** Derive the ACK id once and send the second copy with the same id. Rewrite the comment "ACK mit neuer msg_id
-  versenden" so it says what the repeat is for. One gateway ACK then costs the same everywhere, whatever the
-  debug setting.
-- W2 (after the decision): host-testable helper for the ACK frame pair plus a native test that fails on the
-  current inline logic (two clock reads give two ids) and passes on the fix. Gate `tools/regression.sh --stage 1,2`,
-  builds of `heltec_wifi_lora_32_V3`, `wiscore_rak4631` and `ttgo_tbeam`, Opus advisor pass.
-- W3: bench rerun of `gwack_bench.py --phase timing --info-mode on`. Expected: 0 distinct pairs, relay per pair
-  `same:1`.
+- **Operator decision 2026-10-24: C.** Fix `c462d018`: `gwAckBuildPair()` (`src/gw_ack_frame.h`) reads the clock
+  once, and the second copy is a byte copy of the first. The wire layout is unchanged. `OnRxDone` queues the same
+  two ring entries (`rx_dm_ack_gw`, `rx_dm_ack_new`) and calls `addLoraRxBuffer()` once for the one id.
+- Regression test `test/test_gw_ack_frame` (env `native`): fails on the two-read algorithm (`Expected 0x0002286C
+Was 0x0002286D`), passes on the fix. Golden `variant-ini-effective.json` regenerated for the new filter entry.
+- Gate: `tools/regression.sh --stage 1,2` PASS (native 743/743, golden selftest, board links, ruff, pytest 1323).
+  Builds `heltec_wifi_lora_32_V3`, `ttgo_tbeam` and `wiscore_rak4631` OK. Opus advisor: APPROVED, no defects.
+- **W3 bench** (INSTRUMENT images of `c462d018`, same setup as P1 round 2, DisplayInfo on): **28/28 pairs same id**
+  (before: 25/28 distinct). Relay per pair `same:1` in 28/28. Summary
+  `tools/bench/runs/harness/gwack-w3fix-20261024-110548.json`. The nodes run stock images of the fixed tree again.
 - Out of scope: ACK ids are bare uptime milliseconds (top bits zero), so two gateways can collide across the
   fleet. That is upstream design.
 

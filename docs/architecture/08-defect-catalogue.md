@@ -1688,10 +1688,10 @@ RCA: `docs/rca-gwrx01-20261023.md`; campaign: `docs/campaign-bl01-gwrx01-nrf52-2
   providers, else every server slot was a sole-provider veto.
 - **Verified:** ESP32 W3 (DK5EN-1/-92): 10/10 case B, 4/10 `CANCEL?`. nRF52 W2 (DK5EN-90): NEED B on every server
   slot, `--nbrrelay on` released 5 of 7 slots without TX, no reboot, heap flat. Open: count-mode night on DK5EN-98.
-- **Side finding GWACK-01 (open, upstream code, measured 2026-10-24):** the gateway's `rx_dm_ack_gw` and
+- **Side finding GWACK-01 (FIXED on fork-dev `c462d018`, option C, benched 28/28 same id; upstream code):** the gateway's `rx_dm_ack_gw` and
   `rx_dm_ack_new` carry the same msg id unless the millisecond ticks between the two `millis()` reads; `DisplayInfo`
   on forces the tick (bench 25/28 distinct, info off 1/23). Same id is a working repeat (listener that missed copy 1
-  takes copy 2, 8/8); a distinct id makes every relay forward both copies. Decision A/B/C pending:
+  takes copy 2, 8/8); a distinct id makes every relay forward both copies. Fix reads the clock once:
   [`campaign-gwack01-20261024.md`](../campaign-gwack01-20261024.md).
 
 ## 3. Refuted claims — do not re-investigate
