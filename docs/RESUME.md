@@ -35,6 +35,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 ## Hottest first (details in BACKLOG)
 
 - AU-14: single TASK_WDT during an AU download, cause unknown.
+- AU-21: Wireless Tracker AU check failed (`tls -9984`, heap at 0): TFT sprite 25.6 KB fixed on fork-dev (`e6e74bc6`,
+  `c100451a`), not released; open: S3 TLS heap floor and BLE pause after a DK5EN-1 measurement
+  ([campaign-au21-tft-heap-20261024.md](campaign-au21-tft-heap-20261024.md)).
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
 - GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
@@ -146,11 +149,11 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-10-24 (evening):** AU-21 field log DJ8MEH-81 analysed; tracker TFT sprite on demand and released for AU
+  TLS jobs, `lowheap_tls`, heap logging (`(tft)` mark, `--info` HEAP); two waves, gate green, DK5EN-1 benched.
 - **2026-10-24:** campaign BL-01 + GWRX-01 nRF52 closed: `--mesh off` meaning decided and pinned by tests,
   GWRX-01 benched on the RAK gateway (5 of 7 server slots released), bench driver `gwrx_bench.py`; GWACK-01
   found; RESUME and BACKLOG cleaned up (48 closed rows archived).
 - **2026-10-23:** bench session: AU-17 closed, AU-18/19/20, UDP-04, RX-DEAF-01/02, WEB-RX-01 fixed (not released);
   upstream PR #1235 cut, opened and merged (synced 4898cada); upstream sync (#1233 merged, #1234 SP server taken);
   net console clients on `mc_console.py` with `.env` passwords; mock keep-reply timer race fixed.
-- **2026-10-22:** UDP-03 fixed and benched (upstream issue #1231), PR #1233 opened and merged; upstream sync
-  (#1224 merged, #1225 taken); release `v4.40a.10.22`.

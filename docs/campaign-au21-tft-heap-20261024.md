@@ -31,8 +31,8 @@ bounce buffer failed and mbedTLS reported -9984, which the GUI showed as "No con
 | W1b  | implementer  | `src/tft_display_functions.cpp`, `src/tft_display_functions.h`                                                             | sprite acquire/release/active/bytes, `[TFT];sprite` lines, no alloc when off, `tftShowUpdating`        | done (W1 commit), host tests in test_tft_backlight                                             |
 | W2a  | implementer  | `src/esp32/fw_update_net.cpp`                                                                                              | `httpFail()` lowheap on alloc fails, `FW_SHED_TFT` before CHECK/DOWNLOAD, `[AU];shed;tft`              | done (W2 commit)                                                                               |
 | W2b  | implementer  | `src/esp32/esp32_main.cpp`, `src/esp32/loop_actions_esp32.cpp`, `src/loop_functions_extern.h`, `src/command_functions.cpp` | loop sprite reconcile, shed avail/settled, `(tft)` heap mark, `--info` TFT + HEAP lines                | done (W2 commit)                                                                               |
-| W3   | orchestrator | bench DK5EN-1                                                                                                              | AU check still works, no `[TFT]` lines, `--info` HEAP line                                             | open                                                                                           |
-| W4   | orchestrator | `docs/BACKLOG.md`, `docs/architecture/08-defect-catalogue.md`, `docs/RESUME.md`                                            | AU-21 state                                                                                            | open                                                                                           |
+| W3   | orchestrator | bench DK5EN-1                                                                                                              | AU check still works, no `[TFT]` lines, `--info` HEAP line                                             | done: pass                                                                                     |
+| W4   | orchestrator | `docs/BACKLOG.md`, `docs/architecture/08-defect-catalogue.md`, `docs/RESUME.md`                                            | AU-21 state                                                                                            | done                                                                                           |
 
 Gate per wave: diff read, `tools/regression.sh --stage 1,2`, board builds (W2: tracker, Heltec V3,
 T-Beam, T-Deck Plus, RAK) one at a time, Opus advisor, commit on `fork-dev`. Every pio call goes
@@ -65,6 +65,13 @@ through the scratchpad `piolock.sh`.
   head page after an update; INSTRUMENT `[AU];shed;fail` also fires when only the TFT was shed.
 - Gate: regression stage 1,2 PASS (2872/2872); builds tracker, Heltec V3, T-Beam, T-Deck Plus, RAK4631 OK; tracker elf
   carries `[TFT];sprite` alloc/free, `shed;tft`, `(tft)`, `TFT sprite`.
+
+## W3 result (DK5EN-1, Heltec V3, 2026-10-24)
+
+Flashed `c100451a`, booted over USB: boot marks init 227.5 / ble 179.4 / wifi 124.4 / mdns 114.7 KB, no `(tft)` mark
+and no `[TFT]` lines (no `HAS_TFT`), `--info` shows `...HEAP : free 115504 min 111516 blk 106484`, `--update check`
+found v4.40a.10.23 with `[AU];alloc;end;fails;0`. The defect catalogue carries no AU rows; AU-21 lives in BACKLOG and
+this doc.
 
 ## Known gap
 
