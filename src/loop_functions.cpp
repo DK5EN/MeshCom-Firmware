@@ -49,6 +49,8 @@
 #include "pos_tag_nan.h"
 #include "prod_lock.h"   // production lock: {SET} hop range
 #include "instrument.h"   // INSTRUMENT_ENABLED
+#include "rm_client_cmd.h"   // client RM1 commands: reply stops their repeats
+#include "lora_functions.h"   // rm1StoppedForget()
 #include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
 #include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
 #include "own_msg_status.h"   // durable delivery state of own text messages (web GUI ticks)
@@ -4773,6 +4775,22 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // wenn text via Console kommt auch an BLE bzw. WEBService senden
     if(bConsoleText)
         addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
+
+    // Client RM1 command (McApp, phone, serial, web): the node holds no key, so the target's reply
+    // cannot be verified here; remember dst + ctr + msg_id so that reply stops the repeats
+    // (rm_client_cmd.h, rm_runtime.cpp handleReply()). Only after the ring accepted the frame. A command of
+    // the node's own sender (--rm) is forgotten again by bookAndSend(). Not for a KISS client's frame
+    // (src_override): its source is not ours, the ladder never repeats it and the reply is not for us.
+    if(bDM && !(src_override && src_override[0]) && dmTextIsRm1Command(strMsg.c_str()))
+    {
+        uint32_t rmCtr = 0;
+        if(rmClientParseCtr(strMsg.c_str(), rmCtr))
+        {
+            // as bookAndSend(): a stale "RM1 stopped" entry with this id core must not cut the new repeats
+            rm1StoppedForget((uint32_t)aprsmsg.msg_id);
+            rmClientCmdArm(strDestinationCall.c_str(), rmCtr, (uint32_t)aprsmsg.msg_id, millis());
+        }
+    }
 
     // KISS interface needs the assigned id for the TX-result frame / ack map.
     if(out_msg_id)

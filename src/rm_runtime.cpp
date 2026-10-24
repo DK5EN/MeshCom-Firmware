@@ -15,6 +15,7 @@
 #include "remote_cmd.h"
 #include "rm_commands.h"
 #include "rm_queue.h"
+#include "rm_client_cmd.h"
 #include "rm_exec_ext.h"
 #include "rm_runtime.h"
 #include "rm_sender_policy.h"
@@ -543,6 +544,16 @@ void handleReply(const char *src, const char *text)
         refreshReplyWanted();
         return;
     }
+
+    // Not a command of our own sender: a command a client handed to sendMessage() (client RM1, no key here).
+    // The first reply from that call with that ctr stops its repeats, unverified: a forged reply can only
+    // cut the repeats, which is the old send-once behaviour.
+    const uint32_t cid = rmClientCmdTake(src, (uint32_t)ctr, millis());
+    if (cid != 0)
+    {
+        int slot = findAndStopRingSlot(cid); // -1: copy READY / on air, the ladder releases it
+        Serial.printf("[RM];stop;client;%s;ctr;%lu;slot;%d\n", src, (unsigned long)ctr, slot);
+    }
 }
 
 void countReject(RmVerdict v)
@@ -589,11 +600,12 @@ void rmDrain(void)
     static char text[RM_QUEUE_TEXT_LEN];
 
     // RM-09: replies to commands we sent (one per pass), then key expiry
-    if (s_nsent > 0)
+    if (s_nsent > 0 || rmClientReplyWanted(millis()))
     {
         if (rmReplyPop(src, sizeof(src), text, sizeof(text)))
             handleReply(src, text);
-        expireKeys(millis());
+        if (s_nsent > 0)
+            expireKeys(millis());
     }
     else
     {
@@ -916,6 +928,7 @@ bool bookAndSend(const char *to, const uint8_t key[32], uint32_t ctr, const char
     const int rc = sendMessage(out, (int)strlen(out), nullptr, &origMsgId);
     memset(wire, 0, sizeof(wire)); // the tag is not needed any more
     memset(out, 0, sizeof(out));
+    rmClientCmdForget((uint32_t)origMsgId); // sendMessage() armed it as a client command: ours stops on a VERIFIED reply only
     if (rc != BP_SEND_OK)
     {
         Serial.printf("[RM];send_failed;%d\n", rc);

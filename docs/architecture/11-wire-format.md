@@ -500,7 +500,14 @@ see 1.9.3.)
   byte-identical payload (same `ctr`, same tag). The own or relayed echo restarts the 42 s wait; a
   gateway binary ACK, a server ACK or a DM `:ack` never ends the repeats. Only the sender's RM layer
   stops them (`findAndStopRingSlot(original msg_id)`, marker `[RM];stop;ctr;<n>`): when a reply for
-  that `ctr` verifies, and on forget, key expiry or eviction of the sent entry. After the last
+  that `ctr` verifies, and on forget, key expiry or eviction of the sent entry. A command a client
+  composed and handed to the node (McApp over Extern-UDP or BLE, serial, web, KISS; 2026-10-24) is not in
+  the sent book and the node has no key for it: `sendMessage()` remembers `(dst, ctr, msg_id)` for
+  `RM_NOANSWER_MS` (`rm_client_cmd.h`, 4 entries), and the first reply from that call with that `ctr`
+  stops its repeats UNVERIFIED (marker `[RM];stop;client;<dst>;ctr;<n>;slot;<s>`). A forged reply can
+  only cut the repeats, which is the old send-once behaviour; the client still verifies the reply
+  itself. A command of the node's own sender is dropped from that table at once, so its stop stays
+  verified-only. After the last
   repeat the slot is dropped silently: no DM statistics, no failure notice. All copies are one send
   in the sender's budget and sent book. If the stop finds no waiting copy (it is READY, in CSMA or on air:
   `[RM];stop;ctr;<n>;slot;-1`), the original id goes into a small RAM "RM1 stopped" set (8 entries)

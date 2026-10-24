@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "remote_cmd.h"
+#include "rm_client_cmd.h"
 #include "rm_queue.h"
 
 // RM switch on and a node password set (an empty or blank password switches RM off, concept 6.2)
@@ -32,7 +33,9 @@ inline bool rmRxEnabled(int nodeRm, const char *passwd)
 // counts as consumed (command dropped, the sender repeats it with a fresh counter); verify, rate limit
 // and lockout are rmDrain()'s, in the loop task.
 //  - a REPLY ("RM1 <ctr> ok ..." / "RM1 <ctr> err ...") is for the operator to read: never consumed, and
-//    queued for verification only while a command this node sent still waits for its reply
+//    queued only while a command still waits for its reply: one this node sent with its own key
+//    (rmqReplyWanted()) or one a client handed to sendMessage() (rm_client_cmd.h). The latter has no key:
+//    the loop task only uses the reply to stop that command's repeats.
 //  - a COMMAND with RM off or no password is ordinary text
 //  - msgId/nowMs: message id of the frame (0 = unknown) and millis(), for the duplicate ring (rm_queue.h)
 inline bool rmRxTryQueue(const char *src, const char *text, bool enabled, uint32_t msgId, uint32_t nowMs)
@@ -42,7 +45,7 @@ inline bool rmRxTryQueue(const char *src, const char *text, bool enabled, uint32
 
     if (rmIsReply(text))
     {
-        if (rmqReplyWanted())
+        if (rmqReplyWanted() || rmClientReplyWanted(nowMs))
             rmReplyPush(src, text);
         return false;
     }

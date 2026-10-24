@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeshCom Wire Format</title>
-<meta name="source-sha256" content="363bd3274f7f966982d22892a33a7b14bd97766ae791a8fd1fcaf2d52d1e9d7b">
+<meta name="source-sha256" content="a9a54c4a80d915e43ddbdf4de84f649a295fba73aa4029a2fd46ed67f10b9485">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -773,7 +773,14 @@ carries <code>msg_id = pnRetryId(orig, gw, k)</code> (bits 10-11 XOR-rotated, <c
 byte-identical payload (same <code>ctr</code>, same tag). The own or relayed echo restarts the 42 s wait; a
 gateway binary ACK, a server ACK or a DM <code>:ack</code> never ends the repeats. Only the sender's RM layer
 stops them (<code>findAndStopRingSlot(original msg_id)</code>, marker <code>[RM];stop;ctr;&lt;n&gt;</code>): when a reply for
-that <code>ctr</code> verifies, and on forget, key expiry or eviction of the sent entry. After the last
+that <code>ctr</code> verifies, and on forget, key expiry or eviction of the sent entry. A command a client
+composed and handed to the node (McApp over Extern-UDP or BLE, serial, web, KISS; 2026-10-24) is not in
+the sent book and the node has no key for it: <code>sendMessage()</code> remembers <code>(dst, ctr, msg_id)</code> for
+<code>RM_NOANSWER_MS</code> (<code>rm_client_cmd.h</code>, 4 entries), and the first reply from that call with that <code>ctr</code>
+stops its repeats UNVERIFIED (marker <code>[RM];stop;client;&lt;dst&gt;;ctr;&lt;n&gt;;slot;&lt;s&gt;</code>). A forged reply can
+only cut the repeats, which is the old send-once behaviour; the client still verifies the reply
+itself. A command of the node's own sender is dropped from that table at once, so its stop stays
+verified-only. After the last
 repeat the slot is dropped silently: no DM statistics, no failure notice. All copies are one send
 in the sender's budget and sent book. If the stop finds no waiting copy (it is READY, in CSMA or on air:
 <code>[RM];stop;ctr;&lt;n&gt;;slot;-1</code>), the original id goes into a small RAM &quot;RM1 stopped&quot; set (8 entries)

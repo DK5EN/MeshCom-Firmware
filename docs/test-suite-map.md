@@ -261,6 +261,7 @@ flashes whatever is attached.
 | test_web_txbuf               | Unit          |    20 | native_web_txbuf                                             |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
+| test_rm_client_cmd           | Regression    |    15 | native_rm_client_cmd                                         |
 | test_web_guard               | Unit          |    28 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
