@@ -54,7 +54,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
   <p class="lead">Wie die MeshCom-Firmware funktioniert, was der Fork verbessert hat und wie man das aktuelle
-  Release v4.40a.10.22 flasht. Jede Aussage ist aus dem Quellcode oder aus GitHub belegt.</p>
+  Release v4.40a.10.23 flasht. Jede Aussage ist aus dem Quellcode oder aus GitHub belegt.</p>
   <ul class="toc">
     <li><strong>Firmware flashen:</strong> <a href="flash/">Web-Flasher</a> für 30 Boards, direkt aus dem Browser.</li>
     <li><strong>Verstehen:</strong> <a href="meshcom-protocol.html">Vortrag zum Protokoll</a>, <a href="Nachbarschaftsmatrix.html">Nachbarschaftsmatrix</a>, <a href="rm1-protokoll.html">Fernsteuerung RM1</a>.</li>
@@ -64,24 +64,17 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.40a.10.22</div>
-      <h2>Gateway-Warnung zuverlässig, polnischer Server in der Tabelle</h2>
-      <p class="bluf">v4.40a.10.22 ist v4.40a.10.21 plus eine Diagnose-Korrektur für Gateways und den Abgleich mit upstream.
-      Wer ein T-Deck Pro oder einen T-Beam 1W hat und 10.21 nicht per Web-Flasher geflasht hat, holt das nach.</p>
+      <div class="eyebrow">Neu · Release v4.40a.10.23</div>
+      <h2>Neue Sendewarteschlange, Sperrliste, kein Absturz im Update-Check</h2>
+      <p class="bluf">v4.40a.10.23 ist v4.40a.10.22 plus eine neu gebaute LoRa-Sendewarteschlange, eine Rufzeichen-Sperrliste und neun Stabilitätsfixes.
+      Die Einstellungen bleiben erhalten. Wer ein T-Deck Pro oder einen T-Beam 1W hat und noch nie per Web-Flasher geflasht hat, holt das nach.</p>
       <ul>
-        <li><strong>Gateway:</strong> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, upstream #1233).</li>
-        <li><strong>Server-Tabelle:</strong> neue Zeile SP (Polen) aus upstream #1234; OE heißt jetzt „MeshCom OE (Austria/WW)“.</li>
+        <li><strong>Sendewarteschlange:</strong> Slot-Pool statt Ring; alte Frames verfallen je Priorität (Relays 300 s, Positionen 120 s, ACKs 90 s); Zeitbaken älter als 150 s gehen nicht mehr auf die Luft; ein neueres HEY oder eine neuere Position ersetzt die wartende Kopie.</li>
+        <li><strong>Sperrliste:</strong> <code>--blockcall</code> verwirft Frames gesperrter Rufzeichen und leitet sie nicht weiter.</li>
+        <li><strong>Stabilität:</strong> kein Absturz mehr in der BLE-Pause des täglichen Update-Checks auf klassischen ESP32 (AU-19), kein LoRa-Paketverlust bei langsamem Browser (#1229), kein „tauber“ Empfänger bis zum Neustart, Gateways senden schon gehörte Server-Frames nicht erneut.</li>
+        <li><strong>Upstream:</strong> #1235 (Konsole, GPS-Filter, Board-LED, Via-Prüfung) ist seit 23.10. gemerged; kein PR mehr offen.</li>
       </ul>
       <div class="cols">
-        <div>
-          <h3>Aus v4.40a.10.21</h3>
-          <ul>
-            <li><strong>Board-Kennung</strong> in jedem Image: Hardware-ID, Build-Umgebung, Release. Ausgabe mit <code>--id</code>.</li>
-            <li><strong>Eindeutige Auswahl:</strong> der Web-Flasher findet genau ein Board, auch bei geteilter Hardware-ID.</li>
-            <li><strong>Stummes Board:</strong> „Aus dem Flash lesen“ holt die Kennung über das ESP32-ROM; ein Knopf startet das Board zurück in die App.</li>
-            <li><strong>Safeboot v3</strong> nennt das Board ebenfalls.</li>
-          </ul>
-        </div>
         <div class="todo">
           <h3>Einmal per Web-Flasher flashen</h3>
           <ul>
@@ -92,6 +85,14 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
       </div>
       <details>
         <summary>Was seit v4.40a.10.16 dazukam</summary>
+        <h3>v4.40a.10.22</h3>
+        <ul>
+          <li>Ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, upstream #1233); Server-Zeile SP (Polen) aus #1234.</li>
+        </ul>
+        <h3>v4.40a.10.21</h3>
+        <ul>
+          <li>Board-Kennung in jedem Image (<code>--id</code>), eindeutige Auswahl im Web-Flasher, „Aus dem Flash lesen“, Safeboot v3; Partitionstabelle für die T-Deck Pro.</li>
+        </ul>
         <h3>v4.40a.10.20</h3>
         <ul>
           <li><strong>Kein Watchdog-Neustart durch langsame Browser:</strong> Web-Seiten laufen über einen begrenzten Sendepuffer; ein hängender Browser bekommt eine abgebrochene Seite.</li>
@@ -127,7 +128,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
           <li>Offizielles v4.40a.hbserver plus die Fork-Funktionen aus #1187–#1189: Auto Update über GitHub, Speichern-und-Weiterleiten, HMAC-gesicherte Fernsteuerung per LoRa.</li>
         </ul>
       </details>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">Release v4.40a.10.22</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
+      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.23">Release v4.40a.10.23</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
     </div>
     <a class="card" href="meshcom-protocol.html">
       <div class="eyebrow">Vortrag · 27 Folien</div>
@@ -183,18 +184,18 @@ a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
       <h2>Web-Flasher: 4.40a direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.22 mit Server-Tabelle, Auto Update,
+      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.23 mit neuer Sendewarteschlange, Server-Tabelle, Auto Update,
       Fernsteuerung per LoRa und dem Safeboot – ohne Installation und ohne esptool:
       Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
       am Knoten erkannt oder aus dem Flash gelesen. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
       und Opera auf dem Desktop.</p>
-      <div class="meta">v4.40a.10.22 · Web Serial</div>
+      <div class="meta">v4.40a.10.23 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a> (22.10.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.23">v4.40a.10.23</a> (23.10.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>

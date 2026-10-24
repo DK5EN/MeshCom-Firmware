@@ -1,18 +1,19 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
-`v4.40a.10.22` (CI, Latest, 2026-10-23). No upstream PR of ours is open. Next step: release `v4.40a.10.24`.
+`v4.40a.10.23` (CI, Latest, tagged 2026-10-24, 66 assets; web flasher on 10.23). No upstream PR of ours is open.
+Next step: evaluate the TXP logger night (until 2026-10-25 16:21), then TTL decision.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **Next release (`v4.40a.10.24`, the 10-23 date is past):** W5 of [campaign-bench-20261023.md](campaign-bench-20261023.md)
-  via `/release-firmware`, then nodes back on the release. Unreleased on `fork-dev`: AU-19 (NimBLE panic in the
-  update-check BLE pause), AU-20 (flow-timer leak), AU-18 (TLS heap gate), UDP-04, RX-DEAF-01/02, WEB-RX-01
-  (#1229), GWRX-01 (benched ESP32 + nRF52), BL-01 tests, upstream #1235, GWACK-01, TX pool W0-W1c, BLK-01
-  call blocklist `--blockcall` (fork only; retires the DM3KS build, see below).
+- **`v4.40a.10.23` released 2026-10-24** (operator chose the 10.23 date): TX pool W0-W1c, BLK-01 `--blockcall`,
+  AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
+  Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
+  `check`: 30 boards, 0 mismatches. Unreleased on `fork-dev`: nothing. The five nodes run the gate build of
+  `3e07f894` (functionally identical; `FLASH_VERSION` 20261022, no tag string), left in place for the logger night.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
@@ -32,7 +33,6 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Hottest first (details in BACKLOG)
 
-- Release the fixes above: AU-19 hits every classic ESP32 on its daily update check (2 panics in ~35 pauses).
 - AU-14: single TASK_WDT during an AU download, cause unknown.
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.

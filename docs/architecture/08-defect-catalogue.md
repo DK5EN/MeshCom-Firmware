@@ -1664,7 +1664,7 @@ diagnostics only.
 
 ## 2h. WEB-RX-01 — LoRa RX during web stalls (upstream #1229, 2026-10-23)
 
-**FIXED** on fork-dev 2026-10-23 (`5fdd4b8d`, not released yet), W3 bench 0 frames lost (was 16 of 44 in arm C). ESP32 only (nRF52 runs `OnRxDone()` in its own LORA task). Side finding RX-DEAF-01 stays open (BACKLOG).
+**FIXED** on fork-dev 2026-10-23 (`5fdd4b8d`, released in v4.40a.10.23), W3 bench 0 frames lost (was 16 of 44 in arm C). ESP32 only (nRF52 runs `OnRxDone()` in its own LORA task). Side finding RX-DEAF-01 stays open (BACKLOG).
 
 - **Mechanism (code, not measured):** the web server runs in `esp32loop()`; the DIO1 ISR `setFlagReceive()` only
   sets `receiveFlag`, and `checkRX()` reads the packet in the loop. The send buffer of #1224 bounds a stalled
@@ -1677,7 +1677,7 @@ diagnostics only.
 
 ## 2i. GWRX-01 — gateway transmits a server frame it already heard on LoRa (2026-10-23)
 
-**FIXED** on fork-dev 2026-10-23/24 (`257e5e2b`, `0281dce4`, not released yet), benched on ESP32 and nRF52.
+**FIXED** on fork-dev 2026-10-23/24 (`257e5e2b`, `0281dce4`, released in v4.40a.10.23), benched on ESP32 and nRF52.
 RCA: `docs/rca-gwrx01-20261023.md`; campaign: `docs/campaign-bl01-gwrx01-nrf52-20261024.md`.
 
 - **Mechanism:** a server-injected text frame (`udp_rx`, `src=g`) was queued `RING_STATUS_DONE`, and none of the
