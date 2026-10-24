@@ -1,0 +1,189 @@
+{
+ "tag": "p2miss",
+ "stamp": "20261024-101545",
+ "per_gw": {
+  "DK5EN-1": {
+   "summary": {
+    "same": 8
+   },
+   "rows": [
+    {
+     "ids": [
+      "0017003B",
+      "0017003B"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6801
+    },
+    {
+     "ids": [
+      "0017F5A3",
+      "0017F5A3"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3374
+    },
+    {
+     "ids": [
+      "0018C7CE",
+      "0018C7CE"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6853
+    },
+    {
+     "ids": [
+      "0019A10F",
+      "0019A10F"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6433
+    },
+    {
+     "ids": [
+      "001A725F",
+      "001A725F"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 10332
+    },
+    {
+     "ids": [
+      "001B48A1",
+      "001B48A1"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6510
+    },
+    {
+     "ids": [
+      "001C22BB",
+      "001C22BB"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3410
+    },
+    {
+     "ids": [
+      "001CF9A6",
+      "001CF9A6"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 10089
+    }
+   ]
+  },
+  "DK5EN-90": {
+   "summary": {
+    "same": 8
+   },
+   "rows": [
+    {
+     "ids": [
+      "0015B1C2",
+      "0015B1C2"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6664
+    },
+    {
+     "ids": [
+      "0016A72B",
+      "0016A72B"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3837
+    },
+    {
+     "ids": [
+      "00177959",
+      "00177959"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6666
+    },
+    {
+     "ids": [
+      "00185297",
+      "00185297"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6574
+    },
+    {
+     "ids": [
+      "001923E5",
+      "001923E5"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3834
+    },
+    {
+     "ids": [
+      "0019FA27",
+      "0019FA27"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6666
+    },
+    {
+     "ids": [
+      "001AD445",
+      "001AD445"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6464
+    },
+    {
+     "ids": [
+      "001BAB32",
+      "001BAB32"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3541
+    }
+   ]
+  },
+  "DK5EN-92": {
+   "summary": {},
+   "rows": []
+  }
+ },
+ "listeners": {
+  "DK5EN-1": {
+   "same:direct2:nd": 6,
+   "same:direct1:n": 2
+  },
+  "DK5EN-90": {
+   "same:direct1:n": 3,
+   "same:direct0:": 5
+  },
+  "DK5EN-92": {
+   "same:direct1:n": 11,
+   "same:direct2:nd": 5
+  },
+  "DK5EN-14": {
+   "same:direct2:nd": 14,
+   "same:direct1:n": 2
+  }
+ },
+ "relay_per_pair": {
+  "same:1": 16
+ }
+}

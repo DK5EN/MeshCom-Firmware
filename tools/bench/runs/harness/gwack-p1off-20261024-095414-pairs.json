@@ -1,0 +1,263 @@
+{
+ "tag": "p1off",
+ "stamp": "20261024-095414",
+ "per_gw": {
+  "DK5EN-1": {
+   "summary": {
+    "same": 8
+   },
+   "rows": [
+    {
+     "ids": [
+      "00037A24",
+      "00037A24"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6810
+    },
+    {
+     "ids": [
+      "0003EDC5",
+      "0003EDC5"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 12571
+    },
+    {
+     "ids": [
+      "00049E1E",
+      "00049E1E"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6494
+    },
+    {
+     "ids": [
+      "0005452A",
+      "0005452A"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 9634
+    },
+    {
+     "ids": [
+      "00065C77",
+      "00065C77"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 11071
+    },
+    {
+     "ids": [
+      "00069BA2",
+      "00069BA2"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 5441
+    },
+    {
+     "ids": [
+      "00070DAA",
+      "00070DAA"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 10014
+    },
+    {
+     "ids": [
+      "0007A2FB",
+      "0007A2FB"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3374
+    }
+   ]
+  },
+  "DK5EN-92": {
+   "summary": {
+    "same": 6,
+    "distinct": 1
+   },
+   "rows": [
+    {
+     "ids": [
+      "0002E5CC",
+      "0002E5CC"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 9896
+    },
+    {
+     "ids": [
+      "000409C4",
+      "000409C5"
+     ],
+     "kind": "distinct",
+     "id_delta": 1,
+     "gap_ms": 5721
+    },
+    {
+     "ids": [
+      "0004B0D7",
+      "0004B0D7"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 9361
+    },
+    {
+     "ids": [
+      "0005C824",
+      "0005C824"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6853
+    },
+    {
+     "ids": [
+      "00060748",
+      "00060748"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3521
+    },
+    {
+     "ids": [
+      "00067952",
+      "00067952"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6104
+    },
+    {
+     "ids": [
+      "00070EA5",
+      "00070EA5"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 12089
+    }
+   ]
+  },
+  "DK5EN-90": {
+   "summary": {
+    "same": 8
+   },
+   "rows": [
+    {
+     "ids": [
+      "00022BA7",
+      "00022BA7"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3837
+    },
+    {
+     "ids": [
+      "00029F46",
+      "00029F46"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6364
+    },
+    {
+     "ids": [
+      "00034FA0",
+      "00034FA0"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6463
+    },
+    {
+     "ids": [
+      "0003F6AF",
+      "0003F6AF"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6763
+    },
+    {
+     "ids": [
+      "00050DFD",
+      "00050DFD"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 3431
+    },
+    {
+     "ids": [
+      "00054D23",
+      "00054D23"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 21362
+    },
+    {
+     "ids": [
+      "0005BF2B",
+      "0005BF2B"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 6764
+    },
+    {
+     "ids": [
+      "00065480",
+      "00065480"
+     ],
+     "kind": "same",
+     "id_delta": 0,
+     "gap_ms": 11922
+    }
+   ]
+  }
+ },
+ "listeners": {
+  "DK5EN-1": {
+   "same:direct2:nd": 7,
+   "distinct:direct2:nn": 1,
+   "same:direct1:n": 7
+  },
+  "DK5EN-92": {
+   "same:direct1:n": 5,
+   "same:direct2:nd": 10,
+   "same:direct0:": 1
+  },
+  "DK5EN-90": {
+   "same:direct1:n": 8,
+   "same:direct2:nd": 3,
+   "same:direct0:": 3,
+   "distinct:direct1:n": 1
+  },
+  "DK5EN-14": {
+   "same:direct2:nd": 17,
+   "distinct:direct2:nn": 1,
+   "same:direct1:n": 5
+  }
+ },
+ "relay_per_pair": {
+  "same:1": 21,
+  "distinct:2": 1,
+  "same:0": 1
+ }
+}
