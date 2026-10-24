@@ -538,7 +538,8 @@ const char *httpFail(int code, WiFiClientSecure &c)
         // heap low-water mark can (fails > 0 and min near 0 = heap, else the chain)
         allocFailMark("tls");
         heapMark("tlsfail");
-        snprintf(s_err, sizeof(s_err), "tls %d", le);
+        // AU-21: first word "lowheap_tls" when the alloc-fail callback fired (read after allocFailMark, same value)
+        snprintf(s_err, sizeof(s_err), "%s %d", fwTlsFailToken(s_afN), le);
     }
     else
         snprintf(s_err, sizeof(s_err), "conn %d", code);
@@ -674,7 +675,8 @@ bool shedHold(uint8_t add)
     s_shedMask |= add;
     s_shedDone = true;
     auShedHold(s_shedMask);
-    auLog("[AU];shed;services;console;%u;kiss;%u\n", (unsigned)(add & FW_SHED_CONSOLE), (unsigned)((add & FW_SHED_KISS) >> 1));
+    auLog("[AU];shed;services;console;%u;kiss;%u;tft;%u\n", (unsigned)(add & FW_SHED_CONSOLE),
+          (unsigned)((add & FW_SHED_KISS) >> 1), (unsigned)((add & FW_SHED_TFT) >> 2));
     uint32_t waited = 0;
     while (waited < FW_SHED_MAX_MS && (waited < FW_SHED_MIN_MS || !auShedSettled(s_shedMask)))
     {
@@ -1321,6 +1323,12 @@ void fwNetTask(void *)
             auLog("[AU];shed;ble\n");
     }
 #endif
+    // AU-21: the TFT sprite is released before every CHECK/DOWNLOAD (unconditional); the loop frees it, shedRestore() returns it
+    if (tlsJob && (auShedAvail() & FW_SHED_TFT))
+    {
+        shedHold(FW_SHED_TFT);
+        auLog("[AU];shed;tft\n");
+    }
     s_shedAllowed = fwShedAllowed(blePaused, guarded, phoneHeld);
     const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
 #if INSTRUMENT_ENABLED

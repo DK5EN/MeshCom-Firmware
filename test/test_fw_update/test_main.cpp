@@ -1701,10 +1701,13 @@ static void test_shed_settled_waits_for_the_tft_sprite(void)
 
 static void test_tft_sprite_wanted_needs_display_on_and_no_shed(void)
 {
-    TEST_ASSERT_TRUE(fwTftSpriteWanted(false, false));
-    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, false)); // --display off
-    TEST_ASSERT_FALSE(fwTftSpriteWanted(false, true)); // shed by the update
-    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, true));
+    TEST_ASSERT_TRUE(fwTftSpriteWanted(false, false, false));
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, false, false)); // --display off
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(false, true, false)); // shed by the update
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, true, false));
+    // a job is running without the hold (an earlier acquire failed, or between CHECK and a chained DOWNLOAD):
+    // no 25.6 KB allocation in the middle of the TLS handshake
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(false, false, true));
 }
 
 static void test_notify_due_for_a_finished_newer_check_once(void)

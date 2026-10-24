@@ -1031,10 +1031,11 @@ inline const char *fwTlsFailToken(uint32_t allocFails)
 }
 
 // The stored `--display off` setting (bDisplayOff), not the screensaver, decides whether the TFT sprite is
-// wanted (operator decision 2026-10-24); shedHeld = the update has released it.
-inline bool fwTftSpriteWanted(bool displayOffSetting, bool shedHeld)
+// wanted (operator decision 2026-10-24); shedHeld = the update has released it; jobBusy = an AU job runs (no
+// 25.6 KB allocation in the middle of a TLS handshake, also when the job started without the hold).
+inline bool fwTftSpriteWanted(bool displayOffSetting, bool shedHeld, bool jobBusy)
 {
-    return !displayOffSetting && !shedHeld;
+    return !displayOffSetting && !shedHeld && !jobBusy;
 }
 
 // "[AU];notify;<tag>" for a finished CHECK: notify mode (effective 1), a newer release, not announced before.

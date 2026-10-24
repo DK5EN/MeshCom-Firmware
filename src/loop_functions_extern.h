@@ -362,6 +362,7 @@ void phoneRingsDetach(void);   // drop queued frames, free both rings; producers
 
 // ESP32 [HEAP] boot marks (loop_actions_esp32.cpp)
 void heapMarkBle(void);
+void heapMarkTft(void);
 void heapMarksPoll(void);
 
 extern bool hasMsgFromPhone;

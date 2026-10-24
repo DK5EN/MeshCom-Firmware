@@ -7383,6 +7383,13 @@ void commandAction(char *umsg_text, bool ble)
                 printfdeb("...BLOCKED: %s (dropped %lu)\n", blk[0] ? blk : "none", (unsigned long)blockListDrops());
             }
             #ifdef ESP32
+            printfdeb("...HEAP         : free %lu min %lu blk %lu\n", (unsigned long)ESP.getFreeHeap(),
+                      (unsigned long)ESP.getMinFreeHeap(), (unsigned long)ESP.getMaxAllocHeap());
+            #if defined(HAS_TFT)
+            printfdeb("...TFT sprite   : %lu B%s\n", (unsigned long)tftSpriteBytes(), bDisplayOff ? " (display off)" : "");
+            #endif
+            #endif
+            #ifdef ESP32
             { // RM-NVS-01: NVS fill level (RM "remember password" fails when the 20 KB partition is full)
                 NvsDiagStats nst;
                 if(nvsDiagRead(nst))

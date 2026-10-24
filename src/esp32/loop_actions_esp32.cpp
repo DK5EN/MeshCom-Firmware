@@ -115,6 +115,7 @@ bool loopEnabled_heapMon(void)
 //   kiss  bKISS and the link is up (kissLoop() has opened the listener in this pass)
 //   netconsole  bNETCONSOLE and iWlanWait==0 (startNetConsole()/loopNetConsole() ran this pass)
 //   ble   heapMarkBle(), called right after the boot bleStackStart()
+//   tft   heapMarkTft() (HAS_TFT), called right after the boot initTFT()
 extern bool bweb_server_running;   // web_functions.cpp
 extern bool bMDNSOK;               // web_functions.cpp
 extern bool hasIPaddress;          // udp_functions.cpp
@@ -127,6 +128,7 @@ static uint8_t s_heapMarksDone = 0;
 #define HM_KISS 0x10
 #define HM_NETCON 0x20
 #define HM_BLE 0x40
+#define HM_TFT 0x80
 
 #define HEAP_MARK(bit, label)                                                              \
     do                                                                                     \
@@ -141,6 +143,12 @@ void heapMarkBle(void)
 {
     if (!(s_heapMarksDone & HM_BLE))
         HEAP_MARK(HM_BLE, "ble");
+}
+
+void heapMarkTft(void)
+{
+    if (!(s_heapMarksDone & HM_TFT))
+        HEAP_MARK(HM_TFT, "tft");
 }
 
 void heapMarksPoll(void)

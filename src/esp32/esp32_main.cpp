@@ -1816,6 +1816,7 @@ void esp32setup()
     //
     #elif defined(HAS_TFT)
         initTFT();
+        heapMarkTft();
     #else
         initDisplay();
     #endif
@@ -2576,6 +2577,10 @@ uint8_t auShedAvail(void)
     if(bKISS)
         mask |= FW_SHED_KISS;
     #endif
+    #if defined(HAS_TFT)
+    if(tftSpriteActive())
+        mask |= FW_SHED_TFT;   // AU-21: the loop can release the 25.6 KB sprite
+    #endif
     return mask;
 }
 
@@ -2597,7 +2602,11 @@ bool auShedSettled(uint8_t mask)
     #ifndef DISABLE_KISS_TCP
     kissUp = isKissClientConnected();
     #endif
-    return fwShedSettled(mask, consoleUp, kissUp);
+    bool tftUp = false;
+    #if defined(HAS_TFT)
+    tftUp = tftSpriteActive();
+    #endif
+    return fwShedSettled(mask, consoleUp, kissUp, tftUp);
 }
 
 #if INSTRUMENT_ENABLED
@@ -3129,6 +3138,50 @@ static void auTick(void)
         }
     }
 }
+
+#if defined(HAS_TFT)
+// AU-21: the loop owns the TFT sprite. Released while the update job holds FW_SHED_TFT or the stored display
+// setting is off (bDisplayOff, not the screensaver); never re-acquired while an AU job runs. A failed acquire retries
+// at most every 30 s, a transition (hold ends, display on again) retries at once. Nothing else creates the
+// sprite: displayTFT is a no-op without it and initTFT runs once at boot.
+static void tftSpriteReconcile(void)
+{
+    static bool lastHeld = false;
+    static bool lastOff = false;
+    static unsigned long lastTry = 0;
+    static bool tried = false;
+
+    const bool held = (s_auShedMask & FW_SHED_TFT) != 0;
+    bool busy = false;
+    if(!bDisplayOff && !held)   // only then can a running job change the verdict
+    {
+        FwNetStatus st;
+        fwNetGetStatus(st);
+        busy = (st.state == FWS_BUSY);
+    }
+    const bool wanted = fwTftSpriteWanted(bDisplayOff, held, busy);
+    const bool transition = (lastHeld && !held) || (lastOff && !bDisplayOff);
+    lastHeld = held;
+    lastOff = bDisplayOff;
+
+    if(!wanted && tftSpriteActive())
+    {
+        tftSpriteRelease();
+        if(held && !bDisplayOff)
+            tftShowUpdating();
+    }
+    else if(wanted && !tftSpriteActive())
+    {
+        if(transition || !tried || (millis() - lastTry) >= 30000UL)
+        {
+            tried = true;
+            lastTry = millis();
+            if(tftSpriteAcquire() && !bDisplayIsOff)
+                sendDisplayHead(true);   // full redraw of the current page
+        }
+    }
+}
+#endif
 
 void esp32loop()
 {
@@ -5198,6 +5251,9 @@ void esp32loop()
     }
 
     heapMarksPoll();   // [HEAP] boot marks, each once per boot
+    #if defined(HAS_TFT)
+    tftSpriteReconcile();
+    #endif
 
     if (resendPing == 0)
         resendPing = millis();
