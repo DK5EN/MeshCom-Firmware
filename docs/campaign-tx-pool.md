@@ -6,7 +6,7 @@
 | Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                         |
 | Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md) |
 | Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                       |
-| Status    | W0 `cee174b7` (logger night running), W1a `05a18b36`, W1b `2ce8872e`, W1c committed; open: W0 night evaluation, bench of W1a-W1c                                                 |
+| Status    | W0-W1c committed and benched (2026-10-24); open: DK5EN-98 night evaluation (until 2026-10-25 12:30), release decision                                                            |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -131,3 +131,21 @@ dominates the age. Without a gate a beacon can sit 5 to 7 minutes and still go o
 - Tests: 11 W1c cases (8 failed before) plus 2 advisor regressions (HEY vs HN, user `{CET}` text;
   both failed before). Advisor (Opus): REWORK (destination match, CET relay-only), applied by the
   orchestrator.
+
+### Bench 2026-10-24 (INSTRUMENT images of `1f5521d9`, legend fix `eda5edb8` on DK5EN-1)
+
+Logs in `tools/bench/runs/harness/` (raw, gitignored): `txp-w1c-dk5en1-rearm3.log`,
+`txp-rak-pool.log`, `txp-cet-mock-92.log`.
+
+| Check                       | Node     | Result                                                                                        |
+| --------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| Gauge G3 on hardware        | DK5EN-1  | DM waiting for ACK: one outlined crit cell, "1/20 queued", legend "bg 0, 1 waiting for ACK"   |
+| ACK path on the pool        | DK5EN-1  | DM to DK5EN-92: server ACK `:ack306` after 4 s stops the ladder                               |
+| Retry rearm, ESP32          | DK5EN-1  | DM to offline DK5EN-93: 3 x `RING_REARM` in slot 0, new retry ids, 40 s apart, `giveup=1`     |
+| Retry rearm, nRF52          | DK5EN-90 | same, 3 x `RING_REARM` in slot 0; a WX position in slot 1 sent while slot 0 waited; no fault  |
+| `{CET}` gate at the gateway | DK5EN-92 | mock server, airgap: 200 s old and 200 s future dropped (`[CET];drop;where;gw`), fresh queued |
+| `{CET}` supersede           | DK5EN-92 | newer beacon replaces the queued one (`RING_SUPERSEDE`), older one dropped (`..._KEEP`)       |
+| Clock for the gate          | DK5EN-92 | `cetNowUtc()` within about 1 s of the Mac clock                                               |
+
+Not run: the relay-side `{CET}` gate on air (bench nodes run `--mesh off`; covered by native tests)
+and a 1 h gwflood replay.

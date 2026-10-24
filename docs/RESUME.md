@@ -17,6 +17,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
 - **Campaign resume points with open steps:**
+  - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92; DK5EN-98 runs the W0
+    image with a 24 h logger until 2026-10-25 12:30, then evaluate and decide TTL values, the DK5EN-98 flash and the
+    release ([campaign-tx-pool.md](campaign-tx-pool.md)).
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
   - Fork hardening: visual LED confirmation, phone-app SN check, deep-sleep LED test, LED pins on T-Echo, T114,
