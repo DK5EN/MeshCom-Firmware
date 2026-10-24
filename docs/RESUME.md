@@ -1,7 +1,7 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
-`v4.40a.10.23` (CI, Latest, tagged 2026-10-24, 66 assets; web flasher on 10.23). No upstream PR of ours is open.
+`v4.40a.10.23` (CI, Latest, tagged 2026-10-24, 66 assets; web flasher on 10.23). Open upstream PR: #1236 (SP server host `sp.meshcom.pl`, branch `pr/sp-server-host`).
 Next step: evaluate the TXP logger night (until 2026-10-25 16:21), then TTL decision.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
@@ -13,7 +13,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
   `check`: 30 boards, 0 mismatches. Unreleased on `fork-dev`: SP gateway server host renamed to
-  `sp.meshcom.pl` (same IP 146.59.232.234, operator request 2026-10-24). The five nodes run the gate build of
+  `sp.meshcom.pl` (same IP 146.59.232.234, operator request 2026-10-24); upstream PR #1236. The five nodes run the gate build of
   `3e07f894` (functionally identical; `FLASH_VERSION` 20261022, no tag string), left in place for the logger night.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
