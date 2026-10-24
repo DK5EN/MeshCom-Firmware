@@ -1,0 +1,36 @@
+GWRX-01 + BL-01 W2 bench, 2026-10-24, build a7b21de5 (fork-dev). Campaign: docs/campaign-bl01-gwrx01-nrf52-20261024.md.
+
+Setup: gateways DK5EN-90 (RAK4631, Ethernet, USB serial transport) and DK5EN-92 (T-Beam v1.2), INSTRUMENT
+builds, --srvip to the mock (tools/mock/meshcom_server.py on 192.168.68.58), driver tools/bench/gwrx_bench.py.
+Dependent DK5EN-1 (Heltec V3, INSTRUMENT, --gateway off, --nbrreport on; production builds pin nbrreport to
+auto, so the dependent needs an INSTRUMENT image too). 2 dBm, group 9999, source DK5EN-97, flags 0xA0.
+DK5EN-98 (production, in range) relays the frames as usual.
+
+Run 1, count, --delay-client DK5EN-90=10, 20 min warm-up: DK5EN-90 never opened a server slot (GWI 0/10).
+DK5EN-92 transmits about 5.9 s after its injection; DK5EN-90 heard that RF copy first and dropped its late
+server copy as a duplicate. Delay too long; no data on the nRF52 path.
+
+Run 2, count, delay 3 s, 2 min warm-up (matrices warm): DK5EN-90 6/10 slots (4 deduped as in run 1), NEED
+case B on 6/6, CANCEL? on 1 (frame 4D306230: GWI, NEED, partner copy heard 0.4 s later, CANCEL?, own TX
+9.8 s later as count mode prescribes). DK5EN-92 NEED B 10/10, transmitted 10/10.
+
+Run 3, --nbrrelay on, delay 3 s: DK5EN-90 7/10 slots, NEED B 7/7, CANCEL 5 with no TX (slot released),
+2 transmitted (partner copy came after own TX). --info "cancelled 5". DK5EN-92 NEED B 10/10.
+
+Health DK5EN-90 over runs 2-3: no reboot (uptime continuous from the 08:19 flash, 3162 s), no
+RING_DROP_STALE / RING_REJECT, heap int_free 92808 -> 92796 B.
+Verdict GWRX-01 nRF52: the overhear scan counts and releases server slots on the nRF52 gateway path.
+
+BL-01 hardware check, DK5EN-1 normal HEAD image, gateway on (real server), --mesh off, --setinfo on.
+DK5EN-92 sends group 9999 text x4106E12E, then its position x4106E12F and HEY x4106E130 over RF:
+  text: "ACK from LoRa GW 84 4106E12E 01 00", ACK transmitted on LoRa, text uploaded (TX-UDP),
+        RLY q=nomesh slot=-1 (not repeated)
+  POS:  uploaded, RLY q=nomesh slot=-1 (not repeated)
+  HEY:  uploaded with own signal report (HG@R3;3,48,5), RLY q=nomesh slot=-1 (not repeated)
+Verdict BL-01: matches the table in campaign section 1.
+Side observation (upstream behaviour, not BL-01): rx_dm_ack_gw and rx_dm_ack_new carried the same msg id
+x0002286C (both take millis() in the same millisecond), so the second ACK repeats the first id.
+
+Restore: all three nodes back on normal a7b21de5 images (08:16/08:17 builds), gateway on, mesh off,
+2 dBm, DK5EN-1 nbrreport auto; driver restore confirmed on DK5EN-90/-92 after every run.
+Raw logs: gwrx-gwrx01-w2-*.log, gwrx01-w2-mock-*.log, bl01-w2-*.log (gitignored).

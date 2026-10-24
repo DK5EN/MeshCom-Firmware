@@ -1,6 +1,6 @@
 # Campaign BL-01 + GWRX-01 nRF52 (2026-10-24)
 
-Status: **W1 done** (BL-01 + mock `deea597f`, bench driver next commit after three advisor rounds). Next: W2 nRF52 bench.
+Status: **W2 done** (nRF52 bench passed, BL-01 hardware check passed, all nodes restored; section 4). Next: W3 docs.
 Run with `/orchestrate-waves`. Resume point for this campaign.
 
 ## 1. BL-01: `--mesh off` semantics (operator decision 2026-10-24)
@@ -40,7 +40,7 @@ behaviour-neutral `src/mesh_policy.h` with one predicate per row, called from th
 Fix `257e5e2b` + `0281dce4` (both platforms). W0 code check (2026-10-24): on nRF52 the loop-task enqueue is
 safe against the LORA-task `OnRxDone` scans: `nbrServerNeed()` reads the matrix under `NBR_LOCK()`
 (`vTaskSuspendAll`, `nbr_matrix.cpp:43`, :2940), the slot with kind/need/alone is written inside
-`addTxRingEntryCore()`'s `taskENTER_CRITICAL` (`txring_functions.cpp:672-847`). Open: the hardware run.
+`addTxRingEntryCore()`'s `taskENTER_CRITICAL` (`txring_functions.cpp:672-847`). Hardware run passed in W2 (section 4).
 
 Bench setup: DK5EN-90 (RAK4631, Ethernet) gateway under test, INSTRUMENT build, `--srvip` to the mock;
 DK5EN-92 second gateway; dependent node with `--nbrreport on`; 2 dBm, group 9999. Mock delays DK5EN-90's copy
@@ -54,15 +54,34 @@ operator watches as well.
 
 ## 3. Waves
 
-| Wave | Content                                                                             | Status  |
-| ---- | ----------------------------------------------------------------------------------- | ------- |
-| W0   | RF-path inventory, mock recon, nRF52 concurrency check                              | done    |
-| W1   | I1 bench driver + serial transport; I3 mock `--delay-client`; I2 BL-01 seam + tests | running |
-| W2   | nRF52 bench (count, on) + BL-01 hardware check                                      | open    |
-| W3   | Docs (BACKLOG, RESUME, 08 catalogue, `--mesh` help), commit                         | open    |
+| Wave | Content                                                                             | Status |
+| ---- | ----------------------------------------------------------------------------------- | ------ |
+| W0   | RF-path inventory, mock recon, nRF52 concurrency check                              | done   |
+| W1   | I1 bench driver + serial transport; I3 mock `--delay-client`; I2 BL-01 seam + tests | done   |
+| W2   | nRF52 bench (count, on) + BL-01 hardware check                                      | done   |
+| W3   | Docs (BACKLOG, RESUME, 08 catalogue, `--mesh` help), commit                         | open   |
 
 File ownership W1: I1 `tools/bench/gwrx_bench.py`, `tools/bench/gwrx_frame.py`, `tools/tests/test_gwrx_bench.py`;
 I3 `tools/mock/meshcom_server.py`, `tools/mock/test_mock_server.py`, `tools/mock/README.md`; I2 `src/mesh_policy.h`,
 the sites in section 1, `test/test_checkvia/test_checkvia.cpp`; orchestrator `platformio.ini`, docs, git.
 
 Approvals (operator 2026-10-24): flash all bench nodes, DK5EN-14 over OTA; mock delay. Out of scope: DK5EN-98.
+
+## 4. W2 result (2026-10-24)
+
+Evidence: `tools/bench/runs/harness/gwrx01-w2-20261024.summary`. All images built from `a7b21de5`.
+
+- **GWRX-01 nRF52: passed.** DK5EN-90 (RAK4631, Ethernet) and DK5EN-92 as gateways on the mock, DK5EN-1 as
+  dependent. Count mode: NEED case B on every DK5EN-90 server slot (6/6), one `CANCEL?`. `--nbrrelay on`:
+  NEED B 7/7, 5 slots released by `CANCEL` without TX, 2 transmitted (partner copy came after own TX). No
+  reboot, no ring drop, heap flat (92808 to 92796 B).
+- **BL-01 hardware: passed.** DK5EN-1 (gateway on, `--mesh off`, normal image) sent `rx_dm_ack_gw` for a
+  group-9999 text from DK5EN-92 and repeated none of its text, position or HEY (`RLY q=nomesh`); all three
+  were uploaded, the HEY with its own signal report.
+- **Bench recipe, learned:** the dependent needs an INSTRUMENT image, since production builds pin
+  `--nbrreport auto`. `--delay-client` must stay below the partner's dwell (about 5.9 s on DK5EN-92): at 10 s
+  DK5EN-90 heard the RF copy first and dropped its server copy as a duplicate (0 slots); 3 s gave 6 to 7
+  slots out of 10.
+- **Side observation (upstream, not BL-01):** `rx_dm_ack_gw` and `rx_dm_ack_new` carried the same msg id
+  (`millis()` read twice in one millisecond). Candidate BACKLOG row in W3.
+- Restore: all three nodes on normal `a7b21de5` images, original settings, verified by `--info`.
