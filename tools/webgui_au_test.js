@@ -224,6 +224,7 @@ async function mkPage(node, opts) {
     const P = await mkPage(mkNode(J('F')));
     check('state F: selector returns F only with the remembered click', P.w.auState(j, true) === 'F' && P.w.auState(j, false) === 'E');
     check('state S wins over F, busy, E', P.w.auState({ sbok: 0, st: 'busy', job: 'check', staged: 'x' }, true) === 'S');
+    check('state H for lowheap_tls (AU-21)', P.w.auState(JSON.parse(mk({ st: 'fail', job: 'check', err: 'lowheap_tls' })), false) === 'H');
   }
 
   // ---- hint line, tag as text, 404 -------------------------------------------------------------------------

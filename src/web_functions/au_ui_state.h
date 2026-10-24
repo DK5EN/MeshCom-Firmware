@@ -72,7 +72,7 @@ static inline bool auErrIsLowHeap(const char *err)
 {
     char w[24];
     auErrWord(err, w, sizeof(w));
-    return auStrEq(w, "lowheap") || auStrEq(w, "lowheap_phone") || auStrEq(w, "lowheap_ble_off");
+    return auStrEq(w, "lowheap") || auStrEq(w, "lowheap_phone") || auStrEq(w, "lowheap_ble_off") || auStrEq(w, "lowheap_tls");
 }
 
 // ---- state selector (spec 4.1) ------------------------------------------------------------------
@@ -112,7 +112,7 @@ static inline char auUiState(const AuUiIn &in, bool installRemembered)
     auErrWord(in.err, w, sizeof(w));
     if (auStrEq(w, "lowheap_phone"))
         return in.phone ? AU_G : AU_G2;
-    if (auStrEq(w, "lowheap_ble_off") || auStrEq(w, "lowheap"))
+    if (auStrEq(w, "lowheap_ble_off") || auStrEq(w, "lowheap") || auStrEq(w, "lowheap_tls"))
         return AU_H;
     if (in.newer && in.inst)
         return AU_C;

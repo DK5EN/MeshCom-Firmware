@@ -1261,12 +1261,12 @@ static void auScaffoldJs()
     web_client.println("if(d&&auIn(w,['erase','noflash','nvs']))return 'Could not write the image to flash';");
     web_client.println("if(w=='nomem')return 'Not enough free memory for the update';");
     web_client.println("return 'Update failed';}");
-    web_client.println("function auLowHeap(e){var w=auWord(e);return w=='lowheap'||w=='lowheap_phone'||w=='lowheap_ble_off';}");
+    web_client.println("function auLowHeap(e){var w=auWord(e);return w=='lowheap'||w=='lowheap_phone'||w=='lowheap_ble_off'||w=='lowheap_tls';}");
     web_client.println("function auState(s,f){if(!s.sbok)return 'S';if(f)return 'F';");
     web_client.println("if(s.st=='busy'){if(s.job=='check')return 'B';return s.pct>=100?'d':'D';}");
     web_client.println("if(s.staged)return 'E';var w=auWord(s.err);");
     web_client.println("if(w=='lowheap_phone')return s.phone?'G':'g';");
-    web_client.println("if(w=='lowheap_ble_off'||w=='lowheap')return 'H';");
+    web_client.println("if(w=='lowheap_ble_off'||w=='lowheap'||w=='lowheap_tls')return 'H';");
     web_client.println("if(s.newer&&s.inst)return 'C';return 'A';}");
     web_client.println("function auDraw(g,m,e,h,lab,act,dis,red){var t=auEl('au_tr'),b=auEl('au_btn');if(!t||!b)return;");
     web_client.println("t.className=g?'au-green':'';auEl('au_msg').textContent=m;auEl('au_err').textContent=e;auEl('au_hint').textContent=h;");

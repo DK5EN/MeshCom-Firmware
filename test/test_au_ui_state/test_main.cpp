@@ -186,6 +186,9 @@ void test_priority_table(void)
     TEST_ASSERT_EQUAL_CHAR('H', auUiState(in, false));
     strcpy(in.err, "lowheap_ble_off");
     TEST_ASSERT_EQUAL_CHAR('H', auUiState(in, false));
+    strcpy(in.err, "lowheap_tls"); // AU-21: heap ran out inside the TLS handshake
+    TEST_ASSERT_EQUAL_CHAR('H', auUiState(in, false));
+    TEST_ASSERT_FALSE(auUiOverlay(in, 'C'));
     // C beats A; newer but not installable is A
     TEST_ASSERT_EQUAL_CHAR('C', auUiState(inC(), false));
     in = inC();

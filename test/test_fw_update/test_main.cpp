@@ -1679,6 +1679,34 @@ static void test_shed_settled_waits_only_for_what_was_shed(void)
     TEST_ASSERT_TRUE(FW_SHED_MIN_MS < FW_SHED_MAX_MS && FW_SHED_POLL_MS <= FW_SHED_MIN_MS);
 }
 
+static void test_tls_fail_token_blames_heap_when_allocations_failed(void)
+{
+    TEST_ASSERT_EQUAL_STRING("lowheap_tls", fwTlsFailToken(5u)); // AU-21 field number
+    TEST_ASSERT_EQUAL_STRING("lowheap_tls", fwTlsFailToken(1u));
+    // a heap failure inside the handshake uses a download attempt (bounded retries, no 10 min loop on the S3)
+    TEST_ASSERT_TRUE(fwErrConsumesAttempt(fwTlsFailToken(5u)));
+    TEST_ASSERT_EQUAL_STRING("tls", fwTlsFailToken(0u));
+    TEST_ASSERT_TRUE(fwGuardRefusedErr(fwTlsFailToken(5u))); // GUI maps it to state H
+    TEST_ASSERT_FALSE(fwGuardRefusedErr(fwTlsFailToken(0u)));
+}
+
+static void test_shed_settled_waits_for_the_tft_sprite(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(4u, FW_SHED_TFT);
+    TEST_ASSERT_FALSE(fwShedSettled(FW_SHED_TFT, false, false, true));
+    TEST_ASSERT_TRUE(fwShedSettled(FW_SHED_TFT, false, false, false));
+    TEST_ASSERT_TRUE(fwShedSettled(FW_SHED_KISS, false, false, true)); // sprite held but not requested
+    TEST_ASSERT_FALSE(fwShedSettled(FW_SHED_TFT | FW_SHED_KISS, false, true, false));
+}
+
+static void test_tft_sprite_wanted_needs_display_on_and_no_shed(void)
+{
+    TEST_ASSERT_TRUE(fwTftSpriteWanted(false, false));
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, false)); // --display off
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(false, true)); // shed by the update
+    TEST_ASSERT_FALSE(fwTftSpriteWanted(true, true));
+}
+
 static void test_notify_due_for_a_finished_newer_check_once(void)
 {
     TEST_ASSERT_TRUE(fwNotifyDue(true, true, 1, false));
@@ -1693,6 +1721,9 @@ static void test_notify_due_for_a_finished_newer_check_once(void)
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_tls_fail_token_blames_heap_when_allocations_failed);
+    RUN_TEST(test_shed_settled_waits_for_the_tft_sprite);
+    RUN_TEST(test_tft_sprite_wanted_needs_display_on_and_no_shed);
     RUN_TEST(test_parse_plain);
     RUN_TEST(test_parse_dated);
     RUN_TEST(test_parse_without_v);

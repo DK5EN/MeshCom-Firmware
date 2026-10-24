@@ -928,7 +928,7 @@ inline bool fwGuardChainOk(bool availNewer, bool installable, bool tagKnown, boo
     return availNewer && installable && tagKnown && !alreadyStaged;
 }
 
-// A lowheap token (lowheap, lowheap_ble_off, lowheap_phone) is a refusal, any other error a failure.
+// A lowheap token (lowheap, lowheap_ble_off, lowheap_phone, lowheap_tls) is a refusal, any other error a failure.
 inline bool fwGuardRefusedErr(const char *err)
 {
     return err != nullptr && fw_update_detail::strEqN(err, "lowheap", 7) && (err[7] == '\0' || err[7] == '_');
@@ -978,6 +978,9 @@ inline bool fwGuardPhoneConnected(bool phone, bool guardSet)
 // Services a heap refusal may stop: bit 0 = a net console session, bit 1 = KISS TCP.
 #define FW_SHED_CONSOLE 1u
 #define FW_SHED_KISS 2u
+// Wireless Tracker TFT sprite (25600 B on the internal heap), released by the loop task before every
+// CHECK/DOWNLOAD (AU-21).
+#define FW_SHED_TFT 4u
 // Heap a service gives back (W3, DK5EN-92: KISS TCP 1-2 KB, one console session 1-8 KB); the console figure is the
 // middle of the range so a board that is far short of the gate does not lose its session for nothing.
 #define FW_SHED_EST_CONSOLE 4096u
@@ -1010,10 +1013,28 @@ inline uint8_t fwShedSecond(bool allowed, uint8_t avail, uint32_t freeNow, uint3
     return (freeNow + FW_SHED_EST_CONSOLE >= need) ? (uint8_t)FW_SHED_CONSOLE : (uint8_t)0;
 }
 
-// The sockets of mask are closed (consoleUp / kissUp = still connected).
-inline bool fwShedSettled(uint8_t mask, bool consoleUp, bool kissUp)
+// The sockets of mask are closed (consoleUp / kissUp = still connected) and the TFT sprite is freed
+// (tftHeld = sprite still allocated).
+inline bool fwShedSettled(uint8_t mask, bool consoleUp, bool kissUp, bool tftHeld = false)
 {
-    return !((mask & FW_SHED_CONSOLE) && consoleUp) && !((mask & FW_SHED_KISS) && kissUp);
+    return !((mask & FW_SHED_CONSOLE) && consoleUp) && !((mask & FW_SHED_KISS) && kissUp) &&
+           !((mask & FW_SHED_TFT) && tftHeld);
+}
+
+// AU-21: mbedTLS reports -9984 (X509 verify failed) when the hardware SHA bounce buffer cannot be allocated;
+// with failed allocations during the job the cause is heap, not the chain. The caller (httpFail) keeps logging
+// the raw mbedTLS code. Its own token, not "lowheap": the gate passed and the handshake still ran out, so it uses
+// a download attempt (fwErrConsumesAttempt) instead of the 10 min lowheap retry, which never ends on the S3.
+inline const char *fwTlsFailToken(uint32_t allocFails)
+{
+    return allocFails > 0 ? "lowheap_tls" : "tls";
+}
+
+// The stored `--display off` setting (bDisplayOff), not the screensaver, decides whether the TFT sprite is
+// wanted (operator decision 2026-10-24); shedHeld = the update has released it.
+inline bool fwTftSpriteWanted(bool displayOffSetting, bool shedHeld)
+{
+    return !displayOffSetting && !shedHeld;
 }
 
 // "[AU];notify;<tag>" for a finished CHECK: notify mode (effective 1), a newer release, not announced before.
