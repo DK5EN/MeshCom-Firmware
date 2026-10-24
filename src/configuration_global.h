@@ -17,6 +17,15 @@
 #define DEFAULT_CALL "XX0XXX-00"
 #define DEFAULT_CALL_PREFIX "XX0XXX"
 
+// node_sset, den ein T-Beam (MODUL_FW_TBEAM) beim ersten Start mit
+// Werkseinstellungen (node_sset == 0x0004) erhaelt: bDisplayVolt 0x0001,
+// bPosDisplay 0x0004, bButtonCheck 0x0010, bGPSON 0x0040. TRK-03: von V4.21
+// bis 4.40a.10.23 stand hier 0x0035 -- 0x0020 ist bDisplayTrack, nicht bGPSON;
+// ein frisch geflashter T-Beam startete mit Track an und GPS aus. bDisplayVolt
+// war 2023 vermutlich ebenso unbeabsichtigt, bleibt aber, damit sich fuer
+// T-Beams ausser Track/GPS nichts aendert.
+#define TBEAM_FIRST_BOOT_SSET 0x0055
+
 // true, wenn das Rufzeichen noch die Werkseinstellung ist (oder leer/"none").
 // Der 6-Zeichen-Praefixtest deckt "XX0XXX-00" mit ab -- die vier Formen, die
 // safeboot einzeln geprueft hat, sind damit vollstaendig abgedeckt.

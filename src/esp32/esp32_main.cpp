@@ -1665,7 +1665,9 @@ void esp32setup()
         if(meshcom_settings.node_sset == 0x0004)
         {
             bButtonCheck = true;
-            meshcom_settings.node_sset = meshcom_settings.node_sset | 0x0035;	// bDisplayPos = true, bButtonCheck = true, bGPSON = true
+            bGPSON = true;          // TRK-03: GPS schon beim ersten Start, nicht erst nach dem Reboot
+            bDisplayVolt = true;
+            meshcom_settings.node_sset = meshcom_settings.node_sset | TBEAM_FIRST_BOOT_SSET;	// TRK-03
             save_settings();
         }
     #endif

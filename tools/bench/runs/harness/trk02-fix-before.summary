@@ -1,0 +1,4 @@
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:27: test_first_boot_leaves_track_off: Expected 0x00000000 Was 0x00000020	[FAILED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:33: test_first_boot_turns_gps_on: Expected 0x00000040 Was 0x00000000	[FAILED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:55: test_first_boot_keeps_volt_pos_button	[PASSED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:47: test_first_boot_sets_nothing_else: Expected 0x00000000 Was 0x00000020	[FAILED]

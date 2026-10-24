@@ -35,6 +35,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 ## Hottest first (details in BACKLOG)
 
 - AU-14: single TASK_WDT during an AU download, cause unknown.
+- TRK-02/03: "TRACK on after web flash" (Heltec V3) not reproduced, the flasher cannot click GPIO0 while the
+  app runs; TRK-03 found on the way: T-Beam first boot set TRACK instead of GPS since V4.21, fixed on fork-dev
+  (`TBEAM_FIRST_BOOT_SSET`), not released, upstream PR candidate
+  ([campaign-trk02-webflash-track-20261024.md](campaign-trk02-webflash-track-20261024.md)).
 - AU-21: Wireless Tracker AU check failed (`tls -9984`, heap at 0): TFT sprite 25.6 KB fixed on fork-dev (`e6e74bc6`,
   `c100451a`), not released; open: S3 TLS heap floor and BLE pause after a DK5EN-1 measurement
   ([campaign-au21-tft-heap-20261024.md](campaign-au21-tft-heap-20261024.md)).
@@ -149,11 +153,11 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-10-24 (late):** TRK-02 measurement campaign (web flasher vs PRG/GPIO0): `dtr_replay.py`, 80 replays
+  plus one Chrome install on DK5EN-1, 0 clicks; TRK-03 T-Beam first-boot TRACK bit confirmed on DK5EN-92
+  (erased and restored) and fixed with a native test.
 - **2026-10-24 (evening):** AU-21 field log DJ8MEH-81 analysed; tracker TFT sprite on demand and released for AU
   TLS jobs, `lowheap_tls`, heap logging (`(tft)` mark, `--info` HEAP); two waves, gate green, DK5EN-1 benched.
 - **2026-10-24:** campaign BL-01 + GWRX-01 nRF52 closed: `--mesh off` meaning decided and pinned by tests,
   GWRX-01 benched on the RAK gateway (5 of 7 server slots released), bench driver `gwrx_bench.py`; GWACK-01
   found; RESUME and BACKLOG cleaned up (48 closed rows archived).
-- **2026-10-23:** bench session: AU-17 closed, AU-18/19/20, UDP-04, RX-DEAF-01/02, WEB-RX-01 fixed (not released);
-  upstream PR #1235 cut, opened and merged (synced 4898cada); upstream sync (#1233 merged, #1234 SP server taken);
-  net console clients on `mc_console.py` with `.env` passwords; mock keep-reply timer race fixed.

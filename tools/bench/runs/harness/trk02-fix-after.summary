@@ -1,0 +1,5 @@
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:53: test_first_boot_leaves_track_off	[PASSED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:54: test_first_boot_turns_gps_on	[PASSED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:55: test_first_boot_keeps_volt_pos_button	[PASSED]
+test/test_tbeam_first_boot_sset/test_tbeam_first_boot_sset.cpp:56: test_first_boot_sets_nothing_else	[PASSED]
+--------- native:test_tbeam_first_boot_sset [PASSED] Took 0.76 seconds ---------

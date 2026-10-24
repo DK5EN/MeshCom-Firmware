@@ -1694,6 +1694,22 @@ RCA: `docs/rca-gwrx01-20261023.md`; campaign: `docs/campaign-bl01-gwrx01-nrf52-2
   takes copy 2, 8/8); a distinct id makes every relay forward both copies. Fix reads the clock once:
   [`campaign-gwack01-20261024.md`](../campaign-gwack01-20261024.md).
 
+## 2j. TRK-02 / TRK-03 — TRACK on after a web flash; T-Beam first-boot defaults (2026-10-24)
+
+Campaign: [`campaign-trk02-webflash-track-20261024.md`](../campaign-trk02-webflash-track-20261024.md).
+
+- **TRK-02 (not reproduced, open on evidence):** field report "Heltec V3 had TRACK on after our web flasher".
+  The V3's user button is GPIO0, which the CP2102 auto-reset circuit pulls LOW with DTR asserted and RTS
+  deasserted; three such pulses while the app runs are a OneButton multi-click, `tripleClick()` runs
+  `--track on` and saves it (bench: 3/3). The flasher never holds that state while the app runs: esptool-js
+  `classicReset` asserts it only at EN release (ROM entry), every other sequence is RTS-only. 80 replays on
+  DK5EN-1 and one real Chrome install: 0 button events. Remaining explanations: PRG pressed by the user, or a
+  TRACK state that predates the flash and is shown since TRK-01's boot warning.
+- **TRK-03 (FIXED on fork-dev, not released):** `src/esp32/esp32_main.cpp` (`MODUL_FW_TBEAM`, factory
+  settings) ORed `0x0035` into `node_sset` since V4.21; 0x0020 is TRACK, not GPS (0x0040). An erased T-Beam
+  booted with Track on and GPS off. Now `TBEAM_FIRST_BOOT_SSET 0x0055` (`src/configuration_global.h`), test
+  `test/test_tbeam_first_boot_sset`. Upstream code.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
