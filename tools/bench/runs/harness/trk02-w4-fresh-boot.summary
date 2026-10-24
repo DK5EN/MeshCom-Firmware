@@ -1,0 +1,8 @@
+[BOOT] RESET_REASON=1 POWERON
+[INIT]...Track on - degraded MeshCom RX performance, packetloss likely
+[OBUT]...One Button GPIO(38) started
+...GPS: off
+...Track: on
+...Call: <XX0XXX-00> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [CPU]
+...NOMSGALL off ...MESH on ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+...BOOT RESET_REASON=1 POWERON

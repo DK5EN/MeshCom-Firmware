@@ -1,0 +1,23 @@
+# TRK-02 W3 run A1: GitHub Pages flasher, v4.40a.10.23, DK5EN-1 (Heltec V3, CP2102), update without erase, button on
+# Web Serial calls captured in Chrome by wrapping SerialPort.prototype.open/close/setSignals (wall clock)
+20:43:34.681 open {"baudRate":115200,"bufferSize":8192}
+20:43:34.769 setSignals {"dataTerminalReady":false,"requestToSend":true}
+20:43:34.893 setSignals {"dataTerminalReady":false,"requestToSend":false}
+20:45:12.820 close
+20:45:12.978 open {"baudRate":115200}
+20:45:13.050 setSignals {"dataTerminalReady":false}
+20:45:13.051 setSignals {"requestToSend":true}
+20:45:13.051 setSignals {"dataTerminalReady":false}
+20:45:13.153 setSignals {"dataTerminalReady":true}
+20:45:13.154 setSignals {"requestToSend":false}
+20:45:13.155 setSignals {"dataTerminalReady":true}
+20:45:13.207 setSignals {"dataTerminalReady":false}
+20:47:44.526 setSignals {"requestToSend":true}
+20:47:44.529 setSignals {"dataTerminalReady":false}
+20:47:44.732 setSignals {"requestToSend":false}
+20:47:44.733 setSignals {"dataTerminalReady":false}
+20:47:44.738 close
+20:47:44.998 open {"baudRate":115200,"bufferSize":8192}
+20:48:19.603 close
+# 2323 capture 20:43-20:48: 0 SingleClick/DoubleClick/TripleClick/LongPress/Track on lines
+# after the run: --pos "...Track: off", --info "...BUTTON (0) on"

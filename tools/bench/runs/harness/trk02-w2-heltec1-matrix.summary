@@ -1,0 +1,8 @@
+classic50 runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+classic550 runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+usbjtag runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+hardreset runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+wa runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+console_reset runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
+rts_then_dtr runs=10 runs_with_events=10 runs_track_changed=0 verdict=finding
+open_close runs=10 runs_with_events=0 runs_track_changed=0 verdict=ok
