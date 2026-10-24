@@ -10,6 +10,7 @@ This file contains all web-based setup functions
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
 #endif
+#include <blocked_calls.h> // BLK-01
 #include <string>
 
 
@@ -554,6 +555,32 @@ void webSetup_setParam(setupStruct *setupData){
         commandAction(message_text, bPhoneReady);
         setupData->returnCode = (bNoMSGtoALL == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = bNoMSGtoALL?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("blockcall")) {
+        // BLK-01: validate first; an invalid request never reaches the console command.
+        String req = setupData->paramValue;
+        req.trim();
+        if(req.length() == 0)
+            req = "none";
+
+        char want[BLOCKLIST_CSV_MAX];
+        char bad[BLOCKLIST_CSV_MAX];
+        char have[BLOCKLIST_CSV_MAX];
+        if(!blockListParse(req.c_str(), want, sizeof(want), bad, sizeof(bad)))
+        {
+            blockListGet(have, sizeof(have));
+            setupData->returnCode = WS_RETURNCODE_FAIL;
+            setupData->returnValue = have;
+            return;
+        }
+        // the canonical list always fits the line; the raw request (spaces) may not
+        snprintf(message_text, sizeof(message_text), "--blockcall %s", want[0] ? want : "none");
+        commandAction(message_text, bPhoneReady);
+        blockListGet(have, sizeof(have));
+        setupData->returnCode = (strcmp(have, want)==0 && blockListLastSaveOk())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = have;
         return;
     } else
 
@@ -1159,6 +1186,13 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("nomsgall")) {
         setupData->returnValue = bNoMSGtoALL?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("blockcall")) {
+        char have[BLOCKLIST_CSV_MAX];
+        blockListGet(have, sizeof(have));
+        setupData->returnValue = have;
         return;
     } else
 

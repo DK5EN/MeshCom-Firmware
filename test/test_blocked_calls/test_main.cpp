@@ -315,6 +315,17 @@ static void test_drop_counter(void)
     TEST_ASSERT_EQUAL_UINT32(before + 2, blockListDrops());
 }
 
+// A save that does not reach flash must be reported (web GUI shows FAIL).
+static void test_failed_save_is_reported(void)
+{
+    blockListTestFailSave(true);
+    TEST_ASSERT_FALSE(blockListSave());
+    TEST_ASSERT_FALSE(blockListLastSaveOk());
+    blockListTestFailSave(false);
+    TEST_ASSERT_TRUE(blockListSave());
+    TEST_ASSERT_TRUE(blockListLastSaveOk());
+}
+
 static void test_host_persistence_stubs(void)
 {
     blockListSet("DK5EN");
@@ -355,6 +366,7 @@ int main(int, char **)
     RUN_TEST(test_lenient_load_keeps_good_entries);
     RUN_TEST(test_lenient_load_caps_and_empty);
     RUN_TEST(test_drop_counter);
+    RUN_TEST(test_failed_save_is_reported);
     RUN_TEST(test_host_persistence_stubs);
     return UNITY_END();
 }

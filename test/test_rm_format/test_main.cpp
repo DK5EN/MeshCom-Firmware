@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <string>
+
 #include <rm_format.h>
 #include <rm_exec_ext.h>
 
@@ -149,6 +151,43 @@ static void test_name_atxt(void)
     TEST_ASSERT_TRUE(rmFmtAtxt(g_buf, sizeof(g_buf), "123456789012345678901234567890123456789") > 0);   // 39
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtAtxt(g_buf, sizeof(g_buf), "1234567890123456789012345678901234567890")); // 40
     TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
+}
+
+// ---- blockcall -----------------------------------------------------------------------------------------------
+
+static void test_block(void)
+{
+    expectStr("b=-", rmFmtBlock(g_buf, sizeof(g_buf), ""));
+    expectStr("b=-", rmFmtBlock(g_buf, sizeof(g_buf), nullptr));
+    expectStr("b=DL1ABC", rmFmtBlock(g_buf, sizeof(g_buf), "DL1ABC"));
+    expectStr("b=DL1ABC,DK5EN-1", rmFmtBlock(g_buf, sizeof(g_buf), "DL1ABC,DK5EN-1"));
+
+    // exactly fitting: "b=" + 103 chars = RM_FMT_BODY_MAX, no marker (9 entries of 10 + 8 commas = 98, + ",ABCD")
+    std::string fit;
+    for (int i = 0; i < 9; i++)
+        fit += std::string(i ? "," : "") + "ABCDEFGH-1";
+    fit += ",ABCD";
+    TEST_ASSERT_EQUAL_UINT(RM_FMT_BODY_MAX - 2, fit.size());
+    TEST_ASSERT_EQUAL_UINT32(RM_FMT_BODY_MAX, rmFmtBlock(g_buf, sizeof(g_buf), fit.c_str()));
+    TEST_ASSERT_EQUAL_STRING(("b=" + fit).c_str(), g_buf);
+
+    // one char over: whole entries that fit, then ",+N"; the cut entry is not shown
+    std::string over = fit + "E";
+    TEST_ASSERT_TRUE(rmFmtBlock(g_buf, sizeof(g_buf), over.c_str()) > 0);
+    std::string head;
+    for (int i = 0; i < 9; i++)
+        head += std::string(i ? "," : "") + "ABCDEFGH-1";
+    TEST_ASSERT_EQUAL_STRING(("b=" + head + ",+1").c_str(), g_buf);
+
+    // 16 entries of the maximum length (9 chars): 16 * 9 + 15 = 159 chars
+    std::string full;
+    for (int i = 0; i < 16; i++)
+        full += std::string(i ? "," : "") + "DK5EN-123";
+    TEST_ASSERT_EQUAL_UINT(159, full.size());
+    const size_t len = rmFmtBlock(g_buf, sizeof(g_buf), full.c_str());
+    TEST_ASSERT_TRUE(len > 0 && len <= RM_FMT_BODY_MAX);
+    // 10 whole entries = 99 chars + ",+6" = 102 <= 103; an eleventh would need 109
+    TEST_ASSERT_EQUAL_STRING("b=DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,DK5EN-123,+6", g_buf);
 }
 
 // ---- pos ----------------------------------------------------------------------------------------------------
@@ -713,6 +752,7 @@ int main(int, char **)
     RUN_TEST(test_radio_sentinels);
     RUN_TEST(test_radio_rounding);
     RUN_TEST(test_name_atxt);
+    RUN_TEST(test_block);
     RUN_TEST(test_pos);
     RUN_TEST(test_sens);
     RUN_TEST(test_mh_page_empty_and_one);

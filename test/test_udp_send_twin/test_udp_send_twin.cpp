@@ -276,6 +276,9 @@ void logRxDropUnconfigured(const char *call)
     log_sink("DROP", c);
 }
 
+// BLK-01: counterpart of logRxDropUnconfigured(); not exercised in this twin.
+void logRxDropBlocked(const char *) {}
+
 // DR-25: the outbound leak logger, shared by both platforms' drains -- kept
 // in its own vector (g_leaked) so a test can assert it never overlaps with
 // g_dropped (the RX drop counter's stub above).

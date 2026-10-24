@@ -154,6 +154,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <batt_functions.h>
 #include <lora_functions.h>
 #include "rm_runtime.h" // RM-05 (#1189): rmInit(), rmDrain()
+#include "blocked_calls.h" // BLK-01: blockListLoad()
 #include "txring_functions.h" // BP-02: txRingDepth() declaration
 #include <udp_functions.h>
 #include <extudp_functions.h>
@@ -1329,6 +1330,9 @@ void esp32setup()
     msgstoreGlueInit();
     msgstoreSettingsLoad();
 #endif
+
+    // BLK-01: call blocklist from flash/NVS (independent of ENABLE_MSGSTORE).
+    blockListLoad();
 
     // RM-05 (#1189): remote-management state (high-water mark from its own NVS key), after the
     // settings load so node_call/node_passwd are final.

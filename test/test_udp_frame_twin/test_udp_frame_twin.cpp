@@ -72,6 +72,7 @@
 #include <sto_notice.h>      // wave4 group B hookup under test (faked below, see there)
 #include <gw_link_status.h>  // GW-LINK hookup under test: gwLinkNoteRx() on server frames only
 #include <gw_reg_runtime.h> // registration state hooks both handlers call (stubbed below)
+#include "blocked_calls.h"    // BLK-01
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 #include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
 #include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
@@ -426,6 +427,14 @@ void logRxDropUnconfigured(const char *call)
 {
     g_dropped.push_back(call ? call : "(null)");
     record_sink("DROP", call ? call : "(null)");
+}
+
+// BLK-01: the handlers call logRxDropBlocked() + isBlockedFrame(); the env
+// links the real src/blocked_calls.cpp.
+static std::vector<std::string> g_blocked_drops;
+void logRxDropBlocked(const char *path)
+{
+    g_blocked_drops.push_back(path ? path : "(null)");
 }
 
 void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage, const char *tail)
@@ -1814,6 +1823,156 @@ static void test_agreement_rx01_unconfigured_guard_on_both(void)
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_dropped.size(), msg);
         snprintf(msg, sizeof(msg), "%s relayed a frame from an unconfigured source", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+    }
+}
+
+static void test_agreement_blk01_blocked_call_not_relayed_on_both(void)
+{
+    // BLK-01: a server frame whose source or path holds a blocked call is
+    // counted (logRxDropBlocked) and neither put on the TX ring nor displayed.
+    // Case 0: blocked call is the source. Case 1: blocked call is a relay in
+    // the path. Case 2 (control): same shape, nothing blocked -> relayed.
+    const char *paths[3] = {"DK5EN-7", "DK5EN-2,DK5EN-7", "DK5EN-2,DK5EN-3"};
+    for (int c = 0; c < 3; c++)
+    {
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, paths[c], "9", ':', "blocked", 0x6101 + c);
+        for (int side = 0; side < 2; side++)
+        {
+            const char *name = side ? "nrf52" : "esp32";
+            recorder_reset();
+            g_blocked_drops.clear();
+            blockListSet("DK5EN-7");
+            uint8_t buf[BUF_CAP];
+            int depth0 = txRingDepth();
+            copy_into(buf, tmpl, len);
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+            char msg[96];
+            if (c < 2)
+            {
+                snprintf(msg, sizeof(msg), "%s case %d: blocked drop not counted", name, c);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_blocked_drops.size(), msg);
+                snprintf(msg, sizeof(msg), "%s case %d: blocked frame put on the TX ring", name, c);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+            }
+            else
+            {
+                snprintf(msg, sizeof(msg), "%s control: unblocked frame counted as blocked", name);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_blocked_drops.size(), msg);
+                snprintf(msg, sizeof(msg), "%s control: unblocked frame not relayed", name);
+                TEST_ASSERT_TRUE_MESSAGE(txRingDepth() > depth0, msg);
+            }
+            blockListSet("");
+        }
+    }
+}
+
+// BLK-01: a blocked frame (blocked source OR blocked path element) must have no
+// effect on the node besides the drop counter: no display, no phone/BLE copy,
+// no EXTUDP forward, no KISS, no ACK, no TX-ring entry, no dedup-ring insert,
+// no sink call of any kind. Unblocked control frames keep their behaviour.
+static void test_agreement_blk01_blocked_frame_has_no_effect_on_both(void)
+{
+    struct Shape { const char *name; char type; const char *dest; const char *payload; };
+    const Shape shapes[3] = {
+        {"dm-to-own", ':', "DK5EN-1", "hallo{12"},       // would be ACKed
+        {"group-text", ':', "9", "gruppe{13"},            // would be ACKed / displayed
+        {"position", '!', "9", "4700.00N/01300.00E-blk"}, // would enter the dedup ring
+    };
+    const char *paths[3] = {"DK5EN-7", "DK5EN-2,DK5EN-7", "DK5EN-2,DK5EN-3"};   // src, relay, control
+    uint32_t id = 0x6200;
+    for (int sh = 0; sh < 3; sh++)
+    for (int c = 0; c < 3; c++)
+    for (int side = 0; side < 2; side++)
+    {
+        id++;
+        const char *name = side ? "nrf52" : "esp32";
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, paths[c], shapes[sh].dest, shapes[sh].type,
+                                           shapes[sh].payload, id);
+        recorder_reset();
+        g_blocked_drops.clear();
+        blockListSet("DK5EN-7");
+        bEXTUDP = true;
+        hasExternIPaddress = true;
+        bKISS = true;
+        int depth0 = txRingDepth();
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        uint8_t mid[4] = {(uint8_t)id, (uint8_t)(id >> 8), (uint8_t)(id >> 16), (uint8_t)(id >> 24)};
+        char msg[160];
+        if (c < 2)
+        {
+            snprintf(msg, sizeof(msg), "%s %s c%d: drop not counted", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_blocked_drops.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: blocked frame reached a display", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls + g_sendDisplayPosition_calls, msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: blocked frame reached the phone/BLE", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: blocked frame forwarded to EXTUDP", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_extern.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: blocked frame reached KISS", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_kiss.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: blocked frame triggered an ACK", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ack_ids.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: TX ring changed", name, shapes[sh].name, c);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: msg_id entered the dedup ring", name, shapes[sh].name, c);
+            TEST_ASSERT_TRUE_MESSAGE(is_new_packet(mid), msg);
+            snprintf(msg, sizeof(msg), "%s %s c%d: some other sink was called (%s)", name, shapes[sh].name, c,
+                     g_sink_log.empty() ? "-" : g_sink_log[0].sink.c_str());
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sink_log.size(), msg);
+        }
+        else
+        {
+            snprintf(msg, sizeof(msg), "%s %s control: counted as blocked", name, shapes[sh].name);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_blocked_drops.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s control: not forwarded to EXTUDP", name, shapes[sh].name);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_extern.size(), msg);
+            snprintf(msg, sizeof(msg), "%s %s control: not displayed", name, shapes[sh].name);
+            TEST_ASSERT_TRUE_MESSAGE(g_sendDisplayText_calls + g_sendDisplayPosition_calls > 0, msg);
+            if (sh == 0)   // DM to the own call: ACKed, not relayed
+            {
+                snprintf(msg, sizeof(msg), "%s %s control: no ACK", name, shapes[sh].name);
+                TEST_ASSERT_TRUE_MESSAGE(g_ack_ids.size() > 0 || txRingDepth() > depth0, msg);
+            }
+            else
+            {
+                snprintf(msg, sizeof(msg), "%s %s control: not relayed", name, shapes[sh].name);
+                TEST_ASSERT_TRUE_MESSAGE(txRingDepth() > depth0, msg);
+            }
+        }
+        blockListSet("");
+    }
+}
+
+// BLK-01: a frame decodeAPRS() rejects is still forwarded to EXTUDP (the tap
+// stays independent of the block check), even with a non-empty block list.
+static void test_agreement_blk01_undecodable_frame_still_reaches_extudp_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        g_blocked_drops.clear();
+        blockListSet("DK5EN-7");
+        bEXTUDP = true;
+        hasExternIPaddress = true;
+        uint8_t buf[BUF_CAP];
+        memset(buf, 0, sizeof(buf));
+        uint16_t len = build_gate_raw(buf, 0x3A, 0x41, 4);   // too short for decodeAPRS
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: undecodable frame lost on the EXTUDP tap", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_extern.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_blocked_drops.size(), msg);
+        blockListSet("");
     }
 }
 
@@ -3294,6 +3453,9 @@ int main(int, char **argv)
     RUN_TEST(test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
     RUN_TEST(test_regression_dm_dedup_reacks_without_redisplay_on_both);
+    RUN_TEST(test_agreement_blk01_blocked_call_not_relayed_on_both);
+    RUN_TEST(test_agreement_blk01_blocked_frame_has_no_effect_on_both);
+    RUN_TEST(test_agreement_blk01_undecodable_frame_still_reaches_extudp_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);

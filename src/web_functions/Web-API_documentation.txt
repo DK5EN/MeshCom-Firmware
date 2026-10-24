@@ -40,6 +40,7 @@ To set a parameter to the node, use:
 	/setparam/?small=on|off				Set if displayed content should be reduced to fit small displays
 	/setparam/?volt=on|off				If set to on, battery SOC will be displayed as voltage instead of percentage
 	/setparam/?mesh=on|off				Enables mesh / forwarding of received LoRa messages via radio
+	/setparam/?blockcall=LIST|none	Blocked calls (same as --blockcall): comma list of up to 16 calls, CALL blocks all SSIDs, empty or none clears; invalid list = returncode 1, list unchanged; read-back (getparam) is the stored list
 	/setparam/?gateway=on|off			Enables the gateway function
 	/setparam/?rm=on|off				Enables the authenticated RM1 remote management by DM (same as --remotemgmt; stays inactive while no --passwd is set; read-back is the stored switch)
 	/setparam/?rmstrict=on|off			RM brute-force protection (same as --rmstrictsecurity; default off): per-sender lockout, receiver rate limits and the sender budget only with on; read-back is the stored switch)

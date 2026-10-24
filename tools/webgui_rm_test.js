@@ -49,6 +49,9 @@ function headerConsts() {
     const f = new RegExp('A\\(char,\\s*' + m[2] + ',\\s*\\[(\\d+)\\]').exec(ms);   // settings table row  A(char, node_name, [20], ...)
     if (f) out[m[1]] = +f[1] - 1;
   }
+  const ra = fs.readFileSync(path.join(SRC_DIR, 'remote_cmd.h'), 'utf8');
+  const am = /#define RM_MAX_ARGS\s+(\d+)/.exec(ra);
+  if (am) out.RM_MAX_ARGS = +am[1];
   return out;
 }
 const HDR = headerConsts();
@@ -365,8 +368,8 @@ function leaks(P, canary) {
   // ---- static checks of the C++ source -------------------------------------------------------------
   check('extractor found the page and the JS', pageX.calls.length > 5 && jsX.calls.length > 20, pageX.calls.length + '/' + jsX.calls.length);
   const pf = [...pageX.calls, ...jsX.calls].filter((c) => c.kind === 'printf');
-  check('only literal arguments; the one printf is the rmLen line (format < 64 B, resolved from the headers)', pageX.errors.length === 0 && jsX.errors.length === 0 && pf.length === 1 && pf[0].bytes < 64 && /^var rmLen=\{name:\d+,atxt:\d+\};\n$/.test(pf[0].text), pageX.errors.concat(jsX.errors).join('; ') + ' ' + pf.map((c) => c.text).join('|'));
-  check('DRY-04 rmLen equals sizeof(settings field) - 1 from the headers (19/40-1 style, not typed in the page)', HDR.RM_NAME_MAX > 0 && HDR.RM_ATXT_MAX > HDR.RM_NAME_MAX && pf.length === 1 && pf[0].text.indexOf('name:' + HDR.RM_NAME_MAX + ',atxt:' + HDR.RM_ATXT_MAX + '}') > 0, JSON.stringify(HDR));
+  check('only literal arguments; the one printf is the rmLen line (format < 64 B, resolved from the headers)', pageX.errors.length === 0 && jsX.errors.length === 0 && pf.length === 1 && pf[0].bytes < 64 && /^var rmLen=\{name:\d+,atxt:\d+,args:\d+\};\n$/.test(pf[0].text), pageX.errors.concat(jsX.errors).join('; ') + ' ' + pf.map((c) => c.text).join('|'));
+  check('DRY-04 rmLen equals sizeof(settings field) - 1 from the headers (19/40-1 style, not typed in the page)', HDR.RM_NAME_MAX > 0 && HDR.RM_ATXT_MAX > HDR.RM_NAME_MAX && pf.length === 1 && pf[0].text.indexOf('name:' + HDR.RM_NAME_MAX + ',atxt:' + HDR.RM_ATXT_MAX + ',args:' + HDR.RM_MAX_ARGS + '}') > 0, JSON.stringify(HDR));
   check('DRY-04 the page source does not hard-code the text limits 19 / 39 in the JS', !/\b(?:19|39)\b/.test(JS.replace(/var rmLen=\{[^}]*\};/, '').replace(/\d+\.\d+/g, '')), (JS.replace(/var rmLen=\{[^}]*\};/, '').match(/.{20}\b(?:19|39)\b.{10}/) || [''])[0]);
   const all = pageX.calls.concat(jsX.calls);
   const maxLit = Math.max(...all.map((c) => c.bytes));
@@ -1113,7 +1116,7 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     await P.setPoll({ sent: [], targets: tg });
     const hs = ['rm_card_radio', 'rm_card_ident', 'rm_card_pos', 'rm_card_queues'].map((i) => [...P.el(i).lastElementChild.querySelectorAll('.rmh')]).reduce((a, b) => a.concat(b), []);
-    check('RS-03 headers of Radio (4: radio, sens, net, upd), Identity (1), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 7 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
+    check('RS-03 headers of Radio (5: radio, sens, net, upd, blockcall), Identity (1), Position (1), Queues (1) are all .rmh with the status span in child 2 and the button last', hs.length === 8 && hs.every((h) => h.children.length === 3 && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'), hs.length);
     P.w.rmPageLeave();
   }
 
@@ -1867,6 +1870,10 @@ function leaks(P, canary) {
     await poll([E('upd', 'err unsupported', 1, { st: 'err' })]);
     check('NU-25 err unsupported on upd: sentence shown, button disabled, no values', go().disabled && /cannot update itself/.test(X('rm_def_upd').textContent) && !X('rm_v_upd_m'));
     check('NU-26 reply texts for go', /installing v4\.41a/.test(P.w.rmOkText({ cmd: 'upd go v4.41a', reply: 'ok installing v4.41a', msg: 'x' })) && /applying v4\.41a/.test(P.w.rmOkText({ cmd: 'upd go v4.41a', reply: 'ok applying v4.41a', msg: 'x' })));
+    // BLK-01 blockcall: card in the Radio card, field limit from RM_MAX_ARGS, reply texts, input check
+    check('BLK-01 blockcall card is in the Radio card with one text field limited to RM_MAX_ARGS', X('rm_def_blockcall') && X('rm_card_radio').contains(X('rm_def_blockcall')) && !!X('rm_f_blockcall_v') && P.w.rmLen.args === HDR.RM_MAX_ARGS && P.w.rmDefs.filter((d) => d.c === 'blockcall')[0].w[0][3] === HDR.RM_MAX_ARGS, String(P.w.rmLen.args));
+    check('BLK-01 reply texts: read, set, empty list', P.w.rmOkText({ cmd: 'blockcall', reply: 'ok b=DL1ABC,DK5EN-1', msg: 'x' }) === 'Blocked calls: DL1ABC,DK5EN-1.' && P.w.rmOkText({ cmd: 'blockcall DL1ABC', reply: 'ok b=DL1ABC', msg: 'x' }) === 'Done. Blocked calls are now DL1ABC.' && P.w.rmOkText({ cmd: 'blockcall none', reply: 'ok b=-', msg: 'x' }) === 'Done. Blocked calls are now none.' && P.w.rmOkText({ cmd: 'blockcall', reply: 'ok b=-', msg: 'x' }) === 'Blocked calls: none.');
+    check('BLK-01 input check: list and none pass, other characters and over-long input are refused', P.w.rmChk('blockcall', 'dl1abc,DK5EN-1') === false && P.w.rmChk('blockcall', 'none') === false && P.w.rmChk('blockcall', 'DL1ABC;X') !== false && P.w.rmChk('blockcall', 'A'.repeat(HDR.RM_MAX_ARGS + 1)) === 'Too long.');
     check('NU-27 err tokens are not mapped to texts in the page JS (they come from the server message)', !/aubusy|nowifi|noasset|safeboot|err stale/.test(JS.replace(/e=nowifi/g, '')));
     P.w.rmPageLeave();
   }

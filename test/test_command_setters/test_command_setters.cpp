@@ -558,14 +558,14 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
     const std::string names = rm_command_list_names();
     static const char *const pinned[] = {"reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track",
                                          "display", "led", "gateway", "mesh", "txpower", "setout", "radio", "sens",
-                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled", "net", "upd"};
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(25, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 25 names");
+                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled", "net", "upd", "blockcall"};
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(26, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 26 names");
     for (const char *nm : pinned)
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + nm + ",") != std::string::npos, nm);
     size_t count = 0;
     for (char ch : names)
         count += (ch == ',') ? 1 : 0;
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(25 + 1, count, "rm_commands.h does not list exactly 25 commands");
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(26 + 1, count, "rm_commands.h does not list exactly 26 commands");
     for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd"})
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + bad + ",") == std::string::npos, bad);
 

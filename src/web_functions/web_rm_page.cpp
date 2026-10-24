@@ -25,6 +25,7 @@
 #include "web_rm_util.h"
 #include "web_functions.h"
 #include "../rm_commands.h" // RM_NAME_MAX, RM_ATXT_MAX
+#include "../remote_cmd.h"  // RM_MAX_ARGS
 
 /** Remote page body: the sub-header, then the static skeleton. The elements are filled by the scaffold JS.
  *  Every card uses the shared collapsablecard markup (CSS and togglecard() live in web_functions.cpp): teaser span,
@@ -153,9 +154,9 @@ void sub_page_remote()
  *  deliver_scaffold(), inside its <script> block. All global names start with rm. */
 void rmScaffoldJs()
 {
-    web_client.printf("var rmLen={name:%u,atxt:%u};\n", (unsigned)RM_NAME_MAX, (unsigned)RM_ATXT_MAX);
+    web_client.printf("var rmLen={name:%u,atxt:%u,args:%u};\n", (unsigned)RM_NAME_MAX, (unsigned)RM_ATXT_MAX, (unsigned)RM_MAX_ARGS);
     web_client.println("var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmQq=[],rmQp='',rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);");
-    web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list',net:'Network',upd:'Update'};");
+    web_client.println("var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list',net:'Network',upd:'Update',blockcall:'Blocked calls'};");
     web_client.println("var rmUpdT0=0,rmUpdGone=Object.create(null),rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);\n"
                        "function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.';}");
     web_client.println("var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'},rmChgModes=['auto','on','off'];function rmSwLbl(n){return n=='ledflash'?'Light flash':rmTogName[n];}");
@@ -272,17 +273,19 @@ void rmScaffoldJs()
     web_client.println("{c:'txq',card:'queues',l:'TX queue',k:1,v:rmTxqView,t:['tx','Sent','rt','Retransmitted','dr','Dropped']},\n"
                        "{c:'mbox',card:'queues',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Slots used',''],['b','Bytes',''],['a','Actions this hour','']],t:['st','Stored','dl','Delivered','ak','Acknowledged','dr','Dropped','bl','Blocked','nt','Notified']},\n");
     web_client.println("{c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]},\n"
-                       "{c:'net',card:'radio',l:'Network',k:1,x:1,v:rmNetView,u:'This node has no network settings.'},{c:'upd',card:'radio',l:'Software update',k:1,x:1,a:1,v:rmUpdView,u:'This node cannot update itself.'}];\n"
-                       "function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}\n");
+                       "{c:'net',card:'radio',l:'Network',k:1,x:1,v:rmNetView,u:'This node has no network settings.'},{c:'upd',card:'radio',l:'Software update',k:1,x:1,a:1,v:rmUpdView,u:'This node cannot update itself.'},\n");
+    web_client.println("{c:'blockcall',card:'radio',l:'Blocked calls',f:[],n:'The whole list is replaced. Over remote management it can hold '+rmLen.args+' characters (3 or 4 calls); type none to clear it.',w:[['v','Blocked calls','blockcall',rmLen.args,'b']]}];\n");
+    web_client.println("function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}\n");
     web_client.println("function rmChk(k,v){var m;if(v==='')return '';\n"
                        "if(k=='lat'||k=='lon'){m=k=='lat'?90:180;return(/^-?\\d{1,3}(\\.\\d{1,6})?$/.test(v)&&Math.abs(+v)<=m)?false:(k=='lat'?'Latitude':'Longitude')+' must be -'+m+' to '+m+', decimal point, at most 6 decimals.';}\n"
-                       "if(k=='alt')return(/^\\d{1,5}$/.test(v)&&+v<=40000)?false:'Altitude must be a whole number from 0 to 40000.';\n"
+                       "if(k=='alt')return(/^\\d{1,5}$/.test(v)&&+v<=40000)?false:'Altitude must be a whole number from 0 to 40000.';\n");
+    web_client.println("if(k=='blockcall')return v.length>rmLen.args?'Too long.':/^(none|[A-Za-z0-9,-]+)$/i.test(v)?false:'Use calls separated by commas, or the word none.';\n"
                        "return v.length>rmLen[k=='name'?'name':'atxt']?'Too long.':false;}\n");
     web_client.println("function rmWUpd(d){var c=rmSel.call,g=!rmValidCall(c)||rmLocked(),j,w,v,r,x,s,n,t,a=[],y;\n"
                        "for(j=0;j<d.w.length;j++)a.push(rmEl('rm_f_'+d.c+'_'+d.w[j][0]).getAttribute('data-r'));");
     web_client.println("for(j=0;j<d.w.length;j++){w=d.w[j];n='rm_f_'+d.c+'_'+w[0];x=rmEl(n);v=x.value;r=rmChk(w[2],v);t=rmEl(n+'_cnt');if(t)t.textContent=v.length+'/'+w[3];\n"
-                       "y=a.slice();y[j]=v;s=rmEl(n+'_set');s.disabled=g||r!==false||(!!d.p&&(+v==a[j]||a.indexOf('')>=0));s.setAttribute('data-args',y.join(' '));s.setAttribute('data-cf',d.c+' '+y.join(' '));rmTxt(n+'_hint',r||'','font-small rmbad');}}\n"
-                       "function rmWire(x,d){x.addEventListener('input',function(){rmIn[x.id]=x.value;rmWUpd(d);});}\n");
+                       "y=a.slice();y[j]=d.c=='blockcall'?(v.toLowerCase()=='none'?'none':v.toUpperCase()):v;s=rmEl(n+'_set');s.disabled=g||r!==false||(!!d.p&&(+v==a[j]||a.indexOf('')>=0));s.setAttribute('data-args',y.join(' '));s.setAttribute('data-cf',d.c+' '+y.join(' '));rmTxt(n+'_hint',r||'','font-small rmbad');}}\n");
+    web_client.println("function rmWire(x,d){x.addEventListener('input',function(){rmIn[x.id]=x.value;rmWUpd(d);});}\n");
     web_client.println("function rmKv(r,f){var o={},t,i,a;if(typeof r!='string'||r.indexOf('ok ')!==0)return null;t=r.substring(3).split(' ');\n"
                        "for(i=0;i<t.length;i++){if(!f&&/^[na]=/.test(t[i])){o[t[i].charAt(0)]=t.slice(i).join(' ').substring(2);break;}a=t[i].indexOf('=');if(a>0)o[t[i].substring(0,a)]=t[i].substring(a+1);}return o;}\n"
                        "function rmPosKv(p,r){var o={},t,i;if(typeof r!='string'||r.indexOf('ok ')!==0)return null;t=r.substring(3).split(' ');if(t.length!=p.length)return null;for(i=0;i<p.length;i++)o[p[i]]=t[i];return o;}");
@@ -291,6 +294,7 @@ void rmScaffoldJs()
                        "if(n=='sens')return 'Sensors read.';\n"
                        "if(n=='net')return o&&o.mtu?'Network read.':'';if(n=='upd')return rmUpdOk(c,e.reply);\n"
                        "if(n=='name'||n=='atxt'){o=o&&o[n=='name'?'n':'a'];if(t)return 'Done. The '+w+' is now '+(o||t)+'.';return o?'The '+w+' is '+(o=='-'?'empty':o)+'.':'';}\n");
+    web_client.println("if(n=='blockcall'){o=o&&o.b;if(t)return 'Done. Blocked calls are now '+(o=='-'?'none':(o||t))+'.';return o?'Blocked calls: '+(o=='-'?'none':o)+'.':'';}\n");
     web_client.println("if(n=='pos'){if(t)return 'Done. Position set to '+c[1]+', '+c[2]+', '+c[3]+' m.';return q?'Position '+q.lat+', '+q.lon+', '+q.alt+' m, '+rmDefs[4].f[0][3](q.src)+'.':'';}return '';}\n");
     web_client.println("function rmKvRows(p,r){var y=p.appendChild(rmNew('div','rmkv')),i;for(i=0;i<r.length;i++){y.appendChild(rmNew('span','font-small',r[i][0]));y.appendChild(rmNew('span','',r[i][1],r[i][2]));}}");
     web_client.println("function rmNetView(p,o){var w={auto:'automatic',inet:'Internet',hamnet:'HAMNET'},e=o.eff;rmKvRows(p,[['MTU',o.mtu?o.mtu+' bytes':'-','rm_v_net_mtu'],['Server',o.srv||'-','rm_v_net_srv'],['Network',Object.prototype.hasOwnProperty.call(w,o.net)?w[o.net]:o.net||'-','rm_v_net_net'],['Effective uplink',e=='-'?'no IP uplink':e?(w[e]||e):'-','rm_v_net_eff']]);}");
@@ -350,7 +354,7 @@ void rmScaffoldJs()
                        "rmBtn(h,'Read','',dis,{'data-cmd':d.c,'data-args':''});}");
     web_client.println("if(d.v&&(o||d.a))d.v(p,o||{},v);if(o&&d.f&&!d.p){y=p.appendChild(rmNew('div','rmkv'));\n"
                        "for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not present':(f[3]?f[3](e):e)+f[2];y.appendChild(rmNew('span','font-small',f[1]));y.appendChild(rmNew('span','',z,'rm_v_'+d.c+'_'+f[0]));}}if(o&&d.t)rmTiles(p,d.c,o,d.t);");
-    web_client.println("rmWBuild(p,d,o);\n"
+    web_client.println("rmWBuild(p,d,o);if(d.n)p.appendChild(rmNew('div','font-small',d.n));\n"
                        "if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}\n"
                        "y=B.pos.appendChild(rmNew('div','grid rmf'));z=rmKn();rmSwRow(y,'gps',z.sw[0],dis,'enable GPS');rmSwRow(y,'track',z.sw[1],dis,'enable display of SmartBeaconing');rmMhCard(B.mh,dis);if(fid&&rmEl(fid))rmEl(fid).focus();}");
     web_client.println("function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}\n"

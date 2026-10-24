@@ -1311,10 +1311,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 {
     static const char *const kPinned[] = {
         "reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track", "display", "led", "gateway", "mesh",
-        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "net", "upd"};
+        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "net", "upd", "blockcall"};
     const size_t n = sizeof(kPinned) / sizeof(kPinned[0]);
-    TEST_ASSERT_EQUAL_UINT(25, n);
-    TEST_ASSERT_EQUAL_UINT(25, RM_COMMAND_COUNT);
+    TEST_ASSERT_EQUAL_UINT(26, n);
+    TEST_ASSERT_EQUAL_UINT(26, RM_COMMAND_COUNT);
 
     // the list itself, name by name and in order, with a sample argument that fits the shape in column 3
     size_t i = 0;
@@ -1329,6 +1329,7 @@ static void test_allowlist_is_the_pinned_command_list(void)
                            : !strcmp(#shape, "TXPOWER") ? "10"                                                   \
                            : !strcmp(#shape, "SETOUT")  ? "a0 on"                                                \
                            : !strcmp(#shape, "MH")      ? "5"                                                    \
+                           : !strcmp(#shape, "CALLS")   ? "DL1ABC,DK5EN-1"                                       \
                                                         : "";                                                    \
         TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(#nm, good, 0, 22), #nm);                                          \
         /* a stray argument never passes a no-argument shape, and a missing one never passes on/off */         \
@@ -1342,10 +1343,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 #undef CHECK_ROW
     TEST_ASSERT_EQUAL_UINT(n, i);
 
-    // by kind: 5 actions, 6 toggles, 3 parametrised, 7 reads, 4 read/write
+    // by kind: 5 actions, 6 toggles, 3 parametrised, 7 reads, 5 read/write
     TEST_ASSERT_EQUAL_UINT(6, rmCountWhere(rmKindIsToggle));
-    TEST_ASSERT_EQUAL_UINT(11, rmCountWhere(rmKindIsRead));
-    TEST_ASSERT_EQUAL_UINT(4, rmCountWhere(rmKindIsWrite));
+    TEST_ASSERT_EQUAL_UINT(12, rmCountWhere(rmKindIsRead));
+    TEST_ASSERT_EQUAL_UINT(5, rmCountWhere(rmKindIsWrite));
     TEST_ASSERT_EQUAL_INT(RM_CK_TOGGLE, rmCommandKind("led"));
     TEST_ASSERT_EQUAL_INT(RM_CK_RW, rmCommandKind("pos"));
     TEST_ASSERT_EQUAL_INT(RM_CK_READ, rmCommandKind("mh"));
@@ -1628,6 +1629,12 @@ static void test_ext_allowlist_accepts_and_rejects(void)
         {"upd", "go 123456789012345678901234", false}, // 24
         {"upd", "foo", false}, {"upd", "go", false}, {"upd", "go ", false}, {"upd", "go a b", false},
         {"upd", "go v4/41", false}, {"upd", "check now", false}, {"upd", "Check", false}, {"upd", " check", false},
+        {"blockcall", "", true}, {"blockcall", "none", true}, {"blockcall", "DL1ABC", true},
+        {"blockcall", "DL1ABC,DK5EN-1", true}, {"blockcall", "dl1abc,dk5en-1", true},
+        {"blockcall", "123456789012345678901234567890123456789", true},   // 39
+        {"blockcall", "1234567890123456789012345678901234567890", false}, // 40
+        {"blockcall", "DL1ABC;X", false}, {"blockcall", "DL1ABC X", false}, {"blockcall", "DL1ABC.X", false},
+        {"blockcall", "DL1ABC_X", false}, {"blockcall", "DL1ABC|X", false}, {"blockcall", "DL1\xc3\x84", false},
         // the old shapes keep their exact lower-case grammar
         {"gps", "ON", false}, {"txpower", "1O", false}, {"setout", "A0 on", false}, {"setout", "a0 ON", false},
         {"Radio", "", false}, {"RADIO", "", false},
@@ -1644,7 +1651,7 @@ static void test_ext_args_survive_parse_build_and_check(void)
 {
     uint8_t key[32];
     rmDeriveKey(PW, key);
-    const char *cases[][2] = {{"name", "Martin"}, {"atxt", "MeshCom Garten"}, {"mh", "DK5EN-98"}, {"pos", "48.40812 11.73812 492"}, {"upd", "go V4.41A"}};
+    const char *cases[][2] = {{"name", "Martin"}, {"atxt", "MeshCom Garten"}, {"mh", "DK5EN-98"}, {"pos", "48.40812 11.73812 492"}, {"upd", "go V4.41A"}, {"blockcall", "DL1ABC,DK5EN-1"}};
     for (auto &t : cases)
     {
         char wire[160];

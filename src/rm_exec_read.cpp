@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "blocked_calls.h"
 #include "configuration.h"
 #include "gw_servers.h"
 #include "loop_functions.h"
@@ -456,6 +457,16 @@ static int rdUpd(const RmCmd &c, char *res, size_t n)
     return done(res, n, body, rmFmtUpd(body, sizeof(body), st));
 }
 
+static int rdBlockcall(const RmCmd &c, char *res, size_t n)
+{
+    if (c.args[0] != '\0')
+        return 0; // write executor
+    char csv[BLOCKLIST_CSV_MAX];
+    blockListGet(csv, sizeof(csv));
+    char body[RM_FMT_BODY_MAX + 1];
+    return done(res, n, body, rmFmtBlock(body, sizeof(body), csv));
+}
+
 struct ReadRow
 {
     const char *name;
@@ -465,7 +476,7 @@ struct ReadRow
 static constexpr ReadRow kReadRows[] = {
     {"radio", rdRadio}, {"name", rdName}, {"atxt", rdAtxt}, {"pos", rdPos},     {"sens", rdSens},
     {"mh", rdMh},       {"txq", rdTxq},   {"mbox", rdMbox}, {"maxhop", rdMaxhop},
-    {"net", rdNet},     {"upd", rdUpd},
+    {"net", rdNet},     {"upd", rdUpd},   {"blockcall", rdBlockcall},
 };
 static_assert(rmRowsMatchList(kReadRows, rmKindIsRead), "kReadRows = READ and RW rows of rm_commands.h");
 

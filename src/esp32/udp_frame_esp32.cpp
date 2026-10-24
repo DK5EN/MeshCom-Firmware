@@ -32,6 +32,7 @@
 #include "gw_link_status.h"
 #include "gw_reg_runtime.h"
 #include "gw_reg_state.h"
+#include "blocked_calls.h"   // BLK-01
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"  // SNF-GW-01: shared ack/store classification
 #include "msgstore_api.h"   // SNF-GW-03: store node hook on the server ingress
@@ -56,6 +57,7 @@ extern String strSource_call;
 extern bool had_initial_udp_conn;
 extern IPAddress node_hostip;
 void logRxDropUnconfigured(const char *call);
+void logRxDropBlocked(const char *path);   // BLK-01
 
 // UDP functions
 // DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): returns a
@@ -152,9 +154,30 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
         // Der Puffer wird jetzt VOR beiden Bloecken gefuellt.
         memcpy(convBuffer, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, lora_tx_msg_len);
 
+        // BLK-01: decode ONCE, ahead of the EXTUDP tap, so the tap can skip a
+        // frame whose source or path holds a blocked call. decodeAPRS() does
+        // not write the buffer, so the tap still forwards the same bytes; a
+        // frame decodeAPRS() rejects has bBlockedRx == false and is forwarded
+        // exactly as before, and the tap stays ahead of is_new_packet().
+        struct aprsMessage aprsmsg;
+        uint8_t msg_type_b_lora = 0;
+        bool bBlockedRx = false;
         if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
         {
-          if(hasExternIPaddress)
+          msg_type_b_lora = decodeAPRS(convBuffer, lora_tx_msg_len, aprsmsg);
+          if(msg_type_b_lora > 0 && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
+          {
+            // No effect on the node besides the counter: no display, phone,
+            // EXTUDP, KISS, ACK, relay, dedup-ring insert (the clean RF copy
+            // via another relay must stay "new").
+            bBlockedRx = true;
+            logRxDropBlocked(aprsmsg.msg_source_path);
+          }
+        }
+
+        if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
+        {
+          if(hasExternIPaddress && !bBlockedRx)
           {
             if(bEXTUDP)
               sendExtern(true, (char*)"udp", convBuffer, lora_tx_msg_len, 0, 0);
@@ -165,11 +188,10 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
         {
           bool bBLELoopOut = true;
 
+          // server link liveness stays: the server is alive whatever the frame
           last_upd_timer = millis();
           gwLinkNoteRx(millis());
           hb_warn_logged = false;
-
-          struct aprsMessage aprsmsg;
 
           // DR-06 (2026-09-12 decided nrf52-correct): capture decodeAPRS()'s
           // return value and gate everything below on it, matching nRF52
@@ -182,9 +204,8 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           // isUnconfiguredCall("") on the empty source_call a failed decode
           // leaves behind -- that RX-01 coupling below is unchanged and now
           // redundant-but-harmless once decode itself gates entry.
-          uint8_t msg_type_b_lora = decodeAPRS(convBuffer, lora_tx_msg_len, aprsmsg);
-
-          if(msg_type_b_lora > 0)
+          // (decoded above, ahead of the EXTUDP tap -- BLK-01)
+          if(msg_type_b_lora > 0 && !bBlockedRx)
           {
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call);
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);

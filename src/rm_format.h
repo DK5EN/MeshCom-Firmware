@@ -352,6 +352,61 @@ inline size_t rmFmtAtxt(char *out, size_t n, const char *atxt)
     return rmfText(out, n, "a=", atxt, RM_ATXT_MAX);
 }
 
+// ---- blockcall --------------------------------------------------------------------------------------------
+// "b=<csv>" ("b=-" when empty). A csv that does not fit the body is cut at an entry boundary and closed with
+// ",+N" (N = entries left out); an entry is never cut.
+inline size_t rmFmtBlock(char *out, size_t n, const char *csv)
+{
+    RmFmtBuf b;
+    rmfInit(b);
+    rmfStr(b, "b=");
+    if (csv == nullptr || csv[0] == '\0')
+    {
+        rmfCh(b, '-');
+        return rmfEmit(out, n, b);
+    }
+    const size_t room = RM_FMT_BODY_MAX - 2;
+    const size_t total = strlen(csv);
+    if (total <= room)
+    {
+        rmfStr(b, csv);
+        return rmfEmit(out, n, b);
+    }
+    unsigned entries = 1;
+    for (const char *q = csv; *q; q++)
+        if (*q == ',')
+            entries++;
+    // largest k whose first k entries plus ",+N" fit
+    size_t keepLen = 0;
+    unsigned keep = 0;
+    size_t pos = 0;
+    for (unsigned k = 1; k <= entries; k++)
+    {
+        size_t end = pos;
+        while (csv[end] != '\0' && csv[end] != ',')
+            end++;
+        const unsigned left = entries - k;
+        const size_t suffix = left == 0 ? 0 : (left < 10 ? 3 : 4); // ",+N"
+        if (end + suffix > room)
+            break;
+        keep = k;
+        keepLen = end;
+        if (csv[end] == '\0')
+            break;
+        pos = end + 1;
+    }
+    for (size_t i = 0; i < keepLen; i++)
+        rmfCh(b, csv[i]);
+    if (keep < entries)
+    {
+        if (keep > 0)
+            rmfCh(b, ',');
+        rmfCh(b, '+');
+        rmfU(b, entries - keep);
+    }
+    return rmfEmit(out, n, b);
+}
+
 // ---- pos ------------------------------------------------------------------------------------------------
 
 enum RmPosSrc

@@ -35,6 +35,7 @@
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
 #include "sto_notice.h"        // F1/stage 4: :sto custody notice on server ingress
 #include "rm_rx_gate.h"     // RM-GWRELAY: remote management over the server path
+#include "blocked_calls.h"   // BLK-01
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_hook.h"     // SNF-GW-04: shared ack/store classification (mboxClassify)
 #include "msgstore_api.h"      // SNF-GW-04: msgstoreStore/OnAck/Eligible
@@ -59,6 +60,7 @@ extern bool hasExternIPaddress;
 // DR-02: shared with the ESP32 copy (lora_functions.cpp defines it,
 // udp_frame_esp32.cpp:40 already externs it the same way).
 void logRxDropUnconfigured(const char *call);
+void logRxDropBlocked(const char *path);   // BLK-01
 
 /**@brief C1 carve-out (DRY unification U1): everything that happens once a
  * datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0 when the
@@ -152,9 +154,29 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // the length argument to (uint8_t) for no reason (drift DR-19 --
       // latent truncation risk if UDP_TX_BUF_SIZE is ever raised past 255,
       // removed now while it is still a no-op).
+      // BLK-01: decode ONCE, ahead of the EXTUDP tap, so the tap can skip a
+      // frame whose source or path holds a blocked call. decodeAPRS() does
+      // not write the buffer, so the tap still forwards the same bytes; a
+      // frame decodeAPRS() rejects has bBlockedRx == false and is forwarded
+      // exactly as before, and the tap stays ahead of is_new_packet().
+      struct aprsMessage aprsmsg;
+      uint8_t msg_type_b_lora = 0;
+      bool bBlockedRx = false;
       if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
       {
-        if(hasExternIPaddress)
+        msg_type_b_lora = decodeAPRS(RcvBuffer, neth.lora_tx_msg_len, aprsmsg);
+        if(msg_type_b_lora > 0 && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
+        {
+          // No effect on the node besides the counter: no display, phone,
+          // EXTUDP, KISS, ACK, relay, dedup-ring insert.
+          bBlockedRx = true;
+          logRxDropBlocked(aprsmsg.msg_source_path);
+        }
+      }
+
+      if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
+      {
+        if(hasExternIPaddress && !bBlockedRx)
         {
           if(bEXTUDP)
             sendExtern(true, (char*)"udp", RcvBuffer, neth.lora_tx_msg_len, 0, 0);
@@ -165,12 +187,8 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       {
         bool bBLELoopOut = true;
 
-        struct aprsMessage aprsmsg;
-        
-        // print which message type we got
-        uint8_t msg_type_b_lora = decodeAPRS(RcvBuffer, neth.lora_tx_msg_len, aprsmsg);
-
-        if(msg_type_b_lora > 0)
+        // (decoded above, ahead of the EXTUDP tap -- BLK-01)
+        if(msg_type_b_lora > 0 && !bBlockedRx)
         {
           if(bDisplayInfo)
           {

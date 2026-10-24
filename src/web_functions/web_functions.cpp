@@ -32,6 +32,7 @@
 #include "own_msg_status.h" // durable per-message delivery state for the messages-page tick
 #include "rm_runtime.h"          // RM-07 (#1189): RmStats/g_rmStats for the info page RM row
 #include <prod_lock.h>      // prodLockNormalise(): an imported file may hold values the setters now refuse
+#include <blocked_calls.h> // BLK-01: info row + setup card
 #include <instrument.h>     // INSTRUMENT_ENABLED
 #include "web_server_gate.h" // WEB-STOP-01: stopWebserver() acts on a running server only
 #include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
@@ -3815,6 +3816,23 @@ void sub_page_setup()
     web_client.println("</div>");
 #endif
 
+    // BLK-01: blocked callsigns card (not tied to the store node).
+    web_client.println("<div class=\"cardlayout collapsablecard\">");
+    web_client.println("<label class=\"cardlabel\">Blocked callsigns</label>");
+    web_client.println("<span>Open this to drop frames from unwanted stations.</span>\n");
+    web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
+    web_client.println("<div class=\"cardbody\">");
+    web_client.println("<div class=\"grid grid3\">");
+    {
+        char blkcsv[BLOCKLIST_CSV_MAX];
+        blockListGet(blkcsv, sizeof(blkcsv));
+        _create_setup_textinput_element("blockcall", "Callsign list (up to 16)", String(blkcsv), "DL1ABC,DL2XYZ-12", "blockcall", BLOCKLIST_CSV_MAX + BLOCKLIST_MAX, false, false);
+    }
+    web_client.println("</div>");
+    web_client.println("<div class=\"mbx-warn\">Frames from, or relayed by, a listed call are dropped: not shown, not uploaded, not relayed. A call without SSID blocks all its SSIDs. An empty field clears the list.</div>");
+    web_client.println("</div>"); // cardbody
+    web_client.println("</div>");
+
     // Config Backup / Restore Section (CS-03)
     // The download is a plain navigation to /config.json -- the response
     // carries a Content-Disposition, so the browser saves it instead of
@@ -4364,6 +4382,14 @@ void sub_page_info()
             web_client.printf("<tr><td>RTC UTC Date/Time</td><td>%s</td></tr>\n", getStringRTCNow().c_str());
         }
     #endif
+
+    { // BLK-01
+        char blkcsv[BLOCKLIST_CSV_MAX];
+        blockListGet(blkcsv, sizeof(blkcsv));
+        String blkshow = blkcsv[0] ? String(blkcsv) : String("none");
+        blkshow.replace(",", ", ");
+        web_client.printf("<tr><td>Blocked calls</td><td>%s (dropped %lu)</td></tr>\n", htmlEscape(blkshow).c_str(), (unsigned long)blockListDrops());
+    }
 
     // web_client.printf("<tr><td></td><td></td></tr>\n", );
     // web_client.printf("<tr><td></td><td></td></tr>\n", );

@@ -149,6 +149,7 @@ enum RmArgShape : uint8_t
     RM_ARGS_POS,     // none (read) | "<lat> <lon> <alt>" (write)
     RM_ARGS_MH,      // row index 0..999 | callsign with optional SSID
     RM_ARGS_UPD,     // none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23
+    RM_ARGS_CALLS,   // none (read) | "none" | comma list of [A-Za-z0-9,-] 1..RM_MAX_ARGS (syntax only, the executor validates)
 };
 
 struct RmAllowRow
@@ -198,6 +199,19 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
         for (const char *q = a; *q; q++)
             digits = digits && *q >= '0' && *q <= '9';
         return digits ? rmArgIsRowIndex(a) : rmArgIsCall(a);
+    }
+    case RM_ARGS_CALLS:
+    {
+        if (a[0] == '\0')
+            return true;
+        for (const char *q = a; *q; q++)
+        {
+            const char ch = *q;
+            if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == ',' ||
+                  ch == '-'))
+                return false;
+        }
+        return strlen(a) <= RM_MAX_ARGS;
     }
     case RM_ARGS_UPD:
     {

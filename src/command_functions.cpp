@@ -10,6 +10,7 @@
 #include "printfdeb_functions.h"
 #include "mc_board_id.h" // F4-1a: --id board marker
 #include "command_match.h" // D2-10: commandMatches(), the ladder's matching rule
+#include "blocked_calls.h" // BLK-01: --blockcall
 #include "command_toggles.h" // D2-06: the table-driven on/off toggles
 #include "command_setters.h" // D2-07: numeric argument parse/range/store
 #include "node_position.h"    // DRY-01: hemisphere split / signed decode of the own position
@@ -1431,6 +1432,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--store off/own/list/heard store-node mode\n--storecall <list>/none store-node call list (list mode)\n--storetime 1-168       store-node hold hours (no value: show)\n--storeslots 1-50       store-node mailbox slots (no value: show)\n--storenotice on/off    sender-visible custody notice\n--stor on/off           announce mailbox calls to the server (STOR, default off)\n--mbox                  store-node mailbox contents\n");
             #endif
             printdeb("--mesh on/off           relay foreign frames\n");
+            printdeb("--blockcall <list>/none  blocked calls, dropped and not relayed (CALL = all SSIDs)\n");
             printdeb("--remotemgmt on/off     remote management via LoRa (RM1, needs --passwd)\n");
             printdeb("--rmstrictsecurity on/off  RM brute-force protection (default off): per-sender lockout,\n"
                      "                          receiver rate limits and sender spacing/budget. Off = no punishment.\n"
@@ -4686,6 +4688,39 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // BLK-01: call blocklist. Full write; "none" clears; no argument shows.
+    // Not inside ENABLE_MSGSTORE. "blockcall" (exact) and "blockcall " (argument form) cannot shadow each other.
+    if(commandCheck(msg_text+2, (char*)"blockcall ") == 0 || commandCheck(msg_text+2, (char*)"blockcall") == 0)
+    {
+        char blk[BLOCKLIST_CSV_MAX] = {0};
+        char bad[BLOCKLIST_CSV_MAX] = {0};
+        bool blkArg = (commandCheck(msg_text+2, (char*)"blockcall ") == 0);
+        const char *blkIn = blkArg ? msg_text+12 : "";
+        while(*blkIn == ' ')
+            blkIn++;
+
+        if(*blkIn != 0)
+        {
+            if(!blockListSet(blkIn, bad, sizeof(bad)))
+            {
+                Serial.printf("[ERR];blockcall;%s\n", bad);
+                printfdeb("Blocked calls not changed, invalid entry %s (max %d)\n", bad, BLOCKLIST_MAX);
+                return;
+            }
+            if(!blockListSave())
+            {
+                Serial.printf("[ERR];blockcall;save\n");
+                printfdeb("Blocked calls set, but NOT saved to flash (lost at reboot)\n");
+            }
+        }
+
+        blockListGet(blk, sizeof(blk));
+        Serial.printf("[BLOCK];list;%s\n", blk);
+        printfdeb("Blocked calls: %s\n", blk[0] ? blk : "none");
+
+        return;
+    }
+    else
     // Store node (mailbox) settings, stage 3 (docs/dm-stage3-wave-plan-20260914.md)
     // + stage 4 sender-visible custody notice (docs/dm-stage4-plan-20260914.md).
     // T13: persisted through msgstore_settings.cpp's own keys/file, never
@@ -7342,6 +7377,11 @@ void commandAction(char *umsg_text, bool ble)
             }
             if(gwRegBlocked())
                 printfdeb("...REGISTRATION: failed\n");
+            { // BLK-01
+                char blk[BLOCKLIST_CSV_MAX];
+                blockListGet(blk, sizeof(blk));
+                printfdeb("...BLOCKED: %s (dropped %lu)\n", blk[0] ? blk : "none", (unsigned long)blockListDrops());
+            }
             #ifdef ESP32
             { // RM-NVS-01: NVS fill level (RM "remember password" fails when the 20 KB partition is full)
                 NvsDiagStats nst;

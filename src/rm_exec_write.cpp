@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "blocked_calls.h"
 #include "configuration.h"
 #include "command_functions.h"
 #include "gps_functions.h"
@@ -71,6 +72,21 @@ int writeText(const RmCmd &c, char *res, size_t n, bool isName)
         return fail(res, n, "err failed");
     const size_t len = isName ? rmFmtName(body, n - 3, stored) : rmFmtAtxt(body, n - 3, stored);
     return okFrom(res, n, len);
+}
+
+// blockcall: full write of the call blocklist ("none" clears). Invalid list -> err text, list unchanged.
+int writeBlockcall(const RmCmd &c, char *res, size_t n)
+{
+    char bad[BLOCKLIST_CALL_MAX + 12];
+    if (!blockListSet(c.args, bad, sizeof(bad)))
+        return fail(res, n, "err text");
+    if (!blockListSave())
+        return fail(res, n, "err failed");
+    char csv[BLOCKLIST_CSV_MAX];
+    blockListGet(csv, sizeof(csv));
+    if (n < 4)
+        return fail(res, n, "err failed");
+    return okFrom(res, n, rmFmtBlock(res + 3, n - 3, csv));
 }
 
 // True when the stored double reproduces the requested value at 5 decimals.
@@ -158,6 +174,7 @@ constexpr WriteRow kWriteRows[] = {
     {"atxt", writeAtxt},
     {"pos", writePos},
     {"upd", writeUpd},
+    {"blockcall", writeBlockcall},
 };
 static_assert(rmRowsMatchList(kWriteRows, rmKindIsWrite), "kWriteRows = RW rows of rm_commands.h");
 

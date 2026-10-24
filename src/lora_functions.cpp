@@ -100,6 +100,7 @@
 #endif
 
 #include "lora_functions.h"
+#include "blocked_calls.h"   // BLK-01
 #if defined(EXTERNAL_RADIO)
 #include "external_radio_txq.h"   // async external-TX ownership record
 #endif
@@ -286,6 +287,27 @@ static uint32_t extractRingMsgId(int slot)
 // into the "dropped" count on the next line that does print (TM-21's
 // lesson).
 uint32_t stat_rx_drop_unconfigured = 0;
+
+// BLK-01: same rate-limited marker for the call blocklist.
+void logRxDropBlocked(const char *path)
+{
+    static bool s_have_marker = false;
+    static uint32_t s_last_marker_ms = 0;
+    static uint32_t s_dropped_since_marker = 0;
+
+    blockListNoteDrop();
+    s_dropped_since_marker++;
+
+    uint32_t now = (uint32_t)millis();
+    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
+    {
+        Serial.printf("[RX];drop;blocked;path;%s;ms;%lu;dropped;%lu\n",
+                      path, (unsigned long)now, (unsigned long)s_dropped_since_marker);
+        s_have_marker = true;
+        s_last_marker_ms = now;
+        s_dropped_since_marker = 0;
+    }
+}
 
 void logRxDropUnconfigured(const char *call)
 {
@@ -1028,11 +1050,28 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     {
         memcpy(RcvBuffer, payload, size);
 
+        // BLK-01: decode BEFORE the ring scan so a blocked call (source or any
+        // path element) can be recognised there. decodeAPRS() only reads
+        // RcvBuffer; the scan below only touches the TX ring.
+        struct aprsMessage aprsmsg;
+
+        // print which message type we got
+        uint16_t msg_type_b_lora = decodeAPRS(RcvBuffer, size, aprsmsg);
+#if INSTRUMENT_ENABLED
+        INSTR_PH("dec");
+#endif
+
+        // BLK-01: a blocked frame has no effect on this node except the drop
+        // counter/log (further down): not the RX-OK ring release, not the
+        // HN/NBR topology feed, not the NBR relay cover, not the main branch.
+        const bool rx_blocked = msg_type_b_lora != 0 &&
+                                isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path);
+
         // RX-OK do not need retransmission
         // RX-OK: find matching ring buffer slot and release it
         uint32_t dbg_msg_id = 0;
         int rxSlot = -1;
-        for(int i = 0; i < MAX_RING; i++)
+        for(int i = 0; !rx_blocked && i < MAX_RING; i++)
         {
             if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY &&
                ringBuffer[i][1] != RING_STATUS_INFLIGHT) // INFLIGHT: doTX() ends it (TXP W1b)
@@ -1144,14 +1183,6 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             }
         }
 
-        struct aprsMessage aprsmsg;
-        
-        // print which message type we got
-        uint16_t msg_type_b_lora = decodeAPRS(RcvBuffer, size, aprsmsg);
-#if INSTRUMENT_ENABLED
-        INSTR_PH("dec");
-#endif
-
         // TM-06(a): no-op unless this call is draining a staged raw-inject
         // frame (test_inject.cpp) -- see test_inject_service() below.
         test_inject_raw_report(size, msg_type_b_lora);
@@ -1214,7 +1245,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         // Block. Der Selbstschutz gegen das eigene Echo ist bei max_hop 0
         // eigentlich unerreichbar (kein Relay wiederholt so ein Frame), bleibt
         // aber als Guard stehen.
-        if(msg_type_b_lora != 0 && aprsmsg.payload_type == '@' &&
+        // BLK-01: a blocked call's HN report (or one with a blocked relay in
+        // the path) skips this branch and lands in the blocked drop below.
+        if(msg_type_b_lora != 0 && !rx_blocked && aprsmsg.payload_type == '@' &&
            is_equ(aprsmsg.msg_destination_call, "HN") &&
            !is_equ(aprsmsg.msg_source_call, meshcom_settings.node_call))
         {
@@ -1290,7 +1323,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         // decodeAPRS() aus (aprsmsg waere dann nicht verlaesslich befuellt);
         // der Absender-Retry (ein einzelnes Pfad-Token) und das eigene Echo
         // (letzter Hop == ich) duerfen diesen Zweig nie erreichen.
-        if(bNBRRELAY && msg_type_b_lora != 0 &&
+        if(bNBRRELAY && msg_type_b_lora != 0 && !rx_blocked &&
            (aprsmsg.payload_type == ':' || aprsmsg.payload_type == '!' || aprsmsg.payload_type == '@') &&
            strchr(aprsmsg.msg_source_path, ',') != NULL &&
            !is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
@@ -1467,6 +1500,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
                                 aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "unconf", 0, -1);
+                setlogPrint(setlog_buf);
+            }
+        }
+        else if(rx_blocked)
+        {
+            // BLK-01: blocked call as source or in the path -- same exit as RX-01.
+            logRxDropBlocked(aprsmsg.msg_source_path);
+
+            if(bDisplayLog && !rx_dup)
+            {
+                setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
+                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "blocked", 0, -1);
                 setlogPrint(setlog_buf);
             }
         }

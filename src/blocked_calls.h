@@ -58,5 +58,10 @@ uint32_t blockListDrops();
 // ---- persistence (host: no-ops) ----------------------------------------
 void blockListLoad();
 bool blockListSave();
+// false after a save that did not reach flash (full NVS); the RAM list is set anyway
+bool blockListLastSaveOk();
+#if defined(NATIVE_BUILD)
+void blockListTestFailSave(bool fail);   // host tests only
+#endif
 
 #endif

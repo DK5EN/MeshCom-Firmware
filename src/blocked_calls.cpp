@@ -35,6 +35,7 @@ static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static char s_csv[BLOCKLIST_CSV_MAX];   // canonical "A,B,C", empty = no blocking
 static volatile uint32_t s_drops = 0;
+static bool s_last_save_ok = true;
 
 // ---- normalisation -----------------------------------------------------
 
@@ -333,6 +334,7 @@ bool isBlockedInPath(const char *path)
 }
 
 void blockListNoteDrop() { s_drops = s_drops + 1; }
+bool blockListLastSaveOk() { return s_last_save_ok; }
 uint32_t blockListDrops() { return s_drops; }
 
 // ---- persistence -------------------------------------------------------
@@ -342,7 +344,9 @@ uint32_t blockListDrops() { return s_drops; }
 #if defined(NATIVE_BUILD)
 
 void blockListLoad() {}
-bool blockListSave() { return true; }
+static bool s_host_save_fail = false;   // host tests: simulate a full NVS
+void blockListTestFailSave(bool fail) { s_host_save_fail = fail; }
+static bool blockListSaveImpl() { return !s_host_save_fail; }
 
 #else
 
@@ -362,24 +366,51 @@ static void applyLoaded(const char *raw)
 
 #if defined(ESP32)
 
+// Own namespace: clear_flash() wipes "Credentials" on --reset and on a settings
+// layout bump; the blocklist survives both, like the nRF52 file does. The fork
+// build stored it as "Credentials"/"block_list"; that key is migrated once.
+static const char kBlockNs[] = "blocklist";
+static const char kBlockKey[] = "block_list";
+
 void blockListLoad()
 {
     Preferences prefs;
-    prefs.begin("Credentials", false);
-    String v = prefs.getString("block_list", "");
+    prefs.begin(kBlockNs, false);   // read-write: a read-only open of a missing namespace logs an error
+    bool have = prefs.isKey(kBlockKey);
+    String v = have ? prefs.getString(kBlockKey, "") : String("");
     prefs.end();
+
+    if (!have)
+    {
+        // legacy key: migrate, then remove it so a later cleared list cannot
+        // be resurrected from it
+        prefs.begin("Credentials", false);
+        bool legacy = prefs.isKey(kBlockKey);
+        v = legacy ? prefs.getString(kBlockKey, "") : String("");
+        applyLoaded(v.c_str());
+        // remove it only once the new copy is stored: a failed save keeps the
+        // legacy key, and the next boot migrates again
+        if (legacy && blockListSave())
+            prefs.remove(kBlockKey);
+        prefs.end();
+        return;
+    }
     applyLoaded(v.c_str());
 }
 
-bool blockListSave()
+static bool blockListSaveImpl()
 {
     char tmp[BLOCKLIST_CSV_MAX];
     blockListGet(tmp, sizeof(tmp));
     Preferences prefs;
-    prefs.begin("Credentials", false);
-    prefs.putString("block_list", String(tmp));
+    if (!prefs.begin(kBlockNs, false))
+        return false;
+    // putString() returns the bytes written, 0 on failure (full NVS); an empty
+    // list is stored as a removed key so it never looks like a write failure
+    bool ok = tmp[0] ? prefs.putString(kBlockKey, tmp) == strlen(tmp)
+                     : (!prefs.isKey(kBlockKey) || prefs.remove(kBlockKey));
     prefs.end();
-    return true;
+    return ok;
 }
 
 #else // nRF52
@@ -405,7 +436,7 @@ void blockListLoad()
     applyLoaded(buf + ml);
 }
 
-bool blockListSave()
+static bool blockListSaveImpl()
 {
     char csv[BLOCKLIST_CSV_MAX];
     blockListGet(csv, sizeof(csv));
@@ -427,3 +458,9 @@ bool blockListSave()
 
 #endif // ESP32 / nRF52
 #endif // NATIVE_BUILD
+
+bool blockListSave()
+{
+    s_last_save_ok = blockListSaveImpl();
+    return s_last_save_ok;
+}
