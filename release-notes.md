@@ -3,7 +3,7 @@
 
 ## What this release is
 
-**`v4.40a.10.24` is `v4.40a.10.23` plus three small fixes: the Polish gateway server moves to `sp.meshcom.pl`, the Heltec Wireless Tracker gets enough memory for Auto Update, and a factory-fresh T-Beam starts with GPS on instead of TRACK.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
+**`v4.40a.10.24` is `v4.40a.10.23` plus four small fixes: the Polish gateway server moves to `sp.meshcom.pl`, the Heltec Wireless Tracker gets enough memory for Auto Update, a factory-fresh T-Beam starts with GPS on instead of TRACK, and a remote-management command sent from the phone app stops repeating once the target answers.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
 
 ### Action needed
 
@@ -49,6 +49,10 @@
   - A TLS failure caused by low memory now reports `lowheap_tls` (web GUI: the low-memory state) instead of a connection error, and counts as one download attempt.
   - `--info` gains a `HEAP free/min/blk` line on every ESP32 and the display buffer size on the tracker.
   - Background: [`docs/campaign-au21-tft-heap-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-au21-tft-heap-20261024.md).
+- **A remote-management command from the phone app stops repeating once the target answers** (fork only, remote management).
+  - Since `v4.40a.10.11` an own `RM1` command repeats until the target replies. Only commands sent with `--rm` on the node itself had that stop.
+  - A command composed in McApp (Extern-UDP or BLE), on the serial console or in the web GUI was sent with 3 repeats even after the target had answered within seconds, and the node logged `RETRANSMIT_GIVEUP` (field log `DK5EN-98` to `DK5EN-1`, 2026-10-24).
+  - Now the reply to such a command stops the repeats: `[RM];stop;client;<dst>;ctr;<n>;slot;<s>`. The node holds no key for these commands, so the stop is unverified. A forged reply can only cut the repeats (the old send-once behaviour); the client still verifies the reply itself.
 - **A factory-fresh T-Beam starts with GPS on, not TRACK** (TRK-03).
   - Since V4.21 the first-boot default set the TRACK bit where it meant GPS (wrong bit value), so an erased T-Beam booted with TRACK on and GPS off.
   - Only an erased node gets the new default. Existing nodes keep their stored setting: check `--pos`, and use `--track off` / `--gps on` if needed.
@@ -251,13 +255,13 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 ### Verification for this release
 
-- **Host suite:** 2876 test cases in 80 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1352, web GUI incl. the Auto Update low-memory state, web flasher). New: the tracker display-buffer lifecycle and T-Beam first-boot suites.
+- **Host suite:** 2891 test cases in 81 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1352, web GUI incl. the Auto Update low-memory state, web flasher). New: the tracker display-buffer lifecycle, T-Beam first-boot and remote-management client-command suites.
 - **Build:** all release images built by CI (27 ESP32, 3 nRF52, Safeboot), and the 27 `.autoupdate` files re-inflated byte-exact.
-- **Idle heap gate skipped** for this release (operator decision): the T-Beam code change is limited to the new `--info` heap line and update-check bookkeeping. The `v4.40a.10.23` result stands: 70296 B against the 69332 B baseline.
+- **Idle heap gate skipped** for this release (operator decision): the T-Beam code changes are small (the new `--info` heap line, update-check bookkeeping, a four-entry remote-management table). The `v4.40a.10.23` result stands: 70296 B against the 69332 B baseline.
 - **Benched for this release (2026-10-24):**
   - Auto Update check on Heltec V3 (`DK5EN-1`) with the AU-21 code: the check passes, no allocation failure, `--info` shows the heap line.
   - TRK-03 on T-Beam v1.2 (`DK5EN-92`): erased and reflashed, the bug confirmed (TRACK on, GPS off on first boot); the fix is covered by a regression test that fails on the old value.
-- **Host-tested only:** the tracker display-buffer release and re-acquire (no Wireless Tracker on our bench), and the TRK-03 fix itself (no second erase on hardware).
+- **Host-tested only:** the tracker display-buffer release and re-acquire (no Wireless Tracker on our bench), the TRK-03 fix itself (no second erase on hardware), and the remote-management repeat stop (not benched; new suite with 15 cases).
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
@@ -319,6 +323,7 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 **Not benched (host tests or builds only)**
 
+- **Remote-management repeat stop for client commands:** host tests and builds only; not yet run over the air between two nodes.
 - **Wireless Tracker memory fix (AU-21):** no tracker on our bench; display-buffer release and re-acquire are host tests and builds only until the first field report. Still open: the ESP32-S3 memory floor for TLS and a Bluetooth pause before the check on S3 boards.
 - **Transmit queue in the field:** a 24 h capture on the gateway `DK5EN-98` started on 2026-10-24 and is not evaluated yet. The expiry times (300/120/90 s) may be tuned after it; in a small older sample (27 relayed frames, 2026-10-18) the slowest 10 % waited longer than 300 s and would now be dropped. The relay-side time-beacon gate was not seen on air (host tests only).
 - **Call blocklist:** taking over the DM3KS build's stored list was not benched on hardware.
@@ -393,7 +398,7 @@ With default settings, compared with the official `v4.40a.hbserver`:
 - **No PR of ours is open upstream.** The board marker and `--id` are planned as a PR.
 - **Fork-only so far:**
   - the "WEBServer stopped" fix (the bug is in upstream `dev` too) and the NVS diagnostics in remote management
-  - the Wireless Tracker memory fix (AU-21) and the T-Beam first-boot fix (TRK-03, planned as a PR) of this release
+  - the Wireless Tracker memory fix (AU-21), the T-Beam first-boot fix (TRK-03, planned as a PR) and the remote-management repeat stop of this release
   - the transmit queue pool and the call blocklist of `v4.40a.10.23`; its fixes (AU-18/19/20, WEB-RX-01, RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04) are planned as PRs
   - everything of `v4.40a.10.19`: queue work, setting lock, Auto Update web row, heap and LED work, `sens` fix, neighbour-page fix
   - Safeboot v3 and the web flasher changes
