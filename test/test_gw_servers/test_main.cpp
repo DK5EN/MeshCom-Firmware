@@ -153,8 +153,8 @@ static void test_table_values_every_cell(void)
     expectTarget("HC", GW_NET_HAMNET, nullptr, hcH, nullptr, hcN);
     expectTarget("HB", GW_NET_INET, "meshcom.emcomm.ch", hbI, "pool.ntp.org", pool);
     expectTarget("HB", GW_NET_HAMNET, nullptr, hbH, nullptr, hbN);
-    expectTarget("SP", GW_NET_INET, "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool);
-    expectTarget("SP", GW_NET_HAMNET, "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool);
+    expectTarget("SP", GW_NET_INET, "sp.meshcom.pl", spI, "pool.ntp.org", pool);
+    expectTarget("SP", GW_NET_HAMNET, "sp.meshcom.pl", spI, "pool.ntp.org", pool);
 
     // table structure
     TEST_ASSERT_EQUAL(GWM_VIA, gwFind("DL")->side[GW_NET_HAMNET].mode);
@@ -307,8 +307,8 @@ static void test_resolve_node_end_to_end(void)
         {"HC", 1, "hamnet", nullptr, hcH, nullptr, hcN},
         {"HB", 0, "inet", "meshcom.emcomm.ch", hbI, "pool.ntp.org", pool},
         {"HB", 1, "hamnet", nullptr, hbH, nullptr, hbN},
-        {"SP", 0, "inet", "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool},
-        {"SP", 1, "inet", "spmeshcom.dynalias.com", spI, "pool.ntp.org", pool},
+        {"SP", 0, "inet", "sp.meshcom.pl", spI, "pool.ntp.org", pool},
+        {"SP", 1, "inet", "sp.meshcom.pl", spI, "pool.ntp.org", pool},
     };
     for (const C &c : cs) {
         GwTarget t;

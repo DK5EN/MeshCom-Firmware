@@ -22,7 +22,7 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
   LED parity, the LoRa QRT waves 1-2 and the neighbour-page watchdog feed. Matrix:
   [`fork-dev-vs-upstream-20261018.md`](fork-dev-vs-upstream-20261018.md).
 - **Released in `v4.40a.10.23`** (2026-10-24, CI, Latest): AU-18, AU-19, AU-20, UDP-04, RX-DEAF-01/02,
-  WEB-RX-01, GWRX-01, BL-01 tests, upstream #1235, GWACK-01, TX pool W0-W1c, BLK-01. Unreleased on fork-dev: nothing.
+  WEB-RX-01, GWRX-01, BL-01 tests, upstream #1235, GWACK-01, TX pool W0-W1c, BLK-01. Unreleased on fork-dev: SP server host `sp.meshcom.pl` (was `spmeshcom.dynalias.com`, same IP; 2026-10-24).
 - **Open work:** section 3.2, one table. Rows carry their own dated status; rows marked Done or
   Closed stay until their upstream PR or follow-up is through, then move to
   [`archive/backlog-closed-20261024.md`](archive/backlog-closed-20261024.md).

@@ -12,7 +12,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - **`v4.40a.10.23` released 2026-10-24** (operator chose the 10.23 date): TX pool W0-W1c, BLK-01 `--blockcall`,
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
-  `check`: 30 boards, 0 mismatches. Unreleased on `fork-dev`: nothing. The five nodes run the gate build of
+  `check`: 30 boards, 0 mismatches. Unreleased on `fork-dev`: SP gateway server host renamed to
+  `sp.meshcom.pl` (same IP 146.59.232.234, operator request 2026-10-24). The five nodes run the gate build of
   `3e07f894` (functionally identical; `FLASH_VERSION` 20261022, no tag string), left in place for the logger night.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
