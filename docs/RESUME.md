@@ -18,9 +18,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
 - **Campaign resume points with open steps:**
-  - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92; DK5EN-98 runs the W0
-    image with a 24 h logger until 2026-10-25 12:30, then evaluate and decide TTL values, the DK5EN-98 flash and the
-    release ([campaign-tx-pool.md](campaign-tx-pool.md)).
+  - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. All five nodes
+    (DK5EN-1/-14/-90/-92/-98) run the gate build of `3e07f894` (TXP + BLK-01) since 2026-10-24 16:20; 24 h loggers on
+    rpizero for DK5EN-98 and DK5EN-14 until 2026-10-25 16:21 (`screen` sessions `txp-98`, `txp-14`). Then evaluate
+    against the W0 baseline and decide TTL values and the release ([campaign-tx-pool.md](campaign-tx-pool.md)).
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
   - Fork hardening: visual LED confirmation, phone-app SN check, deep-sleep LED test, LED pins on T-Echo, T114,
@@ -38,7 +39,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
 - BLK-01 call blocklist `--blockcall`: on fork-dev 2026-10-24 (`ecf00df0`, `1635ba56`, `986aa573`), benched
   DK5EN-1/-90/-92, DK5EN-98 runs the build (list empty). Not released; ships with the next release so the third-party
-  DM3KS build (sku2atsc/MeshCom-Firmware, DB0SD area) can retire. Open: flash DK5EN-14 (offline on 10-24), fork-key
+  DM3KS build (sku2atsc/MeshCom-Firmware, DB0SD area) can retire. DK5EN-14 flashed 10-24 16:09. Open: fork-key
   migration not benched ([campaign-blockcall.md](campaign-blockcall.md)).
 - GPS: baro fusion tau (GPS-05b), operator decision.
 - Stability: REBOOT-98 (single event, watch); BL-04 closed with WEB-WDT-01.

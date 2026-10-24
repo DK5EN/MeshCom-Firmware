@@ -6,7 +6,7 @@
 | Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                         |
 | Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md) |
 | Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                       |
-| Status    | W0-W1c committed and benched (2026-10-24); open: DK5EN-98 night evaluation (until 2026-10-25 12:30), release decision                                                            |
+| Status    | W0-W1c committed and benched; all five nodes on `3e07f894` since 2026-10-24 16:20; open: night evaluation (until 2026-10-25 16:21), TTL and release decision                     |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -149,3 +149,25 @@ Logs in `tools/bench/runs/harness/` (raw, gitignored): `txp-w1c-dk5en1-rearm3.lo
 
 Not run: the relay-side `{CET}` gate on air (bench nodes run `--mesh off`; covered by native tests)
 and a 1 h gwflood replay.
+
+### Fleet flash and logger night 2026-10-24 (gate build of `3e07f894`, TXP + BLK-01)
+
+Gate before the flash: `tools/regression.sh --stage 1,2` PASS (80 Unity envs, 2861/2861), all 32 `default_envs`
+built as production images (no INSTRUMENT, no build tag), `make_autoupdate.py --check` 27/27 app images. Images
+string-checked for `RING_SUPERSEDE` (TXP) and the `--blockcall` help text (BLK-01).
+
+| Node     | Board       | Method                                   | Build                    |
+| -------- | ----------- | ---------------------------------------- | ------------------------ |
+| DK5EN-1  | Heltec V3   | OTA `.autoupdate` (1.20->1.89 MB)        | `Oct 24 2026 / 16:01:45` |
+| DK5EN-92 | T-Beam      | OTA `.autoupdate` (1.26->2.02 MB)        | `Oct 24 2026 / 16:07:01` |
+| DK5EN-14 | T-Deck Plus | OTA `.autoupdate` (1.61->2.51 MB)        | `Oct 24 2026 / 16:09:55` |
+| DK5EN-90 | RAK4631     | USB DFU (no WiFi OTA on nRF52)           | `Oct 24 2026 / 16:11:33` |
+| DK5EN-98 | Heltec V3   | OTA `.autoupdate`, same image as DK5EN-1 | `Oct 24 2026 / 16:01:45` |
+
+W0 baseline: the W0 logger was stopped with SIGINT at 16:19 (flags restored), `~/meshlog/dk5en-98-txp-w0/`
+holds 12:30-16:19 (57 808 lines) of the W0 image, plus the 10-18 sample above.
+
+Loggers on rpizero, detached `screen` sessions (survive the SSH session, not a rpizero reboot), 24 h from
+2026-10-24 16:21: `txp-98` -> `~/meshlog/dk5en-98-txp-w1c/`, `txp-14` -> `~/meshlog/dk5en-14-txp-w1c/`
+(stdout in `~/meshlog/run-txp-w1c-98.out`, `run-txp-w1c-14.out`). Evaluate against W0: per-prio age at TX,
+`[CET]` ages and drops, `RING_DROP_*` / `RING_SUPERSEDE*` counts, full events, gauge counts.
