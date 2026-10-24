@@ -9,10 +9,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **Campaign BL-01 + GWRX-01 nRF52 (2026-10-24, `/orchestrate-waves`):** W1 done (`deea597f` BL-01 `--mesh off`
-  pinned, mock `--delay-client`; `57d34631` bench driver `tools/bench/gwrx_bench.py`). W2 done: nRF52 gateway path
-  benched on DK5EN-90 (count and `on` passed), BL-01 checked on DK5EN-1 hardware. Next: W3 docs. Resume point:
-  [campaign-bl01-gwrx01-nrf52-20261024.md](campaign-bl01-gwrx01-nrf52-20261024.md).
+- **Campaign BL-01 + GWRX-01 nRF52 (2026-10-24): closed.** BL-01 `--mesh off` decided and pinned (`deea597f`),
+  GWRX-01 benched on nRF52 (DK5EN-90) and ESP32, bench driver `tools/bench/gwrx_bench.py`. New: GWACK-01 (gateway
+  ACK pair can share one msg id). Record: [campaign-bl01-gwrx01-nrf52-20261024.md](campaign-bl01-gwrx01-nrf52-20261024.md).
 - **AU-19 fix (candidate `v4.40a.10.23`):** NimBLE host-task panic in the BLE pause of `--update check` on
   the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
   remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
@@ -51,7 +50,6 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - AU-14: single TASK_WDT during an AU download. (AU-17 closed 2026-10-23: not reproduced on 10.22.)
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01: fixed on fork-dev (`257e5e2b`, `0281dce4`, [rca-gwrx01-20261023.md](rca-gwrx01-20261023.md)), bench W3 passed (4/10 `CANCEL?` on DK5EN-1); nRF52 gateway path passed W2 on DK5EN-90 (5 of 7 server slots released by `CANCEL`); open: count-mode night on DK5EN-98 (operator OK).
-- `--mesh off` (BL-01): decided 2026-10-24 (repeating only, pinned by tests, hardware-checked W2); W3 updates BACKLOG and help.
 - GPS: altitude Kalman re-seed length (BL-03) and baro fusion tau (GPS-05b), measured, unchanged.
 - Stability, single events: TASK_WDT on DK5EN-1 (BL-04), REBOOT-98.
 - Gateway server table: FR/US rows when operators name servers; stale `test/golden/corpus/commands`.

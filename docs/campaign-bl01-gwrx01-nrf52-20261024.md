@@ -1,6 +1,6 @@
 # Campaign BL-01 + GWRX-01 nRF52 (2026-10-24)
 
-Status: **W2 done** (nRF52 bench passed, BL-01 hardware check passed, all nodes restored; section 4). Next: W3 docs.
+Status: **closed** (W0-W3 done 2026-10-24). Remaining outside this campaign: GWRX-01 count-mode night on DK5EN-98 (operator OK), GWACK-01 (BACKLOG), INSTRUMENT `--nbrreport` question (section 1).
 Run with `/orchestrate-waves`. Resume point for this campaign.
 
 ## 1. BL-01: `--mesh off` semantics (operator decision 2026-10-24)
@@ -59,7 +59,7 @@ operator watches as well.
 | W0   | RF-path inventory, mock recon, nRF52 concurrency check                              | done   |
 | W1   | I1 bench driver + serial transport; I3 mock `--delay-client`; I2 BL-01 seam + tests | done   |
 | W2   | nRF52 bench (count, on) + BL-01 hardware check                                      | done   |
-| W3   | Docs (BACKLOG, RESUME, 08 catalogue, `--mesh` help), commit                         | open   |
+| W3   | Docs (BACKLOG, RESUME, 08 catalogue, `--mesh` help), commit                         | done   |
 
 File ownership W1: I1 `tools/bench/gwrx_bench.py`, `tools/bench/gwrx_frame.py`, `tools/tests/test_gwrx_bench.py`;
 I3 `tools/mock/meshcom_server.py`, `tools/mock/test_mock_server.py`, `tools/mock/README.md`; I2 `src/mesh_policy.h`,
@@ -85,3 +85,9 @@ Evidence: `tools/bench/runs/harness/gwrx01-w2-20261024.summary`. All images buil
 - **Side observation (upstream, not BL-01):** `rx_dm_ack_gw` and `rx_dm_ack_new` carried the same msg id
   (`millis()` read twice in one millisecond). Candidate BACKLOG row in W3.
 - Restore: all three nodes on normal `a7b21de5` images, original settings, verified by `--info`.
+
+## 5. W3 result (2026-10-24)
+
+BACKLOG: BL-01 row now records the decision and the pins, GWRX-01 row the nRF52 bench (row also repaired: it had
+one cell too many), new row GWACK-01. 08 catalogue: new section 2i (GWRX-01, side finding GWACK-01). `--mesh` help
+(`src/command_functions.cpp`, "relay foreign frames") already matches the decision; unchanged.

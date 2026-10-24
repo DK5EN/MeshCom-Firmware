@@ -1675,6 +1675,22 @@ diagnostics only.
   DK5EN-14; arms no client / stalled client / trickle), go/no-go 5 percentage points extra loss; W2 parks the
   packet into a small ring from the web feed path `txFeed()`.
 
+## 2i. GWRX-01 — gateway transmits a server frame it already heard on LoRa (2026-10-23)
+
+**FIXED** on fork-dev 2026-10-23/24 (`257e5e2b`, `0281dce4`, not released yet), benched on ESP32 and nRF52.
+RCA: `docs/rca-gwrx01-20261023.md`; campaign: `docs/campaign-bl01-gwrx01-nrf52-20261024.md`.
+
+- **Mechanism:** a server-injected text frame (`udp_rx`, `src=g`) was queued `RING_STATUS_DONE`, and none of the
+  OnRxDone ring scans matched a pending DONE slot of kind `g`. A gateway that heard another gateway's copy of the
+  same id still transmitted its own (21 % of `src=g` TX in field logs, median 5 s after the heard copy).
+- **Fix:** server text frames are queued as `RING_KIND_RELAY` (`src/gw_udp_ring.h`), so the NBR overhear scan counts
+  them (`--nbrrelay count`, `CANCEL?`) or releases them (`on`); `nbrServerNeed()` counts gateway-held rows as
+  providers, else every server slot was a sole-provider veto.
+- **Verified:** ESP32 W3 (DK5EN-1/-92): 10/10 case B, 4/10 `CANCEL?`. nRF52 W2 (DK5EN-90): NEED B on every server
+  slot, `--nbrrelay on` released 5 of 7 slots without TX, no reboot, heap flat. Open: count-mode night on DK5EN-98.
+- **Side finding GWACK-01 (open, upstream code):** the gateway's `rx_dm_ack_gw` and `rx_dm_ack_new` can carry the
+  same msg id (two `millis()` reads in one millisecond); seen on DK5EN-1 2026-10-24. BACKLOG row GWACK-01.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
