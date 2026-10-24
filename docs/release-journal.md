@@ -1,11 +1,63 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261022`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261023`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.23 (Freitag, 2026-10-23)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.22.
+Getaggt am 2026-10-24 mit dem Datum 10.23 (Operator-Entscheidung, der fuer einen Fix-Release freigehaltene
+Name aus 10.22); Auto Update vergleicht MM.DD, 10.23 ist neuer als 10.22. `FLASH_VERSION` 20261023,
+`FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3 unveraendert.
+
+Inhalt seit `v4.40a.10.22` (Firmware: 19 Commits, 41 Dateien, +2780/-630):
+
+- TX-Pool (TXP, fork-only, `cee174b7`, `05a18b36`, `2ce8872e`, `1f5521d9`, `eda5edb8`): der LoRa-Sendepuffer
+  ist ein Slot-Pool statt eines Rings; TTL je Prioritaet (Relays 300 s, Position 120 s, ACKs 90 s; HEY
+  behaelt 180 s); `{CET}`-Baken aelter als 150 s (oder aus der Zukunft, oder ohne vertrauenswuerdige
+  Uhr) werden am Gateway, in der Queue und vor dem Relay verworfen; HEY/Position/CET ersetzen ihren
+  wartenden Zwilling; DM-Retries nutzen ihren Slot weiter; Web-Gauge "TX queue" zaehlt alle belegten Slots,
+  ACK-Wartende umrandet.
+- Call-Blocklist `--blockcall` (BLK-01, fork-only, `ecf00df0`, `1635ba56`): ersetzt die Blocklist des
+  DM3KS-Builds (sku2atsc/MeshCom-Firmware); `--info`, Web Info/Setup, `RM1 blockcall`.
+- AU-19 (`be1589e0`): NimBLE-Panic in der BLE-Pause des Update-Checks (klassischer ESP32), Build-Patch
+  `tools/nimble_patch.py`. AU-20 (`dea4f82a` + Patch-Hunk): ein verwaister esp_timer je BLE-Pause.
+- AU-18 (`9b43b4f0`): Heap-Pruefung vor TLS beruecksichtigt beide mbedTLS-Record-Puffer.
+- WEB-RX-01 (`5fdd4b8d`, Issue #1229): empfangene Pakete werden geparkt, solange ein Web-Send die Loop blockiert.
+- RX-DEAF-01 (`15d0627b`, `7d9b6d74`, ESP32) und RX-DEAF-02 (`53681dd1`, nRF52): verwaistes `is_receiving`
+  wird geloescht.
+- GWRX-01 (`257e5e2b`, `0281dce4`): Server-Textframes nehmen am NBR-Overhear-Cancel teil, Server-Frames zaehlen
+  das Gateway als Provider.
+- GWACK-01 (`c462d018`): beide ACK-Kopien eines Gateways mit derselben Id.
+- UDP-04 (`6e6e7e40`): doppelte Server-Position belegt keinen zweiten Dedup-Slot (ESP32).
+- BL-01 (`deea597f`): Tests fuer `--mesh off`, Mock `--delay-client` (keine Firmware-Wirkung).
+- Upstream #1235 am 2026-10-23 gemergt und per Merge `4898cada` synchronisiert (kein Code-Unterschied).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (80 Unity-Envs, 2861/2861, Golden 48, pytest 1332); alle 32 `default_envs` lokal
+  gebaut, 27 `.autoupdate` mit `--check` byte-genau zurueckgewandelt.
+- Idle-Heap: DK5EN-92 (Release-Code von `3e07f894`, nur `FLASH_VERSION` noch 20261022), BLE an, Gateway an:
+  70296 B gegen Baseline 69332 B (+964 B, Toleranz 3072 B), PASS.
+- TXP auf DK5EN-1, DK5EN-90, DK5EN-92 (Gauge, ACK-Pfad, 3 Retries in einem Slot ESP32 + nRF52, CET-Gate und
+  Supersede am Gateway mit Mock-Server und Airgap); BLK-01 auf DK5EN-1/-90/-92; AU-19/AU-20 100 BLE-Pausen
+  ohne Panic; AU-18 drei Checks; WEB-RX-01 0 von 44 verloren; RX-DEAF-01 erzwungener Latch; GWACK-01 28/28.
+- Gate-Build von `3e07f894` laeuft seit 2026-10-24 16:20 auf allen fuenf Knoten (DK5EN-1/-14/-90/-92/-98),
+  24-h-Logger fuer DK5EN-98 und DK5EN-14 auf rpizero.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die 24-h-Nacht mit TXP auf DK5EN-98 ist beim Release noch nicht ausgewertet; die TTL-Werte koennen danach
+  angepasst werden. Das Relay-seitige CET-Gate wurde on air nicht beobachtet (nur Host-Tests).
+- BLK-01: Uebernahme des Fremd-Schluessels aus dem DM3KS-Build nicht auf Hardware.
+- UDP-04 und RX-DEAF-02 nur Host-Tests; 1-h-gwflood-Replay nicht gelaufen.
+- Alle Boards ausser Heltec V3, T-Beam v1.2, T-Deck Plus und RAK4631 nur gebaut.
 
 ---
 
