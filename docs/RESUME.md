@@ -9,6 +9,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **Campaign BL-01 + GWRX-01 nRF52 (2026-10-24, `/orchestrate-waves`):** W1 done (`deea597f` BL-01 `--mesh off`
+  pinned, mock `--delay-client`; `57d34631` bench driver `tools/bench/gwrx_bench.py` with serial transport). Next:
+  W2 nRF52 bench on DK5EN-90. Resume point: [campaign-bl01-gwrx01-nrf52-20261024.md](campaign-bl01-gwrx01-nrf52-20261024.md).
 - **AU-19 fix (candidate `v4.40a.10.23`):** NimBLE host-task panic in the BLE pause of `--update check` on
   the classic ESP32; plan and waves in [campaign-bench-20261023.md](campaign-bench-20261023.md), section 6. The
   remaining #1235 hardware checks (Heltec V3, T-Beam) run against `fork-dev`; findings are fixed on `fork-dev`, no PR.
