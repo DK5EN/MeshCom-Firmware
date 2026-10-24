@@ -1,5 +1,5 @@
 // Native Testsuite fuer den TX-Ring-Kern (getMessagePriority, getNextTxSlot,
-// advanceIReadPastEmpty, addTxRingEntry) -- nach txring_functions.cpp
+// addTxRingEntry) -- nach txring_functions.cpp
 // extrahiert (QA-Welle 2026-08-22), weil genau dieser Code dem Projekteigner
 // ausdruecklich misstraut wird: N-14 (zwei Schreiber teilten sich denselben
 // Slot), die Prioritaets-Klassifizierung und die Overflow/Eviction-Logik.
@@ -61,8 +61,6 @@ static void resetRing(void)
     // so the fixture needs a real callsign before any enqueue.
     strcpy(meshcom_settings.node_call, "DK5EN-90");
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iWrite = 0;
-    iRead = 0;
     memset(retryCount, 0, sizeof(retryCount));
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
@@ -193,8 +191,6 @@ static void test_einfacher_enqueue(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT8(RING_STATUS_READY, ringBuffer[slot][1]);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(f.bytes, &ringBuffer[slot][2], f.len);
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[slot]);
     TEST_ASSERT_EQUAL_UINT32(12345, ringEnqueueTime[slot]);
 }
@@ -395,203 +391,165 @@ static void test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done(void)
 // Fall-B-Hold, der die Eviction-Auswahl hier verzerren wuerde.
 static void test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden(void)
 {
-    // Ring mit MAX_RING-1 Relay-Eintraegen (Text, Status DONE -> NORMAL,
-    // siehe getMessagePriority()) "voll" fuellen.
-    for (int i = 0; i < MAX_RING - 1; i++)
+    // Pool mit MAX_RING Relay-Eintraegen (Text, Status DONE -> NORMAL,
+    // siehe getMessagePriority()) voll fuellen.
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildTextFrame("DK5EN-91", "relay", (uint32_t)(0x4000 + i));
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "t2b_relayfill");
         TEST_ASSERT_EQUAL_INT(i, slot);
         TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
     BuiltFrame dm = buildTextFrame("DK5EN-92", "dringend", 0x5000UL);
     int slot = addTxRingEntryOnce(dm.bytes, dm.len, "t2b_evict");
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot); // landet im zuvor freien letzten Slot
+    // Slot 0 (aeltester Relay-Eintrag) wurde verdraengt, die DM uebernimmt
+    // genau diesen Slot (Pool: kein Umzug, kein freier Slot sonst).
+    TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
     TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(dm.bytes, &ringBuffer[slot][2], dm.len);
-
-    // Slot 0 (aeltester Relay-Eintrag) wurde verdraengt, nicht die neue DM.
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_NORMAL]);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 }
 
 // ----------------------------------------------------- Test 3: Ring-Wrap
 
 static void test_ring_wrap(void)
 {
-    // Phase 1: MAX_RING-1 sequentielle Enqueues fuellen den Ring bis knapp
-    // unter "voll" (der letzte Slot bleibt frei -- klassisches Ringpuffer-
-    // Vollkriterium ueber nextWrite==iRead).
-    for (int i = 0; i < MAX_RING - 1; i++)
+    // TXP W1b (Slot-Pool, vorher Indexrand-Wrap): Phase 1 fuellt den Pool
+    // KOMPLETT -- alle MAX_RING Slots (20, nicht mehr 19) nehmen Eintraege auf.
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildPositionFrame((uint32_t)(0x1000 + i));
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t3");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 
-    // Alle Slots wieder freigeben (simuliert vollstaendige Konsumierung durch
-    // doTX) -- der Ring hat danach keine Daten mehr, iRead holt zu iWrite auf.
-    for (int i = 0; i < MAX_RING - 1; i++)
+    // Alle Slots wieder freigeben (simuliert vollstaendige Konsumierung durch doTX).
+    for (int i = 0; i < MAX_RING; i++)
         ringBuffer[i][0] = 0;
-    advanceIReadPastEmpty();
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)iWrite, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_INT(0, txRingDepth());
 
-    // Phase 2 "dann wrap": drei weitere Enqueues muessen bei MAX_RING-1
-    // beginnen und ueber den Indexrand auf 0, 1 wickeln.
-    int expected[3] = {MAX_RING - 1, 0, 1};
+    // Phase 2: ein freigegebener Slot ist sofort wieder belegbar, jeweils der
+    // ERSTE freie (Slot 0, 1, 2) -- es gibt keinen Schreibzeiger mehr.
+    int expected[3] = {0, 1, 2};
     for (int i = 0; i < 3; i++)
     {
         BuiltFrame f = buildPositionFrame((uint32_t)(0x2000 + i));
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t3wrap");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(expected[i], slot, "wrap-slot");
+        TEST_ASSERT_EQUAL_INT_MESSAGE(expected[i], slot, "erster freier Slot");
     }
-    TEST_ASSERT_EQUAL_UINT8(2, (uint8_t)iWrite); // letzter belegter Slot war 1 -> iWrite==2
 }
 
 // ----------------------------------------------------- Test 4: Overflow mit Eviction
 
 static void test_overflow_mit_eviction(void)
 {
-    // Ring mit MAX_RING-1 LOW-Prio-Eintraegen (Position) "voll" fuellen.
-    for (int i = 0; i < MAX_RING - 1; i++)
+    // Pool mit MAX_RING LOW-Prio-Eintraegen (Position) voll fuellen. Die
+    // Enqueue-Zeit steigt mit dem Index, Slot 0 ist der aelteste.
+    for (int i = 0; i < MAX_RING; i++)
     {
+        mc_test_set_millis((uint32_t)(100 + i));
         BuiltFrame f = buildPositionFrame((uint32_t)(0x3000 + i));
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t4fill");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
-    // Eine CRITICAL-DM enqueuen -> muss den aeltesten (= Slot 0, da alle
-    // gleiche Prio LOW haben und der Scan bei iRead beginnt) LOW-Eintrag
-    // verdraengen.
+    // Eine CRITICAL-DM enqueuen -> muss den aeltesten (= Slot 0, kleinste
+    // ringEnqueueTime) LOW-Eintrag verdraengen und dessen Slot uebernehmen.
+    mc_test_set_millis(1000);
     BuiltFrame dm = buildTextFrame("DK5EN-91", "dringend");
     int slot = addTxRingEntry(dm.bytes, dm.len, RING_STATUS_READY, "t4evict");
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot); // landet im zuvor freien letzten Slot
+    TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(dm.bytes, &ringBuffer[slot][2], dm.len);
-
-    // Slot 0 (aeltester LOW-Eintrag) wurde als leer markiert (Wiederverwendungs-
-    // Semantik: [0]==0 vor der naechsten Wiederbeschreibung).
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
-
-    // iRead ist ueber den entleerten Slot 0 hinweg auf 1 vorgerueckt.
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iRead);
-
-    // iWrite ist auf 0 gewickelt (MAX_RING-1 + 1 == MAX_RING -> 0).
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT32(1000, ringEnqueueTime[slot]);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
 }
 
-// ----------------------------------------------- Fund: verwaister Slot bei
-// indirekter Eviction (TXRING-ORPHAN-SLOT)
+// ----------------------------------------------- Eviction im Pool (ersetzt N-24)
 //
-// Waehrend des Schreibens dieser Suite entdeckt (siehe Wave-Report): die
-// Overflow-Logik in addTxRingEntry() hat zwei voneinander unabhaengige
-// "Ring voll"-Pfade, die sich gegenseitig nicht abstimmen:
-//
-//   1) Die Prio-Eviction weiter oben waehlt den Slot mit der SCHLECHTESTEN
-//      Prioritaet im gesamten Fenster [iRead,iWrite) zur Verdraengung -- das
-//      muss NICHT der Slot an iRead sein, wenn irgendwo dazwischen ein noch
-//      niedriger priorisierter Eintrag liegt.
-//   2) Der anschliessende unbedingte Block "ring full: advance read pointer
-//      past the overwritten slot" prueft NUR noch, ob iWrite nach dem
-//      Schreiben rechnerisch mit iRead kollidiert -- unabhaengig davon,
-//      WELCHER Slot in Schritt 1 tatsaechlich entleert wurde.
-//
-// Wird in Schritt 1 ein Slot verdraengt, der NICHT der an iRead ist, bleibt
-// der Slot an iRead unveraendert belegt (advanceIReadPastEmpty() haelt sofort
-// an, weil [iRead][0] noch >0 ist) -- aber Schritt 2 schiebt iRead trotzdem
-// eins weiter, weil die Kollisionsrechnung nur auf dem urspruenglichen iRead
-// beruht. Der Slot an der alten iRead-Position bleibt mit [0]>0 im Speicher
-// stehen, faellt aber aus dem von getNextTxSlot() gescannten Fenster
-// [iRead,iWrite) heraus: eine gueltige, nie gesendete Nachricht wird still
-// und ohne stat_drop_count-Buchung verworfen (erst ein spaeteres, volles
-// Ring-Wrap ueberschreibt den Slot wieder physisch).
-//
-// GEFIXT (N-24): der Eviction-Pfad zieht den Eintrag von iRead in den
-// soeben freigewordenen Slot um (Payload + Seitenarrays), leert iRead und
-// laesst advanceIReadPastEmpty() regulaer weiterruecken -- kein belegter
-// Slot faellt mehr aus dem Fenster, kein stiller Verlust. Preis: der
-// umgezogene Eintrag verliert seinen FIFO-Rang innerhalb gleicher
-// Prioritaet. Dieser Test fixiert das GEFIXTE Verhalten und schlaegt fehl,
-// falls einer der beiden Ueberlauf-Pfade wieder auseinanderlaeuft.
-static void test_n24_indirekte_eviction_verwaist_keinen_slot(void)
+// TXP W1b: die N-24-Umzugslogik (TXRING-ORPHAN-SLOT: iRead-Eintrag in den
+// geraeumten Slot umziehen) entfaellt mit dem Lesezeiger. Der Pool verdraengt
+// den AELTESTEN Eintrag (ringEnqueueTime, wrap-sicher) der SCHLECHTESTEN
+// Prioritaet; der neue Eintrag uebernimmt genau diesen Slot, kein anderer
+// Eintrag wandert, nichts wird still unsichtbar.
+static void test_eviction_trifft_aeltesten_der_schlechtesten_prio_und_nichts_wandert(void)
 {
-    // Slot 0: CRITICAL (beste Prio, bleibt bei der Eviction-Auswahl unangetastet)
+    // Slot 0: CRITICAL (beste Prio, bleibt unangetastet)
     BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
-    int slot0 = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "orphan0");
+    int slot0 = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "evict0");
     TEST_ASSERT_EQUAL_INT(0, slot0);
 
     // Slots 1..4: LOW (Position) -- Fuellmaterial
     for (int i = 1; i <= 4; i++)
     {
         BuiltFrame f = buildPositionFrame((uint32_t)(0x5000 + i));
-        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill");
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "evictfill");
     }
 
-    // Slot 5: BACKGROUND (HEY) -- schlechteste Prio im Fenster, wird bei der
-    // naechsten Eviction gewaehlt, NICHT Slot 0.
+    // Slot 5: BACKGROUND (HEY), Zeit 500 -- schlechteste Prio.
+    mc_test_set_millis(500);
     BuiltFrame hey = buildHeyFrame(0x6000UL);
-    int slot5 = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "orphanworst");
-    TEST_ASSERT_EQUAL_INT(5, slot5);
+    TEST_ASSERT_EQUAL_INT(5, addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "evictworst"));
 
-    // Slots 6..18: weiteres LOW-Fuellmaterial, Ring damit bis MAX_RING-1 voll.
-    for (int i = 6; i < MAX_RING - 1; i++)
+    // Slots 6..MAX_RING-1: LOW-Fuellmaterial; ein zweites BACKGROUND (HEY) auf
+    // dem HOEHEREN Index 9, aber AELTER (Zeit 100 < 500).
+    for (int i = 6; i < MAX_RING; i++)
     {
+        if (i == 9)
+        {
+            mc_test_set_millis(100);
+            BuiltFrame h2 = buildHeyFrame(0x6100UL);
+            TEST_ASSERT_EQUAL_INT(9, addTxRingEntry(h2.bytes, h2.len, RING_STATUS_READY, "evictworst2"));
+            mc_test_set_millis(0);
+            continue;
+        }
         BuiltFrame f = buildPositionFrame((uint32_t)(0x7000 + i));
-        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill2");
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "evictfill2");
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 
-    // Ein weiterer LOW-Eintrag ist besser als das BACKGROUND-Fuellstueck in
-    // Slot 5 (4 < 5) -> Slot 5 wird verdraengt, nicht Slot 0.
+    // Ein LOW-Eintrag (4) ist besser als BACKGROUND (5): verdraengt wird das
+    // AELTERE der beiden HEYs (Slot 9, Zeit 100), nicht Slot 5 (Zeit 500)
+    // und nicht Slot 0.
+    mc_test_set_millis(2000);
     BuiltFrame trigger = buildPositionFrame(0x8000UL);
-    int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "orphantrigger");
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+    int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "evicttrigger");
+    TEST_ASSERT_EQUAL_INT(9, slotNew);
 
-    // Der Drop traf ausschliesslich das BACKGROUND-Stueck (gebucht) --
-    // und der CRITICAL-Eintrag von Slot 0 ist nach Slot 5 UMGEZOGEN.
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[5][0]);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(ack.bytes, &ringBuffer[5][2], ack.len);
-    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[5]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(trigger.bytes, &ringBuffer[9][2], trigger.len);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[9]);
 
-    // Slot 0 ist geleert, iRead regulaer auf den ersten belegten Slot (1)
-    // weitergerueckt, iWrite steht auf 0 -- kein belegter Slot liegt mehr
-    // ausserhalb des Fensters [iRead, iWrite).
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iRead);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
+    // Nichts ist umgezogen: Slot 0 haelt weiter den ACK, Slot 5 das andere HEY.
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[0][0]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ack.bytes, &ringBuffer[0][2], ack.len);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[0]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)hey.len, ringBuffer[5][0]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_BACKGROUND, ringPriority[5]);
 
-    // getNextTxSlot() findet den umgezogenen CRITICAL-Eintrag (Slot 5) --
-    // die nie gesendete Nachricht bleibt sichtbar und gewinnt die Auswahl.
-    TEST_ASSERT_EQUAL_INT(5, getNextTxSlot());
-
-    // Kein unbilanzierter Verlust: CRITICAL wurde nie als Drop gebucht.
+    // getNextTxSlot() sieht den CRITICAL-Eintrag weiter (Slot 0).
+    TEST_ASSERT_EQUAL_INT(0, getNextTxSlot());
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
 }
 
 // -------------------------------------------- SL-03/SL-06: ringSource[]
 //
 // addTxRingEntry() leitet die Herkunftskennung aus dem `source`-Label ab
-// (setlogRingSourceCode() in setlog_lines.h) und nimmt sie beim Umzug der
-// Prio-Verdraengung mit -- ohne diese Kopie druckte die TX-Zeile aus SL-03
-// fuer den umgezogenen Eintrag die Herkunft des verdraengten Slots.
+// (setlogRingSourceCode() in setlog_lines.h). Bei der Prio-Verdraengung
+// uebernimmt der neue Eintrag den Slot und MUSS seine eigene Herkunft setzen,
+// nicht die des verdraengten Eintrags behalten.
 static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
 {
     // Slot 0: Relay-Weiterleitung eines Empfangs -> 'r', Prio CRITICAL
-    // (bleibt bei der Eviction-Auswahl unangetastet und zieht deshalb um).
+    // (bleibt bei der Eviction-Auswahl unangetastet).
     BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
     TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "rx_ack_fwd"));
     TEST_ASSERT_EQUAL_INT('r', (int)ringSource[0]);
@@ -609,25 +567,22 @@ static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
     TEST_ASSERT_EQUAL_INT(5, addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "beacon"));
     TEST_ASSERT_EQUAL_INT('o', (int)ringSource[5]);
 
-    for (int i = 6; i < MAX_RING - 1; i++)
+    for (int i = 6; i < MAX_RING; i++)
     {
         BuiltFrame f = buildPositionFrame((uint32_t)(0x7000 + i));
         addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos");
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
-    // Vom Server eingespeist -> 'g'; verdraengt Slot 5 und zieht Slot 0 dorthin.
+    // Vom Server eingespeist -> 'g'; verdraengt Slot 5 (HEY) und uebernimmt ihn.
     BuiltFrame trigger = buildPositionFrame(0x8000UL);
     int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "udp_rx");
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+    TEST_ASSERT_EQUAL_INT(5, slotNew);
 
-    // aus dem Label des neuen Eintrags
+    // aus dem Label des neuen Eintrags, nicht das verdraengte 'o' des HEY
     TEST_ASSERT_EQUAL_INT('g', (int)ringSource[slotNew]);
-    // beim Umzug mitgenommen: der ACK von Slot 0 steht jetzt in Slot 5 und
-    // ist weiterhin als Relay gekennzeichnet, nicht als das verdraengte 'o'.
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[5][0]);
-    TEST_ASSERT_EQUAL_INT('r', (int)ringSource[5]);
+    // der ACK in Slot 0 ist nicht umgezogen und weiterhin 'r'.
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[0][0]);
+    TEST_ASSERT_EQUAL_INT('r', (int)ringSource[0]);
     // unbeteiligte Slots unveraendert
     TEST_ASSERT_EQUAL_INT('o', (int)ringSource[1]);
 }
@@ -638,8 +593,9 @@ static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
 // ringSource[], gesetzt in addTxRingEntry(). Drei Eigenschaften werden hier
 // fixiert: (a) jeder Enqueue OHNE die neuen Argumente nullt sie, auch wenn
 // der Slot vorher eine fremde Maske trug (kein Leck zwischen Wiederverwendungen),
-// (b) mit Argumenten landen sie unveraendert im Slot, (c) der N-24-Umzug
-// nimmt sie mit wie ringSource[].
+// (b) mit Argumenten landen sie unveraendert im Slot, (c) die Eviction im
+// Pool ueberschreibt sie im uebernommenen Slot und laesst die der anderen
+// Slots stehen (der N-24-Umzug entfiel mit dem Slot-Pool).
 //
 // Welle 2 (edge pool): ringNeed[]/ringAlone[] sind NbrMask (nbr_mask.h), und
 // addTxRingEntry() nimmt need/alone als const NbrMask* (nullptr = leere
@@ -660,12 +616,15 @@ static NbrMask maskFromU32(uint32_t bits)
 // zuruecksetzen.
 static void test_stufe2_default_ueberschreibt_alte_maske(void)
 {
+    // Slots 0..2 belegen, damit Slot 3 der erste freie ist.
+    for (int i = 0; i < 3; i++)
+    {
+        BuiltFrame pre = buildPositionFrame((uint32_t)(0x9100 + i));
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(pre.bytes, pre.len, RING_STATUS_READY, "user_pos"));
+    }
     ringKind[3]  = RING_KIND_RELAY | RING_KIND_COUNTED;
     ringNeed[3]  = maskFromU32(0xAAAAAAAAUL);
     ringAlone[3] = maskFromU32(0x55555555UL);
-
-    iWrite = 3;
-    iRead = 3;
 
     BuiltFrame f = buildPositionFrame(0x9001UL);
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos"); // keine Stufe-2-Argumente
@@ -757,10 +716,11 @@ static void test_gwrx01_ohne_nbrrelay_oder_unbekannt_wie_heute(void)
     TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[s1]));
 }
 
-// (c) N-24-Umzug (siehe test_n24_indirekte_eviction_verwaist_keinen_slot
-// oben): derselbe Aufbau, aber Slot 0 traegt eine Stufe-2-Maske, die den
-// Umzug nach Slot 5 ueberleben muss.
-static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
+// (c) Eviction im Pool: Slot 0 traegt eine Stufe-2-Maske und bleibt
+// unangetastet; der verdraengte Slot 5 bekam sie nie und der neue Eintrag
+// in Slot 5 setzt die Defaults. Eine Maske im verdraengten Slot darf nicht
+// auf den Nachfolger durchschlagen.
+static void test_stufe2_eviction_ueberschreibt_maske_im_uebernommenen_slot(void)
 {
     NbrMask needMask  = maskFromU32(0x000000AAUL);
     NbrMask aloneMask = maskFromU32(0x00000002UL);
@@ -776,30 +736,31 @@ static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
         addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill");
     }
 
+    // Slot 5: HEY mit (fremder) Relay-Maske -- schlechteste Prio, wird verdraengt.
     BuiltFrame hey = buildHeyFrame(0x6100UL);
-    int slot5 = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "orphanworst");
+    int slot5 = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "orphanworst", 0, false,
+                                RING_KIND_RELAY, &needMask, &aloneMask);
     TEST_ASSERT_EQUAL_INT(5, slot5);
 
-    for (int i = 6; i < MAX_RING - 1; i++)
+    for (int i = 6; i < MAX_RING; i++)
     {
         BuiltFrame f = buildPositionFrame((uint32_t)(0x7100 + i));
         addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill2");
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
     BuiltFrame trigger = buildPositionFrame(0x8100UL);
     int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "orphantrigger");
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+    TEST_ASSERT_EQUAL_INT(5, slotNew);
 
-    // Der CRITICAL-Relay-Eintrag ist von Slot 0 nach Slot 5 umgezogen --
-    // seine Stufe-2-Maske muss ihn begleitet haben.
-    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[5]);
-    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[5]));
-    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[5]));
+    // Slot 5: Defaults des neuen Eintrags, nichts vom verdraengten HEY.
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[5]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[5]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[5]));
 
-    // Slot 0 ist geleert.
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
+    // Slot 0: nicht umgezogen, Maske unveraendert.
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[0]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[0]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[0]));
 }
 
 // (d) Ein Zeilenindex >= 32 liegt jenseits des ersten Maskenworts (NBR_MASK_WORDS
@@ -838,16 +799,13 @@ static void test_stufe2_maskenbit_ueber_32_ueberlebt_case_b(void)
 
 static void test_overflow_drop(void)
 {
-    // Ring mit MAX_RING-1 CRITICAL-Eintraegen (ACK) "voll" fuellen.
-    for (int i = 0; i < MAX_RING - 1; i++)
+    // Pool mit MAX_RING CRITICAL-Eintraegen (ACK) voll fuellen.
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildAckFrame((uint32_t)(0x4000 + i));
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t5fill");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
-    uint8_t iReadBefore = (uint8_t)iRead;
-    uint8_t iWriteBefore = (uint8_t)iWrite;
 
     // LOW-Prio-Position enqueuen: nichts im Ring hat niedrigere Prio als CRITICAL
     // -> der NEUE Eintrag wird verworfen, nicht der Bestand.
@@ -855,12 +813,11 @@ static void test_overflow_drop(void)
     int slot = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "t5drop");
 
     TEST_ASSERT_EQUAL_INT(-2, slot);   // RING_ENQUEUE_FULL (QRT Finding 5)
-    TEST_ASSERT_EQUAL_UINT8(iWriteBefore, (uint8_t)iWrite); // unveraendert
-    TEST_ASSERT_EQUAL_UINT8(iReadBefore, (uint8_t)iRead);   // unveraendert
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
-    // Der Slot, in den der verworfene Eintrag geschrieben worden waere, ist
-    // wieder auf [0]==0 zurueckgesetzt ("Don't enqueue").
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[MAX_RING - 1][0]);
+    // Bestand unangetastet: kein Slot frei geworden, keiner umgeschrieben.
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+    for (int i = 0; i < MAX_RING; i++)
+        TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[i]);
 }
 
 // ------------------------------------------- QRT Finding 5: eigener Code -2
@@ -869,7 +826,7 @@ static void test_overflow_drop(void)
 // Validitaetsfehler (len == 0, nicht konfiguriertes Rufzeichen) bleiben -1.
 static void test_qrt_f5_voll_ohne_eviction_liefert_minus2(void)
 {
-    for (int i = 0; i < MAX_RING - 1; i++)
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildAckFrame((uint32_t)(0x6000 + i));
         TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "f5fill"));
@@ -901,8 +858,6 @@ static void test_len_null_wird_abgewiesen(void)
     int slot = addTxRingEntry(f.bytes, 0, RING_STATUS_READY, "t5b-null");
 
     TEST_ASSERT_EQUAL_INT(-1, slot);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]); // Ring unangetastet
 }
 
@@ -914,8 +869,6 @@ static void test_len_ueber_max_wird_abgewiesen(void)
     int slot = addTxRingEntry(big, UDP_TX_BUF_SIZE + 1, RING_STATUS_READY, "t5b-over");
 
     TEST_ASSERT_EQUAL_INT(-1, slot);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]); // Ring unangetastet
 }
 
@@ -929,7 +882,6 @@ static void test_len_exakt_max_wird_enqueued(void)
     TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)UDP_TX_BUF_SIZE, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(exact, &ringBuffer[slot][2], UDP_TX_BUF_SIZE);
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
 }
 
 // ----------------------------------------------------- Test 6: getNextTxSlot
@@ -961,7 +913,7 @@ static void test_get_next_tx_slot(void)
     ringBuffer[sHey][0] = 0;
     TEST_ASSERT_EQUAL_INT(-1, getNextTxSlot());
 
-    // Gleiche Prio: FIFO -- der Slot naeher an iRead gewinnt
+    // Gleiche Prio: FIFO -- der frueher eingereihte (kleinere ringEnqueueTime) gewinnt
     resetRing();
     BuiltFrame pos1 = buildPositionFrame(0xAAAAUL);
     BuiltFrame pos2 = buildPositionFrame(0xBBBBUL);
@@ -1011,6 +963,7 @@ static void test_retry_count_in(void)
 static void test_clear_slot_first(void)
 {
     memset(ringBuffer[0], 0xFF, sizeof(ringBuffer[0])); // Alt-Muell simulieren
+    ringBuffer[0][0] = 0;                               // ... in einem freien Slot (len 0)
 
     static const uint8_t payload[5] = {1, 2, 3, 4, 5};
     BuiltFrame f = buildFrame(MSG_TYPE_ACK, 0x0AUL, 0x00, nullptr, nullptr, payload, sizeof(payload));
@@ -1067,9 +1020,9 @@ static void test_n14_stress_randomisiert(void)
         return (lcg >> 8) & 0x7FFFFFFFUL;
     };
 
-    // Schatten-Buchhaltung MARKER-basiert statt Slot-basiert: der N-24-Fix
-    // darf Eintraege bei indirekter Eviction zwischen Slots UMZIEHEN, eine
-    // Slot-gebundene Schattenkopie wuerde danach falsch vergleichen. Der
+    // Schatten-Buchhaltung MARKER-basiert statt Slot-basiert (historisch: der
+    // N-24-Fix zog Eintraege zwischen Slots um; im Pool wandert nichts mehr,
+    // der Marker-Vergleich bleibt als robuste Pruefung). Der
     // Marker wird zusaetzlich als msg_id kodiert (Ring-Offset [3] = LSB der
     // LE-msg_id) -- damit ist er fuer JEDEN belegten Slot an fester Stelle
     // ablesbar, egal wohin der Eintrag gewandert ist.
@@ -1114,12 +1067,11 @@ static void test_n14_stress_randomisiert(void)
             markerPayloadLen[marker] = f.payload_len;
         }
 
-        // Invariante: Indizes bleiben im gueltigen Bereich.
-        TEST_ASSERT_TRUE((uint8_t)iWrite < MAX_RING);
-        TEST_ASSERT_TRUE((uint8_t)iRead < MAX_RING);
-
-        int w = (uint8_t)iWrite;
-        int r = (uint8_t)iRead;
+        // Invariante: ein angenommener Eintrag steht im gemeldeten Slot, die
+        // Belegung uebersteigt den Pool nie.
+        if (slot >= 0)
+            TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
+        TEST_ASSERT_TRUE(txRingDepth() <= MAX_RING);
 
         for (int s = 0; s < MAX_RING; s++)
         {
@@ -1129,20 +1081,13 @@ static void test_n14_stress_randomisiert(void)
             char ctx[64];
             snprintf(ctx, sizeof(ctx), "iter=%d slot=%d", iter, s);
 
-            // Invariante (seit dem N-24-Fix wieder haltbar): jeder belegte
-            // Slot liegt im aktiven Fenster [iRead, iWrite) -- kein Eintrag
-            // faellt durch indirekte Eviction aus dem Scan-Bereich.
-            bool inWindow = (w > r) ? (s >= r && s < w)
-                                    : (w < r ? (s >= r || s < w) : false);
-            TEST_ASSERT_TRUE_MESSAGE(inWindow, ctx);
-
             // Belegter Slot muss aus einem getrackten Enqueue stammen: der
             // Marker steht als msg_id-LSB an fester Position [3].
             uint8_t m = ringBuffer[s][3];
             TEST_ASSERT_TRUE_MESSAGE(markerKnown[m] != 0, ctx);
 
             // Kein "torn write": die gesamte Nutzlast-Region traegt exakt EIN
-            // Muster -- auch nach einem N-24-Umzug des Eintrags.
+            // Muster -- auch nach einer Eviction im Nachbarslot.
             for (uint16_t i = 0; i < markerPayloadLen[m]; i++)
             {
                 TEST_ASSERT_EQUAL_UINT8_MESSAGE(m, ringBuffer[s][markerOff[m] + i], ctx);
@@ -1178,8 +1123,6 @@ static void test_bp02_tiefe_mit_loechern(void)
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp02holes");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
     // Slots 1 und 3 freigeben (simuliert erfolgreiche Retransmits/Eviction) --
     // Slots 0, 2, 4 bleiben belegt.
@@ -1201,8 +1144,6 @@ static void test_bp02_dj8meh_szenario_prio5_am_lesezeiger(void)
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp02dj8meh");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
     // Slots 1..4 freigeben -- nur Slot 0 (am Lesezeiger) bleibt belegt, wie
     // ein prioritaets-ausgehungerter Eintrag, der von getNextTxSlot() nie
@@ -1218,7 +1159,7 @@ static void test_bp02_dj8meh_szenario_prio5_am_lesezeiger(void)
 // txRingAgeBackground() (txring_functions.cpp): sweeps the ring and drops
 // any BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
 // (configuration_global.h, 180000 ms). DJ8MEH-RCA Teil 2: a priority-
-// starved HEY parked at iRead can sit unsent for many minutes (10 min in
+// starved HEY can sit unsent for many minutes (10 min in
 // the field episode that motivated this) while getNextTxSlot() never picks
 // it -- txRingAgeBackground() is the only place that ever frees such a
 // slot, called from the main-loop 2s tick, NOT from getNextTxSlot() itself
@@ -1227,20 +1168,19 @@ static void test_bp02_dj8meh_szenario_prio5_am_lesezeiger(void)
 // Kontrollrechnung (fails-before): mit einem No-Op-Rumpf von
 // txRingAgeBackground() (Rueckkehr sofort nach Betreten, kein Sweep) --
 // probeweise so gegen diese Suite laufen lassen -- schlagen
-// test_bp03_stale_drop_und_lesezeiger_vorruecken und
+// test_bp03_stale_drop_und_slot_frei und
 // test_bp03_rollover_sicher (zweite Haelfte) rot fehl: der Slot bleibt
 // belegt (ringBuffer[slot][0] != 0 statt 0), stat_drop_count[5] bleibt 0
-// statt 1, und iRead ruecht nicht vor. Verifiziert waehrend der Umsetzung,
+// statt 1. Verifiziert waehrend der Umsetzung,
 // Fix danach wiederhergestellt.
 
-static void test_bp03_stale_drop_und_lesezeiger_vorruecken(void)
+static void test_bp03_stale_drop_und_slot_frei(void)
 {
     mc_test_set_millis(1000);
     BuiltFrame f = buildHeyFrame(0xAABBCCDDUL);
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp03stale");
     TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_BACKGROUND, ringPriority[slot]);
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
 
     // Genau ueber der Grenze (Grenze selbst ist noch KEIN Drop, siehe ">").
     mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS + 1UL);
@@ -1250,10 +1190,8 @@ static void test_bp03_stale_drop_und_lesezeiger_vorruecken(void)
     TEST_ASSERT_EQUAL_UINT8(0, retryCount[slot]);
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
 
-    // Der abgelaufene Eintrag sass allein am Lesezeiger -- advanceIReadPastEmpty()
-    // (innerhalb des Sweeps aufgerufen) muss iRead bis zu iWrite (leerer Ring)
-    // vorruecken.
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)iWrite, (uint8_t)iRead);
+    // Der Slot ist sofort wieder belegbar (Pool: kein Lesezeiger zum Nachziehen).
+    TEST_ASSERT_EQUAL_INT(0, txRingDepth());
 }
 
 static void test_bp03_frischer_bg_bleibt(void)
@@ -1269,7 +1207,6 @@ static void test_bp03_frischer_bg_bleibt(void)
 
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead); // nichts geraeumt, iRead unveraendert
 }
 
 static void test_bp03_nicht_bg_altert_nie(void)
@@ -1287,7 +1224,6 @@ static void test_bp03_nicht_bg_altert_nie(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 }
 
 // Rollover-Fall (F8): ringEnqueueTime nahe UINT32_MAX, now nach dem Wrap.
@@ -1617,8 +1553,6 @@ static void test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt(void)
         int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "wq01holes");
         TEST_ASSERT_EQUAL_INT(i, slot);
     }
-    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
 
     // Slots 1 und 3 freigeben -- Slots 0, 2, 4 bleiben belegt (alle LOW).
     ringBuffer[1][0] = 0;
@@ -1837,24 +1771,33 @@ static void test_nbr_caseb_text_relay_kein_hold(void)
 
 // --------------------------------------------------------------- M0-1 (0.4)
 //
-// ringstat_parked_overwrite (docs/dm-transport-impl-plan-20260913.md): landet
-// ein Enqueue auf einem Slot, der noch retransmit-pending ist (Laenge != 0,
-// Status weder READY(0x00) noch DONE(0xFF) noch EXT_PENDING(0x80) -- 0x05 hier
-// als typischer Wert innerhalb der 0x01..0x14-Alterungsfolge aus
-// updateRetransmissionStatus()), muss der Zaehler steigen; auf einem leeren
-// Slot nicht. ringstat_enqueue zaehlt beide Faelle (jeder erreichte Write).
+// ringstat_parked_overwrite (docs/dm-transport-impl-plan-20260913.md). Im
+// alten Ring: ein Enqueue landete auf einem retransmit-pending Slot (Laenge
+// != 0, Status weder READY noch DONE noch EXT_PENDING). Im Slot-Pool (TXP
+// W1b) kann das nur noch ueber die Eviction passieren: der verdraengte
+// Eintrag war ein geparkter SENT-Slot (0x01..0x14-Alterungsfolge aus
+// updateRetransmissionStatus(), hier 0x05) und nicht READY/DONE. Ein freier
+// Slot zaehlt nicht. ringstat_enqueue zaehlt jeden erreichten Write.
+
+// Pool voll mit LOW-Positionen (READY); Slot 0 ist der aelteste (gleiche
+// Zeit, kleinster Index gewinnt den Gleichstand).
+static void fillPoolWithLowPositions(uint32_t idBase)
+{
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildPositionFrame(idBase + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "m01fill"));
+    }
+    ringstat_enqueue.store(0);
+}
 
 static void test_ringstat_parked_overwrite_bei_pending_slot(void)
 {
-    // Slot 0 traegt noch einen unbestaetigten Sendeversuch: Laenge gesetzt,
-    // Status 0x05 (pending, wie ihn updateRetransmissionStatus() nach ein
-    // paar Alterungs-Ticks hinterlaesst) -- weder READY noch DONE noch
-    // EXT_PENDING.
-    ringBuffer[0][0] = 10;
-    ringBuffer[0][1] = 0x05;
+    fillPoolWithLowPositions(0xF000UL);
+    ringBuffer[0][1] = 0x05;   // Slot 0: geparkt, unbestaetigter Sendeversuch
 
-    BuiltFrame f = buildPositionFrame(0xF001UL);
-    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_ovw");
+    BuiltFrame ack = buildAckFrame(0xF001UL);   // CRITICAL verdraengt den aeltesten LOW
+    int slot = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "parked_ovw");
 
     TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT32(1, ringstat_parked_overwrite.load());
@@ -1864,7 +1807,7 @@ static void test_ringstat_parked_overwrite_bei_pending_slot(void)
 static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
 {
     // resetRing() (per setUp bereits gelaufen) liefert einen frischen, leeren
-    // Slot 0 -- kein Ueberschreiben eines Pending-Eintrags.
+    // Pool -- kein Ueberschreiben eines Pending-Eintrags.
     BuiltFrame f = buildPositionFrame(0xF002UL);
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_empty");
 
@@ -1873,26 +1816,397 @@ static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
     TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
 }
 
-// Die drei Ausschluesse des Kriteriums einzeln: ein Slot mit Laenge != 0,
-// dessen Status DONE, READY oder EXT_PENDING ist, wird NICHT als
-// ueberschriebener Pending-Eintrag gezaehlt. Ohne diese Faelle bestuende der
-// Test auch mit `len != 0` allein (Advisor-Befund F4, 2026-09-13).
+// Die Ausschluesse einzeln: wird ein READY- oder DONE-Slot verdraengt, zaehlt
+// das nicht als geparkter Eintrag; ein EXT_PENDING-Slot wird gar nicht
+// verdraengt (die Eviction nimmt den naechstaeltesten, Zaehler bleibt 0).
 static void test_ringstat_parked_overwrite_ignoriert_done_ready_ext(void)
 {
     const uint8_t statusse[3] = { RING_STATUS_DONE, RING_STATUS_READY, RING_STATUS_EXT_PENDING };
     for(int i = 0; i < 3; i++)
     {
         resetRing();
-        ringBuffer[0][0] = 10;
+        fillPoolWithLowPositions(0xF010UL);
         ringBuffer[0][1] = statusse[i];
 
-        BuiltFrame f = buildPositionFrame(0xF010UL + (uint32_t)i);
-        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_excl");
+        BuiltFrame ack = buildAckFrame(0xF020UL + (uint32_t)i);
+        int slot = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "parked_excl");
 
-        TEST_ASSERT_EQUAL_INT(0, slot);
+        TEST_ASSERT_EQUAL_INT(statusse[i] == RING_STATUS_EXT_PENDING ? 1 : 0, slot);
         TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
         TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+        if (statusse[i] == RING_STATUS_EXT_PENDING)
+            TEST_ASSERT_EQUAL_UINT8(RING_STATUS_EXT_PENDING, ringBuffer[0][1]); // unangetastet
     }
+}
+
+// --------------------------------------------------------------- TXP W1b
+//
+// Slot-Pool: freie Slots werden wiederverwendet, Kapazitaet ist MAX_RING,
+// Auswahl nach Prio und Enqueue-Alter, INFLIGHT-Fenster, Gauge-Zaehler.
+
+// Ein geparkter eigener Text (SENT) mitten im vollen Pool blockiert nichts:
+// Loecher dahinter UND davor werden belegt. (Im alten Ring scheiterte das mit
+// RING_DROP_NEW, sobald der Parker am Lesezeiger sass und der Schreibzeiger
+// ihn eingeholt hatte.)
+static void test_pool_loch_hinter_geparktem_sent_slot_wird_gefuellt(void)
+{
+    // Slot 0: eigener Text, per doTX-Aequivalent als SENT geparkt (len bleibt).
+    BuiltFrame txt = buildTextFrame("DK5EN-91", "park me", 0xC100UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(txt.bytes, txt.len, RING_STATUS_READY, "user_msg"));
+    uint8_t prev = 0xEE;
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev));
+    txRingFinishTx(0, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_SENT, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)txt.len, ringBuffer[0][0]);
+
+    // Rest des Pools mit Relays fuellen (voll), dann zwei Loecher reissen.
+    for (int i = 1; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildTextFrame("DK5EN-92", "relay", 0xC200UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "rx_relay"));
+    }
+    ringBuffer[7][0] = 0;
+    ringBuffer[13][0] = 0;
+
+    BuiltFrame a = buildTextFrame("DK5EN-92", "neu1", 0xC300UL);
+    BuiltFrame b = buildTextFrame("DK5EN-92", "neu2", 0xC301UL);
+    TEST_ASSERT_EQUAL_INT(7, addTxRingEntry(a.bytes, a.len, RING_STATUS_DONE, "rx_relay"));
+    TEST_ASSERT_EQUAL_INT(13, addTxRingEntry(b.bytes, b.len, RING_STATUS_DONE, "rx_relay"));
+
+    // Der Parker ist unberuehrt; kein Drop gebucht.
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_SENT, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_NORMAL]);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+}
+
+// Kapazitaet: MAX_RING Eintraege passen (der alte Ring nahm MAX_RING-1), der
+// naechste gleichrangige wird verworfen.
+static void test_pool_kapazitaet_ist_max_ring(void)
+{
+    TEST_ASSERT_EQUAL_INT(20, MAX_RING);
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildPositionFrame(0xC400UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "cap"));
+    }
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+
+    BuiltFrame extra = buildPositionFrame(0xC4FFUL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntry(extra.bytes, extra.len, RING_STATUS_READY, "cap"));
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+}
+
+// Gleiche Prio: der AELTERE Eintrag (ringEnqueueTime) gewinnt, auch wenn er
+// auf dem hoeheren Index sitzt; wrap-sicher ueber den uint32-Ueberlauf.
+static void test_pool_gleiche_prio_aelterer_eintrag_zuerst_auch_bei_hoeherem_index(void)
+{
+    mc_test_set_millis(10);
+    BuiltFrame a = buildPositionFrame(0xC501UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_READY, "tie"));
+    mc_test_set_millis(20);
+    BuiltFrame b = buildPositionFrame(0xC502UL);
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(b.bytes, b.len, RING_STATUS_READY, "tie"));
+
+    ringBuffer[0][0] = 0;   // A gesendet, Slot 0 frei
+    mc_test_set_millis(30);
+    BuiltFrame c = buildPositionFrame(0xC503UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(c.bytes, c.len, RING_STATUS_READY, "tie")); // erster freier Slot
+
+    // B (Zeit 20, Slot 1) ist aelter als C (Zeit 30, Slot 0).
+    TEST_ASSERT_EQUAL_INT(1, getNextTxSlot());
+
+    // Wrap: Slot 0 jetzt "nach dem Ueberlauf" (klein), Slot 1 davor (gross)
+    // -> Slot 1 bleibt der aeltere.
+    ringEnqueueTime[0] = 5UL;
+    ringEnqueueTime[1] = UINT32_MAX - 5UL;
+    TEST_ASSERT_EQUAL_INT(1, getNextTxSlot());
+    // und umgekehrt
+    ringEnqueueTime[0] = UINT32_MAX - 5UL;
+    ringEnqueueTime[1] = 5UL;
+    TEST_ASSERT_EQUAL_INT(0, getNextTxSlot());
+
+    // Prio schlaegt Alter: ein juengerer ACK gewinnt gegen beide Positionen.
+    mc_test_set_millis(99);
+    BuiltFrame ack = buildAckFrame(0xC504UL);
+    int sAck = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "tie");
+    TEST_ASSERT_EQUAL_INT(sAck, getNextTxSlot());
+}
+
+// INFLIGHT-Fenster: ein von doTX() gegriffener Slot behaelt seine Laenge,
+// wird nicht erneut gewaehlt, nicht verdraengt und nicht von einem Enqueue
+// ueberschrieben; Rollback stellt READY bzw. DONE wieder her.
+static void test_pool_inflight_slot_ist_geschuetzt_und_rollback_stellt_status_her(void)
+{
+    // Slot 0: LOW (schlechteste Prio -> waere der erste Eviction-Kandidat),
+    // alle anderen CRITICAL (ACK).
+    BuiltFrame pos = buildPositionFrame(0xC600UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "inflt"));
+    for (int i = 1; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildAckFrame(0xC610UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "inflt"));
+    }
+
+    uint8_t prev = 0xEE;
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev));
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_READY, prev);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_INFLIGHT, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)pos.len, ringBuffer[0][0]);   // Laenge bleibt
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+    // zweites Begin auf demselben Slot scheitert
+    uint8_t prev2 = 0xEE;
+    TEST_ASSERT_FALSE(txRingBeginTx(0, &prev2));
+
+    // Auswahl sieht den INFLIGHT-Slot nicht (der ACK-Slot 1 gewinnt).
+    TEST_ASSERT_EQUAL_INT(1, getNextTxSlot());
+
+    // Ein weiterer ACK wuerde den LOW-Slot 0 verdraengen -- ist er INFLIGHT,
+    // wird der Neue stattdessen verworfen und Slot 0 bleibt unversehrt.
+    BuiltFrame ack = buildAckFrame(0xC6FFUL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "inflt"));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)pos.len, ringBuffer[0][0]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_INFLIGHT, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(pos.bytes, &ringBuffer[0][2], pos.len);
+
+    // Rollback: READY zurueck, Laenge unveraendert, wieder waehlbar nach ACKs.
+    txRingFinishTx(0, prev, TXRING_FIN_ROLLBACK);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_READY, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)pos.len, ringBuffer[0][0]);
+    // Doppeltes Finish ist ein No-Op (Slot ist nicht mehr INFLIGHT).
+    txRingFinishTx(0, RING_STATUS_DONE, TXRING_FIN_DROP);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)pos.len, ringBuffer[0][0]);
+
+    // Rollback eines Einmal-Slots (DONE) stellt DONE her.
+    resetRing();
+    BuiltFrame once = buildPositionFrame(0xC700UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(once.bytes, once.len, RING_STATUS_DONE, "once"));
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev));
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, prev);
+    txRingFinishTx(0, prev, TXRING_FIN_ROLLBACK);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)once.len, ringBuffer[0][0]);
+}
+
+// Ausgaenge von doTX(): Einmal-Slot (DONE) -> frei; eigener Text (READY) ->
+// SENT mit Laenge (Retry-Leiter); READY-Nicht-Text -> frei; Drop -> frei.
+// Begin auf freiem oder geparktem Slot scheitert.
+static void test_pool_finish_tx_ausgaenge(void)
+{
+    uint8_t prev = 0;
+
+    // Einmal (DONE) gesendet -> frei
+    BuiltFrame d = buildTextFrame("DK5EN-91", "once", 0xC800UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntryOnce(d.bytes, d.len, "ack_once"));
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev));
+    txRingFinishTx(0, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
+
+    // Eigener Text (READY) gesendet -> SENT geparkt, Laenge bleibt
+    BuiltFrame t = buildTextFrame("DK5EN-91", "own", 0xC801UL);
+    int st = addTxRingEntry(t.bytes, t.len, RING_STATUS_READY, "user_msg");
+    TEST_ASSERT_EQUAL_INT(0, st);
+    TEST_ASSERT_TRUE(txRingBeginTx(st, &prev));
+    txRingFinishTx(st, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_SENT, ringBuffer[st][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)t.len, ringBuffer[st][0]);
+    TEST_ASSERT_EQUAL_INT(-1, getNextTxSlot());   // SENT wird nicht gewaehlt
+    TEST_ASSERT_FALSE(txRingBeginTx(st, &prev));  // geparkt: nicht greifbar
+    TEST_ASSERT_FALSE(txRingBeginTx(5, &prev));   // frei: nicht greifbar
+    TEST_ASSERT_FALSE(txRingBeginTx(-1, &prev));
+    TEST_ASSERT_FALSE(txRingBeginTx(MAX_RING, &prev));
+
+    // READY-Nicht-Text (Position) gesendet -> frei
+    BuiltFrame p = buildPositionFrame(0xC802UL);
+    int sp = addTxRingEntry(p.bytes, p.len, RING_STATUS_READY, "user_pos");
+    TEST_ASSERT_TRUE(txRingBeginTx(sp, &prev));
+    txRingFinishTx(sp, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[sp][0]);
+
+    // Verworfen ohne Senden (TX aus / unkonfiguriert / Decode-Fehler) -> frei
+    BuiltFrame t2 = buildTextFrame("DK5EN-91", "drop", 0xC803UL);
+    int s2 = addTxRingEntry(t2.bytes, t2.len, RING_STATUS_READY, "user_msg");
+    TEST_ASSERT_TRUE(txRingBeginTx(s2, &prev));
+    txRingFinishTx(s2, prev, TXRING_FIN_DROP);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[s2][0]);
+
+    // Ein waehrenddessen per ACK aufgeloester Slot (nicht mehr INFLIGHT)
+    // bleibt, wie er ist: Finish fasst ihn nicht an.
+    BuiltFrame t3 = buildTextFrame("DK5EN-91", "acked", 0xC804UL);
+    int s3 = addTxRingEntry(t3.bytes, t3.len, RING_STATUS_READY, "user_msg");
+    TEST_ASSERT_TRUE(txRingBeginTx(s3, &prev));
+    ringBuffer[s3][1] = RING_STATUS_DONE;   // ACK-Scan loest auf ...
+    ringBuffer[s3][0] = 0;                  // ... und gibt frei
+    txRingFinishTx(s3, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[s3][0]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[s3][1]);
+}
+
+// EXT_PENDING-Slot wird nie verdraengt (auch ausserhalb von EXTERNAL_RADIO-Builds
+// schuetzt der Pool den Status).
+static void test_pool_ext_pending_wird_nie_verdraengt(void)
+{
+    BuiltFrame pos = buildPositionFrame(0xC900UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "ext"));
+    for (int i = 1; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildAckFrame(0xC910UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "ext"));
+    }
+    ringBuffer[0][1] = RING_STATUS_EXT_PENDING;
+
+    BuiltFrame ack = buildAckFrame(0xC9FFUL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "ext"));
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_EXT_PENDING, ringBuffer[0][1]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)pos.len, ringBuffer[0][0]);
+}
+
+// Ein geparkter SENT-Slot (eigener Text, wartet auf ACK) IST verdraengbar --
+// wie im alten Ring --, aber nur von einer strikt hoeheren Prioritaet.
+static void test_pool_geparkter_sent_slot_ist_verdraengbar_nur_von_hoeherer_prio(void)
+{
+    // Pool voll mit Gruppentexten (HIGH, Prio 2), Slot 0 aelter und geparkt.
+    mc_test_set_millis(1);
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        BuiltFrame f = buildTextFrame("9", "grp", 0xCA00UL + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_msg"));
+        mc_test_set_millis(2 + (uint32_t)i);
+    }
+    ringBuffer[0][1] = 0x07;
+
+    // Gleiche Prio (2): verworfen, Parker bleibt.
+    BuiltFrame g = buildTextFrame("9", "grp2", 0xCAF0UL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntry(g.bytes, g.len, RING_STATUS_READY, "user_msg"));
+    TEST_ASSERT_EQUAL_UINT8(0x07, ringBuffer[0][1]);
+
+    // Prio 1 (DM): verdraengt den aeltesten der schlechtesten Prio = den Parker.
+    BuiltFrame dm = buildTextFrame("DK5EN-91", "dm", 0xCAF1UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(dm.bytes, dm.len, RING_STATUS_READY, "user_msg"));
+    // Buchung: 1 verworfener Neuer (gleiche Prio) + 1 verdraengter Parker.
+    TEST_ASSERT_EQUAL_UINT16(2, stat_drop_count[MSG_PRIO_HIGH]);
+}
+
+// stat_preempt_count-Definition: gewaehlter Slot ist nicht der aelteste belegte.
+static void test_pool_is_preempt_aeltester_belegter_slot(void)
+{
+    mc_test_set_millis(10);
+    BuiltFrame a = buildHeyFrame(0xCB01UL);      // aelter, BACKGROUND
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_READY, "pre"));
+    mc_test_set_millis(20);
+    BuiltFrame b = buildAckFrame(0xCB02UL);      // juenger, CRITICAL -> wird gewaehlt
+    TEST_ASSERT_EQUAL_INT(1, addTxRingEntry(b.bytes, b.len, RING_STATUS_READY, "pre"));
+
+    TEST_ASSERT_EQUAL_INT(1, getNextTxSlot());
+    TEST_ASSERT_TRUE(txRingIsPreempt(1));    // Slot 0 ist aelter
+    TEST_ASSERT_FALSE(txRingIsPreempt(0));   // der aelteste selbst: keine Ueberholung
+
+    ringBuffer[0][0] = 0;
+    TEST_ASSERT_FALSE(txRingIsPreempt(1));   // allein
+}
+
+// txRingDepth()/txRingPrioCounts() zaehlen jeden belegten Slot (INFLIGHT, SENT,
+// EXT_PENDING eingeschlossen); txRingAckWaitCounts() nur die SENT-Leiter.
+static void test_pool_depth_und_ackwait_counts(void)
+{
+    BuiltFrame dm   = buildTextFrame("DK5EN-91", "dm", 0xCC01UL);   // Prio 1
+    BuiltFrame grp  = buildTextFrame("9", "grp", 0xCC02UL);         // Prio 2
+    BuiltFrame grp2 = buildTextFrame("9", "grp2", 0xCC03UL);        // Prio 2
+    BuiltFrame rdy  = buildTextFrame("9", "rdy", 0xCC04UL);         // Prio 2, READY bleibt
+    BuiltFrame pos  = buildPositionFrame(0xCC05UL);                 // Prio 4
+    BuiltFrame hey  = buildHeyFrame(0xCC06UL);                      // Prio 5
+    int sDm  = addTxRingEntry(dm.bytes,  dm.len,  RING_STATUS_READY, "user_msg");
+    int sGrp = addTxRingEntry(grp.bytes, grp.len, RING_STATUS_READY, "user_msg");
+    int sGr2 = addTxRingEntry(grp2.bytes, grp2.len, RING_STATUS_READY, "user_msg");
+    int sRdy = addTxRingEntry(rdy.bytes, rdy.len, RING_STATUS_READY, "user_msg");
+    int sPos = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "user_pos");
+    int sHey = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "beacon");
+    (void)sRdy;
+
+    ringBuffer[sDm][1]  = 0x01;                      // SENT-Leiter, Beginn
+    ringBuffer[sGrp][1] = 0x14;                      // SENT-Leiter, Ende
+    ringBuffer[sGr2][1] = 0x15;                      // transienter Schwellwert, zaehlt noch
+    ringBuffer[sPos][1] = RING_STATUS_INFLIGHT;      // gerade auf Sendung
+    ringBuffer[sHey][1] = RING_STATUS_EXT_PENDING;   // externes Funkmodul
+
+    uint8_t all[6], wait[6];
+    txRingPrioCounts(all);
+    txRingAckWaitCounts(wait);
+
+    TEST_ASSERT_EQUAL_INT(6, txRingDepth());
+    TEST_ASSERT_EQUAL_UINT8(6, all[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, all[MSG_PRIO_CRITICAL]);
+    TEST_ASSERT_EQUAL_UINT8(3, all[MSG_PRIO_HIGH]);
+    TEST_ASSERT_EQUAL_UINT8(1, all[MSG_PRIO_LOW]);
+    TEST_ASSERT_EQUAL_UINT8(1, all[MSG_PRIO_BACKGROUND]);
+
+    TEST_ASSERT_EQUAL_UINT8(3, wait[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, wait[MSG_PRIO_CRITICAL]);
+    TEST_ASSERT_EQUAL_UINT8(2, wait[MSG_PRIO_HIGH]);
+    TEST_ASSERT_EQUAL_UINT8(0, wait[MSG_PRIO_NORMAL]);
+    TEST_ASSERT_EQUAL_UINT8(0, wait[MSG_PRIO_LOW]);
+    TEST_ASSERT_EQUAL_UINT8(0, wait[MSG_PRIO_BACKGROUND]);
+
+    // Freie Slots (len 0) mit altem SENT-Status zaehlen nicht.
+    ringBuffer[sDm][0] = 0;
+    txRingAckWaitCounts(wait);
+    TEST_ASSERT_EQUAL_UINT8(2, wait[0]);
+    TEST_ASSERT_EQUAL_UINT8(0, wait[MSG_PRIO_CRITICAL]);
+}
+
+// Der Alterungs-Sweep laesst einen INFLIGHT-Slot in Ruhe (doTX() gibt ihn selbst frei).
+static void test_pool_sweep_ueberspringt_inflight(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildHeyFrame(0xCD01UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "sweep"));
+    ringBuffer[0][1] = RING_STATUS_INFLIGHT;
+
+    mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS + 1UL);
+    txRingAgeBackground((uint32_t)millis(), kNoClock);
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[0][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
+}
+
+// W1b-Advisor R1: liegt nur ein geparkter SENT-Text im Pool, gibt es nichts zu
+// senden -- die TX-Gates der Hauptschleifen (esp32_main/nrf52_main) fragen
+// darum getNextTxSlot() >= 0, nicht txRingDepth() > 0.
+static void test_pool_nur_geparkter_sent_nichts_zu_senden(void)
+{
+    BuiltFrame txt = buildTextFrame("DK5EN-91", "warte auf ack", 0xC700UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(txt.bytes, txt.len, RING_STATUS_READY, "user_msg"));
+    uint8_t prev = 0xEE;
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev));
+    txRingFinishTx(0, prev, TXRING_FIN_SENT);
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
+    TEST_ASSERT_EQUAL_INT(-1, getNextTxSlot());
+}
+
+// W1b-Advisor R2: zwischen getNextTxSlot() (ohne Lock) und dem Claim kann
+// OnRxDone (nRF52, LORA-Task) den Slot verdraengen und neu belegen. Der Claim
+// prueft darum unter dem Lock die Einreihzeit des gewaehlten Eintrags.
+static void test_pool_claim_scheitert_an_neu_belegtem_slot(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame a = buildTextFrame("DK5EN-92", "alt", 0xC710UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(a.bytes, a.len, RING_STATUS_DONE, "rx_relay"));
+    int pick = getNextTxSlot();
+    TEST_ASSERT_EQUAL_INT(0, pick);
+    uint32_t snap = ringEnqueueTime[pick];
+
+    // "OnRxDone": Slot frei und mit einem neuen Frame belegt
+    ringBuffer[0][0] = 0;
+    mc_test_set_millis(2000);
+    BuiltFrame b = buildTextFrame("DK5EN-92", "neu", 0xC711UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(b.bytes, b.len, RING_STATUS_DONE, "rx_relay"));
+
+    uint8_t prev = 0xEE;
+    TEST_ASSERT_FALSE(txRingBeginTx(pick, &prev, &snap));
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, (uint8_t)ringBuffer[0][1]);   // der Neue bleibt unberuehrt
+
+    // ohne Wechsel gelingt der Claim mit Schnappschuss
+    snap = ringEnqueueTime[0];
+    TEST_ASSERT_TRUE(txRingBeginTx(0, &prev, &snap));
 }
 
 int main(int argc, char **argv)
@@ -1912,14 +2226,14 @@ int main(int argc, char **argv)
     RUN_TEST(test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden);
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);
-    RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
+    RUN_TEST(test_eviction_trifft_aeltesten_der_schlechtesten_prio_und_nichts_wandert);
     RUN_TEST(test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert);
     RUN_TEST(test_stufe2_default_ueberschreibt_alte_maske);
     RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
     RUN_TEST(test_gwrx01_server_text_mit_bekanntem_bedarf_wird_relay);
     RUN_TEST(test_gwrx01_server_nichttext_bleibt_other);
     RUN_TEST(test_gwrx01_ohne_nbrrelay_oder_unbekannt_wie_heute);
-    RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
+    RUN_TEST(test_stufe2_eviction_ueberschreibt_maske_im_uebernommenen_slot);
     RUN_TEST(test_stufe2_maskenbit_ueber_32_ueberlebt_case_b);
     RUN_TEST(test_qrt_f5_voll_ohne_eviction_liefert_minus2);
     RUN_TEST(test_qrt_f5_laenge_null_bleibt_minus1);
@@ -1934,7 +2248,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_n14_stress_randomisiert);
     RUN_TEST(test_bp02_tiefe_mit_loechern);
     RUN_TEST(test_bp02_dj8meh_szenario_prio5_am_lesezeiger);
-    RUN_TEST(test_bp03_stale_drop_und_lesezeiger_vorruecken);
+    RUN_TEST(test_bp03_stale_drop_und_slot_frei);
     RUN_TEST(test_bp03_frischer_bg_bleibt);
     RUN_TEST(test_bp03_nicht_bg_altert_nie);
     RUN_TEST(test_bp03_rollover_sicher);
@@ -1972,5 +2286,17 @@ int main(int argc, char **argv)
     RUN_TEST(test_ringstat_parked_overwrite_bei_pending_slot);
     RUN_TEST(test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null);
     RUN_TEST(test_ringstat_parked_overwrite_ignoriert_done_ready_ext);
+    RUN_TEST(test_pool_loch_hinter_geparktem_sent_slot_wird_gefuellt);
+    RUN_TEST(test_pool_kapazitaet_ist_max_ring);
+    RUN_TEST(test_pool_nur_geparkter_sent_nichts_zu_senden);
+    RUN_TEST(test_pool_claim_scheitert_an_neu_belegtem_slot);
+    RUN_TEST(test_pool_gleiche_prio_aelterer_eintrag_zuerst_auch_bei_hoeherem_index);
+    RUN_TEST(test_pool_inflight_slot_ist_geschuetzt_und_rollback_stellt_status_her);
+    RUN_TEST(test_pool_finish_tx_ausgaenge);
+    RUN_TEST(test_pool_ext_pending_wird_nie_verdraengt);
+    RUN_TEST(test_pool_geparkter_sent_slot_ist_verdraengbar_nur_von_hoeherer_prio);
+    RUN_TEST(test_pool_is_preempt_aeltester_belegter_slot);
+    RUN_TEST(test_pool_depth_und_ackwait_counts);
+    RUN_TEST(test_pool_sweep_ueberspringt_inflight);
     return UNITY_END();
 }

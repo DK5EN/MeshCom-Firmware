@@ -135,10 +135,7 @@ static int execTxq(char *res, size_t n)
     txRingPrioCounts(prio);
     RmTxqIn in;
     memset(&in, 0, sizeof(in));
-    uint16_t q = 0;
-    for (int i = 0; i < 6; i++)
-        q = (uint16_t)(q + prio[i]);
-    in.queued = q;
+    in.queued = rmTxqQueued(prio); // prio[0] is already the total (D6)
     in.cap = (uint16_t)MAX_RING;
     in.bp = (uint8_t)bpCurrentState();
     in.tx = (uint32_t)stat_txn;  // own transmissions (interval counter, drained by the STAT log)

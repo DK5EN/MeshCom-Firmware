@@ -50,8 +50,6 @@ static void resetRing(void)
 {
     strcpy(meshcom_settings.node_call, "DK5EN-90");
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iWrite = 0;
-    iRead = 0;
     memset(retryCount, 0, sizeof(retryCount));
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
@@ -110,24 +108,23 @@ static int enqueueHeyRelay(uint32_t id)
     return addTxRingEntry(f, len, 0xFF, "rx_relay");
 }
 
-/// Simuliert den doTX-Konsum: Slot geleert (wie lora_functions.cpp:1569),
-/// danach rueckt der Lesezeiger wie im Original vor.
+/// Simuliert den doTX-Konsum: Slot geleert (len 0 = frei). TXP W1b: es gibt
+/// keinen Lesezeiger mehr, der nachrueckt.
 static void drainAllSlotsExcept(int keep_slot)
 {
     for (int i = 0; i < MAX_RING; i++)
         if (i != keep_slot)
             ringBuffer[i][0] = 0;
-    advanceIReadPastEmpty();
 }
 
 // --------------------------------------------------------------------------
 // T1 — Der Vorfall, Ende-zu-Ende: Burst -> korrektes QRT -> realer Drain,
-// nur der ausgehungerte Prio-5-HEY bleibt am Lesezeiger -> die Episode
+// nur der ausgehungerte Prio-5-HEY bleibt im Pool -> die Episode
 // MUSS binnen QRV_HOLD_MS schliessen und der Node wieder annehmen.
 //
 // Kontrollrechnung Altverhalten (beides im Feld belegt):
-//  - BP-02 kaputt (Indexdistanz): txRingDepth() nach dem Drain == 17 (iRead
-//    steht am Blocker, iWrite dahinter) -> poll() sieht nie das Wasserband,
+//  - BP-02 kaputt (Indexdistanz): txRingDepth() nach dem Drain == 17 (die alte
+//    Lesezeiger-Spanne stand am Blocker) -> poll() sieht nie das Wasserband,
 //    refusing() bleibt true -> Assert "!refusing" rot.
 //  - BP-04 kaputt (QRV nur bei 0): Tiefe bleibt 1 (der Blocker) -> QRV
 //    kommt nie -> Assert "QRV nach 10 s" rot.
@@ -147,7 +144,7 @@ static void test_dj8meh_episode_endet_nach_realem_drain(void)
 {
     BackPressure bp(MAX_RING);
 
-    // Blocker zuerst: HEY-Relay am kuenftigen Lesezeiger (Slot 0).
+    // Blocker zuerst: HEY-Relay in Slot 0.
     int blocker = enqueueHeyRelay(0x70A28124u);
     TEST_ASSERT_EQUAL_INT(0, blocker);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_BACKGROUND, ringPriority[blocker]);
@@ -178,9 +175,8 @@ static void test_dj8meh_episode_endet_nach_realem_drain(void)
     // Realer Drain: alles gesendet ausser dem prioritaets-ausgehungerten
     // Blocker -- exakt der Ringzustand 15:45-15:50 im Feldlog.
     drainAllSlotsExcept(blocker);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead); // Blocker pinnt den Lesezeiger
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, txRingDepth(),
-        "BP-02: ehrliche Tiefe 1 (alte Indexdistanz haette 17+ gemeldet)");
+        "BP-02: ehrliche Tiefe 1 (die alte Indexdistanz haette 17+ gemeldet)");
 
     // bpPollDrain()-Verdrahtung, M1 (QRT-Analyse 2026-10-18): unter der
     // Linie gibt poll() QRT sofort frei -- ein QRV, kein 10-s-Halt mehr.
@@ -228,14 +224,13 @@ static void test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort(void)
     txRingAgeBackground(millis(), CetClock{false, false, 0});
     TEST_ASSERT_NOT_EQUAL(0, ringBuffer[blocker][0]);
 
-    // Naechster Tick NACH der Grenze: Blocker faellt, Lesezeiger rueckt vor,
-    // Ring ist wirklich leer -> poll() schliesst ohne Wasserband-Halt.
+    // Naechster Tick NACH der Grenze: Blocker faellt,
+    // Pool ist wirklich leer -> poll() schliesst ohne Wasserband-Halt.
     mc_test_set_millis(enq_t + RING_BG_MAX_AGE_MS + 2000);
     txRingAgeBackground(millis(), CetClock{false, false, 0});
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBuffer[blocker][0],
         "BP-03: Stale-HEY nach 3 min freigegeben (alt: sass 10 min)");
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)iWrite, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_INT(0, txRingDepth());
     TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRV, bp.poll(txRingDepth(), millis()),
         "Tiefe 0 schliesst sofort, kein 10-s-Halt noetig");
@@ -343,32 +338,49 @@ static void test_flood_13_into_10_yields_five_nacks(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(8, txRingDepth(), "kein Abfluss in diesem Test -- 8 bleiben im Ring stehen");
 }
 
-// QRT Finding 5: ein eigener Text, den der Ring ohne Eviction ablehnt (-2),
-// bekommt den QTA-Nack auch bei Tiefe 5 (< refuseThreshold). -1 (Validitaet)
-// bleibt unter der Schwelle ohne Nack.
-static void test_f5_overflow_code_nackt_bei_tiefe_5(void)
+// QRT Finding 5: ein eigener Text, den der Pool ohne Eviction ablehnt (-2),
+// bekommt den QTA-Nack. TXP W1b: -2 gibt es nur noch bei vollem Pool (Tiefe
+// MAX_RING); die alte "Index-Spanne voll, aber nur 5 belegte Slots"-Lage
+// (Tiefe 5 mit -2) ist mit dem Slot-Pool verschwunden -- Loecher werden
+// wiederverwendet. -1 (Validitaet) bleibt unter der Schwelle ohne Nack.
+static void test_f5_overflow_code_nackt_bei_vollem_pool(void)
 {
     BackPressure bp(MAX_RING);
-    // Index-Spanne voll, aber nur 5 belegte Slots: Slot 0 (iRead) und 4 weitere
-    // Prio-1-Eintraege, der Rest sind Loecher hinter dem Lesezeiger.
     uint8_t f[300];
-    for (int i = 0; i < MAX_RING - 1; i++)
+    for (int i = 0; i < MAX_RING; i++)
     {
         uint16_t len = buildRawFrame(f, 0x41, 0xB0000000u + i, nullptr, nullptr, "ack!");
         TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f, len, 0xFF, "fill"));
     }
-    for (int i = 5; i < MAX_RING - 1; i++)
-        ringBuffer[i][0] = 0;
-    TEST_ASSERT_EQUAL_INT(5, txRingDepth());
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 
     int rc = enqueueUserText(0xB1000000u);
     TEST_ASSERT_EQUAL_INT_MESSAGE(RING_ENQUEUE_FULL, rc, "no-evict overflow code");
-    TEST_ASSERT_TRUE_MESSAGE(txRingDepth() < bp.refuseThreshold(), "depth below QRT line");
     TEST_ASSERT_TRUE_MESSAGE(sendMessageNeedsQtaNack(rc, txRingDepth(), bp.refuseThreshold()),
-                             "QTA nack on -2 regardless of depth");
-    TEST_ASSERT_FALSE_MESSAGE(sendMessageNeedsQtaNack(-1, txRingDepth(), bp.refuseThreshold()),
+                             "QTA nack on -2");
+    TEST_ASSERT_FALSE_MESSAGE(sendMessageNeedsQtaNack(-1, 5, bp.refuseThreshold()),
                               "-1 below threshold stays [BP];invalid");
     TEST_ASSERT_TRUE(sendMessageNeedsQtaNack(-1, bp.refuseThreshold(), bp.refuseThreshold()));
+}
+
+// Regression der alten Index-Spanne: 5 belegte Slots verteilt ueber den Pool,
+// Rest frei -> ein Enqueue gelingt (der alte Ring lieferte hier -2, obwohl 15
+// Slots frei waren).
+static void test_loecher_im_pool_blockieren_enqueue_nicht(void)
+{
+    uint8_t f[300];
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        uint16_t len = buildRawFrame(f, 0x41, 0xB2000000u + i, nullptr, nullptr, "ack!");
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f, len, 0xFF, "fill"));
+    }
+    for (int i = 5; i < MAX_RING; i++)
+        ringBuffer[i][0] = 0;
+    TEST_ASSERT_EQUAL_INT(5, txRingDepth());
+
+    int rc = enqueueUserText(0xB3000000u);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(5, rc, "erster freier Slot");
+    TEST_ASSERT_EQUAL_INT(6, txRingDepth());
 }
 
 int main(int argc, char **argv)
@@ -379,6 +391,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort);
     RUN_TEST(test_qrt_ausloesung_bleibt_intakt);
     RUN_TEST(test_flood_13_into_10_yields_five_nacks);
-    RUN_TEST(test_f5_overflow_code_nackt_bei_tiefe_5);
+    RUN_TEST(test_f5_overflow_code_nackt_bei_vollem_pool);
+    RUN_TEST(test_loecher_im_pool_blockieren_enqueue_nicht);
     return UNITY_END();
 }

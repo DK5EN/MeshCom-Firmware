@@ -686,6 +686,12 @@ struct RmTxqIn
     uint8_t util; // channel utilisation percent, clamped 0..100
 };
 
+// D6: txRingPrioCounts() returns the total in prio[0] and the per-priority counts in prio[1..5].
+inline uint16_t rmTxqQueued(const uint8_t prio[6])
+{
+    return prio[0];
+}
+
 inline size_t rmFmtTxq(char *out, size_t n, const RmTxqIn &in)
 {
     RmFmtBuf b;

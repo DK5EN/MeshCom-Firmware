@@ -6,7 +6,7 @@
 | Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                         |
 | Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md) |
 | Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                       |
-| Status    | W0 done (`cee174b7`, logger night running); W1a committed; W1b next                                                                                                              |
+| Status    | W0 done (`cee174b7`, logger night running), W1a `05a18b36`, W1b committed; W1c next                                                                                              |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -34,7 +34,7 @@
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
 | W0   | Measurement: `{CET}` age helper + log lines, `stat_latency_max` to `uint32`, `RING_DROP_STALE prio=`; flash DK5EN-1, then DK5EN-98; logger night | done   |
 | W1a  | TTL table for all priorities, `{CET}` age gate (D1, D2)                                                                                          | done   |
-| W1b  | Slot pool: `INFLIGHT` status, delete `iRead`/`iWrite`; gauge G3 (D5); RM1 `txq` fix (D6)                                                         | open   |
+| W1b  | Slot pool: `INFLIGHT` status, delete `iRead`/`iWrite`; gauge G3 (D5); RM1 `txq` fix (D6)                                                         | done   |
 | W1c  | Supersede in place: HEY, position, `{CET}` (D3)                                                                                                  | open   |
 | W2   | Time-aged dedup (concept stage 3), dedup line of the gauge: later campaign                                                                       | parked |
 
@@ -93,3 +93,26 @@ dominates the age. Without a gate a beacon can sit 5 to 7 minutes and still go o
   should stay small or move code into helpers.
 - Advisor (Opus): APPROVED; three follow-ups applied (prio-1 scope, prio-2 DONE test, `cet` row in
   `how-to-read-meshcom-logs.md`).
+
+### W1b
+
+- Slot pool replaces the ring: free = len 0, capacity 20 (was 19), selection by priority then
+  oldest enqueue time, eviction takes the oldest of the worst priority and never touches
+  `INFLIGHT` (0x81) or `EXT_PENDING`. `iRead`/`iWrite`, `advanceIReadPastEmpty()`, the N-24
+  relocation and `RING_OVERFLOW buf=tx` are gone; `nrf_eth.cpp` routes through `addTxRingEntry()`.
+- `doTX()` claims the picked slot right after `getNextTxSlot()` (`txRingBeginTx()`, locked, with an
+  enqueue-time snapshot so an nRF52 evict-and-refill in between is detected) and ends it with
+  `txRingFinishTx()` (sent, rollback, drop). Loop TX gates use `getNextTxSlot() >= 0`: a parked own
+  text waiting for its ACK no longer keeps the CAD cycle running.
+- Gauge G3 (D5): `txRingAckWaitCounts()`, `data-w0..w5`, outlined cells, "n waiting for ACK",
+  wording "TX queue" / "Queue:". RM1 `txq` counts `prio[0]` (D6, test failed 10 vs 5 before).
+- Before/after proof of the hole problem: the same probe (full queue, parked head, two holes)
+  fails on `05a18b36` ("enqueue refused although holes exist") and passes on the pool.
+- Log changes: `RING_STATUS` lost `iW=`/`iR=`/`dist=`; `preempt=` now means "the pick was not the
+  oldest by enqueue time". `RING_ZOMBIES` in `tools/loganalyse.sh` and `tools/serial_monitor.py`
+  no longer fires on pool logs (concept obsolete in a pool).
+- Advisor (Opus): REWORK (R1 loop gate, R2 claim race), applied by the orchestrator with tests;
+  re-check found one nRF52 hole (async CAD: the gate also stays open while `cad_in_progress` or
+  `cad_done_flag` is set, so a stale CAD result is consumed, never reused), fixed as proposed.
+- Open, next wave: a retry in a full pool can still lose the message (`updateRetransmissionStatus()`
+  enqueues the copy before freeing the original; pre-existing). Fix: rearm the parked slot in place.

@@ -1517,7 +1517,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var d=document.getElementById('mcq');");
     web_client.println("if(!d)return;");
     web_client.println("var p=[0,0,0,0,0,0];");
-    web_client.println("for(var i=1;i<=5;i++){p[i]=parseInt(d.getAttribute('data-p'+i))||0;}");
+    web_client.println("var w=[0,0,0,0,0,0];");
+    web_client.println("for(var i=1;i<=5;i++){p[i]=parseInt(d.getAttribute('data-p'+i))||0;w[i]=parseInt(d.getAttribute('data-w'+i))||0;}");
+    web_client.println("var w0=parseInt(d.getAttribute('data-w0'))||0;");
     web_client.println("var ring=parseInt(d.getAttribute('data-ring'))||0;");
     web_client.println("var used=parseInt(d.getAttribute('data-p0'))||0;");
     web_client.println("var bp=parseInt(d.getAttribute('data-bp'))||0;");
@@ -1541,9 +1543,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var colors=['#A2182F','#E07B39','#3B7DD8','#6FA96F','#9E9E9E'];");
     web_client.println("var names=['crit','high','normal','low','bg'];");
     web_client.println("var html='';");
-    web_client.println("html+='<div class=font-bold>TX ring</div>';");
+    web_client.println("html+='<div class=font-bold>TX queue</div>';");
     web_client.println("html+='<div class=mcq-barwrap><div class=mcq-bar>';");
-    web_client.println("for(var pr=1;pr<=5;pr++){for(var c=0;c<p[pr];c++){html+='<div class=mcq-cell style=background:'+colors[pr-1]+'></div>';}}");
+    web_client.println("for(var pr=1;pr<=5;pr++){var wn=Math.min(w[pr],p[pr]);for(var c=0;c<p[pr]-wn;c++){html+='<div class=mcq-cell style=background:'+colors[pr-1]+'></div>';}for(var cw=0;cw<wn;cw++){html+='<div class=mcq-cell-wait style=border-color:'+colors[pr-1]+'></div>';}}");
     web_client.println("for(var c2=0;c2<empty;c2++){html+='<div class=mcq-cell-empty></div>';}");
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-tick-faint style=left:'+qrsPct+'%></div>';");
@@ -1556,13 +1558,14 @@ void deliver_scaffold(bool bget_password)
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
     web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
+    web_client.println("if(w0>0){html+=', '+w0+' waiting for ACK';}");
     web_client.println("html+='</div>';");
     web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
     web_client.println("var bptxt=(bp==0)?'accepted':((bp==1)?'slow down':'refused');");
     web_client.println("html+='<div class=font-bold>Your messages: <span style=color:'+bpcolor+'>'+bptxt+'</span></div>';");
     web_client.println("var drop=parseInt(d.getAttribute('data-drop'))||0;");
     web_client.println("var iv=intv*1000;");
-    web_client.println("html+='<div class=font-bold>Ring: '+used+'/'+ring+' queued'+(win?', '+drop+' dropped in the last '+Math.round(intv/60)+' min, TX '+(tx/iv*100).toFixed(1)+' % / RX '+(rx/iv*100).toFixed(1)+' %':'')+'</div>';");
+    web_client.println("html+='<div class=font-bold>Queue: '+used+'/'+ring+' queued'+(win?', '+drop+' dropped in the last '+Math.round(intv/60)+' min, TX '+(tx/iv*100).toFixed(1)+' % / RX '+(rx/iv*100).toFixed(1)+' %':'')+'</div>';");
     web_client.println("html+='<div class=font-small>(QRS forecast at&nbsp;'+qrsf+' for your next msgs, line&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
     web_client.println("if(win==0){");
     web_client.println("html+='<div class=font-bold>Dedup window: n/a (no completed 5-min window yet)</div>';");
@@ -1687,6 +1690,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".mcq-barwrap {position:relative;}\n");
     web_client.println(".mcq-bar {display:flex;flex-direction:row;gap:1px;height:14px;margin:4px 0 2px 0;}\n");
     web_client.println(".mcq-cell {flex:1;height:14px;}\n");
+    web_client.println(".mcq-cell-wait {flex:1;height:14px;background:#fff;border:2px solid #888;box-sizing:border-box;}\n");
     web_client.println(".mcq-cell-empty {flex:1;height:14px;background:#ECECEC;border:1px solid #d0d0d0;box-sizing:border-box;}\n");
     web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.5;}\n");
     web_client.println(".mcq-tick-faint {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.15;}\n");
@@ -1974,6 +1978,8 @@ void sub_page_rxlog()
     // since boot -- data-win covers that for the JS side.
     uint8_t mcqPrio[6] = {0};
     txRingPrioCounts(mcqPrio);
+    uint8_t mcqWait[6] = {0};
+    txRingAckWaitCounts(mcqWait);
     uint32_t mcqDedupWin = setlogDedupWindowMin(stat_last_window.newid, PRIO_STAT_INTERVAL_S, MAX_DEDUP_RING);
     uint32_t mcqDrop = 0;
     for (int i = 0; i < 5; i++)
@@ -2000,8 +2006,10 @@ void sub_page_rxlog()
     web_client.printf(" data-win=\"%d\" data-rx=\"%lu\" data-tx=\"%lu\" data-int=\"%d\" data-newid=\"%lu\"\n",
                        (stat_last_window_ms != 0) ? 1 : 0, (unsigned long)stat_last_window.rx_ms, (unsigned long)stat_last_window.tx_ms,
                        (int)PRIO_STAT_INTERVAL_S, (unsigned long)stat_last_window.newid);
-    web_client.printf(" data-dup=\"%lu\" data-dedup=\"%u\" data-dwin=\"%lu\" data-age=\"%lu\" data-drop=\"%lu\"></div>\n",
+    web_client.printf(" data-dup=\"%lu\" data-dedup=\"%u\" data-dwin=\"%lu\" data-age=\"%lu\" data-drop=\"%lu\"\n",
                        (unsigned long)stat_last_window.dup, (unsigned int)MAX_DEDUP_RING, (unsigned long)mcqDedupWin, (unsigned long)mcqAgeS, (unsigned long)mcqDrop);
+    web_client.printf(" data-w0=\"%u\" data-w1=\"%u\" data-w2=\"%u\" data-w3=\"%u\" data-w4=\"%u\" data-w5=\"%u\"></div>\n",
+                       (unsigned int)mcqWait[0], (unsigned int)mcqWait[1], (unsigned int)mcqWait[2], (unsigned int)mcqWait[3], (unsigned int)mcqWait[4], (unsigned int)mcqWait[5]);
     web_client.println("</div>");
 
     web_client.println("<div style=\"overflow:scroll;\">");

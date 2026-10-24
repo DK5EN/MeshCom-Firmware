@@ -59,8 +59,8 @@ void addBLECommandBack(char *text);
 // Funktionsparameter gueltig; die volle Definition holt sich jede TU, die
 // need/alone tatsaechlich dereferenziert (txring_functions.h/.cpp), selbst.
 struct NbrMask;
-// N-14: kompletter TX-Ring-Enqueue (Slot-Wahl, Payload-Kopie, Prio/Overflow,
-// iWrite/iRead) in einer Funktion unter einem Lock (nRF52) -- siehe
+// N-14: kompletter TX-Ring-Enqueue (Slot-Wahl, Payload-Kopie, Prio/Eviction)
+// in einer Funktion unter einem Lock (nRF52) -- siehe
 // lora_functions.cpp fuer Details/Locking-Begruendung. Rueckgabe: Slot-Index
 // oder < 0 (immer mit `< 0` testen, nie mit `== -1`): -1 = ungueltig
 // (nicht konfiguriertes Rufzeichen, Laenge 0 / > UDP_TX_BUF_SIZE),

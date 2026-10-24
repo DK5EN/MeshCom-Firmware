@@ -387,6 +387,15 @@ static void test_txq(void)
     reportWorst("txq", rmFmtTxq(g_buf, sizeof(g_buf), w), g_buf, "q=65535/65535 bp=qrt tx=4294M rt=4294M dr=4294M u=100");
 }
 
+// D6: prio[0] is the total of prio[1..5]; txq must not add it twice.
+static void test_txq_queued_no_double_count(void)
+{
+    const uint8_t prio[6] = {5, 1, 0, 2, 2, 0};
+    TEST_ASSERT_EQUAL_UINT16(5, rmTxqQueued(prio));
+    const uint8_t none[6] = {0, 0, 0, 0, 0, 0};
+    TEST_ASSERT_EQUAL_UINT16(0, rmTxqQueued(none));
+}
+
 static void test_mbox(void)
 {
     RmMboxIn m = {3, 12, 50, 1834, 3, 20, 111, 222, 333, 4, 5, 6, 777, 888};
@@ -713,6 +722,7 @@ int main(int, char **)
     RUN_TEST(test_mh_direct);
     RUN_TEST(test_mh_route);
     RUN_TEST(test_txq);
+    RUN_TEST(test_txq_queued_no_double_count);
     RUN_TEST(test_mbox);
     RUN_TEST(test_maxhop);
     RUN_TEST(test_worst_cases_rest);

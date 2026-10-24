@@ -58,8 +58,6 @@ void printAsciiBuffer(unsigned char *buf, int len) { (void)buf; (void)len; }
 static void resetRing(void)
 {
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iWrite = 0;
-    iRead = 0;
     memset(retryCount, 0, sizeof(retryCount));
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
@@ -282,8 +280,7 @@ static void test_addTxRingEntry_refuses_when_node_unconfigured(void)
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t-unconf");
 
     TEST_ASSERT_EQUAL_INT(-1, slot);
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);  // Ring unangetastet
-    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_INT(0, txRingDepth());      // Ring unangetastet
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
     TEST_ASSERT_EQUAL_UINT32(before + 1, stat_tx_refuse_unconfigured);
 }
@@ -308,7 +305,7 @@ static void test_addTxRingEntry_queues_when_node_configured(void)
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "t-conf");
 
     TEST_ASSERT_EQUAL_INT(0, slot);
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
     TEST_ASSERT_EQUAL_UINT8_ARRAY(f.bytes, &ringBuffer[slot][2], f.len);
     TEST_ASSERT_EQUAL_UINT32(before, stat_tx_refuse_unconfigured); // unveraendert
 }

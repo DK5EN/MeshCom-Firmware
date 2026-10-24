@@ -551,18 +551,14 @@ int NrfETH::getUDP()
  */
 void NrfETH::fillUDP_RING_BUFFER(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
 {
-  // first byte is always the len of the msg
-  // UDP messages send to LoRa TX
-  ringBuffer[iWrite][0] = rx_buf_size;
-  ringBuffer[iWrite][1] = 0xFF;
-  memcpy(ringBuffer[iWrite] + 2, buffer, rx_buf_size);
+  // UDP messages send to LoRa TX: one producer path (addTxRingEntry(): free
+  // slot choice, copy, priority and eviction under the nRF52 ring lock).
+  // Status DONE (0xFF), label "udp_rx" like the other server -> LoRa enqueues
+  // (addUdpRxRingEntry()), no retransmission.
+  int slot = addTxRingEntry(buffer, rx_buf_size, RING_STATUS_DONE, "udp_rx", 0);
+  (void)slot;   // DEBUG_MSG_VAL may compile away
 
-  DEBUG_MSG_VAL("RADIO", (int)iWrite, "fill LORA Send:");
-
-  iWrite++;
-  if (iWrite >= MAX_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
-    iWrite = 0;
-
+  DEBUG_MSG_VAL("RADIO", slot, "fill LORA Send:");
 }
 
 /**@brief Method to check Link Status

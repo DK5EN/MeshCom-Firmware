@@ -53,8 +53,6 @@ static void resetRing(void)
     // so the fixture needs a real callsign before any enqueue.
     strcpy(meshcom_settings.node_call, "DK5EN-90");
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iWrite = 0;
-    iRead = 0;
     memset(retryCount, 0, sizeof(retryCount));
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
@@ -130,10 +128,10 @@ static BuiltFrame buildAckFrame(uint32_t id)
     return buildFrame(MSG_TYPE_ACK, id, 0x84, nullptr, nullptr, payload, sizeof(payload));
 }
 
-// Fuellt den Ring bis an die Ueberlaufkante (MAX_RING-1 Eintraege).
+// Fuellt den Pool vollstaendig (MAX_RING Eintraege, TXP W1b: vorher MAX_RING-1).
 static void fillWithPositions(uint32_t base)
 {
-    for (int i = 0; i < MAX_RING - 1; i++)
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildPositionFrame(base + (uint32_t)i);
         TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
@@ -149,17 +147,12 @@ static void test_gleiche_prio_voller_ring_verwirft_den_neuen(void)
 {
     fillWithPositions(0x3000);
 
-    uint8_t iReadBefore = (uint8_t)iRead;
-    uint8_t iWriteBefore = (uint8_t)iWrite;
-
     BuiltFrame neu = buildPositionFrame(0xDEAD0001UL);
     int slot = addTxRingEntry(neu.bytes, neu.len, RING_STATUS_READY, "udp_rx");
 
     TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, slot);         // abgewiesen (F5: -2)
-    TEST_ASSERT_EQUAL_UINT8(iWriteBefore, (uint8_t)iWrite); // Bestand unangetastet
-    TEST_ASSERT_EQUAL_UINT8(iReadBefore, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());         // Bestand unangetastet
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[MAX_RING - 1][0]);
 
     // Der aelteste Eintrag lebt weiter -- Tail-Drop, nicht Head-Drop.
     TEST_ASSERT_EQUAL_UINT8(MSG_TYPE_POSITION, ringBuffer[0][2]);
@@ -182,10 +175,9 @@ static void test_broadcast_text_verdraengt_aelteste_position(void)
     BuiltFrame txt = buildBroadcastTextFrame(0xBEEF0001UL, "BBS listing 1/7");
     int slot = addTxRingEntry(txt.bytes, txt.len, RING_STATUS_READY, "udp_rx");
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot);                     // aufgenommen
+    TEST_ASSERT_EQUAL_INT(0, slot);                                // aufgenommen, im Slot der aeltesten Position
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[slot]);
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);                  // Slot 0 geraeumt
-    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iRead);                    // Lesezeiger vor
+    TEST_ASSERT_EQUAL_UINT8(MSG_TYPE_TEXT, ringBuffer[0][2]);      // Slot 0 uebernommen
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_HIGH]);
 }
@@ -197,7 +189,7 @@ static void test_broadcast_text_verdraengt_aelteste_position(void)
 
 static void test_position_verdraengt_eigenes_hey(void)
 {
-    for (int i = 0; i < MAX_RING - 1; i++)
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildHeyFrame(0x7000 + (uint32_t)i);
         TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "hey"));
@@ -206,9 +198,9 @@ static void test_position_verdraengt_eigenes_hey(void)
     BuiltFrame pos = buildPositionFrame(0xC0DE0001UL);
     int slot = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "udp_rx");
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot);
+    TEST_ASSERT_EQUAL_INT(0, slot);                                // uebernimmt den Slot des aeltesten HEY
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[slot]);
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);                  // HEY geraeumt
+    TEST_ASSERT_EQUAL_UINT8(MSG_TYPE_POSITION, ringBuffer[0][2]);  // HEY verdraengt
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
 }
 
@@ -221,20 +213,20 @@ static void test_ack_kommt_auch_im_flood_durch(void)
     BuiltFrame ack = buildAckFrame(0xAABBCCDDUL);
     int slot = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "ack");
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot);
+    TEST_ASSERT_EQUAL_INT(0, slot);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
 }
 
 // ---- 5: die Flut selbst ----------------------------------------------------
 //
-// 30 gleichrangige Frames ohne jeden Abfluss -- die Bankzahl. Genau MAX_RING-1
-// werden angenommen, der Rest faellt; und weil der Ring per Tail-Drop verwirft,
+// 30 gleichrangige Frames ohne jeden Abfluss -- die Bankzahl. Genau MAX_RING
+// (TXP W1b, vorher MAX_RING-1) werden angenommen, der Rest faellt; und weil der Ring per Tail-Drop verwirft,
 // ueberleben die ZUERST eingetroffenen. Fuer #568 heisst das: unter Last geht
 // nicht der Bestand verloren, sondern alles, was danach kommt -- bis der Sender
 // die Schlange abgearbeitet hat.
 
-static void test_flut_ohne_abfluss_nimmt_max_ring_minus_eins_an(void)
+static void test_flut_ohne_abfluss_nimmt_max_ring_an(void)
 {
     const int kInjected = 30;
     int accepted = 0;
@@ -257,23 +249,15 @@ static void test_flut_ohne_abfluss_nimmt_max_ring_minus_eins_an(void)
         }
     }
 
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, accepted);
-    TEST_ASSERT_EQUAL_INT(kInjected - (MAX_RING - 1), rejected);
-    // Der erste Verworfene ist genau der, der auf den vollen Ring trifft.
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, first_rejected);
+    TEST_ASSERT_EQUAL_INT(MAX_RING, accepted);
+    TEST_ASSERT_EQUAL_INT(kInjected - MAX_RING, rejected);
+    // Der erste Verworfene ist genau der, der auf den vollen Pool trifft.
+    TEST_ASSERT_EQUAL_INT(MAX_RING, first_rejected);
     TEST_ASSERT_EQUAL_UINT16((uint16_t)rejected, stat_drop_count[MSG_PRIO_LOW]);
-    // Hochwassermarke: MAX_RING, nicht MAX_RING-1. addTxRingEntry() zieht
-    // stat_queue_hwm hoch, BEVOR die Ueberlaufentscheidung faellt -- die Marke
-    // zaehlt also auch den Eintrag mit, der gleich darauf verworfen wird. Ein
-    // gemeldeter HWM von MAX_RING heisst im Feld deshalb "Ring war voll UND es
-    // wurde verworfen", nicht "Ring war randvoll und es ging gerade noch".
-    //
-    // BP-02 (reviewed, unveraendert): `queued` in addTxRingEntry() zaehlt seit
-    // BP-02 belegte Slots statt Indexdistanz, und stat_queue_hwm bleibt
-    // `queued + 1` (belegt NACH dem Insert). Dieser Test erzeugt nie ein
-    // interiores Loch (reines sequentielles Fuellen, kein manuelles
-    // ringBuffer[i][0]=0 dazwischen) -- belegt-Zaehlung und Indexdistanz sind
-    // hier identisch, MAX_RING bleibt der korrekte erwartete Wert.
+    // Hochwassermarke: MAX_RING. Der 20. Eintrag fuellt den Pool; die danach
+    // verworfenen sehen einen vollen Pool (depth == MAX_RING) -- die Marke
+    // bleibt bei MAX_RING (TXP W1b: ein Verwerfen hebt sie nicht ueber die
+    // Poolgroesse; der alte Ring zaehlte den verworfenen Eintrag mit).
     TEST_ASSERT_EQUAL_UINT16((uint16_t)MAX_RING, stat_queue_hwm);
 
     // Der aelteste Frame (0x9000) steht unveraendert in Slot 0.
@@ -324,7 +308,8 @@ static void test_relay_text_ist_normal_und_schlaegt_position_trotzdem(void)
     TEST_ASSERT_TRUE(slot >= 0);
     TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);   // nicht HIGH
     TEST_ASSERT_TRUE(MSG_PRIO_NORMAL < MSG_PRIO_LOW);               // schlaegt Position
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);                   // Position geraeumt
+    TEST_ASSERT_EQUAL_INT(0, slot);                                 // Slot der aeltesten Position
+    TEST_ASSERT_EQUAL_UINT8(MSG_TYPE_TEXT, ringBuffer[0][2]);       // Position verdraengt
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
 }
 
@@ -341,7 +326,7 @@ static void test_ringgroesse_ist_dokumentiert(void)
     TEST_ASSERT_EQUAL_INT(20, MAX_RING);
 #endif
     TEST_ASSERT_TRUE(MAX_RING >= 10);
-    TEST_ASSERT_TRUE(MAX_RING <= 255);   // iWrite/iRead sind 8 Bit
+    TEST_ASSERT_TRUE(MAX_RING <= 255);   // Slot-Index und Zaehler sind 8 Bit
 }
 
 // ---- 8: BP-01 -- txRingDepth() ist der Ring, nicht eine zweite Buchfuehrung -
@@ -352,27 +337,23 @@ static void test_ringgroesse_ist_dokumentiert(void)
 // Ring gemessen, nicht gegen eine Nachbildung.
 //
 // BP-02 (reviewed, unveraendert): txRingDepth() zaehlt seit BP-02 belegte
-// Slots statt Indexdistanz (siehe txring_functions.cpp). Der einzige hier
-// entstehende Hohlraum ist Slot 0 an der Ringfront, den advanceIReadPastEmpty()
-// sofort ueberspringt -- kein interiores Loch bleibt zwischen iRead und
-// iWrite stehen, deshalb bleiben MAX_RING-1 und MAX_RING-2 unten die
-// richtigen erwarteten Werte unter beiden Zaehlweisen.
+// Slots statt Indexdistanz (siehe txring_functions.cpp). TXP W1b: der Pool
+// zaehlt alle MAX_RING Slots; ein geleerter Slot ist sofort ein freier Slot.
 
 static void test_txringdepth_folgt_dem_echten_ring(void)
 {
     TEST_ASSERT_EQUAL_INT(0, txRingDepth());
 
-    for (int i = 0; i < MAX_RING - 1; i++)
+    for (int i = 0; i < MAX_RING; i++)
     {
         BuiltFrame f = buildPositionFrame(0xC000 + (uint32_t)i);
         TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
         TEST_ASSERT_EQUAL_INT(i + 1, txRingDepth());
     }
 
-    // Abfluss: doTX() leert einen Slot und schiebt den Lesezeiger nach.
+    // Abfluss: doTX() leert einen Slot.
     ringBuffer[0][0] = 0;
-    advanceIReadPastEmpty();
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 2, txRingDepth());
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, txRingDepth());
 }
 
 // Die 80-%-Schwelle, an der der Knoten aufhoert, lokale Nutzernachrichten
@@ -385,7 +366,7 @@ static void test_backpressure_qrt_an_der_echten_80_prozent_marke(void)
     const int threshold = bp.refuseThreshold();
 
     TEST_ASSERT_EQUAL_INT((MAX_RING * 4) / 5, threshold);
-    TEST_ASSERT_TRUE_MESSAGE(threshold < MAX_RING - 1, "Schwelle muss unter der Ueberlaufkante liegen");
+    TEST_ASSERT_TRUE_MESSAGE(threshold < MAX_RING, "Schwelle muss unter der Ueberlaufkante liegen");
 
     int qrs_count = 0;
     int qrt_count = 0;
@@ -424,22 +405,20 @@ static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
 
     fillWithPositions(0xE000);
     bp.onSend(txRingDepth(), false, millis());
-    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, txRingDepth());
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
 
     BuiltFrame neu = buildPositionFrame(0xE0FF0001UL);
     int slot = addTxRingEntry(neu.bytes, neu.len, RING_STATUS_READY, "user_msg");
 
     TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, slot);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_RING - 1, txRingDepth(), "ein verworfener Frame veraendert die Tiefe nicht");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_RING, txRingDepth(), "ein verworfener Frame veraendert die Tiefe nicht");
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(txRingDepth(), slot < 0, millis()));
 
     // Abfluss bis in das Ruheband -> genau ein QRV schliesst die Episode.
-    // Tiefe hier ist 0 (CLEAR_DEPTH, Ring komplett leer, iRead==iWrite), nicht
+    // Tiefe hier ist 0 (CLEAR_DEPTH, Pool komplett leer), nicht
     // das BP-04-Wasserband (Tiefe 1) -- CLEAR_DEPTH schliesst weiterhin sofort,
     // ohne QRV_HOLD_MS abzuwarten, deshalb genuegt ein einzelnes poll().
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iRead = 0;
-    iWrite = 0;
     TEST_ASSERT_EQUAL_INT(0, txRingDepth());
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(txRingDepth(), millis()));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), millis()));
@@ -452,7 +431,7 @@ int main(int, char **)
     RUN_TEST(test_broadcast_text_verdraengt_aelteste_position);
     RUN_TEST(test_position_verdraengt_eigenes_hey);
     RUN_TEST(test_ack_kommt_auch_im_flood_durch);
-    RUN_TEST(test_flut_ohne_abfluss_nimmt_max_ring_minus_eins_an);
+    RUN_TEST(test_flut_ohne_abfluss_nimmt_max_ring_an);
     RUN_TEST(test_text_kommt_durch_wo_position_faellt);
     RUN_TEST(test_relay_text_ist_normal_und_schlaegt_position_trotzdem);
     RUN_TEST(test_ringgroesse_ist_dokumentiert);

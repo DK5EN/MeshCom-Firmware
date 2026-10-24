@@ -431,6 +431,13 @@ static inline bool flashLayoutCompatible(int stored)
 // retransmission maintenance must skip it explicitly. Used only when the optional
 // EXTERNAL_RADIO backend is compiled in; otherwise no slot ever carries it.
 #define RING_STATUS_EXT_PENDING 0x80
+// 0x81: TXP W1b (slot pool). doTX() has picked the slot and the frame is being
+// handed to the radio; the slot keeps its length (so an enqueue cannot take it)
+// but is invisible to selection, the retry ladder and the ACK scans. doTX()
+// ends it via txRingFinishTx(): one-shot -> free, own text -> SENT (parked),
+// rollback -> the status it had before. Outside READY, SENT (0x01..0x14),
+// EXT_PENDING and DONE.
+#define RING_STATUS_INFLIGHT    0x81
 
 // Message Priority Classes (lower = higher priority)
 #define MSG_PRIO_CRITICAL   1   // ACK (0x41) + persoenliche DM

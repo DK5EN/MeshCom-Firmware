@@ -262,8 +262,6 @@ extern float BATexp2;
 
 // RINGBUFFER for incoming UDP lora packets for lora TX
 extern unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5];
-extern ring_index_t iWrite;
-extern ring_index_t iRead;
 extern int iRetransmit;
 extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
@@ -466,7 +464,7 @@ extern int trickle_last_neighbor_count;         // Nachbarzahl beim letzten Chec
 // Priority statistics (5-minute window, reset after output)
 extern uint16_t stat_tx_count[6];               // Index 1-5 = Prio 1-5
 extern uint16_t stat_drop_count[6];             // Drops per priority
-extern uint16_t stat_preempt_count;             // Priority preemptions (out-of-order sends)
+extern uint16_t stat_preempt_count;             // doTX picked a slot that was not the oldest occupied one (enqueue time)
 extern uint32_t stat_latency_sum[6];            // Sum of queue-to-TX latency per prio (ms)
 extern uint32_t stat_latency_max[6];            // Max latency per prio (ms)
 extern uint8_t  stat_queue_hwm;                 // Queue high-water mark since boot

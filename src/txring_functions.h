@@ -8,10 +8,12 @@
 // Uebersetzungseinheit. Siehe docs/.../08-defect-catalogue.md N-14 und
 // test/test_txring/test_txring.cpp.
 //
-// advanceIReadPastEmpty() ist hier zusaetzlich deklariert (nicht mehr rein
-// TU-lokal wie im Original): doTX() in lora_functions.cpp ruft sie ebenfalls
-// auf (Zeile ~1837 vor der Extraktion) und braucht daher externe Sichtbarkeit.
-// Siehe Abweichungsvermerk im Wave-Report.
+// TXP W1b: der Ring ist ein Slot-Pool (docs/campaign-tx-pool.md,
+// docs/tx-pool-dedup-concept-20261021.md 5.2). Frei = ringBuffer[i][0] == 0,
+// "voll" = kein freier Slot (MAX_RING Eintraege), kein iRead/iWrite mehr.
+// Auswahl: niedrigste Prio, dann aeltester ringEnqueueTime (wrap-sicher).
+// Ein Slot, den doTX() gerade ans Funkmodul gibt, traegt RING_STATUS_INFLIGHT
+// und behaelt seine Laenge (txRingBeginTx()/txRingFinishTx() unten).
 
 #include <Arduino.h>
 #include <configuration.h>
@@ -32,7 +34,7 @@ extern uint8_t ringSource[MAX_RING];
 // unter NATIVE_BUILD) in txring_functions.cpp definiert. Geschrieben
 // ausschliesslich in addTxRingEntry() (jeder Enqueue ueberschreibt alle drei,
 // damit ein wiederverwendeter Slot nie die Masken seines Vorbesitzers
-// behaelt) und beim N-24-Slot-Umzug mitkopiert; gelesen/veraendert vom
+// behaelt); gelesen/veraendert vom
 // Mithoer-Scan (lora_functions.cpp OnRxDone) und vom fallabhaengigen
 // CSMA-Backoff (csma_compute_timeout_slot()).
 // Welle 2 (edge pool): NbrMask statt uint32_t (nbr_mask.h) -- ein Wort auf
@@ -53,7 +55,24 @@ extern uint8_t  ringKind[MAX_RING];
 
 uint8_t getMessagePriority(int slot);
 int getNextTxSlot(void);
-void advanceIReadPastEmpty(void);
+
+// TXP W1b: Zustandsuebergaenge eines Slots waehrend doTX(), hier statt inline,
+// damit nativ testbar (siehe Doku an den Definitionen in txring_functions.cpp).
+//   txRingBeginTx():  READY/DONE -> INFLIGHT (len bleibt); false, wenn der Slot
+//                     inzwischen frei oder anders ist. *prevStatus = Rollback-Status.
+//   txRingFinishTx(): INFLIGHT -> je nach Ausgang
+//                       SENT      gesendet: eigener Text (prev READY) parkt als SENT,
+//                                 sonst Slot frei (len 0)
+//                       ROLLBACK  nichts gesendet: prevStatus zurueck, len bleibt
+//                       DROP      verworfen ohne Senden: Slot frei
+//   txRingIsPreempt(): true, wenn ein belegter Slot aelter (ringEnqueueTime) ist
+//                     als `slot` -- Definition von stat_preempt_count.
+enum TxRingFinish { TXRING_FIN_SENT = 0, TXRING_FIN_ROLLBACK = 1, TXRING_FIN_DROP = 2 };
+// expectEnqueueTime (optional): ringEnqueueTime[slot] zum Zeitpunkt der Auswahl;
+// weicht er unter dem Lock ab, wurde der Slot inzwischen neu belegt -> false.
+bool txRingBeginTx(int slot, uint8_t *prevStatus, const uint32_t *expectEnqueueTime = nullptr);
+void txRingFinishTx(int slot, uint8_t prevStatus, TxRingFinish outcome);
+bool txRingIsPreempt(int slot);
 
 // Nachbarschaftsmatrix Stufe 2, Feldlauf 23.09. (docs/nbr-wichtigkeit-konzept.md
 // 5.1/5.2; DK5EN-98, --nbrrelay on: 149 verworfene Relays + 10 eigene
@@ -101,8 +120,9 @@ bool txringInCaseBHold(int slot, uint32_t now_ms);
 //                                              fielen in die ersten 60s)
 unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms);
 
-// BP-01 (BACKLOG) / TM-37: current fill level of the TX ring, same arithmetic
-// as the local `queued` inside addTxRingEntry(). Read-only; the back-pressure
+// BP-01 (BACKLOG) / TM-37: current fill level of the TX pool = number of
+// occupied slots (len > 0) over all MAX_RING slots, INFLIGHT, parked SENT and
+// EXT_PENDING included (TXP D5). Read-only; the back-pressure
 // state machine (src/backpressure.h) needs the depth from outside this file,
 // both after an enqueue and on the per-loop drain check.
 int txRingDepth(void);
@@ -118,6 +138,15 @@ int txRingDepth(void);
 // -- defensive, not reachable via getMessagePriority() today. Read-only,
 // lock-free, same as txRingDepth(): caller must pass a 6-element array.
 void txRingPrioCounts(uint8_t out[6]);
+
+// TXP W1b (gauge G3, decision D5): own texts that were sent and wait for an
+// ACK/retry. out[0] = number of occupied slots whose status is in the SENT
+// ladder (0x01..0x7F: aging counter 0x01..0x14 plus the transient threshold
+// 0x15); READY, DONE, INFLIGHT and EXT_PENDING do not count. out[1..5] = the
+// same count per ringPriority[] (1..5); an out-of-range priority only bumps
+// out[0]. A subset of txRingDepth() / txRingPrioCounts(). Read-only, lock-free
+// like txRingPrioCounts(): caller must pass a 6-element array.
+void txRingAckWaitCounts(uint8_t out[6]);
 
 // BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): sweep the whole ring and drop any
 // BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS

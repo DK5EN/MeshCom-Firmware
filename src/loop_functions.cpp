@@ -669,8 +669,6 @@ int iWriteOwn=0;
 
 // RINGBUFFER for incoming UDP lora packets for lora TX
 unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5] = {0};
-ring_index_t iWrite{0};
-ring_index_t iRead{0};
 int iRetransmit=-1;
 
 // FIX: Per-slot retry counter for retransmit cap
@@ -4626,13 +4624,13 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // ETH-03 (docs/BACKLOG.md 3.8at): this used to test `iWrite == iRead`,
     // which is ALSO the empty ring -- so a node with nothing queued printed
     // "[RING] overflow" on every user message and sent a whole investigation
-    // after a full ring that was not there. Occupancy is txRingDepth(), and
-    // the ring holds at most MAX_RING-1 entries (addTxRingEntry() keeps iRead
-    // one ahead of iWrite on overflow), so MAX_RING-1 is "full". The eviction
-    // itself (which slot, why) is decided and logged inside addTxRingEntry()
-    // below; this line is only a heads-up.
-    if (txRingDepth() >= MAX_RING - 1) {   // ring full: addTxRingEntry() will evict or refuse
-        Serial.printf("[RING] full, depth %d of %d\n", txRingDepth(), (int)MAX_RING - 1);
+    // after a full ring that was not there. Occupancy is txRingDepth(). Since
+    // the slot pool (TXP W1b) the TX buffer holds MAX_RING entries, so
+    // MAX_RING occupied slots is "full" (it used to be MAX_RING-1 with the
+    // iRead/iWrite ring). The eviction itself (which slot, why) is decided and
+    // logged inside addTxRingEntry() below; this line is only a heads-up.
+    if (txRingDepth() >= MAX_RING) {   // pool full: addTxRingEntry() will evict or refuse
+        Serial.printf("[RING] full, depth %d of %d\n", txRingDepth(), (int)MAX_RING);
     }
     // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
     // Slot wird erst im Einreihen unter Lock gewaehlt/beschrieben.
@@ -4750,11 +4748,6 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     // enqueuing decides between silence, QRS and QRT.
     bpRoute(bp_state.onSend(txRingDepth(), false, millis()));
 
-    /*
-    iWrite++;
-    if(iWrite >= MAX_RING)
-        iWrite=0;
-    */
 
     if(bGATEWAY && meshcom_settings.node_hasIPaddress)
     {
@@ -5513,11 +5506,6 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     // local position-messages send to LoRa TX
     addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "user_hey"); // 0xFF no retransmission
 
-    /*
-    iWrite++;
-    if(iWrite >= MAX_RING)
-        iWrite=0;
-    */
 
     if(bGATEWAY)
     {
@@ -5605,11 +5593,6 @@ unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *s
     // ungenutzt, wie schon bisher (kein Nachtrag mehr noetig).
     addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "beacon");
 
-    /*
-    iWrite++;
-    if(iWrite >= MAX_RING)
-        iWrite=0;
-    */
     
     if(bGATEWAY && meshcom_settings.node_hasIPaddress)
     {
@@ -5718,11 +5701,6 @@ void sendHey()
         // local messages send to LoRa TX
         addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "auto_pos"); // 0xFF no retransmission
 
-        /*
-        iWrite++;
-        if(iWrite >= MAX_RING)
-            iWrite=0;
-        */
     }
 }
 

@@ -3354,18 +3354,12 @@ void esp32loop()
                     else if(ringBuffer[i][1] == RING_STATUS_READY) pending++;
                     else retrying++;
                 }
-                int w = iWrite;
-                int r = iRead;
-                // BP-02: queued is now the honest occupied-slot count (the
+                // BP-02: queued is the honest occupied-slot count (the
                 // pending/retrying/done buckets above already scan every
-                // slot and partition it exactly) instead of the raw index
-                // distance -- that distance counted freed holes left behind
-                // by a priority-starved entry parked at iRead as still
-                // queued (DJ8MEH-RCA: queued=19 vs. 3-4 real). The old
-                // arithmetic survives as `dist` below for anyone comparing
-                // against pre-BP-02 logs.
+                // slot and partition it exactly). TXP W1b (slot pool): the
+                // iW=/iR=/dist= fields are gone with the indices; retrying
+                // includes INFLIGHT and parked SENT slots.
                 int queued = pending + retrying + done;
-                int dist = (w >= r) ? (w - r) : (MAX_RING - r + w);
                 int dedup_used = 0;
                 for(int i = 0; i < MAX_DEDUP_RING; i++)
                 {
@@ -3374,9 +3368,9 @@ void esp32loop()
                         dedup_used++;
                 }
                 printfdeb("[MC-DBG] RING_STATUS queued=%d pending=%d retrying=%d "
-                              "done=%d iW=%d iR=%d dedup=%d/%d dist=%d\n",
-                              queued, pending, retrying, done, w, r,
-                              dedup_used, MAX_DEDUP_RING, dist);
+                              "done=%d dedup=%d/%d\n",
+                              queued, pending, retrying, done,
+                              dedup_used, MAX_DEDUP_RING);
             }
         }
 
@@ -3807,9 +3801,9 @@ void esp32loop()
             // channel is free
             // nothing was detected
             // do not print anything, it just spams the console
-            int _w = iWrite;
-            int _r = iRead;
-            if (_w != _r)
+            // TXP W1b: "something sendable in the TX pool" (was iWrite != iRead); not
+            // txRingDepth() > 0: a parked own text waiting for its ACK is not sendable
+            if (getNextTxSlot() >= 0)
             {
                 // Debug E: TX_GATE_ENTER
                 // BP-02: qlen is txRingDepth() (occupied slots), not the raw

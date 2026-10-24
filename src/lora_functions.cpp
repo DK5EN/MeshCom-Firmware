@@ -391,7 +391,8 @@ static int findAndStopRingSlotImpl(uint32_t msgId, bool skipRm1Cmd)
 #endif
     for(int i = 0; i < MAX_RING; i++)
     {
-        if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY)
+        if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY &&
+           ringBuffer[i][1] != RING_STATUS_INFLIGHT) // INFLIGHT: doTX() ends it (TXP W1b)
         {
             if(pnRetryCore(extractRingMsgId(i)) == pnRetryCore(msgId))
             {
@@ -1033,7 +1034,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         int rxSlot = -1;
         for(int i = 0; i < MAX_RING; i++)
         {
-            if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY)
+            if(ringBuffer[i][0] > 0 && ringBuffer[i][1] != RING_STATUS_DONE && ringBuffer[i][1] != RING_STATUS_READY &&
+               ringBuffer[i][1] != RING_STATUS_INFLIGHT) // INFLIGHT: doTX() ends it (TXP W1b)
             {
                 if(memcmp(ringBuffer[i]+3, RcvBuffer+1, 4) == 0)
                 {
@@ -1050,9 +1052,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // still waits READY (typically a gateway's server copy) means
                     // the message is on air -- release the slot instead of sending
                     // a duplicate. Own PN / own RM1 command keep the old skip.
-                    // RAK4630: same ring lock as doTX()'s slot scan (getNextTxSlot()
-                    // runs under taskENTER_CRITICAL()) and findAndStopRingSlotImpl();
-                    // doTX() itself writes the READY->SENT takeover unlocked.
+                    // RAK4630: same ring lock as findAndStopRingSlotImpl() and as
+                    // doTX()'s claim (txRingBeginTx(), READY/DONE->INFLIGHT, locked;
+                    // getNextTxSlot() itself scans lock-free).
                     bool readyReleased = false;
 #if defined(BOARD_RAK4630)
                     taskENTER_CRITICAL();
@@ -2813,7 +2815,7 @@ void OnRxError(void)
 //////////////////////////////////////////////////////////////////////////
 // LoRa TX functions
 //
-// getMessagePriority/getNextTxSlot/advanceIReadPastEmpty/addTxRingEntry
+// getMessagePriority/getNextTxSlot/addTxRingEntry
 // wurden nach txring_functions.cpp verschoben (QA-Welle 2026-08-22, N-14) --
 // reine Verschiebung, Logik unveraendert. Siehe txring_functions.h/.cpp und
 // test/test_txring/test_txring.cpp.
@@ -2863,6 +2865,19 @@ bool doTX()
     int txSlot = getNextTxSlot();
     if (txSlot >= 0)
     {
+        // TXP W1b: claim the slot as INFLIGHT right after the (lock-free) pick,
+        // before anything reads it. The claim re-checks under the lock that the
+        // slot still holds the picked entry (same enqueue time): on nRF52
+        // OnRxDone may evict and refill it in between. INFLIGHT keeps the length
+        // (a concurrent enqueue cannot take it) and is invisible to selection,
+        // the retry ladder and the ACK scans until txRingFinishTx() ends the
+        // window: sent -> freed or parked as SENT, rollback -> prev_status back,
+        // refused -> freed.
+        uint32_t pick_enqueue = ringEnqueueTime[txSlot];
+        uint8_t prev_status = RING_STATUS_READY;
+        if(!txRingBeginTx(txSlot, &prev_status, &pick_enqueue))
+            return false;   // slot changed under us, nothing sent
+
         // Track latency
         uint8_t prio = ringPriority[txSlot];
         uint32_t latency = millis() - ringEnqueueTime[txSlot];
@@ -2881,8 +2896,9 @@ bool doTX()
                 stat_latency_max[prio] = latency;
         }
 
-        // Track preemption (out-of-order send)
-        if(txSlot != iRead)
+        // Track preemption: the pick was not the oldest occupied slot by
+        // enqueue time (TXP W1b; stat_preempt_count).
+        if(txRingIsPreempt(txSlot))
             stat_preempt_count++;
 
         sendlng = ringBuffer[txSlot][0];
@@ -2924,10 +2940,6 @@ bool doTX()
 
         int save_read = txSlot;
 
-        #ifndef BOARD_TLORA_OLV216
-        char save_ring_status = ringBuffer[txSlot][1];
-        #endif
-
         if(bLORADEBUG)
         {
             uint32_t tx_mid = ((uint32_t)ringBuffer[txSlot][6] << 24) |
@@ -2942,7 +2954,7 @@ bool doTX()
             if(bLORADEBUG)
                 printfdeb("[MC-DBG] RING_TX_READ slot=%d prio=%d type=%02X status=%02X "
                           "len=%d msg_id=%08X retry=%d queued=%d/%d lat=%lums\n",
-                          txSlot, prio, ringBuffer[txSlot][2], ringBuffer[txSlot][1],
+                          txSlot, prio, ringBuffer[txSlot][2], prev_status,
                           sendlng, tx_mid, retryCount[txSlot], queued, MAX_RING, (unsigned long)latency);
         }
 
@@ -2965,23 +2977,6 @@ bool doTX()
                            tx_cad_attempt, (uint16_t)sendlng, (uint32_t)millis());
         }
 
-        if(ringBuffer[txSlot][1] == RING_STATUS_READY) // mark open to send
-            ringBuffer[txSlot][1] = RING_STATUS_SENT; // mark as sent
-
-        // For out-of-order reads: clear slot data length so getNextTxSlot skips it
-        // and advance iRead past any empty leading slots
-        #if !defined(BOARD_RAK4630) && !defined(BOARD_T5_EPAPER)   // every use sits under #ifndef BOARD_T5_EPAPER
-        int iReadBeforeAdvance = iRead; // saved for startTransmit failure rollback
-        #endif
-
-        ringBuffer[txSlot][0] = 0; // Mark as consumed (data is in lora_tx_buffer)
-        advanceIReadPastEmpty();
-
-        // NOTE: Slot clearing (Bug 1 fix) is deferred until after the transmit
-        // decision. Two rollback paths (CAD wait, APRS chip-switch failure)
-        // restore the slot and retry on the next call.
-        // For rollback: we restore ringBuffer[save_read][0] = sendlng.
-
         // Testfang-Hook TX (siehe capture_functions.h): die Bytes, die dieser
         // Knoten gleich auf den Kanal legt. Ohne diese Seite zeigt der
         // Mitschnitt nur, was empfangen wurde -- ob unser eigenes
@@ -2998,7 +2993,7 @@ bool doTX()
         // we can now tx the message
 #if INSTRUMENT_ENABLED
         // 0.5 --airgap: treat like TX disabled, same drop semantics (slot
-        // already marked consumed above -- non-rollback).
+        // is consumed below -- non-rollback).
         if (TX_ENABLE == 1 && !bAirgap && !gwRegBlocked())
 #else
         if (TX_ENABLE == 1 && !gwRegBlocked())
@@ -3009,12 +3004,13 @@ bool doTX()
             // into the ring. addTxRingEntry() already refuses to enqueue
             // for such a node; this is the runtime sibling of TX_ENABLE at
             // the only place in the tree that calls
-            // Radio.Send()/startTransmit(). Non-rollback: the slot was
-            // already marked consumed above, same as the TX-disabled and
+            // Radio.Send()/startTransmit(). Non-rollback: the slot is
+            // consumed (freed right here), same as the TX-disabled and
             // decode-failure drop paths below.
             if(isUnconfiguredCall(meshcom_settings.node_call))
             {
                 logTxRefuseUnconfigured();
+                txRingFinishTx(save_read, prev_status, TXRING_FIN_DROP);
                 return false;
             }
 
@@ -3055,9 +3051,7 @@ bool doTX()
                         {
                             printfdeb("[LoRa] startTransmit(track) failed: %d\n", transmissionState);
                             tx_is_active = false;
-                            ringBuffer[save_read][0] = sendlng;
-                            ringBuffer[save_read][1] = save_ring_status;
-                            iRead = iReadBeforeAdvance;
+                            txRingFinishTx(save_read, prev_status, TXRING_FIN_ROLLBACK);
                             return false;
                         }
                         #endif
@@ -3070,8 +3064,7 @@ bool doTX()
                 if(!lora_setchip_aprs())
                 {
                     // Rollback: restore slot so it gets picked up again
-                    ringBuffer[save_read][0] = sendlng;
-                    ringBuffer[save_read][1] = save_ring_status;
+                    txRingFinishTx(save_read, prev_status, TXRING_FIN_ROLLBACK);
 
                     return false;
                 }
@@ -3100,9 +3093,7 @@ bool doTX()
                     {
                         printfdeb("[LoRa] startTransmit(aprs) failed: %d\n", transmissionState);
                         tx_is_active = false;
-                        ringBuffer[save_read][0] = sendlng;
-                        ringBuffer[save_read][1] = save_ring_status;
-                        iRead = iReadBeforeAdvance;
+                        txRingFinishTx(save_read, prev_status, TXRING_FIN_ROLLBACK);
                         return false;
                     }
                     #endif
@@ -3119,10 +3110,10 @@ bool doTX()
 
                 setlogPrintTx(setlog_tx_buf);   // SL-03
 
-                // For text messages needing retransmit: restore length so
-                // updateRetransmissionStatus() can find and retransmit them.
-                if(ringBuffer[save_read][1] != (char)RING_STATUS_DONE && ringBuffer[save_read][2] == MSG_TYPE_TEXT)
-                    ringBuffer[save_read][0] = sendlng;
+                // Own text (was READY): park as SENT with its length for the retry
+                // ladder (updateRetransmissionStatus()); one-shot (DONE) and
+                // non-text frames free the slot.
+                txRingFinishTx(save_read, prev_status, TXRING_FIN_SENT);
 
                 return true;
             }
@@ -3169,11 +3160,7 @@ bool doTX()
                         {
                             printfdeb("[LoRa] startTransmit failed: %d\n", transmissionState);
                             tx_is_active = false;
-                            ringBuffer[save_read][0] = sendlng;
-                            #ifndef BOARD_TLORA_OLV216
-                            ringBuffer[save_read][1] = save_ring_status;
-                            #endif
-                            iRead = iReadBeforeAdvance; // re-include slot in scan window
+                            txRingFinishTx(save_read, prev_status, TXRING_FIN_ROLLBACK);
                             return false;
                         }
                         #endif
@@ -3203,10 +3190,10 @@ bool doTX()
                         }
                     }
 
-                    // For text messages needing retransmit: restore length so
-                    // updateRetransmissionStatus() can find and retransmit them.
-                    if(ringBuffer[save_read][1] != (char)RING_STATUS_DONE && ringBuffer[save_read][2] == MSG_TYPE_TEXT)
-                        ringBuffer[save_read][0] = sendlng;
+                    // Own text (was READY): park as SENT with its length for the
+                    // retry ladder (updateRetransmissionStatus()); one-shot (DONE)
+                    // and non-text frames free the slot.
+                    txRingFinishTx(save_read, prev_status, TXRING_FIN_SENT);
 
                     return true;
                 }
@@ -3229,7 +3216,9 @@ bool doTX()
 #endif
         }
 
-        // Non-rollback drop paths (TX disabled, unconfigured node, or decode failure) — slot stays cleared
+        // Non-rollback drop paths (TX disabled, unconfigured node, or decode
+        // failure): the slot is consumed, free it (it is still INFLIGHT here).
+        txRingFinishTx(save_read, prev_status, TXRING_FIN_DROP);
     }
 
     //#endif
@@ -3255,6 +3244,10 @@ bool updateRetransmissionStatus()
 {
     for(int ircheck = 0; ircheck < MAX_RING; ircheck++)
     {
+        // TXP W1b: a slot doTX() is sending right now is neither aged nor
+        // coerced nor retransmitted; doTX() ends the INFLIGHT window itself.
+        if(ringBuffer[ircheck][1] == RING_STATUS_INFLIGHT)
+            continue;
 
 #if defined(EXTERNAL_RADIO)
         // owned-slot reuse invariant: a slot owned by an in-flight external TX must not be
@@ -3564,10 +3557,10 @@ bool updateRetransmissionStatus()
                 uint8_t retransmitStatus = (ringBuffer[ircheck][2] == MSG_TYPE_TEXT)
                                             ? RING_STATUS_READY : RING_STATUS_DONE;
 
-                // Quelle ist ircheck, Ziel wird erst innerhalb der Funktion (unter
-                // Lock) gewaehlt — ircheck != iWrite im Normalfall (iWrite zeigt auf
-                // einen leeren Slot); selbst im theoretischen Gleichstand ist
-                // memcpy(dst==src) hier folgenlos (Quelle == Ziel-Byte fuer Byte).
+                // Quelle ist ircheck (belegt), Ziel wird erst innerhalb der Funktion
+                // (unter Lock) gewaehlt: ein freier Slot (also != ircheck) oder ein
+                // verdraengter niedrigerer Prio -- ircheck selbst ist nie freier Slot
+                // und bei gleicher Prio nie Verdraengungsziel.
                 // Original erst NACH dem Kopieren freigeben, damit die Payload beim
                 // Kopiervorgang garantiert noch gueltig ist.
                 int retxSlot = addTxRingEntry(pnRewritten ? pnLocalFrame : &ringBuffer[ircheck][2],

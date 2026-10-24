@@ -717,8 +717,6 @@ static void recorder_reset()
 
     // Shared TX ring (txring_functions.cpp).
     memset(ringBuffer, 0, sizeof(ringBuffer));
-    iWrite = 0;
-    iRead = 0;
 
     // Stage 2.1 dedup table + stage 0.2 re-ACK rate limiter -- both process-
     // global, shared by every test in this binary the moment the RX-decode
