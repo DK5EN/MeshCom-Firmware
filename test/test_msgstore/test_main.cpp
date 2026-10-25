@@ -1025,7 +1025,7 @@ static void test_format_line_content(void)
     int  len = msgstoreFormatLine(buf, sizeof(buf));
     TEST_ASSERT_TRUE(len > 0);
     TEST_ASSERT_EQUAL_STRING(
-        "MBOX mode=own used=0/50 act=0/20 stored=0 refr=0 deliv=0 ack=0 dropt=0 dropc=0 drops=0 peer=0 blk=0 sto=0/0",
+        "MBOX mode=own used=0/50 act=0/20 stored=0 refr=0 deliv=0 ack=0 dropt=0 dropc=0 drops=0 peer=0 blk=0 sto=0/0 tomb=0",
         buf);
 
     // no semicolons -- printfdeb strips them in csv mode
@@ -1555,6 +1555,110 @@ static void test_same_base_call_exported(void)
     TEST_ASSERT_FALSE(msgstoreSameBaseCall(NULL, NULL));
 }
 
+// ---- SNF-ACK-01: acked tombstone ----------------------------------------
+
+#define TOMB_CNT() (msgstoreCounters()->dropped_acked)
+#define TOMB_SLOTS_N MSGSTORE_TOMB_SLOTS
+#define TOMB_TTL_N MSGSTORE_TOMB_TTL_MS
+
+static void tombSetup(void)
+{
+    msgstoreConfigure(MSGSTORE_LIST, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    msgstoreSetList("OE1ABC");
+    msgstoreSetNotice(true);
+}
+
+static void test_tomb_ack_before_store_blocks(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2));
+    TEST_ASSERT_EQUAL_UINT8(0, msgstoreUsed());
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_INT(0, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT32(1, TOMB_CNT());
+}
+
+static void test_tomb_store_after_purge_blocks(void)
+{
+    tombSetup();
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2) >= 0);
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    TEST_ASSERT_EQUAL_UINT8(0, msgstoreUsed());
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2));
+    TEST_ASSERT_EQUAL_UINT8(0, msgstoreUsed());
+    TEST_ASSERT_EQUAL_UINT32(1, TOMB_CNT());
+}
+
+static void test_tomb_other_nnn_stored(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1ABC", 451, "hi", 2) >= 0);
+    TEST_ASSERT_EQUAL_UINT32(0, TOMB_CNT());
+}
+
+static void test_tomb_ttl_expires(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    g_now += TOMB_TTL_N + 1;
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2) >= 0);
+    TEST_ASSERT_EQUAL_UINT32(0, TOMB_CNT());
+}
+
+static void test_tomb_ring_full_overwrites_oldest(void)
+{
+    tombSetup();
+    for(unsigned k = 0; k < TOMB_SLOTS_N + 1; k++)
+    {
+        msgstoreOnAck("OE1ABC", "DL1AAA", (uint16_t)(100 + k));
+        g_now += 10;
+    }
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1ABC", 100, "hi", 2) >= 0);   // first evicted
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 101, "hi", 2));   // 2nd still blocks
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", (uint16_t)(100 + TOMB_SLOTS_N), "hi", 2));   // 33rd
+}
+
+static void test_tomb_not_eligible_no_tombstone(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1XYZ", "DL1AAA", 450);   // acker not in the store set
+    msgstoreSetList("OE1ABC,OE1XYZ");
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1XYZ", 450, "hi", 2) >= 0);
+    TEST_ASSERT_EQUAL_UINT32(0, TOMB_CNT());
+}
+
+static void test_tomb_reack_refreshes_stamp(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    g_now += 50UL * 60UL * 1000UL;   // 50 min: re-ack refreshes the stamp
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    g_now += 20UL * 60UL * 1000UL;   // 70 min after the first ack, 20 after the second
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2));
+}
+
+static void test_tomb_reack_takes_no_second_slot(void)
+{
+    tombSetup();
+    msgstoreOnAck("OE1ABC", "DL1AAA", 100);              // slot 0
+    for(unsigned k = 1; k < TOMB_SLOTS_N; k++)           // slots 1..31: ring full
+        msgstoreOnAck("OE1ABC", "DL1AAA", (uint16_t)(100 + k));
+    msgstoreOnAck("OE1ABC", "DL1AAA", 100);              // same key: refresh only, no write
+    msgstoreOnAck("OE1ABC", "DL1AAA", (uint16_t)(100 + TOMB_SLOTS_N));   // evicts slot 0, not slot 1
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 101, "hi", 2));
+}
+
+static void test_tomb_survives_purge_all(void)
+{
+    tombSetup();
+    TEST_ASSERT_TRUE(msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2) >= 0);
+    msgstoreOnAck("OE1ABC", "DL1AAA", 450);
+    msgstorePurgeAll();
+    TEST_ASSERT_EQUAL_INT(-1, msgstoreStore("DL1AAA", "OE1ABC", 450, "hi", 2));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1634,6 +1738,15 @@ int main(int, char **)
     RUN_TEST(test_lock_not_held_in_env_callbacks_across_flow);
     RUN_TEST(test_lock_hook_during_deliver_still_guarded);
     RUN_TEST(test_same_base_call_exported);
+    RUN_TEST(test_tomb_ack_before_store_blocks);
+    RUN_TEST(test_tomb_store_after_purge_blocks);
+    RUN_TEST(test_tomb_other_nnn_stored);
+    RUN_TEST(test_tomb_ttl_expires);
+    RUN_TEST(test_tomb_ring_full_overwrites_oldest);
+    RUN_TEST(test_tomb_not_eligible_no_tombstone);
+    RUN_TEST(test_tomb_reack_refreshes_stamp);
+    RUN_TEST(test_tomb_reack_takes_no_second_slot);
+    RUN_TEST(test_tomb_survives_purge_all);
 
     return UNITY_END();
 }

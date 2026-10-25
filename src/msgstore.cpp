@@ -36,7 +36,21 @@ static uint16_t          s_hold_h = MSGSTORE_HOLD_DEFAULT_H;
 static char              s_list[MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX] = {0};
 static bool              s_notice_on = true;   // stage 4: --storenotice, default on
 
-static struct MsgStoreCounters s_cnt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static struct MsgStoreCounters s_cnt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// SNF-ACK-01: acked tombstones. An ack heard for a store-set call is
+// remembered for MSGSTORE_TOMB_TTL_MS so a late copy of the same DM
+// (src, dst, nnn) is not stored again. Fixed ring, oldest overwritten.
+struct MsgStoreTomb
+{
+    char     sender[MSGSTORE_CALL_MAX];   // the DM's src
+    char     acker[MSGSTORE_CALL_MAX];    // the DM's dst
+    uint16_t nnn;
+    uint32_t stamp_ms;
+    bool     used;
+};
+static struct MsgStoreTomb s_tomb[MSGSTORE_TOMB_SLOTS];
+static uint8_t             s_tomb_next = 0;   // next ring slot to overwrite
 
 // Ring of the last MSGSTORE_ACTION_RING_SIZE (== 20) mailbox action
 // timestamps, so "actions in the trailing hour" never needs an unbounded
@@ -307,6 +321,8 @@ void msgstoreReset(void)
     memset(s_entries, 0, sizeof(s_entries));
     memset(s_capblocked, 0, sizeof(s_capblocked));
     memset(&s_cnt, 0, sizeof(s_cnt));
+    memset(s_tomb, 0, sizeof(s_tomb));   // SNF-ACK-01
+    s_tomb_next = 0;
     memset(s_action_ring, 0, sizeof(s_action_ring));
 
     s_action_ring_count = 0;
@@ -421,6 +437,20 @@ int msgstoreStore(const char *src, const char *dst, uint16_t nnn,
         goto done;
     }
 
+    // SNF-ACK-01: already acked? A live tombstone refuses a new slot.
+    for(int t = 0; t < MSGSTORE_TOMB_SLOTS; t++)
+    {
+        if(!s_tomb[t].used || s_tomb[t].nnn != nnn)
+            continue;
+        if((uint32_t)(now - s_tomb[t].stamp_ms) >= MSGSTORE_TOMB_TTL_MS)
+            continue;
+        if(strcmp(s_tomb[t].sender, src) != 0 || strcmp(s_tomb[t].acker, dst) != 0)
+            continue;
+
+        s_cnt.dropped_acked++;
+        goto done;   // result stays -1
+    }
+
     // New entry: first free slot within the first msgstoreSlots().
     for(int i = 0; i < s_slots; i++)
     {
@@ -459,7 +489,35 @@ void msgstoreOnAck(const char *acker, const char *sender, uint16_t nnn)
     if(acker == NULL || sender == NULL)
         return;
 
+    // SNF-ACK-01: env callbacks before the lock; tombstones only for calls we store for.
+    bool     tomb_ok  = msgstoreEligible(acker);
+    uint32_t tomb_now = nowMs();
+
     MSGSTORE_LOCK();
+
+    if(tomb_ok)
+    {
+        int slot = -1;
+        for(int t = 0; t < MSGSTORE_TOMB_SLOTS; t++)
+        {
+            if(s_tomb[t].used && s_tomb[t].nnn == nnn &&
+               strcmp(s_tomb[t].sender, sender) == 0 && strcmp(s_tomb[t].acker, acker) == 0)
+            {
+                slot = t;   // same key: refresh the stamp, no second slot
+                break;
+            }
+        }
+        if(slot < 0)
+        {
+            slot = s_tomb_next;
+            s_tomb_next = (uint8_t)((s_tomb_next + 1) % MSGSTORE_TOMB_SLOTS);
+            copyCall(s_tomb[slot].sender, sizeof(s_tomb[slot].sender), sender);
+            copyCall(s_tomb[slot].acker, sizeof(s_tomb[slot].acker), acker);
+            s_tomb[slot].nnn  = nnn;
+            s_tomb[slot].used = true;
+        }
+        s_tomb[slot].stamp_ms = tomb_now;
+    }
 
     for(int i = 0; i < s_slots; i++)
     {
@@ -948,14 +1006,15 @@ int msgstoreFormatLine(char *buf, size_t n)
     // node-wide gates (30 s gap, 20/h ceiling, back-pressure, utilisation),
     // not only back-pressure.
     int len = snprintf(buf, n,
-        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u blk=%u sto=%u/%u",
+        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u blk=%u sto=%u/%u tomb=%u",
         msgstoreModeName(s_mode),
         (unsigned)msgstoreUsed(), (unsigned)s_slots,
         (unsigned)msgstoreActionsLastHour(),
         (unsigned)s_cnt.stored, (unsigned)s_cnt.refreshed, (unsigned)s_cnt.delivered,
         (unsigned)s_cnt.purged_ack, (unsigned)s_cnt.dropped_storetime, (unsigned)s_cnt.dropped_cap,
         (unsigned)s_cnt.dropped_slots, (unsigned)s_cnt.cancelled_peer, (unsigned)s_cnt.blocked_bp,
-        (unsigned)s_cnt.notified, (unsigned)s_cnt.notice_blocked);
+        (unsigned)s_cnt.notified, (unsigned)s_cnt.notice_blocked,
+        (unsigned)s_cnt.dropped_acked);
 
     if(len < 0)
         return 0;

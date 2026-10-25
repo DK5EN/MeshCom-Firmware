@@ -3390,6 +3390,7 @@ void sub_page_mailbox()
     web_client.printf("<div><span>blocked by caps</span><b>%u</b></div>", (unsigned)cnt->blocked_bp);
     web_client.printf("<div><span>notices sent</span><b>%u</b></div>", (unsigned)cnt->notified);
     web_client.printf("<div><span>notices blocked</span><b>%u</b></div>", (unsigned)cnt->notice_blocked);
+    web_client.printf("<div><span>refused, already acked</span><b>%u</b></div>", (unsigned)cnt->dropped_acked);   // SNF-ACK-01
     web_client.println("</div>");
     web_client.println("<p class=\"font-small\" style=\"margin:7px;\">Same numbers as the <code>MBOX</code> setlog line. Dropped by cap and dropped no slot are two counters on purpose: the first means the 20-per-hour ceiling ate a hold time, the second means the mailbox was full.</p>");
     web_client.println("</div>");

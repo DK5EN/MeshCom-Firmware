@@ -32,6 +32,9 @@ any mode, so they never get a `:sto` notice either. Their sessions are interacti
 
 `--info` adds one line: `STORE mode=<name> used=<n>/<slots> time=<h>h
 notice=<on|off>`.
+An ack heard for a store-set call blocks re-storing that sender/recipient/`{NNN` for 1 h (SNF-ACK-01);
+the `tomb=` counter at the end of the `MBOX` line counts the refused stores.
+
 `--mbox` prints the mailbox summary line followed by one line per held entry
 — never the payload text:
 

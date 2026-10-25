@@ -164,8 +164,12 @@ Setlog lines under `--setlog on` (every 5 minutes, next to `STAT`):
 
 ```
 DM sent=.. echo=.. gwack=.. ack=.. giveup=.. giveuph=.. att=.. reack=../.. rtt=a/b/c/d/e/f ring=enq:.. ovw:..
-MBOX mode=.. used=../.. act=../20 stored=.. refr=.. deliv=.. ack=.. dropt=.. dropc=.. drops=.. peer=.. blk=.. sto=../..
+MBOX mode=.. used=../.. act=../20 stored=.. refr=.. deliv=.. ack=.. dropt=.. dropc=.. drops=.. peer=.. blk=.. sto=../.. tomb=..
 ```
+
+An ack heard for a store-set call blocks re-storing that sender/recipient/`{NNN` for 1 h
+(SNF-ACK-01), so a late copy of an already acknowledged DM is not held again; the `tomb=` counter in the
+`MBOX` line counts the refused stores.
 
 Web GUI: `/?page=mailbox` (owner password), setup card "Store node", and the `/setparam/` names
 `store`, `storecall`, `storetime`, `storeslots`, `storenotice`.

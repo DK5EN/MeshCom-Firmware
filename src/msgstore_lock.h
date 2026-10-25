@@ -13,7 +13,8 @@
 // env->deliver(); this lock covers the table itself.
 //
 // Rules for code between MSGSTORE_LOCK() and MSGSTORE_UNLOCK():
-//   - short and bounded (scan of <= MSGSTORE_SLOTS_MAX slots, one memcpy);
+//   - short and bounded (a few scans of <= MSGSTORE_SLOTS_MAX slots plus the
+//     MSGSTORE_TOMB_SLOTS tombstone ring, one memcpy);
 //   - no printf/printfdeb/Serial, no malloc, no flash access;
 //   - no call into MsgStoreEnv (now_ms, own_call, random_between, deliver,
 //     notify, log, ...): read the clock and draw random numbers BEFORE the

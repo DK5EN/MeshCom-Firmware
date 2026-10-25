@@ -35,6 +35,8 @@
 #define MSGSTORE_ACTIONS_PER_HOUR  20           // load-bearing node ceiling
 #define MSGSTORE_UTIL_MAX_PCT      25           // no action above this 5-min utilisation
 #define MSGSTORE_HEARD_WINDOW_MS   43200000UL   // 12 h, the mheard window (D4)
+#define MSGSTORE_TOMB_SLOTS        32           // SNF-ACK-01: acked tombstone ring
+#define MSGSTORE_TOMB_TTL_MS       3600000UL    // SNF-ACK-01: 1 h, the {NNN horizon
 
 enum MsgStoreMode  { MSGSTORE_OFF = 0, MSGSTORE_OWN = 1, MSGSTORE_LIST = 2, MSGSTORE_HEARD = 3 };
 enum MsgStoreState { MSGSTORE_FREE = 0, MSGSTORE_HELD = 1, MSGSTORE_ARMED = 2, MSGSTORE_LADDER = 3, MSGSTORE_COOLDOWN = 4 };
@@ -67,7 +69,8 @@ struct MsgStoreCounters
     uint32_t stored, refreshed, delivered, purged_ack,
              dropped_storetime, dropped_cap, dropped_slots,
              cancelled_peer, blocked_bp,
-             notified, notice_blocked;   // stage 4: :sto notices sent / refused by the caps
+             notified, notice_blocked,   // stage 4: :sto notices sent / refused by the caps
+             dropped_acked;             // SNF-ACK-01: store refused, already acked (tombstone)
 };
 
 // Environment the core runs against. All pointers required except log.
