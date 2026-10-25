@@ -15,6 +15,8 @@
 
 #if defined(ESP32)
 #include <esp_heap_caps.h>
+#include <esp_wifi.h>
+#include <WiFi.h>
 #else
 #include <malloc.h>
 extern int dbgHeapTotal(void);   // nrf52_main.cpp: __HeapLimit - __HeapBase
@@ -29,6 +31,8 @@ extern int dbgHeapUsed(void);    // mallinfo().uordblks
 extern uint32_t instrument_msg_list_children(void);
 extern uint32_t instrument_persisted_msg_count(void);
 extern uint32_t instrument_active_tab_bubble_count(void);
+extern uint32_t instrument_tab_count(void);
+extern uint32_t instrument_tab_msg_total(void);
 extern int      map_point_count;
 #endif
 
@@ -129,8 +133,107 @@ void instrument_note_flush(uint32_t us)
         s_flush_max = us;
 }
 
+/* ---- T-Deck Plus heap/WiFi investigation: [INSTR-HEAP], alloc-fail capture, --wifips ---- */
+static volatile uint32_t s_af_n = 0, s_af_size = 0, s_af_caps = 0;
+static const char *volatile s_af_fn = NULL;
+static uint32_t s_heaplog_s = 30;
+static uint32_t s_heaplog_last_ms = 0;
+
+void instrument_note_alloc_fail(size_t size, uint32_t caps, const char *fn)
+{
+    /* any task, possibly with the heap locked: plain stores only */
+    s_af_n = s_af_n + 1u;
+    s_af_size = (uint32_t)size;
+    s_af_caps = caps;
+    s_af_fn = fn;
+}
+
+#if defined(ESP32)
+static void instr_alloc_fail_cb(size_t size, uint32_t caps, const char *fn)
+{
+    instrument_note_alloc_fail(size, caps, fn);
+}
+#endif
+
+void instrument_report_heapwifi(void)
+{
+#if defined(ESP32)
+    const uint32_t ci = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    wifi_ps_type_t ps = WIFI_PS_NONE;
+    int psv = (esp_wifi_get_ps(&ps) == ESP_OK) ? (int)ps : -1;
+    const char *fn = s_af_fn;
+    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    printfdeb("[INSTR-HEAP];up_s;%lu;ifree;%u;imin;%u;iblk;%u;dfree;%u;dblk;%u;pfree;%u;pblk;%u;afail;%u;afsz;%u;afcaps;%x;affn;%s;pmsgs;%u;tabs;%u;tabmsgs;%u;wifi;%i;rssi;%i;ps;%i\n",
+    #else
+    printfdeb("[INSTR-HEAP];up_s;%lu;ifree;%u;imin;%u;iblk;%u;dfree;%u;dblk;%u;pfree;%u;pblk;%u;afail;%u;afsz;%u;afcaps;%x;affn;%s;wifi;%i;rssi;%i;ps;%i\n",
+    #endif
+              (unsigned long)(millis() / 1000UL),
+              (unsigned)heap_caps_get_free_size(ci),
+              (unsigned)heap_caps_get_minimum_free_size(ci),
+              (unsigned)heap_caps_get_largest_free_block(ci),
+              (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA),
+              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
+              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM),
+              (unsigned)s_af_n, (unsigned)s_af_size, (unsigned)s_af_caps,
+              fn != NULL ? fn : "-"
+    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+              , (unsigned)instrument_persisted_msg_count(),
+              (unsigned)instrument_tab_count(),
+              (unsigned)instrument_tab_msg_total()
+    #endif
+              , (int)WiFi.status(), (int)WiFi.RSSI(), psv);
+#else
+    printfdeb("[INSTR-HEAP];not_available_on_this_board\n");
+#endif
+}
+
+void instrument_heaplog_set(uint32_t s)
+{
+    s_heaplog_s = s;
+    s_heaplog_last_ms = millis();
+}
+
+static void instrument_heaplog_tick(void)
+{
+    if (s_heaplog_s == 0)
+        return;
+    uint32_t now = millis();
+    if ((uint32_t)(now - s_heaplog_last_ms) >= s_heaplog_s * 1000UL)
+    {
+        s_heaplog_last_ms = now;
+        instrument_report_heapwifi();
+    }
+}
+
+void instrument_wifips(const char *mode)
+{
+#if defined(ESP32)
+    wifi_ps_type_t want;
+    if (mode != NULL && strncasecmp(mode, "none", 4) == 0)
+        want = WIFI_PS_NONE;
+    else if (mode != NULL && strncasecmp(mode, "min", 3) == 0)
+        want = WIFI_PS_MIN_MODEM;
+    else if (mode != NULL && strncasecmp(mode, "max", 3) == 0)
+        want = WIFI_PS_MAX_MODEM;
+    else
+    {
+        printfdeb("[INSTR-WIFIPS];err;usage --wifips none|min|max\n");
+        return;
+    }
+    esp_err_t rc = esp_wifi_set_ps(want);
+    wifi_ps_type_t now = WIFI_PS_NONE;
+    int nv = (esp_wifi_get_ps(&now) == ESP_OK) ? (int)now : -1;
+    printfdeb("[INSTR-WIFIPS];set;%s;rc;%i;now;%i\n", mode, (int)rc, nv);
+#else
+    printfdeb("[INSTR-WIFIPS];not_available_on_this_board\n");
+#endif
+}
+
 void instrument_note_loop_tick(void)
 {
+    instrument_heaplog_tick();
+
     uint32_t now = micros();
 
     /* Skip the very first tick: there is no previous timestamp to subtract,
@@ -188,6 +291,9 @@ void instrument_note_loop_tick(void)
 void instrument_report_prev_boot(void)
 {
 #if defined(ESP32)
+    /* boot-time alloc-fail capture; fw_update_net's per-job arming replaces the
+     * slot later and forwards to instrument_note_alloc_fail() */
+    heap_caps_register_failed_alloc_callback(instr_alloc_fail_cb);
     /* Raw Serial.printf, not printfdeb: this is a bench marker that must
      * survive --debug off (see the FL-01 note in tdeck_main.cpp). */
     if (s_rtc.magic == INSTR_RTC_MAGIC)

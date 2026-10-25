@@ -5835,6 +5835,21 @@ void commandAction(char *umsg_text, bool ble)
     // Order matters: commandCheck() is a prefix match, so "heap " (tagged form)
     // must be tested before the bare "heap".
     else
+    // --heaplog <s>: [INSTR-HEAP] every s seconds (0 = off). Before "heap" on purpose.
+    if(commandCheck(msg_text+2, (char*)"heaplog ") == 0)
+    {
+        instrument_heaplog_set((uint32_t)atoi(msg_text + 10));
+        printfdeb("[INSTR-HEAP];heaplog;set;%u\n", (unsigned)atoi(msg_text + 10));
+        return;
+    }
+    else
+    // --wifips none|min|max: esp_wifi_set_ps(), prints [INSTR-WIFIPS]
+    if(commandCheck(msg_text+2, (char*)"wifips ") == 0)
+    {
+        instrument_wifips(msg_text + 9);
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"heap ") == 0)
     {
         instrument_report_heap(msg_text + 7);
@@ -6342,6 +6357,7 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"instr") == 0)
     {
         instrument_report_heap("instr");
+        instrument_report_heapwifi();
         instrument_report_timing();
         instrument_report_gui();
         return;

@@ -299,6 +299,9 @@ const char *volatile s_afFirstFn;
 
 void onAllocFail(size_t size, uint32_t caps, const char *fn)
 {
+#if INSTRUMENT_ENABLED
+    instrument_note_alloc_fail(size, caps, fn); // whole-boot counter, plain stores
+#endif
     if (__atomic_fetch_add(&s_afN, 1u, __ATOMIC_RELAXED) == 0u)
     {
         s_afFirstSize = (uint32_t)size;

@@ -220,6 +220,19 @@ uint32_t instrument_persisted_msg_count(void)
     return (uint32_t)persisted_msgs.size();
 }
 
+uint32_t instrument_tab_count(void)
+{
+    return (uint32_t)msg_tab_entries.size();
+}
+
+uint32_t instrument_tab_msg_total(void)
+{
+    uint32_t n = 0;
+    for (size_t i = 0; i < msg_tab_entries.size(); i++)
+        n += (uint32_t)msg_tab_entries[i].bubbles.size();
+    return n;
+}
+
 uint32_t instrument_active_tab_bubble_count(void)
 {
     if (msg_active_tab_index < 0 || (size_t)msg_active_tab_index >= msg_tab_entries.size())

@@ -59,6 +59,19 @@ void instrument_note_loop_tick(void);
  *  samples up with the stimulus that produced them. */
 void instrument_report_heap(const char *tag);
 
+/** Bench heap/WiFi diagnostics for the T-Deck Plus investigation.
+ *  [INSTR-HEAP] every `s` seconds from the loop tick (0 = off), or once on demand. */
+void instrument_heaplog_set(uint32_t s);
+void instrument_report_heapwifi(void);
+
+/** Failed-alloc capture for the whole boot (plain stores, any task, no printf/malloc/lock).
+ *  Armed at boot from instrument_report_prev_boot(); fw_update_net.cpp's callback
+ *  forwards here too, so its per-job counters keep their semantics. */
+void instrument_note_alloc_fail(size_t size, uint32_t caps, const char *fn);
+
+/** --wifips none|min|max; prints [INSTR-WIFIPS]. */
+void instrument_wifips(const char *mode);
+
 /** Accumulated flush/loop statistics since the last reset. */
 void instrument_report_timing(void);
 
