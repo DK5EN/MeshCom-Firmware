@@ -5,8 +5,9 @@
 [#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238) (all fork firmware of `6c84a46c` as one commit) and
 [#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239) (CI `.autoupdate` assets, `MC_BUILD_TAG` only for
 `v<VER>[.MM.DD]` tags), both unchanged by review. Synced into `fork-dev` by merge; the merge tree equals the pre-merge
-tree (see "Upstream sync 2026-10-25" below). PR branches `pr/fork-firmware-20261025`, `pr/ci-autoupdate` and worktrees
-`../MeshCom-PR-next`, `../MeshCom-PR-ci` are **kept on purpose** until rework is ruled out (operator, 2026-10-25).
+tree (see "Upstream sync 2026-10-25" below). PR branches `pr/fork-firmware-20261025`, `pr/ci-autoupdate` (local and origin) and
+worktrees `../MeshCom-PR-next`, `../MeshCom-PR-ci` removed 2026-10-25; the PR heads stay reachable as parents of the
+upstream merges. Pages PR history updated (63 PRs, gh-pages `6c835be8`).
 Next step: watch upstream for follow-up review; prod channel needs upstream tags of the form `v<VER>` or `v<VER>.MM.DD`.
 TD-22 soak and TD-23 UAT still open.
 
