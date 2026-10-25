@@ -1,0 +1,4 @@
+TD-22 phase 1 (tab cap), DK5EN-14, INSTRUMENT w5a (first TD-22 version), 2026-10-25 10:36-10:42
+stimulus: --injectmsg round robin over 20 numeric groups (9001-9020), every 2 s, 155 messages (stopped early)
+tabs held at 16, 146 evictions ([TDECK];tab;evict), every new message evicts the LRU inactive tab (round robin > cap)
+ifree 65-67 KB throughout, imin 60356, afail 0; pings 474 ok / 0 lost; no panic

@@ -1,0 +1,8 @@
+TD-21b bench, DK5EN-14, INSTRUMENT final (9e4d8781 tree, build 10:57:10), 2026-10-25 11:10-11:17
+11:11-11:12:25 --heapeat 6 KB steps to 66 KB held, ifree 492; pings lost from ~11:12:2x
+11:12:50 --heapeat 0 -> ifree 72680
+failure mode this run: real link drop (WiFi.status 6, last_reason 39), not the associated-but-dead state;
+  liveness probe correctly idle (runs only while WL_CONNECTED), driver auto-reconnect failed for 180 s
+11:15:45 [WIFI];watchdog;reconnect;down_s;180 (existing not-connected watchdog, stage 1)
+11:15:49 connected; 11:16:27 link up got_ip_n 2; pings ok again by 11:16:55
+outage ~4 min 30 s; test stopped manually after recovery (driver waits for an ipdead line)

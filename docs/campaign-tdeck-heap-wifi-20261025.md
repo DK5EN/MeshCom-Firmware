@@ -24,8 +24,8 @@ internal heap below 30 KB). Operator scope: measure, reproduce, RCA, fix, re-tes
 | ---------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | TD-20      | `persisted_msgs` RAM-only copy of every non-System message until reboot                                  | Fixed `5b1e1da8`, benched                |
 | TD-21      | `checkWifiPing()` returns early on `WL_CONNECTED`; a wedged IP path on an associated link never recovers | Fixed `5b1e1da8`, benched (`td21_bench`) |
-| TD-22      | Per-tab model ~650 B internal RAM per bubble, 50 per tab, tab count uncapped                             | Open (decision)                          |
-| WIFI-PS-01 | LAN ping 80-100 ms median from WiFi modem sleep; PS none needs BLE off (IDF aborts otherwise)            | Measured, operator decision              |
+| TD-22      | Per-tab model ~650 B internal RAM per bubble, 50 per tab, tab count uncapped                             | Fixed `bae97fd1`, benched                |
+| WIFI-PS-01 | LAN ping 80-100 ms median from WiFi modem sleep; PS none needs BLE off (IDF aborts otherwise)            | Accepted (operator), guard `9e4d8781`    |
 
 ## Measurements (logs and summaries in `tools/bench/runs/harness/`)
 
@@ -80,3 +80,31 @@ internal heap below 30 KB). Operator scope: measure, reproduce, RCA, fix, re-tes
 - TD-22 decision (bubble Strings to PSRAM or cap tabs).
 - WIFI-PS-01 decision.
 - Not released, no upstream PR (operator scope).
+
+## Follow-up waves (2026-10-25, operator decisions)
+
+Decisions: TD-22 = 16-tab cap with LRU eviction of inactive tabs plus a heap floor (below 40 KB free internal RAM
+drop the oldest bubbles of the least recently used inactive tab; active tab keeps at least 10). WIFI-PS-01 = accept
+and document; `--wifips none` (INSTRUMENT) refuses while the BT controller runs instead of panicking. Full control
+over DK5EN-14 (soak interrupted for the bench).
+
+| Wave | Content                                                                                                                     | Owner                | State           |
+| ---- | --------------------------------------------------------------------------------------------------------------------------- | -------------------- | --------------- |
+| 5-A  | TD-22: `msg_tab_policy.h`, tab cap + eviction, heap floor trim, active-index fix on tab removal, test `test_tdeck_msg_tabs` | implementer + rework | Done `bae97fd1` |
+| 5-B  | TD-21b: gateway-change blind spot fixed, session bookkeeping in `wifi_liveness.h`, 4 new tests                              | implementer          | Done `ace935c6` |
+| 5-C  | `--wifips none` BT guard, test list registration                                                                            | orchestrator         | Done `9e4d8781` |
+| 6    | Bench: multi-tab drain (eviction, heap floor), TD-21 starvation re-run, GUI smoke; release image; soak                      | orchestrator         | Open            |
+
+### Wave 6 bench results
+
+| Run             | Build                      | Result                                                                                                                                                                                    |
+| --------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `td22_multitab` | INSTRUMENT, first TD-22    | 20 groups round robin: 16 tabs held, 146 evictions, ifree 65-67 KB, 0 pings lost                                                                                                          |
+| `td22_floor`    | INSTRUMENT, reworked TD-22 | 5 groups, 500 messages: floor engaged 77x (409 bubbles), ifree 41.0-61.9 KB, afail 0, 0 pings lost                                                                                        |
+| Reviews         |                            | TD-22: Opus rework (render on removal, use-after-free in the delete callback, view thrash, click recency, persisted iteration, System body cap) then approved; TD-21b approved first pass |
+| `td21b_bench`   | INSTRUMENT, final          | Starvation dropped the link this time (status 6, reason 39): probe idle as designed, driver auto-reconnect failed 180 s, old watchdog stage 1 reconnected at 180 s, pings back 70 s later |
+| Not covered     |                            | GUI visual check on the device (no camera on the bench); `T_DECK_SPIFFS` paths reviewed only                                                                                              |
+
+Finding (BACKLOG TD-21): after heap starvation the driver's own auto-reconnect did not recover the link within 180 s,
+while the watchdog's forced disconnect + `wifiBegin()` reconnected in 3.5 s. Shortening `WIFI_WD_GRACE_S` (180 s)
+would shorten that outage; not changed.

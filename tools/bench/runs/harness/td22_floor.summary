@@ -1,0 +1,5 @@
+TD-22 phase 2 (heap floor), DK5EN-14, INSTRUMENT w5b (reworked TD-22), 2026-10-25 10:47-11:08
+stimulus: --injectmsg round robin over 5 numeric groups (9101-9105), every 2 s, 500 messages
+floor (40 KiB) engaged 77 times, 409 bubbles trimmed; first trim at ~43 bubbles in 7 tabs
+plateau ifree 41.0-61.9 KB, iblk min 20468, imin 16984 (transient), afail 0, bubbles kept 49-64
+pings 1131 ok / 0 lost; no panic, no ipdead

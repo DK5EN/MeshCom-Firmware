@@ -2,7 +2,7 @@
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
 `v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
-Next step: evaluate the DK5EN-14 TD-20/TD-21 soak (until ~2026-10-26 10:00) and the TXP DK5EN-98 logger night (until 2026-10-25 16:21), then TTL decision.
+Next step: evaluate the DK5EN-14 TD-22 soak (24 h from 2026-10-25 ~11:30) and the TXP DK5EN-98 logger night (until 2026-10-25 16:21), then TTL decision.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -22,10 +22,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
-- **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, not released):** `persisted_msgs` RAM-only message copy
-  removed (`5b1e1da8`), WiFi IP-liveness watchdog added; both benched on DK5EN-14. DK5EN-14 runs the release build of
-  `5b1e1da8` (09:40:55) with a 24 h soak on rpizero (`screen td20-14`). Open: TD-22 tab model heap, WIFI-PS-01 ping
-  latency decision ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
+- **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, TD-21b, TD-22, not released):** `persisted_msgs` RAM-only
+  copy removed (`5b1e1da8`), WiFi IP-liveness watchdog (`5b1e1da8`, gateway-change fix `ace935c6`), 16-tab cap with
+  40 KiB heap floor (`bae97fd1`); all benched on DK5EN-14. WIFI-PS-01 accepted (modem sleep). DK5EN-14 runs the
+  release build of `9e4d8781` with a 24 h soak on rpizero (`screen td22-14`, `~/meshlog/dk5en-14-td22/`). Open: soak
+  evaluation, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
   - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. All five nodes
     (DK5EN-1/-14/-90/-92/-98) run the gate build of `3e07f894` (TXP + BLK-01) since 2026-10-24 16:20; 24 h logger on
@@ -160,7 +161,8 @@ Hard bench rules:
 ## Last three sessions
 
 - **2026-10-25:** T-Deck heap/WiFi campaign: field RCA reproduced on DK5EN-14 (~250 messages wedge the IP path while
-  WiFi stays associated); TD-20 and TD-21 fixed and benched; slow LAN ping traced to WiFi modem sleep (WIFI-PS-01).
+  WiFi stays associated); TD-20, TD-21/21b and TD-22 fixed and benched; slow LAN ping traced to WiFi modem sleep
+  (WIFI-PS-01, accepted).
 - **2026-10-24 (late):** TRK-02 measurement campaign (web flasher vs PRG/GPIO0): `dtr_replay.py`, 80 replays
   plus one Chrome install on DK5EN-1, 0 clicks; TRK-03 T-Beam first-boot TRACK bit confirmed on DK5EN-92
   (erased and restored) and fixed with a native test.
