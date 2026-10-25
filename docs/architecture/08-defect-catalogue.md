@@ -1712,7 +1712,8 @@ Campaign: [`campaign-trk02-webflash-track-20261024.md`](../campaign-trk02-webfla
 
 ## 2k. TXP-01 — own group text released before its first own TX (2026-10-25)
 
-**OPEN**, reproduced on the bench; fix proposed (campaign [`campaign-tx-pool.md`](../campaign-tx-pool.md) W1e).
+**FIXED** on fork-dev 2026-10-25 (`556b997d`, not released), benched: unfixed 6/10 released, fixed 0/20 (campaign
+[`campaign-tx-pool.md`](../campaign-tx-pool.md) W1e). DK5EN-98 still on the unfixed image.
 Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-20261024.md).
 
 - **Mechanism:** a gateway queues an own text READY and uploads it to the server in the same call
@@ -1723,7 +1724,7 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
 - **Scope:** own group texts and `*`. Own PN and own RM1 commands are excluded and always sent once.
 - **Evidence:** DK5EN-98 logger 50/118 own texts never on air (group 20 49/82). Bench: DK5EN-98 -> 9999 9/10
   released, 0/10 with the bench gateways airgapped; only 1 of the 9 released texts reached a field node.
-- **Fix (proposal):** an own text (source = own call) is not released while READY; it goes out once, and the
+- **Fix:** an own text (source = own call) is not released while READY; it goes out once, and the
   existing heard check at the 40 s retry point (`[RETX] already heard, stop`) suppresses the repeat.
 - **TXP-02 (low, open):** a PN to the gateway's own call received over UDP is not added to the dedup ring
   (`RX_DEDUP_NEW` without `RX_DEDUP_ADD`); the later LoRa copy is new and is uploaded to the server again.

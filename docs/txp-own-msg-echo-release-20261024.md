@@ -273,7 +273,7 @@ Destinations restricted to 9999, TEST and PNs between own nodes; `*`, 20, 232, 2
   arrives later is new (`DUP:n`) and is uploaded to the server again (`GWU` + `TX-UDP`, DK5EN-1 in E4). The
   display and ACK path dedups correctly (`[DMDUP]`).
 
-## 9. Fix (TXP-01, proposal 1 above, not implemented)
+## 9. Fix (TXP-01, proposal 1 above, implemented in section 10)
 
 Operator rule: a message from my node goes out on LoRa at least once; if its echo was already heard, no repeat
 is needed. The TX buffer already has the second half: every echo of an own text sets `own_msg_id[][4] = 0x01`
@@ -283,3 +283,28 @@ text (source = own call) is not released while READY; it goes out once and the e
 the repeat. Regression test: own group text READY plus a foreign echo -> slot still reaches `doTX()` once and no
 retry follows. Open for the operator: whether a text sent for a KISS client (foreign source) keeps the
 release-on-echo it has always had.
+
+## 10. Fix and bench verification (2026-10-25, `556b997d`)
+
+- **Fix:** `pnFrameIsReleasableGroupText()` (src/pn_retry.h) excludes every frame with our own callsign as
+  source, so an own text stays READY when the server copy of another gateway is heard first and goes out once.
+  `pnFrameIsRetryEligibleGroupText()` keeps its truth table, so the 40 s heard check still stops the repeat. Texts
+  sent for a KISS client (foreign source) keep the release.
+- **Regression test:** `test_pn_retry` own group text and own `*` text not releasable (failed before: 2 of 55,
+  test_main.cpp:875/:883), still retry-eligible; foreign-source group text stays releasable. Gate stage 1+2 PASS
+  (81 envs, 2928/2928, golden 48, pytest 1410). Advisor (Opus) approved.
+- **Bench, same setup before and after** (DK5EN-1 and DK5EN-90 send to 9999; DK5EN-90/-92 and DK5EN-1 compete
+  as gateways with the server copy; INSTRUMENT images):
+
+| Run        | Firmware            | DK5EN-1 -> 9999           | DK5EN-90 -> 9999          |
+| ---------- | ------------------- | ------------------------- | ------------------------- |
+| V0 (13:12) | `eb246050`, unfixed | 4 of 5 released, 1 sent   | 2 of 5 released, 3 sent   |
+| V1 (13:27) | `556b997d`, fixed   | 0 of 10 released, 10 sent | 0 of 10 released, 10 sent |
+
+- **Echo before own TX is now harmless:** in 5 of the 20 fixed texts the competitor's copy arrived first
+  (`ACK_SKIP_READY` 4 on DK5EN-1, 1 on DK5EN-90), the slot stayed READY and was sent once. Example `EA25A38E`:
+  echoes 13:33:22 (DK5EN-92) and 13:33:26 (DK5EN-90), own TX 13:33:29, gateway ACK 13:33:54, no repeat.
+- **One-time send:** 19 of 20 texts went out exactly once. The one repeat (DK5EN-90 `91A434CE`) was not heard by
+  anyone within 40 s (heard flag `00`), so the retry is the intended behaviour.
+- **Not yet in the field:** DK5EN-98 still runs the unfixed `3e07f894` image; the fix reaches it with an OTA flash
+  (operator OK) or the next release. Summaries `tools/bench/runs/harness/own-echo-V0-*.json`, `own-echo-V1-*.json`.
