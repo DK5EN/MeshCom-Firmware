@@ -1087,10 +1087,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             {
                 if(memcmp(ringBuffer[i]+3, RcvBuffer+1, 4) == 0)
                 {
-                    // QRT Finding 1: an echo of our own group text while the copy
-                    // still waits READY (typically a gateway's server copy) means
-                    // the message is on air -- release the slot instead of sending
-                    // a duplicate. Own PN / own RM1 command keep the old skip.
+                    // QRT Finding 1 / TXP-01: an echo while the copy still waits
+                    // READY releases only a foreign-source text (KISS client). An
+                    // own text stays READY for its first own TX; the 40 s heard
+                    // check (own_msg_id 0x01) then stops the repeat. Own PN / own
+                    // RM1 command keep the old skip.
                     // RAK4630: same ring lock as findAndStopRingSlotImpl() and as
                     // doTX()'s claim (txRingBeginTx(), READY/DONE->INFLIGHT, locked;
                     // getNextTxSlot() itself scans lock-free).

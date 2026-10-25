@@ -869,7 +869,18 @@ void test_releasable_own_group_text(void)
 {
     uint8_t frame[160];
     uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "9", "hello group", 0x04, 0x03);
-    TEST_ASSERT_TRUE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    // TXP-01: an own group text must NOT be released by a READY-slot echo (its
+    // first own LoRa TX would be lost); it stays retry-eligible so the 40 s
+    // heard-check (own_msg_id 0x01) can suppress the repeat.
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+void test_releasable_own_star_broadcast_text(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DK5EN-1", "*", "hello all", 0x04, 0x03);
+    TEST_ASSERT_FALSE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
     TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
 }
 
@@ -894,6 +905,16 @@ void test_releasable_kiss_client_pn_foreign_source(void)
 {
     uint8_t frame[160];
     uint16_t n = buildFrame(frame, qOwnId(), "DL1ABC-7", "DK5EN-90", "Test{042", 0x04, 0x03);
+    TEST_ASSERT_TRUE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
+    TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
+}
+
+// TXP-01: a group text sent for a KISS client (foreign source) keeps the
+// release at a READY echo; only own-source texts are excluded.
+void test_releasable_kiss_client_group_text_foreign_source(void)
+{
+    uint8_t frame[160];
+    uint16_t n = buildFrame(frame, qOwnId(), "DL1ABC-7", "9", "hello group", 0x04, 0x03);
     TEST_ASSERT_TRUE(pnFrameIsReleasableGroupText(0x3A, frame, n, QGW, "DK5EN-1"));
     TEST_ASSERT_TRUE(pnFrameIsRetryEligibleGroupText(frame, n, QGW, "DK5EN-1"));
 }
@@ -970,9 +991,11 @@ int main(int, char **)
     RUN_TEST(test_rm1_stopped_stale_entry_purged_on_enqueue);
 
     RUN_TEST(test_releasable_own_group_text);
+    RUN_TEST(test_releasable_own_star_broadcast_text);
     RUN_TEST(test_releasable_own_pn_not);
     RUN_TEST(test_releasable_own_rm1_cmd_not);
     RUN_TEST(test_releasable_kiss_client_pn_foreign_source);
+    RUN_TEST(test_releasable_kiss_client_group_text_foreign_source);
     RUN_TEST(test_releasable_requires_text_rx_and_slot);
 
     return UNITY_END();
