@@ -17,7 +17,7 @@ does see. Nothing is stored either way.
   list; `--storecall none` clears it.
 - `--storetime <h>` — hold time, 1..168 h (default 24). Out of range answers
   `[ERR]` and changes nothing.
-- `--storeslots <n>` — slot count, 1..100 (default 50). Out of range answers
+- `--storeslots <n>` — slot count, 1..50 (default 50, `MSGSTORE_SLOTS_MAX`). Out of range answers
   `[ERR]`. Shrinking while entries are held is allowed; the core caps its use
   at the new value immediately.
 - `--storenotice on|off` — sender-visible custody notice (stage 4, default

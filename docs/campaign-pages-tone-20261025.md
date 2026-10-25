@@ -36,15 +36,18 @@ ein gemeinsames Aussehen ueber `assets/site.css`.** Ergebnis ist ein PR `docs/pa
 | E            | `docs/presentation/index.html`, `docs/presentation/404.html`                             | 2     |
 | Orchestrator | `docs/presentation/assets/site.css`, dieses Dokument                                     | alle  |
 
-## Befunde ausserhalb der Seiten (Welle 1, nicht angefasst)
+## Befunde ausserhalb der Seiten (Welle 1; erledigt 2026-10-25 mit v4.40a.10.25)
 
 - `docs/rm1-commands.md` nannte 25 Befehle; jetzt 26 mit `blockcall` (im PR behoben).
 - `release-notes.md`, Abschnitt "Upstream": #1213, #1214, #1224, #1233 stehen inzwischen im
-  offiziellen Tag `v4.40a.spserver`, nicht nur in `dev`.
+  offiziellen Tag `v4.40a.spserver`, nicht nur in `dev`. Erledigt: Abschnitt neu, Vergleichsbasis
+  der Release Notes ist jetzt `v4.40a.spserver`.
 - `docs/commands-store-node.md`: `--storeslots 1..100`, der Code erlaubt hoechstens 50
-  (`src/msgstore_api.h:19`).
+  (`src/msgstore_api.h:19`). Erledigt: 1..50.
 - `docs/BACKLOG.md` (SNF-GW: STOR-Freigabe erledigt) widerspricht `docs/RESUME.md` und
-  `docs/fork-dev-vs-upstream-20261018.md` (Freigabe des Serverbetreibers noetig).
+  `docs/fork-dev-vs-upstream-20261018.md` (Freigabe des Serverbetreibers noetig). Erledigt: `RESUME.md`
+  korrigiert (Freigabe 2026-10-11 erteilt, in Release-Builds seit v4.40a.10.19 fest aus); die
+  fork-dev-Tabelle sagt nur "freigegeben, sobald der Server die Meldung auswertet" und bleibt.
 
 ## Offen nach dem PR
 
@@ -55,5 +58,6 @@ ein gemeinsames Aussehen ueber `assets/site.css`.** Ergebnis ist ein PR `docs/pa
 
 ## Offen ausserhalb des PR
 
-- Verweis auf `schreibstil` in `.claude/commands/release-firmware.md` des Haupt-Checkouts eintragen
-  (aus dem Worktree heraus gesperrt).
+- Verweis auf `schreibstil` in `.claude/commands/release-firmware.md`: erledigt 2026-10-25 (lokal,
+  nicht versioniert), Vorbild jetzt `v4.40a.10.24`.
+- `404.html`: gestaltet ab dem pages-sync von v4.40a.10.25.

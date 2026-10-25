@@ -21,8 +21,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
   `check`: 30 boards, 0 mismatches. The SP host change shipped in 10.24.
 - **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
-  (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
-  operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
+  (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188; STOR accepted live by the
+  operator 2026-10-11, locked off in release builds since v4.40a.10.19), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
 - **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, TD-21b, TD-22, not released):** `persisted_msgs` RAM-only
   copy removed (`5b1e1da8`), WiFi IP-liveness watchdog (`5b1e1da8`, gateway-change fix `ace935c6`), 16-tab cap with

@@ -3,19 +3,35 @@
 
     python3 tools/code_share/measure.py --out build/code-share
     python3 tools/code_share/render_pages.py --summary build/code-share/summary.json \
-        [--dir docs/presentation]
+        [--dir docs/presentation] [--version 4.40a] [--stand DD.MM.YYYY]
 
-Adds the section "Wie viel vom Original steckt noch in ..." (id="anteil") in front of
-the first round, the column "In <version>" to every PR row (docs/presentation/), and
-the sentence on the index card. Idempotent: an existing section and column are
-replaced, not duplicated. Publish afterwards with tools/pages-sync.sh. Stdlib only.
+Writes, in docs/presentation/pr-history.html:
+  - the block "Wie viel vom Original steckt noch in <version>?" from <h2 id="anteil">
+    up to the first round heading (<h2 id="rN">), with the round, top-10 and area
+    tables in <details>;
+  - the column "In <version>" of every PR row in every round (r7, r6 as <h2>,
+    r1-r5 as <details>): surviving lines for a measured PR, "0" for a measured PR
+    with nothing left, "–" for a PR that is not merged or was merged after --stand;
+  - the note "Die Spalte „In <version>“ ist für die PRs ab #N leer ..." under the
+    table of the first PR merged after --stand (removed when there is none);
+  - the TOC entry and the details block "Methode der Zeilenbilanz";
+and the sentence "Mit Zeilenbilanz je PR und je Runde: ..." on the index card.
+
+--stand is the date of the measured state; summary.json carries none, so it defaults
+to the commit date of the summary's ref_sha (git log in the repo of this script).
+Lead sentence, key facts, meta and "Was nicht geprüft ist" lines elsewhere on the
+page are hand-written and not touched.
+Idempotent: a second run with the same summary changes nothing. Publish afterwards
+with tools/pages-sync.sh. Stdlib only.
 """
-# ruff: noqa: E501  (the German page text and CSS are long single-line templates)
+# ruff: noqa: E501  (the German page text is long single-line templates)
 
 import argparse
-import html
+import datetime as dt
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -25,6 +41,14 @@ def de(n):
 
 def pc(x):
     return f"{x:.1f}".replace(".", ",")
+
+
+def bw(x):
+    return f"{x:.2f}"
+
+
+def und(items):
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " und " + items[-1]
 
 
 ORDER = [
@@ -38,32 +62,78 @@ ORDER = [
     "variants",
     "config",
 ]
+BIG = [
+    ("loop_functions.cpp", "src/loop_functions.cpp"),
+    ("web_functions.cpp", "src/web_functions/web_functions.cpp"),
+    ("command_functions.cpp", "src/command_functions.cpp"),
+    ("lora_functions.cpp", "src/lora_functions.cpp"),
+    ("udp_functions.cpp", "src/udp_functions.cpp"),
+]
+BASE_DATE = "22.02.2026"  # last upstream state before the first PR (measure.py --base)
+PR_URL = "https://github.com/icssw-org/MeshCom-Firmware/pull/"
 CSS = (
-    ".share{display:flex;height:2.1rem;border-radius:8px;overflow:hidden;border:1px solid var(--line);"
-    "margin:.6rem 0 .4rem;font-size:.74rem;font-family:var(--mono)}\n"
+    "table.sh{min-width:520px}\n"
+    "td .note{color:var(--fg3);font-size:.78rem;margin-top:.15rem}\n"
+    "table.sh td.num,table.sh th.num{font-family:var(--mono);font-size:.8rem;white-space:nowrap}\n"
+    ".share{display:flex;height:2.1rem;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin:.6rem 0 .4rem;font-size:.74rem;font-family:var(--mono)}\n"
     ".share .seg{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff}\n"
-    ".s-orig{background:#64748b}.s-pr{background:var(--acc)}.s-x{background:var(--acc2)}.s-oth{background:#0ea5e9}\n"
-    "td .note{color:var(--fg3)}\ntable.sh th{width:auto}\n"
-)
-W5 = (
-    "th:nth-child(1){width:9%}th:nth-child(2){width:13%}th:nth-child(3){width:50%}"
-    "th:nth-child(4){width:18%}th:nth-child(5){width:10%}"
-)
-W6 = (
-    "th:nth-child(1){width:8%}th:nth-child(2){width:11%}th:nth-child(3){width:44%}"
-    "th:nth-child(4){width:17%}th:nth-child(5){width:9%}th:nth-child(6){width:11%}"
+    ".s-orig{background:#64748b}.s-pr{background:#4f46e5}.s-x{background:#c026d3}.s-oth{background:#0369a1}\n"
 )
 # "Zeilen" cell of a PR without merge: closed ones say "nicht gemerged", open ones "offen"
 NOT_MERGED = ("nicht gemerged", "offen")
+# one PR row of a round table; the last cell ("In <version>") is optional on input
 ROW = re.compile(
-    r'(<tr[^>]*><td><a href="[^"]*/pull/(\d+)">#\d+</a></td><td>[\d-]+</td><td>.*?</td>'
-    r'<td class="num">(.*?)</td><td class="num">[^<]*</td>)(<td class="num">[^<]*</td>)?</tr>'
+    r'(?P<head><tr(?P<cls>[^>]*)><td><a href="[^"]*/pull/(?P<pr>\d+)">#\d+</a></td>'
+    r"<td>(?P<date>\d\d\.\d\d\.\d{4})</td><td>(?P<title>.*?)</td>"
+    r'<td class="num">(?P<lines>.*?)</td><td class="num">[^<]*</td>)'
+    r'(?:<td class="num">[^<]*</td>)?</tr>'
 )
+NOTE_DIV = re.compile(r'<div class="note">.*?</div>')
+HEAD = re.compile(r"<th>Zeilen</th><th>Dateien</th>(?:<th>In [^<]*</th>)?</tr></thead>")
+EMPTY_NOTE = re.compile(
+    r"<p>Die Spalte „In [^“]*“ ist für die PRs ab #\d+ leer, weil die Messung vom [\d.]+ stammt\.</p>\n"
+)
+ANTEIL = re.compile(r'<h2 id="anteil">.*?(?=<h2 id="r\d+">)', re.S)
+METHOD = re.compile(
+    r'<details class="dev">\n<summary>Methode der Zeilenbilanz</summary>\n.*?</details>\n', re.S
+)
+ROUND_ANCHOR = re.compile(r'<(?:h2|details) id="r(\d+)">')
+BOUNDARY = re.compile(r'<h2 |<details id="r\d+">')
 
 
-def col(widths):
-    cols = "".join('<col style="width:%d%%">' % w for w in widths)
-    return "<colgroup>" + cols + "</colgroup>"
+def day(s):
+    d, m, y = (int(x) for x in s.split("."))
+    return dt.date(y, m, d)
+
+
+def period(dates):
+    a, b = min(dates), max(dates)
+    if a == b:
+        return f"{a:%d.%m.}"
+    if a.year != b.year:
+        return f"{a:%d.%m.%Y}–{b:%d.%m.%Y}"
+    if a.month == b.month:
+        return f"{a:%d}.–{b:%d.%m.}"
+    return f"{a:%d.%m.}–{b:%d.%m.}"
+
+
+def ref_html(ref, sha):
+    """'upstream/dev' -> 'upstream <code>dev</code> 9669ec99'; a bare sha -> '<code>9669ec99</code>'."""
+    if re.fullmatch(r"[0-9a-f]{7,40}", ref):
+        return f"<code>{sha[:8]}</code>"
+    remote, _, branch = ref.rpartition("/")
+    return f"{remote + ' ' if remote else ''}<code>{branch}</code> {sha[:8]}"
+
+
+def commit_date(where, sha):
+    r = subprocess.run(
+        ["git", "-C", str(where), "log", "-1", "--format=%cd", "--date=format:%d.%m.%Y", sha],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode or not re.fullmatch(r"\d\d\.\d\d\.\d{4}", r.stdout.strip()):
+        sys.exit(f"cannot read the date of {sha[:8]} from git; pass --stand DD.MM.YYYY")
+    return r.stdout.strip()
 
 
 def main():
@@ -71,9 +141,17 @@ def main():
     ap.add_argument("--summary", required=True)
     ap.add_argument("--dir", default="docs/presentation")
     ap.add_argument("--version", default="4.40a")
+    ap.add_argument(
+        "--stand",
+        help="date of the measured state, DD.MM.YYYY (default: commit date of ref_sha)",
+    )
     a = ap.parse_args()
     S = json.loads(Path(a.summary).read_text())
     d = Path(a.dir)
+    stand = a.stand or commit_date(Path(__file__).resolve().parent, S["ref_sha"])
+    if not re.fullmatch(r"\d\d\.\d\d\.\d{4}", stand):
+        sys.exit("--stand must be DD.MM.YYYY")
+    stand_day = day(stand)
     page = (d / "pr-history.html").read_text(encoding="utf-8")
     BASE, NOW = S["base_lines"], S["now_lines"]
     M = S["modes"]["strict"]
@@ -82,65 +160,81 @@ def main():
     assert ORIG + DKPR + DKX + OTH == NOW, "summary does not add up"
     surv = {int(k): v for k, v in S["per_pr"].items()}
     ver = a.version
+    refh = ref_html(S["ref"], S["ref_sha"])
 
-    # 1. start from a page without the section, with a 5-column table
-    page = re.sub(r'<section id="anteil">.*?</section>\n', "", page, flags=re.S)
-    page = page.replace(f"<th>Dateien</th><th>In {ver}</th>", "<th>Dateien</th>")
+    # 1. PR rows: classify every row, then fill the "In <version>" column
+    info = {}  # pr -> (date, title html, merged, measured)
 
-    def addcol(m):
-        pr, merged = int(m.group(2)), m.group(3) not in NOT_MERGED
-        v = de(surv[pr]["lines"]) if merged and pr in surv else ("0" if merged else "–")
-        return m.group(1) + f'<td class="num">{v}</td></tr>'
+    def classify(m):
+        pr, date = int(m["pr"]), m["date"]
+        lines = re.sub("<[^>]+>", "", m["lines"]).strip()
+        merged = not re.search(r"\b(closed|open)\b", m["cls"]) and lines not in NOT_MERGED
+        measured = merged and (pr in surv or day(date) <= stand_day)
+        info[pr] = (date, NOTE_DIV.sub("", m["title"]), merged, measured)
+        return pr, measured
 
-    page, n_rows = ROW.subn(addcol, page)
-    page = page.replace(
-        "<th>Zeilen</th><th>Dateien</th></tr></thead>",
-        f"<th>Zeilen</th><th>Dateien</th><th>In {ver}</th></tr></thead>",
-    )
-    page = page.replace(W5, W6)
+    def fill(m):
+        pr, measured = classify(m)
+        v = de(surv[pr]["lines"]) if pr in surv else ("0" if measured else "–")
+        return m["head"] + f'<td class="num">{v}</td></tr>'
+
+    page, n_rows = ROW.subn(fill, page)
+    page = HEAD.sub(f"<th>Zeilen</th><th>Dateien</th><th>In {ver}</th></tr></thead>", page)
+    missing = sorted(set(surv) - set(info))
+    assert not missing, f"PRs of the summary without a row on the page: {missing}"
+    late = sorted(p for p, (_, _, mg, ms) in info.items() if mg and not ms)
+    page = EMPTY_NOTE.sub("", page)
+    if late:
+        i = page.index(f'/pull/{late[0]}">#{late[0]}</a></td><td>')
+        j = page.index("</tbody></table></div>\n", i) + len("</tbody></table></div>\n")
+        note = f"<p>Die Spalte „In {ver}“ ist für die PRs ab #{late[0]} leer, weil die Messung vom {stand} stammt.</p>\n"
+        page = page[:j] + note + page[j:]
     if ".share{" not in page:
         page = page.replace("</style>", CSS + "</style>", 1)
+    page = re.sub(
+        r'(<li><a href="#anteil">)Wie viel vom Original steckt noch in [^<]*\?(</a></li>)',
+        lambda m: f"{m[1]}Wie viel vom Original steckt noch in {ver}?{m[2]}",
+        page,
+    )
 
-    # 2. data for the section
-    rounds, titles, merged_total = [], {}, 0
-    for s in re.split(r"(?=<section>)", page)[1:]:
-        h2 = re.search(r"<h2>([^<]*)", s)
-        eb = re.search(r'class="eyebrow">([^<]*)', s)
-        rows = re.findall(
-            r'<tr[^>]*><td><a href="[^"]*/pull/(\d+)">#\d+</a></td><td>([\d-]+)</td><td>(.*?)'
-            r'(?:<div class="note">.*?</div>)?</td><td class="num">(.*?)</td>',
-            s,
+    # 2. per round: measured merged PRs and their surviving lines
+    anchors = list(ROUND_ANCHOR.finditer(page))
+    rounds = []
+    for m in anchors:
+        nxt = BOUNDARY.search(page, m.end())
+        block = page[m.start() : nxt.start() if nxt else len(page)]
+        prs = [int(r["pr"]) for r in ROW.finditer(block) if info[int(r["pr"])][3]]
+        if not prs:
+            continue
+        n = int(m[1])
+        th = re.search(
+            rf'<a href="#r{n}">Runde {n}</a></td><td>[^<]*</td><td>[^<]*</td><td>([^<]*)</td>', page
         )
-        mr = [int(r[0]) for r in rows if r[3] not in NOT_MERGED]
-        for r in rows:
-            titles[int(r[0])] = (r[1], re.sub("<[^>]+>", "", r[2]))
-        if mr:
-            rounds.append(
-                (
-                    eb.group(1),
-                    h2.group(1),
-                    len(mr),
-                    sum(surv.get(p, {"lines": 0})["lines"] for p in mr),
-                )
-            )
-            merged_total += len(mr)
-    assert sum(r[3] for r in rounds) == DKPR, "round sums differ from the PR sum"
+        if th:
+            thema = th[1]
+        else:
+            h = re.search(r">Runde \d+: ([^<(]*)", page[m.start() :])
+            thema = h[1].strip(" ,") if h else ""
+        dates = [day(info[p][0]) for p in prs]
+        rounds.append((n, period(dates), thema, len(prs), sum(surv.get(p, {"lines": 0})["lines"] for p in prs)))
+    rounds.sort()
+    merged_measured = sum(r[3] for r in rounds)
+    assert sum(r[4] for r in rounds) == DKPR, "round sums differ from the PR sum"
     top = sorted(surv.items(), key=lambda kv: -kv[1]["lines"])[:10]
     big, fl, ar = S["big_files"], S["files"], S["areas"]
 
     def kept(f):
         return round(100 * big[f]["kept"] / big[f]["base"])
 
-    def bw(x):
-        return f"{x:.2f}"
-
-    first = S["base"][:8]
-    sec = f"""<section id="anteil">
-<div class="eyebrow">Zeilenbilanz · git blame auf {html.escape(S["ref"])} {S["ref_sha"][:8]} (v{ver})</div>
-<h2>Wie viel vom Original steckt noch in {ver}?</h2>
-<p class="lead">Die Kernfirmware ist von {de(BASE)} Zeilen (Stand vor dem ersten PR, 22.02.2026) auf {de(NOW)} Zeilen gewachsen. <b>{pc(100 * ORIG / NOW)} % der heutigen Zeilen sind noch unverändert die von Februar</b>, {pc(100 * ORIG / BASE)} % der damaligen Zeilen haben überlebt, rund {pc(100 - 100 * ORIG / BASE)} % wurden entfernt oder neu geschrieben. {pc(100 * (DKPR + DKX) / NOW)} % der heutigen Zeilen stammen aus Commits dieses Forks, {pc(100 * OTH / NOW)} % von anderen Autoren in upstream.</p>
+    # 3. the block from <h2 id="anteil"> to the first round heading
+    late_li = ""
+    if late:
+        verb = "Sie wurden" if len(late) > 1 else "Er wurde"
+        late_li = f"<li><strong>Nicht enthalten:</strong> {und([f'#{p}' for p in late])}. {verb} nach der Messung gemergt.</li>\n"
+    sec = f"""<h2 id="anteil">Wie viel vom Original steckt noch in {ver}?</h2>
+<p><strong>{pc(100 * ORIG / NOW)} % der heutigen Kernfirmware sind noch unverändert die von Februar, {pc(100 * (DKPR + DKX) / NOW)} % stammen aus Commits dieses Forks.</strong> Die Kernfirmware ist von {de(BASE)} Zeilen (vor dem ersten PR, {BASE_DATE}) auf {de(NOW)} Zeilen gewachsen. Stand der Messung: <code>git blame</code> auf {refh}, {stand}.</p>
 <div class="stats">
-<div class="stat"><div class="k">Ausgangsbasis 22.02.</div><div class="v">{de(BASE)}</div></div>
+<div class="stat"><div class="k">Ausgangsbasis {BASE_DATE[:6]}</div><div class="v">{de(BASE)}</div></div>
 <div class="stat"><div class="k">Heute ({ver})</div><div class="v">{de(NOW)}</div></div>
 <div class="stat"><div class="k">Original unverändert</div><div class="v">{de(ORIG)} · {pc(100 * ORIG / NOW)} %</div></div>
 <div class="stat"><div class="k">Original überlebt</div><div class="v">{pc(100 * ORIG / BASE)} %</div></div>
@@ -148,46 +242,83 @@ def main():
 <div class="share" role="img" aria-label="Zusammensetzung der Kernfirmware {ver}: {pc(100 * ORIG / NOW)} % Original, {pc(100 * DKPR / NOW)} % PRs dieses Forks, {pc(100 * DKX / NOW)} % Einzelcommits dieses Forks, {pc(100 * OTH / NOW)} % andere Autoren">
 <span class="seg s-orig" style="width:{bw(100 * ORIG / NOW)}%">Original {pc(100 * ORIG / NOW)} %</span><span class="seg s-pr" style="width:{bw(100 * DKPR / NOW)}%">PRs DK5EN {pc(100 * DKPR / NOW)} %</span><span class="seg s-x" style="width:{bw(100 * DKX / NOW)}%"></span><span class="seg s-oth" style="width:{bw(100 * OTH / NOW)}%">andere {pc(100 * OTH / NOW)} %</span>
 </div>
-<p class="small">Original = Zeilen, die schon vor dem ersten PR in upstream standen. PRs DK5EN = Zeilen aus Commits von {S["prs_with_lines"]} der {merged_total} gemergten PRs dieses Forks, die heute noch stehen ({de(DKPR)}). Einzelcommits ohne PR: {de(DKX)} Zeilen. Andere = Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</p>
-<h3>Je Runde: wie viel der Runde steht heute noch</h3>
-<div class="tocwrap"><table class="sh">{col([52, 10, 20, 18])}<thead><tr><th>Runde</th><th>PRs</th><th>Zeilen heute</th><th>Anteil</th></tr></thead><tbody>
+<ul>
+<li><strong>Original:</strong> Zeilen, die schon vor dem ersten PR in upstream standen.</li>
+<li><strong>PRs DK5EN:</strong> Zeilen aus Commits von {S["prs_with_lines"]} der {merged_measured} bis dahin gemergten PRs, die heute noch stehen ({de(DKPR)}).</li>
+<li><strong>Einzelcommits ohne PR:</strong> {de(DKX)} Zeilen.</li>
+<li><strong>Andere:</strong> Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</li>
+{late_li}</ul>
+
+<details>
+<summary>Je Runde: wie viel der Runde heute noch steht</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>Runde</th><th class="num">PRs</th><th class="num">Zeilen heute</th><th class="num">Anteil</th></tr></thead><tbody>
 """
-    for eb, h2, np_, sv in rounds:
-        sec += f'<tr><td>{html.escape(eb)}<div class="note small">{html.escape(h2)}</div></td><td class="num">{np_}</td><td class="num">{de(sv)}</td><td class="num">{pc(100 * sv / NOW)} %</td></tr>\n'
+    for n, per, thema, np_, sv in rounds:
+        sec += f'<tr><td><a href="#r{n}">Runde {n}</a> · {per}<div class="note small">{thema}</div></td><td class="num">{np_}</td><td class="num">{de(sv)}</td><td class="num">{pc(100 * sv / NOW)} %</td></tr>\n'
     sec += f"""</tbody></table></div>
-<p class="small">Gezählt werden nur Zeilen, die in den PRs der Runde entstanden und im aktuellen Stand noch stehen; spätere Umbauten nehmen sie der Runde wieder weg. Die Spalte „Zeilen“ in den Tabellen unten zeigt dagegen, was GitHub zum Zeitpunkt des Merge gezählt hat.</p>
-<h3>Die zehn PRs mit dem größten Anteil in {ver}</h3>
-<div class="tocwrap"><table class="sh">{col([14, 52, 18, 16])}<thead><tr><th>PR</th><th>Titel</th><th>Zeilen heute</th><th>Dateien</th></tr></thead><tbody>
+<p>Gezählt werden nur Zeilen, die in den PRs der Runde entstanden und im Stand {stand} noch stehen. Spätere Umbauten nehmen sie der Runde wieder weg. Die Spalte „Zeilen“ in den Rundentabellen zeigt dagegen, was GitHub beim Merge gezählt hat.</p>
+</details>
+
+<details>
+<summary>Die zehn PRs mit dem größten Anteil in {ver}</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>PR</th><th>Titel</th><th class="num">Zeilen heute</th><th class="num">Dateien</th></tr></thead><tbody>
 """
     for pr, v in top:
-        dt, t = titles.get(pr, ("", f"PR #{pr}"))
-        sec += f'<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/{pr}">#{pr}</a><div class="note small">{dt}</div></td><td>{html.escape(t)}</td><td class="num">{de(v["lines"])}</td><td class="num">{v["files"]}</td></tr>\n'
+        date, title = info[pr][:2]
+        sec += f'<tr><td><a href="{PR_URL}{pr}">#{pr}</a><div class="note small">{date}</div></td><td>{title}</td><td class="num">{de(v["lines"])}</td><td class="num">{v["files"]}</td></tr>\n'
     rest = DKPR - sum(v["lines"] for _, v in top)
-    top_pr = top[0]
+    top_pr, top_v = top[0]
+    big_txt = ", ".join(f"<code>{name}</code> {kept(f)} %" for name, f in BIG[:-1])
+    big_txt += f" und <code>{BIG[-1][0]}</code> {kept(BIG[-1][1])} %"
     sec += f"""</tbody></table></div>
-<p class="small">Die übrigen {S["prs_with_lines"] - 10} PRs tragen zusammen {de(rest)} Zeilen bei, dazu kommen {de(DKX)} Zeilen aus Einzelcommits ohne PR. PR #{top_pr[0]} allein stellt {de(top_pr[1]["lines"])} Zeilen, das sind {pc(100 * top_pr[1]["lines"] / NOW)} % der Kernfirmware.</p>
-<h3>Wo am meisten neu ist</h3>
-<div class="tocwrap"><table class="sh">{col([56, 22, 22])}<thead><tr><th>Bereich</th><th>Zeilen heute</th><th>davon Original</th></tr></thead><tbody>
+<p>Die übrigen {S["prs_with_lines"] - len(top)} PRs tragen zusammen {de(rest)} Zeilen bei, dazu kommen {de(DKX)} Zeilen aus Einzelcommits ohne PR. PR #{top_pr} allein stellt {de(top_v["lines"])} Zeilen, das sind {pc(100 * top_v["lines"] / NOW)} % der Kernfirmware.</p>
+</details>
+
+<details>
+<summary>Wo am meisten neu ist: Zeilen heute nach Bereich</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>Bereich</th><th class="num">Zeilen heute</th><th class="num">davon Original</th></tr></thead><tbody>
 """
     for k in ORDER:
-        sec += f'<tr><td>{html.escape(k)}</td><td class="num">{de(ar[k]["lines"])}</td><td class="num">{pc(100 * ar[k]["original"] / ar[k]["lines"])} %</td></tr>\n'
+        sec += f'<tr><td>{k}</td><td class="num">{de(ar[k]["lines"])}</td><td class="num">{pc(100 * ar[k]["original"] / ar[k]["lines"])} %</td></tr>\n'
     sec += f"""</tbody></table></div>
-<p class="small">Die großen Dateien sind gewachsen, aber ihre alten Zeilen blieben meist stehen: <code>loop_functions.cpp</code> {kept("src/loop_functions.cpp")} %, <code>web_functions.cpp</code> {kept("src/web_functions/web_functions.cpp")} %, <code>command_functions.cpp</code> {kept("src/command_functions.cpp")} %, <code>lora_functions.cpp</code> {kept("src/lora_functions.cpp")} % und <code>udp_functions.cpp</code> {kept("src/udp_functions.cpp")} % der Zeilen von Februar sind noch da. Das Neue steht überwiegend in neuen Dateien ({fl["new"]} neue gegen {fl["baseline"]} Ausgangsdateien); vollständig ersetzt wurde nur die MHeard-Liste (<code>mheard_functions.cpp</code>). Von {fl["baseline"]} Dateien aus Februar sind {fl["identical"]} byte-identisch, {fl["modified"]} verändert und {fl["deleted"]} entfallen.</p>
-<div class="box">Methode: <code>git blame -w</code> auf jeder Datei der handgeschriebenen Kernfirmware von {html.escape(S["ref"])} {S["ref_sha"][:8]} (<code>src/</code> ohne Fonts, Plattform-Stubs, Display- und Treiberbibliotheken, T5- und T-Deck-Pro-Oberfläche und den erzeugten <code>ota.h</code>, dazu <code>variants/</code>, <code>config/</code>, <code>platformio.ini</code>; <code>lib/</code> mit rund {pc(S["lib_lines_ref"] / 1e6)} Millionen Zeilen Fremdcode bleibt außen vor). Ausgangspunkt ist der letzte upstream-Stand vor dem Merge des ersten PR ({first}). Eine Zeile zählt als Original, wenn ihr letzter Autor-Commit in der Historie dieses Stands liegt. Mit Erkennung verschobener und kopierter Zeilen (<code>-M -C</code>) steigt der Originalanteil auf {pc(100 * S["modes"]["moves"]["original"] / NOW)} %. Zuordnung zu PRs über die Merge-Commits „from DK5EN“; Zeilenzahlen sind rohe Zeilen einschließlich Kommentaren und Leerzeilen und sagen nichts über Verhalten. Autorenzuordnung nach Commit-Adresse: PRs, die das ICSSW-Team unter eigenem Namen übernommen hat, erscheinen unter „andere“. Skripte: <code>tools/code_share/</code>.</div>
-</section>
+<p>Die großen Dateien sind gewachsen, aber ihre alten Zeilen blieben meist stehen: {big_txt} der Zeilen von Februar sind noch da. Das Neue steht überwiegend in neuen Dateien, {fl["new"]} neue gegen {fl["baseline"]} Ausgangsdateien. Vollständig ersetzt wurde nur die MHeard-Liste (<code>mheard_functions.cpp</code>). Von {fl["baseline"]} Dateien aus Februar sind {fl["identical"]} byte-identisch, {fl["modified"]} verändert und {fl["deleted"]} entfallen.</p>
+</details>
+
 """
-    i = page.index("<section>")
-    page = page[:i] + sec + page[i:]
+    if ANTEIL.search(page):
+        page = ANTEIL.sub(lambda m: sec, page, count=1)
+    else:
+        i = anchors[0].start()
+        page = page[:i] + sec + page[i:]
+
+    # 4. method details
+    method = f"""<details class="dev">
+<summary>Methode der Zeilenbilanz</summary>
+<p><code>git blame -w</code> auf jeder Datei der handgeschriebenen Kernfirmware von {refh}. Einbezogen sind <code>src/</code> ohne Fonts, Plattform-Stubs, Display- und Treiberbibliotheken, T5- und T-Deck-Pro-Oberfläche und den erzeugten <code>ota.h</code>, dazu <code>variants/</code>, <code>config/</code> und <code>platformio.ini</code>. <code>lib/</code> mit rund {pc(S["lib_lines_ref"] / 1e6)} Millionen Zeilen Fremdcode bleibt außen vor.</p>
+<ul>
+<li><strong>Ausgangspunkt:</strong> der letzte upstream-Stand vor dem Merge des ersten PR ({S["base"][:8]}).</li>
+<li><strong>Original:</strong> eine Zeile, deren letzter Autor-Commit in der Historie dieses Stands liegt. Mit Erkennung verschobener und kopierter Zeilen (<code>-M -C</code>) steigt der Originalanteil auf {pc(100 * S["modes"]["moves"]["original"] / NOW)} %.</li>
+<li><strong>Zuordnung zu PRs:</strong> über die Merge-Commits „from DK5EN“. PRs, die das ICSSW-Team unter eigenem Namen übernommen hat, erscheinen unter „andere“ (Autorenzuordnung nach Commit-Adresse).</li>
+<li><strong>Zeilen:</strong> rohe Zeilen einschließlich Kommentaren und Leerzeilen. Sie sagen nichts über Verhalten.</li>
+<li><strong>Skripte:</strong> <code>tools/code_share/</code>.</li>
+</ul>
+</details>
+"""
+    page, n_method = METHOD.subn(lambda m: method, page, count=1)
+    if not n_method:
+        print("note: no 'Methode der Zeilenbilanz' details block found, left out", file=sys.stderr)
     (d / "pr-history.html").write_text(page, encoding="utf-8")
 
+    # 5. index card
     idx = (d / "index.html").read_text(encoding="utf-8")
-    new = f"Mit Zeilenbilanz je PR und je Runde und der Frage, wie viel vom Original von Februar in {ver} noch steht: {round(100 * ORIG / NOW)} % der Kernfirmware, {round(100 * ORIG / BASE)} % der damaligen Zeilen.</p>"
-    idx, n_idx = re.subn(
-        r"Mit Zeilenbilanz je PR und je Runde[^<]*</p>", lambda m: new, idx, count=1
-    )
+    new = f"Mit Zeilenbilanz je PR und je Runde: {pc(100 * ORIG / NOW)} % der heutigen Kernfirmware sind unverändert das Original von Februar (Stand {stand}).</p>"
+    idx, n_idx = re.subn(r"Mit Zeilenbilanz je PR und je Runde[^<]*</p>", lambda m: new, idx, count=1)
     assert n_idx == 1, "index card sentence not found"
     (d / "index.html").write_text(idx, encoding="utf-8")
-    print(f"rows {n_rows}, rounds {len(rounds)}, PRs on page {merged_total}")
+    print(
+        f"rows {n_rows}, rounds {len(rounds)}, measured merged PRs {merged_measured}, "
+        f"after the measurement {len(late)}, stand {stand}"
+    )
 
 
 if __name__ == "__main__":
