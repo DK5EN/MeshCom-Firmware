@@ -16,6 +16,12 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **DK5EN-98 extended soak of `v4.40a.10.25` running** (started 2026-10-25 20:36, ends by itself 2026-10-29 18:00):
+  net console logger on rpizero in screen `soak98`, build `Oct 25 2026 / 15:54:42`, AU tag `v4.40a.10.25`, flags
+  `txcapture,loradebug` (restored at the end). Logs `~/meshlog/dk5en-98-soak-20261025/YYYY-MM-DD.log`, state in
+  `status.txt` there, screen output `~/meshlog/run-98-soak-20261025.out`. Console is single-client: `PAUSE` file to take
+  it over. **Open after 10-29 18:00:** check `status=finished: time elapsed`, reconnect count, gaps and reboots
+  (uptime resets), then evaluate (`/logauswertung`, all five day files) and record the verdict here.
 - **`v4.40a.10.25` released 2026-10-25** (CI, Latest, tag on `61077a8c`, after two cancelled cuts: SNF-ACK-01 and upstream
   #1237 came in): TXP-01 own text sent once, WIFI-HEAP-01 raw ICMP probe (TD-21/21b), TD-20/TD-22 T-Deck heap, TD-23
   backlight (fork PR #1), SNF-ACK-01 mailbox tombstone, upstream #1237 BLE app settings; pages rework (fork PR #2).
