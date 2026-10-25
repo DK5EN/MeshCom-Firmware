@@ -20,7 +20,7 @@ ein gemeinsames Aussehen ueber `assets/site.css`.** Ergebnis ist ein PR `docs/pa
 | Welle | Inhalt                                                                                                                                                | Status   |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | 0     | Skill `schreibstil`, `konzeptpapier` angepasst, `assets/site.css`, Branch                                                                             | erledigt |
-| 1     | A `meshcom-protocol.html`, B `mesh-roadmap.html`, C `main-loop-timing.html` + `Nachbarschaftsmatrix.html`, D `rm1-protokoll.html` + `pr-history.html` | offen    |
+| 1     | A `meshcom-protocol.html`, B `mesh-roadmap.html`, C `main-loop-timing.html` + `Nachbarschaftsmatrix.html`, D `rm1-protokoll.html` + `pr-history.html` | erledigt (`d58af699`) |
 | 2     | E `index.html` + `404.html` (Karten fassen die fertigen Seiten zusammen)                                                                              | offen    |
 | 3     | Sichtpruefung Chrome (hell/dunkel, Desktop/Handy), Deduktion, Linkcheck                                                                               | offen    |
 | 4     | Advisor (Fakten gegen Code), Nacharbeit, Commit, PR nach `fork-dev`                                                                                   | offen    |
@@ -35,6 +35,16 @@ ein gemeinsames Aussehen ueber `assets/site.css`.** Ergebnis ist ein PR `docs/pa
 | D            | `docs/presentation/rm1-protokoll.html`, `docs/presentation/pr-history.html`              | 1     |
 | E            | `docs/presentation/index.html`, `docs/presentation/404.html`                             | 2     |
 | Orchestrator | `docs/presentation/assets/site.css`, dieses Dokument                                     | alle  |
+
+## Befunde ausserhalb der Seiten (Welle 1, nicht angefasst)
+
+- `docs/rm1-commands.md` nennt 25 Befehle; der Code hat 26 (`blockcall`, `src/rm_commands.h`).
+- `release-notes.md`, Abschnitt "Upstream": #1213, #1214, #1224, #1233 stehen inzwischen im
+  offiziellen Tag `v4.40a.spserver`, nicht nur in `dev`.
+- `docs/commands-store-node.md`: `--storeslots 1..100`, der Code erlaubt hoechstens 50
+  (`src/msgstore_api.h:19`).
+- `docs/BACKLOG.md` (SNF-GW: STOR-Freigabe erledigt) widerspricht `docs/RESUME.md` und
+  `docs/fork-dev-vs-upstream-20261018.md` (Freigabe des Serverbetreibers noetig).
 
 ## Offen ausserhalb des PR
 

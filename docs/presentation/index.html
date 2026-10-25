@@ -3,204 +3,191 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MeshCom — Vorträge und Analysen (DK5EN)</title>
-<meta name="description" content="Präsentationen und Analyseseiten zur MeshCom-Firmware aus dem Fork von DK5EN.">
+<title>MeshCom-Fork von DK5EN: Firmware zum Flashen und sechs belegte Analysen</title>
+<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.10.24 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
 <style>
-:root{color-scheme:dark light;
-  --bg:#0f172a;--bg2:#151f36;--line:#2a3654;--fg:#e6ecff;--fg2:#9fb0cc;--fg3:#6f7f9c;
-  --acc:#6366f1;--acc2:#e879f9;--mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
-@media (prefers-color-scheme:light){:root{--bg:#fbfcfe;--bg2:#ffffff;--line:#dfe5f0;--fg:#111a2b;--fg2:#4a5a72;--fg3:#7a879c}}
-*{margin:0;padding:0;box-sizing:border-box}
-body{min-height:100vh;background:var(--bg);color:var(--fg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;padding:clamp(1.5rem,5vw,4rem) 1.5rem}
-main{max-width:860px;margin:0 auto}
-.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg3)}
-h1{font-size:clamp(1.7rem,4vw,2.5rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:.4rem 0 .8rem;
-  background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.lead{color:var(--fg2);max-width:62ch;margin-bottom:.9rem}
-.toc{color:var(--fg2);max-width:70ch;padding-left:1.1rem;margin-bottom:2.2rem}
-.toc li{margin:.25rem 0}
-.toc strong{color:var(--fg)}
-.toc a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--acc)}
-.cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.card{display:block;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
-a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
-.card h2{font-size:1.15rem;font-weight:600;margin:.15rem 0 .5rem;letter-spacing:-.01em}
-.card p{color:var(--fg2);font-size:.95rem}
-.card .meta{font-family:var(--mono);font-size:.74rem;color:var(--fg3);margin-top:.8rem}
-.card.wide{grid-column:1/-1;border-color:var(--acc)}
-.card p a,.card .meta a{color:var(--acc);text-decoration:underline;text-decoration-color:var(--acc)}
-.card .bluf{color:var(--fg);font-size:1rem;margin-bottom:1rem}
-.card .cols{display:grid;gap:1rem 1.6rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.card h3{font-family:var(--mono);font-size:.72rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);margin:0 0 .4rem}
-.card ul{color:var(--fg2);font-size:.95rem;padding-left:1.1rem}
-.card li{margin:.2rem 0}
-.card li ul{margin-top:.15rem}
-.card li strong{color:var(--fg)}
-.card .todo{border-left:3px solid var(--acc);padding-left:.9rem}
-.card details{margin-top:1rem;border-top:1px solid var(--line);padding-top:.7rem}
-.card summary{cursor:pointer;color:var(--fg2);font-size:.92rem}
-.card details h3{margin-top:.9rem}
-.foot{margin-top:2.6rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--fg2);font-size:.9rem}
-.foot a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--acc)}
-.foot .note{margin-top:.6rem;color:var(--fg3);font-size:.82rem;max-width:70ch}
+/* Seitenspezifisch: Versionsmarken in der Historie, Text im Warnkasten der Karte */
+.card h4{text-transform:none;letter-spacing:0;font-size:.85rem;margin:1rem 0 .3rem}
+.card .callout p,.card .callout ul{color:var(--fg);font-size:.95rem}
+.card .callout{max-width:none}
+.card details{background:transparent;margin:1rem 0 0}
+.card summary{font-size:.95rem}
+.card a:not(.card){color:var(--fg)}
 </style>
 </head>
 <body>
 <main>
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
-  <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
-  <p class="lead">Wie die MeshCom-Firmware funktioniert, was der Fork verbessert hat und wie man das aktuelle
-  Release v4.40a.10.24 flasht. Jede Aussage ist aus dem Quellcode oder aus GitHub belegt.</p>
-  <ul class="toc">
-    <li><strong>Firmware flashen:</strong> <a href="flash/">Web-Flasher</a> für 30 Boards, direkt aus dem Browser.</li>
-    <li><strong>Verstehen:</strong> <a href="meshcom-protocol.html">Vortrag zum Protokoll</a>, <a href="Nachbarschaftsmatrix.html">Nachbarschaftsmatrix</a>, <a href="rm1-protokoll.html">Fernsteuerung RM1</a>.</li>
-    <li><strong>Nachvollziehen:</strong> <a href="main-loop-timing.html">gemessene Verbesserungen der Hauptschleife</a>, <a href="pr-history.html">alle Pull Requests nach upstream</a>.</li>
-    <li><strong>Basis:</strong> offizielles 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update, Fernsteuerung per LoRa und Speichern-und-Weiterleiten über den Server.</li>
+  <h1>Fork-Firmware zum Flashen und sechs belegte Analysen dazu</h1>
+  <ul class="meta">
+    <li>Stand: 25.10.2026, Aussagen geprüft gegen den Quellcode von <code>fork-dev</code></li>
+    <li>Firmware: Release v4.40a.10.24 vom 24.10.2026</li>
+    <li>Quellen: Quellcode, Repo-Dokumente, GitHub-API; jede Seite nennt ihre Quellen am Ende</li>
+  </ul>
+
+  <div class="bluf">
+    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.10.24 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
+    <p class="reco">Wer ein T-Beam 1W oder ein T-Deck Pro betreibt, liest zuerst den Handlungsbedarf in der Release-Karte.</p>
+  </div>
+
+  <h2 style="margin-top:1.4rem;padding-top:0;border-top:0">Wer findet was</h2>
+  <ul class="keyfacts">
+    <li><strong>Firmware flashen:</strong> der <a href="flash/">Web-Flasher</a> für 30 Boards, direkt aus dem Browser.</li>
+    <li><strong>Verstehen (Betreiber):</strong> der <a href="meshcom-protocol.html">Vortrag zum Protokoll</a>, die <a href="Nachbarschaftsmatrix.html">Nachbarschaftsmatrix</a> und die <a href="mesh-roadmap.html">Roadmap des Sendepuffers</a>.</li>
+    <li><strong>Nachvollziehen (Entwickler, App-Bauer):</strong> die <a href="rm1-protokoll.html">Fernsteuerung RM1</a>, die <a href="main-loop-timing.html">gemessenen Verbesserungen der Hauptschleife</a> und <a href="pr-history.html">alle Pull Requests nach upstream</a>.</li>
+    <li><strong>Basis:</strong> das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update und Fernsteuerung per LoRa. Speichern-und-Weiterleiten über den Server ist in Release-Builds gesperrt.</li>
+    <li><strong>Belegt:</strong> jede Aussage kommt aus dem Quellcode oder aus GitHub. Was nicht geprüft ist, sagt die jeweilige Seite.</li>
   </ul>
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Neu · Release v4.40a.10.24</div>
-      <h2>Vier kleine Fixes: SP-Server, Wireless Tracker, T-Beam-Erststart, Fernsteuerung</h2>
-      <p class="bluf">v4.40a.10.24 ist v4.40a.10.23 plus vier kleine Fixes. Die Einstellungen bleiben erhalten.
-      Wer ein T-Deck Pro oder einen T-Beam 1W hat und noch nie per Web-Flasher geflasht hat, holt das nach.</p>
-      <ul>
-        <li><strong>SP-Server:</strong> Gateways mit Server-Code SP verbinden sich mit <code>sp.meshcom.pl</code> (gleiche Adresse, upstream #1236).</li>
-        <li><strong>Heltec Wireless Tracker:</strong> der Display-Puffer (25,6 KB) wird für jeden Update-Check freigegeben; Auto Update scheitert nicht mehr am Speicher (AU-21).</li>
-        <li><strong>T-Beam:</strong> ein frisch gelöschter T-Beam startet mit GPS an statt mit TRACK (TRK-03); bestehende Knoten behalten ihre Einstellung.</li>
-        <li><strong>Fernsteuerung:</strong> ein RM1-Kommando aus McApp, Konsole oder Web-GUI hört mit der Antwort des Ziels auf zu wiederholen.</li>
-      </ul>
-      <div class="cols">
-        <div class="todo">
-          <h3>Einmal per Web-Flasher flashen</h3>
-          <ul>
-            <li><strong>T-Deck Pro:</strong> bekommt erstmals eine Partitionstabelle mit Safeboot.</li>
-            <li><strong>T-Beam 1W:</strong> behebt den Safeboot-Hänger nach Auto Update (falscher DIO-Bootloader). Fix im Feld bestätigt. Bis dahin bleibt das Update über die Luft gesperrt.</li>
-          </ul>
-        </div>
+      <div class="eyebrow">Aktuelles Release · 24.10.2026</div>
+      <h2>v4.40a.10.24 ist v4.40a.10.23 plus vier kleine Fixes</h2>
+      <p><strong>Der SP-Server zieht um, der Wireless Tracker bekommt genug Speicher für Auto Update, ein frischer T-Beam startet mit GPS statt TRACK, und ein RM1-Befehl aus der App hört mit der Antwort auf zu wiederholen.</strong> Die Einstellungen bleiben erhalten.</p>
+      <div class="callout warn">
+        <p><strong>Handlungsbedarf: T-Beam 1W und T-Deck Pro</strong></p>
+        <ul>
+          <li><strong>T-Beam 1W:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.20 geschehen (ohne Löschen).
+            <ul>
+              <li>Der Flasher schreibt den QIO-Bootloader, der dem 1W fehlte. Ein Betreiber hat am 19.10.2026 bestätigt, dass ein 1W mit diesem Bootloader ein Auto Update abschließt.</li>
+              <li>Bis dahin bleiben Auto Update, <code>--ota-update</code> und die Safeboot-Update-Seite gesperrt.</li>
+              <li>Nicht über die Luft aktualisieren: ältere Firmware übergibt an Safeboot, und <strong>der Knoten verliert seine Einstellungen</strong>.</li>
+            </ul></li>
+          <li><strong>T-Deck Pro:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.21 geschehen (ohne Löschen).
+            <ul>
+              <li>Die alte Partitionstabelle hatte keinen Safeboot-Platz, deshalb überschrieb der Flasher die Anwendung und das Board startete nicht mehr.</li>
+              <li>Die neue Tabelle behält die Einstellungen; der SPIFFS-Bereich (interner Dateispeicher) wandert und wird beim ersten Start einmal formatiert.</li>
+            </ul></li>
+          <li><strong>Alle anderen:</strong> wie gewohnt aktualisieren (Web-Flasher, <code>.bin</code> per USB, <code>tools/webflash.py</code> oder Auto Update im Kanal <code>dev</code>).</li>
+        </ul>
       </div>
+      <h3>Kernfakten</h3>
+      <ul>
+        <li><strong>SP-Server:</strong> Gateways mit Server-Code SP verbinden sich mit <code>sp.meshcom.pl</code> (vorher <code>spmeshcom.dynalias.com</code>, beide lösen auf 146.59.232.234 auf). Upstream gemergt als #1236.</li>
+        <li><strong>Heltec Wireless Tracker:</strong> der Display-Puffer (25,6 KB) existiert nur noch bei eingeschaltetem Display und wird für jeden Update-Check freigegeben. Auto Update scheitert nicht mehr am Speicher (AU-21).</li>
+        <li><strong>T-Beam:</strong> ein frisch gelöschter T-Beam startet mit GPS an statt mit TRACK (TRK-03). Bestehende Knoten behalten ihre Einstellung; prüfen mit <code>--pos</code>.</li>
+        <li><strong>Fernsteuerung:</strong> ein RM1-Befehl aus McApp, Konsole oder Web-GUI hört mit der Antwort des Ziels auf zu wiederholen. Auf der Bench nicht gemessen, nur am Host getestet.</li>
+        <li><strong>Einstellungen:</strong> der Flash-Strukturstand bleibt <code>20260724</code>. Ausnahme: zehn feste Protokolleinstellungen werden beim ersten Start auf ihren Festwert gesetzt (seit v4.40a.10.19).</li>
+        <li><strong>Auto Update:</strong> der Modus ist immer <code>notify</code>, der Knoten meldet ein neues Release und installiert nichts von selbst. Der Kanal <code>dev</code> liest das Latest-Release dieses Forks.</li>
+        <li><strong>Build:</strong> von GitHub CI aus dem getaggten Commit gebaut, 66 Dateien. Nicht byte-gleich mit einem offiziellen Release.</li>
+      </ul>
       <details>
         <summary>Was seit v4.40a.10.16 dazukam</summary>
-        <h3>v4.40a.10.23</h3>
+        <h4>v4.40a.10.23</h4>
         <ul>
-          <li>Neue LoRa-Sendewarteschlange (Slot-Pool, Verfall je Priorität, keine Zeitbaken älter als 150 s), Rufzeichen-Sperrliste <code>--blockcall</code>, kein Absturz in der BLE-Pause des Update-Checks (AU-19) und acht weitere Stabilitätsfixes.</li>
+          <li><strong>Neue LoRa-Sendewarteschlange:</strong> ein Slot-Pool mit Verfall je Priorität; Zeitbaken, die älter als 150 s sind, werden nicht gesendet.</li>
+          <li><strong>Rufzeichen-Sperrliste:</strong> <code>--blockcall</code> (BLK-01).</li>
+          <li><strong>Kein Absturz</strong> in der BLE-Pause des Update-Checks (AU-19) und acht weitere Stabilitätsfixes.</li>
         </ul>
-        <h3>v4.40a.10.22</h3>
+        <h4>v4.40a.10.22</h4>
         <ul>
-          <li>Ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, upstream #1233); Server-Zeile SP (Polen) aus #1234.</li>
+          <li><strong>Server-Warnung:</strong> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, upstream #1233).</li>
+          <li><strong>Server-Zeile SP (Polen)</strong> aus upstream #1234.</li>
         </ul>
-        <h3>v4.40a.10.21</h3>
+        <h4>v4.40a.10.21</h4>
         <ul>
-          <li>Board-Kennung in jedem Image (<code>--id</code>), eindeutige Auswahl im Web-Flasher, „Aus dem Flash lesen“, Safeboot v3; Partitionstabelle für die T-Deck Pro.</li>
+          <li><strong>Board-Kennung</strong> in jedem Image (<code>--id</code>), eindeutige Auswahl im Web-Flasher, „Aus dem Flash lesen“, Safeboot v3.</li>
+          <li><strong>Partitionstabelle</strong> für das T-Deck Pro.</li>
         </ul>
-        <h3>v4.40a.10.20</h3>
+        <h4>v4.40a.10.20</h4>
         <ul>
           <li><strong>Kein Watchdog-Neustart durch langsame Browser:</strong> Web-Seiten laufen über einen begrenzten Sendepuffer; ein hängender Browser bekommt eine abgebrochene Seite.</li>
-          <li>Ohne IP-Adresse flutet „WEBServer stopped“ nicht mehr das Log.</li>
-          <li><code>--info</code> zeigt die NVS-Belegung.</li>
+          <li><strong>Ohne IP-Adresse</strong> flutet „WEBServer stopped“ nicht mehr das Log.</li>
+          <li><strong><code>--info</code></strong> zeigt die NVS-Belegung.</li>
         </ul>
-        <h3>v4.40a.10.19</h3>
+        <h4>v4.40a.10.19</h4>
         <ul>
           <li><strong>Volle LoRa-Warteschlange blockiert nicht mehr minutenlang:</strong>
             <ul>
               <li>lange wartende Frames bekommen nach einem Empfang eine kurze Haltezeit</li>
               <li>das Echo des eigenen Gruppentexts gibt dessen Kopie frei</li>
               <li>vom Server gespiegelte eigene Frames gehen nicht noch einmal auf LoRa</li>
-              <li>QRT endet, sobald weniger als 16 Frames warten</li>
+              <li>QRT (Sendestopp bei voller Warteschlange) endet, sobald weniger als 16 Frames warten</li>
             </ul>
           </li>
           <li><strong>Release-Builds halten zehn Protokoll-Einstellungen fest</strong>, darunter <code>--nbrrelay on</code>.</li>
           <li><strong>Auto Update</strong> kennt nur noch <code>notify</code>; ein Knopf auf der Info-Seite läuft vom Prüfen bis zum Neustart mit.</li>
-          <li>Klassische ESP32: mehr Heap beim Update-Check. nRF52: Board-LED. Die Nachbarseite löst den Watchdog nicht mehr aus.</li>
+          <li><strong>Weitere Änderungen:</strong> klassische ESP32 haben mehr Heap beim Update-Check, nRF52 bekommt die Board-LED, die Nachbarseite löst den Watchdog nicht mehr aus.</li>
         </ul>
-        <h3>v4.40a.10.18</h3>
+        <h4>v4.40a.10.18</h4>
         <ul>
-          <li>GPS-Positionsfilter auf ESP32-GPS-Boards.</li>
-          <li>Fixes an der Netzkonsole.</li>
-          <li><code>net</code> und <code>upd</code> per Fernsteuerung.</li>
+          <li><strong>GPS-Positionsfilter</strong> auf ESP32-GPS-Boards.</li>
+          <li><strong>Netzkonsole:</strong> Fixes.</li>
+          <li><strong>Fernsteuerung:</strong> <code>net</code> und <code>upd</code> per RM1.</li>
         </ul>
-        <h3>v4.40a.10.16 / .17</h3>
+        <h4>v4.40a.10.16 und .17</h4>
         <ul>
-          <li>Zentrale Server-Tabelle und <code>--setnet</code> (#1213), Antwort-Knopf auf der T-Deck (#1214). Beide seit 18.10. upstream gemerged.</li>
+          <li><strong>Zentrale Server-Tabelle</strong> und <code>--setnet</code> (#1213), Antwort-Knopf auf der T-Deck (#1214).</li>
+          <li><strong>Upstream:</strong> beide gemergt und im offiziellen Tag v4.40a.spserver (22.10.2026).</li>
         </ul>
-        <h3>Basis</h3>
+        <h4>Basis</h4>
         <ul>
-          <li>Offizielles v4.40a.hbserver plus die Fork-Funktionen aus #1187–#1189: Auto Update über GitHub, Speichern-und-Weiterleiten, HMAC-gesicherte Fernsteuerung per LoRa.</li>
+          <li><strong>Offizielles v4.40a.hbserver</strong> plus die Fork-Funktionen aus #1187 bis #1189: Auto Update über GitHub, Speichern-und-Weiterleiten über den Server (seit v4.40a.10.19 in Release-Builds gesperrt) und HMAC-gesicherte Fernsteuerung per LoRa (ab Werk aus).</li>
         </ul>
       </details>
-      <div class="meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">Release v4.40a.10.24</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie</a></div>
+      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">Release v4.40a.10.24</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
     </div>
+
     <a class="card" href="meshcom-protocol.html">
-      <div class="eyebrow">Vortrag · 27 Folien</div>
+      <div class="eyebrow">Vortrag · 28 Folien</div>
       <h2>Kein Routing, und genau das ist richtig</h2>
-      <p>Warum MeshCom flutet statt zu routen, wo es hakt (Overhead, Stau, Zustellung) und was seit 4.40a
-      gelöst ist: die Nachbarschaftsmatrix streicht redundante Relays, persönliche Nachrichten werden bis zur
-      Quittung wiederholt und von Store-Knoten aufgehoben, die Fernsteuerung ist signiert. Mit dem Abgleich
-      gegen die Anforderungen aus EMCOMM.</p>
-      <div class="meta">Firmware 4.40a · nachgeführt 19.10.2026 · Tasten: → ← U</div>
+      <p><strong>MeshCom flutet statt zu routen, und das ist auf einem geteilten LoRa-Kanal die richtige Wahl.</strong> Der Vortrag belegt Overhead, Stau und Zustellung mit Netzdaten.</p>
+      <p>Seit 4.40a streicht die Nachbarschaftsmatrix überflüssige Relays, und persönliche Nachrichten werden bis zur Quittung wiederholt. Der Sendepuffer ist ein Slot-Pool. Speichern-und-Weiterleiten ist in Release-Builds faktisch aus (<code>--stor</code> gesperrt). Dazu der Abgleich mit den Anforderungen aus EMCOMM (Notfunk).</p>
+      <div class="card-meta">Stand 25.10.2026 · Netzdaten 19.10.2026 · Tasten: → ← U</div>
     </a>
     <a class="card" href="mesh-roadmap.html">
-      <div class="eyebrow">Vortrag · 18 Folien · interaktiv</div>
-      <h2>Mesh-Roadmap: welche Frames gehören auf den Kanal?</h2>
-      <p>Diskussionsstand, nichts entschieden: der Kanal ist der Engpass, nicht der RAM. Mit Sendezeit-Rechner,
-      Hop-Modell und Hop-Cap, Review der QRT-Maßnahmen für Berg-Knoten und Stadt-Cluster, Slot-Pool statt Ring,
-      Dedup nach Zeit, Prioritätsmatrizen, <code>{CET}</code>, Multi-SF, Source Routing, EMCOMM-Signaturen,
-      Zellen und MPR-Wahl sowie dem Wellenplan W0 bis W9+ und den offenen Fragen.</p>
-      <div class="meta">Konzeptpapiere Teil A und B · 21.10.2026 · Tasten: → ← U</div>
+      <div class="eyebrow">Vortrag · 19 Folien · interaktiv</div>
+      <h2>Welche Frames gehören auf den Kanal?</h2>
+      <p><strong>Der Sendepuffer ist umgebaut, der Rest ist Konzept.</strong> Seit v4.40a.10.23 ausgeliefert: Slot-Pool, Verfall je Priorität, Altersgrenze 150 s für <code>{CET}</code>-Zeitbaken und das Ersetzen des Zwillings.</p>
+      <p>Konzept, nichts davon entschieden: Sendezeit-Rechner, Hop-Modell und Hop-Cap, Review der QRT-Maßnahmen, Dedup nach Zeit, Multi-SF, Source Routing, EMCOMM-Signaturen, Zellen, MPR-Wahl, Wellenplan W0 bis W9+ und offene Fragen.</p>
+      <div class="card-meta">Konzeptpapiere Teil A und B vom 21.10.2026 · Stand 25.10.2026 · Tasten: → ← U</div>
     </a>
     <a class="card" href="main-loop-timing.html">
       <div class="eyebrow">Analyse · interaktiv</div>
-      <h2>Wie der Main-Loop beschleunigt wurde</h2>
-      <p>Fünfzehn Stellen, an denen die Hauptschleife seit Firmware 4.35s schneller, stabiler und
-      robuster läuft. Jede Verbesserung gemessen, mit Quelle. Umschaltbar zwischen 4.35p und 4.35s.</p>
-      <div class="meta">Firmware 4.35s · PR #1115</div>
+      <h2>An fünfzehn Stellen steht die Hauptschleife nicht mehr still</h2>
+      <p><strong>Seit 4.35s blockiert die Hauptschleife an fünfzehn Stellen nicht mehr.</strong> Die größte Pause, bis zu 31 s Namensauflösung, läuft jetzt nebenher. Jede Verbesserung ist gemessen und mit Quelle belegt.</p>
+      <p>Umschaltbar zwischen 4.35n, 4.35p und 4.35s. Am 25.10.2026 gegen den Code geprüft.</p>
+      <div class="card-meta">Messungen August 2026 · PR #1115, upstream gemergt am 01.09.2026</div>
     </a>
     <a class="card" href="pr-history.html">
-      <div class="eyebrow">Historie · 57 gemergte Pull Requests</div>
-      <h2>Sieben Runden nach upstream: von 4.35m bis 4.40a</h2>
-      <p>Alle Beiträge dieses Forks an die offizielle Firmware seit 4.35m: Empfangslöcher im Februar, CAD im
-      März, Härtung und Ausbau im Sommer, Feldfixes gegen 4.35t, RAM-Arbeit, Safeboot-OTA und die
-      PN-Wiederholung (#1168), dann der große PR #1186: die Version 4.40a mit
-      Speichern-und-Weiterleiten und Nachbarschaftsmatrix, zuletzt Feldfixes, Web-GUI, die Server-Tabelle (#1213) und der Antwort-Knopf der T-Deck (#1214). Mit Zeilenbilanz je PR und je Runde und der Frage, wie viel vom Original von Februar in 4.40a noch steht: 40 % der Kernfirmware, 75 % der damaligen Zeilen.</p>
-      <div class="meta">22.02. – 18.10.2026 · GitHub-API</div>
+      <div class="eyebrow">Historie · 61 gemergte Pull Requests</div>
+      <h2>61 Pull Requests nach upstream gemergt, keiner mehr offen</h2>
+      <p><strong>Sieben Runden von 4.35m bis 4.40a.spserver, 22.02. bis 24.10.2026.</strong> Mit Zeilenbilanz je PR und je Runde: 39,8 % der heutigen Kernfirmware sind unverändert das Original von Februar (Stand 18.10.2026).</p>
+      <p>Im offiziellen Tag v4.40a.spserver stehen unter anderem #1213, #1214, #1224 und #1233.</p>
+      <div class="card-meta">GitHub-API, Stand 25.10.2026</div>
     </a>
     <a class="card" href="Nachbarschaftsmatrix.html">
-      <div class="eyebrow">Konzept · Stufe 1 umgesetzt</div>
-      <h2>Nachbarschaftsmatrix: Wer hört wen</h2>
-      <p>Jeder Frame trägt im Pfad einen Hörbeweis. Die Matrix wertet jedes Pfadpaar aus, hält je
-      Nachbar Zähler, Signalbericht und Letztzeit über 12 Stunden und beantwortet lokal, ob dieser
-      Knoten meshen soll. Mit den Entscheidungen zu den Anforderungen, der Web-Seite und dem
-      Serienkommando; Stufe 2 (Gateway-ACK-Zuordnung) zurückgestellt.</p>
-      <div class="meta">Stand 20.09.2026 · in 4.40a über PR #1186</div>
+      <div class="eyebrow">Konzept und Umsetzung · Stufe 1 in 4.40a</div>
+      <h2>Wer hört wen: Jeder Knoten weiß, ob sein Relay gebraucht wird</h2>
+      <p><strong>Jeder Knoten führt eine lokale Tabelle „wer hört wen“ über 12 Stunden und lässt Relays weg, die niemand braucht.</strong> Das Funkformat bleibt unverändert.</p>
+      <p>In Release-Builds ist <code>--nbrrelay</code> fest an. Die Gateway-ACK-Zuordnung (Stufe 2) ist zurückgestellt.</p>
+      <div class="card-meta">Konzept vom 20.09.2026 · Stand 25.10.2026 · in 4.40a über PR #1186</div>
     </a>
     <a class="card" href="rm1-protokoll.html">
       <div class="eyebrow">Protokoll · Fernsteuerung</div>
-      <h2>RM1: Fernsteuerung per LoRa mit HMAC</h2>
-      <p>Wie ein Knoten aus der Ferne Befehle annimmt, ohne dass sich jemand als ein anderes Rufzeichen ausgeben
-      kann: HMAC-SHA256 über Ziel, Absender, Zähler und Befehl, signierte Antworten, Schutz gegen Wiedereinspielen,
-      alles im Klartext. Mit Rechenbeispiel und den 25 erlaubten Befehlen.</p>
-      <div class="meta">Firmware 4.40a · für App-Entwickler</div>
+      <h2>RM1 steuert einen Knoten aus der Ferne, und nur mit dem richtigen Passwort</h2>
+      <p><strong>Jeder Befehl trägt eine 64-Bit-Signatur aus HMAC-SHA256, die Antwort ist ebenfalls signiert.</strong> 26 Befehle sind erlaubt, ab Werk ist RM1 aus.</p>
+      <p>Mit Rechenbeispiel, Wiedereinspielschutz und Hinweisen für App-Entwickler. Alles bleibt im Klartext lesbar.</p>
+      <div class="card-meta">Firmware 4.40a · Stand 25.10.2026 · für App-Entwickler</div>
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
-      <h2>Web-Flasher: 4.40a direkt aus dem Browser</h2>
-      <p>Das aktuelle Release per USB auf den Knoten – v4.40a.10.24 mit neuer Sendewarteschlange, Server-Tabelle, Auto Update,
-      Fernsteuerung per LoRa und dem Safeboot – ohne Installation und ohne esptool:
-      Bootloader, Partitionstabelle, Safeboot und Anwendung in einem Durchgang, das Board auf Wunsch
-      am Knoten erkannt oder aus dem Flash gelesen. Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge
-      und Opera auf dem Desktop.</p>
-      <div class="meta">v4.40a.10.24 · Web Serial</div>
+      <h2>Web-Flasher: v4.40a.10.24 direkt aus dem Browser</h2>
+      <p><strong>Das aktuelle Release per USB auf den Knoten, ohne Installation und ohne esptool.</strong> Bootloader, Partitionstabelle, Safeboot und Anwendung gehen in einem Durchgang; das Board wird am Knoten erkannt oder aus dem Flash gelesen.</p>
+      <p>Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge und Opera auf dem Desktop.</p>
+      <div class="card-meta">v4.40a.10.24 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
-    Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
+    <p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
     · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a> (24.10.2026)
-    · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a>
+    · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a></p>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
   </div>
