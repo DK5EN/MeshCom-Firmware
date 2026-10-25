@@ -30,6 +30,8 @@
 #include "tdeck_sdmap.h"
 #include "pos_persist.h"
 #include "msg_persist_policy.h"
+#include "msg_tab_policy.h"
+#include <esp_heap_caps.h>
 #include "event_functions.h"
 #include "dm_prefill.h"
 #include <lora_setchip.h>
@@ -184,12 +186,15 @@ struct MsgTabEntry
     String group;
     lv_obj_t *button;
     std::vector<MsgBubble> bubbles;
+    uint32_t last_activity = 0; // monotonic counter stamp (msg_tab_stamp), not millis
 };
 
 static std::vector<MsgTabEntry> msg_tab_entries;
 static lv_obj_t *msg_tab_bar = NULL;
 static lv_obj_t *msg_tab_hint_label = NULL;
 static int msg_active_tab_index = -1;
+static uint32_t msg_tab_activity_counter = 0;
+static uint32_t msg_tab_stamp(void) { return ++msg_tab_activity_counter; }
 static const size_t MSG_TAB_MAX_MESSAGES = 50;
 
 // Persistence for recent messages (keeps insertion order, excludes System messages)
@@ -280,7 +285,7 @@ static void msg_tabs_clear_all(void);
 static void msg_render_active_tab(void);
 static void msg_list_show_hint(const char *text);
 static void msg_list_append_bubble(const MsgBubble &bubble);
-static void msg_list_trim_view(void);
+static void msg_list_trim_view(size_t target = MSG_TAB_MAX_MESSAGES);
 
 struct HeaderEventData
 {
@@ -2704,6 +2709,21 @@ static void init_msg_tab_bar(lv_obj_t *parent)
     msg_tabs_update_hint();
 }
 
+// Mirror msg_active_tab_index into the LV_STATE_CHECKED state of the tab buttons.
+static void msg_tabs_refresh_checked(void)
+{
+    for(size_t i = 0; i < msg_tab_entries.size(); ++i)
+    {
+        if(msg_tab_entries[i].button == NULL)
+            continue;
+
+        if((int)i == msg_active_tab_index)
+            lv_obj_add_state(msg_tab_entries[i].button, LV_STATE_CHECKED);
+        else
+            lv_obj_clear_state(msg_tab_entries[i].button, LV_STATE_CHECKED);
+    }
+}
+
 static void msg_tabs_select_index(int index)
 {
     if(msg_tab_entries.empty())
@@ -2717,18 +2737,7 @@ static void msg_tabs_select_index(int index)
         index = 0;
 
     msg_active_tab_index = index;
-
-    for(size_t i = 0; i < msg_tab_entries.size(); ++i)
-    {
-        if(msg_tab_entries[i].button == NULL)
-            continue;
-
-        if((int)i == msg_active_tab_index)
-            lv_obj_add_state(msg_tab_entries[i].button, LV_STATE_CHECKED);
-        else
-            lv_obj_clear_state(msg_tab_entries[i].button, LV_STATE_CHECKED);
-    }
-
+    msg_tabs_refresh_checked();
     msg_render_active_tab();
 }
 
@@ -2751,18 +2760,23 @@ static void msg_flush_timer_cb(lv_timer_t *t)
 // gerade offenen Tabs unbegrenzt (2 760 B PSRAM pro Nachricht, tdeck-baseline
 // Run 2). lv_obj_del() loest LV_EVENT_DELETE aus, das HeaderEventData und
 // DeleteEventData der Bubble freigibt.
-static void msg_list_trim_view(void)
+//
+// TD-22: `target` lets the heap trim shrink the view by exactly the bubbles it
+// dropped from the active tab (oldest first) instead of re-rendering. A hint
+// label (never a bubble) is skipped and kept.
+static void msg_list_trim_view(size_t target)
 {
     if(msg_list == NULL)
         return;
 
-    while(lv_obj_get_child_cnt(msg_list) > MSG_TAB_MAX_MESSAGES)
+    size_t excess = msg_view_excess(lv_obj_get_child_cnt(msg_list), msg_list_hint_label != NULL, target);
+    while(excess-- > 0)
     {
         lv_obj_t *oldest = lv_obj_get_child(msg_list, 0);
+        if(oldest != NULL && oldest == msg_list_hint_label)
+            oldest = lv_obj_get_child(msg_list, 1);
         if(oldest == NULL)
             break;
-        if(oldest == msg_list_hint_label)
-            msg_list_hint_label = NULL;
         lv_obj_del(oldest);
     }
 }
@@ -2791,6 +2805,70 @@ static MsgTabEntry *msg_tabs_find_entry(const String &group, int *index_out)
     return NULL;
 }
 
+// Remove tab k (button + entry) and fix the active index, the CHECKED state of the
+// remaining buttons and the hint. Does NOT render: callers that need the view
+// refreshed (bubble delete) do so themselves after their last read of event data;
+// eviction/trim only remove inactive tabs, so the view stays valid. Does not touch
+// persisted_msgs (callers may be iterating it); only the user delete path prunes it.
+static void msg_tabs_remove_index(size_t k)
+{
+    if(k >= msg_tab_entries.size())
+        return;
+
+    if(msg_tab_entries[k].button != NULL)
+    {
+        lv_obj_del(msg_tab_entries[k].button);
+        msg_tab_entries[k].button = NULL;
+    }
+    msg_tab_entries.erase(msg_tab_entries.begin() + k);
+    msg_active_tab_index = msg_tab_index_after_erase(msg_active_tab_index, k, msg_tab_entries.size());
+    msg_tabs_refresh_checked();
+    msg_tabs_update_hint();
+}
+
+// TD-22: while internal free heap is below MSG_HEAP_FLOOR, drop the oldest bubble
+// of the least-recently-active tab. Invalidates entry pointers and tab indices.
+// Never renders: trimming the active tab deletes the same number of oldest view
+// children (view mirrors the active tab 1:1, see msg_list_trim_view). Skipped
+// while loading from file (callers iterate persisted_msgs and the view is not
+// kept in sync during a load).
+static void msg_tabs_heap_trim(void)
+{
+    if(loading_messages_from_file)
+        return;
+
+    int trimmed = 0;
+    bool active_trimmed = false;
+    while(trimmed < 25 && heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) < MSG_HEAP_FLOOR)
+    {
+        size_t counts[32];
+        uint32_t stamps[32];
+        size_t n = msg_tab_entries.size() < 32 ? msg_tab_entries.size() : 32;
+        for(size_t i = 0; i < n; ++i)
+        {
+            counts[i] = msg_tab_entries[i].bubbles.size();
+            stamps[i] = msg_tab_entries[i].last_activity;
+        }
+        size_t k = msg_tab_pick_trim(counts, stamps, n, msg_active_tab_index, MSG_ACTIVE_MIN_KEEP);
+        if(k == MSG_TAB_NPOS)
+            break;
+        std::vector<MsgBubble> &b = msg_tab_entries[k].bubbles;
+        b.erase(b.begin());
+        trimmed++;
+        if((int)k == msg_active_tab_index)
+            active_trimmed = true;
+        else if(b.empty())
+            msg_tabs_remove_index(k);
+    }
+    if(trimmed > 0)
+    {
+        Serial.printf("[TDECK];tab;trim;n;%d;ifree;%u\n", trimmed,
+                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        if(active_trimmed && msg_active_tab_index >= 0 && msg_active_tab_index < (int)msg_tab_entries.size())
+            msg_list_trim_view(msg_tab_entries[msg_active_tab_index].bubbles.size());
+    }
+}
+
 static void msg_tab_button_event_cb(lv_event_t * e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED)
@@ -2801,6 +2879,8 @@ static void msg_tab_button_event_cb(lv_event_t * e)
     {
         if(msg_tab_entries[i].button == btn)
         {
+            // a tab the user just opened is not the next eviction/trim victim
+            msg_tab_entries[i].last_activity = msg_tab_stamp();
             msg_tabs_select_index(static_cast<int>(i));
             break;
         }
@@ -2816,8 +2896,24 @@ static MsgTabEntry *msg_tabs_get_or_create_entry(const String &group, int *index
     if(msg_tab_bar == NULL)
         return NULL;
 
+    if(msg_tab_entries.size() >= MSG_TAB_MAX_TABS)
+    {
+        std::vector<uint32_t> stamps;
+        stamps.reserve(msg_tab_entries.size());
+        for(const MsgTabEntry &e : msg_tab_entries)
+            stamps.push_back(e.last_activity);
+        size_t victim = msg_tab_pick_victim(stamps.data(), stamps.size(), msg_active_tab_index, MSG_TAB_MAX_TABS);
+        if(victim != MSG_TAB_NPOS)
+        {
+            Serial.printf("[TDECK];tab;evict;%s;bubbles;%u\n", msg_tab_entries[victim].group.c_str(),
+                          (unsigned)msg_tab_entries[victim].bubbles.size());
+            msg_tabs_remove_index(victim);
+        }
+    }
+
     MsgTabEntry new_entry;
     new_entry.group = group;
+    new_entry.last_activity = msg_tab_stamp();
     new_entry.button = lv_btn_create(msg_tab_bar);
 
     lv_obj_set_style_bg_color(new_entry.button, lv_palette_lighten(LV_PALETTE_BLUE, 3), LV_PART_MAIN);
@@ -2944,6 +3040,8 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
     if(entry == NULL)
         return;
 
+    entry->last_activity = msg_tab_stamp();
+
     // Check if we can merge with the last bubble (System messages only)
     if (bubble.type == MsgBubbleType::System && !entry->bubbles.empty())
     {
@@ -2952,6 +3050,11 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
         {
             // Merge bodies
             last.body += "\n" + bubble.body;
+            // bound the merged body: keep the last MSG_SYSTEM_BODY_MAX characters
+            size_t keep_from = msg_utf8_align(last.body.c_str(), last.body.length(),
+                                              msg_system_body_keep_from(last.body.length()));
+            if(keep_from > 0)
+                last.body = last.body.substring(keep_from);
             // Update status to latest
             last.gps = bubble.gps;
             last.sd = bubble.sd;
@@ -2987,6 +3090,7 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
                     }
                 }
             }
+            msg_tabs_heap_trim(); // `entry`, `last` are stale after this call
             return; // Done, merged
         }
     }
@@ -3058,6 +3162,9 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
             msg_tabs_select_index(index);
         }
     }
+
+    // `entry` and `index` are stale after this call
+    msg_tabs_heap_trim();
 }
 
 static void msg_render_active_tab(void)
@@ -3438,18 +3545,7 @@ static void bubble_delete_event_cb(lv_event_t * e)
                 {
                     // remove button and erase entry
                     if(idx >= 0 && idx < (int)msg_tab_entries.size())
-                    {
-                        if(msg_tab_entries[idx].button != NULL)
-                        {
-                            lv_obj_del(msg_tab_entries[idx].button);
-                            msg_tab_entries[idx].button = NULL;
-                        }
-                        msg_tab_entries.erase(msg_tab_entries.begin() + idx);
-                        // adjust active index
-                        if(msg_active_tab_index >= (int)msg_tab_entries.size())
-                            msg_active_tab_index = (int)msg_tab_entries.size() - 1;
-                        msg_tabs_update_hint();
-                    }
+                        msg_tabs_remove_index((size_t)idx);
                 }
 
                 break;
@@ -3473,13 +3569,9 @@ static void bubble_delete_event_cb(lv_event_t * e)
     // Save immediately to reflect deletion
     save_persisted_messages();
 
-    // Re-render the active tab so the UI updates
-    if(msg_active_tab_index >= 0)
-    {
-        if(msg_active_tab_index >= (int)msg_tab_entries.size())
-            msg_active_tab_index = (int)msg_tab_entries.size() - 1;
-        msg_render_active_tab();
-    }
+    // Re-render the active tab so the UI updates. Must stay the LAST statement:
+    // it deletes this bubble's button, which frees `data` (LV_EVENT_DELETE).
+    msg_tabs_select_index(msg_active_tab_index);
 }
 
 static void msg_tabs_clear_all(void)

@@ -2397,6 +2397,7 @@
    "test_tile_cache",
    "test_pos_persist",
    "test_tdeck_msg_persist",
+   "test_tdeck_msg_tabs",
    "test_wifi_liveness",
    "test_drift_dr16_gates",
    "test_extudp_target",
