@@ -125,6 +125,7 @@ extern TinyGPSPlus gps;
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
 #include <t-deck/tdeck_debug.h>
+#include <t-deck/tdeck_helpers.h>   // TD-23: --bl
 #include <SD.h>
 #include <esp32/esp32_audio.h>
 #ifdef HEAP_TEST
@@ -1547,6 +1548,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--persiststat           NVS-only values\n");
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             printdeb("--keylock on/off        SYM+K lock\n");
+            printdeb("--bl                    backlight state\n--bl auto on/off        day/night switch\n--bl day|night 1-16     saved level\n");
             #endif
             #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
             printdeb("--board led on/off      board LED\n");
@@ -5745,14 +5747,17 @@ void commandAction(char *umsg_text, bool ble)
                       meshcom_settings.node_immediate_save ? 1 : 0,
                       meshcom_settings.node_mute ? 1 : 0);
 
-        Serial.printf("[PERSIST];ui;kblock;%d;bllock;%d;kllock;%d;kblsync;%d;map;%d;modus;%d;wifion;%d\n",
+        Serial.printf("[PERSIST];ui;kblock;%d;bllock;%d;kllock;%d;kblsync;%d;map;%d;modus;%d;wifion;%d;blday;%d;blnight;%d;blauto;%d\n",
                       meshcom_settings.node_keyboardlock ? 1 : 0,
                       meshcom_settings.node_backlightlock ? 1 : 0,
                       meshcom_settings.node_kbllightlock ? 1 : 0,
                       meshcom_settings.node_kbl_sync ? 1 : 0,
                       meshcom_settings.node_map,
                       meshcom_settings.node_modus,
-                      meshcom_settings.node_wifion ? 1 : 0);
+                      meshcom_settings.node_wifion ? 1 : 0,
+                      meshcom_settings.node_bl_day,
+                      meshcom_settings.node_bl_night,
+                      meshcom_settings.node_bl_auto ? 1 : 0);
 
         // One path per line: these are free-text char[128] and a ';' inside a
         // path would otherwise split a field of the line above.
@@ -5822,6 +5827,41 @@ void commandAction(char *umsg_text, bool ble)
         meshcom_settings.node_immediate_save = (commandCheck(msg_text+2, (char*)"immediatesave on") == 0);
         save_settings();
         Serial.printf("[PERSIST];immediate;%d\n", meshcom_settings.node_immediate_save ? 1 : 0);
+        return;
+    }
+    else
+    // TD-23: saved backlight levels and the auto day/night switch. Every form
+    // answers with the [TFT];bl state line; a change is saved and applied at once.
+    // The bare "bl" comes last: an exact token also matches "bl <argument>".
+    if(commandCheck(msg_text+2, (char*)"bl auto on") == 0 ||
+       commandCheck(msg_text+2, (char*)"bl auto off") == 0)
+    {
+        meshcom_settings.node_bl_auto = (commandCheck(msg_text+2, (char*)"bl auto on") == 0);
+        save_settings();
+        brightnessTick(true);
+        tdeck_refresh_SET_view();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"bl day ") == 0 ||
+       commandCheck(msg_text+2, (char*)"bl night ") == 0)
+    {
+        const bool night = (commandCheck(msg_text+2, (char*)"bl night ") == 0);
+        int seen = 0;
+        int *dest = night ? &meshcom_settings.node_bl_night : &meshcom_settings.node_bl_day;
+        if(cmdStoreInt(msg_text + (night ? 11 : 9), dest, 1, 16, &seen) != CMD_SET_OK)
+        {
+            Serial.printf("[TFT];bl;error;level;%d;range;1-16\n", seen);
+            return;
+        }
+        save_settings();
+        brightnessTick(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"bl") == 0)
+    {
+        brightnessLogState("show");
         return;
     }
     #endif

@@ -224,6 +224,9 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_audio_msg": PERSIST,
     "node_audio_start": PERSIST,
     "node_backlightlock": PERSIST,
+    "node_bl_auto": PERSIST,
+    "node_bl_day": PERSIST,
+    "node_bl_night": PERSIST,
     "node_button_pin": PERSIST,
     "node_bw": PERSIST,
     "node_call": PERSIST,
@@ -361,14 +364,15 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 153, (
+assert len(FIELD_CLASSIFICATION) == 156, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"153 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"156 -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "
     f"node_stor (2026-10-04, SNF-D7 / #1188) and node_rm (2026-10-05, RM-06 / #1189) and node_autoupd/node_updchan "
-    f"(2026-10-05, AU-03 / #1187) and node_rmstrict (2026-10-10, BF-01) and node_gwrf/node_gwrc (gateway registration)")
+    f"(2026-10-05, AU-03 / #1187) and node_rmstrict (2026-10-10, BF-01) and node_gwrf/node_gwrc (gateway registration) "
+    f"and node_bl_day/node_bl_night/node_bl_auto (2026-10-25, TD-23)")
 
 # ---------------------------------------------------------------------------
 # EXCLUDED_FROM_SCHEMA -- see the module docstring's "EXCLUDED_FROM_SCHEMA"

@@ -297,6 +297,33 @@ static void test_boot_nbrrelay_on_in_production(void)
     TEST_ASSERT_EQUAL_HEX(0x3B00, s.node_sset4);
 }
 
+/* TD-23: T-Deck backlight levels; 0 (panel off) and 17 are reset to the default */
+static void test_backlight_level(void)
+{
+    int v = 0;
+    TEST_ASSERT_TRUE(sanitize_backlight_level(v, 16, "node_bl_day", capture_log));
+    TEST_ASSERT_EQUAL_INT(16, v);
+    TEST_ASSERT_EQUAL_STRING("node_bl_day", g_last_field);
+
+    v = 17;
+    TEST_ASSERT_TRUE(sanitize_backlight_level(v, 4, "node_bl_night", capture_log));
+    TEST_ASSERT_EQUAL_INT(4, v);
+
+    v = -3;
+    TEST_ASSERT_TRUE(sanitize_backlight_level(v, 4, "node_bl_night", capture_log));
+    TEST_ASSERT_EQUAL_INT(4, v);
+    TEST_ASSERT_EQUAL_INT(3, g_log_calls);
+
+    const int ok[] = {1, 2, 8, 16};
+    for (unsigned i = 0; i < 4; i++)
+    {
+        v = ok[i];
+        TEST_ASSERT_FALSE(sanitize_backlight_level(v, 4, "node_bl_night", capture_log));
+        TEST_ASSERT_EQUAL_INT(ok[i], v);
+    }
+    TEST_ASSERT_EQUAL_INT(3, g_log_calls);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -316,5 +343,6 @@ int main(int, char **)
     RUN_TEST(test_maxv_plausible_werte_bleiben);
     RUN_TEST(test_maxv_grenze_null_und_nan);
     RUN_TEST(test_boot_nbrrelay_on_in_production);
+    RUN_TEST(test_backlight_level);
     return UNITY_END();
 }
