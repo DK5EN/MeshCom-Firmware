@@ -354,6 +354,54 @@ void instrument_report_heap(const char *tag)
 #endif
 }
 
+void instrument_heapeat(uint32_t kb)
+{
+#if defined(ESP32)
+    static void   **s_eat = NULL;      /* pointer table, PSRAM when present */
+    static uint32_t s_eat_n = 0;       /* chunks held */
+    static uint32_t s_eat_cap = 0;     /* table capacity */
+    if(kb == 0)
+    {
+        for(uint32_t i = 0; i < s_eat_n; i++)
+            heap_caps_free(s_eat[i]);
+        s_eat_n = 0;
+    }
+    else
+    {
+        uint32_t want = s_eat_n + kb * 4;      /* 4 chunks of 256 B per KB */
+        if(want > s_eat_cap)
+        {
+            void **nt = (void **)heap_caps_malloc(want * sizeof(void *), MALLOC_CAP_SPIRAM);
+            if(nt == NULL)
+                nt = (void **)heap_caps_malloc(want * sizeof(void *), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            if(nt == NULL)
+            {
+                printfdeb("[INSTR-HEAPEAT];table_alloc_failed\n");
+                return;
+            }
+            if(s_eat_n)
+                memcpy(nt, s_eat, s_eat_n * sizeof(void *));
+            if(s_eat)
+                heap_caps_free(s_eat);
+            s_eat = nt;
+            s_eat_cap = want;
+        }
+        for(uint32_t i = 0; i < kb * 4; i++)
+        {
+            void *p = heap_caps_malloc(256, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            if(p == NULL)
+                break;
+            s_eat[s_eat_n++] = p;
+        }
+    }
+    printfdeb("[INSTR-HEAPEAT];held_kb;%u;ifree;%u\n", (unsigned)(s_eat_n / 4),
+              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+#else
+    (void)kb;
+    printfdeb("[INSTR-HEAPEAT];not_available_on_this_board\n");
+#endif
+}
+
 void instrument_report_timing(void)
 {
     uint32_t flush_avg = (s_flush_n > 0) ? (uint32_t)(s_flush_us / s_flush_n) : 0;

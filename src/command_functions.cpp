@@ -5843,6 +5843,13 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // --heapeat <kb>: hold <kb> KB of internal heap in 256 B chunks (0 = free). Before "heap" (prefix match).
+    if(commandCheck(msg_text+2, (char*)"heapeat ") == 0)
+    {
+        instrument_heapeat((uint32_t)atoi(msg_text + 10));
+        return;
+    }
+    else
     // --wifips none|min|max: esp_wifi_set_ps(), prints [INSTR-WIFIPS]
     if(commandCheck(msg_text+2, (char*)"wifips ") == 0)
     {

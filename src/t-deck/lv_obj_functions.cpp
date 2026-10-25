@@ -29,6 +29,7 @@
 #include <SPI.h>
 #include "tdeck_sdmap.h"
 #include "pos_persist.h"
+#include "msg_persist_policy.h"
 #include "event_functions.h"
 #include "dm_prefill.h"
 #include <lora_setchip.h>
@@ -192,6 +193,8 @@ static int msg_active_tab_index = -1;
 static const size_t MSG_TAB_MAX_MESSAGES = 50;
 
 // Persistence for recent messages (keeps insertion order, excludes System messages)
+// TD-20: RAM-only staging for /messages.json; without T_DECK_SPIFFS nothing reads it,
+// so msg_persist_stage() leaves it empty (it used to cost ~220 B internal heap per message).
 static std::vector<std::pair<String, MsgBubble>> persisted_msgs;
 static bool loading_messages_from_file = false;
 static const size_t PERSISTED_MSG_LIMIT = 1000;
@@ -2999,12 +3002,10 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
             // Log to SD card immediately (append)
             log_message_to_sd(normalized, bubble);
 
-            persisted_msgs.push_back(std::make_pair(normalized, bubble));
-            if(persisted_msgs.size() > PERSISTED_MSG_LIMIT)
-            {
-                size_t overflow = persisted_msgs.size() - PERSISTED_MSG_LIMIT;
-                persisted_msgs.erase(persisted_msgs.begin(), persisted_msgs.begin() + overflow);
-            }
+            // TD-20: stages only when T_DECK_SPIFFS gives it a reader (no String copies otherwise)
+            if(TDECK_MSG_PERSIST)
+                msg_persist_stage(persisted_msgs, std::make_pair(normalized, bubble),
+                                  PERSISTED_MSG_LIMIT, true);
 
             // If configured to immediate save, write to flash now. Otherwise
             // buffer in RAM and flush periodically to reduce flash wear.

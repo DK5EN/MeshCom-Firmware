@@ -62,6 +62,9 @@ String grc_ids;
 #include <WiFiClient.h>
 #include "esp_wifi.h"
 #include <ESP32Ping.h>
+#include "ping/ping_sock.h"
+#include "lwip/ip_addr.h"
+#include "wifi_liveness.h"
 #include <Preferences.h>
 #include "esp32/netif_mtu.h"
 #include "gw_servers.h"
@@ -896,6 +899,209 @@ void wifiLinkHeartbeat()
   wifiLinkLog("link");
 }
 
+// TD-21: IP-Liveness. WL_CONNECTED sagt nichts ueber den IP-Pfad (Heap-Starvation
+// legt ihn lahm, die Assoziation bleibt). Alle 30 s eine Runde ICMP-Echo (3x) an
+// das Gateway. Die Session wird einmal angelegt (neu nur bei anderer Gateway-IP),
+// damit ein ausgehungerter Heap keinen neuen Task allozieren muss. Nie blockierend:
+// eine Runde wird in einem Aufruf gestartet, im naechsten ausgelesen.
+static constexpr uint32_t WIFI_PING_COUNT = 3;
+// Der Ping-Task der Session wird einmal angelegt und dauerhaft gehalten
+// (nie freigegeben ausser bei Gateway-Wechsel): Stack explizit, IDF-Default
+// ist 2048, hier etwas Reserve.
+static constexpr uint32_t WIFI_PING_TASK_STACK = 3072;
+static esp_ping_handle_t s_pingH = NULL;
+static uint32_t s_pingGw = 0;
+static volatile bool s_pingPending = false;  // Runde gestartet, noch nicht ausgewertet
+static int s_pingPendingChecks = 0;          // Checks, in denen die Runde pending war
+static bool s_pingNewFailLogged = false;
+static volatile int s_pingReplies = -1;     // gesetzt von on_ping_end
+static volatile bool s_pingBusy = false;    // Ping-Task in einer Runde (on_ping_end loescht)
+static volatile bool s_pingStuck = false;   // Runde als tot erklaert, Task haengt noch darin
+static uint8_t s_pingIdleBusyChecks = 0;     // Sicherheitsventil, siehe wifiPingCollect
+static wifi_liveness::State s_liveness;
+static uint32_t s_livenessFailRounds = 0;
+static bool s_livenessSelfReconnect = false;
+
+static void wifiPingEnd(esp_ping_handle_t hdl, void *args)
+{
+  (void)args;
+  if(hdl != s_pingH)
+    return;                  // aufgegebene Session (haengender Task wacht spaet auf)
+  s_pingBusy = false;        // der Ping-Task hat die Runde verlassen (auch nach stop)
+  s_pingStuck = false;
+  // Verspaetetes on_ping_end einer abgebrochenen Runde (pending schon geloescht)
+  // darf die naechste Runde nicht verfaelschen.
+  if(!s_pingPending)
+    return;
+  uint32_t rep = 0;
+  // Der Ping-Task nullt die Zaehler, wenn er eine neue Runde annimmt (IDF 4.4):
+  // REPLY gilt direkt je Runde.
+  esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &rep, sizeof(rep));
+  s_pingReplies = (int)rep;
+}
+
+// Laufende Runde abbrechen; naechster Check startet eine frische Runde.
+static void wifiPingAbortRound()
+{
+  if(s_pingPending && s_pingH)
+    esp_ping_stop(s_pingH);
+  s_pingPending = false;
+  s_pingPendingChecks = 0;
+  s_pingReplies = -1;
+}
+
+// Session wegen Gateway-Wechsel loswerden. Solange der Ping-Task in einer Runde
+// steckt (s_pingBusy, erst on_ping_end loescht es), wird nur gestoppt und nicht
+// geloescht: vTaskDelete auf einen Task, der in lwIP wartet, waere use-after-free.
+// Gilt die Runde als tot (haengt in lwIP), wird die Session aufgegeben statt
+// geloescht (bewusstes Leck, nur bei Gateway-Wechsel im Haenger).
+// Rueckgabe true = Session ist weg.
+static bool wifiPingDrop()
+{
+  if(s_pingH)
+  {
+    if(s_pingBusy)
+    {
+      if(!s_pingStuck)
+      {
+        esp_ping_stop(s_pingH);   // idempotent; Handle bleibt bis zum Rundenende
+        return false;
+      }
+      s_pingH = NULL;             // haengender Task: aufgeben, nicht loeschen
+    }
+    else
+    {
+      esp_ping_stop(s_pingH);
+      esp_ping_delete_session(s_pingH);
+      s_pingH = NULL;
+    }
+  }
+  s_pingBusy = false;
+  s_pingStuck = false;
+  s_pingGw = 0;
+  s_pingPending = false;
+  s_pingPendingChecks = 0;
+  s_pingReplies = -1;
+  return true;
+}
+
+// Ergebnis der letzten Runde abholen (startet keine neue, siehe wifiPingStart):
+// -1 kein Ergebnis/keine Probe, 0 Runde ohne Antwort, 1 ok
+static int wifiPingCollect()
+{
+  uint32_t gw = (uint32_t)WiFi.gatewayIP();
+  if(gw == 0)
+    return -1;
+
+  int result = -1;
+  if(s_pingPending && s_pingH && gw == s_pingGw)
+  {
+    // Haengende Runde (on_ping_end kommt nie, z.B. tcpip-Thread blockiert) gilt
+    // beim 2. Check nach dem Start als Fehlschlag; sonst eskaliert nie etwas.
+    wifi_liveness::Probe pr = wifi_liveness::probe_eval(true, s_pingReplies, s_pingPendingChecks);
+    if(!pr.done)
+      return -1;            // Runde laeuft noch: weder ok noch Fehler
+    if(pr.stuck)
+    {
+      s_pingStuck = s_pingBusy;   // Task steckt noch in der Runde
+      esp_ping_stop(s_pingH);
+    }
+    result = pr.result;
+    s_pingPending = false;
+  }
+  else if(s_pingStuck && s_pingBusy && s_pingH && gw == s_pingGw)
+  {
+    // Task haengt weiter in der toten Runde: keine neue Runde moeglich, jeder
+    // Check zaehlt als Fehlschlag, damit die Eskalation weiterlaeuft.
+    result = 0;
+  }
+  if(!s_pingPending && s_pingBusy && !s_pingStuck)
+  {
+    // Abgebrochene Runde ohne on_ping_end: nach 2 Checks nicht mehr als busy
+    // werten, sonst startet nie wieder eine Runde.
+    if(++s_pingIdleBusyChecks >= 2)
+    {
+      s_pingIdleBusyChecks = 0;
+      s_pingBusy = false;
+    }
+  }
+  else
+    s_pingIdleBusyChecks = 0;
+
+  if(s_pingH && gw != s_pingGw)
+  {
+    // Neues Gateway: bisheriger Armed-Zustand gilt nicht, es muss erst selbst
+    // ICMP beantworten, bevor irgendetwas eskalieren kann.
+    s_liveness = wifi_liveness::State();
+    s_livenessFailRounds = 0;
+    if(!wifiPingDrop())
+      return -1;            // alte Runde noch nicht beendet: Session bleibt vorerst
+    result = -1;
+  }
+
+  if(!s_pingH)
+  {
+    esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
+    ip_addr_t target;
+    IP_ADDR4(&target, gw & 0xFF, (gw >> 8) & 0xFF, (gw >> 16) & 0xFF, (gw >> 24) & 0xFF);
+    cfg.target_addr = target;
+    cfg.count = WIFI_PING_COUNT;
+    cfg.interval_ms = 1000;
+    cfg.timeout_ms = 1000;
+    cfg.task_stack_size = WIFI_PING_TASK_STACK;
+    esp_ping_callbacks_t cbs;
+    memset(&cbs, 0, sizeof(cbs));
+    cbs.on_ping_end = wifiPingEnd;
+    if(esp_ping_new_session(&cfg, &cbs, &s_pingH) != ESP_OK)
+    {
+      s_pingH = NULL;
+      if(!s_pingNewFailLogged)
+      {
+        s_pingNewFailLogged = true;
+        Serial.printf("[WIFI];probe;session_failed;ms;%lu\n", (unsigned long)millis());
+      }
+      return -1;
+    }
+    s_pingGw = gw;
+    s_pingPending = false;
+    s_pingPendingChecks = 0;
+    s_pingReplies = -1;
+  }
+  return result;
+}
+
+// Neue Runde erst starten, nachdem step() entschieden hat (keine Aktion): sonst
+// bricht RECONNECT/RESET eine gerade gestartete Runde ab, deren Task noch in
+// lwIP steckt.
+static void wifiPingStart()
+{
+  if(!s_pingH || s_pingPending || s_pingBusy)
+    return;
+  s_pingReplies = -1;
+  s_pingPendingChecks = 0;
+  s_pingPending = true;      // vor dem Start: on_ping_end darf nicht verworfen werden
+  s_pingBusy = true;
+  s_pingStuck = false;       // ein Task, der eine neue Runde annimmt, haengt nicht
+  if(esp_ping_start(s_pingH) != ESP_OK)
+  {
+    s_pingPending = false;
+    s_pingBusy = false;
+  }
+}
+
+// Link weg: Zustand entwaffnen, laufende Runde abbrechen
+static void wifiLivenessLinkDown()
+{
+  // Eigener Reconnect (RECONNECT): Zustand behalten, sonst eskaliert ein
+  // wirkungsloser Reconnect nie weiter (entwaffnet ohne erfolgreichen Ping).
+  if(!s_livenessSelfReconnect)
+  {
+    wifi_liveness::step(s_liveness, false, -1);
+    s_livenessFailRounds = 0;
+  }
+  wifiPingAbortRound();
+}
+
 // F4: Watchdog. Liefert false, solange die Verbindung fehlt; ifalseping == 0
 // heisst fuer den Aufrufer (esp32_main): Funk-Reset ueber startNetwork().
 bool checkWifiPing()
@@ -925,10 +1131,56 @@ bool checkWifiPing()
     s_wifiDownSince = 0;
     s_wifiWdStage = 0;
     ifalseping = 5;
+
+    // TD-21: IP-Pfad pruefen (Gateway-Ping), assoziiert aber tot -> eskalieren
+    s_livenessSelfReconnect = false;
+    {
+      int probe = wifiPingCollect();
+      bool wasArmed = s_liveness.armed;
+      wifi_liveness::Action act = wifi_liveness::step(s_liveness, true, probe);
+      if(probe == 0 && wasArmed)
+      {
+        s_livenessFailRounds++;
+        Serial.printf("[WIFI];probe;fail;rounds;%lu\n", (unsigned long)s_livenessFailRounds);
+      }
+      else if(probe == 1)
+        s_livenessFailRounds = 0;
+
+      uint32_t nowMs = millis();
+      if(act == wifi_liveness::RECONNECT)
+      {
+        Serial.printf("[WIFI];watchdog;ipdead;reconnect;rounds;%lu;ms;%lu\n", (unsigned long)s_livenessFailRounds, (unsigned long)nowMs);
+        s_livenessSelfReconnect = true;
+        wifiPingAbortRound();   // Runde ueberspannt unsere Aktion: naechster Check startet neu
+        { WifiStall st("disconnect"); WiFi.disconnect(false, false); }
+        wifiBegin();
+        return false;     // ifalseping == 5: Aufrufer prueft in 5 s wieder
+      }
+      else if(act == wifi_liveness::RESET)
+      {
+        Serial.printf("[WIFI];watchdog;ipdead;reset;ms;%lu\n", (unsigned long)nowMs);
+        s_livenessSelfReconnect = true;   // startNetwork() schaltet WiFi aus: Stufe 2 behalten
+        wifiPingAbortRound();             // Runde ueberspannt unsere Aktion: naechster Check startet neu
+        Udp.stop();
+        hasIPaddress = false;
+        meshcom_settings.node_hasIPaddress = hasIPaddress;
+        ifalseping = 0;   // Aufrufer: stopWebserver() + startNetwork()
+        return false;
+      }
+      else if(act == wifi_liveness::RESTART)
+      {
+        Serial.printf("[WIFI];watchdog;ipdead;restart;ms;%lu\n", (unsigned long)nowMs);
+        Serial.flush();
+        ESP.restart();
+      }
+      wifiPingStart();      // keine Aktion: naechste Runde, Auswertung beim naechsten Check
+    }
     if(bDEBUG && bDisplayCont)
       printfdeb("%s [WIFI]..WiFi connected\n", getTimeString().c_str());
     return true;
   }
+
+  wifiLivenessLinkDown();
 
   uint32_t now = millis();
   if(s_wifiDownSince == 0)

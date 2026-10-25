@@ -64,6 +64,11 @@ void instrument_report_heap(const char *tag);
 void instrument_heaplog_set(uint32_t s);
 void instrument_report_heapwifi(void);
 
+/** TD-21 bench: starve the internal heap. Allocates `kb` KB in 256 B chunks
+ *  (MALLOC_CAP_INTERNAL) until done or a malloc fails; 0 frees everything.
+ *  Prints [INSTR-HEAPEAT];held_kb;<n>;ifree;<free internal>. ESP32 only. */
+void instrument_heapeat(uint32_t kb);
+
 /** Failed-alloc capture for the whole boot (plain stores, any task, no printf/malloc/lock).
  *  Armed at boot from instrument_report_prev_boot(); fw_update_net.cpp's callback
  *  forwards here too, so its per-job counters keep their semantics. */
