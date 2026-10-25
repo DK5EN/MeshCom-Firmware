@@ -1,9 +1,9 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-10-25, branch `fork-dev` (contains `upstream/dev` 112e4e5b plus #1237 cherry-picked as `ce4407b3`), last release
-`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). No upstream PR open.
-Next step: review the upstream PR draft (worktree `../MeshCom-PR-next`, branch `pr/fork-firmware-20261025`, body
-`../pr-fork-firmware-20261025-body.md`); then the CI PR for `.autoupdate` assets. TD-22 soak and TD-23 UAT still open.
+`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). Upstream PR open: [#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)
+(all fork firmware of `6c84a46c` as one commit, branch `pr/fork-firmware-20261025`, worktree `../MeshCom-PR-next`).
+Next step: maintainer review of #1238, then the CI PR for `.autoupdate` assets. TD-22 soak and TD-23 UAT still open.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
