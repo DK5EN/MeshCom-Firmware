@@ -16,6 +16,7 @@
 #if defined(ESP32)
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
+#include <esp_bt.h>
 #include <WiFi.h>
 #else
 #include <malloc.h>
@@ -219,6 +220,13 @@ void instrument_wifips(const char *mode)
     else
     {
         printfdeb("[INSTR-WIFIPS];err;usage --wifips none|min|max\n");
+        return;
+    }
+    /* WIFI-PS-01: IDF aborts (RESET_REASON=4 PANIC) on PS none while the BT
+     * controller runs (WiFi/BLE coexistence needs modem sleep). Refuse instead. */
+    if (want == WIFI_PS_NONE && esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_IDLE)
+    {
+        printfdeb("[INSTR-WIFIPS];refused;none;reason;bt_enabled\n");
         return;
     }
     esp_err_t rc = esp_wifi_set_ps(want);
