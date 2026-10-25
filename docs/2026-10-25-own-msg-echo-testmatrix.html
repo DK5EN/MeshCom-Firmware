@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Own-message echo release: test matrix (2026-10-25)</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1b1f24; --muted: #5b6672; --line: #cfd6de;
+  --zebra: #f4f6f8; --head: #e6eaef; --code-bg: #eef1f4;
+  --bluf-bg: #fff6e0; --bluf-line: #d9a400;
+  --rel-bg: #fbe0dc; --rel-fg: #7a1a10;
+  --sent-bg: #d9f0de; --sent-fg: #11512a;
+  --open-bg: #e3e6ea; --open-fg: #3d4651;
+  --accent: #1f5fae; --warn: #b3261e; --ok: #1b7a3e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d; --fg: #e3e8ee; --muted: #9aa6b3; --line: #3a444f;
+    --zebra: #1b2027; --head: #252c35; --code-bg: #222a33;
+    --bluf-bg: #2b2410; --bluf-line: #b88a00;
+    --rel-bg: #4a1f1a; --rel-fg: #ffc9c2;
+    --sent-bg: #173a24; --sent-fg: #bfeccd;
+    --open-bg: #2c333b; --open-fg: #c5ced8;
+    --accent: #7fb2f0; --warn: #ff8a80; --ok: #6fd18f;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 1200px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+h1 { font-size: 1.55rem; margin: 0 0 .2rem; }
+h2 { font-size: 1.2rem; margin: 2.2rem 0 .6rem; padding-bottom: .25rem; border-bottom: 2px solid var(--line); }
+h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
+p, li { max-width: 100ch; }
+.sub { color: var(--muted); margin: 0 0 1rem; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86em; }
+code { background: var(--code-bg); padding: 0 .25em; border-radius: 3px; }
+.bluf { background: var(--bluf-bg); border: 1px solid var(--bluf-line); border-left: 6px solid var(--bluf-line);
+  padding: .7rem 1rem; border-radius: 4px; }
+.bluf strong.t { display: block; margin-bottom: .2rem; letter-spacing: .04em; }
+.bluf ul { margin: .2rem 0 0; padding-left: 1.2rem; }
+figure { margin: .8rem 0 1.2rem; }
+figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
+figcaption { color: var(--muted); font-size: .9em; margin-top: .3rem; }
+.wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; max-height: 80vh; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .86rem; }
+.matrix { min-width: 1500px; }
+th, td { padding: .35rem .5rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+thead th { position: sticky; top: 0; background: var(--head); z-index: 2; border-bottom: 2px solid var(--line); }
+tbody tr:nth-child(even) td { background: var(--zebra); }
+tbody tr:nth-child(even) td.rel, tbody td.rel { background: var(--rel-bg); color: var(--rel-fg); }
+tbody tr:nth-child(even) td.sent, tbody td.sent { background: var(--sent-bg); color: var(--sent-fg); }
+tbody tr:nth-child(even) td.open, tbody td.open { background: var(--open-bg); color: var(--open-fg); }
+td.cid { font-weight: 700; white-space: nowrap; }
+tr.theory td.cid span.tag { display: block; font-weight: 400; font-size: .78em; color: var(--muted); }
+.pill { font-weight: 700; font-size: .78em; letter-spacing: .03em; }
+.legend { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0; font-size: .86rem; }
+.legend span { padding: .15rem .6rem; border-radius: 3px; border: 1px solid var(--line); }
+.legend .rel { background: var(--rel-bg); color: var(--rel-fg); }
+.legend .sent { background: var(--sent-bg); color: var(--sent-fg); }
+.legend .open { background: var(--open-bg); color: var(--open-fg); }
+.filters { margin: .6rem 0; display: flex; gap: .4rem; flex-wrap: wrap; }
+.filters button { font: inherit; font-size: .86rem; padding: .2rem .8rem; border: 1px solid var(--line);
+  background: var(--head); color: var(--fg); border-radius: 3px; cursor: pointer; }
+.filters button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); font-weight: 700; }
+.obs { font-style: italic; color: var(--muted); min-width: 12rem; }
+.summary { margin-top: .8rem; padding: .5rem .8rem; border: 1px dashed var(--line); border-radius: 4px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; }
+.card { border: 1px solid var(--line); border-radius: 4px; padding: .6rem .9rem; }
+.card h3 { margin-top: 0; }
+.bad { color: var(--warn); font-weight: 700; }
+.good { color: var(--ok); font-weight: 700; }
+footer { margin-top: 2.5rem; padding-top: .6rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .88rem; }
+/* svg helpers */
+.sv-box { fill: var(--head); stroke: var(--line); }
+.sv-life { stroke: var(--muted); stroke-dasharray: 4 4; }
+.sv-arrow { stroke: currentColor; fill: none; stroke-width: 1.5; }
+.sv-bad { stroke: var(--warn); fill: none; stroke-width: 2; }
+.sv-good { stroke: var(--ok); fill: none; stroke-width: 2; }
+.sv-note { fill: var(--muted); }
+.sv-badt { fill: var(--warn); font-weight: 700; }
+.sv-goodt { fill: var(--ok); font-weight: 700; }
+.sv-t { fill: currentColor; }
+.sv-band-bad { fill: var(--rel-bg); stroke: none; }
+.sv-band-good { fill: var(--sent-bg); stroke: none; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Own-message echo release: test matrix and expected outcomes</h1>
+<p class="sub">MeshCom firmware, fork-dev <code>eb246050</code>, nodes on 4.40a builds of 2026-10-24. Prepared 2026-10-25. Cases, expected outcomes and log patterns, with the observed results of the bench run on 2026-10-25.</p>
+
+<div class="bluf" role="note">
+  <strong class="t">BLUF</strong>
+  <ul>
+    <li><strong>Reproduced on the bench 2026-10-25:</strong> DK5EN-98 to group 9999 released 9 of 10 own texts before its own TX; with the competing bench gateways airgapped 0 of 10. Own PNs 0 of 20. Observed column below.</li>
+    <li><strong>Bug:</strong> an own group or <code>*</code> text on a gateway is released (slot DONE, length 0) before its first own LoRa TX, because another gateway transmits the server copy first and the originator takes that echo as "already on air".</li>
+    <li><strong>Scope:</strong> group texts and <code>*</code>: yes. Own PN: no (<code>ACK_SKIP_READY</code>, the slot stays READY and is sent). A non-gateway originator has no server shortcut and is not affected.</li>
+    <li><strong>Evidence</strong> (DK5EN-98 logger 2026-10-24 16:21 to 2026-10-25 11:24, organic traffic, no test sends): group 20: 49 of 82 own texts released before own TX; <code>*</code>: 1 of 4; PN: 0 of 26. Other groups: 0 of 6.</li>
+    <li><strong>Goal rule:</strong> a message from my node goes out on LoRa at least once. An echo heard after that stops further repeats (one-time send). An echo may stop retries, never the first transmission.</li>
+    <li><strong>Plan:</strong> 8 executable cases (E1-E8, N = 10 each, unique marker per message) on group 9999, group TEST and PN between own bench nodes; 4 theory cases (T1-T4) are never sent.</li>
+  </ul>
+</div>
+
+<h2>1. Mechanism</h2>
+<p>On a gateway the server upload is queued in the same call that writes the ring slot (immediate, for group, <code>*</code> and PN). The LoRa side waits for the running CSMA window (0-4.85 s plus re-arms). Another gateway that gets the server copy queues it as <code>udp_rx</code> (status DONE) with no destination filter and may reach the air first. The originator hears that echo while its own slot is still READY and releases it.</p>
+
+<figure>
+<svg viewBox="0 0 1100 470" role="img" aria-labelledby="t1 d1" font-size="13" font-family="system-ui, sans-serif">
+  <title id="t1">Race: server copy reaches the air before the originator's own TX</title>
+  <desc id="d1">Sequence diagram. DK5EN-98 writes the ring slot READY and uploads at once. The server delivers the copy to another gateway, which queues it as udp_rx DONE and transmits first. DK5EN-98 hears the echo and releases its slot without any own TX.</desc>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+    <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--warn)"/></marker>
+  </defs>
+  <rect class="sv-band-bad" x="0" y="372" width="1100" height="98"/>
+  <g>
+    <rect class="sv-box" x="40" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="135" y="36" text-anchor="middle">DK5EN-98 (originator)</text>
+    <rect class="sv-box" x="330" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="425" y="36" text-anchor="middle">Server</text>
+    <rect class="sv-box" x="620" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="715" y="36" text-anchor="middle">Other gateway (-1/-90/-92)</text>
+    <rect class="sv-box" x="880" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="975" y="36" text-anchor="middle">LoRa air</text>
+  </g>
+  <g>
+    <line class="sv-life" x1="135" y1="48" x2="135" y2="460"/>
+    <line class="sv-life" x1="425" y1="48" x2="425" y2="460"/>
+    <line class="sv-life" x1="715" y1="48" x2="715" y2="460"/>
+    <line class="sv-life" x1="975" y1="48" x2="975" y2="460"/>
+  </g>
+  <!-- 1 -->
+  <text class="sv-t" x="145" y="78">t0: ring write READY</text>
+  <text class="sv-note" x="145" y="94">src=user_msg (loop_functions.cpp:4660)</text>
+  <line class="sv-arrow" x1="135" y1="112" x2="425" y2="112" marker-end="url(#ah)"/>
+  <text class="sv-t" x="290" y="128" text-anchor="middle">immediate UDP upload</text>
+  <text class="sv-note" x="290" y="143" text-anchor="middle">same call, :4755 addNodeData</text>
+  <!-- own CSMA wait -->
+  <rect x="115" y="140" width="40" height="190" fill="none" stroke="currentColor" stroke-dasharray="3 3"/>
+  <text class="sv-note" x="160" y="166">own LoRa waits for the running</text>
+  <text class="sv-note" x="160" y="181">CSMA window (0-4.85 s, re-arms)</text>
+  <!-- 2 -->
+  <line class="sv-arrow" x1="425" y1="196" x2="715" y2="196" marker-end="url(#ah)"/>
+  <text class="sv-t" x="570" y="190" text-anchor="middle">server copy (routing: server)</text>
+  <!-- 3 -->
+  <text class="sv-t" x="725" y="222">udp_rx: ring DONE, prio 3</text>
+  <text class="sv-note" x="725" y="238">udp_frame_esp32.cpp:611-620, no dest. filter</text>
+  <!-- 4 -->
+  <line class="sv-bad" x1="715" y1="272" x2="975" y2="272" marker-end="url(#ahb)"/>
+  <text class="sv-badt" x="845" y="266" text-anchor="middle">TX first (server copy)</text>
+  <!-- 5 -->
+  <line class="sv-bad" x1="975" y1="308" x2="135" y2="308" marker-end="url(#ahb)"/>
+  <text class="sv-badt" x="555" y="302" text-anchor="middle">echo heard, p50 4.7 s after t0 (max 16.8 s, organic log)</text>
+  <!-- 6 -->
+  <text class="sv-badt" x="145" y="354">slot READY -&gt; DONE / len 0 (lora_functions.cpp:1090-1117,</text>
+  <text class="sv-badt" x="145" y="370">pnFrameIsReleasableGroupText(), pn_retry.h:362)</text>
+  <text class="sv-badt" x="145" y="402">Result: RELEASED. No TX-LoRa / RING_TX_READ for this id.</text>
+  <text class="sv-t" x="145" y="424">Log: [RETX] echo on READY slot, released retid:N, then checkOwnTx:&lt;id&gt;.</text>
+  <text class="sv-note" x="145" y="444">The originator never transmitted its own message; another node did.</text>
+</svg>
+<figcaption>Failing order (today, group and <code>*</code>). Own text p50 4.8 s against echo p50 4.7 s: roughly even odds. The other gateway has a head start, not a higher priority.</figcaption>
+</figure>
+
+<figure>
+<svg viewBox="0 0 1100 330" role="img" aria-labelledby="t2 d2" font-size="13" font-family="system-ui, sans-serif">
+  <title id="t2">Healthy order: own TX first, echo afterwards, retries stopped</title>
+  <desc id="d2">Sequence diagram. DK5EN-98 transmits its own copy first. The echo from another gateway is heard afterwards and stops further repeats.</desc>
+  <defs>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ok)"/></marker>
+  </defs>
+  <rect class="sv-band-good" x="0" y="236" width="1100" height="94"/>
+  <g>
+    <rect class="sv-box" x="40" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="135" y="36" text-anchor="middle">DK5EN-98 (originator)</text>
+    <rect class="sv-box" x="330" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="425" y="36" text-anchor="middle">Server</text>
+    <rect class="sv-box" x="620" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="715" y="36" text-anchor="middle">Other gateway</text>
+    <rect class="sv-box" x="880" y="14" width="190" height="34" rx="4"/><text class="sv-t" x="975" y="36" text-anchor="middle">LoRa air</text>
+  </g>
+  <g>
+    <line class="sv-life" x1="135" y1="48" x2="135" y2="320"/>
+    <line class="sv-life" x1="425" y1="48" x2="425" y2="320"/>
+    <line class="sv-life" x1="715" y1="48" x2="715" y2="320"/>
+    <line class="sv-life" x1="975" y1="48" x2="975" y2="320"/>
+  </g>
+  <text class="sv-t" x="145" y="76">t0: ring READY + upload</text>
+  <line class="sv-arrow" x1="135" y1="96" x2="425" y2="96" marker-end="url(#ah)"/>
+  <line class="sv-good" x1="135" y1="132" x2="975" y2="132" marker-end="url(#ag)"/>
+  <text class="sv-goodt" x="555" y="126" text-anchor="middle">own TX first (TX-LoRa / RING_TX_READ)</text>
+  <line class="sv-arrow" x1="425" y1="168" x2="715" y2="168" marker-end="url(#ah)"/>
+  <text class="sv-t" x="570" y="162" text-anchor="middle">server copy arrives, waits for its window</text>
+  <line class="sv-arrow" x1="715" y1="204" x2="975" y2="204" marker-end="url(#ah)"/>
+  <text class="sv-t" x="845" y="198" text-anchor="middle">echo (after own TX)</text>
+  <line class="sv-arrow" x1="975" y1="228" x2="135" y2="228" marker-end="url(#ah)"/>
+  <text class="sv-goodt" x="145" y="262">Result: SENT at least once; echo heard after own TX.</text>
+  <text class="sv-goodt" x="145" y="282">Echo stops further repeats (one-time send). Fix target for group and *.</text>
+  <text class="sv-note" x="145" y="304">Also the order for PN today (own PN is never released) and for a gateway-off originator (E8).</text>
+</svg>
+<figcaption>Healthy order and the fix target: the echo may stop retries, never the first transmission.</figcaption>
+</figure>
+
+<h3>Code locations (fork-dev eb246050)</h3>
+<ul>
+  <li>Own text entry: <code>sendMessage()</code> <code>src/loop_functions.cpp:4278</code>; ring write READY, src=user_msg <code>:4660</code>; server upload queued in the same call <code>:4755</code> (<code>addNodeData</code>).</li>
+  <li>Server text at a gateway: <code>src/esp32/udp_frame_esp32.cpp:611-620</code> -&gt; <code>gwUdpRxEnqueue</code> -&gt; <code>addTxRingEntry(..., RING_STATUS_DONE, "udp_rx")</code>. No destination filter on the LoRa side: <code>*</code>, any numeric group (own group list not consulted), named group TEST and PN to a foreign call all go on LoRa. Only a PN to the gateway's own call is not put on LoRa (<code>:386-402</code>, displayed and ACKed).</li>
+  <li>Echo release: <code>src/lora_functions.cpp:1090-1117</code>; predicate <code>pnFrameIsReleasableGroupText()</code> <code>src/pn_retry.h:362</code> (text frame, not an own PN, not an own RM1 command).</li>
+  <li>PN retry ladder after SENT: <code>src/lora_functions.cpp:3290-3420</code> (echo restarts the 40 s wait, <code>[RETX] PN echo, wait restarted</code>; 3 copies). <code>findAndStopRingSlotImpl</code> skips READY slots.</li>
+  <li>Which gateways receive a given server text is decided by the server (subscription), not by the firmware.</li>
+  <li>Log gap: <code>[RETX] echo on READY slot, released retid:N</code> (<code>bDisplayRetx</code>) carries no msg_id; the next <code>checkOwnTx:&lt;id&gt;</code> line with the same timestamp has it. <code>TX-UDP</code> is printed at ring write, not on LoRa; <code>TX-LoRa</code> / <code>[MC-DBG] RING_TX_READ</code> is the real TX marker.</li>
+</ul>
+
+<h2>2. Scenario matrix</h2>
+<div class="legend" aria-label="Legend">
+  <span class="rel"><strong>RELEASED</strong>: own copy may be released before own TX (red tint)</span>
+  <span class="sent"><strong>SENT</strong>: own TX happens for every message (green tint)</span>
+  <span class="open"><strong>OPEN</strong>: depends on server routing or is to be measured (grey tint)</span>
+</div>
+<div class="filters" role="group" aria-label="Row filter">
+  <button type="button" data-f="all" aria-pressed="true">All rows</button>
+  <button type="button" data-f="theory" aria-pressed="false">Theory only (T1-T4)</button>
+  <button type="button" data-f="exec" aria-pressed="false">Executable only (E1-E8)</button>
+</div>
+<p class="sub">Executable cases: N = 10 messages each, unique marker per message. Theory rows are labelled "never sent -- test spam"; their evidence is the organic DK5EN-98 log (group 20: 49/82 released, <code>*</code>: 1/4). Decision per message from the sender's log: RELEASED = ring write, <code>[RETX] echo on READY slot, released</code> (+ <code>checkOwnTx:&lt;id&gt;</code>), no <code>TX-LoRa</code> / <code>RING_TX_READ</code> for the id. SENT = <code>TX-LoRa</code> / <code>RING_TX_READ</code> for the id.</p>
+
+<div class="wrap" tabindex="0" role="region" aria-label="Scenario matrix, scrolls horizontally">
+<table class="matrix" id="matrix">
+<thead>
+<tr>
+  <th>Case</th><th>Sender</th><th>Destination</th><th>Bench state</th><th>Server upload?</th>
+  <th>Who puts a copy on LoRa first</th><th>Echo release possible today?</th>
+  <th>Expected today (4.40a)</th><th>Expected with fix</th><th>Pass/fail log pattern</th><th>OBSERVED</th>
+</tr>
+</thead>
+<tbody>
+<tr class="theory" data-k="theory">
+  <td class="cid">T1<span class="tag">never sent -- test spam</span></td>
+  <td>DK5EN-98</td><td><code>*</code></td><td>gateway on (production)</td><td>yes, immediate</td>
+  <td>Race: own TX vs. server copy transmitted by any subscribed gateway the originator hears</td>
+  <td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> whenever a subscribed gateway that -98 hears transmits the server copy first. Organic log: 1 of 4 released (echo from DK5EN-1), 3 sent.</td>
+  <td class="sent"><span class="pill">SENT</span> always one own TX</td>
+  <td>Organic evidence only. Would show: <code>released</code> + no <code>TX-LoRa</code>.</td>
+  <td class="obs">not executed (theory)</td>
+</tr>
+<tr class="theory" data-k="theory">
+  <td class="cid">T2<span class="tag">never sent -- test spam</span></td>
+  <td>DK5EN-98</td><td>group 20</td><td>gateway on (production)</td><td>yes, immediate</td>
+  <td>Race: own TX vs. server copy from DK5EN-90, DK5EN-1, DK5EN-92, DF2SI-12 (field gateway)</td>
+  <td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> Organic log: 49 of 82 released (DK5EN-90 17, DK5EN-1 12, DK5EN-92 12, DF2SI-12 8), 33 sent. Echo delay p50 4.7 s, max 16.8 s.</td>
+  <td class="sent"><span class="pill">SENT</span> always one own TX</td>
+  <td>Organic evidence only. Would show: <code>released</code> + no <code>TX-LoRa</code>.</td>
+  <td class="obs">not executed (theory)</td>
+</tr>
+<tr class="theory" data-k="theory">
+  <td class="cid">T3<span class="tag">never sent -- test spam</span></td>
+  <td>DK5EN-98</td><td>group 232 / 262</td><td>gateway on (production)</td><td>yes, immediate</td>
+  <td>Race, as T2 (no own-group filter on the LoRa side)</td>
+  <td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> whenever a subscribed gateway that -98 hears transmits the server copy first. Other groups in the organic log (2, 9, 2322, 2325, 2628, 26298): 0 of 6 released.</td>
+  <td class="sent"><span class="pill">SENT</span> always one own TX</td>
+  <td>Organic evidence only. Would show: <code>released</code> + no <code>TX-LoRa</code>.</td>
+  <td class="obs">not executed (theory)</td>
+</tr>
+<tr class="theory" data-k="theory">
+  <td class="cid">T4<span class="tag">never sent -- test spam</span></td>
+  <td>bench node DK5EN-1</td><td><code>*</code> / group 20</td><td>gateway on</td><td>yes, immediate (same code path)</td>
+  <td>Race, as T1/T2</td>
+  <td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> whenever a subscribed gateway the sender hears transmits the server copy first. No organic count for -1 in the source facts.</td>
+  <td class="sent"><span class="pill">SENT</span> always one own TX</td>
+  <td>None (theory).</td>
+  <td class="obs">not executed (theory)</td>
+</tr>
+
+<tr data-k="exec">
+  <td class="cid">E1</td><td>DK5EN-98</td><td>group 9999</td>
+  <td>-1/-90/-92 gateway on, subscribed 9999</td><td>yes, immediate</td>
+  <td>Race: own TX vs. server copy from -1/-90/-92</td><td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> for part of the 10 before own TX (log analogue: 60 %, 49/82 on group 20); echo from -1/-90/-92.</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX; echo stops retries</td>
+  <td>Today: some ids with <code>released</code> and no <code>TX-LoRa</code>. Fix: every id has <code>TX-LoRa</code>/<code>RING_TX_READ</code>.</td>
+  <td class="obs" id="obs-E1"><strong>9/10 released before own TX</strong> (by DK5EN-92 7, DK5EN-90 2), 1/10 sent. Field echo 1/10. Trace 1AE1E170: write 11:40:09, released 11:40:12 on DK5EN-90's server copy, no RING_TX_READ. Run A.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E2</td><td>DK5EN-98</td><td>group 9999</td>
+  <td>-1/-90/-92 <code>--airgap on</code></td><td>yes, immediate</td>
+  <td>Own TX of -98 (airgapped nodes neither receive nor transmit on LoRa)</td><td>no from the bench nodes; field relays only after own TX</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX; echoes only after own TX (field relays; field gateways if the server forwards 9999 to them)</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX</td>
+  <td>All ids <code>TX-LoRa</code>/<code>RING_TX_READ</code>; no <code>released</code>. Control for E1.</td>
+  <td class="obs" id="obs-E2"><strong>0/10 released, 10/10 sent</strong> 1-11 s after the write. Airgapped gateways queued the server copy (udp_rx) and dropped TX ([AIRGAP] tx-dropped). Field echo 10/10. Run D.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E3</td><td>DK5EN-98</td><td>group TEST</td>
+  <td>normal</td><td>yes, immediate</td>
+  <td>Depends on server routing of a named group</td><td>depends on server routing</td>
+  <td class="open"><span class="pill">OPEN</span> forwarded -&gt; like E1; not forwarded -&gt; 10/10 own TX. Measure.</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX</td>
+  <td>Count <code>released</code> vs. <code>TX-LoRa</code> per id; the split answers the routing question.</td>
+  <td class="obs" id="obs-E3"><strong>0/10 released, 10/10 sent.</strong> TEST is not a group: <code>::{TEST}</code> is a PN to callsign TEST (gets {NNN, never ACKed, server forwards to no gateway, retry ladder sends 4 copies: 69 LoRa TX for 10 texts). Field echo 8/10. Run B.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E4</td><td>DK5EN-98</td><td>PN to DK5EN-1</td>
+  <td>normal</td><td>yes, immediate</td>
+  <td>Own TX of -98; -1 does not put a PN to its own call on LoRa</td><td>no (own PN never released)</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX. <code>ACK_SKIP_READY</code> if a gateway echoes the server copy first. -1 ACKs once.</td>
+  <td class="sent"><span class="pill">SENT</span> unchanged</td>
+  <td>Per id: optional <code>[MC-DBG] ACK_SKIP_READY</code>, then <code>TX-LoRa</code>; ACK lines (<code>server ACK</code>, <code>binary ACK</code>, <code>PN already acked</code>); never <code>released</code>.</td>
+  <td class="obs" id="obs-E4"><strong>0/10 released, 10/10 sent once.</strong> DK5EN-1 got the PN over UDP within 1 s and ACKed once per PN; the server ACK reached -98 ~4 s later while still READY, -98 still sent it once. Later LoRa copy = [DMDUP] on -1. Field echo 10/10. Run C.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E5</td><td>DK5EN-1</td><td>PN to DK5EN-98</td>
+  <td>normal</td><td>yes, immediate</td>
+  <td>Own TX of -1; -98 gets the UDP copy (own call, not put on LoRa)</td><td>no (own PN never released)</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX by -1; -98 displays and ACKs once.</td>
+  <td class="sent"><span class="pill">SENT</span> unchanged</td>
+  <td>-1: <code>TX-LoRa</code> per id, no <code>released</code>. -98: one display + ACK per id; later LoRa copy = dedup drop, no second ACK.</td>
+  <td class="obs" id="obs-E5"><strong>0/10 released, 10/10 sent once by DK5EN-1.</strong> Server ACK 7, already-acked 1. DK5EN-90 got one server copy (E5 #9). Field echo 6/10. Run C.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E6</td><td>DK5EN-1</td><td>group 9999</td>
+  <td>-98 subscribed 9999</td><td>yes, immediate</td>
+  <td>Race: own TX of -1 vs. server copy from -98 (22 dBm) and -90/-92</td><td>yes</td>
+  <td class="rel"><span class="pill">RELEASED</span> -1 released before own TX often (-98 and -90/-92 transmit the server copy).</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX</td>
+  <td>Today: many ids <code>released</code> without <code>TX-LoRa</code> on -1. Fix: every id <code>TX-LoRa</code>.</td>
+  <td class="obs" id="obs-E6"><strong>3/10 released before own TX</strong> (all by DK5EN-98's 22 dBm server copy), 7/10 sent. Field echo 7/10. Run A.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E7</td><td>DK5EN-1</td><td>group TEST</td>
+  <td>normal</td><td>yes, immediate</td>
+  <td>Depends on server routing of a named group</td><td>depends on server routing</td>
+  <td class="open"><span class="pill">OPEN</span> as E3: forwarded -&gt; like E6; not forwarded -&gt; 10/10 own TX. Measure.</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX</td>
+  <td>As E3, on -1.</td>
+  <td class="obs" id="obs-E7"><strong>0/10 released, 10/10 sent.</strong> Same as E3 (PN to callsign TEST, 4 copies each, 73 LoRa TX). Field echo 6/10. Run B.</td>
+</tr>
+<tr data-k="exec">
+  <td class="cid">E8</td><td>DK5EN-14</td><td>group 9999</td>
+  <td>-14 gateway off (control)</td><td>no</td>
+  <td>Own TX of -14 (other gateways learn the text only after -14's TX was heard and uploaded)</td><td>no (no server head start)</td>
+  <td class="sent"><span class="pill">SENT</span> 10/10 own TX -- control</td>
+  <td class="sent"><span class="pill">SENT</span> unchanged</td>
+  <td>All ids <code>TX-LoRa</code>/<code>RING_TX_READ</code>; no <code>released</code>.</td>
+  <td class="obs" id="obs-E8"><strong>0/10 released, 10/10 sent</strong> (control: gateway off, no server head start). Field echo 8/10. Run A.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="summary"><strong>Summary of observations:</strong> <span id="obs-summary"><strong>Bug reproduced:</strong> own group texts lose the race against the server copy (E1 9/10, E6 3/10); with the competing gateways airgapped none is released (E2 0/10). Own PNs are never released (E4/E5 0/20). Side findings: TEST is a PN to a callsign (TXP-03); a UDP-received own-call PN is not in the dedup ring and is re-uploaded from the LoRa copy (TXP-02). Bench 2026-10-25, summaries tools/bench/runs/harness/own-echo-{A,B,C,D}-*.json. <strong>Fix verified (556b997d):</strong> same setup before/after, DK5EN-1 and DK5EN-90 to 9999: unfixed 6 of 10 released, fixed 0 of 20 released, 20 of 20 sent, 19 exactly once (one retry of a text nobody heard, by design).</span></div>
+
+<h2>3. PN (private messages)</h2>
+<div class="cols">
+  <div class="card">
+    <h3>DK5EN-98 to DK5EN-1 (E4)</h3>
+    <ul>
+      <li>-98 writes the ring slot READY and uploads at once. LoRa waits for the CSMA window.</li>
+      <li>-1 gets the UDP copy: PN to its own call is displayed and ACKed, not put on LoRa.</li>
+      <li>Other gateways put a PN to a foreign call on LoRa (no destination filter). If one transmits first and -98 hears it: <code>[MC-DBG] ACK_SKIP_READY</code>, the slot stays READY and is sent.</li>
+      <li>-98's own LoRa copy reaching -1 is the second copy with the same msg_id: dedup drop, no second ACK.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>DK5EN-1 to DK5EN-98 (E5)</h3>
+    <ul>
+      <li>-1 writes READY, uploads at once, sends its own LoRa copy.</li>
+      <li>-98 gets the UDP copy: own call, not put on LoRa, displayed and ACKed (organic log: 47 PN to DK5EN-98 received, 0 on LoRa).</li>
+      <li>A later copy via LoRa with the same msg_id: dedup drop, no second ACK.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Rules that hold for both</h3>
+    <ul>
+      <li>Own PN is never released by an echo (<code>pnFrameIsReleasableGroupText()</code> excludes it). Organic: 26 of 26 sent, 1 x <code>ACK_SKIP_READY</code>.</li>
+      <li>An ACK never stops an unsent READY PN: <code>findAndStopRingSlotImpl</code> skips READY slots. The PN is always sent at least once.</li>
+      <li>After SENT: an echo restarts the 40 s wait (<code>[RETX] PN echo, wait restarted</code>), retry ladder of 3 copies; server <code>:ack</code> / binary ACK stop it.</li>
+      <li>First copy (UDP or LoRa) displays and ACKs (LoRa one-shot + UDP); later copy with the same msg_id is a dedup drop.</li>
+      <li>Organic: PN to OE5PYB-1 was put on LoRa by -98 as a server frame 8 times.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. Bench setup and rules</h2>
+<h3>Settings snapshot (HTTP, read-only)</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>Node</th><th>Board</th><th>Gateway (server)</th><th>Mesh</th><th>TX power</th><th>Groups</th></tr></thead>
+<tbody>
+<tr><td>DK5EN-98</td><td>Heltec V3</td><td>on (meshcom.oevsv.at)</td><td>on</td><td>22 dBm</td><td>20;232;262;26244;9</td></tr>
+<tr><td>DK5EN-1</td><td>Heltec V3</td><td>on (meshcom.oevsv.at)</td><td>on</td><td>2 dBm</td><td>9;20;232;262</td></tr>
+<tr><td>DK5EN-90</td><td>RAK4631</td><td>on (Internet 89.185.97.38)</td><td>off</td><td>2 dBm</td><td>9;20;232;262</td></tr>
+<tr><td>DK5EN-92</td><td>T-Beam</td><td>on (meshcom.oevsv.at)</td><td>off</td><td>2 dBm</td><td>9;20;232;262</td></tr>
+<tr><td>DK5EN-14</td><td>T-Deck Plus</td><td>off</td><td>off</td><td>2 dBm</td><td>9;20;232;262</td></tr>
+</tbody>
+</table>
+</div>
+<p>For the test all five nodes get group <code>9999</code> added. Firmware: fork-dev <code>eb246050</code>, 4.40a builds of 2026-10-24 (gate build 3e07f894 class).</p>
+
+<div class="cols">
+  <div class="card">
+    <h3>Allowed destinations</h3>
+    <ul>
+      <li><span class="good">ALLOWED:</span> group <code>9999</code></li>
+      <li><span class="good">ALLOWED:</span> group <code>TEST</code></li>
+      <li><span class="good">ALLOWED:</span> PN between DK5EN-1/-14/-90/-92/-98</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Prohibited destinations</h3>
+    <ul>
+      <li><span class="bad">PROHIBITED:</span> <code>*</code></li>
+      <li><span class="bad">PROHIBITED:</span> groups <code>20</code>, <code>232</code>, <code>262</code></li>
+      <li>These appear in theory rows T1-T4 only, with evidence from the organic log. Never sent.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Power and airgap</h3>
+    <ul>
+      <li>Bench TX power 2 dBm. DK5EN-98 sends at its production 22 dBm (operator approved for TEST/9999/PN).</li>
+      <li><code>--airgap on</code> (INSTRUMENT builds, RAM-only): the node neither receives nor transmits on LoRa; UDP stays up. It simulates a gateway too far away to hear or be heard, or total packet loss. Used in E2.</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Schedule (about 75 min on air)</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>Run</th><th>Cases</th><th>Pacing</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>A</td><td>E1 + E6 + E8</td><td>interleaved, 90 s per sender, 30 s offset</td><td>group 9999</td></tr>
+<tr><td>B</td><td>E3 + E7</td><td>pacing not stated in the source facts (open)</td><td>group TEST</td></tr>
+<tr><td>C</td><td>E4 + E5</td><td>180 s per sender</td><td>PN</td></tr>
+<tr><td>D</td><td>E2</td><td>-1/-90/-92 <code>--airgap on</code></td><td>group 9999, control for E1</td></tr>
+</tbody>
+</table>
+</div>
+<p class="sub">Each message carries a unique marker; N = 10 per case.</p>
+
+<h2>5. Field echoes on DK5EN-98</h2>
+<p>Field nodes (not ours, passive): DL2JA-1, DL2JA-2, DB0ED-99, DL2UD-1 (mesh on, gateway off). DF2SI-12 is a field gateway. A field echo is a <code>[LOG]</code> line on DK5EN-98 whose path contains DL2JA-1, DL2JA-2, DB0ED-99 or DL2UD-1, after -98's own TX.</p>
+<div class="wrap">
+<table>
+<thead><tr><th>Node</th><th>Role</th><th>Organic count (distinct msg ids heard on -98 after its own TX)</th><th>Expect in the bench run</th></tr></thead>
+<tbody>
+<tr><td>DL2JA-1</td><td>field, mesh on, gateway off</td><td>26</td><td class="open"><span class="pill">OPEN</span> echo line after -98's TX only if the node relays it; not predicted</td></tr>
+<tr><td>DL2JA-2</td><td>field, mesh on, gateway off</td><td>30</td><td class="open"><span class="pill">OPEN</span> as above</td></tr>
+<tr><td>DB0ED-99</td><td>field, mesh on, gateway off</td><td>33</td><td class="open"><span class="pill">OPEN</span> as above</td></tr>
+<tr><td>DL2UD-1</td><td>field, mesh on, gateway off</td><td>23</td><td class="open"><span class="pill">OPEN</span> as above</td></tr>
+<tr><td>DF2SI-12</td><td>field gateway</td><td>8 of the 49 group-20 releases (organic)</td><td class="open"><span class="pill">OPEN</span> only if the server forwards 9999 / TEST to it (E2 note)</td></tr>
+</tbody>
+</table>
+</div>
+<p>These nodes can only echo after -98's own TX (no server shortcut, gateway off), so they never cause a release before own TX. They are the expected echoes in E2 (bench nodes airgapped). Organic server frames put on LoRa by -98: <code>*</code> 175, group 20 229, group 262 63, PN to OE5PYB-1 8; PN to DK5EN-98 itself 47 received, 0 on LoRa.</p>
+
+<h3>Organic evidence (DK5EN-98 logger, 2026-10-24 16:21 to 2026-10-25 11:24)</h3>
+<div class="wrap">
+<table>
+<thead><tr><th>Destination</th><th>Own texts</th><th>Sent on LoRa</th><th>Released before own TX</th><th>Echo that released it</th></tr></thead>
+<tbody>
+<tr><td><code>*</code></td><td>4</td><td>3</td><td>1</td><td>DK5EN-1</td></tr>
+<tr><td>group 20</td><td>82</td><td>33</td><td>49</td><td>DK5EN-90 17, DK5EN-1 12, DK5EN-92 12, DF2SI-12 8</td></tr>
+<tr><td>other groups (2, 9, 2322, 2325, 2628, 26298)</td><td>6</td><td>6</td><td>0</td><td>-</td></tr>
+<tr><td>PN</td><td>26</td><td>26</td><td>0 (1 x ACK_SKIP_READY)</td><td>-</td></tr>
+</tbody>
+</table>
+</div>
+<p class="sub">Released echo delay after ring write: p50 4.7 s, max 16.8 s.</p>
+
+<h2>6. Open questions</h2>
+<ul>
+  <li>E3/E7: does the server forward a named group (TEST) to other gateways? Not known; measure.</li>
+  <li>E2: do field gateways (e.g. DF2SI-12) receive 9999 from the server? Depends on server subscription.</li>
+  <li>PN in E4: which gateways besides -1 receive the server copy of a PN to a foreign call is decided by the server.</li>
+</ul>
+
+<footer>
+  Date: 2026-10-25. Firmware: fork-dev <code>eb246050</code>. Sources: orchestrator-verified facts (W1), DK5EN-98 TXP logger report 2026-10-24.
+</footer>
+</main>
+<script>
+(function () {
+  var btns = document.querySelectorAll('.filters button');
+  var rows = document.querySelectorAll('#matrix tbody tr');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = b.getAttribute('data-f');
+      btns.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      rows.forEach(function (r) {
+        var k = r.getAttribute('data-k');
+        r.style.display = (f === 'all' || f === k) ? '' : 'none';
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
