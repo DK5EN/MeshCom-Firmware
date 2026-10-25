@@ -24,7 +24,7 @@
 
 ### Key facts
 
-- **Base:** official `v4.40a.spserver` (the latest official release, 2026-10-22), upstream `dev` up to #1236, and the fork's own work (transmit queue pool, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release.
+- **Base:** official `v4.40a.spserver` (the latest official release, 2026-10-22), upstream `dev` up to #1237, and the fork's own work (transmit queue pool, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release.
 - **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. **Exception:** ten locked protocol settings are reset to their fixed value at first boot (since `v4.40a.10.19`, see below).
 - **How to tell builds apart:** the version on the air still reads `4.40a`.
   - `--info` prints `...AU env=<board> tag=v4.40a.10.25` and `FLASH_VERSION 20261025`.
@@ -68,6 +68,10 @@
   - Without a valid clock or position the day level is used.
   - Console: `--bl`, `--bl auto on|off`, `--bl day|night 1-16`.
   - Background: [`docs/TD-23-tdeck-day-night-brightness.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/TD-23-tdeck-day-night-brightness.md).
+- **Phone app sees more settings** (upstream [#1237](https://github.com/icssw-org/MeshCom-Firmware/pull/1237), merged 2026-10-25, taken as is).
+  - The settings frame to the app (SN1) gains the text hop limit, MTU, voltage or percent display, net console and the KISS bits.
+  - `--netconsole`, `--kiss`, `--volt`/`--proz` and `--mtu` now push the new state to the phone; `--maxv` sends the stored value.
+  - The INA226 keys are only sent by builds with an INA226 driver, so the app hides that card on other boards.
 - **Bench diagnostics only** (INSTRUMENT builds, release images unchanged): a periodic heap and WiFi line, `--heaplog`, `--wifips`, a memory starvation injector; `--wifips none` is refused while Bluetooth runs instead of crashing the node (WIFI-PS-01).
 
 ## Earlier fork releases
@@ -299,7 +303,7 @@ With default settings, compared with the official `v4.40a.spserver`:
   - WiFi watchdog on T-Deck Plus (`DK5EN-14`), final probe: internal memory starved until the IP path hung (588 B free), memory released, the path stayed dead; the watchdog reconnected after 3 failed rounds, outage 2 min 0 s, no reboot (before the fix: no recovery in 20 min).
   - The probe gets answers from a real access point: `[WIFI];probe;armed` 60 s after boot on T-Beam v1.2 and T-Deck Plus.
   - T-Deck memory on `DK5EN-14`: 400 messages in one tab plateau at 41.6 KB free (before: hang at about 250). 20 groups round robin hold 16 tabs with 0 lost pings; 500 messages in 5 groups keep 41.0-61.9 KB free, no failed allocation.
-- **Host-tested only:** the mailbox fix (SNF-ACK-01: 9 new cases, each failing against the unfixed code), the day/night backlight (TD-23: no hardware test yet), the watchdog on any board except the T-Deck Plus, and the watchdog's network reset and reboot stages.
+- **Host-tested only:** the app settings from #1237 (builds and the host suite only, not tried with the McApp phone app), the mailbox fix (SNF-ACK-01: 9 new cases, each failing against the unfixed code), the day/night backlight (TD-23: no hardware test yet), the watchdog on any board except the T-Deck Plus, and the watchdog's network reset and reboot stages.
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
@@ -441,6 +445,7 @@ With default settings, compared with the official `v4.40a.spserver`:
 - **Merged into upstream `dev`, not in an official release yet** (this release carries the same code):
   - `--via` validation, GPS filter, net console fixes, console transmit ring, OnRxDone STAT figures, `[HEAP]` boot marks, NVS line, board LED work ([#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235), merged 2026-10-23)
   - SP server host `sp.meshcom.pl` ([#1236](https://github.com/icssw-org/MeshCom-Firmware/pull/1236), merged 2026-10-24)
+  - BLE app settings by the upstream team ([#1237](https://github.com/icssw-org/MeshCom-Firmware/pull/1237), merged 2026-10-25, cherry-picked)
 - **No PR of ours is open upstream.** The board marker and `--id` are planned as a PR.
 - **Fork-only so far:**
   - the "WEBServer stopped" fix (the bug is in upstream `dev` too) and the NVS diagnostics in remote management

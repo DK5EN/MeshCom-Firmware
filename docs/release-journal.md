@@ -15,12 +15,15 @@ Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 A
 `FLASH_VERSION` 20261025, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten
 (die drei TD-23-Felder sind neue NVS-Keys nur auf T-Deck/T-Deck Plus/T-Deck Pro). Safeboot v3 unveraendert.
 
-Inhalt seit `v4.40a.10.24` (Firmware: 9 Commits plus Merge von Fork-PR #1, dazu der `FLASH_VERSION`-Stempel):
+Inhalt seit `v4.40a.10.24` (Firmware: 9 Commits plus Merge von Fork-PR #1 und Cherry-Pick von upstream #1237, dazu der `FLASH_VERSION`-Stempel):
 
 - TXP-01 (`556b997d`): `pnFrameIsReleasableGroupText()` gibt keinen Frame mit eigenem Call als Quelle mehr frei.
   Vorher gab die Server-Kopie eines anderen Gateways einen eigenen Gruppen- oder `*`-Text frei, bevor er einmal
   gesendet war (DK5EN-98-Logger 2026-10-24/25: 45 von 103 eigenen Gruppentexten nie auf LoRa; Bench 9/10). Der
   40-s-Gehoert-Check stoppt die Wiederholung wie bisher; Texte fuer einen KISS-Client (fremde Quelle) bleiben freigebbar.
+- Upstream #1237 (`ce4407b3`, cherry-pick -x von `41a49fac`, rainerfritz, gemergt 2026-10-25): SN1 an die App mit
+  MHOP, MTU, VOLT, NCON, KISS; Settings-Push nach `--netconsole`, `--kiss`, `--volt`/`--proz`, `--mtu`; `--maxv` sendet
+  das Info-JSON; INA226-Keys nur mit `ENABLE_INA226`. Ein Konflikt (Kommentar an `LEDNF`), upstream-Text behalten.
 - SNF-ACK-01 (`e95e5dd9`): ein Store-Knoten hielt und lieferte eine bereits quittierte DM erneut aus (Feldfall
   2026-10-25, DK5EN-98 -> DM3KS-12 `{450` via DB0SD-22): Ack vor der eigenen Kopie, Re-Ack der Zustellung leert den
   Slot, spaete Kopie oeffnet einen neuen. Jetzt merkt `msgstoreOnAck()` (Sender, Acker, NNN) 1 h in einem Ring mit
@@ -65,6 +68,8 @@ Inhalt seit `v4.40a.10.24` (Firmware: 9 Commits plus Merge von Fork-PR #1, dazu 
 
 ### Was ausdruecklich NICHT geprueft wurde
 
+- #1237 nicht mit McApp geprueft (nur Builds und Host-Suite). Idle-Heap nach #1237 nicht neu gemessen (nur
+  Kommando-Handler und JSON-Keys auf dem Stack); DK5EN-92 traegt fuer den Auto-Update-Test 10.24.
 - SNF-ACK-01 nur Host-Tests (`test_msgstore`, 9 neue `test_tomb_*`, jeder rot gegen den alten Code) und Builds,
   nicht on air.
 - Idle-Heap nach SNF-ACK-01 nicht neu gemessen: der Mailbox-Code wird auf klassischen ESP32 (T-Beam) nicht

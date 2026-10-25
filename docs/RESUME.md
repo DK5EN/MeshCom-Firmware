@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
+**Stand:** 2026-10-25, branch `fork-dev` (contains `upstream/dev` 112e4e5b plus #1237 cherry-picked as `ce4407b3`), last release
 `v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
 Next step: TXP-01 fix `556b997d` is benched (0/20 released); DK5EN-98 OTA flash (operator OK) and release; TTL decision. The TD-22 soak on DK5EN-14 was stopped after 6 min and is re-run later, after the pending T-Deck PR.
 
