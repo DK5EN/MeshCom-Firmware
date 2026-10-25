@@ -100,7 +100,7 @@ EXPLAINED EXCLUSIONS -- how a documented exception is told apart from a gap
 and `config_json.h:127-137` / `config_json.h:362-367` say so in as many
 words: flash/firmware bookkeeping (`node_fversion`, `node_mversion`,
 `node_fwversion`, `node_cleanflash`/`node_cflash`), the T-Deck-only UI block
-(`node_map` .. `node_wifion`, 13 fields), the running `node_msgid`/
+(`node_map` .. `node_bl_auto`, 16 fields), the running `node_msgid`/
 `node_ackid` counters, and six last-sensor-reading fields (`node_temp`,
 `node_hum`, `node_press`, `node_temp2`, `node_gas_res`/`node_gas`,
 `node_co2`). None of these are `X()` table rows, so check 1 never iterates
@@ -219,6 +219,9 @@ for _names, _reason in [
     (("node_immediate_save", "node_immsave"), _TDECK),
     (("node_kbl_sync", "node_kblsync"), _TDECK),
     (("node_wifion",), _TDECK),
+    (("node_bl_day", "node_blday"), _TDECK),
+    (("node_bl_night", "node_blnight"), _TDECK),
+    (("node_bl_auto", "node_blauto"), _TDECK),
     (("node_date_year",), _CLOCK_MARKER),
     (("node_date_month",), _CLOCK_MARKER),
     (("node_date_day",), _CLOCK_MARKER),

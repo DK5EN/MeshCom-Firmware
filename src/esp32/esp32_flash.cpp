@@ -9,6 +9,7 @@
 #include <msgid_counter.h>
 #include <lora_setchip.h>
 #include <prod_lock.h>   // prodLockNormalise(): production-locked settings, dependency-free
+#include <daylight.h>    // TD-23: BL_DAY_DEFAULT / BL_NIGHT_DEFAULT for the backlight sanitize
 #include <instrument.h>  // INSTRUMENT_ENABLED
 #else
 #include <maxhop.h>   // MAXHOP_TEXT_FALLBACK, dependency-frei (siehe unten)
@@ -257,6 +258,14 @@ bool sanitize_loaded_settings(void)
     // Wipe 4.2 V < 6.5 V -> BAT-01 meldet "kein Akku", Anzeige bleibt auf USB)
     #if defined(BAT_MIN_VOLTAGE) && defined(BAT_MAX_VOLTAGE)
     if(sanitize_max_voltage(meshcom_settings.node_maxv, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE, sanitize_log))
+        fixed++;
+    #endif
+
+    // TD-23: backlight levels 1..16 (0 = panel off is never a stored level)
+    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
+    if(sanitize_backlight_level(meshcom_settings.node_bl_day, BL_DAY_DEFAULT, "node_bl_day", sanitize_log))
+        fixed++;
+    if(sanitize_backlight_level(meshcom_settings.node_bl_night, BL_NIGHT_DEFAULT, "node_bl_night", sanitize_log))
         fixed++;
     #endif
 

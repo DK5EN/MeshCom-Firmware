@@ -66,6 +66,8 @@ void test_round_trip_restores_every_persisted_field(void)
     meshcom_settings.node_lat = 48.2082;                // DOUBLE
     meshcom_settings.node_symid = 'X';                  // U8 (CFG_CHR)
     meshcom_settings.node_mute = true;                  // BOOL (T-Deck-only)
+    meshcom_settings.node_bl_night = 2;                 // TD-23 T-Deck-only INT
+    meshcom_settings.node_bl_auto = true;               // TD-23 T-Deck-only BOOL
     meshcom_settings.node_fversion = 7;                 // SETTINGS_PERSIST_ONLY_LIST row
     strncpy(meshcom_settings.node_gwsrv, "AA", sizeof(meshcom_settings.node_gwsrv) - 1);
 
@@ -76,6 +78,8 @@ void test_round_trip_restores_every_persisted_field(void)
     strncpy(meshcom_settings.node_call, "ZZ", sizeof(meshcom_settings.node_call) - 1);
     meshcom_settings.node_alt = 999;
     meshcom_settings.node_mute = false;
+    meshcom_settings.node_bl_night = 9;
+    meshcom_settings.node_bl_auto = false;
 
     init_flash();
 
@@ -86,6 +90,8 @@ void test_round_trip_restores_every_persisted_field(void)
     TEST_ASSERT_DOUBLE_WITHIN(0.00001, 48.2082, meshcom_settings.node_lat);
     TEST_ASSERT_EQUAL_INT8('X', meshcom_settings.node_symid);
     TEST_ASSERT_TRUE(meshcom_settings.node_mute);
+    TEST_ASSERT_EQUAL_INT(2, meshcom_settings.node_bl_night);
+    TEST_ASSERT_TRUE(meshcom_settings.node_bl_auto);
     TEST_ASSERT_EQUAL_INT(7, meshcom_settings.node_fversion);
     TEST_ASSERT_EQUAL_STRING("AA", meshcom_settings.node_gwsrv);
 }

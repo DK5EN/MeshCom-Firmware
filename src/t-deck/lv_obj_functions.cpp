@@ -125,6 +125,7 @@ lv_obj_t    *dropdown_mapselect;
 lv_obj_t    *btn_clear_messages;
 lv_obj_t    *btn_clear_mh;
 lv_obj_t    *btn_clear_nodes;
+lv_obj_t    *btn_blauto;
 lv_obj_t    *btn_gps;
 lv_obj_t    *btn_mesh;
 lv_obj_t    *btn_noallmsg;
@@ -1337,8 +1338,33 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_obj_add_event_cb(dropdown_mapselect, btn_event_handler_dropdown_mapselect, LV_EVENT_ALL, NULL);
     lv_dropdown_close(dropdown_mapselect);
 
+    // Line Backlight (TD-23): the callsign and buttons lines are full at 320 px
+    lv_obj_t * setup_line_backlight = SET_new_line(t1, setup_line_buttons, 5);
+
+    lv_obj_t * setup_bl_label = lv_label_create(setup_line_backlight);
+    lv_obj_align(setup_bl_label, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_set_width(setup_bl_label, 75);
+    lv_label_set_text(setup_bl_label, "Display ");
+    lv_obj_set_style_text_align(setup_bl_label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+
+    // AUTO DAY/NIGHT BRIGHTNESS (levels are set with SYM+B)
+    btn_blauto = lv_btn_create(setup_line_backlight);
+    lv_obj_align(btn_blauto, LV_ALIGN_TOP_LEFT, 77, 0);
+    lv_obj_set_width(btn_blauto, 140);
+    lv_obj_set_height(btn_blauto, 35);
+
+    /* Make the button checkable (like a toggle) */
+    lv_obj_add_flag(btn_blauto, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_style_bg_color(btn_blauto, lv_color_make(0xd2, 0xd2, 0xd2), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(btn_blauto, lv_color_make(0x00, 0xa3, 0x00), LV_PART_MAIN | LV_STATE_CHECKED);
+    lv_obj_add_event_cb(btn_blauto, btn_event_handler_setup_btn, LV_EVENT_VALUE_CHANGED, NULL);
+
+    lv_obj_t * btn_blauto_label = lv_label_create(btn_blauto);
+    lv_label_set_text(btn_blauto_label, "Auto Day/Night");
+    lv_obj_center(btn_blauto_label);
+
     // StartupTone
-    lv_obj_t * setup_line_starttone = SET_new_line(t1, setup_line_buttons, 5);
+    lv_obj_t * setup_line_starttone = SET_new_line(t1, setup_line_backlight, 5);
 
     // StartupTone
     lv_obj_t * setup_stone_label = lv_label_create(setup_line_starttone);
@@ -4382,6 +4408,11 @@ void tdeck_refresh_SET_view()
         lv_obj_clear_state(btn_soundon, LV_STATE_CHECKED);
     else
         lv_obj_add_state(btn_soundon, LV_STATE_CHECKED);
+    // AUTO DAY/NIGHT BRIGHTNESS (TD-23)
+    if (meshcom_settings.node_bl_auto)
+        lv_obj_add_state(btn_blauto, LV_STATE_CHECKED);
+    else
+        lv_obj_clear_state(btn_blauto, LV_STATE_CHECKED);
     // Save to Flash
     if (meshcom_settings.node_persist_to_flash)
         lv_obj_add_state(btn_persist_to_flash, LV_STATE_CHECKED);

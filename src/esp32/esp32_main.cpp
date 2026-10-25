@@ -220,6 +220,7 @@ bool bDEEP_SLEEP = false;
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/tdeck_main.h>
 #include <t-deck/tdeck_extern.h>
+#include <t-deck/tdeck_helpers.h>   // TD-23: brightnessTick()
 #include <t-deck/lv_obj_functions.h>
 #include <t-deck/lv_obj_functions_extern.h>
 #endif
@@ -5292,6 +5293,9 @@ void esp32loop()
         // printfdeb("Loop: Timeout reached. Timer: %lu, Millis: %lu\n", tdeck_tft_timer, millis());
         tft_off();
     }
+
+    // TD-23: day/night backlight check and the debounced SYM+B save
+    brightnessTick(false);
 
     { INSTR_SECTION("lvgl"); LOOP_SECTION(LSEC_LVGL); lv_task_handler(); }
 

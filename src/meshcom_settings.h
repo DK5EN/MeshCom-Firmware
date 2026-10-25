@@ -38,7 +38,7 @@
  * init_flash() seeds most of these again before the walk. Do not "unify"
  * them without reading esp32_flash.cpp's pre-load block first.
  *
- * Platform-specific MEMBERS: the 13 T-Deck UI fields stay T-Deck-only and
+ * Platform-specific MEMBERS: the 16 T-Deck UI fields stay T-Deck-only and
  * node_disp_rot / node_ntp stay ESP32-only (operator decision 2026-09-13,
  * BACKLOG W3 step 4: platform-scoped via CFG_FIELD_LIST_PLATFORM, not inert
  * members on the other platform). Removed for good in the merge:
@@ -244,7 +244,11 @@
         M(bool, node_persist_to_sd, false)                                                           \
         M(bool, node_immediate_save, false)                                                          \
         M(bool, node_kbl_sync, true)                                                                 \
-        M(bool, node_wifion, true)
+        M(bool, node_wifion, true)                                                                   \
+        /* TD-23 backlight: day and night level 1..16 (SYM+B), auto day/night switch */             \
+        M(int, node_bl_day, 16)                                                                      \
+        M(int, node_bl_night, 4)                                                                     \
+        M(bool, node_bl_auto, false)
 #else
     #define MESHCOM_SETTINGS_MEMBERS_TDECK(M, A)
 #endif

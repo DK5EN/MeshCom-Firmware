@@ -39,6 +39,13 @@ existing round-trip case), `test_decodetinyxml` (+2: station offset kept while a
 set, applied when not) and `test_ble_phone_harness` (SN1 frame size pinned at
 99 bytes, case count unchanged).
 
+Added with TD-23 (2026-10-25, T-Deck day/night backlight): `test_daylight` (sun
+elevation of `src/daylight.h` against astral/PyEphem sunrise and sunset for Munich,
+Sydney, New York and Tromsoe within 3 min, polar day and night, hysteresis, the
+backlight policy and the SYM+B step table; Unit, own env `native_daylight`).
+Extended: `test_settings_sanitize` (+1, backlight level clamp) and
+`test_esp32_settings_nvs` (round trip covers `node_bl_night`/`node_bl_auto`).
+
 Added with the #1187-#1191 campaign (2026-10-04, `docs/concept-open-issues-20261004.md`):
 `test_netif_mtu` (NMTU-01: MTU clamp of `src/esp32/netif_mtu.h` and a source pin
 that the apply hooks avoid `AP_START` and precede both web servers; Unit, own
@@ -185,6 +192,7 @@ flashes whatever is attached.
 | test_config_json             | Contract      |    25 | native_config                                                |
 | test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
 | test_csma_timing             | Unit          |    10 | native                                                       |
+| test_daylight                | Unit          |    11 | native_daylight                                              |
 | test_decodeaprspos           | Unit          |    22 | native_parsers                                               |
 | test_decodetinyxml           | Unit          |    14 | native_xml                                                   |
 | test_dedup_replay            | Oracle/Replay |     2 | native_dedup                                                 |
@@ -270,7 +278,7 @@ flashes whatever is attached.
 | test_setlog_lines            | Unit          |    29 | native                                                       |
 | test_settings_members        | Contract      |     5 | native_settings_members_esp32, native_settings_members_nrf52 |
 | test_settings_roundtrip      | Contract      |     9 | native_settings_roundtrip                                    |
-| test_settings_sanitize       | Regression    |    15 | native                                                       |
+| test_settings_sanitize       | Regression    |    17 | native                                                       |
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
 | test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
 | test_sto_notice              | Unit          |    26 | native                                                       |
