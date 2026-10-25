@@ -42,7 +42,7 @@ details > h3:first-of-type{margin-top:.4rem}
 <li>Stand: 25.10.2026, PR-Zahlen aus der GitHub-API (<code>gh pr list -R icssw-org/MeshCom-Firmware --author DK5EN --state all</code>)</li>
 <li>Zeitraum: 22.02.2026 bis 24.10.2026, letzter Merge ist #1236</li>
 <li>Zeilenanteil in der Firmware: <code>git blame</code> auf upstream <code>dev</code> 9669ec99, Stand 18.10.2026, nicht neu berechnet</li>
-<li>Fork-Release: <code>v4.40a.10.24</code>; letztes offizielles Release: <code>v4.40a.spserver</code> (22.10.2026)</li>
+<li>Fork-Release: <code>v4.40a.10.25</code>; letztes offizielles Release: <code>v4.40a.spserver</code> (22.10.2026)</li>
 </ul>
 
 <div class="bluf">
@@ -63,8 +63,8 @@ Zusammen sind das +76.698 und −38.910 Zeilen in 899 Dateiänderungen.</p>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a> stehen in 4.40a.spserver.</li>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a> stehen nur in <code>dev</code>, ein Tag folgt noch.</li>
   </ul></li>
-<li><strong>Offene PRs:</strong> keiner. Die Board-Kennung und <code>--id</code> sind als nächster PR geplant (Release Notes <code>v4.40a.10.24</code>, Abschnitt „Upstream“).</li>
-<li><strong>Der Fork liefert mehr:</strong> Das Fork-Release <code>v4.40a.10.24</code> enthält neben diesen PRs die Fork-Funktionen zu den upstream-Issues #1187 bis #1189: Auto Update, Speichern-und-Weiterleiten über den Server und Fernsteuerung per LoRa. Sie sind noch nicht in upstream. Siehe „Was der Fork darüber hinaus liefert“.</li>
+<li><strong>Offene PRs:</strong> keiner. Die Board-Kennung und <code>--id</code> sind als nächster PR geplant (Release Notes <code>v4.40a.10.25</code>, Abschnitt „Upstream“).</li>
+<li><strong>Der Fork liefert mehr:</strong> Das Fork-Release <code>v4.40a.10.25</code> enthält neben diesen PRs die Fork-Funktionen zu den upstream-Issues #1187 bis #1189: Auto Update, Speichern-und-Weiterleiten über den Server und Fernsteuerung per LoRa. Sie sind noch nicht in upstream. Siehe „Was der Fork darüber hinaus liefert“.</li>
 </ul>
 
 <ol class="toc">
@@ -382,8 +382,8 @@ Zusammen sind das +76.698 und −38.910 Zeilen in 899 Dateiänderungen.</p>
 </details>
 
 <h2 id="fork">Was der Fork darüber hinaus liefert</h2>
-<p><strong>Seit 24.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a>.</strong> Es besteht aus dem offiziellen 4.40a.hbserver, den Änderungen aus upstream <code>dev</code> bis d47c34c1 (Stand von 4.40a.spserver) und den Fork-Funktionen für #1187 bis #1189.</p>
-<p>Upstream hat 4.40a am 02.10.2026, 4.40a.hbserver am 13.10.2026 und 4.40a.spserver am 22.10.2026 veröffentlicht. Der Fork stellte aus dem Quelltext von 4.40a das Release v4.40a.10.02 bereit. Seit dem 19.10. kamen im Fork sechs Releases mit wichtigen Fehlerkorrekturen. Was davon schon in upstream ist, steht in der Zeile.</p>
+<p><strong>Seit 25.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.25">v4.40a.10.25</a>.</strong> Es besteht aus dem offiziellen 4.40a.hbserver, den Änderungen aus upstream <code>dev</code> bis d47c34c1 (Stand von 4.40a.spserver) und den Fork-Funktionen für #1187 bis #1189.</p>
+<p>Upstream hat 4.40a am 02.10.2026, 4.40a.hbserver am 13.10.2026 und 4.40a.spserver am 22.10.2026 veröffentlicht. Der Fork stellte aus dem Quelltext von 4.40a das Release v4.40a.10.02 bereit. Seit dem 19.10. kamen im Fork sieben Releases mit wichtigen Fehlerkorrekturen. Was davon schon in upstream ist, steht in der Zeile.</p>
 <div class="table-wrap"><table><thead><tr><th>Release</th><th>Datum</th><th>Was es behebt oder bringt</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19">v4.40a.10.19</a></td><td>19.10.2026</td><td><b>Volle LoRa-Sendewarteschlange:</b> ein Knoten mit eigenen und weitergeleiteten Paketen hängt nicht mehr minutenlang hinter seinen Nachbarn. Dazu feste Werte für zehn Protokoll-Einstellungen in Release-Builds, Auto Update im Web-GUI nur noch als Hinweis, mehr freier Heap für die Update-Prüfung auf klassischen ESP32, die Board-LED auf nRF52 und ein Watchdog-Fix für die Nachbarseite.</td></tr>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">v4.40a.10.20</a></td><td>19.10.2026</td><td><b>Webserver startet den Knoten nicht mehr über den Watchdog neu:</b> jede Seite läuft durch einen begrenzten Sendepuffer, ein langsamer oder hängender Browser beendet nur die Seite. Dazu Ende der „WEBServer stopped“-Logflut ohne IP-Adresse, NVS-Diagnose für die Fernsteuerung und der Fix für die T-Beam 1W, die nach einem Auto Update im Safeboot blieb (AU-16).</td></tr>
@@ -391,6 +391,7 @@ Zusammen sind das +76.698 und −38.910 Zeilen in 899 Dateiänderungen.</p>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a></td><td>23.10.2026</td><td><b>Gateway-Diagnose:</b> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, als #1233 auch in upstream). Dazu die Server-Zeile SP (Polen) aus upstream #1234.</td></tr>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.23">v4.40a.10.23</a></td><td>24.10.2026</td><td><b>Neue LoRa-Sendewarteschlange:</b> ein Slot-Pool statt Ring, alte Frames verfallen je Priorität, Zeitbaken älter als 150 s gehen nicht mehr auf die Luft, ein neueres HEY oder eine neuere Position ersetzt die wartende Kopie. Dazu die Rufzeichen-Sperrliste <code>--blockcall</code>, der Fix für einen Absturz in der BLE-Pause des täglichen Update-Checks auf klassischen ESP32 (AU-19) und acht weitere Stabilitätsfixes. Noch nicht in upstream; #1235 ist seit 23.10. gemerged.</td></tr>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a></td><td>24.10.2026</td><td><b>Vier kleine Fixes:</b> SP-Server auf <code>sp.meshcom.pl</code> (als #1236 auch in upstream), Display-Puffer des Heltec Wireless Tracker wird für den Update-Check freigegeben (AU-21), ein frisch gelöschter T-Beam startet mit GPS statt TRACK (TRK-03), ein Fernwartungs-Kommando (RM1) aus der App oder Konsole hört mit der Antwort auf zu wiederholen. Außer #1236 noch nicht in upstream.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.25">v4.40a.10.25</a></td><td>25.10.2026</td><td><b>Eigene Gruppentexte gehen mindestens einmal raus:</b> die Server-Kopie eines anderen Gateways gibt den eigenen Text nicht mehr vor dem ersten Senden frei (TXP-01). Dazu ein WLAN-Watchdog, der eine angemeldete, aber tote Verbindung auf allen ESP32 erkennt (TD-21), Speicherfixes für die T-Deck (TD-20, TD-22) und die gespeicherte Helligkeit mit Tag/Nacht-Umschaltung (TD-23). Noch nicht in upstream.</td></tr>
 </tbody></table></div>
 
 <h2 id="grenzen">Was nicht geprüft ist</h2>

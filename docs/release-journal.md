@@ -1,11 +1,73 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261024`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261025`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.25 (Sonntag, 2026-10-25)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 Assets wie bei 10.24.
+`FLASH_VERSION` 20261025, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten
+(die drei TD-23-Felder sind neue NVS-Keys nur auf T-Deck/T-Deck Plus/T-Deck Pro). Safeboot v3 unveraendert.
+
+Inhalt seit `v4.40a.10.24` (Firmware: 8 Commits plus Merge von Fork-PR #1, dazu der `FLASH_VERSION`-Stempel):
+
+- TXP-01 (`556b997d`): `pnFrameIsReleasableGroupText()` gibt keinen Frame mit eigenem Call als Quelle mehr frei.
+  Vorher gab die Server-Kopie eines anderen Gateways einen eigenen Gruppen- oder `*`-Text frei, bevor er einmal
+  gesendet war (DK5EN-98-Logger 2026-10-24/25: 45 von 103 eigenen Gruppentexten nie auf LoRa; Bench 9/10). Der
+  40-s-Gehoert-Check stoppt die Wiederholung wie bisher; Texte fuer einen KISS-Client (fremde Quelle) bleiben freigebbar.
+- TD-20 (`5b1e1da8`): `persisted_msgs` hielt jede empfangene Nachricht bis zum Reboot im internen RAM
+  (Staging fuer `/messages.json`, dessen Datei-I/O nur unter `T_DECK_SPIFFS` existiert, nirgends definiert).
+  Nach ~250 Nachrichten fielen 124-B-DMA-Allokationen aus und der IP-Pfad hing. Jetzt nur noch unter `T_DECK_SPIFFS`.
+- TD-21 (`5b1e1da8`) und TD-21b (`ace935c6`): IP-Liveness-Watchdog fuer alle ESP32 im WiFi-Modus. Alle 30 s
+  drei ICMP-Echos an `WiFi.gatewayIP()` (seit WIFI-HEAP-01 per raw-pcb ohne eigenen Task); scharf
+  erst nach der ersten Antwort; 3 Fehlrunden -> Reconnect, +3 -> Netz-Reset, +10 -> Restart
+  (`[WIFI];watchdog;ipdead;...`). TD-21b: eine haengende Runde ueber einen Gateway-Wechsel hinweg wird erkannt.
+- WIFI-HEAP-01 (im Release-Gate gefunden): die esp_ping-Session hielt dauerhaft einen Task mit 3 KB Stack,
+  Idle-Heap DK5EN-92 63884 B (-5448 B, Gate rot). Ersetzt durch einen raw-lwIP-ICMP-pcb im tcpip-Thread
+  (`tcpip_try_callback`, kein Task, Loop blockiert nie); nur eine Antwort auf die laufende Runde zaehlt;
+  `[WIFI];probe;armed` bei der ersten Antwort. Unabhaengiger Review: zwei Punkte uebernommen (Runden-Vergleich,
+  hoechstens ein eingereihter Send).
+- TD-22 (`bae97fd1`): T-Deck hoechstens 16 Nachrichten-Tabs (LRU-Verdraengung inaktiver Tabs), unter 40 KiB
+  freiem internem RAM werden die aeltesten Blasen des am laengsten inaktiven Tabs verworfen (aktiver Tab behaelt 10);
+  System-Texte auf 1024 Zeichen begrenzt.
+- TD-23 (`ef95563f`, Fork-PR #1, Merge `b5af54b0`): T-Deck-Hintergrundlicht gespeichert (`node_bl_day` 16,
+  `node_bl_night` 4, `node_bl_auto` aus), SYM+B 16/12/8/4/2/1, Tag/Nacht ueber den Sonnenstand an der eigenen
+  Position (-6 Grad, 1 Grad Hysterese), ohne Uhr oder Position Tag-Stufe; `--bl`, Setup-Tab "Auto Day/Night".
+- INSTRUMENT-only, Release-Builds unveraendert: `[INSTR-HEAP]`-Zeile, `--heaplog`, `--wifips` (`b55a5a6a`),
+  `--wifips none` verweigert bei laufendem BT-Controller statt Panic (`9e4d8781`, WIFI-PS-01), `--heapeat`.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (82 Unity-Envs, 2942/2942, Golden 48, pytest 1410).
+- Idle-Heap DK5EN-92 (T-Beam v1.2, Release-Image, ueber 2323, `--boot-timeout-s 400`): 68728 B gegen Baseline
+  69332 B (-604 B) PASS. Gemessen auf dem raw-Probe-Build vor den zwei Review-Punkten (ein bool mehr).
+  Mit der esp_ping-Session vorher 63884 B (FAIL).
+- TXP-01 auf DK5EN-1 (Heltec V3) und DK5EN-90 (RAK4631) nach Gruppe 9999, gleicher Aufbau vor/nach dem Fix:
+  ohne Fix 6 von 10 eigenen Texten vor dem ersten TX freigegeben, mit Fix 0 von 20; 20 von 20 gesendet, 19 genau einmal.
+- TD-20 auf DK5EN-14 (T-Deck Plus, INSTRUMENT): 400 Nachrichten, Plateau bei 41,6 KB frei, `persisted_msgs` 0
+  (vorher Haenger bei ~250).
+- TD-21 auf DK5EN-14 mit dem finalen raw-Probe (INSTRUMENT): mit `--heapeat` auf 588 B frei, IP-Pfad tot, Heap
+  freigegeben, Pfad bleibt tot, nach 3 Fehlrunden `ipdead;reconnect`, Ausfall 2 min 0 s, kein Reboot
+  (`td21c_bench.summary`; esp_ping-Variante 2 min 1 s, vor TD-21 keine Erholung in 20 min).
+- TD-22 auf DK5EN-14: 20 Gruppen reihum -> 16 Tabs, 146 Verdraengungen, 0 Pings verloren; 500 Nachrichten in
+  5 Gruppen -> Boden 77-mal gegriffen, 41,0-61,9 KB frei, keine Fehlallokation.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- TD-23 nicht auf Hardware (UAT durch den Operator steht aus): nur Host-Tests (`native_daylight` 11 Faelle,
+  Sanitize, NVS-Roundtrip) und Builds.
+- TD-21 nur auf dem T-Deck Plus ausgehungert (T-Beam nur `probe;armed`); Stufen Netz-Reset und Restart nur im Host-Test. Bei `td21b_bench` fiel die
+  Assoziation ganz weg; der alte Watchdog verband erst nach `WIFI_WD_GRACE_S` (180 s) neu, nicht verkuerzt.
+- Kein 24-h-Soak nach TD-20/TD-22 (der Soak wurde am 2026-10-25 nach 6 min fuer den TXP-01-Bench abgebrochen),
+  keine Sichtpruefung der Tabs am Geraet.
+- TXP-01 nicht auf DK5EN-98 im Feld (laeuft noch den `3e07f894`-Gate-Build); TTL-Werte nicht nachjustiert.
+- Alle Boards ausser Heltec V3, RAK4631, T-Deck Plus und T-Beam v1.2 fuer die Aenderungen dieses Releases nur gebaut.
 
 ---
 

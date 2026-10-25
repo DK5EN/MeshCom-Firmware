@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MeshCom-Fork von DK5EN: Firmware zum Flashen und sechs belegte Analysen</title>
-<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.10.24 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
+<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.10.25 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,12 +26,12 @@
   <h1>Fork-Firmware zum Flashen und sechs belegte Analysen dazu</h1>
   <ul class="meta">
     <li>Stand: 25.10.2026, Aussagen geprüft gegen den Quellcode von <code>fork-dev</code></li>
-    <li>Firmware: Release v4.40a.10.24 vom 24.10.2026</li>
+    <li>Firmware: Release v4.40a.10.25 vom 25.10.2026</li>
     <li>Quellen: Quellcode, Repo-Dokumente, GitHub-API; jede Seite nennt ihre Quellen am Ende</li>
   </ul>
 
   <div class="bluf">
-    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.10.24 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
+    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.10.25 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
     <p class="reco">Wer ein T-Beam 1W oder ein T-Deck Pro betreibt, liest zuerst den Handlungsbedarf in der Release-Karte.</p>
   </div>
 
@@ -46,9 +46,9 @@
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Aktuelles Release · 24.10.2026</div>
-      <h2>v4.40a.10.24 ist v4.40a.10.23 plus vier kleine Fixes</h2>
-      <p><strong>Der SP-Server zieht um, der Wireless Tracker bekommt genug Speicher für Auto Update, ein frischer T-Beam startet mit GPS statt TRACK, und ein RM1-Befehl aus der App hört mit der Antwort auf zu wiederholen.</strong> Die Einstellungen bleiben erhalten.</p>
+      <div class="eyebrow">Aktuelles Release · 25.10.2026</div>
+      <h2>v4.40a.10.25: eigene Gruppentexte gehen sicher raus, WLAN erholt sich selbst</h2>
+      <p><strong>Jeder eigene Gruppentext geht mindestens einmal auf LoRa, ein ESP32 im WLAN holt eine tote Verbindung selbst zurück, und die T-Deck läuft auch nach vielen Nachrichten nicht mehr voll.</strong> Die Einstellungen bleiben erhalten.</p>
       <div class="callout warn">
         <p><strong>Handlungsbedarf: T-Beam 1W und T-Deck Pro</strong></p>
         <ul>
@@ -68,16 +68,23 @@
       </div>
       <h3>Kernfakten</h3>
       <ul>
-        <li><strong>SP-Server:</strong> Gateways mit Server-Code SP verbinden sich mit <code>sp.meshcom.pl</code> (vorher <code>spmeshcom.dynalias.com</code>, beide lösen auf 146.59.232.234 auf). Upstream gemergt als #1236.</li>
-        <li><strong>Heltec Wireless Tracker:</strong> der Display-Puffer (25,6 KB) existiert nur noch bei eingeschaltetem Display und wird für jeden Update-Check freigegeben. Auto Update scheitert nicht mehr am Speicher (AU-21).</li>
-        <li><strong>T-Beam:</strong> ein frisch gelöschter T-Beam startet mit GPS an statt mit TRACK (TRK-03). Bestehende Knoten behalten ihre Einstellung; prüfen mit <code>--pos</code>.</li>
-        <li><strong>Fernsteuerung:</strong> ein RM1-Befehl aus McApp, Konsole oder Web-GUI hört mit der Antwort des Ziels auf zu wiederholen. Auf der Bench nicht gemessen, nur am Host getestet.</li>
+        <li><strong>Eigene Gruppentexte:</strong> die Server-Kopie eines anderen Gateways löscht den eigenen Text nicht mehr aus der Warteschlange, bevor er einmal gesendet wurde. Am Gateway DK5EN-98 gingen vorher 45 von 103 eigenen Gruppentexten nie auf LoRa; auf der Bench nach dem Fix 0 von 20 (TXP-01).</li>
+        <li><strong>WLAN auf allen ESP32:</strong> der Knoten pingt alle 30 s seinen WLAN-Router. Ist die Verbindung angemeldet, aber tot, verbindet er neu, startet dann das Netz neu und zuletzt sich selbst (TD-21). Ein Router, der nie auf Ping antwortet, löst nichts aus.</li>
+        <li><strong>T-Deck und T-Deck Plus, Speicher:</strong> keine zweite Kopie jeder Nachricht mehr im internen RAM, höchstens 16 Tabs, unter 40 KiB frei fallen alte Nachrichten inaktiver Tabs weg. Vorher hing das WLAN nach etwa 250 Nachrichten (TD-20, TD-22).</li>
+        <li><strong>T-Deck und T-Deck Plus, Helligkeit:</strong> die Stufe bleibt nach dem Neustart erhalten. „Auto Day/Night“ im Setup schaltet nach dem Sonnenstand zwischen Tag- und Nachtstufe um; aus, bis man es einschaltet (TD-23, noch nicht auf dem Gerät geprüft).</li>
         <li><strong>Einstellungen:</strong> der Flash-Strukturstand bleibt <code>20260724</code>. Ausnahme: zehn feste Protokolleinstellungen werden beim ersten Start auf ihren Festwert gesetzt (seit v4.40a.10.19).</li>
         <li><strong>Auto Update:</strong> der Modus ist immer <code>notify</code>, der Knoten meldet ein neues Release und installiert nichts von selbst. Der Kanal <code>dev</code> liest das Latest-Release dieses Forks.</li>
         <li><strong>Build:</strong> von GitHub CI aus dem getaggten Commit gebaut, 66 Dateien. Nicht byte-gleich mit einem offiziellen Release.</li>
       </ul>
       <details>
         <summary>Was seit v4.40a.10.16 dazukam</summary>
+        <h4>v4.40a.10.24</h4>
+        <ul>
+          <li><strong>SP-Server</strong> auf <code>sp.meshcom.pl</code> (upstream #1236).</li>
+          <li><strong>Heltec Wireless Tracker:</strong> Auto Update scheitert nicht mehr am Display-Puffer (AU-21).</li>
+          <li><strong>T-Beam:</strong> ein frisch gelöschter T-Beam startet mit GPS statt TRACK (TRK-03).</li>
+          <li><strong>Fernsteuerung:</strong> ein RM1-Befehl aus der App hört mit der Antwort auf zu wiederholen.</li>
+        </ul>
         <h4>v4.40a.10.23</h4>
         <ul>
           <li><strong>Neue LoRa-Sendewarteschlange:</strong> ein Slot-Pool mit Verfall je Priorität; Zeitbaken, die älter als 150 s sind, werden nicht gesendet.</li>
@@ -130,7 +137,7 @@
           <li><strong>Offizielles v4.40a.hbserver</strong> plus die Fork-Funktionen aus #1187 bis #1189: Auto Update über GitHub, Speichern-und-Weiterleiten über den Server (seit v4.40a.10.19 in Release-Builds gesperrt) und HMAC-gesicherte Fernsteuerung per LoRa (ab Werk aus).</li>
         </ul>
       </details>
-      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">Release v4.40a.10.24</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
+      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.25">Release v4.40a.10.25</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
     </div>
 
     <a class="card" href="meshcom-protocol.html">
@@ -177,16 +184,16 @@
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
-      <h2>Web-Flasher: v4.40a.10.24 direkt aus dem Browser</h2>
+      <h2>Web-Flasher: v4.40a.10.25 direkt aus dem Browser</h2>
       <p><strong>Das aktuelle Release per USB auf den Knoten, ohne Installation und ohne esptool.</strong> Bootloader, Partitionstabelle, Safeboot und Anwendung gehen in einem Durchgang; das Board wird am Knoten erkannt oder aus dem Flash gelesen.</p>
       <p>Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge und Opera auf dem Desktop.</p>
-      <div class="card-meta">v4.40a.10.24 · Web Serial</div>
+      <div class="card-meta">v4.40a.10.25 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     <p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a> (24.10.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.25">v4.40a.10.25</a> (25.10.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a></p>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>

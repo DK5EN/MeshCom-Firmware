@@ -3,7 +3,7 @@
 
 ## What this release is
 
-**`v4.40a.10.24` is `v4.40a.10.23` plus four small fixes: the Polish gateway server moves to `sp.meshcom.pl`, the Heltec Wireless Tracker gets enough memory for Auto Update, a factory-fresh T-Beam starts with GPS on instead of TRACK, and a remote-management command sent from the phone app stops repeating once the target answers.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
+**`v4.40a.10.25` makes sure an own group text always goes on air, lets every ESP32 node on WiFi recover a dead network link by itself, and stops the T-Deck from running out of memory after many messages; the T-Deck also keeps its backlight level and can dim at night.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
 
 ### Action needed
 
@@ -24,11 +24,11 @@
 
 ### Key facts
 
-- **Base:** official `v4.40a.hbserver` plus the fork's own work (gateway server table, `--setnet`, GPS position filter, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release.
+- **Base:** official `v4.40a.spserver` (the latest official release, 2026-10-22), upstream `dev` up to #1236, and the fork's own work (transmit queue pool, Auto Update, store-and-forward, authenticated remote management over LoRa). It is the fork's `fork-dev` branch and **not** byte-identical to any official release.
 - **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. **Exception:** ten locked protocol settings are reset to their fixed value at first boot (since `v4.40a.10.19`, see below).
 - **How to tell builds apart:** the version on the air still reads `4.40a`.
-  - `--info` prints `...AU env=<board> tag=v4.40a.10.24` and `FLASH_VERSION 20261024`.
-  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.10.24`.
+  - `--info` prints `...AU env=<board> tag=v4.40a.10.25` and `FLASH_VERSION 20261025`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.10.25`.
 - **Safeboot v3** ships unchanged since `v4.40a.10.21`.
   - It reaches a node only through the web flasher; over-the-air updates write the application alone.
   - Optional: the application still works with Safeboot v2 (`v4.40a.10.05` and later). v3 only adds that Safeboot names the board.
@@ -38,7 +38,39 @@
   - the three nRF52 boards as `.uf2` and DFU `.zip`
   - six support files
 
-## New in `v4.40a.10.24`
+## New in `v4.40a.10.25`
+
+- **An own group text is always sent at least once** (fork only, transmit queue, TXP-01).
+  - Cause: when another gateway put the server copy of our group or `*` text on air first, our node took that copy as the echo of its own text and dropped it from the queue before its own first transmission.
+  - Effect: on the gateway `DK5EN-98` 45 of 103 own group texts never left the node on LoRa (field log, 2026-10-24/25); on the bench 9 of 10.
+  - Now: an own text is never released before it was sent once. The existing check stops the repeat after it was heard. Texts sent for a KISS client keep the old release.
+  - Own direct messages (PN) were not affected (0 of 20 on the bench).
+  - Background: [`docs/txp-own-msg-echo-release-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/txp-own-msg-echo-release-20261024.md).
+- **ESP32 nodes on WiFi recover a dead network link by themselves** (TD-21, all ESP32 boards in WiFi mode).
+  - Cause: a node can stay associated with its access point while the IP path is dead (no answer to ARP or ping). The old watchdog only acted when the link dropped, so the node stayed offline: 47 minutes on a T-Deck Plus in the field, more than 20 minutes on the bench.
+  - Now: every 30 s the node pings its WiFi gateway (3 echoes). After 3 failed rounds it reconnects WiFi, after 3 more it restarts the network, after 10 more it reboots. Log: `[WIFI];watchdog;ipdead;<reconnect|reset|restart>`.
+  - A gateway that never answered a ping does not arm the watchdog, so routers that block ping cause no action.
+  - No extra task: the probe runs inside the network stack and costs about 0.6 KB of idle heap on a T-Beam (WIFI-HEAP-01).
+  - Bench: an outage of 2 min instead of no recovery in 20 min.
+- **T-Deck: no more memory exhaustion after many received messages** (TD-20, TD-22, T-Deck and T-Deck Plus).
+  - Cause: every received message was kept a second time in internal memory until reboot, and the number of message tabs had no limit. After about 250 messages the WiFi buffers ran out and the network link hung.
+  - Now: the extra copy is gone. At most 16 tabs, the least recently used one is closed first. Below 40 KiB of free internal memory the oldest messages of an inactive tab are dropped (the open tab keeps at least 10).
+  - Bench `DK5EN-14`: 500 messages in 5 groups held 41-62 KB free, 0 lost pings.
+  - Background: [`docs/campaign-tdeck-heap-wifi-20261025.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-tdeck-heap-wifi-20261025.md).
+- **T-Deck: saved backlight level with an automatic day/night switch** (TD-23, T-Deck and T-Deck Plus).
+  - The level survives a reboot (was 16 on every boot). SYM+B steps 16, 12, 8, 4, 2, 1 and saves the level of the current period.
+  - "Auto Day/Night" in the Setup tab (Display line): the node switches between a day level (default 16) and a night level (default 4) by the sun's elevation at its position. Off by default, so nothing changes until you switch it on.
+  - Without a valid clock or position the day level is used.
+  - Console: `--bl`, `--bl auto on|off`, `--bl day|night 1-16`.
+  - Background: [`docs/TD-23-tdeck-day-night-brightness.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/TD-23-tdeck-day-night-brightness.md).
+- **Bench diagnostics only** (INSTRUMENT builds, release images unchanged): a periodic heap and WiFi line, `--heaplog`, `--wifips`, a memory starvation injector; `--wifips none` is refused while Bluetooth runs instead of crashing the node (WIFI-PS-01).
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.10.24` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.10.24</code></strong> — Polish server host, Wireless Tracker Auto Update, T-Beam first boot, remote-management repeat stop</summary>
 
 - **Polish gateway server host is now `sp.meshcom.pl`** (was `spmeshcom.dynalias.com`, server operator's request).
   - Both names resolve to 146.59.232.234; nRF52 uses the literal address, which is unchanged.
@@ -48,7 +80,7 @@
   - Now the buffer exists only while the display is on, and it is released for every update check and download. The display shows "Update..." meanwhile and redraws afterwards.
   - A TLS failure caused by low memory now reports `lowheap_tls` (web GUI: the low-memory state) instead of a connection error, and counts as one download attempt.
   - `--info` gains a `HEAP free/min/blk` line on every ESP32 and the display buffer size on the tracker.
-  - Background: [`docs/campaign-au21-tft-heap-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-au21-tft-heap-20261024.md).
+  - Background: [`docs/campaign-au21-tft-heap-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-au21-tft-heap-20261024.md).
 - **A remote-management command from the phone app stops repeating once the target answers** (fork only, remote management).
   - Since `v4.40a.10.11` an own `RM1` command repeats until the target replies. Only commands sent with `--rm` on the node itself had that stop.
   - A command composed in McApp (Extern-UDP or BLE), on the serial console or in the web GUI was sent with 3 repeats even after the target had answered within seconds, and the node logged `RETRANSMIT_GIVEUP` (field log `DK5EN-98` to `DK5EN-1`, 2026-10-24).
@@ -56,11 +88,9 @@
 - **A factory-fresh T-Beam starts with GPS on, not TRACK** (TRK-03).
   - Since V4.21 the first-boot default set the TRACK bit where it meant GPS (wrong bit value), so an erased T-Beam booted with TRACK on and GPS off.
   - Only an erased node gets the new default. Existing nodes keep their stored setting: check `--pos`, and use `--track off` / `--gps on` if needed.
-  - Background: [`docs/campaign-trk02-webflash-track-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-trk02-webflash-track-20261024.md).
+  - Background: [`docs/campaign-trk02-webflash-track-20261024.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-trk02-webflash-track-20261024.md).
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.10.23` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.10.23</code></strong> — transmit queue pool, call blocklist, nine stability fixes</summary>
@@ -73,13 +103,13 @@ Everything below is already in `v4.40a.10.23` and older, and therefore in this r
 - **A newer frame replaces its queued twin:** HEY and position of the same originator, and a newer relayed time beacon, take the queued copy's slot instead of a second one.
 - **DM retries reuse their slot,** so a DM waiting for its ACK holds one slot, not one per retry.
 - **Web GUI "TX queue" gauge:** counts every occupied slot; messages waiting for an ACK are outlined, and the legend says how many.
-- Background: [`docs/campaign-tx-pool.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-tx-pool.md).
+- Background: [`docs/campaign-tx-pool.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-tx-pool.md).
 
 **Call blocklist (fork only, BLK-01)**
 
 - **`--blockcall <list>` / `--blockcall none`:** frames from a blocked call, or relayed by one, are dropped and not relayed. A bare call blocks all its SSIDs.
 - Shown in `--info` and on the web Info/Setup pages; settable over remote management (`RM1 blockcall`). Empty by default.
-- Replaces the blocklist of the third-party DM3KS build; its stored list is taken over (ESP32). Background: [`docs/campaign-blockcall.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-blockcall.md).
+- Replaces the blocklist of the third-party DM3KS build; its stored list is taken over (ESP32). Background: [`docs/campaign-blockcall.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-blockcall.md).
 
 **Stability fixes**
 
@@ -124,7 +154,7 @@ Everything below is already in `v4.40a.10.23` and older, and therefore in this r
 - **T-Deck Pro starts again after web flashing** (WF-04).
   - It was built with `default_16MB.csv` (no Safeboot partition), while the web flasher wrote Safeboot to 0x10000 and the application to 0xC0000 like on every other 16 MB board.
   - It now uses the 16 MB Safeboot table, and `pages_flasher.py` refuses a manifest that writes outside a board's partition table (all 27 ESP32 boards pass).
-- Background: [`docs/campaign-webflasher-autodetect-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-webflasher-autodetect-20261019.md).
+- Background: [`docs/campaign-webflasher-autodetect-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-webflasher-autodetect-20261019.md).
 
 </details>
 
@@ -142,8 +172,8 @@ Everything below is already in `v4.40a.10.23` and older, and therefore in this r
   - Cause: the 1W board definition had flash mode `dio`, so it shipped the DIO bootloader. Safeboot (IDF 5) then misreads the flash, sees no settings, opens the `MeshCom-OTA` access point at 192.168.4.1, rejects the application, and writes an empty settings page: **the node loses its settings**.
   - Fix: the 1W builds with `qio` (bootloader byte-identical to the other S3 boards). Confirmed on a real 1W in the field on 2026-10-19.
   - The bootloader changes only through the web flasher. Until then every ESP32-S3 with a DIO bootloader refuses the handover to Safeboot with `[ERR];safeboot;bootloader_dio;renew with the web flasher` (no override). `--update status` and the web GUI say so.
-  - Guide: [`docs/troubleshooting-tbeam-1w-autoupdate.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/troubleshooting-tbeam-1w-autoupdate.md).
-- Background: [`docs/campaign-web-wdt-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-web-wdt-20261019.md).
+  - Guide: [`docs/troubleshooting-tbeam-1w-autoupdate.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/troubleshooting-tbeam-1w-autoupdate.md).
+- Background: [`docs/campaign-web-wdt-20261019.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-web-wdt-20261019.md).
 
 </details>
 
@@ -157,24 +187,24 @@ Everything below is already in `v4.40a.10.23` and older, and therefore in this r
   - A full queue answers with a refusal (QTA) at any depth. QRT ends below 16 entries with one QRV, at most every 60 s.
   - **Age-escalated hold:** a priority 1-3 frame waiting 20 s gets a short hold after a received frame, after 60 s the rapid hold. Never after own TX or a busy CAD.
   - Logs: the TX log `cad=` shows the real CAD attempt; `[MC-HWM]` gains `aged1`/`aged2`/`wait_hwm` (ESP32). The web queue card says "Your messages: accepted / slow down / refused".
-  - Background: [analysis](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/lora-qrt-dk5en98-db0taw14-20261018.md), [plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-lora-qrt-20261018.md).
+  - Background: [analysis](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/lora-qrt-dk5en98-db0taw14-20261018.md), [plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-lora-qrt-20261018.md).
 - **Ten protocol-tuning settings are fixed in release builds.**
   - Locked: `--nbrrelay` (on), `--nbrsym` (on), `--nbrreport` (auto), `--shortpath` (off), `--pingtime`/`--pingmax`, the four `--spec*` parameters, and `--stor on`. A change is refused with `[ERR];locked;<name>` on every path (USB, 2323 console, web, BLE, T-Deck, remote management).
   - **A node that had any of these changed is set to the fixed value at first boot.**
   - `{SET}` over LoRa accepts a text hop of 1..6 and ignores the position hop.
   - New range limits: `--postime` 300..86400 s, `--ptime` 5..120 min. Setter fixes: `--ptime` fallback 15 min (was 30 h), `--pingtime` floor 30 s, `--pingmax max` is 5 (was 100).
   - SF, bandwidth, coding rate, TX power, gateway, mesh, via and network mode stay free.
-  - Spec: [`docs/production-locked-settings.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/production-locked-settings.md).
+  - Spec: [`docs/production-locked-settings.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/production-locked-settings.md).
 - **Auto Update: `notify` only, one button in the web GUI.**
   - `off` is gone and loads as `notify`: **every ESP32 node with WiFi checks for a new release about once a day and reports it; nothing installs by itself.** `auto` is refused in every build.
   - The Info page's Auto update row runs one button through every state (Check now, Install, Downloading %, Install now, Installing %) and follows the node through Safeboot and back without a reload.
   - Classic ESP32 with a phone connected: "Pause Bluetooth and check" drops the phone link for the job. Before giving up on low heap the check sheds KISS TCP and, if that is enough, the net console.
-  - Background: [`docs/campaign-au-webgui-ux-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-au-webgui-ux-20261018.md).
+  - Background: [`docs/campaign-au-webgui-ux-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-au-webgui-ux-20261018.md).
 - **More heap for the update check on classic ESP32.** The 5 KB phone byte rings exist only while BLE runs; the check now starts with 86 KB free instead of 76-81 KB. Side effect: the web message history is empty after an update check on these boards.
 - **Board LED and charge LED.** RAK4631, T114 and T-Echo get the LED heartbeat and remote `led`; LEDs go dark in sleep and with BLE off. More variant pins; `--info` prints `BOARD LED` and `CHARGE LED`. `--board led on` is refused while OneWire owns the pad (T-Beam GPIO4).
 - **Remote `sens` reports only detected sensors** (BME280 humidity was reported as not fitted).
 - **The neighbour page no longer trips the watchdog** (field reboots on a 47-row table).
-- Background: [`docs/campaign-fork-hardening-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-fork-hardening-20261018.md).
+- Background: [`docs/campaign-fork-hardening-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/campaign-fork-hardening-20261018.md).
 
 </details>
 
@@ -230,15 +260,17 @@ Everything below is already in `v4.40a.10.23` and older, and therefore in this r
 
 </details>
 
-Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/fork-dev-vs-upstream-20261018.md).
+Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/fork-dev-vs-upstream-20261018.md).
 
 ## What changes on the air
 
-With default settings, compared with the official `v4.40a.hbserver`:
+With default settings, compared with the official `v4.40a.spserver`:
 
 - **Nothing new on LoRa by default.** STOR and remote management are off. Auto Update is a daily Internet check over WiFi, never on LoRa.
 - **Every release node relays with `--nbrrelay on`** and cannot switch it off. Relays are cancelled when every neighbour is served; expect fewer redundant copies and shorter queues. Field evidence so far: one gateway (`DK5EN-98`).
-- **Fewer own retries and copies:** echoed group texts cancel their queued copy, heard or acknowledged texts stop retrying, no retries during QRT, and a gateway no longer re-sends its own message when the server reflects it.
+- **Own group texts go out at least once:** another gateway's server copy no longer cancels an own text before its first transmission (new in this release). Expect more own texts on air from gateways near other gateways.
+- **ESP32 nodes on WiFi ping their WiFi gateway** (3 echoes every 30 s, local network only, never on LoRa).
+- **Fewer own retries and copies:** echoed group texts cancel their queued copy once it was sent, heard or acknowledged texts stop retrying, no retries during QRT, and a gateway no longer re-sends its own message when the server reflects it.
 - **Stale frames leave the queue:** relayed frames after 300 s, positions after 120 s, ACKs after 90 s; time beacons older than 150 s are not sent or relayed at all. A newer HEY, position or time beacon replaces its queued twin.
 - **Gateways send fewer server copies:** a server frame already heard on LoRa is not transmitted again.
 - **Old frames wait less:** a priority 1-3 frame queued for 20 s (60 s) goes out after a short (rapid) hold, so a busy node no longer stalls for minutes.
@@ -246,8 +278,6 @@ With default settings, compared with the official `v4.40a.hbserver`:
 - **`{SET}` over LoRa sets the text hop only** (1..6). Changed `--pingtime`/`--pingmax`, `--nbrreport` or `--shortpath` go back to the fixed value.
 - **Gateways with server code SP** connect to `sp.meshcom.pl` (same address as before).
 - **A factory-fresh T-Beam** runs GPS and no TRACK beaconing; configured T-Beams are unchanged.
-- **Gateways with server code DL or HC**, and nRF52 gateways with a static address, may talk to a different server host than before. Non-gateway nodes are not affected.
-- **T-Deck:** composing while a conversation tab is open sends to that callsign or group; before, the empty "To" field sent it to `*`.
 - **ESP32 boards with GPS send a filtered position:** a still node stays on one grid cell; a moving node follows a smoothed track.
 - **Remote management** (if enabled with a password): a LoRa DM to the own call starting with `RM1 ` is a command; a gateway uploads its own HEY echoes and RM1 messages to the server.
 
@@ -255,17 +285,24 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 ### Verification for this release
 
-- **Host suite:** 2891 test cases in 81 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1352, web GUI incl. the Auto Update low-memory state, web flasher). New: the tracker display-buffer lifecycle, T-Beam first-boot and remote-management client-command suites.
+- **Host suite:** 2942 test cases in 82 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1410, web GUI, web flasher). New: suites for the own-text release, the WiFi liveness watchdog, the T-Deck message store and tab limit, and the day/night backlight (sun elevation against reference times).
 - **Build:** all release images built by CI (27 ESP32, 3 nRF52, Safeboot), and the 27 `.autoupdate` files re-inflated byte-exact.
-- **Idle heap gate skipped** for this release (operator decision): the T-Beam code changes are small (the new `--info` heap line, update-check bookkeeping, a four-entry remote-management table). The `v4.40a.10.23` result stands: 70296 B against the 69332 B baseline.
-- **Benched for this release (2026-10-24):**
-  - Auto Update check on Heltec V3 (`DK5EN-1`) with the AU-21 code: the check passes, no allocation failure, `--info` shows the heap line.
-  - TRK-03 on T-Beam v1.2 (`DK5EN-92`): erased and reflashed, the bug confirmed (TRACK on, GPS off on first boot); the fix is covered by a regression test that fails on the old value.
-- **Host-tested only:** the tracker display-buffer release and re-acquire (no Wireless Tracker on our bench), the TRK-03 fix itself (no second erase on hardware), and the remote-management repeat stop (not benched; new suite with 15 cases).
+- **Idle heap on T-Beam v1.2 (`DK5EN-92`):** 68728 B against the 69332 B baseline (-604 B, the gate allows 3072 B).
+  - A first build of the WiFi watchdog with its own ping task measured 63884 B and failed the gate; the release ships the probe without a task.
+- **Benched for this release (2026-10-25):**
+  - Own group text fix on Heltec V3 (`DK5EN-1`) and RAK4631 (`DK5EN-90`), same setup before and after: without the fix 6 of 10 own texts released before their first transmission, with it 0 of 20; 20 of 20 sent, 19 exactly once (one repeat of a text nobody heard, by design).
+  - WiFi watchdog on T-Deck Plus (`DK5EN-14`), final probe: internal memory starved until the IP path hung (588 B free), memory released, the path stayed dead; the watchdog reconnected after 3 failed rounds, outage 2 min 0 s, no reboot (before the fix: no recovery in 20 min).
+  - The probe gets answers from a real access point: `[WIFI];probe;armed` 60 s after boot on T-Beam v1.2 and T-Deck Plus.
+  - T-Deck memory on `DK5EN-14`: 400 messages in one tab plateau at 41.6 KB free (before: hang at about 250). 20 groups round robin hold 16 tabs with 0 lost pings; 500 messages in 5 groups keep 41.0-61.9 KB free, no failed allocation.
+- **Host-tested only:** the day/night backlight (TD-23: no hardware test yet), the watchdog on any board except the T-Deck Plus, and the watchdog's network reset and reboot stages.
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
 
+- **`v4.40a.10.24` (2026-10-24):**
+  - Auto Update check on Heltec V3 (`DK5EN-1`) with the AU-21 code: the check passes, no allocation failure, `--info` shows the heap line.
+  - TRK-03 on T-Beam v1.2 (`DK5EN-92`): erased and reflashed, the bug confirmed (TRACK on, GPS off on first boot); the fix is covered by a regression test that fails on the old value.
+  - Host-tested only: the tracker display-buffer release and re-acquire, the TRK-03 fix itself, the remote-management repeat stop. Idle heap gate skipped (operator decision).
 - **`v4.40a.10.23` (2026-10-23/24):**
   - Transmit queue on Heltec V3 (`DK5EN-1`), RAK4631 (`DK5EN-90`) and T-Beam v1.2 (`DK5EN-92`): gauge and legend, ACK path, three DM retries in one slot on ESP32 and nRF52, time-beacon age gate and replacement at a gateway fed by a mock server.
   - Call blocklist on `DK5EN-1`, `DK5EN-90`, `DK5EN-92`.
@@ -325,7 +362,11 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 - **Remote-management repeat stop for client commands:** host tests and builds only; not yet run over the air between two nodes.
 - **Wireless Tracker memory fix (AU-21):** no tracker on our bench; display-buffer release and re-acquire are host tests and builds only until the first field report. Still open: the ESP32-S3 memory floor for TLS and a Bluetooth pause before the check on S3 boards.
-- **Transmit queue in the field:** a 24 h capture on the gateway `DK5EN-98` started on 2026-10-24 and is not evaluated yet. The expiry times (300/120/90 s) may be tuned after it; in a small older sample (27 relayed frames, 2026-10-18) the slowest 10 % waited longer than 300 s and would now be dropped. The relay-side time-beacon gate was not seen on air (host tests only).
+- **Day/night backlight (TD-23):** host tests and builds only; not yet checked on a T-Deck.
+- **WiFi watchdog:** benched on one T-Deck Plus only. The network reset and reboot stages ran in host tests only. After a heavy memory shortage the link can also drop completely; then the older watchdog reconnects after its 180 s grace time (seen on the bench, not shortened).
+- **T-Deck memory fixes:** no 24 h soak after the fixes yet, and no visual check of the message tabs on the device.
+- **Own group text fix in the field:** benched only; the gateway `DK5EN-98` does not run it yet.
+- **Transmit queue in the field:** the 24 h capture on the gateway `DK5EN-98` (2026-10-24/25) found the own-text bug fixed in this release; the expiry times (300/120/90 s) are not re-tuned yet. In a small older sample (27 relayed frames, 2026-10-18) the slowest 10 % waited longer than 300 s and would now be dropped. The relay-side time-beacon gate was not seen on air (host tests only).
 - **Call blocklist:** taking over the DM3KS build's stored list was not benched on hardware.
 - **Queue work of `v4.40a.10.19`:** host tests (including the golden corpus) and builds only. The locked `--nbrrelay on` rests on one gateway's field data. The age-escalated hold is counted only since boot (`[MC-HWM]`), not per 5-minute window.
 - **Auto Update:** the BLE guard runs on classic ESP32 only (a forced NimBLE restart crashed an ESP32-S3) and was tested with a BLE client script, not the McApp phone app. Stale-click and stuck-in-Safeboot handling in the web row is host-tested only. The T-Beam download after the heap work was not re-run.
@@ -345,6 +386,8 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 **Accepted behaviour**
 
+- **T-Deck under memory pressure:** the oldest messages of an inactive tab disappear from the display, and a 17th conversation closes the least recently used tab.
+- **WiFi round trip of 80-100 ms** on ESP32 nodes with Bluetooth on: WiFi modem sleep, not a memory problem (WIFI-PS-01). Switching modem sleep off needs Bluetooth off.
 - **T-Beams first booted on V4.21 or later keep TRACK on** if the old default set it. Not migrated: a TRACK the owner wanted cannot be told apart. Use `--track off` / `--gps on`.
 - **Wireless Tracker:** a message page held on the display returns to the main page after an update check.
 - **Slow browser links get truncated pages** (2 s without progress or 15 s total; at 1.2 s reply delay the 94 kB main page is cut at about 73-87 kB). Not checked in Chrome on the bench. On the RAK4631 the send library can still wait without a timeout for a chip acknowledgement; no hang seen.
@@ -388,17 +431,15 @@ With default settings, compared with the official `v4.40a.hbserver`:
 
 ## Upstream
 
-- **Merged into upstream `dev`** (not in an official release yet; this release carries the same code):
-  - gateway server table, network mode, RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213))
-  - T-Deck reply button, web firmware column ([#1214](https://github.com/icssw-org/MeshCom-Firmware/pull/1214))
-  - web send buffer ([#1224](https://github.com/icssw-org/MeshCom-Firmware/pull/1224))
-  - gateway server-link warning fix ([#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233))
+- **In the official release `v4.40a.spserver`** (2026-10-22): gateway server table, network mode, RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)), T-Deck reply button and web firmware column ([#1214](https://github.com/icssw-org/MeshCom-Firmware/pull/1214)), web send buffer ([#1224](https://github.com/icssw-org/MeshCom-Firmware/pull/1224)), gateway server-link warning fix ([#1233](https://github.com/icssw-org/MeshCom-Firmware/pull/1233)).
+- **Merged into upstream `dev`, not in an official release yet** (this release carries the same code):
   - `--via` validation, GPS filter, net console fixes, console transmit ring, OnRxDone STAT figures, `[HEAP]` boot marks, NVS line, board LED work ([#1235](https://github.com/icssw-org/MeshCom-Firmware/pull/1235), merged 2026-10-23)
   - SP server host `sp.meshcom.pl` ([#1236](https://github.com/icssw-org/MeshCom-Firmware/pull/1236), merged 2026-10-24)
 - **No PR of ours is open upstream.** The board marker and `--id` are planned as a PR.
 - **Fork-only so far:**
   - the "WEBServer stopped" fix (the bug is in upstream `dev` too) and the NVS diagnostics in remote management
-  - the Wireless Tracker memory fix (AU-21), the T-Beam first-boot fix (TRK-03, planned as a PR) and the remote-management repeat stop of this release
+  - everything of this release: the own group text fix (part of the transmit queue pool), the WiFi watchdog, the T-Deck memory fixes and the day/night backlight
+  - the Wireless Tracker memory fix (AU-21), the T-Beam first-boot fix (TRK-03, planned as a PR) and the remote-management repeat stop of `v4.40a.10.24`
   - the transmit queue pool and the call blocklist of `v4.40a.10.23`; its fixes (AU-18/19/20, WEB-RX-01, RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04) are planned as PRs
   - everything of `v4.40a.10.19`: queue work, setting lock, Auto Update web row, heap and LED work, `sens` fix, neighbour-page fix
   - Safeboot v3 and the web flasher changes
