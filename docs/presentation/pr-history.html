@@ -3,63 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MeshCom-Firmware: Beiträge von DK5EN nach upstream</title>
+<title>61 Pull Requests nach upstream gemergt, keiner mehr offen (DK5EN)</title>
+<meta name="description" content="Alle Beiträge von DK5EN an die offizielle MeshCom-Firmware: 61 gemergte Pull Requests in sieben Runden von 4.35m bis 4.40a.spserver, mit Zeilenbilanz je PR und Runde.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
 <style>
-:root{color-scheme:dark light;--bg:#0f172a;--bg2:#151f36;--bg3:#1f2840;--line:#2a3654;--fg:#e6ecff;--fg2:#9fb0cc;--fg3:#6f7f9c;--acc:#6366f1;--acc2:#e879f9;--ok:#34d399;--bad:#f87171;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-@media (prefers-color-scheme:light){:root{--bg:#fbfcfe;--bg2:#ffffff;--bg3:#eef2f8;--line:#dfe5f0;--fg:#111a2b;--fg2:#4a5a72;--fg3:#7a879c;--ok:#059669;--bad:#dc2626}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:15px}
-.wrap{max-width:980px;margin:0 auto;padding:2.4rem 1.4rem 5rem}
-h1{font-size:1.7rem;font-weight:800;letter-spacing:-.01em;margin:0 0 .4rem;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
-h2{font-size:1.2rem;font-weight:700;margin:.2rem 0 .6rem}
-h3{font-size:1.02rem;font-weight:700;margin:1.6rem 0 .3rem}
-section{margin-top:2.4rem;padding-top:1.2rem;border-top:1px solid var(--line)}
-.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3)}
-.lead{color:var(--fg2);max-width:78ch;margin:.4rem 0 1rem}
-a{color:var(--acc)}
-.small{font-size:.82rem;color:var(--fg3)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:1rem 0}
 .stat{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
 .stat .k{font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--fg3);margin-bottom:.3rem}
-.stat .v{font-family:var(--mono);font-weight:700;font-size:1.05rem;white-space:nowrap}
+.stat .v{font-family:var(--mono);font-weight:700;font-size:1.05rem;overflow-wrap:anywhere}
 .plus{color:var(--ok)}.minus{color:var(--bad)}
-table{width:100%;border-collapse:collapse;margin:.6rem 0;font-size:.84rem;table-layout:fixed}
-th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
-th{color:var(--fg3);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
-th:nth-child(1){width:8%}th:nth-child(2){width:11%}th:nth-child(3){width:44%}th:nth-child(4){width:17%}th:nth-child(5){width:9%}th:nth-child(6){width:11%}
-td.num{font-family:var(--mono);font-size:.8rem;white-space:nowrap}
+table.pr{min-width:640px}
+table.sh{min-width:520px}
+table.pr td:nth-child(2){white-space:nowrap}
+table.pr td.num,table.pr th.num{font-family:var(--mono);font-size:.8rem;white-space:nowrap}
 tr.closed td{color:var(--fg3)}
-tr.closed .note{font-size:.78rem;margin-top:.15rem}
-.tocwrap{overflow-x:auto}
-.box{border-radius:10px;border:1px solid var(--line);background:var(--bg2);padding:.85rem 1rem;margin:1rem 0;color:var(--fg2)}
-table.cap th:nth-child(1){width:14%}table.cap th:nth-child(2){width:70%}table.cap th:nth-child(3){width:16%}
-td.sha{font-family:var(--mono);font-size:.8rem}
-@media (max-width:640px){table{table-layout:auto;font-size:.78rem}th,td{padding:.35rem .4rem}}
+td .note{color:var(--fg3);font-size:.78rem;margin-top:.15rem}
+table.sh td.num,table.sh th.num{font-family:var(--mono);font-size:.8rem;white-space:nowrap}
 .share{display:flex;height:2.1rem;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin:.6rem 0 .4rem;font-size:.74rem;font-family:var(--mono)}
 .share .seg{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff}
-.s-orig{background:#64748b}.s-pr{background:var(--acc)}.s-x{background:var(--acc2)}.s-oth{background:#0ea5e9}
-td .note{color:var(--fg3)}
-table.sh th{width:auto}
+.s-orig{background:#64748b}.s-pr{background:#4f46e5}.s-x{background:#c026d3}.s-oth{background:#0369a1}
+.toc{columns:2;column-gap:32px;max-width:none}.toc li{break-inside:avoid}
+@media (max-width:720px){.toc{columns:1}}
+@media (max-width:720px){figure svg{min-width:700px}}
+details > h3:first-of-type{margin-top:.4rem}
 </style>
 </head>
 <body>
-<div class="wrap">
-<p class="small" style="margin:0 0 .6rem"><a href="./">← Übersicht</a></p>
+<main>
+<nav class="nav-top"><a href="index.html">&larr; Übersicht</a></nav>
+
 <div class="eyebrow">icssw-org/MeshCom-Firmware · Pull Requests von DK5EN</div>
-<h1>Sieben Runden nach upstream: von 4.35m bis 4.40a</h1>
-<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in sieben Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt. Die sechste Runde bringt mit #1186 den bisher größten Beitrag: die Version 4.40a, seit dem 02.10.2026 offiziell veröffentlicht. Die siebte bringt Feld- und Prüfstandsfixes mit Zeitzone und MTU, die Web-GUI-Arbeit, eine zentrale Server-Tabelle für alle Gateways und den Antwort-Knopf der T-Deck; bis zum 23.10.2026 kommen der Web-Sendepuffer, eine Gateway-Diagnose und die Konsolen-, GPS- und LED-Arbeit dazu; seither ist kein PR mehr offen. Was der Fork darüber hinaus nachgelegt hat, steht unten unter „Release und Web-Flasher“ (Stand 24.10.2026).</p>
-<div class="stats">
-<div class="stat"><div class="k">Gemergte PRs</div><div class="v">61</div></div>
-<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+76.698</span> <span class="minus">−38.910</span></div></div>
-<div class="stat"><div class="k">Dateiänderungen</div><div class="v">899</div></div>
-<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 24.10.2026</div></div>
+<h1>61 Pull Requests nach upstream gemergt, keiner mehr offen</h1>
+<ul class="meta">
+<li>Stand: 25.10.2026, PR-Zahlen aus der GitHub-API (<code>gh pr list -R icssw-org/MeshCom-Firmware --author DK5EN --state all</code>)</li>
+<li>Zeitraum: 22.02.2026 bis 24.10.2026, letzter Merge ist #1236</li>
+<li>Zeilenanteil in der Firmware: <code>git blame</code> auf upstream <code>dev</code> 9669ec99, Stand 18.10.2026, nicht neu berechnet</li>
+<li>Fork-Release: <code>v4.40a.10.24</code>; letztes offizielles Release: <code>v4.40a.spserver</code> (22.10.2026)</li>
+</ul>
+
+<div class="bluf">
+<p class="lead"><strong>DK5EN hat bis 24.10.2026 insgesamt 61 Pull Requests in die offizielle MeshCom-Firmware gemergt, verteilt auf sieben Runden von 4.35m bis 4.40a.spserver, und keiner ist mehr offen.</strong>
+Zusammen sind das +76.698 und −38.910 Zeilen in 899 Dateiänderungen.</p>
+<p>Die Zeilenbilanz unten zeigt, wie viel davon heute noch steht: 39,8 % der Kernfirmware sind unverändert das Original von Februar.</p>
 </div>
-<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.) → <b>4.35t</b> (10.09., fortgeführt bis 13.09.) → <b>4.35t.09.20</b> (20.09.) → <b>4.35t.09.24</b> (24.09., #1153) → <code>upstream/dev</code> <b>6cc8b552</b> (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159–#1161 OE1KBC Repeat-Bit-Vorarbeiten — die letzten vier nicht von uns) → <b>4.35u</b> (27.09., <code>61a58daa</code>: 6cc8b552 plus #1162 und #1165–#1172, darin unsere #1162, #1168 und #1169) → <b>4.35v</b> (29.09.; <b>v4.35v.09.30</b> am 30.09. mit #1185) → <b>4.40a</b> (02.10., #1186) → <b>4.40a.hbserver</b> (13.10.; #1209–#1212 von OE1KBC mit HB- und HC-Server, darin unsere #1200/#1201 vom 10./11.10. und #1207/#1208 vom 12.10.) → <code>upstream/dev</code> <b>9669ec99</b> (18.10., unsere #1213 und #1214) → <code>upstream/dev</code> <b>06a4fd9a</b> (18.10., #1215 von OE1KBC: Korrektur in <code>gw_servers.cpp</code> und neue Safeboot-Images; noch ohne Tag). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
-<section id="anteil">
-<div class="eyebrow">Zeilenbilanz · git blame auf upstream/dev 9669ec99 (4.40a, Stand 18.10.2026)</div>
-<h2>Wie viel vom Original steckt noch in 4.40a?</h2>
-<p class="lead">Die Kernfirmware ist von 64.292 Zeilen (Stand vor dem ersten PR, 22.02.2026) auf 120.881 Zeilen gewachsen. <b>39,8 % der heutigen Zeilen sind noch unverändert die von Februar</b>, 74,8 % der damaligen Zeilen haben überlebt, rund 25,2 % wurden entfernt oder neu geschrieben. 43,3 % der heutigen Zeilen stammen aus Commits dieses Forks, 16,9 % von anderen Autoren in upstream.</p>
+
+<h2>Kernfakten</h2>
+<ul class="keyfacts">
+<li><strong>Umfang:</strong> 61 PRs gemergt, 4 geschlossen und ersetzt oder nicht übernommen (<a href="#r1">#709</a>, <a href="#r2">#742, #749, #776</a>), 0 offen. Stand GitHub-API, 25.10.2026.</li>
+<li><strong>Größter Beitrag:</strong> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a> mit der Version 4.40a vom 02.10.2026, +34.238 und −29.304 Zeilen in 288 Dateien.
+  <ul><li>Davon stehen heute 28.148 Zeilen, das sind 23,3 % der Kernfirmware (Stand 18.10.2026).</li></ul></li>
+<li><strong>Original lebt weiter:</strong> 39,8 % der heutigen Kernfirmware sind unverändert die Zeilen von Februar. 74,8 % der damaligen Zeilen haben überlebt (Stand 18.10.2026).</li>
+<li><strong>Herkunft heute:</strong> 43,3 % der Zeilen stammen aus Commits dieses Forks, 16,9 % von anderen Autoren, im Wesentlichen vom ICSSW-Team (Stand 18.10.2026).</li>
+<li><strong>In offiziellen Releases:</strong> 4.40a (02.10.2026), 4.40a.hbserver (13.10.2026) und 4.40a.spserver (22.10.2026) tragen unsere Arbeit.
+  <ul>
+  <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a> stehen in 4.40a.spserver.</li>
+  <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a> stehen nur in <code>dev</code>, ein Tag folgt noch.</li>
+  </ul></li>
+<li><strong>Offene PRs:</strong> keiner. Die Board-Kennung und <code>--id</code> sind als nächster PR geplant (Release Notes <code>v4.40a.10.24</code>, Abschnitt „Upstream“).</li>
+<li><strong>Der Fork liefert mehr:</strong> Das Fork-Release <code>v4.40a.10.24</code> enthält neben diesen PRs die Fork-Funktionen zu den upstream-Issues #1187 bis #1189: Auto Update, Speichern-und-Weiterleiten über den Server und Fernsteuerung per LoRa. Sie sind noch nicht in upstream. Siehe „Was der Fork darüber hinaus liefert“.</li>
+</ul>
+
+<ol class="toc">
+<li><a href="#uebersicht">Sieben Runden im Überblick</a></li>
+<li><a href="#anteil">Wie viel vom Original steckt noch in 4.40a?</a></li>
+<li><a href="#r7">Runde 7: Feld- und Prüfstandsfixes, Server-Tabelle</a></li>
+<li><a href="#r6">Runde 6: Version 4.40a</a></li>
+<li><a href="#aeltere">Ältere Runden 1 bis 5</a></li>
+<li><a href="#fork">Was der Fork darüber hinaus liefert</a></li>
+<li><a href="#grenzen">Was nicht geprüft ist</a></li>
+<li><a href="#methode">Technisch: Methode und Versionsfolge</a></li>
+</ol>
+
+<h2 id="uebersicht">Sieben Runden im Überblick</h2>
+<p><strong>Runde 6 mit der Version 4.40a liefert 45 % aller hinzugefügten und 75 % aller gelöschten Zeilen.</strong> Jede Runde hat ein Thema und eine Zeilenbilanz aus GitHub zum Zeitpunkt des Merge.</p>
+<figure>
+<svg viewBox="0 0 900 290" role="img" aria-label="Balkendiagramm: hinzugefügte Zeilen je Runde, Runde 6 am längsten"><text x="20" y="33">Runde 1 · Feb.</text><rect class="d-fill-acc" x="230" y="18" width="7" height="22" rx="3"/><text x="245" y="33" class="d-mono">+478 −153 · 3 PRs</text><text x="20" y="71">Runde 2 · März</text><rect class="d-fill-acc" x="230" y="56" width="79" height="22" rx="3"/><text x="317" y="71" class="d-mono">+5.768 −2.168 · 21 PRs</text><text x="20" y="109">Runde 3 · Aug./Sep.</text><rect class="d-fill-acc" x="230" y="94" width="252" height="22" rx="3"/><text x="490" y="109" class="d-mono">+18.450 −3.620 · 9 PRs</text><text x="20" y="147">Runde 4 · Sep.</text><rect class="d-fill-acc" x="230" y="132" width="7" height="22" rx="3"/><text x="245" y="147" class="d-mono">+529 −63 · 9 PRs</text><text x="20" y="185">Runde 5 · Sep.</text><rect class="d-fill-acc" x="230" y="170" width="130" height="22" rx="3"/><text x="368" y="185" class="d-mono">+9.535 −1.716 · 4 PRs</text><text x="20" y="223" class="d-b">Runde 6 · 28.09.–02.10.</text><rect class="d-fill-acc" x="230" y="208" width="470" height="22" rx="3"/><text x="708" y="223" class="d-mono">+34.441 −29.373 · 5 PRs</text><text x="20" y="261">Runde 7 · 10.–24.10.</text><rect class="d-fill-acc" x="230" y="246" width="102" height="22" rx="3"/><text x="340" y="261" class="d-mono">+7.497 −1.817 · 10 PRs</text></svg>
+<figcaption><strong>Abb. 1:</strong> Runde 6 stellt 45 % der hinzugefügten und 75 % der gelöschten Zeilen. Balken: hinzugefügte Zeilen je Runde, Summe 76.698. Quelle: GitHub-API, 25.10.2026.</figcaption>
+</figure>
+<div class="table-wrap"><table class="pr"><thead><tr><th>Runde</th><th>Zeitraum</th><th>Upstream-Version</th><th>Thema</th><th class="num">PRs</th><th class="num">Zeilen</th><th class="num">Dateien</th></tr></thead><tbody>
+<tr><td style="white-space:nowrap"><a href="#r1">Runde 1</a></td><td>22.–24.02.</td><td>4.35m → 4.35n</td><td>Empfangslöcher und Wiederholungen</td><td class="num">3</td><td class="num"><span class="plus">+478</span> <span class="minus">−153</span></td><td class="num">12</td></tr><tr><td style="white-space:nowrap"><a href="#r2">Runde 2</a></td><td>16.–24.03.</td><td>4.35n → 4.35p</td><td>CAD kommt in den Sendepfad</td><td class="num">21</td><td class="num"><span class="plus">+5.768</span> <span class="minus">−2.168</span></td><td class="num">83</td></tr><tr><td style="white-space:nowrap"><a href="#r3">Runde 3</a></td><td>27.08.–13.09.</td><td>4.35p → 4.35t</td><td>Feldbetrieb, Härtung und Ausbau</td><td class="num">9</td><td class="num"><span class="plus">+18.450</span> <span class="minus">−3.620</span></td><td class="num">253</td></tr><tr><td style="white-space:nowrap"><a href="#r4">Runde 4</a></td><td>14.–24.09.</td><td>4.35t → 4.35t.09.24</td><td>Feldmeldungen gegen 4.35t</td><td class="num">9</td><td class="num"><span class="plus">+529</span> <span class="minus">−63</span></td><td class="num">26</td></tr><tr><td style="white-space:nowrap"><a href="#r5">Runde 5</a></td><td>25.–27.09.</td><td>4.35t.09.24 → 4.35u</td><td>RAM-Arbeit, Safeboot-OTA, PN-Wiederholung</td><td class="num">4</td><td class="num"><span class="plus">+9.535</span> <span class="minus">−1.716</span></td><td class="num">52</td></tr><tr><td style="white-space:nowrap"><a href="#r6">Runde 6</a></td><td>28.09.–02.10.</td><td>4.35u → 4.40a</td><td>Vier Korrekturen, dann Version 4.40a</td><td class="num">5</td><td class="num"><span class="plus">+34.441</span> <span class="minus">−29.373</span></td><td class="num">299</td></tr><tr><td style="white-space:nowrap"><a href="#r7">Runde 7</a></td><td>10.–24.10.</td><td>4.40a → 4.40a.spserver</td><td>Feld- und Prüfstandsfixes, Server-Tabelle, T-Deck</td><td class="num">10</td><td class="num"><span class="plus">+7.497</span> <span class="minus">−1.817</span></td><td class="num">174</td></tr><tr><th colspan="4">Gesamt</th><th class="num">61</th><th class="num"><span class="plus">+76.698</span> <span class="minus">−38.910</span></th><th class="num">899</th></tr>
+</tbody></table></div>
+<p>Die Tabelle „Zeilen“ ist die Bilanz des PR-Diffs bei GitHub, nicht das, was heute noch steht. Das zeigt der nächste Abschnitt.</p>
+
+<h2 id="anteil">Wie viel vom Original steckt noch in 4.40a?</h2>
+<p><strong>39,8 % der heutigen Kernfirmware sind noch unverändert die von Februar, 43,3 % stammen aus Commits dieses Forks.</strong> Die Kernfirmware ist von 64.292 Zeilen (vor dem ersten PR, 22.02.2026) auf 120.881 Zeilen gewachsen. Stand der Messung: <code>git blame</code> auf upstream <code>dev</code> 9669ec99, 18.10.2026.</p>
 <div class="stats">
 <div class="stat"><div class="k">Ausgangsbasis 22.02.</div><div class="v">64.292</div></div>
 <div class="stat"><div class="k">Heute (4.40a)</div><div class="v">120.881</div></div>
@@ -69,9 +100,17 @@ table.sh th{width:auto}
 <div class="share" role="img" aria-label="Zusammensetzung der Kernfirmware 4.40a: 39,8 % Original, 42,8 % PRs dieses Forks, 0,5 % Einzelcommits dieses Forks, 16,9 % andere Autoren">
 <span class="seg s-orig" style="width:39.76%">Original 39,8 %</span><span class="seg s-pr" style="width:42.84%">PRs DK5EN 42,8 %</span><span class="seg s-x" style="width:0.47%"></span><span class="seg s-oth" style="width:16.93%">andere 16,9 %</span>
 </div>
-<p class="small">Original = Zeilen, die schon vor dem ersten PR in upstream standen. PRs DK5EN = Zeilen aus Commits von 50 der 57 gemergten PRs dieses Forks, die heute noch stehen (51.782). Einzelcommits ohne PR: 572 Zeilen. Andere = Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</p>
-<h3>Je Runde: wie viel der Runde steht heute noch</h3>
-<div class="tocwrap"><table class="sh"><colgroup><col style="width:52%"><col style="width:10%"><col style="width:20%"><col style="width:18%"></colgroup><thead><tr><th>Runde</th><th>PRs</th><th>Zeilen heute</th><th>Anteil</th></tr></thead><tbody>
+<ul>
+<li><strong>Original:</strong> Zeilen, die schon vor dem ersten PR in upstream standen.</li>
+<li><strong>PRs DK5EN:</strong> Zeilen aus Commits von 50 der 57 bis dahin gemergten PRs, die heute noch stehen (51.782).</li>
+<li><strong>Einzelcommits ohne PR:</strong> 572 Zeilen.</li>
+<li><strong>Andere:</strong> Commits anderer Autoren seit Februar, im Wesentlichen das ICSSW-Team.</li>
+<li><strong>Nicht enthalten:</strong> #1224, #1233, #1235 und #1236. Sie wurden nach der Messung gemergt.</li>
+</ul>
+
+<details>
+<summary>Je Runde: wie viel der Runde heute noch steht</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>Runde</th><th class="num">PRs</th><th class="num">Zeilen heute</th><th class="num">Anteil</th></tr></thead><tbody>
 <tr><td>Februar 2026 · 4.35m → 4.35n<div class="note small">Empfangslöcher und Wiederholungen</div></td><td class="num">3</td><td class="num">188</td><td class="num">0,2 %</td></tr>
 <tr><td>März 2026 · 4.35n → 4.35p<div class="note small">CAD kommt in den Sendepfad</div></td><td class="num">21</td><td class="num">492</td><td class="num">0,4 %</td></tr>
 <tr><td>August / September 2026 · 4.35p → 4.35t<div class="note small">Fünf Monate Feldbetrieb, dann Härtung und Ausbau</div></td><td class="num">9</td><td class="num">16.163</td><td class="num">13,4 %</td></tr>
@@ -80,23 +119,29 @@ table.sh th{width:auto}
 <tr><td>28. September – 2. Oktober 2026 · 4.35u → 4.40a<div class="note small">Vier kleine Korrekturen, dann ein großer PR: Version 4.40a</div></td><td class="num">5</td><td class="num">28.307</td><td class="num">23,4 %</td></tr>
 <tr><td>10.–18. Oktober 2026 · 4.40a → 4.40a.hbserver → upstream/dev<div class="note small">Feld- und Prüfstandsfixes, Web-GUI, Server-Tabelle für alle Gateways, Antwort-Knopf der T-Deck</div></td><td class="num">6</td><td class="num">3.814</td><td class="num">3,2 %</td></tr>
 </tbody></table></div>
-<p class="small">Gezählt werden nur Zeilen, die in den PRs der Runde entstanden und im aktuellen Stand noch stehen; spätere Umbauten nehmen sie der Runde wieder weg. Die Spalte „Zeilen“ in den Tabellen unten zeigt dagegen, was GitHub zum Zeitpunkt des Merge gezählt hat.</p>
-<h3>Die zehn PRs mit dem größten Anteil in 4.40a</h3>
-<div class="tocwrap"><table class="sh"><colgroup><col style="width:14%"><col style="width:52%"><col style="width:18%"><col style="width:16%"></colgroup><thead><tr><th>PR</th><th>Titel</th><th>Zeilen heute</th><th>Dateien</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a><div class="note small">2026-10-02</div></td><td>feat: 4.40a – Store-and-Forward, Nachbarschaftsmatrix statt MHeard/Pfadtabelle, serielle Konfiguration, Fehlerkorrekturen</td><td class="num">28.148</td><td class="num">210</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a><div class="note small">2026-09-01</div></td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num">9.528</td><td class="num">71</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a><div class="note small">2026-08-27</div></td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num">2.634</td><td class="num">57</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a><div class="note small">2026-09-10</div></td><td>feat/fix: Deepsleep, ACK-Herkunft, Web-Queue, Hoehenfusion, Feldfixes</td><td class="num">2.114</td><td class="num">50</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1207">#1207</a><div class="note small">2026-10-12</div></td><td>Fehlerkorrekturen aus Feld und Prüfstand, Zeitzone als POSIX-TZ (#1192) und MTU auf allen Boards (#1190)</td><td class="num">1.984</td><td class="num">38</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1162">#1162</a><div class="note small">2026-09-26</div></td><td>feat(safeboot): OTA-Sitzung als Zustandsautomat, Statusseite, Auto-AP, ein App-Slot; Build-Fix nach Mainline-Builds</td><td class="num">1.797</td><td class="num">7</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a><div class="note small">2026-09-03</div></td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num">1.664</td><td class="num">23</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a><div class="note small">2026-10-12</div></td><td>Web-GUI: Escaping, Positionsprüfung, kleinere Erweiterungen (Gateway, Web, T-Deck)</td><td class="num">786</td><td class="num">19</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a><div class="note small">2026-10-18</div></td><td>Zentrale Server-Tabelle (gw_servers), statische nRF52 bleiben statisch, Netzmodus auto/inet/hamnet</td><td class="num">756</td><td class="num">13</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1157">#1157</a><div class="note small">2026-09-25</div></td><td>fix: ESP32-Stack-Ueberlauf (Extern-UDP), --mesh off auf Via-Pfaden, Byte-Ringe fuer RAM und Feldfixes</td><td class="num">609</td><td class="num">22</td></tr>
+<p>Gezählt werden nur Zeilen, die in den PRs der Runde entstanden und im Stand 18.10.2026 noch stehen. Spätere Umbauten nehmen sie der Runde wieder weg. Die Spalte „Zeilen“ in den Rundentabellen zeigt dagegen, was GitHub beim Merge gezählt hat.</p>
+</details>
+
+<details>
+<summary>Die zehn PRs mit dem größten Anteil in 4.40a</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>PR</th><th>Titel</th><th class="num">Zeilen heute</th><th class="num">Dateien</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a><div class="note small">02.10.2026</div></td><td>feat: 4.40a – Store-and-Forward, Nachbarschaftsmatrix statt MHeard/Pfadtabelle, serielle Konfiguration, Fehlerkorrekturen</td><td class="num">28.148</td><td class="num">210</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a><div class="note small">01.09.2026</div></td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num">9.528</td><td class="num">71</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a><div class="note small">27.08.2026</div></td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num">2.634</td><td class="num">57</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a><div class="note small">10.09.2026</div></td><td>feat/fix: Deepsleep, ACK-Herkunft, Web-Queue, Hoehenfusion, Feldfixes</td><td class="num">2.114</td><td class="num">50</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1207">#1207</a><div class="note small">12.10.2026</div></td><td>Fehlerkorrekturen aus Feld und Prüfstand, Zeitzone als POSIX-TZ (#1192) und MTU auf allen Boards (#1190)</td><td class="num">1.984</td><td class="num">38</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1162">#1162</a><div class="note small">26.09.2026</div></td><td>feat(safeboot): OTA-Sitzung als Zustandsautomat, Statusseite, Auto-AP, ein App-Slot; Build-Fix nach Mainline-Builds</td><td class="num">1.797</td><td class="num">7</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a><div class="note small">03.09.2026</div></td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num">1.664</td><td class="num">23</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a><div class="note small">12.10.2026</div></td><td>Web-GUI: Escaping, Positionsprüfung, kleinere Erweiterungen (Gateway, Web, T-Deck)</td><td class="num">786</td><td class="num">19</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a><div class="note small">18.10.2026</div></td><td>Zentrale Server-Tabelle (gw_servers), statische nRF52 bleiben statisch, Netzmodus auto/inet/hamnet</td><td class="num">756</td><td class="num">13</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1157">#1157</a><div class="note small">25.09.2026</div></td><td>fix: ESP32-Stack-Ueberlauf (Extern-UDP), --mesh off auf Via-Pfaden, Byte-Ringe fuer RAM und Feldfixes</td><td class="num">609</td><td class="num">22</td></tr>
 </tbody></table></div>
-<p class="small">Die übrigen 40 PRs tragen zusammen 1.762 Zeilen bei, dazu kommen 572 Zeilen aus Einzelcommits ohne PR. PR #1186 allein stellt 28.148 Zeilen, das sind 23,3 % der Kernfirmware.</p>
-<h3>Wo am meisten neu ist</h3>
-<div class="tocwrap"><table class="sh"><colgroup><col style="width:56%"><col style="width:22%"><col style="width:22%"></colgroup><thead><tr><th>Bereich</th><th>Zeilen heute</th><th>davon Original</th></tr></thead><tbody>
+<p>Die übrigen 40 PRs tragen zusammen 1.762 Zeilen bei, dazu kommen 572 Zeilen aus Einzelcommits ohne PR. PR #1186 allein stellt 28.148 Zeilen, das sind 23,3 % der Kernfirmware.</p>
+</details>
+
+<details>
+<summary>Wo am meisten neu ist: Zeilen heute nach Bereich</summary>
+<div class="table-wrap"><table class="sh"><thead><tr><th>Bereich</th><th class="num">Zeilen heute</th><th class="num">davon Original</th></tr></thead><tbody>
 <tr><td>src/ Kernlogik (Funk, Mesh, Kommandos, APRS)</td><td class="num">57.239</td><td class="num">26,6 %</td></tr>
 <tr><td>src/nrf52</td><td class="num">11.299</td><td class="num">27,4 %</td></tr>
 <tr><td>src/esp32</td><td class="num">8.996</td><td class="num">35,0 %</td></tr>
@@ -107,167 +152,275 @@ table.sh th{width:auto}
 <tr><td>variants</td><td class="num">22.018</td><td class="num">67,5 %</td></tr>
 <tr><td>config</td><td class="num">782</td><td class="num">96,9 %</td></tr>
 </tbody></table></div>
-<p class="small">Die großen Dateien sind gewachsen, aber ihre alten Zeilen blieben meist stehen: <code>loop_functions.cpp</code> 81 %, <code>web_functions.cpp</code> 86 %, <code>command_functions.cpp</code> 66 %, <code>lora_functions.cpp</code> 62 % und <code>udp_functions.cpp</code> 41 % der Zeilen von Februar sind noch da. Das Neue steht überwiegend in neuen Dateien (219 neue gegen 194 Ausgangsdateien); vollständig ersetzt wurde nur die MHeard-Liste (<code>mheard_functions.cpp</code>). Von 194 Dateien aus Februar sind 49 byte-identisch, 128 verändert und 17 entfallen.</p>
-<div class="box">Methode: <code>git blame -w</code> auf jeder Datei der handgeschriebenen Kernfirmware von upstream/dev 9669ec99 (<code>src/</code> ohne Fonts, Plattform-Stubs, Display- und Treiberbibliotheken, T5- und T-Deck-Pro-Oberfläche und den erzeugten <code>ota.h</code>, dazu <code>variants/</code>, <code>config/</code>, <code>platformio.ini</code>; <code>lib/</code> mit rund 1,7 Millionen Zeilen Fremdcode bleibt außen vor). Ausgangspunkt ist der letzte upstream-Stand vor dem Merge des ersten PR (4eb1a282). Eine Zeile zählt als Original, wenn ihr letzter Autor-Commit in der Historie dieses Stands liegt. Mit Erkennung verschobener und kopierter Zeilen (<code>-M -C</code>) steigt der Originalanteil auf 41,9 %. Zuordnung zu PRs über die Merge-Commits „from DK5EN“; Zeilenzahlen sind rohe Zeilen einschließlich Kommentaren und Leerzeilen und sagen nichts über Verhalten. Autorenzuordnung nach Commit-Adresse: PRs, die das ICSSW-Team unter eigenem Namen übernommen hat, erscheinen unter „andere“. Skripte: <code>tools/code_share/</code>.</div>
-</section>
-<section>
-<div class="eyebrow">Februar 2026 · 4.35m → 4.35n</div>
-<h2>Empfangslöcher und Wiederholungen</h2>
-<p class="lead">Ausgangspunkt war rund 50 % Nachrichtenverlust in beide Richtungen auf einem belegten Kanal, gemessen auf Heltec V3. Zwölf Fehler in der Funk-Zustandsmaschine und im Ringpuffer: Empfangsfenster, in denen das Modul blind war, ein Wiederholmechanismus, der nie griff, Quittungen ohne msg_id, und ein Ringpuffer, der sich mit fertigen Slots füllte. Nach den drei PRs: Paketverlust auf der Teststrecke 13,2 % auf 0 %, drei Wiederholungen im Abstand von 40 s, nRF52 nachgezogen.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">3</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+478</span> <span class="minus">−153</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">12</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/709">#709</a></td><td>2026-02-22</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs<div class="note">Ersetzt durch #710: gegen master statt dev gestellt.</div></td><td class="num">nicht gemerged</td><td class="num">5</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/710">#710</a></td><td>2026-02-22</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs</td><td class="num"><span class="plus">+279</span> <span class="minus">−99</span></td><td class="num">5</td><td class="num">148</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/714">#714</a></td><td>2026-02-23</td><td>Fix: Retransmit-Mechanismus und RING_OVERFLOW-Diagnose (BUG-01, BUG-02)</td><td class="num"><span class="plus">+54</span> <span class="minus">−41</span></td><td class="num">4</td><td class="num">9</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/728">#728</a></td><td>2026-02-24</td><td>Port LoRa message loss fixes to nRF52/RAK4630</td><td class="num"><span class="plus">+145</span> <span class="minus">−13</span></td><td class="num">3</td><td class="num">31</td></tr>
-</tbody></table></div>
-</section>
-<section>
-<div class="eyebrow">März 2026 · 4.35n → 4.35p</div>
-<h2>CAD kommt in den Sendepfad</h2>
-<p class="lead">Vor 4.35p sendete ein Knoten nach Timer, ohne den Kanal zu prüfen. Diese Runde bringt Hardware-CAD mit Doppelprüfung, CSMA mit Prioritäten und Zufallsslots, die Prioritätswarteschlange und Trickle für HEY-Baken. Dazu die Nachbesserungen am neuen CAD (Zustandsautomat, Schleife ohne Empfang), zehn Wettläufe zwischen Interrupt und Hauptschleife, und auf dem RAK4631 die Stillstände durch geteilten SPI-Bus, Stack-Überlauf und Flash-Schreiben im HTTP-Handler. Upstream hat CAD am 15.03. übernommen, die Fixes folgten bis 24.03.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">21</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+5.768</span> <span class="minus">−2.168</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">83</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/742">#742</a></td><td>2026-03-02</td><td>Fix: max_hop bei UDP-zu-LoRa Gateway-Relay dekrementieren<div class="note">Nicht gemerged. Hop-Dekrement am Gateway; das Thema kam später über den Server-Pfad.</div></td><td class="num">nicht gemerged</td><td class="num">1</td><td class="num">–</td></tr>
-<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/749">#749</a></td><td>2026-03-04</td><td>Dependency-Update: RadioLib 7.6.0, NimBLE-Arduino 2.3.8<div class="note">Nicht gemerged. RadioLib 7.6.0 / NimBLE 2.3.8, upstream blieb bei den gepinnten Versionen.</div></td><td class="num">nicht gemerged</td><td class="num">2</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/775">#775</a></td><td>2026-03-16</td><td>fix: strcpy/strcat Buffer-Overflow Hardening</td><td class="num"><span class="plus">+30</span> <span class="minus">−17</span></td><td class="num">4</td><td class="num">24</td></tr>
-<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/776">#776</a></td><td>2026-03-17</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben<div class="note">Ersetzt durch #777: der Branch hatte eine falsche Basis, deshalb die absurde Bilanz von −30.991 Zeilen.</div></td><td class="num">nicht gemerged</td><td class="num">221</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/777">#777</a></td><td>2026-03-17</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben</td><td class="num"><span class="plus">+39</span> <span class="minus">−2</span></td><td class="num">3</td><td class="num">24</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/778">#778</a></td><td>2026-03-17</td><td>fix: RAK4630 Radio-Watchdog bei leerer TX-Queue</td><td class="num"><span class="plus">+7</span> <span class="minus">−0</span></td><td class="num">1</td><td class="num">7</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/779">#779</a></td><td>2026-03-18</td><td>fix: RACE-01..05 — ISR/Main-Loop Race Conditions in Ring-Buffer, Display-Queue und CAD-State-Machine</td><td class="num"><span class="plus">+164</span> <span class="minus">−102</span></td><td class="num">5</td><td class="num">1</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/781">#781</a></td><td>2026-03-18</td><td>fix: RACE-01..05 — volatile Ring-Buffer-Indizes, ISR-Display-Spinlock, CAD Critical Sections</td><td class="num"><span class="plus">+166</span> <span class="minus">−106</span></td><td class="num">8</td><td class="num">82</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/782">#782</a></td><td>2026-03-18</td><td>feat: Priority-Queue, Trickle-HEY (RFC 6206), CSMA-Prioritaeten, Statistik</td><td class="num"><span class="plus">+545</span> <span class="minus">−114</span></td><td class="num">8</td><td class="num">247</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/783">#783</a></td><td>2026-03-19</td><td>fix: TX-Loop und UDP-Dedup Bugfix</td><td class="num"><span class="plus">+3.984</span> <span class="minus">−1.516</span></td><td class="num">12</td><td class="num">2</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/784">#784</a></td><td>2026-03-19</td><td>fix: BLE-Ringpuffer speichert Offline-Nachrichten</td><td class="num"><span class="plus">+20</span> <span class="minus">−4</span></td><td class="num">2</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/785">#785</a></td><td>2026-03-20</td><td>fix: updateHeyPath überschreibt RSSI/SNR/MOD mit Relay-Werten</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/787">#787</a></td><td>2026-03-21</td><td>fix: conffin nur einmal senden, nach Queue-Drain</td><td class="num"><span class="plus">+45</span> <span class="minus">−24</span></td><td class="num">4</td><td class="num">14</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/789">#789</a></td><td>2026-03-21</td><td>fix(radio): CAD-Spinloop und RX-Error-Diagnose</td><td class="num"><span class="plus">+95</span> <span class="minus">−13</span></td><td class="num">6</td><td class="num">35</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/790">#790</a></td><td>2026-03-21</td><td>fix(nrf52): BLE CR/BW Anzeige + RX_PROCESS State-Log</td><td class="num"><span class="plus">+76</span> <span class="minus">−2</span></td><td class="num">3</td><td class="num">5</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/791">#791</a></td><td>2026-03-22</td><td>Serial Monitor Replay, nRF52 RX-Airtime Fix, loganalyse.sh CRC-Errors</td><td class="num"><span class="plus">+316</span> <span class="minus">−62</span></td><td class="num">4</td><td class="num">6</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/792">#792</a></td><td>2026-03-22</td><td>fix(lora): Doppel-Send nach ACK verhindert</td><td class="num"><span class="plus">+2</span> <span class="minus">−2</span></td><td class="num">1</td><td class="num">2</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/793">#793</a></td><td>2026-03-22</td><td>fix(lora): findAndStopRingSlot len=0 (Doppel-Send v2)</td><td class="num"><span class="plus">+1</span> <span class="minus">−0</span></td><td class="num">1</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/802">#802</a></td><td>2026-03-23</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+77</span> <span class="minus">−113</span></td><td class="num">6</td><td class="num">11</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/803">#803</a></td><td>2026-03-23</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+49</span> <span class="minus">−42</span></td><td class="num">3</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/805">#805</a></td><td>2026-03-23</td><td>fix: ext. UDP WebUI Standstill auf RAK4631 (deferred save/reset)</td><td class="num"><span class="plus">+31</span> <span class="minus">−8</span></td><td class="num">4</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/806">#806</a></td><td>2026-03-23</td><td>fix: SPI bus guard — LoRa ISR Crash bei Ethernet-Zugriff (RAK4631)</td><td class="num"><span class="plus">+40</span> <span class="minus">−12</span></td><td class="num">3</td><td class="num">2</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/809">#809</a></td><td>2026-03-23</td><td>fix: Stack Overflow in sendExtern() crasht RAK4631</td><td class="num"><span class="plus">+7</span> <span class="minus">−14</span></td><td class="num">1</td><td class="num">2</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/816">#816</a></td><td>2026-03-24</td><td>feat: Heap/RAM Monitoring via Serial (ESP32 + nRF52)</td><td class="num"><span class="plus">+73</span> <span class="minus">−14</span></td><td class="num">3</td><td class="num">28</td></tr>
-</tbody></table></div>
-</section>
-<section>
-<div class="eyebrow">August / September 2026 · 4.35p → 4.35t</div>
-<h2>Fünf Monate Feldbetrieb, dann Härtung und Ausbau</h2>
-<p class="lead">Drei große Sammel-PRs und fünf Nachzügler. #1102 bringt 82 Änderungen aus dem Dauerbetrieb an OE- und DL-Knoten: Speichersicherheit auf allen von außen erreichbaren Pfaden, Absturz- und Einfrierfixes, Nebenläufigkeit, Zeitarithmetik. #1115 macht die Hauptschleife frei (WLAN, DNS und NTP asynchron, OLED auf Hardware-I2C, Audio auf eigenem Task, Ethernet-Link-Check) und liefert das Rückstau-Protokoll, Zeichensatzfilter, den Konfigurations-Export und die Feld-Instrumentierung. #1125 bringt GPS-Kalmanfilter, T-Deck-Tastenwiederholung und die setlog-Zeilen. #1135 schließt ab: Deepsleep, der auf jedem Board wirklich schläft, ACK-Frames mit dem Rufzeichen des Quittierenden, Echo-Schutz im Rückstau-Protokoll, das LoRa-Queue-Panel und die Nachrichten-Tabs in der Web-GUI, GPS/Barometer-Höhenfusion, MCP23017-Eingänge als <code>/D=</code> im Beacon, Latin-1-Umlaute im Zeichensatzfilter und die HWCDC-Fixes auf ESP32-S3; mit #1135 wurde die offizielle 4.35t geschnitten. #1140 und #1141 sind die Feldmeldungen gegen 4.35t: Deepsleep per langem Tastendruck, T-Deck-Tastensperre, Supreme-OLED, und der Sound-on-Schalter samt <code>--mute</code>, die in jedem 4.35t-Image aus dem Build gefallen waren. Alles davon ist in der offiziellen 4.35t.09.13.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">9</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+18.450</span> <span class="minus">−3.620</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">253</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a></td><td>2026-08-27</td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num"><span class="plus">+3.213</span> <span class="minus">−1.113</span></td><td class="num">64</td><td class="num">2.634</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1103">#1103</a></td><td>2026-08-27</td><td>fix(ble): FWDATE-Puffer zu klein -- snprintf schneidet die Sekunden ab</td><td class="num"><span class="plus">+4</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a></td><td>2026-09-01</td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num"><span class="plus">+11.020</span> <span class="minus">−1.989</span></td><td class="num">102</td><td class="num">9.528</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1118">#1118</a></td><td>2026-09-01</td><td>fix: PlatformIO-Upload ohne upload_port reparieren, -Wall -Wextra nur fuer src/</td><td class="num"><span class="plus">+14</span> <span class="minus">−2</span></td><td class="num">2</td><td class="num">13</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1122">#1122</a></td><td>2026-09-02</td><td>fix: QRS erst ab der dritten eigenen Nachricht bei Ringtiefe >= 5</td><td class="num"><span class="plus">+35</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">35</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a></td><td>2026-09-03</td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num"><span class="plus">+1.737</span> <span class="minus">−114</span></td><td class="num">23</td><td class="num">1.664</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a></td><td>2026-09-10</td><td>feat/fix: Deepsleep, ACK-Herkunft, Web-Queue, Hoehenfusion, Feldfixes</td><td class="num"><span class="plus">+2.235</span> <span class="minus">−307</span></td><td class="num">51</td><td class="num">2.114</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1140">#1140</a></td><td>2026-09-12</td><td>fix: 4.35t Feldfixes: Deepsleep-Taste, T-Deck Keylock, Supreme OLED</td><td class="num"><span class="plus">+104</span> <span class="minus">−14</span></td><td class="num">7</td><td class="num">104</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1141">#1141</a></td><td>2026-09-13</td><td>fix(t-deck): Sound-on-Schalter und --mute sind in 4.35t wirkungslos</td><td class="num"><span class="plus">+88</span> <span class="minus">−79</span></td><td class="num">2</td><td class="num">71</td></tr>
-</tbody></table></div>
-</section>
+<p>Die großen Dateien sind gewachsen, aber ihre alten Zeilen blieben meist stehen: <code>loop_functions.cpp</code> 81 %, <code>web_functions.cpp</code> 86 %, <code>command_functions.cpp</code> 66 %, <code>lora_functions.cpp</code> 62 % und <code>udp_functions.cpp</code> 41 % der Zeilen von Februar sind noch da. Das Neue steht überwiegend in neuen Dateien, 219 neue gegen 194 Ausgangsdateien. Vollständig ersetzt wurde nur die MHeard-Liste (<code>mheard_functions.cpp</code>). Von 194 Dateien aus Februar sind 49 byte-identisch, 128 verändert und 17 entfallen.</p>
+</details>
 
-<section>
-<div class="eyebrow">September 2026 · 4.35t → 4.35t.09.24</div>
-<h2>Feldmeldungen gegen 4.35t</h2>
-<p class="lead">Neun kleine PRs, jeder aus einer Meldung aus dem Betrieb. #1142: der APRS-Positionsdecoder liest <code>#name</code> sowie <code>/R=</code>, <code>/U=</code> und <code>/I=</code>, und der Encoder schreibt keine NaN-Werte mehr. #1143: nach dem Deepsleep nennt das Boot-Log den Aufwachgrund. #1144: in der Web-GUI bleibt die Gruppennummer nach dem Senden im Zielfeld, statt dass die nächste Nachricht als Broadcast hinausgeht. #1147: über BLE kamen nach längerer Laufzeit leere Node Settings an, weil der MHeard-Schub die Config-Frames im Kommando-Ring überschrieb. #1148: ohne App lief der Hop-Zähler bei Gruppen- und Broadcast-Frames auf 15 über. #1149: das eigene Rufzeichen steht immer mit SSID und in kanonischer Schreibweise. #1150: <code>setlat</code>/<code>setlon</code> über die Web-GUI meldeten auf nRF52 fälschlich einen Fehler. #1152: eine T-Beam 1W zeigte nach dem Löschen der Einstellungen dauerhaft USB statt Akku. #1153: der Voltage-Schalter in der Web-GUI sendete nacktes <code>--volt</code>/<code>--proz</code> statt <code>--volt on</code>/<code>off</code>. Sieben davon sind im upstream-Tag 4.35t.09.20; #1152 und #1153 kamen danach und liegen auf dev.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">9</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+529</span> <span class="minus">−63</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">26</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1142">#1142</a></td><td>2026-09-14</td><td>fix(aprs): Positionsdecoder liest #name, /R= /U= /I=; NaN-Schutz je Tag im Encoder</td><td class="num"><span class="plus">+230</span> <span class="minus">−25</span></td><td class="num">5</td><td class="num">173</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1143">#1143</a></td><td>2026-09-14</td><td>feat(esp32): Aufwachgrund nach Deepsleep im Boot-Log (WAKE_CAUSE)</td><td class="num"><span class="plus">+29</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">29</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1144">#1144</a></td><td>2026-09-14</td><td>fix(webgui): Gruppennummer bleibt nach dem Senden im Zielfeld, kein ungewollter Broadcast</td><td class="num"><span class="plus">+6</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">6</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1147">#1147</a></td><td>2026-09-20</td><td>fix(ble): leere Node Settings nach laengerer Laufzeit - MHeard-Schub ueberschreibt Config-Frames im Kommando-Ring</td><td class="num"><span class="plus">+61</span> <span class="minus">−13</span></td><td class="num">5</td><td class="num">6</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1148">#1148</a></td><td>2026-09-20</td><td>fix(relay): Hop-Zaehler laeuft bei Gruppen-/Broadcast-Frames ohne App auf 15 ueber</td><td class="num"><span class="plus">+10</span> <span class="minus">−2</span></td><td class="num">1</td><td class="num">10</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1149">#1149</a></td><td>2026-09-20</td><td>fix(call): eigenes Rufzeichen immer mit SSID, kanonisch geschrieben</td><td class="num"><span class="plus">+154</span> <span class="minus">−2</span></td><td class="num">8</td><td class="num">146</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1150">#1150</a></td><td>2026-09-20</td><td>fix(web): setlat/setlon auf nRF52 meldeten faelschlich "Value could not be set"</td><td class="num"><span class="plus">+10</span> <span class="minus">−10</span></td><td class="num">1</td><td class="num">10</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1152">#1152</a></td><td>2026-09-22</td><td>fix(batt): T-Beam 1W zeigt nach Wipe dauerhaft USB statt Akku</td><td class="num"><span class="plus">+26</span></td><td class="num">3</td><td class="num">26</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1153">#1153</a></td><td>2026-09-24</td><td>fix(web): Schalter "Voltage" sendet --volt on|off statt nacktem --volt/--proz</td><td class="num"><span class="plus">+3</span> <span class="minus">−9</span></td><td class="num">1</td><td class="num">1</td></tr>
+<h2 id="r7">Runde 7: Feld- und Prüfstandsfixes, Server-Tabelle, Antwort-Knopf der T-Deck</h2>
+<p><strong>Zehn PRs in zwei Wochen, von zwei Temperatur-Fixes am 10.10. bis zur Umbenennung des Polen-Servers am 24.10.2026; seither ist kein PR mehr offen.</strong> Upstream-Versionen in dieser Runde: 4.40a, 4.40a.hbserver, 4.40a.spserver.</p>
+<ul>
+<li><strong>Temperatur-Offset gilt auch bei AHT20, SHT21 und SHTC3</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1200">#1200</a>, 10.10.). Im Web-GUI sind eine führende Null und ein Dezimalkomma erlaubt (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1201">#1201</a>, 11.10.).</li>
+<li><strong>Fehlerkorrekturen aus Feld und Prüfstand</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1207">#1207</a>, 12.10.):
+  <ul>
+  <li>softAP auf Knoten ohne gespeicherte SSID, das BMP390-Bit, die Lade-LED der AXP-Boards, der RTC hält UTC, Extern-UDP ohne Broadcast-Ziel.</li>
+  <li>Zustellhaken im Web-GUI, DHCP-Lease des RAK4631 bei der Wiederherstellung (ETH-04), BLE-Sitzungs-Reset als Teil von #1191.</li>
+  <li>T-Deck-Kartenmarker, Polen-Frequenz, Priorität der <code>{CET}/{MCP}/{SET}</code>-Texte.</li>
+  <li>Dazu die Zeitzone als POSIX-TZ-Regel (#1192) und die MTU-Einstellung auf allen Boards (#1190).</li>
+  </ul></li>
+<li><strong>Web-GUI geschützt und erweitert</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a>, 12.10.): HTML-Escaping, Prüfung von Breiten- und Längengrad bei Konsole und BLE, Upload der eigenen HEY-Echos am Gateway, Zeile „Server:“ auf der Info-Seite, Sendeleistung als Zahlenfeld, einklappbare Karten. Für das T-Deck ein Kachel-Cache im PSRAM und der Zustellstatus in der Nachrichtenblase.
+  <ul><li>Upstream hat #1207 und #1208 am 13.10. als Teil von 4.40a.hbserver veröffentlicht.</li></ul></li>
+<li><strong>Eine Server-Tabelle für alle Gateways</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, 18.10.): ESP32 und nRF52 wählen MeshCom-Server und Zeitserver aus einer gemeinsamen Tabelle (<code>src/gw_servers.cpp</code>, eine Zeile je Land) statt aus drei auseinandergelaufenen Kopien.
+  <ul>
+  <li>Neu: der Netzmodus <code>--setnet auto|inet|hamnet</code>. Ein RAK4631 mit statischer Adresse bleibt bei der Ethernet-Wiederherstellung statisch.</li>
+  <li>Auf der Bank lief vorher eine Matrix aus drei Netzen, drei Modi und fünf Servern auf RAK4631 und Heltec V3.</li>
+  </ul></li>
+<li><strong>Antwort-Knopf an jeder eingehenden T-Deck-Blase</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a>, 18.10.): „An“ wird aus dem Konversations-Tab vorgefüllt. Die Web-Seiten Path und MHeard zeigen die Firmware jeder Station.</li>
+<li><strong>Ein langsamer Browser löst keinen Watchdog-Neustart mehr aus</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a>, 21.10., Issue #1217): Web-Seiten laufen durch einen begrenzten Sendepuffer mit Watchdog-Feeds.</li>
+<li><strong>Die Warnung „Server antwortet nicht“ kommt am Gateway wieder</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a>, 22.10., Issue #1231): ein unbekanntes UDP-Datagramm am Gateway-Port hält den Heartbeat-Watchdog nicht mehr frisch.</li>
+<li><strong>Kleinere Fork-Funktionen gebündelt</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a>, 23.10.): Prüfung von <code>--via</code>, der GPS-Positionsfilter, Fixes an der Netzkonsole samt Sende-Ring der Konsole, OnRxDone-Zahlen im STAT, <code>[HEAP]</code>-Bootmarken, die NVS-Zeile in <code>--info</code>, eine Board-LED für ESP32 und nRF52 und Aufräumen im Build.</li>
+<li><strong>Der SP-Gateway-Server heißt jetzt <code>sp.meshcom.pl</code></strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a>, 24.10.), gleiche IP.</li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">10</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+7.497</span> <span class="minus">−1.817</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">174</div></div><div class="stat"><div class="k">Offen</div><div class="v">0</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1200">#1200</a></td><td>10.10.2026</td><td>fix: Temperatur-Offset bei AHT20, SHT21 und SHTC3 anwenden</td><td class="num"><span class="plus">+6</span> <span class="minus">−4</span></td><td class="num">4</td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1201">#1201</a></td><td>11.10.2026</td><td>fix: Temperatur-Offset im Web-GUI mit führender Null und Dezimalkomma</td><td class="num"><span class="plus">+24</span> <span class="minus">−6</span></td><td class="num">3</td><td class="num">25</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1207">#1207</a></td><td>12.10.2026</td><td>Fehlerkorrekturen aus Feld und Prüfstand, Zeitzone als POSIX-TZ (#1192) und MTU auf allen Boards (#1190)</td><td class="num"><span class="plus">+2.025</span> <span class="minus">−191</span></td><td class="num">41</td><td class="num">1.984</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a></td><td>12.10.2026</td><td>Web-GUI: Escaping, Positionsprüfung, kleinere Erweiterungen (Gateway, Web, T-Deck)</td><td class="num"><span class="plus">+793</span> <span class="minus">−114</span></td><td class="num">19</td><td class="num">786</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a></td><td>18.10.2026</td><td>Zentrale Server-Tabelle (gw_servers), statische nRF52 bleiben statisch, Netzmodus auto/inet/hamnet</td><td class="num"><span class="plus">+774</span> <span class="minus">−357</span></td><td class="num">13</td><td class="num">756</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a></td><td>18.10.2026</td><td>T-Deck: auf DMs antworten; Web-GUI: Firmware-Stand auf Path- und MHeard-Seite</td><td class="num"><span class="plus">+259</span> <span class="minus">−32</span></td><td class="num">13</td><td class="num">257</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a></td><td>21.10.2026</td><td>Web-Server: begrenzter Sendepuffer und Watchdog-Feeds gegen TASK_WDT-Neustart bei langsamem Browser (#1217)</td><td class="num"><span class="plus">+830</span> <span class="minus">−0</span></td><td class="num">6</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a></td><td>22.10.2026</td><td>Gateway: unbekannte UDP-Datagramme halten den Heartbeat-Watchdog nicht mehr frisch</td><td class="num"><span class="plus">+2</span> <span class="minus">−4</span></td><td class="num">2</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a></td><td>23.10.2026</td><td>Konsole, GPS-Filter, Board-LED, Via-Prüfung und Build-Aufräumen</td><td class="num"><span class="plus">+2.783</span> <span class="minus">−1.108</span></td><td class="num">72</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a></td><td>24.10.2026</td><td>Gateway-Server: SP-Server auf sp.meshcom.pl umgestellt</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">–</td></tr>
 </tbody></table></div>
-</section>
+<p>Die Spalte „In 4.40a“ ist für die PRs ab #1224 leer, weil die Messung vom 18.10.2026 stammt.</p>
 
-<section>
-<div class="eyebrow">September 2026 · 4.35t.09.24 → 4.35u</div>
-<h2>Vier PRs bringen RAM-Arbeit, Safeboot-OTA und PN-Wiederholung zurück in den Hauptzweig</h2>
-<p class="lead">Vier eigenständige Themen, alle direkt auf <code>dev</code>, keines mehr im Tag 4.35t.09.24. #1157 bringt die ESP32-Stack-Überlauf-Behebung bei Extern-UDP (der Loop-Task-Stack reichte nicht für die Eingangskette), macht <code>--mesh off</code> auch auf Via-Pfaden wirksam, und bringt die Byte-Ring-Umstellung der drei Ausgangsringe als eigenständigen PR nach upstream; gemerged 25.09. #1162 baut das Safeboot-OTA neu: die Update-Sitzung als Zustandsautomat, eine Statusseite, ein Auto-AP, wenn kein WLAN gefunden wird, und nur noch ein App-Slot statt eines Rückfalls, der auf einer einzigen Partition ohnehin nie funktionieren konnte; gemerged 26.09. #1168 ist die serverseitig zuerst nötige PN-Wiederholung per XOR-Kennung: ein Wiederholpfad für jede Direktnachricht, der zentrale Server muss seinen Dedup-Schlüssel zuerst umstellen; gemerged 27.09. #1169 behebt, dass das Web-RX-Log die älteste Zeile zuletzt statt zuerst zeigt; gemerged 27.09.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">4</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+9.535</span> <span class="minus">−1.716</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">52</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1157">#1157</a></td><td>2026-09-25</td><td>fix: ESP32-Stack-Ueberlauf (Extern-UDP), --mesh off auf Via-Pfaden, Byte-Ringe fuer RAM und Feldfixes</td><td class="num"><span class="plus">+942</span> <span class="minus">−314</span></td><td class="num">26</td><td class="num">609</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1162">#1162</a></td><td>2026-09-26</td><td>feat(safeboot): OTA-Sitzung als Zustandsautomat, Statusseite, Auto-AP, ein App-Slot; Build-Fix nach Mainline-Builds</td><td class="num"><span class="plus">+5.351</span> <span class="minus">−1.362</span></td><td class="num">11</td><td class="num">1.797</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">#1168</a></td><td>2026-09-27</td><td>feat: PN-Wiederholungen mit XOR-msg_id (Variante a aus wiederholungen.md)</td><td class="num"><span class="plus">+3.236</span> <span class="minus">−37</span></td><td class="num">14</td><td class="num">0</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1169">#1169</a></td><td>2026-09-27</td><td>fix(web): RX-Log zeigt älteste Zeile zuerst (#1154)</td><td class="num"><span class="plus">+6</span> <span class="minus">−3</span></td><td class="num">1</td><td class="num">5</td></tr>
+<h2 id="r6">Runde 6: vier kleine Korrekturen, dann die Version 4.40a</h2>
+<p><strong>Am 28.09.2026 gehen vier kleine PRs durch, am 02.10.2026 folgt mit <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a> der bisher größte Beitrag: die Version 4.40a, am selben Tag als offizielles Release veröffentlicht.</strong> Basis ist 4.35v.</p>
+<ul>
+<li><strong>Die Wiederholung einer persönlichen Nachricht stoppt, sobald ein Relais oder Gateway sie quittiert</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">#1176</a>, 28.09.). Der Haken kommt in der App an.
+  <ul><li>Ursache: Seit #1168 trägt jede Kopie eine eigene msg_id, die Tabelle der eigenen Sendungen kannte aber nur die Original-id.</li></ul></li>
+<li><strong>Zusammengesetzte Emoji-Sequenzen bleiben ganz</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1177">#1177</a>): der Zeichenfilter behält das unsichtbare ZERO WIDTH JOINER.</li>
+<li><strong>WebUI-Parameter werden als UTF-8 dekodiert</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1178">#1178</a>, Issue #1173).</li>
+<li><strong>Die Track-Bake bekommt den Pfad <code>WIDE1-1</code></strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1179">#1179</a>, Issue #1174), damit gewöhnliche LoRa-APRS-Digipeater sie wiederholen.</li>
+<li><strong>Version 4.40a</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a>, 02.10.): Speichern-und-Weiterleiten für Direktnachrichten, die Nachbarschaftsmatrix anstelle von MHeard-Liste und Pfadtabelle, 19 neue serielle Kommandos und eine Reihe von Fehlerkorrekturen.
+  <ul><li>Der PR enthält nur Firmware. Tests, Werkzeuge und Dokumentation bleiben im Fork.</li></ul></li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">5</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+34.441</span> <span class="minus">−29.373</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">299</div></div><div class="stat"><div class="k">Basis</div><div class="v">4.35v</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">#1176</a></td><td>28.09.2026</td><td>fix(pn-retry): Relay-ACK für eine Wiederholung stoppt sie und erreicht die App</td><td class="num"><span class="plus">+64</span> <span class="minus">−2</span></td><td class="num">5</td><td class="num">21</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1177">#1177</a></td><td>28.09.2026</td><td>fix: ZERO WIDTH JOINER in zusammengesetzten Emoji-Sequenzen erhalten</td><td class="num"><span class="plus">+16</span> <span class="minus">−1</span></td><td class="num">2</td><td class="num">16</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1178">#1178</a></td><td>28.09.2026</td><td>fix(web): WebUI-Parameter als UTF-8 dekodieren (#1173)</td><td class="num"><span class="plus">+120</span> <span class="minus">−65</span></td><td class="num">3</td><td class="num">119</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1179">#1179</a></td><td>28.09.2026</td><td>fix(aprs): WIDE1-1-Pfad für die Track-Bake (#1174)</td><td class="num"><span class="plus">+3</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">3</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a></td><td>02.10.2026</td><td>feat: 4.40a – Store-and-Forward, Nachbarschaftsmatrix statt MHeard/Pfadtabelle, serielle Konfiguration, Fehlerkorrekturen</td><td class="num"><span class="plus">+34.238</span> <span class="minus">−29.304</span></td><td class="num">288</td><td class="num">28.148</td></tr>
 </tbody></table></div>
-</section>
+<p>Die Kopfzahl stammt aus der GitHub-API. #1186 löscht fast so viel, wie es hinzufügt: MHeard-Liste, Pfadtabelle, ungenutzte Fonts und Plattform-Dateien entfallen.</p>
 
-<section>
-<div class="eyebrow">28. September – 2. Oktober 2026 · 4.35u → 4.40a</div>
-<h2>Vier kleine Korrekturen, dann ein großer PR: Version 4.40a</h2>
-<p class="lead">Am 28.09. gehen vier kleine PRs durch: #1176 stoppt die Wiederholung einer persönlichen Nachricht, sobald ein Relais oder Gateway die Wiederholungskopie quittiert hat, und lässt den Haken in der App ankommen (seit #1168 trägt jede Kopie eine eigene msg_id, die Tabelle der eigenen Sendungen kannte aber nur die Original-id). #1177 behält das unsichtbare ZERO WIDTH JOINER in zusammengesetzten Emoji-Sequenzen, die der Zeichenfilter bisher auseinanderriss. #1178 dekodiert WebUI-Parameter als UTF-8 (Issue #1173). #1179 hängt den Pfad <code>WIDE1-1</code> an die Track-Bake, damit gewöhnliche LoRa-APRS-Digipeater sie wiederholen (Issue #1174).</p>
-<p class="lead">Am 02.10. folgt <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a>: die Version <b>4.40a</b>, und am selben Tag als offizielles Release veröffentlicht. Es ist der bisher größte Beitrag, ein Versionssprung auf Basis von 4.35v, der die Arbeit der vergangenen Wochen zusammenfasst: Speichern-und-Weiterleiten für Direktnachrichten, die Nachbarschaftsmatrix anstelle von MHeard-Liste und Pfadtabelle, 19 neue serielle Kommandos und eine Reihe von Fehlerkorrekturen. Der PR enthält nur Firmware; Tests, Werkzeuge und Dokumentation bleiben im Fork.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">5</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+34.441</span> <span class="minus">−29.373</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">299</div></div><div class="stat"><div class="k">Basis</div><div class="v">4.35v</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1176">#1176</a></td><td>2026-09-28</td><td>fix(pn-retry): Relay-ACK für eine Wiederholung stoppt sie und erreicht die App</td><td class="num"><span class="plus">+64</span> <span class="minus">−2</span></td><td class="num">5</td><td class="num">21</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1177">#1177</a></td><td>2026-09-28</td><td>fix: ZERO WIDTH JOINER in zusammengesetzten Emoji-Sequenzen erhalten</td><td class="num"><span class="plus">+16</span> <span class="minus">−1</span></td><td class="num">2</td><td class="num">16</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1178">#1178</a></td><td>2026-09-28</td><td>fix(web): WebUI-Parameter als UTF-8 dekodieren (#1173)</td><td class="num"><span class="plus">+120</span> <span class="minus">−65</span></td><td class="num">3</td><td class="num">119</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1179">#1179</a></td><td>2026-09-28</td><td>fix(aprs): WIDE1-1-Pfad für die Track-Bake (#1174)</td><td class="num"><span class="plus">+3</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">3</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1186">#1186</a></td><td>2026-10-02</td><td>feat: 4.40a – Store-and-Forward, Nachbarschaftsmatrix statt MHeard/Pfadtabelle, serielle Konfiguration, Fehlerkorrekturen</td><td class="num"><span class="plus">+34.238</span> <span class="minus">−29.304</span></td><td class="num">288</td><td class="num">28.148</td></tr>
-</tbody></table></div>
-
+<details>
+<summary>Was die Version 4.40a (#1186) bringt: Speichern-und-Weiterleiten, Nachbarschaftsmatrix, Kommandos</summary>
 <h3>Speichern und Weiterleiten für Direktnachrichten</h3>
-<p class="lead">Eine Direktnachricht an eine gerade nicht erreichbare Station ging bisher verloren. Ein Mailbox-Knoten hält sie jetzt und liefert sie aus, sobald er das Ziel wieder direkt hört: in einer Leiter von neun Sendungen binnen gut sieben Minuten, begrenzt auf 20 Aktionen pro Stunde und Knoten, nicht bei QRS/QRT und nicht über 25 % Kanalauslastung. Hört er die Auslieferung eines anderen Knotens, bricht er ab. Das gibt es nur auf ESP32-S3 und nRF52840 und ist standardmäßig aus (<code>--store off|own|list|heard</code>). Die Absenderseite bleibt gegenüber upstream unverändert, neu ist nur die Rückmeldung „fehlgeschlagen“ an die App, wenn der Knoten aufgibt.</p>
-
+<ul>
+<li><strong>Vorher:</strong> Eine Direktnachricht an eine gerade nicht erreichbare Station ging verloren.</li>
+<li><strong>Jetzt:</strong> Ein Mailbox-Knoten hält sie und liefert sie aus, sobald er das Ziel wieder direkt hört, in einer Leiter von neun Sendungen binnen gut sieben Minuten.</li>
+<li><strong>Grenzen:</strong> höchstens 20 Aktionen pro Stunde und Knoten, nicht bei QRS/QRT, nicht über 25 % Kanalauslastung. Hört der Knoten die Auslieferung eines anderen, bricht er ab.</li>
+<li><strong>Wo:</strong> nur ESP32-S3 und nRF52840, standardmäßig aus (<code>--store off|own|list|heard</code>).</li>
+<li><strong>Absenderseite:</strong> unverändert gegenüber upstream. Neu ist nur die Rückmeldung „fehlgeschlagen“ an die App, wenn der Knoten aufgibt.</li>
+</ul>
 <h3>Nachbarschaftsmatrix statt MHeard und Pfadtabelle</h3>
-<p class="lead">Jeder Knoten rechnet aus den Pfadfeldern empfangener Frames eine lokale Zwei-Hop-Matrix: wer hört wen. Daraus entscheidet er je Frame, ob er der Einzige ist, der bestimmte Nachbarn erreicht (dann mit Vorrang weiterleiten, nie abbrechen), oder ob andere abdecken (dann mit Backoff und Abbruch, sobald die Abdeckung zu hören ist). Das Luftformat bleibt unverändert; ältere Firmware flutet wie bisher. Die Matrix ersetzt <code>--mheard</code>, <code>--path</code>, die Web-Seiten, den BLE-MHeard-Rahmen und die T-Deck-Anzeige als Datenquelle. Das ist die größte sichtbare Änderung: die Ausgabe von <code>--mheard</code> hat ein neues Format, der BLE-Rahmen behält seine 13 Schlüssel und hängt sieben an, und die Nachbarzahl auf der Luft (<code>R&lt;n&gt;</code>, <code>/N</code>) zählt zweiseitige Nachbarn statt aller in 60 Minuten gehörten Stationen, auf Karte und Server also systematisch kleinere Zahlen.</p>
-
+<ul>
+<li><strong>Was sie ist:</strong> Jeder Knoten rechnet aus den Pfadfeldern empfangener Frames eine lokale Zwei-Hop-Matrix, wer wen hört.</li>
+<li><strong>Wozu:</strong> Je Frame entscheidet der Knoten, ob er der Einzige ist, der bestimmte Nachbarn erreicht. Dann leitet er mit Vorrang weiter und bricht nie ab. Decken andere ab, wartet er mit Backoff und bricht ab, sobald die Abdeckung zu hören ist.</li>
+<li><strong>Luftformat:</strong> unverändert. Ältere Firmware flutet wie bisher.</li>
+<li><strong>Sichtbare Änderung:</strong> Die Matrix ersetzt <code>--mheard</code>, <code>--path</code>, die Web-Seiten, den BLE-MHeard-Rahmen und die T-Deck-Anzeige als Datenquelle.
+  <ul>
+  <li>Die Ausgabe von <code>--mheard</code> hat ein neues Format. Der BLE-Rahmen behält seine 13 Schlüssel und hängt sieben an.</li>
+  <li>Die Nachbarzahl auf der Luft (<code>R&lt;n&gt;</code>, <code>/N</code>) zählt zweiseitige Nachbarn statt aller in 60 Minuten gehörten Stationen. Auf Karte und Server erscheinen systematisch kleinere Zahlen.</li>
+  </ul></li>
+</ul>
 <h3>Kommandos, Fehlerkorrekturen, Aufbau</h3>
-<p class="lead">19 neue serielle/USB-Kommandos (<code>--neighbours</code>, <code>--store*</code>, <code>--nbr*</code>, <code>--msgid</code>, <code>--mbox</code>, <code>--keylock</code>, <code>--ethmtu</code> und weitere), ein nach Gruppen gegliedertes <code>--help</code>, tabellengetriebene Schalter. Behoben sind unter anderem: ein vom BLE-Stack abgelehntes Notify verlor das Frame (nRF52), ein Telefon mit falscher PIN-Prüfsumme wird sofort getrennt, ein BLE-Schreibvorgang der Einstellungen ließ den Nachrichtenzähler zurücklaufen (nRF52), eigene Nachrichten ohne Wiederholung behalten ihre TX-Ring-Priorität, das Hintergrundlicht des T-Trackers folgt „Display aus“, und der Nachrichtenzähler der Weboberfläche zählt UTF-8-Bytes. Der RAK4631 wird mit <code>-Os</code> statt <code>-Ofast</code> gebaut: Flash-Belegung rund 70 % statt 96 %, und NaN-Prüfungen greifen dort wieder. Einstellungen, Zähler, BLE- und UDP-Pfade liegen in eigenen Modulen; ungenutzte Fonts und Plattform-Dateien sind entfernt.</p>
-<div class="box"><b>Getestet und offen.</b> Alle 32 Board-Envs und beide Safeboot-Envs bauen; 48 Host-Umgebungen mit 1.618 Testfällen sind grün (die Tests liegen im Fork, nicht im PR). Auf der Bank liefen RAK4631 und Heltec V3 mit diesem Stand; T-Beam und T-Deck nicht. Bekannt offen: zwei Mailbox-Knoten, die sich nicht hören, liefern beide aus; ein Knoten, der mich hört und den ich nie höre, erscheint nicht in der Matrix; die Stock-App kennt die Statuswerte 0x03 und 0x04 nicht und lässt die Nachricht unverändert.</div>
+<ul>
+<li><strong>19 neue serielle Kommandos</strong> (<code>--neighbours</code>, <code>--store*</code>, <code>--nbr*</code>, <code>--msgid</code>, <code>--mbox</code>, <code>--keylock</code>, <code>--ethmtu</code> und weitere), ein nach Gruppen gegliedertes <code>--help</code>, tabellengetriebene Schalter.</li>
+<li><strong>Behoben:</strong> ein vom BLE-Stack abgelehntes Notify verlor das Frame (nRF52). Ein Telefon mit falscher PIN-Prüfsumme wird sofort getrennt. Ein BLE-Schreibvorgang der Einstellungen ließ den Nachrichtenzähler zurücklaufen (nRF52). Eigene Nachrichten ohne Wiederholung behalten ihre TX-Ring-Priorität. Das Hintergrundlicht des T-Trackers folgt „Display aus“. Der Nachrichtenzähler der Weboberfläche zählt UTF-8-Bytes.</li>
+<li><strong>RAK4631:</strong> gebaut mit <code>-Os</code> statt <code>-Ofast</code>. Die Flash-Belegung sinkt von rund 96 % auf rund 70 %, und NaN-Prüfungen greifen dort wieder.</li>
+<li><strong>Aufbau:</strong> Einstellungen, Zähler, BLE- und UDP-Pfade liegen in eigenen Modulen. Ungenutzte Fonts und Plattform-Dateien sind entfernt.</li>
+</ul>
+</details>
 
-<p class="small">Die Kopfzahl der PRs stammt aus der GitHub-API; #1186 löscht fast so viel, wie es hinzufügt: MHeard-Liste und Pfadtabelle, ungenutzte Fonts und Plattform-Dateien entfallen.</p>
-</section>
-
-<section>
-<div class="eyebrow">10.–24. Oktober 2026 · 4.40a → 4.40a.hbserver → upstream/dev</div>
-<h2>Feld- und Prüfstandsfixes, Web-GUI, Server-Tabelle für alle Gateways, Antwort-Knopf der T-Deck</h2>
-<p class="lead">Am 10. und 11.10. gehen zwei kleine Korrekturen am Temperatur-Offset durch: #1200 wendet ihn auch bei AHT20, SHT21 und SHTC3 an, #1201 lässt im Web-GUI eine führende Null und ein Dezimalkomma zu. Am 12.10. folgen zwei größere PRs. #1207 sammelt die Fehlerkorrekturen aus Feld und Prüfstand: ein softAP auf Knoten ohne gespeicherte SSID, das BMP390-Bit, die Lade-LED der AXP-Boards, der RTC hält UTC, Extern-UDP ohne Broadcast-Ziel, die Zustellhaken im Web-GUI, der DHCP-Lease des RAK4631 bei der Wiederherstellung (ETH-04), der BLE-Sitzungs-Reset (Teil von #1191), die T-Deck-Kartenmarker, die Polen-Frequenz und die Priorität der <code>{CET}/{MCP}/{SET}</code>-Texte; dazu die Zeitzone als POSIX-TZ-Regel (#1192) und die MTU-Einstellung auf allen Boards (#1190). #1208 schützt die Web-Seiten durch HTML-Escaping, prüft Breiten- und Längengrad von Konsole und BLE und bringt kleinere Erweiterungen: den Upload der eigenen HEY-Echos am Gateway, eine Zeile „Server:“ auf der Info-Seite, die Sendeleistung als Zahlenfeld, einklappbare Karten und für das T-Deck einen Kachel-Cache im PSRAM und den Zustellstatus in der Nachrichtenblase. Am 13.10. veröffentlicht upstream beides als Teil von <b>4.40a.hbserver</b>.</p>
-<p class="lead">Am 18.10. merged upstream zwei weitere PRs nach <code>dev</code>. <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>: ESP32 und nRF52 wählen MeshCom-Server und Zeitserver aus einer gemeinsamen Tabelle (<code>src/gw_servers.cpp</code>, eine Zeile je Land) statt aus drei auseinandergelaufenen Kopien; dazu der Netzmodus <code>--setnet auto|inet|hamnet</code>, und ein RAK4631 mit statischer Adresse bleibt bei der Ethernet-Wiederherstellung statisch. Auf der Bank lief vorher eine Matrix aus drei Netzen, drei Modi und fünf Servern auf RAK4631 und Heltec V3. <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a> gibt jeder eingehenden Blase der T-Deck einen Antwort-Knopf und füllt „An“ aus dem Konversations-Tab vor; die Web-Seiten Path und MHeard zeigen die Firmware jeder Station. Beide stehen in <code>dev</code>, ein upstream-Tag folgt noch.</p>
-<p class="lead">Vom 21. bis 23.10. folgen drei weitere. <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a> (Issue #1217): Web-Seiten laufen durch einen begrenzten Sendepuffer mit Watchdog-Feeds, ein langsamer Browser löst keinen <code>TASK_WDT</code>-Neustart mehr aus. <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a> (Issue #1231): ein unbekanntes UDP-Datagramm am Gateway-Port hält den Heartbeat-Watchdog nicht mehr frisch, die Warnung „Server antwortet nicht“ kommt wieder. <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a> bündelt die kleineren Fork-Funktionen: Prüfung von <code>--via</code>, den GPS-Positionsfilter, Fixes an der Netzkonsole samt Sende-Ring der Konsole, OnRxDone-Zahlen im STAT, <code>[HEAP]</code>-Bootmarken, die NVS-Zeile in <code>--info</code>, eine Board-LED für ESP32 und nRF52 und Aufräumen im Build. Am 24.10. folgt <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a>: der SP-Gateway-Server heißt jetzt <code>sp.meshcom.pl</code> (gleiche IP). Die Zeilenbilanz oben (git blame vom 18.10.) enthält diese vier noch nicht.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">10</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+7.497</span> <span class="minus">−1.817</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">174</div></div><div class="stat"><div class="k">Offen</div><div class="v">0</div></div></div>
-<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1200">#1200</a></td><td>2026-10-10</td><td>fix: Temperatur-Offset bei AHT20, SHT21 und SHTC3 anwenden</td><td class="num"><span class="plus">+6</span> <span class="minus">−4</span></td><td class="num">4</td><td class="num">6</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1201">#1201</a></td><td>2026-10-11</td><td>fix: Temperatur-Offset im Web-GUI mit führender Null und Dezimalkomma</td><td class="num"><span class="plus">+24</span> <span class="minus">−6</span></td><td class="num">3</td><td class="num">25</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1207">#1207</a></td><td>2026-10-12</td><td>Fehlerkorrekturen aus Feld und Prüfstand, Zeitzone als POSIX-TZ (#1192) und MTU auf allen Boards (#1190)</td><td class="num"><span class="plus">+2.025</span> <span class="minus">−191</span></td><td class="num">41</td><td class="num">1.984</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a></td><td>2026-10-12</td><td>Web-GUI: Escaping, Positionsprüfung, kleinere Erweiterungen (Gateway, Web, T-Deck)</td><td class="num"><span class="plus">+793</span> <span class="minus">−114</span></td><td class="num">19</td><td class="num">786</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a></td><td>2026-10-18</td><td>Zentrale Server-Tabelle (gw_servers), statische nRF52 bleiben statisch, Netzmodus auto/inet/hamnet</td><td class="num"><span class="plus">+774</span> <span class="minus">−357</span></td><td class="num">13</td><td class="num">756</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a></td><td>2026-10-18</td><td>T-Deck: auf DMs antworten; Web-GUI: Firmware-Stand auf Path- und MHeard-Seite</td><td class="num"><span class="plus">+259</span> <span class="minus">−32</span></td><td class="num">13</td><td class="num">257</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a></td><td>2026-10-21</td><td>Web-Server: begrenzter Sendepuffer und Watchdog-Feeds gegen TASK_WDT-Neustart bei langsamem Browser (#1217)</td><td class="num"><span class="plus">+830</span> <span class="minus">−0</span></td><td class="num">6</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a></td><td>2026-10-22</td><td>Gateway: unbekannte UDP-Datagramme halten den Heartbeat-Watchdog nicht mehr frisch</td><td class="num"><span class="plus">+2</span> <span class="minus">−4</span></td><td class="num">2</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a></td><td>2026-10-23</td><td>Konsole, GPS-Filter, Board-LED, Via-Prüfung und Build-Aufräumen</td><td class="num"><span class="plus">+2.783</span> <span class="minus">−1.108</span></td><td class="num">72</td><td class="num">–</td></tr>
-<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a></td><td>2026-10-24</td><td>Gateway-Server: SP-Server auf sp.meshcom.pl umgestellt</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">–</td></tr>
-</tbody></table></div>
-<h3>Release und Web-Flasher</h3>
-<p class="lead">Upstream hat 4.40a am 02.10.2026 veröffentlicht und 4.40a.hbserver am 13.10.2026. Der Fork stellte aus demselben Quelltext das Release v4.40a.10.02 bereit; seit 24.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a>: das offizielle 4.40a.hbserver plus alles aus #1213, #1214, #1224, #1233, #1235 und #1236 (in upstream <code>dev</code>) sowie die Fork-Funktionen für #1187–#1189.</p>
-<p>Seit dem 19.10. kamen im Fork sechs Releases mit wichtigen Fehlerkorrekturen. Was davon schon in upstream ist, steht in der Zeile.</p>
-<div class="tocwrap"><table>
-<thead><tr><th>Release</th><th>Datum</th><th>Was es behebt oder bringt</th></tr></thead>
-<tbody>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19">v4.40a.10.19</a></td><td>2026-10-19</td><td><b>Volle LoRa-Sendewarteschlange:</b> ein Knoten mit eigenen und weitergeleiteten Paketen hängt nicht mehr minutenlang hinter seinen Nachbarn. Dazu feste Werte für zehn Protokoll-Einstellungen in Release-Builds, Auto Update im Web-GUI nur noch als Hinweis, mehr freier Heap für die Update-Prüfung auf klassischen ESP32, die Board-LED auf nRF52 und ein Watchdog-Fix für die Nachbarseite.</td></tr>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">v4.40a.10.20</a></td><td>2026-10-19</td><td><b>Webserver startet den Knoten nicht mehr über den Watchdog neu:</b> jede Seite läuft durch einen begrenzten Sendepuffer, ein langsamer oder hängender Browser beendet nur die Seite. Dazu Ende der „WEBServer stopped“-Logflut ohne IP-Adresse, NVS-Diagnose für die Fernsteuerung und der Fix für die T-Beam 1W, die nach einem Auto Update im Safeboot blieb (AU-16).</td></tr>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">v4.40a.10.21</a></td><td>2026-10-19</td><td><b>Board-Erkennung im Web-Flasher, auch wenn die Firmware nicht läuft:</b> Kennung in jedem Image, neues Kommando <code>--id</code>, Safeboot v3 nennt das Board, und „Aus dem Flash lesen“ liest die Kennung über das ESP32-ROM. Dazu eine funktionierende Partitionstabelle für die T-Deck Pro.</td></tr>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a></td><td>2026-10-22</td><td><b>Gateway-Diagnose:</b> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, als #1233 auch in upstream). Dazu die Server-Zeile SP (Polen) aus upstream #1234.</td></tr>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.23">v4.40a.10.23</a></td><td>2026-10-23</td><td><b>Neue LoRa-Sendewarteschlange:</b> ein Slot-Pool statt Ring, alte Frames verfallen je Priorität, Zeitbaken älter als 150 s gehen nicht mehr auf die Luft, ein neueres HEY oder eine neuere Position ersetzt die wartende Kopie. Dazu die Rufzeichen-Sperrliste <code>--blockcall</code>, der Fix für einen Absturz in der BLE-Pause des täglichen Update-Checks auf klassischen ESP32 (AU-19) und acht weitere Stabilitätsfixes. Noch nicht in upstream; #1235 ist seit 23.10. gemerged.</td></tr>
-<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a></td><td>2026-10-24</td><td><b>Vier kleine Fixes:</b> SP-Server auf <code>sp.meshcom.pl</code> (als #1236 auch in upstream), Display-Puffer des Heltec Wireless Tracker wird für den Update-Check freigegeben (AU-21), ein frisch gelöschter T-Beam startet mit GPS statt TRACK (TRK-03), ein RM1-Kommando aus einem Client hört mit der Antwort auf zu wiederholen. Außer #1236 noch nicht in upstream.</td></tr>
-</tbody></table></div>
-</section>
-
-<section>
-<div class="eyebrow">Quelle</div>
-<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 23.10.2026; Fork-Releases Stand 24.10.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
-</section>
+<div class="callout note">
+<p><strong>Getestet und offen (Stand der PR-Beschreibung, 02.10.2026).</strong> Alle 32 Board-Envs und beide Safeboot-Envs bauen. 48 Host-Umgebungen mit 1.618 Testfällen sind grün; die Tests liegen im Fork, nicht im PR. Auf der Bank liefen RAK4631 und Heltec V3 mit diesem Stand, T-Beam und T-Deck nicht.</p>
+<ul>
+<li>Zwei Mailbox-Knoten, die sich nicht hören, liefern beide aus.</li>
+<li>Ein Knoten, der mich hört und den ich nie höre, erscheint nicht in der Matrix.</li>
+<li>Die Stock-App kennt die Statuswerte 0x03 und 0x04 nicht und lässt die Nachricht unverändert.</li>
+</ul>
 </div>
+
+<h2 id="aeltere">Ältere Runden 1 bis 5</h2>
+<p><strong>Fünf frühere Runden von Februar bis September 2026, aufgeklappt mit Tabelle je PR.</strong> Geschlossene PRs stehen grau in der Tabelle mit einer Erklärung.</p>
+<details id="r5"><summary>Runde 5: RAM-Arbeit, Safeboot-OTA und PN-Wiederholung, 25.–27.09.2026 (4 PRs, +9.535 −1.716)</summary>
+<p><strong>Vier eigenständige PRs bringen die Behebung eines ESP32-Stack-Überlaufs, ein neu gebautes Safeboot-OTA und die PN-Wiederholung in den Hauptzweig; alle stehen im Tag 4.35u.</strong></p>
+<ul>
+<li><strong>ESP32-Stack-Überlauf bei Extern-UDP behoben</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1157">#1157</a>, 25.09.): Der Loop-Task-Stack reichte für die Eingangskette nicht.
+  <ul><li>Dazu: <code>--mesh off</code> wirkt auch auf Via-Pfaden. Die Byte-Ring-Umstellung der drei Ausgangsringe kommt als eigenständiger PR nach upstream.</li></ul></li>
+<li><strong>Safeboot-OTA neu gebaut</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1162">#1162</a>, 26.09.): Die Update-Sitzung läuft als Zustandsautomat, es gibt eine Statusseite und einen Auto-AP, wenn kein WLAN gefunden wird. Es bleibt nur ein App-Slot statt eines Rückfalls, der auf einer einzigen Partition ohnehin nie funktionieren konnte.</li>
+<li><strong>PN-Wiederholung per XOR-Kennung</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">#1168</a>, 27.09.): ein Wiederholpfad für jede Direktnachricht (PN = persönliche Nachricht). Der zentrale Server muss seinen Dedup-Schlüssel zuerst umstellen.</li>
+<li><strong>Das Web-RX-Log zeigt die älteste Zeile zuerst</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1169">#1169</a>, 27.09.).</li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">4</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+9.535</span> <span class="minus">−1.716</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">52</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1157">#1157</a></td><td>25.09.2026</td><td>fix: ESP32-Stack-Ueberlauf (Extern-UDP), --mesh off auf Via-Pfaden, Byte-Ringe fuer RAM und Feldfixes</td><td class="num"><span class="plus">+942</span> <span class="minus">−314</span></td><td class="num">26</td><td class="num">609</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1162">#1162</a></td><td>26.09.2026</td><td>feat(safeboot): OTA-Sitzung als Zustandsautomat, Statusseite, Auto-AP, ein App-Slot; Build-Fix nach Mainline-Builds</td><td class="num"><span class="plus">+5.351</span> <span class="minus">−1.362</span></td><td class="num">11</td><td class="num">1.797</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1168">#1168</a></td><td>27.09.2026</td><td>feat: PN-Wiederholungen mit XOR-msg_id (Variante a aus wiederholungen.md)</td><td class="num"><span class="plus">+3.236</span> <span class="minus">−37</span></td><td class="num">14</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1169">#1169</a></td><td>27.09.2026</td><td>fix(web): RX-Log zeigt älteste Zeile zuerst (#1154)</td><td class="num"><span class="plus">+6</span> <span class="minus">−3</span></td><td class="num">1</td><td class="num">5</td></tr>
+</tbody></table></div>
+</details>
+<details id="r4"><summary>Runde 4: Feldmeldungen gegen 4.35t, 14.–24.09.2026 (9 PRs, +529 −63)</summary>
+<p><strong>Neun kleine PRs, jeder aus einer Meldung aus dem Betrieb; #1142 bis #1150 stehen im upstream-Tag 4.35t.09.20, #1152 und #1153 im Tag 4.35t.09.24.</strong></p>
+<ul>
+<li><strong>APRS-Positionen werden vollständiger gelesen</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1142">#1142</a>): Der Decoder liest <code>#name</code> sowie <code>/R=</code>, <code>/U=</code> und <code>/I=</code>, der Encoder schreibt keine NaN-Werte mehr.</li>
+<li><strong>Das Boot-Log nennt den Aufwachgrund nach dem Deepsleep</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1143">#1143</a>).</li>
+<li><strong>Die Gruppennummer bleibt in der Web-GUI nach dem Senden im Zielfeld</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1144">#1144</a>), statt dass die nächste Nachricht als Broadcast hinausgeht.</li>
+<li><strong>Über BLE kommen keine leeren Node Settings mehr an</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1147">#1147</a>): Nach längerer Laufzeit überschrieb der MHeard-Schub die Config-Frames im Kommando-Ring.</li>
+<li><strong>Der Hop-Zähler läuft ohne App nicht mehr auf 15 über</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1148">#1148</a>) bei Gruppen- und Broadcast-Frames.</li>
+<li><strong>Das eigene Rufzeichen steht immer mit SSID in kanonischer Schreibweise</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1149">#1149</a>).</li>
+<li><strong><code>setlat</code>/<code>setlon</code> über die Web-GUI melden auf nRF52 keinen falschen Fehler mehr</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1150">#1150</a>).</li>
+<li><strong>Eine T-Beam 1W zeigt nach dem Löschen der Einstellungen wieder den Akku</strong> statt dauerhaft USB (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1152">#1152</a>).</li>
+<li><strong>Der Voltage-Schalter der Web-GUI sendet <code>--volt on|off</code></strong> statt nacktem <code>--volt</code>/<code>--proz</code> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1153">#1153</a>).</li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">9</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+529</span> <span class="minus">−63</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">26</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1142">#1142</a></td><td>14.09.2026</td><td>fix(aprs): Positionsdecoder liest #name, /R= /U= /I=; NaN-Schutz je Tag im Encoder</td><td class="num"><span class="plus">+230</span> <span class="minus">−25</span></td><td class="num">5</td><td class="num">173</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1143">#1143</a></td><td>14.09.2026</td><td>feat(esp32): Aufwachgrund nach Deepsleep im Boot-Log (WAKE_CAUSE)</td><td class="num"><span class="plus">+29</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">29</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1144">#1144</a></td><td>14.09.2026</td><td>fix(webgui): Gruppennummer bleibt nach dem Senden im Zielfeld, kein ungewollter Broadcast</td><td class="num"><span class="plus">+6</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1147">#1147</a></td><td>20.09.2026</td><td>fix(ble): leere Node Settings nach laengerer Laufzeit - MHeard-Schub ueberschreibt Config-Frames im Kommando-Ring</td><td class="num"><span class="plus">+61</span> <span class="minus">−13</span></td><td class="num">5</td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1148">#1148</a></td><td>20.09.2026</td><td>fix(relay): Hop-Zaehler laeuft bei Gruppen-/Broadcast-Frames ohne App auf 15 ueber</td><td class="num"><span class="plus">+10</span> <span class="minus">−2</span></td><td class="num">1</td><td class="num">10</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1149">#1149</a></td><td>20.09.2026</td><td>fix(call): eigenes Rufzeichen immer mit SSID, kanonisch geschrieben</td><td class="num"><span class="plus">+154</span> <span class="minus">−2</span></td><td class="num">8</td><td class="num">146</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1150">#1150</a></td><td>20.09.2026</td><td>fix(web): setlat/setlon auf nRF52 meldeten faelschlich "Value could not be set"</td><td class="num"><span class="plus">+10</span> <span class="minus">−10</span></td><td class="num">1</td><td class="num">10</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1152">#1152</a></td><td>22.09.2026</td><td>fix(batt): T-Beam 1W zeigt nach Wipe dauerhaft USB statt Akku</td><td class="num"><span class="plus">+26</span></td><td class="num">3</td><td class="num">26</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1153">#1153</a></td><td>24.09.2026</td><td>fix(web): Schalter "Voltage" sendet --volt on|off statt nacktem --volt/--proz</td><td class="num"><span class="plus">+3</span> <span class="minus">−9</span></td><td class="num">1</td><td class="num">1</td></tr>
+</tbody></table></div>
+</details>
+<details id="r3"><summary>Runde 3: Fünf Monate Feldbetrieb, dann Härtung und Ausbau, 27.08.–13.09.2026 (9 PRs, +18.450 −3.620)</summary>
+<p><strong>Vier große PRs und fünf kleine bringen Speichersicherheit, eine freie Hauptschleife, Deepsleep und GPS-Filter aus fünf Monaten Feldbetrieb; mit #1135 wurde die offizielle 4.35t geschnitten.</strong></p>
+<ul>
+<li><strong>82 Änderungen aus dem Dauerbetrieb an OE- und DL-Knoten</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a>): Speichersicherheit auf allen von außen erreichbaren Pfaden, Absturz- und Einfrierfixes, Nebenläufigkeit, Zeitarithmetik.</li>
+<li><strong>Freie Hauptschleife</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a>): WLAN, DNS und NTP laufen asynchron, das OLED auf Hardware-I2C, Audio auf eigenem Task, dazu ein Ethernet-Link-Check.
+  <ul><li>Dazu das Rückstau-Protokoll, ein Zeichensatzfilter, der Konfigurations-Export und die Feld-Instrumentierung.</li></ul></li>
+<li><strong>GPS-Kalmanfilter, T-Deck-Tastenwiederholung und die setlog-Zeilen</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a>).</li>
+<li><strong>Deepsleep, der auf jedem Board wirklich schläft</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a>): ACK-Frames mit dem Rufzeichen des Quittierenden, Echo-Schutz im Rückstau-Protokoll, das LoRa-Queue-Panel und die Nachrichten-Tabs in der Web-GUI, GPS/Barometer-Höhenfusion, MCP23017-Eingänge als <code>/D=</code> im Beacon, Latin-1-Umlaute im Zeichensatzfilter und HWCDC-Fixes auf ESP32-S3. Mit diesem PR wurde die offizielle 4.35t geschnitten.</li>
+<li><strong>Feldmeldungen gegen 4.35t</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1140">#1140</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1141">#1141</a>): Deepsleep per langem Tastendruck, T-Deck-Tastensperre, Supreme-OLED. Der Sound-on-Schalter samt <code>--mute</code> war in jedem 4.35t-Image aus dem Build gefallen.</li>
+<li><strong>Drei kleine Fixes:</strong> der FWDATE-Puffer war zu klein und schnitt die Sekunden ab (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1103">#1103</a>), der PlatformIO-Upload ohne <code>upload_port</code> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1118">#1118</a>), QRS erst ab der dritten eigenen Nachricht bei Ringtiefe ab 5 (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1122">#1122</a>).</li>
+<li><strong>Alles davon steht in der offiziellen 4.35t.09.13.</strong></li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">9</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+18.450</span> <span class="minus">−3.620</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">253</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a></td><td>27.08.2026</td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num"><span class="plus">+3.213</span> <span class="minus">−1.113</span></td><td class="num">64</td><td class="num">2.634</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1103">#1103</a></td><td>27.08.2026</td><td>fix(ble): FWDATE-Puffer zu klein -- snprintf schneidet die Sekunden ab</td><td class="num"><span class="plus">+4</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a></td><td>01.09.2026</td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num"><span class="plus">+11.020</span> <span class="minus">−1.989</span></td><td class="num">102</td><td class="num">9.528</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1118">#1118</a></td><td>01.09.2026</td><td>fix: PlatformIO-Upload ohne upload_port reparieren, -Wall -Wextra nur fuer src/</td><td class="num"><span class="plus">+14</span> <span class="minus">−2</span></td><td class="num">2</td><td class="num">13</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1122">#1122</a></td><td>02.09.2026</td><td>fix: QRS erst ab der dritten eigenen Nachricht bei Ringtiefe >= 5</td><td class="num"><span class="plus">+35</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">35</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a></td><td>03.09.2026</td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num"><span class="plus">+1.737</span> <span class="minus">−114</span></td><td class="num">23</td><td class="num">1.664</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a></td><td>10.09.2026</td><td>feat/fix: Deepsleep, ACK-Herkunft, Web-Queue, Hoehenfusion, Feldfixes</td><td class="num"><span class="plus">+2.235</span> <span class="minus">−307</span></td><td class="num">51</td><td class="num">2.114</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1140">#1140</a></td><td>12.09.2026</td><td>fix: 4.35t Feldfixes: Deepsleep-Taste, T-Deck Keylock, Supreme OLED</td><td class="num"><span class="plus">+104</span> <span class="minus">−14</span></td><td class="num">7</td><td class="num">104</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1141">#1141</a></td><td>13.09.2026</td><td>fix(t-deck): Sound-on-Schalter und --mute sind in 4.35t wirkungslos</td><td class="num"><span class="plus">+88</span> <span class="minus">−79</span></td><td class="num">2</td><td class="num">71</td></tr>
+</tbody></table></div>
+</details>
+<details id="r2"><summary>Runde 2: CAD kommt in den Sendepfad, 16.–24.03.2026 (21 PRs, +5.768 −2.168)</summary>
+<p><strong>21 PRs bringen CAD, die Kanalabfrage vor dem Senden, in den Sendepfad und beseitigen Wettläufe und Stillstände auf dem RAK4631.</strong></p>
+<ul>
+<li><strong>Vorher:</strong> Vor 4.35p sendete ein Knoten nach Timer, ohne den Kanal zu prüfen.</li>
+<li><strong>Neu im Sendepfad</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/782">#782</a>): Hardware-CAD mit Doppelprüfung, CSMA (erst hören, dann senden) mit Prioritäten und Zufallsslots, die Prioritätswarteschlange und Trickle für HEY-Baken.</li>
+<li><strong>Nachbesserungen:</strong> ein Zustandsautomat für das CAD, die Schleife ohne Empfang und zehn Wettläufe zwischen Interrupt und Hauptschleife (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/779">#779</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/781">#781</a>).</li>
+<li><strong>RAK4631:</strong> Stillstände durch den geteilten SPI-Bus, einen Stack-Überlauf und Flash-Schreiben im HTTP-Handler.</li>
+<li><strong>Upstream</strong> hat CAD am 15.03. übernommen, die Fixes folgten bis 24.03.</li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">21</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+5.768</span> <span class="minus">−2.168</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">83</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/742">#742</a></td><td>02.03.2026</td><td>Fix: max_hop bei UDP-zu-LoRa Gateway-Relay dekrementieren<div class="note">Nicht gemerged. Hop-Dekrement am Gateway; das Thema kam später über den Server-Pfad.</div></td><td class="num">nicht gemerged</td><td class="num">1</td><td class="num">–</td></tr>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/749">#749</a></td><td>04.03.2026</td><td>Dependency-Update: RadioLib 7.6.0, NimBLE-Arduino 2.3.8<div class="note">Nicht gemerged. RadioLib 7.6.0 / NimBLE 2.3.8, upstream blieb bei den gepinnten Versionen.</div></td><td class="num">nicht gemerged</td><td class="num">2</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/775">#775</a></td><td>16.03.2026</td><td>fix: strcpy/strcat Buffer-Overflow Hardening</td><td class="num"><span class="plus">+30</span> <span class="minus">−17</span></td><td class="num">4</td><td class="num">24</td></tr>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/776">#776</a></td><td>17.03.2026</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben<div class="note">Ersetzt durch #777: der Branch hatte eine falsche Basis, deshalb die absurde Bilanz von −30.991 Zeilen.</div></td><td class="num">nicht gemerged</td><td class="num">221</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/777">#777</a></td><td>17.03.2026</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben</td><td class="num"><span class="plus">+39</span> <span class="minus">−2</span></td><td class="num">3</td><td class="num">24</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/778">#778</a></td><td>17.03.2026</td><td>fix: RAK4630 Radio-Watchdog bei leerer TX-Queue</td><td class="num"><span class="plus">+7</span> <span class="minus">−0</span></td><td class="num">1</td><td class="num">7</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/779">#779</a></td><td>18.03.2026</td><td>fix: RACE-01..05 — ISR/Main-Loop Race Conditions in Ring-Buffer, Display-Queue und CAD-State-Machine</td><td class="num"><span class="plus">+164</span> <span class="minus">−102</span></td><td class="num">5</td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/781">#781</a></td><td>18.03.2026</td><td>fix: RACE-01..05 — volatile Ring-Buffer-Indizes, ISR-Display-Spinlock, CAD Critical Sections</td><td class="num"><span class="plus">+166</span> <span class="minus">−106</span></td><td class="num">8</td><td class="num">82</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/782">#782</a></td><td>18.03.2026</td><td>feat: Priority-Queue, Trickle-HEY (RFC 6206), CSMA-Prioritaeten, Statistik</td><td class="num"><span class="plus">+545</span> <span class="minus">−114</span></td><td class="num">8</td><td class="num">247</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/783">#783</a></td><td>19.03.2026</td><td>fix: TX-Loop und UDP-Dedup Bugfix</td><td class="num"><span class="plus">+3.984</span> <span class="minus">−1.516</span></td><td class="num">12</td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/784">#784</a></td><td>19.03.2026</td><td>fix: BLE-Ringpuffer speichert Offline-Nachrichten</td><td class="num"><span class="plus">+20</span> <span class="minus">−4</span></td><td class="num">2</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/785">#785</a></td><td>20.03.2026</td><td>fix: updateHeyPath überschreibt RSSI/SNR/MOD mit Relay-Werten</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/787">#787</a></td><td>21.03.2026</td><td>fix: conffin nur einmal senden, nach Queue-Drain</td><td class="num"><span class="plus">+45</span> <span class="minus">−24</span></td><td class="num">4</td><td class="num">14</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/789">#789</a></td><td>21.03.2026</td><td>fix(radio): CAD-Spinloop und RX-Error-Diagnose</td><td class="num"><span class="plus">+95</span> <span class="minus">−13</span></td><td class="num">6</td><td class="num">35</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/790">#790</a></td><td>21.03.2026</td><td>fix(nrf52): BLE CR/BW Anzeige + RX_PROCESS State-Log</td><td class="num"><span class="plus">+76</span> <span class="minus">−2</span></td><td class="num">3</td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/791">#791</a></td><td>22.03.2026</td><td>Serial Monitor Replay, nRF52 RX-Airtime Fix, loganalyse.sh CRC-Errors</td><td class="num"><span class="plus">+316</span> <span class="minus">−62</span></td><td class="num">4</td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/792">#792</a></td><td>22.03.2026</td><td>fix(lora): Doppel-Send nach ACK verhindert</td><td class="num"><span class="plus">+2</span> <span class="minus">−2</span></td><td class="num">1</td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/793">#793</a></td><td>22.03.2026</td><td>fix(lora): findAndStopRingSlot len=0 (Doppel-Send v2)</td><td class="num"><span class="plus">+1</span> <span class="minus">−0</span></td><td class="num">1</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/802">#802</a></td><td>23.03.2026</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+77</span> <span class="minus">−113</span></td><td class="num">6</td><td class="num">11</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/803">#803</a></td><td>23.03.2026</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+49</span> <span class="minus">−42</span></td><td class="num">3</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/805">#805</a></td><td>23.03.2026</td><td>fix: ext. UDP WebUI Standstill auf RAK4631 (deferred save/reset)</td><td class="num"><span class="plus">+31</span> <span class="minus">−8</span></td><td class="num">4</td><td class="num">0</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/806">#806</a></td><td>23.03.2026</td><td>fix: SPI bus guard — LoRa ISR Crash bei Ethernet-Zugriff (RAK4631)</td><td class="num"><span class="plus">+40</span> <span class="minus">−12</span></td><td class="num">3</td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/809">#809</a></td><td>23.03.2026</td><td>fix: Stack Overflow in sendExtern() crasht RAK4631</td><td class="num"><span class="plus">+7</span> <span class="minus">−14</span></td><td class="num">1</td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/816">#816</a></td><td>24.03.2026</td><td>feat: Heap/RAM Monitoring via Serial (ESP32 + nRF52)</td><td class="num"><span class="plus">+73</span> <span class="minus">−14</span></td><td class="num">3</td><td class="num">28</td></tr>
+</tbody></table></div>
+</details>
+<details id="r1"><summary>Runde 1: Empfangslöcher und Wiederholungen, 22.–24.02.2026 (3 PRs, +478 −153)</summary>
+<p><strong>Drei PRs beseitigen Empfangslöcher und Wiederholungsfehler; auf der Teststrecke sinkt der Paketverlust von 13,2 % auf 0 %.</strong></p>
+<ul>
+<li><strong>Ausgangspunkt:</strong> rund 50 % Nachrichtenverlust in beide Richtungen auf einem belegten Kanal, gemessen auf Heltec V3.</li>
+<li><strong>Ursachen:</strong> zwölf Fehler in der Funk-Zustandsmaschine und im Ringpuffer.
+  <ul>
+  <li>Empfangsfenster, in denen das Modul blind war, ein Wiederholmechanismus, der nie griff, Quittungen ohne msg_id.</li>
+  <li>Ein Ringpuffer, der sich mit fertigen Slots füllte.</li>
+  </ul></li>
+<li><strong>Jetzt:</strong> Paketverlust auf der Teststrecke 13,2 % auf 0 %, drei Wiederholungen im Abstand von 40 s, nRF52 nachgezogen (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/728">#728</a>).</li>
+<li><strong>Geschlossen:</strong> <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/709">#709</a> wurde durch <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/710">#710</a> ersetzt, weil er gegen <code>master</code> statt <code>dev</code> gestellt war.</li>
+</ul>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">3</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+478</span> <span class="minus">−153</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">12</div></div></div><div class="table-wrap"><table class="pr"><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th><th>In 4.40a</th></tr></thead><tbody>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/709">#709</a></td><td>22.02.2026</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs<div class="note">Ersetzt durch #710: gegen master statt dev gestellt.</div></td><td class="num">nicht gemerged</td><td class="num">5</td><td class="num">–</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/710">#710</a></td><td>22.02.2026</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs</td><td class="num"><span class="plus">+279</span> <span class="minus">−99</span></td><td class="num">5</td><td class="num">148</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/714">#714</a></td><td>23.02.2026</td><td>Fix: Retransmit-Mechanismus und RING_OVERFLOW-Diagnose (BUG-01, BUG-02)</td><td class="num"><span class="plus">+54</span> <span class="minus">−41</span></td><td class="num">4</td><td class="num">9</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/728">#728</a></td><td>24.02.2026</td><td>Port LoRa message loss fixes to nRF52/RAK4630</td><td class="num"><span class="plus">+145</span> <span class="minus">−13</span></td><td class="num">3</td><td class="num">31</td></tr>
+</tbody></table></div>
+</details>
+
+<h2 id="fork">Was der Fork darüber hinaus liefert</h2>
+<p><strong>Seit 24.10.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a>.</strong> Es besteht aus dem offiziellen 4.40a.hbserver, den Änderungen aus upstream <code>dev</code> bis d47c34c1 (Stand von 4.40a.spserver) und den Fork-Funktionen für #1187 bis #1189.</p>
+<p>Upstream hat 4.40a am 02.10.2026, 4.40a.hbserver am 13.10.2026 und 4.40a.spserver am 22.10.2026 veröffentlicht. Der Fork stellte aus dem Quelltext von 4.40a das Release v4.40a.10.02 bereit. Seit dem 19.10. kamen im Fork sechs Releases mit wichtigen Fehlerkorrekturen. Was davon schon in upstream ist, steht in der Zeile.</p>
+<div class="table-wrap"><table><thead><tr><th>Release</th><th>Datum</th><th>Was es behebt oder bringt</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19">v4.40a.10.19</a></td><td>19.10.2026</td><td><b>Volle LoRa-Sendewarteschlange:</b> ein Knoten mit eigenen und weitergeleiteten Paketen hängt nicht mehr minutenlang hinter seinen Nachbarn. Dazu feste Werte für zehn Protokoll-Einstellungen in Release-Builds, Auto Update im Web-GUI nur noch als Hinweis, mehr freier Heap für die Update-Prüfung auf klassischen ESP32, die Board-LED auf nRF52 und ein Watchdog-Fix für die Nachbarseite.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.20">v4.40a.10.20</a></td><td>19.10.2026</td><td><b>Webserver startet den Knoten nicht mehr über den Watchdog neu:</b> jede Seite läuft durch einen begrenzten Sendepuffer, ein langsamer oder hängender Browser beendet nur die Seite. Dazu Ende der „WEBServer stopped“-Logflut ohne IP-Adresse, NVS-Diagnose für die Fernsteuerung und der Fix für die T-Beam 1W, die nach einem Auto Update im Safeboot blieb (AU-16).</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.21">v4.40a.10.21</a></td><td>19.10.2026</td><td><b>Board-Erkennung im Web-Flasher, auch wenn die Firmware nicht läuft:</b> Kennung in jedem Image, neues Kommando <code>--id</code>, Safeboot v3 nennt das Board, und „Aus dem Flash lesen“ liest die Kennung über das ESP32-ROM. Dazu eine funktionierende Partitionstabelle für die T-Deck Pro.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.22">v4.40a.10.22</a></td><td>23.10.2026</td><td><b>Gateway-Diagnose:</b> ein fremdes Datagramm am Gateway-Port hält die Warnung „Server antwortet nicht“ nicht mehr stumm (UDP-03, als #1233 auch in upstream). Dazu die Server-Zeile SP (Polen) aus upstream #1234.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.23">v4.40a.10.23</a></td><td>24.10.2026</td><td><b>Neue LoRa-Sendewarteschlange:</b> ein Slot-Pool statt Ring, alte Frames verfallen je Priorität, Zeitbaken älter als 150 s gehen nicht mehr auf die Luft, ein neueres HEY oder eine neuere Position ersetzt die wartende Kopie. Dazu die Rufzeichen-Sperrliste <code>--blockcall</code>, der Fix für einen Absturz in der BLE-Pause des täglichen Update-Checks auf klassischen ESP32 (AU-19) und acht weitere Stabilitätsfixes. Noch nicht in upstream; #1235 ist seit 23.10. gemerged.</td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a></td><td>24.10.2026</td><td><b>Vier kleine Fixes:</b> SP-Server auf <code>sp.meshcom.pl</code> (als #1236 auch in upstream), Display-Puffer des Heltec Wireless Tracker wird für den Update-Check freigegeben (AU-21), ein frisch gelöschter T-Beam startet mit GPS statt TRACK (TRK-03), ein Fernwartungs-Kommando (RM1) aus der App oder Konsole hört mit der Antwort auf zu wiederholen. Außer #1236 noch nicht in upstream.</td></tr>
+</tbody></table></div>
+
+<h2 id="grenzen">Was nicht geprüft ist</h2>
+<p><strong>Offene Stellen dieser Seite</strong></p>
+<ul>
+<li><strong>Zeilenanteil nicht neu berechnet:</strong> Die Zahlen im Abschnitt „Wie viel vom Original steckt noch in 4.40a?“ stammen vom 18.10.2026 (<code>git blame</code> auf <code>dev</code> 9669ec99). #1224, #1233, #1235 und #1236 sind darin nicht enthalten, die Spalte „In 4.40a“ ist für sie leer.</li>
+<li><strong>Beschreibungen der PRs</strong> sind aus den PR-Texten und Titeln übernommen und hier nicht gegen den Code neu geprüft. Zahlen, Anzahl und Zeilen kommen aus der GitHub-API und sind nachgerechnet.</li>
+<li><strong>Frühe Versionsdaten</strong> von 4.35m, 4.35n und 4.35p sind aus der Seite vom 18.10.2026 übernommen. 4.35o und alle Daten ab 4.35s sind gegen die GitHub-Releases geprüft.</li>
+<li><strong>Zeilenbilanz je PR</strong> zählt, was GitHub im PR-Diff sieht. Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen.</li>
+</ul>
+<p><strong>Offene PRs:</strong> keiner. <strong>Geschlossen ohne Merge:</strong> vier, jeder in seiner Rundentabelle erklärt.</p>
+
+<h2 id="methode">Technisch: Methode und Versionsfolge</h2>
+<details class="dev">
+<summary>Methode der Zeilenbilanz</summary>
+<p><code>git blame -w</code> auf jeder Datei der handgeschriebenen Kernfirmware von upstream <code>dev</code> 9669ec99. Einbezogen sind <code>src/</code> ohne Fonts, Plattform-Stubs, Display- und Treiberbibliotheken, T5- und T-Deck-Pro-Oberfläche und den erzeugten <code>ota.h</code>, dazu <code>variants/</code>, <code>config/</code> und <code>platformio.ini</code>. <code>lib/</code> mit rund 1,7 Millionen Zeilen Fremdcode bleibt außen vor.</p>
+<ul>
+<li><strong>Ausgangspunkt:</strong> der letzte upstream-Stand vor dem Merge des ersten PR (4eb1a282).</li>
+<li><strong>Original:</strong> eine Zeile, deren letzter Autor-Commit in der Historie dieses Stands liegt. Mit Erkennung verschobener und kopierter Zeilen (<code>-M -C</code>) steigt der Originalanteil auf 41,9 %.</li>
+<li><strong>Zuordnung zu PRs:</strong> über die Merge-Commits „from DK5EN“. PRs, die das ICSSW-Team unter eigenem Namen übernommen hat, erscheinen unter „andere“ (Autorenzuordnung nach Commit-Adresse).</li>
+<li><strong>Zeilen:</strong> rohe Zeilen einschließlich Kommentaren und Leerzeilen. Sie sagen nichts über Verhalten.</li>
+<li><strong>Skripte:</strong> <code>tools/code_share/</code>.</li>
+</ul>
+</details>
+<details class="dev">
+<summary>Versionsfolge upstream von 4.35l bis 4.40a.spserver</summary>
+<p>4.35l → 4.35m (22.02.2026) → 4.35n (05.03.) → 4.35o (08.03.) → 4.35p (22.03.) → 4.35s (03.09.) → 4.35t (10.09., fortgeführt bis 13.09.) → 4.35t.09.20 (20.09.) → 4.35t.09.24 (24.09., #1153) → <code>dev</code> 6cc8b552 (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159 bis #1161 OE1KBC Repeat-Bit-Vorarbeiten, die letzten vier nicht von uns) → 4.35u (27.09., 61a58daa: 6cc8b552 plus #1162 und #1165 bis #1172, darin unsere #1162, #1168 und #1169) → 4.35v (29.09.; v4.35v.09.30 am 30.09. mit #1185) → 4.40a (02.10., #1186) → 4.40a.hbserver (13.10.; #1209 bis #1212 von OE1KBC mit HB- und HC-Server, darin unsere #1200/#1201 vom 10./11.10. und #1207/#1208 vom 12.10.) → <code>dev</code> 9669ec99 (18.10., unsere #1213 und #1214) → <code>dev</code> 06a4fd9a (18.10., #1215 von OE1KBC: Korrektur in <code>gw_servers.cpp</code> und neue Safeboot-Images) → 4.40a.spserver (22.10., d47c34c1: darin #1224, #1233 und #1234 von OE1KBC mit dem Polen-Server) → <code>dev</code> 72d32574 (24.10., unsere #1235 und #1236, noch ohne Tag).</p>
+<p>Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</p>
+</details>
+
+<div class="foot">
+<p>Quelle der Zahlen: GitHub-API (<code>gh pr list -R icssw-org/MeshCom-Firmware --author DK5EN --state all</code>, Felder additions, deletions, changedFiles), Stand 25.10.2026. Fork-Releases und Upstream-Releases ebenfalls aus der GitHub-API, 25.10.2026. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
+<p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>. Zurück zur <a href="index.html">Übersicht</a>.</p>
+<p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
+ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
+</div>
+</main>
 </body>
 </html>

@@ -3,140 +3,275 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RM1: Fernsteuerung per LoRa mit HMAC</title>
+<title>RM1: Fernsteuerung per LoRa, nur mit dem richtigen Passwort</title>
+<meta name="description" content="RM1 steuert einen MeshCom-Knoten per Direktnachricht aus der Ferne. Jeder Befehl und jede Antwort trägt eine HMAC-SHA256-Signatur.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
 <style>
-:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
-          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
-  html { color-scheme: light; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
-  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
-  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
-  h3 { font-size: 16px; margin: 26px 0 8px; }
-  p { margin: 8px 0; }
-  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
-  .meta li { margin: 2px 0; }
-  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
-  .bluf p { margin: 6px 0; }
-  .bluf ol { margin: 4px 0 10px; }
-  .reco { font-weight: 600; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
-  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
-  th { background: var(--soft); }
-  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
-  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
-  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
-  figure { margin: 18px 0; }
-  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
-  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
-  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
-  svg text { font-size: 12px; fill: var(--ink); }
-  svg .t11 { font-size: 11px; fill: var(--muted); }
-  svg .b { font-weight: 600; }
-  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
-  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; }
-  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
-  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
-  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
-  svg .chk { fill: #eaf7ef; stroke: var(--ok); }
-  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
-  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
-  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
-  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc { columns: 2; column-gap: 32px; max-width: none; }
   .toc li { break-inside: avoid; }
-  .small { font-size: 13px; color: var(--muted); }
-  @media (max-width: 720px) { .toc { columns: 1; } main { padding: 24px 16px 60px; } }
-  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+  @media (max-width: 720px) { .toc { columns: 1; } }
+  @media (max-width: 720px) { figure svg { min-width: 700px; } }
+  .cmdgrid td:first-child { white-space: nowrap; }
+  .tag.info { color: var(--acc); border-color: var(--acc); }
 </style>
 </head>
 <body>
 <main>
-<h1>RM1: Fernsteuerung per LoRa mit HMAC</h1>
+<nav class="nav-top"><a href="index.html">&larr; Übersicht</a></nav>
+
+<div class="eyebrow">Protokoll · Fernwartung</div>
+<h1>RM1 steuert einen Knoten aus der Ferne, und nur mit dem richtigen Passwort</h1>
 <ul class="meta">
-<li>Stand: 2026-10-19, Firmware <code>v4.40a.10.21</code> (DK5EN-Fork, Branch <code>fork-dev</code>)</li>
-<li>Autor: DK5EN, mit Claude</li>
-<li>Signatur und Testvektoren: <code>docs/rm1-hmac.md</code>, <code>tools/tests/remote_cmd_vectors.json</code></li>
-<li>Befehlsreferenz: <code>docs/rm1-commands.md</code> (25 Befehle, jede Antwortform)</li>
-<li>Wire-Format: <code>docs/architecture/11-wire-format.md</code> Abschnitt 1.9; Referenz-Client in Python: <code>tools/remote_cmd.py</code></li>
+<li>Stand: 25.10.2026, geprüft gegen <code>fork-dev</code></li>
+<li>Firmware: <code>v4.40a.10.24</code> (DK5EN-Fork, nicht byte-gleich mit einem offiziellen Release)</li>
+<li>Quellen: <code>src/remote_cmd.cpp</code>, <code>src/rm_commands.h</code>, <code>src/rm_runtime.cpp</code>, <code>docs/rm1-hmac.md</code>, <code>docs/rm1-commands.md</code></li>
 <li>Rufzeichen im Text: DK5EN-1 und DK5EN-90 sind Bench-Knoten des Autors</li>
 </ul>
 
-<h2 id="s1">1. Ergebnis</h2>
 <div class="bluf">
-<p>RM1 („Remote Management 1“) steuert einen MeshCom-Knoten aus der Ferne, über eine ganz normale Direktnachricht im LoRa-Netz.
-Jeder Befehl trägt ein <b>64-Bit-Tag aus HMAC-SHA256</b> über Ziel, Absender, Zähler und Befehl, geschlüsselt mit dem Passwort des Knotens.
-Der Knoten rechnet das Tag nach, bevor er irgendetwas ausführt, und antwortet ebenfalls signiert. Ein streng steigender Zähler macht
-mitgeschnittene Befehle wertlos.</p>
-<ol>
-<li><b>Authentisch, nicht geheim.</b> Befehl und Antwort bleiben im Klartext lesbar, wie § 16 Abs. 8 AFuV es verlangt. Geschützt ist nur, <em>wer</em> etwas befiehlt.</li>
-<li><b>Geschlossene Liste.</b> Genau 25 Befehle sind aus der Ferne erreichbar. Rufzeichen, Passwörter, WLAN, Flash-Löschen und Firmware-Wechsel außerhalb des Auto-Updates gehören nicht dazu.</li>
-<li><b>Aus im Werkszustand.</b> RM1 läuft nur mit <code>--remotemgmt on</code> und gesetztem Knotenpasswort. Ein leeres Passwort schaltet RM1 ab.</li>
-</ol>
-<p class="reco">Was fehlt: Das Protokoll ist definiert und auf der Bench geprüft. Damit Nutzer es verwenden können, muss ihre App es unterstützen;
-heute können es das WebGUI eines Fork-Knotens („Remote“) und der Python-Client.</p>
+<p class="lead"><strong>RM1 („Remote Management 1“) ist die Fernwartung eines MeshCom-Knotens per LoRa-Direktnachricht: Jeder Befehl trägt eine 64-Bit-Signatur aus HMAC-SHA256 über Ziel, Absender, Zähler und Befehl, und die Antwort ist ebenfalls signiert.</strong>
+Ab Werk ist RM1 aus. Es läuft nur mit <code>--remotemgmt on</code> und einem gesetzten Knotenpasswort.</p>
+<p class="reco">Empfehlung: RM1 nur für Knoten einschalten, die man aus der Ferne betreut, mit einem langen, zufälligen Passwort. Wer eine App baut, testet gegen alle Vektoren, bevor er auf die Luft geht.</p>
 </div>
 
-<h3>Inhalt</h3>
+<div class="callout warn">
+<p><strong>Handlungsbedarf nur, wenn Sie RM1 nutzen wollen.</strong></p>
+<ul>
+<li><strong>Betreiber:</strong> Passwort mit <code>--passwd</code> setzen, dann <code>--remotemgmt on</code>. Ein leeres Passwort schaltet RM1 wieder ab.</li>
+<li><strong>Passwort:</strong> lang und zufällig wählen. Ein mitgeschnittener Befehl erlaubt Raten am eigenen Rechner, die 64 Bit schützen nur gegen Fälschen im Funk.</li>
+<li><strong>App-Entwickler:</strong> den Zähler vor dem Senden speichern und die Antwortsignatur prüfen, bevor die App der Antwort traut.</li>
+</ul>
+</div>
+
+<h2>Kernfakten</h2>
+<ul class="keyfacts">
+<li><strong>Was es ist:</strong> Eine normale Direktnachricht an das Rufzeichen des Zielknotens, deren Text mit <code>RM1 </code> beginnt. Sie läuft wie jede andere Nachricht durch das Mesh.</li>
+<li><strong>Wer es braucht:</strong> Betreiber abgesetzter Knoten, etwa auf einem Berg. Wer seinen Knoten nicht aus der Ferne betreut, schaltet es nicht ein.</li>
+<li><strong>Aus ab Werk:</strong> Die Einstellung <code>node_rm</code> steht auf 0 (<code>src/meshcom_settings.h:203</code>). Ohne Passwort bleibt RM1 auch bei <code>--remotemgmt on</code> inaktiv (<code>src/command_functions.cpp:5032-5033</code>).</li>
+<li><strong>Echt, nicht geheim:</strong> Befehl und Antwort bleiben im Klartext lesbar. Geschützt ist nur, <em>wer</em> etwas befiehlt, und dass eine Antwort zu genau diesem Befehl gehört.</li>
+<li><strong>Wiedereinspielschutz:</strong> Ein streng steigender Zähler macht mitgeschnittene Befehle wertlos. Der Knoten speichert ihn vor der Ausführung, er überlebt Neustarts.</li>
+<li><strong>Geschlossene Liste:</strong> Genau 26 Befehle sind aus der Ferne erreichbar. Rufzeichen, Passwörter, WLAN, Flash löschen und Firmwarewechsel außerhalb des Auto Updates gehören nicht dazu.</li>
+<li><strong>Stumm bei Fehlern:</strong> Falsche Signatur, Formatfehler und alter Zähler bekommen keine Antwort. Ein Angreifer lernt daraus nichts.</li>
+<li><strong>Öffentlich sichtbar:</strong> Ein Gateway lädt RM1-Nachrichten auf den öffentlichen Server hoch. Keine Geheimnisse in Argumente oder Antworten schreiben.</li>
+</ul>
+
 <ol class="toc">
-<li><a href="#s1">Ergebnis</a></li>
-<li><a href="#s2">Ablauf</a></li>
-<li><a href="#s3">Rahmen und Signatur</a></li>
-<li><a href="#s4">Rechenbeispiel</a></li>
-<li><a href="#s5">Zähler, Wiederholung, verlorene Antworten</a></li>
-<li><a href="#s6">Wann der Knoten antwortet</a></li>
-<li><a href="#s7">Die 25 Befehle</a></li>
-<li><a href="#s8">Sicherheit und Grenzen</a></li>
-<li><a href="#s9">Einschalten</a></li>
+<li><a href="#s1">Ablauf eines Befehls</a></li>
+<li><a href="#s2">Was der Knoten prüft</a></li>
+<li><a href="#s3">Die 26 Befehle</a></li>
+<li><a href="#s4">Sicherheit und Grenzen</a></li>
+<li><a href="#s5">Einschalten</a></li>
+<li><a href="#s6">Was nicht geprüft ist</a></li>
+<li><a href="#s7">Technisch: Rahmen, Signatur, Rechenbeispiel</a></li>
+<li><a href="#s8">Technisch: Zähler, Wiederholung, Stopp</a></li>
 </ol>
 
-<h2 id="s2">2. Ablauf</h2>
+<h2 id="s1">Ablauf eines Befehls</h2>
+<p><strong>Ein Befehl ist eine Anfrage mit Signatur, die Antwort eine zweite Signatur.</strong> Vorher fragt der Absender mit <code>sync</code> den höchsten angenommenen Zähler ab. Der nächste Befehl nimmt einen größeren.</p>
 <figure>
-<div class="fig">
 <svg viewBox="0 0 900 300" role="img" aria-label="Ablauf eines RM1-Befehls zwischen Absender und Zielknoten">
-  <rect class="node" x="20" y="16" width="220" height="44" rx="6"/>
-  <text x="130" y="36" text-anchor="middle" class="b">Absender (Client)</text>
-  <text x="130" y="52" text-anchor="middle" class="t11">z. B. DK5EN-1, WebGUI oder App</text>
-  <rect class="node" x="660" y="16" width="220" height="44" rx="6"/>
-  <text x="770" y="36" text-anchor="middle" class="b">Zielknoten</text>
-  <text x="770" y="52" text-anchor="middle" class="t11">z. B. DK5EN-90, RM1 an</text>
-  <line class="lnd" x1="130" y1="60" x2="130" y2="290"/>
-  <line class="lnd" x1="770" y1="60" x2="770" y2="290"/>
+  <rect class="d-box" x="20" y="16" width="220" height="44" rx="6"/>
+  <text x="130" y="36" text-anchor="middle" class="d-b">Absender (Client)</text>
+  <text x="130" y="52" text-anchor="middle" class="d-t3">z. B. DK5EN-1, WebGUI oder App</text>
+  <rect class="d-box" x="660" y="16" width="220" height="44" rx="6"/>
+  <text x="770" y="36" text-anchor="middle" class="d-b">Zielknoten</text>
+  <text x="770" y="52" text-anchor="middle" class="d-t3">z. B. DK5EN-90, RM1 an</text>
+  <line class="d-zone" x1="130" y1="60" x2="130" y2="290"/>
+  <line class="d-zone" x1="770" y1="60" x2="770" y2="290"/>
 
-  <line class="lnh" x1="130" y1="96" x2="764" y2="96" marker-end="url(#ah)"/>
-  <text x="450" y="88" text-anchor="middle" class="mono">RM1 0 sync &lt;tag&gt;</text>
-  <line class="lnh" x1="770" y1="126" x2="136" y2="126" marker-end="url(#ah)"/>
-  <text x="450" y="118" text-anchor="middle" class="mono">RM1 0 ok ctr=41 v=4.40a &lt;rtag&gt;</text>
+  <line class="d-line-acc" x1="130" y1="96" x2="758" y2="96" marker-end="url(#ah1)"/>
+  <text x="450" y="86" text-anchor="middle" class="d-mono">RM1 0 sync &lt;tag&gt;</text>
+  <line class="d-line-acc" x1="770" y1="130" x2="142" y2="130" marker-end="url(#ah1)"/>
+  <text x="450" y="120" text-anchor="middle" class="d-mono">RM1 0 ok ctr=41 v=4.40a &lt;rtag&gt;</text>
 
-  <line class="lnh" x1="130" y1="176" x2="764" y2="176" marker-end="url(#ah)"/>
-  <text x="450" y="168" text-anchor="middle" class="mono">RM1 42 txpower 2 &lt;tag&gt;</text>
-  <rect class="chk" x="676" y="186" width="188" height="44" rx="5"/>
-  <text x="770" y="204" text-anchor="middle" class="t11">Tag nachrechnen, Zähler &gt; 41,</text>
-  <text x="770" y="219" text-anchor="middle" class="t11">Zähler speichern, ausführen</text>
-  <line class="lnh" x1="770" y1="256" x2="136" y2="256" marker-end="url(#ah)"/>
-  <text x="450" y="248" text-anchor="middle" class="mono">RM1 42 ok txpower=2 &lt;rtag&gt;</text>
-  <rect class="chk" x="36" y="266" width="188" height="24" rx="5"/>
-  <text x="130" y="282" text-anchor="middle" class="t11">Antwort-Tag prüfen</text>
-  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7b4fbf"/></marker></defs>
+  <line class="d-line-acc" x1="130" y1="178" x2="758" y2="178" marker-end="url(#ah1)"/>
+  <text x="450" y="168" text-anchor="middle" class="d-mono">RM1 42 txpower 2 &lt;tag&gt;</text>
+  <rect class="d-box-ok" x="620" y="190" width="260" height="46" rx="5"/>
+  <text x="750" y="208" text-anchor="middle" class="d-t2">Tag nachrechnen, Zähler &gt; 41,</text>
+  <text x="750" y="224" text-anchor="middle" class="d-t2">Zähler speichern, ausführen</text>
+  <line class="d-line-acc" x1="770" y1="262" x2="142" y2="262" marker-end="url(#ah1)"/>
+  <text x="450" y="252" text-anchor="middle" class="d-mono">RM1 42 ok txpower=2 &lt;rtag&gt;</text>
+  <rect class="d-box-ok" x="20" y="268" width="220" height="24" rx="5"/>
+  <text x="130" y="284" text-anchor="middle" class="d-t2">Antwort-Tag prüfen</text>
+  <defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-fill-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
 </svg>
-</div>
-<figcaption>Jede Zeile ist eine Direktnachricht im LoRa-Netz und läuft wie jede andere durch das Mesh. <code>sync</code> fragt den höchsten angenommenen Zähler ab; der nächste Befehl nimmt einen größeren.</figcaption>
+<figcaption><strong>Abb. 1:</strong> Der Zielknoten rechnet das Tag nach, bevor er etwas ausführt, und signiert seine Antwort. <code>sync</code> ändert nichts am Knoten.</figcaption>
 </figure>
 
-<h2 id="s3">3. Rahmen und Signatur</h2>
+<h2 id="s2">Was der Knoten prüft</h2>
+<p><strong>Der Knoten führt einen Befehl erst aus, wenn Signatur, Zähler und Liste stimmen. Jede andere Zeile bleibt stumm oder bekommt eine kurze Ablehnung.</strong> Die Reihenfolge folgt dem Code (<code>rmCheck</code>, <code>src/remote_cmd.cpp:631-697</code>).</p>
+<figure>
+<svg viewBox="0 0 900 430" role="img" aria-label="Prüfkette des Knotens: sechs Prüfungen, danach Ausführung">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-fill-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+
+  <rect class="d-box" x="20" y="10" width="330" height="40" rx="6"/>
+  <text x="185" y="35" text-anchor="middle">1. RM1 an, Passwort gesetzt?</text>
+  <line class="d-line" x1="350" y1="30" x2="470" y2="30"/>
+  <text x="410" y="23" text-anchor="middle" class="d-t3">nein</text>
+  <rect class="d-box" x="470" y="10" width="410" height="40" rx="6"/>
+  <text x="675" y="35" text-anchor="middle" class="d-t2">RM1 ist aus, die Zeile ist eine normale DM</text>
+
+  <line class="d-line-acc" x1="185" y1="50" x2="185" y2="68" marker-end="url(#ah2)"/>
+  <rect class="d-box" x="20" y="70" width="330" height="40" rx="6"/>
+  <text x="185" y="95" text-anchor="middle">2. Absender nicht gesperrt?</text>
+  <line class="d-line" x1="350" y1="90" x2="470" y2="90"/>
+  <text x="410" y="83" text-anchor="middle" class="d-t3">gesperrt</text>
+  <rect class="d-box" x="470" y="70" width="410" height="40" rx="6"/>
+  <text x="675" y="95" text-anchor="middle" class="d-t2">stumm (nur mit strenger Sicherheit)</text>
+
+  <line class="d-line-acc" x1="185" y1="110" x2="185" y2="128" marker-end="url(#ah2)"/>
+  <rect class="d-box" x="20" y="130" width="330" height="40" rx="6"/>
+  <text x="185" y="155" text-anchor="middle">3. Format richtig, Tag stimmt?</text>
+  <line class="d-line" x1="350" y1="150" x2="470" y2="150"/>
+  <text x="410" y="143" text-anchor="middle" class="d-t3">nein</text>
+  <rect class="d-box-warn" x="470" y="130" width="410" height="40" rx="6"/>
+  <text x="675" y="155" text-anchor="middle" class="d-t2">stumm, ein Strafpunkt (streng)</text>
+
+  <line class="d-line-acc" x1="185" y1="170" x2="185" y2="188" marker-end="url(#ah2)"/>
+  <rect class="d-box" x="20" y="190" width="330" height="40" rx="6"/>
+  <text x="185" y="215" text-anchor="middle">4. Zähler größer als der Höchstwert?</text>
+  <line class="d-line" x1="350" y1="210" x2="470" y2="210"/>
+  <text x="410" y="203" text-anchor="middle" class="d-t3">nein</text>
+  <rect class="d-box" x="470" y="190" width="410" height="40" rx="6"/>
+  <text x="675" y="207" text-anchor="middle" class="d-t2">stumm, kein Strafpunkt; gleiche Zeile binnen</text>
+  <text x="675" y="222" text-anchor="middle" class="d-t2">10 min: gespeicherte Antwort noch einmal</text>
+
+  <line class="d-line-acc" x1="185" y1="230" x2="185" y2="248" marker-end="url(#ah2)"/>
+  <rect class="d-box" x="20" y="250" width="330" height="40" rx="6"/>
+  <text x="185" y="275" text-anchor="middle">5. Abstand eingehalten?</text>
+  <line class="d-line" x1="350" y1="270" x2="470" y2="270"/>
+  <text x="410" y="263" text-anchor="middle" class="d-t3">zu schnell</text>
+  <rect class="d-box" x="470" y="250" width="410" height="40" rx="6"/>
+  <text x="675" y="275" text-anchor="middle" class="d-t2">stumm (nur mit strenger Sicherheit)</text>
+
+  <line class="d-line-acc" x1="185" y1="290" x2="185" y2="308" marker-end="url(#ah2)"/>
+  <rect class="d-box" x="20" y="310" width="330" height="40" rx="6"/>
+  <text x="185" y="335" text-anchor="middle">6. Befehl in der Liste, Argument gültig?</text>
+  <line class="d-line" x1="350" y1="330" x2="470" y2="330"/>
+  <text x="410" y="323" text-anchor="middle" class="d-t3">nein</text>
+  <rect class="d-box" x="470" y="310" width="410" height="40" rx="6"/>
+  <text x="675" y="327" text-anchor="middle" class="d-t2">signierte Antwort err blocked oder</text>
+  <text x="675" y="342" text-anchor="middle" class="d-t2">err range; Zähler verbraucht</text>
+
+  <line class="d-line-acc" x1="185" y1="350" x2="185" y2="368" marker-end="url(#ah2)"/>
+  <rect class="d-box-ok" x="20" y="370" width="860" height="48" rx="6"/>
+  <text x="450" y="390" text-anchor="middle" class="d-b">Zähler speichern, Befehl ausführen, signierte Antwort senden</text>
+  <text x="450" y="407" text-anchor="middle" class="d-t2">Die Antwort geht genau einmal in die Luft</text>
+</svg>
+<figcaption><strong>Abb. 2:</strong> Vier Prüfungen verwerfen eine Zeile stumm, nur die Liste antwortet mit einer Ablehnung. Strafpunkt und Sperre gibt es nur mit <code>--rmstrictsecurity on</code>.</figcaption>
+</figure>
+
+<div class="table-wrap">
+<table>
+<tr><th>Fall</th><th>Antwort</th><th>Zähler verbraucht</th></tr>
+<tr><td>Gültiges Tag, Befehl erlaubt</td><td><code>ok …</code> oder <code>err …</code> des Befehls</td><td>ja</td></tr>
+<tr><td>Gültiges Tag, Befehl nicht erlaubt oder Argument ungültig</td><td><code>err blocked</code> bzw. <code>err range a..b</code></td><td>ja</td></tr>
+<tr><td>Gleicher Zähler und Tag wie zuletzt, höchstens 10 min her</td><td>letzte Antwort noch einmal</td><td>nein</td></tr>
+<tr><td><code>sync</code></td><td><code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code></td><td>nein</td></tr>
+<tr><td>Falsches Tag, Formatfehler, Zähler zu klein, leeres Passwort</td><td><strong>keine</strong> (stumm)</td><td>nein</td></tr>
+<tr><td>Zu schnell oder gesperrt (nur mit strenger Sicherheit)</td><td><strong>keine</strong> (stumm)</td><td>nein</td></tr>
+</table>
+</div>
+<ul>
+<li><strong>Keine Antwort heißt nicht Funkverlust.</strong> Der Knoten schweigt auch bei falschem Passwort. Ein Client darf daraus nicht schließen, dass der Befehl nie ankam.</li>
+<li><strong>Ein alter Zähler zählt nicht als Angriff.</strong> Wer ein gültiges Tag mit zu kleinem Zähler schickt, bekommt keinen Strafpunkt. Sonst könnte ein einzelner mitgeschnittener Befehl, dreimal wiederholt, den Knoten sperren (<code>src/remote_cmd.cpp:665-670</code>).</li>
+</ul>
+
+<h2 id="s3">Die 26 Befehle</h2>
+<p><strong>Die Liste ist im Knoten fest eingebaut und steht an einer einzigen Stelle im Code (<code>src/rm_commands.h:35-61</code>).</strong> Die Tabelle ist aus dieser Liste erzeugt. Ein Test pinnt sie Name für Name (<code>test/test_remote_cmd/test_main.cpp:1317</code>).</p>
+<div class="table-wrap">
+<table class="cmdgrid">
+<tr><th>Art</th><th>Befehle</th><th>Gespeichert</th></tr>
+<tr><td>Aktion</td><td><code>reboot</code>, <code>status</code>, <code>sendpos</code>, <code>sendtrack</code>, <code>sync</code></td><td>nein</td></tr>
+<tr><td>Schalter <code>on|off</code></td><td><code>gps</code>, <code>track</code>, <code>display</code>, <code>gateway</code>, <code>mesh</code></td><td>ja</td></tr>
+<tr><td>Schalter</td><td><code>led on|off|flash</code></td><td>nein, aus nach Neustart</td></tr>
+<tr><td>Parameter</td><td><code>txpower &lt;dBm&gt;</code> im Bereich der Platine, <code>setout &lt;pin&gt; on|off</code></td><td>ja</td></tr>
+<tr><td>Parameter</td><td><code>chgled auto|on|off</code></td><td>nein</td></tr>
+<tr><td>Lesen</td><td><code>radio</code>, <code>sens</code>, <code>txq</code>, <code>mbox</code>, <code>maxhop</code>, <code>net</code>, <code>mh &lt;zeile|rufzeichen&gt;</code></td><td>nein</td></tr>
+<tr><td>Lesen und Schreiben</td><td><code>name</code>, <code>atxt</code>, <code>pos</code></td><td>Schreiben: ja</td></tr>
+<tr><td>Auto Update</td><td><code>upd</code>, <code>upd check</code>, <code>upd go &lt;tag&gt;</code>, nur ESP32 mit Auto Update</td><td>nein</td></tr>
+<tr><td>Sperrliste</td><td><code>blockcall</code> liest, <code>blockcall none</code> oder <code>blockcall &lt;liste&gt;</code> ersetzt die ganze Liste</td><td>ja</td></tr>
+</table>
+</div>
+<ul>
+<li><strong>Zuletzt dazugekommen:</strong> <code>blockcall</code> mit <code>v4.40a.10.23</code>, davor <code>net</code> und <code>upd</code> mit <code>v4.40a.10.18</code>. Frames eines gesperrten Rufzeichens werden verworfen und nicht weitergeleitet.</li>
+<li><strong>Grenze bei <code>blockcall</code>:</strong> Über RM1 sind Argumente auf 39 Zeichen begrenzt. Eine remote gesetzte Liste hält deshalb nur etwa drei bis vier Rufzeichen (<code>src/rm_commands.h:22-24</code>).</li>
+<li><strong><code>net</code> und <code>upd</code>:</strong> <code>net</code> nennt MTU, Server und Netzmodus. <code>upd go</code> installiert auch bei <code>--autoupdate off</code> und braucht das Passwort.</li>
+<li><strong>Nie erreichbar</strong>, auch mit gültigem Tag (<code>err blocked</code>): <code>cleanflash</code>, <code>ota-update</code>, <code>dfu</code>, <code>deepsleep</code>, <code>setcall</code>, <code>passwd</code>, <code>webpwd</code>, <code>btcode</code>, <code>setssid</code>, <code>setpwd</code>, <code>wifiset</code>, <code>updrepo</code>, <code>updchan</code>, <code>autoupdate</code>, <code>rm</code>, <code>stor</code>.</li>
+<li><strong>Verbotene Zeichen:</strong> Jedes Argument mit <code>;</code>, <code>{</code>, <code>%</code> oder <code>--</code> wird abgelehnt (<code>src/remote_cmd.cpp:99-109</code>).</li>
+</ul>
+<p>Beispiele: <code>status</code> antwortet <code>ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=0</code>.
+<code>mh DL2JA-2</code> antwortet <code>ok d g=1 m=1 r=-95 s=8 … n=15 x=14 h=18 t=0</code>, also direkt gehört, mit den Werten aus der Nachbarschaftsmatrix.
+<code>txq</code> antwortet <code>ok q=3/20 bp=quiet tx=17 rt=0 dr=0 u=0</code>. Alle Antwortformen: <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/docs/rm1-commands.md">docs/rm1-commands.md</a>.</p>
+
+<h2 id="s4">Sicherheit und Grenzen</h2>
+<p><strong>RM1 schützt, wer befiehlt und was geantwortet wird. Es verschlüsselt nichts und signiert keinen normalen Chat.</strong></p>
+<div class="table-wrap">
+<table>
+<tr><th>Eigenschaft</th><th>Stand</th><th>Bemerkung</th></tr>
+<tr><td>Absender echt</td><td><span class="tag ok">gegeben</span></td><td>Ohne Passwort kein gültiges Tag. Ziel und Absender sind mitsigniert, ein Befehl an DK5EN-90 gilt für keinen anderen Knoten.</td></tr>
+<tr><td>Antwort echt</td><td><span class="tag ok">gegeben</span></td><td>Das Antwort-Tag bindet das Ergebnis an Zähler und Absender des Befehls.</td></tr>
+<tr><td>Schutz gegen Wiedereinspielen</td><td><span class="tag ok">gegeben</span></td><td>Streng steigender Zähler, überlebt Neustarts.</td></tr>
+<tr><td>Vertraulichkeit</td><td><span class="tag info">bewusst nicht</span></td><td>Klartext auf Funk. Keine Geheimnisse in Argumente oder Antworten.</td></tr>
+<tr><td>Passwort-Raten</td><td><span class="tag warn">Grenze</span></td><td>Ein mitgeschnittenes Tag erlaubt Raten am eigenen Rechner. Langes, zufälliges Passwort wählen, bis 14 Zeichen.</td></tr>
+<tr><td>Brute Force im Funk</td><td><span class="tag warn">optional</span></td><td><code>--rmstrictsecurity on</code>: höchstens ein Befehl je 10&nbsp;s, ein <code>sync</code> je 60&nbsp;s. Nach drei Fehlversuchen in 90&nbsp;s sperrt der Knoten diesen Absender 5 Minuten. Standard: aus.</td></tr>
+<tr><td>Normale Nachrichten</td><td><span class="tag bad">nicht signiert</span></td><td>Chat und Positionen bleiben unsigniert. Das Rufzeichen dort ist frei behauptbar.</td></tr>
+</table>
+</div>
+<ul>
+<li><strong>Die Sperre gilt je Absender-Rufzeichen.</strong> Der Knoten merkt sich bis zu sechs Absender gleichzeitig (<code>RM_REJ_SOURCES</code>, <code>src/remote_cmd.h:92</code>).</li>
+<li><strong>Dieselbe Zeile zählt nur einmal.</strong> Wiederholungen eines Befehls sind ein Rateversuch, nicht drei (<code>src/remote_cmd.cpp:345-347</code>).</li>
+<li><strong>Immer aktiv, auch ohne strenge Sicherheit:</strong> Der Knoten beantwortet höchstens ein <code>sync</code> je 10&nbsp;s. Das verhindert, dass ein mitgeschnittenes <code>sync</code> den Knoten zum Verstärker macht (<code>src/rm_runtime.cpp:740-758</code>).</li>
+</ul>
+
+<h2 id="s5">Einschalten</h2>
+<p><strong>Passwort setzen, dann RM1 einschalten.</strong> Der steuernde Knoten braucht dasselbe Passwort in seinem Client.</p>
+<pre>--passwd &lt;passwort&gt;          Knotenpasswort setzen (Schlüssel für RM1)
+--remotemgmt on              RM1 einschalten (Standard: aus)
+--rmstrictsecurity on        optional: Ratenbegrenzung und Sperre</pre>
+<ul>
+<li><strong>WebGUI:</strong> Ein Fork-Knoten hat die Seite „Remote“. Zielknoten wählen, Befehl absetzen, Antwort geprüft anzeigen.</li>
+<li><strong>Eigene App:</strong> Schritt-für-Schritt-Anleitung in <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/docs/rm1-hmac.md">docs/rm1-hmac.md</a>, Python-Referenz in <code>tools/remote_cmd.py</code>.</li>
+<li><strong>Heute nutzbar:</strong> das WebGUI eines Fork-Knotens, der Python-Client und der Knoten selbst mit <code>--rm</code>. Eine App muss das Protokoll selbst unterstützen.</li>
+</ul>
+
+<h2 id="s6">Was nicht geprüft ist</h2>
+<p><strong>Kann Einstellungen kosten</strong></p>
+<ul>
+<li><strong><code>pos</code>, <code>name</code>, <code>atxt</code>, <code>blockcall</code> schreiben:</strong> ändert gespeicherte Werte. Wer das Passwort hat, kann das.</li>
+</ul>
+<p><strong>Nicht auf der Bench</strong></p>
+<ul>
+<li><strong>Stopp der Wiederholungen für App-Befehle:</strong> nur Hosttests und Build, noch nicht über die Luft zwischen zwei Knoten (Release Notes <code>v4.40a.10.24</code>).</li>
+<li><strong>Sync-Begrenzer und Duplikatring:</strong> laut Release Notes seit <code>v4.40a.10.11</code> nicht auf Hardware gemessen.</li>
+<li><strong><code>upd go</code>:</strong> Release Notes führen den Download-Pfad als nur im Hosttest geprüft. Ein echtes <code>upd go</code> durch Safeboot und zurück lief auf der Bench bei <code>v4.40a.10.18</code>.</li>
+<li><strong><code>blockcall</code>:</strong> die Übernahme der gespeicherten Liste des DM3KS-Builds ist nicht auf Hardware geprüft.</li>
+</ul>
+<p><strong>Nicht nachprüfbar von dieser Seite</strong></p>
+<ul>
+<li><strong>Rechtsgrundlage Klartext:</strong> Die Projektdoku begründet den Verzicht auf Verschlüsselung mit § 16 Abs. 8 AFuV. Das ist keine Rechtsberatung und hier nicht geprüft.</li>
+<li><strong>Wiederholabstand:</strong> Code-Kommentar und Konstanten widersprechen sich um zwei Sekunden, siehe unten.</li>
+</ul>
+
+<h2 id="s7">Technisch: Rahmen, Signatur, Rechenbeispiel</h2>
+<div class="table-wrap">
 <table>
 <tr><th>Teil</th><th>Form</th><th>Regel</th></tr>
-<tr><td>Befehl (DM-Text)</td><td><code>RM1 &lt;ctr&gt; &lt;befehl&gt;[ &lt;argumente&gt;] &lt;tag&gt;</code></td><td>DM an das Rufzeichen des Zielknotens, ohne <code>{NNN</code>; Befehl klein, höchstens 15 Zeichen; Argumente höchstens 39 Zeichen, druckbares ASCII</td></tr>
-<tr><td>Schlüssel</td><td><code>K = SHA-256(passwort)</code></td><td>Knotenpasswort <code>node_passwd</code>, höchstens 14 Zeichen, Leerzeichen am Ende entfernt</td></tr>
-<tr><td>Kanonischer String</td><td><code>RM1|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;befehl&gt;[ &lt;argumente&gt;]</code></td><td>Rufzeichen in Großbuchstaben, genau wie konfiguriert bzw. empfangen; der Knoten normalisiert nichts</td></tr>
-<tr><td>Tag</td><td>erste 8 Byte von <code>HMAC-SHA256(K, kanonisch)</code></td><td>16 kleine Hex-Zeichen</td></tr>
-<tr><td>Antwort</td><td><code>RM1 &lt;ctr&gt; ok|err &lt;ergebnis&gt; &lt;rtag&gt;</code></td><td>Ergebnis höchstens 108 Zeichen, ganze Zeile höchstens 140</td></tr>
-<tr><td>Antwort-Tag</td><td>über <code>RM1R|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;ergebnis&gt;</code></td><td>gleiche Reihenfolge wie im Befehl: <code>dst</code> ist der antwortende Knoten, <code>src</code> der ursprüngliche Absender; in konstanter Zeit vergleichen</td></tr>
+<tr><td>Befehl (DM-Text)</td><td><code>RM1 &lt;ctr&gt; &lt;befehl&gt;[ &lt;argumente&gt;] &lt;tag&gt;</code></td><td>DM an das Rufzeichen des Zielknotens, ohne <code>{NNN</code>. Befehl klein, höchstens 15 Zeichen. Argumente höchstens 39 Zeichen, druckbares ASCII.</td></tr>
+<tr><td>Schlüssel</td><td><code>K = SHA-256(passwort)</code></td><td>Knotenpasswort <code>node_passwd</code>, höchstens 14 Zeichen, Leerzeichen am Ende entfernt (<code>src/remote_cmd.cpp:84-92, 529-538</code>).</td></tr>
+<tr><td>Kanonischer String</td><td><code>RM1|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;befehl&gt;[ &lt;argumente&gt;]</code></td><td>Rufzeichen in Großbuchstaben, genau wie konfiguriert bzw. empfangen. Der Knoten normalisiert nichts (<code>:540-558</code>).</td></tr>
+<tr><td>Tag</td><td>erste 8 Byte von <code>HMAC-SHA256(K, kanonisch)</code></td><td>16 kleine Hexzeichen (<code>:247-256</code>).</td></tr>
+<tr><td>Antwort</td><td><code>RM1 &lt;ctr&gt; ok|err &lt;ergebnis&gt; &lt;rtag&gt;</code></td><td>Ergebnis höchstens 108 Zeichen, ganze Zeile höchstens 140 (<code>src/remote_cmd.h:47</code>).</td></tr>
+<tr><td>Antwort-Tag</td><td>über <code>RM1R|&lt;dst&gt;|&lt;src&gt;|&lt;ctr&gt;|&lt;ergebnis&gt;</code></td><td>Gleiche Reihenfolge wie im Befehl: <code>dst</code> ist der antwortende Knoten, <code>src</code> der ursprüngliche Absender. In konstanter Zeit vergleichen (<code>:560-575</code>).</td></tr>
 </table>
-<p>Ziel und Absender stehen im signierten String. Ein Befehl an DK5EN-90 gilt deshalb nicht für einen anderen Knoten, und eine Antwort
-lässt sich nicht als Antwort auf einen anderen Befehl ausgeben.</p>
+</div>
 
-<h2 id="s4">4. Rechenbeispiel</h2>
-<p>Aus den gemeinsamen Testvektoren: Passwort <code>secret</code>, Ziel <code>DK5EN-90</code>, Absender <code>DK5EN-1</code>, Zähler 1, Befehl <code>reboot</code>.</p>
+<details class="dev">
+<summary>Rechenbeispiel mit dem gemeinsamen Testvektor, nachgerechnet am 25.10.2026</summary>
+<p>Aus <code>tools/tests/remote_cmd_vectors.json</code>: Passwort <code>secret</code>, Ziel <code>DK5EN-90</code>, Absender <code>DK5EN-1</code>, Zähler 1, Befehl <code>reboot</code>. Die Werte stimmen mit einer unabhängigen Rechnung in Python (<code>hashlib</code>, <code>hmac</code>) überein.</p>
 <pre>Schlüssel (hex)    2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b
 Kanonisch          RM1|DK5EN-90|DK5EN-1|1|reboot
 Tag                18f287b79c551022
@@ -145,68 +280,50 @@ DM-Text            RM1 1 reboot 18f287b79c551022
 Antwort kanonisch  RM1R|DK5EN-90|DK5EN-1|1|ok rebooting
 Antwort-Tag        facf04f881d89cde
 Antwort-DM         RM1 1 ok rebooting facf04f881d89cde</pre>
-<p class="small">Weitere Vektoren (mit Argumenten, <code>sync</code>, größter Zähler) in <code>tools/tests/remote_cmd_vectors.json</code>. Ein eigener Client sollte gegen alle Vektoren testen, bevor er auf die Luft geht.</p>
+<p>Weitere Vektoren mit Argumenten, <code>sync</code> und größtem Zähler stehen in derselben Datei. Der Hosttest <code>test/test_remote_cmd</code> reproduziert sie gegen <code>src/remote_cmd.cpp</code>. Ein eigener Client sollte gegen alle Vektoren testen, bevor er auf die Luft geht.</p>
+</details>
 
-<h2 id="s5">5. Zähler, Wiederholung, verlorene Antworten</h2>
+<h2 id="s8">Technisch: Zähler, Wiederholung, Stopp</h2>
 <ul>
-<li><b>Zähler:</b> 1 bis 4294967295, bei jedem Befehl größer als alles bisher Angenommene. Der Knoten speichert den neuen Höchstwert <em>vor</em> der Ausführung, er überlebt Neustarts. Der Client speichert seinen Zähler ebenfalls vor dem Senden und verwendet ihn nie für einen zweiten Befehl.</li>
-<li><b><code>sync</code></b> (Zähler 0) liefert <code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code> und ändert nichts. Höchstens eine <code>sync</code>-Antwort je 10&nbsp;s.</li>
-<li><b>Wiederholung beim Absender:</b> Ein Befehl läuft wie eine persönliche Nachricht auf der Wiederholungsleiter: Original plus drei Wiederholungen im 40-Sekunden-Abstand, mit gekippten msg_id-Bits 10–11 und byte-gleichem Text. Nur eine <b>geprüfte</b> Antwort stoppt die Leiter; eine normale Quittung oder ein Echo nicht. Die Antwort selbst geht genau einmal in die Luft.</li>
-<li><b>Antwort verloren:</b> Denselben Befehl mit demselben Zähler und Tag noch einmal senden. Innerhalb von 10 Minuten liefert der Knoten die gespeicherte Antwort erneut, ohne den Befehl noch einmal auszuführen.</li>
+<li><strong>Zähler:</strong> 1 bis 4294967295, bei jedem Befehl größer als alles bisher Angenommene. Der Knoten speichert den neuen Höchstwert <em>vor</em> der Ausführung. Der Client speichert seinen Zähler ebenfalls vor dem Senden und nutzt ihn nie für einen zweiten Befehl.</li>
+<li><strong><code>sync</code> mit Zähler 0:</strong> liefert <code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code> und ändert nichts. Nur <code>sync</code> darf Zähler 0 tragen (<code>src/remote_cmd.cpp:522-523</code>).</li>
+<li><strong>Antwort verloren:</strong> denselben Befehl mit gleichem Zähler und Tag noch einmal senden. Binnen 10 Minuten liefert der Knoten die gespeicherte Antwort erneut, ohne den Befehl auszuführen (<code>RM_CACHE_MS</code>, <code>src/remote_cmd.h:43</code>).</li>
+<li><strong>Zwei Wege hinein:</strong> Ein Befehl wird über LoRa und über den Server eines Gateways angenommen. Signatur und Zähler gelten auf beiden Wegen. Kommt dieselbe Zeile zweimal an, antwortet der Knoten aus dem Speicher und führt nichts doppelt aus (<code>src/rm_rx_gate.h:5-17</code>).</li>
+<li><strong>Die Antwort selbst wird nicht wiederholt.</strong> Sie geht genau einmal in die Luft. Der Befehl trägt kein <code>{NNN</code> und wird nicht per ACK bestätigt; die Bestätigung ist die signierte Antwort.</li>
 </ul>
 
-<h2 id="s6">6. Wann der Knoten antwortet</h2>
-<table>
-<tr><th>Fall</th><th>Antwort</th><th>Zähler verbraucht</th></tr>
-<tr><td>Gültiges Tag, Befehl erlaubt</td><td><code>ok …</code> oder <code>err …</code> des Befehls</td><td>ja</td></tr>
-<tr><td>Gültiges Tag, Befehl nicht erlaubt oder Argument ungültig</td><td><code>err blocked</code> bzw. <code>err range a..b</code></td><td>ja</td></tr>
-<tr><td>Gleicher Zähler und Tag wie zuletzt (10 min)</td><td>letzte Antwort noch einmal</td><td>nein</td></tr>
-<tr><td><code>sync</code></td><td><code>ok ctr=&lt;hwm&gt; v=&lt;version&gt;</code></td><td>nein</td></tr>
-<tr><td>Falsches Tag, Formatfehler, Zähler zu klein, leeres Passwort</td><td><b>keine</b> (stumm)</td><td>nein</td></tr>
-<tr><td>Zu schnell oder gesperrt (nur mit strenger Sicherheit)</td><td><b>keine</b> (stumm)</td><td>nein</td></tr>
-</table>
-<p>Ein Angreifer ohne Passwort bekommt also nie eine Antwort, an der er etwas lernen könnte. Für den Client heißt das umgekehrt:
-Keine Antwort bedeutet nicht automatisch Funkverlust.</p>
+<details class="dev">
+<summary>Wiederholung eines eigenen Befehls und Stopp durch die Antwort</summary>
+<ul>
+<li><strong>Eigener Befehl (<code>--rm</code> am Knoten):</strong> Original plus drei Wiederholungen mit gleichem Zähler und Tag, auf der Wiederholungsleiter der persönlichen Nachrichten (<code>src/rm_sender_policy.h:32-37</code>). Die msg_id-Bits 10 und 11 sind gekippt, der Text bleibt byte-gleich (<code>src/lora_functions.cpp:604-610</code>).</li>
+<li><strong>Abstand:</strong> Der Code-Kommentar in <code>src/lora_functions.cpp:3317</code> nennt 40&nbsp;s je Wiederholung, die Konstante <code>RM_REPEAT_GAP_MS</code> rechnet mit 42&nbsp;s (Schwelle <code>0x15</code> bei 2-s-Takt). Gemessen ist der Abstand hier nicht.</li>
+<li><strong>Stopp:</strong> Nur eine <em>geprüfte</em> Antwort stoppt die Leiter. Eine normale Quittung oder ein Echo stoppt sie nicht.</li>
+</ul>
+<p><strong>Neu seit <code>v4.40a.10.24</code>: Auch ein Befehl aus der App stoppt.</strong></p>
+<ul>
+<li><strong>Befehle aus McApp, serieller Konsole oder WebGUI:</strong> Der Knoten reicht sie nur durch und hat keinen Schlüssel dafür. Bisher liefen die drei Wiederholungen weiter, auch wenn das Ziel nach Sekunden geantwortet hatte. Der Knoten meldete dann <code>RETRANSMIT_GIVEUP</code> (Feldlog <code>DK5EN-98</code> an <code>DK5EN-1</code>, 24.10.2026).</li>
+<li><strong>Jetzt:</strong> Die erste Antwort desselben Rufzeichens mit demselben Zähler stoppt die Wiederholungen. Der Knoten meldet <code>[RM];stop;client;&lt;dst&gt;;ctr;&lt;n&gt;;slot;&lt;s&gt;</code> (<code>src/rm_runtime.cpp:548-556</code>).</li>
+<li><strong>Ungeprüft:</strong> Der Knoten kann die Antwort nicht verifizieren. Eine gefälschte Antwort kann die Wiederholungen nur abkürzen, das ist das alte Sendeeinmal-Verhalten. Der Client prüft die Antwort weiter selbst.</li>
+<li><strong>Tabelle:</strong> vier Einträge, jeder verfällt nach Ende der Leiter plus Antwortzeit, 171&nbsp;s (<code>src/rm_client_cmd.h</code>, <code>RM_CLIENT_SLOTS</code>, <code>RM_NOANSWER_MS</code>).</li>
+<li><strong>Beleg:</strong> <code>test/test_rm_client_cmd</code> prüft Anlegen, Treffer, Ablauf, Verdrängung und den Torweg zur Warteschlange.</li>
+</ul>
+</details>
 
-<h2 id="s7">7. Die 25 Befehle</h2>
-<table>
-<tr><th>Art</th><th>Befehle</th><th>Gespeichert</th></tr>
-<tr><td>Aktion</td><td><code>reboot</code>, <code>status</code>, <code>sendpos</code>, <code>sendtrack</code>, <code>sync</code></td><td>nein</td></tr>
-<tr><td>Schalter <code>on|off</code></td><td><code>gps</code>, <code>track</code>, <code>display</code>, <code>gateway</code>, <code>mesh</code></td><td>ja</td></tr>
-<tr><td>Schalter</td><td><code>led on|off|flash</code></td><td>nein (aus nach Neustart)</td></tr>
-<tr><td>Parameter</td><td><code>txpower &lt;dBm&gt;</code> (im Bereich der Platine), <code>setout &lt;pin&gt; on|off</code></td><td>ja</td></tr>
-<tr><td>Parameter</td><td><code>chgled auto|on|off</code></td><td>nein</td></tr>
-<tr><td>Lesen</td><td><code>radio</code>, <code>sens</code>, <code>txq</code>, <code>mbox</code>, <code>maxhop</code>, <code>net</code>, <code>mh &lt;zeile|rufzeichen&gt;</code></td><td>nein</td></tr>
-<tr><td>Lesen / Schreiben</td><td><code>name</code>, <code>atxt</code>, <code>pos</code></td><td>Schreiben: ja</td></tr>
-<tr><td>Auto-Update</td><td><code>upd</code>, <code>upd check</code>, <code>upd go &lt;tag&gt;</code> (nur ESP32 mit Auto-Update)</td><td>nein</td></tr>
-</table>
-<p>Beispiele: <code>status</code> → <code>ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=0</code>;
-<code>mh DL2JA-2</code> → <code>ok d g=1 m=1 r=-95 s=8 … n=15 x=14 h=18 t=0</code> (direkt gehört, mit den Werten aus der Nachbarschaftsmatrix);
-<code>txq</code> → <code>ok q=3/20 bp=quiet tx=17 rt=0 dr=0 u=0</code>.</p>
-<p><b>Nie erreichbar</b>, auch mit gültigem Tag (<code>err blocked</code>): <code>cleanflash</code>, <code>ota-update</code>, <code>dfu</code>, <code>deepsleep</code>,
-<code>setcall</code>, <code>passwd</code>, <code>webpwd</code>, <code>btcode</code>, <code>setssid</code>, <code>setpwd</code>, <code>wifiset</code>, <code>updrepo</code>,
-<code>updchan</code>, <code>autoupdate</code>, <code>rm</code>, <code>stor</code>. Jedes Argument mit <code>;</code>, <code>{</code>, <code>%</code> oder <code>--</code> wird abgelehnt.</p>
+<details class="dev">
+<summary>Sendebegrenzung im WebGUI-Client (nur mit strenger Sicherheit)</summary>
+<ul>
+<li><strong>Regel:</strong> höchstens 2 unbeantwortete Sendungen an ein Ziel, solange noch keine Antwort mit dem aktuellen Schlüssel geprüft wurde. Danach höchstens 10. Zwischen zwei Sendungen an ein Ziel liegen mindestens 10&nbsp;s (<code>src/rm_sender_policy.h:1-22, 44-46</code>).</li>
+<li><strong>Grund:</strong> Eine abgelehnte Zeile ist auf Funk stumm und zählt gegen die Sperre des Ziels. Der Absender sieht davon nichts und bremst sich deshalb selbst.</li>
+<li><strong>Ohne strenge Sicherheit</strong> darf jede Sendung raus.</li>
+</ul>
+</details>
 
-<h2 id="s8">8. Sicherheit und Grenzen</h2>
-<table>
-<tr><th>Eigenschaft</th><th>Stand</th><th>Bemerkung</th></tr>
-<tr><td>Absender echt</td><td><span class="tag ok">gegeben</span></td><td>Ohne Passwort kein gültiges Tag; Ziel und Absender sind mitsigniert</td></tr>
-<tr><td>Antwort echt</td><td><span class="tag ok">gegeben</span></td><td>Antwort-Tag bindet Ergebnis an Befehlszähler und Absender</td></tr>
-<tr><td>Schutz gegen Wiedereinspielen</td><td><span class="tag ok">gegeben</span></td><td>Streng steigender Zähler, überlebt Neustarts</td></tr>
-<tr><td>Vertraulichkeit</td><td><span class="tag info">bewusst nicht</span></td><td>Klartext auf Funk (AFuV); keine Geheimnisse in Argumente oder Antworten</td></tr>
-<tr><td>Passwort-Raten</td><td><span class="tag warn">Grenze</span></td><td>Ein mitgeschnittenes Tag erlaubt Offline-Raten. Langes, zufälliges Passwort (bis 14 Zeichen) wählen; 64 Bit Tag schützen gegen Fälschen im Funk, ersetzen aber kein starkes Passwort</td></tr>
-<tr><td>Brute Force im Funk</td><td><span class="tag warn">optional</span></td><td><code>--rmstrictsecurity on</code>: höchstens ein Befehl je 10&nbsp;s, ein <code>sync</code> je 60&nbsp;s, nach drei Fehlversuchen in 90&nbsp;s 5 Minuten Sperre für diesen Absender. Standard: aus</td></tr>
-<tr><td>Normale Nachrichten</td><td><span class="tag bad">nicht signiert</span></td><td>RM1 signiert nur Fernsteuerbefehle. Chat und Positionen bleiben unsigniert; das Rufzeichen dort ist frei behauptbar</td></tr>
-</table>
-
-<h2 id="s9">9. Einschalten</h2>
-<pre>--passwd &lt;passwort&gt;          Knotenpasswort setzen (Schlüssel für RM1)
---remotemgmt on              RM1 einschalten (Standard: aus)
---rmstrictsecurity on        optional: Ratenbegrenzung und Sperre</pre>
-<p>Der steuernde Knoten braucht dasselbe Passwort in seinem Client. Im WebGUI eines Fork-Knotens steht dafür die Seite
-<b>Remote</b> bereit: Zielknoten wählen, Befehl absetzen, Antwort geprüft anzeigen. Wer eine eigene App baut, findet in
-<code>docs/rm1-hmac.md</code> die Schritt-für-Schritt-Anleitung und in <code>docs/rm1-commands.md</code> jede Antwortform.</p>
-<p class="small">Zurück zur <a href="index.html">Übersicht</a> · zum Vortrag <a href="meshcom-protocol.html">Kein Routing, und warum das richtig ist</a></p>
+<div class="foot">
+<p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>.
+Wire-Format: <code>docs/architecture/11-wire-format.md</code> Abschnitt 1.9. Zurück zur <a href="index.html">Übersicht</a> oder zum Vortrag <a href="meshcom-protocol.html">Kein Routing, und warum das richtig ist</a>.</p>
+<p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
+ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
+</div>
 </main>
 </body>
 </html>
