@@ -1,12 +1,12 @@
 # Campaign: TX Ring to Priority Pool (TXP)
 
-| Item      | Value                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Started   | 2026-10-24                                                                                                                                                                       |
-| Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                         |
-| Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md) |
-| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                       |
-| Status    | W0-W1c committed and benched; all five nodes on `3e07f894` since 2026-10-24 16:20; open: night evaluation (until 2026-10-25 16:21), TTL and release decision                     |
+| Item      | Value                                                                                                                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Started   | 2026-10-24                                                                                                                                                                                                               |
+| Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                                                                 |
+| Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md)                                         |
+| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                                                               |
+| Status    | W0-W1c committed and benched; logger night stopped 2026-10-25 11:24 (found TXP-01); W1d (own text released before its first TX) reproduced on the bench, fix W1e awaits operator approval; TTL and release decision open |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -36,6 +36,8 @@
 | W1a  | TTL table for all priorities, `{CET}` age gate (D1, D2)                                                                                          | done   |
 | W1b  | Slot pool: `INFLIGHT` status, delete `iRead`/`iWrite`; gauge G3 (D5); RM1 `txq` fix (D6)                                                         | done   |
 | W1c  | Supersede in place: HEY, position, `{CET}` (D3)                                                                                                  | done   |
+| W1d  | TXP-01 own-text echo release: log evaluation, bench matrix E1-E8, driver `tools/bench/own_echo_bench.py`                                         | done   |
+| W1e  | TXP-01 fix: an own text is not released while READY (sent once, the heard check stops repeats) + regression test; bench re-run E1/E6             | open   |
 | W2   | Time-aged dedup (concept stage 3), dedup line of the gauge: later campaign                                                                       | parked |
 
 ## 4. Wave log
@@ -171,3 +173,20 @@ Loggers on rpizero, detached `screen` sessions (survive the SSH session, not a r
 2026-10-24 16:21: `txp-98` -> `~/meshlog/dk5en-98-txp-w1c/`, `txp-14` -> `~/meshlog/dk5en-14-txp-w1c/`
 (stdout in `~/meshlog/run-txp-w1c-98.out`, `run-txp-w1c-14.out`). Evaluate against W0: per-prio age at TX,
 `[CET]` ages and drops, `RING_DROP_*` / `RING_SUPERSEDE*` counts, full events, gauge counts.
+
+### W1d: own text released before its first TX (TXP-01, 2026-10-25)
+
+Paper: [`txp-own-msg-echo-release-20261024.md`](txp-own-msg-echo-release-20261024.md) (moved from the Desktop;
+sections 6-9 are this wave). Test matrix with expected and observed outcome per case:
+`~/Desktop/2026-10-25-own-msg-echo-testmatrix.html`.
+
+- **Logger:** both rpizero loggers stopped 2026-10-25 11:24 (`txp-98`, and DK5EN-14 `td22-14` of the T-Deck
+  campaign after 6 min; operator: re-run that soak later). 50 of 118 own texts of DK5EN-98 released before their
+  first TX: group 20 49/82, `*` 1/4, PN 0/26.
+- **Bench:** DK5EN-1/-90/-92 flashed with INSTRUMENT images of `eb246050` (OTA, RAK via DFU) for `--airgap`; all
+  five subscribed to 9999 for the runs, DK5EN-98 restored to `20;232;262;26244;9` afterwards, the bench nodes keep
+  9999 for W1e. Results: E1 DK5EN-98 -> 9999 released 9/10, E2 same with the bench gateways airgapped 0/10, E6
+  DK5EN-1 -> 9999 released 3/10 by DK5EN-98's server copy, PNs E4/E5 0/20 released, control E8 (gateway off) 0/10.
+  Summaries `tools/bench/runs/harness/own-echo-{A,B,C,D}-20261025-*.json`.
+- **Side findings:** TXP-02 (UDP-received own-call PN not in the dedup ring, re-uploaded from the LoRa copy),
+  TXP-03 (`TEST` is a PN to a callsign, 4 copies per text). Both in the defect catalogue.

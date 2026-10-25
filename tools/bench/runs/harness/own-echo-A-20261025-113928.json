@@ -1,0 +1,4517 @@
+{
+ "cases": {
+  "E1": {
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "sent": 10,
+   "released": 9,
+   "tx": 1,
+   "unknown": 0,
+   "released_by": {
+    "DK5EN-90": 2,
+    "DK5EN-92": 7
+   },
+   "field_echo": {
+    "DB0ED-99": 1
+   },
+   "pn_ack_skip": 0,
+   "pn_tx_total": 0,
+   "pn_acks": {}
+  },
+  "E6": {
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "sent": 10,
+   "released": 3,
+   "tx": 7,
+   "unknown": 0,
+   "released_by": {
+    "DK5EN-98": 3
+   },
+   "field_echo": {
+    "DL2UD-1": 7,
+    "DL2JA-2": 1
+   },
+   "pn_ack_skip": 0,
+   "pn_tx_total": 0,
+   "pn_acks": {}
+  },
+  "E8": {
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "sent": 10,
+   "released": 0,
+   "tx": 10,
+   "unknown": 0,
+   "released_by": {},
+   "field_echo": {
+    "DB0ED-99": 1,
+    "DL2JA-1": 1,
+    "DL2UD-1": 7,
+    "DL2JA-2": 2
+   },
+   "pn_ack_skip": 0,
+   "pn_tx_total": 0,
+   "pn_acks": {}
+  }
+ },
+ "messages": [
+  {
+   "case": "E1",
+   "i": 1,
+   "marker": "EC E1 1/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E170",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 3,
+   "released_by": "DK5EN-90",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 211,
+       "t": 42012,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 175,
+       "t": 42012,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 148,
+       "t": 42012,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 134,
+       "t": 42012,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 1,
+   "marker": "EC E6 1/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A324",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 5,
+   "released_by": "DK5EN-98",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 290,
+       "t": 42044,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 269,
+       "t": 42044,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 243,
+       "t": 42044,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 230,
+       "t": 42044,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E8",
+   "i": 1,
+   "marker": "EC E8 1/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B5978068",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 3,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 596,
+       "t": 42072,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 729,
+       "t": 42091,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1159,
+       "t": 42146,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2JA-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1311,
+       "t": 42164,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DB0ED-99"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2JA-1",
+      "DB0ED-99"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 376,
+       "t": 42072,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 662,
+       "t": 42118,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 421,
+       "t": 42091,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 566,
+       "t": 42118,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 430,
+       "t": 42091,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 569,
+       "t": 42118,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 294,
+       "t": 42072,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 385,
+       "t": 42091,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 474,
+       "t": 42118,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DB0ED-99",
+    "DL2JA-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 2,
+   "marker": "EC E1 2/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E171",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 8,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 842,
+       "t": 42107,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 880,
+       "t": 42111,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 934,
+       "t": 42115,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 633,
+       "t": 42115,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 516,
+       "t": 42111,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 532,
+       "t": 42115,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 493,
+       "t": 42107,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 524,
+       "t": 42111,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 539,
+       "t": 42115,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 2,
+   "marker": "EC E6 2/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A326",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 4,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1084,
+       "t": 42134,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1115,
+       "t": 42139,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1143,
+       "t": 42144,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 760,
+       "t": 42139,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 785,
+       "t": 42144,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 848,
+       "t": 42156,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 620,
+       "t": 42134,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 670,
+       "t": 42144,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 743,
+       "t": 42156,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 629,
+       "t": 42134,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 663,
+       "t": 42139,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 679,
+       "t": 42144,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 742,
+       "t": 42156,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 517,
+       "t": 42134,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 616,
+       "t": 42156,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E8",
+   "i": 2,
+   "marker": "EC E8 2/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B5978069",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 10,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1372,
+       "t": 42169,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1813,
+       "t": 42217,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 906,
+       "t": 42169,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1354,
+       "t": 42222,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 800,
+       "t": 42169,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1111,
+       "t": 42217,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1187,
+       "t": 42222,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1087,
+       "t": 42217,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1154,
+       "t": 42222,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 663,
+       "t": 42169,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 921,
+       "t": 42222,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E1",
+   "i": 3,
+   "marker": "EC E1 3/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E173",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 24,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1772,
+       "t": 42213,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1339,
+       "t": 42221,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1172,
+       "t": 42221,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1039,
+       "t": 42213,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1138,
+       "t": 42221,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 3,
+   "marker": "EC E6 3/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A327",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 6,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2033,
+       "t": 42238,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2336,
+       "t": 42281,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1442,
+       "t": 42238,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1484,
+       "t": 42245,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1205,
+       "t": 42226,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1265,
+       "t": 42238,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1296,
+       "t": 42245,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1171,
+       "t": 42226,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1249,
+       "t": 42238,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1280,
+       "t": 42245,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 932,
+       "t": 42226,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1004,
+       "t": 42245,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 3,
+   "marker": "EC E8 3/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B597806A",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 1,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2279,
+       "t": 42273,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2389,
+       "t": 42287,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1507,
+       "t": 42250,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1670,
+       "t": 42276,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1313,
+       "t": 42250,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1452,
+       "t": 42273,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1469,
+       "t": 42276,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1410,
+       "t": 42273,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1428,
+       "t": 42276,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1016,
+       "t": 42250,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1108,
+       "t": 42273,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1118,
+       "t": 42276,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 4,
+   "marker": "EC E1 4/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E174",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 3,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2354,
+       "t": 42282,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2372,
+       "t": 42286,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1518,
+       "t": 42286,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1452,
+       "t": 42282,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1484,
+       "t": 42286,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1158,
+       "t": 42286,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 4,
+   "marker": "EC E6 4/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A328",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 3,
+   "released_by": "DK5EN-98",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2650,
+       "t": 42324,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1854,
+       "t": 42312,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1627,
+       "t": 42312,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1573,
+       "t": 42312,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1248,
+       "t": 42312,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 4,
+   "marker": "EC E8 4/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B597806B",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 1,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2721,
+       "t": 42341,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3101,
+       "t": 42388,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5805,
+       "t": 42727,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2JA-2"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1",
+      "DL2JA-2"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1922,
+       "t": 42341,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2221,
+       "t": 42379,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1713,
+       "t": 42341,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1955,
+       "t": 42379,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1891,
+       "t": 42379,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1301,
+       "t": 42341,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1461,
+       "t": 42378,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2JA-2",
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 5,
+   "marker": "EC E1 5/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E175",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 7,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3005,
+       "t": 42376,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2191,
+       "t": 42376,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1847,
+       "t": 42376,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1440,
+       "t": 42376,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 5,
+   "marker": "EC E6 5/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A32A",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 4,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3217,
+       "t": 42403,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3253,
+       "t": 42408,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3313,
+       "t": 42423,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6255,
+       "t": 42781,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2JA-2"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1",
+      "DL2JA-2"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2358,
+       "t": 42408,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2379,
+       "t": 42414,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2073,
+       "t": 42408,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2093,
+       "t": 42414,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1968,
+       "t": 42403,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1999,
+       "t": 42408,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2019,
+       "t": 42414,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1564,
+       "t": 42414,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2JA-2",
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 5,
+   "marker": "EC E8 5/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B597806C",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 4,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3345,
+       "t": 42433,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3708,
+       "t": 42474,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3867,
+       "t": 42488,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2420,
+       "t": 42433,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2772,
+       "t": 42480,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2134,
+       "t": 42433,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2383,
+       "t": 42474,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2418,
+       "t": 42480,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2458,
+       "t": 42474,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2561,
+       "t": 42480,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1590,
+       "t": 42433,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1738,
+       "t": 42474,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1758,
+       "t": 42480,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 6,
+   "marker": "EC E1 6/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E176",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 19,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3805,
+       "t": 42482,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3849,
+       "t": 42486,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5580,
+       "t": 42699,
+       "path": [
+        "DK5EN-98",
+        "DB0ED-99"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DB0ED-99"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2757,
+       "t": 42479,
+       "path": [
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2802,
+       "t": 42482,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2818,
+       "t": 42486,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2469,
+       "t": 42486,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2533,
+       "t": 42479,
+       "path": [
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2576,
+       "t": 42482,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2600,
+       "t": 42486,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DB0ED-99"
+   ]
+  },
+  {
+   "case": "E6",
+   "i": 6,
+   "marker": "EC E6 6/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A32B",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 4,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3911,
+       "t": 42494,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3971,
+       "t": 42503,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4102,
+       "t": 42522,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2920,
+       "t": 42503,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2957,
+       "t": 42511,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2519,
+       "t": 42494,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2556,
+       "t": 42503,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2649,
+       "t": 42494,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2697,
+       "t": 42503,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2731,
+       "t": 42511,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 1839,
+       "t": 42494,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 1901,
+       "t": 42511,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 6,
+   "marker": "EC E8 6/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B597806D",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 2,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4064,
+       "t": 42521,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4457,
+       "t": 42563,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4619,
+       "t": 42578,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2987,
+       "t": 42521,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3343,
+       "t": 42571,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2609,
+       "t": 42521,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2902,
+       "t": 42571,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2972,
+       "t": 42563,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3034,
+       "t": 42571,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 1920,
+       "t": 42521,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2104,
+       "t": 42571,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 7,
+   "marker": "EC E1 7/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E177",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 21,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 4530,
+       "t": 42570,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4603,
+       "t": 42574,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3328,
+       "t": 42570,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3382,
+       "t": 42574,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2936,
+       "t": 42574,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3003,
+       "t": 42570,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3080,
+       "t": 42574,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 7,
+   "marker": "EC E6 7/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A32C",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 4,
+   "released_by": "DK5EN-98",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4687,
+       "t": 42588,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3430,
+       "t": 42583,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2966,
+       "t": 42583,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3101,
+       "t": 42583,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2164,
+       "t": 42583,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 7,
+   "marker": "EC E8 7/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B597806E",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 3,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4769,
+       "t": 42613,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5146,
+       "t": 42648,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5476,
+       "t": 42689,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3498,
+       "t": 42613,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3895,
+       "t": 42671,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3030,
+       "t": 42613,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3250,
+       "t": 42648,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3367,
+       "t": 42671,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3377,
+       "t": 42648,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3482,
+       "t": 42671,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2218,
+       "t": 42613,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2389,
+       "t": 42648,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2461,
+       "t": 42671,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 8,
+   "marker": "EC E1 8/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E178",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 3,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 5063,
+       "t": 42642,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5113,
+       "t": 42646,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3685,
+       "t": 42642,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3724,
+       "t": 42646,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3234,
+       "t": 42646,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3313,
+       "t": 42642,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3361,
+       "t": 42646,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 8,
+   "marker": "EC E6 8/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A32D",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 5,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 5390,
+       "t": 42675,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5420,
+       "t": 42681,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5447,
+       "t": 42685,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5639,
+       "t": 42703,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3941,
+       "t": 42681,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3958,
+       "t": 42685,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3999,
+       "t": 42694,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3383,
+       "t": 42675,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3465,
+       "t": 42694,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3502,
+       "t": 42675,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3540,
+       "t": 42681,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3555,
+       "t": 42685,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3594,
+       "t": 42694,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2472,
+       "t": 42675,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2508,
+       "t": 42685,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2536,
+       "t": 42694,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 8,
+   "marker": "EC E8 8/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B5978070",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 1,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 5596,
+       "t": 42701,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5990,
+       "t": 42742,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6159,
+       "t": 42764,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6969,
+       "t": 42860,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1",
+        "DL2JA-2"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1",
+      "DL2JA-2"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4039,
+       "t": 42701,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4363,
+       "t": 42747,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3501,
+       "t": 42701,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3741,
+       "t": 42742,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3855,
+       "t": 42742,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3885,
+       "t": 42747,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2562,
+       "t": 42701,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2726,
+       "t": 42742,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 2741,
+       "t": 42747,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2JA-2",
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E1",
+   "i": 9,
+   "marker": "EC E1 9/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E179",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 11,
+   "released_by": "DK5EN-92",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 5957,
+       "t": 42740,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 4309,
+       "t": 42740,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3823,
+       "t": 42740,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2713,
+       "t": 42740,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 9,
+   "marker": "EC E6 9/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A32E",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 2,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 6144,
+       "t": 42761,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6187,
+       "t": 42766,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6343,
+       "t": 42793,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4434,
+       "t": 42766,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4458,
+       "t": 42773,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3787,
+       "t": 42761,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3803,
+       "t": 42766,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3826,
+       "t": 42773,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3910,
+       "t": 42761,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3937,
+       "t": 42766,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3959,
+       "t": 42773,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 2809,
+       "t": 42773,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  },
+  {
+   "case": "E8",
+   "i": 9,
+   "marker": "EC E8 9/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B5978071",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 3,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 6305,
+       "t": 42792,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6794,
+       "t": 42839,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4497,
+       "t": 42792,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4897,
+       "t": 42853,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3864,
+       "t": 42792,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4121,
+       "t": 42839,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4198,
+       "t": 42853,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4242,
+       "t": 42839,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4312,
+       "t": 42853,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 2832,
+       "t": 42792,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3014,
+       "t": 42839,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3063,
+       "t": 42853,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E1",
+   "i": 10,
+   "marker": "EC E1 10/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "id": "1AE1E17A",
+   "verdict": "RELEASED",
+   "own_tx": 0,
+   "first_tx_after_write_s": null,
+   "release_after_write_s": 13,
+   "released_by": "DK5EN-90",
+   "released_and_sent": false,
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 6725,
+       "t": 42832,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6761,
+       "t": 42836,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 6844,
+       "t": 42845,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4149,
+       "t": 42845,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 4194,
+       "t": 42832,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4226,
+       "t": 42836,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4270,
+       "t": 42845,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3004,
+       "t": 42836,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3032,
+       "t": 42845,
+       "path": [
+        "DK5EN-98",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E6",
+   "i": 10,
+   "marker": "EC E6 10/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "id": "EA25A330",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 7,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 6986,
+       "t": 42862,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 7014,
+       "t": 42866,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4942,
+       "t": 42862,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4961,
+       "t": 42866,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4977,
+       "t": 42872,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4216,
+       "t": 42857,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4263,
+       "t": 42866,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4284,
+       "t": 42872,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 4329,
+       "t": 42857,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4358,
+       "t": 42862,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-92"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4375,
+       "t": 42866,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-90"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4390,
+       "t": 42872,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": true,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 3075,
+       "t": 42857,
+       "path": [
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3123,
+       "t": 42872,
+       "path": [
+        "DK5EN-1",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": []
+  },
+  {
+   "case": "E8",
+   "i": 10,
+   "marker": "EC E8 10/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "id": "B5978073",
+   "verdict": "SENT",
+   "own_tx": 1,
+   "first_tx_after_write_s": 9,
+   "echo_vs_own_tx": "after",
+   "nodes": {
+    "DK5EN-98": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 7160,
+       "t": 42889,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 7477,
+       "t": 42926,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 7733,
+       "t": 42947,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98",
+        "DL2UD-1"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": [
+      "DL2UD-1"
+     ]
+    },
+    "DK5EN-1": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 5091,
+       "t": 42889,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 5404,
+       "t": 42933,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-92": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 4372,
+       "t": 42889,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4600,
+       "t": 42926,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4640,
+       "t": 42933,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-14": {
+     "queued_from_server": false,
+     "tx": 1,
+     "heard": [
+      {
+       "idx": 4689,
+       "t": 42926,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 4729,
+       "t": 42933,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    },
+    "DK5EN-90": {
+     "queued_from_server": false,
+     "tx": 0,
+     "heard": [
+      {
+       "idx": 3202,
+       "t": 42889,
+       "path": [
+        "DK5EN-14"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3337,
+       "t": 42926,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-1"
+       ],
+       "dst": "9999"
+      },
+      {
+       "idx": 3359,
+       "t": 42933,
+       "path": [
+        "DK5EN-14",
+        "DK5EN-98"
+       ],
+       "dst": "9999"
+      }
+     ],
+     "field": []
+    }
+   },
+   "field_echo": [
+    "DL2UD-1"
+   ]
+  }
+ ],
+ "tag": "A",
+ "stamp": "20261025-113928",
+ "rc": 0,
+ "reasons": [],
+ "sends": [
+  {
+   "case": "E1",
+   "i": 1,
+   "n": 10,
+   "marker": "EC E1 1/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 1,
+   "n": 10,
+   "marker": "EC E6 1/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 1,
+   "n": 10,
+   "marker": "EC E8 1/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 2,
+   "n": 10,
+   "marker": "EC E1 2/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 2,
+   "n": 10,
+   "marker": "EC E6 2/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 2,
+   "n": 10,
+   "marker": "EC E8 2/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 3,
+   "n": 10,
+   "marker": "EC E1 3/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 3,
+   "n": 10,
+   "marker": "EC E6 3/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 3,
+   "n": 10,
+   "marker": "EC E8 3/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 4,
+   "n": 10,
+   "marker": "EC E1 4/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 4,
+   "n": 10,
+   "marker": "EC E6 4/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 4,
+   "n": 10,
+   "marker": "EC E8 4/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 5,
+   "n": 10,
+   "marker": "EC E1 5/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 5,
+   "n": 10,
+   "marker": "EC E6 5/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 5,
+   "n": 10,
+   "marker": "EC E8 5/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 6,
+   "n": 10,
+   "marker": "EC E1 6/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 6,
+   "n": 10,
+   "marker": "EC E6 6/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 6,
+   "n": 10,
+   "marker": "EC E8 6/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 7,
+   "n": 10,
+   "marker": "EC E1 7/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 7,
+   "n": 10,
+   "marker": "EC E6 7/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 7,
+   "n": 10,
+   "marker": "EC E8 7/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 8,
+   "n": 10,
+   "marker": "EC E1 8/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 8,
+   "n": 10,
+   "marker": "EC E6 8/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 8,
+   "n": 10,
+   "marker": "EC E8 8/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 9,
+   "n": 10,
+   "marker": "EC E1 9/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 9,
+   "n": 10,
+   "marker": "EC E6 9/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 9,
+   "n": 10,
+   "marker": "EC E8 9/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E1",
+   "i": 10,
+   "n": 10,
+   "marker": "EC E1 10/10 113928",
+   "sender": "DK5EN-98",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E6",
+   "i": 10,
+   "n": 10,
+   "marker": "EC E6 10/10 113928",
+   "sender": "DK5EN-1",
+   "dest": "9999",
+   "pn": false
+  },
+  {
+   "case": "E8",
+   "i": 10,
+   "n": 10,
+   "marker": "EC E8 10/10 113928",
+   "sender": "DK5EN-14",
+   "dest": "9999",
+   "pn": false
+  }
+ ]
+}

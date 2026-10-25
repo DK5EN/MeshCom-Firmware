@@ -2,7 +2,7 @@
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
 `v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
-Next step: evaluate the DK5EN-14 TD-22 soak (24 h from 2026-10-25 ~11:30) and the TXP DK5EN-98 logger night (until 2026-10-25 16:21), then TTL decision.
+Next step: operator review of TXP-01 (own text released before its first TX, reproduced 2026-10-25), then the W1e fix; TTL decision. The TD-22 soak on DK5EN-14 was stopped after 6 min and is re-run later, after the pending T-Deck PR.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -13,7 +13,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   tracker TFT sprite, TRK-03 T-Beam first boot GPS, client RM1 command stops its repeats on the reply (`56519299`, not
   benched). Gate 81 Unity envs 2891/2891, pytest 1352, golden 48; idle-heap step skipped (operator decision). Web flasher
   `check`: 30 boards, 0 mismatches. The first tag on `755a4dec` was moved before CI published (run cancelled for the RM fix).
-  DK5EN-1/-90/-92/-98 still run the `3e07f894` gate build for the TXP logger night; DK5EN-14 runs the TD-20/TD-21 build.
+  Since 2026-10-25 DK5EN-1/-90/-92 run INSTRUMENT images of `eb246050` (for `--airgap`) and keep group 9999; DK5EN-98
+  runs the `3e07f894` gate build; DK5EN-14 runs the release build of `9e4d8781`.
 - **`v4.40a.10.23` released 2026-10-24** (operator chose the 10.23 date): TX pool W0-W1c, BLK-01 `--blockcall`,
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
@@ -25,13 +26,15 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, TD-21b, TD-22, not released):** `persisted_msgs` RAM-only
   copy removed (`5b1e1da8`), WiFi IP-liveness watchdog (`5b1e1da8`, gateway-change fix `ace935c6`), 16-tab cap with
   40 KiB heap floor (`bae97fd1`); all benched on DK5EN-14. WIFI-PS-01 accepted (modem sleep). DK5EN-14 runs the
-  release build of `9e4d8781` with a 24 h soak on rpizero (`screen td22-14`, `~/meshlog/dk5en-14-td22/`). Open: soak
-  evaluation, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
+  release build of `9e4d8781`; its 24 h soak was stopped 2026-10-25 11:24 after 6 min (operator, TXP-01 bench). Open:
+  a new soak after the pending T-Deck PR, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
-  - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. All five nodes
-    (DK5EN-1/-14/-90/-92/-98) run the gate build of `3e07f894` (TXP + BLK-01) since 2026-10-24 16:20; 24 h logger on
-    rpizero for DK5EN-98 until 2026-10-25 16:21 (`screen txp-98`); the DK5EN-14 run was stopped 08:09 for the TD-20 campaign. Then evaluate
-    against the W0 baseline and decide TTL values and the release ([campaign-tx-pool.md](campaign-tx-pool.md)).
+  - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. The DK5EN-98 logger
+    was stopped 2026-10-25 11:24: it found **TXP-01** (own group/`*` text released before its first own TX when
+    another gateway transmits the server copy first; log 50/118, bench 9/10). W1d reproduced it with
+    `tools/bench/own_echo_bench.py` ([txp-own-msg-echo-release-20261024.md](txp-own-msg-echo-release-20261024.md)).
+    Open: operator approval of W1e (fix + regression test + bench re-run E1/E6), TTL values, release
+    ([campaign-tx-pool.md](campaign-tx-pool.md)).
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
   - Fork hardening: visual LED confirmation, phone-app SN check, deep-sleep LED test, LED pins on T-Echo, T114,

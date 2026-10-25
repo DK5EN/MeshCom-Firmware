@@ -108,3 +108,6 @@ over DK5EN-14 (soak interrupted for the bench).
 Finding (BACKLOG TD-21): after heap starvation the driver's own auto-reconnect did not recover the link within 180 s,
 while the watchdog's forced disconnect + `wifiBegin()` reconnected in 3.5 s. Shortening `WIFI_WD_GRACE_S` (180 s)
 would shorten that outage; not changed.
+
+Soak 2026-10-25: the 24 h soak (`screen td22-14`, started 11:18) was stopped at 11:24 on operator instruction for
+the TXP-01 bench ([campaign-tx-pool.md](campaign-tx-pool.md) W1d). A new soak follows the pending T-Deck PR.
