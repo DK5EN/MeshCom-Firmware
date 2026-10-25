@@ -3,54 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MeshCom Mesh-Roadmap</title>
-<meta name="description" content="Interaktiver Vortrag zu Teil A (TX-Pool, TTL, Dedup, Hop-Modell) und Teil B (Review der QRT-Maßnahmen, Ideen, Prioritäten, Wellenplan) der MeshCom-Mesh-Evolution. Diskussionsstand, nichts entschieden.">
+<title>MeshCom Mesh-Roadmap: welche Frames gehören auf den Kanal?</title>
+<meta name="description" content="Interaktiver Vortrag zur Mesh-Evolution von MeshCom (Fork DK5EN): Slot-Pool, Verfall und {CET}-Altersgrenze sind seit v4.40a.10.23 ausgeliefert, alles andere ist Konzept. Stand 25.10.2026.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/site.css">
 <style>
+/* Seitenspezifisch: Folien-Mechanik, Rechner und Widgets. Das Grundaussehen kommt aus assets/site.css. */
 :root{
-  color-scheme:dark;
-  --bg:#0f172a; --bg2:#1a2436; --bg3:#243046; --line:#334155; --line2:#3f4d66;
-  --fg:#e6ecff; --fg2:#9fb0cc; --fg3:#7488a8;
-  --acc:#818cf8; --acc2:#6366f1; --acc-dim:#312e81;
-  --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa; --mag:#e879f9; --cyan:#22d3ee; --orange:#fb923c; --grey:#94a3b8;
+  --line2:#3f4d66; --acc-dim:#312e81; --acc-t:#818cf8;
+  --info:#60a5fa; --mag:#e879f9; --cyan:#22d3ee; --orange:#fb923c;
   --p0:#e879f9; --p1:#f87171; --p2:#fbbf24; --p3:#60a5fa; --p4:#34d399; --p5:#94a3b8;
   --on-acc:#0b1020;
-  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
 }
 @media (prefers-color-scheme:light){
   :root:not([data-theme="dark"]){
-    color-scheme:light;
-    --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
-    --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
-    --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
-    --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c; --grey:#64748b;
+    --line2:#c0cad9; --acc-dim:#e0e7ff; --acc-t:#4f46e5;
+    --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c;
     --p0:#a21caf; --p1:#dc2626; --p2:#b45309; --p3:#2563eb; --p4:#059669; --p5:#64748b;
     --on-acc:#ffffff;
     --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
   }
 }
+/* Umschalter T (Hell/Dunkel) setzt data-theme und muss die Tokens aus site.css selbst übersteuern */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f172a; --bg2:#151f36; --bg3:#1c2846; --line:#2a3654; --fg:#e6ecff; --fg2:#9fb0cc; --fg3:#6f7f9c;
+  --acc:#6366f1; --acc2:#e879f9; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+  --ok-bg:rgba(52,211,153,.1); --warn-bg:rgba(251,191,36,.1); --bad-bg:rgba(248,113,113,.1); --acc-bg:rgba(99,102,241,.12);
+  --line2:#3f4d66; --acc-dim:#312e81; --acc-t:#818cf8;
+  --info:#60a5fa; --mag:#e879f9; --cyan:#22d3ee; --orange:#fb923c;
+  --p0:#e879f9; --p1:#f87171; --p2:#fbbf24; --p3:#60a5fa; --p4:#34d399; --p5:#94a3b8;
+  --on-acc:#0b1020;
+  --sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+}
 :root[data-theme="light"]{
   color-scheme:light;
-  --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
-  --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
-  --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
-  --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c; --grey:#64748b;
+  --bg:#fbfcfe; --bg2:#ffffff; --bg3:#f1f4fa; --line:#dfe5f0; --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b788d;
+  --acc:#4f46e5; --acc2:#c026d3; --ok:#047857; --warn:#b45309; --bad:#b91c1c;
+  --ok-bg:rgba(4,120,87,.08); --warn-bg:rgba(180,83,9,.08); --bad-bg:rgba(185,28,28,.07); --acc-bg:rgba(79,70,229,.08);
+  --line2:#c0cad9; --acc-dim:#e0e7ff; --acc-t:#4f46e5;
+  --info:#2563eb; --mag:#a21caf; --cyan:#0e7490; --orange:#c2410c;
   --p0:#a21caf; --p1:#dc2626; --p2:#b45309; --p3:#2563eb; --p4:#059669; --p5:#64748b;
   --on-acc:#ffffff;
   --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
 }
-*{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{padding:0;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+main.deck{max-width:none;margin:0;scroll-snap-type:y proximity}
 
-/* chrome */
+/* Bedienleiste */
 #bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:60}
-#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc2),var(--mag));transition:width .25s ease}
+#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .25s ease}
 #hud{position:fixed;bottom:1rem;right:1rem;z-index:60;display:flex;gap:.35rem;align-items:center;
   font-family:var(--mono);font-size:.75rem;color:var(--fg2);background:color-mix(in srgb,var(--bg2) 90%,transparent);
   border:1px solid var(--line);border-radius:999px;padding:.3rem .45rem;backdrop-filter:blur(8px);box-shadow:var(--sh)}
@@ -59,137 +66,131 @@ body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.
 #hud #pos{min-width:3.6em;text-align:center;letter-spacing:.04em}
 #toc{position:fixed;inset:0;z-index:70;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(10px);display:none;padding:3rem 16px;overflow:auto}
 #toc.on{display:block}
-#toc ol{max-width:760px;margin:0 auto;list-style:none;counter-reset:t}
-#toc li{counter-increment:t}
+#toc ol{max-width:760px;margin:0 auto;padding:0;list-style:none;counter-reset:t}
+#toc li{counter-increment:t;margin:0}
 #toc a{display:flex;gap:1rem;align-items:baseline;padding:.55rem .8rem;border-radius:8px;color:var(--fg);text-decoration:none;border:1px solid transparent}
 #toc a:hover{background:var(--bg2);border-color:var(--line)}
-#toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);color:var(--acc);font-size:.8rem;min-width:2em}
+#toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);color:var(--acc-t);font-size:.8rem;min-width:2em}
 #toc a small{color:var(--fg3);font-weight:400}
-#toc h2{max-width:760px;margin:0 auto 1.2rem;font-family:var(--mono);font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc)}
+#toc h2{max-width:760px;margin:0 auto 1.2rem;padding:0;border:0;font-family:var(--mono);font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc-t)}
 
-/* slides */
-.deck{scroll-snap-type:y proximity}
+/* Folien */
 .slide{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3.6rem 1.75rem 3.6rem;scroll-snap-align:start;position:relative;border-bottom:1px solid var(--line)}
 .slide:nth-child(even){background:var(--bg2)}
 .inner{width:100%;max-width:1100px;min-width:0}
 .num{position:absolute;top:1.4rem;right:1.6rem;font-family:var(--mono);font-size:.72rem;color:var(--fg3);letter-spacing:.1em}
-.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:.5rem}
-h1{font-family:var(--mono);font-size:clamp(2rem,5.4vw,3.6rem);font-weight:700;letter-spacing:-.03em;line-height:1.05;text-wrap:balance}
-h2{font-family:var(--mono);font-size:clamp(1.3rem,2.8vw,1.85rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin-bottom:.8rem;text-wrap:balance}
-h3{font-size:1rem;font-weight:600;margin-bottom:.5rem}
-.lead{font-size:clamp(.95rem,1.4vw,1.06rem);color:var(--fg2);max-width:70ch;text-wrap:pretty}
-p+p{margin-top:.7rem}
-strong,b{color:var(--fg);font-weight:600}
-a{color:var(--acc)}
+.slide h2{font-size:clamp(1.3rem,2.7vw,1.8rem);margin:.3rem 0 .8rem;padding:0;border:0;text-wrap:balance;max-width:30em}
+.slide h3{font-size:1rem}
+.slide p,.slide ul,.slide ol{max-width:72ch}
+.slide ul,.slide ol{font-size:.95rem}
+.slide li{margin:.3rem 0}
+.slide .eyebrow{display:flex;flex-wrap:wrap;gap:.3rem .6rem;align-items:center}
+.slide .eyebrow .tag{white-space:normal}
+.slide .grid p,.slide .grid ul{max-width:none}
+.lead{font-size:clamp(.95rem,1.4vw,1.04rem);color:var(--fg2);max-width:70ch}
+.facts{margin:0 0 1rem}
+.facts li{color:var(--fg2)}
+.facts li strong:first-child{color:var(--fg)}
+.cols{columns:2 22rem;column-gap:2rem;max-width:none}
+.cols li{break-inside:avoid}
 
-/* primitives */
+/* Bausteine */
 .grid{display:grid;gap:.8rem}
 .grid>*{min-width:0}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .g64{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
 .mt{margin-top:.9rem}.mt2{margin-top:1.3rem}
-.card{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem}
-.slide:nth-child(even) .card{background:var(--bg)}
-.card h3{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:.5rem}
-.card p,.card li{font-size:.85rem;color:var(--fg2);line-height:1.55}
-.card ul{margin:.35rem 0 0 1.05rem}
-.card li{margin:.2rem 0}
-.card.hot{border-color:var(--warn)} .card.hot h3{color:var(--warn)}
-.card.good{border-color:var(--ok)} .card.good h3{color:var(--ok)}
-.card.cold{border-color:var(--info)} .card.cold h3{color:var(--info)}
-.card.badc{border-color:var(--bad)} .card.badc h3{color:var(--bad)}
-.mono,code{font-family:var(--mono);font-size:.86em}
-code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;padding:.08em .35em;color:var(--fg);overflow-wrap:anywhere}
-.big{font-family:var(--mono);font-size:clamp(1.3rem,2.8vw,1.9rem);font-weight:700;color:var(--acc);line-height:1.05;letter-spacing:-.02em}
+.wbox{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem}
+.slide:nth-child(even) .wbox{background:var(--bg)}
+.wbox h3{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--acc-t);margin:0 0 .5rem}
+.wbox p,.wbox li{font-size:.85rem;color:var(--fg2);line-height:1.55}
+.wbox ul{margin:.35rem 0 0 1.05rem}
+.big{font-family:var(--mono);font-size:clamp(1.3rem,2.8vw,1.9rem);font-weight:700;color:var(--acc-t);line-height:1.05;letter-spacing:-.02em}
 .stat{text-align:center;padding:.6rem .5rem}
 .stat .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);margin-bottom:.35rem}
 .stat .s{font-size:.72rem;color:var(--fg3);margin-top:.35rem}
-.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
-table{width:100%;border-collapse:collapse;font-size:.8rem}
-th{text-align:left;font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);padding:.35rem .5rem;border-bottom:1px solid var(--line2);vertical-align:bottom}
-td{padding:.32rem .5rem;border-bottom:1px solid var(--line);color:var(--fg2);vertical-align:top;line-height:1.45}
-tbody tr:last-child td{border-bottom:0}
+.slide .table-wrap table{font-size:.82rem}
+.slide .table-wrap td,.slide .table-wrap th{padding:.32rem .5rem}
 td.m,th.m{font-family:var(--mono)} td.r,th.r{text-align:right}
-.note{border-left:3px solid var(--acc);background:var(--bg3);border-radius:0 8px 8px 0;padding:.6rem .9rem;font-size:.84rem;color:var(--fg2);line-height:1.55}
-.note.warn{border-color:var(--warn)} .note.bad{border-color:var(--bad)} .note.ok{border-color:var(--ok)}
-.tag{display:inline-block;font-family:var(--mono);font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;padding:.15em .55em;border-radius:999px;border:1px solid currentColor;font-weight:600;vertical-align:middle;white-space:nowrap}
-.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)} .t-info{color:var(--info)} .t-acc{color:var(--acc)} .t-mag{color:var(--mag)} .t-dim{color:var(--fg3)}
+.slide .callout{max-width:none;font-size:.88rem}
+.slide .callout p{max-width:none;font-size:.88rem}
+.slide .callout ul{margin:.2rem 0 .3rem;font-size:.88rem}
+.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)} .t-info{color:var(--info)} .t-dim{color:var(--fg3)}
 .prop{display:inline-block;font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px dashed var(--warn);border-radius:6px;padding:.1em .5em;margin-right:.35rem;white-space:nowrap}
 .calc{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--info);border:1px solid var(--info);border-radius:4px;padding:0 .35em;margin-left:.25rem;white-space:nowrap;vertical-align:middle}
-.cite,.card p.cite,.panel p.cite{font-family:var(--mono);font-size:.66rem;color:var(--fg3);margin-top:.45rem;line-height:1.45}
-details.deep{margin-top:.8rem;border:1px solid var(--line);border-radius:8px;background:var(--bg3);overflow:hidden}
-details.deep>summary{cursor:pointer;padding:.6rem 1rem;font-family:var(--mono);font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--fg2);list-style:none;user-select:none}
-details.deep>summary::-webkit-details-marker{display:none}
-details.deep>summary::before{content:'▸ ';color:var(--acc)}
-details.deep[open]>summary::before{content:'▾ '}
-details.deep .body{padding:0 1rem 1rem;font-size:.85rem;color:var(--fg2)}
-details.deep .body>*+*{margin-top:.6rem}
-ul.plain{list-style:none;margin:0}
-ul.plain li{position:relative;padding-left:1.3rem;margin:.28rem 0;font-size:.85rem;color:var(--fg2);line-height:1.55}
-ul.plain li::before{content:'—';position:absolute;left:0;color:var(--acc)}
-ul.plain li.no::before{content:'✕';color:var(--bad);font-size:.8em}
-ul.plain li.yes::before{content:'✓';color:var(--ok)}
+.cite,.wbox p.cite,.panel p.cite{font-family:var(--mono);font-size:.68rem;color:var(--fg3);margin-top:.45rem;line-height:1.5;max-width:none}
+.slide details{margin-top:.8rem;background:var(--bg3)}
+.slide details .body{font-size:.88rem;color:var(--fg2)}
+.slide details .body>*+*{margin-top:.6rem}
+.slide details p,.slide details ul{max-width:none}
 
-/* controls */
+/* Bedienelemente */
 .ctl{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
 .btn,.seg button{font-family:var(--mono);font-size:.74rem;color:var(--fg2);background:var(--bg3);border:1px solid var(--line2);border-radius:7px;padding:.38rem .65rem;cursor:pointer;line-height:1.2}
 .btn:hover,.seg button:hover{color:var(--fg);border-color:var(--acc)}
 .btn:focus-visible,.seg button:focus-visible,.opt:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.btn.pri{background:var(--acc2);color:#fff;border-color:var(--acc2)}
+.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
 .seg{display:inline-flex;flex-wrap:wrap;gap:0;border-radius:8px}
 .seg button{border-radius:0;margin-left:-1px}
 .seg button:first-child{border-radius:7px 0 0 7px;margin-left:0}
 .seg button:last-child{border-radius:0 7px 7px 0}
-.seg button[aria-pressed="true"],.btn[aria-pressed="true"]{background:var(--acc-dim);color:var(--acc);border-color:var(--acc);position:relative;z-index:1}
+.seg button[aria-pressed="true"],.btn[aria-pressed="true"]{background:var(--acc-dim);color:var(--fg);border-color:var(--acc);position:relative;z-index:1}
 .lbl{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin-right:.2rem}
 .rng{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(0,1fr) 4.2rem;gap:.5rem;align-items:center;font-size:.8rem;color:var(--fg2);margin:.25rem 0}
 .rng output{font-family:var(--mono);text-align:right;color:var(--fg)}
-input[type=range]{width:100%;accent-color:var(--acc2)}
+input[type=range]{width:100%;accent-color:var(--acc)}
 .opt{display:block;text-align:left;width:100%;font:inherit;color:inherit;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:.55rem .7rem;cursor:pointer}
 .slide:nth-child(even) .opt{background:var(--bg)}
 .opt:hover{border-color:var(--acc)}
 .opt[aria-pressed="true"]{border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
-.opt .k{font-family:var(--mono);font-weight:700;color:var(--acc);font-size:.8rem}
+.opt .k{font-family:var(--mono);font-weight:700;color:var(--acc-t);font-size:.8rem}
 .opt .t{display:block;font-size:.8rem;color:var(--fg2);line-height:1.4;margin-top:.15rem}
 .optgrid{display:grid;gap:.45rem;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 .panel{background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:.8rem .95rem;font-size:.85rem;color:var(--fg2)}
-.panel h4{font-family:var(--mono);font-size:.78rem;color:var(--fg);margin-bottom:.4rem}
+.panel h4{font-family:var(--mono);font-size:.78rem;font-weight:600;letter-spacing:0;text-transform:none;color:var(--fg);margin:0 0 .4rem}
+.panel p{max-width:none}
+.panel h4.mt{margin-top:.9rem}
 .pc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.45rem}
 .pc>div{min-width:0}
 .pc .p::before{content:'Pro';display:block;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ok);margin-bottom:.15rem}
 .pc .c::before{content:'Contra';display:block;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-bottom:.15rem}
-.viz{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.slide:nth-child(even) .viz{background:var(--bg)}
-.slide:nth-child(odd) .viz{background:var(--bg2)}
-.viz svg{display:block;width:100%;height:auto}
+
+/* Diagramme */
+figure.viz{width:100%;margin:0;padding:.3rem;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.slide:nth-child(even) figure.viz{background:var(--bg)}
+figure.viz svg{display:block;width:100%;height:auto}
+figure.viz.wide,figure.viz.xwide{overflow-x:auto}
+figure.viz.wide svg{min-width:600px}
+figure.viz.xwide svg{min-width:780px}
+figure.viz figcaption,.figcap{font-size:.8rem;color:var(--fg2);margin:.35rem .5rem .3rem;line-height:1.45}
+.figcap{margin:.6rem 0 0;max-width:none}
+.viz svg text{font-family:var(--mono)}
 .cap{font-size:.8rem;color:var(--fg2);min-height:2.6em;margin-top:.45rem;line-height:1.45}
 .legend{display:flex;flex-wrap:wrap;gap:.35rem .9rem;font-size:.72rem;color:var(--fg3);margin-top:.4rem;font-family:var(--mono)}
 .legend i{display:inline-block;width:.75em;height:.75em;border-radius:3px;margin-right:.35em;vertical-align:-.05em}
-svg text{font-family:var(--mono)}
 .log{font-family:var(--mono);font-size:.7rem;color:var(--fg2);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.45rem .6rem;height:8.5rem;overflow:auto;line-height:1.5}
 .log div{white-space:pre-wrap}
-.bluf{counter-reset:b;display:grid;gap:.55rem}
-.bluf li{list-style:none;counter-increment:b;display:grid;grid-template-columns:2rem minmax(0,1fr);gap:.6rem;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.6rem .8rem;font-size:.88rem;color:var(--fg2)}
-.bluf li::before{content:counter(b);font-family:var(--mono);font-weight:700;color:var(--acc);font-size:1.15rem;line-height:1.3}
 .share{height:14px;background:var(--bg3);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:.35rem}
 .share i{display:block;height:100%;width:0;background:var(--ok);transition:width .35s ease,background .35s}
-.qlist{counter-reset:q;display:grid;gap:.5rem}
-.qlist li{list-style:none;counter-increment:q;display:grid;grid-template-columns:2.2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.55rem .8rem;font-size:.86rem;color:var(--fg2)}
+.qlist{counter-reset:q;display:grid;gap:.5rem;padding:0;max-width:none}
+.qlist li{list-style:none;counter-increment:q;display:grid;grid-template-columns:2.2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.55rem .8rem;font-size:.86rem;color:var(--fg2);margin:0}
 .slide:nth-child(even) .qlist li{background:var(--bg)}
-.qlist li::before{content:'Q' counter(q);font-family:var(--mono);font-weight:700;color:var(--acc)}
+.qlist li::before{content:'Q' counter(q);font-family:var(--mono);font-weight:700;color:var(--acc-t)}
+.qlist li.done{opacity:.8}
+.qlist li.done::before{content:'ok';color:var(--ok)}
 .hide{display:none!important}
+.deckfoot{max-width:1100px;margin:0 auto;padding:0 1.75rem 4.5rem}
 
 @media (max-width:900px){
-  .g2,.g3,.g4,.g5,.g64{grid-template-columns:minmax(0,1fr)}
+  .g2,.g3,.g64{grid-template-columns:minmax(0,1fr)}
   .slide{padding:4.2rem 16px 4.6rem}
+  .deckfoot{padding:0 16px 4.6rem}
   .num{top:1rem;right:16px}
   .pc{grid-template-columns:minmax(0,1fr)}
   .rng{grid-template-columns:minmax(0,7rem) minmax(0,1fr) 3.6rem}
   .qlist li{grid-template-columns:2.2rem minmax(0,1fr)}
-  .qlist li .tag{grid-column:2}
+  .qlist li .tag{grid-column:2;justify-self:start}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
@@ -206,33 +207,142 @@ svg text{font-family:var(--mono)}
 <nav id="hud" aria-label="Foliennavigation">
   <button id="btoc" title="Übersicht (Taste U)" aria-label="Übersicht">☰</button>
   <button id="bprev" title="Zurück (←)" aria-label="Zurück">←</button>
-  <span id="pos" aria-live="polite">1/18</span>
+  <span id="pos" aria-live="polite">1/19</span>
   <button id="bnext" title="Weiter (→)" aria-label="Weiter">→</button>
   <button id="btheme" title="Hell/Dunkel (T)" aria-label="Farbschema wechseln">◐</button>
 </nav>
-<div id="toc" role="dialog" aria-label="Übersicht"><h2>Übersicht — Taste U oder Esc schließt</h2><ol id="toclist"></ol></div>
+<div id="toc" role="dialog" aria-label="Übersicht"><h2>Übersicht: Taste U oder Esc schließt</h2><ol id="toclist"></ol></div>
 <main class="deck">
 
 <!-- 01 -->
 <section class="slide" id="titel"><span class="num">01</span><div class="inner">
-<div class="eyebrow">MeshCom · Fork DK5EN · Diskussionsstand 21.10.2026</div>
-<h1>Mesh-Roadmap: welche Frames gehören auf den Kanal?</h1>
-<p class="lead" style="margin-top:.9rem">Teil A klärt, wie ein Knoten Frames hält und altern lässt (TX-Pool, TTL, Dedup, Hop-Modell). Teil B fragt, welche Frames überhaupt auf den Kanal gehören, in welcher Rate, von wem und wie weit. <b>Nichts davon ist entschieden.</b> Bewertungen sind als <span class="prop">Vorschlag, nicht entschieden</span> markiert, gerechnete Werte als <span class="calc">berechnet</span>.</p>
-<ol class="bluf mt">
-<li><div><b>Die QRT-Maßnahmen vom Oktober gingen ohne Nachweis über die Luft raus.</b> Beide Wellen stecken in <code>v4.40a.10.19</code>, die geplante Nachtmessung dazwischen fand nicht statt. Mehrere Maßnahmen helfen Berg-Knoten und können dichten Stadt-Clustern schaden. Vor allem Weiteren braucht es eine Messwelle.</div></li>
-<li><div><b>Der Kanal ist der Engpass, nicht der RAM.</b> Bei SF11/BW250 braucht ein 80-Byte-Positionsframe 1,1 s <span class="calc">berechnet</span>. Ein Positionsframe alle 30 s mit zwei Relay-Ringen zu je drei Knoten belegt allein 26 % des Kanals (Rechenbeispiel). Rate, Relay-Zahl und Reichweite bestimmen die Auslastung; Queue-Tuning entscheidet nur, wer verliert.</div></li>
-<li><div><b>Persönliche Nachrichten verlieren ihre Priorität beim ersten Relay</b> (Teil A 10.10). Eine absolute PN-Priorität ist im Code billig; sie gegen Missbrauch abzusichern ist der schwere Teil.</div></li>
-<li><div><b>Multi-SF ist der einzige Hebel, der Kapazität vervielfacht.</b> SF9 trägt das 3,4-Fache von SF11 bei 5 dB weniger Reserve. Jeder Chip der ausgelieferten Envs kann SF7 bis SF12; die Grenze: ein Knoten mit einem Funkmodul hört immer nur ein SF.</div></li>
-<li><div><b>EMCOMM braucht Prioritätsflag und Absender-Authentifizierung zusammen.</b> Ein Flag ohne Authentifizierung lädt zum Fluten ein. Das HMAC von RM1 ist symmetrisch und skaliert nicht auf „viele Empfänger prüfen einen Absender“; eine Signatur mit gepinnten Schlüsseln schon, für 64 Byte pro Frame (als Base64-Text 88 Byte).</div></li>
-</ol>
-<p class="cite">Quellen: <code>docs/tx-pool-dedup-concept-20261021.md</code> (Teil A, Basis <code>bd49c742</code>), <code>docs/mesh-evolution-concept-20261021.md</code> (Teil B, Basis <code>7fe790f</code>). Tasten: → ← · U Übersicht · T Hell/Dunkel.</p>
+<nav class="nav-top"><a href="index.html">&larr; Startseite</a></nav>
+<div class="eyebrow">Vortrag · MeshCom Fork DK5EN · Mesh-Evolution Teil A und B</div>
+<h1>Welche Frames gehören auf den Kanal? Der Sendepuffer ist umgebaut, der Rest ist Konzept</h1>
+<ul class="meta">
+  <li>Stand: 25.10.2026, geprüft gegen <code>fork-dev</code></li>
+  <li>Firmware: <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a> (Slot-Pool seit v4.40a.10.23, 24.10.2026)</li>
+  <li>Quellen: Konzeptpapiere Teil A und B vom 21.10.2026, Kampagne <code>campaign-tx-pool.md</code>, <code>release-notes.md</code></li>
+  <li>Tasten: → ← blättern · U Übersicht · T Hell/Dunkel</li>
+</ul>
+<div class="bluf">
+  <p class="lead">Ausgeliefert ist der Sendepuffer als Slot-Pool mit Verfall je Priorität, einer Altersgrenze für Zeitbaken (<code>{CET}</code>) und dem Ersetzen des Zwillings (v4.40a.10.23). Alles andere in diesem Vortrag ist Konzept, nichts davon ist entschieden.</p>
+  <p class="reco">Nächster Schritt: die 24-Stunden-Nacht auf dem Gateway DK5EN-98 auswerten, dann Verfallszeiten und Release entscheiden.</p>
+</div>
+<div class="callout warn">
+  <p><strong>Handlungsbedarf</strong></p>
+  <ul>
+    <li><strong>Betreiber:</strong> auf v4.40a.10.23 oder neuer aktualisieren, eingestellt werden muss nichts.</li>
+    <li><strong>Nebenwirkung:</strong> ein Knoten ohne GPS, NTP oder RTC leitet <code>{CET}</code>-Baken nicht mehr weiter (gewollt, Folie 11).</li>
+    <li><strong>Operator:</strong> Verfallszeiten 300, 120 und 90 s nach der Auswertung bestätigen oder ändern.</li>
+  </ul>
+</div>
+<h2>Kernfakten</h2>
+<ul class="facts">
+  <li><span class="tag ok">ausgeliefert</span> <strong>Slot-Pool statt Ring (v4.40a.10.23):</strong> ein wartender Text blockiert die Slots dahinter nicht mehr. Relay-Text verfällt nach 300 s, Position nach 120 s, ACK nach 90 s, HEY (Nachbarschafts-Bake) nach 180 s.</li>
+  <li><span class="tag ok">ausgeliefert</span> <strong>Zeitbaken <code>{CET}</code> älter als 150 s</strong> werden nicht gesendet und nicht weitergeleitet. Eine neuere Bake ersetzt die eingereihte ältere.</li>
+  <li><span class="tag warn">Feld offen</span> <strong>QRT-Entlastung (v4.40a.10.19):</strong> QRT heißt Sendestopp bei voller Warteschlange. Die Maßnahmen gingen nach Host-Tests, Builds und Review raus, ohne Nachweis über die Luft. Sie helfen Berg-Knoten und können dichten Stadt-Clustern schaden.</li>
+  <li><span class="tag">Konzept</span> <strong>Der Kanal ist der Engpass, nicht der RAM:</strong> bei SF11/BW250 braucht ein 80-Byte-Frame 1,1 s Sendezeit <span class="calc">berechnet</span>. Eine Position alle 30 s mit zwei Relay-Ringen zu je drei Knoten belegt 26 % des Kanals (Rechenbeispiel).</li>
+  <li><span class="tag">Konzept</span> <strong>Persönliche Nachrichten verlieren ihre Priorität beim ersten Relay.</strong> Eine absolute PN-Priorität ist im Code billig, sie gegen Missbrauch abzusichern ist der schwere Teil.</li>
+  <li><span class="tag">Konzept</span> <strong>Multi-SF ist der einzige Hebel, der Kapazität vervielfacht:</strong> SF9 trägt das 3,4-Fache von SF11 bei 5 dB weniger Reserve. Ein Knoten mit einem Funkmodul hört immer nur ein SF.</li>
+  <li><span class="tag">Konzept</span> <strong>EMCOMM (Notfunk) braucht Prioritätsflag und Absender-Authentifizierung zusammen.</strong> Ein Flag allein lädt zum Fluten ein. Das HMAC von RM1 ist symmetrisch; eine Signatur mit gepinnten Schlüsseln skaliert, für 64 Byte je Frame (als Base64 88 Byte).</li>
+</ul>
+<details class="dev"><summary>Kennzeichnungen und Quellen auf den Folien</summary><div class="body">
+<ul>
+  <li><span class="calc">berechnet</span> steht an Werten, die aus Formeln folgen, nicht aus einer Messung.</li>
+  <li><span class="prop">Vorschlag, nicht entschieden</span> steht an Bewertungen der Konzeptpapiere.</li>
+  <li><strong>INFERRED</strong> heißt abgeleitet, nicht gemessen.</li>
+  <li><strong>Teil A / Teil B</strong> mit Abschnittsnummer verweist auf <code>docs/tx-pool-dedup-concept-20261021.md</code> (Basis <code>bd49c742</code>) und <code>docs/mesh-evolution-concept-20261021.md</code> (Basis <code>7fe790f</code>).</li>
+  <li><strong>Faktenstand:</strong> Zahlen zum Pool, zum Verfall und zur <code>{CET}</code>-Grenze sind am Code geprüft (<code>src/txring_functions.cpp</code>, <code>src/txring_ttl.h</code>, <code>src/cet_age.h</code>, <code>src/configuration_global.h</code>). Zahlen aus den Konzeptpapieren, die keinen Code betreffen, sind nicht neu geprüft.</li>
+</ul>
+</div></details>
 </div></section>
 
 <!-- 02 -->
-<section class="slide" id="kanal"><span class="num">02</span><div class="inner">
-<div class="eyebrow">Teil B · 2.4 und 4.4 · Kanal</div>
-<h2>Der Kanal ist der Engpass: Sendezeit mal Kopien durch Intervall</h2>
-<div class="grid g64">
+<section class="slide" id="stand"><span class="num">02</span><div class="inner">
+<div class="eyebrow">Überblick · Stand 25.10.2026</div>
+<h2>Drei Stände, die dieser Vortrag trennt: ausgeliefert, im Feld offen, Konzept</h2>
+<ul class="facts">
+  <li><strong>Ausgeliefert</strong> ist, was in einem Release steht: v4.40a.10.19 (19.10.2026) und v4.40a.10.23 (24.10.2026).</li>
+  <li><strong>Feld offen</strong> heißt: ausgeliefert, aber die Wirkung im Netz ist nicht ausgewertet.</li>
+  <li><strong>Konzept</strong> heißt: nur im Papier, nichts entschieden, kein Code.</li>
+</ul>
+<figure class="viz xwide">
+<svg viewBox="0 0 960 205" role="img" aria-label="Zeitachse vom 19. bis 25.10.2026">
+  <line class="d-line" x1="60" y1="118" x2="920" y2="118"/>
+  <g>
+    <circle class="d-fill-ok" cx="110" cy="118" r="8"/>
+    <text class="d-b" x="110" y="86" text-anchor="middle">19.10.2026</text>
+    <text x="110" y="62" text-anchor="middle" class="d-t2">v4.40a.10.19</text>
+    <text x="110" y="148" text-anchor="middle">QRT-Entlastung,</text>
+    <text x="110" y="164" text-anchor="middle">feste Einstellungen</text>
+    <text x="110" y="184" text-anchor="middle" class="d-t3">nur Host-Tests und Builds</text>
+  </g>
+  <g>
+    <circle class="d-fill-acc" cx="300" cy="118" r="8"/>
+    <text class="d-b" x="300" y="86" text-anchor="middle">21.10.2026</text>
+    <text x="300" y="62" text-anchor="middle" class="d-t2">Konzeptpapiere</text>
+    <text x="300" y="148" text-anchor="middle">Teil A und Teil B,</text>
+    <text x="300" y="164" text-anchor="middle">Basis dieses Vortrags</text>
+  </g>
+  <g>
+    <circle class="d-fill-ok" cx="490" cy="118" r="8"/>
+    <text class="d-b" x="490" y="86" text-anchor="middle">24.10.2026</text>
+    <text x="490" y="62" text-anchor="middle" class="d-t2">v4.40a.10.23</text>
+    <text x="490" y="148" text-anchor="middle">Slot-Pool, Verfall,</text>
+    <text x="490" y="164" text-anchor="middle">{CET}-Grenze, Ersetzen</text>
+    <text x="490" y="184" text-anchor="middle" class="d-t3">alle fünf Knoten ab 16:20</text>
+  </g>
+  <g>
+    <circle class="d-fill-warn" cx="680" cy="118" r="8"/>
+    <text class="d-b" x="680" y="86" text-anchor="middle">25.10.2026</text>
+    <text x="680" y="62" text-anchor="middle" class="d-t2">Logger-Nacht endet 16:21</text>
+    <text x="680" y="148" text-anchor="middle">Gateway DK5EN-98,</text>
+    <text x="680" y="164" text-anchor="middle">Auswertung offen</text>
+  </g>
+  <g>
+    <circle class="d-box" cx="860" cy="118" r="8"/>
+    <text class="d-b" x="860" y="86" text-anchor="middle">danach</text>
+    <text x="860" y="62" text-anchor="middle" class="d-t2">noch nicht datiert</text>
+    <text x="860" y="148" text-anchor="middle">Dedup nach Zeit parkt,</text>
+    <text x="860" y="164" text-anchor="middle">Wellen W3 bis W9+ offen</text>
+  </g>
+</svg>
+<figcaption><strong>Abb. 1:</strong> Slot-Pool, Verfall und <code>{CET}</code>-Grenze sind seit dem 24.10.2026 draußen; die Auswertung im Feld und alle weiteren Wellen stehen aus. Abstände nicht maßstäblich.</figcaption>
+</figure>
+<div class="table-wrap mt"><table>
+<thead><tr><th>Thema</th><th>Stand</th><th>Wo</th><th>Folie</th></tr></thead>
+<tbody>
+<tr><td>Sendepuffer als Slot-Pool</td><td><span class="tag ok">ausgeliefert</span></td><td>v4.40a.10.23</td><td>8</td></tr>
+<tr><td>Verfall je Priorität (300, 120, 90, 180 s)</td><td><span class="tag warn">Feld offen</span></td><td>v4.40a.10.23, Werte nach der Nacht prüfen</td><td>8</td></tr>
+<tr><td><code>{CET}</code>-Altersgrenze 150 s, Ersetzen des Zwillings</td><td><span class="tag ok">ausgeliefert</span></td><td>v4.40a.10.23, Relay-Seite nur Host-Tests</td><td>8, 11</td></tr>
+<tr><td>QRT-Entlastung (<code>--nbrrelay</code>, Altersstufen)</td><td><span class="tag warn">Feld offen</span></td><td>v4.40a.10.19</td><td>7</td></tr>
+<tr><td>Zehn feste Protokoll-Einstellungen</td><td><span class="tag ok">ausgeliefert</span></td><td>v4.40a.10.19</td><td>5, 7</td></tr>
+<tr><td>Messung (Stufe 0): Alters-Logzeilen für <code>{CET}</code> und Verfall</td><td><span class="tag warn">teilweise</span></td><td>v4.40a.10.23; Histogramme fehlen</td><td>18</td></tr>
+<tr><td>Doppelfilter nach Zeit</td><td><span class="tag">Konzept</span></td><td>Kampagne geparkt</td><td>9</td></tr>
+<tr><td>Hop-Cap, HG-Reichweite, PN-Priorität, <code>{CET}</code>-Reichweite</td><td><span class="tag">Konzept</span></td><td>nur Papier</td><td>6, 10, 11, 12</td></tr>
+<tr><td>Multi-SF, Source Routing, EMCOMM, End of Life, Tags, Zellen</td><td><span class="tag">Konzept</span></td><td>nur Papier</td><td>13 bis 17</td></tr>
+</tbody></table></div>
+<details class="dev"><summary>Belege für die Zuordnung</summary><div class="body">
+<ul>
+  <li><strong>Ausgeliefert:</strong> <code>release-notes.md</code>, Abschnitte <code>v4.40a.10.23</code> und <code>v4.40a.10.19</code>; <code>docs/campaign-tx-pool.md</code> (Wellen W0 bis W1c erledigt, W2 geparkt).</li>
+  <li><strong>Feld offen:</strong> <code>release-notes.md</code>, Abschnitt Known gaps (Sendewarteschlange im Feld, QRT-Arbeit nur Host-Tests und Builds); <code>docs/RESUME.md</code>, Zeile Next step.</li>
+  <li><strong>Konzept:</strong> kein Eintrag zu Hop-Cap, EMCOMM, Multi-SF oder Source Routing in <code>docs/BACKLOG.md</code> oder <code>docs/RESUME.md</code>.</li>
+  <li><strong>Upstream:</strong> kein PR von uns offen; der Pool ist fork-only (<code>release-notes.md</code>, Abschnitt Upstream).</li>
+</ul>
+</div></details>
+</div></section>
+
+<!-- 03 -->
+<section class="slide" id="kanal"><span class="num">03</span><div class="inner">
+<div class="eyebrow">Teil B · 2.4 und 4.4 · Kanal <span class="tag">Rechenmodell</span></div>
+<h2>Der Kanal ist der Engpass, nicht der RAM: Sendezeit mal Kopien durch Intervall</h2>
+<ul class="facts">
+  <li><strong>Auslastung = Kopien × Sendezeit ÷ Intervall.</strong> Eine Kopie sendet der Urheber, die weiteren die Relays (weiterleitende Knoten) in jedem Hop-Ring (Hop = ein Funkschritt).</li>
+  <li><strong>Beispiel:</strong> ein 80-Byte-Positionsframe alle 30 s mit zwei Ringen zu je drei Relays belegt 26 % des Kanals (SF11, BW250 <span class="calc">berechnet</span>).</li>
+  <li><strong>Pool und Verfall ändern nicht, wie viel gesendet wird,</strong> nur wer bei Stau verliert. Rate, Relay-Zahl und Reichweite bestimmen die Last.</li>
+</ul>
+<div class="grid g64 mt">
 <div>
   <div class="ctl"><span class="lbl">Vorgabe</span>
     <button class="btn" data-preset="t30">Position 30 s (Beispiel)</button>
@@ -247,102 +357,125 @@ svg text{font-family:var(--mono)}
     <div class="rng"><label for="toa-rel">Relays je Ring</label><input type="range" id="toa-rel" min="1" max="12" value="3"><output id="toa-rel-o">3</output></div>
     <div class="rng"><label for="toa-int">Intervall</label><input type="range" id="toa-int" min="0" max="13" value="4"><output id="toa-int-o">30 s</output></div>
   </div>
-  <div class="viz mt"><svg id="toa-svg" viewBox="0 0 640 120" role="img" aria-label="Sendezeit der Kopien im Intervall"></svg></div>
+  <figure class="viz wide mt"><svg id="toa-svg" viewBox="0 0 640 120" role="img" aria-label="Sendezeit der Kopien im Intervall"></svg>
+  <figcaption><strong>Abb. 2:</strong> Die Kopien eines Frames füllen das Intervall; rot ragt über das Intervall hinaus.</figcaption></figure>
   <p class="cap" id="toa-note"></p>
 </div>
 <div>
   <div class="grid g2">
-    <div class="card stat"><div class="k">Time on Air <span class="calc">berechnet</span></div><div class="big" id="toa-ms">–</div><div class="s" id="toa-sym"></div></div>
-    <div class="card stat"><div class="k">Kopien je Frame</div><div class="big" id="toa-cp">–</div><div class="s">1 + Ringe × Relays</div></div>
+    <div class="wbox stat"><div class="k">Time on Air <span class="calc">berechnet</span></div><div class="big" id="toa-ms">–</div><div class="s" id="toa-sym"></div></div>
+    <div class="wbox stat"><div class="k">Kopien je Frame</div><div class="big" id="toa-cp">–</div><div class="s">1 + Ringe × Relays</div></div>
   </div>
-  <div class="card mt"><h3>Kanalanteil <span class="calc">berechnet</span></h3>
+  <div class="wbox mt"><h3>Kanalanteil <span class="calc">berechnet</span></h3>
     <div class="big" id="toa-share">–</div>
     <div class="share"><i id="toa-bar"></i></div>
     <p class="mt" id="toa-share-t" style="font-size:.8rem"></p>
   </div>
-  <div class="card mt"><h3>Formel</h3>
-    <p style="font-size:.78rem">Semtech-Formel, BW 250 kHz, CR 4/6, Präambel P (EU-Vorgabe 32), expliziter Header, CRC an, LDRO wenn Symbolzeit &gt; 16 ms. T<sub>sym</sub> = 2<sup>SF</sup>/BW; n = 8 + max(⌈(8·PL − 4·SF + 28 + 16)/(4·(SF − 2·DE))⌉·6, 0); ToA = (P + 4,25 + n)·T<sub>sym</sub>.</p>
-    <p class="cite">Abgleich mit Teil B 2.4: SF11 60/80/120 B = 903/1100/1444 ms, SF12 80 B = 2298 ms. Position alle 30 s mit 2 Ringen à 3 = 26 %, alle 10 s 77 % (Rechenbeispiel). Präambel 32 → 8 spart bei SF11 197 ms je Frame (etwa 18 % eines 80-B-Frames) <span class="calc">berechnet</span>; mehrere Länderprofile nutzen schon 8.</p>
-  </div>
 </div>
 </div>
-</div></section>
-
-<!-- 03 -->
-<section class="slide" id="track"><span class="num">03</span><div class="inner">
-<div class="eyebrow">Teil B · 4.4 · Multi-Line POS und Track-Modus</div>
-<h2>Track = On wechselt pro Paket die QRG</h2>
-<div class="grid g2">
-<div>
-  <div class="note warn"><b>Korrektur nach Review:</b> Mit <code>--track on</code> und GPS-Fix geht die Position als LoRa-APRS-Frame (<code>&lt;</code>) auf 433,775 MHz, SF12/BW125: Profilwechsel je Paket <code>lora_setchip_aprs</code> → TX → <code>lora_setchip_meshcom</code>. Die MeshCom-QRG bekommt nur alle 5 min eine Kopie. Ein Tracker belegt den MeshCom-Kanal also <b>nicht</b> zu 26 %; die Zahlen auf Folie 2 sind ein allgemeines Rechenbeispiel für Positionsframes.</div>
-  <div class="grid g3 mt">
-    <div class="card stat"><div class="k">QRG-Wechsel</div><div class="big">433,775</div><div class="s">SF12 / BW125, je Paket</div></div>
-    <div class="card stat"><div class="k">Kopie MeshCom</div><div class="big">5 min</div><div class="s">auf der MeshCom-QRG</div></div>
-    <div class="card stat"><div class="k">Nebenwirkung</div><div class="big">taub</div><div class="s">während des Wechsels auf der MeshCom-QRG</div></div>
-  </div>
-  <div class="note mt"><b>Frage:</b> ein APRS-Format auf der MeshCom-QRG ohne QRG-Wechsel? Der Wechsel je Paket ist schon heute ein messbarer Fall von Rendezvous- und Taubheitskosten (siehe Multi-SF, M1/M2).</div>
-</div>
-<div>
-  <h3>Multi-Line POS: #1219, zurückgenommen mit #1223</h3>
-  <p style="font-size:.86rem;color:var(--fg2)"><code>--aprswx on</code> schickte nach jeder eigenen Position einen <b>zweiten <code>!</code>-Frame</b> mit APRS-1.0.1-Wetterblock (<code>/_</code>, t/h/b), damit aprs.fi den Knoten als Wetterstation zeigt. oe1kbc hat am 20.10. zurückgenommen („please check notes from DK5EN“): jede Position wird zu zwei Frames, beide werden weitergeleitet, das Symbol wird überschrieben, MeshCom dekodiert t/h/b nicht, Bit 0x2000 war bis Juni <code>--checkmesh</code>.</p>
-  <div class="grid g2 mt">
-    <div class="card stat"><div class="k">WX-Frame 75–85 B</div><div class="big">1,05–1,15 s</div><div class="s">SF11, Präambel 32 <span class="calc">berechnet</span></div></div>
-    <div class="card stat"><div class="k">je WX-Knoten</div><div class="big">0,4 %</div><div class="s">2 Frames/h × 7 Kopien; 50 WX-Knoten ≈ 20 % <span class="calc">berechnet</span></div></div>
-  </div>
-  <div class="optgrid mt" id="opt-k"></div>
-  <div class="panel mt" id="opt-k-p"></div>
-  <p class="cite">Track-Optionen K0–K6 (Track auf MeshCom-QRG, Hop 0/1, Budget je Quelle, kompakte Frames, zweites Radio) stehen in Teil B 4.4.2.</p>
-  <p class="mt" style="font-size:.84rem"><span class="prop">Vorschlag, nicht entschieden</span>X2 erreicht das Ziel (aprs.fi-Wetterstation) ohne RF-Kosten und kann den Kanal nicht überlaufen lassen; X3, wenn ein Standard-APRS-Frame auf RF gewünscht ist.</p>
-</div>
-</div>
+<details class="dev"><summary>Formel und Abgleich mit Teil B 2.4</summary><div class="body">
+<p>Semtech-Formel, BW 250 kHz, CR 4/6, Präambel P (EU-Vorgabe 32), expliziter Header, CRC an, LDRO wenn Symbolzeit &gt; 16 ms. T<sub>sym</sub> = 2<sup>SF</sup>/BW; n = 8 + max(⌈(8·PL − 4·SF + 28 + 16)/(4·(SF − 2·DE))⌉·6, 0); ToA = (P + 4,25 + n)·T<sub>sym</sub>.</p>
+<p class="cite">Abgleich: SF11 60/80/120 B = 903/1100/1444 ms, SF12 80 B = 2298 ms. Position alle 30 s mit 2 Ringen à 3 = 26 %, alle 10 s 77 % (Rechenbeispiel). Präambel 32 → 8 spart bei SF11 197 ms je Frame (etwa 18 % eines 80-B-Frames) <span class="calc">berechnet</span>; mehrere Länderprofile nutzen schon 8.</p>
+</div></details>
 </div></section>
 
 <!-- 04 -->
-<section class="slide" id="hop"><span class="num">04</span><div class="inner">
-<div class="eyebrow">Teil A · 10.0 · Hop-Modell aus dem Code</div>
-<h2>Byte 5: der Nibble zählt herunter, je Insel neu</h2>
-<div class="ctl"><button class="btn pri" id="hop-play">▶ Abspielen</button>
+<section class="slide" id="track"><span class="num">04</span><div class="inner">
+<div class="eyebrow">Teil B · 4.4 · Track-Modus und Multi-Line-Position <span class="tag">Konzept</span></div>
+<h2>Ein Tracker belegt den MeshCom-Kanal nicht zu 26 %: Track = On wechselt pro Paket die Frequenz</h2>
+<ul class="facts">
+  <li><strong>Mit <code>--track on</code> und GPS-Fix</strong> geht die Position als LoRa-APRS-Frame (<code>&lt;</code>) auf 433,775 MHz, SF12/BW125: Profilwechsel je Paket <code>lora_setchip_aprs</code>, Senden, <code>lora_setchip_meshcom</code>. Die Frequenz (QRG) ist die Vorgabe aus <code>configuration_default.h</code>.</li>
+  <li><strong>Auf der MeshCom-QRG</strong> erscheint nur alle 5 min eine Kopie (<code>lora_functions.cpp:3070</code>). Die 26 % von Folie 3 sind ein allgemeines Rechenbeispiel, kein Tracker.</li>
+  <li><strong>Nebenwirkung:</strong> während des Wechsels ist der Knoten auf der MeshCom-QRG taub.</li>
+</ul>
+<div class="grid g2 mt">
+<div>
+  <div class="grid g3">
+    <div class="wbox stat"><div class="k">QRG-Wechsel</div><div class="big">433,775</div><div class="s">SF12 / BW125, je Paket</div></div>
+    <div class="wbox stat"><div class="k">Kopie MeshCom</div><div class="big">5 min</div><div class="s">auf der MeshCom-QRG</div></div>
+    <div class="wbox stat"><div class="k">Nebenwirkung</div><div class="big">taub</div><div class="s">während des Wechsels auf der MeshCom-QRG</div></div>
+  </div>
+  <div class="callout note mt"><strong>Offene Frage:</strong> ein APRS-Format auf der MeshCom-QRG ohne QRG-Wechsel? Der Wechsel je Paket ist schon heute ein messbarer Fall von Rendezvous- und Taubheitskosten (siehe Multi-SF, M1 und M2).</div>
+</div>
+<div>
+  <h3>Multi-Line POS: Pull Request 1219, zurückgenommen mit 1223</h3>
+  <ul class="facts">
+    <li><strong>Was gebaut war:</strong> <code>--aprswx on</code> schickte nach jeder eigenen Position einen zweiten <code>!</code>-Frame mit APRS-1.0.1-Wetterblock (<code>/_</code>, t/h/b), damit aprs.fi den Knoten als Wetterstation zeigt.</li>
+    <li><strong>Warum zurückgenommen</strong> (oe1kbc, 20.10.): jede Position wird zu zwei Frames, beide werden weitergeleitet, das Symbol wird überschrieben, MeshCom dekodiert t/h/b nicht, Bit 0x2000 war bis Juni <code>--checkmesh</code>.</li>
+  </ul>
+  <div class="grid g2 mt">
+    <div class="wbox stat"><div class="k">WX-Frame 75–85 B</div><div class="big">1,05–1,15 s</div><div class="s">SF11, Präambel 32 <span class="calc">berechnet</span></div></div>
+    <div class="wbox stat"><div class="k">je WX-Knoten</div><div class="big">0,4 %</div><div class="s">2 Frames/h × 7 Kopien; 50 WX-Knoten ≈ 20 % <span class="calc">berechnet</span></div></div>
+  </div>
+</div>
+</div>
+<div class="optgrid mt" id="opt-k"></div>
+<div class="panel mt" id="opt-k-p"></div>
+<p class="mt" style="font-size:.84rem"><span class="prop">Vorschlag, nicht entschieden</span>X2 erreicht das Ziel (aprs.fi-Wetterstation) ohne RF-Kosten und kann den Kanal nicht überlaufen lassen; X3, wenn ein Standard-APRS-Frame auf RF gewünscht ist.</p>
+<details class="dev"><summary>Track-Optionen K0 bis K6 und Quellen</summary><div class="body">
+<p>Track-Optionen K0 bis K6 (Track auf MeshCom-QRG, Hop 0/1, Budget je Quelle, kompakte Frames, zweites Radio) stehen in Teil B 4.4.2. K0 ist der Status quo: APRS-QRG mit einer MeshCom-Kopie alle 5 min.</p>
+<p class="cite">Code: <code>src/lora_functions.cpp:3070</code> (<code>track_to_meshcom_timer</code>, 5 min), <code>src/lora_setchip.cpp:387</code> (<code>lora_setchip_aprs()</code>), <code>src/configuration_default.h:75</code> (<code>LORA_APRS_FREQUENCY</code>).</p>
+</div></details>
+</div></section>
+
+<!-- 05 -->
+<section class="slide" id="hop"><span class="num">05</span><div class="inner">
+<div class="eyebrow">Teil A · 10.0 · Hop-Modell aus dem Code <span class="tag">Ist-Stand</span></div>
+<h2>Der Hop-Zähler läuft je Funkinsel herunter und startet hinter jedem Gateway neu</h2>
+<ul class="facts">
+  <li><strong>Der Urheber setzt den Hop-Zähler (im Code "Nibble") einmal:</strong> Text und HEY bekommen 4 (<code>max_hop_text</code>), alles andere 2 (<code>max_hop_pos</code>). Seit v4.40a.10.19 ist der Positions-Hop fest, <code>{SET}</code> über Funk ändert nur den Text-Hop (1 bis 6).</li>
+  <li><strong>Ein Gateway speist Server-Frames ohne Dekrement ein:</strong> jede Funkinsel hinter einem Gateway startet mit dem Wert des Servers. Was der Server mit dem Zähler tut, steht nicht im Repository (offen).</li>
+  <li><strong>Ohne Fix wickelt 4.35x den Zähler von 0 auf 15</strong> (4.35p, 4.35c, 4.35s; 17 Wraps in 10 Tagen; DMs nicht betroffen).</li>
+</ul>
+<div class="ctl mt"><button class="btn pri" id="hop-play">▶ Abspielen</button>
   <button class="btn" id="hop-srv" aria-pressed="false">Server-Einspeisung</button>
   <button class="btn" id="hop-wrap" aria-pressed="false">Wrap-Bug 4.35x</button>
 </div>
 <div class="grid g64 mt">
-<div><div class="viz"><svg id="hop-svg" viewBox="0 0 720 340" role="img" aria-label="Frame läuft durch Relays, Nibble zählt herunter"></svg></div>
+<div><figure class="viz wide"><svg id="hop-svg" viewBox="0 0 720 340" role="img" aria-label="Frame läuft durch Relays, Hop-Zähler zählt herunter"></svg>
+<figcaption><strong>Abb. 3:</strong> Der Zähler fällt je Relay um 1, bei H00 endet das Relayen; hinter dem Gateway beginnt eine neue Insel.</figcaption></figure>
 <p class="cap" id="hop-cap"></p></div>
 <div>
   <div class="log" id="hop-log" aria-live="polite"></div>
-  <ul class="plain mt">
-    <li>Bits 0 bis 3 von Byte 5 sind die Rest-Hops; 0x80 Server, 0x40 Track, 0x20 App offline, 0x10 Mesh. Kein freies Bit.</li>
-    <li>Der Urheber setzt den Nibble einmal: Text und HEY <code>max_hop_text</code> (Vorgabe 4), alles andere <code>max_hop_pos</code> (2). <code>MAX_HOP_LIMIT</code> 7.</li>
-    <li>Relay-Gate: <code>nibble &gt; 0</code>, dann <code>max_hop--</code>, dann Loop-Check. Kein Knoten vergleicht den empfangenen Nibble mit seiner eigenen Einstellung.</li>
-    <li>Ein Gateway lädt vor dem eigenen Dekrement hoch und speist Server-Frames <b>ohne Dekrement</b> ein. Was der Server mit dem Nibble tut, steht nicht im Repository (offen).</li>
-    <li>Ohne Fix wickelt 4.35x den Nibble von 0 auf 15 (4.35p, 4.35c, 4.35s; 17 Wraps in 10 Tagen; DMs nicht betroffen).</li>
-  </ul>
 </div>
 </div>
-</div></section>
-
-<!-- 05 -->
-<section class="slide" id="hopcap"><span class="num">05</span><div class="inner">
-<div class="eyebrow">Teil A · 10.1 · Hop-Cap</div>
-<h2>Den Nibble durch die eigene Grenze L kappen? Sechs Varianten</h2>
-<p class="lead">Idee des Operators: Ein Relay empfängt einen Frame, dessen Rest-Hops die eigene Grenze <code>L</code> überschreiten, und schreibt den Nibble herunter. Ziel: Frames bleiben regional. Status: offen.</p>
-<div class="optgrid mt" id="opt-h" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
-<div class="panel mt" id="opt-h-p"></div>
-<div class="grid g2 mt">
-  <div class="note"><b>Ausnahmen für jede umschreibende Variante:</b> DMs, DM-ACKs (<code>:ackNNN</code>, <code>:rejNNN</code>), das binäre ACK 0x41 und <code>{ping}</code>. Beide ACK-Typen schließen eine Wiederholungsleiter; ein abgeschnittener Rückweg kostet mehr Sendezeit, als der Cap spart.</div>
-  <div class="note warn"><span class="prop">Vorschlag, nicht entschieden</span>H4 widerspricht 10.0 Punkt 5. H1 ist ein billiger Schutz gegen Ausreißer, falls Stufe 0 Frames mit Nibble &gt; L zeigt. Ist Lokalität das Ziel, wirken H3 oder H2 dort, wo die Weite plausibel entsteht; das ruht auf einer ungemessenen Annahme. H5 nur, wenn der Grat-Fall sonst ungelöst bleibt.</div>
-</div>
+<details class="dev"><summary>Bits von Byte 5 und Reihenfolge im Relay-Gate</summary><div class="body">
+<ul>
+  <li><strong>Byte 5:</strong> Bits 0 bis 3 sind die Rest-Hops (der Nibble, ein halbes Byte); 0x80 Server, 0x40 Track, 0x20 App offline, 0x10 Mesh. Kein freies Bit (<code>src/aprs_functions.cpp:183-192</code>).</li>
+  <li><strong>Grenzen:</strong> <code>MAX_HOP_LIMIT</code> 7 (<code>configuration_global.h:374</code>), Text-Hop per <code>{SET}</code> 1 bis 6 (<code>maxhop.h:18</code>).</li>
+  <li><strong>Relay-Gate:</strong> <code>nibble &gt; 0</code>, dann <code>max_hop--</code>, dann Loop-Check. Kein Knoten vergleicht den empfangenen Wert mit seiner eigenen Einstellung.</li>
+  <li><strong>Gateway:</strong> lädt vor dem eigenen Dekrement hoch und speist Server-Frames ohne Dekrement ein.</li>
+</ul>
+</div></details>
 </div></section>
 
 <!-- 06 -->
-<section class="slide" id="qrt"><span class="num">06</span><div class="inner">
-<div class="eyebrow">Teil B · 3 · Review der Maßnahmen seit v4.40a</div>
-<h2>QRT-Maßnahmen: Berg-Knoten gegen Stadt-Cluster</h2>
-<p class="lead">Geschrieben und ausgeliefert in zwei Tagen unter dem Druck zweier Feldvorfälle: DB0TAW-14 (Berg, 24 direkte Nachbarn, 41 bis 43 % RX, 16 bis 19 Relays in der Queue, 0,0 % TX) und DK5EN-98 (Gateway, 3,8 Kopien je Servernachricht, 6,4 je eigener Nachricht). <b>Prozessbefund zuerst:</b> nach Welle 1 war eine Nachtmessung geplant; beide Wellen stecken in <code>v4.40a.10.19</code>, ein Ergebnis über die Luft danach gibt es nicht.</p>
+<section class="slide" id="hopcap"><span class="num">06</span><div class="inner">
+<div class="eyebrow">Teil A · 10.1 · Hop-Cap <span class="tag">Konzept</span></div>
+<h2>Den Hop-Zähler auf die eigene Grenze L kappen? Sechs Varianten, offen</h2>
+<ul class="facts">
+  <li><strong>Idee des Operators:</strong> ein Relay empfängt einen Frame, dessen Rest-Hops die eigene Grenze <code>L</code> überschreiten, und schreibt den Zähler herunter. Ziel: Frames bleiben regional.</li>
+  <li><strong>Ausnahmen für jede umschreibende Variante:</strong> DMs, DM-ACKs (<code>:ackNNN</code>, <code>:rejNNN</code>), das binäre ACK 0x41 und <code>{ping}</code>. Beide ACK-Typen schließen eine Wiederholungsleiter; ein abgeschnittener Rückweg kostet mehr Sendezeit, als der Cap spart.</li>
+</ul>
+<div class="optgrid mt" id="opt-h" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
+<div class="panel mt" id="opt-h-p"></div>
+<div class="callout warn mt"><span class="prop">Vorschlag, nicht entschieden</span>H4 widerspricht 10.0 Punkt 5. H1 ist ein billiger Schutz gegen Ausreißer, falls Stufe 0 Frames mit Zähler &gt; L zeigt. Ist Lokalität das Ziel, wirken H3 oder H2 dort, wo die Weite plausibel entsteht; das ruht auf einer ungemessenen Annahme. H5 nur, wenn der Grat-Fall sonst ungelöst bleibt.</div>
+</div></section>
+
+<!-- 07 -->
+<section class="slide" id="qrt"><span class="num">07</span><div class="inner">
+<div class="eyebrow">Teil B · 3 · Review der QRT-Maßnahmen <span class="tag warn">ausgeliefert, Feld offen</span></div>
+<h2>Die QRT-Maßnahmen helfen Berg-Knoten und können dichten Stadt-Clustern schaden</h2>
+<ul class="facts">
+  <li><strong>Ausgeliefert ohne Nachweis über die Luft:</strong> beide Wellen stecken in v4.40a.10.19 (19.10.2026). Geprüft wurde mit Host-Tests, Board-Builds und Review; die Bench entfiel, die DK5EN-98-Nacht ist nicht ausgewertet. QRT ist der Sendestopp bei voller Warteschlange.</li>
+  <li><strong>Anlass waren zwei Feldvorfälle:</strong> DB0TAW-14 (Berg, 24 direkte Nachbarn, 41 bis 43 % RX, 16 bis 19 Relays in der Queue, 0,0 % TX) und DK5EN-98 (Gateway, 3,8 Kopien je Servernachricht, 6,4 je eigener Nachricht).</li>
+  <li><strong>Seit dem Review neu:</strong> Gateways überspringen Server-Frames, die sie schon auf LoRa gehört haben (v4.40a.10.23), und der Pool beseitigt die Ringlücken.</li>
+</ul>
 <div class="grid g2 mt">
 <div>
   <div class="ctl"><span class="lbl">Sicht</span><div class="seg" id="qrt-mode"><button data-v="berg" aria-pressed="true">Berg-Node</button><button data-v="stadt" aria-pressed="false">Stadt-Cluster</button></div></div>
-  <div class="viz mt"><svg id="qrt-svg" viewBox="0 0 600 280" role="img" aria-label="Szenario Berg-Knoten oder Stadt-Cluster"></svg></div>
+  <figure class="viz wide mt"><svg id="qrt-svg" viewBox="0 0 600 280" role="img" aria-label="Szenario Berg-Knoten oder Stadt-Cluster"></svg>
+  <figcaption><strong>Abb. 4:</strong> Dieselbe Maßnahme nützt dem Berg und kann im Stadt-Cluster Schattenknoten leer lassen.</figcaption></figure>
   <div class="ctl mt"><span class="lbl">Szenario</span>
     <button class="btn" data-sc="cancel">Falsche Abdeckung (veraltete Matrix)</button>
     <button class="btn" data-sc="burst">Age floor Stufe 2</button>
@@ -355,159 +488,233 @@ svg text{font-family:var(--mono)}
   <div class="panel mt" id="qrt-p"></div>
 </div>
 </div>
-<div class="note warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Behalten, was reine Verschwendung entfernt (Server-Spiegelung mit geschlossener Lücke bei der Telefonkopie, Ring −2, verschobener Retry). Drei Maßnahmen zuerst messen: erzwungenes <code>--nbrrelay on</code> (falsche Abdeckung), Age floor Stufe 2 (Prioritätsinversion zwischen Knoten, Kollisionen versteckter Paare) und die READY-Echo-Freigabe am Gateway (eigene Funkinsel bekommt den Gruppentext nie). Erwägen, <code>--nbrrelay</code> per RM1 schaltbar statt fest einkompiliert zu machen.</div>
+<div class="callout warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Behalten, was reine Verschwendung entfernt (Server-Spiegelung mit geschlossener Lücke bei der Telefonkopie, Puffer voll −2, verschobener Retry). Drei Maßnahmen zuerst messen: erzwungenes <code>--nbrrelay on</code> (falsche Abdeckung), Age floor Stufe 2 (Prioritätsinversion zwischen Knoten, Kollisionen versteckter Paare) und die READY-Echo-Freigabe am Gateway (eigene Funkinsel bekommt den Gruppentext nie). Erwägen, <code>--nbrrelay</code> per RM1 schaltbar statt fest einkompiliert zu machen.</div>
+<details class="dev"><summary>Wo die Sperren im Code stehen</summary><div class="body">
+<ul>
+  <li><strong>Erzwungen:</strong> <code>--nbrrelay on</code> (<code>src/prod_lock.h:177</code>) und <code>--shortpath off</code> (<code>src/prod_lock.h:176</code>) werden beim ersten Start in Release-Builds gesetzt. INSTRUMENT-Builds bleiben frei.</li>
+  <li><strong>Altersstufen:</strong> Zähler <code>aged1</code>, <code>aged2</code>, <code>wait_hwm</code> in der Zeile <code>[MC-HWM]</code> (<code>src/esp32/esp32_main.cpp:3536</code>), nur ESP32, nur seit dem Start.</li>
+</ul>
+</div></details>
 </div></section>
 
-<!-- 07 -->
-<section class="slide" id="pool"><span class="num">07</span><div class="inner">
-<div class="eyebrow">Teil A · 3.1, 5.1, 5.2 · TX-Puffer</div>
-<h2>Vom Ring zum Slot-Pool: Lücken füllen, alles altert</h2>
-<div class="ctl">
+<!-- 08 -->
+<section class="slide" id="pool"><span class="num">08</span><div class="inner">
+<div class="eyebrow">Teil A · 3.1, 5.1, 5.2 · TX-Puffer <span class="tag ok">ausgeliefert in v4.40a.10.23</span></div>
+<h2>Der Sendepuffer ist ein Slot-Pool: Lücken füllen sich, jede Priorität altert</h2>
+<ul class="facts">
+  <li><strong>Jeder freie Slot ist nutzbar.</strong> Ein wartender Text blockiert die Slots dahinter nicht mehr, "Puffer voll" bei freien Slots entfällt. Der Pool hat 20 Slots (<code>MAX_RING</code>), der Ring nutzte 19.</li>
+  <li><strong>Frames verfallen nach Priorität:</strong> Relay-Text 300 s, Position 120 s, ACK 90 s, HEY 180 s. Eigene Texte und DMs, die auf ein ACK warten, verfallen nicht; ihre Wiederholungsleiter regelt sie.</li>
+  <li><strong>Ein neuerer Zwilling ersetzt den eingereihten:</strong> HEY und Position desselben Urhebers, dazu eine neuere <code>{CET}</code>-Bake. Eine DM-Wiederholung nutzt ihren Slot wieder.</li>
+  <li><strong>Auf der Bench belegt, im Feld offen:</strong> dieselbe Probe (voller Puffer, geparkter Kopf, zwei Lücken) scheitert vor dem Umbau und läuft im Pool durch. Die 24-Stunden-Nacht auf DK5EN-98 ist nicht ausgewertet.</li>
+</ul>
+<div class="ctl mt">
   <button class="btn" id="rp-add">+3 Frames</button>
+  <button class="btn" id="rp-twin">Zwilling (HEY)</button>
   <button class="btn" id="rp-send">Senden</button>
   <button class="btn" id="rp-cancel">Cancel</button>
   <button class="btn" id="rp-park">Parked SENT</button>
-  <button class="btn" id="rp-ttl">TTL (+120 s)</button>
+  <button class="btn" id="rp-ttl">Verfall (+120 s)</button>
   <button class="btn" id="rp-reset">Zurücksetzen</button>
   <button class="btn pri" id="rp-demo">▶ Demo</button>
 </div>
 <div class="grid g2 mt">
-  <div class="card"><h3>Heute: Ring mit iRead / iWrite</h3><svg id="rp-ring" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="TX-Ring"></svg><p class="cap" id="rp-ring-t"></p></div>
-  <div class="card"><h3>Vorschlag O2: Slot-Pool, Priorität + Einreihzeit</h3><svg id="rp-pool" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="Slot-Pool"></svg><p class="cap" id="rp-pool-t"></p></div>
+  <div class="wbox"><h3>Bis v4.40a.10.22: Ring mit iRead / iWrite</h3><svg id="rp-ring" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="TX-Ring"></svg><p class="cap" id="rp-ring-t"></p></div>
+  <div class="wbox"><h3>Seit v4.40a.10.23: Slot-Pool, Priorität + Einreihzeit</h3><svg id="rp-pool" viewBox="0 0 300 300" style="width:100%;max-width:300px;display:block;margin:0 auto" role="img" aria-label="Slot-Pool"></svg><p class="cap" id="rp-pool-t"></p></div>
 </div>
-<div class="legend"><span><i style="background:var(--p1)"></i>1 ACK/DM</span><span><i style="background:var(--p2)"></i>2 Gruppe</span><span><i style="background:var(--p3)"></i>3 Relay</span><span><i style="background:var(--p4)"></i>4 Position</span><span><i style="background:var(--p5)"></i>5 HEY</span><span><i style="background:none;border:1px dashed var(--bad)"></i>Loch: frei, aber tot</span><span>▣ SENT geparkt</span></div>
+<div class="legend"><span><i style="background:var(--p1)"></i>1 ACK/DM</span><span><i style="background:var(--p2)"></i>2 Gruppe</span><span><i style="background:var(--p3)"></i>3 Relay</span><span><i style="background:var(--p4)"></i>4 Position</span><span><i style="background:var(--p5)"></i>5 HEY</span><span><i style="background:none;border:1px dashed var(--bad)"></i>Loch: frei, aber tot</span><span>S = SENT geparkt, wartet auf ACK</span></div>
+<p class="figcap"><strong>Abb. 5:</strong> Im Ring bleiben nach Cancel und Parken tote Löcher; im Pool wird jeder freie Slot sofort wieder genutzt. Das Modell ist vereinfacht (kein INFLIGHT-Zustand, 20 Slots, fester Zufallsstrom).</p>
 <div class="grid g2 mt">
-<div class="tw"><table><thead><tr><th>Prio</th><th>Klasse</th><th>TTL heute</th><th>TTL-Vorschlag</th></tr></thead><tbody>
-<tr><td class="m">1</td><td>ACK (0x41, eigenes <code>:ackNNN</code>), eigener DM</td><td>keine</td><td>90 s für ACKs; eigener DM keine (Leiter 3 × 40 s)</td></tr>
+<div class="table-wrap"><table><thead><tr><th>Prio</th><th>Klasse</th><th>Bis v4.40a.10.22</th><th>Seit v4.40a.10.23</th></tr></thead><tbody>
+<tr><td class="m">1</td><td>ACK (0x41, eigenes <code>:ackNNN</code>)</td><td>keine</td><td>90 s</td></tr>
+<tr><td class="m">1</td><td>eigener DM</td><td>keine</td><td>keine (Leiter 3 × 40 s)</td></tr>
 <tr><td class="m">2</td><td>eigener Gruppentext</td><td>keine</td><td>keine</td></tr>
-<tr><td class="m">3</td><td>Relay-Text / <code>{CET}</code></td><td>keine</td><td>300 s / 30 s</td></tr>
+<tr><td class="m">3</td><td>Relay-Text</td><td>keine</td><td>300 s</td></tr>
+<tr><td class="m">3</td><td><code>{CET}</code></td><td>keine</td><td>Altersgrenze 150 s (statt der erwogenen 30 s)</td></tr>
 <tr><td class="m">4</td><td>Position</td><td>keine</td><td>120 s</td></tr>
-<tr><td class="m">5</td><td>HEY</td><td>180 s (BP-03)</td><td>180 s</td></tr>
-</tbody></table><p class="cite">Kosten 0 B RAM: <code>ringEnqueueTime[]</code> existiert, die Tabelle liegt im Flash. Werte erst nach dem Alters-Histogramm aus Stufe 0 festschreiben.</p></div>
-<div><p style="font-size:.85rem;color:var(--fg2)">Seit es Prioritätsauswahl gibt, liest niemand den Ring mehr der Reihe nach. <code>iRead</code>/<code>iWrite</code> überleben nur als Kapazitätsbuchhaltung, die genau beim Cancel oder Parken falsch wird: Löcher zwischen <code>iRead</code> und <code>iWrite</code> sind tot, bis <code>iRead</code> vorbeiläuft, und <code>iRead</code> steht bis zu 120 s auf einem geparkten <code>SENT</code>-Text. Der Pool kostet <b>0 Byte</b> und lässt die N-24-Umlagerung entfallen.</p>
-<details class="deep"><summary>Stufenplan und Entscheidungsmatrix (Teil A 1, 7, 8)</summary><div class="body">
-<div class="tw"><table><thead><tr><th>Stufe</th><th>Änderung</th><th class="r">RAM klassisch</th></tr></thead><tbody>
-<tr><td class="m">0</td><td>Instrumentierung (Alters- und Hop-Histogramme, <code>{CET}</code>-Alter, HG je Ring, DM/ACK-Anteil)</td><td class="r m">–</td></tr>
-<tr><td class="m">1</td><td>TTL je Priorität im bestehenden Sweep</td><td class="r m">+0 B</td></tr>
-<tr><td class="m">1b</td><td>SNR-gewichtete Relay-Verzögerung, Vorgabe aus</td><td class="r m">+0 B</td></tr>
-<tr><td class="m">2</td><td>Slot-Pool ersetzt den Ring</td><td class="r m">+0 B</td></tr>
-<tr><td class="m">3</td><td>Zeitgealterte Dedup-Tabelle, 45 min</td><td class="r m">+847 B / +697 B</td></tr>
-<tr><td class="m">4</td><td>Supersede-in-place für HEY/POS</td><td class="r m">+0 B</td></tr>
-<tr><td class="m">später</td><td>Deskriptortabelle + Byte-Pool</td><td class="r m">−2 kB oder +Slots</td></tr>
+<tr><td class="m">5</td><td>HEY</td><td>180 s (Altersgrenze der Rückstau-Korrektur, <span style="white-space:nowrap">BP-03</span>)</td><td>180 s</td></tr>
+</tbody></table><p class="cite">Kosten 0 B RAM: <code>ringEnqueueTime[]</code> existiert, die Werte sind Konstanten (<code>configuration_global.h:472-480</code>, <code>RING_BG_MAX_AGE_MS</code> in Zeile 465). Nur abgeschlossene Einträge (Status DONE) altern, HEY in jedem Status. Die Werte sind per Build-Flag änderbar, nicht zur Laufzeit; sie können nach der DK5EN-98-Nacht angepasst werden.</p></div>
+<div><p style="font-size:.85rem;color:var(--fg2)">Im Ring las niemand mehr der Reihe nach, seit es die Prioritätsauswahl gibt. <code>iRead</code> und <code>iWrite</code> blieben nur als Kapazitätsbuchhaltung, die bei Cancel und Parken falsch wurde. Der Pool kostet <b>0 Byte</b> und lässt die N-24-Umlagerung entfallen.</p>
+<p style="font-size:.85rem;color:var(--fg2)"><strong>Wenn der Pool voll ist,</strong> verdrängt ein Frame mit strikt höherer Priorität den ältesten Eintrag der schlechtesten Priorität. Sonst wird der Neue verworfen (<code>RING_DROP_NEW</code>).</p></div>
+</div>
+<details class="dev"><summary>Stufenplan, Entscheidungsmatrix und Umsetzung (Teil A 1, 7, 8; Kampagne TXP)</summary><div class="body">
+<div class="table-wrap"><table><thead><tr><th>Stufe</th><th>Änderung</th><th class="r">RAM klassisch</th><th>Stand 25.10.2026</th></tr></thead><tbody>
+<tr><td class="m">0</td><td>Instrumentierung (Alters- und Hop-Histogramme, <code>{CET}</code>-Alter, HG je Ring, DM/ACK-Anteil)</td><td class="r m">–</td><td><span class="tag warn">teilweise</span> Alters-Logzeilen für <code>{CET}</code>, <code>RING_DROP_STALE prio=</code>, Latenzzähler 32 Bit; Histogramme offen</td></tr>
+<tr><td class="m">1</td><td>TTL je Priorität im bestehenden Sweep</td><td class="r m">+0 B</td><td><span class="tag ok">ausgeliefert</span></td></tr>
+<tr><td class="m">1b</td><td>SNR-gewichtete Relay-Verzögerung, Vorgabe aus</td><td class="r m">+0 B</td><td><span class="tag">Konzept</span></td></tr>
+<tr><td class="m">2</td><td>Slot-Pool ersetzt den Ring</td><td class="r m">+0 B</td><td><span class="tag ok">ausgeliefert</span></td></tr>
+<tr><td class="m">3</td><td>Zeitgealterte Dedup-Tabelle, 45 min</td><td class="r m">+847 B / +697 B</td><td><span class="tag">Konzept</span> geparkt</td></tr>
+<tr><td class="m">4</td><td>Supersede-in-place für HEY/POS</td><td class="r m">+0 B</td><td><span class="tag ok">ausgeliefert</span> auch für <code>{CET}</code></td></tr>
+<tr><td class="m">später</td><td>Deskriptortabelle + Byte-Pool</td><td class="r m">−2 kB oder +Slots</td><td><span class="tag">Konzept</span></td></tr>
 </tbody></table></div>
-<p>Knock-out: nur C, D, E lösen alle vier Strukturprobleme (Lücken, veraltete Einträge, Dedup-Fenster, Board-Parität). Gewichtet (max. 75): C 51, D 52, E 56. Empfehlung des Papiers: E als sechs aufeinanderfolgende Commits, harte Voraussetzung Stufe 0.</p>
+<p>Knock-out: nur C, D, E lösen alle vier Strukturprobleme (Lücken, veraltete Einträge, Dedup-Fenster, Board-Parität). Gewichtet (max. 75): C 51, D 52, E 56. Die Empfehlung des Papiers war E mit Stufe 0 als harter Voraussetzung. Gebaut wurde in vier Wellen der Kampagne (W0, W1a, W1b, W1c).</p>
+<ul>
+  <li><strong>Platz und Auswahl:</strong> frei ist jeder Slot mit Länge 0; Auswahl nach Priorität, dann ältester Einreihzeit (<code>getNextTxSlot()</code>, <code>txring_functions.cpp:213</code>). Der Sender belegt den gewählten Slot sofort (<code>INFLIGHT</code>, 0x81), den ein Neuer nicht verdrängen kann.</li>
+  <li><strong>Web-GUI:</strong> der Füllstand "TX queue" zählt jeden belegten Slot, auch Texte im Warten auf ACK (umrandet, Legende "n waiting for ACK"). RM1 <code>txq</code> zählt nicht mehr doppelt.</li>
+  <li><strong>Bekannte Grenzen:</strong> ein neues HEY ersetzt auch ein eingereihtes weitergeleitetes HEY und kostet dessen Meldekette. <code>stat_supersede_count</code> steht noch nicht in STAT oder auf der Web-Seite.</li>
+  <li><strong>Bench 24.10.2026</strong> (DK5EN-1 Heltec V3, DK5EN-90 RAK4631, DK5EN-92 T-Beam): Füllstand, ACK-Pfad, drei DM-Wiederholungen im selben Slot auf ESP32 und nRF52, {CET}-Grenze und Ersetzen am Gateway mit Mock-Server. Nicht gelaufen: Relay-Seite der {CET}-Grenze auf Luft (Bench-Knoten laufen <code>--mesh off</code>) und ein einstündiger gwflood-Replay.</li>
+</ul>
 </div></details>
-</div>
-</div>
-</div></section>
-
-<!-- 08 -->
-<section class="slide" id="dedup"><span class="num">08</span><div class="inner">
-<div class="eyebrow">Teil A · 3.3, 5.3, 10.4 · Dedup</div>
-<h2>Dedup nach Anzahl oder nach Zeit: das Fenster hängt an der Last</h2>
-<div class="grid g64">
-<div>
-  <div class="rng"><label for="dd-rate">Neue IDs je Minute</label><input type="range" id="dd-rate" min="5" max="60" value="22"><output id="dd-rate-o">2,2</output></div>
-  <div class="ctl"><button class="btn" data-dd="2.2">Median 2,2</button><button class="btn" data-dd="3.8">Spitze 3,8</button><button class="btn pri" id="dd-play">▶ Last durchfahren</button></div>
-  <div class="viz mt"><svg id="dd-svg" viewBox="0 0 640 300" role="img" aria-label="Dedup-Fenster gegen Last"></svg></div>
-  <div class="legend"><span><i style="background:var(--bad)"></i>Ring 70 (klassisch)</span><span><i style="background:var(--warn)"></i>Ring 100 (S3/nRF52)</span><span><i style="background:var(--orange)"></i>Ring 60 (E22_XML)</span><span><i style="background:var(--ok)"></i>D3: 171 Einträge, 45 min</span><span><i style="background:var(--info)"></i>128 Einträge, 45 min</span></div>
-</div>
-<div>
-  <div class="card"><h3>Fenster bei dieser Last <span class="calc">berechnet</span></h3><div id="dd-vals"></div></div>
-  <p class="mt" style="font-size:.84rem;color:var(--fg2)">Gefordert (DG0OPK): länger als <b>39,6 min</b> (längstes gemessenes Paketleben), kürzer als <b>48,5 min</b> (kürzeste msg_id-Wiederverwendung). Zwei nachgewiesene Überläufe (<code>5D01F26F</code>, <code>BC98723D</code>): Heartbeats wurden ein zweites Mal angenommen.</p>
-  <div class="tw mt"><table><thead><tr><th>Option</th><th class="r">RAM klass.</th><th>Urteil</th></tr></thead><tbody>
-  <tr><td>D1 Zählring heute</td><td class="r m">350 B</td><td>verwerfen</td></tr>
-  <tr><td>D2 Zählring + 2-B-Minutenstempel, 45-min-Deckel</td><td class="r m">+140 B</td><td>teilweise</td></tr>
-  <tr><td><b>D3 zeitgealterte Tabelle für 45 min Spitze</b></td><td class="r m">+847 B</td><td>empfohlen</td></tr>
-  <tr><td>D4 gehashte 3-B-IDs</td><td class="r m">+513 B</td><td>verwerfen</td></tr>
-  </tbody></table></div>
-  <p class="cite">10.4: mit 5-B-Eintrag (1-B-Minutenstempel mod 256, Serverbit) kosten 171 Einträge 855 B, +505 B statt +847 B. 128 Einträge: +546 B, 33,7 min bei Spitze.</p>
-</div>
-</div>
 </div></section>
 
 <!-- 09 -->
-<section class="slide" id="prio"><span class="num">09</span><div class="inner">
-<div class="eyebrow">Teil B · 5 · Prioritätsmatrizen je Nachrichtentyp</div>
-<h2>Wer kommt zuerst dran: heute, V1 und V2</h2>
-<div class="ctl"><span class="lbl">Matrix</span><div class="seg" id="pm-var"><button data-v="heute" aria-pressed="true">Heute</button><button data-v="v1" aria-pressed="false">V1 PN zuerst</button><button data-v="v2" aria-pressed="false">V2 EMCOMM + PN</button></div></div>
-<div class="grid g2 mt">
-<div class="tw"><table id="pm-table"><thead><tr><th>Frame-Art</th><th class="r">eigen</th><th class="r">weitergeleitet</th></tr></thead><tbody></tbody></table>
-<p class="cite">Kleiner ist früher. CSMA-Basis heute: 3000 ms (Prio 1, 2), 4500 ms (3), 5500 ms (4, 5) plus Slot-Jitter. Weitergeleitet mit <code>--nbrrelay on</code>: Fall A 3500 ms, nach 8 s 150 ms; Fall B für POS/HEY einmalig 20 s Halt; dazu der Age floor. <code>{CET}</code> und Server-Einspeisung sind heute 3 (<code>DONE</code>); 1/2 gilt nur für lokal getipptes <code>{SET}</code>/<code>{ping}</code>.</p></div>
+<section class="slide" id="dedup"><span class="num">09</span><div class="inner">
+<div class="eyebrow">Teil A · 3.3, 5.3, 10.4 · Doppelfilter (Dedup) <span class="tag">Konzept, geparkt</span></div>
+<h2>Der Doppelfilter zählt Einträge statt Zeit: sein Fenster hängt an der Last</h2>
+<ul class="facts">
+  <li><strong>Heute:</strong> ein Zählring mit 70 (klassische ESP32), 100 (ESP32-S3, nRF52) oder 60 Einträgen (E22_XML-DevKitC), unverändert gegenüber dem Papier (<code>configuration_global.h:313-353</code>).</li>
+  <li><strong>Folge:</strong> bei der Spitzenlast von 3,8 neuen IDs je Minute deckt der klassische Ring nur 18,4 min. Gefordert sind 39,6 bis 48,5 min (DG0OPK). Zwei Überläufe sind belegt: Heartbeats wurden ein zweites Mal angenommen.</li>
+  <li><strong>Vorschlag D3:</strong> eine zeitgealterte Tabelle für 45 min kostet +847 B RAM auf klassischen Boards. Die Kampagne TXP hat sie als W2 geparkt.</li>
+</ul>
+<div class="grid g64 mt">
 <div>
-  <div class="ctl"><button class="btn pri" id="pm-play">▶ Queue abspielen</button><button class="btn" id="pm-burst">+ Burst Gruppen-Relays</button><button class="btn" id="pm-reset">Neu starten</button></div>
-  <div class="viz mt"><svg id="pm-svg" viewBox="0 0 520 300" role="img" aria-label="Queue nach Priorität"></svg></div>
-  <div class="tw"><table id="pm-stats" style="font-size:.74rem"><thead><tr><th>Typ</th><th class="r">bedient</th><th class="r">Ø Warten (Ticks)</th></tr></thead><tbody></tbody></table></div>
-  <p class="cite">Modell: ein Frame je Tick, kleinste Priorität zuerst, bei Gleichstand der älteste. CSMA, TTL und Ratenlimits sind nicht modelliert (außer dem V2-Limit 1 DM je Quelle und 10 Ticks im hohen Band). Gleiche Zufallsfolge für alle drei Matrizen.</p>
+  <div class="rng"><label for="dd-rate">Neue IDs je Minute</label><input type="range" id="dd-rate" min="5" max="60" value="22"><output id="dd-rate-o">2,2</output></div>
+  <div class="ctl"><button class="btn" data-dd="2.2">Median 2,2</button><button class="btn" data-dd="3.8">Spitze 3,8</button><button class="btn pri" id="dd-play">▶ Last durchfahren</button></div>
+  <figure class="viz wide mt"><svg id="dd-svg" viewBox="0 0 640 300" role="img" aria-label="Dedup-Fenster gegen Last"></svg>
+  <figcaption><strong>Abb. 6:</strong> Zählringe fallen mit wachsender Last unter den Korridor von 39,6 bis 48,5 min, die Zeittabelle bleibt bei 45 min, bis ihre Einträge reichen.</figcaption></figure>
+  <div class="legend"><span><i style="background:var(--bad)"></i>Ring 70 (klassisch)</span><span><i style="background:var(--warn)"></i>Ring 100 (S3/nRF52)</span><span><i style="background:var(--orange)"></i>Ring 60 (E22_XML)</span><span><i style="background:var(--ok)"></i>D3: 171 Einträge, 45 min</span><span><i style="background:var(--info)"></i>128 Einträge, 45 min</span></div>
+</div>
+<div>
+  <div class="wbox"><h3>Fenster bei dieser Last <span class="calc">berechnet</span></h3><div id="dd-vals"></div></div>
+  <div class="table-wrap mt"><table><thead><tr><th>Option</th><th class="r">RAM klass.</th><th>Urteil</th></tr></thead><tbody>
+  <tr><td>D1 Zählring heute</td><td class="r m">350 B</td><td>verwerfen</td></tr>
+  <tr><td>D2 Zählring + 2-B-Minutenstempel, 45-min-Deckel</td><td class="r m">+140 B</td><td>teilweise</td></tr>
+  <tr><td><b>D3 zeitgealterte Tabelle für 45 min Spitze</b></td><td class="r m">+847 B</td><td>empfohlen (Papier)</td></tr>
+  <tr><td>D4 gehashte 3-B-IDs</td><td class="r m">+513 B</td><td>verwerfen</td></tr>
+  </tbody></table></div>
 </div>
 </div>
+<details class="dev"><summary>Messbasis und Eintragsgröße (Teil A 10.4)</summary><div class="body">
+<p>Gefordert (DG0OPK): länger als <b>39,6 min</b> (längstes gemessenes Paketleben), kürzer als <b>48,5 min</b> (kürzeste msg_id-Wiederverwendung). Nachgewiesene Überläufe: <code>5D01F26F</code>, <code>BC98723D</code>.</p>
+<p class="cite">10.4: mit 5-B-Eintrag (1-B-Minutenstempel mod 256, Serverbit) kosten 171 Einträge 855 B, +505 B statt +847 B. 128 Einträge: +546 B, 33,7 min bei Spitze.</p>
+</div></details>
 </div></section>
 
 <!-- 10 -->
-<section class="slide" id="cet"><span class="num">10</span><div class="inner">
-<div class="eyebrow">Teil A · 10.8 · Zeitbaken</div>
-<h2><code>{CET}</code>: Reichweite und Alter</h2>
-<div class="grid g64">
+<section class="slide" id="prio"><span class="num">10</span><div class="inner">
+<div class="eyebrow">Teil B · 5 · Prioritätsmatrizen je Nachrichtentyp <span class="tag">Heute = Code, V1 und V2 = Konzept</span></div>
+<h2>Persönliche Nachrichten verlieren beim ersten Relay ihre Priorität: heute, V1 und V2 im Vergleich</h2>
+<ul class="facts">
+  <li><strong>Heute:</strong> eine eigene DM und ein eigenes ACK senden mit Priorität 1, weitergeleitet fallen sie auf 3 und konkurrieren mit Gruppen-Relays (<code>classifyFrame()</code>, <code>txring_functions.cpp:119</code>). Kleiner ist früher.</li>
+  <li><strong>V1 "PN zuerst":</strong> weitergeleitete DM auf 2, ACK auf 1.</li>
+  <li><strong>V2 "EMCOMM + PN":</strong> zusätzlich ein neues Band 0 für signierte EMCOMM-Frames und höchstens eine hochpriore DM je Quelle in 10 Ticks.</li>
+</ul>
+<div class="ctl mt"><span class="lbl">Matrix</span><div class="seg" id="pm-var"><button data-v="heute" aria-pressed="true">Heute</button><button data-v="v1" aria-pressed="false">V1 PN zuerst</button><button data-v="v2" aria-pressed="false">V2 EMCOMM + PN</button></div></div>
+<div class="grid g2 mt">
+<div class="table-wrap"><table id="pm-table"><thead><tr><th>Frame-Art</th><th class="r">eigen</th><th class="r">weitergeleitet</th></tr></thead><tbody></tbody></table></div>
 <div>
-  <div class="ctl"><button class="btn pri" id="cet-play">▶ Bake abspielen</button><span class="lbl">„zwei Hops“ heißt</span><div class="seg" id="cet-target"><button data-v="2" aria-pressed="true">Nibble 2 (heute)</button><button data-v="1" aria-pressed="false">Nibble 1</button></div></div>
-  <div class="viz mt"><svg id="cet-svg" viewBox="0 0 640 300" role="img" aria-label="Zeitbake vom Server über Gateway und Relay-Ringe"></svg></div>
-  <p class="cap" id="cet-cap"></p>
-  <div class="ctl"><span class="lbl">Reichweite</span><div class="seg" id="cet-r"><button data-v="R0" aria-pressed="true">R0</button><button data-v="R1" aria-pressed="false">R1</button><button data-v="R2" aria-pressed="false">R2</button><button data-v="R3" aria-pressed="false">R3</button></div>
-  <span class="lbl" style="margin-left:.5rem">Alter</span><div class="seg" id="cet-a"><button data-v="A0" aria-pressed="true">A0</button><button data-v="A1" aria-pressed="false">A1</button><button data-v="A2" aria-pressed="false">A2</button><button data-v="A3" aria-pressed="false">A3</button><button data-v="A4" aria-pressed="false">A4</button><button data-v="A5" aria-pressed="false">A5</button></div></div>
-</div>
-<div>
-  <div class="panel" id="cet-p"></div>
-  <div class="tw mt"><table><thead><tr><th>Pfad</th><th>Nibble</th><th class="r">Alter</th></tr></thead><tbody>
-  <tr><td>Gateway direkt</td><td class="m">H02</td><td class="r m">55 s</td></tr>
-  <tr><td>Gateway + 2 Relays</td><td class="m">H00</td><td class="r m">91 s</td></tr>
-  </tbody></table><p class="cite">Feldlog <code>docs/bench/snf-20260926/</code>, zwei verschiedene Baken. Wartezeiten der Relays einer Bake (prio 3): 17,0 s, 20,3 s, 31,7 s.</p></div>
-  <div class="note warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Zuerst messen (Stufe 0). Dominieren Queue-Wartezeiten, sind A1 (Wert aus dem Histogramm) plus A3 klein. A2 ist am genauesten, ändert aber Serverinhalt auf der Luft: Entscheidung der Maintainer. Reichweite: R1, wenn die Serverbetreiber zustimmen, sonst R2; R3 als Empfängerseite ohne Sendezeitgewinn.</div>
+  <div class="ctl"><button class="btn pri" id="pm-play">▶ Queue abspielen</button><button class="btn" id="pm-burst">+ Burst Gruppen-Relays</button><button class="btn" id="pm-reset">Neu starten</button></div>
+  <figure class="viz mt"><svg id="pm-svg" viewBox="0 0 520 300" role="img" aria-label="Queue nach Priorität"></svg>
+  <figcaption><strong>Abb. 7:</strong> Mit V1 und V2 überholt eine weitergeleitete DM die Gruppen-Relays in der Queue.</figcaption></figure>
+  <div class="table-wrap"><table id="pm-stats" style="font-size:.74rem"><thead><tr><th>Typ</th><th class="r">bedient</th><th class="r">Ø Warten (Ticks)</th></tr></thead><tbody></tbody></table></div>
 </div>
 </div>
+<details class="dev"><summary>CSMA-Zeiten, Relay-Fälle und Modellannahmen</summary><div class="body">
+<p class="cite">Kleiner ist früher. CSMA-Basis heute: 3000 ms (Prio 1, 2), 4500 ms (3), 5500 ms (4, 5) plus Slot-Jitter (<code>configuration_global.h:483-487</code>). Weitergeleitet mit <code>--nbrrelay on</code>: Fall A 3500 ms, nach 8 s 150 ms; Fall B für POS/HEY einmalig 20 s Halt (<code>configuration_global.h:579-585</code>); dazu der Age floor. <code>{CET}</code> und Server-Einspeisung sind heute 3 (<code>DONE</code>); 1/2 gilt nur für lokal getipptes <code>{SET}</code>/<code>{ping}</code>.</p>
+<p class="cite">Modell: ein Frame je Tick, kleinste Priorität zuerst, bei Gleichstand der älteste. CSMA, TTL und Ratenlimits sind nicht modelliert (außer dem V2-Limit 1 DM je Quelle und 10 Ticks im hohen Band). Gleiche Zufallsfolge für alle drei Matrizen.</p>
+</div></details>
 </div></section>
 
 <!-- 11 -->
-<section class="slide" id="hgdm"><span class="num">11</span><div class="inner">
-<div class="eyebrow">Teil A · 10.9, 10.10 · HG und persönliche Nachrichten</div>
-<h2>HG-Reichweite und die Priorität von DM und <code>:ackNNN</code></h2>
-<div class="grid g2">
+<section class="slide" id="cet"><span class="num">11</span><div class="inner">
+<div class="eyebrow">Teil A · 10.8 · Zeitbaken <span class="tag ok">Altersgrenze ausgeliefert</span> <span class="tag">Reichweite Konzept</span></div>
+<h2>Zeitbaken (<code>{CET}</code>) dürfen höchstens 150 s alt sein: die Grenze ist ausgeliefert, die Reichweite offen</h2>
+<ul class="facts">
+  <li><strong>Ausgeliefert seit v4.40a.10.23:</strong> eine <code>{CET}</code>-Bake (die Serverzeit, mit der Knoten ihre Uhr setzen) älter als 150 s wird weder gesendet noch weitergeleitet. Die Grenze gilt am Gateway-Eingang, in der Relay-Entscheidung, in der Queue und vor dem Senden.</li>
+  <li><strong>Gemessen wird gegen eine vertrauenswürdige Uhr:</strong> GPS, NTP oder RTC. Eine aus <code>{CET}</code> gestellte Uhr zählt nicht. Eine Bake aus der Zukunft, eine unlesbare Nutzlast und jede Bake auf einem Knoten ohne vertrauenswürdige Uhr fallen ebenfalls heraus.</li>
+  <li><strong>Eine neuere Bake ersetzt die eingereihte ältere,</strong> gleich von welcher Quelle. Der Grund für 150 s: ein halbes Kombi-Intervall der beiden Serverquellen (je 10 min, versetzt).</li>
+  <li><strong>Warum nötig:</strong> im Mitschnitt vom 18.10.2026 lagen zwei Baken 440 s und 305 s in der Queue und wurden nie gesendet; ohne Grenze kann eine Bake 5 bis 7 min warten und trotzdem rausgehen.</li>
+  <li><strong>Offen (Konzept):</strong> Reichweite R0 bis R3, Alterskorrektur beim Senden (A2), Priorität (A4) und Telefonzeit (A5). Die Relay-Seite der Grenze wurde nur in Host-Tests geprüft, nicht auf Luft.</li>
+</ul>
+<div class="grid g64 mt">
+<div>
+  <div class="ctl"><button class="btn pri" id="cet-play">▶ Bake abspielen</button><span class="lbl">„zwei Hops“ heißt</span><div class="seg" id="cet-target"><button data-v="2" aria-pressed="true">Zähler 2 (heute)</button><button data-v="1" aria-pressed="false">Zähler 1</button></div></div>
+  <figure class="viz wide mt"><svg id="cet-svg" viewBox="0 0 640 300" role="img" aria-label="Zeitbake vom Server über Gateway und Relay-Ringe"></svg>
+  <figcaption><strong>Abb. 8:</strong> Jeder Relay-Ring addiert Wartezeit; das Alter der Bake wächst von 55 s am Gateway auf 91 s im dritten Ring.</figcaption></figure>
+  <p class="cap" id="cet-cap"></p>
+  <div class="ctl"><span class="lbl">Reichweite</span><div class="seg" id="cet-r"><button data-v="R0" aria-pressed="true">R0</button><button data-v="R1" aria-pressed="false">R1</button><button data-v="R2" aria-pressed="false">R2</button><button data-v="R3" aria-pressed="false">R3</button></div>
+  <span class="lbl" style="margin-left:.5rem">Alter</span><div class="seg" id="cet-a"><button data-v="A0" aria-pressed="false">A0</button><button data-v="A1" aria-pressed="true">A1</button><button data-v="A2" aria-pressed="false">A2</button><button data-v="A3" aria-pressed="false">A3</button><button data-v="A4" aria-pressed="false">A4</button><button data-v="A5" aria-pressed="false">A5</button></div></div>
+</div>
+<div>
+  <div class="panel" id="cet-p"></div>
+  <div class="table-wrap mt"><table><thead><tr><th>Pfad</th><th>Zähler</th><th class="r">Alter</th></tr></thead><tbody>
+  <tr><td>Gateway direkt</td><td class="m">H02</td><td class="r m">55 s</td></tr>
+  <tr><td>Gateway + 2 Relays</td><td class="m">H00</td><td class="r m">91 s</td></tr>
+  </tbody></table><p class="cite">Feldlog <code>docs/bench/snf-20260926/</code>, zwei verschiedene Baken. Wartezeiten der Relays einer Bake (Prio 3): 17,0 s, 20,3 s, 31,7 s.</p></div>
+  <div class="callout warn mt"><span class="prop">Vorschlag, nicht entschieden</span>Zuerst messen. Dominieren Queue-Wartezeiten, sind die Altersgrenze (A1, jetzt 150 s) plus Ersetzen (A3) schon klein genug. A2 ist am genauesten, ändert aber Serverinhalt auf der Luft: Entscheidung der Maintainer. Reichweite: R1, wenn die Serverbetreiber zustimmen, sonst R2; R3 als Empfängerseite ohne Sendezeitgewinn.</div>
+</div>
+</div>
+<details class="dev"><summary>Code und Mitschnitte zur Altersgrenze</summary><div class="body">
+<ul>
+  <li><strong>Konstante:</strong> <code>CET_MAX_AGE_S 150</code> (<code>src/cet_age.h:16</code>), per Build-Flag änderbar. Entscheidung D1 bis D3 in <code>docs/campaign-tx-pool.md</code>.</li>
+  <li><strong>Mitschnitt DK5EN-98, 18.10.2026:</strong> drei Server-Baken am Gateway; eine nach 21,5 s Queue gesendet (24 s alt), zwei nie gesendet. Die Server-Strecke dauerte etwa 3 s, die Queue dominiert das Alter.</li>
+  <li><strong>Bench DK5EN-92, 24.10.2026</strong> (Mock-Server, airgap): 200 s alte und 200 s zukünftige Baken am Gateway verworfen, frische eingereiht, neuere ersetzt ältere.</li>
+  <li><strong>Folge für die Reichweite:</strong> ein Knoten ohne vertrauenswürdige Uhr leitet <code>{CET}</code> nicht mehr weiter, die Bake erreicht dort weniger weit, wo solche Knoten Brücken bilden.</li>
+</ul>
+</div></details>
+</div></section>
+
+<!-- 12 -->
+<section class="slide" id="hgdm"><span class="num">12</span><div class="inner">
+<div class="eyebrow">Teil A · 10.9, 10.10 · Gateway-HEY und persönliche Nachrichten <span class="tag">Konzept</span></div>
+<h2>Zwei Posten kosten Sendezeit, die sich begrenzen lässt: der HG-Radius und die späte DM-Quittung</h2>
+<ul class="facts">
+  <li><strong>Ein Gateway-HEY (HG) wird so weit geflutet wie ein Text:</strong> Zähler 4 und drei Relays je Ring ergeben 13 Sendungen je HG <span class="calc">berechnet</span>. Jeder Hop verlängert die Signalbericht-Kette.</li>
+  <li><strong>Eine weitergeleitete DM und ihr ACK fallen beim ersten Relay auf 3.</strong> Kommt das ACK zu spät, feuert die Wiederholungsleiter des Absenders (3 × 40 s), und jede Wiederholung wird wieder geflutet.</li>
+</ul>
+<div class="grid g2 mt">
 <div>
   <h3>HG: Gateway-HEY</h3>
-  <p style="font-size:.85rem;color:var(--fg2)"><code>sendHey()</code> sendet <code>HG</code> auf Gateways, sonst <code>H</code>; Hop <code>max_hop_text</code> (Vorgabe 4), Priorität 5, mindestens ein HG je Imax (15 min). Empfänger setzen <code>NBR_FLAG_GW</code> für 45 min und nehmen Gateways aus der Relay-Abhängigenmenge. Die Signalbericht-Kette wächst je Hop (gedeckelt bei 106 B).</p>
-  <div class="ctl mt"><span class="lbl">Nibble des HG</span><div class="seg" id="hg-n"><button data-v="4" aria-pressed="true">4 (G0)</button><button data-v="2" aria-pressed="false">2 (G1/G2)</button></div><span class="lbl" style="margin-left:.4rem">Relays je Ring</span><div class="seg" id="hg-r"><button data-v="2" aria-pressed="false">2</button><button data-v="3" aria-pressed="true">3</button><button data-v="5" aria-pressed="false">5</button></div></div>
-  <div class="viz mt"><svg id="hg-svg" viewBox="0 0 520 200" role="img" aria-label="HG-Reichweite in Ringen"></svg></div>
+  <div class="ctl mt"><span class="lbl">Zähler des HG</span><div class="seg" id="hg-n"><button data-v="4" aria-pressed="true">4 (G0)</button><button data-v="2" aria-pressed="false">2 (G1/G2)</button></div><span class="lbl" style="margin-left:.4rem">Relays je Ring</span><div class="seg" id="hg-r"><button data-v="2" aria-pressed="false">2</button><button data-v="3" aria-pressed="true">3</button><button data-v="5" aria-pressed="false">5</button></div></div>
+  <figure class="viz mt"><svg id="hg-svg" viewBox="0 0 520 200" role="img" aria-label="HG-Reichweite in Ringen"></svg>
+  <figcaption><strong>Abb. 9:</strong> Ein kleinerer Zähler macht aus dem HG ein Nachbarschaftssignal und spart ganze Relay-Ringe.</figcaption></figure>
   <p class="cap" id="hg-cap"></p>
   <div class="optgrid" id="opt-g"></div>
   <div class="panel mt" id="opt-g-p"></div>
 </div>
 <div>
   <h3>DM und ACK fallen beim ersten Relay auf 3</h3>
-  <p style="font-size:.85rem;color:var(--fg2)"><code>getMessagePriority()</code> gibt für <code>DONE</code>-Text 3 zurück, bevor das Ziel geparst wird. Jeder Relay-Ring wartet im 4500-ms-Band und konkurriert in voller Queue mit Gruppen-Relays. Kommt das ACK zu spät, feuert die Leiter des Absenders (3 × 40 s).</p>
   <div class="rng mt"><label for="lad-d">ACK kommt nach</label><input type="range" id="lad-d" min="0" max="160" value="55"><output id="lad-d-o">55 s</output></div>
-  <div class="viz"><svg id="lad-svg" viewBox="0 0 520 120" role="img" aria-label="Wiederholungsleiter gegen ACK-Ankunft"></svg></div>
+  <figure class="viz"><svg id="lad-svg" viewBox="0 0 520 120" role="img" aria-label="Wiederholungsleiter gegen ACK-Ankunft"></svg>
+  <figcaption><strong>Abb. 10:</strong> Je später das ACK, desto mehr zusätzliche DM-Sendungen feuert die Leiter.</figcaption></figure>
   <p class="cap" id="lad-cap"></p>
   <div class="optgrid" id="opt-p"></div>
   <div class="panel mt" id="opt-p-p"></div>
-  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>P2 hat das beste Verhältnis von gesparter Sendezeit zu Änderungsgröße, danach P4. P1 und P3 verschieben die Fairness zwischen fremdem und eigenem Verkehr und brauchen Stufe-0-Daten. Teil B 4.3 ergänzt: P-A4 (ACK zuerst) plus P-A3 (Band 2 mit Limit je Quelle) als erster Schritt, P-A5 (DM-Retries in QRT) nach dem Slot-Pool, P-A1 nur mit Authentifizierung.</p>
+  <div class="mt" style="font-size:.82rem"><p style="margin:0 0 .3rem"><span class="prop">Vorschlag, nicht entschieden</span></p>
+  <ul style="margin:0">
+  <li><b>Erste Wahl:</b> P2 hat das beste Verhältnis von gesparter Sendezeit zu Änderungsgröße, danach P4.</li>
+  <li><b>Mit Vorbehalt:</b> P1 und P3 verschieben die Fairness zwischen fremdem und eigenem Verkehr und brauchen Stufe-0-Daten.</li>
+  <li><b>Teil B 4.3 ergänzt:</b> P-A4 (ACK zuerst) plus P-A3 (Band 2 mit Limit je Quelle) als erster Schritt, P-A5 (DM-Retries in QRT) nach dem Slot-Pool, P-A1 nur mit Authentifizierung.</li>
+  </ul></div>
 </div>
 </div>
+<details class="dev"><summary>HG im Code und Priorität von DONE-Text</summary><div class="body">
+<p><code>sendHey()</code> sendet <code>HG</code> auf Gateways, sonst <code>H</code> (<code>loop_functions.cpp:5675</code>); Hop <code>max_hop_text</code> (Vorgabe 4), Priorität 5, mindestens ein HG je Imax (15 min). Empfänger setzen <code>NBR_FLAG_GW</code> für 45 min (<code>nbr_matrix.h</code>, <code>NBR_GW_HOLD_MIN</code>) und nehmen Gateways aus der Relay-Abhängigenmenge. Die Signalbericht-Kette wächst je Hop (gedeckelt bei 106 B).</p>
+<p><code>classifyFrame()</code> gibt für <code>DONE</code>-Text 3 zurück, bevor das Ziel geparst wird (<code>txring_functions.cpp:119</code>). Jeder Relay-Ring wartet im 4500-ms-Band und konkurriert in voller Queue mit Gruppen-Relays. Jeder Retry trägt eine eigene ID; Dedup fasst sie nicht zusammen.</p>
+</div></details>
 </div></section>
 
-<!-- 12 -->
-<section class="slide" id="msf"><span class="num">12</span><div class="inner">
-<div class="eyebrow">Teil B · 2.4, 4.5 · Multi-SF</div>
+<!-- 13 -->
+<section class="slide" id="msf"><span class="num">13</span><div class="inner">
+<div class="eyebrow">Teil B · 2.4, 4.5 · Multi-SF <span class="tag">Konzept</span></div>
 <h2>Mehr Kapazität wie bei Wi-Fi: Links steigen auf, wo sie können</h2>
-<div class="grid g2">
+<ul class="facts">
+  <li><strong>SF (Spreizfaktor) ist der einzige Hebel, der Kapazität vervielfacht:</strong> SF9 trägt das 3,4-Fache von SF11 bei 5 dB weniger Reserve <span class="calc">berechnet</span>.</li>
+  <li><strong>Jeder Chip der ausgelieferten Envs kann SF7 bis SF12</strong> (Teil B 2.4, nicht neu geprüft). Die Grenze: ein Knoten mit einem Funkmodul hört immer nur ein SF.</li>
+  <li><strong>Muster aus Wi-Fi:</strong> Beacons und Broadcast mit Basisrate, Unicast je Link mit der schnellsten Rate, die die Reserve erlaubt. Der Preis ist Taubheit für den Basiskanal während des Austauschs.</li>
+</ul>
+<div class="grid g2 mt">
 <div>
   <div class="ctl"><span class="lbl">SF</span><div class="seg" id="sf-sel"></div></div>
-  <div class="viz mt"><svg id="sf-svg" viewBox="0 0 560 300" role="img" aria-label="SNR-Grenze und Durchsatz je SF"></svg></div>
+  <figure class="viz mt"><svg id="sf-svg" viewBox="0 0 560 300" role="img" aria-label="SNR-Grenze und Durchsatz je SF"></svg>
+  <figcaption><strong>Abb. 11:</strong> Jeder SF-Schritt nach unten verdoppelt fast die Rate und kostet 2,5 dB Reserve.</figcaption></figure>
   <div class="rng mt"><label for="sf-snr">Link-SNR</label><input type="range" id="sf-snr" min="-26" max="0" step="0.5" value="-7"><output id="sf-snr-o">−7 dB</output></div>
   <p class="cap" id="sf-cap"></p>
-  <div class="card mt" id="sf-row"></div>
+  <div class="wbox mt" id="sf-row"></div>
 </div>
 <div>
   <div class="ctl"><button class="btn pri" id="wf-play">▶ Link-Upgrade abspielen</button></div>
-  <div class="viz mt"><svg id="wf-svg" viewBox="0 0 520 250" role="img" aria-label="Basis-SF flutet, Unicast steigt auf, Taubheitsproblem"></svg></div>
+  <figure class="viz mt"><svg id="wf-svg" viewBox="0 0 520 250" role="img" aria-label="Basis-SF flutet, Unicast steigt auf, Taubheitsproblem"></svg>
+  <figcaption><strong>Abb. 12:</strong> Zwei Knoten steigen auf SF9 auf und verpassen dabei die Flut auf SF11.</figcaption></figure>
   <p class="cap" id="wf-cap">Muster aus Wi-Fi: Beacons und Broadcast mit Basisrate, Unicast je Link mit der schnellsten Rate, die die Reserve erlaubt.</p>
   <div class="optgrid" id="opt-m"></div>
   <div class="panel mt" id="opt-m-p"></div>
@@ -516,36 +723,46 @@ svg text{font-family:var(--mono)}
 </div>
 </div></section>
 
-<!-- 13 -->
-<section class="slide" id="route"><span class="num">13</span><div class="inner">
-<div class="eyebrow">Teil B · 4.7 · Source Routing für persönliche Nachrichten</div>
-<h2>Fluten, Next-Hop oder Quellroute: wie viele Kopien je DM?</h2>
-<div class="grid g64">
+<!-- 14 -->
+<section class="slide" id="route"><span class="num">14</span><div class="inner">
+<div class="eyebrow">Teil B · 4.7 · Source Routing für persönliche Nachrichten <span class="tag">Konzept</span></div>
+<h2>Fluten, Next-Hop oder Quellroute: wie viele Kopien braucht eine DM?</h2>
+<ul class="facts">
+  <li><strong>Heute flutet jede DM,</strong> und jedes ACK flutet zurück: N Kopien je DM und je ACK.</li>
+  <li><strong>Der Pfad steht schon im Frame:</strong> mit shortpath aus (Produktion) listet der Quellpfad jedes Relay. Der Empfänger kennt beim Senden von <code>:ackNNN</code> einen funktionierenden Pfad.</li>
+  <li><strong>Solange alte Firmware flutet,</strong> sinken die Kopien erst, wenn die meisten Relays neu sind.</li>
+</ul>
+<div class="grid g64 mt">
 <div>
   <div class="ctl"><span class="lbl">Verfahren</span><div class="seg" id="sr-mode"><button data-v="S0" aria-pressed="true">S0 Flut</button><button data-v="S1" aria-pressed="false">S1 Next-Hop</button><button data-v="S2" aria-pressed="false">S2 Quellroute</button><button data-v="S3" aria-pressed="false">S3 Hybrid</button></div><button class="btn pri" id="sr-play">▶ DM senden</button></div>
   <div class="rng mt"><label for="sr-old">Anteil alte FW</label><input type="range" id="sr-old" min="0" max="100" step="10" value="0"><output id="sr-old-o">0 %</output></div>
-  <div class="viz"><svg id="sr-svg" viewBox="0 0 640 300" role="img" aria-label="Beispielgraph mit Kopienzahl"></svg></div>
+  <figure class="viz wide"><svg id="sr-svg" viewBox="0 0 640 300" role="img" aria-label="Beispielgraph mit Kopienzahl"></svg>
+  <figcaption><strong>Abb. 13:</strong> Auf einem Beispielgraphen sinkt die Zahl der Sendungen, je mehr Relays den Pfad kennen und je weniger alte Firmware flutet.</figcaption></figure>
   <p class="cap" id="sr-cap"></p>
 </div>
 <div>
-  <div class="grid g2"><div class="card stat"><div class="k">Sendungen <span class="calc">berechnet</span></div><div class="big" id="sr-n">–</div><div class="s">Beispielgraph, Hop 4</div></div><div class="card stat"><div class="k">Zusatz-Header</div><div class="big" id="sr-h">–</div><div class="s">S2: etwa 10 B je Rufzeichen</div></div></div>
+  <div class="grid g2"><div class="wbox stat"><div class="k">Sendungen <span class="calc">berechnet</span></div><div class="big" id="sr-n">–</div><div class="s">Beispielgraph, Hop 4</div></div><div class="wbox stat"><div class="k">Zusatz-Header</div><div class="big" id="sr-h">–</div><div class="s">S2: etwa 10 B je Rufzeichen</div></div></div>
   <div class="panel mt" id="sr-p"></div>
-  <p class="mt" style="font-size:.84rem;color:var(--fg2)">Der Pfad steht schon im Frame: mit shortpath aus (Produktion) listet der Quellpfad jedes Relay. Der Empfänger kennt beim Senden von <code>:ackNNN</code> einen funktionierenden Pfad. Solange alte Firmware flutet, sinken die Kopien erst, wenn die meisten Relays neu sind.</p>
   <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>S1 zuerst (kleinste Änderung, kompatibel, kein Routen-Header), S2 später für Store-and-Forward-Knoten und feste Standorte.</p>
 </div>
 </div>
 </div></section>
 
-<!-- 14 -->
-<section class="slide" id="emcomm"><span class="num">14</span><div class="inner">
-<div class="eyebrow">Teil B · 4.8, 4.9 · EMCOMM</div>
-<h2>EMCOMM-Flag nur mit Absender-Authentifizierung</h2>
-<div class="grid g2">
+<!-- 15 -->
+<section class="slide" id="emcomm"><span class="num">15</span><div class="inner">
+<div class="eyebrow">Teil B · 4.8, 4.9 · EMCOMM <span class="tag">Konzept</span></div>
+<h2>Ein EMCOMM-Flag (Notfunk) bekommt nur mit Absender-Authentifizierung Priorität</h2>
+<ul class="facts">
+  <li><strong>Ein Flag ohne Authentifizierung lädt zum Fluten ein.</strong> Ein unsignierter EMCOMM-Frame wird angezeigt, normal weitergeleitet und nicht bevorzugt.</li>
+  <li><strong>Das HMAC von RM1 skaliert nicht</strong> auf "viele Empfänger prüfen einen Absender": es ist symmetrisch. Eine Ed25519-Signatur mit gepinnten Schlüsseln kostet 64 Byte je Frame, als Base64 88 Byte (etwa +786 ms bei SF11 <span class="calc">berechnet</span>).</li>
+  <li><strong>Regulatorik ist offen:</strong> Authentifizierung ohne Verschlüsselung hält den Inhalt lesbar; für DL und OE wurde keine Regelung gefunden. Prüfung nötig (DARC, BNetzA, ÖVSV).</li>
+</ul>
+<div class="grid g2 mt">
 <div>
   <h3>Wo das Flag hin kann (Byte 5 hat kein freies Bit)</h3>
   <div class="optgrid" id="opt-e"></div>
   <div class="panel mt" id="opt-e-p"></div>
-  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>E1 oder E4 für die Sichtbarkeit in der alten Flotte; Priorität nur, wenn der Frame auch eine gültige Signatur trägt. Ein unsignierter EMCOMM-Frame wird angezeigt, normal weitergeleitet, nicht bevorzugt.</p>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>E1 oder E4 für die Sichtbarkeit in der alten Flotte; Priorität nur, wenn der Frame auch eine gültige Signatur trägt.</p>
   <h3 class="mt2">Authentifizierung A1 bis A5</h3>
   <div class="optgrid" id="opt-a"></div>
   <div class="panel mt" id="opt-a-p"></div>
@@ -553,16 +770,17 @@ svg text{font-family:var(--mono)}
 <div>
   <div class="ctl"><span class="lbl">Bild</span><div class="seg" id="ts-mode"><button data-v="A1" aria-pressed="false">A1 Netzschlüssel</button><button data-v="A3" aria-pressed="true">A3 Pinning</button><button data-v="A4" aria-pressed="false">A4 Verzeichnis</button></div></div>
   <div class="ctl mt"><span class="lbl">Frame</span><button class="btn" data-ts="ok">signiert, gepinnt</button><button class="btn" data-ts="uns">unsigniert</button><button class="btn" data-ts="bad">fremder Schlüssel</button></div>
-  <div class="viz mt"><svg id="ts-svg" viewBox="0 0 520 300" role="img" aria-label="Trust-Store und Pinning"></svg></div>
+  <figure class="viz mt"><svg id="ts-svg" viewBox="0 0 520 300" role="img" aria-label="Trust-Store und Pinning"></svg>
+  <figcaption><strong>Abb. 14:</strong> Mit gepinnten öffentlichen Schlüsseln besteht nur der echte Absender die Prüfung; ein gemeinsamer Netzschlüssel (A1) lässt Fälschungen durch.</figcaption></figure>
   <p class="cap" id="ts-cap"></p>
-  <div class="note mt"><b>Größe auf der Luft:</b> die Payload ist Text mit Zeichensatzfilter; 64 B Ed25519 brauchen Base64 = 88 B ≈ +786 ms bei SF11, das RM1-Tag 16 B hex ≈ +147 ms <span class="calc">berechnet</span>.</div>
-  <div class="note mt"><b>Trust-Store:</b> je Eintrag Rufzeichen (10 B) + öffentlicher Schlüssel (32 B) + Flags (1 B) = etwa 43 B; 100 Einträge 4,3 kB, passt in den Flash (LittleFS), RAM nur als Cache. In der Web-GUI: Fingerabdruck je Rufzeichen anzeigen, Operator bestätigt; Haken „EMCOMM-Nachrichten signieren“ je Nachricht oder Sitzung.</div>
-  <div class="note warn mt"><b>Regulatorik offen:</b> Authentifizierung ohne Verschlüsselung hält den Inhalt lesbar; für DL/OE wurde keine Regelung gefunden. Prüfung nötig (DARC/BNetzA, ÖVSV). <span class="prop">Vorschlag, nicht entschieden</span>A3 mit manuellem Pinning plus A4 als optionales Verzeichnis; A1 als schneller Bench-Prototyp mit bekannten Schwächen.</div>
-  <details class="deep"><summary>Was Onion-Routing einem Amateurfunk-Mesh beibringt (4.1)</summary><div class="body">
+  <div class="callout note mt"><strong>Größe auf der Luft:</strong> die Payload ist Text mit Zeichensatzfilter; 64 B Ed25519 brauchen Base64 = 88 B ≈ +786 ms bei SF11, das RM1-Tag 16 B hex ≈ +147 ms <span class="calc">berechnet</span>.</div>
+  <div class="callout note mt"><strong>Trust-Store:</strong> je Eintrag Rufzeichen (10 B) + öffentlicher Schlüssel (32 B) + Flags (1 B) = etwa 43 B; 100 Einträge 4,3 kB, passt in den Flash (LittleFS), RAM nur als Cache. In der Web-GUI: Fingerabdruck je Rufzeichen anzeigen, Operator bestätigt; Haken "EMCOMM-Nachrichten signieren" je Nachricht oder Sitzung.</div>
+  <div class="callout warn mt"><span class="prop">Vorschlag, nicht entschieden</span>A3 mit manuellem Pinning plus A4 als optionales Verzeichnis; A1 als schneller Bench-Prototyp mit bekannten Schwächen.</div>
+  <details class="dev"><summary>Was Onion-Routing einem Amateurfunk-Mesh beibringt (4.1)</summary><div class="body">
   <p>Schichtverschlüsselung ist auf Amateurfunkbändern nicht erlaubt, Anonymität kein Ziel. Übertragbar ist die Infrastruktur drumherum:</p>
-  <div class="tw"><table><thead><tr><th>Tor</th><th>Mesh-Gegenstück</th><th>Nutzung</th></tr></thead><tbody>
+  <div class="table-wrap"><table><thead><tr><th>Tor</th><th>Mesh-Gegenstück</th><th>Nutzung</th></tr></thead><tbody>
   <tr><td>Directory Authorities</td><td>Server veröffentlicht Knotenliste, Rollen, FW-Stand, Schlüssel; signiert</td><td>EOL, Trust-Store</td></tr>
-  <tr><td>Relay-Flags</td><td>„Hochstandort“, „stabil“, „Gateway“ aus Uptime, SNR, ACK-Erfolg</td><td>Relay-Wahl, Source Routing</td></tr>
+  <tr><td>Relay-Flags</td><td>"Hochstandort", "stabil", "Gateway" aus Uptime, SNR, ACK-Erfolg</td><td>Relay-Wahl, Source Routing</td></tr>
   <tr><td>Guard Nodes</td><td>ein bis zwei bevorzugte erste Relays pinnen</td><td>Source Routing, Stadt-Cluster</td></tr>
   <tr><td>Circuit Reuse</td><td>entdeckten Pfad cachen, bis er ausfällt</td><td>Source Routing</td></tr>
   <tr><td>Bandbreiten-Gewichtung</td><td>Relays mit freier Sendezeit bevorzugen</td><td>Relay-Wahl, Multi-SF</td></tr>
@@ -573,22 +791,26 @@ svg text{font-family:var(--mono)}
 </div>
 </div></section>
 
-<!-- 15 -->
-<section class="slide" id="eol"><span class="num">15</span><div class="inner">
-<div class="eyebrow">Teil B · 4.10, 4.2 · Lebensende alter Firmware und Tag-Gruppen</div>
-<h2>Alte Firmware leiser stellen, Gruppen mit Namen</h2>
-<div class="grid g2">
+<!-- 16 -->
+<section class="slide" id="eol"><span class="num">16</span><div class="inner">
+<div class="eyebrow">Teil B · 4.10, 4.2 · Lebensende alter Firmware und Tag-Gruppen <span class="tag">Konzept</span></div>
+<h2>Alte Firmware leiser stellen, Gruppen mit Namen: zwei Hebel mit Kompatibilitätspreis</h2>
+<ul class="facts">
+  <li><strong>End of Life (L0 bis L4):</strong> das Firmware-Versionsbyte im Trailer ist die Version des Urhebers, nicht des letzten Relays. Der Filter <code>0 &lt; fw_version &lt; 35</code> ("4.35a") wirkt also auf Urheber.</li>
+  <li><strong>Tag-Gruppen (T0 bis T3):</strong> Gruppen heute sind numerisch 1..99999, höchstens 6 je Knoten, ohne gruppenspezifische Relay-Regel. Tags ändern die Bedienbarkeit, nicht die Kanallast.</li>
+</ul>
+<div class="grid g2 mt">
 <div>
   <h3>End of Life L0 bis L4</h3>
-  <div class="bytes-strip viz" style="padding:.6rem"><svg id="eol-svg" viewBox="0 0 520 110" role="img" aria-label="Firmware-Trailer nach der FCS"></svg></div>
-  <p class="cite">Trailer nach der FCS: FW-Versionsbyte, Last-Hardware-Byte, Subversion-Zeichen, 0x7E. Das FW-Versionsbyte ist die Version des <b>Urhebers</b>; Relays schreiben nur <code>msg_last_hw</code> neu. Der Filter <code>0 &lt; fw_version &lt; 35</code> („4.35a“) wirkt also auf Urheber; die Firmware des letzten Hops muss aus der Nachbarschaftsmatrix kommen.</p>
+  <figure class="viz" style="padding:.6rem"><svg id="eol-svg" viewBox="0 0 520 110" role="img" aria-label="Firmware-Trailer nach der FCS"></svg>
+  <figcaption><strong>Abb. 15:</strong> Das Versionsbyte im Trailer nennt den Urheber; die Firmware des letzten Hops steht nicht im Frame.</figcaption></figure>
+  <p class="cite">Trailer nach der FCS: FW-Versionsbyte, Last-Hardware-Byte, Subversion-Zeichen, 0x7E. Relays schreiben nur <code>msg_last_hw</code> neu; die Firmware des letzten Hops muss aus der Nachbarschaftsmatrix kommen.</p>
   <div class="optgrid mt" id="opt-l"></div>
   <div class="panel mt" id="opt-l-p"></div>
-  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>L1 für die Nibble-wickelnden Builds, mit vorheriger Hinweis-DM („bitte aktualisieren“) und veröffentlichtem Datum; L4, sobald ein signiertes Verzeichnis existiert.</p>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>L1 für die Zähler-wickelnden Builds, mit vorheriger Hinweis-DM ("bitte aktualisieren") und veröffentlichtem Datum; L4, sobald ein signiertes Verzeichnis existiert.</p>
 </div>
 <div>
   <h3>Tag-Gruppen T0 bis T3</h3>
-  <p style="font-size:.85rem;color:var(--fg2)">Gruppen heute: numerisch 1..99999, höchstens 6 je Knoten, keine gruppenspezifische Relay-Regel. Tags ändern daher die Bedienbarkeit, nicht die Kanallast.</p>
   <div class="optgrid mt" id="opt-t"></div>
   <div class="panel mt" id="opt-t-p"></div>
   <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>T2 als kompatibler erster Schritt (Anzeigefilter, unbegrenzte Abos, keine Protokolländerung), T1 für Firmware der 4.36-Klasse, sobald Server und App es können. Relay-Scoping nach Abo ist eine spätere, eigene Idee (braucht Abo-Daten im HEY oder HN-Bericht).</p>
@@ -596,70 +818,105 @@ svg text{font-family:var(--mono)}
 </div>
 </div></section>
 
-<!-- 16 -->
-<section class="slide" id="zellen"><span class="num">16</span><div class="inner">
-<div class="eyebrow">Teil B · 4.13, 4.14 · Zellen, Färbung, Relay-Wahl</div>
-<h2>Zellen färben, Relays wählen statt alle meshen</h2>
-<div class="grid g2">
+<!-- 17 -->
+<section class="slide" id="zellen"><span class="num">17</span><div class="inner">
+<div class="eyebrow">Teil B · 4.13, 4.14 · Zellen, Färbung, Relay-Wahl <span class="tag">Konzept</span></div>
+<h2>Zellen färben, Relays wählen statt alle meshen: erreichbar sind Rollen und SF-Regionen</h2>
+<ul class="facts">
+  <li><strong>Frequenzzellen sind auf 70 cm spekulativ:</strong> es gibt höchstens 2 bis 3 freie 250-kHz-Kanäle.</li>
+  <li><strong>MPR-Wahl (OLSR-Idee):</strong> jeder Knoten wählt die kleinste Menge direkter Nachbarn, die alle Zwei-Hop-Nachbarn abdeckt; nur diese leiten seine Fluten weiter.</li>
+  <li><strong>Die Datenlage ist dünn:</strong> ein HN-Bericht trägt höchstens 8 Einträge, nur Links ≥ −16 dB, 60 min frisch. Eine MPR-Wahl daraus arbeitet mit Teildaten.</li>
+</ul>
+<div class="grid g2 mt">
 <div>
   <div class="ctl"><span class="lbl">Farben</span><div class="seg" id="hx-n"><button data-v="3" aria-pressed="true">3</button><button data-v="7" aria-pressed="false">7</button></div>
   <span class="lbl" style="margin-left:.4rem">Dimension</span><div class="seg" id="hx-dim"><button data-v="f" aria-pressed="true">Frequenz</button><button data-v="sf" aria-pressed="false">SF</button><button data-v="t" aria-pressed="false">Zeit</button><button data-v="r" aria-pressed="false">Rolle</button></div></div>
-  <div class="viz mt"><svg id="hx-svg" viewBox="0 0 520 330" role="img" aria-label="Hexagonales Zellraster"></svg></div>
+  <figure class="viz mt"><svg id="hx-svg" viewBox="0 0 520 330" role="img" aria-label="Hexagonales Zellraster"></svg>
+  <figcaption><strong>Abb. 16:</strong> Benachbarte Zellen tragen verschiedene Farben; was eine Farbe physikalisch heißt, hängt von der Dimension ab.</figcaption></figure>
   <p class="cap" id="hx-cap"></p>
   <div class="panel" id="hx-p"></div>
 </div>
 <div>
   <div class="ctl"><button class="btn" id="mpr-new">Neuer Graph</button><span class="lbl">Knoten anklicken</span></div>
-  <div class="viz mt"><svg id="mpr-svg" viewBox="0 0 520 330" role="img" aria-label="MPR-Wahl auf einem Zufallsgraphen"></svg></div>
+  <figure class="viz mt"><svg id="mpr-svg" viewBox="0 0 520 330" role="img" aria-label="MPR-Wahl auf einem Zufallsgraphen"></svg>
+  <figcaption><strong>Abb. 17:</strong> Eine MPR-Menge deckt alle Zwei-Hop-Nachbarn mit weniger Relays ab, als Nachbarn da sind.</figcaption></figure>
   <div class="legend"><span><i style="background:var(--acc)"></i>gewählt</span><span><i style="background:var(--mag)"></i>MPR-Relay</span><span><i style="background:var(--info)"></i>1-Hop, kein MPR</span><span><i style="background:var(--ok)"></i>2-Hop</span></div>
   <p class="cap" id="mpr-cap">OLSR-Idee: jeder Knoten wählt die kleinste Menge direkter Nachbarn, die alle Zwei-Hop-Nachbarn abdeckt; nur diese leiten seine Fluten weiter.</p>
-  <div class="note mt">Die Nachbarschaftsmatrix und die HN-Berichte halten Zwei-Hop-Daten, aber nur teilweise: ein HN-Bericht trägt höchstens 8 Einträge, nur Links ≥ −16 dB, 60 min frisch. Eine MPR-Wahl daraus arbeitet mit Teildaten. Fall A/B ist eine reaktive Form davon (je Frame), eine MPR-Menge ist proaktiv (je Topologieänderung) und deterministisch, statt je Frame auf eine gehörte Wiederholung zu reagieren. Contra: hängt an der Matrixqualität (Teil A 10.7), größere Änderung, braucht einen Fallback bei veralteter MPR-Menge.</div>
-  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>Frequenzzellen sind auf 70 cm spekulativ; Rollenfärbung (wer relayt) und SF-Regionen (M4) sind die erreichbaren Formen der Idee.</p>
+  <div class="callout note mt">Die Nachbarschaftsmatrix und die HN-Berichte halten Zwei-Hop-Daten, aber nur teilweise. Fall A/B ist eine reaktive Form davon (je Frame), eine MPR-Menge ist proaktiv (je Topologieänderung) und deterministisch, statt je Frame auf eine gehörte Wiederholung zu reagieren. Contra: hängt an der Matrixqualität (Teil A 10.7), größere Änderung, braucht einen Fallback bei veralteter MPR-Menge.</div>
+  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>Rollenfärbung (wer relayt) und SF-Regionen (M4) sind die erreichbaren Formen der Idee.</p>
 </div>
-</div>
-</div></section>
-
-<!-- 17 -->
-<section class="slide" id="roadmap"><span class="num">17</span><div class="inner">
-<div class="eyebrow">Teil B · 6 · Roadmap und Wellenplan</div>
-<h2>Wellen W0 bis W9+: messen, puffern, priorisieren, absichern</h2>
-<p class="lead">Gleiche Schleife wie die v4.40a-Kampagne: planen, umsetzen, testen (Host-Gate, Golden Sets), Bench, Feldmitschnitt, auswerten, lernen, anpassen. Jede Welle endet mit einem Upstream-PR aus <code>upstream/dev</code> (deutsch). Schätzungen sind Kalenderzeit für einen Operator mit Agent, keine Zusagen.</p>
-<div class="ctl mt"><button class="btn pri" id="rm-play">▶ Zeitachse abspielen</button><button class="btn" id="rm-dep" aria-pressed="true">Abhängigkeiten</button></div>
-<div class="viz mt"><svg id="rm-svg" viewBox="0 0 900 330" role="img" aria-label="Wellenplan als Zeitachse"></svg></div>
-<p class="cite">Lage auf der Achse: Annahme streng nacheinander in Plan-Reihenfolge, Balken = obere Schätzung, heller Teil = Spanne <span class="calc">berechnet</span>. Das Papier legt keine Parallelisierung fest.</p>
-<div class="grid g2 mt">
-  <div class="panel" id="rm-p"></div>
-  <div>
-    <div class="card"><h3>Abhängigkeiten</h3><ul class="plain">
-      <li>W0 vor allem, was das Relay-Verhalten ändert</li>
-      <li>W1 vor W4 (Retries brauchen den Pool)</li>
-      <li>W3 vor W5 (die Hop-Klemme neutralisiert gewickelte Frames schon)</li>
-      <li>W6 vor jeder absoluten Priorität für fremden Verkehr</li>
-      <li>W8 nach den PER-Daten aus W0</li></ul><p class="cite">W0 braucht Beobachter-Knoten außerhalb des Clusters. W6 und W8 hängen an Dritten (Regulierer, andere Betreiber).</p></div>
-    <div class="card mt"><h3>Wiederkehrende Prüfungen</h3><p>Host-Gate <code>tools/regression.sh --stage 1,2</code>, Golden-Selftest (48), Dedup-Replay, NBR-Replay, gwflood-Replay, APRS-Korpus und Fuzz, Bench-Suite Stufe 3, DK5EN-98-Soaks. Jede Welle fügt ihr Golden Set hinzu.</p></div>
-  </div>
 </div>
 </div></section>
 
 <!-- 18 -->
-<section class="slide" id="fragen"><span class="num">18</span><div class="inner">
-<div class="eyebrow">Teil A · 9 und Teil B · 7 · Offen</div>
-<h2>Offene Fragen an den Operator</h2>
-<ol class="qlist">
-<li><div>Multi-Line POS: X2 (Umwandlung am Gateway oder Server, keine RF-Kosten) oder X3 (ein APRS-WX-Frame statt der Position)?</div><span class="tag t-dim">B 4.4.1</span></li>
-<li><div>Soll das erzwungene <code>--nbrrelay on</code> per RM1 schaltbar werden?</div><span class="tag t-dim">B 3</span></li>
-<li><div>EMCOMM-Vertrauensanker: nur manuelles Pinning oder ein Verzeichnis, und wer betreibt es (DARC? ÖVSV? icssw?)?</div><span class="tag t-dim">B 4.9</span></li>
-<li><div>EOL-Schwelle und Datum.</div><span class="tag t-dim">B 4.10</span></li>
-<li><div>Regulatorische Prüfung von Signaturen auf 70 cm in DL und OE.</div><span class="tag t-dim">B 4.9</span></li>
-<li><div>Darf W0 / Stufe 0 auf DK5EN-98 laufen (Produktions-Gateway, nur lesend, ausdrückliches OK nötig)?</div><span class="tag t-dim">A 9 · B 7</span></li>
-<li><div>TTL-Werte für Priorität 3 und 4 (Vorschlag 300 s / 120 s) nach dem Stufe-0-Histogramm.</div><span class="tag t-dim">A 9</span></li>
-<li><div><code>DEDUP_ENTRIES</code> klassisch: 171 (+847 B, deckt die DK5EN-98-Spitze) oder 128 (+546 B, 33,7 min bei Spitze). Vorschlag des Papiers: 171.</div><span class="tag t-dim">A 9</span></li>
-<li><div>Behält <code>E22_XML-DevKitC</code> ein kürzeres Dedup-Fenster oder werden seine Puffer gekürzt?</div><span class="tag t-dim">A 9</span></li>
-<li><div>Diskussionspunkte, alle offen und erst nach Stufe-0-Daten: Hop-Cap-Variante (10.1), <code>{CET}</code>-Reichweite und -Alter samt Bedeutung von „zwei Hops“ (10.8), HG-Budget (10.9), Priorität weitergeleiteter DMs und <code>:ackNNN</code> (10.10).</div><span class="tag t-dim">A 9, 10</span></li>
-</ol>
-<div class="note mt">Alles auf diesen Folien ist Diskussionsstand vom 21.10.2026. Zahlen stammen aus den beiden Konzeptpapieren; gerechnete Werte sind als <span class="calc">berechnet</span> markiert, Bewertungen als <span class="prop">Vorschlag, nicht entschieden</span>. <a href="index.html">Zur Übersicht aller Vorträge</a>.</div>
+<section class="slide" id="roadmap"><span class="num">18</span><div class="inner">
+<div class="eyebrow">Teil B · 6 · Roadmap und Wellenplan <span class="tag warn">W1 ausgeliefert, W2 geparkt, W3 bis W9+ offen</span></div>
+<h2>Von den Wellen W0 bis W9+ ist nur W1 ausgeliefert: W0 ist teilweise erledigt, W2 geparkt</h2>
+<ul class="facts">
+  <li><strong>W1 TX-Puffer ist ausgeliefert</strong> (v4.40a.10.23, 24.10.2026): Verfall, Slot-Pool und Ersetzen; die Kampagne nennt das W1a bis W1c.</li>
+  <li><strong>W0 Messung ist teilweise erledigt:</strong> <code>{CET}</code>-Alters-Logzeilen und Verfallszähler sind drin, die DK5EN-98-Nacht (bis 25.10.2026 16:21) ist nicht ausgewertet. Alters- und Hop-Histogramme fehlen.</li>
+  <li><strong>W2 Pufferparität (Dedup nach Zeit) ist geparkt;</strong> W3 bis W9+ sind nicht begonnen.</li>
+  <li><strong>Der Plan sah einen Upstream-PR je Welle vor.</strong> Tatsächlich landet neue Fork-Firmware zuerst auf <code>fork-dev</code>; der Pool ist noch nicht upstream.</li>
+</ul>
+<div class="ctl mt"><button class="btn pri" id="rm-play">▶ Zeitachse abspielen</button><button class="btn" id="rm-dep" aria-pressed="true">Abhängigkeiten</button></div>
+<figure class="viz xwide mt"><svg id="rm-svg" viewBox="0 0 900 330" role="img" aria-label="Wellenplan als Zeitachse mit Stand je Welle"></svg>
+<figcaption><strong>Abb. 18:</strong> Der Plan vom 21.10.2026 mit dem Stand vom 25.10.2026: grün ausgeliefert, gelb teilweise, gestrichelt geparkt, blau offen. Balken zeigen die Schätzung, nicht die tatsächliche Dauer.</figcaption></figure>
+<p class="cite">Lage auf der Achse: Annahme streng nacheinander in Plan-Reihenfolge, Balken = obere Schätzung, heller Teil = Spanne <span class="calc">berechnet</span>. Schätzungen sind Kalenderzeit für einen Operator mit Agent, keine Zusagen.</p>
+<div class="grid g2 mt">
+  <div class="panel" id="rm-p"></div>
+  <div>
+    <div class="wbox"><h3>Abhängigkeiten</h3><ul>
+      <li>W0 vor allem, was das Relay-Verhalten ändert</li>
+      <li>W1 vor W4 (Retries brauchen den Pool; der Pool steht)</li>
+      <li>W3 vor W5 (die Hop-Klemme neutralisiert gewickelte Frames schon)</li>
+      <li>W6 vor jeder absoluten Priorität für fremden Verkehr</li>
+      <li>W8 nach den PER-Daten aus W0</li></ul><p class="cite">W0 braucht Beobachter-Knoten außerhalb des Clusters. W6 und W8 hängen an Dritten (Regulierer, andere Betreiber).</p></div>
+    <div class="wbox mt"><h3>Wiederkehrende Prüfungen</h3><p>Host-Gate <code>tools/regression.sh --stage 1,2</code>, Golden-Selftest (48), Dedup-Replay, NBR-Replay, gwflood-Replay, APRS-Korpus und Fuzz, Bench-Suite Stufe 3, DK5EN-98-Soaks. Jede Welle fügt ihr Golden Set hinzu.</p></div>
+  </div>
+</div>
+<details class="dev"><summary>Schleife je Welle und Zuordnung zur Kampagne TXP</summary><div class="body">
+<ul>
+  <li><strong>Schleife:</strong> planen, umsetzen, testen (Host-Gate, Golden Sets), Bench, Feldmitschnitt, auswerten, lernen, anpassen, wie in der v4.40a-Kampagne.</li>
+  <li><strong>Namen:</strong> W0 bis W2 des Plans entsprechen der Kampagne <code>docs/campaign-tx-pool.md</code>: W0 = W0, W1 = W1a bis W1c, W2 = W2. Dort sind W0 bis W1c "done" und W2 "parked".</li>
+  <li><strong>Gate der Auslieferung:</strong> 80 Unity-Umgebungen 2861/2861, pytest 1332, golden 48 (<code>docs/RESUME.md</code>, Eintrag v4.40a.10.23).</li>
+</ul>
+</div></details>
 </div></section>
 
+<!-- 19 -->
+<section class="slide" id="fragen"><span class="num">19</span><div class="inner">
+<div class="eyebrow">Teil A · 9 und Teil B · 7 · Offen</div>
+<h2>Offene Fragen an den Operator: eine ist beantwortet, zehn stehen aus</h2>
+<ol class="qlist">
+<li><div>Multi-Line POS: X2 (Umwandlung am Gateway oder Server, keine RF-Kosten) oder X3 (ein APRS-WX-Frame statt der Position)?</div><span class="tag">B 4.4.1</span></li>
+<li><div>Soll das erzwungene <code>--nbrrelay on</code> per RM1 schaltbar werden?</div><span class="tag">B 3</span></li>
+<li><div>EMCOMM-Vertrauensanker: nur manuelles Pinning oder ein Verzeichnis, und wer betreibt es (DARC? ÖVSV? icssw?)?</div><span class="tag">B 4.9</span></li>
+<li><div>EOL-Schwelle und Datum.</div><span class="tag">B 4.10</span></li>
+<li><div>Regulatorische Prüfung von Signaturen auf 70 cm in DL und OE.</div><span class="tag">B 4.9</span></li>
+<li><div>Verfallszeiten für Priorität 3 und 4 (ausgeliefert: 300 s und 120 s) nach der Auswertung der DK5EN-98-Nacht bestätigen oder ändern?</div><span class="tag warn">neu gefasst</span></li>
+<li><div><code>DEDUP_ENTRIES</code> klassisch: 171 (+847 B, deckt die DK5EN-98-Spitze) oder 128 (+546 B, 33,7 min bei Spitze). Vorschlag des Papiers: 171. Die Kampagne hat die Zeittabelle geparkt.</div><span class="tag">A 9</span></li>
+<li><div>Behält <code>E22_XML-DevKitC</code> ein kürzeres Dedup-Fenster oder werden seine Puffer gekürzt?</div><span class="tag">A 9</span></li>
+<li><div>Soll die Relay-Seite der <code>{CET}</code>-Altersgrenze auf Luft geprüft werden? Die Bench-Knoten laufen mit <code>--mesh off</code>, bisher decken nur Host-Tests sie ab.</div><span class="tag warn">neu</span></li>
+<li><div>Diskussionspunkte, alle offen und erst nach Stufe-0-Daten: Hop-Cap-Variante (10.1), <code>{CET}</code>-Reichweite und Alterskorrektur samt Bedeutung von "zwei Hops" (10.8), HG-Budget (10.9), Priorität weitergeleiteter DMs und <code>:ackNNN</code> (10.10).</div><span class="tag">A 9, 10</span></li>
+<li class="done"><div>Darf W0 / Stufe 0 auf DK5EN-98 laufen? Beantwortet: ja, die Image-Freigabe für das Produktions-Gateway erfolgte am 24.10.2026 (Entscheidung D7 der Kampagne).</div><span class="tag ok">beantwortet</span></li>
+</ol>
+<div class="callout note mt">Alles auf diesen Folien ist Stand 25.10.2026. Ausgeliefert ist, was oben als ausgeliefert markiert ist; alles andere ist Diskussionsstand der Konzeptpapiere vom 21.10.2026. Gerechnete Werte tragen <span class="calc">berechnet</span>, Bewertungen <span class="prop">Vorschlag, nicht entschieden</span>.</div>
+</div></section>
+
+<div class="deckfoot">
+<div class="foot">
+  <p>Quellen:
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/tx-pool-dedup-concept-20261021.md">Konzeptpapier Teil A</a>
+    · <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/mesh-evolution-concept-20261021.md">Teil B</a>
+    · <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/campaign-tx-pool.md">Kampagne TX-Pool</a>
+    · <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.24/docs/production-locked-settings.md">feste Einstellungen</a>
+    · Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.24">v4.40a.10.24</a> (24.10.2026)
+    · <a href="index.html">Startseite</a></p>
+  <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
+  ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
+</div>
+</div>
 </main>
 <script>
 (function(){
@@ -668,7 +925,7 @@ var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').
 var NS = 'http://www.w3.org/2000/svg';
 function $(s, r){ return (r || document).querySelector(s); }
 function $$(s, r){ return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
-function S(tag, a, p){ var e = document.createElementNS(NS, tag); if (a) for (var k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function S(tag, a, p){ var e = document.createElementNS(NS, tag); if (a) for (var k in a){ if (tag === 'text' && k === 'fill') e.style.fill = a[k]; else if (tag === 'text' && k === 'font-size') e.style.fontSize = a[k] + 'px'; else e.setAttribute(k, a[k]); } if (p) p.appendChild(e); return e; }
 function T(a, txt, p){ var e = S('text', a, p); e.textContent = txt; return e; }
 function clear(e){ while (e.firstChild) e.removeChild(e.firstChild); }
 function de(n, d){ return Number(n).toLocaleString('de-DE', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
@@ -748,8 +1005,8 @@ function initToa(){
   seg(sfBox, function(v){ state.sf = +v; note = ''; upd(); });
   [pl, ring, rel, itv].forEach(function(e){ e.addEventListener('input', function(){ note = ''; upd(); }); });
   var presets = {
-    t30: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 30, n: 'Rechenbeispiel: ein 80-B-Positionsframe (Größe INFERRED) alle 30 s auf der MeshCom-QRG, <code>max_hop_pos</code> 2, drei Relays je Ring: 26 %. Das ist <b>nicht</b> der Track-Modus: der sendet auf 433,775 MHz und nur alle 5 min eine Kopie auf die MeshCom-QRG (Folie 3).' },
-    t10: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 10, n: 'Rechenbeispiel: derselbe Positionsframe alle 10 s auf der MeshCom-QRG: 77 %. Kein Track-Modus-Szenario (Folie 3).' },
+    t30: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 30, n: 'Rechenbeispiel: ein 80-B-Positionsframe (Größe INFERRED) alle 30 s auf der MeshCom-QRG, <code>max_hop_pos</code> 2, drei Relays je Ring: 26 %. Das ist <b>nicht</b> der Track-Modus: der sendet auf 433,775 MHz und nur alle 5 min eine Kopie auf die MeshCom-QRG (Folie 4, Track).' },
+    t10: { sf: 11, pl: 80, ring: 2, rel: 3, itv: 10, n: 'Rechenbeispiel: derselbe Positionsframe alle 10 s auf der MeshCom-QRG: 77 %. Kein Track-Modus-Szenario (Folie 4, Track).' },
     hey: { sf: 11, pl: 30, ring: 4, rel: 3, itv: 900, n: 'HEY: etwa 30 B auf der Luft, <code>max_hop_text</code> 4, ein HEY je Imax (15 min). Drei Relays je Ring sind eine Annahme für dieses Bild.' },
     dm:  { sf: 11, pl: 77, ring: 4, rel: 3, itv: 40, n: 'DM: 77 B ist die mittlere Framelänge auf der Luft (Teil A 5.4), Hop 4, ein DM je 40-s-Leiterstufe. Relays je Ring und Länge sind Annahmen für dieses Bild.' }
   };
@@ -856,7 +1113,7 @@ function initHop(){
       var col = i === 0 ? v('acc') : i === 2 ? v('mag') : (i === 5 && wrap) ? v('warn') : v('fg3');
       var g = node(n, col); if (i >= 6 && !wrap) g.setAttribute('opacity', 0.25);
     });
-    if (wrap) T({ x: A[5].x, y: A[5].y + 34, 'text-anchor': 'middle', fill: v('warn'), 'font-size': 10 }, '4.35x, ohne App', svg);
+    if (wrap) T({ x: A[5].x, y: A[5].y + 50, 'text-anchor': 'middle', fill: v('warn'), 'font-size': 10 }, '4.35x, ohne App', svg);
     layer = S('g', {}, svg);
   }
   function node(n, col){
@@ -961,10 +1218,10 @@ function initQrt(){
     { k: 'Echo-Freigabe', n: 'Echo gibt eigenen Gruppentext frei; Retry stoppt, wenn schon gehört', ok: '20 ignorierte Echos und 5 Nachrichten mit 3 Retries gemessen', bad: 'der Echo-Stopp für <code>SENT</code>-Gruppentext gab es schon vor QRT; DMs sind ausgenommen. Ein Echo eines Nachbarn beweist nur, dass der Nachbar ihn hat, nicht die ferne Seite. Echtes Contra: auf einem Gateway ist das erste Echo oft die Serverkopie eines anderen Gateways, sodass die eigene Funkinsel den Gruppentext eventuell nie bekommt', berg: 'neutral bis gut: das Echo des Bergs kommt meist von einem fernen Relay', stadt: 'Risiko: ein Echo von einem Knoten 50 m weiter stoppt den Retry, obwohl die Nachricht den Cluster nie verlassen hat', w0: 'durch ein Echo gestoppte Retries mit RSSI über z. B. −80 dBm', sc: 'echo' },
     { k: 'Retry in QRT verschoben', n: 'Retry wartet bis zur QRT-Freigabe (unter 16/20)', ok: '7 Verdrängungen, 4 Servertexte durch eigene Retries verloren', bad: 'der Retry wird bis zur QRT-Freigabe verschoben; nur ein Slot, der schon am Retry-Limit steht, gibt auf. Unter Last kommt die Wiederholung später, genau wenn es zählt', berg: 'selten in QRT, außer bei Rückstau', stadt: 'oft in QRT unter Last: Retries kommen erst nach der Freigabe' },
     { k: 'Server-Spiegelung', n: 'vom Server gespiegelte eigene Nachricht nicht eingereiht', ok: 'eigene Nachricht 311 s später erneut gesendet', bad: 'Positionen und Texte an nicht abonnierte Gruppen verlieren die Kopie fürs Telefon (Abweichung C)', berg: 'gut für die Sendezeit; Telefonkopie fehlt', stadt: 'gut für die Sendezeit; Telefonkopie fehlt' },
-    { k: 'Ring voll −2', n: 'Ring voll gibt −2, QTA bei jeder Tiefe; QRT-Freigabe unter 16, 60-s-Wiederholung', ok: '11 von 19 Drops bei 11 oder weniger belegten Slots; 6 min 57 s abgewiesen bei 15 freien Slots', bad: 'behandelt das Symptom der Ringlücken (Teil A Problem A); die Schwellen sind an einem Replay getunt', berg: 'gut', stadt: 'gut' },
+    { k: 'Puffer voll −2', n: 'Voller Puffer gibt −2, QTA bei jeder Tiefe; QRT-Freigabe unter 16, 60-s-Wiederholung', ok: '11 von 19 Drops bei 11 oder weniger belegten Slots; 6 min 57 s abgewiesen bei 15 freien Slots', bad: 'behandelte das Symptom der Ringlücken (Teil A Problem A); die Lücken sind mit dem Slot-Pool seit v4.40a.10.23 weg. Die Schwellen sind an einem Replay getunt', berg: 'gut', stadt: 'gut' },
     { k: 'shortpath aus', n: 'erzwungen aus (prod_lock.h:176)', ok: 'der volle Pfad speist Nachbarschaftsmatrix, Loop-Check und gwcap; die Vorgabe war schon vorher aus', bad: 'längere Frames, aber nur etwa +98 ms je zusätzlichem Hop im Pfad (SF11, berechnet); gwcap schlägt bei langen eingespeisten Pfaden an (Teil A 10.1)', berg: 'etwas mehr Sendezeit je Relay auf dem belebtesten Knoten', stadt: 'etwas mehr Sendezeit je Kopie, mal viele Kopien' },
     { k: 'Sperren', n: 'HN-Bericht auto, nbrsym an, pingtime/pingmax gesperrt, postime-Klemme 300 s', ok: 'stoppt Fehlkonfiguration (pingtime ohne Ziel brachte HEY/HN zum Schweigen)', bad: 'Sperren nehmen das Tuning im Feld; postime 300 s begrenzt den Track-Modus nicht', berg: 'neutral', stadt: 'neutral' },
-    { k: 'Nicht gemacht', n: 'Finding 3 (Gateway cancelt schon gehörte Server-Frames), Finding 6 (90 s Server-Höchstalter), Rest von Finding 9', ok: '–', bad: 'Finding 3 ist das Gateway-Gegenstück zu Cancel-on-Overhear und greift die 3,8 Kopien direkt an', berg: '–', stadt: '–' }
+    { k: 'Nicht gemacht', n: 'Finding 6 (90 s Server-Höchstalter), Rest von Finding 9; Finding 3 kam später', ok: 'Finding 3 (Gateway cancelt schon gehörte Server-Frames) ist seit v4.40a.10.23 im Code (GWRX-01): Server-Textframes nehmen am Nachbar-Cancel teil', bad: 'Finding 3 greift die 3,8 Kopien direkt an, ist im Feld aber nicht ausgewertet (Zählnacht auf DK5EN-98 offen). Finding 4 (Ring-Verdichtung) betrifft einen Ring, den es seit dem Pool nicht mehr gibt. Finding 6 und der Rest von Finding 9 bleiben offen', berg: '–', stadt: '–' }
   ];
   var list = $('#qrt-list'), panel = $('#qrt-p'), cap = $('#qrt-cap');
   var mode = 'berg', selIdx = 0;
@@ -977,8 +1234,8 @@ function initQrt(){
   });
   function show(){
     var m = M[selIdx];
-    panel.innerHTML = '<h4>' + m.k + ' · ' + m.n + '</h4><div class="pc"><div><span class="tag t-ok">warum richtig</span><p style="margin-top:.3rem">' + m.ok + '</p></div><div><span class="tag t-bad">warum evtl. falsch</span><p style="margin-top:.3rem">' + m.bad + '</p></div></div>' +
-      '<div class="note mt ' + (/Risiko/.test(m[mode]) ? 'warn' : '') + '"><b>' + (mode === 'berg' ? 'Berg-Knoten' : 'Stadt-Cluster') + ':</b> ' + m[mode] + '</div>' +
+    panel.innerHTML = '<h4>' + m.k + ' · ' + m.n + '</h4><div class="pc"><div><span class="tag ok">warum richtig</span><p style="margin-top:.3rem">' + m.ok + '</p></div><div><span class="tag bad">warum evtl. falsch</span><p style="margin-top:.3rem">' + m.bad + '</p></div></div>' +
+      '<div class="callout mt ' + (/Risiko/.test(m[mode]) ? 'warn' : 'note') + '"><b>' + (mode === 'berg' ? 'Berg-Knoten' : 'Stadt-Cluster') + ':</b> ' + m[mode] + '</div>' +
       (m.w0 ? '<p class="cite">W0-Metrik: ' + m.w0 + '</p>' : '');
   }
   seg($('#qrt-mode'), function(val){ mode = val; show(); scene(); cap.textContent = 'Szenario wählen. Die Bilder veranschaulichen die Risiken aus der Tabelle; gemessen ist keines davon.'; });
@@ -1088,19 +1345,40 @@ function initPool(){
   var st;
   var R = rng(7);
   var seq = [3, 4, 5, 3, 3, 5, 4, 3, 5, 4, 3, 3, 4, 5, 3, 4];
-  function reset(){ st = { ring: new Array(NSL).fill(null), iR: 0, iW: 0, pool: new Array(NSL).fill(null), id: 1, k: 0, t: 0, rd: 0, pd: 0, rs: 0, ps: 0, pc: 0, msgR: '', msgP: '' }; }
+  function reset(){ st = { ring: new Array(NSL).fill(null), iR: 0, iW: 0, pool: new Array(NSL).fill(null), id: 1, k: 0, t: 0, rd: 0, pd: 0, pe: 0, sup: 0, rs: 0, ps: 0, pc: 0, msgR: '', msgP: '' }; }
   function ringFull(){ return ((st.iW + 1) % NSL === st.iR) && st.ring[st.iR] !== null; }
   function adv(){ while (st.iR !== st.iW && st.ring[st.iR] === null) st.iR = (st.iR + 1) % NSL; }
   function inRange(i){ var a = st.iR, b = st.iW; return a <= b ? (i >= a && i < b) : (i >= a || i < b); }
-  function add(n){
-    var dr = 0, dp = 0;
-    for (var j = 0; j < n; j++){
-      var f = { id: st.id++, p: seq[st.k++ % seq.length], age: 0, s: 'R', t: st.t + j * 0.01 };
-      if (ringFull()) { st.rd++; dr++; } else { st.ring[st.iW] = Object.assign({}, f); st.iW = (st.iW + 1) % NSL; }
+  function put(f){
+    var dr = 0, dp = 0, note = '';
+    if (ringFull()) { st.rd++; dr = 1; } else { st.ring[st.iW] = Object.assign({}, f); st.iW = (st.iW + 1) % NSL; }
+    var si = f.o ? st.pool.findIndex(function(e){ return e && e.o === f.o && e.s !== 'S'; }) : -1;
+    if (si >= 0) { st.pool[si] = Object.assign({}, f); st.sup++; note = 'ersetzt'; }
+    else {
       var fi = st.pool.indexOf(null);
-      if (fi < 0) { st.pd++; dp++; } else st.pool[fi] = Object.assign({}, f);
+      if (fi >= 0) st.pool[fi] = Object.assign({}, f);
+      else {
+        var w = -1;
+        st.pool.forEach(function(e, i){ if (e && (w < 0 || e.p > st.pool[w].p || (e.p === st.pool[w].p && e.t < st.pool[w].t))) w = i; });
+        if (w >= 0 && f.p < st.pool[w].p) { st.pool[w] = Object.assign({}, f); st.pe++; note = 'verdrängt'; }
+        else { st.pd++; dp = 1; }
+      }
     }
-    st.msgR = dr ? dr + '× RING_DROP_NEW' : ''; st.msgP = dp ? dp + '× voll' : '';
+    return { dr: dr, dp: dp, note: note };
+  }
+  function add(n){
+    var dr = 0, dp = 0, nv = 0;
+    for (var j = 0; j < n; j++){
+      var r = put({ id: st.id++, p: seq[st.k++ % seq.length], age: 0, s: 'R', t: st.t + j * 0.01 });
+      dr += r.dr; dp += r.dp; if (r.note === 'verdrängt') nv++;
+    }
+    st.msgR = dr ? dr + '× RING_DROP_NEW' : '';
+    st.msgP = dp ? dp + '× voll, verworfen' : (nv ? nv + '× verdrängt (höhere Priorität)' : '');
+  }
+  function twin(){
+    var r = put({ id: st.id++, p: 5, age: 0, s: 'R', t: st.t, o: 'T' });
+    st.msgR = r.dr ? '1× RING_DROP_NEW' : 'Zwilling belegt einen weiteren Slot';
+    st.msgP = r.note === 'ersetzt' ? 'Zwilling ersetzt den alten, kein neuer Slot' : (r.dp ? '1× voll, verworfen' : 'Zwilling eingereiht');
   }
   function pick(arr, order){
     var best = -1;
@@ -1136,7 +1414,7 @@ function initPool(){
       var e = st.ring[i]; if (e){ e.age += 120; if ((e.p === 5 && e.age >= 180) || (e.s === 'S' && e.age >= 120)){ st.ring[i] = null; rr++; } }
       var f = st.pool[i]; if (f){ f.age += 120; if ((f.s === 'S' && f.age >= 120) || (f.s !== 'S' && TTL[f.p] && f.age >= TTL[f.p])){ st.pool[i] = null; pp++; } }
     }
-    adv(); st.msgR = rr + '× entfernt (nur HEY altert, 180 s)'; st.msgP = pp + '× entfernt (TTL je Priorität)';
+    adv(); st.msgR = rr + '× entfernt (nur HEY altert, 180 s)'; st.msgP = pp + '× entfernt (Verfall je Priorität)';
   }
   function colr(e){ return v('p' + e.p); }
   function draw(){
@@ -1174,10 +1452,11 @@ function initPool(){
     T({ x: 150, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: v('fg'), 'font-weight': 700 }, pocc + '/20 belegt', svP);
     T({ x: 150, y: 272, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'frei = jeder leere Slot', svP);
     T({ x: 150, y: 287, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'Auswahl: Prio, dann Einreihzeit', svP);
-    $('#rp-pool-t').innerHTML = 'belegt ' + pocc + ' · frei ' + (NSL - pocc) + ' · Drops ' + st.pd + (st.msgP ? ' · ' + st.msgP : '');
+    $('#rp-pool-t').innerHTML = 'belegt ' + pocc + ' · frei ' + (NSL - pocc) + ' · Drops ' + st.pd + ' · verdrängt ' + st.pe + ' · ersetzt ' + st.sup + (st.msgP ? ' · ' + st.msgP : '');
   }
   function act(fn){ return function(){ fn(); draw(); }; }
   $('#rp-add').addEventListener('click', act(function(){ add(3); }));
+  $('#rp-twin').addEventListener('click', act(twin));
   $('#rp-send').addEventListener('click', act(send));
   $('#rp-cancel').addEventListener('click', act(cancel));
   $('#rp-park').addEventListener('click', act(park));
@@ -1186,7 +1465,7 @@ function initPool(){
   var run = Run();
   async function demo(){
     var tk = run.start(); reset(); add(3); add(3); draw();
-    var steps = [function(){ add(3); }, send, cancel, park, function(){ add(3); }, function(){ add(3); }, cancel, function(){ add(3); }, function(){ add(3); }, function(){ add(3); }, ttl, send];
+    var steps = [function(){ add(3); }, send, cancel, park, twin, twin, function(){ add(3); }, function(){ add(3); }, cancel, function(){ add(3); }, function(){ add(3); }, function(){ add(3); }, ttl, send];
     for (var i = 0; i < steps.length; i++){ await wait(800); if (!run.ok(tk)) return; steps[i](); draw(); }
   }
   $('#rp-demo').addEventListener('click', demo);
@@ -1273,7 +1552,7 @@ function initPrio(){
     grp: { n: 'Gruppe', c: 'info' }, cet: { n: '{CET}', c: 'cyan' }, pos: { n: 'Position', c: 'ok' }, hey: { n: 'HEY', c: 'p5' }
   };
   var variant = 'heute';
-  function chip(s){ var m = String(s).match(/^(\d)/); return m ? '<span class="tag" style="color:var(--p' + m[1] + ')">' + s + '</span>' : '<span class="t-dim">' + s + '</span>'; }
+  function chip(s){ var m = String(s).match(/^(\d)/); return m ? '<span class="tag" style="color:var(--p' + m[1] + ');border-color:var(--p' + m[1] + ')">' + s + '</span>' : '<span class="t-dim">' + s + '</span>'; }
   function table(){
     var tb = $('#pm-table tbody'); var h = '';
     ROWS.forEach(function(r){
@@ -1347,7 +1626,7 @@ function initPrio(){
     T({ x: 340, y: 186, 'font-size': 10, fill: v('fg3') }, '● eigen   ↻ weitergeleitet', svg);
     T({ x: 340, y: 202, 'font-size': 10, fill: v('fg3') }, 'Queue-Länge ' + q.length, svg);
     var tb = $('#pm-stats tbody'), h = '';
-    ['emc', 'a41', 'ack', 'dm', 'grp', 'cet', 'pos', 'hey'].forEach(function(k){ var s = stats[k]; if (!s) return; h += '<tr><td><span class="tag" style="color:var(--' + TYPES[k].c + ')">' + TYPES[k].n + '</span></td><td class="r m">' + s.n + '</td><td class="r m">' + de(s.w / s.n, 1) + '</td></tr>'; });
+    ['emc', 'a41', 'ack', 'dm', 'grp', 'cet', 'pos', 'hey'].forEach(function(k){ var s = stats[k]; if (!s) return; h += '<tr><td><span class="tag" style="color:var(--' + TYPES[k].c + ');border-color:var(--' + TYPES[k].c + ')">' + TYPES[k].n + '</span></td><td class="r m">' + s.n + '</td><td class="r m">' + de(s.w / s.n, 1) + '</td></tr>'; });
     tb.innerHTML = h || '<tr><td colspan="3">noch nichts bedient</td></tr>';
   }
   async function play(){
@@ -1374,14 +1653,14 @@ function initCet(){
     R3: { n: 'Empfänger nimmt die frischeste Kopie', p: '<code>{CET}</code> nur mit Nibble ≥ 1 annehmen, also nahe einem Gateway; 0 B', c: 'Knoten jenseits eines Relays bekommen keine Zeit aus <code>{CET}</code>; die Bake kostet dieselbe Sendezeit' }
   };
   var A = {
-    A0: { n: 'Status quo', p: 'keine Änderung; kein Umschreiben von Serverinhalt; funktioniert mit der ganzen Flotte', c: 'Alter von einer Minute und mehr wird als aktuelle Zeit gesetzt, auch über eine Telefon-synchronisierte Uhr' },
-    A1: { n: 'TTL in der Queue (z. B. 30 s)', p: '0 B, passt zu Stufe 1; stoppt das Senden veralteter Zeit', c: 'bei gemessenen Relay-Wartezeiten von 17 bis 32 s würden 30 s schon einen Teil des zweiten Rings verwerfen; der Wert braucht das Stufe-0-Altershistogramm' },
+    A0: { n: 'Stand bis v4.40a.10.22 (keine Grenze)', p: 'keine Änderung; kein Umschreiben von Serverinhalt; funktioniert mit der ganzen Flotte', c: 'Alter von einer Minute und mehr wird als aktuelle Zeit gesetzt, auch über eine Telefon-synchronisierte Uhr; im Mitschnitt vom 18.10.2026 lagen zwei Baken 305 und 440 s in der Queue' },
+    A1: { n: 'Altersgrenze 150 s, ausgeliefert seit v4.40a.10.23', p: '0 B, gegen eine vertrauenswürdige Uhr (GPS, NTP, RTC); stoppt das Senden veralteter Zeit am Gateway-Eingang, in der Relay-Entscheidung und vor dem Senden', c: 'die zuerst erwogene Queue-TTL von 30 s hätte bei gemessenen Relay-Wartezeiten von 17 bis 32 s einen Teil des zweiten Rings verworfen; 150 s lässt alle drei Ringe dieses Bildes passieren. Ein Knoten ohne vertrauenswürdige Uhr leitet keine Bake mehr weiter' },
     A2: { n: 'Alterskorrektur beim Senden', p: 'addiert die Queue-Wartezeit (<code>now − ringEnqueueTime[slot]</code>, existiert) zur Payload; Restfehler etwa die Sendezeit', c: 'schreibt die Payload eines Server-Frames bei jedem Relay um; die Latenz Server → Gateway bleibt unkorrigiert; alte Firmware leitet unkorrigiert weiter' },
-    A3: { n: 'Supersede in der Queue', p: 'eine neuere <code>{CET}</code> ersetzt eine eingereihte ältere (5.4 Punkt 1)', c: 'hilft nur, wenn sich zwei Baken in einer Queue treffen' },
+    A3: { n: 'Ersetzen in der Queue, ausgeliefert seit v4.40a.10.23', p: 'eine neuere <code>{CET}</code> ersetzt eine eingereihte ältere, gleich von welcher Quelle (5.4 Punkt 1)', c: 'hilft nur, wenn sich zwei Baken in einer Queue treffen' },
     A4: { n: 'Priorität anheben (auf 2)', p: 'kürzere Wartezeit', c: 'drängt Gruppentext zurück; behebt den Teil Server → Gateway nicht' },
     A5: { n: 'Telefonzeit schützt die Uhr', p: '<code>bPhoneTimeValid</code> im <code>{CET}</code>-Gate wieder aktivieren', c: 'braucht regelmäßige Telefonzeit (sagt der Code-Kommentar); hilft Knoten ohne Telefon nicht' }
   };
-  var target = '2', rOpt = 'R0', aOpt = 'A0';
+  var target = '2', rOpt = 'R0', aOpt = 'A1';
   function showPanel(){
     var r = R[rOpt], a = A[aOpt];
     panel.innerHTML = '<h4>' + rOpt + ' · ' + r.n + '</h4><div class="pc"><div class="p">' + r.p + '</div><div class="c">' + r.c + '</div></div>' +
@@ -1406,7 +1685,7 @@ function initCet(){
       T({ x: r[0].x, y: 22, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'Ring ' + (k + 1), svg);
       r.forEach(function(n, i){ n.c = S('circle', { cx: n.x, cy: n.y, r: 11, fill: v('bg3'), stroke: v('fg3'), 'stroke-width': 1.5 }, svg); });
     });
-    if (aOpt === 'A5'){ T({ x: rings[2][2].x + 16, y: rings[2][2].y + 4, 'font-size': 10, fill: v('info') }, '☎ Telefonzeit', svg); }
+    if (aOpt === 'A5'){ T({ x: rings[2][2].x, y: rings[2][2].y + 52, 'text-anchor': 'middle', 'font-size': 10, fill: v('info') }, 'Telefonzeit', svg); }
     fx = S('g', {}, svg);
   }
   function note(n, s, c, dy){ T({ x: n.x, y: n.y + (dy || 26), 'text-anchor': 'middle', 'font-size': 10, fill: c || v('fg2') }, s, fx); }
@@ -1451,7 +1730,6 @@ function initCet(){
           if (!alive[m]) continue;
           if (k === 0){
             note(rings[0][m], 'wartet ' + waits[m], v('fg3'), -18);
-            if (aOpt === 'A1' && waitsN[m] > 30){ alive[m] = false; note(rings[0][m], 'TTL 30 s: verworfen', v('bad'), 38); continue; }
           }
           tx++;
         }
@@ -1459,9 +1737,9 @@ function initCet(){
       }
     }
     var extra = '';
-    if (aOpt === 'A1') extra = ' A1: der Relay mit 31,7 s Wartezeit verwirft seine Kopie; Ring-2-Wartezeiten sind nicht gemessen.';
+    if (aOpt === 'A1') extra = ' A1 (ausgeliefert): Altersgrenze 150 s; alle Ringe dieses Bildes liegen mit 55, 72 bis 87 und 91 s darunter, nichts wird verworfen. Eine 30-s-Grenze hätte den Relay mit 31,7 s Wartezeit verworfen.';
     if (aOpt === 'A2') extra = ' A2: die Relays addieren ihre Queue-Wartezeit; übrig bleibt die Latenz Server → Gateway (Teil der 55 s, Anteil unbekannt, TM-39) plus Sendezeit.';
-    if (aOpt === 'A3') extra = ' A3 wirkt nur, wenn sich zwei Baken in einer Queue treffen; in diesem Bild nicht.';
+    if (aOpt === 'A3') extra = ' A3 (ausgeliefert) wirkt nur, wenn sich zwei Baken in einer Queue treffen; in diesem Bild nicht.';
     if (aOpt === 'A4') extra = ' A4: Prio 2 kürzt die Wartezeit, drängt aber Gruppentext zurück.';
     if (aOpt === 'A5') extra = ' A5: der Knoten mit Telefonzeit übernimmt die Bake nicht.';
     if (rOpt === 'R3') extra += ' R3: Empfänger mit H00 setzen ihre Uhr nicht, die Sendezeit bleibt gleich.';
@@ -1472,7 +1750,7 @@ function initCet(){
   seg($('#cet-a'), function(val){ aOpt = val; play(); });
   $('#cet-play').addEventListener('click', play);
   base(); showPanel();
-  cap.textContent = 'Abspielen zeigt eine Bake mit Nibble 2 vom Gateway, wie im Feldlog vom 26.09.2026.';
+  cap.textContent = 'Abspielen zeigt eine Bake mit Nibble 2 vom Gateway, wie im Feldlog vom 26.09.2026, mit der ausgelieferten Altersgrenze (A1).';
   return { play: play };
 }
 
@@ -1563,7 +1841,7 @@ function initSf(){
       if (usable && !best) best = s;
       S('rect', { x: x, y: Y(0), width: w, height: Y(s.snr) - Y(0), rx: 4, fill: s.sf === sel ? v('acc') : (usable ? v('ok') : v('line2')), opacity: s.sf === sel ? 0.95 : 0.6, style: 'cursor:pointer' }, svg)
         .addEventListener('click', function(){ $$('button', box)[i].click(); });
-      T({ x: x + w / 2, y: Y(s.snr) + 14, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg') }, (s.snr < 0 ? '−' : '') + de(Math.abs(s.snr), 1), svg);
+      T({ x: x + w / 2, y: Y(s.snr) + (Math.abs(s.snr + 15) < 0.1 ? 25 : 14), 'text-anchor': 'middle', 'font-size': 10, fill: v('fg') }, (s.snr < 0 ? '−' : '') + de(Math.abs(s.snr), 1), svg);
       T({ x: x + w / 2, y: Y(0) - 6, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg'), 'font-weight': 700 }, s.thr, svg);
       T({ x: x + w / 2, y: yb + 18, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg2') }, 'SF' + s.sf, svg);
     });
@@ -1576,7 +1854,7 @@ function initSf(){
     $('#sf-cap').innerHTML = best ? 'Bei ' + $('#sf-snr-o').textContent + ' ist SF' + best.sf + ' das schnellste SF mit 5,5 dB Reserve über der Grenze (' + best.thr + ' gegen SF11) <span class="calc">berechnet</span>. Teil B: Upgrade auf SF9 ab etwa −7 dB.' :
       'Bei ' + $('#sf-snr-o').textContent + ' hat kein SF 5,5 dB Reserve. Unter etwa −18 dB ist ein gemeldeter SNR „am Rand“, keine gemessene Reserve; −24 dB bei SF11 liegt 6,5 dB unter der typischen Grenze, eine echte Dekodierung ist unwahrscheinlich (INFERRED, Bench mit kalibriertem Dämpfungsglied entscheidet).';
     var s = SF.filter(function(x){ return x.sf === sel; })[0];
-    $('#sf-row').innerHTML = '<h3>SF' + s.sf + ' · BW 250 kHz, CR 4/6, Präambel 32</h3><div class="tw"><table><tbody>' +
+    $('#sf-row').innerHTML = '<h3>SF' + s.sf + ' · BW 250 kHz, CR 4/6, Präambel 32</h3><div class="table-wrap"><table><tbody>' +
       '<tr><td>SNR-Grenze (Semtech typisch)</td><td class="r m">' + (s.snr < 0 ? '−' : '') + de(Math.abs(s.snr), 1) + ' dB</td></tr>' +
       '<tr><td>Bitrate <span class="calc">berechnet</span></td><td class="r m">' + s.br + ' kbit/s</td></tr>' +
       '<tr><td>ToA 60 / 80 / 120 B <span class="calc">berechnet</span></td><td class="r m">' + s.t60 + ' / ' + s.t80 + ' / ' + s.t120 + ' ms</td></tr>' +
@@ -1594,7 +1872,7 @@ function initSf(){
     Object.keys(Nn).forEach(function(k){ var n = Nn[k]; n.c = S('circle', { cx: n.x, cy: n.y, r: 14, fill: v('bg3'), stroke: v('fg3'), 'stroke-width': 2 }, wf); T({ x: n.x, y: n.y + 4, 'text-anchor': 'middle', 'font-size': 12, fill: v('fg') }, n.n, wf); n.sf = T({ x: n.x, y: n.y - 20, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, 'SF11', wf); });
     fx = S('g', {}, wf);
   }
-  function setSf(k, s, c){ Nn[k].sf.textContent = s; Nn[k].sf.setAttribute('fill', c); Nn[k].c.setAttribute('stroke', c); }
+  function setSf(k, s, c){ Nn[k].sf.textContent = s; Nn[k].sf.style.fill = c; Nn[k].c.setAttribute('stroke', c); }
   async function wplay(){
     var tk = run.start(); wbase(); var ok = function(){ return run.ok(tk); };
     cap.textContent = '1 · Basis-SF11: C flutet (HEY, Position, Gruppe). Alle hören es.';
@@ -1739,7 +2017,7 @@ function initEmcomm(){
     clear(svg);
     S('rect', { x: 18, y: 112, width: 104, height: 76, rx: 8, fill: v('bg3'), stroke: v('acc') }, svg);
     T({ x: 70, y: 132, 'text-anchor': 'middle', 'font-size': 11, fill: v('fg') }, 'Absender A', svg);
-    T({ x: 70, y: 152, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg2') }, mode === 'A1' ? '🔑 Netzschlüssel' : '🔑 privat', svg);
+    T({ x: 70, y: 152, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg2') }, mode === 'A1' ? 'Netzschlüssel' : 'privat', svg);
     T({ x: 70, y: 170, 'text-anchor': 'middle', 'font-size': 10, fill: v('fg3') }, mode === 'A1' ? 'HMAC 16 B hex' : 'Ed25519 88 B b64', svg);
     if (mode === 'A4'){
       S('rect', { x: 190, y: 6, width: 150, height: 44, rx: 8, fill: v('bg3'), stroke: v('mag') }, svg);
@@ -1913,22 +2191,22 @@ function initCells(){
 function initRoadmap(){
   var svg = $('#rm-svg'); if (!svg) return;
   var W = [
-    { k: 'W0', n: 'Messung', lo: 1, hi: 2, est: '1 bis 2 Wochen', c: 'Teil A Stufe 0 plus Metriken aus Abschnitt 3 (falsche Abdeckung über <code>removed_inferred</code>, Prioritätsinversion durch Stufe 2, Echo-Freigabe am Gateway), Zähler für Hop, <code>{SET}</code>, <code>{CET}</code>, HG, DM-Band, Taubheit beim Track-QRG-Wechsel (K0), PER je SNR-Klasse', g: 'Host-Gate; neue Golden Sets: Hop-Nibble-Korpus, CET-Alters-Replay', f: 'Logger-Daten DK5EN-98 seit 18.10. (ausdrückliches OK), Beobachter-Knoten außerhalb eines Clusters, eine Bench-Nacht' },
-    { k: 'W1', n: 'TX-Puffer', lo: 2, hi: 2, est: '2 Wochen', c: 'TTL je Priorität, Slot-Pool, Supersede (Teil A Stufen 1, 2, 4)', g: '<code>test_txring</code>, <code>test_txring_flood</code>, <code>test_txprio_replay</code>, <code>test_nbr_replay</code>', f: 'gwflood-Replay auf DK5EN-1/-92/-90, 1 Nacht' },
-    { k: 'W2', n: 'Pufferparität', lo: 2, hi: 2, est: '2 Wochen', c: 'zeitgealterte Dedup, Abdeckungsfenster der Nachbarn, Puffer-Inventur, Byte-Pool-Studie', g: '<code>test_dedup_replay</code> mit Uhr (8813 Urteile, zwei Überläufe werden DUP), <code>test_topo_shadow</code>, RAM-Baseline (<code>tools/resource_baseline.json</code>)', f: 'DK5EN-98-Soak: kein <code>RX_DEDUP_NEW</code> für IDs älter als 39 min' },
-    { k: 'W3', n: 'Hop-Klemme', lo: 0.6, hi: 1, est: '3 bis 5 Tage', c: 'Nibble-Cap beim Relay (H1), gwcap-Review', g: 'neuer Nibble-Korpus mit gewickelten Frames; <code>test_aprs_corpus</code>', f: 'Anzahl Nibble > L vorher/nachher' },
-    { k: 'W4', n: 'PN-Priorität', lo: 2, hi: 2, est: '2 Wochen', c: 'ACK zuerst, DM-Band 2 mit Limit je Quelle, DM-Retries in QRT nach dem Pool; Studie S1 Next-Hop', g: '<code>test_ack_replay</code>, neues DM-Latenz-Replay (Golden: DG0OPK-DM-Rundläufe, 1 min ruhig / 4 min belastet)', f: 'Median und p95 der DM-Rundlaufzeit auf der Bench-Flotte, nur Gruppe <code>TEST</code> und eigene Knoten' },
-    { k: 'W5', n: 'End of Life', lo: 1, hi: 1, est: '1 Woche', c: 'Relay-Filter für wickelnde Builds, Hinweis-DM, veröffentlichtes Datum', g: 'Trailer-Korpus je Firmware-Version', f: 'Anzahl blockierter Frames, kein Verlust von Frames aktueller Firmware' },
-    { k: 'W6', n: 'EMCOMM', lo: 3, hi: 4, est: '3 bis 4 Wochen', c: 'Prioritätsflag (E1/E4), Ed25519-Signaturen (A3), Trust-Store mit Pinning in der Web-GUI; zuerst die regulatorische Prüfung', g: 'Signatur-Vektoren (Golden), Lint für die Persistenz des Trust-Stores', f: 'Bench: signierter Frame auf allen vier Boards geprüft, unsignierter mit Warnung angezeigt. Hängt an Dritten (Regulierer, Verzeichnisbetreiber)' },
-    { k: 'W7', n: 'Tag-Gruppen', lo: 1, hi: 2, est: '1 bis 2 Wochen', c: 'T2-Anzeigefilter, dann T1 mit App und Server', g: 'Lint des Settings-Schemas, Gruppen-Korpus', f: 'Bench und eine Nutzergruppe' },
-    { k: 'W8', n: 'Multi-SF', lo: 4, hi: 6, est: '4 bis 6 Wochen', c: 'regionales SF (M4) und Backbone-Schicht (M3) als Experimente; zuerst PER je SNR-Klasse', g: 'PER/SNR-Messsatz (Golden für die Schwelle)', f: 'Dämpfungsglied-Bench, dann eine Stadtzelle. Hängt an Dritten (andere Betreiber der Zelle)' },
-    { k: 'W9+', n: 'Spekulativ', lo: 0, hi: 0, est: 'offen', c: 'Source Routing S2, Link-Strecken, Zell- und Rollenfärbung, MPR-Wahl (4.14), adaptive Sendeleistung', g: 'je Thema', f: 'je Thema' }
+    { k: 'W0', n: 'Messung', lo: 1, hi: 2, est: '1 bis 2 Wochen', st: 'part', s: 'teilweise', sd: 'Seit v4.40a.10.23 drin: <code>{CET}</code>-Alters-Logzeilen (<code>[CET];gw_rx|rx|tx</code>), <code>RING_DROP_STALE prio=</code>, Latenzzähler mit 32 Bit. Die 24-Stunden-Nacht auf DK5EN-98 lief bis 25.10.2026 16:21 und ist nicht ausgewertet. Offen: Alters- und Hop-Histogramme, HG je Ring, DM/ACK-Anteil, PER je SNR-Klasse, Beobachter-Knoten außerhalb eines Clusters.', c: 'Teil A Stufe 0 plus Metriken aus Abschnitt 3 (falsche Abdeckung über <code>removed_inferred</code>, Prioritätsinversion durch Stufe 2, Echo-Freigabe am Gateway), Zähler für Hop, <code>{SET}</code>, <code>{CET}</code>, HG, DM-Band, Taubheit beim Track-QRG-Wechsel (K0), PER je SNR-Klasse', g: 'Host-Gate; neue Golden Sets: Hop-Nibble-Korpus, CET-Alters-Replay (<code>test_cet_age</code>)', f: 'Logger-Daten DK5EN-98 (Freigabe am 24.10.2026 erteilt), Beobachter-Knoten außerhalb eines Clusters, eine Bench-Nacht' },
+    { k: 'W1', n: 'TX-Puffer', lo: 2, hi: 2, est: '2 Wochen', st: 'done', s: 'ausgeliefert', sd: 'Ausgeliefert in v4.40a.10.23 (24.10.2026) als W1a (Verfall, {CET}-Grenze), W1b (Slot-Pool, Füllstand) und W1c (Ersetzen, DM-Wiederholung im Slot). Bench auf DK5EN-1, -90, -92. Offen: Auswertung der DK5EN-98-Nacht, Bestätigung der Verfallszeiten, Relay-Seite der {CET}-Grenze auf Luft, Upstream-PR.', c: 'TTL je Priorität, Slot-Pool, Supersede (Teil A Stufen 1, 2, 4)', g: '<code>test_txring</code>, <code>test_txring_flood</code>, <code>test_txprio_replay</code>, <code>test_nbr_replay</code>, <code>test_cet_age</code>', f: 'gwflood-Replay auf DK5EN-1/-92/-90, 1 Nacht (einstündiger Replay nicht gelaufen)' },
+    { k: 'W2', n: 'Pufferparität', lo: 2, hi: 2, est: '2 Wochen', st: 'parked', s: 'geparkt', sd: 'Die Kampagne TXP hat die zeitgealterte Dedup-Tabelle und die Dedup-Zeile des Füllstands als späteres Vorhaben geparkt. Die Ringgrößen 70, 100 und 60 gelten unverändert.', c: 'zeitgealterte Dedup, Abdeckungsfenster der Nachbarn, Puffer-Inventur, Byte-Pool-Studie', g: '<code>test_dedup_replay</code> mit Uhr (8813 Urteile, zwei Überläufe werden DUP), <code>test_topo_shadow</code>, RAM-Baseline (<code>tools/resource_baseline.json</code>)', f: 'DK5EN-98-Soak: kein <code>RX_DEDUP_NEW</code> für IDs älter als 39 min' },
+    { k: 'W3', n: 'Hop-Klemme', lo: 0.6, hi: 1, est: '3 bis 5 Tage', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden.', c: 'Nibble-Cap beim Relay (H1), gwcap-Review', g: 'neuer Nibble-Korpus mit gewickelten Frames; <code>test_aprs_corpus</code>', f: 'Anzahl Nibble > L vorher/nachher' },
+    { k: 'W4', n: 'PN-Priorität', lo: 2, hi: 2, est: '2 Wochen', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden. Die Voraussetzung W1 (Pool) steht.', c: 'ACK zuerst, DM-Band 2 mit Limit je Quelle, DM-Retries in QRT nach dem Pool; Studie S1 Next-Hop', g: '<code>test_ack_replay</code>, neues DM-Latenz-Replay (Golden: DG0OPK-DM-Rundläufe, 1 min ruhig / 4 min belastet)', f: 'Median und p95 der DM-Rundlaufzeit auf der Bench-Flotte, nur Gruppe <code>TEST</code> und eigene Knoten' },
+    { k: 'W5', n: 'End of Life', lo: 1, hi: 1, est: '1 Woche', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden.', c: 'Relay-Filter für wickelnde Builds, Hinweis-DM, veröffentlichtes Datum', g: 'Trailer-Korpus je Firmware-Version', f: 'Anzahl blockierter Frames, kein Verlust von Frames aktueller Firmware' },
+    { k: 'W6', n: 'EMCOMM', lo: 3, hi: 4, est: '3 bis 4 Wochen', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden. Die regulatorische Prüfung steht aus.', c: 'Prioritätsflag (E1/E4), Ed25519-Signaturen (A3), Trust-Store mit Pinning in der Web-GUI; zuerst die regulatorische Prüfung', g: 'Signatur-Vektoren (Golden), Lint für die Persistenz des Trust-Stores', f: 'Bench: signierter Frame auf allen vier Boards geprüft, unsignierter mit Warnung angezeigt. Hängt an Dritten (Regulierer, Verzeichnisbetreiber)' },
+    { k: 'W7', n: 'Tag-Gruppen', lo: 1, hi: 2, est: '1 bis 2 Wochen', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden.', c: 'T2-Anzeigefilter, dann T1 mit App und Server', g: 'Lint des Settings-Schemas, Gruppen-Korpus', f: 'Bench und eine Nutzergruppe' },
+    { k: 'W8', n: 'Multi-SF', lo: 4, hi: 6, est: '4 bis 6 Wochen', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden. Zuerst PER je SNR-Klasse messen (W0).', c: 'regionales SF (M4) und Backbone-Schicht (M3) als Experimente; zuerst PER je SNR-Klasse', g: 'PER/SNR-Messsatz (Golden für die Schwelle)', f: 'Dämpfungsglied-Bench, dann eine Stadtzelle. Hängt an Dritten (andere Betreiber der Zelle)' },
+    { k: 'W9+', n: 'Spekulativ', lo: 0, hi: 0, est: 'offen', st: 'open', s: 'nicht begonnen', sd: 'Konzept, nichts entschieden.', c: 'Source Routing S2, Link-Strecken, Zell- und Rollenfärbung, MPR-Wahl (4.14), adaptive Sendeleistung', g: 'je Thema', f: 'je Thema' }
   ];
   var DEP = [[0, 1], [0, 3], [0, 4], [1, 4], [3, 5], [0, 8]];
-  var x0 = 150, x1 = 880, wk = (x1 - x0) / 26, rowH = 29, y0 = 30;
+  var x0 = 240, x1 = 880, wk = (x1 - x0) / 26, rowH = 29, y0 = 30;
   var start = [], acc = 0;
   W.forEach(function(w){ start.push(acc); acc += w.hi; });
-  var sel = 0, bars = [], showDep = true, run = Run();
+  var sel = 1, bars = [], showDep = true, run = Run();
   function X(w){ return x0 + w * wk; }
   function draw(progress){
     clear(svg); bars = [];
@@ -1940,14 +2218,15 @@ function initRoadmap(){
       T({ x: 10, y: y + 18, 'font-size': 12, fill: on ? v('acc') : v('fg'), 'font-weight': 700 }, w.k, g);
       T({ x: 48, y: y + 18, 'font-size': 11, fill: v('fg2') }, w.n, g);
       var p = progress === undefined ? 1 : Math.max(0, Math.min(1, progress * W.length - i));
+      var bc = w.st === 'done' ? v('ok') : w.st === 'part' ? v('warn') : w.st === 'parked' ? v('fg3') : v('info');
+      T({ x: 232, y: y + 18, 'text-anchor': 'end', 'font-size': 10, fill: w.st === 'done' ? v('ok') : w.st === 'part' ? v('warn') : v('fg3') }, w.s, g);
       if (w.hi > 0){
-        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, w.lo * wk * p), height: rowH - 12, rx: 4, fill: v('acc'), opacity: 0.9 }, g);
-        if (w.hi > w.lo) S('rect', { x: X(start[i] + w.lo), y: y + 5, width: Math.max(0, (w.hi - w.lo) * wk * p), height: rowH - 12, rx: 4, fill: v('acc'), opacity: 0.35 }, g);
-        if (p >= 1) T({ x: X(start[i] + w.hi) + 6, y: y + 18, 'font-size': 10, fill: v('fg3') }, w.est, g);
+        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, w.lo * wk * p), height: rowH - 12, rx: 4, fill: bc, opacity: w.st === 'open' ? 0.7 : w.st === 'parked' ? 0.35 : 0.9 }, g);
+        if (w.hi > w.lo) S('rect', { x: X(start[i] + w.lo), y: y + 5, width: Math.max(0, (w.hi - w.lo) * wk * p), height: rowH - 12, rx: 4, fill: bc, opacity: 0.35 }, g);
       } else {
-        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, (x1 - X(start[i])) * p), height: rowH - 12, rx: 4, fill: 'none', stroke: v('acc'), 'stroke-dasharray': '4 3' }, g);
-        if (p >= 1) T({ x: X(start[i]) + 8, y: y + 18, 'font-size': 10, fill: v('fg3') }, 'offen', g);
+        S('rect', { x: X(start[i]), y: y + 5, width: Math.max(0, (x1 - X(start[i])) * p), height: rowH - 12, rx: 4, fill: 'none', stroke: v('info'), 'stroke-dasharray': '4 3' }, g);
       }
+      if (w.st === 'parked') S('rect', { x: X(start[i]) - 1, y: y + 4, width: Math.max(0, w.hi * wk * p) + 2, height: rowH - 10, rx: 5, fill: 'none', stroke: v('warn'), 'stroke-dasharray': '4 3' }, g);
       g.addEventListener('click', function(){ sel = i; draw(); panel(); });
       bars.push(g);
     });
@@ -1959,13 +2238,18 @@ function initRoadmap(){
         S('circle', { cx: xb, cy: yb, r: 2.5, fill: v('mag') }, svg);
       });
     }
+    if (progress === undefined || progress >= 1) W.forEach(function(w, i){
+      var y = y0 + i * rowH, halo = { stroke: v('bg'), 'stroke-width': 3, 'paint-order': 'stroke', 'pointer-events': 'none' };
+      var lab = w.hi > 0 ? T({ x: X(start[i] + w.hi) + 6, y: y + 18, 'font-size': 10, fill: v('fg3') }, w.est, svg) : T({ x: X(start[i]) + 8, y: y + 18, 'font-size': 10, fill: v('fg3') }, 'offen', svg);
+      for (var hk in halo) lab.setAttribute(hk, halo[hk]);
+    });
     T({ x: x1, y: y0 + rowH * W.length + 18, 'text-anchor': 'end', 'font-size': 10, fill: v('fg3') }, 'Summe W0–W8 streng nacheinander: etwa 17 bis 21 Wochen (berechnet, 3–5 Tage als 0,6–1 Woche)', svg);
   }
   function panel(){
     var w = W[sel];
     var deps = DEP.filter(function(d){ return d[1] === sel; }).map(function(d){ return W[d[0]].k; });
     var feeds = DEP.filter(function(d){ return d[0] === sel; }).map(function(d){ return W[d[1]].k; });
-    $('#rm-p').innerHTML = '<h4>' + w.k + ' · ' + w.n + ' · Schätzung ' + w.est + '</h4><p><b>Inhalt:</b> ' + w.c + '</p><p class="mt"><b>Gate und Golden Sets:</b> ' + w.g + '</p><p class="mt"><b>Feldnachweis:</b> ' + w.f + '</p>' +
+    $('#rm-p').innerHTML = '<h4>' + w.k + ' · ' + w.n + ' · Schätzung ' + w.est + '</h4><p><span class="tag ' + (w.st === 'done' ? 'ok' : w.st === 'part' || w.st === 'parked' ? 'warn' : '') + '">' + w.s + '</span> ' + w.sd + '</p><p class="mt"><b>Inhalt:</b> ' + w.c + '</p><p class="mt"><b>Gate und Golden Sets:</b> ' + w.g + '</p><p class="mt"><b>Feldnachweis:</b> ' + w.f + '</p>' +
       ((deps.length || feeds.length) ? '<p class="cite">' + (deps.length ? 'braucht vorher: ' + deps.join(', ') : '') + (deps.length && feeds.length ? ' · ' : '') + (feeds.length ? 'Voraussetzung für: ' + feeds.join(', ') : '') + (sel === 6 ? ' (W6 vor absoluter Priorität für fremden Verkehr)' : '') + '</p>' : '');
   }
   function play(){ var tk = run.start(); tween(2600, function(t){ if (run.ok(tk)) draw(t); }).then(function(){ if (run.ok(tk)) draw(); }); }

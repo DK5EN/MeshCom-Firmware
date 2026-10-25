@@ -1,0 +1,618 @@
+/* Gemeinsames Aussehen aller Seiten unter docs/presentation/.
+ *
+ * Jede Seite bindet diese Datei ein und haelt nur noch seitenspezifisches CSS
+ * inline (Folien-Mechanik, Rechner, einzelne Diagramme). Farben ausschliesslich
+ * ueber die Tokens unten, damit Hell und Dunkel ueberall gleich funktionieren.
+ * Dunkel ist der Standard; Hell folgt der Systemeinstellung.
+ */
+
+:root {
+  color-scheme: dark light;
+  --bg: #0f172a;
+  --bg2: #151f36;
+  --bg3: #1c2846;
+  --line: #2a3654;
+  --fg: #e6ecff;
+  --fg2: #9fb0cc;
+  --fg3: #6f7f9c;
+  --acc: #6366f1;
+  --acc2: #e879f9;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --ok-bg: rgba(52, 211, 153, 0.1);
+  --warn-bg: rgba(251, 191, 36, 0.1);
+  --bad-bg: rgba(248, 113, 113, 0.1);
+  --acc-bg: rgba(99, 102, 241, 0.12);
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 12px;
+  --measure: 72ch;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fbfcfe;
+    --bg2: #ffffff;
+    --bg3: #f1f4fa;
+    --line: #dfe5f0;
+    --fg: #111a2b;
+    --fg2: #4a5a72;
+    --fg3: #6b788d;
+    --acc: #4f46e5;
+    --acc2: #c026d3;
+    --ok: #047857;
+    --warn: #b45309;
+    --bad: #b91c1c;
+    --ok-bg: rgba(4, 120, 87, 0.08);
+    --warn-bg: rgba(180, 83, 9, 0.08);
+    --bad-bg: rgba(185, 28, 28, 0.07);
+    --acc-bg: rgba(79, 70, 229, 0.08);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: clamp(1.5rem, 5vw, 4rem) 16px;
+  overflow-wrap: break-word;
+}
+
+main,
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* --- Kopf ------------------------------------------------------------ */
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+
+h1 {
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0.4rem 0 0.8rem;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+h2 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin: 2.6rem 0 0.8rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 1.8rem 0 0.5rem;
+}
+
+h4 {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg3);
+  margin: 1.2rem 0 0.4rem;
+}
+
+p,
+ul,
+ol {
+  max-width: var(--measure);
+  margin: 0 0 0.9rem;
+}
+
+ul,
+ol {
+  padding-left: 1.2rem;
+}
+
+li {
+  margin: 0.25rem 0;
+}
+
+li > ul,
+li > ol {
+  margin: 0.2rem 0 0.3rem;
+}
+
+li strong:first-child {
+  color: var(--fg);
+}
+
+a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--acc);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--acc);
+}
+
+code,
+kbd,
+samp {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.05em 0.35em;
+}
+
+pre {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Meta-Liste unter dem Titel: eine Zeile je Angabe (Stand, Autor, Quellen) */
+.meta {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.6rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--fg3);
+}
+
+.meta li {
+  margin: 0.1rem 0;
+}
+
+.meta a {
+  color: var(--fg2);
+}
+
+/* --- BLUF und Kernfakten -------------------------------------------- */
+
+.bluf {
+  background: var(--bg2);
+  border: 1px solid var(--acc);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 1.1rem 1.3rem;
+  margin: 0 0 1.4rem;
+}
+
+.bluf > :last-child {
+  margin-bottom: 0;
+}
+
+.bluf .lead {
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.reco {
+  font-weight: 700;
+  color: var(--fg);
+  border-left: 3px solid var(--acc);
+  padding-left: 0.8rem;
+}
+
+.keyfacts {
+  margin-bottom: 1.4rem;
+}
+
+/* Hinweiskaesten: .callout.warn / .ok / .bad / .note */
+.callout {
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 0.8rem 1.1rem;
+  margin: 0 0 1.2rem;
+  background: var(--bg2);
+  max-width: var(--measure);
+}
+
+.callout > :last-child {
+  margin-bottom: 0;
+}
+
+.callout.warn {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.callout.ok {
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.callout.bad {
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.callout.note {
+  border-left-color: var(--acc);
+  background: var(--acc-bg);
+}
+
+/* Status-Marken in Tabellen und Listen */
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 0 0.45em;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--fg2);
+  white-space: nowrap;
+}
+
+.tag.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.tag.warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.tag.bad {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+/* --- Inhaltsverzeichnis --------------------------------------------- */
+
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1.1rem 0.8rem 2.2rem;
+  margin: 0 0 1.6rem;
+  font-size: 0.95rem;
+  color: var(--fg2);
+}
+
+/* --- Ausklappbare Schicht (Tiefe fuer Entwickler, Historie) ---------- */
+
+details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg2);
+  padding: 0.6rem 1rem;
+  margin: 0 0 1rem;
+  max-width: 100%;
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--fg2);
+  font-weight: 500;
+}
+
+details[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+details.dev > summary::before {
+  content: "Für Entwickler · ";
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+
+/* --- Tabellen ------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.2rem;
+  max-width: 100%;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  font-weight: 600;
+  color: var(--fg2);
+  background: var(--bg2);
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Abbildungen ---------------------------------------------------- */
+
+figure {
+  margin: 0 0 1.6rem;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+figure svg,
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+figcaption {
+  margin-top: 0.7rem;
+  font-size: 0.88rem;
+  color: var(--fg2);
+}
+
+figcaption b,
+figcaption strong {
+  color: var(--fg);
+}
+
+/* SVG-Klassen fuer Diagramme: nur Tokens, damit Hell/Dunkel stimmen */
+svg .d-box {
+  fill: var(--bg3);
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+
+svg .d-box-acc {
+  fill: var(--acc-bg);
+  stroke: var(--acc);
+  stroke-width: 1.4;
+}
+
+svg .d-box-ok {
+  fill: var(--ok-bg);
+  stroke: var(--ok);
+  stroke-width: 1.4;
+}
+
+svg .d-box-warn {
+  fill: var(--warn-bg);
+  stroke: var(--warn);
+  stroke-width: 1.4;
+}
+
+svg .d-box-bad {
+  fill: var(--bad-bg);
+  stroke: var(--bad);
+  stroke-width: 1.4;
+}
+
+svg .d-zone {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+}
+
+svg .d-line {
+  fill: none;
+  stroke: var(--fg3);
+  stroke-width: 1.5;
+}
+
+svg .d-line-acc {
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 2;
+}
+
+svg .d-line-bad {
+  fill: none;
+  stroke: var(--bad);
+  stroke-width: 1.8;
+  stroke-dasharray: 6 4;
+}
+
+svg .d-fill-acc {
+  fill: var(--acc);
+}
+
+svg .d-fill-ok {
+  fill: var(--ok);
+}
+
+svg .d-fill-warn {
+  fill: var(--warn);
+}
+
+svg .d-fill-bad {
+  fill: var(--bad);
+}
+
+svg text {
+  font-family: var(--sans);
+  font-size: 12px;
+  fill: var(--fg);
+}
+
+svg .d-t2 {
+  fill: var(--fg2);
+}
+
+svg .d-t3 {
+  fill: var(--fg3);
+  font-size: 11px;
+}
+
+svg .d-mono {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+svg .d-b {
+  font-weight: 600;
+}
+
+/* --- Fuss und Navigation -------------------------------------------- */
+
+.nav-top {
+  font-size: 0.85rem;
+  margin-bottom: 1.2rem;
+}
+
+.nav-top a {
+  color: var(--fg2);
+}
+
+.foot {
+  margin-top: 3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
+  color: var(--fg2);
+  font-size: 0.88rem;
+}
+
+.foot p {
+  max-width: var(--measure);
+}
+
+.foot .note {
+  color: var(--fg3);
+  font-size: 0.82rem;
+}
+
+/* --- Karten (Startseite, Uebersichten) ------------------------------ */
+
+.cards {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.card {
+  display: block;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.2rem 1.3rem;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
+}
+
+a.card:hover {
+  border-color: var(--acc);
+  transform: translateY(-2px);
+  color: inherit;
+}
+
+.card.wide {
+  grid-column: 1 / -1;
+  border-color: var(--acc);
+}
+
+.card h2,
+.card h3 {
+  border: 0;
+  padding: 0;
+  margin: 0.15rem 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.card p,
+.card ul {
+  color: var(--fg2);
+  font-size: 0.95rem;
+}
+
+.card .card-meta {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--fg3);
+  margin-top: 0.8rem;
+}
+
+/* --- Druck ---------------------------------------------------------- */
+
+@media print {
+  :root {
+    --bg: #fff;
+    --bg2: #fff;
+    --bg3: #f4f4f4;
+    --fg: #000;
+    --fg2: #333;
+    --fg3: #555;
+    --line: #ccc;
+  }
+
+  body {
+    padding: 0;
+  }
+
+  details {
+    border: 0;
+    padding: 0;
+  }
+
+  h1 {
+    color: #000;
+    background: none;
+  }
+}
