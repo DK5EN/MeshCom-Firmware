@@ -242,7 +242,7 @@ static void test_maxv_grenze_null_und_nan(void)
  * --nbrrelay on: node_sset4 bits 0x1800. */
 struct BootSettings {
     int node_sset, node_sset4, node_pingtime, node_pingmax, node_specsamples, max_hop_pos;
-    int node_postime, node_parm_time, node_stor, node_autoupd;
+    int node_postime, node_parm_time, node_stor, node_autoupd, node_updchan;
     float node_specstart, node_specend, node_specstep;
     char node_pingcall[20];
     int node_power, node_sf, node_cr, node_country, max_hop_text;

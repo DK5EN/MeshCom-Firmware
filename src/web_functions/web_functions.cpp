@@ -3531,7 +3531,9 @@ void sub_page_setup()
         web_client.printf("<select id=\"aumode\" name=\"aumode\"%s onchange=\"setvalue('aumode',this.value,true);\">\r\n", au_sb_ok ? "" : " disabled");
         // D3: notify (prod), notify (dev), auto greyed. A console-set auto shows greyed and selected.
         web_client.printf("\t<option value=\"prod\" %s>notify (prod, icssw-org releases)</option>\n", (au_mode != 2 && au_chan == 0) ? "selected" : "");
+#if defined(MC_AU_DEV_CHANNEL)   // dev channel: fork builds only (fw_update.h)
         web_client.printf("\t<option value=\"dev\" %s>notify (dev, DK5EN releases)</option>\n", (au_mode != 2 && au_chan == 1) ? "selected" : "");
+#endif
         web_client.printf("\t<option value=\"auto\" disabled %s>auto (coming soon)</option>\n", (au_mode == 2) ? "selected" : "");
         web_client.println("</select>");
         web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");

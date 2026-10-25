@@ -839,6 +839,13 @@ static void cmdPosRange(const char *label, const char *range, const char *msg_te
     }
 }
 
+// --help text of --updchan: the dev channel exists only in fork builds (fw_update.h)
+#if defined(MC_AU_DEV_CHANNEL)
+#define AU_UPDCHAN_HELP "prod/dev       update source: prod icssw-org, dev DK5EN"
+#else
+#define AU_UPDCHAN_HELP "prod           update source: icssw-org releases"
+#endif
+
 void commandAction(char *umsg_text, bool ble)
 {
     // -info
@@ -1419,7 +1426,8 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan prod/dev       update source: prod icssw-org, dev DK5EN\n--update check/install/status/apply  firmware update now (ESP32)\n");
+            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan " AU_UPDCHAN_HELP "\n");
+            printdeb("--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
             delay(100);
@@ -5195,7 +5203,13 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"dev") == 0)
         {
+            #if defined(MC_AU_DEV_CHANNEL)   // dev channel: fork builds only (fw_update.h)
             meshcom_settings.node_updchan = 1;
+            #else
+            Serial.printf("[ERR];updchan;no dev channel in this build\n");
+
+            return;
+            #endif
         }
         else
         {

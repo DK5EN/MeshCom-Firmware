@@ -206,10 +206,24 @@ enum FwChannel : uint8_t
     FW_CH_DEV = 1
 };
 
-// Unknown values fall back to prod.
+// The dev channel (DK5EN fork releases) exists only in fork builds: the fork CI
+// and local fork builds export MC_AU_DEV_CHANNEL=1 (tools/mc_build_defines.py).
+// Without it the firmware knows prod alone and carries no fork URL.
+#if defined(MC_AU_DEV_CHANNEL)
+#define FW_HAS_DEV_CHANNEL 1
+#else
+#define FW_HAS_DEV_CHANNEL 0
+#endif
+
+// Unknown values, and dev in a build without the dev channel, fall back to prod.
 inline const char *fwChannelRepo(FwChannel c)
 {
-    return c == FW_CH_DEV ? "DK5EN/MeshCom-Firmware" : "icssw-org/MeshCom-Firmware";
+#if FW_HAS_DEV_CHANNEL
+    if (c == FW_CH_DEV)
+        return "DK5EN/MeshCom-Firmware";
+#endif
+    (void)c;
+    return "icssw-org/MeshCom-Firmware";
 }
 
 // ---------------------------------------------------------------------------

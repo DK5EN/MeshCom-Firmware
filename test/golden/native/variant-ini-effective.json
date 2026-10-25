@@ -2890,6 +2890,7 @@
    "-std=gnu++17",
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
+   "-D MC_AU_DEV_CHANNEL",
    "-I test/test_config_json/stubs",
    "-I test/support",
    "-I src",
@@ -3170,6 +3171,7 @@
    "-std=gnu++17",
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
+   "-D MC_AU_DEV_CHANNEL",
    "-I src",
    "-Wall",
    "-Wextra"
@@ -3222,6 +3224,26 @@
   "test_build_src": "False",
   "test_filter": [
    "test_fw_update_http"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_fw_update_prod": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_fw_update"
   ],
   "test_framework": "unity"
  },

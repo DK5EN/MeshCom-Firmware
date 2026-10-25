@@ -676,8 +676,12 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
     // help lines (ESP32 guard) and the --info line (ESP32 guard)
     const size_t help = cmd.find("--autoupdate notify      firmware update mode (ESP32)");
     TEST_ASSERT_TRUE_MESSAGE(help != std::string::npos, "--autoupdate help line missing");
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--updchan prod/dev       update source: prod icssw-org, dev DK5EN") != std::string::npos,
-                             "--updchan help line missing");
+    // the channel part comes from AU_UPDCHAN_HELP: prod/dev in fork builds (MC_AU_DEV_CHANNEL), prod alone upstream
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--updchan \" AU_UPDCHAN_HELP") != std::string::npos, "--updchan help line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"prod/dev       update source: prod icssw-org, dev DK5EN\"") != std::string::npos,
+                             "--updchan dev help text missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("\"prod           update source: icssw-org releases\"") != std::string::npos,
+                             "--updchan prod-only help text missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.rfind("#if defined(ESP32)", help) > cmd.rfind("#endif", help), "--autoupdate help line is not inside an ESP32 guard");
     const size_t info = cmd.find("\"...AU: %s chan=%s\\n\"");
     TEST_ASSERT_TRUE_MESSAGE(info != std::string::npos, "--info AU line missing");

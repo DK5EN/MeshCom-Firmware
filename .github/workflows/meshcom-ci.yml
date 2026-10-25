@@ -9,7 +9,8 @@ name: MeshCom CI
 #                       danach Entwurf und Tag loeschen.
 # - Jeder andere Tag -> nichts.
 #
-# Gegenueber upstream zusaetzlich: MC_BUILD_TAG aus dem Tag (Auto-Update-
+# Gegenueber upstream zusaetzlich: MC_AU_DEV_CHANNEL=1 (Auto-Update-Kanal dev nur im Fork),
+# MC_BUILD_TAG aus dem Tag (Auto-Update-
 # Wiedererkennung, AU-D16), T-ETH-ELITE_1262 in Umbenennung und Assets, je ESP32-
 # App-Image ein `<name>.autoupdate` (tools/make_autoupdate.py, mit --check
 # byte-genau zurueckgeprueft), `wait` nach den im Hintergrund laufenden `mv`.
@@ -75,6 +76,8 @@ jobs:
       env:
         # release tags carry their name into the image (AU-D16); proof tags build undated
         MC_BUILD_TAG: ${{ startsWith(github.ref_name, 'v') && github.ref_name || '' }}
+        # fork builds carry the Auto Update dev channel (DK5EN releases); upstream builds do not
+        MC_AU_DEV_CHANNEL: "1"
       run: "cd ${{ github.workspace }} && pio run"
 
     - name: Convert RAK to UF2

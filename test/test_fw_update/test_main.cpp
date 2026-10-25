@@ -208,7 +208,14 @@ static void test_compare_invalid_is_zero(void)
 static void test_channel_repos(void)
 {
     TEST_ASSERT_EQUAL_STRING("icssw-org/MeshCom-Firmware", fwChannelRepo(FW_CH_PROD));
+#if defined(MC_AU_DEV_CHANNEL)
+    TEST_ASSERT_EQUAL_INT(1, FW_HAS_DEV_CHANNEL);
     TEST_ASSERT_EQUAL_STRING("DK5EN/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
+#else
+    // native_fw_update_prod, the upstream build: no dev channel, a stored dev reads prod
+    TEST_ASSERT_EQUAL_INT(0, FW_HAS_DEV_CHANNEL);
+    TEST_ASSERT_EQUAL_STRING("icssw-org/MeshCom-Firmware", fwChannelRepo(FW_CH_DEV));
+#endif
     TEST_ASSERT_EQUAL_UINT8(0, FW_CH_PROD);
     TEST_ASSERT_EQUAL_UINT8(1, FW_CH_DEV);
     // an out-of-range stored value falls back to prod

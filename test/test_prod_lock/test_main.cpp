@@ -23,6 +23,7 @@ struct FakeSettings
     int node_parm_time;
     int node_stor;
     int node_autoupd;
+    int node_updchan;
 };
 
 static FakeSettings broken(void)
@@ -141,6 +142,25 @@ static void test_normalise_instrument_keeps_tuning_but_repairs_ranges(void)
     TEST_ASSERT_EQUAL_INT(60, s.node_pingtime);            /* 20 is below the loop threshold */
 }
 
+/* No MC_AU_DEV_CHANNEL in this env (the upstream view): a stored or imported dev channel becomes prod. */
+static void test_normalise_updchan_without_dev_channel(void)
+{
+    FakeSettings s;
+    memset(&s, 0, sizeof(s));
+    s.node_parm_time = 15; s.node_autoupd = 1; s.node_pingmax = 5; s.node_sset4 = 0x1800;
+    s.node_specstart = 432.0f; s.node_specend = 434.0f; s.node_specstep = 0.025f;
+    s.node_specsamples = 2048; s.max_hop_pos = 2;
+    s.node_updchan = 1;
+#if defined(MC_AU_DEV_CHANNEL)
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, false));
+    TEST_ASSERT_EQUAL_INT(1, s.node_updchan);
+#else
+    TEST_ASSERT_EQUAL_INT(1, prodLockNormalise(s, false));
+    TEST_ASSERT_EQUAL_INT(0, s.node_updchan);
+    TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(s, true));   /* INSTRUMENT too: the channel is a build fact */
+#endif
+}
+
 static void test_normalise_nbrrelay_on_is_locked_default(void)
 {
     FakeSettings s;
@@ -244,5 +264,6 @@ int main(int, char **)
     RUN_TEST(test_normalise_keeps_valid_values);
     RUN_TEST(test_set_hop_clamp);
     RUN_TEST(test_bug_clamps);
+    RUN_TEST(test_normalise_updchan_without_dev_channel);
     return UNITY_END();
 }

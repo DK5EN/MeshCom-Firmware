@@ -143,7 +143,8 @@ inline const char *prodLockRefuses(const char *cmd, bool instrument)
  * names). `hasAutoUpdate` is false on nRF52 (no AU there, node_autoupd is left
  * alone).
  *
- * All builds: node_autoupd 2 -> 1 (hasAutoUpdate), node_postime 1..299 -> 300 /
+ * All builds: node_autoupd 2 -> 1 (hasAutoUpdate), node_updchan -> 0 without
+ * MC_AU_DEV_CHANNEL, node_postime 1..299 -> 300 /
  * > 86400 -> 86400, node_parm_time into 5..120 (0 -> 15), node_pingmax > 5 -> 5,
  * node_pingtime 1..29 or > 300 -> 60. max_hop_pos is RAM-only and not counted.
  * Production only (!instrument): the locked fixed values.
@@ -157,6 +158,12 @@ inline int prodLockNormalise(S &s, bool instrument, bool hasAutoUpdate = true)
 
     if (hasAutoUpdate && s.node_autoupd == 2)
         setI(s.node_autoupd, 1);
+
+#if !defined(MC_AU_DEV_CHANNEL)
+    /* no dev update channel in this build (fw_update.h FW_HAS_DEV_CHANNEL): a stored or imported dev is prod */
+    if (s.node_updchan != 0)
+        setI(s.node_updchan, 0);
+#endif
 
     setI(s.node_postime, prodClampPostime(s.node_postime));
 

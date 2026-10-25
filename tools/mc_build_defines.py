@@ -15,3 +15,8 @@ env.Append(  # noqa: F821
         ("MC_BUILD_TAG", env.StringifyMacro(os.environ.get("MC_BUILD_TAG", ""))),  # noqa: F821
     ]
 )
+
+# Fork builds only: MC_AU_DEV_CHANNEL=1 (fork CI, local fork builds) compiles the
+# Auto Update dev channel (DK5EN releases, src/fw_update.h). Unset = prod only.
+if os.environ.get("MC_AU_DEV_CHANNEL") == "1":
+    env.Append(CPPDEFINES=["MC_AU_DEV_CHANNEL"])  # noqa: F821
