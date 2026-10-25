@@ -116,6 +116,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   2026-10-27 05:35 (194 s without keepalive, then -67 instead of -55 dBm). Report: Desktop
   `logauswertung-dk5en-98-soak-20261025.html`, artifact <https://claude.ai/artifact/XwSCwExCxEqog8vW8yv3xo>; logs
   rpizero `~/meshlog/dk5en-98-soak-20261025/`. Details: [campaign-tx-pool.md](campaign-tx-pool.md), "DK5EN-98 soak".
+- **QA review of `fork-dev` f0a81c8 (2026-10-25, report only, no code change):**
+  [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md); raw reports in `review/qa-20261025/`.
+  All 32 CI envs built. Top items: QA-NET-04 (UDP datagram ≥255 B wedges the gateway downlink, DK5EN-98),
+  QA-STAB-01/02 (blocking DNS in EXTUDP, server DNS never re-resolved), QA-NET-01/02/03 (BLE PIN not gating
+  writes, nRF52 settings characteristic leaks secrets, CSRF `otaupdate`), QA-AU-01 (Safeboot erases before the inflate
+  length check), QA-SIZE-AU01 (T-Beam family ≈61 KB from AU staging refusal). Size levers: nRF52 ETH/Web gating
+  (−192 KB on T114/t_echo), `-fno-exceptions` + `CORE_DEBUG_LEVEL=0` (−139 KB measured on E22). Operator decisions are
+  listed in §6.
 - **`v4.40a.10.25` released 2026-10-25** (CI, Latest, tag on `61077a8c`, after two cancelled cuts: SNF-ACK-01 and upstream
   #1237 came in): TXP-01 own text sent once, WIFI-HEAP-01 raw ICMP probe (TD-21/21b), TD-20/TD-22 T-Deck heap, TD-23
   backlight (fork PR #1), SNF-ACK-01 mailbox tombstone, upstream #1237 BLE app settings; pages rework (fork PR #2).
