@@ -1,7 +1,7 @@
 # Campaign GWACK-01: the gateway's double ACK (2026-10-24)
 
-Status: **closed on fork-dev 2026-10-24.** Operator chose C; fix `c462d018`, benched (W3). Not released;
-goes upstream later inside the larger PR. Bench driver `tools/bench/gwack_bench.py`, test
+Status: **closed on fork-dev 2026-10-24.** Operator chose C; fix `c462d018`, benched (W3). Released in
+v4.40a.10.25; upstream since 2026-10-25 inside #1238 (all fork firmware, merged). Bench driver `tools/bench/gwack_bench.py`, test
 `tools/bench/test_gwack_bench.py`.
 
 ## 1. Bottom line

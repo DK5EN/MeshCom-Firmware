@@ -200,4 +200,5 @@ sections 6-9 are this wave). Test matrix with expected and observed outcome per 
 - **Bench:** same setup before/after on INSTRUMENT images (DK5EN-1 OTA, DK5EN-90 DFU): unfixed 6 of 10 released,
   fixed 0 of 20 released, 20 of 20 sent, 19 exactly once (one retry of an unheard text, by design). Details:
   paper section 10.
-- **Open:** DK5EN-98 OTA flash (operator OK), release, upstream PR (QRT Finding 1 is fork-only).
+- **Open:** DK5EN-98 OTA flash (operator OK). Released in v4.40a.10.25; W0-W1e and QRT Finding 1 upstream since
+  2026-10-25 inside #1238 (merged).

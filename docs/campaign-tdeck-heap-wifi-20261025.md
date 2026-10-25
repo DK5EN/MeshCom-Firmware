@@ -80,7 +80,7 @@ internal heap below 30 KB). Operator scope: measure, reproduce, RCA, fix, re-tes
 
 - TD-22 decision (bubble Strings to PSRAM or cap tabs).
 - WIFI-PS-01 decision.
-- Not released, no upstream PR (operator scope).
+- Released in v4.40a.10.25; upstream since 2026-10-25 inside #1238 (all fork firmware, merged).
 
 ## Follow-up waves (2026-10-25, operator decisions)
 

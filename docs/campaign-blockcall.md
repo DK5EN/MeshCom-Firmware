@@ -1,7 +1,8 @@
 # Campaign BLK-01: call blocklist (`--blockcall`)
 
 Fork-only feature. Replaces the blocklist of the third-party build sku2atsc/MeshCom-Firmware
-(DM3KS, DB0SD area), so that build has no reason to exist. No upstream PR.
+(DM3KS, DB0SD area), so that build has no reason to exist. Upstream since 2026-10-25 inside
+[#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238) (all fork firmware, merged).
 
 ## Decisions (operator, 2026-10-24)
 

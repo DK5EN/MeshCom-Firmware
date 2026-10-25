@@ -1,11 +1,14 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-25, branch `fork-dev` (contains `upstream/dev` 112e4e5b plus #1237 cherry-picked as `ce4407b3`), last release
-`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). Upstream PR open: [#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)
-(all fork firmware of `6c84a46c` as one commit, branch `pr/fork-firmware-20261025`, worktree `../MeshCom-PR-next`).
-CI PR open: [#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239) (`.autoupdate` assets, `MC_BUILD_TAG` only for
-`v<VER>[.MM.DD]` tags, branch `pr/ci-autoupdate`, worktree `../MeshCom-PR-ci`).
-Next step: maintainer review of #1238 and #1239; prod channel needs upstream tags of the form `v<VER>` or `v<VER>.MM.DD`. TD-22 soak and TD-23 UAT still open.
+**Stand:** 2026-10-25, branch `fork-dev` (contains `upstream/dev` 7a1cdd70 by merge), last release
+`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). **Upstream merged 2026-10-25:**
+[#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238) (all fork firmware of `6c84a46c` as one commit) and
+[#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239) (CI `.autoupdate` assets, `MC_BUILD_TAG` only for
+`v<VER>[.MM.DD]` tags), both unchanged by review. Synced into `fork-dev` by merge; the merge tree equals the pre-merge
+tree (see "Upstream sync 2026-10-25" below). PR branches `pr/fork-firmware-20261025`, `pr/ci-autoupdate` and worktrees
+`../MeshCom-PR-next`, `../MeshCom-PR-ci` are **kept on purpose** until rework is ruled out (operator, 2026-10-25).
+Next step: watch upstream for follow-up review; prod channel needs upstream tags of the form `v<VER>` or `v<VER>.MM.DD`.
+TD-22 soak and TD-23 UAT still open.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -32,10 +35,21 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
   `check`: 30 boards, 0 mismatches. The SP host change shipped in 10.24.
-- **Fork-only firmware still waiting for upstream:** Auto Update with Safeboot v3 and the board identity marker
-  (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188; STOR accepted live by the
-  operator 2026-10-11, locked off in release builds since v4.40a.10.19), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
-  `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
+- **Upstream sync 2026-10-25 (merge of `upstream/dev` 7a1cdd70):** three new upstream commits.
+  - #1237 (`5123fc02`, BLE app settings): already in the fork as `ce4407b3` (same diff), nothing new.
+  - #1238 (`3a9d1281`) and #1239 (`7a1cdd70`): our PRs, merged as submitted. Every path keeps the `fork-dev` side: the
+    PR copies are the fork code with fork-doc references and INSTRUMENT bench hooks stripped.
+  - Build config kept from the fork: `.github/workflows/meshcom-ci.yml` (`MC_AU_DEV_CHANNEL=1`, `ci-proof-*` drafts,
+    `makeLatest`, `release-notes.md` body, 27-image check), `FLASH_VERSION 20261025` (upstream keeps 20260929), native
+    envs in `platformio.ini`, fork `safeboot*.bin` (the published CI build; upstream carries a rebuild of the same size).
+    Upstream's `[env] extra_scripts`, `-Wall -Wextra` and the S3 board `qio` were already in the fork.
+  - Result: merge `7119ea2c`, `git diff ORIG_HEAD HEAD` empty. 68 conflicts (add/add from the squash), all resolved to
+    the fork side. Gate: regression stage 1,2 PASS (83 Unity envs, 3066/3066), Heltec V3 and RAK4631 build.
+- **Fork-only firmware upstream since #1238:** Auto Update with Safeboot v3 and the board identity marker
+  (AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188), LoRa QRT waves 1-2, production setting lock,
+  WEB-STOP-01, the AU-tied heap levers, RM LED and `chgled` override, TX pool, GWACK-01, BLK-01, TD-20..TD-23. Still
+  fork-only: INSTRUMENT bench hooks, fork-doc comments, native test envs, CI fork channel. Matrix of 10-18 is
+  superseded: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
 - **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, TD-21b, TD-22, not released):** `persisted_msgs` RAM-only
   copy removed (`5b1e1da8`), WiFi IP-liveness watchdog (`5b1e1da8`, gateway-change fix `ace935c6`), 16-tab cap with
   40 KiB heap floor (`bae97fd1`); all benched on DK5EN-14. WIFI-PS-01 accepted (modem sleep). DK5EN-14 runs the
@@ -69,7 +83,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   ([campaign-au21-tft-heap-20261024.md](campaign-au21-tft-heap-20261024.md)).
 - RM-NVS-01: E22 field report, NVS-full hypothesis; waiting for the reporter's `--info` and log.
 - GWRX-01 count-mode night on DK5EN-98 (operator OK) before relying on `--nbrrelay on` in the field.
-- GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; not released, goes up with the larger PR (`campaign-gwack01-20261024.md`).
+- GWACK-01: fixed on fork-dev 2026-10-24 (`c462d018`, option C: both ACK copies with one id), benched 28/28; released in v4.40a.10.25, upstream with #1238 (`campaign-gwack01-20261024.md`).
 - BLK-01 call blocklist `--blockcall`: on fork-dev 2026-10-24 (`ecf00df0`, `1635ba56`, `986aa573`), benched
   DK5EN-1/-90/-92, DK5EN-98 runs the build (list empty). Not released; ships with the next release so the third-party
   DM3KS build (sku2atsc/MeshCom-Firmware, DB0SD area) can retire. DK5EN-14 flashed 10-24 16:09. Open: fork-key
