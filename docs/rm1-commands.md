@@ -1,7 +1,7 @@
 # RM1-Befehle: vollständige Referenz / RM1 commands: complete reference
 
 Deutsch zuerst, English below (ab Abschnitt "English"). Stand: Firmware-Quelltext `fork-dev`,
-25 Befehle / 25 commands.
+26 Befehle / 26 commands.
 
 Die Signatur (HMAC-SHA-256, Schlüsselableitung, Antwort-Tag) steht in [rm1-hmac.md](rm1-hmac.md) und wird hier
 nicht wiederholt. Dieses Dokument beschreibt, was in der Zeile steht, was der Knoten antwortet und wann er
@@ -75,7 +75,7 @@ antwortet er `err storage` und führt nichts aus.
 
 ### Nie erreichbar
 
-Die Erlaubnisliste ist geschlossen und im Knoten fest eingebaut: genau die 25 Befehle unten. Alles andere
+Die Erlaubnisliste ist geschlossen und im Knoten fest eingebaut: genau die 26 Befehle unten. Alles andere
 antwortet (bei gültigem Tag) `err blocked`, auch diese Konsolenbefehle: `cleanflash`, `ota-update`, `dfu`,
 `deepsleep`, `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`, `updchan`,
 `autoupdate`, `rm`, `stor`. Jedes Argument (und jeder Befehlsname), das `;`, `{`, `%` oder `--` enthält, wird
@@ -83,21 +83,21 @@ ebenfalls mit `err blocked` abgelehnt, egal bei welchem Befehl.
 
 ## 2. Fehler-Token
 
-| Token                                                                                                       | Bedeutung                                                                                              |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `err blocked`                                                                                               | Befehl nicht in der Erlaubnisliste, Argumentform falsch, verbotenes Zeichen oder Argument zu lang      |
-| `err range <min>..<max>`                                                                                    | nur `txpower`: Wert außerhalb des Bereichs dieser Platine (z.B. `err range 0..22`)                     |
-| `err range`                                                                                                 | `pos`: Koordinate/Höhe außerhalb des Wertebereichs                                                     |
-| `err text`                                                                                                  | `name`/`atxt`: Text enthält ein verbotenes Zeichen, ist leer oder ein reserviertes Wort                |
-| `err gps`                                                                                                   | `pos` schreiben, solange GPS eingeschaltet ist                                                         |
-| `err failed`                                                                                                | Befehl ausgeführt, aber der Zustand hat sich nicht wie gewünscht geändert / Antwort passt nicht hinein |
-| `err unsupported`                                                                                           | die Platine/der Build hat die Funktion nicht (LED, Ladeanzeige, Sensor, Mailbox, Auto-Update)          |
-| `err not output`                                                                                            | `setout`: der Pin ist nicht als Ausgang konfiguriert                                                   |
-| `err hidden`                                                                                                | `pos` lesen: der Knoten hat keine Position (0/0) und gibt keine preis                                  |
-| `err end`                                                                                                   | `mh <zeile>`: Zeilenindex hinter dem Ende der Liste                                                    |
-| `err unknown`                                                                                               | `mh <rufzeichen>`: Rufzeichen weder direkt gehört noch als Route bekannt                               |
-| `err storage`                                                                                               | der Zähler konnte nicht dauerhaft gespeichert werden; nichts wurde ausgeführt                          |
-| `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, siehe dort                                                                                      |
+| Token                                                                                                       | Bedeutung                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `err blocked`                                                                                               | Befehl nicht in der Erlaubnisliste, Argumentform falsch, verbotenes Zeichen oder Argument zu lang                                                     |
+| `err range <min>..<max>`                                                                                    | nur `txpower`: Wert außerhalb des Bereichs dieser Platine (z.B. `err range 0..22`)                                                                    |
+| `err range`                                                                                                 | `pos`: Koordinate/Höhe außerhalb des Wertebereichs                                                                                                    |
+| `err text`                                                                                                  | `name`/`atxt`: Text enthält ein verbotenes Zeichen, ist leer oder ein reserviertes Wort; `blockcall`: ungültiges Rufzeichen oder mehr als 16 Einträge |
+| `err gps`                                                                                                   | `pos` schreiben, solange GPS eingeschaltet ist                                                                                                        |
+| `err failed`                                                                                                | Befehl ausgeführt, aber der Zustand hat sich nicht wie gewünscht geändert / Antwort passt nicht hinein                                                |
+| `err unsupported`                                                                                           | die Platine/der Build hat die Funktion nicht (LED, Ladeanzeige, Sensor, Mailbox, Auto-Update)                                                         |
+| `err not output`                                                                                            | `setout`: der Pin ist nicht als Ausgang konfiguriert                                                                                                  |
+| `err hidden`                                                                                                | `pos` lesen: der Knoten hat keine Position (0/0) und gibt keine preis                                                                                 |
+| `err end`                                                                                                   | `mh <zeile>`: Zeilenindex hinter dem Ende der Liste                                                                                                   |
+| `err unknown`                                                                                               | `mh <rufzeichen>`: Rufzeichen weder direkt gehört noch als Route bekannt                                                                              |
+| `err storage`                                                                                               | der Zähler konnte nicht dauerhaft gespeichert werden; nichts wurde ausgeführt                                                                         |
+| `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, siehe dort                                                                                                                                     |
 
 ## 3. Befehle
 
@@ -114,7 +114,7 @@ Spalte "Gespeichert": ändert der Befehl dauerhaft gespeicherte Einstellungen (�
 | `txpower`, `setout`                             | Parameter         | ja                                  |
 | `chgled`                                        | Parameter         | nein (nächster Start stellt zurück) |
 | `radio`,`sens`,`txq`,`mbox`,`maxhop`,`net`,`mh` | Lesen             | nein                                |
-| `name`,`atxt`,`pos`                             | Lesen / Schreiben | Schreiben: ja                       |
+| `name`,`atxt`,`pos`,`blockcall`                 | Lesen / Schreiben | Schreiben: ja                       |
 | `upd`                                           | Lesen / Aktion    | nein (Einstellungen), siehe unten   |
 
 In den Beispielen steht `<tag>` für den 16-stelligen Tag der Anfrage und `<rtag>` für den der Antwort. Echte
@@ -314,6 +314,22 @@ Beispiel: `RM1 70 pos 48.40812 11.73812 492 <tag>` -> `RM1 70 ok 48.40812 11.738
 - Ablauf: `upd check` -> mit `upd` den Tag aus `a=` lesen -> `upd go <tag>` -> Fortschritt über `upd` (`b`, `g`,
   `st`, `e`) beobachten.
 
+**`blockcall`** - Rufzeichen-Sperrliste (Frames eines gesperrten Rufzeichens, oder von einem solchen weitergeleitete,
+werden verworfen und nicht weitergeleitet; die Liste ist ab Werk leer).
+
+- `blockcall` (lesen): `ok b=<liste>` (`b=-` wenn die Liste leer ist). Die Liste ist durch Komma getrennt und
+  normalisiert (Großbuchstaben, `-0` entfällt, führende Null der SSID entfällt). Ist die Liste für die Antwort zu
+  lang, wird sie an einer Eintragsgrenze gekürzt und mit `,+N` geschlossen (N = ausgelassene Einträge).
+- `blockcall <liste>` (schreiben): ersetzt die GANZE Liste, fügt also nichts hinzu. `none` leert sie. `liste`:
+  Rufzeichen durch `,` getrennt, nur die Zeichen `A-Za-z0-9,-`. Ein Rufzeichen ohne SSID (`DK5EN`) sperrt alle
+  seine SSIDs, eines mit SSID (`DK5EN-7`) nur diese. Höchstens 16 Einträge, je bis 9 Zeichen einschließlich SSID.
+  Doppelte Einträge werden zusammengelegt. Das Argument ist auf 39 Zeichen begrenzt, eine aus der Ferne gesetzte
+  Liste fasst daher etwa 3-4 Rufzeichen; längere Listen setzt man an der Konsole (`--blockcall`). Schreiben wird
+  gespeichert. Antwort wie beim Lesen, mit der gespeicherten Liste.
+- Fehler: `err text` (ungültiges Rufzeichen oder mehr als 16 Einträge, die Liste bleibt unverändert), `err failed`
+  (nicht speicherbar), `err blocked` (Zeichen außerhalb von `A-Za-z0-9,-` oder länger als 39 Zeichen).
+- Beispiel: `RM1 72 blockcall DK5EN-7,DK5EN-12 <tag>` -> `RM1 72 ok b=DK5EN-7,DK5EN-12 <rtag>`.
+
 ---
 
 # English
@@ -379,7 +395,7 @@ node cannot persist the counter it answers `err storage` and executes nothing.
 
 ### Never reachable
 
-The allowlist is closed and compiled in: exactly the 25 commands below. Everything else (with a valid tag)
+The allowlist is closed and compiled in: exactly the 26 commands below. Everything else (with a valid tag)
 answers `err blocked`, including these console commands: `cleanflash`, `ota-update`, `dfu`, `deepsleep`,
 `setcall`, `passwd`, `webpwd`, `btcode`, `setssid`, `setpwd`, `wifiset`, `updrepo`, `updchan`, `autoupdate`,
 `rm`, `stor`. Any argument (or command name) containing `;`, `{`, `%` or `--` is refused with `err blocked`
@@ -387,21 +403,21 @@ as well, whatever the command.
 
 ## 2. Error tokens
 
-| Token                                                                                                       | Meaning                                                                                      |
-| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `err blocked`                                                                                               | command not on the allowlist, wrong argument shape, forbidden character or argument too long |
-| `err range <min>..<max>`                                                                                    | `txpower` only: value outside this board's range (e.g. `err range 0..22`)                    |
-| `err range`                                                                                                 | `pos`: coordinate or altitude outside its range                                              |
-| `err text`                                                                                                  | `name`/`atxt`: text has a forbidden character, is empty or is a reserved word                |
-| `err gps`                                                                                                   | writing `pos` while GPS is switched on                                                       |
-| `err failed`                                                                                                | command ran but the state did not change as requested / the reply did not fit                |
-| `err unsupported`                                                                                           | the board/build lacks the feature (LED, charge LED, sensor, mailbox, auto-update)            |
-| `err not output`                                                                                            | `setout`: the pin is not configured as an output                                             |
-| `err hidden`                                                                                                | reading `pos`: the node has no position (0/0) and does not reveal one                        |
-| `err end`                                                                                                   | `mh <row>`: row index past the end of the list                                               |
-| `err unknown`                                                                                               | `mh <call>`: callsign neither heard directly nor known as a route                            |
-| `err storage`                                                                                               | the counter could not be stored; nothing was executed                                        |
-| `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, see there                                                                             |
+| Token                                                                                                       | Meaning                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `err blocked`                                                                                               | command not on the allowlist, wrong argument shape, forbidden character or argument too long                                     |
+| `err range <min>..<max>`                                                                                    | `txpower` only: value outside this board's range (e.g. `err range 0..22`)                                                        |
+| `err range`                                                                                                 | `pos`: coordinate or altitude outside its range                                                                                  |
+| `err text`                                                                                                  | `name`/`atxt`: text has a forbidden character, is empty or is a reserved word; `blockcall`: invalid call or more than 16 entries |
+| `err gps`                                                                                                   | writing `pos` while GPS is switched on                                                                                           |
+| `err failed`                                                                                                | command ran but the state did not change as requested / the reply did not fit                                                    |
+| `err unsupported`                                                                                           | the board/build lacks the feature (LED, charge LED, sensor, mailbox, auto-update)                                                |
+| `err not output`                                                                                            | `setout`: the pin is not configured as an output                                                                                 |
+| `err hidden`                                                                                                | reading `pos`: the node has no position (0/0) and does not reveal one                                                            |
+| `err end`                                                                                                   | `mh <row>`: row index past the end of the list                                                                                   |
+| `err unknown`                                                                                               | `mh <call>`: callsign neither heard directly nor known as a route                                                                |
+| `err storage`                                                                                               | the counter could not be stored; nothing was executed                                                                            |
+| `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, see there                                                                                                                 |
 
 ## 3. Commands
 
@@ -418,7 +434,7 @@ as well, whatever the command.
 | `txpower`, `setout`                             | parameter     | yes                      |
 | `chgled`                                        | parameter     | no (next boot restores)  |
 | `radio`,`sens`,`txq`,`mbox`,`maxhop`,`net`,`mh` | read          | no                       |
-| `name`,`atxt`,`pos`                             | read / write  | write: yes               |
+| `name`,`atxt`,`pos`,`blockcall`                 | read / write  | write: yes               |
 | `upd`                                           | read / action | no (settings), see below |
 
 In the examples `<tag>` stands for the 16-digit request tag and `<rtag>` for the reply tag. Real values with
@@ -611,3 +627,18 @@ Example: `RM1 70 pos 48.40812 11.73812 492 <tag>` -> `RM1 70 ok 48.40812 11.7381
 - Everything else (`upd foo`, `upd go` without tag, tag containing `/` etc., tag longer than 23): `err blocked`.
 - Flow: `upd check` -> read the tag from `a=` with `upd` -> `upd go <tag>` -> watch progress with `upd` (`b`, `g`,
   `st`, `e`).
+
+**`blockcall`** - call blocklist (frames from a blocked call, or relayed by one, are dropped and not relayed; the
+list is empty by default).
+
+- `blockcall` (read): `ok b=<list>` (`b=-` if the list is empty). The list is comma-separated and normalised
+  (upper case, `-0` dropped, leading zero of the SSID dropped). A list too long for the reply is cut at an entry
+  boundary and closed with `,+N` (N = entries left out).
+- `blockcall <list>` (write): replaces the WHOLE list, it does not add. `none` clears it. `list`: calls separated by
+  `,`, characters `A-Za-z0-9,-` only. A bare call (`DK5EN`) blocks all its SSIDs, a call with SSID (`DK5EN-7`)
+  only that one. At most 16 entries, each up to 9 characters including the SSID. Duplicates are merged.
+  The argument is capped at 39 characters, so a list set remotely holds about 3-4 calls; longer lists need the
+  console (`--blockcall`). Writes are stored. Reply as for read, with the stored list.
+- Errors: `err text` (invalid call or more than 16 entries, the list stays unchanged), `err failed` (could not be
+  stored), `err blocked` (a character outside `A-Za-z0-9,-`, or longer than 39 characters).
+- Example: `RM1 72 blockcall DK5EN-7,DK5EN-12 <tag>` -> `RM1 72 ok b=DK5EN-7,DK5EN-12 <rtag>`.
