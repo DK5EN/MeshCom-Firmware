@@ -1,14 +1,24 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-10-25, branch `fork-dev` (contains `upstream/dev` 112e4e5b plus #1237 cherry-picked as `ce4407b3`), last release
-`v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
-Next step: TXP-01 fix `556b997d` is benched (0/20 released); DK5EN-98 OTA flash (operator OK) and release; TTL decision. The TD-22 soak on DK5EN-14 was stopped after 6 min and is re-run later, after the pending T-Deck PR.
+`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). No upstream PR open.
+Next step: review the upstream PR draft (worktree `../MeshCom-PR-next`, branch `pr/fork-firmware-20261025`, body
+`../pr-fork-firmware-20261025-body.md`); then the CI PR for `.autoupdate` assets. TD-22 soak and TD-23 UAT still open.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **`v4.40a.10.25` released 2026-10-25** (CI, Latest, tag on `61077a8c`, after two cancelled cuts: SNF-ACK-01 and upstream
+  #1237 came in): TXP-01 own text sent once, WIFI-HEAP-01 raw ICMP probe (TD-21/21b), TD-20/TD-22 T-Deck heap, TD-23
+  backlight (fork PR #1), SNF-ACK-01 mailbox tombstone, upstream #1237 BLE app settings; pages rework (fork PR #2).
+  Gate 82 envs 2951/2951, golden 48, pytest 1410; idle heap DK5EN-92 68728 B (esp_ping variant 63884 B failed and was
+  replaced). Assets: 66, 27/27 `.autoupdate` re-inflate, field-command scan ok. Web flasher `check`: 30 boards, 0
+  mismatches; Pages synced. All five nodes on 10.25: DK5EN-1/-14/-92 and DK5EN-98 by the operator through the web GUI
+  Auto Update (worked), DK5EN-90 by DFU from the release package.
+- **Dev update channel is a build flag since `6c84a46c`** (after the release): `MC_AU_DEV_CHANNEL=1` in fork CI and every
+  local fork build; upstream builds know prod only.
 - **`v4.40a.10.24` released 2026-10-24** (CI, Latest, tag on `c8f0be5b`): SP server host `sp.meshcom.pl` (#1236), AU-21
   tracker TFT sprite, TRK-03 T-Beam first boot GPS, client RM1 command stops its repeats on the reply (`56519299`, not
   benched). Gate 81 Unity envs 2891/2891, pytest 1352, golden 48; idle-heap step skipped (operator decision). Web flasher
