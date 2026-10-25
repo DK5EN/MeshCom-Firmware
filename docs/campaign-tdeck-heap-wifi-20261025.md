@@ -20,12 +20,13 @@ internal heap below 30 KB). Operator scope: measure, reproduce, RCA, fix, re-tes
 
 ## Defects
 
-| ID         | Defect                                                                                                   | State                                    |
-| ---------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| TD-20      | `persisted_msgs` RAM-only copy of every non-System message until reboot                                  | Fixed `5b1e1da8`, benched                |
-| TD-21      | `checkWifiPing()` returns early on `WL_CONNECTED`; a wedged IP path on an associated link never recovers | Fixed `5b1e1da8`, benched (`td21_bench`) |
-| TD-22      | Per-tab model ~650 B internal RAM per bubble, 50 per tab, tab count uncapped                             | Fixed `bae97fd1`, benched                |
-| WIFI-PS-01 | LAN ping 80-100 ms median from WiFi modem sleep; PS none needs BLE off (IDF aborts otherwise)            | Accepted (operator), guard `9e4d8781`    |
+| ID           | Defect                                                                                                   | State                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| TD-20        | `persisted_msgs` RAM-only copy of every non-System message until reboot                                  | Fixed `5b1e1da8`, benched                        |
+| TD-21        | `checkWifiPing()` returns early on `WL_CONNECTED`; a wedged IP path on an associated link never recovers | Fixed `5b1e1da8`, benched (`td21_bench`)         |
+| TD-22        | Per-tab model ~650 B internal RAM per bubble, 50 per tab, tab count uncapped                             | Fixed `bae97fd1`, benched                        |
+| WIFI-PS-01   | LAN ping 80-100 ms median from WiFi modem sleep; PS none needs BLE off (IDF aborts otherwise)            | Accepted (operator), guard `9e4d8781`            |
+| WIFI-HEAP-01 | TD-21 esp_ping session held a 3 KB task for good: release heap gate failed (63884 B vs 69332 B)          | Fixed: raw ICMP pcb in the tcpip thread, benched |
 
 ## Measurements (logs and summaries in `tools/bench/runs/harness/`)
 
@@ -111,3 +112,23 @@ would shorten that outage; not changed.
 
 Soak 2026-10-25: the 24 h soak (`screen td22-14`, started 11:18) was stopped at 11:24 on operator instruction for
 the TXP-01 bench ([campaign-tx-pool.md](campaign-tx-pool.md) W1d). A new soak follows the pending T-Deck PR.
+
+## WIFI-HEAP-01: probe without a task (2026-10-25, release gate)
+
+- **Trigger:** the v4.40a.10.25 idle-heap gate on DK5EN-92 (release image, over 2323) read 63884 B against the
+  69332 B baseline (-5448 B, tolerance 3072 B). Operator decision: shrink the probe before the release.
+- **Fix:** the esp_ping session (task with 3 KB stack, held for good) is replaced by a raw lwIP ICMP pcb. The loop
+  task queues the echo burst with `tcpip_try_callback()` (never blocks; no core locking in this IDF build); the
+  receive callback runs in the tcpip thread and records the round only when the reply carries the sequence number
+  of the round in flight. A wedged tcpip thread sends and answers nothing, so its rounds fail and the watchdog
+  escalates. The pure session layer (busy/stuck/abandon) is gone; `wifi_liveness::Round` replaces it.
+- **Review (independent agent):** lwIP usage and thread split confirmed. Applied: replies only to the current round
+  count (a 16-bit serial compare would have gone stale after about 11 days of silence), at most one queued send.
+  Accepted: the 3 echoes go out back-to-back.
+- **Measurements:**
+
+| Run                       | Build                   | Result                                                                                                         |
+| ------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `heap-idle-v4.40a.10.25`  | release, esp_ping probe | DK5EN-92 STAT heap 64228 / 64228 / 63884 B: gate FAIL                                                          |
+| `heap-idle-v4.40a.10.25b` | release, raw probe      | DK5EN-92 STAT heap 69264 / 69264 / 68728 B: gate PASS (-604 B); `[WIFI];probe;armed` 60 s after boot           |
+| `td21c_bench`             | INSTRUMENT, raw probe   | DK5EN-14: wedge at 588 B free, heap released, 3 failed rounds, `ipdead;reconnect`, outage 2 min 0 s, no reboot |

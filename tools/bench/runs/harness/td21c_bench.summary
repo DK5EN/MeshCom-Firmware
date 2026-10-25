@@ -1,0 +1,9 @@
+TD-21c bench (WIFI-HEAP-01 raw ICMP probe), DK5EN-14 T-Deck Plus, INSTRUMENT build of the probe tree, 2026-10-25 14:27-14:30
+14:27:12 [WIFI];probe;armed (60 s after boot: the raw probe gets gateway replies)
+14:27:13-14:27:45 --heapeat 6 KB steps, 71 KB held, ifree 588, afail 8 (124 B caps 0x80c)
+14:27:47 pings lost (IP path wedged)
+14:28:21 --heapeat 0 -> ifree 77836, IP stays dead
+14:28:42 / 14:29:12 / 14:29:42 [WIFI];probe;fail;rounds;1..3
+14:29:42 [WIFI];watchdog;ipdead;reconnect;rounds;3
+14:29:47 ping ok, 30 consecutive ok (RECOVERED), no reboot (up_s continuous)
+outage 2 min 0 s (esp_ping probe 2026-10-25 09:54: 2 min 1 s)

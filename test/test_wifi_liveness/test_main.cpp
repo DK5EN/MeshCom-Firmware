@@ -69,192 +69,136 @@ void test_no_result_is_neutral(void)
     State s;
     ok(s);
     fail(s);
-    // -1 comes from a round that is merely running (1st check after start)
-    int pc = 0;
-    int r1 = probe_eval(true, -1, pc).result;
-    TEST_ASSERT_EQUAL(-1, r1);
-    TEST_ASSERT_EQUAL(NONE, step(s, true, r1));
-    TEST_ASSERT_EQUAL(NONE, step(s, true, r1));
+    // -1: no round pending (first check, gateway change, own reconnect)
+    TEST_ASSERT_EQUAL(NONE, step(s, true, -1));
+    TEST_ASSERT_EQUAL(NONE, step(s, true, -1));
     TEST_ASSERT_EQUAL(NONE, fail(s));          // 2nd fail, -1 did not reset
     TEST_ASSERT_EQUAL(RECONNECT, fail(s));     // 3rd, -1 did not count
 }
 
-// Item 1: round bookkeeping via probe_eval. A check mimics wifiPingRound():
-// evaluate the pending round, feed the result to step().
+// A check mimics checkWifiPing(): collect the last round, step(), start the next.
+// ok_seq stands in for s_probeOkSeq, written by the tcpip thread per reply.
+static const uint32_t GW1 = 0x0144A8C0u;   // 192.168.68.1
+static const uint32_t GW2 = 0x0101A8C0u;   // 192.168.1.1
 struct Sim {
     State s;
-    bool pending = false;
-    int  replies = -1;
-    int  pchecks = 0;
-    // returns Action of this check; starts a new round afterwards
-    Action check(int ended_replies = -1)   // ended_replies: on_ping_end fired with n before this check
+    Round r;
+    uint16_t ok_seq = 0;
+    uint16_t last_seq = 0;
+    bool disarmed = false;
+    Action check(uint32_t gw = GW1)
     {
-        if (ended_replies >= 0) replies = ended_replies;
-        Probe p = probe_eval(pending, replies, pchecks);
-        if (p.done) { pending = false; replies = -1; }
-        Action a = step(s, true, p.result);
-        if (!pending) { replies = -1; pending = true; pchecks = 0; }   // start next round
+        bool disarm = false;
+        int res = round_collect(r, gw, ok_seq, disarm);
+        if (disarm) { s = State(); disarmed = true; }
+        Action a = step(s, true, res);
+        if (a == NONE) last_seq = round_start(r, gw);
+        else round_abort(r);
         return a;
     }
+    void reply() { ok_seq = ok_seq_on_reply(ok_seq, last_seq, last_seq); }
 };
 
-void test_running_round_first_check_is_neutral(void)
+void test_first_check_has_no_result(void)
 {
-    int pc = 0;
-    Probe p = probe_eval(true, -1, pc);        // merely running, 1st check after start
-    TEST_ASSERT_EQUAL(-1, p.result);
-    TEST_ASSERT_FALSE(p.done);
-    TEST_ASSERT_FALSE(p.stuck);
-    TEST_ASSERT_EQUAL(1, pc);
-    p = probe_eval(false, -1, pc);             // no round at all
-    TEST_ASSERT_EQUAL(-1, p.result);
-    TEST_ASSERT_FALSE(p.done);
-    TEST_ASSERT_EQUAL(0, pc);
+    Round r;
+    bool d = false;
+    TEST_ASSERT_EQUAL(-1, round_collect(r, GW1, 0, d));
+    TEST_ASSERT_FALSE(d);
 }
 
-void test_ended_round_maps_replies(void)
+void test_reply_maps_ok_and_silence_maps_fail(void)
 {
-    int pc = 1;
-    Probe p = probe_eval(true, 3, pc);
-    TEST_ASSERT_TRUE(p.done); TEST_ASSERT_EQUAL(1, p.result); TEST_ASSERT_EQUAL(0, pc);
-    p = probe_eval(true, 0, pc);
-    TEST_ASSERT_TRUE(p.done); TEST_ASSERT_EQUAL(0, p.result); TEST_ASSERT_FALSE(p.stuck);
+    Round r;
+    bool d = false;
+    uint16_t seq = round_start(r, GW1);
+    TEST_ASSERT_EQUAL(1, round_collect(r, GW1, seq, d));
+    round_start(r, GW1);
+    TEST_ASSERT_EQUAL(0, round_collect(r, GW1, seq, d));   // only the old round answered
+    TEST_ASSERT_EQUAL(-1, round_collect(r, GW1, seq, d));  // collected once
 }
 
-void test_pending_at_second_check_is_failure(void)
+void test_only_reply_to_current_round_counts(void)
 {
-    int pc = 0;
-    Probe p = probe_eval(true, -1, pc);        // 1st check: neutral
-    TEST_ASSERT_EQUAL(-1, p.result);
-    p = probe_eval(true, -1, pc);              // 2nd check: dead
-    TEST_ASSERT_TRUE(p.done);
-    TEST_ASSERT_TRUE(p.stuck);
-    TEST_ASSERT_EQUAL(0, p.result);
-    TEST_ASSERT_EQUAL(0, pc);
+    TEST_ASSERT_EQUAL_UINT16(5, ok_seq_on_reply(0, 5, 5));
+    TEST_ASSERT_EQUAL_UINT16(5, ok_seq_on_reply(5, 4, 6));      // late reply of round 4
+    TEST_ASSERT_EQUAL_UINT16(6, ok_seq_on_reply(5, 6, 6));
 }
 
-void test_stuck_rounds_escalate_to_reconnect(void)
+void test_long_silence_does_not_go_stale(void)
 {
-    Sim m;
-    m.s.armed = true;                          // armed by an earlier ok round
-    // the wedged tcpip thread never fires on_ping_end: every round stays pending.
-    // check1 starts round A; check2 pending(1) neutral; check3 pending(2) -> fail 1
-    TEST_ASSERT_EQUAL(NONE, m.check());        // start A
-    TEST_ASSERT_EQUAL(NONE, m.check());        // A pending 1st
-    TEST_ASSERT_EQUAL(NONE, m.check());        // A dead -> fail 1, start B
-    TEST_ASSERT_EQUAL(NONE, m.check());        // B pending 1st
-    TEST_ASSERT_EQUAL(NONE, m.check());        // B dead -> fail 2, start C
-    TEST_ASSERT_EQUAL(NONE, m.check());        // C pending 1st
-    TEST_ASSERT_EQUAL(RECONNECT, m.check());   // C dead -> fail 3
+    // last reply in round 100, then 40000 silent rounds (about 14 days at 30 s)
+    TEST_ASSERT_EQUAL_UINT16(40100, ok_seq_on_reply(100, 40100, 40100));
+    Round r;
+    bool d = false;
+    r.seq = 40099;
+    uint16_t seq = round_start(r, GW1);
+    TEST_ASSERT_EQUAL(1, round_collect(r, GW1, ok_seq_on_reply(100, seq, seq), d));
 }
 
-void test_slow_but_finished_round_does_not_fail(void)
+void test_seq_never_zero_across_wrap(void)
+{
+    Round r;
+    r.seq = 0xFFFF;
+    TEST_ASSERT_EQUAL_UINT16(1, round_start(r, GW1));
+    TEST_ASSERT_EQUAL_UINT16(2, round_start(r, GW1));
+}
+
+void test_dead_stack_escalates_to_reconnect(void)
 {
     Sim m;
-    m.s.armed = true;
-    for (int i = 0; i < 20; i++) {
-        m.check();                              // start
-        TEST_ASSERT_EQUAL(NONE, m.check(3));    // ended with replies before next check
-    }
-    TEST_ASSERT_EQUAL(0, m.s.fails);
+    TEST_ASSERT_EQUAL(NONE, m.check());   // first round starts
+    m.reply();
+    TEST_ASSERT_EQUAL(NONE, m.check());   // ok: armed
+    TEST_ASSERT_TRUE(m.s.armed);
+    // tcpip thread wedged: nothing is sent or received any more
+    TEST_ASSERT_EQUAL(NONE, m.check());
+    TEST_ASSERT_EQUAL(NONE, m.check());
+    TEST_ASSERT_EQUAL(RECONNECT, m.check());
 }
 
-// TD-21b: session bookkeeping
-struct SSim {
-    Session s;
-    State st;
-    int stops = 0, dels = 0, abandons = 0, creates = 0;
-    int check(uint32_t gw, Action *act = nullptr)
-    {
-        Plan pl = session_collect(s, gw);
-        if (pl.stop) stops++;
-        if (pl.del) dels++;
-        if (pl.abandon) abandons++;
-        if (pl.disarm) st = State();
-        if (pl.create) { creates++; session_created(s, gw); }
-        Action a = step(st, true, pl.result);
-        if (a == RECONNECT) { session_abort_round(s); }
-        else if (a == NONE) session_start_round(s);
-        if (act) *act = a;
-        return pl.result;
-    }
-    void on_end(int n) { session_on_end(s, n); }
-};
+void test_reconnect_aborts_round(void)
+{
+    Sim m;
+    m.check(); m.reply(); m.check();
+    m.check(); m.check();
+    TEST_ASSERT_EQUAL(RECONNECT, m.check());
+    TEST_ASSERT_FALSE(m.r.pending);       // no round spans our own action
+    TEST_ASSERT_EQUAL(NONE, m.check());   // -1, new round starts
+    m.reply();
+    TEST_ASSERT_EQUAL(NONE, m.check());   // ok again
+    TEST_ASSERT_EQUAL(0, m.s.stage);
+}
+
+void test_never_answering_gateway_never_acts(void)
+{
+    Sim m;
+    for (int i = 0; i < 40; i++) TEST_ASSERT_EQUAL(NONE, m.check());
+    TEST_ASSERT_FALSE(m.s.armed);
+}
 
 void test_gw_change_while_armed_disarms(void)
 {
-    SSim m;
-    m.check(1);                      // create
-    m.on_end(0);                     // (start happened in check)
-    m.st.armed = true;
-    m.s.busy = false; m.s.pending = false;
-    Action a;
-    m.check(2, &a);                  // gw change, idle session: delete + create
-    TEST_ASSERT_EQUAL(1, m.dels);
-    TEST_ASSERT_FALSE(m.st.armed);
-    for (int i = 0; i < 6; i++) { m.check(2, &a); TEST_ASSERT_EQUAL(NONE, a); m.on_end(0); }
-    TEST_ASSERT_EQUAL(0, m.st.fails);                // disarmed: fails not counted
-    m.check(2); m.on_end(2); m.check(2);             // answers once -> armed
-    TEST_ASSERT_TRUE(m.st.armed);
+    Sim m;
+    m.check(); m.reply(); m.check();
+    m.check(); m.check();                 // two fails on GW1
+    TEST_ASSERT_EQUAL(NONE, m.check(GW2));
+    TEST_ASSERT_TRUE(m.disarmed);
+    TEST_ASSERT_FALSE(m.s.armed);
+    for (int i = 0; i < 10; i++) TEST_ASSERT_EQUAL(NONE, m.check(GW2));   // GW2 silent: no action
+    m.reply();
+    TEST_ASSERT_EQUAL(NONE, m.check(GW2));
+    TEST_ASSERT_TRUE(m.s.armed);
 }
 
-void test_late_end_after_abort_not_counted(void)
+void test_no_gateway_is_neutral(void)
 {
-    Session s;
-    session_created(s, 1);
-    TEST_ASSERT_TRUE(session_start_round(s));
-    TEST_ASSERT_TRUE(session_abort_round(s));
-    session_on_end(s, 3);                            // late
-    TEST_ASSERT_EQUAL(-1, s.replies);
-    TEST_ASSERT_FALSE(s.busy);
-    Plan pl = session_collect(s, 1);
-    TEST_ASSERT_EQUAL(-1, pl.result);
-}
-
-void test_drop_while_busy_deferred_then_done(void)
-{
-    Session s;
-    session_created(s, 1);
-    session_start_round(s);
-    Plan pl = session_collect(s, 2);                 // gw change, round running
-    TEST_ASSERT_TRUE(pl.stop);
-    TEST_ASSERT_FALSE(pl.del);
-    TEST_ASSERT_FALSE(pl.abandon);
-    TEST_ASSERT_FALSE(pl.create);
-    TEST_ASSERT_TRUE(s.have);
-    session_on_end(s, 0);                            // task leaves the round
-    pl = session_collect(s, 2);
-    TEST_ASSERT_TRUE(pl.del);
-    TEST_ASSERT_FALSE(pl.abandon);
-    TEST_ASSERT_TRUE(pl.create);
-    TEST_ASSERT_EQUAL(-1, pl.result);
-}
-
-void test_gw_change_with_wedged_old_round_recovers(void)
-{
-    SSim m;
-    Action a;
-    m.check(1);                                      // create + start
-    m.on_end(2); m.check(1);                         // ok round -> armed
-    TEST_ASSERT_TRUE(m.st.armed);
-    // the check above also started a new round, which never ends
-    m.check(2, &a);                                  // gw change, old pending (1)
-    TEST_ASSERT_EQUAL(0, m.abandons);
-    m.check(2, &a);                                  // pending (2) -> stuck -> abandon + create
-    TEST_ASSERT_EQUAL(1, m.abandons);
-    TEST_ASSERT_EQUAL(0, m.dels);
-    TEST_ASSERT_EQUAL(2, m.creates);
-    TEST_ASSERT_TRUE(m.s.have);
-    TEST_ASSERT_EQUAL(2, (int)m.s.gw);
-    TEST_ASSERT_FALSE(m.st.armed);
-    // new gateway answers once -> armed
-    m.check(2); m.on_end(3); m.check(2);
-    TEST_ASSERT_TRUE(m.st.armed);
-    // 3 failed rounds -> RECONNECT
-    Action last = NONE;
-    for (int i = 0; i < 3; i++) { m.check(2, &last); m.on_end(0); }
-    m.check(2, &last);
-    TEST_ASSERT_EQUAL(RECONNECT, last);
+    Round r;
+    bool d = false;
+    round_start(r, GW1);
+    TEST_ASSERT_EQUAL(-1, round_collect(r, 0, 0, d));
+    TEST_ASSERT_TRUE(r.pending);           // kept for the next check with a gateway
+    TEST_ASSERT_EQUAL(0, round_collect(r, GW1, 0, d));
 }
 
 int main(int, char **)
@@ -266,14 +210,15 @@ int main(int, char **)
     RUN_TEST(test_success_resets_counters);
     RUN_TEST(test_link_down_disarms);
     RUN_TEST(test_no_result_is_neutral);
-    RUN_TEST(test_running_round_first_check_is_neutral);
-    RUN_TEST(test_ended_round_maps_replies);
-    RUN_TEST(test_pending_at_second_check_is_failure);
-    RUN_TEST(test_stuck_rounds_escalate_to_reconnect);
-    RUN_TEST(test_slow_but_finished_round_does_not_fail);
+    RUN_TEST(test_first_check_has_no_result);
+    RUN_TEST(test_reply_maps_ok_and_silence_maps_fail);
+    RUN_TEST(test_only_reply_to_current_round_counts);
+    RUN_TEST(test_long_silence_does_not_go_stale);
+    RUN_TEST(test_seq_never_zero_across_wrap);
+    RUN_TEST(test_dead_stack_escalates_to_reconnect);
+    RUN_TEST(test_reconnect_aborts_round);
+    RUN_TEST(test_never_answering_gateway_never_acts);
     RUN_TEST(test_gw_change_while_armed_disarms);
-    RUN_TEST(test_late_end_after_abort_not_counted);
-    RUN_TEST(test_drop_while_busy_deferred_then_done);
-    RUN_TEST(test_gw_change_with_wedged_old_round_recovers);
+    RUN_TEST(test_no_gateway_is_neutral);
     return UNITY_END();
 }
