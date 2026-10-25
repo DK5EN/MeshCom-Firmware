@@ -90,7 +90,12 @@ table.cmp{min-width:640px}
 </div>
 
 <div class="callout note">
-<p><b>Nachmessen geht nur mit einem Messbuild.</b> Die Instrumentierung (<code>--instr</code>) war bis vor dem Release 4.35s.09.06.2 in jedem Build. Seitdem ist sie abgeschaltet, weil die Konsole sonst unaufgefordert Lückenmeldungen ausgab. Wer messen will, baut mit <code>-D INSTRUMENT_ENABLED=1</code>. Belege stehen im Abschnitt „Was sich seit dem 23.08.2026 geändert hat“.</p>
+<p><b>Nachmessen geht nur mit einem Messbuild.</b></p>
+<ul>
+<li><b>Warum:</b> Die Instrumentierung (<code>--instr</code>) war bis vor dem Release 4.35s.09.06.2 in jedem Build. Seitdem ist sie abgeschaltet, weil die Konsole sonst unaufgefordert Lückenmeldungen ausgab.</li>
+<li><b>Wie:</b> Wer messen will, baut mit <code>-D INSTRUMENT_ENABLED=1</code>.</li>
+<li><b>Belege:</b> Sie stehen im Abschnitt „Was sich seit dem 23.08.2026 geändert hat“.</li>
+</ul>
 </div>
 
 <h2 id="kernfakten" style="border-top:0;padding-top:0;margin-top:1.6rem">Kernfakten</h2>
@@ -98,7 +103,7 @@ table.cmp{min-width:640px}
 <li><strong>Start:</strong> Das T-Deck meldet „ready“ nach 10,9 statt 14,9 s (Median aus 24 Starts). Dazu kommen die Boot-Meldungen: 17,8 s auf 4,6 s.</li>
 <li><strong>WLAN:</strong> Die Erstanmeldung an WPA2/WPA3-Mischnetzen klappt in 24 von 24 Starts, vorher in 0 von 24. Im 9-Stunden-Dauertest verbinden sich 165 von 165 erzwungenen Trennungen ohne Eingriff wieder.</li>
 <li><strong>Namensauflösung:</strong> Bis zu 31 s Stillstand bei totem DNS sind weg. Die Auflösung dauert 22 bis 93 ms und läuft nebenher.</li>
-<li><strong>Zeit:</strong> Ein Knoten ohne Gateway-Flag bekommt die Uhrzeit jetzt tatsächlich (0 von 548 Erfolgen vorher, jetzt 89 ms). Auf dem RAK4631 sinkt das Schleifenmaximum von 314 auf 145 ms.</li>
+<li><strong>Zeit:</strong> Ein Knoten ohne Gateway-Flag bekommt die Uhrzeit jetzt tatsächlich (0 von 548 Erfolgen vorher, jetzt 89 ms). Auf dem RAK4631 sinkt das Schleifenmaximum im 600-s-Messfenster von 314 auf 145 ms; die früher beobachteten Stillstände von 1,7 bis 3,4 s waren dort nicht mehr nachzustellen.</li>
 <li><strong>Anzeige:</strong> Das Heltec-OLED braucht 34,5 statt 579 ms je Bild. Die T-Deck-Kopfzeile zeichnet 7,0 statt 36,9 Mal pro Sekunde neu.</li>
 <li><strong>Ton und Batterie:</strong> Der Quittungston am T-Deck blockiert 23 statt 1552 ms. Die Batteriemessung am Heltec wartet nicht mehr 100 ms je 500 ms.</li>
 <li><strong>Beleg:</strong> Jede Zahl trägt ihre Quelle am Kartenende. Eine gemeinsame Zahl „Pakete pro Sekunde Stillstand“ gibt es bewusst nicht, weil kein Versuch sie gemessen hat.</li>
@@ -148,8 +153,8 @@ table.cmp{min-width:640px}
   <!-- Zeile 4: NTP RAK -->
   <text x="20" y="214" class="d-b">Zeitabgleich (NTP)</text>
   <text x="20" y="230" class="d-t3">RAK4631, Schleifenmaximum</text>
-  <rect x="290" y="194" width="380" height="14" rx="3" class="d-box-bad"/>
-  <text x="678" y="205" class="d-mono">bis 3,4 s</text>
+  <rect x="290" y="194" width="225" height="14" rx="3" class="d-box-bad"/>
+  <text x="523" y="205" class="d-mono">314 ms</text>
   <rect x="290" y="212" width="174" height="14" rx="3" class="d-box-ok"/>
   <text x="472" y="223" class="d-mono">145 ms</text>
 
@@ -183,7 +188,7 @@ table.cmp{min-width:640px}
   <text x="400" y="419" class="d-t2">4.35s</text>
   <text x="470" y="419" class="d-t3">Zeitachse logarithmisch, Messungen August 2026</text>
 </svg>
-<figcaption><b>Abb. 1:</b> Sieben Wartezeiten von 100 ms bis 31 s sind in 4.35s weg oder liegen bei höchstens 145 ms. Bei der Namensauflösung ist „22 bis 93 ms“ die Dauer der Auflösung, die nebenher läuft und die Schleife nicht anhält. Beim Netzwerkstart ist die Summe der festen Wartezeiten je Versuch gezeichnet, beim Heartbeat die größte von zwei Lücken. Quellen an den Karten unten.</figcaption>
+<figcaption><b>Abb. 1:</b> Sieben Wartezeiten von 100 ms bis 31 s sind in 4.35s weg oder liegen bei höchstens 145 ms. Bei der Namensauflösung ist „22 bis 93 ms“ die Dauer der Auflösung, die nebenher läuft und die Schleife nicht anhält. Beim Netzwerkstart ist die Summe der festen Wartezeiten je Versuch gezeichnet, beim Heartbeat die größte von zwei Lücken. Beim Zeitabgleich ist das Schleifenmaximum im 600-s-Fenster gezeichnet (314 gegen 145 ms); die früheren Stillstände von 1,7 bis 3,4 s stehen auf der Karte „Ethernet-Socket blockiert regelmäßig“. Quellen an den Karten unten.</figcaption>
 </figure>
 
 <nav class="toc" aria-label="Inhalt">
@@ -313,7 +318,8 @@ table.cmp{min-width:640px}
   <div class="gain"><b>Was das bringt:</b> Im 600-Sekunden-Messfenster keine einzige Lücke über 250 ms. Der Ethernet-Abschnitt braucht maximal 2,9 ms statt 213 ms.</div>
   <details class="dev"><summary>Code, Messreihe, Prüfung</summary>
     <p><b>Jetzt:</b> <code>src/ntp_async.{h,cpp}</code>: Timeout 2,5 s, Wiederholung nach 5 s, ab dem dritten Fehlschlag nach 60 s (<code>ntp_async.cpp:3–5</code>). Es ersetzt <code>NTPClient::forceUpdate()</code>, das zusätzlich jedes wartende Datagramm vom Socket spülte.</p>
-    <p><b>Vorher:</b> <code>neth.getUDP()</code> 1,6 s alle ~20 s, Loop-Max 1,7 bis 3,4 s. Nativer Regressionstest <code>test_ntp_async</code> 10/10.</p>
+    <p><b>Vorher:</b> Im 600-s-Messfenster vom 30.08.2026 lag das Loop-Max bei 314 ms, mit einer Lücke durch die NTP-Anfrage (213 ms im Ethernet-Abschnitt). Das ist die Basis der Überschrift; nachher 145 ms, 0 Lücken über 250 ms. Die früher beobachteten 1,7 bis 3,4 s (<code>neth.getUDP()</code> 1,6 s alle ~20 s, Messung vom 29.08.2026) sind eine andere, frühere Messung und im 600-s-Fenster nicht mehr aufgetreten (Karte „Ethernet-Socket blockiert regelmäßig“).</p>
+    <p><b>Test:</b> Nativer Regressionstest <code>test_ntp_async</code> 10/10.</p>
     <p><b>Prüfung 25.10.2026:</b> unverändert.</p>
   </details>
   <div class="src"><b>Quelle</b> Backlog-Journal TM-35 · PR #1115 Abschnitt 3.1</div>
@@ -474,7 +480,7 @@ table.cmp{min-width:640px}
 <div class="item baseline">
   <div class="dot"></div>
   <div class="head"><span class="title">Ethernet-Socket blockiert regelmäßig</span><span class="plat">RAK4631</span><span class="dur">1,6 s alle ~20 s</span></div>
-  <div class="desc"><code>neth.getUDP()</code> mit Link und registriertem Gateway; <code>sendHey()</code> zusätzlich 0,7 bis 1,4 s nach dem Start. Loop-Maximum 1,7 bis 3,4 s.</div>
+  <div class="desc"><code>neth.getUDP()</code> mit Link und registriertem Gateway; <code>sendHey()</code> zusätzlich 0,7 bis 1,4 s nach dem Start. Loop-Maximum 1,7 bis 3,4 s in der Messung vom 29.08.2026; im späteren 600-s-Fenster (Loop-Max 314 ms) nicht mehr nachzustellen.</div>
   <div class="gain"><b>Auswirkung:</b> Auf dem RAK ist das Verlustfenster die SPI-Konkurrenz mit Ethernet, kein genereller Stillstand.</div>
   <div class="src"><b>Quelle</b> Backlog-Journal TM-35</div>
 </div>
@@ -608,7 +614,7 @@ table.cmp{min-width:640px}
 <tr><td>Netzwerkstart (TM-20)</td><td>ESP32</td><td class="num">~7 s Wartezeiten je Versuch</td><td class="num">Loop-Max 26 ms</td><td><span class="tag ok">unverändert</span></td></tr>
 <tr><td>Namensauflösung</td><td>ESP32</td><td class="num">bis 31 s</td><td class="num">22–93 ms, asynchron</td><td><span class="tag ok">unverändert</span></td></tr>
 <tr><td>Heartbeat</td><td>ESP32</td><td class="num">2,9 s + 1,1 s je Start</td><td class="num">0 Lücken</td><td><span class="tag ok">unverändert</span></td></tr>
-<tr><td>NTP asynchron (TM-35)</td><td>RAK4631</td><td class="num">Loop-Max 1,7–3,4 s</td><td class="num">Loop-Max 145 ms, 0 Lücken &gt; 250 ms</td><td><span class="tag ok">unverändert</span></td></tr>
+<tr><td>NTP asynchron (TM-35)</td><td>RAK4631</td><td class="num">Loop-Max 314 ms, 1 Lücke &gt; 250 ms (600 s)</td><td class="num">Loop-Max 145 ms, 0 Lücken &gt; 250 ms (600 s)</td><td><span class="tag ok">unverändert</span></td></tr>
 <tr><td>NTP ohne Gateway (TM-45)</td><td>ESP32 + nRF52</td><td class="num">0/548 Erfolge in 9,1 h</td><td class="num">ok, 89 ms</td><td><span class="tag ok">unverändert</span></td></tr>
 <tr><td>Ethernet-Start (N-20)</td><td>RAK4631</td><td class="num">Minuten, nicht deterministisch</td><td class="num">≤ 3 s, Soak bestanden</td><td><span class="tag ok">unverändert</span></td></tr>
 <tr><td>OLED-Anzeige (TM-09)</td><td>Heltec V3/V4, Stick V3</td><td class="num">579 ms je Bild</td><td class="num">34,5 ms</td><td><span class="tag ok">unverändert</span></td></tr>
@@ -654,8 +660,10 @@ table.cmp{min-width:640px}
   </ul>
 </li>
 <li><strong>Die Batteriemessung hat einen Zeitplaner.</strong> Die Aussage „kein Warten“ gilt weiter, der Mechanismus ist ein anderer (Karte „Batteriemessung ohne Wartezeit“).</li>
-<li><strong>Der Empfang auf ESP32 ist robuster gegen langsame Webseiten.</strong> Seit <code>v4.40a.10.23</code> liest die Hauptschleife das Paket vom Chip aus und startet den Empfang sofort neu, bevor sie es verarbeitet. Wartet der Webserver auf einen langsamen Browser, liest sein Warteweg das Paket und parkt es (4 Plätze); die Schleife arbeitet es danach ab.
+<li><strong>Der Empfang auf ESP32 ist robuster gegen langsame Webseiten.</strong> Das gilt seit <code>v4.40a.10.23</code>.
   <ul>
+    <li><b>Hauptschleife:</b> Sie liest das Paket vom Chip aus und startet den Empfang sofort neu, bevor sie es verarbeitet.</li>
+    <li><b>Webserver:</b> Wartet er auf einen langsamen Browser, liest sein Warteweg das Paket und parkt es (4 Plätze); die Schleife arbeitet es danach ab.</li>
     <li>Bench: 0 von 44 Paketen verloren, vorher 16 (WEB-RX-01, Upstream-Issue #1229).</li>
     <li>Code: <code>checkRXRead()</code> und <code>checkRXProcess()</code> in <code>src/esp32/esp32_main.cpp:5342–5640</code>, <code>RX_PARK_SLOTS 4</code> in <code>src/lora_rx_park.h:20</code>.</li>
     <li>Ein Upstream-PR ist nicht gemacht.</li>
@@ -673,9 +681,14 @@ table.cmp{min-width:640px}
     <li>Beleg: <code>docs/rca-onrxdone-r0-findings-20261013.md</code>, Release Notes <code>v4.40a.10.16</code>.</li>
   </ul>
 </li>
-<li><strong>Webseiten lösen keinen Watchdog-Reboot mehr aus</strong> (<code>v4.40a.10.20</code>, WEB-WDT-01). Der Webserver schrieb direkt in den TCP-Socket; bei einem langsamen Browser konnte ein Schreibvorgang 10 s hängen, und der Knoten startete mit <code>TASK_WDT</code> neu. Jetzt gibt es einen 1400-Byte-Sendepuffer, die Seite bricht nach 2 s ohne Fortschritt oder 15 s insgesamt ab (<code>[WEB];tx;abort</code>).</li>
+<li><strong>Webseiten lösen keinen Watchdog-Reboot mehr aus</strong> (<code>v4.40a.10.20</code>, WEB-WDT-01).
+  <ul>
+    <li><b>Vorher:</b> Der Webserver schrieb direkt in den TCP-Socket. Bei einem langsamen Browser konnte ein Schreibvorgang 10 s hängen, und der Knoten startete mit <code>TASK_WDT</code> neu.</li>
+    <li><b>Jetzt:</b> Es gibt einen 1400-Byte-Sendepuffer. Die Seite bricht nach 2 s ohne Fortschritt oder 15 s insgesamt ab (<code>[WEB];tx;abort</code>).</li>
+  </ul>
+</li>
 <li><strong>OLED des T-Beam Supreme auf Hardware-I2C</strong> (Eintrag 203 und 220). Die Lücke von etwa 570 ms im 15-s-Uhrentakt entfällt; ein Bild kostet etwa 100 ms bei 100 kHz (Kommentar <code>src/esp32/esp32_functions.cpp:215</code>). Eine erste Fassung hängte die Supreme im Start, die Korrektur ist am 25.10.2026 im Code; Bestätigung auf echter Supreme-Hardware steht aus.</li>
-<li><strong>Sendewarteschlange als Pool</strong> (<code>v4.40a.10.19</code> und <code>.23</code>). Ein freier Platz wird überall genommen, alte Frames verfallen nach Priorität, und eine volle Warteschlange antwortet dem Absender mit einer Ablehnung. Das berührt den Kasten „Senderring unter Flutlast“ weiter unten.</li>
+<li><strong>Sendewarteschlange als Pool</strong> (seit <code>v4.40a.10.23</code>). Ein freier Platz wird überall genommen, und alte Frames verfallen nach Priorität. Schon <code>v4.40a.10.19</code> brachte die Ablehnung (QTA) bei voller Warteschlange und die Entlastung von QRT. Das berührt den Kasten „Senderring unter Flutlast“ weiter unten.</li>
 </ul>
 
 <h2 id="messen">Wo noch gemessen wird</h2>
@@ -725,7 +738,7 @@ table.cmp{min-width:640px}
 </div>
 <div class="callout">
 <p><b>Senderring unter Flutlast.</b> Ein per UDP geflutetes Gateway sendet weiter auf LoRa, verwirft aber bei unter einer Sekunde Abstand ankommende Frames nach Priorität (Text bleibt, Position weicht). Das ist ein Effekt der Sendewarteschlange nach erfolgtem Empfang. Seit 4.35p.09.02 bekommt der Absender dazu eine Rückmeldung (Rückstau-Protokoll).</p>
-<p><b>Nachtrag 25.10.2026:</b> Seit <code>v4.40a.10.19</code> und <code>.23</code> ist die Warteschlange ein Pool mit Verfall nach Priorität und einer Ablehnung bei voller Warteschlange. Die Beschreibung oben gilt für den Stand 4.35p und ist nicht neu gegen den Pool-Code geprüft.</p>
+<p><b>Nachtrag 25.10.2026:</b> Seit <code>v4.40a.10.23</code> ist die Warteschlange ein Pool mit Verfall nach Priorität; <code>v4.40a.10.19</code> brachte die Ablehnung (QTA) bei voller Warteschlange und die Entlastung von QRT. Die Beschreibung oben gilt für den Stand 4.35p und ist nicht neu gegen den Pool-Code geprüft.</p>
 <p class="src"><b>Quelle</b> Backlog-Journal TM-31 · docs/backpressure-protocol.md</p>
 </div>
 

@@ -1377,7 +1377,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   <ul>
     <li><strong>Preis:</strong> LoRa SF11 mit 250 kHz belegt etwa das 73-fache der Bandbreite von 1200-Baud-FSK und liefert nominal rund 0,9 kbit/s.</li>
     <li><strong>Gewinn:</strong> Der Prozessgewinn der Spreizung lässt LoRa noch unter dem Rauschen dekodieren. Die Empfindlichkeitswerte in der Abbildung sind Datenblatt-Richtwerte und nicht im Code prüfbar.</li>
-    <li><strong>Folge:</strong> Ein einzelner Frame belegt den Kanal lange (0,7 bis 2,5 Sekunden), siehe nächste Folie.</li>
+    <li><strong>Folge:</strong> Ein einzelner Frame belegt den Kanal lange (0,85 bis 2,7 Sekunden), siehe nächste Folie.</li>
   </ul>
   <figure class="bare">
 <div class="cmp-mount" data-cmp="signal">
@@ -1510,11 +1510,11 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     <div class="cmp-signal__label cmp-signal__label--lora" id="cs-lbl-lora" aria-label="LoRa Kennzahlen">
       <div class="cmp-signal__label-title">LoRa SF11/BW250</div>
       <div class="cmp-signal__label-row"><strong>breit &amp; gespreizt</strong></div>
-      <div class="cmp-signal__label-row">MeshCom EU8: <strong>433,175 MHz</strong> | CR4/6</div>
+      <div class="cmp-signal__label-row">MeshCom EU: <strong>433,175 MHz</strong> | CR4/6</div>
       <div class="cmp-signal__label-row">Bitrate: <strong>~0,9 kbit/s</strong></div>
       <div class="cmp-signal__label-row">Empfindlichkeit: <strong>bis -137 dBm</strong></div>
       <div class="cmp-signal__label-row">Dekodiert <strong>~20 dB unter Rauschen</strong></div>
-      <div class="cmp-signal__label-row">Frame-Airtime: <strong>0,7 s (50 B) bis 2,5 s (255 B)</strong></div>
+      <div class="cmp-signal__label-row">Frame-Airtime: <strong>0,85 s (50 B) bis 2,7 s (255 B)</strong></div>
     </div>
   </div>
 </div>
@@ -1527,25 +1527,26 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   <div class="eyebrow">Das Medium</div>
   <h2>Ein Kanal im ISM-Band, geteilt mit allem, was dort funkt</h2>
   <ul>
-    <li><strong>Eine Einstellung für alle:</strong> Region EU8 (433,175 MHz, SF11, 250 kHz, Coding Rate 4/6) ist der Normalfall im DACH-Raum. Die Firmware kennt 17 Regionen-Presets, Großbritannien läuft auf 439,9125 MHz mit SF10 und 125 kHz.</li>
+    <li><strong>Eine Einstellung für alle:</strong> Region EU (433,175 MHz, SF11, 250 kHz, Coding Rate 4/6, Präambel 32) ist die Werkseinstellung und der Normalfall im DACH-Raum.</li>
+    <li><strong>Weitere Regionen:</strong> Die Firmware kennt 17 Regionen-Presets. EU8 ist die Variante mit Präambel 8 und muss gewählt werden. Großbritannien läuft auf 439,9125 MHz mit SF10 und 125 kHz.</li>
     <li><strong>Jede Wiederholung kostet Kanalzeit:</strong> Eine Nachricht mit <code>max_hop=4</code> (Vorgabe, per <code>--maxhop</code> zwischen 1 und 6 wählbar) belegt den Kanal einmal je weiterleitendem Nachbarn und Hop.</li>
     <li><strong>Kein Duty-Cycle in der Firmware:</strong> Sie erzwingt keinen. Den Hinweis auf die 1-Prozent-Grenze der ETSI gibt es nur als Kommentar im Code.</li>
   </ul>
   <div class="grid g2 top">
     <div class="card">
-      <h3>Region EU8, der Normalfall</h3>
+      <h3>Region EU, die Werkseinstellung</h3>
       <div class="kv"><span>Frequenz</span><span>433,175 MHz</span></div>
       <div class="kv"><span>Spreading Factor</span><span>SF11</span></div>
       <div class="kv"><span>Bandbreite</span><span>250 kHz</span></div>
       <div class="kv"><span>Coding Rate</span><span>4/6</span></div>
-      <div class="kv"><span>Präambel</span><span>8 Symbole</span></div>
-      <p class="cite" style="margin-bottom:0">Beleg: <b>src/country_profile.cpp</b> (Zeile EU8), <b>src/configuration_default.h</b> (RF_FREQUENCY)</p>
+      <div class="kv"><span>Präambel</span><span>32 Symbole (EU8: 8)</span></div>
+      <p class="cite" style="margin-bottom:0">Beleg: <b>src/country_profile.cpp</b> (Standardzeile EU, Präambel <b>LORA_PREAMBLE_LENGTH</b>), <b>src/configuration_global.h</b> (<b>DEFAULT_PREAMPLE_LENGTH</b> 32), <b>src/configuration_default.h</b> (RF_FREQUENCY)</p>
     </div>
     <div class="card hot">
       <h3>Zeit auf dem Kanal</h3>
       <div class="kv"><span>Symboldauer bei SF11 und 250 kHz</span><span>8,19 ms</span></div>
-      <div class="kv"><span>Kurze Textnachricht (50 Byte)</span><span>0,66 s</span></div>
-      <div class="kv"><span>Größter Frame (255 Byte)</span><span>2,5 s</span></div>
+      <div class="kv"><span>Kurze Textnachricht (50 Byte)</span><span>0,85 s (EU8: 0,66 s)</span></div>
+      <div class="kv"><span>Größter Frame (255 Byte)</span><span>2,7 s (EU8: 2,5 s)</span></div>
       <div class="kv"><span>Wartezeit vor dem Senden</span><span>3,0 bis 5,9 s</span></div>
       <div class="kv"><span>TX-Watchdog</span><span>15 s</span></div>
       <p class="cite" style="margin-bottom:0">Beleg: Airtime nach Semtech-Formel gerechnet. Wartezeit: Basis 3000, 4500 oder 5500 ms plus bis 350 ms Zufall (<b>src/configuration_global.h</b>), ab dem 4. Versuch 100 ms. TX-Watchdog <b>TX_WATCHDOG_MS</b>.</p>
@@ -1566,7 +1567,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     <summary>Presets, Airtime-Rechnung und Code-Stellen</summary>
     <ul>
       <li><strong>17 Presets:</strong> EU, UK, ON, EA, LA, 868, 915, MAN, EU8, UK8, US, VR2, 435, 436, 442, PL, none (<code>strCountry</code> in <code>src/lora_setchip.cpp</code>). Die Parameter je Preset stehen in <code>kCountryRfProfiles</code> in <code>src/country_profile.cpp</code>.</li>
-      <li><strong>Airtime:</strong> Nach der Semtech-Formel mit SF11, 250 kHz, CR 4/6, Präambel 8, CRC an: 50 Byte ergeben 0,657 s, 100 Byte 1,10 s, 255 Byte 2,48 s. Nominale Bitrate 895 bit/s.</li>
+      <li><strong>Airtime:</strong> Nach der Semtech-Formel mit SF11, 250 kHz, CR 4/6, Präambel 32, expliziter Header, CRC an, LDRO aus: 50 Byte ergeben 0,854 s, 80 Byte 1,10 s, 100 Byte 1,30 s, 255 Byte 2,67 s. Mit Präambel 8 (EU8) sind es 0,657 s, 0,903 s, 1,10 s und 2,48 s. Nominale Bitrate 895 bit/s.</li>
       <li><strong>Airtime in der Firmware:</strong> <code>lora_time_on_air_ms()</code> in <code>src/lora_functions.cpp</code> rechnet sie nur für die altersabhängige Haltezeit. Gezählt oder begrenzt wird die Sendezeit nicht.</li>
     </ul>
   </details>
@@ -1917,7 +1918,8 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     </div>
   </div>
   <div class="callout note">
-    <p><strong>Die Nachbarzahl zählt seit 4.40a nur noch, wer mich auch hört.</strong> Gezählt wird ein Nachbar, den ich in der letzten Stunde direkt gehört habe und der mich laut eigener Meldung hört oder stabil über der SNR-Schwelle liegt. Auf der Luft ist der Wert höchstens 99. Die Matrix hält 128 Nachbarn auf ESP32-S3 und RAK4631 und 64 auf dem klassischen ESP32 und dem T-Deck.</p>
+    <p><strong>Die Nachbarzahl zählt seit 4.40a nur noch, wer mich auch hört.</strong> Gezählt wird ein Nachbar, den ich in der letzten Stunde direkt gehört habe und der mich laut eigener Meldung hört oder stabil über der SNR-Schwelle liegt.</p>
+    <p>Auf der Luft ist der Wert höchstens 99. Die Matrix hält 128 Nachbarn auf allen ESP32-S3 (auch T-Deck und T-Deck Plus) und auf dem RAK4631, 64 auf dem klassischen ESP32 und auf E22_XML.</p>
   </div>
   <details class="dev">
     <summary>Messung, Konstanten und Code-Stellen</summary>
@@ -2017,7 +2019,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
           bis <strong>27 CAD-Retries</strong> pro Paket
         </div>
         <div class="cmp-flood__callout-line">
-          1 Frame: 10 Knoten &times; 4 Hops &times; 2,5 s = <strong>~100 s Kanalzeit</strong>
+          1 Frame: 10 Knoten &times; 4 Hops &times; 2,7 s = <strong>~107 s Kanalzeit</strong>
         </div>
         <div class="cmp-flood__callout-line ref">
           Florenz-Cluster: 53 Nodes, 22 Gateways
@@ -2074,7 +2076,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
       <figcaption><b>Abb. 8:</b> Florenz und Prato (23.08.2026): fast jeder hört fast jeden, genau hier wird die Luft dicht.</figcaption>
     </figure>
     <div class="callout note">
-      <p><strong>Zur Rechnung in der Simulation:</strong> Ein Frame von 255 Byte dauert etwa 2,5 Sekunden. Zehn Knoten mit vier Hops ergeben als Obergrenze rund 100 Sekunden Kanalzeit für einen einzigen Frame. Das ist eine Rechnung, keine Messung.</p>
+      <p><strong>Zur Rechnung in der Simulation:</strong> Ein Frame von 255 Byte dauert bei Präambel 32 etwa 2,7 Sekunden. Zehn Knoten mit vier Hops ergeben als Obergrenze rund 107 Sekunden Kanalzeit für einen einzigen Frame. Das ist eine Rechnung, keine Messung.</p>
     </div>
   </div>
 </div></section>
@@ -2115,7 +2117,8 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         <p class="cite" style="margin-bottom:0">Beleg: <b>docs/campaign-tx-pool.md</b>, <b>docs/backpressure-protocol.md</b></p>
       </div>
       <div class="card hot" style="margin-top:1rem"><h3>Der Kanal ist meistens belegt, und dann wird der Takt schneller</h3>
-        <p>Ist der Kanal belegt, wartet der Knoten nicht länger, sondern kürzer. Das ist der CAD-Sturm: Wird der Kanal frei, feuern alle wartenden Knoten im selben 100-ms-Fenster ineinander.</p>
+        <p>Vor jedem Senden prüft CAD den Kanal, bei Belegung ein zweites Mal gegen Fehlalarme. Ist der Kanal belegt, wartet der Knoten nicht länger, sondern kürzer.</p>
+        <p>Das ist der CAD-Sturm: Wird der Kanal frei, feuern alle wartenden Knoten im selben 100-ms-Fenster ineinander, innerhalb der 28-ms-Blindzone des CAD.</p>
         <div class="big" style="margin-top:.7rem">66 %</div>
         <p style="margin-top:.3rem">aller Sendeversuche fanden den Kanal belegt (5 Knoten, 16 Stunden, BergLog 13. und 14.03.2026).</p>
       </div>
@@ -2128,6 +2131,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     <summary>Wo das im Code steht</summary>
     <ul>
       <li><strong>Backoff-Arithmetik:</strong> <code>csmaTimeoutPrio()</code> in <code>src/csma_timing.h</code>, Zufallsziehung in <code>csma_compute_timeout_prio()</code> (<code>src/lora_functions.cpp</code>). Die Versuchszahl ist nicht begrenzt (<code>MAX_CAD_WAIT</code> ist definiert, wird aber nicht gelesen); ab <code>CSMA_MAX_ATTEMPTS</code> 3 gilt <code>CSMA_RAPID_RX_MS</code>.</li>
+      <li><strong>Zweiter CAD-Scan:</strong> Bei belegtem Kanal ruft das TX-Gate in <code>src/esp32/esp32_main.cpp</code> (um Zeile 3915 bis 3940) <code>radio.scanChannel()</code> ein zweites Mal auf; erst die bestätigte Belegung zählt als Versuch. Die 28 ms stehen als CAD-Anteil der Slotgröße <code>CSMA_SLOT_SIZE</code> in <code>src/configuration_global.h</code>.</li>
       <li><strong>Alters-Boden:</strong> <code>csmaApplyAgeFloor()</code> und <code>CSMA_AGE_*</code> (20.000 und 60.000 ms), nur für Prioritäten 1 bis 3, nie nach eigenem TX.</li>
       <li><strong>Fall A und B:</strong> <code>txringCaseBackoffSlot()</code> in <code>src/txring_functions.cpp</code>, Konstanten <code>NBR_RELAY_CASE_*</code>.</li>
       <li><strong>Pool:</strong> <code>getNextTxSlot()</code>, <code>txRingBeginTx()</code>, <code>txRingFinishTx()</code> in <code>src/txring_functions.cpp</code>, Verfall <code>txRingTtlMs()</code> in <code>src/txring_ttl.h</code>. Während einer Sendung hat ein Platz den Status INFLIGHT und wird nie verdrängt.</li>
@@ -2308,7 +2312,8 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   </div>
   <p style="margin-top:1rem"><strong>Der nächste Schritt wäre dieselbe Idee für normale Nachrichten.</strong> RM1 beweist, dass Authentizität ohne Verschlüsselung geht. Für Chat fehlt sie noch, und die App des Nutzers muss mitziehen.</p>
   <div class="callout warn">
-    <p><strong>Rechtsrahmen:</strong> Verschlüsselung ist im Amateurfunk nicht zulässig. § 16 Abs. 8 AFuV verlangt, dass Übertragungsverfahren eine Wiederherstellung der Inhalte mit allgemein verfügbarer Technik zulassen. Erlaubt sind <strong>Integrität und Authentizität</strong>: signieren, nicht verschlüsseln. Eine Signatur verschleiert nichts, jeder kann mitlesen, aber niemand kann sich als anderes Rufzeichen ausgeben. Der Wortlaut steht auf der Folie „Ein Kanal im ISM-Band“.</p>
+    <p><strong>Rechtsrahmen:</strong> Verschlüsselung ist im Amateurfunk nicht zulässig. § 16 Abs. 8 AFuV verlangt, dass Übertragungsverfahren eine Wiederherstellung der Inhalte mit allgemein verfügbarer Technik zulassen.</p>
+    <p>Erlaubt sind <strong>Integrität und Authentizität</strong>: signieren, nicht verschlüsseln. Eine Signatur verschleiert nichts, jeder kann mitlesen, aber niemand kann sich als anderes Rufzeichen ausgeben. Der Wortlaut steht auf der Folie „Ein Kanal im ISM-Band“.</p>
     <p class="cite" style="margin-bottom:0">Quelle: AFuV § 16 Abs. 8, gesetze-im-internet.de/afuv_2005/__16.html</p>
   </div>
 </div></section>
@@ -2348,7 +2353,8 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     </div>
   </div>
   <div class="callout note" style="margin-top:1rem">
-    <p><strong>Ohne neues Wire-Format:</strong> Wiederholung, erneute Quittung und Statusmeldung nutzen die bereits definierte Quittung. Alte Firmware im Pfad relayt alles wie gewohnt. Die Wiederholung ist mit PR #1168 auch im offiziellen <code>dev</code>. Zurück zum Anfang: Quittung mit Wiederholung und ein Timer, der aufgibt und es sagt, bringt AX.25 im verbindungsorientierten Modus seit 1984 mit.</p>
+    <p><strong>Ohne neues Wire-Format:</strong> Wiederholung, erneute Quittung und Statusmeldung nutzen die bereits definierte Quittung. Alte Firmware im Pfad relayt alles wie gewohnt. Die Wiederholung ist mit PR #1168 auch im offiziellen <code>dev</code>.</p>
+    <p>Zurück zum Anfang: Quittung mit Wiederholung und ein Timer, der aufgibt und es sagt, bringt AX.25 im verbindungsorientierten Modus seit 1984 mit.</p>
   </div>
   <details>
     <summary>Der Vorschlag vom August: eine Outbox beim Absender, so nicht gebaut</summary>
@@ -2428,7 +2434,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     <thead><tr><th>Stufe</th><th>Inhalt</th><th>Stand</th></tr></thead>
     <tbody>
       <tr><td class="mono">0</td><td><strong>Beobachten:</strong> wer hört wen, heute die Nachbarschaftsmatrix auf den Seiten Path, MHeard und Nachbarn</td><td><span class="tag ok">umgesetzt</span></td></tr>
-      <tr><td class="mono">0.5</td><td><strong>Duplikatspeicher:</strong> 100 Einträge auf ESP32-S3 und RAK4631 reichen (gemessen über 48 Knotenstunden). Altern nach Zeit statt nach Anzahl steht noch aus (parkt als Welle W2 der TX-Pool-Kampagne).</td><td><span class="tag warn">teilweise</span></td></tr>
+      <tr><td class="mono">0.5</td><td><strong>Duplikatspeicher:</strong> 100 Einträge auf ESP32-S3 und RAK4631 reichen knapp, ohne Reserve: Das Fenster beträgt etwa 38 Minuten gegen 36,7 Minuten längster beobachteter Paketlebensdauer (gemessen über 48 Knotenstunden, <code>docs/CHANGELOG-stability.md</code> Punkt 98). Altern nach Zeit statt nach Anzahl steht noch aus (parkt als Welle W2 der TX-Pool-Kampagne).</td><td><span class="tag warn">teilweise</span></td></tr>
       <tr><td class="mono">S</td><td><strong>Sturmschutz:</strong> Rückstau zum eigenen Absender (QRS, QRT, QTA); QRT endet früher und ein voller Puffer lehnt ab. Neu seit v4.40a.10.23 ist die Sperrliste <code>--blockcall</code> für einzelne Rufzeichen. Ein automatisches Limit für fremde Quellen fehlt.</td><td><span class="tag warn">teilweise</span></td></tr>
       <tr><td class="mono">1</td><td><strong>Vorrang:</strong> statt Wichtigkeits-Slots fragt jeder Knoten die Matrix, ob ein Nachbar ihn braucht, für Text, Position und HEY</td><td><span class="tag ok">anders gelöst</span></td></tr>
       <tr><td class="mono">2</td><td><strong>Unterdrückung:</strong> Eine gehörte Kopie, die alle Bedürftigen versorgt, streicht das eigene Relay. Der einzige Versorger eines Nachbarn sendet immer.</td><td><span class="tag ok">umgesetzt</span></td></tr>
@@ -2770,8 +2776,8 @@ DM-Text      RM1 1 reboot 18f287b79c551022
 Antwort      RM1R|DK5EN-90|DK5EN-1|1|ok rebooting
 Antwort-DM   RM1 1 ok rebooting facf04f881d89cde</pre>
       <p class="cite">Beleg: <b>tools/tests/remote_cmd_vectors.json</b>. Ein eigener Client testet gegen alle Vektoren, bevor er auf die Luft geht.</p>
-      <h3>25 Befehle, geschlossene Liste</h3>
-      <p style="margin-bottom:0">Aktion (<code>reboot</code>, <code>status</code>, <code>sendpos</code> ...), Schalter (<code>gps</code>, <code>mesh</code>, <code>gateway</code> ...), Parameter (<code>txpower</code>, <code>setout</code>), Lesen (<code>radio</code>, <code>txq</code>, <code>mh</code>, <code>net</code> ...) und Auto-Update (<code>upd go</code>). <strong>Nie erreichbar,</strong> auch mit gültigem Tag: Rufzeichen, Passwörter, WLAN, Flash löschen, OTA, Deep-Sleep.</p>
+      <h3>26 Befehle, geschlossene Liste</h3>
+      <p style="margin-bottom:0">Aktion (<code>reboot</code>, <code>status</code>, <code>sendpos</code> ...), Schalter (<code>gps</code>, <code>mesh</code>, <code>gateway</code> ...), Parameter (<code>txpower</code>, <code>setout</code>), Sperrliste (<code>blockcall</code>), Lesen (<code>radio</code>, <code>txq</code>, <code>mh</code>, <code>net</code> ...) und Auto-Update (<code>upd go</code>). <strong>Nie erreichbar,</strong> auch mit gültigem Tag: Rufzeichen, Passwörter, WLAN, Flash löschen, OTA, Deep-Sleep.</p>
     </div>
   </div>
   <div class="callout warn" style="margin-top:1rem">

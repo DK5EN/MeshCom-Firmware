@@ -531,7 +531,7 @@ figure.viz figcaption,.figcap{font-size:.8rem;color:var(--fg2);margin:.35rem .5r
 <tr><td class="m">3</td><td>Relay-Text</td><td>keine</td><td>300 s</td></tr>
 <tr><td class="m">3</td><td><code>{CET}</code></td><td>keine</td><td>Altersgrenze 150 s (statt der erwogenen 30 s)</td></tr>
 <tr><td class="m">4</td><td>Position</td><td>keine</td><td>120 s</td></tr>
-<tr><td class="m">5</td><td>HEY</td><td>180 s (Grenze BP-03)</td><td>180 s</td></tr>
+<tr><td class="m">5</td><td>HEY</td><td>180 s (Altersgrenze der Rückstau-Korrektur, <span style="white-space:nowrap">BP-03</span>)</td><td>180 s</td></tr>
 </tbody></table><p class="cite">Kosten 0 B RAM: <code>ringEnqueueTime[]</code> existiert, die Werte sind Konstanten (<code>configuration_global.h:472-480</code>, <code>RING_BG_MAX_AGE_MS</code> in Zeile 465). Nur abgeschlossene Einträge (Status DONE) altern, HEY in jedem Status. Die Werte sind per Build-Flag änderbar, nicht zur Laufzeit; sie können nach der DK5EN-98-Nacht angepasst werden.</p></div>
 <div><p style="font-size:.85rem;color:var(--fg2)">Im Ring las niemand mehr der Reihe nach, seit es die Prioritätsauswahl gibt. <code>iRead</code> und <code>iWrite</code> blieben nur als Kapazitätsbuchhaltung, die bei Cancel und Parken falsch wurde. Der Pool kostet <b>0 Byte</b> und lässt die N-24-Umlagerung entfallen.</p>
 <p style="font-size:.85rem;color:var(--fg2)"><strong>Wenn der Pool voll ist,</strong> verdrängt ein Frame mit strikt höherer Priorität den ältesten Eintrag der schlechtesten Priorität. Sonst wird der Neue verworfen (<code>RING_DROP_NEW</code>).</p></div>
@@ -679,7 +679,12 @@ figure.viz figcaption,.figcap{font-size:.8rem;color:var(--fg2);margin:.35rem .5r
   <p class="cap" id="lad-cap"></p>
   <div class="optgrid" id="opt-p"></div>
   <div class="panel mt" id="opt-p-p"></div>
-  <p class="mt" style="font-size:.82rem"><span class="prop">Vorschlag, nicht entschieden</span>P2 hat das beste Verhältnis von gesparter Sendezeit zu Änderungsgröße, danach P4. P1 und P3 verschieben die Fairness zwischen fremdem und eigenem Verkehr und brauchen Stufe-0-Daten. Teil B 4.3 ergänzt: P-A4 (ACK zuerst) plus P-A3 (Band 2 mit Limit je Quelle) als erster Schritt, P-A5 (DM-Retries in QRT) nach dem Slot-Pool, P-A1 nur mit Authentifizierung.</p>
+  <div class="mt" style="font-size:.82rem"><p style="margin:0 0 .3rem"><span class="prop">Vorschlag, nicht entschieden</span></p>
+  <ul style="margin:0">
+  <li><b>Erste Wahl:</b> P2 hat das beste Verhältnis von gesparter Sendezeit zu Änderungsgröße, danach P4.</li>
+  <li><b>Mit Vorbehalt:</b> P1 und P3 verschieben die Fairness zwischen fremdem und eigenem Verkehr und brauchen Stufe-0-Daten.</li>
+  <li><b>Teil B 4.3 ergänzt:</b> P-A4 (ACK zuerst) plus P-A3 (Band 2 mit Limit je Quelle) als erster Schritt, P-A5 (DM-Retries in QRT) nach dem Slot-Pool, P-A1 nur mit Authentifizierung.</li>
+  </ul></div>
 </div>
 </div>
 <details class="dev"><summary>HG im Code und Priorität von DONE-Text</summary><div class="body">

@@ -41,7 +41,12 @@ table.wide { min-width: 640px; }
 </div>
 
 <div class="callout note">
-<p><b>Seit <code>v4.40a.10.19</code> fest eingestellt:</b> In Release-Builds laufen <code>--nbrrelay on</code>, <code>--nbrsym on</code> und <code>--nbrreport auto</code> mit festem Wert; eine Änderung wird mit <code>[ERR];locked;&lt;name&gt;</code> abgelehnt, und ein Knoten, der einen anderen Wert hatte, wird beim ersten Start zurückgesetzt. Wer Relays vorher abgeschaltet hatte, sieht jetzt weniger doppelte Kopien und kürzere Warteschlangen. Spezifikation: <code>docs/production-locked-settings.md</code>.</p>
+<p><b>Seit <code>v4.40a.10.19</code> fest eingestellt:</b> In Release-Builds laufen <code>--nbrrelay on</code>, <code>--nbrsym on</code> und <code>--nbrreport auto</code> mit festem Wert.</p>
+<ul>
+<li><b>Änderung:</b> Sie wird mit <code>[ERR];locked;&lt;name&gt;</code> abgelehnt. Ein Knoten, der einen anderen Wert hatte, wird beim ersten Start zurückgesetzt.</li>
+<li><b>Wirkung:</b> Wer Relays vorher abgeschaltet hatte, sieht jetzt weniger doppelte Kopien und kürzere Warteschlangen.</li>
+<li><b>Spezifikation:</b> <code>docs/production-locked-settings.md</code>.</li>
+</ul>
 </div>
 
 <h2 id="kernfakten" style="border-top:0;padding-top:0;margin-top:1.6rem">Kernfakten</h2>
@@ -52,12 +57,19 @@ table.wide { min-width: 640px; }
 <li><strong>Wirkung:</strong> Vor jedem Relay rechnet der Knoten, welche direkten Nachbarn den Frame noch brauchen. Hört er die Kopie eines anderen Relais, das den ganzen Bedarf deckt, bricht er sein Relay ab. Ist er für einen Nachbarn der einzige Weg, sendet er in jedem Fall.</li>
 <li><strong>Feldwert:</strong> Am 23.09.2026 sanken die Relays auf dem Gateway DK5EN-98 im ersten Tag mit aktivem Abbruch von 72 auf 22 je Stunde. Das war vor der Korrektur der Fall-B-Sperre (<code>docs/nbr-stage2-campaign.md</code>).</li>
 <li><strong>Auf der Luft:</strong> Die Entscheidung braucht kein neues Format. Optional sendet ein Knoten alle 15 Minuten einen Nachbarbericht (HEY an „HN“, ein Hop), den Stock-Firmware verwirft.</li>
-<li><strong>Sichtbar:</strong> Web-Seite Neighbours im Knoten, Serienkommando <code>--neighbours</code>, dazu MHeard, Path und die Telefon-App aus derselben Tabelle.</li>
+<li><strong>Sichtbar:</strong> Web-Seite Neighbours im Knoten, serielles Kommando <code>--neighbours</code>, dazu MHeard, Path und die Telefon-App aus derselben Tabelle.</li>
 <li><strong>Nicht gebaut:</strong> Den quittierenden Gateway im ACK zu nennen. Das ist eine Protokolländerung und bleibt zurückgestellt.</li>
 </ul>
 
 <div class="callout">
-<p><b>Begriffe.</b> Ein <b>Relay</b> wiederholt einen fremden Frame für Nachbarn, die den Absender nicht direkt hören. <b>HEY</b> ist das regelmäßige Lebenszeichen eines Knotens. Der <b>SNR</b> ist der Signal-Rausch-Abstand einer Funkstrecke in dB. Die <b>Haltezeit</b> ist die Wartezeit vor dem Senden, die nach jedem empfangenen Frame neu beginnt (CSMA, Kanalzugriff mit Zufallsverzögerung). Ein <b>Gateway</b> verbindet das Mesh mit dem Server.</p>
+<p><b>Begriffe</b></p>
+<ul>
+<li><b>Relay:</b> wiederholt einen fremden Frame für Nachbarn, die den Absender nicht direkt hören.</li>
+<li><b>HEY:</b> das regelmäßige Lebenszeichen eines Knotens.</li>
+<li><b>SNR:</b> der Signal-Rausch-Abstand einer Funkstrecke in dB.</li>
+<li><b>Haltezeit:</b> die Wartezeit vor dem Senden, die nach jedem empfangenen Frame neu beginnt (CSMA, Kanalzugriff mit Zufallsverzögerung).</li>
+<li><b>Gateway:</b> verbindet das Mesh mit dem Server.</li>
+</ul>
 </div>
 
 <nav class="toc" aria-label="Inhalt">
@@ -276,8 +288,14 @@ table.wide { min-width: 640px; }
 
 <h3>Symmetrie und Nachbarbericht</h3>
 <ul>
-<li><strong>Symmetrie-Annahme (<code>--nbrsym on</code>):</strong> Hört mich ein Nachbar mit SNR ≥ −16 dB, gilt die Strecke als beidseitig, solange keine direkte Beobachtung vorliegt (<code>LORA_SNR_STABLE_MIN_DB</code>). Die Annahme geht in die Abdeckungsrechnung ein und wird im Log als <code>SYM</code> festgehalten.
-  <ul><li>Ursache der Einführung: Nach 11,6 h im Zählmodus auf DK5EN-98 zählte der Knoten 926 Mal Fall A und nur 10 Mal Fall B, weil in 96 % der Fälle ein Nachbar als einziger Empfänger galt, den der Knoten nie als Hörer beobachtet hatte (DK5EN-1 und DL2JA-1). Ohne diese beiden waren es 36 gegen 900.</li></ul></li>
+<li><strong>Symmetrie-Annahme (<code>--nbrsym on</code>):</strong> Hört mich ein Nachbar mit SNR ≥ −16 dB, gilt die Strecke als beidseitig, solange keine direkte Beobachtung vorliegt (<code>LORA_SNR_STABLE_MIN_DB</code>).</li>
+<li><strong>Wirkung der Annahme:</strong> Sie geht in die Abdeckungsrechnung ein und wird im Log als <code>SYM</code> festgehalten.</li>
+<li><strong>Ursache der Einführung:</strong> Nach 11,6 h im Zählmodus auf DK5EN-98 zählte der Knoten 926 Mal Fall A und nur 10 Mal Fall B.
+  <ul>
+    <li>In 96 % der Fälle galt ein Nachbar als einziger Empfänger, den der Knoten nie als Hörer beobachtet hatte (DK5EN-1 und DL2JA-1).</li>
+    <li>Ohne diese beiden waren es 36 gegen 900.</li>
+  </ul>
+</li>
 <li><strong>Nachbarbericht (<code>--nbrreport auto</code>):</strong> Ein Knoten sagt selbst, wen er hört, statt dass die anderen raten. Ein HEY an „HN“, ein Hop, alle 15 Minuten, erster Bericht 5 Minuten nach dem Start, höchstens 8 Einträge, nur Links der letzten 60 Minuten.
   <ul><li><code>auto</code> sendet nur, wenn der Knoten weder Mesh-Relay noch Gateway ist. Ein vollständiger Bericht (45 Minuten gültig) kann eine Symmetrie-Annahme widerlegen.</li><li>Stock-Firmware verwirft „HN“, weil es die Rufzeichenprüfung nicht besteht.</li></ul></li>
 </ul>
@@ -309,7 +327,11 @@ table.wide { min-width: 640px; }
 <p class="small">Quellen: <code>src/command_functions.cpp:560–575, 6544, 6629, 6640</code>, <code>src/prod_lock.h:49, 123</code>, <code>docs/production-locked-settings.md</code>. Die Schalter liegen in <code>node_sset4</code> 0x0100 bis 0x2000, also außerhalb der KISS-Bits 0x10 bis 0x80.</p>
 
 <h2 id="stufe2">Gateway-ACK-Zuordnung: zurückgestellt</h2>
-<p><b>Wer ein Gateway-ACK gesendet hat, steht weiter nirgends im Frame; die Matrix zählt solche ACKs nur global als „quittiert, Gateway unbekannt“.</b> Das war im Konzept vom 20.09.2026 die Stufe 2 und ist es geblieben. Im Code sendet der Builder weiter 12 Byte mit Byte 11 gleich 0 (<code>src/gw_ack_frame.h:46</code>), der Leser erkennt einen Hash-Anhang, aber kein Knoten sendet ihn (<code>src/ack_attribution.h</code>).</p>
+<p><b>Wer ein Gateway-ACK gesendet hat, steht weiter nirgends im Frame; die Matrix zählt solche ACKs nur global als „quittiert, Gateway unbekannt“.</b> Das war im Konzept vom 20.09.2026 die Stufe 2 und ist es geblieben.</p>
+<ul>
+<li><b>Sender:</b> Der Builder sendet weiter 12 Byte mit Byte 11 gleich 0 (<code>src/gw_ack_frame.h:46</code>).</li>
+<li><b>Leser:</b> Er erkennt einen Hash-Anhang, aber kein Knoten sendet ihn (<code>src/ack_attribution.h</code>).</li>
+</ul>
 
 <div class="table-wrap">
 <table class="wide">

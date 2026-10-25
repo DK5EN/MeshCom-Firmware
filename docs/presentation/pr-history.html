@@ -166,12 +166,18 @@ Zusammen sind das +76.698 und −38.910 Zeilen in 899 Dateiänderungen.</p>
   <li>T-Deck-Kartenmarker, Polen-Frequenz, Priorität der <code>{CET}/{MCP}/{SET}</code>-Texte.</li>
   <li>Dazu die Zeitzone als POSIX-TZ-Regel (#1192) und die MTU-Einstellung auf allen Boards (#1190).</li>
   </ul></li>
-<li><strong>Web-GUI geschützt und erweitert</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a>, 12.10.): HTML-Escaping, Prüfung von Breiten- und Längengrad bei Konsole und BLE, Upload der eigenen HEY-Echos am Gateway, Zeile „Server:“ auf der Info-Seite, Sendeleistung als Zahlenfeld, einklappbare Karten. Für das T-Deck ein Kachel-Cache im PSRAM und der Zustellstatus in der Nachrichtenblase.
-  <ul><li>Upstream hat #1207 und #1208 am 13.10. als Teil von 4.40a.hbserver veröffentlicht.</li></ul></li>
-<li><strong>Eine Server-Tabelle für alle Gateways</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, 18.10.): ESP32 und nRF52 wählen MeshCom-Server und Zeitserver aus einer gemeinsamen Tabelle (<code>src/gw_servers.cpp</code>, eine Zeile je Land) statt aus drei auseinandergelaufenen Kopien.
+<li><strong>Web-GUI geschützt und erweitert</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1208">#1208</a>, 12.10.)
   <ul>
-  <li>Neu: der Netzmodus <code>--setnet auto|inet|hamnet</code>. Ein RAK4631 mit statischer Adresse bleibt bei der Ethernet-Wiederherstellung statisch.</li>
-  <li>Auf der Bank lief vorher eine Matrix aus drei Netzen, drei Modi und fünf Servern auf RAK4631 und Heltec V3.</li>
+  <li><b>Web-GUI:</b> HTML-Escaping, Prüfung von Breiten- und Längengrad bei Konsole und BLE, Zeile „Server:“ auf der Info-Seite, Sendeleistung als Zahlenfeld, einklappbare Karten.</li>
+  <li><b>Gateway:</b> Upload der eigenen HEY-Echos.</li>
+  <li><b>T-Deck:</b> ein Kachel-Cache im PSRAM und der Zustellstatus in der Nachrichtenblase.</li>
+  <li><b>Upstream:</b> hat #1207 und #1208 am 13.10. als Teil von 4.40a.hbserver veröffentlicht.</li>
+  </ul></li>
+<li><strong>Eine Server-Tabelle für alle Gateways</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, 18.10.)
+  <ul>
+  <li><b>Tabelle:</b> ESP32 und nRF52 wählen MeshCom-Server und Zeitserver aus einer gemeinsamen Tabelle (<code>src/gw_servers.cpp</code>, eine Zeile je Land) statt aus drei auseinandergelaufenen Kopien.</li>
+  <li><b>Netzmodus:</b> neu ist <code>--setnet auto|inet|hamnet</code>. Ein RAK4631 mit statischer Adresse bleibt bei der Ethernet-Wiederherstellung statisch.</li>
+  <li><b>Bank:</b> Vorher lief eine Matrix aus drei Netzen, drei Modi und fünf Servern auf RAK4631 und Heltec V3.</li>
   </ul></li>
 <li><strong>Antwort-Knopf an jeder eingehenden T-Deck-Blase</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a>, 18.10.): „An“ wird aus dem Konversations-Tab vorgefüllt. Die Web-Seiten Path und MHeard zeigen die Firmware jeder Station.</li>
 <li><strong>Ein langsamer Browser löst keinen Watchdog-Neustart mehr aus</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a>, 21.10., Issue #1217): Web-Seiten laufen durch einen begrenzten Sendepuffer mit Watchdog-Feeds.</li>

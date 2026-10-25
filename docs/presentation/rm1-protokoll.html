@@ -32,8 +32,8 @@
 </ul>
 
 <div class="bluf">
-<p class="lead"><strong>RM1 („Remote Management 1“) ist die Fernwartung eines MeshCom-Knotens per LoRa-Direktnachricht: Jeder Befehl trägt eine 64-Bit-Signatur aus HMAC-SHA256 über Ziel, Absender, Zähler und Befehl, und die Antwort ist ebenfalls signiert.</strong>
-Ab Werk ist RM1 aus. Es läuft nur mit <code>--remotemgmt on</code> und einem gesetzten Knotenpasswort.</p>
+<p class="lead"><strong>RM1 („Remote Management 1“) ist die Fernwartung eines MeshCom-Knotens per LoRa-Direktnachricht, jeder Befehl und jede Antwort ist signiert.</strong>
+Ab Werk ist RM1 aus; es läuft nur mit <code>--remotemgmt on</code> und einem gesetzten Knotenpasswort.</p>
 <p class="reco">Empfehlung: RM1 nur für Knoten einschalten, die man aus der Ferne betreut, mit einem langen, zufälligen Passwort. Wer eine App baut, testet gegen alle Vektoren, bevor er auf die Luft geht.</p>
 </div>
 
@@ -49,6 +49,7 @@ Ab Werk ist RM1 aus. Es läuft nur mit <code>--remotemgmt on</code> und einem ge
 <h2>Kernfakten</h2>
 <ul class="keyfacts">
 <li><strong>Was es ist:</strong> Eine normale Direktnachricht an das Rufzeichen des Zielknotens, deren Text mit <code>RM1 </code> beginnt. Sie läuft wie jede andere Nachricht durch das Mesh.</li>
+<li><strong>Signatur:</strong> Jeder Befehl trägt eine 64-Bit-Signatur aus HMAC-SHA256 über Ziel, Absender, Zähler und Befehl. Die Antwort ist ebenfalls signiert.</li>
 <li><strong>Wer es braucht:</strong> Betreiber abgesetzter Knoten, etwa auf einem Berg. Wer seinen Knoten nicht aus der Ferne betreut, schaltet es nicht ein.</li>
 <li><strong>Aus ab Werk:</strong> Die Einstellung <code>node_rm</code> steht auf 0 (<code>src/meshcom_settings.h:203</code>). Ohne Passwort bleibt RM1 auch bei <code>--remotemgmt on</code> inaktiv (<code>src/command_functions.cpp:5032-5033</code>).</li>
 <li><strong>Echt, nicht geheim:</strong> Befehl und Antwort bleiben im Klartext lesbar. Geschützt ist nur, <em>wer</em> etwas befiehlt, und dass eine Antwort zu genau diesem Befehl gehört.</li>
