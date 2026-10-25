@@ -910,14 +910,16 @@ static constexpr uint32_t WIFI_PING_COUNT = 3;
 // ist 2048, hier etwas Reserve.
 static constexpr uint32_t WIFI_PING_TASK_STACK = 3072;
 static esp_ping_handle_t s_pingH = NULL;
+static bool s_pingNewFailLogged = false;
+// Bridge zum Ping-Task (wifi_liveness::Session): on_ping_end schreibt nur
+// s_pingBusy, s_pingStuck und s_pingReplies; s_pingPending/s_pingGw gehoeren dem Loop-Task.
 static uint32_t s_pingGw = 0;
 static volatile bool s_pingPending = false;  // Runde gestartet, noch nicht ausgewertet
-static int s_pingPendingChecks = 0;          // Checks, in denen die Runde pending war
-static bool s_pingNewFailLogged = false;
 static volatile int s_pingReplies = -1;     // gesetzt von on_ping_end
 static volatile bool s_pingBusy = false;    // Ping-Task in einer Runde (on_ping_end loescht)
 static volatile bool s_pingStuck = false;   // Runde als tot erklaert, Task haengt noch darin
-static uint8_t s_pingIdleBusyChecks = 0;     // Sicherheitsventil, siehe wifiPingCollect
+static int s_pingPendingChecks = 0;          // Checks, in denen die Runde pending war
+static int s_pingIdleBusyChecks = 0;         // Sicherheitsventil, siehe session_collect
 static wifi_liveness::State s_liveness;
 static uint32_t s_livenessFailRounds = 0;
 static bool s_livenessSelfReconnect = false;
@@ -940,106 +942,73 @@ static void wifiPingEnd(esp_ping_handle_t hdl, void *args)
   s_pingReplies = (int)rep;
 }
 
+// Zustand aus den Statics in die pure Session laden / geaenderte Felder zurueckschreiben
+// (nur Aenderungen, damit ein zwischenzeitliches on_ping_end nicht ueberschrieben wird).
+static wifi_liveness::Session wifiPingLoad()
+{
+  wifi_liveness::Session s;
+  s.have = (s_pingH != NULL);
+  s.pending = s_pingPending;
+  s.busy = s_pingBusy;
+  s.stuck = s_pingStuck;
+  s.gw = s_pingGw;
+  s.pending_checks = s_pingPendingChecks;
+  s.replies = s_pingReplies;
+  s.idle_busy_checks = s_pingIdleBusyChecks;
+  return s;
+}
+
+static void wifiPingStore(const wifi_liveness::Session &before, const wifi_liveness::Session &now)
+{
+  if(now.pending != before.pending) s_pingPending = now.pending;
+  if(now.busy != before.busy) s_pingBusy = now.busy;
+  if(now.stuck != before.stuck) s_pingStuck = now.stuck;
+  if(now.replies != before.replies) s_pingReplies = now.replies;
+  s_pingGw = now.gw;
+  s_pingPendingChecks = now.pending_checks;
+  s_pingIdleBusyChecks = now.idle_busy_checks;
+}
+
 // Laufende Runde abbrechen; naechster Check startet eine frische Runde.
 static void wifiPingAbortRound()
 {
-  if(s_pingPending && s_pingH)
+  wifi_liveness::Session b = wifiPingLoad(), s = b;
+  if(wifi_liveness::session_abort_round(s) && s_pingH)
     esp_ping_stop(s_pingH);
-  s_pingPending = false;
-  s_pingPendingChecks = 0;
-  s_pingReplies = -1;
-}
-
-// Session wegen Gateway-Wechsel loswerden. Solange der Ping-Task in einer Runde
-// steckt (s_pingBusy, erst on_ping_end loescht es), wird nur gestoppt und nicht
-// geloescht: vTaskDelete auf einen Task, der in lwIP wartet, waere use-after-free.
-// Gilt die Runde als tot (haengt in lwIP), wird die Session aufgegeben statt
-// geloescht (bewusstes Leck, nur bei Gateway-Wechsel im Haenger).
-// Rueckgabe true = Session ist weg.
-static bool wifiPingDrop()
-{
-  if(s_pingH)
-  {
-    if(s_pingBusy)
-    {
-      if(!s_pingStuck)
-      {
-        esp_ping_stop(s_pingH);   // idempotent; Handle bleibt bis zum Rundenende
-        return false;
-      }
-      s_pingH = NULL;             // haengender Task: aufgeben, nicht loeschen
-    }
-    else
-    {
-      esp_ping_stop(s_pingH);
-      esp_ping_delete_session(s_pingH);
-      s_pingH = NULL;
-    }
-  }
-  s_pingBusy = false;
-  s_pingStuck = false;
-  s_pingGw = 0;
-  s_pingPending = false;
-  s_pingPendingChecks = 0;
-  s_pingReplies = -1;
-  return true;
+  wifiPingStore(b, s);
 }
 
 // Ergebnis der letzten Runde abholen (startet keine neue, siehe wifiPingStart):
 // -1 kein Ergebnis/keine Probe, 0 Runde ohne Antwort, 1 ok
+// Die Entscheidungen (Stuck-Regel, Gateway-Wechsel, Drop/Abandon, Neuanlage)
+// trifft wifi_liveness::session_collect; hier nur die esp_ping_*-Aufrufe.
+// Drop: solange der Ping-Task in einer Runde steckt, nur stoppen (vTaskDelete auf
+// einen Task in lwIP waere use-after-free); tote Runde -> Session aufgeben statt loeschen.
 static int wifiPingCollect()
 {
   uint32_t gw = (uint32_t)WiFi.gatewayIP();
-  if(gw == 0)
-    return -1;
+  wifi_liveness::Session b = wifiPingLoad(), s = b;
+  wifi_liveness::Plan pl = wifi_liveness::session_collect(s, gw);
 
-  int result = -1;
-  if(s_pingPending && s_pingH && gw == s_pingGw)
-  {
-    // Haengende Runde (on_ping_end kommt nie, z.B. tcpip-Thread blockiert) gilt
-    // beim 2. Check nach dem Start als Fehlschlag; sonst eskaliert nie etwas.
-    wifi_liveness::Probe pr = wifi_liveness::probe_eval(true, s_pingReplies, s_pingPendingChecks);
-    if(!pr.done)
-      return -1;            // Runde laeuft noch: weder ok noch Fehler
-    if(pr.stuck)
-    {
-      s_pingStuck = s_pingBusy;   // Task steckt noch in der Runde
-      esp_ping_stop(s_pingH);
-    }
-    result = pr.result;
-    s_pingPending = false;
-  }
-  else if(s_pingStuck && s_pingBusy && s_pingH && gw == s_pingGw)
-  {
-    // Task haengt weiter in der toten Runde: keine neue Runde moeglich, jeder
-    // Check zaehlt als Fehlschlag, damit die Eskalation weiterlaeuft.
-    result = 0;
-  }
-  if(!s_pingPending && s_pingBusy && !s_pingStuck)
-  {
-    // Abgebrochene Runde ohne on_ping_end: nach 2 Checks nicht mehr als busy
-    // werten, sonst startet nie wieder eine Runde.
-    if(++s_pingIdleBusyChecks >= 2)
-    {
-      s_pingIdleBusyChecks = 0;
-      s_pingBusy = false;
-    }
-  }
-  else
-    s_pingIdleBusyChecks = 0;
-
-  if(s_pingH && gw != s_pingGw)
+  if(pl.disarm)
   {
     // Neues Gateway: bisheriger Armed-Zustand gilt nicht, es muss erst selbst
     // ICMP beantworten, bevor irgendetwas eskalieren kann.
     s_liveness = wifi_liveness::State();
     s_livenessFailRounds = 0;
-    if(!wifiPingDrop())
-      return -1;            // alte Runde noch nicht beendet: Session bleibt vorerst
-    result = -1;
   }
+  if(s_pingH)
+  {
+    if(pl.stop)
+      esp_ping_stop(s_pingH);   // idempotent; Handle bleibt bis zum Rundenende
+    if(pl.del)
+      esp_ping_delete_session(s_pingH);
+    if(pl.del || pl.abandon)
+      s_pingH = NULL;           // abandon: haengender Task, bewusstes Leck
+  }
+  wifiPingStore(b, s);
 
-  if(!s_pingH)
+  if(pl.create)
   {
     esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
     ip_addr_t target;
@@ -1062,12 +1031,11 @@ static int wifiPingCollect()
       }
       return -1;
     }
-    s_pingGw = gw;
-    s_pingPending = false;
-    s_pingPendingChecks = 0;
-    s_pingReplies = -1;
+    wifi_liveness::Session c = wifiPingLoad(), n = c;
+    wifi_liveness::session_created(n, gw);
+    wifiPingStore(c, n);
   }
-  return result;
+  return pl.result;
 }
 
 // Neue Runde erst starten, nachdem step() entschieden hat (keine Aktion): sonst
@@ -1075,17 +1043,15 @@ static int wifiPingCollect()
 // lwIP steckt.
 static void wifiPingStart()
 {
-  if(!s_pingH || s_pingPending || s_pingBusy)
+  wifi_liveness::Session b = wifiPingLoad(), s = b;
+  if(!wifi_liveness::session_start_round(s))
     return;
-  s_pingReplies = -1;
-  s_pingPendingChecks = 0;
-  s_pingPending = true;      // vor dem Start: on_ping_end darf nicht verworfen werden
-  s_pingBusy = true;
-  s_pingStuck = false;       // ein Task, der eine neue Runde annimmt, haengt nicht
+  wifiPingStore(b, s);       // pending/busy vor dem Start: on_ping_end darf nicht verworfen werden
   if(esp_ping_start(s_pingH) != ESP_OK)
   {
-    s_pingPending = false;
-    s_pingBusy = false;
+    wifi_liveness::Session c = wifiPingLoad(), n = c;
+    wifi_liveness::session_start_failed(n);
+    wifiPingStore(c, n);
   }
 }
 

@@ -159,6 +159,104 @@ void test_slow_but_finished_round_does_not_fail(void)
     TEST_ASSERT_EQUAL(0, m.s.fails);
 }
 
+// TD-21b: session bookkeeping
+struct SSim {
+    Session s;
+    State st;
+    int stops = 0, dels = 0, abandons = 0, creates = 0;
+    int check(uint32_t gw, Action *act = nullptr)
+    {
+        Plan pl = session_collect(s, gw);
+        if (pl.stop) stops++;
+        if (pl.del) dels++;
+        if (pl.abandon) abandons++;
+        if (pl.disarm) st = State();
+        if (pl.create) { creates++; session_created(s, gw); }
+        Action a = step(st, true, pl.result);
+        if (a == RECONNECT) { session_abort_round(s); }
+        else if (a == NONE) session_start_round(s);
+        if (act) *act = a;
+        return pl.result;
+    }
+    void on_end(int n) { session_on_end(s, n); }
+};
+
+void test_gw_change_while_armed_disarms(void)
+{
+    SSim m;
+    m.check(1);                      // create
+    m.on_end(0);                     // (start happened in check)
+    m.st.armed = true;
+    m.s.busy = false; m.s.pending = false;
+    Action a;
+    m.check(2, &a);                  // gw change, idle session: delete + create
+    TEST_ASSERT_EQUAL(1, m.dels);
+    TEST_ASSERT_FALSE(m.st.armed);
+    for (int i = 0; i < 6; i++) { m.check(2, &a); TEST_ASSERT_EQUAL(NONE, a); m.on_end(0); }
+    TEST_ASSERT_EQUAL(0, m.st.fails);                // disarmed: fails not counted
+    m.check(2); m.on_end(2); m.check(2);             // answers once -> armed
+    TEST_ASSERT_TRUE(m.st.armed);
+}
+
+void test_late_end_after_abort_not_counted(void)
+{
+    Session s;
+    session_created(s, 1);
+    TEST_ASSERT_TRUE(session_start_round(s));
+    TEST_ASSERT_TRUE(session_abort_round(s));
+    session_on_end(s, 3);                            // late
+    TEST_ASSERT_EQUAL(-1, s.replies);
+    TEST_ASSERT_FALSE(s.busy);
+    Plan pl = session_collect(s, 1);
+    TEST_ASSERT_EQUAL(-1, pl.result);
+}
+
+void test_drop_while_busy_deferred_then_done(void)
+{
+    Session s;
+    session_created(s, 1);
+    session_start_round(s);
+    Plan pl = session_collect(s, 2);                 // gw change, round running
+    TEST_ASSERT_TRUE(pl.stop);
+    TEST_ASSERT_FALSE(pl.del);
+    TEST_ASSERT_FALSE(pl.abandon);
+    TEST_ASSERT_FALSE(pl.create);
+    TEST_ASSERT_TRUE(s.have);
+    session_on_end(s, 0);                            // task leaves the round
+    pl = session_collect(s, 2);
+    TEST_ASSERT_TRUE(pl.del);
+    TEST_ASSERT_FALSE(pl.abandon);
+    TEST_ASSERT_TRUE(pl.create);
+    TEST_ASSERT_EQUAL(-1, pl.result);
+}
+
+void test_gw_change_with_wedged_old_round_recovers(void)
+{
+    SSim m;
+    Action a;
+    m.check(1);                                      // create + start
+    m.on_end(2); m.check(1);                         // ok round -> armed
+    TEST_ASSERT_TRUE(m.st.armed);
+    // the check above also started a new round, which never ends
+    m.check(2, &a);                                  // gw change, old pending (1)
+    TEST_ASSERT_EQUAL(0, m.abandons);
+    m.check(2, &a);                                  // pending (2) -> stuck -> abandon + create
+    TEST_ASSERT_EQUAL(1, m.abandons);
+    TEST_ASSERT_EQUAL(0, m.dels);
+    TEST_ASSERT_EQUAL(2, m.creates);
+    TEST_ASSERT_TRUE(m.s.have);
+    TEST_ASSERT_EQUAL(2, (int)m.s.gw);
+    TEST_ASSERT_FALSE(m.st.armed);
+    // new gateway answers once -> armed
+    m.check(2); m.on_end(3); m.check(2);
+    TEST_ASSERT_TRUE(m.st.armed);
+    // 3 failed rounds -> RECONNECT
+    Action last = NONE;
+    for (int i = 0; i < 3; i++) { m.check(2, &last); m.on_end(0); }
+    m.check(2, &last);
+    TEST_ASSERT_EQUAL(RECONNECT, last);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -173,5 +271,9 @@ int main(int, char **)
     RUN_TEST(test_pending_at_second_check_is_failure);
     RUN_TEST(test_stuck_rounds_escalate_to_reconnect);
     RUN_TEST(test_slow_but_finished_round_does_not_fail);
+    RUN_TEST(test_gw_change_while_armed_disarms);
+    RUN_TEST(test_late_end_after_abort_not_counted);
+    RUN_TEST(test_drop_while_busy_deferred_then_done);
+    RUN_TEST(test_gw_change_with_wedged_old_round_recovers);
     return UNITY_END();
 }
