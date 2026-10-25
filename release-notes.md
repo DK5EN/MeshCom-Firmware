@@ -3,7 +3,7 @@
 
 ## What this release is
 
-**`v4.40a.10.25` makes sure an own group text always goes on air, lets every ESP32 node on WiFi recover a dead network link by itself, and stops the T-Deck from running out of memory after many messages; the T-Deck also keeps its backlight level and can dim at night.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
+**`v4.40a.10.25` makes sure an own group text always goes on air, lets every ESP32 node on WiFi recover a dead network link by itself, stops a mailbox node from delivering an already acknowledged direct message twice, and stops the T-Deck from running out of memory after many messages; the T-Deck also keeps its backlight level and can dim at night.** Your configuration survives the update. T-Beam 1W and T-Deck Pro owners who skipped the web flasher on the last releases must use it once now.
 
 ### Action needed
 
@@ -52,6 +52,11 @@
   - A gateway that never answered a ping does not arm the watchdog, so routers that block ping cause no action.
   - No extra task: the probe runs inside the network stack and costs about 0.6 KB of idle heap on a T-Beam (WIFI-HEAP-01).
   - Bench: an outage of 2 min instead of no recovery in 20 min.
+- **A mailbox node no longer delivers an already acknowledged direct message a second time** (SNF-ACK-01, store-and-forward, ESP32-S3 and nRF52 nodes with a mailbox switched on, `--store own|list|heard`).
+  - Cause: when the recipient's ack arrived before the mailbox node's own copy, the delivery's re-ack cleared the slot, and a late copy opened a new one. The recipient got the message twice plus a second store notice (field case 2026-10-25).
+  - Now: an ack heard for a call the mailbox serves blocks storing that sender, recipient and message number again for 1 hour (32 entries).
+  - The `MBOX` line ends with `tomb=<n>`, the count of refused stores; the mailbox web page shows it too.
+  - Background: [`docs/commands-store-node.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/commands-store-node.md).
 - **T-Deck: no more memory exhaustion after many received messages** (TD-20, TD-22, T-Deck and T-Deck Plus).
   - Cause: every received message was kept a second time in internal memory until reboot, and the number of message tabs had no limit. After about 250 messages the WiFi buffers ran out and the network link hung.
   - Now: the extra copy is gone. At most 16 tabs, the least recently used one is closed first. Below 40 KiB of free internal memory the oldest messages of an inactive tab are dropped (the open tab keeps at least 10).
@@ -285,7 +290,7 @@ With default settings, compared with the official `v4.40a.spserver`:
 
 ### Verification for this release
 
-- **Host suite:** 2942 test cases in 82 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1410, web GUI, web flasher). New: suites for the own-text release, the WiFi liveness watchdog, the T-Deck message store and tab limit, and the day/night backlight (sun elevation against reference times).
+- **Host suite:** 2951 test cases in 82 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1410, web GUI, web flasher). New: suites for the own-text release, the WiFi liveness watchdog, the T-Deck message store and tab limit, and the day/night backlight (sun elevation against reference times).
 - **Build:** all release images built by CI (27 ESP32, 3 nRF52, Safeboot), and the 27 `.autoupdate` files re-inflated byte-exact.
 - **Idle heap on T-Beam v1.2 (`DK5EN-92`):** 68728 B against the 69332 B baseline (-604 B, the gate allows 3072 B).
   - A first build of the WiFi watchdog with its own ping task measured 63884 B and failed the gate; the release ships the probe without a task.
@@ -294,7 +299,7 @@ With default settings, compared with the official `v4.40a.spserver`:
   - WiFi watchdog on T-Deck Plus (`DK5EN-14`), final probe: internal memory starved until the IP path hung (588 B free), memory released, the path stayed dead; the watchdog reconnected after 3 failed rounds, outage 2 min 0 s, no reboot (before the fix: no recovery in 20 min).
   - The probe gets answers from a real access point: `[WIFI];probe;armed` 60 s after boot on T-Beam v1.2 and T-Deck Plus.
   - T-Deck memory on `DK5EN-14`: 400 messages in one tab plateau at 41.6 KB free (before: hang at about 250). 20 groups round robin hold 16 tabs with 0 lost pings; 500 messages in 5 groups keep 41.0-61.9 KB free, no failed allocation.
-- **Host-tested only:** the day/night backlight (TD-23: no hardware test yet), the watchdog on any board except the T-Deck Plus, and the watchdog's network reset and reboot stages.
+- **Host-tested only:** the mailbox fix (SNF-ACK-01: 9 new cases, each failing against the unfixed code), the day/night backlight (TD-23: no hardware test yet), the watchdog on any board except the T-Deck Plus, and the watchdog's network reset and reboot stages.
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
@@ -362,6 +367,7 @@ With default settings, compared with the official `v4.40a.spserver`:
 
 - **Remote-management repeat stop for client commands:** host tests and builds only; not yet run over the air between two nodes.
 - **Wireless Tracker memory fix (AU-21):** no tracker on our bench; display-buffer release and re-acquire are host tests and builds only until the first field report. Still open: the ESP32-S3 memory floor for TLS and a Bluetooth pause before the check on S3 boards.
+- **Mailbox double delivery (SNF-ACK-01):** host tests and builds only; not run over the air. Classic ESP32 boards have no mailbox and are not affected.
 - **Day/night backlight (TD-23):** host tests and builds only; not yet checked on a T-Deck.
 - **WiFi watchdog:** benched on one T-Deck Plus only. The network reset and reboot stages ran in host tests only. After a heavy memory shortage the link can also drop completely; then the older watchdog reconnects after its 180 s grace time (seen on the bench, not shortened).
 - **T-Deck memory fixes:** no 24 h soak after the fixes yet, and no visual check of the message tabs on the device.
@@ -438,7 +444,7 @@ With default settings, compared with the official `v4.40a.spserver`:
 - **No PR of ours is open upstream.** The board marker and `--id` are planned as a PR.
 - **Fork-only so far:**
   - the "WEBServer stopped" fix (the bug is in upstream `dev` too) and the NVS diagnostics in remote management
-  - everything of this release: the own group text fix (part of the transmit queue pool), the WiFi watchdog, the T-Deck memory fixes and the day/night backlight
+  - everything of this release: the own group text fix (part of the transmit queue pool), the mailbox fix (part of store-and-forward), the WiFi watchdog, the T-Deck memory fixes and the day/night backlight
   - the Wireless Tracker memory fix (AU-21), the T-Beam first-boot fix (TRK-03, planned as a PR) and the remote-management repeat stop of `v4.40a.10.24`
   - the transmit queue pool and the call blocklist of `v4.40a.10.23`; its fixes (AU-18/19/20, WEB-RX-01, RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04) are planned as PRs
   - everything of `v4.40a.10.19`: queue work, setting lock, Auto Update web row, heap and LED work, `sens` fix, neighbour-page fix

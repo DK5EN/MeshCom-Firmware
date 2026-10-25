@@ -15,12 +15,17 @@ Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 66 A
 `FLASH_VERSION` 20261025, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten
 (die drei TD-23-Felder sind neue NVS-Keys nur auf T-Deck/T-Deck Plus/T-Deck Pro). Safeboot v3 unveraendert.
 
-Inhalt seit `v4.40a.10.24` (Firmware: 8 Commits plus Merge von Fork-PR #1, dazu der `FLASH_VERSION`-Stempel):
+Inhalt seit `v4.40a.10.24` (Firmware: 9 Commits plus Merge von Fork-PR #1, dazu der `FLASH_VERSION`-Stempel):
 
 - TXP-01 (`556b997d`): `pnFrameIsReleasableGroupText()` gibt keinen Frame mit eigenem Call als Quelle mehr frei.
   Vorher gab die Server-Kopie eines anderen Gateways einen eigenen Gruppen- oder `*`-Text frei, bevor er einmal
   gesendet war (DK5EN-98-Logger 2026-10-24/25: 45 von 103 eigenen Gruppentexten nie auf LoRa; Bench 9/10). Der
   40-s-Gehoert-Check stoppt die Wiederholung wie bisher; Texte fuer einen KISS-Client (fremde Quelle) bleiben freigebbar.
+- SNF-ACK-01 (`e95e5dd9`): ein Store-Knoten hielt und lieferte eine bereits quittierte DM erneut aus (Feldfall
+  2026-10-25, DK5EN-98 -> DM3KS-12 `{450` via DB0SD-22): Ack vor der eigenen Kopie, Re-Ack der Zustellung leert den
+  Slot, spaete Kopie oeffnet einen neuen. Jetzt merkt `msgstoreOnAck()` (Sender, Acker, NNN) 1 h in einem Ring mit
+  32 Eintraegen (nur fuer Acker im Store-Set), `msgstoreStore()` verweigert dafuer einen neuen Slot; Zaehler
+  `tomb=` im `MBOX`-Zeile und auf der Web-Seite. Nur S3 und nRF52 (`ENABLE_MSGSTORE`), klassische ESP32 nicht.
 - TD-20 (`5b1e1da8`): `persisted_msgs` hielt jede empfangene Nachricht bis zum Reboot im internen RAM
   (Staging fuer `/messages.json`, dessen Datei-I/O nur unter `T_DECK_SPIFFS` existiert, nirgends definiert).
   Nach ~250 Nachrichten fielen 124-B-DMA-Allokationen aus und der IP-Pfad hing. Jetzt nur noch unter `T_DECK_SPIFFS`.
@@ -44,7 +49,7 @@ Inhalt seit `v4.40a.10.24` (Firmware: 8 Commits plus Merge von Fork-PR #1, dazu 
 
 ### Was fuer dieses Release auf Hardware geprueft wurde
 
-- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (82 Unity-Envs, 2942/2942, Golden 48, pytest 1410).
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (82 Unity-Envs, 2951/2951, Golden 48, pytest 1410).
 - Idle-Heap DK5EN-92 (T-Beam v1.2, Release-Image, ueber 2323, `--boot-timeout-s 400`): 68728 B gegen Baseline
   69332 B (-604 B) PASS. Gemessen auf dem raw-Probe-Build vor den zwei Review-Punkten (ein bool mehr).
   Mit der esp_ping-Session vorher 63884 B (FAIL).
@@ -60,6 +65,10 @@ Inhalt seit `v4.40a.10.24` (Firmware: 8 Commits plus Merge von Fork-PR #1, dazu 
 
 ### Was ausdruecklich NICHT geprueft wurde
 
+- SNF-ACK-01 nur Host-Tests (`test_msgstore`, 9 neue `test_tomb_*`, jeder rot gegen den alten Code) und Builds,
+  nicht on air.
+- Idle-Heap nach SNF-ACK-01 nicht neu gemessen: der Mailbox-Code wird auf klassischen ESP32 (T-Beam) nicht
+  gebaut; DK5EN-92 laeuft das Release-Image von HEAD.
 - TD-23 nicht auf Hardware (UAT durch den Operator steht aus): nur Host-Tests (`native_daylight` 11 Faelle,
   Sanitize, NVS-Roundtrip) und Builds.
 - TD-21 nur auf dem T-Deck Plus ausgehungert (T-Beam nur `probe;armed`); Stufen Netz-Reset und Restart nur im Host-Test. Bei `td21b_bench` fiel die

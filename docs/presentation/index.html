@@ -69,6 +69,7 @@
       <h3>Kernfakten</h3>
       <ul>
         <li><strong>Eigene Gruppentexte:</strong> die Server-Kopie eines anderen Gateways löscht den eigenen Text nicht mehr aus der Warteschlange, bevor er einmal gesendet wurde. Am Gateway DK5EN-98 gingen vorher 45 von 103 eigenen Gruppentexten nie auf LoRa; auf der Bench nach dem Fix 0 von 20 (TXP-01).</li>
+        <li><strong>Postfach (Speichern und Weiterleiten):</strong> ein Postfach-Knoten liefert eine schon quittierte Direktnachricht nicht mehr ein zweites Mal aus; eine gehörte Quittung sperrt die Nachricht 1 h gegen erneutes Speichern (SNF-ACK-01, nur ESP32-S3 und nRF52 mit eingeschaltetem Postfach).</li>
         <li><strong>WLAN auf allen ESP32:</strong> der Knoten pingt alle 30 s seinen WLAN-Router. Ist die Verbindung angemeldet, aber tot, verbindet er neu, startet dann das Netz neu und zuletzt sich selbst (TD-21). Ein Router, der nie auf Ping antwortet, löst nichts aus.</li>
         <li><strong>T-Deck und T-Deck Plus, Speicher:</strong> keine zweite Kopie jeder Nachricht mehr im internen RAM, höchstens 16 Tabs, unter 40 KiB frei fallen alte Nachrichten inaktiver Tabs weg. Vorher hing das WLAN nach etwa 250 Nachrichten (TD-20, TD-22).</li>
         <li><strong>T-Deck und T-Deck Plus, Helligkeit:</strong> die Stufe bleibt nach dem Neustart erhalten. „Auto Day/Night“ im Setup schaltet nach dem Sonnenstand zwischen Tag- und Nachtstufe um; aus, bis man es einschaltet (TD-23, noch nicht auf dem Gerät geprüft).</li>
