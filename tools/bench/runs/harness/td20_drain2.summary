@@ -1,0 +1,5 @@
+TD-20 drain 2, DK5EN-14, INSTRUMENT with TD-20 fix, 2026-10-25 09:23-09:49
+stimulus as drain 1, 400 messages, no console logger
+pmsgs 0 throughout; tabmsgs 50 per tab cap reached at ~50 messages
+ifree 76508 -> 42392 at 51 msgs -> 41520 at ~400 msgs (plateau); imin 13584, iblk 18420-19444 at plateau
+afail 0; pings 1306 ok / 9 lost (scattered); no ipdead/probe;fail lines

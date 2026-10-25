@@ -2,7 +2,7 @@
 
 **Stand:** 2026-10-24, branch `fork-dev` (contains `upstream/dev` 112e4e5b), last release
 `v4.40a.10.24` (CI, Latest, tag on `c8f0be5b`, 66 assets; web flasher on 10.24). No upstream PR open: #1236 (SP server host `sp.meshcom.pl`) merged 2026-10-24, synced `ff67ecd5`.
-Next step: evaluate the TXP logger night (until 2026-10-25 16:21), then TTL decision.
+Next step: evaluate the DK5EN-14 TD-20/TD-21 soak (until ~2026-10-26 10:00) and the TXP DK5EN-98 logger night (until 2026-10-25 16:21), then TTL decision.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -13,7 +13,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   tracker TFT sprite, TRK-03 T-Beam first boot GPS, client RM1 command stops its repeats on the reply (`56519299`, not
   benched). Gate 81 Unity envs 2891/2891, pytest 1352, golden 48; idle-heap step skipped (operator decision). Web flasher
   `check`: 30 boards, 0 mismatches. The first tag on `755a4dec` was moved before CI published (run cancelled for the RM fix).
-  The five nodes still run the `3e07f894` gate build for the TXP logger night.
+  DK5EN-1/-90/-92/-98 still run the `3e07f894` gate build for the TXP logger night; DK5EN-14 runs the TD-20/TD-21 build.
 - **`v4.40a.10.23` released 2026-10-24** (operator chose the 10.23 date): TX pool W0-W1c, BLK-01 `--blockcall`,
   AU-18/19/20, WEB-RX-01 (#1229), RX-DEAF-01/02, GWRX-01, GWACK-01, UDP-04, BL-01 tests, upstream #1235 sync.
   Gate 80 Unity envs 2861/2861, pytest 1332, golden 48; idle heap DK5EN-92 70296 B (+964 B). Web flasher
@@ -22,10 +22,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   (one large PR, AU-13 included), RM1 remote management (#1189), SNF-GW/STOR (#1188, STOR needs the server
   operator's OK), LoRa QRT waves 1-2, production setting lock, WEB-STOP-01, the AU-tied heap levers, RM LED and
   `chgled` override. Matrix: [fork-dev-vs-upstream-20261018.md](fork-dev-vs-upstream-20261018.md).
+- **T-Deck heap/WiFi campaign 2026-10-25 (TD-20, TD-21, not released):** `persisted_msgs` RAM-only message copy
+  removed (`5b1e1da8`), WiFi IP-liveness watchdog added; both benched on DK5EN-14. DK5EN-14 runs the release build of
+  `5b1e1da8` (09:40:55) with a 24 h soak on rpizero (`screen td20-14`). Open: TD-22 tab model heap, WIFI-PS-01 ping
+  latency decision ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
   - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. All five nodes
-    (DK5EN-1/-14/-90/-92/-98) run the gate build of `3e07f894` (TXP + BLK-01) since 2026-10-24 16:20; 24 h loggers on
-    rpizero for DK5EN-98 and DK5EN-14 until 2026-10-25 16:21 (`screen` sessions `txp-98`, `txp-14`). Then evaluate
+    (DK5EN-1/-14/-90/-92/-98) run the gate build of `3e07f894` (TXP + BLK-01) since 2026-10-24 16:20; 24 h logger on
+    rpizero for DK5EN-98 until 2026-10-25 16:21 (`screen txp-98`); the DK5EN-14 run was stopped 08:09 for the TD-20 campaign. Then evaluate
     against the W0 baseline and decide TTL values and the release ([campaign-tx-pool.md](campaign-tx-pool.md)).
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
@@ -155,11 +159,10 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-10-25:** T-Deck heap/WiFi campaign: field RCA reproduced on DK5EN-14 (~250 messages wedge the IP path while
+  WiFi stays associated); TD-20 and TD-21 fixed and benched; slow LAN ping traced to WiFi modem sleep (WIFI-PS-01).
 - **2026-10-24 (late):** TRK-02 measurement campaign (web flasher vs PRG/GPIO0): `dtr_replay.py`, 80 replays
   plus one Chrome install on DK5EN-1, 0 clicks; TRK-03 T-Beam first-boot TRACK bit confirmed on DK5EN-92
   (erased and restored) and fixed with a native test.
 - **2026-10-24 (evening):** AU-21 field log DJ8MEH-81 analysed; tracker TFT sprite on demand and released for AU
   TLS jobs, `lowheap_tls`, heap logging (`(tft)` mark, `--info` HEAP); two waves, gate green, DK5EN-1 benched.
-- **2026-10-24:** campaign BL-01 + GWRX-01 nRF52 closed: `--mesh off` meaning decided and pinned by tests,
-  GWRX-01 benched on the RAK gateway (5 of 7 server slots released), bench driver `gwrx_bench.py`; GWACK-01
-  found; RESUME and BACKLOG cleaned up (48 closed rows archived).

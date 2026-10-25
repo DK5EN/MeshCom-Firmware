@@ -1,0 +1,9 @@
+TD-20 drain 1, DK5EN-14 T-Deck Plus, INSTRUMENT b55a5a6a (pre-fix), 2026-10-25 08:35-09:12
+stimulus: --injectmsg TEST, 76 B, every 3 s, USB serial held, console logger attached (loradebug/txcapture on)
+08:35 ifree 78424 iblk 69620 pmsgs 0
+08:50:00 ifree 4540 iblk 1524 pmsgs 248 afail 0
+08:50:23 first lost ping; afail 5 (124 B, caps 0x80c, heap_caps_malloc)
+08:50:30 ifree 44792 (buffers released), wifi=3 WL_CONNECTED, no ICMP/ARP
+09:00 ifree 59188, still no ICMP/ARP; 606 consecutive pings lost until 09:12
+09:12:43 --wifidrop -> 09:12:46 connected -> 09:12:48 ping ok (151 ok)
+ping RTT mean by phase: 136.6 ms (77-40 KB free), 138.0 ms (40-30 KB), 76.9 ms (15-5 KB)

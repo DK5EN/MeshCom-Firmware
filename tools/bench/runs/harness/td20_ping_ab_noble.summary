@@ -1,0 +1,9 @@
+# min: [INSTR-WIFIPS];set;min;rc;0;now;1
+# min: [INSTR-HEAP];up_s;24;ifree;133720;imin;122728;iblk;122868;dfree;125980;dblk;122868;pfree;4884195;pblk;4849652;afail;0;afsz;0;afcaps;0;affn;-;pmsgs;0;tabs;0;tabmsgs;0;wifi;3;rssi;-78;ps;1
+mode=min n=120/120 min=20.6 p50=86.0 p90=150.2 p95=170.6 max=275.6 mean=86.6
+# none: [INSTR-WIFIPS];set;none;rc;0;now;0
+# none: [INSTR-HEAP];up_s;153;ifree;133116;imin;122728;iblk;122868;dfree;125376;dblk;122868;pfree;4879967;pblk;4849652;afail;0;afsz;0;afcaps;0;affn;-;pmsgs;1;tabs;1;tabmsgs;1;wifi;3;rssi;-78;ps;0
+mode=none n=120/120 min=3.1 p50=6.2 p90=47.0 p95=82.0 max=759.9 mean=20.7
+# min: [INSTR-WIFIPS];set;min;rc;0;now;1
+# min: [INSTR-HEAP];up_s;282;ifree;132904;imin;122728;iblk;122868;dfree;125164;dblk;122868;pfree;4879719;pblk;4849652;afail;0;afsz;0;afcaps;0;affn;-;pmsgs;1;tabs;1;tabmsgs;1;wifi;3;rssi;-77;ps;1
+mode=min n=120/120 min=4.0 p50=76.7 p90=138.7 p95=161.6 max=194.7 mean=77.4

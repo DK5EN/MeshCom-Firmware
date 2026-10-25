@@ -1,0 +1,8 @@
+TD-21 bench, DK5EN-14, INSTRUMENT final (5b1e1da8 tree, build 09:40:16), 2026-10-25 09:51-09:57
+09:52:42-09:54:23 --heapeat 6 KB steps to 66 KB held, ifree 204
+09:54:16 pings lost (IP path wedged)
+09:54:48 --heapeat 0 -> ifree 71836, IP stays dead
+09:55:11 / 09:55:41 / 09:56:11 [WIFI];probe;fail;rounds;1..3
+09:56:11 [WIFI];watchdog;ipdead;reconnect;rounds;3
+09:56:17 ping ok; 60 consecutive ok by 09:57:17 (RECOVERED)
+outage 2 min 1 s (pre-fix: no recovery in 20+ min)
