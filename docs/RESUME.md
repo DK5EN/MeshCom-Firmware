@@ -16,6 +16,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **QA review of `fork-dev` f0a81c8 (2026-10-25, report only, no code change):**
+  [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md); raw reports in `review/qa-20261025/`.
+  All 32 CI envs built. Top items: QA-NET-04 (UDP datagram ≥255 B wedges the gateway downlink, DK5EN-98),
+  QA-STAB-01/02 (blocking DNS in EXTUDP, server DNS never re-resolved), QA-NET-01/02/03 (BLE PIN not gating
+  writes, nRF52 settings characteristic leaks secrets, CSRF `otaupdate`), QA-AU-01 (Safeboot erases before the inflate
+  length check), QA-SIZE-AU01 (T-Beam family ≈61 KB from AU staging refusal). Size levers: nRF52 ETH/Web gating
+  (−192 KB on T114/t_echo), `-fno-exceptions` + `CORE_DEBUG_LEVEL=0` (−139 KB measured on E22). Operator decisions are
+  listed in §6.
 - **DK5EN-98 extended soak of `v4.40a.10.25` running** (started 2026-10-25 20:36, ends by itself 2026-10-29 18:00):
   net console logger on rpizero in screen `soak98`, build `Oct 25 2026 / 15:54:42`, AU tag `v4.40a.10.25`, flags
   `txcapture,loradebug` (restored at the end). Logs `~/meshlog/dk5en-98-soak-20261025/YYYY-MM-DD.log`, state in
