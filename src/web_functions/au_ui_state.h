@@ -146,8 +146,8 @@ static inline const char *auErrText(const char *job, const char *err)
 {
     static const char *const kConn[] = {"tls", "conn", "http", "begin", "timeout", nullptr};
     static const char *const kList[] = {"short", "stall", "toobig", "chunk", "feed", "enc", "json", "noenv", "badver", nullptr};
-    static const char *const kDamaged[] = {"short", "stall", "digest", "readback", "crc", "write", "enc", "feed", "chunk", nullptr};
-    static const char *const kNoImg[] = {"noasset", "nodigest", nullptr};
+    static const char *const kDamaged[] = {"short", "stall", "digest", "readback", "crc", "write", "enc", "feed", "chunk", "inflate_chk", "image", nullptr};
+    static const char *const kNoImg[] = {"noasset", "nodigest", "env", nullptr};
     static const char *const kLayout[] = {"notota0", "imglen", "size", "overlap", "small", "inflate", "layout", nullptr};
     static const char *const kFlash[] = {"erase", "noflash", "nvs", nullptr};
     char w[24];

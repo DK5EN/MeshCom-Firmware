@@ -248,7 +248,7 @@ void test_error_table(void)
     txt("download", "noenv", "Update failed");
     txt("download", "badver", "Update failed");
     const char *DMG = "Download damaged, it was discarded -- try again";
-    for (const char *t : {"short", "stall", "digest", "readback", "crc", "write", "enc", "feed", "chunk"})
+    for (const char *t : {"short", "stall", "digest", "readback", "crc", "write", "enc", "feed", "chunk", "inflate_chk", "image"})
     {
         txt("download", t, DMG);
         txt("stagelan", t, DMG);
@@ -257,7 +257,7 @@ void test_error_table(void)
     txt("check", "readback", "Update failed");
     txt("check", "crc", "Update failed");
     txt("check", "write", "Update failed");
-    for (const char *t : {"noasset", "nodigest"})
+    for (const char *t : {"noasset", "nodigest", "env"})
     {
         txt("download", t, "This release has no image for this board");
         txt("check", t, "Update failed");

@@ -139,6 +139,10 @@ jobs:
         z=$(ls .pio/build/*/*.autoupdate | wc -l)
         [ "$z" -eq "$n" ] || { echo "::error::$n app images but $z .autoupdate files"; exit 1; }
 
+    - name: Auto-update stage headroom
+      # fwStageLayout() per env (running == new image); fails if an env could no longer stage its own update
+      run: python3 tools/au_stage_check.py .pio/build/*/
+
     - uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
