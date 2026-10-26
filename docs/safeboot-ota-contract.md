@@ -179,7 +179,7 @@ with the ROM `tinfl` into `ota_0`, `esp_image_verify`, set boot, drop the record
 Markers: `[SAFEBOOT];apply;start;tag;..;zlen;..;ilen;..;try;N`, `[SAFEBOOT];apply;ok;bytes;..;ms;..`,
 `[SAFEBOOT];apply;fail;<reason>`, `[SAFEBOOT];apply;retry;restart;try;N`. Power-type failures keep the
 record and restart (at most 3 tries, NVS `fwstage`/`tries`); deterministic failures drop it and `last`.
-Any entry into Safeboot (also a manual `--ota-update` for a web upload) applies a staged record first.
+Any entry into Safeboot (also a manual `--ota-update` for a web upload) applies a staged record first. A web upload (`/ota/start`) then drops the record (keep `last`), even if the upload later fails.
 Design: `docs/concept-open-issues-20261004.md` section 4 (AU-D11, D15, D19).
 
 ## Capability version (AU-12, since 2026-10-05)
