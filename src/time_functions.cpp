@@ -142,13 +142,7 @@ void loadTimePersistence() {
     {
         MyClock.SetClock((time_t)max_time + (meshcom_settings.node_utcoff * 60.0 * 60.0), false);
 
-        meshcom_settings.node_date_year = MyClock.Year();
-        meshcom_settings.node_date_month = MyClock.Month();
-        meshcom_settings.node_date_day = MyClock.Day();
-    
-        meshcom_settings.node_date_hour = MyClock.Hour();
-        meshcom_settings.node_date_minute = MyClock.Minute();
-        meshcom_settings.node_date_second = MyClock.Second();
+        syncNodeDateFromClock();
     }
 }
 #endif 

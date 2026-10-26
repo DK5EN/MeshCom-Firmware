@@ -636,13 +636,7 @@ unsigned int tdeck_get_gps()
         snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
     }
         
-    meshcom_settings.node_date_year = MyClock.Year();
-    meshcom_settings.node_date_month = MyClock.Month();
-    meshcom_settings.node_date_day = MyClock.Day();
-
-    meshcom_settings.node_date_hour = MyClock.Hour();
-    meshcom_settings.node_date_minute = MyClock.Minute();
-    meshcom_settings.node_date_second = MyClock.Second();
+    syncNodeDateFromClock();
 
     if(fix == 0)
     {

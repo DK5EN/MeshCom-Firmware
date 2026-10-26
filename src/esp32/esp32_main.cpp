@@ -4161,17 +4161,9 @@ void esp32loop()
     {
         MyClock.CheckEvent();
         
-        if(MyClock.Year() > 2023)
-            meshcom_settings.node_date_year = MyClock.Year();
-        else
+        syncNodeDateFromClock();
+        if(MyClock.Year() <= 2023)
             meshcom_settings.node_date_year = 2000;
-
-        meshcom_settings.node_date_month = MyClock.Month();
-        meshcom_settings.node_date_day = MyClock.Day();
-
-        meshcom_settings.node_date_hour = MyClock.Hour();
-        meshcom_settings.node_date_minute = MyClock.Minute();
-        meshcom_settings.node_date_second = MyClock.Second();
 
         // Starttime setzen
         if(meshcom_settings.node_date_year > 2023 && meshcom_settings.node_update[0] == 0x00 && memcmp(cTimeSource, "INIT", 4) != 0)

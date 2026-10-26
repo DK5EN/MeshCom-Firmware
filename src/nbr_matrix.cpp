@@ -2837,7 +2837,8 @@ uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, 
     return n;
 }
 
-int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
+// Shared body of nbrExclusive / nbrExclusiveDirect; they differ only in the excl mask.
+static int nbrExclusiveImpl(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max, bool directOnly)
 {
     NbrMask direct, excl;
     NBR_LOCK();
@@ -2846,7 +2847,8 @@ int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max
         NbrCtx cbuf;
         const NbrCtx &c = nbrICtx(m, now_min, cbuf);
         direct = c.direct;
-        excl = nbrMaskAndNot(c.direct, nbrICoveredByAnyone(m, c));
+        excl = directOnly ? nbrIExclusiveDirect(m, c)
+                          : nbrMaskAndNot(c.direct, nbrICoveredByAnyone(m, c));
     }
     else
         direct = excl = nbrMaskNone();
@@ -2861,6 +2863,11 @@ int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max
         count++;
     }
     return count;
+}
+
+int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
+{
+    return nbrExclusiveImpl(m, now_min, out, max, false);
 }
 
 int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min)
@@ -2986,28 +2993,7 @@ NbrMask nbrCopyMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, b
 
 int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
 {
-    NbrMask direct, excl;
-    NBR_LOCK();
-    if (nbrIReady(m))
-    {
-        NbrCtx cbuf;
-        const NbrCtx &c = nbrICtx(m, now_min, cbuf);
-        direct = c.direct;
-        excl = nbrIExclusiveDirect(m, c);
-    }
-    else
-        direct = excl = nbrMaskNone();
-    NBR_UNLOCK();
-    if (nbrMaskEmpty(direct))
-        return -1;
-    int count = 0;
-    for (int x = nbrMaskNext(excl, -1); x >= 0; x = nbrMaskNext(excl, x))
-    {
-        if (out && count < (int)max)
-            out[count] = (uint8_t)x;
-        count++;
-    }
-    return count;
+    return nbrExclusiveImpl(m, now_min, out, max, true);
 }
 
 float nbrDistKm(float lat1, float lon1, float lat2, float lon2)

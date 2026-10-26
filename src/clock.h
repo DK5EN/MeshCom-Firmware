@@ -195,6 +195,9 @@ public:
 
 extern Clock MyClock;
 
+// Copy MyClock (year..second) into meshcom_settings.node_date_*; hundredths untouched.
+void syncNodeDateFromClock();
+
 // TZ-01 (docs/ntp-tz-rtc-wave-plan.md W3): POSIX-TZ-Regel aus
 // meshcom_settings.node_tz. Leer oder ungueltig = fester node_utcoff wie bisher.
 // Ist eine Regel gesetzt, ist node_utcoff ein abgeleiteter Laufzeitwert: jeder
