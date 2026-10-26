@@ -320,3 +320,152 @@ Für die Upstream-PRs gilt REVIEW.md: klein und je Thema ein PR.
 - Nicht geprüft: KISS/TCP-Port 8001 im Detail, Display-/T-Deck-UI, Pages-Web-Flasher, Bootloader-Verhalten.
 - Build-Hinweis Cloud: GitHub-`/archive/*.zip` liefert hier 403; `ETHClass2` wurde für den Messbuild per
   `.git#v1.0.0` (gleiche Quelle) bezogen. Der pioarduino-penv braucht `platformio` von PyPI statt des GitHub-ZIPs.
+
+## 8. Umsetzung 2026-10-26
+
+Branch `claude/fork-dev-code-review-xdxqzv`, 17 Arbeitspakete (WP1 bis WP17) als je ein Commit auf Basis von `950fe5cd`.
+Alle Änderungen sind in der Cloud entstanden: Host-Tests und Builds, **kein Hardware-Test**. Betreiberentscheidungen
+(binden): QA-NET-01 bleibt unverändert (BLE-App ohne PIN-Hello darf schreiben), `MC_WEB_GUARD=1` ist Release-Default,
+Stack-Canaries bleiben, Ethernet auf T114/t_echo ist ein Build-Flag (Default aus, RAK4631 an), nRF52-BLE-Settings
+maskieren Secrets. Kein Wire-Format- und kein Settings-Layout-Wechsel.
+
+### 8.1 Pakete
+
+| WP | Commit | Status | Inhalt |
+|---|---|---|---|
+| WP1 | `52a8d5bd` | committed | QA-NET-04, QA-STAB-01/02: UDP-Datagramm wird vollständig geleert (Downlink bleibt nicht hängen), Server-DNS wird neu aufgelöst (Refresh mit Keep-old-Schutz), EXTUDP-DNS asynchron (nur ESP32). |
+| WP2 | `6fc54471` | committed | `MC_WEB_GUARD` Default 1; `otaupdate` und `reboot` brauchen `X-MC`; keine `Access-Control-Allow-*`-Header mehr (Secrets); `webid`-Grenzprüfung; Header-Zeile auf 1023 B begrenzt (431); Web-API-Doku und Tests angepasst. |
+| WP3 | `538314e4` | committed | QA-CMD-01, QA-DRY-02: `cmdArgCopyTrim()` ersetzt 8 Strip-Stellen (kein Überlauf), Reboot-Check-Helper für `setown*`/`setssid`/`hamnet`. |
+| WP4 | `9c52a6d6` | committed | QA-NET-02 (nur nRF52): Settings-Characteristic maskiert `node_passwd`, `node_webpwd`, `node_pwd`, `bt_code` (Sentinel -1); Schreiben mit maskiertem Feld behält das Live-Secret. |
+| WP5 | `be599631` | committed | QA-AU-01/09/12: Dry-Run-Inflate prüft die entpackte Länge und den App-Descriptor vor der Übergabe an Safeboot, Batteriegrenze beim Apply, neue Fehlertokens `inflate_chk`/`image` in der Web-UI, `tools/au_stage_check.py` plus CI-Schritt als Staging-Gate. |
+| WP6 | `bf8dfd6c` | committed | QA-SIZE-M01, QA-AU-11, QA-AU-15: Safeboot-OTA-Seite gzip (`ota_html_len` 36 639 auf 11 682), `onOTAStart()` verwirft einen alten Stage-Record, Tippfehler `_server->sendHeader`. |
+| WP7 | `8fba27c2` | committed | QA-SIZE-01/02/08: `-fno-exceptions`, `CORE_DEBUG_LEVEL=0` in allen ESP32-Envs, NimBLE-Rollen-Flags überall; ein `snprintf`-Format in `command_functions.cpp` (`%.5s`) wegen des Compiler-Verhaltens. Golden neu erzeugt. |
+| WP8 | `3bb1d9e4` | committed | QA-SIZE-05: Ethernet als Build-Flag je nRF52-Env (aus auf T114/t_echo, an auf RAK4631), nur TinyUSB-CDC, GPS-Objekt-Guard; `--gateway on` wird ohne Ethernet abgelehnt. |
+| WP9 | `ba94f99f` | committed | T-Deck: 18 ungenutzte LVGL-Widgets aus, eigenes `tft_setup.h` (nur genutzte TFT_eSPI-Fonts). Messung im WP: -59,5 KB je t_deck/t_deck_plus. |
+| WP10 | `ce7dc8ba` | committed | QA-SIZE-B01 (`bmp390.cpp` prüft `ENABLE_BMP390`), QA-STAB-06/NET-10 (Net-Console: Gesamt-Deadline für den Handshake, accept-Fehlerlog auf 1 pro 30 s begrenzt; nur ESP32). |
+| WP11 | `adc8946a` | committed | QA-STAB-03 (NimBLE-Host-Callbacks loggen nicht mehr, Ausgabe in `loop()`; `[BLE];stat` zeigt `hoststack;free`), QA-STAB-04 (Stack-Puffer statt `String` in `decodeAPRSPOS`/`aprsExtractTag`). |
+| WP12 | `4f485e34` | committed | QA-RX-02/03/07 und `:rej`-Offset: `{SET}` wird höchstens alle 10 min gespeichert, Echo-Scan nur nach Decode (ohne ACK-Zweig), Sonderrufzeichen als Absender abgelehnt. |
+| WP13 | `b372f0a1` | committed | QA-DRY-05/06/09/13: gemeinsame EXTUDP-Sendehelfer, `syncNodeDateFromClock()`, `nbrExclusiveImpl`, `GPS_UART`-Alias (19 von 27 Stellen). |
+| WP14 | `d6437a46` | committed | SHA-256/HMAC über mbedtls auf ESP32 (nRF52 unverändert); `glueHmac` bewusst nicht zusammengelegt (Begründung im Code). |
+| WP15 | `d45056b1` | committed | QA-DRY-01: tabellengetriebene `setParam`/`getParam` (`wsParams[]`); `producer_match_lint.py` angepasst. |
+| WP16 | `365cd3bf` | committed | Statisches CSS/JS als gzip-Assets (`/mc.css`, `/mc.js`, `/mcrm.js`, `/mcau.js`) mit Cache-Header; Generator `tools/gen_web_assets.py`. nRF52: AU-CSS-Regeln gelten jetzt überall. |
+| WP17 | `17793944` | committed | QA-AU-05: CI legt das Release als Draft an, prüft Asset-Paare (`tools/verify_release_assets.py`), veröffentlicht erst danach; Re-Run fasst kein veröffentlichtes Release an. |
+
+Kein WP ist gescheitert. Beim Abschluss-Gate trat ein Folgefehler aus WP5 auf (siehe 8.3), der in diesem Commit behoben ist.
+
+### 8.2 Bewusst nicht umgesetzt (Skipped)
+
+- **WP1:** keine Tests für die DNS-Zustandsautomaten (inline `static`, nativ nicht testbar); kein frühes Return für Literal-IPs; synchroner `ip==0`-Pfad in `extDnsResolve` versucht jeden Durchlauf erneut (Nits).
+- **WP2:** `X-MC` kommt über den globalen fetch/XHR-Wrapper; ob es im 1023-B-Header-Fenster bei `guard=1` ankommt, ist im Browser ungeprüft.
+- **WP3:** kein `setown*`-Snprintf-Helper, kein gemeinsamer Reboot-Helper (Werte unterscheiden sich); Reboot-/Hamnet-Helper nicht host-testbar (nur `cmdArgCopyTrim` getestet).
+- **WP4:** Verhalten der App bei `bt_code = -1` nicht prüfbar (App-Quelle außerhalb des Repos); SN1-Notify `WSPWD` im Klartext (außerhalb QA-NET-02).
+- **WP5:** kein Heap-Check vor dem Download (Dict und Dekompressor sind getrennt alloziert); kein IDF-5-Compile von `fw_update_net.cpp` (kein App-Env nutzt IDF 5); neue Python-Dateien nicht mit `ruff format` formatiert.
+- **WP6:** `ota.h` mit einem Python-`xxd -i`-Shim erzeugt (echtes `xxd` fehlt; bei Neuerzeugung evtl. nur Whitespace-Diff).
+- **WP8:** tote Funktionsrümpfe (`webpwd`, `webtimer 0`, `extudpip`, `srvip`, `ntpsync`) nicht mit `#if` umzäunt; `config_json.cpp` nicht gegated (geteilt mit Settings-Store und BLE-Settings); TinyUSB-CDC/UF2 nicht an Hardware geprüft. In der PR-Beschreibung erwähnen: zusätzliches `lib_ignore` für SparkFun u-blox auf T114/t_echo.
+- **WP9:** keine Größenmessung gegen gleiche Basis außerhalb des WP; Golden-Gates im WP nicht gelaufen (hier im Gate nachgeholt).
+- **WP10:** Handshake-Deadline und accept-Log-Rate-Limit nicht zur Laufzeit geprüft.
+- **WP11:** weitere `Serial.printf` in den Callbacks (`bBLEDEBUG`, Disconnect-Reason, PassKey) bleiben; `extudp_functions.cpp` String-Pfade unverändert.
+- **WP12:** QA-RX-03 und QA-RX-11 ohne Host-Test (in `OnRxDone` und den `udp_frame`-Zwillingen, nativ nicht testbar).
+- **WP13:** 8 GPS-`#if`-Stellen nicht aliasbar (Pins, Baudrate, Schreibweise); Set-Clock-Blöcke nicht zusammengelegt (andere Jahresschwellen); keine nativen Tests für DRY-05/06/13.
+- **WP14:** `sha256Abort`/Free auf OTA-Fehlerpfaden nicht angefasst (braucht Bench gegen die gepinnte IDF).
+- **WP15:** `mesh`, `rm`, `rmstrict`, `display`, `boardled`, `chargeled`, `aumode`, `autoupdate`, `updchan`, Store-Gruppe, `setvia`, `tempoffset*` bleiben explizit (Tests pinnen Text oder Reihenfolge). **Bekannter Fehler unverändert:** GET `tempoffsetoutdoor` liefert UNKNOWN (doppelter `tempoffsetindoor`-Zweig), braucht Freigabe. `webgui_settings_test.js` im Cloud-WP ohne jsdom nicht gelaufen (im Gate unten grün).
+- **WP16:** Serving-Pfad nur kompiliert und host-getestet, nicht im Browser; `webgui_tick_test.js`/`webgui_badge_test.js` (Live-Node-Tests) nicht gelaufen.
+- **WP17:** `ncipollo/release-action`-Eingaben (`artifactErrorsFailBuild`, `draft` beim Update) und der `gh api`-Draft-Download aus dem Gedächtnis; der erste `ci-proof-*`-Lauf muss das bestätigen. `actionlint` nicht verfügbar.
+- Nicht aus dem Report aufgegriffen: QA-NET-01 (Betreiber), Stack-Canaries (Betreiber), QA-SIZE-06/09/12 (Sensoren/GPS/OLED, keine Feldnutzungsdaten).
+
+### 8.3 Gate
+
+`tools/regression.sh --stage 1,2` auf `17793944` (Stand nach WP17), `MC_AU_DEV_CHANNEL=1`:
+
+- Stage 1: 83 Unity-Envs, 3028 Fälle, 3021 ok, 2 failed, 1 skipped. Golden-Selftest 48 Kommandos grün; Board-Links nRF52 grün (RAK4631 78,7 %, T114 49,8 %, t_echo 52,9 %).
+- Stage 2: pytest 1422 passed; alle node-/nbrlog-/Self-Test-Suiten und `ruff` grün (0 Fehler); `topo_shadow raw window` übersprungen (rpizero nicht erreichbar).
+- Bekannte Cloud-Fehler (gcc 13, Baseline): `native` `test_pos_filter::test_kadenz_unabhaengig`; `native_udp_frame_twin` kompiliert nicht ("taking address of temporary array").
+- **Neuer Fehler, behoben:** `native_command_setters::test_stage_flash_goes_through_one_guarded_helper`. Der Source-Pin erlaubt `stageFlash(STAGE_` nur in `dlFeed`/`stagePrepare`/`stageFinish`; WP5 ruft `stageFlash(STAGE_READ, ...)` aus dem neuen Dry-Run-Reader `DryRd`. Die WP-Berichte hielten den Fehler für Baseline, er stammt aber aus WP5. Fix: der Test erlaubt zusätzlich den Bereich `struct DryRd` bis `struct DryWr` (nur lesend, derselbe geschützte Helper). `pio test -e native_command_setters` danach grün (50 Fälle).
+- Nicht geändert: `safeboot.bin` und `safeboot-s3.bin` im Repo-Root (Safeboot-Builds überschreiben sie, nach dem Build zurückgesetzt). Die Images für die Pages/den Web-Flasher entstehen beim Release aus CI.
+
+### 8.4 Größen (alle 32 CI-Envs gebaut, `MC_AU_DEV_CHANNEL=1`)
+
+Alle 32 Envs bauen. `LilyGo_T_Connect_Pro` und `T-ETH-ELITE_1262` scheitern in der Cloud am 403 auf `ETHClass2/archive/v1.0.0.zip`
+und wurden in einer Kopie mit `ETHClass2.git#v1.0.0` gebaut (gleiche Quelle). Baseline = §3.1 (gleiche Cloud, gleiche Messmethode wie dort).
+Sortiert nach Flash-Auslastung. Safeboot-Limit 720 896 B (factory-Partition 704 K).
+
+| Env | Baseline B | Neu B | Delta B | Limit B | Flash % | Headroom KB | RAM % (Basis) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| esp32-safeboot | 713 411 | 688 487 | -24 924 | 720 896 | 95.5 | 31 | 14.8 (14.8) |
+| esp32-S3-safeboot | 674 303 | 649 515 | -24 788 | 720 896 | 90.1 | 69 | 13.3 (13.3) |
+| wiscore_rak4631 | 702 116 | 641 536 | -60 580 | 815 104 | 78.7 | 169 | 38.6 (39.6) |
+| ttgo_tbeam_SX1262 | 2 020 601 | 1 807 189 | -213 412 | 3 403 776 | 53.1 | 1559 | 8.0 (7.9) |
+| ttgo_tbeam_SX1268 | 2 020 537 | 1 807 145 | -213 392 | 3 403 776 | 53.1 | 1559 | 8.0 (7.9) |
+| E22_XML-DevKitC | 2 010 021 | 1 802 997 | -207 024 | 3 403 776 | 53.0 | 1563 | 20.1 (19.9) |
+| t_echo | 675 688 | 431 372 | -244 316 | 815 104 | 52.9 | 374 | 38.4 (41.7) |
+| ttgo_tbeam | 2 012 533 | 1 799 469 | -213 064 | 3 403 776 | 52.9 | 1566 | 8.0 (7.9) |
+| E22_1262-DevKitC | 1 990 857 | 1 791 161 | -199 696 | 3 403 776 | 52.6 | 1574 | 19.7 (19.5) |
+| E22-DevKitC | 1 990 713 | 1 791 073 | -199 640 | 3 403 776 | 52.6 | 1574 | 19.7 (19.5) |
+| esp32-loraprs-e22 | 1 990 505 | 1 790 825 | -199 680 | 3 403 776 | 52.6 | 1575 | 19.7 (19.5) |
+| heltec_wifi_lora_32_V2 | 1 982 313 | 1 782 733 | -199 580 | 3 403 776 | 52.4 | 1583 | 32.0 (31.7) |
+| esp32-loraprs-ra01 | 1 979 897 | 1 781 361 | -198 536 | 3 403 776 | 52.3 | 1584 | 19.7 (19.5) |
+| ttgo-lora32-v21 | 1 979 733 | 1 780 793 | -198 940 | 3 403 776 | 52.3 | 1584 | 32.0 (31.7) |
+| LilyGo_T_Connect_Pro | 1 974 369 | 1 760 833 | -213 536 | 3 403 776 | 51.7 | 1604 | 40.0 (39.7) |
+| T-ETH-ELITE_1262 | 1 937 517 | 1 729 425 | -208 092 | 3 403 776 | 50.8 | 1635 | 39.8 (39.6) |
+| vision-master-e290 | 1 935 505 | 1 717 581 | -217 924 | 3 403 776 | 50.5 | 1646 | 40.9 (40.6) |
+| ttgo_tbeam_supreme | 1 931 853 | 1 717 169 | -214 684 | 3 403 776 | 50.4 | 1647 | 39.7 (39.4) |
+| LilyGo_T-Beam-1W | 1 918 085 | 1 713 757 | -204 328 | 3 403 776 | 50.3 | 1650 | 24.5 (24.3) |
+| heltec_wireless_tracker | 1 920 001 | 1 713 649 | -206 352 | 3 403 776 | 50.3 | 1650 | 39.8 (39.5) |
+| E22_1262_S3-DevKitC-1-N16R8 | 1 913 009 | 1 709 917 | -203 092 | 3 403 776 | 50.2 | 1654 | 39.9 (39.5) |
+| E22_1268_S3-DevKitC-1-N16R8 | 1 912 933 | 1 709 889 | -203 044 | 3 403 776 | 50.2 | 1654 | 39.9 (39.5) |
+| LilyGo_T3_S3_V1_3 | 1 913 989 | 1 709 577 | -204 412 | 3 403 776 | 50.2 | 1654 | 39.9 (39.5) |
+| heltec_t114 | 650 420 | 405 900 | -244 520 | 815 104 | 49.8 | 399 | 38.2 (41.6) |
+| heltec_wifi_lora_32_V3 | 1 896 117 | 1 694 177 | -201 940 | 3 403 776 | 49.8 | 1669 | 39.6 (39.3) |
+| heltec_wifi_lora_32_V4 | 1 895 669 | 1 693 001 | -202 668 | 3 403 776 | 49.7 | 1670 | 39.7 (39.4) |
+| heltec_wireless_stick | 1 893 049 | 1 691 181 | -201 868 | 3 403 776 | 49.7 | 1672 | 39.6 (39.3) |
+| vision-master-e213 | 1 888 445 | 1 678 537 | -209 908 | 3 403 776 | 49.3 | 1684 | 40.3 (40.0) |
+| wireless-paper | 1 863 225 | 1 656 101 | -207 124 | 3 403 776 | 48.7 | 1706 | 40.2 (39.9) |
+| t_deck | 2 518 997 | 2 224 585 | -294 412 | 12 582 912 | 17.7 | 10115 | 45.5 (45.4) |
+| t_deck_plus | 2 518 805 | 2 224 321 | -294 484 | 12 582 912 | 17.7 | 10115 | 45.5 (45.4) |
+| t_deck_pro | 2 302 321 | 2 120 473 | -181 848 | 12 582 912 | 16.9 | 10217 | 47.3 (47.0) |
+
+Highlights:
+
+- **Safeboot:** `esp32-safeboot` 713 411 auf 688 487 B (-24 924), Headroom von 7 KB auf 31 KB; `esp32-S3-safeboot` -24 788, Headroom 69 KB (WP6).
+- **nRF52:** `heltec_t114` -244 520 B (49,8 %), `t_echo` -244 316 B (52,9 %), `wiscore_rak4631` -60 580 B (78,7 %), jeweils Ethernet-Flag, Web-Gzip und TinyUSB-Trim.
+- **ESP32-Familie:** -199 KB bis -214 KB (`-fno-exceptions`, `CORE_DEBUG_LEVEL=0`, gzip-Web-Assets); T-Deck -294 KB (zusätzlich LVGL/Fonts), `t_deck_pro` -182 KB.
+- **RAM (statisch):** ESP32 +0,1 bis +0,3 Prozentpunkte (`wsParams[]`, Puffer, Dry-Run-Strukturen), nRF52 -1 bis -3,5 Prozentpunkte.
+
+Deltas der einzelnen WPs (A/B im jeweiligen WP, Flash Bytes): WP1 +980 (V3) / +984 (E22) / +16 (RAK); WP2 -4 (V3) / -712 (RAK); WP3 -784 (V3) / -1 232 (RAK);
+WP4 -864 (RAK) / -880 (T114) / -872 (t_echo); WP5 +592 (V3) / +620 (E22); WP6 -24 924 / -24 788 (Safeboot); WP7 -142 KB (E22) bis -175 KB (t_deck);
+WP8 T114 -244 256 / t_echo -244 016 / RAK -11 872; WP9 -60,9 KB (t_deck, t_deck_plus); WP10 +120 (V3) / -36 (t_echo) / +84 (t_deck);
+WP11 -228 (V3) / -44 (E22) / -608 (RAK); WP12 +172 (V3) / +232 (RAK); WP13 -676 (V3); WP14 -1 112 (V3) / -1 176 (E22) / 0 (RAK);
+WP15 -1 376 (V3) / -212 (RAK); WP16 -54 664 (V3) / -47 696 (RAK) / -54,7 KB (E22).
+
+### 8.5 AU-Staging-Gate (QA-SIZE-AU01)
+
+`tools/make_autoupdate.py --check` und `tools/au_stage_check.py` auf den frischen Images aller 27 ESP32-App-Envs: **27 Envs, 0 abgelehnt, 0 unter der Warnschwelle**
+(alle `.autoupdate` re-inflate byte-genau). Die T-Beam-Familie hatte vorher nur ≈61 KB Reserve bis zur Ablehnung des Stagings; jetzt:
+`ttgo_tbeam_SX1262`/`SX1268` Reserve 371 KB (max. Wachstum 212 KB), `ttgo_tbeam` 384 KB, `E22_XML-DevKitC` 377 KB (216 KB), `E22-DevKitC` 396 KB (228 KB),
+`heltec_wifi_lora_32_V3` 554 KB (329 KB). T-Deck-Familie 8,6 MB Reserve. Die Gate-Ausgabe ist die Kennzahl für künftige Image-Zuwächse.
+
+### 8.6 Nicht gebencht: Bench-Liste für DK5EN-92 (ESP32, Heltec V3) und DK5EN-90 (nRF52, RAK4631)
+
+Vorher `identity_guard.py`, Testverkehr nur an Gruppe `TEST` oder direkt an eigene Knoten, TX höchstens 2 dBm, DK5EN-98 nicht anfassen.
+
+DK5EN-92 (ESP32):
+1. **WP1:** UDP-Datagramm ≥255 B an den Gateway-Port (eigene Testinstanz, nicht DK5EN-98): Downlink GATE/BEAT/CONF läuft weiter. Server-DNS-Wechsel: Refresh übernimmt neue Adresse, fehlgeschlagene Auflösung behält die alte. EXTUDP mit Hostnamen: Loop blockiert nicht.
+2. **WP2:** Web-GUI im Browser mit `guard=1`: alle Seiten laden, `otaupdate`, `reboot`, `upd*` mit und ohne `X-MC`, Header-Zeile >1023 B ergibt 431; prüfen, dass `X-MC` im Header-Fenster liegt; kein CORS-Header.
+3. **WP5:** Auto-Update End-to-End über die Web-GUI: Dry-Run bis zum Handover, Fehlertokens `inflate_chk`/`image` mit manipuliertem `.autoupdate`, Verhalten bei niedriger Batteriespannung; Heap-Spitze beim Dry-Run (Dict plus Dekompressor getrennt).
+4. **WP6:** Safeboot mit gzip-OTA-Seite (`/ota`) im Browser, Upload; ein alter Stage-Record wird bei `/ota/start` verworfen (Reinstall-Guard `last` bleibt). Beide Safeboot-Images auf einem Board (Classic und S3) booten.
+5. **WP7:** Stabilität und BLE ohne Exceptions und mit `CORE_DEBUG_LEVEL=0` (Soak, BLE-Pairing, Heap-Idle gegen 68 728 B aus 10.25); Absturz-Pfade, die vorher eine Exception fingen, im Log suchen.
+6. **WP9:** (T-Deck, falls verfügbar) Display und Menüs ohne die entfernten LVGL-Widgets und Fonts; kein fehlendes Glyph.
+7. **WP10:** Net-Console (Port 2323): Login-Handshake, langsamer Client (Deadline), accept-Fehlerlog-Rate-Limit.
+8. **WP11:** BLE connect/disconnect/Reconnect: Log "BLE Connected with"/"Client connected" erscheint in `loop()`; `[BLE];stat` zeigt `hoststack;free`; APRS-POS-Decode und Gruppenfilter mit Testframes.
+9. **WP12:** `{SET}` Hop-Änderung A-B-A: Flash-Schreibrate (höchstens alle 10 min); ACK-Echo-Verhalten ohne 0x41-Zweig; `:rej`-Offset; Sonderrufzeichen als Absender.
+10. **WP13:** EXTUDP-Sendepfad (Fehlerfall, Reset), Uhr-Synchronisation (NTP, GPS), `--nbrexcl`-Ausgabe, GPS-UART auf den Boards mit GPS.
+11. **WP14:** HMAC/SHA-256 mbedtls-Zweig: RM-Tag-Round-Trip mit bekanntem Schlüssel (alt gegen neu) und OTA-DOWNLOAD-Digest-Match in `stageFinish`.
+12. **WP15:** Web-GUI Einstellungen: alle `setParam`/`getParam`-Parameter (Set, Read-back, Float-Nachkommastellen); GET `tempoffsetoutdoor` bleibt UNKNOWN (bekannt).
+13. **WP16:** Web-GUI im echten Browser: `/mc.css`, `/mc.js`, `/mcrm.js`, `/mcau.js` laden gzip, Cache-Header, Remote-Seite mit 4 bis 5 zusätzlichen Verbindungen gegen den Single-Thread-Server (Timeouts?); `webgui_tick_test.js`, `webgui_badge_test.js` gegen den Node.
+14. **WP17:** erster `ci-proof-*`-Lauf: Draft, `Verify uploaded assets`, kein Publish bei `ci-proof`; danach Draft und Tag löschen. Ein `v*`-Tag veröffentlicht erst nach der Prüfung als Latest.
+
+DK5EN-90 (nRF52, RAK4631):
+1. **WP4:** BLE-Settings-Characteristic lesen: `node_passwd`, `node_webpwd`, `node_pwd` leer, `bt_code` -1 bei gesetzter PIN; Schreiben des gelesenen Images lässt die Secrets unverändert, neues Secret wird übernommen. Verträglichkeit der Apps mit `bt_code` -1 (App-Eigner fragen).
+2. **WP8:** RAK4631 mit Ethernet (W5100S): Netz, Net-Console, `--gateway on`; TinyUSB-CDC-Enumeration und Serial; UF2-Bootloader; GPS. Auf T114/t_echo (falls verfügbar): `--gateway on` wird abgelehnt, `--gateway off` funktioniert, Boot und BLE ohne Ethernet-Code.
+3. **WP12/13/14:** nRF52-Gegenstücke (`udp_frame`, Uhr, `nbrExclusive`) auf Regression prüfen, HMAC unverändert (kein mbedtls).
+4. **WP16:** nRF52-Web-GUI: AU-CSS-Regeln gelten jetzt überall (disabled Buttons gedimmt).
