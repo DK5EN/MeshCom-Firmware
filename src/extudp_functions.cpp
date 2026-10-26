@@ -655,6 +655,39 @@ void getExternUDP()
 // parser this native build tests, so it is guarded out with the socket.
 #ifndef NATIVE_BUILD
 #if !defined(EXT_NO_SOCKET)
+// One datagram to the EXTUDP peer. resetOnError=false keeps sendExternNotice()'s
+// historic behaviour (write result ignored, endPacket() always called).
+static bool extSendDatagram(const uint8_t *buf, size_t len, bool resetOnError)
+{
+  UdpExtern.beginPacket(apip , EXTERN_PORT);
+  bool ok = UdpExtern.write(buf, len);
+  if(!ok && resetOnError)
+  {
+    resetExternUDP();
+    return false;
+  }
+  UdpExtern.endPacket();
+  return ok;
+}
+
+// Serial log of an outgoing datagram, printed in two halves for long payloads
+static void extLogOut(const char *tag, const char *buf)
+{
+  if(strlen(buf) < 10)
+  {
+    Serial.printf("%s %s Len: %i\n", tag, buf, strlen(buf));
+  }
+  else
+  {
+    int iklng=strlen(buf) / 2;
+
+    String strKurz = buf;
+
+    Serial.printf("%s %s", tag, strKurz.substring(0, iklng).c_str());
+    Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(buf)).c_str(), strlen(buf));
+  }
+}
+
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
   (void)bUDP;
@@ -907,56 +940,18 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
 
   if(bEXTUDP && hasExternIPaddress && (int)strlen(meshcom_settings.node_extern) > 7)
   {
-    UdpExtern.beginPacket(apip , EXTERN_PORT);
+    extLogOut("[EXT] Out:", c_json);
 
-    if(strlen(c_json) < 10)
-    {
-      Serial.printf("[EXT] Out: %s Len: %i\n", c_json, strlen(c_json));
-    }
-    else
-    {
-      int iklng=strlen(c_json) / 2;
-
-      String strKurz = c_json;
-
-      Serial.printf("[EXT] Out: %s", strKurz.substring(0, iklng).c_str());
-      Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(c_json)).c_str(), strlen(c_json));
-    }
-
-    if (!UdpExtern.write((uint8_t*)c_json, strlen(c_json)))
-    {
-      resetExternUDP();
+    if (!extSendDatagram((uint8_t*)c_json, strlen(c_json), true))
       return;
-    }
-
-    UdpExtern.endPacket();
 
     if((strcmp(src_type, "node") == 0 || strcmp(src_type, "lora") == 0) && strlen(c_tjson) > 0)
     {
       // Telemetrie
-      UdpExtern.beginPacket(apip , EXTERN_PORT);
+      extLogOut("[EXT] Tele-Out:", c_tjson);
 
-      if(strlen(c_tjson) < 10)
-      {
-        Serial.printf("[EXT] Tele-Out: %s Len: %i\n", c_tjson, strlen(c_tjson));
-      }
-      else
-      {
-        int iklng=strlen(c_tjson) / 2;
-
-        String strKurz = c_tjson;
-
-        Serial.printf("[EXT] Tele-Out: %s", strKurz.substring(0, iklng).c_str());
-        Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(c_tjson)).c_str(), strlen(c_tjson));
-      }
-
-      if (!UdpExtern.write((uint8_t*)c_tjson, strlen(c_tjson)))
-      {
-        resetExternUDP();
+      if (!extSendDatagram((uint8_t*)c_tjson, strlen(c_tjson), true))
         return;
-      }
-
-      UdpExtern.endPacket();
     }
   }
   else
@@ -1067,17 +1062,9 @@ static void sendExternJson(const uint8_t *json, uint16_t jlen)
     return;
   }
 
-  UdpExtern.beginPacket(apip, EXTERN_PORT);
-
   Serial.printf("[EXT] Ack-Out: %.*s Len: %u\n", (int)jlen, (const char*)json, (unsigned)jlen);
 
-  if (!UdpExtern.write(json, jlen))
-  {
-    resetExternUDP();
-    return;
-  }
-
-  UdpExtern.endPacket();
+  extSendDatagram(json, jlen, true);
 }
 #else
 static void sendExternJson(const uint8_t *json, uint16_t jlen)
@@ -1162,9 +1149,7 @@ void sendExternNotice(const char *text, const char *dst)
   if(json_len == 0)
     return;
 
-  UdpExtern.beginPacket(apip, EXTERN_PORT);
-  UdpExtern.write((const uint8_t *)c_json, json_len);
-  UdpExtern.endPacket();
+  extSendDatagram((const uint8_t *)c_json, json_len, false);
 }
 #else
 void sendExternNotice(const char *text, const char *dst)

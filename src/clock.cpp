@@ -553,6 +553,16 @@ void Clock::setCurrentTime(float fUTC, uint16_t Year, uint16_t Month, uint16_t D
 //----------------------------------------------------------------------------
 Clock MyClock;
 
+void syncNodeDateFromClock()
+{
+	meshcom_settings.node_date_year = MyClock.Year();
+	meshcom_settings.node_date_month = MyClock.Month();
+	meshcom_settings.node_date_day = MyClock.Day();
+	meshcom_settings.node_date_hour = MyClock.Hour();
+	meshcom_settings.node_date_minute = MyClock.Minute();
+	meshcom_settings.node_date_second = MyClock.Second();
+}
+
 //----------------------------------------------------------------------------
 // TZ-01: see the contract in clock.h
 //----------------------------------------------------------------------------
