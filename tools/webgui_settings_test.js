@@ -1,12 +1,12 @@
 // Settings page "Remote Admin" card: offline jsdom test (src/web_functions/web_functions.cpp).
 //
-// The card markup (between the C++ comments RA-HTML-BEGIN / RA-HTML-END in sub_page_setup()) and its scaffold JS
-// (RA-JS-BEGIN / RA-JS-END) are extracted by concatenating the string literals of their web_client.println calls and
-// run in jsdom against a fake fetch that speaks /rmstatus, /rmpasswd and /setparam. Timers are virtual.
+// The card markup (between the C++ comments RA-HTML-BEGIN / RA-HTML-END in sub_page_setup()) is extracted by
+// concatenating the string literals of its web_client.println calls, its scaffold JS is the block between the
+// comments RA-JS-BEGIN / RA-JS-END of src/web_functions/web/mc.js; both run in jsdom against a fake fetch that speaks /rmstatus, /rmpasswd and /setparam. Timers are virtual.
 //
 // The card reuses the helpers of the Remote page scaffold (rmEl, rmPost, rmJson, rmPwProblem, rmEnc, rmErrText), which
-// rmScaffoldJs() prints in the same <script> block before the RA block; the test loads that scaffold from web_rm_page.cpp
-// (RM_PAGE_SRC overrides the path) and the loadPage() literal from web_functions.cpp to prove the raSt() hook.
+// /mcrm.js defines; the test loads that script from src/web_functions/web_assets.h (the rmLen line from
+// web_rm_page.cpp, RM_PAGE_SRC overrides the path) and the loadPage() literal from web_functions.cpp to prove the raSt() hook.
 //
 // Prerequisites (not part of the repo):  npm i jsdom@24   (anywhere; set NODE_PATH to its node_modules)
 // Run:   NODE_PATH=<dir>/node_modules node tools/webgui_settings_test.js
@@ -14,9 +14,12 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const { loadAssets } = require('./webgui_assets');
 
 const SRC = process.env.SETTINGS_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_functions.cpp');
 const RM_SRC = process.env.RM_PAGE_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_rm_page.cpp');
+const MC_JS_SRC = process.env.MC_JS_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web', 'mc.js');
+const ASSETS = loadAssets();
 const MUT = process.env.SETTINGS_MUTATE || '';
 
 let failures = 0;
@@ -39,16 +42,17 @@ function decodeLiteral(s) {
 }
 
 function block(tag) {
-  const src = fs.readFileSync(SRC, 'utf8');
+  const src = fs.readFileSync(tag === 'RA-JS' ? MC_JS_SRC : SRC, 'utf8');
   const a = src.indexOf('// ' + tag + '-BEGIN'), b = src.indexOf('// ' + tag + '-END');
   if (a < 0 || b < a) throw new Error('marker ' + tag + ' not found');
   const text = src.slice(src.indexOf('\n', a), b).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  if (tag === 'RA-JS') return text.trim() + '\n';   // plain JS, no C++ literals
   let out = '';
   for (const m of text.matchAll(/"((?:[^"\\]|\\.)*)"/g)) out += decodeLiteral(m[1]);
   return out;
 }
 
-// rmScaffoldJs() of web_rm_page.cpp: the literals of all its web_client calls (the one printf only carries %u limits)
+// rmScaffoldJs() of web_rm_page.cpp (the rmLen printf, %u limits) and then /mcrm.js
 function scaffold() {
   const src = fs.readFileSync(RM_SRC, 'utf8');
   const a = src.indexOf('void rmScaffoldJs()'), b = src.indexOf('\n}\n', a);
@@ -57,7 +61,7 @@ function scaffold() {
     for (const l of m[2].matchAll(/"((?:[^"\\]|\\.)*)"/g)) out += decodeLiteral(l[1]);
     out += '\n';
   }
-  return out.replace(/%u/g, '0');
+  return out.replace(/%u/g, '0') + ASSETS.MC_RM_JS;
 }
 // the loadPage() literal of web_functions.cpp (one println line)
 function loadPageJs() {

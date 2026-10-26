@@ -1,40 +1,21 @@
 // AU-16: offline jsdom test of state S (Safeboot cannot take the install) of the Info page "Auto update" row.
-// Extracts the page JS from auScaffoldJs() like tools/webgui_au_test.js; no node needed.
+// Runs the page JS of the /mcau.js blob (tools/webgui_assets.js) like tools/webgui_au_test.js; no node needed.
 //   sbok 0 + sbwhy 'dio'  -> DIO bootloader notice, button disabled
 //   sbok 0, no sbwhy      -> old text (older firmware), button disabled
 //   sbok 0 + sbwhy 'old'  -> old text, button disabled
 // A click on the disabled button starts no job, with and without a busy job.
-// Run:   NODE_PATH=<dir>/node_modules node tools/webgui_au_sbwhy_test.js   (env AU_PAGE_SRC overrides the C++ source)
+// Run:   NODE_PATH=<dir>/node_modules node tools/webgui_au_sbwhy_test.js   (env WEB_ASSETS_H overrides web_assets.h)
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const { loadAssets } = require('./webgui_assets');
 
-const SRC = process.env.AU_PAGE_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_functions.cpp');
 let failures = 0;
 function check(name, cond, detail) {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (detail !== undefined && !cond ? '  [' + detail + ']' : ''));
   if (!cond) failures++;
 }
-function decodeLiteral(s) {
-  let o = '';
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] !== '\\') { o += s[i]; continue; }
-    const c = s[++i];
-    if (c === 'n') o += '\n'; else if (c === 't') o += '\t'; else o += c;
-  }
-  return o;
-}
-function extractJs(src, fn) {
-  const at = src.indexOf('void ' + fn + '()');
-  const i = src.indexOf('{', at);
-  const body = src.slice(i, src.indexOf('\n}\n', i));
-  let out = '';
-  const re = /web_client\.println\(\s*"((?:[^"\\]|\\.)*)"\s*\)/g;
-  let m;
-  while ((m = re.exec(body))) out += decodeLiteral(m[1]) + '\n';
-  return out;
-}
-const JS = extractJs(fs.readFileSync(SRC, 'utf8'), 'auScaffoldJs');
+const JS = loadAssets().MC_AU_JS;
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r)); };
 const ROW = '<table><tr id="au_tr"><td id="au_row" data-blepause="0"><div id="au_msg"></div><div id="au_err"></div><div id="au_hint"></div>' +
   '<button type="button" id="au_btn" disabled>Check now</button></td></tr></table>';

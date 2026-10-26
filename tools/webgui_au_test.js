@@ -1,7 +1,7 @@
-// AU web GUI: offline jsdom test of the Info page "Auto update" row (auScaffoldJs() in src/web_functions/web_functions.cpp).
+// AU web GUI: offline jsdom test of the Info page "Auto update" row (src/web_functions/web/mcau.js, served as /mcau.js).
 //
-// No firmware and no node needed. The scaffold JS is extracted from the C++ source by concatenating the string
-// literals of the web_client.println calls of auScaffoldJs(), then run in jsdom against a fake fetch that speaks the
+// No firmware and no node needed. The scaffold JS is the gunzipped blob of src/web_functions/web_assets.h (made from
+// web/mcau.js by tools/gen_web_assets.py), run in jsdom against a fake fetch that speaks the
 // server contract (GET /austatus, GET /ota/state, GET /callfunction/?upd*). The fake /austatus bodies are the
 // AU_GOLDEN_<STATE>_JSON strings of test/test_au_ui_state/test_main.cpp (read the cppStrings() way), so a C++ key
 // change breaks this test. Timers and Date are virtual, so polling, the F tick and the 180 s timeout run without waiting.
@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const { loadAssets } = require('./webgui_assets');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = process.env.AU_PAGE_SRC || path.join(ROOT, 'src', 'web_functions', 'web_functions.cpp');
@@ -48,8 +49,8 @@ function extractJs(src, fn) {
 }
 
 const cpp = fs.readFileSync(SRC, 'utf8');
-const JS = extractJs(cpp, 'auScaffoldJs');
-check('the page JS was extracted from auScaffoldJs()', JS.length > 2000 && /function auPageInit/.test(JS), String(JS.length));
+const JS = loadAssets().MC_AU_JS;
+check('the page JS was read from the mcau.js blob', JS.length > 2000 && /function auPageInit/.test(JS), String(JS.length));
 
 // ---- golden bodies from the Unity test -------------------------------------------------------------------
 function goldens(file) {
@@ -185,7 +186,8 @@ async function mkPage(node, opts) {
 (async () => {
   // ---- source pins ---------------------------------------------------------------------------------------
   check('JS has no confirm() and no innerHTML (tag text goes through textContent)', !/confirm\(/.test(JS) && !/innerHTML/.test(JS));
-  check('auScaffoldJs and the row sit inside #if defined(ESP32)', /#if defined\(ESP32\)\n\/\*\*\n \* Scaffold JS of the Info page "Auto update" row[\s\S]*?\n#endif/.test(cpp) && /data-blepause/.test(cpp));
+  const assetsH = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_assets.h'), 'utf8');
+  check('the mcau.js blob and its <script> tag sit inside #if defined(ESP32)', /#if defined\(ESP32\)\n\/\/ mcau\.js[^\n]*\n#define WEB_MC_AU_JS_TAG[\s\S]*?\n#endif/.test(assetsH) && /#if defined\(ESP32\)\n\s+web_client\.println\("<script src=\\"\/mcau\.js\?v=" WEB_MC_AU_JS_TAG/.test(cpp) && /data-blepause/.test(cpp));
   check('the row ids the JS needs exist in the C++ row', ['au_tr', 'au_row', 'au_msg', 'au_err', 'au_hint', 'au_btn'].every((i) => cpp.indexOf('id=\\"' + i + '\\"') >= 0));
   check('banner and .au-banner CSS are gone', !/au-banner|au_banner/.test(cpp));
   check('loadPage hooks auPageLeave/auPageInit through RAK-empty macros', /#define AU_LP_LEAVE ""/.test(cpp) && /" AU_LP_LEAVE "/.test(cpp) && /AU_LP_INIT/.test(cpp));

@@ -520,13 +520,21 @@ void test_same_origin_post_with_matching_origin_passes(void)
 void test_read_only_gets_need_no_proof(void)
 {
     static const char *const ro[] = {"/rmstatus", "/config.json", "/rmnodes", "/rmheard", "/getparam/?x=y", "/?getmessages",
-                                     "/?page=setup", "/?page=remote", "/", "/favicon.ico", "/style.css"};
+                                     "/?page=setup", "/?page=remote", "/", "/favicon.ico", "/style.css",
+                                     // the gzip CSS/JS assets of the GUI (web_functions.cpp deliver_web_asset)
+                                     "/mc.css?v=8116ab29", "/mc.js?v=13d9a7c3", "/mcau.js?v=48fa6fe6", "/mcrm.js?v=7230b9c3"};
     for (size_t i = 0; i < sizeof(ro) / sizeof(ro[0]); i++)
     {
         std::string line = std::string("GET ") + ro[i] + " HTTP/1.1";
         expect(WG_OK, req(line.c_str(), {"Host: 192.168.68.71", "User-Agent: curl/8.7.1", "Accept: */*"}), ro[i], ro[i]);
         expect(WG_OK, req(line.c_str(), {"Host: dk5en-1.local", "Referer: http://attacker.example/"}), ro[i], ro[i]);
     }
+    // a script/style sub-resource of the page: same-origin fetch metadata, Dest script|style
+    static const char *const dest[] = {"script", "style"};
+    for (size_t i = 0; i < 2; i++)
+        expect(WG_OK, req("GET /mc.js?v=13d9a7c3 HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: same-origin",
+                                                              (std::string("Sec-Fetch-Dest: ") + dest[i]).c_str()}),
+               "/mc.js", dest[i]);
 }
 
 void test_xmc_header_name_case_and_value(void)

@@ -47,6 +47,7 @@
 #include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
 #include "web_rm_handlers.h"   // RM GUI W2a: /rmpasswd, /rmnodes, /rmheard, rmSendBySlot()
 #include "web_rm_parse.h"      // RM GUI W2a: rmParseSendBody()
+#include "web_assets.h"        // gzip blobs of the GUI's CSS/JS (tools/gen_web_assets.py); include here only
 // RM GUI W1c: set per request by the guard in work_webpage(). No CORS headers are emitted any more
 // (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
@@ -871,6 +872,57 @@ static void sub_config_upload(long content_length)
 
 /**
  * ###########################################################################################################################
+ * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header() says no-cache and
+ * text/html). Needs no login: the login page is the scaffold and loads them too. The URL carries the content tag
+ * (?v=), so the browser may keep the file. The body goes out through write(): print()/printf() would stop at a 0 byte
+ * or, on the nRF, over-read the printf buffer. Returns false when the request line names no asset.
+ */
+static bool deliver_web_asset(const String &req)
+{
+    const uint8_t *blob = NULL;
+    size_t len = 0;
+    const char *type = "application/javascript";
+    if (req.startsWith("GET /mc.css"))
+    {
+        blob = web_mc_css_gz;
+        len = sizeof(web_mc_css_gz);
+        type = "text/css";
+    }
+    else if (req.startsWith("GET /mc.js"))
+    {
+        blob = web_mc_js_gz;
+        len = sizeof(web_mc_js_gz);
+    }
+    else if (req.startsWith("GET /mcrm.js"))
+    {
+        blob = web_mc_rm_js_gz;
+        len = sizeof(web_mc_rm_js_gz);
+    }
+#if defined(ESP32)
+    else if (req.startsWith("GET /mcau.js"))
+    {
+        blob = web_mc_au_js_gz;
+        len = sizeof(web_mc_au_js_gz);
+    }
+#endif
+    else
+        return false;
+
+    web_client.println("HTTP/1.1 200 OK");
+    web_client.print("Content-type:");
+    web_client.println(type);
+    web_client.println("Content-Encoding: gzip");
+    web_client.print("Content-Length: ");
+    web_client.println((unsigned)len);
+    web_client.println("Cache-Control: public, max-age=31536000, immutable");
+    web_client.println("Connection: close");
+    web_client.println();
+    web_client.write(blob, len);
+    return true;
+}
+
+/**
+ * ###########################################################################################################################
  * Handle Web requests and call the matching sub function
  */
 
@@ -964,6 +1016,13 @@ String work_webpage(bool bget_password, int webid)
                         web_cors_ok = false;
                         send_http_header(403, RESPONSE_TYPE_JSON);
                         web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+                        web_client.stop();
+                        continue;
+                    }
+
+                    // static CSS/JS of the GUI: before the login gate (the login page needs them), after the guard
+                    if (deliver_web_asset(web_header))
+                    {
                         web_client.stop();
                         continue;
                     }
@@ -1246,114 +1305,6 @@ String decodeURLPercentCoding(String input)
 #define AU_LP_INIT ""
 #endif
 
-#if defined(ESP32)
-/**
- * Scaffold JS of the Info page "Auto update" row (campaign-au-webgui-ux): one renderer driven by GET /austatus.
- * Lives in the scaffold because the sub-pages are injected with innerHTML (a <script> inside never runs);
- * loadPage() calls auPageLeave() / auPageInit(). The state selector and the error table mirror
- * au_ui_state.h (auUiState, auErrText); tools/webgui_au_test.js runs this code against its golden strings.
- */
-static void auScaffoldJs()
-{
-    web_client.println("var auS=null,auF=null,auBusy=false,auLoc='',auShown=false,auInfl=false,auFInfl=false,auFPct=0,auFMsg='',auFDead=false,auUpAt=0,auT={poll:0,tick:0};");
-    web_client.println("function auEl(i){return document.getElementById(i);}");
-    web_client.println("function auKey(){return 'auF:'+location.host;}");
-    web_client.println("function auFGet(){try{var v=sessionStorage.getItem(auKey());return v?JSON.parse(v):null;}catch(e){return null;}}");
-    web_client.println("function auFSet(o){try{if(o)sessionStorage.setItem(auKey(),JSON.stringify(o));else sessionStorage.removeItem(auKey());}catch(e){}}");
-    web_client.println("function auReload(){location.reload();}");
-    web_client.println("function auWord(e){return String(e||'').split(' ')[0];}");
-    web_client.println("function auIn(w,l){return l.indexOf(w)>=0;}");
-    web_client.println("function auErrText(job,err){var w=auWord(err),c=job=='check',d=job=='download'||job=='stagelan';");
-    web_client.println("if(auIn(w,['tls','conn','http','begin','timeout']))return 'No connection to GitHub';");
-    web_client.println("if(c&&auIn(w,['short','stall','toobig','chunk','feed','enc','json','noenv','badver']))return 'The release list could not be read';");
-    web_client.println("if(d&&auIn(w,['short','stall','digest','readback','crc','write','enc','feed','chunk','inflate_chk','image']))return 'Download damaged, it was discarded -- try again';");
-    web_client.println("if(d&&auIn(w,['noasset','nodigest','env']))return 'This release has no image for this board';");
-    web_client.println("if(d&&auIn(w,['notota0','imglen','size','overlap','small','inflate','layout']))return 'This node'+String.fromCharCode(39)+'s partition layout cannot take the image -- use the Webflasher';");
-    web_client.println("if(d&&auIn(w,['erase','noflash','nvs']))return 'Could not write the image to flash';");
-    web_client.println("if(w=='nomem')return 'Not enough free memory for the update';");
-    web_client.println("return 'Update failed';}");
-    web_client.println("function auLowHeap(e){var w=auWord(e);return w=='lowheap'||w=='lowheap_phone'||w=='lowheap_ble_off'||w=='lowheap_tls';}");
-    web_client.println("function auState(s,f){if(!s.sbok)return 'S';if(f)return 'F';");
-    web_client.println("if(s.st=='busy'){if(s.job=='check')return 'B';return s.pct>=100?'d':'D';}");
-    web_client.println("if(s.staged)return 'E';var w=auWord(s.err);");
-    web_client.println("if(w=='lowheap_phone')return s.phone?'G':'g';");
-    web_client.println("if(w=='lowheap_ble_off'||w=='lowheap'||w=='lowheap_tls')return 'H';");
-    web_client.println("if(s.newer&&s.inst)return 'C';return 'A';}");
-    web_client.println("function auDraw(g,m,e,h,lab,act,dis,red){var t=auEl('au_tr'),b=auEl('au_btn');if(!t||!b)return;");
-    web_client.println("t.className=g?'au-green':'';auEl('au_msg').textContent=m;auEl('au_err').textContent=e;auEl('au_hint').textContent=h;");
-    web_client.println("b.textContent=lab;b.className=red?'au-red':'';b.disabled=!!(dis||auBusy);b.setAttribute('data-act',act);}");
-    web_client.println("function auRender(){var s=auS;if(!s)return;var L=auState(s,0),g=0,m='',lab='Check now',act='check',dis=0,red=0,e='',h='';");
-    web_client.println("if(L=='S'){m=s.sbwhy=='dio'?'! Bootloader (DIO) cannot start the Safeboot: renew bootloader and Safeboot with the Webflasher':'! Use Webflasher to renew Auto Update aware Safeboot';dis=1;}");
-    web_client.println("else if(L=='B'){lab='Checking now ...';dis=1;}");
-    web_client.println("else if(L=='D'){g=1;m='Firmware '+s.avail+' available';lab='Downloading now ... '+s.pct+' %';dis=1;}");
-    web_client.println("else if(L=='d'){g=1;lab='Verifying download ...';dis=1;}");
-    web_client.println("else if(L=='E'){g=1;m='Firmware '+s.staged+' downloaded and verified';lab='Install now';act='apply';red=1;}");
-    web_client.println("else if(L=='G'){m='! A connected phone uses the memory the update needs';lab='Pause Bluetooth and check';act='ble';}");
-    web_client.println("else if(L=='g'){m='The phone has disconnected -- check again';}");
-    web_client.println("else if(L=='H'){m='! Not enough free memory for the update. Reboot the node and try again.';}");
-    web_client.println("else if(L=='C'){g=1;m='Firmware '+s.avail+' available';lab='Install';act='install';}");
-    web_client.println("else{m=s.newer&&!s.inst?'Firmware '+s.avail+' exists, but has no image for this board':(s.avail?'up to date':'available none');}");
-    web_client.println("if((L=='A'||L=='C'||L=='E')&&(auLoc||(s.err&&!auLowHeap(s.err))))e=auLoc||auErrText(s.job,s.err)+' ['+s.err+']';");
-    web_client.println("var r=auEl('au_row');if(s.phone&&(L=='A'||L=='C')&&!e&&r&&r.getAttribute('data-blepause')=='1')h='(i) A connected phone may block the update on this board';");
-    // BLE guard (section 7): the phone link is dropped for the job; the row says so until the guard is released
-    web_client.println("if(s.guard&&L!='S'&&L!='E'){m='Bluetooth paused for the update';e='';h='';dis=1;act='none';if(L!='B'&&L!='D'&&L!='d')lab='Checking now ...';}");
-    web_client.println("auDraw(g,m,e,h,lab,act,dis,red);}");
-    web_client.println("function auSched(){clearTimeout(auT.poll);auT.poll=0;if(!auShown||!auS||auF)return;var L=auState(auS,0),ms=0;");
-    web_client.println("if(auS.st=='busy'||auS.guard)ms=1000;else if(L=='G')ms=10000;");
-    web_client.println("if(ms)auT.poll=setTimeout(auFetch,ms);}");
-    web_client.println("function auFetch(){if(!auShown)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}if(auInfl)return;auInfl=true;");
-    web_client.println("fetch('/austatus').then(function(r){if(r.status==404){var t=auEl('au_tr');if(t)t.style.display='none';return null;}if(!r.ok)throw 0;return r.json();}).then(function(j){auInfl=false;");
-    web_client.println("if(!auShown||!j)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}auApply(j);}).catch(function(){auInfl=false;auBusy=false;auRender();auSched();if(auShown&&!auF&&!auT.poll)auT.poll=setTimeout(auFetch,5000);});}");
-    web_client.println("function auApply(s){auS=s;auUpAt=Date.now();auBusy=false;auRender();auSched();}");
-    web_client.println("function auClick(){if(auBusy||auF||!auS)return;var b=auEl('au_btn'),a=b?b.getAttribute('data-act'):'';if(!a||b.disabled)return;");
-    web_client.println("auBusy=true;b.disabled=true;auLoc='';var fn=a=='apply'?'updapply':(a=='install'?'updinstall':'updcheck'),p=a=='ble'?'ble':'',tag=auS.staged;");
-    web_client.println("fetch('/callfunction/?'+fn+'='+p).then(function(r){return r.json();}).then(function(j){");
-    web_client.println("if(a=='apply'&&j[fn]=='ok'){auFBegin({tag:tag,t0:Date.now(),etaS:auS.etaS||35,upBase:typeof auS.up=='number'?auS.up:undefined,upAt:auUpAt,img:typeof auS.img=='string'?auS.img:undefined});return;}");
-    web_client.println("if(j[fn]!='ok')auLoc=a=='apply'?'Install of '+tag+' failed':'The node did not start the job, try again in a minute';");
-    web_client.println("auInfl=false;auFetch();}).catch(function(){auBusy=false;auLoc='No answer from the node';auRender();});}");
-    web_client.println("function auFBegin(o){auF=o;auFDead=false;auFSet(o);auBusy=false;clearTimeout(auT.poll);clearInterval(auT.tick);auFPct=0;auFMsg='';auFDraw();auT.tick=setInterval(auFTick,1000);}");
-    web_client.println("function auFDraw(){if(!auF)return;var el=(Date.now()-auF.t0)/1000,m=auFMsg||('Installing '+auF.tag+', the node restarts ...');");
-    web_client.println("if(!auFMsg&&el>180+auF.etaS)m='The node is not back yet. Check its display and power; reload this page when it is up.';");
-    web_client.println("auDraw(1,m,'','',auFDead?'Install failed':'Installing now ... '+auFPct+' %','none',1,0);}");
-    web_client.println("function auFTick(){if(!auF)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}");
-    web_client.println("var el=(Date.now()-auF.t0)/1000,p=Math.min(95,Math.floor(el/auF.etaS*100));if(p>auFPct)auFPct=p;auFDraw();");
-    web_client.println("if(el>=Math.max(auF.etaS-10,8)&&Math.floor(el)%2==0)auFProbe();}");
-    web_client.println("function auFProbe(){if(auFInfl)return;auFInfl=true;");
-    // a firmware without the /austatus route answers the Info scaffold (2xx HTML with "cpage=") on /austatus and /ota/state:
-    // the node is demonstrably up, so that counts as back. Safeboot answers /ota/state with JSON; a redirect page has no "cpage=".
-    web_client.println("var auSc=false;");
-    web_client.println("fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}");
-    web_client.println("if(j&&typeof j.run=='string'){auFInfl=false;auFJson(j);return;}auSc=t.indexOf('cpage=')>=0;throw 0;}).catch(function(){");
-    web_client.println("fetch('/ota/state').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var o=null;try{o=JSON.parse(t);}catch(e){}");
-    web_client.println("auFInfl=false;if(o){auFOta(o);return;}if(auSc&&auF){auFDone();return;}throw 0;}).catch(function(){auFInfl=false;});});}");
-    web_client.println("function auFDone(){auFPct=100;auFDraw();auFSet(null);clearInterval(auT.tick);auF=null;auReload();}");
-    web_client.println("function auFRestarted(j){return typeof j.up=='number'&&typeof auF.upBase=='number'&&j.up+10<auF.upBase+(Date.now()-auF.upAt)/1000;}");
-    // run "local": a Safeboot fallback also restarts the node, so with "img" on both sides only a changed image id is success
-    web_client.println("function auFNewImg(j){if(typeof j.img=='string'&&typeof auF.img=='string')return j.img!=auF.img;return auFRestarted(j);}");
-    web_client.println("function auFJson(j){if(!auF)return;if(j.run==auF.tag||(j.run=='local'&&auFNewImg(j))){auFDone();return;}");
-    web_client.println("auFSet(null);clearInterval(auT.tick);auT.tick=0;auF=null;auFMsg='';");
-    web_client.println("if(j.sbok){auLoc='Install failed, the old firmware is running';}");
-    web_client.println("auApply(j);}");
-    // apply_failed: with fallback_in_ms >= 0 Safeboot counts down to the old firmware; with a negative value or app_valid false it has
-    // no app to fall back to and waits for an upload (dead end, the line stays; probing goes on so the page recovers by itself)
-    web_client.println("function auFOta(o){if(!auF||!o)return;auFMsg='';auFDead=false;if(o.reason=='apply_failed'||o.state=='aborted'){");
-    web_client.println("var fb=typeof o.fallback_in_ms=='number'?o.fallback_in_ms:-1;");
-    web_client.println("if(o.app_valid===false||fb<0){auFDead=true;auFMsg='Install failed -- the node stays in Safeboot. Upload a firmware at http://'+location.host+'/update or use the Webflasher';}");
-    web_client.println("else auFMsg='Install failed -- the node returns to the old firmware in '+Math.max(0,Math.ceil(fb/1000))+' s';}");
-    web_client.println("else if(o.state=='applying'&&o.total>0){var p=Math.min(99,Math.floor(o.received*100/o.total));if(p>auFPct)auFPct=p;}");
-    web_client.println("auFDraw();}");
-    // a remembered click counts only for the tag the node still has staged (or already runs); anything else, or a record past its
-    // time budget while the node answers idle, is dropped and the plain base state is drawn
-    web_client.println("function auFStale(f,j){if(j.run==f.tag)return false;if(j.staged!=f.tag)return true;");
-    web_client.println("return j.st!='busy'&&(Date.now()-f.t0)/1000>180+(f.etaS||35)+60;}");
-    web_client.println("function auFInit(f){fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}");
-    web_client.println("if(!auShown||auF)return;if(j&&typeof j.run=='string'&&auFStale(f,j)){auFSet(null);auApply(j);return;}auFBegin(f);}).catch(function(){if(auShown&&!auF)auFBegin(f);});}");
-    web_client.println("function auPageLeave(){clearTimeout(auT.poll);clearInterval(auT.tick);auT.poll=0;auT.tick=0;auShown=false;auInfl=false;auFInfl=false;auBusy=false;auS=null;auF=null;auLoc='';auFMsg='';auFDead=false;auFPct=0;}");
-    web_client.println("function auPageInit(){auPageLeave();var b=auEl('au_btn');if(!b)return;auShown=true;b.onclick=auClick;");
-    web_client.println("var f=auFGet();if(f&&f.tag&&f.t0){auFInit(f);return;}auFetch();}");
-}
-#endif
-
 /**
  * ###########################################################################################################################
  * delivers the WebUI scaffold including the info page
@@ -1368,389 +1319,25 @@ void deliver_scaffold(bool bget_password)
     web_client.println("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
     web_client.printf("<title>%s - Meshcom</title>\n",  meshcom_settings.node_call);
 
-    // ECMA-Script/Javascript
+    // The static CSS/JS are gzip blobs served as /mc.css, /mc.js, /mcau.js, /mcrm.js (web_assets.h, made by
+    // tools/gen_web_assets.py from src/web_functions/web/). The ?v= tag is their content hash. mc.js comes first:
+    // it wraps fetch() with the X-MC header. Sub-pages are injected with innerHTML, their <script> never runs,
+    // so every script a sub-page needs is loaded here, in the head.
+    web_client.println("<link rel=\"stylesheet\" href=\"/mc.css?v=" WEB_MC_CSS_TAG "\">");
+    web_client.println("<script src=\"/mc.js?v=" WEB_MC_JS_TAG "\"></script>");
+    // Inline: what depends on the build or on the headers (rmLen, the AU hook in loadPage, the mailbox refresh)
     web_client.println("<script type=\"text/javascript\">\n");
-    // RM GUI: every request of the page carries `X-MC: 1`. The node refuses state-changing requests
-    // (setparam, callfunction, sendmessage, every POST) without it or without a same-host Origin: a foreign
-    // web page cannot set a custom header without a CORS preflight, which the node does not answer.
-    web_client.println("(function(){var f=window.fetch;if(f){window.fetch=function(u,o){o=o||{};var h=new Headers(o.headers||{});h.set('X-MC','1');o.headers=h;return f.call(window,u,o);};}"
-                       "var s=window.XMLHttpRequest&&XMLHttpRequest.prototype.send;if(s){XMLHttpRequest.prototype.send=function(b){try{this.setRequestHeader('X-MC','1');}catch(e){}return s.call(this,b);};}})();");
-    // these variables will hold the last loaded page name and sender in order to force a refresh
-    web_client.println("cpage=\"info\";csender=undefined;\nsetInterval(autorefresh,30000);");
-    // This function will be called in intervalls - can be used to auto-refresh content depending on what page is loaded
-    web_client.println("function autorefresh() {if(cpage=='messages')updateMessages();if(cpage=='wx')loadPage('wx',csender,false);if(cpage=='position')loadPage('position',csender,false);if(cpage=='mheard')loadPage('mheard',csender,false);if(cpage=='path')loadPage('path',csender,false);if(cpage=='rxlog')loadPage('rxlog',csender,false);};");
+    rmScaffoldJs(); // var rmLen=...: mcrm.js reads it while it loads
 #if defined(ENABLE_MSGSTORE)
     web_client.println("function autorefreshMbox(){if(cpage=='mailbox')loadPage('mailbox',csender,false);}setInterval(autorefreshMbox,10000);");
 #endif
-    // this function is used for login and logout
-    web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
     web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
-    // this function is used to send a message from the browser via node to the mesh
-    //
-    // BP-09: the input fields used to be cleared unconditionally, right after
-    // xhttp.send() and without ever looking at the answer -- so a message the
-    // node refused (QRT) or dropped (QTA) took the operator's typed text with
-    // it, exactly the loss BP-09 fixes on the T-Deck and T-Deck Pro. The clear
-    // now waits for the response and only fires on "sendmessage ok"; every
-    // other outcome (refused / dropped / invalid / failed) leaves the text in
-    // place so it can be resent after the QRV. updateCharsLeft() is called
-    // from the handler because the onclick chain has long since run its own
-    // call by the time the answer arrives.
-    //
-    // The destination survives the send when it is a group number: the tab
-    // bar puts the selected group into #sendcall, and clearing it after every
-    // send silently turned the next quick message into a broadcast to '*'
-    // (DJ8MEH, 2026-09-11). A DM call sign is still cleared as before.
-    web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200 && this.responseText.indexOf(\"sendmessage ok\")>=0){var sc=document.getElementById(\"sendcall\");if(!/^[0-9]+$/.test(sc.value))sc.value=\"\"; document.getElementById(\"messagetext\").value=\"\"; updateCharsLeft();}};xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();}\n");
-    // counts what is left of the node's 150-byte message limit (send_message() adds ":" or ":{call}").
-    // #1173: count UTF-8 bytes, not characters -- "ą" costs 2, an emoji 4 -- and cut an over-long
-    // text between characters (for..of walks code points, so no surrogate pair is split).
-    web_client.println("var mcEnc=new TextEncoder();function updateCharsLeft() {let maxlength=149;let call=document.getElementById(\"sendcall\").value;if(call.length>0) {maxlength-=mcEnc.encode(call).length+2;}let t=document.getElementById(\"messagetext\");let msglength=mcEnc.encode(t.value).length;if(msglength>maxlength){let out=\"\";msglength=0;for(const ch of t.value){let b=mcEnc.encode(ch).length;if(msglength+b>maxlength)break;out+=ch;msglength+=b;}t.value=out;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
-    // MC-msg-history: BLEtoPhoneBuff/MAX_RING is only 20 slots and is shared
-    // with positions and acks, so a handful of new messages can push an old
-    // message out of the node's own ring within minutes. The browser tab
-    // keeps every message it has seen for the life of the page in
-    // mcHistory/mcSeen (capped at MC_HIST_MAX, oldest dropped first) so
-    // switching Info -> Messages -> Info -> Messages does not lose messages
-    // that scrolled out of the node's ring. This is browser memory only --
-    // node RAM is unchanged, and persisting the history to localStorage is
-    // deferred (not implemented in this round).
-    web_client.println("var mcSeen={};");
-    web_client.println("var mcHistory=[];");
-    web_client.println("var MC_HIST_MAX=200;");
-    // MC-msg-tabs: this and the rest of the mcTab* functions live in the
-    // scaffold rather than sub_page_messages() because sub-pages are
-    // injected via innerHTML and their own <script> tags never run.
-    web_client.println("var mcTabSel='all';");
-    web_client.println("try{var mcTabStored=localStorage.getItem('mcTab');if(mcTabStored!=null)mcTabSel=mcTabStored;}catch(e){}");
-    // MC-msg-badges: unread-state model. mcReadIds is a session-only set of
-    // message ids the operator has definitely seen -- it survives while
-    // mcHistory holds the entry, but not a browser restart. mcWm holds, per
-    // tab key, a unix-time watermark below which everything on that tab
-    // counts as read; it is the only read-state that is persisted
-    // (localStorage 'mcWm'), because persisting the exact id set across days
-    // of ring turnover would grow without bound. A message is unread for a
-    // tab key when it is inbound (an own message-send is never unread), it
-    // matches that key's dst filter, its id has not been marked read this
-    // session, and its ts is strictly greater than that key's watermark --
-    // equal timestamps fall back to the id set, since an unsynced node clock
-    // can hand two independent messages the same second. Viewing "All"
-    // raises every tab's watermark to the newest message seen, because
-    // looking at the merged stream is defined as having read everything in
-    // it, not only the "all" tab itself.
-    web_client.println("var mcReadIds={};");
-    web_client.println("var mcWm={};");
-    web_client.println("try{var mcWmStored=localStorage.getItem('mcWm');if(mcWmStored!=null)mcWm=JSON.parse(mcWmStored);}catch(e){}if(typeof mcWm!=='object' || mcWm===null)mcWm={};");
-    web_client.println("function mcSaveWm(){try{localStorage.setItem('mcWm',JSON.stringify(mcWm));}catch(e){}}");
-    web_client.println("function mcTabMatchKey(key,dst){if(key=='all')return true;if(key=='*')return dst=='*';if(key=='dm')return dst!='*' && !/^[0-9]+$/.test(dst);return dst==key;}");
-    web_client.println("function mcTabMatch(dst){return mcTabMatchKey(mcTabSel,dst);}");
-    web_client.println("function mcUnreadCount(key){var wm=mcWm[key]||0;var n=0;for(var i=0;i<mcHistory.length;i++){var m=mcHistory[i];if(m.rx && mcTabMatchKey(key,m.dst) && !mcReadIds[m.id] && m.ts>wm)n++;}return n;}");
-    // seeds the watermark of any tab key that has never had one (first visit
-    // to this browser, or a group number just added in setup) to the newest
-    // ts already known, so first load never shows a wall of unread badges
-    web_client.println("function mcSeedWm(){var btns=document.querySelectorAll('#mctabs .mctab');if(btns.length==0)return;var maxTs=0;for(var i=0;i<mcHistory.length;i++){if(mcHistory[i].ts>maxTs)maxTs=mcHistory[i].ts;}var changed=false;for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');if(!(key in mcWm)){mcWm[key]=maxTs;changed=true;}}if(changed)mcSaveWm();}");
-    // marks every history entry on the currently selected tab as read; viewing
-    // 'all' counts as having read every tab, so its watermark propagates to
-    // every configured tab key, not only 'all' itself
-    web_client.println("function mcMarkRead(){if(document.visibilityState==='hidden')return;var maxTs=0;var changed=false;for(var i=0;i<mcHistory.length;i++){var m=mcHistory[i];if(mcTabMatchKey(mcTabSel,m.dst)){if(!mcReadIds[m.id]){mcReadIds[m.id]=true;changed=true;}if(m.ts>maxTs)maxTs=m.ts;}}if(maxTs>(mcWm[mcTabSel]||0)){mcWm[mcTabSel]=maxTs;changed=true;}if(mcTabSel=='all'){var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');if(maxTs>(mcWm[key]||0)){mcWm[key]=maxTs;changed=true;}}}if(changed)mcSaveWm();}");
-    // the tab bar is re-rendered by the server on every loadPage('messages'),
-    // so badges are painted here on every call, never once at page load
-    web_client.println("function mcApplyTab(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-dst]');for(var i=0;i<els.length;i++){els[i].hidden=!mcTabMatch(els[i].getAttribute('data-dst'));}mcSeedWm();mcMarkRead();var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');btns[j].classList.toggle('mctab-on',key==mcTabSel);var label=key=='all'?'All':(key=='dm'?'DM':key);var cnt=mcUnreadCount(key);btns[j].innerHTML=label+(cnt>0?' <span class=\"mcbadge\">'+cnt+'</span>':'');btns[j].classList.toggle('mctab-new',cnt>0);}}");
-    web_client.println("function mcTab(btn){mcTabSel=btn.getAttribute('data-tab');try{localStorage.setItem('mcTab',mcTabSel);}catch(e){}var sc=document.getElementById('sendcall');if(sc){if(/^[0-9]+$/.test(mcTabSel))sc.value=mcTabSel;else if(mcTabSel=='*')sc.value='';}if(typeof updateCharsLeft==='function' && sc)updateCharsLeft();mcApplyTab();}");
-    // messages that arrive while the tab is hidden must not count as read
-    // until the operator actually comes back to look at them
-    web_client.println("document.addEventListener('visibilitychange',function(){if(cpage=='messages')mcApplyTab();});");
-    web_client.println("function mcHistIndex(id){for(var i=0;i<mcHistory.length;i++){if(mcHistory[i].id==id)return i;}return -1;}");
-    // a tick is rank-monotone: the server's status ring is shared and churned and drops the tick of an old message, so a ranked-higher tick of the remembered entry survives (rank = index 0,1,4,3,2: heard < held < failed < ACK)
-    web_client.println("function mcTickKeep(h,el){if(!el.classList.contains('message-send'))return;var t=document.createElement('template');t.innerHTML=h;var o=t.content.querySelector('.mctick');if(!o)return;var n=el.querySelector('.mctick');var R=[0,1,4,3,2];if(n&&R[n.getAttribute('data-st')]>=R[o.getAttribute('data-st')])return;if(n)n.replaceWith(o);else{var p=el.querySelector('p');if(p)p.insertBefore(o,p.firstChild);}}");
-    web_client.println("function mcMergeEntry(el){var id=el.getAttribute('data-id');var idx=mcHistIndex(id);if(idx>=0)mcTickKeep(mcHistory[idx].html,el);var html=el.outerHTML;var dst=el.getAttribute('data-dst')||'';var ts=parseInt(el.getAttribute('data-ts'))||0;var rx=el.classList.contains('message-received');if(idx<0){mcHistory.push({id:id,html:html,dst:dst,ts:ts,rx:rx});mcSeen[id]=true;if(mcHistory.length>MC_HIST_MAX){var dropped=mcHistory.shift();delete mcSeen[dropped.id];}}else{mcHistory[idx].html=html;mcHistory[idx].dst=dst;mcHistory[idx].ts=ts;mcHistory[idx].rx=rx;}}");
-    web_client.println("function mcRemovePlaceholder(panel){var kids=panel.children;for(var i=kids.length-1;i>=0;i--){if(kids[i].tagName=='P')panel.removeChild(kids[i]);}}");
-    // this function is an ayncronous loader that is used to update the received messages without re-loading the whole page, it will re-call itself after a timeout as long as the message-page is displayed
-    // it merges the response into mcHistory/mcSeen instead of overwriting the panel outright, so a message already on screen keeps its DOM position when only its ack mark changed
-    web_client.println("function mcProcessMessages(text,panel){var tmpl=document.createElement('template');tmpl.innerHTML=text;var els=tmpl.content.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){var el=els[i];var id=el.getAttribute('data-id');var existed=mcSeen.hasOwnProperty(id);mcMergeEntry(el);if(existed){var old=panel.querySelector('.message[data-id=\"'+id+'\"]');if(old)old.replaceWith(el);}else{panel.appendChild(el);}}mcRemovePlaceholder(panel);if(mcHistory.length==0)panel.innerHTML='<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
-    web_client.println("function updateMessages() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){var panel=document.getElementById('messages_panel');if(panel!=null)mcProcessMessages(this.responseText,panel);}};setTimeout(function(){xhttp.open('GET','/?getmessages',true);xhttp.send();},1000);}\n");
-    // rebuilds #messages_panel from mcHistory when the messages page is (re-)injected by loadPage(); first merges the server-rendered entries already sitting in the panel into mcHistory (same dedupe as mcProcessMessages) so nothing the server just sent is lost, then renders the full remembered history in order
-    web_client.println("function mcRenderHistory(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){mcMergeEntry(els[i]);}var html='';for(var j=0;j<mcHistory.length;j++){html+=mcHistory[j].html;}panel.innerHTML=html.length>0?html:'<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
-    //  this function sends a parameter:value request to the backend
-    // TRK-01: bei Erfolg (returncode==0, die Seite wird hier NICHT neu geladen) den Warnhinweis
-    // "<id>_warn" live ein-/ausblenden -- generisch ueber param, damit kuenftige Switches denselben Mechanismus erben
-    web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']==0){var w=document.getElementById(param+\"_warn\");if(w)w.style.display=(value==\"on\")?\"\":\"none\";}if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
-    // this function invokes a function call to the backend passing the function name and an optional parameter (e.g. sendpos)
-    web_client.println("function callfunction(functionname,functionparameter){fetch(\"/callfunction/?\"+functionname+\"=\"+functionparameter).then(function(response){return response.json();}).then(function (jsonResponse) {/*Nothing todo yet.*/})}\n");
+    web_client.println("</script>\n");
 #if defined(ESP32)
-    auScaffoldJs(); // AU web GUI: Info page Auto update row
+    web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\"></script>"); // AU web GUI: Info page Auto update row
 #endif
-    // CS-03: config restore. Lives here and not in the setup page, because the
-    // sub-pages are injected with innerHTML -- a <script> inside them never runs.
-    web_client.println("function uploadconfig(){var e=document.getElementById(\"cfgfile\");if(!e||e.files.length==0){alert(\"choose a config file first\");return;}if(!confirm(\"Restore this configuration and reboot the node?\"))return;var r=new FileReader();r.onload=function(){fetch(\"/config\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:r.result}).then(function(x){return x.text().then(function(t){var m=t.replace(/<[^>]*>/g,\" \").trim();if(x.ok){alert(\"config imported: \"+m);}else{alert(\"import failed: \"+m);}});}).catch(function(err){alert(\"upload failed: \"+err);});};r.readAsText(e.files[0]);}\n");
-
-    // This function is used to toggle a css class so setup cars can collapse / expand
-    web_client.println("function togglecard(element){element.parentElement.classList.toggle(\"cardopen\");}");
-
-    // RM GUI W2b: Remote page scripts (state tiles, saved nodes, password, polling). Lives here because
-    // sub-pages are injected with innerHTML and their <script> never runs.
-    rmScaffoldJs();
-
-    // Remote Admin card of the Settings page (sub_page_setup()): scripts of sub-pages never run, so the logic lives here;
-    // loadPage() calls raSt() after the setup fragment is in. Password only in the POST body, never in a URL.
-    // RA-JS-BEGIN
-    web_client.println("var raA=0,raT=0;\n"
-                       "function raM(t,b){var e=rmEl('ra_msg');if(e){e.textContent=t;e.style.color=b?'var(--mcred)':'';}}\n"
-                       "function raX(e,t){raM(e===0?'Log in again to change these settings.':t,1);}\n"
-                       "function raDis(m){clearTimeout(raT);raA=0;var b=rmEl('ra_clr');if(b)b.textContent='Clear';if(m)raM('');}");
-    web_client.println("function raSt(){fetch('/rmstatus').then(rmJson).then(function(j){var o=rmEl('ra_on');if(!o)return;o.checked=!!j.on;o.disabled=!j.pw&&!j.on;\n"
-                       "rmEl('ra_hint').textContent=j.pw?'':'Set a password first, then switch remote management on.';\n"
-                       "rmEl('ra_st').textContent='password: '+(j.pw?'set':'not set')+(j.lock?', a sender is blocked for '+(j.lockS||1)+' s after wrong attempts':'');})\n"
-                       ".catch(function(e){raX(e,'Could not read the state of this node. Reload the page.');});}");
-    web_client.println("function raP(b,t){rmPost('/rmpasswd',b).then(rmJson).then(function(j){if(j&&j.ok)raM(t);else raM(rmErrText(j),1);raSt();})\n"
-                       ".catch(function(e){raX(e,'The node did not answer. Try again.');});}");
-    web_client.println("function raSet(){var i=rmEl('ra_pw'),p=i.value,e=rmPwProblem(p);raDis();\n"
-                       "if(e){raM(e,1);return;}i.value='';raP('act=set&pw='+rmEnc(p),'Password set.');}\n"
-                       "function raClr(){if(!raA){raA=1;rmEl('ra_clr').textContent='Really? tap again';raM('Clear the password? Remote management will be switched off.');raT=setTimeout(function(){raDis(1);},4000);return;}\n"
-                       "raDis();raP('act=clear','Password cleared. Remote management is off.');}");
-    web_client.println("function raOn(){var o=rmEl('ra_on'),v=o.checked?'on':'off';o.disabled=true;fetch('/setparam/?rm='+v).then(rmJson).then(function(j){var k=j&&j.returncode==0;\n"
-                       "raM(k?'Remote management is '+v+'.':'Could not change it. Is a password set?',!k);raSt();})\n"
-                       ".catch(function(e){raX(e,'The node did not answer. Try again.');raSt();});}");
-    // RA-JS-END
-
-    // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
-    // and injected with innerHTML, which never runs a <script> tag it carries,
-    // so the rendering logic has to live here in the scaffold instead and be
-    // invoked from loadPage() after each fragment swap (that covers both the
-    // initial page load and the 30s autorefresh). The fragment itself only
-    // emits an empty #mcq div carrying data-* attributes; all markup below is
-    // built from those. JS strings use single quotes and HTML attribute
-    // values are written unquoted (none of them ever contain a space) so
-    // nothing here needs quote-escaping in the C string literals.
-    web_client.println("var mcQueueOpen=true;");
-    web_client.println("function mcQueueToggle(btn){mcQueueOpen=!mcQueueOpen;var b=document.getElementById('mcq');if(b)b.hidden=!mcQueueOpen;if(btn)btn.textContent=mcQueueOpen?'hide':'show';}");
-    web_client.println("function mcRenderQueue(){");
-    web_client.println("var d=document.getElementById('mcq');");
-    web_client.println("if(!d)return;");
-    web_client.println("var p=[0,0,0,0,0,0];");
-    web_client.println("var w=[0,0,0,0,0,0];");
-    web_client.println("for(var i=1;i<=5;i++){p[i]=parseInt(d.getAttribute('data-p'+i))||0;w[i]=parseInt(d.getAttribute('data-w'+i))||0;}");
-    web_client.println("var w0=parseInt(d.getAttribute('data-w0'))||0;");
-    web_client.println("var ring=parseInt(d.getAttribute('data-ring'))||0;");
-    web_client.println("var used=parseInt(d.getAttribute('data-p0'))||0;");
-    web_client.println("var bp=parseInt(d.getAttribute('data-bp'))||0;");
-    web_client.println("var bpname=d.getAttribute('data-bpname')||'';");
-    web_client.println("var qrs=parseInt(d.getAttribute('data-qrs'))||0;");
-    web_client.println("var qrsf=parseInt(d.getAttribute('data-qrsf'))||qrs;");
-    web_client.println("var qrt=parseInt(d.getAttribute('data-qrt'))||0;");
-    web_client.println("var win=parseInt(d.getAttribute('data-win'))||0;");
-    web_client.println("var rx=parseInt(d.getAttribute('data-rx'))||0;");
-    web_client.println("var tx=parseInt(d.getAttribute('data-tx'))||0;");
-    web_client.println("var intv=parseInt(d.getAttribute('data-int'))||300;");
-    web_client.println("var newid=parseInt(d.getAttribute('data-newid'))||0;");
-    web_client.println("var dup=parseInt(d.getAttribute('data-dup'))||0;");
-    web_client.println("var dwin=parseInt(d.getAttribute('data-dwin'))||0;");
-    web_client.println("var age=parseInt(d.getAttribute('data-age'))||0;");
-    web_client.println("var empty=ring-used;");
-    web_client.println("if(empty<0)empty=0;");
-    web_client.println("var qrsPct=ring>0?(qrs/ring*100):0;");
-    web_client.println("var qrsfPct=ring>0?(qrsf/ring*100):0;");
-    web_client.println("var qrtPct=ring>0?(qrt/ring*100):0;");
-    web_client.println("var colors=['#A2182F','#E07B39','#3B7DD8','#6FA96F','#9E9E9E'];");
-    web_client.println("var names=['crit','high','normal','low','bg'];");
-    web_client.println("var html='';");
-    web_client.println("html+='<div class=font-bold>TX queue</div>';");
-    web_client.println("html+='<div class=mcq-barwrap><div class=mcq-bar>';");
-    web_client.println("for(var pr=1;pr<=5;pr++){var wn=Math.min(w[pr],p[pr]);for(var c=0;c<p[pr]-wn;c++){html+='<div class=mcq-cell style=background:'+colors[pr-1]+'></div>';}for(var cw=0;cw<wn;cw++){html+='<div class=mcq-cell-wait style=border-color:'+colors[pr-1]+'></div>';}}");
-    web_client.println("for(var c2=0;c2<empty;c2++){html+='<div class=mcq-cell-empty></div>';}");
-    web_client.println("html+='</div>';");
-    web_client.println("html+='<div class=mcq-tick-faint style=left:'+qrsPct+'%></div>';");
-    web_client.println("html+='<div class=mcq-tick style=left:'+qrsfPct+'%></div>';");
-    web_client.println("html+='<div class=mcq-tick style=left:'+qrtPct+'%></div>';");
-    web_client.println("html+='</div>';");
-    web_client.println("html+='<div class=mcq-ticklabels>';");
-    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrsfPct+'%;transform:translateX(-50%)>QRS</span>';");
-    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrtPct+'%;transform:translateX(-50%)>QRT</span>';");
-    web_client.println("html+='</div>';");
-    web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
-    web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
-    web_client.println("if(w0>0){html=html.replace(/ +$/,'')+', '+w0+' waiting for ACK';}");
-    web_client.println("html+='</div>';");
-    web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
-    web_client.println("var bptxt=(bp==0)?'accepted':((bp==1)?'slow down':'refused');");
-    web_client.println("html+='<div class=font-bold>Your messages: <span style=color:'+bpcolor+'>'+bptxt+'</span></div>';");
-    web_client.println("var drop=parseInt(d.getAttribute('data-drop'))||0;");
-    web_client.println("var iv=intv*1000;");
-    web_client.println("html+='<div class=font-bold>Queue: '+used+'/'+ring+' queued'+(win?', '+drop+' dropped in the last '+Math.round(intv/60)+' min, TX '+(tx/iv*100).toFixed(1)+' % / RX '+(rx/iv*100).toFixed(1)+' %':'')+'</div>';");
-    web_client.println("html+='<div class=font-small>(QRS forecast at&nbsp;'+qrsf+' for your next msgs, line&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
-    web_client.println("if(win==0){");
-    web_client.println("html+='<div class=font-bold>Dedup window: n/a (no completed 5-min window yet)</div>';");
-    web_client.println("}else if(dwin==0){");
-    web_client.println("html+='<div class=font-bold>Dedup window: n/a (no new ids in the last window)</div>';");
-    web_client.println("}else{");
-    web_client.println("var dwc=(dwin<40||dwin>48)?'#E07B39':'inherit';");
-    web_client.println("html+='<div class=font-bold>Dedup window:&nbsp;&asymp;<span style=color:'+dwc+'>'+dwin+'</span> min</div>';");
-    web_client.println("html+='<div class=font-small>('+newid+' new ids, '+dup+' dups in last '+Math.round(intv/60)+' min; safe corridor 40-48 min)</div>';");
-    web_client.println("}");
-    web_client.println("html+='<div class=font-bold>Channel utilisation (last 5 min)</div>';");
-    web_client.println("if(win==0){");
-    web_client.println("html+='<div class=font-small>n/a</div>';");
-    web_client.println("}else{");
-    web_client.println("var rxPct=rx/(intv*1000)*100;if(rxPct>100)rxPct=100;");
-    web_client.println("var txPct=tx/(intv*1000)*100;if(txPct>100)txPct=100;");
-    web_client.println("var totPct=(rx+tx)/(intv*1000)*100;if(totPct>100)totPct=100;");
-    web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>rx '+rxPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+rxPct+'%;background:#3B7DD8></div></div></div>';");
-    web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>tx '+txPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+txPct+'%;background:#A2182F></div></div></div>';");
-    web_client.println("html+='<div class=font-small>total '+totPct.toFixed(1)+'% ('+age+' s ago)</div>';");
-    web_client.println("}");
-    web_client.println("d.innerHTML=html;");
-    web_client.println("var btn=document.getElementById('mcqtogglebtn');");
-    web_client.println("d.hidden=!mcQueueOpen;");
-    web_client.println("if(btn)btn.textContent=mcQueueOpen?'hide':'show';");
-    web_client.println("}");
-
-    web_client.println("</script>\n\n");
-
-    // css style definitions
-    web_client.println("<style>\n");
-
-    // basic definitions
-    web_client.println(":root {--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;}\n");
-    web_client.println("@media screen and (max-width:600px) {html {font-size:12px;} :root{--widthfactor:0.7;}}\n");
-    web_client.println("@media screen and (min-width:601px) {html {font-size:14px;} :root{--widthfactor:0.7;}}\n");
-    web_client.println("@media screen and (min-width:801px) {html {font-size:14px;} :root{--widthfactor:1.0;}}\n");
-    web_client.println("h1,h2,h3,h4,h5,h6,small,code,pre,kbd,samp,button,input,select,textarea {font-size:inherit;}\n");
-    web_client.println("body {font-size:var(--fs-m);background:var(--mcbg);padding:0px;margin:0px 0px;height:100%;width:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:var(--mcgray);font-family:sans-serif;}\n");
-    web_client.println(".font-small {font-size:var(--fs-s);}\n");
-    web_client.println(".font-large {font-size:var(--fs-l);}\n");
-    web_client.println(".font-xlarge {font-size:var(--fs-xl);}\n");
-    web_client.println(".font-bold {font-weight:bold;}\n");
-    web_client.println(".no-wrap {white-space:nowrap;}\n");
-    web_client.println(".mw-600 {max-width:600px;}");
-
-    // nav-bar definitions
-    web_client.println("#nav_layer {height:100%;width:calc(60px*var(--widthfactor));background-color:var(--mcgray);position:fixed !important;overflow:auto;top:0px;}\n");
-    web_client.println("#mc_logo {width:100%;aspect-ratio:1/1;margin:0px auto 75px auto;padding:5px 0px;display:block;background-color:#000;}\n");
-    web_client.println(".nav_button {background-color:var(--mcgray);border:solid 6px var(--mcgray);box-shadow:none;border-radius:10px 0px 0px 10px;cursor:pointer; width:100%; aspect-ratio:1/1; margin:calc(20px*var(--widthfactor)) auto; display:block;}\n");
-    web_client.println(".nav_button>svg {display:block;width:90%;height:90%;margin:auto auto;}\n");
-    web_client.println(".nav_button.nbactive {background-color:var(--mcbg);-webkit-transition:0.5s;transition:0.5s; border-right-color:var(--mcbg);}\n");
-    web_client.println(".nav_button.nbactive>svg, .nav_button.nbactive>img {filter:invert(1);}\n");
-    web_client.println(".nav_button.extra_space {margin-top:40px !important;}\n");
-    web_client.println("select,input,textarea {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing:border-box;border:solid 1px #7c7c7c;-webkit-transition:0.5s;transition:0.5s;}\n");
-    web_client.println("select:focus,input:focus,textarea:focus {border:solid 1px var(--mcred);background-color:var(--mclightred);outline:none;}\n");
-
-    // header (red bar with Call, Time, Date, etc) definitions
-    web_client.println("#head_layer {margin:0px 0px 0px calc(60px*var(--widthfactor)); padding:10px 30px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#a2182f;color:#ffffff;width:auto;height:39px;}\n");
-    web_client.println("#head_layer>p {margin:0px 0px;}\n");
-
-    // loader animation (the circling animation when content is loaded)
-    web_client.println(".loader {display:block;margin:150px auto 50px auto;width:100px;height:100px;border:5px solid #FFF;border-bottom-color:#FF3D00;border-radius:50%;box-sizing:border-box;animation:rotation 1s linear infinite;}\n");
-    web_client.println("@keyframes rotation{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}\n");
-
-    // content definitions
-    web_client.println("#content_title {padding:0px 30px 0px 0px;margin:0px 0px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#FCEDF0;}\n");
-    web_client.println("#content_layer {margin-left:calc(60px*var(--widthfactor));top:0px;overflow:hidden;}");
-    web_client.println("#content_inner {margin:20px 10px 30px 4%;}\n");
-
-    // content definitions -> tables
-    web_client.println("#content_inner > table {border-collapse:separate;overflow:hidden;border-spacing:0;border:solid 1px #7c7c7c;border-radius:10px;width:100%;background:#f9f9f9;}\n");
-    web_client.println("#content_inner > table thead {background-color:var(--mcgray);color:#ffffff;border-radius:10px;}\n");
-    web_client.println("#content_inner > table tr:nth-child(even) {background-color:#f0f0f0;}\n");
-    web_client.println("#content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px #e0e0e0;}\n");
-
-    // content definitions -> anchors
-    web_client.println("#content_inner a {color:var(--mcred);}\n");
-
-    // content definitions -> buttons
-    web_client.println("#content_inner button {background-color:var(--mclightred);border:solid 1px var(--mcgray);padding:3px 10px;text-align:center;cursor:pointer;display:inline-flex;align-items:center;border-radius:5px;}\n");
-    web_client.println("#content_inner button:hover {background-color:var(--mcmidred);}\n");
-    web_client.println(".btncheckmark {width:20px;height:20px;margin:auto;background:center no-repeat url(\"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgNDggNDgiIHZlcnNpb249IjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgNDggNDgiIGZpbGw9IiMwMDAwMDAiPjxnIHN0cm9rZS13aWR0aD0iMCI+PC9nPjxnIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PC9nPjxnPjxwb2x5Z29uIGZpbGw9IiM0M0EwNDciIHBvaW50cz0iNDAuNiwxMi4xIDE3LDM1LjcgNy40LDI2LjEgNC42LDI5IDE3LDQxLjMgNDMuNCwxNC45Ij48L3BvbHlnb24+PC9nPjwvc3ZnPg==\");}\n");
-    web_client.println(".btnrefresh {width:20px;height:20px;margin:auto;background:center no-repeat url(\"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgc3Ryb2tlLXdpZHRoPSIwIj48L2c+PGcgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L2c+PGc+PHBhdGggZD0iTTIxIDNWOE0yMSA4SDE2TTIxIDhMMTggNS4yOTE2OEMxNi40MDc3IDMuODY2NTYgMTQuMzA1MSAzIDEyIDNDNy4wMjk0NCAzIDMgNy4wMjk0NCAzIDEyQzMgMTYuOTcwNiA3LjAyOTQ0IDIxIDEyIDIxQzE2LjI4MzIgMjEgMTkuODY3NSAxOC4wMDggMjAuNzc3IDE0IiBzdHJva2U9IiM0M0EwNDciIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L3BhdGg+IDwvZz48L3N2Zz4=\");}\n");
-
-    // content definitions -> message-page
-    web_client.println("#messagetext {width:100%;}\n");
-    web_client.println("#sendcall {min-width:8em;}\n");
-
-    web_client.println(".message {--r:1em;--t:1.5em;max-width:300px;padding:15px;margin-bottom:20px;border-inline:var(--t) solid #0000; border-radius:calc(var(--r) + var(--t))/var(--r);mask:radial-gradient(100% 100% at var(--_p) 0,#0000 99%,#000 102%) var(--_p) 100%/var(--t) var(--t) no-repeat, linear-gradient(#000 0 0) padding-box;color:#000;}\n");
-    web_client.println(".message>div>p {padding:0px;margin:0px;}\n");
-    web_client.println(".message-received{--_p:0;border-bottom-left-radius:0 0;place-self:start;background-color:var(--mclightgreen);border-color:var(--mclightgreen);}\n");
-    web_client.println(".message-send{--_p:100%;border-bottom-right-radius:0 0;place-self:end;background-color:var(--mclightblue);border-color:var(--mclightblue);}\n");
-
-    // content definitions -> commonly used cards
-    web_client.println(".cardlayout {min-height:20px;border:solid 1px var(--mcgray);border-radius:7px;padding:7px;padding-top:16px;margin:30px 0px;position:relative;max-width:600px;}\n");
-    web_client.println(".cardlabel {position:absolute;font-weight:bold;margin:0 5px;left:6px;top:-1px;transform:translateY(-50%);z-index:10;background-color:#fff;padding:0 2px;}\n");
-
-    web_client.println(".grid {display:grid;align-items:center;grid-column-gap:8px;grid-row-gap:7px;margin:7px;}\n");
-    web_client.println(".grid3{grid-template-columns:minmax(min-content,400px) minmax(min-content,150px) minmax(min-content,50px)}\n");
-    web_client.println(".grid2 {grid-template-columns:minmax(min-content,550px) minmax(min-content,50px)}\n");
-    web_client.println(".flex-auto-wrap {display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;}\n");
-    web_client.println(".flex-auto-wrap>* {flex:1;}\n");
-
-    // content definitions -> commonly used inputs
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:rgb(212, 212, 212);}\n");
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]):checked {background-color:rgb(102, 214, 102);}\n");
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"])::before {content:\"\";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:var(--mcbg);-webkit-transition:0.5s;transition:0.5s;}\n");
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]):checked::before {left:1.8em;}\n");
-
-    // content definitions -> setup collapsable cards
-
-    web_client.println(".collapsablecard>.cardtoggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;width:36px;height:36px;border-radius:50% !important;disjplay:none;}\n");
-    web_client.println(".collapsablecard>.cardtoggle>i {padding:4px;margin:auto;border:solid black;border-width:2px 0 0 2px;display:block;-webkit-transform:rotate(-135deg);transform:rotate(-135deg);-webkit-transition:0.5s;transition:0.5s;}\n");
-    web_client.println(".cardopen>.cardtoggle>i {-webkit-transform: rotate(45deg);transform: rotate(45deg);}\n");
-    web_client.println(".collapsablecard>div {max-height:0px;-webkit-transition:opacity .15s .0s,max-height .25s .10s;transition:opacity .15s .0s,max-height .25s .10s,margin .0s .50s;	opacity:0.0;overflow:hidden;margin:0px;}\n");
-    web_client.println(".cardopen>div {-webkit-transition:opacity .15s .10s,max-height .25s .0s;transition:opacity .15s .10s,max-height .25s .0s;max-height:none;opacity:1;margin:7px;}\n");
-    web_client.println(".cardopen>span:first-of-type {display:none;}\n");
-
-    // content definitions -> WQ-01 LoRa Queue panel (rxlog page)
-    web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:#fff;border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
-    web_client.println(".mcq-barwrap {position:relative;}\n");
-    web_client.println(".mcq-bar {display:flex;flex-direction:row;gap:1px;height:14px;margin:4px 0 2px 0;}\n");
-    web_client.println(".mcq-cell {flex:1;height:14px;}\n");
-    web_client.println(".mcq-cell-wait {flex:1;height:14px;background:#fff;border:2px solid #888;box-sizing:border-box;}\n");
-    web_client.println(".mcq-cell-empty {flex:1;height:14px;background:#ECECEC;border:1px solid #d0d0d0;box-sizing:border-box;}\n");
-    web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.5;}\n");
-    web_client.println(".mcq-tick-faint {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.15;}\n");
-    web_client.println(".mcq-ticklabels {position:relative;height:12px;font-size:var(--fs-s);margin:0 0 8px 0;}\n");
-    web_client.println(".mcq-legend {font-size:var(--fs-s);margin:0 0 8px 0;}\n");
-    web_client.println(".mcq-swatch {display:inline-block;width:8px;height:8px;margin:0 3px 0 6px;border-radius:2px;vertical-align:middle;}\n");
-    web_client.println(".mcq-util-row {display:flex;align-items:center;gap:6px;margin:2px 0;}\n");
-    web_client.println(".mcq-util-label {display:inline-block;min-width:60px;}\n");
-    web_client.println(".mcq-util-track {flex:1;height:10px;background:#ECECEC;border-radius:4px;overflow:hidden;}\n");
-
-    // content definitions -> message-page tab bar
-    web_client.println("#mctabs {margin:6px 0;}\n");
-    web_client.println("#content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;cursor:pointer;}\n");
-    web_client.println("#content_inner .mctab-new {background-color:var(--mclightgreen);}\n");
-    web_client.println("#content_inner .mctab-on {background-color:var(--mclightblue);}\n");
-    web_client.println(".mcbadge {font-size:var(--fs-s);font-weight:bold;margin-left:4px;}\n");
-
-    // stage 3 mailbox card below: "before you switch this on" warning box.
-    web_client.println(".cardbody>.grid,.cardbody>.mbx-warn {margin:0 0 7px 0;}\n"); // Store node card: sub-grids inside the single collapsible body
-    web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
-#if defined(ESP32)
-    // AU web GUI: Auto update row of the info page: green row, disabled and red (Install now) buttons.
-    web_client.println("#content_inner tr.au-green td {background-color:var(--mclightgreen);}\n");
-    web_client.println("#content_inner button:disabled {opacity:.45;cursor:not-allowed;}\n");
-    web_client.println("#content_inner button.au-red {background-color:var(--mcred);color:#fff;}\n");
-    web_client.println("#au_msg,#au_err {margin:4px 0;}\n#au_hint {color:var(--mcgray);font-size:var(--fs-s);}\n");
-#endif
-
-    // content definitions -> mailbox page (stage 3, docs/design/mailbox-page-mockup.html).
-    // Kept unconditional (not #if ENABLE_MSGSTORE) because this is a string literal inside
-    // one big <style> block: the rules never match anything on a board without the page.
-    web_client.println("#content_inner > table td.num {white-space:nowrap;font-variant-numeric:tabular-nums;}\n");
-    web_client.println(".mbx-actions button {padding:3px 7px;}\n");
-    web_client.println(".mbx-counters {display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px 10px;margin:7px;font-variant-numeric:tabular-nums;}\n");
-    web_client.println(".mbx-counters>div {display:flex;justify-content:space-between;gap:6px;border-bottom:1px dotted #c8c8c8;padding:2px 0;}\n");
-    web_client.println(".mbx-counters b {font-weight:bold;}\n");
-    web_client.println(".mbx-state {display:inline-block;border:solid 1px var(--mcgray);border-radius:5px;padding:0 6px;font-size:var(--fs-s);font-weight:bold;white-space:nowrap;}\n");
-    web_client.println(".mbx-held {background:var(--mclightblue);}\n");
-    web_client.println(".mbx-armed, .mbx-ladder {background:var(--mclightgreen);}\n");
-    web_client.println(".mbx-cooldown {background:#F6E7B8;}\n");
-    web_client.println(".mbx-stale {color:var(--mcred);}\n");
-    web_client.println(".mbx-actions {display:flex;gap:6px;white-space:nowrap;}\n");
-    web_client.println(".mbx-toolbar {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 10px 0;}\n");
-    web_client.println(".mbx-toolbar .spacer {flex:1;}\n");
-    web_client.println(".mbx-legend {font-size:var(--fs-s);margin:8px 0 0 0;color:#555;}\n");
-    web_client.println(".mbx-legend .mbx-state {margin-right:8px;}\n");
-
-    web_client.println("</style>\n\n");
+    web_client.println("<script src=\"/mcrm.js?v=" WEB_MC_RM_JS_TAG "\"></script>\n"); // RM GUI W2b: Remote page scripts
 
     // scaffold body
     web_client.println("</head>\n<body>\n");

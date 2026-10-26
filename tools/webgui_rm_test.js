@@ -1,8 +1,9 @@
 // RM web GUI: offline jsdom test of the Remote page (src/web_functions/web_rm_page.cpp).
 //
-// No firmware and no node needed. The scaffold JS (rmScaffoldJs()) and the page skeleton
-// (sub_page_remote()) are extracted from the C++ source by concatenating the string literals of their
-// web_client.print/println calls, then run in jsdom against a fake fetch that speaks the server contract
+// No firmware and no node needed. The page skeleton (sub_page_remote()) and the rmLen line (rmScaffoldJs())
+// are extracted from the C++ source by concatenating the string literals of their web_client.print/println
+// calls; the page CSS and JS are the gzip blobs of src/web_functions/web_assets.h (web/mc.css, web/mcrm.js),
+// all run in jsdom against a fake fetch that speaks the server contract
 // (docs/rm-gui/impl-plan.md, C4): /rmstatus, /rmnodes, /rmheard, /rmpasswd, /rmsend, /setparam.
 // Timers and Date are virtual (fake clock), so lock, confirm timeout and polling are tested without waiting
 // and leaked timers are counted.
@@ -13,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
+const { loadAssets } = require('./webgui_assets');
 
 const SRC = path.join(process.env.RM_PAGE_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_rm_page.cpp'));   // RM_PAGE_SRC: run against another copy (before/after evidence)
 const SRC_DIR = process.env.RM_SRC_DIR || path.join(__dirname, '..', 'src');   // RM_SRC_DIR: a copy of rm_commands.h, meshcom_settings.h, rm_sender_policy.h (evidence runs)
@@ -143,8 +145,11 @@ function joinCalls(calls) {
 const cpp = fs.readFileSync(SRC, 'utf8');
 const pageX = extractCalls(cpp, 'sub_page_remote');
 const jsX = extractCalls(cpp, 'rmScaffoldJs');
-let JS = joinCalls(jsX.calls);
-const HTML = joinCalls(pageX.calls);
+const ASSETS = loadAssets();
+const RMCSS = ASSETS.MC_CSS.slice(ASSETS.MC_CSS.indexOf('.rmrow{'));   // the Remote page rules, the tail of mc.css
+let JS = joinCalls(jsX.calls) + ASSETS.MC_RM_JS;   // the inline rmLen line, then /mcrm.js
+// the page CSS used to sit inline in the fragment; the checks below read it from there
+const HTML = joinCalls(pageX.calls).replace('<div id="content_inner">\n', '<div id="content_inner">\n<style>\n' + RMCSS + '</style>\n');
 
 // ---- optional mutations (prove the assertions can fail) --------------------------------------------
 const MUT = process.env.RM_MUTATE || '';
@@ -366,7 +371,7 @@ function leaks(P, canary) {
 
 (async () => {
   // ---- static checks of the C++ source -------------------------------------------------------------
-  check('extractor found the page and the JS', pageX.calls.length > 5 && jsX.calls.length > 20, pageX.calls.length + '/' + jsX.calls.length);
+  check('extractor found the page and the rmLen line, the asset carries the JS', pageX.calls.length > 5 && jsX.calls.length === 1 && RMCSS.length > 1000 && ASSETS.MC_RM_JS.length > 20000, pageX.calls.length + '/' + jsX.calls.length);
   const pf = [...pageX.calls, ...jsX.calls].filter((c) => c.kind === 'printf');
   check('only literal arguments; the one printf is the rmLen line (format < 64 B, resolved from the headers)', pageX.errors.length === 0 && jsX.errors.length === 0 && pf.length === 1 && pf[0].bytes < 64 && /^var rmLen=\{name:\d+,atxt:\d+,args:\d+\};\n$/.test(pf[0].text), pageX.errors.concat(jsX.errors).join('; ') + ' ' + pf.map((c) => c.text).join('|'));
   check('DRY-04 rmLen equals sizeof(settings field) - 1 from the headers (19/40-1 style, not typed in the page)', HDR.RM_NAME_MAX > 0 && HDR.RM_ATXT_MAX > HDR.RM_NAME_MAX && pf.length === 1 && pf[0].text.indexOf('name:' + HDR.RM_NAME_MAX + ',atxt:' + HDR.RM_ATXT_MAX + ',args:' + HDR.RM_MAX_ARGS + '}') > 0, JSON.stringify(HDR));
@@ -385,7 +390,7 @@ function leaks(P, canary) {
   check('only the reply/result cells break inside words', !/\.rmtab td\{[^}]*word-break/.test(HTML) && /#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(3\)[^{]*\{overflow-wrap:anywhere;\}/.test(HTML));
   // CR-06: jsdom has no layout, so pin the rules that keep a 39-char word or a 10-digit ctr from widening the table
   check('CR-06 command columns and ctr column wrap anywhere', /#rm_msgs td:nth-child\(2\),#rm_msgs td:nth-child\(4\),#rm_log td:nth-child\(3\),#rm_log td:nth-child\(4\),#rm_log td:nth-child\(5\)\{overflow-wrap:anywhere;\}/.test(HTML));
-  check('UI-09 no font-size and no x-small in the page source (sizes come from the font-small class)', !/font-size|x-small/.test(cpp) && /class="rmtab font-small"/.test(HTML));
+  check('UI-09 no font-size and no x-small in the page source (sizes come from the font-small class)', !/font-size|x-small/.test(cpp + RMCSS) && /class="rmtab font-small"/.test(HTML));
   check('UI-08 no #rm_page selector prefix repetition, no nested CSS', (HTML.match(/#rm_page /g) || []).length <= 1 && !/\{[^{}]*\{/.test(HTML.match(/<style>[\s\S]*<\/style>/)[0].replace(/@media[^{]*\{([^{}]*\{[^{}]*\})*\}/, '')));
   {
     const D = new JSDOM(HTML).window.document;
