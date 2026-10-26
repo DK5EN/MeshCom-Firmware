@@ -7,6 +7,11 @@
 
 bool checkRegexCall(String strCallSign);
 
+// QA-RX-07: the special targets checkRegexCall() accepts ("*", "H", "HG",
+// "TEST", "TESTER"). They are destinations only; decodeAPRS() rejects them
+// as the source call of a received frame.
+bool isSpecialTargetCall(const char *callsign);
+
 // Prueft die Via-Liste des Knotens (--via): kommagetrennte Hop-Rufzeichen,
 // zusammen hoechstens 39 Zeichen (node_via ist char[40]). Leere Liste, leere
 // Eintraege, SSID ausserhalb 0..99 oder mit fuehrender Null und die

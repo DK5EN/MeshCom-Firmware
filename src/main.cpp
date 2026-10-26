@@ -7,6 +7,7 @@
 
 #include <configuration.h>
 #include <capture_functions.h>
+#include <loop_functions.h>
 
 #ifdef ESP32
   #include <esp32/esp32_main.h>
@@ -22,6 +23,7 @@
   static void nrf52LoopBody()
   {
     nrf52loop();
+    flushDeferredSettingsSave();
     captureDrain();
   }
 #endif
@@ -61,8 +63,8 @@ void setup()
       // buffers into BSS (N-22, TM-43); this moves the loop itself into a task
       // with twice the stack, via the core's own Scheduler API, and parks the
       // core's loop task for good. The body is the same as loop() below:
-      // nrf52loop() plus captureDrain() (the raw-frame capture ring is only
-      // drained from loop context). If the task cannot be created (heap), the
+      // nrf52loop(), flushDeferredSettingsSave() and captureDrain() (the
+      // raw-frame capture ring is only drained from loop context). If the task cannot be created (heap), the
       // core's 4 kB loop keeps running and the boot log says so.
       if(Scheduler.startLoop(nrf52LoopBody, NRF52_LOOP_STACK_WORDS, TASK_PRIO_LOW, "mcloop"))
       {
@@ -104,5 +106,6 @@ void loop()
   // Rohframe-Mitschnitt ausgeben. Die Erfassung sitzt im Radio-Callback bzw.
   // zwischen CAD und startTransmit() und darf dort nicht drucken; hier ist
   // Loop-Kontext. Ein Frame je Durchlauf, siehe capture_functions.h.
+  flushDeferredSettingsSave();   // QA-RX-02
   captureDrain();
 }

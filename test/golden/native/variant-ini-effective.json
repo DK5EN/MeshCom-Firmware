@@ -2487,6 +2487,7 @@
    "test_url_decode",
    "test_beacon_rate",
    "test_maxhop",
+   "test_deferred_save",
    "test_backpressure",
    "test_tile_cache",
    "test_pos_persist",

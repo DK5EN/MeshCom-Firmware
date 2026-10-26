@@ -176,6 +176,40 @@ static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
     TEST_ASSERT_EQUAL_STRING(payload.c_str(), rx.msg_payload);
 }
 
+// QA-RX-07: the special targets checkRegexCall() accepts ("*", "H", "HG",
+// "TEST", "TESTER") are destinations only. As the source call of a received
+// frame they are rejected (a DM from "*" would make the receiver broadcast an
+// :ack); a normal source call and "HG" as destination still decode.
+static uint16_t encode_and_decode_dm(const char *src, const char *dst)
+{
+    struct aprsMessage tx;
+    initAPRS(tx, ':');
+    tx.msg_id = 0x00ABCDEFu;
+    mcSet(tx.msg_source_path, sizeof(tx.msg_source_path), src);
+    mcSet(tx.msg_destination_path, sizeof(tx.msg_destination_path), dst);
+    mcSet(tx.msg_payload, sizeof(tx.msg_payload), "hallo{123");
+
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = encodeAPRS(buf, tx);
+    TEST_ASSERT_TRUE_MESSAGE(len > 0, "encodeAPRS() muss einen Frame liefern");
+
+    struct aprsMessage rx;
+    initAPRS(rx, 0x00);
+    return decodeAPRS(buf, len, rx);
+}
+
+static void test_sondermarke_als_absender_wird_abgelehnt(void)
+{
+    TEST_ASSERT_EQUAL_UINT16(0x3A, encode_and_decode_dm("DK5EN-90", "DK5EN-91"));
+    TEST_ASSERT_EQUAL_UINT16(0x3A, encode_and_decode_dm("DK5EN-90", "HG"));
+
+    TEST_ASSERT_EQUAL_UINT16(0, encode_and_decode_dm("*", "DK5EN-91"));
+    TEST_ASSERT_EQUAL_UINT16(0, encode_and_decode_dm("H", "DK5EN-91"));
+    TEST_ASSERT_EQUAL_UINT16(0, encode_and_decode_dm("HG", "DK5EN-91"));
+    TEST_ASSERT_EQUAL_UINT16(0, encode_and_decode_dm("TEST", "DK5EN-91"));
+    TEST_ASSERT_EQUAL_UINT16(0, encode_and_decode_dm("TESTER", "DK5EN-91"));
+}
+
 static void test_leerer_frame_wird_abgelehnt(void)
 {
     uint8_t buf[UDP_TX_BUF_SIZE] = {0};
@@ -357,6 +391,7 @@ int main(int argc, char **argv)
     (void)argc; (void)argv;
     UNITY_BEGIN();
     RUN_TEST(test_leerer_frame_wird_abgelehnt);
+    RUN_TEST(test_sondermarke_als_absender_wird_abgelehnt);
     RUN_TEST(test_vektor1_position_dl2ja);
     RUN_TEST(test_vektor2_text_oe1xar);
     RUN_TEST(test_latin1_umlaute_ueberleben_encode_und_decode);

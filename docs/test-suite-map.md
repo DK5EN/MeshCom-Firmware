@@ -162,7 +162,7 @@ flashes whatever is attached.
 | test_ack_validate            | Unit          |    17 | native                                                       |
 | test_alt_fusion              | Unit          |     7 | native                                                       |
 | test_aprs_corpus             | Oracle/Replay |     2 | native_aprs                                                  |
-| test_aprs_decode             | Oracle/Replay |    13 | native_aprs                                                  |
+| test_aprs_decode             | Oracle/Replay |    14 | native_aprs                                                  |
 | test_aprs_epilogue           | Contract      |     8 | native_aprs                                                  |
 | test_aprs_fuzz               | Fuzz          |     4 | native_aprs_fuzz                                             |
 | test_aprs_reencode           | Oracle/Replay |     1 | native_aprs_fuzz                                             |
@@ -230,6 +230,7 @@ flashes whatever is attached.
 | test_lora_aprs_encode        | Regression    |     4 | native_aprs_fuzz                                             |
 | test_mask_secret             | Unit          |     6 | native                                                       |
 | test_maxhop                  | Unit          |     7 | native                                                       |
+| test_deferred_save           | Unit          |     5 | native                                                       |
 | test_mc_text                 | Unit          |    21 | native_mc_text                                               |
 | test_mcp17_bits              | Unit          |     8 | native                                                       |
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
