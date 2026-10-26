@@ -564,6 +564,14 @@ class Producer:
         return [render("on"), render("off")] if has_s else [render("")]
 
 
+# Table-driven setParam rungs: `static const WsParam wsParams[] = {` ... `};`. Only the settable
+# macros (WSP_ONOFF/INT/FLOAT/STR) are handlers; the read-only WSP_*_RO rows answer getParam only.
+_PARAMTABLE_RE = re.compile(r"^static\s+const\s+WsParam\s+wsParams\s*\[\s*\]\s*=\s*\{", re.MULTILINE)
+_PARAMROW_RE = re.compile(r'^[ \t]*WSP_(?:ONOFF|INT|FLOAT|STR)\s*\(\s*"([^"]*)"', re.MULTILINE)
+# The command a settable row sends: the second string literal, `WSP_INT   ("name", "cmd", ...`.
+_PARAMCMD_RE = re.compile(r'^[ \t]*WSP_(?:ONOFF|INT|FLOAT|STR)\s*\(\s*"[^"]*"\s*,\s*"([^"]*)"', re.MULTILINE)
+
+
 def scan_producers_text(text: str, relpath: str) -> List[Producer]:
     """Every commandAction() call site in one file's (already read) text."""
     blanked = blank_comments(text)
@@ -603,6 +611,7 @@ def scan_producers_text(text: str, relpath: str) -> List[Producer]:
             buf = bufm.group(1)
             fmtm = _LITERAL_ARG_RE.match(argslist[2])
             if fmtm and fmtm.group(1).startswith("--"):
+                # "--%s %s" is the wsParams engine: its rows are scanned as producers below
                 pending[buf] = (fmtm.group(1), lineno)
             else:
                 pending.pop(buf, None)
@@ -629,6 +638,8 @@ def scan_producers_text(text: str, relpath: str) -> List[Producer]:
                         dir_tag=tag,
                         unchecked_reason=f"{name}: no resolvable snprintf format nearby",
                     ))
+                elif entry[0].startswith("--%s"):
+                    continue
                 else:
                     fmt, snline = entry
                     sn_guard = guards[snline]
@@ -646,6 +657,16 @@ def scan_producers_text(text: str, relpath: str) -> List[Producer]:
                     dir_tag=tag,
                     unchecked_reason=f"non-literal argument: {arg0[:50]!r}",
                 ))
+    # web_setup.cpp parameter table: every settable row sends "--<cmd> <value>" through the engine
+    tbl = _PARAMTABLE_RE.search(blanked)
+    if tbl is not None:
+        tend = re.compile(r"^\};", re.MULTILINE).search(blanked, tbl.end())
+        for m in _PARAMCMD_RE.finditer(blanked, tbl.end(), tend.start() if tend else len(blanked)):
+            lineno = blanked.count("\n", 0, m.start()) + 1
+            producers.append(Producer(
+                file=relpath, line=lineno, guard=guards[lineno],
+                dir_tag=tag, literal="--" + m.group(1) + " %s",
+            ))
     return producers
 
 
@@ -866,6 +887,14 @@ def scan_handlers(text: str) -> List[Handler]:
     for m in _HANDLER_RE.finditer(blanked, start.end(), body_end):
         lineno = blanked.count("\n", 0, m.start()) + 1
         out.append(Handler(param=m.group(1), guard=guards[lineno], line=lineno))
+    # the parameter table lives above setParam and ends at its own column-0 `};`
+    tbl = _PARAMTABLE_RE.search(blanked)
+    if tbl is not None:
+        tend = re.compile(r"^\};", re.MULTILINE).search(blanked, tbl.end())
+        tbl_end = tend.start() if tend else len(blanked)
+        for m in _PARAMROW_RE.finditer(blanked, tbl.end(), tbl_end):
+            lineno = blanked.count("\n", 0, m.start()) + 1
+            out.append(Handler(param=m.group(1), guard=guards[lineno], line=lineno))
     return out
 
 
@@ -1102,6 +1131,44 @@ def self_test() -> int:
     scanned = scan_handlers(web_setup_fixture)
     expect("scan_handlers() sees setParam blocks only, not getParam's",
            sorted(h.param for h in scanned) == ["gps", "track"])
+
+    # -- table rungs: settable WSP_* rows count as handlers (with their #if guard), the read-only
+    #    WSP_*_RO rows (getParam side only) and everything outside the table do not --------------
+    table_fixture = (
+        "static const WsParam wsParams[] = {\n"
+        "    #if defined(FEAT)\n"
+        '    WSP_ONOFF ("bmp", "bmp", bBMPON),\n'
+        "    #else\n"
+        '    WSP_ONOFF_RO("bmp", bBMPON),\n'
+        "    #endif\n"
+        '    WSP_INT   ("txpower", "txpower", meshcom_settings.node_power),\n'
+        '    WSP_FLOAT ("maxv", "maxv", 3, meshcom_settings.node_maxv),\n'
+        "};\n"
+        "\n"
+        "void webSetup_setParam(setupStruct *setupData){\n"
+        '    if(setupData->paramName.equals("track")) {\n'
+        "        return;\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "void webSetup_getParam(setupStruct *setupData){\n"
+        '    if(setupData->paramName.equals("volt")) {\n'
+        "        return;\n"
+        "    }\n"
+        "}\n"
+    )
+    tscanned = scan_handlers(table_fixture)
+    expect("scan_handlers() reads the settable table rows with their guards, not the _RO rows",
+           sorted((h.param, h.guard) for h in tscanned)
+           == [("bmp", "(defined(FEAT))"), ("maxv", ""), ("track", ""), ("txpower", "")])
+    tprod = scan_producers_text(
+        table_fixture
+        + 'void f(){ snprintf(message_text, sizeof(message_text), "--%s %s", wsRow->cmd, v);\n'
+        + "commandAction(message_text, b); }\n", "src/web_functions/web_setup.cpp")
+    expect("table rows are producers (\"--<cmd> %s\"), the \"--%s %s\" engine call is not",
+           sorted(p.literal for p in tprod if p.literal)
+           == ["--bmp %s", "--maxv %s", "--txpower %s"] and not any(p.unchecked_reason for p in tprod))
+
     gviol4, _ = check_gui_parity(
         [GuiElement(param="gps", guard="", line=1, kind="switch"),
          GuiElement(param="volt", guard="", line=2, kind="switch")],
