@@ -4,7 +4,9 @@ name: MeshCom CI
 # DK5EN-Fork: seit 2026-10-11 wieder AN -- dieser Workflow baut und veroeffentlicht
 # die Fork-Releases (v4.40a.10.11 war das erste CI-Release).
 #
-# - Tag `v*`        -> Release, wird "Latest" (der Auto-Update-Dev-Kanal liest es).
+# - Tag `v*`        -> Release, wird "Latest" (der Auto-Update-Dev-Kanal liest es), aber erst
+#                       nach dem Hochladen und Pruefen: Entwurf anlegen, Assets hochladen,
+#                       Paare/Board-Marker pruefen (tools/verify_release_assets.py), dann veroeffentlichen.
 # - Tag `ci-proof-*` -> Probelauf als ENTWURF (draft, nie Latest, fuer niemanden sichtbar);
 #                       danach Entwurf und Tag loeschen.
 # - Jeder andere Tag -> nichts.
@@ -13,7 +15,7 @@ name: MeshCom CI
 # MC_BUILD_TAG aus dem Tag (Auto-Update-
 # Wiedererkennung, AU-D16), T-ETH-ELITE_1262 in Umbenennung und Assets, je ESP32-
 # App-Image ein `<name>.autoupdate` (tools/make_autoupdate.py, mit --check
-# byte-genau zurueckgeprueft), `wait` nach den im Hintergrund laufenden `mv`.
+# byte-genau zurueckgeprueft), `mv` nacheinander (ein Fehler bricht den Lauf ab).
 #
 # Abschalten: `if: false` unter `jobs.build` setzen UND den Workflow in den
 # Repository-Einstellungen deaktivieren.
@@ -90,38 +92,39 @@ jobs:
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/t_echo/firmware.hex -c -o .pio/build/t_echo/t_echo.uf2 -f 0xADA52840"
 
     - name: Rename Files
-      run: "mv .pio/build/E22_1262-DevKitC/firmware.bin .pio/build/E22_1262-DevKitC/E22_1262-DevKitC.bin &
-      mv .pio/build/E22-DevKitC/firmware.bin .pio/build/E22-DevKitC/E22-DevKitC.bin & 
-      mv .pio/build/t_deck/firmware.bin .pio/build/t_deck/t_deck.bin & 
-      mv .pio/build/t_deck_plus/firmware.bin .pio/build/t_deck_plus/t_deck_plus.bin & 
-      mv .pio/build/t_deck_pro/firmware.bin .pio/build/t_deck_pro/t_deck_pro.bin & 
-      mv .pio/build/E22_XML-DevKitC/firmware.bin .pio/build/E22_XML-DevKitC/E22_XML-DevKitC.bin & 
-      mv .pio/build/E22_1262_S3-DevKitC-1-N16R8/firmware.bin .pio/build/E22_1262_S3-DevKitC-1-N16R8/E22_1262_S3-DevKitC-1-N16R8.bin & 
-      mv .pio/build/E22_1268_S3-DevKitC-1-N16R8/firmware.bin .pio/build/E22_1268_S3-DevKitC-1-N16R8/E22_1268_S3-DevKitC-1-N16R8.bin & 
-      mv .pio/build/heltec_wifi_lora_32_V2/firmware.bin .pio/build/heltec_wifi_lora_32_V2/heltec_wifi_lora_32_V2.bin &
-      mv .pio/build/heltec_wifi_lora_32_V3/firmware.bin .pio/build/heltec_wifi_lora_32_V3/heltec_wifi_lora_32_V3.bin &
-      mv .pio/build/heltec_wifi_lora_32_V4/firmware.bin .pio/build/heltec_wifi_lora_32_V4/heltec_wifi_lora_32_V4.bin &
-      mv .pio/build/heltec_wireless_stick/firmware.bin .pio/build/heltec_wireless_stick/heltec_wireless_stick.bin &
-      mv .pio/build/heltec_wireless_tracker/firmware.bin .pio/build/heltec_wireless_tracker/heltec_wireless_tracker.bin &
-      mv .pio/build/ttgo-lora32-v21/firmware.bin .pio/build/ttgo-lora32-v21/ttgo-lora32-v21.bin &
-      mv .pio/build/ttgo_tbeam/firmware.bin .pio/build/ttgo_tbeam/ttgo_tbeam.bin &
-      mv .pio/build/ttgo_tbeam_SX1262/firmware.bin .pio/build/ttgo_tbeam_SX1262/ttgo_tbeam_SX1262.bin &
-      mv .pio/build/ttgo_tbeam_SX1268/firmware.bin .pio/build/ttgo_tbeam_SX1268/ttgo_tbeam_SX1268.bin &
-      mv .pio/build/ttgo_tbeam_supreme/firmware.bin .pio/build/ttgo_tbeam_supreme/ttgo_tbeam_supreme.bin &
-      mv .pio/build/vision-master-e290/firmware.bin .pio/build/vision-master-e290/vision-master-e290.bin &
-      mv .pio/build/vision-master-e213/firmware.bin .pio/build/vision-master-e213/vision-master-e213.bin &
-      mv .pio/build/esp32-loraprs-e22/firmware.bin .pio/build/esp32-loraprs-e22/esp32-loraprs-e22.bin &
-      mv .pio/build/esp32-loraprs-ra01/firmware.bin .pio/build/esp32-loraprs-ra01/esp32-loraprs-ra01.bin &
-      mv .pio/build/wireless-paper/firmware.bin .pio/build/wireless-paper/wireless-paper.bin &
-      mv .pio/build/LilyGo_T-Beam-1W/firmware.bin .pio/build/LilyGo_T-Beam-1W/T-Beam-1W.bin &
-      mv .pio/build/LilyGo_T3_S3_V1_3/firmware.bin .pio/build/LilyGo_T3_S3_V1_3/T3_S3_V13.bin &
-      mv .pio/build/LilyGo_T_Connect_Pro/firmware.bin .pio/build/LilyGo_T_Connect_Pro/t_connect_pro.bin &
-      mv .pio/build/T-ETH-ELITE_1262/firmware.bin .pio/build/T-ETH-ELITE_1262/T-ETH-ELITE_1262.bin &
-      mv .pio/build/wiscore_rak4631/firmware.zip .pio/build/wiscore_rak4631/wiscore_rak4631.zip &
-      mv .pio/build/heltec_t114/firmware.zip .pio/build/heltec_t114/heltec_t114.zip &
-      mv .pio/build/t_echo/firmware.zip .pio/build/t_echo/t_echo.zip &
-      mv .pio/build/esp32-S3-safeboot/bootloader.bin .pio/build/esp32-S3-safeboot/bootloader-s3.bin &
-      wait"
+      run: |
+        set -e
+        mv .pio/build/E22_1262-DevKitC/firmware.bin .pio/build/E22_1262-DevKitC/E22_1262-DevKitC.bin
+        mv .pio/build/E22-DevKitC/firmware.bin .pio/build/E22-DevKitC/E22-DevKitC.bin
+        mv .pio/build/t_deck/firmware.bin .pio/build/t_deck/t_deck.bin
+        mv .pio/build/t_deck_plus/firmware.bin .pio/build/t_deck_plus/t_deck_plus.bin
+        mv .pio/build/t_deck_pro/firmware.bin .pio/build/t_deck_pro/t_deck_pro.bin
+        mv .pio/build/E22_XML-DevKitC/firmware.bin .pio/build/E22_XML-DevKitC/E22_XML-DevKitC.bin
+        mv .pio/build/E22_1262_S3-DevKitC-1-N16R8/firmware.bin .pio/build/E22_1262_S3-DevKitC-1-N16R8/E22_1262_S3-DevKitC-1-N16R8.bin
+        mv .pio/build/E22_1268_S3-DevKitC-1-N16R8/firmware.bin .pio/build/E22_1268_S3-DevKitC-1-N16R8/E22_1268_S3-DevKitC-1-N16R8.bin
+        mv .pio/build/heltec_wifi_lora_32_V2/firmware.bin .pio/build/heltec_wifi_lora_32_V2/heltec_wifi_lora_32_V2.bin
+        mv .pio/build/heltec_wifi_lora_32_V3/firmware.bin .pio/build/heltec_wifi_lora_32_V3/heltec_wifi_lora_32_V3.bin
+        mv .pio/build/heltec_wifi_lora_32_V4/firmware.bin .pio/build/heltec_wifi_lora_32_V4/heltec_wifi_lora_32_V4.bin
+        mv .pio/build/heltec_wireless_stick/firmware.bin .pio/build/heltec_wireless_stick/heltec_wireless_stick.bin
+        mv .pio/build/heltec_wireless_tracker/firmware.bin .pio/build/heltec_wireless_tracker/heltec_wireless_tracker.bin
+        mv .pio/build/ttgo-lora32-v21/firmware.bin .pio/build/ttgo-lora32-v21/ttgo-lora32-v21.bin
+        mv .pio/build/ttgo_tbeam/firmware.bin .pio/build/ttgo_tbeam/ttgo_tbeam.bin
+        mv .pio/build/ttgo_tbeam_SX1262/firmware.bin .pio/build/ttgo_tbeam_SX1262/ttgo_tbeam_SX1262.bin
+        mv .pio/build/ttgo_tbeam_SX1268/firmware.bin .pio/build/ttgo_tbeam_SX1268/ttgo_tbeam_SX1268.bin
+        mv .pio/build/ttgo_tbeam_supreme/firmware.bin .pio/build/ttgo_tbeam_supreme/ttgo_tbeam_supreme.bin
+        mv .pio/build/vision-master-e290/firmware.bin .pio/build/vision-master-e290/vision-master-e290.bin
+        mv .pio/build/vision-master-e213/firmware.bin .pio/build/vision-master-e213/vision-master-e213.bin
+        mv .pio/build/esp32-loraprs-e22/firmware.bin .pio/build/esp32-loraprs-e22/esp32-loraprs-e22.bin
+        mv .pio/build/esp32-loraprs-ra01/firmware.bin .pio/build/esp32-loraprs-ra01/esp32-loraprs-ra01.bin
+        mv .pio/build/wireless-paper/firmware.bin .pio/build/wireless-paper/wireless-paper.bin
+        mv .pio/build/LilyGo_T-Beam-1W/firmware.bin .pio/build/LilyGo_T-Beam-1W/T-Beam-1W.bin
+        mv .pio/build/LilyGo_T3_S3_V1_3/firmware.bin .pio/build/LilyGo_T3_S3_V1_3/T3_S3_V13.bin
+        mv .pio/build/LilyGo_T_Connect_Pro/firmware.bin .pio/build/LilyGo_T_Connect_Pro/t_connect_pro.bin
+        mv .pio/build/T-ETH-ELITE_1262/firmware.bin .pio/build/T-ETH-ELITE_1262/T-ETH-ELITE_1262.bin
+        mv .pio/build/wiscore_rak4631/firmware.zip .pio/build/wiscore_rak4631/wiscore_rak4631.zip
+        mv .pio/build/heltec_t114/firmware.zip .pio/build/heltec_t114/heltec_t114.zip
+        mv .pio/build/t_echo/firmware.zip .pio/build/t_echo/t_echo.zip
+        mv .pio/build/esp32-S3-safeboot/bootloader.bin .pio/build/esp32-S3-safeboot/bootloader-s3.bin
 
     - name: Auto-update assets (.autoupdate)
       # one zlib twin per ESP32 app image (AU-D11); --check re-inflates and compares byte-exact.
@@ -141,10 +144,21 @@ jobs:
       # fwStageLayout() per env (running == new image); fails if an env could no longer stage its own update
       run: python3 tools/au_stage_check.py .pio/build/*/
 
+    - name: Refuse to touch a published release
+      # a re-run must not demote a live release to draft while it is re-uploaded
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -e
+        pub=$(gh api --paginate "repos/${{ github.repository }}/releases" --jq '.[] | select(.tag_name == "${{ github.ref_name }}" and .draft == false) | .id')
+        [ -z "$pub" ] || { echo "::error::release ${{ github.ref_name }} is already published; delete it first"; exit 1; }
+
     - uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
-        draft: ${{ startsWith(github.ref_name, 'ci-proof-') }}
+        # always a draft here; the release is published after the verify step
+        draft: true
+        artifactErrorsFailBuild: true
         makeLatest: ${{ startsWith(github.ref_name, 'v') && 'true' || 'false' }}
         removeArtifacts: true
         replacesArtifacts: true
@@ -193,3 +207,32 @@ jobs:
         # Release. release.md ist das fortlaufende deutsche Journal ueber
         # alle Releases und waere als Release-Body unbrauchbar lang.
         bodyFile: "release-notes.md"
+
+    - name: Verify uploaded assets
+      # download what the draft really holds and check it before anybody can see it
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -e
+        mkdir -p "$RUNNER_TEMP/rel"
+        gh api --paginate "repos/${{ github.repository }}/releases" --jq '.[] | select(.tag_name == "${{ github.ref_name }}" and .draft == true) | .assets[] | "\(.id) \(.name)"' > "$RUNNER_TEMP/assets.txt"
+        [ -s "$RUNNER_TEMP/assets.txt" ] || { echo "::error::no draft assets found for ${{ github.ref_name }}"; exit 1; }
+        while read -r id name; do
+          gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$id" > "$RUNNER_TEMP/rel/$name"
+        done < "$RUNNER_TEMP/assets.txt"
+        # (stage headroom ran on the build dirs above; the release dir has one partitions.bin only)
+        # 27 app bins + 27 .autoupdate + 3 zip + 3 uf2 + 6 safeboot/bootloader/partitions/otadata
+        tag_arg=""
+        if [[ "${{ github.ref_name }}" == v* ]]; then tag_arg="--tag ${{ github.ref_name }}"; fi
+        python3 tools/verify_release_assets.py "$RUNNER_TEMP/rel" $tag_arg --pairs 27 --total 66
+
+    - name: Publish release
+      # v* only; ci-proof-* stays a draft
+      if: startsWith(github.ref_name, 'v')
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -e
+        id=$(gh api --paginate "repos/${{ github.repository }}/releases" --jq '.[] | select(.tag_name == "${{ github.ref_name }}" and .draft == true) | .id')
+        [ -n "$id" ] && [ "$(echo "$id" | wc -l)" -eq 1 ] || { echo "::error::expected exactly one draft for ${{ github.ref_name }}"; exit 1; }
+        gh api -X PATCH "repos/${{ github.repository }}/releases/$id" -F draft=false -f make_latest=true
