@@ -64,6 +64,7 @@ static bool              s_started        = false;
 static volatile bool     s_server_pending = false;
 static bool              s_authenticated  = false;
 static volatile bool     s_hs_running     = false;
+static uint32_t          s_acceptErrLogMs = 0;   // rate limit for the accept() error log
 
 // 1-byte lookahead for netConsoleAvailable()
 static bool     s_peek_valid = false;
@@ -168,15 +169,22 @@ static void authTask(void* arg)
         strcat(chalBuf, "\r\n");
         ::send(fd, chalBuf, strlen(chalBuf), 0);
 
-        // 3. Receive response line (30 s timeout)
-        struct timeval tv = {30, 0};
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        // 3. Receive response line. Total deadline 10 s: a per-recv timeout alone
+        //    would let a slow peer (1 byte / 29 s) hold the single handshake slot.
+        const uint32_t hsStart = millis();
+        const uint32_t hsBudgetMs = 10000;
 
         char respBuf[72] = {0};
         uint8_t idx = 0;
         bool readOk = false;
         while (idx < sizeof(respBuf) - 1)
         {
+            uint32_t elapsed = millis() - hsStart;
+            if (elapsed >= hsBudgetMs) break;   // deadline hit: readOk stays false -> FAIL path
+            uint32_t left = hsBudgetMs - elapsed;
+            struct timeval tv = { (time_t)(left / 1000), (suseconds_t)((left % 1000) * 1000) };
+            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
             char c;
             int r = ::recv(fd, &c, 1, 0);
             if (r <= 0) break;
@@ -483,7 +491,14 @@ void loopNetConsole()
     if (client_fd < 0)
     {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
-            s_hwSerial.printf("[CON ]...accept() error: errno=%d\n", errno);
+        {
+            uint32_t now = millis();
+            if ((int32_t)(now - s_acceptErrLogMs) >= 30000 || s_acceptErrLogMs == 0)
+            {
+                s_acceptErrLogMs = now ? now : 1;
+                s_hwSerial.printf("[CON ]...accept() error: errno=%d\n", errno);
+            }
+        }
         return;
     }
 
