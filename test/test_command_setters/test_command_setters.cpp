@@ -1315,7 +1315,9 @@ static void test_stage_flash_goes_through_one_guarded_helper()
         const bool inDl = at > net.find("bool dlFeed(") && at < net.find("const char *layoutReason(");
         const bool inPrep = at > prep && at < net.find("const char *stageFinish(");
         const bool inFin = at > net.find("const char *stageFinish(") && at < net.find("const char *runDownload()");
-        TEST_ASSERT_TRUE_MESSAGE(inDl || inPrep || inFin, "stageFlash() is called outside dlFeed/stagePrepare/stageFinish");
+        // QA-AU-01: the dry-inflate reader (read only) goes through the same guarded helper
+        const bool inDry = at > net.find("struct DryRd") && at < net.find("struct DryWr");
+        TEST_ASSERT_TRUE_MESSAGE(inDl || inPrep || inFin || inDry, "stageFlash() is called outside dlFeed/stagePrepare/stageFinish");
     }
     TEST_ASSERT_TRUE_MESSAGE(hdr.find("esp_flash") == std::string::npos, "the private chip leaked into the net header");
 

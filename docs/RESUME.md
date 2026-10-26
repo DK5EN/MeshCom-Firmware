@@ -16,14 +16,18 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **QA review of `fork-dev` f0a81c8 (2026-10-25, report only, no code change):**
-  [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md); raw reports in `review/qa-20261025/`.
-  All 32 CI envs built. Top items: QA-NET-04 (UDP datagram ≥255 B wedges the gateway downlink, DK5EN-98),
-  QA-STAB-01/02 (blocking DNS in EXTUDP, server DNS never re-resolved), QA-NET-01/02/03 (BLE PIN not gating
-  writes, nRF52 settings characteristic leaks secrets, CSRF `otaupdate`), QA-AU-01 (Safeboot erases before the inflate
-  length check), QA-SIZE-AU01 (T-Beam family ≈61 KB from AU staging refusal). Size levers: nRF52 ETH/Web gating
-  (−192 KB on T114/t_echo), `-fno-exceptions` + `CORE_DEBUG_LEVEL=0` (−139 KB measured on E22). Operator decisions are
-  listed in §6.
+- **QA review of `fork-dev` f0a81c8 and its fix campaign (2026-10-25/26, branch `claude/fork-dev-code-review-xdxqzv`, not merged):**
+  [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md) (section 8 = result); raw reports in
+  `review/qa-20261025/`. 17 work packages (WP1-WP17) as commits `52a8d5bd`..`17793944`, all cloud-built and host-tested, **not
+  benched**. Fixed: QA-NET-04, QA-STAB-01/02/03/04/06, QA-NET-02 (nRF52 settings masking), QA-AU-01/05/09/11/12/15, `MC_WEB_GUARD=1`
+  default plus `otaupdate`/`reboot` need X-MC, no CORS headers, size levers (`-fno-exceptions`, `CORE_DEBUG_LEVEL=0`, gzip web assets,
+  nRF52 Ethernet as a per-env build flag off on T114/t_echo, T-Deck LVGL/fonts, Safeboot gzip page), DRY items. Not changed by
+  decision: QA-NET-01, stack canaries. Gate: 83 Unity envs, 3021/3028 ok (known gcc-13 failures `test_kadenz_unabhaengig`,
+  `native_udp_frame_twin`; a WP5 source-pin failure in `native_command_setters` fixed in the closing commit), pytest 1422, all 32
+  CI envs build, `au_stage_check` 27 envs 0 refused (T-Beam family reserve now ≥371 KB). Safeboot headroom 7 KB -> 31 KB, T114/t_echo
+  -244 KB. **Open:** bench list in report section 8.6 (DK5EN-92/-90), first `ci-proof-*` run for WP17, app tolerance of `bt_code` -1
+  (WP4), then cut the upstream PRs from `upstream/dev`. Still open from the report: QA-SIZE-06/09/12 (sensors/GPS/OLED, no field data),
+  protocol-level items (QA-RX-04/05, QA-AU-06), GET `tempoffsetoutdoor` UNKNOWN bug (needs OK).
 - **DK5EN-98 extended soak of `v4.40a.10.25` running** (started 2026-10-25 20:36, ends by itself 2026-10-29 18:00):
   net console logger on rpizero in screen `soak98`, build `Oct 25 2026 / 15:54:42`, AU tag `v4.40a.10.25`, flags
   `txcapture,loradebug` (restored at the end). Logs `~/meshlog/dk5en-98-soak-20261025/YYYY-MM-DD.log`, state in
