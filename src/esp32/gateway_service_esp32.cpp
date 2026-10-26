@@ -65,6 +65,9 @@ if(bGATEWAY && meshcom_settings.node_hasIPaddress)
                 {
                     printfdeb("[UDP] Heartbeat timeout %lus — WiFi CONNECTED, server unresponsive, waiting\n",
                                   hb_age / 1000);
+                    // QA-STAB-02: the server address may have changed (ESP32 only,
+                    // nRF52 has no DNS resolver)
+                    wifiDnsRefreshServer();
                 }
 
                 last_upd_timer = millis();
