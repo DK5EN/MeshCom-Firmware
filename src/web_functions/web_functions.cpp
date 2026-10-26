@@ -48,8 +48,8 @@
 #include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
 #include "web_rm_handlers.h"   // RM GUI W2a: /rmpasswd, /rmnodes, /rmheard, rmSendBySlot()
 #include "web_rm_parse.h"      // RM GUI W2a: rmParseSendBody()
-// RM GUI W1c: set per request by the guard in work_webpage(); send_http_header() and sub_config_download()
-// drop the CORS headers when it is false (state-changing paths, /config, /rmstatus).
+// RM GUI W1c: set per request by the guard in work_webpage(). No CORS headers are emitted any more
+// (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
 #if defined(ESP32)
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
@@ -760,8 +760,6 @@ static void sub_config_download(void)
     web_client.println("Content-type:application/json");
     web_client.printf("Content-Disposition: attachment; filename=\"meshcom-%s.json\"\n", fname);
     web_client.printf("Content-Length: %u\n", (unsigned int)n);
-    if (web_cors_ok)
-        web_client.println("Access-Control-Allow-Origin: *");
     web_client.println("Connection: close");
     web_client.println("Cache-Control: no-cache, no-store, must-revalidate");
     web_client.println("Pragma: no-cache");
@@ -942,8 +940,8 @@ void work_webpage(void)
                         if (wa >= 0 && wb > wa)
                             wg_path = web_header.substring(wa + 1, wb);
                     }
-                    // MC_WEB_GUARD=0 (default): only requests the router sends to an RM handler are
-                    // guarded; the rest behaves like upstream (no checks, CORS "*"). Decided on the
+                    // MC_WEB_GUARD=1 (default) guards every path; with 0 only requests the router sends to
+                    // an RM handler are guarded and the rest is unchecked. Decided on the
                     // header, the way the router matches (web_guard.h).
                     const bool wg_on = webGuardRequestApplies(web_header.c_str(), web_header.length(), wg_path.c_str());
                     const WebGuardVerdict wgv = wg_on ? webGuardCheck(web_header.c_str(), web_header.length(), wg_path.c_str()) : WG_OK;
@@ -1266,7 +1264,18 @@ void work_webpage(void)
                 }
             }
             else if (c != '\r')
-            {                         // if you got anything else but a carriage return character,
+            {
+                if (web_currentLine.length() >= WEB_HEADER_MAX)
+                {
+                    rm_wipe_string(web_currentLine); // a GET /rmsend line may carry the password
+                    rm_wipe_string(web_header);
+                    web_cors_ok = false;
+                    send_http_header(431, RESPONSE_TYPE_JSON);
+                    web_client.println("{\"ok\":false,\"err\":\"header line too large\"}");
+                    web_client.stop();
+                    break;
+                }
+                // if you got anything else but a carriage return character,
                 web_currentLine += c; // add it to the end of the currentLine
             }
         }
@@ -4671,6 +4680,9 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
     case 400:
         status_text = "Bad Request";
         break; // use this when a request body was rejected (CS-03 config upload)
+    case 431:
+        status_text = "Request Header Fields Too Large";
+        break;
     case 401:
         status_text = "Unauthorized";
         break; // use this when ever a request was successful
@@ -4696,12 +4708,7 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
         web_client.println("Content-type:application/json");
     else
         web_client.println("Content-type:text/html; charset=utf-8");
-    if (web_cors_ok) // RM GUI W1c: no CORS on state-changing paths, /config and /rmstatus
-    {
-        web_client.println("Access-Control-Allow-Origin: *"); // tell modern browsers that CORS is okay for us
-        web_client.println("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-        web_client.println("Access-Control-Allow-Headers: access-control-allow-headers,access-control-allow-methods,access-control-allow-origin, Origin, Content-Type, Accept");
-    }
+    // No Access-Control-Allow-* headers: the GUI is same-origin and no cross-origin consumer is documented
     if (extra_header && extra_header[0])
         web_client.println(extra_header); // WEB-AUTH-01: Set-Cookie of the login / logout answers
     web_client.println("Connection: close");                                  // tell broser that the connection will be closed (in opposite to keep-alive)
