@@ -2,7 +2,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 
-#if defined (ENABLE_BMX280)
+#if defined (ENABLE_BMP390)
 
 /***************************************************************************
  This is a library for the BMP3XX temperature & pressure sensor
