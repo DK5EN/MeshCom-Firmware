@@ -5280,8 +5280,9 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"apply") == 0)
         {
-            // operator action (bench): hand over now, no update window, no idle / phone / battery
-            // test. Needs a valid staged record; fwNetLoadRecord() drops a stale one.
+            // operator action (bench): hand over now, no update window, no idle / phone
+            // test; the battery floor still applies (QA-AU-09). Needs a valid staged
+            // record; fwNetLoadRecord() drops a stale one.
             FwStageRecord _rec;
             if(_auBusy)
             {
@@ -5298,6 +5299,12 @@ void commandAction(char *umsg_text, bool ble)
                 {
                     // AU-16: the Safeboot handover guard would refuse anyway; stop before the NVS marker
                     Serial.printf("[ERR];safeboot;bootloader_dio;renew with the web flasher\n");
+                    return;
+                }
+                if(!fwBattOk(battHardwarePresent(), global_batt))
+                {
+                    // QA-AU-09: the erase + rewrite of ota_0 must not start on a weak battery
+                    Serial.printf("[AU];apply;refuse;battery\n");
                     return;
                 }
                 if(fwNetSafebootOld())

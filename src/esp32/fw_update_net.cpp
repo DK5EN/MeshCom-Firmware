@@ -18,6 +18,16 @@
 #include <esp_partition.h>
 #include <esp_rom_crc.h>
 #include <esp_system.h>
+// ROM tinfl: the dry-run inflate in stageFinish. IDF 5 has a top-level miniz.h and turns the
+// <chip>/rom/ form into a #warning forwarder; IDF 4.4 (the app build) only has <chip>/rom/miniz.h
+// and a deprecated rom/miniz.h with a #warning. Both warnings break src/ under -Werror.
+#if __has_include(<miniz.h>)
+#include <miniz.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#include <esp32s3/rom/miniz.h>
+#else
+#include <esp32/rom/miniz.h>
+#endif
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
 #include <soc/soc.h>
 #include <soc/spi_mem_reg.h>
@@ -36,6 +46,8 @@
 #include "../hmac_sha256.h"
 #include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
 #include "../net_console.h"  // Serial -> MSerial: the AU log lines reach the net console too
+#include "../safeboot/fw_apply.h"  // fwInflateStream (shared with Safeboot)
+#include "../safeboot/safeboot_id.h" // sbIdParse: the board marker in the inflated head
 #include "../safeboot/safeboot_ver.h" // SafebootVerScan, AU_SAFEBOOT_MIN
 #include "fw_update_net.h"
 
@@ -995,6 +1007,102 @@ struct Stage
     DlCtx dl;
 };
 
+// QA-AU-01: Safeboot erases ota_0 before it inflates, so an inflate that ends at a length other
+// than ilen (ilen is the size of the separate .bin asset) would leave the node without an app.
+// Safeboot cannot be updated over the air, hence the app proves the staged bytes first.
+struct DryDec
+{
+    tinfl_decompressor d;
+    int step(const uint8_t *in, size_t *inSize, uint8_t *dictStart, uint8_t *outNext,
+             size_t *outSize, bool more)
+    {
+        mz_uint32 flags = TINFL_FLAG_PARSE_ZLIB_HEADER | (more ? TINFL_FLAG_HAS_MORE_INPUT : 0);
+        return (int)tinfl_decompress(&d, in, inSize, dictStart, outNext, outSize, flags);
+    }
+};
+
+struct DryRd
+{
+    uint32_t base; // stage start, relative to ota_0
+    bool read(uint32_t pos, uint8_t *dst, size_t n)
+    {
+        vTaskDelay(1); // about 2 MB of inflate: let the idle task run
+        return stageFlash(STAGE_READ, base + pos, dst, (uint32_t)n) == ESP_OK;
+    }
+};
+
+// Never writes: keeps only the head of the inflated image (marker check).
+struct DryWr
+{
+    uint8_t head[SB_ID_HEAD_LEN];
+    uint32_t have;
+    bool write(uint32_t pos, const uint8_t *src, size_t n)
+    {
+        if (pos < sizeof(head))
+        {
+            size_t c = sizeof(head) - pos < n ? sizeof(head) - pos : n;
+            memcpy(head + pos, src, c);
+            have = pos + (uint32_t)c;
+        }
+        return true;
+    }
+};
+
+// nullptr = the staged bytes inflate to exactly ilen bytes of an ESP image for this env.
+// Needs the private chip still armed. A NO_MARKER image (built before the board marker) passes.
+// Dict (32 KB) and state (~11 KB) are two allocations, so no single 44 KB block is needed. With
+// PSRAM they go there (the internal heap is tight after the download); on an ESP32 rev0/1 the
+// ROM tinfl is not covered by the PSRAM cache workaround, a spurious failure only refuses.
+const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
+{
+    struct DryMem
+    {
+        DryDec dec;
+        DryWr wr;
+    };
+    const uint32_t caps[2] = {MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT};
+    DryMem *m = nullptr;
+    uint8_t *dict = nullptr;
+    for (int i = psramFound() ? 0 : 1; i < 2; i++)
+    {
+        if (m == nullptr)
+            m = (DryMem *)heap_caps_malloc(sizeof(DryMem), caps[i]);
+        if (dict == nullptr)
+            dict = (uint8_t *)heap_caps_malloc(TINFL_LZ_DICT_SIZE, caps[i]);
+    }
+    const char *why = nullptr;
+    if (m == nullptr || dict == nullptr)
+        why = refuse("nomem");
+    else
+    {
+        m->wr.have = 0;
+        DryRd rd = {sg.off};
+        tinfl_init(&m->dec.d);
+        uint32_t total = 0;
+        const FwInflateResult r = fwInflateStream(m->dec, rd, m->wr, in, FWNET_BLK, dict,
+                                                  TINFL_LZ_DICT_SIZE, sg.dl.zlen, ilen, &total);
+        SbIdentity id;
+        SbIdReason sr = SB_ID_NO_IMAGE;
+        if (r != FWI_OK)
+        {
+            auLog("[AU];refuse;inflate_chk;%s;total;%u;ilen;%u\n", fwInflateReason(r),
+                  (unsigned)total, (unsigned)ilen);
+            why = "inflate_chk"; // not "inflate": that one is the layout refusal (layoutReason)
+        }
+        else if (m->wr.have < SB_ID_HEAD_LEN || m->wr.head[0] != 0xE9 ||
+                 (sr = sbIdParse(m->wr.head, m->wr.have, &id)) == SB_ID_NO_IMAGE)
+            why = refuse("image"); // no ESP image header, or no app descriptor at 0x20
+        else if (sr == SB_ID_OK && strcmp(id.env, MC_ENV_NAME) != 0)
+        {
+            auLog("[AU];refuse;env;%s;own;%s\n", id.env, MC_ENV_NAME);
+            why = "env";
+        }
+    }
+    heap_caps_free(dict);
+    heap_caps_free(m);
+    return why;
+}
+
 // Returns nullptr, or the reason. On a reason nothing is left allocated and no record
 // survives; refusals before the first destructive step were printed by refuse(), the
 // lowheap refusal by heapGateOk(). minBlock != 0 only switches the pre-TLS heap gate on.
@@ -1116,6 +1224,9 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
         if (err == nullptr && crc != sg.dl.crc)
             err = "crc";
     }
+    // dry-run inflate while the chip is armed, before anything is committed (QA-AU-01)
+    if (err == nullptr)
+        err = stageDryRun(sg, sg.blk, ilen);
     heap_caps_free(sg.blk);
     sg.blk = nullptr;
     stageFlashDisarm(); // the private chip is not used past this point

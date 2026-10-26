@@ -1265,8 +1265,8 @@ static void auScaffoldJs()
     web_client.println("function auErrText(job,err){var w=auWord(err),c=job=='check',d=job=='download'||job=='stagelan';");
     web_client.println("if(auIn(w,['tls','conn','http','begin','timeout']))return 'No connection to GitHub';");
     web_client.println("if(c&&auIn(w,['short','stall','toobig','chunk','feed','enc','json','noenv','badver']))return 'The release list could not be read';");
-    web_client.println("if(d&&auIn(w,['short','stall','digest','readback','crc','write','enc','feed','chunk']))return 'Download damaged, it was discarded -- try again';");
-    web_client.println("if(d&&auIn(w,['noasset','nodigest']))return 'This release has no image for this board';");
+    web_client.println("if(d&&auIn(w,['short','stall','digest','readback','crc','write','enc','feed','chunk','inflate_chk','image']))return 'Download damaged, it was discarded -- try again';");
+    web_client.println("if(d&&auIn(w,['noasset','nodigest','env']))return 'This release has no image for this board';");
     web_client.println("if(d&&auIn(w,['notota0','imglen','size','overlap','small','inflate','layout']))return 'This node'+String.fromCharCode(39)+'s partition layout cannot take the image -- use the Webflasher';");
     web_client.println("if(d&&auIn(w,['erase','noflash','nvs']))return 'Could not write the image to flash';");
     web_client.println("if(w=='nomem')return 'Not enough free memory for the update';");

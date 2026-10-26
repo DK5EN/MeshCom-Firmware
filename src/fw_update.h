@@ -590,6 +590,13 @@ inline bool fwGoHandoverReady(const FwPolicyIn &in)
     return !in.phoneConnected && (!in.onBattery || in.battMv >= FW_BATT_FLOOR_MV);
 }
 
+// QA-AU-09: the battery floor for the manual apply paths (--update apply, web Apply), the same test
+// as the auto download start and the remote go. battHw: battery hardware present; mv: global_batt.
+inline bool fwBattOk(bool battHw, float mv)
+{
+    return !battHw || mv >= (float)FW_BATT_FLOOR_MV;
+}
+
 // Remote go, request side ("upd go <tag>", rmAuGo in src/esp32/rm_au_esp32.cpp). Pure decision over a
 // snapshot; the caller maps the result to its reply and, for STARTED / APPLYING, starts the download
 // resp. arms the go. Order: busy, staged tag wins (apply, no download), stale, current, no asset,

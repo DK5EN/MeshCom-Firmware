@@ -667,6 +667,13 @@ static void test_handover_needs_valid_time(void)
     TEST_ASSERT_EQUAL_UINT8(FW_NONE, fwTick(t, in, true, 1000));
 }
 
+static void test_batt_ok_manual_apply(void)
+{
+    TEST_ASSERT_TRUE(fwBattOk(false, 0.0f));  // no battery hardware: mains
+    TEST_ASSERT_FALSE(fwBattOk(true, (float)FW_BATT_FLOOR_MV - 1.0f));
+    TEST_ASSERT_TRUE(fwBattOk(true, (float)FW_BATT_FLOOR_MV));
+}
+
 static void test_handover_battery_floor(void)
 {
     FwTimer t;
@@ -1776,6 +1783,7 @@ int main(int, char **)
     RUN_TEST(test_handover_needs_no_wifi);
     RUN_TEST(test_handover_needs_valid_time);
     RUN_TEST(test_handover_battery_floor);
+    RUN_TEST(test_batt_ok_manual_apply);
     RUN_TEST(test_handover_beats_due_check);
     RUN_TEST(test_battery_does_not_gate_check);
     RUN_TEST(test_attempts_three_per_tag);

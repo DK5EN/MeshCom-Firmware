@@ -663,7 +663,8 @@ async function mkPage(node, opts) {
     const t = P.w.auErrText;
     const rows = [['check', 'tls -80', 'No connection to GitHub'], ['download', 'http 404', 'No connection to GitHub'], ['check', 'short', 'The release list could not be read'],
       ['download', 'digest', 'Download damaged, it was discarded -- try again'], ['stagelan', 'crc', 'Download damaged, it was discarded -- try again'],
-      ['download', 'noasset', 'This release has no image for this board'], ['download', 'layout', "This node's partition layout cannot take the image -- use the Webflasher"],
+      ['download', 'noasset', 'This release has no image for this board'], ['download', 'env', 'This release has no image for this board'],
+      ['download', 'inflate_chk', 'Download damaged, it was discarded -- try again'], ['download', 'image', 'Download damaged, it was discarded -- try again'], ['download', 'layout', "This node's partition layout cannot take the image -- use the Webflasher"],
       ['download', 'erase', 'Could not write the image to flash'], ['check', 'nomem', 'Not enough free memory for the update'], ['check', 'nocheck', 'Update failed'], ['check', 'digest', 'Update failed']];
     check('error table 4.3 per job', rows.every((r) => t(r[0], r[1]) === r[2]), rows.filter((r) => t(r[0], r[1]) !== r[2]).map((r) => r.join('/')).join(' | '));
   }
