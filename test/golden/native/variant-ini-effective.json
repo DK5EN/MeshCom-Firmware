@@ -5,6 +5,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -48,6 +50,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -123,6 +128,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -166,6 +173,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -243,6 +253,8 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -288,6 +300,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -367,6 +382,8 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -412,6 +429,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -489,6 +509,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -535,6 +557,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -611,6 +636,8 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -655,6 +682,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -729,6 +759,8 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -774,6 +806,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -853,6 +888,8 @@
   "board_upload.flash_size": "16MB",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -922,6 +959,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -1000,6 +1040,8 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -1046,6 +1088,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -1175,6 +1220,9 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
    "-DBOARD_HAS_PSRAM",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-DDISABLE_ALL_LIBRARY_WARNINGS",
@@ -1215,6 +1263,9 @@
    "-Wall -Wextra",
    "-Wformat=2",
    "-Wno-missing-field-initializers"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "env:t_deck_pro"
@@ -1273,6 +1324,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -1316,6 +1369,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -1391,6 +1447,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -1434,6 +1492,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -1727,6 +1788,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -1770,6 +1833,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -1842,6 +1908,8 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -1886,6 +1954,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -1958,6 +2029,8 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -2007,6 +2080,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -2079,6 +2155,8 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -2122,6 +2200,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -2193,6 +2274,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -2261,6 +2344,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -4500,10 +4586,13 @@
   "board": "T5-ePaper-S3",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
    "-DBOARD_HAS_PSRAM",
    "-D MONITOR_SPEED=115200",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
-   "-DCORE_DEBUG_LEVEL=1",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DLOG_PORT=Serial",
    "-DDISABLE_ALL_LIBRARY_WARNINGS",
    "-Wl,--gc-sections",
@@ -4530,6 +4619,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
@@ -4580,6 +4672,8 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -4616,7 +4710,7 @@
    "-DRADIOLIB_EXCLUDE_SX128X=1",
    "-Wl,--print-memory-usage",
    "-DBOARD_HAS_PSRAM=1",
-   "-DCORE_DEBUG_LEVEL=1",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-D LV_CONF_INCLUDE_SIMPLE",
    "-D BOARD_T_DECK=\"tdeck\"",
@@ -4645,6 +4739,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -4716,6 +4813,8 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -4752,7 +4851,7 @@
    "-DRADIOLIB_EXCLUDE_SX128X=1",
    "-Wl,--print-memory-usage",
    "-DBOARD_HAS_PSRAM=1",
-   "-DCORE_DEBUG_LEVEL=1",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-D LV_CONF_INCLUDE_SIMPLE",
    "-D BOARD_T_DECK_PLUS=\"tdeck-plus\"",
@@ -4781,6 +4880,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -4852,6 +4954,9 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
    "-DBOARD_HAS_PSRAM",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-DDISABLE_ALL_LIBRARY_WARNINGS",
@@ -4892,6 +4997,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
@@ -5090,6 +5198,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -5133,6 +5243,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_classic"
@@ -5205,6 +5318,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -5250,6 +5365,7 @@
    "-Werror"
   ],
   "build_unflags": [
+   "-fexceptions",
    "-DBOARD_HAS_PSRAM",
    "-mfix-esp32-psram-cache-issue"
   ],
@@ -5324,6 +5440,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -5369,6 +5487,7 @@
    "-Werror"
   ],
   "build_unflags": [
+   "-fexceptions",
    "-DBOARD_HAS_PSRAM",
    "-mfix-esp32-psram-cache-issue"
   ],
@@ -5443,6 +5562,8 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -5488,6 +5609,7 @@
    "-Werror"
   ],
   "build_unflags": [
+   "-fexceptions",
    "-DBOARD_HAS_PSRAM",
    "-mfix-esp32-psram-cache-issue"
   ],
@@ -5563,6 +5685,8 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
@@ -5608,6 +5732,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "esp32_s3"
@@ -5683,6 +5810,10 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DRADIOLIB_EXCLUDE_ADSB=1",
    "-DRADIOLIB_EXCLUDE_AFSK=1",
    "-DRADIOLIB_EXCLUDE_APRS=1",
@@ -5730,6 +5861,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
@@ -5816,6 +5950,10 @@
    "-DRADIOLIB_EXCLUDE_SX128X=1",
    "-Wl,--print-memory-usage",
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-D ARDUINO_USB_CDC_ON_BOOT=1",
    "-D MONITOR_SPEED=115200",
    "-D BOARD_E213=\"Vision_Master_E213\"",
@@ -5838,6 +5976,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extends": [
    "env:vision-master-e213"
@@ -5902,6 +6043,10 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DRADIOLIB_EXCLUDE_ADSB=1",
    "-DRADIOLIB_EXCLUDE_AFSK=1",
    "-DRADIOLIB_EXCLUDE_APRS=1",
@@ -5948,6 +6093,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
@@ -6008,6 +6156,10 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D ARDUINO_LOOP_STACK_SIZE=12288",
+   "-DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED",
+   "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
+   "-fno-exceptions",
+   "-DCORE_DEBUG_LEVEL=0",
    "-DRADIOLIB_EXCLUDE_ADSB=1",
    "-DRADIOLIB_EXCLUDE_AFSK=1",
    "-DRADIOLIB_EXCLUDE_APRS=1",
@@ -6053,6 +6205,9 @@
    "-Wformat=2",
    "-Wno-missing-field-initializers",
    "-Werror"
+  ],
+  "build_unflags": [
+   "-fexceptions"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
