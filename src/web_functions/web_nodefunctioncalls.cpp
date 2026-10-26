@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /*
 This file contains all web-based remotely callable functions
 */
@@ -130,3 +131,4 @@ void webFunctionCall(funCallStruct* functionData) {
     functionData->returnCode = WF_RETURNCODE_FAIL;
     return;
 }
+#endif

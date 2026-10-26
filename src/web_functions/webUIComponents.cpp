@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 
 /// WEB UI Components
 /// This offers a small set of methods to create Web UI Components to be used for the Meshcom UI
@@ -38,3 +39,4 @@ void uic_button(CommonWebClient* target, char onClickHandler[], char buttonCapti
 void uic_input(CommonWebClient* target, char id[], char onChangeHandler[], char value[]) {
     target->printf("<input type=\"text\" id=\"%s\" onchange=\"%s\" value=\"%s\">\n" ,  id, onChangeHandler, value);
 }
+#endif

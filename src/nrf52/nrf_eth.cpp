@@ -1,3 +1,4 @@
+#if HAS_NRF_ETH   // W5100S Ethernet; not built when HAS_NRF_ETH=0
 /**
    @brief  Sets up a UDP client to transmit the buffers we receive from Lora
 **/
@@ -1174,4 +1175,5 @@ void nrfEthRestartUDP()
     extern NrfETH neth;
     neth.startServerLink();
 }
+#endif
 #endif

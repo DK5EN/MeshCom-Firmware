@@ -1669,6 +1669,12 @@
    "-D MONITOR_SPEED=115200",
    "-D SERIAL_BUFFER_SIZE=250",
    "-Isrc/nrf52",
+   "-D CFG_TUD_MSC=0",
+   "-D CFG_TUD_HID=0",
+   "-D CFG_TUD_MIDI=0",
+   "-D CFG_TUD_VENDOR=0",
+   "-D CFG_TUD_VIDEO=0",
+   "-D CFG_TUD_VIDEO_STREAMING=0",
    "-DRADIOLIB_EXCLUDE_ADSB=1",
    "-DRADIOLIB_EXCLUDE_AFSK=1",
    "-DRADIOLIB_EXCLUDE_APRS=1",
@@ -1723,7 +1729,8 @@
    "-D SPI_FREQUENCY=40000000",
    "-D USE_HSPI_PORT",
    "-D MONITOR_SPEED=115200",
-   "-D DISABLE_NET_CONSOLE"
+   "-D DISABLE_NET_CONSOLE",
+   "-D HAS_NRF_ETH=0"
   ],
   "build_src_filter": [
    "+<*>",
@@ -1797,6 +1804,7 @@
    "SensorLibTDECKPro",
    "TFT_eSPI",
    "Timeout",
+   "SparkFun u-blox GNSS Arduino Library",
    "TinyGSM",
    "XPowersLib"
   ],
@@ -5412,6 +5420,12 @@
    "-D MONITOR_SPEED=115200",
    "-D SERIAL_BUFFER_SIZE=250",
    "-Isrc/nrf52",
+   "-D CFG_TUD_MSC=0",
+   "-D CFG_TUD_HID=0",
+   "-D CFG_TUD_MIDI=0",
+   "-D CFG_TUD_VENDOR=0",
+   "-D CFG_TUD_VIDEO=0",
+   "-D CFG_TUD_VIDEO_STREAMING=0",
    "-DRADIOLIB_EXCLUDE_ADSB=1",
    "-DRADIOLIB_EXCLUDE_AFSK=1",
    "-DRADIOLIB_EXCLUDE_APRS=1",
@@ -5441,7 +5455,8 @@
    "-I variants/t_echo",
    "-D BOARD_T_ECHO=\"T_ECHO\"",
    "-D SERIAL_BUFFER_SIZE=250",
-   "-D DISABLE_NET_CONSOLE"
+   "-D DISABLE_NET_CONSOLE",
+   "-D HAS_NRF_ETH=0"
   ],
   "build_src_filter": [
    "+<*>",
@@ -5515,6 +5530,7 @@
    "SensorLibTDECKPro",
    "TFT_eSPI",
    "Timeout",
+   "SparkFun u-blox GNSS Arduino Library",
    "TinyGSM",
    "XPowersLib"
   ],
@@ -6747,8 +6763,15 @@
    "-D MONITOR_SPEED=115200",
    "-D SERIAL_BUFFER_SIZE=250",
    "-Isrc/nrf52",
+   "-D CFG_TUD_MSC=0",
+   "-D CFG_TUD_HID=0",
+   "-D CFG_TUD_MIDI=0",
+   "-D CFG_TUD_VENDOR=0",
+   "-D CFG_TUD_VIDEO=0",
+   "-D CFG_TUD_VIDEO_STREAMING=0",
    "-I variants/wiscore_rak4631",
    "-D DISABLE_NET_CONSOLE",
+   "-D HAS_NRF_ETH=1",
    "-Os"
   ],
   "build_src_filter": [

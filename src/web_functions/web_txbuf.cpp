@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /**
  * Device binding of the web send buffer (web_txbuf.h): CommonWebClient::write/stop/txEnd.
  * One file-static WebTxBuf shared by all copies of the client (only one web client at a time).
@@ -145,3 +146,4 @@ void CommonWebClient::stop()
     txEnd();
     Base::stop();
 }
+#endif
