@@ -5,10 +5,9 @@
 // lines, as the server accumulates it, CR bytes included) BEFORE any routing, and answers
 // 403 on anything but WG_OK. Host test: test/test_web_guard (env native_web_guard).
 //
-// Scope (compile flag MC_WEB_GUARD, default 0): by default the guard applies ONLY to the remote
-// management paths (/rm*, and the remote page /?page=remote); every other path passes unchecked,
-// like upstream (which also always sends Access-Control-Allow-Origin: *). Build with
-// -D MC_WEB_GUARD=1 to guard every path as described below. See webGuardApplies().
+// Scope (compile flag MC_WEB_GUARD, default 1): the guard applies to every path as described
+// below. Build with -D MC_WEB_GUARD=0 to restrict it to the remote management paths (/rm*, and
+// the remote page /?page=remote) like before. See webGuardApplies().
 //
 // What it stops (docs/rm-gui/verdict-security.md):
 //   - DNS rebinding: an attacker page whose name resolves to the node is "same-origin" for
@@ -82,9 +81,9 @@
 #define WEB_GUARD_PAGE_ALLOW_EMPTY_DEST 0
 #endif
 
-// 0 (default): guard only /rm* and the remote page. 1: guard all paths.
+// 1 (default): guard all paths. 0: guard only /rm* and the remote page.
 #ifndef MC_WEB_GUARD
-#define MC_WEB_GUARD 0
+#define MC_WEB_GUARD 1
 #endif
 
 enum WebGuardVerdict
@@ -781,8 +780,12 @@ inline bool webGuardHasXmc(const char *header, size_t len)
     return count > 0 && !bad;
 }
 
-// True for the update actions of /callfunction (name already percent-decoded).
-inline bool webGuardIsUpdAction(const char *fn) { return fn != NULL && strncmp(fn, "upd", 3) == 0; }
+// True for the update actions of /callfunction (name already percent-decoded): "upd*" plus the
+// explicit "otaupdate" and "reboot".
+inline bool webGuardIsUpdAction(const char *fn)
+{
+    return fn != NULL && (strncmp(fn, "upd", 3) == 0 || strcmp(fn, "otaupdate") == 0 || strcmp(fn, "reboot") == 0);
+}
 
 // The decision call_function() makes: update actions need X-MC, everything else is unchanged.
 inline bool webGuardCallAllowed(const char *fn, const char *header, size_t len)

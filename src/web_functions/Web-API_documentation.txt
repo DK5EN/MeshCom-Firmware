@@ -17,15 +17,15 @@ Setting Parameters
 ============================================
 To set a parameter to the node, use:
 
-	NOTE (RM GUI, request guard): by default (build flag MC_WEB_GUARD=0) the guard below applies only to the
-	remote-management endpoints (/rm*, /?page=remote, /setparam/?rm= and /setparam/?rmstrict=); all other
-	endpoints are unchecked. Built with
-	-D MC_WEB_GUARD=1 every state-changing request (/setparam, /callfunction, /?sendmessage,
-	/?nodepassword and any POST) must carry the header "X-MC: 1" (the web page adds it itself), for example
-	curl -H 'X-MC: 1' 'http://<node>/setparam/?onewire=on'. Without it, or with a Host that is not an IP address,
-	a single-label name or a *.local / *.fritz.box / *.lan / *.home.arpa / *.internal / *.speedport.ip /
-	*.localdomain / *.home name, the node answers 403. Typing a /setparam URL into the browser bar is refused
-	for the same reason.
+	NOTE (request guard): by default (build flag MC_WEB_GUARD=1; -D MC_WEB_GUARD=0 limits the guard to the
+	remote-management endpoints /rm*, /?page=remote, /setparam/?rm= and /setparam/?rmstrict=) every
+	state-changing request (/setparam, /callfunction, /?sendmessage, /?nodepassword and any POST) must carry
+	the header "X-MC: 1" (the web page adds it itself), for example
+	curl -H 'X-MC: 1' 'http://<node>/setparam/?onewire=on'. The callfunction actions upd*, otaupdate and
+	reboot always need X-MC. Every request needs a Host that is an IP address, a single-label name or a
+	*.local / *.fritz.box / *.lan / *.home.arpa / *.internal / *.speedport.ip / *.localdomain / *.home name
+	(public FQDNs and reverse-proxy names are refused); otherwise, or without X-MC, the node answers 403.
+	Typing a /setparam URL into the browser bar is refused for the same reason. The node sends no CORS headers.
 
 	/setparam/?setcall=AB1CDE-12		Sets the nodes call-sign 
 	/setparam/?onewiregpio=XX			Sets the GPIO to be used for the 1-Wire bus
