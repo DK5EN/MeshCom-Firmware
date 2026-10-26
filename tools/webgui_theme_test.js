@@ -1,7 +1,6 @@
 // WEB-DARK-01 / WEB-A11Y-01: theme + contrast test of the web GUI CSS (src/web_functions/*.cpp).
 //
-// The page <style> block (web_functions.cpp, between println("<style>\n") and println("</style>\n\n")) and the Remote
-// page <style> (web_rm_page.cpp) are rebuilt from their println string literals. A small CSS parser resolves the
+// The page and Remote page CSS is read from the shipped gzip asset (web/mc.css via web_assets.h). A small CSS parser resolves the
 // custom properties for the light palette (:root) and the dark palette (@media (prefers-color-scheme:dark)) and the
 // WCAG 2.1 contrast ratio of every fg/bg pair the GUI uses is computed and checked (text 4.5:1, icons/UI 3:1).
 // Also: at most 4 distinct font sizes, nav icons carry no hard-coded white, login error colour comes from the palette.
@@ -33,15 +32,11 @@ function literals(text) {
 }
 
 // ---- CSS source -----------------------------------------------------------------------------------------------
-const a = WF.indexOf('web_client.println("<style>\\n");');
-const b = WF.indexOf('web_client.println("</style>\\n\\n");', a);
-if (a < 0 || b < a) throw new Error('page <style> block not found');
-const pageCss = literals(WF.slice(a + 'web_client.println("<style>\\n");'.length, b));
-const ra = RM.indexOf('"<style>\\n"');
-const rb = RM.indexOf('"</style>\\n"', ra);
-if (ra < 0 || rb < ra) throw new Error('remote <style> block not found');
-const rmCss = literals(RM.slice(ra + '"<style>\\n"'.length, rb));
-const css = pageCss + '\n' + rmCss;
+// The page and Remote page rules ship as one gzip blob (web/mc.css -> web_assets.h, tools/gen_web_assets.py); test what
+// the firmware serves.
+const { loadAssets } = require('./webgui_assets');
+const css = loadAssets().MC_CSS;
+if (!css || css.indexOf(':root') < 0) throw new Error('MC_CSS asset not found in web_assets.h');
 
 // ---- tiny CSS parser: [{sel, decl:{prop:value}, media}] ----------------------------------------------------------
 function parse(src, media, out) {
@@ -284,10 +279,11 @@ imgLines.forEach((l) => {
 // 4.5:1, any other colour (stroke, fill, bar) 3:1 against its surface. The Spectrum SVG surface is the #spectrum_display
 // background when the CSS pins one. Palette variables (var(--mc*)) are resolved per theme; raw literals are theme-invariant.
 function lineOf(src, idx) { return src.slice(0, idx).split('\n').length; }
-const skipRanges = {
-  WF: [[lineOf(WF, a), lineOf(WF, b)]],
-  RM: [[lineOf(RM, ra), lineOf(RM, rb)]],
-};
+// The CSS is no longer in the .cpp files (web/mc.css), so nothing there is skipped; the static JS moved to web/mc.js and
+// web/mcrm.js and is scanned as plain text (no C string literals).
+const skipRanges = { WF: [], RM: [], JS: [] };
+const MCJS = fs.readFileSync(path.join(DIR, 'web', 'mc.js'), 'utf8');
+const MCRM = fs.readFileSync(path.join(DIR, 'web', 'mcrm.js'), 'utf8');
 const specStart = WF.split('\n').findIndex((l) => l.includes('id=\\"spectrum_display\\"')) + 1;
 let specEnd = specStart;
 WF.split('\n').forEach((l, i) => { if (i + 1 > specStart && specEnd === specStart && l.includes('</svg>')) specEnd = i + 1; });
@@ -304,16 +300,17 @@ const surfaceCol = (theme, inSpec) => {
   return colour(BODY, 'background', theme);
 };
 let scanned = 0;
-for (const [fname, src] of [['web_functions.cpp', WF], ['web_rm_page.cpp', RM]]) {
-  const key = fname === 'web_functions.cpp' ? 'WF' : 'RM';
+for (const [fname, src] of [['web_functions.cpp', WF], ['web_rm_page.cpp', RM], ['web/mc.js', MCJS], ['web/mcrm.js', MCRM]]) {
+  const key = fname === 'web_functions.cpp' ? 'WF' : fname === 'web_rm_page.cpp' ? 'RM' : 'JS';
+  const lit = key === 'JS' ? (x) => x : literals;
   // JS variables that feed `color:'+NAME` are text colours
-  const textVars = new Set([...literals(src).matchAll(/color:'\+(\w+)/g)].map((m) => m[1]));
+  const textVars = new Set([...lit(src).matchAll(/color:'\+(\w+)/g)].map((m) => m[1]));
   src.split('\n').forEach((raw, i) => {
     const ln = i + 1;
     if (/^\s*\/\//.test(raw) || skipRanges[key].some(([x, y]) => ln >= x && ln <= y)) return;
     if (key === 'WF' && ln >= logoStart && ln <= logoEnd) return;
     if (raw.includes('class=\\"nav_button') || raw.includes('base64,')) return;
-    const t = literals(raw.replace(/\/\/.*$/, (m) => (m.includes('"') ? m : '')));
+    const t = key === 'JS' ? raw : literals(raw.replace(/\/\/.*$/, (m) => (m.includes('"') ? m : '')));
     if (!t) return;
     const inSpec = key === 'WF' && ln >= specStart && ln <= specEnd;
     const varAssign = (t.match(/var\s+(\w+)\s*=/) || [])[1];
