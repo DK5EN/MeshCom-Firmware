@@ -12,6 +12,7 @@ uint16_t encodeStartAPRS(uint8_t msg_buffer[MAX_MSG_LEN_PHONE], struct aprsMessa
 uint16_t encodePayloadAPRS(uint8_t msg_buffer[MAX_MSG_LEN_PHONE], struct aprsMessage &aprsmsg);
 void appendHeySignalReport(struct aprsMessage &aprsMessage, int16_t rssi, int8_t snr, int ncnt_air);
 void initAPRSPOS(struct aprsPosition &aprsPosition);
+uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprsPosition);   // no heap, payload capped at MC_PAYLOAD_LEN
 uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprsPosition);
 
 uint16_t encodeLoRaAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], char strSourceCall[10], double lat, char lat_c, double lon, char lon_c, int alt);
@@ -21,6 +22,7 @@ uint16_t encodeLoRaAPRSText(uint8_t msg_buffer[UDP_TX_BUF_SIZE], char cSourceCal
 double conv_coord_to_dec(double coord);
 
 int CheckGroup(String callsign);
+int CheckGroup(const char *callsign);   // same result, no String temporary (char arrays and literals pick this)
 bool CheckOwnGroup(String callsign);
 
 #endif

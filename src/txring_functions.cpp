@@ -166,7 +166,7 @@ static uint8_t classifyFrame(const uint8_t *frame, int len, uint8_t status)
             if(strcmp(dest, "*") == 0)
                 return MSG_PRIO_HIGH; // Broadcast
 
-            if(CheckGroup(String(dest)) != 0)
+            if(CheckGroup(dest) != 0)
                 return MSG_PRIO_HIGH; // Group message
 
             return MSG_PRIO_CRITICAL; // Personal DM
@@ -823,7 +823,7 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
     uint32_t dropId = 0, newLostId = 0;
 
     // TXP W1b: classify the NEW frame up front, from the frame itself and
-    // outside the lock (CheckGroup() builds a String): a pool without a free
+    // outside the lock: a pool without a free
     // slot must know the priority before it decides to evict or drop.
     // ringBuffer[slot][2..] = frame, so frame[k] = ringBuffer[slot][k+2].
     prio = classifyFrame(frame, len, classify_status);

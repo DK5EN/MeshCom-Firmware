@@ -2501,9 +2501,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                 // Loop detection: skip relay if own callsign already in path
                                 {
-                                    String searchCall = String(",") + meshcom_settings.node_call + ",";
-                                    String searchPath = String(",") + aprsmsg.msg_source_path + ",";
-                                    if(searchPath.indexOf(searchCall) >= 0)
+                                    // no String allocation; node_call is never empty (an empty call would not match here)
+                                    if(setlogPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call))
                                     {
                                         if(bLORADEBUG)
                                             printfdeb("[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path\n");

@@ -61,6 +61,30 @@ int CheckGroup(String callsign)
 	return ig;
 }
 
+int CheckGroup(const char *callsign)
+{
+	// mirrors CheckGroup(String): 1..6 chars, digits only, 1..99999 or 100001
+	size_t len = callsign ? strnlen(callsign, 7) : 0;
+	if(len < 1 || len > 6)
+		return 0;
+
+	for(size_t ic=0;ic<len;ic++)
+	{
+		if(callsign[ic] < 0x30 || callsign[ic] > 0x39)
+			return 0;
+	}
+
+	int ig=atoi(callsign);
+
+	if(ig == 100001)
+        return ig;
+
+    if(ig < 1 || ig > 99999)
+		return 0;
+
+	return ig;
+}
+
 bool CheckOwnGroup(String callsign)
 {
     if(strcmp(callsign.c_str(), "*") == 0)
@@ -645,20 +669,20 @@ enum AprsTagType
     APRS_TAG_FLOAT,        // "%f" -> float *
 };
 
-static void aprsExtractTag(const String &PayloadBuffer, unsigned int istarttext, char tagchar, AprsTagType type, void *target)
+static void aprsExtractTag(const char *PayloadBuffer, size_t PayloadLen, unsigned int istarttext, char tagchar, AprsTagType type, void *target)
 {
     char decode_text[8];
     memset(decode_text, 0x00, sizeof(decode_text));
     unsigned int ipt = 0;
 
-    for(unsigned int itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    for(unsigned int itxt=istarttext; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == tagchar && PayloadBuffer.charAt(itxt+2) == '=')
+        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == tagchar && PayloadBuffer[itxt+2] == '=')
         {
-            for(unsigned int id=itxt+3; id<PayloadBuffer.length(); id++)
+            for(unsigned int id=itxt+3; id<PayloadLen; id++)
             {
                 // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
+                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen || ipt > 6)
                 {
                     switch(type)
                     {
@@ -671,7 +695,7 @@ static void aprsExtractTag(const String &PayloadBuffer, unsigned int istarttext,
 
                 if(ipt < 7)
                 {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
+                    decode_text[ipt]=PayloadBuffer[id];
                     ipt++;
                 }
             }
@@ -681,7 +705,9 @@ static void aprsExtractTag(const String &PayloadBuffer, unsigned int istarttext,
     }
 }
 
-uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
+// Payload is copied once into a stack buffer (no String churn per packet). Same
+// semantics as the String version: a ' ' is appended and bytes past the end read 0.
+uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
 {
     initAPRSPOS(aprspos);
 
@@ -689,30 +715,34 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     unsigned int itxt=0;
     int istarttext = 0;
 
-    PayloadBuffer.concat(" ");
+    char PayloadBuffer[MC_PAYLOAD_LEN + 3];   // +1 appended ' ', +2 lookahead reads past the end
+    memset(PayloadBuffer, 0x00, sizeof(PayloadBuffer));
+    size_t PayloadLen = Payload ? strnlen(Payload, MC_PAYLOAD_LEN) : 0;
+    memcpy(PayloadBuffer, Payload, PayloadLen);
+    PayloadBuffer[PayloadLen++] = ' ';
 
     memset(decode_text, 0x00, sizeof(decode_text));
     int ipt=0;
 
-    for(itxt=0; itxt<PayloadBuffer.length(); itxt++)
+    for(itxt=0; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer.charAt(itxt) == 'N' || PayloadBuffer.charAt(itxt) == 'S' || ipt > 10)
+        if(PayloadBuffer[itxt] == 'N' || PayloadBuffer[itxt] == 'S' || ipt > 10)
         {
             // ipt>10 alone is an overrun brake, not a hemisphere match --
             // only accept the byte at the cut-off as lat_c/aprs_group when it
             // really is 'N'/'S'. Otherwise reject the position (keep the
             // initAPRSPOS() defaults) instead of reading a fabricated
             // hemisphere/group byte and an 11-digit fantasy lat.
-            if(PayloadBuffer.charAt(itxt) != 'N' && PayloadBuffer.charAt(itxt) != 'S')
+            if(PayloadBuffer[itxt] != 'N' && PayloadBuffer[itxt] != 'S')
                 return 0x00;
 
             decode_text[ipt]=0x00;
 
             sscanf(decode_text, "%lf", &aprspos.lat);
 
-            aprspos.lat_c = PayloadBuffer.charAt(itxt);
+            aprspos.lat_c = PayloadBuffer[itxt];
             itxt++;
-            aprspos.aprs_group = PayloadBuffer.charAt(itxt);
+            aprspos.aprs_group = PayloadBuffer[itxt];
 
             istarttext = itxt+1;    // Char-Symbol 1
             break;
@@ -721,7 +751,7 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
         {
             if(ipt < 11)
             {
-                decode_text[ipt]=PayloadBuffer.charAt(itxt);
+                decode_text[ipt]=PayloadBuffer[itxt];
                 ipt++;
             }
         }
@@ -730,20 +760,20 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     memset(decode_text, 0x00, sizeof(decode_text));
     ipt=0;
 
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    for(itxt=istarttext; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer.charAt(itxt) == 'W' || PayloadBuffer.charAt(itxt) == 'E' || ipt > 10)
+        if(PayloadBuffer[itxt] == 'W' || PayloadBuffer[itxt] == 'E' || ipt > 10)
         {
             // Same overrun-vs-hemisphere check as the latitude loop above.
-            if(PayloadBuffer.charAt(itxt) != 'W' && PayloadBuffer.charAt(itxt) != 'E')
+            if(PayloadBuffer[itxt] != 'W' && PayloadBuffer[itxt] != 'E')
                 return 0x00;
 
             decode_text[ipt]=0x00;
 
             sscanf(decode_text, "%lf", &aprspos.lon);
-            aprspos.lon_c = PayloadBuffer.charAt(itxt);
+            aprspos.lon_c = PayloadBuffer[itxt];
             itxt++;
-            aprspos.aprs_symbol = PayloadBuffer.charAt(itxt);
+            aprspos.aprs_symbol = PayloadBuffer[itxt];
 
             istarttext = itxt+1;    // Char-Symbol 2
             break;
@@ -752,7 +782,7 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
         {
             if(ipt < 11)
             {
-                decode_text[ipt]=PayloadBuffer.charAt(itxt);
+                decode_text[ipt]=PayloadBuffer[itxt];
                 ipt++;
             }
         }
@@ -772,14 +802,14 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     memset(cregion, 0x00, sizeof(cregion));
     int iregion = 0;
 
-    for(unsigned int id=istarttext; id<PayloadBuffer.length() && iregion < 47; id++)
+    for(unsigned int id=istarttext; id<PayloadLen && iregion < 47; id++)
     {
-        char c = PayloadBuffer.charAt(id);
+        char c = PayloadBuffer[id];
 
         if(c == '/')
         {
-            char c1 = PayloadBuffer.charAt(id+1);
-            char c2 = PayloadBuffer.charAt(id+2);
+            char c1 = PayloadBuffer[id+1];
+            char c2 = PayloadBuffer[id+2];
 
             if((c1 >= 'A' && c1 <= 'Z' && c2 == '=') || (c1 == 'N' && c2 >= '1' && c2 <= '9'))
                 break;
@@ -823,44 +853,44 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     aprspos.alt = 0;
 
     // check Batt
-    aprsExtractTag(PayloadBuffer, istarttext, 'B', APRS_TAG_INT, &aprspos.bat);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'B', APRS_TAG_INT, &aprspos.bat);
 
     // check Altitute
-    aprsExtractTag(PayloadBuffer, istarttext, 'A', APRS_TAG_INT, &aprspos.alt);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'A', APRS_TAG_INT, &aprspos.alt);
 
     // check Press
-    aprsExtractTag(PayloadBuffer, istarttext, 'P', APRS_TAG_FLOAT, &aprspos.press);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'P', APRS_TAG_FLOAT, &aprspos.press);
 
     // check Hum
-    aprsExtractTag(PayloadBuffer, istarttext, 'H', APRS_TAG_FLOAT, &aprspos.hum);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'H', APRS_TAG_FLOAT, &aprspos.hum);
 
     // check Temp
-    aprsExtractTag(PayloadBuffer, istarttext, 'T', APRS_TAG_FLOAT, &aprspos.temp);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'T', APRS_TAG_FLOAT, &aprspos.temp);
 
     // check Temp2
-    aprsExtractTag(PayloadBuffer, istarttext, 'O', APRS_TAG_FLOAT, &aprspos.temp2);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'O', APRS_TAG_FLOAT, &aprspos.temp2);
 
     // check QFE
-    aprsExtractTag(PayloadBuffer, istarttext, 'F', APRS_TAG_INT, &aprspos.qfe);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'F', APRS_TAG_INT, &aprspos.qfe);
 
     // check QNH
-    aprsExtractTag(PayloadBuffer, istarttext, 'Q', APRS_TAG_FLOAT, &aprspos.qnh);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'Q', APRS_TAG_FLOAT, &aprspos.qnh);
 
     // check GASRES
-    aprsExtractTag(PayloadBuffer, istarttext, 'G', APRS_TAG_FLOAT, &aprspos.gasres);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'G', APRS_TAG_FLOAT, &aprspos.gasres);
 
     // check NCNT
     memset(decode_text, 0x00, sizeof(decode_text));
     ipt=0;
     
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    for(itxt=istarttext; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'N' && PayloadBuffer.charAt(itxt+2) >= '1' && PayloadBuffer.charAt(itxt+2) <= '9')
+        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'N' && PayloadBuffer[itxt+2] >= '1' && PayloadBuffer[itxt+2] <= '9')
         {
-            for(unsigned int id=itxt+2;id<PayloadBuffer.length();id++)
+            for(unsigned int id=itxt+2;id<PayloadLen;id++)
             {
                 // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
+                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen || ipt > 6)
                 {
                     sscanf(decode_text, "%d", &aprspos.ncnt);
                     break;
@@ -868,7 +898,7 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
 
                 if(ipt < 3)
                 {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
+                    decode_text[ipt]=PayloadBuffer[id];
                     ipt++;
                 }
             }
@@ -878,7 +908,7 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     }
 
     // check CO2
-    aprsExtractTag(PayloadBuffer, istarttext, 'C', APRS_TAG_FLOAT, &aprspos.co2);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'C', APRS_TAG_FLOAT, &aprspos.co2);
 
     // check GRC (Group-Call list) /R=; up to 6 groups separated by ';'.
     // Own buffer sized for the worst case (6 x "99999;" = 36 chars) instead
@@ -888,19 +918,19 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
         memset(decode_grc, 0x00, sizeof(decode_grc));
         int igrc = 0;
 
-        for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+        for(itxt=istarttext; itxt<PayloadLen; itxt++)
         {
-            if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'R' && PayloadBuffer.charAt(itxt+2) == '=')
+            if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'R' && PayloadBuffer[itxt+2] == '=')
             {
-                for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
+                for(unsigned int id=itxt+3;id<PayloadLen;id++)
                 {
                     // ENDE
-                    if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || igrc > 38)
+                    if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen || igrc > 38)
                     {
                         break;
                     }
 
-                    decode_grc[igrc]=PayloadBuffer.charAt(id);
+                    decode_grc[igrc]=PayloadBuffer[id];
                     igrc++;
                 }
 
@@ -941,38 +971,38 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     }
 
     // check version
-    aprsExtractTag(PayloadBuffer, istarttext, 'V', APRS_TAG_INT_AUTOBASE, &aprspos.version);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'V', APRS_TAG_INT_AUTOBASE, &aprspos.version);
 
     // check Bus-Voltage /U=
-    aprsExtractTag(PayloadBuffer, istarttext, 'U', APRS_TAG_FLOAT, &aprspos.vbus);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'U', APRS_TAG_FLOAT, &aprspos.vbus);
 
     // check Current /I=
-    aprsExtractTag(PayloadBuffer, istarttext, 'I', APRS_TAG_FLOAT, &aprspos.vcurrent);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'I', APRS_TAG_FLOAT, &aprspos.vcurrent);
 
     // check telemetry
-    aprsExtractTag(PayloadBuffer, istarttext, 'Y', APRS_TAG_INT_AUTOBASE, &aprspos.telemetry);
+    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'Y', APRS_TAG_INT_AUTOBASE, &aprspos.telemetry);
 
     memset(decode_text, 0x00, sizeof(decode_text));
     ipt=0;
 
     // check Digital /D=
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    for(itxt=istarttext; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'D' && PayloadBuffer.charAt(itxt+2) == '=')
+        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'D' && PayloadBuffer[itxt+2] == '=')
         {
             bool din_overflow = false;
 
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
+            for(unsigned int id=itxt+3;id<PayloadLen;id++)
             {
                 // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length())
+                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen)
                 {
                     break;
                 }
 
                 if(ipt < 8)
                 {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
+                    decode_text[ipt]=PayloadBuffer[id];
                     ipt++;
                 }
                 else
@@ -1015,6 +1045,11 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     aprspos.lon_d = aprspos.lon_d + (min / 60.0);
 
     return 0x01;
+}
+
+uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
+{
+    return decodeAPRSPOS(PayloadBuffer.c_str(), aprspos);
 }
 
 uint16_t encodeStartAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], struct aprsMessage &aprsmsg)

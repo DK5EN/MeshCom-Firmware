@@ -347,6 +347,7 @@ uint8_t iPhoneState=0;
 
 // BLE connection diagnostics (bBLEDEBUG): start of the current link, for the link duration on disconnect
 static uint32_t g_ble_conn_start_ms = 0;
+#define BLE_ADDR_STR_LEN 18   // "AA:BB:CC:DD:EE:FF" + NUL
 
 // BLC-01: the whole per-session reset runs inside the NimBLE callbacks, not on
 // the loop-observed edge: a disconnect and reconnect between two loop passes
@@ -357,6 +358,15 @@ static inline void bleSessionResetAll()
                           &config_to_phone_prepare, &conffin_sent, &ble_disconnect_requested };
     bleSessionReset(f);
 }
+
+// The NimBLE host task has a 3 KB stack: printfdeb() needs about 900 B of frame,
+// so the callbacks only copy the address and the loop prints (like nRF52: s_discPending).
+// Flag set last; a second connect before the loop printed overwrites the address.
+static char s_bleConnAddr[BLE_ADDR_STR_LEN];
+static volatile bool s_bleConnPending = false;
+static char s_bleAuthAddr[BLE_ADDR_STR_LEN];
+static volatile bool s_bleAuthEnc = false;
+static volatile bool s_bleAuthPending = false;
 
 // Connection interval in units of 1.25 ms, printed as ms with two decimals
 #define BLE_ITVL_MS_FMT "%u.%02u"
@@ -373,7 +383,8 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
         g_ble_conn_handle = connInfo.getConnHandle();
         g_ble_conn_start_ms = millis();
 
-        printfdeb("BLE Connected with: %s\n", connInfo.getAddress().toString().c_str());
+        snprintf(s_bleConnAddr, sizeof(s_bleConnAddr), "%s", connInfo.getAddress().toString().c_str());
+        s_bleConnPending = true;   // printed by the loop
 
         // parameters the phone uses for connection setup, before our update request below
         if(bBLEDEBUG)
@@ -450,9 +461,9 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 	/*******************************************************************/
 
     void onAuthenticationComplete(NimBLEConnInfo& connInfo) override {
-        printfdeb("Client connected: %s (encrypted: %s)\n",
-            connInfo.getAddress().toString().c_str(),
-            connInfo.isEncrypted() ? "yes" : "no");
+        snprintf(s_bleAuthAddr, sizeof(s_bleAuthAddr), "%s", connInfo.getAddress().toString().c_str());
+        s_bleAuthEnc = connInfo.isEncrypted();
+        s_bleAuthPending = true;   // printed by the loop
     }
 } serverCallbacks;
 
@@ -4380,6 +4391,18 @@ void esp32loop()
         #endif
     }
 
+    // log lines deferred from the NimBLE host callbacks (stack size, see s_bleConnAddr)
+    if(s_bleConnPending)
+    {
+        s_bleConnPending = false;
+        printfdeb("BLE Connected with: %s\n", s_bleConnAddr);
+    }
+    if(s_bleAuthPending)
+    {
+        s_bleAuthPending = false;
+        printfdeb("Client connected: %s (encrypted: %s)\n", s_bleAuthAddr, s_bleAuthEnc ? "yes" : "no");
+    }
+
     #if !defined(DISABLE_BLE)
     // BLC-01: advertising self-check. The library restarts advertising on
     // disconnect and on a failed connect; if that ever fails the node would stay
@@ -4441,6 +4464,10 @@ void esp32loop()
             bleStatsFormat(g_bleStats, sb, sizeof(sb));
             Serial.print("[BLE ];stat;");
             Serial.println(sb);
+            // ESP32 only (nRF52 has no NimBLE host task): free stack of the host task, in bytes
+            TaskHandle_t hh = xTaskGetHandle("nimble_host");
+            if(hh)
+                Serial.printf("[BLE ];hoststack;free;%u\n", (unsigned)uxTaskGetStackHighWaterMark(hh));
         }
     }
     #endif    // check if message from phone to send
