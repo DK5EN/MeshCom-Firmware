@@ -573,6 +573,85 @@ static void test_apply_last_of_two_writes_wins(void)
                                       "the LAST staged image before an apply must be the one applied");
 }
 
+// QA-NET-02: secrets are masked on read and kept on a masked write.
+static void applyImage(const s_ble_settings_v1 &image, s_meshcom_settings &live)
+{
+    BleSettingsV1Stage stage{};
+    stageBleSettingsV1(stage, image);
+    uint32_t appliedSeq = 0;
+    TEST_ASSERT_TRUE(tryApplyBleSettingsV1Stage(stage, &appliedSeq, live) == BleSettingsV1ApplyResult::Applied);
+}
+
+static void test_secrets_masked_outbound(void)
+{
+    s_meshcom_settings live;
+    zeroAndFillAllMembers(live);
+    strcpy(live.node_passwd, "pw");
+    strcpy(live.node_webpwd, "web");
+    strcpy(live.node_pwd, "psk");
+    live.bt_code = 123456;
+
+    s_ble_settings_v1 out;
+    bleSettingsToV1(live, out);
+    bleSettingsV1MaskSecrets(out);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)out.node_passwd[0]);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)out.node_webpwd[0]);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)out.node_pwd[0]);
+    TEST_ASSERT_EQUAL_INT(BLE_SETTINGS_V1_BTCODE_MASKED, out.bt_code);
+
+    live.bt_code = 0;
+    bleSettingsToV1(live, out);
+    bleSettingsV1MaskSecrets(out);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, out.bt_code, "no PIN must stay 0");
+}
+
+static void test_read_write_round_trip_keeps_secrets(void)
+{
+    s_meshcom_settings live;
+    zeroAndFillAllMembers(live);
+    strcpy(live.node_passwd, "pw");
+    strcpy(live.node_webpwd, "web");
+    strcpy(live.node_pwd, "psk");
+    live.bt_code = 123456;
+    s_meshcom_settings before = live;
+
+    s_ble_settings_v1 img;
+    bleSettingsToV1(live, img);
+    bleSettingsV1MaskSecrets(img);
+    applyImage(img, live);
+
+    TEST_ASSERT_EQUAL_STRING("pw", live.node_passwd);
+    TEST_ASSERT_EQUAL_STRING("web", live.node_webpwd);
+    TEST_ASSERT_EQUAL_STRING("psk", live.node_pwd);
+    TEST_ASSERT_EQUAL_INT(123456, live.bt_code);
+    TEST_ASSERT_EQUAL_MEMORY(before.node_passwd, live.node_passwd, sizeof(live.node_passwd));
+}
+
+static void test_new_secret_applied_and_space_counts_masked(void)
+{
+    s_meshcom_settings live;
+    zeroAndFillAllMembers(live);
+    strcpy(live.node_passwd, "old");
+    strcpy(live.node_webpwd, "oldweb");
+    live.bt_code = 111111;
+
+    s_ble_settings_v1 img = validImage();
+    memset(img.node_passwd, 0, sizeof(img.node_passwd));
+    memset(img.node_passwd, ' ', 14); // padded "unset" form
+    memset(img.node_webpwd, 0, sizeof(img.node_webpwd));
+    strcpy(img.node_webpwd, "newweb");
+    img.bt_code = 654321;
+    applyImage(img, live);
+
+    TEST_ASSERT_EQUAL_STRING("old", live.node_passwd);
+    TEST_ASSERT_EQUAL_STRING("newweb", live.node_webpwd);
+    TEST_ASSERT_EQUAL_INT(654321, live.bt_code);
+
+    img.bt_code = 0; // explicit 0 still disables the PIN
+    applyImage(img, live);
+    TEST_ASSERT_EQUAL_INT(0, live.bt_code);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -587,6 +666,9 @@ int main(void)
     RUN_TEST(test_apply_busy_while_seq_odd);
     RUN_TEST(test_apply_none_when_nothing_new);
     RUN_TEST(test_apply_last_of_two_writes_wins);
+    RUN_TEST(test_secrets_masked_outbound);
+    RUN_TEST(test_read_write_round_trip_keeps_secrets);
+    RUN_TEST(test_new_secret_applied_and_space_counts_masked);
 
     return UNITY_END();
 }
