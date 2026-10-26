@@ -465,6 +465,7 @@ BLEService init_settings_characteristic(void)
 	// synchronously, so the shared scratch is free again when it returns.
 	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
 	bleSettingsToV1(meshcom_settings, outImage);
+	bleSettingsV1MaskSecrets(outImage);
 	g_lora_data.write((void *)&outImage, sizeof(outImage));
 
 	return lora_service;
@@ -560,6 +561,7 @@ void applyPendingBleSettings(void)
 	// (notify() per MTU chunk), so the shared scratch is free afterwards.
 	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
 	bleSettingsToV1(meshcom_settings, outImage);
+	bleSettingsV1MaskSecrets(outImage);
 	g_lora_data.write((void *)&outImage, sizeof(outImage));
 
 	// Inform connected device about new settings

@@ -72,6 +72,32 @@ enum class BleSettingsV1ApplyResult
 };
 
 /**
+ * QA-NET-02: the settings characteristic is SECMODE_OPEN, so the secrets are
+ * not put on the wire. nRF52 only; ESP32 has no settings characteristic.
+ * Masked read value is empty (never "***", a read->write round trip would
+ * store it). bt_code: 0 = no PIN stays 0, a set PIN reads as -1 (outside
+ * 0..999999); -1 on write keeps the stored PIN, 0 still disables it.
+ * Applied after bleSettingsToV1(), not inside it: the flash path shares that
+ * function and must keep the real values.
+ */
+#define BLE_SETTINGS_V1_BTCODE_MASKED (-1)
+
+inline void bleSettingsV1MaskSecrets(s_ble_settings_v1 &img)
+{
+	memset(img.node_passwd, 0, sizeof(img.node_passwd));
+	memset(img.node_webpwd, 0, sizeof(img.node_webpwd));
+	memset(img.node_pwd, 0, sizeof(img.node_pwd));
+	if (img.bt_code != 0)
+		img.bt_code = BLE_SETTINGS_V1_BTCODE_MASKED;
+}
+
+// Empty or leading space/NUL counts as unset, same test as maskSecret().
+inline bool bleSettingsV1SecretMasked(const char *s)
+{
+	return s[0] == 0x00 || s[0] == ' ';
+}
+
+/**
  * Apply the staged image onto `live` if there is a new, complete one. Takes
  * no lock itself: the caller wraps this call in taskENTER_CRITICAL() /
  * taskEXIT_CRITICAL(), which keeps the callback task out while it runs.
@@ -88,7 +114,26 @@ inline BleSettingsV1ApplyResult tryApplyBleSettingsV1Stage(const BleSettingsV1St
 	if (seq == *appliedSeq)
 		return BleSettingsV1ApplyResult::None;
 
-	bleSettingsFromV1(stage.buf.img, live);
+	// A masked secret field keeps the stored value (QA-NET-02).
+	const s_ble_settings_v1 &in = stage.buf.img;
+	char keepPasswd[sizeof(live.node_passwd)];
+	char keepWebpwd[sizeof(live.node_webpwd)];
+	char keepPwd[sizeof(live.node_pwd)];
+	memcpy(keepPasswd, live.node_passwd, sizeof(keepPasswd));
+	memcpy(keepWebpwd, live.node_webpwd, sizeof(keepWebpwd));
+	memcpy(keepPwd, live.node_pwd, sizeof(keepPwd));
+	const int keepBtCode = live.bt_code;
+
+	bleSettingsFromV1(in, live);
+
+	if (bleSettingsV1SecretMasked(in.node_passwd))
+		memcpy(live.node_passwd, keepPasswd, sizeof(keepPasswd));
+	if (bleSettingsV1SecretMasked(in.node_webpwd))
+		memcpy(live.node_webpwd, keepWebpwd, sizeof(keepWebpwd));
+	if (bleSettingsV1SecretMasked(in.node_pwd))
+		memcpy(live.node_pwd, keepPwd, sizeof(keepPwd));
+	if (in.bt_code == BLE_SETTINGS_V1_BTCODE_MASKED)
+		live.bt_code = keepBtCode;
 	*appliedSeq = seq;
 	return BleSettingsV1ApplyResult::Applied;
 }
