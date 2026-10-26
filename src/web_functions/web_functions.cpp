@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /**
  *  @author      Ralph Weich (DD5RW)
  *  @date        2025-12-03
@@ -4981,3 +4982,4 @@ void getparam(String web_header)
     serializeJson(doc, web_client);
     web_client.println();
 }
+#endif

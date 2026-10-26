@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /**
  * RM GUI W2a -- server side of the Remote page, see web_rm_handlers.h for the route table.
  *
@@ -286,3 +287,4 @@ void sub_rm_heard(void)
     }
     web_client.println("]}");
 }
+#endif

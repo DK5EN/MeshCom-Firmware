@@ -68,7 +68,9 @@
 
 #if defined(NRF52_SERIES)
 #include "nrf52/settings_store_nrf52.h" // settingsStoreDump() -- --dumpsettings
+#if HAS_NRF_ETH
 #include <RAK13800_W5100S.h>            // IPAddress for nrf_eth.h
+#endif
 #include <nrf_eth.h>                    // ethIsStaticConfigured() for the GWU status helpers
 #endif
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
@@ -960,6 +962,15 @@ void commandAction(char *umsg_text, bool ble)
     if(commandMatches(msg_text+2, "board led on") && !boardLedPinUsable())
     {
         printfdeb("\n--board led refused: LED pin is used by OneWire/DHT (see --info, --owgpio)\n");
+        return;
+    }
+#endif
+#if defined(NRF52_NO_ETH)
+    // No uplink in this build: refuse before the row saves the flag and announces HG to the
+    // neighbours. "--gateway off" stays allowed so a stale flag from older firmware can be cleared.
+    if(commandMatches(msg_text+2, "gateway on"))
+    {
+        printfdeb(NRF52_NO_ETH_MSG);
         return;
     }
 #endif
@@ -2909,6 +2920,10 @@ void commandAction(char *umsg_text, bool ble)
     #endif
     if(commandCheck(msg_text+2, (char*)"webserver on") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        bReturn = true;
+        #else
         #ifndef BOARD_RAK4630
         if(meshcom_settings.node_netmode == 0 && strlen(meshcom_settings.node_ssid) < 3)
         {
@@ -2933,10 +2948,15 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         bReturn = true;
+        #endif
     }
     else
     if(commandCheck(msg_text+2, (char*)"webpwd ") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+9);
         sVar = _owner_c;
 
@@ -2968,6 +2988,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"webtimer 0") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         web_timer = 0;
 
         return;
@@ -3011,6 +3035,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"extudp on") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         if((int)strlen(meshcom_settings.node_extern) < 7)
         {
             printfdeb("\nPlease set EXPUDP IP first\n");
@@ -3028,12 +3055,17 @@ void commandAction(char *umsg_text, bool ble)
 
             save_settings();
         }
+        #endif
 
         bReturn = true;
     }
     else
     if(commandCheck(msg_text+2, (char*)"extudpip") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         // max. 40 char
         msg_text[50]=0x00;
 
@@ -4138,6 +4170,17 @@ void commandAction(char *umsg_text, bool ble)
         #endif
     }
     else
+#endif
+#if defined(NRF52_NO_ETH)
+    // The static IP set is read by the W5100S driver only; storing it here would just trigger
+    // the auto-reboot below. The fields stay as they are so the settings layout is unchanged.
+    if(commandMatches(msg_text+2, "setownip ") || commandMatches(msg_text+2, "setowndns ") ||
+       commandMatches(msg_text+2, "setowngw ") || commandMatches(msg_text+2, "setownms ") ||
+       commandMatches(msg_text+2, "setownntp "))
+    {
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+    }
 #endif
     if(commandCheck(msg_text+2, (char*)"setownip ") == 0)
     {
@@ -5650,17 +5693,25 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern void ethStat();
         ethStat();
+        #endif
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
     {
         // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern bool bUDPLOG;
         bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
         Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        #endif
         return;
     }
     #endif
@@ -5978,8 +6029,12 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
     {
         // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern void ethDrop();
         ethDrop();
+        #endif
         return;
     }
     #endif
@@ -6263,6 +6318,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"srvip ") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         // TM-31 bench hook: MeshCom server override (0.0.0.0 clears), RAM only,
         // takes effect at the next startMeshComUDP() (--reboot or WiFi restart).
         extern IPAddress bench_srvip;
@@ -6323,6 +6382,10 @@ void commandAction(char *umsg_text, bool ble)
         // txfail/kod) prints asynchronously off the [NTP];... markers
         // NtpAsync::loop()/tryConsume() already emit -- see
         // tools/bench/experiments/ntpsync.py, which parses exactly those.
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         extern NtpAsync timeClient;
 
         if(!meshcom_settings.node_hasIPaddress)

@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // Ethernet only; host twins do not define NRF52_SERIES
 #include <SPI.h>
 #include <RAK13800_W5100S.h>   // IPAddress for nrf_eth.h, same order as nrf_eth.cpp
 #include <Arduino.h>
@@ -181,3 +182,4 @@ else if(neth.hasIPaddress)
     INSTR_SECTION("udp"); neth.harvestNTP();
 }
 }
+#endif

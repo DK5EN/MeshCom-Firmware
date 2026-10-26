@@ -17,6 +17,15 @@
 // extudp_functions.h, which is outside the U1 carve's file set).
 #include "udp_frame.h"
 
+// nRF52 without Ethernet (HAS_NRF_ETH=0, T114/t_echo): there is no socket to
+// open, so the EthernetUDP object and every function touching it compile to
+// empty stubs; bEXTUDP can never be switched on there (see command_functions).
+// If an old settings image still carries the EXTUDP bit, queueExtern() keeps
+// writing the ring, which just wraps over itself: nothing drains or sends it.
+#if defined(NRF52_SERIES) && !HAS_NRF_ETH
+#define EXT_NO_SOCKET 1
+#endif
+
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
 // Ethernet headers, the UdpExtern socket object, and every function that
 // touches it) is reachable from getExtern()/handleExternTelemetry(), which
@@ -34,7 +43,7 @@
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <WiFiClient.h>
-#else
+#elif !defined(EXT_NO_SOCKET)
   #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
   #include <nrf52/nrf_eth.h>
 #endif
@@ -51,6 +60,7 @@ String str_ip;
 // getExtern() nor handleExternTelemetry() reference them, and IPAddress
 // isn't available without the network headers guarded out above.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
 IPAddress apip;
 
 #ifdef BOARD_T_ETH_ELITE
@@ -63,6 +73,7 @@ IPAddress apip;
   IPAddress extern_node_ip;
   EthernetUDP UdpExtern;
 #endif
+#endif // !EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 unsigned char incomingExtPacket[UDP_TX_BUF_SIZE];  // buffer for incoming packets
@@ -184,6 +195,7 @@ static bool extDnsResolve(const char *host, IPAddress &ip)
 }
 #endif
 
+#if !defined(EXT_NO_SOCKET)
 void startExternUDP()
 {
   #ifdef BOARD_T_ETH_ELITE
@@ -335,6 +347,11 @@ void startExternUDP()
 
   sendExternHeartbeat();
 }
+#else
+void startExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 
@@ -529,6 +546,7 @@ void getExtern(unsigned char incoming[], int len)
 // hands the datagram to getExtern() below -- not part of what this native
 // build tests, guarded out with the socket it depends on.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
 void getExternUDP()
 {
   #ifdef ESP32
@@ -622,6 +640,11 @@ void getExternUDP()
                   (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
   }
 }
+#else
+void getExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 // PT-01: sendExtern() (and everything below it -- queueExtern(),
@@ -631,6 +654,7 @@ void getExternUDP()
 // it is reachable from getExtern()/handleExternTelemetry(), the inbound
 // parser this native build tests, so it is guarded out with the socket.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
   (void)bUDP;
@@ -947,6 +971,12 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   Serial.printf("[EXT];tx;len;%u;stack_hwm;%u;ms;%lu\n", (unsigned)strlen(c_json),
                 (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
 }
+#else
+void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
+{
+  (void)bUDP; (void)src_type; (void)buffer; (void)buflen; (void)rssi; (void)snr;
+}
+#endif // EXT_NO_SOCKET
 
 void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
@@ -1017,6 +1047,7 @@ void queueExternAck(uint32_t msg_id, uint8_t status, const char *from, const cha
 // bytes first. Same guard order and same write-fails-so-reset pattern as
 // sendExtern()'s send block, so a socket failure on an ack datagram is
 // handled identically to one on a text/position datagram.
+#if !defined(EXT_NO_SOCKET)
 static void sendExternJson(const uint8_t *json, uint16_t jlen)
 {
   #ifdef ESP32
@@ -1048,6 +1079,12 @@ static void sendExternJson(const uint8_t *json, uint16_t jlen)
 
   UdpExtern.endPacket();
 }
+#else
+static void sendExternJson(const uint8_t *json, uint16_t jlen)
+{
+  (void)json; (void)jlen;
+}
+#endif // EXT_NO_SOCKET
 
 void flushExternQueue()
 {
@@ -1090,6 +1127,7 @@ void  sendExternHeartbeat()
 // (group, DM call, or "*"), forwarded through from bp_origin_dst /
 // bp_episode_dst in loop_functions.cpp -- see externNoticeJson() for why a
 // DM dst is still safe here.
+#if !defined(EXT_NO_SOCKET)
 void sendExternNotice(const char *text, const char *dst)
 {
   #ifdef ESP32
@@ -1128,7 +1166,14 @@ void sendExternNotice(const char *text, const char *dst)
   UdpExtern.write((const uint8_t *)c_json, json_len);
   UdpExtern.endPacket();
 }
+#else
+void sendExternNotice(const char *text, const char *dst)
+{
+  (void)text; (void)dst;
+}
+#endif // EXT_NO_SOCKET
 
+#if !defined(EXT_NO_SOCKET)
 void resetExternUDP()
 {
   #ifdef ESP32
@@ -1145,6 +1190,11 @@ void resetExternUDP()
     startExternUDP();
   }
 }
+#else
+void resetExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 
 // JSN-01: strEsc() used to live here and hand-escaped '"'/'\\' before handing
 // the string to ArduinoJson, which escapes JSON strings itself on

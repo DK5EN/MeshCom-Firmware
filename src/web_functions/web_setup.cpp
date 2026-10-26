@@ -1,3 +1,7 @@
+// Above the board guard on purpose: test_command_setters pins this include outside any guard
+// (boards without ENABLE_MSGSTORE once lost it). Header-only, harmless in the HAS_NRF_ETH=0 TU.
+#include <command_setters.h> // cmdDecimalComma
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /*
 This file contains all web-based setup functions
 */
@@ -6,7 +10,6 @@ This file contains all web-based setup functions
 #include <regex_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
-#include <command_setters.h> // cmdDecimalComma
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
 #endif
@@ -1309,3 +1312,4 @@ void webSetup_getParam(setupStruct *setupData){
     setupData->returnCode =  WS_RETURNCODE_UNKNOWN;
     return;
 }
+#endif

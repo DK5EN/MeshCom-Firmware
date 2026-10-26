@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /**
  * RM web GUI W2b: the Remote page (GET /?page=remote) -- HTML skeleton and the scaffold JS that drives it.
  * Contract: docs/rm-gui/impl-plan.md (C4), look and rules: docs/rm-gui/verdict-ux.md, verdict-webtests.md.
@@ -436,3 +437,4 @@ void rmScaffoldJs()
     web_client.println("rmEl('rm_page').onclick=rmClick;rmEl('rm_page').onchange=rmChange;rmEl('rm_call').oninput=rmCallInput;rmEl('rm_call').value=rmSel.call;\n"
                        "rmT.tick=setInterval(rmTick,1000);rmRender();rmPoll();rmLoadNodes();rmLoadHeard();}");
 }
+#endif

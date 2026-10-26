@@ -4,12 +4,33 @@
 #include <string.h>
 #include "meshcom_settings.h"
 
+// Set per nRF52 env in variants/<env>/platformio.ini; an env that forgets it must not
+// silently build without Ethernet.
+#ifndef HAS_NRF_ETH
+#error "HAS_NRF_ETH not set: add -D HAS_NRF_ETH=1 (RAK13800) or =0 to the env build_flags"
+#endif
+
 // ETH-05: the one definition of "static IP configured" (own IP, mask and gateway
 // set). A static node stays static: no recovery path may fall back to DHCP.
 inline bool ethIsStaticConfigured()
 {
   return strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6;
 }
+
+#if !HAS_NRF_ETH
+// HAS_NRF_ETH=0 (heltec_t114, t_echo): the W5100S stack, gateway service,
+// web GUI and extudp are not built in. Only the two flags the main loop
+// reads stay, both permanently false.
+#define NRF52_NO_ETH
+#define NRF52_NO_ETH_MSG "no ethernet in this build\n"
+
+class NrfETH {
+    public:
+    bool hasIPaddress = false;
+    bool hasETHHardware = false;
+};
+
+#else
 
 // TM-35 / N-20 instrumentation (parity with the ESP32 [WIFI] markers, see
 // udp_functions.cpp): every blocking W5100S call reports itself as
@@ -118,3 +139,4 @@ class NrfETH {
     bool udp_is_busy = false;
 };
 
+#endif // HAS_NRF_ETH

@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // Ethernet only; host twins do not define NRF52_SERIES
 // SPI and the W5100S driver are what nrf_eth.h's IPAddress comes from -- the
 // Ethernet library defines it, not the Adafruit core. Included for the type
 // only; this file touches no driver call.
@@ -762,3 +763,4 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
   return 1;   // too many zeros
 }
+#endif
