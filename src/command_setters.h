@@ -47,6 +47,23 @@
 
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+
+/**
+ * Copy a command argument and strip one trailing LF (QA-CMD-01). The ladder did
+ * `if(buf[strlen(buf)-1] == 0x0a)` on the copy, which indexes SIZE_MAX when the
+ * argument is empty (`--setlog ` matches its rung with nothing after the space).
+ * CR is not stripped, as before.
+ */
+inline void cmdArgCopyTrim(char *dst, size_t dstSize, const char *src)
+{
+    snprintf(dst, dstSize, "%s", src);
+
+    size_t l = strlen(dst);
+    if (l > 0 && dst[l - 1] == 0x0a)
+        dst[l - 1] = 0x00;
+}
 
 /**
  * Parse into an existing temporary, reporting whether the argument was a number
