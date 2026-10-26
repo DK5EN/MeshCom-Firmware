@@ -106,6 +106,10 @@ void ntpHarvestReply(UdpT &udp, NtpAsync &client)
     uint16_t remotePort = udp.remotePort();
 
     int len = udp.read(buf, (int)sizeof(buf));
+    // QA-NET-04: an oversized datagram would wedge WiFiUDP::parsePacket()
+    // (arduino-esp32 keeps the unread rx_buffer); EthernetUDP::flush() is a no-op.
+    if(packetSize > len)
+        udp.flush();
     if(len <= 0)
         return;
 

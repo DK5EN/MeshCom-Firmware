@@ -176,6 +176,26 @@ void getMeshComUDP()
 
     int len = Udp.read(incomingPacket, UDP_TX_BUF_SIZE - 1);
 
+    // QA-NET-04: same wedge as UDP-02 in extudp_functions.cpp -- on
+    // arduino-esp32 WiFiUDP::parsePacket() returns 0 while an unread
+    // rx_buffer is held, so a datagram of 255 bytes or more would stop the
+    // gateway receive until reboot. Drop the remainder (before the early
+    // returns below). nRF52 EthernetUDP discards the remainder itself, no
+    // change in nrf_eth.cpp.
+    if (packetSize > len)
+    {
+      Udp.flush();
+      static uint32_t last_drain_log = 0;
+      static bool first_drain = true;
+      uint32_t now_ms = millis();
+      if(first_drain || (uint32_t)(now_ms - last_drain_log) > 30000)
+      {
+        Serial.printf("[UDP] oversized datagram drained: %d of %d bytes read\n", len, packetSize);
+        last_drain_log = now_ms;
+        first_drain = false;
+      }
+    }
+
     if (len > 0)
     {
       incomingPacket[len] = 0;
@@ -587,13 +607,38 @@ static void wifiDnsStart(WifiDns *d, const char *host)
   }
 }
 
+// QA-STAB-02: the server name is otherwise resolved once per boot; called on
+// the stage-2 heartbeat timeout to pick up a changed address. At most once per
+// 10 min. The cache is dropped first, wifiDnsStart() would return it otherwise.
+static bool s_dnsKeepOld = false;   // set only for the refresh of an unchanged name
+
+void wifiDnsRefreshServer()
+{
+  static bool first = true;
+  static uint32_t last = 0;
+  uint32_t now = millis();
+  if(s_dnsSrv.pending || s_dnsSrv.name[0] == 0)
+    return;
+  if(!first && (uint32_t)(now - last) < 600000UL)
+    return;
+  first = false;
+  last = now;
+  s_dnsSrv.result = IPAddress(0,0,0,0);
+  s_dnsKeepOld = true;
+  wifiDnsStart(&s_dnsSrv, s_dnsSrv.name);
+}
+
 // Aus der Hauptschleife: aufgeloeste Adressen anwenden.
 void wifiDnsPoll()
 {
   if(s_dnsSrv.done && !s_dnsSrv.applied)
   {
     s_dnsSrv.applied = true;
-    node_hostip = s_dnsSrv.result;
+    // QA-STAB-02: a failed re-resolve (result 0) must not discard a working address
+    // (only for that refresh: a failed lookup of a changed name must still zero it)
+    if(!s_dnsKeepOld || (uint32_t)s_dnsSrv.result != 0 || (uint32_t)node_hostip == 0)
+      node_hostip = s_dnsSrv.result;
+    s_dnsKeepOld = false;
     // TM-31 bench hook: after the server selection, so it is not overwritten
     if(bench_srvip != IPAddress(0,0,0,0))
     {
@@ -830,7 +875,7 @@ bool wifiTrulyOffline()
   uint32_t now = millis();
   if(s_wifiLastEventMs == 0 || (uint32_t)(now - s_wifiLastEventMs) > WIFI_DRIVER_IDLE_MS)
     return true;
-  uint32_t ref = (s_wifiLastGotIpMs > s_wifiBringupMs) ? s_wifiLastGotIpMs : s_wifiBringupMs;
+  uint32_t ref = ((int32_t)(s_wifiLastGotIpMs - s_wifiBringupMs) > 0) ? s_wifiLastGotIpMs : s_wifiBringupMs;
   return (uint32_t)(now - ref) > WIFI_OFFLINE_MAX_MS;
 }
 

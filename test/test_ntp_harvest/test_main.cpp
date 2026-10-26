@@ -33,6 +33,7 @@ struct FakeUdp : public UDP
     uint8_t  lastPayload[64] = {0};
     size_t   lastLen = 0;
     bool     failSend = false;
+    void     flush() {}
 
     // read side: one queued datagram at a time, like a real UDP socket
     bool      hasQueued = false;

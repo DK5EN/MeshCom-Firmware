@@ -99,6 +99,91 @@ static int externQueueWrite = 0;
 // and is not part of the getExtern()/handleExternTelemetry() input path this
 // native build tests -- guarded out with it.
 #ifndef NATIVE_BUILD
+#if defined(ESP32)
+#include "lwip/dns.h"
+
+// QA-STAB-01: WiFi.hostByName() blocks loopTask for up to 16 s (task WDT is
+// 5 s), so the extern host is asked via lwIP directly and the result arrives
+// by callback; startExternUDP() is called every pass and polls the state.
+// Own instance, not the gateway server's s_dnsSrv in udp_functions.cpp.
+// nRF52 has no resolver and keeps its behaviour (see startExternUDP).
+static struct
+{
+  char name[64];
+  IPAddress result;
+  volatile bool pending;
+  volatile bool done;
+} s_extDns = {{0}, IPAddress(0,0,0,0), false, false};
+
+static void extDnsCb(const char *name, const ip_addr_t *ipaddr, void *arg)
+{
+  if(ipaddr != NULL && ipaddr->u_addr.ip4.addr != 0)
+    s_extDns.result = IPAddress(ipaddr->u_addr.ip4.addr);
+  else
+    s_extDns.result = IPAddress(0,0,0,0);
+  s_extDns.pending = false;
+  s_extDns.done = true;
+}
+
+// true: ip holds the resolved address. false: pending or failed, caller
+// returns without latching hasExternIPaddress.
+static bool extDnsResolve(const char *host, IPAddress &ip)
+{
+  static uint32_t last_log = 0;
+  static uint32_t fail_ms = 0;
+  static bool failed = false;
+  uint32_t now = millis();
+
+  if(s_extDns.pending)
+    return false;
+
+  if(s_extDns.done && strncmp(s_extDns.name, host, sizeof(s_extDns.name)) == 0)
+  {
+    s_extDns.done = false;
+    if((uint32_t)s_extDns.result != 0)
+    {
+      failed = false;
+      ip = s_extDns.result;
+      return true;
+    }
+    failed = true;
+    fail_ms = now;
+    Serial.printf("[EXT] DNS lookup of %s failed, will retry\n", host);
+    return false;
+  }
+  s_extDns.done = false;
+
+  if(failed && (uint32_t)(now - fail_ms) < 10000)   // do not hammer the resolver
+    return false;
+
+  snprintf(s_extDns.name, sizeof(s_extDns.name), "%s", host);
+  s_extDns.result = IPAddress(0,0,0,0);
+
+  ip_addr_t addr;
+  err_t err = dns_gethostbyname(s_extDns.name, &addr, extDnsCb, NULL);
+  if(err == ERR_OK)
+  {
+    ip = IPAddress(addr.u_addr.ip4.addr);
+    failed = false;
+    return (uint32_t)ip != 0;
+  }
+  if(err == ERR_INPROGRESS)
+  {
+    s_extDns.pending = true;
+    if((uint32_t)(now - last_log) > 30000 || last_log == 0)
+    {
+      Serial.printf("[EXT] resolving %s ...\n", host);
+      last_log = now;
+    }
+    return false;
+  }
+  failed = true;
+  fail_ms = now;
+  Serial.printf("[EXT] DNS lookup of %s failed (err %d), will retry\n", host, (int)err);
+  return false;
+}
+#endif
+
 void startExternUDP()
 {
   #ifdef BOARD_T_ETH_ELITE
@@ -166,6 +251,25 @@ void startExternUDP()
   // (nrf52_main.cpp:2467 / esp32_main.cpp:4002) tests !hasExternIPaddress on
   // every pass, so leaving the flag clear IS the retry. The log is rate-limited
   // so a node that genuinely has no socket left does not flood the console.
+  // QA-STAB-01: the hostname lookup runs before begin(), so a pending or
+  // failed lookup returns cheaply instead of re-opening the socket each pass.
+  // A literal IP needs no lookup (path below); nRF52 has no resolver and
+  // keeps its behaviour (returning there would keep a hostname node from
+  // ever starting its socket).
+  #if defined(ESP32)
+  bool extByName = false;
+  if(WiFi.isConnected())
+  {
+    IPAddress extLit;
+    if(!extLit.fromString(meshcom_settings.node_extern))
+    {
+      if(!extDnsResolve(meshcom_settings.node_extern, apip))
+        return;
+      extByName = true;
+    }
+  }
+  #endif
+
   if(UdpExtern.begin(EXTERN_PORT) == 0)
   {
       static uint32_t last_fail_log = 0;
@@ -191,7 +295,8 @@ void startExternUDP()
 
   Serial.println("WiFI is open");
   
-  if(WiFi.hostByName(meshcom_settings.node_extern, apip) == 1)
+  // Hostname already resolved above (apip); literal IPs take the else path.
+  if(extByName)
   {
     Serial.printf("[EXT] URL:%s to IP:%s\n", meshcom_settings.node_extern, apip.toString().c_str());
     // str_ip feeds the "now sending to IP" line below; it was only set in

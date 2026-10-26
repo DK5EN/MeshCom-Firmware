@@ -139,6 +139,7 @@ void sendMeshComUDP() { record("esp_sendMeshComUDP"); }
 void sendMeshComHeartbeat() { record("esp_sendMeshComHeartbeat"); }
 void resetMeshComUDP() { record("esp_resetMeshComUDP"); }
 void ntpHarvestUDP() { record("esp_ntpHarvestUDP"); }
+void wifiDnsRefreshServer() { record("esp_wifiDnsRefreshServer"); }
 
 wl_status_t WiFiClass::status()
 {

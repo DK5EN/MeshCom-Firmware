@@ -20,6 +20,8 @@ bool wifiHarvestGotIp();     // apply a driver-side got_ip (startMeshComUDP); tr
 bool wifiTrulyOffline();     // 5-min path may cycle the radio only when this is true
 void wifiRequestRestart();   // force the next 5-min evaluation to restart (resetMeshComUDP)
 void wifiDnsPoll();          // apply resolved server/NTP addresses
+// ESP32 only: re-resolve the server name on heartbeat timeout (rate-limited, QA-STAB-02)
+void wifiDnsRefreshServer();
 void wifiLinkHeartbeat();    // [WIFI];link every 60 s
 void wifiStat();             // --wifistat
 void wifiDrop();             // --wifidrop
