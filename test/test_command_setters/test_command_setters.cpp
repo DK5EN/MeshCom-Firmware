@@ -2240,6 +2240,27 @@ void test_bat04_ble_is2_register(void)
     TEST_ASSERT_TRUE_MESSAGE(cfg.find("#define BLE_JSON_PAYLOAD_MAX 244") != std::string::npos, "BLE_JSON_PAYLOAD_MAX is not 244 any more");
 }
 
+// QA-CMD-01: the LF strip must survive an empty argument (`--setlog `).
+static void test_cmd_arg_copy_trim_empty_and_lf()
+{
+    char b[8];
+    memset(b, 'x', sizeof(b));
+    cmdArgCopyTrim(b, sizeof(b), "");
+    TEST_ASSERT_EQUAL_STRING("", b);
+
+    cmdArgCopyTrim(b, sizeof(b), "abc\n");
+    TEST_ASSERT_EQUAL_STRING("abc", b);
+
+    cmdArgCopyTrim(b, sizeof(b), "abc\r\n");     // CR stays, as before
+    TEST_ASSERT_EQUAL_STRING("abc\r", b);
+
+    cmdArgCopyTrim(b, sizeof(b), "\n");
+    TEST_ASSERT_EQUAL_STRING("", b);
+
+    cmdArgCopyTrim(b, sizeof(b), "0123456789");   // truncates like snprintf
+    TEST_ASSERT_EQUAL_STRING("0123456", b);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2294,6 +2315,7 @@ int main(int, char **)
     RUN_TEST(test_bleguard_wiring_pins);
     RUN_TEST(test_bleguard_is_classic_esp32_only);
     RUN_TEST(test_rx_deaf01_is_receiving_latch);
+    RUN_TEST(test_cmd_arg_copy_trim_empty_and_lf);
     RUN_TEST(test_rx_deaf02_nrf52_tx_unblock);
     RUN_TEST(test_lrf21_ping_target_wiring);
     RUN_TEST(test_lrf21_ping_target_sanitize_and_callers);
