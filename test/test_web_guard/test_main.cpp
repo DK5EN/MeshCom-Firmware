@@ -232,6 +232,8 @@ void test_fetch_site_matrix_sendmessage_login(void)
 {
     run_fs_matrix("GET /?sendmessage=hi HTTP/1.1", "/?sendmessage=hi", true);
     run_fs_matrix("GET /?nodepassword=pw HTTP/1.1", "/?nodepassword=pw", true);
+    run_fs_matrix("GET /?login=aa.bb HTTP/1.1", "/?login=aa.bb", true);
+    run_fs_matrix("GET /?logout HTTP/1.1", "/?logout", true);
 }
 // read-only GETs need no X-MC
 void test_fetch_site_matrix_read_only(void)
@@ -262,6 +264,8 @@ void test_page_load_exception(void)
     expect(WG_CROSS_SITE, req("GET /?page=a/setparam/?manualcommand=--reboot HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/?page=a/setparam/?manualcommand=--reboot", "route smuggled behind a page name");
     expect(WG_CROSS_SITE, req("GET /setparam/?manualcommand=--reboot HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/setparam/", "navigation to /setparam/");
     expect(WG_CROSS_SITE, req("GET /?nodepassword= HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/?nodepassword=", "logout navigation");
+    expect(WG_CROSS_SITE, req("GET /?logout HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/?logout", "logout navigation (new)");
+    expect(WG_CROSS_SITE, req("GET /?login=aa.bb HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/?login=aa.bb", "login navigation");
     expect(WG_CROSS_SITE, req("GET / HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), "/setparam/", "caller path disagrees");
     expect(WG_CROSS_SITE, req("GET / HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: cross-site", "Sec-Fetch-Dest: document"}), NULL, "NULL path");
     // the server routes by indexOf over the WHOLE header: a Referer can route a plain GET /
@@ -431,10 +435,10 @@ void test_truncated_header_fails_closed(void)
 void test_is_state_changing(void)
 {
     static const char *const yes[] = {"/setparam/?manualcommand=--reboot", "/callfunction/?otaupdate", "/rmsend", "/rmpasswd",
-                                      "/?sendmessage=x", "/?nodepassword=pw", "/?nodepassword=", "/?page=a/setparam/?x"};
+                                      "/?sendmessage=x", "/?nodepassword=pw", "/?nodepassword=", "/?login=aa.bb", "/?logout", "/?page=a/setparam/?x"};
     for (size_t i = 0; i < sizeof(yes) / sizeof(yes[0]); i++)
         TEST_ASSERT_TRUE_MESSAGE(webGuardIsStateChanging(yes[i]), yes[i]);
-    static const char *const no[] = {"/", "/?page=setup", "/?page=remote", "/getparam/?x=y", "/?getmessages", "/config.json",
+    static const char *const no[] = {"/", "/?page=setup", "/?page=remote", "/getparam/?x=y", "/?getmessages", "/?loginnonce", "/config.json",
                                      "/rmstatus", "/rmnodes", "/rmheard", "/index.js", ""};
     for (size_t i = 0; i < sizeof(no) / sizeof(no[0]); i++)
         TEST_ASSERT_FALSE_MESSAGE(webGuardIsStateChanging(no[i]), no[i]);
@@ -482,7 +486,7 @@ void test_img_csrf_matrix_without_fetch_metadata(void)
 {
     static const char *const targets[] = {
         "/setparam/?manualcommand=--passwd%20x", "/setparam/?manualcommand=--reboot", "/callfunction/?otaupdate",
-        "/?sendmessage=hi", "/?nodepassword=", "/rmsend?dst=X&cmd=reboot", "/rmpasswd?pw=x"};
+        "/?sendmessage=hi", "/?nodepassword=", "/?login=aa.bb", "/?logout", "/rmsend?dst=X&cmd=reboot", "/rmpasswd?pw=x"};
     for (size_t i = 0; i < sizeof(targets) / sizeof(targets[0]); i++)
     {
         expect(WG_CROSS_SITE, imgGet(targets[i], "X-Other: 1"), targets[i], targets[i]);
