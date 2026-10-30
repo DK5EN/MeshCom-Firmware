@@ -1,5 +1,5 @@
 /**
- * WEB-AUTH-01: the web login page and the scaffold JS that drives it (contract: docs/campaign-webui-login.md C1, C3).
+ * WEB-AUTH-01: the web login page and the scaffold JS that drives it (wire format: Web-API_documentation.txt, section "Login").
  *
  * Rules the code keeps:
  *  - Plain http has no crypto.subtle, so the JS carries its own compact SHA-256 / HMAC-SHA256. The password never

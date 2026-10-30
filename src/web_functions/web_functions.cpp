@@ -960,7 +960,7 @@ void work_webpage(void)
                         continue;
                     }
 
-                    // WEB-AUTH-01: login routes (contract C1), after the guard and before the auth gate
+                    // WEB-AUTH-01: login routes (Web-API_documentation.txt "Login"), after the guard and before the auth gate
                     if (wg_path.startsWith("/?loginnonce"))
                     {
                         char nonce[33];

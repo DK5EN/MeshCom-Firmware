@@ -4,7 +4,7 @@
 // The firmware answers /?loginnonce with webAuthIssueNonce(), /?login=<nonce>.<mac> with webAuthLogin()
 // and checks the Cookie header with webAuthSessionValid(). The password never crosses the wire: the
 // browser sends mac = HMAC-SHA256(key = password, msg = 32 hex chars of the nonce).
-// Contract: docs/campaign-webui-login.md (C1 wire, C2 API). Host test: test/test_web_auth (env native_web_auth).
+// Wire format: Web-API_documentation.txt, section "Login". Host test: test/test_web_auth (env native_web_auth).
 
 #ifndef WEB_AUTH_H
 #define WEB_AUTH_H
