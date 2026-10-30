@@ -150,9 +150,39 @@ export function diagnose({ info, facts, kind, bytes, afterReset }) {
   return 'no-answer';
 }
 
+// Images that run on the same board and differ in a part no answer reveals
+// (detect.json sameBoard, e.g. the two E290 panel revisions): a result naming
+// one of them names all of them, and the user chooses by the board's marking.
+// Even the env the running image reports is no proof: the wrong panel image
+// boots fine and only draws badly.
+function widenSameBoard(detect, pool, envs, warnings) {
+  const boards = detect.boards || {};
+  const out = [];
+  for (const env of envs) {
+    const group = (detect.sameBoard || []).find((g) => g.includes(env)) || [env];
+    for (const member of group) {
+      if (pool.includes(member) && !out.includes(member)) out.push(member);
+    }
+  }
+  // Say so only once the evidence has come down to that one board; among
+  // seventeen S3 candidates the panel question is not the open one.
+  for (const group of detect.sameBoard || []) {
+    const hit = group.filter((env) => out.includes(env));
+    if (hit.length > 1 && hit.length === out.length) {
+      warnings.push(
+        `Fuer dieses Board gibt es ${hit.length} Abbilder, die sich nicht erkennen lassen ` +
+          `(${hit.map((env) => boards[env].variant || env).join(' / ')}). ` +
+          'Bitte nach dem Aufdruck am Board waehlen.',
+      );
+    }
+  }
+  return out;
+}
+
 // Narrow the selected release's boards down to the ones this node can be.
 //
-//   detect      detect.json: { boards: {env: {hwid, radio, chipFamily}}, aliases: {hwid: [env]} }
+//   detect      detect.json: { boards: {env: {hwid, radio, chipFamily, variant?}},
+//               aliases: {hwid: [env]}, sameBoard: [[env, ...]] }
 //   releaseEnvs env names the selected release actually ships
 //   info        parseInfo() result or null (info.env, when set, is the exact image)
 //   facts       parseBoot() result
@@ -190,7 +220,11 @@ export function candidates(detect, releaseEnvs, info, facts, usbFamily) {
         `Das laufende Abbild ${info.env} findet seinen Funkchip nicht; die Meldung wird nicht verwendet.`,
       );
     } else {
-      return { envs: [info.env], basis: [`Build-Env ${info.env}`], warnings };
+      return {
+        envs: widenSameBoard(detect, pool, [info.env], warnings),
+        basis: [`Build-Env ${info.env}`],
+        warnings,
+      };
     }
   }
 
@@ -236,5 +270,5 @@ export function candidates(detect, releaseEnvs, info, facts, usbFamily) {
 
   // Nothing learned at all: an unfiltered list is not a detection result.
   if (basis.length === 0) pool = [];
-  return { envs: pool, basis, warnings };
+  return { envs: widenSameBoard(detect, pool, pool, warnings), basis, warnings };
 }

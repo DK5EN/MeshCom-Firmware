@@ -90,6 +90,13 @@ function fillVersions() {
   }
 }
 
+// "Vision Master E290 (Displaykabel 15-22243) -- SX1262": the variant names the
+// marking that tells images for one board apart (releases.json, optional).
+const boardText = (b) => {
+  const name = b.variant ? `${b.name} (${b.variant})` : b.name;
+  return b.radio ? `${name} \u2014 ${b.radio}` : name;
+};
+
 // Boards are grouped by vendor, in the order the generator emitted them, so
 // the page needs no vendor list of its own.
 function fillBoards(keepEnv) {
@@ -115,7 +122,7 @@ function fillBoards(keepEnv) {
     for (const b of boards) {
       const o = document.createElement('option');
       o.value = b.env;
-      o.textContent = b.radio ? `${b.name} \u2014 ${b.radio}` : b.name;
+      o.textContent = boardText(b);
       og.append(o);
     }
     boardSel.append(og);
@@ -635,7 +642,7 @@ function showResult(result, info, facts, usbFamily, ctx) {
   const names = new Map(rel.boards.map((b) => [b.env, b]));
   const label = (env) => {
     const b = names.get(env);
-    return b.radio ? `${b.group} ${b.name} \u2014 ${b.radio}` : `${b.group} ${b.name}`;
+    return `${b.group} ${boardText(b)}`;
   };
 
   detectResult.replaceChildren();

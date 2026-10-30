@@ -128,7 +128,14 @@
     "vision-master-e290": {
       "hwid": 44,
       "radio": "SX1262",
-      "chipFamily": "ESP32-S3"
+      "chipFamily": "ESP32-S3",
+      "variant": "Displaykabel 15-22243"
+    },
+    "vision-master-e290-otp": {
+      "hwid": 44,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3",
+      "variant": "Displaykabel FPC-7519revb"
     },
     "wireless-paper": {
       "hwid": 57,
@@ -157,5 +164,11 @@
       "ttgo_tbeam_SX1262",
       "ttgo_tbeam_SX1268"
     ]
-  }
+  },
+  "sameBoard": [
+    [
+      "vision-master-e290",
+      "vision-master-e290-otp"
+    ]
+  ]
 }

@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "v4.40a.10.25",
-      "date": "2026-10-25",
-      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.25",
+      "version": "v4.40a.10.30",
+      "date": "2026-10-30",
+      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.30",
       "boards": [
         {
           "env": "E22-DevKitC",
@@ -185,7 +185,16 @@
           "group": "Heltec",
           "name": "Vision Master E290",
           "radio": "SX1262",
-          "chipFamily": "ESP32-S3"
+          "chipFamily": "ESP32-S3",
+          "variant": "Displaykabel 15-22243"
+        },
+        {
+          "env": "vision-master-e290-otp",
+          "group": "Heltec",
+          "name": "Vision Master E290",
+          "radio": "SX1262",
+          "chipFamily": "ESP32-S3",
+          "variant": "Displaykabel FPC-7519revb"
         },
         {
           "env": "wireless-paper",
