@@ -1,6 +1,6 @@
 # Campaign UDP-05 -- EXTUDP messages missing from the local WebUI chat
 
-**Status:** plan, awaiting operator approval (2026-10-30). Source: DK5EN/map#3 (filed in the wrong repo; it is a
+**Status:** W1 done 2026-10-30 (orchestrator inline; advisor REWORK serial double echo, applied, re-review APPROVED). Gate stage 1,2: 83 envs 3084/3084, golden selftest 48 green after the `variant-ini-effective` baseline gained the new suite; builds `ttgo-lora32-v21`, `heltec_wifi_lora_32_V3`, `wiscore_rak4631` green. Next: W2 bench. Source: DK5EN/map#3 (filed in the wrong repo; it is a
 firmware change). Spec: operator note `extudp-webui-echo.md` (Desktop), reproduced in short below.
 
 ## BLUF
@@ -14,14 +14,14 @@ firmware change). Spec: operator note `extudp-webui-echo.md` (Desktop), reproduc
 
 ## Root cause (verified on `72cc7f33`)
 
-| Where                                                                          | What                                                                                                                 |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `src/loop_functions.cpp:4757`                                                  | `if(hasMsgFromPhone) { addBLEOutBuffer(msg_buffer, ...); <gateway ack frame> }` -- the only echo into the phone ring |
-| `src/web_functions/web_functions.cpp:4696`                                     | WebUI send sets `hasMsgFromPhone = true` and `ORIGIN_WEB`                                                            |
-| `src/esp32/esp32_main.cpp:4465`, `nrf52/nrf52_main.cpp:1893`                   | BLE app send sets `ORIGIN_BLE` (`hasMsgFromPhone` set by `phone_commands.cpp`)                                       |
-| `src/extudp_functions.cpp:415-419`                                             | `getExtern()` sets `ORIGIN_EXTUDP` around `sendMessage()`, never `hasMsgFromPhone`                                   |
-| `src/esp32/serial_command_esp32.cpp:138`, `nrf52/serial_command_nrf52.cpp:117` | serial `::` send sets `ORIGIN_SERIAL`, never `hasMsgFromPhone` -- same gap (decision D2)                             |
-| `src/web_functions/web_functions.cpp:3875`                                     | WebUI Messages page renders `phoneRing` -- no echo, nothing to render                                                |
+| Where                                                                          | What                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/loop_functions.cpp:4757`                                                  | `if(hasMsgFromPhone) { addBLEOutBuffer(msg_buffer, ...); <gateway ack frame> }` -- the only echo into the phone ring                        |
+| `src/web_functions/web_functions.cpp:4696`                                     | WebUI send sets `hasMsgFromPhone = true` and `ORIGIN_WEB`                                                                                   |
+| `src/esp32/esp32_main.cpp:4465`, `nrf52/nrf52_main.cpp:1893`                   | BLE app send sets `ORIGIN_BLE` (`hasMsgFromPhone` set by `phone_commands.cpp`)                                                              |
+| `src/extudp_functions.cpp:415-419`                                             | `getExtern()` sets `ORIGIN_EXTUDP` around `sendMessage()`, never `hasMsgFromPhone`                                                          |
+| `src/esp32/serial_command_esp32.cpp:138`, `nrf52/serial_command_nrf52.cpp:117` | serial `::` send sets `ORIGIN_SERIAL`; already echoed by `sendMessage()`'s `bConsoleText` branch (`loop_functions.cpp:4825`) -- no gap (D2) |
+| `src/web_functions/web_functions.cpp:3875`                                     | WebUI Messages page renders `phoneRing` -- no echo, nothing to render                                                                       |
 
 `bp_origin` (`getMsgOrigin()`, `loop_functions.cpp:4067`) is set by the caller immediately before `sendMessage()` and
 cleared right after; relays, ACKs and beacons never set it, so an origin-keyed echo cannot fire for them.
@@ -77,7 +77,7 @@ belong to the orchestrator afterwards.
   - `ORIGIN_NONE`, not from phone (relay, beacon, ACK): echo no.
   - `fromPhone` with `ORIGIN_WEB` / `ORIGIN_BLE`: echo yes (unchanged).
   - `ORIGIN_GUI`: echo no (T-Deck has its own `tdeck_add_MSG`).
-  - `ORIGIN_SERIAL`: per D2.
+  - `ORIGIN_SERIAL`, not from phone: echo no (pins the no-double-echo rule, D2).
   - Before-run: the helper first lands with today's semantics (`return fromPhone;`), the suite runs and fails on the
     EXTUDP case; output pasted in the report. Then the fix, suite passes.
 - **Call-site integrity:** `grep -c "phoneEchoWanted" src/loop_functions.cpp` = 1; the ack frame stays under
@@ -93,8 +93,8 @@ belong to the orchestrator afterwards.
 
 ## Decisions (operator)
 
-- **D1 ack frame:** echo only, ack stays phone/WebUI-only -- recommended. _Open._
-- **D2 `ORIGIN_SERIAL`:** cover in the same change or leave out of scope. _Open._
-- **D3 bench node and destination.** _Open._
-- **Q4 W1 dispatch:** implementer agent or orchestrator inline (~15 changed lines). _Open._
-- **Q5 DK5EN/map#3 reply and close** after the upstream PR is up. _Open._
+- **D1 ack frame:** echo only, ack stays phone/WebUI-only. _Decided 2026-10-30._
+- **D2 `ORIGIN_SERIAL`:** operator said cover it; the advisor then showed serial `::` sends are already echoed (`bConsoleText`), so the spec's gap does not exist and covering it would double the echo. Left out; the test pins `ORIGIN_SERIAL` = no echo.
+- **D3 bench node and destination:** DK5EN-1, 2 dBm; destination TEST vs. 9999 open (`CheckGroup()` accepts digits only, so `{TEST}` is a PN in the firmware).
+- **Q4 W1 dispatch:** orchestrator inline. _Decided._
+- **Q5 DK5EN/map#3:** reply and close after the upstream PR is up. _Approved._
