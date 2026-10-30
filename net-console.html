@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Net Console: das Log des Knotens über das Netz, auch mit Passwort</title>
+<meta name="description" content="Anleitung zur MeshCom Net Console auf TCP-Port 2323: einschalten, verbinden mit PuTTY, nc oder Skript, und die Anmeldung per NONCE und HMAC-SHA256.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+  .toc { columns: 2; column-gap: 32px; max-width: none; }
+  .toc li { break-inside: avoid; }
+  @media (max-width: 720px) { .toc { columns: 1; } }
+  pre { white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+<nav class="nav-top"><a href="index.html">&larr; Startseite</a></nav>
+
+<div class="eyebrow">Anleitung · Net Console</div>
+<h1>Das Log des Knotens über das Netz lesen, auch mit Passwort</h1>
+<ul class="meta">
+<li>Stand: 30.10.2026, geprüft gegen <code>fork-dev</code></li>
+<li>Firmware: 4.40a, alle ESP32-Boards mit Net Console im Build</li>
+<li>Quellen: <code>src/net_console.cpp</code>, <code>src/command_functions.cpp</code>, <code>src/rm_validate.h</code>, <code>tools/hmac_connect.py</code>, <code>tools/hmac_connect.ps1</code>, <code>docs/net-console-putty.md</code></li>
+</ul>
+
+<div class="bluf">
+<p class="lead"><strong>Die Net Console zeigt das Log eines ESP32-Knotens über WLAN oder LAN auf TCP-Port 2323 und nimmt Befehle wie <code>--info</code> an. Ist am Knoten ein Passwort gesetzt, schickt er eine Zufallszahl (NONCE), und der Client muss daraus binnen 30 Sekunden eine Antwort berechnen.</strong></p>
+<p class="reco">Empfehlung: ohne Passwort reicht PuTTY oder <code>nc</code>. Mit Passwort nimmt man eines der beiden Skripte aus dem Repo, die rechnen die Antwort selbst aus.</p>
+</div>
+
+<div class="callout warn">
+<p><strong>Die NONCE erzeugt der Knoten, nicht der Nutzer.</strong></p>
+<ul>
+<li><strong>Was der Nutzer tut:</strong> die NONCE aus der ersten Zeile lesen und <code>HMAC-SHA256(Passwort, NONCE)</code> zurückschicken, als 64 Hex-Zeichen und Zeilenende.</li>
+<li><strong>Von Hand geht es nicht:</strong> ein Terminal wie PuTTY kann die Antwort nicht berechnen. Dafür gibt es die Skripte oder einen Einzeiler zum Kopieren (Abschnitt 4).</li>
+</ul>
+</div>
+
+<h2>Kernfakten</h2>
+<ul class="keyfacts">
+<li><strong>Was es ist:</strong> eine rohe TCP-Verbindung, kein Telnet und kein SSH. Man sieht dasselbe Log wie am USB-Kabel, und der Knoten startet beim Verbinden nicht neu.</li>
+<li><strong>Einschalten:</strong> <code>--netconsole on</code>, die Einstellung überlebt den Neustart. <code>--netconsole</code> zeigt den Status mit IP und Port.</li>
+<li><strong>Welche Boards:</strong> alle ESP32 außer dem E22 XML DevKitC, dem fehlt der Platz im RAM. RAK4631 und die anderen nRF52-Boards haben keine Net Console.</li>
+<li><strong>Passwort:</strong> <code>--passwd &lt;pwd&gt;</code> setzt es, <code>--passwd none</code> löscht es. 1 bis 14 Zeichen, nur einfache ASCII-Zeichen, keine Umlaute.</li>
+<li><strong>Ein Passwort für drei Dinge:</strong> dasselbe Knotenpasswort schützt auch KISS über TCP und die Fernsteuerung RM1. <code>--passwd none</code> schaltet RM1 mit ab.</li>
+<li><strong>Nur ein Client:</strong> eine neue Anmeldung wirft die laufende Sitzung raus.</li>
+<li><strong>Nicht verschlüsselt:</strong> nach der Anmeldung läuft alles im Klartext. Das Passwort selbst geht nie über die Leitung, nur die berechnete Antwort.</li>
+</ul>
+
+<ol class="toc">
+<li><a href="#s1">Einschalten</a></li>
+<li><a href="#s2">Verbinden ohne Passwort</a></li>
+<li><a href="#s3">Verbinden mit Passwort: die Skripte</a></li>
+<li><a href="#s4">Antwort von Hand berechnen</a></li>
+<li><a href="#s5">Wenn es nicht klappt</a></li>
+<li><a href="#s6">Was nicht geprüft ist</a></li>
+<li><a href="#s7">Technisch: der Anmeldeablauf</a></li>
+</ol>
+
+<h2 id="s1">1. Einschalten</h2>
+<p><strong>Ein Befehl genügt, über App, Web-Oberfläche oder serielle Konsole.</strong></p>
+<pre><code>--netconsole on
+--passwd MeinPasswort     (optional)</code></pre>
+<ul>
+<li><strong>IP-Adresse:</strong> steht in der Antwort auf <code>--netconsole</code>, in der Web-Oberfläche oder im Router.</li>
+<li><strong>Abschalten:</strong> <code>--netconsole off</code>.</li>
+</ul>
+
+<h2 id="s2">2. Verbinden ohne Passwort</h2>
+<p><strong>Ohne Passwort meldet sich der Knoten sofort, jedes Raw-TCP-Programm reicht.</strong></p>
+<ul>
+<li><strong>Linux und macOS:</strong> <code>nc 192.168.1.50 2323</code></li>
+<li><strong>Windows:</strong> PuTTY mit Connection type <strong>Raw</strong>, Port 2323. Unter Terminal „Implicit CR in every LF“, Local echo und Local line editing auf „Force on“.</li>
+</ul>
+<p>Der Knoten antwortet:</p>
+<pre><code>OK
+MeshCom Console
+Type --help for commands</code></pre>
+<p>Danach läuft das Log mit, Befehle tippt man ein und schickt sie mit Enter ab.</p>
+
+<h2 id="s3">3. Verbinden mit Passwort: die Skripte</h2>
+<p><strong>Zwei Skripte im Repo erledigen die Anmeldung und zeigen danach das Log an.</strong> Beide stammen von DH1FR, dem Autor der Net Console, und brauchen keine Zusatzpakete.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Skript</th><th>System</th><th>Aufruf</th></tr></thead>
+<tbody>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/tools/hmac_connect.py"><code>hmac_connect.py</code></a></td><td>Linux, macOS, Windows mit Python 3.6+</td><td><code>python3 hmac_connect.py 192.168.1.50 MeinPasswort</code></td></tr>
+<tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-dev/tools/hmac_connect.ps1"><code>hmac_connect.ps1</code></a></td><td>Windows, PowerShell 5.1 oder neuer</td><td><code>powershell -ExecutionPolicy Bypass -File hmac_connect.ps1 192.168.1.50 MeinPasswort</code></td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong>Ohne Passwort:</strong> das Passwort einfach weglassen, beide Skripte verbinden dann direkt.</li>
+<li><strong>Anderer Port:</strong> als drittes Argument, etwa bei einer Portweiterleitung.</li>
+<li><strong>Erfolg:</strong> die Skripte melden „Authentication OK.“ und zeigen das Log. Beenden mit Strg+C.</li>
+<li><strong>Achtung, Shell-Verlauf:</strong> das Passwort steht auf der Kommandozeile und landet damit im Verlauf der Shell. Auf geteilten Rechnern den Verlauf danach löschen.</li>
+</ul>
+
+<h2 id="s4">4. Antwort von Hand berechnen</h2>
+<p><strong>Wer bei PuTTY oder <code>nc</code> bleiben will, berechnet die Antwort in einem zweiten Fenster und fügt sie ein.</strong> Das muss binnen 30 Sekunden nach der NONCE-Zeile geschehen.</p>
+<ol>
+<li>Verbinden. Der Knoten schickt eine Zeile wie <code>NONCE: 3f9a0c…</code> mit 32 Hex-Zeichen.</li>
+<li>Im zweiten Fenster den passenden Einzeiler unten ausführen, mit eigenem Passwort und der NONCE.</li>
+<li>Das Ergebnis, 64 Zeichen, ins Verbindungsfenster einfügen und Enter drücken. In PuTTY fügt ein Rechtsklick ein.</li>
+<li>Es erscheint <code>OK</code> und das Log, oder <code>FAIL</code> und die Verbindung endet.</li>
+</ol>
+<p><strong>Windows (PowerShell):</strong></p>
+<pre><code>$n='HIER_NONCE_EINSETZEN'; $k=[Text.Encoding]::UTF8.GetBytes('MeinPasswort'); $b=[byte[]](0..15|%{[Convert]::ToByte($n.Substring($_*2,2),16)}); [BitConverter]::ToString(([Security.Cryptography.HMACSHA256]::new($k)).ComputeHash($b)).Replace('-','').ToLower()</code></pre>
+<p><strong>Linux und macOS (Python 3):</strong></p>
+<pre><code>python3 -c "import hmac,hashlib,sys; print(hmac.new(sys.argv[1].encode(), bytes.fromhex(sys.argv[2]), hashlib.sha256).hexdigest())" 'MeinPasswort' HIER_NONCE_EINSETZEN</code></pre>
+
+<h2 id="s5">5. Wenn es nicht klappt</h2>
+<ul>
+<li><strong>Keine Verbindung:</strong> IP prüfen, <code>--netconsole</code> zeigt ob die Konsole an ist. Der Rechner muss den Knoten im Netz erreichen.</li>
+<li><strong>NONCE erscheint, obwohl kein Passwort gewollt ist:</strong> am Knoten ist eins gesetzt. <code>--passwd none</code> entfernt es, schaltet aber auch RM1 ab.</li>
+<li><strong><code>FAIL</code>:</strong> Passwort falsch, 30 Sekunden überschritten oder die Antwort nicht genau 64 Hex-Zeichen. Neu verbinden, jede Verbindung bringt eine neue NONCE.</li>
+<li><strong>Sitzung bricht plötzlich ab:</strong> ein zweiter Client hat sich angemeldet, etwa ein anderes Fenster oder Tool.</li>
+<li><strong>Zeilen laufen treppenartig nach rechts:</strong> in PuTTY „Implicit CR in every LF“ einschalten.</li>
+</ul>
+
+<h2 id="s6">Was nicht geprüft ist</h2>
+<ul>
+<li><strong>Die beiden Skripte</strong> sind für diese Seite gegen den Code gelesen, aber am 30.10.2026 nicht neu gegen einen Knoten gelaufen. Die Bench-Werkzeuge des Forks melden sich mit demselben Verfahren täglich an (<code>tools/mc_console.py</code>).</li>
+<li><strong>Die PowerShell-Variante</strong> ist nur unter Windows PowerShell 5.1 gedacht. Unter PowerShell 7 auf macOS oder Linux ist sie hier nicht ausprobiert.</li>
+</ul>
+
+<h2 id="s7">Technisch: der Anmeldeablauf</h2>
+<p><strong>Challenge-Response mit HMAC-SHA256: der Knoten prüft, dass der Client das Passwort kennt, ohne dass es übertragen wird.</strong></p>
+<pre><code>Knoten -&gt; Client:  NONCE: &lt;32 Hex-Zeichen&gt;\r\n
+Client -&gt; Knoten:  &lt;64 Hex-Zeichen HMAC-SHA256(Passwort, NONCE)&gt;\n
+Knoten -&gt; Client:  OK\r\nMeshCom Console\r\nType --help for commands\r\n
+             oder:  FAIL\r\n, dann Verbindungsende</code></pre>
+<details class="dev">
+<summary>Details aus dem Quellcode</summary>
+<ul>
+<li><strong>NONCE:</strong> 16 Byte aus dem Hardware-Zufallsgenerator, <code>esp_fill_random</code>, als 32 Hex-Zeichen gesendet (<code>src/net_console.cpp:160-169</code>).</li>
+<li><strong>Schlüssel und Daten:</strong> Schlüssel ist das Passwort als Bytes, Daten sind die 16 dekodierten NONCE-Bytes, nicht der Hex-Text (<code>src/net_console.cpp:192-197</code>).</li>
+<li><strong>Passwort ohne Füllzeichen:</strong> der Knoten speichert das Passwort auf 14 Zeichen mit Leerzeichen aufgefüllt und entfernt sie vor der Rechnung. Der Client rechnet mit dem Passwort, wie man es eingegeben hat (<code>src/net_console.cpp:365-372</code>).</li>
+<li><strong>Antwort:</strong> eine Zeile, beendet mit CR oder LF, genau 64 Hex-Zeichen. Der Vergleich läuft in konstanter Zeit (<code>src/net_console.cpp:176-203</code>).</li>
+<li><strong>Zeitlimit:</strong> 30 Sekunden Empfangs-Timeout auf die Antwort (<code>src/net_console.cpp:171-173</code>).</li>
+<li><strong>Ohne Passwort:</strong> keine NONCE, der Knoten schickt sofort <code>OK</code> und das Banner (<code>src/net_console.cpp:221-222</code>).</li>
+<li><strong>Passwortregeln:</strong> 1 bis 14 druckbare ASCII-Zeichen, kein Leerzeichen am Anfang oder Ende, nicht das Wort <code>none</code> (<code>src/rm_validate.h:32-51</code>).</li>
+</ul>
+</details>
+
+<div class="foot">
+<p>Quellcode: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>.
+Ausführliche PuTTY-Anleitung: <code>docs/net-console-putty.md</code>. Zurück zur <a href="index.html">Startseite</a> oder zur <a href="rm1-protokoll.html">Fernsteuerung RM1</a>, die dasselbe Passwort nutzt.</p>
+<p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
+ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
+</div>
+</main>
+</body>
+</html>

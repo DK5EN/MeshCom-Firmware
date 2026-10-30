@@ -40,6 +40,7 @@
     <li><strong>Firmware flashen:</strong> der <a href="flash/">Web-Flasher</a> für 30 Boards, direkt aus dem Browser.</li>
     <li><strong>Verstehen (Betreiber):</strong> der <a href="meshcom-protocol.html">Vortrag zum Protokoll</a>, die <a href="Nachbarschaftsmatrix.html">Nachbarschaftsmatrix</a> und die <a href="mesh-roadmap.html">Roadmap des Sendepuffers</a>.</li>
     <li><strong>Nachvollziehen (Entwickler, App-Bauer):</strong> die <a href="rm1-protokoll.html">Fernsteuerung RM1</a>, die <a href="main-loop-timing.html">gemessenen Verbesserungen der Hauptschleife</a> und <a href="pr-history.html">alle Pull Requests nach upstream</a>.</li>
+    <li><strong>Bedienen:</strong> die <a href="net-console.html">Anleitung zur Net Console</a>, dem Log des Knotens über WLAN oder LAN, auch mit Passwort.</li>
     <li><strong>Basis:</strong> das offizielle 4.40a.hbserver mit zentraler Server-Tabelle, Netzmodus auto/inet/hamnet, Auto Update und Fernsteuerung per LoRa. Speichern-und-Weiterleiten über den Server ist in Release-Builds gesperrt.</li>
     <li><strong>Belegt:</strong> jede Aussage kommt aus dem Quellcode oder aus GitHub. Was nicht geprüft ist, sagt die jeweilige Seite.</li>
   </ul>
@@ -183,6 +184,13 @@
       <p><strong>Jeder Befehl trägt eine 64-Bit-Signatur aus HMAC-SHA256, die Antwort ist ebenfalls signiert.</strong> 26 Befehle sind erlaubt, ab Werk ist RM1 aus.</p>
       <p>Mit Rechenbeispiel, Wiedereinspielschutz und Hinweisen für App-Entwickler. Alles bleibt im Klartext lesbar.</p>
       <div class="card-meta">Firmware 4.40a · Stand 25.10.2026 · für App-Entwickler</div>
+    </a>
+    <a class="card" href="net-console.html">
+      <div class="eyebrow">Anleitung · Net Console</div>
+      <h2>Das Log des Knotens über das Netz lesen, auch mit Passwort</h2>
+      <p><strong>Die Net Console zeigt das Log eines ESP32-Knotens auf TCP-Port 2323 und nimmt Befehle an.</strong> Mit Passwort schickt der Knoten eine NONCE, die Antwort rechnen zwei Skripte aus dem Repo aus.</p>
+      <p>Mit PuTTY, <code>nc</code>, Python- und PowerShell-Skript sowie Einzeilern zum Ausrechnen von Hand.</p>
+      <div class="card-meta">Firmware 4.40a · Stand 30.10.2026 · für Betreiber</div>
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 30 Boards</div>
