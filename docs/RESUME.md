@@ -21,6 +21,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **WEB-AUTH-01 (#1241) fixed and bench-verified 2026-10-30** (`9ac4f45f`, not released): Enter submits the web
+  login, the field gets the focus, the password no longer crosses the wire (nonce + HMAC-SHA256 in the browser),
+  a random session cookie replaces the per-IP login, plaintext `/?nodepassword=` is refused. Gate stage 1,2 PASS
+  (84 envs, 3111/3111), two Opus advisor rounds APPROVED after rework. Bench: DK5EN-1 (USB) 19/19 HTTP checks incl.
+  throttle + Chrome (Enter, autofocus, wrong-password message, logout); DK5EN-98 (OTA, operator OK) 17/17 + Chrome.
+  Both nodes run `9ac4f45f`, web password removed again (DK5EN-98 had none; DK5EN-1 no longer INSTRUMENT).
+  Upstream PR: see campaign doc. Details: [campaign-webui-login.md](campaign-webui-login.md).
+
 - **UDP-05 fixed and bench-verified 2026-10-30** (`2b1a9dc4`, not released): EXTUDP sends now show in the node's
   own WebUI chat (DK5EN/map#3). Gate stage 1,2 PASS (83 envs, 3084/3084), golden 48, Opus advisor APPROVED after
   one rework (serial is already echoed). DK5EN-1 runs the INSTRUMENT build of `2b1a9dc4`. Upstream

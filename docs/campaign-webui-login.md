@@ -1,10 +1,7 @@
 # Campaign WEB-AUTH-01 -- web login: Enter key, autofocus, no plaintext password on the wire
 
-**Status:** W0-W2 done 2026-10-30 (W1 and W2 advisor APPROVED after rework). Gate running. Base `18f04e26`.
-**Issue:** upstream [#1241](https://github.com/icssw-org/MeshCom-Firmware/issues/1241) (Enter does not submit the
-login), extended by operator decision 2026-10-30 to option B of the password overview: challenge-response login
-plus cookie sessions. Options A/C (hash at rest) and D (TLS) are blocked: web side only, no change to settings
-layout, BLE `SN1`/`WSPWD`, config export or the phone app.
+**Status:** W0-W3 done 2026-10-30, fork-dev `9ac4f45f` (W1/W2 advisor APPROVED after rework, gate stage 1,2
+PASS, bench DK5EN-1 + DK5EN-98 PASS). W4 upstream PR next. Base `18f04e26`.
 
 ## BLUF
 
@@ -90,3 +87,16 @@ const char *webAuthErrCode(WebAuthResult r);                                    
   orchestrator: the RNG callback reports failure (WA_RNG) instead of a `micros()` fallback on nRF52; advisor
   required the legacy `/?nodepassword=` request line to be wiped from `web_currentLine`; Cookie scan finds `mcs=`
   beyond 255 bytes; Web-API_documentation.txt documents the login for scripts.
+- 2026-10-30 gate: `regression.sh --stage 1,2` PASS (84 envs, 3111/3111, `webgui_login_test.js` 27, golden
+  `variant-ini-effective.json` regenerated for `native_web_auth` only). Builds Heltec V3, RAK4631, E22, T-Deck Plus,
+  T-Beam OK. Cost vs `18f04e26`: E22 +456 B RAM / +5.2 kB flash, RAK +472 B RAM / +4.8 kB flash (86.8 %). Firmware
+  strings: `mcHmacHex`, `loginnonce`, `SameSite=Strict` present, old plaintext login JS absent. Commit `9ac4f45f`.
+- 2026-10-30 W3 bench (HTTP script `webauth_bench.py`, logs `tools/bench/runs/harness/webauth-*.log`):
+  DK5EN-1 (USB flash, identity guard ok) 19/19: login page and 401 without cookie, nonce/login/cookie, replay 403,
+  wrong password 403, plaintext 403, `mcs=` behind 400 B of foreign cookies, `xmcs=` and last-char-changed tokens
+  refused, logout, `--webpwd` drops sessions, throttle after 5 failures and release after 60 s; the documented
+  curl/openssl recipe logs in. Chrome: autofocus on load, Enter with wrong password shows "Wrong password" and
+  refocuses, Enter with the right one logs in, `loadPage` works with the cookie, after logout `loadPage` shows the
+  login form with focus. DK5EN-98 (OTA via `webflash.py`, 72 s; no 2323 login in `.env`, so the password was set
+  via `/setparam/?manualcommand=` and the identity guard was not run; HTTP-only test, no RF traffic) 17/17 without
+  the throttle case, Chrome Enter login. Both nodes: web password removed again.
