@@ -7,7 +7,8 @@
 `v<VER>[.MM.DD]` tags), both unchanged by review. Synced into `fork-dev` by merge; the merge tree equals the pre-merge
 tree (see "Upstream sync 2026-10-25" below). PR branches `pr/fork-firmware-20261025`, `pr/ci-autoupdate` (local and origin) and
 worktrees `../MeshCom-PR-next`, `../MeshCom-PR-ci` removed 2026-10-25; the PR heads stay reachable as parents of the
-upstream merges. Pages PR history updated (63 PRs, gh-pages `6c835be8`).
+upstream merges. Pages PR history updated (63 PRs). 2026-10-30: Pages got the Net Console guide
+(`net-console.html`: 2323 login, NONCE/HMAC scripts and one-liners), gh-pages `2f4e7df0`.
 Next step: watch upstream for follow-up review; prod channel needs upstream tags of the form `v<VER>` or `v<VER>.MM.DD`.
 TD-22 soak and TD-23 UAT still open.
 
