@@ -27,7 +27,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   (84 envs, 3111/3111), two Opus advisor rounds APPROVED after rework. Bench: DK5EN-1 (USB) 19/19 HTTP checks incl.
   throttle + Chrome (Enter, autofocus, wrong-password message, logout); DK5EN-98 (OTA, operator OK) 17/17 + Chrome.
   Both nodes run `9ac4f45f`, web password removed again (DK5EN-98 had none; DK5EN-1 no longer INSTRUMENT).
-  Upstream PR: see campaign doc. Details: [campaign-webui-login.md](campaign-webui-login.md).
+  Upstream [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (branch `pr/webui-login`, worktree
+  `../MeshCom-PR-webauth`, one commit `fc388770`, firmware + `test_web_auth` + jsdom test). Details:
+  [campaign-webui-login.md](campaign-webui-login.md).
 
 - **UDP-05 fixed and bench-verified 2026-10-30** (`2b1a9dc4`, not released): EXTUDP sends now show in the node's
   own WebUI chat (DK5EN/map#3). Gate stage 1,2 PASS (83 envs, 3084/3084), golden 48, Opus advisor APPROVED after

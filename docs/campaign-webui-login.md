@@ -1,7 +1,8 @@
 # Campaign WEB-AUTH-01 -- web login: Enter key, autofocus, no plaintext password on the wire
 
-**Status:** W0-W3 done 2026-10-30, fork-dev `9ac4f45f` (W1/W2 advisor APPROVED after rework, gate stage 1,2
-PASS, bench DK5EN-1 + DK5EN-98 PASS). W4 upstream PR next. Base `18f04e26`.
+**Status:** done 2026-10-30. fork-dev `9ac4f45f` + `fb8c19d4`; upstream
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (branch `pr/webui-login`, worktree `../MeshCom-PR-webauth`). After the
+maintainers merge: `/sync-upstream`, then remove the worktree and branch. Base `18f04e26`.
 
 ## BLUF
 
@@ -100,3 +101,9 @@ const char *webAuthErrCode(WebAuthResult r);                                    
   login form with focus. DK5EN-98 (OTA via `webflash.py`, 72 s; no 2323 login in `.env`, so the password was set
   via `/setparam/?manualcommand=` and the identity guard was not run; HTTP-only test, no RF traffic) 17/17 without
   the throttle case, Chrome Enter login. Both nodes: web password removed again.
+- 2026-10-30 W4: PR branch `pr/webui-login` from `upstream/dev` 10203967, cherry-pick of `9ac4f45f` without the
+  fork-only files (regression.sh, suite map, golden baseline, test_web_guard, campaign doc), `[env:native_web_auth]`
+  placed after `native_web_txbuf`; the change set equals fork-dev's (0 differing diff lines). PR gate: five boards
+  build, native envs safeboot 17, pnretry 34, web_txbuf 20, web_auth 27, extradio 149, jsdom 27. Submitted as
+  [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), German body, closes #1241. Residual risks stay
+  out of the public text (no unfixed weakness of deployed firmware in PR text).
