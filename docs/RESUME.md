@@ -17,6 +17,13 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **HEY-UP-01 fixed and field-verified 2026-10-30** (`a3a8fc5f`, not released): a gateway's HEY upload now names
+  the gateway as the last path element, so the INTERLINK feed and mcmap get the gateway-to-gateway links
+  (DK5EN/map#5). Gate stage 1,2 PASS (83 envs, 3073/3073), Opus advisor APPROVED. DK5EN-98 runs the fix build
+  since 17:22 (`DL2JA-2,DK5EN-98` published, mcmap edge drawn, publish rate unchanged). Upstream PR prepared in a
+  parallel session. Details: [bug-hey-upload-no-receiver-20261030.md](bug-hey-upload-no-receiver-20261030.md),
+  catalogue 2l. Upstream `dev` has 3 new commits (#1240, e290) for the next `/sync-upstream`.
+
 - **DK5EN-98 extended soak of `v4.40a.10.25` passed** (2026-10-25 20:36 to 2026-10-29 18:00, 93.4 h, evaluated
   2026-10-30): finished as planned, no reboot (uptime continuous), 0 crashes, 0 `MC_SM_ERRORS`. TX pool: 0
   `RING_DROP_PRIO`, 0 `RING_DROP_NEW`, 0 `RING_DROP_STALE` (TTL and `{CET}`), queue peak 5/20, 0 retries, 0 txfail.

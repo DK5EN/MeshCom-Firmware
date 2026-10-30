@@ -166,6 +166,27 @@ these.
 - The gateway still relays over RF: no `RELAY_LOOP_BLOCKED` for those frames.
 - The gateway's own HEYs stay single-element with an empty report.
 
+## Field result 2026-10-30 (DK5EN-98)
+
+**Pass.** Fix `a3a8fc5f` (HEY-UP-01), Heltec V3 build flashed OTA on DK5EN-98 at 17:22, console logged on
+rpizero (`~/meshlog/dk5en-98-heyup-20261030/`, 17:23 to 18:29, `--loradebug` on for the run only, restored).
+
+- **Direct reception, the case of this report:** DK5EN-98 uploaded `E9FB71B6` as `DL2JA-2,DK5EN-98`, report
+  `3,120,-8;` last. `interlink.log` on oe-link: `"path":"DL2JA-2,DK5EN-98","gw":1`; mcmap:
+  `edge: DL2JA-2 -> DK5EN-98  snr=-8 rssi=-120`. Second direct case: `B080FAAA` `DF2SI-12,DK5EN-98`.
+- **Relayed reception:** `B080FAA7` published as `DF2SI-12,DL2JA-1,DK5EN-98`, `"rssi":"7,118,-13;2,117,-9;"`;
+  mcmap: `edge: DL2JA-1 -> DK5EN-98  snr=-9 rssi=-117`, the report DK5EN-98 appended.
+- **Call exactly once:** 39 uploads of foreign HEYs, none with the call twice. DK5EN-98's own HEY heard back
+  (`DK5EN-98,DL2UD-1`, 13 uploads) gets no second call.
+- **RF relay intact:** 0 `RELAY_LOOP_BLOCKED` in the run.
+- **Own HEY:** constraint 5 needs no code; `sendHey()` has not uploaded the own HEY since GW-01
+  (src/loop_functions.cpp). No test for it.
+- **Publish rate unchanged:** the server publishes only part of the uploaded copies, by arrival order: a dropped
+  copy almost never has a later published copy of the same `msg_id` (10-29: 11 of 163; 10-30: 1 of 29). Uploads
+  matched by `msg_id` + report: 10/39 published after the fix (direct 2/2), 13/41 before the fix in the same
+  evening window of 10-29 (direct 2/2); per bucket (path length without the own call) the rates match within
+  sample noise. Daytime 10-29 before the fix: 175/338, direct 42/42.
+
 ## Upstream server (separate track, not for this fix)
 
 The cleaner fix is on the MeshCom server. It already has the uploader's call in the `DATA` header
