@@ -41,7 +41,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-# The 32 release environments, minus the two safeboot helper envs, which are
+# The 33 release environments, minus the two safeboot helper envs, which are
 # inputs rather than boards. Mirrors the Fallback appendix of
 # .claude/commands/release-firmware.md; t5_epaper and esp32-external-radio are
 # deliberately absent.
@@ -72,6 +72,7 @@ RELEASE_ENVS = [
     "t_deck_pro",
     "vision-master-e213",
     "vision-master-e290",
+    "vision-master-e290-otp",
     "wireless-paper",
     "heltec_t114",
     "t_echo",
@@ -80,7 +81,6 @@ RELEASE_ENVS = [
 
 # env -> (vendor group, board name). The radio chip is NOT in here: it is
 # derived from the variant's configuration.h and appended by radio_label().
-# The only hand-maintained table in this file.
 DISPLAY = {
     "heltec_wifi_lora_32_V2": ("Heltec", "WiFi LoRa 32 V2"),
     "heltec_wifi_lora_32_V3": ("Heltec", "WiFi LoRa 32 V3"),
@@ -89,6 +89,7 @@ DISPLAY = {
     "heltec_wireless_tracker": ("Heltec", "Wireless Tracker"),
     "vision-master-e213": ("Heltec", "Vision Master E213"),
     "vision-master-e290": ("Heltec", "Vision Master E290"),
+    "vision-master-e290-otp": ("Heltec", "Vision Master E290"),
     "wireless-paper": ("Heltec", "Wireless Paper"),
     "heltec_t114": ("Heltec", "Mesh Node T114"),
     "ttgo_tbeam": ("LilyGo", "T-Beam"),
@@ -112,6 +113,17 @@ DISPLAY = {
     "E22_1268_S3-DevKitC-1-N16R8": ("DevKit", "ESP32-S3 DevKitC-1 + E22-400M30S"),
     "esp32-loraprs-e22": ("DevKit", "LoRa-APRS ESP32 + E22"),
     "esp32-loraprs-ra01": ("DevKit", "LoRa-APRS ESP32 + RA-01"),
+}
+
+# Images built from one variant directory run on the same board and report the
+# same hardware ID; nothing the page can read tells them apart. Each gets the
+# marking the user checks on the board instead. Every env of such a group needs
+# one (same_board_groups() refuses otherwise). The E290 panels differ in their
+# refresh waveform only; the marking is on the display's flex cable
+# (variants/vision-master-e290/platformio.ini).
+VARIANT_LABEL = {
+    "vision-master-e290": "Displaykabel 15-22243",
+    "vision-master-e290-otp": "Displaykabel FPC-7519revb",
 }
 
 # Which RadioLib class each variant define actually instantiates. Ground truth
@@ -146,13 +158,38 @@ CHIP_LABEL = {
 # which has no variant define to read.
 NRF52_CHIP = "SX1262"
 
-def radio_chip(env: str, family: str, repo: Path = REPO) -> str:
+_VARIANT_INCLUDE = re.compile(r"-I\s*variants/(\S+)")
+
+
+def variant_dir(cfg, env: str) -> str:
+    """The variants/ subdirectory an env compiles against.
+
+    Read from the env's `-I variants/<dir>` build flag, the include that makes
+    its configuration.h the one the firmware sees. Most envs write
+    ${this.__env__}; an env that extends another and shares its variant (the
+    E290 OTP image) names the directory outright.
+    """
+    flags = resolve(cfg, env, "build_flags") or ""
+    dirs = {d.replace("${this.__env__}", env) for d in _VARIANT_INCLUDE.findall(flags)}
+    if len(dirs) > 1:
+        raise SystemExit(f"{env}: build_flags include several variant dirs {sorted(dirs)}")
+    return dirs.pop() if dirs else env
+
+
+def variant_header(cfg, env: str, repo: Path = REPO) -> Path:
+    """variants/<dir>/configuration.h of an env; refuses when it is missing."""
+    d = variant_dir(cfg, env)
+    cfg_h = repo / "variants" / d / "configuration.h"
+    if not cfg_h.is_file():
+        raise SystemExit(f"{env}: no variants/{d}/configuration.h")
+    return cfg_h
+
+
+def radio_chip(cfg, env: str, family: str, repo: Path = REPO) -> str:
     """The RadioLib class this env's firmware instantiates."""
     if family == "NRF52":
         return NRF52_CHIP
-    cfg_h = repo / "variants" / env / "configuration.h"
-    if not cfg_h.is_file():
-        raise SystemExit(f"{env}: no variants/{env}/configuration.h to read the radio from")
+    cfg_h = variant_header(cfg, env, repo)
     found = set()
     for line in cfg_h.read_text(errors="replace").splitlines():
         parts = line.strip().split()
@@ -205,14 +242,14 @@ def hardware_ids(repo: Path = REPO) -> dict[str, int]:
     return ids
 
 
-def modul_hardware(env: str, repo: Path = REPO) -> str:
+def modul_hardware(cfg, env: str, repo: Path = REPO) -> str:
     """The MODUL_HARDWARE symbol of a variant, e.g. HELTEC_V3."""
-    cfg_h = repo / "variants" / env / "configuration.h"
+    cfg_h = variant_header(cfg, env, repo)
     for line in cfg_h.read_text(errors="replace").splitlines():
         m = _MODUL_HARDWARE.match(line)
         if m:
             return m.group(1)
-    raise SystemExit(f"{env}: no MODUL_HARDWARE in variants/{env}/configuration.h")
+    raise SystemExit(f"{env}: no MODUL_HARDWARE in {cfg_h.relative_to(repo)}")
 
 
 def reports_axp2101_id(cfg, env: str, repo: Path = REPO) -> bool:
@@ -223,11 +260,31 @@ def reports_axp2101_id(cfg, env: str, repo: Path = REPO) -> bool:
     with TBEAM_AXP2101 unless BOARD_TBEAM_V3 (the Supreme) is set. Every
     T-Beam image run on a v1.2 board therefore answers with that one ID.
     """
-    cfg_h = repo / "variants" / env / "configuration.h"
+    cfg_h = variant_header(cfg, env, repo)
     has_pmu = any(_PMU_DEFINE.match(line) for line in
                   cfg_h.read_text(errors="replace").splitlines())
     flags = resolve(cfg, env, "build_flags") or ""
     return has_pmu and "BOARD_TBEAM_V3" not in flags
+
+
+def same_board_groups(cfg, envs) -> list[list[str]]:
+    """Envs that share a variant directory, i.e. images for one board.
+
+    Detection cannot choose between them, so each member must carry a
+    VARIANT_LABEL the user can match against the board.
+    """
+    by_dir: dict[str, list[str]] = {}
+    for env in envs:
+        by_dir.setdefault(variant_dir(cfg, env), []).append(env)
+    groups = [g for g in by_dir.values() if len(g) > 1]
+    for g in groups:
+        missing = [env for env in g if env not in VARIANT_LABEL]
+        if missing:
+            raise SystemExit(
+                f"{', '.join(g)} share variants/{variant_dir(cfg, g[0])} but "
+                f"{', '.join(missing)} has no VARIANT_LABEL -- the page could not tell them apart"
+            )
+    return groups
 
 
 def detect_table(repo: Path = REPO, envs=None) -> dict:
@@ -243,17 +300,19 @@ def detect_table(repo: Path = REPO, envs=None) -> dict:
     axp = []
     for env in envs:
         family = chip_family(cfg, env, repo)
-        sym = modul_hardware(env, repo)
+        sym = modul_hardware(cfg, env, repo)
         if sym not in ids:
             raise SystemExit(f"{env}: MODUL_HARDWARE {sym} is not in the Hardware Types table")
-        boards[env] = {"hwid": ids[sym], "radio": radio_chip(env, family, repo),
+        boards[env] = {"hwid": ids[sym], "radio": radio_chip(cfg, env, family, repo),
                        "chipFamily": family}
+        if env in VARIANT_LABEL:
+            boards[env]["variant"] = VARIANT_LABEL[env]
         if family != "NRF52" and reports_axp2101_id(cfg, env, repo):
             axp.append(env)
     aliases = {}
     if axp:
         aliases[str(ids["TBEAM_AXP2101"])] = axp
-    return {"boards": boards, "aliases": aliases}
+    return {"boards": boards, "aliases": aliases, "sameBoard": same_board_groups(cfg, envs)}
 
 
 def write_detect(pages_root: Path, repo: Path = REPO) -> None:
@@ -563,8 +622,9 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
     comes from the CI release assets; everything else from the local build.
     """
     family = chip_family(cfg, env, repo)
-    radio = CHIP_LABEL[radio_chip(env, family, repo)]
+    radio = CHIP_LABEL[radio_chip(cfg, env, family, repo)]
     group, name = DISPLAY[env]
+    variant = VARIANT_LABEL.get(env)
     dest.mkdir(parents=True, exist_ok=True)
 
     if family == "NRF52" and release_dir is not None:
@@ -608,21 +668,25 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
             parts.append({"path": name_out, "offset": offset})
         builds = [{"chipFamily": family, "parts": parts}]
 
+    title = f"{name}, {variant}" if variant else name
     manifest = {
-        "name": f"MeshCom {group} {name} ({radio})",
+        "name": f"MeshCom {group} {title} ({radio})",
         "version": version,
         "new_install_prompt_erase": True,
         "new_install_improv_wait_time": 0,
         "builds": builds,
     }
     (dest / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    return {
+    entry = {
         "env": env,
         "group": group,
         "name": name,
         "radio": radio,
         "chipFamily": family,
     }
+    if variant:
+        entry["variant"] = variant
+    return entry
 
 
 def stage(version: str, out: Path, repo: Path = REPO, envs=None,

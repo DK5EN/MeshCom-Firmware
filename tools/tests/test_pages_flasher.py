@@ -143,15 +143,16 @@ def test_t_deck_pro_falls_back_to_family_default(cfg, tmp_path):
         ("heltec_wifi_lora_32_V3", "SX1262"),  # SX1262_V3
         ("wireless-paper", "SX1262"),          # two defines, one chip
         ("wiscore_rak4631", "SX1262"),         # nRF52, no variant define
+        ("vision-master-e290-otp", "SX1262"),  # shares variants/vision-master-e290
     ],
 )
 def test_radio_chip_from_variant_header(env, chip, cfg):
-    assert pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO) == chip
+    assert pf.radio_chip(cfg, env, pf.chip_family(cfg, env, REPO), REPO) == chip
 
 
 def test_every_release_env_yields_exactly_one_radio(cfg):
     for env in pf.RELEASE_ENVS:
-        chip = pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO)
+        chip = pf.radio_chip(cfg, env, pf.chip_family(cfg, env, REPO), REPO)
         assert chip in pf.CHIP_LABEL
 
 
@@ -168,14 +169,59 @@ def test_display_names_carry_no_chip_text():
         assert "SX12" not in name.upper(), f"{env}: chip text in the display name"
 
 
-def test_boards_sharing_a_name_are_told_apart_by_the_radio(cfg):
+def test_boards_sharing_a_name_are_told_apart_by_radio_or_variant(cfg):
     labels = {}
     for env in pf.RELEASE_ENVS:
         group, name = pf.DISPLAY[env]
-        radio = pf.CHIP_LABEL[pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO)]
-        key = (group, name, radio)
+        radio = pf.CHIP_LABEL[pf.radio_chip(cfg, env, pf.chip_family(cfg, env, REPO), REPO)]
+        key = (group, name, radio, pf.VARIANT_LABEL.get(env))
         assert key not in labels, f"{env} and {labels.get(key)} render identically"
         labels[key] = env
+
+
+# --------------------------------------------------------------------------
+# variant directory (PF-01: an env may build from another env's variant)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "env,vdir",
+    [
+        ("heltec_wifi_lora_32_V3", "heltec_wifi_lora_32_V3"),  # ${this.__env__}
+        ("vision-master-e213", "vision-master-e213"),          # named outright
+        ("vision-master-e290-otp", "vision-master-e290"),      # extends, shares the variant
+    ],
+)
+def test_variant_dir_from_the_include_flag(cfg, env, vdir):
+    assert pf.variant_dir(cfg, env) == vdir
+
+
+def test_every_release_env_has_a_variant_header(cfg):
+    for env in pf.RELEASE_ENVS:
+        assert pf.variant_header(cfg, env, REPO).is_file(), env
+
+
+def test_otp_image_is_a_release_board():
+    """PF-01: CI releases vision-master-e290-otp.bin; the flasher must offer it."""
+    assert "vision-master-e290-otp" in pf.RELEASE_ENVS
+    ci = (REPO / ".github" / "workflows" / "meshcom-ci.yml").read_text()
+    assert "vision-master-e290-otp/vision-master-e290-otp.bin" in ci
+
+
+def test_same_board_groups_are_the_e290_images(cfg):
+    assert pf.same_board_groups(cfg, pf.RELEASE_ENVS) == [
+        ["vision-master-e290", "vision-master-e290-otp"]
+    ]
+
+
+def test_same_board_group_without_a_label_is_refused(cfg, monkeypatch):
+    monkeypatch.setattr(pf, "VARIANT_LABEL", {"vision-master-e290": "Displaykabel 15-22243"})
+    with pytest.raises(SystemExit, match="vision-master-e290-otp has no VARIANT_LABEL"):
+        pf.same_board_groups(cfg, pf.RELEASE_ENVS)
+
+
+def test_variant_labels_only_for_release_envs():
+    assert set(pf.VARIANT_LABEL) <= set(pf.RELEASE_ENVS)
 
 
 # --------------------------------------------------------------------------
@@ -214,6 +260,17 @@ def test_every_release_env_has_a_hardware_id():
 )
 def test_hardware_id_per_env(env, hwid):
     assert pf.detect_table(REPO)["boards"][env]["hwid"] == hwid
+
+
+def test_both_e290_images_share_one_hardware_id_and_carry_their_panel():
+    table = pf.detect_table(REPO)
+    stock = table["boards"]["vision-master-e290"]
+    otp = table["boards"]["vision-master-e290-otp"]
+    assert stock["hwid"] == otp["hwid"]
+    assert stock["variant"] == "Displaykabel 15-22243"
+    assert otp["variant"] == "Displaykabel FPC-7519revb"
+    assert "variant" not in table["boards"]["heltec_wifi_lora_32_V3"]
+    assert table["sameBoard"] == [["vision-master-e290", "vision-master-e290-otp"]]
 
 
 def test_axp2101_id_covers_the_tbeam_images_but_not_the_supreme():
@@ -373,6 +430,26 @@ def test_release_rename_map(cfg, tmp_path, env, asset):
     out = tmp_path / "out"
     pf.stage_board(cfg, env, "v1", out, REPO, build, rel)
     assert (out / "firmware.bin").read_bytes() == marker_image(env, asset.encode())
+
+
+def test_otp_image_stages_with_its_panel_label(cfg, tmp_path):
+    env = "vision-master-e290-otp"
+    build = fake_build(tmp_path, [env])
+    rel = fake_release(tmp_path, {f"{env}.bin": marker_image(env, b"CI-otp")})
+    out = tmp_path / "out"
+    entry = pf.stage_board(cfg, env, "v1", out, REPO, build, rel)
+    assert entry["variant"] == "Displaykabel FPC-7519revb"
+    assert entry["name"] == "Vision Master E290"
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["name"] == "MeshCom Heltec Vision Master E290, Displaykabel FPC-7519revb (SX1262)"
+    assert (out / "firmware.bin").read_bytes() == marker_image(env, b"CI-otp")
+    assert [p["offset"] for p in manifest["builds"][0]["parts"]] == [0x0, 0x8000, 0xE000, 0x10000, 0xC0000]
+
+
+def test_board_without_variant_has_no_variant_key(cfg, tmp_path):
+    build = fake_build(tmp_path, ["t_deck"])
+    entry = pf.stage_board(cfg, "t_deck", "v1", tmp_path / "out", REPO, build)
+    assert "variant" not in entry
 
 
 def test_release_missing_asset_refused(cfg, tmp_path):

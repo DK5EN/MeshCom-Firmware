@@ -240,6 +240,49 @@ test('WF-01: an env contradicting the ROM family is not trusted', () => {
   assert.ok(r.warnings.length >= 1);
 });
 
+// PF-01: the stock and the OTP E290 image run on one board and both report
+// HELTEC_E290; only the display's flex cable tells which panel is fitted.
+const E290 = ['vision-master-e290', 'vision-master-e290-otp'];
+
+test('PF-01: detect.json groups the two E290 images and labels their panels', () => {
+  assert.deepEqual(DETECT.sameBoard, [E290]);
+  assert.equal(DETECT.boards[E290[0]].hwid, DETECT.boards[E290[1]].hwid);
+  assert.match(DETECT.boards[E290[0]].variant, /15-22243/);
+  assert.match(DETECT.boards[E290[1]].variant, /FPC-7519revb/);
+});
+
+test('PF-01: the E290 hardware id offers both panel images, with a hint', () => {
+  const hwid = DETECT.boards[E290[0]].hwid;
+  const r = candidates(DETECT, ALL, parseInfo(infoText(hwid, 'HELTEC_E290', null)), {}, 'ESP32-S3');
+  assert.deepEqual(r.envs, E290);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /15-22243 \/ .*FPC-7519revb/);
+});
+
+for (const running of E290) {
+  test(`PF-01: a running ${running} still offers both panel images`, () => {
+    const hwid = DETECT.boards[running].hwid;
+    const r = candidates(DETECT, ALL, parseInfo(infoText(hwid, 'HELTEC_E290', running)), {}, 'ESP32-S3');
+    assert.deepEqual([...r.envs].sort(), [...E290].sort());
+    assert.match(r.basis.join(' '), new RegExp(`Build-Env ${running}`));
+    assert.match(r.warnings.join(' '), /Aufdruck am Board/);
+  });
+}
+
+test('PF-01: a release without the OTP image offers the stock E290 alone', () => {
+  const rel = ALL.filter((e) => e !== 'vision-master-e290-otp');
+  const hwid = DETECT.boards[E290[0]].hwid;
+  const r = candidates(DETECT, rel, parseInfo(infoText(hwid, 'HELTEC_E290', E290[0])), {}, 'ESP32-S3');
+  assert.deepEqual(r.envs, [E290[0]]);
+  assert.deepEqual(r.warnings, []);
+});
+
+test('PF-01: no panel hint while many boards are still open', () => {
+  const r = candidates(DETECT, ALL, null, {}, 'ESP32-S3');
+  assert.ok(r.envs.includes(E290[0]) && r.envs.includes(E290[1]));
+  assert.deepEqual(r.warnings, []);
+});
+
 test('native S3 USB alone: every S3 board remains (the 17-board case)', () => {
   const r = candidates(DETECT, ALL, null, {}, 'ESP32-S3');
   assert.ok(S3_ENVS.length > 1);
