@@ -1732,6 +1732,23 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
 - **TXP-03 (behaviour, documented):** `TEST` is not a group (`CheckGroup()` accepts digits only); `::{TEST}` is a
   PN to the callsign TEST, never ACKed, sent 4 times by the retry ladder. Bench group tests use 9 or 9999.
 
+## 2l. HEY-UP-01 — gateway HEY upload does not name the receiving gateway (2026-10-30)
+
+**FIXED** on fork-dev 2026-10-30 (`a3a8fc5f`, not released), field-verified on DK5EN-98 (build of `a3a8fc5f`, flashed
+2026-10-30 17:22). Report and evidence: [`bug-hey-upload-no-receiver-20261030.md`](../bug-hey-upload-no-receiver-20261030.md)
+(mcmap issue DK5EN/map#5).
+
+- **Mechanism:** the gateway upload branch in `OnRxDone()` (src/lora_functions.cpp ~2413) appended the own signal
+  report to a received `@` payload and re-encoded it, but never touched `msg_source_path`. The own call was only
+  appended in the relay branch (~2548), after the upload and only for an RF relay. The server publishes the path as
+  uploaded, so about 44 % of HEY reports in the INTERLINK feed named no receiver and no link could be drawn from them.
+- **Fix:** `encodeHeyUpload()` (src/aprs_functions.cpp) saves `msg_source_path`, appends `,<own call>` via
+  `appendUploaderToPath()` (long path; only if it fits `MC_PATH_LEN` and the call is not already an element),
+  encodes the upload frame and restores the path. Loop detection and the relay-branch append see the unchanged path.
+- **Out of scope:** own HEY (`sendHey()` has not uploaded itself since GW-01), `pos` and text uploads (the server
+  names the uploader there). The same fix on the MeshCom server would also cover older gateways; separate track.
+- **Tests:** `test_hey_report` +8 cases, fail before (direct, relayed, partial match), pass after.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
