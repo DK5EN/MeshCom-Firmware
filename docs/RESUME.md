@@ -23,7 +23,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - **UDP-05 fixed and bench-verified 2026-10-30** (`2b1a9dc4`, not released): EXTUDP sends now show in the node's
   own WebUI chat (DK5EN/map#3). Gate stage 1,2 PASS (83 envs, 3084/3084), golden 48, Opus advisor APPROVED after
-  one rework (serial is already echoed). DK5EN-1 runs the INSTRUMENT build of `2b1a9dc4`. Upstream PR next.
+  one rework (serial is already echoed). DK5EN-1 runs the INSTRUMENT build of `2b1a9dc4`. Upstream
+  [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (branch `pr/extudp-webui-echo`, worktree
+  `../MeshCom-PR-extudp`, one commit, 2 files); DK5EN/map#3 answered and closed.
   Details: [campaign-extudp-webui-echo.md](campaign-extudp-webui-echo.md), catalogue 2m.
 
 - **HEY-UP-01 fixed and field-verified 2026-10-30** (`a3a8fc5f`, not released): a gateway's HEY upload now names

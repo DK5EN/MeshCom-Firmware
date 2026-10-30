@@ -1,6 +1,6 @@
 # Campaign UDP-05 -- EXTUDP messages missing from the local WebUI chat
 
-**Status:** W1 and W2 done 2026-10-30 (`2b1a9dc4`); W3 upstream PR next. Source: DK5EN/map#3 (filed in the wrong repo; it is a
+**Status:** W1 and W2 done 2026-10-30 (`2b1a9dc4`); W3 done: upstream [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (branch `pr/extudp-webui-echo` from `upstream/dev` 10203967, worktree `../MeshCom-PR-extudp`, helper + call site only; builds `heltec_wifi_lora_32_V3`, `ttgo_tbeam`, `t_deck_plus`, `wiscore_rak4631`, `ttgo-lora32-v21` green). DK5EN/map#3 answered and closed. Open: maintainer review, then `/sync-upstream` (merge) and worktree cleanup. Source: DK5EN/map#3 (filed in the wrong repo; it is a
 firmware change). Spec: operator note `extudp-webui-echo.md` (Desktop), reproduced in short below.
 
 ## BLUF
