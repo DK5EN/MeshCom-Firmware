@@ -242,27 +242,99 @@ static void test_uploader_overflow(void)
     TEST_ASSERT_EQUAL_MEMORY(b, a, lb);
 }
 
+// Pfad aus Rufzeichen-Elementen mit genau n Zeichen (n >= 9): "DL4AAA-1,..." und
+// ein letztes, per 'A' gedehntes Element.
+static void mkPathLen(char *out, size_t cap, size_t n)
+{
+    mcSet(out, cap, "DL4AAA-1");
+    while(strlen(out) + 9 + 9 <= n)
+        mcAppend(out, cap, ",DL4AAA-1");
+    size_t rest = n - strlen(out) - 1;          // Komma + letztes Element
+    char last[40] = "DL4";
+    size_t k = rest - 3;
+    memset(last + 3, 'A', k);
+    last[3 + k] = '\0';
+    mcAppendChar(out, cap, ',');
+    mcAppend(out, cap, last);
+}
+
 static void test_uploader_kante_120(void)
 {
-    // Ergebnis genau MC_PATH_LEN-1 (120) Zeichen: wird angehaengt;
-    // ein Zeichen mehr (121): bleibt unveraendert
+    // Decodierbarer Quellpfad hat hoechstens MC_PATH_LEN-2 (119) Zeichen
+    // (decodeAPRS-Schleife). Ergebnis 119: wird angehaengt UND der Upload-Rahmen
+    // decodiert; Ergebnis 120: bleibt unveraendert.
     struct aprsMessage m;
     const char *own = "DL3OWN-9";
-    size_t lp = (MC_PATH_LEN - 1) - 1 - strlen(own);
+    size_t lp = (MC_PATH_LEN - 2) - 1 - strlen(own);
     char longp[MC_PATH_LEN];
 
-    memset(longp, 'D', lp);
-    longp[lp] = '\0';
+    mkPathLen(longp, sizeof(longp), lp);
     mkHey(m, "DL1ORG-1");
     mcSet(m.msg_source_path, sizeof(m.msg_source_path), longp);
-    TEST_ASSERT_TRUE(appendUploaderToPath(m, own));
-    TEST_ASSERT_EQUAL_size_t(MC_PATH_LEN - 1, strlen(m.msg_source_path));
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    uint16_t len = encodeHeyUpload(buf, m, own);
+    struct aprsMessage d;
+    decodeBack(buf, len, d);
+    size_t dl = strlen(d.msg_source_path);
+    TEST_ASSERT_EQUAL_size_t(MC_PATH_LEN - 2, dl);
+    TEST_ASSERT_EQUAL_STRING(own, d.msg_source_path + dl - strlen(own));
 
-    memset(longp, 'D', lp + 1);
-    longp[lp + 1] = '\0';
+    TEST_ASSERT_TRUE(appendUploaderToPath(m, own));
+    TEST_ASSERT_EQUAL_size_t(MC_PATH_LEN - 2, strlen(m.msg_source_path));
+
+    mkPathLen(longp, sizeof(longp), lp + 1);
     mcSet(m.msg_source_path, sizeof(m.msg_source_path), longp);
     TEST_ASSERT_FALSE(appendUploaderToPath(m, own));
     TEST_ASSERT_EQUAL_STRING(longp, m.msg_source_path);
+}
+
+static void test_appendcall_erfolg(void)
+{
+    char p[MC_PATH_LEN];
+    mcSet(p, sizeof(p), "DL1ORG-1");
+    TEST_ASSERT_TRUE(appendCallToPath(p, sizeof(p), "DL3OWN-9"));
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL3OWN-9", p);
+}
+
+static void test_appendcall_verweigert_ohne_komma(void)
+{
+    char p[MC_PATH_LEN], ref[MC_PATH_LEN];
+    const char *own = "DL3OWN-9";
+    // Ergebnis genau 119: ok; Ergebnis 120: abgelehnt, Pfad byte-identisch
+    mkPathLen(p, sizeof(p), MC_PATH_MAX_CHARS - 1 - strlen(own));
+    TEST_ASSERT_TRUE(appendCallToPath(p, sizeof(p), own));
+    TEST_ASSERT_EQUAL_size_t(MC_PATH_MAX_CHARS, strlen(p));
+
+    mkPathLen(p, sizeof(p), MC_PATH_MAX_CHARS - strlen(own));
+    memcpy(ref, p, sizeof(ref));
+    TEST_ASSERT_FALSE(appendCallToPath(p, sizeof(p), own));
+    TEST_ASSERT_EQUAL_MEMORY(ref, p, sizeof(ref));
+    TEST_ASSERT_EQUAL_size_t(MC_PATH_MAX_CHARS - strlen(own), strlen(p));
+}
+
+static void test_appendcall_leer(void)
+{
+    char p[MC_PATH_LEN];
+    mcSet(p, sizeof(p), "DL1ORG-1");
+    TEST_ASSERT_FALSE(appendCallToPath(p, sizeof(p), ""));
+    TEST_ASSERT_FALSE(appendCallToPath(p, sizeof(p), NULL));
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1", p);
+}
+
+static void test_report_rueckgabewert(void)
+{
+    struct aprsMessage m;
+    initAPRS(m, '@');
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R0;");
+    TEST_ASSERT_TRUE(appendHeySignalReport(m, -118, 7, 5));
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", m.msg_payload);
+
+    // Nutzlast so lang, dass keine Gruppe mehr passt
+    size_t n = HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX + 1;
+    memset(m.msg_payload, 'x', n);
+    m.msg_payload[n] = '\0';
+    TEST_ASSERT_FALSE(appendHeySignalReport(m, -118, 7, 5));
+    TEST_ASSERT_EQUAL_size_t(n, strlen(m.msg_payload));
 }
 
 static void test_uploader_schon_im_pfad(void)
@@ -311,6 +383,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_uploader_struct_unveraendert);
     RUN_TEST(test_uploader_overflow);
     RUN_TEST(test_uploader_kante_120);
+    RUN_TEST(test_appendcall_erfolg);
+    RUN_TEST(test_appendcall_verweigert_ohne_komma);
+    RUN_TEST(test_appendcall_leer);
+    RUN_TEST(test_report_rueckgabewert);
     RUN_TEST(test_uploader_schon_im_pfad);
     RUN_TEST(test_uploader_teiltreffer);
     RUN_TEST(test_uploader_leer);

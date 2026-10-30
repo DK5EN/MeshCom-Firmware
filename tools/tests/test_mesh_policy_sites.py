@@ -123,4 +123,7 @@ def test_checkmesh_called_only_at_rx_relay():
     assert calls == {"lora_functions.cpp": 1}, f"checkMesh() call sites changed, see {DOC}: {calls}"
     lora = _read("lora_functions.cpp")
     pos = lora.index("checkMesh(aprsmsg)")
-    assert lora.index('"rx_relay"', pos) - pos < 8000, "checkMesh() no longer guards rx_relay"
+    # rx_relay must follow in the same function (before the next top-level closing brace), not a
+    # byte distance: unrelated relay-branch edits grew the gap past a fixed limit.
+    fn_end = re.compile(r"^\}", re.M).search(lora, pos).start()
+    assert pos < lora.index('"rx_relay"', pos) < fn_end, "checkMesh() no longer guards rx_relay"

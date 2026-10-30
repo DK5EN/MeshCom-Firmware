@@ -1748,6 +1748,12 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
 - **Out of scope:** own HEY (`sendHey()` has not uploaded itself since GW-01), `pos` and text uploads (the server
   names the uploader there). The same fix on the MeshCom server would also cover older gateways; separate track.
 - **Tests:** `test_hey_report` +8 cases, fail before (direct, relayed, partial match), pass after.
+- **Follow-up 2026-10-30 (pre-sync audit):** `decodeAPRS()` finds the `>` only for a source path of at most 119
+  characters, so the uploader append now stops at `MC_PATH_MAX_CHARS` (119; it accepted 120 before). Shared helper
+  `appendCallToPath()`; the gateway call goes into the upload only when its signal report went in. The relay
+  long-path append had the same off-by-one and left a stray `,` when the call did not fit; it now skips the relay
+  with reason `pathfull` (loop detection needs the own call in the path). Tests: `test_uploader_kante_120` fails
+  before, +4 cases. Open, low: on relay, a full HEY payload still gets the call without a report group.
 
 ## 3. Refuted claims — do not re-investigate
 

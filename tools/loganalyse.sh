@@ -880,11 +880,11 @@ else
         print "--- RLY_REASONS ---"
         if (rly_n > 0) {
             printf "RLY_TOTAL: %d\n", rly_n
-            split("tx unconf self aprs nomesh gwfilter gwcap ping hop0 loop full", ord, " ")
-            for (k = 1; k <= 11; k++) printf "  q=%s: %d\n", ord[k], rly[ord[k]] + 0
+            split("tx unconf self aprs nomesh gwfilter gwcap ping hop0 loop pathfull full", ord, " ")
+            for (k = 1; k <= 12; k++) printf "  q=%s: %d\n", ord[k], rly[ord[k]] + 0
             for (q in rly) {
                 known = 0
-                for (k = 1; k <= 11; k++) if (ord[k] == q) known = 1
+                for (k = 1; k <= 12; k++) if (ord[k] == q) known = 1
                 if (!known) printf "  q=%s: %d\n", q, rly[q]
             }
             if (rly["full"] > 0) printf "FINDING: RLY q=full %d (relay ring full, frames not relayed)\n", rly["full"]
