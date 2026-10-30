@@ -167,6 +167,133 @@ static void test_report_bleibt_beschraenkt(void)
                              "Nutzlast muss unter HEY_PATH_PAYLOAD_MAX bleiben");
 }
 
+// ---- HEY-UP-01: Empfaenger im Upload-Pfad ---------------------------------
+static void mkHey(struct aprsMessage &m, const char *path)
+{
+    initAPRS(m, '@');
+    m.msg_id = 0x11223344;
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), path);
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "HG");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "HG");
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R0;");
+    appendHeySignalReport(m, -118, 7, 5);
+}
+
+static void decodeBack(uint8_t *buf, uint16_t len, struct aprsMessage &d)
+{
+    initAPRS(d, 0x00);
+    TEST_ASSERT_EQUAL_UINT16('@', decodeAPRS(buf, len, d));
+}
+
+static void test_uploader_direkt(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1");
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    uint16_t len = encodeHeyUpload(buf, m, "DL3OWN-9");
+    TEST_ASSERT_GREATER_THAN_UINT16(0, len);
+
+    struct aprsMessage d;
+    decodeBack(buf, len, d);
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL3OWN-9", d.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", d.msg_payload);
+}
+
+static void test_uploader_relayed(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1,DL2REL-2");
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    uint16_t len = encodeHeyUpload(buf, m, "DL3OWN-9");
+
+    struct aprsMessage d;
+    decodeBack(buf, len, d);
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL2REL-2,DL3OWN-9", d.msg_source_path);
+}
+
+static void test_uploader_struct_unveraendert(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1,DL2REL-2");
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    encodeHeyUpload(buf, m, "DL3OWN-9");
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL2REL-2", m.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", m.msg_payload);
+}
+
+static void test_uploader_overflow(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1");
+    // Pfad auf MC_PATH_LEN-1 Zeichen auffuellen
+    char longp[MC_PATH_LEN];
+    mcSet(longp, sizeof(longp), "DL1ORG-1");
+    while(strlen(longp) + 9 < (size_t)(MC_PATH_LEN - 1))
+        mcAppend(longp, sizeof(longp), ",DL4AAA-1");
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), longp);
+
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, "DL3OWN-9-XXXXXXXX"));
+    TEST_ASSERT_EQUAL_STRING(longp, m.msg_source_path);
+
+    uint8_t a[UDP_TX_BUF_SIZE], b[UDP_TX_BUF_SIZE] = {0};
+    uint16_t la = encodeHeyUpload(a, m, "DL3OWN-9-XXXXXXXX");
+    uint16_t lb = encodeAPRS(b, m);
+    TEST_ASSERT_EQUAL_UINT16(lb, la);
+    TEST_ASSERT_EQUAL_MEMORY(b, a, lb);
+}
+
+static void test_uploader_kante_120(void)
+{
+    // Ergebnis genau MC_PATH_LEN-1 (120) Zeichen: wird angehaengt;
+    // ein Zeichen mehr (121): bleibt unveraendert
+    struct aprsMessage m;
+    const char *own = "DL3OWN-9";
+    size_t lp = (MC_PATH_LEN - 1) - 1 - strlen(own);
+    char longp[MC_PATH_LEN];
+
+    memset(longp, 'D', lp);
+    longp[lp] = '\0';
+    mkHey(m, "DL1ORG-1");
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), longp);
+    TEST_ASSERT_TRUE(appendUploaderToPath(m, own));
+    TEST_ASSERT_EQUAL_size_t(MC_PATH_LEN - 1, strlen(m.msg_source_path));
+
+    memset(longp, 'D', lp + 1);
+    longp[lp + 1] = '\0';
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), longp);
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, own));
+    TEST_ASSERT_EQUAL_STRING(longp, m.msg_source_path);
+}
+
+static void test_uploader_schon_im_pfad(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1,DL3OWN-9,DL2REL-2");
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, "DL3OWN-9"));
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL3OWN-9,DL2REL-2", m.msg_source_path);
+
+    mkHey(m, "DL1ORG-1,DL3OWN-9");
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, "DL3OWN-9"));
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1,DL3OWN-9", m.msg_source_path);
+}
+
+static void test_uploader_teiltreffer(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL3OWN-91");
+    TEST_ASSERT_TRUE(appendUploaderToPath(m, "DL3OWN-9"));
+    TEST_ASSERT_EQUAL_STRING("DL3OWN-91,DL3OWN-9", m.msg_source_path);
+}
+
+static void test_uploader_leer(void)
+{
+    struct aprsMessage m;
+    mkHey(m, "DL1ORG-1");
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, ""));
+    TEST_ASSERT_FALSE(appendUploaderToPath(m, NULL));
+    TEST_ASSERT_EQUAL_STRING("DL1ORG-1", m.msg_source_path);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -179,5 +306,13 @@ int main(int argc, char **argv)
     RUN_TEST(test_report_schranke_untere_kante);
     RUN_TEST(test_report_schranke_kappt_nicht_sondern_beendet);
     RUN_TEST(test_report_bleibt_beschraenkt);
+    RUN_TEST(test_uploader_direkt);
+    RUN_TEST(test_uploader_relayed);
+    RUN_TEST(test_uploader_struct_unveraendert);
+    RUN_TEST(test_uploader_overflow);
+    RUN_TEST(test_uploader_kante_120);
+    RUN_TEST(test_uploader_schon_im_pfad);
+    RUN_TEST(test_uploader_teiltreffer);
+    RUN_TEST(test_uploader_leer);
     return UNITY_END();
 }

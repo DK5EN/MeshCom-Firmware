@@ -11,6 +11,8 @@ uint16_t encodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], struct aprsMessage &aprs
 uint16_t encodeStartAPRS(uint8_t msg_buffer[MAX_MSG_LEN_PHONE], struct aprsMessage &aprsmsg);
 uint16_t encodePayloadAPRS(uint8_t msg_buffer[MAX_MSG_LEN_PHONE], struct aprsMessage &aprsmsg);
 void appendHeySignalReport(struct aprsMessage &aprsMessage, int16_t rssi, int8_t snr, int ncnt_air);
+bool appendUploaderToPath(struct aprsMessage &aprsMessage, const char *own_call);
+uint16_t encodeHeyUpload(uint8_t buf[UDP_TX_BUF_SIZE], struct aprsMessage &aprsMessage, const char *own_call);
 void initAPRSPOS(struct aprsPosition &aprsPosition);
 uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprsPosition);
 
