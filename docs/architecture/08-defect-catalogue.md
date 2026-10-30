@@ -1755,6 +1755,22 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
   with reason `pathfull` (loop detection needs the own call in the path). Tests: `test_uploader_kante_120` fails
   before, +4 cases. Open, low: on relay, a full HEY payload still gets the call without a report group.
 
+## 2m. UDP-05 — EXTUDP sends missing from the local WebUI chat (2026-10-30)
+
+**FIXED** on fork-dev 2026-10-30 (`2b1a9dc4`, not released), bench-verified on DK5EN-1. Plan and evidence:
+[`campaign-extudp-webui-echo.md`](../campaign-extudp-webui-echo.md) (report DK5EN/map#3, TTGO LoRa32 V2.1).
+
+- **Mechanism:** `sendMessage()` (src/loop_functions.cpp ~4757) echoed the outgoing frame into the phone ring only
+  under `hasMsgFromPhone`, which only the BLE app and WebUI send paths set. `getExtern()` tags its send
+  `ORIGIN_EXTUDP` but never set the flag, so the WebUI Messages page (renders `phoneRing`) never showed it.
+- **Fix:** `phoneEchoWanted()` (src/backpressure.h): echo for `hasMsgFromPhone` or `ORIGIN_EXTUDP`. The gateway
+  "server reached" ack frame stays phone/WebUI-only.
+- **Not a gap:** serial `::` sends are already echoed by the `bConsoleText` branch (~4825); covering `ORIGIN_SERIAL`
+  would double them (advisor finding). The test pins `ORIGIN_SERIAL` = no echo.
+- **Side effects:** a connected BLE app also shows EXTUDP sends; a chatty EXTUDP client pushes older frames out of
+  the 20-slot ring sooner.
+- **Tests:** `test_phone_echo_origin` (6 cases), EXTUDP case fails before, passes after.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |

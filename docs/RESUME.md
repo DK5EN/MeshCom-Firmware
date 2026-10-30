@@ -21,6 +21,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **UDP-05 fixed and bench-verified 2026-10-30** (`2b1a9dc4`, not released): EXTUDP sends now show in the node's
+  own WebUI chat (DK5EN/map#3). Gate stage 1,2 PASS (83 envs, 3084/3084), golden 48, Opus advisor APPROVED after
+  one rework (serial is already echoed). DK5EN-1 runs the INSTRUMENT build of `2b1a9dc4`. Upstream PR next.
+  Details: [campaign-extudp-webui-echo.md](campaign-extudp-webui-echo.md), catalogue 2m.
+
 - **HEY-UP-01 fixed and field-verified 2026-10-30** (`a3a8fc5f`, not released): a gateway's HEY upload now names
   the gateway as the last path element, so the INTERLINK feed and mcmap get the gateway-to-gateway links
   (DK5EN/map#5). Gate stage 1,2 PASS (83 envs, 3073/3073), Opus advisor APPROVED. DK5EN-98 runs the fix build

@@ -1,6 +1,6 @@
 # Campaign UDP-05 -- EXTUDP messages missing from the local WebUI chat
 
-**Status:** W1 done 2026-10-30 (orchestrator inline; advisor REWORK serial double echo, applied, re-review APPROVED). Gate stage 1,2: 83 envs 3084/3084, golden selftest 48 green after the `variant-ini-effective` baseline gained the new suite; builds `ttgo-lora32-v21`, `heltec_wifi_lora_32_V3`, `wiscore_rak4631` green. Next: W2 bench. Source: DK5EN/map#3 (filed in the wrong repo; it is a
+**Status:** W1 and W2 done 2026-10-30 (`2b1a9dc4`); W3 upstream PR next. Source: DK5EN/map#3 (filed in the wrong repo; it is a
 firmware change). Spec: operator note `extudp-webui-echo.md` (Desktop), reproduced in short below.
 
 ## BLUF
@@ -85,6 +85,17 @@ belong to the orchestrator afterwards.
 - **Gate:** stage 1,2 PASS with the new suite counted; three board builds green.
 - **Bench (W2):** EXTUDP JSON to UDP 1799 of the bench node shows in the WebUI Messages page within one refresh; a
   WebUI-typed message appears exactly once; a relayed frame from another node does not appear as own.
+
+## Results
+
+- **W1:** orchestrator inline. Advisor REWORK (serial already echoed via `bConsoleText`), applied, re-review
+  APPROVED. Gate stage 1,2: 83 envs 3084/3084; golden selftest 48 green after the `variant-ini-effective` baseline
+  gained the new suite; builds `ttgo-lora32-v21`, `heltec_wifi_lora_32_V3`, `wiscore_rak4631` green.
+- **W2 (DK5EN-1, INSTRUMENT build of `2b1a9dc4`, USB flash, 2 dBm, identity guard ok):** `--extudpip <Mac>` and
+  `--extudp on` (the node refuses `--extudp on` without a peer IP). `{"type":"msg","dst":"9999",...}` to UDP 1799
+  showed once as an own message (`DK5EN-1>9999`, later with the server tick) after one Update click. A message typed
+  in the WebUI to 9999 showed exactly once, also after a further Update. Frames from other stations relayed through
+  the gateway still showed as received. EXTUDP restored to off, peer none.
 
 ## Bench rules for W2
 
