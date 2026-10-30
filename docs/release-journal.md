@@ -1,11 +1,61 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261025`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261030`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.10.30 (Freitag, 2026-10-30)
+
+Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 68 Assets (neu:
+`vision-master-e290-otp.bin` und sein `.autoupdate`-Zwilling). `FLASH_VERSION` 20261030, `FLASH_STRUCT_VERSION`
+20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3 unveraendert.
+
+Basis ist jetzt das offizielle `v4.40a.10.28` (upstream `dev` 10203967, 2026-10-28): es enthaelt die gesamte
+Fork-Firmware bis `v4.40a.10.25` (#1238), die CI-`.autoupdate`-Assets (#1239) und #1240 (sp2ong). Der Fork-Unterschied
+in Release-Images sind nur noch die drei offenen PRs #1243-#1245 und der `dev`-Kanal (`MC_AU_DEV_CHANNEL`).
+
+Inhalt seit `v4.40a.10.25` (Firmware):
+
+- HEY-UP-01 (`a3a8fc5f`, `34d44b64`, upstream #1243): ein Gateway haengt beim HEY-Upload seinen Call an den Pfad
+  (`appendCallToPath()`), gepaart mit seiner Signal-Gruppe (`appendHeySignalReport()` liefert jetzt bool). Vorher
+  ~44 % der HEY-Berichte am Server ohne Empfaenger (DK5EN/map#5). `MC_PATH_MAX_CHARS` 119 (was `decodeAPRS()`
+  annimmt); ein Relay, dessen Call nicht mehr passt, verwirft mit Grund `pathfull` statt mit Komma-Rest.
+- Merge `upstream/dev` 10203967 (`2135826b`): #1240 neues Env `vision-master-e290-otp` (OTP-Waveform fuer
+  FPC-7519revb, Partial Refresh, Full Refresh alle `E290_FULL_EVERY` = 10) und Blaettern durch bis zu 9 Nachrichten
+  auf beiden E290-Images. Web-Flasher: beide Images, Wahl ueber die Displaykabel-Beschriftung (PF-01).
+- UDP-05 (`2b1a9dc4`, upstream #1244): `sendMessage()` spiegelt auch `ORIGIN_EXTUDP` in den Phone-Ring, damit
+  EXTUDP-Sendungen im Web-Chat erscheinen (DK5EN/map#3). Die Gateway-"Server erreicht"-Quittung bleibt Web/Phone.
+- WEB-AUTH-01 (`9ac4f45f`, Kommentare `fb8c19d4`, upstream #1245, Issue #1241): Login per Formular (Enter,
+  Autofokus), Nonce + HMAC-SHA256 im Browser (`/?loginnonce`, `/?login=<nonce>.<mac>`), Session-Cookie `mcs`
+  (10 Slots, 4 h Leerlauf) statt IP-Freigabe; `/?nodepassword=<pw>` antwortet 403 `plaintext`; 5 Fehlversuche/min
+  sperren 60 s; `--webpwd` beendet alle Sessions. Skripte brauchen den Cookie-Ablauf (`Web-API_documentation.txt`).
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (84 Unity-Envs, 3111/3111, Golden 48, pytest 1422).
+- WEB-AUTH-01 auf DK5EN-1 (Heltec V3, USB) 19/19 HTTP-Pruefungen inkl. Sperre und Chrome (Enter, Autofokus,
+  Fehlermeldung, Logout); DK5EN-98 (OTA, Operator-OK) 17/17 plus Chrome. Beide auf `9ac4f45f`.
+- UDP-05 auf DK5EN-1 (INSTRUMENT-Build von `2b1a9dc4`, 2 dBm): EXTUDP-JSON an UDP 1799 erscheint einmal als eigene
+  Nachricht im Web-Chat.
+- HEY-UP-01 im Feld auf DK5EN-98 seit 2026-10-30 17:22: `DL2JA-2,DK5EN-98` im INTERLINK-Feed, Kante in mcmap
+  gezeichnet, Publish-Rate unveraendert.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- E290-OTP-Image: kein E290 auf der Bench, nur gebaut; Displayverhalten ist der Test des upstream-Autors.
+- HEY-Pfadgrenze 119 und Relay-`pathfull`: nur Host-Tests (`test_hey_report`), kein 119-Zeichen-Pfad on air.
+- WEB-AUTH-01: kein TLS, Cookie-Diebstahl durch Mitlauschen und Klartext-Einstellungen nach dem Login bleiben;
+  `tools/webflash.py` gegen einen Knoten mit Web-Passwort nicht geprueft.
+- `prod`-Kanal-Installation aus dem offiziellen `v4.40a.10.28` nicht probiert.
+- Idle-Heap-Gate auf DK5EN-92 uebersprungen: der T-Beam war am 2026-10-30 weder per USB noch im LAN erreichbar
+  (Sweep 192.168.68.0/24: nur DK5EN-1 und DK5EN-98). Statisch kommen 672 B dazu (`g_sess` 480 B, `g_nonce` 192 B,
+  `nm` auf dem lokalen `ttgo_tbeam`-ELF), die 3072-B-Grenze ist damit nicht beruehrt, aber nicht gemessen.
+- Alle Boards ausser Heltec V3 und dem Gateway DK5EN-98 fuer die Aenderungen dieses Releases nur gebaut.
 
 ---
 
