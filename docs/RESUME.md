@@ -3,7 +3,8 @@
 **Stand:** 2026-10-30, branch `fork-dev` (contains `upstream/dev` 10203967 by merge `2135826b`: #1240 E290 OTP build
 and 9-message browse; CI image count now dynamic, release has 68 assets from the next tag, OTP image not yet in the web
 flasher, BACKLOG PF-01). HEY-UP-01 (`a3a8fc5f`, follow-up `34d44b64`: 119-char path cap, relay `pathfull`) goes
-upstream as a PR. Earlier: branch `fork-dev` (contained `upstream/dev` 7a1cdd70 by merge), last release
+upstream as [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (branch `pr/hey-upload-receiver`,
+worktree `../MeshCom-PR-next`; two commits: HEY upload path, relay `pathfull`). Earlier: branch `fork-dev` (contained `upstream/dev` 7a1cdd70 by merge), last release
 `v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). **Upstream merged 2026-10-25:**
 [#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238) (all fork firmware of `6c84a46c` as one commit) and
 [#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239) (CI `.autoupdate` assets, `MC_BUILD_TAG` only for
