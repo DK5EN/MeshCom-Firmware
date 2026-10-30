@@ -126,6 +126,7 @@ jobs:
 
     - name: Auto-update assets (.autoupdate)
       # one zlib twin per ESP32 app image (AU-D11); --check re-inflates and compares byte-exact.
+      # Image count is dynamic as upstream (no pinned 27): new envs need no CI edit.
       # make_autoupdate.py refuses any input without the 0xE9 app magic, so no support file slips in.
       run: |
         set -e
@@ -133,10 +134,10 @@ jobs:
         echo "$apps"
         n=$(echo "$apps" | wc -l)
         echo "ESP32 app images: $n"
-        [ "$n" -eq 27 ] || { echo "::error::expected 27 ESP32 app images, found $n"; exit 1; }
+        [ "$n" -ge 1 ] || { echo "::error::no ESP32 app image found"; exit 1; }
         python3 tools/make_autoupdate.py --check $apps
         z=$(ls .pio/build/*/*.autoupdate | wc -l)
-        [ "$z" -eq 27 ] || { echo "::error::expected 27 .autoupdate files, found $z"; exit 1; }
+        [ "$z" -eq "$n" ] || { echo "::error::$n app images but $z .autoupdate files"; exit 1; }
 
     - uses: ncipollo/release-action@v1
       with:
