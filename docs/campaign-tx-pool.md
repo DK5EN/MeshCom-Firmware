@@ -1,12 +1,12 @@
 # Campaign: TX Ring to Priority Pool (TXP)
 
-| Item      | Value                                                                                                                                                                                                                                                                             |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Started   | 2026-10-24                                                                                                                                                                                                                                                                        |
-| Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                                                                                                                          |
-| Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md)                                                                                                  |
-| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                                                                                                                        |
-| Status    | W0-W1c committed and benched; logger night stopped 2026-10-25 11:24 (found TXP-01); W1d (own text released before its first TX) reproduced on the bench, fix W1e committed `556b997d` and benched (0/20 released); DK5EN-98 flash and release open; TTL and release decision open |
+| Item      | Value                                                                                                                                                                                          |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Started   | 2026-10-24                                                                                                                                                                                     |
+| Baseline  | `fork-dev` at `45978b7a`                                                                                                                                                                       |
+| Concept   | [`tx-pool-dedup-concept-20261021.md`](tx-pool-dedup-concept-20261021.md) (Part A), roadmap wave W1 of [`mesh-evolution-concept-20261021.md`](mesh-evolution-concept-20261021.md)               |
+| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; upstream PRs later, one per stage                                                                                                     |
+| Status    | W0-W1e committed, benched and released in `v4.40a.10.25`; DK5EN-98 on it, 93-h soak 2026-10-25..29 passed (0 drops, 0 TTL evictions, peak 5/20); TTL values: operator decision open; W2 parked |
 
 ## 1. Goals (operator, 2026-10-24)
 
@@ -202,3 +202,29 @@ sections 6-9 are this wave). Test matrix with expected and observed outcome per 
   paper section 10.
 - **Open:** DK5EN-98 OTA flash (operator OK). Released in v4.40a.10.25; W0-W1e and QRT Finding 1 upstream since
   2026-10-25 inside #1238 (merged).
+
+### DK5EN-98 soak 2026-10-25..29 (`v4.40a.10.25`, evaluated 2026-10-30)
+
+- **Setup:** net console logger on rpizero, 2026-10-25 20:36 to 2026-10-29 18:00 (93.4 h), `loradebug`,
+  `txcapture`, `setlog`; logs `~/meshlog/dk5en-98-soak-20261025/`. Finished as planned, uptime continuous (no
+  reboot), 0 crashes, 0 `MC_SM_ERRORS`, 4 logger reconnects from one WiFi AP change (2026-10-27 05:35, 194 s
+  without keepalive).
+- **Drops:** 0 `RING_DROP_PRIO`, 0 `RING_DROP_NEW`, 0 `RING_DROP_STALE` (neither `ttl` nor `cet`); `[MC-STAT]` drop
+  totals 0 in all priorities; 0 retries, `txfail=0` in all 1121 STAT lines.
+- **Fate of 8512 enqueued msg_ids:** 5517 sent, 2925 NBR cancel (each matched to a `[NBR]|CANCEL`), 70 superseded,
+  0 lost.
+- **Queue depth:** `RING_STATUS` peak 5/20 (0: 68.4 %, 1: 25.7 %, 2: 5.1 %, 3+: 0.7 %); `ringmax` max 5. The
+  `[MC-STAT] qmax=7/20` is a since-boot latch from before the soak start.
+- **Age at TX vs TTL:**
+
+| Prio | n    | p50    | p99    | max    | TTL   |
+| ---- | ---- | ------ | ------ | ------ | ----- |
+| 1    | 455  | 5.9 s  | 22.8 s | 26.4 s | 90 s  |
+| 3    | 1427 | 5.7 s  | 24.0 s | 45.0 s | 300 s |
+| 4    | 1074 | 20.1 s | 61.6 s | 65.4 s | 120 s |
+| 5    | 2795 | 20.1 s | 64.5 s | 99.1 s | 180 s |
+
+- **`{CET}`:** 580 sent, age p50 7 s, p90 25 s, max 125 s (gate 150 s); 4 received beacons dropped at the relay
+  gate (159, 176, 222, 351 s old on arrival).
+- **Verdict:** TX pool works as designed in production; TTL values have wide margin. Open: operator decision on
+  the TTL values. Report: Desktop `logauswertung-dk5en-98-soak-20261025.html`.

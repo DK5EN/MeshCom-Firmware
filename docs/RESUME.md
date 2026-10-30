@@ -16,12 +16,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
-- **DK5EN-98 extended soak of `v4.40a.10.25` running** (started 2026-10-25 20:36, ends by itself 2026-10-29 18:00):
-  net console logger on rpizero in screen `soak98`, build `Oct 25 2026 / 15:54:42`, AU tag `v4.40a.10.25`, flags
-  `txcapture,loradebug` (restored at the end). Logs `~/meshlog/dk5en-98-soak-20261025/YYYY-MM-DD.log`, state in
-  `status.txt` there, screen output `~/meshlog/run-98-soak-20261025.out`. Console is single-client: `PAUSE` file to take
-  it over. **Open after 10-29 18:00:** check `status=finished: time elapsed`, reconnect count, gaps and reboots
-  (uptime resets), then evaluate (`/logauswertung`, all five day files) and record the verdict here.
+- **DK5EN-98 extended soak of `v4.40a.10.25` passed** (2026-10-25 20:36 to 2026-10-29 18:00, 93.4 h, evaluated
+  2026-10-30): finished as planned, no reboot (uptime continuous), 0 crashes, 0 `MC_SM_ERRORS`. TX pool: 0
+  `RING_DROP_PRIO`, 0 `RING_DROP_NEW`, 0 `RING_DROP_STALE` (TTL and `{CET}`), queue peak 5/20, 0 retries, 0 txfail.
+  Of 8512 enqueued: 5517 sent, 2925 NBR cancel (every one matched to a `[NBR]|CANCEL`), 70 superseded. Max age at
+  TX far below TTL (ACK 26 s/90, text 45 s/300, position 65 s/120, HEY 99 s/180). Side finding: one WiFi AP change
+  2026-10-27 05:35 (194 s without keepalive, then -67 instead of -55 dBm). Report: Desktop
+  `logauswertung-dk5en-98-soak-20261025.html`, artifact <https://claude.ai/artifact/XwSCwExCxEqog8vW8yv3xo>; logs
+  rpizero `~/meshlog/dk5en-98-soak-20261025/`. Details: [campaign-tx-pool.md](campaign-tx-pool.md), "DK5EN-98 soak".
 - **`v4.40a.10.25` released 2026-10-25** (CI, Latest, tag on `61077a8c`, after two cancelled cuts: SNF-ACK-01 and upstream
   #1237 came in): TXP-01 own text sent once, WIFI-HEAP-01 raw ICMP probe (TD-21/21b), TD-20/TD-22 T-Deck heap, TD-23
   backlight (fork PR #1), SNF-ACK-01 mailbox tombstone, upstream #1237 BLE app settings; pages rework (fork PR #2).
@@ -68,8 +70,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
     another gateway transmits the server copy first; log 50/118, bench 9/10). W1d reproduced it with
     `tools/bench/own_echo_bench.py` ([txp-own-msg-echo-release-20261024.md](txp-own-msg-echo-release-20261024.md)).
     W1e fixed it (`556b997d`, an own text is not released while READY), benched 0/20 released.
-    Open: DK5EN-98 OTA flash (operator OK), TTL values, release
-    ([campaign-tx-pool.md](campaign-tx-pool.md)).
+    Released in `v4.40a.10.25`, DK5EN-98 on it; 93-h soak passed (0 drops, 0 TTL evictions, peak 5/20).
+    Open: operator decision on the TTL values (soak shows wide margin) ([campaign-tx-pool.md](campaign-tx-pool.md)).
   - LoRa QRT: DK5EN-98 night capture, release decision ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md), Status).
   - Web flasher WF-05: CI marker check, Windows run ([campaign-webflasher-autodetect-20261019.md](campaign-webflasher-autodetect-20261019.md)).
   - Fork hardening: visual LED confirmation, phone-app SN check, deep-sleep LED test, LED pins on T-Echo, T114,
