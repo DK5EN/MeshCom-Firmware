@@ -11,7 +11,9 @@ Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ## Release v4.40a.10.30 (Freitag, 2026-10-30)
 
-Von GitHub CI gebaut und veroeffentlicht (Tag-Push, Workflow `MeshCom CI`), 68 Assets (neu:
+Lokal gebaut und per `gh release create` veroeffentlicht (Fallback: der CI-Lauf 41121057432 hing in der
+Warteschlange und wurde abgebrochen; Build mit `MC_BUILD_TAG=v4.40a.10.30` und `MC_AU_DEV_CHANNEL=1`, 33/33 Envs),
+68 Assets (neu:
 `vision-master-e290-otp.bin` und sein `.autoupdate`-Zwilling). `FLASH_VERSION` 20261030, `FLASH_STRUCT_VERSION`
 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3 unveraendert.
 
@@ -37,6 +39,11 @@ Inhalt seit `v4.40a.10.25` (Firmware):
 
 ### Was fuer dieses Release auf Hardware geprueft wurde
 
+- Release-Assets: 68, nicht Entwurf, Latest; Download byte-gleich mit dem Staging; 28 `.autoupdate` mit `78 da` und
+  byte-genauem Re-Inflate; Tag-String im Heltec-V3-Image; Feldkommando-Scan beider T-Deck-Images
+  `mute=2 stat=1 udplog=1 injectraw=0`.
+- Web-Flasher: `pages_flasher.py check` 31 Boards, 0 Abweichungen; in Chrome einzige und Standard-Version, beide
+  E290-Varianten nach Displaykabel.
 - Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (84 Unity-Envs, 3111/3111, Golden 48, pytest 1422).
 - WEB-AUTH-01 auf DK5EN-1 (Heltec V3, USB) 19/19 HTTP-Pruefungen inkl. Sperre und Chrome (Enter, Autofokus,
   Fehlermeldung, Logout); DK5EN-98 (OTA, Operator-OK) 17/17 plus Chrome. Beide auf `9ac4f45f`.

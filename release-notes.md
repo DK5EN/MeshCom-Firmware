@@ -30,7 +30,7 @@
 - **Safeboot v3** ships unchanged since `v4.40a.10.21`; it reaches a node only through the web flasher.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`: nothing installs by itself.
   - Official releases carry `.autoupdate` files since `v4.40a.10.28` ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)), so the `prod` channel has something to install now.
-- **Built by GitHub CI** (`MeshCom CI`) from the tagged commit, 68 assets:
+- **Built locally from the tagged commit** (the GitHub CI runner was queued too long; same environments, same `MC_BUILD_TAG`, same asset names as CI), 68 assets:
   - 28 ESP32 application `.bin` plus 28 `.autoupdate` files (new: `vision-master-e290-otp`)
   - the three nRF52 boards as `.uf2` and DFU `.zip`
   - six support files
@@ -328,7 +328,7 @@ With default settings, compared with the official `v4.40a.10.28`:
 ### Verification for this release
 
 - **Host suite:** 3111 test cases in 84 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1422, web GUI, web flasher). New: suites for the web login (C side and browser script), the Extern-UDP echo and the HEY upload path.
-- **Build:** all release images built by CI (28 ESP32, 3 nRF52, Safeboot), and the 28 `.autoupdate` files re-inflated byte-exact.
+- **Build:** all 33 environments built locally from the tagged tree (28 ESP32, 3 nRF52, 2 Safeboot); the 28 `.autoupdate` files re-inflate byte-exact, also after download from this release.
 - **Idle heap on T-Beam v1.2 not measured:** the bench T-Beam (`DK5EN-92`) was unreachable on 2026-10-30. The web login adds 672 B of static tables (10 sessions, 4 challenges) on the T-Beam image, well inside the 3072 B the heap gate allows, but the idle figure itself is not re-measured.
 - **Benched for this release (2026-10-30):**
   - Web login on Heltec V3 (`DK5EN-1`, USB): 19 of 19 HTTP checks including the login block, plus Chrome (Enter, focus, wrong-password message, logout). On the gateway `DK5EN-98` (over the air): 17 of 17 plus Chrome.

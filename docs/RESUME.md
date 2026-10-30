@@ -1,25 +1,27 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-30, branch `fork-dev` (contains `upstream/dev` 10203967 by merge `2135826b`: #1240 E290 OTP build
-and 9-message browse; CI image count now dynamic, release has 68 assets from the next tag; PF-01 done: the web flasher
-offers the OTP image next to the stock E290, chosen by the display flex-cable marking, from the next publish). HEY-UP-01 (`a3a8fc5f`, follow-up `34d44b64`: 119-char path cap, relay `pathfull`) goes
-upstream as [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (branch `pr/hey-upload-receiver`,
-worktree `../MeshCom-PR-next`; two commits: HEY upload path, relay `pathfull`). Earlier: branch `fork-dev` (contained `upstream/dev` 7a1cdd70 by merge), last release
-`v4.40a.10.25` (CI, Latest, tag on `61077a8c`, 66 assets; web flasher on 10.25). **Upstream merged 2026-10-25:**
-[#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238) (all fork firmware of `6c84a46c` as one commit) and
-[#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239) (CI `.autoupdate` assets, `MC_BUILD_TAG` only for
-`v<VER>[.MM.DD]` tags), both unchanged by review. Synced into `fork-dev` by merge; the merge tree equals the pre-merge
-tree (see "Upstream sync 2026-10-25" below). PR branches `pr/fork-firmware-20261025`, `pr/ci-autoupdate` (local and origin) and
-worktrees `../MeshCom-PR-next`, `../MeshCom-PR-ci` removed 2026-10-25; the PR heads stay reachable as parents of the
-upstream merges. Pages PR history updated (63 PRs). 2026-10-30: Pages got the Net Console guide
-(`net-console.html`: 2323 login, NONCE/HMAC scripts and one-liners), gh-pages `2f4e7df0`.
-Next step: watch upstream for follow-up review; prod channel needs upstream tags of the form `v<VER>` or `v<VER>.MM.DD`.
-TD-22 soak and TD-23 UAT still open.
+**Stand:** 2026-10-30, branch `fork-dev`, last release **`v4.40a.10.30`** (Latest, tag on `b3d7da3a`, 68 assets).
+Base is the official `v4.40a.10.28` (upstream `dev` 10203967, contains all fork firmware up to `v4.40a.10.25` via #1238,
+the CI `.autoupdate` assets via #1239 and #1240 E290 OTP). Fork-only firmware: the three open upstream PRs
+[#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (HEY-UP-01),
+[#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05),
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), plus the `dev` AU channel.
+Next step: watch the three PRs; after each merge `/sync-upstream` (merge) and remove its worktree and branch. TD-22
+soak and TD-23 UAT still open.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
+
+- **`v4.40a.10.30` released 2026-10-30** (Latest, tag on `b3d7da3a`): WEB-AUTH-01 web login, UDP-05 EXTUDP echo,
+  HEY-UP-01 gateway call in the HEY upload, E290 OTP image from #1240. **Built locally** and published with
+  `gh release create`: the CI run 41121057432 stayed queued (runner not picked up) and was cancelled on operator
+  request. Gate stage 1,2 PASS (84 envs, 3111/3111, golden 48, pytest 1422). Assets: 68, 28/28 `.autoupdate`
+  re-inflate after download, tag string present, T-Deck field-command scan ok. Web flasher `check` 31 boards, 0
+  mismatches, `flash/v4.40a.10.25` pruned; Pages index card and PR history updated (gh-pages `ed750e6d`).
+  **Not done:** idle-heap step (DK5EN-92 not on USB, not on the LAN; static +672 B for the web-auth tables only),
+  no bench node flashed with the release image yet.
 
 - **WEB-AUTH-01 (#1241) fixed and bench-verified 2026-10-30** (`9ac4f45f`, not released): Enter submits the web
   login, the field gets the focus, the password no longer crosses the wire (nonce + HMAC-SHA256 in the browser),
