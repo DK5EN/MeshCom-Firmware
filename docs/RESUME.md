@@ -12,6 +12,14 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
+  DEV/MAIN for McApp. One setter `auSetChannel()` for RM1, `--updchan` and `/setparam updchan`; a switch clears the
+  last check result, keeps a staged image, starts no check; console switch during a check answers busy. Flag builds
+  only (`MC_AU_DEV_CHANNEL`). Gate stage 1,2 PASS (85 envs, 3219/3219), two advisor rounds. Benched DK5EN-92 ->
+  DK5EN-1 over LoRa and over the 2323 console; both nodes run `636e681b`, DK5EN-1 back on `dev`. McApp work order:
+  MCProxy B14 (`doc/2026-10-31_1000-rm1-updchan-requirements.md`, commit `786099a`). Campaign:
+  [campaign-rm1-updchan.md](campaign-rm1-updchan.md).
+
 - **Upstream sync 2026-10-31** (merge `a1a31850`): #1243, #1244 and #1245 squash-merged upstream, merged into
   `fork-dev` with every path on the fork side (`platformio.ini` kept: the auto-merge would have duplicated
   `[env:native_web_auth]`); the merge tree equals the pre-merge tree. Branches `pr/webui-login`,

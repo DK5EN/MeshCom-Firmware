@@ -310,9 +310,18 @@ Beispiel: `RM1 70 pos 48.40812 11.73812 492 <tag>` -> `RM1 70 ok 48.40812 11.738
   `err current` (nichts Neueres bekannt), `err noasset` (Release ohne Update-Datei), `err safeboot` (Safeboot zu
   alt), `err notready` (keine gültige Uhrzeit, Telefon verbunden oder Akku zu schwach), `err aubusy`, `err nowifi`,
   `err unsupported`.
-- Alles andere (`upd foo`, `upd go` ohne Tag, Tag mit `/` o.ä., Tag länger als 23): `err blocked`.
+- `upd chan prod|dev`: setzt den Update-Kanal (`prod` = icssw-org-Releases, "MAIN"; `dev` = DK5EN-Fork-Releases,
+  "DEV"). Nur in Builds mit `MC_AU_DEV_CHANNEL` (alle Fork-Builds); andere Builds lehnen das Argument mit
+  `err blocked` ab. Antworten: `ok chan prod` / `ok chan dev` (auch wenn der Kanal schon gesetzt war, dann ohne
+  Änderung); Fehler: `err aubusy` (Prüfung/Download läuft oder ein `upd go` wartet), `err unsupported`. Ein Wechsel
+  speichert den Kanal und verwirft das letzte Prüfergebnis (`a=-`, `n=0`, `ck=-`); ein bereitgestelltes Image
+  (`st=`) bleibt. Es startet keine Prüfung: danach `upd check` senden. Derselbe Weg gilt für `--updchan` an der
+  Konsole und `/setparam updchan` (während einer Prüfung dort `[ERR];updchan;busy`).
+- Alles andere (`upd foo`, `upd go` ohne Tag, Tag mit `/` o.ä., Tag länger als 23, `upd chan` mit anderem
+  Argument): `err blocked`.
 - Ablauf: `upd check` -> mit `upd` den Tag aus `a=` lesen -> `upd go <tag>` -> Fortschritt über `upd` (`b`, `g`,
   `st`, `e`) beobachten.
+- Kanalwechsel: `upd chan dev` -> `upd check` -> `upd` (`c=dev`, Tag in `a=`) -> wie oben.
 
 **`blockcall`** - Rufzeichen-Sperrliste (Frames eines gesperrten Rufzeichens, oder von einem solchen weitergeleitete,
 werden verworfen und nicht weitergeleitet; die Liste ist ab Werk leer).

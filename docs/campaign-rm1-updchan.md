@@ -35,9 +35,9 @@ upstream), no upstream PR. Base `fork-dev` at `b7802398`.
 | 0    | Contract `src/rm_au.h`, `rm_commands.h` comment, `[env:native_remote_cmd_dev]` | done  |
 | 1    | A1 wire, A2 AU, B console, C web page                                          | done  |
 | 2    | Gate stage 1,2; clean builds Heltec V3, T-Beam, RAK4631; image scan; advisor   | done  |
-| 3    | McApp requirements + B14 in MCProxy                                            | open  |
-| 4    | Docs: `docs/rm1-commands.md`, RESUME, BACKLOG (bench pending)                  | open  |
-| -    | Bench: sender DK5EN-92, target DK5EN-1 (both USB, flash approved 10-31)        | open  |
+| 3    | McApp requirements + B14 in MCProxy                                            | done  |
+| 4    | Docs: `docs/rm1-commands.md`, RESUME, BACKLOG                                  | done  |
+| -    | Bench: sender DK5EN-92, target DK5EN-1                                         | done  |
 
 ### Wave 1 file ownership
 
@@ -67,3 +67,30 @@ upstream), no upstream PR. Base `fork-dev` at `b7802398`.
 - Known residuals: after a switch a staged image of the old channel stays installable (operator decision);
   `s_auNotifiedTag` survives a switch (a re-reported tag is not notified again); FWNET_STUB builds answer
   `--updchan` with `unsupported`.
+
+### Bench (2026-10-31 09:30-09:41)
+
+- Both nodes flashed over USB with the `636e681b` images (app + otadata at 460800, bootloader and Safeboot
+  untouched); identity guard ok (DK5EN-1 192.168.68.71, DK5EN-92 .70, both 2 dBm). RM1 driven through DK5EN-92's
+  `POST /rmsend` (no web password set on either node), every reply verified:
+
+```
+status          ok v=4.40a up=1 bat=100 heap=109 s=GtdMWl p=2/0/22 rs=0
+upd             ok m=notify c=dev n=0 a=- st=- b=0 g=0 ck=- e=-
+upd check       ok checking
+upd             ok m=notify c=dev n=0 a=v4.40a.10.30 st=- b=0 g=0 ck=0 e=-
+upd chan prod   ok chan prod
+upd             ok m=notify c=prod n=0 a=- st=- b=0 g=0 ck=- e=-
+upd chan prod   ok chan prod
+upd check       ok checking
+upd chan dev    ok chan dev          (check already finished, its prod result cleared)
+upd             ok m=notify c=dev n=0 a=- st=- b=0 g=0 ck=- e=-
+```
+
+- `err aubusy` over RM1 is not reproducible on air: the 10 s sender spacing outlasts a check. Shown on the
+  console path instead (2323, same `auSetChannel()`): `--update check` then `--updchan prod` ->
+  `[ERR];updchan;busy`; after the check `--updchan prod` -> `[AU];chan;prod` and `--update status` shows
+  `avail;none` (the dev result cleared).
+- End state: both nodes on `636e681b`; DK5EN-1 back on `dev` (its setting before the bench).
+- Web page channel row: jsdom-tested (UCH-01..14), not clicked in Chrome.
+- McApp work order: MCProxy `doc/2026-10-31_1000-rm1-updchan-requirements.md`, backlog B14 (commit `786099a`).
