@@ -1,18 +1,23 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-30, branch `fork-dev`, last release **`v4.40a.10.30`** (Latest, tag on `b3d7da3a`, 68 assets).
-Base is the official `v4.40a.10.28` (upstream `dev` 10203967, contains all fork firmware up to `v4.40a.10.25` via #1238,
-the CI `.autoupdate` assets via #1239 and #1240 E290 OTP). Fork-only firmware: the three open upstream PRs
+**Stand:** 2026-10-31, branch `fork-dev`, last release **`v4.40a.10.30`** (Latest, tag on `b3d7da3a`, 68 assets).
+Base is upstream `dev` 147812e0: the official `v4.40a.10.28` (10203967) plus our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (HEY-UP-01),
-[#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05),
-[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), plus the `dev` AU channel.
-Next step: watch the three PRs; after each merge `/sync-upstream` (merge) and remove its worktree and branch. TD-22
-soak and TD-23 UAT still open.
+[#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05) and
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), all merged 2026-10-31. No upstream PR
+of ours is open; the only fork-only firmware left is the `dev` AU channel. Next step: TD-22 soak and TD-23 UAT.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
+
+- **Upstream sync 2026-10-31** (merge `a1a31850`): #1243, #1244 and #1245 squash-merged upstream, merged into
+  `fork-dev` with every path on the fork side (`platformio.ini` kept: the auto-merge would have duplicated
+  `[env:native_web_auth]`); the merge tree equals the pre-merge tree. Branches `pr/webui-login`,
+  `pr/extudp-webui-echo`, `pr/hey-upload-receiver`, `docs/pages-tone`, `feature/td23-brightness` and their worktrees
+  removed locally and on origin; `claude/fork-dev-code-review-xdxqzv` (19 commits, no PR) kept. Pages PR history:
+  round 8 with the three PRs, 66 merged, none open.
 
 - **`v4.40a.10.30` released 2026-10-30** (Latest, tag on `b3d7da3a`): WEB-AUTH-01 web login, UDP-05 EXTUDP echo,
   HEY-UP-01 gateway call in the HEY upload, E290 OTP image from #1240. **Built locally** and published with
