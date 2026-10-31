@@ -60,6 +60,7 @@ void sub_page_remote()
                        ".rmf>div{grid-column:2;}\n"
                        ".rmf>div:empty{display:none;}\n"
                        ".rmf>.rmc{text-align:right;}");
+    // The active update channel is disabled but must read as selected, not unavailable: its own println follows the block with the disabled rule.
     web_client.println(".rmkv{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-variant-numeric:tabular-nums;}\n"
                        ".rmdet{border-top:solid 1px #e0e0e0;margin-top:6px;padding-top:4px;}\n"
                        "#rm_mh tr>:nth-child(2){text-align:right;}\n"
@@ -68,6 +69,7 @@ void sub_page_remote()
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
                        ".rmsw:indeterminate{background-color:#d4d4d4;}\n"
                        ".rmsw:indeterminate::before{left:.9em;}");
+    web_client.println("#rm_upd_chan button.rmsel:disabled{opacity:1;color:inherit;border:solid 2px var(--mcgray);font-weight:bold;}");
     web_client.println(".rmok{color:#1a7f37;font-weight:bold;}\n"
                        ".rmbad{color:var(--mcred);font-weight:bold;}\n"
                        ".rmlock{font-weight:bold;}\n"

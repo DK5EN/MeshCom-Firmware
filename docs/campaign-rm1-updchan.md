@@ -94,3 +94,14 @@ upd             ok m=notify c=dev n=0 a=- st=- b=0 g=0 ck=- e=-
 - End state: both nodes on `636e681b`; DK5EN-1 back on `dev` (its setting before the bench).
 - Web page channel row: jsdom-tested (UCH-01..14), not clicked in Chrome.
 - McApp work order: MCProxy `doc/2026-10-31_1000-rm1-updchan-requirements.md`, backlog B14 (commit `786099a`).
+
+### Chrome check and selected style (2026-10-31 10:00-10:15)
+
+- Remote page of DK5EN-92 in Chrome, target DK5EN-1 (saved slot 0): no password -> "Type the password of DK5EN-1
+  first.", nothing armed; first tap arms with the confirm text, second tap sends; `ok chan prod` and `ok chan dev`
+  verified over LoRa, card and history row ("Update channel MAIN · verified · Channel set to MAIN. Run Check.") as
+  specified. DK5EN-1 back on `dev`.
+- Finding fixed: the active channel tile is disabled and looked unavailable (opacity 0.45 from the page rule, 30 %
+  text alpha from Chrome's disabled style). Own rule `#rm_upd_chan button.rmsel:disabled` (full opacity, inherited
+  colour, grey 2 px border, bold) after the disabled rule; jsdom UCH-15 fails on the HEAD page, passes now. Gate
+  stage 1,2 PASS (3219/3219); DK5EN-92 flashed, checked in Chrome.

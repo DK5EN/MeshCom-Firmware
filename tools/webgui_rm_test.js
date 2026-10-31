@@ -1890,6 +1890,8 @@ function leaks(P, canary) {
     await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-');
     check('UCH-01 flag 1: row "Update channel" with MAIN (icssw-org) and DEV (DK5EN) shown', !!X('rm_upd_chan') && /Update channel/.test(X('rm_upd_chan').textContent) && ch('prod') && ch('dev') && ch('prod').textContent === 'MAIN (icssw-org)' && ch('dev').textContent === 'DEV (DK5EN)', X('rm_upd_chan') && X('rm_upd_chan').textContent);
     check('UCH-02 c=prod marks MAIN, DEV is offered', ch('prod').getAttribute('aria-pressed') === 'true' && ch('dev').getAttribute('aria-pressed') === 'false' && !ch('dev').disabled);
+    { const cs = P.w.getComputedStyle(ch('prod')), cd = P.w.getComputedStyle(chk());
+      check('UCH-15 the active channel reads as selected, not as unavailable: full opacity, normal text colour (Chrome greys disabled text), grey 2px border, bold (other disabled buttons stay faded)', ch('prod').disabled && cs.opacity === '1' && /2px/.test(cs.borderTopWidth || cs.borderWidth || cs.border) && (cs.fontWeight === 'bold' || cs.fontWeight === '700') && /#rm_upd_chan button\.rmsel:disabled\{[^}]*color:inherit/.test(HTML), 'opacity ' + cs.opacity + ' border ' + (cs.borderTopWidth || cs.border) + ' weight ' + cs.fontWeight + ' check-btn opacity ' + cd.opacity); }
     P.w.eval('rmUpdChan=0'); P.w.rmRender();
     check('UCH-03 flag 0: no channel row at all, Check and Update now unaffected', !X('rm_upd_chan') && !ch('dev') && !!chk() && !!go());
     P.w.eval('rmUpdChan=1'); P.w.rmRender();
