@@ -148,7 +148,7 @@ enum RmArgShape : uint8_t
     RM_ARGS_ATXT,    // none (read) | free text 1..RM_ATXT_MAX (write)
     RM_ARGS_POS,     // none (read) | "<lat> <lon> <alt>" (write)
     RM_ARGS_MH,      // row index 0..999 | callsign with optional SSID
-    RM_ARGS_UPD,     // none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23
+    RM_ARGS_UPD,     // none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23 | "chan prod"|"chan dev" (only with MC_AU_DEV_CHANNEL)
     RM_ARGS_CALLS,   // none (read) | "none" | comma list of [A-Za-z0-9,-] 1..RM_MAX_ARGS (syntax only, the executor validates)
 };
 
@@ -217,6 +217,10 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
     {
         if (a[0] == '\0' || strcmp(a, "check") == 0)
             return true;
+#if defined(MC_AU_DEV_CHANNEL)
+        if (strcmp(a, "chan prod") == 0 || strcmp(a, "chan dev") == 0)
+            return true;
+#endif
         if (strncmp(a, "go ", 3) != 0)
             return false;
         const size_t n = strlen(a + 3);

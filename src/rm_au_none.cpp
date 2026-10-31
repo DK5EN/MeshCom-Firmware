@@ -24,4 +24,9 @@ RmAuResult rmAuGo(const char *)
     return RM_AU_UNSUPPORTED;
 }
 
+RmAuResult auSetChannel(uint8_t)
+{
+    return RM_AU_UNSUPPORTED;
+}
+
 #endif

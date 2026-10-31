@@ -613,6 +613,24 @@ static void test_autoupdate_updchan_do_not_collide_with_other_commands()
     }
 }
 
+static void test_updchan_rung_routes_through_auSetChannel()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t rungCh = cmd.find("commandCheck(msg_text+2, (char*)\"updchan \") == 0");
+    const size_t bareCh = cmd.find("commandCheck(msg_text+2, (char*)\"updchan\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(rungCh != std::string::npos && bareCh != std::string::npos && rungCh < bareCh, "--updchan rungs missing or misordered");
+    const std::string rung = cmd.substr(rungCh, bareCh - rungCh);
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("auSetChannel(") != std::string::npos, "--updchan rung does not call auSetChannel");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("node_updchan =") == std::string::npos, "--updchan rung assigns node_updchan directly");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("save_settings()") == std::string::npos, "--updchan rung saves itself (auSetChannel saves)");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("RM_AU_CHAN_OK") != std::string::npos, "--updchan rung does not map RM_AU_CHAN_OK");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("[ERR];updchan;busy") != std::string::npos, "--updchan busy line missing");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("[ERR];updchan;unsupported") != std::string::npos, "--updchan unsupported line missing");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("[ERR];updchan;no dev channel in this build") != std::string::npos, "--updchan no-dev line missing");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("[ERR];updchan;must be prod or dev") != std::string::npos, "--updchan bad-arg line missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#include \"rm_au.h\"") != std::string::npos, "command_functions.cpp does not include rm_au.h");
+}
+
 static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
@@ -667,9 +685,6 @@ static void test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_ass
 
     const std::string bodyCh = cmd.substr(rungCh, 900);
     TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("msg_text+10") != std::string::npos, "--updchan argument offset is not +10");
-    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("meshcom_settings.node_updchan = 0") != std::string::npos, "--updchan prod does not set 0");
-    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("meshcom_settings.node_updchan = 1") != std::string::npos, "--updchan dev does not set 1");
-    TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("save_settings()") != std::string::npos, "--updchan rung does not save");
     TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[AU];chan;%s") != std::string::npos, "--updchan rung does not print [AU];chan;prod|dev");
     TEST_ASSERT_TRUE_MESSAGE(bodyCh.find("[ERR];updchan;") != std::string::npos, "--updchan has no error line");
 
@@ -1085,11 +1100,17 @@ static void test_au_web_gate_and_status_wiring_pins()
     TEST_ASSERT_TRUE_MESSAGE(wf.find("#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()") != std::string::npos, "IDF 4.4 (Arduino 2.x) has no esp_app_get_description()");
 
     const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
-    // STAGELAN must not overwrite the CHECK's zlen (runDownload reads it as the expected asset size)
+    // STAGELAN must not overwrite the CHECK's zlen (runDownload reads it as the expected asset size).
+    // The one legitimate reset is fwNetForgetAvail() (RM1 upd chan drops the CHECK result): count outside its body.
+    const size_t fa = pin_find(net, "void fwNetForgetAvail(void)\n{", 0, "no fwNetForgetAvail body");
+    const size_t fa_end = pin_find(net, "\n}\n", fa, "fwNetForgetAvail has no end");
+    const std::string forget = net.substr(fa, fa_end - fa);
+    const std::string outside = net.substr(0, fa) + net.substr(fa_end);
     size_t writes = 0;
-    for (size_t at = 0; (at = net.find("s_st.zlen =", at)) != std::string::npos; at += 11)
+    for (size_t at = 0; (at = outside.find("s_st.zlen =", at)) != std::string::npos; at += 11)
         writes++;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, (uint32_t)writes, "s_st.zlen is assigned outside the CHECK result (STAGELAN must use progLen)");
+    TEST_ASSERT_TRUE_MESSAGE(forget.find("s_st.zlen = 0;") != std::string::npos, "fwNetForgetAvail does not reset s_st.zlen to 0");
     TEST_ASSERT_TRUE_MESSAGE(net.find("s_st.progLen = zlen;") != std::string::npos, "stagePrepare does not set progLen");
     TEST_ASSERT_TRUE_MESSAGE(net.find("!blePaused && fwNetPhoneHeld()") != std::string::npos, "lowheap_phone does not use fwNetPhoneHeld()");
     // no new job inside the apply reboot window
@@ -1103,6 +1124,92 @@ static void test_au_web_gate_and_status_wiring_pins()
     const size_t act = pin_find(mn, "fwApplyRebootAct(true, auNow.state == FWS_BUSY)", at, "auTick does not re-check busy before the apply reboot");
     const size_t unmark = pin_find(mn, "fwNetUnmarkHandover();", act, "the busy abort does not unmark the handover");
     TEST_ASSERT_TRUE_MESSAGE(unmark < pin_find(mn, "auRebootToSafeboot()", act, "no reboot call"), "the busy abort must come before the reboot call");
+}
+
+// RM1 "upd chan prod|dev": the ESP32 glue and the RM write branch are compiled by no native env, so pin them by text.
+static std::string slice_body(const std::string &t, const char *sig, const char *what)
+{
+    const size_t at = pin_find(t, sig, 0, what);
+    const size_t open = pin_find(t, "\n{\n", at, what);
+    const size_t end = pin_find(t, "\n}\n", open, what);
+    return t.substr(open, end - open);
+}
+
+static void test_rm_upd_chan_glue_pins()
+{
+    // RM write branch
+    const std::string w = slice_body(read_repo_file("src/rm_exec_write.cpp"), "int writeUpd(const RmCmd &c, char *res, size_t n)", "no writeUpd");
+    const size_t chan = pin_find(w, "strncmp(c.args, \"chan \", 5) == 0", 0, "writeUpd has no chan branch");
+    const size_t call = pin_find(w, "auSetChannel(", chan, "writeUpd chan branch does not call auSetChannel");
+    const size_t ret = pin_find(w, "return cr == RM_AU_CHAN_OK ? 1 : -1;", call, "writeUpd chan branch does not return cr == RM_AU_CHAN_OK ? 1 : -1");
+    TEST_ASSERT_TRUE_MESSAGE(ret < pin_find(w, "strcmp(c.args, \"check\") == 0", chan, "writeUpd has no check handling"), "writeUpd chan branch must come before the check/go handling");
+    TEST_ASSERT_TRUE_MESSAGE(ret < pin_find(w, "strncmp(c.args, \"go \", 3) == 0", chan, "writeUpd has no go handling"), "writeUpd chan branch must come before the check/go handling");
+
+    // ESP32 glue
+    const std::string g = slice_body(read_repo_file("src/esp32/rm_au_esp32.cpp"), "RmAuResult auSetChannel(uint8_t chan)", "no ESP32 auSetChannel");
+    const size_t dec = pin_find(g, "fwChanDecide(", 0, "auSetChannel does not call fwChanDecide");
+    const size_t dec_end = pin_find(g, ")\n", dec, "fwChanDecide call has no end");
+    const std::string dargs = g.substr(dec, dec_end - dec);
+    TEST_ASSERT_TRUE_MESSAGE(dargs.find("st.state == FWS_BUSY") != std::string::npos, "fwChanDecide is not fed st.state == FWS_BUSY");
+    TEST_ASSERT_TRUE_MESSAGE(dargs.find("s_goArmed") != std::string::npos, "fwChanDecide is not fed s_goArmed");
+    TEST_ASSERT_TRUE_MESSAGE(g.find("fwNetStart") == std::string::npos, "auSetChannel starts a job (a channel switch must not)");
+    const size_t c_nodev = pin_find(g, "case FWCH_NODEV:", 0, "no FWCH_NODEV case");
+    const size_t c_busy = pin_find(g, "case FWCH_BUSY:", 0, "no FWCH_BUSY case");
+    const size_t c_chg = pin_find(g, "case FWCH_CHANGE:", 0, "no FWCH_CHANGE case");
+    const size_t c_same = pin_find(g, "case FWCH_SAME:", 0, "no FWCH_SAME case");
+    TEST_ASSERT_TRUE_MESSAGE(c_nodev < c_busy && c_busy < c_chg && c_chg < c_same, "auSetChannel cases are reordered (pin slicing assumes NODEV, BUSY, CHANGE, SAME)");
+    const std::string chg = g.substr(c_chg, c_same - c_chg);
+    TEST_ASSERT_TRUE_MESSAGE(chg.find("node_updchan =") != std::string::npos, "FWCH_CHANGE does not assign node_updchan");
+    TEST_ASSERT_TRUE_MESSAGE(chg.find("save_settings()") != std::string::npos, "FWCH_CHANGE does not save_settings()");
+    TEST_ASSERT_TRUE_MESSAGE(chg.find("fwNetForgetAvail()") != std::string::npos, "FWCH_CHANGE does not call fwNetForgetAvail()");
+    TEST_ASSERT_TRUE_MESSAGE(chg.find("fwNetStart") == std::string::npos, "FWCH_CHANGE starts a job");
+    const std::string noop = g.substr(c_nodev, c_chg - c_nodev) + g.substr(c_same);
+    TEST_ASSERT_TRUE_MESSAGE(noop.find("save_settings") == std::string::npos, "a NODEV/BUSY/SAME channel request saves settings");
+    TEST_ASSERT_TRUE_MESSAGE(noop.find("fwNetForgetAvail") == std::string::npos, "a NODEV/BUSY/SAME channel request drops the CHECK result");
+
+    // fwNetForgetAvail: clears the CHECK result under the lock, leaves the staged image and persistence alone
+    const std::string f = slice_body(read_repo_file("src/esp32/fw_update_net.cpp"), "void fwNetForgetAvail(void)\n{", "no ESP32 fwNetForgetAvail");
+    const size_t enter = pin_find(f, "portENTER_CRITICAL(&s_mux);", 0, "fwNetForgetAvail does not take s_mux");
+    const size_t exit_ = pin_find(f, "portEXIT_CRITICAL(&s_mux);", enter, "fwNetForgetAvail does not release s_mux");
+    const size_t tag = pin_find(f, "s_st.availTag", 0, "fwNetForgetAvail does not clear availTag");
+    const size_t newer = pin_find(f, "s_st.availNewer", 0, "fwNetForgetAvail does not clear availNewer");
+    const size_t av = pin_find(f, "memset(&s_av", 0, "fwNetForgetAvail does not clear s_av");
+    TEST_ASSERT_TRUE_MESSAGE(enter < tag && tag < exit_ && enter < newer && newer < exit_ && enter < av && av < exit_, "fwNetForgetAvail clears outside the s_mux critical section");
+    TEST_ASSERT_TRUE_MESSAGE(f.find("stagedTag") == std::string::npos, "fwNetForgetAvail touches stagedTag (the staged image must survive a channel switch)");
+    TEST_ASSERT_TRUE_MESSAGE(f.find("staged") == std::string::npos, "fwNetForgetAvail touches the staged state");
+    TEST_ASSERT_TRUE_MESSAGE(f.find("Preferences") == std::string::npos && f.find("nvs") == std::string::npos && f.find("FWNET_NS") == std::string::npos, "fwNetForgetAvail touches persistence");
+    std::string f_nolast = f;
+    for (size_t at = 0; (at = f_nolast.find("lastCheckEpoch", at)) != std::string::npos;)
+        f_nolast.erase(at, 14);
+    TEST_ASSERT_TRUE_MESSAGE(f_nolast.find("last") == std::string::npos, "fwNetForgetAvail touches a last-* record (only the lastCheckEpoch reset is allowed)");
+    // whitelist (advisor pass 2): helpers such as fwNetForgetLast() / fwNetClearRecord() escape every name
+    // scan above, so every statement of the body must be the lock, an s_st field store or the s_av wipe
+    {
+        size_t pos = 0;
+        while (pos < f.size())
+        {
+            size_t eol = f.find('\n', pos);
+            if (eol == std::string::npos)
+                eol = f.size();
+            std::string ln = f.substr(pos, eol - pos);
+            pos = eol + 1;
+            const size_t b = ln.find_first_not_of(" \t\r");
+            if (b == std::string::npos)
+                continue;
+            ln = ln.substr(b);
+            if (ln == "{" || ln == "}" || ln.compare(0, 2, "//") == 0 || ln.compare(0, 4, "void") == 0)
+                continue;
+            const bool ok = ln == "portENTER_CRITICAL(&s_mux);" || ln == "portEXIT_CRITICAL(&s_mux);" ||
+                            ln == "memset(&s_av, 0, sizeof(s_av));" ||
+                            (ln.compare(0, 5, "s_st.") == 0 && ln.find('(') == std::string::npos);
+            TEST_ASSERT_TRUE_MESSAGE(ok, ("fwNetForgetAvail has a statement outside the whitelist: " + ln).c_str());
+        }
+    }
+
+    // builds without the AU bridge refuse the channel switch
+    const std::string none = read_repo_file("src/rm_au_none.cpp");
+    const std::string nb = slice_body(none, "RmAuResult auSetChannel(uint8_t)", "rm_au_none.cpp defines no auSetChannel");
+    TEST_ASSERT_TRUE_MESSAGE(nb.find("return RM_AU_UNSUPPORTED;") != std::string::npos, "rm_au_none auSetChannel does not return RM_AU_UNSUPPORTED");
 }
 
 static void test_web_setvia_compares_canonical_form()
@@ -1844,6 +1951,7 @@ int main(int, char **)
     RUN_TEST(test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumptions);
     RUN_TEST(test_autoupdate_updchan_do_not_collide_with_other_commands);
     RUN_TEST(test_autoupdate_updchan_rungs_schema_rows_and_defaults_match_the_assumptions);
+    RUN_TEST(test_updchan_rung_routes_through_auSetChannel);
     RUN_TEST(test_update_does_not_collide_with_other_commands);
     RUN_TEST(test_update_rungs_sit_in_the_esp32_block_with_the_expected_output);
     RUN_TEST(test_au_tick_and_wifi_gate_are_wired_in_esp32_main);
@@ -1860,6 +1968,7 @@ int main(int, char **)
     RUN_TEST(test_charge_led_marker_is_set_before_save_and_never_masked_away);
     RUN_TEST(test_web_setvia_compares_canonical_form);
     RUN_TEST(test_au_web_gate_and_status_wiring_pins);
+    RUN_TEST(test_rm_upd_chan_glue_pins);
     RUN_TEST(test_bleguard_cycle_and_shed_fail_are_instrument_only);
     RUN_TEST(test_bleguard_wiring_pins);
     RUN_TEST(test_bleguard_is_classic_esp32_only);

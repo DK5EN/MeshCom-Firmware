@@ -264,6 +264,8 @@ EXT_CASES = [
     ("upd", "go V4.41A_x-1", True), ("upd", "go " + "a" * 23, True), ("upd", "go " + "a" * 24, False),
     ("upd", "foo", False), ("upd", "go", False), ("upd", "go ", False), ("upd", "go a b", False),
     ("upd", "go v4/41", False), ("upd", "check now", False), ("upd", "Check", False),
+    ("upd", "chan prod", True), ("upd", "chan dev", True), ("upd", "chan", False), ("upd", "chan ", False),
+    ("upd", "chan DEV", False), ("upd", "chan main", False), ("upd", "chan dev x", False),
     ("gps", "ON", False), ("setout", "A0 on", False), ("Radio", "", False),
 ]
 

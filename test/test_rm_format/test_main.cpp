@@ -615,6 +615,24 @@ static void test_upd_result()
     TEST_ASSERT_EQUAL_UINT32(0, rmFmtUpdResult(g_buf, 5, true, RM_AU_STARTED, "v1.2.3", ""));
 }
 
+static void test_chan_result()
+{
+    size_t n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_CHAN_OK, 0);
+    expectStr("ok chan prod", n);
+    n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_CHAN_OK, 1);
+    expectStr("ok chan dev", n);
+    n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_BUSY, 1);
+    expectStr("err aubusy", n);
+    n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_UNSUPPORTED, 0);
+    expectStr("err unsupported", n);
+    n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_NODEV, 1);
+    expectStr("err blocked", n);
+    n = rmFmtChanResult(g_buf, sizeof(g_buf), RM_AU_STARTED, 1);
+    expectStr("err failed", n);
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtChanResult(g_buf, 5, RM_AU_CHAN_OK, 0));
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtChanResult(nullptr, 5, RM_AU_CHAN_OK, 0));
+}
+
 // rmSensPresence: flags x detection (regression for "Humidity: not fitted" on a BME280 run with --bmp on)
 static RmSensFlags sf()
 {
@@ -769,6 +787,7 @@ int main(int, char **)
     RUN_TEST(test_small_buffer);
     RUN_TEST(test_net_upd);
     RUN_TEST(test_upd_result);
+    RUN_TEST(test_chan_result);
     RUN_TEST(test_sens_bmpflag_bme280);
     RUN_TEST(test_sens_bmeflag_bmp280);
     RUN_TEST(test_sens_bmpflag_bmp280);

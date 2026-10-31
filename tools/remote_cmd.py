@@ -86,7 +86,7 @@ ALLOWLIST: Dict[str, Any] = {
     "pos": "pos",    # none (read) | "<lat> <lon> <alt>" (write)
     "mh": "mh",      # row index 0..999 | callsign with optional SSID
     "net": None,
-    "upd": "upd",    # none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23
+    "upd": "upd",    # none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23 | "chan prod"|"chan dev" (dev-channel builds)
     "blockcall": "calls",  # none (read) | "none" | comma list [A-Za-z0-9,-] (BLK-01, full write)
 }
 
@@ -177,8 +177,8 @@ def _check_ext_args(cmd: str, shape: str, args: str) -> None:
         if not 1 <= len(args) <= limit or any(c in _TEXT_BAD for c in args):
             raise RmError("%s needs free text of 1..%d characters without { } | :" % (cmd, limit))
     elif shape == "upd":
-        if args != "check" and not _UPD_GO_RE.fullmatch(args):
-            raise RmError("upd needs nothing, 'check' or 'go <tag>' (tag [A-Za-z0-9._-], 1..23)")
+        if args not in ("check", "chan prod", "chan dev") and not _UPD_GO_RE.fullmatch(args):
+            raise RmError("upd needs nothing, 'check' 'go <tag>' (tag [A-Za-z0-9._-], 1..23), 'chan prod' or 'chan dev'")
     elif shape == "pos":
         if not _POS_RE.fullmatch(args):
             raise RmError("pos needs '<lat> <lon> <alt>'")
@@ -363,6 +363,8 @@ _VECTOR_CMDS = [
     ("secret", "DK5EN-90", "DK5EN-1", 101, "upd", ""),
     ("secret", "DK5EN-90", "DK5EN-1", 102, "upd", "check"),
     ("secret", "DK5EN-90", "DK5EN-1", 103, "upd", "go v4.41a"),
+    ("secret", "DK5EN-90", "DK5EN-1", 104, "upd", "chan dev"),
+    ("secret", "DK5EN-90", "DK5EN-1", 105, "upd", "chan prod"),
 ]
 
 _VECTOR_REPLIES = [
@@ -445,6 +447,10 @@ _VECTOR_REFUSALS = [
     ("upd", "go a b", 0, 22),
     ("upd", "go v4/41", 0, 22),
     ("upd", "go " + "a" * 24, 0, 22),
+    ("upd", "chan", 0, 22),
+    ("upd", "chan DEV", 0, 22),
+    ("upd", "chan main", 0, 22),
+    ("upd", "chan dev x", 0, 22),
     ("net", "x", 0, 22),
 ]
 

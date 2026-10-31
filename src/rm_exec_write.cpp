@@ -136,7 +136,7 @@ int writeAtxt(const RmCmd &c, char *res, size_t n)
     return writeText(c, res, n, false);
 }
 
-// upd check | upd go <tag>: the shape is validated upstream; the AU bridge (rm_au.h) does the work.
+// upd check | upd go <tag> | upd chan <prod|dev>: the shape is validated upstream; the AU bridge (rm_au.h) does the work.
 int writeUpd(const RmCmd &c, char *res, size_t n)
 {
     RmAuState st;
@@ -144,6 +144,16 @@ int writeUpd(const RmCmd &c, char *res, size_t n)
     rmAuGetState(st);
     if (!st.supported)
         return fail(res, n, "err unsupported");
+
+    if (strncmp(c.args, "chan ", 5) == 0)
+    {
+        // shape validated upstream (only "chan prod" / "chan dev", only with MC_AU_DEV_CHANNEL)
+        const uint8_t chan = strcmp(c.args + 5, "dev") == 0 ? 1 : 0;
+        const RmAuResult cr = auSetChannel(chan);
+        if (rmFmtChanResult(res, n, cr, chan) == 0)
+            return fail(res, n, "err failed");
+        return cr == RM_AU_CHAN_OK ? 1 : -1;
+    }
 
     bool isGo = false;
     RmAuResult r;

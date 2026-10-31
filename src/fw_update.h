@@ -215,6 +215,30 @@ enum FwChannel : uint8_t
 #define FW_HAS_DEV_CHANNEL 0
 #endif
 
+// RM-UPDCHAN: decision for setting the update channel (pure; the glue is auSetChannel()).
+// cur/want are normalised to 0/1. Order: dev without dev channel -> NODEV; want == cur -> SAME
+// (even while busy); change while a job runs or a go is armed -> BUSY; else CHANGE.
+enum FwChanVerdict
+{
+    FWCH_SAME,
+    FWCH_CHANGE,
+    FWCH_BUSY,
+    FWCH_NODEV
+};
+
+inline FwChanVerdict fwChanDecide(uint8_t cur, uint8_t want, bool busy, bool goPending)
+{
+    cur = cur ? 1 : 0;
+    want = want ? 1 : 0;
+    if(want == 1 && !FW_HAS_DEV_CHANNEL)
+        return FWCH_NODEV;
+    if(want == cur)
+        return FWCH_SAME;
+    if(busy || goPending)
+        return FWCH_BUSY;
+    return FWCH_CHANGE;
+}
+
 // Unknown values, and dev in a build without the dev channel, fall back to prod.
 inline const char *fwChannelRepo(FwChannel c)
 {

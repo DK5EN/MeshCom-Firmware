@@ -1,0 +1,69 @@
+# Campaign RM1 `upd chan` (update channel switch DEV/MAIN, 2026-10-31)
+
+Request: "dann mach in mcapp RM1 bitte einen Schalter für DEV/MAIN". Fork-only (RM1 and AU are not
+upstream), no upstream PR. Base `fork-dev` at `b7802398`.
+
+## Grammar
+
+| Command         | Reply                                                                        |
+| --------------- | ---------------------------------------------------------------------------- |
+| `upd chan prod` | `ok chan prod`, `err aubusy`, `err unsupported`                              |
+| `upd chan dev`  | `ok chan dev`, `err aubusy`, `err unsupported`                               |
+| both, no flag   | `err blocked` (builds without `MC_AU_DEV_CHANNEL` refuse the argument shape) |
+
+- Wire tokens stay `prod`/`dev` (as `c=` and the console); "MAIN"/"DEV" is a UI label only.
+- A change saves `node_updchan` and clears the last check result (`a=-`, `n=0`); a staged image (`st=`)
+  stays. No check starts; the UI sends `upd check` afterwards (sender spacing 10 s).
+- Same channel: `ok`, nothing saved or cleared. `err aubusy` while `b=1` or `g=1`.
+- One function `auSetChannel()` (`src/rm_au.h`) serves RM1 and console `--updchan`; `/setparam updchan`
+  runs `--updchan`, so the web path gets the same behaviour. Console change while busy is new:
+  `[ERR];updchan;busy`.
+
+## Operator decisions 2026-10-31
+
+- Clear the check result on a switch, keep the staged image; no automatic check.
+- Fix the stale `a=` on the console/web path in this campaign.
+- Remote switch only in builds with `MC_AU_DEV_CHANNEL`; no strict-mode requirement.
+- McApp: requirements file plus backlog item B14 in the MCProxy repo (a later code agent implements FE
+  and BE there).
+- Bench: sender DK5EN-92, target DK5EN-1, both on USB; flashing both explicitly approved.
+
+## Waves
+
+| Wave | Content                                                                        | State |
+| ---- | ------------------------------------------------------------------------------ | ----- |
+| 0    | Contract `src/rm_au.h`, `rm_commands.h` comment, `[env:native_remote_cmd_dev]` | done  |
+| 1    | A1 wire, A2 AU, B console, C web page                                          | done  |
+| 2    | Gate stage 1,2; clean builds Heltec V3, T-Beam, RAK4631; image scan; advisor   | done  |
+| 3    | McApp requirements + B14 in MCProxy                                            | open  |
+| 4    | Docs: `docs/rm1-commands.md`, RESUME, BACKLOG (bench pending)                  | open  |
+| -    | Bench: sender DK5EN-92, target DK5EN-1 (both USB, flash approved 10-31)        | open  |
+
+### Wave 1 file ownership
+
+| Agent | Files                                                                                                                                                                        |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1    | `src/remote_cmd.cpp`, `src/rm_exec_write.cpp`, `src/rm_exec_ext.h`, `tools/remote_cmd.py`, `tools/tests/` (vectors, py tests), `test/test_remote_cmd`, `test/test_rm_format` |
+| A2    | `src/esp32/rm_au_esp32.cpp`, `src/rm_au_none.cpp`, `src/esp32/fw_update_net.{h,cpp}`, `src/fw_update.h`, `test/test_fw_update`                                               |
+| B     | `src/command_functions.cpp` (`--updchan` rung), `test/test_command_setters`                                                                                                  |
+| C     | `src/web_functions/web_rm_page.cpp`, `tools/webgui_rm_test.js`                                                                                                               |
+| Orch. | `src/rm_au.h`, `src/rm_commands.h`, `platformio.ini`, `test/golden/`, docs                                                                                                   |
+
+### Waves 1-2 closed (2026-10-31)
+
+- Four Sonnet-medium writers; each new test failed before and passes after (B's scan: orchestrator ran it
+  against the HEAD copy of `command_functions.cpp`).
+- Gate run 1: one red pin, `s_st.zlen =` count 2 (the reset in `fwNetForgetAvail`). Scan now excludes that body.
+- Advisor pass 1 (Opus): rework, the RM write branch and the ESP32 glue were compiled by no native env.
+  Fresh Sonnet-high implementer added source pins `test_rm_upd_chan_glue_pins` (mutations "drop
+  fwNetForgetAvail" and "return 1" fail). Orchestrator: short sent-history label "Update channel DEV|MAIN",
+  UCH-14.
+- Advisor pass 2: the persistence pins were a blacklist; orchestrator made the `fwNetForgetAvail` body a
+  whitelist (mutation `fwNetForgetLast();` fails at the whitelist pin). No third advisor run: test-only,
+  mutation-verified; `native_command_setters` rerun after it 51/51 (gate run 2 predates this test-only edit).
+- Gate run 2: Unity 85 envs 3219/3219, stage 2 PASS; clean builds with `MC_AU_DEV_CHANNEL=1`:
+  heltec_wifi_lora_32_V3 RAM 39.5 % flash 55.9 %, ttgo_tbeam flash 59.4 %, wiscore_rak4631 flash 86.9 %.
+  Image scan Heltec V3 and T-Beam: `ok chan %s`, `updchan;busy`, `var rmUpdChan=1` present.
+- Known residuals: after a switch a staged image of the old channel stays installable (operator decision);
+  `s_auNotifiedTag` survives a switch (a re-reported tag is not notified again); FWNET_STUB builds answer
+  `--updchan` with `unsupported`.

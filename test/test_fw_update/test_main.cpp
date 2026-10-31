@@ -1728,12 +1728,37 @@ static void test_notify_due_for_a_finished_newer_check_once(void)
     TEST_ASSERT_TRUE(fwNotifyDue(true, true, fwEffectiveMode(2), false));
 }
 
+void test_chan_decide_verdicts(void)
+{
+    // same channel: idempotent, even while busy or armed
+    TEST_ASSERT_EQUAL_INT(FWCH_SAME, fwChanDecide(0, 0, false, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_SAME, fwChanDecide(0, 0, true, true));
+    // change while a job runs or a go is armed: BUSY, nothing else
+    TEST_ASSERT_EQUAL_INT(FWCH_BUSY, fwChanDecide(1, 0, true, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_BUSY, fwChanDecide(1, 0, false, true));
+#if FW_HAS_DEV_CHANNEL
+    TEST_ASSERT_EQUAL_INT(FWCH_SAME, fwChanDecide(1, 1, true, true));
+    TEST_ASSERT_EQUAL_INT(FWCH_SAME, fwChanDecide(1, 5, false, false)); // 5 normalises to 1
+    TEST_ASSERT_EQUAL_INT(FWCH_CHANGE, fwChanDecide(0, 1, false, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_CHANGE, fwChanDecide(1, 0, false, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_BUSY, fwChanDecide(0, 1, true, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_BUSY, fwChanDecide(0, 1, false, true));
+#else
+    // prod-only build: dev is never available, busy or not; cur=1 (stale NVS) -> prod is a change
+    TEST_ASSERT_EQUAL_INT(FWCH_NODEV, fwChanDecide(0, 1, false, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_NODEV, fwChanDecide(0, 1, true, true));
+    TEST_ASSERT_EQUAL_INT(FWCH_NODEV, fwChanDecide(1, 1, false, false));
+    TEST_ASSERT_EQUAL_INT(FWCH_CHANGE, fwChanDecide(1, 0, false, false));
+#endif
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_tls_fail_token_blames_heap_when_allocations_failed);
     RUN_TEST(test_shed_settled_waits_for_the_tft_sprite);
     RUN_TEST(test_tft_sprite_wanted_needs_display_on_and_no_shed);
+    RUN_TEST(test_chan_decide_verdicts);
     RUN_TEST(test_parse_plain);
     RUN_TEST(test_parse_dated);
     RUN_TEST(test_parse_without_v);

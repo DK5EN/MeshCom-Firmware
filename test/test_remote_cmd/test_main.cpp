@@ -150,7 +150,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(40, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(42, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -196,6 +196,14 @@ static void test_vectors_commands_reproduced(void)
         RmState s;
         strictInit(s, 0);
         const RmVerdict v = rmCheck(s, c, dst.c_str(), src.c_str(), passwd.c_str(), 0, 22, 1000000);
+#if !defined(MC_AU_DEV_CHANNEL)
+        // "upd chan ..." is a dev-channel-build shape: the prod view refuses it (tag already verified above)
+        if (cmd == "upd" && args.compare(0, 5, "chan ") == 0)
+        {
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(v), msg);
+            continue;
+        }
+#endif
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
     }
     printf("[vectors] commands reproduced: %u/%u\n", (unsigned)n, (unsigned)n);
@@ -209,7 +217,7 @@ static void test_vectors_refusals_reproduced(void)
 
     static std::string objs[32];
     const size_t n = objectsOf(json, "refusals", objs, 32);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(13, n, "refusal vector count drifted from tools/remote_cmd.py");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(17, n, "refusal vector count drifted from tools/remote_cmd.py");
     for (size_t i = 0; i < n; i++)
     {
         std::string cmd, args, text;
@@ -1213,7 +1221,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(40, n);
+    TEST_ASSERT_EQUAL_INT(42, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1241,6 +1249,14 @@ static void test_build_command_reproduces_every_vector(void)
         RmState st;
         strictInit(st, 0);
         const RmVerdict v = rmCheck(st, c, dst.c_str(), src.c_str(), passwd.c_str(), 0, 22, 1000000);
+#if !defined(MC_AU_DEV_CHANNEL)
+        if (cmd == "upd" && args.compare(0, 5, "chan ") == 0)
+        {
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("refused", rmVerdictName(v), msg);
+            TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(cmd.c_str(), args.c_str(), 0, 22), msg);
+            continue;
+        }
+#endif
         TEST_ASSERT_EQUAL_STRING_MESSAGE(c.ctr == 0 ? "sync" : "ok", rmVerdictName(v), msg);
 
         // and every vector command passes the public allowlist predicate
@@ -1629,6 +1645,8 @@ static void test_ext_allowlist_accepts_and_rejects(void)
         {"upd", "go 123456789012345678901234", false}, // 24
         {"upd", "foo", false}, {"upd", "go", false}, {"upd", "go ", false}, {"upd", "go a b", false},
         {"upd", "go v4/41", false}, {"upd", "check now", false}, {"upd", "Check", false}, {"upd", " check", false},
+        {"upd", "chan", false}, {"upd", "chan ", false}, {"upd", "chan DEV", false}, {"upd", "chan main", false},
+        {"upd", "chan dev x", false},
         {"blockcall", "", true}, {"blockcall", "none", true}, {"blockcall", "DL1ABC", true},
         {"blockcall", "DL1ABC,DK5EN-1", true}, {"blockcall", "dl1abc,dk5en-1", true},
         {"blockcall", "123456789012345678901234567890123456789", true},   // 39
@@ -1645,6 +1663,32 @@ static void test_ext_allowlist_accepts_and_rejects(void)
         snprintf(msg, sizeof(msg), "%s '%s'", t.cmd, t.args);
         TEST_ASSERT_EQUAL_MESSAGE(t.ok, rmCommandAllowed(t.cmd, t.args, 0, 22), msg);
     }
+}
+
+// RM1 "upd chan <prod|dev>": allowed only in builds with MC_AU_DEV_CHANNEL (env native_remote_cmd_dev);
+// the other view (native_remote_cmd) refuses the shape. Malformed forms are refused in both.
+static void test_upd_chan_allowlist(void)
+{
+#if defined(MC_AU_DEV_CHANNEL)
+    const bool want = true;
+#else
+    const bool want = false;
+#endif
+    TEST_ASSERT_EQUAL(want, rmCommandAllowed("upd", "chan prod", 0, 22));
+    TEST_ASSERT_EQUAL(want, rmCommandAllowed("upd", "chan dev", 0, 22));
+    const char *bad[] = {"chan", "chan ", "chan DEV", "chan Prod", "chan main", "chan dev x", "chan  dev", "chan dev ",
+                         "chan prod;", "Chan dev"};
+    for (const char *b : bad)
+        TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed("upd", b, 0, 22), b);
+    // refused shape: the node answers the generic refusal
+    RmCmd c;
+    memset(&c, 0, sizeof(c));
+    strcpy(c.cmd, "upd");
+    strcpy(c.args, "chan dev");
+    char txt[40];
+    rmRefusalText(c, 0, 22, txt, sizeof(txt));
+    if (!want)
+        TEST_ASSERT_EQUAL_STRING("err blocked", txt);
 }
 
 static void test_ext_args_survive_parse_build_and_check(void)
@@ -2498,6 +2542,7 @@ int main(int, char **)
     RUN_TEST(test_sanitiser_vectors);
     RUN_TEST(test_allowlist_table_equivalence);
     RUN_TEST(test_ext_allowlist_accepts_and_rejects);
+    RUN_TEST(test_upd_chan_allowlist);
     RUN_TEST(test_ext_args_survive_parse_build_and_check);
     RUN_TEST(test_ext_separator_cannot_be_injected_through_args);
     RUN_TEST(test_replies_fit_the_cap_and_carry_no_retired_fields);

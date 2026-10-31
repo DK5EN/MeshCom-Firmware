@@ -47,6 +47,7 @@ bool fwNetStart(FwNetJob, uint8_t) { return false; }
 bool fwNetStartLan(const char *, uint32_t, const char *) { return false; }
 #endif
 void fwNetGetStatus(FwNetStatus &out) { memset(&out, 0, sizeof(out)); }
+void fwNetForgetAvail(void) {}
 bool fwNetPhoneHeld(void) { return false; }
 void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
 {
@@ -1611,6 +1612,19 @@ void fwNetGetStatus(FwNetStatus &out)
     ensureStagedLoaded();
     portENTER_CRITICAL(&s_mux);
     out = s_st;
+    portEXIT_CRITICAL(&s_mux);
+}
+
+void fwNetForgetAvail(void)
+{
+    portENTER_CRITICAL(&s_mux);
+    s_st.availTag[0] = '\0';
+    s_st.availNewer = false;
+    s_st.installable = false;
+    s_st.zlen = 0;
+    s_st.ilen = 0;
+    s_st.lastCheckEpoch = 0;
+    memset(&s_av, 0, sizeof(s_av));
     portEXIT_CRITICAL(&s_mux);
 }
 

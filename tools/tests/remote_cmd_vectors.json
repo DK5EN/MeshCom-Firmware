@@ -481,6 +481,30 @@
       "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
       "tag": "5d1659ea985e0f60",
       "dm_text": "RM1 103 upd go v4.41a 5d1659ea985e0f60"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 104,
+      "cmd": "upd",
+      "args": "chan dev",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|104|upd chan dev",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "ab240d2c6273e4f4",
+      "dm_text": "RM1 104 upd chan dev ab240d2c6273e4f4"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 105,
+      "cmd": "upd",
+      "args": "chan prod",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|105|upd chan prod",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "58d43aaa7875ff7c",
+      "dm_text": "RM1 105 upd chan prod 58d43aaa7875ff7c"
     }
   ],
   "replies": [
@@ -966,6 +990,34 @@
     {
       "cmd": "upd",
       "args": "go aaaaaaaaaaaaaaaaaaaaaaaa",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "chan",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "chan DEV",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "chan main",
+      "min": 0,
+      "max": 22,
+      "text": "err blocked"
+    },
+    {
+      "cmd": "upd",
+      "args": "chan dev x",
       "min": 0,
       "max": 22,
       "text": "err blocked"

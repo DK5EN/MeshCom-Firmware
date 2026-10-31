@@ -19,6 +19,8 @@
 #include "fw_update_net.h"
 #include "rm_au_go.h"
 
+void save_settings(void); // esp32_flash.cpp
+
 // ---- go state (tag + not-before, RAM only) ----
 static char s_goTag[24] = "";
 static uint32_t s_goNotBeforeMs = 0;
@@ -144,6 +146,27 @@ RmAuResult rmAuGo(const char *tag)
         return RM_AU_NOTREADY;
     default:
         return RM_AU_STALE;
+    }
+}
+
+RmAuResult auSetChannel(uint8_t chan)
+{
+    FwNetStatus st;
+    fwNetGetStatus(st);
+    switch(fwChanDecide((uint8_t)meshcom_settings.node_updchan, chan, st.state == FWS_BUSY, s_goArmed))
+    {
+    case FWCH_NODEV:
+        return RM_AU_NODEV;
+    case FWCH_BUSY:
+        return RM_AU_BUSY;
+    case FWCH_CHANGE:
+        meshcom_settings.node_updchan = chan ? 1 : 0;
+        save_settings();
+        fwNetForgetAvail();
+        return RM_AU_CHAN_OK;
+    case FWCH_SAME:
+    default:
+        return RM_AU_CHAN_OK;
     }
 }
 

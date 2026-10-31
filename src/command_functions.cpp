@@ -63,6 +63,7 @@
 #ifdef ESP32
 #include "esp32/esp32_functions.h"
 #include "esp32/esp32_sleep.h"
+#include "rm_au.h"       // RM-UPDCHAN: auSetChannel() for --updchan
 #include "esp32/fw_update_net.h" // AU-05 (#1187): fwNetStart/fwNetGetStatus for --update, --info AU line
 #include "safeboot/safeboot_ver.h" // AU-12 (#1187): AU_SAFEBOOT_MIN for the capability refuse / status
 #endif
@@ -5131,7 +5132,8 @@ void commandAction(char *umsg_text, bool ble)
     // (Safeboot) does not exist on nRF52. Both are ordinary persisted settings
     // (config_json.h rows); the scheduler that acts on them is a later wave. Neither
     // is on the RM allowlist (remote_cmd.cpp allowed() is a positive list), so a
-    // remote RM1 command can never reach these rungs. commandCheck() is exact-token:
+    // remote RM1 command can never reach these rungs (RM sets the channel with its own
+    // "upd chan" verb; both end in auSetChannel()). commandCheck() is exact-token:
     // "autoupdate" / "updchan" collide with no other rung (ladder has no "update*"
     // name). The argument rung ("autoupdate ") must stay above the bare one, because
     // a space ends the token and the bare rung would also match "autoupdate notify".
@@ -5199,19 +5201,15 @@ void commandAction(char *umsg_text, bool ble)
     {
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
 
+        uint8_t _uc;
+
         if(casecmp(_owner_c, (char*)"prod") == 0)
         {
-            meshcom_settings.node_updchan = 0;
+            _uc = 0;
         }
         else if(casecmp(_owner_c, (char*)"dev") == 0)
         {
-            #if defined(MC_AU_DEV_CHANNEL)   // dev channel: fork builds only (fw_update.h)
-            meshcom_settings.node_updchan = 1;
-            #else
-            Serial.printf("[ERR];updchan;no dev channel in this build\n");
-
-            return;
-            #endif
+            _uc = 1;   // a build without MC_AU_DEV_CHANNEL answers RM_AU_NODEV below
         }
         else
         {
@@ -5220,8 +5218,22 @@ void commandAction(char *umsg_text, bool ble)
             return;
         }
 
-        save_settings();
-        Serial.printf("[AU];chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+        // RM-UPDCHAN: auSetChannel() is the one setter (validates, saves, clears the last check result)
+        switch(auSetChannel(_uc))
+        {
+            case RM_AU_CHAN_OK:
+                Serial.printf("[AU];chan;%s\n", meshcom_settings.node_updchan ? "dev" : "prod");
+                break;
+            case RM_AU_NODEV:
+                Serial.printf("[ERR];updchan;no dev channel in this build\n");
+                break;
+            case RM_AU_BUSY:
+                Serial.printf("[ERR];updchan;busy\n");
+                break;
+            default:   // RM_AU_UNSUPPORTED (FWNET_STUB builds)
+                Serial.printf("[ERR];updchan;unsupported\n");
+                break;
+        }
 
         return;
     }

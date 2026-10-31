@@ -192,6 +192,11 @@ bool auRebootToSafeboot(void);
 // Thread-safe snapshot (portMUX). Never blocks on the network.
 void fwNetGetStatus(FwNetStatus &out);
 
+// RM-UPDCHAN: forget the last CHECK result (availTag, availNewer, installable, zlen, ilen,
+// lastCheckEpoch and the download cache) after a channel switch. Keeps the staged record,
+// stagedTag and the NVS "last" tag. Thread-safe (portMUX).
+void fwNetForgetAvail(void);
+
 // True while a phone holds the BLE link (connected or app ready): the same expression esp32BlePause()
 // declines on and the lowheap_phone token keys on, so /austatus "phone" and the job agree.
 bool fwNetPhoneHeld(void);

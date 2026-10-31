@@ -107,6 +107,28 @@ inline bool rmUpdResultOk(RmAuResult r, bool isGo)
     return r == RM_AU_STARTED || (isGo && r == RM_AU_APPLYING);
 }
 
+// Reply of "upd chan <prod|dev>": chan = the requested channel (0 prod, 1 dev). Returns the length, 0 if it does not fit.
+inline size_t rmFmtChanResult(char *out, size_t n, RmAuResult r, uint8_t chan)
+{
+    if (out == nullptr || n == 0)
+        return 0;
+    int w;
+    switch (r)
+    {
+    case RM_AU_CHAN_OK: w = snprintf(out, n, "ok chan %s", chan ? "dev" : "prod"); break;
+    case RM_AU_BUSY: w = snprintf(out, n, "err aubusy"); break;
+    case RM_AU_UNSUPPORTED: w = snprintf(out, n, "err unsupported"); break;
+    case RM_AU_NODEV: w = snprintf(out, n, "err blocked"); break;
+    default: w = snprintf(out, n, "err failed"); break;
+    }
+    if (w <= 0 || (size_t)w >= n)
+    {
+        out[0] = '\0';
+        return 0;
+    }
+    return (size_t)w;
+}
+
 inline size_t rmFmtUpdResult(char *out, size_t n, bool isGo, RmAuResult r, const char *tag, const char *avail)
 {
     if (out == nullptr || n == 0)
