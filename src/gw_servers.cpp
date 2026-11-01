@@ -93,10 +93,83 @@ static bool parseIpv4(const char *s, uint8_t out[4])
     return field == 4;
 }
 
-bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver, GwTarget *out)
+bool gwParseLab(const char *spec, char *host, size_t hostMax, bool *isIp, uint8_t ip[4], uint16_t *port)
+{
+    if (spec == nullptr || host == nullptr || hostMax < 2 || isIp == nullptr || ip == nullptr || port == nullptr)
+        return false;
+    size_t n = strlen(spec);
+    if (n == 0) return false;
+    const char *colon = strchr(spec, ':');
+    size_t hl = colon ? (size_t)(colon - spec) : n;
+    if (hl == 0 || hl >= hostMax) return false;
+    uint32_t p = GW_LAB_DEFAULT_PORT;
+    if (colon) {
+        const char *q = colon + 1;
+        if (*q == '\0') return false;
+        p = 0;
+        for (; *q; q++) {
+            if (*q < '0' || *q > '9') return false;
+            p = p * 10 + (uint32_t)(*q - '0');
+            if (p > 65535) return false;
+        }
+        if (p == 0) return false;
+    }
+    for (size_t i = 0; i < hl; i++) {
+        char c = spec[i];
+        bool ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '.' || c == '-';
+        if (!ok) return false;   // also rejects a second ':' (IPv6) and spaces
+    }
+    if (spec[0] == '.' || spec[0] == '-' || spec[hl - 1] == '.' || spec[hl - 1] == '-') return false;
+    memcpy(host, spec, hl);
+    host[hl] = '\0';
+    *isIp = parseIpv4(host, ip);
+    // all-digit-and-dots that is no valid IPv4 ("300.1.1.1", "1.2.3") is garbage, not a host name
+    if (!*isIp) {
+        bool alpha = false;
+        for (size_t i = 0; i < hl; i++)
+            if ((host[i] >= 'a' && host[i] <= 'z') || (host[i] >= 'A' && host[i] <= 'Z')) alpha = true;
+        if (!alpha) return false;
+    }
+    *port = (uint16_t)p;
+    return true;
+}
+
+bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver, GwTarget *out,
+               const char *lab)
 {
     if (out == nullptr) return false;
     memset(out, 0, sizeof(*out));
+    out->srv_port = GW_LAB_DEFAULT_PORT;
+
+    if (code != nullptr && code[0] == 'L' && code[1] == 'B') {
+        // lab server: NTP and path follow the normal OE choice, only the server is replaced
+        bool isIp = false;
+        uint8_t ip[4] = {0, 0, 0, 0};
+        uint16_t port = 0;
+        char host[sizeof(out->lab_host)];
+        const char *why = nullptr;
+        if (lab == nullptr || !gwParseLab(lab, host, sizeof(host), &isIp, ip, &port))
+            why = "node_gwlab empty or invalid";
+        else if (!isIp && !hasResolver)
+            why = "no DNS resolver, lab needs an IPv4 literal";
+        if (why != nullptr) {
+            bool r = gwResolve("OE", net, ownNtp, hasResolver, out, nullptr);
+            out->lab_fallback = why;
+            return r;
+        }
+        if (!gwResolve("OE", net, ownNtp, hasResolver, out, nullptr)) return false;
+        out->lab = true;
+        out->srv_port = port;
+        if (isIp) {
+            out->srv_host = nullptr;
+            memcpy(out->srv_ip, ip, 4);
+        } else {
+            memcpy(out->lab_host, host, strlen(host) + 1);
+            out->srv_host = out->lab_host;
+            memset(out->srv_ip, 0, 4);
+        }
+        return true;
+    }
 
     const GwServer *row = gwFind(code);
     GwNet used = net;
@@ -119,6 +192,7 @@ bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver
     memcpy(out->ntp_ip, side->ntp.ip, 4);
     out->path = (used == GW_NET_HAMNET) ? "hamnet" : "inet";
     out->ownntp_ignored = false;
+    out->srv_port = GW_LAB_DEFAULT_PORT;
 
     if (ownNtp != nullptr && strlen(ownNtp) >= 7) {
         uint8_t ip[4];
@@ -145,7 +219,7 @@ int gwCodes(char out[][3], int max)
 }
 
 bool gwResolveNode(const char *code, uint8_t mode, const uint8_t ownIp[4], const char *ownNtp,
-                   bool hasResolver, GwTarget *out)
+                   bool hasResolver, GwTarget *out, const char *lab)
 {
-    return gwResolve(code, gwSelectNet(mode, ownIp), ownNtp, hasResolver, out);
+    return gwResolve(code, gwSelectNet(mode, ownIp), ownNtp, hasResolver, out, lab);
 }

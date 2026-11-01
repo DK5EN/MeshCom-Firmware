@@ -68,6 +68,7 @@ ALIASES = {
     "msg": "node_audmsg",
     "gwrf": "node_gwrf",
     "gwrc": "node_gwrc",
+    "gwlab": "node_gwlab",
 }
 
 

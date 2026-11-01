@@ -1498,6 +1498,7 @@ void commandAction(char *umsg_text, bool ble)
                 char _gwl[24];
                 gwCodesList(_gwl, sizeof(_gwl), '/');
                 printfdeb("--gateway srv %s  gateway server, reboots\n", _gwl);
+                printdeb("--gateway lab <host[:port]>  lab server (instrumentation), reboots; --gateway srv OE restores\n");
             }
             printdeb("--setudpcall <call>     UDP callsign\n--setnet auto/inet/hamnet  gateway network (auto: Hamnet if own IP is 44.x)\n--setnet                show network mode\n--sethamnet on/off      deprecated alias of --setnet hamnet/inet\n--setinet on/off        deprecated alias of --setnet inet/hamnet\n--extudp on/off         external UDP\n--extudpip a.b.c.d/none external UDP peer\n--nopmother on/off      no foreign DMs to EXTUDP peer\n--webserver on/off      web server\n--webpwd <pwd>/none     web password\n--webtimer 0            reset web session timer\n");
             #ifndef DISABLE_NET_CONSOLE
@@ -2676,6 +2677,44 @@ void commandAction(char *umsg_text, bool ble)
         bReturn = true;
 
         save_settings();
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"gateway lab ") == 0)
+    {
+        // F1: lab hub for DK5EN-98 instrumentation. host or IPv4, optional :port.
+        char _labhost[sizeof(meshcom_settings.node_gwlab)];
+        bool _labip = false;
+        uint8_t _labipv[4];
+        uint16_t _labport = 0;
+        char _labarg[sizeof(meshcom_settings.node_gwlab)];
+        snprintf(_labarg, sizeof(_labarg), "%s", msg_text+14);
+
+        if(!gwParseLab(_labarg, _labhost, sizeof(_labhost), &_labip, _labipv, &_labport)
+           || strlen(msg_text+14) >= sizeof(meshcom_settings.node_gwlab))
+        {
+            printfdeb("\nGateway lab fault <%s> use host, a.b.c.d or host:port\n", msg_text+14);
+            return;
+        }
+
+        snprintf(meshcom_settings.node_gwlab, sizeof(meshcom_settings.node_gwlab), "%s", _labarg);
+        snprintf(meshcom_settings.node_gwsrv, sizeof(meshcom_settings.node_gwsrv), "%s", GW_LAB_CODE);
+
+        if(ble)
+        {
+            bNodeSetting=true;
+        }
+
+        bReturn = true;
+
+        save_settings();
+
+        if(bGATEWAY)
+        {
+            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+            printfdeb("Gateway lab %s. Auto. Reboot after 5 sec.", meshcom_settings.node_gwlab);
+            rebootAuto = millis() + 5 * 1000; // 5 Sekunden
+            #endif
+        }
     }
     else
     if(commandCheck(msg_text+2, (char*)"gateway srv ") == 0)
@@ -5797,7 +5836,7 @@ void commandAction(char *umsg_text, bool ble)
                       meshcom_settings.node_cleanflash,
                       meshcom_settings.node_fwversion);
 
-        Serial.printf("[PERSIST];gw;gwrf;%d;gwrc;%s\n", meshcom_settings.node_gwrf, meshcom_settings.node_gwrc);
+        Serial.printf("[PERSIST];gw;gwrf;%d;gwrc;%s;gwlab;%s\n", meshcom_settings.node_gwrf, meshcom_settings.node_gwrc, meshcom_settings.node_gwlab);
 
         #if defined(ESP32) && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO))
         Serial.printf("[PERSIST];stat;flash;%d;sd;%d;immediate;%d;mute;%d\n",
@@ -7478,7 +7517,10 @@ void commandAction(char *umsg_text, bool ble)
                     {
                         printfdeb("...NET MODE      : %s (in use: %s)\n", gwModeText(), gwNetInUse());
 
-                        printfdeb("...GW server    : %s\n", meshcom_settings.node_gwsrv);
+                        if(strncmp(meshcom_settings.node_gwsrv, GW_LAB_CODE, 2) == 0)
+                            printfdeb("...GW server    : LB %s\n", meshcom_settings.node_gwlab);
+                        else
+                            printfdeb("...GW server    : %s\n", meshcom_settings.node_gwsrv);
                     }
 
                     if(bGATEWAY || bWEBSERVER)

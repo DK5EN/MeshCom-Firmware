@@ -6,6 +6,7 @@
 
 // WIFI functions
 bool startNetwork();
+uint16_t udpGwDestPort();   // UDP destination port of the gateway server (1990, or the lab :port)
 bool doWiFiConnect();
 String udpUpdateTimeClient();
 String udpGetTimeClient();

@@ -112,6 +112,8 @@ size_t fieldCount();
     /* gateway registration state (gw_reg_runtime.cpp): persisted, never exported/imported. */   \
     X("node_gwrf",      CFG_INT, node_gwrf,       CFG_NORANGE, CFG_NOESC)                        \
     X("node_gwrc",      CFG_STR, node_gwrc,       CFG_NORANGE, CFG_NOESC)                        \
+    /* F1 lab hub "host[:port]" for gateway code LB (--gateway lab); not exported to JSON. */   \
+    X("node_gwlab",     CFG_STR, node_gwlab,      CFG_NORANGE, CFG_NOESC)                        \
     SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)
 
 /* Platform-only persisted-but-not-exported fields: the 13 T-Deck device

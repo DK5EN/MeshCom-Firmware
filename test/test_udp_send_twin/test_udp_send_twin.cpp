@@ -250,6 +250,8 @@ bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len)
     return !g_write_fails;
 }
 
+uint16_t udpGwDestPort() { return 1990; }
+
 bool udpEndRaw_esp32()
 {
     if (!g_sent.empty())

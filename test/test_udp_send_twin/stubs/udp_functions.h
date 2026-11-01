@@ -23,6 +23,7 @@ void udpCountTx(bool ok);
 bool udpBeginRaw_esp32();
 bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len);
 bool udpEndRaw_esp32();
+uint16_t udpGwDestPort();   // UDP destination port of the gateway server (1990, or the lab :port)
 void resetMeshComUDP();
 
 #include "udp_drain.h"

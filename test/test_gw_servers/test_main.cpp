@@ -77,6 +77,10 @@ static void test_all_rows_both_nets_resolve_one_step_to_direct(void)
             TEST_ASSERT_TRUE(nonZero(t.ntp_ip));
             TEST_ASSERT_TRUE(t.ntp_host == nullptr || strlen(t.ntp_host) > 0);
             TEST_ASSERT_TRUE(t.path != nullptr);
+            // non-LB invariant: normal port, no lab, no fallback
+            TEST_ASSERT_EQUAL_UINT16_MESSAGE(1990, t.srv_port, ALL[i]);
+            TEST_ASSERT_FALSE(t.lab);
+            TEST_ASSERT_NULL(t.lab_fallback);
             // redirection target is DIRECT after at most one step
             const GwSide *s = &row->side[n];
             if (s->mode == GWM_OTHER_NET) {
@@ -321,6 +325,72 @@ static void test_resolve_node_end_to_end(void)
     }
 }
 
+// ---- F1 lab server (LB) ----
+static void test_lab_parse(void)
+{
+    char h[48]; bool isIp; uint8_t ip[4]; uint16_t port;
+    TEST_ASSERT_TRUE(gwParseLab("lab.example.org", h, sizeof(h), &isIp, ip, &port));
+    TEST_ASSERT_EQUAL_STRING("lab.example.org", h); TEST_ASSERT_FALSE(isIp); TEST_ASSERT_EQUAL_UINT16(1990, port);
+    TEST_ASSERT_TRUE(gwParseLab("192.168.1.20", h, sizeof(h), &isIp, ip, &port));
+    TEST_ASSERT_TRUE(isIp); TEST_ASSERT_EQUAL_UINT8(168, ip[1]); TEST_ASSERT_EQUAL_UINT16(1990, port);
+    TEST_ASSERT_TRUE(gwParseLab("192.168.1.20:2000", h, sizeof(h), &isIp, ip, &port));
+    TEST_ASSERT_TRUE(isIp); TEST_ASSERT_EQUAL_UINT16(2000, port); TEST_ASSERT_EQUAL_STRING("192.168.1.20", h);
+    TEST_ASSERT_TRUE(gwParseLab("mac.local:65535", h, sizeof(h), &isIp, ip, &port));
+    TEST_ASSERT_EQUAL_STRING("mac.local", h); TEST_ASSERT_EQUAL_UINT16(65535, port);
+    const char *bad[] = {"", ":1990", "host:", "host:0", "host:65536", "host:12x", "a b", "a:b:c", "1.2.3", "300.1.1.1",
+                         "-x", "x.", "ho$t", "a..b:99999999999"};
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+        TEST_ASSERT_FALSE_MESSAGE(gwParseLab(bad[i], h, sizeof(h), &isIp, ip, &port), bad[i]);
+    TEST_ASSERT_FALSE(gwParseLab(nullptr, h, sizeof(h), &isIp, ip, &port));
+    char big[80]; memset(big, 'a', 60); big[60] = 0;
+    TEST_ASSERT_FALSE(gwParseLab(big, h, sizeof(h), &isIp, ip, &port));
+}
+
+static void test_lab_resolve_host_and_ip(void)
+{
+    GwTarget t;
+    TEST_ASSERT_TRUE(gwResolve("LB", GW_NET_INET, nullptr, true, &t, "lab.example.org:2000"));
+    TEST_ASSERT_TRUE(t.lab); TEST_ASSERT_NULL(t.lab_fallback);
+    TEST_ASSERT_EQUAL_STRING("lab.example.org", t.srv_host); TEST_ASSERT_EQUAL_UINT16(2000, t.srv_port);
+    TEST_ASSERT_EQUAL_STRING("pool.ntp.org", t.ntp_host);   // normal NTP
+    TEST_ASSERT_TRUE(gwResolve("LB", GW_NET_INET, "10.0.0.5", true, &t, "10.1.2.3"));
+    TEST_ASSERT_NULL(t.srv_host); const uint8_t e[4] = {10, 1, 2, 3}; eqIp(e, t.srv_ip);
+    TEST_ASSERT_EQUAL_UINT16(1990, t.srv_port);
+    const uint8_t n[4] = {10, 0, 0, 5}; eqIp(n, t.ntp_ip);  // own NTP honoured
+}
+
+static void test_lab_resolve_nrf52_and_fallbacks(void)
+{
+    GwTarget t;
+    // nRF52 (no resolver): IPv4 ok, host falls back to OE with a reason
+    TEST_ASSERT_TRUE(gwResolve("LB", GW_NET_INET, nullptr, false, &t, "10.1.2.3:2001"));
+    TEST_ASSERT_TRUE(t.lab); TEST_ASSERT_EQUAL_UINT16(2001, t.srv_port);
+    TEST_ASSERT_TRUE(gwResolve("LB", GW_NET_INET, nullptr, false, &t, "lab.example.org"));
+    TEST_ASSERT_FALSE(t.lab); TEST_ASSERT_NOT_NULL(t.lab_fallback);
+    TEST_ASSERT_EQUAL_STRING("meshcom.oevsv.at", t.srv_host); TEST_ASSERT_EQUAL_UINT16(1990, t.srv_port);
+    // empty / null / garbage lab: OE
+    const char *labs[] = {nullptr, "", "!!"};
+    for (int i = 0; i < 3; i++) {
+        TEST_ASSERT_TRUE(gwResolve("LB", GW_NET_INET, nullptr, true, &t, labs[i]));
+        TEST_ASSERT_FALSE(t.lab); TEST_ASSERT_NOT_NULL(t.lab_fallback);
+        TEST_ASSERT_EQUAL_STRING("meshcom.oevsv.at", t.srv_host);
+    }
+    // lab ignored for other codes; gwResolveNode passes it through
+    TEST_ASSERT_TRUE(gwResolve("DL", GW_NET_INET, nullptr, true, &t, "10.1.2.3"));
+    TEST_ASSERT_FALSE(t.lab);
+    const uint8_t own[4] = {192, 168, 0, 5};
+    TEST_ASSERT_TRUE(gwResolveNode("LB", 0, own, nullptr, true, &t, "10.1.2.3:99"));
+    TEST_ASSERT_TRUE(t.lab); TEST_ASSERT_EQUAL_UINT16(99, t.srv_port);
+}
+
+static void test_lab_not_in_codes(void)
+{
+    char c[16][3];
+    int n = gwCodes(c, 16);
+    for (int i = 0; i < n; i++) TEST_ASSERT_NOT_EQUAL(0, strcmp(c[i], "LB"));
+    TEST_ASSERT_EQUAL_STRING("OE", gwFind("LB")->code);   // LB is not a table row
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -340,5 +410,9 @@ int main(int, char **)
     RUN_TEST(test_effective_mode);
     RUN_TEST(test_resolve_node_mode_and_address);
     RUN_TEST(test_resolve_node_end_to_end);
+    RUN_TEST(test_lab_parse);
+    RUN_TEST(test_lab_resolve_host_and_ip);
+    RUN_TEST(test_lab_resolve_nrf52_and_fallbacks);
+    RUN_TEST(test_lab_not_in_codes);
     return UNITY_END();
 }

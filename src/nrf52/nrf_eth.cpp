@@ -394,9 +394,12 @@ void NrfETH::initethDHCP()
 // never looks at Udp.write()'s result, so the only failure nRF52 can report is
 // endPacket()'s. ESP32 checks the write and can reset the socket on it. That
 // asymmetry is D1 drift-matrix material; preserved here, not fixed.
+// F1: destination port, 1990 unless the lab server (--gateway lab ip:port) says otherwise.
+static uint16_t s_gwDestPort = UDP_PORT;
+
 bool udpBeginRaw_nrf52()
 {
-  return Udp.beginPacket(neth.udp_dest_addr, UDP_PORT) != 0;
+  return Udp.beginPacket(neth.udp_dest_addr, s_gwDestPort) != 0;
 }
 
 bool udpWriteRaw_nrf52(const uint8_t *buf, uint16_t len)
@@ -446,7 +449,7 @@ bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
   if(bUDPLOG)
     Serial.printf("[UDP];tx;ip;%d.%d.%d.%d;port;%u;len;%u;ok;%d;ms;%lu\n",
                    udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3],
-                   (unsigned)UDP_PORT, (unsigned)rx_buf_size,
+                   (unsigned)s_gwDestPort, (unsigned)rx_buf_size,
                    ok ? 1 : 0, (unsigned long)millis());
 
   return ok;
@@ -979,10 +982,17 @@ static const char *nrfApplyServerTarget(const uint8_t ownIp[4], uint8_t mode)
 {
   GwTarget t;
   if(!gwResolveNode(meshcom_settings.node_gwsrv, mode, ownIp,
-                    meshcom_settings.node_ownntp, false /* nRF52 has no DNS resolver */, &t))
+                    meshcom_settings.node_ownntp, false /* nRF52 has no DNS resolver */, &t,
+                    meshcom_settings.node_gwlab))
   {
     printlndeb("[UDP-DEST] gwResolveNode failed - destination unchanged");
     return "inet";
+  }
+  s_gwDestPort = t.srv_port;
+  if(t.lab_fallback)
+  {
+    printlndeb("[UDP-DEST] LB not usable, using OE:");
+    printlndeb(t.lab_fallback);
   }
 
   neth.udp_dest_addr = IPAddress(t.srv_ip[0], t.srv_ip[1], t.srv_ip[2], t.srv_ip[3]);

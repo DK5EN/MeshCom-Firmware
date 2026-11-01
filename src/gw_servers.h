@@ -57,7 +57,20 @@ struct GwTarget {
     uint8_t     ntp_ip[4];
     const char *path;      // "inet" | "hamnet": network really used (TM-39 [GW];srv)
     bool        ownntp_ignored; // ownNtp was set but unusable (no resolver, not an IPv4 literal)
+    uint16_t    srv_port;       // UDP destination port; 1990 except for a lab server with :port
+    bool        lab;            // code LB was honoured: srv_host/srv_ip come from node_gwlab
+    const char *lab_fallback;   // LB requested but unusable: reason text, OE was used instead (else nullptr)
+    char        lab_host[48];   // storage for srv_host when lab (host name without :port)
 };
+
+// Lab server (instrumentation, F1): code "LB" is NOT a table row and is not listed by gwCodes();
+// it is reachable only through `--gateway lab <host[:port]>`, which stores node_gwlab and sets
+// node_gwsrv = "LB". Syntax of node_gwlab: DNS host or IPv4 literal, optional ":port" (1..65535).
+#define GW_LAB_CODE "LB"
+#define GW_LAB_DEFAULT_PORT 1990
+// Parses spec. host receives the name without port (hostMax >= 2), isIp/ip describe an IPv4 literal,
+// port is 1990 when absent. false on empty, garbage, bad port, over-long host.
+bool gwParseLab(const char *spec, char *host, size_t hostMax, bool *isIp, uint8_t ip[4], uint16_t *port);
 
 // mode (node_hamnet_only): 0 = unset/legacy -> Internet (the nRF52 static
 // caller applies its own legacy rule before calling), 1 = Hamnet forced,
@@ -73,7 +86,8 @@ const GwServer *gwFind(const char *code);
 // hasResolver, ntp_host = ownNtp; otherwise ownntp_ignored = true and the
 // table NTP stays. Returns false if the redirection chain is longer than one
 // step or does not end on a DIRECT side (table error).
-bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver, GwTarget *out);
+bool gwResolve(const char *code, GwNet net, const char *ownNtp, bool hasResolver, GwTarget *out,
+               const char *lab = nullptr);
 
 // Codes of all enabled rows in table order. Returns the count (<= max).
 int gwCodes(char out[][3], int max);
@@ -90,5 +104,9 @@ uint8_t gwEffectiveMode(uint8_t stored, const uint8_t ownIp[4], bool staticLegac
 // mode is the node_hamnet_only setting (0 Internet/legacy, 1 Hamnet, 2 auto,
 // 3 Internet forced, any other value auto). Callers pass their own address: ESP32 node_ip, nRF52 dynamic
 // Ethernet.localIP(), nRF52 static the configured node_ownip.
+// lab (node_gwlab) is used only when code is "LB": ESP32 (hasResolver) accepts host or IPv4, nRF52
+// IPv4 only; an unusable lab falls back to OE and sets out->lab_fallback. NTP of LB is the normal
+// OE/own-NTP choice. Note: out->srv_host may point into out->lab_host, so do not copy GwTarget by value
+// and keep using the copy's srv_host.
 bool gwResolveNode(const char *code, uint8_t mode, const uint8_t ownIp[4], const char *ownNtp,
-                   bool hasResolver, GwTarget *out);
+                   bool hasResolver, GwTarget *out, const char *lab = nullptr);

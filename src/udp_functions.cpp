@@ -269,9 +269,13 @@ void ntpHarvestUDP()
 // writes byte by byte, ignores every Udp.write() result and reports only
 // endPacket(), so a failed write cannot reset the socket there. That
 // asymmetry is D1 drift-matrix material; preserved here, not fixed.
+// F1: destination port, 1990 unless the lab server (--gateway lab host:port) says otherwise.
+static uint16_t s_gwDestPort = UDP_PORT;
+uint16_t udpGwDestPort() { return s_gwDestPort; }
+
 bool udpBeginRaw_esp32()
 {
-    return Udp.beginPacket(node_hostip , UDP_PORT) != 0;
+    return Udp.beginPacket(node_hostip , s_gwDestPort) != 0;
 }
 
 bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len)
@@ -1287,11 +1291,14 @@ void startMeshComUDP()
       uint8_t ownIp[4] = {node_ip[0], node_ip[1], node_ip[2], node_ip[3]};
       GwTarget t;
       if(!gwResolveNode(meshcom_settings.node_gwsrv, (uint8_t)meshcom_settings.node_hamnet_only, ownIp,
-                        meshcom_settings.node_ownntp, true, &t))
+                        meshcom_settings.node_ownntp, true, &t, meshcom_settings.node_gwlab))
       {
         printlndeb("[WIFI]...gw_servers table error, no server lookup");
         return;
       }
+      s_gwDestPort = t.srv_port;
+      if(t.lab_fallback)
+        printfdeb("[WIFI]...GW LB not usable (%s), using OE\n", t.lab_fallback);
 
       static char s_srvHostBuf[16];
       const char *srv_host = t.srv_host;

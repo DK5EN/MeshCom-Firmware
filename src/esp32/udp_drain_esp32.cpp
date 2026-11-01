@@ -77,7 +77,7 @@ void sendMeshComUDP()
             udpCountTx(tx_ok);            // TM-31 instrument
             if(bUDPLOG)
               Serial.printf("[UDP];tx;ip;%s;port;%u;len;%u;ok;%d\n",
-                            node_hostip.toString().c_str(), (unsigned)UDP_PORT,
+                            node_hostip.toString().c_str(), (unsigned)udpGwDestPort(),
                             (unsigned)msg_len, tx_ok ? 1 : 0);
 
                 // ADVISOR-BEFUND W6b (F6): err_cnt_udp_tx wurde NUR im

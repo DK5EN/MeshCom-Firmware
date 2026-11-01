@@ -149,6 +149,7 @@
     M(float, node_analog_offset, 0.0)                                                                    \
     M(float, node_analog_atten, 0.0)                                                                     \
     A(char, node_gwsrv, [3], {0x00})                                                                     \
+    A(char, node_gwlab, [48], {0})                                                                       \
     M(float, node_tempi_off, 0.0)                                                                        \
     M(float, node_tempo_off, 0.0)                                                                        \
     M(float, node_shunt, 0.002)                                                                          \
