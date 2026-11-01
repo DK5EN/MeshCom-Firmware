@@ -1357,6 +1357,106 @@ static void test_ttl_prio5_180s(void)
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
 }
 
+// ------------------------------------------------ LRF W1b / D2: own beacons = prio 2
+//
+// An own position/WX/HEY (source labels user_pos/user_wx/user_hey/auto_pos/
+// nbr_report, stored DONE) is classified prio 2 like an own group message.
+// The same frame as a relay (rx_relay, DONE) stays 4/5. TTL by frame type is
+// unchanged (position 120 s, HEY 180 s); prio 2 text still never ages.
+
+static void test_d2_own_beacon_ist_prio2_relay_bleibt_4_5(void)
+{
+    const char *ownPos[] = {"user_pos", "user_wx", "auto_pos"};
+    for (size_t k = 0; k < sizeof(ownPos) / sizeof(ownPos[0]); k++)
+    {
+        resetRing();
+        BuiltFrame p = buildPositionFrame();
+        int s = addTxRingEntry(p.bytes, p.len, 0xFF, ownPos[k]);
+        TEST_ASSERT_TRUE(s >= 0);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(MSG_PRIO_HIGH, ringPriority[s], ownPos[k]);
+    }
+    const char *ownHey[] = {"user_hey", "nbr_report"};
+    for (size_t k = 0; k < sizeof(ownHey) / sizeof(ownHey[0]); k++)
+    {
+        resetRing();
+        BuiltFrame h = buildHeyFrame();
+        int s = addTxRingEntry(h.bytes, h.len, 0xFF, ownHey[k]);
+        TEST_ASSERT_TRUE(s >= 0);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(MSG_PRIO_HIGH, ringPriority[s], ownHey[k]);
+    }
+
+    // relayed beacons (status DONE, rx_relay) and a server-injected one stay 4/5
+    resetRing();
+    BuiltFrame p = buildPositionFrame();
+    BuiltFrame h = buildHeyFrame();
+    int sp = addTxRingEntry(p.bytes, p.len, RING_STATUS_DONE, "rx_relay");
+    int sh = addTxRingEntry(h.bytes, h.len, RING_STATUS_DONE, "rx_relay");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[sp]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_BACKGROUND, ringPriority[sh]);
+    resetRing();
+    sp = addTxRingEntry(p.bytes, p.len, RING_STATUS_DONE, "udp_rx");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[sp]);
+    // kiss_pos is a KISS-injected position (other SSID), not an own beacon: stays 4
+    resetRing();
+    sp = addTxRingEntry(p.bytes, p.len, 0xFF, "kiss_pos");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_LOW, ringPriority[sp]);
+}
+
+static void test_d2_own_beacon_ttl_bleibt_nach_frametyp(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame p = buildPositionFrame();
+    BuiltFrame h = buildHeyFrame();
+    int sp = addTxRingEntry(p.bytes, p.len, 0xFF, "user_pos");
+    int sh = addTxRingEntry(h.bytes, h.len, 0xFF, "user_hey");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[sp]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[sh]);
+    sweepAt(1000UL + RING_TTL_POS_MS);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sp][0]);
+    sweepAt(1000UL + RING_TTL_POS_MS + 1);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[sp][0]);      // position gone at 120 s
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sh][0]);        // HEY still queued
+    sweepAt(1000UL + RING_BG_MAX_AGE_MS);
+    TEST_ASSERT_NOT_EQUAL(0, ringBuffer[sh][0]);
+    sweepAt(1000UL + RING_BG_MAX_AGE_MS + 1);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[sh][0]);      // HEY gone at 180 s
+
+    // the pure function: prio 2 TEXT keeps "no TTL", frame type decides for beacons
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(2, RING_STATUS_DONE, false, MSG_TYPE_TEXT));
+    TEST_ASSERT_EQUAL_UINT32(RING_TTL_POS_MS, txRingTtlMs(2, RING_STATUS_DONE, false, MSG_TYPE_POSITION));
+    TEST_ASSERT_EQUAL_UINT32(RING_BG_MAX_AGE_MS, txRingTtlMs(2, RING_STATUS_READY, false, MSG_TYPE_HEY));
+    TEST_ASSERT_EQUAL_UINT32(0, txRingTtlMs(2, RING_STATUS_EXT_PENDING, false, MSG_TYPE_HEY));
+}
+
+static void test_d2_pick_ack_dann_own_beacon_dann_relays(void)
+{
+    BuiltFrame txt = buildTextFrame("DK5EN-91", "Relay", 0x2001UL);
+    BuiltFrame rp = buildPositionFrame(0x2002UL);
+    BuiltFrame rh = buildHeyFrame(0x2003UL);
+    BuiltFrame ack = buildAckFrame(0x2004UL);
+    BuiltFrame own = buildPositionFrame(0x2005UL);
+    // oldest first: the relays must lose against the younger own beacon
+    mc_test_set_millis(100);
+    int sT = addTxRingEntry(txt.bytes, txt.len, RING_STATUS_DONE, "rx_relay");
+    mc_test_set_millis(200);
+    int sP = addTxRingEntry(rp.bytes, rp.len, RING_STATUS_DONE, "rx_relay");
+    mc_test_set_millis(300);
+    int sH = addTxRingEntry(rh.bytes, rh.len, RING_STATUS_DONE, "rx_relay");
+    mc_test_set_millis(400);
+    int sO = addTxRingEntry(own.bytes, own.len, 0xFF, "user_pos");
+    mc_test_set_millis(500);
+    int sA = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_DONE, "rx_ack_fwd");
+    TEST_ASSERT_EQUAL_INT(sA, getNextTxSlot());
+    ringBuffer[sA][0] = 0;
+    TEST_ASSERT_EQUAL_INT(sO, getNextTxSlot());
+    ringBuffer[sO][0] = 0;
+    TEST_ASSERT_EQUAL_INT(sT, getNextTxSlot());   // relay text (prio 3)
+    ringBuffer[sT][0] = 0;
+    TEST_ASSERT_EQUAL_INT(sP, getNextTxSlot());   // relayed position (prio 4)
+    ringBuffer[sP][0] = 0;
+    TEST_ASSERT_EQUAL_INT(sH, getNextTxSlot());   // relayed HEY (prio 5)
+}
+
 static void test_ttl_own_text_never_ages(void)
 {
     mc_test_set_millis(1000);
@@ -1650,8 +1750,11 @@ static void test_nbr_caseb_hold_blockiert_hn_meldung_nicht(void)
                                    0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // Fall B -> gehalten
     TEST_ASSERT_EQUAL_INT(0, slotHeld);
 
-    BuiltFrame heyOwn = buildHeyFrame(0xC002UL); // BACKGROUND -- eigene HN-Meldung, kind=OTHER (Default)
-    int slotHN = addTxRingEntry(heyOwn.bytes, heyOwn.len, RING_STATUS_READY, "nbr_report");
+    // BACKGROUND, kind=OTHER (Default). Label "t5", not "nbr_report": since LRF D2 an own
+    // nbr_report is prio 2 and would beat the held prio-4 relay on priority alone -- the
+    // test would no longer prove that txringInCaseBHold() excludes the held slot.
+    BuiltFrame heyOwn = buildHeyFrame(0xC002UL);
+    int slotHN = addTxRingEntry(heyOwn.bytes, heyOwn.len, RING_STATUS_READY, "t5");
     TEST_ASSERT_EQUAL_INT(1, slotHN);
 
     TEST_ASSERT_TRUE(txringInCaseBHold(slotHeld, (uint32_t)millis()));
@@ -1735,7 +1838,9 @@ static void test_nbr_ohne_bnbrcancel_unveraendert(void)
     TEST_ASSERT_EQUAL_INT(0, slotLow);
 
     BuiltFrame heyBg = buildHeyFrame(0xC005UL); // BACKGROUND, schlechtere Prio
-    int slotBg = addTxRingEntry(heyBg.bytes, heyBg.len, RING_STATUS_READY, "nbr_report");
+    // D2: label "t5" (not the own-HEY label "nbr_report", which is prio 2 now), so
+    // the entry stays the worse-priority BACKGROUND this test is about.
+    int slotBg = addTxRingEntry(heyBg.bytes, heyBg.len, RING_STATUS_READY, "t5");
     TEST_ASSERT_EQUAL_INT(1, slotBg);
 
     TEST_ASSERT_FALSE(txringInCaseBHold(slotLow, (uint32_t)millis()));
@@ -2119,7 +2224,9 @@ static void test_pool_depth_und_ackwait_counts(void)
     int sGrp = addTxRingEntry(grp.bytes, grp.len, RING_STATUS_READY, "user_msg");
     int sGr2 = addTxRingEntry(grp2.bytes, grp2.len, RING_STATUS_READY, "user_msg");
     int sRdy = addTxRingEntry(rdy.bytes, rdy.len, RING_STATUS_READY, "user_msg");
-    int sPos = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "user_pos");
+    // D2: neutral label "t_pos" (an own "user_pos" is prio 2 now); this test counts
+    // one prio-4 entry.
+    int sPos = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "t_pos");
     int sHey = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "beacon");
     (void)sRdy;
 
@@ -2455,6 +2562,9 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_einfacher_enqueue);
     RUN_TEST(test_prioritaets_klassifizierung);
+    RUN_TEST(test_d2_own_beacon_ist_prio2_relay_bleibt_4_5);
+    RUN_TEST(test_d2_own_beacon_ttl_bleibt_nach_frametyp);
+    RUN_TEST(test_d2_pick_ack_dann_own_beacon_dann_relays);
     RUN_TEST(test_add_tx_ring_entry_once_dm_wird_critical_und_done);
     RUN_TEST(test_add_tx_ring_entry_once_gruppe_wird_high_und_done);
     RUN_TEST(test_add_tx_ring_entry_once_broadcast_wird_high_und_done);

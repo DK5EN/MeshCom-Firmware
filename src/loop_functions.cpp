@@ -53,6 +53,7 @@
 #include "lora_functions.h"   // rm1StoppedForget()
 #include "dm_text_escape.h"   // P14/P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
 #include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
+#include "ping_target.h"   // LRF 2.1: one ping-target rule
 #include "own_msg_status.h"   // durable delivery state of own text messages (web GUI ticks)
 
 bool gpsDetected = false;
@@ -3839,6 +3840,21 @@ PingResult sendPing(char msg_call[10])
     }
     bPingTrackNoticeShown = false;
 
+    // LRF 2.1 (D1): last guard, before the msg_id advances and before any pool write.
+    // Group, special target, own call or junk never leaves the node (a group ping
+    // only draws gateway ACKs, it can never be answered). Once per episode.
+    static bool bPingInvalidNoticeShown = false;
+    if(!pingTargetValid(msg_call, meshcom_settings.node_call))
+    {
+        if(!bPingInvalidNoticeShown)
+        {
+            printfdeb("[PING]...invalid target %s, ping not sent\n", msg_call);
+            bPingInvalidNoticeShown = true;
+        }
+        return PING_INVALID_TARGET;
+    }
+    bPingInvalidNoticeShown = false;
+
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
     struct aprsMessage aprsmsg;
@@ -4504,6 +4520,15 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
             printfdeb("[ERROR]...DM to own-all not allowed\n");
             return BP_SEND_INVALID;
         }
+    }
+
+    // LRF 2.1 (D1): a manual {ping} only makes sense towards a callsign. After the
+    // {ZIEL} parse (a bare {ping} parses as destination PING), before any msg_id.
+    if(strMsg.startsWith("{ping}") &&
+       !pingTargetValid(strDestinationCall.c_str(), meshcom_settings.node_call))
+    {
+        printfdeb("[ERROR]...{ping} needs a callsign target\n");
+        return BP_SEND_INVALID;
     }
 
     // BP-11: the node's own back-pressure wording fed back in by a client

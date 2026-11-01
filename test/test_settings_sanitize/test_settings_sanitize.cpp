@@ -324,6 +324,58 @@ static void test_backlight_level(void)
     TEST_ASSERT_EQUAL_INT(3, g_log_calls);
 }
 
+static char g_new_value[8];
+static void capture_new(const char *, const char *, const char *newv)
+{
+    g_log_calls++;
+    snprintf(g_new_value, sizeof(g_new_value), "%s", newv);
+}
+
+static void test_ping_target_ungueltig_wird_geleert(void)
+{
+    char pc[10];
+
+    snprintf(pc, sizeof(pc), "%s", "255.");
+    TEST_ASSERT_TRUE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", capture_new));
+    TEST_ASSERT_EQUAL_STRING("", pc);
+    TEST_ASSERT_EQUAL_INT(1, g_log_calls);
+    TEST_ASSERT_EQUAL_STRING("\"\"", g_new_value);
+
+    snprintf(pc, sizeof(pc), "%s", "2025");
+    TEST_ASSERT_TRUE(sanitize_ping_target(pc, sizeof(pc), "OE3XWJ-12", capture_log));
+    TEST_ASSERT_EQUAL_STRING("", pc);
+
+    snprintf(pc, sizeof(pc), "%s", "TEST");
+    TEST_ASSERT_TRUE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", capture_log));
+    TEST_ASSERT_EQUAL_STRING("", pc);
+
+    snprintf(pc, sizeof(pc), "%s", "OE3XIR-12");   // own call
+    TEST_ASSERT_TRUE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", NULL));
+    TEST_ASSERT_EQUAL_STRING("", pc);
+}
+
+static void test_ping_target_gueltig_und_leer_bleiben(void)
+{
+    char pc[10];
+
+    snprintf(pc, sizeof(pc), "%s", "DK5EN-1");
+    g_log_calls = 0;
+    TEST_ASSERT_FALSE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", capture_log));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-1", pc);
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+
+    pc[0] = 0;
+    TEST_ASSERT_FALSE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", capture_log));
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+}
+
+static void test_ping_target_ohne_terminator(void)
+{
+    char pc[4] = { '2', '0', '2', '5' };
+    TEST_ASSERT_TRUE(sanitize_ping_target(pc, sizeof(pc), "OE3XIR-12", NULL));
+    TEST_ASSERT_EQUAL_STRING("", pc);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -344,5 +396,8 @@ int main(int, char **)
     RUN_TEST(test_maxv_grenze_null_und_nan);
     RUN_TEST(test_boot_nbrrelay_on_in_production);
     RUN_TEST(test_backlight_level);
+    RUN_TEST(test_ping_target_ungueltig_wird_geleert);
+    RUN_TEST(test_ping_target_gueltig_und_leer_bleiben);
+    RUN_TEST(test_ping_target_ohne_terminator);
     return UNITY_END();
 }

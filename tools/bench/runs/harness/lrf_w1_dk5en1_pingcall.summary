@@ -1,0 +1,30 @@
+>>> --pingcall 2025
+    --pingcall 2025
+    [ERR]..Ping-Callsign <2025> not valid (group)
+>>> --pingcall 255.
+    --pingcall 255.
+    [ERR]..Ping-Callsign <255.> not valid (not a callsign)
+>>> --pingcall TEST
+    --pingcall TEST
+    [ERR]..Ping-Callsign <TEST> not valid (special target)
+>>> --pingcall *
+    --pingcall *
+    [ERR]..Ping-Callsign <*> not valid (special target)
+>>> --pingcall DK5EN-1
+    --pingcall DK5EN-1
+    [ERR]..Ping-Callsign <DK5EN-1> not valid (own call)
+>>> --pingcall DK5EN-05
+    --pingcall DK5EN-05
+    [ERR]..Ping-Callsign <DK5EN-05> not valid (not a callsign)
+>>> --pingcall DK5EN-90
+    --pingcall DK5EN-90
+>>> --info
+    ...NOMSGALL off ...MESH on ...BUTTON (0) on ...SOFTSER off ... SOFTSERREAD off
+    ...ATXT: MeshCom Freising
+    ...PING  CALL DK5EN-90 Time:60 Max:0 Count:0
+>>> --pingcall none
+    --pingcall none
+    Ping-Call cleared
+>>> --info
+    ...NOMSGALL off ...MESH on ...BUTTON (0) on ...SOFTSER off ... SOFTSERREAD off
+    ...ATXT: MeshCom Freising

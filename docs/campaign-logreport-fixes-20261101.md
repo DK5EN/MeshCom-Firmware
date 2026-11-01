@@ -6,20 +6,20 @@
 | Baseline  | `fork-dev` at `e644e21c`. Code facts below were read at this commit                                                                      |
 | Evidence  | [`log-reports/2026-11-01-24h/data/CORE-FINDINGS.md`](log-reports/2026-11-01-24h/data/CORE-FINDINGS.md), `verify/*.md`, `uebersicht.html` |
 | Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; upstream PRs later, one per item         |
-| Status    | W0 done and verified 2026-11-01 (section 7). D1, D3, D4, D5 decided; D2 open, W0 numbers in 2.2. W1a + W1c ready; W1b waits for D2       |
+| Status    | W0 and W1 done 2026-11-01 (section 7). Next: W2b ESP32 RX-silence parity plus the END-line refinement (4.3)                              |
 
 Line numbers drift: `src/` changed in 9 files between the analysis commit `651e0920` and `e644e21c`. Every brief
 must `grep -n` the named symbol before trusting a line number in this document.
 
 ## 1. Items and outcome
 
-| #   | Finding (report wording)                        | Operator decision 2026-11-01                           | Section | Work            |
-| --- | ----------------------------------------------- | ------------------------------------------------------ | ------- | --------------- |
-| 1   | The ping target is not validated                | Callsign targets only; lock every path in the firmware | 2.1     | W1a             |
-| 2   | Own beacons starve at busy nodes                | Open: more information on the age floor first          | 2.2     | W0-M2, then W1b |
-| 3   | ACK forwards have no overhear-cancel            | Accepted as is. No cancel for binary ACKs              | 2.3     | none            |
-| 4   | `{CET}` server slots are always "sole provider" | Accepted as is. A sole provider sends; no change       | 2.4     | none            |
-| 5   | OE3XIA is deaf at times                         | Extend the firmware logging                            | 2.5     | W0-M5, W1c, W2  |
+| #   | Finding (report wording)                        | Operator decision 2026-11-01                           | Section | Work           |
+| --- | ----------------------------------------------- | ------------------------------------------------------ | ------- | -------------- |
+| 1   | The ping target is not validated                | Callsign targets only; lock every path in the firmware | 2.1     | W1a            |
+| 2   | Own beacons starve at busy nodes                | Own beacons get the priority of an own group message   | 2.2     | W1b            |
+| 3   | ACK forwards have no overhear-cancel            | Accepted as is. No cancel for binary ACKs              | 2.3     | none           |
+| 4   | `{CET}` server slots are always "sole provider" | Accepted as is. A sole provider sends; no change       | 2.4     | none           |
+| 5   | OE3XIA is deaf at times                         | Extend the firmware logging                            | 2.5     | W0-M5, W1c, W2 |
 
 Campaign goal, unchanged from the analysis: a stable network, nothing builds up, minimal double transmissions,
 nothing lost, maximum useful LoRa airtime. Every claim is backed by a measurement and checked adversarially.
@@ -214,13 +214,26 @@ the surrounding neighbourhood matrices learn about them. Quiet nodes (OE3XHL: 0/
 - The prio-1 ACK backlog stays: entries that sit behind ACKs for their whole TTL still drop. Item 1 (no more group
   pings) removes most of that backlog in this cluster.
 
-**Recommendation for D2: A2 (stands after W0).** It is one condition, it touches no NBR code, and it never enters the rapid window.
+**Decision D2 (operator, 2026-11-01, after W0): own beacons are treated like an own group message.** An own
+position, WX or HEY is classified as prio 2 (`MSG_PRIO_HIGH`) instead of 4/5; nothing else changes. The age floor
+is not touched. Relayed beacons stay at prio 4/5. Consequences, all inherited from prio 2:
+
+- In the own pool an own beacon goes before relay text and relayed beacons, still behind ACKs and own DMs (prio 1).
+- Hold 3000 ms after a received frame instead of 5500 ms, and the existing age floor applies (stage 1 from 20 s,
+  stage 2 from 60 s), as for an own group message.
+- Pool-full eviction treats it like prio 2.
+- Kept as today (not a prio-2 property): the TTL by frame type (own position/WX 120 s, own HEY 180 s, BP-03) and
+  HEY supersede. Prio 2 has no TTL, so `txRingTtlMs()` must keep the beacon TTL for these entries.
+
+The variant analysis below (A1-A3) is the record that led to the decision.
+
+**Recommendation before D2 was taken: A2.** It is one condition, it touches no NBR code, and it never enters the rapid window.
 Re-measure after item 1 is in the field; take C only if own beacons still sit behind ACKs.
 
-**Regression test (W1b):** `test/test_csma_timing` (extend). New pure helper in `src/csma_timing.h`, e.g.
-`csmaApplyAgeFloorKind(today, age, prio, is_relay, airtime, jitter)`. Prio 4/5 non-relay at 25 s returns the
-stage-1 hold (fails before: 5500 ms base). Under A2 the same at 70 s returns the stage-1 hold, not 100 ms. Prio 4/5
-relay returns `today`; prio 1-3 unchanged. Keep `stat_csma_aged_boot` and the `CSMA_AGED` print condition in step.
+**Regression test (W1b, after D2):** `test/test_txring` (env `native_aprs`): an own position, own WX and own HEY
+classify as prio 2 (fail before: 4/5); the same frames as relays (status DONE) stay 4/5; own beacon TTL stays 120 s
+/ 180 s (not "no TTL"); in a pool with relay text, relayed beacons and an own beacon, `getNextTxSlot()` picks the
+own beacon before the relays and after an ACK.
 
 ### 2.3 ACK forwards have no overhear-cancel (item 3): accepted, no change (D3)
 
@@ -346,7 +359,7 @@ owner. Bench verification only proves that the lines exist and the tracker works
 | #   | Decision              | Status             | Content                                                                                                           |
 | --- | --------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | D1  | Valid ping targets    | decided 2026-11-01 | Callsigns only: no groups, no special targets, not the own callsign. Enforced on all five paths (2.1)             |
-| D2  | Own-beacon fix        | **open**           | Recommendation A2: stage-1 age floor for own prio 4/5, never stage 2, relays unchanged (2.2). W0-M2 numbers first |
+| D2  | Own-beacon fix        | decided 2026-11-01 | Own position/WX/HEY classified as prio 2 like an own group message; TTL and supersede unchanged; relays unchanged |
 | D3  | Binary ACK forwards   | decided 2026-11-01 | No overhear-cancel; behaviour accepted (2.3)                                                                      |
 | D4  | `{CET}` sole provider | decided 2026-11-01 | No change; a sole provider sends (2.4)                                                                            |
 | D5  | OE3XIA                | decided 2026-11-01 | Extend the firmware logging; no recovery change yet (2.5)                                                         |
@@ -356,8 +369,8 @@ owner. Bench verification only proves that the lines exist and the tracker works
 | Wave | Content                                                                                                        | Gated by | Status |
 | ---- | -------------------------------------------------------------------------------------------------------------- | -------- | ------ |
 | W0   | Read-only recon (R1, R2) and measurements on the 2026-11-01 capture (M2, M5), adversarial verification         | -        | done   |
-| W1   | W1a ping lock (item 1), W1c RX-silence logging nRF52 (item 5); W1b age floor (item 2) if D2 is decided by then | W0, D2   | open   |
-| W2   | W2b RX-silence logging ESP32 parity (item 5); W1b if D2 came later                                             | W1       | open   |
+| W1   | W1a ping lock (item 1), W1b own beacons at prio 2 (item 2), W1c RX-silence logging nRF52 (item 5)              | W0, D2   | done   |
+| W2   | W2b RX-silence logging ESP32 parity (item 5)                                                                   | W1       | open   |
 | W3   | Bench (RAK + Heltec V3), docs, release candidate; field capture by the operators, re-run of `tools/logreport/` | W2       | open   |
 
 ### 4.1 W0: recon and measurements (read-only on `src/`)
@@ -383,7 +396,7 @@ W0 ends with a short report to the operator: the M2 numbers per D2 variant and t
 | Brief | Item | Exclusive files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Tests (own suite only, through `piolock.sh`)                                    |
 | ----- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | W1a   | 1    | `src/ping_target.h` (new), `src/command_functions.cpp` (`"pingcall "` block only), `src/loop_functions.cpp` (`sendPing()` and the destination checks in `sendMessage()` only), `src/loop_functions.h` (`PingResult`), `src/settings_sanitize.h` + `.cpp`, `src/esp32/esp32_flash.cpp` + `src/nrf52/nrf52_flash.cpp` (one call each in `sanitize_loaded_settings()`), `src/nrf52/nrf52_ble.cpp` (`applyPendingBleSettings()` only, R1), `src/esp32/esp32_main.cpp` (ping block only), `test/test_ping_target/` (new), `test/test_settings_sanitize/`, `platformio.ini` test filter if a new suite needs it | `native -f test_ping_target`, `-f test_settings_sanitize`, `-f test_regex_call` |
-| W1b   | 2    | Only after D2. `src/csma_timing.h`, `src/lora_functions.cpp` (`csma_compute_timeout_slot()` and the `CSMA_AGED` stat only), `test/test_csma_timing/`                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `native -f test_csma_timing`                                                    |
+| W1b   | 2    | `src/txring_functions.cpp` (`classifyFrame()` and `ringPriority[]` consumers only), `src/txring_ttl.h`, `test/test_txring/`, `test/test_txprio_replay/`, `test/test_bp_regression/`, `test/test_gwflood_frames/`, `test/test_txring_flood/`                                                                                                                                                                                                                                                                                                                                                               | `native*` suites of its own test dirs                                           |
 | W1c   | 5    | `src/rx_silence.h` (new), `src/nrf52/nrf52_main.cpp` (RX watchdog block, CAD start sites, loop hook, stats print), `src/nrf52/nrf52_radio.cpp` + `.h` (diag read helper), `test/test_rx_silence/` (new)                                                                                                                                                                                                                                                                                                                                                                                                   | `native -f test_rx_silence`                                                     |
 
 - **Hotspots:** `platformio.ini` belongs to W1a only. If W1c needs a test filter entry, it reports the line and the
@@ -401,9 +414,13 @@ W0 ends with a short report to the operator: the M2 numbers per D2 variant and t
 - **W2b (item 5, ESP32 parity):** `src/rx_silence.h` (shared tracker from W1c, read-only unless a bug is found),
   `src/esp32/esp32_main.cpp` (RX timeout restart, CAD sites, radio construction to keep the `Module*`), the ESP32
   radio diag helper. IRQ flags and RSSI via the public API; status and device errors via `Module::SPIreadStream()`
-  (R2).
+  (R2). Device errors in datasheet byte order (the nRF52 library needed a swap, W1c rework).
+- **END-line refinement (from the W1 bench):** the RX restart fires about every 4.6 s, so with the 3000 ms window
+  `by=watchdog` is assigned by chance to about 60 % of silence ends. `src/rx_silence.h` keeps the time of the last
+  CAD, own TX and RX restart separately; `RX_SILENCE_END` gains `since_cad=<ms> since_tx=<ms> since_restart=<ms>`
+  (or `-` if none since the silence began), and `by=` prefers cad over tx over watchdog within the window. Applies to
+  nRF52 and ESP32; `test/test_rx_silence` extended.
   `src/esp32/esp32_main.cpp` was touched by W1a, so W2b starts after the W1 commit.
-- **W1b**, if D2 was decided after W1 started. Disjoint from W2b.
 
 ### 4.4 Gate per wave (orchestrator)
 
@@ -455,6 +472,7 @@ W0 ends with a short report to the operator: the M2 numbers per D2 variant and t
 
 ## 7. Wave log
 
-| Wave | Date       | Result                                                                                                                                                                                                                                                                                                                            |
-| ---- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| W0   | 2026-11-01 | R1: one more bypass (nRF52 live BLE write), no host harness for `loop_functions.cpp`. R2: nRF52 op mode is cached, ESP32 status/errors protected. M2 and M5 confirmed by independent Opus verifiers; corrections to 2.2 (gap median 1.42 s, airtime 0.95/0.44 s) applied. Outputs `verify/lrf_*.md`, `data/extra/lrf_m{2,5}.json` |
+| Wave | Date       | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| W0   | 2026-11-01 | R1: one more bypass (nRF52 live BLE write), no host harness for `loop_functions.cpp`. R2: nRF52 op mode is cached, ESP32 status/errors protected. M2 and M5 confirmed by independent Opus verifiers; corrections to 2.2 (gap median 1.42 s, airtime 0.95/0.44 s) applied. Outputs `verify/lrf_*.md`, `data/extra/lrf_m{2,5}.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| W1   | 2026-11-01 | W1a ping target locked on every path (console, boot sanitize both platforms, nRF52 live BLE write, `sendPing()`, manual `{ping}`). W1b own position/WX/HEY at prio 2 (source label `txRingSourceIsOwnBeacon()`), TTL by frame type kept. W1c RX-silence tracker and chip diagnostics on nRF52. Advisor rework applied (BLE sanitize order, repeated FAILED line, case-sensitive `{ping}`, vacuous case-B test, `err=` byte order, no SPI read while the driver reports sleep). Gate: Unity 3254/3254, stage 2 green, RAK and Heltec V3 build with all strings present. Bench: DK5EN-1 refuses `2025`, `255.`, `TEST`, `*`, own call, `DK5EN-05`, accepts `DK5EN-90` (`lrf_w1_dk5en1_pingcall.summary`); DK5EN-90 shows `RX_SILENCE` snapshots (`mode=rx st=0x52 rssi_inst=-110`), END lines and `RXSIL` counters (`lrf_w1_rak90_rxsil.summary`). Separate commit: `tools/webflash.py` web login from `.env` |

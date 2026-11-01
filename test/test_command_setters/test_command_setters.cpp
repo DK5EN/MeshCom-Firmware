@@ -1922,6 +1922,105 @@ static void test_guard_chain_announces_the_check_result_before_the_download(void
     TEST_ASSERT_TRUE_MESSAGE(mainSrc.find("fwNotifyDue(") != std::string::npos, "fwNotifyDue not used");
 }
 
+// LRF 2.1 (D1): one ping-target rule on every path. No native env compiles loop_functions.cpp or the
+// platform files, so the wiring is pinned at source level.
+static size_t pos_after(const std::string &s, const std::string &needle, size_t from, const char *msg)
+{
+    const size_t p = s.find(needle, from);
+    TEST_ASSERT_TRUE_MESSAGE(p != std::string::npos, msg);
+    return p;
+}
+
+static void test_lrf21_ping_target_wiring(void)
+{
+    const std::string loop = read_repo_file("src/loop_functions.cpp");
+    const std::string hdr = read_repo_file("src/loop_functions.h");
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    // sendPing(): guard before the msg_id is built and before the pool write
+    const size_t sp = pos_after(loop, "PingResult sendPing(char msg_call[10])", 0, "sendPing");
+    const size_t guard = pos_after(loop, "pingTargetValid(msg_call, meshcom_settings.node_call)", sp, "sendPing guard");
+    pos_after(loop, "return PING_INVALID_TARGET;", guard, "sendPing returns PING_INVALID_TARGET");
+    const size_t msgid = pos_after(loop, "aprsmsg.msg_id = ((_GW_ID", sp, "sendPing msg_id");
+    TEST_ASSERT_TRUE_MESSAGE(guard < msgid, "ping guard must precede the msg_id");
+    pos_after(loop, "[PING]...invalid target %s, ping not sent", sp, "sendPing log text");
+    pos_after(hdr, "PING_INVALID_TARGET", 0, "PingResult enum");
+
+    // sendMessage(): {ping} refusal after the {ZIEL} parse and the own-call refusal, before the msg_id
+    const size_t sm = pos_after(loop, "DM to own-all not allowed", 0, "own-call refusal");
+    const size_t pg = pos_after(loop, "{ping}\")", sm, "sendMessage {ping} check");
+    const size_t pv = pos_after(loop, "pingTargetValid(strDestinationCall.c_str()", sm, "sendMessage guard");
+    const size_t pe = pos_after(loop, "{ping} needs a callsign target", sm, "sendMessage error text");
+    const size_t bp = pos_after(loop, "return BP_SEND_INVALID;", pe, "sendMessage refusal code");
+    TEST_ASSERT_TRUE(pg <= pv && pv < pe && pe < bp);
+    // the msg_id of an outgoing text is minted after the guard
+    const size_t mint = pos_after(loop, "mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), strDestinationCall.c_str())", sm, "dest set");
+    TEST_ASSERT_TRUE_MESSAGE(bp < mint, "refusal must precede message construction");
+
+    // console / web setter uses the new rule, not checkRegexCall()
+    const size_t pc = pos_after(cmd, "\"pingcall \"", 0, "pingcall setter");
+    const size_t pcEnd = pos_after(cmd, "\"pingtime \"", pc, "next setter");
+    const std::string blk = cmd.substr(pc, pcEnd - pc);
+    TEST_ASSERT_TRUE(blk.find("pingTargetCheck(") != std::string::npos);
+    TEST_ASSERT_TRUE(blk.find("checkRegexCall") == std::string::npos);
+}
+
+static void test_lrf21_ping_target_sanitize_and_callers(void)
+{
+    const std::string esp = read_repo_file("src/esp32/esp32_flash.cpp");
+    const std::string nrf = read_repo_file("src/nrf52/nrf52_flash.cpp");
+    const std::string ble = read_repo_file("src/nrf52/nrf52_ble.cpp");
+    const std::string emain = read_repo_file("src/esp32/esp32_main.cpp");
+
+    const size_t e0 = pos_after(esp, "bool sanitize_loaded_settings(void)", 0, "esp32 sanitize_loaded_settings");
+    pos_after(esp, "sanitize_ping_target(meshcom_settings.node_pingcall", e0, "esp32 sanitize call");
+    const size_t n0 = pos_after(nrf, "void sanitize_loaded_settings(void)", 0, "nrf52 sanitize_loaded_settings");
+    pos_after(nrf, "sanitize_ping_target(meshcom_settings.node_pingcall", n0, "nrf52 sanitize call");
+
+    const size_t b0 = pos_after(ble, "void applyPendingBleSettings(void)", 0, "applyPendingBleSettings");
+    const size_t bs = pos_after(ble, "sanitize_ping_target(meshcom_settings.node_pingcall", b0, "ble sanitize call");
+    const size_t bv = pos_after(ble, "save_settings();", b0, "ble save");
+    TEST_ASSERT_TRUE_MESSAGE(bs < bv, "sanitize before save_settings()");
+
+    pos_after(emain, "pingResult != PING_INVALID_TARGET", 0, "esp32 caller keeps node_pingcount");
+}
+
+// LRF W1 advisor rework: order and gating details the first pins did not cover.
+static void test_lrf_w1_advisor_rework_pins(void)
+{
+    const std::string ble = read_repo_file("src/nrf52/nrf52_ble.cpp");
+    const std::string emain = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string nmain = read_repo_file("src/nrf52/nrf52_main.cpp");
+    const std::string loop = read_repo_file("src/loop_functions.cpp");
+    const std::string radio = read_repo_file("src/nrf52/nrf52_radio.cpp");
+
+    // W1a-1: the BLE blob's ping target is sanitized before prodLockNormalise() derives
+    // node_pingtime from node_pingcall[0].
+    const size_t b0 = pos_after(ble, "void applyPendingBleSettings(void)", 0, "applyPendingBleSettings");
+    const size_t bs = pos_after(ble, "sanitize_ping_target(meshcom_settings.node_pingcall", b0, "ble sanitize call");
+    const size_t bp = pos_after(ble, "prodLockNormalise(meshcom_settings", b0, "ble prodLockNormalise");
+    TEST_ASSERT_TRUE_MESSAGE(bs < bp, "sanitize_ping_target before prodLockNormalise()");
+
+    // W1a-2: neither ping caller prints a per-interval FAILED line for an invalid target.
+    const size_t ep = pos_after(emain, "[PING]...%s Ping to %s", 0, "esp32 ping print");
+    const size_t eg = emain.rfind("if(pingResult != PING_INVALID_TARGET)", ep);
+    TEST_ASSERT_TRUE_MESSAGE(eg != std::string::npos && ep - eg < 120, "esp32 ping print skips PING_INVALID_TARGET");
+    pos_after(nmain, "pingResult != PING_QUEUED && pingResult != PING_INVALID_TARGET", 0, "nrf52 ping print skips PING_INVALID_TARGET");
+
+    // W1a-3: the manual {ping} refusal is case-sensitive like every other {ping} check.
+    TEST_ASSERT_TRUE_MESSAGE(loop.find("equalsIgnoreCase(\"{ping}\")") == std::string::npos, "no case-insensitive {ping} match");
+    pos_after(loop, "strMsg.startsWith(\"{ping}\") &&", 0, "case-sensitive {ping} refusal");
+
+    // W1c-1/2: device errors byte-swapped into chip order; no SPI read while the driver
+    // believes the chip sleeps (SX126xCheckDeviceReady() would wake it).
+    const size_t r0 = pos_after(radio, "void radioDiagRead(RadioDiag *d)", 0, "radioDiagRead");
+    const size_t rs = pos_after(radio, "if (d->drv_mode == MODE_SLEEP || d->drv_mode == MODE_RX_DC)", r0, "radioDiagRead sleep skip");
+    pos_after(radio, "d->chip_mode = RADIO_DIAG_CHIP_SLEEP;", rs, "radioDiagRead sleep sentinel");
+    pos_after(radio, "(uint16_t)((e >> 8) | (e << 8))", r0, "device errors byte swap");
+    // W1c-3: the watchdog restart reads diagnostics only for the loradebug print.
+    pos_after(nmain, "if(bLORADEBUG) radioDiagRead(&_rxs_before);", 0, "watchdog diag read gated");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1974,6 +2073,9 @@ int main(int, char **)
     RUN_TEST(test_bleguard_is_classic_esp32_only);
     RUN_TEST(test_rx_deaf01_is_receiving_latch);
     RUN_TEST(test_rx_deaf02_nrf52_tx_unblock);
+    RUN_TEST(test_lrf21_ping_target_wiring);
+    RUN_TEST(test_lrf21_ping_target_sanitize_and_callers);
+    RUN_TEST(test_lrf_w1_advisor_rework_pins);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     return UNITY_END();

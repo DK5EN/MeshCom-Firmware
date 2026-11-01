@@ -1,0 +1,16 @@
+LRF W1 bench, RAK4631 DK5EN-90, gate build, --loradebug on, 2026-11-01
+2026-11-01 16:12:03.378  ...RXSIL: silences=0 longest=0s total=0s
+2026-11-01 16:12:07.397  [MC-DBG] RX_RESTART src=timeout mode_before=rx
+2026-11-01 16:12:16.462  [MC-DBG] RX_RESTART src=timeout mode_before=rx
+2026-11-01 16:27:05.581  ...RXSIL: silences=4 longest=181s total=502s
+2026-11-01 16:27:49.758  [MC-DBG] RX_SILENCE t=60 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-109 cad=2/10 restarts=186 boosted=0
+2026-11-01 16:19:05.403  [MC-DBG] RX_SILENCE t=60 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-110 cad=2/8 restarts=80 boosted=0
+2026-11-01 16:20:05.826  [MC-DBG] RX_SILENCE t=120 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-109 cad=2/8 restarts=93 boosted=0
+2026-11-01 16:20:10.869  [MC-DBG] RX_SILENCE_END dur=125 by=rx rssi=-66 snr=6
+2026-11-01 16:22:02.678  [MC-DBG] RX_SILENCE t=60 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-109 cad=2/9 restarts=116 boosted=0
+2026-11-01 16:23:03.101  [MC-DBG] RX_SILENCE t=120 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-110 cad=2/9 restarts=129 boosted=0
+2026-11-01 16:24:02.307  [MC-DBG] RX_SILENCE t=180 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-104 cad=2/9 restarts=142 boosted=0
+2026-11-01 16:24:04.312  [MC-DBG] RX_SILENCE_END dur=181 by=watchdog rssi=-49 snr=7
+2026-11-01 16:26:28.807  [MC-DBG] RX_SILENCE t=60 mode=rx drv=rx st=0x52 irq=0x0000 err=0x0020 rssi_inst=-110 cad=2/10 restarts=169 boosted=0
+2026-11-01 16:26:49.885  [MC-DBG] RX_SILENCE_END dur=80 by=rx rssi=-66 snr=6
+RX_RESTART lines (capture 1): 68 all mode_before=rx

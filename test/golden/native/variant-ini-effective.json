@@ -2387,6 +2387,8 @@
    "test_nvs_diag",
    "test_ble_json_frame",
    "test_settings_sanitize",
+   "test_ping_target",
+   "test_rx_silence",
    "test_ntp_async",
    "test_ntp_harvest",
    "test_charset_filter",

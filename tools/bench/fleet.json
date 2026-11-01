@@ -7,8 +7,8 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.73",
-      "last_ip_verified": "2026-10-24 (identity_guard over 2323)"
+      "host": "192.168.68.72",
+      "last_ip_verified": "2026-11-01 (identity_guard over USB)"
     },
     "t-deck-14": {
       "call": "DK5EN-14",

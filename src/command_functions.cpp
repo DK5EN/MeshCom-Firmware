@@ -39,6 +39,7 @@
 #include "configuration.h"
 #include "configuration_global.h"
 #include "regex_functions.h"
+#include "ping_target.h"   // LRF 2.1: one ping-target rule
 #include "lora_setchip.h"
 #include "spectral_scan.h"
 #include "rtc_functions.h"
@@ -72,6 +73,8 @@
 #include "nrf52/settings_store_nrf52.h" // settingsStoreDump() -- --dumpsettings
 #include <RAK13800_W5100S.h>            // IPAddress for nrf_eth.h
 #include <nrf_eth.h>                    // ethIsStaticConfigured() for the GWU status helpers
+// LRF W1c: boot counters of the RX-silence tracker (nrf52_main.cpp).
+extern void rxSilenceGetStats(uint32_t *silences, uint32_t *longest_s, uint32_t *total_s);
 #endif
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 #include "esp32/esp32_pmu.h"
@@ -3860,9 +3863,10 @@ void commandAction(char *umsg_text, bool ble)
         }
         else
         {
-            if(!checkRegexCall(sVar))
+            const PingTargetReason pingReason = pingTargetCheck(sVar.c_str(), meshcom_settings.node_call);
+            if(pingReason != PING_TARGET_OK)
             {
-                printfdeb("\n[ERR]..Ping-Callsign <%s> not valid\n", sVar.c_str());
+                printfdeb("\n[ERR]..Ping-Callsign <%s> not valid (%s)\n", sVar.c_str(), pingTargetReasonText(pingReason));
                 return;
             }
         }
@@ -7357,6 +7361,16 @@ void commandAction(char *umsg_text, bool ble)
                 printfdeb("...RM: %s strict=%s ok=%lu rej=%lu\n", meshcom_settings.node_rm ? "on" : "off",
                          meshcom_settings.node_rmstrict ? "on" : "off", (unsigned long)rm.ok, rmRej);
             }
+
+            #if defined(NRF52_SERIES)
+            // LRF W1c: RX silences since boot (no RX event for RX_SILENCE_MS).
+            {
+                uint32_t rxsN = 0, rxsLongest = 0, rxsTotal = 0;
+                rxSilenceGetStats(&rxsN, &rxsLongest, &rxsTotal);
+                printfdeb("...RXSIL: silences=%lu longest=%lus total=%lus\n", (unsigned long)rxsN,
+                         (unsigned long)rxsLongest, (unsigned long)rxsTotal);
+            }
+            #endif
 
             #if defined(ESP32)
             // AU-03 (#1187): firmware auto update mode and channel.
