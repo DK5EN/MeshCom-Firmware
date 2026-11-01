@@ -1,18 +1,28 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-10-31, branch `fork-dev`, last release **`v4.40a.10.30`** (Latest, tag on `b3d7da3a`, 68 assets).
+**Stand:** 2026-11-01, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
 Base is upstream `dev` 147812e0: the official `v4.40a.10.28` (10203967) plus our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (HEY-UP-01),
 [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05) and
 [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), all merged 2026-10-31. Open upstream PR:
 [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) (2026-11-01, branch `pr/lrf-ping-beacon-rxsilence`,
 worktree `../MeshCom-PR-next`): LRF ping target lock, own beacons at prio 2, RX-silence diagnostics. Fork-only
-firmware left: the `dev` AU channel and `--gateway lab` (2fe7ebd4). Next step: TD-22 soak and TD-23 UAT.
+firmware left: the `dev` AU channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4) and the E290 refresh default. Next step: TD-22 soak and TD-23 UAT.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
+
+- **`v4.40a.11.01` released 2026-11-01** (Latest, tag on `47f339ad`): RM1 `upd chan prod|dev`, ping target lock, own
+  beacons at prio 2, RX-silence logging (nRF52 and ESP32), `--gateway lab`, E290 OTP without periodic full refresh.
+  **Built by CI** (run 41333106863, green). Gate stage 1,2 PASS (85 envs, 3262/3262, golden 48, pytest 1473). Assets:
+  68, 28/28 `.autoupdate` re-inflate after download (`78 da`), tag string present, T-Deck field-command scan ok
+  (`mute=2 stat=1 udplog=1 injectraw=0`). Idle heap DK5EN-92: 68688 B (baseline 69332 B, -644 B), pass. Web flasher
+  `check` 31 boards, 0 mismatches, `flash/v4.40a.10.30` pruned (gh-pages `70c0c648`). The repo-root `safeboot.bin` and
+  `safeboot-s3.bin` are now the published CI build (the committed ones were stale: `settings_schema.cpp` and
+  `esp32_flash.cpp` are part of the Safeboot image). **Not done:** no bench node besides DK5EN-92 (local build of the
+  same commit) runs the release; own beacons at prio 2 and the boot-time ping-target clean-up are host-tested only.
 
 - **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
   DEV/MAIN for McApp. One setter `auSetChannel()` for RM1, `--updchan` and `/setparam updchan`; a switch clears the

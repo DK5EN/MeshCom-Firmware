@@ -12,9 +12,9 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
 - **Upstream:** official `v4.40a.10.28` (2026-10-28) carries all fork firmware up to `v4.40a.10.25` (#1238), the CI
   `.autoupdate` assets (#1239) and #1240. Open PRs by dk5en: #1243 (HEY-UP-01), #1244 (UDP-05), #1245 (WEB-AUTH-01).
   DK5EN never merges upstream himself.
-- **Last release:** `v4.40a.10.30` (2026-10-30, Latest, tag on `b3d7da3a`, built locally and published with
-  `gh release create` because the CI runner stayed queued; run 41121057432 cancelled). 68 assets. Base official
-  `v4.40a.10.28`; fork delta #1243-#1245 plus the `dev` AU channel. Idle-heap step skipped (DK5EN-92 unreachable).
+- **Last release:** `v4.40a.11.01` (2026-11-01, Latest, tag on `47f339ad`, built by CI, run 41333106863). 68 assets.
+  Base upstream `dev` 147812e0; fork delta: RM1 `upd chan`, LRF items 1/2/5 (upstream #1247 open), `--gateway lab`,
+  E290 refresh default, plus the `dev` AU channel. Idle heap DK5EN-92 68688 B, pass.
   Web flasher offers only this release (31 boards, `check` 0 mismatches).
 - **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). 2026-10-30: 84
   native envs, 3111 Unity cases, 1422 pytest, golden selftest 48. Stage 3 has run against the bench

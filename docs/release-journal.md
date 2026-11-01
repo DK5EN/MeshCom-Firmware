@@ -16,7 +16,7 @@ gesetzt), 68 Assets, Struktur wie `v4.40a.10.30`. `FLASH_VERSION` 20261101, `FLA
 unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3 unveraendert.
 
 Basis ist upstream `dev` 147812e0 (offizielles `v4.40a.10.28` plus unsere gemergten #1243-#1245). Der Fork-Unterschied
-in Release-Images sind die sechs Aenderungen unten und der `dev`-Kanal. Kein upstream-PR dafuer offen.
+in Release-Images sind die sechs Aenderungen unten und der `dev`-Kanal. Drei davon (Ping-Ziel, Prio 2, RX-Stille) liegen als upstream-PR #1247 vor (offen).
 
 Inhalt seit `v4.40a.10.30` (Firmware, `git log v4.40a.10.30..HEAD -- src variants platformio.ini`, 6 Commits):
 
@@ -54,6 +54,12 @@ Inhalt seit `v4.40a.10.30` (Firmware, `git log v4.40a.10.30..HEAD -- src variant
   Die Stillen auf der Bench sind ein leerer Kanal (60-107 s), kein tauber Chip.
 - Idle-Heap-Gate auf DK5EN-92 (T-Beam v1.2, lokaler Build dieses Commits, Net-Konsole 2323): 68688 B gegen Baseline
   69332 B (-644 B, Grenze 3072 B), PASS.
+- Release-Pruefung nach Veroeffentlichung: CI-Lauf 41333106863 gruen, 68 Assets, nicht Entwurf, Namensliste gleich
+  `v4.40a.10.30`; 28 `.autoupdate` mit `78 da` und byte-genauem Re-Inflate; Tag-String im Heltec-V3-Image;
+  Feldkommando-Scan beider T-Deck-Images `mute=2 stat=1 udplog=1 injectraw=0`; Web-Flasher `check` 31 Boards, 0
+  Abweichungen, `flash/v4.40a.10.30` entfernt (gh-pages `70c0c648`).
+- Safeboot: die im Repo-Wurzelverzeichnis eingecheckten `safeboot.bin`/`safeboot-s3.bin` waren veraltet
+  (`settings_schema.cpp` und `esp32_flash.cpp` gehoeren zum Safeboot-Image); ersetzt durch das veroeffentlichte CI-Build.
 
 ### Was ausdruecklich NICHT geprueft wurde
 
