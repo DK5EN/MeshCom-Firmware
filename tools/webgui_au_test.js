@@ -203,9 +203,9 @@ async function mkPage(node, opts) {
     G: { msg: /connected phone uses the memory/, btn: 'Pause Bluetooth and check', act: 'ble' },
     G2: { msg: /phone has disconnected/, btn: 'Check now' },
     H: { msg: /Not enough free memory for the update. Reboot the node and try again./, btn: 'Check now' },
-    C: { green: true, msg: /Firmware v4.40a.10.18 available/, btn: 'Install', act: 'install' },
+    C: { green: true, msg: /Firmware v4.40a.10.18 available/, btn: 'Download', act: 'install' },
     A: { msg: /available none|up to date/, btn: 'Check now', act: 'check' },
-    I: { green: true, err: /Download damaged, it was discarded -- try again \[digest\]/, btn: 'Install' },
+    I: { green: true, err: /Download damaged, it was discarded -- try again \[digest\]/, btn: 'Download' },
   };
   for (const k of Object.keys(exp)) {
     const P = await mkPage(mkNode(J(k)));
@@ -263,7 +263,7 @@ async function mkPage(node, opts) {
     check('B: polling every 1 s', node.statusCalls - n1 === 3, String(node.statusCalls - n1));
     node.status = J('C');
     await P.T.advance(1000);
-    check('B -> C: Install, green', P.view().btn === 'Install' && P.view().green && !P.view().dis);
+    check('B -> C: Download, green', P.view().btn === 'Download' && P.view().green && !P.view().dis);
     const n2 = node.statusCalls;
     await P.T.advance(5000);
     check('C: polling stops at idle', node.statusCalls === n2);
@@ -470,7 +470,7 @@ async function mkPage(node, opts) {
     node.st500 = false;
     node.status = J('C');
     await P.T.advance(1000);
-    check('500 over: the next answer renders again', P.view().btn === 'Install' && P.view().green, JSON.stringify(P.view()));
+    check('500 over: the next answer renders again', P.view().btn === 'Download' && P.view().green, JSON.stringify(P.view()));
     P.w.auPageLeave();
     // first fetch fails at idle: row stays empty-ish and a retry follows
     const n2 = mkNode(J('A'));

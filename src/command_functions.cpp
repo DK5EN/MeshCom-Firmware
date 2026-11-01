@@ -5382,7 +5382,7 @@ void commandAction(char *umsg_text, bool ble)
             }
             else if(!fwNetBootloaderQio())
             {
-                // AU-16: the handover is blocked anyway, so do not download (web "Install" lands here too)
+                // AU-16: the handover is blocked anyway, so do not download (web "Download" lands here too)
                 Serial.printf("[ERR];update;bootloader_dio;renew with the web flasher\n");
             }
             else if(_au.staged && _au.availTag[0] != '\0' && strcmp(_au.stagedTag, _au.availTag) == 0)

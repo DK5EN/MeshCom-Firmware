@@ -1345,7 +1345,7 @@ static void auScaffoldJs()
     web_client.println("else if(L=='G'){m='! A connected phone uses the memory the update needs';lab='Pause Bluetooth and check';act='ble';}");
     web_client.println("else if(L=='g'){m='The phone has disconnected -- check again';}");
     web_client.println("else if(L=='H'){m='! Not enough free memory for the update. Reboot the node and try again.';}");
-    web_client.println("else if(L=='C'){g=1;m='Firmware '+s.avail+' available';lab='Install';act='install';}");
+    web_client.println("else if(L=='C'){g=1;m='Firmware '+s.avail+' available';lab='Download';act='install';}");
     web_client.println("else{m=s.newer&&!s.inst?'Firmware '+s.avail+' exists, but has no image for this board':(s.avail?'up to date':'available none');}");
     web_client.println("if((L=='A'||L=='C'||L=='E')&&(auLoc||(s.err&&!auLowHeap(s.err))))e=auLoc||auErrText(s.job,s.err)+' ['+s.err+']';");
     web_client.println("var r=auEl('au_row');if(s.phone&&(L=='A'||L=='C')&&!e&&r&&r.getAttribute('data-blepause')=='1')h='(i) A connected phone may block the update on this board';");
