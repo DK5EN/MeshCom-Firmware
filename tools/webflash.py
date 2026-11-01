@@ -42,8 +42,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import http.client
 import json
+import os
 import re
 import socket
 import sys
@@ -56,6 +58,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
+
+import mc_console  # .env machinery (sits next to this file)
 
 APP_INVALID_NOTE = ("node reports: firmware image incomplete -- the node stays in the bootloader, "
                      "upload a complete firmware to recover")
@@ -101,6 +105,8 @@ def _normalize_hw(s: str) -> str:
 
 GetFn = Callable[[str, float], "tuple[int, str]"]
 PostFn = Callable[[str, Path], "tuple[int, str]"]
+# (url, timeout, session cookie or None) -> (status, body, Set-Cookie header or None); never raises on HTTP status
+RawFn = Callable[[str, float, Optional[str]], "tuple[int, str, Optional[str]]"]
 
 
 def http_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
@@ -109,6 +115,69 @@ def http_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
     req = urllib.request.Request(url, headers={"X-MC": "1"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.status, resp.read().decode(errors="replace")
+
+
+def http_raw(url: str, timeout: float = 5.0, cookie: Optional[str] = None) -> tuple[int, str, Optional[str]]:
+    """GET with an optional session cookie; HTTP error statuses are returned, not raised."""
+    headers = {"X-MC": "1"}
+    if cookie:
+        headers["Cookie"] = f"mcs={cookie}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode(errors="replace"), resp.headers.get("Set-Cookie")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace"), None
+
+
+class WebLoginError(RuntimeError):
+    """Web login failed or is impossible; the message is safe to print (no secrets)."""
+
+
+WEBPW_PREFIX = "MC_WEBPW_"
+
+
+def webpw_keys(call: str) -> list[str]:
+    """Lookup order for the web password of `call`: MC_WEBPW_<CALL>, then MC_PW_<CALL>."""
+    return [WEBPW_PREFIX + mc_console.pw_key(call)[len(mc_console.KEY_PREFIX):], mc_console.pw_key(call)]
+
+
+def webpw_for(call: str) -> tuple[Optional[str], list[str]]:
+    """(password or None, key names tried). Environment first, then the .env file."""
+    keys = webpw_keys(call)
+    try:
+        env = mc_console.load_env()
+    except mc_console.EnvFileError as e:
+        raise WebLoginError(str(e)) from e
+    for k in keys:
+        v = os.environ.get(k) or env.get(k)
+        if v:
+            return v, keys
+    return None, keys
+
+
+def web_login(host: str, password: str, raw: RawFn = http_raw, timeout: float = 10.0) -> str:
+    """Nonce login (Web-API_documentation.txt "Login"); returns the session cookie value.
+
+    Exactly two requests, no retry: five bad logins within a minute lock the node.
+    """
+    try:
+        status, body, _ = raw(f"http://{host}/?loginnonce", timeout, None)
+        nonce = body.strip()
+        if status == 403:
+            raise WebLoginError("web login throttled by the node (403), wait a minute")
+        if status != 200 or not re.fullmatch(r"[0-9a-f]{32}", nonce):
+            raise WebLoginError(f"web login: unexpected nonce answer (HTTP {status})")
+        mac = hmac.new(password.encode(), nonce.encode(), hashlib.sha256).hexdigest()
+        status, body, set_cookie = raw(f"http://{host}/?login={nonce}.{mac}", timeout, None)
+    except (urllib.error.URLError, OSError) as e:
+        raise WebLoginError(f"web login: node not reachable: {e}") from e
+    m = re.search(r"mcs=([0-9a-f]{32})", set_cookie or "")
+    if status == 200 and m:
+        return m.group(1)
+    err = re.search(r'"err"\s*:\s*"([a-z]+)"', body)
+    raise WebLoginError(f"web login refused (HTTP {status}, {err.group(1) if err else 'no reason'}); "
+                        "not retrying, five bad attempts lock the node for a minute")
 
 
 def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optional[dict[str, str]]:
@@ -129,6 +198,12 @@ def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optiona
     # hardware row to check against, but the OTA session is directly reachable.
     if "<title>MeshCom OTA</title>" in body:
         info["safeboot"] = "1"
+    # WEB-AUTH-01: a node with a web password answers "/" with the login form
+    # (sub_page_login, input id="nodepassword") instead of the info page.
+    if 'id="nodepassword"' in body:
+        info["login"] = "1"
+    if m := re.search(r"<title>([A-Za-z0-9-]+) - Meshcom</title>", body):
+        info["call"] = m.group(1).upper()
     if m := re.search(r"Hardware</td><td>([A-Z0-9_+-]+)", body):
         info["hardware"] = m.group(1)
     if m := re.search(r"build: ([^<)]+)", body):
@@ -385,7 +460,8 @@ class OtaResult:
     def line(self) -> str:
         if self.ok:
             a = self.after or {}
-            return (f"OTA ok: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
+            head = "OTA done, build unverified" if self.stage == "done_unverified" else "OTA ok"
+            return (f"{head}: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
                     f"hardware {a.get('hardware', '?')} (total {self.timings.get('total_s', 0):.0f}s)")
         out = f"OTA FAILED at {self.stage}: {self.error}"
         extra = self.node_state_line()
@@ -398,6 +474,8 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
           safeboot_poll_s: float = SAFEBOOT_POLL_S, reboot_poll_s: float = REBOOT_POLL_S,
           precheck_timeout: float = 10.0, poll_interval: float = 3.0,
           get: GetFn = http_get, poster: PostFn = upload_multipart,
+          raw: RawFn = http_raw, call: Optional[str] = None,
+          webpw: Callable[[str], "tuple[Optional[str], list[str]]"] = webpw_for,
           on_phase: Optional[Callable[[str, str], None]] = None,
           on_wait: Optional[Callable[[str], None]] = None) -> OtaResult:
     """Run the OTA flow against an already-reachable node.
@@ -438,6 +516,43 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
         return OtaResult(ok=False, stage="not_reachable", fw_path=str(fw), fw_size=fw_size,
                           md5=md5, timings=timings, error=f"node not reachable at http://{host}/")
 
+    # WEB-AUTH-01: password-protected app. Log in once (key from .env) before
+    # anything is rebooted; a node without a web password never gets here.
+    session_get = get  # carries the session cookie once logged in
+    if info.get("login"):
+        def fail(stage: str, msg: str) -> OtaResult:
+            timings["total_s"] = time.monotonic() - t_all
+            return OtaResult(ok=False, stage=stage, fw_path=str(fw), fw_size=fw_size, md5=md5,
+                              before=info, timings=timings, error=msg)
+
+        who = call or mc_console.call_from_host(host) or info.get("call")
+        if not who:
+            return fail("login_key_missing", "node needs a web login but its callsign is unknown "
+                        "-- pass --call <CALL>")
+        try:
+            pw, keys = webpw(who)
+            if pw is None:
+                return fail("login_key_missing", f"node {who} needs a web login: add {keys[0]}=<password> "
+                            f"(or {keys[1]}) to .env (chmod 600)")
+            phase("login", who)
+            cookie = web_login(host, pw, raw)
+        except WebLoginError as e:
+            return fail("login_failed", str(e))
+
+        def session_get(url: str, timeout: float = 5.0, _cookie: str = cookie) -> tuple[int, str]:
+            status, body, _ = raw(url, timeout, _cookie)
+            if status >= 400:
+                raise urllib.error.HTTPError(url, status, "HTTP error", None, None)  # type: ignore[arg-type]
+            return status, body
+
+        started = node_info(host, timeout=precheck_timeout, get=session_get)
+        if started is None:
+            return fail("login_failed", "web login accepted but the start page with the session "
+                        "cookie is not readable")
+        info = started
+        if info.get("login"):
+            return fail("login_failed", "web login accepted but the node still shows the login page")
+
     # TM-46 retry case: the node is already sitting in safeboot (aborted or
     # stale OTA session). The app page -- and with it the hardware row -- is
     # not available, and triggering safeboot again is pointless. Skip both and
@@ -463,7 +578,17 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
         phase("trigger_safeboot", "callfunction/?otaupdate")
         t = time.monotonic()
         try:
-            get(f"http://{host}/callfunction/?otaupdate", 10.0)
+            session_get(f"http://{host}/callfunction/?otaupdate", 10.0)
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                timings["total_s"] = time.monotonic() - t_all
+                who401 = call or mc_console.call_from_host(host) or info.get("call")
+                hint = f": add {webpw_keys(who401)[0]}=<password> to .env (chmod 600)" if who401 else \
+                    " (pass --call <CALL> so the password can be looked up in .env)"
+                return OtaResult(ok=False, stage="login_failed", fw_path=str(fw), fw_size=fw_size,
+                                 md5=md5, before=info, timings=timings,
+                                 error=f"node requires web login (HTTP {e.code} on callfunction/?otaupdate){hint}")
+            # any other HTTP status: same as a dropped connection, the safeboot poll decides
         except (urllib.error.URLError, OSError):
             pass  # node reboots before answering; a dropped connection is the normal case
         timings["trigger_safeboot_s"] = time.monotonic() - t
@@ -536,7 +661,9 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
     t = time.monotonic()
     def app_page() -> Optional[dict[str, str]]:
         i = node_info(host, get=get)
-        return i if app_back(i) else None
+        # the session dies with the reboot: for a protected node the login page is the proof
+        # that the app is back (also on the resume path, where no login happened before)
+        return i if app_back(i) or (i and i.get("login")) else None
 
     new_info = poll(app_page, reboot_poll_s, interval=poll_interval, label="app reboot",
                      on_wait=on_wait)
@@ -547,6 +674,32 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
                           md5=md5, before=info, timings=timings,
                           error=f"node did not come back into the app within {reboot_poll_s:.0f}s "
                                 "-- check it manually")
+
+    # The login page proves the app is up. One login (a fresh one if the session died with
+    # the reboot, the first one on the resume path) verifies version/build; no retry.
+    if new_info.get("login"):
+        def unverified(msg: str) -> OtaResult:
+            timings["total_s"] = time.monotonic() - t_all
+            return OtaResult(ok=True, stage="done_unverified", fw_path=str(fw), fw_size=fw_size,
+                              md5=md5, before=info, after=new_info, timings=timings,
+                              note=f"flash done, node is back in the app, but the build is unverified: {msg}")
+
+        who2 = call or mc_console.call_from_host(host) or info.get("call") or new_info.get("call")
+        if not who2:
+            return unverified("callsign unknown, pass --call <CALL>")
+        try:
+            pw, keys = webpw(who2)
+            if pw is None:
+                raise WebLoginError(f"no web password for {who2}: add {keys[0]}=<password> "
+                                    f"(or {keys[1]}) to .env (chmod 600)")
+            phase("relogin", who2)
+            cookie = web_login(host, pw, raw)
+            verified = node_info(host, get=lambda u, t=5.0, _c=cookie: raw(u, t, _c)[:2])
+            if not verified or verified.get("login") or not app_back(verified):
+                raise WebLoginError("start page after the login shows no build string")
+            new_info = verified
+        except WebLoginError as e:
+            return unverified(str(e))
 
     note = None
     if info.get("build") and new_info.get("build") == info.get("build"):
@@ -778,9 +931,17 @@ def build_parser() -> argparse.ArgumentParser:
                               "(default: looked up from --env via ENV_HARDWARE, "
                               "falling back to HELTEC_V3)")
     parser.add_argument("--force", action="store_true", help="skip the hardware check")
+    parser.add_argument("--call", default=None,
+                         help="callsign for the web password lookup (MC_WEBPW_<CALL>, then MC_PW_<CALL> in .env); "
+                              "default: from the host name, else from the node's start page")
     parser.add_argument("--self-test", action="store_true",
                          help="run offline parser self-tests (no network, no serial) and exit")
     return parser
+
+
+def exit_code(result: OtaResult) -> int:
+    """0 only for a fully verified flash; `done_unverified` (flashed, build not checked) is 1."""
+    return 0 if result.ok and result.stage == "done" else 1
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -796,6 +957,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             "precheck": f"Checking node {detail} ...",
             "safeboot_resume": "Node is already in safeboot (aborted session?) -- "
                                "skipping hardware check and trigger ...",
+            "relogin": "Node rebooted, logging in again to verify the build ...",
+            "login": f"Web login as {detail} (password from .env) ...",
             "trigger_safeboot": "Triggering safeboot (callfunction/?otaupdate) ...",
             "safeboot_wait": "Waiting for the safeboot web server ...",
             "ota_start": "Starting OTA session ...",
@@ -808,7 +971,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     def on_wait(msg: str) -> None:
         print(f"  ... {msg}")
 
-    result = flash(args.host, fw, expect_hw=expect_hw, force=args.force,
+    result = flash(args.host, fw, expect_hw=expect_hw, force=args.force, call=args.call,
                     on_phase=on_phase, on_wait=on_wait)
 
     if result.stage == "firmware_missing":
@@ -830,11 +993,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"  {APP_INVALID_NOTE}")
         return 1
     a = result.after or {}
+    if result.stage == "done_unverified":
+        print(f"Flashed, NOT verified (total {result.timings.get('total_s', 0):.0f}s)")
+        print(f"  note: {result.note}")
+        return exit_code(result)
     print(f"Done: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
           f"hardware {a.get('hardware', '?')} (total {result.timings.get('total_s', 0):.0f}s)")
     if result.note:
         print(f"  note: {result.note}")
-    return 0
+    return exit_code(result)
 
 
 if __name__ == "__main__":
