@@ -3,16 +3,21 @@
 
 ## What this release is
 
-**`v4.40a.10.30` stops the web GUI from sending its password in plain text, shows messages sent by an external app in the node's own web chat, and lets gateways name themselves when they upload a HEY; it also ships the official Vision Master E290 image for the newer display panel.** Your configuration survives the update. Anyone who logs in to a node's web GUI by script must switch to the new login.
+**`v4.40a.11.01` lets remote management switch a node's Auto Update channel, locks the ping target to callsigns, sends a node's own position, weather and HEY reports with the priority of an own group message, and adds receive-silence logging for field diagnosis.** Your configuration survives the update. Nobody has to act unless a stored ping target is not a callsign (below).
 
 ### Action needed
 
 > [!WARNING]
-> **Scripts that log in to the web GUI with `/?nodepassword=<password>` stop working** on a node with a web password.
+> **A stored ping target that is not a callsign is cleared at boot.** A group (`2025`), a special target (`*`, `TEST`), the node's own call or a malformed value (`255.`) becomes empty, so the node stops pinging.
 >
-> - The node now answers that request with 403 `{"ok":false,"err":"plaintext"}`.
-> - Use the new three-step login (nonce, HMAC, session cookie); a `curl`/`openssl` example is in [`Web-API_documentation.txt`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.30/src/web_functions/Web-API_documentation.txt), section "Login".
-> - Nodes without a web password and the browser login are not affected.
+> - Set a real callsign again with `--pingcall <call>`; the console now says why a value is refused.
+> - Nodes with a valid ping target or none are not affected.
+
+> [!WARNING]
+> **Scripts that log in to the web GUI with `/?nodepassword=<password>` stop working** on a node with a web password, if you skipped `v4.40a.10.30`.
+>
+> - The node answers that request with 403 `{"ok":false,"err":"plaintext"}`.
+> - Use the three-step login (nonce, HMAC, session cookie); a `curl`/`openssl` example is in [`Web-API_documentation.txt`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.01/src/web_functions/Web-API_documentation.txt), section "Login".
 
 > [!WARNING]
 > **T-Beam 1W and T-Deck Pro:** run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once if you skipped it with `v4.40a.10.20` (1W) or `v4.40a.10.21` (Pro). Details: "Known gaps" below.
@@ -21,21 +26,48 @@
 
 ### Key facts
 
-- **Base:** the official `v4.40a.10.28` (2026-10-28). It already carries all fork firmware up to `v4.40a.10.25` (merged upstream as [#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)) and the E290 work of [#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240).
-- **Fork-only firmware in this release:** the three fixes below, each submitted upstream ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244), [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245)), and the `dev` Auto Update channel. It is **not** byte-identical to any official release.
-- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. Ten locked protocol settings are still reset to their fixed value at boot (since `v4.40a.10.19`).
+- **Base:** the official `v4.40a.10.28` (2026-10-28) plus our merged [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) and [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (upstream `dev` 147812e0, 2026-10-31). All fork firmware of earlier releases is upstream.
+- **Fork-only firmware in this release:** the six changes below and the `dev` Auto Update channel. No upstream PR of ours is open for them yet. The release is **not** byte-identical to any official release.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. Ten locked protocol settings are still reset to their fixed value at boot (since `v4.40a.10.19`). A new keyed setting `node_gwlab` exists only after `--gateway lab`.
 - **How to tell builds apart:** the version on the air still reads `4.40a`.
-  - `--info` prints `...AU env=<board> tag=v4.40a.10.30` and `FLASH_VERSION 20261030`.
-  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.10.30`.
+  - `--info` prints `...AU env=<board> tag=v4.40a.11.01` and `FLASH_VERSION 20261101`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.01`.
 - **Safeboot v3** ships unchanged since `v4.40a.10.21`; it reaches a node only through the web flasher.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`: nothing installs by itself.
-  - Official releases carry `.autoupdate` files since `v4.40a.10.28` ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)), so the `prod` channel has something to install now.
-- **Built locally from the tagged commit** (the GitHub CI runner was queued too long; same environments, same `MC_BUILD_TAG`, same asset names as CI), 68 assets:
-  - 28 ESP32 application `.bin` plus 28 `.autoupdate` files (new: `vision-master-e290-otp`)
-  - the three nRF52 boards as `.uf2` and DFU `.zip`
-  - six support files
+- **Assets (68):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and six support files.
 
-## New in `v4.40a.10.30`
+## New in `v4.40a.11.01`
+
+- **Remote management can switch the Auto Update channel** (fork, flag builds only, RM-UPDCHAN, RM1 `upd chan prod|dev`).
+  - Use: an authenticated `RM1` DM `upd chan dev` or `upd chan prod` sets the channel; answers are `ok chan <x>`, `err aubusy` (a check or download runs, or a remote `upd go` is armed) and `err unsupported`.
+  - Console `--updchan`, `/setparam updchan` and the remote web page use the same setter. A switch clears the last check result, keeps a staged image and starts no check.
+  - Fixed on the way: after a console or web switch the stale "update available" line stayed; a console switch during a check now answers `[ERR];updchan;busy`.
+  - The remote web page shows the active channel as selected (it looked unavailable before) and asks for confirmation before a switch.
+  - Builds without the `dev` channel refuse the command with `err blocked`; remote management itself stays off unless enabled with a password.
+  - Background: [`docs/campaign-rm1-updchan.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.01/docs/campaign-rm1-updchan.md).
+- **The ping target must be a callsign** (fork, LRF item 1, every board).
+  - Cause: a group, `*`, junk or a malformed value could be stored by a JSON import, a BLE settings write or an older build, and then pinged every interval. A group ping drew ACKs from every gateway: in the 2026-10-31 log analysis 97.9 % of all ACK forwards in one cluster belonged to such pings.
+  - Now: groups, special targets, the node's own call and leading-zero SSIDs are refused by the console setter (with the reason), the nRF52 BLE write, boot-time clean-up, the ping timer and a manual `{ping}` text. A refused ping does not use up `pingcount`.
+  - Background: [`docs/campaign-logreport-fixes-20261101.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.01/docs/campaign-logreport-fixes-20261101.md).
+- **A node's own position, weather and HEY reports go out with the priority of an own group message** (fork, LRF item 2, every board).
+  - Cause: own beacons had the low priority of relayed beacons and starved at busy nodes.
+  - Now: own beacons are priority 2; relayed beacons stay at 4/5. Expiry times by frame type are unchanged (own position 120 s, own HEY 180 s).
+- **Receive-silence logging for field diagnosis** (fork, LRF item 5, ESP32 and nRF52; no change in radio behaviour).
+  - `--loradebug on` prints `RX_SILENCE` snapshots (chip mode, IRQ flags, device errors, instantaneous RSSI) after 60 s without a reception, and `RX_SILENCE_END` with what ended it and the ages of the last CAD, own TX and RX restart.
+  - The RX restart line gains `mode_before=`; `--info` shows `RXSIL` counters (silences, longest, total). Counters run always; chip reads and prints only under `--loradebug`.
+  - Purpose: tell a stuck receiver chip from a quiet channel on nodes that go deaf (OE3XIA-12 in the 24-h analysis).
+- **`--gateway lab <host[:port]>` for a lab server** (fork, developers).
+  - A gateway can register at a lab hub (code `LB`, new setting `node_gwlab`) instead of the public server. ESP32 takes a host name or IPv4, nRF52 IPv4 only; an unusable lab falls back to `OE` with a logged reason.
+  - It is not offered in the web dropdown, the BLE list or `--gateway srv`. `--gateway srv OE` restores the normal server. The setting reboots the node.
+- **Vision Master E290 OTP image: no periodic full refresh by default** (fork, `vision-master-e290-otp`).
+  - Testing on panels marked `FPC-7519revb` showed no ghosting with partial refresh alone, so the full refresh every 10 updates is off (`E290_FULL_EVERY=0`). `-D E290_FULL_EVERY=N` brings it back.
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.10.30` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.10.30</code></strong> — web login without plain-text password, Extern-UDP echo in web chat, gateway names itself in HEY upload, E290 OTP image</summary>
 
 - **The web GUI password no longer crosses the network** (fork, upstream [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), issue [#1241](https://github.com/icssw-org/MeshCom-Firmware/issues/1241), WEB-AUTH-01, every board with a web GUI).
   - Cause: the login sent the password unencoded in the URL, and a login unlocked the client's IP address for 4 h, so every device behind the same router was logged in too.
@@ -58,9 +90,7 @@
   - Both images: a single click browses up to 9 stored messages, newest first, then the status page.
   - The web flasher offers both and asks for the flex-cable marking, because board detection cannot tell the panels apart.
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.10.25` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.10.25</code></strong> — own group text always sent, WiFi watchdog, mailbox double delivery, T-Deck memory and backlight</summary>
@@ -298,10 +328,11 @@ Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`
 
 With default settings, compared with the official `v4.40a.10.28`:
 
-- **Nothing new on LoRa by default.** The fork-only changes of this release touch the web GUI, the chat history and the gateway's server upload.
-- **Gateways upload HEY reports with their own call in the path** (server side, not LoRa). Maps and INTERLINK clients can now draw the gateway's links.
-- **A relay skips a frame whose path is already too long** for its own call (more than 119 characters, log `pathfull`). Before, it relayed a path the next node could not decode.
-- **Auto Update `dev` channel:** fork builds can follow this fork's releases (`--updchan dev`); official builds know `prod` only.
+- **Own position, weather and HEY reports leave the queue sooner** at a busy node: priority 2 instead of 4/5. Expect these beacons to win against relayed traffic; expiry times are unchanged.
+- **No more pings to groups or special targets:** a stored non-callsign ping target is cleared at boot. Fewer ACK floods from gateways answering group pings.
+- **Nothing else new on LoRa by default.** The receive-silence logging reads the radio chip only under `--loradebug`; the channel switch and `--gateway lab` are remote-management and console features.
+- **Since `v4.40a.10.30`:** gateways upload HEY reports with their own call (server side, not LoRa), and a relay skips a frame whose path is already too long for its own call (more than 119 characters, log `pathfull`).
+- **Auto Update `dev` channel:** fork builds can follow this fork's releases (`--updchan dev`, now also by remote management); official builds know `prod` only.
 
 <details>
 <summary>Shared with the official <code>v4.40a.10.28</code>: fork behaviour merged upstream in #1238 (compared with <code>v4.40a.spserver</code>)</summary>
@@ -327,18 +358,22 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ### Verification for this release
 
-- **Host suite:** 3111 test cases in 84 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1422, web GUI, web flasher). New: suites for the web login (C side and browser script), the Extern-UDP echo and the HEY upload path.
-- **Build:** all 33 environments built locally from the tagged tree (28 ESP32, 3 nRF52, 2 Safeboot); the 28 `.autoupdate` files re-inflate byte-exact, also after download from this release.
-- **Idle heap on T-Beam v1.2 not measured:** the bench T-Beam (`DK5EN-92`) was unreachable on 2026-10-30. The web login adds 672 B of static tables (10 sessions, 4 challenges) on the T-Beam image, well inside the 3072 B the heap gate allows, but the idle figure itself is not re-measured.
-- **Benched for this release (2026-10-30):**
-  - Web login on Heltec V3 (`DK5EN-1`, USB): 19 of 19 HTTP checks including the login block, plus Chrome (Enter, focus, wrong-password message, logout). On the gateway `DK5EN-98` (over the air): 17 of 17 plus Chrome.
-  - Extern-UDP echo on Heltec V3 (`DK5EN-1`): a JSON message to UDP 1799 shows once as an own message in the web chat.
-  - HEY upload on the gateway `DK5EN-98` in the field since 2026-10-30 17:22: `DL2JA-2,DK5EN-98` published on the INTERLINK feed, link drawn on the map, publish rate unchanged.
-- **Host-tested only:** the HEY path cap and relay skip, the E290 images (built only, no E290 on our bench).
+- **Host suite:** 3262 test cases in 85 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1473, web GUI, web flasher). New: suites for the ping target, the receive-silence tracker, the remote channel switch and the lab gateway.
+- **Build:** CI builds all 33 environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download (checked on the published assets).
+- **Idle heap on T-Beam v1.2 (`DK5EN-92`):** 68688 B against the 69332 B baseline (-644 B, the gate allows 3072 B), measured 2026-11-01 as the 600 s STAT heap with Bluetooth up on a local build of this commit.
+- **Benched for this release (2026-10-31 and 11-01):**
+  - Remote channel switch (RM1 `upd chan`): T-Beam `DK5EN-92` to Heltec V3 `DK5EN-1` over LoRa and over the 2323 console, both on the fix commit; the remote web page checked in Chrome on `DK5EN-92`.
+  - Ping target: refusals of group, special, own-call and malformed targets at the console setter on `DK5EN-1`.
+  - Receive-silence logging: nRF52 on RAK4631 `DK5EN-90`; ESP32 on Heltec V3 `DK5EN-1` for 18 minutes at 2 dBm (six snapshots, six end lines, 178 timed RX restarts all in receive mode, no reset). On the bench a silence is a quiet channel, not a deaf chip.
+- **Host-tested only:** own beacons at priority 2 (queue order, expiry), boot-time clean-up of a stored ping target, the lab gateway, the E290 refresh default (built only, no E290 on our bench).
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
 
+- **`v4.40a.10.30` (2026-10-30):**
+  - Web login on Heltec V3 (`DK5EN-1`, USB): 19 of 19 HTTP checks including the login block, plus Chrome (Enter, focus, wrong-password message, logout). On the gateway `DK5EN-98` (over the air): 17 of 17 plus Chrome.
+  - Extern-UDP echo on Heltec V3 (`DK5EN-1`): a JSON message to UDP 1799 shows once as an own message in the web chat.
+  - HEY upload on the gateway `DK5EN-98` in the field since 2026-10-30 17:22: `DL2JA-2,DK5EN-98` published on the INTERLINK feed, link drawn on the map, publish rate unchanged.
 - **`v4.40a.10.25` (2026-10-25):**
   - **Idle heap on T-Beam v1.2 (`DK5EN-92`):** 68728 B against the 69332 B baseline (-604 B, the gate allows 3072 B).
     - A first build of the WiFi watchdog with its own ping task measured 63884 B and failed the gate; the release ships the probe without a task.
@@ -408,7 +443,7 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
 - **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
 
-**Web login (new in this release)**
+**Web login (since `v4.40a.10.30`)**
 
 - **No encryption:** the web GUI still runs over plain HTTP. Someone who can sniff the network can take over an open session cookie, and settings changed after login travel in plain text.
 - **Use a long random web password:** a sniffed login challenge can be attacked offline.
@@ -417,7 +452,12 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 **Not benched (host tests or builds only)**
 
-- **Vision Master E290 OTP image:** no E290 on our bench; built only. Its display behaviour is the upstream author's test.
+- **Vision Master E290 OTP image:** no E290 on our bench; built only. Its display behaviour, including the new default without periodic full refresh, is the upstream author's test; ghosting after long partial-only runs is not ruled out.
+- **Own beacons at priority 2:** host tests only; no field capture yet shows the effect on a busy node. Own beacons now share priority 2 with own group texts.
+- **Ping target clean-up at boot:** host tests only; a stored `255.` or group value was not loaded on hardware.
+- **Receive-silence logging:** the chip-state fields were read on a quiet channel only; a real deaf phase (OE3XIA-12 type) has not been caught with it yet. The cause of those silences stays open until it is.
+- **Remote channel switch:** benched between two nodes; not tried with McApp, which still needs its own command.
+- **`--gateway lab`:** host tests and a build check; not run against a lab server on hardware.
 - **HEY path cap and relay `pathfull` skip:** host tests only; a 119-character path was not produced on air.
 
 - **Remote-management repeat stop for client commands:** host tests and builds only; not yet run over the air between two nodes.
@@ -493,9 +533,7 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 - **In the official release `v4.40a.10.28`** (2026-10-28): all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238): transmit queue pool, Auto Update, Safeboot v3, remote management, store-and-forward, call blocklist and the fixes of `v4.40a.10.11` to `10.25`), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)), and the E290 OTP image with 9-message browse ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong).
 - **Earlier official releases:** `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)) T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233). #1235-#1237 came with `v4.40a.10.28`.
-- **Open upstream, fork-only until merged** (everything new in this release):
-  - HEY upload names the gateway, path cap ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243))
-  - Extern-UDP sends in the web chat ([#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244))
-  - web login without plain-text password ([#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245))
+- **Merged upstream 2026-10-31** (squash, in upstream `dev` 147812e0, shipped here since `v4.40a.10.30`): HEY upload names the gateway and path cap ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243)), Extern-UDP sends in the web chat ([#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244)), web login without plain-text password ([#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245)). The next official release will carry them.
+- **Fork-only until submitted** (everything new in this release, no upstream PR open yet): remote channel switch, ping target lock, own beacons at priority 2, receive-silence logging, `--gateway lab`, E290 refresh default.
 - **Fork-only by design:** the `dev` Auto Update channel (built only with `MC_AU_DEV_CHANNEL`) and the INSTRUMENT bench diagnostics (not in release images).
 - Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.

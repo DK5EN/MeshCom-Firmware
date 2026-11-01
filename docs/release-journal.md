@@ -1,11 +1,71 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261030`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261101`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.11.01 (Sonntag, 2026-11-01)
+
+Gebaut und veroeffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.01`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1`
+gesetzt), 68 Assets, Struktur wie `v4.40a.10.30`. `FLASH_VERSION` 20261101, `FLASH_STRUCT_VERSION` 20260724
+unveraendert -- die Einstellungen bleiben erhalten. Safeboot v3 unveraendert.
+
+Basis ist upstream `dev` 147812e0 (offizielles `v4.40a.10.28` plus unsere gemergten #1243-#1245). Der Fork-Unterschied
+in Release-Images sind die sechs Aenderungen unten und der `dev`-Kanal. Kein upstream-PR dafuer offen.
+
+Inhalt seit `v4.40a.10.30` (Firmware, `git log v4.40a.10.30..HEAD -- src variants platformio.ini`, 6 Commits):
+
+- RM-UPDCHAN (`636e681b`, `651e0920`): RM1-Argument `upd chan prod|dev` (nur Builds mit `MC_AU_DEV_CHANNEL`, sonst
+  `err blocked`). Ein Setter `auSetChannel()` (`src/rm_au.h`) fuer RM1, `--updchan` und `/setparam updchan`: gleicher
+  Kanal ist ein No-op, ein Wechsel speichert `node_updchan`, loescht das letzte Pruefergebnis (`fwNetForgetAvail`),
+  behaelt ein bereitgestelltes Image und startet keine Pruefung. Antworten `ok chan <x>`, `err aubusy`,
+  `err unsupported`; Konsole waehrend einer Pruefung: `[ERR];updchan;busy`. Remote-Webseite: MAIN/DEV-Schalter mit
+  Rueckfrage; der aktive Kanal wird nicht mehr wie "nicht verfuegbar" dargestellt.
+- LRF W1a (`16a33b12`, Entscheidung D1): Ping-Ziele sind nur Rufzeichen (`src/ping_target.h`). Abgelehnt werden
+  Gruppen, Sonderziele, der eigene Call und SSIDs mit fuehrender Null, an allen Wegen: Konsolen-Setter (Grund im
+  Fehlertext), Boot-Sanitize ESP32 und nRF52 (`sanitize_ping_target()` leert den Wert), nRF52-BLE-Live-Write,
+  `sendPing()` (`PING_INVALID_TARGET`, kein `pingcount`-Abzug) und manueller `{ping}`-Text (`BP_SEND_INVALID`).
+- LRF W1b (`16a33b12`, D2): eigene Position, WX und HEY (Quellen `user_pos`, `user_wx`, `user_hey`, `auto_pos`,
+  `nbr_report`) haben Prio 2 wie eine eigene Gruppennachricht; weitergeleitete Beacons bleiben 4/5. TTL nach Frametyp
+  unveraendert (eigene Position 120 s, eigenes HEY 180 s).
+- LRF W1c/W2 (`16a33b12`, `e01a5dc9`, D5): RX-Stille-Tracker `src/rx_silence.h` auf nRF52 und ESP32, Chip-Diagnose
+  (Modus aus `GetStatus`, IRQ, Device-Errors, RSSI momentan; SX1276 meldet `na`). `--loradebug` druckt `RX_SILENCE`
+  nach 60 s ohne Empfang und `RX_SILENCE_END` mit `by=` und `since_cad/since_tx/since_restart`; die RX-Restart-Zeile
+  traegt `mode_before=`; `--info` zeigt `RXSIL`. Zaehler laufen immer, Chip-Lesezugriffe nur unter `--loradebug`.
+- GWU (`2fe7ebd4`): `--gateway lab <host[:port]>`, Code `LB`, neuer Schluessel `node_gwlab`. ESP32 Host oder IPv4,
+  nRF52 nur IPv4; unbrauchbares Lab faellt mit Log-Grund auf OE zurueck. Nicht in `gwCodes()` (Web, BLE,
+  `--gateway srv`). UDP-Zielport folgt `:port` (Standard 1990). `--gateway srv OE` stellt zurueck.
+- E290 (`96e16e6e`): im Env `vision-master-e290-otp` kein periodischer Full Refresh mehr (`E290_FULL_EVERY=0`);
+  `-D E290_FULL_EVERY=N` schaltet ihn wieder ein.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Gate auf dem Release-Commit: `tools/regression.sh --stage 1,2` PASS (85 Unity-Envs, 3262/3262, Golden 48, pytest 1473).
+- RM-UPDCHAN: DK5EN-92 (T-Beam) nach DK5EN-1 (Heltec V3) per LoRa und ueber die 2323-Konsole, beide auf `636e681b`;
+  Remote-Webseite in Chrome auf DK5EN-92 (`651e0920`); DK5EN-1 danach wieder auf `dev`.
+- LRF W1: Ping-Ziel-Ablehnungen am Konsolen-Setter auf DK5EN-1; `RX_SILENCE`-Zeilen auf RAK4631 DK5EN-90.
+- LRF W3 (`lrf_w3_dk5en1_rxsil.summary`): Heltec V3 DK5EN-1, `--loradebug on`, 2 dBm, 18 min: sechs `RX_SILENCE`,
+  sechs `RX_SILENCE_END` (`by=rx` 4, `by=watchdog` 2), 178 `RX_RESTART src=timeout` alle `mode_before=rx`, kein Reset.
+  Die Stillen auf der Bench sind ein leerer Kanal (60-107 s), kein tauber Chip.
+- Idle-Heap-Gate auf DK5EN-92 (T-Beam v1.2, lokaler Build dieses Commits, Net-Konsole 2323): 68688 B gegen Baseline
+  69332 B (-644 B, Grenze 3072 B), PASS.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Prio 2 fuer eigene Beacons: nur Host-Tests (`test_txring`); kein Feldmitschnitt zeigt die Wirkung auf einem
+  ausgelasteten Knoten.
+- Boot-Sanitize eines gespeicherten Ping-Ziels (`255.`, Gruppe): nur Host-Tests (`test_settings_sanitize`), nicht auf
+  Hardware geladen; Config-Import mit `node_pingcall: "255."` ebenfalls nicht.
+- RX-Stille: echte taube Phase (Typ OE3XIA-12) noch nicht mit dem neuen Logging gefangen; Ursache bleibt offen.
+- `upd chan` per McApp nicht geprueft (McApp braucht das Kommando noch: MCProxy B14).
+- `--gateway lab` nicht gegen einen Lab-Server auf Hardware betrieben; nur Host-Tests und Build.
+- E290-Standardwert ohne Full Refresh: kein E290 auf der Bench; Beobachtung stammt vom Upstream-Autor.
+- Alle Boards ausser Heltec V3, T-Beam und RAK4631 fuer die Aenderungen dieses Releases nur gebaut.
 
 ---
 
