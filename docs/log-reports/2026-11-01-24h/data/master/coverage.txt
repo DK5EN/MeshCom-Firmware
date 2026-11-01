@@ -1,0 +1,17 @@
+Master-data coverage (mcmap-prod nodes_query, bbox tiles)
+
+All calls: 425; with master data: 317; without: 108 (of which OE1XAR-33/62 excluded from missing list: 2).
+Missing (excluding OE1XAR-33/62): 106
+
+Per log list:
+- calls_db0ais.txt: 249 calls, 198 with data, 49 without
+- calls_oe3xhl.txt: 220 calls, 148 with data, 71 without
+- calls_oe3xia.txt: 218 calls, 148 with data, 69 without
+- calls_oe3xir.txt: 182 calls, 126 with data, 55 without
+- calls_oe3xoc.txt: 228 calls, 155 with data, 72 without
+- calls_oe3xwj.txt: 225 calls, 154 with data, 70 without
+
+Calls without master data (excluding OE1XAR-33/62):
+DA6NDR-9 DA6WT-20 DB4MLA-12 DB5COA-20 DF2AP-99 DF6FQ-13 DG3FAW-13 DG3FBL-1 DG4NEU-5 DK5AI-12 DK9EJ-14 DL1IO-11 DL3MC-21 DL4NCQ-12 DL4NCQ-15 DL4QB-90 DM3KS-7 DM7DS-99 DM9PT-22 DN9TRE-9 DO3RR-50 DO5DAM-1 F4BQN-19 F4BQN-87 F5MIW-19 F6JON-19 GM4MCV-2 GM4UPX-1 HB9FOU-63 HB9WNM-13 IK5NJM-11 IK5PWA-10 IK5XMK-99 IK6QKB-15 IQ5ARI-11 IS0HHA-10 IS0HHA-80 IS0HXK-7 IS0QLX-11 IU0NDT-98 IU0TGU-10 IU3MBY-1 IU3UJO-1 IU4LEG-15 IU5CZN-10 IU5RDX-16 IU5SGO-10 IU5SNJ-12 IW0ELF-15 IW2NKC-10 IW4ECF-10 IW5CWC-11 IW5EIA-12 IW9HRH-15 IZ0EMY-15 IZ2BKS-9 OE1EPU-12 OE1ETI-15 OE1FUC-12 OE1GCA-12 OE1IAH-11 OE1KBC-9 OE1KFR-9 OE1LAB-0 OE1RIG-2 OE1UHA-12 OE1VER-1 OE1XAR-12 OE1XAR-63 OE3AHU-14 OE3AHU-15 OE3ALB-2 OE3AOG-15 OE3ESA-1 OE3FMN-1 OE3HOI-10 OE3KJN-12 OE3MAG-3 OE3MIF-12 OE3MTC-10 OE3MZC-7 OE3NRA-1 OE3PTA-3 OE3REE-1 OE3REI-12 OE3RFA-1 OE3RFA-7 OE3RQF-9 OE3SMA-5 OE3TPB-29 OE3TVJ-10 OE3WFA-5 OE3XDC-12 OE3XIR-12 OE5FLY-11 OE5FRW-13 OE5FRW-16 SP1RAC-10 SP3PAT-1 SP5AV-1 SP5XTF-2 SP5ZEN-7 SP6TK-12 SP6TSE-1 SP9TSA-1 SQ9S-1
+
+Caveat: the tiles cover AT, DE, SI and N-Italy only. Calls heard from outside these boxes (e.g. SP, IK, IZ, IS, IU south, HB9, F4, GM, DF, DA, DG, DK, DL, DM, DO, DB4/5, OE1 outside box) cannot be matched by bbox and appear as missing even if they exist in the database. Position-less nodes are never returned by bbox queries either.

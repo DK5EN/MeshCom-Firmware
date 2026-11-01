@@ -33,3 +33,5 @@
 
 - **2026-10-19/20:** releases v4.40a.10.20 and v4.40a.10.21; AU-16 root cause and fix (field-verified);
   WEB-WDT-01, WEB-STOP-01, RM-NVS-01 diagnostics; web flasher WF-01..WF-05; upstream PR #1224.
+- **2026-10-24 (evening):** AU-21 field log DJ8MEH-81 analysed; tracker TFT sprite on demand and released for AU
+  TLS jobs, `lowheap_tls`, heap logging (`(tft)` mark, `--info` HEAP); two waves, gate green, DK5EN-1 benched.

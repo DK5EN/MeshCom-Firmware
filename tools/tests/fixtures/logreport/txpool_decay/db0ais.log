@@ -1,0 +1,104 @@
+[MC-DBG] RX_ERROR rssi=-97 snr=-7 ts=5298650
+18:29:29 [LOG] ERR rssi=-97 snr=-7 len=0 ferr=0 t=5298650
+[MC-DBG] CHANNEL_UTIL rx=756ms tx=0ms util=7%
+[MC-DBG] RX_ERROR rssi=-99 snr=-17 ts=5303919
+18:29:34 [LOG] ERR rssi=-99 snr=-17 len=0 ferr=0 t=5303919
+[MC-DBG] RX_ERROR rssi=-103 snr=-6 ts=5306576
+18:29:37 [LOG] ERR rssi=-103 snr=-6 len=0 ferr=0 t=5306576
+[MC-DBG] RX_ERROR rssi=-106 snr=-9 ts=5309645
+18:29:40 [LOG] ERR rssi=-106 snr=-9 len=0 ferr=0 t=5309645
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=0ms util=0%
+[MC-DBG] RX_ERROR rssi=-103 snr=-1 ts=5312996
+18:29:43 [LOG] ERR rssi=-103 snr=-1 len=0 ferr=0 t=5312996
+18:29:48 [LOG] 137 : x63CE83E1 H04 S1 T0 M01 OE1YEM-10,DB0HRF-12>20:Hallo Helmut. Freut mich, dass mann mich lesen kann. Ist erst seit ein paar Tagen online, der Node. HW:12 MOD:8/8 FCS:2BD6 FW:40:a LH:8C RSSI:-98 SNR:5 DUP:n OWN:- t=5318193
+[MC-DBG] RING_WRITE slot=0 type=3A status=FF len=147 msg_id=63CE83E1 queued=0/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=0 prio=3
+18:29:48 [LOG] RLY x63CE83E1 : H04 q=tx prio=3 slot=0
+[MC-DBG] ONRXDONE_TIME ms=10
+[MC-DBG] RING_STATUS queued=1 pending=0 retrying=0 done=1
+[MC-DBG] RX_ERROR rssi=-106 snr=-13 ts=5320201
+18:29:50 [LOG] ERR rssi=-106 snr=-13 len=0 ferr=0 t=5320201
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=0
+[MC-DBG] CAD_BUSY_1 attempt=0, double-check...
+[MC-DBG] CHANNEL_UTIL rx=1395ms tx=0ms util=13%
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=1
+[MC-DBG] CAD_BUSY_1 attempt=1, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=2
+[MC-DBG] RING_TX_READ slot=0 prio=3 type=3A status=FF len=147 msg_id=63CE83E1 retry=0 queued=1/20 lat=9558ms
+18:29:58 [LOG] TX x63CE83E1 : H03 prio=3 src=r wait=9558 q=1 cad=2 len=147 t=5327759
+[MC-DBG] TX_START qlen=0
+OnTXDone
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=1492ms util=14%
+18:30:04 [LOG] 082 : x4608416F H04 S1 T0 M01 DC8CE-12,DB0HRF-12>20:ja, werde ich gleich am Wochenende aufspielen HW:03 MOD:8/8 FCS:17C2 FW:35:t LH:8C RSSI:-98 SNR:4 DUP:n OWN:- t=5333620
+[MC-DBG] RING_WRITE slot=0 type=3A status=FF len=92 msg_id=4608416F queued=0/20 src=rx_relay
+[MC-DBG] RING_PRIO slot=0 prio=3
+18:30:04 [LOG] RLY x4608416F : H04 q=tx prio=3 slot=0
+[MC-DBG] ONRXDONE_TIME ms=9
+[MC-DBG] RX_ERROR rssi=-104 snr=-6 ts=5335546
+18:30:06 [LOG] ERR rssi=-104 snr=-6 len=0 ferr=0 t=5335546
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=0
+[MC-DBG] CAD_BUSY_1 attempt=0, double-check...
+[MC-DBG] RX_ERROR rssi=-105 snr=-10 ts=5339850
+18:30:10 [LOG] ERR rssi=-105 snr=-10 len=0 ferr=0 t=5339850
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=1
+[MC-DBG] CAD_BUSY_1 attempt=1, double-check...
+[MC-DBG] CHANNEL_UTIL rx=904ms tx=0ms util=9%
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=2
+[MC-DBG] CAD_BUSY_1 attempt=2, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=3
+[MC-DBG] CAD_BUSY_1 attempt=3, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=4
+[MC-DBG] CAD_BUSY_1 attempt=4, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=5
+[MC-DBG] CAD_BUSY_1 attempt=5, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=6
+[MC-DBG] CAD_BUSY_1 attempt=6, double-check...
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=7
+[MC-DBG] RING_TX_READ slot=0 prio=3 type=3A status=FF len=92 msg_id=4608416F retry=0 queued=1/20 lat=11073ms
+18:30:15 [LOG] TX x4608416F : H03 prio=3 src=r wait=11073 q=1 cad=7 len=92 t=5344699
+[MC-DBG] TX_START qlen=0
+OnTXDone
+[MC-DBG] RX_ERROR rssi=-102 snr=-17 ts=5349058
+18:30:19 [LOG] ERR rssi=-102 snr=-17 len=0 ferr=0 t=5349058
+[MC-DBG] RING_STATUS queued=0 pending=0 retrying=0 done=0
+[MC-DBG] RX_ERROR rssi=-101 snr=-13 ts=5351440
+18:30:21 [LOG] ERR rssi=-101 snr=-13 len=0 ferr=0 t=5351440
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=1000ms util=9%
+[MC-DBG] RX_ERROR rssi=-102 snr=-9 ts=5353094
+18:30:23 [LOG] ERR rssi=-102 snr=-9 len=0 ferr=0 t=5353094
+[MC-DBG] RX_ERROR rssi=-102 snr=-9 ts=5357305
+18:30:27 [LOG] ERR rssi=-102 snr=-9 len=0 ferr=0 t=5357305
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=0ms util=0%
+[MC-DBG] RX_ERROR rssi=-107 snr=-16 ts=5363508
+18:30:33 [LOG] ERR rssi=-107 snr=-16 len=0 ferr=0 t=5363508
+[MC-DBG] RX_ERROR rssi=-77 snr=-20 ts=5369396
+18:30:39 [LOG] ERR rssi=-77 snr=-20 len=0 ferr=0 t=5369396
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=0ms util=0%
+[MC-DBG] RING_WRITE slot=0 type=3A status=FF len=123 msg_id=69C502B2 queued=0/20 src=udp_rx
+[MC-DBG] RING_PRIO slot=0 prio=3
+18:30:49 [LOG] GWI x69C502B2 : H04 from=OE5HWN-14 t=5379076
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=0
+[MC-DBG] RING_STATUS queued=1 pending=0 retrying=0 done=1
+[MC-DBG] CAD_BUSY_1 attempt=0, double-check...
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=0ms util=0%
+[MC-DBG] TX_GATE_ENTER qlen=1 cad_attempt=1
+[MC-DBG] RING_TX_READ slot=0 prio=3 type=3A status=FF len=123 msg_id=69C502B2 retry=0 queued=1/20 lat=3855ms
+18:30:53 [LOG] TX x69C502B2 : H04 prio=3 src=g wait=3855 q=1 cad=1 len=123 t=5382930
+[MC-DBG] TX_START qlen=0
+OnTXDone
+[MC-DBG] RX_ERROR rssi=-103 snr=-2 ts=5385811
+18:30:56 [LOG] ERR rssi=-103 snr=-2 len=0 ferr=0 t=5385811
+[MC-DBG] RX_ERROR rssi=-103 snr=-2 ts=5390168
+18:31:00 [LOG] ERR rssi=-103 snr=-2 len=0 ferr=0 t=5390168
+[MC-DBG] RX_ERROR rssi=-103 snr=-2 ts=5390626
+18:31:01 [LOG] ERR rssi=-103 snr=-2 len=0 ferr=0 t=5390626
+[MC-DBG] CHANNEL_UTIL rx=0ms tx=1296ms util=12%
+[MC-DBG] RX_ERROR rssi=-97 snr=-3 ts=5394817
+18:31:05 [LOG] ERR rssi=-97 snr=-3 len=0 ferr=0 t=5394817
+18:31:06 [LOG] 117 : x69C502B1 H04 S1 T0 M01 OE5HWN-14,DB0HRF-12>20:@OE1YEM kein Problem, jeder hat eimal begonnen damit, wichtig ist das es läuft HW:47 MOD:8/8 FCS:2535 FW:40:a LH:8C RSSI:-97 SNR:3 DUP:d OWN:- t=5396226
+[MC-DBG] ONRXDONE_TIME ms=6
+18:31:12 [LOG] 122 : x69C502B2 H04 S1 T0 M01 OE5HWN-14,DB0MW-12>20:Jetzt eimal eine Rauchpause, da schreibe ich am Handy weiter und nicht mehr am Laptop HW:47 MOD:8/8 FCS:272D FW:40:a LH:83 RSSI:-85 SNR:7 DUP:d OWN:- t=5401823
+[MC-DBG] ONRXDONE_TIME ms=5
+[MC-DBG] CHANNEL_UTIL rx=2545ms tx=0ms util=25%
+18:31:13 [LOG] DM sent=0 echo=0 gwack=0 ack=0 giveup=0 giveuph=0 att=0 reack=0/0 rtt=0/0/0/0/0/0 ring=enq:9 ovw:0
+18:31:13 [LOG] STAT util=10 rx=20323 tx=11500 newid=10 dup=9 err=57 txn=11 txfail=0 ringmax=2/20 drop=0/0/0/0/0 mh=11 heap=91604 trk=900/2 fw=40a/20260929 up=5403 t=5403329 onrx_n=22 onrx_avg=6 onrx_p95=10 onrx_p99=10 onrx_max=10 onrx_warn=0

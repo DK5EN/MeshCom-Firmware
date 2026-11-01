@@ -1,0 +1,337 @@
+{
+ "oe3xhl": {
+  "gw_rx_by_src": {
+   "OE1XAR-33": 146
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-33": {
+    "n_distinct": 146,
+    "median_gap_s": 607.0,
+    "expected_in_span": 148,
+    "missing_beacons": 2,
+    "largest_gaps": [
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-31 18:10:20"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 20:42:07"
+     }
+    ]
+   }
+  },
+  "lora_cet_events": 681,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 148
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 148,
+    "median_gap_s": 607.0,
+    "expected_in_span": 148,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_oe1xar33_heard_of_union": {
+   "union_distinct_in_span": 148,
+   "heard": 148,
+   "pct": 100.0
+  }
+ },
+ "oe3xia": {
+  "gw_rx_by_src": {
+   "OE1XAR-33": 150
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-33": {
+    "n_distinct": 148,
+    "median_gap_s": 607.0,
+    "expected_in_span": 148,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_cet_events": 778,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 141
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 141,
+    "median_gap_s": 607.0,
+    "expected_in_span": 148,
+    "missing_beacons": 7,
+    "largest_gaps": [
+     {
+      "gap_s": 2428.0,
+      "after_stamp": "10-31 18:31:17"
+     },
+     {
+      "gap_s": 1216.0,
+      "after_stamp": "10-31 20:22:37"
+     },
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-31 10:45:46"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 19:11:45"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 09:45:03"
+     }
+    ]
+   }
+  },
+  "lora_oe1xar33_heard_of_union": {
+   "union_distinct_in_span": 148,
+   "heard": 141,
+   "pct": 95.3
+  }
+ },
+ "oe3xir": {
+  "gw_rx_by_src": {
+   "OE1XAR-33": 70
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-33": {
+    "n_distinct": 68,
+    "median_gap_s": 607.0,
+    "expected_in_span": 68,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_cet_events": 300,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 69
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 69,
+    "median_gap_s": 607.0,
+    "expected_in_span": 69,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_oe1xar33_heard_of_union": {
+   "union_distinct_in_span": 69,
+   "heard": 69,
+   "pct": 100.0
+  }
+ },
+ "oe3xoc": {
+  "gw_rx_by_src": {
+   "OE1XAR-33": 157
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-33": {
+    "n_distinct": 151,
+    "median_gap_s": 607.0,
+    "expected_in_span": 151,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_cet_events": 986,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 151
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 151,
+    "median_gap_s": 607.0,
+    "expected_in_span": 151,
+    "missing_beacons": 0,
+    "largest_gaps": []
+   }
+  },
+  "lora_oe1xar33_heard_of_union": {
+   "union_distinct_in_span": 151,
+   "heard": 151,
+   "pct": 100.0
+  }
+ },
+ "oe3xwj": {
+  "gw_rx_by_src": {
+   "OE1XAR-33": 153
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-33": {
+    "n_distinct": 149,
+    "median_gap_s": 607.0,
+    "expected_in_span": 151,
+    "missing_beacons": 2,
+    "largest_gaps": [
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 23:24:03"
+     },
+     {
+      "gap_s": 1212.0,
+      "after_stamp": "11-01 06:08:19"
+     }
+    ]
+   }
+  },
+  "lora_cet_events": 593,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 147
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 147,
+    "median_gap_s": 607.0,
+    "expected_in_span": 151,
+    "missing_beacons": 4,
+    "largest_gaps": [
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-31 17:50:48"
+     },
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-31 12:37:05"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 18:31:17"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 09:45:03"
+     }
+    ]
+   }
+  },
+  "lora_oe1xar33_heard_of_union": {
+   "union_distinct_in_span": 151,
+   "heard": 147,
+   "pct": 97.4
+  }
+ },
+ "db0ais": {
+  "gw_rx_by_src": {
+   "OE1XAR-62": 145
+  },
+  "gw_rx_gaps": {
+   "OE1XAR-62": {
+    "n_distinct": 145,
+    "median_gap_s": 602.304,
+    "expected_in_span": 150,
+    "missing_beacons": 5,
+    "largest_gaps": [
+     {
+      "gap_s": 1807.209,
+      "after_stamp": "10-31 01:55:44"
+     },
+     {
+      "gap_s": 1806.515,
+      "after_stamp": "10-31 00:55:31"
+     },
+     {
+      "gap_s": 1204.472,
+      "after_stamp": "10-30 22:14:56"
+     }
+    ]
+   }
+  },
+  "lora_cet_events": 861,
+  "lora_distinct_by_src": {
+   "OE1XAR-33": 141,
+   "OE1XAR-62": 141,
+   "OE1XAR-63": 142
+  },
+  "lora_gaps_by_src": {
+   "OE1XAR-33": {
+    "n_distinct": 141,
+    "median_gap_s": 607.0,
+    "expected_in_span": 149,
+    "missing_beacons": 8,
+    "largest_gaps": [
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-30 18:43:54"
+     },
+     {
+      "gap_s": 1215.0,
+      "after_stamp": "10-30 17:22:56"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 16:29:52"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 12:06:44"
+     },
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-31 11:16:08"
+     }
+    ]
+   },
+   "OE1XAR-62": {
+    "n_distinct": 141,
+    "median_gap_s": 602.0,
+    "expected_in_span": 150,
+    "missing_beacons": 9,
+    "largest_gaps": [
+     {
+      "gap_s": 1809.0,
+      "after_stamp": "10-30 20:34:44"
+     },
+     {
+      "gap_s": 1206.0,
+      "after_stamp": "10-30 16:23:03"
+     },
+     {
+      "gap_s": 1205.0,
+      "after_stamp": "10-31 16:20:43"
+     },
+     {
+      "gap_s": 1205.0,
+      "after_stamp": "10-31 09:48:21"
+     },
+     {
+      "gap_s": 1205.0,
+      "after_stamp": "10-30 19:44:06"
+     }
+    ]
+   },
+   "OE1XAR-63": {
+    "n_distinct": 142,
+    "median_gap_s": 606.0,
+    "expected_in_span": 149,
+    "missing_beacons": 7,
+    "largest_gaps": [
+     {
+      "gap_s": 1214.0,
+      "after_stamp": "10-30 17:24:51"
+     },
+     {
+      "gap_s": 1213.0,
+      "after_stamp": "10-31 16:40:09"
+     },
+     {
+      "gap_s": 1213.0,
+      "after_stamp": "10-31 15:09:12"
+     },
+     {
+      "gap_s": 1213.0,
+      "after_stamp": "10-31 14:28:47"
+     },
+     {
+      "gap_s": 1213.0,
+      "after_stamp": "10-30 17:45:05"
+     }
+    ]
+   }
+  }
+ }
+}

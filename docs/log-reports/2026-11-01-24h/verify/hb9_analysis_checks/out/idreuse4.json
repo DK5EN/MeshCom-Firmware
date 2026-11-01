@@ -1,0 +1,435 @@
+{
+ "origin_counts": {
+  "HB9JAT": 53
+ },
+ "candidates": 53,
+ "same_payload": 0,
+ "different_payload": 53,
+ "unknown": 0,
+ "rows": [
+  {
+   "id": "4EBC7191",
+   "gap_min": 63.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;13,110,-18;",
+   "p2": "*!4703.14N/00836.45E-MeshCom Home#HB9JAT"
+  },
+  {
+   "id": "4EBC7067",
+   "gap_min": 63.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-12;127,-17;3,137,-18;",
+   "p2": "H@R2;5,122,-9;7,118,-14;"
+  },
+  {
+   "id": "4EBC7322",
+   "gap_min": 63.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;",
+   "p2": "H@R0;5,124,-11;"
+  },
+  {
+   "id": "4EBC7190",
+   "gap_min": 69.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,109,-16;",
+   "p2": "H@R0;6,123,-10;13,110,-16;97,0;"
+  },
+  {
+   "id": "4EBC7000",
+   "gap_min": 69.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,121,-9;",
+   "p2": "H@R0;5,123,-10;"
+  },
+  {
+   "id": "4EBC70C8",
+   "gap_min": 73.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;",
+   "p2": "H@R0;5,124,-11;"
+  },
+  {
+   "id": "4EBC7064",
+   "gap_min": 74.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;126,-18;3,134,-16;",
+   "p2": "H@R0;6,123,-10;13,110,-16;"
+  },
+  {
+   "id": "4EBC7385",
+   "gap_min": 79.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;6,123,-10;13,110,-16;",
+   "p2": "H@R2;6,123,-11;2,93,4;"
+  },
+  {
+   "id": "4EBC70C9",
+   "gap_min": 83.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;6,123,-10;6,120,-10;",
+   "p2": "H@R0;6,123,-10;13,111,-16;5,107,0;"
+  },
+  {
+   "id": "4EBC72BC",
+   "gap_min": 86.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;8,119,-15;",
+   "p2": "H@R0;6,123,-10;6,120,-11;"
+  },
+  {
+   "id": "4EBC712C",
+   "gap_min": 94.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-16;",
+   "p2": "H@R0;6,123,-11;127,-13;7,121,-15;"
+  },
+  {
+   "id": "4EBC7384",
+   "gap_min": 94.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;",
+   "p2": "H@R0;6,124,-11;13,109,-16;"
+  },
+  {
+   "id": "4EBC7002",
+   "gap_min": 96.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-16;",
+   "p2": "H@R1;6,123,-10;126,-17;2,136,-18;"
+  },
+  {
+   "id": "4EBC70CA",
+   "gap_min": 99.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;7,127,-16;",
+   "p2": "H@R2;5,123,-10;13,110,-17;"
+  },
+  {
+   "id": "4EBC725C",
+   "gap_min": 102.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;127,-18;2,135,-18;",
+   "p2": "H@R1;5,123,-10;128,-19;2,135,-17;"
+  },
+  {
+   "id": "4EBC712D",
+   "gap_min": 107.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;13,108,-17;",
+   "p2": "H@R0;6,123,-10;13,111,-16;"
+  },
+  {
+   "id": "4EBC71F8",
+   "gap_min": 118.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;124,-15;3,137,-19;",
+   "p2": "H@R2;5,123,-13;15,111,-16;"
+  },
+  {
+   "id": "4EBC7321",
+   "gap_min": 136.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;128,-15;7,123,-20;",
+   "p2": "H@R1;5,122,-10;13,110,-17;"
+  },
+  {
+   "id": "4EBC71F5",
+   "gap_min": 146.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;124,-15;14,110,-15;",
+   "p2": "H@R1;5,123,-12;125,-16;3,135,-17;"
+  },
+  {
+   "id": "4EBC71F4",
+   "gap_min": 152.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;",
+   "p2": "H@R0;6,123,-11;13,110,-16;"
+  },
+  {
+   "id": "4EBC725B",
+   "gap_min": 154.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;6,118,-17;",
+   "p2": "H@R2;5,123,-10;15,110,-17;7,45,7;"
+  },
+  {
+   "id": "4EBC7259",
+   "gap_min": 161.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,122,-10;13,110,-15;",
+   "p2": "H@R0;6,123,-10;13,111,-16;101,9;"
+  },
+  {
+   "id": "4EBC71F7",
+   "gap_min": 175.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,122,-10;13,110,-17;",
+   "p2": "H@R2;5,123,-10;15,108,-17;"
+  },
+  {
+   "id": "4EBC7387",
+   "gap_min": 180.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,122,-9;6,121,-19;4,123,-15;",
+   "p2": "H@R2;6,123,-13;13,110,-16;"
+  },
+  {
+   "id": "4EBC70CB",
+   "gap_min": 183.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-15;",
+   "p2": "H@R2;6,124,-13;13,111,-16;"
+  },
+  {
+   "id": "4EBC7386",
+   "gap_min": 200.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-11;124,-13;3,135,-18;",
+   "p2": "*!4703.14N/00836.45E-MeshCom Home#HB9JAT"
+  },
+  {
+   "id": "4EBC7001",
+   "gap_min": 201.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,122,-9;14,111,-16;",
+   "p2": "H@R2;6,123,-12;13,110,-15;"
+  },
+  {
+   "id": "4EBC72BE",
+   "gap_min": 207.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-11;13,108,-17;",
+   "p2": "H@R1;5,123,-10;126,-15;3,135,-17;"
+  },
+  {
+   "id": "4EBC70CD",
+   "gap_min": 211.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;14,110,-17;",
+   "p2": "H@R2;6,123,-10;13,110,-17;"
+  },
+  {
+   "id": "4EBC725A",
+   "gap_min": 216.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;130,-16;8,122,-15;",
+   "p2": "H@R0;5,124,-11;125,-16;3,135,-17;"
+  },
+  {
+   "id": "4EBC712F",
+   "gap_min": 237.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,124,-11;",
+   "p2": "H@R2;5,123,-11;127,-17;2,135,-17;"
+  },
+  {
+   "id": "4EBC7320",
+   "gap_min": 260.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-15;",
+   "p2": "H@R0;5,123,-10;15,110,-17;"
+  },
+  {
+   "id": "4EBC7193",
+   "gap_min": 269.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;8,119,-11;",
+   "p2": "H@R1;5,124,-11;"
+  },
+  {
+   "id": "4EBC72C1",
+   "gap_min": 280.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;130,-19;2,136,-18;",
+   "p2": "H@R2;5,123,-14;12,109,-18;"
+  },
+  {
+   "id": "4EBC71F6",
+   "gap_min": 291.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;2,94,4;13,110,-13;",
+   "p2": "H@R2;5,122,-12;14,109,-19;"
+  },
+  {
+   "id": "4EBC72BF",
+   "gap_min": 296.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;2,94,3;",
+   "p2": "H@R2;5,123,-10;"
+  },
+  {
+   "id": "4EBC725F",
+   "gap_min": 303.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,124,-11;127,-17;1,135,-18;",
+   "p2": "H@R2;5,123,-10;2,94,3;"
+  },
+  {
+   "id": "4EBC712E",
+   "gap_min": 321.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;6,123,-11;127,-17;13,111,-18;",
+   "p2": "*!4703.14N/00836.45E-MeshCom Home#HB9JAT"
+  },
+  {
+   "id": "4EBC7066",
+   "gap_min": 333.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-11;127,-18;3,135,-17;",
+   "p2": "H@R0;5,123,-10;127,-16;14,110,-16;"
+  },
+  {
+   "id": "4EBC725E",
+   "gap_min": 347.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;13,111,-16;",
+   "p2": "H@R2;5,124,-11;"
+  },
+  {
+   "id": "4EBC7258",
+   "gap_min": 347.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;",
+   "p2": "H@R0;5,123,-10;7,119,-12;"
+  },
+  {
+   "id": "4EBC7068",
+   "gap_min": 365.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-16;",
+   "p2": "H@R1;5,123,-10;13,110,-17;"
+  },
+  {
+   "id": "4EBC72BD",
+   "gap_min": 368.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;125,-17;13,111,-16;",
+   "p2": "H@R0;5,124,-11;"
+  },
+  {
+   "id": "4EBC71F9",
+   "gap_min": 411.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,124,-11;",
+   "p2": "H@R0;5,124,-11;2,91,-1;14,110,-13;"
+  },
+  {
+   "id": "4EBC7069",
+   "gap_min": 414.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;129,-18;9,122,-21;",
+   "p2": "H@R1;5,123,-12;126,-17;1,136,-18;"
+  },
+  {
+   "id": "4EBC7065",
+   "gap_min": 499.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-11;15,110,-17;",
+   "p2": "H@R0;5,123,-10;13,110,-16;"
+  },
+  {
+   "id": "4EBC7325",
+   "gap_min": 595.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,124,-11;13,110,-17;",
+   "p2": "*!4703.14N/00836.45E-MeshCom Home#HB9JAT"
+  },
+  {
+   "id": "4EBC7003",
+   "gap_min": 603.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,122,-10;128,-19;15,110,-17;",
+   "p2": "H@R2;5,123,-10;126,-15;2,135,-17;"
+  },
+  {
+   "id": "4EBC7004",
+   "gap_min": 652.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;13,111,-16;",
+   "p2": "H@R2;5,123,-10;13,111,-15;"
+  },
+  {
+   "id": "4EBC7192",
+   "gap_min": 658.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;125,-16;15,111,-16;",
+   "p2": "H@R2;5,123,-10;13,110,-16;"
+  },
+  {
+   "id": "4EBC71FA",
+   "gap_min": 873.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-16;5,47,7;",
+   "p2": "H@R2;5,123,-10;7,120,-18;"
+  },
+  {
+   "id": "4EBC72C4",
+   "gap_min": 1042.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;127,-17;3,135,-16;",
+   "p2": "H@R2;5,123,-11;128,-19;2,135,-17;"
+  },
+  {
+   "id": "4EBC71FE",
+   "gap_min": 1092.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;",
+   "p2": "H@R0;6,123,-10;"
+  }
+ ]
+}

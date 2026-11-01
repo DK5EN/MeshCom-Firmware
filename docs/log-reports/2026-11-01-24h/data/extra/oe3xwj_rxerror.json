@@ -1,0 +1,6 @@
+{
+ "rx_error": 7697,
+ "rx_done_incl_ack": 31097,
+ "share_pct": 19.8,
+ "definition": "RX_ERROR / (RX_ERROR + ONRXDONE_TIME); ONRXDONE_TIME is printed for every decoded reception including 12-byte ACKs"
+}

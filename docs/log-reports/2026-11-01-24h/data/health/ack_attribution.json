@@ -1,0 +1,414 @@
+{
+ "oe3xhl": {
+  "ack012_events": 10179,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "F5CE7",
+    "events": 10005,
+    "share_pct": 98.3,
+    "distinct_ack_ids": 2802,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "63CE8",
+    "events": 77,
+    "share_pct": 0.8,
+    "distinct_ack_ids": 12,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "049C3",
+    "events": 23,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 4,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BE8B",
+    "events": 21,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 7,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4AA5C",
+    "events": 6,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "75C63",
+    "events": 6,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4D9A4",
+    "events": 5,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "BBEC3",
+    "events": 5,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {},
+  "b10_b11_top": {
+   "01/00": 10132,
+   "3B/9B": 6,
+   "45/84": 6,
+   "7B/8C": 5,
+   "AB/0E": 5
+  }
+ },
+ "oe3xia": {
+  "ack012_events": 14482,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "F5CE7",
+    "events": 14101,
+    "share_pct": 97.4,
+    "distinct_ack_ids": 2436,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "63CE8",
+    "events": 120,
+    "share_pct": 0.8,
+    "distinct_ack_ids": 14,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "6AE58",
+    "events": 76,
+    "share_pct": 0.5,
+    "distinct_ack_ids": 63,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "049C3",
+    "events": 28,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 4,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BE8B",
+    "events": 21,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 5,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4D9A4",
+    "events": 13,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "75C63",
+    "events": 13,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4913D",
+    "events": 10,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 8,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {},
+  "b10_b11_top": {
+   "01/00": 14417,
+   "7B/8C": 13,
+   "45/84": 13,
+   "AB/0E": 9,
+   "B0/7E": 8
+  }
+ },
+ "oe3xir": {
+  "ack012_events": 9112,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "F5CE7",
+    "events": 9012,
+    "share_pct": 98.9,
+    "distinct_ack_ids": 1568,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BE8B",
+    "events": 52,
+    "share_pct": 0.6,
+    "distinct_ack_ids": 7,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4913D",
+    "events": 17,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 9,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "350FF",
+    "events": 8,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "EF38E",
+    "events": 5,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "409DA",
+    "events": 5,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "BBDFF",
+    "events": 5,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "F7CC5",
+    "events": 3,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {},
+  "b10_b11_top": {
+   "01/00": 9090,
+   "09/CC": 8,
+   "D6/2C": 5,
+   "B1/00": 4,
+   "29/22": 3
+  }
+ },
+ "oe3xoc": {
+  "ack012_events": 27675,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "F5CE7",
+    "events": 27340,
+    "share_pct": 98.8,
+    "distinct_ack_ids": 3728,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "63CE8",
+    "events": 116,
+    "share_pct": 0.4,
+    "distinct_ack_ids": 13,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BE8B",
+    "events": 51,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 7,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "049C3",
+    "events": 34,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 4,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4913D",
+    "events": 27,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 10,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "EF38E",
+    "events": 14,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 3,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "BBEC3",
+    "events": 14,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "75C63",
+    "events": 13,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {},
+  "b10_b11_top": {
+   "01/00": 27593,
+   "AB/0E": 14,
+   "45/84": 13,
+   "65/06": 10,
+   "B1/00": 9
+  }
+ },
+ "oe3xwj": {
+  "ack012_events": 20166,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "F5CE7",
+    "events": 19946,
+    "share_pct": 98.9,
+    "distinct_ack_ids": 4293,
+    "ping_origin": "OE3XWJ-12>2025"
+   },
+   {
+    "acked_prefix": "63CE8",
+    "events": 75,
+    "share_pct": 0.4,
+    "distinct_ack_ids": 13,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BE8B",
+    "events": 38,
+    "share_pct": 0.2,
+    "distinct_ack_ids": 7,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "4913D",
+    "events": 13,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 7,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "049C3",
+    "events": 13,
+    "share_pct": 0.1,
+    "distinct_ack_ids": 4,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "75C63",
+    "events": 9,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "BBDFF",
+    "events": 8,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 3,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "BBEC3",
+    "events": 8,
+    "share_pct": 0.0,
+    "distinct_ack_ids": 1,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {
+   "F5CE7": "OE3XWJ-12>2025"
+  },
+  "b10_b11_top": {
+   "01/00": 20104,
+   "45/84": 9,
+   "AB/0E": 8,
+   "65/06": 8,
+   "B0/7E": 7
+  }
+ },
+ "db0ais": {
+  "ack012_events": 310,
+  "top_acked_prefix": [
+   {
+    "acked_prefix": "4EBEE",
+    "events": 93,
+    "share_pct": 30.0,
+    "distinct_ack_ids": 33,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "3C605",
+    "events": 43,
+    "share_pct": 13.9,
+    "distinct_ack_ids": 18,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "A64E1",
+    "events": 39,
+    "share_pct": 12.6,
+    "distinct_ack_ids": 18,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "687B4",
+    "events": 34,
+    "share_pct": 11.0,
+    "distinct_ack_ids": 13,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "5DFC7",
+    "events": 21,
+    "share_pct": 6.8,
+    "distinct_ack_ids": 10,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "A3760",
+    "events": 21,
+    "share_pct": 6.8,
+    "distinct_ack_ids": 10,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9BF3C",
+    "events": 17,
+    "share_pct": 5.5,
+    "distinct_ack_ids": 9,
+    "ping_origin": null
+   },
+   {
+    "acked_prefix": "9975D",
+    "events": 12,
+    "share_pct": 3.9,
+    "distinct_ack_ids": 4,
+    "ping_origin": null
+   }
+  ],
+  "ping_origins_seen_in_log": {},
+  "b10_b11_top": {
+   "01/00": 310
+  }
+ }
+}

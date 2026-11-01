@@ -1,0 +1,50 @@
+{
+ "minutes": 1441,
+ "by_rx_per_min": {
+  "0-5": {
+   "minutes": 523,
+   "tx_per_min_mean": 0.84,
+   "writes_per_min_mean": 0.78,
+   "queue_mean": 0.11,
+   "queue_max": 2
+  },
+  "6-10": {
+   "minutes": 808,
+   "tx_per_min_mean": 1.76,
+   "writes_per_min_mean": 1.82,
+   "queue_mean": 0.29,
+   "queue_max": 4
+  },
+  "11-15": {
+   "minutes": 108,
+   "tx_per_min_mean": 2.94,
+   "writes_per_min_mean": 3.15,
+   "queue_mean": 0.6,
+   "queue_max": 7
+  },
+  "16-20": {
+   "minutes": 2,
+   "tx_per_min_mean": 2.5,
+   "writes_per_min_mean": 3.5,
+   "queue_mean": 1.5,
+   "queue_max": 2
+  }
+ },
+ "rx_or_err_gap_s": {
+  "n": 9395,
+  "min": 0.4119999408721924,
+  "p5": 1.0573998928070067,
+  "p50": 6.347999811172485,
+  "p90": 20.029200029373186,
+  "p95": 26.76280002593987,
+  "p99": 41.267119965553285,
+  "max": 80.9980001449585,
+  "mean": 9.196247791368444
+ },
+ "share_gaps_ge_3.30s_pct": 74.3,
+ "share_gaps_ge_4.80s_pct": 63.0,
+ "share_gaps_ge_5.85s_pct": 52.9,
+ "share_gaps_ge_8.00s_pct": 41.0,
+ "share_gaps_ge_15.00s_pct": 17.8,
+ "rx_events_per_min_mean": 6.52
+}

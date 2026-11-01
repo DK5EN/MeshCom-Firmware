@@ -1,0 +1,151 @@
+[
+ {
+  "id": "A3F15113",
+  "src": "auto_pos",
+  "prio": 5,
+  "type": "40",
+  "written": "2026-10-31 18:59:02",
+  "lat_s": 156.7,
+  "events": {
+   "ONRXDONE_TIME": 19,
+   "CRC_ERROR": 10,
+   "RING_STATUS": 5,
+   "TX_GATE_ENTER": 5,
+   "CAD_FREE": 5,
+   "RING_TX_READ": 5
+  },
+  "other_tx_by_prio_during_wait": {
+   "4": 2,
+   "3": 2,
+   "5": 1
+  },
+  "queued_p50_max_during": [
+   7,
+   8
+  ],
+  "rx_ok_during": 19,
+  "gate_attempts": 5,
+  "cad_busy_confirmed": 0,
+  "csma_aged": 0
+ },
+ {
+  "id": "A4029176",
+  "src": "rx_relay",
+  "prio": 5,
+  "type": "40",
+  "written": "2026-10-31 18:59:05",
+  "lat_s": 153.8,
+  "events": {
+   "ONRXDONE_TIME": 19,
+   "CRC_ERROR": 10,
+   "RING_STATUS": 5,
+   "TX_GATE_ENTER": 6,
+   "CAD_FREE": 6,
+   "RING_TX_READ": 6
+  },
+  "other_tx_by_prio_during_wait": {
+   "4": 2,
+   "3": 2,
+   "5": 2
+  },
+  "queued_p50_max_during": [
+   7,
+   8
+  ],
+  "rx_ok_during": 19,
+  "gate_attempts": 6,
+  "cad_busy_confirmed": 0,
+  "csma_aged": 0
+ },
+ {
+  "id": "4B11C313",
+  "src": "rx_relay",
+  "prio": 5,
+  "type": "40",
+  "written": "2026-10-31 18:59:08",
+  "lat_s": 152.9,
+  "events": {
+   "ONRXDONE_TIME": 16,
+   "CRC_ERROR": 10,
+   "RING_STATUS": 5,
+   "TX_GATE_ENTER": 9,
+   "CAD_FREE": 8,
+   "RING_TX_READ": 8,
+   "CAD_BUSY_1": 1,
+   "CAD_BUSY": 1
+  },
+  "other_tx_by_prio_during_wait": {
+   "4": 2,
+   "3": 2,
+   "5": 4
+  },
+  "queued_p50_max_during": [
+   7,
+   8
+  ],
+  "rx_ok_during": 16,
+  "gate_attempts": 9,
+  "cad_busy_confirmed": 1,
+  "csma_aged": 0
+ },
+ {
+  "id": "E9F69234",
+  "src": "rx_relay",
+  "prio": 5,
+  "type": "40",
+  "written": "2026-10-31 18:59:07",
+  "lat_s": 152.6,
+  "events": {
+   "ONRXDONE_TIME": 17,
+   "CRC_ERROR": 10,
+   "RING_STATUS": 5,
+   "TX_GATE_ENTER": 7,
+   "CAD_FREE": 7,
+   "RING_TX_READ": 7
+  },
+  "other_tx_by_prio_during_wait": {
+   "4": 2,
+   "3": 2,
+   "5": 3
+  },
+  "queued_p50_max_during": [
+   7,
+   8
+  ],
+  "rx_ok_during": 17,
+  "gate_attempts": 7,
+  "cad_busy_confirmed": 0,
+  "csma_aged": 0
+ },
+ {
+  "id": "A3F150F9",
+  "src": "auto_pos",
+  "prio": 5,
+  "type": "40",
+  "written": "2026-10-31 15:14:01",
+  "lat_s": 133.0,
+  "events": {
+   "CRC_ERROR": 12,
+   "RING_STATUS": 4,
+   "ONRXDONE_TIME": 10,
+   "TX_GATE_ENTER": 3,
+   "CAD_FREE": 3,
+   "RING_TX_READ": 3,
+   "CAD_BUSY_1": 2,
+   "CAD_FALSE_POSITIVE": 2
+  },
+  "other_tx_by_prio_during_wait": {
+   "4": 1,
+   "3": 1,
+   "5": 1
+  },
+  "queued_p50_max_during": [
+   3,
+   5
+  ],
+  "rx_ok_during": 10,
+  "gate_attempts": 3,
+  "cad_busy_confirmed": 0,
+  "csma_aged": 0
+ }
+]

@@ -1,0 +1,220 @@
+{
+ "_comment": "Numbers measured by the adversarial verifiers (verify/*.md) that the wave-1 results.json files do not carry or carry in v1 form. The overview page reads them from here; each key names its verify row.",
+ "verify_counts": {
+  "q2": {
+   "confirmed": 7,
+   "corrected": 6,
+   "refuted": 0,
+   "file": "verify/q2.md",
+   "topic": "TX-Pool (F2)"
+  },
+  "q34": {
+   "confirmed": 13,
+   "corrected": 10,
+   "refuted": 1,
+   "file": "verify/q34.md",
+   "topic": "Zeitverfall und CSMA-Altersboden (F3, F4)"
+  },
+  "q5": {
+   "confirmed": 13,
+   "corrected": 4,
+   "refuted": 1,
+   "file": "verify/q5.md",
+   "topic": "Zeitsignal {CET} (F5)"
+  },
+  "q6": {
+   "confirmed": 12,
+   "corrected": 5,
+   "refuted": 0,
+   "file": "verify/q6.md",
+   "topic": "Manipulationen (F6)"
+  },
+  "health": {
+   "confirmed": 20,
+   "corrected": 10,
+   "refuted": 0,
+   "file": "verify/health.md",
+   "topic": "Gesundheit, OE3XIA, OE3XIR, DB0AIS"
+  }
+ },
+ "rx_error_share_pct": {
+  "_src": "verify/health.md #18, denominator incl. ACK receptions",
+  "oe3xhl": 7.3,
+  "oe3xia": 32.0,
+  "oe3xir": 25.2,
+  "oe3xoc": 21.9,
+  "oe3xwj": 19.8,
+  "db0ais": 65.8,
+  "threshold_pct": 40
+ },
+ "stale_relays_full_run": {
+  "_src": "verify/q5.md #15 and #16 (full run; the q5 results.json holds the 67-telegram window)",
+  "rows": [
+   {
+    "call": "OE3MIF-12",
+    "stale": 62,
+    "total": 64,
+    "p50_s": 327
+   },
+   {
+    "call": "OE3NRA-1",
+    "stale": 47,
+    "total": 47,
+    "p50_s": 328
+   },
+   {
+    "call": "OE3MTC-10",
+    "stale": 46,
+    "total": 46,
+    "p50_s": 817
+   },
+   {
+    "call": "OE3XDC-12",
+    "stale": 44,
+    "total": 49,
+    "p50_s": 261
+   }
+  ],
+  "four_share_of_stale_pct": 79.6,
+  "four_stale": 199,
+  "all_stale": 250,
+  "gateway_part": 19,
+  "relay_part": 231
+ },
+ "ping": {
+  "_src": "verify/q6.md #4 and #5",
+  "ack_relay_tx": 8727,
+  "ack_relay_air_s": 2735,
+  "ack_relay_tx_pct": 41.3,
+  "ack_relay_air_pct": 20.2,
+  "with_own_pings_tx": 10256,
+  "with_own_pings_tx_pct": 48.5,
+  "with_own_pings_air_s": 3514,
+  "with_own_pings_air_pct": 25.9,
+  "ack_gateway_format_share": "80343 von 80344",
+  "ack_relay_share_of_all_ack_relays_pct": 97.9,
+  "_note": "ACK ids per ping come from extra/oe3xwj_ping.json (per ping event); the verifier's 4.6 grouped by msg_id and pools wrapped ids"
+ },
+ "ack_after_heard": {
+  "_src": "verify/q6.md #10",
+  "hl": 766,
+  "ia": 1144,
+  "ir": 949,
+  "oc": 2494,
+  "air_s_total": 4013,
+  "air_pct": 29.6,
+  "ack_air_s": 1683,
+  "other_air_s": 2330,
+  "ack_relay_tx_total": 8913
+ },
+ "cancel": {
+  "_src": "verify/q6.md #6",
+  "lines": 589,
+  "matched": 587,
+  "relays": 2462,
+  "pct": 23.9
+ },
+ "need_case_a": {
+  "_src": "verify/q6.md #7",
+  "lines": 8327,
+  "oc": 2914
+ },
+ "parallel_pairs": {
+  "_src": "verify/q6.md #12",
+  "hidden_with_hl_pct": 78.5,
+  "hidden_wj_ia_pct": 21.5,
+  "ack_class_min_not_a": 336,
+  "ack_class_n": 1590
+ },
+ "dedup_rerelay": {
+  "_src": "verify/q6.md #15",
+  "n": 5,
+  "wj": 2,
+  "gap_min_lo": 22.2,
+  "gap_min_hi": 25.3
+ },
+ "xia_deaf": {
+  "_src": "verify/health.md #1-#6",
+  "cad_scans_inside": 218,
+  "cad_busy_inside": 161,
+  "tx_heard_by_others": "40 von 57",
+  "max_log_line_gap_s": 4.9,
+  "rx_events_others_lo": 37,
+  "rx_events_others_hi": 582
+ },
+ "ack_wait": {
+  "_src": "verify/q2.md #6 and #7",
+  "ir_p50": 20.9,
+  "ir_p90": 31.7,
+  "ir_max": 60.5,
+  "ir_ge20_pct": 53,
+  "empty_queue_ia": 16.1,
+  "empty_queue_oc": 18.0,
+  "empty_queue_ir": 12.7,
+  "max_s": 64.6
+ },
+ "ring": {
+  "_src": "verify/q2.md #10 and #12",
+  "slope_lo": -0.038,
+  "slope_hi": 0.014,
+  "max_depth_after_write": 16,
+  "supersede_entries_in_chains": 45,
+  "chains": 28,
+  "chains_ia": 14,
+  "chains_oc": 14
+ },
+ "csma_aged": {
+  "_src": "verify/q34.md #19, #20, #23",
+  "prio3_episodes": 38,
+  "prio2_episodes_wj": 62,
+  "double_ack_wj": 4
+ },
+ "q34_model": {
+  "_src": "verify/q34.md #14, #15"
+ },
+ "oe3gjc": {
+  "call": "OE3GJC-12",
+  "hw": "RAK4631",
+  "fw": "4.40a",
+  "role": "Gateway Traiskirchen",
+  "lat": "48.0135 N",
+  "lon": "16.2948 E",
+  "alt_m": 213,
+  "src": "mcmap",
+  "copies": 5,
+  "age_lo_s": 154,
+  "age_hi_s": 356
+ },
+ "rca": {
+  "_src": "verify/rca_own_beacons.md (head_hazard.py, timeline.py, blocker_share.py)",
+  "oc_head_tx_per_min": {
+   "relay_hey": 15.76,
+   "relay_pos": 13.04,
+   "own_hey": 0.44,
+   "own_wx": 0.63
+  },
+  "oc_fired_hold_p50_ms": {
+   "relay": 185,
+   "own_hey": 5535,
+   "own_wx": 4793
+  },
+  "oc_rx_per_min_own_head": 35.41,
+  "oc_wait_p50_s": {
+   "own_hey": 58.9,
+   "relay_hey": 19.7
+  },
+  "oc_own_wx_lost_pct": 69,
+  "oc_relay_pos_lost_pct": 1.1,
+  "pick_blocked_pct_lo": 64,
+  "pick_blocked_pct_hi": 72,
+  "oc_cad_attempts_at_head": 21,
+  "oc_head_time_s": 2924,
+  "ia_cad_busy_failed": "62 von 62",
+  "behind_ack_pct": 70,
+  "ack_fwd_n": 3367,
+  "night_losses": "24 von 26 zwischen 21:44 und 07:24",
+  "case_a_after_s": 8,
+  "case_a_hold_ms": "150-220",
+  "own_hold_ms": 5500
+ }
+}

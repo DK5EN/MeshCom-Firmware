@@ -1,0 +1,538 @@
+{
+ "boots": [
+  "10-30 17:01:11",
+  "10-30 17:01:31"
+ ],
+ "boot_count_ready_markers": 2,
+ "keepalives": 3013,
+ "keepalive_gap_max_s": 30.4,
+ "beats": 2936,
+ "keepalives_without_beat": 77,
+ "pct_without_beat": 2.56,
+ "miss_runs_n": 66,
+ "miss_runs_longest": [
+  {
+   "first_missed_keep": "10-31 02:18:39",
+   "keeps_without_beat": 4,
+   "next_beat_after": "10-31 02:20:40",
+   "silence_s": 121.0,
+   "flap_near": [
+    "10-31 02:20:35 down",
+    "10-31 02:20:37 up"
+   ]
+  },
+  {
+   "first_missed_keep": "10-31 02:14:39",
+   "keeps_without_beat": 3,
+   "next_beat_after": "10-31 02:16:09",
+   "silence_s": 90.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-30 22:15:14",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-30 22:16:14",
+   "silence_s": 60.0,
+   "flap_near": [
+    "10-30 22:14:57 down",
+    "10-30 22:14:58 up"
+   ]
+  },
+  {
+   "first_missed_keep": "10-31 01:36:05",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-31 01:37:05",
+   "silence_s": 60.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-31 01:38:05",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-31 01:39:05",
+   "silence_s": 60.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-31 01:45:36",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-31 01:46:36",
+   "silence_s": 60.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-31 02:05:08",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-31 02:06:08",
+   "silence_s": 60.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-31 02:16:39",
+   "keeps_without_beat": 2,
+   "next_beat_after": "10-31 02:17:39",
+   "silence_s": 60.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-30 17:33:44",
+   "keeps_without_beat": 1,
+   "next_beat_after": "10-30 17:34:14",
+   "silence_s": 30.0,
+   "flap_near": []
+  },
+  {
+   "first_missed_keep": "10-30 22:16:44",
+   "keeps_without_beat": 1,
+   "next_beat_after": "10-30 22:17:14",
+   "silence_s": 30.0,
+   "flap_near": [
+    "10-30 22:14:57 down",
+    "10-30 22:14:58 up"
+   ]
+  }
+ ],
+ "miss_runs_all_n_by_len": {
+  "1": 58,
+  "2": 6,
+  "3": 1,
+  "4": 1
+ },
+ "link_events": [
+  [
+   "10-30 17:01:31",
+   "up"
+  ],
+  [
+   "10-30 22:14:57",
+   "down"
+  ],
+  [
+   "10-30 22:14:58",
+   "up"
+  ],
+  [
+   "10-31 02:20:35",
+   "down"
+  ],
+  [
+   "10-31 02:20:37",
+   "up"
+  ]
+ ],
+ "link_windows": [
+  {
+   "link_down": "10-30 22:14:57",
+   "link_up": "10-30 22:14:58",
+   "down_ms": 1007,
+   "last_beat_before": "10-30 22:14:44",
+   "age_s_at_down": 13.2,
+   "first_beat_after_down": "10-30 22:16:14",
+   "first_beat_after_up_s": 76.0,
+   "keepalive_verdicts": [
+    {
+     "t": "10-30 22:12:44",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:13:14",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:13:44",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:14:14",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:14:44",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:15:14",
+     "beat": false
+    },
+    {
+     "t": "10-30 22:15:44",
+     "beat": false
+    },
+    {
+     "t": "10-30 22:16:14",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:16:44",
+     "beat": false
+    },
+    {
+     "t": "10-30 22:17:14",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:17:44",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:18:14",
+     "beat": true
+    },
+    {
+     "t": "10-30 22:18:44",
+     "beat": true
+    }
+   ],
+   "eth_summaries_near": [
+    {
+     "ms": 18755959,
+     "hb_age_s": 2,
+     "downs": 0,
+     "renews": 0,
+     "rx_n": 805,
+     "tx_fail": 0,
+     "tx_max_ms": 42
+    },
+    {
+     "ms": 18816037,
+     "hb_age_s": 2,
+     "downs": 0,
+     "renews": 0,
+     "rx_n": 807,
+     "tx_fail": 0,
+     "tx_max_ms": 42
+    },
+    {
+     "ms": 18876087,
+     "hb_age_s": 50,
+     "downs": 1,
+     "renews": 0,
+     "rx_n": 808,
+     "tx_fail": 0,
+     "tx_max_ms": 42
+    },
+    {
+     "ms": 18936107,
+     "hb_age_s": 32,
+     "downs": 1,
+     "renews": 0,
+     "rx_n": 810,
+     "tx_fail": 0,
+     "tx_max_ms": 42
+    }
+   ],
+   "udp_not_responding_near": [
+    "10-30 22:15:28",
+    "10-30 22:16:49"
+   ],
+   "ext_tx_in_window": 9,
+   "gwu_in_window": 11
+  },
+  {
+   "link_down": "10-31 02:20:35",
+   "link_up": "10-31 02:20:37",
+   "down_ms": 2016,
+   "last_beat_before": "10-31 02:18:09",
+   "age_s_at_down": 145.6,
+   "first_beat_after_down": "10-31 02:20:40",
+   "first_beat_after_up_s": 2.7,
+   "keepalive_verdicts": [
+    {
+     "t": "10-31 02:18:09",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:18:39",
+     "beat": false
+    },
+    {
+     "t": "10-31 02:19:09",
+     "beat": false
+    },
+    {
+     "t": "10-31 02:19:39",
+     "beat": false
+    },
+    {
+     "t": "10-31 02:20:09",
+     "beat": false
+    },
+    {
+     "t": "10-31 02:20:39",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:21:09",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:21:40",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:22:10",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:22:40",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:23:10",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:23:40",
+     "beat": true
+    },
+    {
+     "t": "10-31 02:24:10",
+     "beat": true
+    }
+   ],
+   "eth_summaries_near": [
+    {
+     "ms": 33468644,
+     "hb_age_s": 49,
+     "downs": 1,
+     "renews": 0,
+     "rx_n": 1311,
+     "tx_fail": 0,
+     "tx_max_ms": 613
+    },
+    {
+     "ms": 33528655,
+     "hb_age_s": 44,
+     "downs": 1,
+     "renews": 0,
+     "rx_n": 1311,
+     "tx_fail": 0,
+     "tx_max_ms": 613
+    },
+    {
+     "ms": 33588723,
+     "hb_age_s": 19,
+     "downs": 2,
+     "renews": 0,
+     "rx_n": 1312,
+     "tx_fail": 0,
+     "tx_max_ms": 613
+    },
+    {
+     "ms": 33648759,
+     "hb_age_s": 19,
+     "downs": 2,
+     "renews": 0,
+     "rx_n": 1314,
+     "tx_fail": 0,
+     "tx_max_ms": 613
+    }
+   ],
+   "udp_not_responding_near": [
+    "10-31 02:18:44",
+    "10-31 02:19:47"
+   ],
+   "ext_tx_in_window": 8,
+   "gwu_in_window": 13
+  }
+ ],
+ "udp_not_responding_n": 67,
+ "hourly": {
+  "10-30 17": {
+   "keepalives": 118,
+   "no_beat": 1
+  },
+  "10-30 18": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-30 19": {
+   "keepalives": 119,
+   "no_beat": 0
+  },
+  "10-30 20": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-30 21": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-30 22": {
+   "keepalives": 120,
+   "no_beat": 7
+  },
+  "10-30 23": {
+   "keepalives": 120,
+   "no_beat": 10
+  },
+  "10-31 00": {
+   "keepalives": 119,
+   "no_beat": 11
+  },
+  "10-31 01": {
+   "keepalives": 120,
+   "no_beat": 23
+  },
+  "10-31 02": {
+   "keepalives": 120,
+   "no_beat": 20
+  },
+  "10-31 03": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 04": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 05": {
+   "keepalives": 119,
+   "no_beat": 0
+  },
+  "10-31 06": {
+   "keepalives": 120,
+   "no_beat": 1
+  },
+  "10-31 07": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 08": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 09": {
+   "keepalives": 120,
+   "no_beat": 2
+  },
+  "10-31 10": {
+   "keepalives": 119,
+   "no_beat": 0
+  },
+  "10-31 11": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 12": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 13": {
+   "keepalives": 120,
+   "no_beat": 1
+  },
+  "10-31 14": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 15": {
+   "keepalives": 119,
+   "no_beat": 0
+  },
+  "10-31 16": {
+   "keepalives": 120,
+   "no_beat": 1
+  },
+  "10-31 17": {
+   "keepalives": 120,
+   "no_beat": 0
+  },
+  "10-31 18": {
+   "keepalives": 20,
+   "no_beat": 0
+  }
+ },
+ "ext_tx_n": 1878,
+ "ext_tx_largest_gaps_s": [
+  [
+   277.758,
+   "10-31 17:11:21"
+  ],
+  [
+   289.15,
+   "10-31 08:48:59"
+  ],
+  [
+   306.076,
+   "10-31 13:13:05"
+  ],
+  [
+   398.358,
+   "10-31 10:58:25"
+  ],
+  [
+   420.687,
+   "10-31 17:33:41"
+  ]
+ ],
+ "gwu_n": 2135,
+ "gwi_n": 356,
+ "gwu_largest_gaps_s": [
+  [
+   285.873,
+   "10-30 22:30:09"
+  ],
+  [
+   318.312,
+   "10-30 18:14:02"
+  ],
+  [
+   318.407,
+   "10-30 18:29:01"
+  ],
+  [
+   376.237,
+   "10-31 03:41:20"
+  ],
+  [
+   552.206,
+   "10-30 19:35:05"
+  ]
+ ],
+ "ntp_timeouts": [
+  "10-30 22:16:32",
+  "10-30 22:31:25"
+ ],
+ "stalls": [
+  [
+   "10-30 17:01:11",
+   "hw_init",
+   199
+  ],
+  [
+   "10-30 17:01:26",
+   "dhcp_begin",
+   4171
+  ],
+  [
+   "10-31 01:01:32",
+   "ntp",
+   202
+  ],
+  [
+   "10-31 01:16:29",
+   "ntp",
+   404
+  ],
+  [
+   "10-31 01:31:34",
+   "udp_tx",
+   613
+  ]
+ ],
+ "other_eth_events": [
+  [
+   "10-30 17:01:11",
+   "[ETH];event;rng_seed;src;sd"
+  ],
+  [
+   "10-30 17:01:31",
+   "[ETH];event;got_ip;44.149.189.136;ms;20113"
+  ]
+ ],
+ "hb_age_gt35_summaries": 34,
+ "eth_summaries": 1508,
+ "cet_rx": 145,
+ "tx_fail_final": 0,
+ "tx_max_ms_final": 613
+}

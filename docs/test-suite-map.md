@@ -74,6 +74,9 @@ policy timer, reinstall guard, millis-wrap latch) and `test_fw_update_assets`
 fixtures); `tools/tests/test_flash_map.py` (14 cases). `test_fw_update_http` (AU-04: chunked transfer
 decoder of the download, split at every byte, malformed sizes, sink refusal);
 `tools/tests/test_make_autoupdate.py` (13 cases, release `.autoupdate` assets incl. env name length).
+`tools/tests/test_logreport_*.py` (22 cases, LOGREP-01: the `tools/logreport/` runner incl. the render-only
+regression, txpool/decay, timesignal/manipulations/health on fixture logs, and the HB9/ESP32 set incl. the
+ACK-aware RX counting regression).
 `test_command_setters` also holds `test_dio_bootloader_blocks_safeboot` (AU-16: source pin, DIO bootloader
 refuses the Safeboot handover with `bootloader_dio`; fails on the pre-fix `command_functions.cpp`).
 `tools/tests/test_nimble_patch.py` (5 cases, AU-19: the build-time NimBLE `ble_hs_timer_reset()` patch of

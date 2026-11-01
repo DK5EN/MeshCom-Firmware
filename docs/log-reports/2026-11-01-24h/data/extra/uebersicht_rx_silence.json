@@ -1,0 +1,58 @@
+{
+ "oe3xhl": {
+  "span_s": 90118.6,
+  "receptions": 23539,
+  "silences_gt_300s": 0,
+  "silent_s": 0,
+  "silent_pct_of_span": 0.0,
+  "longest_gap_s": 67.6,
+  "longest_gap_start": "2026-10-31 23:31:45"
+ },
+ "oe3xia": {
+  "span_s": 89803.0,
+  "receptions": 34622,
+  "silences_gt_300s": 35,
+  "silent_s": 15619.9,
+  "silent_pct_of_span": 17.4,
+  "longest_gap_s": 1023.8,
+  "longest_gap_start": "2026-10-31 11:49:01",
+  "first_silence_start": "2026-10-31 08:26:28",
+  "util_samples_inside": 1511,
+  "util_samples_inside_rx0": 1511,
+  "cad_scans_inside": 218,
+  "ends_with_cad_before": 30,
+  "other_rx_with_cad_before_pct": 20.6
+ },
+ "oe3xir": {
+  "span_s": 41364.9,
+  "receptions": 19058,
+  "silences_gt_300s": 0,
+  "silent_s": 0,
+  "silent_pct_of_span": 0.0,
+  "longest_gap_s": 53.5,
+  "longest_gap_start": "2026-10-31 11:33:22"
+ },
+ "oe3xoc": {
+  "span_s": 91262.5,
+  "receptions": 55962,
+  "silences_gt_300s": 0,
+  "silent_s": 0,
+  "silent_pct_of_span": 0.0,
+  "longest_gap_s": 87.7,
+  "longest_gap_start": "2026-10-31 17:51:33"
+ },
+ "oe3xwj": {
+  "span_s": 91829.4,
+  "receptions": 38794,
+  "silences_gt_300s": 0,
+  "silent_s": 0,
+  "silent_pct_of_span": 0.0,
+  "longest_gap_s": 153.2,
+  "longest_gap_start": "2026-10-31 17:03:38"
+ },
+ "_meta": {
+  "threshold_s": 300.0,
+  "reception": "ONRXDONE_TIME or RX_ERROR line (ACK receptions included)",
+  "source": "norm logs, generators/lib/uebersicht_rx_silence.py"
+ }
+}

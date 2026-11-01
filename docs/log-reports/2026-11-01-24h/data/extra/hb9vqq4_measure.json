@@ -1,0 +1,618 @@
+{
+ "generated_by": "generators/lib/hb9vqq4_measure.py",
+ "capture": {
+  "hb9vqq4": [
+   "2026-10-31 09:39:56",
+   "2026-11-01 09:39:56"
+  ],
+  "hb9vqq5": [
+   "2026-10-31 10:03:15",
+   "2026-11-01 10:03:16"
+  ]
+ },
+ "nodes": {
+  "hb9vqq4": {
+   "fate": {
+    "writes": 3010,
+    "fates": {
+     "aired": 2577,
+     "superseded": 50,
+     "vanished": 383
+    },
+    "by_src": {
+     "auto_pos": {
+      "aired": 96,
+      "superseded": 1,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_ack_fwd": {
+      "aired": 22,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_dm_ack_gw": {
+      "aired": 5,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_dm_ack_new": {
+      "aired": 5,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_relay": {
+      "aired": 2143,
+      "superseded": 49,
+      "vanished": 383,
+      "pending": 0
+     },
+     "udp_rx": {
+      "aired": 253,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "user_msg": {
+      "aired": 6,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "user_wx": {
+      "aired": 47,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     }
+    },
+    "relay_writes": 2575,
+    "relay_fates": {
+     "aired": 2143,
+     "superseded": 49,
+     "vanished": 383
+    },
+    "vanished_by_prio": {
+     "5": 280,
+     "4": 93,
+     "3": 10
+    },
+    "vanished_with_foreign_copy": 383,
+    "vanished_total": 383,
+    "aired_relays": 2143,
+    "aired_relays_with_foreign_copy": 780,
+    "first_foreign_copy_s": {
+     "n": 383,
+     "p50": 6.8,
+     "p90": 23.4,
+     "max": 63.2
+    },
+    "inject_aired": 253,
+    "inject_aired_with_foreign_copy": 170,
+    "inject_aired_airtime_s": 193.3,
+    "inject_vanished": 0,
+    "vanished_airtime_s": 357.2,
+    "aired_airtime_foreign_s": 708.6,
+    "tx_airtime_s_distinct_ids": 2058.6,
+    "hourly_vanished": [
+     26,
+     24,
+     8,
+     2,
+     1,
+     3,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     14,
+     14,
+     19,
+     9,
+     24,
+     38,
+     49,
+     54,
+     42,
+     30,
+     26
+    ],
+    "hourly_aired_with_foreign_copy": [
+     45,
+     54,
+     52,
+     44,
+     38,
+     41,
+     34,
+     35,
+     34,
+     26,
+     15,
+     42,
+     29,
+     23,
+     30,
+     26,
+     34,
+     20,
+     22,
+     23,
+     30,
+     28,
+     32,
+     23
+    ],
+    "hourly_relay_writes": [
+     118,
+     117,
+     102,
+     107,
+     115,
+     113,
+     114,
+     109,
+     107,
+     108,
+     79,
+     106,
+     104,
+     100,
+     101,
+     103,
+     97,
+     112,
+     105,
+     108,
+     109,
+     115,
+     116,
+     110
+    ],
+    "hey_wait_s": {
+     "own": {
+      "n": 96,
+      "p50": 20.9,
+      "p90": 70.8,
+      "max": 166.5
+     },
+     "relay": {
+      "n": 1404,
+      "p50": 9.7,
+      "p90": 58.7,
+      "max": 158.9
+     },
+     "ratio_p50": 2.15
+    }
+   },
+   "stale_cet": {
+    "cet_frames_decoded": 1098,
+    "stale_frames": 46,
+    "stale_distinct_ids": 46,
+    "stale_ids": [
+     "6ADB5B9B",
+     "6ADB5BA5",
+     "6ADB5BCD",
+     "6ADB5BE4",
+     "6AE58942",
+     "6AE58954",
+     "6AE58955",
+     "6AE58959",
+     "6AE58960",
+     "6AE58964",
+     "6AE5896F",
+     "6AE58971",
+     "6AE58975",
+     "6AE5897B",
+     "6AE5897D",
+     "6AE58982",
+     "6AE58985",
+     "6AE5898E",
+     "6AE5898F",
+     "6AE58991",
+     "6AE58992",
+     "6AE58997",
+     "6AE58998",
+     "6AE5899F",
+     "6AE589A1",
+     "6AE589A4",
+     "6AE589A7",
+     "6AE589A8",
+     "6AE589AA",
+     "6AE589AC",
+     "6AE589AF",
+     "6AE589B2",
+     "6AE589B4",
+     "6AE589B7",
+     "6AE589BA",
+     "6AE589BB",
+     "6AE589BD",
+     "6AE589BE",
+     "6AE589C0",
+     "6AE589C3",
+     "6AE589C4",
+     "6AE589C5",
+     "6AE589C6",
+     "6AE589CC",
+     "6AE589D0",
+     "6AE589D5"
+    ],
+    "stale_last_hop": {
+     "HB9HNO-49": 46
+    },
+    "stale_age_s": {
+     "min": 975,
+     "p50": 1510,
+     "max": 1992
+    },
+    "stale_accepted_new": 1,
+    "stale_accepted_new_detail": [
+     {
+      "time": "2026-11-01 06:22:57",
+      "id": "6ADB5BE4",
+      "path": "OE1XAR-63,DO1FE-19,HB9VQQ-5,HB9HNO-49",
+      "age_s": 1492,
+      "hop": "H00"
+     }
+    ],
+    "own_cet_tx": 207,
+    "own_cet_tx_age_max_logger_s": 58,
+    "own_cet_tx_over_150": 0,
+    "own_cet_tx_node_age_max_s": 56,
+    "own_cet_tx_node_lines": 207
+   },
+   "hno_late_at_node": {
+    "accepted_new_by_type": {
+     "Position": 1,
+     "Text": 1
+    },
+    "accepted_new_total": 2,
+    "relayed_by_type": {},
+    "relayed_total": 0
+   },
+   "hno_frames": {
+    "frames": 448,
+    "frames_over_300s_after_first_copy": 392
+   },
+   "markers": {
+    "trickle_send": 97,
+    "trickle_send_consistent_ge_k": 71,
+    "supersede_keep": 3,
+    "rly_q_full": 3,
+    "rly_q_full_directly_after_supersede_keep_same_id": 3,
+    "tx_udp_lines": 3166
+   },
+   "radio": {
+    "lek_frames": 839,
+    "lek_median_abs_ferr_hz": 4525,
+    "lek_share_over_3000hz_pct": 100.0,
+    "other_neighbours_ge40_frames": 13,
+    "other_neighbours_max_median_ferr_hz": 2260,
+    "other_neighbours_max_median_ferr_call": "HB9WAD-51",
+    "crc_errors": 1903,
+    "crc_ferr_4000_5000": 371,
+    "crc_ferr_over_3000": 380,
+    "stale_irq_total": 449,
+    "stale_irq_over_m80": 153,
+    "stale_irq_m72_m71": 142,
+    "stale_irq_over_m80_pre": 152
+   }
+  },
+  "hb9vqq5": {
+   "fate": {
+    "writes": 2224,
+    "fates": {
+     "aired": 2175,
+     "vanished": 21,
+     "superseded": 28
+    },
+    "by_src": {
+     "auto_pos": {
+      "aired": 118,
+      "superseded": 1,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_ack_fwd": {
+      "aired": 8,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_dm_ack_gw": {
+      "aired": 7,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_dm_ack_new": {
+      "aired": 7,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "rx_relay": {
+      "aired": 1735,
+      "superseded": 23,
+      "vanished": 20,
+      "pending": 0
+     },
+     "udp_rx": {
+      "aired": 248,
+      "superseded": 4,
+      "vanished": 1,
+      "pending": 0
+     },
+     "user_msg": {
+      "aired": 4,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     },
+     "user_wx": {
+      "aired": 48,
+      "superseded": 0,
+      "vanished": 0,
+      "pending": 0
+     }
+    },
+    "relay_writes": 1778,
+    "relay_fates": {
+     "aired": 1735,
+     "vanished": 20,
+     "superseded": 23
+    },
+    "vanished_by_prio": {
+     "5": 18,
+     "3": 1,
+     "4": 2
+    },
+    "vanished_with_foreign_copy": 19,
+    "vanished_total": 21,
+    "aired_relays": 1735,
+    "aired_relays_with_foreign_copy": 173,
+    "first_foreign_copy_s": {
+     "n": 19,
+     "p50": 11.1,
+     "p90": 32.3,
+     "max": 35.0
+    },
+    "inject_aired": 248,
+    "inject_aired_with_foreign_copy": 122,
+    "inject_aired_airtime_s": 193.0,
+    "inject_vanished": 1,
+    "vanished_airtime_s": 18.6,
+    "aired_airtime_foreign_s": 152.1,
+    "tx_airtime_s_distinct_ids": 1761.1,
+    "hourly_vanished": [
+     0,
+     0,
+     1,
+     3,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     1,
+     3,
+     4,
+     2,
+     1,
+     2,
+     0,
+     0,
+     0,
+     0,
+     2,
+     1,
+     1
+    ],
+    "hourly_aired_with_foreign_copy": [
+     8,
+     5,
+     5,
+     11,
+     5,
+     12,
+     6,
+     9,
+     7,
+     9,
+     6,
+     7,
+     10,
+     3,
+     9,
+     7,
+     6,
+     9,
+     12,
+     4,
+     8,
+     8,
+     4,
+     3
+    ],
+    "hourly_relay_writes": [
+     74,
+     82,
+     85,
+     87,
+     93,
+     93,
+     92,
+     73,
+     80,
+     74,
+     69,
+     71,
+     66,
+     66,
+     73,
+     61,
+     73,
+     59,
+     74,
+     63,
+     53,
+     73,
+     80,
+     64
+    ],
+    "hey_wait_s": {
+     "own": {
+      "n": 118,
+      "p50": 12.8,
+      "p90": 49.5,
+      "max": 156.7
+     },
+     "relay": {
+      "n": 1202,
+      "p50": 8.7,
+      "p90": 16.1,
+      "max": 153.8
+     },
+     "ratio_p50": 1.47
+    }
+   },
+   "stale_cet": {
+    "cet_frames_decoded": 482,
+    "stale_frames": 50,
+    "stale_distinct_ids": 50,
+    "stale_ids": [
+     "6ADB5B6C",
+     "6ADB5B96",
+     "6ADB5B9B",
+     "6ADB5BA5",
+     "6ADB5BCD",
+     "6ADB5BE4",
+     "6AE58953",
+     "6AE58954",
+     "6AE58955",
+     "6AE58959",
+     "6AE58960",
+     "6AE58964",
+     "6AE58966",
+     "6AE5896C",
+     "6AE58971",
+     "6AE58975",
+     "6AE58977",
+     "6AE5897B",
+     "6AE5897D",
+     "6AE58982",
+     "6AE58985",
+     "6AE5898E",
+     "6AE5898F",
+     "6AE58991",
+     "6AE58992",
+     "6AE58997",
+     "6AE58998",
+     "6AE5899F",
+     "6AE589A1",
+     "6AE589A4",
+     "6AE589A7",
+     "6AE589A8",
+     "6AE589AA",
+     "6AE589AF",
+     "6AE589B2",
+     "6AE589B4",
+     "6AE589B7",
+     "6AE589BA",
+     "6AE589BB",
+     "6AE589BD",
+     "6AE589BE",
+     "6AE589C0",
+     "6AE589C3",
+     "6AE589C4",
+     "6AE589C5",
+     "6AE589C6",
+     "6AE589C7",
+     "6AE589CC",
+     "6AE589D0",
+     "6AE589D5"
+    ],
+    "stale_last_hop": {
+     "HB9HNO-49": 50
+    },
+    "stale_age_s": {
+     "min": 975,
+     "p50": 1511,
+     "max": 1992
+    },
+    "stale_accepted_new": 0,
+    "stale_accepted_new_detail": [],
+    "own_cet_tx": 219,
+    "own_cet_tx_age_max_logger_s": 42,
+    "own_cet_tx_over_150": 0,
+    "own_cet_tx_node_age_max_s": 40,
+    "own_cet_tx_node_lines": 219
+   },
+   "hno_late_at_node": {
+    "accepted_new_by_type": {
+     "Position": 11,
+     "HEY": 21
+    },
+    "accepted_new_total": 32,
+    "relayed_by_type": {
+     "Position": 2,
+     "HEY": 12
+    },
+    "relayed_total": 14
+   },
+   "hno_frames": {
+    "frames": 495,
+    "frames_over_300s_after_first_copy": 395
+   }
+  }
+ },
+ "stale_union_distinct_ids": 53,
+ "pair": {
+  "ids_aired_by_at_least_one": 2579,
+  "pairs": 1937,
+  "distinct_ids_in_pairs": 1846,
+  "relay_relay_pairs": 1392,
+  "inject_inject_pairs": 220,
+  "classes": {
+   "rx_relay/rx_relay": 1392,
+   "udp_rx/udp_rx": 220,
+   "rx_relay/auto_pos": 97,
+   "auto_pos/rx_relay": 92,
+   "user_wx/rx_relay": 43,
+   "rx_relay/user_wx": 36,
+   "rx_relay/udp_rx": 17,
+   "udp_rx/rx_relay": 13
+  },
+  "later_copy_airtime_s": 1733.7,
+  "both_nodes_tx_airtime_s": 4119.4,
+  "later_copy_share_pct": 42.1,
+  "gap_p50_s": 9.3,
+  "first_is_hb9vqq4_pairs": 1308
+ },
+ "cet_pair": {
+  "pairs": 172,
+  "later_node_had_heard_earlier_copy": 129,
+  "later_copy_airtime_s": 128.5
+ },
+ "mutual": {
+  "window_s": 3.5,
+  "hb9vqq5_decodes_hb9vqq4": {
+   "hit": 2290,
+   "of": 2487,
+   "pct": 92.1
+  },
+  "hb9vqq4_decodes_hb9vqq5": {
+   "hit": 1382,
+   "of": 2128,
+   "pct": 64.9
+  }
+ }
+}

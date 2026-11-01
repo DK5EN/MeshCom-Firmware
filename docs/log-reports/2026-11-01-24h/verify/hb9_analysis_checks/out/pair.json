@@ -1,0 +1,73 @@
+{
+ "writes_4": 3010,
+ "writes_5": 2224,
+ "ids_written_by_both": 2080,
+ "fate_matrix": {
+  "4:aired|5:aired": 1929,
+  "4:vanished|5:aired": 94,
+  "4:superseded|5:aired": 26,
+  "4:aired|5:vanished": 19,
+  "4:aired|5:superseded": 8,
+  "4:superseded|5:superseded": 3,
+  "4:vanished|5:vanished": 1
+ },
+ "both_aired_n": 1929,
+ "both_aired_gap_s": {
+  "n": 1929,
+  "min": 0.006999969482421875,
+  "p5": 1.7073999404907227,
+  "p50": 9.293999910354614,
+  "p90": 30.06140003204346,
+  "p95": 53.61560006141662,
+  "p99": 85.35227997779847,
+  "max": 1610.1929998397827,
+  "mean": 17.486434942456093
+ },
+ "both_aired_gap_le_30s": 1735,
+ "both_aired_first_is_4": 1301,
+ "both_aired_by_src_prio": {
+  "udp_rx/p3": 234,
+  "rx_relay/p4": 324,
+  "rx_relay/p5": 1112,
+  "rx_relay/p3": 109,
+  "auto_pos/p5": 92,
+  "user_wx/p4": 43,
+  "rx_ack_fwd/p1": 9,
+  "user_msg/p2": 4,
+  "rx_dm_ack_gw/p1": 2
+ },
+ "both_aired_by_type": {
+  "3A": 347,
+  "21": 367,
+  "40": 1204,
+  "41": 11
+ },
+ "write_delta_5_minus_4_s": {
+  "n": 2080,
+  "min": -172.7519998550415,
+  "p5": -22.168699979782104,
+  "p50": 4.426500082015991,
+  "p90": 35.75160012245178,
+  "p95": 61.148749971389755,
+  "p99": 1312.7948199605955,
+  "max": 1747.6909999847412,
+  "mean": 23.389210578455376
+ },
+ "relay_pairs": 1511,
+ "relay_pairs_fate": {
+  "4:aired|5:aired": 1392,
+  "4:vanished|5:aired": 69,
+  "4:superseded|5:aired": 24,
+  "4:aired|5:vanished": 18,
+  "4:aired|5:superseded": 4,
+  "4:superseded|5:superseded": 3,
+  "4:vanished|5:vanished": 1
+ },
+ "relay_both_aired_n": 1392,
+ "relay_both_aired_share_of_pairs_pct": 92.1,
+ "relay_both_aired_by_prio": {
+  "4": 288,
+  "5": 1015,
+  "3": 89
+ }
+}

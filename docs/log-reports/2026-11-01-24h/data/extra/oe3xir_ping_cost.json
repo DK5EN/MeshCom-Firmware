@@ -1,0 +1,48 @@
+{
+ "ping_gate_entries_per_read": {
+  "n": 689,
+  "sum": 1748,
+  "mean": 2.54,
+  "p50": 2,
+  "p90": 5,
+  "max": 15
+ },
+ "tx_gate_entries_per_read": {
+  "n": 2598,
+  "sum": 6125,
+  "mean": 2.36,
+  "p50": 2,
+  "p90": 5,
+  "max": 24
+ },
+ "gate_entries_total": 7873,
+ "ping_share_of_gate_entries_pct": 22.2,
+ "ping_lat_ms_p50": 14338,
+ "ping_lat_ms_max": 50182,
+ "ping_first": "2026-10-31 06:47:33.947",
+ "ping_last": "2026-10-31 18:15:37.833",
+ "counts": {
+  "ping_errors": 689,
+  "cad_free_no_tx": 689,
+  "tx_frame": 3287,
+  "tx_start": 2598,
+  "ack_frames": 9112,
+  "ack_frames_f5ce7": 9012,
+  "rx_error_strong": 323,
+  "rx_error": 4800,
+  "rx_decoded_incl_ack": 14258
+ },
+ "ack_wait_s": {
+  "n": 1421,
+  "p50": 20.9,
+  "p90": 31.7,
+  "max": 60.5,
+  "share_ge_20s_pct": 52.9
+ },
+ "rx_error_share_incl_ack_pct": 25.2,
+ "rx_longest_silence_s": 83.9,
+ "rx_longest_silence_at": "2026-10-31 11:55:16",
+ "dedup_window_min": 19.1,
+ "cet_tx_wait_ms_max": 147865,
+ "cet_tx_age_s_max_node": 147
+}

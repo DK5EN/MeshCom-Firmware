@@ -1,0 +1,23 @@
+{
+ "rx_dedup_add": 7178,
+ "span_min": 1530.5,
+ "dedup_slots": 100,
+ "dedup_window_min": 21.3,
+ "long_gap_relays": [
+  {
+   "id": "4DCC80B6",
+   "type": ":",
+   "first": "2026-10-31 13:10:43.449",
+   "again": "2026-10-31 13:32:55.279",
+   "gap_s": 1332
+  },
+  {
+   "id": "BBC85361",
+   "type": ":",
+   "first": "2026-10-31 17:29:18.307",
+   "again": "2026-10-31 17:52:42.226",
+   "gap_s": 1404
+  }
+ ],
+ "all_exceed_window": true
+}

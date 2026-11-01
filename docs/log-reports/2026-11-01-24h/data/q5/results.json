@@ -1,0 +1,3851 @@
+{
+ "nodes": {
+  "oe3xhl": {
+   "window_utc": [
+    1793425880.392,
+    1793515368.137
+   ],
+   "expected_in_window": 148,
+   "udp_got": 146,
+   "udp_missed": 2,
+   "udp_missed_ids_heard_on_rf": 2,
+   "not_heard_at_all": 0,
+   "rf_valid_frames": 681,
+   "rf_fcs0000_frames": 0,
+   "udp_arrival_gap_s": {
+    "n": 145,
+    "min": 603.9,
+    "p50": 607.0,
+    "p90": 607.4,
+    "p99": 976.4,
+    "max": 1214.8
+   },
+   "udp_arrival_gaps_gt_900s": [
+    1215,
+    1214
+   ],
+   "udp_lag_behind_first_gateway_s": {
+    "n": 146,
+    "min": 0.0,
+    "p50": 0.046,
+    "p90": 0.094,
+    "p99": 0.184,
+    "max": 0.496
+   },
+   "rf_copies_per_id": {
+    "n": 148,
+    "min": 1,
+    "p50": 5.0,
+    "p90": 6.0,
+    "p99": 7.5,
+    "max": 8
+   },
+   "rf_copies_per_id_mean": 4.6,
+   "rf_distinct_paths_per_id": {
+    "n": 148,
+    "min": 1,
+    "p50": 5.0,
+    "p90": 6.0,
+    "p99": 7.5,
+    "max": 8
+   },
+   "rf_distinct_lasthop_per_id": {
+    "n": 148,
+    "min": 1,
+    "p50": 5.0,
+    "p90": 6.0,
+    "p99": 7.5,
+    "max": 8
+   },
+   "rf_path_len_dist": {
+    "1": 339,
+    "2": 325,
+    "3": 17
+   },
+   "rf_H_dist": {
+    "0": 17,
+    "1": 325,
+    "2": 339
+   },
+   "rf_dup_flag": {
+    "d": 679,
+    "n": 2
+   },
+   "rf_own_in_path": {
+    "e": 183,
+    "-": 498
+   },
+   "rf_rssi_snr_pathlen1": {
+    "rssi_p50": -113
+   },
+   "rf_age_s": {
+    "n": 681,
+    "min": 1.2,
+    "p50": 17.7,
+    "p90": 56.3,
+    "p99": 132.8,
+    "max": 355.7
+   },
+   "rf_age_gt150_n": 6,
+   "rf_age_gt150_pct": 0.88,
+   "rf_age_gt600_n": 0,
+   "rf_stale_lasthop_top": [
+    [
+     "OE3GJC-12",
+     5
+    ],
+    [
+     "OE3HUS-01",
+     1
+    ]
+   ],
+   "rf_age_neg_n": 0,
+   "tx_count": 148,
+   "tx_src_dist": {
+    "g": 146,
+    "r": 2
+   },
+   "tx_prio_dist": {
+    "3": 148
+   },
+   "tx_wait_ms": {
+    "n": 148,
+    "min": 207,
+    "p50": 8069.0,
+    "p90": 11691.0,
+    "p99": 22771.0,
+    "max": 24467
+   },
+   "tx_wait_ms_gateway_src": {
+    "n": 146,
+    "min": 207,
+    "p50": 8120.0,
+    "p90": 11754.0,
+    "p99": 22812.0,
+    "max": 24467
+   },
+   "tx_q_after_pick": {
+    "n": 148,
+    "min": 1,
+    "p50": 1.0,
+    "p90": 2.0,
+    "p99": 4.0,
+    "max": 5
+   },
+   "tx_cad_attempts": {
+    "0": 112,
+    "3": 4,
+    "2": 4,
+    "1": 27,
+    "8": 1
+   },
+   "tx_airtime_ms_measured": {
+    "n": 148,
+    "min": 700,
+    "p50": 734.0,
+    "p90": 735.0,
+    "p99": 760.0,
+    "max": 783
+   },
+   "tx_age_s_logger_based": {
+    "n": 148,
+    "min": 0.6,
+    "p50": 8.8,
+    "p90": 12.6,
+    "p99": 23.3,
+    "max": 25.5
+   },
+   "tx_age_s_node_based": {
+    "n": 24,
+    "min": 0,
+    "p50": 8.0,
+    "p90": 15.0,
+    "p99": 22.0,
+    "max": 24
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 0,
+   "tx_age_gt100_n": 0,
+   "tx_trusted_flag": {
+    "1": 148
+   },
+   "tx_after_overheard_any_rf_copy_n": 69,
+   "tx_after_overheard_gateway_radiation_n": 69,
+   "tx_after_overheard_pct": 46.6,
+   "tx_after_overheard_lead_s": {
+    "n": 69,
+    "min": 0.3,
+    "p50": 6.5,
+    "p90": 10.5,
+    "p99": 21.0,
+    "max": 21.2
+   },
+   "cet_lines": {
+    "gw_rx": 146,
+    "tx": 148,
+    "rx": 2
+   },
+   "gw_rx_age_s_node_based": {
+    "n": 146,
+    "min": -1,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 2.0,
+    "max": 3
+   },
+   "gw_rx_age_dist": {
+    "-1": 64,
+    "0": 75,
+    "1": 3,
+    "2": 3,
+    "3": 1
+   },
+   "cet_drop_lines": [],
+   "cet_rx_lines": [
+    [
+     "2",
+     "2",
+     "2"
+    ],
+    [
+     "9",
+     "2",
+     "2"
+    ]
+   ],
+   "ring_drop_stale_cet": 0,
+   "ring_marker_counts": {
+    "RX_DEDUP_DUP": 681,
+    "RX_DEDUP_NEW": 148,
+    "RING_WRITE": 148,
+    "[NBR]|NEED": 148,
+    "RX_DEDUP_ADD": 148,
+    "RING_TX_READ": 148,
+    "[LOG] GWI": 146,
+    "[NBR]|SYM": 118,
+    "[NBR]|REFUSE": 68,
+    "[LOG] RLY": 2
+   },
+   "queue_depth_at_cet_enqueue": {
+    "n": 148,
+    "min": 0,
+    "p50": 1.0,
+    "p90": 2.0,
+    "p99": 3.0,
+    "max": 5
+   },
+   "cet_slot_seconds_per_hour": 46.4,
+   "ring_supersede_cet": 0,
+   "hours": 24.86,
+   "cet_rx_airtime_s_per_h": 20.5,
+   "cet_tx_airtime_s_per_h": 4.3,
+   "stat_rx_s_per_h": 553.7,
+   "stat_tx_s_per_h": 108.4,
+   "stat_util_median_pct": 18,
+   "cet_share_of_stat_rx_pct": 3.71,
+   "cet_share_of_stat_tx_pct": 3.98,
+   "cet_share_of_stat_rxtx_pct": 3.75,
+   "stat_windows": 299,
+   "stat_txn_total": 4353,
+   "cet_share_of_tx_count_pct": 3.4,
+   "cet_rf_frames_per_h": 27.4,
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    0,
+    3
+   ],
+   "stat_ringmax_p50_p90_max": [
+    3.0,
+    5.0,
+    8
+   ],
+   "clock": {
+    "log_lines": 34640,
+    "hour_buckets": {
+     "0": 34640
+    },
+    "dominant_offset_h": 0,
+    "resid_s": {
+     "min": 0.12,
+     "p5": 0.47,
+     "median": 1.19,
+     "p95": 1.88,
+     "max": 2.23
+    },
+    "ntp_ok": 100,
+    "ntp_vs_logger_s": {
+     "min": -1.11,
+     "median": -0.62,
+     "max": -0.1
+    },
+    "ntp_rtt_ms": {
+     "median": 105.0
+    },
+    "timeclient_vs_logger_s": null,
+    "hourly_median_resid_s_sample": {
+     "10-31 05": 1.47,
+     "10-31 06": 1.6,
+     "10-31 07": 0.79,
+     "10-31 08": 0.9
+    },
+    "hourly_resid_median_range_s": [
+     0.79,
+     1.6
+    ],
+    "offset_hour_transitions": [],
+    "offset_hour_transition_count": 0
+   },
+   "rawpass": {
+    "node": "oe3xhl",
+    "rx_decoded_frames": 21838,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 13143.0,
+    "rx_cet_airtime_s": 510.8,
+    "rx_cet_share_of_decoded_airtime_pct": 3.89,
+    "rx_airtime_by_type_s": {
+     "@": 6190.3,
+     "A": 2856.0,
+     "!": 2575.3,
+     ":": 1516.7,
+     ".": 3.8,
+     "I": 1.0
+    },
+    "rx_frames_by_type": {
+     "A": 10179,
+     "@": 7500,
+     "!": 2390,
+     ":": 1757,
+     ".": 11,
+     "I": 1
+    },
+    "ntp_ok": 100,
+    "ntp_timeout": 7,
+    "ntp_rtt_ms": {
+     "n": 100,
+     "p50": 105.0,
+     "p90": 106.0,
+     "max": 168
+    },
+    "tx_total": 4375,
+    "tx_airtime_s_all": 2570.8,
+    "tx_airtime_s_cet": 107.1,
+    "tx_cet_share_airtime_pct": 4.17,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 146,
+      "p50": 8120.0,
+      "p90": 11754.0,
+      "max": 24467
+     },
+     "cet/p3/r": {
+      "n": 2,
+      "p50": 6270.0,
+      "p90": 7504.0,
+      "max": 7813
+     },
+     "other/p1/r": {
+      "n": 2140,
+      "p50": 6618.0,
+      "p90": 14612.0,
+      "max": 29588
+     },
+     "other/p3/g": {
+      "n": 86,
+      "p50": 9042.0,
+      "p90": 14844.0,
+      "max": 40751
+     },
+     "other/p3/r": {
+      "n": 112,
+      "p50": 10452.0,
+      "p90": 23361.0,
+      "max": 30724
+     },
+     "other/p4/o": {
+      "n": 49,
+      "p50": 17900.0,
+      "p90": 89741.0,
+      "max": 114955
+     },
+     "other/p4/r": {
+      "n": 487,
+      "p50": 9862.0,
+      "p90": 58663.0,
+      "max": 79911
+     },
+     "other/p5/o": {
+      "n": 100,
+      "p50": 25944.0,
+      "p90": 106023.0,
+      "max": 152296
+     },
+     "other/p5/r": {
+      "n": 1253,
+      "p50": 10586.0,
+      "p90": 61976.0,
+      "max": 149797
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 2140,
+      "p50": 6618.0,
+      "p90": 14612.0,
+      "max": 29588
+     },
+     "p2": null,
+     "p3": {
+      "n": 198,
+      "p50": 9388.0,
+      "p90": 21481.0,
+      "max": 40751
+     },
+     "p4": {
+      "n": 536,
+      "p50": 10094.0,
+      "p90": 60697.0,
+      "max": 114955
+     },
+     "p5": {
+      "n": 1353,
+      "p50": 10819.0,
+      "p90": 62683.0,
+      "max": 152296
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 148,
+     "p50": 8069.0,
+     "p90": 11691.0,
+     "max": 24467
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 198,
+     "p50": 9388.0,
+     "p90": 21481.0,
+     "max": 40751
+    }
+   },
+   "tx_age_node_based_join": {
+    "n_joined": 148,
+    "node_age": {
+     "n": 148,
+     "min": -1,
+     "p50": 8.0,
+     "p90": 12.0,
+     "p99": 23.0,
+     "max": 24
+    },
+    "logger_minus_node_age_s": {
+     "n": 148,
+     "min": 0.24,
+     "p50": 1.16,
+     "p90": 1.71,
+     "p99": 2.01,
+     "max": 2.05
+    },
+    "node_age_gt150": 0,
+    "node_age_max": 24
+   }
+  },
+  "oe3xia": {
+   "window_utc": [
+    1793425231.272,
+    1793514609.898
+   ],
+   "expected_in_window": 148,
+   "udp_got": 148,
+   "udp_missed": 0,
+   "udp_missed_ids_heard_on_rf": 0,
+   "not_heard_at_all": 0,
+   "rf_valid_frames": 778,
+   "rf_fcs0000_frames": 0,
+   "udp_arrival_gap_s": {
+    "n": 147,
+    "min": 604.0,
+    "p50": 607.0,
+    "p90": 607.4,
+    "p99": 610.5,
+    "max": 673.6
+   },
+   "udp_arrival_gaps_gt_900s": [],
+   "udp_lag_behind_first_gateway_s": {
+    "n": 148,
+    "min": 0.0,
+    "p50": 0.009,
+    "p90": 0.063,
+    "p99": 0.089,
+    "max": 0.153
+   },
+   "rf_copies_per_id": {
+    "n": 141,
+    "min": 1,
+    "p50": 6.0,
+    "p90": 8.0,
+    "p99": 11.0,
+    "max": 13
+   },
+   "rf_copies_per_id_mean": 5.52,
+   "rf_distinct_paths_per_id": {
+    "n": 141,
+    "min": 1,
+    "p50": 6.0,
+    "p90": 8.0,
+    "p99": 11.0,
+    "max": 13
+   },
+   "rf_distinct_lasthop_per_id": {
+    "n": 141,
+    "min": 1,
+    "p50": 6.0,
+    "p90": 8.0,
+    "p99": 11.0,
+    "max": 13
+   },
+   "rf_path_len_dist": {
+    "1": 370,
+    "2": 370,
+    "3": 37,
+    "4": 1
+   },
+   "rf_H_dist": {
+    "0": 38,
+    "1": 370,
+    "2": 370
+   },
+   "rf_dup_flag": {
+    "d": 771,
+    "n": 7
+   },
+   "rf_own_in_path": {
+    "-": 668,
+    "e": 110
+   },
+   "rf_rssi_snr_pathlen1": {
+    "rssi_p50": -104.0
+   },
+   "rf_age_s": {
+    "n": 778,
+    "min": 1.3,
+    "p50": 19.9,
+    "p90": 70.0,
+    "p99": 754.7,
+    "max": 2865.5
+   },
+   "rf_age_gt150_n": 46,
+   "rf_age_gt150_pct": 5.91,
+   "rf_age_gt600_n": 10,
+   "rf_stale_lasthop_top": [
+    [
+     "OE3XDC-12",
+     15
+    ],
+    [
+     "OE3MIF-12",
+     13
+    ],
+    [
+     "OE3NRA-1",
+     10
+    ],
+    [
+     "OE3XWJ-94",
+     4
+    ],
+    [
+     "OE3KJO-62",
+     2
+    ],
+    [
+     "OE3XPA-12",
+     2
+    ]
+   ],
+   "rf_age_neg_n": 0,
+   "tx_count": 148,
+   "tx_src_dist": {
+    "g": 148
+   },
+   "tx_prio_dist": {
+    "3": 148
+   },
+   "tx_wait_ms": {
+    "n": 148,
+    "min": 207,
+    "p50": 11204.0,
+    "p90": 49544.0,
+    "p99": 117374.0,
+    "max": 121889
+   },
+   "tx_wait_ms_gateway_src": {
+    "n": 148,
+    "min": 207,
+    "p50": 11204.0,
+    "p90": 49544.0,
+    "p99": 117374.0,
+    "max": 121889
+   },
+   "tx_q_after_pick": {
+    "n": 148,
+    "min": 1,
+    "p50": 1.0,
+    "p90": 5.0,
+    "p99": 7.0,
+    "max": 8
+   },
+   "tx_cad_attempts": {
+    "0": 72,
+    "13": 2,
+    "3": 15,
+    "10": 3,
+    "1": 17,
+    "2": 9,
+    "6": 7,
+    "8": 1,
+    "4": 6,
+    "7": 2,
+    "12": 1,
+    "5": 3,
+    "17": 2,
+    "15": 2,
+    "11": 2,
+    "9": 3,
+    "20": 1
+   },
+   "tx_airtime_ms_measured": {
+    "n": 148,
+    "min": 707,
+    "p50": 720.0,
+    "p90": 725.0,
+    "p99": 743.0,
+    "max": 743
+   },
+   "tx_age_s_logger_based": {
+    "n": 148,
+    "min": 0.7,
+    "p50": 12.0,
+    "p90": 50.3,
+    "p99": 117.7,
+    "max": 122.1
+   },
+   "tx_age_s_node_based": {
+    "n": 23,
+    "min": 1,
+    "p50": 12.0,
+    "p90": 23.0,
+    "p99": 48.0,
+    "max": 54
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 2,
+   "tx_age_gt100_n": 4,
+   "tx_trusted_flag": {
+    "1": 148
+   },
+   "tx_after_overheard_any_rf_copy_n": 99,
+   "tx_after_overheard_gateway_radiation_n": 94,
+   "tx_after_overheard_pct": 66.9,
+   "tx_after_overheard_lead_s": {
+    "n": 99,
+    "min": 0.4,
+    "p50": 10.8,
+    "p90": 58.1,
+    "p99": 117.4,
+    "max": 120.4
+   },
+   "cet_lines": {
+    "gw_rx": 150,
+    "tx": 148,
+    "rx": 1
+   },
+   "gw_rx_age_s_node_based": {
+    "n": 150,
+    "min": -1,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 2.0,
+    "max": 3
+   },
+   "gw_rx_age_dist": {
+    "-1": 71,
+    "0": 73,
+    "1": 3,
+    "2": 2,
+    "3": 1
+   },
+   "cet_drop_lines": [],
+   "cet_rx_lines": [
+    [
+     "2864",
+     "0",
+     "4"
+    ]
+   ],
+   "ring_drop_stale_cet": 0,
+   "ring_marker_counts": {
+    "checkOwnTx": 856,
+    "RX_DEDUP_DUP": 776,
+    "[NBR]|SYM": 396,
+    "RX_DEDUP_NEW": 155,
+    "RX_DEDUP_ADD": 149,
+    "OWN-TX-CHECK-UDP": 148,
+    "Insert own_msg_id": 148,
+    "RING_WRITE": 148,
+    "[NBR]|NEED": 148,
+    "[LOG] GWI": 148,
+    "RING_TX_READ": 148,
+    "[NBR]|REFUSE": 99,
+    "[LOG] RLY": 1
+   },
+   "queue_depth_at_cet_enqueue": {
+    "n": 148,
+    "min": 0,
+    "p50": 0.0,
+    "p90": 5.0,
+    "p99": 9.0,
+    "max": 14
+   },
+   "cet_slot_seconds_per_hour": 119.6,
+   "ring_supersede_cet": 0,
+   "hours": 24.83,
+   "cet_rx_airtime_s_per_h": 23.6,
+   "cet_tx_airtime_s_per_h": 4.3,
+   "stat_rx_s_per_h": 507.1,
+   "stat_tx_s_per_h": 100.1,
+   "stat_util_median_pct": 18.0,
+   "cet_share_of_stat_rx_pct": 4.66,
+   "cet_share_of_stat_tx_pct": 4.3,
+   "cet_share_of_stat_rxtx_pct": 4.6,
+   "stat_windows": 298,
+   "stat_txn_total": 3998,
+   "cet_share_of_tx_count_pct": 3.7,
+   "cet_rf_frames_per_h": 31.3,
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    15,
+    78
+   ],
+   "stat_ringmax_p50_p90_max": [
+    5,
+    9.0,
+    15
+   ],
+   "clock": {
+    "log_lines": 56213,
+    "hour_buckets": {
+     "0": 56213
+    },
+    "dominant_offset_h": 0,
+    "resid_s": {
+     "min": 0.15,
+     "p5": 0.5,
+     "median": 1.19,
+     "p95": 1.89,
+     "max": 2.25
+    },
+    "ntp_ok": 99,
+    "ntp_vs_logger_s": {
+     "min": -1.09,
+     "median": -0.62,
+     "max": -0.12
+    },
+    "ntp_rtt_ms": {
+     "median": 105
+    },
+    "timeclient_vs_logger_s": {
+     "min": 0.57,
+     "median": 1.56,
+     "max": 2.1,
+     "n": 99
+    },
+    "hourly_median_resid_s_sample": {
+     "10-31 05": 1.37,
+     "10-31 06": 0.92,
+     "10-31 07": 1.22,
+     "10-31 08": 1.49
+    },
+    "hourly_resid_median_range_s": [
+     0.8,
+     1.56
+    ],
+    "offset_hour_transitions": [],
+    "offset_hour_transition_count": 0
+   },
+   "rawpass": {
+    "node": "oe3xia",
+    "rx_decoded_frames": 23542,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 11796.4,
+    "rx_cet_airtime_s": 586.6,
+    "rx_cet_share_of_decoded_airtime_pct": 4.97,
+    "rx_airtime_by_type_s": {
+     "A": 4063.3,
+     "@": 4030.3,
+     ":": 1870.8,
+     "!": 1814.3,
+     ".": 14.5,
+     ")": 1.3,
+     "p": 1.2,
+     "H": 0.7
+    },
+    "rx_frames_by_type": {
+     "A": 14482,
+     "@": 4875,
+     ":": 2438,
+     "!": 1678,
+     ".": 66,
+     ")": 1,
+     "p": 1,
+     "H": 1
+    },
+    "ntp_ok": 99,
+    "ntp_timeout": 0,
+    "ntp_rtt_ms": {
+     "n": 99,
+     "p50": 105.0,
+     "p90": 108.0,
+     "max": 115
+    },
+    "tx_total": 3999,
+    "tx_airtime_s_all": 2363.1,
+    "tx_airtime_s_cet": 107.0,
+    "tx_cet_share_airtime_pct": 4.53,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 148,
+      "p50": 11204.0,
+      "p90": 49544.0,
+      "max": 121889
+     },
+     "other/p1/r": {
+      "n": 1924,
+      "p50": 21956.0,
+      "p90": 34738.0,
+      "max": 60975
+     },
+     "other/p3/g": {
+      "n": 134,
+      "p50": 12502.0,
+      "p90": 35173.0,
+      "max": 81712
+     },
+     "other/p3/r": {
+      "n": 52,
+      "p50": 13850.0,
+      "p90": 44604.0,
+      "max": 97161
+     },
+     "other/p4/o": {
+      "n": 38,
+      "p50": 22076.0,
+      "p90": 100147.0,
+      "max": 120209
+     },
+     "other/p4/r": {
+      "n": 446,
+      "p50": 14726.0,
+      "p90": 61082.0,
+      "max": 119533
+     },
+     "other/p5/o": {
+      "n": 149,
+      "p50": 25471.0,
+      "p90": 115971.0,
+      "max": 166685
+     },
+     "other/p5/r": {
+      "n": 1108,
+      "p50": 26800.0,
+      "p90": 116366.0,
+      "max": 181364
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 1924,
+      "p50": 21956.0,
+      "p90": 34738.0,
+      "max": 60975
+     },
+     "p2": null,
+     "p3": {
+      "n": 186,
+      "p50": 12802.0,
+      "p90": 39360.0,
+      "max": 97161
+     },
+     "p4": {
+      "n": 484,
+      "p50": 14966.0,
+      "p90": 65340.0,
+      "max": 120209
+     },
+     "p5": {
+      "n": 1257,
+      "p50": 26650.0,
+      "p90": 116321.0,
+      "max": 181364
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 148,
+     "p50": 11204.0,
+     "p90": 49544.0,
+     "max": 121889
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 186,
+     "p50": 12802.0,
+     "p90": 39360.0,
+     "max": 97161
+    }
+   },
+   "tx_age_node_based_join": {
+    "n_joined": 148,
+    "node_age": {
+     "n": 148,
+     "min": 0,
+     "p50": 11.0,
+     "p90": 49.0,
+     "p99": 117.0,
+     "max": 121
+    },
+    "logger_minus_node_age_s": {
+     "n": 148,
+     "min": 0.16,
+     "p50": 1.08,
+     "p90": 1.69,
+     "p99": 2.01,
+     "max": 2.09
+    },
+    "node_age_gt150": 0,
+    "node_age_max": 121
+   }
+  },
+  "oe3xir": {
+   "window_utc": [
+    1793425880.383,
+    1793466763.158
+   ],
+   "expected_in_window": 68,
+   "udp_got": 68,
+   "udp_missed": 0,
+   "udp_missed_ids_heard_on_rf": 0,
+   "not_heard_at_all": 0,
+   "rf_valid_frames": 300,
+   "rf_fcs0000_frames": 0,
+   "udp_arrival_gap_s": {
+    "n": 67,
+    "min": 604.0,
+    "p50": 607.1,
+    "p90": 607.4,
+    "p99": 632.1,
+    "max": 673.6
+   },
+   "udp_arrival_gaps_gt_900s": [],
+   "udp_lag_behind_first_gateway_s": {
+    "n": 68,
+    "min": 0.0,
+    "p50": 0.062,
+    "p90": 0.129,
+    "p99": 0.153,
+    "max": 0.166
+   },
+   "rf_copies_per_id": {
+    "n": 69,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 8.0,
+    "p99": 9.0,
+    "max": 9
+   },
+   "rf_copies_per_id_mean": 4.35,
+   "rf_distinct_paths_per_id": {
+    "n": 69,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 8.0,
+    "p99": 9.0,
+    "max": 9
+   },
+   "rf_distinct_lasthop_per_id": {
+    "n": 69,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 8.0,
+    "p99": 9.0,
+    "max": 9
+   },
+   "rf_path_len_dist": {
+    "1": 189,
+    "2": 108,
+    "3": 3
+   },
+   "rf_H_dist": {
+    "0": 3,
+    "1": 108,
+    "2": 189
+   },
+   "rf_dup_flag": {
+    "d": 298,
+    "n": 2
+   },
+   "rf_own_in_path": {
+    "-": 269,
+    "e": 31
+   },
+   "rf_rssi_snr_pathlen1": {
+    "rssi_p50": -103
+   },
+   "rf_age_s": {
+    "n": 300,
+    "min": 1.3,
+    "p50": 20.2,
+    "p90": 191.3,
+    "p99": 446.6,
+    "max": 2339.5
+   },
+   "rf_age_gt150_n": 36,
+   "rf_age_gt150_pct": 12.0,
+   "rf_age_gt600_n": 2,
+   "rf_stale_lasthop_top": [
+    [
+     "OE3MIF-12",
+     9
+    ],
+    [
+     "OE3NRA-1",
+     8
+    ],
+    [
+     "OE3XDC-12",
+     6
+    ],
+    [
+     "OE3MTC-10",
+     4
+    ],
+    [
+     "OE3XPA-12",
+     4
+    ],
+    [
+     "OE3KJO-62",
+     3
+    ],
+    [
+     "OE3NRS-13",
+     1
+    ],
+    [
+     "OE3KJO-64",
+     1
+    ]
+   ],
+   "rf_age_neg_n": 0,
+   "tx_count": 68,
+   "tx_src_dist": {
+    "g": 68
+   },
+   "tx_prio_dist": {
+    "3": 68
+   },
+   "tx_wait_ms": {
+    "n": 68,
+    "min": 1215,
+    "p50": 20832.0,
+    "p90": 39957.0,
+    "p99": 115302.0,
+    "max": 147865
+   },
+   "tx_wait_ms_gateway_src": {
+    "n": 68,
+    "min": 1215,
+    "p50": 20832.0,
+    "p90": 39957.0,
+    "p99": 115302.0,
+    "max": 147865
+   },
+   "tx_q_after_pick": {
+    "n": 68,
+    "min": 1,
+    "p50": 2.0,
+    "p90": 5.0,
+    "p99": 8.0,
+    "max": 8
+   },
+   "tx_cad_attempts": {
+    "0": 36,
+    "3": 3,
+    "1": 10,
+    "2": 9,
+    "6": 1,
+    "11": 1,
+    "4": 3,
+    "5": 3,
+    "9": 1,
+    "10": 1
+   },
+   "tx_airtime_ms_measured": {
+    "n": 68,
+    "min": 721,
+    "p50": 732.0,
+    "p90": 733.0,
+    "p99": 747.0,
+    "max": 747
+   },
+   "tx_age_s_logger_based": {
+    "n": 68,
+    "min": 2.1,
+    "p50": 22.2,
+    "p90": 40.6,
+    "p99": 116.1,
+    "max": 148.8
+   },
+   "tx_age_s_node_based": {
+    "n": 15,
+    "min": 11,
+    "p50": 26.0,
+    "p90": 35.0,
+    "p99": 37.0,
+    "max": 37
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 1,
+   "tx_age_gt100_n": 1,
+   "tx_trusted_flag": {
+    "1": 68
+   },
+   "tx_after_overheard_any_rf_copy_n": 52,
+   "tx_after_overheard_gateway_radiation_n": 52,
+   "tx_after_overheard_pct": 76.5,
+   "tx_after_overheard_lead_s": {
+    "n": 52,
+    "min": 0.3,
+    "p50": 19.2,
+    "p90": 43.8,
+    "p99": 113.8,
+    "max": 139.9
+   },
+   "cet_lines": {
+    "gw_rx": 70,
+    "tx": 68,
+    "rx": 2
+   },
+   "gw_rx_age_s_node_based": {
+    "n": 70,
+    "min": -1,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 3.0,
+    "max": 3
+   },
+   "gw_rx_age_dist": {
+    "-1": 31,
+    "0": 33,
+    "1": 1,
+    "2": 3,
+    "3": 2
+   },
+   "cet_drop_lines": [],
+   "cet_rx_lines": [
+    [
+     "1207",
+     "1",
+     "3"
+    ],
+    [
+     "2338",
+     "0",
+     "4"
+    ]
+   ],
+   "ring_drop_stale_cet": 0,
+   "ring_marker_counts": {
+    "RX_DEDUP_DUP": 301,
+    "[NBR]|SYM": 155,
+    "RX_DEDUP_NEW": 70,
+    "RX_DEDUP_ADD": 70,
+    "RING_WRITE": 68,
+    "[NBR]|NEED": 68,
+    "[LOG] GWI": 68,
+    "RING_TX_READ": 68,
+    "[NBR]|REFUSE": 52,
+    "[LOG] RLY": 2
+   },
+   "queue_depth_at_cet_enqueue": {
+    "n": 68,
+    "min": 0,
+    "p50": 1.0,
+    "p90": 4.0,
+    "p99": 8.0,
+    "max": 9
+   },
+   "cet_slot_seconds_per_hour": 157.5,
+   "ring_supersede_cet": 0,
+   "hours": 11.36,
+   "cet_rx_airtime_s_per_h": 19.6,
+   "cet_tx_airtime_s_per_h": 4.3,
+   "stat_rx_s_per_h": 630.9,
+   "stat_tx_s_per_h": 135.8,
+   "stat_util_median_pct": 21.0,
+   "cet_share_of_stat_rx_pct": 3.1,
+   "cet_share_of_stat_tx_pct": 3.19,
+   "cet_share_of_stat_rxtx_pct": 3.12,
+   "stat_windows": 136,
+   "stat_txn_total": 2565,
+   "cet_share_of_tx_count_pct": 2.6,
+   "cet_rf_frames_per_h": 26.4,
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    8,
+    0
+   ],
+   "stat_ringmax_p50_p90_max": [
+    5.0,
+    8.0,
+    11
+   ],
+   "clock": {
+    "log_lines": 25385,
+    "hour_buckets": {
+     "-1": 25385
+    },
+    "dominant_offset_h": -1,
+    "resid_s": {
+     "min": 0.14,
+     "p5": 0.48,
+     "median": 1.16,
+     "p95": 1.85,
+     "max": 2.21
+    },
+    "ntp_ok": 46,
+    "ntp_vs_logger_s": {
+     "min": -1.12,
+     "median": -0.6,
+     "max": -0.1
+    },
+    "ntp_rtt_ms": {
+     "median": 105.0
+    },
+    "timeclient_vs_logger_s": null,
+    "hourly_median_resid_s_sample": {
+     "10-31 05": 1.48,
+     "10-31 06": 1.21,
+     "10-31 07": 1.3,
+     "10-31 08": 1.61
+    },
+    "hourly_resid_median_range_s": [
+     0.74,
+     1.61
+    ],
+    "offset_hour_transitions": [],
+    "offset_hour_transition_count": 0
+   },
+   "rawpass": {
+    "node": "oe3xir",
+    "rx_decoded_frames": 14258,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 6762.0,
+    "rx_cet_airtime_s": 222.1,
+    "rx_cet_share_of_decoded_airtime_pct": 3.28,
+    "rx_airtime_by_type_s": {
+     "A": 2556.6,
+     "@": 1950.6,
+     ":": 1376.7,
+     "!": 864.9,
+     ".": 12.9,
+     "Z": 0.3
+    },
+    "rx_frames_by_type": {
+     "A": 9112,
+     "@": 2365,
+     ":": 1948,
+     "!": 779,
+     ".": 53,
+     "Z": 1
+    },
+    "ntp_ok": 46,
+    "ntp_timeout": 1,
+    "ntp_rtt_ms": {
+     "n": 46,
+     "p50": 105.0,
+     "p90": 108.0,
+     "max": 205
+    },
+    "tx_total": 2598,
+    "tx_airtime_s_all": 1473.3,
+    "tx_airtime_s_cet": 49.2,
+    "tx_cet_share_airtime_pct": 3.34,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 68,
+      "p50": 20832.0,
+      "p90": 39957.0,
+      "max": 147865
+     },
+     "other/p1/r": {
+      "n": 1421,
+      "p50": 20908.0,
+      "p90": 31739.0,
+      "max": 60486
+     },
+     "other/p3/g": {
+      "n": 78,
+      "p50": 15834.0,
+      "p90": 54888.0,
+      "max": 143212
+     },
+     "other/p3/r": {
+      "n": 69,
+      "p50": 21227.0,
+      "p90": 60832.0,
+      "max": 118434
+     },
+     "other/p4/o": {
+      "n": 17,
+      "p50": 32796.0,
+      "p90": 68210.0,
+      "max": 100503
+     },
+     "other/p4/r": {
+      "n": 249,
+      "p50": 15855.0,
+      "p90": 61548.0,
+      "max": 114017
+     },
+     "other/p5/r": {
+      "n": 696,
+      "p50": 19028.0,
+      "p90": 67560.0,
+      "max": 163740
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 1421,
+      "p50": 20908.0,
+      "p90": 31739.0,
+      "max": 60486
+     },
+     "p2": null,
+     "p3": {
+      "n": 147,
+      "p50": 16737.0,
+      "p90": 57046.0,
+      "max": 143212
+     },
+     "p4": {
+      "n": 266,
+      "p50": 16710.0,
+      "p90": 63138.0,
+      "max": 114017
+     },
+     "p5": {
+      "n": 696,
+      "p50": 19028.0,
+      "p90": 67560.0,
+      "max": 163740
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 68,
+     "p50": 20832.0,
+     "p90": 39957.0,
+     "max": 147865
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 147,
+     "p50": 16737.0,
+     "p90": 57046.0,
+     "max": 143212
+    }
+   },
+   "tx_age_node_based_join": {
+    "n_joined": 68,
+    "node_age": {
+     "n": 68,
+     "min": 1,
+     "p50": 22.0,
+     "p90": 39.0,
+     "p99": 115.0,
+     "max": 147
+    },
+    "logger_minus_node_age_s": {
+     "n": 68,
+     "min": 0.2,
+     "p50": 1.1,
+     "p90": 1.68,
+     "p99": 1.85,
+     "max": 1.98
+    },
+    "node_age_gt150": 0,
+    "node_age_max": 147
+   }
+  },
+  "oe3xoc": {
+   "window_utc": [
+    1793424667.673,
+    1793515821.633
+   ],
+   "expected_in_window": 151,
+   "udp_got": 151,
+   "udp_missed": 0,
+   "udp_missed_ids_heard_on_rf": 0,
+   "not_heard_at_all": 0,
+   "rf_valid_frames": 986,
+   "rf_fcs0000_frames": 0,
+   "udp_arrival_gap_s": {
+    "n": 150,
+    "min": 604.0,
+    "p50": 606.9,
+    "p90": 607.4,
+    "p99": 610.5,
+    "max": 673.6
+   },
+   "udp_arrival_gaps_gt_900s": [],
+   "udp_lag_behind_first_gateway_s": {
+    "n": 151,
+    "min": 0.0,
+    "p50": 0.028,
+    "p90": 0.078,
+    "p99": 0.118,
+    "max": 0.155
+   },
+   "rf_copies_per_id": {
+    "n": 151,
+    "min": 2,
+    "p50": 7.0,
+    "p90": 9.0,
+    "p99": 12.5,
+    "max": 14
+   },
+   "rf_copies_per_id_mean": 6.53,
+   "rf_distinct_paths_per_id": {
+    "n": 151,
+    "min": 2,
+    "p50": 7.0,
+    "p90": 9.0,
+    "p99": 12.5,
+    "max": 14
+   },
+   "rf_distinct_lasthop_per_id": {
+    "n": 151,
+    "min": 2,
+    "p50": 7.0,
+    "p90": 9.0,
+    "p99": 12.5,
+    "max": 13
+   },
+   "rf_path_len_dist": {
+    "1": 492,
+    "2": 416,
+    "3": 78
+   },
+   "rf_H_dist": {
+    "0": 78,
+    "1": 416,
+    "2": 492
+   },
+   "rf_dup_flag": {
+    "d": 953,
+    "n": 33
+   },
+   "rf_own_in_path": {
+    "-": 896,
+    "e": 90
+   },
+   "rf_rssi_snr_pathlen1": {
+    "rssi_p50": -103.0
+   },
+   "rf_age_s": {
+    "n": 986,
+    "min": 1.3,
+    "p50": 23.8,
+    "p90": 327.2,
+    "p99": 1776.0,
+    "max": 2602.3
+   },
+   "rf_age_gt150_n": 179,
+   "rf_age_gt150_pct": 18.15,
+   "rf_age_gt600_n": 46,
+   "rf_stale_lasthop_top": [
+    [
+     "OE3NRA-1",
+     42
+    ],
+    [
+     "OE3MTC-10",
+     36
+    ],
+    [
+     "OE3XDC-12",
+     35
+    ],
+    [
+     "OE3MIF-12",
+     35
+    ],
+    [
+     "OE3KJO-62",
+     9
+    ],
+    [
+     "OE3BCB-10",
+     6
+    ],
+    [
+     "OE3XWJ-94",
+     6
+    ],
+    [
+     "OE3XPA-12",
+     4
+    ]
+   ],
+   "rf_age_neg_n": 0,
+   "tx_count": 151,
+   "tx_src_dist": {
+    "g": 151
+   },
+   "tx_prio_dist": {
+    "3": 151
+   },
+   "tx_wait_ms": {
+    "n": 151,
+    "min": 102,
+    "p50": 13098.0,
+    "p90": 54650.0,
+    "p99": 82584.0,
+    "max": 129413
+   },
+   "tx_wait_ms_gateway_src": {
+    "n": 151,
+    "min": 102,
+    "p50": 13098.0,
+    "p90": 54650.0,
+    "p99": 82584.0,
+    "max": 129413
+   },
+   "tx_q_after_pick": {
+    "n": 151,
+    "min": 1,
+    "p50": 2.0,
+    "p90": 6.0,
+    "p99": 7.0,
+    "max": 8
+   },
+   "tx_cad_attempts": {
+    "5": 4,
+    "8": 2,
+    "1": 28,
+    "9": 1,
+    "0": 64,
+    "10": 2,
+    "4": 9,
+    "2": 20,
+    "12": 1,
+    "3": 10,
+    "6": 4,
+    "7": 5,
+    "16": 1
+   },
+   "tx_airtime_ms_measured": {
+    "n": 151,
+    "min": 683,
+    "p50": 706.0,
+    "p90": 729.0,
+    "p99": 732.0,
+    "max": 737
+   },
+   "tx_age_s_logger_based": {
+    "n": 151,
+    "min": 1.1,
+    "p50": 14.3,
+    "p90": 54.9,
+    "p99": 84.1,
+    "max": 130.2
+   },
+   "tx_age_s_node_based": {
+    "n": 17,
+    "min": 4,
+    "p50": 14.0,
+    "p90": 37.0,
+    "p99": 67.0,
+    "max": 73
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 1,
+   "tx_age_gt100_n": 1,
+   "tx_trusted_flag": {
+    "1": 151
+   },
+   "tx_after_overheard_any_rf_copy_n": 131,
+   "tx_after_overheard_gateway_radiation_n": 130,
+   "tx_after_overheard_pct": 86.8,
+   "tx_after_overheard_lead_s": {
+    "n": 131,
+    "min": 0.9,
+    "p50": 13.3,
+    "p90": 53.2,
+    "p99": 78.9,
+    "max": 126.0
+   },
+   "cet_lines": {
+    "gw_rx": 157,
+    "tx": 151,
+    "rx": 2,
+    "drop": 2
+   },
+   "gw_rx_age_s_node_based": {
+    "n": 157,
+    "min": -1,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 2.0,
+    "max": 3
+   },
+   "gw_rx_age_dist": {
+    "-1": 77,
+    "0": 75,
+    "1": 1,
+    "2": 2,
+    "3": 2
+   },
+   "cet_drop_lines": [
+    [
+     1793468025,
+     "relay",
+     "2011"
+    ],
+    [
+     1793476414,
+     "relay",
+     "2508"
+    ]
+   ],
+   "cet_rx_lines": [
+    [
+     "2011",
+     "1",
+     "3"
+    ],
+    [
+     "2508",
+     "1",
+     "3"
+    ]
+   ],
+   "ring_drop_stale_cet": 0,
+   "ring_marker_counts": {
+    "checkOwnTx": 983,
+    "RX_DEDUP_DUP": 964,
+    "[NBR]|SYM": 231,
+    "RX_DEDUP_NEW": 184,
+    "RX_DEDUP_ADD": 152,
+    "OWN-TX-CHECK-UDP": 151,
+    "Insert own_msg_id": 151,
+    "RING_WRITE": 151,
+    "[NBR]|NEED": 151,
+    "[LOG] GWI": 151,
+    "RING_TX_READ": 151,
+    "[NBR]|REFUSE": 131,
+    "[LOG] RLY": 2
+   },
+   "queue_depth_at_cet_enqueue": {
+    "n": 151,
+    "min": 0,
+    "p50": 2.0,
+    "p90": 5.0,
+    "p99": 8.0,
+    "max": 11
+   },
+   "cet_slot_seconds_per_hour": 138.6,
+   "ring_supersede_cet": 0,
+   "hours": 25.32,
+   "cet_rx_airtime_s_per_h": 29.3,
+   "cet_tx_airtime_s_per_h": 4.3,
+   "stat_rx_s_per_h": 894.3,
+   "stat_tx_s_per_h": 150.3,
+   "stat_util_median_pct": 29.0,
+   "cet_share_of_stat_rx_pct": 3.28,
+   "cet_share_of_stat_tx_pct": 2.87,
+   "cet_share_of_stat_rxtx_pct": 3.22,
+   "stat_windows": 304,
+   "stat_txn_total": 6265,
+   "cet_share_of_tx_count_pct": 2.4,
+   "cet_rf_frames_per_h": 38.9,
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    43,
+    81
+   ],
+   "stat_ringmax_p50_p90_max": [
+    5.0,
+    9.0,
+    12
+   ],
+   "clock": {
+    "log_lines": 90590,
+    "hour_buckets": {
+     "0": 90590
+    },
+    "dominant_offset_h": 0,
+    "resid_s": {
+     "min": 0.15,
+     "p5": 0.5,
+     "median": 1.21,
+     "p95": 1.9,
+     "max": 3.51
+    },
+    "ntp_ok": 101,
+    "ntp_vs_logger_s": {
+     "min": -1.1,
+     "median": -0.62,
+     "max": -0.11
+    },
+    "ntp_rtt_ms": {
+     "median": 105
+    },
+    "timeclient_vs_logger_s": {
+     "min": 0.93,
+     "median": 1.57,
+     "max": 2.07,
+     "n": 101
+    },
+    "hourly_median_resid_s_sample": {
+     "10-31 05": 1.58,
+     "10-31 06": 0.96,
+     "10-31 07": 0.96,
+     "10-31 08": 1.2
+    },
+    "hourly_resid_median_range_s": [
+     0.74,
+     1.61
+    ],
+    "offset_hour_transitions": [],
+    "offset_hour_transition_count": 0
+   },
+   "rawpass": {
+    "node": "oe3xoc",
+    "rx_decoded_frames": 43750,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 21173.1,
+    "rx_cet_airtime_s": 742.2,
+    "rx_cet_share_of_decoded_airtime_pct": 3.51,
+    "rx_airtime_by_type_s": {
+     "A": 7764.9,
+     "@": 6422.1,
+     ":": 4262.6,
+     "!": 2693.0,
+     ".": 29.8,
+     "Q": 0.8
+    },
+    "rx_frames_by_type": {
+     "A": 27675,
+     "@": 7666,
+     ":": 5944,
+     "!": 2363,
+     ".": 101,
+     "Q": 1
+    },
+    "ntp_ok": 101,
+    "ntp_timeout": 0,
+    "ntp_rtt_ms": {
+     "n": 101,
+     "p50": 105.0,
+     "p90": 106.0,
+     "max": 118
+    },
+    "tx_total": 6276,
+    "tx_airtime_s_all": 3615.5,
+    "tx_airtime_s_cet": 109.2,
+    "tx_cet_share_airtime_pct": 3.02,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 151,
+      "p50": 13098.0,
+      "p90": 54650.0,
+      "max": 129413
+     },
+     "other/p1/r": {
+      "n": 3378,
+      "p50": 23334.0,
+      "p90": 33901.0,
+      "max": 64611
+     },
+     "other/p3/g": {
+      "n": 176,
+      "p50": 13608.0,
+      "p90": 49686.0,
+      "max": 112033
+     },
+     "other/p3/r": {
+      "n": 70,
+      "p50": 17110.0,
+      "p90": 60591.0,
+      "max": 132713
+     },
+     "other/p4/o": {
+      "n": 15,
+      "p50": 26737.0,
+      "p90": 81067.0,
+      "max": 88207
+     },
+     "other/p4/r": {
+      "n": 782,
+      "p50": 13399.0,
+      "p90": 50609.0,
+      "max": 119009
+     },
+     "other/p5/o": {
+      "n": 41,
+      "p50": 58924.0,
+      "p90": 151695.0,
+      "max": 178555
+     },
+     "other/p5/r": {
+      "n": 1663,
+      "p50": 19681.0,
+      "p90": 96610.0,
+      "max": 181218
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 3378,
+      "p50": 23334.0,
+      "p90": 33901.0,
+      "max": 64611
+     },
+     "p2": null,
+     "p3": {
+      "n": 246,
+      "p50": 14234.0,
+      "p90": 52354.0,
+      "max": 132713
+     },
+     "p4": {
+      "n": 797,
+      "p50": 13459.0,
+      "p90": 51374.0,
+      "max": 119009
+     },
+     "p5": {
+      "n": 1704,
+      "p50": 20236.0,
+      "p90": 99227.0,
+      "max": 181218
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 151,
+     "p50": 13098.0,
+     "p90": 54650.0,
+     "max": 129413
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 246,
+     "p50": 14234.0,
+     "p90": 52354.0,
+     "max": 132713
+    }
+   },
+   "tx_age_node_based_join": {
+    "n_joined": 151,
+    "node_age": {
+     "n": 151,
+     "min": 0,
+     "p50": 13.0,
+     "p90": 54.0,
+     "p99": 83.0,
+     "max": 129
+    },
+    "logger_minus_node_age_s": {
+     "n": 151,
+     "min": 0.34,
+     "p50": 1.19,
+     "p90": 1.77,
+     "p99": 1.95,
+     "max": 1.97
+    },
+    "node_age_gt150": 0,
+    "node_age_max": 129
+   }
+  },
+  "oe3xwj": {
+   "window_utc": [
+    1793424667.663,
+    1793515866.215
+   ],
+   "expected_in_window": 151,
+   "udp_got": 149,
+   "udp_missed": 2,
+   "udp_missed_ids_heard_on_rf": 2,
+   "not_heard_at_all": 0,
+   "rf_valid_frames": 593,
+   "rf_fcs0000_frames": 0,
+   "udp_arrival_gap_s": {
+    "n": 148,
+    "min": 604.0,
+    "p50": 607.0,
+    "p90": 607.4,
+    "p99": 959.2,
+    "max": 1213.4
+   },
+   "udp_arrival_gaps_gt_900s": [
+    1213,
+    1212
+   ],
+   "udp_lag_behind_first_gateway_s": {
+    "n": 149,
+    "min": 0.0,
+    "p50": 0.034,
+    "p90": 0.08,
+    "p99": 0.102,
+    "max": 0.111
+   },
+   "rf_copies_per_id": {
+    "n": 147,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 6.0,
+    "p99": 8.0,
+    "max": 8
+   },
+   "rf_copies_per_id_mean": 4.03,
+   "rf_distinct_paths_per_id": {
+    "n": 147,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 6.0,
+    "p99": 8.0,
+    "max": 8
+   },
+   "rf_distinct_lasthop_per_id": {
+    "n": 147,
+    "min": 1,
+    "p50": 4.0,
+    "p90": 6.0,
+    "p99": 8.0,
+    "max": 8
+   },
+   "rf_path_len_dist": {
+    "1": 332,
+    "2": 241,
+    "3": 20
+   },
+   "rf_H_dist": {
+    "0": 20,
+    "1": 241,
+    "2": 332
+   },
+   "rf_dup_flag": {
+    "d": 577,
+    "n": 16
+   },
+   "rf_own_in_path": {
+    "-": 444,
+    "e": 149
+   },
+   "rf_rssi_snr_pathlen1": {
+    "rssi_p50": -102.0
+   },
+   "rf_age_s": {
+    "n": 593,
+    "min": 1.1,
+    "p50": 22.5,
+    "p90": 331.4,
+    "p99": 2012.0,
+    "max": 2602.3
+   },
+   "rf_age_gt150_n": 109,
+   "rf_age_gt150_pct": 18.38,
+   "rf_age_gt600_n": 40,
+   "rf_stale_lasthop_top": [
+    [
+     "OE3MIF-12",
+     50
+    ],
+    [
+     "OE3MTC-10",
+     33
+    ],
+    [
+     "OE3NRA-1",
+     12
+    ],
+    [
+     "OE3XPA-12",
+     8
+    ],
+    [
+     "OE3XWJ-94",
+     6
+    ]
+   ],
+   "rf_age_neg_n": 0,
+   "tx_count": 151,
+   "tx_src_dist": {
+    "g": 149,
+    "r": 2
+   },
+   "tx_prio_dist": {
+    "3": 151
+   },
+   "tx_wait_ms": {
+    "n": 151,
+    "min": 409,
+    "p50": 9072.0,
+    "p90": 12928.0,
+    "p99": 23626.0,
+    "max": 25187
+   },
+   "tx_wait_ms_gateway_src": {
+    "n": 149,
+    "min": 409,
+    "p50": 9072.0,
+    "p90": 12130.0,
+    "p99": 23031.0,
+    "max": 23628
+   },
+   "tx_q_after_pick": {
+    "n": 151,
+    "min": 1,
+    "p50": 1.0,
+    "p90": 2.0,
+    "p99": 4.0,
+    "max": 4
+   },
+   "tx_cad_attempts": {
+    "0": 109,
+    "10": 1,
+    "2": 11,
+    "1": 20,
+    "7": 1,
+    "3": 5,
+    "6": 1,
+    "4": 3
+   },
+   "tx_airtime_ms_measured": {
+    "n": 151,
+    "min": 709,
+    "p50": 720.0,
+    "p90": 725.0,
+    "p99": 756.0,
+    "max": 773
+   },
+   "tx_age_s_logger_based": {
+    "n": 151,
+    "min": 0.8,
+    "p50": 9.8,
+    "p90": 13.5,
+    "p99": 25.1,
+    "max": 32.4
+   },
+   "tx_age_s_node_based": {
+    "n": 16,
+    "min": 0,
+    "p50": 8.0,
+    "p90": 11.0,
+    "p99": 13.0,
+    "max": 13
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 0,
+   "tx_age_gt100_n": 0,
+   "tx_trusted_flag": {
+    "1": 151
+   },
+   "tx_after_overheard_any_rf_copy_n": 85,
+   "tx_after_overheard_gateway_radiation_n": 85,
+   "tx_after_overheard_pct": 56.3,
+   "tx_after_overheard_lead_s": {
+    "n": 85,
+    "min": 0.3,
+    "p50": 5.8,
+    "p90": 10.1,
+    "p99": 21.2,
+    "max": 25.2
+   },
+   "cet_lines": {
+    "gw_rx": 153,
+    "tx": 151,
+    "rx": 16,
+    "drop": 6
+   },
+   "gw_rx_age_s_node_based": {
+    "n": 153,
+    "min": -1,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 2.0,
+    "max": 3
+   },
+   "gw_rx_age_dist": {
+    "-1": 60,
+    "0": 87,
+    "1": 3,
+    "2": 2,
+    "3": 1
+   },
+   "cet_drop_lines": [
+    [
+     1793443898,
+     "relay",
+     "1565"
+    ],
+    [
+     1793468025,
+     "relay",
+     "2011"
+    ],
+    [
+     1793469829,
+     "relay",
+     "2601"
+    ],
+    [
+     1793476414,
+     "relay",
+     "2508"
+    ],
+    [
+     1793495496,
+     "relay",
+     "2168"
+    ],
+    [
+     1793508324,
+     "relay",
+     "2261"
+    ]
+   ],
+   "cet_rx_lines": [
+    [
+     "1565",
+     "1",
+     "3"
+    ],
+    [
+     "1435",
+     "0",
+     "4"
+    ],
+    [
+     "1678",
+     "0",
+     "4"
+    ],
+    [
+     "2011",
+     "1",
+     "3"
+    ],
+    [
+     "1727",
+     "1",
+     "3"
+    ],
+    [
+     "2601",
+     "1",
+     "3"
+    ],
+    [
+     "2508",
+     "1",
+     "3"
+    ],
+    [
+     "4",
+     "2",
+     "2"
+    ],
+    [
+     "1649",
+     "1",
+     "3"
+    ],
+    [
+     "2168",
+     "1",
+     "3"
+    ],
+    [
+     "1529",
+     "0",
+     "4"
+    ],
+    [
+     "1646",
+     "1",
+     "3"
+    ],
+    [
+     "1412",
+     "0",
+     "4"
+    ],
+    [
+     "2261",
+     "1",
+     "3"
+    ],
+    [
+     "1371",
+     "0",
+     "4"
+    ],
+    [
+     "6",
+     "2",
+     "2"
+    ]
+   ],
+   "ring_drop_stale_cet": 0,
+   "ring_marker_counts": {
+    "RX_DEDUP_DUP": 582,
+    "checkOwnTx": 557,
+    "RX_DEDUP_NEW": 165,
+    "RX_DEDUP_ADD": 165,
+    "RING_WRITE": 151,
+    "[NBR]|NEED": 151,
+    "RING_TX_READ": 151,
+    "OWN-TX-CHECK-UDP": 149,
+    "Insert own_msg_id": 149,
+    "[LOG] GWI": 149,
+    "[NBR]|SYM": 127,
+    "[NBR]|REFUSE": 84,
+    "[LOG] RLY": 16
+   },
+   "queue_depth_at_cet_enqueue": {
+    "n": 151,
+    "min": 0,
+    "p50": 0.0,
+    "p90": 1.0,
+    "p99": 3.0,
+    "max": 4
+   },
+   "cet_slot_seconds_per_hour": 53.9,
+   "ring_supersede_cet": 0,
+   "hours": 25.33,
+   "cet_rx_airtime_s_per_h": 17.4,
+   "cet_tx_airtime_s_per_h": 4.3,
+   "stat_rx_s_per_h": 603.6,
+   "stat_tx_s_per_h": 116.4,
+   "stat_util_median_pct": 20.0,
+   "cet_share_of_stat_rx_pct": 2.88,
+   "cet_share_of_stat_tx_pct": 3.71,
+   "cet_share_of_stat_rxtx_pct": 3.02,
+   "stat_windows": 304,
+   "stat_txn_total": 3868,
+   "cet_share_of_tx_count_pct": 3.9,
+   "cet_rf_frames_per_h": 23.4,
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    4,
+    0
+   ],
+   "stat_ringmax_p50_p90_max": [
+    2.0,
+    4.0,
+    9
+   ],
+   "clock": {
+    "log_lines": 63130,
+    "hour_buckets": {
+     "0": 63130
+    },
+    "dominant_offset_h": 0,
+    "resid_s": {
+     "min": 0.15,
+     "p5": 0.48,
+     "median": 1.14,
+     "p95": 1.81,
+     "max": 3.85
+    },
+    "ntp_ok": 102,
+    "ntp_vs_logger_s": {
+     "min": -1.1,
+     "median": -0.57,
+     "max": -0.12
+    },
+    "ntp_rtt_ms": {
+     "median": 105.0
+    },
+    "timeclient_vs_logger_s": {
+     "min": 0.23,
+     "median": 1.51,
+     "max": 2.09,
+     "n": 102
+    },
+    "hourly_median_resid_s_sample": {
+     "10-31 05": 0.96,
+     "10-31 06": 1.19,
+     "10-31 07": 1.4,
+     "10-31 08": 1.32
+    },
+    "hourly_resid_median_range_s": [
+     0.83,
+     1.48
+    ],
+    "offset_hour_transitions": [],
+    "offset_hour_transition_count": 0
+   },
+   "rawpass": {
+    "node": "oe3xwj",
+    "rx_decoded_frames": 31097,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 14350.4,
+    "rx_cet_airtime_s": 440.7,
+    "rx_cet_share_of_decoded_airtime_pct": 3.07,
+    "rx_airtime_by_type_s": {
+     "A": 5658.1,
+     "@": 3683.5,
+     ":": 3541.1,
+     "!": 1447.0,
+     ".": 17.2,
+     "J": 1.9,
+     "M": 1.0,
+     "B": 0.7
+    },
+    "rx_frames_by_type": {
+     "A": 20166,
+     ":": 5135,
+     "@": 4432,
+     "!": 1298,
+     ".": 63,
+     "J": 1,
+     "B": 1,
+     "M": 1
+    },
+    "ntp_ok": 102,
+    "ntp_timeout": 4,
+    "ntp_rtt_ms": {
+     "n": 102,
+     "p50": 105.0,
+     "p90": 106.0,
+     "max": 306
+    },
+    "tx_total": 3900,
+    "tx_airtime_s_all": 2848.3,
+    "tx_airtime_s_cet": 109.3,
+    "tx_cet_share_airtime_pct": 3.84,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 149,
+      "p50": 9072.0,
+      "p90": 12130.0,
+      "max": 23628
+     },
+     "cet/p3/r": {
+      "n": 2,
+      "p50": 14804.0,
+      "p90": 23110.0,
+      "max": 25187
+     },
+     "other/p1/r": {
+      "n": 50,
+      "p50": 9783.0,
+      "p90": 20014.0,
+      "max": 28190
+     },
+     "other/p2/o": {
+      "n": 1529,
+      "p50": 7052.0,
+      "p90": 17230.0,
+      "max": 135318
+     },
+     "other/p3/g": {
+      "n": 141,
+      "p50": 9168.0,
+      "p90": 13924.0,
+      "max": 163880
+     },
+     "other/p3/r": {
+      "n": 85,
+      "p50": 9699.0,
+      "p90": 15977.0,
+      "max": 26093
+     },
+     "other/p4/o": {
+      "n": 46,
+      "p50": 33358.0,
+      "p90": 74512.0,
+      "max": 116951
+     },
+     "other/p4/r": {
+      "n": 489,
+      "p50": 9447.0,
+      "p90": 15926.0,
+      "max": 110102
+     },
+     "other/p5/r": {
+      "n": 1409,
+      "p50": 9677.0,
+      "p90": 17587.0,
+      "max": 180577
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 50,
+      "p50": 9783.0,
+      "p90": 20014.0,
+      "max": 28190
+     },
+     "p2": {
+      "n": 1529,
+      "p50": 7052.0,
+      "p90": 17230.0,
+      "max": 135318
+     },
+     "p3": {
+      "n": 226,
+      "p50": 9418.0,
+      "p90": 14006.0,
+      "max": 163880
+     },
+     "p4": {
+      "n": 535,
+      "p50": 9586.0,
+      "p90": 20879.0,
+      "max": 116951
+     },
+     "p5": {
+      "n": 1409,
+      "p50": 9677.0,
+      "p90": 17587.0,
+      "max": 180577
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 151,
+     "p50": 9072.0,
+     "p90": 12928.0,
+     "max": 25187
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 226,
+     "p50": 9418.0,
+     "p90": 14006.0,
+     "max": 163880
+    }
+   },
+   "tx_age_node_based_join": {
+    "n_joined": 151,
+    "node_age": {
+     "n": 151,
+     "min": 0,
+     "p50": 9.0,
+     "p90": 12.0,
+     "p99": 24.0,
+     "max": 32
+    },
+    "logger_minus_node_age_s": {
+     "n": 151,
+     "min": 0.18,
+     "p50": 1.07,
+     "p90": 1.65,
+     "p99": 2.0,
+     "max": 2.07
+    },
+    "node_age_gt150": 0,
+    "node_age_max": 32
+   }
+  },
+  "db0ais": {
+   "sources": {
+    "OE1XAR-33": 141,
+    "OE1XAR-62": 149,
+    "OE1XAR-63": 142
+   },
+   "id_collisions_between_sources": -81,
+   "wrong_time_cet_lt": 0,
+   "window_utc": [
+    "2026-10-30T16:02:03+00:00",
+    "2026-10-31T17:01:18+00:00"
+   ],
+   "hours": 24.99,
+   "rf_fcs0000": 0,
+   "by_source": {
+    "OE1XAR-33": {
+     "distinct_ids": 141,
+     "udp_injected": 0,
+     "rf_frames": 251,
+     "rf_distinct_ids": 141,
+     "own_tx": 126,
+     "rf_copies_per_id": {
+      "n": 141,
+      "min": 1,
+      "p50": 2.0,
+      "p90": 3.0,
+      "p99": 4.0,
+      "max": 4
+     },
+     "rf_age_s": {
+      "n": 251,
+      "min": 1.0,
+      "p50": 21.0,
+      "p90": 58.0,
+      "p99": 218.0,
+      "max": 621.0
+     },
+     "rf_age_gt150_pct": 1.2,
+     "rf_age_gt150_n": 3,
+     "rf_path_len_dist": {
+      "1": 102,
+      "2": 114,
+      "3": 35
+     },
+     "rf_stale_lasthop_top": [
+      [
+       "DB0MW-12",
+       2
+      ],
+      [
+       "DB0HRF-12",
+       1
+      ]
+     ],
+     "first_via_top": [
+      [
+       "DB0HRF-12",
+       207
+      ],
+      [
+       "DC2SK-12",
+       16
+      ],
+      [
+       "DK6PR-20",
+       15
+      ],
+      [
+       "DO5PY-12",
+       4
+      ],
+      [
+       "DB9XP-12",
+       4
+      ],
+      [
+       "DN7TMU-12",
+       2
+      ]
+     ],
+     "first_heard_age_s": {
+      "n": 141,
+      "min": 1.0,
+      "p50": 15.0,
+      "p90": 61.0,
+      "p99": 225.2,
+      "max": 621.0
+     },
+     "first_heard_age_gt150_n": 2
+    },
+    "OE1XAR-62": {
+     "distinct_ids": 149,
+     "udp_injected": 145,
+     "rf_frames": 313,
+     "rf_distinct_ids": 141,
+     "own_tx": 149,
+     "rf_copies_per_id": {
+      "n": 141,
+      "min": 1,
+      "p50": 2.0,
+      "p90": 3.0,
+      "p99": 4.0,
+      "max": 4
+     },
+     "rf_age_s": {
+      "n": 313,
+      "min": 0.0,
+      "p50": 16.0,
+      "p90": 50.0,
+      "p99": 134.0,
+      "max": 3391.0
+     },
+     "rf_age_gt150_pct": 1.0,
+     "rf_age_gt150_n": 3,
+     "rf_path_len_dist": {
+      "1": 90,
+      "2": 175,
+      "3": 48
+     },
+     "rf_stale_lasthop_top": [
+      [
+       "DB0HRF-12",
+       3
+      ]
+     ],
+     "first_via_top": [
+      [
+       "DB0AIS-12",
+       185
+      ],
+      [
+       "DB0MW-12",
+       119
+      ],
+      [
+       "DB0TAW-13",
+       4
+      ],
+      [
+       "DB0PET-15",
+       3
+      ],
+      [
+       "DH1TZ-12",
+       1
+      ],
+      [
+       "DO2AD-12",
+       1
+      ]
+     ],
+     "first_heard_age_s": {
+      "n": 141,
+      "min": 0.0,
+      "p50": 11.0,
+      "p90": 21.0,
+      "p99": 81.8,
+      "max": 306.0
+     },
+     "first_heard_age_gt150_n": 1
+    },
+    "OE1XAR-63": {
+     "distinct_ids": 142,
+     "udp_injected": 0,
+     "rf_frames": 297,
+     "rf_distinct_ids": 142,
+     "own_tx": 71,
+     "rf_copies_per_id": {
+      "n": 142,
+      "min": 1,
+      "p50": 2.0,
+      "p90": 3.0,
+      "p99": 5.0,
+      "max": 5
+     },
+     "rf_age_s": {
+      "n": 297,
+      "min": 0.0,
+      "p50": 26.0,
+      "p90": 62.4,
+      "p99": 411.4,
+      "max": 836.0
+     },
+     "rf_age_gt150_pct": 2.4,
+     "rf_age_gt150_n": 7,
+     "rf_path_len_dist": {
+      "1": 37,
+      "2": 101,
+      "3": 159
+     },
+     "rf_stale_lasthop_top": [
+      [
+       "DB0HRF-12",
+       4
+      ],
+      [
+       "DM0MTK-12",
+       2
+      ],
+      [
+       "DB0MW-12",
+       1
+      ]
+     ],
+     "first_via_top": [
+      [
+       "DK4RS-20",
+       63
+      ],
+      [
+       "DL0BOD-20",
+       49
+      ],
+      [
+       "DM0MTK-12",
+       46
+      ],
+      [
+       "DG3FAW-12",
+       33
+      ],
+      [
+       "DB0ZAV-12",
+       27
+      ],
+      [
+       "DF1VA-16",
+       24
+      ]
+     ],
+     "first_heard_age_s": {
+      "n": 142,
+      "min": 0.0,
+      "p50": 21.0,
+      "p90": 42.0,
+      "p99": 345.8,
+      "max": 832.0
+     },
+     "first_heard_age_gt150_n": 3
+    }
+   },
+   "cadence": {
+    "OE1XAR-33": {
+     "n": 141,
+     "gap_s": {
+      "n": 140,
+      "min": 606,
+      "p50": 607.0,
+      "p90": 608.0,
+      "p99": 1214.6,
+      "max": 1215
+     },
+     "gaps_gt_900": [
+      [
+       "10-30 17:22",
+       1215
+      ],
+      [
+       "10-30 18:43",
+       1215
+      ],
+      [
+       "10-30 19:04",
+       1214
+      ],
+      [
+       "10-31 05:00",
+       1213
+      ],
+      [
+       "10-31 08:34",
+       1214
+      ],
+      [
+       "10-31 11:16",
+       1214
+      ],
+      [
+       "10-31 12:06",
+       1214
+      ],
+      [
+       "10-31 16:29",
+       1214
+      ]
+     ]
+    },
+    "OE1XAR-62": {
+     "n": 149,
+     "gap_s": {
+      "n": 148,
+      "min": 602,
+      "p50": 602.0,
+      "p90": 603.0,
+      "p99": 627.6,
+      "max": 1204
+     },
+     "gaps_gt_900": [
+      [
+       "10-31 00:05",
+       1204
+      ]
+     ]
+    },
+    "OE1XAR-63": {
+     "n": 142,
+     "gap_s": {
+      "n": 141,
+      "min": 605,
+      "p50": 606.0,
+      "p90": 607.0,
+      "p99": 1213.0,
+      "max": 1214
+     },
+     "gaps_gt_900": [
+      [
+       "10-30 17:24",
+       1214
+      ],
+      [
+       "10-30 17:45",
+       1213
+      ],
+      [
+       "10-31 00:59",
+       1212
+      ],
+      [
+       "10-31 12:17",
+       1212
+      ],
+      [
+       "10-31 14:28",
+       1213
+      ],
+      [
+       "10-31 15:09",
+       1213
+      ],
+      [
+       "10-31 16:40",
+       1213
+      ]
+     ]
+    }
+   },
+   "udp62_arrival_gap_s": {
+    "n": 144,
+    "min": 601.0,
+    "p50": 602.0,
+    "p90": 604.7,
+    "p99": 1547.1,
+    "max": 1807.0
+   },
+   "udp_age_s": {
+    "n": 145,
+    "min": -1.0,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p99": 0.0,
+    "max": 1.0
+   },
+   "tx_total": 346,
+   "tx_src_dist": {
+    "r": 201,
+    "g": 145
+   },
+   "tx_prio_dist": {
+    "3": 346
+   },
+   "tx_wait_ms": {
+    "n": 346,
+    "min": 101,
+    "p50": 6785.0,
+    "p90": 9948.0,
+    "p99": 11751.0,
+    "max": 14076
+   },
+   "tx_wait_ms_src_g": {
+    "n": 145,
+    "min": 101,
+    "p50": 5064.0,
+    "p90": 10256.0,
+    "p99": 12620.0,
+    "max": 14076
+   },
+   "tx_wait_ms_src_r": {
+    "n": 201,
+    "min": 2470,
+    "p50": 6918.0,
+    "p90": 9885.0,
+    "p99": 11564.0,
+    "max": 13464
+   },
+   "tx_by_source_and_origin": {
+    "OE1XAR-33/r": 126,
+    "OE1XAR-62/g": 145,
+    "OE1XAR-63/r": 71,
+    "OE1XAR-62/r": 4
+   },
+   "tx_age_s": {
+    "n": 346,
+    "min": -1.0,
+    "p50": 11.5,
+    "p90": 36.0,
+    "p99": 94.1,
+    "max": 117.0
+   },
+   "tx_age_gt150_n": 0,
+   "tx_age_gt120_n": 0,
+   "cet_lines": {
+    "rx": 288,
+    "tx": 346,
+    "gw_rx": 145,
+    "drop": 4
+   },
+   "cet_tx_age_node_s": {
+    "n": 346,
+    "min": -1,
+    "p50": 12.0,
+    "p90": 36.0,
+    "p99": 94.0,
+    "max": 117
+   },
+   "cet_tx_age_gt150": 0,
+   "cet_tx_wait_ms": {
+    "n": 346,
+    "min": 101,
+    "p50": 6785.0,
+    "p90": 9948.0,
+    "p99": 11751.0,
+    "max": 14076
+   },
+   "cet_rx_age_node_s": {
+    "n": 288,
+    "min": 0,
+    "p50": 18.0,
+    "p90": 51.0,
+    "p99": 438.0,
+    "max": 3391
+   },
+   "cet_rx_age_gt150_n": 6,
+   "cet_rx_hop_dist": {
+    "2": 121,
+    "0": 80,
+    "1": 87
+   },
+   "cet_rx_by_src": {
+    "OE1XAR-33": 141,
+    "OE1XAR-63": 142,
+    "OE1XAR-62": 5
+   },
+   "cet_drops": [
+    [
+     "relay",
+     "621"
+    ],
+    [
+     "relay",
+     "832"
+    ],
+    [
+     "relay",
+     "411"
+    ],
+    [
+     "relay",
+     "302"
+    ]
+   ],
+   "gw_rx_age_dist": {
+    "-1": 62,
+    "0": 82,
+    "1": 1
+   },
+   "gw_rx_src": {
+    "OE1XAR-62": 145
+   },
+   "ring_drop_stale_cet": 0,
+   "trusted_flags": {
+    "1": 783
+   },
+   "tx_age_gt100_list": [
+    [
+     "10-30 17:45:08",
+     "OE1XAR-33",
+     117,
+     "r",
+     6888
+    ]
+   ],
+   "tx_age_gt100_n": 1,
+   "tx_src_g_after_overheard": [
+    33,
+    145
+   ],
+   "cet_rx_airtime_s_per_h": 26.9,
+   "cet_tx_airtime_s_per_h": 10.7,
+   "cet_rf_frames_per_h": 34.5,
+   "cet_tx_per_h": 13.8,
+   "cet_tx_by_source_per_h": {
+    "OE1XAR-33": 5.04,
+    "OE1XAR-62": 5.96,
+    "OE1XAR-63": 2.84
+   },
+   "stat_windows": 301,
+   "stat_util_median": 9,
+   "stat_rx_s_per_h": 231.0,
+   "stat_tx_s_per_h": 100.5,
+   "stat_txn_total": 2821,
+   "cet_share_of_stat_tx_pct": 10.7,
+   "cet_share_of_stat_rx_pct": 11.6,
+   "cet_share_of_tx_count_pct": 12.3,
+   "stat_ringmax_p50_p90_max": [
+    2,
+    2.0,
+    4
+   ],
+   "stat_drop_total_prio1to5": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "slots_total": 151,
+   "slots_by_source_combo": {
+    "OE1XAR-33+OE1XAR-62+OE1XAR-63": 131,
+    "OE1XAR-62": 1,
+    "OE1XAR-33+OE1XAR-62": 8,
+    "OE1XAR-62+OE1XAR-63": 9,
+    "OE1XAR-33+OE1XAR-63": 2
+   },
+   "clock_node_vs_ntp": {
+    "n": 101,
+    "hour_buckets": {
+     "8": 1,
+     "2": 5,
+     "1": 95
+    },
+    "transitions": [
+     [
+      "2026-10-30 16:16:31 UTC",
+      8,
+      2
+     ],
+     [
+      "2026-10-30 17:31:31 UTC",
+      2,
+      1
+     ]
+    ],
+    "first_epoch_utc": "2026-10-30T16:01:31+00:00",
+    "last_epoch_utc": "2026-10-31T17:01:36+00:00"
+   },
+   "source_phase": {
+    "minus62_to_nearest_33_s": {
+     "n": 141,
+     "min": -261,
+     "p50": 7.0,
+     "p90": 223.0,
+     "p99": 267.0,
+     "max": 470
+    },
+    "minus62_to_nearest_63_s": {
+     "n": 142,
+     "min": -277,
+     "p50": 105.0,
+     "p90": 260.0,
+     "p99": 287.0,
+     "max": 379
+    },
+    "33_to_nearest_63_s": {
+     "n": 142,
+     "min": -138,
+     "p50": -91.0,
+     "p90": -17.0,
+     "p99": 572.0,
+     "max": 597
+    },
+    "merged_gap_s": {
+     "n": 431,
+     "min": 1,
+     "p50": 138.0,
+     "p90": 474.0,
+     "p99": 555.0,
+     "max": 601
+    },
+    "merged_gaps_gt_300": 123,
+    "merged_n": 432
+   },
+   "rawpass": {
+    "node": "db0ais",
+    "rx_decoded_frames": 6720,
+    "rx_fcs0000": 0,
+    "rx_decoded_airtime_s": 5577.9,
+    "rx_cet_airtime_s": 671.4,
+    "rx_cet_share_of_decoded_airtime_pct": 12.04,
+    "rx_airtime_by_type_s": {
+     "@": 2572.5,
+     ":": 1530.7,
+     "!": 1383.2,
+     "A": 87.0,
+     "]": 2.0,
+     "j": 1.2,
+     "u": 0.8,
+     "H": 0.6
+    },
+    "rx_frames_by_type": {
+     "@": 3464,
+     ":": 1771,
+     "!": 1171,
+     "A": 310,
+     "u": 1,
+     "H": 1,
+     "j": 1,
+     "]": 1
+    },
+    "ntp_ok": 101,
+    "ntp_timeout": 2,
+    "ntp_rtt_ms": {
+     "n": 101,
+     "p50": 105.0,
+     "p90": 110.0,
+     "max": 508
+    },
+    "tx_total": 2832,
+    "tx_airtime_s_all": 2440.1,
+    "tx_airtime_s_cet": 268.1,
+    "tx_cet_share_airtime_pct": 10.99,
+    "tx_by_class_prio_src": {
+     "cet/p3/g": {
+      "n": 145,
+      "p50": 5064.0,
+      "p90": 10256.0,
+      "max": 14076
+     },
+     "cet/p3/r": {
+      "n": 201,
+      "p50": 6918.0,
+      "p90": 9885.0,
+      "max": 13464
+     },
+     "other/p1/o": {
+      "n": 1,
+      "p50": 569.0,
+      "p90": 569.0,
+      "max": 569
+     },
+     "other/p1/r": {
+      "n": 65,
+      "p50": 6665.0,
+      "p90": 11797.0,
+      "max": 14701
+     },
+     "other/p3/g": {
+      "n": 211,
+      "p50": 7097.0,
+      "p90": 10603.0,
+      "max": 14054
+     },
+     "other/p3/r": {
+      "n": 260,
+      "p50": 6926.0,
+      "p90": 10786.0,
+      "max": 20223
+     },
+     "other/p4/o": {
+      "n": 50,
+      "p50": 7442.0,
+      "p90": 18014.0,
+      "max": 24492
+     },
+     "other/p4/r": {
+      "n": 315,
+      "p50": 6961.0,
+      "p90": 10172.0,
+      "max": 24481
+     },
+     "other/p5/o": {
+      "n": 168,
+      "p50": 7168.0,
+      "p90": 23876.0,
+      "max": 91796
+     },
+     "other/p5/r": {
+      "n": 1416,
+      "p50": 6922.0,
+      "p90": 10516.0,
+      "max": 43284
+     }
+    },
+    "tx_wait_other_by_prio_ms": {
+     "p1": {
+      "n": 66,
+      "p50": 6624.0,
+      "p90": 11794.0,
+      "max": 14701
+     },
+     "p2": null,
+     "p3": {
+      "n": 471,
+      "p50": 6946.0,
+      "p90": 10749.0,
+      "max": 20223
+     },
+     "p4": {
+      "n": 365,
+      "p50": 6965.0,
+      "p90": 10828.0,
+      "max": 24492
+     },
+     "p5": {
+      "n": 1584,
+      "p50": 6925.0,
+      "p90": 11289.0,
+      "max": 91796
+     }
+    },
+    "tx_wait_prio3_cet_ms": {
+     "n": 346,
+     "p50": 6785.0,
+     "p90": 9948.0,
+     "max": 14076
+    },
+    "tx_wait_prio3_other_ms": {
+     "n": 471,
+     "p50": 6946.0,
+     "p90": 10749.0,
+     "max": 20223
+    }
+   }
+  }
+ },
+ "network": {
+  "sources": {
+   "OE1XAR-33": 151
+  },
+  "distinct_ids": 151,
+  "wrong_time_cet_lt": 0,
+  "content_gap_s": {
+   "n": 150,
+   "min": 606,
+   "p50": 607.0,
+   "p90": 608.0,
+   "p99": 608.5,
+   "max": 674
+  },
+  "id_step_counter": {
+   "1": 143,
+   "2": 4,
+   "3": 2,
+   "667082": 1
+  },
+  "content_first": "2026-10-31 05:31:07",
+  "content_last": "2026-11-01 06:49:21",
+  "expected_telegrams_at_median_gap": 151,
+  "content_gaps_gt_1p5_median": [],
+  "content_gap_minus_600_s": {
+   "n": 150,
+   "min": 6,
+   "p50": 7.0,
+   "p90": 8.0,
+   "p99": 8.5,
+   "max": 74
+  },
+  "udp_push_spread_across_gateways_s": {
+   "n": 151,
+   "min": 0.003,
+   "p50": 0.075,
+   "p90": 0.122,
+   "p99": 0.197,
+   "max": 0.496
+  },
+  "udp_ids_with_any_gateway": 151,
+  "udp_age_s_logger_based": {
+   "n": 662,
+   "min": 0.06,
+   "p50": 0.7,
+   "p90": 1.04,
+   "p99": 3.88,
+   "max": 4.06
+  },
+  "udp_first_arrival_gap_s": {
+   "n": 150,
+   "min": 604.0,
+   "p50": 607.0,
+   "p90": 607.4,
+   "p99": 610.4,
+   "max": 673.6
+  },
+  "udp_first_arrival_gaps_gt_900s": [],
+  "hourly_cet_tx_total_all5_sample": [
+   [
+    1793422800,
+    10,
+    49
+   ],
+   [
+    1793426400,
+    30,
+    185
+   ],
+   [
+    1793430000,
+    30,
+    149
+   ],
+   [
+    1793433600,
+    30,
+    138
+   ]
+  ],
+  "oe3_cluster": {
+   "all5_window_ids": 67,
+   "all5_window_utc": [
+    "2026-10-31T05:51:20.392000+00:00",
+    "2026-10-31T17:12:43.158000+00:00"
+   ],
+   "distinct_radiations_total": 1376,
+   "radiations_by_vias": {
+    "1": 771,
+    "2": 548,
+    "3": 56,
+    "4": 1
+   },
+   "radiations_per_telegram": {
+    "n": 67,
+    "min": 15,
+    "p50": 20.0,
+    "p90": 24.4,
+    "p99": 26.7,
+    "max": 28
+   },
+   "radiation_class_counts": {
+    "our_gateway": 335,
+    "foreign_gateway": 436,
+    "relay": 605
+   },
+   "radiation_class_per_telegram_mean": {
+    "our_gateway": 5.0,
+    "foreign_gateway": 6.51,
+    "relay": 9.03
+   },
+   "radiation_airtime_s_total": 1028.9,
+   "window_hours": 11.36,
+   "radiation_airtime_s_per_h": 90.6,
+   "radiation_airtime_pct_of_hour": 2.52,
+   "radiation_airtime_by_class_s_per_h": {
+    "our_gateway": 21.3,
+    "foreign_gateway": 27.6,
+    "relay": 41.6
+   },
+   "radiation_airtime_per_telegram_s": 15.36,
+   "radiation_age_s": {
+    "our_gateway": {
+     "n": 335,
+     "min": 1.3,
+     "p50": 12.1,
+     "p90": 37.8,
+     "p99": 114.3,
+     "max": 149.5
+    },
+    "foreign_gateway": {
+     "n": 436,
+     "min": 1.2,
+     "p50": 11.8,
+     "p90": 62.7,
+     "p99": 283.5,
+     "max": 355.7
+    },
+    "relay": {
+     "n": 605,
+     "min": 6.7,
+     "p50": 26.9,
+     "p90": 307.3,
+     "p99": 1725.8,
+     "max": 2339.5
+    },
+    "all": {
+     "n": 1376,
+     "min": 1.2,
+     "p50": 18.4,
+     "p90": 88.5,
+     "p99": 1129.8,
+     "max": 2339.5
+    }
+   },
+   "radiation_age_gt150": {
+    "our_gateway": [
+     0,
+     335,
+     0.0
+    ],
+    "foreign_gateway": [
+     13,
+     436,
+     3.0
+    ],
+    "relay": [
+     94,
+     605,
+     15.5
+    ],
+    "all": [
+     107,
+     1376,
+     7.8
+    ]
+   },
+   "radiation_age_gt300_pct": 4.8,
+   "radiation_age_gt600_pct": 1.6,
+   "radiation_age_gt1200_n": 12,
+   "telegrams_with_stale_radiation": [
+    54,
+    67
+   ],
+   "stale_relay_offenders": [
+    {
+     "call": "OE3MIF-12",
+     "radiations": 25,
+     "stale": 24,
+     "stale_pct": 96,
+     "stale_age_p50": 328,
+     "stale_age_p90": 383,
+     "stale_age_max": 1790
+    },
+    {
+     "call": "OE3NRA-1",
+     "radiations": 21,
+     "stale": 21,
+     "stale_pct": 100,
+     "stale_age_p50": 327,
+     "stale_age_p90": 400,
+     "stale_age_max": 1774
+    },
+    {
+     "call": "OE3MTC-10",
+     "radiations": 19,
+     "stale": 19,
+     "stale_pct": 100,
+     "stale_age_p50": 691,
+     "stale_age_p90": 1688,
+     "stale_age_max": 2012
+    },
+    {
+     "call": "OE3XDC-12",
+     "radiations": 21,
+     "stale": 18,
+     "stale_pct": 86,
+     "stale_age_p50": 389,
+     "stale_age_p90": 498,
+     "stale_age_max": 2039
+    },
+    {
+     "call": "OE3XPA-12",
+     "radiations": 56,
+     "stale": 9,
+     "stale_pct": 16,
+     "stale_age_p50": 270,
+     "stale_age_p90": 312,
+     "stale_age_max": 340
+    }
+   ],
+   "stale_radiations_share_from_offenders_pct": 76.6,
+   "relay_age_by_vias_p50_p90": {
+    "2": [
+     25.7,
+     263.8,
+     548
+    ],
+    "3": [
+     43.7,
+     1635.9,
+     56
+    ],
+    "4": [
+     29.2,
+     29.2,
+     1
+    ]
+   },
+   "very_old_gt600_lasthops": [
+    [
+     "OE3MTC-10",
+     12
+    ],
+    [
+     "OE3XWJ-94",
+     3
+    ],
+    [
+     "OE3MIF-12",
+     2
+    ],
+    [
+     "OE3XDC-12",
+     1
+    ],
+    [
+     "OE3KJO-64",
+     1
+    ],
+    [
+     "OE3BCB-10",
+     1
+    ],
+    [
+     "OE3NRA-1",
+     1
+    ],
+    [
+     "OE3XHU-22",
+     1
+    ]
+   ],
+   "very_old_gt600_n": 22,
+   "gateways_per_telegram": {
+    "n": 67,
+    "min": 9,
+    "p50": 13.0,
+    "p90": 15.0,
+    "p99": 17.0,
+    "max": 17
+   },
+   "gateways_per_telegram_dist": {
+    "9": 1,
+    "10": 5,
+    "11": 6,
+    "12": 13,
+    "13": 11,
+    "14": 13,
+    "15": 12,
+    "16": 3,
+    "17": 3
+   },
+   "foreign_gateways_per_telegram": {
+    "n": 67,
+    "min": 4,
+    "p50": 8.0,
+    "p90": 10.0,
+    "p99": 12.0,
+    "max": 12
+   },
+   "gateway_presence_per_telegram_pct": [
+    [
+     "OE3XHL-12",
+     100
+    ],
+    [
+     "OE3XIA-12",
+     100
+    ],
+    [
+     "OE3XIR-12",
+     100
+    ],
+    [
+     "OE3XOC-12",
+     100
+    ],
+    [
+     "OE3XWJ-12",
+     100
+    ],
+    [
+     "OE1XAR-12",
+     91
+    ],
+    [
+     "OE3GJC-12",
+     91
+    ],
+    [
+     "OE3XPA-12",
+     84
+    ],
+    [
+     "OE3ZKW-12",
+     82
+    ],
+    [
+     "OE3WFA-12",
+     79
+    ],
+    [
+     "OE3XSI-13",
+     61
+    ],
+    [
+     "OE1RIG-12",
+     52
+    ],
+    [
+     "OE3BCB-10",
+     52
+    ],
+    [
+     "OE1XCS-12",
+     49
+    ],
+    [
+     "OE3XHQ-12",
+     39
+    ],
+    [
+     "OE3XKN-1",
+     37
+    ],
+    [
+     "OE1MBW-12",
+     33
+    ],
+    [
+     "OE1IAH-12",
+     19
+    ],
+    [
+     "OE3AOG-12",
+     9
+    ],
+    [
+     "OE1GNR-12",
+     6
+    ],
+    [
+     "OE3AHU-13",
+     6
+    ],
+    [
+     "OE3EFR-12",
+     6
+    ],
+    [
+     "OE3XER-12",
+     4
+    ],
+    [
+     "OE1KBC-12",
+     3
+    ],
+    [
+     "OE1YEM-10",
+     3
+    ]
+   ],
+   "distinct_gateways_seen": 33,
+   "distinct_relay_nodes_per_telegram": {
+    "n": 67,
+    "min": 3,
+    "p50": 9.0,
+    "p90": 13.0,
+    "p99": 14.3,
+    "max": 15
+   },
+   "relay_paths_per_telegram": {
+    "n": 67,
+    "min": 3,
+    "p50": 9.0,
+    "p90": 13.0,
+    "p99": 15.0,
+    "max": 15
+   },
+   "hears_gateway_radiation_pct": {
+    "oe3xhl": {
+     "oe3xia": 0,
+     "oe3xir": 0,
+     "oe3xoc": 0,
+     "oe3xwj": 0
+    },
+    "oe3xia": {
+     "oe3xhl": 52,
+     "oe3xir": 36,
+     "oe3xoc": 46,
+     "oe3xwj": 0
+    },
+    "oe3xir": {
+     "oe3xhl": 0,
+     "oe3xia": 28,
+     "oe3xoc": 73,
+     "oe3xwj": 60
+    },
+    "oe3xoc": {
+     "oe3xhl": 0,
+     "oe3xia": 27,
+     "oe3xir": 46,
+     "oe3xwj": 18
+    },
+    "oe3xwj": {
+     "oe3xhl": 0,
+     "oe3xia": 0,
+     "oe3xir": 45,
+     "oe3xoc": 19
+    }
+   },
+   "our_tx_pairs_overlapping_airtime_lt0.75s": 30,
+   "our_tx_pairs_within_3s": 119,
+   "our_tx_overlap_pairs": {
+    "oe3xwj-oe3xoc": 3,
+    "oe3xir-oe3xhl": 1,
+    "oe3xwj-oe3xir": 1,
+    "oe3xhl-oe3xir": 1,
+    "oe3xia-oe3xwj": 4,
+    "oe3xoc-oe3xhl": 3,
+    "oe3xhl-oe3xoc": 1,
+    "oe3xhl-oe3xia": 5,
+    "oe3xoc-oe3xia": 1,
+    "oe3xwj-oe3xia": 2,
+    "oe3xir-oe3xwj": 1,
+    "oe3xhl-oe3xwj": 2,
+    "oe3xia-oe3xhl": 3,
+    "oe3xir-oe3xoc": 1,
+    "oe3xwj-oe3xhl": 1
+   },
+   "our_tx_per_telegram": {
+    "5": 67
+   },
+   "our_tx_spread_first_to_last_s": {
+    "n": 67,
+    "min": 4.4,
+    "p50": 25.3,
+    "p90": 81.5,
+    "p99": 134.1,
+    "max": 144.8
+   },
+   "first_own_radiation_after_push_s": {
+    "n": 67,
+    "min": 0.1,
+    "p50": 4.8,
+    "p90": 8.9,
+    "p99": 9.4,
+    "max": 9.5
+   },
+   "tx_age_node_based_join": {
+    "oe3xhl": {
+     "n_joined": 148,
+     "node_age": {
+      "n": 148,
+      "min": -1,
+      "p50": 8.0,
+      "p90": 12.0,
+      "p99": 23.0,
+      "max": 24
+     },
+     "logger_minus_node_age_s": {
+      "n": 148,
+      "min": 0.24,
+      "p50": 1.16,
+      "p90": 1.71,
+      "p99": 2.01,
+      "max": 2.05
+     },
+     "node_age_gt150": 0,
+     "node_age_max": 24
+    },
+    "oe3xia": {
+     "n_joined": 148,
+     "node_age": {
+      "n": 148,
+      "min": 0,
+      "p50": 11.0,
+      "p90": 49.0,
+      "p99": 117.0,
+      "max": 121
+     },
+     "logger_minus_node_age_s": {
+      "n": 148,
+      "min": 0.16,
+      "p50": 1.08,
+      "p90": 1.69,
+      "p99": 2.01,
+      "max": 2.09
+     },
+     "node_age_gt150": 0,
+     "node_age_max": 121
+    },
+    "oe3xir": {
+     "n_joined": 68,
+     "node_age": {
+      "n": 68,
+      "min": 1,
+      "p50": 22.0,
+      "p90": 39.0,
+      "p99": 115.0,
+      "max": 147
+     },
+     "logger_minus_node_age_s": {
+      "n": 68,
+      "min": 0.2,
+      "p50": 1.1,
+      "p90": 1.68,
+      "p99": 1.85,
+      "max": 1.98
+     },
+     "node_age_gt150": 0,
+     "node_age_max": 147
+    },
+    "oe3xoc": {
+     "n_joined": 151,
+     "node_age": {
+      "n": 151,
+      "min": 0,
+      "p50": 13.0,
+      "p90": 54.0,
+      "p99": 83.0,
+      "max": 129
+     },
+     "logger_minus_node_age_s": {
+      "n": 151,
+      "min": 0.34,
+      "p50": 1.19,
+      "p90": 1.77,
+      "p99": 1.95,
+      "max": 1.97
+     },
+     "node_age_gt150": 0,
+     "node_age_max": 129
+    },
+    "oe3xwj": {
+     "n_joined": 151,
+     "node_age": {
+      "n": 151,
+      "min": 0,
+      "p50": 9.0,
+      "p90": 12.0,
+      "p99": 24.0,
+      "max": 32
+     },
+     "logger_minus_node_age_s": {
+      "n": 151,
+      "min": 0.18,
+      "p50": 1.07,
+      "p90": 1.65,
+      "p99": 2.0,
+      "max": 2.07
+     },
+     "node_age_gt150": 0,
+     "node_age_max": 32
+    }
+   },
+   "gateway_radiation_followed_by_relay": {
+    "our_gateway": [
+     211,
+     335,
+     63.0
+    ],
+    "foreign_gateway": [
+     90,
+     436,
+     20.6
+    ]
+   },
+   "our_tx_followed_by_relay_per_node": {
+    "oe3xhl": [
+     59,
+     67,
+     88.1
+    ],
+    "oe3xia": [
+     41,
+     67,
+     61.2
+    ],
+    "oe3xir": [
+     35,
+     67,
+     52.2
+    ],
+    "oe3xoc": [
+     24,
+     67,
+     35.8
+    ],
+    "oe3xwj": [
+     52,
+     67,
+     77.6
+    ]
+   }
+  },
+  "db0ais_is_separate_mesh": true
+ }
+}

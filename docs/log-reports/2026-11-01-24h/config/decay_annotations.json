@@ -1,0 +1,22 @@
+{
+ "cet_manual": {
+  "ring_drop_stale_reason_cet": 0,
+  "n_tx_age_ge_150s": 0,
+  "n_untrusted_tx": 0,
+  "relay_admission_drops_not_ring": {
+   "oe3xwj": 6,
+   "oe3xoc": 2,
+   "age_s_range": [
+    1565,
+    2601
+   ]
+  }
+ },
+ "examples": {
+  "redundant": "oe3xia 2026-10-31 07:11:25.0 drop HEY 86C8D169 (OE3REI-14, H03): oe3xhl TX at -160.7 s, oe3xir TX at -172.3 s (relative to drop), all 5 nodes received it",
+  "redundant_lower_hop": "oe3xia 2026-10-31 06:52:59.4 drop HEY 4DCBE2CC (OE3HES-1): oe3xhl TX at -131.6 s; oe3xia re-heard copies at -133.7 s (H3) and -101.2 / -97.7 s (H0)",
+  "potential_loss": "oe3xoc 2026-10-31 11:35:09.5 drop HEY 1AFB2190 (OE3KJO-64>H, H04, RSSI -108, direct): written 11:32:09.13, no other node ever heard this id; same minute XOC sent 10 ACKs (waits 13-41 s); originator's next HEY 1AFB2192 at 11:43:46",
+  "own_wx_empty_ring": "oe3xoc 2026-10-31 14:37:44.43 WX position 81125FC5 written into EMPTY ring (queued=0), TX-UDP uplink at 14:37:44.46, never radiated; 5 higher-prio frames sent in 120 s (2x prio-3 text, 3x ACK), dropped 14:39:45.27 age 120 s",
+  "own_wx_silence": "oe3xoc own WX position: last RF-sent 2026-10-31 21:14:16.6, next 2026-11-01 04:52:36.8 = 7.64 h; 34 of 49 WX beacons dropped by TTL, 34/34 had TX-UDP uplink at write time"
+ }
+}

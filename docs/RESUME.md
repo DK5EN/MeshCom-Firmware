@@ -244,11 +244,14 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-11-01:** 24-h multi-node log analysis: five OE3 gateways, DB0AIS and two HB9 Heltec V3, every claim
+  adversarially verified; nine self-contained HTML reports in `docs/log-reports/2026-11-01-24h/` and the reusable
+  pipeline `tools/logreport/`. Findings: RAK4631 auto-ping has no count limit (ESP32/RAK difference, decision
+  open), own prio-4/5 beacons starve at busy nodes (age floor misses prio 4/5), OE3XIA deaf receiver (bench test
+  pending), ACK relays without cancel path. Session review: LOGREP-01.
 - **2026-10-25:** T-Deck heap/WiFi campaign: field RCA reproduced on DK5EN-14 (~250 messages wedge the IP path while
   WiFi stays associated); TD-20, TD-21/21b and TD-22 fixed and benched; slow LAN ping traced to WiFi modem sleep
   (WIFI-PS-01, accepted).
 - **2026-10-24 (late):** TRK-02 measurement campaign (web flasher vs PRG/GPIO0): `dtr_replay.py`, 80 replays
   plus one Chrome install on DK5EN-1, 0 clicks; TRK-03 T-Beam first-boot TRACK bit confirmed on DK5EN-92
   (erased and restored) and fixed with a native test.
-- **2026-10-24 (evening):** AU-21 field log DJ8MEH-81 analysed; tracker TFT sprite on demand and released for AU
-  TLS jobs, `lowheap_tls`, heap logging (`(tft)` mark, `--info` HEAP); two waves, gate green, DK5EN-1 benched.

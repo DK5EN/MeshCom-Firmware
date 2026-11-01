@@ -1,0 +1,46 @@
+{
+ "pings": 1529,
+ "distinct_ping_ids": 987,
+ "first_ping": "2026-10-31 06:27:25",
+ "last_ping": "2026-11-01 07:56:59",
+ "cluster_by_acked_id": {
+  "ids_with_ack": 962,
+  "ack_ids_per_ping_mean": 4.64,
+  "median": 4.0,
+  "max": 13
+ },
+ "cluster_by_ping_event": {
+  "pings_with_ack": 1477,
+  "ack_ids_per_ping_mean": 2.92,
+  "median": 3,
+  "max": 8
+ },
+ "ack_format": {
+  "receptions": 80344,
+  "gateway_byte_01": 80343,
+  "server_bit_set": 80344
+ },
+ "ack_receptions_per_node": {
+  "oe3xhl": 10001,
+  "oe3xia": 14101,
+  "oe3xir": 9008,
+  "oe3xoc": 27330,
+  "oe3xwj": 19904
+ },
+ "at_wj": {
+  "with_ack": 1458,
+  "frames_mean": 2.76,
+  "frames_median": 3,
+  "frames_max": 8,
+  "recv_mean": 12.8,
+  "recv_median": 12,
+  "first_ack_s": {
+   "n": 1458,
+   "mean": 28.3,
+   "p50": 16.4,
+   "p90": 45.3,
+   "max": 453.2
+  },
+  "first_ack_hop4": 739
+ }
+}

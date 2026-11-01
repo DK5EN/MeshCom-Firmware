@@ -1,0 +1,347 @@
+{
+ "origin_counts": {
+  "HB9JAT": 42
+ },
+ "candidates": 42,
+ "same_payload": 0,
+ "different_payload": 42,
+ "unknown": 0,
+ "rows": [
+  {
+   "id": "4EBC7321",
+   "gap_min": 59.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,122,-10;13,110,-17;12,82,3;",
+   "p2": "H@R2;5,124,-13;13,121,-17;"
+  },
+  {
+   "id": "4EBC7320",
+   "gap_min": 71.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;",
+   "p2": "H@R0;5,123,-10;13,110,-15;13,81,4;"
+  },
+  {
+   "id": "4EBC71F4",
+   "gap_min": 72.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;14,118,-15;",
+   "p2": "H@R0;6,123,-10;"
+  },
+  {
+   "id": "4EBC70C8",
+   "gap_min": 74.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;12,89,-4;",
+   "p2": "H@R0;5,124,-11;13,121,-18;"
+  },
+  {
+   "id": "4EBC7385",
+   "gap_min": 80.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;6,123,-10;13,110,-16;12,89,-6;",
+   "p2": "H@R2;6,123,-11;2,93,4;13,119,-15;"
+  },
+  {
+   "id": "4EBC72BF",
+   "gap_min": 80.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;12,123,-21;",
+   "p2": "H@R2;5,123,-11;2,93,4;12,119,-14;"
+  },
+  {
+   "id": "4EBC72BC",
+   "gap_min": 86.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;",
+   "p2": "H@R0;6,123,-10;"
+  },
+  {
+   "id": "4EBC725A",
+   "gap_min": 93.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;2,94,4;13,120,-16;",
+   "p2": "H@R1;5,123,-13;13,121,-17;"
+  },
+  {
+   "id": "4EBC7384",
+   "gap_min": 94.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;13,82,4;",
+   "p2": "H@R0;6,124,-11;13,109,-16;13,82,3;"
+  },
+  {
+   "id": "4EBC70CA",
+   "gap_min": 99.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;7,127,-16;13,114,-9;",
+   "p2": "H@R2;5,123,-10;13,110,-17;12,81,3;"
+  },
+  {
+   "id": "4EBC712D",
+   "gap_min": 108.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;13,108,-17;12,82,3;",
+   "p2": "H@R0;6,123,-10;13,111,-16;13,83,3;"
+  },
+  {
+   "id": "4EBC70C9",
+   "gap_min": 109.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;",
+   "p2": "H@R0;6,123,-10;"
+  },
+  {
+   "id": "4EBC7259",
+   "gap_min": 110.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;",
+   "p2": "H@R0;5,122,-10;13,110,-15;13,89,-5;"
+  },
+  {
+   "id": "4EBC72BD",
+   "gap_min": 119.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,124,-11;13,121,-15;",
+   "p2": "H@R0;5,123,-11;"
+  },
+  {
+   "id": "4EBC7001",
+   "gap_min": 133.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-12;13,110,-15;13,81,3;",
+   "p2": "H@R2;5,123,-10;"
+  },
+  {
+   "id": "4EBC7000",
+   "gap_min": 147.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;",
+   "p2": "H@R0;6,123,-10;13,110,-16;13,82,3;"
+  },
+  {
+   "id": "4EBC7387",
+   "gap_min": 149.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-13;13,110,-16;12,85,3;",
+   "p2": "H@R2;5,123,-10;"
+  },
+  {
+   "id": "4EBC7322",
+   "gap_min": 157.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;",
+   "p2": "H@R2;5,123,-10;13,118,-15;"
+  },
+  {
+   "id": "4EBC71F7",
+   "gap_min": 175.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,122,-10;13,110,-17;12,81,4;",
+   "p2": "H@R2;5,123,-10;15,108,-17;14,85,3;"
+  },
+  {
+   "id": "4EBC70CB",
+   "gap_min": 183.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-15;13,88,-4;",
+   "p2": "H@R2;6,124,-13;13,111,-16;13,83,3;"
+  },
+  {
+   "id": "4EBC7064",
+   "gap_min": 197.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;6,123,-10;13,110,-16;12,81,3;",
+   "p2": "H@R0;5,123,-11;15,110,-17;14,82,4;"
+  },
+  {
+   "id": "4EBC70CD",
+   "gap_min": 210.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;14,110,-17;14,87,3;",
+   "p2": "H@R2;6,123,-10;13,110,-17;13,82,4;"
+  },
+  {
+   "id": "4EBC7386",
+   "gap_min": 217.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;7,127,-19;12,115,-10;",
+   "p2": "H@R0;5,123,-11;"
+  },
+  {
+   "id": "4EBC7263",
+   "gap_min": 220.2,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;",
+   "p2": "H@R2;5,123,-11;"
+  },
+  {
+   "id": "4EBC712C",
+   "gap_min": 228.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-16;12,89,-5;",
+   "p2": "H@R0;5,122,-10;"
+  },
+  {
+   "id": "4EBC7190",
+   "gap_min": 233.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,109,-16;13,81,4;",
+   "p2": "H@R0;5,123,-10;"
+  },
+  {
+   "id": "4EBC7193",
+   "gap_min": 270.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;",
+   "p2": "H@R1;5,124,-11;12,119,-14;"
+  },
+  {
+   "id": "4EBC71F6",
+   "gap_min": 274.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,122,-12;14,109,-19;13,81,3;",
+   "p2": "H@R0;5,123,-11;12,110,-17;12,81,4;"
+  },
+  {
+   "id": "4EBC71F5",
+   "gap_min": 289.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-11;",
+   "p2": "H@R0;5,124,-10;"
+  },
+  {
+   "id": "4EBC7258",
+   "gap_min": 346.9,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;13,110,-17;13,82,3;",
+   "p2": "H@R0;5,123,-10;"
+  },
+  {
+   "id": "4EBC725E",
+   "gap_min": 347.8,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;13,111,-16;12,83,3;",
+   "p2": "H@R2;5,124,-11;12,123,-19;"
+  },
+  {
+   "id": "4EBC7005",
+   "gap_min": 364.7,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,111,-16;112,-6;",
+   "p2": "H@R2;5,124,-11;13,111,-17;12,81,4;"
+  },
+  {
+   "id": "4EBC7068",
+   "gap_min": 365.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-16;12,81,3;",
+   "p2": "H@R1;5,123,-10;13,110,-17;12,81,3;"
+  },
+  {
+   "id": "4EBC725B",
+   "gap_min": 445.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;",
+   "p2": "H@R2;5,123,-12;8,126,-20;13,114,-11;"
+  },
+  {
+   "id": "4EBC7324",
+   "gap_min": 479.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,124,-11;",
+   "p2": "H@R1;5,123,-10;"
+  },
+  {
+   "id": "4EBC72BE",
+   "gap_min": 483.1,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-11;",
+   "p2": "H@R2;5,124,-11;12,123,-19;"
+  },
+  {
+   "id": "4EBC7065",
+   "gap_min": 500.4,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-11;",
+   "p2": "H@R0;5,123,-10;13,110,-16;12,81,3;"
+  },
+  {
+   "id": "4EBC7194",
+   "gap_min": 514.0,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R0;5,123,-10;115,-20;",
+   "p2": "H@R2;5,123,-10;13,110,-17;12,81,4;"
+  },
+  {
+   "id": "4EBC712F",
+   "gap_min": 569.3,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,124,-11;13,119,-14;",
+   "p2": "H@R2;5,124,-11;12,123,-19;112,-6;"
+  },
+  {
+   "id": "4EBC7004",
+   "gap_min": 653.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;6,123,-10;13,111,-16;13,83,3;",
+   "p2": "H@R2;5,123,-10;13,111,-15;12,81,4;"
+  },
+  {
+   "id": "4EBC7002",
+   "gap_min": 802.6,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R2;5,123,-10;13,110,-16;12,82,4;",
+   "p2": "H@R0;5,123,-12;13,110,-17;112,-4;"
+  },
+  {
+   "id": "4EBC71FE",
+   "gap_min": 1093.5,
+   "origin": "HB9JAT",
+   "verdict": "different_payload",
+   "p1": "H@R1;5,123,-10;",
+   "p2": "H@R0;6,123,-10;13,118,-14;"
+  }
+ ]
+}

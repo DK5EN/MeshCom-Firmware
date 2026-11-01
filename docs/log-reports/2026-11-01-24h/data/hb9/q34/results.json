@@ -1,0 +1,615 @@
+{
+ "meta": {
+  "toa_assumption": "SF11 BW250 CR4/6 (MOD 8 = fastslow, country 8 = EU8) preamble 8 explicit header CRC on, LDRO off; bytes on air = ring len; validated: observed TX_START->OnTXDone is constant ~40 ms below calc over lens 12..153",
+  "time_base": "logger wall clock; day 0 = 2026-10-31",
+  "cf_model": "see scripts/cf.py docstring; HL excluded (nbrrelay CANCEL path not modelled, baseline pick match 56 %)"
+ },
+ "nodes": {
+  "hb9vqq4": {
+   "drops_total": 0,
+   "by_prio_cat": {},
+   "reason": {},
+   "write_age_range": [
+    null,
+    null
+   ],
+   "relay_class": {},
+   "relay_refreshed_within_30min": 0,
+   "relay_refresh_median_s": null,
+   "own_dropped": 0,
+   "drop_toa_s": 0.0,
+   "drop_toa_n": 0,
+   "drop_bytes": 0,
+   "tx_frames": 2577,
+   "tx_toa_s": 2259.3,
+   "span_h": 23.99,
+   "tx_duty_pct": 2.616,
+   "drop_toa_pct_of_tx": 0.0,
+   "headroom": {
+    "p1": {
+     "ttl_s": 90,
+     "n_sent": 32,
+     "n_dropped": 0,
+     "p50": 22.7,
+     "p90": 34.9,
+     "p99": 42.2,
+     "max": 43.3,
+     "n_ge80pct_ttl_sent": 0,
+     "n_ge50pct_ttl_sent": 0
+    },
+    "p3": {
+     "ttl_s": 300,
+     "n_sent": 409,
+     "n_dropped": 0,
+     "p50": 9.0,
+     "p90": 11.9,
+     "p99": 32.7,
+     "max": 61.9,
+     "n_ge80pct_ttl_sent": 0,
+     "n_ge50pct_ttl_sent": 0
+    },
+    "p4": {
+     "ttl_s": 120,
+     "n_sent": 630,
+     "n_dropped": 0,
+     "p50": 8.9,
+     "p90": 36.7,
+     "p99": 65.1,
+     "max": 80.4,
+     "n_ge80pct_ttl_sent": 0,
+     "n_ge50pct_ttl_sent": 20
+    },
+    "p5": {
+     "ttl_s": 180,
+     "n_sent": 1500,
+     "n_dropped": 0,
+     "p50": 9.8,
+     "p90": 58.8,
+     "p99": 85.8,
+     "max": 166.5,
+     "n_ge80pct_ttl_sent": 3,
+     "n_ge50pct_ttl_sent": 15
+    }
+   },
+   "cet_tx_n": 207,
+   "cet_tx_age_s": {
+    "min": 0,
+    "p50": 10.0,
+    "max": 56,
+    "n_gt_120": 0,
+    "n_untrusted": 0
+   },
+   "cet_tx_wait_s_max": 25.173,
+   "drop_table": {},
+   "context": {
+    "tx": 2577,
+    "span_h": 23.99,
+    "tx_per_h": 107.4,
+    "rx_logged": 14620,
+    "rx_per_h": 609,
+    "rx_error_per_h": 0,
+    "cad_busy_1_per_tx": 0.68,
+    "tx_gate_enter_per_tx": 1.48,
+    "cancel_events": 0,
+    "ring_supersede": 50,
+    "txudp_lines": 3166
+   },
+   "cf": {
+    "n_items": 2972,
+    "n_services_p345": 2539,
+    "baseline_pick_match_pct": 68.9,
+    "baseline_ttl_drops": 285,
+    "real_ttl_drops": 0,
+    "baseline_drops_in_real_drops_pct": 0.0,
+    "stale_fate_no_ttl": {
+     "served": 0,
+     "superseded": 0,
+     "never_served_by_end": 0
+    },
+    "fresh_delayed": {
+     "n_compared": 2369,
+     "n_delayed_gt_0_5s": 451,
+     "pct_delayed": 19.0,
+     "delay_s_p50": 431.0,
+     "delay_s_p90": 719.9,
+     "delay_s_max": 2178.9,
+     "fresh_served_in_baseline_but_not_in_noTTL": 169
+    },
+    "depth_ttl_on": {
+     "max": 12,
+     "mean_at_events": 2.18,
+     "pct_events_ge10": 0.2
+    },
+    "depth_no_ttl": {
+     "max": 26,
+     "mean_at_events": 6.48,
+     "pct_events_ge10": 34.7
+    },
+    "end_backlog_ttl_on": 1,
+    "end_backlog_no_ttl": 10,
+    "depth_time_weighted": {
+     "ttl_on": 1.88,
+     "no_ttl": 6.59
+    },
+    "stale_slot_seconds_real": 0,
+    "stale_slot_seconds_no_ttl_served": 0
+   },
+   "ttl_sens": {
+    "p4": {
+     "n_items": 630,
+     "ttl_now": 120,
+     "table": {
+      "30": {
+       "n_over": 81,
+       "own": 8,
+       "pct_of_items": 12.86
+      },
+      "45": {
+       "n_over": 46,
+       "own": 5,
+       "pct_of_items": 7.3
+      },
+      "60": {
+       "n_over": 20,
+       "own": 2,
+       "pct_of_items": 3.17
+      },
+      "90": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "120": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "180": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "240": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "300": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "600": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      }
+     }
+    },
+    "p5": {
+     "n_items": 1500,
+     "ttl_now": 180,
+     "table": {
+      "30": {
+       "n_over": 326,
+       "own": 35,
+       "pct_of_items": 21.73
+      },
+      "60": {
+       "n_over": 146,
+       "own": 10,
+       "pct_of_items": 9.73
+      },
+      "90": {
+       "n_over": 15,
+       "own": 7,
+       "pct_of_items": 1.0
+      },
+      "120": {
+       "n_over": 6,
+       "own": 4,
+       "pct_of_items": 0.4
+      },
+      "150": {
+       "n_over": 3,
+       "own": 2,
+       "pct_of_items": 0.2
+      },
+      "180": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "240": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "300": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      },
+      "600": {
+       "n_over": 0,
+       "own": 0,
+       "pct_of_items": 0.0
+      }
+     }
+    }
+   },
+   "csma": {
+    "events": 124,
+    "episodes": 26,
+    "stage_events": {
+     "1": 124
+    },
+    "stage_episodes": {
+     "1": 26
+    },
+    "ep_prio": {
+     "3": 8,
+     "1": 16,
+     "2": 2
+    },
+    "ep_outcome": {
+     "sent": 26
+    },
+    "hold_ms": {
+     "p10": 1500.0,
+     "p50": 1570.0,
+     "p90": 1640.0
+    },
+    "tx_prio_le3": 447,
+    "tx_prio_le3_wait_ge20s": 39,
+    "tx_prio_le3_wait_ge20s_pct": 8.7,
+    "tx_prio_le3_wait_ge60s": 3,
+    "replay": {
+     "n_episodes_eval": 26,
+     "real_remaining_after_first_aged_event_s": {
+      "p50": 3.2,
+      "p90": 7.8,
+      "sum": 100
+     },
+     "saved_s_vs_attempt0_hold": {
+      "p50": 3.07,
+      "p90": 7.33,
+      "sum": 106,
+      "pct_ep_gt_1s": 100.0
+     },
+     "saved_s_vs_attempt2_hold": {
+      "p50": 1.12,
+      "p90": 4.21,
+      "sum": 54,
+      "pct_ep_gt_1s": 50.0
+     },
+     "real_tx_minus_sim_fire_s": {
+      "p10": 0.07,
+      "p50": 0.65,
+      "p90": 5.59
+     },
+     "pct_saved_of_real_remaining_attempt0": 105.9
+    },
+    "latency_split": {
+     "p1": {
+      "n_ge20": 21,
+      "n_lt20": 13,
+      "ge20_p50": 25.5,
+      "ge20_p90": 35.3,
+      "lt20_p50": 6.5
+     },
+     "p3": {
+      "n_ge20": 15,
+      "n_lt20": 394,
+      "ge20_p50": 25.1,
+      "ge20_p90": 60.6,
+      "lt20_p50": 8.9
+     }
+    },
+    "probe_p1_aged": {
+     "n": 21,
+     "cad_mean": 0.19,
+     "pct_cad_ge2": 0.0,
+     "pct_cad_ge3": 0.0,
+     "pct_rxerr_within_3s_after_tx": 0.0,
+     "pct_echo_within_60s": 85.7,
+     "pct_dup_tx_within_120s": 28.57
+    },
+    "probe_p1_fresh": {
+     "n": 13,
+     "cad_mean": 0.31,
+     "pct_cad_ge2": 0.0,
+     "pct_cad_ge3": 0.0,
+     "pct_rxerr_within_3s_after_tx": 0.0,
+     "pct_echo_within_60s": 69.2,
+     "pct_dup_tx_within_120s": 30.77
+    },
+    "probe_p3_aged": {
+     "n": 15,
+     "cad_mean": 0.6,
+     "pct_cad_ge2": 13.3,
+     "pct_cad_ge3": 6.7,
+     "pct_rxerr_within_3s_after_tx": 0.0,
+     "pct_echo_within_60s": 73.3,
+     "pct_dup_tx_within_120s": 0.0
+    },
+    "probe_p3_fresh": {
+     "n": 394,
+     "cad_mean": 0.66,
+     "pct_cad_ge2": 11.2,
+     "pct_cad_ge3": 8.4,
+     "pct_rxerr_within_3s_after_tx": 0.0,
+     "pct_echo_within_60s": 88.6,
+     "pct_dup_tx_within_120s": 0.0
+    }
+   }
+  }
+ },
+ "network": {
+  "drops_total": 0,
+  "by_prio_cat": {},
+  "reason": {},
+  "relay_class": {},
+  "relay_refreshed": 0,
+  "own_beacons": {
+   "hb9vqq4/own_HEY": {
+    "written": 97,
+    "outcomes": {
+     "sent": 96,
+     "superseded": 1
+    },
+    "effective_sent_pct": 99.0,
+    "sent_gap_s": {
+     "p50": 900,
+     "p90": 1326,
+     "max": 1791
+    },
+    "gap_around_dropped_s": {
+     "n": 0,
+     "p50": null,
+     "max": null
+    },
+    "dropped_with_udp_uplink": 0,
+    "sent_lat_s": {
+     "p50": 20.9,
+     "p90": 64.7
+    }
+   },
+   "hb9vqq4/own_WX_POS": {
+    "written": 47,
+    "outcomes": {
+     "sent": 47
+    },
+    "effective_sent_pct": 100.0,
+    "sent_gap_s": {
+     "p50": 1832,
+     "p90": 1858,
+     "max": 1877
+    },
+    "gap_around_dropped_s": {
+     "n": 0,
+     "p50": null,
+     "max": null
+    },
+    "dropped_with_udp_uplink": 0,
+    "sent_lat_s": {
+     "p50": 13.2,
+     "p90": 42.6
+    }
+   }
+  },
+  "ttl_sens_pooled_ia_ir_oc_wj": {
+   "p4": {
+    "n_items": 630,
+    "ttl_now": 120,
+    "table": {
+     "30": {
+      "n_over": 81,
+      "own": 8,
+      "pct_of_items": 12.86
+     },
+     "45": {
+      "n_over": 46,
+      "own": 5,
+      "pct_of_items": 7.3
+     },
+     "60": {
+      "n_over": 20,
+      "own": 2,
+      "pct_of_items": 3.17
+     },
+     "90": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "120": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "180": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "240": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "300": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "600": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     }
+    }
+   },
+   "p5": {
+    "n_items": 1500,
+    "ttl_now": 180,
+    "table": {
+     "30": {
+      "n_over": 326,
+      "own": 35,
+      "pct_of_items": 21.73
+     },
+     "60": {
+      "n_over": 146,
+      "own": 10,
+      "pct_of_items": 9.73
+     },
+     "90": {
+      "n_over": 15,
+      "own": 7,
+      "pct_of_items": 1.0
+     },
+     "120": {
+      "n_over": 6,
+      "own": 4,
+      "pct_of_items": 0.4
+     },
+     "150": {
+      "n_over": 3,
+      "own": 2,
+      "pct_of_items": 0.2
+     },
+     "180": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "240": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "300": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     },
+     "600": {
+      "n_over": 0,
+      "own": 0,
+      "pct_of_items": 0.0
+     }
+    }
+   }
+  },
+  "hb9vqq5": {
+   "ring_drop_stale": 0,
+   "csma_aged": 8,
+   "tx_by_prio": {
+    "p1": {
+     "n": 22,
+     "p50": 15.5,
+     "p99": 42.5,
+     "max": 42.5,
+     "n_gt_20s": 7,
+     "n_gt_60s": 0
+    },
+    "p2": {
+     "n": 4,
+     "p50": 7.5,
+     "p99": 15.9,
+     "max": 16.1,
+     "n_gt_20s": 0,
+     "n_gt_60s": 0
+    },
+    "p3": {
+     "n": 399,
+     "p50": 8.7,
+     "p99": 21.4,
+     "max": 48.6,
+     "n_gt_20s": 6,
+     "n_gt_60s": 0
+    },
+    "p4": {
+     "n": 431,
+     "p50": 8.4,
+     "p99": 52.2,
+     "max": 78.0,
+     "n_gt_20s": 17,
+     "n_gt_60s": 4
+    },
+    "p5": {
+     "n": 1327,
+     "p50": 8.8,
+     "p99": 66.8,
+     "max": 156.7,
+     "n_gt_20s": 139,
+     "n_gt_60s": 27
+    }
+   }
+  },
+  "drop_toa_s_total": 0.0,
+  "tx_toa_s_total": 2259.3,
+  "drop_toa_pct_of_tx": 0.0,
+  "relay_potential_loss": {
+   "relay_total": 0,
+   "weak_or_none": 0,
+   "none": 0,
+   "weak_or_none_refreshed_by_originator_within_30min": 0,
+   "none_refreshed": 0,
+   "text_or_ack_drops": 0,
+   "refresh_median_s_positive": null
+  },
+  "headroom_pooled": {
+   "p1": {
+    "ttl_s": 90,
+    "n_sent": 32,
+    "n_dropped": 0,
+    "n_sent_ge80pct_ttl": 0,
+    "pct_sent_ge80": 0.0,
+    "n_sent_ge50pct_ttl": 0,
+    "max_sent_lat_s": 43.3,
+    "pct_reached_ttl": 0.0
+   },
+   "p3": {
+    "ttl_s": 300,
+    "n_sent": 409,
+    "n_dropped": 0,
+    "n_sent_ge80pct_ttl": 0,
+    "pct_sent_ge80": 0.0,
+    "n_sent_ge50pct_ttl": 0,
+    "max_sent_lat_s": 61.9,
+    "pct_reached_ttl": 0.0
+   },
+   "p4": {
+    "ttl_s": 120,
+    "n_sent": 630,
+    "n_dropped": 0,
+    "n_sent_ge80pct_ttl": 0,
+    "pct_sent_ge80": 0.0,
+    "n_sent_ge50pct_ttl": 20,
+    "max_sent_lat_s": 80.4,
+    "pct_reached_ttl": 0.0
+   },
+   "p5": {
+    "ttl_s": 180,
+    "n_sent": 1500,
+    "n_dropped": 0,
+    "n_sent_ge80pct_ttl": 3,
+    "pct_sent_ge80": 0.2,
+    "n_sent_ge50pct_ttl": 15,
+    "max_sent_lat_s": 166.5,
+    "pct_reached_ttl": 0.0
+   }
+  },
+  "cet": {
+   "cet_tx_n": 207,
+   "max_payload_age_at_tx_s": 56,
+   "n_tx_age_gt_120s": 0
+  },
+  "examples": {}
+ },
+ "unavailable": {
+  "hb9vqq5": "no [LOG] TX/RX lines in the capture (--setlog on missing): drop table, loss classification, counterfactual replay and TTL sensitivity not computable; network.hb9vqq5 carries the ring counters only"
+ }
+}

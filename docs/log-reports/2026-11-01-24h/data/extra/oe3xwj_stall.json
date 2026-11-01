@@ -1,0 +1,23 @@
+{
+ "last_rx": "2026-10-31 17:03:38.730",
+ "next_rx": "2026-10-31 17:06:11.911",
+ "gap_s": 153.2,
+ "second_longest_gap_s": 104.6,
+ "inside_wj": {
+  "cad_safety_timeout": 22,
+  "radio_tx": 0,
+  "eth_stall": 2,
+  "rx_restart_timeout": 23
+ },
+ "cad_safety_timeout_total": 24,
+ "queue_before_gap": 0,
+ "queue_in_gap_max": 8,
+ "queue_in_gap_last": 8,
+ "receptions_at_others_in_gap": {
+  "oe3xhl": 42,
+  "oe3xia": 68,
+  "oe3xir": 61,
+  "oe3xoc": 64
+ },
+ "rx_event_definition": "ONRXDONE_TIME or RX_ERROR line (ACK receptions included)"
+}

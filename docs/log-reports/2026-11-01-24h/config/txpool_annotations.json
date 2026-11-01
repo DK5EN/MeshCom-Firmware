@@ -1,0 +1,14 @@
+{
+ "network": {
+  "db0ais_note": "separate mesh and day, not correlated with OE3",
+  "verdict": {
+   "oe3xhl": "OK",
+   "oe3xia": "Beobachten",
+   "oe3xir": "Beobachten (client ping decode drop)",
+   "oe3xoc": "Handlungsbedarf (policy: prio 4/5 starvation)",
+   "oe3xwj": "OK",
+   "db0ais": "OK",
+   "overall": "Pool mechanics OK; Beobachten/Handlungsbedarf on CSMA-gated starvation of prio 4/5 at busy nodes"
+  }
+ }
+}

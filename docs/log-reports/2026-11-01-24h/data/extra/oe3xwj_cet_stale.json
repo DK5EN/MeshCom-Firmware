@@ -1,0 +1,231 @@
+{
+ "cet_rx_lines": 16,
+ "stale_threshold_s": 1000,
+ "stale_n": 14,
+ "age_min_s": 1371,
+ "age_max_s": 2601,
+ "outcome": {
+  "cet": 6,
+  "hop0": 5,
+  "loop": 3
+ },
+ "via_oe3mtc10_in_path": 14,
+ "oe3mtc10_last_station": 10,
+ "rows": [
+  {
+   "line": 96351,
+   "logger": "2026-10-31 11:51:38.462",
+   "age_s": 1565,
+   "outcome": "cet",
+   "drop_line": 96354,
+   "id": "6AE58951",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XIR-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 10:25:32"
+  },
+  {
+   "line": 108796,
+   "logger": "2026-10-31 12:40:04.252",
+   "age_s": 1435,
+   "outcome": "hop0",
+   "drop_line": null,
+   "id": "6AE58956",
+   "hop": 0,
+   "path": [
+    "OE1XAR-33",
+    "OE3XIR-12",
+    "OE3MTC-10",
+    "OE3MIF-12"
+   ],
+   "stamp_utc": "2026-10-31 11:16:08"
+  },
+  {
+   "line": 195867,
+   "logger": "2026-10-31 17:37:35.519",
+   "age_s": 1678,
+   "outcome": "hop0",
+   "drop_line": null,
+   "id": "6AE58975",
+   "hop": 0,
+   "path": [
+    "OE1XAR-33",
+    "OE3RAB-99",
+    "OE3RAB-1",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 16:09:37"
+  },
+  {
+   "line": 212350,
+   "logger": "2026-10-31 18:33:44.845",
+   "age_s": 2011,
+   "outcome": "cet",
+   "drop_line": 212354,
+   "id": "6AE5897C",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XIR-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 17:00:13"
+  },
+  {
+   "line": 213945,
+   "logger": "2026-10-31 18:39:07.853",
+   "age_s": 1727,
+   "outcome": "loop",
+   "drop_line": null,
+   "id": "6AE5897D",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XWJ-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 17:10:20"
+  },
+  {
+   "line": 220921,
+   "logger": "2026-10-31 19:03:49.368",
+   "age_s": 2601,
+   "outcome": "cet",
+   "drop_line": 220924,
+   "id": "6AE5897E",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XPA-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 17:20:27"
+  },
+  {
+   "line": 246713,
+   "logger": "2026-10-31 20:53:34.209",
+   "age_s": 2508,
+   "outcome": "cet",
+   "drop_line": 246716,
+   "id": "6AE58989",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XPA-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 19:11:45"
+  },
+  {
+   "line": 308205,
+   "logger": "2026-11-01 01:02:19.821",
+   "age_s": 1649,
+   "outcome": "loop",
+   "drop_line": null,
+   "id": "6AE589A3",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XWJ-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-10-31 23:34:49"
+  },
+  {
+   "line": 326218,
+   "logger": "2026-11-01 02:11:35.838",
+   "age_s": 2168,
+   "outcome": "cet",
+   "drop_line": 326222,
+   "id": "6AE589A9",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XPA-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-11-01 00:35:27"
+  },
+  {
+   "line": 339269,
+   "logger": "2026-11-01 03:01:36.398",
+   "age_s": 1529,
+   "outcome": "hop0",
+   "drop_line": null,
+   "id": "6AE589AF",
+   "hop": 0,
+   "path": [
+    "OE1XAR-33",
+    "OE3XWJ-12",
+    "OE3MTC-10",
+    "OE3MIF-12"
+   ],
+   "stamp_utc": "2026-11-01 01:36:06"
+  },
+  {
+   "line": 350880,
+   "logger": "2026-11-01 03:43:58.884",
+   "age_s": 1646,
+   "outcome": "loop",
+   "drop_line": null,
+   "id": "6AE589B3",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XWJ-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-11-01 02:16:32"
+  },
+  {
+   "line": 355501,
+   "logger": "2026-11-01 04:00:18.470",
+   "age_s": 1412,
+   "outcome": "hop0",
+   "drop_line": null,
+   "id": "6AE589B5",
+   "hop": 0,
+   "path": [
+    "OE1XAR-33",
+    "OE3XWJ-12",
+    "OE3MTC-10",
+    "OE3XWJ-94"
+   ],
+   "stamp_utc": "2026-11-01 02:36:45"
+  },
+  {
+   "line": 384837,
+   "logger": "2026-11-01 05:45:23.707",
+   "age_s": 2261,
+   "outcome": "cet",
+   "drop_line": 384842,
+   "id": "6AE589BE",
+   "hop": 1,
+   "path": [
+    "OE1XAR-33",
+    "OE3XPA-12",
+    "OE3MTC-10"
+   ],
+   "stamp_utc": "2026-11-01 04:07:42"
+  },
+  {
+   "line": 386416,
+   "logger": "2026-11-01 05:50:45.976",
+   "age_s": 1371,
+   "outcome": "hop0",
+   "drop_line": null,
+   "id": "6AE589C0",
+   "hop": 0,
+   "path": [
+    "OE1XAR-33",
+    "OE3XPA-12",
+    "OE3MTC-10",
+    "OE3MIF-12"
+   ],
+   "stamp_utc": "2026-11-01 04:27:54"
+  }
+ ]
+}

@@ -1,0 +1,106 @@
+{
+ "oe3xhl": {
+  "thr_dbm": -60,
+  "decoded_total": 11647,
+  "decoded_strong": 0,
+  "err_total": 1720,
+  "err_strong": 0,
+  "strong_decoded_per_hour": {},
+  "strong_err_per_hour": {},
+  "last_hops_strong": {},
+  "snr_decoded_strong_median": null,
+  "snr_err_strong_median": null
+ },
+ "oe3xia": {
+  "thr_dbm": -60,
+  "decoded_total": 8989,
+  "decoded_strong": 0,
+  "err_total": 11080,
+  "err_strong": 0,
+  "strong_decoded_per_hour": {},
+  "strong_err_per_hour": {},
+  "last_hops_strong": {},
+  "snr_decoded_strong_median": null,
+  "snr_err_strong_median": null
+ },
+ "oe3xir": {
+  "thr_dbm": -60,
+  "decoded_total": 5091,
+  "decoded_strong": 15,
+  "err_total": 4800,
+  "err_strong": 323,
+  "strong_decoded_per_hour": {
+   "10-31 07": 2,
+   "10-31 08": 3,
+   "10-31 09": 1,
+   "10-31 12": 1,
+   "10-31 14": 1,
+   "10-31 15": 2,
+   "10-31 16": 1,
+   "10-31 17": 4
+  },
+  "strong_err_per_hour": {
+   "10-31 06": 6,
+   "10-31 07": 28,
+   "10-31 08": 32,
+   "10-31 09": 21,
+   "10-31 10": 28,
+   "10-31 11": 31,
+   "10-31 12": 35,
+   "10-31 13": 27,
+   "10-31 14": 24,
+   "10-31 15": 23,
+   "10-31 16": 33,
+   "10-31 17": 27,
+   "10-31 18": 8
+  },
+  "last_hops_strong": {
+   "OE3XOC-12": 4,
+   "OE3XWJ-12": 3,
+   "OE3XPA-12": 2,
+   "OE3KJO-62": 2,
+   "OE3REI-14": 1,
+   "OE3KJO-64": 1,
+   "OE3XSI-13": 1,
+   "OE1XAR-12": 1
+  },
+  "snr_decoded_strong_median": -6,
+  "snr_err_strong_median": -20
+ },
+ "oe3xoc": {
+  "thr_dbm": -60,
+  "decoded_total": 15971,
+  "decoded_strong": 0,
+  "err_total": 12239,
+  "err_strong": 0,
+  "strong_decoded_per_hour": {},
+  "strong_err_per_hour": {},
+  "last_hops_strong": {},
+  "snr_decoded_strong_median": null,
+  "snr_err_strong_median": null
+ },
+ "oe3xwj": {
+  "thr_dbm": -60,
+  "decoded_total": 10864,
+  "decoded_strong": 0,
+  "err_total": 7697,
+  "err_strong": 0,
+  "strong_decoded_per_hour": {},
+  "strong_err_per_hour": {},
+  "last_hops_strong": {},
+  "snr_decoded_strong_median": null,
+  "snr_err_strong_median": null
+ },
+ "db0ais": {
+  "thr_dbm": -60,
+  "decoded_total": 6400,
+  "decoded_strong": 0,
+  "err_total": 12952,
+  "err_strong": 0,
+  "strong_decoded_per_hour": {},
+  "strong_err_per_hour": {},
+  "last_hops_strong": {},
+  "snr_decoded_strong_median": null,
+  "snr_err_strong_median": null
+ }
+}

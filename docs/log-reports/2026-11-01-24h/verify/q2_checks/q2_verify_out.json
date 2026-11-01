@@ -1,0 +1,903 @@
+{
+ "oe3xhl": {
+  "counts": {
+   "rx_decoded": 21838,
+   "onrxdone_lines": 11659,
+   "read": 4375,
+   "log_tx": 4375,
+   "write": 4985,
+   "cad_busy_confirmed": 1603,
+   "nbr_cancel": 589,
+   "supersede": 21,
+   "stale_ttl": 3
+  },
+  "writes": 4985,
+  "fate_pct": {
+   "aired": 87.7,
+   "cancelled": 11.82,
+   "superseded": 0.42,
+   "stale": 0.06
+  },
+  "fate_n": {
+   "aired": 4372,
+   "cancelled": 589,
+   "superseded": 21,
+   "stale": 3
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 7,
+   "read": 7,
+   "status": 7
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 3,
+  "dest_err_first_last": null,
+  "hourly_mean_queued_slope_per_h": -0.0131,
+  "hourly_mean_queued_first_last3": [
+   0.54,
+   0.47,
+   0.81,
+   0.75,
+   0.52,
+   0.2
+  ],
+  "own_hey": {
+   "episodes": 101,
+   "fate": {
+    "aired": 99,
+    "stale": 2
+   },
+   "aired_pct": 98.0,
+   "chain_span_max_s": 202.4,
+   "chains_span_gt180_not_dropped_at_180": 1,
+   "stale_age_s_values": {
+    "180": 1,
+    "181": 1
+   },
+   "stale_last_link_age_s_max": 181.6,
+   "aired_gap_min_p50_max": [
+    14.95,
+    31.7
+   ],
+   "head_analysis_stale": {
+    "n": 2,
+    "head_s_p50": 81.9,
+    "head_s_p90": 84.1,
+    "head_s_max": 84.1,
+    "head_share_mean_pct": 45.8,
+    "own_tx_in_win_p50": 13,
+    "own_tx_in_win_min": 13,
+    "n_with_head_ge_30s": 2,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 0,
+    "head_s_total": 166.0,
+    "gate_entries_in_head_total": 2,
+    "cad_busy_in_head_total": 2,
+    "n_head_ge_30s_zero_gate": 0,
+    "max_rx_gap_in_head_p50": 8.2
+   }
+  },
+  "own_wx": {
+   "episodes": 49,
+   "fate": {
+    "aired": 49
+   },
+   "aired_pct": 100.0,
+   "chain_span_max_s": 115.0,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {},
+   "stale_last_link_age_s_max": 0,
+   "head_analysis_stale": {
+    "n": 0
+   }
+  },
+  "stale_all_head": {
+   "n": 3,
+   "head_s_p50": 81.9,
+   "head_s_p90": 84.1,
+   "head_s_max": 84.1,
+   "head_share_mean_pct": 31.7,
+   "own_tx_in_win_p50": 14,
+   "own_tx_in_win_min": 13,
+   "n_with_head_ge_30s": 2,
+   "n_head_ge_30s_and_rxgap_lt_5_8s": 0,
+   "head_s_total": 172.2,
+   "gate_entries_in_head_total": 2,
+   "cad_busy_in_head_total": 2,
+   "n_head_ge_30s_zero_gate": 0,
+   "max_rx_gap_in_head_p50": 8.2
+  },
+  "ack_wait": {
+   "n": 2140,
+   "p50": 6.62,
+   "p90": 14.61,
+   "max": 29.6,
+   "share_ge20_pct": 3.5,
+   "hist_2s_10_30": {
+    "10": 199,
+    "12": 129,
+    "14": 81,
+    "16": 53,
+    "18": 29,
+    "20": 28,
+    "22": 28,
+    "24": 11,
+    "26": 7,
+    "28": 1
+   },
+   "p50_queued0": 6.29,
+   "n_queued0": 1270,
+   "p50_queued1": 8.04,
+   "n_queued1": 576,
+   "ge20": {
+    "n": 75,
+    "own_tx_during_p50": 1,
+    "own_tx_during_p90": 1,
+    "own_tx_during_zero": 34,
+    "rx_during_p50": 9,
+    "hold_expiries_p50": 3,
+    "cad_busy_p50": 1
+   },
+   "lt20": {
+    "n": 2065,
+    "own_tx_during_p50": 0,
+    "rx_during_p50": 1
+   }
+  },
+  "prelog_fate": {
+   "prelog_aired": 3
+  },
+  "supersede_by_type": {
+   "40/rx_relay": 19,
+   "40/auto_pos": 2
+  }
+ },
+ "oe3xia": {
+  "counts": {
+   "rx_decoded": 23542,
+   "write": 4176,
+   "onrxdone_lines": 9055,
+   "cad_busy_confirmed": 8986,
+   "read": 3999,
+   "log_tx": 3999,
+   "supersede": 94,
+   "supersede_old_unknown": 1,
+   "stale_ttl": 93,
+   "stale_unmatched": 5
+  },
+  "writes": 4176,
+  "fate_pct": {
+   "aired": 95.67,
+   "superseded": 2.23,
+   "stale": 2.11
+  },
+  "fate_n": {
+   "aired": 3995,
+   "superseded": 93,
+   "stale": 88
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 15,
+   "read": 15,
+   "status": 15
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 4,
+  "dest_err_first_last": null,
+  "hourly_mean_queued_slope_per_h": -0.013,
+  "hourly_mean_queued_first_last3": [
+   3.12,
+   2.63,
+   1.91,
+   1.99,
+   2.66,
+   1.97
+  ],
+  "own_hey": {
+   "episodes": 189,
+   "fate": {
+    "aired": 149,
+    "stale": 40
+   },
+   "aired_pct": 78.8,
+   "chain_span_max_s": 537.3,
+   "chains_span_gt180_not_dropped_at_180": 21,
+   "stale_age_s_values": {
+    "181": 21,
+    "180": 18,
+    "182": 1
+   },
+   "stale_last_link_age_s_max": 182.0,
+   "aired_gap_min_p50_max": [
+    5.96,
+    60.5
+   ],
+   "head_analysis_stale": {
+    "n": 40,
+    "head_s_p50": 64.3,
+    "head_s_p90": 97.9,
+    "head_s_max": 125.7,
+    "head_share_mean_pct": 36.0,
+    "own_tx_in_win_p50": 9,
+    "own_tx_in_win_min": 5,
+    "n_with_head_ge_30s": 35,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 4,
+    "head_s_total": 2606.6,
+    "gate_entries_in_head_total": 62,
+    "cad_busy_in_head_total": 62,
+    "n_head_ge_30s_zero_gate": 4,
+    "max_rx_gap_in_head_p50": 7.9
+   }
+  },
+  "own_wx": {
+   "episodes": 49,
+   "fate": {
+    "aired": 38,
+    "stale": 11
+   },
+   "aired_pct": 77.6,
+   "chain_span_max_s": 122.0,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {
+    "120": 4,
+    "121": 7
+   },
+   "stale_last_link_age_s_max": 122.0,
+   "head_analysis_stale": {
+    "n": 11,
+    "head_s_p50": 40.3,
+    "head_s_p90": 64.6,
+    "head_s_max": 83.1,
+    "head_share_mean_pct": 35.2,
+    "own_tx_in_win_p50": 5,
+    "own_tx_in_win_min": 4,
+    "n_with_head_ge_30s": 8,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 3,
+    "head_s_total": 468.9,
+    "gate_entries_in_head_total": 12,
+    "cad_busy_in_head_total": 12,
+    "n_head_ge_30s_zero_gate": 2,
+    "max_rx_gap_in_head_p50": 6.4
+   }
+  },
+  "stale_all_head": {
+   "n": 88,
+   "head_s_p50": 29.7,
+   "head_s_p90": 86.6,
+   "head_s_max": 125.7,
+   "head_share_mean_pct": 20.4,
+   "own_tx_in_win_p50": 9,
+   "own_tx_in_win_min": 4,
+   "n_with_head_ge_30s": 43,
+   "n_head_ge_30s_and_rxgap_lt_5_8s": 7,
+   "head_s_total": 3089.9,
+   "gate_entries_in_head_total": 100,
+   "cad_busy_in_head_total": 98,
+   "n_head_ge_30s_zero_gate": 6,
+   "max_rx_gap_in_head_p50": 4.9
+  },
+  "ack_wait": {
+   "n": 1922,
+   "p50": 21.94,
+   "p90": 34.67,
+   "max": 61.0,
+   "share_ge20_pct": 55.3,
+   "hist_2s_10_30": {
+    "10": 98,
+    "12": 100,
+    "14": 105,
+    "16": 118,
+    "18": 95,
+    "20": 106,
+    "22": 202,
+    "24": 156,
+    "26": 121,
+    "28": 109
+   },
+   "p50_queued0": 16.07,
+   "n_queued0": 459,
+   "p50_queued1": 19.41,
+   "n_queued1": 423,
+   "ge20": {
+    "n": 1062,
+    "own_tx_during_p50": 1,
+    "own_tx_during_p90": 2,
+    "own_tx_during_zero": 324,
+    "rx_during_p50": 14,
+    "hold_expiries_p50": 6,
+    "cad_busy_p50": 4
+   },
+   "lt20": {
+    "n": 860,
+    "own_tx_during_p50": 0,
+    "rx_during_p50": 4
+   }
+  },
+  "prelog_fate": {
+   "prelog_aired": 4
+  },
+  "supersede_by_type": {
+   "40/auto_pos": 57,
+   "40/rx_relay": 36
+  }
+ },
+ "oe3xir": {
+  "counts": {
+   "rx_decoded": 14258,
+   "onrxdone_lines": 5128,
+   "cad_busy_confirmed": 4582,
+   "read": 3287,
+   "log_tx": 2598,
+   "write": 3307,
+   "dest_err": 689,
+   "supersede": 16,
+   "stale_ttl": 8
+  },
+  "writes": 3307,
+  "fate_pct": {
+   "aired": 78.44,
+   "decode_drop": 20.8,
+   "superseded": 0.48,
+   "stale": 0.24,
+   "pending": 0.03
+  },
+  "fate_n": {
+   "aired": 2594,
+   "decode_drop": 688,
+   "superseded": 16,
+   "stale": 8,
+   "pending": 1
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 10,
+   "read": 11,
+   "status": 10
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 5,
+  "dest_err_first_last": [
+   "2026-10-31 06:47:33.947",
+   "2026-10-31 18:15:37.833"
+  ],
+  "hourly_mean_queued_slope_per_h": -0.0383,
+  "hourly_mean_queued_first_last3": [
+   1.8,
+   1.74,
+   2.0,
+   1.97,
+   1.5,
+   0.95
+  ],
+  "own_hey": {
+   "episodes": 0,
+   "fate": {},
+   "aired_pct": null,
+   "chain_span_max_s": null,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {},
+   "stale_last_link_age_s_max": 0,
+   "aired_gap_min_p50_max": [
+    null,
+    null
+   ],
+   "head_analysis_stale": {
+    "n": 0
+   }
+  },
+  "own_wx": {
+   "episodes": 22,
+   "fate": {
+    "aired": 17,
+    "stale": 5
+   },
+   "aired_pct": 77.3,
+   "chain_span_max_s": 121.9,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {
+    "120": 3,
+    "121": 2
+   },
+   "stale_last_link_age_s_max": 121.9,
+   "head_analysis_stale": {
+    "n": 5,
+    "head_s_p50": 17.6,
+    "head_s_p90": 57.4,
+    "head_s_max": 57.4,
+    "head_share_mean_pct": 20.2,
+    "own_tx_in_win_p50": 7,
+    "own_tx_in_win_min": 4,
+    "n_with_head_ge_30s": 2,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 1,
+    "head_s_total": 121.8,
+    "gate_entries_in_head_total": 4,
+    "cad_busy_in_head_total": 4,
+    "n_head_ge_30s_zero_gate": 1,
+    "max_rx_gap_in_head_p50": 5.5
+   }
+  },
+  "stale_all_head": {
+   "n": 8,
+   "head_s_p50": 9.5,
+   "head_s_p90": 30.0,
+   "head_s_max": 57.4,
+   "head_share_mean_pct": 12.6,
+   "own_tx_in_win_p50": 7,
+   "own_tx_in_win_min": 4,
+   "n_with_head_ge_30s": 2,
+   "n_head_ge_30s_and_rxgap_lt_5_8s": 1,
+   "head_s_total": 121.8,
+   "gate_entries_in_head_total": 4,
+   "cad_busy_in_head_total": 4,
+   "n_head_ge_30s_zero_gate": 1,
+   "max_rx_gap_in_head_p50": 5.4
+  },
+  "ack_wait": {
+   "n": 1418,
+   "p50": 20.88,
+   "p90": 31.74,
+   "max": 60.5,
+   "share_ge20_pct": 52.8,
+   "hist_2s_10_30": {
+    "10": 79,
+    "12": 92,
+    "14": 92,
+    "16": 87,
+    "18": 79,
+    "20": 101,
+    "22": 157,
+    "24": 109,
+    "26": 98,
+    "28": 86
+   },
+   "p50_queued0": 12.68,
+   "n_queued0": 428,
+   "p50_queued1": 21.48,
+   "n_queued1": 363,
+   "ge20": {
+    "n": 748,
+    "own_tx_during_p50": 1,
+    "own_tx_during_p90": 2,
+    "own_tx_during_zero": 243,
+    "rx_during_p50": 12,
+    "hold_expiries_p50": 5,
+    "cad_busy_p50": 3
+   },
+   "lt20": {
+    "n": 670,
+    "own_tx_during_p50": 0,
+    "rx_during_p50": 4
+   }
+  },
+  "phone_msg": {
+   "writes": 689,
+   "fate": {
+    "decode_drop": 688,
+    "pending": 1
+   }
+  },
+  "prelog_fate": {
+   "prelog_aired": 4,
+   "prelog_decode_drop": 1
+  },
+  "supersede_by_type": {
+   "40/rx_relay": 16
+  }
+ },
+ "oe3xoc": {
+  "counts": {
+   "cad_busy_confirmed": 8429,
+   "write": 6481,
+   "read": 6276,
+   "log_tx": 6276,
+   "rx_decoded": 43750,
+   "supersede": 93,
+   "supersede_old_unknown": 2,
+   "onrxdone_lines": 16012,
+   "stale_ttl": 124
+  },
+  "writes": 6481,
+  "fate_pct": {
+   "aired": 96.65,
+   "superseded": 1.4,
+   "stale": 1.91,
+   "pending": 0.03
+  },
+  "fate_n": {
+   "aired": 6264,
+   "superseded": 91,
+   "stale": 124,
+   "pending": 2
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 11,
+   "read": 12,
+   "status": 12
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 12,
+  "dest_err_first_last": null,
+  "hourly_mean_queued_slope_per_h": 0.0142,
+  "hourly_mean_queued_first_last3": [
+   2.24,
+   1.94,
+   1.43,
+   2.13,
+   2.03,
+   3.15
+  ],
+  "own_hey": {
+   "episodes": 98,
+   "fate": {
+    "stale": 57,
+    "aired": 41
+   },
+   "aired_pct": 41.8,
+   "chain_span_max_s": 902.3,
+   "chains_span_gt180_not_dropped_at_180": 18,
+   "stale_age_s_values": {
+    "181": 28,
+    "180": 28,
+    "182": 1
+   },
+   "stale_last_link_age_s_max": 182.0,
+   "aired_gap_min_p50_max": [
+    28.73,
+    179.2
+   ],
+   "head_analysis_stale": {
+    "n": 57,
+    "head_s_p50": 49.1,
+    "head_s_p90": 86.5,
+    "head_s_max": 99.4,
+    "head_share_mean_pct": 28.3,
+    "own_tx_in_win_p50": 10,
+    "own_tx_in_win_min": 7,
+    "n_with_head_ge_30s": 46,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 29,
+    "head_s_total": 2924.1,
+    "gate_entries_in_head_total": 21,
+    "cad_busy_in_head_total": 21,
+    "n_head_ge_30s_zero_gate": 30,
+    "max_rx_gap_in_head_p50": 5.4
+   }
+  },
+  "own_wx": {
+   "episodes": 49,
+   "fate": {
+    "aired": 15,
+    "stale": 34
+   },
+   "aired_pct": 30.6,
+   "chain_span_max_s": 122.0,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {
+    "120": 16,
+    "121": 18
+   },
+   "stale_last_link_age_s_max": 122.0,
+   "head_analysis_stale": {
+    "n": 34,
+    "head_s_p50": 28.5,
+    "head_s_p90": 59.9,
+    "head_s_max": 83.6,
+    "head_share_mean_pct": 28.0,
+    "own_tx_in_win_p50": 6,
+    "own_tx_in_win_min": 4,
+    "n_with_head_ge_30s": 17,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 13,
+    "head_s_total": 1152.6,
+    "gate_entries_in_head_total": 6,
+    "cad_busy_in_head_total": 6,
+    "n_head_ge_30s_zero_gate": 13,
+    "max_rx_gap_in_head_p50": 4.1
+   }
+  },
+  "stale_all_head": {
+   "n": 124,
+   "head_s_p50": 32.0,
+   "head_s_p90": 77.4,
+   "head_s_max": 99.4,
+   "head_share_mean_pct": 20.6,
+   "own_tx_in_win_p50": 9,
+   "own_tx_in_win_min": 4,
+   "n_with_head_ge_30s": 63,
+   "n_head_ge_30s_and_rxgap_lt_5_8s": 42,
+   "head_s_total": 4087.9,
+   "gate_entries_in_head_total": 27,
+   "cad_busy_in_head_total": 27,
+   "n_head_ge_30s_zero_gate": 43,
+   "max_rx_gap_in_head_p50": 4.2
+  },
+  "ack_wait": {
+   "n": 3373,
+   "p50": 23.33,
+   "p90": 33.83,
+   "max": 64.6,
+   "share_ge20_pct": 65.4,
+   "hist_2s_10_30": {
+    "10": 131,
+    "12": 142,
+    "14": 143,
+    "16": 148,
+    "18": 145,
+    "20": 188,
+    "22": 460,
+    "24": 369,
+    "26": 273,
+    "28": 256
+   },
+   "p50_queued0": 17.95,
+   "n_queued0": 1047,
+   "p50_queued1": 23.38,
+   "n_queued1": 786,
+   "ge20": {
+    "n": 2206,
+    "own_tx_during_p50": 1,
+    "own_tx_during_p90": 2,
+    "own_tx_during_zero": 764,
+    "rx_during_p50": 15,
+    "hold_expiries_p50": 4,
+    "cad_busy_p50": 2
+   },
+   "lt20": {
+    "n": 1167,
+    "own_tx_during_p50": 0,
+    "rx_during_p50": 4
+   }
+  },
+  "prelog_fate": {
+   "prelog_aired": 12
+  },
+  "supersede_by_type": {
+   "40/auto_pos": 43,
+   "40/rx_relay": 46,
+   "21/rx_relay": 2
+  }
+ },
+ "oe3xwj": {
+  "counts": {
+   "rx_decoded": 31097,
+   "read": 3900,
+   "log_tx": 3900,
+   "write": 3904,
+   "onrxdone_lines": 10906,
+   "cad_busy_confirmed": 1984,
+   "supersede": 1,
+   "stale_ttl": 4
+  },
+  "writes": 3904,
+  "fate_pct": {
+   "aired": 99.87,
+   "superseded": 0.03,
+   "stale": 0.1
+  },
+  "fate_n": {
+   "aired": 3899,
+   "superseded": 1,
+   "stale": 4
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 8,
+   "read": 9,
+   "status": 8
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 1,
+  "dest_err_first_last": null,
+  "hourly_mean_queued_slope_per_h": -0.0018,
+  "hourly_mean_queued_first_last3": [
+   0.32,
+   0.61,
+   0.48,
+   0.48,
+   0.59,
+   0.93
+  ],
+  "own_hey": {
+   "episodes": 0,
+   "fate": {},
+   "aired_pct": null,
+   "chain_span_max_s": null,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {},
+   "stale_last_link_age_s_max": 0,
+   "aired_gap_min_p50_max": [
+    null,
+    null
+   ],
+   "head_analysis_stale": {
+    "n": 0
+   }
+  },
+  "own_wx": {
+   "episodes": 50,
+   "fate": {
+    "aired": 46,
+    "stale": 4
+   },
+   "aired_pct": 92.0,
+   "chain_span_max_s": 121.2,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {
+    "120": 3,
+    "121": 1
+   },
+   "stale_last_link_age_s_max": 121.2,
+   "head_analysis_stale": {
+    "n": 4,
+    "head_s_p50": 91.9,
+    "head_s_p90": 108.4,
+    "head_s_max": 108.4,
+    "head_share_mean_pct": 74.8,
+    "own_tx_in_win_p50": 4,
+    "own_tx_in_win_min": 3,
+    "n_with_head_ge_30s": 4,
+    "n_head_ge_30s_and_rxgap_lt_5_8s": 3,
+    "head_s_total": 360.6,
+    "gate_entries_in_head_total": 1,
+    "cad_busy_in_head_total": 1,
+    "n_head_ge_30s_zero_gate": 3,
+    "max_rx_gap_in_head_p50": 5.5
+   }
+  },
+  "stale_all_head": {
+   "n": 4,
+   "head_s_p50": 91.9,
+   "head_s_p90": 108.4,
+   "head_s_max": 108.4,
+   "head_share_mean_pct": 74.8,
+   "own_tx_in_win_p50": 4,
+   "own_tx_in_win_min": 3,
+   "n_with_head_ge_30s": 4,
+   "n_head_ge_30s_and_rxgap_lt_5_8s": 3,
+   "head_s_total": 360.6,
+   "gate_entries_in_head_total": 1,
+   "cad_busy_in_head_total": 1,
+   "n_head_ge_30s_zero_gate": 3,
+   "max_rx_gap_in_head_p50": 5.5
+  },
+  "ack_wait": {
+   "n": 49,
+   "p50": 9.62,
+   "p90": 17.87,
+   "max": 28.2,
+   "share_ge20_pct": 8.2,
+   "hist_2s_10_30": {
+    "10": 5,
+    "12": 4,
+    "14": 1,
+    "16": 8,
+    "18": 1,
+    "20": 2,
+    "22": 1,
+    "28": 1
+   },
+   "p50_queued0": 9.95,
+   "n_queued0": 34,
+   "p50_queued1": 10.95,
+   "n_queued1": 10,
+   "ge20": {
+    "n": 4,
+    "own_tx_during_p50": 0,
+    "own_tx_during_p90": 0,
+    "own_tx_during_zero": 4,
+    "rx_during_p50": 11,
+    "hold_expiries_p50": 2,
+    "cad_busy_p50": 1
+   },
+   "lt20": {
+    "n": 45,
+    "own_tx_during_p50": 0,
+    "rx_during_p50": 2
+   }
+  },
+  "phone_msg": {
+   "writes": 1529,
+   "fate": {
+    "aired": 1529
+   }
+  },
+  "prelog_fate": {
+   "prelog_aired": 1
+  },
+  "supersede_by_type": {
+   "40/rx_relay": 1
+  }
+ },
+ "db0ais": {
+  "counts": {
+   "write": 2837,
+   "rx_decoded": 6732,
+   "onrxdone_lines": 6422,
+   "read": 2832,
+   "log_tx": 2832,
+   "cad_busy_confirmed": 2879,
+   "supersede": 5
+  },
+  "writes": 2837,
+  "fate_pct": {
+   "aired": 99.82,
+   "superseded": 0.18
+  },
+  "fate_n": {
+   "aired": 2832,
+   "superseded": 5
+  },
+  "fate_sum_pct": 100.0,
+  "status_retrying_nonzero": 0,
+  "queued_max": {
+   "write": 3,
+   "read": 4,
+   "status": 3
+  },
+  "cancel_unmatched": 0,
+  "prelog_reads": 0,
+  "dest_err_first_last": null,
+  "own_hey": {
+   "episodes": 168,
+   "fate": {
+    "aired": 168
+   },
+   "aired_pct": 100.0,
+   "chain_span_max_s": null,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {},
+   "stale_last_link_age_s_max": 0,
+   "aired_gap_min_p50_max": [
+    null,
+    null
+   ],
+   "head_analysis_stale": {
+    "n": 0
+   }
+  },
+  "own_wx": {
+   "episodes": 50,
+   "fate": {
+    "aired": 50
+   },
+   "aired_pct": 100.0,
+   "chain_span_max_s": null,
+   "chains_span_gt180_not_dropped_at_180": 0,
+   "stale_age_s_values": {},
+   "stale_last_link_age_s_max": 0,
+   "head_analysis_stale": {
+    "n": 0
+   }
+  },
+  "stale_all_head": {
+   "n": 0
+  },
+  "ack_wait": {
+   "n": 65,
+   "p50": 6.67,
+   "p90": 11.81,
+   "max": 14.7,
+   "share_ge20_pct": 0.0,
+   "hist_2s_10_30": {
+    "10": 7,
+    "12": 4,
+    "14": 2
+   },
+   "p50_queued0": 6.67,
+   "n_queued0": 58,
+   "p50_queued1": 6.32,
+   "n_queued1": 6
+  },
+  "prelog_fate": {},
+  "supersede_by_type": {
+   "3A/rx_relay": 3,
+   "40/auto_pos": 1,
+   "40/rx_relay": 1
+  }
+ }
+}

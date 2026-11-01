@@ -1,0 +1,102 @@
+{
+ "generated_by": "generators/lib/oe3xhl_measure.py",
+ "nodes": {
+  "oe3xhl": {
+   "rx_decoded_onrxdone_time": 21835,
+   "rx_error": 1720,
+   "rx_error_share_pct": 7.3,
+   "gap_longest_s": 67.6,
+   "gap_longest_end": "2026-10-31 23:32:52.845",
+   "gap_median_s": 2.81,
+   "gaps_over_300s": 0,
+   "cancel_lines": 589,
+   "cancel_distinct_ids": 589,
+   "rly_q_tx": 2462,
+   "cancel_pct_of_rly_q_tx": 23.92,
+   "cet_rf_copies_parsed": 681,
+   "cet_rf_older_150s_n": 6,
+   "cet_rf_older_150s": [
+    {
+     "age_s": 355.7,
+     "logger_time": "2026-10-31 08:29:20.667",
+     "msg_id": "6AE5893B",
+     "path": "OE1XAR-33,OE3GJC-12"
+    },
+    {
+     "age_s": 153.9,
+     "logger_time": "2026-10-31 09:46:53.922",
+     "msg_id": "6AE58943",
+     "path": "OE1XAR-33,OE3GJC-12"
+    },
+    {
+     "age_s": 197.9,
+     "logger_time": "2026-10-31 19:34:34.880",
+     "msg_id": "6AE58985",
+     "path": "OE1XAR-33,OE3GJC-12"
+    },
+    {
+     "age_s": 181.3,
+     "logger_time": "2026-11-01 07:22:03.344",
+     "msg_id": "6AE589CB",
+     "path": "OE1XAR-33,OE3GJC-12"
+    },
+    {
+     "age_s": 197.1,
+     "logger_time": "2026-11-01 07:22:19.085",
+     "msg_id": "6AE589CB",
+     "path": "OE1XAR-33,OE3XHL-12,OE3HUS-01"
+    },
+    {
+     "age_s": 213.1,
+     "logger_time": "2026-11-01 07:42:48.137",
+     "msg_id": "6AE589CD",
+     "path": "OE1XAR-33,OE3GJC-12"
+    }
+   ]
+  },
+  "oe3xia": {
+   "rx_decoded_onrxdone_time": 23542,
+   "rx_error": 11080,
+   "rx_error_share_pct": 32.0,
+   "gap_longest_s": 1023.8,
+   "gap_longest_end": "2026-10-31 12:06:05.449",
+   "gap_median_s": 1.14,
+   "gaps_over_300s": 35,
+   "hl_as_last_hop_log_lines": 4,
+   "hl_nbr_me_lines": 4
+  },
+  "oe3xir": {
+   "rx_decoded_onrxdone_time": 14258,
+   "rx_error": 4800,
+   "rx_error_share_pct": 25.19,
+   "gap_longest_s": 53.5,
+   "gap_longest_end": "2026-10-31 11:34:16.045",
+   "gap_median_s": 1.29,
+   "gaps_over_300s": 0,
+   "hl_as_last_hop_log_lines": 0,
+   "hl_nbr_me_lines": 0
+  },
+  "oe3xoc": {
+   "rx_decoded_onrxdone_time": 43749,
+   "rx_error": 12239,
+   "rx_error_share_pct": 21.86,
+   "gap_longest_s": 87.7,
+   "gap_longest_end": "2026-10-31 17:53:01.120",
+   "gap_median_s": 1.25,
+   "gaps_over_300s": 0,
+   "hl_as_last_hop_log_lines": 0,
+   "hl_nbr_me_lines": 0
+  },
+  "oe3xwj": {
+   "rx_decoded_onrxdone_time": 31097,
+   "rx_error": 7697,
+   "rx_error_share_pct": 19.84,
+   "gap_longest_s": 153.2,
+   "gap_longest_end": "2026-10-31 17:06:11.912",
+   "gap_median_s": 1.72,
+   "gaps_over_300s": 0,
+   "hl_as_last_hop_log_lines": 0,
+   "hl_nbr_me_lines": 0
+  }
+ }
+}

@@ -1,0 +1,62 @@
+{
+  "_comment": "Per-run extra arguments for tools/logreport/run.py extract; paths are relative to this run directory.",
+  "names": {
+    "DB0AIS 24 Stnuden.log": "db0ais"
+  },
+  "topics": {
+    "txpool": [
+      "--clock-profiles",
+      "config/txpool_clock_profiles.json",
+      "--annotations",
+      "config/txpool_annotations.json"
+    ],
+    "decay": [
+      "--ttl-exclude",
+      "oe3xhl",
+      "--annotations",
+      "config/decay_annotations.json"
+    ],
+    "timesignal": [
+      "--standalone-start",
+      "2026-10-30 17:01:11",
+      "--standalone-utc-off-h",
+      "2",
+      "--logger-utc-off-s",
+      "3600"
+    ],
+    "health": [
+      "--standalone-start",
+      "2026-10-30 17:01:11"
+    ]
+  },
+  "groups": {
+    "hb9": [
+      "hb9vqq4",
+      "hb9vqq5"
+    ]
+  },
+  "group_topics": {
+    "hb9": {
+      "timesignal": [
+        "--owncall",
+        "hb9vqq4=HB9VQQ-4",
+        "--owncall",
+        "hb9vqq5=HB9VQQ-5",
+        "--logger-utc-off-s",
+        "3600"
+      ],
+      "health": [
+        "--owncall",
+        "hb9vqq4=HB9VQQ-4",
+        "--owncall",
+        "hb9vqq5=HB9VQQ-5"
+      ],
+      "manipulations": [
+        "--owncall",
+        "hb9vqq4=HB9VQQ-4",
+        "--owncall",
+        "hb9vqq5=HB9VQQ-5"
+      ]
+    }
+  }
+}

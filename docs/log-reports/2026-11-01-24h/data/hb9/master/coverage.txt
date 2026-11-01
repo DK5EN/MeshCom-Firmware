@@ -1,0 +1,13 @@
+Master-data coverage (mcmap-prod nodes_query, bbox tiles)
+
+All calls: 147; with master data: 77; without: 70 (of which OE1XAR-33/62 excluded from missing list: 1).
+Missing (excluding OE1XAR-33/62): 69
+
+Per log list:
+- calls_hb9vqq4.txt: 73 calls, 58 with data, 14 without
+- calls_hb9vqq5.txt: 130 calls, 64 with data, 65 without
+
+Calls without master data (excluding OE1XAR-33/62):
+DA6NDR-9 DA6PG-12 DB4RC-12 DF4ND-99 DF8QL-25 DG0CW-12 DG6YHX-12 DH9YAX-1 DK8JP-12 DL1MX-12 DL1UDO-12 DL2YED-99 DL3FRE-1 DL4EM-1 DL4QB-90 DL7NAW-1 DM2FK-86 DM3KS-7 DN9NN-13 DO1AU-1 DO2QG-1 DO5DMF-99 DO7FJK-12 DO7FJK-99 DO8AIL-12 DO9RKO-99 GM4MCV-2 GM4UPX-1 HB9FOU-63 HB9VQQ-1 HB9VQQ-12 HB9VQQ-6 HB9WNM-13 IK5JCK-10 IK5NJM-11 IS0HHA-80 IS0QLX-11 IU0NDT-98 IU3UJO-1 IU5RDX-16 IU5SGO-10 IW0ELF-15 IW5CWC-11 IW9HRH-15 OE1KBC-9 OE1KFR-9 OE1XAR-28 OE1XAR-63 OE1YEM-10 OE3AHU-13 OE3BCB-10 OE3MZC-1 OE3MZC-7 OE3REE-12 OE5ANI-12 OE5ANI-13 OE5FRW-13 OE5HWN-14 OE6DJG-2 OE8FER-12 SP1RAC-10 SP3PAT-1 SP5AV-1 SP5XTF-2 SP5XTF-99 SP5ZEN-7 SQ5STR-7 SQ7RJZ-7 SQ9APP-1
+
+Caveat: only the queried tiles are covered. Calls heard from outside the boxes cannot be matched by bbox and appear as missing even if they exist in the database. Position-less nodes are never returned by bbox queries either.

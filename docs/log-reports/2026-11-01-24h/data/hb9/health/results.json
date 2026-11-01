@@ -1,0 +1,3097 @@
+{
+ "nodes": {
+  "hb9vqq4": {
+   "log": "hb9vqq4.log",
+   "has_wall_prefix": true,
+   "span": {
+    "first": "2026-10-31 09:39:56",
+    "last": "2026-11-01 09:39:56",
+    "hours": 24.0,
+    "lines": 362785,
+    "clock_basis": "logger wall prefix"
+   },
+   "identity": {
+    "callsign": "HB9VQQ-4 ",
+    "gw_id": "336900A4",
+    "version_keep": "4.40a",
+    "keep_rest": "9;20;228;2280;2285;2288;",
+    "hw_id": null,
+    "hw_name": null,
+    "hw_votes": {},
+    "hw_votes_NEW_lines": {},
+    "own_new_fw": [],
+    "tx_frames_seen": 0,
+    "own_originated_tx_frames": 0,
+    "tx_frame_first_call_top": {},
+    "lora_cfg_lines": [
+     "[LoRa]...Received packet: RSSI:\t\t-108 dBm / SNR:\t\t-4 dB / Frequency error:\t-355.",
+     "[LoRa]...Received packet: RSSI:\t\t-80 dBm / SNR:\t\t4 dB / Frequency error:\t-619.03",
+     "[LoRa]...Received packet: RSSI:\t\t-107 dBm / SNR:\t\t-4 dB / Frequency error:\t-355.",
+     "[LoRa]...Received packet: RSSI:\t\t-81 dBm / SNR:\t\t4 dB / Frequency error:\t-613.22",
+     "[LoRa]...Received packet: RSSI:\t\t-90 dBm / SNR:\t\t5 dB / Frequency error:\t-506.66",
+     "[LoRa]...Received packet: RSSI:\t\t-108 dBm / SNR:\t\t-5 dB / Frequency error:\t-59.0",
+     "[LoRa]...Received packet: RSSI:\t\t-117 dBm / SNR:\t\t-12 dB / Frequency error:\t4244",
+     "[LoRa]...Received packet: RSSI:\t\t-91 dBm / SNR:\t\t4 dB / Frequency error:\t-508.59",
+     "[LoRa]...Received packet: RSSI:\t\t-96 dBm / SNR:\t\t4 dB / Frequency error:\t-448.53",
+     "[LoRa]...Received packet: RSSI:\t\t-115 dBm / SNR:\t\t-11 dB / Frequency error:\t-320",
+     "[LoRa]...Received packet: RSSI:\t\t-97 dBm / SNR:\t\t2 dB / Frequency error:\t18.41 H",
+     "[LoRa]...Received packet: RSSI:\t\t-96 dBm / SNR:\t\t2 dB / Frequency error:\t-448.53"
+    ],
+    "gw_srv_lines": [],
+    "own_gateway_role": {
+     "keepalive_ok": 2879,
+     "gwu_upload": 3113,
+     "gwi_inject": 253,
+     "beat_rx": 2879
+    },
+    "stat_fw": {
+     "40a/20261030": 288
+    }
+   },
+   "clock": {
+    "regimes": [
+     [
+      0,
+      "10-31 09:39:58",
+      "11-01 09:39:46",
+      17026
+     ]
+    ],
+    "offset_node_minus_logger_s_mode": 0,
+    "offset_dist_s": {
+     "0": 17026
+    },
+    "raw_delta_range_s": [
+     -3,
+     0
+    ],
+    "samples": 17026
+   },
+   "traffic": {
+    "heard_events": 14449,
+    "fcs0000_excluded": 4,
+    "no_setlog_tail": 0,
+    "ack_events": 171,
+    "ack_h_outside_80_84": 37,
+    "ack_h_top": {
+     "81": 36,
+     "83": 35,
+     "84": 31,
+     "85": 30,
+     "82": 28,
+     "86": 7
+    },
+    "dup_flag": {
+     "d": 10580,
+     "n": 3869,
+     "ack_n": 29,
+     "ack_d": 142
+    },
+    "own_in_path": {
+     "-": 9121,
+     "e": 5328
+    },
+    "srv_flag": {
+     "1": 10136,
+     "0": 4313
+    },
+    "types": {
+     "@": {
+      "n": 9300,
+      "pct": 64.4,
+      "label": "heartbeat/HEY(40)"
+     },
+     "!": {
+      "n": 3025,
+      "pct": 20.9,
+      "label": "position(21)"
+     },
+     ":": {
+      "n": 2124,
+      "pct": 14.7,
+      "label": "text(3A)"
+     }
+    },
+    "unique_originators": 150,
+    "unique_originators_excl_time_server": 148,
+    "time_server_events": {
+     "OE1XAR-33": 816,
+     "OE1XAR-63": 183
+    },
+    "unique_msgids": 3122,
+    "hop_H_field": {
+     "H00": 3526,
+     "H01": 4010,
+     "H02": 3316,
+     "H03": 1558,
+     "H04": 1162,
+     "H05": 767,
+     "H06": 110
+    },
+    "hop_H_pct": {
+     "H00": 24.4,
+     "H01": 27.8,
+     "H02": 22.9,
+     "H03": 10.8,
+     "H04": 8.0,
+     "H05": 5.3,
+     "H06": 0.8
+    },
+    "path_len": {
+     "1": 817,
+     "2": 3394,
+     "3": 5640,
+     "4": 2940,
+     "5": 1635,
+     "6": 21,
+     "7": 2
+    },
+    "path_len_pct": {
+     "1": 5.7,
+     "2": 23.5,
+     "3": 39.0,
+     "4": 20.3,
+     "5": 11.3,
+     "6": 0.1,
+     "7": 0.0
+    },
+    "direct_zero_relay_pct": 5.7,
+    "rx_airtime_decoded_s": 12965.0,
+    "airtime_share_by_type_pct": {
+     "@": 59.7,
+     "!": 25.2,
+     ":": 14.7,
+     "ACK": 0.4
+    },
+    "ack_share_of_all_frames_pct": 1.2
+   },
+   "own_tx": {
+    "tx_lines": 2577,
+    "radio_tx_markers": 2577,
+    "tx_done": 2577,
+    "src_split": {
+     "r": 2175,
+     "o": 149,
+     "g": 253
+    },
+    "src_labels": {
+     "o": "own",
+     "r": "relay",
+     "g": "gateway(server)"
+    },
+    "src_pct": {
+     "r": 84.4,
+     "o": 5.8,
+     "g": 9.8
+    },
+    "type_split": {
+     "@": 1500,
+     ":": 415,
+     "!": 630,
+     "A": 32
+    },
+    "prio_split": {
+     "1": 34,
+     "2": 4,
+     "3": 409,
+     "4": 630,
+     "5": 1500
+    },
+    "src_type": {
+     "r:@": 1404,
+     "o:@": 96,
+     "g::": 253,
+     "r:!": 583,
+     "r::": 156,
+     "o:!": 47,
+     "r:A": 32,
+     "o::": 6
+    },
+    "airtime_s": 2259.3,
+    "wait_ms": {
+     "n": 2577,
+     "min": 59.0,
+     "p5": 3557.0,
+     "median": 9450.0,
+     "mean": 16264.0,
+     "p95": 61797.0,
+     "max": 166509.0
+    },
+    "cad_at_tx": {
+     "0": 2004,
+     "1": 366,
+     "2": 65,
+     "3": 48,
+     "4": 28,
+     "5": 21,
+     "6": 10,
+     "7": 10,
+     "8": 9,
+     "9": 6,
+     "10": 5,
+     "11": 2,
+     "13": 2,
+     "17": 1
+    },
+    "relay_decisions_RLY": {
+     "tx": 2575,
+     "gwcap": 351,
+     "hop0": 197,
+     "full": 3
+    },
+    "tx_per_hour": 107.4
+   },
+   "neighbours": {
+    "n_direct": 16,
+    "top": [
+     {
+      "call": "HB9VQQ-2",
+      "n": 2680,
+      "rssi_median": -82.0,
+      "rssi_p10": -85.0,
+      "rssi_p90": -81.0,
+      "rssi_max": -79,
+      "snr_median": 3.0,
+      "hw": "RAK4631",
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-3",
+      "n": 1667,
+      "rssi_median": -90.0,
+      "rssi_p10": -94.0,
+      "rssi_p90": -89.0,
+      "rssi_max": -88,
+      "snr_median": 5.0,
+      "hw": "RAK4631",
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "DB0TOD-12",
+      "n": 1495,
+      "rssi_median": -115.0,
+      "rssi_p10": -118.0,
+      "rssi_p90": -114.0,
+      "rssi_max": -112,
+      "snr_median": -11.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-5",
+      "n": 1408,
+      "rssi_median": -97.0,
+      "rssi_p10": -100.0,
+      "rssi_p90": -96.0,
+      "rssi_max": -95,
+      "snr_median": 3.0,
+      "hw": "HELTEC V3",
+      "fw_log": "40:a",
+      "fw_master": "4.40a",
+      "desc": "Tanzboden SG",
+      "lat": "47.2215",
+      "lon": "9.1072",
+      "isGateway": "true",
+      "dist_km": null
+     },
+     {
+      "call": "DB0HRH-12",
+      "n": 1389,
+      "rssi_median": -108.0,
+      "rssi_p10": -111.0,
+      "rssi_p90": -108.0,
+      "rssi_max": -103,
+      "snr_median": -5.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "DB0SAC-12",
+      "n": 1327,
+      "rssi_median": -96.0,
+      "rssi_p10": -100.0,
+      "rssi_p90": -96.0,
+      "rssi_max": -94,
+      "snr_median": 3.0,
+      "hw": null,
+      "fw_log": "35:h",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9TVJ-12",
+      "n": 1290,
+      "rssi_median": -96.0,
+      "rssi_p10": -100.0,
+      "rssi_p90": -94.0,
+      "rssi_max": -93,
+      "snr_median": 4.0,
+      "hw": "T-Beam",
+      "fw_log": "35:i",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9LEK-12",
+      "n": 839,
+      "rssi_median": -117.0,
+      "rssi_p10": -120.0,
+      "rssi_p90": -116.8,
+      "rssi_max": -116,
+      "snr_median": -13.0,
+      "hw": "TTGO LoRa32 V2.1 1.6",
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9BBE-18",
+      "n": 829,
+      "rssi_median": -104.0,
+      "rssi_p10": -106.0,
+      "rssi_p90": -103.0,
+      "rssi_max": -102,
+      "snr_median": -1.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-11",
+      "n": 729,
+      "rssi_median": -97.0,
+      "rssi_p10": -101.0,
+      "rssi_p90": -91.0,
+      "rssi_max": -87,
+      "snr_median": 3.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9HNO-49",
+      "n": 448,
+      "rssi_median": -95.0,
+      "rssi_p10": -99.0,
+      "rssi_p90": -94.0,
+      "rssi_max": -92,
+      "snr_median": 3.0,
+      "hw": null,
+      "fw_log": "35:h",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9ZG-49",
+      "n": 192,
+      "rssi_median": -120.0,
+      "rssi_p10": -123.0,
+      "rssi_p90": -118.0,
+      "rssi_max": -116,
+      "snr_median": -16.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "DB0TOD-13",
+      "n": 79,
+      "rssi_median": -107.0,
+      "rssi_p10": -109.0,
+      "rssi_p90": -106.0,
+      "rssi_max": -106,
+      "snr_median": -4.0,
+      "hw": null,
+      "fw_log": "35:p",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9WAD-51",
+      "n": 52,
+      "rssi_median": -120.0,
+      "rssi_p10": -121.0,
+      "rssi_p90": -118.0,
+      "rssi_max": -115,
+      "snr_median": -15.0,
+      "hw": "TTGO LoRa32 V2.1 1.6",
+      "fw_log": "35:p",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-6",
+      "n": 18,
+      "rssi_median": -99.0,
+      "rssi_p10": -104.5,
+      "rssi_p90": -96.7,
+      "rssi_max": -91,
+      "snr_median": 2.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-12",
+      "n": 7,
+      "rssi_median": -107.0,
+      "rssi_p10": -109.0,
+      "rssi_p90": -101.2,
+      "rssi_max": -100,
+      "snr_median": -4.0,
+      "hw": null,
+      "fw_log": "40:a",
+      "fw_master": null,
+      "desc": "",
+      "lat": null,
+      "lon": null,
+      "isGateway": null,
+      "dist_km": null
+     }
+    ],
+    "all_calls": [
+     "HB9VQQ-2",
+     "HB9VQQ-3",
+     "DB0TOD-12",
+     "HB9VQQ-5",
+     "DB0HRH-12",
+     "DB0SAC-12",
+     "HB9TVJ-12",
+     "HB9LEK-12",
+     "HB9BBE-18",
+     "HB9VQQ-11",
+     "HB9HNO-49",
+     "HB9ZG-49",
+     "DB0TOD-13",
+     "HB9WAD-51",
+     "HB9VQQ-6",
+     "HB9VQQ-12"
+    ]
+   },
+   "rf": {
+    "rssi_hist_10dB": {
+     "-130": 162,
+     "-120": 2608,
+     "-110": 2608,
+     "-100": 5667,
+     "-90": 3399,
+     "-80": 176
+    },
+    "rssi_all": {
+     "n": 14449,
+     "min": -125.0,
+     "p5": -118.0,
+     "median": -97.0,
+     "mean": -98.7,
+     "p95": -81.0,
+     "max": -79.0
+    },
+    "rx_rssi_gt_minus20": 0,
+    "rx_rssi_gt_minus40": 0,
+    "ack_rssi": {
+     "n": 171,
+     "min": -118.0,
+     "p5": -117.0,
+     "median": -97.0,
+     "mean": -98.6,
+     "p95": -82.0,
+     "max": -81.0
+    },
+    "noise_rssi_minus_snr_all": {
+     "n": 14449,
+     "min": -107.0,
+     "p5": -105.0,
+     "median": -100.0,
+     "mean": -97.3,
+     "p95": -84.0,
+     "max": -67.0
+    },
+    "noise_rssi_minus_snr_snr_ge0": {
+     "n": 9018,
+     "min": -105.0,
+     "p5": -103.0,
+     "median": -98.0,
+     "mean": -95.3,
+     "p95": -84.0,
+     "max": -83.0
+    },
+    "rx_error_hist_10dB": {
+     "-130": 176,
+     "-120": 264,
+     "-110": 373,
+     "-100": 829,
+     "-90": 204,
+     "-80": 57
+    },
+    "rx_error_gt_minus85": 161,
+    "rx_error_gt_minus60": 0,
+    "rx_error_n": 1903,
+    "rx_error_log_ERR_n": 1903,
+    "rx_error_ferr_nonzero": 1903,
+    "rx_error_rssi": {
+     "n": 1903,
+     "min": -127.0,
+     "p5": -123.0,
+     "median": -99.0,
+     "mean": -101.2,
+     "p95": -83.0,
+     "max": -72.0
+    },
+    "rx_error_snr": {
+     "n": 1903,
+     "min": -28.0,
+     "p5": -22.0,
+     "median": -2.0,
+     "mean": -6.0,
+     "p95": 2.0,
+     "max": 5.0
+    },
+    "rx_error_per_hour_mean": 79.3,
+    "rx_error_share_of_rx_pct": 11.5,
+    "rx_good_events": 14624,
+    "rx_good_events_source": "ONRXDONE_TIME",
+    "rx_irq_stale": {
+     "rssi_lines": 898,
+     "note": "ESP32 stale-IRQ markers present (rssi= lines and 'forced restart' lines)",
+     "rssi": {
+      "n": 449,
+      "min": -107.0,
+      "p5": -106.0,
+      "median": -98.0,
+      "mean": -90.9,
+      "p95": -71.0,
+      "max": -61.0
+     },
+     "early": 0
+    },
+    "theory_floor_bw250_dbm": -114
+   },
+   "channel": {
+    "CHANNEL_UTIL": {
+     "n": 8636,
+     "min": 0.0,
+     "p5": 0.0,
+     "median": 19.0,
+     "mean": 19.4,
+     "p95": 40.0,
+     "max": 75.0,
+     "ge70": 2,
+     "ge90": 0,
+     "first_half_mean": 19.5,
+     "second_half_mean": 19.3,
+     "window_est_s": 10.2
+    },
+    "util_by_hour": {
+     "10-31 09": 25.6,
+     "10-31 10": 20.9,
+     "10-31 11": 18.6,
+     "10-31 12": 17.8,
+     "10-31 13": 20.8,
+     "10-31 14": 18.7,
+     "10-31 15": 22.4,
+     "10-31 16": 16.5,
+     "10-31 17": 19.4,
+     "10-31 18": 19.2,
+     "10-31 19": 20.9,
+     "10-31 20": 14.7,
+     "10-31 21": 21.6,
+     "10-31 22": 19.1,
+     "10-31 23": 18.6,
+     "11-01 00": 19.3,
+     "11-01 01": 18.7,
+     "11-01 02": 19.6,
+     "11-01 03": 18.5,
+     "11-01 04": 19.2,
+     "11-01 05": 18.6,
+     "11-01 06": 17.9,
+     "11-01 07": 20.5,
+     "11-01 08": 22.9,
+     "11-01 09": 18.6
+    },
+    "inflation_check": {
+     "rx_values_multiple_of_2476ms": 11,
+     "rx_values_nonzero": 7447,
+     "verdict": "no inflation fingerprint"
+    },
+    "STAT_util_5min": {
+     "n": 288,
+     "min": 3.0,
+     "p5": 9.3,
+     "median": 19.5,
+     "mean": 19.3,
+     "p95": 27.0,
+     "max": 31.0
+    },
+    "STAT_rx_ms_total": 14823289,
+    "STAT_tx_ms_total": 2274140,
+    "STAT_mean_util_from_airtime_pct": 19.8,
+    "own_tx_airtime_s_from_TX_lines": 2259.0,
+    "own_tx_airtime_s_from_CHANNEL_UTIL": 2271.0,
+    "own_tx_airtime_s_from_STAT": 2274.0,
+    "rx_airtime_s_decoded_frames": 12965.0,
+    "rx_airtime_s_from_STAT": 14823.0,
+    "stat_rows": 288
+   },
+   "cad": {
+    "cad_scans": 5557,
+    "cad_busy_1_initial": 1752,
+    "cad_busy_confirmed": 1228,
+    "cad_false_positive": 524,
+    "initial_busy_rate_pct": 31.5,
+    "false_positive_pct_of_initial_busy": 29.9,
+    "confirmed_busy_pct_of_initial_busy": 70.1,
+    "tx_gate_enter": 3805,
+    "cad_attempt_dist": {
+     "0": 2577,
+     "1": 573,
+     "2": 207,
+     "3": 142,
+     "4": 94,
+     "5": 66,
+     "6": 45,
+     "7": 35,
+     "8": 25,
+     "9": 16,
+     "10": 10,
+     "11": 5,
+     "12": 3,
+     "13": 3,
+     "14": 1,
+     "15": 1,
+     "16": 1,
+     "17": 1
+    },
+    "cad_attempt_pct": {
+     "0": 67.7,
+     "1": 15.1,
+     "2": 5.4,
+     "3": 3.7,
+     "4": 2.5,
+     "5": 1.7,
+     "6": 1.2,
+     "7": 0.9,
+     "8": 0.7,
+     "9": 0.4,
+     "10": 0.3,
+     "11": 0.1,
+     "12": 0.1,
+     "13": 0.1,
+     "14": 0.0,
+     "15": 0.0,
+     "16": 0.0,
+     "17": 0.0
+    },
+    "attempt0_pct": 67.7,
+    "attempt_ge3_pct": 11.8,
+    "attempt_max": 17,
+    "cad_free_attempt_dist": {
+     "0": 2004,
+     "1": 366,
+     "2": 65,
+     "3": 48,
+     "4": 28,
+     "5": 21,
+     "6": 10,
+     "7": 10,
+     "8": 9,
+     "9": 6,
+     "10": 5,
+     "11": 2,
+     "13": 2,
+     "17": 1
+    },
+    "cad_free": 2577,
+    "cad_free_no_tx": 0,
+    "cad_safety_timeout": 0,
+    "storm_episodes_attempt_ge3": 142,
+    "storm_dur_s": {
+     "n": 142,
+     "min": 0.0,
+     "p5": 0.0,
+     "median": 0.6,
+     "mean": 0.7,
+     "p95": 1.8,
+     "max": 3.2
+    },
+    "storm_longest": [
+     {
+      "start": "10-31 23:33:32",
+      "max_attempt": 17,
+      "gates": 15,
+      "end": "10-31 23:33:35",
+      "dur_s": 3.2
+     },
+     {
+      "start": "11-01 00:38:18",
+      "max_attempt": 13,
+      "gates": 11,
+      "end": "11-01 00:38:21",
+      "dur_s": 3.18
+     },
+     {
+      "start": "10-31 15:00:45",
+      "max_attempt": 13,
+      "gates": 11,
+      "end": "10-31 15:00:48",
+      "dur_s": 3.16
+     }
+    ],
+    "csma_aged": 124,
+    "per_hour": {
+     "10-31 09": {
+      "gates": 75,
+      "busy1": 39,
+      "fp": 14,
+      "rx_err": 44,
+      "util": 25.6
+     },
+     "10-31 10": {
+      "gates": 129,
+      "busy1": 58,
+      "fp": 23,
+      "rx_err": 74,
+      "util": 20.9
+     },
+     "10-31 11": {
+      "gates": 168,
+      "busy1": 74,
+      "fp": 22,
+      "rx_err": 78,
+      "util": 18.6
+     },
+     "10-31 12": {
+      "gates": 147,
+      "busy1": 55,
+      "fp": 21,
+      "rx_err": 69,
+      "util": 17.8
+     },
+     "10-31 13": {
+      "gates": 187,
+      "busy1": 90,
+      "fp": 27,
+      "rx_err": 91,
+      "util": 20.8
+     },
+     "10-31 14": {
+      "gates": 211,
+      "busy1": 108,
+      "fp": 32,
+      "rx_err": 60,
+      "util": 18.7
+     },
+     "10-31 15": {
+      "gates": 221,
+      "busy1": 109,
+      "fp": 25,
+      "rx_err": 108,
+      "util": 22.4
+     },
+     "10-31 16": {
+      "gates": 189,
+      "busy1": 87,
+      "fp": 20,
+      "rx_err": 67,
+      "util": 16.5
+     },
+     "10-31 17": {
+      "gates": 195,
+      "busy1": 97,
+      "fp": 24,
+      "rx_err": 86,
+      "util": 19.4
+     },
+     "10-31 18": {
+      "gates": 192,
+      "busy1": 91,
+      "fp": 24,
+      "rx_err": 82,
+      "util": 19.2
+     },
+     "10-31 19": {
+      "gates": 211,
+      "busy1": 105,
+      "fp": 20,
+      "rx_err": 103,
+      "util": 20.9
+     },
+     "10-31 20": {
+      "gates": 146,
+      "busy1": 54,
+      "fp": 19,
+      "rx_err": 68,
+      "util": 14.7
+     },
+     "10-31 21": {
+      "gates": 205,
+      "busy1": 95,
+      "fp": 31,
+      "rx_err": 101,
+      "util": 21.6
+     },
+     "10-31 22": {
+      "gates": 173,
+      "busy1": 91,
+      "fp": 29,
+      "rx_err": 85,
+      "util": 19.1
+     },
+     "10-31 23": {
+      "gates": 139,
+      "busy1": 58,
+      "fp": 15,
+      "rx_err": 82,
+      "util": 18.6
+     },
+     "11-01 00": {
+      "gates": 156,
+      "busy1": 75,
+      "fp": 13,
+      "rx_err": 80,
+      "util": 19.3
+     },
+     "11-01 01": {
+      "gates": 129,
+      "busy1": 53,
+      "fp": 16,
+      "rx_err": 75,
+      "util": 18.7
+     },
+     "11-01 02": {
+      "gates": 151,
+      "busy1": 76,
+      "fp": 25,
+      "rx_err": 60,
+      "util": 19.6
+     },
+     "11-01 03": {
+      "gates": 122,
+      "busy1": 57,
+      "fp": 23,
+      "rx_err": 57,
+      "util": 18.5
+     },
+     "11-01 04": {
+      "gates": 127,
+      "busy1": 60,
+      "fp": 21,
+      "rx_err": 74,
+      "util": 19.2
+     },
+     "11-01 05": {
+      "gates": 95,
+      "busy1": 47,
+      "fp": 16,
+      "rx_err": 77,
+      "util": 18.6
+     },
+     "11-01 06": {
+      "gates": 79,
+      "busy1": 33,
+      "fp": 16,
+      "rx_err": 66,
+      "util": 17.9
+     },
+     "11-01 07": {
+      "gates": 117,
+      "busy1": 40,
+      "fp": 15,
+      "rx_err": 80,
+      "util": 20.5
+     },
+     "11-01 08": {
+      "gates": 152,
+      "busy1": 65,
+      "fp": 18,
+      "rx_err": 82,
+      "util": 22.9
+     },
+     "11-01 09": {
+      "gates": 89,
+      "busy1": 35,
+      "fp": 15,
+      "rx_err": 54,
+      "util": 18.6
+     }
+    }
+   },
+   "onrxdone": {
+    "ms": {
+     "n": 14624,
+     "min": 0.0,
+     "p5": 3.0,
+     "median": 5.0,
+     "mean": 5.4,
+     "p95": 10.0,
+     "max": 29.0
+    },
+    "gt50ms": 0,
+    "slow_warn_markers": 0,
+    "stats_max_ms": 8636,
+    "stat_onrx_max_ms": 29,
+    "stat_onrx_p99_median": 13.0
+   },
+   "state_machine": {
+    "transitions": {
+     "RX_LISTEN -> RX_PROCESS rc=0": 16524,
+     "RX_PROCESS -> RX_LISTEN rc=0": 14453,
+     "IDLE -> RX_LISTEN rc=0": 8288,
+     "IDLE -> TX_PREPARE rc=0": 3805,
+     "TX_PREPARE -> TX_ACTIVE rc=0": 2577,
+     "TX_ACTIVE -> TX_DONE rc=0": 2577,
+     "TX_DONE -> RX_LISTEN rc=0": 2577,
+     "TX_PREPARE -> IDLE rc=-1": 1228
+    },
+    "csma_backoff_rc_minus1": 1228,
+    "errors_other_rc": [],
+    "errors_other_n": 0,
+    "interleaved_garbage_lines": 0
+   },
+   "ring": {
+    "ring_status_samples": 2879,
+    "max": {
+     "queued": 6,
+     "pending": 1,
+     "retrying": 1
+    },
+    "retrying_gt0_samples": 2,
+    "ring_write_by_src_type": {
+     "rx_relay:40": 1713,
+     "rx_relay:21": 677,
+     "udp_rx:3A": 253,
+     "rx_relay:3A": 185,
+     "auto_pos:40": 97,
+     "user_wx:21": 47,
+     "rx_ack_fwd:41": 22,
+     "user_msg:3A": 6,
+     "rx_dm_ack_gw:41": 5,
+     "rx_dm_ack_new:41": 5
+    },
+    "ring_write_queued_max": 7,
+    "MAX_RING": 20,
+    "drops_non_stale": {},
+    "drop_stale_by_prio_reason": {},
+    "supersede": 50,
+    "supersede_keep": 3,
+    "ring_overflow": 0,
+    "relay_loop_blocked": 0,
+    "retransmit_giveup": 0,
+    "ack_reject": 3,
+    "relay_queued": 2578,
+    "ring_tx_read_unique_ids": 2370,
+    "ring_tx_read_ids_gt1": 58,
+    "double_send_bug_type_00_then_FF_same_slot": 0,
+    "dedup": {
+     "new": 4155,
+     "dup": 10722,
+     "add": 3419,
+     "ring_size": 100,
+     "max_slot_seen": 99
+    },
+    "overhear_cancel_NBR": null
+   },
+   "stat": {
+    "rows": 288,
+    "newid_sum": 3408,
+    "dup_sum": 9321,
+    "err_sum": 1906,
+    "txn_sum": 2580,
+    "txfail_sum": 0,
+    "drop_sum_prio1to5": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "ringmax_max": 8,
+    "ringmax_of": 20,
+    "ringmax_ge15_rows": 0,
+    "mh_max": 14,
+    "heap": {
+     "min": 105768,
+     "max": 110492,
+     "first": 108520,
+     "last": 110348,
+     "slope_per_hour": 72.1
+    },
+    "up_first": 3900,
+    "up_last": 90001,
+    "boot_wall_est": "2026-10-31 08:37:54",
+    "boot_before_capture_start_s": 3722,
+    "uptime_resets": [],
+    "dedup_dup_share_pct": 73.2
+   },
+   "health": {
+    "boot_banner_hits": [],
+    "crash_hits": [],
+    "heap_markers": 0,
+    "wifi_markers": 1440,
+    "mc_warn": {},
+    "rx_drop_unconfigured": 3,
+    "aprs_decode_errors": {
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <FN NCN": 1
+    },
+    "ping_send_lines": 0
+   },
+   "firmware_census": {
+    "nodes_total": 148,
+    "nodes_pre_cad": 11,
+    "own_call_echo_events_excluded": 0,
+    "nodes_unknown_4_35_hash": [],
+    "nodes_fw0_not_time_server": [
+     "DL4QB-90",
+     "OE1KFR-9",
+     "OE1XAR-28"
+    ],
+    "nodes_pre_cad_pct": 7.4,
+    "events_total_excl_time_server": 13450,
+    "events_pre_cad": 2205,
+    "events_pre_cad_pct": 16.4,
+    "unique_msgs_pre_cad_pct": 15.4,
+    "airtime_pre_cad_pct": 15.0,
+    "fw_events_incl_server": {
+     "post_cad": 11121,
+     "server": 1123,
+     "pre_cad": 2205
+    },
+    "versions_nodes": {
+     "4.40a": 120,
+     "4.35p": 14,
+     "4.0#": 3,
+     "4.35k": 3,
+     "4.35h": 3,
+     "4.35d": 2,
+     "4.35o": 2,
+     "4.35i": 1
+    },
+    "top_pre_cad": [
+     {
+      "call": "DB0SAC-12",
+      "fw": "4.35h",
+      "events": 675,
+      "msgs": 133,
+      "events_pct_of_nodes": 5.0,
+      "hw": null,
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "HB9TVJ-12",
+      "fw": "4.35i",
+      "events": 570,
+      "msgs": 114,
+      "events_pct_of_nodes": 4.2,
+      "hw": "T-Beam",
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "HB9HEH-40",
+      "fw": "4.35h",
+      "events": 430,
+      "msgs": 100,
+      "events_pct_of_nodes": 3.2,
+      "hw": null,
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "HB9HNO-49",
+      "fw": "4.35h",
+      "events": 338,
+      "msgs": 58,
+      "events_pct_of_nodes": 2.5,
+      "hw": null,
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "HB9AK-2",
+      "fw": "4.35k",
+      "events": 131,
+      "msgs": 24,
+      "events_pct_of_nodes": 1.0,
+      "hw": "TTGO LoRa32 V2.1 1.6",
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "DB7GV-15",
+      "fw": "4.35o",
+      "events": 35,
+      "msgs": 11,
+      "events_pct_of_nodes": 0.3,
+      "hw": "T-Beam",
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "DL1EEN-12",
+      "fw": "4.35k",
+      "events": 10,
+      "msgs": 2,
+      "events_pct_of_nodes": 0.1,
+      "hw": "TBEAM V1.2",
+      "desc": "Norbert",
+      "dist_km": null,
+      "lat": "50.1273",
+      "lon": "6.7128",
+      "fw_master": "4.35k"
+     },
+     {
+      "call": "F4AVI-12",
+      "fw": "4.35d",
+      "events": 9,
+      "msgs": 2,
+      "events_pct_of_nodes": 0.1,
+      "hw": "TTGO LoRa32 V2.1 1.6",
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "F1ZKT-12",
+      "fw": "4.35d",
+      "events": 5,
+      "msgs": 1,
+      "events_pct_of_nodes": 0.0,
+      "hw": "TTGO LoRa32 V2.1 1.6",
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     },
+     {
+      "call": "DO1IJB-13",
+      "fw": "4.35o",
+      "events": 1,
+      "msgs": 1,
+      "events_pct_of_nodes": 0.0,
+      "hw": "TLORA V2.1.6",
+      "desc": "",
+      "dist_km": null,
+      "lat": "48.921",
+      "lon": "8.3612",
+      "fw_master": "4.35o"
+     },
+     {
+      "call": "DO3GB-1",
+      "fw": "4.35k",
+      "events": 1,
+      "msgs": 1,
+      "events_pct_of_nodes": 0.0,
+      "hw": null,
+      "desc": "",
+      "dist_km": null,
+      "lat": null,
+      "lon": null,
+      "fw_master": null
+     }
+    ],
+    "top_talkers_all": [
+     {
+      "call": "HB9JAT",
+      "events": 1754,
+      "msgs": 92,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-5",
+      "events": 909,
+      "msgs": 166,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "OE1XAR-33",
+      "events": 816,
+      "msgs": 142,
+      "fw": "4.0#",
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-11",
+      "events": 795,
+      "msgs": 143,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "HB9VQQ-4",
+      "events": 766,
+      "msgs": 148,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "DO1FE-19",
+      "events": 722,
+      "msgs": 186,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "DB0HRH-12",
+      "events": 696,
+      "msgs": 138,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "DB0SAC-12",
+      "events": 675,
+      "msgs": 133,
+      "fw": "4.35h",
+      "dist_km": null
+     },
+     {
+      "call": "HB9TVJ-12",
+      "events": 570,
+      "msgs": 114,
+      "fw": "4.35i",
+      "dist_km": null
+     },
+     {
+      "call": "DB0TOD-12",
+      "events": 447,
+      "msgs": 84,
+      "fw": "4.40a",
+      "dist_km": null
+     },
+     {
+      "call": "HB9HEH-40",
+      "events": 430,
+      "msgs": 100,
+      "fw": "4.35h",
+      "dist_km": null
+     },
+     {
+      "call": "HB9LEK-12",
+      "events": 379,
+      "msgs": 61,
+      "fw": "4.40a",
+      "dist_km": null
+     }
+    ],
+    "unique_originators_excl_own_and_time_server": 148
+   },
+   "gateway": {
+    "keepalive_ok": 2879,
+    "keepalive_expected_30s": 2880.0,
+    "keepalive_gaps": {
+     "n_gt_thr": 0,
+     "thr_s": 45.0,
+     "max_s": 0,
+     "max_all_s": 31.2,
+     "median_all_s": 30.0,
+     "top": []
+    },
+    "beat_rx": 2879,
+    "beat_after_keep_missing": 126,
+    "beat_orphans": 126,
+    "beat_gaps_gt65s": {
+     "n_gt_thr": 0,
+     "thr_s": 65.0,
+     "max_s": 0,
+     "max_all_s": 31.2,
+     "median_all_s": 30.0,
+     "top": []
+    },
+    "beat_miss_episodes_n": 116,
+    "beat_miss_episodes": [
+     {
+      "start": "10-31 09:41:25",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 09:42:25",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 14:50:28",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 14:51:58",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 14:52:58",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 14:57:59",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 1
+     },
+     {
+      "start": "10-31 15:12:59",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 15:14:29",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 15:15:59",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 15:17:59",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 1
+     },
+     {
+      "start": "10-31 15:20:59",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:05:29",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:11:29",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:12:29",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:21:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:25:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:52:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:54:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:56:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:57:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 16:58:30",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 19:43:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 19:52:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 19:55:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 19:56:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 19:59:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 20:08:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 20:27:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 20:32:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 20:37:32",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:36:03",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:37:03",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:39:03",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:44:03",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:56:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 21:59:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:04:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:09:03",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:11:03",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:12:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:13:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:16:33",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:31:34",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:42:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 22:43:34",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 1
+     },
+     {
+      "start": "10-31 23:09:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:10:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:15:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:16:04",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:26:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:27:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:37:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:43:34",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:45:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:49:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:50:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:54:04",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 1
+     },
+     {
+      "start": "10-31 23:56:05",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "10-31 23:58:05",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 00:03:05",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 00:18:35",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 00:34:05",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:07:05",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:08:35",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:16:35",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:20:35",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:24:05",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:28:35",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:29:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:34:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:35:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:36:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:39:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:43:06",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 01:44:06",
+      "missed_keepalives": 2,
+      "no_beat_for_s": 60.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 02:26:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 02:29:36",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 02:40:06",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 02:41:06",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     },
+     {
+      "start": "11-01 02:49:06",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 30.0,
+      "cet_rx_inside": 0
+     }
+    ],
+    "beat_miss_per_hour": {
+     "10-31 09": 2,
+     "10-31 14": 5,
+     "10-31 15": 6,
+     "10-31 16": 10,
+     "10-31 19": 5,
+     "10-31 20": 4,
+     "10-31 21": 7,
+     "10-31 22": 9,
+     "10-31 23": 16,
+     "11-01 00": 3,
+     "11-01 01": 14,
+     "11-01 02": 8,
+     "11-01 03": 4,
+     "11-01 04": 4,
+     "11-01 06": 1,
+     "11-01 07": 7,
+     "11-01 08": 7,
+     "11-01 09": 14
+    },
+    "beat_miss_pct_of_keepalives": 4.38,
+    "cet_gw_rx": 142,
+    "gw_rx_types": {
+     "BEAT": 2879,
+     "CET": 142
+    },
+    "gw_other": {},
+    "udp_server_not_responding_n": 0,
+    "udp_server_not_responding_variants": {},
+    "udp_age_s_max": 0,
+    "udp_clusters_n": 0,
+    "udp_clusters": [],
+    "udp_per_hour": {},
+    "ntp": {
+     "ok": 0,
+     "timeout": 0,
+     "rtt_ms": {
+      "n": 0
+     },
+     "timeouts": []
+    },
+    "own_tx_check_udp": {},
+    "gw_srv": []
+   },
+   "eth": {
+    "present": false,
+    "summaries": 0,
+    "first": null,
+    "last": null,
+    "hb_age_s": {
+     "n": 0
+    },
+    "hb_age_gt35_n": 0,
+    "ips_seen": [],
+    "dest_seen": [],
+    "link_states": {},
+    "rx_n_increment_60s": {
+     "n": 0
+    },
+    "rx_zero_increment_intervals": 0,
+    "stalls": {},
+    "events_count": {},
+    "dhcp_rc": {},
+    "events_first": [],
+    "max_tx_ms": null,
+    "max_rx_ms": null,
+    "counters_final": null
+   },
+   "markers_top": {
+    "RX_RESTARTED": 19106,
+    "RX_FLAG_PROCESS": 16524,
+    "ONRXDONE_TIME": 14624,
+    "OnRxDone": 14453,
+    "RX_TIMEOUT_FIRE": 11903,
+    "RX_DEDUP_DUP": 10722,
+    "CHANNEL_UTIL": 8636,
+    "ONRXDONE_STATS": 8636,
+    "RX_RESTART": 8288,
+    "CAD_SCAN": 5557,
+    "RX_DEDUP_NEW": 4155,
+    "TX_GATE_ENTER": 3805,
+    "RX_TIMEOUT_DEFERRED": 3614,
+    "RX_DEDUP_ADD": 3419,
+    "RING_WRITE": 3010,
+    "RING_PRIO": 3010,
+    "RING_STATUS": 2879,
+    "RELAY_QUEUED": 2578,
+    "CAD_FREE": 2577,
+    "RING_TX_READ": 2577,
+    "RADIO_TX": 2577,
+    "TX_START": 2577,
+    "TX_DONE": 2577,
+    "OnTXDone": 2577,
+    "OnRxError": 1903,
+    "CRC_ERROR": 1903,
+    "CRC_PAYLOAD": 1903,
+    "CAD_BUSY_1": 1752,
+    "WIFI_line": 1440,
+    "CAD_BUSY": 1228,
+    "RX_IRQ_STALE": 898,
+    "CAD_FALSE_POSITIVE": 524,
+    "CET_tx": 207,
+    "CET_rx": 148,
+    "CET_gw_rx": 142,
+    "CSMA_AGED": 124,
+    "TimeClient": 96,
+    "RING_SUPERSEDE": 50,
+    "ACK_SKIP_READY": 6,
+    "RING_SUPERSEDE_KEEP": 3,
+    "ACK_REJECT": 3,
+    "RX_drop_unconfigured": 3,
+    "ACK_RECEIVED": 3,
+    "CHECKRX": 2,
+    "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <FN NCN": 1
+   },
+   "rx_silence": {
+    "rx_events": 16527,
+    "median_gap_s": 3.9,
+    "gaps_gt_300s": 0,
+    "silent_seconds_in_gaps_gt_300s": 0,
+    "silent_pct_of_span": 0.0,
+    "gaps_gt_300s_list": [],
+    "longest_gaps": [
+     {
+      "start": "10-31 20:18:01",
+      "gap_s": 110.8,
+      "own_tx_in_gap": 1,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 8
+      }
+     },
+     {
+      "start": "10-31 16:02:55",
+      "gap_s": 94.5,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 6
+      }
+     },
+     {
+      "start": "10-31 20:28:47",
+      "gap_s": 85.8,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 7
+      }
+     },
+     {
+      "start": "10-31 20:24:19",
+      "gap_s": 73.7,
+      "own_tx_in_gap": 2,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 3
+      }
+     },
+     {
+      "start": "10-31 16:07:29",
+      "gap_s": 72.4,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 5
+      }
+     },
+     {
+      "start": "10-31 17:33:55",
+      "gap_s": 67.9,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq5": 3
+      }
+     }
+    ]
+   },
+   "time_signal": {
+    "gw_rx_by_src": {
+     "OE1XAR-33": 142
+    },
+    "gw_rx_gaps": {
+     "OE1XAR-33": {
+      "n_distinct": 142,
+      "median_gap_s": 607.0,
+      "expected_in_span": 142,
+      "missing_beacons": 0,
+      "largest_gaps": []
+     }
+    },
+    "lora_cet_events": 1098,
+    "lora_distinct_by_src": {
+     "OE1XAR-33": 142,
+     "OE1XAR-63": 85,
+     "OE1XAR-28": 63
+    },
+    "lora_gaps_by_src": {
+     "OE1XAR-33": {
+      "n_distinct": 142,
+      "median_gap_s": 607.0,
+      "expected_in_span": 143,
+      "missing_beacons": 1,
+      "largest_gaps": [
+       {
+        "gap_s": 1214.0,
+        "after_stamp": "10-31 17:10:20"
+       }
+      ]
+     },
+     "OE1XAR-63": {
+      "n_distinct": 85,
+      "median_gap_s": 606.5,
+      "expected_in_span": 142,
+      "missing_beacons": 57,
+      "largest_gaps": [
+       {
+        "gap_s": 6061.0,
+        "after_stamp": "11-01 06:49:13"
+       },
+       {
+        "gap_s": 4244.0,
+        "after_stamp": "10-31 19:52:12"
+       },
+       {
+        "gap_s": 3032.0,
+        "after_stamp": "10-31 17:10:28"
+       },
+       {
+        "gap_s": 3030.0,
+        "after_stamp": "10-31 21:02:56"
+       },
+       {
+        "gap_s": 2426.0,
+        "after_stamp": "10-31 18:41:27"
+       }
+      ]
+     },
+     "OE1XAR-28": {
+      "n_distinct": 63,
+      "median_gap_s": 1201.0,
+      "expected_in_span": 71,
+      "missing_beacons": 30,
+      "largest_gaps": [
+       {
+        "gap_s": 5409.0,
+        "after_stamp": "11-01 06:07:01"
+       },
+       {
+        "gap_s": 4807.0,
+        "after_stamp": "10-31 10:55:11"
+       },
+       {
+        "gap_s": 4209.0,
+        "after_stamp": "10-31 22:56:16"
+       },
+       {
+        "gap_s": 4206.0,
+        "after_stamp": "11-01 02:46:41"
+       },
+       {
+        "gap_s": 3005.0,
+        "after_stamp": "10-31 18:35:51"
+       }
+      ]
+     }
+    },
+    "lora_oe1xar33_heard_of_union": {
+     "union_distinct_in_span": 142,
+     "heard": 142,
+     "pct": 100.0
+    }
+   },
+   "strong_signals": {
+    "thr_dbm": -60,
+    "decoded_total": 14449,
+    "decoded_strong": 0,
+    "err_total": 0,
+    "err_strong": 0,
+    "strong_decoded_per_hour": {},
+    "strong_err_per_hour": {},
+    "last_hops_strong": {},
+    "snr_decoded_strong_median": null,
+    "snr_err_strong_median": null
+   },
+   "ack_attribution": {
+    "ack012_events": 171,
+    "top_acked_prefix": [
+     {
+      "acked_prefix": "A3F15",
+      "events": 86,
+      "share_pct": 50.3,
+      "distinct_ack_ids": 16,
+      "ping_origin": null
+     },
+     {
+      "acked_prefix": "554A7",
+      "events": 31,
+      "share_pct": 18.1,
+      "distinct_ack_ids": 5,
+      "ping_origin": null
+     },
+     {
+      "acked_prefix": "A4036",
+      "events": 30,
+      "share_pct": 17.5,
+      "distinct_ack_ids": 5,
+      "ping_origin": null
+     },
+     {
+      "acked_prefix": "A4029",
+      "events": 22,
+      "share_pct": 12.9,
+      "distinct_ack_ids": 6,
+      "ping_origin": "HB9VQQ-4>HB9ZG-49"
+     },
+     {
+      "acked_prefix": "06C85",
+      "events": 2,
+      "share_pct": 1.2,
+      "distinct_ack_ids": 1,
+      "ping_origin": null
+     }
+    ],
+    "ping_origins_seen_in_log": {
+     "A4029": "HB9VQQ-4>HB9ZG-49"
+    },
+    "b10_b11_top": {
+     "01/00": 171
+    }
+   }
+  },
+  "hb9vqq5": {
+   "log": "hb9vqq5.log",
+   "has_wall_prefix": true,
+   "span": {
+    "first": "2026-10-31 10:03:15",
+    "last": "2026-11-01 10:03:16",
+    "hours": 24.0,
+    "lines": 242548,
+    "clock_basis": "logger wall prefix"
+   },
+   "identity": {
+    "callsign": "HB9VQQ-5 ",
+    "gw_id": "3368FC54",
+    "version_keep": "4.40a",
+    "keep_rest": "228;2285;",
+    "hw_id": null,
+    "hw_name": null,
+    "hw_votes": {},
+    "hw_votes_NEW_lines": {},
+    "own_new_fw": [],
+    "tx_frames_seen": 0,
+    "own_originated_tx_frames": 0,
+    "tx_frame_first_call_top": {},
+    "lora_cfg_lines": [
+     "[LoRa]...Received packet: RSSI:\t\t-106 dBm / SNR:\t\t-3 dB / Frequency error:\t-198.",
+     "[LoRa]...Received packet: RSSI:\t\t-107 dBm / SNR:\t\t-10 dB / Frequency error:\t-374",
+     "[LoRa]...Received packet: RSSI:\t\t-100 dBm / SNR:\t\t-1 dB / Frequency error:\t-20.3",
+     "[LoRa]...Received packet: RSSI:\t\t-107 dBm / SNR:\t\t-15 dB / Frequency error:\t-450",
+     "[LoRa]...Received packet: RSSI:\t\t-100 dBm / SNR:\t\t0 dB / Frequency error:\t-20.34",
+     "[LoRa]...Received packet: RSSI:\t\t-119 dBm / SNR:\t\t-16 dB / Frequency error:\t-421",
+     "[LoRa]...Received packet: RSSI:\t\t-101 dBm / SNR:\t\t4 dB / Frequency error:\t-24.22",
+     "[LoRa]...Received packet: RSSI:\t\t-109 dBm / SNR:\t\t-2 dB / Frequency error:\t-464.",
+     "[LoRa]...Received packet: RSSI:\t\t-103 dBm / SNR:\t\t2 dB / Frequency error:\t-450.4",
+     "[LoRa]...Received packet: RSSI:\t\t-100 dBm / SNR:\t\t1 dB / Frequency error:\t-24.22",
+     "[LoRa]...Received packet: RSSI:\t\t-103 dBm / SNR:\t\t-2 dB / Frequency error:\t-458.",
+     "[LoRa]...Received packet: RSSI:\t\t-109 dBm / SNR:\t\t-3 dB / Frequency error:\t-452."
+    ],
+    "gw_srv_lines": [],
+    "own_gateway_role": {
+     "keepalive_ok": 2878,
+     "gwu_upload": 0,
+     "gwi_inject": 0,
+     "beat_rx": 2878
+    },
+    "stat_fw": {}
+   },
+   "clock": {},
+   "traffic": {
+    "heard_events": 0,
+    "fcs0000_excluded": 0,
+    "no_setlog_tail": 0,
+    "ack_events": 0,
+    "ack_h_outside_80_84": 0,
+    "ack_h_top": {},
+    "dup_flag": {},
+    "own_in_path": {},
+    "srv_flag": {},
+    "types": {},
+    "unique_originators": 0,
+    "unique_originators_excl_time_server": 0,
+    "time_server_events": {},
+    "unique_msgids": 0,
+    "hop_H_field": {},
+    "hop_H_pct": {},
+    "path_len": {},
+    "path_len_pct": {},
+    "direct_zero_relay_pct": 0,
+    "rx_airtime_decoded_s": 0.0,
+    "airtime_share_by_type_pct": {},
+    "ack_share_of_all_frames_pct": 0
+   },
+   "own_tx": {
+    "tx_lines": 0,
+    "radio_tx_markers": 2183,
+    "tx_done": 2182,
+    "src_split": {},
+    "src_labels": {
+     "o": "own",
+     "r": "relay",
+     "g": "gateway(server)"
+    },
+    "src_pct": {},
+    "type_split": {},
+    "prio_split": {},
+    "src_type": {},
+    "airtime_s": 0.0,
+    "wait_ms": {
+     "n": 0
+    },
+    "cad_at_tx": {},
+    "relay_decisions_RLY": {},
+    "tx_per_hour": 0.0
+   },
+   "neighbours": {
+    "n_direct": 0,
+    "top": [],
+    "all_calls": []
+   },
+   "rf": {
+    "rssi_hist_10dB": {},
+    "rssi_all": {
+     "n": 0
+    },
+    "rx_rssi_gt_minus20": 0,
+    "rx_rssi_gt_minus40": 0,
+    "ack_rssi": {
+     "n": 0
+    },
+    "noise_rssi_minus_snr_all": {
+     "n": 0
+    },
+    "noise_rssi_minus_snr_snr_ge0": {
+     "n": 0
+    },
+    "rx_error_hist_10dB": {
+     "-130": 1195,
+     "-120": 2609,
+     "-110": 1138,
+     "-100": 6
+    },
+    "rx_error_gt_minus85": 0,
+    "rx_error_gt_minus60": 0,
+    "rx_error_n": 4948,
+    "rx_error_log_ERR_n": 0,
+    "rx_error_ferr_nonzero": 0,
+    "rx_error_rssi": {
+     "n": 4948,
+     "min": -127.0,
+     "p5": -126.0,
+     "median": -118.0,
+     "mean": -116.3,
+     "p95": -107.0,
+     "max": -98.0
+    },
+    "rx_error_snr": {
+     "n": 4948,
+     "min": -27.0,
+     "p5": -23.0,
+     "median": -17.0,
+     "mean": -15.4,
+     "p95": -3.0,
+     "max": 3.0
+    },
+    "rx_error_per_hour_mean": 206.2,
+    "rx_error_share_of_rx_pct": 52.2,
+    "rx_good_events": 4529,
+    "rx_good_events_source": "ONRXDONE_TIME",
+    "rx_irq_stale": {
+     "rssi_lines": 4456,
+     "note": "ESP32 stale-IRQ markers present (rssi= lines and 'forced restart' lines)",
+     "rssi": {
+      "n": 2228,
+      "min": -111.0,
+      "p5": -110.0,
+      "median": -102.0,
+      "mean": -100.8,
+      "p95": -83.0,
+      "max": -79.0
+     },
+     "early": 0
+    },
+    "theory_floor_bw250_dbm": -114
+   },
+   "channel": {
+    "CHANNEL_UTIL": {
+     "n": 8621,
+     "min": 0.0,
+     "p5": 0.0,
+     "median": 10.0,
+     "mean": 11.6,
+     "p95": 30.0,
+     "max": 64.0,
+     "ge70": 0,
+     "ge90": 0,
+     "first_half_mean": 12.5,
+     "second_half_mean": 10.7,
+     "window_est_s": 10.3
+    },
+    "util_by_hour": {
+     "10-31 10": 12.2,
+     "10-31 11": 12.1,
+     "10-31 12": 12.1,
+     "10-31 13": 12.5,
+     "10-31 14": 14.6,
+     "10-31 15": 13.5,
+     "10-31 16": 13.0,
+     "10-31 17": 12.2,
+     "10-31 18": 11.9,
+     "10-31 19": 11.5,
+     "10-31 20": 11.6,
+     "10-31 21": 12.7,
+     "10-31 22": 11.7,
+     "10-31 23": 10.2,
+     "11-01 00": 11.0,
+     "11-01 01": 10.5,
+     "11-01 02": 10.6,
+     "11-01 03": 10.1,
+     "11-01 04": 10.6,
+     "11-01 05": 10.2,
+     "11-01 06": 9.7,
+     "11-01 07": 11.4,
+     "11-01 08": 12.2,
+     "11-01 09": 10.5,
+     "11-01 10": 11.2
+    },
+    "inflation_check": {
+     "rx_values_multiple_of_2476ms": 3,
+     "rx_values_nonzero": 5931,
+     "verdict": "no inflation fingerprint"
+    },
+    "STAT_util_5min": {
+     "n": 0
+    },
+    "STAT_rx_ms_total": 0,
+    "STAT_tx_ms_total": 0,
+    "STAT_mean_util_from_airtime_pct": null,
+    "own_tx_airtime_s_from_TX_lines": 0.0,
+    "own_tx_airtime_s_from_CHANNEL_UTIL": 1885.0,
+    "own_tx_airtime_s_from_STAT": 0.0,
+    "rx_airtime_s_decoded_frames": 0.0,
+    "rx_airtime_s_from_STAT": 0.0,
+    "stat_rows": 0
+   },
+   "cad": {
+    "cad_scans": 4683,
+    "cad_busy_1_initial": 1552,
+    "cad_busy_confirmed": 948,
+    "cad_false_positive": 604,
+    "initial_busy_rate_pct": 33.1,
+    "false_positive_pct_of_initial_busy": 38.9,
+    "confirmed_busy_pct_of_initial_busy": 61.1,
+    "tx_gate_enter": 3131,
+    "cad_attempt_dist": {
+     "0": 2183,
+     "1": 592,
+     "2": 202,
+     "3": 78,
+     "4": 44,
+     "5": 18,
+     "6": 9,
+     "7": 5
+    },
+    "cad_attempt_pct": {
+     "0": 69.7,
+     "1": 18.9,
+     "2": 6.5,
+     "3": 2.5,
+     "4": 1.4,
+     "5": 0.6,
+     "6": 0.3,
+     "7": 0.2
+    },
+    "attempt0_pct": 69.7,
+    "attempt_ge3_pct": 4.9,
+    "attempt_max": 7,
+    "cad_free_attempt_dist": {
+     "0": 1590,
+     "1": 391,
+     "2": 124,
+     "3": 34,
+     "4": 26,
+     "5": 9,
+     "6": 4,
+     "7": 5
+    },
+    "cad_free": 2183,
+    "cad_free_no_tx": 0,
+    "cad_safety_timeout": 0,
+    "storm_episodes_attempt_ge3": 78,
+    "storm_dur_s": {
+     "n": 78,
+     "min": 0.0,
+     "p5": 0.0,
+     "median": 0.2,
+     "mean": 0.3,
+     "p95": 0.9,
+     "max": 1.2
+    },
+    "storm_longest": [
+     {
+      "start": "10-31 14:57:19",
+      "max_attempt": 7,
+      "gates": 5,
+      "end": "10-31 14:57:21",
+      "dur_s": 1.2
+     },
+     {
+      "start": "10-31 19:10:58",
+      "max_attempt": 7,
+      "gates": 5,
+      "end": "10-31 19:10:59",
+      "dur_s": 1.1
+     },
+     {
+      "start": "10-31 12:46:38",
+      "max_attempt": 7,
+      "gates": 5,
+      "end": "10-31 12:46:39",
+      "dur_s": 1.04
+     }
+    ],
+    "csma_aged": 8,
+    "per_hour": {
+     "10-31 10": {
+      "gates": 119,
+      "busy1": 50,
+      "fp": 21,
+      "rx_err": 233,
+      "util": 12.2
+     },
+     "10-31 11": {
+      "gates": 127,
+      "busy1": 48,
+      "fp": 26,
+      "rx_err": 195,
+      "util": 12.1
+     },
+     "10-31 12": {
+      "gates": 148,
+      "busy1": 77,
+      "fp": 35,
+      "rx_err": 193,
+      "util": 12.1
+     },
+     "10-31 13": {
+      "gates": 157,
+      "busy1": 85,
+      "fp": 30,
+      "rx_err": 216,
+      "util": 12.5
+     },
+     "10-31 14": {
+      "gates": 180,
+      "busy1": 100,
+      "fp": 36,
+      "rx_err": 259,
+      "util": 14.6
+     },
+     "10-31 15": {
+      "gates": 191,
+      "busy1": 103,
+      "fp": 28,
+      "rx_err": 258,
+      "util": 13.5
+     },
+     "10-31 16": {
+      "gates": 154,
+      "busy1": 80,
+      "fp": 29,
+      "rx_err": 234,
+      "util": 13.0
+     },
+     "10-31 17": {
+      "gates": 139,
+      "busy1": 65,
+      "fp": 24,
+      "rx_err": 203,
+      "util": 12.2
+     },
+     "10-31 18": {
+      "gates": 141,
+      "busy1": 67,
+      "fp": 22,
+      "rx_err": 211,
+      "util": 11.9
+     },
+     "10-31 19": {
+      "gates": 148,
+      "busy1": 70,
+      "fp": 22,
+      "rx_err": 177,
+      "util": 11.5
+     },
+     "10-31 20": {
+      "gates": 121,
+      "busy1": 52,
+      "fp": 22,
+      "rx_err": 213,
+      "util": 11.6
+     },
+     "10-31 21": {
+      "gates": 165,
+      "busy1": 92,
+      "fp": 25,
+      "rx_err": 210,
+      "util": 12.7
+     },
+     "10-31 22": {
+      "gates": 120,
+      "busy1": 61,
+      "fp": 25,
+      "rx_err": 223,
+      "util": 11.7
+     },
+     "10-31 23": {
+      "gates": 96,
+      "busy1": 42,
+      "fp": 19,
+      "rx_err": 202,
+      "util": 10.2
+     },
+     "11-01 00": {
+      "gates": 119,
+      "busy1": 62,
+      "fp": 26,
+      "rx_err": 199,
+      "util": 11.0
+     },
+     "11-01 01": {
+      "gates": 108,
+      "busy1": 46,
+      "fp": 11,
+      "rx_err": 195,
+      "util": 10.5
+     },
+     "11-01 02": {
+      "gates": 117,
+      "busy1": 59,
+      "fp": 24,
+      "rx_err": 191,
+      "util": 10.6
+     },
+     "11-01 03": {
+      "gates": 98,
+      "busy1": 41,
+      "fp": 16,
+      "rx_err": 162,
+      "util": 10.1
+     },
+     "11-01 04": {
+      "gates": 110,
+      "busy1": 54,
+      "fp": 27,
+      "rx_err": 188,
+      "util": 10.6
+     },
+     "11-01 05": {
+      "gates": 104,
+      "busy1": 57,
+      "fp": 29,
+      "rx_err": 193,
+      "util": 10.2
+     },
+     "11-01 06": {
+      "gates": 84,
+      "busy1": 40,
+      "fp": 19,
+      "rx_err": 165,
+      "util": 9.7
+     },
+     "11-01 07": {
+      "gates": 125,
+      "busy1": 72,
+      "fp": 30,
+      "rx_err": 208,
+      "util": 11.4
+     },
+     "11-01 08": {
+      "gates": 143,
+      "busy1": 71,
+      "fp": 30,
+      "rx_err": 219,
+      "util": 12.2
+     },
+     "11-01 09": {
+      "gates": 110,
+      "busy1": 56,
+      "fp": 26,
+      "rx_err": 192,
+      "util": 10.5
+     },
+     "11-01 10": {
+      "gates": 7,
+      "busy1": 2,
+      "fp": 2,
+      "rx_err": 9,
+      "util": 11.2
+     }
+    }
+   },
+   "onrxdone": {
+    "ms": {
+     "n": 4529,
+     "min": 0.0,
+     "p5": 2.0,
+     "median": 4.0,
+     "mean": 4.8,
+     "p95": 10.0,
+     "max": 37.0
+    },
+    "gt50ms": 0,
+    "slow_warn_markers": 0,
+    "stats_max_ms": 8621,
+    "stat_onrx_max_ms": null,
+    "stat_onrx_p99_median": null
+   },
+   "state_machine": {
+    "transitions": {
+     "IDLE -> RX_LISTEN rc=0": 9574,
+     "RX_LISTEN -> RX_PROCESS rc=0": 9474,
+     "RX_PROCESS -> RX_LISTEN rc=0": 4448,
+     "IDLE -> TX_PREPARE rc=0": 3131,
+     "TX_PREPARE -> TX_ACTIVE rc=0": 2183,
+     "TX_ACTIVE -> TX_DONE rc=0": 2182,
+     "TX_DONE -> RX_LISTEN rc=0": 2182,
+     "TX_PREPARE -> IDLE rc=-1": 948
+    },
+    "csma_backoff_rc_minus1": 948,
+    "errors_other_rc": [],
+    "errors_other_n": 0,
+    "interleaved_garbage_lines": 0
+   },
+   "ring": {
+    "ring_status_samples": 2877,
+    "max": {
+     "queued": 8,
+     "pending": 1,
+     "retrying": 1
+    },
+    "retrying_gt0_samples": 1,
+    "ring_write_by_src_type": {
+     "rx_relay:40": 1222,
+     "rx_relay:21": 385,
+     "udp_rx:3A": 253,
+     "rx_relay:3A": 171,
+     "auto_pos:40": 119,
+     "user_wx:21": 48,
+     "rx_ack_fwd:41": 8,
+     "rx_dm_ack_gw:41": 7,
+     "rx_dm_ack_new:41": 7,
+     "user_msg:3A": 4
+    },
+    "ring_write_queued_max": 9,
+    "MAX_RING": 20,
+    "drops_non_stale": {},
+    "drop_stale_by_prio_reason": {},
+    "supersede": 28,
+    "supersede_keep": 22,
+    "ring_overflow": 0,
+    "relay_loop_blocked": 0,
+    "retransmit_giveup": 0,
+    "ack_reject": 3,
+    "relay_queued": 1800,
+    "ring_tx_read_unique_ids": 2059,
+    "ring_tx_read_ids_gt1": 49,
+    "double_send_bug_type_00_then_FF_same_slot": 0,
+    "dedup": {
+     "new": 2863,
+     "dup": 1919,
+     "add": 2598,
+     "ring_size": 100,
+     "max_slot_seen": 99
+    },
+    "overhear_cancel_NBR": null
+   },
+   "stat": {
+    "rows": 0,
+    "newid_sum": 0,
+    "dup_sum": 0,
+    "err_sum": 0,
+    "txn_sum": 0,
+    "txfail_sum": 0,
+    "drop_sum_prio1to5": null,
+    "ringmax_max": null,
+    "ringmax_of": null,
+    "ringmax_ge15_rows": 0,
+    "mh_max": null,
+    "heap": null,
+    "up_first": null,
+    "up_last": null,
+    "boot_wall_est": null,
+    "boot_before_capture_start_s": null,
+    "uptime_resets": [],
+    "dedup_dup_share_pct": 0.0
+   },
+   "health": {
+    "boot_banner_hits": [],
+    "crash_hits": [],
+    "heap_markers": 367,
+    "wifi_markers": 1440,
+    "mc_warn": {},
+    "rx_drop_unconfigured": 3,
+    "aprs_decode_errors": {
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <ND FNF": 1,
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <FN FN": 1,
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol - size <": 1,
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol - bSourc": 1,
+     "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <CA ANE": 1
+    },
+    "ping_send_lines": 0
+   },
+   "firmware_census": {
+    "nodes_total": 0,
+    "nodes_pre_cad": 0,
+    "own_call_echo_events_excluded": 0,
+    "nodes_unknown_4_35_hash": [],
+    "nodes_fw0_not_time_server": [],
+    "nodes_pre_cad_pct": null,
+    "events_total_excl_time_server": 0,
+    "events_pre_cad": 0,
+    "events_pre_cad_pct": null,
+    "unique_msgs_pre_cad_pct": null,
+    "airtime_pre_cad_pct": null,
+    "fw_events_incl_server": {},
+    "versions_nodes": {},
+    "top_pre_cad": [],
+    "top_talkers_all": [],
+    "unique_originators_excl_own_and_time_server": 0
+   },
+   "gateway": {
+    "keepalive_ok": 2878,
+    "keepalive_expected_30s": 2880.0,
+    "keepalive_gaps": {
+     "n_gt_thr": 1,
+     "thr_s": 45.0,
+     "max_s": 60.7,
+     "max_all_s": 60.7,
+     "median_all_s": 30.0,
+     "top": [
+      {
+       "gap_s": 60.7,
+       "after": "10-31 21:37:45"
+      }
+     ]
+    },
+    "beat_rx": 2878,
+    "beat_after_keep_missing": 1,
+    "beat_orphans": 1,
+    "beat_gaps_gt65s": {
+     "n_gt_thr": 0,
+     "thr_s": 65.0,
+     "max_s": 0,
+     "max_all_s": 60.6,
+     "median_all_s": 30.0,
+     "top": []
+    },
+    "beat_miss_episodes_n": 1,
+    "beat_miss_episodes": [
+     {
+      "start": "10-31 19:01:45",
+      "missed_keepalives": 1,
+      "no_beat_for_s": 29.0,
+      "cet_rx_inside": 0
+     }
+    ],
+    "beat_miss_per_hour": {
+     "10-31 19": 1
+    },
+    "beat_miss_pct_of_keepalives": 0.03,
+    "cet_gw_rx": 143,
+    "gw_rx_types": {
+     "BEAT": 2878,
+     "CET": 143
+    },
+    "gw_other": {},
+    "udp_server_not_responding_n": 0,
+    "udp_server_not_responding_variants": {},
+    "udp_age_s_max": 0,
+    "udp_clusters_n": 0,
+    "udp_clusters": [],
+    "udp_per_hour": {},
+    "ntp": {
+     "ok": 0,
+     "timeout": 0,
+     "rtt_ms": {
+      "n": 0
+     },
+     "timeouts": []
+    },
+    "own_tx_check_udp": {},
+    "gw_srv": []
+   },
+   "eth": {
+    "present": false,
+    "summaries": 0,
+    "first": null,
+    "last": null,
+    "hb_age_s": {
+     "n": 0
+    },
+    "hb_age_gt35_n": 0,
+    "ips_seen": [],
+    "dest_seen": [],
+    "link_states": {},
+    "rx_n_increment_60s": {
+     "n": 0
+    },
+    "rx_zero_increment_intervals": 0,
+    "stalls": {},
+    "events_count": {},
+    "dhcp_rc": {},
+    "events_first": [],
+    "max_tx_ms": null,
+    "max_rx_ms": null,
+    "counters_final": null
+   },
+   "markers_top": {
+    "RX_TIMEOUT_FIRE": 15357,
+    "RX_RESTARTED": 11697,
+    "RX_RESTART": 9574,
+    "RX_FLAG_PROCESS": 9474,
+    "CHANNEL_UTIL": 8621,
+    "ONRXDONE_STATS": 8621,
+    "RX_TIMEOUT_DEFERRED": 5783,
+    "OnRxError": 4948,
+    "CRC_ERROR": 4948,
+    "CRC_PAYLOAD": 4948,
+    "CAD_SCAN": 4683,
+    "ONRXDONE_TIME": 4529,
+    "RX_IRQ_STALE": 4456,
+    "OnRxDone": 4448,
+    "TX_GATE_ENTER": 3131,
+    "RING_STATUS": 2877,
+    "RX_DEDUP_NEW": 2863,
+    "RX_DEDUP_ADD": 2598,
+    "RING_WRITE": 2224,
+    "RING_PRIO": 2224,
+    "CAD_FREE": 2183,
+    "RING_TX_READ": 2183,
+    "RADIO_TX": 2183,
+    "TX_START": 2183,
+    "TX_DONE": 2182,
+    "OnTXDone": 2182,
+    "RX_DEDUP_DUP": 1919,
+    "RELAY_QUEUED": 1800,
+    "CAD_BUSY_1": 1552,
+    "WIFI_line": 1440,
+    "CAD_BUSY": 948,
+    "CAD_FALSE_POSITIVE": 604,
+    "HEAP_line": 367,
+    "CET_tx": 219,
+    "CET_gw_rx": 143,
+    "CET_rx": 143,
+    "TimeClient": 96,
+    "CHECKRX": 38,
+    "RING_SUPERSEDE": 28,
+    "RING_SUPERSEDE_KEEP": 22,
+    "CSMA_AGED": 8,
+    "ACK_REJECT": 3,
+    "RX_drop_unconfigured": 3,
+    "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <ND FNF": 1,
+    "APRS_decode_err:APRS decode - Packet discarded, wrong APRS-protocol! <FN FN": 1
+   },
+   "unavailable": {
+    "traffic_rf_neighbours_firmware_census": "no [LOG] RX lines (--setlog on missing): decoded frames, RSSI/SNR, originators, types and airtime unknown",
+    "stat_windows_heap_ringmax_drops": "no [LOG] STAT lines (--setlog on missing)",
+    "own_tx_prio_wait_src": "no [LOG] TX lines (--setlog on missing); only RADIO_TX/TX_DONE markers counted"
+   },
+   "rx_silence": {
+    "rx_events": 9477,
+    "median_gap_s": 6.25,
+    "gaps_gt_300s": 0,
+    "silent_seconds_in_gaps_gt_300s": 0,
+    "silent_pct_of_span": 0.0,
+    "gaps_gt_300s_list": [],
+    "longest_gaps": [
+     {
+      "start": "11-01 01:17:10",
+      "gap_s": 81.0,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 15
+      }
+     },
+     {
+      "start": "11-01 03:04:27",
+      "gap_s": 80.9,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 5
+      }
+     },
+     {
+      "start": "10-31 10:21:50",
+      "gap_s": 73.4,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 3
+      }
+     },
+     {
+      "start": "11-01 04:38:07",
+      "gap_s": 72.7,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 9
+      }
+     },
+     {
+      "start": "11-01 02:34:10",
+      "gap_s": 71.2,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 2
+      }
+     },
+     {
+      "start": "10-31 17:22:58",
+      "gap_s": 70.6,
+      "own_tx_in_gap": 0,
+      "cad_safety_timeouts_in_gap": 0,
+      "rx_events_at_other_oe3_nodes": {
+       "hb9vqq4": 3
+      }
+     }
+    ]
+   },
+   "time_signal": {
+    "gw_rx_by_src": {
+     "OE1XAR-33": 143
+    },
+    "gw_rx_gaps": {
+     "OE1XAR-33": {
+      "n_distinct": 143,
+      "median_gap_s": 607.0,
+      "expected_in_span": 143,
+      "missing_beacons": 0,
+      "largest_gaps": []
+     }
+    },
+    "lora_cet_events": 0,
+    "lora_distinct_by_src": {},
+    "lora_gaps_by_src": {}
+   },
+   "strong_signals": {
+    "thr_dbm": -60,
+    "decoded_total": 0,
+    "decoded_strong": 0,
+    "err_total": 0,
+    "err_strong": 0,
+    "strong_decoded_per_hour": {},
+    "strong_err_per_hour": {},
+    "last_hops_strong": {},
+    "snr_decoded_strong_median": null,
+    "snr_err_strong_median": null
+   },
+   "ack_attribution": {
+    "ack012_events": 0,
+    "top_acked_prefix": [],
+    "ping_origins_seen_in_log": {},
+    "b10_b11_top": {}
+   }
+  }
+ },
+ "network": {
+  "hardware": {
+   "hb9vqq4": null,
+   "hb9vqq5": null
+  },
+  "ack_ping_attribution": {
+   "acked_prefix_F5CE7_share_pct_of_012_acks": {
+    "hb9vqq4": 50.3,
+    "hb9vqq5": null
+   },
+   "note": "F5CE7xxx = msg_ids of OE3XWJ-12 ping (`OE3XWJ-12>2025:{ping}`, 1/min, 1529 sent per xwj [PING] lines)",
+   "ack_airtime_share_pct": {
+    "hb9vqq4": 0.4,
+    "hb9vqq5": null
+   }
+  },
+  "common_beat_miss_events_oe3": [],
+  "noise_carpet_p5_dbm": {
+   "hb9vqq4": -123.0,
+   "hb9vqq5": -126.0
+  },
+  "pre_cad_events_pct": {
+   "hb9vqq4": 16.4,
+   "hb9vqq5": null
+  },
+  "chan_util_mean_pct": {
+   "hb9vqq4": 19.4,
+   "hb9vqq5": 11.6
+  },
+  "clock": {
+   "hb9vqq4": [
+    [
+     0,
+     "10-31 09:39:58",
+     "11-01 09:39:46",
+     17026
+    ]
+   ],
+   "hb9vqq5": null
+  }
+ }
+}
