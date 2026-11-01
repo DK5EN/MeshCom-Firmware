@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MeshCom-Fork von DK5EN: Firmware zum Flashen und sechs belegte Analysen</title>
-<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.10.30 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
+<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.11.01 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,13 +25,13 @@
   <div class="eyebrow">MeshCom · Fork DK5EN</div>
   <h1>Fork-Firmware zum Flashen und sechs belegte Analysen dazu</h1>
   <ul class="meta">
-    <li>Stand: 25.10.2026, Aussagen geprüft gegen den Quellcode von <code>fork-dev</code></li>
-    <li>Firmware: Release v4.40a.10.30 vom 30.10.2026</li>
+    <li>Stand: 01.11.2026, Aussagen geprüft gegen den Quellcode von <code>fork-dev</code></li>
+    <li>Firmware: Release v4.40a.11.01 vom 01.11.2026</li>
     <li>Quellen: Quellcode, Repo-Dokumente, GitHub-API; jede Seite nennt ihre Quellen am Ende</li>
   </ul>
 
   <div class="bluf">
-    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.10.30 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
+    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.11.01 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
     <p class="reco">Wer ein T-Beam 1W oder ein T-Deck Pro betreibt, liest zuerst den Handlungsbedarf in der Release-Karte.</p>
   </div>
 
@@ -47,13 +47,14 @@
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Aktuelles Release · 30.10.2026</div>
-      <h2>v4.40a.10.30: Web-Login ohne Klartext-Passwort, Gateway-Call im HEY-Upload</h2>
-      <p><strong>Das Web-GUI schickt das Passwort nicht mehr im Klartext, Nachrichten aus einer externen App stehen im eigenen Web-Chat, und ein Gateway nennt sich im HEY-Upload. Basis ist das offizielle 4.40a.10.28, das die Fork-Firmware bis v4.40a.10.25 schon enthält.</strong> Die Einstellungen bleiben erhalten.</p>
+      <div class="eyebrow">Aktuelles Release · 01.11.2026</div>
+      <h2>v4.40a.11.01: Update-Kanal per Fernwartung, Ping nur an Rufzeichen, eigene Baken mit Priorität 2</h2>
+      <p><strong>Die Fernwartung kann den Update-Kanal eines Knotens umschalten, das Ping-Ziel muss ein Rufzeichen sein, eigene Position, Wetter und HEY gehen mit der Priorität einer eigenen Gruppennachricht raus, und ein neues Log zeigt, wann ein Empfänger still wird.</strong> Die Einstellungen bleiben erhalten.</p>
       <div class="callout warn">
-        <p><strong>Handlungsbedarf: Skripte mit Web-Login, T-Beam 1W und T-Deck Pro</strong></p>
+        <p><strong>Handlungsbedarf: Ping-Ziel, Skripte mit Web-Login, T-Beam 1W und T-Deck Pro</strong></p>
         <ul>
-          <li><strong>Skripte, die sich mit <code>/?nodepassword=</code> anmelden,</strong> funktionieren an einem Knoten mit Web-Passwort nicht mehr. Der neue Ablauf (Nonce, HMAC, Cookie) steht in <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.30/src/web_functions/Web-API_documentation.txt">Web-API_documentation.txt</a>.</li>
+          <li><strong>Ping-Ziel:</strong> ein gespeichertes Ziel, das kein Rufzeichen ist (Gruppe wie <code>2025</code>, <code>*</code>, <code>TEST</code>, der eigene Call, <code>255.</code>), wird beim Start gelöscht; der Knoten pingt dann nicht mehr. Mit <code>--pingcall &lt;Call&gt;</code> neu setzen.</li>
+          <li><strong>Skripte, die sich mit <code>/?nodepassword=</code> anmelden,</strong> funktionieren an einem Knoten mit Web-Passwort nicht mehr, falls v4.40a.10.30 ausgelassen wurde. Der Ablauf (Nonce, HMAC, Cookie) steht in <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.01/src/web_functions/Web-API_documentation.txt">Web-API_documentation.txt</a>.</li>
           <li><strong>T-Beam 1W:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.20 geschehen (ohne Löschen). Bis dahin nicht über die Luft aktualisieren: <strong>der Knoten verliert sonst seine Einstellungen</strong>.</li>
           <li><strong>T-Deck Pro:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.21 geschehen (ohne Löschen); die alte Partitionstabelle hatte keinen Safeboot-Platz.</li>
           <li><strong>Alle anderen:</strong> wie gewohnt aktualisieren (Web-Flasher, <code>.bin</code> per USB, <code>tools/webflash.py</code> oder Auto Update im Kanal <code>dev</code>).</li>
@@ -61,17 +62,23 @@
       </div>
       <h3>Kernfakten</h3>
       <ul>
-        <li><strong>Web-Login:</strong> das Passwort geht nicht mehr über das Netz. Der Browser beweist es mit einer Einmal-Challenge (HMAC-SHA256), danach gilt eine Sitzung per Cookie statt der Freigabe nach IP-Adresse. Enter schickt den Login ab (Issue #1241, upstream #1245).</li>
-        <li><strong>Grenze:</strong> das Web-GUI läuft weiter ohne Verschlüsselung (HTTP). Wer mitlauschen kann, kann eine offene Sitzung übernehmen; ein langes Zufallspasswort schützt den Login.</li>
-        <li><strong>Web-Chat:</strong> Nachrichten, die eine App wie McApp über Extern-UDP (Port 1799) sendet, erscheinen jetzt auch im Verlauf des Knotens (upstream #1244).</li>
-        <li><strong>HEY-Upload:</strong> ein Gateway hängt seinen Call an den Pfad. Vorher fehlte der Empfänger in etwa 44 % der HEY-Berichte am Server, Karten konnten die Verbindung nicht zeichnen (upstream #1243, am Gateway DK5EN-98 im Feld bestätigt).</li>
-        <li><strong>Vision Master E290:</strong> ein zweites Image für Displays mit Flexkabel <code>FPC-7519revb</code>; der Web-Flasher fragt nach der Kabelbeschriftung (upstream #1240 von sp2ong).</li>
+        <li><strong>Update-Kanal per Fernwartung:</strong> eine authentifizierte RM1-Nachricht <code>upd chan dev</code> oder <code>upd chan prod</code> stellt den Kanal um; dieselbe Funktion nutzen <code>--updchan</code> und die Fernwartungs-Webseite. Nur in Builds mit Kanal <code>dev</code>.</li>
+        <li><strong>Ping-Ziel:</strong> nur Rufzeichen. Ein Ping an eine Gruppe löste bei jedem Gateway eine Bestätigung aus; im Log vom 31.10.2026 hingen 97,9 % aller ACK-Weiterleitungen eines Clusters an solchen Pings.</li>
+        <li><strong>Eigene Baken:</strong> Position, Wetter und HEY haben Priorität 2 statt 4/5 und verhungern an einem ausgelasteten Knoten nicht mehr. Weitergeleitete Baken bleiben bei 4/5. Nur mit Host-Tests geprüft.</li>
+        <li><strong>Empfangs-Stille-Log:</strong> mit <code>--loradebug on</code> meldet ein Knoten nach 60 s ohne Empfang Chip-Zustand, Fehlerflags und Pegel und danach, was die Stille beendet hat. Ändert das Funkverhalten nicht; soll klären, ob ein Chip hängt oder der Kanal nur leer ist.</li>
+        <li><strong>Labor-Gateway:</strong> <code>--gateway lab &lt;Host[:Port]&gt;</code> verbindet ein Gateway mit einem Laborserver (nur für Entwickler, nicht im Web-Dropdown).</li>
+        <li><strong>Vision Master E290 (OTP):</strong> kein regelmäßiger Voll-Refresh mehr; auf Displays mit <code>FPC-7519revb</code> zeigte sich ohne ihn kein Geisterbild.</li>
         <li><strong>Einstellungen:</strong> der Flash-Strukturstand bleibt <code>20260724</code>.</li>
-        <li><strong>Auto Update:</strong> der Modus ist immer <code>notify</code>. Der Kanal <code>dev</code> liest das Latest-Release dieses Forks; offizielle Releases tragen seit 4.40a.10.28 selbst Update-Dateien für den Kanal <code>prod</code>.</li>
-        <li><strong>Build:</strong> lokal aus dem getaggten Commit gebaut (der CI-Runner hing in der Warteschlange), 68 Dateien wie bei CI. Nicht byte-gleich mit einem offiziellen Release.</li>
+        <li><strong>Build:</strong> von GitHub CI aus dem getaggten Commit gebaut, 68 Dateien. Nicht byte-gleich mit einem offiziellen Release; drei der sechs Änderungen (Ping-Ziel, Baken-Priorität, Stille-Log) liegen als upstream-PR #1247 vor, die übrigen sind nur im Fork.</li>
       </ul>
       <details>
         <summary>Was seit v4.40a.10.16 dazukam</summary>
+        <h4>v4.40a.10.30</h4>
+        <ul>
+          <li><strong>Web-Login</strong> ohne Klartext-Passwort: Einmal-Challenge (HMAC-SHA256), Sitzung per Cookie, Enter schickt ab (upstream #1245).</li>
+          <li><strong>Web-Chat</strong> zeigt Nachrichten aus Extern-UDP (upstream #1244).</li>
+          <li><strong>HEY-Upload</strong> nennt das Gateway im Pfad (upstream #1243); zweites Image für Vision Master E290 mit Flexkabel <code>FPC-7519revb</code> (upstream #1240).</li>
+        </ul>
         <h4>v4.40a.10.25</h4>
         <ul>
           <li><strong>Eigene Gruppentexte</strong> gehen mindestens einmal auf LoRa (TXP-01); am Gateway DK5EN-98 im 93-h-Lauf ohne einen verlorenen Frame.</li>
@@ -138,7 +145,7 @@
           <li><strong>Offizielles v4.40a.hbserver</strong> plus die Fork-Funktionen aus #1187 bis #1189: Auto Update über GitHub, Speichern-und-Weiterleiten über den Server (seit v4.40a.10.19 in Release-Builds gesperrt) und HMAC-gesicherte Fernsteuerung per LoRa (ab Werk aus).</li>
         </ul>
       </details>
-      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.30">Release v4.40a.10.30</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
+      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.01">Release v4.40a.11.01</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
     </div>
 
     <a class="card" href="meshcom-protocol.html">
@@ -192,16 +199,16 @@
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 31 Boards</div>
-      <h2>Web-Flasher: v4.40a.10.30 direkt aus dem Browser</h2>
+      <h2>Web-Flasher: v4.40a.11.01 direkt aus dem Browser</h2>
       <p><strong>Das aktuelle Release per USB auf den Knoten, ohne Installation und ohne esptool.</strong> Bootloader, Partitionstabelle, Safeboot und Anwendung gehen in einem Durchgang; das Board wird am Knoten erkannt oder aus dem Flash gelesen.</p>
       <p>Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge und Opera auf dem Desktop.</p>
-      <div class="card-meta">v4.40a.10.30 · Web Serial</div>
+      <div class="card-meta">v4.40a.11.01 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     <p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.30">v4.40a.10.30</a> (30.10.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.01">v4.40a.11.01</a> (01.11.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a></p>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
