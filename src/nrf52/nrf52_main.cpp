@@ -1660,12 +1660,17 @@ void nrf52loop()
             int8_t _snr = g_rxs_ev_snr;
             if(g_rxs.noteRx(g_rxs_ev_ms) && bLORADEBUG)
             {
+                // LRF W2: age of the last CAD / own TX / RX restart before the end ("-" = none since last RX)
+                char sc[12], st[12], sr[12];
+                rxSilenceFmtSince(sc, sizeof(sc), g_rxs.end_since_cad_ms);
+                rxSilenceFmtSince(st, sizeof(st), g_rxs.end_since_tx_ms);
+                rxSilenceFmtSince(sr, sizeof(sr), g_rxs.end_since_restart_ms);
                 if(_hq)
-                    Serial.printf("[MC-DBG] RX_SILENCE_END dur=%lu by=%s rssi=%d snr=%d\n",
-                        (unsigned long)g_rxs.end_dur_s, rxSilenceReasonName(g_rxs.end_reason), (int)_rssi, (int)_snr);
+                    Serial.printf("[MC-DBG] RX_SILENCE_END dur=%lu by=%s since_cad=%s since_tx=%s since_restart=%s rssi=%d snr=%d\n",
+                        (unsigned long)g_rxs.end_dur_s, rxSilenceReasonName(g_rxs.end_reason), sc, st, sr, (int)_rssi, (int)_snr);
                 else
-                    Serial.printf("[MC-DBG] RX_SILENCE_END dur=%lu by=%s rssi=na snr=na\n",
-                        (unsigned long)g_rxs.end_dur_s, rxSilenceReasonName(g_rxs.end_reason));
+                    Serial.printf("[MC-DBG] RX_SILENCE_END dur=%lu by=%s since_cad=%s since_tx=%s since_restart=%s rssi=na snr=na\n",
+                        (unsigned long)g_rxs.end_dur_s, rxSilenceReasonName(g_rxs.end_reason), sc, st, sr);
             }
         }
         uint32_t _rxs_t = 0;

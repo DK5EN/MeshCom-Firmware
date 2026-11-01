@@ -76,6 +76,10 @@
 // LRF W1c: boot counters of the RX-silence tracker (nrf52_main.cpp).
 extern void rxSilenceGetStats(uint32_t *silences, uint32_t *longest_s, uint32_t *total_s);
 #endif
+#if defined(ESP32)
+// LRF W2b: boot counters of the RX-silence tracker (esp32/esp32_main.cpp).
+extern void rxSilenceGetStats(uint32_t *silences, uint32_t *longest_s, uint32_t *total_s);
+#endif
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 #include "esp32/esp32_pmu.h"
 #endif
@@ -7362,8 +7366,8 @@ void commandAction(char *umsg_text, bool ble)
                          meshcom_settings.node_rmstrict ? "on" : "off", (unsigned long)rm.ok, rmRej);
             }
 
-            #if defined(NRF52_SERIES)
-            // LRF W1c: RX silences since boot (no RX event for RX_SILENCE_MS).
+            #if defined(NRF52_SERIES) || defined(ESP32)
+            // LRF W1c/W2b: RX silences since boot (no RX event for RX_SILENCE_MS).
             {
                 uint32_t rxsN = 0, rxsLongest = 0, rxsTotal = 0;
                 rxSilenceGetStats(&rxsN, &rxsLongest, &rxsTotal);

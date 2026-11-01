@@ -1,4 +1,4 @@
-// Native tests for the RX-silence tracker (src/rx_silence.h, LRF W1c).
+// Native tests for the RX-silence tracker (src/rx_silence.h, LRF W1c; end-reason refinement LRF W2).
 //   pio test -e native -f test_rx_silence
 
 #include <unity.h>
@@ -82,14 +82,104 @@ void test_action_outside_window_is_rx(void)
     run_end(RXS_BY_CAD, true, RX_SILENCE_END_WINDOW_MS + 1, RXS_BY_RX);
 }
 
-void test_latest_action_wins(void)
+// LRF W2: the RX restart fires every ~4.6 s, so inside the window CAD beats TX beats the watchdog,
+// whichever came last.
+void test_cad_beats_later_watchdog(void)
 {
     T.init(0);
     T.tick(60000);
     T.noteAction(RXS_BY_CAD, 129000);
     T.noteAction(RXS_BY_WATCHDOG, 129800);
     TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_CAD, T.end_reason);
+}
+
+void test_tx_beats_later_watchdog(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_TX, 128000);
+    T.noteAction(RXS_BY_WATCHDOG, 129900);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_TX, T.end_reason);
+}
+
+void test_cad_beats_later_tx(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_CAD, 127500);
+    T.noteAction(RXS_BY_TX, 129500);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_CAD, T.end_reason);
+}
+
+void test_cad_outside_window_falls_back_to_watchdog(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_CAD, 130000 - RX_SILENCE_END_WINDOW_MS - 1);
+    T.noteAction(RXS_BY_WATCHDOG, 129000);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
     TEST_ASSERT_EQUAL_UINT8(RXS_BY_WATCHDOG, T.end_reason);
+}
+
+void test_window_edge_is_inclusive_per_kind(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_CAD, 130000 - RX_SILENCE_END_WINDOW_MS);   // exactly at the edge: counts
+    T.noteAction(RXS_BY_WATCHDOG, 129900);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_CAD, T.end_reason);
+}
+
+void test_tx_outside_window_falls_back_to_watchdog(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_TX, 130000 - RX_SILENCE_END_WINDOW_MS - 1);
+    T.noteAction(RXS_BY_WATCHDOG, 128000);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_WATCHDOG, T.end_reason);
+    TEST_ASSERT_EQUAL_UINT32(RX_SILENCE_END_WINDOW_MS + 1, T.end_since_tx_ms);
+}
+
+void test_since_fields(void)
+{
+    T.init(0);
+    T.tick(60000);
+    T.noteAction(RXS_BY_CAD, 100000);      // outside the window, still reported
+    T.noteAction(RXS_BY_CAD, 110000);      // the latest CAD counts
+    T.noteAction(RXS_BY_WATCHDOG, 129000);
+    TEST_ASSERT_TRUE(T.noteRx(130000));
+    TEST_ASSERT_EQUAL_UINT32(20000, T.end_since_cad_ms);
+    TEST_ASSERT_EQUAL_UINT32(RXS_SINCE_NONE, T.end_since_tx_ms);
+    TEST_ASSERT_EQUAL_UINT32(1000, T.end_since_restart_ms);
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_WATCHDOG, T.end_reason);
+}
+
+void test_since_fields_reset_by_rx(void)
+{
+    T.init(0);
+    T.noteAction(RXS_BY_CAD, 500);
+    T.noteAction(RXS_BY_TX, 600);
+    T.noteAction(RXS_BY_WATCHDOG, 700);
+    T.noteRx(1000);                        // consumes all three
+    T.tick(61000);
+    TEST_ASSERT_TRUE(T.noteRx(70000));
+    TEST_ASSERT_EQUAL_UINT32(RXS_SINCE_NONE, T.end_since_cad_ms);
+    TEST_ASSERT_EQUAL_UINT32(RXS_SINCE_NONE, T.end_since_tx_ms);
+    TEST_ASSERT_EQUAL_UINT32(RXS_SINCE_NONE, T.end_since_restart_ms);
+    TEST_ASSERT_EQUAL_UINT8(RXS_BY_RX, T.end_reason);
+}
+
+void test_fmt_since(void)
+{
+    char b[12];
+    TEST_ASSERT_EQUAL_STRING("-", rxSilenceFmtSince(b, sizeof(b), RXS_SINCE_NONE));
+    TEST_ASSERT_EQUAL_STRING("0", rxSilenceFmtSince(b, sizeof(b), 0));
+    TEST_ASSERT_EQUAL_STRING("4294967294", rxSilenceFmtSince(b, sizeof(b), 0xFFFFFFFEUL));
 }
 
 void test_stale_action_from_before_prior_event_ignored(void)
@@ -154,7 +244,15 @@ int main(int, char **)
     RUN_TEST(test_end_by_tx);
     RUN_TEST(test_end_by_watchdog);
     RUN_TEST(test_action_outside_window_is_rx);
-    RUN_TEST(test_latest_action_wins);
+    RUN_TEST(test_cad_beats_later_watchdog);
+    RUN_TEST(test_tx_beats_later_watchdog);
+    RUN_TEST(test_cad_beats_later_tx);
+    RUN_TEST(test_cad_outside_window_falls_back_to_watchdog);
+    RUN_TEST(test_window_edge_is_inclusive_per_kind);
+    RUN_TEST(test_tx_outside_window_falls_back_to_watchdog);
+    RUN_TEST(test_since_fields);
+    RUN_TEST(test_since_fields_reset_by_rx);
+    RUN_TEST(test_fmt_since);
     RUN_TEST(test_stale_action_from_before_prior_event_ignored);
     RUN_TEST(test_counters);
     RUN_TEST(test_running_silence_in_now_counters);
