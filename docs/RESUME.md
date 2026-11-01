@@ -4,8 +4,10 @@
 Base is upstream `dev` 147812e0: the official `v4.40a.10.28` (10203967) plus our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (HEY-UP-01),
 [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05) and
-[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), all merged 2026-10-31. No upstream PR
-of ours is open; the only fork-only firmware left is the `dev` AU channel. Next step: TD-22 soak and TD-23 UAT.
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), all merged 2026-10-31. Open upstream PR:
+[#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) (2026-11-01, branch `pr/lrf-ping-beacon-rxsilence`,
+worktree `../MeshCom-PR-next`): LRF ping target lock, own beacons at prio 2, RX-silence diagnostics. Fork-only
+firmware left: the `dev` AU channel and `--gateway lab` (2fe7ebd4). Next step: TD-22 soak and TD-23 UAT.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).

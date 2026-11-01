@@ -1,12 +1,12 @@
 # Campaign: Fixes from the 24-h log analysis 2026-11-01 (LRF)
 
-| Item      | Value                                                                                                                                              |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Started   | 2026-11-01 (plan only, nothing implemented)                                                                                                        |
-| Baseline  | `fork-dev` at `e644e21c`. Code facts below were read at this commit                                                                                |
-| Evidence  | [`log-reports/2026-11-01-24h/data/CORE-FINDINGS.md`](log-reports/2026-11-01-24h/data/CORE-FINDINGS.md), `verify/*.md`, `uebersicht.html`           |
-| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; upstream PRs later, one per item                   |
-| Status    | W0-W2 done, W3 bench done 2026-11-01 (section 7). Next: release candidate (operator go), then the 24-h field capture and `tools/logreport/` re-run |
+| Item      | Value                                                                                                                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Started   | 2026-11-01 (plan only, nothing implemented)                                                                                                                                                                  |
+| Baseline  | `fork-dev` at `e644e21c`. Code facts below were read at this commit                                                                                                                                          |
+| Evidence  | [`log-reports/2026-11-01-24h/data/CORE-FINDINGS.md`](log-reports/2026-11-01-24h/data/CORE-FINDINGS.md), `verify/*.md`, `uebersicht.html`                                                                     |
+| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; upstream PRs later, one per item                                                                             |
+| Status    | W0-W2 done, W3 bench done 2026-11-01 (section 7). Items 1, 2, 5 upstream as one PR #1247 (operator choice). Next: release candidate (operator go), then the 24-h field capture and `tools/logreport/` re-run |
 
 Line numbers drift: `src/` changed in 9 files between the analysis commit `651e0920` and `e644e21c`. Every brief
 must `grep -n` the named symbol before trusting a line number in this document.
