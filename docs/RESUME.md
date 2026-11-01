@@ -110,8 +110,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   a new soak after the pending T-Deck PR, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
   - Log-report fixes (LRF): W0-W2 done 2026-11-01 (ping target locked, own beacons at prio 2, RX-silence logging on
-    nRF52 and ESP32 with end-reason ages; nRF52 benched on DK5EN-1 and DK5EN-90, ESP32 not benched, not released).
-    Next: W3 bench on a Heltec V3, release candidate, field capture
+    nRF52 and ESP32 with end-reason ages; benched on DK5EN-90 (RAK) and DK5EN-1 (Heltec V3, W3), not released).
+    Next: release candidate (operator go), field capture
     ([campaign-logreport-fixes-20261101.md](campaign-logreport-fixes-20261101.md)).
   - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. The DK5EN-98 logger
     was stopped 2026-10-25 11:24: it found **TXP-01** (own group/`*` text released before its first own TX when

@@ -1,0 +1,21 @@
+LRF W3 bench, Heltec V3 DK5EN-1, fork-dev e01a5dc9 (MC_AU_DEV_CHANNEL=1), --loradebug on, 2 dBm, 2026-11-01 16:57-17:15
+identity_guard: heltec-1 ok -- DK5EN-1, 2 dBm
+2026-11-01 16:57:17.655  ...RXSIL: silences=0 longest=0s total=0s
+2026-11-01 17:03:02.852  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0000 err=0x0000 rssi_inst=-108 cad=0/11 restarts=53 boosted=0
+2026-11-01 17:03:28.942  [MC-DBG] RX_SILENCE_END dur=85 by=watchdog since_cad=7184 since_tx=7176 since_restart=1181 rssi=-48 snr=5
+2026-11-01 17:04:32.159  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0000 err=0x0000 rssi_inst=-109 cad=0/12 restarts=72 boosted=0
+2026-11-01 17:05:20.319  [MC-DBG] RX_SILENCE_END dur=107 by=rx since_cad=- since_tx=- since_restart=5894 rssi=-50 snr=6
+2026-11-01 17:07:07.712  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0004 err=0x0000 rssi_inst=-105 cad=0/14 restarts=97 boosted=0
+2026-11-01 17:07:08.717  [MC-DBG] RX_SILENCE_END dur=61 by=rx since_cad=56535 since_tx=56526 since_restart=9115 rssi=-49 snr=5
+2026-11-01 17:08:50.090  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0000 err=0x0000 rssi_inst=-106 cad=2/21 restarts=114 boosted=0
+2026-11-01 17:08:57.111  [MC-DBG] RX_SILENCE_END dur=67 by=rx since_cad=52544 since_tx=52536 since_restart=3578 rssi=-50 snr=6
+2026-11-01 17:10:31.458  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0000 err=0x0000 rssi_inst=-106 cad=2/26 restarts=130 boosted=0
+2026-11-01 17:10:46.517  [MC-DBG] RX_SILENCE_END dur=75 by=rx since_cad=60381 since_tx=60373 since_restart=8798 rssi=-59 snr=6
+2026-11-01 17:12:44.935  [MC-DBG] RX_SILENCE t=60 mode=rx drv=na st=0x52 irq=0x0004 err=0x0000 rssi_inst=-106 cad=2/29 restarts=155 boosted=0
+2026-11-01 17:13:05.002  [MC-DBG] RX_SILENCE_END dur=79 by=watchdog since_cad=- since_tx=- since_restart=2492 rssi=-55 snr=6
+RX_RESTART lines: 253
+ 178  src=timeout state=0 mode_before=rx
+   2 ED src=after_crc_error state=0
+  42 ED src=after_readData state=0
+  31 ED src=after_tx state=0
+resets/panics in capture: 0
