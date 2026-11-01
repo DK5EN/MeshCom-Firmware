@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HB9ZG-49: wird gut gehört, hört selbst schlecht</title>
+<style>
+:root{
+  /* Layout: single reading column 960px, tables full column width, charts as inline SVG. */
+  color-scheme: light;
+  --bg:#f7f9fc; --bg2:#ffffff; --bg3:#eef2f8; --line:#d6deea;
+  --fg:#0f1a2b; --fg2:#3f4f68; --fg3:#5d6b82;
+  --acc:#4338ca; --acc-bg:rgba(67,56,202,.08);
+  --ok:#047857; --ok-bg:rgba(4,120,87,.09);
+  --watch:#0e7490; --watch-bg:rgba(14,116,144,.10);
+  --act:#be123c; --act-bg:rgba(190,18,60,.08);
+  --neu:#475569; --neu-bg:rgba(71,85,105,.09);
+  --c1:#4338ca; --c2:#0e7490; --c3:#be185d; --c4:#047857; --c5:#7c3aed; --c6:#475569;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-h1: 1.75rem; --fs-h2: 1.25rem; --fs-body: 1rem; --fs-small: .875rem;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme: dark;
+  --bg:#0f172a; --bg2:#141e33; --bg3:#1b2742; --line:#2b3857;
+  --fg:#e7edfb; --fg2:#a9b8d2; --fg3:#8a9ab6;
+  --acc:#a5b4fc; --acc-bg:rgba(165,180,252,.12);
+  --ok:#34d399; --ok-bg:rgba(52,211,153,.12);
+  --watch:#22d3ee; --watch-bg:rgba(34,211,238,.12);
+  --act:#fb7185; --act-bg:rgba(251,113,133,.12);
+  --neu:#a3b1c6; --neu-bg:rgba(163,177,198,.12);
+  --c1:#a5b4fc; --c2:#22d3ee; --c3:#f472b6; --c4:#34d399; --c5:#c4b5fd; --c6:#94a3b8;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0f172a; --bg2:#141e33; --bg3:#1b2742; --line:#2b3857;
+  --fg:#e7edfb; --fg2:#a9b8d2; --fg3:#8a9ab6;
+  --acc:#a5b4fc; --acc-bg:rgba(165,180,252,.12);
+  --ok:#34d399; --ok-bg:rgba(52,211,153,.12);
+  --watch:#22d3ee; --watch-bg:rgba(34,211,238,.12);
+  --act:#fb7185; --act-bg:rgba(251,113,133,.12);
+  --neu:#a3b1c6; --neu-bg:rgba(163,177,198,.12);
+  --c1:#a5b4fc; --c2:#22d3ee; --c3:#f472b6; --c4:#34d399; --c5:#c4b5fd; --c6:#94a3b8;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:var(--fs-body);
+  line-height:1.6;padding:clamp(1.25rem,4vw,3rem) 16px;overflow-wrap:break-word}
+main{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:1.25rem}
+h1{font-size:var(--fs-h1);line-height:1.25;margin:0;text-wrap:balance}
+h2{font-size:var(--fs-h2);line-height:1.3;margin:1.25rem 0 0;padding-top:1rem;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:var(--fs-body);margin:.5rem 0 0}
+p,ul,ol{margin:0;max-width:75ch}
+ul,ol{padding-left:1.25rem;display:flex;flex-direction:column;gap:.3rem}
+small,.small,figcaption,.meta,td.n small{font-size:var(--fs-small);color:var(--fg2)}
+a{color:var(--acc)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+code,.mono{font-family:var(--mono);font-size:var(--fs-small)}
+.eyebrow{font-size:var(--fs-small);color:var(--fg3);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+ul.meta{list-style:none;padding:0;gap:.1rem}
+.bluf{background:var(--acc-bg);border-left:4px solid var(--acc);border-radius:var(--radius);padding:1rem 1.25rem;display:flex;flex-direction:column;gap:.5rem}
+.bluf .lead{font-weight:700}
+.callout{border-radius:var(--radius);padding:.85rem 1.1rem;border-left:4px solid var(--neu);background:var(--neu-bg);display:flex;flex-direction:column;gap:.4rem}
+.callout.act{border-color:var(--act);background:var(--act-bg)}
+.callout.watch{border-color:var(--watch);background:var(--watch-bg)}
+.callout.ok{border-color:var(--ok);background:var(--ok-bg)}
+.chip{display:inline-block;font-size:var(--fs-small);font-weight:700;line-height:1.3;padding:.1rem .55rem;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.chip.ok{color:var(--ok);background:var(--ok-bg)}
+.chip.watch{color:var(--watch);background:var(--watch-bg)}
+.chip.act{color:var(--act);background:var(--act-bg)}
+.chip.neu{color:var(--neu);background:var(--neu-bg)}
+.chip.pos{color:var(--ok);background:var(--ok-bg)}
+.chip.neg{color:var(--act);background:var(--act-bg)}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2)}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-small)}
+th,td{padding:.4rem .65rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--bg3);font-weight:700;color:var(--fg)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+figure{margin:0;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:.75rem 1rem;display:flex;flex-direction:column;gap:.4rem;overflow-x:auto}
+/* Charts keep a minimum drawing width so SVG text never shrinks below ~10 px on a phone; the figure
+   scrolls sideways instead (the page body never does). */
+figure svg{width:100%;min-width:720px;height:auto;display:block}
+svg text{fill:var(--fg2);font-family:var(--sans);font-size:13px}
+svg .axis{stroke:var(--line);stroke-width:1}
+svg .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4;opacity:.7}
+svg .lbl{fill:var(--fg);font-weight:600}
+nav.toc ol{columns:2;column-gap:2rem;display:block}
+nav.toc li{margin-bottom:.2rem}
+details{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);padding:.6rem 1rem}
+details>summary{cursor:pointer;font-weight:600}
+details[open]>summary{margin-bottom:.6rem}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.75rem}
+.card{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);padding:.75rem 1rem;display:flex;flex-direction:column;gap:.35rem}
+.card.pos{border-top:4px solid var(--ok)} .card.neg{border-top:4px solid var(--act)} .card.neu{border-top:4px solid var(--neu)}
+.foot{font-size:var(--fs-small);color:var(--fg3);border-top:1px solid var(--line);padding-top:1rem}
+@media (max-width:520px){nav.toc ol{columns:1}}
+/* Explainer drawings (one small animated SVG per identified issue).
+   Shapes: .d-box (node/box), .d-node (circle), .d-line (static link), .d-txt / .d-txt-s (labels).
+   State colours: .d-ok .d-act .d-watch .d-acc .d-neu (stroke+fill tint). Animations loop from a
+   meaningful resting frame; with prefers-reduced-motion they stop on that frame. */
+/* No align-items:center here: a centred flex child wider than its container is cut off on the left and
+   cannot be scrolled; margin:auto centres it only while it fits. */
+figure.explain svg{max-width:640px;min-width:520px;margin:0 auto}
+svg .d-box{fill:var(--bg3);stroke:var(--line);stroke-width:1.5}
+svg .d-node{fill:var(--bg3);stroke:var(--fg3);stroke-width:1.5}
+svg .d-line{stroke:var(--fg3);stroke-width:1.5;fill:none}
+svg .d-txt{fill:var(--fg);font-size:13px;font-weight:600}
+svg .d-txt-s{fill:var(--fg2);font-size:13px}
+svg .d-ok{stroke:var(--ok);fill:var(--ok-bg)} svg .d-act{stroke:var(--act);fill:var(--act-bg)}
+svg .d-watch{stroke:var(--watch);fill:var(--watch-bg)} svg .d-acc{stroke:var(--acc);fill:var(--acc-bg)}
+svg .d-neu{stroke:var(--neu);fill:var(--neu-bg)}
+svg .d-ok-s{stroke:var(--ok)} svg .d-act-s{stroke:var(--act)} svg .d-watch-s{stroke:var(--watch)} svg .d-acc-s{stroke:var(--acc)}
+svg .d-ok-f{fill:var(--ok)} svg .d-act-f{fill:var(--act)} svg .d-watch-f{fill:var(--watch)} svg .d-acc-f{fill:var(--acc)}
+/* .anim-flow: dashes run along a path/line (packet in flight). */
+svg .anim-flow{stroke-dasharray:6 6;animation:mc-flow 1.2s linear infinite}
+@keyframes mc-flow{to{stroke-dashoffset:-24}}
+/* .anim-pulse: element breathes (attention, active state). */
+svg .anim-pulse{animation:mc-pulse 2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mc-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* .anim-move: element travels by --dx/--dy (set inline: style="--dx:200px"), then restarts. */
+svg .anim-move{animation:mc-move var(--dur,3s) ease-in-out infinite}
+@keyframes mc-move{0%,10%{transform:translate(0,0);opacity:1}80%{transform:translate(var(--dx,0),var(--dy,0));opacity:1}100%{transform:translate(var(--dx,0),var(--dy,0));opacity:0}}
+/* .anim-drop: element fades out late in the cycle (dropped / expired / lost). */
+svg .anim-drop{animation:mc-drop var(--dur,3s) ease-in infinite}
+@keyframes mc-drop{0%,60%{opacity:1}85%,100%{opacity:.08}}
+/* .anim-delay-1..3: stagger. */
+svg .anim-delay-1{animation-delay:.5s} svg .anim-delay-2{animation-delay:1s} svg .anim-delay-3{animation-delay:1.5s}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<main>
+<p class="eyebrow">MeshCom Log-Auswertung · HB9-Netz · Einzelfall</p>
+<h1>HB9ZG-49: wird gut gehört, hört selbst schlecht</h1>
+<p class="meta">Quellen: mcmap (Funkstrecken der letzten 7 Tage, Abfrage 01.11.2026) und der 24-h-Mitschnitt von HB9VQQ-4 (2026-10-31 09:39 bis 2026-11-01 09:39).</p>
+<div class="callout act"><p><strong>Ja: HB9ZG-49 wird viel besser gehört, als er selbst hört.</strong> 24 Stationen hören ihn, er hört nur 9. Auf denselben Strecken kommt er beim Partner 12 bis 15 dB besser an als umgekehrt. Vergleichbare Strecken ohne ihn liegen bei 0 bis 6 dB.</p><p><strong>Ob er schlecht hört oder nur sehr laut sendet, zeigen die Daten nicht.</strong> Beides sieht von außen gleich aus. Eine Endstufe (PA) mit 1 bis 2 W würde den Unterschied fast vollständig erklären. Ein Verlust im Empfangsweg (Kabel, Stecker, Filter, Board) ebenso. Klarheit bringt eine Frage an den Sysop und seine <code>--info</code>-Ausgabe.</p></div>
+<div class="table-wrap"><table><thead><tr><th>Frage</th><th>Kurzantwort</th><th>Status</th></tr></thead><tbody><tr><td>Ist HB9ZG-49 stumm?</td><td>Nein. 24 Stationen hören ihn.</td><td><span class="chip ok">OK</span></td></tr><tr><td>Hört er schlecht?</td><td>Im Verhältnis zu seiner Lautstärke ja: er hört 9 Stationen, 12 bis 15 dB schlechter als umgekehrt (normal: bis 6 dB).</td><td><span class="chip act">Handlungsbedarf</span></td></tr><tr><td>Kann es eine PA sein?</td><td>Ja, das passt zu den Zahlen. Ebenso ein Verlust im Empfangsweg. Sysop fragen.</td><td><span class="chip watch">Beobachten</span></td></tr></tbody></table></div>
+<figure class="explain"><svg viewBox="0 0 640 230" role="img" aria-label="Abb. 1: Raus kommt HB9ZG-49 gut, rein kommt fast nichts an. Grün: was die Talstationen von ihm hören (SNR). Rot: was er von ihnen hört."><polygon class="d-neu" points="250,150 320,58 390,150"/><rect class="d-box d-watch " x="258" y="18" width="124" height="40" rx="6"/><text class="d-txt" x="320.0" y="35.0" text-anchor="middle">HB9ZG-49</text><text class="d-txt-s" x="320.0" y="51.0" text-anchor="middle">1703 m</text><rect class="d-box d-ok " x="14" y="150" width="150" height="46" rx="6"/><text class="d-txt" x="89.0" y="170.0" text-anchor="middle">HB9CF-40</text><text class="d-txt-s" x="89.0" y="186.0" text-anchor="middle">16 km, Tal</text><rect class="d-box d-ok " x="476" y="150" width="150" height="46" rx="6"/><text class="d-txt" x="551.0" y="170.0" text-anchor="middle">HB9FRR-12</text><text class="d-txt-s" x="551.0" y="186.0" text-anchor="middle">9 km, Tal</text><path class="d-line d-ok-s anim-flow" d="M258,46 C180,60 120,100 100,148" style="stroke-width:3"/><path class="d-line d-ok-s anim-flow" d="M382,46 C460,60 520,100 540,148" style="stroke-width:3"/><text class="d-txt-s" x="20" y="40">sendet: −0,4 dB</text><text class="d-txt-s" x="620" y="40" text-anchor="end">sendet: −3,2 dB</text><path class="d-line d-act-s anim-flow anim-drop" d="M150,150 C190,120 240,92 262,62" style="stroke-width:1.5"/><path class="d-line d-act-s anim-flow anim-drop" d="M490,150 C450,120 400,92 378,62" style="stroke-width:1.5"/><text class="d-txt-s" x="172" y="186">hört: −15,5 dB</text><text class="d-txt-s" x="468" y="186" text-anchor="end">hört: −17,0 dB</text><text class="d-txt" x="320" y="214" text-anchor="middle">gleiche Strecke, 12 bis 15 dB Unterschied je Richtung</text></svg><figcaption>Abb. 1: Raus kommt HB9ZG-49 gut, rein kommt fast nichts an. Grün: was die Talstationen von ihm hören (SNR). Rot: was er von ihnen hört.</figcaption></figure>
+<h2>Steckbrief</h2>
+<div class="table-wrap"><table><thead><tr><th>Feld</th><th>Wert</th></tr></thead><tbody><tr><td>Rufzeichen</td><td>HB9ZG-49</td></tr><tr><td>Hardware</td><td>Heltec V3 (SX1262)</td></tr><tr><td>Firmware</td><td>4.40a (laut mcmap)</td></tr><tr><td>Standort</td><td>47,0275 N, 8,5200 E, 1703 m</td></tr><tr><td>Beschreibung</td><td>Digipeater, SysOp-HB9JAY</td></tr><tr><td>Internet-Gateway</td><td>nein (reiner Digipeater)</td></tr><tr><td>Nachbarzahl, die er selbst meldet</td><td>5</td></tr></tbody></table></div>
+<h2>1. Nicht stumm: 24 Stationen hören ihn</h2>
+<ul><li><strong>24 Empfänger in 7 Tagen</strong>, davon 15 aktuell aktiv.</li><li><strong>Bis 40 km weit:</strong> HB9VQQ-2 hört ihn 1327-mal mit −110 dBm.</li><li><strong>Talstationen hören ihn kräftig:</strong> HB9CF-40 mit −105 dBm und −0,4 dB Rauschabstand, HB9FRR-12 mit −109 dBm und −3,2 dB.</li></ul>
+<figure><svg viewBox="0 0 900 120" role="img" aria-label="Abb. 2: 24 Stationen hören HB9ZG-49, er selbst hört 9 (Funkstrecken laut mcmap, 7 Tage)."><text x="219" y="25" text-anchor="end">hören HB9ZG-49 (7 Tage)</text><rect x="227" y="12" width="583.0" height="17" rx="3" fill="var(--c1)"/><text class="lbl" x="816.0" y="25">24 Stationen</text><text x="219" y="51" text-anchor="end">davon aktiv</text><rect x="227" y="38" width="364.4" height="17" rx="3" fill="var(--c1)"/><text class="lbl" x="597.4" y="51">15 Stationen</text><text x="219" y="77" text-anchor="end">von HB9ZG-49 gehört (7 Tage)</text><rect x="227" y="64" width="218.6" height="17" rx="3" fill="var(--c1)"/><text class="lbl" x="451.6" y="77">9 Stationen</text><text x="219" y="103" text-anchor="end">davon aktiv</text><rect x="227" y="90" width="145.8" height="17" rx="3" fill="var(--c1)"/><text class="lbl" x="378.8" y="103">6 Stationen</text></svg><figcaption>Abb. 2: 24 Stationen hören HB9ZG-49, er selbst hört 9 (Funkstrecken laut mcmap, 7 Tage).</figcaption></figure>
+<h2>2. Was er hört, kommt am Limit an</h2>
+<ul><li><strong>7 von 9 Empfangsstrecken</strong> zeigen im Mittel −127 dBm, den tiefsten Wert, den der Empfängerchip ausgeben kann. Das allein beweist nichts: auch gesunde Heltec V3 zeigen bei so schwachen Signalen −125 bis −127 dBm (HB9CF-44 und HB9CF-46 hören HB9ZG-49 selbst mit −125 dBm).</li><li><strong>Rauschabstand am Limit:</strong> im Mittel −15,5 dB von HB9CF-40 und −17,0 dB von HB9FRR-12. Schon wenige dB weniger und der Rahmen ist verloren.</li><li><strong>Einzige kräftige Strecke:</strong> HB9WAD-51 (Knonau, 22 km) mit −112 dBm, aber nur 23 Meldungen in 7 Tagen. Der Empfänger kann also höhere Werte anzeigen; es kommt nur fast nie so viel an.</li></ul>
+<div class="table-wrap"><table><thead><tr><th>Partner</th><th>Entfernung</th><th>Richtung 1: Partner hört ZG (Pegel / SNR, Meldungen)</th><th>Richtung 2: ZG hört Partner</th><th class="n">Unterschied SNR</th></tr></thead><tbody><tr><td>HB9RMW-40</td><td>24 km</td><td>−109 dBm / 4,0 dB (1)</td><td>−127 dBm / −14,9 dB (426)</td><td class="n">19 dB (wenig Daten)</td></tr><tr><td>HB9CF-40</td><td>16 km</td><td>−105 dBm / −0,4 dB (214)</td><td>−127 dBm / −15,5 dB (1317)</td><td class="n">15 dB</td></tr><tr><td>HB9IJS-10</td><td>20 km</td><td>−119 dBm / −5,3 dB (173)</td><td>−127 dBm / −20,2 dB (5)</td><td class="n">15 dB (wenig Daten)</td></tr><tr><td>HB9FRR-12</td><td>9 km</td><td>−109 dBm / −3,2 dB (151)</td><td>−127 dBm / −17,0 dB (420)</td><td class="n">14 dB</td></tr><tr><td>HB9JAO-9</td><td>21 km</td><td>−113 dBm / −6,2 dB (273)</td><td>−127 dBm / −18,6 dB (221)</td><td class="n">12 dB</td></tr><tr><td>HB9JAT</td><td>7 km</td><td>−108 dBm / −7,9 dB (16)</td><td>−125 dBm / −12,6 dB (7141)</td><td class="n">5 dB (wenig Daten)</td></tr><tr><td>DB0TOD-13</td><td>91 km</td><td>−120 dBm / −15,6 dB (926)</td><td>−127 dBm / −20,0 dB (2)</td><td class="n">4 dB (wenig Daten)</td></tr><tr><td>HB9JAT-7</td><td>7 km</td><td>−115 dBm / −15,2 dB (9)</td><td>−127 dBm / −17,8 dB (548)</td><td class="n">3 dB (wenig Daten)</td></tr><tr><td>Kontrolle: HB9CF-40 ↔ HB9CF-44</td><td>–</td><td>−93 dBm / −0,5 dB (52)</td><td>−92 dBm / −0,7 dB (26)</td><td class="n">0 dB</td></tr><tr><td>Kontrolle: HB9CF-40 ↔ HB9CF-46</td><td>–</td><td>−106 dBm / −0,3 dB (39)</td><td>−107 dBm / −2,6 dB (23)</td><td class="n">2 dB</td></tr><tr><td>Kontrolle: HB9CF-40 ↔ HB9JAO-9</td><td>–</td><td>−117 dBm / −7,7 dB (14)</td><td>−117 dBm / −10,6 dB (25)</td><td class="n">3 dB</td></tr></tbody></table></div><figcaption>Tabelle 1: Dieselbe Strecke in beiden Richtungen (mcmap, 7 Tage; Kontrollpaare 24 h). Ein Messwert gehört immer dem Empfänger. Kontrollpaare: Richtung 1 = rechte Station hört linke. Pegel verschiedener Chips sind nicht direkt vergleichbar, der Rauschabstand schon.</figcaption>
+<p><strong>Einschränkung:</strong> Die Sendeleistung der Partner ist nicht bekannt. Ein Unterschied in der Tabelle kann auch heißen, dass HB9ZG-49 lauter sendet als der Partner. Abschnitt 3 vergleicht deshalb mit Strecken ohne ihn und fragt: taub oder laut?</p>
+<h2>3. Gegenprobe: Ist das normal?</h2>
+<ul><li><strong>12 schwache Vergleichsstrecken ohne HB9ZG-49</strong> sind 0,2 bis 5,9 dB unsymmetrisch, im Median 3,7 dB. Keine erreicht 10 dB.</li><li><strong>10 weitere Stationen hören ihn, er hört sie nie</strong> (Tabelle 2). Sie hören ihn mit −11 bis −18 dB. Wäre die Strecke symmetrisch, käme ihr Signal bei ihm ähnlich an und wäre noch dekodierbar. Mit 12 bis 15 dB weniger liegt es unter der Grenze.</li><li><strong>Der Empfänger ist nicht tot:</strong> HB9WAD-51 hört er mit −112 dBm und −0,8 dB.</li></ul>
+<figure><svg viewBox="0 0 900 432" role="img" aria-label="Abb. 3: Unsymmetrie im Rauschabstand. Oben 12 Strecken ohne HB9ZG-49 (höchstens 6 dB), unten die Strecken mit ihm (12 bis 15 dB)."><text x="167" y="25" text-anchor="end">HB9FRR-12 ↔ HB9JAY-60</text><rect x="175" y="12" width="248.1" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="429.1" y="25">5,9 dB</text><text x="167" y="51" text-anchor="end">HB9VQQ-4 ↔ HB9BBE-18</text><rect x="175" y="38" width="218.7" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="399.7" y="51">5,2 dB</text><text x="167" y="77" text-anchor="end">HB9VQQ-4 ↔ DB0TOD-13</text><rect x="175" y="64" width="210.3" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="391.3" y="77">5 dB</text><text x="167" y="103" text-anchor="end">HB9VQQ-4 ↔ HB9VQQ-5</text><rect x="175" y="90" width="206.1" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="387.1" y="103">4,9 dB</text><text x="167" y="129" text-anchor="end">HB9CF-44 ↔ HB9JAY-60</text><rect x="175" y="116" width="176.6" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="357.6" y="129">4,2 dB</text><text x="167" y="155" text-anchor="end">HB9VQQ-4 ↔ HB9TVJ-12</text><rect x="175" y="142" width="159.8" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="340.8" y="155">3,8 dB</text><text x="167" y="181" text-anchor="end">HB9PLM-66 ↔ HB9JAY-60</text><rect x="175" y="168" width="151.4" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="332.4" y="181">3,6 dB</text><text x="167" y="207" text-anchor="end">HB9JAO-9 ↔ HB9JAY-60</text><rect x="175" y="194" width="117.7" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="298.7" y="207">2,8 dB</text><text x="167" y="233" text-anchor="end">HB9VQQ-4 ↔ HB9LEK-12</text><rect x="175" y="220" width="117.7" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="298.7" y="233">2,8 dB</text><text x="167" y="259" text-anchor="end">HB9CF-46 ↔ HB9JAY-60</text><rect x="175" y="246" width="50.5" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="231.5" y="259">1,2 dB</text><text x="167" y="285" text-anchor="end">HB9VQQ-4 ↔ DB0TOD-12</text><rect x="175" y="272" width="21.0" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="202.0" y="285">0,5 dB</text><text x="167" y="311" text-anchor="end">HB9CF-44 ↔ HB9CF-46</text><rect x="175" y="298" width="8.4" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="189.4" y="311">0,2 dB</text><text x="167" y="337" text-anchor="end">HB9ZG-49 ↔ HB9CF-40</text><rect x="175" y="324" width="635.0" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="816.0" y="337">15,1 dB</text><text x="167" y="363" text-anchor="end">HB9ZG-49 ↔ HB9IJS-10</text><rect x="175" y="350" width="626.6" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="807.6" y="363">14,9 dB</text><text x="167" y="389" text-anchor="end">HB9ZG-49 ↔ HB9FRR-12</text><rect x="175" y="376" width="580.3" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="761.3" y="389">13,8 dB</text><text x="167" y="415" text-anchor="end">HB9ZG-49 ↔ HB9JAO-9</text><rect x="175" y="402" width="521.5" height="17" rx="3" fill="var(--c3)"/><text class="lbl" x="702.5" y="415">12,4 dB</text></svg><figcaption>Abb. 3: Unsymmetrie im Rauschabstand. Oben 12 Strecken ohne HB9ZG-49 (höchstens 6 dB), unten die Strecken mit ihm (12 bis 15 dB).</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Station</th><th>Entfernung</th><th>hört HB9ZG-49 (Pegel / SNR)</th><th class="n">Meldungen</th><th>HB9ZG-49 hört sie</th></tr></thead><tbody><tr><td>HB9JAO-60</td><td>21 km</td><td>−119 dBm / −10,6 dB</td><td class="n">191</td><td>nie</td></tr><tr><td>HB9AK-2</td><td>79 km</td><td>−129 dBm / −14,1 dB</td><td class="n">1605</td><td>nie</td></tr><tr><td>HB9VQQ-5</td><td>49 km</td><td>−119 dBm / −14,6 dB</td><td class="n">91</td><td>nie</td></tr><tr><td>HB9CF-46</td><td>20 km</td><td>−125 dBm / −14,9 dB</td><td class="n">81</td><td>nie</td></tr><tr><td>HB9CF-44</td><td>17 km</td><td>−125 dBm / −15,1 dB</td><td class="n">43</td><td>nie</td></tr><tr><td>HB9WNM-13</td><td>–</td><td>−110 dBm / −15,2 dB</td><td class="n">21</td><td>nie</td></tr><tr><td>HB9VQQ-4</td><td>40 km</td><td>−120 dBm / −15,7 dB</td><td class="n">126</td><td>nie</td></tr><tr><td>HB9IJS-13</td><td>–</td><td>−122 dBm / −16,4 dB</td><td class="n">33</td><td>nie</td></tr><tr><td>HB9VQQ-2</td><td>40 km</td><td>−110 dBm / −16,6 dB</td><td class="n">1327</td><td>nie</td></tr><tr><td>DB0TOD-12</td><td>91 km</td><td>−125 dBm / −17,7 dB</td><td class="n">514</td><td>nie</td></tr></tbody></table></div><figcaption>Tabelle 2: Einseitige Strecken (mcmap, 7 Tage, mindestens 20 Meldungen).</figcaption>
+<h3>Taub oder laut?</h3>
+<p>Die Unsymmetrie misst <em>Lautstärke minus Gehör</em>. Woher sie kommt, lässt sich von außen nicht trennen:</p>
+<div class="table-wrap"><table><thead><tr><th>Erklärung</th><th>Passt zu den Zahlen?</th><th>Woran man es erkennt</th></tr></thead><tbody><tr><td><strong>Endstufe (PA)</strong> hinter dem Heltec</td><td>Ja. 1 W sind 8 dB, 2 W 11 dB mehr als die 22 dBm des Heltec. Dazu 1 bis 4 dB normale Streuung, das ergibt 12 bis 15 dB.</td><td>Sysop fragen. Dann hört er normal, sendet aber viel weiter, als er hören kann.</td></tr><tr><td><strong>Verlust im Empfangsweg</strong> (Kabel, Stecker, Filter, Board)</td><td>Ja, wenn Senden davon nicht betroffen ist, z. B. eine PA mit verlustreichem Empfangszweig oder ein beschädigter Eingang.</td><td>Anderes Heltec V3 an dieselbe Antenne; Empfangszweig der PA prüfen.</td></tr><tr><td><strong>Alle Partner senden leiser</strong></td><td>Unwahrscheinlich. Heltec V3 sendet ab Werk mit 22 dBm (Höchstwert 22); die Lücke zeigt sich bei rund 13 Partnern verschiedener Betreiber gleich.</td><td>–</td></tr><tr><td><strong>Firmware-Einstellung</strong></td><td>Nur teilweise. <code>--setboostedgain</code> ändert die Empfängerverstärkung je Knoten, laut Datenblatt aber nur um wenige dB.</td><td><code>--info</code>: RXBOOST</td></tr></tbody></table></div>
+<h2>4. Was der Mitschnitt von HB9VQQ-4 zeigt</h2>
+<ul><li><strong>168 Rahmen</strong> von HB9ZG-49 hat HB9VQQ-4 direkt gehört, mit −120 dBm im Median (158 weitergeleitete, 10 eigene).</li><li><strong>Nur wenige Quellen:</strong> in 388 HEY-Baken hat er HB9CF-40 (175), HB9FRR-12 (114), HB9JAT (88), HB9RMW-40 (8), HB9JAT-7 (1), HB9IJS-10 (1), HB9WAD-51 (1) gehört.</li><li><strong>Kein einziger Rahmen von HB9VQQ-2</strong> (0), obwohl HB9VQQ-2 ihn 1327-mal gehört hat. Bei 40 km und dem schwachen Empfang ist das zu erwarten.</li><li><strong>Nachbarzahl 5</strong> im Median, die HB9ZG-49 selbst meldet; HB9VQQ-2 meldet 13.</li></ul>
+<h2>5. Bewertung</h2>
+<div class="table-wrap"><table><thead><tr><th>Frage</th><th>Antwort</th><th>Status</th></tr></thead><tbody><tr><td>Sendet HB9ZG-49 normal?</td><td>Ja, eher kräftig: 24 Empfänger, bis 40 km.</td><td><span class="chip ok">OK</span></td></tr><tr><td>Hört er im Verhältnis dazu?</td><td>Nein: 12 bis 15 dB Lücke, normal sind 0 bis 6 dB.</td><td><span class="chip act">Handlungsbedarf</span></td></tr><tr><td>Taub oder laut?</td><td>Offen. PA oder Verlust im Empfangsweg, die Daten trennen es nicht.</td><td><span class="chip watch">Beobachten</span></td></tr><tr><td>Seit wann?</td><td>Mindestens seit 25.10.2026 (Beginn der 7-Tage-Historie), über die Woche flach.</td><td><span class="chip watch">Beobachten</span></td></tr><tr><td>Firmware-Fehler?</td><td>Kein Hinweis. HB9CF-40 hat dieselbe Hardware und Firmware und keine solche Lücke.</td><td><span class="chip ok">OK</span></td></tr></tbody></table></div>
+<p><strong>Für das Netz ist es gleich, welche Erklärung stimmt:</strong> Er ist auf vielen Strecken zu hören, kann dort aber nichts aufnehmen und weiterleiten.</p>
+<h2>6. Auswirkung auf das Netz</h2>
+<ul><li><strong>Bester Standort, wenig Relaisleistung:</strong> auf 1703 m könnte er weit verbinden, leitet aber nur weiter, was er von wenigen Stationen gerade noch hört.</li><li><strong>Einseitige Strecken:</strong> 15 Stationen hören ihn und führen ihn als Nachbarn. Das Netz sieht dadurch besser abgedeckt aus, als es ist.</li></ul>
+<h2>7. Fragen an den Sysop (HB9JAY)</h2><ol><li><strong>Ist eine Endstufe (PA) eingebaut?</strong> Wenn ja: welche Leistung, und hat sie einen eigenen Empfangsverstärker oder nur einen Durchgang?</li><li><strong><code>--info</code>-Ausgabe:</strong> Sendeleistung (TXPWR) und RXBOOST.</li><li>Filter oder Duplexer in der Leitung? Antenne, Kabel und Stecker, wann zuletzt geprüft?</li><li>Wenn eine PA drin ist: bei geringerer Leistung passt die Reichweite zum Gehör, und das Netz plant nicht mit Strecken, die nur in eine Richtung gehen.</li></ol>
+<details><summary>Methode und Datenquellen</summary><ul><li>mcmap: mcmap-prod MCP, abgefragt 2026-11-01 (link_quality_overview HB9ZG-49 both 7d, HB9CF-40 both 24h, nodes_query). Historie ab 2026-10-25. Werte sind HEY-Meldungen, die über Gateways beim Server ankommen, nicht jeder Rahmen.</li><li>Mitschnitt: HB9VQQ-4, 24 h, nur [LOG]-Zeilen mit gültiger Prüfsumme; je Nachrichten-ID und Station einmal gezählt. HB9VQQ-5 hat keine [LOG]-Zeilen.</li><li>Geprüft und verworfen: der Absolutpegel als Beweis. Auch gesunde Heltec V3 zeigen bei Rauschabständen um −15 dB −125 bis −127 dBm; −127 ist der Boden der Skala (RadioLib: Registerwert/2, abgeschnitten).</li><li>Vergleichsstrecken: mcmap link_quality_overview 7d, SNR-Mittel je Richtung, Paare ohne HB9ZG-49 mit schwachem SNR (Gegenprüfung 01.11.2026).</li><li>Sendeleistung Heltec V3: src/configuration_default.h:106,110 (keine Abweichung in variants/heltec_wifi_lora_32_V3).</li><li>HEY-Signalbericht: je Relais die Gruppe Nachbarzahl, Pegel, Rauschabstand (src/aprs_functions.cpp, appendHeySignalReport). Die Firmware rundet oder begrenzt den Pegel nicht.</li><li>Daten: data/hb9/extra/hb9zg49_log.json (generators/lib/hb9zg49_log.py), data/hb9/extra/hb9zg49_mcmap.json.</li></ul></details>
+<p class="foot">Erstellt 01.11.2026 aus Messdaten; Aussagen unabhängig gegengeprüft; eine (Absolutpegel) wurde dabei verworfen. Vermutungen sind als solche markiert.</p>
+</main>
+</body>
+</html>

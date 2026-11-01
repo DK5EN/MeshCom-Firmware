@@ -1,0 +1,690 @@
+{
+ "source": "mcmap-prod MCP, abgefragt 2026-11-01 (link_quality_overview HB9ZG-49 both 7d, HB9CF-40 both 24h, nodes_query)",
+ "history_from": "2026-10-25",
+ "zg_links": [
+  {
+   "fromCall": "HB9CF-40",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 1317,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -126,
+   "snrAvg": -15.5,
+   "snrMin": -20,
+   "snrMax": -13,
+   "active": true
+  },
+  {
+   "fromCall": "HB9FRR-12",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 420,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -127,
+   "snrAvg": -17.0,
+   "snrMin": -21,
+   "snrMax": -14,
+   "active": true
+  },
+  {
+   "fromCall": "HB9JAO-9",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 221,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -127,
+   "snrAvg": -18.6,
+   "snrMin": -21,
+   "snrMax": -17,
+   "active": false
+  },
+  {
+   "fromCall": "HB9JAT",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 7141,
+   "rssiAvg": -124.8,
+   "rssiMin": -127,
+   "rssiMax": -121,
+   "snrAvg": -12.6,
+   "snrMin": -20,
+   "snrMax": -8,
+   "active": true
+  },
+  {
+   "fromCall": "HB9JAT-7",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 548,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -127,
+   "snrAvg": -17.8,
+   "snrMin": -21,
+   "snrMax": -16,
+   "active": false
+  },
+  {
+   "fromCall": "HB9RMW-40",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 426,
+   "rssiAvg": -126.8,
+   "rssiMin": -127,
+   "rssiMax": -124,
+   "snrAvg": -14.9,
+   "snrMin": -19,
+   "snrMax": -12,
+   "active": true
+  },
+  {
+   "fromCall": "HB9WAD-51",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 23,
+   "rssiAvg": -111.8,
+   "rssiMin": -115,
+   "rssiMax": -110,
+   "snrAvg": -0.8,
+   "snrMin": -5,
+   "snrMax": 1,
+   "active": true
+  },
+  {
+   "fromCall": "DB0TOD-13",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 2,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -127,
+   "snrAvg": -20.0,
+   "snrMin": -21,
+   "snrMax": -19,
+   "active": false
+  },
+  {
+   "fromCall": "HB9IJS-10",
+   "toCall": "HB9ZG-49",
+   "role": "rx",
+   "samples": 5,
+   "rssiAvg": -127.0,
+   "rssiMin": -127,
+   "rssiMax": -127,
+   "snrAvg": -20.2,
+   "snrMin": -21,
+   "snrMax": -19,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "DB0TOD-13",
+   "role": "tx",
+   "samples": 926,
+   "rssiAvg": -120.2,
+   "rssiMin": -127,
+   "rssiMax": -112,
+   "snrAvg": -15.6,
+   "snrMin": -21,
+   "snrMax": -5,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9AK-2",
+   "role": "tx",
+   "samples": 1605,
+   "rssiAvg": -128.7,
+   "rssiMin": -135,
+   "rssiMax": -122,
+   "snrAvg": -14.1,
+   "snrMin": -20,
+   "snrMax": -7,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9CF-40",
+   "role": "tx",
+   "samples": 214,
+   "rssiAvg": -105.2,
+   "rssiMin": -108,
+   "rssiMax": -100,
+   "snrAvg": -0.4,
+   "snrMin": -11,
+   "snrMax": 2,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9CF-44",
+   "role": "tx",
+   "samples": 43,
+   "rssiAvg": -125.4,
+   "rssiMin": -127,
+   "rssiMax": -122,
+   "snrAvg": -15.1,
+   "snrMin": -17,
+   "snrMax": -13,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9CF-46",
+   "role": "tx",
+   "samples": 81,
+   "rssiAvg": -125.3,
+   "rssiMin": -127,
+   "rssiMax": -122,
+   "snrAvg": -14.9,
+   "snrMin": -17,
+   "snrMax": -12,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9EHP-41",
+   "role": "tx",
+   "samples": 4,
+   "rssiAvg": -132.5,
+   "rssiMin": -133,
+   "rssiMax": -132,
+   "snrAvg": -19.0,
+   "snrMin": -19,
+   "snrMax": -19,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9IJS-10",
+   "role": "tx",
+   "samples": 173,
+   "rssiAvg": -118.7,
+   "rssiMin": -125,
+   "rssiMax": -100,
+   "snrAvg": -5.3,
+   "snrMin": -18,
+   "snrMax": 1,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9IJS-12",
+   "role": "tx",
+   "samples": 5,
+   "rssiAvg": -136.2,
+   "rssiMin": -139,
+   "rssiMax": -134,
+   "snrAvg": -15.6,
+   "snrMin": -18,
+   "snrMax": -13,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9JAO-9",
+   "role": "tx",
+   "samples": 273,
+   "rssiAvg": -113.1,
+   "rssiMin": -127,
+   "rssiMax": -109,
+   "snrAvg": -6.2,
+   "snrMin": -20,
+   "snrMax": 0,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9JAT",
+   "role": "tx",
+   "samples": 16,
+   "rssiAvg": -108.0,
+   "rssiMin": -112,
+   "rssiMax": -105,
+   "snrAvg": -7.9,
+   "snrMin": -19,
+   "snrMax": -4,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9JAY-60",
+   "role": "tx",
+   "samples": 18,
+   "rssiAvg": -127.1,
+   "rssiMin": -130,
+   "rssiMax": -124,
+   "snrAvg": -10.9,
+   "snrMin": -14,
+   "snrMax": -8,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9JAO-60",
+   "role": "tx",
+   "samples": 191,
+   "rssiAvg": -119.3,
+   "rssiMin": -122,
+   "rssiMax": -117,
+   "snrAvg": -10.6,
+   "snrMin": -20,
+   "snrMax": -8,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9VQQ-4",
+   "role": "tx",
+   "samples": 126,
+   "rssiAvg": -119.6,
+   "rssiMin": -125,
+   "rssiMax": -112,
+   "snrAvg": -15.7,
+   "snrMin": -21,
+   "snrMax": -10,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9FRR-12",
+   "role": "tx",
+   "samples": 151,
+   "rssiAvg": -108.7,
+   "rssiMin": -113,
+   "rssiMax": -106,
+   "snrAvg": -3.2,
+   "snrMin": -7,
+   "snrMax": -1,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9JAT-7",
+   "role": "tx",
+   "samples": 9,
+   "rssiAvg": -115.2,
+   "rssiMin": -118,
+   "rssiMax": -113,
+   "snrAvg": -15.2,
+   "snrMin": -19,
+   "snrMax": -13,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB3XTK-13",
+   "role": "tx",
+   "samples": 12,
+   "rssiAvg": -111.3,
+   "rssiMin": -112,
+   "rssiMax": -108,
+   "snrAvg": -17.0,
+   "snrMin": -19,
+   "snrMax": -15,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "DB0TOD-12",
+   "role": "tx",
+   "samples": 514,
+   "rssiAvg": -124.9,
+   "rssiMin": -127,
+   "rssiMax": -117,
+   "snrAvg": -17.7,
+   "snrMin": -21,
+   "snrMax": -9,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9IJS-13",
+   "role": "tx",
+   "samples": 33,
+   "rssiAvg": -121.5,
+   "rssiMin": -124,
+   "rssiMax": -119,
+   "snrAvg": -16.4,
+   "snrMin": -18,
+   "snrMax": -13,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9RMW-40",
+   "role": "tx",
+   "samples": 1,
+   "rssiAvg": -109.0,
+   "rssiMin": -109,
+   "rssiMax": -109,
+   "snrAvg": 4.0,
+   "snrMin": 4,
+   "snrMax": 4,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9HEH-40",
+   "role": "tx",
+   "samples": 7,
+   "rssiAvg": -123.6,
+   "rssiMin": -127,
+   "rssiMax": -122,
+   "snrAvg": -14.1,
+   "snrMin": -18,
+   "snrMax": -12,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9VQQ-2",
+   "role": "tx",
+   "samples": 1327,
+   "rssiAvg": -109.7,
+   "rssiMin": -111,
+   "rssiMax": -104,
+   "snrAvg": -16.6,
+   "snrMin": -21,
+   "snrMax": -13,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9WNM-13",
+   "role": "tx",
+   "samples": 21,
+   "rssiAvg": -110.0,
+   "rssiMin": -112,
+   "rssiMax": -108,
+   "snrAvg": -15.2,
+   "snrMin": -18,
+   "snrMax": -14,
+   "active": false
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB9VQQ-5",
+   "role": "tx",
+   "samples": 91,
+   "rssiAvg": -119.2,
+   "rssiMin": -123,
+   "rssiMax": -111,
+   "snrAvg": -14.6,
+   "snrMin": -20,
+   "snrMax": -8,
+   "active": true
+  },
+  {
+   "fromCall": "HB9ZG-49",
+   "toCall": "HB3YPS-11",
+   "role": "tx",
+   "samples": 1,
+   "rssiAvg": -119.0,
+   "rssiMin": -119,
+   "rssiMax": -119,
+   "snrAvg": -5.0,
+   "snrMin": -5,
+   "snrMax": -5,
+   "active": false
+  }
+ ],
+ "control_links": [
+  {
+   "fromCall": "HB9CF-44",
+   "toCall": "HB9CF-40",
+   "role": "rx",
+   "samples": 26,
+   "rssiAvg": -92.5,
+   "rssiMin": -94,
+   "rssiMax": -90,
+   "snrAvg": -0.7,
+   "snrMin": -2,
+   "snrMax": 1,
+   "active": true
+  },
+  {
+   "fromCall": "HB9CF-40",
+   "toCall": "HB9CF-44",
+   "role": "tx",
+   "samples": 52,
+   "rssiAvg": -93.4,
+   "rssiMin": -96,
+   "rssiMax": -92,
+   "snrAvg": -0.5,
+   "snrMin": -2,
+   "snrMax": 2,
+   "active": true
+  },
+  {
+   "fromCall": "HB9CF-46",
+   "toCall": "HB9CF-40",
+   "role": "rx",
+   "samples": 23,
+   "rssiAvg": -106.7,
+   "rssiMin": -108,
+   "rssiMax": -104,
+   "snrAvg": -2.6,
+   "snrMin": -6,
+   "snrMax": -1,
+   "active": true
+  },
+  {
+   "fromCall": "HB9CF-40",
+   "toCall": "HB9CF-46",
+   "role": "tx",
+   "samples": 39,
+   "rssiAvg": -106.4,
+   "rssiMin": -108,
+   "rssiMax": -104,
+   "snrAvg": -0.3,
+   "snrMin": -3,
+   "snrMax": 0,
+   "active": true
+  },
+  {
+   "fromCall": "HB9JAO-9",
+   "toCall": "HB9CF-40",
+   "role": "rx",
+   "samples": 25,
+   "rssiAvg": -117.0,
+   "rssiMin": -120,
+   "rssiMax": -113,
+   "snrAvg": -10.6,
+   "snrMin": -16,
+   "snrMax": -7,
+   "active": true
+  },
+  {
+   "fromCall": "HB9CF-40",
+   "toCall": "HB9JAO-9",
+   "role": "tx",
+   "samples": 14,
+   "rssiAvg": -117.0,
+   "rssiMin": -119,
+   "rssiMax": -114,
+   "snrAvg": -7.7,
+   "snrMin": -10,
+   "snrMax": -5,
+   "active": true
+  }
+ ],
+ "nodes": {
+  "HB9ZG-49": {
+   "hw": "Heltec V3",
+   "fw": "4.40a",
+   "lat": 47.0275,
+   "lon": 8.52,
+   "alt": 1703,
+   "desc": "Digipeater, SysOp-HB9JAY",
+   "gw": false,
+   "nbcnt": 5
+  },
+  "HB9CF-40": {
+   "hw": "Heltec V3",
+   "fw": "4.40a",
+   "lat": 46.9018,
+   "lon": 8.6232,
+   "alt": 434,
+   "desc": "MeshCom iGate, SysOp-HB9JAO",
+   "gw": true,
+   "nbcnt": 7
+  },
+  "HB9FRR-12": {
+   "hw": "TTGO LoRa32 V2.1.6",
+   "fw": "4.40a",
+   "lat": 47.0333,
+   "lon": 8.6423,
+   "alt": 547,
+   "desc": "",
+   "gw": true,
+   "nbcnt": 2
+  },
+  "HB9JAT": {
+   "hw": "Heltec V3",
+   "fw": "4.40a",
+   "lat": 47.0523,
+   "lon": 8.6075,
+   "alt": 467,
+   "desc": "MeshCom Home",
+   "gw": false,
+   "nbcnt": 0
+  },
+  "HB9JAT-7": {
+   "hw": "Heltec V3",
+   "fw": "4.40a",
+   "lat": 47.05,
+   "lon": 8.6075,
+   "alt": 450,
+   "desc": "Tracker Node",
+   "gw": false,
+   "nbcnt": 2
+  },
+  "HB9WAD-51": {
+   "hw": "TTGO LoRa32 V2.1.6",
+   "fw": "4.35p",
+   "lat": 47.2233,
+   "lon": 8.4617,
+   "alt": 428,
+   "desc": "MeshCom iGate Knonau",
+   "gw": false,
+   "nbcnt": 4
+  },
+  "HB9JAO-9": {
+   "hw": "Heltec V3",
+   "fw": "4.40a",
+   "lat": 46.8553,
+   "lon": 8.6437,
+   "alt": 450,
+   "desc": "Wohnmobil",
+   "gw": false,
+   "nbcnt": 5
+  },
+  "HB9VQQ-2": {
+   "hw": "RAK4631",
+   "fw": "4.40a",
+   "lat": 47.3058,
+   "lon": 8.8482,
+   "alt": 650,
+   "desc": "",
+   "gw": false,
+   "nbcnt": 14
+  },
+  "HB9RMW-40": {
+   "hw": "T-Beam V1.2",
+   "fw": "4.40a",
+   "lat": 47.2423,
+   "lon": 8.4652,
+   "alt": 477,
+   "desc": "Repeater JN47FF",
+   "gw": false,
+   "nbcnt": 3
+  },
+  "HB9IJS-10": {
+   "hw": "T-Beam V1.1",
+   "fw": "4.40a",
+   "lat": 46.9525,
+   "lon": 8.2738,
+   "alt": 445,
+   "desc": "MeshCom Digi OW",
+   "gw": false,
+   "nbcnt": 1
+  }
+ },
+ "nodes_missing": [
+  "DB0TOD-13"
+ ],
+ "control_pairs_weak": {
+  "source": "mcmap link_quality_overview 7d, SNR-Mittel je Richtung, Paare ohne HB9ZG-49 mit schwachem SNR (Gegenprüfung 01.11.2026)",
+  "pairs": [
+   [
+    "HB9JAO-9",
+    "HB9JAY-60",
+    2.8
+   ],
+   [
+    "HB9CF-46",
+    "HB9JAY-60",
+    1.2
+   ],
+   [
+    "HB9CF-44",
+    "HB9JAY-60",
+    4.2
+   ],
+   [
+    "HB9PLM-66",
+    "HB9JAY-60",
+    3.6
+   ],
+   [
+    "HB9FRR-12",
+    "HB9JAY-60",
+    5.9
+   ],
+   [
+    "HB9VQQ-4",
+    "DB0TOD-12",
+    0.5
+   ],
+   [
+    "HB9VQQ-4",
+    "DB0TOD-13",
+    5.0
+   ],
+   [
+    "HB9VQQ-4",
+    "HB9BBE-18",
+    5.2
+   ],
+   [
+    "HB9VQQ-4",
+    "HB9VQQ-5",
+    4.9
+   ],
+   [
+    "HB9VQQ-4",
+    "HB9TVJ-12",
+    3.8
+   ],
+   [
+    "HB9VQQ-4",
+    "HB9LEK-12",
+    2.8
+   ],
+   [
+    "HB9CF-44",
+    "HB9CF-46",
+    0.2
+   ]
+  ]
+ },
+ "tx_power": {
+  "heltec_v3_default_dbm": 22,
+  "heltec_v3_max_dbm": 22,
+  "source": "src/configuration_default.h:106,110 (keine Abweichung in variants/heltec_wifi_lora_32_V3)"
+ }
+}
