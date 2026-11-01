@@ -109,6 +109,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   release build of `9e4d8781`; its 24 h soak was stopped 2026-10-25 11:24 after 6 min (operator, TXP-01 bench). Open:
   a new soak after the pending T-Deck PR, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
+  - Log-report fixes (LRF): W0 done 2026-11-01 (recon, M2 own-beacon replay, M5 OE3XIA RF-path test, all verified).
+    Next: W1a ping-target lock + W1c RX-silence logging nRF52; W1b age floor waits for operator decision D2
+    (recommendation A2) ([campaign-logreport-fixes-20261101.md](campaign-logreport-fixes-20261101.md)).
   - TX pool (TXP): W0-W1c on `fork-dev` (`cee174b7`..`eda5edb8`), benched on DK5EN-1/-90/-92. The DK5EN-98 logger
     was stopped 2026-10-25 11:24: it found **TXP-01** (own group/`*` text released before its first own TX when
     another gateway transmits the server copy first; log 50/118, bench 9/10). W1d reproduced it with
