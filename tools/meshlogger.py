@@ -32,6 +32,14 @@ a timestamp in the format ``serial_monitor.py`` uses -- both harvesters strip
 it. Files are appended, so restarting the logger does not discard the day.
 ``<outdir>/status.txt`` is rewritten every minute with progress and free space.
 
+Time zone: the prefix is the wall clock of the capture zone, ``--tz local``
+(default, the host zone), ``--tz utc`` or an IANA name such as
+``Europe/Vienna``. The prefix format never changes (every harvester anchors on
+it); the zone is named instead: each file opens with
+``[LOGGER] tz=<zone> utc_offset=+HH:MM utc=<ISO Z>``, a DST jump writes a
+``utc_offset changed`` line, the day files roll over on the capture zone's
+date, and ``status.txt`` carries ``tz=``, ``utc_offset=`` and ISO start/now.
+
 Volume is roughly 200 B/s with both debug flags on, so about 36 MB for 48 h.
 
 Usage::
@@ -67,7 +75,8 @@ import signal
 import socket
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 # mc_console.py sits next to this file, in the repo and on the rpizero alike.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -112,42 +121,119 @@ def on_signal(signum, frame):
     stop_requested = True
 
 
-def stamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+def resolve_tz(spec):
+    """``local`` (or None) -> None, the host zone; ``utc`` -> UTC; else an IANA name."""
+    if spec is None or spec.lower() == "local":
+        return None
+    if spec.lower() == "utc":
+        return timezone.utc
+    return ZoneInfo(spec)
+
+
+def local_zone_name():
+    """IANA name of the host zone where the system states it, else its abbreviation."""
+    tzenv = os.environ.get("TZ", "").lstrip(":")
+    if "/" in tzenv:
+        return tzenv
+    try:
+        with open("/etc/timezone") as fh:
+            name = fh.read().strip()
+        if name:
+            return name
+    except OSError:
+        pass
+    link = os.path.realpath("/etc/localtime")
+    if "zoneinfo/" in link:
+        return link.split("zoneinfo/", 1)[1]
+    return datetime.now().astimezone().tzname() or "local"
+
+
+def tz_label(tz):
+    if tz is None:
+        return local_zone_name()
+    if tz is timezone.utc:
+        return "UTC"
+    return str(tz)
+
+
+def now_in(tz):
+    """Aware 'now' in the capture zone (tz None = host zone)."""
+    return datetime.now(tz) if tz is not None else datetime.now().astimezone()
+
+
+def at(ts, tz):
+    """Aware datetime for a time.time() value in the capture zone."""
+    return datetime.fromtimestamp(ts, tz) if tz is not None else datetime.fromtimestamp(ts).astimezone()
+
+
+def stamp(dt):
+    """Line prefix: wall clock of ``dt``. Format is fixed -- the harvesters anchor on it."""
+    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def utc_offset(dt):
+    z = dt.strftime("%z")
+    return z[:3] + ":" + z[3:]
+
+
+def utc_iso(dt):
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 class Sink:
-    """One log file per day (or the one ``outfile``), one timestamped line per console line."""
+    """One log file per day (or the one ``outfile``), one timestamped line per console line.
 
-    def __init__(self, outdir, outfile=None):
+    Every file opened gets a ``[LOGGER] tz=...`` header; a change of the UTC offset
+    (DST) gets a marker line, so each prefix can be put on UTC without guessing.
+    """
+
+    def __init__(self, outdir, outfile=None, tz=None, clock=None):
         self.outdir = outdir
         self.outfile = outfile
+        self.tz = tz
+        self.clock = clock or (lambda: now_in(tz))
+        self.label = tz_label(tz)
+        self.offset = None
         self.day = None
         self.fh = None
         self.lines = 0
         self.bytes = 0
         os.makedirs(outdir, exist_ok=True)
 
-    def _rotate(self):
+    def _emit(self, dt, text):
+        line = "%s  %s\n" % (stamp(dt), text)
+        self.fh.write(line)
+        self.lines += 1
+        self.bytes += len(line)
+
+    def _open(self, path, dt):
+        # Append: restarting the logger must not discard the day.
+        self.fh = open(path, "a", buffering=1, errors="replace")
+        self.offset = utc_offset(dt)
+        self._emit(dt, "[LOGGER] tz=%s utc_offset=%s utc=%s -- line times are %s wall clock"
+                   % (self.label, self.offset, utc_iso(dt), self.label))
+
+    def _rotate(self, dt):
         if self.outfile:
             if not self.fh:
-                self.fh = open(self.outfile, "a", buffering=1, errors="replace")
+                self._open(self.outfile, dt)
             return
-        day = datetime.now().strftime("%Y-%m-%d")
+        day = dt.strftime("%Y-%m-%d")
         if day != self.day:
             if self.fh:
                 self.fh.close()
             self.day = day
-            path = os.path.join(self.outdir, day + ".log")
-            # Append: restarting the logger must not discard the day.
-            self.fh = open(path, "a", buffering=1, errors="replace")
+            self._open(os.path.join(self.outdir, day + ".log"), dt)
 
     def write(self, text):
-        self._rotate()
-        line = "%s  %s\n" % (stamp(), text)
-        self.fh.write(line)
-        self.lines += 1
-        self.bytes += len(line)
+        dt = self.clock()
+        self._rotate(dt)
+        off = utc_offset(dt)
+        if off != self.offset:
+            self._emit(dt, "[LOGGER] tz=%s utc_offset changed %s -> %s utc=%s"
+                       % (self.label, self.offset, off, utc_iso(dt)))
+            self.offset = off
+        self._emit(dt, text)
 
     def close(self):
         if self.fh:
@@ -189,13 +275,18 @@ def main():
                     help="seconds of read silence before the connection is "
                          "declared dead and re-opened (TM-50; default %.0f)"
                          % STALL_TIMEOUT)
+    ap.add_argument("--tz", default="local",
+                    help="zone of the line timestamps: local (host zone), utc, or an IANA "
+                         "name like Europe/Vienna; named in every file header "
+                         "(default: %(default)s)")
     args = ap.parse_args()
+    tz = resolve_tz(args.tz)
 
     if args.out:
         outdir = os.path.dirname(os.path.abspath(args.out))
     else:
         outdir = args.outdir or os.path.expanduser("~/meshlog/" + args.host.split(".")[0])
-    sink = Sink(outdir, args.out)
+    sink = Sink(outdir, args.out, tz=tz)
     status_path = os.path.join(outdir, "status.txt")
     pause_path = os.path.join(outdir, "PAUSE")
 
@@ -332,11 +423,15 @@ def main():
                     with open(status_path, "w") as fh:
                         fh.write(
                             "pid=%d\nhost=%s\nstart=%s\nnow=%s\n"
+                            "tz=%s\nutc_offset=%s\nstart_iso=%s\nnow_iso=%s\n"
                             "elapsed_h=%.2f\nremaining_h=%.2f\n"
                             "lines=%d\nbytes=%d\nreconnects=%d\nfree_mb=%d\nstatus=%s\n"
                             % (os.getpid(), args.host,
-                               datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M:%S"),
-                               datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                               at(started, tz).strftime("%Y-%m-%d %H:%M:%S"),
+                               at(now, tz).strftime("%Y-%m-%d %H:%M:%S"),
+                               sink.label, utc_offset(at(now, tz)),
+                               at(started, tz).isoformat(timespec="seconds"),
+                               at(now, tz).isoformat(timespec="seconds"),
                                (now - started) / 3600.0, max(0.0, (deadline - now) / 3600.0),
                                sink.lines, sink.bytes, reconnects, free_now, reason))
                     if free_now < args.minfree:
@@ -399,9 +494,12 @@ def main():
     sink.write("[LOGGER] end (%s) lines=%d bytes=%d reconnects=%d"
                % (reason, sink.lines, sink.bytes, reconnects))
     with open(status_path, "w") as fh:
+        end = now_in(tz)
         fh.write("pid=%d\nhost=%s\nlines=%d\nbytes=%d\nreconnects=%d\nstatus=%s\nend=%s\n"
+                 "tz=%s\nutc_offset=%s\nend_iso=%s\n"
                  % (os.getpid(), args.host, sink.lines, sink.bytes, reconnects, reason,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    end.strftime("%Y-%m-%d %H:%M:%S"), sink.label, utc_offset(end),
+                    end.isoformat(timespec="seconds")))
     sink.close()
 
 
