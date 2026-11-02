@@ -914,6 +914,7 @@ static void test_real_led_surfaces_are_wired()
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
     auto has = [&](const char *n) { return src.find(n) != std::string::npos; };
     TEST_ASSERT_TRUE_MESSAGE(has("commandMatches(msg_text+2, \"board led on\") && !boardLedPinUsable()"), "LED-04: --board led on refusal missing or not case-insensitive like toggleApply");
+    TEST_ASSERT_TRUE_MESSAGE(has("commandMatches(msg_text+2, \"board led steady\") && !boardLedPinUsable()"), "WEB-LED-01: --board led steady refusal on a busy pad missing");
     TEST_ASSERT_TRUE_MESSAGE(has("...BOARD LED: %s") && has("...CHARGE LED: "), "LED-09: --info LED lines missing");
     TEST_ASSERT_TRUE_MESSAGE(has("nsetdoc1[\"LEDNF\"]") && has("ledNotFittedList("), "LED-10: SN1 LEDNF missing");
     TEST_ASSERT_TRUE_MESSAGE(has("if(ledfit.board)") && has("if(ledfit.charge)"), "LED-10: SN keys must be conditional");
@@ -983,7 +984,9 @@ static void test_real_led_guards_are_wired()
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("static LedFitted") == std::string::npos && web.find("static LedFitted") == std::string::npos, "private LedFitted helper copy is back");
 
     // --info marks a busy pad; the web GUI switch uses the same BOARD_LED guard as the handler
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("on (pin busy)") != std::string::npos, "--info BOARD LED: on (pin busy) missing");
+    // WEB-LED-01: the "on" state is now shown as flash or steady
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("flash (pin busy)") != std::string::npos, "--info BOARD LED: flash (pin busy) missing");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("steady (pin busy)") != std::string::npos, "--info BOARD LED: steady (pin busy) missing");
     std::string sw = led_span(web, "const LedFitted ledHw = ledFittedNow();", "chargeled", 600);
     TEST_ASSERT_TRUE_MESSAGE(led_order(sw, "#if defined(BOARD_LED)", "\"boardled\""), "web GUI boardled element must be gated by #if defined(BOARD_LED)");
 }

@@ -3505,6 +3505,7 @@ static const char *webChargeLedText()
  * delivers the setup-page to be injected into the scaffold
  *
  */
+__attribute__((unused)) static void _create_setup_led_mode_element(const char id[], const char labelText[], const char descriptionText[], int mode);   // WEB-LED-01, below
 void sub_page_setup()
 {
     _create_meshcom_subheader("Node Setup");
@@ -3581,7 +3582,7 @@ void sub_page_setup()
         const LedFitted ledHw = ledFittedNow();
 #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)   // same guard as the webSetup_setParam handler and the --board led console row
         if (ledHw.board)
-            _create_setup_switch_element("boardled", "Board LED", "short heartbeat flash every 2 s", bUSER_BOARD_LED);
+            _create_setup_led_mode_element("boardled", "Board LED", "off, heartbeat flash every 2 s, or steady on", boardLedModeGet());   // WEB-LED-01
 #endif
         if (ledHw.charge)
             _create_setup_switch_element("chargeled", "Charge LED", "on = follows charging, off = dark", bCHARGE_LED);
@@ -4320,7 +4321,7 @@ void sub_page_info()
     web_client.printf("Userbutton: %s<br>", (bButtonCheck ? "on" : "off"));
     { // LED-08: outside the battery branch (USB-powered nodes too); labels equal the setup switch labels (info_switch_lint)
         const LedFitted ledHw = ledFittedNow();
-        web_client.printf("Board LED: %s<br>", !ledHw.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? "on" : "on (pin busy)");   // as --info
+        web_client.printf("Board LED: %s<br>", !ledHw.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? boardLedModeName(boardLedModeGet()) : (boardLedModeGet() == BOARD_LED_MODE_STEADY ? "steady (pin busy)" : "flash (pin busy)"));   // as --info, WEB-LED-01
         web_client.printf("Charge LED: %s<br>", ledHw.charge ? webChargeLedText() : "not fitted");
     }
     #if defined(ANALOG_PIN)
@@ -4787,6 +4788,21 @@ void _create_setup_switch_element(const char id[], const char labelText[], const
     }
     web_client.println("</label>");
     web_client.printf("<input type=\"checkbox\" role=\"switch\" id=\"%s\" %s onchange=\"setvalue(this.id,this.checked?'on':'off',false)\"/>\n", id, checked ? "checked" : "");
+}
+
+// WEB-LED-01: three-way LED mode (off / flash / steady) as aria-pressed buttons; posts setparam <id>=off|flash|steady
+__attribute__((unused)) static void _create_setup_led_mode_element(const char id[], const char labelText[], const char descriptionText[], int mode)
+{
+    web_client.printf("<label id=\"%s_lbl\" for=\"%s_off\">%s <span class=\"font-small\">(%s)</span></label>\n", id, id, labelText, descriptionText);
+    web_client.printf("<div role=\"group\" aria-labelledby=\"%s_lbl\">\n", id);
+    const char *names[3] = {"off", "flash", "steady"};
+    for (int i = 0; i < 3; i++)
+    {
+        const bool on = (mode == i);
+        web_client.printf("<button type=\"button\" class=\"mctab%s\" id=\"%s_%s\" aria-pressed=\"%s\" onclick=\"setvalue('%s','%s',true)\">%s</button>\n",
+                          on ? " mctab-on" : "", id, names[i], on ? "true" : "false", id, names[i], names[i]);
+    }
+    web_client.println("</div>");
 }
 
 /**

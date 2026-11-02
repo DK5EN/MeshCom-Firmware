@@ -479,6 +479,7 @@ static void tg_post_charge_led_off() { meshcom_settings.node_sset2 |= SSET2_CHGL
 #endif
 static void tg_post_board_led_off()
 {
+    meshcom_settings.node_sset4 &= ~BOARD_LED_STEADY_BIT;   // WEB-LED-01: off forgets steady
 #if defined(BOARD_LED)   // a NeoPixel-only board (LED_PIN/LED_PIXEL) has no plain pad to drive low
     if(!boardLedPinUsable()) return;   // OneWire/DHT owns the pad (T-Beam GPIO4): never write it
 #if defined(REMOTE_LED_PIN)
@@ -487,6 +488,9 @@ static void tg_post_board_led_off()
     digitalWrite(BOARD_LED, BOARD_LED_ACTIVE_LOW);
 #endif
 }
+// WEB-LED-01: "on" = flash, "steady" = persistent steady-on (node_sset4 0x4000); both run before the mask/save
+static void tg_post_board_led_flash() { meshcom_settings.node_sset4 &= ~BOARD_LED_STEADY_BIT; }
+static void tg_post_board_led_steady() { meshcom_settings.node_sset4 |= BOARD_LED_STEADY_BIT; }
 #endif
 #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
 static void tg_post_gps_on() { gpsInitDone = false; init_loop_function(); }
@@ -925,7 +929,8 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--charge led off",     &bCHARGE_LED,          &meshcom_settings.node_sset3,    0xFFFFFFFE,   0x00000000,   tg_post_charge_led_off,        TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
 #endif
 #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
-    { "--board led on",       &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
+    { "--board led on",       &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0080,       tg_post_board_led_flash,       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE | TG_POST_FIRST },
+    { "--board led steady",   &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0080,       tg_post_board_led_steady,      TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE | TG_POST_FIRST },
     { "--board led off",      &bUSER_BOARD_LED,      &meshcom_settings.node_sset3,    0xFFFFFF7F,   0x00000000,   tg_post_board_led_off,         TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_POST_FIRST },
 #endif
 #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -1233,6 +1238,11 @@ void commandAction(char *umsg_text, bool ble)
 #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     // LED-04: the heartbeat must not take a pad OneWire/DHT owns (T-Beam: both GPIO4). Refuse before the row saves.
     if(commandMatches(msg_text+2, "board led on") && !boardLedPinUsable())
+    {
+        printfdeb("\n--board led refused: LED pin is used by OneWire/DHT (see --info, --owgpio)\n");
+        return;
+    }
+    if(commandMatches(msg_text+2, "board led steady") && !boardLedPinUsable())   // WEB-LED-01: same refusal as "on"
     {
         printfdeb("\n--board led refused: LED pin is used by OneWire/DHT (see --info, --owgpio)\n");
         return;
@@ -1902,7 +1912,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--bl                    backlight state\n--bl auto on/off        day/night switch\n--bl day|night 1-16     saved level\n");
             #endif
             #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
-            printdeb("--board led on/off      board LED\n");
+            printdeb("--board led off|on|steady  board LED: off, flash (on) or steady\n");
             #endif
             #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
             printdeb("--charge led on/off     charge indicator LED\n");
@@ -7750,7 +7760,7 @@ void commandAction(char *umsg_text, bool ble)
             // LED-09: LED readback (charge LED shows the effective mode, "(RM x)" while an RM override is active)
             {
                 const LedFitted lf = ledFittedNow();
-                const char *bledTxt = !lf.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? "on" : "on (pin busy)";   // OneWire/DHT holds the pad
+                const char *bledTxt = !lf.board ? "not fitted" : !bUSER_BOARD_LED ? "off" : boardLedPinUsable() ? boardLedModeName(boardLedModeGet()) : (boardLedModeGet() == BOARD_LED_MODE_STEADY ? "steady (pin busy)" : "flash (pin busy)");   // WEB-LED-01; OneWire/DHT holds the pad
                 printfdeb("...BOARD LED: %s\n", bledTxt);
                 if(!lf.charge)
                     printfdeb("...CHARGE LED: not fitted\n");

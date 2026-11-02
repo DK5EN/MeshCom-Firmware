@@ -226,7 +226,7 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 | ------------ | ------------ | ----------- | -------------- | ------------------------------------------------------------- |
 | `node_relay` | `node_relay` | int         | 0..65535       | Bitmaske                                                      |
 | `node_via`   | `node_via`   | string (40) | —              |                                                               |
-| `node_sset4` | `node_sset4` | int         | 0..65535       | Bitmaske — u. a. `NoPMOther` (`PM-01`, Bit `0x8000`, geplant) |
+| `node_sset4` | `node_sset4` | int         | 0..65535       | Bitmaske — u. a. `NoPMOther` (`PM-01`, Bit `0x8000`, geplant), Board-LED dauerhaft an (`WEB-LED-01`, Bit `0x4000`, letztes freies Bit) |
 
 ### X. APRS-Multicast & Ping
 

@@ -10,6 +10,60 @@
 
 #include "board_led.h"
 
+// WEB-LED-01: three-way mode (off / flash / steady), persisted bits + RM hold -> level at time t
+static void test_mode_from_stored_bits(void)
+{
+    TEST_ASSERT_EQUAL_INT(BOARD_LED_MODE_OFF, boardLedMode(false, false));
+    TEST_ASSERT_EQUAL_INT(BOARD_LED_MODE_OFF, boardLedMode(false, true));    // steady bit alone never lights
+    TEST_ASSERT_EQUAL_INT(BOARD_LED_MODE_FLASH, boardLedMode(true, false));  // old stored settings: bit clear = flash
+    TEST_ASSERT_EQUAL_INT(BOARD_LED_MODE_STEADY, boardLedMode(true, true));
+    TEST_ASSERT_EQUAL_STRING("off", boardLedModeName(BOARD_LED_MODE_OFF));
+    TEST_ASSERT_EQUAL_STRING("flash", boardLedModeName(BOARD_LED_MODE_FLASH));
+    TEST_ASSERT_EQUAL_STRING("steady", boardLedModeName(BOARD_LED_MODE_STEADY));
+}
+
+static void test_decide_steady_lit_at_any_time(void)
+{
+    BoardLedStep s = boardLedDecide(BOARD_LED_MODE_STEADY, true, false, 5, 0, false);
+    TEST_ASSERT_TRUE(s.lit);
+    TEST_ASSERT_TRUE(s.changed);
+    s = boardLedDecide(BOARD_LED_MODE_STEADY, true, false, 7000, s.timer, s.lit);
+    TEST_ASSERT_TRUE(s.lit);
+    TEST_ASSERT_FALSE(s.changed);   // no pin write once lit
+}
+
+static void test_decide_flash_matches_phase(void)
+{
+    BoardLedStep a = boardLedDecide(BOARD_LED_MODE_FLASH, true, false, 2000, 0, false);
+    BoardLedStep b = boardLedPhase(2000, 0, false);
+    TEST_ASSERT_EQUAL(b.lit, a.lit);
+    TEST_ASSERT_EQUAL_UINT32(b.timer, a.timer);
+    TEST_ASSERT_TRUE(a.changed);
+    a = boardLedDecide(BOARD_LED_MODE_FLASH, true, false, 2030, a.timer, a.lit);
+    TEST_ASSERT_FALSE(a.lit);
+}
+
+static void test_decide_off_and_busy_pin_go_dark(void)
+{
+    BoardLedStep s = boardLedDecide(BOARD_LED_MODE_OFF, true, false, 100, 0, true);
+    TEST_ASSERT_FALSE(s.lit);
+    TEST_ASSERT_TRUE(s.changed);
+    s = boardLedDecide(BOARD_LED_MODE_STEADY, false, false, 100, 0, true);   // OneWire owns the pad
+    TEST_ASSERT_FALSE(s.lit);
+    s = boardLedDecide(BOARD_LED_MODE_STEADY, false, false, 100, 0, false);
+    TEST_ASSERT_FALSE(s.changed);
+}
+
+static void test_decide_rm_hold_wins_and_steady_resumes(void)
+{
+    BoardLedStep s = boardLedDecide(BOARD_LED_MODE_STEADY, true, true, 100, 0, true);   // RM holds the pad
+    TEST_ASSERT_FALSE(s.lit);       // not driven by the stored mode
+    TEST_ASSERT_FALSE(s.changed);   // and no pin write
+    s = boardLedDecide(BOARD_LED_MODE_STEADY, true, false, 200, s.timer, s.lit);   // RM released the pad
+    TEST_ASSERT_TRUE(s.lit);
+    TEST_ASSERT_TRUE(s.changed);
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -140,6 +194,19 @@ static void test_not_fitted_list(void)
     TEST_ASSERT_EQUAL_STRING("BLE", tiny);
 }
 
+// WEB-LED-01 M1: NeoPixel-only steady re-arm ignores CLEAR (the WEISS branch wins over CLEAR in the handler)
+void test_steady_rearm_ignores_clear_but_yields_to_colours(void)
+{
+    TEST_ASSERT_TRUE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, false, false, false, false, false));
+    TEST_ASSERT_TRUE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, false, false, false, false, true));    // CLEAR pending
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, true, false, false, false, true));    // RED pending
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, false, true, false, false, false));   // GREEN
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, false, false, true, false, false));   // ORANGE
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_STEADY, false, false, false, true, true));    // BLUE
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_FLASH, false, false, false, false, true));    // flash: heartbeat only
+    TEST_ASSERT_FALSE(boardLedSteadyRearm(BOARD_LED_MODE_OFF, false, false, false, false, false));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -156,5 +223,11 @@ int main(int, char **)
     RUN_TEST(test_level_follows_polarity);
     RUN_TEST(test_fitted_flags);
     RUN_TEST(test_not_fitted_list);
+    RUN_TEST(test_mode_from_stored_bits);
+    RUN_TEST(test_decide_steady_lit_at_any_time);
+    RUN_TEST(test_decide_flash_matches_phase);
+    RUN_TEST(test_decide_off_and_busy_pin_go_dark);
+    RUN_TEST(test_decide_rm_hold_wins_and_steady_resumes);
+    RUN_TEST(test_steady_rearm_ignores_clear_but_yields_to_colours);
     return UNITY_END();
 }

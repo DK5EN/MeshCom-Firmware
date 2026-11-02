@@ -25,7 +25,7 @@ committed and pushed; the bench checks listed at the end are done later by the o
 | W2 | E | TD-30 | `src/t-deck/lv_obj_functions.cpp`, `src/t-deck/event_functions.cpp`, `src/esp32/esp32_main.cpp` (BLE on/off without deinit), `src/meshcom_settings.h` + settings store, `src/command_functions.cpp` | done (1 rework round) |
 | W2 | F | BAT-04b | `src/esp32/loop_actions_esp32.cpp` (BQ branch in `loopAction_battCheck`), `src/batt_charge.h`, `test/test_batt_charge/` | done (1 rework round) |
 | W2 | G | WEB-PWD-01 | `web_functions.cpp` Setup card + route, `web_rm_handlers.cpp` / `web_auth.cpp`, `tools/webgui_settings_test.js`, `test/test_web_auth/` | done (1 rework round) |
-| W3 | H | WEB-LED-01 | `web_functions.cpp`, `web_setup.cpp`, `command_functions.cpp`, LED + settings, native test | planned |
+| W3 | H | WEB-LED-01 | `web_functions.cpp`, `web_setup.cpp`, `command_functions.cpp`, LED + settings, native test | done (1 rework round) |
 
 Gate per wave: `tools/regression.sh --stage 1,2`, firmware builds of the touched envs
 (sequential, through `piolock.sh`), artifact string check, Opus advisor for behavioural waves,
@@ -56,6 +56,15 @@ then commit + push and update this doc, `docs/RESUME.md`, `docs/BACKLOG.md`.
   (MCC-T1, passes in isolation); builds t_deck, t_deck_plus, t_deck_pro, t5_epaper, heltec V3, ttgo_tbeam,
   wiscore_rak4631 green. New: TD-32, MCC-T1.
 
+- W3 (2026-11-02): WEB-LED-01. Advisor: core correct; must-fix NeoPixel-only steady (one dark frame per
+  second), missing steady-refusal assertion, two lints no longer saw `boardled` -> fresh implementer at high
+  (fail-before/pass-after on `boardLedSteadyRearm`); re-pass APPROVED. Gate: Unity 95 envs 3427 cases, only PF-T1;
+  golden selftest 48/48 after the toggle-table row count 88 -> 89; builds heltec V3, E22_1262_S3 (NeoPixel-only),
+  wiscore_rak4631, t_deck, ttgo_tbeam green. Follow-ups noted in the row (BLE `BLED`
+  bool, getparam value `flash` instead of `on`).
+
+**Campaign complete 2026-11-02:** all 15 items done host-side and pushed; only the bench checks below remain.
+
 ## Bench checks left for the operator
 
 - BOOT-01: boot screen on Heltec V3 OLED, a TFT board and the T-Deck Pro shows "MeshCom 4.4".
@@ -67,3 +76,4 @@ then commit + push and update this doc, `docs/RESUME.md`, `docs/BACKLOG.md`.
 - TD-30: tap BLE and WiFi icons on DK5EN-14: live off/on, phone drops on BLE off, state survives reboot, AU with BLE off does not re-enable it.
 - BAT-04b: T-Deck Pro and T5 with and without a cell, on USB and on battery: `--info` charge state and current, BLE `IS2`.
 - WEB-PWD-01: set, change, clear the web password in Chrome; the open session lands on the login page after a change.
+- WEB-LED-01: Heltec V3 board LED off / flash / steady from the Setup page and console, survives reboot; an E22 S3 NeoPixel board stays white in steady; RM1 `led on/off` still overrides.

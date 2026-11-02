@@ -813,7 +813,7 @@ class Handler:
     line: int
 
 
-_SWITCH_RE = re.compile(r"_create_setup_switch_element")
+_SWITCH_RE = re.compile(r"_create_setup_(?:switch|led_mode)_element")
 _TEXTINPUT_RE = re.compile(r"_create_setup_textinput_element")
 _HANDLER_RE = re.compile(r'setupData->paramName\.equals\(\s*"([^"]*)"\s*\)')
 
@@ -823,7 +823,9 @@ def scan_gui_elements(text: str) -> List[GuiElement]:
     lines = blanked.splitlines()
     guards = _guard_stack(lines)
     out: List[GuiElement] = []
-    for lineno, args in _find_calls(blanked, "_create_setup_switch_element"):
+    # WEB-LED-01: the three-way LED element takes (id, label, ...) like a switch and posts setparam <id>=...
+    for lineno, args in sorted(_find_calls(blanked, "_create_setup_switch_element")
+                               + _find_calls(blanked, "_create_setup_led_mode_element")):
         a = split_args(args)
         if a:
             m = _LITERAL_ARG_RE.match(a[0])

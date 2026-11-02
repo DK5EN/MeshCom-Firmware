@@ -234,10 +234,13 @@ void webSetup_setParam(setupStruct *setupData){
 
     #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     if(setupData->paramName.equals("boardled")) {   // LED-08: same toggle row as the console
-        snprintf(message_text, sizeof(message_text), "--board led %s", setupData->paramValue.equals("on") ? "on" : "off");
+        // WEB-LED-01: off | flash | steady; the old "on" (= flash) is still accepted
+        const int want = setupData->paramValue.equals("steady") ? BOARD_LED_MODE_STEADY
+                       : (setupData->paramValue.equals("flash") || setupData->paramValue.equals("on")) ? BOARD_LED_MODE_FLASH : BOARD_LED_MODE_OFF;
+        snprintf(message_text, sizeof(message_text), "--board led %s", want == BOARD_LED_MODE_STEADY ? "steady" : want == BOARD_LED_MODE_FLASH ? "on" : "off");
         commandAction(message_text, bPhoneReady);
-        setupData->returnCode = (bUSER_BOARD_LED == setupData->paramValue.equals("on"))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
-        setupData->returnValue = bUSER_BOARD_LED?"on":"off";
+        setupData->returnCode = (boardLedModeGet() == want)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = boardLedModeName(boardLedModeGet());
         return;
     } else
     #endif
@@ -1062,7 +1065,7 @@ void webSetup_getParam(setupStruct *setupData){
 
     #if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
     if(setupData->paramName.equals("boardled")) {
-        setupData->returnValue = bUSER_BOARD_LED?"on":"off";
+        setupData->returnValue = boardLedModeName(boardLedModeGet());   // WEB-LED-01: off | flash | steady
         return;
     } else
     #endif

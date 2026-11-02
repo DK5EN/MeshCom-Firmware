@@ -41,7 +41,7 @@ WEB_FUNCTIONS = REPO_ROOT / "src" / "web_functions" / "web_functions.cpp"
 ALLOWED_MISSING: dict[str, str] = {}
 
 SWITCH_CALL = re.compile(
-    r'_create_setup_switch_element\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"'
+    r'_create_setup_(?:switch|led_mode)_element\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"'
 )
 
 
