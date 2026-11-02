@@ -124,6 +124,22 @@ static void test_overlong_3_and_4_byte_dropped(void)
     TEST_ASSERT_EQUAL_STRING("XY", buf4);
 }
 
+static void test_bidi_isolates_stripped(void)
+{
+    // U+2066 LRI .. U+2069 PDI (E2 81 A6..A9): the bidi isolates mc-chat and
+    // MCProxy already strip. U+2065 (unassigned, E2 81 A5) is not in the table.
+    char buf[] = {
+        'A', (char)0xE2, (char)0x81, (char)0xA6,
+        'B', (char)0xE2, (char)0x81, (char)0xA7,
+        'C', (char)0xE2, (char)0x81, (char)0xA8,
+        'D', (char)0xE2, (char)0x81, (char)0xA9,
+        'E', 0
+    };
+    size_t out = charset_filter_apply(buf, strlen(buf), CHARSET_FILTER_PLAIN);
+    buf[out] = 0;
+    TEST_ASSERT_EQUAL_STRING("ABCDE", buf);
+}
+
 static void test_bidi_and_zero_width_stripped(void)
 {
     // U+200B ZERO WIDTH SPACE (E2 80 8B), U+202A LRE (E2 80 AA),
@@ -552,6 +568,7 @@ int main(int, char **)
     RUN_TEST(test_invalid_and_overlong_dropped_without_corrupting_neighbors);
     RUN_TEST(test_overlong_3_and_4_byte_dropped);
     RUN_TEST(test_bidi_and_zero_width_stripped);
+    RUN_TEST(test_bidi_isolates_stripped);
     RUN_TEST(test_zwj_preserved_in_compound_emoji);
     RUN_TEST(test_other_zero_width_chars_in_200b_range_still_stripped);
     RUN_TEST(test_separator_mode_strips_exact_derived_set);

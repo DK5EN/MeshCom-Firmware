@@ -299,6 +299,9 @@ void test_absorb_tags() {
     eq("\xF0\x9F\x8F\xB4\xF3\xA0\x81\xA7\xF3\xA0\x81\xA2\xF3\xA0\x81\xB3\xF3\xA0\x81\xA3\xF3\xA0\x81\xB4\xF3\xA0\x81\xBF",
        TF_ASCII, "?");
 }
+void test_absorb_bidi_isolates() {
+    absorbed_range(0x2066, 0x2069);
+}
 void test_absorb_combining() {
     absorbed_range(0x0300, 0x036F);
     absorbed_range(0x20D0, 0x20FF);
@@ -373,6 +376,7 @@ int main() {
     RUN_TEST(test_absorb_variation_selectors);
     RUN_TEST(test_absorb_tags);
     RUN_TEST(test_absorb_combining);
+    RUN_TEST(test_absorb_bidi_isolates);
     RUN_TEST(test_whitespace_controls);
     RUN_TEST(test_maximal_subpart);
     return UNITY_END();

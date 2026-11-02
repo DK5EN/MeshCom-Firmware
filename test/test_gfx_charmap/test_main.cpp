@@ -3,6 +3,7 @@
 
 #include <unity.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "gfx_charmap.h"
@@ -176,6 +177,50 @@ void test_expansion_that_does_not_fit_ends_the_text(void)
     TEST_ASSERT_EQUAL_UINT(3, n);
 }
 
+// WP info page (extended WP_FONT9): the SSID is converted BEFORE %-15.15s, so the width counts
+// glyphs and a multibyte letter is never split.
+void test_wp_ssid_converted_before_width(void)
+{
+    const char *ssid = "Caf\xC3\xA9-Netz";
+    char codes[64];
+    gfx_utf8_to_font(ssid, strlen(ssid), codes, sizeof(codes));
+    char line[40];
+    snprintf(line, sizeof(line), "SSID : %-15.15s", codes);
+    TEST_ASSERT_EQUAL_STRING("SSID : Caf\xBD-Netz      ", line);   // e-acute = 0xBD, 15 glyphs wide
+    const char *deg = "21.5 \xC2\xB0" "C";
+    gfx_utf8_to_font(deg, strlen(deg), codes, sizeof(codes));
+    TEST_ASSERT_EQUAL_STRING("21.5 \x99" "C", codes);           // degree = one font code
+}
+
+// Pages in a standard 12pt font (E290 status pages, WP WX page) carry no extended glyphs: ASCII fold.
+void test_status_ascii_for_12pt_pages(void)
+{
+    char line[40];
+    snprintf(line, sizeof(line), "TEMP : %.1f \xC2\xB0" "C", 21.5);
+    epaper_status_ascii(line, sizeof(line));
+    TEST_ASSERT_EQUAL_STRING("TEMP : 21.5 degC", line);
+    snprintf(line, sizeof(line), "SSID : %-15.15s", "Caf\xC3\xA9-Netz");
+    epaper_status_ascii(line, sizeof(line));
+    TEST_ASSERT_EQUAL_STRING("SSID : Cafe-Netz     ", line);
+    for (const char *q = line; *q; q++) TEST_ASSERT_TRUE((uint8_t)*q >= 0x20 && (uint8_t)*q <= 0x7E);
+}
+
+// Serial echo of the page buffers (font codes) must be readable UTF-8 again.
+void test_font_to_utf8_roundtrip(void)
+{
+    const char *msgs[] = {"Gr\xC3\xBC\xC3\x9F" "e 21\xC2\xB0" "C \xE2\x82\xAC \xC4\x85\xC5\x82", "plain ASCII"};
+    for (const char *m : msgs)
+    {
+        char font[64], back[96];
+        gfx_utf8_to_font(m, strlen(m), font, sizeof(font));
+        gfx_font_to_utf8(font, strlen(font), back, sizeof(back));
+        TEST_ASSERT_EQUAL_STRING(m, back);
+    }
+    char small[4];
+    TEST_ASSERT_EQUAL_UINT(3, gfx_font_to_utf8("\x99" "x\x99", 3, small, sizeof(small)));   // 2nd degree sign would not fit
+    TEST_ASSERT_EQUAL_STRING("\xC2\xB0" "x", small);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -195,5 +240,8 @@ int main(int, char **)
     RUN_TEST(test_output_is_bounded);
     RUN_TEST(test_zwj_sequences_collapse_to_one_question_mark);
     RUN_TEST(test_expansion_that_does_not_fit_ends_the_text);
+    RUN_TEST(test_wp_ssid_converted_before_width);
+    RUN_TEST(test_font_to_utf8_roundtrip);
+    RUN_TEST(test_status_ascii_for_12pt_pages);
     return UNITY_END();
 }

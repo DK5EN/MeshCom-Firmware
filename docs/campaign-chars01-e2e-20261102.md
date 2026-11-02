@@ -84,7 +84,16 @@ Flash target after the commit: DK5EN-14 (T-Deck Plus), operator request 2026-11-
   build Nov 2 2026). Visual check of the test sentence on its screen still open.
 - W3: bench ( OLED board with the test sentence; E290 not in the fleet),
   concept doc and PR draft (German, sp2ong credit first; see memory `chars01-pr-attribution-and-scope`).
-- Follow-ups (BACKLOG CHARS-01): E290/WP status lines (TEMP `°C`, a UTF-8 SSID) print raw UTF-8 bytes into the
-  extended GFX font and show two wrong glyphs; `onebutton_functions.cpp:199` prints E290 glyph codes to serial;
-  firmware `charset_filter.h` does not strip bidi isolates U+2066-2069 (mc-chat and MCProxy do); MCProxy publishes
-  an inbound msg that is empty after the filter; VT/FF are stripped instead of becoming a space in both back ends.
+- Follow-up left (BACKLOG CHARS-01): VT/FF are stripped instead of becoming a space in both back ends.
+
+## Wave 2b: follow-ups (2026-11-02)
+
+- **E290 / Wireless Paper status lines:** converted for the font that page actually draws in. WP info page
+  (WP_FONT9, extended): SSID to GFX font codes before `%-15.15s`. E290 info page (FreeMonoBold12pt7b) and the WX page
+  on both boards (12pt, 0x20..0x7E): ASCII fold, `21.5 °C` shows `21.5 degC`. Before, these 12pt pages silently
+  dropped `°` (GFX skips out-of-range bytes); only the WP info page showed two wrong glyphs. E290 serial echo of a
+  message page prints UTF-8 again (`gfx_font_to_utf8`).
+- **Firmware filter:** `charset_filter` strips and `text_fold` absorbs U+2066-2069, like mc-chat and MCProxy.
+- **MCProxy:** an inbound text message empty after the filter is dropped on BLE and UDP (DEBUG log), not published and
+  not counted as undecodable.
+- Gate and advisor: see the commit messages (firmware, MCProxy).

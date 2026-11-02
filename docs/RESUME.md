@@ -31,7 +31,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   punctuation), T-Deck Latin fonts (`23e03fed`) plus fallback for the rest, web GUI and T-Deck no longer cut a
   message at the first `{`. Back ends: MCProxy `6df61da`, mc-chat `bb2ae3b` (same charset policy both ways,
   150-byte checks in bytes, weather contract in bytes). Firmware W1 `6b94c253`, W2 committed after it; gate stage
-  1,2 PASS (88 envs, 3324/3324), Opus advisor on every wave. **Open:** W3 bench (DK5EN-14 first) and the upstream PR
+  1,2 PASS (88 envs, 3324/3324), Opus advisor on every wave. Follow-ups W2b closed: E290/WP status lines per
+  font, firmware filter strips U+2066-2069, MCProxy drops inbound text empty after the filter. **Open:** W3 bench (DK5EN-14 first) and the upstream PR
   (German, credit sp2ong first; only when the feature ships). Campaign:
   [campaign-chars01-e2e-20261102.md](campaign-chars01-e2e-20261102.md).
 
