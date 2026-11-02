@@ -4310,6 +4310,30 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_text_fold": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*> +<text_fold.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_text_fold",
+   "test_msg_body"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_topo_shadow": {
   "build_flags": [
    "-std=gnu++17",

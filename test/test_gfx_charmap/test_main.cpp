@@ -15,18 +15,18 @@ static void conv(const char *in, char *out, size_t cap)
     gfx_utf8_to_font(in, strlen(in), out, cap);
 }
 
-// The table must stay sorted by codepoint (binary search) and use the codes 0x80..0x9A once each.
+// The table must stay sorted by codepoint (binary search) and use the codes 0x80..0xDF once each.
 void test_table_sorted_and_codes_unique(void)
 {
     bool seen[256] = {false};
     for (size_t i = 0; i < kGfxCharmapCount; i++)
     {
         if (i > 0) TEST_ASSERT_TRUE(kGfxCharmap[i - 1].cp < kGfxCharmap[i].cp);
-        TEST_ASSERT_TRUE(kGfxCharmap[i].code >= 0x80 && kGfxCharmap[i].code <= 0x9A);
+        TEST_ASSERT_TRUE(kGfxCharmap[i].code >= 0x80 && kGfxCharmap[i].code <= 0xDF);
         TEST_ASSERT_FALSE(seen[kGfxCharmap[i].code]);
         seen[kGfxCharmap[i].code] = true;
     }
-    TEST_ASSERT_EQUAL_UINT(27, kGfxCharmapCount);
+    TEST_ASSERT_EQUAL_UINT(96, kGfxCharmapCount);
 }
 
 void test_ascii_unchanged(void)
@@ -71,10 +71,56 @@ void test_mixed_text(void)
     TEST_ASSERT_EQUAL_STRING(exp, out);
 }
 
+void test_french(void)
+{
+    char out[64];
+    conv("Œuvre élève ça", out, sizeof(out));
+    const char exp[] = {(char)0xD0, 'u', 'v', 'r', 'e', ' ', (char)0xBD, 'l', (char)0xBC, 'v', 'e', ' ', (char)0xBB, 'a', 0};
+    TEST_ASSERT_EQUAL_STRING(exp, out);
+    conv("Ÿ", out, sizeof(out));
+    const char exp2[] = {(char)0xD2, 0};
+    TEST_ASSERT_EQUAL_STRING(exp2, out);
+}
+
+void test_spanish(void)
+{
+    char out[64];
+    conv("¿Señor? ¡Año!", out, sizeof(out));
+    const char exp[] = {(char)0xD4, 'S', 'e', (char)0xC5, 'o', 'r', '?', ' ', (char)0xD3, 'A', (char)0xC5, 'o', '!', 0};
+    TEST_ASSERT_EQUAL_STRING(exp, out);
+}
+
+void test_portuguese(void)
+{
+    char out[64];
+    conv("ação", out, sizeof(out));
+    const char exp[] = {'a', (char)0xBB, (char)0xB8, 'o', 0};
+    TEST_ASSERT_EQUAL_STRING(exp, out);
+}
+
+void test_punctuation(void)
+{
+    char out[64];
+    conv("‘’“”„–—…•«»", out, sizeof(out));
+    const char exp[] = {(char)0xD7, (char)0xD8, (char)0xD9, (char)0xDA, (char)0xDB, (char)0xDC,
+                        (char)0xDD, (char)0xDE, (char)0xDF, (char)0xD5, (char)0xD6, 0};
+    TEST_ASSERT_EQUAL_STRING(exp, out);
+}
+
+void test_latin1_complete(void)
+{
+    // every Latin-1 letter U+00C0..U+00FF except multiplication and division signs are mapped
+    for (uint32_t cp = 0xC0; cp <= 0xFF; cp++)
+    {
+        if (cp == 0xD7 || cp == 0xF7) { TEST_ASSERT_EQUAL_UINT8(0, gfx_font_code(cp)); continue; }
+        TEST_ASSERT_TRUE(gfx_font_code(cp) >= 0x80);
+    }
+}
+
 void test_unknown_characters_dropped(void)
 {
     char out[64];
-    conv("a\xC3\xA9" "b", out, sizeof(out));                       // é: no glyph -> dropped
+    conv("a\xC5\x99" "b", out, sizeof(out));                       // ř (Czech): no glyph yet -> dropped
     TEST_ASSERT_EQUAL_STRING("ab", out);
     conv("x\xF0\x9F\x98\x80y", out, sizeof(out));                  // emoji (4 bytes) -> dropped
     TEST_ASSERT_EQUAL_STRING("xy", out);
@@ -111,6 +157,11 @@ int main(int, char **)
     RUN_TEST(test_polish_uppercase);
     RUN_TEST(test_german_and_symbols);
     RUN_TEST(test_mixed_text);
+    RUN_TEST(test_french);
+    RUN_TEST(test_spanish);
+    RUN_TEST(test_portuguese);
+    RUN_TEST(test_punctuation);
+    RUN_TEST(test_latin1_complete);
     RUN_TEST(test_unknown_characters_dropped);
     RUN_TEST(test_invalid_and_cut_off_sequences);
     RUN_TEST(test_output_is_bounded);
