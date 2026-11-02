@@ -41,8 +41,9 @@ telemetry frame, whose 5 analog slots are picked by name from `node_values` (`se
 - **LTR390:** own minimal driver (I2C 0x53, UVS mode, gain 18x, 20-bit), no new library dependency. Pure
   conversion `raw -> UVI` in a header-only `src/ltr390_calc.h` so it runs in a native test. Sensitivity and
   window factor from the datasheet (W1a states the source and the numbers it used).
-- **Wind:** ESP32 PCNT hardware counter with glitch filter on the configured pin (debounce of the reed contact
-  without an ISR); GPIO-interrupt fallback only if PCNT is not usable on the framework version found in W0.
+- **Wind:** GPIO interrupt (`CHANGE`, IRAM handler) with a two-state software debouncer (3 ms per transition) on
+  the configured pin. The PCNT plan was dropped in W1: its glitch filter tops out at about 12.8 us, reed bounce
+  lasts 0.1 to 2 ms (advisor verdict 2026-11-02).
   Speed = pulses per second x `node_wind_cal` (default 2.4 km/h per Hz, the common cup anemometer). Unit km/h.
 - **Averaging:** header-only `src/wx_avg.h`, a running mean that resets when telemetry is sent. Wind is sampled
   every second and averaged over the telemetry interval (default 30 min, `TELEMETRY_INTERVAL`); UV is sampled on
@@ -113,7 +114,10 @@ The PR carries this section in German, the issue comment in English. Placeholder
 - **What to send with a report:** `--info`, the status print, 10 minutes of serial log with `--wxdebug on`, the
   board, the GPIO used and the anemometer model (pulses per revolution).
 - **Known limits:** ESP32 only; no RAK4631; only tested host-side and without sensors on the bench (field test
-  necessary); wind is the mean over the telemetry interval, gust the highest 3 s mean in it.
+  necessary); wind is the mean over the telemetry interval, gust the highest 3 s mean in it. The reed contact is
+  debounced in software (3 ms per transition, GPIO interrupt), which caps the counter at about 166 Hz (about 400 km/h
+  at 2.4 km/h per Hz); a close that follows a release within 3 ms is missed once, the counter re-syncs on the next
+  pulse. The LTR390 window factor is 1.0 (no cover glass).
 
 ## Open questions
 
@@ -121,6 +125,8 @@ None; Q1-Q3 answered (see Operator decisions).
 
 ## Wave log
 
-| Wave | Commit | Gate | Advisor | Notes |
-| ---- | ------ | ---- | ------- | ----- |
-| -    | -      | -    | -       | plan  |
+| Wave | Commit                      | Gate          | Advisor                                                                                                           | Notes                                                                                                                                                                                                                                                                                                                                   |
+| ---- | --------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| -    | -                           | -             | -                                                                                                                 | plan                                                                                                                                                                                                                                                                                                                                    |
+| W0   | -                           | -             | -                                                                                                                 | Scout (C0): recon table confirmed; `sendTelemetry()` absent sensor sends the stored value (0.0 default), no omit; ESP32-only members go into `MESHCOM_SETTINGS_MEMBERS_ESP32`; framework arduino-esp32 2.0.17 / IDF 4.4.7; `Wire.begin(I2C_SDA, I2C_SCL)` in `esp32setup()` before the sensor boot reads; no device at 0x53 in the code |
+| W1   | see C1 row of the cloud doc | see cloud doc | REWORK (PCNT cannot debounce a reed contact; LTR390 MEAS_RATE, resolution range, `ltr390End`/wfac), then APPROVED | Rework by a fresh Sonnet-high implementer: GPIO-ISR debouncer, wrap-safe pulse delta, `ltr390End()`, `ltr390SetWfac()`. Host tests 14 + 17. **W2 must reject in `--windpin`:** LoRa, I2C, GPS, button pins, flash pins (classic 6-11, S3 26-32) and classic 34-39 (no internal pull-up)                                                 |
