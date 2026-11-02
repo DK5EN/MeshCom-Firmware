@@ -237,6 +237,8 @@ struct Reg { const char *name; uint16_t len; };
 // (, / < > + - . :) need no JSON escaping. Worst case, a 39-char TZ with the
 // longest VIACALL (39) and WSPWD (19): 1 + 167 JSON bytes = 168, still below
 // BLE_JSON_PAYLOAD_MAX 244 (TZ is the last key, so fail-soft would drop it first).
+// IS2 (BAT-04 charge state, after IS1) is sent only by AXP192/AXP2101 boards (T-Beam, T-Beam Supreme); neither profile below has
+// one, so their bursts are unchanged. Worst case IS2: {"TYP":"IS2","CHG":"discharging","CHGMA":-32768} = 1 + 48.
 static const Reg HELTEC[] = {
     {"I", 223}, {"IS1", 42}, {"SE", 224}, {"S1", 113}, {"SW", 129}, {"S2", 112},
     {"SN", 228}, {"SN1", 99}, {"W", 139}, {"G", 162}, {"SA", 59}, {"IO", 108},

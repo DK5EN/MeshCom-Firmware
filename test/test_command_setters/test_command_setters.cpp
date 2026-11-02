@@ -21,6 +21,7 @@
 
 #include "command_setters.h"
 #include "command_match.h"
+#include "batt_charge.h"    // BAT-04 C5: worst-case IS2 size from the real state names
 #include "esp32/fw_update_net.h" // fwLanUrlParse() (AU-08), the pure part outside the ESP32 guard
 
 static void test_a_plain_number_parses()
@@ -2030,7 +2031,10 @@ void test_bat04_info_charge_line_pin(void)
     TEST_ASSERT_TRUE_MESSAGE(anchor != std::string::npos, "no --info battery printf anchor");
     const size_t idocBegin = cmd.rfind("JsonDocument idoc;", anchor);
     TEST_ASSERT_TRUE_MESSAGE(idocBegin != std::string::npos, "no idoc block");
-    const std::string idoc = cmd.substr(idocBegin, anchor - idocBegin);
+    // the "I" document ends where IS1 starts (IS2 after it carries CHG/CHGMA on purpose, BAT-04 C5)
+    const size_t idocEnd = cmd.find("JsonDocument idoc1;", idocBegin);
+    TEST_ASSERT_TRUE_MESSAGE(idocEnd != std::string::npos && idocEnd < anchor, "no IS1 document after I");
+    const std::string idoc = cmd.substr(idocBegin, idocEnd - idocBegin);
     TEST_ASSERT_TRUE_MESSAGE(idoc.find("\"CHG") == std::string::npos && idoc.find("\"BATI") == std::string::npos,
                              "BLE I document must not carry CHG/BATI keys (3 bytes margin)");
     const std::string blk = cmd.substr(anchor, 1200);
@@ -2204,6 +2208,38 @@ static void test_wx_settings_rows_and_defaults()
     TEST_ASSERT_TRUE(sc.find("\"node_windcal\", CFG_FLT, node_wind_cal, 0.1, 100.0") != std::string::npos);
 }
 
+
+// BAT-04 C5 (operator decision 2026-11-02): the charge state reaches the phone in its own register
+// "IS2" (CHG = state name, CHGMA = signed mA only when measurable), sent right after IS1 and only
+// when the state is known, so boards without a PMU keep a byte-identical I/IS1 burst.
+void test_bat04_ble_is2_register(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t is1 = cmd.find("idoc1[\"TYP\"] = \"IS1\";");
+    TEST_ASSERT_TRUE_MESSAGE(is1 != std::string::npos, "no IS1 register");
+    const size_t is1send = cmd.find("sendBleJsonRegister(idoc1);", is1);
+    TEST_ASSERT_TRUE_MESSAGE(is1send != std::string::npos, "IS1 is not sent");
+    const std::string blk = cmd.substr(is1send, 900);
+    const size_t typ = blk.find("[\"TYP\"] = \"IS2\";");
+    TEST_ASSERT_TRUE_MESSAGE(typ != std::string::npos, "no IS2 register after IS1");
+    const size_t guard = blk.find("state != BCS_UNKNOWN");
+    TEST_ASSERT_TRUE_MESSAGE(guard != std::string::npos && guard < typ, "IS2 not guarded by state != BCS_UNKNOWN");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("[\"CHG\"] = battChargeName(") != std::string::npos, "CHG is not battChargeName()");
+    const size_t valid = blk.find("if(bci.ma_valid)");   // exact: an inverted condition must fail
+    const size_t ma = blk.find("[\"CHGMA\"]");
+    TEST_ASSERT_TRUE_MESSAGE(valid != std::string::npos && ma != std::string::npos && valid < ma, "CHGMA not behind ma_valid");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("sendBleJsonRegister(idoc2);", typ) != std::string::npos, "IS2 is not sent");
+
+    // worst case: longest state name, most negative int16 -- far below the 244-byte payload limit
+    size_t longest = 0;
+    for (int st = BCS_UNKNOWN; st <= BCS_DISCHARGING; st++)
+        longest = std::max(longest, strlen(battChargeName((BattChargeState)st)));
+    const std::string worst = std::string("{\"TYP\":\"IS2\",\"CHG\":\"") + std::string(longest, 'x') + "\",\"CHGMA\":-32768}";
+    TEST_ASSERT_TRUE_MESSAGE(worst.size() <= 244, "IS2 worst case exceeds BLE_JSON_PAYLOAD_MAX");
+    const std::string cfg = read_repo_file("src/configuration_global.h");
+    TEST_ASSERT_TRUE_MESSAGE(cfg.find("#define BLE_JSON_PAYLOAD_MAX 244") != std::string::npos, "BLE_JSON_PAYLOAD_MAX is not 244 any more");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2262,6 +2298,7 @@ int main(int, char **)
     RUN_TEST(test_lrf21_ping_target_wiring);
     RUN_TEST(test_lrf21_ping_target_sanitize_and_callers);
     RUN_TEST(test_bat04_info_charge_line_pin);
+    RUN_TEST(test_bat04_ble_is2_register);
     RUN_TEST(test_lrf_w1_advisor_rework_pins);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);

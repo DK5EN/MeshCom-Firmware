@@ -120,7 +120,8 @@ axp->getBattDischargeCurrent())`, `ma_valid = true`. AXP2101: `ma_valid = false`
 
 - **Console `--info`:** one new line `Charge: <battChargeFormat>` after the battery line; omitted when
   `BCS_UNKNOWN`, so boards without a PMU print exactly what they print today.
-- **BLE `I`:** keys `CHG` (state name) and `BATI` (mA, only when `ma_valid`); both omitted on `BCS_UNKNOWN`.
+- **BLE (as built, C5):** own register `IS2` after `IS1` with `CHG` (state name) and `CHGMA` (mA, only when
+  `ma_valid`); not sent on `BCS_UNKNOWN`. The original plan (keys `CHG`/`BATI` in `I`) failed on the `I` budget, see 5a.
   W0 measures the worst-case `I` document against the BLE send buffer before the keys are added; if the margin is
   under 30 bytes, the keys move to SN1-style follow-up (decision then, not now).
 - **Web status page:** the Battery row gains `, charging +312 mA` (same formatter). "USB" rows (BAT-01,
@@ -195,7 +196,9 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
   (register 0x0C), no average-current getter. **W1-C dropped; follow-up row BAT-04b.**
 - **BLE `I` keys deferred.** The worst-case `I` document is 296 bytes against `msg_buffer[300]` (3 bytes margin) and
   already above `BLE_JSON_PAYLOAD_MAX` 244, where `bleJsonFrameFailSoft()` drops trailing keys. Margin under 30
-  bytes, so per 4.5 `CHG` / `BATI` are not added; decision for the operator (SN1-style follow-up).
+  bytes, so per 4.5 `CHG` / `BATI` are not added to `I`. **Closed 2026-11-02 (operator decision, C5):** a new
+  register `"TYP":"IS2"` after `IS1` carries `CHG` (state name) and `CHGMA` (signed mA, only when measurable); it is
+  sent only when the state is known, so `I` and `IS1` stay byte-identical everywhere.
 - **Both battery files define `global_batt_charge`:** the T-Beam, Heltec, RAK and BQ boards build
   `batt_function_old.cpp`, the E22 boards `batt_functions.cpp`.
 - **Bench boards per PMU:** not checked in the cloud session (no `/bench` access); W3 on the operator's machine.
@@ -215,7 +218,7 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
 | ----- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | W0    | -                                         | -                                                                                                                  | -                     | Findings in 5a: AXP192 current ADC not enabled, no clean BQ hook (W1-C dropped, follow-up BAT-04b), BLE `I` keys deferred (3 bytes margin)                                                                                                                                                                                                                                                                               |
 | W1+W2 | BAT-04 firmware commit (cloud session C1) | stage 1,2 PASS (92 envs, 3383/3383); clean builds of all 7 gate envs green; T-Beam image +2136 B flash, RAK +544 B | REWORK, then APPROVED | Writers A (core + 10 host tests), B (PMU read, AXP192 ADC enable, 5 source pins), D (`--info` line + pin), E (web row, no test: no native harness covers `sub_page_info()`). Rework: AXP192 VBUS ADC stays off (a cell-less T-Beam keeps showing "USB"), currents above 4095.5 mA (failed I2C read) leave `ma_valid` false, exact guard pin. `--info` prints `...Charge: <state>` (prefix like the other `--info` lines) |
+| C5    | BAT-04 BLE commit (cloud session C5)      | stage 1,2 and builds, see the cloud doc C5 row                                                                     | see the cloud doc     | Register `IS2` (`CHG`, `CHGMA`) after `IS1`, only when the state is known; source pin + worst-case size test (48 JSON bytes against 244); `I` pin narrowed to the `I` document; harness note (HELTEC/RAK profiles have no PMU, burst unchanged)                                                                                                                                                                          |
 
 Open for the operator: W3 bench (AXP2101 and AXP192 T-Beam transitions, Heltec V3 byte-identical check), W4 PR and
-the #1073 comment, BAT-04b (BQ boards: needs a periodic `PPM`/`bq27220` poll), BLE `I` keys `CHG`/`BATI` (needs room
-in the `I` document).
+the #1073 comment, BAT-04b (BQ boards: needs a periodic `PPM`/`bq27220` poll). The BLE keys shipped as register `IS2` (C5).
